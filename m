@@ -1,14 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Jun 2016 15:24:23 -0700
-Subject: [GIT PULL 8/8] ARM: defconfig: exynos: Defconfig for v4.8
-In-Reply-To: <1465215933-22709-9-git-send-email-k.kozlowski@samsung.com>
+Date: Mon, 13 Jun 2016 14:53:39 -0700
+Subject: [GIT PULL 7/8] ARM: dts: exynos: Topic branch with Odroid XU for
+ v4.8
+In-Reply-To: <1465215933-22709-8-git-send-email-k.kozlowski@samsung.com>
 References: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
- <1465215933-22709-9-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160613222423.GA29879@localhost>
+ <1465215933-22709-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160613215339.GE20845@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2016 at 02:25:33PM +0200, Krzysztof Kozlowski wrote:
+On Mon, Jun 06, 2016 at 02:25:32PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> This topic branch pulls external clk dependency (provided by Sylwester
+> Nawrocki).
+> 
+> Expected annoying conflict with DT changes here (please see the email 0/8).
+> 
+> 
+> Best regards,
+> Krzysztof
+> 
 > 
 > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
@@ -16,24 +28,32 @@ On Mon, Jun 06, 2016 at 02:25:33PM +0200, Krzysztof Kozlowski wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.8
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-odroid-xu-4.8
 > 
-> for you to fetch changes up to 4b388071a2235ed8f05d05d069f5a5a29782a8c5:
+> for you to fetch changes up to b8bd7e23bb0be762c39510497c931066dc62e62f:
 > 
->   ARM: exynos_defconfig: Save defconfig on current linux-next (2016-06-06 08:36:55 +0200)
+>   ARM: dts: exynos: Add watchdog and Security SubSystem to Exynos5410 (2016-06-06 13:20:57 +0200)
 > 
 > ----------------------------------------------------------------
-> Samsung defconfig update for v4.8:
-> 1. Disable big.LITTLE switcher so the cpufreq-dt could be enabled.
-> 2. Enable Samsung media platform drivers.
-> 3. Enable some board-specific drivers for boards: Trats2, Universal C210.
-> 4. Few more minor additions.
+> Topic branch for adding Exynos 5410 Odroid XU board for v4.8.
+> 
+> This brings support for Hardkernel's Odroid XU board.  It was the first
+> design with big.LITTLE SoC from Samsung: Exynos5410.  The board is not
+> very popular.  Newer XU3 and XU4 got more attention.
+> 
+> Board details:
+> 1. Exynos5410 octa-core (A15+A7, however as of now only one cluster is
+>    enabled),
+> 2. 2 GB DDR3 RAM,
+> 3. PowerVR SGX544MP3 GPU (not enabled in DTS),
+> 4. USB 3.0 Host x 1, USB 3.0 OTG x 1, USB 2.0 Host x 4,
+> 5. HDMI 1.4a, MIPI DSI and Display Port (Display Port not on all of
+>    revisions though),
+> 6. eMMC 4.5 and microSD slots.
 
-Hmm. So this made me wonder what's used on the 5420/5800 chromebooks, but it
-looks like they don't even boot with SMP, at least not the way I boot them
-(with u-boot as a chainloaded kernel).
-
-Branch merged.
+Merged. Please double-check conflict resolution but it seemed trivial
+(reapplied "ARM: dts: exynos: Add async-bridge clock to MFC power domain
+for Exynos5420" to the new context).
 
 
 -Olof
