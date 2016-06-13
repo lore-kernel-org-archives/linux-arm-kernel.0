@@ -1,183 +1,27 @@
-From: vikas.cha.sajjan@hpe.com (Sajjan, Vikas C)
-Date: Mon, 13 Jun 2016 04:47:24 +0000
-Subject: [PATCH v5 4/5] arm64: add support for ACPI Low Power Idle(LPI)
-In-Reply-To: <1462981062-24909-5-git-send-email-sudeep.holla@arm.com>
-References: <1462981062-24909-1-git-send-email-sudeep.holla@arm.com>
- <1462981062-24909-5-git-send-email-sudeep.holla@arm.com>
-Message-ID: <DF4PR84MB0041D17321244DFB84979A84D9530@DF4PR84MB0041.NAMPRD84.PROD.OUTLOOK.COM>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 13 Jun 2016 11:12:44 +0530
+Subject: [PATCH] dmaengine: vdma: Fix compilation warning in cyclic dma
+ mode
+In-Reply-To: <1465452132-13512-1-git-send-email-appanad@xilinx.com>
+References: <1465452132-13512-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20160613054243.GB16910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+On Thu, Jun 09, 2016 at 11:32:12AM +0530, Kedareswara rao Appana wrote:
+> This patch fixes the below compilation warining.
+> drivers/dma/xilinx/xilinx_vdma.c: In function 'xilinx_dma_prep_dma_cyclic':
+> drivers/dma/xilinx/xilinx_vdma.c:1808:23: warning: 'segment' may be used
+> uninitialized in this function [-Wmaybe-uninitialized]
+>    segment->hw.control |= XILINX_DMA_BD_SOP;
+> 
+> The start of packet (SOP) should be set to the first segment in the desc
+> chain not for the last segment of the desc chain.
 
------Original Message-----
-From: Sudeep Holla [mailto:sudeep.holla at arm.com] 
-Sent: Wednesday, May 11, 2016 9:08 PM
-To: linux-acpi at vger.kernel.org; Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Sudeep Holla <sudeep.holla@arm.com>; linux-kernel at vger.kernel.org; Sajjan, Vikas C <vikas.cha.sajjan@hpe.com>; Lakshminarasimha, Sunil Vishwanathpur <sunil.vl@hpe.com>; Prashanth Prakash <pprakash@codeaurora.org>; Ashwin Chaugule <ashwin.chaugule@linaro.org>; Al Stone <al.stone@linaro.org>; Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>; Mark Rutland <mark.rutland@arm.com>; linux-arm-kernel at lists.infradead.org
-Subject: [PATCH v5 4/5] arm64: add support for ACPI Low Power Idle(LPI)
+I have applied this after adding Reported by from SFR.
 
-This patch adds appropriate callbacks to support ACPI Low Power Idle
-(LPI) on ARM64.
+You should always give credit to folks who report issues.
 
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/kernel/acpi.c | 48 +++++++++++++++++++++++++++++++++++++++++
- drivers/firmware/psci.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 104 insertions(+)
-
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c index d1ce8e2f98b9..bf82ce5c8fce 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -18,6 +18,7 @@
- #include <linux/acpi.h>
- #include <linux/bootmem.h>
- #include <linux/cpumask.h>
-+#include <linux/cpu_pm.h>
- #include <linux/init.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-@@ -25,6 +26,9 @@
- #include <linux/of_fdt.h>
- #include <linux/smp.h>
- 
-+#include <acpi/processor.h>
-+
-+#include <asm/cpuidle.h>
- #include <asm/cputype.h>
- #include <asm/cpu_ops.h>
- #include <asm/smp_plat.h>
-@@ -211,6 +215,50 @@ void __init acpi_boot_table_init(void)
- 	}
- }
- 
-+int acpi_processor_ffh_lpi_probe(unsigned int cpu) {
-+	return arm_cpuidle_init(cpu);
-+}
-+
-+#define ACPI_FFH_LPI_ARM_FLAGS_CORE_CONTEXT	BIT(0)
-+#define ACPI_FFH_LPI_ARM_FLAGS_TRACE_CONTEXT	BIT(1)
-+#define ACPI_FFH_LPI_ARM_FLAGS_GICR_CONTEXT	BIT(2)
-+#define ACPI_FFH_LPI_ARM_FLAGS_GICD_CONTEXT	BIT(3)
-+#define ACPI_FFH_LPI_ARM_FLAGS_ALL_CONTEXT	\
-+	(ACPI_FFH_LPI_ARM_FLAGS_CORE_CONTEXT |	\
-+	 ACPI_FFH_LPI_ARM_FLAGS_TRACE_CONTEXT |	\
-+	 ACPI_FFH_LPI_ARM_FLAGS_GICR_CONTEXT |	\
-+	 ACPI_FFH_LPI_ARM_FLAGS_GICD_CONTEXT)
-+
-+struct acpi_lpi_state *lpi;
-+int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi, int idx) {
-+	int ret = 0;
-+	bool save_ctx = lpi->arch_flags & ACPI_FFH_LPI_ARM_FLAGS_ALL_CONTEXT;
-+
-+	if (!idx) {
-+		cpu_do_idle();
-+		return idx;
-+	}
-+
-+	/* TODO cpu_pm_{enter,exit} can be done in generic code ? */
-+	if (save_ctx)
-+		ret = cpu_pm_enter();
-+	if (!ret) {
-+		/*
-+		 * Pass idle state index to cpu_suspend which in turn will
-+		 * call the CPU ops suspend protocol with idle index as a
-+		 * parameter.
-+		 */
-+		ret = arm_cpuidle_suspend(idx);
-+
-+		if (save_ctx)
-+			cpu_pm_exit();
-+	}
-+
-+	return ret ? -1 : idx;
-+}
-+
- #ifdef CONFIG_ACPI_APEI
- pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)  { diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c index fa4ea22ca12e..e06bfee68e1d 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -13,6 +13,7 @@
- 
- #define pr_fmt(fmt) "psci: " fmt
- 
-+#include <linux/acpi.h>
- #include <linux/arm-smccc.h>
- #include <linux/cpuidle.h>
- #include <linux/errno.h>
-@@ -310,11 +311,66 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- 	return ret;
- }
- 
-+#ifdef CONFIG_ACPI
-+#include <acpi/processor.h>
-+
-+static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu) {
-+	int i, count;
-+	u32 *psci_states;
-+	struct acpi_processor *pr;
-+	struct acpi_lpi_state *lpi;
-+
-+	pr = per_cpu(processors, cpu);
-+	if (unlikely(!pr || !pr->flags.has_lpi))
-
-Any particular reason for _not_ considering CST flag here.
-Or you are planning to add CST support in some other patch set.
-
-+		return -EINVAL;
-+
-+	/*
-+	 * If the PSCI cpu_suspend function hook has not been initialized
-+	 * idle states must not be enabled, so bail out
-+	 */
-+	if (!psci_ops.cpu_suspend)
-+		return -EOPNOTSUPP;
-+
-+	count = pr->power.count - 1;
-+	if (!count)
-+		return -ENODEV;
-+
-+	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
-+	if (!psci_states)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < count; i++) {
-+		u32 state;
-+
-+		lpi = &pr->power.lpi_states[i + 1];
-
-  Same case here too.
-
-+		state = lpi->address & 0xFFFFFFFF;
-+		if (!psci_power_state_is_valid(state)) {
-+			pr_warn("Invalid PSCI power state %#x\n", state);
-+			kfree(psci_states);
-+			return -EINVAL;
-+		}
-+		psci_states[i] = state;
-+	}
-+	/* Idle states parsed correctly, initialize per-cpu pointer */
-+	per_cpu(psci_power_state, cpu) = psci_states;
-+	return 0;
-+}
-+#else
-+static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu) {
-+	return -EINVAL;
-+}
-+#endif
-+
- int psci_cpu_init_idle(unsigned int cpu)  {
- 	struct device_node *cpu_node;
- 	int ret;
- 
-+	if (!acpi_disabled)
-+		return psci_acpi_cpu_init_idle(cpu);
-+
- 	cpu_node = of_get_cpu_node(cpu, NULL);
- 	if (!cpu_node)
- 		return -ENODEV;
---
-1.9.1
+Thanks
+-- 
+~Vinod
