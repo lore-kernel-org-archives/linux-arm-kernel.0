@@ -1,109 +1,38 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 13 Jun 2016 11:22:47 -0400
-Subject: [PATCH v13 05/10] arm64: Kprobes with single stepping support
-In-Reply-To: <20160613155017.860097875e8bc86563a065ce@kernel.org>
-References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
- <1464924384-15269-6-git-send-email-dave.long@linaro.org>
- <20160608100714.4abbcebcf356eb72173d0ce3@kernel.org>
- <575E3235.1020904@linaro.org>
- <20160613155017.860097875e8bc86563a065ce@kernel.org>
-Message-ID: <575ECFC7.10207@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 13 Jun 2016 17:24:09 +0200
+Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
+In-Reply-To: <11395561.bQatt85IOg@wuerfel>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <11395561.bQatt85IOg@wuerfel>
+Message-ID: <20160613152409.GD3240@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2016 02:50 AM, Masami Hiramatsu wrote:
-> On Mon, 13 Jun 2016 00:10:29 -0400
-> David Long <dave.long@linaro.org> wrote:
->
->>>> ---
->>>>    arch/arm64/Kconfig                      |   1 +
->>>>    arch/arm64/include/asm/debug-monitors.h |   5 +
->>>>    arch/arm64/include/asm/insn.h           |   4 +-
->>>>    arch/arm64/include/asm/kprobes.h        |  60 ++++
->>>>    arch/arm64/include/asm/probes.h         |  44 +++
->>>>    arch/arm64/kernel/Makefile              |   1 +
->>>>    arch/arm64/kernel/debug-monitors.c      |  18 +-
->>>>    arch/arm64/kernel/kprobes-arm64.c       | 144 +++++++++
->>>>    arch/arm64/kernel/kprobes-arm64.h       |  35 +++
->>>>    arch/arm64/kernel/kprobes.c             | 526 ++++++++++++++++++++++++++++++++
->>>
->>> Not sure why kprobes.c and kprobes-arm64.c are splitted.
->>>
->>>
->>
->> This comes from the model of the arm32 kprobes code where handling of
->> the low-level instruction simulation is implemented in separate files
->> for 32-bit vs. thumb instructions.  It should make a little more sense
->> in the future when additional instruction simulation code will hopefully
->> be added for those instructions we cannot currently single-step
->> out-of-line.  It also probably *could* be merged into one file.
->
-> Hmm, at least the name of arch/arm64/kernel/kprobes-arm64.c is
-> meaningless. As we've done in x86, I think we can make it
-> arch/arm64/kernel/kprobes/decode-insn.{c,h}
->
+On 11/06/2016 at 00:30:36 +0200, Arnd Bergmann wrote :
+> On Saturday, June 11, 2016 12:03:04 AM CEST Alexandre Belloni wrote:
+> > From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> > 
+> > Fix the main and slow clock .prepare() implementations which used to call
+> > usleep() when the scheduler wasn't ready yet.
+> > 
+> 
+> Does this have to be called that early? It seems wasteful to always
+> call udelay() here, when these are functions that are normally
+> allowed to sleep.
+> 
 
-I've changed the name to kprobe-decode-insn.[hc], or do you feel 
-strongly the three kprobes source files in arch/arm64/kernel need their 
-own subdirectory?
+So I've tested it and something like that would work:
 
->
-> [..]
->>>> +
->>>> +/* Return:
->>>> + *   INSN_REJECTED     If instruction is one not allowed to kprobe,
->>>> + *   INSN_GOOD         If instruction is supported and uses instruction slot,
->>>> + *   INSN_GOOD_NO_SLOT If instruction is supported but doesn't use its slot.
->>>
->>> Is there any chance to return INSN_GOOD_NO_SLOT?
->>>
->>
->> Ah, that gets used later when simulation support is added.  I've removed
->> this enum value from this commit and will add it to the later one.
->> Please no one complain about using an enum instead of a bool, it will
->> eventually have three possible values.
->
-> OK :)
->
-> [..]
->>>> +enum kprobe_insn __kprobes
->>>> +arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
->>>> +{
->>>> +	enum kprobe_insn decoded;
->>>> +	kprobe_opcode_t insn = le32_to_cpu(*addr);
->>>> +	kprobe_opcode_t *scan_start = addr - 1;
->>>> +	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
->>>> +#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
->>>> +	struct module *mod;
->>>> +#endif
->>>> +
->>>> +	if (addr >= (kprobe_opcode_t *)_text &&
->>>> +	    scan_end < (kprobe_opcode_t *)_text)
->>>> +		scan_end = (kprobe_opcode_t *)_text;
->>>> +#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
->>>> +	else {
->>>> +		preempt_disable();
->>>> +		mod = __module_address((unsigned long)addr);
->>>> +		if (mod && within_module_init((unsigned long)addr, mod) &&
->>>> +			!within_module_init((unsigned long)scan_end, mod))
->>>> +			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
->>>> +		else if (mod && within_module_core((unsigned long)addr, mod) &&
->>>> +			!within_module_core((unsigned long)scan_end, mod))
->>>> +			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
->>>
->>> What happen if mod == NULL? it should be return error, isn't it?
->>>
->>
->> No, it should be fine.  It just means it didn't have to do either of the
->> extra checks to limit the end of the search through the code to the
->> boundary of one of the corresponding module text sections. It means the
->> instruction is in the regular kernel (non-module) text segment.
->
-> Ah, I see. It is OK then. :)
->
-> Thank you,
->
->
+	if (system_state < SYSTEM_RUNNING)
+		udelay(osc->startup_usec);
+	else
+		usleep_range(osc->startup_usec, osc->startup_usec + 1);
 
-Thanks,
--dl
+But I'm afraid it would be the first driver to actually do something
+like that (however, it is already the only driver trying to sleep). 
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
