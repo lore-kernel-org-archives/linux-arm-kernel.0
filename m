@@ -1,77 +1,59 @@
 From: amitoj1606@gmail.com (Amitoj Kaur Chawla)
-Date: Mon, 13 Jun 2016 20:23:07 +0530
-Subject: [PATCH 1/2] ARM: pxa: ssp: Drop unnecessary freeing functions
+Date: Mon, 13 Jun 2016 20:23:12 +0530
+Subject: [PATCH 2/2] ARM: pxa: ssp: Switch to devm_ioremap_resource
 In-Reply-To: <cover.1465827542.git.amitoj1606@gmail.com>
 References: <cover.1465827542.git.amitoj1606@gmail.com>
-Message-ID: <da474c948aefa6ff7ef13f8e1250055d572ffbac.1465827542.git.amitoj1606@gmail.com>
+Message-ID: <9afeef532b761b8cfe68003b41a71b8000096511.1465827542.git.amitoj1606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop clk_put, kfree, release_mem_region and iounmap for
-devm_ allocated data in the remove function of the driver.
+Replace calls to devm_request_mem_region and devm_ioremap with a
+single call to devm_ioremap_resource instead and modify error
+handling.
 
-Some of these changes were made with the help of the following
-Coccinelle semantic patch:
-@r@
-expression x;
-@@
-
-(
- x = devm_kzalloc(...)
-|
- x = devm_request_irq(...)
-|
- x = devm_ioremap(...)
-|
- x = devm_ioremap_nocache(...)
-)
-
-@@
-expression r.x;
-@@
-
-(
-* kfree(x)
-|
-* free_irq(x)
-|
-* iounmap(x)
-)
+Move the call to devm_ioremap_resource adjacent to the call to
+platform_get_resource and the assignment ssp->phys_base below the 
+call to devm_ioremap_resource to take advantage of the null check 
+on res by devm_ioremap_resource.
 
 Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
 ---
- arch/arm/plat-pxa/ssp.c | 9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/plat-pxa/ssp.c | 20 +++-----------------
+ 1 file changed, 3 insertions(+), 17 deletions(-)
 
 diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-index ba13f79..97bd43c 100644
+index 97bd43c..aecc8d5 100644
 --- a/arch/arm/plat-pxa/ssp.c
 +++ b/arch/arm/plat-pxa/ssp.c
-@@ -230,25 +230,16 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+@@ -175,26 +175,12 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+ 	}
  
- static int pxa_ssp_remove(struct platform_device *pdev)
- {
--	struct resource *res;
- 	struct ssp_device *ssp;
- 
- 	ssp = platform_get_drvdata(pdev);
- 	if (ssp == NULL)
- 		return -ENODEV;
- 
--	iounmap(ssp->mmio_base);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (res == NULL) {
+-		dev_err(dev, "no memory resource defined\n");
+-		return -ENODEV;
+-	}
 -
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	release_mem_region(res->start, resource_size(res));
--
--	clk_put(ssp->clk);
--
- 	mutex_lock(&ssp_lock);
- 	list_del(&ssp->node);
- 	mutex_unlock(&ssp_lock);
+-	res = devm_request_mem_region(dev, res->start, resource_size(res),
+-				      pdev->name);
+-	if (res == NULL) {
+-		dev_err(dev, "failed to request memory resource\n");
+-		return -EBUSY;
+-	}
++	ssp->mmio_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ssp->mmio_base))
++		return PTR_ERR(ssp->mmio_base);
  
--	kfree(ssp);
- 	return 0;
- }
+ 	ssp->phys_base = res->start;
  
+-	ssp->mmio_base = devm_ioremap(dev, res->start, resource_size(res));
+-	if (ssp->mmio_base == NULL) {
+-		dev_err(dev, "failed to ioremap() registers\n");
+-		return -ENODEV;
+-	}
+-
+ 	ssp->irq = platform_get_irq(pdev, 0);
+ 	if (ssp->irq < 0) {
+ 		dev_err(dev, "no IRQ resource defined\n");
 -- 
 1.9.1
