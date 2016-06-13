@@ -1,68 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Jun 2016 16:30:03 +0100
-Subject: [PATCH 4/5] arm/arm64: KVM: Map the HYP text as read-only
-In-Reply-To: <575ECE49.3070209@arm.com>
-References: <1465826449-14349-1-git-send-email-marc.zyngier@arm.com>
- <1465826449-14349-5-git-send-email-marc.zyngier@arm.com>
- <20160613150251.GB29783@leverpostej> <575ECE49.3070209@arm.com>
-Message-ID: <20160613153003.GD29783@leverpostej>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 13 Jun 2016 09:38:38 -0600
+Subject: [PATCH] media: s5p-mfc fix memory leak in s5p_mfc_remove()
+In-Reply-To: <CABxcv=nT_zp2BkvSV04sqaXmZGnQz=z-cGURDJwUW7hthD6-Fw@mail.gmail.com>
+References: <1465436115-13880-1-git-send-email-shuahkh@osg.samsung.com>
+ <CABxcv=nT_zp2BkvSV04sqaXmZGnQz=z-cGURDJwUW7hthD6-Fw@mail.gmail.com>
+Message-ID: <575ED37E.4010204@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 04:16:25PM +0100, Marc Zyngier wrote:
-> On 13/06/16 16:02, Mark Rutland wrote:
-> > On Mon, Jun 13, 2016 at 03:00:48PM +0100, Marc Zyngier wrote:
-> >> There should be no reason for mapping the HYP text read/write.
-> >>
-> >> As such, let's have a new set of flags (PAGE_HYP_EXEC) that allows
-> >> execution, but makes the page as read-only, and update the two call
-> >> sites that deal with mapping code.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm/include/asm/pgtable.h        | 1 +
-> >>  arch/arm/kvm/arm.c                    | 2 +-
-> >>  arch/arm/kvm/mmu.c                    | 2 +-
-> >>  arch/arm64/include/asm/pgtable-prot.h | 1 +
-> >>  4 files changed, 4 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-> >> index f332087..7487bf9 100644
-> >> --- a/arch/arm/include/asm/pgtable.h
-> >> +++ b/arch/arm/include/asm/pgtable.h
-> >> @@ -98,6 +98,7 @@ extern pgprot_t		pgprot_s2_device;
-> >>  #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
-> >>  #define PAGE_KERNEL_EXEC	pgprot_kernel
-> >>  #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
-> >> +#define PAGE_HYP_EXEC		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY)
-> >>  #define PAGE_HYP_RO		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY | L_PTE_XN)
-> >>  #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
-> >>  #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
-> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >> index 0b5099f..d7bf2dd 100644
-> >> --- a/arch/arm/kvm/arm.c
-> >> +++ b/arch/arm/kvm/arm.c
-> >> @@ -1285,7 +1285,7 @@ static int init_hyp_mode(void)
-> >>  	 * Map the Hyp-code called directly from the host
-> >>  	 */
-> >>  	err = create_hyp_mappings(kvm_ksym_ref(__hyp_text_start),
-> >> -				  kvm_ksym_ref(__hyp_text_end), PAGE_HYP);
-> >> +				  kvm_ksym_ref(__hyp_text_end), PAGE_HYP_EXEC);
-> > 
-> > As far as I can tell, __hyp_text_{start,end} aren't guaranteed to be
-> > page-aligned. Are we certain that we'll never share a page with
-> > something that we'll subsequently want to map non-executable?
+On 06/13/2016 07:42 AM, Javier Martinez Canillas wrote:
+> Hello Shuah,
 > 
-> The HYP text sits firmly in the middle of the rest of the text, so I'm
-> not too worried. We could force some additional alignment just in case
-> we end-up moving things around, but I don't see it as a problem we can
-> have today.
+> On Wed, Jun 8, 2016 at 9:35 PM, Shuah Khan <shuahkh@osg.samsung.com> wrote:
+>> s5p_mfc_remove() fails to release encoder and decoder video devices.
+>>
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>>  drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+>> index 274b4f1..af61f54 100644
+>> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+>> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+>> @@ -1317,7 +1317,9 @@ static int s5p_mfc_remove(struct platform_device *pdev)
+>>         destroy_workqueue(dev->watchdog_workqueue);
+>>
+>>         video_unregister_device(dev->vfd_enc);
+>> +       video_device_release(dev->vfd_enc);
+>>         video_unregister_device(dev->vfd_dec);
+>> +       video_device_release(dev->vfd_dec);
+>>         v4l2_device_unregister(&dev->v4l2_dev);
+>>         s5p_mfc_release_firmware(dev);
+>>         vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[0]);
+>> --
+> 
+> Can you please do the remove operations in the inverse order of their
+> counterparts? IOW to do the release for both encoder and decoder after
+> their unregistration.
+> 
 
-Sure, jsut though I should check.
+I considered that. No problem. I will move both release after the
+video_unregister_device(dev->vfd_dec), releasing enc first and then
+the dec
 
-Given that, FWIW, for the series:
+> 
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+thanks,
+-- Shuah
