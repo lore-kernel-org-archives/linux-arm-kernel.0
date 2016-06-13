@@ -1,49 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Jun 2016 15:00:49 +0100
-Subject: [PATCH 5/5] arm/arm64: KVM: Make default HYP mappings non-excutable
-In-Reply-To: <1465826449-14349-1-git-send-email-marc.zyngier@arm.com>
-References: <1465826449-14349-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1465826449-14349-6-git-send-email-marc.zyngier@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 13 Jun 2016 10:02:59 -0400
+Subject: [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space accessors
+ against platfrom specific ECAM quirks
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F782C86@lhreml507-mbx>
+References: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
+ <1465822923-33599-2-git-send-email-liudongdong3@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F782C86@lhreml507-mbx>
+Message-ID: <575EBD13.8080808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Structures that can be generally written to don't have any requirement
-to be executable (quite the opposite). This includes the kvm and vcpu
-structures, as well as the stacks.
+On 6/13/2016 9:54 AM, Gabriele Paoloni wrote:
+> As you can see here Liudongdong has replaced oem_revision with
+> oem_table_id.
+> 
+> Now it seems that there are some platforms that have already shipped
+> using a matching based on the oem_revision (right Jon?)
+> 
+> However I guess that if in FW they have defined oem_table_id properly
+> they should be able to use this mechanism without needing to a FW update.
+> 
+> Can these vendors confirm this?
+> 
+> Tomasz do you think this can work for Cavium Thunder?
+> 
+> Thanks
+> 
+> Gab
 
-Let's change the default to incorporate the XN flag.
+Why not have all three of them? 
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/pgtable.h        | 2 +-
- arch/arm64/include/asm/pgtable-prot.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+The initial approach was OEM id and revision id. 
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 7487bf9..e0d76ba 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -97,7 +97,7 @@ extern pgprot_t		pgprot_s2_device;
- #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
- #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
- #define PAGE_KERNEL_EXEC	pgprot_kernel
--#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
-+#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_XN)
- #define PAGE_HYP_EXEC		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY)
- #define PAGE_HYP_RO		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY | L_PTE_XN)
- #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 3802048..39f5252 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -55,7 +55,7 @@
- #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
- #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
- 
--#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
-+#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
- #define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
- #define PAGE_HYP_RO		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
- #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+Jeff Hugo indicated that addition (not removing any other fields) of table id
+would make more sense.
+
 -- 
-2.1.4
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
