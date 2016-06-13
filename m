@@ -1,76 +1,82 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 13 Jun 2016 16:04:24 -0700
-Subject: [PATCH v2 0/11] Changes to support 150 MHz eMMC on rk3399
-Message-ID: <1465859076-4868-1-git-send-email-dianders@chromium.org>
+Date: Mon, 13 Jun 2016 16:04:25 -0700
+Subject: [PATCH v2 01/11] phy: rockchip-emmc: Increase lock time allowance
+In-Reply-To: <1465859076-4868-1-git-send-email-dianders@chromium.org>
+References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
+Message-ID: <1465859076-4868-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The theme of this series of patches is to try to allow running the eMMC
-at 150 MHz on the rk3399 SoC, though the changes should still be correct
-and have merit on their own.  The motivation for running at 150 MHz is
-that doing so improves signal integrity and (with some eMMC devices)
-doesn't affect throughput.
+Previous PHY code waited a fixed amount of time for the DLL to lock at
+power on time.  Unfortunately, the time for the DLL to lock is actually
+a bit more dynamic and can be longer if the card clock is slower.
 
-These patches have been structured to keep things as separate as
-possible, but nevertheless there are still some dependencies between
-patches.  It probably makes the most sense for all of the non-device
-tree patches to go through a single tree.  If others agree, perhaps the
-most sane would be to get Acks from PHY maintainers and then to land the
-patches in the MMC tree.  Device tree patches should be able to be
-landed separately and the worst what would happen is a warning in the
-kernel log if you have the code without the device tree.
+Instead of waiting a fixed 30 us, let's now dynamically wait until the
+lock bit gets set.  We'll wait up to 10 ms which should be OK even if
+the card clock is at the super slow 100 kHz.
 
-The code patches are based on Ulf's mmc-next, then 4 patches that are
-outstanding / ready to land.  Specifically:
-- https://patchwork.kernel.org/patch/9086501/
-  phy: rockchip-emmc: give DLL some extra time to be ready
-- https://patchwork.kernel.org/patch/9093681/
-  phy: rockchip-emmc: configure frequency range and drive impedance
-- https://patchwork.kernel.org/patch/9086511/
-  phy: rockchip-emmc: configure default output tap delay
-- https://patchwork.kernel.org/patch/9086531/
-  phy: rockchip-emmc: reindent the register definitions
+On its own, this change makes the PHY power on code a little more
+robust.  Before this change the PHY was relying on the eMMC code to make
+sure the PHY was only powered on when the card clock was set to at least
+50 MHz before, though this reliance wasn't documented anywhere.
 
-The device tree patches are based on Heiko's v4.8-armsoc/dts64.
+This change will be even more useful in future changes where we actually
+need to be able to wait for a DLL lock at slower clock speeds.
 
-If requested, I could repost my series with the outstanding code patches
-or I could try folding those patches into mine.  Since those patches
-aren't in 4.7-rc1 presumably they would also make sense to take through
-the MMC tree if others agree.
-
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
 Changes in v2:
 - Indicate that 5.1 ms is calculated (Shawn).
-- Clean up description of rk3399 PHY (Shawn)
-- Add Rob Herring's Ack.
-- Reorder includes (Shawn)
-- Adjust commit message wording (Rob)
-- List out clocks and clock names (Rob)
-- Move code cleanup before set phyctrl_frqsel based on card clock (Shawn)
-- Warn if we're more than 15 MHz from ideal rate (Shawn)
-- Fix typo USB => SDHCI (Shawn)
 
-Douglas Anderson (11):
-  phy: rockchip-emmc: Increase lock time allowance
-  mmc: sdhci-of-arasan: Always power the PHY off/on when clock changes
-  Documentation: mmc: sdhci-of-arasan: Add soc-ctl-syscon for corecfg
-    regs
-  mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
-  arm64: dts: rockchip: Add soc-ctl-syscon to sdhci for rk3399
-  Documentation: mmc: sdhci-of-arasan: Add ability to export card clock
-  mmc: sdhci-of-arasan: Add ability to export card clock
-  Documentation: phy: Let the rockchip eMMC PHY get an exported card
-    clock
-  phy: rockchip-emmc: Minor code cleanup in
-    rockchip_emmc_phy_power_on/off()
-  phy: rockchip-emmc: Set phyctrl_frqsel based on card clock
-  arm64: dts: rockchip: Provide emmcclk to PHY for rk3399
+ drivers/phy/phy-rockchip-emmc.c | 28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
 
- .../devicetree/bindings/mmc/arasan,sdhci.txt       |  35 ++-
- .../devicetree/bindings/phy/rockchip-emmc-phy.txt  |   9 +
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   5 +
- drivers/mmc/host/sdhci-of-arasan.c                 | 333 +++++++++++++++++++--
- drivers/phy/phy-rockchip-emmc.c                    | 120 ++++++--
- 5 files changed, 442 insertions(+), 60 deletions(-)
-
+diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
+index a69f53630e67..2d059c046978 100644
+--- a/drivers/phy/phy-rockchip-emmc.c
++++ b/drivers/phy/phy-rockchip-emmc.c
+@@ -85,6 +85,7 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+ {
+ 	unsigned int caldone;
+ 	unsigned int dllrdy;
++	unsigned long timeout;
+ 
+ 	/*
+ 	 * Keep phyctrl_pdb and phyctrl_endll low to allow
+@@ -137,15 +138,26 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+ 				   PHYCTRL_ENDLL_MASK,
+ 				   PHYCTRL_ENDLL_SHIFT));
+ 	/*
+-	 * After enable analog DLL circuits, we need an extra 10.2us
+-	 * for dll to be ready for work. But according to testing, we
+-	 * find some chips need more than 25us.
++	 * After enabling analog DLL circuits docs say that we need 10.2 us if
++	 * our source clock is at 50 MHz and that lock time scales linearly
++	 * with clock speed.  If we are powering on the PHY and the card clock
++	 * is super slow (like 100 kHZ) this could take as long as 5.1 ms as
++	 * per the math: 10.2 us * (50000000 Hz / 100000 Hz) => 5.1 ms
++	 * Hopefully we won't be running at 100 kHz, but we should still make
++	 * sure we wait long enough.
+ 	 */
+-	udelay(30);
+-	regmap_read(rk_phy->reg_base,
+-		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+-		    &dllrdy);
+-	dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
++	timeout = jiffies + msecs_to_jiffies(10);
++	do {
++		udelay(1);
++
++		regmap_read(rk_phy->reg_base,
++			rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
++			&dllrdy);
++		dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
++		if (dllrdy == PHYCTRL_DLLRDY_DONE)
++			break;
++	} while (!time_after(jiffies, timeout));
++
+ 	if (dllrdy != PHYCTRL_DLLRDY_DONE) {
+ 		pr_err("rockchip_emmc_phy_power: dllrdy timeout.\n");
+ 		return -ETIMEDOUT;
 -- 
 2.8.0.rc3.226.g39d4020
