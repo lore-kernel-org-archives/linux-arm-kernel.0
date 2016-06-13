@@ -1,149 +1,118 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 13 Jun 2016 11:39:26 +0100
-Subject: [PATCH v2 6/7] iommu/rockchip: use DMA API to map, to flush cache
-In-Reply-To: <575E834C.30305@gmail.com>
-References: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
- <1465392392-2003-7-git-send-email-zhengsq@rock-chips.com>
- <CAAFQd5Da+Eg=eiRUgLSS_qPjGbG474KYWDC=GaAMS8A_CuQ3Mg@mail.gmail.com>
- <575E834C.30305@gmail.com>
-Message-ID: <575E8D5E.9090400@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Jun 2016 12:00:43 +0100
+Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
+In-Reply-To: <20160610164721.GP13357@hector.attlocal.net>
+References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
+ <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
+ <20160610154857.GA6430@leverpostej>
+ <20160610161234.GO13357@hector.attlocal.net>
+ <20160610162555.GB6430@leverpostej>
+ <20160610164721.GP13357@hector.attlocal.net>
+Message-ID: <20160613110043.GB19604@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/16 10:56, Shunqian Zheng wrote:
-> Hi
->
-> On 2016?06?10? 17:10, Tomasz Figa wrote:
->> Hi,
->>
->> On Wed, Jun 8, 2016 at 10:26 PM, Shunqian Zheng
->> <zhengsq@rock-chips.com> wrote:
->>> Use DMA API instead of architecture internal functions like
->>> __cpuc_flush_dcache_area() etc.
->>>
->>> To support the virtual device like DRM the virtual slave iommu
->>> added in the previous patch, attaching to which the DRM can use
->>> it own domain->dev for dma_map_*(), dma_sync_*() even VOP is disabled.
->>>
->>> With this patch, this driver is available for ARM64 like RK3399.
->>>
->> Could we instead simply allocate coherent memory for page tables using
->> dma_alloc_coherent() and skip any flushing on CPU side completely? If
->> I'm looking correctly, the driver only reads back the page directory
->> when checking if there is a need to allocate new page table, so there
->> shouldn't be any significant penalty for disabling the cache.
-> I try to use dma_alloc_coherent() to replace the dma_map_single(),
-> but it doesn't work for me properly.
-> Because the DRM uses the iommu_dma_ops instead the swiotlb_dma_ops after
-> attaching
-> to iommu, so when the iommu domain need to alloc a new page in
-> rk_iommu_map(),
-> it would call:
-> rk_iommu_map()  --> dma_alloc_coherent()  --> ops->alloc()  -->
-> iommu_map() --> rk_iommu_map()
+On Fri, Jun 10, 2016 at 11:47:21AM -0500, Andy Gross wrote:
+> On Fri, Jun 10, 2016 at 05:25:55PM +0100, Mark Rutland wrote:
+> > On Fri, Jun 10, 2016 at 11:12:34AM -0500, Andy Gross wrote:
+> > > On Fri, Jun 10, 2016 at 04:48:57PM +0100, Mark Rutland wrote:
+> > > > [+ Lorenzo]
+> > > > 
+> > > > On Thu, May 19, 2016 at 12:00:18AM -0500, Andy Gross wrote:
+> > > > > This patch adds the qcom,idle-state-spc compatible to the SPC idle
+> > > > > state.  This compatible indicates that the state is one which supports
+> > > > > freeze.
+> > > > > 
+> > > > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> > > > > ---
+> > > > >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
+> > > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > > 
+> > > > > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > > > > index 208af00..032e411 100644
+> > > > > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > > > > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > > > > @@ -104,7 +104,7 @@
+> > > > >  
+> > > > >  		idle-states {
+> > > > >  			CPU_SPC: spc {
+> > > > > -				compatible = "arm,idle-state";
+> > > > > +				compatible = "qcom,idle-state-spc", "arm,idle-state";
+> > > > >  				arm,psci-suspend-param = <0x40000002>;
+> > > > >  				entry-latency-us = <130>;
+> > > > >  				exit-latency-us = <150>;
+> > > > 
+> > > > This looks suspicious.
+> > > > 
+> > > > This is a PSCI idle state, and we have a PSCI driver driven by the
+> > > > generic ARM cpuidle driver.
+> > > > 
+> > > > Why do we need a qcom-specific compatible here?
+> > > > 
+> > > > Surely we should be able to use the idle code in a generic fashion to
+> > > > driver suspend-to-idle?
+> > > 
+> > > We need a way to identify specific idle states that support suspend-to-idle.  In
+> > > addition, when we have identified the states, we may have to configure the
+> > > enter_freeze() function.
+> > 
+> > Could you elaborate on what you mean by a state supporting
+> > suspend-to-idle? It was my understanding that any idle state should
+> > function for suspend-to-idle (and the choice of state is potentially
+> > subjective).
+> 
+> when you freeze the system, cpuidle will try to find the deepest state which
+> supports freeze (by checking if a enter_freeze() exists).  If it does exist,
+> then the tick is frozen and the enter_freeze is called as each cpu goes idle.
 
-That sounds more like you're passing the wrong device around somewhere, 
-since this approach is working fine for other IOMMUs; specifically, the 
-flow goes:
+Per Lorenzo's replies in another thread, it sounds like this is a
+generic issue, and not specific to Qualcomm. My understanding is that
+the only issue is coupled idle states, and further, that issue is really
+an implementation detail within Linux w.r.t. IRQ management.
 
-dma_alloc_coherent(DRM dev)   // for buffer
---> ops->alloc(DRM dev)
-     --> iommu_dma_alloc(DRM dev)
-         --> iommu_map()
-             --> dma_alloc_coherent(IOMMU dev)  // for pagetable
-                 --> ops->alloc(IOMMU dev)
-                     --> swiotlb_alloc(IOMMU dev)
+So it sounds like we need to rework things to be robust in the case of
+coupled idle states, and we can wire up enter_freeze for all states
+generically.
 
-There shouldn't be any need for this "virtual IOMMU" at all. I think the 
-Exynos DRM driver is in a similar situation of having multiple devices 
-(involving multiple IOMMUs) backing the virtual DRM device, and that 
-doesn't seem to be doing anything this crazy so it's probably worth 
-taking a look at.
+If there is some peroblem with making things robust, I assume we can
+identify coupled idle states today in some generic manner. I don't
+currently see the need for any DT binding.
 
-Robin.
+Lorenzo, does the above make sense to you?
 
-> Then I try to reserve memory for coherent so that, dma_alloc_coherent()
-> calls dma_alloc_from_coherent()
-> but not ops->alloc(). But it doesn't work too because when DRM request
-> buffer it never uses iommu.
->>
->> Other than that, please see some comments inline.
->>
->>> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
->>> ---
->>>   drivers/iommu/rockchip-iommu.c | 113
->>> ++++++++++++++++++++++++++---------------
->>>   1 file changed, 71 insertions(+), 42 deletions(-)
->>>
->>> diff --git a/drivers/iommu/rockchip-iommu.c
->>> b/drivers/iommu/rockchip-iommu.c
->>> index d6c3051..aafea6e 100644
->>> --- a/drivers/iommu/rockchip-iommu.c
->>> +++ b/drivers/iommu/rockchip-iommu.c
->>> @@ -4,8 +4,6 @@
->>>    * published by the Free Software Foundation.
->>>    */
->>>
->>> -#include <asm/cacheflush.h>
->>> -#include <asm/pgtable.h>
->>>   #include <linux/compiler.h>
->>>   #include <linux/delay.h>
->>>   #include <linux/device.h>
->>> @@ -61,8 +59,7 @@
->>>   #define RK_MMU_IRQ_BUS_ERROR     0x02  /* bus read error */
->>>   #define RK_MMU_IRQ_MASK          (RK_MMU_IRQ_PAGE_FAULT |
->>> RK_MMU_IRQ_BUS_ERROR)
->>>
->>> -#define NUM_DT_ENTRIES 1024
->>> -#define NUM_PT_ENTRIES 1024
->>> +#define NUM_TLB_ENTRIES 1024 /* for both DT and PT */
->> Is it necessary to change this in this patch? In general, it's not a
->> good idea to mix multiple logical changes together.
-> Sure, will restore changes in v3.
->>
->>>   #define SPAGE_ORDER 12
->>>   #define SPAGE_SIZE (1 << SPAGE_ORDER)
->>> @@ -82,7 +79,9 @@
->>>
->>>   struct rk_iommu_domain {
->>>          struct list_head iommus;
->>> +       struct device *dev;
->>>          u32 *dt; /* page directory table */
->>> +       dma_addr_t dt_dma;
->>>          spinlock_t iommus_lock; /* lock for iommus list */
->>>          spinlock_t dt_lock; /* lock for modifying page directory
->>> table */
->>>
->>> @@ -98,14 +97,12 @@ struct rk_iommu {
->>>          struct iommu_domain *domain; /* domain to which iommu is
->>> attached */
->>>   };
->>>
->>> -static inline void rk_table_flush(u32 *va, unsigned int count)
->>> +static inline void rk_table_flush(struct device *dev, dma_addr_t dma,
->>> +                                 unsigned int count)
->>>   {
->>> -       phys_addr_t pa_start = virt_to_phys(va);
->>> -       phys_addr_t pa_end = virt_to_phys(va + count);
->>> -       size_t size = pa_end - pa_start;
->>> +       size_t size = count * 4;
->> It would be a good idea to specify what "count" is. I'm a bit confused
->> that before it meant bytes and now some multiple of 4?
-> "count" means PT/DT entry count to flush here. I would add some more
-> comment on it.
->
-> Thank you very much,
-> Shunqian
->>
->> Best regards,
->> Tomasz
->>
->> _______________________________________________
->> Linux-rockchip mailing list
->> Linux-rockchip at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+> > > I chose to do this outside of the arm cpuidle driver because I didn't want to
+> > > add any more DT information aside from the compatible, and I needed a separate
+> > > place for the Qualcomm specific suspend code. 
+> > 
+> > Which suspend code is Qualcomm-specific? There shouldn't be anything on
+> > the PSCI side, so I can only imagine that device management is left.
+> > What am I missing?
+> 
+> Qualcomm won't be supporting the psci suspend feature and will be doing their
+> own thing.  As such, they need their own suspend ops.  In addition, we have
+> platforms that don't use psci (32 bit).
+
+That's orthogonal to suspend-to-idle, which can be handled in a generic
+fashion. It's also orthogonal to 32-bit !PSCI platforms, as my
+complaint was regarding the use of this with PSCI.
+
+> > > With the compatible, this makes
+> > > my 32 and 64 bit processor suspend code identical, as we have our own cpuidle
+> > > driver for the 32 bit procs.
+> > > 
+> > > An alternative would be to add some facilities to communicate this to the arm
+> > > cpuidle driver and configure the enter_freeze() function at some later point.
+> > 
+> > I would prefer that suspend-to-idle using PSCI occurred via the generic
+> > PSCI and cpuidle code. I am happy to extend that code if there is
+> > something lacking, and I would prefer to not have platform-specific
+> > hooks.
+> 
+> Right, I briefly looked at that in the beginning and decided against it.  But if
+> we can at least add some way to identify freezeable idle states and configure
+> the freeze function, that'd cover all the requirements.
+
+Ok, per the above I believe that is covered.
+
+Thanks,
+Mark.
