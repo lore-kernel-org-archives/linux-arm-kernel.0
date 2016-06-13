@@ -1,74 +1,94 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 13 Jun 2016 13:48:33 +0200
-Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <7d93d81d-cca9-e434-6488-0ea839f81663@cogentembedded.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
- <20160601005751.GG20527@verge.net.au>
- <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
- <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
- <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
- <20160610010245.GA10152@verge.net.au>
- <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
- <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
- <1b9a4cf4-1101-ccbf-772b-49b8a689a1b6@cogentembedded.com>
- <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
- <7d93d81d-cca9-e434-6488-0ea839f81663@cogentembedded.com>
-Message-ID: <CAMuHMdWbkdaDZPfwe7r0=bDbF-RcvddihAJi4VFGonqUnuvTkw@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 13 Jun 2016 13:02:36 +0100
+Subject: [PATCH] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
+In-Reply-To: <20160610170220.GC23223@arm.com>
+References: <1465571984-18776-1-git-send-email-suzuki.poulose@arm.com>
+ <20160610170220.GC23223@arm.com>
+Message-ID: <575EA0DC.2080801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Mon, Jun 13, 2016 at 1:24 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 6/13/2016 10:12 AM, Geert Uytterhoeven wrote:
->>>>>    The only problem I'm seeing (again) is the RCAN clock failing to
->>>>> register:
->>>>>
->>>>> rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock
->>>>> (-12)
->>>>>
->>>>>    I was going to look at it yesterday but (wrongly) thought it somehow
->>>>> cured itself... I'll look at it now.
->>>>
->>>>
->>>> The RCAN parent is the second clock in the CPG node's "clocks" property,
->>>> which you didn't provide.
->>>
->>>
->>>    Actually, the things are more complex. The figure 7.1c suggests that
->>> the
->>> RCAN clock has different parent on R8A7792 than on the other SoCs --
->>> namely
->>> PLL1/VCO 1/4. That may be, since there's just no USB_EXTAL signal on this
->>> SoC (it doesn't seem to support any USB IPs). Which means the
->>> 'clk-rcar-gen2' driver can't work with the RCAN clock in its current
->>> form.
+On 10/06/16 18:02, Will Deacon wrote:
+> On Fri, Jun 10, 2016 at 04:19:44PM +0100, Suzuki K Poulose wrote:
+>> From: Steve Capper <steve.capper@linaro.org>
 >>
->> Right, I had forgotten about that.
->> Fortunately the clk-rcar-gen2 driver has a sane failure mode for this case
->> ;-)
+>> It can be useful for JIT software to be aware of MIDR_EL1 and
+>> REVIDR_EL1 to ascertain the presence of any core errata that could
+>> affect codegen.
+>>
+>> This patch exposes these registers through sysfs:
+>>
+>> /sys/devices/system/cpu/cpu$ID/identification/midr
+>> /sys/devices/system/cpu/cpu$ID/identification/revidr
+
+
+>> +
+>> +#define CPUINFO_ATTR_RO(_name)							\
+>> +	static ssize_t show_##_name (struct device *dev,			\
+>> +			struct device_attribute *attr, char *buf)		\
+>> +	{									\
+>> +		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
+>> +		if (!cpu_present(dev->id))					\
+>> +			return -ENODEV;						\
+>> +										\
+>> +		if (info->reg_midr)						\
+>> +			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
 >
->    What do you mean?
+> Should this be 0x%08x, as these are 32-bit registers?
 
-I mean that it failed due to the missing parent clock, instead of continuing
-silently with a wrong clock rate.
+Yes. Will change it. As per Mark's comments, I can change them to 64bit in a separate
+patch.
 
->> it seems the RCAN clock can just be modeled as a fixed clock. However,
->> its divider value isn't clear to me,
+
+
+>> +
+>> +static int __init cpuinfo_regs_init(void)
+>> +{
+>> +	int cpu, finalcpu, ret;
+>> +	struct device *dev;
+>> +
+>> +	for_each_present_cpu(cpu) {
+>> +		dev = get_cpu_device(cpu);
+>> +
+>> +		if (!dev) {
+>> +			ret = -ENODEV;
+>> +			break;
+>> +		}
+>> +
+>> +		ret = sysfs_create_group(&dev->kobj, &cpuregs_attr_group);
+>> +		if (ret)
+>> +			break;
+>> +	}
+>> +
+>> +	if (!ret)
+>> +		return 0;
+>> +	/*
+>> +	 * We were unable to put down sysfs groups for all the CPUs, revert
+>> +	 * all the groups we have placed down s.t. none are visible.
+>> +	 * Otherwise we could give a misleading picture of what's present.
+>> +	 */
+>> +	finalcpu = cpu;
+>> +	for_each_present_cpu(cpu) {
+>> +		if (cpu == finalcpu)
+>> +			break;
+>> +		dev = get_cpu_device(cpu);
+>> +		if (dev)
+>> +			sysfs_remove_group(&dev->kobj, &cpuregs_attr_group);
+>> +	}
 >
->    IIRC, the fixed RCAN divisor was equal to 6.
+> Can CPUs be removed from underneath us using unregister_cpu? If so, I
 
-1560 / 6 != 15.9.
+Yes. Good point. Though this is done at early boot, nobody prevents
+an unregister_cpu(). The safer way would be to wrap the code in
+cpu_hotplug_disable()...enable().
 
-Gr{oetje,eeting}s,
+I will respin it.
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> don't think we should assume that get_cpu_device will succeed in the
+> same places for both the loops.
+
+
+Thanks
+Suzuki
