@@ -1,37 +1,116 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 14 Jun 2016 00:46:34 +0200
-Subject: [PATCH] clk: rockchip: add flag CLK_SET_RATE_PARENT for
- dclk_vop0_div on RK3399
-In-Reply-To: <1465724928-14611-1-git-send-email-zhengxing@rock-chips.com>
-References: <1465724928-14611-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <2376423.L1zs1HaIGm@diego>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Mon, 13 Jun 2016 16:04:26 -0700
+Subject: [PATCH v2 02/11] mmc: sdhci-of-arasan: Always power the PHY off/on
+ when clock changes
+In-Reply-To: <1465859076-4868-1-git-send-email-dianders@chromium.org>
+References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
+Message-ID: <1465859076-4868-3-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 12. Juni 2016, 17:48:48 schrieb Xing Zheng:
-> The functions and features VOP0 more complete than VOP1's, we need to
-> use it dclk_vop0_div operate VPLLI, and let VOP0 as the default primary
-> screen.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> ---
-> 
->  drivers/clk/rockchip/clk-rk3399.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3399.c
-> b/drivers/clk/rockchip/clk-rk3399.c index 7ecb12c3..6affa75 100644
-> --- a/drivers/clk/rockchip/clk-rk3399.c
-> +++ b/drivers/clk/rockchip/clk-rk3399.c
-> @@ -1157,7 +1157,7 @@ static struct rockchip_clk_branch
-> rk3399_clk_branches[] __initdata = { GATE(HCLK_VOP0_NOC, "hclk_vop0_noc",
-> "hclk_vop0_pre", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(28), 0, GFLAGS),
-> 
-> -	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, 0,
-> +	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p,
-> CLK_SET_RATE_PARENT, RK3399_CLKSEL_CON(49), 8, 2, MFLAGS, 0, 8, DFLAGS,
->  			RK3399_CLKGATE_CON(10), 12, GFLAGS),
+In commit 802ac39a5566 ("mmc: sdhci-of-arasan: fix set_clock when a phy
+is supported") we added code to power the PHY off and on whenever the
+clock was changed but we avoided doing the power cycle code when the
+clock was low speed.  Let's now do it always.
 
-The vpll is a possible source for multiple clocks (cci, aclk_vop0, dclk_vop0, 
-clk_vop0_pwm, aclk_vop1, dclk_vop1, clk_vop1_pwm), so allowing one clock to 
-hog the rate setting, might influence the other consumers of the vpll as well.
+Although there may be other reasons for power cycling the PHY when the
+clock changes, one of the main reasons is that we need to give the DLL a
+chance to re-lock with the new clock.
+
+One of the things that the DLL is for is tuning the Receive Clock in
+HS200 mode and STRB in HS400 mode.  Thus it is clear that we should make
+sure we power cycle the PHY (and wait for the DLL to lock) when we know
+we'll be in one of these two speed modes.  That's what the original code
+did, though it used the clock rate rather than the speed mode.  However,
+even in speed modes other than HS200,/HS400 the DLL is used for
+something since it can be clearly observed that the PHY doesn't function
+properly if you leave the DLL off.
+
+Although it appears less important to power cycle the PHY and wait for
+the DLL to lock when not in HS200/HS400 modes (no bugs were reported),
+it still seems wise to let the locking always happen nevertheless.
+
+Note: as part of this, we make sure that we never try to turn the PHY on
+when the clock is off (when the clock rate is 0).  The PHY cannot work
+when the clock is off since its DLL can't lock.
+
+This change requires ("phy: rockchip-emmc: Increase lock time
+allowance") and will cause problems if picked without that change.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+Changes in v2: None
+
+ drivers/mmc/host/sdhci-of-arasan.c | 23 ++++++++---------------
+ 1 file changed, 8 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+index 533e2bcb10bc..3ff1711077c2 100644
+--- a/drivers/mmc/host/sdhci-of-arasan.c
++++ b/drivers/mmc/host/sdhci-of-arasan.c
+@@ -35,11 +35,13 @@
+ /**
+  * struct sdhci_arasan_data
+  * @clk_ahb:	Pointer to the AHB clock
+- * @phy: Pointer to the generic phy
++ * @phy:	Pointer to the generic phy
++ * @phy_on:	True if the PHY is turned on.
+  */
+ struct sdhci_arasan_data {
+ 	struct clk	*clk_ahb;
+ 	struct phy	*phy;
++	bool		phy_on;
+ };
+ 
+ static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
+@@ -61,12 +63,10 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+-	bool ctrl_phy = false;
+ 
+-	if (clock > MMC_HIGH_52_MAX_DTR && (!IS_ERR(sdhci_arasan->phy)))
+-		ctrl_phy = true;
++	if (sdhci_arasan->phy_on && !IS_ERR(sdhci_arasan->phy)) {
++		sdhci_arasan->phy_on = false;
+ 
+-	if (ctrl_phy) {
+ 		spin_unlock_irq(&host->lock);
+ 		phy_power_off(sdhci_arasan->phy);
+ 		spin_lock_irq(&host->lock);
+@@ -74,7 +74,9 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+ 
+ 	sdhci_set_clock(host, clock);
+ 
+-	if (ctrl_phy) {
++	if (host->mmc->actual_clock && !IS_ERR(sdhci_arasan->phy)) {
++		sdhci_arasan->phy_on = true;
++
+ 		spin_unlock_irq(&host->lock);
+ 		phy_power_on(sdhci_arasan->phy);
+ 		spin_lock_irq(&host->lock);
+@@ -257,12 +259,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+ 			goto clk_disable_all;
+ 		}
+ 
+-		ret = phy_power_on(sdhci_arasan->phy);
+-		if (ret < 0) {
+-			dev_err(&pdev->dev, "phy_power_on err.\n");
+-			goto err_phy_power;
+-		}
+-
+ 		host->mmc_host_ops.hs400_enhanced_strobe =
+ 					sdhci_arasan_hs400_enhanced_strobe;
+ 	}
+@@ -275,9 +271,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+ 
+ err_add_host:
+ 	if (!IS_ERR(sdhci_arasan->phy))
+-		phy_power_off(sdhci_arasan->phy);
+-err_phy_power:
+-	if (!IS_ERR(sdhci_arasan->phy))
+ 		phy_exit(sdhci_arasan->phy);
+ clk_disable_all:
+ 	clk_disable_unprepare(clk_xin);
+-- 
+2.8.0.rc3.226.g39d4020
