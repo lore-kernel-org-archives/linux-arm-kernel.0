@@ -1,31 +1,28 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 12 Jun 2016 22:32:37 -0400
-Subject: [PATCH V6 6/8] vfio, platform: make reset driver a requirement by
- default
-In-Reply-To: <c3538f11-d206-1ffc-35e0-ff5a7672c7d9@redhat.com>
-References: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
- <1464472878-27176-7-git-send-email-okaya@codeaurora.org>
- <c3538f11-d206-1ffc-35e0-ff5a7672c7d9@redhat.com>
-Message-ID: <575E1B45.3070406@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 13 Jun 2016 10:54:09 +0800
+Subject: [PATCH 01/11] clk: imx: clk-pllv3: fix incorrect handle of enet
+ powerdown bit
+In-Reply-To: <CAA+hA=SuPhCnieX1w5Rm6AtypvbiBHmD=HUFOOmiicT9Px-dFw@mail.gmail.com>
+References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
+ <CAA+hA=SuPhCnieX1w5Rm6AtypvbiBHmD=HUFOOmiicT9Px-dFw@mail.gmail.com>
+Message-ID: <20160613025409.GH20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/7/2016 3:59 PM, Auger Eric wrote:
->> -	vfio_platform_get_reset(vdev);
->> > +	ret = vfio_platform_get_reset(vdev);
->> > +	if (ret && vdev->reset_required) {
->> > +		pr_err("vfio: no reset function found for device %s\n",
->> > +		       vdev->name);
->> > +		iommu_group_put(group);
->> > +		return ret;
-> nit: in case you respin you can factorize the group put and return ret in a goto label
-> (since also used above).
+On Sun, Jun 12, 2016 at 10:56:38PM +0800, Dong Aisheng wrote:
+> Hi Shawn,
 > 
-> Besides Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> On Wed, Jun 8, 2016 at 10:33 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+> > After commit f53947456f98 ("ARM: clk: imx: update pllv3 to support imx7"),
+> > the former used BM_PLL_POWER bit is not correct anymore for IMX7 ENET.
+> > Instead, pll->powerdown holds the correct bit, so using powerdown bit
+> > in clk_pllv3_{prepare | unprepare} functions.
+> >
+> > Fixes: f53947456f98 ("ARM: clk: imx: update pllv3 to support imx7")
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> Any comments about this one?
 
-thanks, done. I'll respin with your request.
+Sorry.  I thought I had applied it.  Applied it now, thanks.
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Shawn
