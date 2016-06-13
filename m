@@ -1,67 +1,55 @@
 From: hramrach@gmail.com (Michal Suchanek)
-Date: 13 Jun 2016 17:46:50 -0000
-Subject: [PATCH v3 04/13] spi: sunxi: expose maximum transfer size limit
-In-Reply-To: <cover.1465490774.git.hramrach@gmail.com>
-References: <cover.1465490774.git.hramrach@gmail.com>
-Message-ID: <6962eec8da0b5255cafd7782bcc39ca19041c2b1.1465490774.git.hramrach@gmail.com>
+Date: 13 Jun 2016 17:46:48 -0000
+Subject: [PATCH v3 00/13] sunxi spi fixes
+Message-ID: <cover.1465490774.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sun4i spi hardware can trasfer at most 63 bytes of data without DMA
-support so report the limitation. Same for sun6i.
+Hello,
 
-Signed-off-by: Michal Suchanek <hramrach@gmail.com>
----
- drivers/spi/spi-sun4i.c | 6 ++++++
- drivers/spi/spi-sun6i.c | 5 +++++
- 2 files changed, 11 insertions(+)
+This is update of the sunxi spi patches that should give full-featured SPI
+driver.
 
-diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index f2848b7..ba2b5c8 100644
---- a/drivers/spi/spi-sun4i.c
-+++ b/drivers/spi/spi-sun4i.c
-@@ -167,6 +167,11 @@ static void sun4i_spi_set_cs(struct spi_device *spi, bool enable)
- 	sun4i_spi_write(sspi, SUN4I_CTL_REG, reg);
- }
- 
-+static size_t sun4i_spi_max_transfer_size(struct spi_device *spi)
-+{
-+	return SUN4I_FIFO_DEPTH - 1;
-+}
-+
- static int sun4i_spi_transfer_one(struct spi_master *master,
- 				  struct spi_device *spi,
- 				  struct spi_transfer *tfr)
-@@ -411,6 +416,7 @@ static int sun4i_spi_probe(struct platform_device *pdev)
- 	master->bits_per_word_mask = SPI_BPW_MASK(8);
- 	master->dev.of_node = pdev->dev.of_node;
- 	master->auto_runtime_pm = true;
-+	master->max_transfer_size = sun4i_spi_max_transfer_size;
- 
- 	sspi->hclk = devm_clk_get(&pdev->dev, "ahb");
- 	if (IS_ERR(sspi->hclk)) {
-diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index 8f6be86..bc29a98 100644
---- a/drivers/spi/spi-sun6i.c
-+++ b/drivers/spi/spi-sun6i.c
-@@ -153,6 +153,10 @@ static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
- 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
- }
- 
-+static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
-+{
-+	return SUN6I_FIFO_DEPTH - 1;
-+}
- 
- static int sun6i_spi_transfer_one(struct spi_master *master,
- 				  struct spi_device *spi,
-@@ -403,6 +407,7 @@ static int sun6i_spi_probe(struct platform_device *pdev)
- 	master->bits_per_word_mask = SPI_BPW_MASK(8);
- 	master->dev.of_node = pdev->dev.of_node;
- 	master->auto_runtime_pm = true;
-+	master->max_transfer_size = sun6i_spi_max_transfer_size;
- 
- 	sspi->hclk = devm_clk_get(&pdev->dev, "ahb");
- 	if (IS_ERR(sspi->hclk)) {
+First three patches fix issues with the current driver and can be of use for
+stable kernels so adding cc for those.
+
+I merged the sun4i and sun6i driver because there several issues that need to
+be fixed in both separately and they are even out of sync wrt some fixes.
+I guess some of the merge patches can be squashed.
+
+I tested this with A10s Olinuxino Micro. I have no sun6i device so I cannot
+tell if that side was broken by this patchset - especially the last patch that
+adds DMA was afaik never tested on sun6i.
+
+
+Emilio L?pez (1):
+  spi: sun4i: add DMA support
+
+Michal Suchanek (12):
+  spi: sunxi: set maximum and minimum speed of SPI master
+  spi: sunxi: fix transfer timeout
+  spi: sun4i: fix FIFO limit
+  spi: sunxi: expose maximum transfer size limit
+  spi: sun6i: update CS handling from spi-sun4i
+  spi: sunxi: rename sun4i,sun6i -> sunxi
+  spi: sunxi: rename constants to match between sun4i and sun6i
+  spi: sunxi: synchronize whitespace, comments, struct
+  spi: sunxi: use register map
+  spi: sunxi: merge sun4i and sun6i SPI driver
+  dt: spi: sun4i: merge sun4i and sun6i binding doc
+  spi: sunxi: remove CONFIG_SPI_SUN6I
+
+ .../devicetree/bindings/spi/spi-sun4i.txt          |  21 +-
+ .../devicetree/bindings/spi/spi-sun6i.txt          |  24 -
+ arch/arm/configs/multi_v7_defconfig                |   1 -
+ arch/arm/configs/sunxi_defconfig                   |   1 -
+ drivers/spi/Kconfig                                |  10 +-
+ drivers/spi/Makefile                               |   1 -
+ drivers/spi/spi-sun4i.c                            | 728 +++++++++++++++++----
+ drivers/spi/spi-sun6i.c                            | 482 --------------
+ 8 files changed, 600 insertions(+), 668 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/spi/spi-sun6i.txt
+ delete mode 100644 drivers/spi/spi-sun6i.c
+
 -- 
 2.8.1
