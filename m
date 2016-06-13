@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Jun 2016 15:29:26 -0700
-Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.8
-In-Reply-To: <cover.1465347183.git.horms+renesas@verge.net.au>
-References: <cover.1465347183.git.horms+renesas@verge.net.au>
-Message-ID: <20160613222926.GB29879@localhost>
+Date: Mon, 13 Jun 2016 15:38:21 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.8
+In-Reply-To: <cover.1465346599.git.horms+renesas@verge.net.au>
+References: <cover.1465346599.git.horms+renesas@verge.net.au>
+Message-ID: <20160613223821.GC29879@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 09:59:42AM +0900, Simon Horman wrote:
+On Wed, Jun 08, 2016 at 09:59:59AM +0900, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Renesas ARM64 based SoC DT updates for v4.8.
+> Please consider these Renesas ARM based SoC DT updates for v4.8.
 > 
 > 
 > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
@@ -19,20 +19,22 @@ On Wed, Jun 08, 2016 at 09:59:42AM +0900, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.8
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.8
 > 
-> for you to fetch changes up to 21cc405c8a6332ddad2d2751a9723b2b3e227a05:
+> for you to fetch changes up to b6960f19676e19f37a5e5a8af059fdf3b435d2f4:
 > 
->   arm64: dts: r8a7795: Drop 0x from unit address of gic (2016-05-30 10:18:01 +0900)
+>   ARM: dts: silk: Fix W=1 dtc warnings (2016-05-30 09:37:13 +0900)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM64 Based SoC DT Updates for v4.8
+> Renesas ARM Based SoC DT Updates for v4.8
 > 
-> * Fix W=1 dtc warnings and other cleanups
-> * Enable watchdog timer
-> * Enable DMA for I2C
-> * Increase the size of GIC-400 mapped registers: be nicer to hypervisors
-> * Support RTS/CTS hardware flow control
+> * Fix W=1 dtc warnings
+> * Reverence both DMA controllers on R-Car Gen 2 SoCs
+> * Remove nonexistent thermal sensor clock from r8a7794 SoC
+> * Correct unit names for cpu nodes on r8a7790 SoC
+> * Add MMCIF0 to r8a7793 SoC
+> * RTS/CTS hardware flow control for kzm9g and bockw boards
+> 
 
 Merged, thanks.
 
