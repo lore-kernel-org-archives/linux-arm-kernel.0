@@ -1,42 +1,34 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Jun 2016 15:00:44 +0100
-Subject: [PATCH 0/5] arm/arm64: KVM: Tighten memory protection flags
-Message-ID: <1465826449-14349-1-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 13 Jun 2016 15:00:46 +0100
+Subject: [PATCH 2/5] arm64: Add PTE_HYP_XN page table flag
+In-Reply-To: <1465826449-14349-1-git-send-email-marc.zyngier@arm.com>
+References: <1465826449-14349-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1465826449-14349-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, the HYP mappings have been fairly relaxed: everything is
-RWX. Oddly enough, not everybody is fond of this kind of permissions
-at the highest exception level.
+EL2 page tables can be configured to deny code from being
+executed, which is done by setting bit 54 in the page descriptor.
 
-This small series tightens it a bit by making:
-- the text mapping read-only
-- the rodata mapping read-only + no-exec
-- everything else read-write + no-exec
+It is the same bit as PTE_UXN, but the "USER" reference felt odd
+in the hypervisor code.
 
-Of course, that's only valid when VHE is not in action. Tested on
-Seattle and Cubietruck, based on 4.7-rc2.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/pgtable-hwdef.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-
-	M.
-
-Marc Zyngier (5):
-  arm/arm64: KVM: Add a protection parameter to create_hyp_mappings
-  arm64: Add PTE_HYP_XN page table flag
-  arm/arm64: KVM: Enforce HYP read-only mapping of the kernel's rodata
-    section
-  arm/arm64: KVM: Map the HYP text as read-only
-  arm/arm64: KVM: Make default HYP mappings non-excutable
-
- arch/arm/include/asm/kvm_mmu.h         |  2 +-
- arch/arm/include/asm/pgtable.h         |  4 +++-
- arch/arm/kvm/arm.c                     | 13 +++++++------
- arch/arm/kvm/mmu.c                     |  7 ++++---
- arch/arm64/include/asm/kvm_mmu.h       |  2 +-
- arch/arm64/include/asm/pgtable-hwdef.h |  1 +
- arch/arm64/include/asm/pgtable-prot.h  |  4 +++-
- 7 files changed, 20 insertions(+), 13 deletions(-)
-
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 2813748..c3ae239 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -164,6 +164,7 @@
+ #define PTE_CONT		(_AT(pteval_t, 1) << 52)	/* Contiguous range */
+ #define PTE_PXN			(_AT(pteval_t, 1) << 53)	/* Privileged XN */
+ #define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
++#define PTE_HYP_XN		(_AT(pteval_t, 1) << 54)	/* HYP XN */
+ 
+ /*
+  * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
 -- 
 2.1.4
