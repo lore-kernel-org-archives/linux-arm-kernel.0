@@ -1,52 +1,34 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 13 Jun 2016 22:04:38 +0300
-Subject: [RESEND PATCHv2 04/28] ARM: OMAP2+: hwmod: use new ti_clk_get API to
- search for clock handles
+Date: Mon, 13 Jun 2016 22:04:36 +0300
+Subject: [RESEND PATCHv2 02/28] clk: ti: dpll: use ti_clk_get to fetch
+ ref/bypass clocks
 In-Reply-To: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
 References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1465844702-12200-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1465844702-12200-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new API avoids the need to add clock aliases for most of the clocks,
-should use of it is preferred. Many of the existing clock aliases are
-only created because of hwmod data.
+This allows getting rid of the DT_CLK() aliases under drivers/clk/ti.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/clk/ti/dpll.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 83cb527..0ea869c 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -786,7 +786,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
- 	if (!oh->main_clk)
- 		return 0;
+diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+index 9fc8754..39ba010 100644
+--- a/drivers/clk/ti/dpll.c
++++ b/drivers/clk/ti/dpll.c
+@@ -220,8 +220,8 @@ struct clk *ti_clk_register_dpll(struct ti_clk *setup)
+ 	if (dpll->num_parents < 2)
+ 		return ERR_PTR(-EINVAL);
  
--	oh->_clk = clk_get(NULL, oh->main_clk);
-+	oh->_clk = ti_clk_get(oh->main_clk);
- 	if (IS_ERR(oh->_clk)) {
- 		pr_warn("omap_hwmod: %s: cannot clk_get main_clk %s\n",
- 			oh->name, oh->main_clk);
-@@ -831,7 +831,7 @@ static int _init_interface_clks(struct omap_hwmod *oh)
- 		if (!os->clk)
- 			continue;
+-	clk_ref = clk_get_sys(NULL, dpll->parents[0]);
+-	clk_bypass = clk_get_sys(NULL, dpll->parents[1]);
++	clk_ref = ti_clk_get(dpll->parents[0]);
++	clk_bypass = ti_clk_get(dpll->parents[1]);
  
--		c = clk_get(NULL, os->clk);
-+		c = ti_clk_get(os->clk);
- 		if (IS_ERR(c)) {
- 			pr_warn("omap_hwmod: %s: cannot clk_get interface_clk %s\n",
- 				oh->name, os->clk);
-@@ -868,7 +868,7 @@ static int _init_opt_clks(struct omap_hwmod *oh)
- 	int ret = 0;
- 
- 	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
--		c = clk_get(NULL, oc->clk);
-+		c = ti_clk_get(oc->clk);
- 		if (IS_ERR(c)) {
- 			pr_warn("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
- 				oh->name, oc->clk);
+ 	if (IS_ERR_OR_NULL(clk_ref) || IS_ERR_OR_NULL(clk_bypass))
+ 		return ERR_PTR(-EAGAIN);
 -- 
 1.9.1
