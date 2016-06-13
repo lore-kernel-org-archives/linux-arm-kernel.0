@@ -1,40 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Jun 2016 21:26:49 +0200
-Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
-In-Reply-To: <20160613152409.GD3240@piout.net>
-References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
- <11395561.bQatt85IOg@wuerfel> <20160613152409.GD3240@piout.net>
-Message-ID: <6120818.MyeJZ74hYa@wuerfel>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 13 Jun 2016 13:45:14 -0600
+Subject: [PATCH] media: s5p-mfc fix memory leak in s5p_mfc_remove()
+Message-ID: <1465847114-7427-1-git-send-email-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 13, 2016 5:24:09 PM CEST Alexandre Belloni wrote:
-> On 11/06/2016 at 00:30:36 +0200, Arnd Bergmann wrote :
-> > On Saturday, June 11, 2016 12:03:04 AM CEST Alexandre Belloni wrote:
-> > > From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> > > 
-> > > Fix the main and slow clock .prepare() implementations which used to call
-> > > usleep() when the scheduler wasn't ready yet.
-> > > 
-> > 
-> > Does this have to be called that early? It seems wasteful to always
-> > call udelay() here, when these are functions that are normally
-> > allowed to sleep.
-> > 
-> 
-> So I've tested it and something like that would work:
-> 
->         if (system_state < SYSTEM_RUNNING)
->                 udelay(osc->startup_usec);
->         else
->                 usleep_range(osc->startup_usec, osc->startup_usec + 1);
+s5p_mfc_remove() fails to release encoder and decoder video devices.
 
-I think that's reasonable in this case.
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-> But I'm afraid it would be the first driver to actually do something
-> like that (however, it is already the only driver trying to sleep). 
+Changes since v1:
+- Addressed comments from Javier Martinez Canillas and added
+  his reviewed by:
 
-We have a lot of drivers that call potentially sleeping function from
-the .prepare callback, e.g. when they go to an i2c controller.
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-	Arnd
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index 274b4f1..f537b74 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -1318,6 +1318,8 @@ static int s5p_mfc_remove(struct platform_device *pdev)
+ 
+ 	video_unregister_device(dev->vfd_enc);
+ 	video_unregister_device(dev->vfd_dec);
++	video_device_release(dev->vfd_enc);
++	video_device_release(dev->vfd_dec);
+ 	v4l2_device_unregister(&dev->v4l2_dev);
+ 	s5p_mfc_release_firmware(dev);
+ 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[0]);
+-- 
+2.7.4
