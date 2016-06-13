@@ -1,144 +1,111 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 13 Jun 2016 16:03:07 +0100
-Subject: [PATCH 08/10] ARM: V7M: Wire up caches for V7M processors with cache
- support.
+Date: Mon, 13 Jun 2016 16:03:03 +0100
+Subject: [PATCH 04/10] ARM: V7M: Add support for reading the CTR with
+ CPUID_CACHETYPE
 In-Reply-To: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
 References: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1465830189-20128-9-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1465830189-20128-5-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jonathan Austin <jonathan.austin@arm.com>
 
-This patch does the plumbing required to invoke the V7M cache code added
-in earlier patches in this series, although there is no users for that
-yet.
+With the addition of caches to the V7M Architecture a new Cache Type Register
+(CTR) is defined at 0xE000ED7C. This register serves the same purpose as the
+V7A/R version, called CPUID_CACHETYPE in the kernel.
 
-In order to honour the I/D cache disable config options, this patch changes
-the mechanism by which the CCR is set on boot, to be more like V7A/R.
+This patch adds appropriate definitions to the cpuid macros to allow the CTR to
+be read with read_cpuid(reg).
 
 Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/glue-cache.h |    4 ----
- arch/arm/kernel/head-nommu.S      |   16 +++++++++++++++-
- arch/arm/mm/Kconfig               |    7 ++++---
- arch/arm/mm/Makefile              |    4 ++++
- arch/arm/mm/proc-v7m.S            |    5 ++---
- 5 files changed, 25 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/include/asm/glue-cache.h b/arch/arm/include/asm/glue-cache.h
-index cab07f6..01c3d92 100644
---- a/arch/arm/include/asm/glue-cache.h
-+++ b/arch/arm/include/asm/glue-cache.h
-@@ -118,11 +118,7 @@
- #endif
+Changelog:
+
+    RFC -> v1
+        - use linux/io.h instead of asm/io.h (per Russell)
+        - droped cast to void pointer in set_csselr; BASEADDR_V7M_SCB
+          is already defined with a help of IOMEM macro (per Russell)
+
+ arch/arm/include/asm/cachetype.h |   15 +++++++++++++++
+ arch/arm/include/asm/cputype.h   |    3 ++-
+ arch/arm/kernel/setup.c          |    9 +++++----
+ 3 files changed, 22 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/include/asm/cachetype.h b/arch/arm/include/asm/cachetype.h
+index 8609de8..01509ae 100644
+--- a/arch/arm/include/asm/cachetype.h
++++ b/arch/arm/include/asm/cachetype.h
+@@ -67,6 +67,7 @@ static inline unsigned int __attribute__((pure)) cacheid_is(unsigned int mask)
+ #define CSSELR_L6	(5 << 1)
+ #define CSSELR_L7	(6 << 1)
  
- #if defined(CONFIG_CPU_V7M)
--# ifdef _CACHE
- #  define MULTI_CACHE 1
--# else
--#  define _CACHE nop
--# endif
- #endif
- 
- #if !defined(_CACHE) && !defined(MULTI_CACHE)
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index fb1a69e..6b4eb27 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -158,7 +158,21 @@ __after_proc_init:
- 	bic	r0, r0, #CR_V
- #endif
- 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
--#endif /* CONFIG_CPU_CP15 */
-+#elif defined (CONFIG_CPU_V7M)
-+	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
-+#ifdef CONFIG_CPU_DCACHE_DISABLE
-+	bic	r0, r0, #V7M_SCB_CCR_DC
++#ifndef CONFIG_CPU_V7M
+ static inline void set_csselr(unsigned int cache_selector)
+ {
+ 	asm volatile("mcr p15, 2, %0, c0, c0, 0" : : "r" (cache_selector));
+@@ -79,5 +80,19 @@ static inline unsigned int read_ccsidr(void)
+ 	asm volatile("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
+ 	return val;
+ }
++#else /* CONFIG_CPU_V7M */
++#include <linux/io.h>
++#include "asm/v7m.h"
++
++static inline void set_csselr(unsigned int cache_selector)
++{
++	writel(cache_selector, BASEADDR_V7M_SCB + V7M_SCB_CTR);
++}
++
++static inline unsigned int read_ccsidr(void)
++{
++	return readl(BASEADDR_V7M_SCB + V7M_SCB_CCSIDR);
++}
 +#endif
-+#ifdef CONFIG_CPU_BPREDICT_DISABLE
-+	bic	r0, r0, #V7M_SCB_CCR_BP
-+#endif
-+#ifdef CONFIG_CPU_ICACHE_DISABLE
-+	bic	r0, r0, #V7M_SCB_CCR_IC
-+#endif
-+	movw	r3, #:lower16:(BASEADDR_V7M_SCB + V7M_SCB_CCR)
-+	movt	r3, #:upper16:(BASEADDR_V7M_SCB + V7M_SCB_CCR)
-+	str	r0, [r3]
-+#endif /* CONFIG_CPU_CP15 elif CONFIG_CPU_V7M */
- 	ret	lr
- ENDPROC(__after_proc_init)
- 	.ltorg
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index cb569b6..50afaf0 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -403,6 +403,7 @@ config CPU_V7M
- 	bool
- 	select CPU_32v7M
- 	select CPU_ABRT_NOMMU
-+	select CPU_CACHE_V7
- 	select CPU_CACHE_NOP
- 	select CPU_PABRT_LEGACY
- 	select CPU_THUMBONLY
-@@ -750,14 +751,14 @@ config CPU_HIGH_VECTOR
  
- config CPU_ICACHE_DISABLE
- 	bool "Disable I-Cache (I-bit)"
--	depends on CPU_CP15 && !(CPU_ARM720T || CPU_ARM740T || CPU_XSCALE || CPU_XSC3)
-+	depends on (CPU_CP15 && !(CPU_ARM720T || CPU_ARM740T || CPU_XSCALE || CPU_XSC3)) || CPU_V7M
- 	help
- 	  Say Y here to disable the processor instruction cache. Unless
- 	  you have a reason not to or are unsure, say N.
+ #endif
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index a689034..2f90cd0 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -7,7 +7,7 @@
+ #ifdef CONFIG_CPU_V7M
  
- config CPU_DCACHE_DISABLE
- 	bool "Disable D-Cache (C-bit)"
--	depends on CPU_CP15 && !SMP
-+	depends on (CPU_CP15 && !SMP) || CPU_V7M
- 	help
- 	  Say Y here to disable the processor data cache. Unless
- 	  you have a reason not to or are unsure, say N.
-@@ -792,7 +793,7 @@ config CPU_CACHE_ROUND_ROBIN
+ #define CPUID_ID	0x0
+-#define CPUID_CACHETYPE	-1
++#define CPUID_CACHETYPE	0x7c
+ #define CPUID_TCM	-1
+ #define CPUID_TLBTYPE	-1
+ #define CPUID_MPIDR	-1
+@@ -126,6 +126,7 @@ static inline unsigned int __attribute_const__ read_cpuid(unsigned offset)
+ {
+ 	switch (offset) {
+ 	case CPUID_ID:
++	case CPUID_CACHETYPE:
+ 		return readl(BASEADDR_V7M_SCB + offset);
+ 	default:
+ 		WARN_ON_ONCE(1);
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index e414f50..3698728 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -313,11 +313,12 @@ static void __init cacheid_init(void)
+ {
+ 	unsigned int arch = cpu_architecture();
  
- config CPU_BPREDICT_DISABLE
- 	bool "Disable branch prediction"
--	depends on CPU_ARM1020 || CPU_V6 || CPU_V6K || CPU_MOHAWK || CPU_XSC3 || CPU_V7 || CPU_FA526
-+	depends on CPU_ARM1020 || CPU_V6 || CPU_V6K || CPU_MOHAWK || CPU_XSC3 || CPU_V7 || CPU_FA526 || CPU_V7M
- 	help
- 	  Say Y here to disable branch prediction.  If unsure, say N.
- 
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 7f76d96..cf4709d 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -45,7 +45,11 @@ obj-$(CONFIG_CPU_CACHE_FA)	+= cache-fa.o
- obj-$(CONFIG_CPU_CACHE_NOP)	+= cache-nop.o
- 
- AFLAGS_cache-v6.o	:=-Wa,-march=armv6
-+ifneq ($(CONFIG_CPU_V7M),y)
- AFLAGS_cache-v7.o	:=-Wa,-march=armv7-a
-+else
-+AFLAGS_cache-v7.o	:=-Wa,-march=armv7-m
-+endif
- 
- obj-$(CONFIG_CPU_COPY_V4WT)	+= copypage-v4wt.o
- obj-$(CONFIG_CPU_COPY_V4WB)	+= copypage-v4wb.o
-diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-index 7229d8d..11f5816 100644
---- a/arch/arm/mm/proc-v7m.S
-+++ b/arch/arm/mm/proc-v7m.S
-@@ -118,9 +118,8 @@ __v7m_setup:
- 
- 	@ Configure the System Control Register to ensure 8-byte stack alignment
- 	@ Note the STKALIGN bit is either RW or RAO.
--	ldr	r12, [r0, V7M_SCB_CCR]	@ system control register
--	orr	r12, #V7M_SCB_CCR_STKALIGN
--	str	r12, [r0, V7M_SCB_CCR]
-+	ldr	r0, [r0, V7M_SCB_CCR]   @ system control register
-+	orr	r0, #V7M_SCB_CCR_STKALIGN
- 	ret	lr
- ENDPROC(__v7m_setup)
- 
+-	if (arch == CPU_ARCH_ARMv7M) {
+-		cacheid = 0;
+-	} else if (arch >= CPU_ARCH_ARMv6) {
++	if (arch >= CPU_ARCH_ARMv6) {
+ 		unsigned int cachetype = read_cpuid_cachetype();
+-		if ((cachetype & (7 << 29)) == 4 << 29) {
++
++		if ((arch == CPU_ARCH_ARMv7M) && !cachetype) {
++			cacheid = 0;
++		} else if ((cachetype & (7 << 29)) == 4 << 29) {
+ 			/* ARMv7 register format */
+ 			arch = CPU_ARCH_ARMv7;
+ 			cacheid = CACHEID_VIPT_NONALIASING;
 -- 
 1.7.9.5
