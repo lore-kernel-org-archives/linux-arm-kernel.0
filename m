@@ -1,120 +1,183 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 13 Jun 2016 00:26:38 -0400
-Subject: [PATCH V7 6/9] vfio: platform: call _RST method when using ACPI
-In-Reply-To: <1465792001-27960-1-git-send-email-okaya@codeaurora.org>
-References: <1465792001-27960-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1465792001-27960-7-git-send-email-okaya@codeaurora.org>
+From: vikas.cha.sajjan@hpe.com (Sajjan, Vikas C)
+Date: Mon, 13 Jun 2016 04:47:24 +0000
+Subject: [PATCH v5 4/5] arm64: add support for ACPI Low Power Idle(LPI)
+In-Reply-To: <1462981062-24909-5-git-send-email-sudeep.holla@arm.com>
+References: <1462981062-24909-1-git-send-email-sudeep.holla@arm.com>
+ <1462981062-24909-5-git-send-email-sudeep.holla@arm.com>
+Message-ID: <DF4PR84MB0041D17321244DFB84979A84D9530@DF4PR84MB0041.NAMPRD84.PROD.OUTLOOK.COM>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree code checks for the presence of a reset driver and calls
-the of_reset function pointer by looking up the reset driver as a module.
+Hi Sudeep,
 
-ACPI defines _RST method to perform device level reset. After the _RST
-method is executed, the OS can resume using the device. _RST method is
-expected to stop DMA transfers and IRQs.
+-----Original Message-----
+From: Sudeep Holla [mailto:sudeep.holla at arm.com] 
+Sent: Wednesday, May 11, 2016 9:08 PM
+To: linux-acpi at vger.kernel.org; Rafael J. Wysocki <rjw@rjwysocki.net>
+Cc: Sudeep Holla <sudeep.holla@arm.com>; linux-kernel at vger.kernel.org; Sajjan, Vikas C <vikas.cha.sajjan@hpe.com>; Lakshminarasimha, Sunil Vishwanathpur <sunil.vl@hpe.com>; Prashanth Prakash <pprakash@codeaurora.org>; Ashwin Chaugule <ashwin.chaugule@linaro.org>; Al Stone <al.stone@linaro.org>; Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>; Mark Rutland <mark.rutland@arm.com>; linux-arm-kernel at lists.infradead.org
+Subject: [PATCH v5 4/5] arm64: add support for ACPI Low Power Idle(LPI)
 
-This patch introduces two functions as vfio_platform_acpi_has_reset and
-vfio_platform_acpi_call_reset. The has reset method is used to declare
-reset capability via the ioctl flag VFIO_DEVICE_FLAGS_RESET. The call
-reset function is used to execute the _RST ACPI method.
+This patch adds appropriate callbacks to support ACPI Low Power Idle
+(LPI) on ARM64.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/vfio/platform/vfio_platform_common.c | 51 ++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ arch/arm64/kernel/acpi.c | 48 +++++++++++++++++++++++++++++++++++++++++
+ drivers/firmware/psci.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 104 insertions(+)
 
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index e7ce2c2..0ea8c26 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -73,21 +73,66 @@ static int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c index d1ce8e2f98b9..bf82ce5c8fce 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -18,6 +18,7 @@
+ #include <linux/acpi.h>
+ #include <linux/bootmem.h>
+ #include <linux/cpumask.h>
++#include <linux/cpu_pm.h>
+ #include <linux/init.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+@@ -25,6 +26,9 @@
+ #include <linux/of_fdt.h>
+ #include <linux/smp.h>
+ 
++#include <acpi/processor.h>
++
++#include <asm/cpuidle.h>
+ #include <asm/cputype.h>
+ #include <asm/cpu_ops.h>
+ #include <asm/smp_plat.h>
+@@ -211,6 +215,50 @@ void __init acpi_boot_table_init(void)
  	}
- 	return 0;
  }
+ 
++int acpi_processor_ffh_lpi_probe(unsigned int cpu) {
++	return arm_cpuidle_init(cpu);
++}
 +
-+static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev,
-+					 const char **extra_dbg)
-+{
-+	struct device *dev = vdev->device;
-+	acpi_handle handle = ACPI_HANDLE(dev);
-+	acpi_status acpi_ret;
-+	unsigned long long val;
++#define ACPI_FFH_LPI_ARM_FLAGS_CORE_CONTEXT	BIT(0)
++#define ACPI_FFH_LPI_ARM_FLAGS_TRACE_CONTEXT	BIT(1)
++#define ACPI_FFH_LPI_ARM_FLAGS_GICR_CONTEXT	BIT(2)
++#define ACPI_FFH_LPI_ARM_FLAGS_GICD_CONTEXT	BIT(3)
++#define ACPI_FFH_LPI_ARM_FLAGS_ALL_CONTEXT	\
++	(ACPI_FFH_LPI_ARM_FLAGS_CORE_CONTEXT |	\
++	 ACPI_FFH_LPI_ARM_FLAGS_TRACE_CONTEXT |	\
++	 ACPI_FFH_LPI_ARM_FLAGS_GICR_CONTEXT |	\
++	 ACPI_FFH_LPI_ARM_FLAGS_GICD_CONTEXT)
 +
-+	acpi_ret = acpi_evaluate_integer(handle, "_RST", NULL, &val);
-+	if (ACPI_FAILURE(acpi_ret)) {
-+		if (extra_dbg)
-+			*extra_dbg = acpi_format_exception(acpi_ret);
-+		return -EINVAL;
++struct acpi_lpi_state *lpi;
++int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi, int idx) {
++	int ret = 0;
++	bool save_ctx = lpi->arch_flags & ACPI_FFH_LPI_ARM_FLAGS_ALL_CONTEXT;
++
++	if (!idx) {
++		cpu_do_idle();
++		return idx;
 +	}
 +
++	/* TODO cpu_pm_{enter,exit} can be done in generic code ? */
++	if (save_ctx)
++		ret = cpu_pm_enter();
++	if (!ret) {
++		/*
++		 * Pass idle state index to cpu_suspend which in turn will
++		 * call the CPU ops suspend protocol with idle index as a
++		 * parameter.
++		 */
++		ret = arm_cpuidle_suspend(idx);
++
++		if (save_ctx)
++			cpu_pm_exit();
++	}
++
++	return ret ? -1 : idx;
++}
++
+ #ifdef CONFIG_ACPI_APEI
+ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)  { diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c index fa4ea22ca12e..e06bfee68e1d 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -13,6 +13,7 @@
+ 
+ #define pr_fmt(fmt) "psci: " fmt
+ 
++#include <linux/acpi.h>
+ #include <linux/arm-smccc.h>
+ #include <linux/cpuidle.h>
+ #include <linux/errno.h>
+@@ -310,11 +311,66 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ 	return ret;
+ }
+ 
++#ifdef CONFIG_ACPI
++#include <acpi/processor.h>
++
++static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu) {
++	int i, count;
++	u32 *psci_states;
++	struct acpi_processor *pr;
++	struct acpi_lpi_state *lpi;
++
++	pr = per_cpu(processors, cpu);
++	if (unlikely(!pr || !pr->flags.has_lpi))
+
+Any particular reason for _not_ considering CST flag here.
+Or you are planning to add CST support in some other patch set.
+
++		return -EINVAL;
++
++	/*
++	 * If the PSCI cpu_suspend function hook has not been initialized
++	 * idle states must not be enabled, so bail out
++	 */
++	if (!psci_ops.cpu_suspend)
++		return -EOPNOTSUPP;
++
++	count = pr->power.count - 1;
++	if (!count)
++		return -ENODEV;
++
++	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
++	if (!psci_states)
++		return -ENOMEM;
++
++	for (i = 0; i < count; i++) {
++		u32 state;
++
++		lpi = &pr->power.lpi_states[i + 1];
+
+  Same case here too.
+
++		state = lpi->address & 0xFFFFFFFF;
++		if (!psci_power_state_is_valid(state)) {
++			pr_warn("Invalid PSCI power state %#x\n", state);
++			kfree(psci_states);
++			return -EINVAL;
++		}
++		psci_states[i] = state;
++	}
++	/* Idle states parsed correctly, initialize per-cpu pointer */
++	per_cpu(psci_power_state, cpu) = psci_states;
 +	return 0;
 +}
-+
-+static bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
-+{
-+	struct device *dev = vdev->device;
-+	acpi_handle handle = ACPI_HANDLE(dev);
-+
-+	return acpi_has_method(handle, "_RST");
++#else
++static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu) {
++	return -EINVAL;
 +}
- #else
- static inline int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
- 					   struct device *dev)
- {
- 	return -ENOENT;
- }
++#endif
 +
-+static inline
-+int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev,
-+				  const char **extra_dbg)
-+{
-+	return -ENOENT;
-+}
-+
-+static inline
-+bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
-+{
-+	return false;
-+}
- #endif
+ int psci_cpu_init_idle(unsigned int cpu)  {
+ 	struct device_node *cpu_node;
+ 	int ret;
  
- static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
- {
-+	if (vdev->acpihid)
-+		return vfio_platform_acpi_has_reset(vdev);
++	if (!acpi_disabled)
++		return psci_acpi_cpu_init_idle(cpu);
 +
- 	return vdev->of_reset ? true : false;
- }
- 
- static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
- {
-+	if (vdev->acpihid)
-+		return;
-+
- 	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
- 						    &vdev->reset_module);
- 	if (!vdev->of_reset) {
-@@ -99,6 +144,9 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
- 
- static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
- {
-+	if (vdev->acpihid)
-+		return;
-+
- 	if (vdev->of_reset)
- 		module_put(vdev->reset_module);
- }
-@@ -177,6 +225,9 @@ static int vfio_platform_call_reset(struct vfio_platform_device *vdev,
- 	if (vdev->of_reset) {
- 		dev_info(vdev->device, "reset\n");
- 		return vdev->of_reset(vdev);
-+	} else if (vdev->acpihid) {
-+		dev_info(vdev->device, "reset\n");
-+		return vfio_platform_acpi_call_reset(vdev, extra_dbg);
- 	}
- 
- 	dev_warn(vdev->device, "no reset function found!\n");
--- 
-1.8.2.1
+ 	cpu_node = of_get_cpu_node(cpu, NULL);
+ 	if (!cpu_node)
+ 		return -ENODEV;
+--
+1.9.1
