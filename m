@@ -1,16 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Jun 2016 15:44:42 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.8
-In-Reply-To: <cover.1465347025.git.horms+renesas@verge.net.au>
-References: <cover.1465347025.git.horms+renesas@verge.net.au>
-Message-ID: <20160613224442.GE29879@localhost>
+Date: Mon, 13 Jun 2016 15:54:19 -0700
+Subject: [GIT PULL] ARM: dts: exynos: Fixes for v4.7
+In-Reply-To: <1465830314-3942-1-git-send-email-k.kozlowski@samsung.com>
+References: <1465830314-3942-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160613225419.GJ29879@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 10:00:19AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Mon, Jun 13, 2016 at 05:05:14PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
-> Please consider these Renesas ARM based SoC updates for v4.8.
+> Two fixes for current release cycle (regressions).
+> 
+> Best regards,
+> Krzysztof
 > 
 > 
 > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
@@ -19,28 +22,22 @@ On Wed, Jun 08, 2016 at 10:00:19AM +0900, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.8
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.7-2
 > 
-> for you to fetch changes up to c94bc815f3c757df402d6f6a3e8d855b9168e6af:
+> for you to fetch changes up to a7d7865fecd83adb98b20eca5eddef7efc94831d:
 > 
->   ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on all SoCs (2016-05-30 09:39:43 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC Updates for v4.8
-> 
-> * Use ICRAM1 for jump stub on R-Car Gen 2 SoCs
-> * Postpone call to pm_genpd_init
+>   ARM: dts: exynos: Fix port nodes names for Exynos5420 Peach Pit board (2016-06-07 11:00:39 +0200)
 > 
 > ----------------------------------------------------------------
-> Geert Uytterhoeven (2):
->       ARM: shmobile: pm-rmobile: Postpone call to pm_genpd_init()
->       ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on all SoCs
+> Fixes for Exynos-based Snow and Peach Pit boards for regressions introduced in
+> 4.7-rc1 because OF graph logic expects specific names of child nodes.
 > 
->  arch/arm/mach-shmobile/pm-rcar-gen2.c | 13 ++++---------
->  arch/arm/mach-shmobile/pm-rmobile.c   |  2 +-
->  2 files changed, 5 insertions(+), 10 deletions(-)
+> ----------------------------------------------------------------
+> Javier Martinez Canillas (2):
+>       ARM: dts: exynos: Fix port nodes names for Exynos5250 Snow board
+>       ARM: dts: exynos: Fix port nodes names for Exynos5420 Peach Pit board
 
-Merged, thanks.
+Thanks, merged.
 
 
 -Olof
