@@ -1,28 +1,59 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 13 Jun 2016 10:54:09 +0800
-Subject: [PATCH 01/11] clk: imx: clk-pllv3: fix incorrect handle of enet
- powerdown bit
-In-Reply-To: <CAA+hA=SuPhCnieX1w5Rm6AtypvbiBHmD=HUFOOmiicT9Px-dFw@mail.gmail.com>
-References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
- <CAA+hA=SuPhCnieX1w5Rm6AtypvbiBHmD=HUFOOmiicT9Px-dFw@mail.gmail.com>
-Message-ID: <20160613025409.GH20243@tiger>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 13 Jun 2016 11:01:53 +0800
+Subject: [linux-sunxi] [PATCH] [V2] ARM: dts: sun7i: Add dts file for
+ Bananapi M1 Plus board
+In-Reply-To: <20160610093851.GQ5242@lukather>
+References: <20160602023623.5761-1-luoyi.ly@gmail.com>
+ <CAGRGNgUiGaxoVxtq=k8NG5mCqEXS9fd-ry1vvVJfzb+R2ATMTA@mail.gmail.com>
+ <20160602081638.GG4908@lukather> <574FF94B.3020309@web.de>
+ <20160610093851.GQ5242@lukather>
+Message-ID: <CAGb2v64PYU9H7Ag45ogwtjJAO87D6saTFv5-4P_E7d1xobQXXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12, 2016 at 10:56:38PM +0800, Dong Aisheng wrote:
-> Hi Shawn,
-> 
-> On Wed, Jun 8, 2016 at 10:33 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
-> > After commit f53947456f98 ("ARM: clk: imx: update pllv3 to support imx7"),
-> > the former used BM_PLL_POWER bit is not correct anymore for IMX7 ENET.
-> > Instead, pll->powerdown holds the correct bit, so using powerdown bit
-> > in clk_pllv3_{prepare | unprepare} functions.
-> >
-> > Fixes: f53947456f98 ("ARM: clk: imx: update pllv3 to support imx7")
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> 
-> Any comments about this one?
+On Fri, Jun 10, 2016 at 5:38 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Jun 02, 2016 at 11:15:55AM +0200, Bernhard Nortmann wrote:
+>> Am 02.06.2016 um 10:16 schrieb Maxime Ripard:
+>> >[...]
+>> >Yes, everything that is shared with the banana-pro (which, judging
+>> >from Bernhard, is pretty much everything but a GPIO) should be merged
+>> >in the banapro DT.
+>> >
+>> >Maxime
+>> >
+>>
+>> Don't take my word for granted, as I do not own this hardware or know it
+>> particularly well. There is no doubt that "BPi-M1+" and "Banana Pro" are
+>> very similar, but if in doubt the information form the wiki should be
+>> verified.
+>
+> Hmmmm, ok. Chen-Yu, any input on this? You know the banana-pis much
+> more than I do.
 
-Sorry.  I thought I had applied it.  Applied it now, thanks.
+I did a comparison of the "Banana Pro" vs the "BPi-M1+".
 
-Shawn
+The differences are similar to what we have with any other development
+board, say the Cubietruck:
+
+  - A different WiFi chip is used, and the BT part is not hooked up.
+  - Different GPIOs for external power regulator/switches
+  - Different GPIOs for LEDs
+  - Different peripherals exposed on the headers.
+
+IMO There's no need to merge or have a common .dtsi for the two boards.
+They (and all the other development boards) look similar because
+everyone is following the basic set by Allwinner's reference design,
+like which MMC controller and pins are used for SD/MMC, which ones
+are used for SDIO-based WiFi, and so on.
+
+I did a version completely from scratch using just the schematics:
+
+  https://github.com/wens/linux/commits/bpi-m1-plus
+
+Please ignore the last commit. It's just me playing with NTP support
+for GPS time.
+
+
+Regards
+ChenYu
