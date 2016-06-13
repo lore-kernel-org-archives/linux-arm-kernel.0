@@ -1,101 +1,32 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Mon, 13 Jun 2016 15:50:17 +0900
-Subject: [PATCH v13 05/10] arm64: Kprobes with single stepping support
-In-Reply-To: <575E3235.1020904@linaro.org>
-References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
- <1464924384-15269-6-git-send-email-dave.long@linaro.org>
- <20160608100714.4abbcebcf356eb72173d0ce3@kernel.org>
- <575E3235.1020904@linaro.org>
-Message-ID: <20160613155017.860097875e8bc86563a065ce@kernel.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Jun 2016 08:50:45 +0200
+Subject: [PATCH] pinctrl: nomadik: fix warnings from unexported functions
+In-Reply-To: <1465402062-26122-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465402062-26122-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <CACRpkdavZ9hhrXKAd71_xt7bU6cPyHRynzJeWf+v+p3DMYhnNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jun 2016 00:10:29 -0400
-David Long <dave.long@linaro.org> wrote:
+On Wed, Jun 8, 2016 at 6:07 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
 
-> >> ---
-> >>   arch/arm64/Kconfig                      |   1 +
-> >>   arch/arm64/include/asm/debug-monitors.h |   5 +
-> >>   arch/arm64/include/asm/insn.h           |   4 +-
-> >>   arch/arm64/include/asm/kprobes.h        |  60 ++++
-> >>   arch/arm64/include/asm/probes.h         |  44 +++
-> >>   arch/arm64/kernel/Makefile              |   1 +
-> >>   arch/arm64/kernel/debug-monitors.c      |  18 +-
-> >>   arch/arm64/kernel/kprobes-arm64.c       | 144 +++++++++
-> >>   arch/arm64/kernel/kprobes-arm64.h       |  35 +++
-> >>   arch/arm64/kernel/kprobes.c             | 526 ++++++++++++++++++++++++++++++++
-> >
-> > Not sure why kprobes.c and kprobes-arm64.c are splitted.
-> >
-> >
-> 
-> This comes from the model of the arm32 kprobes code where handling of 
-> the low-level instruction simulation is implemented in separate files 
-> for 32-bit vs. thumb instructions.  It should make a little more sense 
-> in the future when additional instruction simulation code will hopefully 
-> be added for those instructions we cannot currently single-step 
-> out-of-line.  It also probably *could* be merged into one file.
+> There are five functions in the driver that are defined but
+> only used locally. Since these are not used in the current
+> kernel, delete them to avoid the following warnings:
+>
+> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1036:6: warning: symbol 'nmk_gpio_clocks_enable' was not declared. Should it be static?
+> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1050:6: warning: symbol 'nmk_gpio_clocks_disable' was not declared. Should it be static?
+> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1073:6: warning: symbol 'nmk_gpio_wakeups_suspend' was not declared. Should it be static?
+> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1094:6: warning: symbol 'nmk_gpio_wakeups_resume' was not declared. Should it be static?
+> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1120:6: warning: symbol 'nmk_gpio_read_pull' was not declared. Should it be static?
+>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-gpio at vger.kernel.org
 
-Hmm, at least the name of arch/arm64/kernel/kprobes-arm64.c is
-meaningless. As we've done in x86, I think we can make it 
-arch/arm64/kernel/kprobes/decode-insn.{c,h}
+Patch applied.
 
-
-[..]
-> >> +
-> >> +/* Return:
-> >> + *   INSN_REJECTED     If instruction is one not allowed to kprobe,
-> >> + *   INSN_GOOD         If instruction is supported and uses instruction slot,
-> >> + *   INSN_GOOD_NO_SLOT If instruction is supported but doesn't use its slot.
-> >
-> > Is there any chance to return INSN_GOOD_NO_SLOT?
-> >
-> 
-> Ah, that gets used later when simulation support is added.  I've removed 
-> this enum value from this commit and will add it to the later one. 
-> Please no one complain about using an enum instead of a bool, it will 
-> eventually have three possible values.
-
-OK :)
-
-[..]
-> >> +enum kprobe_insn __kprobes
-> >> +arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
-> >> +{
-> >> +	enum kprobe_insn decoded;
-> >> +	kprobe_opcode_t insn = le32_to_cpu(*addr);
-> >> +	kprobe_opcode_t *scan_start = addr - 1;
-> >> +	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
-> >> +#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
-> >> +	struct module *mod;
-> >> +#endif
-> >> +
-> >> +	if (addr >= (kprobe_opcode_t *)_text &&
-> >> +	    scan_end < (kprobe_opcode_t *)_text)
-> >> +		scan_end = (kprobe_opcode_t *)_text;
-> >> +#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
-> >> +	else {
-> >> +		preempt_disable();
-> >> +		mod = __module_address((unsigned long)addr);
-> >> +		if (mod && within_module_init((unsigned long)addr, mod) &&
-> >> +			!within_module_init((unsigned long)scan_end, mod))
-> >> +			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
-> >> +		else if (mod && within_module_core((unsigned long)addr, mod) &&
-> >> +			!within_module_core((unsigned long)scan_end, mod))
-> >> +			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
-> >
-> > What happen if mod == NULL? it should be return error, isn't it?
-> >
-> 
-> No, it should be fine.  It just means it didn't have to do either of the 
-> extra checks to limit the end of the search through the code to the 
-> boundary of one of the corresponding module text sections. It means the 
-> instruction is in the regular kernel (non-module) text segment.
-
-Ah, I see. It is OK then. :)
-
-Thank you,
-
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+Yours,
+Linus Walleij
