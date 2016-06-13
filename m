@@ -1,39 +1,47 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 13 Jun 2016 17:05:14 +0200
-Subject: [GIT PULL] ARM: dts: exynos: Fixes for v4.7
-Message-ID: <1465830314-3942-1-git-send-email-k.kozlowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Jun 2016 17:07:33 +0200
+Subject: [PATCH] dma: xilinx-vdma: add some sanity checks
+Message-ID: <1465830523-2484498-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The newly added xilinx_dma_prep_dma_cyclic function sometimes causes
+a gcc warning about the use of the segment function in case
+we never run into the inner loop of the function:
 
-Two fixes for current release cycle (regressions).
+dma/xilinx/xilinx_vdma.c: In function 'xilinx_dma_prep_dma_cyclic':
+dma/xilinx/xilinx_vdma.c:1808:23: error: 'segment' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+   segment->hw.control |= XILINX_DMA_BD_SOP;
 
-Best regards,
-Krzysztof
+This can only happen if the period len is zero (which would cause other
+problems earlier), or if the buffer is shorter than a period. Neither
+of them should ever happen, but by adding an explicit check for these two
+cases, we can abort in a more controlled way, and the compiler is
+able to see that we never use uninitialized data.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/dma/xilinx/xilinx_vdma.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.7-2
-
-for you to fetch changes up to a7d7865fecd83adb98b20eca5eddef7efc94831d:
-
-  ARM: dts: exynos: Fix port nodes names for Exynos5420 Peach Pit board (2016-06-07 11:00:39 +0200)
-
-----------------------------------------------------------------
-Fixes for Exynos-based Snow and Peach Pit boards for regressions introduced in
-4.7-rc1 because OF graph logic expects specific names of child nodes.
-
-----------------------------------------------------------------
-Javier Martinez Canillas (2):
-      ARM: dts: exynos: Fix port nodes names for Exynos5250 Snow board
-      ARM: dts: exynos: Fix port nodes names for Exynos5420 Peach Pit board
-
- arch/arm/boot/dts/exynos5250-snow-common.dtsi | 13 ++++++++++---
- arch/arm/boot/dts/exynos5420-peach-pit.dts    | 13 ++++++++++---
- 2 files changed, 20 insertions(+), 6 deletions(-)
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index 0f5b38a0e46f..2ac3253bc823 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -1745,8 +1745,14 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
+ 	int i;
+ 	u32 reg;
+ 
++	if (!period_len)
++		return NULL;
++
+ 	num_periods = buf_len / period_len;
+ 
++	if (!num_periods)
++		return NULL;
++
+ 	if (!is_slave_direction(direction))
+ 		return NULL;
+ 
+-- 
+2.7.0
