@@ -1,64 +1,95 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 13 Jun 2016 19:42:02 +0800
-Subject: [PATCH V2 1/1] clk: imx: refine the powerdown bit of clk-pllv3
-In-Reply-To: <1465803434-31507-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <201606131954.Hm2ncCa4%fengguang.wu@intel.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon, 13 Jun 2016 13:43:52 +0200
+Subject: [PATCH] phy: phy-sun4i-usb: Add log when probing
+Message-ID: <1465818232-29108-1-git-send-email-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When phy-sun4i-usb's probing fails, it does not print the reason in
+kernel log, forcing the developer to edit this driver to add info logs.
+This commit makes the kernel print the reason of phy-sun4i-usb's probing
+failure or a success message.
 
-[auto build test ERROR on shawnguo/for-next]
-[cannot apply to v4.7-rc3 next-20160609]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-imx-refine-the-powerdown-bit-of-clk-pllv3/20160613-160108
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: arm-imx_v4_v5_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
-   drivers/clk/imx/clk-pllv3.c: In function 'clk_pllv3_prepare':
->> drivers/clk/imx/clk-pllv3.c:82:14: error: 'struct clk_pllv3' has no member named 'powerdown'
-      val &= ~pll->powerdown;
-                 ^
-   drivers/clk/imx/clk-pllv3.c: In function 'clk_pllv3_unprepare':
-   drivers/clk/imx/clk-pllv3.c:97:13: error: 'struct clk_pllv3' has no member named 'powerdown'
-      val |= pll->powerdown;
-                ^
-
-vim +82 drivers/clk/imx/clk-pllv3.c
-
-bc3b84da arch/arm/mach-imx/clk-pllv3.c Shawn Guo     2013-10-30  76  	u32 val;
-bc3b84da arch/arm/mach-imx/clk-pllv3.c Shawn Guo     2013-10-30  77  
-bc3b84da arch/arm/mach-imx/clk-pllv3.c Shawn Guo     2013-10-30  78  	val = readl_relaxed(pll->base);
-bc3b84da arch/arm/mach-imx/clk-pllv3.c Shawn Guo     2013-10-30  79  	if (pll->powerup_set)
-b3e3e45d drivers/clk/imx/clk-pllv3.c   Dong Aisheng  2016-06-13  80  		val |= pll->power_bit;
-0a036388 arch/arm/mach-imx/clk-pllv3.c Peter Chen    2013-07-16  81  	else
-b3e76bdc drivers/clk/imx/clk-pllv3.c   Dong Aisheng  2016-06-08 @82  		val &= ~pll->powerdown;
-bc3b84da arch/arm/mach-imx/clk-pllv3.c Shawn Guo     2013-10-30  83  	writel_relaxed(val, pll->base);
-bc3b84da arch/arm/mach-imx/clk-pllv3.c Shawn Guo     2013-10-30  84  
-c400f7a2 arch/arm/mach-imx/clk-pllv3.c Dmitry Voytik 2014-11-06  85  	return clk_pllv3_wait_lock(pll);
-
-:::::: The code at line 82 was first introduced by commit
-:::::: b3e76bdc0b2190e67427d31cd740debd01c03631 clk: imx: clk-pllv3: fix incorrect handle of enet powerdown bit
-
-:::::: TO: Dong Aisheng <aisheng.dong@nxp.com>
-:::::: CC: Shawn Guo <shawnguo@kernel.org>
-
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 22549 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160613/d18ff405/attachment-0001.obj>
+ drivers/phy/phy-sun4i-usb.c | 28 ++++++++++++++++++++++------
+ 1 file changed, 22 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index 45f01d6..117afa0 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -552,24 +552,32 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
+ 	data->base = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(data->base))
++	if (IS_ERR(data->base)) {
++		dev_err(dev, "Couldn't map our registers\n");
+ 		return PTR_ERR(data->base);
++	}
+ 
+ 	data->id_det_gpio = devm_gpiod_get_optional(dev, "usb0_id_det",
+ 						    GPIOD_IN);
+-	if (IS_ERR(data->id_det_gpio))
++	if (IS_ERR(data->id_det_gpio)) {
++		dev_err(dev, "Couldn't request ID GPIO\n");
+ 		return PTR_ERR(data->id_det_gpio);
++	}
+ 
+ 	data->vbus_det_gpio = devm_gpiod_get_optional(dev, "usb0_vbus_det",
+ 						      GPIOD_IN);
+-	if (IS_ERR(data->vbus_det_gpio))
++	if (IS_ERR(data->vbus_det_gpio)) {
++		dev_err(dev, "Couldn't request VBUS detect GPIO\n");
+ 		return PTR_ERR(data->vbus_det_gpio);
++	}
+ 
+ 	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
+ 		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
+ 						     "usb0_vbus_power-supply");
+-		if (IS_ERR(data->vbus_power_supply))
++		if (IS_ERR(data->vbus_power_supply)) {
++			dev_err(dev, "Couldn't get the VBUS power supply\n");
+ 			return PTR_ERR(data->vbus_power_supply);
++		}
+ 
+ 		if (!data->vbus_power_supply)
+ 			return -EPROBE_DEFER;
+@@ -584,8 +592,10 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	if (data->id_det_gpio) {
+ 		data->extcon = devm_extcon_dev_allocate(dev,
+ 							sun4i_usb_phy0_cable);
+-		if (IS_ERR(data->extcon))
++		if (IS_ERR(data->extcon)) {
++			dev_err(dev, "Couldn't allocate our extcon device\n");
+ 			return PTR_ERR(data->extcon);
++		}
+ 
+ 		ret = devm_extcon_dev_register(dev, data->extcon);
+ 		if (ret) {
+@@ -601,8 +611,12 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		snprintf(name, sizeof(name), "usb%d_vbus", i);
+ 		phy->vbus = devm_regulator_get_optional(dev, name);
+ 		if (IS_ERR(phy->vbus)) {
+-			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
++			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER) {
++				dev_err(dev, "Couldn't get regulator %s... Deferring probe\n",
++					name);
+ 				return -EPROBE_DEFER;
++			}
++
+ 			phy->vbus = NULL;
+ 		}
+ 
+@@ -690,6 +704,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(phy_provider);
+ 	}
+ 
++	dev_info(dev, "successfully loaded\n");
++
+ 	return 0;
+ }
+ 
+-- 
+2.5.0
