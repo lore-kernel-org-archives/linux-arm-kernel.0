@@ -1,71 +1,35 @@
-From: Wei.Chen@arm.com (Wei Chen)
-Date: Mon, 13 Jun 2016 17:20:17 +0800
-Subject: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
-Message-ID: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Jun 2016 11:24:02 +0200
+Subject: [PATCH 3/3] i.MX: system.c: Replace magic numbers
+In-Reply-To: <1465797329-22537-3-git-send-email-andrew.smirnov@gmail.com>
+References: <1465797329-22537-1-git-send-email-andrew.smirnov@gmail.com>
+ <1465797329-22537-3-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <7839599.pSVM3KJL9Z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCIe ACS capability will affect the layout of iommu groups.
-Generally speaking, if the path from root port to the PCIe device
-is ACS enabled, the iommu will create a single iommu group for this
-PCIe device. If all PCIe devices on the path are ACS enabled then
-Linux can determine this path is ACS enabled.
+On Sunday, June 12, 2016 10:55:29 PM CEST Andrey Smirnov wrote:
+> @@ -61,6 +61,13 @@
+>  #define L2X0_LINE_TAG                  0xF30
+>  #define L2X0_DEBUG_CTRL                        0xF40
+>  #define L310_PREFETCH_CTRL             0xF60
+> +#define   L310_DOUBLE_LINEFILL_EN                      BIT(30)
+> +#define   L310_INSTRUCTION_PREFETCH_EN                 BIT(29)
+> +#define   L310_DATA_PREFETCH_EN                                BIT(28)
+> +#define   L310_DOUBLE_LINEFILL_ON_WRAP_READ_DIS                BIT(27)
+> +#define   L310_PREFETCH_DROP_EN                                BIT(24)
+> +#define   L310_INCR_DOUBLE_LINEFILL_EN                 BIT(23)
+> +#define   L310_ESCLUSIVE_SEQUENCE_EN                   BIT(21)
+>  #define L310_POWER_CTRL                        0xF80
+>  #define   L310_DYNAMIC_CLK_GATING_EN   (1 << 1)
+>  #define   L310_STNDBY_MODE_EN          (1 << 0)
+> diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+> 
 
-Linux use two PCIe configuration registers to determine the ACS
-status of PCIe devices:
-ACS Capability Register and ACS Control Register.
 
-The first register is used to check the implementation of ACS function
-of a PCIe device, the second register is used to check the enable status
-of ACS function. If one PCIe device has implemented and enabled the ACS
-function then Linux will determine this PCIe device enabled ACS.
+Most of these macros seem to all exist further down in the file already
+under slightly differnet names, e.g.
 
->From the Chapter:6.12 of PCI Express Base Specification Revision 3.1a,
-we can find that when a PCIe device implements ACS function, the enable
-status is set to disabled by default and can be enabled by ACS-aware
-software.
+#define L310_PREFETCH_CTRL_DBL_LINEFILL_INCR   BIT(23)
 
-ACS will affect the iommu groups topology, so, the iommu driver is
-ACS-aware software. This patch adds a call to pci_request_acs() to the
-arm-smmu driver to enable the ACS function in PCIe devices that support
-it.
-
-Signed-off-by: Wei Chen <Wei.Chen@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 2 ++
- drivers/iommu/arm-smmu.c    | 4 +++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 94b6821..30ea899 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2686,6 +2686,8 @@ static int __init arm_smmu_init(void)
-        if (ret)
-                return ret;
-
-+       pci_request_acs();
-+
-        return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
- }
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 9345a3f..ab365ec 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -2096,8 +2096,10 @@ static int __init arm_smmu_init(void)
- #endif
-
- #ifdef CONFIG_PCI
--       if (!iommu_present(&pci_bus_type))
-+       if (!iommu_present(&pci_bus_type)) {
-+               pci_request_acs();
-                bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
-+       }
- #endif
-
-        return 0;
---
-2.7.4
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+	Arnd
