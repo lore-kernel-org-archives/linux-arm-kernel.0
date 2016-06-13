@@ -1,62 +1,57 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Jun 2016 14:47:06 -0700
-Subject: [GIT PULL 4/8] ARM: exynos: Topic branch with driver changes for
- v4.8
-In-Reply-To: <1465215933-22709-5-git-send-email-k.kozlowski@samsung.com>
+Date: Mon, 13 Jun 2016 14:48:31 -0700
+Subject: [GIT PULL 5/8] ARM: dts: exynos: DTS for v4.8
+In-Reply-To: <1465215933-22709-6-git-send-email-k.kozlowski@samsung.com>
 References: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
- <1465215933-22709-5-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160613214706.GB20845@localhost>
+ <1465215933-22709-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160613214831.GC20845@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2016 at 02:25:29PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On Mon, Jun 06, 2016 at 02:25:30PM +0200, Krzysztof Kozlowski wrote:
 > 
-> A topic branch for MultiFormat Codec driver. This pulls in
-> an external dependency from media tree (Sylwester Nawrocki).
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
-> Below you will find two pull-request-changelogs
-> 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> ################################################################
-> Samsung tree only changes:
-> ################################################################
-> 
-> The following changes since commit 04f776734c4e03e33111d3d5a994b589870df623:
-> 
->   media: s5p-mfc: add iommu support (2016-06-03 11:13:45 +0200)
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-exynos-mfc-4.8
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.8
 > 
-> for you to fetch changes up to 96167bd37dd604cbba0aed341765dda8556405b2:
+> for you to fetch changes up to cb0df00040d593e3f56eaafdede568121f962c06:
 > 
->   ARM: dts: exynos: Enable MFC device on Exynos4412 Odroid boards (2016-06-06 09:30:43 +0200)
+>   ARM: dts: exynos: No need to enable TMU nodes on Odroid XU3 family (2016-06-06 13:21:39 +0200)
 > 
 > ----------------------------------------------------------------
-> Topic branch for Exynos MFC changes for v4.8:
-> Pull s5p-mfc changes from media tree so the arm/mach-exynos code
-> could be removed. The bindings are converted to generic reserved memory
-> bindings.
+> Samsung DeviceTree update for v4.8:
+> 1. Add missing async bridge for MFC power domain on Exynos5420.
+>    This fixes imprecise abort on s5p-mfc re-bind.
+> 2. Define regulator supplies for MMC nodes on Exynos4412 Odroid boards
+>    and for TMU on Exynos542x Peach boards.
+> 3. Thermal cleanups on Odroid XU3-family (Exynos5422).
+> 4. Enable AX88760 USB hub on Origen board (Exynos4412).
+> 5. Minor cleanups.
+> 
+> ----------------------------------------------------------------
+> Javier Martinez Canillas (3):
+>       ARM: dts: exynos: Add async-bridge clock to MFC power domain for Exynos5420
+>       ARM: dts: exynos: Remove unneded always-on for regulators on Peach boards
+>       ARM: dts: exynos: Add TMU nodes regulator supply for Peach boards
+> 
+> Krzysztof Kozlowski (5):
+>       ARM: dts: exynos: Define vqmmc for SD card and allow disabling regulators on Odroid X/X2/U3
+>       ARM: dts: exynos: Define vqmmc for eMMC card on Odroid X/X2/U3
+>       ARM: dts: exynos: Lower SD card interface voltage to 2.8 V on Odroid X/X2/U3
+>       ARM: dts: exynos: Only Odroid XU3-family boards use DTSI with CPU thermal nodes
+>       ARM: dts: exynos: No need to enable TMU nodes on Odroid XU3 family
+> 
+> Matthew Leach (1):
+>       ARM: dts: exynos: Enable AX88760 USB hub on Origen board
+> 
+> Naveen Krishna Chatradhi (1):
+>       ARM: dts: exynos: Use new compatible string for thermistors in Trats2
 
-Hi,
+Merged, thanks.
 
-Tis branch contains an external dependency but I don't see the toplevel
-maintainer cc:d on the pull request. Just to avoid any confusion, I'd like to
-double check and make sure this branch is expected to be stable.
-
-Mauro, is that the case? The branch is:
-Merge branch 'for-v4.8/media/exynos-mfc' of git://linuxtv.org/snawrocki/samsung into for-v4.8/exynos-mfc
-
-I see it in -next, so I just want to make sure it's on a stable branch that
-won't be rewritten. 
-
-
-Thanks!
 
 -Olof
