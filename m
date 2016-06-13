@@ -1,59 +1,91 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 13 Jun 2016 13:14:58 +0200
-Subject: [PATCH 1/1] ARM: dts: imx6qdl.dtsi: add "arm, shared-override"
- for pl310
-In-Reply-To: <VI1PR04MB14558D10397904A5C33A73E88B530@VI1PR04MB1455.eurprd04.prod.outlook.com>
-References: <1465292365-26038-1-git-send-email-peter.chen@nxp.com>
- <20160611115733.GM20243@tiger> <1465809841.2313.2.camel@pengutronix.de>
- <VI1PR04MB14558D10397904A5C33A73E88B530@VI1PR04MB1455.eurprd04.prod.outlook.com>
-Message-ID: <1465816498.2313.15.camel@pengutronix.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 13 Jun 2016 12:18:50 +0100
+Subject: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
+In-Reply-To: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
+References: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
+Message-ID: <575E969A.6070400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 13.06.2016, 09:42 +0000 schrieb Peter Chen:
->  
-> >Am Samstag, den 11.06.2016, 19:57 +0800 schrieb Shawn Guo:
-> >> + Lucas
-> >>
-> >> On Tue, Jun 07, 2016 at 05:39:25PM +0800, Peter Chen wrote:
-> >> > The imx6 SMP system has the same DMA memory coherency issue [1] with
-> >> > pl310 L2 controller. With this shared override bit set, the customer
-> >> > reports the DMA coherency issue is gone. Besides, I have tested the
-> >> > performance using USB ethernet with/without this bit, it shows no
-> >> > difference.
-> >> >
-> >> > [1] http://patchwork.ozlabs.org/patch/469362/
-> >> >
-> >> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> >> > ---
-> >> >  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
-> >> >  1 file changed, 1 insertion(+)
-> >> >
-> >> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
-> >> > b/arch/arm/boot/dts/imx6qdl.dtsi index ed613eb..30e21ee 100644
-> >> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> >> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> >> > @@ -185,6 +185,7 @@
-> >> >  			cache-level = <2>;
-> >> >  			arm,tag-latency = <4 2 3>;
-> >> >  			arm,data-latency = <4 2 3>;
-> >> > +			arm,shared-override;
-> >>
-> >> Lucas had an objection to the change [1], considering the case that
-> >> kernel is booted as non-secure.
-> >
-> >My objection to this change still stands. Configuring the L2C to be compliant to the
-> >ARMv7 ARM is at the same level as the CPU workarounds that can not be applied in
-> >secure mode. Those must be done in the firmware, if your firmware doesn't do it it's
-> >plain broken.
-> >
-> 
-> Sorry, I not understand what's your mean. We only changes L2 configuration when the
-> cache is disabled, what problem will be?
-> 
-If the kernel is booted in non-secure mode, the L2 cache configuration
-register is RO and the kernel will crash on the attempt to write into
-this register.
+On 13/06/16 10:20, Wei Chen wrote:
+> The PCIe ACS capability will affect the layout of iommu groups.
+> Generally speaking, if the path from root port to the PCIe device
+> is ACS enabled, the iommu will create a single iommu group for this
+> PCIe device. If all PCIe devices on the path are ACS enabled then
+> Linux can determine this path is ACS enabled.
+>
+> Linux use two PCIe configuration registers to determine the ACS
+> status of PCIe devices:
+> ACS Capability Register and ACS Control Register.
+>
+> The first register is used to check the implementation of ACS function
+> of a PCIe device, the second register is used to check the enable status
+> of ACS function. If one PCIe device has implemented and enabled the ACS
+> function then Linux will determine this PCIe device enabled ACS.
+>
+>  From the Chapter:6.12 of PCI Express Base Specification Revision 3.1a,
+> we can find that when a PCIe device implements ACS function, the enable
+> status is set to disabled by default and can be enabled by ACS-aware
+> software.
+>
+> ACS will affect the iommu groups topology, so, the iommu driver is
+> ACS-aware software. This patch adds a call to pci_request_acs() to the
+> arm-smmu driver to enable the ACS function in PCIe devices that support
+> it.
+>
+> Signed-off-by: Wei Chen <Wei.Chen@arm.com>
 
-Regards,
-Lucas
+Makes sense to me:
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+p.s. The confidential disclaimer is a good way to get patches ignored 
+here on the lists - please check with Steve about getting set up on the 
+appropriate SMTP server.
+
+Robin.
+
+> ---
+>   drivers/iommu/arm-smmu-v3.c | 2 ++
+>   drivers/iommu/arm-smmu.c    | 4 +++-
+>   2 files changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 94b6821..30ea899 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2686,6 +2686,8 @@ static int __init arm_smmu_init(void)
+>          if (ret)
+>                  return ret;
+>
+> +       pci_request_acs();
+> +
+>          return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+>   }
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 9345a3f..ab365ec 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -2096,8 +2096,10 @@ static int __init arm_smmu_init(void)
+>   #endif
+>
+>   #ifdef CONFIG_PCI
+> -       if (!iommu_present(&pci_bus_type))
+> +       if (!iommu_present(&pci_bus_type)) {
+> +               pci_request_acs();
+>                  bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+> +       }
+>   #endif
+>
+>          return 0;
+> --
+> 2.7.4
+>
+> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+>
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+>
