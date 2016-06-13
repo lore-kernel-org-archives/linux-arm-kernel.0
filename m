@@ -1,41 +1,43 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 13 Jun 2016 12:08:12 -0400
-Subject: [PATCH V7 0/9] vfio, platform: add ACPI support
-In-Reply-To: <1465792001-27960-1-git-send-email-okaya@codeaurora.org>
-References: <1465792001-27960-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <575EDA6C.9010806@codeaurora.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 13 Jun 2016 18:09:29 +0200
+Subject: [PATCH 00/10] ARM: V7M: Support caches
+In-Reply-To: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
+References: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <575EDAB9.2070809@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baptiste,
+Hi Vladimir,
 
-On 6/13/2016 12:26 AM, Sinan Kaya wrote:
-> 
-> Sinan Kaya (9):
->   vfio: platform: rename reset function
->   vfio: platform: move reset call to a common function
->   vfio: platform: determine reset capability
->   vfio: platform: add support for ACPI probe
->   vfio: platform: add extra debug info argument to call reset
->   vfio: platform: call _RST method when using ACPI
->   vfio, platform: make reset driver a requirement by default
->   vfio: platform: check reset call return code during open
->   vfio: platform: check reset call return code during release
-> 
->  drivers/vfio/platform/vfio_amba.c             |   5 +
->  drivers/vfio/platform/vfio_platform.c         |   5 +
->  drivers/vfio/platform/vfio_platform_common.c  | 195 +++++++++++++++++++++-----
->  drivers/vfio/platform/vfio_platform_private.h |   8 +-
->  4 files changed, 176 insertions(+), 37 deletions(-)
-> 
-Cov and I exchanged some emails with Alex last week. I think
-there is a general expectation for you to review the series since
-you are the subsystem maintainer.
+On 06/13/2016 05:02 PM, Vladimir Murzin wrote:
+> Hi,
+>
+> This patch set allows M-class cpus benefit of optional cache support.
+> It originaly was written by Jonny, I've been keeping it localy mainly
+> rebasing over Linux versions.
+>
+> The main idea behind patches is to reuse existing cache handling code
+> from v7A/R. In case v7M cache operations are provided via memory
+> mapped interface rather than co-processor instructions, so extra
+> macros have been introduced to factor out cache handling logic and
+> low-level operations.
+>
+> Along with the v7M cache support the first user (Cortex-M7) is
+> introduced.
+>
+> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
+> one showed significant boot speed-up.
+>
+> Based on 4.7-rc3.
+>
+> Thanks!
+> Vladimir
+>
 
-I'm looking forward to hear your feedback on the series.
-Sinan
+Thanks for the series.
+Did you change something in those patches compare to patches you sent in 
+the RFC ?
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Regards.
+
+Alex
