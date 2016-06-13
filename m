@@ -1,47 +1,62 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 13 Jun 2016 16:05:27 -0700
-Subject: [PATCH 10/11] phy: rockchip-emmc: Minor code cleanup in
- rockchip_emmc_phy_power_off()
-In-Reply-To: <f80ba471-95dd-5cda-00a2-9006cfe15167@rock-chips.com>
+Date: Mon, 13 Jun 2016 16:05:40 -0700
+Subject: [PATCH 08/11] Documentation: phy: Let the rockchip eMMC PHY get
+ an exported card clock
+In-Reply-To: <20160610133631.GA10634@rob-hp-laptop>
 References: <1465339484-969-1-git-send-email-dianders@chromium.org>
- <1465339484-969-11-git-send-email-dianders@chromium.org>
- <f80ba471-95dd-5cda-00a2-9006cfe15167@rock-chips.com>
-Message-ID: <CAD=FV=U0XuOEBXsuf7cdp-mhe8=XJer9EoRJ99-2Mx_0=CFt-g@mail.gmail.com>
+ <1465339484-969-9-git-send-email-dianders@chromium.org>
+ <20160610133631.GA10634@rob-hp-laptop>
+Message-ID: <CAD=FV=VL0zbx_zbegCqHCa=Q6fDtVG9s3epMc2oGUYB-L2efTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Rob,
 
-On Mon, Jun 13, 2016 at 1:56 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
-> On 2016/6/8 6:44, Douglas Anderson wrote:
+On Fri, Jun 10, 2016 at 6:36 AM, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Jun 07, 2016 at 03:44:41PM -0700, Douglas Anderson wrote:
+>> As of an earlier change in this series ("Documentation: mmc:
+>> sdhci-of-arasan: Add ability to export card clock") the SDHCI driver
+>> used on Rockchip SoCs can now expose its clock.  Let's now specify that
+>> the PHY can use it.
 >>
->> There's no reason to store the return value of rockchip_emmc_phy_power()
->> in a variable nor to check it.  Just return it.
+>> Letting the PHY get access to this clock means it can adjust
+>> phyctrl_frqsel field appropriately.  Although the Rockchip PHY appears
+>> slightly different than the reference Arasan one, you can see that the
+>> Arasan datasheet [1] had it defined as:
+>>   Select the frequency range of DLL operation:
+>>   3b'000 => 200MHz to 170 MHz
+>>   3b'001 => 170MHz to 140 MHz
+>>   3b'010 => 140MHz to 110 MHz
+>>   3b'011 => 110MHz to 80MHz
+>>   3b'100 => 80MHz to 50 MHz
+>>   3b'101 => 275Mhz to 250MHz
+>>   3b'110 => 250MHz to 225MHz
+>>   3b'111 => 225MHz to 200MHz
+>>
+>> On the Rockchip version of the PHY we have less granularity but the idea
+>> is the same.
+>>
+>> [1]: https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
 >>
 >> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 >> ---
->>  drivers/phy/phy-rockchip-emmc.c | 8 +-------
->>  1 file changed, 1 insertion(+), 7 deletions(-)
+>>  Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt | 7 +++++++
+>>  1 file changed, 7 insertions(+)
 >>
->> diff --git a/drivers/phy/phy-rockchip-emmc.c
->> b/drivers/phy/phy-rockchip-emmc.c
->> index 0fce7359d468..188e4c387ba8 100644
->> --- a/drivers/phy/phy-rockchip-emmc.c
->> +++ b/drivers/phy/phy-rockchip-emmc.c
->> @@ -227,8 +227,6 @@ static int rockchip_emmc_phy_power_off(struct phy
->> *phy)
->>  static int rockchip_emmc_phy_power_on(struct phy *phy)
->>  {
+>> diff --git a/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
+>> index 555cb0f40690..fd118b071e5e 100644
+>> --- a/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
+>> +++ b/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
+>> @@ -7,6 +7,11 @@ Required properties:
+>>   - reg: PHY register address offset and length in "general
+>>     register files"
+>>
+>> +Optional clocks (see ../clock/clock-bindings.txt), specified by name:
+>> + - emmcclk: The card clock exported by the SDHCI driver.  Although this is
 >
->
-> I saw the cleanup for power_off is done on [patch 9/11]
->
-> shouldn't be in this patch? :)
+> This reads like emmcclk is the property. You need to list out clocks and
+> clock-names.
 
-Yeah, I tried to, but then I realized that I couldn't split that out
-too easily because the previous patch touched the same code.
-
-...but actually, reordering things solves all the problems so I've done that.
-
+Thanks for the feedback.  Done.
 
 -Doug
