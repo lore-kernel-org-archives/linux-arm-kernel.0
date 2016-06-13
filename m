@@ -1,55 +1,73 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 13 Jun 2016 08:37:35 -0600
-Subject: [PATCH v2 4/9] coresight: Fix csdev connections initialisation
-In-Reply-To: <575E74C9.9010004@arm.com>
-References: <1465204301-24184-1-git-send-email-suzuki.poulose@arm.com>
- <1465204301-24184-5-git-send-email-suzuki.poulose@arm.com>
- <CANLsYkwGckonnLjHbOJQPZ849NQyjf+Zy=N6kjtwwo-kQbbj4Q@mail.gmail.com>
- <575E74C9.9010004@arm.com>
-Message-ID: <CANLsYkzmVxBhf1QWmAYyFUzkRJXSuA-=myO0tc9F1H2oKPb6Gg@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 13 Jun 2016 16:41:06 +0200
+Subject: [PATCH V6 0/7] Introduce ACPI world to ITS irqchip
+Message-ID: <1465828873-23498-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 June 2016 at 02:54, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 12/06/16 21:39, Mathieu Poirier wrote:
->>
->> On 6 June 2016 at 03:11, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->>>
->>> This is a cleanup patch.
->>>
->>> coresight_device->conns holds an array to point to the devices
->>> connected to the OUT ports of a component. Sinks, e.g ETR, do not
->>> have an OUT port (nr_outport = 0), as it streams the trace to
->>> memory via AXI.
->>>
->>> At coresight_register() we do :
->>>
->>>          conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
->>>          if (!conns) {
->>>                  ret = -ENOMEM;
->>>                  goto err_kzalloc_conns;
->>>          }
->>>
->>> For ETR, since the total size requested for kcalloc is zero, the return
->>> value is, ZERO_SIZE_PTR ( != NULL). Hence, csdev->conns = ZERO_SIZE_PTR
->>> which cannot be verified later to contain a valid pointer. The code which
->>> accesses the csdev->conns is bounded by the csdev->nr_outport check,
->>> hence we don't try to dereference the ZERO_SIZE_PTR. This patch cleans
->>> up the csdev->conns and csdev->refcnt, initialisation to make sure we
->>
->>
->> This patch no longer deals with csdev->refcnt.
->
->
-> Ok, fill fix that. Btw, do we need that check ? I am tempted to keep it
-> there,
-> just to make sure we don't end up in something similar in the future.
+The series builds the PCI/MSI domain stack based on initial IORT driver
+which is added in first place. As a reference please see IORT spec:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 
-If it becomes an issue in the future we'll know what to do :o)
+Patches were built on top of accepted ARM64 ACPI PCI support and can be found
+all together here:
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v6)
 
-Thanks,
-Mathieu
+Tested on Cavium ThunderX server.
 
->
-> Cheers
-> Suzuki
+v5 -> v6
+- added locking mechanism for IORT list with domain token
+- IORT function name improvements
+- extended IORT RID mapping helper
+- reworked IORT to be more SMMU friendly
+- IORT functions which map RID and find corresponding domain are not
+  PCI specific any more (struct pci_dev -> struct device)
+- bug fixes
+
+v4 -> v5
+- rebased against v4.7-rc1
+- drop generic layer and call IORT functions directly
+- improve resource abstraction and string formatting
+
+v3 -> v4
+- rebased against v4.5
+- add ACPI support for IRQ domain handling on a per-device basis
+- reorder domain setup step
+- improve error handling
+- code style improvements
+
+v2 -> v3
+- rebased on top of 4.4
+- fixes and improvements for redistributor init via GICC structures
+- fixes as per kbuild reports
+
+v1 -> v2
+- rebased on top of 4.4-rc4
+- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+
+Tomasz Nowicki (7):
+  ACPI: I/O Remapping Table (IORT) initial support
+  PCI/MSI: Setup MSI domain on a per-devices basis using IORT ACPI table
+  irqchip/gicv3-its: Cleanup for ITS domain initialization
+  irqchip/gicv3-its: Refator ITS DT init code to prepare for ACPI
+  irqchip/gicv3-its: Probe ITS in the ACPI way
+  irqchip/gicv3-its: Factor out code that might be reused for ACPI
+  irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
+    initialization
+
+ drivers/acpi/Kconfig                     |   3 +
+ drivers/acpi/Makefile                    |   1 +
+ drivers/acpi/iort.c                      | 386 +++++++++++++++++++++++++++++++
+ drivers/irqchip/Kconfig                  |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 +++++--
+ drivers/irqchip/irq-gic-v3-its.c         | 185 ++++++++++-----
+ drivers/irqchip/irq-gic-v3.c             |   7 +-
+ drivers/pci/msi.c                        |  11 +-
+ include/linux/iort.h                     |  38 +++
+ include/linux/irqchip/arm-gic-v3.h       |   4 +-
+ 10 files changed, 646 insertions(+), 78 deletions(-)
+ create mode 100644 drivers/acpi/iort.c
+ create mode 100644 include/linux/iort.h
+
+-- 
+1.9.1
