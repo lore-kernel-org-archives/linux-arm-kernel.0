@@ -1,40 +1,36 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 13 Jun 2016 18:11:22 +0100
-Subject: [RFC] implement gpio_pci_platform_pm to put pci device into D3cold
-In-Reply-To: <20160612203245.66fbd54a@xhacker>
-References: <20160612203245.66fbd54a@xhacker>
-Message-ID: <20160613171122.GA29837@red-moon>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Jun 2016 18:21:40 +0100
+Subject: [PATCH v4] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
+In-Reply-To: <1465837689-28215-1-git-send-email-suzuki.poulose@arm.com>
+References: <1465837689-28215-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160613172140.GY1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
-
-On Sun, Jun 12, 2016 at 08:32:45PM +0800, Jisheng Zhang wrote:
-> Dear all,
+On Mon, Jun 13, 2016 at 06:08:09PM +0100, Suzuki K Poulose wrote:
+> From: Steve Capper <steve.capper@linaro.org>
 > 
-> I want to solve one problem: we have pcie in a DT based arm64 system,
-> now we want to put the device into D3cold when runtime suspended. The
-> pcie device could be power down by operating one gpio pin, this is the
-> D3cold the platform could support. 
+> It can be useful for JIT software to be aware of MIDR_EL1 and
+> REVIDR_EL1 to ascertain the presence of any core errata that could
+> affect codegen.
 > 
-> My solution is to register a gpio_pci_platform_pm with
-> pci_set_platform_pm() but the key is how to setup a mapping between
-> pci_dev and gpio through DT
+> This patch exposes these registers through sysfs:
 > 
-> I think this is a general case, could you please kindly give some
-> suggestions?
+> /sys/devices/system/cpu/cpu$ID/identification/midr
+> /sys/devices/system/cpu/cpu$ID/identification/revidr
+> 
+> where $ID is the cpu number. For big.LITTLE systems, one can have a
+> mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
+> to be enumerated.
+> 
+> If the kernel does not have valid information to populate these entries
+> with, an empty string is returned to userspace.
 
-You would like to define an "equivalent" of what exists today
-in ACPI (ie ACPI methods like _PSx) through generic DT bindings,
-correct ?
+So there's no confusion, I've historically said no on 32-bit ARM to
+exposing the MIDR to userspace, and my position on that for 32-bit
+ARM has not changed.
 
-It is hard to say what can be really generalized and how without
-having first an implementation (so that we can see how this would
-map to other systems), if you have some code to share even if it
-is an RFC that would help quite a bit.
-
-Question: when you say "I think this is a general case" I wonder,
-are you referring to specific drivers in the mainline ?
-
-Thanks,
-Lorenzo
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
