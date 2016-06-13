@@ -1,58 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 13 Jun 2016 10:56:08 +0200
-Subject: [PATCH] usb: gadget: udc: atmel: Also get regmap for
- at91sam9x5-pmc
-In-Reply-To: <1465807650-27316-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1465807650-27316-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160613085608.GG26768@pengutronix.de>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 13 Jun 2016 16:56:47 +0800
+Subject: [PATCH 10/11] phy: rockchip-emmc: Minor code cleanup in
+ rockchip_emmc_phy_power_off()
+In-Reply-To: <1465339484-969-11-git-send-email-dianders@chromium.org>
+References: <1465339484-969-1-git-send-email-dianders@chromium.org>
+ <1465339484-969-11-git-send-email-dianders@chromium.org>
+Message-ID: <f80ba471-95dd-5cda-00a2-9006cfe15167@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, Jun 13, 2016 at 10:47:30AM +0200, Alexandre Belloni wrote:
-> The "atmel,at91sam9g45-udc" compatible UDC is also used on at91sam9x5 so it
-> is also necessary to try to get the syscon for at91sam9x5-pmc.
-> 
-> Fixes: 4747639f01c9 ("usb: gadget: atmel: access the PMC using regmap")
-> Reported-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-I played with the AT91 during my non-work time, so please use
-uwe at kleine-koenig.org as my email address.
-
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 2016/6/8 6:44, Douglas Anderson wrote:
+> There's no reason to store the return value of rockchip_emmc_phy_power()
+> in a variable nor to check it.  Just return it.
+>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 > ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index 18569de06b04..bb1f6c8f0f01 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -1920,6 +1920,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
->  
->  	udc->errata = match->data;
->  	udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9g45-pmc");
-> +	if (IS_ERR(udc->pmc))
-> +		udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9x5-pmc");
->  	if (udc->errata && IS_ERR(udc->pmc))
->  		return ERR_CAST(udc->pmc);
+>  drivers/phy/phy-rockchip-emmc.c | 8 +-------
+>  1 file changed, 1 insertion(+), 7 deletions(-)
+>
+> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
+> index 0fce7359d468..188e4c387ba8 100644
+> --- a/drivers/phy/phy-rockchip-emmc.c
+> +++ b/drivers/phy/phy-rockchip-emmc.c
+> @@ -227,8 +227,6 @@ static int rockchip_emmc_phy_power_off(struct phy *phy)
+>  static int rockchip_emmc_phy_power_on(struct phy *phy)
+>  {
 
-I didn't retest but I'm sure this makes usb gadget work on my AT91.
-Still I'm unsure if the patch is correct. Can
+I saw the cleanup for power_off is done on [patch 9/11]
 
-	syscon_regmap_lookup_by_compatible("atmel,at91sam9g45-pmc")
+shouldn't be in this patch? :)
 
-return -EPROBE_DEFER? Are there other error codes that should be fatal
-enough to not try to look for a sam9x5-pmc?
+>  	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
+> -	int ret = 0;
+> -
+>
+>  	/* Drive impedance: 50 Ohm */
+>  	regmap_write(rk_phy->reg_base,
+> @@ -252,11 +250,7 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
+>  				   PHYCTRL_OTAPDLYSEL_SHIFT));
+>
+>  	/* Power up emmc phy analog blocks */
+> -	ret = rockchip_emmc_phy_power(phy, PHYCTRL_PDB_PWR_ON);
+> -	if (ret)
+> -		return ret;
+> -
+> -	return 0;
+> +	return rockchip_emmc_phy_power(phy, PHYCTRL_PDB_PWR_ON);
+>  }
+>
+>  static const struct phy_ops ops = {
+>
 
-Nearly orthogonal to the issue: An error message on failure would be
-nice. When I saw usb gadget broken I first had to add messages to this
-driver to see where it failed.
-
-Best regards
-Uwe
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best Regards
+Shawn Lin
