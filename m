@@ -1,79 +1,103 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 13 Jun 2016 16:03:00 +0100
-Subject: [PATCH 01/10] ARM: factor out CSSELR/CCSIDR operations that use cp15
- directly
+Date: Mon, 13 Jun 2016 16:03:09 +0100
+Subject: [PATCH 10/10] ARM: V7M: Add support for the Cortex-M7 processor
 In-Reply-To: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
 References: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1465830189-20128-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1465830189-20128-11-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jonathan Austin <jonathan.austin@arm.com>
 
-Currently we use raw cp15 operations to access the cache setup data.
+Cortex-M7 is a new member of the V7M processor family that adds, among
+other things, caches over the features available in Cortex-M4.
 
-This patch abstracts the CSSELR and CCSIDR accessors out to a header so
-that the implementation for them can be switched out as we do with other
-cpu/cachetype operations.
+This patch adds support for recognising the processor at boot time, and
+make use of recently introduced cache functions.
 
 Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/cachetype.h |   24 ++++++++++++++++++++++++
- arch/arm/kernel/setup.c          |    7 ++-----
- 2 files changed, 26 insertions(+), 5 deletions(-)
+ arch/arm/mm/proc-v7m.S |   42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/arch/arm/include/asm/cachetype.h b/arch/arm/include/asm/cachetype.h
-index 7ea7814..8609de8 100644
---- a/arch/arm/include/asm/cachetype.h
-+++ b/arch/arm/include/asm/cachetype.h
-@@ -56,4 +56,28 @@ static inline unsigned int __attribute__((pure)) cacheid_is(unsigned int mask)
- 	       (~__CACHEID_NEVER & __CACHEID_ARCH_MIN & mask & cacheid);
- }
+diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
+index 796a983..60387a0 100644
+--- a/arch/arm/mm/proc-v7m.S
++++ b/arch/arm/mm/proc-v7m.S
+@@ -15,6 +15,7 @@
+ #include <asm/memory.h>
+ #include <asm/v7m.h>
+ #include "proc-macros.S"
++#include "v7m-cache-macros.S"
  
-+#define CSSELR_ICACHE	1
-+#define CSSELR_DCACHE	0
-+
-+#define CSSELR_L1	(0 << 1)
-+#define CSSELR_L2	(1 << 1)
-+#define CSSELR_L3	(2 << 1)
-+#define CSSELR_L4	(3 << 1)
-+#define CSSELR_L5	(4 << 1)
-+#define CSSELR_L6	(5 << 1)
-+#define CSSELR_L7	(6 << 1)
-+
-+static inline void set_csselr(unsigned int cache_selector)
-+{
-+	asm volatile("mcr p15, 2, %0, c0, c0, 0" : : "r" (cache_selector));
-+}
-+
-+static inline unsigned int read_ccsidr(void)
-+{
-+	unsigned int val;
-+
-+	asm volatile("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
-+	return val;
-+}
-+
+ ENTRY(cpu_v7m_proc_init)
+ 	ret	lr
+@@ -74,6 +75,25 @@ ENTRY(cpu_v7m_do_resume)
+ ENDPROC(cpu_v7m_do_resume)
  #endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 7b53500..e414f50 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -291,12 +291,9 @@ static int cpu_has_aliasing_icache(unsigned int arch)
- 	/* arch specifies the register format */
- 	switch (arch) {
- 	case CPU_ARCH_ARMv7:
--		asm("mcr	p15, 2, %0, c0, c0, 0 @ set CSSELR"
--		    : /* No output operands */
--		    : "r" (1));
-+		set_csselr(CSSELR_ICACHE | CSSELR_L1);
- 		isb();
--		asm("mrc	p15, 1, %0, c0, c0, 0 @ read CCSIDR"
--		    : "=r" (id_reg));
-+		id_reg = read_ccsidr();
- 		line_size = 4 << ((id_reg & 0x7) + 2);
- 		num_sets = ((id_reg >> 13) & 0x7fff) + 1;
- 		aliasing_icache = (line_size * num_sets) > PAGE_SIZE;
+ 
++ENTRY(cpu_cm7_dcache_clean_area)
++	dcache_line_size r2, r3
++1:	dccmvac r0, r3				@ clean D entry
++	add	r0, r0, r2
++	subs	r1, r1, r2
++	bhi	1b
++	dsb
++	ret	lr
++ENDPROC(cpu_cm7_dcache_clean_area)
++
++ENTRY(cpu_cm7_proc_fin)
++	movw	r2, #:lower16:(BASEADDR_V7M_SCB + V7M_SCB_CCR)
++	movt	r2, #:upper16:(BASEADDR_V7M_SCB + V7M_SCB_CCR)
++	ldr	r0, [r2]
++	bic	r0, r0, #(V7M_SCB_CCR_DC | V7M_SCB_CCR_IC)
++	str	r0, [r2]
++	ret	lr
++ENDPROC(cpu_cm7_proc_fin)
++
+ 	.section ".text.init", #alloc, #execinstr
+ 
+ /*
+@@ -120,10 +140,22 @@ __v7m_setup:
+ 	@ Note the STKALIGN bit is either RW or RAO.
+ 	ldr	r0, [r0, V7M_SCB_CCR]   @ system control register
+ 	orr	r0, #V7M_SCB_CCR_STKALIGN
++	read_ctr r12
++	teq     r12, #0
++	orrne   r0, r0, #(V7M_SCB_CCR_DC | V7M_SCB_CCR_IC| V7M_SCB_CCR_BP)
+ 	ret	lr
+ ENDPROC(__v7m_setup)
+ 
++/*
++ * Cortex-M7 processor functions
++ */
++	globl_equ	cpu_cm7_proc_init,	cpu_v7m_proc_init
++	globl_equ	cpu_cm7_reset,		cpu_v7m_reset
++	globl_equ	cpu_cm7_do_idle,	cpu_v7m_do_idle
++	globl_equ	cpu_cm7_switch_mm,	cpu_v7m_switch_mm
++
+ 	define_processor_functions v7m, dabort=nommu_early_abort, pabort=legacy_pabort, nommu=1
++	define_processor_functions cm7, dabort=nommu_early_abort, pabort=legacy_pabort, nommu=1
+ 
+ 	.section ".rodata"
+ 	string cpu_arch_name, "armv7m"
+@@ -147,6 +179,16 @@ ENDPROC(__v7m_setup)
+ .endm
+ 
+ 	/*
++	 * Match ARM Cortex-M7 processor.
++	 */
++	.type	__v7m_cm7_proc_info, #object
++__v7m_cm7_proc_info:
++	.long	0x410fc270		/* ARM Cortex-M7 0xC27 */
++	.long	0xff0ffff0		/* Mask off revision, patch release */
++	__v7m_proc __v7m_cm7_proc_info, __v7m_setup, hwcaps = HWCAP_EDSP, cache_fns = v7_cache_fns, proc_fns = cm7_processor_functions
++	.size	__v7m_cm7_proc_info, . - __v7m_cm7_proc_info
++
++	/*
+ 	 * Match ARM Cortex-M4 processor.
+ 	 */
+ 	.type	__v7m_cm4_proc_info, #object
 -- 
 1.7.9.5
