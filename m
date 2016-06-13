@@ -1,46 +1,43 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 14 Jun 2016 00:10:49 +0200
-Subject: [PATCH 3/5] PM / Hibernate: Allow architectures to specify the
- hibernate/resume CPU
-In-Reply-To: <1982845.x73eTHIS7X@vostro.rjw.lan>
-References: <1464876657-6692-1-git-send-email-james.morse@arm.com>
- <1464876657-6692-4-git-send-email-james.morse@arm.com>
- <1982845.x73eTHIS7X@vostro.rjw.lan>
-Message-ID: <4959514.g8dkWscZ3h@vostro.rjw.lan>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 13 Jun 2016 15:09:55 -0700
+Subject: [PATCH v2 3/3] ARM64: dts: meson-gxbb: Add Hardware Random
+ Generator node
+In-Reply-To: <1465546915-24229-4-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Fri, 10 Jun 2016 10:21:55 +0200")
+References: <1465546915-24229-1-git-send-email-narmstrong@baylibre.com>
+ <1465546915-24229-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m2ziqoviz0.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 14, 2016 12:05:28 AM Rafael J. Wysocki wrote:
-> On Thursday, June 02, 2016 03:10:55 PM James Morse wrote:
-> > On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
-> > user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
-> > kernel will assign logical id 0 to a different physical CPU.
-> > This breaks hibernate as hibernate and resume will be attempted on different
-> > CPUs.
-> > 
-> > Define a weak symbol arch_hibernation_disable_cpus(), which defaults to
-> > calling disable_nonboot_cpus). Architectures that allow CPU 0 to be
-> > hotplugged can use this to control which CPU is used for hibernate/resume.
-> > 
-> > Signed-off-by: James Morse <james.morse@arm.com>
-> > Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > Cc: Pavel Machek <pavel@ucw.cz>
-> > ---
-> > I would have preferred a macro, but there is no hibernate-relevant header
-> > file that all arch's have. arm, arm64 and x86 have a suspend.h, but powerpc
-> > doesn't.
-> 
-> What about include/linux/suspend.h?
-> 
-> There are arch_ things declared in there.
+Hi Neil,
 
-I mean, what about using something like
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-#ifndef arch_hibernation_disable_cpus
-#define arch_hibernation_disable_cpus disable_nonboot_cpus
-#endif
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> index 832815d..8353621 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -167,6 +167,11 @@
+>  			};
+>  		};
+>  
+> +		rng {
+> +			compatible = "amlogic,meson-rng";
+> +			reg = <0x0 0xc8834000 0x0 0x4>;
+> +		};
 
-in there or in another header file?
+This should be under the periphs bus, with an offset of 0x0 instead of
+at the top level.
 
-Thanks,
-Rafael
+See the for-next branch in the linux-amlogic tree[1] which has separate
+busses for periphs and hiu.
+
+Kevin
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
