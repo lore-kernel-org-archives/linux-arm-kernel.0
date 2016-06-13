@@ -1,49 +1,32 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 13 Jun 2016 16:07:37 +0200
-Subject: [GIT PULL] Reset controller changes for v4.8, part 2
-Message-ID: <1465826857.3553.50.camel@pengutronix.de>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Mon, 13 Jun 2016 16:12:51 +0200
+Subject: [PATCH] ARM: V7M: Add dsb before jumping in handler mode
+Message-ID: <1465827171-15847-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+According to ARM AN321 (section 4.12):
 
-Please consider merging this tag with a new driver for the Amlogic Meson
-reset controller. It should be fine for Kevin to also merge this into
-his for-next branch to resolve the dependency of meson dtsi files on the
-new dt-bindings headers.
+"If the vector table is in writable memory such as SRAM, either relocated
+by VTOR or a device dependent memory remapping mechanism, then
+architecturally a memory barrier instruction is required after the vector
+table entry is updated, and if the exception is to be activated
+immediately"
 
-regards
-Philipp
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-The following changes since commit 168d7c4e8bb25c076ed8be67fcca84f5dcd0b2c6:
-
-  reset: Return -ENOTSUPP when not configured (2016-06-01 08:21:08 +0200)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.8-2
-
-for you to fetch changes up to 79795e20a184ebabf4ae743d1506cc39783caa46:
-
-  dt-bindings: reset: Add bindings for the Meson SoC Reset Controller (2016-06-01 08:21:12 +0200)
-
-----------------------------------------------------------------
-Reset controller changes for v4.8, part 2
-
-- add Amlogic Meson SoC Reset Controller driver
-
-----------------------------------------------------------------
-Neil Armstrong (2):
-      reset: Add support for the Amlogic Meson SoC Reset Controller
-      dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
-
- .../bindings/reset/amlogic,meson-reset.txt         |  18 ++
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-meson.c                        | 136 +++++++++++++
- .../dt-bindings/reset/amlogic,meson-gxbb-reset.h   | 210 +++++++++++++++++++++
- include/dt-bindings/reset/amlogic,meson8b-reset.h  | 175 +++++++++++++++++
- 5 files changed, 540 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-reset.txt
- create mode 100644 drivers/reset/reset-meson.c
- create mode 100644 include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
- create mode 100644 include/dt-bindings/reset/amlogic,meson8b-reset.h
+diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
+index 7229d8d..2ddc435 100644
+--- a/arch/arm/mm/proc-v7m.S
++++ b/arch/arm/mm/proc-v7m.S
+@@ -104,6 +104,7 @@ __v7m_setup:
+ 	badr	r1, 1f
+ 	ldr	r5, [r12, #11 * 4]	@ read the SVC vector entry
+ 	str	r1, [r12, #11 * 4]	@ write the temporary SVC vector entry
++	dsb
+ 	mov	r6, lr			@ save LR
+ 	ldr	sp, =init_thread_union + THREAD_START_SP
+ 	cpsie	i
+-- 
+1.9.1
