@@ -1,26 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 13 Jun 2016 13:54:54 -0500
-Subject: [PATCH v3,1/5] dt-bindings: mt8173-xhci: support host side of
- dual-role mode
-In-Reply-To: <1465543962-11678-2-git-send-email-chunfeng.yun@mediatek.com>
-References: <1465543962-11678-1-git-send-email-chunfeng.yun@mediatek.com>
- <1465543962-11678-2-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <20160613185454.GA21742@rob-hp-laptop>
+Date: Mon, 13 Jun 2016 13:58:06 -0500
+Subject: [PATCH 1/4] Documentation: DT: vdma: Update binding doc for
+ multi-channel dma mode
+In-Reply-To: <1465549954-30220-2-git-send-email-appanad@xilinx.com>
+References: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
+ <1465549954-30220-2-git-send-email-appanad@xilinx.com>
+Message-ID: <20160613185805.GA25243@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 03:32:38PM +0800, Chunfeng Yun wrote:
-> Some resources, such as IPPC register etc, shared with device
-> driver are moved into common glue layer when xHCI driver is the
-> host side of dual-role mode and they should be changed as optional
-> properties if they are required ones before. For clarity, add
-> a new part of binding to support host side of dual-role mode.
+On Fri, Jun 10, 2016 at 02:42:31PM +0530, Kedareswara rao Appana wrote:
+> This patch updates the device-tree binding doc for
+> AXI DMA multi channel dma mode.
 > 
-> Additionally add optional properties of pinctrl for host only mode
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 > ---
->  .../devicetree/bindings/usb/mt8173-xhci.txt        |   48 ++++++++++++++++++++
->  1 file changed, 48 insertions(+)
+>  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
