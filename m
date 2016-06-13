@@ -1,97 +1,62 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 13 Jun 2016 16:07:13 -0700
-Subject: [PATCH 01/11] phy: rockchip-emmc: Increase lock time allowance
-In-Reply-To: <3e19ff54-ee4a-c208-e137-1c0f8022f6b3@rock-chips.com>
-References: <1465339484-969-1-git-send-email-dianders@chromium.org>
- <1465339484-969-2-git-send-email-dianders@chromium.org>
- <3e19ff54-ee4a-c208-e137-1c0f8022f6b3@rock-chips.com>
-Message-ID: <CAD=FV=X-318tAquybtdKz6Uqs0ZCMEzP5ZB9zrFUa8qSF8+_Eg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 13 Jun 2016 16:17:25 -0700
+Subject: [PATCH] ARM: mm: fix location of _etext
+In-Reply-To: <20160613212515.GA1041@n2100.armlinux.org.uk>
+References: <20160608231158.GA12159@www.outflux.net>
+ <CAGXu5jJwtDqLALk+3QETK7Wia56yxFp30nO7vwwbNX49s5KVmg@mail.gmail.com>
+ <20160613212515.GA1041@n2100.armlinux.org.uk>
+Message-ID: <CAGXu5j+mQ8MK-vTyKhS=hmgXt4_QBYgan+i34VPHv8_0_wsxPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
-
-On Mon, Jun 13, 2016 at 12:58 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
-> On 2016/6/8 6:44, Douglas Anderson wrote:
+On Mon, Jun 13, 2016 at 2:25 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Jun 13, 2016 at 01:23:29PM -0700, Kees Cook wrote:
+>> On Wed, Jun 8, 2016 at 4:11 PM, Kees Cook <keescook@chromium.org> wrote:
+>> > The _etext position is defined to be the end of the kernel text code,
+>> > and should not include any part of the data segments. This interferes
+>> > with things that might check memory ranges and expect executable code
+>> > up to _etext.
+>> >
+>> > Signed-off-by: Kees Cook <keescook@chromium.org>
 >>
->> Previous PHY code waited a fixed amount of time for the DLL to lock at
->> power on time.  Unfortunately, the time for the DLL to lock is actually
->> a bit more dynamic and can be longer if the card clock is slower.
->>
->> Instead of waiting a fixed 30 us, let's now dynamically wait until the
->> lock bit gets set.  We'll wait up to 10 ms which should be OK even if
->> the card clock is at the super slow 100 kHz.
->>
+>> Can someone give this an Ack? I'd like to land it as it is a
+>> prerequisite to some usercopy hardening work I'm doing.
 >
-> mmc stack limit the min freq to 200k when initializing the card.
+> We use _etext to place the end of the "kernel code" resource in
+> /proc/iomem, and init_mm.end_code.  I don't think anything makes
+> use of init_mm.end_code, but I'm more worried about the resource.
 
-Are you certain?  In "drivers/mmc/core/core.c" I see:
+Yeah, I looked at the init_mm.end_code thing and it appears to be
+entirely aesthetics. The kernel code resource in /proc/iomem is
+correct to end at the end of the kernel (this is what all other
+architectures have too). That resource is used by kexec, and shouldn't
+care about losing non-executable memory regions.
 
-static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
+> Currently, because of where _etext is placed, "kernel code" covers
+> the read-only data and other read-only sections as well - I don't
+> know whether we need to preserve that, but this change has a side
+> effect of changing that.
 
-In ID mode if 400kHz, 300kHz, 200kHz all fail then it will try 100kHz.
+include/asm-generic/vmlinux.lds.h documents the expected underscore
+names (and things like mem_init_print_info() operate on them. (Also of
+note is that _sdata through _edata is supposed to cover both ro and rw
+data, which isn't true for ARM, but isn't causing problems.
+mem_init_print_info() handles overlaps/embedded areas, but things like
+core_kernel_text() don't expect non-executable code in _stext through
+_etext).
 
-
-> So 5ms is enough, but it's ok to set the max timeout to 10ms as we
-> can break out if locked.
-
-Right, it's OK to error on the long side since it is really a pretty
-serious error if the DLL doesn't lock and delaying tens of
-milliseconds in this case is not a huge deal.
-
-
->> On its own, this change makes the PHY power on code a little more
->> robust.  Before this change the PHY was relying on the eMMC code to make
->> sure the PHY was only powered on when the card clock was set to at least
->> 50 MHz before, though this reliance wasn't documented anywhere.
->>
->> This change will be even more useful in future changes where we actually
->> need to be able to wait for a DLL lock at slower clock speeds.
->>
->> Signed-off-by: Douglas Anderson <dianders@chromium.org>
->> ---
->>  drivers/phy/phy-rockchip-emmc.c | 27 +++++++++++++++++++--------
->>  1 file changed, 19 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/phy/phy-rockchip-emmc.c
->> b/drivers/phy/phy-rockchip-emmc.c
->> index a69f53630e67..8336053aea5c 100644
->> --- a/drivers/phy/phy-rockchip-emmc.c
->> +++ b/drivers/phy/phy-rockchip-emmc.c
->> @@ -85,6 +85,7 @@ static int rockchip_emmc_phy_power(struct
->> rockchip_emmc_phy *rk_phy,
->>  {
->>         unsigned int caldone;
->>         unsigned int dllrdy;
->> +       unsigned long timeout;
->>
->>         /*
->>          * Keep phyctrl_pdb and phyctrl_endll low to allow
->> @@ -137,15 +138,25 @@ static int rockchip_emmc_phy_power(struct
->> rockchip_emmc_phy *rk_phy,
->>                                    PHYCTRL_ENDLL_MASK,
->>                                    PHYCTRL_ENDLL_SHIFT));
->>         /*
->> -        * After enable analog DLL circuits, we need an extra 10.2us
->> -        * for dll to be ready for work. But according to testing, we
->> -        * find some chips need more than 25us.
->> +        * After enabling analog DLL circuits docs say that we need 10.2
->> us if
->> +        * our source clock is at 50 MHz and that lock time scales
->> linearly
->> +        * with clock speed.  If we are powering on the PHY and the card
->> clock
->> +        * is super slow (like 100 kHZ) this could take as long as 5.1 ms.
 >
->
-> 5.1ms is by calculation or test?
+> Maybe we also need a "kernel rodata" resource?
 
-By calculation.
+This is already tracked with the standard markers of __start_rodata
+and __end_rodata.
 
->>> 10.2 us * (50000000 Hz / 100000 Hz)
-5100.0 us, or 5.1 ms
+If you want to be extra cautious, we could change kernel_code.end to
+be __init_begin - 1, maybe?
 
-I'll add clarification to the comment.
+-Kees
 
-
--Doug
+-- 
+Kees Cook
+Chrome OS & Brillo Security
