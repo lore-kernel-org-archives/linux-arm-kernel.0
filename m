@@ -1,77 +1,27 @@
-From: jbaron@akamai.com (Jason Baron)
-Date: Mon, 13 Jun 2016 16:32:15 -0400
-Subject: [PATCH v2 4/4] dynamic_debug: add jump label support
-In-Reply-To: <5640634.eWRyv1HFLD@wuerfel>
-References: <cover.1463778029.git.jbaron@akamai.com>
- <575ADDB3.7070304@akamai.com> <3448491.s2zXTXrSlh@wuerfel>
- <5640634.eWRyv1HFLD@wuerfel>
-Message-ID: <575F184F.9010604@akamai.com>
+From: manu@freebsd.org (Emmanuel Vadot)
+Date: Mon, 13 Jun 2016 22:37:03 +0200
+Subject: [PATCH 0/3] Allwinner MMC Fifo register
+Message-ID: <1465850226-37420-1-git-send-email-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi everyone,
 
+The mmc fifo register in A31 and later is at address 0x200 (0x100 for A10 and A20).
+Therefore the compatible string shouldn't be the same.
 
-On 06/13/2016 04:23 PM, Arnd Bergmann wrote:
-> On Monday, June 13, 2016 6:05:22 PM CEST Arnd Bergmann wrote:
->> On Friday, June 10, 2016 11:33:07 AM CEST Jason Baron wrote:
->>> On 06/10/2016 05:54 AM, Arnd Bergmann wrote:
->>>> On Friday, May 20, 2016 5:16:36 PM CEST Jason Baron wrote:
->>>>> Although dynamic debug is often only used for debug builds, sometimes its
->>>>> enabled for production builds as well. Minimize its impact by using jump
->>>>> labels. This reduces the text section by 7000+ bytes in the kernel image
->>>>> below. It does increase data, but this should only be referenced when
->>>>> changing the direction of the branches, and hence usually not in cache.
->>>>>
->>>>>    text         data     bss     dec     hex filename
->>>>> 8194852      4879776  925696 14000324         d5a0c4 vmlinux.pre
->>>>> 8187337      4960224  925696 14073257         d6bda9 vmlinux.post
->>>>>
->>>>> Signed-off-by: Jason Baron <jbaron@akamai.com>
->>>>> ---
->>>>
->>>> This causes problems for some of my randconfig builds, when a dynamic
->>>> debug call is used inside of an __exit function:
->>>>
->>>> `.exit.text' referenced in section `__jump_table' of drivers/built-in.o: defined in discarded section `.exit.text' of drivers/built-in.o
->>>> `.exit.text' referenced in section `__jump_table' of drivers/built-in.o: defined in discarded section `.exit.text' of drivers/built-in.o
->>>>
->>>
->>> I stuck pr_debug() in a few functions marked with __exit, but did not
->>> reproduce yet. Can you share your .config and gcc --version.
->>>
->>
->> I found these on ARM randconfig builds e.g. this one
->> http://pastebin.com/raw/KjWHxnwU
->>
->> I also have some other patches applied that could have interacted with your
->> change, so if you can't reproduce it easily, let me try it on a plain linux-next
->> kernel.
->>
->> The compiler I use is  arm-linux-gnueabi-gcc (GCC) 6.0.0 20160323 (experimental)
-> 
-> Update: on ARM, I have been able to reproduce this with gcc-4.6
-> and gcc-4.8, so I'm pretty confident that this is independent of the
-> toolchain. However, I have so far failed to reproduce this on x86.
-> 
-> Looking at the exit_ceph() function, I get these two assembly outputs,
-> ARM fails with the link error above:
-> 
+Emmanuel Vadot (3):
+  Change compatible string to "allwinner,sun6i-a31-mmc" for A31, A23-A33
+    and H3.
+  Add "allwinner,sun6i-a31-mmc" compatible string in the Documentation.
+  Add "allwinner,sun6i-a31-mmc" support in the driver.
 
-ok, does this fix things up?
+ Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 3 ++-
+ arch/arm/boot/dts/sun6i-a31.dtsi                    | 8 ++++----
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi                | 6 +++---
+ arch/arm/boot/dts/sun8i-h3.dtsi                     | 6 +++---
+ drivers/mmc/host/sunxi-mmc.c                        | 1 +
+ 5 files changed, 13 insertions(+), 11 deletions(-)
 
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -44,7 +44,7 @@
- #endif
-
- #if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
--       defined(CONFIG_GENERIC_BUG)
-+       defined(CONFIG_GENERIC_BUG) || defined(CONFIG_JUMP_LABEL)
- #define ARM_EXIT_KEEP(x)       x
- #define ARM_EXIT_DISCARD(x)
- #else
-
-
-Thanks,
-
--Jason
+-- 
+2.8.1
