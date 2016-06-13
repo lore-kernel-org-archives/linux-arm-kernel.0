@@ -1,88 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Jun 2016 16:02:51 +0100
-Subject: [PATCH 4/5] arm/arm64: KVM: Map the HYP text as read-only
-In-Reply-To: <1465826449-14349-5-git-send-email-marc.zyngier@arm.com>
-References: <1465826449-14349-1-git-send-email-marc.zyngier@arm.com>
- <1465826449-14349-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160613150251.GB29783@leverpostej>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 13 Jun 2016 16:02:59 +0100
+Subject: [PATCH 00/10] ARM: V7M: Support caches
+Message-ID: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 03:00:48PM +0100, Marc Zyngier wrote:
-> There should be no reason for mapping the HYP text read/write.
-> 
-> As such, let's have a new set of flags (PAGE_HYP_EXEC) that allows
-> execution, but makes the page as read-only, and update the two call
-> sites that deal with mapping code.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/pgtable.h        | 1 +
->  arch/arm/kvm/arm.c                    | 2 +-
->  arch/arm/kvm/mmu.c                    | 2 +-
->  arch/arm64/include/asm/pgtable-prot.h | 1 +
->  4 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-> index f332087..7487bf9 100644
-> --- a/arch/arm/include/asm/pgtable.h
-> +++ b/arch/arm/include/asm/pgtable.h
-> @@ -98,6 +98,7 @@ extern pgprot_t		pgprot_s2_device;
->  #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
->  #define PAGE_KERNEL_EXEC	pgprot_kernel
->  #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
-> +#define PAGE_HYP_EXEC		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY)
->  #define PAGE_HYP_RO		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY | L_PTE_XN)
->  #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
->  #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 0b5099f..d7bf2dd 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -1285,7 +1285,7 @@ static int init_hyp_mode(void)
->  	 * Map the Hyp-code called directly from the host
->  	 */
->  	err = create_hyp_mappings(kvm_ksym_ref(__hyp_text_start),
-> -				  kvm_ksym_ref(__hyp_text_end), PAGE_HYP);
-> +				  kvm_ksym_ref(__hyp_text_end), PAGE_HYP_EXEC);
+Hi,
 
-As far as I can tell, __hyp_text_{start,end} aren't guaranteed to be
-page-aligned. Are we certain that we'll never share a page with
-something that we'll subsequently want to map non-executable?
+This patch set allows M-class cpus benefit of optional cache support.
+It originaly was written by Jonny, I've been keeping it localy mainly
+rebasing over Linux versions.
 
-Otherwise this looks good!
+The main idea behind patches is to reuse existing cache handling code
+from v7A/R. In case v7M cache operations are provided via memory
+mapped interface rather than co-processor instructions, so extra
+macros have been introduced to factor out cache handling logic and
+low-level operations.
 
-Thanks,
-Mark.
+Along with the v7M cache support the first user (Cortex-M7) is
+introduced.
 
->  	if (err) {
->  		kvm_err("Cannot map world-switch code\n");
->  		goto out_err;
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 6023abd..8a0aa37 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -1687,7 +1687,7 @@ static int kvm_map_idmap_text(pgd_t *pgd)
->  	err = 	__create_hyp_mappings(pgd,
->  				      hyp_idmap_start, hyp_idmap_end,
->  				      __phys_to_pfn(hyp_idmap_start),
-> -				      PAGE_HYP);
-> +				      PAGE_HYP_EXEC);
->  	if (err)
->  		kvm_err("Failed to idmap %lx-%lx\n",
->  			hyp_idmap_start, hyp_idmap_end);
-> diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-> index 88db58c..3802048 100644
-> --- a/arch/arm64/include/asm/pgtable-prot.h
-> +++ b/arch/arm64/include/asm/pgtable-prot.h
-> @@ -56,6 +56,7 @@
->  #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
->  
->  #define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
-> +#define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
->  #define PAGE_HYP_RO		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
->  #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
->  
-> -- 
-> 2.1.4
-> 
+Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
+one showed significant boot speed-up.
+
+Based on 4.7-rc3.
+
+Thanks!
+Vladimir
+
+Jonathan Austin (9):
+  ARM: factor out CSSELR/CCSIDR operations that use cp15 directly
+  ARM: V7M: Make read_cpuid() generally available on V7M.
+  ARM: V7M: Add addresses for mem-mapped V7M cache operations
+  ARM: V7M: Add support for reading the CTR with CPUID_CACHETYPE
+  ARM: Extract cp15 operations from cache flush code
+  ARM: V7M: Implement cache macros for V7M
+  ARM: V7M: Wire up caches for V7M processors with cache support.
+  ARM: V7M: Indirect proc_info construction for V7M CPUs
+  ARM: V7M: Add support for the Cortex-M7 processor
+
+Vladimir Murzin (1):
+  ARM: V7M: fix notrace variant of save_and_disable_irqs
+
+ arch/arm/include/asm/assembler.h  |    4 ++
+ arch/arm/include/asm/cachetype.h  |   39 ++++++++++
+ arch/arm/include/asm/cputype.h    |   51 +++++++------
+ arch/arm/include/asm/glue-cache.h |    4 --
+ arch/arm/include/asm/v7m.h        |   22 ++++++
+ arch/arm/kernel/head-nommu.S      |   16 ++++-
+ arch/arm/kernel/setup.c           |   16 ++---
+ arch/arm/mm/Kconfig               |    7 +-
+ arch/arm/mm/Makefile              |    4 ++
+ arch/arm/mm/cache-v7.S            |   73 +++++++++++--------
+ arch/arm/mm/proc-macros.S         |   23 ------
+ arch/arm/mm/proc-v7.S             |    1 +
+ arch/arm/mm/proc-v7m.S            |   93 ++++++++++++++++++++----
+ arch/arm/mm/v7-cache-macros.S     |  131 ++++++++++++++++++++++++++++++++++
+ arch/arm/mm/v7m-cache-macros.S    |  142 +++++++++++++++++++++++++++++++++++++
+ 15 files changed, 520 insertions(+), 106 deletions(-)
+ create mode 100644 arch/arm/mm/v7-cache-macros.S
+ create mode 100644 arch/arm/mm/v7m-cache-macros.S
+
+-- 
+1.7.9.5
