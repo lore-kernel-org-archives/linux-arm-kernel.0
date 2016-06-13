@@ -1,125 +1,53 @@
-From: Liviu.Dudau@arm.com (Liviu.Dudau at arm.com)
-Date: Mon, 13 Jun 2016 16:56:46 +0100
-Subject: [PATCH V9 09/11] ARM64/PCI: ACPI support for legacy IRQs parsing
- and consolidation with DT code
-In-Reply-To: <20160613104005.GA26738@red-moon>
-References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
- <1465588519-11334-10-git-send-email-tn@semihalf.com>
- <20160610233612.GB7671@localhost> <20160613104005.GA26738@red-moon>
-Message-ID: <20160613155646.GF1165@e106497-lin.cambridge.arm.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Mon, 13 Jun 2016 18:59:19 +0300
+Subject: [Query]set clk rate must operate its coordinated clock
+In-Reply-To: <2738343.ekabfXD0fs@diego>
+References: <20160309152420.20de187a@xhacker>
+ <20160311165152.4103.82090@quark.deferred.io> <2738343.ekabfXD0fs@diego>
+Message-ID: <575ED857.2020008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 11:40:05AM +0100, Lorenzo Pieralisi wrote:
-> On Fri, Jun 10, 2016 at 06:36:12PM -0500, Bjorn Helgaas wrote:
-> > On Fri, Jun 10, 2016 at 09:55:17PM +0200, Tomasz Nowicki wrote:
-> > > To enable PCI legacy IRQs on platforms booting with ACPI, arch code
-> > > should include ACPI specific callbacks that parse and set-up the
-> > > device IRQ number, equivalent to the DT boot path. Owing to the current
-> > > ACPI core scan handlers implementation, ACPI PCI legacy IRQs bindings
-> > > cannot be parsed at device add time, since that would trigger ACPI scan
-> > > handlers ordering issues depending on how the ACPI tables are defined.
-> > 
-> > Uh, OK :)  I can't figure out exactly what the problem is here -- I
-> > don't know where to look if I wanted to fix the scan handler ordering
-> > issues, and I don't know how I could tell if it would ever be safe to
-> > move this from driver probe-time back to device add-time.
+On 06/06/2016 11:10 AM, Heiko St?bner wrote:
+> Hi Mike,
 > 
-> Right, the commit log could have been more informative.
+> Am Freitag, 11. M?rz 2016, 08:51:52 schrieb Michael Turquette:
+>> Quoting Jisheng Zhang (2016-03-08 23:24:20)
+>>> I have the following clk case which I dunno the elegant solution:
+>>>
+>>>
+>>> cpuclk have two parents: cpupll and refclk. When set the cpuclk freq, we
+>>> have to set its parent's freq, I.E cpupll freq. But before changing the
+>>> cpupll's freq, we should set its refclk as its parent firstly.
+>>>
+>>> AFAIK, this is a common case, I have seen such requirement in rockchip,
+>>> samsung clk driver. They solve this by notifier, but as pointed out by
+>>> Michael in
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351565.ht
+>>> ml
+>>>
+>>> "This is also a hack and it points towards some missing infrastructure in
+>>> the clock framework."
+>>>
+>>> I also don't like the notifier solution, I believe the elegant solution
+>>> could be using the coordinated clock infrastructure. So what's the status
+>>> of this infrastructure? I can test, and I can even add some code to make
+>>> it be ready to be merged if you guide me ;)
+>>
+>> Thanks for the email. I hope to finish that feature before ELC. I have
+>> Cc'd Pi-Cheng Chen from Mediatek who is also interested in coordinated
+>> clock rates.
 > 
-> pcibios_add_device() was added in:
+> pulling this up again, did this materialize yet? :-)
 > 
-> commit d1e6dc91b532 ("arm64: Add architectural support for PCI")
-> 
-> whose commit log does not specify why legacy IRQ parsing should
-> be done at pcibios_add_device() either, so honestly we had to
-> do with the information we have at hand.
-
-Because at that time (September 2014) there was no pcibios_alloc_irq() (added
-June 2015 by commit 890e4847587fcf) and after that nobody bothered to update
-the arm64 code to make use of the new API.
-
-Best regards,
-Liviu
-
-> 
-> > I also notice that x86 and ia64 call acpi_pci_irq_enable() even later,
-> > when the driver *enables* the device.  Is there a reason you didn't do
-> > it at the same time as x86 and ia64?  This is another of those pcibios
-> > hooks that really don't do anything arch-specific, so I can imagine
-> > refactoring this somehow, someday.
-> 
-> Yes, with [1], that was the goal, that stopped because [1] does not
-> work on x86.
-> 
-> Only DT platform(s) affected by this change are all platforms relying on
-> drivers/pci/host/pci-xgene.c (others rely on pci_fixup_irqs() that
-> should be removed too), if on those platforms probing IRQs at device
-> enable time works ok I can update this patch (it can be done through [1]
-> once we figure out what to do with it on x86) and move the IRQ set-up at
-> pcibios_enable_device() time.
-> 
-> @Duc: any feedback on this ?
-> 
-> Thanks,
-> Lorenzo
-> 
-> [1] http://www.spinics.net/lists/linux-pci/msg45950.html
-> 
-> > Did we have this conversation before?  It seems vaguely familiar, so I
-> > apologize if you already explained this once.
-> > 
-> > > To solve this problem and consolidate FW PCI legacy IRQs parsing in
-> > > one single pcibios callback (pending final removal), this patch moves
-> > > DT PCI IRQ parsing to the pcibios_alloc_irq() callback (called by
-> > > PCI core code at device probe time) and adds ACPI PCI legacy IRQs
-> > > parsing to the same callback too, so that FW PCI legacy IRQs parsing
-> > > is confined in one single arch callback that can be easily removed
-> > > when code parsing PCI legacy IRQs is consolidated and moved to core
-> > > PCI code.
-> > > 
-> > > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> > > Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > ---
-> > >  arch/arm64/kernel/pci.c | 11 ++++++++---
-> > >  1 file changed, 8 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > > index d5d3d26..b3b8a2c 100644
-> > > --- a/arch/arm64/kernel/pci.c
-> > > +++ b/arch/arm64/kernel/pci.c
-> > > @@ -51,11 +51,16 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
-> > >  }
-> > >  
-> > >  /*
-> > > - * Try to assign the IRQ number from DT when adding a new device
-> > > + * Try to assign the IRQ number when probing a new device
-> > >   */
-> > > -int pcibios_add_device(struct pci_dev *dev)
-> > > +int pcibios_alloc_irq(struct pci_dev *dev)
-> > >  {
-> > > -	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > > +	if (acpi_disabled)
-> > > +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > > +#ifdef CONFIG_ACPI
-> > > +	else
-> > > +		return acpi_pci_irq_enable(dev);
-> > > +#endif
-> > >  
-> > >  	return 0;
-> > >  }
-> > > -- 
-> > > 1.9.1
-> > > 
-> > 
+> Because it looks like on Rockchip we're getting yet another clock that needs 
+> special handling (set_rate needs to go through the trusted-firmware, while 
+> reading stays the same) which might profit from that as well.
 > 
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Hi,
+I am also interested in the CCR. Hopefully Mike will post some patches on
+the list soon.
+
+Regards,
+Georgi
