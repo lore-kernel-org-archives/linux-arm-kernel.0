@@ -1,54 +1,51 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 13 Jun 2016 09:15:09 +0000
-Subject: [PATCH 1/1] ARM: dts: imx6qdl.dtsi: add "arm, shared-override"
- for pl310
-In-Reply-To: <20160611115733.GM20243@tiger>
-References: <1465292365-26038-1-git-send-email-peter.chen@nxp.com>
- <20160611115733.GM20243@tiger>
-Message-ID: <VI1PR04MB1455E287DCD3AD6F555F7B038B530@VI1PR04MB1455.eurprd04.prod.outlook.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 13 Jun 2016 10:18:14 +0100
+Subject: [PATCH 1/3] arm64: dts: juno: add coresight support
+In-Reply-To: <CANLsYkzbtW2nFsntQ8vLafu=JS+qcjXm+6HQpi3F_P2a5CsHaw@mail.gmail.com>
+References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
+ <1465228765-14038-2-git-send-email-sudeep.holla@arm.com>
+ <CANLsYkzbtW2nFsntQ8vLafu=JS+qcjXm+6HQpi3F_P2a5CsHaw@mail.gmail.com>
+Message-ID: <575E7A56.6070005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
->Subject: Re: [PATCH 1/1] ARM: dts: imx6qdl.dtsi: add "arm, shared-override" for
->pl310
->
->+ Lucas
->
->On Tue, Jun 07, 2016 at 05:39:25PM +0800, Peter Chen wrote:
->> The imx6 SMP system has the same DMA memory coherency issue [1] with
->> pl310 L2 controller. With this shared override bit set, the customer
->> reports the DMA coherency issue is gone. Besides, I have tested the
->> performance using USB ethernet with/without this bit, it shows no
->> difference.
+
+
+On 12/06/16 22:57, Mathieu Poirier wrote:
+> On 6 June 2016 at 09:59, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> Most of the debug-related components on Juno are located in the coreSight
+>> subsystem while others are located in the Cortex-Axx clusters, the SCP
+>> subsystem, and in the main system.
 >>
->> [1] http://patchwork.ozlabs.org/patch/469362/
+>> Each core in the two processor clusters contain an Embedded Trace
+>> Macrocell(ETM) which generates real-time trace information that trace
+>> tools can use and an ATB trace output that is sent to a funnel before
+>> going to the CoreSight subsystem.
 >>
->> Signed-off-by: Peter Chen <peter.chen@nxp.com>
->> ---
->>  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
->>  1 file changed, 1 insertion(+)
+>> The trace output signals combine with two trace expansions using another
+>> funnel and fed into the Embedded Trace FIFO(ETF0).
 >>
->> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
->> b/arch/arm/boot/dts/imx6qdl.dtsi index ed613eb..30e21ee 100644
->> --- a/arch/arm/boot/dts/imx6qdl.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
->> @@ -185,6 +185,7 @@
->>  			cache-level = <2>;
->>  			arm,tag-latency = <4 2 3>;
->>  			arm,data-latency = <4 2 3>;
->> +			arm,shared-override;
+>> The output trace data stream of the funnel is then replicated before it
+>> is sent to either the:
+>> - Trace Port Interface Unit(TPIU), that sends it out using the trace port.
+>> - ETR that can write the trace data to memory located in the application
+>>    memory space
 >
->Lucas had an objection to the change [1], considering the case that kernel is booted
->as non-secure.
+> Hi Sudeep,
 >
->Shawn
->
->[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/471026
+> Did you try booting this on juno-r0?  On my side the system won't boot
+> unless I enable the debug power domain by externally connecting to the
+> system using DS-5.
 >
 
-Add another Lucas in case he changed his email.
+As you have already realized that you need SCPI power domain patches for
+the functionality. However, in absence of those patches or when it's
+disabled, it shouldn't cause any boot or runtime issues. Only ETM or
+coresight won't work. If it's causing any crash or hang, please do let
+me know, that needs to be fixed. I have only tested with latest
+firmware. Let me know the details of hang/crash and firmware version you
+are using.
 
-Shawn, do you know what his mean? Why other pl310 parameters can be changed in kernel?
-
-Peter
+-- 
+Regards,
+Sudeep
