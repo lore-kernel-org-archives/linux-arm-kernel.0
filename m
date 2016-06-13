@@ -1,46 +1,50 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 13 Jun 2016 13:50:57 -0700
-Subject: [PATCH 00/14] run seccomp after ptrace
-In-Reply-To: <1465506124-21866-1-git-send-email-keescook@chromium.org>
-References: <1465506124-21866-1-git-send-email-keescook@chromium.org>
-Message-ID: <CAGXu5jJsWOdhRBauQ-_S-4ODd4m+xUbdjk1_zPXQqY7Qp-Dgdw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Jun 2016 22:02:13 +0100
+Subject: Linux panics when suspend cannot offline the secondary cores
+In-Reply-To: <2041686.H4Vc2p72PV@vostro.rjw.lan>
+References: <575ADFAC.4090009@free.fr> <2922940.3xeChLaYeK@vostro.rjw.lan>
+ <575EBA40.4000803@free.fr> <2041686.H4Vc2p72PV@vostro.rjw.lan>
+Message-ID: <20160613210213.GZ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Oops, forgot to send this series through the lsm list...)
+On Mon, Jun 13, 2016 at 10:49:32PM +0200, Rafael J. Wysocki wrote:
+> I guess all of the existing implementations of smp_ops.cpu_die() don't return
+> to the caller no matter what, so the caller did not have to consider anything
+> else.
 
-On Thu, Jun 9, 2016 at 2:01 PM, Kees Cook <keescook@chromium.org> wrote:
-> There has been a long-standing (and documented) issue with seccomp
-> where ptrace can be used to change a syscall out from under seccomp.
-> This is a problem for containers and other wider seccomp filtered
-> environments where ptrace needs to remain available, as it allows
-> for an escape of the seccomp filter.
->
-> Since the ptrace attack surface is available for any allowed syscall,
-> moving seccomp after ptrace doesn't increase the actually available
-> attack surface. And this actually improves tracing since, for
-> example, tracers will be notified of syscall entry before seccomp
-> sends a SIGSYS, which makes debugging filters much easier.
->
-> The per-architecture changes do make one (hopefully small)
-> semantic change, which is that since ptrace comes first, it may
-> request a syscall be skipped. Running seccomp after this doesn't
-> make sense, so if ptrace wants to skip a syscall, it will bail
-> out early similarly to how seccomp was. This means that skipped
-> syscalls will not be fed through audit, though that likely means
-> we're actually avoiding noise this way.
->
-> This series first cleans up seccomp to remove the now unneeded
-> two-phase entry, fixes the SECCOMP_RET_TRACE hole (same as the
-> ptrace hole above), and then reorders seccomp after ptrace on
-> each architecture.
+Existing implementations for hardware which implements CPU hotplug
+takes the requested CPU down in such a way that smp_ops.cpu_die()
+*never* returns.
 
-Has anyone else had a chance to review this series? I'd like to get it
-landed in -next as early as possible in case there are unexpected
-problems...
+We have a number of evaluation boards where its desirable to emulate
+CPU hotplug.  These boards have no power management abilities, and
+have no way to power down or reset a CPU from software.  For these,
+we implement CPU hotplug by taking the CPU down gracefully, taking
+it out of coherency, and then placing it in a loop waiting for the
+CPU up event to arrive.  At that point (and this is the only legal
+time) smp_ops.cpu_die() returns - at which point you get the
+resuscitating kernel message, and the CPU re-enters the kernel.
 
--Kees
+This path is _only_ for these evaluation platforms which have no
+hardware support for CPU hotplug, and therefore no PM and no kexec.
+
+The *only* solution to having working PM support Mason's platform is
+a properly implemented CPU hotplug correctly - which means ensuring
+that the CPU is either powered down or placed in reset during the
+smp_ops.cpu_die() call.  Everything else (even the simulation of it)
+is not good enough.
+
+That can be done either by the dying CPU when it calls into
+smp_ops.cpu_die(), or the CPU requesting the death of the CPU via
+smp_ops.cpu_kill().
+
+Either way, it's up to the platform code to implement these, and as
+I say, a correct and proper implementation of this is a fundamental
+requirement for system power management (like suspend) and kexec in
+a SMP system.
 
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
