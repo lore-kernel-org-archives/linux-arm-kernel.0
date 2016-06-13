@@ -1,72 +1,107 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 14 Jun 2016 09:45:02 +1000
-Subject: [linux-sunxi] [PATCH v3 11/13] dt: spi: sun4i: merge sun4i and
- sun6i binding doc
-In-Reply-To: <cccbd6c3f0a194ec6eecd6627c4874da7b936f37.1465490774.git.hramrach@gmail.com>
-References: <cover.1465490774.git.hramrach@gmail.com>
- <cccbd6c3f0a194ec6eecd6627c4874da7b936f37.1465490774.git.hramrach@gmail.com>
-Message-ID: <CAGRGNgWXG_d2ScrgehbSHguF-V0cXy-Vr1=zLE36v5rDu6pYtQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 13 Jun 2016 16:46:14 -0700
+Subject: [PATCH] clk: rockchip: add pclk_vio_grf to critical clock on the
+ RK3399
+In-Reply-To: <575E240C.9060502@rock-chips.com>
+References: <1465724913-14553-1-git-send-email-zhengxing@rock-chips.com>
+ <CAD=FV=XSSPMOnMD3mqFyqM3wWLShbRc2cXVdN0PYcUxpaDnsTw@mail.gmail.com>
+ <575E240C.9060502@rock-chips.com>
+Message-ID: <CAD=FV=WhaN__psCV_hYoc67gZMpCt_9yp5=vR-C4uc8i39RAaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Xing,
 
-On Tue, Jun 14, 2016 at 3:46 AM, Michal Suchanek <hramrach@gmail.com> wrote:
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> ---
->  .../devicetree/bindings/spi/spi-sun4i.txt          | 21 ++++++++++---------
->  .../devicetree/bindings/spi/spi-sun6i.txt          | 24 ----------------------
->  2 files changed, 11 insertions(+), 34 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/spi/spi-sun6i.txt
+On Sun, Jun 12, 2016 at 8:10 PM, Xing Zheng <zhengxing@rock-chips.com> wrote:
+> Hi Doug,
 >
-> diff --git a/Documentation/devicetree/bindings/spi/spi-sun4i.txt b/Documentation/devicetree/bindings/spi/spi-sun4i.txt
-> index de827f5..329e543 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-sun4i.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-sun4i.txt
-> @@ -1,7 +1,8 @@
-> -Allwinner A10 SPI controller
-> +Allwinner A10/A31 SPI controller
 >
->  Required properties:
-> -- compatible: Should be "allwinner,sun4-a10-spi".
-> +- compatible: Should be one of "allwinner,sun4i-a10-spi" and
-> +                               "allwinner,sun6i-a31-spi"
->  - reg: Should contain register location and length.
->  - interrupts: Should contain interrupt.
->  - clocks: phandle to the clocks feeding the SPI controller. Two are
-> @@ -9,16 +10,16 @@ Required properties:
->    - "ahb": the gated AHB parent clock
->    - "mod": the parent module clock
->  - clock-names: Must contain the clock names described just above
-> +- resets: (sun6i only) phandle to the reset controller asserting
-> +         this device in reset
+> On 2016?06?13? 05:32, Doug Anderson wrote:
+>>
+>> Xing,
+>>
+>> On Sun, Jun 12, 2016 at 2:48 AM, Xing Zheng<zhengxing@rock-chips.com>
+>> wrote:
+>>>
+>>> The pclk_vio_grf supply power for GRF IOs, if it is disabled, will
+>>> cause abnormal operation of the GRF.
+>>>
+>>> The clock tree of the pclk_vio like this:
+>>>               | --> pclk_vio_grf
+>>> ... pclk_vio | --> pclk_mipi_dsi1
+>>>               | --> pclk_mipi_dsi0
+>>>
+>>> and the pclk_mipi_dsi0 and pclk_mipi_dsi1 don't have the flag
+>>> CLK_IGNORE_UNUSED, and they will be disabled by clk_disable_unused
+>>> when startup:
+>>> clk_disable_unused
+>>>    --> clk_disable_unprepare
+>>>      --> clk_disable
+>>>        --> clk_core_disable(core->parent)
+>>>
+>>> then, the pclk_vio_grf also is disabled. Therefore, we need to add
+>>> pclk_vio_grf to critical clock and avoid to disable pclk_vio and
+>>> pclk_vio_grf.
+>>>
+>>> Tested-by: Yakir Yang<ykk@rock-chips.com>
+>>> Signed-off-by: Yakir Yang<ykk@rock-chips.com>
+>>> Signed-off-by: Brian Norris<briannorris@chromium.org>
+>>> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+>>> ---
+>>>
+>>>   drivers/clk/rockchip/clk-rk3399.c |    1 +
+>>>   1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/clk/rockchip/clk-rk3399.c
+>>> b/drivers/clk/rockchip/clk-rk3399.c
+>>> index b6742fa..7ecb12c3 100644
+>>> --- a/drivers/clk/rockchip/clk-rk3399.c
+>>> +++ b/drivers/clk/rockchip/clk-rk3399.c
+>>> @@ -1485,6 +1485,7 @@ static const char *const
+>>> rk3399_cru_critical_clocks[] __initconst = {
+>>>          "gpll_hclk_perilp1_src",
+>>>          "gpll_aclk_perilp0_src",
+>>>          "gpll_aclk_perihp_src",
+>>> +       "pclk_vio_grf",
+>>
+>> This clock is only needed when doing video output (like eDP), right?
+>> That means it is not really a critical clock.  Critical clocks are
+>> supposed to be ones that are needed for the basic functioning of the
+>> system and that can never be turned off in any circumstances.  In this
+>> case, if someone were running a rk3399 device and didn't have any
+>> video output they would want this clock off.
+>>
+>> Can you figure out in exactly which circumstances this clock needs to
+>> be on and then add a proper consumer of this clock?  For instance, if
+>> this clock is needed whenever the VOP is outputting data, then the VOP
+>> should be a client and should turn this clock on and off when video is
+>> being output.  If this clock is needed whenever you access VOP
+>> registers, then the VOP should be a client and turn this clock on
+>> around register accesses.
+>>
+>> -Doug
+>>
+> Yes, the pclk_vio_grf is needed for doing video output.
+> andpclk_vio_grf supply for: grf_soc_con9, 20~26, grf_hdcp
 >
->  Example:
->
-> -spi1: spi at 01c06000 {
-> -       compatible = "allwinner,sun4i-a10-spi";
-> -       reg = <0x01c06000 0x1000>;
-> -       interrupts = <11>;
-> -       clocks = <&ahb_gates 21>, <&spi1_clk>;
-> +spi1: spi at 01c69000 {
-> +       compatible = "allwinner,sun6i-a31-spi";
-> +       reg = <0x01c69000 0x1000>;
-> +       interrupts = <0 66 4>;
-> +       clocks = <&ahb1_gates 21>, <&spi1_clk>;
->         clock-names = "ahb", "mod";
-> -       status = "disabled";
-> -       #address-cells = <1>;
-> -       #size-cells = <0>;
-> +       resets = <&ahb1_rst 21>;
+> From our design folks, we have many GRF registers in different power
+> domains,
+> and these GRF gates should be always enabled. In this case, we can avoid
+> some
+> of the operations GRF registers exception problems, and it is only a very
+> small
+> increase in  power consumption (aboult <=1ma).
 
-Why not have an example of each type?
+Even if it's not much power, it seems like we should still turn it off
+and on in the right place.  Unless I'm mistaken it should be such a
+simple patch provide the clock to the right driver and then get the
+clock when appropriate.
 
->  };
 
-Thanks,
+> I will refer the latest TRM to update a new patch for always enable these
+> GRFs.
 
--- 
-Julian Calaby
+Does that mean you're going to make these all critical clocks?  That
+doesn't sound so great...
 
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+-Doug
