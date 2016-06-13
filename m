@@ -1,55 +1,51 @@
-From: liudongdong3@huawei.com (Dongdong Liu)
-Date: Mon, 13 Jun 2016 21:02:03 +0800
-Subject: [RFC PATCH V2 2/2] ARM64/PCI: Start using quirks handling for ACPI
- based PCI host controller
-In-Reply-To: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
-References: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
-Message-ID: <1465822923-33599-3-git-send-email-liudongdong3@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Jun 2016 13:54:22 +0100
+Subject: [PATCH 1/2] arm64: fix dump_instr when PAN and UAO are in use
+In-Reply-To: <20160613124823.GF1605@arm.com>
+References: <1465812915-19801-1-git-send-email-mark.rutland@arm.com>
+ <1465812915-19801-2-git-send-email-mark.rutland@arm.com>
+ <20160613124823.GF1605@arm.com>
+Message-ID: <20160613125421.GA29783@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Nowicki <tn@semihalf.com>
+On Mon, Jun 13, 2016 at 01:48:24PM +0100, Will Deacon wrote:
+> On Mon, Jun 13, 2016 at 11:15:14AM +0100, Mark Rutland wrote:
+> > If the kernel is set to show unhandled signals, and a user task does not
+> > handle a SIGILL as a result of an instruction abort, we will attempt to
+> > log the offending instruction with dump_instr before killing the task.
+> > 
+> > We use dump_instr to log the encoding of the offending userspace
+> > instruction. However, dump_instr is also used to dump instructions from
+> > kernel space, and internally always switches to KERNEL_DS before dumping
+> > the instruction with get_user. When both PAN and UAO are in use, reading
+> > a user instruction via get_user while in KERNEL_DS will result in a
+> > permission fault, which leads to an Oops.
+> > 
+> > As we have regs corresponding to the context of the original instruction
+> > abort, we can inspect this and only flip to KERNEL_DS if the original
+> > abort was taken from the kernel, avoiding this issue. At the same time,
+> > remove the redundant (and incorrect) comments regarding the order
+> > dump_mem and dump_instr are called in.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: James Morse <james.morse@arm.com>
+> > Cc: Robin Murphy <robin.murphy@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Fixes: 57f4959bad0a154a ("arm64: kernel: Add support for User Access Override")
+> > ---
+> >  arch/arm64/kernel/traps.c | 26 +++++++++++++-------------
+> >  1 file changed, 13 insertions(+), 13 deletions(-)
+> 
+> Queued as a fix for 4.8 w/ Vladimir's Tested-by. Please try to keep fixes
+> and cleanups/features separate in future series.
 
-pci_generic_ecam_ops is used by default. Since there are platforms
-which have non-compliant ECAM space we need to overwrite these
-accessors prior to PCI buses enumeration. In order to do that
-we call pci_mcfg_get_ops to retrieve pci_ecam_ops structure so that
-we can use proper PCI config space accessors and bus_shift.
+Cheers, will do.
 
-pci_generic_ecam_ops is still used for platforms free from quirks.
+I assume you've only taken patch 1, and it's up to Catalin to take patch
+2 for v4.8. I'll poke as necessary for that to happen.
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- arch/arm64/kernel/pci.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 94cd43c..a891bda 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -139,6 +139,7 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
- 	struct pci_config_window *cfg;
- 	struct resource cfgres;
- 	unsigned int bsz;
-+	struct pci_ecam_ops *ops;
- 
- 	/* Use address from _CBA if present, otherwise lookup MCFG */
- 	if (!root->mcfg_addr)
-@@ -150,12 +151,12 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
- 		return NULL;
- 	}
- 
--	bsz = 1 << pci_generic_ecam_ops.bus_shift;
-+	ops = pci_mcfg_get_ops(root);
-+	bsz = 1 << ops->bus_shift;
- 	cfgres.start = root->mcfg_addr + bus_res->start * bsz;
- 	cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
- 	cfgres.flags = IORESOURCE_MEM;
--	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
--			      &pci_generic_ecam_ops);
-+	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res, ops);
- 	if (IS_ERR(cfg)) {
- 		dev_err(&root->device->dev, "%04x:%pR error %ld mapping ECAM\n",
- 			seg, bus_res, PTR_ERR(cfg));
--- 
-1.9.1
+Thanks,
+Mark.
