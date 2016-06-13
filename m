@@ -1,31 +1,35 @@
-From: ernestovm07@gmail.com (ernestovm07 at gmail.com)
-Date: Mon, 13 Jun 2016 12:10:57 -0700 (PDT)
-Subject: [PATCH v2 0/6] Introduce Allwinner A33 support
-In-Reply-To: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
-References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <8a9fe780-30c2-49eb-8158-a5825887c857@googlegroups.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 13 Jun 2016 21:14:47 +0200 (CEST)
+Subject: [PATCH 44/48] clocksource: atmel-pit: allow unselecting ATMEL_PIT
+In-Reply-To: <20160613210416.4fef01d2@bbrezillon>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1465596231-21766-45-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1606111143330.5839@nanos> <20160611105351.GH19050@piout.net>
+ <20160613210416.4fef01d2@bbrezillon>
+Message-ID: <alpine.DEB.2.11.1606132114190.5839@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El s?bado, 30 de mayo de 2015, 9:55:10 (UTC-5), Hans de Goede escribi?:
-> Hi Maxime,
+On Mon, 13 Jun 2016, Boris Brezillon wrote:
+> On Sat, 11 Jun 2016 12:53:51 +0200
+> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 > 
-> Here is a cleaned up series of Vishnu Patekar's A33 support. This should
-> address all concerns raised during the posting of v1.
+> > On 11/06/2016 at 11:43:54 +0200, Thomas Gleixner wrote :
+> > > On Sat, 11 Jun 2016, Alexandre Belloni wrote:
+> > >   
+> > > > With the new TCB clocksource driver, atmel platforms are now able to boot
+> > > > without the PIT driver. Allow unselecting it.  
+> > > 
+> > > Yay! Thanks for doing this!
+> > >   
+> > 
+> > Sure! Can you still check the request_irq/free_irq in
+> > timer-atmel-tcbclksrc? I'm not sure whether this can work reliably or
+> > only because we are before SYSTEM_STATE=RUNNING.
+> > In the latter case, I have another way of doing that.
+> > 
 > 
-> I've tested that all peripherals declared in the shared sun8i-a23-a33.dtsi
-> work on the A33 too, with the exception of the dma-controller. For the
-> dma-controller I've compared the A23 vs A33 manual and the entire dma-
-> controller description including the register description is bit for bit
-> identical.
-> 
-> This has been tested on a 7" Ippo Q8H v1.2 A23 tablet, a 7" Ippo Q8H v1.2
-> A33 tablet and a 10" GA10H A33 tablet. The dts for the 10" tablet still
-> needs some work wrt the lradc button voltages so that is not included
-> in this set.
-> 
-> Regards,
-> 
-> Hans
+> Sorry to put it back on the table, but shouldn't we consider adding
+> these irq_disable/enable_action() helpers?
 
-http://hp7g2.blogspot.com
+I fear that's the only reliable way to do it.
