@@ -1,66 +1,58 @@
 From: hramrach@gmail.com (Michal Suchanek)
-Date: 13 Jun 2016 17:46:50 -0000
-Subject: [PATCH v3 05/13] spi: sun6i: update CS handling from spi-sun4i
+Date: 13 Jun 2016 17:46:49 -0000
+Subject: [PATCH v3 03/13] spi: sun4i: fix FIFO limit
 In-Reply-To: <cover.1465490774.git.hramrach@gmail.com>
 References: <cover.1465490774.git.hramrach@gmail.com>
-Message-ID: <3bf00d7311a7ed5f5d71125b7b652175551061b6.1465490774.git.hramrach@gmail.com>
+Message-ID: <6495575d7c7e14da06f86d88a6a15042b4c6b96a.1465490774.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While trying to merge sun4i and sun6i spi drivers I noticed
-the sun4i driver seems to have more reasonable CS handling.
+When testing SPI without DMA I noticed that filling the FIFO on the
+spi controller causes timeout.
 
-Update sun6i to same.
+Always leave room for one byte in the FIFO.
 
 Signed-off-by: Michal Suchanek <hramrach@gmail.com>
----
- drivers/spi/spi-sun6i.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index bc29a98..06759d0 100644
---- a/drivers/spi/spi-sun6i.c
-+++ b/drivers/spi/spi-sun6i.c
-@@ -145,11 +145,30 @@ static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
- 	reg &= ~SUN6I_TFR_CTL_CS_MASK;
- 	reg |= SUN6I_TFR_CTL_CS(spi->chip_select);
+---
+v2:
+use EMSGSIZE instead of EINVAL
+v3:
+fix comment style
+---
+ drivers/spi/spi-sun4i.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index 0c2216a..f2848b7 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -180,7 +180,10 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
  
-+	/* We want to control the chip select manually */
-+	reg |= SUN6I_TFR_CTL_CS_MANUAL;
+ 	/* We don't support transfer larger than the FIFO */
+ 	if (tfr->len > SUN4I_FIFO_DEPTH)
+-		return -EINVAL;
++		return -EMSGSIZE;
 +
- 	if (enable)
- 		reg |= SUN6I_TFR_CTL_CS_LEVEL;
- 	else
- 		reg &= ~SUN6I_TFR_CTL_CS_LEVEL;
++	if (tfr->tx_buf && tfr->len >= SUN4I_FIFO_DEPTH)
++		return -EMSGSIZE;
  
+ 	reinit_completion(&sspi->done);
+ 	sspi->tx_buf = tfr->tx_buf;
+@@ -270,8 +273,12 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	sun4i_spi_write(sspi, SUN4I_BURST_CNT_REG, SUN4I_BURST_CNT(tfr->len));
+ 	sun4i_spi_write(sspi, SUN4I_XMIT_CNT_REG, SUN4I_XMIT_CNT(tx_len));
+ 
+-	/* Fill the TX FIFO */
+-	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
 +	/*
-+	 * Even though this looks irrelevant since we are supposed to
-+	 * be controlling the chip select manually, this bit also
-+	 * controls the levels of the chip select for inactive
-+	 * devices.
-+	 *
-+	 * If we don't set it, the chip select level will go low by
-+	 * default when the device is idle, which is not really
-+	 * expected in the common case where the chip select is active
-+	 * low.
++	 * Fill the TX FIFO
++	 * Filling the FIFO fully causes timeout for some reason
++	 * at least on spi2 on A10s
 +	 */
-+	if (spi->mode & SPI_CS_HIGH)
-+		reg &= ~SUN6I_TFR_CTL_SPOL;
-+	else
-+		reg |= SUN6I_TFR_CTL_SPOL;
-+
- 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
- }
++	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH - 1);
  
-@@ -215,9 +234,6 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
- 	else
- 		reg |= SUN6I_TFR_CTL_DHB;
- 
--	/* We want to control the chip select manually */
--	reg |= SUN6I_TFR_CTL_CS_MANUAL;
--
- 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
- 
- 	/* Ensure that we have a parent clock fast enough */
+ 	/* Enable the interrupts */
+ 	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC);
 -- 
 2.8.1
