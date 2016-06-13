@@ -1,177 +1,40 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 13 Jun 2016 18:08:09 +0100
-Subject: [PATCH v4] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-Message-ID: <1465837689-28215-1-git-send-email-suzuki.poulose@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 13 Jun 2016 18:11:22 +0100
+Subject: [RFC] implement gpio_pci_platform_pm to put pci device into D3cold
+In-Reply-To: <20160612203245.66fbd54a@xhacker>
+References: <20160612203245.66fbd54a@xhacker>
+Message-ID: <20160613171122.GA29837@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@linaro.org>
+Hi Jisheng,
 
-It can be useful for JIT software to be aware of MIDR_EL1 and
-REVIDR_EL1 to ascertain the presence of any core errata that could
-affect codegen.
+On Sun, Jun 12, 2016 at 08:32:45PM +0800, Jisheng Zhang wrote:
+> Dear all,
+> 
+> I want to solve one problem: we have pcie in a DT based arm64 system,
+> now we want to put the device into D3cold when runtime suspended. The
+> pcie device could be power down by operating one gpio pin, this is the
+> D3cold the platform could support. 
+> 
+> My solution is to register a gpio_pci_platform_pm with
+> pci_set_platform_pm() but the key is how to setup a mapping between
+> pci_dev and gpio through DT
+> 
+> I think this is a general case, could you please kindly give some
+> suggestions?
 
-This patch exposes these registers through sysfs:
+You would like to define an "equivalent" of what exists today
+in ACPI (ie ACPI methods like _PSx) through generic DT bindings,
+correct ?
 
-/sys/devices/system/cpu/cpu$ID/identification/midr
-/sys/devices/system/cpu/cpu$ID/identification/revidr
+It is hard to say what can be really generalized and how without
+having first an implementation (so that we can see how this would
+map to other systems), if you have some code to share even if it
+is an RFC that would help quite a bit.
 
-where $ID is the cpu number. For big.LITTLE systems, one can have a
-mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
-to be enumerated.
+Question: when you say "I think this is a general case" I wonder,
+are you referring to specific drivers in the mainline ?
 
-If the kernel does not have valid information to populate these entries
-with, an empty string is returned to userspace.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
-[ Return error for access to !present CPU registers, ABI documentation
-  updates, Protection from hotplug ]
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
-Changes since V3:
-  - Disable cpu hotplug while we initialise
-  - Added a comment to explain why expose 64bit value
-  - Update Document/ABI/testing/sysfs-devices-system-cpu
-Changes since V2:
-  - Fix errno for failures (Spotted-by: Russell King)
-  - Roll back, if we encounter a missing cpu device
-  - Return error for access to registers of CPUs not present.
----
- Documentation/ABI/testing/sysfs-devices-system-cpu | 13 ++++
- arch/arm64/include/asm/cpu.h                       |  1 +
- arch/arm64/kernel/cpuinfo.c                        | 80 ++++++++++++++++++++++
- 3 files changed, 94 insertions(+)
-
-diff --git a/Documentation/ABI/testing/sysfs-devices-system-cpu b/Documentation/ABI/testing/sysfs-devices-system-cpu
-index 1650133..8c4607d 100644
---- a/Documentation/ABI/testing/sysfs-devices-system-cpu
-+++ b/Documentation/ABI/testing/sysfs-devices-system-cpu
-@@ -340,3 +340,16 @@ Description:	POWERNV CPUFreq driver's frequency throttle stats directory and
- 		'policyX/throttle_stats' directory and all the attributes are same as
- 		the /sys/devices/system/cpu/cpuX/cpufreq/throttle_stats directory and
- 		attributes which give the frequency throttle information of the chip.
-+
-+What:		/sys/devices/system/cpu/cpuX/identification/
-+		/sys/devices/system/cpu/cpuX/identification/midr
-+		/sys/devices/system/cpu/cpuX/identification/revidr
-+Date:		June 2016
-+Contact:	Linux ARM Kernel Mailing list <linux-arm-kernel@lists.infradead.org>
-+		Linux Kernel mailing list <linux-kernel@vger.kernel.org>
-+Description:	ARM64 CPU identification registers
-+		'identification' directory exposes the CPU ID registers for
-+		 identifying model and revision of the CPU.
-+		- midr : This file gives contents of Main ID Register (MIDR_EL1).
-+		- revidr : This file gives contents of the Revision ID register
-+		 (REVIDR_EL1).
-diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-index 13a6103..116a382 100644
---- a/arch/arm64/include/asm/cpu.h
-+++ b/arch/arm64/include/asm/cpu.h
-@@ -29,6 +29,7 @@ struct cpuinfo_arm64 {
- 	u32		reg_cntfrq;
- 	u32		reg_dczid;
- 	u32		reg_midr;
-+	u32		reg_revidr;
- 
- 	u64		reg_id_aa64dfr0;
- 	u64		reg_id_aa64dfr1;
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index c173d32..c30da19 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -212,6 +212,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	info->reg_ctr = read_cpuid_cachetype();
- 	info->reg_dczid = read_cpuid(DCZID_EL0);
- 	info->reg_midr = read_cpuid_id();
-+	info->reg_revidr = read_cpuid(REVIDR_EL1);
- 
- 	info->reg_id_aa64dfr0 = read_cpuid(ID_AA64DFR0_EL1);
- 	info->reg_id_aa64dfr1 = read_cpuid(ID_AA64DFR1_EL1);
-@@ -264,3 +265,82 @@ void __init cpuinfo_store_boot_cpu(void)
- 	boot_cpu_data = *info;
- 	init_cpu_features(&boot_cpu_data);
- }
-+
-+/*
-+ * Both MIDR_EL1 and REVIDR_EL1 are 32bit registers. However, per C5.1.1,
-+ * "Principles of the System instruction class encoding" in ARM DDI 0487A.i,
-+ * when a system register is escribed as 32-bit, this only means that the
-+ * upper 32 bits are RES0, not that they will never be made use of. To avoid
-+ * changing the ABI for the future, the values are exported as 64bit values.
-+ */
-+#define CPUINFO_ATTR_RO(_name)							\
-+	static ssize_t show_##_name (struct device *dev,			\
-+			struct device_attribute *attr, char *buf)		\
-+	{									\
-+		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
-+		if (!cpu_present(dev->id))					\
-+			return -ENODEV;						\
-+										\
-+		if (info->reg_midr)						\
-+			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
-+		else								\
-+			return 0;						\
-+	}									\
-+	static DEVICE_ATTR(_name, 0444, show_##_name, NULL)
-+
-+CPUINFO_ATTR_RO(midr);
-+CPUINFO_ATTR_RO(revidr);
-+
-+static struct attribute *cpuregs_attrs[] = {
-+	&dev_attr_midr.attr,
-+	&dev_attr_revidr.attr,
-+	NULL
-+};
-+
-+static struct attribute_group cpuregs_attr_group = {
-+	.attrs = cpuregs_attrs,
-+	.name = "identification"
-+};
-+
-+static int __init cpuinfo_regs_init(void)
-+{
-+	int cpu, finalcpu, ret;
-+	struct device *dev;
-+
-+	cpu_hotplug_disable();
-+
-+	for_each_present_cpu(cpu) {
-+		dev = get_cpu_device(cpu);
-+
-+		if (!dev) {
-+			ret = -ENODEV;
-+			break;
-+		}
-+
-+		ret = sysfs_create_group(&dev->kobj, &cpuregs_attr_group);
-+		if (ret)
-+			break;
-+	}
-+
-+	if (!ret)
-+		goto out;
-+	/*
-+	 * We were unable to put down sysfs groups for all the CPUs, revert
-+	 * all the groups we have placed down s.t. none are visible.
-+	 * Otherwise we could give a misleading picture of what's present.
-+	 */
-+	finalcpu = cpu;
-+	for_each_present_cpu(cpu) {
-+		if (cpu == finalcpu)
-+			break;
-+		dev = get_cpu_device(cpu);
-+		if (dev)
-+			sysfs_remove_group(&dev->kobj, &cpuregs_attr_group);
-+	}
-+
-+out:
-+	cpu_hotplug_enable();
-+	return ret;
-+}
-+
-+device_initcall(cpuinfo_regs_init);
--- 
-1.9.1
+Thanks,
+Lorenzo
