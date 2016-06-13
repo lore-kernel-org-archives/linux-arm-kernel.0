@@ -1,46 +1,37 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 13 Jun 2016 14:24:30 -0700
-Subject: [GIT PULL] Amlogic DT changes for v4.8
-Message-ID: <7h60tcdbox.fsf@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Jun 2016 22:25:16 +0100
+Subject: [PATCH] ARM: mm: fix location of _etext
+In-Reply-To: <CAGXu5jJwtDqLALk+3QETK7Wia56yxFp30nO7vwwbNX49s5KVmg@mail.gmail.com>
+References: <20160608231158.GA12159@www.outflux.net>
+ <CAGXu5jJwtDqLALk+3QETK7Wia56yxFp30nO7vwwbNX49s5KVmg@mail.gmail.com>
+Message-ID: <20160613212515.GA1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+On Mon, Jun 13, 2016 at 01:23:29PM -0700, Kees Cook wrote:
+> On Wed, Jun 8, 2016 at 4:11 PM, Kees Cook <keescook@chromium.org> wrote:
+> > The _etext position is defined to be the end of the kernel text code,
+> > and should not include any part of the data segments. This interferes
+> > with things that might check memory ranges and expect executable code
+> > up to _etext.
+> >
+> > Signed-off-by: Kees Cook <keescook@chromium.org>
+> 
+> Can someone give this an Ack? I'd like to land it as it is a
+> prerequisite to some usercopy hardening work I'm doing.
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+We use _etext to place the end of the "kernel code" resource in
+/proc/iomem, and init_mm.end_code.  I don't think anything makes
+use of init_mm.end_code, but I'm more worried about the resource.
 
-are available in the git repository at:
+Currently, because of where _etext is placed, "kernel code" covers
+the read-only data and other read-only sections as well - I don't
+know whether we need to preserve that, but this change has a side
+effect of changing that.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
+Maybe we also need a "kernel rodata" resource?
 
-for you to fetch changes up to bf205ad75a17a878aa0c350d1ce376adaeb69fea:
-
-  ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms (2016-06-01 10:57:42 -0700)
-
-----------------------------------------------------------------
-Amlogic DT changes for v4.8
-- add pinctrl driver and pins for several devices
-- add reset driver
-
-----------------------------------------------------------------
-Carlo Caione (3):
-      ARM64: dts: amlogic: Add hiu and periphs buses
-      documentation: Add compatibles for Amlogic Meson GXBB pin controllers
-      ARM64: dts: amlogic: Enable pin controller on GXBB-based platforms
-
-Kevin Hilman (3):
-      ARM64: dts: amlogic: add pins for EMMC, SD
-      ARM64: dts: amlogic: gxbb: pinctrl: add/update UART
-      ARM64: dts: amlogic: gxbb: add ethernet
-
-Neil Armstrong (2):
-      ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms
-      ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms
-
- Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt |   2 ++
- arch/arm/boot/dts/meson8b.dtsi                              |   7 ++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts         |  20 ++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi            |   9 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi        |   3 ++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                 | 159 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- 6 files changed, 199 insertions(+), 1 deletion(-)
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
