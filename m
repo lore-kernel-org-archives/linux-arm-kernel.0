@@ -1,42 +1,188 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 13 Jun 2016 09:54:33 +0100
-Subject: [PATCH v2 4/9] coresight: Fix csdev connections initialisation
-In-Reply-To: <CANLsYkwGckonnLjHbOJQPZ849NQyjf+Zy=N6kjtwwo-kQbbj4Q@mail.gmail.com>
-References: <1465204301-24184-1-git-send-email-suzuki.poulose@arm.com>
- <1465204301-24184-5-git-send-email-suzuki.poulose@arm.com>
- <CANLsYkwGckonnLjHbOJQPZ849NQyjf+Zy=N6kjtwwo-kQbbj4Q@mail.gmail.com>
-Message-ID: <575E74C9.9010004@arm.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 13 Jun 2016 16:54:41 +0800
+Subject: [PATCH 09/11] phy: rockchip-emmc: Set phyctrl_frqsel based on
+ card clock
+In-Reply-To: <1465339484-969-10-git-send-email-dianders@chromium.org>
+References: <1465339484-969-1-git-send-email-dianders@chromium.org>
+ <1465339484-969-10-git-send-email-dianders@chromium.org>
+Message-ID: <937cbbc5-f9dc-bdf0-c46a-c7e814b9b373@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/16 21:39, Mathieu Poirier wrote:
-> On 6 June 2016 at 03:11, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->> This is a cleanup patch.
->>
->> coresight_device->conns holds an array to point to the devices
->> connected to the OUT ports of a component. Sinks, e.g ETR, do not
->> have an OUT port (nr_outport = 0), as it streams the trace to
->> memory via AXI.
->>
->> At coresight_register() we do :
->>
->>          conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
->>          if (!conns) {
->>                  ret = -ENOMEM;
->>                  goto err_kzalloc_conns;
->>          }
->>
->> For ETR, since the total size requested for kcalloc is zero, the return
->> value is, ZERO_SIZE_PTR ( != NULL). Hence, csdev->conns = ZERO_SIZE_PTR
->> which cannot be verified later to contain a valid pointer. The code which
->> accesses the csdev->conns is bounded by the csdev->nr_outport check,
->> hence we don't try to dereference the ZERO_SIZE_PTR. This patch cleans
->> up the csdev->conns and csdev->refcnt, initialisation to make sure we
+On 2016/6/8 6:44, Douglas Anderson wrote:
+> The "phyctrl_frqsel" is described in the Arasan datasheet [1] as "the
+> frequency range of DLL operation".  Although the Rockchip variant of
+> this PHY has different ranges than the reference Arasan PHY it appears
+> as if the functionality is similar.  We should set this phyctrl field
+> properly.
 >
-> This patch no longer deals with csdev->refcnt.
+> Note: as per Rockchip engineers, apparently the "phyctrl_frqsel" is
+> actually only useful in HS200 / HS400 modes even though the DLL itself
+> it used for some purposes in all modes.  See the discussion in the
+> earlier change in this series: ("mmc: sdhci-of-arasan: Always power the
+> PHY off/on when clock changes").  In any case, it shouldn't hurt to set
+> this always.
+>
+> Note that this change should allow boards to run at HS200 / HS400 speed
+> modes while running at 100 MHz or 150 MHz.  In fact, running HS400 at
+> 150 MHz (giving 300 MB/s) is the main motivation of this series, since
+> performance is still good but signal integrity problems are less
+> prevelant at 150 MHz.
 
-Ok, fill fix that. Btw, do we need that check ? I am tempted to keep it there,
-just to make sure we don't end up in something similar in the future.
+Thanks for doing this, but I think we should limit freq if assigning
+max-frequency from DT more explicitly since the PHY could only support
+50/100/150/200M for hs200/400? Otherwise I can't say if the PHY could
+always work well. i.e if geting 125000000 ... 174999999 , you code make
+the phyctrl_frqsel to be 150M, so it will be 15% missing of precision
+for tuning delay element. Ideally, the sample point should be in the
+middle of window, but I don't know if there is a bad HW	design makes
+the window small enough which need special care about it.
 
-Cheers
-Suzuki
+
+
+>
+> [1]: https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
+>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> ---
+>  drivers/phy/phy-rockchip-emmc.c | 74 +++++++++++++++++++++++++++++++----------
+>  1 file changed, 57 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
+> index 8336053aea5c..0fce7359d468 100644
+> --- a/drivers/phy/phy-rockchip-emmc.c
+> +++ b/drivers/phy/phy-rockchip-emmc.c
+> @@ -14,6 +14,7 @@
+>   * GNU General Public License for more details.
+>   */
+>
+> +#include <linux/clk.h>
+>  #include <linux/delay.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/module.h>
+> @@ -78,16 +79,61 @@
+>  struct rockchip_emmc_phy {
+>  	unsigned int	reg_offset;
+>  	struct regmap	*reg_base;
+> +	struct clk	*emmcclk;
+>  };
+>
+> -static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+> -				   bool on_off)
+> +static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>  {
+> +	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
+>  	unsigned int caldone;
+>  	unsigned int dllrdy;
+> +	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
+>  	unsigned long timeout;
+>
+>  	/*
+> +	 * We purposely get the clock here and not in probe to avoid the
+> +	 * circular dependency problem.  We expect:
+> +	 * - PHY driver to probe
+> +	 * - USB driver to start probe
+> +	 * - USB driver to register it's clock
+> +	 * - USB driver to get the PHY
+> +	 * - USB driver to power on the PHY
+
+USB?
+
+> +	 */
+> +	if (!rk_phy->emmcclk) {
+> +		rk_phy->emmcclk = devm_clk_get(&phy->dev, "emmcclk");
+> +
+> +		/* Don't expect defer at this point; try next time */
+> +		if (PTR_ERR(rk_phy->emmcclk) == -EPROBE_DEFER) {
+> +			dev_warn(&phy->dev, "Unexpected emmcclk defer\n");
+> +			rk_phy->emmcclk = NULL;
+> +		}
+> +	}
+> +
+> +	if (!IS_ERR_OR_NULL(rk_phy->emmcclk)) {
+> +		unsigned long rate = clk_get_rate(rk_phy->emmcclk);
+> +
+> +		switch (rate) {
+> +		case 0 ... 74999999:
+> +			/* Nominal  50 MHz */
+> +			freqsel = PHYCTRL_FREQSEL_50M;
+> +			break;
+> +		case 75000000 ... 124999999:
+> +			/* Nominal 100 MHz */
+> +			freqsel = PHYCTRL_FREQSEL_100M;
+> +			break;
+> +		case 125000000 ... 174999999:
+> +			/* Nominal 150 MHz */
+> +			freqsel = PHYCTRL_FREQSEL_150M;
+> +			break;
+> +		default:
+> +			if (rate > 200000000)
+> +				dev_warn(&phy->dev, "Unsupported rate: %lu\n",
+> +					 rate);
+> +			break;
+> +		};
+> +	}
+> +
+> +	/*
+>  	 * Keep phyctrl_pdb and phyctrl_endll low to allow
+>  	 * initialization of CALIO state M/C DFFs
+>  	 */
+> @@ -132,6 +178,13 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+>  		return -ETIMEDOUT;
+>  	}
+>
+> +	/* Set the frequency of the DLL operation */
+> +	regmap_write(rk_phy->reg_base,
+> +		     rk_phy->reg_offset + GRF_EMMCPHY_CON0,
+> +		     HIWORD_UPDATE(freqsel, PHYCTRL_FREQSEL_MASK,
+> +				   PHYCTRL_FREQSEL_SHIFT));
+> +
+> +	/* Turn on the DLL */
+>  	regmap_write(rk_phy->reg_base,
+>  		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+>  		     HIWORD_UPDATE(PHYCTRL_ENDLL_ENABLE,
+> @@ -167,15 +220,8 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+>
+>  static int rockchip_emmc_phy_power_off(struct phy *phy)
+>  {
+> -	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
+> -	int ret = 0;
+> -
+>  	/* Power down emmc phy analog blocks */
+> -	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_OFF);
+> -	if (ret)
+> -		return ret;
+> -
+> -	return 0;
+> +	return rockchip_emmc_phy_power(phy, PHYCTRL_PDB_PWR_OFF);
+>  }
+>
+>  static int rockchip_emmc_phy_power_on(struct phy *phy)
+> @@ -183,12 +229,6 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
+>  	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
+>  	int ret = 0;
+>
+> -	/* DLL operation: 200 MHz */
+> -	regmap_write(rk_phy->reg_base,
+> -		     rk_phy->reg_offset + GRF_EMMCPHY_CON0,
+> -		     HIWORD_UPDATE(PHYCTRL_FREQSEL_200M,
+> -				   PHYCTRL_FREQSEL_MASK,
+> -				   PHYCTRL_FREQSEL_SHIFT));
+>
+>  	/* Drive impedance: 50 Ohm */
+>  	regmap_write(rk_phy->reg_base,
+> @@ -212,7 +252,7 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
+>  				   PHYCTRL_OTAPDLYSEL_SHIFT));
+>
+>  	/* Power up emmc phy analog blocks */
+> -	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_ON);
+> +	ret = rockchip_emmc_phy_power(phy, PHYCTRL_PDB_PWR_ON);
+>  	if (ret)
+>  		return ret;
+>
+>
+
+
+-- 
+Best Regards
+Shawn Lin
