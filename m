@@ -1,38 +1,60 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 13 Jun 2016 18:40:45 +0100
-Subject: [PATCH v4] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-In-Reply-To: <20160613172616.GC17128@leverpostej>
-References: <1465837689-28215-1-git-send-email-suzuki.poulose@arm.com>
- <20160613172616.GC17128@leverpostej>
-Message-ID: <575EF01D.4020203@arm.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: 13 Jun 2016 17:46:49 -0000
+Subject: [PATCH v3 01/13] spi: sunxi: set maximum and minimum speed of SPI
+ master
+In-Reply-To: <cover.1465490774.git.hramrach@gmail.com>
+References: <cover.1465490774.git.hramrach@gmail.com>
+Message-ID: <2db0ce0ea1ddc17e9bb790c8cc50bcb4bb97be58.1465490774.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/16 18:26, Mark Rutland wrote:
-> On Mon, Jun 13, 2016 at 06:08:09PM +0100, Suzuki K Poulose wrote:
->> +/*
->> + * Both MIDR_EL1 and REVIDR_EL1 are 32bit registers. However, per C5.1.1,
->> + * "Principles of the System instruction class encoding" in ARM DDI 0487A.i,
->> + * when a system register is escribed as 32-bit, this only means that the
->> + * upper 32 bits are RES0, not that they will never be made use of. To avoid
->> + * changing the ABI for the future, the values are exported as 64bit values.
->> + */
->
-> I see this is a direct copy+paste of my earlier message, typo and all.
+The speed limits are unset in the sun4i and sun6i SPI drivers.
 
->
-> I'd prefer something like the below:
->
-> /*
->   * The ARM ARM uses the phrase "32-bit register" to describe a register
->   * whose upper 32 bits are RES0 (per C5.1.1, ARM DDI 0487A.i), however
->   * no statement is made as to whether the upper 32 bits will or will not
->   * be made use of in future, and between ARM DDI 0487A.c and ARM DDI
->   * 0487A.d CLIDR_EL1 was expanded from 32-bit to 64-bit.
->   *
->   * Thus, while both MIDR_EL1 and REVIDR_EL1 are described as 32-bit
->   * registers, we expose them both as 64 bit values to cater for possible
->   * future expansion without an ABI break.
->   */
+The maximum speed of SPI master is used when maximum speed of SPI slave
+is not specified. Also the __spi_validate function should check that
+transfer speeds do not exceed the master limits.
 
-Sorry about that, will fix it.
+The user manual for A10 and A31 specifies maximum
+speed of the SPI clock as 100MHz and minimum as 3kHz.
+
+Setting the SPI clock to out-of-spec values can lock up the SoC.
+
+Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+--
+v2:
+new patch
+v3:
+fix constant style
+---
+ drivers/spi/spi-sun4i.c | 2 ++
+ drivers/spi/spi-sun6i.c | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index 1ddd9e2..4213508 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -387,6 +387,8 @@ static int sun4i_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	sspi->master = master;
++	master->max_speed_hz = 100 * 1000 * 1000;
++	master->min_speed_hz =          3 * 1000;
+ 	master->set_cs = sun4i_spi_set_cs;
+ 	master->transfer_one = sun4i_spi_transfer_one;
+ 	master->num_chipselect = 4;
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index 42e2c4b..fe70695 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -386,6 +386,8 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	sspi->master = master;
++	master->max_speed_hz = 100 * 1000 * 1000;
++	master->min_speed_hz =          3 * 1000;
+ 	master->set_cs = sun6i_spi_set_cs;
+ 	master->transfer_one = sun6i_spi_transfer_one;
+ 	master->num_chipselect = 4;
+-- 
+2.8.1
