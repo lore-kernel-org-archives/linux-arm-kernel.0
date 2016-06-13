@@ -1,35 +1,60 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 13 Jun 2016 18:12:11 +0200
-Subject: [PATCH 1/5] soc: qcom: Add suspend to idle support
-In-Reply-To: <20160609180902.GJ13357@hector.attlocal.net>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-2-git-send-email-andy.gross@linaro.org>
- <CAPDyKFrAGVPkc=ycm-cQg6Y5NLx_d4xGeg8SaSiB-K5sxtv76A@mail.gmail.com>
- <20160609180902.GJ13357@hector.attlocal.net>
-Message-ID: <20160613161211.GG10634@linaro.org>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 13 Jun 2016 17:19:52 +0100
+Subject: [PATCH 00/10] ARM: V7M: Support caches
+In-Reply-To: <575EDAB9.2070809@st.com>
+References: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
+ <575EDAB9.2070809@st.com>
+Message-ID: <575EDD28.40500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 01:09:02PM -0500, Andy Gross wrote:
-> On Thu, Jun 09, 2016 at 09:39:34AM +0200, Ulf Hansson wrote:
-> > + Daniel
-> > 
-> > On 19 May 2016 at 07:00, Andy Gross <andy.gross@linaro.org> wrote:
+Hi Alex,
 
-[ ... ]
-
-> > I don't think this will work!
-> > 
-> > When building a multi defconfig for ARM, you might overwrite the
-> > suspend_ops (there's only one set) as here you don't know that it's
-> > actually the QCOM platform that is running, right!?
-> > 
-> > Perhaps this code actually belongs closer to the cpuidle driver?
+On 13/06/16 17:09, Alexandre Torgue wrote:
+> Hi Vladimir,
 > 
-> Hmmmm, I might have to get creative.  I originally had a DT entry for the pm,
-> but that doesn't make sense as this is purely a software construct.  The db410c
-> uses the arm cpuidle driver so I can't really hook it in there.  I'll have to
-> come up with something else.
+> On 06/13/2016 05:02 PM, Vladimir Murzin wrote:
+>> Hi,
+>>
+>> This patch set allows M-class cpus benefit of optional cache support.
+>> It originaly was written by Jonny, I've been keeping it localy mainly
+>> rebasing over Linux versions.
+>>
+>> The main idea behind patches is to reuse existing cache handling code
+>> from v7A/R. In case v7M cache operations are provided via memory
+>> mapped interface rather than co-processor instructions, so extra
+>> macros have been introduced to factor out cache handling logic and
+>> low-level operations.
+>>
+>> Along with the v7M cache support the first user (Cortex-M7) is
+>> introduced.
+>>
+>> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
+>> one showed significant boot speed-up.
+>>
+>> Based on 4.7-rc3.
+>>
+>> Thanks!
+>> Vladimir
+>>
+> 
+> Thanks for the series.
+> Did you change something in those patches compare to patches you sent in
+> the RFC ?
 
-IMO, the generic ARM driver should be revisited to add support for suspend 
-to idle.
+Only 04, 05, 06 have been changed (each has it's own changelog included).
+
+I did try to hammer patches because of your report of instability with
+caches on, but all run fine... so nothing has been changed in regard of
+your case.
+
+Cheers
+Vladimir
+
+> 
+> Regards.
+> 
+> Alex
+> 
+> 
+> 
