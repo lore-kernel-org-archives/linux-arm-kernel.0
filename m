@@ -1,226 +1,189 @@
 From: garlic.tseng@mediatek.com (Garlic Tseng)
-Date: Mon, 13 Jun 2016 15:26:41 +0800
-Subject: [alsa-devel] [PATCH v4 4/9] ASoC: mediatek: add documents for mt2701
+Date: Mon, 13 Jun 2016 15:26:45 +0800
+Subject: [alsa-devel] [PATCH v4 8/9] ASoC: mediatek: add BT implementation
 In-Reply-To: <1465802806-19197-1-git-send-email-garlic.tseng@mediatek.com>
 References: <1465802806-19197-1-git-send-email-garlic.tseng@mediatek.com>
-Message-ID: <1465802806-19197-5-git-send-email-garlic.tseng@mediatek.com>
+Message-ID: <1465802806-19197-9-git-send-email-garlic.tseng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add mt2701-afe-pcm.txt and mt2701-cs42448.txt for mt2701
+Add BT implementation for mt2701 platform driver.
 
 Signed-off-by: Garlic Tseng <garlic.tseng@mediatek.com>
 ---
- .../devicetree/bindings/sound/mt2701-afe-pcm.txt   | 150 +++++++++++++++++++++
- .../devicetree/bindings/sound/mt2701-cs42448.txt   |  43 ++++++
- 2 files changed, 193 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
- create mode 100644 Documentation/devicetree/bindings/sound/mt2701-cs42448.txt
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 139 +++++++++++++++++++++++++++++
+ 1 file changed, 139 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-new file mode 100644
-index 0000000..3e623a7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-@@ -0,0 +1,150 @@
-+Mediatek AFE PCM controller for mt2701
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index deb5f82..5fd2caa 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -377,6 +377,86 @@ static int mt2701_afe_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+ 	return 0;
+ }
+ 
++static int mt2701_btmrg_startup(struct snd_pcm_substream *substream,
++				struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
++	struct mt2701_afe_private *afe_priv = afe->platform_priv;
 +
-+Required properties:
-+- compatible = "mediatek,mt2701-audio";
-+- reg: register location and size
-+- interrupts: Should contain AFE interrupt
-+- clock-names: should have these clock names:
-+		"infra_sys_audio_clk",
-+		"top_audio_mux1_sel",
-+		"top_audio_mux2_sel",
-+		"top_audio_mux1_div",
-+		"top_audio_mux2_div",
-+		"top_audio_48k_timing",
-+		"top_audio_44k_timing",
-+		"top_audpll_mux_sel",
-+		"top_apll_sel",
-+		"top_aud1_pll_98M",
-+		"top_aud2_pll_90M",
-+		"top_hadds2_pll_98M",
-+		"top_hadds2_pll_294M",
-+		"top_audpll",
-+		"top_audpll_d4",
-+		"top_audpll_d8",
-+		"top_audpll_d16",
-+		"top_audpll_d24",
-+		"top_audintbus_sel",
-+		"clk_26m",
-+		"top_syspll1_d4",
-+		"top_aud_k1_src_sel",
-+		"top_aud_k2_src_sel",
-+		"top_aud_k3_src_sel",
-+		"top_aud_k4_src_sel",
-+		"top_aud_k5_src_sel",
-+		"top_aud_k6_src_sel",
-+		"top_aud_k1_src_div",
-+		"top_aud_k2_src_div",
-+		"top_aud_k3_src_div",
-+		"top_aud_k4_src_div",
-+		"top_aud_k5_src_div",
-+		"top_aud_k6_src_div",
-+		"top_aud_i2s1_mclk",
-+		"top_aud_i2s2_mclk",
-+		"top_aud_i2s3_mclk",
-+		"top_aud_i2s4_mclk",
-+		"top_aud_i2s5_mclk",
-+		"top_aud_i2s6_mclk",
-+		"top_asm_m_sel",
-+		"top_asm_h_sel",
-+		"top_univpll2_d4",
-+		"top_univpll2_d2",
-+		"top_syspll_d5";
++	regmap_update_bits(afe->regmap, AUDIO_TOP_CON4,
++			   AUDIO_TOP_CON4_PDN_MRGIF, 0);
 +
-+Example:
++	afe_priv->mrg_enable[substream->stream] = 1;
++	return 0;
++}
 +
-+	afe: mt2701-afe-pcm at 11220000 {
-+		compatible = "mediatek,mt2701-audio";
-+		reg = <0 0x11220000 0 0x2000>,
-+		      <0 0x112A0000 0 0x20000>;
-+		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_INFRA_AUDIO>,
-+			 <&topckgen CLK_TOP_AUD_MUX1_SEL>,
-+			 <&topckgen CLK_TOP_AUD_MUX2_SEL>,
-+			 <&topckgen CLK_TOP_AUD_MUX1_DIV>,
-+			 <&topckgen CLK_TOP_AUD_MUX2_DIV>,
-+			 <&topckgen CLK_TOP_AUD_48K_TIMING>,
-+			 <&topckgen CLK_TOP_AUD_44K_TIMING>,
-+			 <&topckgen CLK_TOP_AUDPLL_MUX_SEL>,
-+			 <&topckgen CLK_TOP_APLL_SEL>,
-+			 <&topckgen CLK_TOP_AUD1PLL_98M>,
-+			 <&topckgen CLK_TOP_AUD2PLL_90M>,
-+			 <&topckgen CLK_TOP_HADDS2PLL_98M>,
-+			 <&topckgen CLK_TOP_HADDS2PLL_294M>,
-+			 <&topckgen CLK_TOP_AUDPLL>,
-+			 <&topckgen CLK_TOP_AUDPLL_D4>,
-+			 <&topckgen CLK_TOP_AUDPLL_D8>,
-+			 <&topckgen CLK_TOP_AUDPLL_D16>,
-+			 <&topckgen CLK_TOP_AUDPLL_D24>,
-+			 <&topckgen CLK_TOP_AUDINTBUS_SEL>,
-+			 <&clk26m>,
-+			 <&topckgen CLK_TOP_SYSPLL1_D4>,
-+			 <&topckgen CLK_TOP_AUD_K1_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K2_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K3_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K4_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K5_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K6_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K1_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K2_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K3_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K4_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K5_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K6_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_I2S1_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S2_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S3_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S4_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S5_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S6_MCLK>,
-+			 <&topckgen CLK_TOP_ASM_M_SEL>,
-+			 <&topckgen CLK_TOP_ASM_H_SEL>,
-+			 <&topckgen CLK_TOP_UNIVPLL2_D4>,
-+			 <&topckgen CLK_TOP_UNIVPLL2_D2>,
-+			 <&topckgen CLK_TOP_SYSPLL_D5>;
++static int mt2701_btmrg_hw_params(struct snd_pcm_substream *substream,
++				  struct snd_pcm_hw_params *params,
++				  struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
++	int stream_fs;
++	u32 val, msk;
 +
-+		clock-names = "infra_sys_audio_clk",
-+			      "top_audio_mux1_sel",
-+			      "top_audio_mux2_sel",
-+			      "top_audio_mux1_div",
-+			      "top_audio_mux2_div",
-+			      "top_audio_48k_timing",
-+			      "top_audio_44k_timing",
-+			      "top_audpll_mux_sel",
-+			      "top_apll_sel",
-+			      "top_aud1_pll_98M",
-+			      "top_aud2_pll_90M",
-+			      "top_hadds2_pll_98M",
-+			      "top_hadds2_pll_294M",
-+			      "top_audpll",
-+			      "top_audpll_d4",
-+			      "top_audpll_d8",
-+			      "top_audpll_d16",
-+			      "top_audpll_d24",
-+			      "top_audintbus_sel",
-+			      "clk_26m",
-+			      "top_syspll1_d4",
-+			      "top_aud_k1_src_sel",
-+			      "top_aud_k2_src_sel",
-+			      "top_aud_k3_src_sel",
-+			      "top_aud_k4_src_sel",
-+			      "top_aud_k5_src_sel",
-+			      "top_aud_k6_src_sel",
-+			      "top_aud_k1_src_div",
-+			      "top_aud_k2_src_div",
-+			      "top_aud_k3_src_div",
-+			      "top_aud_k4_src_div",
-+			      "top_aud_k5_src_div",
-+			      "top_aud_k6_src_div",
-+			      "top_aud_i2s1_mclk",
-+			      "top_aud_i2s2_mclk",
-+			      "top_aud_i2s3_mclk",
-+			      "top_aud_i2s4_mclk",
-+			      "top_aud_i2s5_mclk",
-+			      "top_aud_i2s6_mclk",
-+			      "top_asm_m_sel",
-+			      "top_asm_h_sel",
-+			      "top_univpll2_d4",
-+			      "top_univpll2_d2",
-+			      "top_syspll_d5";
-+	};
-diff --git a/Documentation/devicetree/bindings/sound/mt2701-cs42448.txt b/Documentation/devicetree/bindings/sound/mt2701-cs42448.txt
-new file mode 100644
-index 0000000..0557444
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mt2701-cs42448.txt
-@@ -0,0 +1,43 @@
-+MT2701 with CS42448 CODEC
++	stream_fs = params_rate(params);
 +
-+Required properties:
-+- compatible: "mediatek,mt2701-cs42448-machine"
-+- mediatek,platform: the phandle of MT2701 ASoC platform
-+- audio-routing: a list of the connections between audio
-+- mediatek,audio-codec: the phandles of cs42448 codec
-+- mediatek,audio-codec-bt-mrg the phandles of bt-sco dummy codec
-+- pinctrl-names: Should contain only one value - "default"
-+- pinctrl-0: Should specify pin control groups used for this controller.
-+- i2s1-in-sel-gpio1, i2s1-in-sel-gpio2: Should specify two gpio pins to
-+					control I2S1-in mux.
++	if ((stream_fs != 8000) && (stream_fs != 16000)) {
++		dev_err(afe->dev, "%s() btmgr not supprt this stream_fs %d\n",
++			__func__, stream_fs);
++		return -EINVAL;
++	}
 +
-+Example:
++	regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++			   AFE_MRGIF_CON_I2S_MODE_MASK,
++			   AFE_MRGIF_CON_I2S_MODE_32K);
 +
-+	sound:sound {
-+		compatible = "mediatek,mt2701-cs42448-machine";
-+		mediatek,platform = <&afe>;
-+		/* CS42448 Machine name */
-+		audio-routing =
-+			"Line Out Jack", "AOUT1L",
-+			"Line Out Jack", "AOUT1R",
-+			"Line Out Jack", "AOUT2L",
-+			"Line Out Jack", "AOUT2R",
-+			"Line Out Jack", "AOUT3L",
-+			"Line Out Jack", "AOUT3R",
-+			"Line Out Jack", "AOUT4L",
-+			"Line Out Jack", "AOUT4R",
-+			"AIN1L", "AMIC",
-+			"AIN1R", "AMIC",
-+			"AIN2L", "Tuner In",
-+			"AIN2R", "Tuner In",
-+			"AIN3L", "Satellite Tuner In",
-+			"AIN3R", "Satellite Tuner In",
-+			"AIN3L", "AUX In",
-+			"AIN3R", "AUX In";
-+		mediatek,audio-codec = <&cs42448>;
-+		mediatek,audio-codec-bt-mrg = <&bt_sco_codec>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&aud_pins_default>;
-+		i2s1-in-sel-gpio1 = <&pio 53 0>;
-+		i2s1-in-sel-gpio2 = <&pio 54 0>;
-+	};
++	val = AFE_DAIBT_CON0_BT_FUNC_EN | AFE_DAIBT_CON0_BT_FUNC_RDY
++	      | AFE_DAIBT_CON0_MRG_USE;
++	msk = val;
++
++	if (stream_fs == 16000)
++		val |= AFE_DAIBT_CON0_BT_WIDE_MODE_EN;
++
++	msk |= AFE_DAIBT_CON0_BT_WIDE_MODE_EN;
++
++	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0, msk, val);
++
++	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0,
++			   AFE_DAIBT_CON0_DAIBT_EN,
++			   AFE_DAIBT_CON0_DAIBT_EN);
++	regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++			   AFE_MRGIF_CON_MRG_I2S_EN,
++			   AFE_MRGIF_CON_MRG_I2S_EN);
++	regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++			   AFE_MRGIF_CON_MRG_EN,
++			   AFE_MRGIF_CON_MRG_EN);
++	return 0;
++}
++
++static void mt2701_btmrg_shutdown(struct snd_pcm_substream *substream,
++				  struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
++	struct mt2701_afe_private *afe_priv = afe->platform_priv;
++
++	/* if the other direction stream is not occupied */
++	if (!afe_priv->mrg_enable[!substream->stream]) {
++		regmap_update_bits(afe->regmap, AFE_DAIBT_CON0,
++				   AFE_DAIBT_CON0_DAIBT_EN, 0);
++		regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++				   AFE_MRGIF_CON_MRG_EN, 0);
++		regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++				   AFE_MRGIF_CON_MRG_I2S_EN, 0);
++		regmap_update_bits(afe->regmap, AUDIO_TOP_CON4,
++				   AUDIO_TOP_CON4_PDN_MRGIF,
++				   AUDIO_TOP_CON4_PDN_MRGIF);
++	}
++	afe_priv->mrg_enable[substream->stream] = 0;
++}
++
+ static int mt2701_simple_fe_startup(struct snd_pcm_substream *substream,
+ 				    struct snd_soc_dai *dai)
+ {
+@@ -560,6 +640,13 @@ static const struct snd_soc_dai_ops mt2701_afe_i2s_ops = {
+ 	.set_fmt	= mt2701_afe_i2s_set_fmt,
+ };
+ 
++/* MRG BE DAIs */
++static struct snd_soc_dai_ops mt2701_btmrg_ops = {
++	.startup = mt2701_btmrg_startup,
++	.shutdown = mt2701_btmrg_shutdown,
++	.hw_params = mt2701_btmrg_hw_params,
++};
++
+ static struct snd_soc_dai_driver mt2701_afe_pcm_dais[] = {
+ 	/* FE DAIs: memory intefaces to CPU */
+ 	{
+@@ -610,6 +697,36 @@ static struct snd_soc_dai_driver mt2701_afe_pcm_dais[] = {
+ 		},
+ 		.ops = &mt2701_single_memif_dai_ops,
+ 	},
++	{
++		.name = "PCM_BT_DL",
++		.id = MT2701_MEMIF_DLBT,
++		.suspend = mtk_afe_dai_suspend,
++		.resume = mtk_afe_dai_resume,
++		.playback = {
++			.stream_name = "DLBT",
++			.channels_min = 1,
++			.channels_max = 1,
++			.rates = (SNDRV_PCM_RATE_8000
++				| SNDRV_PCM_RATE_16000),
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++		},
++		.ops = &mt2701_single_memif_dai_ops,
++	},
++	{
++		.name = "PCM_BT_UL",
++		.id = MT2701_MEMIF_ULBT,
++		.suspend = mtk_afe_dai_suspend,
++		.resume = mtk_afe_dai_resume,
++		.capture = {
++			.stream_name = "ULBT",
++			.channels_min = 1,
++			.channels_max = 1,
++			.rates = (SNDRV_PCM_RATE_8000
++				| SNDRV_PCM_RATE_16000),
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++		},
++		.ops = &mt2701_single_memif_dai_ops,
++	},
+ 	/* BE DAIs */
+ 	{
+ 		.name = "I2S0",
+@@ -709,6 +826,28 @@ static struct snd_soc_dai_driver mt2701_afe_pcm_dais[] = {
+ 		.ops = &mt2701_afe_i2s_ops,
+ 		.symmetric_rates = 1,
+ 	},
++	{
++		.name = "MRG BT",
++		.id = MT2701_IO_MRG,
++		.playback = {
++			.stream_name = "BT Playback",
++			.channels_min = 1,
++			.channels_max = 1,
++			.rates = (SNDRV_PCM_RATE_8000
++				| SNDRV_PCM_RATE_16000),
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++		},
++		.capture = {
++			.stream_name = "BT Capture",
++			.channels_min = 1,
++			.channels_max = 1,
++			.rates = (SNDRV_PCM_RATE_8000
++				| SNDRV_PCM_RATE_16000),
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++		},
++		.ops = &mt2701_btmrg_ops,
++		.symmetric_rates = 1,
++	}
+ };
+ 
+ static const struct snd_kcontrol_new mt2701_afe_o00_mix[] = {
 -- 
 1.9.1
