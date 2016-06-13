@@ -1,92 +1,64 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon, 13 Jun 2016 15:58:41 +0800
-Subject: [PATCH 01/11] phy: rockchip-emmc: Increase lock time allowance
-In-Reply-To: <1465339484-969-2-git-send-email-dianders@chromium.org>
-References: <1465339484-969-1-git-send-email-dianders@chromium.org>
- <1465339484-969-2-git-send-email-dianders@chromium.org>
-Message-ID: <3e19ff54-ee4a-c208-e137-1c0f8022f6b3@rock-chips.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 13 Jun 2016 10:01:24 +0200
+Subject: [PATCH 0/1] ARM: dts: sunxi: Fix simplefb not working in 4.7-rc1
+In-Reply-To: <21258fc0-0250-951b-2ee7-d022fb3c09ac@redhat.com>
+References: <1465063524-4925-1-git-send-email-hdegoede@redhat.com>
+ <20160609074643.GA5242@lukather>
+ <21258fc0-0250-951b-2ee7-d022fb3c09ac@redhat.com>
+Message-ID: <20160613080124.GA4481@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/8 6:44, Douglas Anderson wrote:
-> Previous PHY code waited a fixed amount of time for the DLL to lock at
-> power on time.  Unfortunately, the time for the DLL to lock is actually
-> a bit more dynamic and can be longer if the card clock is slower.
->
-> Instead of waiting a fixed 30 us, let's now dynamically wait until the
-> lock bit gets set.  We'll wait up to 10 ms which should be OK even if
-> the card clock is at the super slow 100 kHz.
->
+On Thu, Jun 09, 2016 at 12:47:36PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 09-06-16 09:46, Maxime Ripard wrote:
+> >Hi Hans,
+> >
+> >On Sat, Jun 04, 2016 at 08:05:23PM +0200, Hans de Goede wrote:
+> >>Hi Maxime,
+> >>
+> >>While testing 4.7-rc1 / linux-sunxi/sunxi-next on a A10s I noticed that
+> >>hdmi out is no longer working (screen goes black when the kernel turns
+> >>of unused clocks).
+> >>
+> >>This is caused by the dtsi for sun4i / sun5i / sun7i based boards now
+> >>listing pll3, without pll3 being added to the clocks list for the
+> >>simplefb nodes.
+> >
+> >Why not do just that then? It's more appropriate for a fix imho.
+> 
+> You mean just for sun5i-a10s, or for all of sun4i / sun5i-a10s and
+> sun7i ?
+> 
+> For sun4i and sun7i things are already fixed in next:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?id=5a7f2310cc847a73852e70bc720a61ca9bf986a6
+> https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?id=c79255ca4d7b67cce4eac4dd532e097ce49f3679
+> 
+> It seems best to use those fixes, rather then come up with a separate
+> fix for 4.7.
+> 
+> My patch for fixing sun5i-a10s is inline with the 2 above patches,
+> which seems best, rather then doing something special for just sun5i-a10s.
 
-mmc stack limit the min freq to 200k when initializing the card.
-So 5ms is enough, but it's ok to set the max timeout to 10ms as we
-can break out if locked.
+Well, you are doing something special for just the A10s: the patches
+quoted above just add a bunch of clocks and add the handles to the
+list of clocks managed by simplefb.
 
-> On its own, this change makes the PHY power on code a little more
-> robust.  Before this change the PHY was relying on the eMMC code to make
-> sure the PHY was only powered on when the card clock was set to at least
-> 50 MHz before, though this reliance wasn't documented anywhere.
->
-> This change will be even more useful in future changes where we actually
-> need to be able to wait for a DLL lock at slower clock speeds.
->
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> ---
->  drivers/phy/phy-rockchip-emmc.c | 27 +++++++++++++++++++--------
->  1 file changed, 19 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-> index a69f53630e67..8336053aea5c 100644
-> --- a/drivers/phy/phy-rockchip-emmc.c
-> +++ b/drivers/phy/phy-rockchip-emmc.c
-> @@ -85,6 +85,7 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
->  {
->  	unsigned int caldone;
->  	unsigned int dllrdy;
-> +	unsigned long timeout;
->
->  	/*
->  	 * Keep phyctrl_pdb and phyctrl_endll low to allow
-> @@ -137,15 +138,25 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
->  				   PHYCTRL_ENDLL_MASK,
->  				   PHYCTRL_ENDLL_SHIFT));
->  	/*
-> -	 * After enable analog DLL circuits, we need an extra 10.2us
-> -	 * for dll to be ready for work. But according to testing, we
-> -	 * find some chips need more than 25us.
-> +	 * After enabling analog DLL circuits docs say that we need 10.2 us if
-> +	 * our source clock is at 50 MHz and that lock time scales linearly
-> +	 * with clock speed.  If we are powering on the PHY and the card clock
-> +	 * is super slow (like 100 kHZ) this could take as long as 5.1 ms.
+For the A10s, you also declare the whole display engine block without
+anyone having tested that it was actually working.
 
-5.1ms is by calculation or test?
-
-> +	 * Hopefully we won't be running at 100 kHz, but we should still make
-> +	 * sure we wait long enough.
->  	 */
-> -	udelay(30);
-> -	regmap_read(rk_phy->reg_base,
-> -		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
-> -		    &dllrdy);
-> -	dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
-> +	timeout = jiffies + msecs_to_jiffies(10);
-> +	do {
-> +		udelay(1);
-> +
-> +		regmap_read(rk_phy->reg_base,
-> +			rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
-> +			&dllrdy);
-> +		dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
-> +		if (dllrdy == PHYCTRL_DLLRDY_DONE)
-> +			break;
-> +	} while (!time_after(jiffies, timeout));
-> +
->  	if (dllrdy != PHYCTRL_DLLRDY_DONE) {
->  		pr_err("rockchip_emmc_phy_power: dllrdy timeout.\n");
->  		return -ETIMEDOUT;
->
-
+Maxime
 
 -- 
-Best Regards
-Shawn Lin
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160613/b202905d/attachment.sig>
