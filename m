@@ -1,94 +1,49 @@
-From: huziji@marvell.com (Ziji Hu)
-Date: Mon, 13 Jun 2016 14:04:28 +0000
-Subject: [PATCH 05/12] mmc: sdhci: add a pre voltage switch callback
- function
-In-Reply-To: <575E72DC.5090604@intel.com>
-References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
- <1465456218-28354-6-git-send-email-gregory.clement@free-electrons.com>,
- <575E72DC.5090604@intel.com>
-Message-ID: <D7CF8A19-9181-4A97-90AF-AC5A6517CE2B@marvell.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 13 Jun 2016 16:07:37 +0200
+Subject: [GIT PULL] Reset controller changes for v4.8, part 2
+Message-ID: <1465826857.3553.50.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
+Dear arm-soc maintainers,
 
-  Thanks a lot for the suggestion. I'm from Marvell Xenon SDHC team.
-  Most of sdhci host ops are still used in our driver. We just change or add few ops. Thus, if we create our own mmc_host_ops, many static sdhci host ops will be exported. I would like to know whether such a modification can be accepted or not.
+Please consider merging this tag with a new driver for the Amlogic Meson
+reset controller. It should be fine for Kevin to also merge this into
+his for-next branch to resolve the dependency of meson dtsi files on the
+new dt-bindings headers.
 
-   I notice that community is improving sdhci. Thus all the static sdhci ops called outside the sdhci.c will be exported. Is my understanding correct?
-   Thank you.
+regards
+Philipp
 
-Best regards,
-Hu Ziji
+The following changes since commit 168d7c4e8bb25c076ed8be67fcca84f5dcd0b2c6:
 
->> ? 2016?6?13??16:52?Adrian Hunter <adrian.hunter@intel.com> ???
->> 
->> On 09/06/16 10:10, Gregory CLEMENT wrote:
->> From: Victor Gu <xigu@marvell.com>
->> 
->> Some host controller such as Xenon needs additional setting when
->> switching signal voltage in eMMC mode. They also need to re-enable
->> internal clock before a voltage switch.
->> 
->> This commit adds a callback routine "voltage_switch_pre" in the struct
->> sdhci_ops, which is used by some host controllers which need re-enable
->> the internal clock before a voltage switch.
-> 
-> Don't want to add sdhci host ops for the "do something before a mmc host op"
-> case.
-> 
-> Instead, export sdhci_start_signal_voltage_switch() and  hook
-> host->mmc_host_ops.start_signal_voltage_switch. Then in sdhci-xenon.c:
-> 
-> int xenon__start_signal_voltage_switch(struct mmc_host *mmc,
->                      struct mmc_ios *ios)
-> {
->   blah blah
->   return sdhci_start_signal_voltage_switch(mmc, ios);
-> }
-> 
-> 
->> 
->> [gregory.clement at free-electrons.com: split the initial commit and
->> reformulate the log]
->> 
->> Signed-off-by: Victor Gu <xigu@marvell.com>
->> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->> drivers/mmc/host/sdhci.c | 4 ++++
->> drivers/mmc/host/sdhci.h | 1 +
->> 2 files changed, 5 insertions(+)
->> 
->> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
->> index b07219426d39..cad03ffa9d9b 100644
->> --- a/drivers/mmc/host/sdhci.c
->> +++ b/drivers/mmc/host/sdhci.c
->> @@ -1729,6 +1729,10 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
->>   if (host->version < SDHCI_SPEC_300)
->>       return 0;
->> 
->> +    /* Some controller need to do more before switching */
->> +    if (host->ops->voltage_switch_pre)
->> +        host->ops->voltage_switch_pre(host);
->> +
->>   ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
->> 
->>   switch (ios->signal_voltage) {
->> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
->> index 49c6c5b0e33b..6bec1b0368d2 100644
->> --- a/drivers/mmc/host/sdhci.h
->> +++ b/drivers/mmc/host/sdhci.h
->> @@ -550,6 +550,7 @@ struct sdhci_ops {
->>                    unsigned int max_dtr, int host_drv,
->>                    int card_drv, int *drv_type);
->>   void    (*init_card)(struct sdhci_host *host, struct mmc_card *card);
->> +    void    (*voltage_switch_pre)(struct sdhci_host *host);
->> };
->> 
->> #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+  reset: Return -ENOTSUPP when not configured (2016-06-01 08:21:08 +0200)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.8-2
+
+for you to fetch changes up to 79795e20a184ebabf4ae743d1506cc39783caa46:
+
+  dt-bindings: reset: Add bindings for the Meson SoC Reset Controller (2016-06-01 08:21:12 +0200)
+
+----------------------------------------------------------------
+Reset controller changes for v4.8, part 2
+
+- add Amlogic Meson SoC Reset Controller driver
+
+----------------------------------------------------------------
+Neil Armstrong (2):
+      reset: Add support for the Amlogic Meson SoC Reset Controller
+      dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
+
+ .../bindings/reset/amlogic,meson-reset.txt         |  18 ++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-meson.c                        | 136 +++++++++++++
+ .../dt-bindings/reset/amlogic,meson-gxbb-reset.h   | 210 +++++++++++++++++++++
+ include/dt-bindings/reset/amlogic,meson8b-reset.h  | 175 +++++++++++++++++
+ 5 files changed, 540 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-reset.txt
+ create mode 100644 drivers/reset/reset-meson.c
+ create mode 100644 include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
+ create mode 100644 include/dt-bindings/reset/amlogic,meson8b-reset.h
