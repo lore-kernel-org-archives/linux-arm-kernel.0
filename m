@@ -1,82 +1,34 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 13 Jun 2016 16:04:25 -0700
-Subject: [PATCH v2 01/11] phy: rockchip-emmc: Increase lock time allowance
+Date: Mon, 13 Jun 2016 16:04:29 -0700
+Subject: [PATCH v2 05/11] arm64: dts: rockchip: Add soc-ctl-syscon to sdhci
+ for rk3399
 In-Reply-To: <1465859076-4868-1-git-send-email-dianders@chromium.org>
 References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
-Message-ID: <1465859076-4868-2-git-send-email-dianders@chromium.org>
+Message-ID: <1465859076-4868-6-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous PHY code waited a fixed amount of time for the DLL to lock at
-power on time.  Unfortunately, the time for the DLL to lock is actually
-a bit more dynamic and can be longer if the card clock is slower.
-
-Instead of waiting a fixed 30 us, let's now dynamically wait until the
-lock bit gets set.  We'll wait up to 10 ms which should be OK even if
-the card clock is at the super slow 100 kHz.
-
-On its own, this change makes the PHY power on code a little more
-robust.  Before this change the PHY was relying on the eMMC code to make
-sure the PHY was only powered on when the card clock was set to at least
-50 MHz before, though this reliance wasn't documented anywhere.
-
-This change will be even more useful in future changes where we actually
-need to be able to wait for a DLL lock at slower clock speeds.
+On rk3399 we'd like to be able to properly set corecfg registers in the
+Arasan SDHCI component.  Specify the syscon to enable that.
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
-Changes in v2:
-- Indicate that 5.1 ms is calculated (Shawn).
+Changes in v2: None
 
- drivers/phy/phy-rockchip-emmc.c | 28 ++++++++++++++++++++--------
- 1 file changed, 20 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-index a69f53630e67..2d059c046978 100644
---- a/drivers/phy/phy-rockchip-emmc.c
-+++ b/drivers/phy/phy-rockchip-emmc.c
-@@ -85,6 +85,7 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
- {
- 	unsigned int caldone;
- 	unsigned int dllrdy;
-+	unsigned long timeout;
- 
- 	/*
- 	 * Keep phyctrl_pdb and phyctrl_endll low to allow
-@@ -137,15 +138,26 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
- 				   PHYCTRL_ENDLL_MASK,
- 				   PHYCTRL_ENDLL_SHIFT));
- 	/*
--	 * After enable analog DLL circuits, we need an extra 10.2us
--	 * for dll to be ready for work. But according to testing, we
--	 * find some chips need more than 25us.
-+	 * After enabling analog DLL circuits docs say that we need 10.2 us if
-+	 * our source clock is at 50 MHz and that lock time scales linearly
-+	 * with clock speed.  If we are powering on the PHY and the card clock
-+	 * is super slow (like 100 kHZ) this could take as long as 5.1 ms as
-+	 * per the math: 10.2 us * (50000000 Hz / 100000 Hz) => 5.1 ms
-+	 * Hopefully we won't be running at 100 kHz, but we should still make
-+	 * sure we wait long enough.
- 	 */
--	udelay(30);
--	regmap_read(rk_phy->reg_base,
--		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
--		    &dllrdy);
--	dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
-+	timeout = jiffies + msecs_to_jiffies(10);
-+	do {
-+		udelay(1);
-+
-+		regmap_read(rk_phy->reg_base,
-+			rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
-+			&dllrdy);
-+		dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
-+		if (dllrdy == PHYCTRL_DLLRDY_DONE)
-+			break;
-+	} while (!time_after(jiffies, timeout));
-+
- 	if (dllrdy != PHYCTRL_DLLRDY_DONE) {
- 		pr_err("rockchip_emmc_phy_power: dllrdy timeout.\n");
- 		return -ETIMEDOUT;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index a4383f359264..1b57e92e0093 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -220,6 +220,7 @@
+ 		compatible = "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1";
+ 		reg = <0x0 0xfe330000 0x0 0x10000>;
+ 		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		arasan,soc-ctl-syscon = <&grf>;
+ 		assigned-clocks = <&cru SCLK_EMMC>;
+ 		assigned-clock-rates = <200000000>;
+ 		clocks = <&cru SCLK_EMMC>, <&cru ACLK_EMMC>;
 -- 
 2.8.0.rc3.226.g39d4020
