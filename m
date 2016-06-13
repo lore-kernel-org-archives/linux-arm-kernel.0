@@ -1,55 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Jun 2016 15:45:28 -0700
-Subject: [GIT PULL] Ux500 DT updates for v4.8
-In-Reply-To: <CACRpkdZ_HPAXVc9Gd3oy5CVb=w76krcb3_Ney-rBb7Hn-YvAKQ@mail.gmail.com>
-References: <CACRpkdZ_HPAXVc9Gd3oy5CVb=w76krcb3_Ney-rBb7Hn-YvAKQ@mail.gmail.com>
-Message-ID: <20160613224528.GF29879@localhost>
+Date: Mon, 13 Jun 2016 15:44:42 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.8
+In-Reply-To: <cover.1465347025.git.horms+renesas@verge.net.au>
+References: <cover.1465347025.git.horms+renesas@verge.net.au>
+Message-ID: <20160613224442.GE29879@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 09:49:59AM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Wed, Jun 08, 2016 at 10:00:19AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> here is a bunch of DT updates to the Ux500 platforms that I'd like to get into
-> the ARM SoC tree.
-> 
-> Please pull it in!
-> 
-> Yours,
-> Linus Walleij
+> Please consider these Renesas ARM based SoC updates for v4.8.
 > 
 > 
-> The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
->   Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-dt-asoc-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.8
 > 
-> for you to fetch changes up to ac07a4e02899b332350b95ee190014c88271eaaa:
+> for you to fetch changes up to c94bc815f3c757df402d6f6a3e8d855b9168e6af:
 > 
->   ARM: dts: UX500: name the GPIO lines on HREFv60plus (2016-06-08
-> 09:42:41 +0200)
+>   ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on all SoCs (2016-05-30 09:39:43 +0900)
 > 
 > ----------------------------------------------------------------
-> Ux500 devicetree patches:
-> - Move the ab8500 compatible string from the board to the
->   chipset.
-> - Define GPIO line names for the boards.
+> Renesas ARM Based SoC Updates for v4.8
+> 
+> * Use ICRAM1 for jump stub on R-Car Gen 2 SoCs
+> * Postpone call to pm_genpd_init
 > 
 > ----------------------------------------------------------------
-> Linus Walleij (3):
->       ARM: dts: Ux500: move compatible string to chipset
->       ARM: dts: Ux500: name the GPIO lines on Snowball
->       ARM: dts: UX500: name the GPIO lines on HREFv60plus
+> Geert Uytterhoeven (2):
+>       ARM: shmobile: pm-rmobile: Postpone call to pm_genpd_init()
+>       ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on all SoCs
 > 
->  arch/arm/boot/dts/ste-dbx5x0.dtsi      |   1 +
->  arch/arm/boot/dts/ste-href.dtsi        |   1 -
->  arch/arm/boot/dts/ste-hrefv60plus.dtsi | 120 +++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/ste-snowball.dts     |  84 ++++++++++++++++++++++-
->  4 files changed, 204 insertions(+), 2 deletions(-)
+>  arch/arm/mach-shmobile/pm-rcar-gen2.c | 13 ++++---------
+>  arch/arm/mach-shmobile/pm-rmobile.c   |  2 +-
+>  2 files changed, 5 insertions(+), 10 deletions(-)
 
 Merged, thanks.
 
