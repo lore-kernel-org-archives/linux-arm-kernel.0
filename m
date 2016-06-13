@@ -1,75 +1,46 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 13 Jun 2016 22:49:32 +0200
-Subject: Linux panics when suspend cannot offline the secondary cores
-In-Reply-To: <575EBA40.4000803@free.fr>
-References: <575ADFAC.4090009@free.fr> <2922940.3xeChLaYeK@vostro.rjw.lan>
- <575EBA40.4000803@free.fr>
-Message-ID: <2041686.H4Vc2p72PV@vostro.rjw.lan>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 13 Jun 2016 13:50:57 -0700
+Subject: [PATCH 00/14] run seccomp after ptrace
+In-Reply-To: <1465506124-21866-1-git-send-email-keescook@chromium.org>
+References: <1465506124-21866-1-git-send-email-keescook@chromium.org>
+Message-ID: <CAGXu5jJsWOdhRBauQ-_S-4ODd4m+xUbdjk1_zPXQqY7Qp-Dgdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 13, 2016 03:50:56 PM Mason wrote:
-> On 13/06/2016 15:30, Rafael J. Wysocki wrote:
-> 
-> > On Monday, June 13, 2016 02:06:14 PM Mason wrote:
-> >
-> >> On 10/06/2016 23:37, Mason wrote:
-> >>
-> >>> On 10/06/2016 23:35, Rafael J. Wysocki wrote:
-> >>>
-> >>>> On Friday, June 10, 2016 05:41:32 PM Mason wrote:
-> >>>>
-> >>>>> I'm playing with S3 Suspend-to-RAM, and I noticed that Linux is really
-> >>>>> unhappy when the suspend framework fails to offline secondary cores.
-> >>>>>
-> >>>>> Is this expected/by design, or could it fail more gracefully?
-> >>>>> (It could also be something missing in my platform's code.)
-> >>>>
-> >>>> This looks like a CPU offline bug to me which is more general than just
-> >>>> system suspend.
-> >>>
-> >>> You may be right, I will try just off-lining cpu1.
-> >>> Suspend may be a red herring.
-> >>>
-> >>> By the way, I know my implementation of tango_cpu_die
-> >>> is incorrect, I was testing the failure mode.
-> >>
-> >> Hello Rafael,
-> >>
-> >> Suspend was indeed a red herring. Manually requesting cpu1 off-lining
-> >> also makes Linux panic when cpu_die() unexpectedly returns.
-> >>
-> >> The subject should perhaps have been:
-> >>
-> >>   Linux panics when secondary core off-lining fails
-> >>
-> >> Could it be made to fail more gracefully?
-> >> Or is this borkage inherent to the failed operation?
-> >> Or is it a bug in my platform code?
-> >> (A bug other than tango_cpu_die() failing to kill the core.)
-> > 
-> > Well, smp_ops.cpu_die() is not expected to return AFAICS, so that may be
-> > the reason why it fails for you the way it does.
-> 
-> I am aware that smp_ops.cpu_die() is not expected to return.
-> (I was wondering if the framework could handle it gracefully.)
-> 
-> The actual implementation for cpu_die() asks the firmware to off-line
-> the current core. If the operation fails, for whatever reason, firmware
-> is not supposed to return control to Linux?
+(Oops, forgot to send this series through the lsm list...)
 
-Firmware can do what it wants (although ideally it should just do what it is
-asked for).  smp_ops.cpu_die() is not supposed to return to its caller anyway.
+On Thu, Jun 9, 2016 at 2:01 PM, Kees Cook <keescook@chromium.org> wrote:
+> There has been a long-standing (and documented) issue with seccomp
+> where ptrace can be used to change a syscall out from under seccomp.
+> This is a problem for containers and other wider seccomp filtered
+> environments where ptrace needs to remain available, as it allows
+> for an escape of the seccomp filter.
+>
+> Since the ptrace attack surface is available for any allowed syscall,
+> moving seccomp after ptrace doesn't increase the actually available
+> attack surface. And this actually improves tracing since, for
+> example, tracers will be notified of syscall entry before seccomp
+> sends a SIGSYS, which makes debugging filters much easier.
+>
+> The per-architecture changes do make one (hopefully small)
+> semantic change, which is that since ptrace comes first, it may
+> request a syscall be skipped. Running seccomp after this doesn't
+> make sense, so if ptrace wants to skip a syscall, it will bail
+> out early similarly to how seccomp was. This means that skipped
+> syscalls will not be fed through audit, though that likely means
+> we're actually avoiding noise this way.
+>
+> This series first cleans up seccomp to remove the now unneeded
+> two-phase entry, fixes the SECCOMP_RET_TRACE hole (same as the
+> ptrace hole above), and then reorders seccomp after ptrace on
+> each architecture.
 
-> Is panic the only safe thing to do in Linux:
-> (If yes, then why doesn't the framework panic immediately?)
+Has anyone else had a chance to review this series? I'd like to get it
+landed in -next as early as possible in case there are unexpected
+problems...
 
-I guess all of the existing implementations of smp_ops.cpu_die() don't return
-to the caller no matter what, so the caller did not have to consider anything
-else.
+-Kees
 
-And quite frankly I don't see why it would have to.  smp_ops.cpu_die() simply
-needs to be implemented to never return.
-
-Thanks,
-Rafael
+-- 
+Kees Cook
+Chrome OS & Brillo Security
