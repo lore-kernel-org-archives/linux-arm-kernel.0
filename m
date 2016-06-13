@@ -1,37 +1,38 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 13 Jun 2016 21:04:16 +0200
-Subject: [PATCH 44/48] clocksource: atmel-pit: allow unselecting ATMEL_PIT
-In-Reply-To: <20160611105351.GH19050@piout.net>
-References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1465596231-21766-45-git-send-email-alexandre.belloni@free-electrons.com>
- <alpine.DEB.2.11.1606111143330.5839@nanos>
- <20160611105351.GH19050@piout.net>
-Message-ID: <20160613210416.4fef01d2@bbrezillon>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 13 Jun 2016 22:04:34 +0300
+Subject: [RESEND PATCHv2 00/28] clk: ti: hwmod clock type support
+Message-ID: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Jun 2016 12:53:51 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+Hi,
 
-> On 11/06/2016 at 11:43:54 +0200, Thomas Gleixner wrote :
-> > On Sat, 11 Jun 2016, Alexandre Belloni wrote:
-> >   
-> > > With the new TCB clocksource driver, atmel platforms are now able to boot
-> > > without the PIT driver. Allow unselecting it.  
-> > 
-> > Yay! Thanks for doing this!
-> >   
-> 
-> Sure! Can you still check the request_irq/free_irq in
-> timer-atmel-tcbclksrc? I'm not sure whether this can work reliably or
-> only because we are before SYSTEM_STATE=RUNNING.
-> In the latter case, I have another way of doing that.
-> 
+Resending the series as it didn't get that much attention last time.
+This has just been rebased on top of 4.7-rc1, no other changes.
 
-Sorry to put it back on the table, but shouldn't we consider adding
-these irq_disable/enable_action() helpers?
+This series adds support for hwmod module clocks, which are currently
+directly handled by hwmod core. This addresses following issues:
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+ * one step closer of removing hwmod core / data from kernel
+ * unblock Tony's interconnect driver work (this is also required
+   for removing hwmod codebase)
+ * add proper clock support for the hardware modules currently handled
+   by hwmod core; use counting for clocks, ability to share clocks
+   between multiple modules, etc.
+ * add helper clock APIs for removing most of the clock aliases under
+   drivers/clk/ti/clk-xyz.c files
+
+Test branch available:
+tree: https://github.com/t-kristo/linux-pm.git
+branch: 4.7-rc1-hwmod-clks
+
+Testing done:
+
+boot: am335x-evm, am335x-evmsk, am3517-evm, am37x-evm, am437x-sk,
+am437x-gp-evm, am57xx-evm, omap3-beagle-xm, am335x-boneblack, am335x-bone,
+dra7xx-evm, omap3-n900, omap5-uevm, omap4-panda, omap3430-sdp,
+omap4-sdp-es23plus
+
+suspend-resume: omap3-beagle, omap4-panda-es
+
+-Tero
