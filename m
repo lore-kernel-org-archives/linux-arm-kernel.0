@@ -1,50 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jun 2016 22:02:13 +0100
-Subject: Linux panics when suspend cannot offline the secondary cores
-In-Reply-To: <2041686.H4Vc2p72PV@vostro.rjw.lan>
-References: <575ADFAC.4090009@free.fr> <2922940.3xeChLaYeK@vostro.rjw.lan>
- <575EBA40.4000803@free.fr> <2041686.H4Vc2p72PV@vostro.rjw.lan>
-Message-ID: <20160613210213.GZ1041@n2100.armlinux.org.uk>
+From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
+Date: Mon, 13 Jun 2016 16:19:05 -0500
+Subject: [PATCHv3 0/7] Add Ethernet EDAC & peripheral init functions
+Message-ID: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 10:49:32PM +0200, Rafael J. Wysocki wrote:
-> I guess all of the existing implementations of smp_ops.cpu_die() don't return
-> to the caller no matter what, so the caller did not have to consider anything
-> else.
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-Existing implementations for hardware which implements CPU hotplug
-takes the requested CPU down in such a way that smp_ops.cpu_die()
-*never* returns.
+This patch set adds the Ethernet EDAC and memory initialization functions
+for Altera's Arria10 peripherals. The ECC memory init functions are common
+to all the peripheral memory buffers.
 
-We have a number of evaluation boards where its desirable to emulate
-CPU hotplug.  These boards have no power management abilities, and
-have no way to power down or reset a CPU from software.  For these,
-we implement CPU hotplug by taking the CPU down gracefully, taking
-it out of coherency, and then placing it in a loop waiting for the
-CPU up event to arrive.  At that point (and this is the only legal
-time) smp_ops.cpu_die() returns - at which point you get the
-resuscitating kernel message, and the CPU re-enters the kernel.
+Thor Thayer (7):
+  EDAC, altera: Check parent status for Arria10 EDAC block
+  EDAC, altera: Add panic flag check to A10 IRQ
+  EDAC, altera: Share Arria10 check_deps & IRQ functions
+  Documentation: dt: socfpga: Add Arria10 Ethernet binding
+  EDAC, altera: Add Arria10 ECC memory init functions
+  EDAC, altera: Add Arria10 Ethernet EDAC support
+  ARM: dts: Add Arria10 Ethernet EDAC devicetree entry
 
-This path is _only_ for these evaluation platforms which have no
-hardware support for CPU hotplug, and therefore no PM and no kexec.
-
-The *only* solution to having working PM support Mason's platform is
-a properly implemented CPU hotplug correctly - which means ensuring
-that the CPU is either powered down or placed in reset during the
-smp_ops.cpu_die() call.  Everything else (even the simulation of it)
-is not good enough.
-
-That can be done either by the dying CPU when it calls into
-smp_ops.cpu_die(), or the CPU requesting the death of the CPU via
-smp_ops.cpu_kill().
-
-Either way, it's up to the platform code to implement these, and as
-I say, a correct and proper implementation of this is a fundamental
-requirement for system power management (like suspend) and kexec in
-a SMP system.
+ .../bindings/arm/altera/socfpga-eccmgr.txt         |   24 ++
+ arch/arm/boot/dts/socfpga_arria10.dtsi             |   16 +
+ drivers/edac/Kconfig                               |    7 +
+ drivers/edac/altera_edac.c                         |  314 ++++++++++++++++++--
+ drivers/edac/altera_edac.h                         |   12 +
+ 5 files changed, 344 insertions(+), 29 deletions(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.7.9.5
