@@ -1,91 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 13 Jun 2016 12:18:50 +0100
-Subject: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
-In-Reply-To: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
-References: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
-Message-ID: <575E969A.6070400@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 13 Jun 2016 14:24:58 +0300
+Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
+ <20160601005751.GG20527@verge.net.au>
+ <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
+ <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
+ <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
+ <20160610010245.GA10152@verge.net.au>
+ <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
+ <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
+ <1b9a4cf4-1101-ccbf-772b-49b8a689a1b6@cogentembedded.com>
+ <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
+Message-ID: <7d93d81d-cca9-e434-6488-0ea839f81663@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/16 10:20, Wei Chen wrote:
-> The PCIe ACS capability will affect the layout of iommu groups.
-> Generally speaking, if the path from root port to the PCIe device
-> is ACS enabled, the iommu will create a single iommu group for this
-> PCIe device. If all PCIe devices on the path are ACS enabled then
-> Linux can determine this path is ACS enabled.
->
-> Linux use two PCIe configuration registers to determine the ACS
-> status of PCIe devices:
-> ACS Capability Register and ACS Control Register.
->
-> The first register is used to check the implementation of ACS function
-> of a PCIe device, the second register is used to check the enable status
-> of ACS function. If one PCIe device has implemented and enabled the ACS
-> function then Linux will determine this PCIe device enabled ACS.
->
->  From the Chapter:6.12 of PCI Express Base Specification Revision 3.1a,
-> we can find that when a PCIe device implements ACS function, the enable
-> status is set to disabled by default and can be enabled by ACS-aware
-> software.
->
-> ACS will affect the iommu groups topology, so, the iommu driver is
-> ACS-aware software. This patch adds a call to pci_request_acs() to the
-> arm-smmu driver to enable the ACS function in PCIe devices that support
-> it.
->
-> Signed-off-by: Wei Chen <Wei.Chen@arm.com>
+On 6/13/2016 10:12 AM, Geert Uytterhoeven wrote:
 
-Makes sense to me:
+>>>>    The only problem I'm seeing (again) is the RCAN clock failing to
+>>>> register:
+>>>>
+>>>> rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock (-12)
+>>>>
+>>>>    I was going to look at it yesterday but (wrongly) thought it somehow
+>>>> cured itself... I'll look at it now.
+>>>
+>>> The RCAN parent is the second clock in the CPG node's "clocks" property,
+>>> which you didn't provide.
+>>
+>>    Actually, the things are more complex. The figure 7.1c suggests that the
+>> RCAN clock has different parent on R8A7792 than on the other SoCs -- namely
+>> PLL1/VCO 1/4. That may be, since there's just no USB_EXTAL signal on this
+>> SoC (it doesn't seem to support any USB IPs). Which means the
+>> 'clk-rcar-gen2' driver can't work with the RCAN clock in its current form.
+>
+> Right, I had forgotten about that.
+> Fortunately the clk-rcar-gen2 driver has a sane failure mode for this case ;-)
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+    What do you mean?
 
-p.s. The confidential disclaimer is a good way to get patches ignored 
-here on the lists - please check with Steve about getting set up on the 
-appropriate SMTP server.
+> it seems the RCAN clock can just be modeled as a fixed clock. However,
+> its divider value isn't clear to me,
 
-Robin.
+    IIRC, the fixed RCAN divisor was equal to 6.
 
-> ---
->   drivers/iommu/arm-smmu-v3.c | 2 ++
->   drivers/iommu/arm-smmu.c    | 4 +++-
->   2 files changed, 5 insertions(+), 1 deletion(-)
+[...]
+
+> Gr{oetje,eeting}s,
 >
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 94b6821..30ea899 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -2686,6 +2686,8 @@ static int __init arm_smmu_init(void)
->          if (ret)
->                  return ret;
->
-> +       pci_request_acs();
-> +
->          return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
->   }
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 9345a3f..ab365ec 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -2096,8 +2096,10 @@ static int __init arm_smmu_init(void)
->   #endif
->
->   #ifdef CONFIG_PCI
-> -       if (!iommu_present(&pci_bus_type))
-> +       if (!iommu_present(&pci_bus_type)) {
-> +               pci_request_acs();
->                  bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
-> +       }
->   #endif
->
->          return 0;
-> --
-> 2.7.4
->
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
->
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->
+>                         Geert
+
+MBR, Sergei
