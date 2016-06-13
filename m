@@ -1,38 +1,47 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 13 Jun 2016 20:31:59 +0800
-Subject: [PATCH] arm64: mm: update SECTION_SIZE_BITS to 27 for 4k pagesize
-Message-ID: <1465821119-3384-1-git-send-email-jszhang@marvell.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Jun 2016 13:37:42 +0100
+Subject: [PATCH] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
+In-Reply-To: <575EA0DC.2080801@arm.com>
+References: <1465571984-18776-1-git-send-email-suzuki.poulose@arm.com>
+ <20160610170220.GC23223@arm.com> <575EA0DC.2080801@arm.com>
+Message-ID: <20160613123742.GD1605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On one of my platforms, linux is given 1152MB memory. With current
-SECTION_SIZE_BITS 30, the reserved memmap is larger, it's a waste for
-us. Inspired by disscusion[1], reducing the SECTION_SIZE_BITS to 27
-which means 128M section size saves us about 14MB, a huge gain for
-embeded memory constrained system.
+On Mon, Jun 13, 2016 at 01:02:36PM +0100, Suzuki K Poulose wrote:
+> On 10/06/16 18:02, Will Deacon wrote:
+> >On Fri, Jun 10, 2016 at 04:19:44PM +0100, Suzuki K Poulose wrote:
+> >>From: Steve Capper <steve.capper@linaro.org>
+> >>
+> >>It can be useful for JIT software to be aware of MIDR_EL1 and
+> >>REVIDR_EL1 to ascertain the presence of any core errata that could
+> >>affect codegen.
+> >>
+> >>This patch exposes these registers through sysfs:
+> >>
+> >>/sys/devices/system/cpu/cpu$ID/identification/midr
+> >>/sys/devices/system/cpu/cpu$ID/identification/revidr
+> 
+> 
+> >>+
+> >>+#define CPUINFO_ATTR_RO(_name)							\
+> >>+	static ssize_t show_##_name (struct device *dev,			\
+> >>+			struct device_attribute *attr, char *buf)		\
+> >>+	{									\
+> >>+		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
+> >>+		if (!cpu_present(dev->id))					\
+> >>+			return -ENODEV;						\
+> >>+										\
+> >>+		if (info->reg_midr)						\
+> >>+			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
+> >
+> >Should this be 0x%08x, as these are 32-bit registers?
+> 
+> Yes. Will change it. As per Mark's comments, I can change them to 64bit in
+> a separate patch
 
-[1]http://lkml.iu.edu/hypermail/linux/kernel/1604.1/03036.html
+No -- this is a sysfs ABI and I think we should be consistent from the
+beginning. I'm fine with having them 64-bit, since Mark's comments make
+sense, but a comment justifying that would be a good idea.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/include/asm/sparsemem.h | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/include/asm/sparsemem.h b/arch/arm64/include/asm/sparsemem.h
-index 74a9d30..41c10f7 100644
---- a/arch/arm64/include/asm/sparsemem.h
-+++ b/arch/arm64/include/asm/sparsemem.h
-@@ -18,7 +18,11 @@
- 
- #ifdef CONFIG_SPARSEMEM
- #define MAX_PHYSMEM_BITS	48
-+#ifdef CONFIG_ARM64_64K_PAGES
- #define SECTION_SIZE_BITS	30
-+#else
-+#define SECTION_SIZE_BITS	27
-+#endif
- #endif
- 
- #endif
--- 
-2.8.1
+Will
