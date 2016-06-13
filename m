@@ -1,66 +1,64 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 13 Jun 2016 14:15:10 +0200
-Subject: [PATCH 03/22] clocksource: clps711x: Changing the compatibility
- string to match with the smallest supported chip
-In-Reply-To: <1465024214-22120-4-git-send-email-shc_work@mail.ru>
-References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
- <1465024214-22120-4-git-send-email-shc_work@mail.ru>
-Message-ID: <20160613121510.GA10634@linaro.org>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 13 Jun 2016 13:15:19 +0100
+Subject: [PATCH 1/2] arm64: fix dump_instr when PAN and UAO are in use
+In-Reply-To: <1465812915-19801-2-git-send-email-mark.rutland@arm.com>
+References: <1465812915-19801-1-git-send-email-mark.rutland@arm.com>
+ <1465812915-19801-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <575EA3D7.8040001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 04, 2016 at 10:09:55AM +0300, Alexander Shiyan wrote:
-> This patch changes the compatibility string to match with the smallest
-> supported chip (EP7209). Since the DT-support for this CPU is not yet
-> announced, this change is safe.
+On 13/06/16 11:15, Mark Rutland wrote:
+> If the kernel is set to show unhandled signals, and a user task does not
+> handle a SIGILL as a result of an instruction abort, we will attempt to
+> log the offending instruction with dump_instr before killing the task.
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
-
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-but please wait for Rob Herring's ack before taking this patch in your tree.
-
->  Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt | 6 
-+++---
->  drivers/clocksource/clps711x-timer.c                              | 2 +-
->  2 files changed, 4 insertions(+), 4 deletions(-)
+> We use dump_instr to log the encoding of the offending userspace
+> instruction. However, dump_instr is also used to dump instructions from
+> kernel space, and internally always switches to KERNEL_DS before dumping
+> the instruction with get_user. When both PAN and UAO are in use, reading
+> a user instruction via get_user while in KERNEL_DS will result in a
+> permission fault, which leads to an Oops.
 > 
-> diff --git a/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt b/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
-> index cd55b52..d4c62e7 100644
-> --- a/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
-> +++ b/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
-> @@ -1,7 +1,7 @@
->  * Cirrus Logic CLPS711X Timer Counter
->  
->  Required properties:
-> -- compatible: Shall contain "cirrus,clps711x-timer".
-> +- compatible: Shall contain "cirrus,ep7209-timer".
->  - reg       : Address and length of the register set.
->  - interrupts: The interrupt number of the timer.
->  - clocks    : phandle of timer reference clock.
-> @@ -15,14 +15,14 @@ Example:
->  	};
->  
->  	timer1: timer at 80000300 {
-> -		compatible = "cirrus,ep7312-timer", "cirrus,clps711x-timer";
-> +		compatible = "cirrus,ep7312-timer", "cirrus,ep7209-timer";
->  		reg = <0x80000300 0x4>;
->  		interrupts = <8>;
->  		clocks = <&clks 5>;
->  	};
->  
->  	timer2: timer at 80000340 {
-> -		compatible = "cirrus,ep7312-timer", "cirrus,clps711x-timer";
-> +		compatible = "cirrus,ep7312-timer", "cirrus,ep7209-timer";
->  		reg = <0x80000340 0x4>;
->  		interrupts = <9>;
->  		clocks = <&clks 6>;
-> diff --git a/drivers/clocksource/clps711x-timer.c b/drivers/clocksource/clps711x-timer.c
-> index cdd86e3..7c65f9e 100644
-> --- a/drivers/clocksource/clps711x-timer.c
-> +++ b/drivers/clocksource/clps711x-timer.c
-> @@ -121,5 +121,5 @@ static void __init clps711x_timer_init(struct device_node *np)
->  		break;
->  	}
->  }
+> As we have regs corresponding to the context of the original instruction
+> abort, we can inspect this and only flip to KERNEL_DS if the original
+> abort was taken from the kernel, avoiding this issue. At the same time,
+> remove the redundant (and incorrect) comments regarding the order
+> dump_mem and dump_instr are called in.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Fixes: 57f4959bad0a154a ("arm64: kernel: Add support for User Access Override")
+
+FWIW:
+
+Tested-by: Vladimir Murzin <vladimir.murzin@arm.com>
+
+with
+
+$ echo 0 > /proc/sys/abi/swp
+
+Removed swp emulation handler
+
+$. /swp_test
+
+$ cat swp_test.c
+
+int main(void)
+{
+        unsigned long ret, x = 42, y = 24;
+
+        asm volatile("swp     %0, %1, [%2]"
+                     : "=&r" (ret)
+                     : "r" (x), "r" (&y)
+                     : "memory");
+
+        return ret;
+}
+
+Thanks
+Vladimir
