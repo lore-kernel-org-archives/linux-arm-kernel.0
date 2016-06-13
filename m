@@ -1,64 +1,134 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 Jun 2016 10:01:24 +0200
-Subject: [PATCH 0/1] ARM: dts: sunxi: Fix simplefb not working in 4.7-rc1
-In-Reply-To: <21258fc0-0250-951b-2ee7-d022fb3c09ac@redhat.com>
-References: <1465063524-4925-1-git-send-email-hdegoede@redhat.com>
- <20160609074643.GA5242@lukather>
- <21258fc0-0250-951b-2ee7-d022fb3c09ac@redhat.com>
-Message-ID: <20160613080124.GA4481@lukather>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 13 Jun 2016 16:08:54 +0800
+Subject: [PATCH 02/11] mmc: sdhci-of-arasan: Always power the PHY off/on
+ when clock changes
+In-Reply-To: <1465339484-969-3-git-send-email-dianders@chromium.org>
+References: <1465339484-969-1-git-send-email-dianders@chromium.org>
+ <1465339484-969-3-git-send-email-dianders@chromium.org>
+Message-ID: <ae4409b0-48a5-e30f-a244-7a28bd7a9daa@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 12:47:36PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 09-06-16 09:46, Maxime Ripard wrote:
-> >Hi Hans,
-> >
-> >On Sat, Jun 04, 2016 at 08:05:23PM +0200, Hans de Goede wrote:
-> >>Hi Maxime,
-> >>
-> >>While testing 4.7-rc1 / linux-sunxi/sunxi-next on a A10s I noticed that
-> >>hdmi out is no longer working (screen goes black when the kernel turns
-> >>of unused clocks).
-> >>
-> >>This is caused by the dtsi for sun4i / sun5i / sun7i based boards now
-> >>listing pll3, without pll3 being added to the clocks list for the
-> >>simplefb nodes.
-> >
-> >Why not do just that then? It's more appropriate for a fix imho.
-> 
-> You mean just for sun5i-a10s, or for all of sun4i / sun5i-a10s and
-> sun7i ?
-> 
-> For sun4i and sun7i things are already fixed in next:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?id=5a7f2310cc847a73852e70bc720a61ca9bf986a6
-> https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?id=c79255ca4d7b67cce4eac4dd532e097ce49f3679
-> 
-> It seems best to use those fixes, rather then come up with a separate
-> fix for 4.7.
-> 
-> My patch for fixing sun5i-a10s is inline with the 2 above patches,
-> which seems best, rather then doing something special for just sun5i-a10s.
+? 2016/6/8 6:44, Douglas Anderson ??:
+> In commit 802ac39a5566 ("mmc: sdhci-of-arasan: fix set_clock when a phy
+> is supported") we added code to power the PHY off and on whenever the
+> clock was changed but we avoided doing the power cycle code when the
+> clock was low speed.  Let's now do it always.
+>
+> Although there may be other reasons for power cycling the PHY when the
+> clock changes, one of the main reasons is that we need to give the DLL a
+> chance to re-lock with the new clock.
+>
+> One of the things that the DLL is for is tuning the Receive Clock in
+> HS200 mode and STRB in HS400 mode.  Thus it is clear that we should make
+> sure we power cycle the PHY (and wait for the DLL to lock) when we know
+> we'll be in one of these two speed modes.  That's what the original code
+> did, though it used the clock rate rather than the speed mode.  However,
+> even in speed modes other than HS200,/HS400 the DLL is used for
+> something since it can be clearly observed that the PHY doesn't function
+> properly if you leave the DLL off.
+>
+> Although it appears less important to power cycle the PHY and wait for
+> the DLL to lock when not in HS200/HS400 modes (no bugs were reported),
+> it still seems wise to let the locking always happen nevertheless.
+>
 
-Well, you are doing something special for just the A10s: the patches
-quoted above just add a bunch of clocks and add the handles to the
-list of clocks managed by simplefb.
+ From the design doc, there is no need to off/on phy when not in
+HS200/400, but maybe someone will limit the clk freq by assigning
+max-frequency in DT when in HS200/400, which will make things worse.
 
-For the A10s, you also declare the whole display engine block without
-anyone having tested that it was actually working.
+So your patch looks sane.
 
-Maxime
+> Note: as part of this, we make sure that we never try to turn the PHY on
+> when the clock is off (when the clock rate is 0).  The PHY cannot work
+> when the clock is off since its DLL can't lock.
+>
+> This change requires ("phy: rockchip-emmc: Increase lock time
+> allowance") and will cause problems if picked without that change.
+>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 23 ++++++++---------------
+>  1 file changed, 8 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index 533e2bcb10bc..3ff1711077c2 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -35,11 +35,13 @@
+>  /**
+>   * struct sdhci_arasan_data
+>   * @clk_ahb:	Pointer to the AHB clock
+> - * @phy: Pointer to the generic phy
+> + * @phy:	Pointer to the generic phy
+> + * @phy_on:	True if the PHY is turned on.
+>   */
+>  struct sdhci_arasan_data {
+>  	struct clk	*clk_ahb;
+>  	struct phy	*phy;
+> +	bool		phy_on;
+>  };
+>
+>  static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
+> @@ -61,12 +63,10 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+>  {
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>  	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> -	bool ctrl_phy = false;
+>
+> -	if (clock > MMC_HIGH_52_MAX_DTR && (!IS_ERR(sdhci_arasan->phy)))
+> -		ctrl_phy = true;
+> +	if (sdhci_arasan->phy_on && !IS_ERR(sdhci_arasan->phy)) {
+> +		sdhci_arasan->phy_on = false;
+>
+> -	if (ctrl_phy) {
+>  		spin_unlock_irq(&host->lock);
+>  		phy_power_off(sdhci_arasan->phy);
+>  		spin_lock_irq(&host->lock);
+> @@ -74,7 +74,9 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+>
+>  	sdhci_set_clock(host, clock);
+>
+> -	if (ctrl_phy) {
+> +	if (host->mmc->actual_clock && !IS_ERR(sdhci_arasan->phy)) {
+> +		sdhci_arasan->phy_on = true;
+> +
+>  		spin_unlock_irq(&host->lock);
+>  		phy_power_on(sdhci_arasan->phy);
+>  		spin_lock_irq(&host->lock);
+> @@ -257,12 +259,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>  			goto clk_disable_all;
+>  		}
+>
+> -		ret = phy_power_on(sdhci_arasan->phy);
+> -		if (ret < 0) {
+> -			dev_err(&pdev->dev, "phy_power_on err.\n");
+> -			goto err_phy_power;
+> -		}
+> -
+
+Because there is too much dependency between phy and controller, so
+previous solution is to setup clk by firmware. The same case for
+suspend and resume.
+
+Look really good to do it more legit.
+
+>  		host->mmc_host_ops.hs400_enhanced_strobe =
+>  					sdhci_arasan_hs400_enhanced_strobe;
+>  	}
+> @@ -275,9 +271,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>
+>  err_add_host:
+>  	if (!IS_ERR(sdhci_arasan->phy))
+> -		phy_power_off(sdhci_arasan->phy);
+> -err_phy_power:
+> -	if (!IS_ERR(sdhci_arasan->phy))
+>  		phy_exit(sdhci_arasan->phy);
+>  clk_disable_all:
+>  	clk_disable_unprepare(clk_xin);
+>
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160613/b202905d/attachment.sig>
+Best Regards
+Shawn Lin
