@@ -1,66 +1,101 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 13 Jun 2016 08:46:08 +0200
-Subject: [PATCH 6/7] ARM: dts: imx53-tx53: Switch using
- simple-audio-card for audio support
-In-Reply-To: <1465621345-12597-6-git-send-email-shc_work@mail.ru>
-References: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
- <1465621345-12597-6-git-send-email-shc_work@mail.ru>
-Message-ID: <20160613084608.17e33ad3@ipc1.ka-ro>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Mon, 13 Jun 2016 15:50:17 +0900
+Subject: [PATCH v13 05/10] arm64: Kprobes with single stepping support
+In-Reply-To: <575E3235.1020904@linaro.org>
+References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
+ <1464924384-15269-6-git-send-email-dave.long@linaro.org>
+ <20160608100714.4abbcebcf356eb72173d0ce3@kernel.org>
+ <575E3235.1020904@linaro.org>
+Message-ID: <20160613155017.860097875e8bc86563a065ce@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 13 Jun 2016 00:10:29 -0400
+David Long <dave.long@linaro.org> wrote:
 
-On Sat, 11 Jun 2016 08:02:24 +0300 Alexander Shiyan wrote:
-> The sound support can be handled by "simple-audio-card" instead of
-> use a private driver.
+> >> ---
+> >>   arch/arm64/Kconfig                      |   1 +
+> >>   arch/arm64/include/asm/debug-monitors.h |   5 +
+> >>   arch/arm64/include/asm/insn.h           |   4 +-
+> >>   arch/arm64/include/asm/kprobes.h        |  60 ++++
+> >>   arch/arm64/include/asm/probes.h         |  44 +++
+> >>   arch/arm64/kernel/Makefile              |   1 +
+> >>   arch/arm64/kernel/debug-monitors.c      |  18 +-
+> >>   arch/arm64/kernel/kprobes-arm64.c       | 144 +++++++++
+> >>   arch/arm64/kernel/kprobes-arm64.h       |  35 +++
+> >>   arch/arm64/kernel/kprobes.c             | 526 ++++++++++++++++++++++++++++++++
+> >
+> > Not sure why kprobes.c and kprobes-arm64.c are splitted.
+> >
+> >
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/boot/dts/imx53-tx53-x03x.dts |  1 +
->  arch/arm/boot/dts/imx53-tx53-x13x.dts |  1 +
->  arch/arm/boot/dts/imx53-tx53.dtsi     | 57 ++++++++++++++++++++++++++---------
->  3 files changed, 45 insertions(+), 14 deletions(-)
+> This comes from the model of the arm32 kprobes code where handling of 
+> the low-level instruction simulation is implemented in separate files 
+> for 32-bit vs. thumb instructions.  It should make a little more sense 
+> in the future when additional instruction simulation code will hopefully 
+> be added for those instructions we cannot currently single-step 
+> out-of-line.  It also probably *could* be merged into one file.
+
+Hmm, at least the name of arch/arm64/kernel/kprobes-arm64.c is
+meaningless. As we've done in x86, I think we can make it 
+arch/arm64/kernel/kprobes/decode-insn.{c,h}
+
+
+[..]
+> >> +
+> >> +/* Return:
+> >> + *   INSN_REJECTED     If instruction is one not allowed to kprobe,
+> >> + *   INSN_GOOD         If instruction is supported and uses instruction slot,
+> >> + *   INSN_GOOD_NO_SLOT If instruction is supported but doesn't use its slot.
+> >
+> > Is there any chance to return INSN_GOOD_NO_SLOT?
+> >
 > 
-[...]
-> @@ -142,6 +156,26 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_ssi1>;
->  	status = "okay";
-> +
-> +	audmux_ssi0 {
-> +		fsl,audmux-port = <MX51_AUDMUX_PORT2_SSI0>;
->
-This fails to compile because MX51_AUDMUX_PORT2_SSI0 is not defined!
-It should be MX51_AUDMUX_PORT1_SSI0.
+> Ah, that gets used later when simulation support is added.  I've removed 
+> this enum value from this commit and will add it to the later one. 
+> Please no one complain about using an enum instead of a bool, it will 
+> eventually have three possible values.
 
-+			(IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			IMX_AUDMUX_V2_PTCR_TFSEL(MX51_AUDMUX_PORT4) |
-+			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(MX51_AUDMUX_PORT4) |
-+			IMX_AUDMUX_V2_PTCR_SYN)
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT4)
->
-These should be MX51_AUDMUX_PORT5 rather than MX51_AUDMUX_PORT4.
-(This applies to the other .dts files in your patchset excluiding
-mx51-babbage.dts).
+OK :)
 
-> @@ -502,14 +536,9 @@
->  };
->  
->  &ssi1 {
-> -	codec-handle = <&sgtl5000>;
->  	status = "okay";
->  };
->  
-> -&ssi2 {
-> -	status = "disabled";
-> -};
-> -
-This may be redundant because it is the default, but I prefer to keep
-it here, to make it easier for the end user to enable it and to
-document, that the SSI2 interface is actually usable on the TX53
-modules.
+[..]
+> >> +enum kprobe_insn __kprobes
+> >> +arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
+> >> +{
+> >> +	enum kprobe_insn decoded;
+> >> +	kprobe_opcode_t insn = le32_to_cpu(*addr);
+> >> +	kprobe_opcode_t *scan_start = addr - 1;
+> >> +	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
+> >> +#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
+> >> +	struct module *mod;
+> >> +#endif
+> >> +
+> >> +	if (addr >= (kprobe_opcode_t *)_text &&
+> >> +	    scan_end < (kprobe_opcode_t *)_text)
+> >> +		scan_end = (kprobe_opcode_t *)_text;
+> >> +#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
+> >> +	else {
+> >> +		preempt_disable();
+> >> +		mod = __module_address((unsigned long)addr);
+> >> +		if (mod && within_module_init((unsigned long)addr, mod) &&
+> >> +			!within_module_init((unsigned long)scan_end, mod))
+> >> +			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
+> >> +		else if (mod && within_module_core((unsigned long)addr, mod) &&
+> >> +			!within_module_core((unsigned long)scan_end, mod))
+> >> +			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
+> >
+> > What happen if mod == NULL? it should be return error, isn't it?
+> >
+> 
+> No, it should be fine.  It just means it didn't have to do either of the 
+> extra checks to limit the end of the search through the code to the 
+> boundary of one of the corresponding module text sections. It means the 
+> instruction is in the regular kernel (non-module) text segment.
+
+Ah, I see. It is OK then. :)
+
+Thank you,
 
 
-Lothar Wa?mann
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
