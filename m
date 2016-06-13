@@ -1,38 +1,75 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon, 13 Jun 2016 17:45:18 +0800
-Subject: [v1,4/4] drm/rockchip: cdn-dp: add cdn DP support for rk3399
-In-Reply-To: <20160608221354.GA25675@roeck-us.net>
-References: <1464966911-18949-5-git-send-email-zyw@rock-chips.com>
- <20160608221354.GA25675@roeck-us.net>
-Message-ID: <575E80AE.2050809@rock-chips.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 13 Jun 2016 11:51:43 +0200
+Subject: [PATCH] tty/serial: atmel: fix RS485 half duplex with DMA
+In-Reply-To: <57500D60.2000900@atmel.com>
+References: <1464389648-4820-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <57500D60.2000900@atmel.com>
+Message-ID: <575E822F.7050501@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter
+Le 02/06/2016 12:41, Nicolas Ferre a ?crit :
+> Le 28/05/2016 00:54, Alexandre Belloni a ?crit :
+>> When using DMA, half duplex doesn't work properly because rx is not stopped
+>> before starting tx. Ensure we call atmel_stop_rx() in the DMA case.
+>>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> We can also add:
+> Cc: <stable@vger.kernel.org> # v4.3+
+> 
+> 
+> Thanks Alexandre!
 
-Thanks for your comments
+Greg,
 
-On 06/09/2016 06:13 AM, Guenter Roeck wrote:
->> +	if (ret < 0) {
->> >+		dev_err(dp->dev, "failed to request firmware %d\n", ret);
->> >+		return ret;
->> >+	}
->> >+
->> >+	hdr = (struct cdn_firmware_header *)fw->data;
->> >+	if (fw->size != le32_to_cpu(hdr->size_bytes))
->> >+		return -EINVAL;
->> >+
->> >+	ret = cdn_dp_clk_enable(dp);
->> >+	if (ret < 0) {
->> >+		dev_err(dp->dev, "cannot enable dp clk %d\n", ret);
->> >+		return ret;
->> >+	}
->> >+
->> >+	dp_clock_reset_seq(dp);
->> >+
->> >+	iram_data = (const u32 *)(fw->data + hdr->header_size);
->> >+	dram_data = (const u32 *)(fw->data + hdr->header_size + hdr->iram_size);
-> No need for endianness conversion here ?
->
-The firmware does need for endianness conversio.
-And for the other comments, I have done them, v2 has been posted.
+It's not a regression but a good fix for this rs485 mode. So I suspect
+it can still be queued for 4.7-rc... (aka: gentle ping).
+
+Bye,
+
+>> ---
+>>  drivers/tty/serial/atmel_serial.c | 14 ++++++++------
+>>  1 file changed, 8 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index 954941dd8124..f9c798cba83f 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -482,19 +482,21 @@ static void atmel_start_tx(struct uart_port *port)
+>>  {
+>>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>>  
+>> -	if (atmel_use_pdc_tx(port)) {
+>> -		if (atmel_uart_readl(port, ATMEL_PDC_PTSR) & ATMEL_PDC_TXTEN)
+>> -			/* The transmitter is already running.  Yes, we
+>> -			   really need this.*/
+>> -			return;
+>> +	if (atmel_use_pdc_tx(port) && (atmel_uart_readl(port, ATMEL_PDC_PTSR)
+>> +				       & ATMEL_PDC_TXTEN))
+>> +		/* The transmitter is already running.  Yes, we
+>> +		   really need this.*/
+>> +		return;
+>>  
+>> +	if (atmel_use_pdc_tx(port) || atmel_use_dma_tx(port))
+>>  		if ((port->rs485.flags & SER_RS485_ENABLED) &&
+>>  		    !(port->rs485.flags & SER_RS485_RX_DURING_TX))
+>>  			atmel_stop_rx(port);
+>>  
+>> +	if (atmel_use_pdc_tx(port))
+>>  		/* re-enable PDC transmit */
+>>  		atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTEN);
+>> -	}
+>> +
+>>  	/* Enable interrupts */
+>>  	atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
+>>  }
+>>
+> 
+> 
+
+
+-- 
+Nicolas Ferre
