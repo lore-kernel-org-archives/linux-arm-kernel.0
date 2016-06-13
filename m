@@ -1,62 +1,62 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 13 Jun 2016 20:17:38 +0200
-Subject: [PATCH 0/7] ir-rx51 driver fixes
-In-Reply-To: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <201606132017.38629@pali>
+From: briannorris@chromium.org (Brian Norris)
+Date: Mon, 13 Jun 2016 11:37:49 -0700
+Subject: [PATCH] clk: rockchip: add flag CLK_SET_RATE_PARENT for
+ dclk_vop0_div on RK3399
+In-Reply-To: <575D3D9B.1070501@rock-chips.com>
+References: <1465724928-14611-1-git-send-email-zhengxing@rock-chips.com>
+ <575D3D9B.1070501@rock-chips.com>
+Message-ID: <20160613183748.GA21936@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 07 May 2016 17:21:41 Ivaylo Dimitrov wrote:
-> ir-rx51 is a driver for Nokia N900 IR transmitter. The current series
-> fixes the remaining problems in the driver:
-> 
->  - replace GP timer 9 with PWM framework usage
->  - replace pulse width timer dmtimer usage with hrtimer
->  - add DT support to the driver
->  - add driver to the board DTS
-> 
-> Pathes 2 and 5 are needed so the driver to function correctly,
-> without those PWM either refuses to set the needed carrier frequency
-> (patch 2) or there are such a delays in the PWM framework, code that
-> transmission duration raises to ~5s instead of half a second.
-> 
-> Ivaylo Dimitrov (6):
->   pwm: omap-dmtimer: Allow for setting dmtimer clock source
->   [media] ir-rx51: use PWM framework instead of OMAP dmtimer
->   [media] ir-rx51: add DT support to driver
->   ARM: OMAP: dmtimer: Do not call PM runtime functions when not
-> needed. [media] ir-rx51: use hrtimer instead of dmtimer
->   ARM: dts: n900: enable lirc-rx51 driver
-> 
-> Tony Lindgren (1):
->   ir-rx51: Fix build after multiarch changes broke it
-> 
->  .../devicetree/bindings/media/nokia,lirc-rx51      |  19 ++
->  .../devicetree/bindings/pwm/pwm-omap-dmtimer.txt   |   4 +
->  arch/arm/boot/dts/omap3-n900.dts                   |  12 ++
->  arch/arm/mach-omap2/board-rx51-peripherals.c       |   5 -
->  arch/arm/mach-omap2/pdata-quirks.c                 |  10 +-
->  arch/arm/plat-omap/dmtimer.c                       |   9 +-
->  arch/arm/plat-omap/include/plat/dmtimer.h          |   1 +
->  drivers/media/rc/Kconfig                           |   2 +-
->  drivers/media/rc/ir-rx51.c                         | 229
-> +++++++-------------- drivers/pwm/pwm-omap-dmtimer.c                
->     |  12 +- include/linux/platform_data/media/ir-rx51.h        |  
-> 3 -
->  11 files changed, 131 insertions(+), 175 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/media/nokia,lirc-rx51
+Hi,
 
-Patch series looks good, you can add my Acked-by.
+On Sun, Jun 12, 2016 at 06:46:51PM +0800, Yakir Yang wrote:
+> On 06/12/2016 05:48 PM, Xing Zheng wrote:
+> >The functions and features VOP0 more complete than VOP1's, we need to
+> >use it dclk_vop0_div operate VPLLI, and let VOP0 as the default primary
+> >screen.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160613/7c464fcc/attachment.sig>
+Personally, I'd like a little better description that talks about the
+rates, not just the differences between VOP0 and VOP1. Presumably the
+clock rates needed by VOP0 are not achievable just by these dividers, so
+we need to adjust the PLL?
+
+FWIW, I haven't actually found this patch necessary in my own testing (I
+have eDP running fine without this change), but perhaps with better
+justification, this will make more sense.
+
+> >Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> 
+> Tested on RK3399 Kevin board, after apply this patch, my eDP panel
+> light up normally. So
+> 
+> Tested-by: Yakir Yang <ykk@rock-chips.com>
+
+For clarification: this patch isn't sufficient for that, right? Of
+course eDP support hasn't fully landed upstream yet, but I presume you
+have other changes to set the correct VOP frequencies?
+
+Brian
+
+> BR,
+> - Yakir
+> 
+> >---
+> >
+> >  drivers/clk/rockchip/clk-rk3399.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> >diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+> >index 7ecb12c3..6affa75 100644
+> >--- a/drivers/clk/rockchip/clk-rk3399.c
+> >+++ b/drivers/clk/rockchip/clk-rk3399.c
+> >@@ -1157,7 +1157,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+> >  	GATE(HCLK_VOP0_NOC, "hclk_vop0_noc", "hclk_vop0_pre", CLK_IGNORE_UNUSED,
+> >  			RK3399_CLKGATE_CON(28), 0, GFLAGS),
+> >-	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, 0,
+> >+	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, CLK_SET_RATE_PARENT,
+> >  			RK3399_CLKSEL_CON(49), 8, 2, MFLAGS, 0, 8, DFLAGS,
+> >  			RK3399_CLKGATE_CON(10), 12, GFLAGS),
+> 
+> 
