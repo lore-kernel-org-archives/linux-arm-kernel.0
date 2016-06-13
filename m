@@ -1,32 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 Jun 2016 01:18:52 +0000
-Subject: [PATCH] irqchip/bcm2836: make bcm2836_smp_boot_secondary static
-In-Reply-To: <1465407697-8116-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465407697-8116-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160613011852.GI24391@io.lakedaemon.net>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 13 Jun 2016 10:38:17 +0900
+Subject: [PATCH] drm/exynos: don't use HW trigger for Exynos5420/5422/5800
+In-Reply-To: <CABxcv=nuw7ZUF0bDC1PZfP0WVQhRY3HSoO5LdwT8_FvNi9N+aQ@mail.gmail.com>
+References: <CGME20160602142058epcas1p4f26bc6ab2acd0012962f90bb2c6c4141@epcas1p4.samsung.com>
+ <1464877210-27207-1-git-send-email-javier@osg.samsung.com>
+ <5758A58D.7050106@samsung.com>
+ <6e24059d-16f3-210a-8dd2-f8dcb89213a1@osg.samsung.com>
+ <5759EF32.5040302@samsung.com>
+ <CABxcv=nuw7ZUF0bDC1PZfP0WVQhRY3HSoO5LdwT8_FvNi9N+aQ@mail.gmail.com>
+Message-ID: <575E0E89.40400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Ben,
 
-On Wed, Jun 08, 2016 at 06:41:37PM +0100, Ben Dooks wrote:
-> The bcm2836_smp_boot_secondary() is not declared or used elsewhere
-> so make it static to fix the following warning:
+
+2016? 06? 10? 09:24? Javier Martinez Canillas ?(?) ? ?:
+> Hello Inki,
 > 
-> drivers/irqchip/irq-bcm2836.c:227:12: warning: symbol 'bcm2836_smp_boot_secondary' was not declared. Should it be static?
+> On Thu, Jun 9, 2016 at 6:35 PM, Inki Dae <inki.dae@samsung.com> wrote:
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/irqchip/irq-bcm2836.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> [snip]
+> 
+>>> I know that removing .trg_type is enough but I also removed those lines
+>>> because the fields are not used if .trg_type != I80_HW_TRG. So there is
+>>> no point to leave a set for unused fields.
+>>>
+>>> We can latter add those one HW trigger support is fixed for Exynos5420.
+>>>
+>>
+>> As of now, I can merge it but I think it would be not reasonable solution because potential problem still exists even we use SW trigger mode in default - ie., in case of using HW trigger mode at bootloader, same problem would happen as long as we don't support PSR mode support.
+>>
+> 
+> Yes, I understand that the problem will show again if the bootloader
+> uses HW trigger mode and that we need proper Panel Self Refresh
+> support but I think that's a separate issue. That's why I said that
+> those can be addressed for v4.8 but revert to SW trigger for v4.7 as a
+> short term fix for the regression.
+> 
+> In other words, enabling HW trigger mode breaks the display for the
+> Exynos5420 and Exynos5800 Peach Pi Chromebooks with the shipped
+> bootloaders (which are probably the most popular Exynos5 devices with
+> display and mainline support so is likely to affect users).
 
-This, and the rest of the irqchip/ ones, applied to irqchip/misc.
+I thought to add PSR support somehow but put me other things to trouble.
+Anyway, we could support it later so picked it up.
 
-thx,
+Thanks,
+Inki Dae
 
-Jason.
+> 
+> Best regards,
+> Javier
+> 
+> 
+> 
