@@ -1,38 +1,59 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 13 Jun 2016 17:24:09 +0200
-Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
-In-Reply-To: <11395561.bQatt85IOg@wuerfel>
-References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
- <11395561.bQatt85IOg@wuerfel>
-Message-ID: <20160613152409.GD3240@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Jun 2016 16:29:12 +0100
+Subject: [PATCH 5/5] arm/arm64: KVM: Make default HYP mappings
+ non-excutable
+In-Reply-To: <1465826449-14349-6-git-send-email-marc.zyngier@arm.com>
+References: <1465826449-14349-1-git-send-email-marc.zyngier@arm.com>
+ <1465826449-14349-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160613152911.GC29783@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2016 at 00:30:36 +0200, Arnd Bergmann wrote :
-> On Saturday, June 11, 2016 12:03:04 AM CEST Alexandre Belloni wrote:
-> > From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> > 
-> > Fix the main and slow clock .prepare() implementations which used to call
-> > usleep() when the scheduler wasn't ready yet.
-> > 
+Hi,
+
+Nit: typo in subject "excutable" is missing an 'e'.
+
+Mark.
+
+On Mon, Jun 13, 2016 at 03:00:49PM +0100, Marc Zyngier wrote:
+> Structures that can be generally written to don't have any requirement
+> to be executable (quite the opposite). This includes the kvm and vcpu
+> structures, as well as the stacks.
 > 
-> Does this have to be called that early? It seems wasteful to always
-> call udelay() here, when these are functions that are normally
-> allowed to sleep.
+> Let's change the default to incorporate the XN flag.
 > 
-
-So I've tested it and something like that would work:
-
-	if (system_state < SYSTEM_RUNNING)
-		udelay(osc->startup_usec);
-	else
-		usleep_range(osc->startup_usec, osc->startup_usec + 1);
-
-But I'm afraid it would be the first driver to actually do something
-like that (however, it is already the only driver trying to sleep). 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/pgtable.h        | 2 +-
+>  arch/arm64/include/asm/pgtable-prot.h | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+> index 7487bf9..e0d76ba 100644
+> --- a/arch/arm/include/asm/pgtable.h
+> +++ b/arch/arm/include/asm/pgtable.h
+> @@ -97,7 +97,7 @@ extern pgprot_t		pgprot_s2_device;
+>  #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+>  #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
+>  #define PAGE_KERNEL_EXEC	pgprot_kernel
+> -#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
+> +#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_XN)
+>  #define PAGE_HYP_EXEC		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY)
+>  #define PAGE_HYP_RO		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY | L_PTE_XN)
+>  #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+> diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+> index 3802048..39f5252 100644
+> --- a/arch/arm64/include/asm/pgtable-prot.h
+> +++ b/arch/arm64/include/asm/pgtable-prot.h
+> @@ -55,7 +55,7 @@
+>  #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+>  #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+>  
+> -#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
+> +#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
+>  #define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
+>  #define PAGE_HYP_RO		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
+>  #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+> -- 
+> 2.1.4
+> 
