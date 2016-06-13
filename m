@@ -1,106 +1,83 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 13 Jun 2016 16:41:13 +0200
-Subject: [PATCH V6 7/7] irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI
- domain initialization
-In-Reply-To: <1465828873-23498-1-git-send-email-tn@semihalf.com>
-References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
-Message-ID: <1465828873-23498-8-git-send-email-tn@semihalf.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 13 Jun 2016 08:47:24 -0600
+Subject: [PATCH 1/3] arm64: dts: juno: add coresight support
+In-Reply-To: <575E7A56.6070005@arm.com>
+References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
+ <1465228765-14038-2-git-send-email-sudeep.holla@arm.com>
+ <CANLsYkzbtW2nFsntQ8vLafu=JS+qcjXm+6HQpi3F_P2a5CsHaw@mail.gmail.com>
+ <575E7A56.6070005@arm.com>
+Message-ID: <CANLsYkzSOrypAZaDYAvvaFBB50ugkOpGFKCh-Sd=EyCE8bG0gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let ACPI build ITS PCI MSI domain. ACPI is responsible for retrieving
-inner domain token and passing it on to its_pci_msi_init_one generic
-init call.
+On 13 June 2016 at 03:18, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 12/06/16 22:57, Mathieu Poirier wrote:
+>>
+>> On 6 June 2016 at 09:59, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>> Most of the debug-related components on Juno are located in the coreSight
+>>> subsystem while others are located in the Cortex-Axx clusters, the SCP
+>>> subsystem, and in the main system.
+>>>
+>>> Each core in the two processor clusters contain an Embedded Trace
+>>> Macrocell(ETM) which generates real-time trace information that trace
+>>> tools can use and an ATB trace output that is sent to a funnel before
+>>> going to the CoreSight subsystem.
+>>>
+>>> The trace output signals combine with two trace expansions using another
+>>> funnel and fed into the Embedded Trace FIFO(ETF0).
+>>>
+>>> The output trace data stream of the funnel is then replicated before it
+>>> is sent to either the:
+>>> - Trace Port Interface Unit(TPIU), that sends it out using the trace
+>>> port.
+>>> - ETR that can write the trace data to memory located in the application
+>>>    memory space
+>>
+>>
+>> Hi Sudeep,
+>>
+>> Did you try booting this on juno-r0?  On my side the system won't boot
+>> unless I enable the debug power domain by externally connecting to the
+>> system using DS-5.
+>>
+>
+> As you have already realized that you need SCPI power domain patches for
+> the functionality. However, in absence of those patches or when it's
+> disabled, it shouldn't cause any boot or runtime issues. Only ETM or
+> coresight won't work. If it's causing any crash or hang, please do let
+> me know, that needs to be fixed. I have only tested with latest
+> firmware. Let me know the details of hang/crash and firmware version you
+> are using.
 
-We have now full PCI MSI domain stack, thus we can enable ITS initialization
-from GICv3 core driver for ACPI scenario.
+We have a problem then.  Booting with this branch[1] and the 3 DT
+patches from this set the system hangs.  But before going any further
+I'd bet the FW on my board is too old.  This is what I get on my side:
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- drivers/irqchip/irq-gic-v3-its-pci-msi.c | 46 +++++++++++++++++++++++++++++++-
- drivers/irqchip/irq-gic-v3.c             |  3 +--
- 2 files changed, 46 insertions(+), 3 deletions(-)
+RM V2M-Juno Boot loader v1.0.0
+HBI0262 build 1684
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index 23679ae..ae7221c 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/iort.h>
- #include <linux/msi.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
-@@ -144,10 +145,53 @@ static int __init its_pci_of_msi_init(void)
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+
-+static int __init
-+its_pci_msi_parse_madt(struct acpi_subtable_header *header,
-+		       const unsigned long end)
-+{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *dom_handle;
-+	const char *node_name;
-+	int err = -ENXIO;
-+
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-+			      (long)its_entry->base_address);
-+	dom_handle = iort_find_domain_token(its_entry->translation_id);
-+	if (!dom_handle) {
-+		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-+		goto out;
-+	}
-+
-+	err = its_pci_msi_init_one(dom_handle, node_name);
-+	if (!err)
-+		pr_info("PCI/MSI: %s domain created\n", node_name);
-+
-+out:
-+	kfree(node_name);
-+	return err;
-+}
-+
-+static int __init its_pci_acpi_msi_init(void)
-+{
-+	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+			      its_pci_msi_parse_madt, 0);
-+	return 0;
-+}
-+#else
-+static int __init its_pci_acpi_msi_init(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int __init its_pci_msi_init(void)
- {
- 	its_pci_of_msi_init();
-+	its_pci_acpi_msi_init();
-+
- 	return 0;
- }
--
- early_initcall(its_pci_msi_init);
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 019b442..2a8b2e1 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -951,8 +951,7 @@ static int __init gic_init_bases(void __iomem *dist_base,
- 
- 	set_handle_irq(gic_handle_irq);
- 
--	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis() &&
--	    to_of_node(handle)) /* Temp hack to prevent ITS init for ACPI */
-+	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
- 		its_init(handle, &gic_data.rdists, gic_data.domain);
- 
- 	gic_smp_init();
--- 
-1.9.1
+ARM V2M_Juno Firmware v1.3.4
+Build Date: Aug 27 2015
+
+Time :  14:44:50
+Date :  13:06:2016
+
+Press Enter to stop auto boot...
+
+What version are you using?
+
+In the mean time I'm digging up your SCPI patches...
+
+Thanks,
+Mathieu
+
+[1]. https://git.linaro.org/kernel/coresight.git/ (branch next)
+
+
+>
+> --
+> Regards,
+> Sudeep
