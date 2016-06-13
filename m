@@ -1,91 +1,189 @@
 From: garlic.tseng@mediatek.com (Garlic Tseng)
-Date: Mon, 13 Jun 2016 14:24:03 +0800
-Subject: [alsa-devel] [PATCH v3 0/9] ASoC: Mediatek: Add support for MT2701 SOC
-Message-ID: <1465799052-9657-1-git-send-email-garlic.tseng@mediatek.com>
+Date: Mon, 13 Jun 2016 14:24:11 +0800
+Subject: [alsa-devel] [PATCH v3 8/9] ASoC: mediatek: add BT implementation
+In-Reply-To: <1465799052-9657-1-git-send-email-garlic.tseng@mediatek.com>
+References: <1465799052-9657-1-git-send-email-garlic.tseng@mediatek.com>
+Message-ID: <1465799052-9657-9-git-send-email-garlic.tseng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic support for Mediatek AFE for MT2701 SoC.
-The patch is based on broonie tree "for-next" branch.
+Add BT implementation for mt2701 platform driver.
 
-Change since v2:
+Signed-off-by: Garlic Tseng <garlic.tseng@mediatek.com>
+---
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 139 +++++++++++++++++++++++++++++
+ 1 file changed, 139 insertions(+)
 
-* fix comments style.
-* replace EXPORT_SYMBOL with EXPORT_SYMBOL_GPL
-* reduce debug message
-* move mutex lock for irq-allocated to AFE struct
-* remove func mtk_simple_isr and call snd_pcm_period_elapsed directly
-* mt2701 driver probe will fail if clock initial error
-* fix dapm on/off switch control naming
-
-Change since v1:
-
-implement common private structure, fe dai and platform driver.
-let mt8173 and mt2701 use the common structure.
-
-
-Garlic Tseng (9):
-  ASoC: mediatek: Refine mt8173 driver and change config option
-  ASoC: mediatek: implement mediatek common structure
-  ASoC: mediatek: let mt8173 use mediatek common structure
-  ASoC: mediatek: add documents for mt2701
-  ASoC: mediatek: add structure define and clock control for 2701
-  ASoC: mediatek: add mt2701 platform driver implementation.
-  ASoC: bt-sco: extend rate and add a general compatible string
-  ASoC: mediatek: add BT implementation
-  ASoC: mediatek: Add mt2701-cs42448 driver and config option.
-
- Documentation/devicetree/bindings/sound/bt-sco.txt |    2 +-
- .../devicetree/bindings/sound/mt2701-afe-pcm.txt   |  150 ++
- .../devicetree/bindings/sound/mt2701-cs42448.txt   |   43 +
- sound/soc/codecs/bt-sco.c                          |    5 +-
- sound/soc/mediatek/Kconfig                         |   44 +-
- sound/soc/mediatek/Makefile                        |   11 +-
- sound/soc/mediatek/common/Makefile                 |   17 +
- sound/soc/mediatek/common/mtk-afe-fe-dai.c         |  379 +++++
- sound/soc/mediatek/common/mtk-afe-fe-dai.h         |   45 +
- .../soc/mediatek/common/mtk-afe-platform-driver.c  |   90 ++
- .../soc/mediatek/common/mtk-afe-platform-driver.h  |   23 +
- sound/soc/mediatek/common/mtk-base-afe.h           |  104 ++
- sound/soc/mediatek/mt2701/Makefile                 |   19 +
- sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c  |  464 ++++++
- sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h  |   38 +
- sound/soc/mediatek/mt2701/mt2701-afe-common.h      |  181 +++
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c         | 1698 ++++++++++++++++++++
- sound/soc/mediatek/mt2701/mt2701-cs42448.c         |  422 +++++
- sound/soc/mediatek/mt2701/mt2701-reg.h             |  186 +++
- sound/soc/mediatek/mt8173/Makefile                 |    7 +
- sound/soc/mediatek/mt8173/mt8173-afe-common.h      |   73 +
- .../{mtk-afe-pcm.c => mt8173/mt8173-afe-pcm.c}     |  921 +++++------
- sound/soc/mediatek/{ => mt8173}/mt8173-max98090.c  |    2 +-
- .../mediatek/{ => mt8173}/mt8173-rt5650-rt5514.c   |    2 +-
- .../mediatek/{ => mt8173}/mt8173-rt5650-rt5676.c   |    4 +-
- sound/soc/mediatek/{ => mt8173}/mt8173-rt5650.c    |    2 +-
- sound/soc/mediatek/mtk-afe-common.h                |  101 --
- 27 files changed, 4399 insertions(+), 634 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
- create mode 100644 Documentation/devicetree/bindings/sound/mt2701-cs42448.txt
- create mode 100644 sound/soc/mediatek/common/Makefile
- create mode 100644 sound/soc/mediatek/common/mtk-afe-fe-dai.c
- create mode 100644 sound/soc/mediatek/common/mtk-afe-fe-dai.h
- create mode 100644 sound/soc/mediatek/common/mtk-afe-platform-driver.c
- create mode 100644 sound/soc/mediatek/common/mtk-afe-platform-driver.h
- create mode 100644 sound/soc/mediatek/common/mtk-base-afe.h
- create mode 100644 sound/soc/mediatek/mt2701/Makefile
- create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
- create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h
- create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-common.h
- create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
- create mode 100644 sound/soc/mediatek/mt2701/mt2701-cs42448.c
- create mode 100644 sound/soc/mediatek/mt2701/mt2701-reg.h
- create mode 100644 sound/soc/mediatek/mt8173/Makefile
- create mode 100644 sound/soc/mediatek/mt8173/mt8173-afe-common.h
- rename sound/soc/mediatek/{mtk-afe-pcm.c => mt8173/mt8173-afe-pcm.c} (51%)
- rename sound/soc/mediatek/{ => mt8173}/mt8173-max98090.c (99%)
- rename sound/soc/mediatek/{ => mt8173}/mt8173-rt5650-rt5514.c (99%)
- rename sound/soc/mediatek/{ => mt8173}/mt8173-rt5650-rt5676.c (99%)
- rename sound/soc/mediatek/{ => mt8173}/mt8173-rt5650.c (99%)
- delete mode 100644 sound/soc/mediatek/mtk-afe-common.h
-
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index deb5f82..5fd2caa 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -377,6 +377,86 @@ static int mt2701_afe_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+ 	return 0;
+ }
+ 
++static int mt2701_btmrg_startup(struct snd_pcm_substream *substream,
++				struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
++	struct mt2701_afe_private *afe_priv = afe->platform_priv;
++
++	regmap_update_bits(afe->regmap, AUDIO_TOP_CON4,
++			   AUDIO_TOP_CON4_PDN_MRGIF, 0);
++
++	afe_priv->mrg_enable[substream->stream] = 1;
++	return 0;
++}
++
++static int mt2701_btmrg_hw_params(struct snd_pcm_substream *substream,
++				  struct snd_pcm_hw_params *params,
++				  struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
++	int stream_fs;
++	u32 val, msk;
++
++	stream_fs = params_rate(params);
++
++	if ((stream_fs != 8000) && (stream_fs != 16000)) {
++		dev_err(afe->dev, "%s() btmgr not supprt this stream_fs %d\n",
++			__func__, stream_fs);
++		return -EINVAL;
++	}
++
++	regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++			   AFE_MRGIF_CON_I2S_MODE_MASK,
++			   AFE_MRGIF_CON_I2S_MODE_32K);
++
++	val = AFE_DAIBT_CON0_BT_FUNC_EN | AFE_DAIBT_CON0_BT_FUNC_RDY
++	      | AFE_DAIBT_CON0_MRG_USE;
++	msk = val;
++
++	if (stream_fs == 16000)
++		val |= AFE_DAIBT_CON0_BT_WIDE_MODE_EN;
++
++	msk |= AFE_DAIBT_CON0_BT_WIDE_MODE_EN;
++
++	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0, msk, val);
++
++	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0,
++			   AFE_DAIBT_CON0_DAIBT_EN,
++			   AFE_DAIBT_CON0_DAIBT_EN);
++	regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++			   AFE_MRGIF_CON_MRG_I2S_EN,
++			   AFE_MRGIF_CON_MRG_I2S_EN);
++	regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++			   AFE_MRGIF_CON_MRG_EN,
++			   AFE_MRGIF_CON_MRG_EN);
++	return 0;
++}
++
++static void mt2701_btmrg_shutdown(struct snd_pcm_substream *substream,
++				  struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
++	struct mt2701_afe_private *afe_priv = afe->platform_priv;
++
++	/* if the other direction stream is not occupied */
++	if (!afe_priv->mrg_enable[!substream->stream]) {
++		regmap_update_bits(afe->regmap, AFE_DAIBT_CON0,
++				   AFE_DAIBT_CON0_DAIBT_EN, 0);
++		regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++				   AFE_MRGIF_CON_MRG_EN, 0);
++		regmap_update_bits(afe->regmap, AFE_MRGIF_CON,
++				   AFE_MRGIF_CON_MRG_I2S_EN, 0);
++		regmap_update_bits(afe->regmap, AUDIO_TOP_CON4,
++				   AUDIO_TOP_CON4_PDN_MRGIF,
++				   AUDIO_TOP_CON4_PDN_MRGIF);
++	}
++	afe_priv->mrg_enable[substream->stream] = 0;
++}
++
+ static int mt2701_simple_fe_startup(struct snd_pcm_substream *substream,
+ 				    struct snd_soc_dai *dai)
+ {
+@@ -560,6 +640,13 @@ static const struct snd_soc_dai_ops mt2701_afe_i2s_ops = {
+ 	.set_fmt	= mt2701_afe_i2s_set_fmt,
+ };
+ 
++/* MRG BE DAIs */
++static struct snd_soc_dai_ops mt2701_btmrg_ops = {
++	.startup = mt2701_btmrg_startup,
++	.shutdown = mt2701_btmrg_shutdown,
++	.hw_params = mt2701_btmrg_hw_params,
++};
++
+ static struct snd_soc_dai_driver mt2701_afe_pcm_dais[] = {
+ 	/* FE DAIs: memory intefaces to CPU */
+ 	{
+@@ -610,6 +697,36 @@ static struct snd_soc_dai_driver mt2701_afe_pcm_dais[] = {
+ 		},
+ 		.ops = &mt2701_single_memif_dai_ops,
+ 	},
++	{
++		.name = "PCM_BT_DL",
++		.id = MT2701_MEMIF_DLBT,
++		.suspend = mtk_afe_dai_suspend,
++		.resume = mtk_afe_dai_resume,
++		.playback = {
++			.stream_name = "DLBT",
++			.channels_min = 1,
++			.channels_max = 1,
++			.rates = (SNDRV_PCM_RATE_8000
++				| SNDRV_PCM_RATE_16000),
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++		},
++		.ops = &mt2701_single_memif_dai_ops,
++	},
++	{
++		.name = "PCM_BT_UL",
++		.id = MT2701_MEMIF_ULBT,
++		.suspend = mtk_afe_dai_suspend,
++		.resume = mtk_afe_dai_resume,
++		.capture = {
++			.stream_name = "ULBT",
++			.channels_min = 1,
++			.channels_max = 1,
++			.rates = (SNDRV_PCM_RATE_8000
++				| SNDRV_PCM_RATE_16000),
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++		},
++		.ops = &mt2701_single_memif_dai_ops,
++	},
+ 	/* BE DAIs */
+ 	{
+ 		.name = "I2S0",
+@@ -709,6 +826,28 @@ static struct snd_soc_dai_driver mt2701_afe_pcm_dais[] = {
+ 		.ops = &mt2701_afe_i2s_ops,
+ 		.symmetric_rates = 1,
+ 	},
++	{
++		.name = "MRG BT",
++		.id = MT2701_IO_MRG,
++		.playback = {
++			.stream_name = "BT Playback",
++			.channels_min = 1,
++			.channels_max = 1,
++			.rates = (SNDRV_PCM_RATE_8000
++				| SNDRV_PCM_RATE_16000),
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++		},
++		.capture = {
++			.stream_name = "BT Capture",
++			.channels_min = 1,
++			.channels_max = 1,
++			.rates = (SNDRV_PCM_RATE_8000
++				| SNDRV_PCM_RATE_16000),
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++		},
++		.ops = &mt2701_btmrg_ops,
++		.symmetric_rates = 1,
++	}
+ };
+ 
+ static const struct snd_kcontrol_new mt2701_afe_o00_mix[] = {
 -- 
 1.9.1
