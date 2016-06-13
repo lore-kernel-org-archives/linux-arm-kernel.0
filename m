@@ -1,89 +1,42 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Mon, 13 Jun 2016 14:29:01 +0000
-Subject: [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space accessors
- against platfrom specific ECAM quirks
-In-Reply-To: <575EBD13.8080808@codeaurora.org>
-References: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
- <1465822923-33599-2-git-send-email-liudongdong3@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F782C86@lhreml507-mbx>
- <575EBD13.8080808@codeaurora.org>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F782E15@lhreml507-mbx>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 13 Jun 2016 16:31:34 +0200
+Subject: [PATCH v2 0/4] ARM: dts: r8a7790: lager: use demuxer for I2C
+In-Reply-To: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
+References: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20160613143134.GB1603@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan
 
-> -----Original Message-----
-> From: Sinan Kaya [mailto:okaya at codeaurora.org]
-> Sent: 13 June 2016 15:03
-> To: Gabriele Paoloni; liudongdong (C); helgaas at kernel.org;
-> arnd at arndb.de; will.deacon at arm.com; catalin.marinas at arm.com;
-> rafael at kernel.org; hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com;
-> jchandra at broadcom.com; tn at semihalf.com
-> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
-> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
-> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
-> acpi at lists.linaro.org; jcm at redhat.com; andrea.gallo at linaro.org;
-> dhdang at apm.com; jeremy.linton at arm.com; cov at codeaurora.org; Chenxin
-> (Charles); Linuxarm
-> Subject: Re: [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space
-> accessors against platfrom specific ECAM quirks
-> 
-> On 6/13/2016 9:54 AM, Gabriele Paoloni wrote:
-> > As you can see here Liudongdong has replaced oem_revision with
-> > oem_table_id.
-> >
-> > Now it seems that there are some platforms that have already shipped
-> > using a matching based on the oem_revision (right Jon?)
-> >
-> > However I guess that if in FW they have defined oem_table_id properly
-> > they should be able to use this mechanism without needing to a FW
-> update.
-> >
-> > Can these vendors confirm this?
-> >
-> > Tomasz do you think this can work for Cavium Thunder?
-> >
-> > Thanks
-> >
-> > Gab
-> 
-> Why not have all three of them?
-> 
-> The initial approach was OEM id and revision id.
-> 
-> Jeff Hugo indicated that addition (not removing any other fields) of
-> table id
-> would make more sense.
+>    # ./exercise-i2c-demux.sh
+>    I2C Demux: i2c-8
+>      Master: 1:/i2c at e650800
+>    [   97.694487] i2c-rcar e6508000.i2c: probed 0 (1)
+>      Master: 0:/i2c at e650000
+>    [  102.706365] i2c-demux-pinctrl i2c-8: failed to setup demux-adapter 0 (-19) 0 (0)
 
-Mmm from last email of Jeff Hugo on "[RFC PATCH 1/3] pci, acpi: Match
-PCI config space accessors against platfrom specific ECAM quirks."
+Confirmed :( Got today only this far that the ENODEV comes from the PFC
+driver. CONFIG_DEBUG_PINCTRL is a good idea for further debugging
+probably.
 
-I quote:
+>    3.1 Unfortunately it fails for the I2C2 dmux if the GPIO fallback is
+>        present.
 
- "Using the OEM revision 
- field does not seem to be appropriate since these are different 
- platforms and the revision field appears to be for the purpose of 
- tracking differences within a single platform.  Therefore, Cov is 
- proposing using the OEM table id as a mechanism to distinguish
- platform A (needs quirk applied) vs platform B (no quirks) from the
- same OEM."
+Hopefully the same issue.
 
-So it looks to me that he pointed out that using the OEM revision field
-is wrong...and this is why I have asked if replacing it with the table
-id can work for other vendors....
+>    3.2 The test also fails for the I2C3 demux but that appears to be due
+>        to a shortcoming in the voltage regulator code which does not
+>        appear to like being reinitialised. The kernel complains as follows:
 
-Thanks
+Yes, the demuxer trigger re-bind cycles which are not well considered
+and/or tested. E.g. for soc-camera, this patch needed to go upstream:
 
-Gab
+https://patchwork.linuxtv.org/patch/32473/
 
-
-> 
-> --
-> Sinan Kaya
-> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center,
-> Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-> Linux Foundation Collaborative Project
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160613/096f1ecb/attachment.sig>
