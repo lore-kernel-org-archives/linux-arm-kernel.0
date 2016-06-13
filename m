@@ -1,90 +1,68 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 13 Jun 2016 15:37:14 +0800
-Subject: [PATCH V2 1/1] clk: imx: refine the powerdown bit of clk-pllv3
-In-Reply-To: <CAA+hA=SG1OViVLeZGVBT=eteWE3t8bUYv=sqotVQkF-apNcDFA@mail.gmail.com>
-References: <CAA+hA=SG1OViVLeZGVBT=eteWE3t8bUYv=sqotVQkF-apNcDFA@mail.gmail.com>
-Message-ID: <1465803434-31507-1-git-send-email-aisheng.dong@nxp.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 13 Jun 2016 15:43:15 +0800
+Subject: [PATCH 3/5] ARM: sun8i: dt: Add DT bindings documentation for
+ Allwinner sun8i-emac
+In-Reply-To: <20160608191133.GA14655@rob-hp-laptop>
+References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1464947790-22991-4-git-send-email-clabbe.montjoie@gmail.com>
+ <20160606141438.GA9510@rob-hp-laptop> <5755BCAE.6060307@gmail.com>
+ <20160608191133.GA14655@rob-hp-laptop>
+Message-ID: <CAGb2v66y8AbQppGmaxJeVsfE0OvG5WMW-HuDAivFu96XN2pLAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The powerdown bit is a bit confused, let's change it to power_bit
-to relfect both powerdown and powerup case according to different
-plls.
+Hi Rob,
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/clk/imx/clk-pllv3.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+On Thu, Jun 9, 2016 at 3:11 AM, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Jun 06, 2016 at 08:10:54PM +0200, Corentin LABBE wrote:
+>> Le 06/06/2016 16:14, Rob Herring a ?crit :
+>> > On Fri, Jun 03, 2016 at 11:56:28AM +0200, LABBE Corentin wrote:
+>> >> This patch adds documentation for Device-Tree bindings for the
+>> >> Allwinner sun8i-emac driver.
+>> >>
+>> >> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+>> >> ---
+>> >>  .../bindings/net/allwinner,sun8i-emac.txt          | 64 ++++++++++++++++++++++
+>> >>  1 file changed, 64 insertions(+)
+>> >>  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+>> >> new file mode 100644
+>> >> index 0000000..cf71a71
+>> >> --- /dev/null
+>> >> +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+>> >> @@ -0,0 +1,64 @@
+>> >> +* Allwinner sun8i EMAC ethernet controller
+>> >> +
+>> >> +Required properties:
+>> >> +- compatible: "allwinner,sun8i-a83t-emac", "allwinner,sun8i-h3-emac",
+>> >> +          or "allwinner,sun50i-a64-emac"
+>> >> +- reg: address and length of the register sets for the device.
+>> >> +- reg-names: should be "emac" and "syscon", matching the register sets
+>> >
+>> > Is syscon shared with other devices? Your example only has 1 reg
+>> > address.
+>> >
+>>
+>> The example is bad, emac and syscon are two distinct regspaces.
+>> I will correct the example.
+>
+> And the syscon registers are not shared with anything else? Typically,
+> syscon registers would be a separate node not part of this blocks
+> registers. The main thing is make sure you are not creating overlapping
+> register addresses.
 
-diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-index eea2b1b3791e..379ec133fab2 100644
---- a/drivers/clk/imx/clk-pllv3.c
-+++ b/drivers/clk/imx/clk-pllv3.c
-@@ -29,8 +29,8 @@
-  * struct clk_pllv3 - IMX PLL clock version 3
-  * @clk_hw:	 clock source
-  * @base:	 base address of PLL registers
-- * @powerup_set: set POWER bit to power up the PLL
-- * @powerdown:   pll powerdown offset bit
-+ * @power_bit:	 pll power bit mask
-+ * @powerup_set: set power_bit to power up the PLL
-  * @div_mask:	 mask of divider bits
-  * @div_shift:	 shift of divider bits
-  *
-@@ -40,8 +40,8 @@
- struct clk_pllv3 {
- 	struct clk_hw	hw;
- 	void __iomem	*base;
-+	u32		power_bit;
- 	bool		powerup_set;
--	u32		powerdown;
- 	u32		div_mask;
- 	u32		div_shift;
- 	unsigned long	ref_clock;
-@@ -52,7 +52,7 @@ struct clk_pllv3 {
- static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
- {
- 	unsigned long timeout = jiffies + msecs_to_jiffies(10);
--	u32 val = readl_relaxed(pll->base) & pll->powerdown;
-+	u32 val = readl_relaxed(pll->base) & pll->power_bit;
- 
- 	/* No need to wait for lock when pll is not powered up */
- 	if ((pll->powerup_set && !val) || (!pll->powerup_set && val))
-@@ -77,7 +77,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
- 
- 	val = readl_relaxed(pll->base);
- 	if (pll->powerup_set)
--		val |= pll->powerdown;
-+		val |= pll->power_bit;
- 	else
- 		val &= ~pll->powerdown;
- 	writel_relaxed(val, pll->base);
-@@ -92,7 +92,7 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
- 
- 	val = readl_relaxed(pll->base);
- 	if (pll->powerup_set)
--		val &= ~pll->powerdown;
-+		val &= ~pll->power_bit;
- 	else
- 		val |= pll->powerdown;
- 	writel_relaxed(val, pll->base);
-@@ -316,7 +316,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 	if (!pll)
- 		return ERR_PTR(-ENOMEM);
- 
--	pll->powerdown = BM_PLL_POWER;
-+	pll->power_bit = BM_PLL_POWER;
- 
- 	switch (type) {
- 	case IMX_PLLV3_SYS:
-@@ -332,7 +332,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 		ops = &clk_pllv3_av_ops;
- 		break;
- 	case IMX_PLLV3_ENET_IMX7:
--		pll->powerdown = IMX7_ENET_PLL_POWER;
-+		pll->power_bit = IMX7_ENET_PLL_POWER;
- 		pll->ref_clock = 1000000000;
- 		ops = &clk_pllv3_enet_ops;
- 		break;
--- 
-1.9.1
+These syscon registers are in a separate address range, like a glue layer
+over the underlying EMAC hardware. There are only 2 registers defined in
+that address range, and this particular one is used only for EMAC related
+controls.
+
+The other register is not used anywhere in the kernel. It's a readonly
+register that gives the SoC revision. IIRC there was some work to add
+per-platform functions to support this, but we haven't the need to use
+it yet.
+
+Hope this clears things up.
+
+Regards
+ChenYu
