@@ -1,55 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 13 Jun 2016 14:24:58 +0300
-Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
- <20160601005751.GG20527@verge.net.au>
- <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
- <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
- <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
- <20160610010245.GA10152@verge.net.au>
- <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
- <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
- <1b9a4cf4-1101-ccbf-772b-49b8a689a1b6@cogentembedded.com>
- <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
-Message-ID: <7d93d81d-cca9-e434-6488-0ea839f81663@cogentembedded.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 13 Jun 2016 17:06:01 +0530
+Subject: [PATCH V6 0/6] iommu/msm: Add DT adaptation and generic bindings
+ support
+Message-ID: <1465817767-9856-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/13/2016 10:12 AM, Geert Uytterhoeven wrote:
+The msm_iommu.c driver currently works based on platform data.
+A single master device can be connected to more than one iommu and multiple
+contexts in each of the iommu. This association between master and iommus was
+represented from platform data using parent/child devices. The master drivers
+were responsible for attaching all of the iommus/context to a domain. Now the
+platform data support is removed and DT support is added. The master/iommus are
+added through generic iommu bindings.
 
->>>>    The only problem I'm seeing (again) is the RCAN clock failing to
->>>> register:
->>>>
->>>> rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock (-12)
->>>>
->>>>    I was going to look at it yesterday but (wrongly) thought it somehow
->>>> cured itself... I'll look at it now.
->>>
->>> The RCAN parent is the second clock in the CPG node's "clocks" property,
->>> which you didn't provide.
->>
->>    Actually, the things are more complex. The figure 7.1c suggests that the
->> RCAN clock has different parent on R8A7792 than on the other SoCs -- namely
->> PLL1/VCO 1/4. That may be, since there's just no USB_EXTAL signal on this
->> SoC (it doesn't seem to support any USB IPs). Which means the
->> 'clk-rcar-gen2' driver can't work with the RCAN clock in its current form.
->
-> Right, I had forgotten about that.
-> Fortunately the clk-rcar-gen2 driver has a sane failure mode for this case ;-)
+This is essentially rework of the patch posted earlier by
+Rob Clark <robdclark@gmail.com>. This series folds the changes in to the
+existing driver with the addition of generic bindings.
 
-    What do you mean?
+        http://www.spinics.net/lists/linux-arm-msm/msg10077.html
 
-> it seems the RCAN clock can just be modeled as a fixed clock. However,
-> its divider value isn't clear to me,
+Tested this series on ifc6410 board.
 
-    IIRC, the fixed RCAN divisor was equal to 6.
+[V6] After some discussions on patch 6 [1] from previous post,
+     it was concluded that the changes for using relaxed writes
+     in all places should not be a part of this series, so should
+     be moved it. So removed that patch and added Acked/Tested tags.
+     [1] https://patchwork.kernel.org/patch/9129231/
 
-[...]
+[V5] Changed the compatible binding name as per comments, added comments
+     for usage of barriers in patch 6.
 
-> Gr{oetje,eeting}s,
->
->                         Geert
+[V4] Addressed comments for making the iommu compatible binding more soc
+     specific and updated the documentation for the iommu clocks.
 
-MBR, Sergei
+[V3] Addressed comments to correct the usage
+     of the #iommu-cells binding, improve the flush_iotlb_range function,
+     added a new patch to use writel_relaxed for register access and split
+     up the documentation patch.
+
+[V2] Adapted the driver to use generic ARMV7S short descriptor pagetable ops
+     and addressed comments.
+
+[V1]
+   https://lists.linuxfoundation.org/pipermail/iommu/2015-August/014074.html
+
+Sricharan R (6):
+  iommu/msm: Add DT adaptation
+  documentation: iommu: Add bindings for msm,iommu-v0 ip
+  iommu/msm: Move the contents from msm_iommu_dev.c to msm_iommu.c
+  iommu/msm: Add support for generic master bindings
+  iommu/msm: use generic ARMV7S short descriptor pagetable ops
+  iommu/msm: Remove driver BROKEN
+
+ .../devicetree/bindings/iommu/msm,iommu-v0.txt     |  64 ++
+ drivers/iommu/Kconfig                              |   2 +-
+ drivers/iommu/Makefile                             |   2 +-
+ drivers/iommu/msm_iommu.c                          | 870 +++++++++++----------
+ drivers/iommu/msm_iommu.h                          |  73 +-
+ drivers/iommu/msm_iommu_dev.c                      | 381 ---------
+ 6 files changed, 564 insertions(+), 828 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+ delete mode 100644 drivers/iommu/msm_iommu_dev.c
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
