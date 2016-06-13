@@ -1,60 +1,74 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 13 Jun 2016 17:19:52 +0100
-Subject: [PATCH 00/10] ARM: V7M: Support caches
-In-Reply-To: <575EDAB9.2070809@st.com>
-References: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
- <575EDAB9.2070809@st.com>
-Message-ID: <575EDD28.40500@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 13 Jun 2016 17:21:16 +0100
+Subject: [PATCH v2 2/2] ARM: dts: sd_600eval: Fix eMMC lockup issue
+In-Reply-To: <20160612044736.GS1256@tuxbot>
+References: <1465582795-30266-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1465582795-30266-2-git-send-email-srinivas.kandagatla@linaro.org>
+ <20160612044736.GS1256@tuxbot>
+Message-ID: <575EDD7C.8010504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
 
-On 13/06/16 17:09, Alexandre Torgue wrote:
-> Hi Vladimir,
-> 
-> On 06/13/2016 05:02 PM, Vladimir Murzin wrote:
->> Hi,
->>
->> This patch set allows M-class cpus benefit of optional cache support.
->> It originaly was written by Jonny, I've been keeping it localy mainly
->> rebasing over Linux versions.
->>
->> The main idea behind patches is to reuse existing cache handling code
->> from v7A/R. In case v7M cache operations are provided via memory
->> mapped interface rather than co-processor instructions, so extra
->> macros have been introduced to factor out cache handling logic and
->> low-level operations.
->>
->> Along with the v7M cache support the first user (Cortex-M7) is
->> introduced.
->>
->> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
->> one showed significant boot speed-up.
->>
->> Based on 4.7-rc3.
->>
->> Thanks!
->> Vladimir
->>
-> 
-> Thanks for the series.
-> Did you change something in those patches compare to patches you sent in
-> the RFC ?
 
-Only 04, 05, 06 have been changed (each has it's own changelog included).
+On 12/06/16 05:47, Bjorn Andersson wrote:
+> On Fri 10 Jun 11:19 PDT 2016, Srinivas Kandagatla wrote:
+>
+>> From: Parth Pancholi <parth.pancholi@einfochips.com>
+>>
+>> This board locks up if we stress test the eMMC, as the regulator s4 is
+>> unable to supply enough current for all the peripherials attached to it.
+>> As this supply is wired up to most of the peripherials including DDR,
+>> it resulted in such lockup.
+>>
+>> This patch fixes this issue by setting s4 regulator correctly with
+>> Auto power mode.
+>>
+>> Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> [Srinivas Kandagatla: rewrote the change log]
+>> Tested-by: Girish Sharma <girish.sharma@einfochips.com>
+>> Signed-off-by: Parth Pancholi <parth.pancholi@einfochips.com>
+>
+> If I read the msm-3.4 tree correctly most (perhaps all) 8064 devices
+> should have this setup.
+>
+I agree, we should patch other boards as well with the same value.
 
-I did try to hammer patches because of your report of instability with
-caches on, but all run fine... so nothing has been changed in regard of
-your case.
 
-Cheers
-Vladimir
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-> 
-> Regards.
-> 
-> Alex
-> 
-> 
-> 
+thanks,
+srini
+>
+> Regards,
+> Bjorn
+>
+>> ---
+>>   arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts | 4 +++-
+>>   1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+>> index 7df0108..39ae2bc 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+>> +++ b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+>> @@ -1,6 +1,7 @@
+>>   #include "qcom-apq8064-v2.0.dtsi"
+>>   #include "qcom-apq8064-arrow-sd-600eval-pins.dtsi"
+>>   #include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/mfd/qcom-rpm.h>
+>>
+>>   / {
+>>   	model = "Arrow Electronics, APQ8064 SD_600eval";
+>> @@ -82,7 +83,8 @@
+>>   				s4 {
+>>   					regulator-min-microvolt	= <1800000>;
+>>   					regulator-max-microvolt	= <1800000>;
+>> -					qcom,switch-mode-frequency = <3200000>;
+>> +					qcom,switch-mode-frequency = <1600000>;
+>> +					qcom,force-mode = <QCOM_RPM_FORCE_MODE_AUTO>;
+>>   					bias-pull-down;
+>>   					regulator-always-on;
+>>   				};
+>> --
+>> 2.8.3
+>>
