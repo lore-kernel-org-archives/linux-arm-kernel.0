@@ -1,34 +1,48 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 13 Jun 2016 22:04:36 +0300
-Subject: [RESEND PATCHv2 02/28] clk: ti: dpll: use ti_clk_get to fetch
- ref/bypass clocks
+Date: Mon, 13 Jun 2016 22:04:37 +0300
+Subject: [RESEND PATCHv2 03/28] ARM: OMAP2+: omap_device: create clock alias
+ purely from DT data
 In-Reply-To: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
 References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1465844702-12200-3-git-send-email-t-kristo@ti.com>
+Message-ID: <1465844702-12200-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows getting rid of the DT_CLK() aliases under drivers/clk/ti.
+This avoids the need to add most of the clock aliases under
+drivers/clk/ti/clk-xyz.c files.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/dpll.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/omap_device.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
-index 9fc8754..39ba010 100644
---- a/drivers/clk/ti/dpll.c
-+++ b/drivers/clk/ti/dpll.c
-@@ -220,8 +220,8 @@ struct clk *ti_clk_register_dpll(struct ti_clk *setup)
- 	if (dpll->num_parents < 2)
- 		return ERR_PTR(-EINVAL);
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index f7ff3b9..b32d7c8 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -63,7 +63,22 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
+ 		return;
+ 	}
  
--	clk_ref = clk_get_sys(NULL, dpll->parents[0]);
--	clk_bypass = clk_get_sys(NULL, dpll->parents[1]);
-+	clk_ref = ti_clk_get(dpll->parents[0]);
-+	clk_bypass = ti_clk_get(dpll->parents[1]);
- 
- 	if (IS_ERR_OR_NULL(clk_ref) || IS_ERR_OR_NULL(clk_bypass))
- 		return ERR_PTR(-EAGAIN);
+-	rc = clk_add_alias(clk_alias, dev_name(&od->pdev->dev), clk_name, NULL);
++	r = clk_get_sys(NULL, clk_name);
++
++	if (IS_ERR(r) && of_have_populated_dt()) {
++		struct of_phandle_args clkspec;
++
++		clkspec.np = of_find_node_by_name(NULL, clk_name);
++
++		r = of_clk_get_from_provider(&clkspec);
++
++		rc = clk_register_clkdev(r, clk_alias,
++					 dev_name(&od->pdev->dev));
++	} else {
++		rc = clk_add_alias(clk_alias, dev_name(&od->pdev->dev),
++				   clk_name, NULL);
++	}
++
+ 	if (rc) {
+ 		if (rc == -ENODEV || rc == -ENOMEM)
+ 			dev_err(&od->pdev->dev,
 -- 
 1.9.1
