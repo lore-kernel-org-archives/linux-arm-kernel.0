@@ -1,33 +1,92 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 13 Jun 2016 15:38:30 +0800
-Subject: [PATCH V2 1/1] clk: imx6ul: fix gpt2 clock names
-In-Reply-To: <1465396420-27064-6-git-send-email-aisheng.dong@nxp.com>
-References: <1465396420-27064-6-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1465803510-31944-1-git-send-email-aisheng.dong@nxp.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 13 Jun 2016 15:58:41 +0800
+Subject: [PATCH 01/11] phy: rockchip-emmc: Increase lock time allowance
+In-Reply-To: <1465339484-969-2-git-send-email-dianders@chromium.org>
+References: <1465339484-969-1-git-send-email-dianders@chromium.org>
+ <1465339484-969-2-git-send-email-dianders@chromium.org>
+Message-ID: <3e19ff54-ee4a-c208-e137-1c0f8022f6b3@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fix gpt2 clock names
+On 2016/6/8 6:44, Douglas Anderson wrote:
+> Previous PHY code waited a fixed amount of time for the DLL to lock at
+> power on time.  Unfortunately, the time for the DLL to lock is actually
+> a bit more dynamic and can be longer if the card clock is slower.
+>
+> Instead of waiting a fixed 30 us, let's now dynamically wait until the
+> lock bit gets set.  We'll wait up to 10 ms which should be OK even if
+> the card clock is at the super slow 100 kHz.
+>
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/clk/imx/clk-imx6ul.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+mmc stack limit the min freq to 200k when initializing the card.
+So 5ms is enough, but it's ok to set the max timeout to 10ms as we
+can break out if locked.
 
-diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
-index 38da5a522d58..d1d7787ce211 100644
---- a/drivers/clk/imx/clk-imx6ul.c
-+++ b/drivers/clk/imx/clk-imx6ul.c
-@@ -305,8 +305,8 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6UL_CLK_CAN1_SERIAL]	= imx_clk_gate2("can1_serial",	"can_podf",	base + 0x68,	16);
- 	clks[IMX6UL_CLK_CAN2_IPG]	= imx_clk_gate2("can2_ipg",	"ipg",		base + 0x68,	18);
- 	clks[IMX6UL_CLK_CAN2_SERIAL]	= imx_clk_gate2("can2_serial",	"can_podf",	base + 0x68,	20);
--	clks[IMX6UL_CLK_GPT2_BUS]	= imx_clk_gate2("gpt_bus",	"perclk",	base + 0x68,	24);
--	clks[IMX6UL_CLK_GPT2_SERIAL]	= imx_clk_gate2("gpt_serial",	"perclk",	base + 0x68,	26);
-+	clks[IMX6UL_CLK_GPT2_BUS]	= imx_clk_gate2("gpt2_bus",	"perclk",	base + 0x68,	24);
-+	clks[IMX6UL_CLK_GPT2_SERIAL]	= imx_clk_gate2("gpt2_serial",	"perclk",	base + 0x68,	26);
- 	clks[IMX6UL_CLK_UART2_IPG]	= imx_clk_gate2("uart2_ipg",	"ipg",		base + 0x68,	28);
- 	clks[IMX6UL_CLK_UART2_SERIAL]	= imx_clk_gate2("uart2_serial",	"uart_podf",	base + 0x68,	28);
- 	clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		base + 0x68,	30);
+> On its own, this change makes the PHY power on code a little more
+> robust.  Before this change the PHY was relying on the eMMC code to make
+> sure the PHY was only powered on when the card clock was set to at least
+> 50 MHz before, though this reliance wasn't documented anywhere.
+>
+> This change will be even more useful in future changes where we actually
+> need to be able to wait for a DLL lock at slower clock speeds.
+>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> ---
+>  drivers/phy/phy-rockchip-emmc.c | 27 +++++++++++++++++++--------
+>  1 file changed, 19 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
+> index a69f53630e67..8336053aea5c 100644
+> --- a/drivers/phy/phy-rockchip-emmc.c
+> +++ b/drivers/phy/phy-rockchip-emmc.c
+> @@ -85,6 +85,7 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+>  {
+>  	unsigned int caldone;
+>  	unsigned int dllrdy;
+> +	unsigned long timeout;
+>
+>  	/*
+>  	 * Keep phyctrl_pdb and phyctrl_endll low to allow
+> @@ -137,15 +138,25 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+>  				   PHYCTRL_ENDLL_MASK,
+>  				   PHYCTRL_ENDLL_SHIFT));
+>  	/*
+> -	 * After enable analog DLL circuits, we need an extra 10.2us
+> -	 * for dll to be ready for work. But according to testing, we
+> -	 * find some chips need more than 25us.
+> +	 * After enabling analog DLL circuits docs say that we need 10.2 us if
+> +	 * our source clock is at 50 MHz and that lock time scales linearly
+> +	 * with clock speed.  If we are powering on the PHY and the card clock
+> +	 * is super slow (like 100 kHZ) this could take as long as 5.1 ms.
+
+5.1ms is by calculation or test?
+
+> +	 * Hopefully we won't be running at 100 kHz, but we should still make
+> +	 * sure we wait long enough.
+>  	 */
+> -	udelay(30);
+> -	regmap_read(rk_phy->reg_base,
+> -		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+> -		    &dllrdy);
+> -	dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
+> +	timeout = jiffies + msecs_to_jiffies(10);
+> +	do {
+> +		udelay(1);
+> +
+> +		regmap_read(rk_phy->reg_base,
+> +			rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+> +			&dllrdy);
+> +		dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
+> +		if (dllrdy == PHYCTRL_DLLRDY_DONE)
+> +			break;
+> +	} while (!time_after(jiffies, timeout));
+> +
+>  	if (dllrdy != PHYCTRL_DLLRDY_DONE) {
+>  		pr_err("rockchip_emmc_phy_power: dllrdy timeout.\n");
+>  		return -ETIMEDOUT;
+>
+
+
 -- 
-1.9.1
+Best Regards
+Shawn Lin
