@@ -1,25 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Jun 2016 11:24:16 +0200
-Subject: [PATCH 1/3] i.MX: system.c: Convert goto to if statement
-In-Reply-To: <1465797329-22537-1-git-send-email-andrew.smirnov@gmail.com>
-References: <1465797329-22537-1-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <12670937.kESCsuxMaL@wuerfel>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 13 Jun 2016 11:24:01 +0200
+Subject: [PATCH 1/1] ARM: dts: imx6qdl.dtsi: add "arm, shared-override"
+ for pl310
+In-Reply-To: <20160611115733.GM20243@tiger>
+References: <1465292365-26038-1-git-send-email-peter.chen@nxp.com>
+ <20160611115733.GM20243@tiger>
+Message-ID: <1465809841.2313.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, June 12, 2016 10:55:27 PM CEST Andrey Smirnov wrote:
-> Using goto here doesn't bring any advantages and only makes the code
-> flow less clear. No functional changes.
+Am Samstag, den 11.06.2016, 19:57 +0800 schrieb Shawn Guo:
+> + Lucas
 > 
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> On Tue, Jun 07, 2016 at 05:39:25PM +0800, Peter Chen wrote:
+> > The imx6 SMP system has the same DMA memory coherency issue [1] with
+> > pl310 L2 controller. With this shared override bit set, the customer
+> > reports the DMA coherency issue is gone. Besides, I have tested
+> > the performance using USB ethernet with/without this bit, it shows
+> > no difference.
+> > 
+> > [1] http://patchwork.ozlabs.org/patch/469362/
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > ---
+> >  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> > index ed613eb..30e21ee 100644
+> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> > @@ -185,6 +185,7 @@
+> >  			cache-level = <2>;
+> >  			arm,tag-latency = <4 2 3>;
+> >  			arm,data-latency = <4 2 3>;
+> > +			arm,shared-override;
+> 
+> Lucas had an objection to the change [1], considering the case that
+> kernel is booted as non-secure.
 
-All three patches looks reasonable to me, but now that I looked at
-the function, I wonder if we could do another cleanup on top and
-not call this function for imx35 at all but instead set the
-.l2c_aux_val/.l2c_aux_mask fields in its machine descriptor.
+My objection to this change still stands. Configuring the L2C to be
+compliant to the ARMv7 ARM is at the same level as the CPU workarounds
+that can not be applied in secure mode. Those must be done in the
+firmware, if your firmware doesn't do it it's plain broken.
 
-The call to l2x0_of_init(0, ~0) seems to be the only thing we
-do on imx35 (where arm,pl310-cache is not present), and the kernel
-can do it automatically.
-
-	Arnd
+Regards,
+Lucas
