@@ -1,141 +1,30 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 13 Jun 2016 11:19:20 +0800
-Subject: [PATCH 4/6] ARM: dts: sun8i-a?3-q8-tablet.dts: Add full otg
- support
-In-Reply-To: <1465653186-953-5-git-send-email-hdegoede@redhat.com>
-References: <1465653186-953-1-git-send-email-hdegoede@redhat.com>
- <1465653186-953-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v67+56hd6b+mZLNpMHPRGu3Fp9j-zJLNS2MkUmy2N_Lmdw@mail.gmail.com>
+Date: Mon, 13 Jun 2016 11:23:20 +0800
+Subject: [PATCH] ARM: dts: sun8i: Add dts file for Polaroid MID2407PXE03
+ tablet
+In-Reply-To: <1465653230-1027-1-git-send-email-hdegoede@redhat.com>
+References: <1465653230-1027-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v649R2VhH6U4YpiFpQp4S_b7N0RCERWjfthdKC_k3FjA3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On Sat, Jun 11, 2016 at 9:53 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Now that we've all the necessary bits in place we can enable
-> full otg support on these tablets.
+> The Polaroid MID2407PXE03 is an a23 based 7" tablet based on a M86_MB V2.0
+> PCB, featuring a 800x480 LCD, 512MB RAM, 4G NAND, esp8089 wifi, gsl1680
+> touchschreen, micro-sd slot, 3.5mm headphone jack and a micro-usb otg
+> connector which doubles as charging port.
 >
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun8i-a23-q8-tablet.dts | 15 ---------------
->  arch/arm/boot/dts/sun8i-a33-q8-tablet.dts | 15 ---------------
->  arch/arm/boot/dts/sun8i-q8-common.dtsi    | 31 +++++++++++++++++++++++++++++++
->  3 files changed, 31 insertions(+), 30 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-> index 6062ea7..956320a 100644
-> --- a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-> +++ b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-> @@ -48,18 +48,3 @@
->         model = "Q8 A23 Tablet";
->         compatible = "allwinner,q8-a23", "allwinner,sun8i-a23";
->  };
-> -
-> -/*
-> - * FIXME for now we only support host mode and rely on u-boot to have
-> - * turned on Vbus which is controlled by the axp223 pmic on the board.
-> - *
-> - * Once we have axp223 support we should switch to fully supporting otg.
-> - */
-> -&usb_otg {
-> -       dr_mode = "host";
-> -       status = "okay";
-> -};
-> -
-> -&usbphy {
-> -       status = "okay";
-> -};
-> diff --git a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
-> index 44b3229..b0bc236 100644
-> --- a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
-> +++ b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
-> @@ -48,18 +48,3 @@
->         model = "Q8 A33 Tablet";
->         compatible = "allwinner,q8-a33", "allwinner,sun8i-a33";
->  };
-> -
-> -/*
-> - * FIXME for now we only support host mode and rely on u-boot to have
-> - * turned on Vbus which is controlled by the axp223 pmic on the board.
-> - *
-> - * Once we have axp223 support we should switch to fully supporting otg.
-> - */
-> -&usb_otg {
-> -       dr_mode = "host";
-> -       status = "okay";
-> -};
-> -
-> -&usbphy {
-> -       status = "okay";
-> -};
-> diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-> index 346a49d..991087f 100644
-> --- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-> @@ -87,6 +87,13 @@
->                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->                 allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->         };
-> +
-> +       usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +               allwinner,pins = "PH8";
-> +               allwinner,function = "gpio_in";
-> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +       };
->  };
->
->  &r_rsb {
-> @@ -98,6 +105,7 @@
->                 interrupt-parent = <&nmi_intc>;
->                 interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->                 eldoin-supply = <&reg_dcdc1>;
-> +               x-powers,drive-vbus-en;
->         };
->  };
->
-> @@ -163,6 +171,11 @@
->         regulator-name = "vcc-dram";
->  };
->
-> +&reg_drivevbus {
-> +       regulator-name = "usb0-vbus";
-> +       status = "okay";
 
-Adding a drivevbus-supply referencing vcc_5v0 (in the axp node) so
-it doesn't show 0V would be nice.
+It seems this tablet is very similar to the Q8s, differing only in the
+WiFi solution (which we have to deal with for the Q8s anyway), and the
+touchscreen firmware.
 
-Sorry for the late reply. I was out on vacation for a few days.
+Should we somehow manage this using the q8-common and q8-tablet dts files?
 
+Same comment for reg_drivevbus as the other patches.
+
+Regards
 ChenYu
-
-> +};
-> +
->  &reg_rtc_ldo {
->         regulator-name = "vcc-rtc";
->  };
-> @@ -176,3 +189,21 @@
->  &simplefb_lcd {
->         vcc-lcd-supply = <&reg_dc1sw>;
->  };
-> +
-> +&usb_otg {
-> +       dr_mode = "otg";
-> +       status = "okay";
-> +};
-> +
-> +&usb_power_supply {
-> +       status = "okay";
-> +};
-> +
-> +&usbphy {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&usb0_id_detect_pin>;
-> +       usb0_id_det-gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
-> +       usb0_vbus_power-supply = <&usb_power_supply>;
-> +       usb0_vbus-supply = <&reg_drivevbus>;
-> +       status = "okay";
-> +};
-> --
-> 2.7.4
->
