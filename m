@@ -1,88 +1,39 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 13 Jun 2016 16:03:08 +0100
-Subject: [PATCH 09/10] ARM: V7M: Indirect proc_info construction for V7M CPUs
-In-Reply-To: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
-References: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1465830189-20128-10-git-send-email-vladimir.murzin@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 13 Jun 2016 17:05:14 +0200
+Subject: [GIT PULL] ARM: dts: exynos: Fixes for v4.7
+Message-ID: <1465830314-3942-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonathan Austin <jonathan.austin@arm.com>
+Hi,
 
-This patch copies the method used for V7A/R CPUs to specify differing
-processor info for different cores.
+Two fixes for current release cycle (regressions).
 
-This patch differentiates Cortex-M3 and Cortex-M4 and leaves a fallback case
-for any other V7M processors.
+Best regards,
+Krzysztof
 
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/mm/proc-v7m.S |   46 +++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 35 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-index 11f5816..796a983 100644
---- a/arch/arm/mm/proc-v7m.S
-+++ b/arch/arm/mm/proc-v7m.S
-@@ -132,6 +132,40 @@ ENDPROC(__v7m_setup)
- 
- 	.section ".proc.info.init", #alloc
- 
-+.macro __v7m_proc name, initfunc, cache_fns = nop_cache_fns, hwcaps = 0,  proc_fns = v7m_processor_functions
-+	.long	0			/* proc_info_list.__cpu_mm_mmu_flags */
-+	.long	0			/* proc_info_list.__cpu_io_mmu_flags */
-+	initfn	\initfunc, \name
-+	.long	cpu_arch_name
-+	.long	cpu_elf_name
-+	.long	HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \hwcaps
-+	.long	cpu_v7m_name
-+	.long   \proc_fns
-+	.long	0			/* proc_info_list.tlb */
-+	.long	0			/* proc_info_list.user */
-+	.long	\cache_fns
-+.endm
-+
-+	/*
-+	 * Match ARM Cortex-M4 processor.
-+	 */
-+	.type	__v7m_cm4_proc_info, #object
-+__v7m_cm4_proc_info:
-+	.long	0x410fc240		/* ARM Cortex-M4 0xC24 */
-+	.long	0xff0ffff0		/* Mask off revision, patch release */
-+	__v7m_proc __v7m_cm4_proc_info, __v7m_setup, hwcaps = HWCAP_EDSP
-+	.size	__v7m_cm4_proc_info, . - __v7m_cm4_proc_info
-+
-+	/*
-+	 * Match ARM Cortex-M3 processor.
-+	 */
-+	.type	__v7m_cm3_proc_info, #object
-+__v7m_cm3_proc_info:
-+	.long	0x410fc230		/* ARM Cortex-M3 0xC23 */
-+	.long	0xff0ffff0		/* Mask off revision, patch release */
-+	__v7m_proc __v7m_cm3_proc_info, __v7m_setup
-+	.size	__v7m_cm3_proc_info, . - __v7m_cm3_proc_info
-+
- 	/*
- 	 * Match any ARMv7-M processor core.
- 	 */
-@@ -139,16 +173,6 @@ ENDPROC(__v7m_setup)
- __v7m_proc_info:
- 	.long	0x000f0000		@ Required ID value
- 	.long	0x000f0000		@ Mask for ID
--	.long   0			@ proc_info_list.__cpu_mm_mmu_flags
--	.long   0			@ proc_info_list.__cpu_io_mmu_flags
--	initfn	__v7m_setup, __v7m_proc_info	@ proc_info_list.__cpu_flush
--	.long	cpu_arch_name
--	.long	cpu_elf_name
--	.long	HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT
--	.long	cpu_v7m_name
--	.long	v7m_processor_functions	@ proc_info_list.proc
--	.long	0			@ proc_info_list.tlb
--	.long	0			@ proc_info_list.user
--	.long	nop_cache_fns		@ proc_info_list.cache
-+	__v7m_proc __v7m_proc_info, __v7m_setup
- 	.size	__v7m_proc_info, . - __v7m_proc_info
- 
--- 
-1.7.9.5
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.7-2
+
+for you to fetch changes up to a7d7865fecd83adb98b20eca5eddef7efc94831d:
+
+  ARM: dts: exynos: Fix port nodes names for Exynos5420 Peach Pit board (2016-06-07 11:00:39 +0200)
+
+----------------------------------------------------------------
+Fixes for Exynos-based Snow and Peach Pit boards for regressions introduced in
+4.7-rc1 because OF graph logic expects specific names of child nodes.
+
+----------------------------------------------------------------
+Javier Martinez Canillas (2):
+      ARM: dts: exynos: Fix port nodes names for Exynos5250 Snow board
+      ARM: dts: exynos: Fix port nodes names for Exynos5420 Peach Pit board
+
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi | 13 ++++++++++---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    | 13 ++++++++++---
+ 2 files changed, 20 insertions(+), 6 deletions(-)
