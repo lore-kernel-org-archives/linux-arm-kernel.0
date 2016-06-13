@@ -1,60 +1,61 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 13 Jun 2016 16:19:06 -0500
-Subject: [PATCHv3 1/7] EDAC, altera: Check parent status for Arria10 EDAC block
+Date: Mon, 13 Jun 2016 16:19:07 -0500
+Subject: [PATCHv3 2/7] EDAC, altera: Add panic flag check to A10 IRQ
 In-Reply-To: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
 References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1465852752-11018-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1465852752-11018-3-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-In preparation for the Arria10 ECC modules, check the status
-of the parent in the device tree to ensure the block is enabled.
-Skip if no parent phandle is set in the device tree.
+In preparation for additional memory module ECCs, the
+IRQ function will check a panic flag before doing a
+kernel panic on double bit errors. ECCs on buffers
+will not cause a kernel panic on DBERRs.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
-v2  No change
-v3  Move check into validate_parent_available().
+v2  New patch. Add panic flag to IRQ function.
+v3  No change
 ---
- drivers/edac/altera_edac.c |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/edac/altera_edac.c |    4 +++-
+ drivers/edac/altera_edac.h |    1 +
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index 6f5d586..926bcaf 100644
+index 926bcaf..a9d8fa7 100644
 --- a/drivers/edac/altera_edac.c
 +++ b/drivers/edac/altera_edac.c
-@@ -1125,6 +1125,20 @@ static void altr_edac_a10_irq_handler(struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
+@@ -897,7 +897,8 @@ static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
+ 		writel(ALTR_A10_ECC_DERRPENA,
+ 		       base + ALTR_A10_ECC_INTSTAT_OFST);
+ 		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
+-		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
++		if (dci->data->panic)
++			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
  
-+static int validate_parent_available(struct device_node *np)
-+{
-+	struct device_node *parent;
-+
-+	/* Ensure parent device is enabled if parent node exists */
-+	parent = of_parse_phandle(np, "parent", 0);
-+	if (parent && !of_device_is_available(parent)) {
-+		of_node_put(parent);
-+		return -ENODEV;
-+	}
-+	of_node_put(parent);
-+	return 0;
-+}
-+
- static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
- 				    struct device_node *np)
- {
-@@ -1146,6 +1160,9 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
- 	if (IS_ERR_OR_NULL(prv))
- 		return -ENODEV;
+ 		return IRQ_HANDLED;
+ 	}
+@@ -936,6 +937,7 @@ const struct edac_device_prv_data a10_ocramecc_data = {
+ 	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
+ 	.ecc_irq_handler = altr_edac_a10_ecc_irq,
+ 	.inject_fops = &altr_edac_a10_device_inject_fops,
++	.panic = true,
+ };
  
-+	if (validate_parent_available(np))
-+		return -ENODEV;
-+
- 	if (!devres_open_group(edac->dev, altr_edac_a10_device_add, GFP_KERNEL))
- 		return -ENOMEM;
+ #endif	/* CONFIG_EDAC_ALTERA_OCRAM */
+diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
+index 62b0fa0..cf4e8cb 100644
+--- a/drivers/edac/altera_edac.h
++++ b/drivers/edac/altera_edac.h
+@@ -298,6 +298,7 @@ struct edac_device_prv_data {
+ 	irqreturn_t (*ecc_irq_handler)(int irq, void *dev_id);
+ 	int trig_alloc_sz;
+ 	const struct file_operations *inject_fops;
++	bool panic;
+ };
  
+ struct altr_edac_device_dev {
 -- 
 1.7.9.5
