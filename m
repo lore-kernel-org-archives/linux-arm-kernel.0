@@ -1,32 +1,43 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Mon, 13 Jun 2016 16:12:51 +0200
-Subject: [PATCH] ARM: V7M: Add dsb before jumping in handler mode
-Message-ID: <1465827171-15847-1-git-send-email-alexandre.torgue@st.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 13 Jun 2016 15:19:50 +0100
+Subject: [PATCH v4 3/3] MAINTAINERS: Add entry for Mali-DP driver
+In-Reply-To: <1465827590-17591-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1465827590-17591-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1465827590-17591-4-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to ARM AN321 (section 4.12):
+Add MAINTAINERS entry for ARM Mali-DP driver and update the
+HDLCD file matching pattern to cover only HDLCD rather than
+the whole drivers/gpu/drm/arm directory.
 
-"If the vector table is in writable memory such as SRAM, either relocated
-by VTOR or a device dependent memory remapping mechanism, then
-architecturally a memory barrier instruction is required after the vector
-table entry is updated, and if the exception is to be activated
-immediately"
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ MAINTAINERS | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
-
-diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-index 7229d8d..2ddc435 100644
---- a/arch/arm/mm/proc-v7m.S
-+++ b/arch/arm/mm/proc-v7m.S
-@@ -104,6 +104,7 @@ __v7m_setup:
- 	badr	r1, 1f
- 	ldr	r5, [r12, #11 * 4]	@ read the SVC vector entry
- 	str	r1, [r12, #11 * 4]	@ write the temporary SVC vector entry
-+	dsb
- 	mov	r6, lr			@ save LR
- 	ldr	sp, =init_thread_union + THREAD_START_SP
- 	cpsie	i
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 81382b2..2581ea4 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -865,9 +865,17 @@ F:	Documentation/devicetree/bindings/display/snps,arcpgu.txt
+ ARM HDLCD DRM DRIVER
+ M:	Liviu Dudau <liviu.dudau@arm.com>
+ S:	Supported
+-F:	drivers/gpu/drm/arm/
++F:	drivers/gpu/drm/arm/hdlcd_*
+ F:	Documentation/devicetree/bindings/display/arm,hdlcd.txt
+ 
++ARM MALI-DP DRM DRIVER
++M:	Liviu Dudau <liviu.dudau@arm.com>
++M:	Brian Starkey <brian.starkey@arm.com>
++M:	Mali DP Maintainers <malidp@foss.arm.com>
++S:	Supported
++F:	drivers/gpu/drm/arm/
++F:	Documentation/devicetree/bindings/display/arm,malidp.txt
++
+ ARM MFM AND FLOPPY DRIVERS
+ M:	Ian Molton <spyro@f2s.com>
+ S:	Maintained
 -- 
-1.9.1
+2.8.2
