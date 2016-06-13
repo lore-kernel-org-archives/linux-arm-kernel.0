@@ -1,113 +1,65 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 13 Jun 2016 16:19:08 -0500
-Subject: [PATCHv3 3/7] EDAC, altera: Share Arria10 check_deps & IRQ functions
+Date: Mon, 13 Jun 2016 16:19:09 -0500
+Subject: [PATCHv3 4/7] Documentation: dt: socfpga: Add Arria10 Ethernet binding
 In-Reply-To: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
 References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1465852752-11018-4-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1465852752-11018-5-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-In preparation for additional memory module ECCs, the IRQ and
-check_deps() functions are being made available to all the memory
-buffers. Move them outside of the OCRAM only area.
+Add the device tree bindings needed to support the Altera Ethernet
+FIFO buffers on the Arria10 chip.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
-v2  New patch. Move shared functions outside OCRAM only area.
-v3  Change title line - check_deps & IRQ.
+v2  No Change
+v3  Change to common compatible string based on maintainer comments
+    Add local IRQ values.
 ---
- drivers/edac/altera_edac.c |   62 ++++++++++++++++++++++++--------------------
- 1 file changed, 34 insertions(+), 28 deletions(-)
+ .../bindings/arm/altera/socfpga-eccmgr.txt         |   24 ++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index a9d8fa7..a3f490d 100644
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -825,9 +825,9 @@ static struct platform_driver altr_edac_device_driver = {
- };
- module_platform_driver(altr_edac_device_driver);
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+index 15eb0df..e9febbb 100644
+--- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+@@ -82,6 +82,14 @@ Required Properties:
+ - interrupts : Should be single bit error interrupt, then double bit error
+ 	interrupt, in this order.
  
--/*********************** OCRAM EDAC Device Functions *********************/
-+/******************* Arria10 Device ECC Shared Functions *****************/
++Ethernet FIFO ECC
++Required Properties:
++- compatible : Should be "altr,socfpga-eth-mac-ecc"
++- reg        : Address and size for ECC block registers.
++- parent     : phandle to parent Ethernet node.
++- interrupts : Should be single bit error interrupt, then double bit error
++	interrupt, in this order.
++
+ Example:
  
--#ifdef CONFIG_EDAC_ALTERA_OCRAM
-+#if defined(CONFIG_EDAC_ALTERA_OCRAM) || defined(CONFIG_EDAC_ALTERA_ETHERNET)
- /*
-  *  Test for memory's ECC dependencies upon entry because platform specific
-  *  startup should have initialized the memory and enabled the ECC.
-@@ -848,6 +848,38 @@ static int altr_check_ecc_deps(struct altr_edac_device_dev *device)
- 	return -ENODEV;
- }
- 
-+static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
-+{
-+	struct altr_edac_device_dev *dci = dev_id;
-+	void __iomem  *base = dci->base;
+ 	eccmgr: eccmgr at ffd06000 {
+@@ -108,4 +116,20 @@ Example:
+ 			interrupts = <1 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <33 IRQ_TYPE_LEVEL_HIGH> ;
+ 		};
 +
-+	if (irq == dci->sb_irq) {
-+		writel(ALTR_A10_ECC_SERRPENA,
-+		       base + ALTR_A10_ECC_INTSTAT_OFST);
-+		edac_device_handle_ce(dci->edac_dev, 0, 0, dci->edac_dev_name);
++		emac0-rx-ecc at ff8c0800 {
++			compatible = "altr,socfpga-eth-mac-ecc";
++			reg = <0xff8c0800 0x400>;
++			parent = <&gmac0>;
++			interrupts = <4 IRQ_TYPE_LEVEL_HIGH>,
++				     <36 IRQ_TYPE_LEVEL_HIGH>;
++		};
 +
-+		return IRQ_HANDLED;
-+	} else if (irq == dci->db_irq) {
-+		writel(ALTR_A10_ECC_DERRPENA,
-+		       base + ALTR_A10_ECC_INTSTAT_OFST);
-+		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
-+		if (dci->data->panic)
-+			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
-+
-+		return IRQ_HANDLED;
-+	}
-+
-+	WARN_ON(1);
-+
-+	return IRQ_NONE;
-+}
-+
-+#endif /* CONFIG_EDAC_ALTERA_OCRAM || CONFIG_EDAC_ALTERA_ETHERNET */
-+
-+/*********************** OCRAM EDAC Device Functions *********************/
-+
-+#ifdef CONFIG_EDAC_ALTERA_OCRAM
-+
- static void *ocram_alloc_mem(size_t size, void **other)
- {
- 	struct device_node *np;
-@@ -882,32 +914,6 @@ static void ocram_free_mem(void *p, size_t size, void *other)
- 	gen_pool_free((struct gen_pool *)other, (u32)p, size);
- }
- 
--static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
--{
--	struct altr_edac_device_dev *dci = dev_id;
--	void __iomem  *base = dci->base;
--
--	if (irq == dci->sb_irq) {
--		writel(ALTR_A10_ECC_SERRPENA,
--		       base + ALTR_A10_ECC_INTSTAT_OFST);
--		edac_device_handle_ce(dci->edac_dev, 0, 0, dci->edac_dev_name);
--
--		return IRQ_HANDLED;
--	} else if (irq == dci->db_irq) {
--		writel(ALTR_A10_ECC_DERRPENA,
--		       base + ALTR_A10_ECC_INTSTAT_OFST);
--		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
--		if (dci->data->panic)
--			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
--
--		return IRQ_HANDLED;
--	}
--
--	WARN_ON(1);
--
--	return IRQ_NONE;
--}
--
- const struct edac_device_prv_data ocramecc_data = {
- 	.setup = altr_check_ecc_deps,
- 	.ce_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_SERR),
++		emac0-tx-ecc at ff8c0c00 {
++			compatible = "altr,socfpga-eth-mac-ecc";
++			reg = <0xff8c0c00 0x400>;
++			parent = <&gmac0>;
++			interrupts = <5 IRQ_TYPE_LEVEL_HIGH>,
++				     <37 IRQ_TYPE_LEVEL_HIGH>;
++		};
+ 	};
 -- 
 1.7.9.5
