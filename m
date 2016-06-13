@@ -1,42 +1,41 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 13 Jun 2016 22:04:53 +0300
-Subject: [RESEND PATCHv2 19/28] clk: ti: remove un-used definitions from
- public clk_hw_omap struct
+Date: Mon, 13 Jun 2016 22:04:55 +0300
+Subject: [RESEND PATCHv2 21/28] clk: ti: am33xx: fix timer3/6 init time setup
+ for module clocks
 In-Reply-To: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
 References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1465844702-12200-20-git-send-email-t-kristo@ti.com>
+Message-ID: <1465844702-12200-22-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clksel support has been deprecated a while back, so remove these from
-the struct also.
+timer*_fck are going to be renamed as timer*_mod_ck:s. Fix the init
+time configuration of timer3/timer6 to take this into account, and
+lookup for the module clock in case the lookup for fck fails.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- include/linux/clk/ti.h | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/clk/ti/clk-33xx.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 331b81b..0269208 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -129,8 +129,6 @@ struct clk_hw_omap_ops {
-  * @enable_bit: bitshift to write to enable/disable the clock (see @enable_reg)
-  * @flags: see "struct clk.flags possibilities" above
-  * @clksel_reg: for clksel clks, register va containing src/divisor select
-- * @clksel_mask: bitmask in @clksel_reg for the src/divisor selector
-- * @clksel: for clksel clks, pointer to struct clksel for this clock
-  * @dpll_data: for DPLLs, pointer to struct dpll_data for this clock
-  * @clkdm_name: clockdomain name that this clock is contained in
-  * @clkdm: pointer to struct clockdomain, resolved from @clkdm_name at runtime
-@@ -145,8 +143,6 @@ struct clk_hw_omap {
- 	u8			enable_bit;
- 	u8			flags;
- 	void __iomem		*clksel_reg;
--	u32			clksel_mask;
--	const struct clksel	*clksel;
- 	struct dpll_data	*dpll_data;
- 	const char		*clkdm_name;
- 	struct clockdomain	*clkdm;
+diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
+index 43847bc..2343a22 100644
+--- a/drivers/clk/ti/clk-33xx.c
++++ b/drivers/clk/ti/clk-33xx.c
+@@ -66,9 +66,15 @@ int __init am33xx_dt_clk_init(void)
+ 
+ 	clk1 = ti_clk_get("sys_clkin_ck");
+ 	clk2 = ti_clk_get("timer3_fck");
++	if (IS_ERR(clk2))
++		clk2 = ti_clk_get("timer3_mod_ck");
++
+ 	clk_set_parent(clk2, clk1);
+ 
+ 	clk2 = ti_clk_get("timer6_fck");
++	if (IS_ERR(clk2))
++		clk2 = ti_clk_get("timer6_mod_ck");
++
+ 	clk_set_parent(clk2, clk1);
+ 	/*
+ 	 * The On-Chip 32K RC Osc clock is not an accurate clock-source as per
 -- 
 1.9.1
