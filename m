@@ -1,189 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 13 Jun 2016 21:17:53 +0200
-Subject: [PATCH] userspace API definitions for auto-focus coil
-In-Reply-To: <20160612112253.GD26360@valkosipuli.retiisi.org.uk>
-References: <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
- <20160601220840.GA21946@amd>
- <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
- <20160602193027.GB7984@amd>
- <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
- <20160605190716.GA11321@amd> <575512E5.5030000@gmail.com>
- <20160611220654.GC26360@valkosipuli.retiisi.org.uk>
- <20160612084811.GA27446@amd>
- <20160612112253.GD26360@valkosipuli.retiisi.org.uk>
-Message-ID: <20160613191753.GA17459@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Jun 2016 21:26:49 +0200
+Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
+In-Reply-To: <20160613152409.GD3240@piout.net>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <11395561.bQatt85IOg@wuerfel> <20160613152409.GD3240@piout.net>
+Message-ID: <6120818.MyeJZ74hYa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2016-06-12 14:22:53, Sakari Ailus wrote:
-> Hi Pavel,
-> 
-> On Sun, Jun 12, 2016 at 10:48:11AM +0200, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > > >Add userspace API definitions.
-> > > > >
-> > > > >Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > > > >
-> > > > >diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-> > > > >index b6a357a..23011cc 100644
-> > > > >--- a/include/uapi/linux/v4l2-controls.h
-> > > > >+++ b/include/uapi/linux/v4l2-controls.h
-> > > > >@@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
-> > > > >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
-> > > > >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
-> > > > >
-> > > > >+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-> > > > >+#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
+On Monday, June 13, 2016 5:24:09 PM CEST Alexandre Belloni wrote:
+> On 11/06/2016 at 00:30:36 +0200, Arnd Bergmann wrote :
+> > On Saturday, June 11, 2016 12:03:04 AM CEST Alexandre Belloni wrote:
+> > > From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 > > > 
-> > > Please check V4L2_CID_USER_*_BASE. That's how custom controls are handled
-> > > nowadays.
+> > > Fix the main and slow clock .prepare() implementations which used to call
+> > > usleep() when the scheduler wasn't ready yet.
+> > > 
 > > 
-> > So something like this?
+> > Does this have to be called that early? It seems wasteful to always
+> > call udelay() here, when these are functions that are normally
+> > allowed to sleep.
 > > 
-> > Thanks,
-> > 									Pavel
-> > 
-> > diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
-> > index 2efa5dc1..b04b471 100644
-> > --- a/drivers/media/i2c/ad5820.c
-> > +++ b/drivers/media/i2c/ad5820.c
-> > @@ -40,6 +40,11 @@
-> >  #define AD5820_RAMP_MODE_LINEAR		(0 << 3)
-> >  #define AD5820_RAMP_MODE_64_16		(1 << 3)
-> >  
-> > +/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-> > +#define V4L2_CID_FOCUS_AD5820_RAMP_TIME		(V4L2_CID_USER_AD5820_BASE+0)
-> > +#define V4L2_CID_FOCUS_AD5820_RAMP_MODE		(V4L2_CID_FOCUS_AD5820_BASE+1)
-> > +
-> > +
 > 
-> We could still define these in a header file that can be included by the
-> user space. Please use V4L2_CID_AD5820 prefix.
+> So I've tested it and something like that would work:
+> 
+>         if (system_state < SYSTEM_RUNNING)
+>                 udelay(osc->startup_usec);
+>         else
+>                 usleep_range(osc->startup_usec, osc->startup_usec + 1);
 
-Not V4L2_CID_USER_AD5820...?
+I think that's reasonable in this case.
 
-> A separate header file should be used,
->  e.g. include/uapi/linux/ad5820.h.
+> But I'm afraid it would be the first driver to actually do something
+> like that (however, it is already the only driver trying to sleep). 
 
-Ok, separate header file for 2 lines seemed like a bit of overkill,
-but why not.
+We have a lot of drivers that call potentially sleeping function from
+the .prepare callback, e.g. when they go to an i2c controller.
 
-Something like this?
-
-commit 8dd701d2580e41b06bb2285e6bd59a4f1702b4d8
-Author: Pavel <pavel@ucw.cz>
-Date:   Mon Jun 13 21:17:15 2016 +0200
-
-    Userspace api, as Sakari asked.
-
-diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
-index 2efa5dc1..ed3facc 100644
---- a/drivers/media/i2c/ad5820.c
-+++ b/drivers/media/i2c/ad5820.c
-@@ -32,6 +32,8 @@
- #include <media/v4l2-device.h>
- #include <media/v4l2-subdev.h>
- 
-+#include <uapi/linux/ad5820.h>
-+
- #define AD5820_NAME		"ad5820"
- 
- /* Register definitions */
-@@ -40,6 +42,8 @@
- #define AD5820_RAMP_MODE_LINEAR		(0 << 3)
- #define AD5820_RAMP_MODE_64_16		(1 << 3)
- 
-+
-+
- #define CODE_TO_RAMP_US(s)	((s) == 0 ? 0 : (1 << ((s) - 1)) * 50)
- #define RAMP_US_TO_CODE(c)	fls(((c) + ((c)>>1)) / 50)
- 
-@@ -165,13 +169,13 @@ static int ad5820_set_ctrl(struct v4l2_ctrl *ctrl)
- 		coil->focus_absolute = ctrl->val;
- 		return ad5820_update_hw(coil);
- 
--	case V4L2_CID_FOCUS_AD5820_RAMP_TIME:
-+	case V4L2_CID_AD5820_RAMP_TIME:
- 		code = RAMP_US_TO_CODE(ctrl->val);
- 		ctrl->val = CODE_TO_RAMP_US(code);
- 		coil->focus_ramp_time = ctrl->val;
- 		break;
- 
--	case V4L2_CID_FOCUS_AD5820_RAMP_MODE:
-+	case V4L2_CID_AD5820_RAMP_MODE:
- 		coil->focus_ramp_mode = ctrl->val;
- 		break;
- 	}
-@@ -191,7 +195,7 @@ static const char * const ad5820_focus_menu[] = {
- static const struct v4l2_ctrl_config ad5820_ctrls[] = {
- 	{
- 		.ops		= &ad5820_ctrl_ops,
--		.id		= V4L2_CID_FOCUS_AD5820_RAMP_TIME,
-+		.id		= V4L2_CID_AD5820_RAMP_TIME,
- 		.type		= V4L2_CTRL_TYPE_INTEGER,
- 		.name		= "Focus ramping time [us]",
- 		.min		= 0,
-@@ -202,7 +206,7 @@ static const struct v4l2_ctrl_config ad5820_ctrls[] = {
- 	},
- 	{
- 		.ops		= &ad5820_ctrl_ops,
--		.id		= V4L2_CID_FOCUS_AD5820_RAMP_MODE,
-+		.id		= V4L2_CID_AD5820_RAMP_MODE,
- 		.type		= V4L2_CTRL_TYPE_MENU,
- 		.name		= "Focus ramping mode",
- 		.min		= 0,
-diff --git a/include/uapi/linux/ad5820.h b/include/uapi/linux/ad5820.h
-new file mode 100644
-index 0000000..d44ba9c
---- /dev/null
-+++ b/include/uapi/linux/ad5820.h
-@@ -0,0 +1,18 @@
-+/*
-+ * AD5820 DAC driver for camera voice coil focus.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ */
-+
-+#ifndef __LINUX_AD5820_H
-+#define __LINUX_AD5820_H
-+
-+#include <linux/v4l2-controls.h>
-+
-+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-+#define V4L2_CID_AD5820_RAMP_TIME	(V4L2_CID_AD5820_BASE+0)
-+#define V4L2_CID_AD5820_RAMP_MODE	(V4L2_CID_AD5820_BASE+1)
-+
-+#endif
-diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-index 23011cc..015e90b 100644
---- a/include/uapi/linux/v4l2-controls.h
-+++ b/include/uapi/linux/v4l2-controls.h
-@@ -181,6 +181,10 @@ enum v4l2_colorfx {
-  * We reserve 16 controls for this driver. */
- #define V4L2_CID_USER_TC358743_BASE		(V4L2_CID_USER_BASE + 0x1080)
- 
-+/* The base for the ad5820 driver controls.
-+ * We reserve 16 controls for this driver. */
-+#define V4L2_CID_AD5820_BASE			(V4L2_CID_USER_BASE + 0x1090)
-+
- /* MPEG-class control IDs */
- /* The MPEG controls are applicable to all codec controls
-  * and the 'MPEG' part of the define is historical */
-@@ -986,9 +990,4 @@ enum v4l2_detect_md_mode {
- #define V4L2_CID_MODE_SENSITIVITY		(V4L2_CID_MODE_CLASS_BASE+6)
- #define V4L2_CID_MODE_OPSYSCLOCK		(V4L2_CID_MODE_CLASS_BASE+7)
- 
--/* Control IDs specific to the AD5820 driver as defined by V4L2 */
--#define V4L2_CID_FOCUS_AD5820_BASE 		(V4L2_CTRL_CLASS_CAMERA | 0x10af)
--#define V4L2_CID_FOCUS_AD5820_RAMP_TIME		(V4L2_CID_FOCUS_AD5820_BASE+0)
--#define V4L2_CID_FOCUS_AD5820_RAMP_MODE		(V4L2_CID_FOCUS_AD5820_BASE+1)
--
- #endif
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+	Arnd
