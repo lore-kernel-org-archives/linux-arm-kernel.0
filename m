@@ -1,35 +1,35 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Mon, 13 Jun 2016 13:45:14 -0600
-Subject: [PATCH] media: s5p-mfc fix memory leak in s5p_mfc_remove()
-Message-ID: <1465847114-7427-1-git-send-email-shuahkh@osg.samsung.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 13 Jun 2016 12:46:02 -0700
+Subject: [PATCH 0/3] ARM: dts: BCM5310x switch support
+In-Reply-To: <1465583756-26740-1-git-send-email-f.fainelli@gmail.com>
+References: <1465583756-26740-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <575F0D7A.7040509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s5p_mfc_remove() fails to release encoder and decoder video devices.
+On 06/10/2016 11:35 AM, Florian Fainelli wrote:
+> Hi all,
+> 
+> This patch series adds the Device Tree changes needed to enable the
+> Switch Register Access Block found on Broadcom BCM5301x SoCs.
+> 
+> First patch adds the SRAB block and the GMAC as child nodes of the BCMA
+> bus so we get proper device_node/struct device parenting. The second patch
+> defines the SRAB interrupts, and the last one defines the switch ports layouts
+> according to the new DSA binding accepted in net-next:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=8c5ad1d6179df31eea1b736c88296db6e3ffd25d
+> 
+> The B53 driver binding is defined here:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/diff/Documentation/devicetree/bindings/net/dsa/b53.txt?id=967dd82ffc52e9d8ea0defde094f9a39a3f4eeed
+> 
+> Florian Fainelli (3):
+>   ARM: dts: Enable SRAB switch and GMACs on 5301x DTS
+>   ARM: dts: BCM5301X: Add SRAB interrupts
+>   ARM: dts: BCM5310x: Enable switch ports on SmartRG SR400AC
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
-
-Changes since v1:
-- Addressed comments from Javier Martinez Canillas and added
-  his reviewed by:
-
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index 274b4f1..f537b74 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1318,6 +1318,8 @@ static int s5p_mfc_remove(struct platform_device *pdev)
- 
- 	video_unregister_device(dev->vfd_enc);
- 	video_unregister_device(dev->vfd_dec);
-+	video_device_release(dev->vfd_enc);
-+	video_device_release(dev->vfd_dec);
- 	v4l2_device_unregister(&dev->v4l2_dev);
- 	s5p_mfc_release_firmware(dev);
- 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[0]);
+Applied with Andrew's Reviewed-by tag and removed the labels in patch 3,
+thanks
 -- 
-2.7.4
+Florian
