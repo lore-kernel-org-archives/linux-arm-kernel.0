@@ -1,110 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Jun 2016 11:15:15 +0100
-Subject: [PATCH 2/2] arm64: simplify dump_mem
-In-Reply-To: <1465812915-19801-1-git-send-email-mark.rutland@arm.com>
-References: <1465812915-19801-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1465812915-19801-3-git-send-email-mark.rutland@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 13 Jun 2016 12:16:16 +0200
+Subject: [PATCH] ARM: imx25-pinfunc: remove SION from all modes
+In-Reply-To: <20160603193148.GW26768@pengutronix.de>
+References: <1461095114-11745-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160419211958.GD19428@n2100.arm.linux.org.uk>
+ <20160420104617.15cf8461@ipc1.ka-ro>
+ <20160420085839.GI29108@pengutronix.de>
+ <20160603133247.GV26768@pengutronix.de>
+ <20160603140107.GA8659@tiger>
+ <20160603193148.GW26768@pengutronix.de>
+Message-ID: <20160613101616.GK26768@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently dump_mem attempts to dump memory in 64-bit chunks when
-reporting a failure in 64-bit code, or 32-bit chunks when reporting a
-failure in 32-bit code. We added code to handle these two cases
-separately in commit e147ae6d7f908412 ("arm64: modify the dump mem for
-64 bit addresses").
+Hello Shawn,
 
-However, in all cases dump_mem is called, the failing context is a
-kernel rather than user context. Additionally dump_mem is assumed to
-only be used for kernel contexts, as internally it switches to
-KERNEL_DS, and its callers pass kernel stack bounds.
+On Fri, Jun 03, 2016 at 09:31:48PM +0200, Uwe Kleine-K?nig wrote:
+> On Fri, Jun 03, 2016 at 10:01:07PM +0800, Shawn Guo wrote:
+> > On Fri, Jun 03, 2016 at 03:32:47PM +0200, Uwe Kleine-K?nig wrote:
+> > > I found a regression of the patch under discussion (which was not
+> > > applied, so no big problem). On the custom mx25 based hardware an
+> > > SD-card isn't detected any more after removing SION from
+> > > MX25_PAD_SD1_CMD__SD1_CMD. I verified the same happens on a tx25.
+> > > 
+> > > Is this expected? IMHO it's unfortunate (if not a silicon bug) that you
+> > > need the SION bit here as the SION bit has some more side effects.  If
+> > > you ask me, muxing a certain function for a pin should enable the input
+> > > path to the respective module if the pin is bidirectional.
+> > > 
+> > > Is there a list of pin/function pairs that need the SION bit set? Shawn,
+> > > would you agree to accept this patch with the high risk that it
+> > > introduces regressions? Or maybe we should make the SION bit more easily
+> > > overridable for board dts files (and default to off unless known it's
+> > > needed)?
+> > 
+> > I would be conservative on this.  Can we just fix the SION bits that are
+> > known doing harm?
+> 
+> I didn't do any measurements, but I'd expect that every SION bit that is
+> set without good reason increases current consumption. So each SION bit
+> does some harm. Plus debugging a missing SION bit is much easier than a
+> SION bit that is set without need.
+> 
+> The first problem I debugged was an UART problem and the SION bit had to
+> be removed from MX25_PAD_KPP_ROW3__GPIO_3_0 (plus back then
+> MX25_PAD_KPP_ROW3__UART1_RI wasn't defined). The problem I had now was a
+> broken SD card and I had to add SION to MX25_PAD_SD1_CMD__SD1_CMD.
+> 
+> So I expect my commit to (maybe) introduce some obvious and easy to
+> debug regressions and to (probably) fix some harder to debug and not so
+> obvious problems. I'd say it's a net win.
 
-This patch removes the redundant 32-bit chunk logic and associated
-compat parameter, largely reverting the aforementioned commit. For the
-call in __die(), the check of in_interrupt() is removed also, as __die()
-is only called in response to faults from the kernel's exception level,
-and thus the !user_mode(regs) check is sufficient. Were this not the
-case, the used of task_stack_page(tsk) to generate the stack bounds
-would be erroneous.
+I didn't hear anything back from you on this topic. So I created a patch
+that documents that SION is needed for MX25_PAD_SD1_CMD__SD1_CMD and
+then rebased the patch under discussion on top of that. I will send the
+resulting patches as reply to this mail. IMHO the first patch should not
+be controversal.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/traps.c | 31 +++++++++++--------------------
- 1 file changed, 11 insertions(+), 20 deletions(-)
+I still think that the second patch is a good one, did your view change?
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 2a43012..d9da2c5 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -52,15 +52,14 @@ static const char *handler[]= {
- int show_unhandled_signals = 1;
- 
- /*
-- * Dump out the contents of some memory nicely...
-+ * Dump out the contents of some kernel memory nicely...
-  */
- static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
--		     unsigned long top, bool compat)
-+		     unsigned long top)
- {
- 	unsigned long first;
- 	mm_segment_t fs;
- 	int i;
--	unsigned int width = compat ? 4 : 8;
- 
- 	/*
- 	 * We need to switch to kernel mode so that we can use __get_user
-@@ -78,22 +77,15 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
- 		memset(str, ' ', sizeof(str));
- 		str[sizeof(str) - 1] = '\0';
- 
--		for (p = first, i = 0; i < (32 / width)
--					&& p < top; i++, p += width) {
-+		for (p = first, i = 0; i < (32 / 8)
-+					&& p < top; i++, p += 8) {
- 			if (p >= bottom && p < top) {
- 				unsigned long val;
- 
--				if (width == 8) {
--					if (__get_user(val, (unsigned long *)p) == 0)
--						sprintf(str + i * 17, " %016lx", val);
--					else
--						sprintf(str + i * 17, " ????????????????");
--				} else {
--					if (__get_user(val, (unsigned int *)p) == 0)
--						sprintf(str + i * 9, " %08lx", val);
--					else
--						sprintf(str + i * 9, " ????????");
--				}
-+				if (__get_user(val, (unsigned long *)p) == 0)
-+					sprintf(str + i * 17, " %016lx", val);
-+				else
-+					sprintf(str + i * 17, " ????????????????");
- 			}
- 		}
- 		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
-@@ -216,7 +208,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 				stack = IRQ_STACK_TO_TASK_STACK(irq_stack_ptr);
- 
- 			dump_mem("", "Exception stack", stack,
--				 stack + sizeof(struct pt_regs), false);
-+				 stack + sizeof(struct pt_regs));
- 		}
- 	}
- }
-@@ -254,10 +246,9 @@ static int __die(const char *str, int err, struct thread_info *thread,
- 	pr_emerg("Process %.*s (pid: %d, stack limit = 0x%p)\n",
- 		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
- 
--	if (!user_mode(regs) || in_interrupt()) {
-+	if (!user_mode(regs)) {
- 		dump_mem(KERN_EMERG, "Stack: ", regs->sp,
--			 THREAD_SIZE + (unsigned long)task_stack_page(tsk),
--			 compat_user_mode(regs));
-+			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
- 		dump_backtrace(regs, tsk);
- 		dump_instr(KERN_EMERG, regs);
- 	}
+Best regards
+Uwe
+
 -- 
-1.9.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
