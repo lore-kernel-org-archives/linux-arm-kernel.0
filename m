@@ -1,76 +1,32 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Mon, 13 Jun 2016 01:17:58 +0000
-Subject: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when FEC is
- active w/o HW workaround
-In-Reply-To: <1465464924.18807.5.camel@pengutronix.de>
-References: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
- <VI1PR0401MB1855AA40FA576AF677A68E6FFF5C0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
- <1465464924.18807.5.camel@pengutronix.de>
-Message-ID: <VI1PR0401MB185520C3915ED81041902AF6FF530@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 Jun 2016 01:18:52 +0000
+Subject: [PATCH] irqchip/bcm2836: make bcm2836_smp_boot_secondary static
+In-Reply-To: <1465407697-8116-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465407697-8116-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20160613011852.GI24391@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lucas Stach <l.stach@pengutronix.de> Sent: Thursday, June 09, 2016 5:35 PM
-> To: Fugang Duan <fugang.duan@nxp.com>; Shawn Guo <shawnguo@kernel.org>
-> Cc: devicetree at vger.kernel.org; patchwork-lst at pengutronix.de;
-> kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> netdev at vger.kernel.org
-> Subject: Re: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when FEC is
-> active w/o HW workaround
-> 
-> Hi Fugang,
-> 
-> Am Montag, den 06.06.2016, 02:00 +0000 schrieb Fugang Duan:
-> > From: Lucas Stach <l.stach@pengutronix.de> Sent: Saturday, June 04,
-> > 2016 12:31 AM
-> > >
-> > > To: Shawn Guo <shawnguo@kernel.org>; Fugang Duan <fugang.duan@nxp.c
-> > > om>
-> > > Cc: devicetree at vger.kernel.org; patchwork-lst at pengutronix.de;
-> > > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> > > netdev at vger.kernel.org
-> > > Subject: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when
-> > > FEC is active w/o HW workaround
-> > >
-> > > The i.MX6 Q/DL has an erratum (ERR006687) that prevents the FEC from
-> > > waking the CPUs when they are in wait(unclocked) state. As the
-> > > hardware workaround isn't applicable to all boards, disable the
-> > > deeper idle state when the workaround isn't present and the FEC is
-> > > in use.
-> > >
-> > > This allows to safely run a kernel with CPUidle enabled on all
-> > > i.MX6 boards.
-> > >
-> > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > > Acked-by: David S. Miller <davem@davemloft.net> (for network
-> > > changes)
-> > > ---
-> 
-> [...]
-> 
-> > Hi, Lucas,
-> >
-> > FEC irq cannot wake up CPUs when system is in wait mode. But we can
-> > use GPIO_6 for FEC interrupt that GPIO irq wake up CPUs.
-> > No need to disable wait mode as your such patches.
-> >
-> > You just config the gpio irq like below patches:
-> > bc20a5d6da71 (ARM: dts: imx6qdl-sabreauto: use GPIO_6 for FEC
-> > interrupt.)
-> > 6261c4c8f13e (ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC
-> > interrupt.)
-> >
-> Please look at the description of this series again. The changes don't disable the
-> deeper idle states on boards where the HW waorkaround is available. There is a
-> large number of boards in the wild which can not use the HW workaround, as
-> they use GPIO_6 for other purposes. The aim of this series is to have an
-> automatic software workaround available for those boards.
-> 
-> Regards,
-> Lucas
+Hey Ben,
 
-I see.  My concern is the wild boards why don't follow NXP HW reference guide.
+On Wed, Jun 08, 2016 at 06:41:37PM +0100, Ben Dooks wrote:
+> The bcm2836_smp_boot_secondary() is not declared or used elsewhere
+> so make it static to fix the following warning:
+> 
+> drivers/irqchip/irq-bcm2836.c:227:12: warning: symbol 'bcm2836_smp_boot_secondary' was not declared. Should it be static?
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/irqchip/irq-bcm2836.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-For the patch itself, it is fine for me to fix the wild boards issue.
+This, and the rest of the irqchip/ ones, applied to irqchip/misc.
 
-Acked-by: Fugang Duan <fugang.duan@nxp.com>
+thx,
+
+Jason.
