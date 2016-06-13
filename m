@@ -1,103 +1,144 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 13 Jun 2016 16:03:09 +0100
-Subject: [PATCH 10/10] ARM: V7M: Add support for the Cortex-M7 processor
+Date: Mon, 13 Jun 2016 16:03:07 +0100
+Subject: [PATCH 08/10] ARM: V7M: Wire up caches for V7M processors with cache
+ support.
 In-Reply-To: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
 References: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1465830189-20128-11-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1465830189-20128-9-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jonathan Austin <jonathan.austin@arm.com>
 
-Cortex-M7 is a new member of the V7M processor family that adds, among
-other things, caches over the features available in Cortex-M4.
+This patch does the plumbing required to invoke the V7M cache code added
+in earlier patches in this series, although there is no users for that
+yet.
 
-This patch adds support for recognising the processor at boot time, and
-make use of recently introduced cache functions.
+In order to honour the I/D cache disable config options, this patch changes
+the mechanism by which the CCR is set on boot, to be more like V7A/R.
 
 Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/mm/proc-v7m.S |   42 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm/include/asm/glue-cache.h |    4 ----
+ arch/arm/kernel/head-nommu.S      |   16 +++++++++++++++-
+ arch/arm/mm/Kconfig               |    7 ++++---
+ arch/arm/mm/Makefile              |    4 ++++
+ arch/arm/mm/proc-v7m.S            |    5 ++---
+ 5 files changed, 25 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-index 796a983..60387a0 100644
---- a/arch/arm/mm/proc-v7m.S
-+++ b/arch/arm/mm/proc-v7m.S
-@@ -15,6 +15,7 @@
- #include <asm/memory.h>
- #include <asm/v7m.h>
- #include "proc-macros.S"
-+#include "v7m-cache-macros.S"
- 
- ENTRY(cpu_v7m_proc_init)
- 	ret	lr
-@@ -74,6 +75,25 @@ ENTRY(cpu_v7m_do_resume)
- ENDPROC(cpu_v7m_do_resume)
+diff --git a/arch/arm/include/asm/glue-cache.h b/arch/arm/include/asm/glue-cache.h
+index cab07f6..01c3d92 100644
+--- a/arch/arm/include/asm/glue-cache.h
++++ b/arch/arm/include/asm/glue-cache.h
+@@ -118,11 +118,7 @@
  #endif
  
-+ENTRY(cpu_cm7_dcache_clean_area)
-+	dcache_line_size r2, r3
-+1:	dccmvac r0, r3				@ clean D entry
-+	add	r0, r0, r2
-+	subs	r1, r1, r2
-+	bhi	1b
-+	dsb
-+	ret	lr
-+ENDPROC(cpu_cm7_dcache_clean_area)
-+
-+ENTRY(cpu_cm7_proc_fin)
-+	movw	r2, #:lower16:(BASEADDR_V7M_SCB + V7M_SCB_CCR)
-+	movt	r2, #:upper16:(BASEADDR_V7M_SCB + V7M_SCB_CCR)
-+	ldr	r0, [r2]
-+	bic	r0, r0, #(V7M_SCB_CCR_DC | V7M_SCB_CCR_IC)
-+	str	r0, [r2]
-+	ret	lr
-+ENDPROC(cpu_cm7_proc_fin)
-+
- 	.section ".text.init", #alloc, #execinstr
+ #if defined(CONFIG_CPU_V7M)
+-# ifdef _CACHE
+ #  define MULTI_CACHE 1
+-# else
+-#  define _CACHE nop
+-# endif
+ #endif
  
- /*
-@@ -120,10 +140,22 @@ __v7m_setup:
+ #if !defined(_CACHE) && !defined(MULTI_CACHE)
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index fb1a69e..6b4eb27 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -158,7 +158,21 @@ __after_proc_init:
+ 	bic	r0, r0, #CR_V
+ #endif
+ 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+-#endif /* CONFIG_CPU_CP15 */
++#elif defined (CONFIG_CPU_V7M)
++	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
++#ifdef CONFIG_CPU_DCACHE_DISABLE
++	bic	r0, r0, #V7M_SCB_CCR_DC
++#endif
++#ifdef CONFIG_CPU_BPREDICT_DISABLE
++	bic	r0, r0, #V7M_SCB_CCR_BP
++#endif
++#ifdef CONFIG_CPU_ICACHE_DISABLE
++	bic	r0, r0, #V7M_SCB_CCR_IC
++#endif
++	movw	r3, #:lower16:(BASEADDR_V7M_SCB + V7M_SCB_CCR)
++	movt	r3, #:upper16:(BASEADDR_V7M_SCB + V7M_SCB_CCR)
++	str	r0, [r3]
++#endif /* CONFIG_CPU_CP15 elif CONFIG_CPU_V7M */
+ 	ret	lr
+ ENDPROC(__after_proc_init)
+ 	.ltorg
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index cb569b6..50afaf0 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -403,6 +403,7 @@ config CPU_V7M
+ 	bool
+ 	select CPU_32v7M
+ 	select CPU_ABRT_NOMMU
++	select CPU_CACHE_V7
+ 	select CPU_CACHE_NOP
+ 	select CPU_PABRT_LEGACY
+ 	select CPU_THUMBONLY
+@@ -750,14 +751,14 @@ config CPU_HIGH_VECTOR
+ 
+ config CPU_ICACHE_DISABLE
+ 	bool "Disable I-Cache (I-bit)"
+-	depends on CPU_CP15 && !(CPU_ARM720T || CPU_ARM740T || CPU_XSCALE || CPU_XSC3)
++	depends on (CPU_CP15 && !(CPU_ARM720T || CPU_ARM740T || CPU_XSCALE || CPU_XSC3)) || CPU_V7M
+ 	help
+ 	  Say Y here to disable the processor instruction cache. Unless
+ 	  you have a reason not to or are unsure, say N.
+ 
+ config CPU_DCACHE_DISABLE
+ 	bool "Disable D-Cache (C-bit)"
+-	depends on CPU_CP15 && !SMP
++	depends on (CPU_CP15 && !SMP) || CPU_V7M
+ 	help
+ 	  Say Y here to disable the processor data cache. Unless
+ 	  you have a reason not to or are unsure, say N.
+@@ -792,7 +793,7 @@ config CPU_CACHE_ROUND_ROBIN
+ 
+ config CPU_BPREDICT_DISABLE
+ 	bool "Disable branch prediction"
+-	depends on CPU_ARM1020 || CPU_V6 || CPU_V6K || CPU_MOHAWK || CPU_XSC3 || CPU_V7 || CPU_FA526
++	depends on CPU_ARM1020 || CPU_V6 || CPU_V6K || CPU_MOHAWK || CPU_XSC3 || CPU_V7 || CPU_FA526 || CPU_V7M
+ 	help
+ 	  Say Y here to disable branch prediction.  If unsure, say N.
+ 
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 7f76d96..cf4709d 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -45,7 +45,11 @@ obj-$(CONFIG_CPU_CACHE_FA)	+= cache-fa.o
+ obj-$(CONFIG_CPU_CACHE_NOP)	+= cache-nop.o
+ 
+ AFLAGS_cache-v6.o	:=-Wa,-march=armv6
++ifneq ($(CONFIG_CPU_V7M),y)
+ AFLAGS_cache-v7.o	:=-Wa,-march=armv7-a
++else
++AFLAGS_cache-v7.o	:=-Wa,-march=armv7-m
++endif
+ 
+ obj-$(CONFIG_CPU_COPY_V4WT)	+= copypage-v4wt.o
+ obj-$(CONFIG_CPU_COPY_V4WB)	+= copypage-v4wb.o
+diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
+index 7229d8d..11f5816 100644
+--- a/arch/arm/mm/proc-v7m.S
++++ b/arch/arm/mm/proc-v7m.S
+@@ -118,9 +118,8 @@ __v7m_setup:
+ 
+ 	@ Configure the System Control Register to ensure 8-byte stack alignment
  	@ Note the STKALIGN bit is either RW or RAO.
- 	ldr	r0, [r0, V7M_SCB_CCR]   @ system control register
- 	orr	r0, #V7M_SCB_CCR_STKALIGN
-+	read_ctr r12
-+	teq     r12, #0
-+	orrne   r0, r0, #(V7M_SCB_CCR_DC | V7M_SCB_CCR_IC| V7M_SCB_CCR_BP)
+-	ldr	r12, [r0, V7M_SCB_CCR]	@ system control register
+-	orr	r12, #V7M_SCB_CCR_STKALIGN
+-	str	r12, [r0, V7M_SCB_CCR]
++	ldr	r0, [r0, V7M_SCB_CCR]   @ system control register
++	orr	r0, #V7M_SCB_CCR_STKALIGN
  	ret	lr
  ENDPROC(__v7m_setup)
  
-+/*
-+ * Cortex-M7 processor functions
-+ */
-+	globl_equ	cpu_cm7_proc_init,	cpu_v7m_proc_init
-+	globl_equ	cpu_cm7_reset,		cpu_v7m_reset
-+	globl_equ	cpu_cm7_do_idle,	cpu_v7m_do_idle
-+	globl_equ	cpu_cm7_switch_mm,	cpu_v7m_switch_mm
-+
- 	define_processor_functions v7m, dabort=nommu_early_abort, pabort=legacy_pabort, nommu=1
-+	define_processor_functions cm7, dabort=nommu_early_abort, pabort=legacy_pabort, nommu=1
- 
- 	.section ".rodata"
- 	string cpu_arch_name, "armv7m"
-@@ -147,6 +179,16 @@ ENDPROC(__v7m_setup)
- .endm
- 
- 	/*
-+	 * Match ARM Cortex-M7 processor.
-+	 */
-+	.type	__v7m_cm7_proc_info, #object
-+__v7m_cm7_proc_info:
-+	.long	0x410fc270		/* ARM Cortex-M7 0xC27 */
-+	.long	0xff0ffff0		/* Mask off revision, patch release */
-+	__v7m_proc __v7m_cm7_proc_info, __v7m_setup, hwcaps = HWCAP_EDSP, cache_fns = v7_cache_fns, proc_fns = cm7_processor_functions
-+	.size	__v7m_cm7_proc_info, . - __v7m_cm7_proc_info
-+
-+	/*
- 	 * Match ARM Cortex-M4 processor.
- 	 */
- 	.type	__v7m_cm4_proc_info, #object
 -- 
 1.7.9.5
