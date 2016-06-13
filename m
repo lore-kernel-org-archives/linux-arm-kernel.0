@@ -1,20 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 12 Jun 2016 21:58:32 -0400 (EDT)
-Subject: [PATCH net-next RFT] net: fec: handle small PHY reset
- durations more precisely
-In-Reply-To: <1465418567-2694-1-git-send-email-stefan.wahren@i2se.com>
-References: <1465418567-2694-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20160612.215832.1472080008176652824.davem@davemloft.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 13 Jun 2016 12:03:34 +1000
+Subject: linux-next: request to include linux-amlogic tree
+In-Reply-To: <7h60tidlvs.fsf@baylibre.com>
+References: <CAOi56cXb7TjsctpeFWqGCmEx2LG-i11qoLBGDhi1OBJpbyko4A@mail.gmail.com>
+ <20160606010007.6941cc2d@canb.auug.org.au>
+ <7h60tidlvs.fsf@baylibre.com>
+Message-ID: <20160613120334.5bd8edd9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Wahren <stefan.wahren@i2se.com>
-Date: Wed,  8 Jun 2016 20:42:46 +0000
+Hi Kevin,
 
-> Since msleep is based on jiffies the PHY reset could take longer
-> than expected. So use msleep for values greater than 20 msec otherwise
-> usleep_range.
+On Thu, 09 Jun 2016 15:43:03 -0700 Kevin Hilman <khilman@baylibre.com> wrote:
+>
+> Stephen Rothwell <sfr@canb.auug.org.au> writes:
 > 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > I also have just you as the contact - I can add more contacts if
+> > that makes sense.  
+> 
+> Please also add Carlo Caione <carlo@caione.org>
 
-Applied.
+Done.
+
+-- 
+Cheers,
+Stephen Rothwell
