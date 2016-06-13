@@ -1,22 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 13 Jun 2016 13:59:08 -0500
-Subject: [PATCH 3/4] Documentation: DT: dma: Delete binding doc for AXI DMA
-In-Reply-To: <1465549954-30220-4-git-send-email-appanad@xilinx.com>
-References: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
- <1465549954-30220-4-git-send-email-appanad@xilinx.com>
-Message-ID: <20160613185908.GA26187@rob-hp-laptop>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 13 Jun 2016 21:04:16 +0200
+Subject: [PATCH 44/48] clocksource: atmel-pit: allow unselecting ATMEL_PIT
+In-Reply-To: <20160611105351.GH19050@piout.net>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1465596231-21766-45-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1606111143330.5839@nanos>
+ <20160611105351.GH19050@piout.net>
+Message-ID: <20160613210416.4fef01d2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 02:42:33PM +0530, Kedareswara rao Appana wrote:
-> The AXI DMA support is added to the existing AXI VDMA
-> driver. Device tree binding information also updated
-> in the VDMA binding doc.
-> 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
->  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |   65 --------------------
->  1 files changed, 0 insertions(+), 65 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+On Sat, 11 Jun 2016 12:53:51 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> On 11/06/2016 at 11:43:54 +0200, Thomas Gleixner wrote :
+> > On Sat, 11 Jun 2016, Alexandre Belloni wrote:
+> >   
+> > > With the new TCB clocksource driver, atmel platforms are now able to boot
+> > > without the PIT driver. Allow unselecting it.  
+> > 
+> > Yay! Thanks for doing this!
+> >   
+> 
+> Sure! Can you still check the request_irq/free_irq in
+> timer-atmel-tcbclksrc? I'm not sure whether this can work reliably or
+> only because we are before SYSTEM_STATE=RUNNING.
+> In the latter case, I have another way of doing that.
+> 
+
+Sorry to put it back on the table, but shouldn't we consider adding
+these irq_disable/enable_action() helpers?
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
