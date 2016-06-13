@@ -1,48 +1,69 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 13 Jun 2016 11:24:01 +0200
-Subject: [PATCH 1/1] ARM: dts: imx6qdl.dtsi: add "arm, shared-override"
- for pl310
-In-Reply-To: <20160611115733.GM20243@tiger>
-References: <1465292365-26038-1-git-send-email-peter.chen@nxp.com>
- <20160611115733.GM20243@tiger>
-Message-ID: <1465809841.2313.2.camel@pengutronix.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 13 Jun 2016 11:26:36 +0200
+Subject: [PATCH] usb: gadget: udc: atmel: Also get regmap for
+ at91sam9x5-pmc
+In-Reply-To: <20160613085608.GG26768@pengutronix.de>
+References: <1465807650-27316-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160613085608.GG26768@pengutronix.de>
+Message-ID: <20160613092636.GA3240@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, den 11.06.2016, 19:57 +0800 schrieb Shawn Guo:
-> + Lucas
+On 13/06/2016 at 10:56:08 +0200, Uwe Kleine-K?nig wrote :
+> Hello,
 > 
-> On Tue, Jun 07, 2016 at 05:39:25PM +0800, Peter Chen wrote:
-> > The imx6 SMP system has the same DMA memory coherency issue [1] with
-> > pl310 L2 controller. With this shared override bit set, the customer
-> > reports the DMA coherency issue is gone. Besides, I have tested
-> > the performance using USB ethernet with/without this bit, it shows
-> > no difference.
+> On Mon, Jun 13, 2016 at 10:47:30AM +0200, Alexandre Belloni wrote:
+> > The "atmel,at91sam9g45-udc" compatible UDC is also used on at91sam9x5 so it
+> > is also necessary to try to get the syscon for at91sam9x5-pmc.
 > > 
-> > [1] http://patchwork.ozlabs.org/patch/469362/
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > Fixes: 4747639f01c9 ("usb: gadget: atmel: access the PMC using regmap")
+> > Reported-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+> I played with the AT91 during my non-work time, so please use
+> uwe at kleine-koenig.org as my email address.
+> 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > > ---
-> >  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
-> >  1 file changed, 1 insertion(+)
+> >  drivers/usb/gadget/udc/atmel_usba_udc.c | 2 ++
+> >  1 file changed, 2 insertions(+)
 > > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> > index ed613eb..30e21ee 100644
-> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> > @@ -185,6 +185,7 @@
-> >  			cache-level = <2>;
-> >  			arm,tag-latency = <4 2 3>;
-> >  			arm,data-latency = <4 2 3>;
-> > +			arm,shared-override;
+> > diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> > index 18569de06b04..bb1f6c8f0f01 100644
+> > --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> > +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> > @@ -1920,6 +1920,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+> >  
+> >  	udc->errata = match->data;
+> >  	udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9g45-pmc");
+> > +	if (IS_ERR(udc->pmc))
+> > +		udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9x5-pmc");
+> >  	if (udc->errata && IS_ERR(udc->pmc))
+> >  		return ERR_CAST(udc->pmc);
 > 
-> Lucas had an objection to the change [1], considering the case that
-> kernel is booted as non-secure.
+> I didn't retest but I'm sure this makes usb gadget work on my AT91.
+> Still I'm unsure if the patch is correct. Can
+> 
+> 	syscon_regmap_lookup_by_compatible("atmel,at91sam9g45-pmc")
+> 
+> return -EPROBE_DEFER? Are there other error codes that should be fatal
+> enough to not try to look for a sam9x5-pmc?
+> 
 
-My objection to this change still stands. Configuring the L2C to be
-compliant to the ARMv7 ARM is at the same level as the CPU workarounds
-that can not be applied in secure mode. Those must be done in the
-firmware, if your firmware doesn't do it it's plain broken.
+Well, if finding the PMC fails, you are probably not far enough in the
+boot process to care about USB :)
 
-Regards,
-Lucas
+Also, looking up the syscon will never return -EPROBE_DEFER because it
+will create the regmap on first lookup, it doesn't matter where it is
+coming from.
+
+> Nearly orthogonal to the issue: An error message on failure would be
+> nice. When I saw usb gadget broken I first had to add messages to this
+> driver to see where it failed.
+> 
+
+Good point, this can probably go in a separate, less urgent patch.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
