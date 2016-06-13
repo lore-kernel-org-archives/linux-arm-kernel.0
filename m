@@ -1,76 +1,42 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 13 Jun 2016 11:46:20 +0300
-Subject: [PATCH 05/12] mmc: sdhci: add a pre voltage switch callback
- function
-In-Reply-To: <1465456218-28354-6-git-send-email-gregory.clement@free-electrons.com>
-References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
- <1465456218-28354-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <575E72DC.5090604@intel.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 13 Jun 2016 09:54:33 +0100
+Subject: [PATCH v2 4/9] coresight: Fix csdev connections initialisation
+In-Reply-To: <CANLsYkwGckonnLjHbOJQPZ849NQyjf+Zy=N6kjtwwo-kQbbj4Q@mail.gmail.com>
+References: <1465204301-24184-1-git-send-email-suzuki.poulose@arm.com>
+ <1465204301-24184-5-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkwGckonnLjHbOJQPZ849NQyjf+Zy=N6kjtwwo-kQbbj4Q@mail.gmail.com>
+Message-ID: <575E74C9.9010004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/16 10:10, Gregory CLEMENT wrote:
-> From: Victor Gu <xigu@marvell.com>
-> 
-> Some host controller such as Xenon needs additional setting when
-> switching signal voltage in eMMC mode. They also need to re-enable
-> internal clock before a voltage switch.
-> 
-> This commit adds a callback routine "voltage_switch_pre" in the struct
-> sdhci_ops, which is used by some host controllers which need re-enable
-> the internal clock before a voltage switch.
+On 12/06/16 21:39, Mathieu Poirier wrote:
+> On 6 June 2016 at 03:11, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>> This is a cleanup patch.
+>>
+>> coresight_device->conns holds an array to point to the devices
+>> connected to the OUT ports of a component. Sinks, e.g ETR, do not
+>> have an OUT port (nr_outport = 0), as it streams the trace to
+>> memory via AXI.
+>>
+>> At coresight_register() we do :
+>>
+>>          conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+>>          if (!conns) {
+>>                  ret = -ENOMEM;
+>>                  goto err_kzalloc_conns;
+>>          }
+>>
+>> For ETR, since the total size requested for kcalloc is zero, the return
+>> value is, ZERO_SIZE_PTR ( != NULL). Hence, csdev->conns = ZERO_SIZE_PTR
+>> which cannot be verified later to contain a valid pointer. The code which
+>> accesses the csdev->conns is bounded by the csdev->nr_outport check,
+>> hence we don't try to dereference the ZERO_SIZE_PTR. This patch cleans
+>> up the csdev->conns and csdev->refcnt, initialisation to make sure we
+>
+> This patch no longer deals with csdev->refcnt.
 
-Don't want to add sdhci host ops for the "do something before a mmc host op"
-case.
+Ok, fill fix that. Btw, do we need that check ? I am tempted to keep it there,
+just to make sure we don't end up in something similar in the future.
 
-Instead, export sdhci_start_signal_voltage_switch() and  hook
-host->mmc_host_ops.start_signal_voltage_switch. Then in sdhci-xenon.c:
-
-int xenon__start_signal_voltage_switch(struct mmc_host *mmc,
-				       struct mmc_ios *ios)
-{
-	blah blah
-	return sdhci_start_signal_voltage_switch(mmc, ios);
-}
-
-
-> 
-> [gregory.clement at free-electrons.com: split the initial commit and
-> reformulate the log]
-> 
-> Signed-off-by: Victor Gu <xigu@marvell.com>
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/mmc/host/sdhci.c | 4 ++++
->  drivers/mmc/host/sdhci.h | 1 +
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index b07219426d39..cad03ffa9d9b 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1729,6 +1729,10 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
->  	if (host->version < SDHCI_SPEC_300)
->  		return 0;
->  
-> +	/* Some controller need to do more before switching */
-> +	if (host->ops->voltage_switch_pre)
-> +		host->ops->voltage_switch_pre(host);
-> +
->  	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
->  
->  	switch (ios->signal_voltage) {
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index 49c6c5b0e33b..6bec1b0368d2 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -550,6 +550,7 @@ struct sdhci_ops {
->  					 unsigned int max_dtr, int host_drv,
->  					 int card_drv, int *drv_type);
->  	void	(*init_card)(struct sdhci_host *host, struct mmc_card *card);
-> +	void	(*voltage_switch_pre)(struct sdhci_host *host);
->  };
->  
->  #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-> 
+Cheers
+Suzuki
