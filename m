@@ -1,39 +1,45 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 13 Jun 2016 20:43:19 +0800
-Subject: [PATCH] ARM: sun8i: Add Parrot Board DTS
-In-Reply-To: <1465812931-22824-2-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <201606132024.ObwKj3uN%fengguang.wu@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Jun 2016 13:45:32 +0100
+Subject: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
+In-Reply-To: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
+References: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
+Message-ID: <20160613124531.GE1605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 13, 2016 at 05:20:17PM +0800, Wei Chen wrote:
+> The PCIe ACS capability will affect the layout of iommu groups.
+> Generally speaking, if the path from root port to the PCIe device
+> is ACS enabled, the iommu will create a single iommu group for this
+> PCIe device. If all PCIe devices on the path are ACS enabled then
+> Linux can determine this path is ACS enabled.
+> 
+> Linux use two PCIe configuration registers to determine the ACS
+> status of PCIe devices:
+> ACS Capability Register and ACS Control Register.
+> 
+> The first register is used to check the implementation of ACS function
+> of a PCIe device, the second register is used to check the enable status
+> of ACS function. If one PCIe device has implemented and enabled the ACS
+> function then Linux will determine this PCIe device enabled ACS.
+> 
+> From the Chapter:6.12 of PCI Express Base Specification Revision 3.1a,
+> we can find that when a PCIe device implements ACS function, the enable
+> status is set to disabled by default and can be enabled by ACS-aware
+> software.
+> 
+> ACS will affect the iommu groups topology, so, the iommu driver is
+> ACS-aware software. This patch adds a call to pci_request_acs() to the
+> arm-smmu driver to enable the ACS function in PCIe devices that support
+> it.
+> 
+> Signed-off-by: Wei Chen <Wei.Chen@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 2 ++
+>  drivers/iommu/arm-smmu.c    | 4 +++-
+>  2 files changed, 5 insertions(+), 1 deletion(-)
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.7-rc3 next-20160609]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks, queued for 4.8 w/ Robin and Eric's reviewed-by tags and the minor
+commit wording change.
 
-url:    https://github.com/0day-ci/linux/commits/Quentin-Schulz/ARM-sun8i-Add-Parrot-Board-DTS/20160613-181947
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: arm-sunxi_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/sun8i-r16-parrot.dts:285.1-15 Label or path reg_drivevbus not found
->> FATAL ERROR: Syntax error parsing input tree
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 19879 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160613/7776e70c/attachment-0001.obj>
+Will
