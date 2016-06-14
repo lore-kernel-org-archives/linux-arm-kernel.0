@@ -1,35 +1,41 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 14 Jun 2016 12:01:43 +0900
-Subject: [PATCH 3/3] arm64: dts: uniphier: add /memreserve/ for spin-table
- release address
+Date: Tue, 14 Jun 2016 12:01:41 +0900
+Subject: [PATCH 1/3] arm64: dts: uniphier: add SoC-Glue node to UniPhier 64bit
+ SoCs
 In-Reply-To: <1465873303-30754-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1465873303-30754-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1465873303-30754-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1465873303-30754-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As Documentation/arm64/booting.txt says, the cpu-release-addr
-location should be reserved.
+This node consists of various system-level configuration registers.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
 
- arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
-index 644025c..c223915 100644
+index 9532880..31dc51b 100644
 --- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
 +++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
-@@ -42,6 +42,8 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+@@ -264,9 +264,13 @@
+ 			reg = <0x59801000 0x400>;
+ 		};
  
-+/memreserve/ 0x80000000 0x00000008;	/* cpu-release-addr */
+-		pinctrl: pinctrl at 5f801000 {
+-			compatible = "socionext,ph1-ld20-pinctrl", "syscon";
+-			reg = <0x5f801000 0xe00>;
++		soc-glue at 5f800000 {
++			compatible = "simple-mfd", "syscon";
++			reg = <0x5f800000 0x2000>;
 +
- / {
- 	compatible = "socionext,ph1-ld20";
- 	#address-cells = <2>;
++			pinctrl: pinctrl {
++				 compatible = "socionext,uniphier-ld20-pinctrl";
++			};
+ 		};
+ 
+ 		gic: interrupt-controller at 5fe00000 {
 -- 
 1.9.1
