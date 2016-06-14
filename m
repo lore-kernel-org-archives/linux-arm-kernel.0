@@ -1,32 +1,35 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 14 Jun 2016 15:37:11 -0500
-Subject: [PATCH] ARM: socfpga: Update socfpga_defconfig
-In-Reply-To: <1462480394-8084-1-git-send-email-marex@denx.de>
-References: <1462480394-8084-1-git-send-email-marex@denx.de>
-Message-ID: <alpine.DEB.2.02.1606141536130.4855@linux-builds1>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 14 Jun 2016 13:50:54 -0700
+Subject: [GIT PULL] Amlogic DT updates for v4.8 (v2)
+Message-ID: <7hziqnbikx.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 May 2016, Marek Vasut wrote:
+Here's a respin of the Amlogic DT branch with only 32-bit DT stuff.
 
-> Enable the following bits:
-> 
-> CONFIG_TOUCHSCREEN_STMPE
->  - STMPE touchscreen support, needed on MCVEVK as it contains the
->    chip. This also enables the STMPE MFD device and touchscreen
->    input support.
-> 
-> CONFIG_USB_STORAGE
->  - USB storage support is often used, so enable it.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
->  arch/arm/configs/socfpga_defconfig | 4 ++++
->  1 file changed, 4 insertions(+)
->
+Kevin
 
-Sorry that this took me a while, I missed it somehow. Anywways, applied! 
 
-Thanks,
-Dinh
+
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
+
+for you to fetch changes up to cad059c6e6b2185a068453608f155e9e8a64af39:
+
+  ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms (2016-06-14 13:36:56 -0700)
+
+----------------------------------------------------------------
+Amlogic DT changes for v4.8
+- add reset driver for meson8b
+
+----------------------------------------------------------------
+Neil Armstrong (1):
+      ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms
+
+ arch/arm/boot/dts/meson8b.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
