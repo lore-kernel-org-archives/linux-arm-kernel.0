@@ -1,88 +1,66 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 14 Jun 2016 11:00:35 -0700
-Subject: [PATCHv2] arm64: Handle el1 synchronous instruction aborts cleanly
-Message-ID: <1465927235-8163-1-git-send-email-labbott@redhat.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 14 Jun 2016 14:03:40 -0400
+Subject: [GIT PULL 8/8] ARM: defconfig: exynos: Defconfig for v4.8
+In-Reply-To: <20160613222423.GA29879@localhost>
+References: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
+ <1465215933-22709-9-git-send-email-k.kozlowski@samsung.com>
+ <20160613222423.GA29879@localhost>
+Message-ID: <a1239955-19cb-92f1-30c8-d354bacc34de@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Executing from a non-executable area gives an ugly message:
+Hello Olof,
 
-lkdtm: Performing direct entry EXEC_RODATA
-lkdtm: attempting ok execution at ffff0000084c0e08
-lkdtm: attempting bad execution at ffff000008880700
-Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
-CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
-Hardware name: linux,dummy-virt (DT)
-task: ffff800077e35780 ti: ffff800077970000 task.ti: ffff800077970000
-PC is at lkdtm_rodata_do_nothing+0x0/0x8
-LR is at execute_location+0x74/0x88
+On 06/13/2016 06:24 PM, Olof Johansson wrote:
+> On Mon, Jun 06, 2016 at 02:25:33PM +0200, Krzysztof Kozlowski wrote:
+>>
+>> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+>>
+>>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.8
+>>
+>> for you to fetch changes up to 4b388071a2235ed8f05d05d069f5a5a29782a8c5:
+>>
+>>   ARM: exynos_defconfig: Save defconfig on current linux-next (2016-06-06 08:36:55 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Samsung defconfig update for v4.8:
+>> 1. Disable big.LITTLE switcher so the cpufreq-dt could be enabled.
+>> 2. Enable Samsung media platform drivers.
+>> 3. Enable some board-specific drivers for boards: Trats2, Universal C210.
+>> 4. Few more minor additions.
+> 
+> Hmm. So this made me wonder what's used on the 5420/5800 chromebooks, but it
 
-The 'IABT (current EL)' indicates the error but it's a bit cryptic
-without knowledge of the ARM ARM. There is also no indication of the
-specific address which triggered the fault. The increase in kernel
-page permissions makes hitting this case more likely as well.
-Handling the case in the vectors gives a much more familiar looking
-error message:
+You mean as CPUFreq driver? It's used cpufreq-dt as well but the compatible
+strings for exynos5420/5800 are not registered when the switcher is enabled.
 
-lkdtm: Performing direct entry EXEC_RODATA
-lkdtm: attempting ok execution at ffff0000084c0840
-lkdtm: attempting bad execution at ffff000008880680
-Unable to handle kernel paging request at virtual address ffff000008880680
-pgd = ffff8000089b2000
-[ffff000008880680] *pgd=00000000489b4003, *pud=0000000048904003, *pmd=0000000000000000
-Internal error: Oops: 8400000e [#1] PREEMPT SMP
-Modules linked in:
-CPU: 1 PID: 997 Comm: sh Not tainted 4.7.0-rc1+ #24
-Hardware name: linux,dummy-virt (DT)
-task: ffff800077f9f080 ti: ffff800008a1c000 task.ti: ffff800008a1c000
-PC is at lkdtm_rodata_do_nothing+0x0/0x8
-LR is at execute_location+0x74/0x88
+> looks like they don't even boot with SMP, at least not the way I boot them
+> (with u-boot as a chainloaded kernel).
+>
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
-v2: Clarified the messages we got a bit. Verified this applies cleanly
-on top of Mark Rutland's kill-esr-lnx-exec series
----
- arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+All 8 cores for the Exynos5420/5800 Chromebooks have been brought up via MCPM
+for a long time in mainline, look for example at Kevin's Peach Pi boot log [0].
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index eefffa8..6c6cec9 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -336,6 +336,8 @@ el1_sync:
- 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
- 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
- 	b.eq	el1_da
-+	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
-+	b.eq	el1_ia
- 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
- 	b.eq	el1_undef
- 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
-@@ -347,6 +349,23 @@ el1_sync:
- 	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
- 	b.ge	el1_dbg
- 	b	el1_inv
-+el1_ia:
-+	/*
-+	 * Instruction abort handling
-+	 */
-+	mrs	x0, far_el1
-+	enable_dbg
-+	// re-enable interrupts if they were enabled in the aborted context
-+	tbnz	x23, #7, 1f			// PSR_I_BIT
-+	enable_irq
-+	orr	x1, x1, #1 << 24		// use reserved ISS bit for instruction aborts
-+1:
-+	mov	x2, sp				// struct pt_regs
-+	bl	do_mem_abort
-+
-+	// disable interrupts before pulling preserved data off the stack
-+	disable_irq
-+	kernel_exit 1
- el1_da:
- 	/*
- 	 * Data abort handling
+This is also true when chainloading u-boot (that's my setup as well), but I see
+that only one CPU is powered up on your boot farm indeed [1].
+
+I'm using the latest ChromeOS u-boot and chain loading u-boot version 2016.01.
+ 
+> Branch merged.
+> 
+> 
+> -Olof
+> 
+
+[0]: https://storage.kernelci.org/next/next-20160614/arm-exynos_defconfig/lab-baylibre-seattle/boot-exynos5800-peach-pi.html
+[1]: http://arm-soc.lixom.net/bootlogs/next/next-20160614/pi-arm-exynos_defconfig.html 
+
+Best regards,
 -- 
-2.5.5
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
