@@ -1,48 +1,97 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Jun 2016 17:30:56 +0200
-Subject: [PATCH 2/5] ARM: dts: add SDCC5 to Qualcomm MSM8660
+Date: Tue, 14 Jun 2016 17:30:58 +0200
+Subject: [PATCH 4/5] ARM: dts: move the fixed MMC regulator to SURF board
 In-Reply-To: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
 References: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1465918259-11138-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1465918259-11138-5-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDCC5 SD/MMC controller is used for a second uSD slot
-on the APQ8060 Dragonboard. On most other systems it is just
-dark silicon so define it and leave it as "disabled" in the core
-SoC file.
+There is currently a fixed regulator in the .dtsi file for
+the MSM8660 chipset, used by the SURF board. We want to define
+real regulators for a board using this chipset, so push the fixed
+regulator down to the SURF board which is the only user.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/qcom-msm8660.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/qcom-msm8660-surf.dts | 11 +++++++++++
+ arch/arm/boot/dts/qcom-msm8660.dtsi     | 12 ------------
+ 2 files changed, 11 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 6a62b62ad980..a5a38820554a 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -262,6 +262,22 @@
- 				no-1-8-v;
- 				vmmc-supply = <&vsdcc_fixed>;
+diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+index b17f379e8c2a..23de764558ab 100644
+--- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
++++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+@@ -23,15 +23,26 @@
  			};
-+
-+			sdcc5: sdcc at 12200000 {
-+				compatible	= "arm,pl18x", "arm,primecell";
-+				arm,primecell-periphid = <0x00051180>;
-+				status		= "disabled";
-+				reg		= <0x12200000 0x8000>;
-+				interrupts	= <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names	= "cmd_irq";
-+				clocks		= <&gcc SDC5_CLK>, <&gcc SDC5_H_CLK>;
-+				clock-names	= "mclk", "apb_pclk";
-+				bus-width	= <4>;
-+				cap-sd-highspeed;
-+				cap-mmc-highspeed;
-+				max-frequency	= <48000000>;
-+				vmmc-supply = <&vsdcc_fixed>;
-+			};
  		};
  
- 		tcsr: syscon at 1a400000 {
++		/* Temporary fixed regulator */
++		vsdcc_fixed: vsdcc-regulator {
++			compatible = "regulator-fixed";
++			regulator-name = "SDCC Power";
++			regulator-min-microvolt = <2700000>;
++			regulator-max-microvolt = <2700000>;
++			regulator-always-on;
++		};
++
+ 		amba {
+ 			/* eMMC */
+ 			sdcc1: sdcc at 12400000 {
+ 				status = "okay";
++				vmmc-supply = <&vsdcc_fixed>;
+ 			};
+ 
+ 			/* External micro SD card */
+ 			sdcc3: sdcc at 12180000 {
+ 				status = "okay";
++				vmmc-supply = <&vsdcc_fixed>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 51d3c9e70617..088b48fdf75d 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -304,15 +304,6 @@
+ 			};
+ 		};
+ 
+-		/* Temporary fixed regulator */
+-		vsdcc_fixed: vsdcc-regulator {
+-			compatible = "regulator-fixed";
+-			regulator-name = "SDCC Power";
+-			regulator-min-microvolt = <2700000>;
+-			regulator-max-microvolt = <2700000>;
+-			regulator-always-on;
+-		};
+-
+ 		amba {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -332,7 +323,6 @@
+ 				non-removable;
+ 				cap-sd-highspeed;
+ 				cap-mmc-highspeed;
+-				vmmc-supply = <&vsdcc_fixed>;
+ 			};
+ 
+ 			sdcc3: sdcc at 12180000 {
+@@ -349,7 +339,6 @@
+ 				cap-mmc-highspeed;
+ 				max-frequency	= <48000000>;
+ 				no-1-8-v;
+-				vmmc-supply = <&vsdcc_fixed>;
+ 			};
+ 
+ 			sdcc5: sdcc at 12200000 {
+@@ -365,7 +354,6 @@
+ 				cap-sd-highspeed;
+ 				cap-mmc-highspeed;
+ 				max-frequency	= <48000000>;
+-				vmmc-supply = <&vsdcc_fixed>;
+ 			};
+ 		};
+ 
 -- 
 2.4.11
