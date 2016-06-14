@@ -1,51 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 13 Jun 2016 22:07:58 -0300
-Subject: [PATCH 3/4] ARM: dts: imx6ul-evk: Use WDOG_B pin reset
-In-Reply-To: <1465866479-15953-1-git-send-email-festevam@gmail.com>
-References: <1465866479-15953-1-git-send-email-festevam@gmail.com>
-Message-ID: <1465866479-15953-3-git-send-email-festevam@gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 14 Jun 2016 01:08:48 +0000
+Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
+ <20160601005751.GG20527@verge.net.au>
+ <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
+ <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
+ <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
+ <20160610010245.GA10152@verge.net.au>
+ <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
+ <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
+ <1b9a4cf4-1101-ccbf-772b-49b8a689a1b6@cogentembedded.com>
+ <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
+Message-ID: <87eg80d1m9.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
 
-imx6ul-evk has WDOG1_B pin connected to the PMIC. 
+Hi Geert
 
-Pass the 'fsl,ext-reset-output' property so that the watchdog
-can trigger a system POR reset via the PMIC.
+> Right, I had forgotten about that.
+> Fortunately the clk-rcar-gen2 driver has a sane failure mode for this case ;-)
+> 
+> it seems the RCAN clock can just be modeled as a fixed clock. However,
+> its divider value isn't clear to me, as 15.9 MHz cannot be generated from PLL1
+> using an integer divider. Morimoto-san, can you please ask for clarification?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6ul-14x14-evk.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-index 668a729..d6ac6cb 100644
---- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-+++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-@@ -207,6 +207,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
-+
- &iomuxc {
- 	pinctrl-names = "default";
- 
-@@ -435,4 +441,10 @@
- 			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3 0x17059
- 		>;
- 	};
-+
-+	pinctrl_wdog: wdoggrp {
-+		fsl,pins = <
-+			MX6UL_PAD_LCD_RESET__WDOG1_WDOG_ANY    0x30b0
-+		>;
-+	};
- };
--- 
-1.9.1
+OK.
+Now, I asked to HW team about that.
+Please wait.
