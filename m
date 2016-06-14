@@ -1,96 +1,95 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 13 Jun 2016 22:06:49 -0700
-Subject: [PATCH 2/2] dmaengine: bcm2835: Avoid splitting periods into very
- small chunks
-In-Reply-To: <1465472504-10191-3-git-send-email-hias@horus.com>
-References: <1465472504-10191-1-git-send-email-hias@horus.com>
- <1465472504-10191-3-git-send-email-hias@horus.com>
-Message-ID: <8760tcwe8m.fsf@eliezer.anholt.net>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Tue, 14 Jun 2016 07:28:39 +0200
+Subject: [linux-sunxi] [PATCH v3 10/13] spi: sunxi: merge sun4i and sun6i
+ SPI driver
+In-Reply-To: <CAGRGNgWPBh03zQrM=OMF24ezJvC-K0TMw2oqPhuNLj-nZ=mZQA@mail.gmail.com>
+References: <cover.1465490774.git.hramrach@gmail.com>
+ <ad0ec30ef6b01f58e1b3b92da06e6cbd5c947354.1465490774.git.hramrach@gmail.com>
+ <CAGRGNgVONS+i=57D52VeW8J6SvfmX=iG+3VpxNS8=kJOV+WSLw@mail.gmail.com>
+ <CAOMqctQD=o6YBk-QRiqbE9Cj+ZAH1nAM33rW6ZHefV8dU3aucQ@mail.gmail.com>
+ <CAGRGNgWPBh03zQrM=OMF24ezJvC-K0TMw2oqPhuNLj-nZ=mZQA@mail.gmail.com>
+Message-ID: <CAOMqctTjGTeaFC3MJe4MoMipdSf2ppOpikBSa8A-ht2v4j86bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matthias Reichl <hias@horus.com> writes:
-
-> The current cyclic DMA period splitting implementation can generate
-> very small chunks at the end of each period. For example a 65536 byte
-> period will be split into a 65532 byte chunk and a 4 byte chunk on
-> the "lite" DMA channels.
+On 14 June 2016 at 06:47, Julian Calaby <julian.calaby@gmail.com> wrote:
+> Hi Michal,
 >
-> This increases pressure on the RAM controller as the DMA controller
-> needs to fetch two control blocks from RAM in quick succession and
-> could potentially cause latency issues if the RAM is tied up by other
-> devices.
+> On Tue, Jun 14, 2016 at 2:34 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+>> Hello,
+>>
+>> On 14 June 2016 at 01:43, Julian Calaby <julian.calaby@gmail.com> wrote:
+>>> Hi Michal,
+>>>
+>>> On Tue, Jun 14, 2016 at 3:46 AM, Michal Suchanek <hramrach@gmail.com> wrote:
+>>>> The drivers are very similar and share multiple flaws which needed
+>>>> separate fixes for both drivers.
+>>>>
+>>>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>>>> ---
+>>>>  drivers/spi/Kconfig     |   8 +-
+>>>>  drivers/spi/Makefile    |   1 -
+>>>>  drivers/spi/spi-sun4i.c | 156 +++++++++++--
+>>>>  drivers/spi/spi-sun6i.c | 598 ------------------------------------------------
+>>>>  4 files changed, 143 insertions(+), 620 deletions(-)
+>>>>  delete mode 100644 drivers/spi/spi-sun6i.c
+>>>>
+>>>> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+>>>> index 0b8e6c6..c76f8e4 100644
+>>>> --- a/drivers/spi/spi-sun4i.c
+>>>> +++ b/drivers/spi/spi-sun4i.c
+>>>> @@ -279,9 +321,14 @@ static int sunxi_spi_transfer_one(struct spi_master *master,
+>>>>         reg = sunxi_spi_read(sspi, SUNXI_TFR_CTL_REG);
+>>>>
+>>>>         /* Reset FIFOs */
+>>>> -       sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG,
+>>>> -                       reg | sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>>>> -                       sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>>>> +       if (sspi->type == SPI_SUN4I)
+>>>> +               sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG,
+>>>> +                               reg | sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>>>> +                               sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>>>> +       else
+>>>> +               sunxi_spi_write(sspi, SUNXI_FIFO_CTL_REG,
+>>>> +                               sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>>>> +                               sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>>>
+>>> If we're already doing different stuff for each generation of the IP,
+>>> why not just use the register offsets and bit definitions directly?
+>>
+>> Because having (*sspi->regmap)[SUNXI_FIFO_CTL_REG] all over the place
+>> makes my eyes bleed and you cannot use the check that you are
+>> accessing a register that actually exists.
 >
-> We can easily avoid these situations by distributing the remaining
-> length evenly between the last-but-one and the last chunk, making
-> sure that split chunks will be at least half the maximum length the
-> DMA controller can handle.
+> I mean removing SUNXI_CTL_RF_RST and SUNXI_CTL_TF_RST from all of the
+> indirection you added and using them directly, i.e.
 >
-> This patch checks if the last chunk would be less than half of
-> the maximum DMA length and if yes distributes the max len+4...max_len*1.5
-> bytes evenly between the last 2 chunks. This results in chunk sizes
-> between max_len/2 and max_len*0.75 bytes.
+> #define SUN4I_TFR_CTL_RF_RST BIT(x)
+> #define SUN4I_TFR_CTL_TF_RST BIT(x)
+> #define SUN6I_FIFO_CTL_RF_RST BIT(x)
+> #define SUN6I_FIFO_CTL_TF_RST BIT(x)
 >
-> Signed-off-by: Matthias Reichl <hias@horus.com>
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> Tested-by: Clive Messer <clive.messer@digitaldreamtime.co.uk>
-> ---
->  drivers/dma/bcm2835-dma.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+> then
 >
-> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-> index 344bcf92..36b998d 100644
-> --- a/drivers/dma/bcm2835-dma.c
-> +++ b/drivers/dma/bcm2835-dma.c
-> @@ -252,6 +252,20 @@ static void bcm2835_dma_create_cb_set_length(
->  
->  	/* have we filled in period_length yet? */
->  	if (*total_len + control_block->length < period_len) {
-> +		/*
-> +		 * If the next control block is the last in the period
-> +		 * and it's length would be less than half of max_len
-> +		 * change it so that both control blocks are (almost)
-> +		 * equally long. This avoids generating very short
-> +		 * control blocks (worst case would be 4 bytes) which
-> +		 * might be problematic. We also have to make sure the
-> +		 * new length is a multiple of 4 bytes.
-> +		 */
-> +		if (*total_len + control_block->length + max_len / 2 >
-> +		    period_len) {
-> +			control_block->length =
-> +				DIV_ROUND_UP(period_len - *total_len, 8) * 4;
-> +		}
->  		/* update number of bytes in this period so far */
->  		*total_len += control_block->length;
->  		return;
+> if (sspi->type == SPI_SUN4I)
+>     sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG, reg |
+> SUN4I_TFR_CTL_RF_RST | SUN4I_TFR_CTL_TF_RST);
+> else
+>     sunxi_spi_write(sspi, SUNXI_FIFO_CTL_REG, reg |
+> SUN6I_FIFO_CTL_RF_RST | SUN6I_FIFO_CTL_TF_RST);
+>
+> I.e. the bits that need setting are in different registers, so you
+> have to have an if statement and separate calls. Therefore there's no
+> real benefit from the indirection you've introduced here, unless
+> you're expecting the SUN8I variant to use different bits in one of
+> those two registers.
+>
 
-It seems to me like this would all be a lot simpler if we always split
-the last 2 control blocks evenly (other than 4-byte rounding):
+That looks nice for this particular case.
 
-u32 period_remaining = period_len - *total_len;
+Still you will have to remember that these bits are specified directly
+while other bits on the register are mapped which is not so nice.
 
-/* Early exit if we aren't finishing this period */
-if (period_remaining >= max_len) {
-	/*
-	 * Split the length between the last 2 CBs, to help hide the
-	 * latency of fetching the CBs.
-	 */
-	if (period_remaining < max_len * 2) {
-		control_block->length =
-                	DIV_ROUND_UP(period_remaining, 8) * 4;
-        }
-	/* update number of bytes in this period so far */
-	*total_len += control_block->length;
-}
+Thanks
 
-I'm about to go semi-AFK for a couple weeks.  If there's a good reason
-to only do this when the last block is very short, I'm fine with:
-
-Acked-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160613/51301430/attachment.sig>
+Michal
