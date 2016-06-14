@@ -1,63 +1,33 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 14 Jun 2016 21:44:04 +0200
-Subject: [GIT PULL 7/8] ARM: dts: exynos: Topic branch with Odroid XU for
- v4.8
-In-Reply-To: <20160613215339.GE20845@localhost>
-References: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
- <1465215933-22709-8-git-send-email-k.kozlowski@samsung.com>
- <20160613215339.GE20845@localhost>
-Message-ID: <20160614194404.GA5581@kozik-lap>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 14 Jun 2016 12:48:53 -0700
+Subject: [PATCH 3/5] ARM: dts: add L2CC and RPM with regulators for MSM8660
+In-Reply-To: <20160614190217.GU1256@tuxbot>
+References: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
+ <1465918259-11138-4-git-send-email-linus.walleij@linaro.org>
+ <20160614185517.GG28218@codeaurora.org>
+ <20160614190217.GU1256@tuxbot>
+Message-ID: <20160614194853.GL28218@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 02:53:39PM -0700, Olof Johansson wrote:
-> On Mon, Jun 06, 2016 at 02:25:32PM +0200, Krzysztof Kozlowski wrote:
-> > Hi,
-> > 
-> > This topic branch pulls external clk dependency (provided by Sylwester
-> > Nawrocki).
-> > 
-> > Expected annoying conflict with DT changes here (please see the email 0/8).
-> > 
-> > 
-> > Best regards,
-> > Krzysztof
-> > 
-> > 
-> > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-> > 
-> >   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-odroid-xu-4.8
-> > 
-> > for you to fetch changes up to b8bd7e23bb0be762c39510497c931066dc62e62f:
-> > 
-> >   ARM: dts: exynos: Add watchdog and Security SubSystem to Exynos5410 (2016-06-06 13:20:57 +0200)
-> > 
-> > ----------------------------------------------------------------
-> > Topic branch for adding Exynos 5410 Odroid XU board for v4.8.
-> > 
-> > This brings support for Hardkernel's Odroid XU board.  It was the first
-> > design with big.LITTLE SoC from Samsung: Exynos5410.  The board is not
-> > very popular.  Newer XU3 and XU4 got more attention.
-> > 
-> > Board details:
-> > 1. Exynos5410 octa-core (A15+A7, however as of now only one cluster is
-> >    enabled),
-> > 2. 2 GB DDR3 RAM,
-> > 3. PowerVR SGX544MP3 GPU (not enabled in DTS),
-> > 4. USB 3.0 Host x 1, USB 3.0 OTG x 1, USB 2.0 Host x 4,
-> > 5. HDMI 1.4a, MIPI DSI and Display Port (Display Port not on all of
-> >    revisions though),
-> > 6. eMMC 4.5 and microSD slots.
+On 06/14, Bjorn Andersson wrote:
+> On Tue 14 Jun 11:55 PDT 2016, Stephen Boyd wrote:
 > 
-> Merged. Please double-check conflict resolution but it seemed trivial
-> (reapplied "ARM: dts: exynos: Add async-bridge clock to MFC power domain
-> for Exynos5420" to the new context).
+> > On 06/14, Linus Walleij wrote:
+> > > diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+> [..]
+> > > +
+> > > +			pm8901-regulators {
+> > 
+> > I'd rather have regulators at 8901 and regulators at 8058. That way the
+> > node name is generic per ePAPR suggestions.
+> > 
+> 
+> I agree, but unfortunately we're not allowed to do that without a
+> matching "reg = <>" anymore.
 
-Looks correct, thanks!
+Oh does dtc blow up now?
 
-Best regards,
-Krzysztof
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
