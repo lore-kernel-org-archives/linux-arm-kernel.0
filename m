@@ -1,62 +1,72 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 13 Jun 2016 20:49:39 -0700
-Subject: [PATCH] clk: rockchip: add pclk_vio_grf to critical clock on the
- RK3399
-In-Reply-To: <575F73B1.9000703@rock-chips.com>
-References: <1465724913-14553-1-git-send-email-zhengxing@rock-chips.com>
- <CAD=FV=XSSPMOnMD3mqFyqM3wWLShbRc2cXVdN0PYcUxpaDnsTw@mail.gmail.com>
- <575E240C.9060502@rock-chips.com>
- <CAD=FV=WhaN__psCV_hYoc67gZMpCt_9yp5=vR-C4uc8i39RAaA@mail.gmail.com>
- <575F73B1.9000703@rock-chips.com>
-Message-ID: <CAD=FV=X-d+hO_zq4UGMsnpELcpEfiD7wFh5dcmgqM_oiSRwOmg@mail.gmail.com>
+From: huangtao@rock-chips.com (Huang, Tao)
+Date: Tue, 14 Jun 2016 12:00:12 +0800
+Subject: [PATCH v2 0/4] clocksource: rockchip/timer: Support rktimer for
+ rk3399
+In-Reply-To: <20160613130625.GC10634@linaro.org>
+References: <1465275273-22076-1-git-send-email-wxt@rock-chips.com>
+ <20160613130625.GC10634@linaro.org>
+Message-ID: <575F814C.104@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Daniel:
+On 2016?06?13? 21:06, Daniel Lezcano wrote:
+> On Tue, Jun 07, 2016 at 12:54:29PM +0800, Caesar Wang wrote:
+>> This series patches had been tested on rockchip inside kernel.
+>> In order to support the rk3399 SoC timer and turn off interrupts and IPIs to
+>> save power in idle.
+> 
+> For my personnal information, are the arch_timer in the same power domain 
+> than the CPU ? IOW, what is the 'always-on' property in the DT ?
 
-On Mon, Jun 13, 2016 at 8:02 PM, Xing Zheng <zhengxing@rock-chips.com> wrote:
-> Hi Doug,
->
-> On 2016?06?14? 07:46, Doug Anderson wrote:
+Yes. In our SoC design, all arch (generic) timer in the same power
+domain of CPU core. So if one CPU core power down, the arch (generic)
+timer will lose it's state and stop working.
+While rk timer maybe in peri power domain or pmu power domain, so the
+timer will still work when CPU power down.
+
+But before RK3399, all SoCs with CPU power domain, do not support auto
+power down while cpu idle. So the arch timer can be seem as always on,
+i.e. we don't need a broadcast timer at all.
+
+> 
+>> Okay, it still works bootup on rk3288/other SoCs, even though many socs 
+>> hasn't used
+>> the broadcast timer.
+> 
+> Yes, unfortunately the SoC design on rk3288 and the previous ones do not 
+> allow to use a cpuidle driver with cpu/cluster power down, so obviously the 
+> broadcast timer is pointless on these boards :)
+> 
+
+You are right.
+
+>> History version:
+>> v1:
+>> https://lkml.org/lkml/2016/5/25/186
 >>
+>> Easy to test for my borad.
+>> localhost / # cat /proc/interrupts
+>> CPU0       CPU1       CPU2       CPU3       CPU4       CPU5
+>> 1:          0          0          0          0          0          0     GICv3  29 Edge      arch_timer
+>> ...
+>> 5:          0          0          0          0          0          0     GICv3 113 Level     rk_timer
+>> ..
 >>
->> Even if it's not much power, it seems like we should still turn it off
->> and on in the right place.  Unless I'm mistaken it should be such a
->> simple patch provide the clock to the right driver and then get the
->> clock when appropriate.
->
-> Yes, I talked with Yakir and we intent to enable/disable the pclk_vio_grf in
-> video drivers,
-> so this patch will be dropped.
->>>
->>> I will refer the latest TRM to update a new patch for always enable these
->>> GRFs.
->>
->> Does that mean you're going to make these all critical clocks?  That
->> doesn't sound so great...
->>
->> -Doug
->
-> Maybe, I heard that they are removed in the updated TRM, but I have not got
-> the TRM yet.
-> I will double check it, and it seems that you do not agree to remove these
-> clock...
+>> localhost / # cat /proc/timer_list | grep event_handler
+>> get "event_handler:  hrtimer_interrupt"
+>> event_handler:  tick_handle_oneshot_broadcast
+>> event_handler:  hrtimer_interrupt
+> 
+> What are you trying to demonstrate here ? There are no interrupts for both 
+> arch_timer and rk_timer.
 
-Well, if it were to be removed from the TRM then that would be a
-strong sign that the SoC designers think that this clock should never
-ever be turned off.  If that were the case I don't think I could
-object to leaving this clock on all the time.  Presumably then we'd
-totally remove the clock from the clock tree and rely on firmware to
-leave it on?  Technically removing this clock is not really
-device-tree backward compatible, but I guess if there are no current
-users...
+I don't know. Maybe Caesar do something wrong :(
+This is my output:
+           CPU0       CPU1       CPU2       CPU3       CPU4       CPU5
 
-...note: if the clock IS listed in the TRM and there's ever a chance
-that we'd want to turn it off, it's much easier to set that up all
-now.  Trying to later go in and decide that these clocks are no longer
-"always on" gets into all sorts of weird device tree backward
-compatibility corner cases.
-
-
-
--Doug
+...
+  2:       2911       1967       1588       1608       1295       1606
+   GICv3  30 Edge      arch_timer
+  5:        578        637        684        626        161        165
+   GICv3 113 Level     rk_timer
