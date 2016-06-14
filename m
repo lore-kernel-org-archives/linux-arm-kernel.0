@@ -1,53 +1,23 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Jun 2016 16:59:48 +0100
-Subject: [PATCH v2 6/7] iommu/arm-smmu: Finish off SMMUv3 default domain
- support
-In-Reply-To: <aabcdd814b93b2b6a902b189f6911f929a29b64f.1464966939.git.robin.murphy@arm.com>
-References: <cover.1464966939.git.robin.murphy@arm.com>
- <aabcdd814b93b2b6a902b189f6911f929a29b64f.1464966939.git.robin.murphy@arm.com>
-Message-ID: <20160614155948.GD16531@arm.com>
+Date: Tue, 14 Jun 2016 17:01:11 +0100
+Subject: [PATCH v3 1/2] arm-smmu: doc: add SMMU mask documentation
+In-Reply-To: <1465469001-2352-2-git-send-email-thommyj@gmail.com>
+References: <5757FD62.2010403@arm.com>
+ <1465469001-2352-1-git-send-email-thommyj@gmail.com>
+ <1465469001-2352-2-git-send-email-thommyj@gmail.com>
+Message-ID: <20160614160110.GE16531@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 06:15:41PM +0100, Robin Murphy wrote:
-> The driver's current reliance on attaching/detaching an entire group
-> for the first device it sees is at odds with the IOMMU core's initial
-> construction of a group by adding each device and attaching it to the
-> default domain in turn. As it turns out, we can happily do away with the
-> whole palaver by simply letting each device be in charge of its own
-> stream ID/stream table entry, and reducing the problem of tracking
-> duplicate IDs and domains down to "Is the STE already associated with
-> the appropriate context?", which is easily done by just looking at the
-> stream table itself.
+On Thu, Jun 09, 2016 at 12:43:20PM +0200, Thommy Jakobsson wrote:
+> Add documentation on how to use a mask for a StreamId.
+> 
+> Signed-off-by: Thommy Jakobsson <thommyj@gmail.com>
+> ---
+>  .../devicetree/bindings/iommu/arm,smmu.txt         | 23 +++++++++++++++++++---
+>  1 file changed, 20 insertions(+), 3 deletions(-)
 
-Hmm, it would be nice if Joerg could confirm this before we remove the
-driver code.
-
-Joerg: can an IOMMU driver rely on not receiving contradictory ->attach
-callbacks for devices in the same group? Robin is proposing that we
-remove the group tracking code from the ARM SMMU driver which is a nice
-cleanup but leaves us open to silent misconfiguration if we are asked to
-violate the group constraints.
-
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 7631639cc209..28dcc5ca237e 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -607,15 +607,6 @@ struct arm_smmu_device {
->  	struct arm_smmu_strtab_cfg	strtab_cfg;
->  };
->  
-> -/* SMMU private data for an IOMMU group */
-> -struct arm_smmu_group {
-> -	struct arm_smmu_device		*smmu;
-> -	struct arm_smmu_domain		*domain;
-> -	int				num_sids;
-> -	u32				*sids;
-> -	struct arm_smmu_strtab_ent	ste;
-> -};
-
-I'm not keen on losing this structure. How about we instead change the
-sids array to be a linked list of {struct device, sid[]} and then change
-arm_smmu_install_ste_for_group to take a device pointer as well?
+We should *really* be moving people over to the generic IOMMU bindings
+rather than extending this one.
 
 Will
