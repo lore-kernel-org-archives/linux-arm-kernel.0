@@ -1,90 +1,118 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 14 Jun 2016 10:07:06 +0300
-Subject: [PATCH 05/12] mmc: sdhci: add a pre voltage switch callback
- function
-In-Reply-To: <D7CF8A19-9181-4A97-90AF-AC5A6517CE2B@marvell.com>
-References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
- <1465456218-28354-6-git-send-email-gregory.clement@free-electrons.com>
- <575E72DC.5090604@intel.com>
- <D7CF8A19-9181-4A97-90AF-AC5A6517CE2B@marvell.com>
-Message-ID: <575FAD1A.6090407@intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 14 Jun 2016 09:31:23 +0200
+Subject: Boot failure on emev2/kzm9d (was: Re: [PATCH v2 11/11] mm/slab:
+ lockless decision to grow cache)
+In-Reply-To: <20160614062456.GB13753@js1304-P5Q-DELUXE>
+References: <CAMuHMdXC=zEjbZADE5wELjOq_kBiFNewpdUrMCe8d3Utu98h8A@mail.gmail.com>
+ <20160614062456.GB13753@js1304-P5Q-DELUXE>
+Message-ID: <CAMuHMdWipquaVFKYLd=2KhTx6djwH7NXpzL-RjtikCE=G8KTbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/16 17:04, Ziji Hu wrote:
-> Hi Adrian,
-> 
-> Thanks a lot for the suggestion. I'm from Marvell Xenon SDHC team. Most
-> of sdhci host ops are still used in our driver. We just change or add few
-> ops. Thus, if we create our own mmc_host_ops, many static sdhci host ops
-> will be exported. I would like to know whether such a modification can be
-> accepted or not.
-> 
-> I notice that community is improving sdhci. Thus all the static sdhci ops
-> called outside the sdhci.c will be exported. Is my understanding
-> correct? Thank you.
+Hi Joonsoo,
 
-The aim is to make sdhci more like a library and give more control to the
-drivers.  That will mean more sdhci functions get exported, particularly mmc
-host ops like sdhci_set_ios() or sdhci_start_signal_voltage_switch().
+On Tue, Jun 14, 2016 at 8:24 AM, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+> On Mon, Jun 13, 2016 at 09:43:13PM +0200, Geert Uytterhoeven wrote:
+>> On Tue, Apr 12, 2016 at 6:51 AM,  <js1304@gmail.com> wrote:
+>> > From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+>> > To check whther free objects exist or not precisely, we need to grab a
+>> > lock.  But, accuracy isn't that important because race window would be
+>> > even small and if there is too much free object, cache reaper would reap
+>> > it.  So, this patch makes the check for free object exisistence not to
+>> > hold a lock.  This will reduce lock contention in heavily allocation case.
+>> >
+>> > Note that until now, n->shared can be freed during the processing by
+>> > writing slabinfo, but, with some trick in this patch, we can access it
+>> > freely within interrupt disabled period.
+>> >
+>> > Below is the result of concurrent allocation/free in slab allocation
+>> > benchmark made by Christoph a long time ago.  I make the output simpler.
+>> > The number shows cycle count during alloc/free respectively so less is
+>> > better.
+>> >
+>> > * Before
+>> > Kmalloc N*alloc N*free(32): Average=248/966
+>> > Kmalloc N*alloc N*free(64): Average=261/949
+>> > Kmalloc N*alloc N*free(128): Average=314/1016
+>> > Kmalloc N*alloc N*free(256): Average=741/1061
+>> > Kmalloc N*alloc N*free(512): Average=1246/1152
+>> > Kmalloc N*alloc N*free(1024): Average=2437/1259
+>> > Kmalloc N*alloc N*free(2048): Average=4980/1800
+>> > Kmalloc N*alloc N*free(4096): Average=9000/2078
+>> >
+>> > * After
+>> > Kmalloc N*alloc N*free(32): Average=344/792
+>> > Kmalloc N*alloc N*free(64): Average=347/882
+>> > Kmalloc N*alloc N*free(128): Average=390/959
+>> > Kmalloc N*alloc N*free(256): Average=393/1067
+>> > Kmalloc N*alloc N*free(512): Average=683/1229
+>> > Kmalloc N*alloc N*free(1024): Average=1295/1325
+>> > Kmalloc N*alloc N*free(2048): Average=2513/1664
+>> > Kmalloc N*alloc N*free(4096): Average=4742/2172
+>> >
+>> > It shows that allocation performance decreases for the object size up to
+>> > 128 and it may be due to extra checks in cache_alloc_refill().  But, with
+>> > considering improvement of free performance, net result looks the same.
+>> > Result for other size class looks very promising, roughly, 50% performance
+>> > improvement.
+>> >
+>> > v2: replace kick_all_cpus_sync() with synchronize_sched().
+>> >
+>> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+>>
+>> I've bisected a boot failure (no output at all) in v4.7-rc2 on emev2/kzm9d
+>> (Renesas dual Cortex A9) to this patch, which is upstream commit
+>> 801faf0db8947e01877920e848a4d338dd7a99e7.
+>>
+>> I've attached my .config. I don't know if it also happens with
+>> shmobile_defconfig, as something went wrong with my remote access to the board,
+>> preventing further testing. I also couldn't verify if the issue persists in
+>> v4.7-rc3.
 
-> 
-> Best regards, Hu Ziji
-> 
->>> ? 2016?6?13??16:52?Adrian Hunter <adrian.hunter@intel.com> ???
->>> 
->>> On 09/06/16 10:10, Gregory CLEMENT wrote: From: Victor Gu
->>> <xigu@marvell.com>
->>> 
->>> Some host controller such as Xenon needs additional setting when 
->>> switching signal voltage in eMMC mode. They also need to re-enable 
->>> internal clock before a voltage switch.
->>> 
->>> This commit adds a callback routine "voltage_switch_pre" in the
->>> struct sdhci_ops, which is used by some host controllers which need
->>> re-enable the internal clock before a voltage switch.
->> 
->> Don't want to add sdhci host ops for the "do something before a mmc
->> host op" case.
->> 
->> Instead, export sdhci_start_signal_voltage_switch() and  hook 
->> host->mmc_host_ops.start_signal_voltage_switch. Then in sdhci-xenon.c:
->> 
->> int xenon__start_signal_voltage_switch(struct mmc_host *mmc, struct
->> mmc_ios *ios) { blah blah return sdhci_start_signal_voltage_switch(mmc,
->> ios); }
->> 
->> 
->>> 
->>> [gregory.clement at free-electrons.com: split the initial commit and 
->>> reformulate the log]
->>> 
->>> Signed-off-by: Victor Gu <xigu@marvell.com> Signed-off-by: Marcin
->>> Wojtas <mw@semihalf.com> Signed-off-by: Gregory CLEMENT
->>> <gregory.clement@free-electrons.com> --- drivers/mmc/host/sdhci.c | 4
->>> ++++ drivers/mmc/host/sdhci.h | 1 + 2 files changed, 5 insertions(+)
->>> 
->>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c 
->>> index b07219426d39..cad03ffa9d9b 100644 ---
->>> a/drivers/mmc/host/sdhci.c +++ b/drivers/mmc/host/sdhci.c @@ -1729,6
->>> +1729,10 @@ static int sdhci_start_signal_voltage_switch(struct
->>> mmc_host *mmc, if (host->version < SDHCI_SPEC_300) return 0;
->>> 
->>> +    /* Some controller need to do more before switching */ +    if
->>> (host->ops->voltage_switch_pre) +
->>> host->ops->voltage_switch_pre(host); + ctrl = sdhci_readw(host,
->>> SDHCI_HOST_CONTROL2);
->>> 
->>> switch (ios->signal_voltage) { diff --git a/drivers/mmc/host/sdhci.h
->>> b/drivers/mmc/host/sdhci.h index 49c6c5b0e33b..6bec1b0368d2 100644 
->>> --- a/drivers/mmc/host/sdhci.h +++ b/drivers/mmc/host/sdhci.h @@
->>> -550,6 +550,7 @@ struct sdhci_ops { unsigned int max_dtr, int
->>> host_drv, int card_drv, int *drv_type); void    (*init_card)(struct
->>> sdhci_host *host, struct mmc_card *card); +    void
->>> (*voltage_switch_pre)(struct sdhci_host *host); };
->>> 
->>> #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
->> 
->> -- To unsubscribe from this list: send the line "unsubscribe linux-mmc"
->> in the body of a message to majordomo at vger.kernel.org More majordomo
->> info at  http://vger.kernel.org/majordomo-info.html
+In the mean time, I've verified it also happens with shmobile_defconfig.
+
+>>
+>> Do you have a clue?
+>
+> I don't have yet. Could you help me to narrow down the problem?
+> Following diff is half-revert change to check that synchronize_sched()
+> has no problem.
+
+Thanks!
+
+Unfortunately the half revert is not sufficient. The full revert is.
+
+> ----->8-----
+> diff --git a/mm/slab.c b/mm/slab.c
+> index 763096a..257a0eb 100644
+> --- a/mm/slab.c
+> +++ b/mm/slab.c
+> @@ -3016,9 +3016,6 @@ static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
+>         n = get_node(cachep, node);
+>
+>         BUG_ON(ac->avail > 0 || !n);
+> -       shared = READ_ONCE(n->shared);
+> -       if (!n->free_objects && (!shared || !shared->avail))
+> -               goto direct_grow;
+>
+>         spin_lock(&n->list_lock);
+>         shared = READ_ONCE(n->shared);
+> @@ -3047,7 +3044,6 @@ alloc_done:
+>         spin_unlock(&n->list_lock);
+>         fixup_objfreelist_debug(cachep, &list);
+>
+> -direct_grow:
+>         if (unlikely(!ac->avail)) {
+>                 /* Check if we can use obj in pfmemalloc slab */
+>                 if (sk_memalloc_socks()) {
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
