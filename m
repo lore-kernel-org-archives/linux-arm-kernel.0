@@ -1,27 +1,80 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 14 Jun 2016 11:17:11 -0600
-Subject: [PATCH 0/3] coresight: fix for v4.7-rcX 
-Message-ID: <1465924634-22310-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Tue, 14 Jun 2016 11:17:12 -0600
+Subject: [PATCH 1/3] coresight: Fix NULL pointer dereference in
+ _coresight_build_path
+In-Reply-To: <1465924634-22310-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1465924634-22310-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1465924634-22310-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-These 3 patches address problems that lead to kernel crashes.  As such
-I think there is value in fixing them in this cycle rather than waiting 
-for next merge window.
+_coresight_build_path assumes that all the connections of a csdev
+has the child_dev initialised. This may not be true if the particular
+component is not supported by the kernel config(e.g TPIU) but is
+present in the DT. In which case, building a path can cause a crash like this :
 
-Best regards,
-Mathieu
+  Unable to handle kernel NULL pointer dereference at virtual address 00000010
+  pgd = ffffffc9750dd000
+  [00000010] *pgd=00000009f5e90003, *pud=00000009f5e90003, *pmd=0000000000000000
+  Internal error: Oops: 96000006 [#1] PREEMPT SMP
+  Modules linked in:
+  CPU: 4 PID: 1348 Comm: bash Not tainted 4.6.0-next-20160517 #1646
+  Hardware name: ARM Juno development board (r0) (DT)
+  task: ffffffc97517a280 ti: ffffffc9762c4000 task.ti: ffffffc9762c4000
+  PC is at _coresight_build_path+0x18/0xe4
+  LR is at _coresight_build_path+0xc0/0xe4
+  pc : [<ffffff80083d5130>] lr : [<ffffff80083d51d8>] pstate: 20000145
+  sp : ffffffc9762c7ba0
 
-Suzuki K Poulose (3):
-  coresight: Fix NULL pointer dereference in _coresight_build_path
-  coresight: Fix tmc_read_unprepare_etr
-  coresight: Fix erroneous memset in tmc_read_unprepare_etr
+  [<ffffff80083d5130>] _coresight_build_path+0x18/0xe4
+  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
+  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
+  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
+  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
+  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
+  [<ffffff80083d5cdc>] coresight_build_path+0x40/0x68
+  [<ffffff80083d5e14>] coresight_enable+0x74/0x1bc
+  [<ffffff80083d60a0>] enable_source_store+0x3c/0x6c
+  [<ffffff800830b17c>] dev_attr_store+0x18/0x28
+  [<ffffff80081ca9c4>] sysfs_kf_write+0x40/0x50
+  [<ffffff80081c9e38>] kernfs_fop_write+0x140/0x1cc
+  [<ffffff8008163ec8>] __vfs_write+0x28/0x110
+  [<ffffff8008164bf0>] vfs_write+0xa0/0x174
+  [<ffffff8008165d18>] SyS_write+0x44/0xa0
+  [<ffffff8008084e70>] el0_svc_naked+0x24/0x28
 
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 11 ++++-------
- drivers/hwtracing/coresight/coresight.c         |  6 +++---
- 2 files changed, 7 insertions(+), 10 deletions(-)
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 5443d03a1eec..0fdaaf4a8994 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -385,7 +385,6 @@ static int _coresight_build_path(struct coresight_device *csdev,
+ 	int i;
+ 	bool found = false;
+ 	struct coresight_node *node;
+-	struct coresight_connection *conn;
+ 
+ 	/* An activated sink has been found.  Enqueue the element */
+ 	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
+@@ -394,8 +393,9 @@ static int _coresight_build_path(struct coresight_device *csdev,
+ 
+ 	/* Not a sink - recursively explore each port found on this element */
+ 	for (i = 0; i < csdev->nr_outport; i++) {
+-		conn = &csdev->conns[i];
+-		if (_coresight_build_path(conn->child_dev, path) == 0) {
++		struct coresight_device *child_dev = csdev->conns[i].child_dev;
++
++		if (child_dev && _coresight_build_path(child_dev, path) == 0) {
+ 			found = true;
+ 			break;
+ 		}
 -- 
 2.5.0
