@@ -1,89 +1,36 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 14 Jun 2016 14:18:08 +0300
-Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
- of aliases
-In-Reply-To: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <575FE7F0.6090200@ti.com>
+From: mamlinav@gmail.com (Aleksei Mamlin)
+Date: Tue, 14 Jun 2016 14:17:34 +0300
+Subject: [PATCH v2 0/4] dts: sunxi: Add sunxi NAND Flash Controller support
+In-Reply-To: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
+References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <1465903058-9211-1-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hello,
 
-On 06/14/2016 01:03 PM, Uwe Kleine-K?nig wrote:
-> Traditionally the n-th gpio device probed by the omap gpio driver got
-> the gpio number range [n*32 .. n*32+31].
-> When order of the devices probed by the driver changes (which can happen
-> already now when some devices have a pinctrl and so the first probe
-> attempt returns -ENODEV) the numbering changes.
-> 
-> To ensure a deterministical numbering use of_alias_get_id to determine
-> the number base for a given device. If no respective alias exists fall
-> back to the traditional numbering.
-> 
-> For the unusual case where only a part of the gpio devices have a
-> matching alias some of them might fail to probe. But if none of them has
-> an alias or all, there is no conflict which should be good enough to
-> maintain backward compatibility.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> if you're happy with this patch I can follow up and add the respective
-> aliases to the device trees.
-> 
+This series adds the sunxi NAND Flash Controller pin definitions and nodes to
+dts.
 
-Thanks for the patch.
-I have no objection to the idea of the patch, but there are some comments.
+Changes since v1:
+- Remove patch with Hynix H27UBG8T2BTR-BC MLC NAND chip definition.
+- Remove patches with NAND support on Marsboard A10 board and Wexler TAB7200.
+- Enable only the pin groups that are actually used by sunxi boards.
+- Enable DMA support. Depends on sunxi NFC DMA support([1], [2]), merged into
+  linux-nand.
 
-> 
->   drivers/gpio/gpio-omap.c | 12 ++++++++++++
->   1 file changed, 12 insertions(+)
-> 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index b98ede78c9d8..6814245a54aa 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1034,6 +1034,7 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->   	static int gpio;
->   	int irq_base = 0;
->   	int ret;
-> +	int gpio_alias_id;
->   
->   	/*
->   	 * REVISIT eventually switch from OMAP-specific gpio structs
-> @@ -1056,6 +1057,17 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->   		bank->chip.label = "gpio";
->   		bank->chip.base = gpio;
+[1] http://lists.infradead.org/pipermail/linux-mtd/2016-April/066899.html
+[2] http://lists.infradead.org/pipermail/linux-mtd/2016-April/066898.html
 
-I think, the gpio base correction should be done here
+Boris Brezillon (4):
+  ARM: dts: sun4i: Add A10 NAND controller pin definitions
+  ARM: dts: sun4i: Add NFC node to Allwinner A10 SoC
+  ARM: dts: sun7i: Add A20 NAND controller pin definitions
+  ARM: dts: sun7i: Add NFC node to Allwinner A20 SoC
 
->   	}
-> +
-> +	/*
-> +	 * Traditionally the base is given out in first-come-first-serve order.
-> +	 * This might shuffle the numbering of gpios if the probe order changes.
-> +	 * So make the base deterministical if the device tree specifies alias
-> +	 * ids.
-> +	 */
-> +	gpio_alias_id = of_alias_get_id(bank->chip.of_node, "gpio");
-> +	if (gpio_alias_id >= 0)
-> +		bank->chip.base = bank->width * gpio_alias_id;
-> +
-
-Unfortunately, this driver is still used by non-DT platforms, so above code will
- break build if !OF && !OF_GPIO
-
-I think, right way would be to get alias_id in .probe(), then calc base and save it
-in struct gpio_bank. Then use it here to fixup GPIO base if positive.
-
->   	bank->chip.ngpio = bank->width;
->   
->   	ret = gpiochip_add_data(&bank->chip, bank);
-> 
-
+ arch/arm/boot/dts/sun4i-a10.dtsi | 65 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 65 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 130 insertions(+)
 
 -- 
-regards,
--grygorii
+2.7.3
