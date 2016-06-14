@@ -1,81 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 14 Jun 2016 17:51:28 -0500
-Subject: [v2 PATCH 1/4] Documentation: bindings: add dt doc for Rockchip
- USB Type-C PHY
-In-Reply-To: <1465810789-22303-2-git-send-email-zyw@rock-chips.com>
-References: <1465810789-22303-1-git-send-email-zyw@rock-chips.com>
- <1465810789-22303-2-git-send-email-zyw@rock-chips.com>
-Message-ID: <20160614225128.GA10606@rob-hp-laptop>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 15 Jun 2016 01:07:34 +0200
+Subject: [PATCH 3/5] PM / Hibernate: Allow architectures to specify the
+ hibernate/resume CPU
+In-Reply-To: <575FD20F.7020606@arm.com>
+References: <1464876657-6692-1-git-send-email-james.morse@arm.com>
+ <4959514.g8dkWscZ3h@vostro.rjw.lan> <575FD20F.7020606@arm.com>
+Message-ID: <1814244.EyXNzvmsTg@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 05:39:46PM +0800, Chris Zhong wrote:
-> This patch adds a binding that describes the Rockchip USB Type-C PHY
-> for rk3399
+On Tuesday, June 14, 2016 10:44:47 AM James Morse wrote:
+> Hi Rafael,
 > 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> On 13/06/16 23:10, Rafael J. Wysocki wrote:
+> > On Tuesday, June 14, 2016 12:05:28 AM Rafael J. Wysocki wrote:
+> >> On Thursday, June 02, 2016 03:10:55 PM James Morse wrote:
+> >>> On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
+> >>> user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
+> >>> kernel will assign logical id 0 to a different physical CPU.
+> >>> This breaks hibernate as hibernate and resume will be attempted on different
+> >>> CPUs.
+> >>>
+> >>> Define a weak symbol arch_hibernation_disable_cpus(), which defaults to
+> >>> calling disable_nonboot_cpus). Architectures that allow CPU 0 to be
+> >>> hotplugged can use this to control which CPU is used for hibernate/resume.
+> >>>
+> >>> Signed-off-by: James Morse <james.morse@arm.com>
+> >>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> >>> Cc: Pavel Machek <pavel@ucw.cz>
+> >>> ---
+> >>> I would have preferred a macro, but there is no hibernate-relevant header
+> >>> file that all arch's have. arm, arm64 and x86 have a suspend.h, but powerpc
+> >>> doesn't.
+> >>
+> >> What about include/linux/suspend.h?
+> >>
+> >> There are arch_ things declared in there.
+> > 
+> > I mean, what about using something like
+> > 
+> > #ifndef arch_hibernation_disable_cpus
+> > #define arch_hibernation_disable_cpus disable_nonboot_cpus
+> > #endif
+> > 
+> > in there or in another header file?
 > 
-> ---
+> This would work fine for an architecture that doesn't need to use
+> arch_hibernation_disable_cpus(), but which header file should we use for an
+> architecture that does?
 > 
-> Changes in v2:
-> - add some registers description
+> As a macro it needs to be in an arch-specific header included before the #ifndef
+> above.
 > 
-> Changes in v1:
-> - add extcon node description
-> - move the registers in phy driver
-> - remove the suffix of reset
+> Of those:
+> include/linux/suspend.h only includes <asm/errno.h>
+> kernel/power/power.h doesn't include any 'asm' headers.
+> snapshot.c includes:
+> > #include <asm/uaccess.h>
+> > #include <asm/mmu_context.h>
+> > #include <asm/pgtable.h>
+> > #include <asm/tlbflush.h>
+> > #include <asm/io.h>
 > 
->  .../devicetree/bindings/phy/phy-rockchip-typec.txt | 77 ++++++++++++++++++++++
->  1 file changed, 77 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> ... but none of those are appropriate.
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> new file mode 100644
-> index 0000000..430920c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> @@ -0,0 +1,77 @@
-> +* ROCKCHIP type-c PHY
-> +---------------------
-> +
-> +Required properties:
-> + - compatible : should be "rockchip,rk3399-typec-phy0" or
-> +			 "rockchip,rk3399-typec-phy1"
+> 
+> I initially added an include for <asm/suspend.h> to kernel/power/power.h, but it
+> broke powerpc, as there is no suspend.h there. I took this as a dead-end for the
+> macro approach, unless someone has a clever trick?!
 
-Unless these blocks are different, these should be be same compat 
-string.
+OK, let's do the __weak function, then.
 
-> + - reg: Address and length of the usb phy control register set
-> + - rockchip,grf : phandle to the syscon managing the "general
-> +   register files"
-> + - clocks : phandle + clock specifier for the phy clocks
-> + - clock-names : string, clock name, must be "tcpdcore", "tcpdphy_ref";
-> + - resets : a list of phandle + reset specifier pairs
-> + - reset-names : string reset name, must be:
-> +		 "tcphy", "tcphy_pipe", "uphy_tcphy"
-> + - #phy-cells : Must be 0.  See ./phy-bindings.txt for details.
-> + - extcon : extcon specifier for the Power Delivery
-> +
-> +Note, there are 2 type-c phys for RK3399, and they are almost identical, except
-> +these registers(description below), every register node contains 3 sections:
-> +offset, enable bit, write mask bit.
-> + - rockchip,typec_conn_dir : the register of type-c connector direction,
+After all, it can be changed later if someone has a better idea.
 
-Don't use underscores in property names.
-
-> +   for type-c phy0, it must be <0xe580 0 16>;
-> +   for type-c phy1, it must be <0xe58c 0 16>;
-> + - rockchip,usb3tousb2_en : the register of type-c force usb3 to usb2 enable
-> +   control.
-> +   for type-c phy0, it must be <0xe580 3 19>;
-> +   for type-c phy1, it must be <0xe58c 3 19>;
-> + - rockchip,external_psm : the register of type-c phy external psm clock
-> +   selection.
-> +   for type-c phy0, it must be <0xe588 14 30>;
-> +   for type-c phy1, it must be <0xe594 14 30>;
-> + - rockchip,pipe_status : the register of type-c phy pipe status.
-> +   for type-c phy0, it must be <0xe5c0 0 0>;
-> +   for type-c phy1, it must be <0xe5c0 16 16>;
-> + - rockchip,uphy_dp_sel : the register of type-c phy selection for DP
-> +   for type-c phy0, it must be <0x6268 19 19>;
-> +   for type-c phy1, it must be <0x6268 3 19>;
+Thanks,
+Rafael
