@@ -1,73 +1,85 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 14 Jun 2016 08:36:11 +0800
-Subject: [PATCH v2 09/11] phy: rockchip-emmc: Minor code cleanup in
- rockchip_emmc_phy_power_on/off()
-In-Reply-To: <1465859076-4868-10-git-send-email-dianders@chromium.org>
-References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
- <1465859076-4868-10-git-send-email-dianders@chromium.org>
-Message-ID: <361ee77c-ae92-a8f5-c716-1867652db653@rock-chips.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 14 Jun 2016 09:43:17 +0900
+Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
+ <20160601005751.GG20527@verge.net.au>
+ <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
+ <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
+ <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
+ <20160610010245.GA10152@verge.net.au>
+ <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
+Message-ID: <20160614004317.GC6456@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/6/14 7:04, Douglas Anderson ??:
-> There's no reason to store the return value of rockchip_emmc_phy_power()
-> in a variable nor to check it.  Just return it.
->
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> ---
-> Changes in v2:
-> - Move code cleanup before set phyctrl_frqsel based on card clock (Shawn)
+On Fri, Jun 10, 2016 at 10:29:17PM +0300, Sergei Shtylyov wrote:
+> On 06/10/2016 04:02 AM, Simon Horman wrote:
+> 
+> >>[...]
+> >>
+> >>>>>And that the system behaves sanely on suspend/resume.
+> >>>>
+> >>>>  I'd be thankful if you told me how to test that. :-)
+> >>>
+> >>>System suspend:
+> >>>
+> >>>   echo mem > /sys/power/state
+> >>
+> >>   Oh. I know that one! :-)
+> >>
+> >>>System resume: You're gonna need a "wakeup-source" in your DTS, e.g. gpio-keys.
+> >>>Serial should work too, echo "enabled" to the corresponding wakeup
+> >>>file in /sys first.
+> >>
+> >>   I'm afraid I couldn't find that file. All I saw were RPM controls...
+> >>
+> >>>In case of issues, try "echo 0 > /sys/module/printk/parameters/console_suspend".
+> >>
+> >>   There's no problems suspending, it's the resuming that's a problem for me.
+> >>
+> >>>Good luck!
+> >>
+> >>   As usual, there was no luck. :-)
+> >>
+> >>WBR, Sergei
+> >
+> >Does resume work for UP (i.e. without SMP)?
+> 
+>    No. My problem with resume is I can't wake up the remote system. I don't
+> see the needed 'wakeup' file in
+> /sys/devices/platform/soc/e6e60000.serial/...
+>     However, if I enable CONFIG_PM_[ADVANCED_]DEBUG and do
+> 
+> $ echo -n core /sys/.power/pm_test
+> 
+> the system happily wakes up after a small delay (5 s), w/either SMP or UP kernel.
 
-Looks good to me.
+That seems promising but it seems curious that there is no wakeup file.
 
-Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+On Lager the following procedure works for me using
+renesas-devel-20160613-v4.7-rc3 and shmobile defconfig.
 
->
->  drivers/phy/phy-rockchip-emmc.c | 14 ++------------
->  1 file changed, 2 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-> index 2d059c046978..23fe50864526 100644
-> --- a/drivers/phy/phy-rockchip-emmc.c
-> +++ b/drivers/phy/phy-rockchip-emmc.c
-> @@ -169,20 +169,14 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
->  static int rockchip_emmc_phy_power_off(struct phy *phy)
->  {
->  	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
-> -	int ret = 0;
->
->  	/* Power down emmc phy analog blocks */
-> -	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_OFF);
-> -	if (ret)
-> -		return ret;
-> -
-> -	return 0;
-> +	return rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_OFF);
->  }
->
->  static int rockchip_emmc_phy_power_on(struct phy *phy)
->  {
->  	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
-> -	int ret = 0;
->
->  	/* DLL operation: 200 MHz */
->  	regmap_write(rk_phy->reg_base,
-> @@ -213,11 +207,7 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
->  				   PHYCTRL_OTAPDLYSEL_SHIFT));
->
->  	/* Power up emmc phy analog blocks */
-> -	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_ON);
-> -	if (ret)
-> -		return ret;
-> -
-> -	return 0;
-> +	return rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_ON);
->  }
->
->  static const struct phy_ops ops = {
->
+0. Add wakeup-source property to serial at e6ce0000 node in DT
+1. echo enabled > /sys/devices/platform/e6e60000.serial/tty/ttySC0/power/wakeup
+2. echo mem > /sys/power/state
+3. Provide input on serial console
 
+* Success! *
 
--- 
-Best Regards
-Shawn Lin
+> >How did testing CPU hotplug go? Did it work for all CPUs?
+> 
+>    Sure!
+
+Great!
+
+>    The only problem I'm seeing (again) is the RCAN clock failing to register:
+> 
+> rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock (-12)
+> 
+>    I was going to look at it yesterday but (wrongly) thought it somehow
+> cured itself... I'll look at it now.
+
+Is this resolved? If not perhaps you could consider removing the node
+in question for now.
