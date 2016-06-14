@@ -1,36 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Jun 2016 17:41:16 +0100
-Subject: [PATCH v3 5/5] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
-In-Reply-To: <02dde480-cc01-6372-5baa-02ecf0037074@linaro.org>
-References: <20160527171424.GG10909@e104818-lin.cambridge.arm.com>
- <20160602174910.30428-1-aleksey.makarov@linaro.org>
- <02dde480-cc01-6372-5baa-02ecf0037074@linaro.org>
-Message-ID: <20160614164116.GF16531@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 14 Jun 2016 17:44:26 +0100
+Subject: Versatile Express randomly fails to boot - Versatile Express to
+ be removed from nightly testing
+In-Reply-To: <20160614155220.GB1041@n2100.armlinux.org.uk>
+References: <55084D99.7050004@arm.com>
+ <20150317161748.GZ8656@n2100.arm.linux.org.uk>
+ <20150330140333.GJ24899@n2100.arm.linux.org.uk> <55196228.5050805@arm.com>
+ <20150330150552.GK24899@n2100.arm.linux.org.uk> <55196E31.80803@arm.com>
+ <551AD902.9090401@arm.com> <20150402141336.GI24899@n2100.arm.linux.org.uk>
+ <551D7EAB.1000200@arm.com> <1465918285.2840.41.camel@linaro.org>
+ <20160614155220.GB1041@n2100.armlinux.org.uk>
+Message-ID: <5760346A.10903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 06:51:19PM +0300, Aleksey Makarov wrote:
-> 
-> On 06/02/2016 08:49 PM, Aleksey Makarov wrote:
-> > From: Jon Masters <jcm@redhat.com>
-> > 
-> > This patch adds support for ACPI_TABLE_UPGRADE for ARM64
-> 
-> Hi Catalin, Will,
-> 
-> Can you review this v3 patch please?  I changed PFN_PHYS(max_pfn) to
-> MEMBLOCK_ALLOC_ACCESSIBLE.
+Hi Russell,
 
-I'm inclined to agree with Mark that this is something that should be
-done by the bootloader (e.g. GRUB) if it's needed, rather than something
-we should support in the kernel. Jon pitched the feature as a developer
-aid for triaging problems, so it's not like we're in a state where some
-widely available machine cannot currently boot Linux without this.
+On 14/06/16 16:52, Russell King - ARM Linux wrote:
+> On Tue, Jun 14, 2016 at 04:31:25PM +0100, Jon Medhurst (Tixy) wrote:
+>> Using "arm,tag-latency = <2 2 1>" as Russell seemed to indicate [2]
+>> fixed things for him, also works for me. So should we update mainline
+>> device-tree with that?
+>
+> I've proposed that several times, and there seems to be no desire to
+> do so.
 
-Having said that, the patch isn't exactly invasive and I suspect it's
-only a matter of time before we will actually want something like this.
-So I've come full circle on this patch:
+Sorry for missing that. IIRC, we didn't conclude as <2 2 1> did fail
+on continuous reboot test over night on my setup. As I mentioned early 
+we can change to this new value if people are able to use it reliably.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> For me, VE CT9x4 no longer boots in my nightly builds, and
+> my plan at the start of the year was to take it out of both the
+> nightly builds and the boot tests - no one within ARM seems to have
+> any interest in the platform.
+>
 
-Will
+It's hard to get any kind of attention from hardware guys for such an
+old platform.
+
+> Having a randomly failing platform due to hardware issues is not
+> productive to an automated boot test system, so I think we should
+> (a) remove it from automated testing, and (b) consider deleting
+> support for it from the kernel tree, as it seems there is little
+> interest in debugging what's happening.
+>
+
+Even with higher latency if the platform is unusable, I agree to remove.
+If you think it's usable with the updated latency(<2 2 1>) then we can
+update it.
+
+-- 
+Regards,
+Sudeep
