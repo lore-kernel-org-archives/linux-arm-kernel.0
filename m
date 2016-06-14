@@ -1,30 +1,24 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Tue, 14 Jun 2016 10:20:15 +0800
-Subject: [PATCH v3,1/5] dt-bindings: mt8173-xhci: support host side of
- dual-role mode
-In-Reply-To: <20160613185454.GA21742@rob-hp-laptop>
-References: <1465543962-11678-1-git-send-email-chunfeng.yun@mediatek.com>
- <1465543962-11678-2-git-send-email-chunfeng.yun@mediatek.com>
- <20160613185454.GA21742@rob-hp-laptop>
-Message-ID: <1465870815.19154.1.camel@mhfsdcap03>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 14 Jun 2016 10:20:40 +0800
+Subject: [PATCH 03/10] mfd: Add driver for X-Powers AC100 audio codec /
+ RTC combo IC
+In-Reply-To: <1465870678-30128-5-git-send-email-wens@csie.org>
+References: <1465870678-30128-1-git-send-email-wens@csie.org>
+ <1465870678-30128-5-git-send-email-wens@csie.org>
+Message-ID: <CAGb2v66_SrKjQ_t_rL68QUVZQ=8hBoCTb8tbwCeBWz84kTabcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-06-13 at 13:54 -0500, Rob Herring wrote:
-> On Fri, Jun 10, 2016 at 03:32:38PM +0800, Chunfeng Yun wrote:
-> > Some resources, such as IPPC register etc, shared with device
-> > driver are moved into common glue layer when xHCI driver is the
-> > host side of dual-role mode and they should be changed as optional
-> > properties if they are required ones before. For clarity, add
-> > a new part of binding to support host side of dual-role mode.
-> > 
-> > Additionally add optional properties of pinctrl for host only mode
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/usb/mt8173-xhci.txt        |   48 ++++++++++++++++++++
-> >  1 file changed, 48 insertions(+)
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+On Tue, Jun 14, 2016 at 10:17 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> The AC100 is a multifunction device with an audio codec subsystem and
+> an RTC subsystem. These two subsystems share a common register space
+> and host interface.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Thank you
+Self-NACK. A last minute fix up resulted in a compile error.
+
+I'll send v2 later. Sorry for the noise.
+
+Regards
+ChenYu
