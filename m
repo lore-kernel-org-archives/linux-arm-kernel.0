@@ -1,41 +1,81 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 14 Jun 2016 18:10:14 +0800
-Subject: [PATCH v4 00/14] fix some type infos and bugs for arm64/of numa
-In-Reply-To: <20160613101233.GB1605@arm.com>
-References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
- <20160607135852.GA20477@arm.com> <575D0ABA.2010503@huawei.com>
- <20160613101233.GB1605@arm.com>
-Message-ID: <575FD806.5090600@huawei.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 14 Jun 2016 12:11:38 +0200
+Subject: [PATCH 1/1] ARM: dts: imx6qdl.dtsi: add "arm, shared-override"
+ for pl310
+In-Reply-To: <HE1PR04MB1450F3D1F7C9CA4C859C04D88B540@HE1PR04MB1450.eurprd04.prod.outlook.com>
+References: <1465292365-26038-1-git-send-email-peter.chen@nxp.com>
+ <20160611115733.GM20243@tiger> <1465809841.2313.2.camel@pengutronix.de>
+ <VI1PR04MB14558D10397904A5C33A73E88B530@VI1PR04MB1455.eurprd04.prod.outlook.com>
+ <1465816498.2313.15.camel@pengutronix.de>
+ <HE1PR04MB1450F3D1F7C9CA4C859C04D88B540@HE1PR04MB1450.eurprd04.prod.outlook.com>
+Message-ID: <1465899098.29321.13.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/13 18:12, Will Deacon wrote:
-> On Sun, Jun 12, 2016 at 03:09:46PM +0800, Hanjun Guo wrote:
->> On 2016/6/7 21:58, Will Deacon wrote:
->>> On Tue, Jun 07, 2016 at 04:08:04PM +0800, Zhen Lei wrote:
->>>> v3 -> v4:
->>>> 1. Packed three patches of Kefeng Wang, patch6-8.
->>>> 2. Add 6 new patches(9-15) to enhance the numa on arm64.
->>>>
->>>> v2 -> v3:
->>>> 1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
->>>>    patches looks more well. The final code have no change. 
->>>>
->>>> v1 -> v2:
->>>> 1. Base on https://lkml.org/lkml/2016/5/24/679
->>> If you want bug fixes to land in 4.7, you'll need to base them on a
->>> mainline kernel.
->>>
->> Rafael queued ARM64 ACPI NUMA support for 4.8, and this patch set is based
->> on that with no urgent bugfixes, can this patch set be queued for 4.8?
-> Up to Catalin, since he's handling the 4.8 merge window. It would be really
-> nice if you could give us the heads up about dependencies like this in the
-> future, preferably *before* the base part has already been merged. That way,
-> it's easier to create shared topic branches and gives us more options if
-> we think that conflicts are likely to occur.
+Hi Peter,
 
-Understood the maintenance difficulty will have, will do that next time.
-Much appreciate if it can be merged for 4.8.
+Am Dienstag, den 14.06.2016, 01:30 +0000 schrieb Peter Chen:
+>  
+> >
+> >Am Montag, den 13.06.2016, 09:42 +0000 schrieb Peter Chen:
+> >>
+> >> >Am Samstag, den 11.06.2016, 19:57 +0800 schrieb Shawn Guo:
+> >> >> + Lucas
+> >> >>
+> >> >> On Tue, Jun 07, 2016 at 05:39:25PM +0800, Peter Chen wrote:
+> >> >> > The imx6 SMP system has the same DMA memory coherency issue [1]
+> >> >> > with
+> >> >> > pl310 L2 controller. With this shared override bit set, the
+> >> >> > customer reports the DMA coherency issue is gone. Besides, I have
+> >> >> > tested the performance using USB ethernet with/without this bit,
+> >> >> > it shows no difference.
+> >> >> >
+> >> >> > [1] http://patchwork.ozlabs.org/patch/469362/
+> >> >> >
+> >> >> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> >> >> > ---
+> >> >> >  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
+> >> >> >  1 file changed, 1 insertion(+)
+> >> >> >
+> >> >> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
+> >> >> > b/arch/arm/boot/dts/imx6qdl.dtsi index ed613eb..30e21ee 100644
+> >> >> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> >> >> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> >> >> > @@ -185,6 +185,7 @@
+> >> >> >  			cache-level = <2>;
+> >> >> >  			arm,tag-latency = <4 2 3>;
+> >> >> >  			arm,data-latency = <4 2 3>;
+> >> >> > +			arm,shared-override;
+> >> >>
+> >> >> Lucas had an objection to the change [1], considering the case that
+> >> >> kernel is booted as non-secure.
+> >> >
+> >> >My objection to this change still stands. Configuring the L2C to be
+> >> >compliant to the
+> >> >ARMv7 ARM is at the same level as the CPU workarounds that can not be
+> >> >applied in secure mode. Those must be done in the firmware, if your
+> >> >firmware doesn't do it it's plain broken.
+> >> >
+> >>
+> >> Sorry, I not understand what's your mean. We only changes L2
+> >> configuration when the cache is disabled, what problem will be?
+> >>
+> >If the kernel is booted in non-secure mode, the L2 cache configuration register is RO
+> >and the kernel will crash on the attempt to write into this register.
+> >
+> 
+> Does that mean current mainline kernel for imx6qdl can't boot with non-secure mode, I see other
+> L2 configurations have been changed like "arm, tag-latency" and "arm,data-latency"? Did you try it?
 
-Thanks
-Hanjun
+I've just re-read the code and hereby withdraw my objection.
+
+The cache configuration registers will only be touched if the DT
+specified values differ from what the firmware has set up already. As
+not setting the "shared-override" bit render the platform non compliant
+to the ARMv7 ARM, one should hope that any firmware booting the kernel
+in secure mode has already set this bit. The crash that will happen
+otherwise might be just as good as the silent data corruption resulting
+from not setting this bit.
+
+Regards,
+Lucas
