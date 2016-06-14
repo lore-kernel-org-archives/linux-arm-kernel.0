@@ -1,219 +1,65 @@
-From: liudongdong3@huawei.com (Dongdong Liu)
-Date: Tue, 14 Jun 2016 13:51:09 +0800
-Subject: [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space accessors
- against platfrom specific ECAM quirks
-In-Reply-To: <CADaLNDkfKxxXWmG3eAawH1H=B+4ia6ZYh41anjTuOdTWGbhfNg@mail.gmail.com>
-References: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
- <1465822923-33599-2-git-send-email-liudongdong3@huawei.com>
- <575ED57F.6050503@codeaurora.org>
- <CADaLNDkfKxxXWmG3eAawH1H=B+4ia6ZYh41anjTuOdTWGbhfNg@mail.gmail.com>
-Message-ID: <575F9B4D.8080501@huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 14 Jun 2016 15:17:34 +0900
+Subject: [PATCH] ARM: keystone: remove redundant depends on
+ ARM_PATCH_PHYS_VIRT
+In-Reply-To: <CAK7LNAR+kU4F-rLDOpf_772am3gS86uizHZG4tZpPSCpyjdR4A@mail.gmail.com>
+References: <1454694041-14990-1-git-send-email-yamada.masahiro@socionext.com>
+ <56B4E257.5050308@oracle.com>
+ <CAK7LNAQQ-fT38pg2S7QmbuZ3dmpy6qE6viQD87ec=QMNnUx6zQ@mail.gmail.com>
+ <56B4EA78.6050203@oracle.com>
+ <CAK7LNAR+kU4F-rLDOpf_772am3gS86uizHZG4tZpPSCpyjdR4A@mail.gmail.com>
+Message-ID: <CAK7LNARin7J3Ks29xf8n-BiU=k-SZ40uoTpv1+X6E8FhbKyajQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Duc
+Hi Santosh
 
-? 2016/6/14 4:57, Duc Dang ??:
-> On Mon, Jun 13, 2016 at 8:47 AM, Christopher Covington
-> <cov@codeaurora.org> wrote:
->> Hi Dongdong,
->>
->> On 06/13/2016 09:02 AM, Dongdong Liu wrote:
->>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->>> index d3c3e85..49612b3 100644
->>> --- a/drivers/acpi/pci_mcfg.c
->>> +++ b/drivers/acpi/pci_mcfg.c
->>> @@ -22,6 +22,10 @@
->>>   #include <linux/kernel.h>
->>>   #include <linux/pci.h>
->>>   #include <linux/pci-acpi.h>
->>> +#include <linux/pci-ecam.h>
->>> +
->>> +/* Root pointer to the mapped MCFG table */
->>> +static struct acpi_table_mcfg *mcfg_table;
+Ping again.
+
+It is taking so long
+for this apparently correct patch.
+
+
+
+2016-04-05 11:14 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> 2016-02-06 3:31 GMT+09:00 santosh shilimkar <santosh.shilimkar@oracle.com>:
+>> On 2/5/2016 10:13 AM, Masahiro Yamada wrote:
 >>>
->>>   /* Structure to hold entries from the MCFG table */
->>>   struct mcfg_entry {
->>> @@ -35,6 +39,38 @@ struct mcfg_entry {
->>>   /* List to save mcfg entries */
->>>   static LIST_HEAD(pci_mcfg_list);
+>>> 2016-02-06 2:56 GMT+09:00 santosh shilimkar
+>>> <santosh.shilimkar@oracle.com>:
+>>>>
+>>>> On 2/5/2016 9:40 AM, Masahiro Yamada wrote:
+>>>>>
+>>>>>
+>>>>> KeyStone is Multi-platform.  ARM_PATCH_PHYS_VIRT is already select'ed
+>>>>> by ARCH_MULTIPLATFORM.
+>>>>>
+>>>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>>>> ---
+>>>>>
+>>>> There is also Keystone config so its nit redundant as you think.
+>>>>
+>>>> P.S: arch/arm/configs/keystone_defconfig
+>>>>
 >>>
->>> +extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
->>> +extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
->>> +
->>> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
->>> +{
->>> +     int bus_num = root->secondary.start;
->>> +     int domain = root->segment;
->>> +     struct pci_cfg_fixup *f;
->>> +
->>> +     if (!mcfg_table)
->>> +             return &pci_generic_ecam_ops;
->>> +
->>> +     /*
->>> +      * Match against platform specific quirks and return corresponding
->>> +      * CAM ops.
->>> +      *
->>> +      * First match against PCI topology <domain:bus> then use OEM ID and
->>> +      * OEM revision from MCFG table standard header.
->>> +      */
->>> +     for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
->>> +             if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
->>> +                 (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
->>> +                 (!strncmp(f->oem_id, mcfg_table->header.oem_id,
->>> +                           ACPI_OEM_ID_SIZE)) &&
->>> +                 (!strncmp(f->oem_table_id, mcfg_table->header.oem_table_id,
->>> +                           ACPI_OEM_TABLE_ID_SIZE)))
->>
->> This would just be a small convenience, but if the character count used here were
->>
->> min(strlen(f->oem_id), ACPI_OEM_ID_SIZE)
->>
->> then the parameters to DECLARE_ACPI_MCFG_FIXUP macro could be substrings and
->> wouldn't need to be padded out to the full length.
->>
->>> +                     return f->ops;
->>> +     }
->>> +     /* No quirks, use ECAM */
->>> +     return &pci_generic_ecam_ops;
->>> +}
->>
->>> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
->>> index 7d63a66..088a1da 100644
->>> --- a/include/linux/pci-acpi.h
->>> +++ b/include/linux/pci-acpi.h
->>> @@ -25,6 +25,7 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
->>>   extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
+>>> It *is* redundant.
 >>>
->>>   extern phys_addr_t pci_mcfg_lookup(u16 domain, struct resource *bus_res);
->>> +extern struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root);
+>>> keystone_defconfig also creates Multiplatform configuration.
 >>>
->>>   static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev *pdev)
->>>   {
->>> @@ -72,6 +73,25 @@ struct acpi_pci_root_ops {
->>>        int (*prepare_resources)(struct acpi_pci_root_info *info);
->>>   };
->>>
->>> +struct pci_cfg_fixup {
->>> +     struct pci_ecam_ops *ops;
->>> +     char *oem_id;
->>> +     char *oem_table_id;
->>> +     int domain;
->>> +     int bus_num;
->>> +};
->>> +
->>> +#define PCI_MCFG_DOMAIN_ANY  -1
->>> +#define PCI_MCFG_BUS_ANY     -1
->>> +
->>> +/* Designate a routine to fix up buggy MCFG */
->>> +#define DECLARE_ACPI_MCFG_FIXUP(ops, oem_id, oem_table_id, dom, bus) \
->>> +     static const struct pci_cfg_fixup                               \
->>> +     __mcfg_fixup_##oem_id##oem_table_id##dom##bus                   \
+>> Fair enough. Should I checked it.
+>> For patch,
+>> Acked-by: Santosh Shilimkar<ssantosh@kernel.org>
 >>
->> I'm not entirely sure that this is the right fix--I'm pretty blindly
->> following a GCC documentation suggestion [1]--but removing the first two
->> preprocessor concatenation operators "##" solved the following build error
->> for me.
->>
->> include/linux/pci-acpi.h:90:2: error: pasting "__mcfg_fixup_" and ""QCOM"" does not give a valid preprocessing token
->>    __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
 >
-> I think the problem is gcc is not happy with quoted string when
-> processing these tokens
-> (""QCOM"", the extra "" are added by gcc). So should we not concat
-> string tokens and
-> use the fixup definition in v1 of this RFC:
-> /* Designate a routine to fix up buggy MCFG */
-> #define DECLARE_ACPI_MCFG_FIXUP(ops, oem_id, rev, dom, bus)             \
->          static const struct pci_cfg_fixup __mcfg_fixup_##system##dom##bus\
->           __used __attribute__((__section__(".acpi_fixup_mcfg"),         \
->                                  aligned((sizeof(void *))))) =           \
->          { ops, oem_id, rev, dom, bus };
-
-V1 fixup exist the redefinition error when compiling mutiple DECLARE_ACPI_MCFG_FIXUP
-with the same PCI_MCFG_DOMAIN_ANY and PCI_MCFG_BUS_ANY.
-
-#define EFI_ACPI_HISI_OEM_ID "HISI"
-#define EFI_ACPI_HISI_D02_OEM_TABLE_ID "HISI-D02"
-#define EFI_ACPI_HISI_D03_OEM_TABLE_ID "HISI-D03"
-
-DECLARE_ACPI_MCFG_FIXUP(&hisi_pcie_ecam_ops, EFI_ACPI_HISI_OEM_ID,
-        EFI_ACPI_HISI_D02_OEM_TABLE_ID, PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
-
-DECLARE_ACPI_MCFG_FIXUP(&hisi_pcie_ecam_ops, EFI_ACPI_HISI_OEM_ID,
-        EFI_ACPI_HISI_D03_OEM_TABLE_ID, PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
-
-In file included from drivers/pci/host/pcie-hisi-acpi.c:15:0:
-include/linux/pci-acpi.h:98:43: error: redefinition of '__mcfg_fixup_systemPCI_MCFG_DOMAIN_ANYPCI_MCFG_BUS_ANY'
-          static const struct pci_cfg_fixup __mcfg_fixup_##system##dom##bus\
-                                            ^
-drivers/pci/host/pcie-hisi-acpi.c:215:1: note: in expansion of macro 'DECLARE_ACPI_MCFG_FIXUP'
-  DECLARE_ACPI_MCFG_FIXUP(&hisi_pcie_ecam_ops, EFI_ACPI_HISI_OEM_ID,
-  ^
-include/linux/pci-acpi.h:98:43: note: previous definition of '__mcfg_fixup_systemPCI_MCFG_DOMAIN_ANYPCI_MCFG_BUS_ANY' was here
-          static const struct pci_cfg_fixup __mcfg_fixup_##system##dom##bus\
-                                            ^
-drivers/pci/host/pcie-hisi-acpi.c:212:1: note: in expansion of macro 'DECLARE_ACPI_MCFG_FIXUP'
-
-
-V2 fixup can resolve the redefinition error, but need to use macro.
-We can see that the name of macro is not replace with it's value in
-"__mcfg_fixup_EFI_ACPI_HISI_OEM_IDEFI_ACPI_HISI_D03_OEM_TABLE_IDPCI_MCFG_DOMAIN_ANYPCI_MCFG_BUS_ANY".
-
-Any good idea is appreciated.
-
-Thanks
-Dongdong
-
->
-> Regards,
-> Duc Dang.
+> If it is OK with you, please apply this patch.
 >
 >
->>    ^
->> arch/arm64/kernel/pci.c:225:1: note: in expansion of macro ?DECLARE_ACPI_MCFG_FIXUP?
->>   DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432", PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
->>   ^
->> arch/arm64/kernel/pci.c:225:44: error: pasting ""QCOM"" and ""QDF2432"" does not give a valid preprocessing token
->>   DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432", PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
->>                                              ^
->> include/linux/pci-acpi.h:90:17: note: in definition of macro ?DECLARE_ACPI_MCFG_FIXUP?
->>    __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
->>                   ^
->> arch/arm64/kernel/pci.c:225:52: error: pasting ""QDF2432"" and "PCI_MCFG_DOMAIN_ANY" does not give a valid preprocessi
->> ng token
->>   DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432", PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
->>                                                      ^
->> include/linux/pci-acpi.h:90:25: note: in definition of macro ?DECLARE_ACPI_MCFG_FIXUP?
->>    __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
->>                           ^
->> arch/arm64/kernel/pci.c:225:44: error: expected ?=?, ?,?, ?;?, ?asm? or ?__attribute__? before string constant
->>   DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432", PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
->>                                              ^
->> include/linux/pci-acpi.h:90:17: note: in definition of macro ?DECLARE_ACPI_MCFG_FIXUP?
->>    __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
->>                   ^
->> make[1]: *** [arch/arm64/kernel/pci.o] Error 1
->> make: *** [arch/arm64/kernel] Error 2
->>
->> 1. https://gcc.gnu.org/onlinedocs/cpp/Concatenation.html#Concatenation
->>
->>> +     __used  __attribute__((__section__(".acpi_fixup_mcfg"),         \
->>> +                             aligned((sizeof(void *))))) =           \
->>> +     { ops, oem_id, oem_table_id, dom, bus };
->>> +
->>>   extern int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info);
->>>   extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
->>>                                            struct acpi_pci_root_ops *ops,
->>>
->>
->> Thanks,
->> Cov
->>
->> --
->> Qualcomm Innovation Center, Inc.
->> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
->> a Linux Foundation Collaborative Project
->
-> .
->
+> --
+> Best Regards
+> Masahiro Yamada
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
