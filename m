@@ -1,49 +1,33 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 14 Jun 2016 17:07:23 +0200
-Subject: [PATCH 05/10] i2c: designware-platdrv: Fix clk gating in ->remove()
+Date: Tue, 14 Jun 2016 17:07:25 +0200
+Subject: [PATCH 07/10] i2c: designware-platdrv: Re-init the HW when resuming
 In-Reply-To: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
 References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1465916848-8207-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1465916848-8207-8-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current approach to gate the clock in ->remove() relies on CONFIG_PM
-to be set, as it's expected that the call to pm_runtime_put_sync()
-triggers the ->runtime_suspend() callback to be invoked.
-
-Even in the case when CONFIG_PM is set, userspace may prevent runtime PM
-suspend via sysfs (pm_runtime_forbid()) for the device.
-
-Fix the behaviour by converting from using pm_runtime_put_sync() into
-directly using the clk API to manage clock gating. Let's also update the
-runtime PM status for the device as to reflect the state of the HW.
+In cases when the designware specific flag "pm_runtime_disable" is set,
+the HW becomes disabled during system PM suspend. Let's make sure it
+becomes operational when resuming by re-initialize it again.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/i2c/busses/i2c-designware-platdrv.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-designware-platdrv.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 7f67d801..4083376 100644
+index 106856f..95a9f4e 100644
 --- a/drivers/i2c/busses/i2c-designware-platdrv.c
 +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -268,11 +268,16 @@ static int dw_i2c_plat_remove(struct platform_device *pdev)
+@@ -337,9 +337,7 @@ static int dw_i2c_plat_resume(struct device *dev)
+ 	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
  
- 	i2c_dw_disable(dev);
- 
-+	if (!IS_ERR(dev->clk))
-+		clk_disable_unprepare(dev->clk);
-+
-+	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_dont_use_autosuspend(&pdev->dev);
- 	if (dev->pm_runtime_disabled)
- 		pm_runtime_put_noidle(&pdev->dev);
--	pm_runtime_dont_use_autosuspend(&pdev->dev);
--	pm_runtime_put_sync(&pdev->dev);
--	pm_runtime_disable(&pdev->dev);
-+
-+	pm_runtime_put_noidle(&pdev->dev);
-+	pm_runtime_set_suspended(&pdev->dev);
+ 	i2c_dw_plat_prepare_clk(i_dev, true);
+-
+-	if (!i_dev->pm_runtime_disabled)
+-		i2c_dw_init(i_dev);
++	i2c_dw_init(i_dev);
  
  	return 0;
  }
