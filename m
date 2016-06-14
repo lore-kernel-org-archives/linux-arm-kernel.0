@@ -1,72 +1,84 @@
-From: huangtao@rock-chips.com (Huang, Tao)
-Date: Tue, 14 Jun 2016 12:00:12 +0800
-Subject: [PATCH v2 0/4] clocksource: rockchip/timer: Support rktimer for
- rk3399
-In-Reply-To: <20160613130625.GC10634@linaro.org>
-References: <1465275273-22076-1-git-send-email-wxt@rock-chips.com>
- <20160613130625.GC10634@linaro.org>
-Message-ID: <575F814C.104@rock-chips.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Tue, 14 Jun 2016 06:34:45 +0200
+Subject: [linux-sunxi] [PATCH v3 10/13] spi: sunxi: merge sun4i and sun6i
+ SPI driver
+In-Reply-To: <CAGRGNgVONS+i=57D52VeW8J6SvfmX=iG+3VpxNS8=kJOV+WSLw@mail.gmail.com>
+References: <cover.1465490774.git.hramrach@gmail.com>
+ <ad0ec30ef6b01f58e1b3b92da06e6cbd5c947354.1465490774.git.hramrach@gmail.com>
+ <CAGRGNgVONS+i=57D52VeW8J6SvfmX=iG+3VpxNS8=kJOV+WSLw@mail.gmail.com>
+Message-ID: <CAOMqctQD=o6YBk-QRiqbE9Cj+ZAH1nAM33rW6ZHefV8dU3aucQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel:
-On 2016?06?13? 21:06, Daniel Lezcano wrote:
-> On Tue, Jun 07, 2016 at 12:54:29PM +0800, Caesar Wang wrote:
->> This series patches had been tested on rockchip inside kernel.
->> In order to support the rk3399 SoC timer and turn off interrupts and IPIs to
->> save power in idle.
-> 
-> For my personnal information, are the arch_timer in the same power domain 
-> than the CPU ? IOW, what is the 'always-on' property in the DT ?
+Hello,
 
-Yes. In our SoC design, all arch (generic) timer in the same power
-domain of CPU core. So if one CPU core power down, the arch (generic)
-timer will lose it's state and stop working.
-While rk timer maybe in peri power domain or pmu power domain, so the
-timer will still work when CPU power down.
-
-But before RK3399, all SoCs with CPU power domain, do not support auto
-power down while cpu idle. So the arch timer can be seem as always on,
-i.e. we don't need a broadcast timer at all.
-
-> 
->> Okay, it still works bootup on rk3288/other SoCs, even though many socs 
->> hasn't used
->> the broadcast timer.
-> 
-> Yes, unfortunately the SoC design on rk3288 and the previous ones do not 
-> allow to use a cpuidle driver with cpu/cluster power down, so obviously the 
-> broadcast timer is pointless on these boards :)
-> 
-
-You are right.
-
->> History version:
->> v1:
->> https://lkml.org/lkml/2016/5/25/186
+On 14 June 2016 at 01:43, Julian Calaby <julian.calaby@gmail.com> wrote:
+> Hi Michal,
+>
+> On Tue, Jun 14, 2016 at 3:46 AM, Michal Suchanek <hramrach@gmail.com> wrote:
+>> The drivers are very similar and share multiple flaws which needed
+>> separate fixes for both drivers.
 >>
->> Easy to test for my borad.
->> localhost / # cat /proc/interrupts
->> CPU0       CPU1       CPU2       CPU3       CPU4       CPU5
->> 1:          0          0          0          0          0          0     GICv3  29 Edge      arch_timer
->> ...
->> 5:          0          0          0          0          0          0     GICv3 113 Level     rk_timer
->> ..
+>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>> ---
+>>  drivers/spi/Kconfig     |   8 +-
+>>  drivers/spi/Makefile    |   1 -
+>>  drivers/spi/spi-sun4i.c | 156 +++++++++++--
+>>  drivers/spi/spi-sun6i.c | 598 ------------------------------------------------
+>>  4 files changed, 143 insertions(+), 620 deletions(-)
+>>  delete mode 100644 drivers/spi/spi-sun6i.c
 >>
->> localhost / # cat /proc/timer_list | grep event_handler
->> get "event_handler:  hrtimer_interrupt"
->> event_handler:  tick_handle_oneshot_broadcast
->> event_handler:  hrtimer_interrupt
-> 
-> What are you trying to demonstrate here ? There are no interrupts for both 
-> arch_timer and rk_timer.
+>> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+>> index 0b8e6c6..c76f8e4 100644
+>> --- a/drivers/spi/spi-sun4i.c
+>> +++ b/drivers/spi/spi-sun4i.c
+>> @@ -279,9 +321,14 @@ static int sunxi_spi_transfer_one(struct spi_master *master,
+>>         reg = sunxi_spi_read(sspi, SUNXI_TFR_CTL_REG);
+>>
+>>         /* Reset FIFOs */
+>> -       sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG,
+>> -                       reg | sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>> -                       sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>> +       if (sspi->type == SPI_SUN4I)
+>> +               sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG,
+>> +                               reg | sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>> +                               sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>> +       else
+>> +               sunxi_spi_write(sspi, SUNXI_FIFO_CTL_REG,
+>> +                               sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>> +                               sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>
+> If we're already doing different stuff for each generation of the IP,
+> why not just use the register offsets and bit definitions directly?
 
-I don't know. Maybe Caesar do something wrong :(
-This is my output:
-           CPU0       CPU1       CPU2       CPU3       CPU4       CPU5
+Because having (*sspi->regmap)[SUNXI_FIFO_CTL_REG] all over the place
+makes my eyes bleed and you cannot use the check that you are
+accessing a register that actually exists.
 
-...
-  2:       2911       1967       1588       1608       1295       1606
-   GICv3  30 Edge      arch_timer
-  5:        578        637        684        626        161        165
-   GICv3 113 Level     rk_timer
+>> @@ -491,10 +558,37 @@ static int sunxi_spi_probe(struct platform_device *pdev)
+>>         }
+>>
+>>         sspi->master = master;
+>> -       sspi->fifo_depth = SUN4I_FIFO_DEPTH;
+>> -       sspi->type = SPI_SUN4I;
+>> -       sspi->regmap = &sun4i_regmap;
+>> -       sspi->bitmap = &sun4i_bitmap;
+>> +       if (of_device_is_compatible(pdev->dev.of_node, SUN4I_COMPATIBLE)) {
+>> +               sspi->fifo_depth = SUN4I_FIFO_DEPTH;
+>> +               sspi->type = SPI_SUN4I;
+>> +               sspi->regmap = &sun4i_regmap;
+>> +               sspi->bitmap = &sun4i_bitmap;
+>> +       } else if (of_device_is_compatible(pdev->dev.of_node,
+>> +                                          SUN6I_COMPATIBLE)) {
+>> +               sspi->fifo_depth = SUN6I_FIFO_DEPTH;
+>> +               sspi->type = SPI_SUN6I;
+>> +               sspi->regmap = &sun6i_regmap;
+>> +               sspi->bitmap = &sun6i_bitmap;
+>
+> Can you store data in the match table instead of doing this?
+
+That might be nicer. Will look into this.
+
+Thanks
+
+Michal
