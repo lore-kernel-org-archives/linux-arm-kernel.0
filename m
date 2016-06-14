@@ -1,85 +1,81 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 14 Jun 2016 09:43:17 +0900
-Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
- <20160601005751.GG20527@verge.net.au>
- <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
- <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
- <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
- <20160610010245.GA10152@verge.net.au>
- <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
-Message-ID: <20160614004317.GC6456@verge.net.au>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 13 Jun 2016 17:43:51 -0700
+Subject: [PATCH 04/11] mmc: sdhci-of-arasan: Properly set
+ corecfg_baseclkfreq on rk3399
+In-Reply-To: <47a2dcd9-9c3c-8fde-2be0-40e305c25e8d@rock-chips.com>
+References: <1465339484-969-1-git-send-email-dianders@chromium.org>
+ <1465339484-969-5-git-send-email-dianders@chromium.org>
+ <f5dcc018-bd60-87a7-798b-efc261e443dd@rock-chips.com>
+ <CAD=FV=UzGZmwGTthqqO5Skxj5f0wsS5VKr4gYP2i9SUyGqvbjg@mail.gmail.com>
+ <47a2dcd9-9c3c-8fde-2be0-40e305c25e8d@rock-chips.com>
+Message-ID: <CAD=FV=UL5tU8RWtHF=-pE8SA0jUcBsqQDOU0BrruXOF7yGh5xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 10:29:17PM +0300, Sergei Shtylyov wrote:
-> On 06/10/2016 04:02 AM, Simon Horman wrote:
-> 
-> >>[...]
-> >>
-> >>>>>And that the system behaves sanely on suspend/resume.
-> >>>>
-> >>>>  I'd be thankful if you told me how to test that. :-)
-> >>>
-> >>>System suspend:
-> >>>
-> >>>   echo mem > /sys/power/state
-> >>
-> >>   Oh. I know that one! :-)
-> >>
-> >>>System resume: You're gonna need a "wakeup-source" in your DTS, e.g. gpio-keys.
-> >>>Serial should work too, echo "enabled" to the corresponding wakeup
-> >>>file in /sys first.
-> >>
-> >>   I'm afraid I couldn't find that file. All I saw were RPM controls...
-> >>
-> >>>In case of issues, try "echo 0 > /sys/module/printk/parameters/console_suspend".
-> >>
-> >>   There's no problems suspending, it's the resuming that's a problem for me.
-> >>
-> >>>Good luck!
-> >>
-> >>   As usual, there was no luck. :-)
-> >>
-> >>WBR, Sergei
-> >
-> >Does resume work for UP (i.e. without SMP)?
-> 
->    No. My problem with resume is I can't wake up the remote system. I don't
-> see the needed 'wakeup' file in
-> /sys/devices/platform/soc/e6e60000.serial/...
->     However, if I enable CONFIG_PM_[ADVANCED_]DEBUG and do
-> 
-> $ echo -n core /sys/.power/pm_test
-> 
-> the system happily wakes up after a small delay (5 s), w/either SMP or UP kernel.
+Hi,
 
-That seems promising but it seems curious that there is no wakeup file.
+On Mon, Jun 13, 2016 at 5:14 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+>>> It's broken when reading capabilities reg on RK3399 platform
+>>> which means you should get it via clk framework. But you should consider
+>>> the non-broken case.
+>>
+>>
+>> I'm afraid I don't understand.  Can you elaborate?  Are you saying if
+>> things weren't broken then we wouldn't have to ask the common clock
+>> framework for this?  Where would we get this value?
+>
+>
+>
+> I mean bascially we should get baseclk from capabilities register[15:8]
+> (offset 0x40 at sdhci), namely EMMCCORE_CAP on TRM. Only when you get 0x0
+> from there, can you consider to get it from clock framework.
 
-On Lager the following procedure works for me using
-renesas-devel-20160613-v4.7-rc3 and shmobile defconfig.
+Ah, got it!
 
-0. Add wakeup-source property to serial at e6ce0000 node in DT
-1. echo enabled > /sys/devices/platform/e6e60000.serial/tty/ttySC0/power/wakeup
-2. echo mem > /sys/power/state
-3. Provide input on serial console
+I guess I would be super surprised if an SoC implemented
+register[15:8] but still then required you to manually copy that value
+to corecfg_baseclkfreq.  Presumably nobody would be crazy enough to
+try to measure the clock rate in the SDHCI driver, so this would
+probably only be non-zero where the SDHCI clock is totally fixed.
+...in that case probably the SoC designer would also put a default
+value in corecfg_baseclkfreq that matched (and maybe even make
+corecfg_baseclkfreq read-only?).
 
-* Success! *
+Even in the case that an SoC designer didn't put a value into
+corecfg_baseclkfreq that matched register[15:8], it seems very likely
+that the rate returned from the clk_get_rate() would match.
 
-> >How did testing CPU hotplug go? Did it work for all CPUs?
-> 
->    Sure!
+I guess what I'm saying is that, to me, it seems like my patch isn't
+broken in any real systems.  If we ever find a system that needs this
+behavior in the future, we can add it.  Until then, it seems like my
+patch would be fine.  Do you agree?
 
-Great!
+Note: right now we only provide a register map for rk3399, so
+certainly we can't be breaking any other SoCs with our current method.
 
->    The only problem I'm seeing (again) is the RCAN clock failing to register:
-> 
-> rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock (-12)
-> 
->    I was going to look at it yesterday but (wrongly) thought it somehow
-> cured itself... I'll look at it now.
 
-Is this resolved? If not perhaps you could consider removing the node
-in question for now.
+> I don't see a reason to check the return code here.  Specifically:
+>>
+>> * If this is a SoC where you don't need to write corecfg_baseclkfreq
+>> then we need do nothing about this error.
+>>
+>> * If the regmap write failed (which would be terribly unexpected for a
+>> memory mapped register) then we've already printed an error (in
+>> sdhci_arasan_syscon_write).  Best course of action seems to keep going
+>> and try anyway.
+>>
+>>
+>> I don't think a retry is likely to help anything.
+>
+>
+> Well, I saw you add a return value for sdhci_arasan_syscon_write, so
+> should we remove it?
+
+It was presuming that there might be future callers who might want to
+write other corecfg registers and might need to know whether the write
+worked or not.  Since having the return value doesn't hurt anything
+I'd rather leave it in.  If you really want me to remove it, though, I
+will.  Just let me know.
+
+
+-Doug
