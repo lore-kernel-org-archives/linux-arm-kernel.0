@@ -1,92 +1,90 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 14 Jun 2016 08:24:43 +0800
-Subject: [PATCH 09/11] phy: rockchip-emmc: Set phyctrl_frqsel based on
- card clock
-In-Reply-To: <CAD=FV=VA6vmfzHEOZwAFJvNXRDhPmf+bX-Jw1eFboOdP6kD3dg@mail.gmail.com>
-References: <1465339484-969-1-git-send-email-dianders@chromium.org>
- <1465339484-969-10-git-send-email-dianders@chromium.org>
- <937cbbc5-f9dc-bdf0-c46a-c7e814b9b373@rock-chips.com>
- <CAD=FV=VA6vmfzHEOZwAFJvNXRDhPmf+bX-Jw1eFboOdP6kD3dg@mail.gmail.com>
-Message-ID: <036b0349-8343-f5de-7215-5a0843ebc6a9@rock-chips.com>
+Date: Tue, 14 Jun 2016 08:28:46 +0800
+Subject: [PATCH v2 01/11] phy: rockchip-emmc: Increase lock time allowance
+In-Reply-To: <1465859076-4868-2-git-send-email-dianders@chromium.org>
+References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
+ <1465859076-4868-2-git-send-email-dianders@chromium.org>
+Message-ID: <1c62147b-0464-6ecc-3ba4-2ec9ddf19111@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/6/14 7:05, Doug Anderson ??:
-> Shawn,
+? 2016/6/14 7:04, Douglas Anderson ??:
+> Previous PHY code waited a fixed amount of time for the DLL to lock at
+> power on time.  Unfortunately, the time for the DLL to lock is actually
+> a bit more dynamic and can be longer if the card clock is slower.
 >
-> On Mon, Jun 13, 2016 at 1:54 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
->> On 2016/6/8 6:44, Douglas Anderson wrote:
->>>
->>> The "phyctrl_frqsel" is described in the Arasan datasheet [1] as "the
->>> frequency range of DLL operation".  Although the Rockchip variant of
->>> this PHY has different ranges than the reference Arasan PHY it appears
->>> as if the functionality is similar.  We should set this phyctrl field
->>> properly.
->>>
->>> Note: as per Rockchip engineers, apparently the "phyctrl_frqsel" is
->>> actually only useful in HS200 / HS400 modes even though the DLL itself
->>> it used for some purposes in all modes.  See the discussion in the
->>> earlier change in this series: ("mmc: sdhci-of-arasan: Always power the
->>> PHY off/on when clock changes").  In any case, it shouldn't hurt to set
->>> this always.
->>>
->>> Note that this change should allow boards to run at HS200 / HS400 speed
->>> modes while running at 100 MHz or 150 MHz.  In fact, running HS400 at
->>> 150 MHz (giving 300 MB/s) is the main motivation of this series, since
->>> performance is still good but signal integrity problems are less
->>> prevelant at 150 MHz.
->>
->>
->> Thanks for doing this, but I think we should limit freq if assigning
->> max-frequency from DT more explicitly since the PHY could only support
->> 50/100/150/200M for hs200/400? Otherwise I can't say if the PHY could
->> always work well. i.e if geting 125000000 ... 174999999 , you code make
->> the phyctrl_frqsel to be 150M, so it will be 15% missing of precision
->> for tuning delay element. Ideally, the sample point should be in the
->> middle of window, but I don't know if there is a bad HW design makes
->> the window small enough which need special care about it.
+> Instead of waiting a fixed 30 us, let's now dynamically wait until the
+> lock bit gets set.  We'll wait up to 10 ms which should be OK even if
+> the card clock is at the super slow 100 kHz.
 >
-> What would you suggest as a valid range, then?
+> On its own, this change makes the PHY power on code a little more
+> robust.  Before this change the PHY was relying on the eMMC code to make
+> sure the PHY was only powered on when the card clock was set to at least
+> 50 MHz before, though this reliance wasn't documented anywhere.
 >
->>From the public Arasan datasheet they seem to indicate +/- 15 MHz is
-> sane.  Does that sound OK?  Presuming that all of your numbers
-> (50/100/150/200) are centers, that means that we could support clock
-> rates of:
+> This change will be even more useful in future changes where we actually
+> need to be able to wait for a DLL lock at slower clock speeds.
 >
-> 35 MHz - 65 MHz
-> 85 MHz - 115 MHz
-> 135 MHz - 165 MHz
-> 185 MHz - 200 MHz
->
->
-> So how about if we add a warning for things that are outside of those
-> ranges?  ...except no warning for < 35 MHz since presumably we're not
-> using high speed modes when the DLL is that slow and so we're OK.
 
-a warning should be ok.
-If we ask 150M, but PLL only provide 175M maybe, then should we
-fallback it to 150M or promote it to 200M when setting?
+Looks good to me.
 
->
->
-> NOTE: In rk3399 it's actually quite important to handle clocks that
-> aren't exactly the right MHz.  When you ask for 150 MHz you actually
-> end up a child of GPLL and actually end up at 148.5 MHz.  This should
-> be close enough, but it's not exactly 150 MHz.  If we can't handle
-> 148.5 MHz then the 150 MHz setting in the PHY is useless.
->
-> Also note that on rk3399 we're fairly limited on the number of rates
-> we can actually make since they need to be even divisors of 594 MHz or
-> 800 MHz (assuming you don't rejigger all the PLLs in the SoC or
-> something).  Most of the rates are actually in those ranges...
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-Yes I don't.
-
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> ---
+> Changes in v2:
+> - Indicate that 5.1 ms is calculated (Shawn).
 >
+>  drivers/phy/phy-rockchip-emmc.c | 28 ++++++++++++++++++++--------
+>  1 file changed, 20 insertions(+), 8 deletions(-)
 >
-> -Doug
+> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
+> index a69f53630e67..2d059c046978 100644
+> --- a/drivers/phy/phy-rockchip-emmc.c
+> +++ b/drivers/phy/phy-rockchip-emmc.c
+> @@ -85,6 +85,7 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+>  {
+>  	unsigned int caldone;
+>  	unsigned int dllrdy;
+> +	unsigned long timeout;
 >
->
+>  	/*
+>  	 * Keep phyctrl_pdb and phyctrl_endll low to allow
+> @@ -137,15 +138,26 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+>  				   PHYCTRL_ENDLL_MASK,
+>  				   PHYCTRL_ENDLL_SHIFT));
+>  	/*
+> -	 * After enable analog DLL circuits, we need an extra 10.2us
+> -	 * for dll to be ready for work. But according to testing, we
+> -	 * find some chips need more than 25us.
+> +	 * After enabling analog DLL circuits docs say that we need 10.2 us if
+> +	 * our source clock is at 50 MHz and that lock time scales linearly
+> +	 * with clock speed.  If we are powering on the PHY and the card clock
+> +	 * is super slow (like 100 kHZ) this could take as long as 5.1 ms as
+> +	 * per the math: 10.2 us * (50000000 Hz / 100000 Hz) => 5.1 ms
+> +	 * Hopefully we won't be running at 100 kHz, but we should still make
+> +	 * sure we wait long enough.
+>  	 */
+> -	udelay(30);
+> -	regmap_read(rk_phy->reg_base,
+> -		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+> -		    &dllrdy);
+> -	dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
+> +	timeout = jiffies + msecs_to_jiffies(10);
+> +	do {
+> +		udelay(1);
+> +
+> +		regmap_read(rk_phy->reg_base,
+> +			rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+> +			&dllrdy);
+> +		dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
+> +		if (dllrdy == PHYCTRL_DLLRDY_DONE)
+> +			break;
+> +	} while (!time_after(jiffies, timeout));
+> +
+>  	if (dllrdy != PHYCTRL_DLLRDY_DONE) {
+>  		pr_err("rockchip_emmc_phy_power: dllrdy timeout.\n");
+>  		return -ETIMEDOUT;
 >
 
 
