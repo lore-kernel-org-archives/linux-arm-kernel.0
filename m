@@ -1,51 +1,33 @@
-From: b.reynal@virtualopensystems.com (Baptiste Reynal)
-Date: Tue, 14 Jun 2016 17:29:39 +0200
-Subject: [PATCH V7 0/9] vfio, platform: add ACPI support
-In-Reply-To: <575EDA6C.9010806@codeaurora.org>
-References: <1465792001-27960-1-git-send-email-okaya@codeaurora.org>
- <575EDA6C.9010806@codeaurora.org>
-Message-ID: <CAN9JPjH6uSvGgY6aS5GDhxi5aTCfXhirFk7wNxvwTxXbV9jtzw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Jun 2016 17:30:54 +0200
+Subject: [PATCH 0/5] APQ8060 Dragonboard support
+Message-ID: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+This concludes my first round of work to get the APQ8060 Dragonboard
+booting properly upstream.
 
-Although I don't have the hardware to test them, I reviewed your
-patches and they look fine to me.
+After the separate fix to the RPM driver, it boots and sets up all stuff
+as expected, adds the serial port and the two SD card slots.
 
-Regards,
-Baptiste
+I was working on getting some stuff like the PM8901 enabled (it has four
+MPP multi-purpose-pins) but that work can happen on top of this series,
+let's start somewhere.
 
-On Mon, Jun 13, 2016 at 6:08 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Hi Baptiste,
->
-> On 6/13/2016 12:26 AM, Sinan Kaya wrote:
->>
->> Sinan Kaya (9):
->>   vfio: platform: rename reset function
->>   vfio: platform: move reset call to a common function
->>   vfio: platform: determine reset capability
->>   vfio: platform: add support for ACPI probe
->>   vfio: platform: add extra debug info argument to call reset
->>   vfio: platform: call _RST method when using ACPI
->>   vfio, platform: make reset driver a requirement by default
->>   vfio: platform: check reset call return code during open
->>   vfio: platform: check reset call return code during release
->>
->>  drivers/vfio/platform/vfio_amba.c             |   5 +
->>  drivers/vfio/platform/vfio_platform.c         |   5 +
->>  drivers/vfio/platform/vfio_platform_common.c  | 195 +++++++++++++++++++++-----
->>  drivers/vfio/platform/vfio_platform_private.h |   8 +-
->>  4 files changed, 176 insertions(+), 37 deletions(-)
->>
-> Cov and I exchanged some emails with Alex last week. I think
-> there is a general expectation for you to review the series since
-> you are the subsystem maintainer.
->
-> I'm looking forward to hear your feedback on the series.
-> Sinan
->
-> --
-> Sinan Kaya
-> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Linus Walleij (5):
+  ARM: dts: add GPIO and MPP to MSM8660 PMIC
+  ARM: dts: add SDCC5 to Qualcomm MSM8660
+  ARM: dts: add L2CC and RPM with regulators for MSM8660
+  ARM: dts: move the fixed MMC regulator to SURF board
+  ARM: dts: add Qualcomm APQ8060-based Dragonboard
+
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 557 +++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8660-surf.dts        |  11 +
+ arch/arm/boot/dts/qcom-msm8660.dtsi            | 149 ++++++-
+ 4 files changed, 709 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+
+-- 
+2.4.11
