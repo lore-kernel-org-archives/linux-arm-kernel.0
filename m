@@ -1,112 +1,597 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 14 Jun 2016 16:31:25 +0100
-Subject: Versatile Express randomly fails to boot - Versatile Express to
- be removed from nightly testing
-In-Reply-To: <551D7EAB.1000200@arm.com>
-References: <20150316195255.GM8656@n2100.arm.linux.org.uk>
- <550818A6.9020205@arm.com> <20150317153657.GY8656@n2100.arm.linux.org.uk>
- <55084D99.7050004@arm.com> <20150317161748.GZ8656@n2100.arm.linux.org.uk>
- <20150330140333.GJ24899@n2100.arm.linux.org.uk> <55196228.5050805@arm.com>
- <20150330150552.GK24899@n2100.arm.linux.org.uk> <55196E31.80803@arm.com>
- <551AD902.9090401@arm.com> <20150402141336.GI24899@n2100.arm.linux.org.uk>
- <551D7EAB.1000200@arm.com>
-Message-ID: <1465918285.2840.41.camel@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Jun 2016 17:30:59 +0200
+Subject: [PATCH 5/5] ARM: dts: add Qualcomm APQ8060-based Dragonboard
+In-Reply-To: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
+References: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1465918259-11138-6-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep
+This is the first Dragonboard based on APQ8060 and PM8058. It
+was produced in 2011 in cooperation between Qualcomm and
+BSQUARE.
 
-Over the past several days I think I've been unknowingly reproducing
-many of the steps in this old discussion thread [1] about A9 Versatile
-Express boot failures. It's only when I found myself looking at the L2
-cache timings that I got a vague recollection and dug out this old
-thread again. Was there any resolution to the issue? As far as I can
-work out, the A9x4 CoreTile stopped working around Linux 3.18 (the
-problem isn't 100% reproducible so it's difficult to tell).
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 557 +++++++++++++++++++++++++
+ 2 files changed, 558 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
 
-Using "arm,tag-latency = <2 2 1>" as Russell seemed to indicate [2]
-fixed things for him, also works for me. So should we update mainline
-device-tree with that?
-
-Alternatively, we could assume nobody cares about A9 as presumably Linux
-has been unbootable for a year without anyone raising the issue. (The
-only reason I'm looking at it is I may be making U-Boot changes for
-vexpress and I wanted to test them).
-
-But if we are going to just ignore things, I think it would be good to
-delete the A9 dts, or the L2 cache entry, so other people in the future
-don't waste days trying to track down the problem.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330860.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/342005.html
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 06b6c2d695bf..793bb14c1329 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -572,6 +572,7 @@ dtb-$(CONFIG_ARCH_PRIMA2) += \
+ dtb-$(CONFIG_ARCH_OXNAS) += \
+ 	wd-mbwe.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += \
++	qcom-apq8060-dragonboard.dtb \
+ 	qcom-apq8064-arrow-db600c.dtb \
+ 	qcom-apq8064-cm-qs600.dtb \
+ 	qcom-apq8064-ifc6410.dtb \
+diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+new file mode 100644
+index 000000000000..734d5e8446db
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+@@ -0,0 +1,557 @@
++/*
++ * Copyright 2016 Linaro Ltd
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
++ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++ * THE SOFTWARE.
++ */
++
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
++#include "qcom-msm8660.dtsi"
++
++/ {
++	model = "Qualcomm APQ8060 Dragonboard";
++	compatible = "qcom,apq8060-dragonboard", "qcom,msm8660";
++
++	aliases {
++		serial0 = &gsbi12_serial;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		/* Main power of the board: 3.7V */
++		vph: regulator-fixed at 1 {
++			compatible = "regulator-fixed";
++			regulator-min-microvolt = <3700000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-name = "VPH";
++			regulator-type = "voltage";
++			regulator-always-on;
++			regulator-boot-on;
++		};
++	};
++
++	/* This is a levelshifter for SDCC5 */
++	dragon_vio_txb: txb0104rgyr {
++		compatible = "regulator-fixed";
++		regulator-name = "Dragon SDCC levelshifter";
++		vin-supply = <&pm8058_l14>;
++		regulator-always-on;
++	};
++
++	soc {
++		gsbi at 19c00000 {
++			status = "ok";
++			pinctrl-names = "default";
++			pinctrl-0 = <&dragon_serial0_pins>;
++			qcom,mode = <GSBI_PROT_I2C_UART>;
++			serial at 19c40000 {
++				status = "ok";
++			};
++		};
++	};
++};
++
++/* Intenal 3.69 GiB eMMC */
++&sdcc1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&dragon_sdcc1_pins>;
++	vmmc-supply = <&pm8901_l5>;
++	vqmmc-supply = <&pm8901_lvs0>;
++};
++
++/* External micro SD card, directly connected, pulled up to 2.85 V */
++&sdcc3 {
++	status = "okay";
++	/* Enable SSBI GPIO 22 as input, use for card detect */
++	pinctrl-names = "default";
++	pinctrl-0 = <&dragon_sdcc3_pins>, <&dragon_sdcc3_gpios>;
++	cd-gpios = <&pm8058_gpio 22 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&tlmm 110 GPIO_ACTIVE_HIGH>;
++	vmmc-supply = <&pm8058_l14>;
++};
++
++/*
++ * Second external micro SD card, using two TXB104RGYR levelshifters
++ * to lift from 1.8 V to 2.85 V
++ */
++&sdcc5 {
++	status = "okay";
++	/* Enable SSBI GPIO 26 as input, use for card detect */
++	pinctrl-names = "default";
++	pinctrl-0 = <&dragon_sdcc5_pins>, <&dragon_sdcc5_gpios>;
++	cd-gpios = <&pm8058_gpio 26 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&tlmm 106 GPIO_ACTIVE_HIGH>;
++	vmmc-supply = <&pm8058_l14>;
++	vqmmc-supply = <&dragon_vio_txb>;
++};
++
++/* Set up of the PMIC RPM regulators for this board */
++&rpm {
++	/* PM8901 supplies "preliminary regulators" whatever that means */
++	pm8901-regulators {
++		vdd_l0-supply = <&pm8901_s4>;
++		vdd_l1-supply = <&vph>;
++		vdd_l2-supply = <&vph>;
++		vdd_l3-supply = <&vph>;
++		vdd_l4-supply = <&vph>;
++		vdd_l5-supply = <&vph>;
++		vdd_l6-supply = <&vph>;
++		/* vdd_s0-supply, vdd_s1-supply: SAW regulators */
++		vdd_s2-supply = <&vph>;
++		vdd_s3-supply = <&vph>;
++		vdd_s4-supply = <&vph>;
++		lvs0_in-supply = <&pm8058_s3>;
++		lvs1_in-supply = <&pm8901_s4>;
++		lvs2_in-supply = <&pm8058_l0>;
++		lvs3_in-supply = <&pm8058_s2>;
++		mvs_in-supply = <&pm8058_s3>;
++
++		l0 {
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++			bias-pull-down;
++		};
++		l1 {
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			bias-pull-down;
++		};
++		l2 {
++			regulator-min-microvolt = <2850000>;
++			regulator-max-microvolt = <3300000>;
++			bias-pull-down;
++		};
++		l3 {
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			bias-pull-down;
++		};
++		l4 {
++			regulator-min-microvolt = <2600000>;
++			regulator-max-microvolt = <2600000>;
++			bias-pull-down;
++		};
++		l5 {
++			regulator-min-microvolt = <2850000>;
++			regulator-max-microvolt = <2850000>;
++			bias-pull-down;
++		};
++		l6 {
++			regulator-min-microvolt = <2200000>;
++			regulator-max-microvolt = <2200000>;
++			bias-pull-down;
++		};
++
++		/* s0 and s1 are SAW regulators controlled over SPM */
++		s2 {
++			regulator-min-microvolt = <1300000>;
++			regulator-max-microvolt = <1300000>;
++			qcom,switch-mode-frequency = <1600000>;
++			bias-pull-down;
++		};
++		s3 {
++			regulator-min-microvolt = <1100000>;
++			regulator-max-microvolt = <1100000>;
++			qcom,switch-mode-frequency = <1600000>;
++			bias-pull-down;
++		};
++		s4 {
++			regulator-min-microvolt = <1225000>;
++			regulator-max-microvolt = <1225000>;
++			qcom,switch-mode-frequency = <1600000>;
++			bias-pull-down;
++		};
++
++		/* LVS0 thru 3 and mvs0 are just switches */
++		lvs0 {
++			regulator-always-on;
++		};
++		lvs1 { };
++		lvs2 { };
++		lvs3 { };
++		mvs0 {};
++	};
++
++	pm8058-regulators {
++		vdd_l0_l1_lvs-supply = <&pm8058_s3>;
++		vdd_l2_l11_l12-supply = <&vph>;
++		vdd_l3_l4_l5-supply = <&vph>;
++		vdd_l6_l7-supply = <&vph>;
++		vdd_l8-supply = <&vph>;
++		vdd_l9-supply = <&vph>;
++		vdd_l10-supply = <&vph>;
++		vdd_l13_l16-supply = <&pm8058_s4>;
++		vdd_l14_l15-supply = <&vph>;
++		vdd_l17_l18-supply = <&vph>;
++		vdd_l19_l20-supply = <&vph>;
++		vdd_l21-supply = <&pm8058_s3>;
++		vdd_l22-supply = <&pm8058_s3>;
++		vdd_l23_l24_l25-supply = <&pm8058_s3>;
++		vdd_s0-supply = <&vph>;
++		vdd_s1-supply = <&vph>;
++		vdd_s2-supply = <&vph>;
++		vdd_s3-supply = <&vph>;
++		vdd_s4-supply = <&vph>;
++		vdd_ncp = <&vph>;
++
++		l0 {
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++			bias-pull-down;
++		};
++		l1 {
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++			bias-pull-down;
++		};
++		l2 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <2600000>;
++			bias-pull-down;
++		};
++		l3 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			bias-pull-down;
++		};
++		l4 {
++			regulator-min-microvolt = <2850000>;
++			regulator-max-microvolt = <2850000>;
++			bias-pull-down;
++		};
++		l5 {
++			regulator-min-microvolt = <2850000>;
++			regulator-max-microvolt = <2850000>;
++			bias-pull-down;
++		};
++		l6 {
++			regulator-min-microvolt = <3000000>;
++			regulator-max-microvolt = <3600000>;
++			bias-pull-down;
++		};
++		l7 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			bias-pull-down;
++		};
++		l8 {
++			regulator-min-microvolt = <2900000>;
++			regulator-max-microvolt = <3050000>;
++			bias-pull-down;
++		};
++		l9 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			bias-pull-down;
++		};
++		l10 {
++			regulator-min-microvolt = <2600000>;
++			regulator-max-microvolt = <2600000>;
++			bias-pull-down;
++		};
++		l11 {
++			regulator-min-microvolt = <1500000>;
++			regulator-max-microvolt = <1500000>;
++			bias-pull-down;
++		};
++		l12 {
++			regulator-min-microvolt = <2900000>;
++			regulator-max-microvolt = <2900000>;
++			bias-pull-down;
++		};
++		l13 {
++			regulator-min-microvolt = <2050000>;
++			regulator-max-microvolt = <2050000>;
++			bias-pull-down;
++		};
++		l14 {
++			regulator-min-microvolt = <2850000>;
++			regulator-max-microvolt = <2850000>;
++		};
++		l15 {
++			regulator-min-microvolt = <2850000>;
++			regulator-max-microvolt = <2850000>;
++			bias-pull-down;
++		};
++		l16 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			bias-pull-down;
++			regulator-always-on;
++		};
++		l17 {
++			// 1.5V according to schematic
++			regulator-min-microvolt = <2600000>;
++			regulator-max-microvolt = <2600000>;
++			bias-pull-down;
++		};
++		l18 {
++			regulator-min-microvolt = <2200000>;
++			regulator-max-microvolt = <2200000>;
++			bias-pull-down;
++		};
++		l19 {
++			regulator-min-microvolt = <2500000>;
++			regulator-max-microvolt = <2500000>;
++			bias-pull-down;
++		};
++		l20 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			bias-pull-down;
++		};
++		l21 {
++			// 1.1 V according to schematic
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++			bias-pull-down;
++			regulator-always-on;
++		};
++		l22 {
++			// 1.2 V according to schematic
++			regulator-min-microvolt = <1150000>;
++			regulator-max-microvolt = <1150000>;
++			bias-pull-down;
++		};
++		l23 {
++			// Unused
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++			bias-pull-down;
++		};
++		l24 {
++			// Unused
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++			bias-pull-down;
++		};
++		l25 {
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++			bias-pull-down;
++		};
++
++		s0 {
++			// regulator-min-microvolt = <500000>;
++			// regulator-max-microvolt = <1325000>;
++			regulator-min-microvolt = <1100000>;
++			regulator-max-microvolt = <1100000>;
++			qcom,switch-mode-frequency = <1600000>;
++			bias-pull-down;
++		};
++		s1 {
++			// regulator-min-microvolt = <500000>;
++			// regulator-max-microvolt = <1250000>;
++			regulator-min-microvolt = <1100000>;
++			regulator-max-microvolt = <1100000>;
++			qcom,switch-mode-frequency = <1600000>;
++			bias-pull-down;
++		};
++		s2 {
++			// regulator-min-microvolt = <1200000>;
++			// regulator-max-microvolt = <1400000>;
++			regulator-min-microvolt = <1300000>;
++			regulator-max-microvolt = <1300000>;
++			qcom,switch-mode-frequency = <1600000>;
++			bias-pull-down;
++		};
++		s3 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			qcom,switch-mode-frequency = <1600000>;
++			regulator-always-on;
++			bias-pull-down;
++		};
++		s4 {
++			regulator-min-microvolt = <2200000>;
++			regulator-max-microvolt = <2200000>;
++			qcom,switch-mode-frequency = <1600000>;
++			regulator-always-on;
++			bias-pull-down;
++		};
++
++		/* LVS0 and LVS1 are just switches */
++		lvs0 {
++			bias-pull-down;
++		};
++		lvs1 {
++			bias-pull-down;
++		};
++
++		ncp {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++		};
++	};
++};
++
++&tlmm {
++	/* eMMMC pins, all 8 data lines connected */
++	dragon_sdcc1_pins: sdcc1 {
++		mux {
++			pins = "gpio159", "gpio160", "gpio161",
++			     "gpio162", "gpio163", "gpio164",
++			     "gpio165", "gpio166", "gpio167",
++			     "gpio168";
++			function = "sdc1";
++		};
++		clk {
++			pins = "gpio167"; /* SDC5 CLK */
++			drive-strength = <16>;
++			bias-disable;
++		};
++		cmd {
++			pins = "gpio168"; /* SDC5 CMD */
++			drive-strength = <10>;
++			bias-pull-up;
++		};
++		data {
++			/* SDC5 D0 to D7 */
++			pins = "gpio159", "gpio160", "gpio161", "gpio162",
++			     "gpio163", "gpio164", "gpio165", "gpio166";
++			drive-strength = <10>;
++			bias-pull-up;
++		};
++	};
++
++	/*
++	 * The SDCC3 pins are hardcoded (non-muxable) but need some pin
++	 * configuration.
++	 */
++	dragon_sdcc3_pins: sdcc3 {
++		clk {
++			pins = "sdc3_clk";
++			drive-strength = <8>;
++			bias-disable;
++		};
++		cmd {
++			pins = "sdc3_cmd";
++			drive-strength = <8>;
++			bias-pull-up;
++		};
++		data {
++			pins = "sdc3_data";
++			drive-strength = <8>;
++			bias-pull-up;
++		};
++	};
++
++	/* Second SD card slot pins */
++	dragon_sdcc5_pins: sdcc5 {
++		mux {
++			pins = "gpio95", "gpio96", "gpio97",
++			     "gpio98", "gpio99", "gpio100";
++			function = "sdc5";
++		};
++		clk {
++			pins = "gpio97"; /* SDC5 CLK */
++			drive-strength = <16>;
++			bias-disable;
++		};
++		cmd {
++			pins = "gpio95"; /* SDC5 CMD */
++			drive-strength = <10>;
++			bias-pull-up;
++		};
++		data {
++			/* SDC5 D0 to D3 */
++			pins = "gpio96", "gpio98", "gpio99", "gpio100";
++			drive-strength = <10>;
++			bias-pull-up;
++		};
++	};
++
++	/* Primary serial port uart 0 pins */
++	dragon_serial0_pins: gsbi12 {
++		mux {
++			pins = "gpio117", "gpio118";
++			function = "gsbi12";
++		};
++		tx {
++			pins = "gpio117";
++			drive-strength = <8>;
++			bias-disable;
++		};
++		rx {
++			pins = "gpio118";
++			drive-strength = <2>;
++			bias-pull-up;
++		};
++	};
++};
++
++&pmicintc {
++	keypad at 148 {
++		linux,keymap = <
++			MATRIX_KEY(0, 0, KEY_MENU)
++			MATRIX_KEY(0, 2, KEY_1)
++			MATRIX_KEY(0, 3, KEY_4)
++			MATRIX_KEY(0, 4, KEY_7)
++			MATRIX_KEY(1, 0, KEY_UP)
++			MATRIX_KEY(1, 1, KEY_LEFT)
++			MATRIX_KEY(1, 2, KEY_DOWN)
++			MATRIX_KEY(1, 3, KEY_5)
++			MATRIX_KEY(1, 3, KEY_8)
++			MATRIX_KEY(2, 0, KEY_HOME)
++			MATRIX_KEY(2, 1, KEY_REPLY)
++			MATRIX_KEY(2, 2, KEY_2)
++			MATRIX_KEY(2, 3, KEY_6)
++			MATRIX_KEY(3, 0, KEY_VOLUMEUP)
++			MATRIX_KEY(3, 1, KEY_RIGHT)
++			MATRIX_KEY(3, 2, KEY_3)
++			MATRIX_KEY(3, 3, KEY_9)
++			MATRIX_KEY(3, 4, KEY_SWITCHVIDEOMODE)
++			MATRIX_KEY(4, 0, KEY_VOLUMEDOWN)
++			MATRIX_KEY(4, 1, KEY_BACK)
++			MATRIX_KEY(4, 2, KEY_CAMERA)
++			MATRIX_KEY(4, 3, KEY_KBDILLUMTOGGLE)
++			>;
++		keypad,num-rows = <6>;
++		keypad,num-columns = <5>;
++	};
++};
++
++&pm8058_gpio {
++	dragon_sdcc3_gpios: sdcc3-gpios {
++		pinconf {
++			pins = "gpio22";
++			function = "normal";
++			input-enable;
++			bias-pull-up;
++			qcom,pull-up-strength = <PMIC_GPIO_PULL_UP_30>;
++			power-source = <PM8058_GPIO_S3>;
++		};
++	};
++	dragon_sdcc5_gpios: sdcc5-gpios {
++		pinconf {
++			pins = "gpio26";
++			function = "normal";
++			input-enable;
++			bias-pull-up;
++			qcom,pull-up-strength = <PMIC_GPIO_PULL_UP_30>;
++			power-source = <PM8058_GPIO_S3>;
++		};
++	};
++};
 -- 
-Tixy
-
-
-n Thu, 2015-04-02 at 18:38 +0100, Sudeep Holla wrote:
-> 
-> On 02/04/15 15:13, Russell King - ARM Linux wrote:
-> > On Tue, Mar 31, 2015 at 06:27:30PM +0100, Sudeep Holla wrote:
-> >> Not sure on that as v3.18 with DT seems to be working fine and passed
-> >> overnight reboot testing.
-> >
-> > Okay, that suggests there's something post v3.18 which is causing this,
-> > rather than it being a DT vs non-DT thing.
-> >
-> 
-> Correct. Just to be 100% sure I reverted that non-DT removal commit on
-> both v3.19-rc1 and v4.0-rc6 and was able to reproduce issue without DT.
-> 
-> > An extra data point which I've just found (by enabling attempts to do
-> > hibernation on various test platforms) is that the Versatile Express
-> > appears to be incapable of taking a CPU offline.
-> >
-> > This crashes the entire system with sometimes random results.  Sometimes
-> > it'll appear that a spinlock has been left owned by CPU#1 which is
-> > offline.  Sometimes it'll silently hang.  Sometimes it'll start slowly
-> > dumping kernel messages from the start of the kernel's ring buffer (!),
-> > eg:
-> >
-> > PM: freeze of devices complete after 29.342 msecs
-> > PM: late freeze of devices complete after 6.398 msecs
-> > PM: noirq freeze of devices complete after 5.493 msecs
-> > Disabling non-boot CPUs ...
-> > __cpu_disable(1)
-> > __cpu_die(1)
-> > handle_IPI(0)
-> > Booting Linux on physical CPU 0x0
-> >
-> > So far, it's not managed to take a CPU successfully offline and know that
-> > it has.  If I disable the calls to cpu_enter_lowpower() and
-> > cpu_leave_lowpower(), then it appears to work.
-> >
-> > This leads me to wonder whether flush_cache_louis() works... which led me
-> > in turn to ARM_ERRATA_643719, which is disabled in my builds.  However,
-> > the CA9 tile has a r0p1 CA9, which allegedly suffers from this errata.
-> >
-> 
-> Yes I observed that and tested for this issue enabling it. It's doesn't
-> affect and I still hit the issue.
-> 
-> [...]
-> >
-> > I haven't tested going back to a tag latency of 1 1 1 yet.  Can you
-> > confirm whether you have this errata enabled for your tests?
-> >
-> I have now gone back to <1 1 1> latency to debug the issue as it's
-> easier to reproduce with that latencies.
-> 
-> After I failed terribly to bisect between v3.18..v3.19-c1, as it depends
-> a lot on the config you choose(a lot of changes introduced as it's merge
-> window), I started looking at the code where we hit this issue since
-> it's always in __radix_tree_lookup in lib/radix-tree.c while
-> accessing the slots to see if it provides any more details.
-> 
-> Regards,
-> Sudeep
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+2.4.11
