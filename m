@@ -1,139 +1,76 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 14 Jun 2016 10:30:19 +0100
-Subject: [PATCH V9 09/11] ARM64/PCI: ACPI support for legacy IRQs parsing
- and consolidation with DT code
-In-Reply-To: <CADaLNDk+pHar2t5Xhv9cvYqcXs3uPyWvTUB2MGKbiRrQWyQ-FA@mail.gmail.com>
-References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
- <1465588519-11334-10-git-send-email-tn@semihalf.com>
- <20160610233612.GB7671@localhost> <20160613104005.GA26738@red-moon>
- <CADaLNDk+pHar2t5Xhv9cvYqcXs3uPyWvTUB2MGKbiRrQWyQ-FA@mail.gmail.com>
-Message-ID: <20160614093019.GB30560@red-moon>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 14 Jun 2016 10:44:47 +0100
+Subject: [PATCH 3/5] PM / Hibernate: Allow architectures to specify the
+ hibernate/resume CPU
+In-Reply-To: <4959514.g8dkWscZ3h@vostro.rjw.lan>
+References: <1464876657-6692-1-git-send-email-james.morse@arm.com>
+ <1464876657-6692-4-git-send-email-james.morse@arm.com>
+ <1982845.x73eTHIS7X@vostro.rjw.lan> <4959514.g8dkWscZ3h@vostro.rjw.lan>
+Message-ID: <575FD20F.7020606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 01:01:35PM -0700, Duc Dang wrote:
-> On Mon, Jun 13, 2016 at 3:40 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> >
-> > On Fri, Jun 10, 2016 at 06:36:12PM -0500, Bjorn Helgaas wrote:
-> > > On Fri, Jun 10, 2016 at 09:55:17PM +0200, Tomasz Nowicki wrote:
-> > > > To enable PCI legacy IRQs on platforms booting with ACPI, arch code
-> > > > should include ACPI specific callbacks that parse and set-up the
-> > > > device IRQ number, equivalent to the DT boot path. Owing to the current
-> > > > ACPI core scan handlers implementation, ACPI PCI legacy IRQs bindings
-> > > > cannot be parsed at device add time, since that would trigger ACPI scan
-> > > > handlers ordering issues depending on how the ACPI tables are defined.
-> > >
-> > > Uh, OK :)  I can't figure out exactly what the problem is here -- I
-> > > don't know where to look if I wanted to fix the scan handler ordering
-> > > issues, and I don't know how I could tell if it would ever be safe to
-> > > move this from driver probe-time back to device add-time.
-> >
-> > Right, the commit log could have been more informative.
-> >
-> > pcibios_add_device() was added in:
-> >
-> > commit d1e6dc91b532 ("arm64: Add architectural support for PCI")
-> >
-> > whose commit log does not specify why legacy IRQ parsing should
-> > be done at pcibios_add_device() either, so honestly we had to
-> > do with the information we have at hand.
-> >
-> > > I also notice that x86 and ia64 call acpi_pci_irq_enable() even later,
-> > > when the driver *enables* the device.  Is there a reason you didn't do
-> > > it at the same time as x86 and ia64?  This is another of those pcibios
-> > > hooks that really don't do anything arch-specific, so I can imagine
-> > > refactoring this somehow, someday.
-> >
-> > Yes, with [1], that was the goal, that stopped because [1] does not
-> > work on x86.
-> >
-> > Only DT platform(s) affected by this change are all platforms relying on
-> > drivers/pci/host/pci-xgene.c (others rely on pci_fixup_irqs() that
-> > should be removed too), if on those platforms probing IRQs at device
-> > enable time works ok I can update this patch (it can be done through [1]
-> > once we figure out what to do with it on x86) and move the IRQ set-up at
-> > pcibios_enable_device() time.
-> >
-> > @Duc: any feedback on this ?
+Hi Rafael,
+
+On 13/06/16 23:10, Rafael J. Wysocki wrote:
+> On Tuesday, June 14, 2016 12:05:28 AM Rafael J. Wysocki wrote:
+>> On Thursday, June 02, 2016 03:10:55 PM James Morse wrote:
+>>> On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
+>>> user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
+>>> kernel will assign logical id 0 to a different physical CPU.
+>>> This breaks hibernate as hibernate and resume will be attempted on different
+>>> CPUs.
+>>>
+>>> Define a weak symbol arch_hibernation_disable_cpus(), which defaults to
+>>> calling disable_nonboot_cpus). Architectures that allow CPU 0 to be
+>>> hotplugged can use this to control which CPU is used for hibernate/resume.
+>>>
+>>> Signed-off-by: James Morse <james.morse@arm.com>
+>>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+>>> Cc: Pavel Machek <pavel@ucw.cz>
+>>> ---
+>>> I would have preferred a macro, but there is no hibernate-relevant header
+>>> file that all arch's have. arm, arm64 and x86 have a suspend.h, but powerpc
+>>> doesn't.
+>>
+>> What about include/linux/suspend.h?
+>>
+>> There are arch_ things declared in there.
 > 
-> Hi Lorenzo,
+> I mean, what about using something like
 > 
-> The changes to add pcibios_alloc_irq works fine on X-Gene PCIe
+> #ifndef arch_hibernation_disable_cpus
+> #define arch_hibernation_disable_cpus disable_nonboot_cpus
+> #endif
 > 
-> I also tried to remove pcibios_alloc_irq and move its code into
-> pcibios_enable_device
-> after pci_enable_resource call and legacy IRQ also works.
+> in there or in another header file?
 
-Thank you, that was important to check.
+This would work fine for an architecture that doesn't need to use
+arch_hibernation_disable_cpus(), but which header file should we use for an
+architecture that does?
 
-> Can you also point me to the discussion thread or some info. about the
-> issue on x86 with [1]?
-> I want to check if there is any more test case I need to verify.
+As a macro it needs to be in an arch-specific header included before the #ifndef
+above.
 
-http://marc.info/?l=linux-pci&m=145091187918297&w=2
+Of those:
+include/linux/suspend.h only includes <asm/errno.h>
+kernel/power/power.h doesn't include any 'asm' headers.
+snapshot.c includes:
+> #include <asm/uaccess.h>
+> #include <asm/mmu_context.h>
+> #include <asm/pgtable.h>
+> #include <asm/tlbflush.h>
+> #include <asm/io.h>
 
-I do not think there is much we can do, unless we convert pci_fixup_irqs
-as per [1] but keep x86 code as-is (for now), there is a way to do it
-it is just a matter of taking Matt's series and refactor it, there are
-potential problems (not on xgene, but on other ARM platforms
-where the IRQ legacy routing is done through pci_fixup_irqs()).
+... but none of those are appropriate.
 
-Lorenzo
 
-> Regards,
-> Duc Dang.
-> 
-> >
-> > Thanks,
-> > Lorenzo
-> >
-> > [1] http://www.spinics.net/lists/linux-pci/msg45950.html
-> >
-> > > Did we have this conversation before?  It seems vaguely familiar, so I
-> > > apologize if you already explained this once.
-> > >
-> > > > To solve this problem and consolidate FW PCI legacy IRQs parsing in
-> > > > one single pcibios callback (pending final removal), this patch moves
-> > > > DT PCI IRQ parsing to the pcibios_alloc_irq() callback (called by
-> > > > PCI core code at device probe time) and adds ACPI PCI legacy IRQs
-> > > > parsing to the same callback too, so that FW PCI legacy IRQs parsing
-> > > > is confined in one single arch callback that can be easily removed
-> > > > when code parsing PCI legacy IRQs is consolidated and moved to core
-> > > > PCI code.
-> > > >
-> > > > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> > > > Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > ---
-> > > >  arch/arm64/kernel/pci.c | 11 ++++++++---
-> > > >  1 file changed, 8 insertions(+), 3 deletions(-)
-> > > >
-> > > > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > > > index d5d3d26..b3b8a2c 100644
-> > > > --- a/arch/arm64/kernel/pci.c
-> > > > +++ b/arch/arm64/kernel/pci.c
-> > > > @@ -51,11 +51,16 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
-> > > >  }
-> > > >
-> > > >  /*
-> > > > - * Try to assign the IRQ number from DT when adding a new device
-> > > > + * Try to assign the IRQ number when probing a new device
-> > > >   */
-> > > > -int pcibios_add_device(struct pci_dev *dev)
-> > > > +int pcibios_alloc_irq(struct pci_dev *dev)
-> > > >  {
-> > > > -   dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > > > +   if (acpi_disabled)
-> > > > +           dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > > > +#ifdef CONFIG_ACPI
-> > > > +   else
-> > > > +           return acpi_pci_irq_enable(dev);
-> > > > +#endif
-> > > >
-> > > >     return 0;
-> > > >  }
-> > > > --
-> > > > 1.9.1
-> > > >
-> > >
-> 
+I initially added an include for <asm/suspend.h> to kernel/power/power.h, but it
+broke powerpc, as there is no suspend.h there. I took this as a dead-end for the
+macro approach, unless someone has a clever trick?!
+
+
+
+Thanks,
+
+James
