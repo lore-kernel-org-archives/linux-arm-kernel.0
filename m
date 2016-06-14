@@ -1,36 +1,53 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 14 Jun 2016 09:59:40 +0900
-Subject: [RESEND PATCH 0/2] arm64: dts: r8a7795: Add FCPF and FDP1 device
- nodes
-In-Reply-To: <1465491418-32752-1-git-send-email-kieran@bingham.xyz>
-References: <1465491418-32752-1-git-send-email-kieran@bingham.xyz>
-Message-ID: <20160614005940.GD6456@verge.net.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 13 Jun 2016 22:07:56 -0300
+Subject: [PATCH 1/4] ARM: dts: imx6qdl-sabresd: Use WDOG_B pin reset
+Message-ID: <1465866479-15953-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 05:56:56PM +0100, Kieran Bingham wrote:
-> Appologies for the resend, I very cleverly sent this cover letter detailing the
-> dependencies only to my e-mail address. And I already know the dependencies!
-> 
-> Following two patches are the same, sorry for the noise.
-> 
-> These are dependent upon the FCP bindings from Laurent [0], and the FCPF
-> update to those bindings from me [1], and of course the bindings for the
-> FDP1 [2] which are all posted separately.
-> 
-> [0] http://www.spinics.net/lists/devicetree/msg123968.html
-> [1] https://lkml.org/lkml/2016/6/9/291
-> [2] https://lkml.org/lkml/2016/6/9/294
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-These patches look good to me. My assumption is that they
-can be applied without causing any breakage and that the
-relevant features will start working once driver support
-shows up in the kernel.
+imx6qdl-sabresd has WDOG2_B pin connected to the PMIC. 
 
-If the above assumption is correct then please let me know when the
-bindings have been accepted by the relevant subsystem maintainer(s).
+Pass the 'fsl,ext-reset-output' property so that the watchdog
+can trigger a system POR reset via the PMIC.
 
-If the patches need rebasing at that time then please repost them.
-Otherwise you can either repost them or ping me as a response to this thread.
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Thanks!
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 5248e7b..a8d65b4 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -501,6 +501,12 @@
+ 				MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
+ 			>;
+ 		};
++
++		pinctrl_wdog: wdoggrp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_1__WDOG2_B		0x1b0b0
++			>;
++		};
+ 	};
+ 
+ 	gpio_leds {
+@@ -596,3 +602,14 @@
+ 	no-1-8-v;
+ 	status = "okay";
+ };
++
++&wdog1 {
++	status = "disabled";
++};
++
++&wdog2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_wdog>;
++	fsl,ext-reset-output;
++	status = "okay";
++};
+-- 
+1.9.1
