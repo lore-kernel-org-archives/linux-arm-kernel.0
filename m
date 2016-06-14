@@ -1,28 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Jun 2016 08:55:05 +0200
-Subject: [PATCH 1/2] pinctrl: fix incorrect inline keyword in multiple
- drivers
-In-Reply-To: <1465831250-2689101-1-git-send-email-arnd@arndb.de>
-References: <1465831250-2689101-1-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdZSqFfp6v-jk1Xv3RVK4xz-Di_4rj_TmHnsmFRPswSB7A@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 14 Jun 2016 09:52:47 +0300
+Subject: [PATCH 09/12] mmc: sdhci-xenon: add initial Xenon eMMC driver
+In-Reply-To: <1465456218-28354-10-git-send-email-gregory.clement@free-electrons.com>
+References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+ <1465456218-28354-10-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <575FA9BF.6070703@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 5:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 09/06/16 10:10, Gregory CLEMENT wrote:
+> From: Victor Gu <xigu@marvell.com>
+> 
+> This path adds the driver for the Marvell Xenon eMMC host controller
+> which supports eMMC 5.1, SD 3.0.
+> 
+> However this driver supports only up to eMMC 5.0 since the command queue
+> feature is not included (yet) in the driver.
+> 
+> [gregory.clement at free-electrons.com:
+>  - reformulate commit log
+>  - overload the sdhci_set_uhs_signaling function instead of using a quirk
+>  - fix a kconfig dependency
+>  - remove dead code]
+> 
+> Signed-off-by: Victor Gu <xigu@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/mmc/host/Kconfig       |   10 +
+>  drivers/mmc/host/Makefile      |    1 +
+>  drivers/mmc/host/sdhci-xenon.c | 1164 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 1175 insertions(+)
+>  create mode 100644 drivers/mmc/host/sdhci-xenon.c
+> 
 
-> When building with 'make W=1', we get harmless warnings about
-> five drivers in drivers/pinctrl, which all contain a copy of
-> the same line:
->
-> drivers/pinctrl/freescale/pinctrl-imx1-core.c:160:1: error: 'inline' is not at beginning of declaration [-Werror=old-style-declaration]
->
-> This replaces the somewhat nonstandard 'static const inline'
-> with 'static inline const', which has the same meaning but
-> does not cause this warning.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+<SNIP>
 
-Patch applied.
+> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+> new file mode 100644
+> index 000000000000..43c06db95872
+> --- /dev/null
+> +++ b/drivers/mmc/host/sdhci-xenon.c
 
-Yours,
-Linus Walleij
+<SNIP>
+
+> +static int sdhci_xenon_delay_adj_test(struct sdhci_host *host,
+> +		struct mmc_card *card, unsigned int delay,
+> +		bool invert, bool phase)
+> +{
+> +	int ret;
+> +	struct mmc_card *oldcard;
+> +
+> +	sdhci_xenon_set_fix_delay(host, delay, invert, phase);
+> +
+> +	/*
+> +	 * If the card is not yet associated to the host, we
+> +	 * temporally do it
+> +	 */
+> +	oldcard = card->host->card;
+> +	if (!oldcard)
+> +		card->host->card = card;
+> +	ret =  card_alive(card);
+
+This looks like an abuse of bus_ops->alive().  You will need to get
+agreement with Ulf how to handle this.  I will wait for Ulf's comments
+before reviewing this patch set further.
+
+
+> +	card->host->card = oldcard;
+> +	if (ret) {
+> +		pr_debug("Xenon failed when sampling fix delay %d, inverted %d, phase %d\n",
+> +			 delay, invert, phase);
+> +		return -EIO;
+> +	}
+> +
+> +	pr_debug("Xenon succeeded when sampling fixed delay %d, inverted %d, phase %d\n",
+> +		 delay, invert, phase);
+> +	return 0;
+> +}
