@@ -1,86 +1,91 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Jun 2016 11:13:08 +0200
-Subject: [PATCH v3 00/14] regulator: pwm: various improvements
-Message-ID: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue, 14 Jun 2016 11:13:10 +0200
+Subject: [PATCH v3 02/14] pwm: Add two helpers to ease relative duty cycle
+ manipulation
+In-Reply-To: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465895602-31008-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The PWM framework expects PWM users to configure the duty cycle in
+nanoseconds, but most users just want to express this duty cycle
+relatively to the period value (i.e. duty_cycle = 33% of the period).
+Add the pwm_{get,set}_relative_duty_cycle() helpers to ease this kind
+of conversion.
 
-This patch series series aims at adding two important features to the
-pwm-regulator driver.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+---
+ include/linux/pwm.h | 56 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-The first one is the support for 'smooth handover' between the
-bootloader and the kernel. This is mainly solving problems we have when
-the PWM is controlling a critical regulator (like the one powering the
-DDR chip). Currently, when the PWM regulator acquire the PWM device it
-assumes it was off and it's safe to change the configuration before
-enabling it, which can generate glitches on the PWM signal which in turn
-generated glitches on the output voltage.
-To solve that we've introduced support for hardware readout to the
-PWM framework, so that the PWM regulator driver can adjust the PWM
-a probe time and avoid glitches.
-Atomic update is also helping in this regard.
-
-Patch 1 is adding convenient helpers (at the PWM level) that will be
-used by the PWM regulator driver.
-Patches 2 to 7 are preparing everything on the PWM driver side to make
-hardware readout available to all platforms using the PWM regulator
-driver (rockchip and sti).
-Patches 8 to 11 are making use of the atomic update and hardware readout
-features to implement this smooth handover.
-
-The second feature we add to the driver is the capability of using
-a sub duty_cycle range in continuous mode. By default the regulator
-is assuming that min_uV is achieved with a 0% dutycyle and max_uV
-with a 100% dutycycle, but this is not necessarily true.
-Moreover, in some cases (when the PWM device does not support
-polarity inversion), we might have min_uV at 100% and max_uV at 0%.
-Hence the addition of new properties to the existing DT bindings.
-The feature is added in patch 12 and 13.
-
-Best Regards,
-
-Boris
-
-Changes since v2:
-- add Heiko's Tested-by
-- split patch 1 in 2 patches
-- rework the documentation
-- rename pwm_prepare_new_state() into pwm_init_state()
-- make pwm_set_relative_duty_cycle() return an error code when scale
-  or duty_cycle are inconsistent
-
-Changes since v1:
-- dropped already applied patches
-- added R-b/A-b/T-b tags
-- s/readl/readl_relaxed/ in patch 3 (as suggested by Brian)
-- fixed pwm-regulator DT binding doc
-- added some comments in the code
-- replaced pwm_get_state() + if (state.enabled) by if (pwm_is_enabled())
-
-Boris Brezillon (14):
-  pwm: Add an helper to prepare a new PWM state
-  pwm: Add two helpers to ease relative duty cycle manipulation
-  pwm: rockchip: Fix period and duty_cycle approximation
-  pwm: rockchip: Add support for hardware readout
-  pwm: rockchip: Avoid glitches on already running PWMs
-  pwm: rockchip: Add support for atomic update
-  pwm: sti: Add support for hardware readout
-  pwm: sti: Avoid glitches on already running PWMs
-  regulator: pwm: Adjust PWM config at probe time
-  regulator: pwm: Switch to the atomic PWM API
-  regulator: pwm: Properly initialize the ->state field
-  regulator: pwm: Retrieve correct voltage
-  regulator: pwm: Support extra continuous mode cases
-  regulator: pwm: Document pwm-dutycycle-unit and pwm-dutycycle-range
-
- .../bindings/regulator/pwm-regulator.txt           |  19 +++
- drivers/pwm/pwm-rockchip.c                         | 178 +++++++++++++++------
- drivers/pwm/pwm-sti.c                              |  52 +++++-
- drivers/regulator/pwm-regulator.c                  | 160 +++++++++++++-----
- include/linux/pwm.h                                |  89 +++++++++++
- 5 files changed, 407 insertions(+), 91 deletions(-)
-
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index a100f6e..05e4ea4 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -181,6 +181,62 @@ static inline void pwm_init_state(const struct pwm_device *pwm,
+ }
+ 
+ /**
++ * pwm_get_relative_duty_cycle() - Get a relative duty_cycle value
++ * @state: PWM state to extract the duty_cycle from
++ * @scale: target scale of the relative duty cycle
++ *
++ * This functions converts the absolute duty_cycle stored in @state
++ * (expressed in nanosecond) into a value relative to the period.
++ * For example if you want to get the duty_cycle expressed in percent,
++ * call:
++ *
++ * pwm_get_state(pwm, &state);
++ * duty = pwm_get_relative_duty_cycle(&state, 100);
++ */
++static inline unsigned int
++pwm_get_relative_duty_cycle(const struct pwm_state *state, unsigned int scale)
++{
++	if (!state->period)
++		return 0;
++
++	return DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * scale,
++				     state->period);
++}
++
++/**
++ * pwm_set_relative_duty_cycle() - Set a relative duty_cycle value
++ * @state: PWM state to fill
++ * @duty_cycle: relative duty_cycle value
++ * @scale: scale in which @duty_cycle is expressed
++ *
++ * This functions converts a relative duty_cycle into an absolute one
++ * (expressed in nanoseconds), and put the result in state->duty_cycle.
++ *
++ * For example if you want to configure a 50% duty_cycle, call:
++ *
++ * pwm_init_state(pwm, &state);
++ * pwm_set_relative_duty_cycle(&state, 50, 100);
++ * pwm_apply_state(pwm, &state);
++ *
++ * This functions returns -EINVAL if @duty_cycle and/or @scale are
++ * inconsistent (@scale == 0 or @duty_cycle > @scale).
++ */
++static inline int
++pwm_set_relative_duty_cycle(struct pwm_state *state, unsigned int duty_cycle,
++			    unsigned int scale)
++{
++	/* Make sure @scale is > 0 and @duty_cycle <= @scale */
++	if (!scale || duty_cycle > scale)
++		return -EINVAL;
++
++	state->duty_cycle = DIV_ROUND_CLOSEST_ULL((u64)duty_cycle *
++						  state->period,
++						  scale);
++
++	return 0;
++}
++
++/**
+  * struct pwm_ops - PWM controller operations
+  * @request: optional hook for requesting a PWM
+  * @free: optional hook for freeing a PWM
 -- 
 2.7.4
