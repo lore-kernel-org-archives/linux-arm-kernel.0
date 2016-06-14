@@ -1,89 +1,68 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 14 Jun 2016 17:12:12 +0800
-Subject: [PATCH v2 0/4] clocksource: rockchip/timer: Support rktimer for
- rk3399
-In-Reply-To: <575F814C.104@rock-chips.com>
-References: <1465275273-22076-1-git-send-email-wxt@rock-chips.com>
- <20160613130625.GC10634@linaro.org> <575F814C.104@rock-chips.com>
-Message-ID: <575FCA6C.1010405@rock-chips.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 14 Jun 2016 11:13:09 +0200
+Subject: [PATCH v3 01/14] pwm: Add an helper to prepare a new PWM state
+In-Reply-To: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465895602-31008-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The pwm_init_state() helper prepares a new state object containing the
+current PWM state except for the polarity and period fields which are
+set to the reference values (those in pwm_args).
+This is particularly useful for PWM users who want to apply a new
+duty-cycle expressed relatively to the reference period without
+changing the enable state.
 
-On 2016?06?14? 12:00, Huang, Tao wrote:
-> Hi Daniel:
-> On 2016?06?13? 21:06, Daniel Lezcano wrote:
->> On Tue, Jun 07, 2016 at 12:54:29PM +0800, Caesar Wang wrote:
->>> This series patches had been tested on rockchip inside kernel.
->>> In order to support the rk3399 SoC timer and turn off interrupts and IPIs to
->>> save power in idle.
->> For my personnal information, are the arch_timer in the same power domain
->> than the CPU ? IOW, what is the 'always-on' property in the DT ?
-> Yes. In our SoC design, all arch (generic) timer in the same power
-> domain of CPU core. So if one CPU core power down, the arch (generic)
-> timer will lose it's state and stop working.
-> While rk timer maybe in peri power domain or pmu power domain, so the
-> timer will still work when CPU power down.
->
-> But before RK3399, all SoCs with CPU power domain, do not support auto
-> power down while cpu idle. So the arch timer can be seem as always on,
-> i.e. we don't need a broadcast timer at all.
->
->>> Okay, it still works bootup on rk3288/other SoCs, even though many socs
->>> hasn't used
->>> the broadcast timer.
->> Yes, unfortunately the SoC design on rk3288 and the previous ones do not
->> allow to use a cpuidle driver with cpu/cluster power down, so obviously the
->> broadcast timer is pointless on these boards :)
->>
-> You are right.
->
->>> History version:
->>> v1:
->>> https://lkml.org/lkml/2016/5/25/186
->>>
->>> Easy to test for my borad.
->>> localhost / # cat /proc/interrupts
->>> CPU0       CPU1       CPU2       CPU3       CPU4       CPU5
->>> 1:          0          0          0          0          0          0     GICv3  29 Edge      arch_timer
->>> ...
->>> 5:          0          0          0          0          0          0     GICv3 113 Level     rk_timer
->>> ..
->>>
->>> localhost / # cat /proc/timer_list | grep event_handler
->>> get "event_handler:  hrtimer_interrupt"
->>> event_handler:  tick_handle_oneshot_broadcast
->>> event_handler:  hrtimer_interrupt
->> What are you trying to demonstrate here ? There are no interrupts for both
->> arch_timer and rk_timer.
-
-My god!! let's forget it now!
-Sorry for forgetting what happened.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
+ include/linux/pwm.h | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-Re-picked them up for my board since I'm doing other things to run a 
-single cpu.
-
-localhost / # cat /proc/interrupts
-            CPU0
-   1:          0     GICv3  29 Edge      arch_timer
-   2:        807     GICv3  30 Edge      arch_timer
-   5:        712     GICv3 113 Level     rk_timer
-....
-
-
-> I don't know. Maybe Caesar do something wrong :(
-> This is my output:
->             CPU0       CPU1       CPU2       CPU3       CPU4       CPU5
->
-> ...
->    2:       2911       1967       1588       1608       1295       1606
->     GICv3  30 Edge      arch_timer
->    5:        578        637        684        626        161        165
->     GICv3 113 Level     rk_timer
->
->
->
-
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 17018f3..a100f6e 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -148,6 +148,39 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
+ }
+ 
+ /**
++ * pwm_init_state() - prepare a new state to be applied with pwm_apply_state()
++ * @pwm: PWM device
++ * @state: state to fill with the prepared PWM state
++ *
++ * This functions prepares a state that can later be tweaked and applied
++ * to the PWM device with pwm_apply_state(). This is a convenient function
++ * that first retrieves the current PWM state and the replaces the period
++ * and polarity fields with the reference values defined in pwm->args.
++ * Once the function returns, you can adjust the ->enabled and ->duty_cycle
++ * fields according to your needs before calling pwm_apply_state().
++ *
++ * ->duty_cycle is initially set to zero to avoid cases where the current
++ * ->duty_cycle value exceed the pwm_args->period one, which would trigger
++ * an error if the user calls pwm_apply_state() without adjusting ->duty_cycle
++ * first.
++ */
++static inline void pwm_init_state(const struct pwm_device *pwm,
++				  struct pwm_state *state)
++{
++	struct pwm_args args;
++
++	/* First get the current state. */
++	pwm_get_state(pwm, state);
++
++	/* Then fill it with the reference config */
++	pwm_get_args(pwm, &args);
++
++	state->period = args.period;
++	state->polarity = args.polarity;
++	state->duty_cycle = 0;
++}
++
++/**
+  * struct pwm_ops - PWM controller operations
+  * @request: optional hook for requesting a PWM
+  * @free: optional hook for freeing a PWM
 -- 
-caesar wang | software engineer | wxt at rock-chip.com
+2.7.4
