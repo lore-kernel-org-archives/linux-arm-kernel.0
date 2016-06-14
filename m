@@ -1,28 +1,80 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 14 Jun 2016 12:02:17 -0700
-Subject: [PATCH 3/5] ARM: dts: add L2CC and RPM with regulators for MSM8660
-In-Reply-To: <20160614185517.GG28218@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 14 Jun 2016 12:11:54 -0700
+Subject: [PATCH 5/5] ARM: dts: add Qualcomm APQ8060-based Dragonboard
+In-Reply-To: <1465918259-11138-6-git-send-email-linus.walleij@linaro.org>
 References: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
- <1465918259-11138-4-git-send-email-linus.walleij@linaro.org>
- <20160614185517.GG28218@codeaurora.org>
-Message-ID: <20160614190217.GU1256@tuxbot>
+ <1465918259-11138-6-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160614191154.GK28218@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 14 Jun 11:55 PDT 2016, Stephen Boyd wrote:
+On 06/14, Linus Walleij wrote:
+> +/ {
+> +	model = "Qualcomm APQ8060 Dragonboard";
+> +	compatible = "qcom,apq8060-dragonboard", "qcom,msm8660";
+> +
+> +	aliases {
+> +		serial0 = &gsbi12_serial;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		/* Main power of the board: 3.7V */
+> +		vph: regulator-fixed at 1 {
+> +			compatible = "regulator-fixed";
+> +			regulator-min-microvolt = <3700000>;
+> +			regulator-max-microvolt = <3700000>;
+> +			regulator-name = "VPH";
+> +			regulator-type = "voltage";
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +		};
+> +	};
+> +
+> +	/* This is a levelshifter for SDCC5 */
+> +	dragon_vio_txb: txb0104rgyr {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "Dragon SDCC levelshifter";
+> +		vin-supply = <&pm8058_l14>;
+> +		regulator-always-on;
+> +	};
 
-> On 06/14, Linus Walleij wrote:
-> > diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-[..]
-> > +
-> > +			pm8901-regulators {
-> 
-> I'd rather have regulators at 8901 and regulators at 8058. That way the
-> node name is generic per ePAPR suggestions.
-> 
+Why not put this under regulators node as well?
 
-I agree, but unfortunately we're not allowed to do that without a
-matching "reg = <>" anymore.
+> +
+> +	soc {
+> +		gsbi at 19c00000 {
+> +			status = "ok";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&dragon_serial0_pins>;
+> +			qcom,mode = <GSBI_PROT_I2C_UART>;
+> +			serial at 19c40000 {
+> +				status = "ok";
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +/* Intenal 3.69 GiB eMMC */
+> +&sdcc1 {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&dragon_sdcc1_pins>;
+> +	vmmc-supply = <&pm8901_l5>;
+> +	vqmmc-supply = <&pm8901_lvs0>;
+> +};
 
-Regards,
-Bjorn
+I think we're following a non-phandle approach to filling out
+board dts files. We didn't follow it that well on 8660 surf,
+probably because it was so basic, but it would be nice to follow
+that style here as well and populate board properties in nodes
+like how gsbi at 19c00000 has been done. I'll leave this up to Andy
+though as he's the maintainer here.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
