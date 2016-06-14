@@ -1,68 +1,79 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Jun 2016 11:13:09 +0200
-Subject: [PATCH v3 01/14] pwm: Add an helper to prepare a new PWM state
+Date: Tue, 14 Jun 2016 11:13:11 +0200
+Subject: [PATCH v3 03/14] pwm: rockchip: Fix period and duty_cycle
+ approximation
 In-Reply-To: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465895602-31008-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465895602-31008-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwm_init_state() helper prepares a new state object containing the
-current PWM state except for the polarity and period fields which are
-set to the reference values (those in pwm_args).
-This is particularly useful for PWM users who want to apply a new
-duty-cycle expressed relatively to the reference period without
-changing the enable state.
+The current implementation always round down the duty and period
+values, while it would be better to round them to the closest integer.
+
+These changes are needed in preparation of atomic update support to
+prevent a period/duty cycle drift when executing several time the
+'pwm_get_state() / modify / pwm_apply_state()' sequence.
+
+Say you have an expected period of 3.333 us and a clk rate of
+112.666667 MHz -- the clock frequency doesn't divide evenly,
+so the period (stashed in nanoseconds) shrinks when we convert to
+the register value and back, as follows:
+
+  pwm_apply_state(): register = period * 112666667 / 1000000000;
+  pwm_get_state(): period = register * 1000000000 / 112666667;
+
+or in other words:
+
+  period = period * 112666667 / 1000000000 * 1000000000 / 112666667;
+
+which yields a sequence like:
+
+  3333 -> 3328
+  3328 -> 3319
+  3319 -> 3310
+  3310 -> 3301
+  3301 -> 3292
+  3292 -> ... (etc) ...
+
+With this patch, we'd see instead:
+
+  period = div_round_closest(period * 112666667, 1000000000) *
+	   1000000000 / 112666667;
+
+which yields a stable sequence:
+
+  3333 -> 3337
+  3337 -> 3337
+  3337 -> ... (etc) ...
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reviewed-by: Brian Norris <briannorris@chromium.org>
+Tested-by: Brian Norris <briannorris@chromium.org>
 Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
- include/linux/pwm.h | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ drivers/pwm/pwm-rockchip.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 17018f3..a100f6e 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -148,6 +148,39 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
- }
+diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+index 7d9cc90..68d72ce 100644
+--- a/drivers/pwm/pwm-rockchip.c
++++ b/drivers/pwm/pwm-rockchip.c
+@@ -114,12 +114,11 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	 * default prescaler value for all practical clock rate values.
+ 	 */
+ 	div = clk_rate * period_ns;
+-	do_div(div, pc->data->prescaler * NSEC_PER_SEC);
+-	period = div;
++	period = DIV_ROUND_CLOSEST_ULL(div,
++				       pc->data->prescaler * NSEC_PER_SEC);
  
- /**
-+ * pwm_init_state() - prepare a new state to be applied with pwm_apply_state()
-+ * @pwm: PWM device
-+ * @state: state to fill with the prepared PWM state
-+ *
-+ * This functions prepares a state that can later be tweaked and applied
-+ * to the PWM device with pwm_apply_state(). This is a convenient function
-+ * that first retrieves the current PWM state and the replaces the period
-+ * and polarity fields with the reference values defined in pwm->args.
-+ * Once the function returns, you can adjust the ->enabled and ->duty_cycle
-+ * fields according to your needs before calling pwm_apply_state().
-+ *
-+ * ->duty_cycle is initially set to zero to avoid cases where the current
-+ * ->duty_cycle value exceed the pwm_args->period one, which would trigger
-+ * an error if the user calls pwm_apply_state() without adjusting ->duty_cycle
-+ * first.
-+ */
-+static inline void pwm_init_state(const struct pwm_device *pwm,
-+				  struct pwm_state *state)
-+{
-+	struct pwm_args args;
-+
-+	/* First get the current state. */
-+	pwm_get_state(pwm, state);
-+
-+	/* Then fill it with the reference config */
-+	pwm_get_args(pwm, &args);
-+
-+	state->period = args.period;
-+	state->polarity = args.polarity;
-+	state->duty_cycle = 0;
-+}
-+
-+/**
-  * struct pwm_ops - PWM controller operations
-  * @request: optional hook for requesting a PWM
-  * @free: optional hook for freeing a PWM
+ 	div = clk_rate * duty_ns;
+-	do_div(div, pc->data->prescaler * NSEC_PER_SEC);
+-	duty = div;
++	duty = DIV_ROUND_CLOSEST_ULL(div, pc->data->prescaler * NSEC_PER_SEC);
+ 
+ 	ret = clk_enable(pc->clk);
+ 	if (ret)
 -- 
 2.7.4
