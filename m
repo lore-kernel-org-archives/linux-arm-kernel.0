@@ -1,74 +1,32 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 14 Jun 2016 11:17:14 -0600
-Subject: [PATCH 3/3] coresight: Fix erroneous memset in tmc_read_unprepare_etr
-In-Reply-To: <1465924634-22310-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1465924634-22310-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1465924634-22310-4-git-send-email-mathieu.poirier@linaro.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 14 Jun 2016 10:37:10 -0700
+Subject: [PATCH v2 1/9] pinctrl: walk into bcm subdir unconditionally
+In-Reply-To: <CACRpkdZ+RnCo=GhsRrY0+VxLYcETrUZZGrbH-O3rwO7rRSG-ow@mail.gmail.com>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-2-git-send-email-kraxel@redhat.com>
+ <CACRpkdZ+RnCo=GhsRrY0+VxLYcETrUZZGrbH-O3rwO7rRSG-ow@mail.gmail.com>
+Message-ID: <87porjoent.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-At the end of a trace collection, we try to clear the entire buffer
-and enable the ETR back if it was already enabled. But, we would have
-adjusted the drvdata->buf to point to the beginning of the trace data
-in the trace buffer @drvdata->vaddr. So, the following code which
-clears the buffer is dangerous and can cause crashes, like below :
+> On Fri, Jun 3, 2016 at 8:18 AM, Gerd Hoffmann <kraxel@redhat.com> wrote:
+>
+>> There is no ARCH_BCM on arm64, and we need pinctrl-bcm2835 for the rpi3.
+>>
+>> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+>
+> I see I got an identical patch from Florian Fainelli and applied it.
+> Sorry for my clashes, confusion and screwups... Added Eric's
+> ACK on the applied patch.
 
-	memset(drvdata->buf, 0, drvdata->size);
-
- Unable to handle kernel paging request at virtual address ffffff800a145000
- pgd = ffffffc974726000
- *pgd=00000009f3e91003, *pud=00000009f3e91003, *pmd=0000000000000000
- PREEMPT SMP
- Modules linked in:
- CPU: 4 PID: 1692 Comm: dd Not tainted 4.7.0-rc2+ #1721
- Hardware name: ARM Juno development board (r0) (DT)
- task: ffffffc9734a0080 ti: ffffffc974460000 task.ti: ffffffc974460000
- PC is at __memset+0x1ac/0x200
- LR is at tmc_read_unprepare_etr+0x144/0x1bc
- pc : [<ffffff80083a05ac>] lr : [<ffffff800859c984>] pstate: 200001c5
- ...
- [<ffffff80083a05ac>] __memset+0x1ac/0x200
- [<ffffff800859b2e4>] tmc_release+0x90/0x94
- [<ffffff8008202f58>] __fput+0xa8/0x1ec
- [<ffffff80082030f4>] ____fput+0xc/0x14
- [<ffffff80080c3ef8>] task_work_run+0xb0/0xe4
- [<ffffff8008088bf4>] do_notify_resume+0x64/0x6c
- [<ffffff8008084d5c>] work_pending+0x10/0x14
- Code: 91010108 54ffff4a 8b040108 cb050042 (d50b7428)
-
-Since we clear the buffer anyway in the following call to
-tmc_etr_enable_hw(), remove the erroneous memset().
-
-Fixes: commit de5461970b3e9e1 ("coresight: tmc: allocating memory when needed")
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 3369d7a80a51..688be9e060fc 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -300,13 +300,10 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
- 	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
- 		/*
- 		 * The trace run will continue with the same allocated trace
--		 * buffer. As such zero-out the buffer so that we don't end
--		 * up with stale data.
--		 *
--		 * Since the tracer is still enabled drvdata::buf
--		 * can't be NULL.
-+		 * buffer. The trace buffer is cleared in tmc_etr_enable_hw(),
-+		 * so we don't have to explicitly clear it. Also, since the
-+		 * tracer is still enabled drvdata::buf can't be NULL.
- 		 */
--		memset(drvdata->buf, 0, drvdata->size);
- 		tmc_etr_enable_hw(drvdata);
- 	} else {
- 		/*
--- 
-2.5.0
+Florian's had a nice commit message, and I'm just happy to see patches
+land.  Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160614/e6ea7959/attachment.sig>
