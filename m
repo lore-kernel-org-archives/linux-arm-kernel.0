@@ -1,90 +1,76 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue, 14 Jun 2016 09:45:16 -0500
-Subject: [PATCH V6 2/5] irqchip/gicv3-its: Add a new function for parsing
- device table BASERn
-In-Reply-To: <1465915519-10807-1-git-send-email-shankerd@codeaurora.org>
-References: <1465915519-10807-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <1465915519-10807-2-git-send-email-shankerd@codeaurora.org>
+Date: Tue, 14 Jun 2016 09:45:15 -0500
+Subject: [PATCH V6 1/5] irqchip/gicv3-its: Introduce two helper functions for
+ accessing BASERn
+Message-ID: <1465915519-10807-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only the device table BASERn needs to be handled differently as
-compared to all other tables. So, adding a separate function for
-easy code maintenance and improved code readability.
+This patch adds the two handy helper functions for reading and writing
+ITS BASERn register.
 
 Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 49 +++++++++++++++++++++-------------------
- 1 file changed, 26 insertions(+), 23 deletions(-)
+Changes since v5:
+  Marc suggested to fold its_write_baser_cache into its_write_baser.
+
+Changes since v1:
+  baser->val is consistent with hardware register contents.
+
+ drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 924f836..254085a 100644
+index 5eb1f9e..924f836 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -840,6 +840,30 @@ static void its_write_baser(struct its_node *its, struct its_baser *baser,
- 	baser->val = its_read_baser(its, baser);
- }
+@@ -824,6 +824,22 @@ static const char *its_base_type_string[] = {
+ 	[GITS_BASER_TYPE_RESERVED7] 	= "Reserved (7)",
+ };
  
-+static void its_parse_baser_device(struct its_node *its, struct its_baser *baser,
-+				   u32 *order)
++static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
 +{
-+	u64 esz = GITS_BASER_ENTRY_SIZE(its_read_baser(its, baser));
-+	u32 ids = its->device_ids;
-+	u32 new_order = *order;
++	u32 idx = baser - its->tables;
 +
-+	/*
-+	 * Allocate as many entries as required to fit the
-+	 * range of device IDs that the ITS can grok... The ID
-+	 * space being incredibly sparse, this results in a
-+	 * massive waste of memory.
-+	 */
-+	new_order = max_t(u32, get_order(esz << ids), new_order);
-+	if (new_order >= MAX_ORDER) {
-+		new_order = MAX_ORDER - 1;
-+		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / esz);
-+		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
-+			&its->phys_base, its->device_ids, ids);
-+	}
++	return readq_relaxed(its->base + GITS_BASER + (idx << 3));
++}
 +
-+	*order = new_order;
++static void its_write_baser(struct its_node *its, struct its_baser *baser,
++			    u64 val)
++{
++	u32 idx = baser - its->tables;
++
++	writeq_relaxed(val, its->base + GITS_BASER + (idx << 3));
++	baser->val = its_read_baser(its, baser);
 +}
 +
  static void its_free_tables(struct its_node *its)
  {
  	int i;
-@@ -891,29 +915,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 		if (type == GITS_BASER_TYPE_NONE)
- 			continue;
+@@ -863,7 +879,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 	its->device_ids = ids;
  
--		/*
--		 * Allocate as many entries as required to fit the
--		 * range of device IDs that the ITS can grok... The ID
--		 * space being incredibly sparse, this results in a
--		 * massive waste of memory.
--		 *
--		 * For other tables, only allocate a single page.
--		 */
--		if (type == GITS_BASER_TYPE_DEVICE) {
--			/*
--			 * 'order' was initialized earlier to the default page
--			 * granule of the the ITS.  We can't have an allocation
--			 * smaller than that.  If the requested allocation
--			 * is smaller, round up to the default page granule.
--			 */
--			order = max(get_order((1UL << ids) * entry_size),
--				    order);
--			if (order >= MAX_ORDER) {
--				order = MAX_ORDER - 1;
--				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
--					node_name, order);
--			}
--		}
-+		if (type == GITS_BASER_TYPE_DEVICE)
-+			its_parse_baser_device(its, baser, &order);
+ 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+-		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
++		struct its_baser *baser = its->tables + i;
++		u64 val = its_read_baser(its, baser);
+ 		u64 type = GITS_BASER_TYPE(val);
+ 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+ 		int order = get_order(psz);
+@@ -937,10 +954,9 @@ retry_baser:
+ 		}
  
- retry_alloc_baser:
- 		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+ 		val |= alloc_pages - 1;
+-		its->tables[i].val = val;
+ 
+-		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+-		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
++		its_write_baser(its, baser, val);
++		tmp = baser->val;
+ 
+ 		if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
+ 			/*
 -- 
 Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
