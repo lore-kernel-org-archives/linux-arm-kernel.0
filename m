@@ -1,34 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Jun 2016 19:09:16 +0100
-Subject: [RFC PATCH v2 09/15] drivers: iommu: arm-smmu-v3: split probe
- functions into DT/generic portions
-In-Reply-To: <1465306270-27076-10-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Tue, 14 Jun 2016 19:12:14 +0100
+Subject: [RFC PATCH v2 10/15] drivers: iommu: arm-smmu-v3: enable ACPI
+ driver initialization
+In-Reply-To: <1465306270-27076-11-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465306270-27076-10-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160614180916.GH16531@arm.com>
+ <1465306270-27076-11-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160614181213.GI16531@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 02:31:04PM +0100, Lorenzo Pieralisi wrote:
-> Current ARM SMMUv3 probe functions intermingle HW and DT probing in the
-> initialization functions to detect and programme the ARM SMMU v3 driver
-> features. In order to allow probing the ARM SMMUv3 with other firmwares
-> than DT, this patch splits the ARM SMMUv3 init functions into DT and HW
-> specific portions so that other FW interfaces (ie ACPI) can reuse the HW
-> probing functions and skip the DT portion accordingly.
+On Tue, Jun 07, 2016 at 02:31:05PM +0100, Lorenzo Pieralisi wrote:
+> On systems booting with ACPI that enable the ARM SMMU components
+> in the kernel config options, the ARM SMMU v3 init function
+> (ie arm_smmu_init(), that registers the driver and sets-up bus
+> iommu operations) does not run only because the device tree interface
+> (of_find_matching_node()) fails to find the respective device tree
+> nodes for ARM SMMU devices.
 > 
-> This patch implements no functional change, only code reshuffling.
+> This works as long as there are no ARM SMMU devices to be probed
+> with ACPI. If ARM SMMU v3 components are part of the IORT tables,
+> for them to be instantiated and probed the function registering
+> the ARM SMMU v3 driver must be able to register the driver and
+> initialize the bus IOMMU operations accordingly.
+> 
+> This patch changes the logic in arm-smmu-v3 init call to allow
+> for it to be probed in ACPI systems.
 > 
 > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
 > Cc: Robin Murphy <robin.murphy@arm.com>
 > Cc: Joerg Roedel <joro@8bytes.org>
 > ---
->  drivers/iommu/arm-smmu-v3.c | 63 +++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 52 insertions(+), 11 deletions(-)
-
-This looks sensible to me.
+>  drivers/iommu/arm-smmu-v3.c | 13 +++++++++----
+>  1 file changed, 9 insertions(+), 4 deletions(-)
 
 Acked-by: Will Deacon <will.deacon@arm.com>
 
