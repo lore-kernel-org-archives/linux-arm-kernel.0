@@ -1,55 +1,36 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 14 Jun 2016 17:31:06 +0100
-Subject: Versatile Express randomly fails to boot - Versatile Express to
- be removed from nightly testing
-In-Reply-To: <1465918285.2840.41.camel@linaro.org>
-References: <20150316195255.GM8656@n2100.arm.linux.org.uk>
- <550818A6.9020205@arm.com> <20150317153657.GY8656@n2100.arm.linux.org.uk>
- <55084D99.7050004@arm.com> <20150317161748.GZ8656@n2100.arm.linux.org.uk>
- <20150330140333.GJ24899@n2100.arm.linux.org.uk> <55196228.5050805@arm.com>
- <20150330150552.GK24899@n2100.arm.linux.org.uk> <55196E31.80803@arm.com>
- <551AD902.9090401@arm.com> <20150402141336.GI24899@n2100.arm.linux.org.uk>
- <551D7EAB.1000200@arm.com> <1465918285.2840.41.camel@linaro.org>
-Message-ID: <5760314A.4060509@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 14 Jun 2016 17:41:16 +0100
+Subject: [PATCH v3 5/5] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+In-Reply-To: <02dde480-cc01-6372-5baa-02ecf0037074@linaro.org>
+References: <20160527171424.GG10909@e104818-lin.cambridge.arm.com>
+ <20160602174910.30428-1-aleksey.makarov@linaro.org>
+ <02dde480-cc01-6372-5baa-02ecf0037074@linaro.org>
+Message-ID: <20160614164116.GF16531@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tixy,
+On Tue, Jun 14, 2016 at 06:51:19PM +0300, Aleksey Makarov wrote:
+> 
+> On 06/02/2016 08:49 PM, Aleksey Makarov wrote:
+> > From: Jon Masters <jcm@redhat.com>
+> > 
+> > This patch adds support for ACPI_TABLE_UPGRADE for ARM64
+> 
+> Hi Catalin, Will,
+> 
+> Can you review this v3 patch please?  I changed PFN_PHYS(max_pfn) to
+> MEMBLOCK_ALLOC_ACCESSIBLE.
 
-On 14/06/16 16:31, Jon Medhurst (Tixy) wrote:
-> Hi Sudeep
->
-> Over the past several days I think I've been unknowingly reproducing
-> many of the steps in this old discussion thread [1] about A9 Versatile
-> Express boot failures. It's only when I found myself looking at the L2
-> cache timings that I got a vague recollection and dug out this old
-> thread again. Was there any resolution to the issue? As far as I can
-> work out, the A9x4 CoreTile stopped working around Linux 3.18 (the
-> problem isn't 100% reproducible so it's difficult to tell).
->
-> Using "arm,tag-latency = <2 2 1>" as Russell seemed to indicate [2]
-> fixed things for him, also works for me. So should we update mainline
-> device-tree with that?
->
+I'm inclined to agree with Mark that this is something that should be
+done by the bootloader (e.g. GRUB) if it's needed, rather than something
+we should support in the kernel. Jon pitched the feature as a developer
+aid for triaging problems, so it's not like we're in a state where some
+widely available machine cannot currently boot Linux without this.
 
-That's fine by me.
+Having said that, the patch isn't exactly invasive and I suspect it's
+only a matter of time before we will actually want something like this.
+So I've come full circle on this patch:
 
-> Alternatively, we could assume nobody cares about A9 as presumably Linux
-> has been unbootable for a year without anyone raising the issue. (The
-> only reason I'm looking at it is I may be making U-Boot changes for
-> vexpress and I wanted to test them).
->
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-I admit I just do a boot test every release and I seem to have flashed
-the DT so failed to notice any issue. That's my fault.
-
-> But if we are going to just ignore things, I think it would be good to
-> delete the A9 dts, or the L2 cache entry, so other people in the future
-> don't waste days trying to track down the problem.
->
-
-I am fine either way, if people still use it as reference, we can retain it.
-
--- 
-Regards,
-Sudeep
+Will
