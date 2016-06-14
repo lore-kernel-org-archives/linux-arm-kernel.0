@@ -1,70 +1,84 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Tue, 14 Jun 2016 16:24:05 +0800
-Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
-In-Reply-To: <1465892645-32381-1-git-send-email-po.liu@nxp.com>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-1-git-send-email-po.liu@nxp.com>
-Message-ID: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 14 Jun 2016 11:36:22 +0300
+Subject: [PATCH 09/12] mmc: sdhci-xenon: add initial Xenon eMMC driver
+In-Reply-To: <878ty8chdr.fsf@free-electrons.com>
+References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+ <1465456218-28354-10-git-send-email-gregory.clement@free-electrons.com>
+ <575FA9BF.6070703@intel.com> <878ty8chdr.fsf@free-electrons.com>
+Message-ID: <575FC206.4030903@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-maybe there is interrupt line for aer pme etc. Search the interrupt
-number in the fdt file. Then fixup the dev->irq with it.
+On 14/06/16 11:19, Gregory CLEMENT wrote:
+> Hi Adrian,
+>  
+>  On mar., juin 14 2016, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> 
+>> On 09/06/16 10:10, Gregory CLEMENT wrote:
+>>> From: Victor Gu <xigu@marvell.com>
+>>>
+>>> This path adds the driver for the Marvell Xenon eMMC host controller
+>>> which supports eMMC 5.1, SD 3.0.
+>>>
+>>> However this driver supports only up to eMMC 5.0 since the command queue
+>>> feature is not included (yet) in the driver.
+>>>
+>>> [gregory.clement at free-electrons.com:
+>>>  - reformulate commit log
+>>>  - overload the sdhci_set_uhs_signaling function instead of using a quirk
+>>>  - fix a kconfig dependency
+>>>  - remove dead code]
+>>>
+>>> Signed-off-by: Victor Gu <xigu@marvell.com>
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> ---
+>>>  drivers/mmc/host/Kconfig       |   10 +
+>>>  drivers/mmc/host/Makefile      |    1 +
+>>>  drivers/mmc/host/sdhci-xenon.c | 1164 ++++++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 1175 insertions(+)
+>>>  create mode 100644 drivers/mmc/host/sdhci-xenon.c
+>>>
+>>
+>> <SNIP>
+>>
+>>> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+>>> new file mode 100644
+>>> index 000000000000..43c06db95872
+>>> --- /dev/null
+>>> +++ b/drivers/mmc/host/sdhci-xenon.c
+>>
+>> <SNIP>
+>>
+>>> +static int sdhci_xenon_delay_adj_test(struct sdhci_host *host,
+>>> +		struct mmc_card *card, unsigned int delay,
+>>> +		bool invert, bool phase)
+>>> +{
+>>> +	int ret;
+>>> +	struct mmc_card *oldcard;
+>>> +
+>>> +	sdhci_xenon_set_fix_delay(host, delay, invert, phase);
+>>> +
+>>> +	/*
+>>> +	 * If the card is not yet associated to the host, we
+>>> +	 * temporally do it
+>>> +	 */
+>>> +	oldcard = card->host->card;
+>>> +	if (!oldcard)
+>>> +		card->host->card = card;
+>>> +	ret =  card_alive(card);
+>>
+>> This looks like an abuse of bus_ops->alive().  You will need to get
+>> agreement with Ulf how to handle this.  I will wait for Ulf's comments
+>> before reviewing this patch set further.
+> 
+> Actually I modified this part of the driver to use
+> bus_ops->alive(). Initially, the alive() code was more or less copied
+> and paste from the mmc core with ugly include from mmc_ops.h and
+> sdio_ops.h to make it work. I find it cleaner to directly access the
+> alive() function.
+> 
+> Could you explain why it is an abuse of  bus_ops->alive()?
 
-Signed-off-by: Po Liu <po.liu@nxp.com>
----
-changes for V3:
-	- Move to quirk;
-	- Only correct the irq in RC mode;
-
- drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
-
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index ee72ebe..8b39cce 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -25,6 +25,7 @@
- #include <linux/sched.h>
- #include <linux/ktime.h>
- #include <linux/mm.h>
-+#include <linux/of_irq.h>
- #include <asm/dma.h>	/* isa_dma_bridge_buggy */
- #include "pci.h"
- 
-@@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
- 	}
- }
- DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
-+
-+/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-+ * but use standalone irq. Read the device tree for the aer
-+ * interrupt number.
-+ */
-+static void quirk_aer_interrupt(struct pci_dev *dev)
-+{
-+	int ret;
-+	u8 header_type;
-+	struct device_node *np = NULL;
-+
-+	/* Only for the RC mode device */
-+	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
-+	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
-+		return;
-+
-+	if (dev->bus->dev.of_node)
-+		np = dev->bus->dev.of_node;
-+
-+	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
-+		ret = of_irq_get_byname(np, "aer");
-+		if (ret > 0) {
-+			dev->no_msi = 1;
-+			dev->irq = ret;
-+		}
-+	}
-+}
-+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_aer_interrupt);
--- 
-2.1.0.27.g96db324
+bus_ops->alive() is used to determine if the card is present and able to
+respond.  You seem to be using it for a different purpose.  I will wait for
+Ulf's comments.
