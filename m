@@ -1,67 +1,59 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 13 Jun 2016 19:27:42 -0700
-Subject: [PATCH 06/14] x86/ptrace: run seccomp after ptrace
-In-Reply-To: <CALCETrVk-UauwaRtZZR0fKQO6kyAx-r=ZCurKRdhQk9nA-TqeQ@mail.gmail.com>
-References: <1465506124-21866-1-git-send-email-keescook@chromium.org>
- <1465506124-21866-7-git-send-email-keescook@chromium.org>
- <CALCETrVk-UauwaRtZZR0fKQO6kyAx-r=ZCurKRdhQk9nA-TqeQ@mail.gmail.com>
-Message-ID: <CALCETrUJr25COBeVs_KS1SVk2f7CFzYgDr7MttZanWsJnTk0-g@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 13 Jun 2016 19:42:10 -0700
+Subject: [PATCH 2/8] tty: serial: fsl_lpuart: support suspend/resume
+In-Reply-To: <cdeb3e9b-92c5-77d9-78ec-3af3954e8e16@toradex.com>
+References: <20160609151039.20817-1-bhuvanchandra.dv@toradex.com>
+ <20160609151039.20817-3-bhuvanchandra.dv@toradex.com>
+ <20160611140341.GT20243@tiger>
+ <cdeb3e9b-92c5-77d9-78ec-3af3954e8e16@toradex.com>
+Message-ID: <AF70EE92-9B41-4ECE-AB5F-E829E611B7C6@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 9, 2016 at 3:52 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On Thu, Jun 9, 2016 at 2:01 PM, Kees Cook <keescook@chromium.org> wrote:
->> This moves seccomp after ptrace on x86 to that seccomp can catch changes
->> made by ptrace. Emulation should skip the rest of processing too.
->>
->> We can get rid of test_thread_flag because there's no longer any
->> opportunity for seccomp to mess with ptrace state before invoking
->> ptrace.
->>
->> Suggested-by: Andy Lutomirski <luto@kernel.org>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> Cc: x86 at kernel.org
->> Cc: Andy Lutomirski <luto@kernel.org>
->> ---
->>  arch/x86/entry/common.c | 22 ++++++++++++----------
->>  1 file changed, 12 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/x86/entry/common.c b/arch/x86/entry/common.c
->> index df56ca394877..81c0e12d831c 100644
->> --- a/arch/x86/entry/common.c
->> +++ b/arch/x86/entry/common.c
->> @@ -73,6 +73,7 @@ static long syscall_trace_enter(struct pt_regs *regs)
->>
->>         struct thread_info *ti = pt_regs_to_thread_info(regs);
->>         unsigned long ret = 0;
->> +       bool emulated = false;
->>         u32 work;
->>
->>         if (IS_ENABLED(CONFIG_DEBUG_ENTRY))
->> @@ -80,11 +81,19 @@ static long syscall_trace_enter(struct pt_regs *regs)
->>
->>         work = ACCESS_ONCE(ti->flags) & _TIF_WORK_SYSCALL_ENTRY;
->>
->> +       if (unlikely(work & _TIF_SYSCALL_EMU))
->> +               emulated = true;
->> +
->> +       if ((emulated || (work & _TIF_SYSCALL_TRACE)) &&
->> +           tracehook_report_syscall_entry(regs))
->> +               return -1L;
->> +
->> +       if (emulated)
->> +               return -1L;
->> +
->
-> I think that this code will result in ptrace-induced skips calling the
-> audit exit hook but not the audit entry hook.  I don't know whether
-> this is a problem.  It's also worth making sure that ptracing a
-> seccomp-skipped syscall calls the exit hook with the right regs.
->
-> I suspect it's fine, but I want to think about it a little bit more.
 
-I poked at it a bit and this seems to work correctly.
-selftests/x86/ptrace_syscall.c exercises PTRACE_SYSCALL_EMU pretty
-well, and it still passes.
 
---Andy
+On June 13, 2016 5:18:19 PM PDT, Bhhuvanchandra DV <bhuvanchandra.dv@toradex.com> wrote:
+>Hi Shawn,
+>
+>On 06/11/2016 02:03 PM, Shawn Guo wrote:
+>
+>> On Thu, Jun 09, 2016 at 08:40:33PM +0530, Bhuvanchandra DV wrote:
+>>> From: Stefan Agner <stefan@agner.ch>
+>>>
+>>> In order to allow wake support in STOP sleep mode, clocks are
+>>> needed. Use imx_clk_gate2_cgr to disable automatic clock gating
+>>> in low power mode STOP. This allows to enable wake by UART using:
+>>> echo enabled > /sys/class/tty/ttyLP0/power/wakeup
+>>>
+>>> However, if wake is not enabled, the driver should disable the
+>>> clocks explicitly to save power.
+>>>
+>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>> ---
+>>>   drivers/clk/imx/clk-vf610.c     | 12 ++++++------
+>> Please send clock driver changes in a separate patch.
+
+The changes are dependet on each other, hence I put it in a single patch. But since it is a new feature it shouldn't really matter...
+
+>
+>How about splitting this patchset to two? few patches are having minor
+>fixes and the few patches might need some review and discussions.
+>May be some thing like DMA fixes and the other minor fixes.
+
+I don't think that splitting up the patchset is necessary, with the current order it is possible to pick up the fixes independently...
+
+--
+Stefan
+
+>
+>--
+>Bhuvan
+>
+>>
+>> Shawn
+>>
+>>>   drivers/tty/serial/fsl_lpuart.c | 16 ++++++++++++++--
+>>>   2 files changed, 20 insertions(+), 8 deletions(-)
+
+-- 
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
