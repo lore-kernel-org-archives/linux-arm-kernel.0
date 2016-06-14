@@ -1,96 +1,64 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 14 Jun 2016 17:11:59 +0100
-Subject: [PATCH v2 5/7] iommu/arm-smmu: Implement of_xlate() for SMMUv3
-In-Reply-To: <20160614150757.GB16531@arm.com>
-References: <cover.1464966939.git.robin.murphy@arm.com>
- <55aa94e099f00fd586077c45d4c4fd1c010981d9.1464966939.git.robin.murphy@arm.com>
- <20160614150757.GB16531@arm.com>
-Message-ID: <57602CCF.1060603@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 14 Jun 2016 17:16:50 +0100
+Subject: [PATCH 6/6] arm64: trap userspace "dc cvau" cache operation on
+ errata-affected core
+In-Reply-To: <1462812590-4494-7-git-send-email-andre.przywara@arm.com>
+References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
+ <1462812590-4494-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <57602DF2.1040501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/16 16:07, Will Deacon wrote:
-> On Fri, Jun 03, 2016 at 06:15:40PM +0100, Robin Murphy wrote:
->> Now that we can properly describe the mapping between PCI RIDs and
->> stream IDs via "iommu-map", and have it fed it to the driver
->> automatically via of_xlate(), rework the SMMUv3 driver to benefit from
->> that. Initially, this just gets rid of the misuse of the "iommus"
->> binding without changing the driver's existing level of functionality,
->> but does at least pave the way to extending it more easily in future.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v2: New.
->>
->>   drivers/iommu/arm-smmu-v3.c | 119 +++++++++++++++++++++++++++-----------------
->>   1 file changed, 73 insertions(+), 46 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 94b68213c50d..7631639cc209 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -30,6 +30,7 @@
->>   #include <linux/msi.h>
->>   #include <linux/of.h>
->>   #include <linux/of_address.h>
->> +#include <linux/of_iommu.h>
->>   #include <linux/of_platform.h>
->>   #include <linux/pci.h>
->>   #include <linux/platform_device.h>
->> @@ -638,6 +639,12 @@ struct arm_smmu_domain {
->>   	struct iommu_domain		domain;
->>   };
->>
->> +/* SMMU private data for each master */
->> +struct arm_smmu_master_data {
->> +	struct arm_smmu_device		*smmu;
->> +	u32				sid;
->> +};
+On 09/05/16 17:49, Andre Przywara wrote:
+> The ARM errata 819472, 826319, 827319 and 824069 for affected
+> Cortex-A53 cores demand to promote "dc cvau" instructions to
+> "dc civac". Since we allow userspace to also emit those instructions,
+> we should make sure that "dc cvau" gets promoted there too.
+> So lets grasp the nettle here and actually trap every userland cache
+> maintenance instruction once we detect at least one affected core in
+> the system.
+> We then emulate the instruction by executing it on behalf of userland,
+> promoting "dc cvau" to "dc civac" on the way and injecting access
+> fault back into userspace.
 >
-> Hmm, we already have this information in arm_smmu_group so I'd rather
-> avoid the duplication if we can.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-For of_xlate() to work at all, we need to associate the IDs with their 
-device long before groups are even available (because the device is only 
-partially constructed), so at a bare minimum we need something to carry 
-the data through until we see it again in add_device, where we can 
-allocate a group.
 
->> @@ -1804,23 +1790,41 @@ static int arm_smmu_add_device(struct device *dev)
->>   {
->>   	int i, ret;
->>   	u32 sid, *sids;
->> -	struct pci_dev *pdev;
->>   	struct iommu_group *group;
->> +	struct device_node *np;
->>   	struct arm_smmu_group *smmu_group;
->> -	struct arm_smmu_device *smmu;
->> +	struct arm_smmu_device *smmu = NULL;
->> +	struct arm_smmu_master_data *data = dev->archdata.iommu;
->>
->> -	/* We only support PCI, for now */
->> -	if (!dev_is_pci(dev))
->> +	if (!data)
->>   		return -ENODEV;
->>
->> -	pdev = to_pci_dev(dev);
->> +	np = (struct device_node *)data->smmu;
->> +	smmu = data->smmu = arm_smmu_get_by_node(np);
->> +	of_node_put(np);
->> +	if (!smmu)
->> +		return -ENODEV;
->
-> Why can't we continue to use the group here?
+> +
+> +asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
+> +{
+> +	unsigned long address;
+> +	int ret;
+> +
+> +	/* if this is a write with: Op0=1, Op2=1, Op1=3, CRn=7 */
+> +	if ((esr & 0x01fffc01) == 0x0012dc00) {
+> +		int rt = (esr >> 5) & 0x1f;
+> +		int crm = (esr >> 1) & 0x0f;
+> +
+> +		address = regs->regs[rt];
+> +
+> +		switch (crm) {
+> +		case 11:		/* DC CVAU, gets promoted */
+> +			__user_cache_maint("dc civac", address, ret);
+> +			break;
+> +		case 10:		/* DC CVAC, gets promoted */
+> +			__user_cache_maint("dc civac", address, ret);
+> +			break;
+> +		case 14:		/* DC CIVAC */
+> +			__user_cache_maint("dc civac", address, ret);
+> +			break;
+> +		case 5:			/* IC IVAU */
+> +			__user_cache_maint("ic ivau", address, ret);
+> +			break;
+> +		default:
+> +			force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+> +			return;
+> +		}
+> +	} else {
+> +		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+> +		return;
 
-I don't follow; at this point we've still not even allocated/found a 
-group for this device yet. The code a few dozen lines later that takes 
-the IDs and stashes them in the groupdata once it _does_ exist is 
-unchanged in this patch, all that's changing is how those IDs got here 
-in the first place.
+Correct me if I am wrong, I think we should handle DC ZVA and emulate the same ?
+Thats the only EL0 accessible instruction we don't handle above.
 
-Robin.
-
->
-> Will
->
+Suzuki
