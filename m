@@ -1,36 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Jun 2016 10:32:42 -0700
-Subject: [GIT PULL] Amlogic DT changes for v4.8
-In-Reply-To: <7h60tcdbox.fsf@baylibre.com>
-References: <7h60tcdbox.fsf@baylibre.com>
-Message-ID: <20160614173242.GH9200@localhost>
+Date: Tue, 14 Jun 2016 10:39:10 -0700
+Subject: [PATCH 0/3] ARM: dts: uniphier: UniPhier DTS updates (32bit) for
+ v4.8-rc1
+In-Reply-To: <1465873186-30658-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1465873186-30658-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160614173910.GI9200@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 02:24:30PM -0700, Kevin Hilman wrote:
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+On Tue, Jun 14, 2016 at 11:59:43AM +0900, Masahiro Yamada wrote:
 > 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 > 
-> are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
-> 
-> for you to fetch changes up to bf205ad75a17a878aa0c350d1ce376adaeb69fea:
-> 
->   ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms (2016-06-01 10:57:42 -0700)
-> 
-> ----------------------------------------------------------------
-> Amlogic DT changes for v4.8
-> - add pinctrl driver and pins for several devices
-> - add reset driver
+> Masahiro Yamada (3):
+>   ARM: dts: uniphier: add System Bus pinmux node
+>   ARM: dts: uniphier: add SoC-Glue node to UniPhier 32bit SoCs
+>   ARM: dts: uniphier: renumber serial aliases for Gentil/Vodka boards
 
-Hi,
-
-We have traditionally kept 32- and 64-bit DT updates separate. Would you mind
-respinning with the 32-bit change in a separate branch or as a standalone
-patch?
-
+Applied.
 
 
 -Olof
