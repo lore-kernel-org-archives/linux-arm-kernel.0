@@ -1,105 +1,36 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 14 Jun 2016 08:59:15 +0800
-Subject: [PATCH 04/11] mmc: sdhci-of-arasan: Properly set
- corecfg_baseclkfreq on rk3399
-In-Reply-To: <CAD=FV=UL5tU8RWtHF=-pE8SA0jUcBsqQDOU0BrruXOF7yGh5xg@mail.gmail.com>
-References: <1465339484-969-1-git-send-email-dianders@chromium.org>
- <1465339484-969-5-git-send-email-dianders@chromium.org>
- <f5dcc018-bd60-87a7-798b-efc261e443dd@rock-chips.com>
- <CAD=FV=UzGZmwGTthqqO5Skxj5f0wsS5VKr4gYP2i9SUyGqvbjg@mail.gmail.com>
- <47a2dcd9-9c3c-8fde-2be0-40e305c25e8d@rock-chips.com>
- <CAD=FV=UL5tU8RWtHF=-pE8SA0jUcBsqQDOU0BrruXOF7yGh5xg@mail.gmail.com>
-Message-ID: <da1c9ae9-71d9-6e9d-7b9f-08485ee9178e@rock-chips.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 14 Jun 2016 09:59:40 +0900
+Subject: [RESEND PATCH 0/2] arm64: dts: r8a7795: Add FCPF and FDP1 device
+ nodes
+In-Reply-To: <1465491418-32752-1-git-send-email-kieran@bingham.xyz>
+References: <1465491418-32752-1-git-send-email-kieran@bingham.xyz>
+Message-ID: <20160614005940.GD6456@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/6/14 8:43, Doug Anderson ??:
-> Hi,
->
-> On Mon, Jun 13, 2016 at 5:14 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
->>>> It's broken when reading capabilities reg on RK3399 platform
->>>> which means you should get it via clk framework. But you should consider
->>>> the non-broken case.
->>>
->>>
->>> I'm afraid I don't understand.  Can you elaborate?  Are you saying if
->>> things weren't broken then we wouldn't have to ask the common clock
->>> framework for this?  Where would we get this value?
->>
->>
->>
->> I mean bascially we should get baseclk from capabilities register[15:8]
->> (offset 0x40 at sdhci), namely EMMCCORE_CAP on TRM. Only when you get 0x0
->> from there, can you consider to get it from clock framework.
->
-> Ah, got it!
->
-> I guess I would be super surprised if an SoC implemented
-> register[15:8] but still then required you to manually copy that value
-> to corecfg_baseclkfreq.  Presumably nobody would be crazy enough to
-> try to measure the clock rate in the SDHCI driver, so this would
-> probably only be non-zero where the SDHCI clock is totally fixed.
-> ...in that case probably the SoC designer would also put a default
-> value in corecfg_baseclkfreq that matched (and maybe even make
-> corecfg_baseclkfreq read-only?).
+On Thu, Jun 09, 2016 at 05:56:56PM +0100, Kieran Bingham wrote:
+> Appologies for the resend, I very cleverly sent this cover letter detailing the
+> dependencies only to my e-mail address. And I already know the dependencies!
+> 
+> Following two patches are the same, sorry for the noise.
+> 
+> These are dependent upon the FCP bindings from Laurent [0], and the FCPF
+> update to those bindings from me [1], and of course the bindings for the
+> FDP1 [2] which are all posted separately.
+> 
+> [0] http://www.spinics.net/lists/devicetree/msg123968.html
+> [1] https://lkml.org/lkml/2016/6/9/291
+> [2] https://lkml.org/lkml/2016/6/9/294
 
-yes, you could see some others similar capabilities case like
-timeoutclkfreq or preset value, etc. SDHCI hope Soc designer to
-implement them within the controller but not mandatory.
+These patches look good to me. My assumption is that they
+can be applied without causing any breakage and that the
+relevant features will start working once driver support
+shows up in the kernel.
 
->
-> Even in the case that an SoC designer didn't put a value into
-> corecfg_baseclkfreq that matched register[15:8], it seems very likely
-> that the rate returned from the clk_get_rate() would match.
->
-> I guess what I'm saying is that, to me, it seems like my patch isn't
-> broken in any real systems.  If we ever find a system that needs this
-> behavior in the future, we can add it.  Until then, it seems like my
-> patch would be fine.  Do you agree?
+If the above assumption is correct then please let me know when the
+bindings have been accepted by the relevant subsystem maintainer(s).
 
-I agree. But from the code itself, we should still use
-SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN to see if we could get
-it from internal register in case of some platforms don't
-provide the clk stuff.. Sounds sane? :)
+If the patches need rebasing at that time then please repost them.
+Otherwise you can either repost them or ping me as a response to this thread.
 
->
-> Note: right now we only provide a register map for rk3399, so
-> certainly we can't be breaking any other SoCs with our current method.
->
->
->> I don't see a reason to check the return code here.  Specifically:
->>>
->>> * If this is a SoC where you don't need to write corecfg_baseclkfreq
->>> then we need do nothing about this error.
->>>
->>> * If the regmap write failed (which would be terribly unexpected for a
->>> memory mapped register) then we've already printed an error (in
->>> sdhci_arasan_syscon_write).  Best course of action seems to keep going
->>> and try anyway.
->>>
->>>
->>> I don't think a retry is likely to help anything.
->>
->>
->> Well, I saw you add a return value for sdhci_arasan_syscon_write, so
->> should we remove it?
->
-> It was presuming that there might be future callers who might want to
-> write other corecfg registers and might need to know whether the write
-> worked or not.  Since having the return value doesn't hurt anything
-> I'd rather leave it in.  If you really want me to remove it, though, I
-> will.  Just let me know.
-
-Ahh, it's trivial, so keep it if you want.
-
->
->
-> -Doug
->
->
->
-
-
--- 
-Best Regards
-Shawn Lin
+Thanks!
