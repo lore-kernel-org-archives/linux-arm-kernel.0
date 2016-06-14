@@ -1,77 +1,124 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 15 Jun 2016 01:07:34 +0200
-Subject: [PATCH 3/5] PM / Hibernate: Allow architectures to specify the
- hibernate/resume CPU
-In-Reply-To: <575FD20F.7020606@arm.com>
-References: <1464876657-6692-1-git-send-email-james.morse@arm.com>
- <4959514.g8dkWscZ3h@vostro.rjw.lan> <575FD20F.7020606@arm.com>
-Message-ID: <1814244.EyXNzvmsTg@vostro.rjw.lan>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 15 Jun 2016 02:08:38 +0300
+Subject: [PATCH 01/23] all: syscall wrappers: add documentation
+In-Reply-To: <20160526222943.GA16729@MBP.local>
+References: <6293194.tGy03QJ9ME@wuerfel>
+ <20160525.135039.244098606649448826.davem@davemloft.net>
+ <6407614.fdv5XFSBue@wuerfel>
+ <20160525.142821.1719403997976778673.davem@davemloft.net>
+ <20160526204819.GA10274@yury-N73SV>
+ <20160526222943.GA16729@MBP.local>
+Message-ID: <20160614230838.GA15130@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 14, 2016 10:44:47 AM James Morse wrote:
-> Hi Rafael,
-> 
-> On 13/06/16 23:10, Rafael J. Wysocki wrote:
-> > On Tuesday, June 14, 2016 12:05:28 AM Rafael J. Wysocki wrote:
-> >> On Thursday, June 02, 2016 03:10:55 PM James Morse wrote:
-> >>> On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
-> >>> user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
-> >>> kernel will assign logical id 0 to a different physical CPU.
-> >>> This breaks hibernate as hibernate and resume will be attempted on different
-> >>> CPUs.
-> >>>
-> >>> Define a weak symbol arch_hibernation_disable_cpus(), which defaults to
-> >>> calling disable_nonboot_cpus). Architectures that allow CPU 0 to be
-> >>> hotplugged can use this to control which CPU is used for hibernate/resume.
-> >>>
-> >>> Signed-off-by: James Morse <james.morse@arm.com>
-> >>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> >>> Cc: Pavel Machek <pavel@ucw.cz>
-> >>> ---
-> >>> I would have preferred a macro, but there is no hibernate-relevant header
-> >>> file that all arch's have. arm, arm64 and x86 have a suspend.h, but powerpc
-> >>> doesn't.
-> >>
-> >> What about include/linux/suspend.h?
-> >>
-> >> There are arch_ things declared in there.
-> > 
-> > I mean, what about using something like
-> > 
-> > #ifndef arch_hibernation_disable_cpus
-> > #define arch_hibernation_disable_cpus disable_nonboot_cpus
-> > #endif
-> > 
-> > in there or in another header file?
-> 
-> This would work fine for an architecture that doesn't need to use
-> arch_hibernation_disable_cpus(), but which header file should we use for an
-> architecture that does?
-> 
-> As a macro it needs to be in an arch-specific header included before the #ifndef
-> above.
-> 
-> Of those:
-> include/linux/suspend.h only includes <asm/errno.h>
-> kernel/power/power.h doesn't include any 'asm' headers.
-> snapshot.c includes:
-> > #include <asm/uaccess.h>
-> > #include <asm/mmu_context.h>
-> > #include <asm/pgtable.h>
-> > #include <asm/tlbflush.h>
-> > #include <asm/io.h>
-> 
-> ... but none of those are appropriate.
-> 
-> 
-> I initially added an include for <asm/suspend.h> to kernel/power/power.h, but it
-> broke powerpc, as there is no suspend.h there. I took this as a dead-end for the
-> macro approach, unless someone has a clever trick?!
+Hi Catalin, David, all
 
-OK, let's do the __weak function, then.
+> COMPAT_SYSCALL_WRAP2(creat, ...):
+> 	mov	w0, w0
+> 	b	<sys_creat>
+> 
+> > > Cost wise, this seems like it all cancels out in the end, but what
+> > > do I know?
+> > 
+> > I think you know something, and I also think Heiko and other s390 guys
+> > know something as well. So I'd like to listen their arguments here.
+> > 
+> > For me spark64 way is looking reasonable only because it's really simple
+> > and takes less coding. I'll try it on some branch and share here what happened.
+> 
+> The kernel code will definitely look simpler ;). It would be good to see
+> if there actually is any performance impact. Even with 16 more cycles on
+> syscall entry, would they be lost in the noise? You don't need a full
+> implementation, just some dummy mov x0, x0 on the entry path.
+> 
+> -- 
+> Catalin
 
-After all, it can be changed later if someone has a better idea.
+I wrote a simple test:
 
-Thanks,
-Rafael
+        struct timeval start, end;
+        unsigned long long ut;
+
+        int main()
+        {
+                gettimeofday(&start, NULL);
+
+                for (int i = 1000000; i; i--)
+                        syscall(__NR_getrusage, 100 /* EINVAL */, NULL);
+
+                gettimeofday(&end, NULL);
+                
+                ut = (end.tv_sec - start.tv_sec) * 1000000ULL
+                        + end.tv_usec - start.tv_usec;
+
+                printf("%lld\n", ut);
+
+                exit(EXIT_SUCCESS);
+        }
+
+In kernel there's minimal overhead:
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 89d5be4..003d5ad 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -1634,6 +1634,17 @@ COMPAT_SYSCALL_DEFINE2(getrusage, int, who,
+struct compat_rusage __user *, ru)
+{
+        struct rusage r;
+         
++       asm volatile (
++       "       mov w0, w0      \n"
++       "       mov w1, w1      \n"
++       "       mov w2, w2      \n"
++       "       mov w3, w3      \n"
++       "       mov w4, w4      \n"
++       "       mov w5, w5      \n"
++       "       mov w6, w6      \n"
++       "       mov w7, w7      \n"
++       );
++
+        if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN &&
+            who != RUSAGE_THREAD)
+                return -EINVAL;
+
+On QEMU:
+With MOVs:      W/O MOVs:
+832015          814564
+840639          803165
+830482          813116
+832895          802928
+832083          832658
+834461          802993
+829405          812465
+846677          822651
+828409          803393
+836845          821470
+828716          801044
+831620          821301
+825423          800278
+829946          821476
+
+We have 83 mS vs 81 mS, ~2.6% of performance degradation.
+And I can show bigger numbers if I'll use asm svc instead of
+syscall() wrapper which increases time as well. 
+
+It's definitely more than 0, but not so big anyway. For syscalls
+with heavy payload it will be non-measurable. So the choice
+is still there. Should we use wrappers and save 2.5% of syscall
+performance. Or clear top-halves unconditionally and win in simplicity?
+
+If QEMU is looking non-representative, I can run test on real
+hardware, but it takes a time, and I think will end up with similar
+results.
+
+Latest kernel with wrappers and library are here:
+https://github.com/norov/linux/commits/ilp32
+https://github.com/norov/glibc/commits/ilp32-dev
+
+BTW, notice the change in ABI: syscalls that take stat and statfs
+structures now routed to (wrapped) native handlers, after switching
+userspace to use 64-bit off_t, ino_t, blkcnt_t, fsblkcnt_t and
+fsfilcnt_t types.
+
+Yury.
