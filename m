@@ -1,122 +1,70 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 14 Jun 2016 11:52:48 +0200
-Subject: [PATCH v2 1/2] clocksource: Add Oxford Semiconductor RPS Dual
- Timer
-In-Reply-To: <20160613143502.GD10634@linaro.org>
-References: <1465315452-20599-1-git-send-email-narmstrong@baylibre.com>
- <1465315452-20599-2-git-send-email-narmstrong@baylibre.com>
- <20160613143502.GD10634@linaro.org>
-Message-ID: <575FD3F0.6040604@baylibre.com>
+From: Wei.Chen@arm.com (Wei Chen)
+Date: Tue, 14 Jun 2016 10:00:21 +0000
+Subject: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
+In-Reply-To: <20160614085627.GA19407@arm.com>
+References: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
+ <20160613124531.GE1605@arm.com>
+ <CANta1d-wRGcU51P3Av7EXbvu7hJfUBk_Kd5p=7RDMW6u+v0gvg@mail.gmail.com>
+ <20160614085627.GA19407@arm.com>
+Message-ID: <DB5PR0801MB151054CCAD2ABFC0F2BB85B19E540@DB5PR0801MB1510.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
 
-On 06/13/2016 04:35 PM, Daniel Lezcano wrote:
-> On Tue, Jun 07, 2016 at 06:04:11PM +0200, Neil Armstrong wrote:
->> Add clocksource and clockevent driver from dual RPS timer.
->> The HW provides a dual one-shot or periodic 24bit timers,
->> the drivers set the first one as tick event source and the
->> second as a continuous scheduler clock source.
->> The timer can use 1, 16 or 256 as pre-dividers, thus the
->> clocksource uses 16 by default.
->>
->> CC: Ma Haijun <mahaijuns@gmail.com>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  drivers/clocksource/Kconfig           |   6 +
->>  drivers/clocksource/Makefile          |   1 +
->>  drivers/clocksource/timer-oxnas-rps.c | 270 ++++++++++++++++++++++++++++++++++
->>  3 files changed, 277 insertions(+)
->>  create mode 100644 drivers/clocksource/timer-oxnas-rps.c
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index 47352d2..7e382c5 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -293,6 +293,12 @@ config VF_PIT_TIMER
->>  	help
->>  	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
->>  
->> +config OXNAS_RPS_TIMER
-> 
->    config OXNAS_RPS_TIMER "bla bla" if COMPILE_TEST
-> 
-OK
 
-Shoud I also add CLKSRC_OF ?
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: 2016?6?14? 16:56
+> To: Wei Chen
+> Cc: Wei Chen; Steve Capper; joro at 8bytes.org; linux-kernel at vger.kernel.org;
+> iommu at lists.linux-foundation.org; Robin Murphy; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
+>
+> On Tue, Jun 14, 2016 at 11:11:36AM +0800, Wei Chen wrote:
+> > On 13 June 2016 at 20:45, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Mon, Jun 13, 2016 at 05:20:17PM +0800, Wei Chen wrote:
+> > >> The PCIe ACS capability will affect the layout of iommu groups.
+> > >> Generally speaking, if the path from root port to the PCIe device
+> > >> is ACS enabled, the iommu will create a single iommu group for this
+> > >> PCIe device. If all PCIe devices on the path are ACS enabled then
+> > >> Linux can determine this path is ACS enabled.
+> > >>
+> > >> Linux use two PCIe configuration registers to determine the ACS
+> > >> status of PCIe devices:
+> > >> ACS Capability Register and ACS Control Register.
+> > >>
+> > >> The first register is used to check the implementation of ACS
+> > >> function of a PCIe device, the second register is used to check the
+> > >> enable status of ACS function. If one PCIe device has implemented
+> > >> and enabled the ACS function then Linux will determine this PCIe
+> device enabled ACS.
+> > >>
+> > >> From the Chapter:6.12 of PCI Express Base Specification Revision
+> > >> 3.1a, we can find that when a PCIe device implements ACS function,
+> > >> the enable status is set to disabled by default and can be enabled
+> > >> by ACS-aware software.
+> > >>
+> > >> ACS will affect the iommu groups topology, so, the iommu driver is
+> > >> ACS-aware software. This patch adds a call to pci_request_acs() to
+> > >> the arm-smmu driver to enable the ACS function in PCIe devices that
+> > >> support it.
+> > >>
+> > >> Signed-off-by: Wei Chen <Wei.Chen@arm.com>
+> > >> ---
+> > >>  drivers/iommu/arm-smmu-v3.c | 2 ++
+> > >>  drivers/iommu/arm-smmu.c    | 4 +++-
+> > >>  2 files changed, 5 insertions(+), 1 deletion(-)
+> > >
+> > > Thanks, queued for 4.8 w/ Robin and Eric's reviewed-by tags and the
+> > > minor commit wording change.
+> > >
+> >
+> > Thanks, I will post a v2 patch to include above changes.
+>
+> :/ As above, I've already queued this.
+Oh, thank you :)
+>
+> Will
 
->> +	bool
->> +	select CLKSRC_MMIO
->> +	help
->> +	  This enables support for the Oxford Semiconductor OXNAS RPS timers.
->> +
->> @@ -0,0 +1,270 @@
->> +/*
->> + * drivers/clocksource/timer-oxnas-rps.c
->> + *
->> + * Copyright (C) 2009 Oxford Semiconductor Ltd
->> + * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
-> 
-> What are these two copyrights ?
-> 
-> [ ... ]
-
-This driver is based from a driver from the OX820 sdk from Oxford and modified by Ma Haijun, thus the copyrights.
-
->> +static void __init oxnas_rps_timer_init(struct device_node *np)
->> +{
->> +	struct oxnas_rps_timer *rps;
->> +	void __iomem *base;
->> +	int ret;
->> +
->> +	rps = kzalloc(sizeof(*rps), GFP_KERNEL);
->> +	if (WARN_ON(!rps))
-> 
-> It is pointless to add a WARN_ON, kzalloc already does that on failure.
-> 
->> +		return;
->> +
->> +	rps->clk = of_clk_get(np, 0);
->> +	if (WARN_ON(IS_ERR(rps->clk)))
->> +		return;
-
-[....]
-
->> +		goto err;
->> +
->> +	oxnas_rps_clockevent_init(rps);
->> +	oxnas_rps_clocksource_init(rps);
->> +
->> +	return;
-> 
-> err_iounmap:
-> 	iounmap(base);
-> 
-> err_clk_unprepare:
-> 	clk_unprepare(rps->clk)
-> 
-> err_clk_put:
->> +	clk_put(rps->clk);
->> +	kfree(rps);
->> +}
-> 
-> Regarding the current work I am doing to change the init function to return 
-> an error in case of failure, can you do proper error handling in this 
-> function and rollback ?
-> 
-> 1. replace WARN_ON by a pr_err
-> 2. make oxnas_rps_clockevent_init and oxnas_rps_clocksource_init to return 
-> an error code
-It can be done.
-
-> 3. rollback clockevent or clocksource if one fails.
-Sure, but as for 4.6, it seems neither sched_clock_register, clocksource_mmio_init or clockevents_config_and_register can be reverted !
-What should I do ?
-
-> 
-> Thanks !
-> 
->   -- Daniel
-> 
-Neil
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
