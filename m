@@ -1,39 +1,55 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 14 Jun 2016 11:02:09 +0800
-Subject: [PATCH] clk: rockchip: add pclk_vio_grf to critical clock on the
- RK3399
-In-Reply-To: <CAD=FV=WhaN__psCV_hYoc67gZMpCt_9yp5=vR-C4uc8i39RAaA@mail.gmail.com>
-References: <1465724913-14553-1-git-send-email-zhengxing@rock-chips.com>
- <CAD=FV=XSSPMOnMD3mqFyqM3wWLShbRc2cXVdN0PYcUxpaDnsTw@mail.gmail.com>
- <575E240C.9060502@rock-chips.com>
- <CAD=FV=WhaN__psCV_hYoc67gZMpCt_9yp5=vR-C4uc8i39RAaA@mail.gmail.com>
-Message-ID: <575F73B1.9000703@rock-chips.com>
+From: wei.chen@linaro.org (Wei Chen)
+Date: Tue, 14 Jun 2016 11:11:36 +0800
+Subject: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
+In-Reply-To: <20160613124531.GE1605@arm.com>
+References: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
+ <20160613124531.GE1605@arm.com>
+Message-ID: <CANta1d-wRGcU51P3Av7EXbvu7hJfUBk_Kd5p=7RDMW6u+v0gvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-On 2016?06?14? 07:46, Doug Anderson wrote:
+On 13 June 2016 at 20:45, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Jun 13, 2016 at 05:20:17PM +0800, Wei Chen wrote:
+>> The PCIe ACS capability will affect the layout of iommu groups.
+>> Generally speaking, if the path from root port to the PCIe device
+>> is ACS enabled, the iommu will create a single iommu group for this
+>> PCIe device. If all PCIe devices on the path are ACS enabled then
+>> Linux can determine this path is ACS enabled.
+>>
+>> Linux use two PCIe configuration registers to determine the ACS
+>> status of PCIe devices:
+>> ACS Capability Register and ACS Control Register.
+>>
+>> The first register is used to check the implementation of ACS function
+>> of a PCIe device, the second register is used to check the enable status
+>> of ACS function. If one PCIe device has implemented and enabled the ACS
+>> function then Linux will determine this PCIe device enabled ACS.
+>>
+>> From the Chapter:6.12 of PCI Express Base Specification Revision 3.1a,
+>> we can find that when a PCIe device implements ACS function, the enable
+>> status is set to disabled by default and can be enabled by ACS-aware
+>> software.
+>>
+>> ACS will affect the iommu groups topology, so, the iommu driver is
+>> ACS-aware software. This patch adds a call to pci_request_acs() to the
+>> arm-smmu driver to enable the ACS function in PCIe devices that support
+>> it.
+>>
+>> Signed-off-by: Wei Chen <Wei.Chen@arm.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 2 ++
+>>  drivers/iommu/arm-smmu.c    | 4 +++-
+>>  2 files changed, 5 insertions(+), 1 deletion(-)
 >
-> Even if it's not much power, it seems like we should still turn it off
-> and on in the right place.  Unless I'm mistaken it should be such a
-> simple patch provide the clock to the right driver and then get the
-> clock when appropriate.
-Yes, I talked with Yakir and we intent to enable/disable the 
-pclk_vio_grf in video drivers,
-so this patch will be dropped.
->> I will refer the latest TRM to update a new patch for always enable these
->> GRFs.
-> Does that mean you're going to make these all critical clocks?  That
-> doesn't sound so great...
+> Thanks, queued for 4.8 w/ Robin and Eric's reviewed-by tags and the minor
+> commit wording change.
 >
-> -Doug
-Maybe, I heard that they are removed in the updated TRM, but I have not 
-got the TRM yet.
-I will double check it, and it seems that you do not agree to remove 
-these clock...
 
-Thanks.
+Thanks, I will post a v2 patch to include above changes.
 
--- 
-- Xing Zheng
+> Will
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
