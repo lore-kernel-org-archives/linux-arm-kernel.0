@@ -1,47 +1,55 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Jun 2016 18:18:20 +0200
-Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
-In-Reply-To: <20160614160517.GA2490@afzalpc>
-References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
- <11395561.bQatt85IOg@wuerfel> <20160613152409.GD3240@piout.net>
- <20160614160517.GA2490@afzalpc>
-Message-ID: <20160614181820.1b817ed3@bbrezillon>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 14 Jun 2016 17:31:06 +0100
+Subject: Versatile Express randomly fails to boot - Versatile Express to
+ be removed from nightly testing
+In-Reply-To: <1465918285.2840.41.camel@linaro.org>
+References: <20150316195255.GM8656@n2100.arm.linux.org.uk>
+ <550818A6.9020205@arm.com> <20150317153657.GY8656@n2100.arm.linux.org.uk>
+ <55084D99.7050004@arm.com> <20150317161748.GZ8656@n2100.arm.linux.org.uk>
+ <20150330140333.GJ24899@n2100.arm.linux.org.uk> <55196228.5050805@arm.com>
+ <20150330150552.GK24899@n2100.arm.linux.org.uk> <55196E31.80803@arm.com>
+ <551AD902.9090401@arm.com> <20150402141336.GI24899@n2100.arm.linux.org.uk>
+ <551D7EAB.1000200@arm.com> <1465918285.2840.41.camel@linaro.org>
+Message-ID: <5760314A.4060509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Jun 2016 21:35:17 +0530
-Afzal Mohammed <afzal.mohd.ma@gmail.com> wrote:
+Hi Tixy,
 
-> Hi,
-> 
-> On Mon, Jun 13, 2016 at 05:24:09PM +0200, Alexandre Belloni wrote:
-> > On 11/06/2016 at 00:30:36 +0200, Arnd Bergmann wrote :  
-> 
-> > > Does this have to be called that early? It seems wasteful to always
-> > > call udelay() here, when these are functions that are normally
-> > > allowed to sleep.  
-> 
-> > So I've tested it and something like that would work:
-> > 
-> > 	if (system_state < SYSTEM_RUNNING)
-> > 		udelay(osc->startup_usec);
-> > 	else
-> > 		usleep_range(osc->startup_usec, osc->startup_usec + 1);
-> > 
-> > But I'm afraid it would be the first driver to actually do something
-> > like that (however, it is already the only driver trying to sleep).   
-> 
-> tglx has suggested to modify clock core to handle a somewhat similar
-> kind of scenario (probably should work here too) and avoid driver
-> changes,
-> 
-> http://lkml.kernel.org/r/alpine.DEB.2.11.1606061448010.28031 at nanos
+On 14/06/16 16:31, Jon Medhurst (Tixy) wrote:
+> Hi Sudeep
+>
+> Over the past several days I think I've been unknowingly reproducing
+> many of the steps in this old discussion thread [1] about A9 Versatile
+> Express boot failures. It's only when I found myself looking at the L2
+> cache timings that I got a vague recollection and dug out this old
+> thread again. Was there any resolution to the issue? As far as I can
+> work out, the A9x4 CoreTile stopped working around Linux 3.18 (the
+> problem isn't 100% reproducible so it's difficult to tell).
+>
+> Using "arm,tag-latency = <2 2 1>" as Russell seemed to indicate [2]
+> fixed things for him, also works for me. So should we update mainline
+> device-tree with that?
+>
 
-Oh, interesting. Definitely a better solution than this custom check.
+That's fine by me.
 
+> Alternatively, we could assume nobody cares about A9 as presumably Linux
+> has been unbootable for a year without anyone raising the issue. (The
+> only reason I'm looking at it is I may be making U-Boot changes for
+> vexpress and I wanted to test them).
+>
+
+I admit I just do a boot test every release and I seem to have flashed
+the DT so failed to notice any issue. That's my fault.
+
+> But if we are going to just ignore things, I think it would be good to
+> delete the A9 dts, or the L2 cache entry, so other people in the future
+> don't waste days trying to track down the problem.
+>
+
+I am fine either way, if people still use it as reference, we can retain it.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Sudeep
