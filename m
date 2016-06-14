@@ -1,42 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 14 Jun 2016 23:08:58 +0200
-Subject: [PATCH] ARM: socfpga: Update socfpga_defconfig
-In-Reply-To: <alpine.DEB.2.02.1606141536130.4855@linux-builds1>
-References: <1462480394-8084-1-git-send-email-marex@denx.de>
- <alpine.DEB.2.02.1606141536130.4855@linux-builds1>
-Message-ID: <5760726A.5050507@denx.de>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 14 Jun 2016 17:20:32 -0400
+Subject: [PATCH] ARM: multi_v7_defconfig: Build Atmel maXTouch driver as a
+ module
+Message-ID: <1465939232-19156-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2016 10:37 PM, Dinh Nguyen wrote:
-> On Thu, 5 May 2016, Marek Vasut wrote:
-> 
->> Enable the following bits:
->>
->> CONFIG_TOUCHSCREEN_STMPE
->>  - STMPE touchscreen support, needed on MCVEVK as it contains the
->>    chip. This also enables the STMPE MFD device and touchscreen
->>    input support.
->>
->> CONFIG_USB_STORAGE
->>  - USB storage support is often used, so enable it.
->>
->> Signed-off-by: Marek Vasut <marex@denx.de>
->> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
->> ---
->>  arch/arm/configs/socfpga_defconfig | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
-> 
-> Sorry that this took me a while, I missed it somehow. Anywways, applied! 
+The driver is for a trackpad device so is not needed for booting and
+makes more sense to have it as module to reduce the kernel image size.
 
-No problem, thanks!
+It was probably enabled as built-in because module autoload was not
+working when the I2C device was registered by OF but this got fixed
+in commit b7d21058b40b ("Input: atmel_mxt_ts - add maxtouch to I2C
+table for module autoload") so it's safe to enable as a module now.
 
-> Thanks,
-> Dinh
-> 
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index ee7c884ab5d8..c29bdd070721 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -269,7 +269,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
+ CONFIG_MOUSE_CYAPA=m
+ CONFIG_MOUSE_ELAN_I2C=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_TOUCHSCREEN_ATMEL_MXT=y
++CONFIG_TOUCHSCREEN_ATMEL_MXT=m
+ CONFIG_TOUCHSCREEN_MMS114=m
+ CONFIG_TOUCHSCREEN_ST1232=m
+ CONFIG_TOUCHSCREEN_STMPE=y
 -- 
-Best regards,
-Marek Vasut
+2.5.5
