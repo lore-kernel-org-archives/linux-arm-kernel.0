@@ -1,61 +1,48 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Tue, 14 Jun 2016 17:02:24 +0300
-Subject: [PATCH v2 4/4] ARM: dts: sun7i: Add NFC node to Allwinner A20 SoC
-In-Reply-To: <20160614135716.GK9354@lukather>
-References: <1465903058-9211-5-git-send-email-mamlinav@gmail.com>
- <201606142105.1AaT2uM6%fengguang.wu@intel.com>
- <20160614161908.53016f4f22c18e9126a041d2@gmail.com>
- <20160614135716.GK9354@lukather>
-Message-ID: <20160614170224.2cfc3545b8b5b4b5935547a6@gmail.com>
+From: rob.rice@broadcom.com (Rob Rice)
+Date: Tue, 14 Jun 2016 10:02:42 -0400
+Subject: [PATCH RESEND 0/3] Add Broadcom PDC mailbox driver
+Message-ID: <1465912965-35500-1-git-send-email-rob.rice@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Jun 2016 15:57:16 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+From: Rob Rice <rrice@broadcom.com>
 
-> On Tue, Jun 14, 2016 at 04:19:08PM +0300, Aleksei Mamlin wrote:
-> > On Tue, 14 Jun 2016 21:11:12 +0800
-> > kbuild test robot <lkp@intel.com> wrote:
-> > 
-> > > Hi,
-> > > 
-> > > [auto build test ERROR on mripard/sunxi/for-next]
-> > > [also build test ERROR on next-20160614]
-> > > [cannot apply to robh/for-next v4.7-rc3]
-> > > [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> > > 
-> > > url:    https://github.com/0day-ci/linux/commits/Aleksei-Mamlin/dts-sunxi-Add-sunxi-NAND-Flash-Controller-support/20160614-192539
-> > > base:   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi/for-next
-> > > config: arm-sunxi_defconfig (attached as .config)
-> > > compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
-> > > reproduce:
-> > >         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-> > >         chmod +x ~/bin/make.cross
-> > >         # save the attached .config to linux build tree
-> > >         make.cross ARCH=arm 
-> > > 
-> > > All errors (new ones prefixed by >>):
-> > > 
-> > > >> Error: arch/arm/boot/dts/sun7i-a20.dtsi:806.26-27 syntax error
-> > >    FATAL ERROR: Unable to parse input tree
-> > > 
-> > 
-> > My bad, dual semicolon at line 806. Maxime, can you fix it locally?
-> 
-> Already did :)
+The Broadcom PDC mailbox driver is a ring manager for the Broadcom
+Secure Processing Unit (SPU) kernel driver and other mailbox clients.
+The PDC driver registers with the Linux mailbox framework a mailbox
+controller, once for each PDC instance. Ring 0 for each PDC is registered as
+a mailbox channel. The PDC driver uses interrupts to determine when ring
+transfers to and from an offload engine are complete. The PDC driver uses
+threaded IRQs so that response messages are handled outside of interrupt
+context.
 
-Thanks a lot!
+For RESEND, added Rob Herring's Ack of bindings doc and rebased
+to Linux 4.7-rc3.
 
-> 
-> Thanks!
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Rob Rice (3):
+  dt-bindings: add bindings documentation for PDC driver.
+  mailbox: Add Broadcom PDC mailbox driver
+  arm64: dts: Add Broadcom Northstar2 device tree entries for PDC
+    driver.
 
+ .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       |   23 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |   36 +
+ drivers/mailbox/Kconfig                            |    9 +
+ drivers/mailbox/Makefile                           |    2 +
+ drivers/mailbox/mailbox-pdc/Makefile               |    8 +
+ drivers/mailbox/mailbox-pdc/pdc.c                  | 1181 ++++++++++++++++++++
+ drivers/mailbox/mailbox-pdc/pdc.h                  |  303 +++++
+ drivers/mailbox/mailbox-pdc/pdc_debug.c            |  101 ++
+ drivers/mailbox/mailbox-pdc/pdc_debug.h            |   24 +
+ include/linux/mailbox/brcm-message.h               |   56 +
+ 10 files changed, 1743 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+ create mode 100644 drivers/mailbox/mailbox-pdc/Makefile
+ create mode 100644 drivers/mailbox/mailbox-pdc/pdc.c
+ create mode 100644 drivers/mailbox/mailbox-pdc/pdc.h
+ create mode 100644 drivers/mailbox/mailbox-pdc/pdc_debug.c
+ create mode 100644 drivers/mailbox/mailbox-pdc/pdc_debug.h
+ create mode 100644 include/linux/mailbox/brcm-message.h
 
 -- 
-Thanks and regards,
-Aleksei Mamlin
+2.1.0
