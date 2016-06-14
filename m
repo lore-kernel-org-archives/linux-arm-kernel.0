@@ -1,76 +1,73 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 14 Jun 2016 18:10:56 +0300
-Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
- of aliases
-In-Reply-To: <20160614120152.GW26768@pengutronix.de>
-References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <575FE7F0.6090200@ti.com> <20160614120152.GW26768@pengutronix.de>
-Message-ID: <57601E80.1060003@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 14 Jun 2016 16:16:42 +0100
+Subject: [PATCH v2 7/7] iommu/arm-smmu: Support non-PCI devices with SMMUv3
+In-Reply-To: <42a8a71932f766d70ea9dcae5d11d5f33dcc3652.1464966939.git.robin.murphy@arm.com>
+References: <cover.1464966939.git.robin.murphy@arm.com>
+ <42a8a71932f766d70ea9dcae5d11d5f33dcc3652.1464966939.git.robin.murphy@arm.com>
+Message-ID: <20160614151642.GC16531@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2016 03:01 PM, Uwe Kleine-K?nig wrote:
-> Hello Grygorii,
+[adding ThunderTown, since he might be able to test this for us]
+
+On Fri, Jun 03, 2016 at 06:15:42PM +0100, Robin Murphy wrote:
+> With the device <-> stream ID relationship suitably abstracted and
+> of_xlate() hooked up, we no longer have any PCI-specifics in play,
+> so adding support for the simpler kinds of platform device (a single
+> unique stream ID each) becomes trivial; let's do it!
 > 
-> On Tue, Jun 14, 2016 at 02:18:08PM +0300, Grygorii Strashko wrote:
->> On 06/14/2016 01:03 PM, Uwe Kleine-K?nig wrote:
->>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>> index b98ede78c9d8..6814245a54aa 100644
->>> --- a/drivers/gpio/gpio-omap.c
->>> +++ b/drivers/gpio/gpio-omap.c
->>> @@ -1034,6 +1034,7 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->>>    	static int gpio;
->>>    	int irq_base = 0;
->>>    	int ret;
->>> +	int gpio_alias_id;
->>>    
->>>    	/*
->>>    	 * REVISIT eventually switch from OMAP-specific gpio structs
->>> @@ -1056,6 +1057,17 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->>>    		bank->chip.label = "gpio";
->>>    		bank->chip.base = gpio;
->>
->> I think, the gpio base correction should be done here
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 > 
-> What is the upside of doing it here? It has the downside that it needs
-> one more indention level. The only difference I see is that it doesn't
-> apply for mpuio devices then and wonder if that is relevant.
-
-Personally, I prefer not ti touch mpuio code unless really required.
-
->   
->>>    	}
->>> +
->>> +	/*
->>> +	 * Traditionally the base is given out in first-come-first-serve order.
->>> +	 * This might shuffle the numbering of gpios if the probe order changes.
->>> +	 * So make the base deterministical if the device tree specifies alias
->>> +	 * ids.
->>> +	 */
->>> +	gpio_alias_id = of_alias_get_id(bank->chip.of_node, "gpio");
->>> +	if (gpio_alias_id >= 0)
->>> +		bank->chip.base = bank->width * gpio_alias_id;
->>> +
->>
->> Unfortunately, this driver is still used by non-DT platforms, so above code will
->>   break build if !OF && !OF_GPIO
+> v2: New. Consider this one "extra bonus material" as I'm not sure there
+>     are even any suitable devices on our model to test it with (it
+>     _should_ be OK, given that I know the basic infrastructure on either
+>     side works...)
 > 
-> Without CONFIG_OF of_alias_get_id still exists and returns -ENOSYS which
-> should make the added code a nop. Does your compiler agree with you that
-> my patch breaks building the driver?
+>  drivers/iommu/Kconfig       |  2 +-
+>  drivers/iommu/arm-smmu-v3.c | 36 ++++++++++++++++++++++++++++++------
+>  2 files changed, 31 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index ad0860383cb3..d1c66afefeed 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -308,7 +308,7 @@ config ARM_SMMU
+>  
+>  config ARM_SMMU_V3
+>  	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
+> -	depends on ARM64 && PCI
+> +	depends on ARM64
+>  	select IOMMU_API
+>  	select IOMMU_IO_PGTABLE_LPAE
+>  	select GENERIC_MSI_IRQ_DOMAIN
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 28dcc5ca237e..6379f0ab24fc 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -35,6 +35,8 @@
+>  #include <linux/pci.h>
+>  #include <linux/platform_device.h>
+>  
+> +#include <linux/amba/bus.h>
+> +
+>  #include "io-pgtable.h"
+>  
+>  /* MMIO registers */
+> @@ -1773,6 +1775,22 @@ static void arm_smmu_remove_device(struct device *dev)
+>  	iommu_group_remove_device(dev);
+>  }
+>  
+> +static struct iommu_group *arm_smmu_device_group(struct device *dev)
+> +{
+> +	struct iommu_group *group;
+> +
+> +	/*
+> +	 * We've currently no means of grouping non-PCI masters, so
+> +	 * there'd better not be any non-unique stream IDs in the DT...
+> +	 */
 
-make ARCH=arm omap1_defconfig
-make ARCH=arm ./drivers/gpio/gpio-omap.o
+Worse: what if a SID in the DT aliases with a PCI master? It might be
+nice to have some basic snity checking, at least.
 
-
-drivers/gpio/gpio-omap.c: In function 'omap_gpio_chip_init':
-drivers/gpio/gpio-omap.c:1066:44: error: 'struct gpio_chip' has no member named 'of_node'
-  gpio_alias_id = of_alias_get_id(bank->chip.of_node, "gpio");
-                                            ^
-make[1]: *** [drivers/gpio/gpio-omap.o] Error 1
-make: *** [drivers/gpio/gpio-omap.o] Error 2
-
-
--- 
-regards,
--grygorii
+Will
