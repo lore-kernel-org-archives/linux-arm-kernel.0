@@ -1,39 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Jun 2016 19:12:14 +0100
-Subject: [RFC PATCH v2 10/15] drivers: iommu: arm-smmu-v3: enable ACPI
- driver initialization
-In-Reply-To: <1465306270-27076-11-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465306270-27076-11-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160614181213.GI16531@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 14 Jun 2016 19:12:46 +0100
+Subject: [PATCH v2 3/7] of/irq: Break out msi-map lookup (again)
+In-Reply-To: <20160614143750.GJ19407@arm.com>
+References: <cover.1464966939.git.robin.murphy@arm.com>
+ <2cbffa9a341edfd10114994f6486f6b08d0c390c.1464966939.git.robin.murphy@arm.com>
+ <20160614143750.GJ19407@arm.com>
+Message-ID: <5760491E.7060104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 02:31:05PM +0100, Lorenzo Pieralisi wrote:
-> On systems booting with ACPI that enable the ARM SMMU components
-> in the kernel config options, the ARM SMMU v3 init function
-> (ie arm_smmu_init(), that registers the driver and sets-up bus
-> iommu operations) does not run only because the device tree interface
-> (of_find_matching_node()) fails to find the respective device tree
-> nodes for ARM SMMU devices.
-> 
-> This works as long as there are no ARM SMMU devices to be probed
-> with ACPI. If ARM SMMU v3 components are part of the IORT tables,
-> for them to be instantiated and probed the function registering
-> the ARM SMMU v3 driver must be able to register the driver and
-> initialize the bus IOMMU operations accordingly.
-> 
-> This patch changes the logic in arm-smmu-v3 init call to allow
-> for it to be probed in ACPI systems.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 13 +++++++++----
->  1 file changed, 9 insertions(+), 4 deletions(-)
+On 14/06/16 15:37, Will Deacon wrote:
+> On Fri, Jun 03, 2016 at 06:15:38PM +0100, Robin Murphy wrote:
+>> The PCI msi-map code is already doing double-duty translating IDs and
+>> retrieving MSI parents, which unsurprisingly is the same functionality
+>> we need for the identically-formatted PCI iommu-map property. Drag the
+>> core parsing routine up yet another layer into the general OF-PCI code,
+>> and further generalise it for either kind of lookup in either flavour
+>> of map property.
+>>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Frank Rowand <frowand.list@gmail.com>
+>> CC: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> v2: No change.
+>>
+>>   drivers/of/irq.c       |  70 ++-------------------------------
+>>   drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/of_pci.h |   8 ++++
+>>   3 files changed, 114 insertions(+), 66 deletions(-)
+>
+> [...]
+>
+>> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+>> index 13f4fed38048..20bf5a0c57fd 100644
+>> --- a/drivers/of/of_pci.c
+>> +++ b/drivers/of/of_pci.c
+>> @@ -306,3 +306,105 @@ struct msi_controller *of_pci_find_msi_chip_by_node(struct device_node *of_node)
+>>   EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
+>>
+>>   #endif /* CONFIG_PCI_MSI */
+>> +
+>> +#define MASK_NAME_LEN	32	/* Safely longer than "iommu-map-mask" */
+>> +
+>> +/**
+>> + * of_pci_map_rid - Translate a requester ID through a downstream mapping.
+>> + * @np: root complex device node.
+>> + * @map_name: property name of the map to use.
+>> + * @target: optional pointer to a target device node.
+>> + * @id_out: optional pointer to receive the translated ID.
+>> + *
+>> + * Given a PCI requester ID, look up the appropriate implementation-defined
+>> + * platform ID and/or the target device which receives transactions on that
+>> + * ID, as per the "iommu-map" and "msi-map" bindings. @target or @id_out may
+>> + * be NULL if not required. If @target points to a device node pointer, only
+>> + * entries targeting that node will be matched; if it points to a NULL
+>> + * value, it will receive the device node for the first matching target entry,
+>> + * with a reference held.
+>> + *
+>> + * Return: 0 on success or a standard error code on failure.
+>> + */
+>> +int of_pci_map_rid(struct device_node *np, const char *map_name, u32 rid_in,
+>> +		   struct device_node **target, u32 *rid_out)
+>> +{
+>> +	u32 map_mask, masked_rid;
+>> +	int map_len;
+>> +	const __be32 *map = NULL;
+>> +	char mask_name[MASK_NAME_LEN];
+>
+> Couldn't you avoid this if you just took const char *mask_name as a
+> parameter too?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Having started out with that, I considered two strings essentially 
+duplicating each other, possibly duplicated per callsite, and thought it 
+might be prudent to trade off a little runtime work for a permanent 
+reduction in static data. I like the "never save anything you can 
+recalculate" philosophy, but it is possible I got a bit carried away 
+here. If you hate it I can just add the extra argument back.
 
-Will
+Robin.
+
+>
+> Will
+>
