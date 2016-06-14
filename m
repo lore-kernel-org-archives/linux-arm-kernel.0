@@ -1,47 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 14 Jun 2016 10:55:38 +0200
-Subject: [PATCH] pwm: atmel-hlcdc: Fix default PWM polarity
-In-Reply-To: <20160614095826.3bbbfd26@bbrezillon>
-References: <1463476352-7485-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160517110005.GA26166@ulmo.ba.sec>
- <20160614095826.3bbbfd26@bbrezillon>
-Message-ID: <20160614085538.GA24442@ulmo.ba.sec>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 14 Jun 2016 09:56:27 +0100
+Subject: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
+In-Reply-To: <CANta1d-wRGcU51P3Av7EXbvu7hJfUBk_Kd5p=7RDMW6u+v0gvg@mail.gmail.com>
+References: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
+ <20160613124531.GE1605@arm.com>
+ <CANta1d-wRGcU51P3Av7EXbvu7hJfUBk_Kd5p=7RDMW6u+v0gvg@mail.gmail.com>
+Message-ID: <20160614085627.GA19407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 09:58:26AM +0200, Boris Brezillon wrote:
-> Hi Thierry,
+On Tue, Jun 14, 2016 at 11:11:36AM +0800, Wei Chen wrote:
+> On 13 June 2016 at 20:45, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Jun 13, 2016 at 05:20:17PM +0800, Wei Chen wrote:
+> >> The PCIe ACS capability will affect the layout of iommu groups.
+> >> Generally speaking, if the path from root port to the PCIe device
+> >> is ACS enabled, the iommu will create a single iommu group for this
+> >> PCIe device. If all PCIe devices on the path are ACS enabled then
+> >> Linux can determine this path is ACS enabled.
+> >>
+> >> Linux use two PCIe configuration registers to determine the ACS
+> >> status of PCIe devices:
+> >> ACS Capability Register and ACS Control Register.
+> >>
+> >> The first register is used to check the implementation of ACS function
+> >> of a PCIe device, the second register is used to check the enable status
+> >> of ACS function. If one PCIe device has implemented and enabled the ACS
+> >> function then Linux will determine this PCIe device enabled ACS.
+> >>
+> >> From the Chapter:6.12 of PCI Express Base Specification Revision 3.1a,
+> >> we can find that when a PCIe device implements ACS function, the enable
+> >> status is set to disabled by default and can be enabled by ACS-aware
+> >> software.
+> >>
+> >> ACS will affect the iommu groups topology, so, the iommu driver is
+> >> ACS-aware software. This patch adds a call to pci_request_acs() to the
+> >> arm-smmu driver to enable the ACS function in PCIe devices that support
+> >> it.
+> >>
+> >> Signed-off-by: Wei Chen <Wei.Chen@arm.com>
+> >> ---
+> >>  drivers/iommu/arm-smmu-v3.c | 2 ++
+> >>  drivers/iommu/arm-smmu.c    | 4 +++-
+> >>  2 files changed, 5 insertions(+), 1 deletion(-)
+> >
+> > Thanks, queued for 4.8 w/ Robin and Eric's reviewed-by tags and the minor
+> > commit wording change.
+> >
 > 
-> On Tue, 17 May 2016 13:00:05 +0200
-> Thierry Reding <thierry.reding@gmail.com> wrote:
-> 
-> > On Tue, May 17, 2016 at 11:12:32AM +0200, Boris Brezillon wrote:
-> > > The PWM device exposed by the HLCDC IP is configured with an inverted
-> > > polarity by default. Registering the PWM chip with the normal polarity
-> > > was not a problem before commit 42e8992c58d4 ("pwm: Add core
-> > > infrastructure to allow atomic updates") because the ->set_polarity()
-> > > hook was called no matter the current polarity state, but this is no longer
-> > > the case.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > Fixes: 42e8992c58d4 ("pwm: Add core infrastructure to allow atomic updates")  
-> > 
-> > That's not technically correct, because it's the driver that has the
-> > bug. The core change merely exposes it. How about if I sort this into
-> > the pwm-atomic branch and reword the commit message accordingly? That
-> > way things should all stay bisectible.
-> 
-> I don't see this change in your branch. Do you want me to resend this
-> fix after reworking the commit message?
+> Thanks, I will post a v2 patch to include above changes.
 
-I must have forgotten about it. I've applied it to my fixes branch now,
-for which I plan on sending a pull request tomorrow.
+:/ As above, I've already queued this.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160614/825f6223/attachment-0001.sig>
+Will
