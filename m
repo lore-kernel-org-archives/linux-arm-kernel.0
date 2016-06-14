@@ -1,40 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 14 Jun 2016 15:10:52 +0200
-Subject: Boot failure on emev2/kzm9d (was: Re: [PATCH v2 11/11] mm/slab:
- lockless decision to grow cache)
-In-Reply-To: <CAMuHMdXC=zEjbZADE5wELjOq_kBiFNewpdUrMCe8d3Utu98h8A@mail.gmail.com>
-References: <CAMuHMdXC=zEjbZADE5wELjOq_kBiFNewpdUrMCe8d3Utu98h8A@mail.gmail.com>
-Message-ID: <CAMuHMdXEjxWY=0Vuu=aHupexVg1hERPnUromk-2sCjwbDn8H1w@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 14 Jun 2016 21:11:12 +0800
+Subject: [PATCH v2 4/4] ARM: dts: sun7i: Add NFC node to Allwinner A20 SoC
+In-Reply-To: <1465903058-9211-5-git-send-email-mamlinav@gmail.com>
+Message-ID: <201606142105.1AaT2uM6%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonsoo,
+Hi,
 
-On Mon, Jun 13, 2016 at 9:43 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Tue, Apr 12, 2016 at 6:51 AM,  <js1304@gmail.com> wrote:
->> From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->> To check whther free objects exist or not precisely, we need to grab a
->> lock.  But, accuracy isn't that important because race window would be
->> even small and if there is too much free object, cache reaper would reap
->> it.  So, this patch makes the check for free object exisistence not to
->> hold a lock.  This will reduce lock contention in heavily allocation case.
+[auto build test ERROR on mripard/sunxi/for-next]
+[also build test ERROR on next-20160614]
+[cannot apply to robh/for-next v4.7-rc3]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
->> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->
-> I've bisected a boot failure (no output at all) in v4.7-rc2 on emev2/kzm9d
-> (Renesas dual Cortex A9) to this patch, which is upstream commit
-> 801faf0db8947e01877920e848a4d338dd7a99e7.
+url:    https://github.com/0day-ci/linux/commits/Aleksei-Mamlin/dts-sunxi-Add-sunxi-NAND-Flash-Controller-support/20160614-192539
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi/for-next
+config: arm-sunxi_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-BTW, when disabling SMP, the problem goes away.
+All errors (new ones prefixed by >>):
 
-Gr{oetje,eeting}s,
+>> Error: arch/arm/boot/dts/sun7i-a20.dtsi:806.26-27 syntax error
+   FATAL ERROR: Unable to parse input tree
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 20206 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160614/c0e6ca52/attachment-0001.obj>
