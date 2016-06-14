@@ -1,59 +1,68 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 13 Jun 2016 19:42:10 -0700
-Subject: [PATCH 2/8] tty: serial: fsl_lpuart: support suspend/resume
-In-Reply-To: <cdeb3e9b-92c5-77d9-78ec-3af3954e8e16@toradex.com>
-References: <20160609151039.20817-1-bhuvanchandra.dv@toradex.com>
- <20160609151039.20817-3-bhuvanchandra.dv@toradex.com>
- <20160611140341.GT20243@tiger>
- <cdeb3e9b-92c5-77d9-78ec-3af3954e8e16@toradex.com>
-Message-ID: <AF70EE92-9B41-4ECE-AB5F-E829E611B7C6@agner.ch>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 14 Jun 2016 11:59:46 +0900
+Subject: [PATCH 3/3] ARM: dts: uniphier: renumber serial aliases for
+ Gentil/Vodka boards
+In-Reply-To: <1465873186-30658-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1465873186-30658-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1465873186-30658-4-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On these two boards, the serial0 is used for inter-chip connection,
+so cannot be used for login console.  The serial2 is used instead
+for them, but it is tedious to use because upper level deployment
+projects must switch login console per board.
 
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-On June 13, 2016 5:18:19 PM PDT, Bhhuvanchandra DV <bhuvanchandra.dv@toradex.com> wrote:
->Hi Shawn,
->
->On 06/11/2016 02:03 PM, Shawn Guo wrote:
->
->> On Thu, Jun 09, 2016 at 08:40:33PM +0530, Bhuvanchandra DV wrote:
->>> From: Stefan Agner <stefan@agner.ch>
->>>
->>> In order to allow wake support in STOP sleep mode, clocks are
->>> needed. Use imx_clk_gate2_cgr to disable automatic clock gating
->>> in low power mode STOP. This allows to enable wake by UART using:
->>> echo enabled > /sys/class/tty/ttyLP0/power/wakeup
->>>
->>> However, if wake is not enabled, the driver should disable the
->>> clocks explicitly to save power.
->>>
->>> Signed-off-by: Stefan Agner <stefan@agner.ch>
->>> ---
->>>   drivers/clk/imx/clk-vf610.c     | 12 ++++++------
->> Please send clock driver changes in a separate patch.
+ arch/arm/boot/dts/uniphier-proxstream2-gentil.dts | 8 ++++----
+ arch/arm/boot/dts/uniphier-proxstream2-vodka.dts  | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-The changes are dependet on each other, hence I put it in a single patch. But since it is a new feature it shouldn't really matter...
-
->
->How about splitting this patchset to two? few patches are having minor
->fixes and the few patches might need some review and discussions.
->May be some thing like DMA fixes and the other minor fixes.
-
-I don't think that splitting up the patchset is necessary, with the current order it is possible to pick up the fixes independently...
-
---
-Stefan
-
->
->--
->Bhuvan
->
->>
->> Shawn
->>
->>>   drivers/tty/serial/fsl_lpuart.c | 16 ++++++++++++++--
->>>   2 files changed, 20 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
+index bf2619e..98d895b 100644
+--- a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
++++ b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
+@@ -55,13 +55,13 @@
+ 	};
+ 
+ 	chosen {
+-		stdout-path = "serial2:115200n8";
++		stdout-path = "serial0:115200n8";
+ 	};
+ 
+ 	aliases {
+-		serial0 = &serial0;
+-		serial1 = &serial1;
+-		serial2 = &serial2;
++		serial0 = &serial2;
++		serial1 = &serial0;
++		serial2 = &serial1;
+ 		i2c0 = &i2c0;
+ 		i2c2 = &i2c2;
+ 		i2c4 = &i2c4;
+diff --git a/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
+index 498acac..1fb8bd7 100644
+--- a/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
++++ b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
+@@ -55,13 +55,13 @@
+ 	};
+ 
+ 	chosen {
+-		stdout-path = "serial2:115200n8";
++		stdout-path = "serial0:115200n8";
+ 	};
+ 
+ 	aliases {
+-		serial0 = &serial0;
+-		serial1 = &serial1;
+-		serial2 = &serial2;
++		serial0 = &serial2;
++		serial1 = &serial0;
++		serial2 = &serial1;
+ 		i2c0 = &i2c0;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
 -- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+1.9.1
