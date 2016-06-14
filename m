@@ -1,70 +1,68 @@
-From: Wei.Chen@arm.com (Wei Chen)
-Date: Tue, 14 Jun 2016 10:00:21 +0000
-Subject: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
-In-Reply-To: <20160614085627.GA19407@arm.com>
-References: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
- <20160613124531.GE1605@arm.com>
- <CANta1d-wRGcU51P3Av7EXbvu7hJfUBk_Kd5p=7RDMW6u+v0gvg@mail.gmail.com>
- <20160614085627.GA19407@arm.com>
-Message-ID: <DB5PR0801MB151054CCAD2ABFC0F2BB85B19E540@DB5PR0801MB1510.eurprd08.prod.outlook.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 14 Jun 2016 12:03:24 +0200
+Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using of
+ aliases
+Message-ID: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Traditionally the n-th gpio device probed by the omap gpio driver got
+the gpio number range [n*32 .. n*32+31].
+When order of the devices probed by the driver changes (which can happen
+already now when some devices have a pinctrl and so the first probe
+attempt returns -ENODEV) the numbering changes.
 
+To ensure a deterministical numbering use of_alias_get_id to determine
+the number base for a given device. If no respective alias exists fall
+back to the traditional numbering.
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: 2016?6?14? 16:56
-> To: Wei Chen
-> Cc: Wei Chen; Steve Capper; joro at 8bytes.org; linux-kernel at vger.kernel.org;
-> iommu at lists.linux-foundation.org; Robin Murphy; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
->
-> On Tue, Jun 14, 2016 at 11:11:36AM +0800, Wei Chen wrote:
-> > On 13 June 2016 at 20:45, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Mon, Jun 13, 2016 at 05:20:17PM +0800, Wei Chen wrote:
-> > >> The PCIe ACS capability will affect the layout of iommu groups.
-> > >> Generally speaking, if the path from root port to the PCIe device
-> > >> is ACS enabled, the iommu will create a single iommu group for this
-> > >> PCIe device. If all PCIe devices on the path are ACS enabled then
-> > >> Linux can determine this path is ACS enabled.
-> > >>
-> > >> Linux use two PCIe configuration registers to determine the ACS
-> > >> status of PCIe devices:
-> > >> ACS Capability Register and ACS Control Register.
-> > >>
-> > >> The first register is used to check the implementation of ACS
-> > >> function of a PCIe device, the second register is used to check the
-> > >> enable status of ACS function. If one PCIe device has implemented
-> > >> and enabled the ACS function then Linux will determine this PCIe
-> device enabled ACS.
-> > >>
-> > >> From the Chapter:6.12 of PCI Express Base Specification Revision
-> > >> 3.1a, we can find that when a PCIe device implements ACS function,
-> > >> the enable status is set to disabled by default and can be enabled
-> > >> by ACS-aware software.
-> > >>
-> > >> ACS will affect the iommu groups topology, so, the iommu driver is
-> > >> ACS-aware software. This patch adds a call to pci_request_acs() to
-> > >> the arm-smmu driver to enable the ACS function in PCIe devices that
-> > >> support it.
-> > >>
-> > >> Signed-off-by: Wei Chen <Wei.Chen@arm.com>
-> > >> ---
-> > >>  drivers/iommu/arm-smmu-v3.c | 2 ++
-> > >>  drivers/iommu/arm-smmu.c    | 4 +++-
-> > >>  2 files changed, 5 insertions(+), 1 deletion(-)
-> > >
-> > > Thanks, queued for 4.8 w/ Robin and Eric's reviewed-by tags and the
-> > > minor commit wording change.
-> > >
-> >
-> > Thanks, I will post a v2 patch to include above changes.
->
-> :/ As above, I've already queued this.
-Oh, thank you :)
->
-> Will
+For the unusual case where only a part of the gpio devices have a
+matching alias some of them might fail to probe. But if none of them has
+an alias or all, there is no conflict which should be good enough to
+maintain backward compatibility.
 
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
+
+if you're happy with this patch I can follow up and add the respective
+aliases to the device trees.
+
+Best regards
+Uwe
+
+ drivers/gpio/gpio-omap.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index b98ede78c9d8..6814245a54aa 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1034,6 +1034,7 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
+ 	static int gpio;
+ 	int irq_base = 0;
+ 	int ret;
++	int gpio_alias_id;
+ 
+ 	/*
+ 	 * REVISIT eventually switch from OMAP-specific gpio structs
+@@ -1056,6 +1057,17 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
+ 		bank->chip.label = "gpio";
+ 		bank->chip.base = gpio;
+ 	}
++
++	/*
++	 * Traditionally the base is given out in first-come-first-serve order.
++	 * This might shuffle the numbering of gpios if the probe order changes.
++	 * So make the base deterministical if the device tree specifies alias
++	 * ids.
++	 */
++	gpio_alias_id = of_alias_get_id(bank->chip.of_node, "gpio");
++	if (gpio_alias_id >= 0)
++		bank->chip.base = bank->width * gpio_alias_id;
++
+ 	bank->chip.ngpio = bank->width;
+ 
+ 	ret = gpiochip_add_data(&bank->chip, bank);
+-- 
+2.8.1
