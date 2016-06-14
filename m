@@ -1,321 +1,122 @@
-From: liudongdong3@huawei.com (Dongdong Liu)
-Date: Tue, 14 Jun 2016 17:45:55 +0800
-Subject: [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space accessors
- against platfrom specific ECAM quirks
-In-Reply-To: <CADaLND=esW9rwrfdKtAvkyPhCs4F9hMH9LDY4DWTpOv0ZgoT9w@mail.gmail.com>
-References: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
- <1465822923-33599-2-git-send-email-liudongdong3@huawei.com>
- <575ED57F.6050503@codeaurora.org>
- <CADaLNDkfKxxXWmG3eAawH1H=B+4ia6ZYh41anjTuOdTWGbhfNg@mail.gmail.com>
- <575F9B4D.8080501@huawei.com>
- <CADaLND=esW9rwrfdKtAvkyPhCs4F9hMH9LDY4DWTpOv0ZgoT9w@mail.gmail.com>
-Message-ID: <575FD253.3070508@huawei.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 14 Jun 2016 11:52:48 +0200
+Subject: [PATCH v2 1/2] clocksource: Add Oxford Semiconductor RPS Dual
+ Timer
+In-Reply-To: <20160613143502.GD10634@linaro.org>
+References: <1465315452-20599-1-git-send-email-narmstrong@baylibre.com>
+ <1465315452-20599-2-git-send-email-narmstrong@baylibre.com>
+ <20160613143502.GD10634@linaro.org>
+Message-ID: <575FD3F0.6040604@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Duc
+Hi Daniel,
 
-? 2016/6/14 17:00, Duc Dang ??:
-> On Mon, Jun 13, 2016 at 10:51 PM, Dongdong Liu <liudongdong3@huawei.com> wrote:
->> Hi Duc
+On 06/13/2016 04:35 PM, Daniel Lezcano wrote:
+> On Tue, Jun 07, 2016 at 06:04:11PM +0200, Neil Armstrong wrote:
+>> Add clocksource and clockevent driver from dual RPS timer.
+>> The HW provides a dual one-shot or periodic 24bit timers,
+>> the drivers set the first one as tick event source and the
+>> second as a continuous scheduler clock source.
+>> The timer can use 1, 16 or 256 as pre-dividers, thus the
+>> clocksource uses 16 by default.
 >>
->> ? 2016/6/14 4:57, Duc Dang ??:
->>>
->>> On Mon, Jun 13, 2016 at 8:47 AM, Christopher Covington
->>> <cov@codeaurora.org> wrote:
->>>>
->>>> Hi Dongdong,
->>>>
->>>> On 06/13/2016 09:02 AM, Dongdong Liu wrote:
->>>>>
->>>>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->>>>> index d3c3e85..49612b3 100644
->>>>> --- a/drivers/acpi/pci_mcfg.c
->>>>> +++ b/drivers/acpi/pci_mcfg.c
->>>>> @@ -22,6 +22,10 @@
->>>>>    #include <linux/kernel.h>
->>>>>    #include <linux/pci.h>
->>>>>    #include <linux/pci-acpi.h>
->>>>> +#include <linux/pci-ecam.h>
->>>>> +
->>>>> +/* Root pointer to the mapped MCFG table */
->>>>> +static struct acpi_table_mcfg *mcfg_table;
->>>>>
->>>>>    /* Structure to hold entries from the MCFG table */
->>>>>    struct mcfg_entry {
->>>>> @@ -35,6 +39,38 @@ struct mcfg_entry {
->>>>>    /* List to save mcfg entries */
->>>>>    static LIST_HEAD(pci_mcfg_list);
->>>>>
->>>>> +extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
->>>>> +extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
->>>>> +
->>>>> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
->>>>> +{
->>>>> +     int bus_num = root->secondary.start;
->>>>> +     int domain = root->segment;
->>>>> +     struct pci_cfg_fixup *f;
->>>>> +
->>>>> +     if (!mcfg_table)
->>>>> +             return &pci_generic_ecam_ops;
->>>>> +
->>>>> +     /*
->>>>> +      * Match against platform specific quirks and return corresponding
->>>>> +      * CAM ops.
->>>>> +      *
->>>>> +      * First match against PCI topology <domain:bus> then use OEM ID
->>>>> and
->>>>> +      * OEM revision from MCFG table standard header.
->>>>> +      */
->>>>> +     for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups;
->>>>> f++) {
->>>>> +             if ((f->domain == domain || f->domain ==
->>>>> PCI_MCFG_DOMAIN_ANY) &&
->>>>> +                 (f->bus_num == bus_num || f->bus_num ==
->>>>> PCI_MCFG_BUS_ANY) &&
->>>>> +                 (!strncmp(f->oem_id, mcfg_table->header.oem_id,
->>>>> +                           ACPI_OEM_ID_SIZE)) &&
->>>>> +                 (!strncmp(f->oem_table_id,
->>>>> mcfg_table->header.oem_table_id,
->>>>> +                           ACPI_OEM_TABLE_ID_SIZE)))
->>>>
->>>>
->>>> This would just be a small convenience, but if the character count used
->>>> here were
->>>>
->>>> min(strlen(f->oem_id), ACPI_OEM_ID_SIZE)
->>>>
->>>> then the parameters to DECLARE_ACPI_MCFG_FIXUP macro could be substrings
->>>> and
->>>> wouldn't need to be padded out to the full length.
->>>>
->>>>> +                     return f->ops;
->>>>> +     }
->>>>> +     /* No quirks, use ECAM */
->>>>> +     return &pci_generic_ecam_ops;
->>>>> +}
->>>>
->>>>
->>>>> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
->>>>> index 7d63a66..088a1da 100644
->>>>> --- a/include/linux/pci-acpi.h
->>>>> +++ b/include/linux/pci-acpi.h
->>>>> @@ -25,6 +25,7 @@ static inline acpi_status
->>>>> pci_acpi_remove_pm_notifier(struct acpi_device *dev)
->>>>>    extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
->>>>>
->>>>>    extern phys_addr_t pci_mcfg_lookup(u16 domain, struct resource
->>>>> *bus_res);
->>>>> +extern struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root
->>>>> *root);
->>>>>
->>>>>    static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev
->>>>> *pdev)
->>>>>    {
->>>>> @@ -72,6 +73,25 @@ struct acpi_pci_root_ops {
->>>>>         int (*prepare_resources)(struct acpi_pci_root_info *info);
->>>>>    };
->>>>>
->>>>> +struct pci_cfg_fixup {
->>>>> +     struct pci_ecam_ops *ops;
->>>>> +     char *oem_id;
->>>>> +     char *oem_table_id;
->>>>> +     int domain;
->>>>> +     int bus_num;
->>>>> +};
->>>>> +
->>>>> +#define PCI_MCFG_DOMAIN_ANY  -1
->>>>> +#define PCI_MCFG_BUS_ANY     -1
->>>>> +
->>>>> +/* Designate a routine to fix up buggy MCFG */
->>>>> +#define DECLARE_ACPI_MCFG_FIXUP(ops, oem_id, oem_table_id, dom, bus) \
->>>>> +     static const struct pci_cfg_fixup                               \
->>>>> +     __mcfg_fixup_##oem_id##oem_table_id##dom##bus                   \
->>>>
->>>>
->>>> I'm not entirely sure that this is the right fix--I'm pretty blindly
->>>> following a GCC documentation suggestion [1]--but removing the first two
->>>> preprocessor concatenation operators "##" solved the following build
->>>> error
->>>> for me.
->>>>
->>>> include/linux/pci-acpi.h:90:2: error: pasting "__mcfg_fixup_" and
->>>> ""QCOM"" does not give a valid preprocessing token
->>>>     __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
->>>
->>>
->>> I think the problem is gcc is not happy with quoted string when
->>> processing these tokens
->>> (""QCOM"", the extra "" are added by gcc). So should we not concat
->>> string tokens and
->>> use the fixup definition in v1 of this RFC:
->>> /* Designate a routine to fix up buggy MCFG */
->>> #define DECLARE_ACPI_MCFG_FIXUP(ops, oem_id, rev, dom, bus)             \
->>>           static const struct pci_cfg_fixup
->>> __mcfg_fixup_##system##dom##bus\
->>>            __used __attribute__((__section__(".acpi_fixup_mcfg"),         \
->>>                                   aligned((sizeof(void *))))) =           \
->>>           { ops, oem_id, rev, dom, bus };
+>> CC: Ma Haijun <mahaijuns@gmail.com>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/clocksource/Kconfig           |   6 +
+>>  drivers/clocksource/Makefile          |   1 +
+>>  drivers/clocksource/timer-oxnas-rps.c | 270 ++++++++++++++++++++++++++++++++++
+>>  3 files changed, 277 insertions(+)
+>>  create mode 100644 drivers/clocksource/timer-oxnas-rps.c
 >>
->>
->> V1 fixup exist the redefinition error when compiling mutiple
->> DECLARE_ACPI_MCFG_FIXUP
->> with the same PCI_MCFG_DOMAIN_ANY and PCI_MCFG_BUS_ANY.
->>
->> #define EFI_ACPI_HISI_OEM_ID "HISI"
->> #define EFI_ACPI_HISI_D02_OEM_TABLE_ID "HISI-D02"
->> #define EFI_ACPI_HISI_D03_OEM_TABLE_ID "HISI-D03"
->>
->> DECLARE_ACPI_MCFG_FIXUP(&hisi_pcie_ecam_ops, EFI_ACPI_HISI_OEM_ID,
->>         EFI_ACPI_HISI_D02_OEM_TABLE_ID, PCI_MCFG_DOMAIN_ANY,
->> PCI_MCFG_BUS_ANY);
->>
->> DECLARE_ACPI_MCFG_FIXUP(&hisi_pcie_ecam_ops, EFI_ACPI_HISI_OEM_ID,
->>         EFI_ACPI_HISI_D03_OEM_TABLE_ID, PCI_MCFG_DOMAIN_ANY,
->> PCI_MCFG_BUS_ANY);
->>
->> In file included from drivers/pci/host/pcie-hisi-acpi.c:15:0:
->> include/linux/pci-acpi.h:98:43: error: redefinition of
->> '__mcfg_fixup_systemPCI_MCFG_DOMAIN_ANYPCI_MCFG_BUS_ANY'
->>           static const struct pci_cfg_fixup __mcfg_fixup_##system##dom##bus\
->>                                             ^
->> drivers/pci/host/pcie-hisi-acpi.c:215:1: note: in expansion of macro
->> 'DECLARE_ACPI_MCFG_FIXUP'
->>   DECLARE_ACPI_MCFG_FIXUP(&hisi_pcie_ecam_ops, EFI_ACPI_HISI_OEM_ID,
->>   ^
->> include/linux/pci-acpi.h:98:43: note: previous definition of
->> '__mcfg_fixup_systemPCI_MCFG_DOMAIN_ANYPCI_MCFG_BUS_ANY' was here
->>           static const struct pci_cfg_fixup __mcfg_fixup_##system##dom##bus\
->>                                             ^
->> drivers/pci/host/pcie-hisi-acpi.c:212:1: note: in expansion of macro
->> 'DECLARE_ACPI_MCFG_FIXUP'
->>
->>
->> V2 fixup can resolve the redefinition error, but need to use macro.
->> We can see that the name of macro is not replace with it's value in
->> "__mcfg_fixup_EFI_ACPI_HISI_OEM_IDEFI_ACPI_HISI_D03_OEM_TABLE_IDPCI_MCFG_DOMAIN_ANYPCI_MCFG_BUS_ANY".
->>
->> Any good idea is appreciated.
-> Hmmm.
->
-> I was testing # op and using min_t to get the min-len when doing
-> strncmp similar to Chris' suggestion (using min_t avoids type
-> warnings)
->
-> /* Designate a routine to fix up buggy MCFG */
-> #define DECLARE_ACPI_MCFG_FIXUP(ops, oem_id, oem_table_id, rev, dom, bus) \
->          static const struct pci_cfg_fixup
-> __mcfg_fixup##oem_id##oem_table_id##rev##dom##bus\
->           __used __attribute__((__section__(".acpi_fixup_mcfg"),         \
->                                  aligned((sizeof(void *))))) =           \
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index 47352d2..7e382c5 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -293,6 +293,12 @@ config VF_PIT_TIMER
+>>  	help
+>>  	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+>>  
+>> +config OXNAS_RPS_TIMER
+> 
+>    config OXNAS_RPS_TIMER "bla bla" if COMPILE_TEST
+> 
+OK
 
->          { ops, #oem_id, #oem_table_id, rev, dom, bus };
+Shoud I also add CLKSRC_OF ?
 
+>> +	bool
+>> +	select CLKSRC_MMIO
+>> +	help
+>> +	  This enables support for the Oxford Semiconductor OXNAS RPS timers.
+>> +
+>> @@ -0,0 +1,270 @@
+>> +/*
+>> + * drivers/clocksource/timer-oxnas-rps.c
+>> + *
+>> + * Copyright (C) 2009 Oxford Semiconductor Ltd
+>> + * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
+> 
+> What are these two copyrights ?
+> 
+> [ ... ]
 
-This should change to { ops, oem_id, oem_table_id, rev, dom, bus };
-?#? is not need.
+This driver is based from a driver from the OX820 sdk from Oxford and modified by Ma Haijun, thus the copyrights.
 
->
-> My fixup definition:
-> DECLARE_ACPI_MCFG_FIXUP(&xgene_pcie_ecam_ops, APM, XGENE, 2,
->                                                 PCI_MCFG_DOMAIN_ANY,
-> PCI_MCFG_BUS_ANY);
-> My match condition is:
->                 if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
->                     (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
->                     (!strncmp(f->oem_id, mcfg->header.oem_id,
->                               min_t(size_t, strlen(f->oem_id),
->                                     ACPI_OEM_ID_SIZE))) &&
->                     (!strncmp(f->oem_table_id, mcfg->header.oem_table_id,
->                               min_t(size_t, strlen(f->oem_table_id),
->                                     ACPI_OEM_TABLE_ID_SIZE))) &&
->                     (f->oem_revision == mcfg->header.oem_revision)) {
->                         return f->ops;
->                 }
->
-> But this still does not work for your case as having HISI-D02 as
-> oem_table_id will cause error.
+>> +static void __init oxnas_rps_timer_init(struct device_node *np)
+>> +{
+>> +	struct oxnas_rps_timer *rps;
+>> +	void __iomem *base;
+>> +	int ret;
+>> +
+>> +	rps = kzalloc(sizeof(*rps), GFP_KERNEL);
+>> +	if (WARN_ON(!rps))
+> 
+> It is pointless to add a WARN_ON, kzalloc already does that on failure.
+> 
+>> +		return;
+>> +
+>> +	rps->clk = of_clk_get(np, 0);
+>> +	if (WARN_ON(IS_ERR(rps->clk)))
+>> +		return;
 
-In my case, I have tested  and it worked ok.
-Could you show the detail error information that you met?
+[....]
 
-Thanks
-Dongdong
->
->>
->> Thanks
->> Dongdong
->>
->>>
->>> Regards,
->>> Duc Dang.
->>>
->>>
->>>>     ^
->>>> arch/arm64/kernel/pci.c:225:1: note: in expansion of macro
->>>> ?DECLARE_ACPI_MCFG_FIXUP?
->>>>    DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432",
->>>> PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
->>>>    ^
->>>> arch/arm64/kernel/pci.c:225:44: error: pasting ""QCOM"" and ""QDF2432""
->>>> does not give a valid preprocessing token
->>>>    DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432",
->>>> PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
->>>>                                               ^
->>>> include/linux/pci-acpi.h:90:17: note: in definition of macro
->>>> ?DECLARE_ACPI_MCFG_FIXUP?
->>>>     __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
->>>>                    ^
->>>> arch/arm64/kernel/pci.c:225:52: error: pasting ""QDF2432"" and
->>>> "PCI_MCFG_DOMAIN_ANY" does not give a valid preprocessi
->>>> ng token
->>>>    DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432",
->>>> PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
->>>>                                                       ^
->>>> include/linux/pci-acpi.h:90:25: note: in definition of macro
->>>> ?DECLARE_ACPI_MCFG_FIXUP?
->>>>     __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
->>>>                            ^
->>>> arch/arm64/kernel/pci.c:225:44: error: expected ?=?, ?,?, ?;?, ?asm? or
->>>> ?__attribute__? before string constant
->>>>    DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432",
->>>> PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
->>>>                                               ^
->>>> include/linux/pci-acpi.h:90:17: note: in definition of macro
->>>> ?DECLARE_ACPI_MCFG_FIXUP?
->>>>     __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
->>>>                    ^
->>>> make[1]: *** [arch/arm64/kernel/pci.o] Error 1
->>>> make: *** [arch/arm64/kernel] Error 2
->>>>
->>>> 1. https://gcc.gnu.org/onlinedocs/cpp/Concatenation.html#Concatenation
->>>>
->>>>> +     __used  __attribute__((__section__(".acpi_fixup_mcfg"),         \
->>>>> +                             aligned((sizeof(void *))))) =           \
->>>>> +     { ops, oem_id, oem_table_id, dom, bus };
->>>>> +
->>>>>    extern int acpi_pci_probe_root_resources(struct acpi_pci_root_info
->>>>> *info);
->>>>>    extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root
->>>>> *root,
->>>>>                                             struct acpi_pci_root_ops
->>>>> *ops,
->>>>>
->>>>
->>>> Thanks,
->>>> Cov
->>>>
->>>> --
->>>> Qualcomm Innovation Center, Inc.
->>>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
->>>> a Linux Foundation Collaborative Project
->>>
->>>
->>> .
->>>
->>
-> Regards
-> Duc Dang.
->
-> .
->
+>> +		goto err;
+>> +
+>> +	oxnas_rps_clockevent_init(rps);
+>> +	oxnas_rps_clocksource_init(rps);
+>> +
+>> +	return;
+> 
+> err_iounmap:
+> 	iounmap(base);
+> 
+> err_clk_unprepare:
+> 	clk_unprepare(rps->clk)
+> 
+> err_clk_put:
+>> +	clk_put(rps->clk);
+>> +	kfree(rps);
+>> +}
+> 
+> Regarding the current work I am doing to change the init function to return 
+> an error in case of failure, can you do proper error handling in this 
+> function and rollback ?
+> 
+> 1. replace WARN_ON by a pr_err
+> 2. make oxnas_rps_clockevent_init and oxnas_rps_clocksource_init to return 
+> an error code
+It can be done.
+
+> 3. rollback clockevent or clocksource if one fails.
+Sure, but as for 4.6, it seems neither sched_clock_register, clocksource_mmio_init or clockevents_config_and_register can be reverted !
+What should I do ?
+
+> 
+> Thanks !
+> 
+>   -- Daniel
+> 
+Neil
