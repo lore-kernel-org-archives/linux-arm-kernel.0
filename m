@@ -1,119 +1,35 @@
-From: keescook@google.com (Kees Cook)
-Date: Tue, 14 Jun 2016 11:05:23 -0700
-Subject: kexec failures with DEBUG_RODATA
-In-Reply-To: <20160614175920.GD1041@n2100.armlinux.org.uk>
-References: <20160614175920.GD1041@n2100.armlinux.org.uk>
-Message-ID: <CAGXu5j+5j32HO0rQtF2hcqMUBaa8cyxgLT4JvaZ6LL2WPj_zjw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 14 Jun 2016 19:09:16 +0100
+Subject: [RFC PATCH v2 09/15] drivers: iommu: arm-smmu-v3: split probe
+ functions into DT/generic portions
+In-Reply-To: <1465306270-27076-10-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1465306270-27076-10-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160614180916.GH16531@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 10:59 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> Guys,
->
-> Having added Keystone2 support to kexec, and asking TI to validate
-> linux-next with mainline kexec-tools, I received two reports from
-> them.
->
-> The first was a report of success, but was kexecing a 4.4 kernel
-> from linux-next.
->
-> The second was a failure report, kexecing current linux-next from
-> linux-next on this platform.  However, my local tests (using my
-> 4.7-rc3 derived kernel) showed there to be no problem.
->
-> Building my 4.7-rc3 derived kernel with TI's configuration they
-> were using with linux-next similarly failed.  So, it came down to
-> a configuration difference.
->
-> After trialling several configurations, it turns out that the
-> failure is, in part, caused by CONFIG_DEBUG_RODATA being enabled
-> on TI's kernel but not mine.  Why should this make any difference?
->
-> Well, CONFIG_DEBUG_RODATA has the side effect that the kernel
-> contains a lot of additional padding - we pad out to section size
-> (1MB) the ELF sections with differing attributes.  This should not
-> normally be a problem, except kexec contains this assumption:
->
->                 /* Otherwise, assume the maximum kernel compression ratio
->                  * is 4, and just to be safe, place ramdisk after that */
->                 initrd_base = base + _ALIGN(len * 4, getpagesize());
->
-> Now, first things first.  Don't get misled by the comment - it's
-> totally false.  That may be what's desired, but that is far from
-> what actually happens in reality.
->
-> "base" is _not_ the address of the start of the kernel image, but
-> is the base address of the start of the region that the kernel is
-> to be loaded into - remember that the kernel is normally loaded
-> 32k higher than the start of memory.  This 32k offset is _not_
-> included in either "base" nor "len".  So, even if we did want to
-> assume that there was a maximum compression ratio of 4, the above
-> always calculates 32k short of that value.
->
-> The other invalid thing here is this whole "maximum kernel compression
-> ratio" assumption.  Consider this non-DEBUG_RODATA kernel image:
->
->    text    data     bss     dec     hex filename
-> 6583513 2273816  215344 9072673  8a7021 ../build/ks2/vmlinux
->
-> This results in an image and zimage of:
-> -rwxrwxr-x 1 rmk rmk 8871936 Jun 14 18:02 ../build/ks2/arch/arm/boot/Image
-> -rwxrwxr-x 1 rmk rmk 4381592 Jun 14 18:02 ../build/ks2/arch/arm/boot/zImage
->
-> which is a ratio of about a 49%.  On entry to the decompressor, the
-> compressed image will be relocated above the expected resulting
-> kernel size.  So, let's say that it's relocated to 9MB.  This means
-> the zImage will occupy around 9MB-14MB above the start of memory.
-> Going by the 4x ratio, we place the other images at 16.7MB.  This
-> leaves around 2.7MB free.  So that's probably fine... but think
-> about this.  We assumed a ratio of 4x, but really we're in a rather
-> tight squeeze - we actually have only about 50% of the compressed
-> image size spare.
->
-> Now let's look at the DEBUG_RODATA case:
->
->    text    data     bss     dec     hex filename
-> 6585305 2273952  215344 9074601  8a77a9 ../build/ks2/vmlinux
->
-> And the resulting sizes:
-> -rwxrwxr-x 1 rmk rmk 15024128 Jun 14 18:49 ../build/ks2/arch/arm/boot/Image
-> -rwxrwxr-x 1 rmk rmk  4399040 Jun 14 18:49 ../build/ks2/arch/arm/boot/zImage
->
-> That's a compression ratio of about 29%.  Still within the 4x limit,
-> but going through the same calculation above shows that we end up
-> totally overflowing the available space this time.
->
-> That's exactly the same kernel configuration except for
-> CONFIG_DEBUG_RODATA - enabling this has almost _doubled_ the
-> decompressed image size without affecting the compressed size.
->
-> We've known for some time that this ratio of 4x doesn't work - we
-> used to use the same assumption in the decompressor when self-
-> relocating, and we found that there are images which achieve a
-> better compression ratio and make this invalid.  Yet, the 4x thing
-> has persisted in kexec code... and buggily too.
->
-> Since the kernel now has CONFIG_DEBUG_RODATA by default, this means
-> that these kinds of ratio-based assumptions are even more invalid
-> than they have been.
->
-> Right now, a zImage doesn't advertise the size of its uncompressed
-> image, but I think with things like CONFIG_DEBUG_RODATA, we can no
-> longer make assumptions like we have done in the past, and we need
-> the zImage to provide this information so that the boot environment
-> can be setup sanely by boot loaders/kexec rather than relying on
-> broken heuristics like this.
->
-> Thoughts?
+On Tue, Jun 07, 2016 at 02:31:04PM +0100, Lorenzo Pieralisi wrote:
+> Current ARM SMMUv3 probe functions intermingle HW and DT probing in the
+> initialization functions to detect and programme the ARM SMMU v3 driver
+> features. In order to allow probing the ARM SMMUv3 with other firmwares
+> than DT, this patch splits the ARM SMMUv3 init functions into DT and HW
+> specific portions so that other FW interfaces (ie ACPI) can reuse the HW
+> probing functions and skip the DT portion accordingly.
+> 
+> This patch implements no functional change, only code reshuffling.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 63 +++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 52 insertions(+), 11 deletions(-)
 
-I'm much less familiar with the ARM decompression stub, but is there a
-boot image header (like x86 has)? If not, perhaps we can invent one,
-and it can carry all the details needed for a bootloader to do the
-right things.
+This looks sensible to me.
 
--Kees
+Acked-by: Will Deacon <will.deacon@arm.com>
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Will
