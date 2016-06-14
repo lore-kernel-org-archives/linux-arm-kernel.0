@@ -1,113 +1,49 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 14 Jun 2016 11:59:45 +0900
-Subject: [PATCH 2/3] ARM: dts: uniphier: add SoC-Glue node to UniPhier 32bit
- SoCs
+Date: Tue, 14 Jun 2016 11:59:44 +0900
+Subject: [PATCH 1/3] ARM: dts: uniphier: add System Bus pinmux node
 In-Reply-To: <1465873186-30658-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1465873186-30658-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1465873186-30658-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1465873186-30658-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This node consists of various system-level configuration registers.
+This pin-muxing is needed to get access to the UniPhier System Bus.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/uniphier-common32.dtsi    | 10 +++++++---
- arch/arm/boot/dts/uniphier-ph1-ld4.dtsi     |  2 +-
- arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi    |  2 +-
- arch/arm/boot/dts/uniphier-ph1-pro4.dtsi    |  2 +-
- arch/arm/boot/dts/uniphier-ph1-pro5.dtsi    |  2 +-
- arch/arm/boot/dts/uniphier-ph1-sld8.dtsi    |  2 +-
- arch/arm/boot/dts/uniphier-proxstream2.dtsi |  2 +-
- 7 files changed, 13 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/uniphier-common32.dtsi | 2 ++
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi  | 5 +++++
+ 2 files changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/uniphier-common32.dtsi b/arch/arm/boot/dts/uniphier-common32.dtsi
-index 891327f..03f60ec 100644
+index 61a0955..891327f 100644
 --- a/arch/arm/boot/dts/uniphier-common32.dtsi
 +++ b/arch/arm/boot/dts/uniphier-common32.dtsi
-@@ -136,9 +136,13 @@
- 			interrupt-controller;
+@@ -105,6 +105,8 @@
+ 			reg = <0x58c00000 0x400>;
+ 			#address-cells = <2>;
+ 			#size-cells = <1>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_system_bus>;
  		};
  
--		pinctrl: pinctrl at 5f801000 {
--			/* specify compatible in each SoC DTSI */
--			reg = <0x5f801000 0xe00>;
-+		soc-glue at 5f800000 {
-+			compatible = "simple-mfd", "syscon";
-+			reg = <0x5f800000 0x2000>;
-+
-+			pinctrl: pinctrl {
-+				 /* specify compatible in each SoC DTSI */
-+			};
- 		};
+ 		smpctrl at 59800000 {
+diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+index f2f3fbe..10a7110 100644
+--- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
++++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+@@ -78,6 +78,11 @@
+ 		function = "nand";
  	};
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-index dadd860..debad7f 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-@@ -182,5 +182,5 @@
- };
  
- &pinctrl {
--	compatible = "socionext,ph1-ld4-pinctrl", "syscon";
-+	compatible = "socionext,uniphier-ld4-pinctrl";
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi b/arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi
-index 5321152..19c107c 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi
-@@ -63,5 +63,5 @@
-  * which makes the pinctrl driver unshareable.
-  */
- &pinctrl {
--	compatible = "socionext,ph1-ld6b-pinctrl", "syscon";
-+	compatible = "socionext,uniphier-ld6b-pinctrl";
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-index 20f3f2a..7b9da08 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-@@ -200,5 +200,5 @@
- };
- 
- &pinctrl {
--	compatible = "socionext,ph1-pro4-pinctrl", "syscon";
-+	compatible = "socionext,uniphier-pro4-pinctrl";
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
-index 24f6f66..7e4aa2f 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
-@@ -194,5 +194,5 @@
- };
- 
- &pinctrl {
--	compatible = "socionext,ph1-pro5-pinctrl", "syscon";
-+	compatible = "socionext,uniphier-pro5-pinctrl";
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-index 6bfd29a..467f9d8 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-@@ -181,5 +181,5 @@
- };
- 
- &pinctrl {
--	compatible = "socionext,ph1-sld8-pinctrl", "syscon";
-+	compatible = "socionext,uniphier-sld8-pinctrl";
- };
-diff --git a/arch/arm/boot/dts/uniphier-proxstream2.dtsi b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
-index 4ac484c..d00d6f5 100644
---- a/arch/arm/boot/dts/uniphier-proxstream2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
-@@ -205,5 +205,5 @@
- };
- 
- &pinctrl {
--	compatible = "socionext,proxstream2-pinctrl", "syscon";
-+	compatible = "socionext,uniphier-pxs2-pinctrl";
- };
++	pinctrl_system_bus: system_bus_grp {
++		groups = "system_bus", "system_bus_cs1";
++		function = "system_bus";
++	};
++
+ 	pinctrl_uart0: uart0_grp {
+ 		groups = "uart0";
+ 		function = "uart0";
 -- 
 1.9.1
