@@ -1,66 +1,119 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 14 Jun 2016 14:03:40 -0400
-Subject: [GIT PULL 8/8] ARM: defconfig: exynos: Defconfig for v4.8
-In-Reply-To: <20160613222423.GA29879@localhost>
-References: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
- <1465215933-22709-9-git-send-email-k.kozlowski@samsung.com>
- <20160613222423.GA29879@localhost>
-Message-ID: <a1239955-19cb-92f1-30c8-d354bacc34de@osg.samsung.com>
+From: keescook@google.com (Kees Cook)
+Date: Tue, 14 Jun 2016 11:05:23 -0700
+Subject: kexec failures with DEBUG_RODATA
+In-Reply-To: <20160614175920.GD1041@n2100.armlinux.org.uk>
+References: <20160614175920.GD1041@n2100.armlinux.org.uk>
+Message-ID: <CAGXu5j+5j32HO0rQtF2hcqMUBaa8cyxgLT4JvaZ6LL2WPj_zjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Olof,
-
-On 06/13/2016 06:24 PM, Olof Johansson wrote:
-> On Mon, Jun 06, 2016 at 02:25:33PM +0200, Krzysztof Kozlowski wrote:
->>
->> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
->>
->>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.8
->>
->> for you to fetch changes up to 4b388071a2235ed8f05d05d069f5a5a29782a8c5:
->>
->>   ARM: exynos_defconfig: Save defconfig on current linux-next (2016-06-06 08:36:55 +0200)
->>
->> ----------------------------------------------------------------
->> Samsung defconfig update for v4.8:
->> 1. Disable big.LITTLE switcher so the cpufreq-dt could be enabled.
->> 2. Enable Samsung media platform drivers.
->> 3. Enable some board-specific drivers for boards: Trats2, Universal C210.
->> 4. Few more minor additions.
-> 
-> Hmm. So this made me wonder what's used on the 5420/5800 chromebooks, but it
-
-You mean as CPUFreq driver? It's used cpufreq-dt as well but the compatible
-strings for exynos5420/5800 are not registered when the switcher is enabled.
-
-> looks like they don't even boot with SMP, at least not the way I boot them
-> (with u-boot as a chainloaded kernel).
+On Tue, Jun 14, 2016 at 10:59 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> Guys,
 >
+> Having added Keystone2 support to kexec, and asking TI to validate
+> linux-next with mainline kexec-tools, I received two reports from
+> them.
+>
+> The first was a report of success, but was kexecing a 4.4 kernel
+> from linux-next.
+>
+> The second was a failure report, kexecing current linux-next from
+> linux-next on this platform.  However, my local tests (using my
+> 4.7-rc3 derived kernel) showed there to be no problem.
+>
+> Building my 4.7-rc3 derived kernel with TI's configuration they
+> were using with linux-next similarly failed.  So, it came down to
+> a configuration difference.
+>
+> After trialling several configurations, it turns out that the
+> failure is, in part, caused by CONFIG_DEBUG_RODATA being enabled
+> on TI's kernel but not mine.  Why should this make any difference?
+>
+> Well, CONFIG_DEBUG_RODATA has the side effect that the kernel
+> contains a lot of additional padding - we pad out to section size
+> (1MB) the ELF sections with differing attributes.  This should not
+> normally be a problem, except kexec contains this assumption:
+>
+>                 /* Otherwise, assume the maximum kernel compression ratio
+>                  * is 4, and just to be safe, place ramdisk after that */
+>                 initrd_base = base + _ALIGN(len * 4, getpagesize());
+>
+> Now, first things first.  Don't get misled by the comment - it's
+> totally false.  That may be what's desired, but that is far from
+> what actually happens in reality.
+>
+> "base" is _not_ the address of the start of the kernel image, but
+> is the base address of the start of the region that the kernel is
+> to be loaded into - remember that the kernel is normally loaded
+> 32k higher than the start of memory.  This 32k offset is _not_
+> included in either "base" nor "len".  So, even if we did want to
+> assume that there was a maximum compression ratio of 4, the above
+> always calculates 32k short of that value.
+>
+> The other invalid thing here is this whole "maximum kernel compression
+> ratio" assumption.  Consider this non-DEBUG_RODATA kernel image:
+>
+>    text    data     bss     dec     hex filename
+> 6583513 2273816  215344 9072673  8a7021 ../build/ks2/vmlinux
+>
+> This results in an image and zimage of:
+> -rwxrwxr-x 1 rmk rmk 8871936 Jun 14 18:02 ../build/ks2/arch/arm/boot/Image
+> -rwxrwxr-x 1 rmk rmk 4381592 Jun 14 18:02 ../build/ks2/arch/arm/boot/zImage
+>
+> which is a ratio of about a 49%.  On entry to the decompressor, the
+> compressed image will be relocated above the expected resulting
+> kernel size.  So, let's say that it's relocated to 9MB.  This means
+> the zImage will occupy around 9MB-14MB above the start of memory.
+> Going by the 4x ratio, we place the other images at 16.7MB.  This
+> leaves around 2.7MB free.  So that's probably fine... but think
+> about this.  We assumed a ratio of 4x, but really we're in a rather
+> tight squeeze - we actually have only about 50% of the compressed
+> image size spare.
+>
+> Now let's look at the DEBUG_RODATA case:
+>
+>    text    data     bss     dec     hex filename
+> 6585305 2273952  215344 9074601  8a77a9 ../build/ks2/vmlinux
+>
+> And the resulting sizes:
+> -rwxrwxr-x 1 rmk rmk 15024128 Jun 14 18:49 ../build/ks2/arch/arm/boot/Image
+> -rwxrwxr-x 1 rmk rmk  4399040 Jun 14 18:49 ../build/ks2/arch/arm/boot/zImage
+>
+> That's a compression ratio of about 29%.  Still within the 4x limit,
+> but going through the same calculation above shows that we end up
+> totally overflowing the available space this time.
+>
+> That's exactly the same kernel configuration except for
+> CONFIG_DEBUG_RODATA - enabling this has almost _doubled_ the
+> decompressed image size without affecting the compressed size.
+>
+> We've known for some time that this ratio of 4x doesn't work - we
+> used to use the same assumption in the decompressor when self-
+> relocating, and we found that there are images which achieve a
+> better compression ratio and make this invalid.  Yet, the 4x thing
+> has persisted in kexec code... and buggily too.
+>
+> Since the kernel now has CONFIG_DEBUG_RODATA by default, this means
+> that these kinds of ratio-based assumptions are even more invalid
+> than they have been.
+>
+> Right now, a zImage doesn't advertise the size of its uncompressed
+> image, but I think with things like CONFIG_DEBUG_RODATA, we can no
+> longer make assumptions like we have done in the past, and we need
+> the zImage to provide this information so that the boot environment
+> can be setup sanely by boot loaders/kexec rather than relying on
+> broken heuristics like this.
+>
+> Thoughts?
 
-All 8 cores for the Exynos5420/5800 Chromebooks have been brought up via MCPM
-for a long time in mainline, look for example at Kevin's Peach Pi boot log [0].
+I'm much less familiar with the ARM decompression stub, but is there a
+boot image header (like x86 has)? If not, perhaps we can invent one,
+and it can carry all the details needed for a bootloader to do the
+right things.
 
-This is also true when chainloading u-boot (that's my setup as well), but I see
-that only one CPU is powered up on your boot farm indeed [1].
+-Kees
 
-I'm using the latest ChromeOS u-boot and chain loading u-boot version 2016.01.
- 
-> Branch merged.
-> 
-> 
-> -Olof
-> 
-
-[0]: https://storage.kernelci.org/next/next-20160614/arm-exynos_defconfig/lab-baylibre-seattle/boot-exynos5800-peach-pi.html
-[1]: http://arm-soc.lixom.net/bootlogs/next/next-20160614/pi-arm-exynos_defconfig.html 
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Kees Cook
+Chrome OS & Brillo Security
