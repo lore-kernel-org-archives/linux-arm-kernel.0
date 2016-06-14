@@ -1,109 +1,54 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 14 Jun 2016 16:09:23 +0800
-Subject: [PATCH 2/2 v16] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <1464861445-11086-2-git-send-email-jitao.shi@mediatek.com>
-References: <1464861445-11086-1-git-send-email-jitao.shi@mediatek.com>
- <1464861445-11086-2-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <CAGS+omDpakAsjijbhUG9gJZ6WA=+UBJ2fhhmp-ZEz7CtK8AHCw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Jun 2016 01:11:02 -0700
+Subject: [GIT PULL] omap fixes for v4.7-rc cycle
+Message-ID: <20160614081101.GV22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
+The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
 
-On Thu, Jun 2, 2016 at 5:57 PM, Jitao Shi <jitao.shi@mediatek.com> wrote:
->
-> This patch adds drm_bridge driver for parade DSI to eDP bridge chip.
->
-> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> ---
-> Changes since v15:
->  - Drop drm_connector_(un)register calls from parade ps8640.
->    The main DRM driver mtk_drm_drv now calls
->    drm_connector_register_all() after drm_dev_register() in the
->    mtk_drm_bind() function. That function should iterate over all
->    connectors and call drm_connector_register() for each of them.
->    So, remove drm_connector_(un)register calls from parade ps8640.
+  Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
 
-[snip...]
+are available in the git repository at:
 
-> +static void ps8640_pre_enable(struct drm_bridge *bridge)
-> +{
-> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
-> +       struct i2c_client *client = ps_bridge->page[2];
-> +       int err;
-> +       u8 set_vdo_done;
-> +       ktime_t timeout;
-> +
-> +       if (ps_bridge->in_fw_update)
-> +               return;
-> +
-> +       if (ps_bridge->enabled)
-> +               return;
-> +
-> +       err = drm_panel_prepare(ps_bridge->panel);
-> +       if (err < 0) {
-> +               DRM_ERROR("failed to prepare panel: %d\n", err);
-> +               return;
-> +       }
-> +
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.7/fixes-powedomain
 
-(1) For patch v10, Philipp Zabel commented that gpio_slp_n &
-gpio_rst_n are both active low, and that the device tree should
-contain a reset-gpios property with the GPIO_ACTIVE_LOW flag set.
-(2) However, you did change the the reset logic from v10 -> v11, but
-it isn't clear why (nor mentioned in the patch notes).
+for you to fetch changes up to 6b41d44862e8f3a4b95102c6ff6cad3fccc7994b:
 
-v10 (https://patchwork.kernel.org/patch/8357851/) had:
+  ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_mem_ret (2016-06-13 01:04:01 -0700)
 
-+ gpiod_set_value(ps_bridge->gpio_slp_n, 1);
-+ gpiod_set_value(ps_bridge->gpio_rst_n, 0);
-+
-+ err = regulator_bulk_enable(ARRAY_SIZE(ps_bridge->supplies),
-+    ps_bridge->supplies);
-+ if (err < 0) {
-+ DRM_ERROR("cannot enable regulators %d\n", err);
-+ goto err_panel_unprepare;
-+ }
-+
-+ usleep_range(500, 700);
-+ gpiod_set_value(ps_bridge->gpio_rst_n, 1);
+----------------------------------------------------------------
+Fixes for omaps for v4.7-rc cycle:
 
-In other words:
-  (a) de-assert power down
-  (b) assert reset
-  (c) enable 1.2 & 3.3 regulators
-  (d) <wait for  regulator delay> (aka regulator-ramp-delay in device-tree)
-  (e) wait an additional 2 ms (as requested by Parade for ps8640 to stabilize?)
-  (f) de-assert reset
-  (g) wait 200 ms (for ps8640 FW to load?)
+- Fix dra7 for hardware issues limiting L4Per and L3init power domains
+  to on state. Without this the devices may not work correctly after
+  some time of use because of asymmetric aging. And related to this,
+  let's also remove the unusable states.
 
-This mostly made sense to me, except for step (a)... I'm not sure why
-you de-assert power down before enabling the regulators.  It seems
-like you'd want to do that later, maybe after reset (can you ask
-Paradetech?).
+- Always select omap interconnect for am43x as otherwise the am43x
+  only configurations will not boot properly. This can happen easily
+  for any product kernels that leave out other SoCs to save memory.
 
-Now (as of v11) it has changed to:
+- Fix DSS PLL2 addresses that have gone unused for now
 
-> +       err = regulator_bulk_enable(ARRAY_SIZE(ps_bridge->supplies),
-> +                                   ps_bridge->supplies);
-> +       if (err < 0) {
-> +               DRM_ERROR("cannot enable regulators %d\n", err);
-> +               goto err_panel_unprepare;
-> +       }
-> +
-> +       gpiod_set_value(ps_bridge->gpio_slp_n, 1);
-> +       gpiod_set_value(ps_bridge->gpio_rst_n, 0);
-> +       usleep_range(2000, 2500);
-> +       gpiod_set_value(ps_bridge->gpio_rst_n, 1);
+- Select erratum 430973 for omap3, this is now safe to do and can
+  save quite a bit of debugging time for people who may have left
+  it out.
 
-Two additional comments:
+----------------------------------------------------------------
+Dave Gerlach (1):
+      ARM: OMAP2+: Select OMAP_INTERCONNECT for SOC_AM43XX
 
-(3) if you correctly configure these gpios as GPIO_ACTIVE_LOW, you can
-drop the "_n" suffix, which will make the driver code easier to
-understand.
-(4) "gpio_slp_n" is called "PD#" by the PS8640 datasheet, so a better
-name might be: "gpio_power_down".
+Nishanth Menon (4):
+      ARM: OMAP2: Enable Errata 430973 for OMAP3
+      ARM: OMAP: DRA7: powerdomain data: Set L3init and L4per to ON
+      ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_logic_ret
+      ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_mem_ret
 
-Thanks,
--Dan
+Tomi Valkeinen (1):
+      ARM: dts: DRA74x: fix DSS PLL2 addresses
+
+ arch/arm/boot/dts/dra74x.dtsi              |  4 +-
+ arch/arm/mach-omap2/Kconfig                |  2 +
+ arch/arm/mach-omap2/powerdomains7xx_data.c | 76 +-----------------------------
+ 3 files changed, 6 insertions(+), 76 deletions(-)
