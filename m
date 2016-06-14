@@ -1,76 +1,66 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Tue, 14 Jun 2016 10:16:55 +0800
-Subject: [PATCH] coresight-stm: support mmapping channel regions with mmio_addr
-Message-ID: <1465870615-10215-1-git-send-email-zhang.chunyan@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 14 Jun 2016 10:17:49 +0800
+Subject: [PATCH 02/10] mfd: ac100: Add device tree bindings for X-Powers AC100
+ codec/RTC combo IC
+In-Reply-To: <1465870678-30128-1-git-send-email-wens@csie.org>
+References: <1465870678-30128-1-git-send-email-wens@csie.org>
+Message-ID: <1465870678-30128-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CoreSight STM device allows direct mapping of the channel regions to
-userspace for zero-copy writing. To support this ability, the STM
-freamwork has provided a hook 'mmio_addr', this patch just implemented
-this hook for CoreSight STM.
-
-This patch also added an item into 'channel_space' to save the start
-physical address of channel region which mmap operation needs to know.
-
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/hwtracing/coresight/coresight-stm.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ Documentation/devicetree/bindings/mfd/ac100.txt | 42 +++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 73be58a..4e70478 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -109,6 +109,7 @@ module_param_named(
-  */
- struct channel_space {
- 	void __iomem		*base;
-+	phys_addr_t		phys;
- 	unsigned long		*guaranteed;
- };
- 
-@@ -356,6 +357,23 @@ static void stm_generic_unlink(struct stm_data *stm_data,
- 	stm_disable(drvdata->csdev);
- }
- 
-+static phys_addr_t
-+stm_mmio_addr(struct stm_data *stm_data, unsigned int master,
-+	      unsigned int channel, unsigned int nr_chans)
-+{
-+	struct stm_drvdata *drvdata = container_of(stm_data,
-+						   struct stm_drvdata, stm);
-+	phys_addr_t addr;
+diff --git a/Documentation/devicetree/bindings/mfd/ac100.txt b/Documentation/devicetree/bindings/mfd/ac100.txt
+new file mode 100644
+index 000000000000..fbab623e6fba
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/ac100.txt
+@@ -0,0 +1,42 @@
++X-Powers AC100 Codec/RTC IC device tree bindings
 +
-+	addr = drvdata->chs.phys + channel * BYTES_PER_CHANNEL;
++AC100 is a audio codec and RTC subsystem combo IC. The 2 parts are
++separated, including power supplies and interrupt lines, but share
++a common register address space and host interface.
 +
-+	if (offset_in_page(addr) ||
-+	    offset_in_page(nr_chans * BYTES_PER_CHANNEL))
-+		return 0;
++Required properties:
++- compatible: "x-powers,ac100"
++- reg: The I2C slave address or RSB hardware address for the chip
++- sub-nodes:
++  - codec
++    - compatible: "x-powers,ac100-codec"
++    - interrupt-parent: The parent interrupt controller
++    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_AUDIO pin
++  - rtc
++    - compatible: "x-powers,ac100-rtc"
++    - interrupt-parent: The parent interrupt controller
++    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_RTC pin
++    - #clock-cells: shall be 1
++    - clock-output-names: "cko1_rtc", "cko2_rtc", "cko3_rtc"
++    - see clock/clock-bindings.txt for common clock bindings
 +
-+	return addr;
-+}
++Example:
 +
- static long stm_generic_set_options(struct stm_data *stm_data,
- 				    unsigned int master,
- 				    unsigned int channel,
-@@ -761,7 +779,9 @@ static void stm_init_generic_data(struct stm_drvdata *drvdata)
- 	drvdata->stm.sw_end = 1;
- 	drvdata->stm.hw_override = true;
- 	drvdata->stm.sw_nchannels = drvdata->numsp;
-+	drvdata->stm.sw_mmiosz = BYTES_PER_CHANNEL;
- 	drvdata->stm.packet = stm_generic_packet;
-+	drvdata->stm.mmio_addr = stm_mmio_addr;
- 	drvdata->stm.link = stm_generic_link;
- 	drvdata->stm.unlink = stm_generic_unlink;
- 	drvdata->stm.set_options = stm_generic_set_options;
-@@ -808,6 +828,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
- 	ret = stm_get_resource_byname(np, "stm-stimulus-base", &ch_res);
- 	if (ret)
- 		return ret;
-+	drvdata->chs.phys = ch_res.start;
- 
- 	base = devm_ioremap_resource(dev, &ch_res);
- 	if (IS_ERR(base))
++ac100: codec at e89 {
++	compatible = "x-powers,ac100";
++	reg = <0xe89>;
++
++	ac100_codec {
++		compatible = "x-powers,ac100-codec";
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	ac100_rtc {
++		compatible = "x-powers,ac100-rtc";
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		#clock-cells = <1>;
++		clock-output-names = "cko1_rtc", "cko2_rtc", "cko3_rtc";
++	};
++};
 -- 
-1.9.1
+2.8.1
