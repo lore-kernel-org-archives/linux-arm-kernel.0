@@ -1,120 +1,112 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Jun 2016 17:30:57 +0200
-Subject: [PATCH 3/5] ARM: dts: add L2CC and RPM with regulators for MSM8660
-In-Reply-To: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
-References: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1465918259-11138-4-git-send-email-linus.walleij@linaro.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 14 Jun 2016 16:31:25 +0100
+Subject: Versatile Express randomly fails to boot - Versatile Express to
+ be removed from nightly testing
+In-Reply-To: <551D7EAB.1000200@arm.com>
+References: <20150316195255.GM8656@n2100.arm.linux.org.uk>
+ <550818A6.9020205@arm.com> <20150317153657.GY8656@n2100.arm.linux.org.uk>
+ <55084D99.7050004@arm.com> <20150317161748.GZ8656@n2100.arm.linux.org.uk>
+ <20150330140333.GJ24899@n2100.arm.linux.org.uk> <55196228.5050805@arm.com>
+ <20150330150552.GK24899@n2100.arm.linux.org.uk> <55196E31.80803@arm.com>
+ <551AD902.9090401@arm.com> <20150402141336.GI24899@n2100.arm.linux.org.uk>
+ <551D7EAB.1000200@arm.com>
+Message-ID: <1465918285.2840.41.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the L2CC IPC resource and RPM devices plus the nodes
-for the PM8901 and PM8058 regulators to the MSM8660 device tree.
-This was tested on the APQ8060 Dragonboard.
+Hi Sudeep
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/qcom-msm8660.dtsi | 89 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 89 insertions(+)
+Over the past several days I think I've been unknowingly reproducing
+many of the steps in this old discussion thread [1] about A9 Versatile
+Express boot failures. It's only when I found myself looking at the L2
+cache timings that I got a vague recollection and dug out this old
+thread again. Was there any resolution to the issue? As far as I can
+work out, the A9x4 CoreTile stopped working around Linux 3.18 (the
+problem isn't 100% reproducible so it's difficult to tell).
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index a5a38820554a..51d3c9e70617 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -215,6 +215,95 @@
- 			};
- 		};
- 
-+		l2cc: clock-controller at 2082000 {
-+			compatible	= "syscon";
-+			reg		= <0x02082000 0x1000>;
-+		};
-+
-+		rpm: rpm at 104000 {
-+			compatible	= "qcom,rpm-msm8660";
-+			reg		= <0x00104000 0x1000>;
-+			qcom,ipc	= <&l2cc 0x8 2>;
-+
-+			interrupts	= <GIC_SPI 19 IRQ_TYPE_EDGE_RISING>,
-+					  <GIC_SPI 21 IRQ_TYPE_EDGE_RISING>,
-+					  <GIC_SPI 22 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-names	= "ack", "err", "wakeup";
-+			clocks = <&gcc RPM_MSG_RAM_H_CLK>;
-+			clock-names = "ram";
-+
-+			rpmcc: clock-controller {
-+				compatible	= "qcom,rpmcc-apq8660", "qcom,rpmcc";
-+				#clock-cells = <1>;
-+			};
-+
-+			pm8901-regulators {
-+				compatible = "qcom,rpm-pm8901-regulators";
-+
-+				pm8901_l0: l0 {};
-+				pm8901_l1: l1 {};
-+				pm8901_l2: l2 {};
-+				pm8901_l3: l3 {};
-+				pm8901_l4: l4 {};
-+				pm8901_l5: l5 {};
-+				pm8901_l6: l6 {};
-+
-+				/* S0 and S1 Handled as SAW regulators by SPM */
-+				pm8901_s2: s2 {};
-+				pm8901_s3: s3 {};
-+				pm8901_s4: s4 {};
-+
-+				pm8901_lvs0: lvs0 {};
-+				pm8901_lvs1: lvs1 {};
-+				pm8901_lvs2: lvs2 {};
-+				pm8901_lvs3: lvs3 {};
-+
-+				pm8058_mvs: mvs {};
-+			};
-+
-+			pm8058-regulators {
-+				compatible = "qcom,rpm-pm8058-regulators";
-+
-+				pm8058_l0: l0 {};
-+				pm8058_l1: l1 {};
-+				pm8058_l2: l2 {};
-+				pm8058_l3: l3 {};
-+				pm8058_l4: l4 {};
-+				pm8058_l5: l5 {};
-+				pm8058_l6: l6 {};
-+				pm8058_l7: l7 {};
-+				pm8058_l8: l8 {};
-+				pm8058_l9: l9 {};
-+				pm8058_l10: l10 {};
-+				pm8058_l11: l11 {};
-+				pm8058_l12: l12 {};
-+				pm8058_l13: l13 {};
-+				pm8058_l14: l14 {};
-+				pm8058_l15: l15 {};
-+				pm8058_l16: l16 {};
-+				pm8058_l17: l17 {};
-+				pm8058_l18: l18 {};
-+				pm8058_l19: l19 {};
-+				pm8058_l20: l20 {};
-+				pm8058_l21: l21 {};
-+				pm8058_l22: l22 {};
-+				pm8058_l23: l23 {};
-+				pm8058_l24: l24 {};
-+				pm8058_l25: l25 {};
-+
-+				pm8058_s0: s0 {};
-+				pm8058_s1: s1 {};
-+				pm8058_s2: s2 {};
-+				pm8058_s3: s3 {};
-+				pm8058_s4: s4 {};
-+
-+				pm8058_lvs0: lvs0 {};
-+				pm8058_lvs1: lvs1 {};
-+
-+				pm8058_ncp: ncp {};
-+			};
-+		};
-+
- 		/* Temporary fixed regulator */
- 		vsdcc_fixed: vsdcc-regulator {
- 			compatible = "regulator-fixed";
+Using "arm,tag-latency = <2 2 1>" as Russell seemed to indicate [2]
+fixed things for him, also works for me. So should we update mainline
+device-tree with that?
+
+Alternatively, we could assume nobody cares about A9 as presumably Linux
+has been unbootable for a year without anyone raising the issue. (The
+only reason I'm looking at it is I may be making U-Boot changes for
+vexpress and I wanted to test them).
+
+But if we are going to just ignore things, I think it would be good to
+delete the A9 dts, or the L2 cache entry, so other people in the future
+don't waste days trying to track down the problem.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330860.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/342005.html
+
 -- 
-2.4.11
+Tixy
+
+
+n Thu, 2015-04-02 at 18:38 +0100, Sudeep Holla wrote:
+> 
+> On 02/04/15 15:13, Russell King - ARM Linux wrote:
+> > On Tue, Mar 31, 2015 at 06:27:30PM +0100, Sudeep Holla wrote:
+> >> Not sure on that as v3.18 with DT seems to be working fine and passed
+> >> overnight reboot testing.
+> >
+> > Okay, that suggests there's something post v3.18 which is causing this,
+> > rather than it being a DT vs non-DT thing.
+> >
+> 
+> Correct. Just to be 100% sure I reverted that non-DT removal commit on
+> both v3.19-rc1 and v4.0-rc6 and was able to reproduce issue without DT.
+> 
+> > An extra data point which I've just found (by enabling attempts to do
+> > hibernation on various test platforms) is that the Versatile Express
+> > appears to be incapable of taking a CPU offline.
+> >
+> > This crashes the entire system with sometimes random results.  Sometimes
+> > it'll appear that a spinlock has been left owned by CPU#1 which is
+> > offline.  Sometimes it'll silently hang.  Sometimes it'll start slowly
+> > dumping kernel messages from the start of the kernel's ring buffer (!),
+> > eg:
+> >
+> > PM: freeze of devices complete after 29.342 msecs
+> > PM: late freeze of devices complete after 6.398 msecs
+> > PM: noirq freeze of devices complete after 5.493 msecs
+> > Disabling non-boot CPUs ...
+> > __cpu_disable(1)
+> > __cpu_die(1)
+> > handle_IPI(0)
+> > Booting Linux on physical CPU 0x0
+> >
+> > So far, it's not managed to take a CPU successfully offline and know that
+> > it has.  If I disable the calls to cpu_enter_lowpower() and
+> > cpu_leave_lowpower(), then it appears to work.
+> >
+> > This leads me to wonder whether flush_cache_louis() works... which led me
+> > in turn to ARM_ERRATA_643719, which is disabled in my builds.  However,
+> > the CA9 tile has a r0p1 CA9, which allegedly suffers from this errata.
+> >
+> 
+> Yes I observed that and tested for this issue enabling it. It's doesn't
+> affect and I still hit the issue.
+> 
+> [...]
+> >
+> > I haven't tested going back to a tag latency of 1 1 1 yet.  Can you
+> > confirm whether you have this errata enabled for your tests?
+> >
+> I have now gone back to <1 1 1> latency to debug the issue as it's
+> easier to reproduce with that latencies.
+> 
+> After I failed terribly to bisect between v3.18..v3.19-c1, as it depends
+> a lot on the config you choose(a lot of changes introduced as it's merge
+> window), I started looking at the code where we hit this issue since
+> it's always in __radix_tree_lookup in lib/radix-tree.c while
+> accessing the slots to see if it provides any more details.
+> 
+> Regards,
+> Sudeep
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
