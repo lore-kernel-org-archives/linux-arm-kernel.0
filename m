@@ -1,105 +1,134 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 14 Jun 2016 10:19:12 +0200
-Subject: [PATCH 09/12] mmc: sdhci-xenon: add initial Xenon eMMC driver
-In-Reply-To: <575FA9BF.6070703@intel.com> (Adrian Hunter's message of "Tue, 14
- Jun 2016 09:52:47 +0300")
-References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
- <1465456218-28354-10-git-send-email-gregory.clement@free-electrons.com>
- <575FA9BF.6070703@intel.com>
-Message-ID: <878ty8chdr.fsf@free-electrons.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 14 Jun 2016 09:23:01 +0100
+Subject: [PATCH] ARM: tegra: beaver: allow SD card voltage to be changed
+In-Reply-To: <575FA21E.80309@intel.com>
+References: <1456779678-20173-1-git-send-email-dev@lynxeye.de>
+ <1463124331.2459.0.camel@lynxeye.de> <20160513172704.GA498@ulmo.ba.sec>
+ <573DCDB3.80202@nvidia.com> <575E897A.5080508@nvidia.com>
+ <575FA21E.80309@intel.com>
+Message-ID: <575FBEE5.50905@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
- 
- On mar., juin 14 2016, Adrian Hunter <adrian.hunter@intel.com> wrote:
 
-> On 09/06/16 10:10, Gregory CLEMENT wrote:
->> From: Victor Gu <xigu@marvell.com>
->> 
->> This path adds the driver for the Marvell Xenon eMMC host controller
->> which supports eMMC 5.1, SD 3.0.
->> 
->> However this driver supports only up to eMMC 5.0 since the command queue
->> feature is not included (yet) in the driver.
->> 
->> [gregory.clement at free-electrons.com:
->>  - reformulate commit log
->>  - overload the sdhci_set_uhs_signaling function instead of using a quirk
->>  - fix a kconfig dependency
->>  - remove dead code]
->> 
->> Signed-off-by: Victor Gu <xigu@marvell.com>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/mmc/host/Kconfig       |   10 +
->>  drivers/mmc/host/Makefile      |    1 +
->>  drivers/mmc/host/sdhci-xenon.c | 1164 ++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 1175 insertions(+)
->>  create mode 100644 drivers/mmc/host/sdhci-xenon.c
->> 
->
-> <SNIP>
->
->> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
->> new file mode 100644
->> index 000000000000..43c06db95872
->> --- /dev/null
->> +++ b/drivers/mmc/host/sdhci-xenon.c
->
-> <SNIP>
->
->> +static int sdhci_xenon_delay_adj_test(struct sdhci_host *host,
->> +		struct mmc_card *card, unsigned int delay,
->> +		bool invert, bool phase)
->> +{
->> +	int ret;
->> +	struct mmc_card *oldcard;
->> +
->> +	sdhci_xenon_set_fix_delay(host, delay, invert, phase);
->> +
->> +	/*
->> +	 * If the card is not yet associated to the host, we
->> +	 * temporally do it
->> +	 */
->> +	oldcard = card->host->card;
->> +	if (!oldcard)
->> +		card->host->card = card;
->> +	ret =  card_alive(card);
->
-> This looks like an abuse of bus_ops->alive().  You will need to get
-> agreement with Ulf how to handle this.  I will wait for Ulf's comments
-> before reviewing this patch set further.
+On 14/06/16 07:20, Adrian Hunter wrote:
+> On 13/06/16 13:22, Jon Hunter wrote:
+>> Adding Adrian and Ulf ...
+>>
+>> On 19/05/16 15:29, Jon Hunter wrote:
+>>>
+>>> On 13/05/16 18:27, Thierry Reding wrote:
+>>>> * PGP Signed by an unknown key
+>>>>
+>>>> On Fri, May 13, 2016 at 09:25:31AM +0200, Lucas Stach wrote:
+>>>>> Am Montag, den 29.02.2016, 22:01 +0100 schrieb Lucas Stach:
+>>>>>> This allows to switch the card signal voltage level to 1.8V,
+>>>>>> which is needed for any ultra high speed modes to work.
+>>>>>>
+>>>>>> Signed-off-by: Lucas Stach <dev@lynxeye.de>
+>>>>>> ---
+>>>>>> This needs the SDMMC memcomp pad calibration patches I just
+>>>>>> sent out to be applied, otherwise the card voltage change will
+>>>>>> fail with a message in the kernel log and a fall back to
+>>>>>> high speed operation.
+>>>>>
+>>>>> The patches this one depends on have been applied for some time now.
+>>>>> Please pick up this patch.
+>>>>
+>>>> My understanding is that UHS modes currently cause problems on Beaver.
+>>>> What I don't understand about that is how it will even try those modes
+>>>> if the voltage regulator can't be set to 1.8 V? Shouldn't that actively
+>>>> prevent those modes from even being attempted?
+>>>
+>>> Looking at the sdhci code, if the regulator is missing then we still
+>>> attempt to place the controller is 1.8V mode ...
+>>>
+>>>  static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>>>                                               struct mmc_ios *ios)
+>>>  {
+>>>
+>>>  ...
+>>>
+>>>          case MMC_SIGNAL_VOLTAGE_180:
+>>>                  if (!IS_ERR(mmc->supply.vqmmc)) {
+>>>                          ret = regulator_set_voltage(mmc->supply.vqmmc,
+>>>                                          1700000, 1950000);
+>>>                          if (ret) {
+>>>                                  pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
+>>>                                          mmc_hostname(mmc));
+>>>                                  return -EIO;
+>>>                          }
+>>>                  }
+>>>
+>>>                  /*
+>>>                   * Enable 1.8V Signal Enable in the Host Control2
+>>>                   * register
+>>>                   */
+>>>                  ctrl |= SDHCI_CTRL_VDD_180;
+>>>                  sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+>>>  
+>>>                  /* Some controller need to do more when switching */
+>>>                  if (host->ops->voltage_switch)
+>>>                          host->ops->voltage_switch(host);
+>>>  
+>>>                  /* 1.8V regulator output should be stable within 5 ms */
+>>>                  ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+>>>                  if (ctrl & SDHCI_CTRL_VDD_180)
+>>>                          return 0;
+>>>  
+>>>                  pr_warn("%s: 1.8V regulator output did not became stable\n",
+>>>                          mmc_hostname(mmc));
+>>>  
+>>>                  return -EAGAIN;
+>>>
+>>> Ideally, the above *should* fail if the regulator is missing. However, what
+>>> I have found, is that in my case, even though the regulator is missing, the
+>>> above succeeds and the host thinks we are operating at 1.8V even though we
+>>> are still at 3.3V! It seems that this does not happen with all SD cards that
+>>> support UHS. 
+>>>
+>>> This patch resolves the problems I am seeing on beaver with SD card
+>>> initialisation failing. I am surprised this is not causing problems for
+>>> others?
+>>
+>> Adrian, Ulf, per the above, I have found that on a Tegra30 beaver board,
+>> if we enable UHS-I modes for Tegra30 but the device-tree for the board
+>> is missing the regulator to select 1.8V mode operation, then the above
+>> code sequence may still return success (ie. SDHCI_CTRL_VDD_180 bit is
+>> set in SDHCI_HOST_CONTROL2) even though we have not changed the voltage.
+>> This leads to other problems later on during SD initialisation.
+>>
+>> Would you expect that an SDHCI controller should fail to set the
+>> SDHCI_CTRL_VDD_180 bit in the SDHCI_HOST_CONTROL2 register if we did not
+>> change the voltage?
+> 
+> What is meant to happen is that sdhci should wait 5ms and then check
+> SDHCI_CTRL_VDD_180 - which it used to do but then someone took the 5ms wait
+> away.
 
-Actually I modified this part of the driver to use
-bus_ops->alive(). Initially, the alive() code was more or less copied
-and paste from the mmc core with ugly include from mmc_ops.h and
-sdio_ops.h to make it work. I find it cleaner to directly access the
-alive() function.
+Do you plan to add the 5ms delay again?
 
-Could you explain why it is an abuse of  bus_ops->alive()?
+> In any case, if you are using a regulator there is no knowing what sdhci is
+> meant to do.
 
-Thanks,
+Ok, seems fragile.
 
-Gregory
+>>
+>> We want to ensure that Tegra devices do not attempt to switch the UHS-I
+>> modes if the regulator is not present and it is not clear to me if there
+>> is a problem with the Tegra SDHCI controller or how this should be handled.
+> 
+> If the driver doesn't support UHS-I modes then it must remove the cap flags.
 
+So the controller itself supports UHS-I modes, but a given board may not
+have the regulator to support them. We need a way to determine if the
+board can support the UHS-I modes. Now we could check to see if the
+regulator is present in the Tegra SDHCI driver and if not remove the cap
+flags. However, I was not sure if this is applicable to other sdhci
+controllers and so there should be a generic solution for this?
 
->> +	card->host->card = oldcard;
->> +	if (ret) {
->> +		pr_debug("Xenon failed when sampling fix delay %d, inverted %d, phase %d\n",
->> +			 delay, invert, phase);
->> +		return -EIO;
->> +	}
->> +
->> +	pr_debug("Xenon succeeded when sampling fixed delay %d, inverted %d, phase %d\n",
->> +		 delay, invert, phase);
->> +	return 0;
->> +}
->
->
+Cheers
+Jon
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+nvpublic
