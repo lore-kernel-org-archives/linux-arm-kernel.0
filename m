@@ -1,17 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Jun 2016 10:19:37 -0700
-Subject: [GIT PULL] ARM: at91: soc for 4.8 #1
-In-Reply-To: <20160612110703.GA24734@piout.net>
-References: <20160612110703.GA24734@piout.net>
-Message-ID: <20160614171937.GB9200@localhost>
+Date: Tue, 14 Jun 2016 10:26:39 -0700
+Subject: [GIT PULL] ARM: at91: dt for 4.8 #1
+In-Reply-To: <20160612112120.GA25664@piout.net>
+References: <20160612112120.GA25664@piout.net>
+Message-ID: <20160614172639.GC9200@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12, 2016 at 01:07:03PM +0200, Alexandre Belloni wrote:
+On Sun, Jun 12, 2016 at 01:21:20PM +0200, Alexandre Belloni wrote:
 > Arnd, Olof, Kevin,
 > 
-> We finally get a driver for the EBI. It will hopefully allow to avoid
-> relying on the bootloader for the EBI configuration.
+> First DT changes for 4.8 with the addition of a new board and a cleanup
+> of unused clock definitions.
 > 
 > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
@@ -19,17 +19,20 @@ On Sun, Jun 12, 2016 at 01:07:03PM +0200, Alexandre Belloni wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-drivers
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-dt
 > 
-> for you to fetch changes up to 1fdab21d1d52a85c31f932844242fec5fb81daac:
+> for you to fetch changes up to 64c0703e269d442f0406b34e64e23744151ea276:
 > 
->   memory: atmel-ebi: add DT bindings documentation (2016-06-02 08:32:25 +0200)
+>   ARM: dts: at91: calao: remove leftovers clock definition (2016-06-10 16:59:30 +0200)
 > 
 > ----------------------------------------------------------------
-> Drivers for 4.8:
->  - Add a driver for the EBI
+> DT Changes for 4.8:
+>  - New board: Olimex SAM9-L9260
+>  - Fix crystal definitions for Denx ma5d4
+>  - Remove leftover clock definitions
+>  - Add stdout-path for usb_a9260/a9g20
 
-Merged, thanks.
+Thanks, merged.
 
 
 -Olof
