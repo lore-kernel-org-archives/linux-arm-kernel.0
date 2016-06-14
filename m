@@ -1,164 +1,63 @@
 From: po.liu@nxp.com (Po Liu)
-Date: Tue, 14 Jun 2016 14:12:26 +0800
-Subject: [PATCH v2 1/2] nxp/dts: add pcie aer interrupt-name property in the
- dts
-In-Reply-To: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+Date: Tue, 14 Jun 2016 14:12:27 +0800
+Subject: [PATCH v2 2/2] pci/aer: interrupt fixup in the quirk
+In-Reply-To: <1465884747-1517-1-git-send-email-po.liu@nxp.com>
 References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
-Message-ID: <1465884747-1517-1-git-send-email-po.liu@nxp.com>
+ <1465884747-1517-1-git-send-email-po.liu@nxp.com>
+Message-ID: <1465884747-1517-2-git-send-email-po.liu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NXP some platforms aer interrupt was not MSI/MSI-X/INTx
-but using interrupt line independently. This patch add a "aer"
-interrupt-names for aer interrupt.
+On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
+maybe there is interrupt line for aer pme etc. Search the interrupt
+number in the fdt file. Then fixup the dev->irq with it.
 
 Signed-off-by: Po Liu <po.liu@nxp.com>
 ---
-Changes for V2:
-	- None.
+changes for V2:
+	- Move to the quirk file
 
- .../devicetree/bindings/pci/layerscape-pci.txt         |  4 ++--
- arch/arm/boot/dts/ls1021a.dtsi                         |  6 ++++--
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi         | 18 +++++++++---------
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi         | 16 ++++++++--------
- 4 files changed, 23 insertions(+), 21 deletions(-)
+ drivers/pci/quirks.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-index ef683b2..d27973a 100644
---- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-@@ -19,7 +19,7 @@ Required properties:
- - interrupts: A list of interrupt outputs of the controller. Must contain an
-   entry for each entry in the interrupt-names property.
- - interrupt-names: Must include the following entries:
--  "intr": The interrupt that is asserted for controller interrupts
-+  "aer" : The interrupt that is asserted for aer interrupts
- - fsl,pcie-scfg: Must include two entries.
-   The first entry must be a link to the SCFG device node
-   The second entry must be '0' or '1' based on physical PCIe controller index.
-@@ -33,7 +33,7 @@ Example:
- 		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
- 		reg-names = "regs", "config";
- 		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
--		interrupt-names = "intr";
-+		interrupt-names = "aer";
- 		fsl,pcie-scfg = <&scfg 0>;
- 		#address-cells = <3>;
- 		#size-cells = <2>;
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 5ae8e92..b638697 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -633,7 +633,8 @@
- 			reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
- 			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
-+			interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			fsl,pcie-scfg = <&scfg 0>;
- 			#address-cells = <3>;
- 			#size-cells = <2>;
-@@ -656,7 +657,8 @@
- 			reg = <0x00 0x03500000 0x0 0x00010000   /* controller registers */
- 			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			fsl,pcie-scfg = <&scfg 1>;
- 			#address-cells = <3>;
- 			#size-cells = <2>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index de0323b..4beb760 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -473,9 +473,9 @@
- 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 118 0x4>, /* controller interrupt */
--				     <0 117 0x4>; /* PME interrupt */
--			interrupt-names = "intr", "pme";
-+			interrupts = <0 117 0x4>, /* PME interrupt */
-+					 <0 118 0x4>; /* aer interrupt */
-+			interrupt-names = "pme", "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -497,9 +497,9 @@
- 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
- 			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 128 0x4>,
--				     <0 127 0x4>;
--			interrupt-names = "intr", "pme";
-+			interrupts = <0 127 0x4>,
-+					 <0 128 0x4>;
-+			interrupt-names = "pme", "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -521,9 +521,9 @@
- 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
- 			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 162 0x4>,
--				     <0 161 0x4>;
--			interrupt-names = "intr", "pme";
-+			interrupts = <0 161 0x4>,
-+					 <0 162 0x4>;
-+			interrupt-names = "pme", "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index 3187c82..6edf24b 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -559,8 +559,8 @@
- 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 			       0x10 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 108 0x4>; /* Level high type */
--			interrupt-names = "intr";
-+			interrupts = <0 108 0x4>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -583,8 +583,8 @@
- 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
- 			       0x12 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 113 0x4>; /* Level high type */
--			interrupt-names = "intr";
-+			interrupts = <0 113 0x4>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -607,8 +607,8 @@
- 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
- 			       0x14 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 118 0x4>; /* Level high type */
--			interrupt-names = "intr";
-+			interrupts = <0 118 0x4>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -631,8 +631,8 @@
- 			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
- 			       0x16 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 123 0x4>; /* Level high type */
--			interrupt-names = "intr";
-+			interrupts = <0 123 0x4>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index ee72ebe..909d479 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -25,6 +25,7 @@
+ #include <linux/sched.h>
+ #include <linux/ktime.h>
+ #include <linux/mm.h>
++#include <linux/of_irq.h>
+ #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+ #include "pci.h"
+ 
+@@ -4419,3 +4420,25 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
+ 	}
+ }
+ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
++
++/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
++ * but use standalone irq. Read the device tree for the aer
++ * interrupt number.
++ */
++static void quirk_aer_interrupt(struct pci_dev *dev)
++{
++	int ret;
++	struct device_node *np = NULL;
++
++	if (dev->bus->dev.of_node)
++		np = dev->bus->dev.of_node;
++
++	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
++		ret = of_irq_get_byname(np, "aer");
++		if (ret > 0) {
++			dev->no_msi = 1;
++			dev->irq = ret;
++		}
++	}
++}
++DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_aer_interrupt);
 -- 
 2.1.0.27.g96db324
