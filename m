@@ -1,206 +1,118 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 14 Jun 2016 07:43:22 +0200
-Subject: [PATCH 1/2] drm/mediatek: Add gamma correction
-In-Reply-To: <1465872953-47706-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1465872953-47706-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <20160614054322.GL1338@phenom.ffwll.local>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Tue, 14 Jun 2016 15:45:45 +1000
+Subject: [linux-sunxi] [PATCH v3 10/13] spi: sunxi: merge sun4i and sun6i
+ SPI driver
+In-Reply-To: <CAOMqctTjGTeaFC3MJe4MoMipdSf2ppOpikBSa8A-ht2v4j86bg@mail.gmail.com>
+References: <cover.1465490774.git.hramrach@gmail.com>
+ <ad0ec30ef6b01f58e1b3b92da06e6cbd5c947354.1465490774.git.hramrach@gmail.com>
+ <CAGRGNgVONS+i=57D52VeW8J6SvfmX=iG+3VpxNS8=kJOV+WSLw@mail.gmail.com>
+ <CAOMqctQD=o6YBk-QRiqbE9Cj+ZAH1nAM33rW6ZHefV8dU3aucQ@mail.gmail.com>
+ <CAGRGNgWPBh03zQrM=OMF24ezJvC-K0TMw2oqPhuNLj-nZ=mZQA@mail.gmail.com>
+ <CAOMqctTjGTeaFC3MJe4MoMipdSf2ppOpikBSa8A-ht2v4j86bg@mail.gmail.com>
+Message-ID: <CAGRGNgUYhwr5gCcp1bkN8R3Mx3LByFXH7j9i=ZXmvX5m7OBb4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 10:55:52AM +0800, Bibby Hsieh wrote:
-> Apply gamma function to correct brightness values.
-> It applies arbitrary mapping curve to compensate the
-> incorrect transfer function of the panel.
-> 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+Hi Michal,
 
-I think it would be much better to use the new atomic color management
-support, which includes gamma. See drm_crtc_enable_color_mgmt.
--Daniel
+On Tue, Jun 14, 2016 at 3:28 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+> On 14 June 2016 at 06:47, Julian Calaby <julian.calaby@gmail.com> wrote:
+>> Hi Michal,
+>>
+>> On Tue, Jun 14, 2016 at 2:34 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+>>> Hello,
+>>>
+>>> On 14 June 2016 at 01:43, Julian Calaby <julian.calaby@gmail.com> wrote:
+>>>> Hi Michal,
+>>>>
+>>>> On Tue, Jun 14, 2016 at 3:46 AM, Michal Suchanek <hramrach@gmail.com> wrote:
+>>>>> The drivers are very similar and share multiple flaws which needed
+>>>>> separate fixes for both drivers.
+>>>>>
+>>>>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>>>>> ---
+>>>>>  drivers/spi/Kconfig     |   8 +-
+>>>>>  drivers/spi/Makefile    |   1 -
+>>>>>  drivers/spi/spi-sun4i.c | 156 +++++++++++--
+>>>>>  drivers/spi/spi-sun6i.c | 598 ------------------------------------------------
+>>>>>  4 files changed, 143 insertions(+), 620 deletions(-)
+>>>>>  delete mode 100644 drivers/spi/spi-sun6i.c
+>>>>>
+>>>>> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+>>>>> index 0b8e6c6..c76f8e4 100644
+>>>>> --- a/drivers/spi/spi-sun4i.c
+>>>>> +++ b/drivers/spi/spi-sun4i.c
+>>>>> @@ -279,9 +321,14 @@ static int sunxi_spi_transfer_one(struct spi_master *master,
+>>>>>         reg = sunxi_spi_read(sspi, SUNXI_TFR_CTL_REG);
+>>>>>
+>>>>>         /* Reset FIFOs */
+>>>>> -       sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG,
+>>>>> -                       reg | sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>>>>> -                       sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>>>>> +       if (sspi->type == SPI_SUN4I)
+>>>>> +               sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG,
+>>>>> +                               reg | sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>>>>> +                               sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>>>>> +       else
+>>>>> +               sunxi_spi_write(sspi, SUNXI_FIFO_CTL_REG,
+>>>>> +                               sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>>>>> +                               sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>>>>
+>>>> If we're already doing different stuff for each generation of the IP,
+>>>> why not just use the register offsets and bit definitions directly?
+>>>
+>>> Because having (*sspi->regmap)[SUNXI_FIFO_CTL_REG] all over the place
+>>> makes my eyes bleed and you cannot use the check that you are
+>>> accessing a register that actually exists.
+>>
+>> I mean removing SUNXI_CTL_RF_RST and SUNXI_CTL_TF_RST from all of the
+>> indirection you added and using them directly, i.e.
+>>
+>> #define SUN4I_TFR_CTL_RF_RST BIT(x)
+>> #define SUN4I_TFR_CTL_TF_RST BIT(x)
+>> #define SUN6I_FIFO_CTL_RF_RST BIT(x)
+>> #define SUN6I_FIFO_CTL_TF_RST BIT(x)
+>>
+>> then
+>>
+>> if (sspi->type == SPI_SUN4I)
+>>     sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG, reg |
+>> SUN4I_TFR_CTL_RF_RST | SUN4I_TFR_CTL_TF_RST);
+>> else
+>>     sunxi_spi_write(sspi, SUNXI_FIFO_CTL_REG, reg |
+>> SUN6I_FIFO_CTL_RF_RST | SUN6I_FIFO_CTL_TF_RST);
+>>
+>> I.e. the bits that need setting are in different registers, so you
+>> have to have an if statement and separate calls. Therefore there's no
+>> real benefit from the indirection you've introduced here, unless
+>> you're expecting the SUN8I variant to use different bits in one of
+>> those two registers.
+>>
+>
+> That looks nice for this particular case.
 
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   12 ++++++
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |    1 +
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |   56 ++++++++++++++++++++++++++-
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |    9 +++++
->  4 files changed, 77 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> index 24aa3ba..1b38406 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> @@ -127,6 +127,16 @@ static void mtk_drm_crtc_reset(struct drm_crtc *crtc)
->  	state->base.crtc = crtc;
->  }
->  
-> +static void mtk_crtc_gamma_set(struct drm_crtc *crtc, u16 *r,
-> +			       u16 *g, u16 *b, uint32_t start, uint32_t size)
-> +{
-> +	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-> +	unsigned int i;
-> +
-> +	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++)
-> +		mtk_ddp_gamma_set(mtk_crtc->ddp_comp[i], r, g, b, start, size);
-> +}
-> +
->  static struct drm_crtc_state *mtk_drm_crtc_duplicate_state(struct drm_crtc *crtc)
->  {
->  	struct mtk_crtc_state *state;
-> @@ -418,6 +428,7 @@ static const struct drm_crtc_funcs mtk_crtc_funcs = {
->  	.reset			= mtk_drm_crtc_reset,
->  	.atomic_duplicate_state	= mtk_drm_crtc_duplicate_state,
->  	.atomic_destroy_state	= mtk_drm_crtc_destroy_state,
-> +	.gamma_set		= mtk_crtc_gamma_set,
->  };
->  
->  static const struct drm_crtc_helper_funcs mtk_crtc_helper_funcs = {
-> @@ -569,6 +580,7 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
->  	if (ret < 0)
->  		goto unprepare;
->  
-> +	drm_mode_crtc_set_gamma_size(&mtk_crtc->base, MTK_LUT_SIZE);
->  	priv->crtc[pipe] = &mtk_crtc->base;
->  	priv->num_pipes++;
->  
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-> index 81e5566..d332564 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-> @@ -19,6 +19,7 @@
->  #include "mtk_drm_plane.h"
->  
->  #define OVL_LAYER_NR	4
-> +#define MTK_LUT_SIZE	512
->  
->  int mtk_drm_crtc_enable_vblank(struct drm_device *drm, unsigned int pipe);
->  void mtk_drm_crtc_disable_vblank(struct drm_device *drm, unsigned int pipe);
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> index 3970fcf..3fd5141 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> @@ -24,6 +24,7 @@
->  #include "mtk_drm_drv.h"
->  #include "mtk_drm_plane.h"
->  #include "mtk_drm_ddp_comp.h"
-> +#include "mtk_drm_crtc.h"
->  
->  #define DISP_OD_EN				0x0000
->  #define DISP_OD_INTEN				0x0008
-> @@ -38,6 +39,18 @@
->  #define DISP_COLOR_WIDTH			0x0c50
->  #define DISP_COLOR_HEIGHT			0x0c54
->  
-> +#define DISP_AAL_EN				0x000
-> +#define DISP_AAL_SIZE				0x030
-> +
-> +#define DISP_GAMMA_CFG				0x020
-> +#define DISP_GAMMA_LUT				0x700
-> +
-> +#define LUT_10BIT_MASK				0x3ff
-> +
-> +#define AAL_EN			BIT(0)
-> +
-> +#define GAMMA_LUT_EN		BIT(1)
-> +
->  #define	OD_RELAY_MODE		BIT(0)
->  
->  #define	UFO_BYPASS		BIT(2)
-> @@ -76,6 +89,40 @@ static void mtk_ufoe_start(struct mtk_ddp_comp *comp)
->  	writel(UFO_BYPASS, comp->regs + DISP_REG_UFO_START);
->  }
->  
-> +static void mtk_aal_config(struct mtk_ddp_comp *comp, unsigned int w,
-> +			   unsigned int h, unsigned int vrefresh)
-> +{
-> +	writel(h << 16 | w, comp->regs + DISP_AAL_SIZE);
-> +}
-> +
-> +static void mtk_aal_start(struct mtk_ddp_comp *comp)
-> +{
-> +	writel(AAL_EN, comp->regs  + DISP_AAL_EN);
-> +}
-> +
-> +static void mtk_aal_stop(struct mtk_ddp_comp *comp)
-> +{
-> +	writel_relaxed(0x0, comp->regs  + DISP_AAL_EN);
-> +}
-> +
-> +static void mtk_gamma_set(struct mtk_ddp_comp *comp, u16 *r, u16 *g,
-> +			  u16 *b, uint32_t start, uint32_t size)
-> +{
-> +	int i;
-> +	unsigned int lut;
-> +	int end = (start + size > MTK_LUT_SIZE) ? MTK_LUT_SIZE : start + size;
-> +	void __iomem *lut_base;
-> +
-> +	writel(GAMMA_LUT_EN, comp->regs + DISP_GAMMA_CFG);
-> +	lut_base = comp->regs + DISP_GAMMA_LUT;
-> +	for (i = start; i < end; i++) {
-> +		lut = (((r[i] >> 6) & LUT_10BIT_MASK) << 20) +
-> +			(((g[i] >> 6) & LUT_10BIT_MASK) << 10) +
-> +			((b[i] >> 6) & LUT_10BIT_MASK);
-> +		writel(lut, (lut_base + i * 4));
-> +	}
-> +}
-> +
->  static const struct mtk_ddp_comp_funcs ddp_color = {
->  	.config = mtk_color_config,
->  	.start = mtk_color_start,
-> @@ -90,6 +137,13 @@ static const struct mtk_ddp_comp_funcs ddp_ufoe = {
->  	.start = mtk_ufoe_start,
->  };
->  
-> +static const struct mtk_ddp_comp_funcs ddp_aal = {
-> +	.gamma_set = mtk_gamma_set,
-> +	.config = mtk_aal_config,
-> +	.start = mtk_aal_start,
-> +	.stop = mtk_aal_stop,
-> +};
-> +
->  static const char * const mtk_ddp_comp_stem[MTK_DDP_COMP_TYPE_MAX] = {
->  	[MTK_DISP_OVL] = "ovl",
->  	[MTK_DISP_RDMA] = "rdma",
-> @@ -112,7 +166,7 @@ struct mtk_ddp_comp_match {
->  };
->  
->  static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
-> -	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, NULL },
-> +	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
->  	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
->  	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
->  	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> index 6b13ba9..0832179 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> @@ -73,6 +73,8 @@ struct mtk_ddp_comp_funcs {
->  	void (*layer_off)(struct mtk_ddp_comp *comp, unsigned int idx);
->  	void (*layer_config)(struct mtk_ddp_comp *comp, unsigned int idx,
->  			     struct mtk_plane_state *state);
-> +	void (*gamma_set)(struct mtk_ddp_comp *comp, u16 *r, u16 *g, u16 *b,
-> +			  u32 start, u32 size);
->  };
->  
->  struct mtk_ddp_comp {
-> @@ -139,6 +141,13 @@ static inline void mtk_ddp_comp_layer_config(struct mtk_ddp_comp *comp,
->  		comp->funcs->layer_config(comp, idx, state);
->  }
->  
-> +static inline void mtk_ddp_gamma_set(struct mtk_ddp_comp *comp, u16 *r, u16 *g,
-> +				     u16 *b, uint32_t start, uint32_t size)
-> +{
-> +	if (comp->funcs && comp->funcs->gamma_set)
-> +		comp->funcs->gamma_set(comp, r, g, b, start, size);
-> +}
-> +
->  int mtk_ddp_comp_get_id(struct device_node *node,
->  			enum mtk_ddp_comp_type comp_type);
->  int mtk_ddp_comp_init(struct device *dev, struct device_node *comp_node,
-> -- 
-> 1.7.9.5
-> 
+There was another case I pointed out in this driver that could
+potentially benefit from this.
+
+> Still you will have to remember that these bits are specified directly
+> while other bits on the register are mapped which is not so nice.
+
+True. I'm not sure which path is best in this case. To my eye, your
+indirection scheme seems like the "heavy" solution, however I have no
+idea what form a "lighter" solution would take.
+
+Other drivers I've seen which have tackled similar problems have used
+a large struct to hold all the variant-specific stuff, whether that's
+function pointers, register offsets, constants, etc. (so this code
+could theoretically be re-written as sunxi_spi_write(sspi,
+sspi->fifo_reg, reg | sspi->fifo_reset_arg) or sspi->reset_fifo())
+however the driver I saw doing this (rtl8xxxu) was handling much more
+significant differences between device variants than you are.
+
+Thanks,
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
