@@ -1,64 +1,32 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 14 Jun 2016 15:42:15 +0100
-Subject: [PATCH RESEND 1/3] dt-bindings: add bindings documentation for
- PDC driver.
-In-Reply-To: <1465912965-35500-2-git-send-email-rob.rice@broadcom.com>
-References: <1465912965-35500-1-git-send-email-rob.rice@broadcom.com>
- <1465912965-35500-2-git-send-email-rob.rice@broadcom.com>
-Message-ID: <576017C7.50609@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 14 Jun 2016 15:43:04 +0100
+Subject: [PATCH] arm64: Implement arch_setup_pdev_archdata hook
+In-Reply-To: <CAMz4kuJbqdmO=Uk07kWSnpg0+yGkzsZMWwNZdyMPH_-7svDdnQ@mail.gmail.com>
+References: <b4645ade4a4d4150e76594f5bf04a3ad5e7d5221.1465287808.git.baolin.wang@linaro.org>
+ <575690CB.5080501@arm.com>
+ <CAMz4kuJbqdmO=Uk07kWSnpg0+yGkzsZMWwNZdyMPH_-7svDdnQ@mail.gmail.com>
+Message-ID: <20160614144304.GD14654@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 07, 2016 at 05:22:25PM +0800, Baolin Wang wrote:
+> On 7 June 2016 at 17:15, Robin Murphy <robin.murphy@arm.com> wrote:
+> > Please elaborate on the situation that you're attempting to address here
+> > (please don't let it be the ongoing Designware USB catastrophe ;))
+> 
+> Yes, like you mentioned, we met problems at DesignWare USB3 controller
+> host glue, do you have any better solutions to solve this problem?
 
+There has been a recent thread on this topic:
 
-On 14/06/16 15:02, Rob Rice wrote:
-> From: Rob Rice <rrice@broadcom.com>
->
-> Add the device tree binding documentation for the PDC hardware
-> in Broadcom iProc SoCs.
->
-> Signed-off-by: Rob Rice <rob.rice@broadcom.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->   .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       | 23 ++++++++++++++++++++++
->   1 file changed, 23 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
-> new file mode 100644
-> index 0000000..411ccf4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
-> @@ -0,0 +1,23 @@
-> +The PDC driver manages data transfer to and from various offload engines
-> +on some Broadcom SoCs. An SoC may have multiple PDC hardware blocks. There is
-> +one device tree entry per block.
-> +
-> +Required properties:
-> +- compatible : Should be "brcm,iproc-pdc-mbox".
-> +- reg: Should contain PDC registers location and length.
-> +- interrupts: Should contain the IRQ line for the PDC.
-> +- #mbox-cells: 1
-> +- brcm,rx-status-len: Length of metadata preceding received frames, in bytes.
-> +
+http://thread.gmane.org/gmane.linux.usb.general/140374
 
-Ideally the metadata is more associated with the software protocol built
-on top of the mailbox controller.
+And a subsequent patch with another long discussion:
 
-Is this metadata added by the hardware ?
+http://thread.gmane.org/gmane.linux.kernel/2207020
 
-Otherwise it's better to make it part of the protocol rather than the
-associating with the controller.
-
-> +Optional properties:
-> +- brcm,use-bcm-hdr:  present if a BCM header precedes each frame.
-> +
-
-Same here.
+Please have a look, maybe you can make more sense of it ;). AFAICT,
+there was no clear conclusion reached.
 
 -- 
-Regards,
-Sudeep
+Catalin
