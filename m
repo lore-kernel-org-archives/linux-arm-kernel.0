@@ -1,75 +1,76 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 14 Jun 2016 17:07:26 +0200
-Subject: [PATCH 08/10] i2c: designware-platdrv: Check return value from
- clk_prepare_enable()
-In-Reply-To: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
-References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1465916848-8207-9-git-send-email-ulf.hansson@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 14 Jun 2016 18:10:56 +0300
+Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
+ of aliases
+In-Reply-To: <20160614120152.GW26768@pengutronix.de>
+References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <575FE7F0.6090200@ti.com> <20160614120152.GW26768@pengutronix.de>
+Message-ID: <57601E80.1060003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As clk_prepare_enable() can fail, let's not ignore the error in the
-->runtime_resume() callback, but instead propagate it.
+On 06/14/2016 03:01 PM, Uwe Kleine-K?nig wrote:
+> Hello Grygorii,
+> 
+> On Tue, Jun 14, 2016 at 02:18:08PM +0300, Grygorii Strashko wrote:
+>> On 06/14/2016 01:03 PM, Uwe Kleine-K?nig wrote:
+>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>> index b98ede78c9d8..6814245a54aa 100644
+>>> --- a/drivers/gpio/gpio-omap.c
+>>> +++ b/drivers/gpio/gpio-omap.c
+>>> @@ -1034,6 +1034,7 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
+>>>    	static int gpio;
+>>>    	int irq_base = 0;
+>>>    	int ret;
+>>> +	int gpio_alias_id;
+>>>    
+>>>    	/*
+>>>    	 * REVISIT eventually switch from OMAP-specific gpio structs
+>>> @@ -1056,6 +1057,17 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
+>>>    		bank->chip.label = "gpio";
+>>>    		bank->chip.base = gpio;
+>>
+>> I think, the gpio base correction should be done here
+> 
+> What is the upside of doing it here? It has the downside that it needs
+> one more indention level. The only difference I see is that it doesn't
+> apply for mpuio devices then and wonder if that is relevant.
 
-This change decreases the callers of i2c_dw_plat_prepare_clk() down to
-one, which seems like a justification of removing it. Instead let's call
-clk_disable_unprepare() directly when needed.
+Personally, I prefer not ti touch mpuio code unless really required.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/i2c/busses/i2c-designware-platdrv.c | 25 ++++++++++---------------
- 1 file changed, 10 insertions(+), 15 deletions(-)
+>   
+>>>    	}
+>>> +
+>>> +	/*
+>>> +	 * Traditionally the base is given out in first-come-first-serve order.
+>>> +	 * This might shuffle the numbering of gpios if the probe order changes.
+>>> +	 * So make the base deterministical if the device tree specifies alias
+>>> +	 * ids.
+>>> +	 */
+>>> +	gpio_alias_id = of_alias_get_id(bank->chip.of_node, "gpio");
+>>> +	if (gpio_alias_id >= 0)
+>>> +		bank->chip.base = bank->width * gpio_alias_id;
+>>> +
+>>
+>> Unfortunately, this driver is still used by non-DT platforms, so above code will
+>>   break build if !OF && !OF_GPIO
+> 
+> Without CONFIG_OF of_alias_get_id still exists and returns -ENOSYS which
+> should make the added code a nop. Does your compiler agree with you that
+> my patch breaks building the driver?
 
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 95a9f4e..2b91af3 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -308,25 +308,15 @@ static void dw_i2c_plat_complete(struct device *dev)
- #endif
- 
- #ifdef CONFIG_PM
--static int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
--{
--	if (IS_ERR(i_dev->clk))
--		return PTR_ERR(i_dev->clk);
--
--	if (prepare)
--		return clk_prepare_enable(i_dev->clk);
--
--	clk_disable_unprepare(i_dev->clk);
--	return 0;
--}
--
- static int dw_i2c_plat_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
- 
- 	i2c_dw_disable(i_dev);
--	i2c_dw_plat_prepare_clk(i_dev, false);
-+
-+	if (!IS_ERR(i_dev->clk))
-+		clk_disable_unprepare(i_dev->clk);
- 
- 	return 0;
- }
-@@ -335,10 +325,15 @@ static int dw_i2c_plat_resume(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
-+	int ret;
- 
--	i2c_dw_plat_prepare_clk(i_dev, true);
--	i2c_dw_init(i_dev);
-+	if (!IS_ERR(i_dev->clk)) {
-+		ret = clk_prepare_enable(i_dev->clk);
-+		if (ret)
-+			return ret;
-+	}
- 
-+	i2c_dw_init(i_dev);
- 	return 0;
- }
- 
+make ARCH=arm omap1_defconfig
+make ARCH=arm ./drivers/gpio/gpio-omap.o
+
+
+drivers/gpio/gpio-omap.c: In function 'omap_gpio_chip_init':
+drivers/gpio/gpio-omap.c:1066:44: error: 'struct gpio_chip' has no member named 'of_node'
+  gpio_alias_id = of_alias_get_id(bank->chip.of_node, "gpio");
+                                            ^
+make[1]: *** [drivers/gpio/gpio-omap.o] Error 1
+make: *** [drivers/gpio/gpio-omap.o] Error 2
+
+
 -- 
-1.9.1
+regards,
+-grygorii
