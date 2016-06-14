@@ -1,73 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Jun 2016 15:37:50 +0100
-Subject: [PATCH v2 3/7] of/irq: Break out msi-map lookup (again)
-In-Reply-To: <2cbffa9a341edfd10114994f6486f6b08d0c390c.1464966939.git.robin.murphy@arm.com>
-References: <cover.1464966939.git.robin.murphy@arm.com>
- <2cbffa9a341edfd10114994f6486f6b08d0c390c.1464966939.git.robin.murphy@arm.com>
-Message-ID: <20160614143750.GJ19407@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 14 Jun 2016 15:42:15 +0100
+Subject: [PATCH RESEND 1/3] dt-bindings: add bindings documentation for
+ PDC driver.
+In-Reply-To: <1465912965-35500-2-git-send-email-rob.rice@broadcom.com>
+References: <1465912965-35500-1-git-send-email-rob.rice@broadcom.com>
+ <1465912965-35500-2-git-send-email-rob.rice@broadcom.com>
+Message-ID: <576017C7.50609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 06:15:38PM +0100, Robin Murphy wrote:
-> The PCI msi-map code is already doing double-duty translating IDs and
-> retrieving MSI parents, which unsurprisingly is the same functionality
-> we need for the identically-formatted PCI iommu-map property. Drag the
-> core parsing routine up yet another layer into the general OF-PCI code,
-> and further generalise it for either kind of lookup in either flavour
-> of map property.
-> 
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Frank Rowand <frowand.list@gmail.com>
-> CC: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+
+
+On 14/06/16 15:02, Rob Rice wrote:
+> From: Rob Rice <rrice@broadcom.com>
+>
+> Add the device tree binding documentation for the PDC hardware
+> in Broadcom iProc SoCs.
+>
+> Signed-off-by: Rob Rice <rob.rice@broadcom.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 > ---
-> 
-> v2: No change.
-> 
->  drivers/of/irq.c       |  70 ++-------------------------------
->  drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_pci.h |   8 ++++
->  3 files changed, 114 insertions(+), 66 deletions(-)
-
-[...]
-
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 13f4fed38048..20bf5a0c57fd 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -306,3 +306,105 @@ struct msi_controller *of_pci_find_msi_chip_by_node(struct device_node *of_node)
->  EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
->  
->  #endif /* CONFIG_PCI_MSI */
+>   .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       | 23 ++++++++++++++++++++++
+>   1 file changed, 23 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+> new file mode 100644
+> index 0000000..411ccf4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+> @@ -0,0 +1,23 @@
+> +The PDC driver manages data transfer to and from various offload engines
+> +on some Broadcom SoCs. An SoC may have multiple PDC hardware blocks. There is
+> +one device tree entry per block.
 > +
-> +#define MASK_NAME_LEN	32	/* Safely longer than "iommu-map-mask" */
+> +Required properties:
+> +- compatible : Should be "brcm,iproc-pdc-mbox".
+> +- reg: Should contain PDC registers location and length.
+> +- interrupts: Should contain the IRQ line for the PDC.
+> +- #mbox-cells: 1
+> +- brcm,rx-status-len: Length of metadata preceding received frames, in bytes.
 > +
-> +/**
-> + * of_pci_map_rid - Translate a requester ID through a downstream mapping.
-> + * @np: root complex device node.
-> + * @map_name: property name of the map to use.
-> + * @target: optional pointer to a target device node.
-> + * @id_out: optional pointer to receive the translated ID.
-> + *
-> + * Given a PCI requester ID, look up the appropriate implementation-defined
-> + * platform ID and/or the target device which receives transactions on that
-> + * ID, as per the "iommu-map" and "msi-map" bindings. @target or @id_out may
-> + * be NULL if not required. If @target points to a device node pointer, only
-> + * entries targeting that node will be matched; if it points to a NULL
-> + * value, it will receive the device node for the first matching target entry,
-> + * with a reference held.
-> + *
-> + * Return: 0 on success or a standard error code on failure.
-> + */
-> +int of_pci_map_rid(struct device_node *np, const char *map_name, u32 rid_in,
-> +		   struct device_node **target, u32 *rid_out)
-> +{
-> +	u32 map_mask, masked_rid;
-> +	int map_len;
-> +	const __be32 *map = NULL;
-> +	char mask_name[MASK_NAME_LEN];
 
-Couldn't you avoid this if you just took const char *mask_name as a
-parameter too?
+Ideally the metadata is more associated with the software protocol built
+on top of the mailbox controller.
 
-Will
+Is this metadata added by the hardware ?
+
+Otherwise it's better to make it part of the protocol rather than the
+associating with the controller.
+
+> +Optional properties:
+> +- brcm,use-bcm-hdr:  present if a BCM header precedes each frame.
+> +
+
+Same here.
+
+-- 
+Regards,
+Sudeep
