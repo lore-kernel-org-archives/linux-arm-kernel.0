@@ -1,64 +1,47 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 14 Jun 2016 17:16:50 +0100
-Subject: [PATCH 6/6] arm64: trap userspace "dc cvau" cache operation on
- errata-affected core
-In-Reply-To: <1462812590-4494-7-git-send-email-andre.przywara@arm.com>
-References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
- <1462812590-4494-7-git-send-email-andre.przywara@arm.com>
-Message-ID: <57602DF2.1040501@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 14 Jun 2016 18:18:20 +0200
+Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
+In-Reply-To: <20160614160517.GA2490@afzalpc>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <11395561.bQatt85IOg@wuerfel> <20160613152409.GD3240@piout.net>
+ <20160614160517.GA2490@afzalpc>
+Message-ID: <20160614181820.1b817ed3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/16 17:49, Andre Przywara wrote:
-> The ARM errata 819472, 826319, 827319 and 824069 for affected
-> Cortex-A53 cores demand to promote "dc cvau" instructions to
-> "dc civac". Since we allow userspace to also emit those instructions,
-> we should make sure that "dc cvau" gets promoted there too.
-> So lets grasp the nettle here and actually trap every userland cache
-> maintenance instruction once we detect at least one affected core in
-> the system.
-> We then emulate the instruction by executing it on behalf of userland,
-> promoting "dc cvau" to "dc civac" on the way and injecting access
-> fault back into userspace.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+On Tue, 14 Jun 2016 21:35:17 +0530
+Afzal Mohammed <afzal.mohd.ma@gmail.com> wrote:
+
+> Hi,
+> 
+> On Mon, Jun 13, 2016 at 05:24:09PM +0200, Alexandre Belloni wrote:
+> > On 11/06/2016 at 00:30:36 +0200, Arnd Bergmann wrote :  
+> 
+> > > Does this have to be called that early? It seems wasteful to always
+> > > call udelay() here, when these are functions that are normally
+> > > allowed to sleep.  
+> 
+> > So I've tested it and something like that would work:
+> > 
+> > 	if (system_state < SYSTEM_RUNNING)
+> > 		udelay(osc->startup_usec);
+> > 	else
+> > 		usleep_range(osc->startup_usec, osc->startup_usec + 1);
+> > 
+> > But I'm afraid it would be the first driver to actually do something
+> > like that (however, it is already the only driver trying to sleep).   
+> 
+> tglx has suggested to modify clock core to handle a somewhat similar
+> kind of scenario (probably should work here too) and avoid driver
+> changes,
+> 
+> http://lkml.kernel.org/r/alpine.DEB.2.11.1606061448010.28031 at nanos
+
+Oh, interesting. Definitely a better solution than this custom check.
 
 
-> +
-> +asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
-> +{
-> +	unsigned long address;
-> +	int ret;
-> +
-> +	/* if this is a write with: Op0=1, Op2=1, Op1=3, CRn=7 */
-> +	if ((esr & 0x01fffc01) == 0x0012dc00) {
-> +		int rt = (esr >> 5) & 0x1f;
-> +		int crm = (esr >> 1) & 0x0f;
-> +
-> +		address = regs->regs[rt];
-> +
-> +		switch (crm) {
-> +		case 11:		/* DC CVAU, gets promoted */
-> +			__user_cache_maint("dc civac", address, ret);
-> +			break;
-> +		case 10:		/* DC CVAC, gets promoted */
-> +			__user_cache_maint("dc civac", address, ret);
-> +			break;
-> +		case 14:		/* DC CIVAC */
-> +			__user_cache_maint("dc civac", address, ret);
-> +			break;
-> +		case 5:			/* IC IVAU */
-> +			__user_cache_maint("ic ivau", address, ret);
-> +			break;
-> +		default:
-> +			force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> +			return;
-> +		}
-> +	} else {
-> +		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> +		return;
-
-Correct me if I am wrong, I think we should handle DC ZVA and emulate the same ?
-Thats the only EL0 accessible instruction we don't handle above.
-
-Suzuki
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
