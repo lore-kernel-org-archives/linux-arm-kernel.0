@@ -1,86 +1,153 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Tue, 14 Jun 2016 14:17:35 +0300
-Subject: [PATCH v2 1/4] ARM: dts: sun4i: Add A10 NAND controller pin
- definitions
-In-Reply-To: <1465903058-9211-1-git-send-email-mamlinav@gmail.com>
-References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
- <1465903058-9211-1-git-send-email-mamlinav@gmail.com>
-Message-ID: <1465903058-9211-2-git-send-email-mamlinav@gmail.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Tue, 14 Jun 2016 21:20:12 +1000
+Subject: [linux-sunxi] [PATCH v3 10/13] spi: sunxi: merge sun4i and sun6i
+ SPI driver
+In-Reply-To: <CAOMqctTff3S9dBa0JVnPwRyY6j2kVbB8SCTKham-MH8CX6JwJw@mail.gmail.com>
+References: <cover.1465490774.git.hramrach@gmail.com>
+ <ad0ec30ef6b01f58e1b3b92da06e6cbd5c947354.1465490774.git.hramrach@gmail.com>
+ <CAGRGNgVONS+i=57D52VeW8J6SvfmX=iG+3VpxNS8=kJOV+WSLw@mail.gmail.com>
+ <CAOMqctQD=o6YBk-QRiqbE9Cj+ZAH1nAM33rW6ZHefV8dU3aucQ@mail.gmail.com>
+ <CAGRGNgWPBh03zQrM=OMF24ezJvC-K0TMw2oqPhuNLj-nZ=mZQA@mail.gmail.com>
+ <CAOMqctTjGTeaFC3MJe4MoMipdSf2ppOpikBSa8A-ht2v4j86bg@mail.gmail.com>
+ <CAGRGNgUYhwr5gCcp1bkN8R3Mx3LByFXH7j9i=ZXmvX5m7OBb4A@mail.gmail.com>
+ <CAOMqctTff3S9dBa0JVnPwRyY6j2kVbB8SCTKham-MH8CX6JwJw@mail.gmail.com>
+Message-ID: <CAGRGNgVuxy7cF4ZSHKxMWKUQQ_TWEMMsw8xLVT6DMmqtDE_rrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+Hi Michal,
 
-Define the NAND controller pin configs.
+On Tue, Jun 14, 2016 at 4:35 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+> Hello,
+>
+> On 14 June 2016 at 07:45, Julian Calaby <julian.calaby@gmail.com> wrote:
+>> Hi Michal,
+>>
+>> On Tue, Jun 14, 2016 at 3:28 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+>>> On 14 June 2016 at 06:47, Julian Calaby <julian.calaby@gmail.com> wrote:
+>>>> Hi Michal,
+>>>>
+>>>> On Tue, Jun 14, 2016 at 2:34 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+>>>>> Hello,
+>>>>>
+>>>>> On 14 June 2016 at 01:43, Julian Calaby <julian.calaby@gmail.com> wrote:
+>>>>>> Hi Michal,
+>>>>>>
+>>>>>> On Tue, Jun 14, 2016 at 3:46 AM, Michal Suchanek <hramrach@gmail.com> wrote:
+>>>>>>> The drivers are very similar and share multiple flaws which needed
+>>>>>>> separate fixes for both drivers.
+>>>>>>>
+>>>>>>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>>>>>>> ---
+>>>>>>>  drivers/spi/Kconfig     |   8 +-
+>>>>>>>  drivers/spi/Makefile    |   1 -
+>>>>>>>  drivers/spi/spi-sun4i.c | 156 +++++++++++--
+>>>>>>>  drivers/spi/spi-sun6i.c | 598 ------------------------------------------------
+>>>>>>>  4 files changed, 143 insertions(+), 620 deletions(-)
+>>>>>>>  delete mode 100644 drivers/spi/spi-sun6i.c
+>>>>>>>
+>>>>>>> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+>>>>>>> index 0b8e6c6..c76f8e4 100644
+>>>>>>> --- a/drivers/spi/spi-sun4i.c
+>>>>>>> +++ b/drivers/spi/spi-sun4i.c
+>>>>>>> @@ -279,9 +321,14 @@ static int sunxi_spi_transfer_one(struct spi_master *master,
+>>>>>>>         reg = sunxi_spi_read(sspi, SUNXI_TFR_CTL_REG);
+>>>>>>>
+>>>>>>>         /* Reset FIFOs */
+>>>>>>> -       sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG,
+>>>>>>> -                       reg | sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>>>>>>> -                       sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>>>>>>> +       if (sspi->type == SPI_SUN4I)
+>>>>>>> +               sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG,
+>>>>>>> +                               reg | sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>>>>>>> +                               sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>>>>>>> +       else
+>>>>>>> +               sunxi_spi_write(sspi, SUNXI_FIFO_CTL_REG,
+>>>>>>> +                               sspi_bits(sspi, SUNXI_CTL_RF_RST) |
+>>>>>>> +                               sspi_bits(sspi, SUNXI_CTL_TF_RST));
+>>>>>>
+>>>>>> If we're already doing different stuff for each generation of the IP,
+>>>>>> why not just use the register offsets and bit definitions directly?
+>>>>>
+>>>>> Because having (*sspi->regmap)[SUNXI_FIFO_CTL_REG] all over the place
+>>>>> makes my eyes bleed and you cannot use the check that you are
+>>>>> accessing a register that actually exists.
+>>>>
+>>>> I mean removing SUNXI_CTL_RF_RST and SUNXI_CTL_TF_RST from all of the
+>>>> indirection you added and using them directly, i.e.
+>>>>
+>>>> #define SUN4I_TFR_CTL_RF_RST BIT(x)
+>>>> #define SUN4I_TFR_CTL_TF_RST BIT(x)
+>>>> #define SUN6I_FIFO_CTL_RF_RST BIT(x)
+>>>> #define SUN6I_FIFO_CTL_TF_RST BIT(x)
+>>>>
+>>>> then
+>>>>
+>>>> if (sspi->type == SPI_SUN4I)
+>>>>     sunxi_spi_write(sspi, SUNXI_TFR_CTL_REG, reg |
+>>>> SUN4I_TFR_CTL_RF_RST | SUN4I_TFR_CTL_TF_RST);
+>>>> else
+>>>>     sunxi_spi_write(sspi, SUNXI_FIFO_CTL_REG, reg |
+>>>> SUN6I_FIFO_CTL_RF_RST | SUN6I_FIFO_CTL_TF_RST);
+>>>>
+>>>> I.e. the bits that need setting are in different registers, so you
+>>>> have to have an if statement and separate calls. Therefore there's no
+>>>> real benefit from the indirection you've introduced here, unless
+>>>> you're expecting the SUN8I variant to use different bits in one of
+>>>> those two registers.
+>>>>
+>>>
+>>> That looks nice for this particular case.
+>>
+>> There was another case I pointed out in this driver that could
+>> potentially benefit from this.
+>>
+>>> Still you will have to remember that these bits are specified directly
+>>> while other bits on the register are mapped which is not so nice.
+>>
+>> True. I'm not sure which path is best in this case. To my eye, your
+>> indirection scheme seems like the "heavy" solution, however I have no
+>> idea what form a "lighter" solution would take.
+>>
+>> Other drivers I've seen which have tackled similar problems have used
+>> a large struct to hold all the variant-specific stuff, whether that's
+>> function pointers, register offsets, constants, etc. (so this code
+>> could theoretically be re-written as sunxi_spi_write(sspi,
+>> sspi->fifo_reg, reg | sspi->fifo_reset_arg)
+>
+> This won't do. There is fifo_reg and tfr_reg on both IPs but some bits
+> from one migrated to the other.
+>
+>> or sspi->reset_fifo())
+>
+> This would work but would require more thorough rewrite and heavier
+> adaptation layer.
+>
+> As it is where different register is used in different IP revision it
+> is specified explicitly in the code while register names to numbers
+> are mapped in read() and write(). Value bits are mapped by explicitly
+> calling a function on the name.
+>
+> This gives nice 1:1 mapping to the old code and allows checking that
+> both the register and the bit value in question exist on the IP.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+And your method is almost beautiful from that perspective, however I
+still feel that it's too "heavy". That said, neither of my suggestions
+are much better. I provided them in the hope that they might be
+illuminating.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 6d9c7c70..e579bdd 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -1033,6 +1033,58 @@
- 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
-+			nand_pins_a: nand_base0 at 0 {
-+				allwinner,pins = "PC0", "PC1", "PC2",
-+						"PC5", "PC8", "PC9", "PC10",
-+						"PC11", "PC12", "PC13", "PC14",
-+						"PC15", "PC16";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs0_pins_a: nand_cs at 0 {
-+				allwinner,pins = "PC4";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs1_pins_a: nand_cs at 1 {
-+				allwinner,pins = "PC3";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs2_pins_a: nand_cs at 2 {
-+				allwinner,pins = "PC17";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs3_pins_a: nand_cs at 3 {
-+				allwinner,pins = "PC18";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_rb0_pins_a: nand_rb at 0 {
-+				allwinner,pins = "PC6";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_rb1_pins_a: nand_rb at 1 {
-+				allwinner,pins = "PC7";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
- 			ps20_pins_a: ps20 at 0 {
- 				allwinner,pins = "PI20", "PI21";
- 				allwinner,function = "ps2";
+> Matching the value to register relies on the driver code, however.
+
+Of course.
+
+I'm not sure what the state-of-the-art for dealing with variants of
+devices where the manufacturer keeps scrambling the registers is,
+however I feel we can do better, though I'm not sure how.
+
+Thanks,
+
 -- 
-2.7.3
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
