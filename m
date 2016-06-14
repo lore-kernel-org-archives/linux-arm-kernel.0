@@ -1,90 +1,34 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 14 Jun 2016 14:48:43 +1000
-Subject: [linux-sunxi] [PATCH v3 11/13] dt: spi: sun4i: merge sun4i and
- sun6i binding doc
-In-Reply-To: <CAOMqctTtpZ-kCJNUO7NZ855444LuAnsJewjK=nEOaoy0NOT3OQ@mail.gmail.com>
-References: <cover.1465490774.git.hramrach@gmail.com>
- <cccbd6c3f0a194ec6eecd6627c4874da7b936f37.1465490774.git.hramrach@gmail.com>
- <CAGRGNgWXG_d2ScrgehbSHguF-V0cXy-Vr1=zLE36v5rDu6pYtQ@mail.gmail.com>
- <CAOMqctTtpZ-kCJNUO7NZ855444LuAnsJewjK=nEOaoy0NOT3OQ@mail.gmail.com>
-Message-ID: <CAGRGNgUX62i53JOZ5BwA5=VfPHEw5wmVKnx8yAz1Jr8rAyqnTw@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 13 Jun 2016 21:49:26 -0700
+Subject: [PATCH 1/2] dmaengine: bcm2835: Fix cyclic DMA period splitting
+In-Reply-To: <1465472504-10191-2-git-send-email-hias@horus.com>
+References: <1465472504-10191-1-git-send-email-hias@horus.com>
+ <1465472504-10191-2-git-send-email-hias@horus.com>
+Message-ID: <87a8iowf1l.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Matthias Reichl <hias@horus.com> writes:
 
-On Tue, Jun 14, 2016 at 2:40 PM, Michal Suchanek <hramrach@gmail.com> wrote:
-> On 14 June 2016 at 01:45, Julian Calaby <julian.calaby@gmail.com> wrote:
->> Hi Michal,
->>
->> On Tue, Jun 14, 2016 at 3:46 AM, Michal Suchanek <hramrach@gmail.com> wrote:
->>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->>> ---
->>>  .../devicetree/bindings/spi/spi-sun4i.txt          | 21 ++++++++++---------
->>>  .../devicetree/bindings/spi/spi-sun6i.txt          | 24 ----------------------
->>>  2 files changed, 11 insertions(+), 34 deletions(-)
->>>  delete mode 100644 Documentation/devicetree/bindings/spi/spi-sun6i.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/spi/spi-sun4i.txt b/Documentation/devicetree/bindings/spi/spi-sun4i.txt
->>> index de827f5..329e543 100644
->>> --- a/Documentation/devicetree/bindings/spi/spi-sun4i.txt
->>> +++ b/Documentation/devicetree/bindings/spi/spi-sun4i.txt
->>> @@ -1,7 +1,8 @@
->>> -Allwinner A10 SPI controller
->>> +Allwinner A10/A31 SPI controller
->>>
->>>  Required properties:
->>> -- compatible: Should be "allwinner,sun4-a10-spi".
->>> +- compatible: Should be one of "allwinner,sun4i-a10-spi" and
->>> +                               "allwinner,sun6i-a31-spi"
->>>  - reg: Should contain register location and length.
->>>  - interrupts: Should contain interrupt.
->>>  - clocks: phandle to the clocks feeding the SPI controller. Two are
->>> @@ -9,16 +10,16 @@ Required properties:
->>>    - "ahb": the gated AHB parent clock
->>>    - "mod": the parent module clock
->>>  - clock-names: Must contain the clock names described just above
->>> +- resets: (sun6i only) phandle to the reset controller asserting
->>> +         this device in reset
->>>
->>>  Example:
->>>
->>> -spi1: spi at 01c06000 {
->>> -       compatible = "allwinner,sun4i-a10-spi";
->>> -       reg = <0x01c06000 0x1000>;
->>> -       interrupts = <11>;
->>> -       clocks = <&ahb_gates 21>, <&spi1_clk>;
->>> +spi1: spi at 01c69000 {
->>> +       compatible = "allwinner,sun6i-a31-spi";
->>> +       reg = <0x01c69000 0x1000>;
->>> +       interrupts = <0 66 4>;
->>> +       clocks = <&ahb1_gates 21>, <&spi1_clk>;
->>>         clock-names = "ahb", "mod";
->>> -       status = "disabled";
->>> -       #address-cells = <1>;
->>> -       #size-cells = <0>;
->>> +       resets = <&ahb1_rst 21>;
->>
->> Why not have an example of each type?
+> The code responsible for splitting periods into chunks that
+> can be handled by the DMA controller missed to update total_len,
+> the number of bytes processed in the current period, when there
+> are more chunks to follow.
 >
-> How many binding docs have examples of all types?
-
-I'm pretty sure that there's a few. This was only a suggestion, so if
-it's not to your taste, ignore it.
-
-> There are actual DTs using these so you can look at those as well.
+> Therefore total_len was stuck at 0 and the code didn't work at all.
+> This resulted in a wrong control block layout and audio issues because
+> the cyclic DMA callback wasn't executing on period boundaries.
 >
-> This driver covers 3 types of bindings which look different in the DT:
->
-> sun4i IP with some Chinese interrupt controller, sun4i IP with GIC,
-> and sun6i IP with GIC.
+> Fix this by adding the missing total_len update.
 
-Fair point.
+It looks like this issue has been around for a long time, and this fix
+is pretty dependent on the recent refactors.
 
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160613/57a4493c/attachment.sig>
