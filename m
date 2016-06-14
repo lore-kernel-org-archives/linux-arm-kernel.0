@@ -1,80 +1,87 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 14 Jun 2016 11:17:12 -0600
-Subject: [PATCH 1/3] coresight: Fix NULL pointer dereference in
- _coresight_build_path
+Date: Tue, 14 Jun 2016 11:17:13 -0600
+Subject: [PATCH 2/3] coresight: Fix tmc_read_unprepare_etr
 In-Reply-To: <1465924634-22310-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1465924634-22310-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1465924634-22310-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1465924634-22310-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-_coresight_build_path assumes that all the connections of a csdev
-has the child_dev initialised. This may not be true if the particular
-component is not supported by the kernel config(e.g TPIU) but is
-present in the DT. In which case, building a path can cause a crash like this :
+At the end of the trace capture, we free the allocated memory,
+resetting the drvdata->buf to NULL, to indicate that trace data
+was collected and the next trace session should allocate the
+memory in tmc_enable_etr_sink_sysfs.
 
-  Unable to handle kernel NULL pointer dereference at virtual address 00000010
-  pgd = ffffffc9750dd000
-  [00000010] *pgd=00000009f5e90003, *pud=00000009f5e90003, *pmd=0000000000000000
-  Internal error: Oops: 96000006 [#1] PREEMPT SMP
-  Modules linked in:
-  CPU: 4 PID: 1348 Comm: bash Not tainted 4.6.0-next-20160517 #1646
-  Hardware name: ARM Juno development board (r0) (DT)
-  task: ffffffc97517a280 ti: ffffffc9762c4000 task.ti: ffffffc9762c4000
-  PC is at _coresight_build_path+0x18/0xe4
-  LR is at _coresight_build_path+0xc0/0xe4
-  pc : [<ffffff80083d5130>] lr : [<ffffff80083d51d8>] pstate: 20000145
-  sp : ffffffc9762c7ba0
+The tmc_enable_etr_sink_sysfs, we only allocate memory if drvdata->vaddr
+is not NULL (which is not performed at the end of previous session).
+This can cause, drvdata->vaddr getting assigned NULL and later we do
+memset() which causes a crash as below :
 
-  [<ffffff80083d5130>] _coresight_build_path+0x18/0xe4
-  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
-  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
-  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
-  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
-  [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
-  [<ffffff80083d5cdc>] coresight_build_path+0x40/0x68
-  [<ffffff80083d5e14>] coresight_enable+0x74/0x1bc
-  [<ffffff80083d60a0>] enable_source_store+0x3c/0x6c
-  [<ffffff800830b17c>] dev_attr_store+0x18/0x28
-  [<ffffff80081ca9c4>] sysfs_kf_write+0x40/0x50
-  [<ffffff80081c9e38>] kernfs_fop_write+0x140/0x1cc
-  [<ffffff8008163ec8>] __vfs_write+0x28/0x110
-  [<ffffff8008164bf0>] vfs_write+0xa0/0x174
-  [<ffffff8008165d18>] SyS_write+0x44/0xa0
-  [<ffffff8008084e70>] el0_svc_naked+0x24/0x28
+Unable to handle kernel NULL pointer dereference at virtual
+ address  00000000
+pgd = ffffffc9747f0000
+[00000000] *pgd=00000009f402e003, *pud=00000009f402e003,
+ *pmd=0000000000000000
+Internal error: Oops: 96000046 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 1592 Comm: bash Not tainted 4.7.0-rc1+ #1712
+Hardware name: ARM Juno development board (r0) (DT)
+task: ffffffc078fe0080 ti: ffffffc974178000 task.ti: ffffffc974178000
+PC is at __memset+0x1ac/0x200
+LR is at tmc_enable_etr_sink+0xf8/0x304
+pc : [<ffffff80083a002c>] lr : [<ffffff800859be44>] pstate: 400001c5
+sp : ffffffc97417bc00
+x29: ffffffc97417bc00 x28: ffffffc974178000
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Call trace:
+Exception stack(0xffffffc97417ba40 to 0xffffffc97417bb60)
+ba40: 0000000000000001 ffffffc974a5d098 ffffffc97417bc00 ffffff80083a002c
+ba60: ffffffc974a5d118 0000000000000000 0000000000000000 0000000000000000
+ba80: 0000000000000001 0000000000000000 ffffff800859bdec 0000000000000040
+baa0: ffffff8008b45b58 00000000000001c0 ffffffc97417baf0 ffffff80080eddb4
+bac0: 0000000000000003 ffffffc078fe0080 ffffffc078fe0960 ffffffc078fe0940
+bae0: 0000000000000000 0000000000000000 00000000007fffc0 0000000000000004
+bb00: 0000000000000000 0000000000000040 000000000000003f 0000000000000000
+bb20: 0000000000000000 0000000000000000 0000000000000000 0000000000000001
+bb40: ffffffc078fe0960 0000000000000018 ffffffffffffffff 0008669628000000
+[<ffffff80083a002c>] __memset+0x1ac/0x200
+[<ffffff8008599814>] coresight_enable_path+0xa8/0x1dc
+[<ffffff8008599b10>] coresight_enable+0x88/0x1b8
+[<ffffff8008599d88>] enable_source_store+0x3c/0x6c
+[<ffffff800845eaf4>] dev_attr_store+0x18/0x28
+[<ffffff80082829e8>] sysfs_kf_write+0x54/0x64
+[<ffffff8008281c30>] kernfs_fop_write+0x148/0x1d8
+[<ffffff8008200128>] __vfs_write+0x28/0x110
+[<ffffff8008200e88>] vfs_write+0xa0/0x198
+[<ffffff80082021b0>] SyS_write+0x44/0xa0
+[<ffffff8008084e70>] el0_svc_naked+0x24/0x28
+Code: 91010108 54ffff4a 8b040108 cb050042 (d50b7428)
+
+This patch fixes the issue by clearing the drvdata->vaddr while we free
+the allocated buffer at the end of a session, so that we allocate the
+memory again.
+
+Cc: mathieu.poirier at linaro.org
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 5443d03a1eec..0fdaaf4a8994 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -385,7 +385,6 @@ static int _coresight_build_path(struct coresight_device *csdev,
- 	int i;
- 	bool found = false;
- 	struct coresight_node *node;
--	struct coresight_connection *conn;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 847d1b5f2c13..3369d7a80a51 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -315,7 +315,7 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
+ 		 */
+ 		vaddr = drvdata->vaddr;
+ 		paddr = drvdata->paddr;
+-		drvdata->buf = NULL;
++		drvdata->buf = drvdata->vaddr = NULL;
+ 	}
  
- 	/* An activated sink has been found.  Enqueue the element */
- 	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
-@@ -394,8 +393,9 @@ static int _coresight_build_path(struct coresight_device *csdev,
- 
- 	/* Not a sink - recursively explore each port found on this element */
- 	for (i = 0; i < csdev->nr_outport; i++) {
--		conn = &csdev->conns[i];
--		if (_coresight_build_path(conn->child_dev, path) == 0) {
-+		struct coresight_device *child_dev = csdev->conns[i].child_dev;
-+
-+		if (child_dev && _coresight_build_path(child_dev, path) == 0) {
- 			found = true;
- 			break;
- 		}
+ 	drvdata->reading = false;
 -- 
 2.5.0
