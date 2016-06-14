@@ -1,78 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Jun 2016 16:07:59 +0100
-Subject: [PATCH v2 5/7] iommu/arm-smmu: Implement of_xlate() for SMMUv3
-In-Reply-To: <55aa94e099f00fd586077c45d4c4fd1c010981d9.1464966939.git.robin.murphy@arm.com>
-References: <cover.1464966939.git.robin.murphy@arm.com>
- <55aa94e099f00fd586077c45d4c4fd1c010981d9.1464966939.git.robin.murphy@arm.com>
-Message-ID: <20160614150757.GB16531@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 14 Jun 2016 17:07:27 +0200
+Subject: [PATCH 09/10] i2c: designware-platdrv: Simplify code by using
+ dev_get_drvdata()
+In-Reply-To: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
+References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1465916848-8207-10-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 06:15:40PM +0100, Robin Murphy wrote:
-> Now that we can properly describe the mapping between PCI RIDs and
-> stream IDs via "iommu-map", and have it fed it to the driver
-> automatically via of_xlate(), rework the SMMUv3 driver to benefit from
-> that. Initially, this just gets rid of the misuse of the "iommus"
-> binding without changing the driver's existing level of functionality,
-> but does at least pave the way to extending it more easily in future.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v2: New.
-> 
->  drivers/iommu/arm-smmu-v3.c | 119 +++++++++++++++++++++++++++-----------------
->  1 file changed, 73 insertions(+), 46 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 94b68213c50d..7631639cc209 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -30,6 +30,7 @@
->  #include <linux/msi.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_iommu.h>
->  #include <linux/of_platform.h>
->  #include <linux/pci.h>
->  #include <linux/platform_device.h>
-> @@ -638,6 +639,12 @@ struct arm_smmu_domain {
->  	struct iommu_domain		domain;
->  };
->  
-> +/* SMMU private data for each master */
-> +struct arm_smmu_master_data {
-> +	struct arm_smmu_device		*smmu;
-> +	u32				sid;
-> +};
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/i2c/busses/i2c-designware-platdrv.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Hmm, we already have this information in arm_smmu_group so I'd rather
-avoid the duplication if we can.
-
-> @@ -1804,23 +1790,41 @@ static int arm_smmu_add_device(struct device *dev)
->  {
->  	int i, ret;
->  	u32 sid, *sids;
-> -	struct pci_dev *pdev;
->  	struct iommu_group *group;
-> +	struct device_node *np;
->  	struct arm_smmu_group *smmu_group;
-> -	struct arm_smmu_device *smmu;
-> +	struct arm_smmu_device *smmu = NULL;
-> +	struct arm_smmu_master_data *data = dev->archdata.iommu;
->  
-> -	/* We only support PCI, for now */
-> -	if (!dev_is_pci(dev))
-> +	if (!data)
->  		return -ENODEV;
->  
-> -	pdev = to_pci_dev(dev);
-> +	np = (struct device_node *)data->smmu;
-> +	smmu = data->smmu = arm_smmu_get_by_node(np);
-> +	of_node_put(np);
-> +	if (!smmu)
-> +		return -ENODEV;
-
-Why can't we continue to use the group here?
-
-Will
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index 2b91af3..b2c6037 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -310,8 +310,7 @@ static void dw_i2c_plat_complete(struct device *dev)
+ #ifdef CONFIG_PM
+ static int dw_i2c_plat_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
++	struct dw_i2c_dev *i_dev = dev_get_drvdata(dev);
+ 
+ 	i2c_dw_disable(i_dev);
+ 
+@@ -323,8 +322,7 @@ static int dw_i2c_plat_suspend(struct device *dev)
+ 
+ static int dw_i2c_plat_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
++	struct dw_i2c_dev *i_dev = dev_get_drvdata(dev);
+ 	int ret;
+ 
+ 	if (!IS_ERR(i_dev->clk)) {
+-- 
+1.9.1
