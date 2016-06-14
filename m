@@ -1,26 +1,26 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 14 Jun 2016 14:56:38 -0700
-Subject: [PATCH v18 08/13] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20160614071348.GN20774@linaro.org>
-References: <cover.1465502767.git.geoff@infradead.org>
- <9bc011f03f5dd30fc66178461d303d3ec1b7ac35.1465502767.git.geoff@infradead.org>
- <20160614071348.GN20774@linaro.org>
-Message-ID: <1465941398.21058.1.camel@infradead.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 15 Jun 2016 00:09:12 +0200
+Subject: [PATCH v2 0/4] ARM: dts: r8a7790: lager: use demuxer for I2C
+In-Reply-To: <20160613143134.GB1603@katana>
+References: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
+ <20160613143134.GB1603@katana>
+Message-ID: <20160614220912.GA5528@tetsubishi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-06-14 at 16:13 +0900, AKASHI Takahiro wrote:
-> On Thu, Jun 09, 2016 at 08:08:44PM +0000, Geoff Levand wrote:
-> >  
-> > -> > 	> > cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
-> > +> > 	> > cpu_soft_restart(in_crash_kexec, reboot_code_buffer_phys, kimage->head,
-> 
->                         => !in_crash_kexec
-> 
-> Please let me recognize any changes you made clearly if you modified my part
-> in the patchset before posting it.
 
-I pushed out a new branch kexec-v18.1 with this fix.  Thanks for
-checking!
+> Confirmed :( Got today only this far that the ENODEV comes from the PFC
+> driver. CONFIG_DEBUG_PINCTRL is a good idea for further debugging
+> probably.
 
--Geoff
+Correction, it seems the pinctrl handle gets mixed up, so the
+devm_pinctrl_get_select() fails. Does that match your findings?
+Pity I can't access my boards for the rest of the week :(
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/37e0a63e/attachment.sig>
