@@ -1,42 +1,96 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Jun 2016 09:58:26 +0200
-Subject: [PATCH] pwm: atmel-hlcdc: Fix default PWM polarity
-In-Reply-To: <20160517110005.GA26166@ulmo.ba.sec>
-References: <1463476352-7485-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160517110005.GA26166@ulmo.ba.sec>
-Message-ID: <20160614095826.3bbbfd26@bbrezillon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 14 Jun 2016 09:59:52 +0200
+Subject: [PATCH 05/12] mmc: sdhci: add a pre voltage switch callback
+ function
+In-Reply-To: <575E72DC.5090604@intel.com> (Adrian Hunter's message of "Mon, 13
+ Jun 2016 11:46:20 +0300")
+References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+ <1465456218-28354-6-git-send-email-gregory.clement@free-electrons.com>
+ <575E72DC.5090604@intel.com>
+Message-ID: <87h9cwci9z.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Hi Adrian,
+ 
+ On lun., juin 13 2016, Adrian Hunter <adrian.hunter@intel.com> wrote:
 
-On Tue, 17 May 2016 13:00:05 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+> On 09/06/16 10:10, Gregory CLEMENT wrote:
+>> From: Victor Gu <xigu@marvell.com>
+>> 
+>> Some host controller such as Xenon needs additional setting when
+>> switching signal voltage in eMMC mode. They also need to re-enable
+>> internal clock before a voltage switch.
+>> 
+>> This commit adds a callback routine "voltage_switch_pre" in the struct
+>> sdhci_ops, which is used by some host controllers which need re-enable
+>> the internal clock before a voltage switch.
+>
+> Don't want to add sdhci host ops for the "do something before a mmc host op"
+> case.
+>
+> Instead, export sdhci_start_signal_voltage_switch() and  hook
+> host->mmc_host_ops.start_signal_voltage_switch. Then in sdhci-xenon.c:
+>
+> int xenon__start_signal_voltage_switch(struct mmc_host *mmc,
+> 				       struct mmc_ios *ios)
+> {
+> 	blah blah
+> 	return sdhci_start_signal_voltage_switch(mmc, ios);
+> }
 
-> On Tue, May 17, 2016 at 11:12:32AM +0200, Boris Brezillon wrote:
-> > The PWM device exposed by the HLCDC IP is configured with an inverted
-> > polarity by default. Registering the PWM chip with the normal polarity
-> > was not a problem before commit 42e8992c58d4 ("pwm: Add core
-> > infrastructure to allow atomic updates") because the ->set_polarity()
-> > hook was called no matter the current polarity state, but this is no longer
-> > the case.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Fixes: 42e8992c58d4 ("pwm: Add core infrastructure to allow atomic updates")  
-> 
-> That's not technically correct, because it's the driver that has the
-> bug. The core change merely exposes it. How about if I sort this into
-> the pwm-atomic branch and reword the commit message accordingly? That
-> way things should all stay bisectible.
+OK I see your point.
 
-I don't see this change in your branch. Do you want me to resend this
-fix after reworking the commit message?
+Thanks,
 
-Regards,
+Gregory
 
-Boris
+>
+>
+>> 
+>> [gregory.clement at free-electrons.com: split the initial commit and
+>> reformulate the log]
+>> 
+>> Signed-off-by: Victor Gu <xigu@marvell.com>
+>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/mmc/host/sdhci.c | 4 ++++
+>>  drivers/mmc/host/sdhci.h | 1 +
+>>  2 files changed, 5 insertions(+)
+>> 
+>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>> index b07219426d39..cad03ffa9d9b 100644
+>> --- a/drivers/mmc/host/sdhci.c
+>> +++ b/drivers/mmc/host/sdhci.c
+>> @@ -1729,6 +1729,10 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>>  	if (host->version < SDHCI_SPEC_300)
+>>  		return 0;
+>>  
+>> +	/* Some controller need to do more before switching */
+>> +	if (host->ops->voltage_switch_pre)
+>> +		host->ops->voltage_switch_pre(host);
+>> +
+>>  	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+>>  
+>>  	switch (ios->signal_voltage) {
+>> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+>> index 49c6c5b0e33b..6bec1b0368d2 100644
+>> --- a/drivers/mmc/host/sdhci.h
+>> +++ b/drivers/mmc/host/sdhci.h
+>> @@ -550,6 +550,7 @@ struct sdhci_ops {
+>>  					 unsigned int max_dtr, int host_drv,
+>>  					 int card_drv, int *drv_type);
+>>  	void	(*init_card)(struct sdhci_host *host, struct mmc_card *card);
+>> +	void	(*voltage_switch_pre)(struct sdhci_host *host);
+>>  };
+>>  
+>>  #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
+>> 
+>
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
