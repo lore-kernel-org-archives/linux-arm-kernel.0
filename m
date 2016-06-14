@@ -1,74 +1,28 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 14 Jun 2016 09:37:47 +0200
-Subject: anatop_regulator probe returns -EINVAL if regulator is set to
- bypass mode
-In-Reply-To: <CACE3x1OUrK8ea78VDxf0bYxNnxBRrcH3xFE0amMsv2jYErRLmQ@mail.gmail.com>
-References: <CACE3x1OUrK8ea78VDxf0bYxNnxBRrcH3xFE0amMsv2jYErRLmQ@mail.gmail.com>
-Message-ID: <1879329.hU2uRcWFRn@galactica.lan>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 14 Jun 2016 10:43:00 -0700
+Subject: [PATCH] pinctrl: qcom-ssbi: support for pm8058
+In-Reply-To: <1465777921-1989-1-git-send-email-linus.walleij@linaro.org>
+References: <1465777921-1989-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160614174300.GC28218@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika,
+On 06/13, Linus Walleij wrote:
+> The PM858 is found in connection to the APQ8060 on the APQ8060
 
-On 2016 M06 6, Mon 17:24:49 CEST Mika B?tsman wrote:
-> Hi Philipp, hi Markus,
-> 
-> there's a problem with anatop regulator driver that relates to
-> functionality you have worked on. The related commits:
-> da0607c8 regulator: anatop: Fail on invalid voltage selector
-> d38018f2 regulator: anatop: Add bypass support to digital LDOs
-> 
-> 
-> So in case bootloader set the regulator to bypass mode sreg->sel gets set
-> to 0
->         sreg->sel = (val & rdesc->vsel_mask) >> sreg->vol_bit_shift;
->         if (sreg->sel == LDO_FET_FULL_ON) {
->             sreg->sel = 0;
->             sreg->bypass = true;
->         }
-> 
-> and a little bit later it's causing EINVAL to be returned.
->         if (!sreg->sel) {
->             dev_err(&pdev->dev, "Failed to read a valid default voltage
-> selector.\n");
->             return -EINVAL;
->         }
-> 
-> Resulting in:
-> anatop_regulator 20c8000.anatop:regulator-vddcore at 140: Failed to read a
-> valid default voltage selector.
-> anatop_regulator: probe of 20c8000.anatop:regulator-vddcore at 140 failed with
-> error -22
-> anatop_regulator 20c8000.anatop:regulator-vddsoc at 140: Failed to read a
-> valid default voltage selector.
-> anatop_regulator: probe of 20c8000.anatop:regulator-vddsoc at 140 failed with
-> error -22
-> 
-> Is that really the expected behaviour or should sreg->bypass be taken into
-> account before returning EINVAL? Like this:
-> 
->         if (!sreg->bypass && !sreg->sel) {
+s/PM858/PM8058/
 
-Thanks for spotting this. This condition seems better. A EINVAL error was not 
-intended for the bypass mode.
-
-Best Regards,
-
-Markus
-
->             dev_err(&pdev->dev, "Failed to read a valid default voltage
-> selector.\n");
->             return -EINVAL;
->         }
+> Dragonboard. Works the same as all others, just add the compatible
+> string for this variant.
 > 
-> 
-> Regards,
-> Mika
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160614/8be279ee/attachment.sig>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
