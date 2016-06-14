@@ -1,45 +1,61 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 13 Jun 2016 17:45:57 -0700
-Subject: [PATCH 09/11] phy: rockchip-emmc: Set phyctrl_frqsel based on
- card clock
-In-Reply-To: <036b0349-8343-f5de-7215-5a0843ebc6a9@rock-chips.com>
-References: <1465339484-969-1-git-send-email-dianders@chromium.org>
- <1465339484-969-10-git-send-email-dianders@chromium.org>
- <937cbbc5-f9dc-bdf0-c46a-c7e814b9b373@rock-chips.com>
- <CAD=FV=VA6vmfzHEOZwAFJvNXRDhPmf+bX-Jw1eFboOdP6kD3dg@mail.gmail.com>
- <036b0349-8343-f5de-7215-5a0843ebc6a9@rock-chips.com>
-Message-ID: <CAD=FV=VN-sNSjkZp_BTEn=uCdOmdTLk7+5AvF8U+7j908Ynycw@mail.gmail.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Tue, 14 Jun 2016 09:45:59 +0900
+Subject: [PATCH v13 05/10] arm64: Kprobes with single stepping support
+In-Reply-To: <575ECFC7.10207@linaro.org>
+References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
+ <1464924384-15269-6-git-send-email-dave.long@linaro.org>
+ <20160608100714.4abbcebcf356eb72173d0ce3@kernel.org>
+ <575E3235.1020904@linaro.org>
+ <20160613155017.860097875e8bc86563a065ce@kernel.org>
+ <575ECFC7.10207@linaro.org>
+Message-ID: <20160614094559.51a7865fa30f3f31f6a70e37@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+On Mon, 13 Jun 2016 11:22:47 -0400
+David Long <dave.long@linaro.org> wrote:
 
-On Mon, Jun 13, 2016 at 5:24 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
->>> From the public Arasan datasheet they seem to indicate +/- 15 MHz is
->>
->> sane.  Does that sound OK?  Presuming that all of your numbers
->> (50/100/150/200) are centers, that means that we could support clock
->> rates of:
->>
->> 35 MHz - 65 MHz
->> 85 MHz - 115 MHz
->> 135 MHz - 165 MHz
->> 185 MHz - 200 MHz
->>
->>
->> So how about if we add a warning for things that are outside of those
->> ranges?  ...except no warning for < 35 MHz since presumably we're not
->> using high speed modes when the DLL is that slow and so we're OK.
->
->
-> a warning should be ok.
-> If we ask 150M, but PLL only provide 175M maybe, then should we
-> fallback it to 150M or promote it to 200M when setting?
+> On 06/13/2016 02:50 AM, Masami Hiramatsu wrote:
+> > On Mon, 13 Jun 2016 00:10:29 -0400
+> > David Long <dave.long@linaro.org> wrote:
+> >
+> >>>> ---
+> >>>>    arch/arm64/Kconfig                      |   1 +
+> >>>>    arch/arm64/include/asm/debug-monitors.h |   5 +
+> >>>>    arch/arm64/include/asm/insn.h           |   4 +-
+> >>>>    arch/arm64/include/asm/kprobes.h        |  60 ++++
+> >>>>    arch/arm64/include/asm/probes.h         |  44 +++
+> >>>>    arch/arm64/kernel/Makefile              |   1 +
+> >>>>    arch/arm64/kernel/debug-monitors.c      |  18 +-
+> >>>>    arch/arm64/kernel/kprobes-arm64.c       | 144 +++++++++
+> >>>>    arch/arm64/kernel/kprobes-arm64.h       |  35 +++
+> >>>>    arch/arm64/kernel/kprobes.c             | 526 ++++++++++++++++++++++++++++++++
+> >>>
+> >>> Not sure why kprobes.c and kprobes-arm64.c are splitted.
+> >>>
+> >>>
+> >>
+> >> This comes from the model of the arm32 kprobes code where handling of
+> >> the low-level instruction simulation is implemented in separate files
+> >> for 32-bit vs. thumb instructions.  It should make a little more sense
+> >> in the future when additional instruction simulation code will hopefully
+> >> be added for those instructions we cannot currently single-step
+> >> out-of-line.  It also probably *could* be merged into one file.
+> >
+> > Hmm, at least the name of arch/arm64/kernel/kprobes-arm64.c is
+> > meaningless. As we've done in x86, I think we can make it
+> > arch/arm64/kernel/kprobes/decode-insn.{c,h}
+> >
+> 
+> I've changed the name to kprobe-decode-insn.[hc], or do you feel 
+> strongly the three kprobes source files in arch/arm64/kernel need their 
+> own subdirectory?
 
-I made it a warning in V2 but still picked the closest reasonable
-value.  See what you think.  The PHY really isn't in control of this
-clock, so the warning is the best it can do.  Presumably someone
-designing a system with this PHY in it would see the warning an
-realize that they should make SDHCI run at more reasonable rates...
+Yes, especially when we start working on kprobes-on-ftrace support,
+it is better to have a separate file for that.
 
--Doug
+Thank you!
+
+
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
