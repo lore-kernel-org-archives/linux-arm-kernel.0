@@ -1,76 +1,336 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue, 14 Jun 2016 09:45:15 -0500
-Subject: [PATCH V6 1/5] irqchip/gicv3-its: Introduce two helper functions for
- accessing BASERn
-Message-ID: <1465915519-10807-1-git-send-email-shankerd@codeaurora.org>
+Date: Tue, 14 Jun 2016 09:45:17 -0500
+Subject: [PATCH V6 3/5] irqchip/gicv3-its: Split its_alloc_tables() into two
+ functions
+In-Reply-To: <1465915519-10807-1-git-send-email-shankerd@codeaurora.org>
+References: <1465915519-10807-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <1465915519-10807-3-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the two handy helper functions for reading and writing
-ITS BASERn register.
+The function is getting out of control, it has too many goto
+statements and would be too complicated for adding a feature
+two-level device table. So, it is time for us to cleanup and
+move some of the logic to a separate function without affecting
+the existing functionality.
 
 Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-Changes since v5:
-  Marc suggested to fold its_write_baser_cache into its_write_baser.
+Changes since v3:
+   Moved all changes that are related to Indirection to patch 5/5.
 
-Changes since v1:
-  baser->val is consistent with hardware register contents.
-
- drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
- 1 file changed, 20 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c   | 242 +++++++++++++++++++------------------
+ include/linux/irqchip/arm-gic-v3.h |   1 +
+ 2 files changed, 127 insertions(+), 116 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 5eb1f9e..924f836 100644
+index 254085a..146189b 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -824,6 +824,22 @@ static const char *its_base_type_string[] = {
- 	[GITS_BASER_TYPE_RESERVED7] 	= "Reserved (7)",
+@@ -56,13 +56,14 @@ struct its_collection {
  };
  
-+static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
-+{
-+	u32 idx = baser - its->tables;
-+
-+	return readq_relaxed(its->base + GITS_BASER + (idx << 3));
-+}
-+
-+static void its_write_baser(struct its_node *its, struct its_baser *baser,
-+			    u64 val)
-+{
-+	u32 idx = baser - its->tables;
-+
-+	writeq_relaxed(val, its->base + GITS_BASER + (idx << 3));
-+	baser->val = its_read_baser(its, baser);
-+}
-+
- static void its_free_tables(struct its_node *its)
- {
- 	int i;
-@@ -863,7 +879,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 	its->device_ids = ids;
+ /*
+- * The ITS_BASER structure - contains memory information and cached
+- * value of BASER register configuration.
++ * The ITS_BASER structure - contains memory information, cached
++ * value of BASER register configuration and ITS page size.
+  */
+ struct its_baser {
+ 	void		*base;
+ 	u64		val;
+ 	u32		order;
++	u32		psz;
+ };
  
- 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
--		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
-+		struct its_baser *baser = its->tables + i;
-+		u64 val = its_read_baser(its, baser);
+ /*
+@@ -840,6 +841,110 @@ static void its_write_baser(struct its_node *its, struct its_baser *baser,
+ 	baser->val = its_read_baser(its, baser);
+ }
+ 
++static int its_setup_baser(struct its_node *its, struct its_baser *baser,
++			   u64 cache, u64 shr, u32 psz, u32 order)
++{
++	u64 val = its_read_baser(its, baser);
++	u64 esz = GITS_BASER_ENTRY_SIZE(val);
++	u64 type = GITS_BASER_TYPE(val);
++	u32 alloc_pages;
++	void *base;
++	u64 tmp;
++
++retry_alloc_baser:
++	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
++	if (alloc_pages > GITS_BASER_PAGES_MAX) {
++		pr_warn("ITS@%pa: %s too large, reduce ITS pages %u->%u\n",
++			&its->phys_base, its_base_type_string[type],
++			alloc_pages, GITS_BASER_PAGES_MAX);
++		alloc_pages = GITS_BASER_PAGES_MAX;
++		order = get_order(GITS_BASER_PAGES_MAX * psz);
++	}
++
++	base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
++	if (!base)
++		return -ENOMEM;
++
++retry_baser:
++	val = (virt_to_phys(base)				 |
++		(type << GITS_BASER_TYPE_SHIFT)			 |
++		((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)	 |
++		((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)	 |
++		cache						 |
++		shr						 |
++		GITS_BASER_VALID);
++
++	switch (psz) {
++	case SZ_4K:
++		val |= GITS_BASER_PAGE_SIZE_4K;
++		break;
++	case SZ_16K:
++		val |= GITS_BASER_PAGE_SIZE_16K;
++		break;
++	case SZ_64K:
++		val |= GITS_BASER_PAGE_SIZE_64K;
++		break;
++	}
++
++	its_write_baser(its, baser, val);
++	tmp = baser->val;
++
++	if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
++		/*
++		 * Shareability didn't stick. Just use
++		 * whatever the read reported, which is likely
++		 * to be the only thing this redistributor
++		 * supports. If that's zero, make it
++		 * non-cacheable as well.
++		 */
++		shr = tmp & GITS_BASER_SHAREABILITY_MASK;
++		if (!shr) {
++			cache = GITS_BASER_nC;
++			__flush_dcache_area(base, PAGE_ORDER_TO_SIZE(order));
++		}
++		goto retry_baser;
++	}
++
++	if ((val ^ tmp) & GITS_BASER_PAGE_SIZE_MASK) {
++		/*
++		 * Page size didn't stick. Let's try a smaller
++		 * size and retry. If we reach 4K, then
++		 * something is horribly wrong...
++		 */
++		free_pages((unsigned long)base, order);
++		baser->base = NULL;
++
++		switch (psz) {
++		case SZ_16K:
++			psz = SZ_4K;
++			goto retry_alloc_baser;
++		case SZ_64K:
++			psz = SZ_16K;
++			goto retry_alloc_baser;
++		}
++	}
++
++	if (val != tmp) {
++		pr_err("ITS@%pa: %s doesn't stick: %lx %lx\n",
++		       &its->phys_base, its_base_type_string[type],
++		       (unsigned long) val, (unsigned long) tmp);
++		free_pages((unsigned long)base, order);
++		return -ENXIO;
++	}
++
++	baser->order = order;
++	baser->base = base;
++	baser->psz = psz;
++
++	pr_info("ITS@%pa: allocated %d %s @%lx (psz %dK, shr %d)\n",
++		&its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / esz),
++		its_base_type_string[type],
++		(unsigned long)virt_to_phys(base),
++		psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
++
++	return 0;
++}
++
+ static void its_parse_baser_device(struct its_node *its, struct its_baser *baser,
+ 				   u32 *order)
+ {
+@@ -879,25 +984,20 @@ static void its_free_tables(struct its_node *its)
+ 
+ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ {
+-	int err;
+-	int i;
+-	int psz = SZ_64K;
++	u64 typer = readq_relaxed(its->base + GITS_TYPER);
++	u32 ids = GITS_TYPER_DEVBITS(typer);
+ 	u64 shr = GITS_BASER_InnerShareable;
+-	u64 cache;
+-	u64 typer;
+-	u32 ids;
++	u64 cache = GITS_BASER_WaWb;
++	u32 psz = SZ_64K;
++	int err, i;
+ 
+ 	if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_22375) {
+ 		/*
+-		 * erratum 22375: only alloc 8MB table size
+-		 * erratum 24313: ignore memory access type
+-		 */
+-		cache	= 0;
+-		ids	= 0x14;			/* 20 bits, 8MB */
+-	} else {
+-		cache	= GITS_BASER_WaWb;
+-		typer	= readq_relaxed(its->base + GITS_TYPER);
+-		ids	= GITS_TYPER_DEVBITS(typer);
++		* erratum 22375: only alloc 8MB table size
++		* erratum 24313: ignore memory access type
++		*/
++		cache   = GITS_BASER_nCnB;
++		ids     = 0x14;                 /* 20 bits, 8MB */
+ 	}
+ 
+ 	its->device_ids = ids;
+@@ -906,11 +1006,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		struct its_baser *baser = its->tables + i;
+ 		u64 val = its_read_baser(its, baser);
  		u64 type = GITS_BASER_TYPE(val);
- 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
- 		int order = get_order(psz);
-@@ -937,10 +954,9 @@ retry_baser:
+-		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+-		int order = get_order(psz);
+-		int alloc_pages;
+-		u64 tmp;
+-		void *base;
++		u32 order = get_order(psz);
+ 
+ 		if (type == GITS_BASER_TYPE_NONE)
+ 			continue;
+@@ -918,105 +1014,19 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		if (type == GITS_BASER_TYPE_DEVICE)
+ 			its_parse_baser_device(its, baser, &order);
+ 
+-retry_alloc_baser:
+-		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+-		if (alloc_pages > GITS_BASER_PAGES_MAX) {
+-			alloc_pages = GITS_BASER_PAGES_MAX;
+-			order = get_order(GITS_BASER_PAGES_MAX * psz);
+-			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
+-				node_name, order, alloc_pages);
+-		}
+-
+-		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+-		if (!base) {
+-			err = -ENOMEM;
+-			goto out_free;
+-		}
+-
+-		its->tables[i].base = base;
+-		its->tables[i].order = order;
+-
+-retry_baser:
+-		val = (virt_to_phys(base) 				 |
+-		       (type << GITS_BASER_TYPE_SHIFT)			 |
+-		       ((entry_size - 1) << GITS_BASER_ENTRY_SIZE_SHIFT) |
+-		       cache						 |
+-		       shr						 |
+-		       GITS_BASER_VALID);
+-
+-		switch (psz) {
+-		case SZ_4K:
+-			val |= GITS_BASER_PAGE_SIZE_4K;
+-			break;
+-		case SZ_16K:
+-			val |= GITS_BASER_PAGE_SIZE_16K;
+-			break;
+-		case SZ_64K:
+-			val |= GITS_BASER_PAGE_SIZE_64K;
+-			break;
+-		}
+-
+-		val |= alloc_pages - 1;
+-
+-		its_write_baser(its, baser, val);
+-		tmp = baser->val;
+-
+-		if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
+-			/*
+-			 * Shareability didn't stick. Just use
+-			 * whatever the read reported, which is likely
+-			 * to be the only thing this redistributor
+-			 * supports. If that's zero, make it
+-			 * non-cacheable as well.
+-			 */
+-			shr = tmp & GITS_BASER_SHAREABILITY_MASK;
+-			if (!shr) {
+-				cache = GITS_BASER_nC;
+-				__flush_dcache_area(base, PAGE_ORDER_TO_SIZE(order));
+-			}
+-			goto retry_baser;
+-		}
+-
+-		if ((val ^ tmp) & GITS_BASER_PAGE_SIZE_MASK) {
+-			/*
+-			 * Page size didn't stick. Let's try a smaller
+-			 * size and retry. If we reach 4K, then
+-			 * something is horribly wrong...
+-			 */
+-			free_pages((unsigned long)base, order);
+-			its->tables[i].base = NULL;
+-
+-			switch (psz) {
+-			case SZ_16K:
+-				psz = SZ_4K;
+-				goto retry_alloc_baser;
+-			case SZ_64K:
+-				psz = SZ_16K;
+-				goto retry_alloc_baser;
+-			}
+-		}
+-
+-		if (val != tmp) {
+-			pr_err("ITS: %s: GITS_BASER%d doesn't stick: %lx %lx\n",
+-			       node_name, i,
+-			       (unsigned long) val, (unsigned long) tmp);
+-			err = -ENXIO;
+-			goto out_free;
++		err = its_setup_baser(its, baser, cache, shr, psz, order);
++		if (err < 0) {
++			its_free_tables(its);
++			return err;
  		}
  
- 		val |= alloc_pages - 1;
--		its->tables[i].val = val;
+-		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
+-			(int)(PAGE_ORDER_TO_SIZE(order) / entry_size),
+-			its_base_type_string[type],
+-			(unsigned long)virt_to_phys(base),
+-			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
++		/* Update settings which will be used for next BASERn */
++		psz = baser->psz;
++		cache = baser->val & GITS_BASER_CACHEABILITY_MASK;
++		shr = baser->val & GITS_BASER_SHAREABILITY_MASK;
+ 	}
  
--		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
--		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
-+		its_write_baser(its, baser, val);
-+		tmp = baser->val;
+ 	return 0;
+-
+-out_free:
+-	its_free_tables(its);
+-
+-	return err;
+ }
  
- 		if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
- 			/*
+ static int its_alloc_collections(struct its_node *its)
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index dc493e0..01cf171 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -228,6 +228,7 @@
+ #define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
+ #define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
+ #define GITS_BASER_PAGES_MAX		256
++#define GITS_BASER_PAGES_SHIFT		(0)
+ 
+ #define GITS_BASER_TYPE_NONE		0
+ #define GITS_BASER_TYPE_DEVICE		1
 -- 
 Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
