@@ -1,45 +1,51 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 14 Jun 2016 18:22:48 +0300
-Subject: [PATCH 02/10] i2c: designware-platdrv: Gate clk in error path
- in ->probe()
-In-Reply-To: <1465916848-8207-3-git-send-email-ulf.hansson@linaro.org>
-References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
- <1465916848-8207-3-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1465917768.30123.65.camel@linux.intel.com>
+From: b.reynal@virtualopensystems.com (Baptiste Reynal)
+Date: Tue, 14 Jun 2016 17:29:39 +0200
+Subject: [PATCH V7 0/9] vfio, platform: add ACPI support
+In-Reply-To: <575EDA6C.9010806@codeaurora.org>
+References: <1465792001-27960-1-git-send-email-okaya@codeaurora.org>
+ <575EDA6C.9010806@codeaurora.org>
+Message-ID: <CAN9JPjH6uSvGgY6aS5GDhxi5aTCfXhirFk7wNxvwTxXbV9jtzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-06-14 at 17:07 +0200, Ulf Hansson wrote:
-> The call to i2c_dw_probe() may fail in ->probe() in which case the
-> clock
-> remains ungated. Fix the error path by gating the clock before the
-> error
-> code is returned.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
-> ?drivers/i2c/busses/i2c-designware-platdrv.c | 10 ++++++++--
-> ?1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
-> b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index e39962b..19174e7 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -235,6 +235,7 @@ static int dw_i2c_plat_probe(struct
-> platform_device *pdev)
-> ?	ACPI_COMPANION_SET(&adap->dev, ACPI_COMPANION(&pdev->dev));
-> ?	adap->dev.of_node = pdev->dev.of_node;
-> 
+Hi Sinan,
 
-?
-> +	pm_runtime_get_noresume(&pdev->dev);
+Although I don't have the hardware to test them, I reviewed your
+patches and they look fine to me.
 
-> +	pm_runtime_put(&pdev->dev);
+Regards,
+Baptiste
 
-I don't see an explanation of these add-ons.
-
--- 
-
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+On Mon, Jun 13, 2016 at 6:08 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> Hi Baptiste,
+>
+> On 6/13/2016 12:26 AM, Sinan Kaya wrote:
+>>
+>> Sinan Kaya (9):
+>>   vfio: platform: rename reset function
+>>   vfio: platform: move reset call to a common function
+>>   vfio: platform: determine reset capability
+>>   vfio: platform: add support for ACPI probe
+>>   vfio: platform: add extra debug info argument to call reset
+>>   vfio: platform: call _RST method when using ACPI
+>>   vfio, platform: make reset driver a requirement by default
+>>   vfio: platform: check reset call return code during open
+>>   vfio: platform: check reset call return code during release
+>>
+>>  drivers/vfio/platform/vfio_amba.c             |   5 +
+>>  drivers/vfio/platform/vfio_platform.c         |   5 +
+>>  drivers/vfio/platform/vfio_platform_common.c  | 195 +++++++++++++++++++++-----
+>>  drivers/vfio/platform/vfio_platform_private.h |   8 +-
+>>  4 files changed, 176 insertions(+), 37 deletions(-)
+>>
+> Cov and I exchanged some emails with Alex last week. I think
+> there is a general expectation for you to review the series since
+> you are the subsystem maintainer.
+>
+> I'm looking forward to hear your feedback on the series.
+> Sinan
+>
+> --
+> Sinan Kaya
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
