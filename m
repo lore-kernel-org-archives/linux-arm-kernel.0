@@ -1,235 +1,236 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 14 Jun 2016 12:17:30 +0200
-Subject: [PATCH v8 2/3] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1465890268.7191.13.camel@mtksdaap41>
-References: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
- <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
- <574C5CBF.7060002@gmail.com> <1464683762.14604.59.camel@mtksdaap41>
- <574DEE40.9010008@gmail.com> <1464775020.11122.40.camel@mtksdaap41>
- <574FF264.7050209@gmail.com> <1464934356.15175.31.camel@mtksdaap41>
- <57516774.5080008@gmail.com> <1464956037.16029.8.camel@mtksdaap41>
- <575181E5.6090603@gmail.com> <5756FD73.3050607@gmail.com>
- <1465364427.9963.13.camel@mtksdaap41> <5757F762.4020908@gmail.com>
- <1465388727.21326.8.camel@mtksdaap41> <57583B45.2080504@gmail.com>
- <1465890268.7191.13.camel@mtksdaap41>
-Message-ID: <575FD9BA.8040708@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 14 Jun 2016 11:26:22 +0100
+Subject: [PATCH 1/5] arm64: Add markers around .text section and create
+ sections.h
+In-Reply-To: <1464876657-6692-2-git-send-email-james.morse@arm.com>
+References: <1464876657-6692-1-git-send-email-james.morse@arm.com>
+ <1464876657-6692-2-git-send-email-james.morse@arm.com>
+Message-ID: <20160614102622.GA19235@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 02, 2016 at 03:10:53PM +0100, James Morse wrote:
+> During resume from hibernate, memory containing the kernel text is cleaned
+> to the PoU. Some parts of the kernel are executed with the MMU off, in
+> which case these instructions need to be cleaned to the PoC.
+> 
+> To aid the cleaning of this text, add markers around the existing section.
 
+The new markers here seem to be around TEXT_TEXT, which covers the
+majority of kernel text, not just that which needs to execute with the
+MMU off.
 
-On 14/06/16 09:44, Horng-Shyang Liao wrote:
-> Hi Matthias,
->
-> On Wed, 2016-06-08 at 17:35 +0200, Matthias Brugger wrote:
->>
->> On 08/06/16 14:25, Horng-Shyang Liao wrote:
->>> Hi Matthias,
->>>
->>> On Wed, 2016-06-08 at 12:45 +0200, Matthias Brugger wrote:
->>>>
->>>> On 08/06/16 07:40, Horng-Shyang Liao wrote:
->>>>> Hi Matthias,
->>>>>
->>>>> On Tue, 2016-06-07 at 18:59 +0200, Matthias Brugger wrote:
->>>>>>
->>>>>> On 03/06/16 15:11, Matthias Brugger wrote:
->>>>>>>
->>>>>>>
->>>>>> [...]
->>>>>>
->>>>>>>>>>>>>>>> +
->>>>>>>>>>>>>>>> +            smp_mb(); /* modify jump before enable thread */
->>>>>>>>>>>>>>>> +        }
->>>>>>>>>>>>>>>> +
->>>>>>>>>>>>>>>> +        cmdq_thread_writel(thread, task->pa_base +
->>>>>>>>>>>>>>>> task->command_size,
->>>>>>>>>>>>>>>> +                   CMDQ_THR_END_ADDR);
->>>>>>>>>>>>>>>> +        cmdq_thread_resume(thread);
->>>>>>>>>>>>>>>> +    }
->>>>>>>>>>>>>>>> +    list_move_tail(&task->list_entry, &thread->task_busy_list);
->>>>>>>>>>>>>>>> +    spin_unlock_irqrestore(&cmdq->exec_lock, flags);
->>>>>>>>>>>>>>>> +}
->>>>>>>>>>>>>>>> +
->>>>>>>>>>>>>>>> +static void cmdq_handle_error_done(struct cmdq *cmdq,
->>>>>>>>>>>>>>>> +                   struct cmdq_thread *thread, u32 irq_flag)
->>>>>>>>>>>>>>>> +{
->>>>>>>>>>>>>>>> +    struct cmdq_task *task, *tmp, *curr_task = NULL;
->>>>>>>>>>>>>>>> +    u32 curr_pa;
->>>>>>>>>>>>>>>> +    struct cmdq_cb_data cmdq_cb_data;
->>>>>>>>>>>>>>>> +    bool err;
->>>>>>>>>>>>>>>> +
->>>>>>>>>>>>>>>> +    if (irq_flag & CMDQ_THR_IRQ_ERROR)
->>>>>>>>>>>>>>>> +        err = true;
->>>>>>>>>>>>>>>> +    else if (irq_flag & CMDQ_THR_IRQ_DONE)
->>>>>>>>>>>>>>>> +        err = false;
->>>>>>>>>>>>>>>> +    else
->>>>>>>>>>>>>>>> +        return;
->>>>>>>>>>>>>>>> +
->>>>>>>>>>>>>>>> +    curr_pa = cmdq_thread_readl(thread, CMDQ_THR_CURR_ADDR);
->>>>>>>>>>>>>>>> +
->>>>>>>>>>>>>>>> +    list_for_each_entry_safe(task, tmp, &thread->task_busy_list,
->>>>>>>>>>>>>>>> +                 list_entry) {
->>>>>>>>>>>>>>>> +        if (curr_pa >= task->pa_base &&
->>>>>>>>>>>>>>>> +            curr_pa < (task->pa_base + task->command_size))
->>>>>>>>>>>>>>>
->>>>>>>>>>>>>>> What are you checking here? It seems as if you make some implcit
->>>>>>>>>>>>>>> assumptions about pa_base and the order of execution of
->>>>>>>>>>>>>>> commands in the
->>>>>>>>>>>>>>> thread. Is it save to do so? Does dma_alloc_coherent give any
->>>>>>>>>>>>>>> guarantees
->>>>>>>>>>>>>>> about dma_handle?
->>>>>>>>>>>>>>
->>>>>>>>>>>>>> 1. Check what is the current running task in this GCE thread.
->>>>>>>>>>>>>> 2. Yes.
->>>>>>>>>>>>>> 3. Yes, CMDQ doesn't use iommu, so physical address is continuous.
->>>>>>>>>>>>>>
->>>>>>>>>>>>>
->>>>>>>>>>>>> Yes, physical addresses might be continous, but AFAIK there is no
->>>>>>>>>>>>> guarantee that the dma_handle address is steadily growing, when
->>>>>>>>>>>>> calling
->>>>>>>>>>>>> dma_alloc_coherent. And if I understand the code correctly, you
->>>>>>>>>>>>> use this
->>>>>>>>>>>>> assumption to decide if the task picked from task_busy_list is
->>>>>>>>>>>>> currently
->>>>>>>>>>>>> executing. So I think this mecanism is not working.
->>>>>>>>>>>>
->>>>>>>>>>>> I don't use dma_handle address, and just use physical addresses.
->>>>>>>>>>>>       From CPU's point of view, tasks are linked by the busy list.
->>>>>>>>>>>>       From GCE's point of view, tasks are linked by the JUMP command.
->>>>>>>>>>>>
->>>>>>>>>>>>> In which cases does the HW thread raise an interrupt.
->>>>>>>>>>>>> In case of error. When does CMDQ_THR_IRQ_DONE get raised?
->>>>>>>>>>>>
->>>>>>>>>>>> GCE will raise interrupt if any task is done or error.
->>>>>>>>>>>> However, GCE is fast, so CPU may get multiple done tasks
->>>>>>>>>>>> when it is running ISR.
->>>>>>>>>>>>
->>>>>>>>>>>> In case of error, that GCE thread will pause and raise interrupt.
->>>>>>>>>>>> So, CPU may get multiple done tasks and one error task.
->>>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> I think we should reimplement the ISR mechanism. Can't we just read
->>>>>>>>>>> CURR_IRQ_STATUS and THR_IRQ_STATUS in the handler and leave
->>>>>>>>>>> cmdq_handle_error_done to the thread_fn? You will need to pass
->>>>>>>>>>> information from the handler to thread_fn, but that shouldn't be an
->>>>>>>>>>> issue. AFAIK interrupts are disabled in the handler, so we should stay
->>>>>>>>>>> there as short as possible. Traversing task_busy_list is expensive, so
->>>>>>>>>>> we need to do it in a thread context.
->>>>>>>>>>
->>>>>>>>>> Actually, our initial implementation is similar to your suggestion,
->>>>>>>>>> but display needs CMDQ to return callback function very precisely,
->>>>>>>>>> else display will drop frame.
->>>>>>>>>> For display, CMDQ interrupt will be raised every 16 ~ 17 ms,
->>>>>>>>>> and CMDQ needs to call callback function in ISR.
->>>>>>>>>> If we defer callback to workqueue, the time interval may be larger than
->>>>>>>>>> 32 ms.sometimes.
->>>>>>>>>>
->>>>>>>>>
->>>>>>>>> I think the problem is, that you implemented the workqueue as a ordered
->>>>>>>>> workqueue, so there is no parallel processing. I'm still not sure why
->>>>>>>>> you need the workqueue to be ordered. Can you please explain.
->>>>>>>>
->>>>>>>> The order should be kept.
->>>>>>>> Let me use mouse cursor as an example.
->>>>>>>> If task 1 means move mouse cursor to point A, task 2 means point B,
->>>>>>>> and task 3 means point C, our expected result is A -> B -> C.
->>>>>>>> If the order is not kept, the result could become A -> C -> B.
->>>>>>>>
->>>>>>>
->>>>>>> Got it, thanks for the clarification.
->>>>>>>
->>>>>>
->>>>>> I think a way to get rid of the workqueue is to use a timer, which gets
->>>>>> programmed to the time a timeout in the first task in the busy list
->>>>>> would happen. Everytime we update the busy list (e.g. because of task
->>>>>> got finished by the thread), we update the timer. When the timer
->>>>>> triggers, which hopefully won't happen too often, we return timeout on
->>>>>> the busy list elements, until the time is lower then the actual time.
->>>>>>
->>>>>> At least with this we can reduce the data structures in this driver and
->>>>>> make it more lightweight.
->>>>>
->>>>>    From my understanding, your proposed method can handle timeout case.
->>>>>
->>>>> However, the workqueue is also in charge of releasing tasks.
->>>>> Do you take releasing tasks into consideration by using the proposed
->>>>> timer method?
->>>>> Furthermore, I think the code will become more complex if we also use
->>>>> timer to implement releasing tasks.
->>>>>
->>>>
->>>> Can't we call
->>>>            clk_disable_unprepare(cmdq->clock);
->>>>            cmdq_task_release(task);
->>>> after invoking the callback?
->>>
->>> Do you mean just call these two functions in ISR?
->>> My major concern is dma_free_coherent() and kfree() in
->>> cmdq_task_release(task).
->>
->> Why do we need the dma calls at all? Can't we just calculate the
->> physical address using __pa(x)?
->
-> I prefer to use dma_map_single/dma_unmap_single.
->
+I see from the next patch that we'll clean the whole TEXT_TEXT area to
+the PoC. It feels odd to be selective about the regions we perform
+maintenance on while doing so for the largest mixed bag of instructions.
 
-Can you please elaborate why you need this. We don't do dma, so we 
-should not use dma memory for this.
+Could we instead create a new section (e.g. .mmuoff.text), and place the
+required functions/data in there? That would avoid having to clean more
+than necessary.
 
->>> Therefore, your suggestion is to use GFP_ATOMIC for both
->>> dma_alloc_coherent() and kzalloc(). Right?
->>
->> I don't think we need GFP_ATOMIC, the critical path will just free the
->> memory.
->
-> I tested these two functions, and kfree was safe.
-> However, dma_free_coherent raised BUG.
-> BUG: failure at
-> /mnt/host/source/src/third_party/kernel/v3.18/mm/vmalloc.c:1514/vunmap()!
+> Each time new section markers are added, kernel/vmlinux.ld.S is updated,
+> and new extern char __start_foo[] definitions are scattered through the
+> tree.
+> 
+> Create asm/include/sections.h to collect these definitions (and include
+> the existing asm-generic version).
 
-Just a general hint. Please try to evaluate on a recent kernel. It looks 
-like as if you tried this on a v3.18 based one.
+Nice cleanup!
 
-Best regards,
-Matthias
+It might make more sense to only add sections.h in this patch, and move
+the TEXT_TEXT section additions to the next patch where they're going to
+be used (so as to keep the review comments together).
 
-> 1512 void vunmap(const void *addr)
-> 1513 {
-> 1514         BUG_ON(in_interrupt());		// <-- here
-> 1515         might_sleep();
-> 1516         if (addr)
-> 1517                 __vunmap(addr, 0);
-> 1518 }
-> 1519 EXPORT_SYMBOL(vunmap);
->
-> Therefore, I plan to use kmalloc + dma_map_single instead of
-> dma_alloc_coherent, and dma_unmap_single + kfree instead of
-> dma_free_coherent.
->
-> What do you think about the function replacement?
->
->>> If so, I can try to implement timeout by timer, and discuss with you
->>> if I have further questions.
->>>
->>
->> Sounds good :)
->>
->> Thanks,
->> Matthias
->
-> Thanks,
-> HS
->
->>>> Regrading the clock, wouldn't it be easier to handle the clock
->>>> enable/disable depending on the state of task_busy_list? I suppose we
->>>> can't as we would need to check the task_busy_list of all threads, right?
->>>>
->>>> Regards,
->>>> Matthias
->>>
->>> Thanks,
->>> HS
->>>
->
->
+Thanks,
+Mark.
+
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/include/asm/Kbuild     |  1 -
+>  arch/arm64/include/asm/sections.h | 29 +++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/traps.h    |  3 +--
+>  arch/arm64/include/asm/virt.h     |  5 +----
+>  arch/arm64/kernel/alternative.c   |  7 +++----
+>  arch/arm64/kernel/hibernate.c     |  6 ------
+>  arch/arm64/kernel/vmlinux.lds.S   |  2 ++
+>  arch/arm64/kvm/reset.c            |  3 +--
+>  8 files changed, 37 insertions(+), 19 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/sections.h
+> 
+> diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+> index cff532a6744e..50c1f646b704 100644
+> --- a/arch/arm64/include/asm/Kbuild
+> +++ b/arch/arm64/include/asm/Kbuild
+> @@ -33,7 +33,6 @@ generic-y += poll.h
+>  generic-y += preempt.h
+>  generic-y += resource.h
+>  generic-y += rwsem.h
+> -generic-y += sections.h
+>  generic-y += segment.h
+>  generic-y += sembuf.h
+>  generic-y += serial.h
+> diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
+> new file mode 100644
+> index 000000000000..1d9b0149f413
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/sections.h
+> @@ -0,0 +1,29 @@
+> +/*
+> + * Copyright (C) 2016 ARM Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __ASM_SECTIONS_H
+> +#define __ASM_SECTIONS_H
+> +
+> +#include <asm-generic/sections.h>
+> +
+> +extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+> +extern char __hyp_text_start[], __hyp_text_end[];
+> +extern char __idmap_text_start[], __idmap_text_end[];
+> +extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
+> +extern char __text_text_start[], __text_text_end[];
+> +extern char __exception_text_start[], __exception_text_end[];
+> +extern char __alt_instructions[], __alt_instructions_end[];
+> +
+> +#endif /* __ASM_SECTIONS_H */
+> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+> index 0cc2f29bf9da..90156c803f11 100644
+> --- a/arch/arm64/include/asm/traps.h
+> +++ b/arch/arm64/include/asm/traps.h
+> @@ -19,6 +19,7 @@
+>  #define __ASM_TRAP_H
+>  
+>  #include <linux/list.h>
+> +#include <asm/sections.h>
+>  
+>  struct pt_regs;
+>  
+> @@ -52,8 +53,6 @@ static inline int __in_irqentry_text(unsigned long ptr)
+>  
+>  static inline int in_exception_text(unsigned long ptr)
+>  {
+> -	extern char __exception_text_start[];
+> -	extern char __exception_text_end[];
+>  	int in;
+>  
+>  	in = ptr >= (unsigned long)&__exception_text_start &&
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index dcbcf8dcbefb..b78611157f8b 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -40,6 +40,7 @@
+>  #ifndef __ASSEMBLY__
+>  
+>  #include <asm/ptrace.h>
+> +#include <asm/sections.h>
+>  
+>  /*
+>   * __boot_cpu_mode records what mode CPUs were booted in.
+> @@ -82,10 +83,6 @@ extern void verify_cpu_run_el(void);
+>  static inline void verify_cpu_run_el(void) {}
+>  #endif
+>  
+> -/* The section containing the hypervisor text */
+> -extern char __hyp_text_start[];
+> -extern char __hyp_text_end[];
+> -
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif /* ! __ASM__VIRT_H */
+> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+> index d2ee1b21a10d..4434dabde898 100644
+> --- a/arch/arm64/kernel/alternative.c
+> +++ b/arch/arm64/kernel/alternative.c
+> @@ -25,14 +25,13 @@
+>  #include <asm/alternative.h>
+>  #include <asm/cpufeature.h>
+>  #include <asm/insn.h>
+> +#include <asm/sections.h>
+>  #include <linux/stop_machine.h>
+>  
+>  #define __ALT_PTR(a,f)		(u32 *)((void *)&(a)->f + (a)->f)
+>  #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
+>  #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
+>  
+> -extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
+> -
+>  struct alt_region {
+>  	struct alt_instr *begin;
+>  	struct alt_instr *end;
+> @@ -124,8 +123,8 @@ static int __apply_alternatives_multi_stop(void *unused)
+>  {
+>  	static int patched = 0;
+>  	struct alt_region region = {
+> -		.begin	= __alt_instructions,
+> -		.end	= __alt_instructions_end,
+> +		.begin	= (struct alt_instr *)__alt_instructions,
+> +		.end	= (struct alt_instr *)__alt_instructions_end,
+>  	};
+>  
+>  	/* We always have a CPU 0 at this point (__init) */
+> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+> index f8df75d740f4..56e548fe0386 100644
+> --- a/arch/arm64/kernel/hibernate.c
+> +++ b/arch/arm64/kernel/hibernate.c
+> @@ -52,12 +52,6 @@ extern int in_suspend;
+>  /* Do we need to reset el2? */
+>  #define el2_reset_needed() (is_hyp_mode_available() && !is_kernel_in_hyp_mode())
+>  
+> -/*
+> - * Start/end of the hibernate exit code, this must be copied to a 'safe'
+> - * location in memory, and executed from there.
+> - */
+> -extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
+> -
+>  /* temporary el2 vectors in the __hibernate_exit_text section. */
+>  extern char hibernate_el2_vectors[];
+>  
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 435e820e898d..6b3d2781a9f2 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -118,7 +118,9 @@ SECTIONS
+>  			__exception_text_end = .;
+>  			IRQENTRY_TEXT
+>  			SOFTIRQENTRY_TEXT
+> +			__text_text_start = .;
+>  			TEXT_TEXT
+> +			__text_text_end = .;
+>  			SCHED_TEXT
+>  			LOCK_TEXT
+>  			HYPERVISOR_TEXT
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index b1ad730e1567..c2d3594dd546 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -32,6 +32,7 @@
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_coproc.h>
+>  #include <asm/kvm_mmu.h>
+> +#include <asm/sections.h>
+>  
+>  /*
+>   * ARMv8 Reset Values
+> @@ -133,8 +134,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>  	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+>  }
+>  
+> -extern char __hyp_idmap_text_start[];
+> -
+>  unsigned long kvm_hyp_reset_entry(void)
+>  {
+>  	if (!__kvm_cpu_uses_extended_idmap()) {
+> -- 
+> 2.8.0.rc3
+> 
