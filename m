@@ -1,27 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Jun 2016 12:50:24 +0200
-Subject: [PATCH 3/3] ARM: dts: add Qualcomm APQ8060-based Dragonboard
-In-Reply-To: <1465779498-11339-3-git-send-email-linus.walleij@linaro.org>
-References: <1465779498-11339-1-git-send-email-linus.walleij@linaro.org>
- <1465779498-11339-3-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdZsQJgv-zzPhcQcBxJPUwB4KMPfxsYnWmfH7is_g9z9Cw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 14 Jun 2016 12:01:54 +0100
+Subject: [PATCH v4] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
+In-Reply-To: <20160613172140.GY1041@n2100.armlinux.org.uk>
+References: <1465837689-28215-1-git-send-email-suzuki.poulose@arm.com>
+ <20160613172140.GY1041@n2100.armlinux.org.uk>
+Message-ID: <20160614110154.GB14654@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 2:58 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Mon, Jun 13, 2016 at 06:21:40PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 13, 2016 at 06:08:09PM +0100, Suzuki K Poulose wrote:
+> > From: Steve Capper <steve.capper@linaro.org>
+> > 
+> > It can be useful for JIT software to be aware of MIDR_EL1 and
+> > REVIDR_EL1 to ascertain the presence of any core errata that could
+> > affect codegen.
+> > 
+> > This patch exposes these registers through sysfs:
+> > 
+> > /sys/devices/system/cpu/cpu$ID/identification/midr
+> > /sys/devices/system/cpu/cpu$ID/identification/revidr
+> > 
+> > where $ID is the cpu number. For big.LITTLE systems, one can have a
+> > mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
+> > to be enumerated.
+> > 
+> > If the kernel does not have valid information to populate these entries
+> > with, an empty string is returned to userspace.
+> 
+> So there's no confusion, I've historically said no on 32-bit ARM to
+> exposing the MIDR to userspace, and my position on that for 32-bit
+> ARM has not changed.
 
-> This is the first Dragonboard based on APQ8060 and PM8058. It
-> was produced in 2011 in cooperation between Qualcomm and
-> BSQUARE.
->
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: David Brown <david.brown@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+It depends on what you mean by "exposing". You can already get this
+information in two ways: /proc/cpuinfo parsing or KVM ioctls. Of course,
+this information can be abused in ways the kernel people did not intend
+but it's late to hide something already exposed.
 
-I managed to get RPM and regulators working on this board, so I
-will revise the series. Patch 1 & 2 will probably be the same but this
-one will use proper regulators.
+What we don't have is REVIDR and that's something useful to a JIT in
+deciding whether it needs to work around certain CPU errata (unless we
+come up with another mechanism to inform user about hardware bugs).
 
-Yours,
-Linus Walleij
+-- 
+Catalin
