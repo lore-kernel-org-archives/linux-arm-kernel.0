@@ -1,65 +1,104 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 14 Jun 2016 15:17:34 +0900
-Subject: [PATCH] ARM: keystone: remove redundant depends on
- ARM_PATCH_PHYS_VIRT
-In-Reply-To: <CAK7LNAR+kU4F-rLDOpf_772am3gS86uizHZG4tZpPSCpyjdR4A@mail.gmail.com>
-References: <1454694041-14990-1-git-send-email-yamada.masahiro@socionext.com>
- <56B4E257.5050308@oracle.com>
- <CAK7LNAQQ-fT38pg2S7QmbuZ3dmpy6qE6viQD87ec=QMNnUx6zQ@mail.gmail.com>
- <56B4EA78.6050203@oracle.com>
- <CAK7LNAR+kU4F-rLDOpf_772am3gS86uizHZG4tZpPSCpyjdR4A@mail.gmail.com>
-Message-ID: <CAK7LNARin7J3Ks29xf8n-BiU=k-SZ40uoTpv1+X6E8FhbKyajQ@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Tue, 14 Jun 2016 15:24:57 +0900
+Subject: Boot failure on emev2/kzm9d (was: Re: [PATCH v2 11/11] mm/slab:
+ lockless decision to grow cache)
+In-Reply-To: <CAMuHMdXC=zEjbZADE5wELjOq_kBiFNewpdUrMCe8d3Utu98h8A@mail.gmail.com>
+References: <CAMuHMdXC=zEjbZADE5wELjOq_kBiFNewpdUrMCe8d3Utu98h8A@mail.gmail.com>
+Message-ID: <20160614062456.GB13753@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh
+On Mon, Jun 13, 2016 at 09:43:13PM +0200, Geert Uytterhoeven wrote:
+> Hi Joonsoo,
 
-Ping again.
+Hello,
 
-It is taking so long
-for this apparently correct patch.
+> 
+> On Tue, Apr 12, 2016 at 6:51 AM,  <js1304@gmail.com> wrote:
+> > From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> >
+> > To check whther free objects exist or not precisely, we need to grab a
+> > lock.  But, accuracy isn't that important because race window would be
+> > even small and if there is too much free object, cache reaper would reap
+> > it.  So, this patch makes the check for free object exisistence not to
+> > hold a lock.  This will reduce lock contention in heavily allocation case.
+> >
+> > Note that until now, n->shared can be freed during the processing by
+> > writing slabinfo, but, with some trick in this patch, we can access it
+> > freely within interrupt disabled period.
+> >
+> > Below is the result of concurrent allocation/free in slab allocation
+> > benchmark made by Christoph a long time ago.  I make the output simpler.
+> > The number shows cycle count during alloc/free respectively so less is
+> > better.
+> >
+> > * Before
+> > Kmalloc N*alloc N*free(32): Average=248/966
+> > Kmalloc N*alloc N*free(64): Average=261/949
+> > Kmalloc N*alloc N*free(128): Average=314/1016
+> > Kmalloc N*alloc N*free(256): Average=741/1061
+> > Kmalloc N*alloc N*free(512): Average=1246/1152
+> > Kmalloc N*alloc N*free(1024): Average=2437/1259
+> > Kmalloc N*alloc N*free(2048): Average=4980/1800
+> > Kmalloc N*alloc N*free(4096): Average=9000/2078
+> >
+> > * After
+> > Kmalloc N*alloc N*free(32): Average=344/792
+> > Kmalloc N*alloc N*free(64): Average=347/882
+> > Kmalloc N*alloc N*free(128): Average=390/959
+> > Kmalloc N*alloc N*free(256): Average=393/1067
+> > Kmalloc N*alloc N*free(512): Average=683/1229
+> > Kmalloc N*alloc N*free(1024): Average=1295/1325
+> > Kmalloc N*alloc N*free(2048): Average=2513/1664
+> > Kmalloc N*alloc N*free(4096): Average=4742/2172
+> >
+> > It shows that allocation performance decreases for the object size up to
+> > 128 and it may be due to extra checks in cache_alloc_refill().  But, with
+> > considering improvement of free performance, net result looks the same.
+> > Result for other size class looks very promising, roughly, 50% performance
+> > improvement.
+> >
+> > v2: replace kick_all_cpus_sync() with synchronize_sched().
+> >
+> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> 
+> I've bisected a boot failure (no output at all) in v4.7-rc2 on emev2/kzm9d
+> (Renesas dual Cortex A9) to this patch, which is upstream commit
+> 801faf0db8947e01877920e848a4d338dd7a99e7.
+> 
+> I've attached my .config. I don't know if it also happens with
+> shmobile_defconfig, as something went wrong with my remote access to the board,
+> preventing further testing. I also couldn't verify if the issue persists in
+> v4.7-rc3.
+> 
+> Do you have a clue?
 
+I don't have yet. Could you help me to narrow down the problem?
+Following diff is half-revert change to check that synchronize_sched()
+has no problem.
 
+Thanks.
 
-2016-04-05 11:14 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> 2016-02-06 3:31 GMT+09:00 santosh shilimkar <santosh.shilimkar@oracle.com>:
->> On 2/5/2016 10:13 AM, Masahiro Yamada wrote:
->>>
->>> 2016-02-06 2:56 GMT+09:00 santosh shilimkar
->>> <santosh.shilimkar@oracle.com>:
->>>>
->>>> On 2/5/2016 9:40 AM, Masahiro Yamada wrote:
->>>>>
->>>>>
->>>>> KeyStone is Multi-platform.  ARM_PATCH_PHYS_VIRT is already select'ed
->>>>> by ARCH_MULTIPLATFORM.
->>>>>
->>>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>>>> ---
->>>>>
->>>> There is also Keystone config so its nit redundant as you think.
->>>>
->>>> P.S: arch/arm/configs/keystone_defconfig
->>>>
->>>
->>> It *is* redundant.
->>>
->>> keystone_defconfig also creates Multiplatform configuration.
->>>
->> Fair enough. Should I checked it.
->> For patch,
->> Acked-by: Santosh Shilimkar<ssantosh@kernel.org>
->>
->
-> If it is OK with you, please apply this patch.
->
->
-> --
-> Best Regards
-> Masahiro Yamada
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+----->8-----
+diff --git a/mm/slab.c b/mm/slab.c
+index 763096a..257a0eb 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -3016,9 +3016,6 @@ static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
+        n = get_node(cachep, node);
+ 
+        BUG_ON(ac->avail > 0 || !n);
+-       shared = READ_ONCE(n->shared);
+-       if (!n->free_objects && (!shared || !shared->avail))
+-               goto direct_grow;
+ 
+        spin_lock(&n->list_lock);
+        shared = READ_ONCE(n->shared);
+@@ -3047,7 +3044,6 @@ alloc_done:
+        spin_unlock(&n->list_lock);
+        fixup_objfreelist_debug(cachep, &list);
+ 
+-direct_grow:
+        if (unlikely(!ac->avail)) {
+                /* Check if we can use obj in pfmemalloc slab */
+                if (sk_memalloc_socks()) {
