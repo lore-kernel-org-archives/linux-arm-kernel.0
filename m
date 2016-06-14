@@ -1,104 +1,164 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 14 Jun 2016 15:24:57 +0900
-Subject: Boot failure on emev2/kzm9d (was: Re: [PATCH v2 11/11] mm/slab:
- lockless decision to grow cache)
-In-Reply-To: <CAMuHMdXC=zEjbZADE5wELjOq_kBiFNewpdUrMCe8d3Utu98h8A@mail.gmail.com>
-References: <CAMuHMdXC=zEjbZADE5wELjOq_kBiFNewpdUrMCe8d3Utu98h8A@mail.gmail.com>
-Message-ID: <20160614062456.GB13753@js1304-P5Q-DELUXE>
+From: po.liu@nxp.com (Po Liu)
+Date: Tue, 14 Jun 2016 14:12:26 +0800
+Subject: [PATCH v2 1/2] nxp/dts: add pcie aer interrupt-name property in the
+ dts
+In-Reply-To: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+Message-ID: <1465884747-1517-1-git-send-email-po.liu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 09:43:13PM +0200, Geert Uytterhoeven wrote:
-> Hi Joonsoo,
+NXP some platforms aer interrupt was not MSI/MSI-X/INTx
+but using interrupt line independently. This patch add a "aer"
+interrupt-names for aer interrupt.
 
-Hello,
+Signed-off-by: Po Liu <po.liu@nxp.com>
+---
+Changes for V2:
+	- None.
 
-> 
-> On Tue, Apr 12, 2016 at 6:51 AM,  <js1304@gmail.com> wrote:
-> > From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> >
-> > To check whther free objects exist or not precisely, we need to grab a
-> > lock.  But, accuracy isn't that important because race window would be
-> > even small and if there is too much free object, cache reaper would reap
-> > it.  So, this patch makes the check for free object exisistence not to
-> > hold a lock.  This will reduce lock contention in heavily allocation case.
-> >
-> > Note that until now, n->shared can be freed during the processing by
-> > writing slabinfo, but, with some trick in this patch, we can access it
-> > freely within interrupt disabled period.
-> >
-> > Below is the result of concurrent allocation/free in slab allocation
-> > benchmark made by Christoph a long time ago.  I make the output simpler.
-> > The number shows cycle count during alloc/free respectively so less is
-> > better.
-> >
-> > * Before
-> > Kmalloc N*alloc N*free(32): Average=248/966
-> > Kmalloc N*alloc N*free(64): Average=261/949
-> > Kmalloc N*alloc N*free(128): Average=314/1016
-> > Kmalloc N*alloc N*free(256): Average=741/1061
-> > Kmalloc N*alloc N*free(512): Average=1246/1152
-> > Kmalloc N*alloc N*free(1024): Average=2437/1259
-> > Kmalloc N*alloc N*free(2048): Average=4980/1800
-> > Kmalloc N*alloc N*free(4096): Average=9000/2078
-> >
-> > * After
-> > Kmalloc N*alloc N*free(32): Average=344/792
-> > Kmalloc N*alloc N*free(64): Average=347/882
-> > Kmalloc N*alloc N*free(128): Average=390/959
-> > Kmalloc N*alloc N*free(256): Average=393/1067
-> > Kmalloc N*alloc N*free(512): Average=683/1229
-> > Kmalloc N*alloc N*free(1024): Average=1295/1325
-> > Kmalloc N*alloc N*free(2048): Average=2513/1664
-> > Kmalloc N*alloc N*free(4096): Average=4742/2172
-> >
-> > It shows that allocation performance decreases for the object size up to
-> > 128 and it may be due to extra checks in cache_alloc_refill().  But, with
-> > considering improvement of free performance, net result looks the same.
-> > Result for other size class looks very promising, roughly, 50% performance
-> > improvement.
-> >
-> > v2: replace kick_all_cpus_sync() with synchronize_sched().
-> >
-> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> 
-> I've bisected a boot failure (no output at all) in v4.7-rc2 on emev2/kzm9d
-> (Renesas dual Cortex A9) to this patch, which is upstream commit
-> 801faf0db8947e01877920e848a4d338dd7a99e7.
-> 
-> I've attached my .config. I don't know if it also happens with
-> shmobile_defconfig, as something went wrong with my remote access to the board,
-> preventing further testing. I also couldn't verify if the issue persists in
-> v4.7-rc3.
-> 
-> Do you have a clue?
+ .../devicetree/bindings/pci/layerscape-pci.txt         |  4 ++--
+ arch/arm/boot/dts/ls1021a.dtsi                         |  6 ++++--
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi         | 18 +++++++++---------
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi         | 16 ++++++++--------
+ 4 files changed, 23 insertions(+), 21 deletions(-)
 
-I don't have yet. Could you help me to narrow down the problem?
-Following diff is half-revert change to check that synchronize_sched()
-has no problem.
-
-Thanks.
-
------>8-----
-diff --git a/mm/slab.c b/mm/slab.c
-index 763096a..257a0eb 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -3016,9 +3016,6 @@ static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
-        n = get_node(cachep, node);
- 
-        BUG_ON(ac->avail > 0 || !n);
--       shared = READ_ONCE(n->shared);
--       if (!n->free_objects && (!shared || !shared->avail))
--               goto direct_grow;
- 
-        spin_lock(&n->list_lock);
-        shared = READ_ONCE(n->shared);
-@@ -3047,7 +3044,6 @@ alloc_done:
-        spin_unlock(&n->list_lock);
-        fixup_objfreelist_debug(cachep, &list);
- 
--direct_grow:
-        if (unlikely(!ac->avail)) {
-                /* Check if we can use obj in pfmemalloc slab */
-                if (sk_memalloc_socks()) {
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index ef683b2..d27973a 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -19,7 +19,7 @@ Required properties:
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+   entry for each entry in the interrupt-names property.
+ - interrupt-names: Must include the following entries:
+-  "intr": The interrupt that is asserted for controller interrupts
++  "aer" : The interrupt that is asserted for aer interrupts
+ - fsl,pcie-scfg: Must include two entries.
+   The first entry must be a link to the SCFG device node
+   The second entry must be '0' or '1' based on physical PCIe controller index.
+@@ -33,7 +33,7 @@ Example:
+ 		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+ 		reg-names = "regs", "config";
+ 		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
+-		interrupt-names = "intr";
++		interrupt-names = "aer";
+ 		fsl,pcie-scfg = <&scfg 0>;
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 5ae8e92..b638697 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -633,7 +633,8 @@
+ 			reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
+ 			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+-			interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
++			interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
++			interrupt-names = "aer";
+ 			fsl,pcie-scfg = <&scfg 0>;
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+@@ -656,7 +657,8 @@
+ 			reg = <0x00 0x03500000 0x0 0x00010000   /* controller registers */
+ 			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+-			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
++			interrupt-names = "aer";
+ 			fsl,pcie-scfg = <&scfg 1>;
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index de0323b..4beb760 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -473,9 +473,9 @@
+ 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+ 			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+-			interrupts = <0 118 0x4>, /* controller interrupt */
+-				     <0 117 0x4>; /* PME interrupt */
+-			interrupt-names = "intr", "pme";
++			interrupts = <0 117 0x4>, /* PME interrupt */
++					 <0 118 0x4>; /* aer interrupt */
++			interrupt-names = "pme", "aer";
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+@@ -497,9 +497,9 @@
+ 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+ 			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+-			interrupts = <0 128 0x4>,
+-				     <0 127 0x4>;
+-			interrupt-names = "intr", "pme";
++			interrupts = <0 127 0x4>,
++					 <0 128 0x4>;
++			interrupt-names = "pme", "aer";
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+@@ -521,9 +521,9 @@
+ 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+ 			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+-			interrupts = <0 162 0x4>,
+-				     <0 161 0x4>;
+-			interrupt-names = "intr", "pme";
++			interrupts = <0 161 0x4>,
++					 <0 162 0x4>;
++			interrupt-names = "pme", "aer";
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 3187c82..6edf24b 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -559,8 +559,8 @@
+ 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+ 			       0x10 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+-			interrupts = <0 108 0x4>; /* Level high type */
+-			interrupt-names = "intr";
++			interrupts = <0 108 0x4>; /* aer interrupt */
++			interrupt-names = "aer";
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+@@ -583,8 +583,8 @@
+ 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+ 			       0x12 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+-			interrupts = <0 113 0x4>; /* Level high type */
+-			interrupt-names = "intr";
++			interrupts = <0 113 0x4>; /* aer interrupt */
++			interrupt-names = "aer";
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+@@ -607,8 +607,8 @@
+ 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+ 			       0x14 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+-			interrupts = <0 118 0x4>; /* Level high type */
+-			interrupt-names = "intr";
++			interrupts = <0 118 0x4>; /* aer interrupt */
++			interrupt-names = "aer";
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+@@ -631,8 +631,8 @@
+ 			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
+ 			       0x16 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+-			interrupts = <0 123 0x4>; /* Level high type */
+-			interrupt-names = "intr";
++			interrupts = <0 123 0x4>; /* aer interrupt */
++			interrupt-names = "aer";
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+-- 
+2.1.0.27.g96db324
