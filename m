@@ -1,132 +1,105 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 14 Jun 2016 08:18:09 +0000
-Subject: [PATCH v10 2/2] dmaengine: Add Xilinx zynqmp dma engine driver
- support
-In-Reply-To: <20160613055012.GC16910@localhost>
-References: <1464765839-29018-1-git-send-email-appanad@xilinx.com>
- <1464765839-29018-2-git-send-email-appanad@xilinx.com>
- <20160607070841.GJ16910@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A5B4FA9@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160613055012.GC16910@localhost>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5B6441@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 14 Jun 2016 10:19:12 +0200
+Subject: [PATCH 09/12] mmc: sdhci-xenon: add initial Xenon eMMC driver
+In-Reply-To: <575FA9BF.6070703@intel.com> (Adrian Hunter's message of "Tue, 14
+ Jun 2016 09:52:47 +0300")
+References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+ <1465456218-28354-10-git-send-email-gregory.clement@free-electrons.com>
+ <575FA9BF.6070703@intel.com>
+Message-ID: <878ty8chdr.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi Adrian,
+ 
+ On mar., juin 14 2016, Adrian Hunter <adrian.hunter@intel.com> wrote:
 
-	Thanks for the review...
+> On 09/06/16 10:10, Gregory CLEMENT wrote:
+>> From: Victor Gu <xigu@marvell.com>
+>> 
+>> This path adds the driver for the Marvell Xenon eMMC host controller
+>> which supports eMMC 5.1, SD 3.0.
+>> 
+>> However this driver supports only up to eMMC 5.0 since the command queue
+>> feature is not included (yet) in the driver.
+>> 
+>> [gregory.clement at free-electrons.com:
+>>  - reformulate commit log
+>>  - overload the sdhci_set_uhs_signaling function instead of using a quirk
+>>  - fix a kconfig dependency
+>>  - remove dead code]
+>> 
+>> Signed-off-by: Victor Gu <xigu@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/mmc/host/Kconfig       |   10 +
+>>  drivers/mmc/host/Makefile      |    1 +
+>>  drivers/mmc/host/sdhci-xenon.c | 1164 ++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 1175 insertions(+)
+>>  create mode 100644 drivers/mmc/host/sdhci-xenon.c
+>> 
+>
+> <SNIP>
+>
+>> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+>> new file mode 100644
+>> index 000000000000..43c06db95872
+>> --- /dev/null
+>> +++ b/drivers/mmc/host/sdhci-xenon.c
+>
+> <SNIP>
+>
+>> +static int sdhci_xenon_delay_adj_test(struct sdhci_host *host,
+>> +		struct mmc_card *card, unsigned int delay,
+>> +		bool invert, bool phase)
+>> +{
+>> +	int ret;
+>> +	struct mmc_card *oldcard;
+>> +
+>> +	sdhci_xenon_set_fix_delay(host, delay, invert, phase);
+>> +
+>> +	/*
+>> +	 * If the card is not yet associated to the host, we
+>> +	 * temporally do it
+>> +	 */
+>> +	oldcard = card->host->card;
+>> +	if (!oldcard)
+>> +		card->host->card = card;
+>> +	ret =  card_alive(card);
+>
+> This looks like an abuse of bus_ops->alive().  You will need to get
+> agreement with Ulf how to handle this.  I will wait for Ulf's comments
+> before reviewing this patch set further.
 
-> 
-> On Wed, Jun 08, 2016 at 07:40:52AM +0000, Appana Durga Kedareswara Rao
-> wrote:
-> > > > +static void zynqmp_dma_desc_config_eod(struct zynqmp_dma_chan
-> > > > +*chan, void *desc)
-> > >
-> > > eod? 80 line?
-> 
-> What's eod?
+Actually I modified this part of the driver to use
+bus_ops->alive(). Initially, the alive() code was more or less copied
+and paste from the mmc core with ugly include from mmc_ops.h and
+sdio_ops.h to make it work. I find it cleaner to directly access the
+alive() function.
 
-End of descriptor...
+Could you explain why it is an abuse of  bus_ops->alive()?
 
-> 
-> > > > +int zynqmp_dma_channel_set_config(struct dma_chan *dchan,
-> > > > +				  struct zynqmp_dma_config *cfg) {
-> > > > +	struct zynqmp_dma_chan *chan = to_chan(dchan);
-> > > > +
-> > > > +	chan->config.ovrfetch = cfg->ovrfetch;
-> > > > +	chan->config.has_sg = cfg->has_sg;
-> > >
-> > > is this HW capability? if so why would anyone not like to use it!
-> >
-> > Yes it is HW capability. It can be either in simple mode or SG mode
-> > Earlier In the driver this configuration is read from the device-tree
-> > But as per lars and your suggestion moved it as runtime config parameters.
-> 
-> If sg mode is available why would anyone _not_ want it?
-> 
-> I do not think there is point to have this
+Thanks,
 
-You mean always keep the device in SG mode and provide an option 
-For simple dma mode if user want to use simple DMA mode??
-
-There are few features that are available in the simple DMA mode won't
-Available in SG mode like write only DMA , read only DMA mode etc...
-
-> 
-> >
-> > >
-> > > > +	chan->config.ratectrl = cfg->ratectrl;
-> > > > +	chan->config.src_issue = cfg->src_issue;
-> > > > +	chan->config.src_burst_len = cfg->src_burst_len;
-> > > > +	chan->config.dst_burst_len = cfg->dst_burst_len;
-> > >
-> > > can you describe these parameters?
-> > ratectl:
-> > Rate control can be independently enabled per channel. When rate
-> > control is enabled, the DMA channel uses the rate control count to schedule
-> successive data read transactions.
-> 
-> And how is this used by client?
-
-When rate control is enabled, ZDMA channel uses the rate control count
-To schedule successive data read transactions I mean kind of flow control to schedule 
-Transactions at fixed intervals instead of pumping the transfers without delay or whenever bus is available
-
-Rate control count register definition (11:0):
-Scheduling interval for SRC AXI transaction, only used if rate control is enabled 
-
-
-> 
-> > src_issue:
-> > Tells outstanding transaction on SRC.
-> 
-> This should be read only then, right?
-
-It is a Read/Write register
-http://www.xilinx.com/html_docs/registers/ug1087/ug1087-zynq-ultrascale-registers.html 
-By default it is configured for Max transactions.
-If user want to limit it they can limit it using this config option.
-
-> 
-> > Burst_len:
-> > Configures the burst length of the src and dst transfers...
-> 
-> Hmmm, but you are on memcpy, so that should be programmed for throughput?
-
-Yes...
-
-> 
-> > >
-> > > How would a client know how to configure them?
-> >
-> > With the default values of the config parameters driver will work.
-> 
-> But how will client know what is default!
-
-Default values means IP default state after reset.
-If user not aware of the above parameters also still the driver will work for basic functionality.
-Do you want me to implement one more API get_config so that 
-Whenever user will call the get_config he will know the default values
-Of the config parameters?
-
-> 
-> > If user has specific requirement to change these parameters they can
-> > pass It to the driver using set_config API and all these parameters
-> > are Documented in the include/linux/dma/xilinx_dma.h file...
-> 
-> Can you give me an example where user would like to do that
+Gregory
 
 
-I am using customized dma test client.
-There I am calling this set_config API before triggering memcpy/SG operations.
+>> +	card->host->card = oldcard;
+>> +	if (ret) {
+>> +		pr_debug("Xenon failed when sampling fix delay %d, inverted %d, phase %d\n",
+>> +			 delay, invert, phase);
+>> +		return -EIO;
+>> +	}
+>> +
+>> +	pr_debug("Xenon succeeded when sampling fixed delay %d, inverted %d, phase %d\n",
+>> +		 delay, invert, phase);
+>> +	return 0;
+>> +}
+>
+>
 
-Regards,
-Kedar.
-
-> 
-> --
-> ~Vinod
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in the body
-> of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
