@@ -1,57 +1,80 @@
-From: mcgrof@kernel.org (Luis R. Rodriguez)
-Date: Mon, 13 Jun 2016 18:53:36 -0700
-Subject: [RESEND/PATCHv4 v4 2/3] firmware: Provide infrastructure to make
- fw caching optional
-In-Reply-To: <20160607164741.31849-3-stephen.boyd@linaro.org>
-References: <20160607164741.31849-1-stephen.boyd@linaro.org>
- <20160607164741.31849-3-stephen.boyd@linaro.org>
-Message-ID: <CAB=NE6WQP9V_0W55pre4my=vHS1=eX8_BK2AVJGNpXViw0EVFA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 13 Jun 2016 19:13:43 -0700
+Subject: [PATCH 04/11] mmc: sdhci-of-arasan: Properly set
+ corecfg_baseclkfreq on rk3399
+In-Reply-To: <da1c9ae9-71d9-6e9d-7b9f-08485ee9178e@rock-chips.com>
+References: <1465339484-969-1-git-send-email-dianders@chromium.org>
+ <1465339484-969-5-git-send-email-dianders@chromium.org>
+ <f5dcc018-bd60-87a7-798b-efc261e443dd@rock-chips.com>
+ <CAD=FV=UzGZmwGTthqqO5Skxj5f0wsS5VKr4gYP2i9SUyGqvbjg@mail.gmail.com>
+ <47a2dcd9-9c3c-8fde-2be0-40e305c25e8d@rock-chips.com>
+ <CAD=FV=UL5tU8RWtHF=-pE8SA0jUcBsqQDOU0BrruXOF7yGh5xg@mail.gmail.com>
+ <da1c9ae9-71d9-6e9d-7b9f-08485ee9178e@rock-chips.com>
+Message-ID: <CAD=FV=WGwiQqRNMSSX9OR6nAOwuu7CbULuz7BcNp-S=duqpLLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 9:47 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> From: Vikram Mulukutla <markivx@codeaurora.org>
+Shawn,
+
+On Mon, Jun 13, 2016 at 5:59 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+>> Even in the case that an SoC designer didn't put a value into
+>> corecfg_baseclkfreq that matched register[15:8], it seems very likely
+>> that the rate returned from the clk_get_rate() would match.
+>>
+>> I guess what I'm saying is that, to me, it seems like my patch isn't
+>> broken in any real systems.  If we ever find a system that needs this
+>> behavior in the future, we can add it.  Until then, it seems like my
+>> patch would be fine.  Do you agree?
 >
-> Some low memory systems with complex peripherals cannot afford to
-> have the relatively large firmware images taking up valuable
-> memory during suspend and resume. Change the internal
-> implementation of firmware_class to disallow caching based on a
-> configurable option. In the near future, variants of
-> request_firmware will take advantage of this feature.
 >
-> Signed-off-by: Vikram Mulukutla <markivx@codeaurora.org>
-> [stephen.boyd at linaro.org: Drop firmware_desc design and use flags]
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/base/firmware_class.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/base/firmware_class.c b/drivers/base/firmware_class.c
-> index 01d55723d82c..45ed20cefa10 100644
-> --- a/drivers/base/firmware_class.c
-> +++ b/drivers/base/firmware_class.c
-> @@ -112,6 +112,7 @@ static inline long firmware_loading_timeout(void)
->  #define FW_OPT_FALLBACK                0
->  #endif
->  #define FW_OPT_NO_WARN (1U << 3)
-> +#define FW_OPT_NOCACHE (1U << 4)
+> I agree. But from the code itself, we should still use
+> SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN to see if we could get
+> it from internal register in case of some platforms don't
+> provide the clk stuff.. Sounds sane? :)
 
-6 days late -- but even if I wasn't Cc'd I caught this on linux-next
--- but please folks
+Could we wait until there exists a SoC that needs to provide
+baseclkfreq in its sdhci_arasan_soc_ctl_map table and that needs this
+value copied from register[15:8]?
 
-NACK,
+AKA:
 
-We should not be adding *yet another flag* and *yet another new API*
-for a mild tweak to the API. The firmware API is already messed up
-enough as it is, enough is enough. I'll post v4 of the new flexible
-API which after feedback from v3 series [0] should put this to an end.
-That should enable you to add your optional needs via a descriptor
-without any other collateral evolutins. I had been waiting to push out
-v4 until me and Julia completed some SmPL conversion to help drivers
-easily convert over but seeing this patch got merged and I think this
-can't wait any more, the SmPL grooviness will have to wait a bit and
-some simple manual transformation examples will be provided.
+A) If you have a SoC where clk_get_rate() is right and software needs
+to set baseclkfreq manualy, then you should include "baseclkfreq" in
+your sdhci_arasan_soc_ctl_map table.  This is like rk3399.  Note that
+if _both_ clk_get_rate() and register[15:8] are right, that's fine.
+We can still use clk_get_rate() since it will be exactly the same as
+register[15:8].
 
-[0] http://lkml.kernel.org/r/1450906497-24179-6-git-send-email-mcgrof@do-not-panic.com
+B) If you have a SoC that doesn't even expose corecfg_baseclkfreq to
+software control, just don't include "baseclkfreq" in your
+sdhci_arasan_soc_ctl_map table.  Easy.  This is how my patch treats
+anyone using the current "generic" bindings, but you could easily just
+specify an offset of "-1" for baseclkfreq if you didn't want to use
+the generic bindings but couldn't control baseclkfreq.
 
-  Luis
+C) If you have a SoC that provides a valid value in register[15:8] and
+clk_get_rate() is wrong and software is required to copy the value
+from register[15:8] to baseclkfreq, technically we should fix
+clk_get_rate() anyway.  It's good when common clock framework provides
+correct values.  NOTE: It seems very unlikely to me that
+register[15:8] would be right AND that software would be required to
+copy this value to baseclkfreq, but I suppose there are some pretty
+crazy hardware designs out there.
+
+D) If you have a SoC that provides a valid value in register[15:8] and
+clk_get_rate() is wrong and can't be fixed (REALLY?) and software is
+required to copy the value from register[15:8] to baseclkfreq, we will
+need to add new code.  My assertion is that such a SoC doesn't exist
+and is unlikely to ever exist, so I am hesitant to add extra code to
+support this SoC.
+
+
+With my patch, A) and B) are certainly handled.  I think C) is
+unlikely to exist, but if it did exist then I'd say we should fix
+clk_get_rate().  I think D) is VERY unlikely to exist.  If I'm shown
+proof of D) existing, I'm happy to submit a patch for it.  Until we
+see proof of D)'s existence, I don't think we should clutter the code
+with support for it.
+
+
+-Doug
