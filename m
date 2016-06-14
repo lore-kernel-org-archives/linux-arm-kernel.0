@@ -1,32 +1,66 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 14 Jun 2016 01:08:48 +0000
-Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
- <20160601005751.GG20527@verge.net.au>
- <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
- <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
- <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
- <20160610010245.GA10152@verge.net.au>
- <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
- <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
- <1b9a4cf4-1101-ccbf-772b-49b8a689a1b6@cogentembedded.com>
- <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
-Message-ID: <87eg80d1m9.wl%kuninori.morimoto.gx@renesas.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Tue, 14 Jun 2016 01:30:29 +0000
+Subject: [PATCH 1/1] ARM: dts: imx6qdl.dtsi: add "arm, shared-override"
+ for pl310
+In-Reply-To: <1465816498.2313.15.camel@pengutronix.de>
+References: <1465292365-26038-1-git-send-email-peter.chen@nxp.com>
+ <20160611115733.GM20243@tiger> <1465809841.2313.2.camel@pengutronix.de>
+ <VI1PR04MB14558D10397904A5C33A73E88B530@VI1PR04MB1455.eurprd04.prod.outlook.com>
+ <1465816498.2313.15.camel@pengutronix.de>
+Message-ID: <HE1PR04MB1450F3D1F7C9CA4C859C04D88B540@HE1PR04MB1450.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ 
+>
+>Am Montag, den 13.06.2016, 09:42 +0000 schrieb Peter Chen:
+>>
+>> >Am Samstag, den 11.06.2016, 19:57 +0800 schrieb Shawn Guo:
+>> >> + Lucas
+>> >>
+>> >> On Tue, Jun 07, 2016 at 05:39:25PM +0800, Peter Chen wrote:
+>> >> > The imx6 SMP system has the same DMA memory coherency issue [1]
+>> >> > with
+>> >> > pl310 L2 controller. With this shared override bit set, the
+>> >> > customer reports the DMA coherency issue is gone. Besides, I have
+>> >> > tested the performance using USB ethernet with/without this bit,
+>> >> > it shows no difference.
+>> >> >
+>> >> > [1] http://patchwork.ozlabs.org/patch/469362/
+>> >> >
+>> >> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+>> >> > ---
+>> >> >  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
+>> >> >  1 file changed, 1 insertion(+)
+>> >> >
+>> >> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
+>> >> > b/arch/arm/boot/dts/imx6qdl.dtsi index ed613eb..30e21ee 100644
+>> >> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+>> >> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+>> >> > @@ -185,6 +185,7 @@
+>> >> >  			cache-level = <2>;
+>> >> >  			arm,tag-latency = <4 2 3>;
+>> >> >  			arm,data-latency = <4 2 3>;
+>> >> > +			arm,shared-override;
+>> >>
+>> >> Lucas had an objection to the change [1], considering the case that
+>> >> kernel is booted as non-secure.
+>> >
+>> >My objection to this change still stands. Configuring the L2C to be
+>> >compliant to the
+>> >ARMv7 ARM is at the same level as the CPU workarounds that can not be
+>> >applied in secure mode. Those must be done in the firmware, if your
+>> >firmware doesn't do it it's plain broken.
+>> >
+>>
+>> Sorry, I not understand what's your mean. We only changes L2
+>> configuration when the cache is disabled, what problem will be?
+>>
+>If the kernel is booted in non-secure mode, the L2 cache configuration register is RO
+>and the kernel will crash on the attempt to write into this register.
+>
 
-Hi Geert
+Does that mean current mainline kernel for imx6qdl can't boot with non-secure mode, I see other
+L2 configurations have been changed like "arm, tag-latency" and "arm,data-latency"? Did you try it?
 
-> Right, I had forgotten about that.
-> Fortunately the clk-rcar-gen2 driver has a sane failure mode for this case ;-)
-> 
-> it seems the RCAN clock can just be modeled as a fixed clock. However,
-> its divider value isn't clear to me, as 15.9 MHz cannot be generated from PLL1
-> using an integer divider. Morimoto-san, can you please ask for clarification?
-
-OK.
-Now, I asked to HW team about that.
-Please wait.
+Peter 
