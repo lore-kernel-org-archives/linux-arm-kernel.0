@@ -1,124 +1,107 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 15 Jun 2016 02:08:38 +0300
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <20160526222943.GA16729@MBP.local>
-References: <6293194.tGy03QJ9ME@wuerfel>
- <20160525.135039.244098606649448826.davem@davemloft.net>
- <6407614.fdv5XFSBue@wuerfel>
- <20160525.142821.1719403997976778673.davem@davemloft.net>
- <20160526204819.GA10274@yury-N73SV>
- <20160526222943.GA16729@MBP.local>
-Message-ID: <20160614230838.GA15130@yury-N73SV>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 14 Jun 2016 18:12:56 -0500
+Subject: [v2 PATCH 3/4] Documentation: bindings: add dt documentation for
+ cdn DP controller
+In-Reply-To: <1465810789-22303-4-git-send-email-zyw@rock-chips.com>
+References: <1465810789-22303-1-git-send-email-zyw@rock-chips.com>
+ <1465810789-22303-4-git-send-email-zyw@rock-chips.com>
+Message-ID: <20160614231256.GA17242@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, David, all
+On Mon, Jun 13, 2016 at 05:39:48PM +0800, Chris Zhong wrote:
+> This patch adds a binding that describes the cdn DP controller for
+> rk3399.
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v2: None
+> Changes in v1:
+> - add extcon node description
+> - add #sound-dai-cells description
+> 
+>  .../bindings/display/rockchip/cdn-dp-rockchip.txt  | 62 ++++++++++++++++++++++
+>  1 file changed, 62 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+> new file mode 100644
+> index 0000000..4a66fc3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+> @@ -0,0 +1,62 @@
+> +Rockchip RK3399 specific extensions to the cdn Display Port
+> +================================
+> +
+> +Required properties:
+> +- compatible: must be "rockchip,cdn-dp"
 
-> COMPAT_SYSCALL_WRAP2(creat, ...):
-> 	mov	w0, w0
-> 	b	<sys_creat>
-> 
-> > > Cost wise, this seems like it all cancels out in the end, but what
-> > > do I know?
-> > 
-> > I think you know something, and I also think Heiko and other s390 guys
-> > know something as well. So I'd like to listen their arguments here.
-> > 
-> > For me spark64 way is looking reasonable only because it's really simple
-> > and takes less coding. I'll try it on some branch and share here what happened.
-> 
-> The kernel code will definitely look simpler ;). It would be good to see
-> if there actually is any performance impact. Even with 16 more cycles on
-> syscall entry, would they be lost in the noise? You don't need a full
-> implementation, just some dummy mov x0, x0 on the entry path.
-> 
+SoC specific compatible string please.
+
+> +
+> +- reg: physical base address of the controller and length
+> +
+> +- clocks: from common clock binding: handle to dp clock.
+> +
+> +- clock-names: from common clock binding:
+> +	       Required elements: "core_clk" "pclk" "spdif"
+> +
+> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
+> +
+> +- ports: contain a port nodes with endpoint definitions as defined in
+> +	 Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +	 contained 2 endpoints, connecting to the output of vop.
+> +
+> +- phys: from general PHY binding: the phandle for the PHY device.
+> +
+> +- extcon: extcon specifier for the Power Delivery
+> +
+> +- #sound-dai-cells = it must be 1 if your system is using 2 DAIs: I2S, SPDIF
+> +
+> +-------------------------------------------------------------------------------
+> +
+> +Example:
+> +	cdn_dp: dp at fec00000 {
+> +		compatible = "rockchip,cdn-dp";
+> +		reg = <0x0 0xfec00000 0x0 0x100000>;
+> +		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru SCLK_DP_CORE>, <&cru PCLK_DP_CTRL>,
+> +			 <&cru SCLK_SPDIF_REC_DPTX>;
+> +		clock-names = "core_clk", "pclk", "spdif";
+> +		phys = <&tcphy0>;
+> +		extcon = <&fusb1>;
+> +		rockchip,grf = <&grf>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		#sound-dai-cells = <1>;
+> +
+> +		ports {
+
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <1>;
+
+Don't need these with a single port.
+
+> +
+> +			dp_in: port {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				dp_in_vopb: endpoint at 0 {
+> +					reg = <0>;
+> +					remote-endpoint = <&vopb_out_dp>;
+> +				};
+> +
+> +				dp_in_vopl: endpoint at 1 {
+> +					reg = <1>;
+> +					remote-endpoint = <&vopl_out_dp>;
+> +				};
+> +			};
+> +		};
+> +	};
 > -- 
-> Catalin
-
-I wrote a simple test:
-
-        struct timeval start, end;
-        unsigned long long ut;
-
-        int main()
-        {
-                gettimeofday(&start, NULL);
-
-                for (int i = 1000000; i; i--)
-                        syscall(__NR_getrusage, 100 /* EINVAL */, NULL);
-
-                gettimeofday(&end, NULL);
-                
-                ut = (end.tv_sec - start.tv_sec) * 1000000ULL
-                        + end.tv_usec - start.tv_usec;
-
-                printf("%lld\n", ut);
-
-                exit(EXIT_SUCCESS);
-        }
-
-In kernel there's minimal overhead:
-diff --git a/kernel/sys.c b/kernel/sys.c
-index 89d5be4..003d5ad 100644
---- a/kernel/sys.c
-+++ b/kernel/sys.c
-@@ -1634,6 +1634,17 @@ COMPAT_SYSCALL_DEFINE2(getrusage, int, who,
-struct compat_rusage __user *, ru)
-{
-        struct rusage r;
-         
-+       asm volatile (
-+       "       mov w0, w0      \n"
-+       "       mov w1, w1      \n"
-+       "       mov w2, w2      \n"
-+       "       mov w3, w3      \n"
-+       "       mov w4, w4      \n"
-+       "       mov w5, w5      \n"
-+       "       mov w6, w6      \n"
-+       "       mov w7, w7      \n"
-+       );
-+
-        if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN &&
-            who != RUSAGE_THREAD)
-                return -EINVAL;
-
-On QEMU:
-With MOVs:      W/O MOVs:
-832015          814564
-840639          803165
-830482          813116
-832895          802928
-832083          832658
-834461          802993
-829405          812465
-846677          822651
-828409          803393
-836845          821470
-828716          801044
-831620          821301
-825423          800278
-829946          821476
-
-We have 83 mS vs 81 mS, ~2.6% of performance degradation.
-And I can show bigger numbers if I'll use asm svc instead of
-syscall() wrapper which increases time as well. 
-
-It's definitely more than 0, but not so big anyway. For syscalls
-with heavy payload it will be non-measurable. So the choice
-is still there. Should we use wrappers and save 2.5% of syscall
-performance. Or clear top-halves unconditionally and win in simplicity?
-
-If QEMU is looking non-representative, I can run test on real
-hardware, but it takes a time, and I think will end up with similar
-results.
-
-Latest kernel with wrappers and library are here:
-https://github.com/norov/linux/commits/ilp32
-https://github.com/norov/glibc/commits/ilp32-dev
-
-BTW, notice the change in ABI: syscalls that take stat and statfs
-structures now routed to (wrapped) native handlers, after switching
-userspace to use 64-bit off_t, ino_t, blkcnt_t, fsblkcnt_t and
-fsfilcnt_t types.
-
-Yury.
+> 2.6.3
+> 
+> 
