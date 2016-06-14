@@ -1,54 +1,42 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Tue, 14 Jun 2016 08:52:18 -0600
-Subject: [RESEND PATCH v5 0/1] ARM64: ACPI: Update documentation for
- latest specification version
-In-Reply-To: <20160614145039.GE14654@e104818-lin.cambridge.arm.com>
-References: <1465854115-4960-1-git-send-email-al.stone@linaro.org>
- <20160614091331.GB19407@arm.com> <20160614092443.GC19407@arm.com>
- <67e97389-c04e-b155-637b-a6bee4e24919@redhat.com>
- <20160614145039.GE14654@e104818-lin.cambridge.arm.com>
-Message-ID: <5f325e36-58c0-a6c0-21a1-36fd455be529@redhat.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 14 Jun 2016 16:04:22 +0100
+Subject: [PATCH v2 1/7] iommu/of: Respect disabled IOMMUs
+In-Reply-To: <20160614141148.GH19407@arm.com>
+References: <cover.1464966939.git.robin.murphy@arm.com>
+ <aca0b44206c87f6cb75d156a53e08aa968981119.1464966939.git.robin.murphy@arm.com>
+ <20160614141148.GH19407@arm.com>
+Message-ID: <57601CF6.6000308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2016 08:50 AM, Catalin Marinas wrote:
-> On Tue, Jun 14, 2016 at 08:46:26AM -0600, Al Stone wrote:
->> On 06/14/2016 03:24 AM, Will Deacon wrote:
->>> On Tue, Jun 14, 2016 at 10:13:31AM +0100, Will Deacon wrote:
->>>> On Mon, Jun 13, 2016 at 03:41:54PM -0600, Al Stone wrote:
->>>>> This is a resend only: Ping?  Last ping was 26 May; there has been zero
->>>>> response since then.  Already have one ACK from Lorenzo; another from an
->>>>> arm64 maintainer would be really helpful.
->>>>
->>>> I thought there were outstanding comments on v4 of this?
->>>>
->>>> http://lkml.kernel.org/r/571E699B.9090906 at linaro.org
->>>
->>> Hmm, that's weird. You sent a v5 on 25 April:
->>>
->>> http://archive.arm.linux.org.uk/lurker/message/20160425.212126.fe36116c.en.html
->>>
->>> but I can't find that in either my ARM inbox or my gmail inbox that's
->>> subscribed to the lists. I guess Catalin can pick this up for 4.8.
->>
->> Huh.  I have no idea why that would have happened.  I used the same
->> script to send the emails for all the revisions.
->>
->> Thanks for checking, Will.  If this would get picked up for 4.8, that would be
->> most excellent.
-> 
-> I'll queue it for 4.8 (should appear in -next towards the end of this
-> week).
-> 
+On 14/06/16 15:11, Will Deacon wrote:
+> On Fri, Jun 03, 2016 at 06:15:36PM +0100, Robin Murphy wrote:
+>> If an IOMMU node is present in the DT but marked as disabled, we should
+>> avoid trying to do anything with it. We currently sort-of get away with
+>> this by virtue of a disabled device probably not having called
+>> of_iommu_set_ops(), but that is hardly safe to rely upon in general, and
+>> either way we don't want to treat it as an error condition with the
+>> resulting "Failed to initialise IOMMU" message.
+>
+> What's the use-case for this? I ask because epapr says that the device
+> binding should provide details as to exactly what "disabled" means for
+> that device.
 
-Brilliant.  Thanks, Catalin!
+Right now, it's mostly a case of making things behave as expected - the 
+OF platform code is already assigning the implicit meaning of "don't 
+probe or do anything with this device", so playing along with that 
+prevents slightly confusing errors or potential null-dereference-style 
+crashes as above.
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Longer term, I was also thinking back to the probe ordering problem, and 
+the sticky case of differentiating "this IOMMU isn't probed yet" from 
+"this IOMMU will never probe, continue without it". Being able to make 
+that decision from the bootloader (by disabling nodes) in at least a 
+subset of cases seemed like a useful tool. I'm still open to other 
+points of view, though.
+
+Robin.
+
+>
+> Will
+>
