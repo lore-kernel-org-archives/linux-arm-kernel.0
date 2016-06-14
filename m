@@ -1,40 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 14 Jun 2016 14:37:18 +0200
-Subject: [PATCH v2 1/4] ARM: dts: sun4i: Add A10 NAND controller pin
- definitions
-In-Reply-To: <1465903058-9211-2-git-send-email-mamlinav@gmail.com>
-References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
- <1465903058-9211-1-git-send-email-mamlinav@gmail.com>
- <1465903058-9211-2-git-send-email-mamlinav@gmail.com>
-Message-ID: <20160614123718.GH9354@lukather>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 14 Jun 2016 07:37:40 -0500
+Subject: [PATCH 05/10] dt-bindings: clock: add DT binding for the Xtal
+ clock on Armada 3700
+In-Reply-To: <1465565018-14172-6-git-send-email-gregory.clement@free-electrons.com>
+References: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
+ <1465565018-14172-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160614123740.GA31855@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jun 14, 2016 at 02:17:35PM +0300, Aleksei Mamlin wrote:
-> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Fri, Jun 10, 2016 at 03:23:33PM +0200, Gregory CLEMENT wrote:
+> This commit adds the DT binding documentation for the the Xtal clock on
+> Armada 3700 used in the Marvell Armada 3700 SoCs.
 > 
-> Define the NAND controller pin configs.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  .../bindings/clock/armada3700-xtal-clock.txt       | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
 
-Unfortunately, we don't have any user for it at the moment.
-
-Please re-submit it later when we'll have some :)
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160614/90e145ec/attachment.sig>
+Acked-by: Rob Herring <robh@kernel.org>
