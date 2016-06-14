@@ -1,57 +1,74 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Jun 2016 11:13:22 +0200
-Subject: [PATCH v3 14/14] regulator: pwm: Document pwm-dutycycle-unit and
- pwm-dutycycle-range
+Date: Tue, 14 Jun 2016 11:13:15 +0200
+Subject: [PATCH v3 07/14] pwm: sti: Add support for hardware readout
 In-Reply-To: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465895602-31008-15-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465895602-31008-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the pwm-dutycycle-unit and pwm-dutycycle-range properties.
+Implement ->get_state() to provide support for initial state retrieval.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Brian Norris <briannorris@chromium.org>
 ---
- .../devicetree/bindings/regulator/pwm-regulator.txt   | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/pwm/pwm-sti.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
-index ed936f0..9fbc7b1 100644
---- a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
-@@ -34,6 +34,18 @@ Only required for Voltage Table Mode:
- 			    First cell is voltage in microvolts (uV)
- 			    Second cell is duty-cycle in percent (%)
+diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+index 92abbd5..6300d3e 100644
+--- a/drivers/pwm/pwm-sti.c
++++ b/drivers/pwm/pwm-sti.c
+@@ -238,6 +238,43 @@ static void sti_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	mutex_unlock(&pc->sti_pwm_lock);
+ }
  
-+Optional properties for Continuous mode:
-+- pwm-dutycycle-unit:	Integer value encoding the duty cycle unit. If not
-+			defined, <100> is assumed, meaning that
-+			pwm-dutycycle-range contains values expressed in
-+			percent.
++static void sti_pwm_get_state(struct pwm_chip *chip,
++			      struct pwm_device *pwm,
++			      struct pwm_state *state)
++{
++	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
++	unsigned int regval, prescaler;
++	int ret;
 +
-+- pwm-dutycycle-range:	Should contain 2 entries. The first entry is encoding
-+			the dutycycle for regulator-min-microvolt and the
-+			second one the dutycycle for regulator-max-microvolt.
-+			Duty cycle values are expressed in pwm-dutycycle-unit.
-+			If not defined, <0 100> is assumed.
++	/* The clock has to be enabled to access PWM registers */
++	ret = clk_enable(pc->clk);
++	if (ret) {
++		dev_err(chip->dev, "Failed to enable PWM clk");
++		return;
++	}
 +
- NB: To be clear, if voltage-table is provided, then the device will be used
- in Voltage Table Mode.  If no voltage-table is provided, then the device will
- be used in Continuous Voltage Mode.
-@@ -48,6 +60,13 @@ Continuous Voltage Example:
- 		regulator-min-microvolt = <1016000>;
- 		regulator-max-microvolt = <1114000>;
- 		regulator-name = "vdd_logic";
-+		/* unit == per-mille */
-+		pwm-dutycycle-unit = <1000>;
-+		/*
-+		 * Inverted PWM logic, and the duty cycle range is limited
-+		 * to 30%-70%.
-+		 */
-+		pwm-dutycycle-range <700 300>; /* */
- 	};
- 
- Voltage Table Example:
++	regmap_field_read(pc->prescale_high, &regval);
++	prescaler = regval << 4;
++	regmap_field_read(pc->prescale_low, &regval);
++	prescaler |= regval;
++	state->period = DIV_ROUND_CLOSEST_ULL((u64)(prescaler + 1) *
++					      NSEC_PER_SEC *
++					      (pc->cdata->max_pwm_cnt + 1),
++					      pc->clk_rate);
++
++	regmap_read(pc->regmap, STI_DS_REG(pwm->hwpwm), &regval);
++	state->duty_cycle = DIV_ROUND_CLOSEST_ULL((u64)(regval + 1) *
++						  state->period,
++						  pc->cdata->max_pwm_cnt + 1);
++
++	regmap_field_read(pc->pwm_en, &regval);
++	state->enabled = regval;
++
++	state->polarity = PWM_POLARITY_NORMAL;
++
++	clk_disable(pc->clk);
++}
++
+ static void sti_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
+@@ -249,6 +286,7 @@ static const struct pwm_ops sti_pwm_ops = {
+ 	.config = sti_pwm_config,
+ 	.enable = sti_pwm_enable,
+ 	.disable = sti_pwm_disable,
++	.get_state = sti_pwm_get_state,
+ 	.free = sti_pwm_free,
+ 	.owner = THIS_MODULE,
+ };
 -- 
 2.7.4
