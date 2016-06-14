@@ -1,11 +1,11 @@
 From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Tue, 14 Jun 2016 14:17:37 +0300
-Subject: [PATCH v2 3/4] ARM: dts: sun7i: Add A20 NAND controller pin
+Date: Tue, 14 Jun 2016 14:17:35 +0300
+Subject: [PATCH v2 1/4] ARM: dts: sun4i: Add A10 NAND controller pin
  definitions
 In-Reply-To: <1465903058-9211-1-git-send-email-mamlinav@gmail.com>
 References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
  <1465903058-9211-1-git-send-email-mamlinav@gmail.com>
-Message-ID: <1465903058-9211-4-git-send-email-mamlinav@gmail.com>
+Message-ID: <1465903058-9211-2-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,15 +16,15 @@ Define the NAND controller pin configs.
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++
  1 file changed, 52 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index de4231e..ad984f8 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -1168,6 +1168,58 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 6d9c7c70..e579bdd 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -1033,6 +1033,58 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
  			};
  
 +			nand_pins_a: nand_base0 at 0 {
