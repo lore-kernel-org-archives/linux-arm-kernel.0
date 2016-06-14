@@ -1,85 +1,84 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 14 Jun 2016 10:17:48 +0800
-Subject: [PATCH 01/10] regmap: Support bulk writes for devices without raw
- formatting
-In-Reply-To: <1465870678-30128-1-git-send-email-wens@csie.org>
-References: <1465870678-30128-1-git-send-email-wens@csie.org>
-Message-ID: <1465870678-30128-2-git-send-email-wens@csie.org>
+Date: Tue, 14 Jun 2016 10:17:47 +0800
+Subject: [PATCH 00/10] mfd: ac100: Add support for X-Powers AC100 audio codec
+ / RTC combo IC
+Message-ID: <1465870678-30128-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When doing a bulk writes from a device which lacks raw I/O support we
-fall back to doing register at a time reads but we still use the raw
-formatters in order to render the data into the word size used by the
-device (since bulk reads still operate on the device word size rather
-than unsigned ints).  This means that devices without raw formatting
-such as those that provide reg_read() are not supported.  Provide
-handling for them by copying the values read into native endian values
-of the appropriate size.
+Hi everyone,
 
-This complements commit d5b98eb12420 ("regmap: Support bulk reads for
-devices without raw formatting").
+This series adds support for X-Powers' AC100 audio codec / RTC combo IC.
+This chip is found on Allwinner A80 SoC based boards, and is also part
+of the AXP813/AXP818 PMIC found with Allwinner A83T SoCs.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/base/regmap/regmap.c | 31 ++++++++++++++++++++++++++++---
- 1 file changed, 28 insertions(+), 3 deletions(-)
+The series focuses on the RTC side of the chip. The audio codec will
+be done later, once the digital audio interface of the SoC is supported.
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index df2d2ef5d6b3..51fa7d66a393 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -1777,8 +1777,6 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
- 	size_t val_bytes = map->format.val_bytes;
- 	size_t total_size = val_bytes * val_count;
- 
--	if (map->bus && !map->format.parse_inplace)
--		return -EINVAL;
- 	if (!IS_ALIGNED(reg, map->reg_stride))
- 		return -EINVAL;
- 
-@@ -1789,7 +1787,8 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
- 	 *
- 	 * The first if block is used for memory mapped io. It does not allow
- 	 * val_bytes of 3 for example.
--	 * The second one is used for busses which do not have this limitation
-+	 * The second one is for busses that do not provide raw I/O.
-+	 * The third one is used for busses which do not have these limitations
- 	 * and can write arbitrary value lengths.
- 	 */
- 	if (!map->bus) {
-@@ -1825,6 +1824,32 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
- 		}
- out:
- 		map->unlock(map->lock_arg);
-+	} else if (map->bus && !map->format.parse_inplace) {
-+		const u8 *u8 = val;
-+		const u16 *u16 = val;
-+		const u32 *u32 = val;
-+		unsigned int ival;
-+
-+		for (i = 0; i < val_count; i++) {
-+			switch (map->format.val_bytes) {
-+			case 4:
-+				ival = u32[i];
-+				break;
-+			case 2:
-+				ival = u16[i];
-+				break;
-+			case 1:
-+				ival = u8[i];
-+				break;
-+			default:
-+				return -EINVAL;
-+			}
-+
-+			ret = regmap_write(map, reg + (i * map->reg_stride),
-+					   ival);
-+			if (ret)
-+				return ret;
-+		}
- 	} else if (map->use_single_write ||
- 		   (map->max_raw_write && map->max_raw_write < total_size)) {
- 		int chunk_stride = map->reg_stride;
+Patch 1 adds bulk write support for regmaps without raw formatting.
+This is used in the RTC driver to write out the date and time in one
+call.
+
+Patch 2 adds device tree bindings for the AC100.
+
+Patch 3 adds the mfd driver for the AC100.
+
+Patch 4 adds the RTC driver for the AC100.
+
+Patch 5 adds RTC clk output support to the RTC driver.
+This is a separate patch as the clk code is over 300 LoC. Having a
+separate patch should make it easier for the clk maintainers to review.
+
+Patch 6 adds the AC100 device nodes to the A80 Optimus board dts.
+
+Patch 7 adds the AC100 device nodes to the Cubieboard4 board dts.
+
+Patch 8 fixes the order of device nodes in the A80 Optimus board dts.
+
+Patch 9 fixes the order of device nodes in the Cubieboard4 board dts.
+
+Patch 10 changes the fixed osc_32k clk to a fixed factor clk,
+representing the 32k clk input pin on the SoC, and also hooks up the
+ac100 rtc clk output to this clk in the board dts files.
+
+I'm hoping we can merge the driver bits (patches 2~5) through the
+mfd tree, with acks from the rtc and clk maintainers for patches
+4 and 5.
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (10):
+  regmap: Support bulk writes for devices without raw formatting
+  mfd: ac100: Add device tree bindings for X-Powers AC100 codec/RTC
+    combo IC
+  mfd: ac100: Add driver for X-Powers AC100 audio codec / RTC combo IC
+  rtc: ac100: Add RTC driver for X-Powers AC100
+  rtc: ac100: Add clk output support
+  ARM: dts: sun9i: a80-optimus: Add device node for AC100
+  ARM: dts: sun9i: cubieboard4: Add device node for AC100
+  ARM: dts: sun9i: cubieboard4: Order nodes by alphabetical order
+  ARM: dts: sun9i: a80-optimus: Order nodes by alphabetical order
+  ARM: dts: sun9i: Switch to the AC100 RTC clock outputs for osc32k
+
+ Documentation/devicetree/bindings/mfd/ac100.txt |  42 ++
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts     |  58 +-
+ arch/arm/boot/dts/sun9i-a80-optimus.dts         |  76 ++-
+ arch/arm/boot/dts/sun9i-a80.dtsi                |   9 +-
+ drivers/base/regmap/regmap.c                    |  31 +-
+ drivers/mfd/Kconfig                             |  10 +
+ drivers/mfd/Makefile                            |   2 +
+ drivers/mfd/ac100.c                             | 135 +++++
+ drivers/rtc/Kconfig                             |  10 +
+ drivers/rtc/Makefile                            |   1 +
+ drivers/rtc/rtc-ac100.c                         | 686 ++++++++++++++++++++++++
+ include/linux/mfd/ac100.h                       | 176 ++++++
+ 12 files changed, 1186 insertions(+), 50 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
+ create mode 100644 drivers/mfd/ac100.c
+ create mode 100644 drivers/rtc/rtc-ac100.c
+ create mode 100644 include/linux/mfd/ac100.h
+
 -- 
 2.8.1
