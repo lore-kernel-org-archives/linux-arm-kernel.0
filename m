@@ -1,54 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Jun 2016 09:56:27 +0100
-Subject: [PATCH] iommu/arm-smmu: request pcie devices to enable ACS
-In-Reply-To: <CANta1d-wRGcU51P3Av7EXbvu7hJfUBk_Kd5p=7RDMW6u+v0gvg@mail.gmail.com>
-References: <1465809617-13003-1-git-send-email-Wei.Chen@arm.com>
- <20160613124531.GE1605@arm.com>
- <CANta1d-wRGcU51P3Av7EXbvu7hJfUBk_Kd5p=7RDMW6u+v0gvg@mail.gmail.com>
-Message-ID: <20160614085627.GA19407@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 14 Jun 2016 11:06:45 +0200
+Subject: [RFC PATCH 1/3] pci, acpi: Match PCI config space accessors
+ against platfrom specific ECAM quirks.
+In-Reply-To: <4608372.hbXNF1lbNO@wuerfel>
+References: <1464856864-18049-1-git-send-email-tn@semihalf.com>
+ <9294389.sZPDtyjoUs@wuerfel> <57503626.9050208@semihalf.com>
+ <4608372.hbXNF1lbNO@wuerfel>
+Message-ID: <575FC925.9000608@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 11:11:36AM +0800, Wei Chen wrote:
-> On 13 June 2016 at 20:45, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Jun 13, 2016 at 05:20:17PM +0800, Wei Chen wrote:
-> >> The PCIe ACS capability will affect the layout of iommu groups.
-> >> Generally speaking, if the path from root port to the PCIe device
-> >> is ACS enabled, the iommu will create a single iommu group for this
-> >> PCIe device. If all PCIe devices on the path are ACS enabled then
-> >> Linux can determine this path is ACS enabled.
-> >>
-> >> Linux use two PCIe configuration registers to determine the ACS
-> >> status of PCIe devices:
-> >> ACS Capability Register and ACS Control Register.
-> >>
-> >> The first register is used to check the implementation of ACS function
-> >> of a PCIe device, the second register is used to check the enable status
-> >> of ACS function. If one PCIe device has implemented and enabled the ACS
-> >> function then Linux will determine this PCIe device enabled ACS.
-> >>
-> >> From the Chapter:6.12 of PCI Express Base Specification Revision 3.1a,
-> >> we can find that when a PCIe device implements ACS function, the enable
-> >> status is set to disabled by default and can be enabled by ACS-aware
-> >> software.
-> >>
-> >> ACS will affect the iommu groups topology, so, the iommu driver is
-> >> ACS-aware software. This patch adds a call to pci_request_acs() to the
-> >> arm-smmu driver to enable the ACS function in PCIe devices that support
-> >> it.
-> >>
-> >> Signed-off-by: Wei Chen <Wei.Chen@arm.com>
-> >> ---
-> >>  drivers/iommu/arm-smmu-v3.c | 2 ++
-> >>  drivers/iommu/arm-smmu.c    | 4 +++-
-> >>  2 files changed, 5 insertions(+), 1 deletion(-)
-> >
-> > Thanks, queued for 4.8 w/ Robin and Eric's reviewed-by tags and the minor
-> > commit wording change.
-> >
-> 
-> Thanks, I will post a v2 patch to include above changes.
+Hi Arnd,
 
-:/ As above, I've already queued this.
+Sorry for late response. Please see comments inline.
 
-Will
+On 02.06.2016 17:19, Arnd Bergmann wrote:
+> On Thursday, June 2, 2016 3:35:34 PM CEST Tomasz Nowicki wrote:
+>> On 02.06.2016 14:32, Arnd Bergmann wrote:
+>>> On Thursday, June 2, 2016 2:07:43 PM CEST Tomasz Nowicki wrote:
+>>>> On 02.06.2016 13:42, Arnd Bergmann wrote:
+>>>>> On Thursday, June 2, 2016 10:41:01 AM CEST Tomasz Nowicki wrote:
+>>>>>> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
+>>>>>> +{
+>>>>>> +       int bus_num = root->secondary.start;
+>>>>>> +       int domain = root->segment;
+>>>>>> +       struct pci_cfg_fixup *f;
+>>>>>> +
+>>>>>> +       if (!mcfg_table)
+>>>>>> +               return &pci_generic_ecam_ops;
+>>>>>> +
+>>>>>> +       /*
+>>>>>> +        * Match against platform specific quirks and return corresponding
+>>>>>> +        * CAM ops.
+>>>>>> +        *
+>>>>>> +        * First match against PCI topology <domain:bus> then use OEM ID and
+>>>>>> +        * OEM revision from MCFG table standard header.
+>>>>>> +        */
+>>>>>> +       for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+>>>>>> +               if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+>>>>>> +                   (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+>>>>>> +                   (!strncmp(f->oem_id, mcfg_table->header.oem_id,
+>>>>>> +                             ACPI_OEM_ID_SIZE)) &&
+>>>>>> +                   (f->oem_revision == mcfg_table->header.oem_revision))
+>>>>>> +                       return f->ops;
+>>>>>> +       }
+>>>>>> +       /* No quirks, use ECAM */
+>>>>>> +       return &pci_generic_ecam_ops;
+>>>>>> +}
+>>>>>> +
+>>>>>>     int pci_mcfg_lookup(struct acpi_pci_root *root)
+>>>>>
+>>>>> Can you explain the use of pci_ecam_ops instead of pci_ops here?
+>>>>>
+>>>>
+>>>> I wanted to get associated bus_shift and use it to setup configuration
+>>>> region properly before calling pci_ecam_create. Please see next patch.
+>>>>
+>>>
+>>> I see. It feels really odd to do it this way though, since having a
+>>> nonstandard bus_shift essentially means not using anything resembling
+>>> ECAM to start with.
+>>>
+>>> I realize that a lot of the host bridges are not ECAM, but because
+>>> of this, it would be more logical to have their own pci_ops instead
+>>> of pci_ecam_ops.
+>>
+>> Well, we have bus_shift there to express bus shift differentiation. So I
+>> would say we should change just structure name to prevent misunderstanding.
+>
+> I'm not really convinced here. We use the bus_shift for two
+> completely different things in the end: for sizing the MMIO window
+> that gets mapped by ACPI and for the pci_ecam_map_bus() function
+> that isn't actually used for the typical fixups that override the
+> pci_ops.
+
+Since we overwrite the whole pci_ecam_ops structure (next patch):
+-	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
+-			      &pci_generic_ecam_ops);
++	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res, ops);
+
+IMO bus_shift is used in the right way. So if anybody decides to put 
+different bus_shift there he also needs to implement map_bus and use 
+there bus_shift appropriate to quirk requirements. Obviously we can use 
+standard pci_ecam_map_bus() as map_bus but that would mean quirk nature 
+needs that, like for ThunderX one.
+
+>
+> I see now that this sneaks in an .init callback for the quirk
+> through the backdoor, by adding it to the pci_ecam_ops. I think
+> that is not good: if the idea is to have the config space access
+> be adapted to various quirks that is one thing, but if we actually
+> need a function to be called for the quirk we should do just that
+> and have it be obvious. That function can then override the
+> pci_ops.
+
+Actually we do not need to call a function for each quirk. At the same 
+time we already have .init callback adopted to configuration space 
+access quirk. This way there is really small amount of code duplication. 
+On the other hand I understand that .init call should be more explicit. 
+Any suggestions are very appreciated.
+
+Thanks,
+Tomasz
