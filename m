@@ -1,23 +1,34 @@
-From: valmikibow@gmail.com (valmiki)
-Date: Tue, 14 Jun 2016 14:58:36 +0000 (UTC)
-Subject: Why MSI is limited to 32 MSI's per device
-Message-ID: <loom.20160614T164843-937@post.gmane.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 14 Jun 2016 17:07:18 +0200
+Subject: [PATCH 00/10] i2c: designware-platdrv: Some improvments related to PM
+Message-ID: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Here's a couple changes for the i2c-designware driver. Most of them a related to
+the support for runtime PM and system PM, but there's also a few that improves
+some error handling.
 
-Why MSI interrupts are limited to 32 per device ?
-We have 16 bit data, with which we can have 2^16 combinaitons of different
-data, which in turn those many MSI vectors.
+I have tested these on Hisilicon Linaro 96-board (hi6220). I used a couple local
+changes to enable the power-key to act as a wakeup in system PM suspend state.
+If anyone are interested about those as well, I am happy to share them.
 
-Other than increase in number interrupts to 2048 in MSI-X, what advantage we
-get by using MSI-X over MSI.
+Ulf Hansson (10):
+  i2c: designware-platdrv: Return error in ->probe() when clk ungate
+    fails
+  i2c: designware-platdrv: Gate clk in error path in ->probe()
+  i2c: designware-platdrv: Unconditionally enable runtime PM
+  i2c: designware-platdrv: Disable autosuspend in error path in
+    ->probe()
+  i2c: designware-platdrv: Fix clk gating in ->remove()
+  i2c: designware-platdrv: Update runtime PM last busy mark in ->probe()
+  i2c: designware-platdrv: Re-init the HW when resuming
+  i2c: designware-platdrv: Check return value from clk_prepare_enable()
+  i2c: designware-platdrv: Simplify code by using dev_get_drvdata()
+  i2c: designware-platdrv: Rework system PM support
 
-I read MSI-X interrupts can be targeted to different CPU's in an SMP system.
-why can't MSI interrupts can be targeted to different processors ?  
+ drivers/i2c/busses/i2c-designware-platdrv.c | 106 +++++++++++++---------------
+ 1 file changed, 50 insertions(+), 56 deletions(-)
 
-
-Thanks & Regards,
-Valmiki
- 
+-- 
+1.9.1
