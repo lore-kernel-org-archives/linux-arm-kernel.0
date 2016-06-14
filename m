@@ -1,54 +1,132 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jun 2016 01:11:02 -0700
-Subject: [GIT PULL] omap fixes for v4.7-rc cycle
-Message-ID: <20160614081101.GV22406@atomide.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Tue, 14 Jun 2016 08:18:09 +0000
+Subject: [PATCH v10 2/2] dmaengine: Add Xilinx zynqmp dma engine driver
+ support
+In-Reply-To: <20160613055012.GC16910@localhost>
+References: <1464765839-29018-1-git-send-email-appanad@xilinx.com>
+ <1464765839-29018-2-git-send-email-appanad@xilinx.com>
+ <20160607070841.GJ16910@localhost>
+ <C246CAC1457055469EF09E3A7AC4E11A4A5B4FA9@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160613055012.GC16910@localhost>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5B6441@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
+Hi Vinod,
 
-  Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
+	Thanks for the review...
 
-are available in the git repository at:
+> 
+> On Wed, Jun 08, 2016 at 07:40:52AM +0000, Appana Durga Kedareswara Rao
+> wrote:
+> > > > +static void zynqmp_dma_desc_config_eod(struct zynqmp_dma_chan
+> > > > +*chan, void *desc)
+> > >
+> > > eod? 80 line?
+> 
+> What's eod?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.7/fixes-powedomain
+End of descriptor...
 
-for you to fetch changes up to 6b41d44862e8f3a4b95102c6ff6cad3fccc7994b:
+> 
+> > > > +int zynqmp_dma_channel_set_config(struct dma_chan *dchan,
+> > > > +				  struct zynqmp_dma_config *cfg) {
+> > > > +	struct zynqmp_dma_chan *chan = to_chan(dchan);
+> > > > +
+> > > > +	chan->config.ovrfetch = cfg->ovrfetch;
+> > > > +	chan->config.has_sg = cfg->has_sg;
+> > >
+> > > is this HW capability? if so why would anyone not like to use it!
+> >
+> > Yes it is HW capability. It can be either in simple mode or SG mode
+> > Earlier In the driver this configuration is read from the device-tree
+> > But as per lars and your suggestion moved it as runtime config parameters.
+> 
+> If sg mode is available why would anyone _not_ want it?
+> 
+> I do not think there is point to have this
 
-  ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_mem_ret (2016-06-13 01:04:01 -0700)
+You mean always keep the device in SG mode and provide an option 
+For simple dma mode if user want to use simple DMA mode??
 
-----------------------------------------------------------------
-Fixes for omaps for v4.7-rc cycle:
+There are few features that are available in the simple DMA mode won't
+Available in SG mode like write only DMA , read only DMA mode etc...
 
-- Fix dra7 for hardware issues limiting L4Per and L3init power domains
-  to on state. Without this the devices may not work correctly after
-  some time of use because of asymmetric aging. And related to this,
-  let's also remove the unusable states.
+> 
+> >
+> > >
+> > > > +	chan->config.ratectrl = cfg->ratectrl;
+> > > > +	chan->config.src_issue = cfg->src_issue;
+> > > > +	chan->config.src_burst_len = cfg->src_burst_len;
+> > > > +	chan->config.dst_burst_len = cfg->dst_burst_len;
+> > >
+> > > can you describe these parameters?
+> > ratectl:
+> > Rate control can be independently enabled per channel. When rate
+> > control is enabled, the DMA channel uses the rate control count to schedule
+> successive data read transactions.
+> 
+> And how is this used by client?
 
-- Always select omap interconnect for am43x as otherwise the am43x
-  only configurations will not boot properly. This can happen easily
-  for any product kernels that leave out other SoCs to save memory.
+When rate control is enabled, ZDMA channel uses the rate control count
+To schedule successive data read transactions I mean kind of flow control to schedule 
+Transactions at fixed intervals instead of pumping the transfers without delay or whenever bus is available
 
-- Fix DSS PLL2 addresses that have gone unused for now
+Rate control count register definition (11:0):
+Scheduling interval for SRC AXI transaction, only used if rate control is enabled 
 
-- Select erratum 430973 for omap3, this is now safe to do and can
-  save quite a bit of debugging time for people who may have left
-  it out.
 
-----------------------------------------------------------------
-Dave Gerlach (1):
-      ARM: OMAP2+: Select OMAP_INTERCONNECT for SOC_AM43XX
+> 
+> > src_issue:
+> > Tells outstanding transaction on SRC.
+> 
+> This should be read only then, right?
 
-Nishanth Menon (4):
-      ARM: OMAP2: Enable Errata 430973 for OMAP3
-      ARM: OMAP: DRA7: powerdomain data: Set L3init and L4per to ON
-      ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_logic_ret
-      ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_mem_ret
+It is a Read/Write register
+http://www.xilinx.com/html_docs/registers/ug1087/ug1087-zynq-ultrascale-registers.html 
+By default it is configured for Max transactions.
+If user want to limit it they can limit it using this config option.
 
-Tomi Valkeinen (1):
-      ARM: dts: DRA74x: fix DSS PLL2 addresses
+> 
+> > Burst_len:
+> > Configures the burst length of the src and dst transfers...
+> 
+> Hmmm, but you are on memcpy, so that should be programmed for throughput?
 
- arch/arm/boot/dts/dra74x.dtsi              |  4 +-
- arch/arm/mach-omap2/Kconfig                |  2 +
- arch/arm/mach-omap2/powerdomains7xx_data.c | 76 +-----------------------------
- 3 files changed, 6 insertions(+), 76 deletions(-)
+Yes...
+
+> 
+> > >
+> > > How would a client know how to configure them?
+> >
+> > With the default values of the config parameters driver will work.
+> 
+> But how will client know what is default!
+
+Default values means IP default state after reset.
+If user not aware of the above parameters also still the driver will work for basic functionality.
+Do you want me to implement one more API get_config so that 
+Whenever user will call the get_config he will know the default values
+Of the config parameters?
+
+> 
+> > If user has specific requirement to change these parameters they can
+> > pass It to the driver using set_config API and all these parameters
+> > are Documented in the include/linux/dma/xilinx_dma.h file...
+> 
+> Can you give me an example where user would like to do that
+
+
+I am using customized dma test client.
+There I am calling this set_config API before triggering memcpy/SG operations.
+
+Regards,
+Kedar.
+
+> 
+> --
+> ~Vinod
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in the body
+> of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
