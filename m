@@ -1,50 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2016 17:45:43 +0200
-Subject: [PATCH v2 01/11] Kbuild: don't add ../../ to include path
-In-Reply-To: <20160615154553.3177021-1-arnd@arndb.de>
-References: <20160615154553.3177021-1-arnd@arndb.de>
-Message-ID: <20160615154553.3177021-2-arnd@arndb.de>
+Date: Wed, 15 Jun 2016 17:45:42 +0200
+Subject: [PATCH v2 00/11] Kbuild: fix -Wmissing-include-path warnings
+Message-ID: <20160615154553.3177021-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we build with O=objdir and objdir is directly below the source tree,
-$(srctree) becomes '..'.
+This warning is enabled at "make W=1" level, and found a bunch of
+actual problems in code that adds -I flags to nonexisting directories.
+All of these are harmless, but clearly wrong.
 
-When a Makefile adds a CFLAGS option like -Ipath/to/headers and
-we are building with a separate object directory, Kbuild tries to
-add two -I options, one for the source tree and one for the object
-tree. An absolute path is treated as a special case, and don't add
-this one twice. This also normally catches -I$(srctree)/$(src)
-as $(srctree) usually is an absolute directory like /home/arnd/linux/.
+Kbuild itself also adds a bunch of extra directories, including in
+some cases those outside of the kernel tree (e.g. ../../include),
+which can have surprising consequences.
 
-The combination of the two behaviors however results in an invalid
-path name to be included: we get both ../$(src) and ../../$(src),
-the latter one pointing outside of the source tree, usually to a
-nonexisting directory. Building with 'make W=1' makes this obvious:
+This series fixes all the warnings I found with -Wmissing-include-dirs
+enabled on ARM randconfigs and x86 allmodconfig. The non-Kbuild
+patches can all be applied independently, while we probably want
+the Kbuild stuff to be kept as a series, if we decide to merge them.
 
-cc1: error: ../../arch/arm/mach-s3c24xx/include: No such file or directory [-Werror=missing-include-dirs]
+I have added my test patch at the end, mainly to see if the Kbuild
+bot finds any other warnings on additional architectures.
 
-This adds another special case, treating path names starting with ../
-like those starting with / so we don't try to prefix that with
-$(srctree).
+	Arnd
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- scripts/Kbuild.include | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Arnd Bergmann (11):
+  Kbuild: don't add ../../ to include path
+  Kbuild: avoid duplicate include path
+  Kbuild: always prefix objtree in LINUXINCLUDE
+  Kbuild: arch: look for generated headers in obtree
+  Kbuild: don't add obj tree in additional includes
+  ARM: don't include removed directories
+  ARM: hide mach-*/ include for ARM_SINGLE_ARMV7M
+  drm: amd: remove broken include path
+  net: skfb: remove obsolete -I cflag
+  rtlwifi: don't add include path for rtl8188ee
+  [EXPERIMENTAL] Kbuild: enable -Wmissing-include-dirs by default
 
-diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
-index 0f82314621f2..f8b45eb47ed3 100644
---- a/scripts/Kbuild.include
-+++ b/scripts/Kbuild.include
-@@ -202,7 +202,7 @@ hdr-inst := -f $(srctree)/scripts/Makefile.headersinst obj
- # Prefix -I with $(srctree) if it is not an absolute path.
- # skip if -I has no parameter
- addtree = $(if $(patsubst -I%,%,$(1)), \
--$(if $(filter-out -I/%,$(1)),$(patsubst -I%,-I$(srctree)/%,$(1))) $(1))
-+$(if $(filter-out -I/% -I../%,$(1)),$(patsubst -I%,-I$(srctree)/%,$(1))) $(1))
- 
- # Find all -I options and call addtree
- flags = $(foreach o,$($(1)),$(if $(filter -I%,$(o)),$(call addtree,$(o)),$(o)))
+ Makefile                                                | 16 ++++++++++------
+ arch/alpha/boot/Makefile                                |  2 +-
+ arch/arm/Makefile                                       |  2 ++
+ arch/arm/mach-mvebu/Makefile                            |  3 +--
+ arch/arm/mach-realview/Makefile                         |  3 +--
+ arch/arm/mach-s5pv210/Makefile                          |  2 +-
+ arch/powerpc/boot/Makefile                              |  2 +-
+ arch/powerpc/kvm/Makefile                               |  2 +-
+ arch/s390/boot/compressed/Makefile                      |  4 ++--
+ arch/um/Makefile                                        |  4 ++--
+ arch/x86/boot/Makefile                                  |  2 +-
+ arch/x86/realmode/rm/Makefile                           |  2 +-
+ drivers/gpu/drm/amd/acp/Makefile                        |  2 --
+ drivers/net/fddi/skfp/Makefile                          |  2 +-
+ drivers/net/wireless/realtek/rtlwifi/rtl8188ee/Makefile |  2 +-
+ scripts/Kbuild.include                                  |  2 +-
+ scripts/Makefile.lib                                    |  7 ++++---
+ 17 files changed, 31 insertions(+), 28 deletions(-)
+
 -- 
 2.9.0
