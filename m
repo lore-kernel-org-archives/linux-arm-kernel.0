@@ -1,126 +1,64 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 15 Jun 2016 09:57:12 +0200
-Subject: [PATCH 2/7] ARM: dts: imx51-babbage: Switch using
- simple-audio-card for audio support
-In-Reply-To: <1465621345-12597-2-git-send-email-shc_work@mail.ru>
-References: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
- <1465621345-12597-2-git-send-email-shc_work@mail.ru>
-Message-ID: <20160615075712.GC11074@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 15 Jun 2016 09:07:30 +0100
+Subject: [PATCH v2 4/9] arm64: Add platform selection for BCM2835.
+In-Reply-To: <87d1njq755.fsf@eliezer.anholt.net>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-5-git-send-email-kraxel@redhat.com>
+ <20160603112721.GC1128@e104818-lin.cambridge.arm.com>
+ <87bn3gu3to.fsf@eliezer.anholt.net>
+ <20160608091219.GA16322@e104818-lin.cambridge.arm.com>
+ <87h9d1x59s.fsf@eliezer.anholt.net>
+ <20160610095633.GA14961@e104818-lin.cambridge.arm.com>
+ <87d1njq755.fsf@eliezer.anholt.net>
+Message-ID: <20160615080730.GA18868@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 11, 2016 at 08:02:20AM +0300, Alexander Shiyan wrote:
-> The sound support can be handled by "simple-audio-card" instead of
-> use a private driver.
+On Tue, Jun 14, 2016 at 11:48:54PM -0700, Eric Anholt wrote:
+> Catalin Marinas <catalin.marinas@arm.com> writes:
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts | 51 +++++++++++++++++++++++++++++++------
->  1 file changed, 43 insertions(+), 8 deletions(-)
-
-I just gave this a test. Playback still works on the right channel, left
-channel is silent. This behaviour hasn't changed with this patch, so
-consider this a:
-
-Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
-
+> > On Thu, Jun 09, 2016 at 05:21:35PM -0700, Eric Anholt wrote:
+> >> Catalin Marinas <catalin.marinas@arm.com> writes:
+> >> > On Sat, Jun 04, 2016 at 12:55:15PM -0700, Eric Anholt wrote:
+> >> >> Catalin Marinas <catalin.marinas@arm.com> writes:
+> >> >> > On Fri, Jun 03, 2016 at 08:18:23AM +0200, Gerd Hoffmann wrote:
+> >> >> >> +	  This SoC is used in the Raspberry Pi 3 device.
+> >> >> >
+> >> >> > I thought we would just use ARCH_BCM, or is it too generic?
+> >> >> 
+> >> >> Consensus last time around seemed to be to drop adding ARCH_BCM, in
+> >> >> favor of patch 1 of the series.
+> >> >
+> >> > I may have missed that discussion. My point was about consistency with
+> >> > existing ARCH_* definitions in the arm64 Kconfig.platforms. I can see
+> >> > why it's easier for you since some drivers are built based on
+> >> > ARCH_BCM2835. Looking at drivers/clk/bcm/Makefile, there is an
+> >> > inconsistent mix of CLK_BCM_* and ARCH_BCM_*. I would rather have a new
+> >> > CLK_BCM2835 that's selected/enabled accordingly (maybe simply depending
+> >> > on ARCH_BCM).
+> >> 
+> >> So I introduce a new ARCH_BCM here, that selects the just the 283x
+> >> family's core drivers?  That seems strange, but I'm willing if that's
+> >> what you want.
+> >
+> > I'll leave this decision to the arm-soc guys. What I want to avoid is
+> > another ARCH_BCM283[89] when some clock or other device changes in a
+> > future revision of this board (RPi4?). I also don't want fine-grained
+> > SoC configuration *within* the arch/arm64 Kconfigs but rather just a
+> > family ARCH_* entry with selectable individual drivers based on the SoC
+> > revision you target (in case you want to avoid single Image).
+> >
+> > We should in general try to give drivers their own Kconfig entries
+> > separate from ARCH_* ones (with a "depend on ARCH_*" and default y if
+> > you want it enabled).
 > 
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index 018d24e..54c38ce 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -11,6 +11,8 @@
->   */
->  
->  /dts-v1/;
-> +#include <dt-bindings/sound/fsl-imx-audmux.h>
-> +
->  #include "imx51.dtsi"
->  
->  / {
-> @@ -141,17 +143,29 @@
->  	};
->  
->  	sound {
-> -		compatible = "fsl,imx51-babbage-sgtl5000",
-> -			     "fsl,imx-audio-sgtl5000";
-> -		model = "imx51-babbage-sgtl5000";
-> -		ssi-controller = <&ssi2>;
-> -		audio-codec = <&sgtl5000>;
-> -		audio-routing =
-> +		compatible = "simple-audio-card";
-> +		simple-audio-card,name = "imx51-babbage-sgtl5000";
-> +		simple-audio-card,format = "i2s";
-> +		simple-audio-card,bitclock-master = <&master>;
-> +		simple-audio-card,frame-master = <&master>;
-> +		simple-audio-card,widgets =
-> +			"Microphone", "Mic Jack",
-> +			"Line", "Line In Jack",
-> +			"Headphone", "Headphone Jack",
-> +			"Speaker", "Line Out Jack",
-> +			"Speaker", "Ext Spk";
-> +		simple-audio-card,routing =
->  			"MIC_IN", "Mic Jack",
->  			"Mic Jack", "Mic Bias",
->  			"Headphone Jack", "HP_OUT";
-> -		mux-int-port = <2>;
-> -		mux-ext-port = <3>;
-> +
-> +		simple-audio-card,cpu {
-> +			sound-dai = <&ssi2>;
-> +		};
-> +
-> +		master: simple-audio-card,codec {
-> +			sound-dai = <&sgtl5000>;
-> +		};
->  	};
->  
->  	usbphy {
-> @@ -173,6 +187,26 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_audmux>;
->  	status = "okay";
-> +
-> +	audmux_ssi1 {
-> +		fsl,audmux-port = <MX51_AUDMUX_PORT2_SSI1>;
-> +		fsl,port-config = <
-> +			(IMX_AUDMUX_V2_PTCR_TFSDIR |
-> +			IMX_AUDMUX_V2_PTCR_TFSEL(MX51_AUDMUX_PORT3) |
-> +			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-> +			IMX_AUDMUX_V2_PTCR_TCSEL(MX51_AUDMUX_PORT3) |
-> +			IMX_AUDMUX_V2_PTCR_SYN)
-> +			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT3)
-> +		>;
-> +	};
-> +
-> +	audmux_aud3 {
-> +		fsl,audmux-port = <MX51_AUDMUX_PORT3>;
-> +		fsl,port-config = <
-> +			IMX_AUDMUX_V2_PTCR_SYN
-> +			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT2_SSI1)
-> +		>;
-> +	};
->  };
->  
->  &ecspi1 {
-> @@ -339,6 +373,7 @@
->  	status = "okay";
->  
->  	sgtl5000: codec at 0a {
-> +		#sound-dai-cells = <0>;
->  		compatible = "fsl,sgtl5000";
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&pinctrl_clkcodec>;
-> -- 
-> 2.4.9
+> OK, we haven't added separate ARCH_BCM283* for the 3 chip revs so far,
+> so I think what you want is actually the status quo, and we're in
+> serious agreement.  The name for the family just happens to be
+> ARCH_BCM2835.
 > 
-> 
-> 
+> Any chance we could get an ack on this?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+If you need one ;) (arm-soc is maintaining this file):
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
