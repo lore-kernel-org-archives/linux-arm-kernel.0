@@ -1,41 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2016 17:45:44 +0200
-Subject: [PATCH v2 02/11] Kbuild: avoid duplicate include path
+Date: Wed, 15 Jun 2016 17:45:49 +0200
+Subject: [PATCH v2 07/11] ARM: hide mach-*/ include for ARM_SINGLE_ARMV7M
 In-Reply-To: <20160615154553.3177021-1-arnd@arndb.de>
 References: <20160615154553.3177021-1-arnd@arndb.de>
-Message-ID: <20160615154553.3177021-3-arnd@arndb.de>
+Message-ID: <20160615154553.3177021-8-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/$(hdr-arch)/include/generated/uapi is included twice in the
-header search path, which is unnecessary, so this changes the
-top-level Makefile to drop the second instance by filtering out
-everything from USERINCLUDE that was already part of LINUXINCLUDE.
+The machine specific header files are exported for traditional
+platforms, but not for the ones that use ARCH_MULTIPLATFORM, as
+they could conflict with one another.
 
-This should have very little effect other than making the 'make V=1'
-output slightly smaller and making the build time faster by a miniscule
-amount, but it seems to be cleaner.
+In case of ARM_SINGLE_ARMV7M, we end up also exporting them,
+but that appears to be a mistake, and we should treat it the
+same way as ARCH_MULTIPLATFORM here.
+
+'make W=1' warns about this because it passes -Wmissing-includes
+to gcc and the directories are not actually present.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- Makefile | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Makefile b/Makefile
-index 8b80a1506be0..45159861e645 100644
---- a/Makefile
-+++ b/Makefile
-@@ -389,8 +389,9 @@ LINUXINCLUDE    := \
- 		-Iarch/$(hdr-arch)/include/generated/uapi \
- 		-Iarch/$(hdr-arch)/include/generated \
- 		$(if $(KBUILD_SRC), -I$(srctree)/include) \
--		-Iinclude \
--		$(USERINCLUDE)
-+		-Iinclude
-+
-+LINUXINCLUDE	+= $(filter-out $(LINUXINCLUDE),$(USERINCLUDE))
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 510620186ee8..3982c7e2fe55 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -266,12 +266,14 @@ machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
+ platdirs := $(patsubst %,arch/arm/plat-%/,$(sort $(plat-y)))
  
- KBUILD_CPPFLAGS := -D__KERNEL__
+ ifneq ($(CONFIG_ARCH_MULTIPLATFORM),y)
++ifneq ($(CONFIG_ARM_SINGLE_ARMV7M),y)
+ ifeq ($(KBUILD_SRC),)
+ KBUILD_CPPFLAGS += $(patsubst %,-I%include,$(machdirs) $(platdirs))
+ else
+ KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
+ endif
+ endif
++endif
+ 
+ export	TEXT_OFFSET GZFLAGS MMUEXT
  
 -- 
 2.9.0
