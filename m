@@ -1,132 +1,83 @@
-From: itaru.kitayama@riken.jp (Itaru Kitayama)
-Date: Wed, 15 Jun 2016 10:22:27 +0900
-Subject: [PATCH v8 0/4] ACPI: parse the SPCR table
-Message-ID: <5760ADD3.30509@riken.jp>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 15 Jun 2016 09:22:14 +0800
+Subject: [PATCH v2 7/7] iommu/arm-smmu: Support non-PCI devices with SMMUv3
+In-Reply-To: <20160614151642.GC16531@arm.com>
+References: <cover.1464966939.git.robin.murphy@arm.com>
+ <42a8a71932f766d70ea9dcae5d11d5f33dcc3652.1464966939.git.robin.murphy@arm.com>
+ <20160614151642.GC16531@arm.com>
+Message-ID: <5760ADC6.8000803@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aleksey,
 
-I've wondering whether your V8 patch set should support !4K-page kernels.
-So far I've seen that on Mustang, 4K-page kernel boots fine, but 64K-page
-kernel always ends up with a panic.
 
-[    0.000000] cma: Reserved 512 MiB at 0x00000040e0000000
-[    0.000000] ACPI: Early table checksum verification disabled
-[    0.000000] ACPI: RSDP 0x00000043FA859014 000024 (v02 APM   )
-[    0.000000] ACPI: XSDT 0x00000043FA8580E8 00007C (v01 APM XGENE    
-00000003      01000013)
-[    0.000000] ACPI: FACP 0x00000043FA850000 00010C (v05 APM XGENE    
-00000003 INTL 20140724)
-[    0.000000] ACPI: DSDT 0x00000043FA851000 003A00 (v05 APM APM88xxx 
-00000001 INTL 20140724)
-[    0.000000] ACPI: DBG2 0x00000043FA855000 0000AA (v00 APMC0D XGENEDBG 
-00000000 INTL 20140724)
-[    0.000000] ACPI: GTDT 0x00000043FA84E000 0000E0 (v02 APM XGENE    
-00000001 INTL 20140724)
-[    0.000000] ACPI: MCFG 0x00000043FA84D000 00003C (v01 APM XGENE    
-00000002 INTL 20140724)
-[    0.000000] ACPI: SPCR 0x00000043FA84C000 000050 (v02 APMC0D XGENESPC 
-00000000 INTL 20140724)
-[    0.000000] ACPI: SSDT 0x00000043FA84B000 00002D (v02 APM XGENE    
-00000001 INTL 20140724)
-[    0.000000] ACPI: BERT 0x00000043FA84A000 000030 (v01 APM XGENE    
-00000002 INTL 20140724)
-[    0.000000] ACPI: HEST 0x00000043FA849000 0002A8 (v01 APM XGENE    
-00000002 INTL 20140724)
-[    0.000000] ACPI: APIC 0x00000043FA848000 0002A4 (v03 APM XGENE    
-00000003      01000013)
-[    0.000000] ACPI: SSDT 0x00000043FA847000 000063 (v02 REDHAT MACADDRS 
-00000001      01000013)
-[    0.000000] ACPI: SSDT 0x00000043FA846000 000032 (v02 REDHAT UARTCLKS 
-00000001      01000013)
-[    0.000000] ACPI: SPCR: console: uart,mmio,0x1c020000,115200
-[    0.000000] memblock_reserve: [0x000043ffff0000-0x000043ffffffff] 
-flags 0x0 memblock_alloc_range_nid+0x64/0x78
-[    0.000000] ------------[ cut here ]------------
-[    0.000000] kernel BUG at arch/arm64/mm/mmu.c:480!
-[    0.000000] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.7.0-rc1-dev+ #28
-[    0.000000] Hardware name: APM X-Gene Mustang board (DT)
-[    0.000000] task: ffff000008e18980 ti: ffff000008df0000 task.ti: 
-ffff000008df0000
-[    0.000000] PC is at map_kernel_segment+0x44/0xb0
-[    0.000000] LR is at paging_init+0x84/0x5b0
-[    0.000000] pc : [<ffff000008b350e0>] lr : [<ffff000008b351d0>] 
-pstate: 600002c5
-[    0.000000] sp : ffff000008df3e60
-[    0.000000] x29: ffff000008df3e60 x28: 0000004000d3001c
-[    0.000000] x27: 00000040009b2074 x26: 0000004001bd0000
-[    0.000000] x25: ffff7fdffe5e0000 x24: 00000043ffff0000
-[    0.000000] x23: 0000000000000000 x22: 000000000078b000
-[    0.000000] x21: 0000004000235000 x20: ffff000008b30000
-[    0.000000] x19: ffff000008f01300 x18: 0000000000000006
-[    0.000000] x17: ffff00000993a638 x16: 0000000000000004
-[    0.000000] x15: ffff00000992e03d x14: 2030783020736761
-[    0.000000] x13: 6c66205d66666666 x12: 6666666633343030
-[    0.000000] x11: 303078302d303030 x10: 3066666666333430
-[    0.000000] x9 : 0000000000000000 x8 : ffff7fdffe620000
-[    0.000000] x7 : 0000000000000000 x6 : 000000000000003f
-[    0.000000] x5 : 0000000000005000 x4 : ffff000008f01300
-[    0.000000] x3 : 00c8000000000713 x2 : ffff0000087c0000
-[    0.000000] x1 : ffff000008035000 x0 : ffff7fdffe5e0000
-[    0.000000]
-[    0.000000] Process swapper (pid: 0, stack limit = 0xffff000008df0020)
-[    0.000000] Stack: (0xffff000008df3e60 to 0xffff000008df4000)
-[    0.000000] 3e60: ffff000008df3ea0 ffff000008b351d0 ffff000008f01300 
-ffff000008b30000
-[    0.000000] 3e80: ffff000008035000 ffff0000087c0000 0000000000000000 
-ffff000008b55480
-[    0.000000] 3ea0: ffff000008df3f20 ffff000008b32708 ffff000008035000 
-ffff000008e30cd8
-[    0.000000] 3ec0: ffff7fdffe800000 ffff000008e10000 0000000000000000 
-0000004000200000
-[    0.000000] 3ee0: 0000004001ba0000 0000004001bd0000 00000040009b2074 
-0000004000d3001c
-[    0.000000] 3f00: ffff7fdffe800000 0000004000200000 ffff7fdffe620000 
-000000000000010c
-[    0.000000] 3f20: ffff000008df3fa0 ffff000008b30848 ffff000008b7d588 
-ffff000008f00000
-[    0.000000] 3f40: ffff000008f00000 ffff000008e10000 0000000000000000 
-0000004000200000
-[    0.000000] 3f60: 0000004001ba0000 0000004001bd0000 0000000000000001 
-000000401fe00000
-[    0.000000] 3f80: ffffffffffffffff 0000000000000000 0000000000000080 
-fefefefefefefefe
-[    0.000000] 3fa0: 0000000000000000 ffff000008b301bc 00000043f7f1f408 
-0000000000000e12
-[    0.000000] 3fc0: 000000401fe00000 0000000030d00800 0000000000000000 
-0000004000200000
-[    0.000000] 3fe0: 0000000000000000 ffff000008b7d588 0000000000000000 
-0000000000000000
-[    0.000000] Call trace:
-[    0.000000] Exception stack(0xffff000008df3ca0 to 0xffff000008df3dc0)
-[    0.000000] 3ca0: ffff000008f01300 ffff000008b30000 ffff000008df3e60 
-ffff000008b350e0
-[    0.000000] 3cc0: 0000004001ba0000 0000004001bd0000 00000040009b2074 
-0000004000d3001c
-[    0.000000] 3ce0: 0000000000000030 0000000000000000 000000000993045a 
-00000000000002c0
-[    0.000000] 3d00: ffff000008df3e00 ffff000008df3e00 ffff000008df3dc0 
-00000000ffffffc8
-[    0.000000] 3d20: ffff000008df3d50 ffff00000811b3d8 ffff000008df3e00 
-ffff000008df3e00
-[    0.000000] 3d40: ffff7fdffe5e0000 ffff000008035000 ffff0000087c0000 
-00c8000000000713
-[    0.000000] 3d60: ffff000008f01300 0000000000005000 000000000000003f 
-0000000000000000
-[    0.000000] 3d80: ffff7fdffe620000 0000000000000000 3066666666333430 
-303078302d303030
-[    0.000000] 3da0: 6666666633343030 6c66205d66666666 2030783020736761 
-ffff00000992e03d
-[    0.000000] [<ffff000008b350e0>] map_kernel_segment+0x44/0xb0
-[    0.000000] [<ffff000008b351d0>] paging_init+0x84/0x5b0
-[    0.000000] [<ffff000008b32708>] setup_arch+0x198/0x534
-[    0.000000] [<ffff000008b30848>] start_kernel+0x70/0x388
-[    0.000000] [<ffff000008b301bc>] __primary_switched+0x30/0x74
-[    0.000000] Code: cb150035 92403ea5 cb010056 b4000045 (d4210000)
-[    0.000000] ---[ end trace cb88537fdc8fa200 ]---
-[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
-[    0.000000] ---[ end Kernel panic - not syncing: Attempted to kill 
-the idle task!
+On 2016/6/14 23:16, Will Deacon wrote:
+> [adding ThunderTown, since he might be able to test this for us]
+
+OK. I'm so glad to do it.
+
+> 
+> On Fri, Jun 03, 2016 at 06:15:42PM +0100, Robin Murphy wrote:
+>> With the device <-> stream ID relationship suitably abstracted and
+>> of_xlate() hooked up, we no longer have any PCI-specifics in play,
+>> so adding support for the simpler kinds of platform device (a single
+>> unique stream ID each) becomes trivial; let's do it!
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> v2: New. Consider this one "extra bonus material" as I'm not sure there
+>>     are even any suitable devices on our model to test it with (it
+>>     _should_ be OK, given that I know the basic infrastructure on either
+>>     side works...)
+>>
+>>  drivers/iommu/Kconfig       |  2 +-
+>>  drivers/iommu/arm-smmu-v3.c | 36 ++++++++++++++++++++++++++++++------
+>>  2 files changed, 31 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+>> index ad0860383cb3..d1c66afefeed 100644
+>> --- a/drivers/iommu/Kconfig
+>> +++ b/drivers/iommu/Kconfig
+>> @@ -308,7 +308,7 @@ config ARM_SMMU
+>>  
+>>  config ARM_SMMU_V3
+>>  	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
+>> -	depends on ARM64 && PCI
+>> +	depends on ARM64
+>>  	select IOMMU_API
+>>  	select IOMMU_IO_PGTABLE_LPAE
+>>  	select GENERIC_MSI_IRQ_DOMAIN
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 28dcc5ca237e..6379f0ab24fc 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -35,6 +35,8 @@
+>>  #include <linux/pci.h>
+>>  #include <linux/platform_device.h>
+>>  
+>> +#include <linux/amba/bus.h>
+>> +
+>>  #include "io-pgtable.h"
+>>  
+>>  /* MMIO registers */
+>> @@ -1773,6 +1775,22 @@ static void arm_smmu_remove_device(struct device *dev)
+>>  	iommu_group_remove_device(dev);
+>>  }
+>>  
+>> +static struct iommu_group *arm_smmu_device_group(struct device *dev)
+>> +{
+>> +	struct iommu_group *group;
+>> +
+>> +	/*
+>> +	 * We've currently no means of grouping non-PCI masters, so
+>> +	 * there'd better not be any non-unique stream IDs in the DT...
+>> +	 */
+> 
+> Worse: what if a SID in the DT aliases with a PCI master? It might be
+> nice to have some basic snity checking, at least.
+> 
+> Will
+> 
+> .
+> 
