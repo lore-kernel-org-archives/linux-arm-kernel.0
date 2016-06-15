@@ -1,86 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Jun 2016 15:16:07 +0200
-Subject: [PATCH 3/5] ARM: dts: add L2CC and RPM with regulators for MSM8660
-In-Reply-To: <20160614185517.GG28218@codeaurora.org>
-References: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
- <1465918259-11138-4-git-send-email-linus.walleij@linaro.org>
- <20160614185517.GG28218@codeaurora.org>
-Message-ID: <CACRpkdZFGUKWiA21j2z4jxMOC=zg8oqC93YjkZR57xumxyJRQQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 15 Jun 2016 21:17:49 +0800
+Subject: [PATCH v2 02/10] mfd: ac100: Add device tree bindings for
+ X-Powers AC100 codec/RTC combo IC
+In-Reply-To: <20160615124943.GE4948@dell>
+References: <1465986467-14802-1-git-send-email-wens@csie.org>
+ <1465986467-14802-3-git-send-email-wens@csie.org> <20160615124943.GE4948@dell>
+Message-ID: <CAGb2v66q0h_BZ-kkRZCneOs5yxvcADXKymMskr3CRc-N8Dqm1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 8:55 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 06/14, Linus Walleij wrote:
-
->> +                     rpmcc: clock-controller {
->> +                             compatible      = "qcom,rpmcc-apq8660", "qcom,rpmcc";
->> +                             #clock-cells = <1>;
->> +                     };
+On Wed, Jun 15, 2016 at 8:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 15 Jun 2016, Chen-Yu Tsai wrote:
 >
-> This driver isn't merged yet, but ok.
-
-It's there because it is there in
-arch/arm/boot/dts/qcom-apq8064.dtsi
-
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  Documentation/devicetree/bindings/mfd/ac100.txt | 42 +++++++++++++++++++++++++
+>>  1 file changed, 42 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/ac100.txt b/Documentation/devicetree/bindings/mfd/ac100.txt
+>> new file mode 100644
+>> index 000000000000..fbab623e6fba
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/ac100.txt
+>> @@ -0,0 +1,42 @@
+>> +X-Powers AC100 Codec/RTC IC device tree bindings
 >> +
->> +                     pm8901-regulators {
->
-> I'd rather have regulators at 8901 and regulators at 8058. That way the
-> node name is generic per ePAPR suggestions.
-
-Seems impossible if I should conclude the other discussion...
-
->> +                             pm8058_mvs: mvs {};
->
-> pm8901_mvs?
-
-Ooops fixing.
-
->> +                     pm8058-regulators {
->> +                             compatible = "qcom,rpm-pm8058-regulators";
+>> +AC100 is a audio codec and RTC subsystem combo IC. The 2 parts are
+>> +separated, including power supplies and interrupt lines, but share
+>> +a common register address space and host interface.
 >> +
->> +                             pm8058_l0: l0 {};
->> +                             pm8058_l1: l1 {};
->> +                             pm8058_l2: l2 {};
->> +                             pm8058_l3: l3 {};
->> +                             pm8058_l4: l4 {};
->> +                             pm8058_l5: l5 {};
->> +                             pm8058_l6: l6 {};
->> +                             pm8058_l7: l7 {};
->> +                             pm8058_l8: l8 {};
->> +                             pm8058_l9: l9 {};
->> +                             pm8058_l10: l10 {};
->> +                             pm8058_l11: l11 {};
->> +                             pm8058_l12: l12 {};
->> +                             pm8058_l13: l13 {};
->> +                             pm8058_l14: l14 {};
->> +                             pm8058_l15: l15 {};
->> +                             pm8058_l16: l16 {};
->> +                             pm8058_l17: l17 {};
->> +                             pm8058_l18: l18 {};
->> +                             pm8058_l19: l19 {};
->> +                             pm8058_l20: l20 {};
->> +                             pm8058_l21: l21 {};
->> +                             pm8058_l22: l22 {};
->> +                             pm8058_l23: l23 {};
->> +                             pm8058_l24: l24 {};
->> +                             pm8058_l25: l25 {};
+>> +Required properties:
+>> +- compatible: "x-powers,ac100"
+>> +- reg: The I2C slave address or RSB hardware address for the chip
+>> +- sub-nodes:
+>> +  - codec
+>> +    - compatible: "x-powers,ac100-codec"
+>> +    - interrupt-parent: The parent interrupt controller
+>> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_AUDIO pin
+>> +  - rtc
+>> +    - compatible: "x-powers,ac100-rtc"
+>> +    - interrupt-parent: The parent interrupt controller
+>> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_RTC pin
+>> +    - #clock-cells: shall be 1
+>> +    - clock-output-names: "cko1_rtc", "cko2_rtc", "cko3_rtc"
+>> +    - see clock/clock-bindings.txt for common clock bindings
 >> +
->> +                             pm8058_s0: s0 {};
->> +                             pm8058_s1: s1 {};
+>> +Example:
+>> +
+>> +ac100: codec at e89 {
+>> +     compatible = "x-powers,ac100";
+>> +     reg = <0xe89>;
+>> +
+>> +     ac100_codec {
+>> +             compatible = "x-powers,ac100-codec";
+>> +             interrupt-parent = <&nmi_intc>;
+>> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>> +     };
+>> +
+>> +     ac100_rtc {
+>> +             compatible = "x-powers,ac100-rtc";
+>> +             interrupt-parent = <&nmi_intc>;
+>> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
 >
-> Just leave these out? RPM shouldn't be touching s0 or s1.
+> Isn't this the same interrupt as above?  Is it shared?
 
-Really? The msm-3.4 tree does:
+Copy paste error... The codec uses a different line in the design.
 
-        /* RPM early regulator constraints */
-        static struct rpm_regulator_init_data
-rpm_regulator_early_init_data[] = {
-        /*       ID       a_on pd ss min_uV   max_uV   init_ip    freq */
-        RPM_SMPS(PM8058_S0, 0, 1, 1,  500000, 1325000, SMPS_HMIN, 1p60),
-        RPM_SMPS(PM8058_S1, 0, 1, 1,  500000, 1250000, SMPS_HMIN, 1p60),
+ChenYu
 
-Are you sure you don't mean s0+s1 on PM8901 (which I left out)?
-
-Yours,
-Linus Walleij
+>
+>> +             #clock-cells = <1>;
+>> +             clock-output-names = "cko1_rtc", "cko2_rtc", "cko3_rtc";
+>> +     };
+>> +};
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
