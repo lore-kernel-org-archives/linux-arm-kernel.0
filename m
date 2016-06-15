@@ -1,63 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Jun 2016 15:25:51 +0100
-Subject: [PATCH v2] arm64: allow building with kcov coverage on ARM64
-In-Reply-To: <CAG_fn=U7-fUnw1GLwBbmqGTxnOWf4QcTjTyP4mGAORfEuWt3Eg@mail.gmail.com>
-References: <1465923441-107596-1-git-send-email-glider@google.com>
- <20160614175543.GA2468@leverpostej>
- <CAG_fn=X521a9uD1bthDZ-swO9hrfq=jE2C_LUvzkn6C_q5dBvA@mail.gmail.com>
- <20160615092509.GA3984@leverpostej>
- <20160615114438.GC3984@leverpostej>
- <CAG_fn=U7-fUnw1GLwBbmqGTxnOWf4QcTjTyP4mGAORfEuWt3Eg@mail.gmail.com>
-Message-ID: <20160615142550.GA7971@leverpostej>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 15 Jun 2016 19:43:33 +0530
+Subject: [PATCH 0/5] clk: Combine MAX77686 and MAX77802 driver and extend for
+ MAX77620
+Message-ID: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 01:53:03PM +0200, Alexander Potapenko wrote:
-> On Wed, Jun 15, 2016 at 1:44 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Jun 15, 2016 at 10:25:10AM +0100, Mark Rutland wrote:
-> >> On Tue, Jun 14, 2016 at 08:16:08PM +0200, Alexander Potapenko wrote:
-> >> > On Tue, Jun 14, 2016 at 7:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > > I built and booted (via EFI) a kernel with this feature enabled (also
-> >> > > with the boot/Makefile change removed). I haven't tested the feature
-> >> > > itself as such, as I'm not sure how to do that.
-> >> > You can test it by running the test program from Documentation/kcov.txt.
-> >>
-> >> Ah, I hadn't spotted that. If I get the chance I'll try to give that a
-> >> go.
-> >
-> > I just had a go (with this applied atop of v4.7-rc3), and I get:
-> >
-> > root at ribbensteg:/home/nanook# ./kcov
-> > mmap: No such device
-> >
-> > The device exists (it was able to open the fd, evidently):
-> >
-> > root at ribbensteg:/home/nanook# ls -al /sys/kernel/debug/kcov
-> > -rw------- 1 root root 0 Jan  1  1970 /sys/kernel/debug/kcov
-> >
-> > Strace show me:
-> >
-> > openat(AT_FDCWD, "/sys/kernel/debug/kcov", O_RDWR) = 3
-> > ioctl(3, CHIOMOVE or CM_IOCGATR, 0x10000) = 0
-> > mmap(NULL, 524288, PROT_READ|PROT_WRITE, MAP_SHARED, 3, 0) = -1 ENODEV (No such device)
-> >
-> > It doesn't look like the error paths in kcov_mmap are hitting.
-> >
-> > Any ideas?
-> According to Dmitry (thanks, Dmitry!) this has regressed recently, but
-> there's a pending patch that should probably fix the problem:
-> http://lkml.iu.edu/hypermail/linux/kernel/1605.2/04379.html
+The clock IP used on the Maxim PMICs max77686 and max77802 are
+same. The configuration of clock register is also same except
+the number of clocks.
+    
+Part of common code utilisation, there is 3 files for these chips
+clock driver, one for common and two files for driver registration.
+    
+Combine both drivers into single file and move common code into
+same common file reduces the 2 files and make max77686 and max77802
+clock driver in single fine. This driver does not depends on the
+parent driver structure. The regmap handle is acquired through
+regmap APIs for the register access.
 
-Thanks for the pointer! With that applied, the program runs.
+After comining the driver and DT files, extend the support to MAX77620.
 
-However, it looks like I missed a warning from the kernel build system, 
-and my toolchain doesn't actually support -fsanitize-coverage=trace-pc,
-so I'm not going to be able to test that further.
 
-It would be great if we could deliberately not register the debugfs file
-when there was no compiler support for the feature, for those like me
-who miss the build time warning. We do something like that for the LSE
-atomics on arm64.
+This series is based on discussion from the series
+	clk: max77620: Add clock driver for MAX77620/MAX20024
+On this series, it is proposed to combine all files together.
 
-Thanks,
-Mark.
+
+Laxman Dewangan (5):
+  clk: max77686: Combine Maxim max77686 and max77802 driver
+  clk: Combine DT binding doc for max77686 and max77802
+  clk: max77686: Add DT binding details for PMIC MAX77620
+  clk: max77686: Add support for MAX77620 clocks
+  ARM: config: Get rid of config COMMON_CLK_MAX77802
+
+ .../devicetree/bindings/clock/maxim,max77686.txt   | 108 +++++++--
+ .../devicetree/bindings/clock/maxim,max77802.txt   |  44 ----
+ arch/arm/configs/exynos_defconfig                  |   1 -
+ arch/arm/configs/multi_v7_defconfig                |   1 -
+ drivers/clk/Kconfig                                |  18 +-
+ drivers/clk/Makefile                               |   2 -
+ drivers/clk/clk-max-gen.c                          | 194 ----------------
+ drivers/clk/clk-max-gen.h                          |  32 ---
+ drivers/clk/clk-max77686.c                         | 257 +++++++++++++++++++--
+ drivers/clk/clk-max77802.c                         |  96 --------
+ include/dt-bindings/mfd/max77620.h                 |   4 +
+ 11 files changed, 335 insertions(+), 422 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
+ delete mode 100644 drivers/clk/clk-max-gen.c
+ delete mode 100644 drivers/clk/clk-max-gen.h
+ delete mode 100644 drivers/clk/clk-max77802.c
+
+-- 
+2.1.4
