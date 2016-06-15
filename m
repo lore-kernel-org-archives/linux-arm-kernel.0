@@ -1,35 +1,22 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 15 Jun 2016 12:26:57 +0200
-Subject: [PATCH v3 2/2] dt-bindings: clocksource: Add Add Oxford
- Semiconductor RPS Timer bindings
-In-Reply-To: <57612C8E.1030405@linaro.org>
-References: <1465985607-21231-1-git-send-email-narmstrong@baylibre.com>
- <1465985607-21231-3-git-send-email-narmstrong@baylibre.com>
- <57612C8E.1030405@linaro.org>
-Message-ID: <57612D71.7050404@linaro.org>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 15 Jun 2016 11:25:18 +0100
+Subject: [PATCH] PM / Hibernate: Don't let kasan instrument snapshot.c
+In-Reply-To: <7230305.BYjCFel4WC@vostro.rjw.lan>
+References: <1464870032-12289-1-git-send-email-james.morse@arm.com>
+ <7230305.BYjCFel4WC@vostro.rjw.lan>
+Message-ID: <57612D0E.5050209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2016 12:23 PM, Daniel Lezcano wrote:
-> On 06/15/2016 12:13 PM, Neil Armstrong wrote:
->> Add DT bindings for the Oxford Semiconductor RPS dual Timer.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->
-> Waiting for Rob's acked before picking the series.
+Hi Rafael,
 
-Ok, Rob already acked this patch in the V2.
+On 15/06/16 00:26, Rafael J. Wysocki wrote:
+> Does the arch code need to be annotated in a similar way too?
 
-I will take these patches in my tree.
+Only if you do the restore copying from C, both 32bit and 64bit x86 do this copy
+in assembly code, which doesn't get instrumented.
 
-Thanks.
 
-   -- Daniel
+Thanks,
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+James
