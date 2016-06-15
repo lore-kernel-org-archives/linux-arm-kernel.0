@@ -1,146 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Jun 2016 12:33:33 +0100
-Subject: [PATCH 3/8] arm64: pmu: Add support for probing with ACPI
-In-Reply-To: <1465511013-10742-4-git-send-email-jeremy.linton@arm.com>
-References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
- <1465511013-10742-4-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20160615113333.GI24029@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jun 2016 12:44:39 +0100
+Subject: [PATCH v2] arm64: allow building with kcov coverage on ARM64
+In-Reply-To: <20160615092509.GA3984@leverpostej>
+References: <1465923441-107596-1-git-send-email-glider@google.com>
+ <20160614175543.GA2468@leverpostej>
+ <CAG_fn=X521a9uD1bthDZ-swO9hrfq=jE2C_LUvzkn6C_q5dBvA@mail.gmail.com>
+ <20160615092509.GA3984@leverpostej>
+Message-ID: <20160615114438.GC3984@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 05:23:28PM -0500, Jeremy Linton wrote:
-> From: Mark Salter <msalter@redhat.com>
+On Wed, Jun 15, 2016 at 10:25:10AM +0100, Mark Rutland wrote:
+> On Tue, Jun 14, 2016 at 08:16:08PM +0200, Alexander Potapenko wrote:
+> > On Tue, Jun 14, 2016 at 7:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > I built and booted (via EFI) a kernel with this feature enabled (also
+> > > with the boot/Makefile change removed). I haven't tested the feature
+> > > itself as such, as I'm not sure how to do that.
+> > You can test it by running the test program from Documentation/kcov.txt.
 > 
-> In the case of ACPI, the PMU IRQ information is contained in the
-> MADT table. Also, since the PMU does not exist as a device in the
-> ACPI DSDT table, it is necessary to create a platform device so
-> that the appropriate driver probing is triggered.
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
-> 
->  NOTE: Much of the code in pmu_acpi_init() is replaced in a later version
->        of this patch. The later version of the patch cleans up some of the
->        possible style/error handling issues that have been pointed out with
->        this version.
-> 
->  arch/arm64/kernel/smp.c      |  5 +++
->  drivers/perf/Kconfig         |  4 ++
->  drivers/perf/Makefile        |  1 +
->  drivers/perf/arm_pmu_acpi.c  | 97 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/perf/arm_pmu.h |  7 ++++
->  5 files changed, 114 insertions(+)
->  create mode 100644 drivers/perf/arm_pmu_acpi.c
-> 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 678e084..5c96d23 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -37,6 +37,7 @@
->  #include <linux/completion.h>
->  #include <linux/of.h>
->  #include <linux/irq_work.h>
-> +#include <linux/perf/arm_pmu.h>
->  
->  #include <asm/alternative.h>
->  #include <asm/atomic.h>
-> @@ -540,6 +541,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->  			return;
->  		}
->  		bootcpu_valid = true;
-> +		arm_pmu_parse_acpi(0, processor);
->  		return;
->  	}
->  
-> @@ -560,6 +562,9 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->  	 */
->  	acpi_set_mailbox_entry(cpu_count, processor);
->  
-> +	/* get PMU irq info */
-> +	arm_pmu_parse_acpi(cpu_count, processor);
-> +
+> Ah, I hadn't spotted that. If I get the chance I'll try to give that a
+> go.
 
-Nit: the outer functions are now misnomers, since this has nothing to do
-with the GIC. It feels like acpi_parse_gic_cpu_interface could use some
-slight restructuring so that the MADT parsing looks less confused.
+I just had a go (with this applied atop of v4.7-rc3), and I get:
 
-> diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-> index acd2397..fd8090d 100644
-> --- a/drivers/perf/Makefile
-> +++ b/drivers/perf/Makefile
-> @@ -1 +1,2 @@
->  obj-$(CONFIG_ARM_PMU) += arm_pmu.o
-> +obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
-> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-> new file mode 100644
-> index 0000000..98c452d
-> --- /dev/null
-> +++ b/drivers/perf/arm_pmu_acpi.c
-> @@ -0,0 +1,97 @@
-> +/*
-> + * PMU support
-> + *
-> + * Copyright (C) 2015 Red Hat Inc.
-> + * Author: Mark Salter <msalter@redhat.com>
-> + *
-> + * This work is licensed under the terms of the GNU GPL, version 2.  See
-> + * the COPYING file in the top-level directory.
-> + *
-> + */
-> +
-> +#include <linux/perf/arm_pmu.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/acpi.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdesc.h>
-> +
-> +#define PMU_PDEV_NAME "armv8-pmu"
+root at ribbensteg:/home/nanook# ./kcov 
+mmap: No such device
 
-Stick this in include/linux/perf/arm_pmu.h where we can use it in the driver
-code too?
+The device exists (it was able to open the fd, evidently):
 
-> +
-> +struct pmu_irq {
-> +	int gsi;
-> +	int trigger;
-> +};
-> +
-> +static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
-> +
-> +void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
-> +{
-> +	pmu_irqs[cpu].gsi = gic->performance_interrupt;
-> +	if (gic->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
-> +		pmu_irqs[cpu].trigger = ACPI_EDGE_SENSITIVE;
-> +	else
-> +		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
-> +}
-> +
-> +static int __init pmu_acpi_init(void)
-> +{
-> +	struct platform_device *pdev;
-> +	struct pmu_irq *pirq = pmu_irqs;
-> +	struct resource	*res, *r;
-> +	int err = -ENOMEM;
-> +	int i, count, irq;
-> +
-> +	if (acpi_disabled)
-> +		return 0;
-> +
-> +	/* Must have irq for boot boot cpu, at least */
+root at ribbensteg:/home/nanook# ls -al /sys/kernel/debug/kcov 
+-rw------- 1 root root 0 Jan  1  1970 /sys/kernel/debug/kcov
 
-boot boot
+Strace show me:
 
-> +	if (pirq->gsi == 0)
-> +		return -EINVAL;
-> +
-> +	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
-> +				ACPI_ACTIVE_HIGH);
+openat(AT_FDCWD, "/sys/kernel/debug/kcov", O_RDWR) = 3
+ioctl(3, CHIOMOVE or CM_IOCGATR, 0x10000) = 0
+mmap(NULL, 524288, PROT_READ|PROT_WRITE, MAP_SHARED, 3, 0) = -1 ENODEV (No such device)
 
-This is quite tricky to read, thanks to the aliasing of pirq and
-pmu_irqs[0]. Why is it necessary to register the first gsi separately,
-rather than just register it later in the loop with all the other
-interrupts?
+It doesn't look like the error paths in kcov_mmap are hitting.
 
-Will
+Any ideas?
+
+Thanks,
+Mark.
