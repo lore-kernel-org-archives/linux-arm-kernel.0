@@ -1,197 +1,58 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 15 Jun 2016 18:41:42 +0100
-Subject: [PATCH v5 2/3] drm/arm: Add support for Mali Display Processors
-In-Reply-To: <20160615173537.GD6754@nuc-i3427.alporthouse.com>
-References: <1466002295-24813-1-git-send-email-Liviu.Dudau@arm.com>
- <1466002295-24813-3-git-send-email-Liviu.Dudau@arm.com>
- <20160615152309.GI1338@phenom.ffwll.local>
- <20160615161758.GF9711@e106497-lin.cambridge.arm.com>
- <CAKMK7uENW3cU8LccHcqffX3cbzax2-5mzY0101yLfR7vtD4CoA@mail.gmail.com>
- <20160615172104.GI9711@e106497-lin.cambridge.arm.com>
- <20160615173537.GD6754@nuc-i3427.alporthouse.com>
-Message-ID: <20160615174142.GJ9711@e106497-lin.cambridge.arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 15 Jun 2016 11:07:50 -0700
+Subject: arm-soc boot: 619 boots: 11 failed, 605 passed with 2 offline,
+ 1 conflict (v4.7-rc3-216-gec0776a212c1)
+In-Reply-To: <9297488.MELcTREXgu@wuerfel> (Arnd Bergmann's message of "Wed, 15
+ Jun 2016 11:10:29 +0200")
+References: <5760acd0.571a1c0a.34a58.7333@mx.google.com>
+ <9297488.MELcTREXgu@wuerfel>
+Message-ID: <m2twgupbpl.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 06:35:37PM +0100, Chris Wilson wrote:
-> On Wed, Jun 15, 2016 at 06:21:04PM +0100, Liviu Dudau wrote:
-> > On Wed, Jun 15, 2016 at 07:13:15PM +0200, Daniel Vetter wrote:
-> > > On Wed, Jun 15, 2016 at 6:17 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > > > On Wed, Jun 15, 2016 at 05:23:10PM +0200, Daniel Vetter wrote:
-> > > >> On Wed, Jun 15, 2016 at 03:51:34PM +0100, Liviu Dudau wrote:
-> > > >> > Add support for the new family of Display Processors from ARM Ltd.
-> > > >> > This commit adds basic support for Mali DP500, DP550 and DP650
-> > > >> > parts, with only the display engine being supported at the moment.
-> > > >> >
-> > > >> > Cc: David Brown <David.Brown@arm.com>
-> > > >> > Cc: Brian Starkey <Brian.Starkey@arm.com>
-> > > >> >
-> > > >> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > > >>
-> > > >> Small thing I noticed: drm_dev_register/connector_register_all should be
-> > > >> the last step in your init code, and unregister the first. Atm it's
-> > > >> somewhere in the middle. But perfectly fine to do that as a follow-up.
-> > > >
-> > > > I've tried that, but the connector and encoder that gets registered as part
-> > > > of the component_bind_all() fails if there is no drm dev registered. You did
-> > > > comment on the v4 version about that and I did test your idea, sorry for
-> > > > forgeting to update you on that.
-> > > 
-> > > Why does it fail? That shouldn't happen ... we need to be able to set
-> > > up everything first, before we register.
-> > 
-> > Could be the tda998x_drv fault, but I'm getting this splat:
-> > 
-> > [    1.347687] kobject_add_internal failed for card0-HDMI-A-1 (error: -2 parent: card0)
-> > [    1.355420] ------------[ cut here ]------------
-> > [    1.360015] WARNING: CPU: 3 PID: 1 at /work/repositories/kernel/lib/kobject.c:244 kobject_add_internal+0xd8/0x290
-> > [    1.370202] Modules linked in:
-> > [    1.373238]
-> > [    1.374724] CPU: 3 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc2+ #2
-> > [    1.380941] Hardware name: ARM Juno development board (r0) (DT)
-> > [    1.386816] task: ffffffc976ca0000 ti: ffffffc976ca8000 task.ti: ffffffc976ca8000
-> > [    1.394251] PC is at kobject_add_internal+0xd8/0x290
-> > [    1.399179] LR is at kobject_add_internal+0xd8/0x290
-> > [    1.404107] pc : [<ffffff8008344730>] lr : [<ffffff8008344730>] pstate: 60000045
-> > [    1.411452] sp : ffffffc976cab7f0
-> > [    1.414742] x29: ffffffc976cab7f0 x28: ffffff8008c5bbb8
-> > [    1.420022] x27: ffffffc0799c3810 x26: ffffff80089f8a10
-> > [    1.425302] x25: 0000000000000000 x24: ffffffc0799c2000
-> > [    1.430582] x23: ffffff8008bddc78 x22: ffffffc0799c2000
-> > [    1.435861] x21: ffffffc0799c2010 x20: 00000000fffffffe
-> > [    1.441139] x19: ffffffc0799c3810 x18: 0000000000000010
-> > [    1.446418] x17: 0000000000000000 x16: 0000000000000000
-> > [    1.451697] x15: ffffff8088c35c87 x14: 6163203a746e6572
-> > [    1.456976] x13: 617020322d203a72 x12: 6f7272652820312d
-> > [    1.462255] x11: 412d494d44482d30 x10: 6472616320726f66
-> > [    1.467533] x9 : 2064656c69616620 x8 : 00000000000000a1
-> > [    1.472812] x7 : 5f6464615f746365 x6 : 000000000000000a
-> > [    1.478091] x5 : ffffffc976453c18 x4 : 0000000000000000
-> > [    1.483370] x3 : 0000000000000000 x2 : ffffff8008baa7b8
-> > [    1.488649] x1 : ffffffc976ca8000 x0 : 0000000000000048
-> > [    1.493927]
-> > [    1.495421] ---[ end trace b193c9c9e93296f4 ]---
-> > [    1.500002] Call trace:
-> > [    1.502434] Exception stack(0xffffffc976cab630 to 0xffffffc976cab750)
-> > [    1.508827] b620:                                   ffffffc0799c3810 00000000fffffffe
-> > [    1.516608] b640: ffffffc976cab7f0 ffffff8008344730 ffffffc976cab670 ffffff80080f81dc
-> > [    1.524389] b660: ffffff80089b7570 0000000108c35000 ffffffc976cab710 ffffff80080f8500
-> > [    1.532170] b680: ffffffc0799c3810 00000000fffffffe ffffffc0799c2010 ffffffc0799c2000
-> > [    1.539951] b6a0: ffffff8008bddc78 ffffffc0799c2000 0000000000000000 ffffff80089f8a10
-> > [    1.547731] b6c0: ffffffc0799c3810 ffffff8008c5bbb8 0000000000000048 ffffffc976ca8000
-> > [    1.555511] b6e0: ffffff8008baa7b8 0000000000000000 0000000000000000 ffffffc976453c18
-> > [    1.563292] b700: 000000000000000a 5f6464615f746365 00000000000000a1 2064656c69616620
-> > [    1.571073] b720: 6472616320726f66 412d494d44482d30 6f7272652820312d 617020322d203a72
-> > [    1.578851] b740: 6163203a746e6572 ffffff8088c35c87
-> > [    1.583695] [<ffffff8008344730>] kobject_add_internal+0xd8/0x290
-> > [    1.589658] [<ffffff800834496c>] kobject_add+0x84/0xd0
-> > [    1.594763] [<ffffff8008484e94>] device_add+0xc4/0x548
-> > [    1.599867] [<ffffff8008485568>] device_create_groups_vargs+0x108/0x118
-> > [    1.606432] [<ffffff8008485644>] device_create_with_groups+0x3c/0x48
-> > [    1.612742] [<ffffff80084630cc>] drm_sysfs_connector_add+0x5c/0xd0
-> > [    1.618880] [<ffffff80084671f0>] drm_connector_register+0x18/0xa0
-> > [    1.624930] [<ffffff80084809b8>] tda998x_bind+0x5f8/0x6c0
-> > [    1.630292] [<ffffff8008482f94>] component_bind_all+0xfc/0x258
-> > [    1.636083] [<ffffff800847d1a4>] malidp_bind+0x3b4/0x528
-> > [    1.641357] [<ffffff8008482be8>] try_to_bring_up_master+0x140/0x1a0
-> > [    1.647579] [<ffffff8008482ce0>] component_add+0x98/0x170
-> > [    1.652940] [<ffffff800847fc18>] tda998x_probe+0x18/0x20
-> > [    1.658216] [<ffffff80085f087c>] i2c_device_probe+0x164/0x228
-> > [    1.663921] [<ffffff8008488124>] driver_probe_device+0x204/0x2b0
-> > [    1.669884] [<ffffff800848827c>] __driver_attach+0xac/0xb0
-> > [    1.675330] [<ffffff80084860d8>] bus_for_each_dev+0x60/0xa0
-> > [    1.680862] [<ffffff80084878b0>] driver_attach+0x20/0x28
-> > [    1.686135] [<ffffff80084874a8>] bus_add_driver+0x1d0/0x238
-> > [    1.691668] [<ffffff8008488a40>] driver_register+0x60/0xf8
-> > [    1.697116] [<ffffff80085f19e0>] i2c_register_driver+0x38/0x88
-> > [    1.702909] [<ffffff8008ad6a4c>] tda998x_driver_init+0x18/0x20
-> > [    1.708701] [<ffffff8008081a10>] do_one_initcall+0x38/0x128
-> > [    1.714234] [<ffffff8008ab0cc0>] kernel_init_freeable+0x14c/0x1f0
-> > [    1.720286] [<ffffff8008782b08>] kernel_init+0x10/0x100
-> > [    1.725475] [<ffffff8008084e10>] ret_from_fork+0x10/0x40
-> > [    1.730771] [drm:drm_sysfs_connector_add] *ERROR* failed to register connector device: -2
-> > [    1.745136] mali-dp 6f200000.malidp: failed to bind 1-0070 (ops tda998x_ops): -2
-> > [    1.752506] [drm:malidp_bind] *ERROR* Failed to bind all components
-> 
-> Something like
-> 
-> diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
-> index f55bd9602462..0baf5cebb3b5 100644
-> --- a/drivers/gpu/drm/drm_crtc.c
-> +++ b/drivers/gpu/drm/drm_crtc.c
-> @@ -995,6 +995,10 @@ int drm_connector_register(struct drm_connector *connector)
->         if (connector->registered)
->                 return 0;
->  
-> +       /* Silently fail to register before the device itself is ready. */
-> +       if (!connector->dev->registered)
-> +               return 0;
-> +
->         ret = drm_sysfs_connector_add(connector);
->         if (ret)
->                 return ret;
-> diff --git a/drivers/gpu/drm/drm_drv.c b/drivers/gpu/drm/drm_drv.c
-> index 13b4c9c0fe36..048733006dbb 100644
-> --- a/drivers/gpu/drm/drm_drv.c
-> +++ b/drivers/gpu/drm/drm_drv.c
-> @@ -789,6 +789,8 @@ int drm_dev_register(struct drm_device *dev, unsigned long flags)
->         if (ret)
->                 goto err_minors;
->  
-> +       dev->registered = true;
-> +
->         if (dev->driver->load) {
->                 ret = dev->driver->load(dev, flags);
->                 if (ret)
-> @@ -840,6 +842,8 @@ void drm_dev_unregister(struct drm_device *dev)
->         list_for_each_entry_safe(r_list, list_temp, &dev->maplist, head)
->                 drm_legacy_rmmap(dev, r_list->map);
->  
-> +       dev->registered = false;
-> +
->         drm_minor_unregister(dev, DRM_MINOR_LEGACY);
->         drm_minor_unregister(dev, DRM_MINOR_RENDER);
->         drm_minor_unregister(dev, DRM_MINOR_CONTROL);
-> diff --git a/include/drm/drmP.h b/include/drm/drmP.h
-> index 057b6ccdbe8e..4a14e5bfcbda 100644
-> --- a/include/drm/drmP.h
-> +++ b/include/drm/drmP.h
-> @@ -867,6 +867,8 @@ struct drm_device {
->         struct drm_vma_offset_manager *vma_offset_manager;
->         /*@} */
->         int switch_power_state;
-> +
-> +       bool registered;
->  };
->  
->  #define DRM_SWITCH_POWER_ON 0
-> 
-> 
-> after "drm: Automatically register/unregister all connectors"?
-> -Chris
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Yes, possible. I wasn't carrying (or have tested) your series, Chris.
+> On Tuesday, June 14, 2016 6:18:08 PM CEST kernelci. org bot wrote:
+>> arm:
+>> 
+>>     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
+>>         exynos5410-odroidxu: 1 failed lab
+>> 
+>>     multi_v7_defconfig+CONFIG_LKDTM=y:
+>>         exynos5410-odroidxu: 1 failed lab
+>> 
+>>     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y+CONFIG_ARM_MODULE_PLTS=y:
+>>         exynos5410-odroidxu: 1 failed lab
+>> 
+>>     multi_v7_defconfig+CONFIG_EFI=y:
+>>         exynos5410-odroidxu: 1 failed lab
+>> 
+>>     exynos_defconfig:
+>>         exynos5410-odroidxu: 1 failed lab
+>> 
+>>     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
+>>         exynos5410-odroidxu: 1 failed lab
+>> 
+>>     multi_v7_defconfig:
+>>         exynos5410-odroidxu: 1 failed lab
+>> 
+>>     multi_v5_defconfig:
+>>         at91sam9261ek: 1 failed lab
+>>         at91sam9m10g45ek: 1 failed lab
+>>         at91sam9x25ek: 1 failed lab
+>>         at91sam9x35ek: 1 failed lab
+>
+> These all seem to have broken after yesterday's merges, adding
+> Alexandre and Krzysztof to Cc here so they can have a look.
 
-Best regards,
-Liviu
+The exynos5410 fails look like the UART3 issue reported earlier and
+which is also happening in linux-next.
 
+Krzysztof posted a fix[1] that was tested by Javier and myself that
+fixed the problem, but I don't see that upstream yet.
 
-> 
-> -- 
-> Chris Wilson, Intel Open Source Technology Centre
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Krzysztof: did you get that fix submitted yet?
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Kevin
+
+[1] http://marc.info/?l=linux-kernel&m=146469459503940&w=2
