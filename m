@@ -1,62 +1,58 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 15 Jun 2016 20:22:34 +0200
-Subject: [PATCH] Revert "gpio: bail out silently on NULL descriptors"
-Message-ID: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
+Date: Wed, 15 Jun 2016 20:23:50 +0200
+Subject: [PATCH] ARM: dts: sun8i-q8-common: Add support for USB wifi
+ controllers
+Message-ID: <1466015030-18091-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 54d77198fdfb("gpio: bail out silently on NULL
-descriptors").
+Some of the sun8i q8 boards have an usb wifi controller, on other
+variants this will result in an used usb root-hub, but the best
+way to deal with wifi on this boards is to simply let the kernel
+auto-detect usb or sdio wifi controllers.
 
-This commit causes the following code to fail:
-
-gpio_desc = devm_gpiod_get_optional(dev, ...);
-gpio_irq  = gpiod_to_irq(gpio_desc);
-if (gpio_irq >= 0) {
-	ret = devm_request_irq(dev, gpio_irq, ...);
-
-And now ret is an error causing the probe function in question to bail.
-
-The problem here is that gpiod_to_irq now returns 0 for a NULL
-gpio_desc while 0 is a valid irq-nr. Also see:
-commit 4c37ce8608a8("gpio: make gpiod_to_irq() return negative for NO_IRQ")
-which specifically avoids returning 0.
+This has been tested on an a23 based q8 tablet with a RTL8188ETV wifi
+controller.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/gpio/gpiolib.c | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/sun8i-q8-common.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 24f60d2..6c33a07 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -1367,13 +1367,10 @@ done:
- /*
-  * This descriptor validation needs to be inserted verbatim into each
-  * function taking a descriptor, so we need to use a preprocessor
-- * macro to avoid endless duplication. If the desc is NULL it is an
-- * optional GPIO and calls should just bail out.
-+ * macro to avoid endless duplication.
-  */
- #define VALIDATE_DESC(desc) do { \
--	if (!desc) \
--		return 0; \
--	if (!desc->gdev) { \
-+	if (!desc || !desc->gdev) { \
- 		pr_warn("%s: invalid GPIO\n", __func__); \
- 		return -EINVAL; \
- 	} \
-@@ -1384,9 +1381,7 @@ done:
- 	} } while (0)
+diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+index 991087f..f3f4ce0 100644
+--- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
++++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+@@ -63,6 +63,10 @@
+ 	};
+ };
  
- #define VALIDATE_DESC_VOID(desc) do { \
--	if (!desc) \
--		return; \
--	if (!desc->gdev) { \
-+	if (!desc || !desc->gdev) { \
- 		pr_warn("%s: invalid GPIO\n", __func__); \
- 		return; \
- 	} \
++&ehci0 {
++	status  = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
+@@ -171,6 +175,12 @@
+ 	regulator-name = "vcc-dram";
+ };
+ 
++&reg_dldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
+ &reg_drivevbus {
+ 	regulator-name = "usb0-vbus";
+ 	status = "okay";
+@@ -205,5 +215,6 @@
+ 	usb0_id_det-gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
+ 	usb0_vbus_power-supply = <&usb_power_supply>;
+ 	usb0_vbus-supply = <&reg_drivevbus>;
++	usb1_vbus-supply = <&reg_dldo1>;
+ 	status = "okay";
+ };
 -- 
 2.7.4
