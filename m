@@ -1,55 +1,30 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 15 Jun 2016 13:21:49 +0200
-Subject: [PATCH v2] ARM: sunxi/dt: make the CHIP inherit from
- allwinner,sun5i-a13
-In-Reply-To: <1465989619-2337-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1465989619-2337-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160615132149.2587c195@bbrezillon>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Wed, 15 Jun 2016 14:24:52 +0300
+Subject: [PATCH 09/10] i2c: designware-platdrv: Simplify code by using
+ dev_get_drvdata()
+In-Reply-To: <1465916848-8207-10-git-send-email-ulf.hansson@linaro.org>
+References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
+ <1465916848-8207-10-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <b6846926-5577-126a-9ed2-bcbfd3a17a59@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jun 2016 13:20:19 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-
-> The sun4i-timer driver registers its sched_clock only if the machine is
-> compatible with "allwinner,sun5i-a13", "allwinner,sun5i-a10s" or
-> "allwinner,sun4i-a10".
-> Add the missing "allwinner,sun5i-a13" string to the machine compatible.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes: 5a33893dd079 ("ARM: sunxi/dt: make the CHIP inherit from allwinner,sun5i-a13")
-
-Should be
-
-Fixes: 465a225fb2af ("ARM: sun5i: Add C.H.I.P DTS")
-
-Maxime, do you want me to resend it?
-
-> Cc: <stable@vger.kernel.org>
+On 06/14/2016 06:07 PM, Ulf Hansson wrote:
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
-> Changes since v1:
-> - added the Fixes and Cc stable tags
-> ---
->  arch/arm/boot/dts/sun5i-r8-chip.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-> index a8d8b4582397..f694482bdeb6 100644
-> --- a/arch/arm/boot/dts/sun5i-r8-chip.dts
-> +++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-> @@ -52,7 +52,7 @@
->  
->  / {
->  	model = "NextThing C.H.I.P.";
-> -	compatible = "nextthing,chip", "allwinner,sun5i-r8";
-> +	compatible = "nextthing,chip", "allwinner,sun5i-r8", "allwinner,sun5i-a13";
->  
->  	aliases {
->  		i2c0 = &i2c0;
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>  drivers/i2c/busses/i2c-designware-platdrv.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+> index 2b91af3..b2c6037 100644
+> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -310,8 +310,7 @@ static void dw_i2c_plat_complete(struct device *dev)
+>  #ifdef CONFIG_PM
+>  static int dw_i2c_plat_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
+> +	struct dw_i2c_dev *i_dev = dev_get_drvdata(dev);
+>
+Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
