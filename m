@@ -1,51 +1,67 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 14 Jun 2016 18:29:47 -0700
-Subject: [PATCH v2 0/6] i.MX L2-cache code cleanups and performance tweaks
-Message-ID: <1465954193-5894-1-git-send-email-andrew.smirnov@gmail.com>
+Date: Tue, 14 Jun 2016 18:29:48 -0700
+Subject: [PATCH v2 1/6] i.MX: system.c: Convert goto to if statement
+In-Reply-To: <1465954193-5894-1-git-send-email-andrew.smirnov@gmail.com>
+References: <1465954193-5894-1-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <1465954193-5894-2-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Using goto here doesn't bring any advantages and only makes the code
+flow less clear. No functional changes.
 
-Here's the second version of i.MX L2-cache related patches. Here's
-what's new from v1:
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ arch/arm/mach-imx/system.c | 36 +++++++++++++++++-------------------
+ 1 file changed, 17 insertions(+), 19 deletions(-)
 
- - Already existing, spelling error free (shame on me for not noticing
-   that in previous version!), symbolic constant defintions are used
-
- - Increased scope of magic number replacement (additional instance in
-   cache-l2x0.c)
-
- - Added patch to remove unnecessary bit clearing in cache-l2x0.c
-
- - Added patch to implement a cleanup as suggested by Arnd
-
- - Added patch to tweak prefetch settings to improve performance. I
-   was originally going to post this patch separately. But now that
-   there was a need for v2, I decided to include it in the series.
-
-All the feedback is much appreciated.
-
-Thank you,
-Andrey Smirnov
-
-
-Andrey Smirnov (6):
-  i.MX: system.c: Convert goto to if statement
-  i.MX: system.c: Remove redundant errata 752271 code
-  i.MX: system.c: Replace magic numbers
-  ARM: cache-l2x0: Do not clear bit 23 in prefetch control register
-  i.MX: system.c: Tweak prefetch settings for performance
-  i.MX: Do not explicitly call l2x0_of_init()
-
- arch/arm/include/asm/hardware/cache-l2x0.h |  1 +
- arch/arm/mach-imx/imx35-dt.c               | 10 +++----
- arch/arm/mach-imx/mach-imx6q.c             |  2 ++
- arch/arm/mach-imx/mach-imx6sl.c            |  2 ++
- arch/arm/mach-imx/mach-imx6sx.c            |  2 ++
- arch/arm/mach-imx/system.c                 | 42 ++++++++++++------------------
- arch/arm/mm/cache-l2x0.c                   |  5 ++--
- 7 files changed, 28 insertions(+), 36 deletions(-)
-
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index 105d1ce..d9f8b0e 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -106,26 +106,24 @@ void __init imx_init_l2cache(void)
+ 		goto out;
+ 	}
+ 
+-	if (readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)
+-		goto skip_if_enabled;
+-
+-	/* Configure the L2 PREFETCH and POWER registers */
+-	val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
+-	val |= 0x70800000;
+-	/*
+-	 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
+-	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
+-	 * But according to ARM PL310 errata: 752271
+-	 * ID: 752271: Double linefill feature can cause data corruption
+-	 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
+-	 * Workaround: The only workaround to this erratum is to disable the
+-	 * double linefill feature. This is the default behavior.
+-	 */
+-	if (cpu_is_imx6q())
+-		val &= ~(1 << 30 | 1 << 23);
+-	writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
++	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
++		/* Configure the L2 PREFETCH and POWER registers */
++		val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
++		val |= 0x70800000;
++		/*
++		 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
++		 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
++		 * But according to ARM PL310 errata: 752271
++		 * ID: 752271: Double linefill feature can cause data corruption
++		 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
++		 * Workaround: The only workaround to this erratum is to disable the
++		 * double linefill feature. This is the default behavior.
++		 */
++		if (cpu_is_imx6q())
++			val &= ~(1 << 30 | 1 << 23);
++		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
++	}
+ 
+-skip_if_enabled:
+ 	iounmap(l2x0_base);
+ 	of_node_put(np);
+ 
 -- 
 2.5.5
