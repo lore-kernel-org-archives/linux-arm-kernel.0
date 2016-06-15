@@ -1,115 +1,152 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 15 Jun 2016 23:13:15 +0200
-Subject: [PATCH 6/7] crypto: marvell: Adding load balancing between engines
-In-Reply-To: <1466018134-10779-7-git-send-email-romain.perier@free-electrons.com>
-References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
- <1466018134-10779-7-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <20160615231315.5e254706@bbrezillon>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Jun 2016 22:13:59 +0100
+Subject: kexec failures with DEBUG_RODATA
+In-Reply-To: <CAGXu5j+5j32HO0rQtF2hcqMUBaa8cyxgLT4JvaZ6LL2WPj_zjw@mail.gmail.com>
+References: <20160614175920.GD1041@n2100.armlinux.org.uk>
+ <CAGXu5j+5j32HO0rQtF2hcqMUBaa8cyxgLT4JvaZ6LL2WPj_zjw@mail.gmail.com>
+Message-ID: <20160615211359.GJ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jun 2016 21:15:33 +0200
-Romain Perier <romain.perier@free-electrons.com> wrote:
+On Tue, Jun 14, 2016 at 11:05:23AM -0700, Kees Cook wrote:
+> I'm much less familiar with the ARM decompression stub, but is there a
+> boot image header (like x86 has)? If not, perhaps we can invent one,
+> and it can carry all the details needed for a bootloader to do the
+> right things.
 
-> This commits adds support for fine grained load balancing on
-> multi-engine IPs. The engine is pre-selected based on its current load
-> and on the weight of the crypto request that is about to be processed.
-> The global crypto queue is also moved to each engine. These changes are
+With a bit of tinkering around, I now have this:
 
-					to the mv_cesa_engine object.
+00000000 <.data>:
+       0:       e1a00000        nop                     ; (mov r0, r0)
+       4:       e1a00000        nop                     ; (mov r0, r0)
+       8:       e1a00000        nop                     ; (mov r0, r0)
+       c:       e1a00000        nop                     ; (mov r0, r0)
+      10:       e1a00000        nop                     ; (mov r0, r0)
+      14:       e1a00000        nop                     ; (mov r0, r0)
+      18:       e1a00000        nop                     ; (mov r0, r0)
+      1c:       e1a00000        nop                     ; (mov r0, r0)
+      20:       ea00000f        b       0x64
 
-> useful for preparing the code to support TDMA chaining between crypto
-> requests, because each tdma chain will be handled per engine.
+Then follows the existing "header" which we've had there for years:
 
-These changes are required to allow chaining crypto requests at the DMA
-level.
+      24:       016f2818	; LE magic number
+      28:       00000000	; LE zImage start address (always zero now)
+      2c:       00431fe0	; LE zImage _edata
+      30:       04030201	; endian flag
 
-> By using
-> a crypto queue per engine, we make sure that we keep the state of the
-> tdma chain synchronized with the crypto queue. We also reduce contention
-> on 'cesa_dev->lock' and improve parallelism.
-> 
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-> ---
->  drivers/crypto/marvell/cesa.c   | 30 +++++++++----------
->  drivers/crypto/marvell/cesa.h   | 26 +++++++++++++++--
->  drivers/crypto/marvell/cipher.c | 59 ++++++++++++++++++-------------------
->  drivers/crypto/marvell/hash.c   | 65 +++++++++++++++++++----------------------
->  4 files changed, 97 insertions(+), 83 deletions(-)
-> 
+And now comes the new header:
 
-[...]
+      34:       016f2818	; LE magic number
+      38:       00000001	; LE version number (v1)
+      3c:       01287000	; LE total space required for decompressor
+      40:       00e54000	; LE uncompressed image size
 
-> diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
-> index fbaae2f..02aa38f 100644
-> --- a/drivers/crypto/marvell/cipher.c
-> +++ b/drivers/crypto/marvell/cipher.c
-> @@ -89,6 +89,9 @@ static void mv_cesa_ablkcipher_std_step(struct ablkcipher_request *req)
->  	size_t  len = min_t(size_t, req->nbytes - sreq->offset,
->  			    CESA_SA_SRAM_PAYLOAD_SIZE);
->  
-> +	mv_cesa_adjust_op(engine, &sreq->op);
-> +	memcpy_toio(engine->sram, &sreq->op, sizeof(sreq->op));
-> +
->  	len = sg_pcopy_to_buffer(req->src, creq->src_nents,
->  				 engine->sram + CESA_SA_DATA_SRAM_OFFSET,
->  				 len, sreq->offset);
-> @@ -167,12 +170,9 @@ mv_cesa_ablkcipher_std_prepare(struct ablkcipher_request *req)
->  {
->  	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(req);
->  	struct mv_cesa_ablkcipher_std_req *sreq = &creq->req.std;
-> -	struct mv_cesa_engine *engine = sreq->base.engine;
->  
->  	sreq->size = 0;
->  	sreq->offset = 0;
-> -	mv_cesa_adjust_op(engine, &sreq->op);
-> -	memcpy_toio(engine->sram, &sreq->op, sizeof(sreq->op));
+Up to 64 bytes available here for future expansion, currently filled
+with zeros.
+        ...
 
-Are these changes really related to this load balancing support?
-AFAICT, it's something that could have been done earlier, and is not
-dependent on the changes your introducing here, but maybe I'm missing
-something.
+Remainder of the zImage code:
+      64:       e10f9000        mrs     r9, CPSR
 
->  }
+I'm rather on the fence whether we need to give the uncompressed image
+size - the important thing is the size of memory that's required for
+the decompressor to run, which is sizeof(uncompressed kernel) rounded
+up to 256 bytes, and the relocated decompressor image size.
 
-[...]
+The "total space required for decompressor" is slightly cheating at the
+figure - I'm including the uncompressed image rounded up and the entire
+compressed image in that size, so it's a safe over-estimate.
 
->  static int mv_cesa_ecb_aes_encrypt(struct ablkcipher_request *req)
-> diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-> index f7f84cc..5946a69 100644
-> --- a/drivers/crypto/marvell/hash.c
-> +++ b/drivers/crypto/marvell/hash.c
-> @@ -162,6 +162,15 @@ static void mv_cesa_ahash_std_step(struct ahash_request *req)
->  	unsigned int new_cache_ptr = 0;
->  	u32 frag_mode;
->  	size_t  len;
-> +	unsigned int digsize;
-> +	int i;
-> +
-> +	mv_cesa_adjust_op(engine, &creq->op_tmpl);
-> +	memcpy_toio(engine->sram, &creq->op_tmpl, sizeof(creq->op_tmpl));
-> +
-> +	digsize = crypto_ahash_digestsize(crypto_ahash_reqtfm(req));
-> +	for (i = 0; i < digsize / 4; i++)
-> +		writel_relaxed(creq->state[i], engine->regs + CESA_IVDIG(i));
->  
->  	if (creq->cache_ptr)
->  		memcpy_toio(engine->sram + CESA_SA_DATA_SRAM_OFFSET,
-> @@ -265,11 +274,8 @@ static void mv_cesa_ahash_std_prepare(struct ahash_request *req)
->  {
->  	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
->  	struct mv_cesa_ahash_std_req *sreq = &creq->req.std;
-> -	struct mv_cesa_engine *engine = sreq->base.engine;
->  
->  	sreq->offset = 0;
-> -	mv_cesa_adjust_op(engine, &creq->op_tmpl);
-> -	memcpy_toio(engine->sram, &creq->op_tmpl, sizeof(creq->op_tmpl));
+I'm not sure there's a need to provide the uncompressed image size, the
+boot environment shouldn't have a reason to know that, so I'm tempted to
+omit it.
 
-Same as above: it doesn't seem related to the load balancing stuff.
+We could dispense with the endian conversions, and push the responsibility
+for interpreting that onto the reader of this data: we have the endian
+flag in the existing header block, so the boot environment can work out
+the endianness of the image and apply fixups as appropriate.
 
->  }
+Why generate this in the linker script?  We need the size of the zImage
+here, which is only known to the linker.
+
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index d50430c40045..1d5467e05250 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -119,6 +119,10 @@ asflags-y := -DZIMAGE
+ KBSS_SZ = $(shell $(CROSS_COMPILE)size $(obj)/../../../../vmlinux | \
+ 		awk 'END{print $$3}')
+ LDFLAGS_vmlinux = --defsym _kernel_bss_size=$(KBSS_SZ)
++
++KERNEL_IMAGE_SIZE = $(shell stat -c '%s' $(obj)/../Image)
++LDFLAGS_vmlinux += --defsym _kernel_image_size=$(KERNEL_IMAGE_SIZE)
++
+ # Supply ZRELADDR to the decompressor via a linker symbol.
+ ifneq ($(CONFIG_AUTO_ZRELADDR),y)
+ LDFLAGS_vmlinux += --defsym zreladdr=$(ZRELADDR)
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index e2e0dcb42ca2..395c60dcc4f7 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -131,11 +131,7 @@ start:
+  THUMB(		badr	r12, 1f		)
+  THUMB(		bx	r12		)
+ 
+-		.word	_magic_sig	@ Magic numbers to help the loader
+-		.word	_magic_start	@ absolute load/run zImage address
+-		.word	_magic_end	@ zImage end address
+-		.word	0x04030201	@ endianness flag
+-
++		.section ".start2", #alloc, #execinstr
+  THUMB(		.thumb			)
+ 1:		__EFI_HEADER
+ 
+diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+index 81c493156ce8..77267724ec8a 100644
+--- a/arch/arm/boot/compressed/vmlinux.lds.S
++++ b/arch/arm/boot/compressed/vmlinux.lds.S
+@@ -37,6 +37,19 @@ SECTIONS
+   .text : {
+     _start = .;
+     *(.start)
++    _header = .;
++    LONG(ZIMAGE_MAGIC(0x016f2818));	/* Magic numbers to help the loader */
++    LONG(ZIMAGE_MAGIC(_start));		/* absolute load/run zImage address */
++    LONG(ZIMAGE_MAGIC(_edata));		/* zImage end address */
++    LONG(0x04030201);			/* Endianness flag */
++    LONG(ZIMAGE_MAGIC(0x016f2818));	/* Further header indicator */
++    LONG(ZIMAGE_MAGIC(1));		/* Version 1 */
++    LONG(ZIMAGE_MAGIC(((_kernel_image_size + 255) & ~ 255) + \
++			_edata - _text + _end_stack - __bss_start));
++    LONG(ZIMAGE_MAGIC(_kernel_image_size));
++    /* Reserve 64 bytes for the header block */
++    . = _header + 64;
++    *(.start2)
+     *(.text)
+     *(.text.*)
+     *(.fixup)
+@@ -72,10 +85,6 @@ SECTIONS
+   .pad			: { BYTE(0); . = ALIGN(8); }
+   _edata = .;
+ 
+-  _magic_sig = ZIMAGE_MAGIC(0x016f2818);
+-  _magic_start = ZIMAGE_MAGIC(_start);
+-  _magic_end = ZIMAGE_MAGIC(_edata);
+-
+   . = BSS_START;
+   __bss_start = .;
+   .bss			: { *(.bss) }
+@@ -83,6 +92,7 @@ SECTIONS
+ 
+   . = ALIGN(8);		/* the stack must be 64-bit aligned */
+   .stack		: { *(.stack) }
++  _end_stack = .;
+ 
+   .stab 0		: { *(.stab) }
+   .stabstr 0		: { *(.stabstr) }
+
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
