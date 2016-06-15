@@ -1,30 +1,95 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Wed, 15 Jun 2016 14:24:52 +0300
-Subject: [PATCH 09/10] i2c: designware-platdrv: Simplify code by using
- dev_get_drvdata()
-In-Reply-To: <1465916848-8207-10-git-send-email-ulf.hansson@linaro.org>
-References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
- <1465916848-8207-10-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <b6846926-5577-126a-9ed2-bcbfd3a17a59@linux.intel.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 15 Jun 2016 12:21:27 +0100
+Subject: [PATCH v2 4/7] iommu/of: Handle iommu-map property for PCI
+In-Reply-To: <20160614144559.GK19407@arm.com>
+References: <cover.1464966939.git.robin.murphy@arm.com>
+ <69952eda726c370ed6e5739bdd2e32cdc4466bfb.1464966939.git.robin.murphy@arm.com>
+ <20160614144559.GK19407@arm.com>
+Message-ID: <57613A37.6080600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2016 06:07 PM, Ulf Hansson wrote:
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/i2c/busses/i2c-designware-platdrv.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
+On 14/06/16 15:45, Will Deacon wrote:
+> On Fri, Jun 03, 2016 at 06:15:39PM +0100, Robin Murphy wrote:
+>> Now that we have a way to pick up the RID translation and target IOMMU,
+>> hook up of_iommu_configure() to bring PCI devices into the of_xlate
+>> mechanism and allow them IOMMU-backed DMA ops without the need for
+>> driver-specific handling.
+>>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Frank Rowand <frowand.list@gmail.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> v2: Skip disabled IOMMUs.
+>>
+>>   drivers/iommu/of_iommu.c | 44 +++++++++++++++++++++++++++++++++++++-------
+>>   1 file changed, 37 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>> index 662f9a600f4f..5716131199b3 100644
+>> --- a/drivers/iommu/of_iommu.c
+>> +++ b/drivers/iommu/of_iommu.c
+>> @@ -22,6 +22,7 @@
+>>   #include <linux/limits.h>
+>>   #include <linux/of.h>
+>>   #include <linux/of_iommu.h>
+>> +#include <linux/of_pci.h>
+>>   #include <linux/slab.h>
+>>
+>>   static const struct of_device_id __iommu_of_table_sentinel
+>> @@ -134,20 +135,49 @@ const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+>>   	return ops;
+>>   }
+>>
+>> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>> +{
+>> +	struct of_phandle_args *iommu_spec = data;
+>> +
+>> +	iommu_spec->args[0] = alias;
+>> +	return iommu_spec->np == pdev->bus->dev.of_node;
+>> +}
+>> +
+>>   const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>   					   struct device_node *master_np)
+>>   {
+>>   	struct of_phandle_args iommu_spec;
+>> -	struct device_node *np;
+>> +	struct device_node *np = NULL;
+>>   	const struct iommu_ops *ops = NULL;
+>>   	int idx;
+>>
+>> -	/*
+>> -	 * We can't do much for PCI devices without knowing how
+>> -	 * device IDs are wired up from the PCI bus to the IOMMU.
+>> -	 */
+>> -	if (dev_is_pci(dev))
+>> -		return NULL;
+>> +	if (dev_is_pci(dev)) {
+>> +		/*
+>> +		 * Start by tracing the RID alias down the PCI topology as
+>> +		 * far as the host bridge whose OF node we have...
+>> +		 */
+>> +		iommu_spec.np = master_np;
+>> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
+>> +				       &iommu_spec);
+>> +		/*
+>> +		 * ...then find out what that becomes once it escapes the PCI
+>> +		 * bus into the system beyond, and which IOMMU it ends up at.
+>> +		 */
+>> +		if (of_pci_map_rid(master_np, "iommu-map", iommu_spec.args[0],
+>> +				   &np, iommu_spec.args) ||
+>> +		    !of_device_is_available(np))
+>> +			return NULL;
 >
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index 2b91af3..b2c6037 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -310,8 +310,7 @@ static void dw_i2c_plat_complete(struct device *dev)
->  #ifdef CONFIG_PM
->  static int dw_i2c_plat_suspend(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
-> +	struct dw_i2c_dev *i_dev = dev_get_drvdata(dev);
+> Hmm, do we need to of_node_put(np) in the case that it's not available?
+
+Ah yes, now I see; I moved the put into the loop iteration for the 
+non-PCI case so that a "continue" does the job, but I've not handled the 
+equivalent here.
+
+Robin.
+
 >
-Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+> Will
+>
