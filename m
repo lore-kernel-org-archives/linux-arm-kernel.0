@@ -1,353 +1,117 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 15 Jun 2016 12:13:26 +0200
-Subject: [PATCH v3 1/2] clocksource: Add Oxford Semiconductor RPS Dual Timer
-In-Reply-To: <1465985607-21231-1-git-send-email-narmstrong@baylibre.com>
-References: <1465985607-21231-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1465985607-21231-2-git-send-email-narmstrong@baylibre.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 15 Jun 2016 12:14:40 +0200
+Subject: [PATCH 00/10] ARM: V7M: Support caches
+In-Reply-To: <575EDF55.2020304@st.com>
+References: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
+ <575EDAB9.2070809@st.com> <575EDD28.40500@arm.com> <575EDF55.2020304@st.com>
+Message-ID: <57612A90.5030808@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clocksource and clockevent driver from dual RPS timer.
-The HW provides a dual one-shot or periodic 24bit timers,
-the drivers set the first one as tick event source and the
-second as a continuous scheduler clock source.
-The timer can use 1, 16 or 256 as pre-dividers, thus the
-clocksource uses 16 by default.
+Hi Vladimir,
 
-CC: Ma Haijun <mahaijuns@gmail.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/clocksource/Kconfig           |   7 +
- drivers/clocksource/Makefile          |   1 +
- drivers/clocksource/timer-oxnas-rps.c | 290 ++++++++++++++++++++++++++++++++++
- 3 files changed, 298 insertions(+)
- create mode 100644 drivers/clocksource/timer-oxnas-rps.c
+On 06/13/2016 06:29 PM, Alexandre Torgue wrote:
+> Hi Vladimir,
+>
+> On 06/13/2016 06:19 PM, Vladimir Murzin wrote:
+>> Hi Alex,
+>>
+>> On 13/06/16 17:09, Alexandre Torgue wrote:
+>>> Hi Vladimir,
+>>>
+>>> On 06/13/2016 05:02 PM, Vladimir Murzin wrote:
+>>>> Hi,
+>>>>
+>>>> This patch set allows M-class cpus benefit of optional cache support.
+>>>> It originaly was written by Jonny, I've been keeping it localy mainly
+>>>> rebasing over Linux versions.
+>>>>
+>>>> The main idea behind patches is to reuse existing cache handling code
+>>>> from v7A/R. In case v7M cache operations are provided via memory
+>>>> mapped interface rather than co-processor instructions, so extra
+>>>> macros have been introduced to factor out cache handling logic and
+>>>> low-level operations.
+>>>>
+>>>> Along with the v7M cache support the first user (Cortex-M7) is
+>>>> introduced.
+>>>>
+>>>> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
+>>>> one showed significant boot speed-up.
+>>>>
+>>>> Based on 4.7-rc3.
+>>>>
+>>>> Thanks!
+>>>> Vladimir
+>>>>
+>>>
+>>> Thanks for the series.
+>>> Did you change something in those patches compare to patches you sent in
+>>> the RFC ?
+>>
+>> Only 04, 05, 06 have been changed (each has it's own changelog included).
+>>
+>> I did try to hammer patches because of your report of instability with
+>> caches on, but all run fine... so nothing has been changed in regard of
+>> your case.
+>>
+> Ok. Thanks for this input. From now, I will use this series to perform
+> my tests. I will continue to debug my instabilities this week.
+> I will let you know.
+>
+I fixed my instabilities and it was linked to my SDRAM timings :(.
+I don't see behavior issues with your series (You can add my Tested-by: 
+Alexandre TORGUE <alexandre.torgue@st.com>).
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 47352d2..7e937e1 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -293,6 +293,13 @@ config VF_PIT_TIMER
- 	help
- 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
- 
-+config OXNAS_RPS_TIMER
-+	bool "Oxford Semiconductor OXNAS RPS Timers driver" if COMPILE_TEST
-+	select CLKSRC_OF
-+	select CLKSRC_MMIO
-+	help
-+	  This enables support for the Oxford Semiconductor OXNAS RPS timers.
-+
- config SYS_SUPPORTS_SH_CMT
-         bool
- 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 473974f..bc66981 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -48,6 +48,7 @@ obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
- obj-$(CONFIG_CLKSRC_PISTACHIO)	+= time-pistachio.o
- obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
- obj-$(CONFIG_CLKSRC_NPS)	+= timer-nps.o
-+obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
- 
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
-diff --git a/drivers/clocksource/timer-oxnas-rps.c b/drivers/clocksource/timer-oxnas-rps.c
-new file mode 100644
-index 0000000..c002e99
---- /dev/null
-+++ b/drivers/clocksource/timer-oxnas-rps.c
-@@ -0,0 +1,290 @@
-+/*
-+ * drivers/clocksource/timer-oxnas-rps.c
-+ *
-+ * Copyright (C) 2009 Oxford Semiconductor Ltd
-+ * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
-+
-+#include <linux/init.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/slab.h>
-+#include <linux/interrupt.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/clockchips.h>
-+#include <linux/sched_clock.h>
-+
-+/* TIMER1 used as tick
-+ * TIMER2 used as clocksource
-+ */
-+
-+/* Registers definitions */
-+
-+#define TIMER_LOAD_REG		0x0
-+#define TIMER_CURR_REG		0x4
-+#define TIMER_CTRL_REG		0x8
-+#define TIMER_CLRINT_REG	0xC
-+
-+#define TIMER_BITS		24
-+
-+#define TIMER_MAX_VAL		(BIT(TIMER_BITS) - 1)
-+
-+#define TIMER_PERIODIC		BIT(6)
-+#define TIMER_ENABLE		BIT(7)
-+
-+#define TIMER_DIV1		(0)
-+#define TIMER_DIV16		(1 << 2)
-+#define TIMER_DIV256		(2 << 2)
-+
-+#define TIMER1_REG_OFFSET	0
-+#define TIMER2_REG_OFFSET	0x20
-+
-+/* Clockevent & Clocksource data */
-+
-+struct oxnas_rps_timer {
-+	struct clock_event_device clkevent;
-+	void __iomem *clksrc_base;
-+	void __iomem *clkevt_base;
-+	unsigned long timer_period;
-+	unsigned int timer_prescaler;
-+	struct clk *clk;
-+	int irq;
-+};
-+
-+static irqreturn_t oxnas_rps_timer_irq(int irq, void *dev_id)
-+{
-+	struct oxnas_rps_timer *rps = dev_id;
-+
-+	writel_relaxed(0, rps->clkevt_base + TIMER_CLRINT_REG);
-+
-+	rps->clkevent.event_handler(&rps->clkevent);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static void oxnas_rps_timer_config(struct oxnas_rps_timer *rps,
-+				   unsigned long period,
-+				   unsigned int periodic)
-+{
-+	uint32_t cfg = rps->timer_prescaler;
-+
-+	if (period)
-+		cfg |= TIMER_ENABLE;
-+
-+	if (periodic)
-+		cfg |= TIMER_PERIODIC;
-+
-+	writel_relaxed(period, rps->clkevt_base + TIMER_LOAD_REG);
-+	writel_relaxed(cfg, rps->clkevt_base + TIMER_CTRL_REG);
-+}
-+
-+static int oxnas_rps_timer_shutdown(struct clock_event_device *evt)
-+{
-+	struct oxnas_rps_timer *rps =
-+		container_of(evt, struct oxnas_rps_timer, clkevent);
-+
-+	oxnas_rps_timer_config(rps, 0, 0);
-+
-+	return 0;
-+}
-+
-+static int oxnas_rps_timer_set_periodic(struct clock_event_device *evt)
-+{
-+	struct oxnas_rps_timer *rps =
-+		container_of(evt, struct oxnas_rps_timer, clkevent);
-+
-+	oxnas_rps_timer_config(rps, rps->timer_period, 1);
-+
-+	return 0;
-+}
-+
-+static int oxnas_rps_timer_set_oneshot(struct clock_event_device *evt)
-+{
-+	struct oxnas_rps_timer *rps =
-+		container_of(evt, struct oxnas_rps_timer, clkevent);
-+
-+	oxnas_rps_timer_config(rps, rps->timer_period, 0);
-+
-+	return 0;
-+}
-+
-+static int oxnas_rps_timer_next_event(unsigned long delta,
-+				struct clock_event_device *evt)
-+{
-+	struct oxnas_rps_timer *rps =
-+		container_of(evt, struct oxnas_rps_timer, clkevent);
-+
-+	oxnas_rps_timer_config(rps, delta, 0);
-+
-+	return 0;
-+}
-+
-+static int __init oxnas_rps_clockevent_init(struct oxnas_rps_timer *rps)
-+{
-+	ulong clk_rate = clk_get_rate(rps->clk);
-+	ulong timer_rate;
-+
-+	/* Start with prescaler 1 */
-+	rps->timer_prescaler = TIMER_DIV1;
-+	rps->timer_period = DIV_ROUND_UP(clk_rate, HZ);
-+	timer_rate = clk_rate;
-+
-+	if (rps->timer_period > TIMER_MAX_VAL) {
-+		rps->timer_prescaler = TIMER_DIV16;
-+		timer_rate = clk_rate / 16;
-+		rps->timer_period = DIV_ROUND_UP(timer_rate, HZ);
-+	}
-+	if (rps->timer_period > TIMER_MAX_VAL) {
-+		rps->timer_prescaler = TIMER_DIV256;
-+		timer_rate = clk_rate / 256;
-+		rps->timer_period = DIV_ROUND_UP(timer_rate, HZ);
-+	}
-+
-+	rps->clkevent.name = "oxnas-rps";
-+	rps->clkevent.features = CLOCK_EVT_FEAT_PERIODIC |
-+				 CLOCK_EVT_FEAT_ONESHOT |
-+				 CLOCK_EVT_FEAT_DYNIRQ;
-+	rps->clkevent.tick_resume = oxnas_rps_timer_shutdown;
-+	rps->clkevent.set_state_shutdown = oxnas_rps_timer_shutdown;
-+	rps->clkevent.set_state_periodic = oxnas_rps_timer_set_periodic;
-+	rps->clkevent.set_state_oneshot = oxnas_rps_timer_set_oneshot;
-+	rps->clkevent.set_next_event = oxnas_rps_timer_next_event;
-+	rps->clkevent.rating = 200;
-+	rps->clkevent.cpumask = cpu_possible_mask;
-+	rps->clkevent.irq = rps->irq;
-+	clockevents_config_and_register(&rps->clkevent,
-+					timer_rate,
-+					1,
-+					TIMER_MAX_VAL);
-+
-+	pr_info("Registered clock event rate %luHz prescaler %x period %lu\n",
-+			clk_rate,
-+			rps->timer_prescaler,
-+			rps->timer_period);
-+
-+	return 0;
-+}
-+
-+/* Clocksource */
-+
-+static void __iomem *timer_sched_base;
-+
-+static u64 notrace oxnas_rps_read_sched_clock(void)
-+{
-+	return ~readl_relaxed(timer_sched_base);
-+}
-+
-+static int __init oxnas_rps_clocksource_init(struct oxnas_rps_timer *rps)
-+{
-+	ulong clk_rate = clk_get_rate(rps->clk);
-+	int ret;
-+
-+	/* use prescale 16 */
-+	clk_rate = clk_rate / 16;
-+
-+	writel_relaxed(TIMER_MAX_VAL, rps->clksrc_base + TIMER_LOAD_REG);
-+	writel_relaxed(TIMER_PERIODIC | TIMER_ENABLE | TIMER_DIV16,
-+			rps->clksrc_base + TIMER_CTRL_REG);
-+
-+	timer_sched_base = rps->clksrc_base + TIMER_CURR_REG;
-+	sched_clock_register(oxnas_rps_read_sched_clock,
-+			     TIMER_BITS, clk_rate);
-+	ret = clocksource_mmio_init(timer_sched_base,
-+				    "oxnas_rps_clocksource_timer",
-+				    clk_rate, 250, TIMER_BITS,
-+				    clocksource_mmio_readl_down);
-+	if (WARN_ON(ret)) {
-+		pr_err("can't register clocksource\n");
-+		return ret;
-+	}
-+
-+	pr_info("Registered clocksource rate %luHz\n", clk_rate);
-+
-+	return 0;
-+}
-+
-+static void __init oxnas_rps_timer_init(struct device_node *np)
-+{
-+	struct oxnas_rps_timer *rps;
-+	void __iomem *base;
-+	int ret;
-+
-+	rps = kzalloc(sizeof(*rps), GFP_KERNEL);
-+	if (!rps) {
-+		pr_err("Failed to allocate rps structure\n");
-+		return;
-+	}
-+
-+	rps->clk = of_clk_get(np, 0);
-+	if (WARN_ON(IS_ERR(rps->clk)))
-+		goto err_alloc;
-+
-+	if (WARN_ON(clk_prepare_enable(rps->clk)))
-+		goto err_clk;
-+
-+	base = of_iomap(np, 0);
-+	if (WARN_ON(!base))
-+		goto err_clk_prepare;
-+
-+	rps->irq = irq_of_parse_and_map(np, 0);
-+	if (WARN_ON(rps->irq < 0))
-+		goto err_iomap;
-+
-+	rps->clkevt_base = base + TIMER1_REG_OFFSET;
-+	rps->clksrc_base = base + TIMER2_REG_OFFSET;
-+
-+	/* Disable timers */
-+	writel_relaxed(0, rps->clkevt_base + TIMER_CTRL_REG);
-+	writel_relaxed(0, rps->clksrc_base + TIMER_CTRL_REG);
-+	writel_relaxed(0, rps->clkevt_base + TIMER_LOAD_REG);
-+	writel_relaxed(0, rps->clksrc_base + TIMER_LOAD_REG);
-+	writel_relaxed(0, rps->clkevt_base + TIMER_CLRINT_REG);
-+	writel_relaxed(0, rps->clksrc_base + TIMER_CLRINT_REG);
-+
-+	ret = request_irq(rps->irq, oxnas_rps_timer_irq,
-+			  IRQF_TIMER | IRQF_IRQPOLL,
-+			  "rps-timer", rps);
-+	if (WARN_ON(ret))
-+		goto err_iomap;
-+
-+	ret = oxnas_rps_clocksource_init(rps);
-+	if (ret)
-+		goto err_irqreq;
-+
-+	ret = oxnas_rps_clockevent_init(rps);
-+	if (ret)
-+		goto err_irqreq;
-+
-+	return;
-+
-+err_irqreq:
-+	free_irq(rps->irq, rps);
-+err_iomap:
-+	iounmap(base);
-+err_clk_prepare:
-+	clk_disable_unprepare(rps->clk);
-+err_clk:
-+	clk_put(rps->clk);
-+err_alloc:
-+	kfree(rps);
-+}
-+
-+CLOCKSOURCE_OF_DECLARE(ox810se_rps,
-+		       "oxsemi,ox810se-rps-timer", oxnas_rps_timer_init);
--- 
-1.9.1
+I have two others questions for you:
+
+1- Maybe I didn't search deeper in the code but when you enable Dcache 
+and Icache, what is the state of cache ? I mean we need to invalidate 
+caches before enable it. It is done by kernel (with your patches) or it 
+has to be done by a bootloader ?
+
+2- I observe an issue (IMO not linked to your series) when I switch 
+off/switch on my board. During the first boot after an hard reset I get 
+a bus error  (BFSR part in CFSR register indicates an "A bus fault on an 
+instruction prefetch has occurred."). After SRST reset through JTAG, the 
+kernel boot correctly.
+Do you already seen this kind of issue ?
+
+I add the backtrace and registers info.
+
+__invalid_entry () at arch/arm/kernel/entry-v7m.S:33
+33	1:	b	1b
+(gdb) bt
+#0  __invalid_entry () at arch/arm/kernel/entry-v7m.S:33
+#1  0xc000bc2a in unwind_exec_insn (ctrl=<optimized out>) at 
+arch/arm/kernel/unwind.c:321
+#2  unwind_frame (frame=0xc023d0c0 <reset_devices>) at 
+arch/arm/kernel/unwind.c:449
+#3  0xc000caec in ?? () at arch/arm/mm/cache-v7.S:69
+Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+(gdb) f 3
+#3  0xc000caec in ?? () at arch/arm/mm/cache-v7.S:69
+69	       ret     lr
+(gdb) info reg
+r0             0x1	1
+r1             0x0	0
+r2             0x1	1
+r3             0x0	0
+r4             0x0	0
+r5             0x100	256
+r6             0x0	0
+r7             0xa	10
+r8             0x40096	262294
+r9             0x0	0
+r10            0xc012b004	-1072517116
+r11            0x0	0
+r12            0x29	41
+sp             0xc0230018	0xc0230018 <cpu_cache+4>
+lr             0xc000caed	-1073689875
+pc             0xc000caec	0xc000caec <v7_flush_icache_all>
+xPSR           0x81000005	-2130706427
+
+
+Thanks for your time.
+
+Alex
