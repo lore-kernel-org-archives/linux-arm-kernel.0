@@ -1,200 +1,205 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Wed, 15 Jun 2016 21:15:30 +0200
-Subject: [PATCH 3/7] crypto: marvell: Copy IV vectors by DMA transfers for
- acipher requests
+Date: Wed, 15 Jun 2016 21:15:32 +0200
+Subject: [PATCH 5/7] crypto: marvell: Adding a complete operation for async
+ requests
 In-Reply-To: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
 References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <1466018134-10779-4-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <1466018134-10779-6-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding a TDMA descriptor at the end of the request for copying the
-output IV vector via a DMA transfer. This is required for processing
-cipher requests asynchroniously in chained mode, otherwise the content
-of the IV vector will be overwriten for each new finished request.
+So far, the 'process' operation was used to check if the current request
+was correctly handled by the engine, if it was the case it copied
+information from the SRAM to the main memory. Now, we split this
+operation. We keep the 'process' operation, which still checks if the
+request was correctly handled by the engine or not, then we add a new
+operation for completion. The 'complete' method copies the content of
+the SRAM to memory. This will soon become useful if we want to call
+the process and the complete operations from different locations
+depending on the type of the request (different cleanup logic).
 
 Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 ---
- drivers/crypto/marvell/cesa.c   |  4 ++++
- drivers/crypto/marvell/cesa.h   |  5 +++++
- drivers/crypto/marvell/cipher.c | 40 +++++++++++++++++++++++++++-------------
- drivers/crypto/marvell/tdma.c   | 29 +++++++++++++++++++++++++++++
- 4 files changed, 65 insertions(+), 13 deletions(-)
+ drivers/crypto/marvell/cesa.c   |  1 +
+ drivers/crypto/marvell/cesa.h   |  3 +++
+ drivers/crypto/marvell/cipher.c | 47 ++++++++++++++++++++++++-----------------
+ drivers/crypto/marvell/hash.c   | 22 ++++++++++---------
+ 4 files changed, 44 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-index fb403e1..93700cd 100644
+index fe04d1b..af96426 100644
 --- a/drivers/crypto/marvell/cesa.c
 +++ b/drivers/crypto/marvell/cesa.c
-@@ -312,6 +312,10 @@ static int mv_cesa_dev_dma_init(struct mv_cesa_dev *cesa)
- 	if (!dma->padding_pool)
- 		return -ENOMEM;
- 
-+	dma->iv_pool = dmam_pool_create("cesa_iv", dev, 16, 1, 0);
-+	if (!dma->iv_pool)
-+		return -ENOMEM;
-+
- 	cesa->dma = dma;
- 
- 	return 0;
+@@ -98,6 +98,7 @@ static irqreturn_t mv_cesa_int(int irq, void *priv)
+ 				engine->req = NULL;
+ 				mv_cesa_dequeue_req_unlocked(engine);
+ 				spin_unlock_bh(&engine->lock);
++				ctx->ops->complete(req);
+ 				ctx->ops->cleanup(req);
+ 				local_bh_disable();
+ 				req->complete(req, res);
 diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
-index 74071e4..74b84bd 100644
+index 158ff82..32de08b 100644
 --- a/drivers/crypto/marvell/cesa.h
 +++ b/drivers/crypto/marvell/cesa.h
-@@ -275,6 +275,7 @@ struct mv_cesa_op_ctx {
- #define CESA_TDMA_DUMMY				0
- #define CESA_TDMA_DATA				1
- #define CESA_TDMA_OP				2
-+#define CESA_TDMA_IV				4
- 
- /**
-  * struct mv_cesa_tdma_desc - TDMA descriptor
-@@ -390,6 +391,7 @@ struct mv_cesa_dev_dma {
- 	struct dma_pool *op_pool;
- 	struct dma_pool *cache_pool;
- 	struct dma_pool *padding_pool;
-+	struct dma_pool *iv_pool;
+@@ -456,6 +456,8 @@ struct mv_cesa_engine {
+  *		code)
+  * @step:	launch the crypto operation on the next chunk
+  * @cleanup:	cleanup the crypto request (release associated data)
++ * @complete:	complete the request, i.e copy result from sram or contexts
++ * 		when it is needed.
+  */
+ struct mv_cesa_req_ops {
+ 	void (*prepare)(struct crypto_async_request *req,
+@@ -463,6 +465,7 @@ struct mv_cesa_req_ops {
+ 	int (*process)(struct crypto_async_request *req, u32 status);
+ 	void (*step)(struct crypto_async_request *req);
+ 	void (*cleanup)(struct crypto_async_request *req);
++	void (*complete)(struct crypto_async_request *req);
  };
  
  /**
-@@ -790,6 +792,9 @@ mv_cesa_tdma_desc_iter_init(struct mv_cesa_tdma_chain *chain)
- 	memset(chain, 0, sizeof(*chain));
- }
- 
-+int mv_cesa_dma_add_iv_op(struct mv_cesa_tdma_chain *chain, dma_addr_t src,
-+			  u32 size, u32 flags, gfp_t gfp_flags);
-+
- struct mv_cesa_op_ctx *mv_cesa_dma_add_op(struct mv_cesa_tdma_chain *chain,
- 					const struct mv_cesa_op_ctx *op_templ,
- 					bool skip_ctx,
 diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
-index 8d0fabb..f42620e 100644
+index 15d2c5a..fbaae2f 100644
 --- a/drivers/crypto/marvell/cipher.c
 +++ b/drivers/crypto/marvell/cipher.c
-@@ -118,6 +118,7 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
+@@ -118,7 +118,6 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
  	struct mv_cesa_ablkcipher_std_req *sreq = &creq->req.std;
  	struct mv_cesa_engine *engine = sreq->base.engine;
  	size_t len;
-+	unsigned int ivsize;
+-	unsigned int ivsize;
  
  	len = sg_pcopy_from_buffer(req->dst, creq->dst_nents,
  				   engine->sram + CESA_SA_DATA_SRAM_OFFSET,
-@@ -127,6 +128,10 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
+@@ -128,10 +127,6 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
  	if (sreq->offset < req->nbytes)
  		return -EINPROGRESS;
  
-+	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(req));
-+	memcpy_fromio(req->info,
-+		      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET, ivsize);
-+
+-	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(req));
+-	memcpy_fromio(req->info,
+-		      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET, ivsize);
+-
  	return 0;
  }
  
-@@ -135,23 +140,23 @@ static int mv_cesa_ablkcipher_process(struct crypto_async_request *req,
+@@ -141,21 +136,9 @@ static int mv_cesa_ablkcipher_process(struct crypto_async_request *req,
+ 	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
+ 	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(ablkreq);
+ 
+-	if (mv_cesa_req_get_type(&creq->req.base) == CESA_DMA_REQ) {
+-		int ret;
+-		struct mv_cesa_req *basereq;
+-		unsigned int ivsize;
+-
+-		ret = mv_cesa_dma_process(&creq->req.base, status);
+-		if (ret)
+-			return ret;
++	if (mv_cesa_req_get_type(&creq->req.base) == CESA_DMA_REQ)
++		return mv_cesa_dma_process(&creq->req.base, status);
+ 
+-		basereq = &creq->req.base;
+-		ivsize = crypto_ablkcipher_ivsize(
+-					     crypto_ablkcipher_reqtfm(ablkreq));
+-		memcpy_fromio(ablkreq->info, basereq->chain.last->data, ivsize);
+-		return ret;
+-	}
+ 	return mv_cesa_ablkcipher_std_process(ablkreq, status);
+ }
+ 
+@@ -197,6 +180,7 @@ static inline void mv_cesa_ablkcipher_prepare(struct crypto_async_request *req,
  {
  	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
  	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(ablkreq);
--	struct mv_cesa_ablkcipher_std_req *sreq = &creq->req.std;
--	struct mv_cesa_engine *engine = sreq->base.engine;
--	int ret;
- 
--	if (creq->req.base.type == CESA_DMA_REQ)
-+	if (creq->req.base.type == CESA_DMA_REQ) {
-+		int ret;
-+		struct mv_cesa_tdma_req *dreq;
-+		unsigned int ivsize;
 +
- 		ret = mv_cesa_dma_process(&creq->req.dma, status);
--	else
--		ret = mv_cesa_ablkcipher_std_process(ablkreq, status);
-+		if (ret)
-+			return ret;
+ 	creq->req.base.engine = engine;
  
--	if (ret)
-+		dreq = &creq->req.dma;
+ 	if (mv_cesa_req_get_type(&creq->req.base) == CESA_DMA_REQ)
+@@ -213,11 +197,36 @@ mv_cesa_ablkcipher_req_cleanup(struct crypto_async_request *req)
+ 	mv_cesa_ablkcipher_cleanup(ablkreq);
+ }
+ 
++static void
++mv_cesa_ablkcipher_complete(struct crypto_async_request *req)
++{
++	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
++	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(ablkreq);
++	struct mv_cesa_engine *engine = creq->req.base.engine;
++	unsigned int ivsize;
++
++	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq));
++
++	if (mv_cesa_req_get_type(&creq->req.base) == CESA_DMA_REQ) {
++		struct mv_cesa_req *basereq;
++
++		basereq = &creq->req.base;
 +		ivsize = crypto_ablkcipher_ivsize(
 +					     crypto_ablkcipher_reqtfm(ablkreq));
-+		memcpy_fromio(ablkreq->info, dreq->chain.last->data, ivsize);
- 		return ret;
--
--	memcpy_fromio(ablkreq->info,
--		      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET,
--		      crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq)));
--
--	return 0;
++		memcpy_fromio(ablkreq->info, basereq->chain.last->data, ivsize);
++	} else {
++		memcpy_fromio(ablkreq->info,
++			      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET,
++			      ivsize);
 +	}
-+	return mv_cesa_ablkcipher_std_process(ablkreq, status);
- }
- 
- static void mv_cesa_ablkcipher_step(struct crypto_async_request *req)
-@@ -302,6 +307,7 @@ static int mv_cesa_ablkcipher_dma_req_init(struct ablkcipher_request *req,
- 	struct mv_cesa_tdma_chain chain;
- 	bool skip_ctx = false;
- 	int ret;
-+	unsigned int ivsize;
- 
- 	dreq->base.type = CESA_DMA_REQ;
- 	dreq->chain.first = NULL;
-@@ -360,6 +366,14 @@ static int mv_cesa_ablkcipher_dma_req_init(struct ablkcipher_request *req,
- 
- 	} while (mv_cesa_ablkcipher_req_iter_next_op(&iter));
- 
-+	/* Add output data for IV */
-+	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(req));
-+	ret = mv_cesa_dma_add_iv_op(&chain, CESA_SA_CRYPT_IV_SRAM_OFFSET,
-+				    ivsize, CESA_TDMA_SRC_IN_SRAM, flags);
-+
-+	if (ret)
-+		goto err_free_tdma;
-+
- 	dreq->chain = chain;
- 
- 	return 0;
-diff --git a/drivers/crypto/marvell/tdma.c b/drivers/crypto/marvell/tdma.c
-index d493714..88c87be 100644
---- a/drivers/crypto/marvell/tdma.c
-+++ b/drivers/crypto/marvell/tdma.c
-@@ -68,6 +68,9 @@ void mv_cesa_dma_cleanup(struct mv_cesa_tdma_req *dreq)
- 		if (tdma->flags & CESA_TDMA_OP)
- 			dma_pool_free(cesa_dev->dma->op_pool, tdma->op,
- 				      le32_to_cpu(tdma->src));
-+		else if (tdma->flags & CESA_TDMA_IV)
-+			dma_pool_free(cesa_dev->dma->iv_pool, tdma->data,
-+				      le32_to_cpu(tdma->dst));
- 
- 		tdma = tdma->next;
- 		dma_pool_free(cesa_dev->dma->tdma_desc_pool, old_tdma,
-@@ -120,6 +123,32 @@ mv_cesa_dma_add_desc(struct mv_cesa_tdma_chain *chain, gfp_t flags)
- 	return new_tdma;
- }
- 
-+int mv_cesa_dma_add_iv_op(struct mv_cesa_tdma_chain *chain, dma_addr_t src,
-+			  u32 size, u32 flags, gfp_t gfp_flags)
-+{
-+
-+	struct mv_cesa_tdma_desc *tdma;
-+	u8 *cache;
-+	dma_addr_t dma_handle;
-+
-+	tdma = mv_cesa_dma_add_desc(chain, gfp_flags);
-+	if (IS_ERR(tdma))
-+		return PTR_ERR(tdma);
-+
-+	cache = dma_pool_alloc(cesa_dev->dma->iv_pool, flags, &dma_handle);
-+	if (!cache)
-+		return -ENOMEM;
-+
-+	tdma->byte_cnt = cpu_to_le32(size | BIT(31));
-+	tdma->src = src;
-+	tdma->dst = cpu_to_le32(dma_handle);
-+	tdma->data = cache;
-+
-+	flags &= (CESA_TDMA_DST_IN_SRAM | CESA_TDMA_SRC_IN_SRAM);
-+	tdma->flags = flags | CESA_TDMA_DATA | CESA_TDMA_IV;
-+	return 0;
 +}
 +
- struct mv_cesa_op_ctx *mv_cesa_dma_add_op(struct mv_cesa_tdma_chain *chain,
- 					const struct mv_cesa_op_ctx *op_templ,
- 					bool skip_ctx,
+ static const struct mv_cesa_req_ops mv_cesa_ablkcipher_req_ops = {
+ 	.step = mv_cesa_ablkcipher_step,
+ 	.process = mv_cesa_ablkcipher_process,
+ 	.prepare = mv_cesa_ablkcipher_prepare,
+ 	.cleanup = mv_cesa_ablkcipher_req_cleanup,
++	.complete = mv_cesa_ablkcipher_complete,
+ };
+ 
+ static int mv_cesa_ablkcipher_cra_init(struct crypto_tfm *tfm)
+diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
+index cc7c5b0..f7f84cc 100644
+--- a/drivers/crypto/marvell/hash.c
++++ b/drivers/crypto/marvell/hash.c
+@@ -287,17 +287,20 @@ static int mv_cesa_ahash_process(struct crypto_async_request *req, u32 status)
+ {
+ 	struct ahash_request *ahashreq = ahash_request_cast(req);
+ 	struct mv_cesa_ahash_req *creq = ahash_request_ctx(ahashreq);
+-	struct mv_cesa_engine *engine = creq->req.base.engine;
+-	unsigned int digsize;
+-	int ret, i;
+ 
+ 	if (mv_cesa_req_get_type(&creq->req.base) == CESA_DMA_REQ)
+-		ret = mv_cesa_dma_process(&creq->req.base, status);
+-	else
+-		ret = mv_cesa_ahash_std_process(ahashreq, status);
++		return mv_cesa_dma_process(&creq->req.base, status);
+ 
+-	if (ret == -EINPROGRESS)
+-		return ret;
++	return mv_cesa_ahash_std_process(ahashreq, status);
++}
++
++static void mv_cesa_ahash_complete(struct crypto_async_request *req)
++{
++	struct ahash_request *ahashreq = ahash_request_cast(req);
++	struct mv_cesa_ahash_req *creq = ahash_request_ctx(ahashreq);
++	struct mv_cesa_engine *engine = creq->req.base.engine;
++	unsigned int digsize;
++	int i;
+ 
+ 	digsize = crypto_ahash_digestsize(crypto_ahash_reqtfm(ahashreq));
+ 	for (i = 0; i < digsize / 4; i++)
+@@ -326,8 +329,6 @@ static int mv_cesa_ahash_process(struct crypto_async_request *req, u32 status)
+ 				result[i] = cpu_to_be32(creq->state[i]);
+ 		}
+ 	}
+-
+-	return ret;
+ }
+ 
+ static void mv_cesa_ahash_prepare(struct crypto_async_request *req,
+@@ -366,6 +367,7 @@ static const struct mv_cesa_req_ops mv_cesa_ahash_req_ops = {
+ 	.process = mv_cesa_ahash_process,
+ 	.prepare = mv_cesa_ahash_prepare,
+ 	.cleanup = mv_cesa_ahash_req_cleanup,
++	.complete = mv_cesa_ahash_complete,
+ };
+ 
+ static int mv_cesa_ahash_init(struct ahash_request *req,
 -- 
 2.7.4
