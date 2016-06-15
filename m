@@ -1,32 +1,30 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 15 Jun 2016 11:30:30 +0900
-Subject: [PATCH v5 05/12] ARM: shmobile: r8a7792: add SMP support
-In-Reply-To: <8892035.WlgqvXCvaR@wasted.cogentembedded.com>
-References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
- <8892035.WlgqvXCvaR@wasted.cogentembedded.com>
-Message-ID: <20160615023030.GC19186@verge.net.au>
+From: xuejiancheng@hisilicon.com (Jiancheng Xue)
+Date: Wed, 15 Jun 2016 10:19:04 +0800
+Subject: [PATCH v11 0/3] ARM: hisi: Add initial support for Hi3519 SOC
+Message-ID: <1465957147-32314-1-git-send-email-xuejiancheng@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+These three patches are abstracted from the patchset titled
+"[RESEND PATCH v10 0/6] ARM: hisi: Add initial support including
+clock driver for Hi3519 soc."(https://lkml.org/lkml/2016/3/31/175).
+The clock driver part was merged in v4.7-rc1. This patch set
+is mainly used to enable Hi3519 basic soc and add dts files.
 
-On Mon, Jun 13, 2016 at 12:04:43AM +0300, Sergei Shtylyov wrote:
-> Add R8A7792 SMP support using the shared APMU code. This SoC has 2 ARM
-> Cortex-A15  CPU cores.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Jiancheng Xue (3):
+  ARM: hisi: add compatible string for Hi3519 soc
+  ARM: dt-bindings: add device tree bindings for Hi3519 sysctrl
+  ARM: dts: add dts files for Hi3519
 
-I apologise for not raising this earlier.
+ .../bindings/arm/hisilicon/hi3519-sysctrl.txt      |  14 ++
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/hi3519-demb.dts                  |  42 +++++
+ arch/arm/boot/dts/hi3519.dtsi                      | 187 +++++++++++++++++++++
+ arch/arm/mach-hisi/hisilicon.c                     |  23 +--
+ 5 files changed, 249 insertions(+), 19 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
+ create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
+ create mode 100644 arch/arm/boot/dts/hi3519.dtsi
 
-I would like you to remove SMP support from this series as I do
-not wish to merge any more per-SoC C SMP code for Gen-2 SoCs.
-
-Rather, I believe the future is to use generic code to support
-the APMU hardware and then describe it in DT. Something like this:
-
-http://www.spinics.net/lists/linux-sh/msg45229.html
-
-As that code is not merged my suggestion is that we merge UP r8a7792 for
-now. This is the same approach that has been taken for the r8a7793.
-
-Thanks!
+-- 
+1.9.1
