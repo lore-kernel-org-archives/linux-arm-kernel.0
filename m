@@ -1,39 +1,34 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 15 Jun 2016 16:02:33 +0200
-Subject: [PATCH v5 00/18] Cleanup for populate default bus
-In-Reply-To: <CAL_JsqKesg9=Gc83ULcpGwWU_C3BO3o02fUcur=RO__BgLPpug@mail.gmail.com>
-References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
- <CAL_JsqKesg9=Gc83ULcpGwWU_C3BO3o02fUcur=RO__BgLPpug@mail.gmail.com>
-Message-ID: <20160615140232.GN26566@8bytes.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 15 Jun 2016 15:04:47 +0100
+Subject: [PATCH v5 1/8] Documentation: arm: define DT cpu
+ capacity-dmips-mhz bindings
+In-Reply-To: <1465985877-18271-2-git-send-email-juri.lelli@arm.com>
+References: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
+ <1465985877-18271-2-git-send-email-juri.lelli@arm.com>
+Message-ID: <20160615140447.GB2282@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 10:42:50AM -0500, Rob Herring wrote:
-> +Joerg, Will
-> 
-> On Wed, Jun 1, 2016 at 1:52 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
-> > This cleanup patchset cantains two parts.
-> >
-> > Firstly, introduce a new way to populate the default bus, then, we can
-> > drop unnecessary calls from the arch code, and do the same thing for
-> > of_iommu_init() in [1].
-> >
-> > Secondly, use helper of_platform_default_populate() in linux/of_platform
-> > when possible, instead of calling of_platform_populate() with default
-> > match table, After that, it is possible for driver code build as a module,
-> > and no need to export of_default_bus_match_table anymore.
-> >
-> > This patchset is based on Linux 4.7-rc1, and only test in arm/arm64 qemu
-> > with defconfig.
-> 
-> This series doesn't apply for me as it appears you had "of: iommu:
-> make of_iommu_init() postcore_initcall_sync" in your tree. Either we
-> need to phase these out over 2 releases or someone needs to take them
-> all (or we leave the minor conflicts for Linus).
+On Wed, Jun 15, 2016 at 11:17:50AM +0100, Juri Lelli wrote:
 
-Feel free to take the mentioned patch through your tree with my
+> +CPU capacities are obtained by running a suitable benchmark. This binding makes
+> +no aspersions on the validity or suitability of any particular benchmark, the
+> +final capacity should, however, be:
 
-Acked-by: Joerg Roedel <jroedel@suse.de>
+Makes no guarantees.  An aspersion is an insult!
 
+> +CPU capacities are obtained by running the Dhrystone benchmark on each CPU at
+> +max frequency. The obtained DMIPS score is then divided by the frequency (in
+> +MHz) at which the benchmark has been run, so that DMIPS/MHz are obtained.
+> +Such values are then normalized w.r.t. the highest score obtained in the
+> +system.
 
-	Joerg
+Perhaps worth mentioning that caches and so on should be enabled (based
+on previous experience with people doing bringup)?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/384c7778/attachment.sig>
