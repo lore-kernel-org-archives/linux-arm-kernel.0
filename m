@@ -1,67 +1,45 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 14 Jun 2016 18:29:48 -0700
-Subject: [PATCH v2 1/6] i.MX: system.c: Convert goto to if statement
+Date: Tue, 14 Jun 2016 18:29:51 -0700
+Subject: [PATCH v2 4/6] ARM: cache-l2x0: Do not clear bit 23 in prefetch
+ control register
 In-Reply-To: <1465954193-5894-1-git-send-email-andrew.smirnov@gmail.com>
 References: <1465954193-5894-1-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <1465954193-5894-2-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <1465954193-5894-5-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using goto here doesn't bring any advantages and only makes the code
-flow less clear. No functional changes.
+As per L2C-310 TRM[1]:
+
+"... You can control this feature using bits 30,27, and 23 of the
+Prefetch Control Register. Bit 23 and27 are only used if you set bit 30
+HIGH..."
+
+which means there is no need to clear bit 23 if bit 30 is being cleared.
+
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246e/CJAJACBJ.html
 
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/mach-imx/system.c | 36 +++++++++++++++++-------------------
- 1 file changed, 17 insertions(+), 19 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 105d1ce..d9f8b0e 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -106,26 +106,24 @@ void __init imx_init_l2cache(void)
- 		goto out;
- 	}
- 
--	if (readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)
--		goto skip_if_enabled;
--
--	/* Configure the L2 PREFETCH and POWER registers */
--	val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
--	val |= 0x70800000;
--	/*
--	 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
--	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
--	 * But according to ARM PL310 errata: 752271
--	 * ID: 752271: Double linefill feature can cause data corruption
--	 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
--	 * Workaround: The only workaround to this erratum is to disable the
--	 * double linefill feature. This is the default behavior.
--	 */
--	if (cpu_is_imx6q())
--		val &= ~(1 << 30 | 1 << 23);
--	writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
-+	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-+		/* Configure the L2 PREFETCH and POWER registers */
-+		val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
-+		val |= 0x70800000;
-+		/*
-+		 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
-+		 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
-+		 * But according to ARM PL310 errata: 752271
-+		 * ID: 752271: Double linefill feature can cause data corruption
-+		 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
-+		 * Workaround: The only workaround to this erratum is to disable the
-+		 * double linefill feature. This is the default behavior.
-+		 */
-+		if (cpu_is_imx6q())
-+			val &= ~(1 << 30 | 1 << 23);
-+		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
-+	}
- 
--skip_if_enabled:
- 	iounmap(l2x0_base);
- 	of_node_put(np);
- 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 30e2012..12c1ba7 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -715,11 +715,8 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	if (revision >= L310_CACHE_ID_RTL_R3P0 &&
+ 	    revision < L310_CACHE_ID_RTL_R3P2) {
+ 		u32 val = l2x0_saved_regs.prefetch_ctrl;
+-		/* I don't think bit23 is required here... but iMX6 does so */
+-		if (val & (L310_PREFETCH_CTRL_DBL_LINEFILL |
+-			   L310_PREFETCH_CTRL_DBL_LINEFILL_INCR)) {
+-			val &= ~(L310_PREFETCH_CTRL_DBL_LINEFILL |
+-				 L310_PREFETCH_CTRL_DBL_LINEFILL_INCR);
++		if (val & L310_PREFETCH_CTRL_DBL_LINEFILL) {
++			val &= ~L310_PREFETCH_CTRL_DBL_LINEFILL;
+ 			l2x0_saved_regs.prefetch_ctrl = val;
+ 			errata[n++] = "752271";
+ 		}
 -- 
 2.5.5
