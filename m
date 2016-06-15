@@ -1,30 +1,64 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Jun 2016 21:11:16 +0100
-Subject: [PATCH v5 2/3] drm/arm: Add support for Mali Display Processors
-In-Reply-To: <20160615172104.GI9711@e106497-lin.cambridge.arm.com>
-References: <1466002295-24813-1-git-send-email-Liviu.Dudau@arm.com>
- <1466002295-24813-3-git-send-email-Liviu.Dudau@arm.com>
- <20160615152309.GI1338@phenom.ffwll.local>
- <20160615161758.GF9711@e106497-lin.cambridge.arm.com>
- <CAKMK7uENW3cU8LccHcqffX3cbzax2-5mzY0101yLfR7vtD4CoA@mail.gmail.com>
- <20160615172104.GI9711@e106497-lin.cambridge.arm.com>
-Message-ID: <20160615201116.GI1041@n2100.armlinux.org.uk>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 15 Jun 2016 13:24:47 -0700
+Subject: [PATCH v2] ARM: mm: fix location of _etext
+Message-ID: <20160615202447.GA5005@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 06:21:04PM +0100, Liviu Dudau wrote:
-> Could be the tda998x_drv fault, but I'm getting this splat:
-> 
-> [    1.347687] kobject_add_internal failed for card0-HDMI-A-1 (error: -2 parent: card0)
+The _etext position is defined to be the end of the kernel text code,
+and should not include any part of the data segments. This interferes
+with things that might check memory ranges and expect executable code
+up to _etext. Just to be conservative, leave the kernel resource as
+it was, using __init_begin instead of _etext as the end mark.
 
-Right, so this is -ENOENT - I expect that it's complaining that the
-parent does not exist before a child is attempted to be added.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+v2:
+- Switched resource tracker to using __init_begin, rmk
+---
+ arch/arm/kernel/setup.c       | 2 +-
+ arch/arm/kernel/vmlinux.lds.S | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Hopefully, this isn't with -rc kernels, but is with -next.  I think
-some folk need to Cc me with patches to tda998x, or at least talk to
-me about what's changed in DRM so that tda998x can get fixed.
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 7b5350060612..dd84f03dc2d4 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -844,7 +844,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+ 	struct resource *res;
+ 
+ 	kernel_code.start   = virt_to_phys(_text);
+-	kernel_code.end     = virt_to_phys(_etext - 1);
++	kernel_code.end     = virt_to_phys(__init_begin - 1);
+ 	kernel_data.start   = virt_to_phys(_sdata);
+ 	kernel_data.end     = virt_to_phys(_end - 1);
+ 
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index e2c6da096cef..99420fc1f066 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -125,6 +125,8 @@ SECTIONS
+ #ifdef CONFIG_DEBUG_ALIGN_RODATA
+ 	. = ALIGN(1<<SECTION_SHIFT);
+ #endif
++	_etext = .;			/* End of text section */
++
+ 	RO_DATA(PAGE_SIZE)
+ 
+ 	. = ALIGN(4);
+@@ -155,8 +157,6 @@ SECTIONS
+ 
+ 	NOTES
+ 
+-	_etext = .;			/* End of text and rodata section */
+-
+ #ifdef CONFIG_DEBUG_RODATA
+ 	. = ALIGN(1<<SECTION_SHIFT);
+ #else
+-- 
+2.7.4
+
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Kees Cook
+Chrome OS & Brillo Security
