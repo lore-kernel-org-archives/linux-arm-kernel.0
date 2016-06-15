@@ -1,114 +1,114 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 15 Jun 2016 22:20:04 +0530
-Subject: [PATCH v10 2/2] dmaengine: Add Xilinx zynqmp dma engine driver
- support
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A5B6441@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1464765839-29018-1-git-send-email-appanad@xilinx.com>
- <1464765839-29018-2-git-send-email-appanad@xilinx.com>
- <20160607070841.GJ16910@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A5B4FA9@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160613055012.GC16910@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A5B6441@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20160615165004.GC16910@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jun 2016 17:58:17 +0100
+Subject: [PATCH] arm64: s/CONFIG_AS_LSE/AS_HAVE_LSE/
+Message-ID: <1466009897-2597-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 08:18:09AM +0000, Appana Durga Kedareswara Rao wrote:
-> > > Yes it is HW capability. It can be either in simple mode or SG mode
-> > > Earlier In the driver this configuration is read from the device-tree
-> > > But as per lars and your suggestion moved it as runtime config parameters.
-> > 
-> > If sg mode is available why would anyone _not_ want it?
-> > 
-> > I do not think there is point to have this
-> 
-> You mean always keep the device in SG mode and provide an option 
-> For simple dma mode if user want to use simple DMA mode??
+Michal objected to the use of the CONFIG_ prefix on definitions which
+are not sourced from .config or Kconfig files, as these cannot be found
+in the usual places.
 
-Yes, why would anyone want to use single if sg is available?
+Following the example of CC_HAVE_ASM_GOTO, replace CONFIG_AS_LSE with
+AS_HAVE_LSE. This avoids confusion w.r.t. the CONFIG_* namespace, and
+more accurately describes what the symbol represents.
 
-> 
-> There are few features that are available in the simple DMA mode won't
-> Available in SG mode like write only DMA , read only DMA mode etc...
+There should be no functional change as a result of this patch.
 
-Can you explain what these are, how they are used by clients?
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Michal Marek <mmarek@suse.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Makefile             | 2 +-
+ arch/arm64/include/asm/atomic.h | 2 +-
+ arch/arm64/include/asm/lse.h    | 6 +++---
+ arch/arm64/kernel/cpufeature.c  | 4 ++--
+ 4 files changed, 7 insertions(+), 7 deletions(-)
 
-> > > > > +	chan->config.ratectrl = cfg->ratectrl;
-> > > > > +	chan->config.src_issue = cfg->src_issue;
-> > > > > +	chan->config.src_burst_len = cfg->src_burst_len;
-> > > > > +	chan->config.dst_burst_len = cfg->dst_burst_len;
-> > > >
-> > > > can you describe these parameters?
-> > > ratectl:
-> > > Rate control can be independently enabled per channel. When rate
-> > > control is enabled, the DMA channel uses the rate control count to schedule
-> > successive data read transactions.
-> > 
-> > And how is this used by client?
-> 
-> When rate control is enabled, ZDMA channel uses the rate control count
-> To schedule successive data read transactions I mean kind of flow control to schedule 
-> Transactions at fixed intervals instead of pumping the transfers without delay or whenever bus is available
-> 
-> Rate control count register definition (11:0):
-> Scheduling interval for SRC AXI transaction, only used if rate control is enabled 
+This follows from Michal's reply [1] to a KCOV patch that followed the idiom
+set by CONFIG_AS_LSE.
 
-Okay, why would anyone want transactions at fixed interval. We are talking
-about DMA, so please give me transfers without delay or whenever bus is
-available!
+Mark.
 
+[1] http://lkml.kernel.org/r/5761806F.5020103 at suse.com
 
-> > > src_issue:
-> > > Tells outstanding transaction on SRC.
-> > 
-> > This should be read only then, right?
-> 
-> It is a Read/Write register
-> http://www.xilinx.com/html_docs/registers/ug1087/ug1087-zynq-ultrascale-registers.html 
-> By default it is configured for Max transactions.
-> If user want to limit it they can limit it using this config option.
-
-And why would they want that?
-
-> > > Burst_len:
-> > > Configures the burst length of the src and dst transfers...
-> > 
-> > Hmmm, but you are on memcpy, so that should be programmed for throughput?
-> 
-> Yes...
-
-So max burst lengths then, why would anyone configure lesser?
-
-> > > > How would a client know how to configure them?
-> > >
-> > > With the default values of the config parameters driver will work.
-> > 
-> > But how will client know what is default!
-> 
-> Default values means IP default state after reset.
-> If user not aware of the above parameters also still the driver will work for basic functionality.
-> Do you want me to implement one more API get_config so that 
-> Whenever user will call the get_config he will know the default values
-> Of the config parameters?
-
-Looking at above I think we do not warrant programming them. Assume defaults
-in your driver for performance. Like max burst lengths, Max transactions,
-without delay scheduling.
-
-If you disagree, which is fine, please provide the cases where a client
-would need to program these to different values.
-
-> > > If user has specific requirement to change these parameters they can
-> > > pass It to the driver using set_config API and all these parameters
-> > > are Documented in the include/linux/dma/xilinx_dma.h file...
-> > 
-> > Can you give me an example where user would like to do that
-> 
-> I am using customized dma test client.
-> There I am calling this set_config API before triggering memcpy/SG operations.
-
-Well that is precisely a  problem. The generic applications wont know "your"
-custom API and will not configure that!
-
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 354d754..44a8e04 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -22,7 +22,7 @@ endif
+ KBUILD_DEFCONFIG := defconfig
+ 
+ # Check for binutils support for specific extensions
+-lseinstr := $(call as-instr,.arch_extension lse,-DCONFIG_AS_LSE=1)
++lseinstr := $(call as-instr,.arch_extension lse,-DAS_HAVE_LSE=1)
+ 
+ ifeq ($(CONFIG_ARM64_LSE_ATOMICS), y)
+   ifeq ($(lseinstr),)
+diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
+index f3a3586..48b7c71 100644
+--- a/arch/arm64/include/asm/atomic.h
++++ b/arch/arm64/include/asm/atomic.h
+@@ -30,7 +30,7 @@
+ 
+ #define __ARM64_IN_ATOMIC_IMPL
+ 
+-#if defined(CONFIG_ARM64_LSE_ATOMICS) && defined(CONFIG_AS_LSE)
++#if defined(CONFIG_ARM64_LSE_ATOMICS) && defined(AS_HAVE_LSE)
+ #include <asm/atomic_lse.h>
+ #else
+ #include <asm/atomic_ll_sc.h>
+diff --git a/arch/arm64/include/asm/lse.h b/arch/arm64/include/asm/lse.h
+index 23acc00..2affb5e 100644
+--- a/arch/arm64/include/asm/lse.h
++++ b/arch/arm64/include/asm/lse.h
+@@ -1,7 +1,7 @@
+ #ifndef __ASM_LSE_H
+ #define __ASM_LSE_H
+ 
+-#if defined(CONFIG_AS_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
++#if defined(AS_HAVE_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
+ 
+ #include <linux/stringify.h>
+ #include <asm/alternative.h>
+@@ -33,7 +33,7 @@ __asm__(".arch_extension	lse");
+ 	ALTERNATIVE(llsc, lse, ARM64_HAS_LSE_ATOMICS)
+ 
+ #endif	/* __ASSEMBLER__ */
+-#else	/* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++#else	/* AS_HAVE_LSE && CONFIG_ARM64_LSE_ATOMICS */
+ 
+ #ifdef __ASSEMBLER__
+ 
+@@ -50,5 +50,5 @@ __asm__(".arch_extension	lse");
+ #define ARM64_LSE_ATOMIC_INSN(llsc, lse)	llsc
+ 
+ #endif	/* __ASSEMBLER__ */
+-#endif	/* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++#endif	/* AS_HAVE_LSE && CONFIG_ARM64_LSE_ATOMICS */
+ #endif	/* __ASM_LSE_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 811773d..45f875d 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -750,7 +750,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.enable = cpu_enable_pan,
+ 	},
+ #endif /* CONFIG_ARM64_PAN */
+-#if defined(CONFIG_AS_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
++#if defined(AS_HAVE_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
+ 	{
+ 		.desc = "LSE atomic instructions",
+ 		.capability = ARM64_HAS_LSE_ATOMICS,
+@@ -761,7 +761,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.sign = FTR_UNSIGNED,
+ 		.min_field_value = 2,
+ 	},
+-#endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++#endif /* AS_HAVE_LSE && CONFIG_ARM64_LSE_ATOMICS */
+ 	{
+ 		.desc = "Software prefetching using PRFM",
+ 		.capability = ARM64_HAS_NO_HW_PREFETCH,
 -- 
-~Vinod
+1.9.1
