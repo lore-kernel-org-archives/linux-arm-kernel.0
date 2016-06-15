@@ -1,74 +1,172 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 15 Jun 2016 09:24:04 +0200
-Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
- of aliases
-In-Reply-To: <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
-References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
-Message-ID: <20160615072404.GB26768@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 15 Jun 2016 09:29:55 +0200
+Subject: [PATCH 02/48] ARM: at91: Document new TCB bindings
+In-Reply-To: <20160614214737.GA10294@rob-hp-laptop>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1465596231-21766-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160614214737.GA10294@rob-hp-laptop>
+Message-ID: <20160615092955.261f14fb@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+On Tue, 14 Jun 2016 16:47:37 -0500
+Rob Herring <robh@kernel.org> wrote:
 
-On Wed, Jun 15, 2016 at 08:56:58AM +0200, Linus Walleij wrote:
-> On Tue, Jun 14, 2016 at 12:03 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
+> On Sat, Jun 11, 2016 at 12:03:05AM +0200, Alexandre Belloni wrote:
+> > The current binding for the TCB is not flexible enough for some use cases
+> > and prevents proper utilization of all the channels.
+> > 
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > Cc: linux-pwm at vger.kernel.org
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
+> >  .../devicetree/bindings/arm/atmel-at91.txt         | 32 -----------
+> >  .../devicetree/bindings/mfd/atmel-tcb.txt          | 62 ++++++++++++++++++++++
+> >  .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
+> >  3 files changed, 69 insertions(+), 37 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt  
 > 
-> > Traditionally the n-th gpio device probed by the omap gpio driver got
-> > the gpio number range [n*32 .. n*32+31].
-> > When order of the devices probed by the driver changes (which can happen
-> > already now when some devices have a pinctrl and so the first probe
-> > attempt returns -ENODEV) the numbering changes.
-> >
-> > To ensure a deterministical numbering use of_alias_get_id to determine
-> > the number base for a given device. If no respective alias exists fall
-> > back to the traditional numbering.
+> [...]
 > 
-> I'm not too happy about this approach.
+> > diff --git a/Documentation/devicetree/bindings/mfd/atmel-tcb.txt b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
+> > new file mode 100644
+> > index 000000000000..48196752c78f
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
+> > @@ -0,0 +1,62 @@
+> > +* Device tree bindings for Atmel Timer Counter Blocks
+> > +- compatible: Should be "atmel,<chip>-tcb", "simple-mfd", "syscon".
+> > +  <chip> can be "at91rm9200" or "at91sam9x5"
+> > +- reg: Should contain registers location and length
+> > +- #address-cells: has to be 1
+> > +- #size-cells: has to be 0
+> > +- interrupts: Should contain all interrupts for the TC block
+> > +  Note that you can specify several interrupt cells if the TC
+> > +  block has one interrupt per channel.
+> > +- clock-names: tuple listing input clock names.
+> > +	Required elements: "t0_clk", "slow_clk"
+> > +	Optional elements: "t1_clk", "t2_clk"
+> > +- clocks: phandles to input clocks.  
 > 
-> The patch doesn't mention what practical problems it is trying to
-> solve.
+> What is the order of clocks?
+> 
+> > +
+> > +The TCB can expose multiple subdevices:
+> > + * a clocksource and clockevent device  
+> 
+> No. These compatible names are linuxisms. Describe features of the 
+> timers to be able to select which timer to use if you need to pick 
+> certain timers. For example, interrupt capability could be used to 
+> select the clkevt.
 
-the practical problem is that a (binary-only and hardware specific)
-application uses GPIO47 via /sys/class/gpio and this number refers to
-the wrong GPIO since I introduced gpio-hogs in the device tree together
-with pinctrl stuff to make the gpio-hogs work.
+Would 'atmel,tcb-free-running-timer' (to replace 'atmel,tcb-clksrc') and
+'atmel,tcb-programmable-timer' (to replace 'atmel,tcb-clkevt') be
+acceptable?
 
-I agree that this doesn't need to be a reason to care for it from a
-mainline POV.
+> 
+> > +   - compatible: Should be "atmel,tcb-clksrc"
+> > +   - reg: Should contain the TCB channels to be used. If the
+> > +     counter width is 16 bits (at91rm9200-tcb), two consecutive
+> > +     channels are needed. Else, only one channel will be used.
+> > +
+> > + * a clockevent device
+> > +   - compatible: Should be "atmel,tcb-clkevt"
+> > +   - reg: Should contain the TCB channel to be used
+> > +
+> > + * a PWM chip: see ../pwm/atmel-tcb-pwm.txt
+> > +
+> > +Examples:
+> > +
+> > +One interrupt per TC block:
+> > +	tcb0: timer at fff7c000 {
+> > +		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		reg = <0xfff7c000 0x100>;
+> > +		interrupts = <18 4>;
+> > +		clocks = <&tcb0_clk>;
+> > +		clock-names = "t0_clk";  
+> 
+> Missing slow_clk
+> 
+> > +
+> > +		timer at 0 {
+> > +			compatible = "atmel,tcb-clksrc";
+> > +			reg = <0>, <1>;
+> > +		};
+> > +
+> > +		timer at 2 {
+> > +			compatible = "atmel,tcb-clkevt";
+> > +			reg = <2>;
+> > +		};
+> > +	};
+> > +
+> > +One interrupt per TC channel in a TC block:
+> > +	tcb1: timer at fffdc000 {
+> > +		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		reg = <0xfffdc000 0x100>;
+> > +		interrupts = <26 4>, <27 4>, <28 4>;
+> > +		clocks = <&tcb1_clk>;
+> > +		clock-names = "t0_clk";
+> > +	};
+> > +
+> > +
+> > diff --git a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+> > index 8031148bcf85..ab8fbd5ba184 100644
+> > --- a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+> > +++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+> > @@ -2,15 +2,17 @@ Atmel TCB PWM controller
+> >  
+> >  Required properties:
+> >  - compatible: should be "atmel,tcb-pwm"
+> > +- reg: tcb channel to use. Each channel can export 2 PWMs  
+> 
+> Is there a difference in channels? If not, then this compatible should 
+> go.
 
-> The GPIO numbering scheme is a matter of Linux internals and
-> not about hardware description IMO.
+This one I don't understand.
+The TCB (Timer Counter Block) is an MFD containing 3 Timer Counter
+devices. Each of these devices (also called channels) can be assigned a
+specific mode:
+- timer mode (free-running of programmable)
+- waveform generator mode (IOW, a PWM)
+- capture mode (an IIO device, but we don't have any driver for that
+  right now)
 
-Not sure if I should agree here or not. It's very usual that the
-"internal" gpio numbers match the hardware reference manual. I know this
-from imx, at91, all pre-dt platforms, I'm sure there are more, and I bet
-I'm not the only one relying on this for omap.
+So each sub-device of the TCB is represented as a sub-node with its own
+compatible. Is there a problem with that?
 
-And this is very usual in the dt world, too:
+> 
+> >  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+> >    the cells format. The only third cell flag supported by this binding is
+> >    PWM_POLARITY_INVERTED.
+> > -- tc-block: The Timer Counter block to use as a PWM chip.
+> >  
+> >  Example:
+> >  
+> > -pwm {
+> > -	compatible = "atmel,tcb-pwm";
+> > -	#pwm-cells = <3>;
+> > -	tc-block = <1>;
+> > +tcb0: timer at f800c000 {
+> > +	pwm at 0 {
+> > +		compatible = "atmel,tcb-pwm";
+> > +		reg = <0>;
+> > +		#pwm-cells = <3>;
+> > +	};
+> >  };
+> > -- 
+> > 2.8.1
+> >   
 
-$ git grep -El 'gpio. = \&gpio' arch/arm/boot/dts | wc -l
-37
 
-> The way forward is to use the character device and use gpiochip
-> devices with offset indexes and look up GPIOs by name from the
-> character devices. If nothing substantial happens I am merging the
-> final pieces of the GPIO chardev ABI for v4.8 and that is doing all that
-> sysfs was doing and then some. I just need to change a small thing
-> before sending the final version for review.
-
-Hmm, so /sys/class/gpio was obsoleted before the substitution was ready?
-I'd say an overlapping of several kernel versions would be good as we
-cannot expect that userspace changes as fast as the kernel.
-
-Independent of the inclusion of my patch series in the mainline kernel
-I'll have to use it on my custom kernel to keep the hardware do what it
-should.
-
-Best regards
-Uwe
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
