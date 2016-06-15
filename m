@@ -1,224 +1,171 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 15 Jun 2016 16:08:37 +0200
-Subject: [PATCH] dma: mv_xor_v2: new driver
-In-Reply-To: <20160222032730.GU19598@localhost>
-References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160222032730.GU19598@localhost>
-Message-ID: <20160615160837.64377829@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 15 Jun 2016 15:13:55 +0100
+Subject: [PATCH V6 1/7] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <57615C35.709@codeaurora.org>
+References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
+ <1465828873-23498-2-git-send-email-tn@semihalf.com>
+ <576155FA.9080706@codeaurora.org> <20160615133423.GA766@red-moon>
+ <57615C35.709@codeaurora.org>
+Message-ID: <20160615141355.GB766@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Sorry for the long delay, I've just sent a v3 of this patch series. I'm
-commenting below the comments you made during your previous review.
-
-On Mon, 22 Feb 2016 08:57:30 +0530, Vinod Koul wrote:
-
-> > +	xor0 at 400000 {
-> > +		compatible = "marvell,mv-xor-v2";
-> > +		reg = <0x400000 0x1000>,
-> > +		      <0x410000 0x1000>;
-> > +		msi-parent = <&gic_v2m0>;
-> > +		dma-coherent;
-> > +	};  
+On Wed, Jun 15, 2016 at 09:46:29AM -0400, Sinan Kaya wrote:
+> On 6/15/2016 9:34 AM, Lorenzo Pieralisi wrote:
+> > On Wed, Jun 15, 2016 at 09:19:54AM -0400, Sinan Kaya wrote:
+> >> Hi Tomasz,
+> >>
+> >>> +static acpi_status
+> >>> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
+> >>> +{
+> >>> +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
+> >>> +		struct acpi_iort_root_complex *pci_rc;
+> >>> +		struct pci_bus *bus;
+> >>> +
+> >>> +		bus = to_pci_bus(dev);
+> >>> +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+> >>> +
+> >>> +		/*
+> >>> +		 * It is assumed that PCI segment numbers maps one-to-one
+> >>> +		 * with root complexes. Each segment number can represent only
+> >>> +		 * one root complex.
+> >>> +		 */
+> >>> +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+> >>> +			return AE_OK;
+> >>> +
+> >>
+> >> There is problem with the find_dev_node and callback for PCIe here. It assumes
+> >> a one-to-one relationship between an SMMU and root complex. 
+> >>
+> >> Just checked with Charles offline to see if there is anything in the IORT spec that forces
+> >> this. And, the answer was no. 
+> >>
+> >> Pasting the IORT requirements for you below.
+> >>
+> >> ?The IORT was intended to be flexible enough to define static RID to SID mappings, which should cover 
+> >> the following configurations:
+> >> -	Dedicated SMMU per RC
+> >> -	Multiple RC?s per SMMU (as you described)
+> >> -	Multiple SMMU?s per RC (with static RID:SID range per SMMU)
+> >>
+> >> The SMMU instance must be identified by either a device ID *or* a combination of 
+> >> segment ID *and* Requestor ID. ?
+> >>
+> >> If a root complex has multiple SMMUs, this code is going to return the
+> >> first SMMU. This needs to be corrected.
+> > 
+> > What you say above is correct, but the problem is not here. This
+> > callback returns either a named component IORT node or a root complex
+> > IORT node corresponding to a device, the problem you are referring to is
+> > related to detecting which SMMU a given named component or root
+> > complex refers too, which is not done here, I will take care of that
+> > on my SMMU series.
+> > 
+> > When we look for the SMMU a PCI device is connected to, we must first
+> > retrieve the IORT node of its root complex and walk its list of
+> > mappings and match through RID range instead of picking the first
+> > one, as I assumed, wrongly.
+> > 
+> > Lorenzo
+> > 
 > 
-> This should be a separate patch :)
-
-Fixed in v3.
-
-> > +#define DMA_DESQ_STOP_OFF	0x800
-> > +#define DMA_DESQ_DEALLOC_OFF	0x804
-> > +#define DMA_DESQ_ADD_OFF	0x808  
+> Thanks for posting. I was trying to be more explicit by a follow up
+> email.  You sent before me. 
 > 
-> Please namespace these and others. Something like MRVL_XOR_XXX or anyother
-> patter you like would be fine...
-
-Fixed in v3.
-
-> > +/* descriptors queue size */
-> > +#define MV_XOR_V2_MAX_DESC_NUM	1024  
+> The summary is that iort_find_dev_node function below will locate the
+> wrong IORT root complex node in a multiple root port inside the same
+> root complex configuration. 
 > 
-> Is this hardware defined?
-
-No, so I've changed this to MV_XOR_V2_DESC_NUM, and added a comment to
-explain what are the hardware limits (they depend on the descriptor
-size).
-
-> > +	/*
-> > +	 * fill the buffer's addresses to the descriptor
-> > +	 * The format of the buffers address for 2 sequential buffers X and X+1:  
+> I wish I could share the picture Harb drew here. Let me put it in text.
 > 
-> space around + please.
-
-Fixed in v3.
-
-> > +		/* Set them if we have a 64 bits DMA address */
-> > +		if (IS_ENABLED(CONFIG_ARCH_DMA_ADDR_T_64BIT))
-> > +			desc->data_buff_addr[arr_index + 2] |=
-> > +				upper_32_bits(src) & 0xFFFF;  
+> You can have a use case where you have two root ports in a single root complex.
 > 
-> So why should it depend on how kernel is configured?
-
-Since the driver now depends on ARM64, CONFIG_ARCH_DMA_ADDR_T_64BIT is
-always y, so I've dropped those conditions.
-
-> > + * Return the next available index in the DESQ.
-> > + */
-> > +static inline int mv_xor_v2_get_desq_write_ptr(struct mv_xor_v2_device *xor_dev)  
+> Each root port has its own SMMU. Root ports are described in the MCFG
+> table and in the DSDT table as root bridge with their respective bus
+> start and end addresses. They both participate in the same root
+> complex with the same segment number.
 > 
-> Pls wrap with 80 chars wherever it is reasonable
+> First root port requester id range (0x0-0x3ff) and second root port
+> requester id range (0x400-0x7ff).
 
-Done in v3.
+Ok, so why a single IORT node root complex entry with multiple node
+mappings (with different RID ranges AND SMMU output references)
+would not do here ?
 
-> > +/*
-> > + * Allocate resources for a channel
-> > + */
-> > +static int mv_xor_v2_alloc_chan_resources(struct dma_chan *chan)
-> > +{
-> > +	/* nothing to be done here */
-> > +	return 0;
-> > +}  
+Sorry for being blunt but I would like to understand where the
+problem is here.
+
+> The IORT table has two root complex entries for each root port. The
+> first entry describes the requester id range (0x0-0x3ff) and points to
+> first smmu behind id.
+
+I lost you here. Do you mean the IORT table has one root complex IORT
+node with two node mappings ?
+
+> The second entry also describes the id range (0x400-0x7ff) and points to second smmu id.
 > 
-> No need for empty alloc
-
-Done in v3.
-
-> > +
-> > +/*
-> > + * Free resources of a channel
-> > + */
-> > +void mv_xor_v2_free_chan_resources(struct dma_chan *chan)
-> > +{
-> > +	/* nothing to be done here */
-> > +}  
+> The iort_find_dev_node function tries to locate an IORT node for a given PCIe device id.
 > 
-> and free as well :)
+> If the requester id is 0x400 and segment id is 0, then this function
+> will stop searching as soon as it finds the first node with segment id
+> 0 as it only uses the segment id as a qualifier. 
 
-Ditto.
+Well yes. The question is whether we should have two root complexes
+IORT nodes with the same segment id or a single root complex IORT node
+with multiple mappings.
 
-> > +static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
-> > +{
-> > +	struct mv_xor_v2_device *xor_dev = data;
-> > +
-> > +	/*
-> > +	 * Update IMSG threshold, to disable new IMSG interrupts until
-> > +	 * end of the tasklet
-> > +	 */
-> > +	mv_xor_v2_set_imsg_thrd(xor_dev, MV_XOR_V2_MAX_DESC_NUM);  
-> 
-> You don't want to check the source of interrupt?
+If we have one PCI root complex IORT node with multiple node mappings,
+where is the problem ?
 
-As we discussed, I've added a check that the number of pending
-descriptors to process is not 0.
-
-> > +	/* lock enqueue DESCQ */
-> > +	spin_lock_bh(&xor_dev->push_lock);  
-> 
-> Why not a generic channel lock which is used in submit, issue_pending and
-> tasklet. What is the reason for opting different locks?
-
-I've changed to use a single spinlock per channel.
-
-> > +	/* get the next available slot in the DESQ */
-> > +	desq_ptr = mv_xor_v2_get_desq_write_ptr(xor_dev);
-> > +
-> > +	/* copy the HW descriptor from the SW descriptor to the DESQ */
-> > +	dest_hw_desc = ((void *)xor_dev->hw_desq_virt +  
-> 
-> cast to and away from void are not required
-
-Correct, I've simplified that in v3.
-
-> > +			(xor_dev->desc_size * desq_ptr));
-> > +
-> > +	memcpy(dest_hw_desc, &sw_desc->hw_desc, xor_dev->desc_size);
-> > +
-> > +	/* update the DMA Engine with the new descriptor */
-> > +	mv_xor_v2_add_desc_to_desq(xor_dev, 1);
-> > +
-> > +	/* unlock enqueue DESCQ */
-> > +	spin_unlock_bh(&xor_dev->push_lock);  
-> 
-> and if IIUC, you are pushing this to HW as well, that is not quite right if
-> thats the case. We need to do this in issue_pending
-
-This is probably the only thing that I have not changed. The mv_xor
-driver is already using the same strategy, and enqueuing in
-issue_pending() would force us to add the request to a temporary linked
-list, which would be dequeued in issue_pending(). This is quite a bit
-of additional processing, while pushing the new requests directly to
-the engine works fine.
-
-> > +static struct dma_async_tx_descriptor *
-> > +mv_xor_v2_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
-> > +		       unsigned int src_cnt, size_t len, unsigned long flags)
-> > +{
-> > +	struct mv_xor_v2_sw_desc	*sw_desc;
-> > +	struct mv_xor_v2_descriptor	*hw_descriptor;
-> > +	struct mv_xor_v2_device		*xor_dev;
-> > +	int i;
-> > +
-> > +	BUG_ON(src_cnt > MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF || src_cnt < 1);  
-> 
-> why BUG_ON, is the system unusable after this?
-
-Changed in v3 to regular error checking (i.e. returning NULL).
-
-> > +static enum dma_status mv_xor_v2_tx_status(struct dma_chan *chan,
-> > +		dma_cookie_t cookie, struct dma_tx_state *txstate)
-> > +{
-> > +	/* return the transaction status */
-> > +	return dma_cookie_status(chan, cookie, txstate);  
-> 
-> why not assign this as you status callback?
-
-Done in v3.
-
-> > +static void mv_xor_v2_issue_pending(struct dma_chan *chan)
-> > +{
-> > +	struct mv_xor_v2_device *xor_dev =
-> > +		container_of(chan, struct mv_xor_v2_device, dmachan);
-> > +
-> > +	/* Activate the channel */
-> > +	writel(0, xor_dev->dma_base + DMA_DESQ_STOP_OFF);  
-> 
-> what if channel is already running?
-
-It will keep running. Writing 0 to this register activates the channel
-if not already activated, and if already activated, the engine keeps
-running.
-
-> > +static void mv_xor_v2_tasklet(unsigned long data)
-> > +{
-> > +	struct mv_xor_v2_device *xor_dev = (struct mv_xor_v2_device *) data;
-> > +	int pending_ptr, num_of_pending, i;
-> > +	struct mv_xor_v2_descriptor *next_pending_hw_desc = NULL;
-> > +	struct mv_xor_v2_sw_desc *next_pending_sw_desc = NULL;
-> > +
-> > +	dev_dbg(xor_dev->dmadev.dev, "%s %d\n", __func__, __LINE__);
-> > +
-> > +	/* get thepending descriptors parameters */  
-> 
-> space after the pls
-
-Done in v3.
+Thanks !
+Lorenzo
 
 > 
-> > +static struct platform_driver mv_xor_v2_driver = {
-> > +	.probe		= mv_xor_v2_probe,
-> > +	.remove		= mv_xor_v2_remove,
-> > +	.driver		= {
-> > +		.owner	= THIS_MODULE,  
+> It will locate the PCIe root complex node with requester id range (0x0-0x3ff) and use the 
+> wrong smmu to do the ITS device id mapping.
 > 
-> I dont think we need this
-
-Was already fixed in v2, so it's fixed in v3 as well.
-
-Thanks a lot!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> "The SMMU instance must be identified by either a device ID *or* a combination of 
+>   segment ID *and* Requestor ID. ?"
+> 
+> 
+> >>
+> >>> +		break;
+> >>> +	}
+> >>> +	}
+> >>> +
+> >>> +	return AE_NOT_FOUND;
+> >>> +}
+> >>> +
+> >>
+> >>> +
+> >>> +static struct acpi_iort_node *
+> >>> +iort_find_dev_node(struct device *dev)
+> >>> +{
+> >>> +	struct pci_bus *pbus;
+> >>> +
+> >>> +	if (!dev_is_pci(dev))
+> >>> +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+> >>> +				      iort_match_node_callback, dev);
+> >>> +
+> >>> +	/* Find a PCI root bus */
+> >>> +	pbus = to_pci_dev(dev)->bus;
+> >>> +	while (!pci_is_root_bus(pbus))
+> >>> +		pbus = pbus->parent;
+> >>> +
+> >>> +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+> >>> +			      iort_match_node_callback, &pbus->dev);
+> >>> +}
+> >>> +
+> >>
+> >> -- 
+> >> Sinan Kaya
+> >> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+> >> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> >>
+> 
+> 
+> -- 
+> Sinan Kaya
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> 
