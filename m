@@ -1,61 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 15 Jun 2016 20:46:28 +0200
-Subject: [PATCH] Revert "gpio: bail out silently on NULL descriptors"
-In-Reply-To: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
-References: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160615184628.GA5144@lukather>
+From: athorlton@sgi.com (Alex Thorlton)
+Date: Wed, 15 Jun 2016 14:04:15 -0500
+Subject: [PATCH 3/3] Update efi_thunk to use the the arch_efi_call_virt* macros
+In-Reply-To: <1466017455-236934-1-git-send-email-athorlton@sgi.com>
+References: <1466017455-236934-1-git-send-email-athorlton@sgi.com>
+Message-ID: <1466017455-236934-4-git-send-email-athorlton@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently, the efi_thunk macro has some semi-duplicated code in it that
+can be replaced with the arch_efi_call_virt_setup/teardown macros. This
+commit simply replaces the duplicated code with those macros.
 
-On Wed, Jun 15, 2016 at 08:22:34PM +0200, Hans de Goede wrote:
-> This reverts commit 54d77198fdfb("gpio: bail out silently on NULL
-> descriptors").
-> 
-> This commit causes the following code to fail:
-> 
-> gpio_desc = devm_gpiod_get_optional(dev, ...);
-> gpio_irq  = gpiod_to_irq(gpio_desc);
-> if (gpio_irq >= 0) {
-> 	ret = devm_request_irq(dev, gpio_irq, ...);
-> 
-> And now ret is an error causing the probe function in question to bail.
-> 
-> The problem here is that gpiod_to_irq now returns 0 for a NULL
-> gpio_desc while 0 is a valid irq-nr. Also see:
-> commit 4c37ce8608a8("gpio: make gpiod_to_irq() return negative for NO_IRQ")
-> which specifically avoids returning 0.
+Signed-off-by: Alex Thorlton <athorlton@sgi.com>
+Suggested-by: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: Russ Anderson <rja@sgi.com>
+Cc: Dimitri Sivanich <sivanich@sgi.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Roy Franz <roy.franz@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-efi at vger.kernel.org
+Cc: x86 at kernel.org
+---
+ arch/x86/platform/efi/efi_64.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-0 is not a valid interrupt number.
-
-irq_find_mapping returns 0 in case of an error:
-http://lxr.free-electrons.com/source/kernel/irq/irqdomain.c#L657
-
-and see that mail from Linus:
-http://yarchive.net/comp/linux/zero.html
-
-"
-(On a PC, hardware irq 0 is a real irq too, but it's a _special_ irq, and
-it is set up by architecture-specific code. So as far as the generic
-kernel and all devices are concerned, "!dev->irq" means that the irq
-doesn't exist or hasn't been mapped for that device yet).
-"
-
-The proper way to solve this is to fix the driver, like Quentin did in
-that patch:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/435881.html
-
-Maxime
-
+diff --git a/arch/x86/platform/efi/efi_64.c b/arch/x86/platform/efi/efi_64.c
+index 6e7242b..4cc2b96 100644
+--- a/arch/x86/platform/efi/efi_64.c
++++ b/arch/x86/platform/efi/efi_64.c
+@@ -469,18 +469,13 @@ extern efi_status_t efi64_thunk(u32, ...);
+ 	unsigned long flags;						\
+ 	u32 func;							\
+ 									\
+-	efi_sync_low_kernel_mappings();					\
+ 	local_irq_save(flags);						\
+-									\
+-	efi_scratch.prev_cr3 = read_cr3();				\
+-	write_cr3((unsigned long)efi_scratch.efi_pgt);			\
+-	__flush_tlb_all();						\
++	arch_efi_call_virt_setup();					\
+ 									\
+ 	func = runtime_service32(f);					\
+-	__s = efi64_thunk(func, __VA_ARGS__);			\
++	__s = efi64_thunk(func, __VA_ARGS__);				\
+ 									\
+-	write_cr3(efi_scratch.prev_cr3);				\
+-	__flush_tlb_all();						\
++	arch_efi_call_virt_teardown();					\
+ 	local_irq_restore(flags);					\
+ 									\
+ 	__s;								\
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/f23634f1/attachment.sig>
+1.8.5.6
