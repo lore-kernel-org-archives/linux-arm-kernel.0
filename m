@@ -1,39 +1,33 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 15 Jun 2016 12:01:45 +0200
-Subject: [RESEND PATCH 1/2] dt-bindings: hwrng: Add Amlogic Meson Hardware
- Random Generator bindings
+Date: Wed, 15 Jun 2016 12:01:46 +0200
+Subject: [RESEND PATCH 2/2] ARM64: dts: meson-gxbb: Add Hardware Random
+ Generator node
 In-Reply-To: <1465984906-17840-1-git-send-email-narmstrong@baylibre.com>
 References: <1465984906-17840-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1465984906-17840-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1465984906-17840-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../devicetree/bindings/rng/amlogic,meson-rng.txt          | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt b/Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt
-new file mode 100644
-index 0000000..202f2d0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt
-@@ -0,0 +1,14 @@
-+Amlogic Meson Random number generator
-+=====================================
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 063e3b6..806b903 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -221,6 +221,11 @@
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xc8834000 0x0 0x2000>;
+ 
++			rng {
++				compatible = "amlogic,meson-rng";
++				reg = <0x0 0x0 0x0 0x4>;
++			};
 +
-+Required properties:
-+
-+- compatible : should be "amlogic,meson-rng"
-+- reg : Specifies base physical address and size of the registers.
-+
-+Example:
-+
-+rng {
-+        compatible = "amlogic,meson-rng";
-+        reg = <0x0 0xc8834000 0x0 0x4>;
-+};
+ 			pinctrl_periphs: pinctrl at 4b0 {
+ 				compatible = "amlogic,meson-gxbb-periphs-pinctrl";
+ 				#address-cells = <2>;
 -- 
 2.7.0
