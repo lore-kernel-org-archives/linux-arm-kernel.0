@@ -1,78 +1,75 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 15 Jun 2016 19:43:35 +0530
-Subject: [PATCH 2/5] clk: Combine DT binding doc for max77686 and max77802
+Date: Wed, 15 Jun 2016 19:43:36 +0530
+Subject: [PATCH 3/5] clk: max77686: Add DT binding details for PMIC MAX77620
 In-Reply-To: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
 References: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1466000018-16784-3-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1466000018-16784-4-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock driver for Maxim PMICs max77686 and max77802 are
-combined into single file to extend the support for same clock
-IP for different PMICs.
+Maxim has used the same clock IP on multiple PMICs like
+MAX77686, MAX77802, MAX77620. Only differences are the
+number of clocks from these PMICs.
 
-Remove the separate DT binding document file for maxim,max77802 and
-move all information to maxim,max77686 DT binding document.
+Add clock binding details and example for the max77620 in
+maxim,max77686.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 CC: Javier Martinez Canillas <javier@dowhile0.org>
 ---
- .../devicetree/bindings/clock/maxim,max77686.txt   | 78 ++++++++++++++++------
- .../devicetree/bindings/clock/maxim,max77802.txt   | 44 ------------
- 2 files changed, 58 insertions(+), 64 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
+ .../devicetree/bindings/clock/maxim,max77686.txt   | 38 +++++++++++++++++++---
+ include/dt-bindings/mfd/max77620.h                 |  4 +++
+ 2 files changed, 38 insertions(+), 4 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/clock/maxim,max77686.txt b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
-index 9c40739..354e5ab 100644
+index 354e5ab..24deb19 100644
 --- a/Documentation/devicetree/bindings/clock/maxim,max77686.txt
 +++ b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
-@@ -1,11 +1,15 @@
--Binding for Maxim MAX77686 32k clock generator block
-+Binding for Maxim MAX77686/MAX77802 32k clock generator block
+@@ -1,8 +1,11 @@
+-Binding for Maxim MAX77686/MAX77802 32k clock generator block
++Binding for Maxim MAX77686/MAX77802/MAX77620 32k clock generator block
  
--This is a part of device tree bindings of MAX77686 multi-function device.
--More information can be found in bindings/mfd/max77686.txt file.
-+This is a part of device tree bindings of MAX77686/MAX77802 multi-function
-+device. More information can be found in bindings/mfd/max77686.txt file for
-+MAX77686 and bindings/mfd/max77802.txt for MAX77802.
+-This is a part of device tree bindings of MAX77686/MAX77802 multi-function
+-device. More information can be found in bindings/mfd/max77686.txt file for
+-MAX77686 and bindings/mfd/max77802.txt for MAX77802.
++This is a part of device tree bindings of MAX77686/MAX77802/MAX77620
++multi-function device. More information can be found in MFD DT binding
++doc as follows:
++	bindings/mfd/max77686.txt for MAX77686 and
++	bindings/mfd/max77802.txt for MAX77802 and
++	bindings/mfd/max77620.txt for MAX77620.
  
  The MAX77686 contains three 32.768khz clock outputs that can be controlled
  (gated/ungated) over I2C.
+@@ -10,6 +13,9 @@ The MAX77686 contains three 32.768khz clock outputs that can be controlled
+ The MAX77802 contains two 32.768khz clock outputs that can be controlled
+ (gated/ungated) over I2C.
  
-+The MAX77802 contains two 32.768khz clock outputs that can be controlled
++The MAX77686 contains one 32.768khz clock outputs that can be controlled
 +(gated/ungated) over I2C.
 +
  Following properties should be presend in main device node of the MFD chip.
  
  Required properties:
-@@ -21,26 +25,60 @@ to specify the clock which they consume. Following indices are allowed:
-     - 1: 32khz_cp clock,
-     - 2: 32khz_pmic clock.
- 
-+For MAX77802, 32khz_pmic is not valid.
+@@ -82,3 +88,27 @@ Example:
+ 			clock-names = "my-clock";
+ 			clocks = <&max77802 MAX77802_CLK_32K_AP>;
+ 		};
 +
- Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max77686.h
--header and can be used in device tree sources.
-+header for MAX77686 and dt-bindings/clock/maxim,max77802.h for MAX77802 and can
-+be used in device tree sources.
 +
-+Example:
++3. With MAX77620:
 +
-+1. With MAX77686:
-+
-+#include <dt-bindings/clock/maxim,max77686.h>
++#include <dt-bindings/mfd/max77620.h>
 +:::
 +
 +	Node of the MFD chip
-+		max77686: max77686 at 09 {
-+			compatible = "maxim,max77686";
-+			interrupt-parent = <&wakeup_eint>;
-+			interrupts = <26 0>;
-+			reg = <0x09>;
++		max77620: max77620 at 3c {
++			compatible = "maxim,max77620";
++			reg = <0x3c>;
++			:::
 +			#clock-cells = <1>;
-+
-+			/* ... */
++			:::
 +		};
 +
 +	Clock consumer node
@@ -81,98 +78,20 @@ index 9c40739..354e5ab 100644
 +			compatible = "bar,foo";
 +			/* ... */
 +			clock-names = "my-clock";
-+			clocks = <&max77686 MAX77686_CLK_PMIC>;
++			clocks = <&max77620 MAX77620_CLK_32K_OUT0>;
 +		};
+diff --git a/include/dt-bindings/mfd/max77620.h b/include/dt-bindings/mfd/max77620.h
+index b911a07..e1bd08c 100644
+--- a/include/dt-bindings/mfd/max77620.h
++++ b/include/dt-bindings/mfd/max77620.h
+@@ -36,4 +36,8 @@
+ #define MAX77620_FPS_SRC_NONE			3
+ #define MAX77620_FPS_SRC_DEF			4
+ 
++/* MAX77686 clocks */
++#define MAX77620_CLKS_NUM			1
++#define MAX77620_CLK_32K_OUT0			0
 +
-+2. With MAX77802:
- 
--Example: Node of the MFD chip
-+#include <dt-bindings/clock/maxim,max77802.h>
-+:::
- 
--	max77686: max77686 at 09 {
--		compatible = "maxim,max77686";
--		interrupt-parent = <&wakeup_eint>;
--		interrupts = <26 0>;
--		reg = <0x09>;
--		#clock-cells = <1>;
-+	Node of the MFD chip
-+		max77802: max77802 at 09 {
-+			compatible = "maxim,max77802";
-+			interrupt-parent = <&wakeup_eint>;
-+			interrupts = <26 0>;
-+			reg = <0x09>;
-+			#clock-cells = <1>;
- 
--		/* ... */
--	};
-+			/* ... */
-+		};
- 
--Example: Clock consumer node
-+	Clock consumer node
- 
--	foo at 0 {
--		compatible = "bar,foo";
--		/* ... */
--		clock-names = "my-clock";
--		clocks = <&max77686 MAX77686_CLK_PMIC>;
--	};
-+		foo at 0 {
-+			compatible = "bar,foo";
-+			/* ... */
-+			clock-names = "my-clock";
-+			clocks = <&max77802 MAX77802_CLK_32K_AP>;
-+		};
-diff --git a/Documentation/devicetree/bindings/clock/maxim,max77802.txt b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
-deleted file mode 100644
-index c6dc783..0000000
---- a/Documentation/devicetree/bindings/clock/maxim,max77802.txt
-+++ /dev/null
-@@ -1,44 +0,0 @@
--Binding for Maxim MAX77802 32k clock generator block
--
--This is a part of device tree bindings of MAX77802 multi-function device.
--More information can be found in bindings/mfd/max77802.txt file.
--
--The MAX77802 contains two 32.768khz clock outputs that can be controlled
--(gated/ungated) over I2C.
--
--Following properties should be present in main device node of the MFD chip.
--
--Required properties:
--- #clock-cells: From common clock binding; shall be set to 1.
--
--Optional properties:
--- clock-output-names: From common clock binding.
--
--Each clock is assigned an identifier and client nodes can use this identifier
--to specify the clock which they consume. Following indices are allowed:
--     - 0: 32khz_ap clock,
--     - 1: 32khz_cp clock.
--
--Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max77802.h
--header and can be used in device tree sources.
--
--Example: Node of the MFD chip
--
--	max77802: max77802 at 09 {
--		compatible = "maxim,max77802";
--		interrupt-parent = <&wakeup_eint>;
--		interrupts = <26 0>;
--		reg = <0x09>;
--		#clock-cells = <1>;
--
--		/* ... */
--	};
--
--Example: Clock consumer node
--
--	foo at 0 {
--		compatible = "bar,foo";
--		/* ... */
--		clock-names = "my-clock";
--		clocks = <&max77802 MAX77802_CLK_32K_AP>;
--	};
+ #endif
 -- 
 2.1.4
