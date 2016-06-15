@@ -1,26 +1,23 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 15 Jun 2016 14:04:23 -0700
-Subject: [PATCH] arm64: defconfig: enable stmmac and realtek PHY as modules
-In-Reply-To: <CAOi56cUGq87cEm0uhfVS=tVnwPoUCKVF5YX-G0Z_wW_zezYXfA@mail.gmail.com>
-References: <1464993495-19018-1-git-send-email-khilman@baylibre.com>
- <CAOi56cUGq87cEm0uhfVS=tVnwPoUCKVF5YX-G0Z_wW_zezYXfA@mail.gmail.com>
-Message-ID: <CAOi56cXzqp3uDRUsmies4PKgoZgDdZU3i1yrqt8y0=Qh+VSvSw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jun 2016 23:06:26 +0200
+Subject: [PATCH] arm/arm64/irqchip/pci: fix PCI_MSI dependencies
+In-Reply-To: <20160615210211.GA17504@localhost>
+References: <8531046.3ceRqUA835@wuerfel> <20160615210211.GA17504@localhost>
+Message-ID: <6064404.Y6hC1iYELB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 11:27 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Hi Catalin, Will,
->
-> On Fri, Jun 3, 2016 at 3:38 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->> Some Amlogic GXBB boards use the stmmac ethernet driver.  Also, enable
->> the realtek PHY used on meson-gxbb-odroidc2.  The micrel PHY used on the
->> meson-gxbb-p20x boards is already enabled.
->>
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->
-> Gentle reminder ping.
+On Wednesday, June 15, 2016 4:02:11 PM CEST Bjorn Helgaas wrote:
+> I applied this to pci/msi, minus the crypto change that looks unrelated:
+> 
+> > @@ -1038,6 +1038,8 @@ source "arch/arm64/Kconfig.debug"
+> >  source "security/Kconfig"
+> >  
+> >  source "crypto/Kconfig"
+> > +if CRYPTO
+> >  source "arch/arm64/crypto/Kconfig"
+> > +endif
 
-Oops, nevermind.  I guess we've been taking these through arm-soc.
-Sorry for the noise.
+Indeed, thanks for catching this!
 
-Kevin
+	Arnd
