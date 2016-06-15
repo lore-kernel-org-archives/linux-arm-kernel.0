@@ -1,36 +1,45 @@
 From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Wed, 15 Jun 2016 20:04:39 +0800
-Subject: [PATCH v3 0/6] fix bugs; enable iommu for ARM64
-Message-ID: <1465992285-16187-1-git-send-email-zhengsq@rock-chips.com>
+Date: Wed, 15 Jun 2016 20:04:40 +0800
+Subject: [PATCH v3 1/6] iommu/rockchip: fix devm_{request,free}_irq parameter
+In-Reply-To: <1465992285-16187-1-git-send-email-zhengsq@rock-chips.com>
+References: <1465992285-16187-1-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <1465992285-16187-2-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patches mainly for ARM64 supporting.
-To do this, it first add virtual iommu slave device which DRM can attach to,
-convert DRM driver to use common iommu API instead of the ARM32
-functions, and then use DMA API in iommu driver to map, to flush cache.
+From: Simon Xue <xxm@rock-chips.com>
 
-Mainly changes of V3:
-    - Instead of registering virtual iommu in DTS, V3
-      creates a iommu when attaching.
-    - Fix some bugs according to Tomasz's comments,
-      most of them are offline, locally.
+Even though the iommu shares irq with its master, using the *dev of iommu
+instead of master's *dev for devm_{request,free}_irq makes things clear.
 
-Shunqian Zheng (3):
-  iommu/rockchip: support virtual iommu slave device
-  drm: rockchip: use common iommu api to attach iommu
-  iommu/rockchip: use DMA API to map, to flush cache
+Signed-off-by: Simon Xue <xxm@rock-chips.com>
+Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+---
+ drivers/iommu/rockchip-iommu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Simon Xue (3):
-  iommu/rockchip: fix devm_{request,free}_irq parameter
-  iommu/rockchip: add map_sg callback for rk_iommu_ops
-  iommu/rockchip: enable rockchip iommu on ARM64 platform
-
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 112 ++++++++-----
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   1 +
- drivers/iommu/Kconfig                       |   2 +-
- drivers/iommu/rockchip-iommu.c              | 251 ++++++++++++++++++++++------
- 4 files changed, 273 insertions(+), 93 deletions(-)
-
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index c7d6156..ec0ce62 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -807,7 +807,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 
+ 	iommu->domain = domain;
+ 
+-	ret = devm_request_irq(dev, iommu->irq, rk_iommu_irq,
++	ret = devm_request_irq(iommu->dev, iommu->irq, rk_iommu_irq,
+ 			       IRQF_SHARED, dev_name(dev), iommu);
+ 	if (ret)
+ 		return ret;
+@@ -860,7 +860,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+ 	}
+ 	rk_iommu_disable_stall(iommu);
+ 
+-	devm_free_irq(dev, iommu->irq, iommu);
++	devm_free_irq(iommu->dev, iommu->irq, iommu);
+ 
+ 	iommu->domain = NULL;
+ 
 -- 
 1.9.1
