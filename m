@@ -1,48 +1,99 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 15 Jun 2016 10:32:02 +0100
-Subject: Versatile Express randomly fails to boot - Versatile Express to
- be removed from nightly testing
-In-Reply-To: <1465982868.2829.20.camel@linaro.org>
-References: <20150330140333.GJ24899@n2100.arm.linux.org.uk>
- <55196228.5050805@arm.com> <20150330150552.GK24899@n2100.arm.linux.org.uk>
- <55196E31.80803@arm.com> <551AD902.9090401@arm.com>
- <20150402141336.GI24899@n2100.arm.linux.org.uk> <551D7EAB.1000200@arm.com>
- <1465918285.2840.41.camel@linaro.org>
- <20160614155220.GB1041@n2100.armlinux.org.uk> <5760346A.10903@arm.com>
- <20160614164944.GC1041@n2100.armlinux.org.uk>
- <1465982868.2829.20.camel@linaro.org>
-Message-ID: <57612092.2070504@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 15 Jun 2016 11:34:00 +0200
+Subject: [PATCH V6 0/7] Introduce ACPI world to ITS irqchip
+In-Reply-To: <20160615100919.6b507b57@arm.com>
+References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
+ <20160615100919.6b507b57@arm.com>
+Message-ID: <57612108.4050407@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 15/06/16 10:27, Jon Medhurst (Tixy) wrote:
-> On Tue, 2016-06-14 at 17:49 +0100, Russell King - ARM Linux wrote:
->> On Tue, Jun 14, 2016 at 05:44:26PM +0100, Sudeep Holla wrote:
->>> Even with higher latency if the platform is unusable, I agree to remove.
->>> If you think it's usable with the updated latency(<2 2 1>) then we can
->>> update it.
+On 15.06.2016 11:09, Marc Zyngier wrote:
+> On Mon, 13 Jun 2016 16:41:06 +0200
+> Tomasz Nowicki <tn@semihalf.com> wrote:
+>
+>> The series builds the PCI/MSI domain stack based on initial IORT driver
+>> which is added in first place. As a reference please see IORT spec:
+>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 >>
->> The kernels I'm booting have that updated latency.  It used to improve
->> things, but for most of this year, it fails most boot attempts.  Out
->> of the last 21 boot attempts, all 21 attempts failed with the above
->> latency value.
+>> Patches were built on top of accepted ARM64 ACPI PCI support and can be found
+>> all together here:
+>> https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v6)
+>>
+>> Tested on Cavium ThunderX server.
+>>
+>> v5 -> v6
+>> - added locking mechanism for IORT list with domain token
+>> - IORT function name improvements
+>> - extended IORT RID mapping helper
+>> - reworked IORT to be more SMMU friendly
+>> - IORT functions which map RID and find corresponding domain are not
+>>    PCI specific any more (struct pci_dev -> struct device)
+>> - bug fixes
+>>
+>> v4 -> v5
+>> - rebased against v4.7-rc1
+>> - drop generic layer and call IORT functions directly
+>> - improve resource abstraction and string formatting
+>>
+>> v3 -> v4
+>> - rebased against v4.5
+>> - add ACPI support for IRQ domain handling on a per-device basis
+>> - reorder domain setup step
+>> - improve error handling
+>> - code style improvements
+>>
+>> v2 -> v3
+>> - rebased on top of 4.4
+>> - fixes and improvements for redistributor init via GICC structures
+>> - fixes as per kbuild reports
+>>
+>> v1 -> v2
+>> - rebased on top of 4.4-rc4
+>> - use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+>>
+>> Tomasz Nowicki (7):
+>>    ACPI: I/O Remapping Table (IORT) initial support
+>>    PCI/MSI: Setup MSI domain on a per-devices basis using IORT ACPI table
+>>    irqchip/gicv3-its: Cleanup for ITS domain initialization
+>>    irqchip/gicv3-its: Refator ITS DT init code to prepare for ACPI
+>>    irqchip/gicv3-its: Probe ITS in the ACPI way
+>>    irqchip/gicv3-its: Factor out code that might be reused for ACPI
+>>    irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
+>>      initialization
+>>
+>>   drivers/acpi/Kconfig                     |   3 +
+>>   drivers/acpi/Makefile                    |   1 +
+>>   drivers/acpi/iort.c                      | 386 +++++++++++++++++++++++++++++++
+>>   drivers/irqchip/Kconfig                  |   1 +
+>>   drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 +++++--
+>>   drivers/irqchip/irq-gic-v3-its.c         | 185 ++++++++++-----
+>>   drivers/irqchip/irq-gic-v3.c             |   7 +-
+>>   drivers/pci/msi.c                        |  11 +-
+>>   include/linux/iort.h                     |  38 +++
+>>   include/linux/irqchip/arm-gic-v3.h       |   4 +-
+>>   10 files changed, 646 insertions(+), 78 deletions(-)
+>>   create mode 100644 drivers/acpi/iort.c
+>>   create mode 100644 include/linux/iort.h
+>>
+>
+>
+> Once you've addressed the couple of remarks I had, and unless someone
+> has further objections, this should be in a sane state.
+
+Thanks for having a look !
+
+>
+> Of course, the following question would be "who merges this thing". I'm
+> happy to take it (mostly because it makes my life easier on the ITS
+> side), but it needs to be Acked by the usual suspects (Rafael, Bjorn,
+> Lorenzo).
 >
 
-[...]
+As for me, I am fine you to merge it.
 
->
-> That didn't fix things, but I noticed this morning there are PL310
-> errata workarounds too that we should have enabled:
->
-> PL310_ERRATA_769419
-> PL310_ERRATA_727915
-> PL310_ERRATA_588369
->
+Bjorn, Rafael, Lorenzo,
 
-I had all the above enabled in my config which doesn't help either.
+Can you please check on respective patches? Thanks in advance.
 
--- 
-Regards,
-Sudeep
+Tomasz
