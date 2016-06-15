@@ -1,61 +1,44 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 15 Jun 2016 17:19:47 +0200
-Subject: [PATCH] ARM: tango: add HOTPLUG_CPU support
-Message-ID: <57617213.9030804@free.fr>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 15 Jun 2016 10:21:12 -0500
+Subject: [PATCH 7/8] arm64: pmu: Enable multiple PMUs in an ACPI system
+In-Reply-To: <20160615132246.GL24029@arm.com>
+References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
+ <1465511013-10742-8-git-send-email-jeremy.linton@arm.com>
+ <20160615132246.GL24029@arm.com>
+Message-ID: <57617268.60705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+On 06/15/2016 08:22 AM, Will Deacon wrote:
+> On Thu, Jun 09, 2016 at 05:23:32PM -0500, Jeremy Linton wrote:
+>> Its possible that an ACPI system has multiple CPU types in it
+>> with differing PMU counters. Use the newly provided acpi_pmu routines
+>> to detect that case, and instantiate more than one set of counters.
+>>
+>
+> [...]
+>
+>> +	pmus = kcalloc(num_possible_cpus(), sizeof(struct pmu_types),
+>> +		       GFP_KERNEL);
+>> +
+>> +	if (pmus) {
+>> +		arm_pmu_acpi_determine_cpu_types(pmus);
+>> +
+>> +		for (j = 0; pmus[j].cpu_count; j++) {
+>> +			pr_devel("CPU type %X, count %d\n", pmus[j].cpu_type,
+>> +				 pmus[j].cpu_count);
+>> +			res = kcalloc(pmus[j].cpu_count,
+>> +				      sizeof(struct resource), GFP_KERNEL);
+>
+> Given that you already have dynamic allocation in here, why not use a
+> linked-list for the pmus list, and avoid having a potentially huge temporary
+> data structure?
 
-cpu_die() and cpu_kill() are implemented in firmware.
+Sure... But, its really only going to be 2 entries on any existing 
+system, I considered limiting this to something reasonable like "4" with 
+a WARN() because who will ever build a machine with more than 4 
+different CPU types in it? <chuckle> Is that an acceptable solution, or 
+do you prefer the list?
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- arch/arm/mach-tango/platsmp.c | 17 +++++++++++++++++
- arch/arm/mach-tango/smc.h     |  4 +++-
- 2 files changed, 20 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-tango/platsmp.c b/arch/arm/mach-tango/platsmp.c
-index a21f55e000d2..ff495f6b6f40 100644
---- a/arch/arm/mach-tango/platsmp.c
-+++ b/arch/arm/mach-tango/platsmp.c
-@@ -9,8 +9,25 @@ static int tango_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return 0;
- }
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int tango_cpu_kill(unsigned int cpu)
-+{
-+	return tango_aux_core_kill(cpu);
-+}
-+
-+static void tango_cpu_die(unsigned int cpu)
-+{
-+	tango_aux_core_die(cpu);
-+}
-+#else
-+#define tango_cpu_kill	NULL
-+#define tango_cpu_die	NULL
-+#endif
-+
- static const struct smp_operations tango_smp_ops __initconst = {
- 	.smp_boot_secondary	= tango_boot_secondary,
-+	.cpu_kill		= tango_cpu_kill,
-+	.cpu_die		= tango_cpu_die,
- };
- 
- CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango_smp_ops);
-diff --git a/arch/arm/mach-tango/smc.h b/arch/arm/mach-tango/smc.h
-index 7a4af35cc390..3d31f984f44c 100644
---- a/arch/arm/mach-tango/smc.h
-+++ b/arch/arm/mach-tango/smc.h
-@@ -2,4 +2,6 @@ extern int tango_smc(unsigned int val, unsigned int service);
- 
- #define tango_set_l2_control(val)	tango_smc(val, 0x102)
- #define tango_start_aux_core(val)	tango_smc(val, 0x104)
--#define tango_set_aux_boot_addr(val)	tango_smc((unsigned int)val, 0x105)
-+#define tango_set_aux_boot_addr(val)	tango_smc(val, 0x105)
-+#define tango_aux_core_die(val)		tango_smc(val, 0x121)
-+#define tango_aux_core_kill(val)	tango_smc(val, 0x122)
--- 
-2.8.2
+Although, maybe the list is better, because then when someone does build 
+such a machine it will "just work (TM)". <shrug>
