@@ -1,117 +1,99 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 15 Jun 2016 12:14:40 +0200
-Subject: [PATCH 00/10] ARM: V7M: Support caches
-In-Reply-To: <575EDF55.2020304@st.com>
-References: <1465830189-20128-1-git-send-email-vladimir.murzin@arm.com>
- <575EDAB9.2070809@st.com> <575EDD28.40500@arm.com> <575EDF55.2020304@st.com>
-Message-ID: <57612A90.5030808@st.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 15 Jun 2016 11:16:16 +0100
+Subject: [PATCH v2 3/7] of/irq: Break out msi-map lookup (again)
+In-Reply-To: <CAL_JsqJ4km0dH2PxHma9-cPwC20WR0ejn_14UeV0vBWJ+XLBBg@mail.gmail.com>
+References: <cover.1464966939.git.robin.murphy@arm.com>
+ <2cbffa9a341edfd10114994f6486f6b08d0c390c.1464966939.git.robin.murphy@arm.com>
+ <CAL_JsqJ4km0dH2PxHma9-cPwC20WR0ejn_14UeV0vBWJ+XLBBg@mail.gmail.com>
+Message-ID: <57612AF0.7020208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
-
-On 06/13/2016 06:29 PM, Alexandre Torgue wrote:
-> Hi Vladimir,
+On 14/06/16 18:01, Rob Herring wrote:
+> On Fri, Jun 3, 2016 at 12:15 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>> The PCI msi-map code is already doing double-duty translating IDs and
+>> retrieving MSI parents, which unsurprisingly is the same functionality
+>> we need for the identically-formatted PCI iommu-map property. Drag the
+>> core parsing routine up yet another layer into the general OF-PCI code,
+>> and further generalise it for either kind of lookup in either flavour
+>> of map property.
+>>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Frank Rowand <frowand.list@gmail.com>
+>> CC: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> v2: No change.
+>>
+>>   drivers/of/irq.c       |  70 ++-------------------------------
+>>   drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/of_pci.h |   8 ++++
+>>   3 files changed, 114 insertions(+), 66 deletions(-)
+>>
+>> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+>> index e7bfc175b8e1..0c9118d849ee 100644
+>> --- a/drivers/of/irq.c
+>> +++ b/drivers/of/irq.c
+>> @@ -24,6 +24,7 @@
+>>   #include <linux/module.h>
+>>   #include <linux/of.h>
+>>   #include <linux/of_irq.h>
+>> +#include <linux/of_pci.h>
+>>   #include <linux/string.h>
+>>   #include <linux/slab.h>
+>>
+>> @@ -586,13 +587,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
+>>                              u32 rid_in)
+>>   {
+>>          struct device *parent_dev;
+>> -       struct device_node *msi_controller_node;
+>> -       struct device_node *msi_np = *np;
+>> -       u32 map_mask, masked_rid, rid_base, msi_base, rid_len, phandle;
+>> -       int msi_map_len;
+>> -       bool matched;
+>>          u32 rid_out = rid_in;
+>> -       const __be32 *msi_map = NULL;
+>>
+>>          /*
+>>           * Walk up the device parent links looking for one with a
+>> @@ -602,71 +597,14 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
+>>                  if (!parent_dev->of_node)
+>>                          continue;
+>>
+>> -               msi_map = of_get_property(parent_dev->of_node,
+>> -                                         "msi-map", &msi_map_len);
+>> -               if (!msi_map)
+>> +               if (!of_property_read_bool(parent_dev->of_node, "msi-map"))
 >
-> On 06/13/2016 06:19 PM, Vladimir Murzin wrote:
->> Hi Alex,
+> But msi-map is not bool, right? I think we allow bools to have values
+> for historical reasons, but really bool with a value should be an
+> error. So don't rely on current behavior.
+
+Right, I now have no idea why that wasn't of_find_property() in the 
+first place...
+
+>>                          continue;
 >>
->> On 13/06/16 17:09, Alexandre Torgue wrote:
->>> Hi Vladimir,
->>>
->>> On 06/13/2016 05:02 PM, Vladimir Murzin wrote:
->>>> Hi,
->>>>
->>>> This patch set allows M-class cpus benefit of optional cache support.
->>>> It originaly was written by Jonny, I've been keeping it localy mainly
->>>> rebasing over Linux versions.
->>>>
->>>> The main idea behind patches is to reuse existing cache handling code
->>>> from v7A/R. In case v7M cache operations are provided via memory
->>>> mapped interface rather than co-processor instructions, so extra
->>>> macros have been introduced to factor out cache handling logic and
->>>> low-level operations.
->>>>
->>>> Along with the v7M cache support the first user (Cortex-M7) is
->>>> introduced.
->>>>
->>>> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
->>>> one showed significant boot speed-up.
->>>>
->>>> Based on 4.7-rc3.
->>>>
->>>> Thanks!
->>>> Vladimir
->>>>
->>>
->>> Thanks for the series.
->>> Did you change something in those patches compare to patches you sent in
->>> the RFC ?
->>
->> Only 04, 05, 06 have been changed (each has it's own changelog included).
->>
->> I did try to hammer patches because of your report of instability with
->> caches on, but all run fine... so nothing has been changed in regard of
->> your case.
->>
-> Ok. Thanks for this input. From now, I will use this series to perform
-> my tests. I will continue to debug my instabilities this week.
-> I will let you know.
+>> -               if (msi_map_len % (4 * sizeof(__be32))) {
+>> -                       dev_err(parent_dev, "Error: Bad msi-map length: %d\n",
+>> -                               msi_map_len);
+>> -                       return rid_out;
+>> -               }
+>>                  /* We have a good parent_dev and msi_map, let's use them. */
+>> +               of_pci_map_rid(parent_dev->of_node, "msi-map", rid_in, np,
+>> +                              &rid_out);
 >
-I fixed my instabilities and it was linked to my SDRAM timings :(.
-I don't see behavior issues with your series (You can add my Tested-by: 
-Alexandre TORGUE <alexandre.torgue@st.com>).
+> Seems like this could return an error code and then you could continue
+> based on the return code. Then you wouldn't be looking up msi-map
+> twice. Probably could get rid of the !parent_dev->of_node check too.
 
-I have two others questions for you:
+...but I agree that approach does sound better overall, so I'll take a 
+closer look at this whole patch again.
 
-1- Maybe I didn't search deeper in the code but when you enable Dcache 
-and Icache, what is the state of cache ? I mean we need to invalidate 
-caches before enable it. It is done by kernel (with your patches) or it 
-has to be done by a bootloader ?
+Thanks,
+Robin.
 
-2- I observe an issue (IMO not linked to your series) when I switch 
-off/switch on my board. During the first boot after an hard reset I get 
-a bus error  (BFSR part in CFSR register indicates an "A bus fault on an 
-instruction prefetch has occurred."). After SRST reset through JTAG, the 
-kernel boot correctly.
-Do you already seen this kind of issue ?
-
-I add the backtrace and registers info.
-
-__invalid_entry () at arch/arm/kernel/entry-v7m.S:33
-33	1:	b	1b
-(gdb) bt
-#0  __invalid_entry () at arch/arm/kernel/entry-v7m.S:33
-#1  0xc000bc2a in unwind_exec_insn (ctrl=<optimized out>) at 
-arch/arm/kernel/unwind.c:321
-#2  unwind_frame (frame=0xc023d0c0 <reset_devices>) at 
-arch/arm/kernel/unwind.c:449
-#3  0xc000caec in ?? () at arch/arm/mm/cache-v7.S:69
-Backtrace stopped: previous frame identical to this frame (corrupt stack?)
-Backtrace stopped: previous frame identical to this frame (corrupt stack?)
-(gdb) f 3
-#3  0xc000caec in ?? () at arch/arm/mm/cache-v7.S:69
-69	       ret     lr
-(gdb) info reg
-r0             0x1	1
-r1             0x0	0
-r2             0x1	1
-r3             0x0	0
-r4             0x0	0
-r5             0x100	256
-r6             0x0	0
-r7             0xa	10
-r8             0x40096	262294
-r9             0x0	0
-r10            0xc012b004	-1072517116
-r11            0x0	0
-r12            0x29	41
-sp             0xc0230018	0xc0230018 <cpu_cache+4>
-lr             0xc000caed	-1073689875
-pc             0xc000caec	0xc000caec <v7_flush_icache_all>
-xPSR           0x81000005	-2130706427
-
-
-Thanks for your time.
-
-Alex
+>
+> Rob
+>
