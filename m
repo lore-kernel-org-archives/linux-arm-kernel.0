@@ -1,38 +1,62 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed, 15 Jun 2016 13:13:26 -0500
-Subject: [PATCH] ARM: socfpga: enable PL330 DMA in socfpga_defconfig
-Message-ID: <1466014406-28469-1-git-send-email-dinguyen@kernel.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 15 Jun 2016 20:22:34 +0200
+Subject: [PATCH] Revert "gpio: bail out silently on NULL descriptors"
+Message-ID: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the PL330 DMA on SoCFPGA.
+This reverts commit 54d77198fdfb("gpio: bail out silently on NULL
+descriptors").
 
-make savedefconfig says CONFIG_FHANDLE is not needed in the defconfig,
-remove it.
+This commit causes the following code to fail:
 
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+gpio_desc = devm_gpiod_get_optional(dev, ...);
+gpio_irq  = gpiod_to_irq(gpio_desc);
+if (gpio_irq >= 0) {
+	ret = devm_request_irq(dev, gpio_irq, ...);
+
+And now ret is an error causing the probe function in question to bail.
+
+The problem here is that gpiod_to_irq now returns 0 for a NULL
+gpio_desc while 0 is a valid irq-nr. Also see:
+commit 4c37ce8608a8("gpio: make gpiod_to_irq() return negative for NO_IRQ")
+which specifically avoids returning 0.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/configs/socfpga_defconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/gpio/gpiolib.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index c267137..541a729 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -1,5 +1,4 @@
- CONFIG_SYSVIPC=y
--CONFIG_FHANDLE=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
-@@ -90,6 +89,8 @@ CONFIG_NOP_USB_XCEIV=y
- CONFIG_USB_GADGET=y
- CONFIG_MMC=y
- CONFIG_MMC_DW=y
-+CONFIG_DMADEVICES=y
-+CONFIG_PL330_DMA=y
- CONFIG_FPGA=y
- CONFIG_FPGA_MGR_SOCFPGA=y
- CONFIG_EXT2_FS=y
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 24f60d2..6c33a07 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1367,13 +1367,10 @@ done:
+ /*
+  * This descriptor validation needs to be inserted verbatim into each
+  * function taking a descriptor, so we need to use a preprocessor
+- * macro to avoid endless duplication. If the desc is NULL it is an
+- * optional GPIO and calls should just bail out.
++ * macro to avoid endless duplication.
+  */
+ #define VALIDATE_DESC(desc) do { \
+-	if (!desc) \
+-		return 0; \
+-	if (!desc->gdev) { \
++	if (!desc || !desc->gdev) { \
+ 		pr_warn("%s: invalid GPIO\n", __func__); \
+ 		return -EINVAL; \
+ 	} \
+@@ -1384,9 +1381,7 @@ done:
+ 	} } while (0)
+ 
+ #define VALIDATE_DESC_VOID(desc) do { \
+-	if (!desc) \
+-		return; \
+-	if (!desc->gdev) { \
++	if (!desc || !desc->gdev) { \
+ 		pr_warn("%s: invalid GPIO\n", __func__); \
+ 		return; \
+ 	} \
 -- 
-1.9.1.315.g3f09db0
+2.7.4
