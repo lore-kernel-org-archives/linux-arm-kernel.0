@@ -1,51 +1,42 @@
-From: glider@google.com (Alexander Potapenko)
-Date: Wed, 15 Jun 2016 11:55:23 +0200
-Subject: [PATCH] arm64: allow building with kcov coverage on ARM64
-Message-ID: <1465984523-68478-1-git-send-email-glider@google.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 15 Jun 2016 12:56:47 +0300
+Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
+ of aliases
+In-Reply-To: <20160615082705.GW22406@atomide.com>
+References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
+ <20160615072404.GB26768@pengutronix.de> <20160615082705.GW22406@atomide.com>
+Message-ID: <5761265F.2050508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARCH_HAS_KCOV to ARM64 config. To avoid potential crashes, disable
-instrumentation of the files in arch/arm64/kvm/hyp/*.
+On 06/15/2016 11:27 AM, Tony Lindgren wrote:
+> * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [160615 00:27]:
+>> On Wed, Jun 15, 2016 at 08:56:58AM +0200, Linus Walleij wrote:
+>>> The way forward is to use the character device and use gpiochip
+>>> devices with offset indexes and look up GPIOs by name from the
+>>> character devices. If nothing substantial happens I am merging the
+>>> final pieces of the GPIO chardev ABI for v4.8 and that is doing all that
+>>> sysfs was doing and then some. I just need to change a small thing
+>>> before sending the final version for review.
+>>
+>> Hmm, so /sys/class/gpio was obsoleted before the substitution was ready?
+>> I'd say an overlapping of several kernel versions would be good as we
+>> cannot expect that userspace changes as fast as the kernel.
+> 
+> Well the /sys/class/gpio is an interface, and we'll have to maintain
+> it basically forever as we all know. It also works just fine for simple
+> things, so let's make sure it is usable. Having it inconsistent can
+> cause nasty side effects upgrading kernels.
+> 
 
-Signed-off-by: Alexander Potapenko <glider@google.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
----
-v3: - reverted arch/arm64/boot/Makefile, there's no code in that dir
-    - added ack from Mark Rutland
-v2: - disable instrumentation of arch/arm64/{boot,kvm/hyp}
-    - enable instrumentation of arch/arm64/lib/delay.c
----
- arch/arm64/Kconfig          | 1 +
- arch/arm64/kvm/hyp/Makefile | 4 ++++
- 2 files changed, 5 insertions(+)
+Wouldn't gpio-line-names be helpful for such cases as mentioned in [1],[2]
+But I don't know it these properties were exposed in legacy GPIO sysfs interface also.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 5a0a691..eb0b0a0 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -7,6 +7,7 @@ config ARM64
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-+	select ARCH_HAS_KCOV
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_USE_CMPXCHG_LOCKREF
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 778d0ef..0c85feb 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -17,6 +17,10 @@ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
- obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
- obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
+[1] http://www.spinics.net/lists/linux-gpio/msg15040.html
+[2] https://patchwork.ozlabs.org/patch/617713/
  
-+# KVM code is run at a different exception code with a different map, so
-+# compiler instrumentation that inserts callbacks or checks into the code may
-+# cause crashes. Just disable it.
- GCOV_PROFILE	:= n
- KASAN_SANITIZE	:= n
- UBSAN_SANITIZE	:= n
-+KCOV_INSTRUMENT	:= n
+
 -- 
-2.8.0.rc3.226.g39d4020
+regards,
+-grygorii
