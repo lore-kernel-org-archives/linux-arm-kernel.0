@@ -1,45 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Jun 2016 08:56:58 +0200
-Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
- of aliases
-In-Reply-To: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Wed, 15 Jun 2016 10:04:00 +0300
+Subject: [PATCH 01/10] i2c: designware-platdrv: Return error in ->probe()
+ when clk ungate fails
+In-Reply-To: <1465916848-8207-2-git-send-email-ulf.hansson@linaro.org>
+References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
+ <1465916848-8207-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <c72735ae-a51d-2ac1-5855-4f4f68920b24@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 12:03 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-
-> Traditionally the n-th gpio device probed by the omap gpio driver got
-> the gpio number range [n*32 .. n*32+31].
-> When order of the devices probed by the driver changes (which can happen
-> already now when some devices have a pinctrl and so the first probe
-> attempt returns -ENODEV) the numbering changes.
+On 06/14/2016 06:07 PM, Ulf Hansson wrote:
+> The error code received from clk_prepare_enable() becomes ignored when
+> i2c_dw_plat_prepare_clk() is called in ->probe().
 >
-> To ensure a deterministical numbering use of_alias_get_id to determine
-> the number base for a given device. If no respective alias exists fall
-> back to the traditional numbering.
+> Fix this by invoking clk_prepare_enable() in ->probe() instead of
+> i2c_dw_plat_prepare_clk(), as it allows the error code to be properly
+> propagated.
+>
+> A side-effect from this change, makes the i2c_dw_plat_prepare_clk() used
+> only when CONFIG_PM is set. Avoid the compiler warning by moving the
+> function within the corresponding #ifdef.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/i2c/busses/i2c-designware-platdrv.c | 30 ++++++++++++++++-------------
+>  1 file changed, 17 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+> index d656657..e39962b 100644
+> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -136,18 +136,6 @@ static inline int dw_i2c_acpi_configure(struct platform_device *pdev)
+>  }
+>  #endif
+>
+> -static int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
+> -{
+> -	if (IS_ERR(i_dev->clk))
+> -		return PTR_ERR(i_dev->clk);
+> -
+> -	if (prepare)
+> -		return clk_prepare_enable(i_dev->clk);
+> -
+> -	clk_disable_unprepare(i_dev->clk);
+> -	return 0;
+> -}
+> -
+>  static int dw_i2c_plat_probe(struct platform_device *pdev)
+>  {
+>  	struct dw_i2c_platform_data *pdata = dev_get_platdata(&pdev->dev);
+> @@ -220,7 +208,11 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
+>  			DW_IC_CON_RESTART_EN | DW_IC_CON_SPEED_FAST;
+>
+>  	dev->clk = devm_clk_get(&pdev->dev, NULL);
+> -	if (!i2c_dw_plat_prepare_clk(dev, true)) {
+> +	if (!IS_ERR(dev->clk)) {
+> +		r = clk_prepare_enable(dev->clk);
+> +		if (r)
 
-I'm not too happy about this approach.
+Looks ok to me. My only worry was commit b33af11de236 ("i2c: designware: 
+Do not require clock when SSCN and FFCN are provided") but I think it's 
+the IS_ERR(dev->clk) that captures that case not the clk_prepare_enable().
 
-The patch doesn't mention what practical problems it is trying to
-solve.
+Suravee: Am I right IS_ERR(dev->clk) is enough to handle your case?
 
-I am very much suspecting the sysfs ABI to be what you're trying to
-get consistent, and that is OBSOLETED, see
-fe95046e960b4b76e73dc1486955d93f47276134
-"gpio: ABI: mark the sysfs ABI as obsolete"
-
-The GPIO numbering scheme is a matter of Linux internals and
-not about hardware description IMO.
-
-The way forward is to use the character device and use gpiochip
-devices with offset indexes and look up GPIOs by name from the
-character devices. If nothing substantial happens I am merging the
-final pieces of the GPIO chardev ABI for v4.8 and that is doing all that
-sysfs was doing and then some. I just need to change a small thing
-before sending the final version for review.
-
-Yours,
-Linus Walleij
+-- 
+Jarkko
