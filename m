@@ -1,68 +1,55 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Wed, 15 Jun 2016 10:04:00 +0300
-Subject: [PATCH 01/10] i2c: designware-platdrv: Return error in ->probe()
- when clk ungate fails
-In-Reply-To: <1465916848-8207-2-git-send-email-ulf.hansson@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 15 Jun 2016 09:16:22 +0200
+Subject: [PATCH 02/10] i2c: designware-platdrv: Gate clk in error path in
+ ->probe()
+In-Reply-To: <1465917768.30123.65.camel@linux.intel.com>
 References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
- <1465916848-8207-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <c72735ae-a51d-2ac1-5855-4f4f68920b24@linux.intel.com>
+ <1465916848-8207-3-git-send-email-ulf.hansson@linaro.org>
+ <1465917768.30123.65.camel@linux.intel.com>
+Message-ID: <CAPDyKFpqR5a+b68wMmyY086OCmkiK9mvC-kcav8Q2x28z=0ONA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2016 06:07 PM, Ulf Hansson wrote:
-> The error code received from clk_prepare_enable() becomes ignored when
-> i2c_dw_plat_prepare_clk() is called in ->probe().
+On 14 June 2016 at 17:22, Andy Shevchenko
+<andriy.shevchenko@linux.intel.com> wrote:
+> On Tue, 2016-06-14 at 17:07 +0200, Ulf Hansson wrote:
+>> The call to i2c_dw_probe() may fail in ->probe() in which case the
+>> clock
+>> remains ungated. Fix the error path by gating the clock before the
+>> error
+>> code is returned.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/i2c/busses/i2c-designware-platdrv.c | 10 ++++++++--
+>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
+>> b/drivers/i2c/busses/i2c-designware-platdrv.c
+>> index e39962b..19174e7 100644
+>> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+>> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+>> @@ -235,6 +235,7 @@ static int dw_i2c_plat_probe(struct
+>> platform_device *pdev)
+>>       ACPI_COMPANION_SET(&adap->dev, ACPI_COMPANION(&pdev->dev));
+>>       adap->dev.of_node = pdev->dev.of_node;
+>>
 >
-> Fix this by invoking clk_prepare_enable() in ->probe() instead of
-> i2c_dw_plat_prepare_clk(), as it allows the error code to be properly
-> propagated.
 >
-> A side-effect from this change, makes the i2c_dw_plat_prepare_clk() used
-> only when CONFIG_PM is set. Avoid the compiler warning by moving the
-> function within the corresponding #ifdef.
+>> +     pm_runtime_get_noresume(&pdev->dev);
 >
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/i2c/busses/i2c-designware-platdrv.c | 30 ++++++++++++++++-------------
->  1 file changed, 17 insertions(+), 13 deletions(-)
+>> +     pm_runtime_put(&pdev->dev);
 >
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index d656657..e39962b 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -136,18 +136,6 @@ static inline int dw_i2c_acpi_configure(struct platform_device *pdev)
->  }
->  #endif
->
-> -static int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
-> -{
-> -	if (IS_ERR(i_dev->clk))
-> -		return PTR_ERR(i_dev->clk);
-> -
-> -	if (prepare)
-> -		return clk_prepare_enable(i_dev->clk);
-> -
-> -	clk_disable_unprepare(i_dev->clk);
-> -	return 0;
-> -}
-> -
->  static int dw_i2c_plat_probe(struct platform_device *pdev)
->  {
->  	struct dw_i2c_platform_data *pdata = dev_get_platdata(&pdev->dev);
-> @@ -220,7 +208,11 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
->  			DW_IC_CON_RESTART_EN | DW_IC_CON_SPEED_FAST;
->
->  	dev->clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (!i2c_dw_plat_prepare_clk(dev, true)) {
-> +	if (!IS_ERR(dev->clk)) {
-> +		r = clk_prepare_enable(dev->clk);
-> +		if (r)
+> I don't see an explanation of these add-ons.
 
-Looks ok to me. My only worry was commit b33af11de236 ("i2c: designware: 
-Do not require clock when SSCN and FFCN are provided") but I think it's 
-the IS_ERR(dev->clk) that captures that case not the clk_prepare_enable().
+As we explicitly do clk_disable_unprepare() in the error path, we must
+prevent the ->runtime_suspend() callback to be called during this
+period.
 
-Suravee: Am I right IS_ERR(dev->clk) is enough to handle your case?
+This is a common pattern used by many drivers deploying runtime PM
+support, which is probably why I left out the explanation.
 
--- 
-Jarkko
+I can update the change log with this information, if you like.
+
+Kind regards
+Uffe
