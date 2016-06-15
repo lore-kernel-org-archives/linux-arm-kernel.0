@@ -1,38 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 15 Jun 2016 10:53:12 +0100
-Subject: [PATCH v5] ASoC: rockchip: Add machine driver for RK3399 GRU
- Boards
-In-Reply-To: <20160614223810.GA7925@rob-hp-laptop>
-References: <1465807339-1100-1-git-send-email-zhengxing@rock-chips.com>
- <20160614223810.GA7925@rob-hp-laptop>
-Message-ID: <20160615095312.GY2282@sirena.org.uk>
+From: glider@google.com (Alexander Potapenko)
+Date: Wed, 15 Jun 2016 11:55:23 +0200
+Subject: [PATCH] arm64: allow building with kcov coverage on ARM64
+Message-ID: <1465984523-68478-1-git-send-email-glider@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 05:38:10PM -0500, Rob Herring wrote:
-> On Mon, Jun 13, 2016 at 04:42:18PM +0800, Xing Zheng wrote:
+Add ARCH_HAS_KCOV to ARM64 config. To avoid potential crashes, disable
+instrumentation of the files in arch/arm64/kvm/hyp/*.
 
-> > +sound {
-> > +	compatible = "rockchip,rk3399-gru-sound";
-> > +	rockchip,cpu = <&i2s0>;
-> > +	rockchip,codec = <&max98357a &rt5514 &da7219>;
+Signed-off-by: Alexander Potapenko <glider@google.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+v3: - reverted arch/arm64/boot/Makefile, there's no code in that dir
+    - added ack from Mark Rutland
+v2: - disable instrumentation of arch/arm64/{boot,kvm/hyp}
+    - enable instrumentation of arch/arm64/lib/delay.c
+---
+ arch/arm64/Kconfig          | 1 +
+ arch/arm64/kvm/hyp/Makefile | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-> These seem fairly standard though a variety of versions in the bindings. 
-> Can we use audio-codec and audio-cpu (or cpu or audio-dai) here? Mark?
-
-Well, the roles aren't actually that standard (the fact that there's
-multiple CODECs and one CPU DAI here is really odd and definitely needs
-a very system specific interpretation).  If they were standard we
-already have the simple-card binding that things should be using.
-There's no point in standard property names if the interpretation has to
-be non-standard.
-
-The vendor specific prefixes are there because all bindings are supposed
-to add prefixes to property names.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/49033911/attachment.sig>
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 5a0a691..eb0b0a0 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -7,6 +7,7 @@ config ARM64
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
++	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_SG_CHAIN
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_USE_CMPXCHG_LOCKREF
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 778d0ef..0c85feb 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -17,6 +17,10 @@ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
+ obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+ obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
+ 
++# KVM code is run at a different exception code with a different map, so
++# compiler instrumentation that inserts callbacks or checks into the code may
++# cause crashes. Just disable it.
+ GCOV_PROFILE	:= n
+ KASAN_SANITIZE	:= n
+ UBSAN_SANITIZE	:= n
++KCOV_INSTRUMENT	:= n
+-- 
+2.8.0.rc3.226.g39d4020
