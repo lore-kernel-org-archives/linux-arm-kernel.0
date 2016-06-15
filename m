@@ -1,26 +1,35 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 15 Jun 2016 11:25:11 +0100
-Subject: [PATCH v5 4/8] arm64: parse cpu capacity-dmips-mhz from DT
-In-Reply-To: <CADRr18P=EOwpZTc-aS=4cCa8B3ObpuqpbNNv+w5Q4shXD6s7HQ@mail.gmail.com>
-References: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
- <1465985877-18271-5-git-send-email-juri.lelli@arm.com>
- <CADRr18P=EOwpZTc-aS=4cCa8B3ObpuqpbNNv+w5Q4shXD6s7HQ@mail.gmail.com>
-Message-ID: <20160615102511.GZ5981@e106622-lin>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 15 Jun 2016 12:26:57 +0200
+Subject: [PATCH v3 2/2] dt-bindings: clocksource: Add Add Oxford
+ Semiconductor RPS Timer bindings
+In-Reply-To: <57612C8E.1030405@linaro.org>
+References: <1465985607-21231-1-git-send-email-narmstrong@baylibre.com>
+ <1465985607-21231-3-git-send-email-narmstrong@baylibre.com>
+ <57612C8E.1030405@linaro.org>
+Message-ID: <57612D71.7050404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/16 11:20, Mark Brown wrote:
-> On 15 June 2016 at 11:17, Juri Lelli <juri.lelli@arm.com> wrote:
-> 
-> 
-> > Cc: Mark Brown <broonie@linaro.org>
-> >
-> 
-> Please use broonie at kernel.org for any upstream work, I'm really not set up
-> to handle upstream stuff on my Linaro address.
+On 06/15/2016 12:23 PM, Daniel Lezcano wrote:
+> On 06/15/2016 12:13 PM, Neil Armstrong wrote:
+>> Add DT bindings for the Oxford Semiconductor RPS dual Timer.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>
+> Waiting for Rob's acked before picking the series.
 
-Sure. Will update the address.
+Ok, Rob already acked this patch in the V2.
 
-Best,
+I will take these patches in my tree.
 
-- Juri
+Thanks.
+
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
