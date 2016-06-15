@@ -1,67 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 15 Jun 2016 21:12:54 +0200
-Subject: arm-soc boot: 619 boots: 11 failed, 605 passed with 2 offline, 1
- conflict (v4.7-rc3-216-gec0776a212c1)
-In-Reply-To: <m2twgupbpl.fsf@baylibre.com>
-References: <5760acd0.571a1c0a.34a58.7333@mx.google.com>
- <9297488.MELcTREXgu@wuerfel> <m2twgupbpl.fsf@baylibre.com>
-Message-ID: <20160615191254.GA19579@kozik-lap>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Jun 2016 20:13:52 +0100
+Subject: kexec failures with DEBUG_RODATA
+In-Reply-To: <20160615075508.GB21202@dhcppc6>
+References: <20160614175920.GD1041@n2100.armlinux.org.uk>
+ <20160615075508.GB21202@dhcppc6>
+Message-ID: <20160615191352.GG1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 11:07:50AM -0700, Kevin Hilman wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > On Tuesday, June 14, 2016 6:18:08 PM CEST kernelci. org bot wrote:
-> >> arm:
-> >> 
-> >>     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
-> >>         exynos5410-odroidxu: 1 failed lab
-> >> 
-> >>     multi_v7_defconfig+CONFIG_LKDTM=y:
-> >>         exynos5410-odroidxu: 1 failed lab
-> >> 
-> >>     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y+CONFIG_ARM_MODULE_PLTS=y:
-> >>         exynos5410-odroidxu: 1 failed lab
-> >> 
-> >>     multi_v7_defconfig+CONFIG_EFI=y:
-> >>         exynos5410-odroidxu: 1 failed lab
-> >> 
-> >>     exynos_defconfig:
-> >>         exynos5410-odroidxu: 1 failed lab
-> >> 
-> >>     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
-> >>         exynos5410-odroidxu: 1 failed lab
-> >> 
-> >>     multi_v7_defconfig:
-> >>         exynos5410-odroidxu: 1 failed lab
-> >> 
-> >>     multi_v5_defconfig:
-> >>         at91sam9261ek: 1 failed lab
-> >>         at91sam9m10g45ek: 1 failed lab
-> >>         at91sam9x25ek: 1 failed lab
-> >>         at91sam9x35ek: 1 failed lab
-> >
-> > These all seem to have broken after yesterday's merges, adding
-> > Alexandre and Krzysztof to Cc here so they can have a look.
-> 
-> The exynos5410 fails look like the UART3 issue reported earlier and
-> which is also happening in linux-next.
-> 
-> Krzysztof posted a fix[1] that was tested by Javier and myself that
-> fixed the problem, but I don't see that upstream yet.
-> 
-> Krzysztof: did you get that fix submitted yet?
-> 
-> Kevin
-> 
-> [1] http://marc.info/?l=linux-kernel&m=146469459503940&w=2
+On Wed, Jun 15, 2016 at 01:25:08PM +0530, Pratyush Anand wrote:
+> Sure, having a header information would be handy to do it. Other alternative
+> could be that we define "HAVE_LIBZ" and then we can have something like
+> kexec-Image-arm.c which handles plane Image.  We can also have something like
+> get_zlib_decompressed_length() which can give us exact length we need for kernel
+> and then we can place initrd accordingly in zImage_arm_load().
 
-The v2 of it is here:
-https://patchwork.kernel.org/patch/9144897/
+I really don't want to do that.  There are things that the decompressor
+does which make it easier to deal with the zImage than the Image.
 
-I do not recall receiving any feedback nor confirmation of applying the patch.
-I guess it is time to resend. I'll do it on Thursday.
+> I see at least another issue clearly in ARM kernel code with CONFIG_DEBUG_RODATA
+> enabled.  When CONFIG_DEBUG_RODATA is enabled, we can not write text area.
+> kexec_start_address has been defined in relocate_kernel.S as a text area.
+> machine_kexec() writes at kexec_start_address with image->start. Similarly there
+> would be issues for overwriting of kexec_indirection_page, kexec_mach_type and
+> kexec_boot_atags. If arm mmu mapping configures text pages as RO, then we should
+> see an abort as soon as we do these writes.
 
-Best regards,
-Krzysztof
+That's not a problem, because set_kernel_text_rw() is called immediately
+prior to writing, which has the effect of allowing these writes.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
