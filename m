@@ -1,54 +1,48 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Wed, 15 Jun 2016 12:55:52 +0200
-Subject: [PATCH 1/2] ARM: OMAP2+: Drop legacy board file for n900
-In-Reply-To: <1465987689-14812-2-git-send-email-tony@atomide.com>
-References: <1465987689-14812-1-git-send-email-tony@atomide.com>
- <1465987689-14812-2-git-send-email-tony@atomide.com>
-Message-ID: <20160615105552.GN29844@pali>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 15 Jun 2016 18:58:42 +0800
+Subject: [alsa-devel] [PATCH v4 9/9] ASoC: mediatek: Add mt2701-cs42448
+ driver and config option.
+In-Reply-To: <1465802806-19197-10-git-send-email-garlic.tseng@mediatek.com>
+References: <1465802806-19197-1-git-send-email-garlic.tseng@mediatek.com>
+ <1465802806-19197-10-git-send-email-garlic.tseng@mediatek.com>
+Message-ID: <1465988322.30493.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 June 2016 03:48:08 Tony Lindgren wrote:
-> Let's drop the last two remaining omap3 legacy boot board files.
-> Let's only use the device tree based booting known to work for
-> these two boards.
+On Mon, 2016-06-13 at 15:26 +0800, Garlic Tseng wrote:
+> Add machine driver and config option for MT2701.
 > 
-> We still have two omap3 boards booting in legacy mode in addition
-> to device tree based booting. All the other ten or so omap2+ SoCs
-> have been booting using device tree mode only for years now. This
-> has allowed us to get rid of quite a bit of arch/arm/mach-omap2
-> related platform init code in favor of dts and driver changes.
-> 
-> Pretty much the only remaining known users for omap3 legacy boot
-> board files are Kevin's and Russell's boot test systems, and N900
-> kernel tree maintained by Pali and Ivaylo. And all of them are
-> also supporting the device tree based booting. The legacy booting
-> mode has been kept around mostly to verify against regressions.
-> 
-> As there is still a slim chance of possible other uses of the
-> mainline kernel for these boards, let's just drop the board
-> files for v4.8, and let's not touch the related platform init
-> code until around v4.9 time if no issues are found. This makes
-> it trivial for us to add back the board files with a simple revert.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Garlic Tseng <garlic.tseng@mediatek.com>
 > ---
->  arch/arm/mach-omap2/Kconfig                  |    6 -
->  arch/arm/mach-omap2/Makefile                 |    3 -
->  arch/arm/mach-omap2/board-rx51-peripherals.c | 1317 --------------------------
->  arch/arm/mach-omap2/board-rx51-video.c       |   67 --
->  arch/arm/mach-omap2/board-rx51.c             |  141 ---
->  arch/arm/mach-omap2/board-rx51.h             |   11 -
->  6 files changed, 1545 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/board-rx51-peripherals.c
->  delete mode 100644 arch/arm/mach-omap2/board-rx51-video.c
->  delete mode 100644 arch/arm/mach-omap2/board-rx51.c
->  delete mode 100644 arch/arm/mach-omap2/board-rx51.h
+>  sound/soc/mediatek/Kconfig                 |  21 ++
+>  sound/soc/mediatek/Makefile                |   1 +
+>  sound/soc/mediatek/mt2701/Makefile         |  19 ++
+>  sound/soc/mediatek/mt2701/mt2701-cs42448.c | 422 +++++++++++++++++++++++++++++
+>  4 files changed, 463 insertions(+)
+>  create mode 100644 sound/soc/mediatek/mt2701/Makefile
+>  create mode 100644 sound/soc/mediatek/mt2701/mt2701-cs42448.c
+> 
+> diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
+> index ff1a419..0ecb785 100644
+> --- a/sound/soc/mediatek/Kconfig
+> +++ b/sound/soc/mediatek/Kconfig
+> @@ -7,6 +7,27 @@ config SND_SOC_MEDIATEK
+>  	  Select Y if you have such device.
+>  	  If unsure select "N".
+>  
+> +config SND_SOC_MT2701
+> +	tristate "ASoC support for Mediatek MT2701 chip"
+> +	depends on ARCH_MEDIATEK
+> +	select SND_SOC_MEDIATEK
+> +	help
+> +	  This adds ASoC driver for Mediatek MT2701 boards
+> +	  that can be used with other codecs.
+> +	  Select Y if you have such device.
+> +	  If unsure select "N".
+> +
+> +config SND_SOC_MT2701_CS42448
+> +	tristate "SND_SOC_MT2701_CS42448"
 
-Hi! I just quickly looked at N900 status matrix https://elinux.org/N900
-and there is still one thing not finished in DT: It is slot-name for
-omap_hsmmc driver. So switch from legacy board code to DT is regression.
+Please provide proper config prompt here.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+Joe.C
