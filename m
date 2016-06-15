@@ -1,94 +1,41 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 15 Jun 2016 11:12:57 -0400
-Subject: [PATCH 1/5] clk: max77686: Combine Maxim max77686 and max77802
- driver
-In-Reply-To: <1466000018-16784-2-git-send-email-ldewangan@nvidia.com>
+Date: Wed, 15 Jun 2016 11:19:02 -0400
+Subject: [PATCH 2/5] clk: Combine DT binding doc for max77686 and max77802
+In-Reply-To: <1466000018-16784-3-git-send-email-ldewangan@nvidia.com>
 References: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
- <1466000018-16784-2-git-send-email-ldewangan@nvidia.com>
-Message-ID: <4ba85edd-203f-c27f-f11c-5b64f972acc0@osg.samsung.com>
+ <1466000018-16784-3-git-send-email-ldewangan@nvidia.com>
+Message-ID: <a9a4bf3b-7ece-f92f-9d49-d4745f512e3c@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Laxman,
 
 On 06/15/2016 10:13 AM, Laxman Dewangan wrote:
-> The clock IP used on the Maxim PMICs max77686 and max77802 are
-> same. The configuration of clock register is also same except
-> the number of clocks.
+> The clock driver for Maxim PMICs max77686 and max77802 are
+> combined into single file to extend the support for same clock
+> IP for different PMICs.
+>
+
+The DT binding docs shouldn't neither refer to drivers nor map the file
+structure of the Linux drivers. That's just an implementation detail of
+Linux and it could be different in other operating systems, the binding
+should only describe the hardware.
+
+So the commit message should explain the benefits of merging the two DT
+bindings docs without mentioning the Linux driver implementation.
+ 
+> Remove the separate DT binding document file for maxim,max77802 and
+> move all information to maxim,max77686 DT binding document.
 > 
-> Part of common code utilisation, there is 3 files for these chips
-> clock driver, one for common and two files for driver registration.
-> 
-> Combine both drivers into single file and move common code into
-> same common file reduces the 2 files and make max77686 and max77802
-> clock driver in single fine. This driver does not depends on the
-> parent driver structure. The regmap handle is acquired through
-> regmap APIs for the register access.
-> 
-> This combination of driver helps on adding clock driver for different
-> Maxim PMICs which has similar clock IP like MAX77620 and MAX20024.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> CC: Javier Martinez Canillas <javier@dowhile0.org>
-> ---
 
-[snip]
+Now, I wonder if this is the correct approach. A system integrator is
+probably going to search for the bindings of the chip that is present
+in their system. For example there are different DT bindings docs for
+both the max77686 and max77802 PMIC even when support is implemented
+by the same driver (drivers/mfd/max77686.c).
 
-> diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-> index 9b6f277..31ba726 100644
-> --- a/drivers/clk/clk-max77686.c
-> +++ b/drivers/clk/clk-max77686.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * clk-max77686.c - Clock driver for Maxim 77686
-> + * clk-max77686.c - Clock driver for Maxim 77686/MAX77802
->   *
->   * Copyright (C) 2012 Samsung Electornics
->   * Jonghwa Lee <jonghwa3.lee@samsung.com>
-> @@ -13,13 +13,7 @@
->   * but WITHOUT ANY WARRANTY; without even the implied warranty of
->   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->   * GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License
-> - * along with this program; if not, write to the Free Software
-> - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> - *
->   */
-> -
-
-I think removing this part of the header is correct but it should be a
-separate patch.
-
-[snip]
-
-> +
-> +struct max_gen_hw_clk_data {
-> +	const char *name;
-> +	u32 reg;
-> +	u32 mask;
-> +	u32 flags;
-> +};
-> +
-> +struct max_gen_clk_data {
-> +	struct regmap *regmap;
-> +	struct clk_init_data clk_idata;
-> +	struct clk_hw hw;
-> +	u32 reg;
-> +	u32 mask;
-> +};
-> +
-
-Probably now makes more sense to rename all the "max_gen_foo" structs and
-functions to just "max77686_foo" since now are all defined in the max77686
-so that naming is more consistent.
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-I also tested on an Exynos5800 Peach Pi Chromebook that has a max77802 IP:
-
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+But maybe I'm wrong so I'll let people with more DT experience to say
+if merging the bindings docs in a single one is the correct approach.
 
 Best regards,
 -- 
