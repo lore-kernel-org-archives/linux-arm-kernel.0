@@ -1,76 +1,78 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 15 Jun 2016 14:57:47 -0700
-Subject: [PATCH v2 4/9] arm64: Add platform selection for BCM2835.
-In-Reply-To: <20160615080730.GA18868@e104818-lin.cambridge.arm.com>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <1464934708-24769-5-git-send-email-kraxel@redhat.com>
- <20160603112721.GC1128@e104818-lin.cambridge.arm.com>
- <87bn3gu3to.fsf@eliezer.anholt.net>
- <20160608091219.GA16322@e104818-lin.cambridge.arm.com>
- <87h9d1x59s.fsf@eliezer.anholt.net>
- <20160610095633.GA14961@e104818-lin.cambridge.arm.com>
- <87d1njq755.fsf@eliezer.anholt.net>
- <20160615080730.GA18868@e104818-lin.cambridge.arm.com>
-Message-ID: <87fuse9ktg.fsf@eliezer.anholt.net>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 15 Jun 2016 15:06:29 -0700
+Subject: [PATCH 4/5] remoteproc: core: Supply framework to request,
+ declare and fetch shared memory
+In-Reply-To: <1462454983-13168-5-git-send-email-lee.jones@linaro.org>
+References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
+ <1462454983-13168-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160615220629.GW1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
+On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
 
-> On Tue, Jun 14, 2016 at 11:48:54PM -0700, Eric Anholt wrote:
->> Catalin Marinas <catalin.marinas@arm.com> writes:
->> 
->> > On Thu, Jun 09, 2016 at 05:21:35PM -0700, Eric Anholt wrote:
->> >> Catalin Marinas <catalin.marinas@arm.com> writes:
->> >> > On Sat, Jun 04, 2016 at 12:55:15PM -0700, Eric Anholt wrote:
->> >> >> Catalin Marinas <catalin.marinas@arm.com> writes:
->> >> >> > On Fri, Jun 03, 2016 at 08:18:23AM +0200, Gerd Hoffmann wrote:
->> >> >> >> +	  This SoC is used in the Raspberry Pi 3 device.
->> >> >> >
->> >> >> > I thought we would just use ARCH_BCM, or is it too generic?
->> >> >> 
->> >> >> Consensus last time around seemed to be to drop adding ARCH_BCM, in
->> >> >> favor of patch 1 of the series.
->> >> >
->> >> > I may have missed that discussion. My point was about consistency with
->> >> > existing ARCH_* definitions in the arm64 Kconfig.platforms. I can see
->> >> > why it's easier for you since some drivers are built based on
->> >> > ARCH_BCM2835. Looking at drivers/clk/bcm/Makefile, there is an
->> >> > inconsistent mix of CLK_BCM_* and ARCH_BCM_*. I would rather have a new
->> >> > CLK_BCM2835 that's selected/enabled accordingly (maybe simply depending
->> >> > on ARCH_BCM).
->> >> 
->> >> So I introduce a new ARCH_BCM here, that selects the just the 283x
->> >> family's core drivers?  That seems strange, but I'm willing if that's
->> >> what you want.
->> >
->> > I'll leave this decision to the arm-soc guys. What I want to avoid is
->> > another ARCH_BCM283[89] when some clock or other device changes in a
->> > future revision of this board (RPi4?). I also don't want fine-grained
->> > SoC configuration *within* the arch/arm64 Kconfigs but rather just a
->> > family ARCH_* entry with selectable individual drivers based on the SoC
->> > revision you target (in case you want to avoid single Image).
->> >
->> > We should in general try to give drivers their own Kconfig entries
->> > separate from ARCH_* ones (with a "depend on ARCH_*" and default y if
->> > you want it enabled).
->> 
->> OK, we haven't added separate ARCH_BCM283* for the 3 chip revs so far,
->> so I think what you want is actually the status quo, and we're in
->> serious agreement.  The name for the family just happens to be
->> ARCH_BCM2835.
->> 
->> Any chance we could get an ack on this?
->
-> If you need one ;) (arm-soc is maintaining this file):
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Normally used for management of; carveout, devmem and trace memory.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/remoteproc/remoteproc_core.c | 174 +++++++++++++++++++++++++++++++++--
+>  1 file changed, 167 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+[..]
+> @@ -222,7 +223,8 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
+[..]
+> -	va = dma_alloc_coherent(dev->parent, size, &dma, GFP_KERNEL);
+> +	dma_dev = rproc_subdev_lookup(rproc, "vring");
+> +	va = dma_alloc_coherent(dma_dev, size, &dma, GFP_KERNEL);
+[..]
+> @@ -594,7 +599,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
+[..]
+> -	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
+> +	dma_dev = rproc_subdev_lookup(rproc, "carveout");
+> +	va = dma_alloc_coherent(dma_dev, rsc->len, &dma, GFP_KERNEL);
+[..]
+> +static int rproc_subdev_match(struct device *dev, void *data)
+> +{
+> +	char *sub_name;
+> +
+> +	if (!dev_name(dev))
+> +		return 0;
+> +
+> +	sub_name = strpbrk(dev_name(dev), "#");
+> +	if (!sub_name)
+> +		return 0;
+> +
+> +	return !strcmp(++sub_name, (char *)data);
+> +}
+> +
+[..]
+> +struct rproc_subdev *rproc_subdev_add(struct rproc *rproc, struct resource *res)
+> +{
+[..]
+> +	dev_set_name(&sub->dev, "%s#%s", dev_name(sub->dev.parent), res->name);
+> +	dev_set_drvdata(&sub->dev, sub);
+> +
+> +	ret = device_register(&sub->dev);
+[..]
+> +}
+> +EXPORT_SYMBOL(rproc_subdev_add);
 
-It's in my for-next now.  Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/39b73856/attachment.sig>
+I worked up a prototype that allows remoteproc drivers to
+programmatically specify carveout resources, which then are matched and
+merged with entires from the resource table. I've given these
+programmatically allocated carveouts a device so that the associated
+allocation comes out of the specified region - or the rproc region if no
+match is found.
+
+
+This solves my use case of carving out memory from two disjoint memory
+regions for one of my remoteprocs, but differs from your approach in
+that you specify one large carveout (and vrings) region and any
+carveouts (or vrings) will chip away from this.
+
+Would this approach work for you, or do you depend on having 1:N
+relationship between your memory region and your resources?
+
+Regards,
+Bjorn
