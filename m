@@ -1,113 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Jun 2016 14:09:50 +0100
-Subject: [PATCH 5/8] arm: arm64: pmu: Assign platform PMU CPU affinity
-In-Reply-To: <1465511013-10742-6-git-send-email-jeremy.linton@arm.com>
-References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
- <1465511013-10742-6-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20160615130950.GK24029@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Jun 2016 15:16:07 +0200
+Subject: [PATCH 3/5] ARM: dts: add L2CC and RPM with regulators for MSM8660
+In-Reply-To: <20160614185517.GG28218@codeaurora.org>
+References: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
+ <1465918259-11138-4-git-send-email-linus.walleij@linaro.org>
+ <20160614185517.GG28218@codeaurora.org>
+Message-ID: <CACRpkdZFGUKWiA21j2z4jxMOC=zg8oqC93YjkZR57xumxyJRQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 05:23:30PM -0500, Jeremy Linton wrote:
-> On systems with multiple PMU types the PMU to CPU affinity
-> needs to be detected and set. The CPU to interrupt affinity
-> should also be set.
-> 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  drivers/perf/arm_pmu.c | 52 ++++++++++++++++++++++++++++++++++++++++----------
->  1 file changed, 42 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index fee4be0e8..865a9db 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -11,6 +11,7 @@
->   */
->  #define pr_fmt(fmt) "hw perfevents: " fmt
->  
-> +#include <linux/acpi.h>
->  #include <linux/bitmap.h>
->  #include <linux/cpumask.h>
->  #include <linux/cpu_pm.h>
-> @@ -24,6 +25,7 @@
->  #include <linux/irq.h>
->  #include <linux/irqdesc.h>
->  
-> +#include <asm/cpu.h>
->  #include <asm/cputype.h>
->  #include <asm/irq_regs.h>
->  
-> @@ -872,25 +874,56 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
->  }
->  
->  /*
-> - * CPU PMU identification and probing.
-> + * CPU PMU identification and probing. Its possible to have
-> + * multiple CPU types in an ARM machine. Assure that we are
-> + * picking the right PMU types based on the CPU in question
->   */
-> -static int probe_current_pmu(struct arm_pmu *pmu,
-> -			     const struct pmu_probe_info *info)
-> +static int probe_plat_pmu(struct arm_pmu *pmu,
-> +			     const struct pmu_probe_info *info,
-> +			     unsigned int pmuid)
->  {
-> -	int cpu = get_cpu();
-> -	unsigned int cpuid = read_cpuid_id();
->  	int ret = -ENODEV;
-> +	int cpu;
-> +	int aff_ctr = 0;
-> +	struct platform_device *pdev = pmu->plat_device;
-> +	int irq = platform_get_irq(pdev, 0);
->  
-> -	pr_info("probing PMU on CPU %d\n", cpu);
-> +	if (irq >= 0 && !irq_is_percpu(irq)) {
-> +		pmu->irq_affinity = kcalloc(pdev->num_resources, sizeof(int),
-> +					    GFP_KERNEL);
-> +		if (!pmu->irq_affinity)
-> +			return -ENOMEM;
-> +	}
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		unsigned int cpuid = read_specific_cpuid(cpu);
-> +
-> +		if (cpuid == pmuid) {
-> +			cpumask_set_cpu(cpu, &pmu->supported_cpus);
-> +			pr_devel("enable pmu on cpu %d\n", cpu);
+On Tue, Jun 14, 2016 at 8:55 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/14, Linus Walleij wrote:
 
-Please remove the pr_devels that you've added (similarly elsewhere in
-the patch).
+>> +                     rpmcc: clock-controller {
+>> +                             compatible      = "qcom,rpmcc-apq8660", "qcom,rpmcc";
+>> +                             #clock-cells = <1>;
+>> +                     };
+>
+> This driver isn't merged yet, but ok.
 
-> +			if (pmu->irq_affinity) {
-> +				pmu->irq_affinity[aff_ctr] = cpu;
-> +				aff_ctr++;
-> +			}
-> +		}
-> +	}
->  
-> +	pr_debug("probing PMU %X\n", pmuid);
+It's there because it is there in
+arch/arm/boot/dts/qcom-apq8064.dtsi
 
-You can also kill this now -- I don't think it's much use.
+>> +
+>> +                     pm8901-regulators {
+>
+> I'd rather have regulators at 8901 and regulators at 8058. That way the
+> node name is generic per ePAPR suggestions.
 
-> +	/* find the type of PMU given the CPU */
->  	for (; info->init != NULL; info++) {
-> -		if ((cpuid & info->mask) != info->cpuid)
-> +		if ((pmuid & info->mask) != info->cpuid)
->  			continue;
-> +		pr_devel("Found PMU\n");
->  		ret = info->init(pmu);
-> +		if (!info->cpuid) {
-> +			pmu->name = kasprintf(GFP_KERNEL, "%s_0x%x",
-> +					    pmu->name, ARM_PARTNUM(pmuid));
+Seems impossible if I should conclude the other discussion...
 
-Hmm, I'm not so keen on this. I think we should name the first PMU
-"armv8_pmuv3" (i.e. pmu->name) and then any subsequent PMUs should inherit
-an index, e.g. "armv8_pmuv3_1". That follows a similar style to uncore
-PMUs and also keeps this backwards compatible with what's currently done
-with devicetree.
+>> +                             pm8058_mvs: mvs {};
+>
+> pm8901_mvs?
 
-You can create a 'cpumask' file in the sysfs directory that identifies
-the cores for the PMU (again, there is precedent for this elsewhere).
+Ooops fixing.
 
-Will
+>> +                     pm8058-regulators {
+>> +                             compatible = "qcom,rpm-pm8058-regulators";
+>> +
+>> +                             pm8058_l0: l0 {};
+>> +                             pm8058_l1: l1 {};
+>> +                             pm8058_l2: l2 {};
+>> +                             pm8058_l3: l3 {};
+>> +                             pm8058_l4: l4 {};
+>> +                             pm8058_l5: l5 {};
+>> +                             pm8058_l6: l6 {};
+>> +                             pm8058_l7: l7 {};
+>> +                             pm8058_l8: l8 {};
+>> +                             pm8058_l9: l9 {};
+>> +                             pm8058_l10: l10 {};
+>> +                             pm8058_l11: l11 {};
+>> +                             pm8058_l12: l12 {};
+>> +                             pm8058_l13: l13 {};
+>> +                             pm8058_l14: l14 {};
+>> +                             pm8058_l15: l15 {};
+>> +                             pm8058_l16: l16 {};
+>> +                             pm8058_l17: l17 {};
+>> +                             pm8058_l18: l18 {};
+>> +                             pm8058_l19: l19 {};
+>> +                             pm8058_l20: l20 {};
+>> +                             pm8058_l21: l21 {};
+>> +                             pm8058_l22: l22 {};
+>> +                             pm8058_l23: l23 {};
+>> +                             pm8058_l24: l24 {};
+>> +                             pm8058_l25: l25 {};
+>> +
+>> +                             pm8058_s0: s0 {};
+>> +                             pm8058_s1: s1 {};
+>
+> Just leave these out? RPM shouldn't be touching s0 or s1.
+
+Really? The msm-3.4 tree does:
+
+        /* RPM early regulator constraints */
+        static struct rpm_regulator_init_data
+rpm_regulator_early_init_data[] = {
+        /*       ID       a_on pd ss min_uV   max_uV   init_ip    freq */
+        RPM_SMPS(PM8058_S0, 0, 1, 1,  500000, 1325000, SMPS_HMIN, 1p60),
+        RPM_SMPS(PM8058_S1, 0, 1, 1,  500000, 1250000, SMPS_HMIN, 1p60),
+
+Are you sure you don't mean s0+s1 on PM8901 (which I left out)?
+
+Yours,
+Linus Walleij
