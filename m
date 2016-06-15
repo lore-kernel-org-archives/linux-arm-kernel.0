@@ -1,99 +1,87 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 15 Jun 2016 11:16:16 +0100
-Subject: [PATCH v2 3/7] of/irq: Break out msi-map lookup (again)
-In-Reply-To: <CAL_JsqJ4km0dH2PxHma9-cPwC20WR0ejn_14UeV0vBWJ+XLBBg@mail.gmail.com>
-References: <cover.1464966939.git.robin.murphy@arm.com>
- <2cbffa9a341edfd10114994f6486f6b08d0c390c.1464966939.git.robin.murphy@arm.com>
- <CAL_JsqJ4km0dH2PxHma9-cPwC20WR0ejn_14UeV0vBWJ+XLBBg@mail.gmail.com>
-Message-ID: <57612AF0.7020208@arm.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Wed, 15 Jun 2016 11:17:49 +0100
+Subject: [PATCH v5 0/8] CPUs capacity information for heterogeneous systems
+Message-ID: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/16 18:01, Rob Herring wrote:
-> On Fri, Jun 3, 2016 at 12:15 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> The PCI msi-map code is already doing double-duty translating IDs and
->> retrieving MSI parents, which unsurprisingly is the same functionality
->> we need for the identically-formatted PCI iommu-map property. Drag the
->> core parsing routine up yet another layer into the general OF-PCI code,
->> and further generalise it for either kind of lookup in either flavour
->> of map property.
->>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Frank Rowand <frowand.list@gmail.com>
->> CC: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v2: No change.
->>
->>   drivers/of/irq.c       |  70 ++-------------------------------
->>   drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/of_pci.h |   8 ++++
->>   3 files changed, 114 insertions(+), 66 deletions(-)
->>
->> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
->> index e7bfc175b8e1..0c9118d849ee 100644
->> --- a/drivers/of/irq.c
->> +++ b/drivers/of/irq.c
->> @@ -24,6 +24,7 @@
->>   #include <linux/module.h>
->>   #include <linux/of.h>
->>   #include <linux/of_irq.h>
->> +#include <linux/of_pci.h>
->>   #include <linux/string.h>
->>   #include <linux/slab.h>
->>
->> @@ -586,13 +587,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
->>                              u32 rid_in)
->>   {
->>          struct device *parent_dev;
->> -       struct device_node *msi_controller_node;
->> -       struct device_node *msi_np = *np;
->> -       u32 map_mask, masked_rid, rid_base, msi_base, rid_len, phandle;
->> -       int msi_map_len;
->> -       bool matched;
->>          u32 rid_out = rid_in;
->> -       const __be32 *msi_map = NULL;
->>
->>          /*
->>           * Walk up the device parent links looking for one with a
->> @@ -602,71 +597,14 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
->>                  if (!parent_dev->of_node)
->>                          continue;
->>
->> -               msi_map = of_get_property(parent_dev->of_node,
->> -                                         "msi-map", &msi_map_len);
->> -               if (!msi_map)
->> +               if (!of_property_read_bool(parent_dev->of_node, "msi-map"))
->
-> But msi-map is not bool, right? I think we allow bools to have values
-> for historical reasons, but really bool with a value should be an
-> error. So don't rely on current behavior.
+Hi all,
 
-Right, I now have no idea why that wasn't of_find_property() in the 
-first place...
+this is take 5 of "CPUs capacity information for heterogeneous systems"
+patchset [1] (please refer to previous postings to get some context). Apologies
+for taking so much time before posting a new version, I've been busy working on
+other (related :-)) stuff.
 
->>                          continue;
->>
->> -               if (msi_map_len % (4 * sizeof(__be32))) {
->> -                       dev_err(parent_dev, "Error: Bad msi-map length: %d\n",
->> -                               msi_map_len);
->> -                       return rid_out;
->> -               }
->>                  /* We have a good parent_dev and msi_map, let's use them. */
->> +               of_pci_map_rid(parent_dev->of_node, "msi-map", rid_in, np,
->> +                              &rid_out);
->
-> Seems like this could return an error code and then you could continue
-> based on the return code. Then you wouldn't be looking up msi-map
-> twice. Probably could get rid of the !parent_dev->of_node check too.
+Anyway, after v4 review we seem to still agree that a new DT binding is
+reasonable (as it is only a first-order approximation that it is useful to get
+acceptable good behaviours during boot and early execution and it can be then
+overwritten using the sysfs interface if needed). However, Rob asked for more
+precision in defining the binding and Mark, Sai and Vincent seem to agree that
+we should extract the frequency component from the values we put in DT.
 
-...but I agree that approach does sound better overall, so I'll take a 
-closer look at this whole patch again.
+In this new version I made several changes:
 
-Thanks,
-Robin.
+ - first patch of v4 is now mainline (but we've got a new one, see below)
+ - clearly state that Dhrystone is used to get this first order approx values
+ - the binding is now called capacity-dmips-mhz (suggestions for better naming
+   are welcome!)
+ - capacity-dmips-mhz have to be calculated by:
+   + running dhrystone at max freq on each cpu (in practice it can be run just
+     on the first cpu of each cluster and at any frequency)
+   + collect DMIPS/MHz by dividing the score by the frequency at which it has
+     been run
+   + normalize DMIPS/MHz and put such values in the DT (we've got a new patch
+     in the series for JUNO R2)
+ - at boot we use a cpufreq callback to be able to multiply back capacity-dmips
+   -mhz for policy->max and then normalize w.r.t. 1024
+ - if cpufreq is not in the mix, we use capacity-dmips-mhz values as they are
+   (since we don't know at which frequency we are running at, we assume that
+   CPUs run all at the same frequency)
 
->
-> Rob
->
+I guess at least some more comments in the code and some more lines in
+Documentation will help, but I'll defer that to v6: I'd like to see if we can
+first reach an agreement.
+
+Patches high level description:
+
+ o 01/08 introduces documentation for the new optional DT binding
+ o [02-06]/08 add cpu-capacity attribute to TC2, Juno and Juno r2 DTs and
+   provide parsing of such information at boot time
+ o [07-08]/08 introduce sysfs attribute
+
+The patchset is based on top of mainline as of today (4.7-rc3). 
+
+In case you would like to test this out, I pushed a branch here:
+
+ git://linux-arm.org/linux-jl.git upstream/default_caps_v5
+
+This branch contains additional patches, useful to better understand how CPU
+capacity information is actually used by the scheduler. However, discussion
+regarding these additional patches is outside the scope of this posting.
+
+Best,
+
+- Juri
+
+Juri Lelli (8):
+  Documentation: arm: define DT cpu capacity-dmips-mhz bindings
+  arm: parse cpu capacity-dmips-mhz from DT
+  arm, dts: add TC2 cpu capacity-dmips-mhz information
+  arm64: parse cpu capacity-dmips-mhz from DT
+  arm64, dts: add Juno cpu capacity-dmips-mhz information
+  arm64, dts: add Juno r2 cpu capacity-dmips-mhz information
+  arm: add sysfs cpu_capacity attribute
+  arm64: add sysfs cpu_capacity attribute
+
+ .../devicetree/bindings/arm/cpu-capacity.txt       | 236 +++++++++++++++++++++
+ Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |   5 +
+ arch/arm/kernel/topology.c                         | 213 ++++++++++++++++++-
+ arch/arm64/boot/dts/arm/juno-r2.dts                |   6 +
+ arch/arm64/boot/dts/arm/juno.dts                   |   6 +
+ arch/arm64/kernel/topology.c                       | 213 +++++++++++++++++++
+ 7 files changed, 688 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-capacity.txt
+
+-- 
+2.7.0
