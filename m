@@ -1,28 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2016 12:41:09 +0200
-Subject: [PATCH v2 6/6] i.MX: Do not explicitly call l2x0_of_init()
-In-Reply-To: <1465954193-5894-7-git-send-email-andrew.smirnov@gmail.com>
-References: <1465954193-5894-1-git-send-email-andrew.smirnov@gmail.com>
- <1465954193-5894-7-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <5355653.147Wd29CCq@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 15 Jun 2016 11:42:34 +0100
+Subject: [PATCH] arm64: allow building with kcov coverage on ARM64
+In-Reply-To: <1465984523-68478-1-git-send-email-glider@google.com>
+References: <1465984523-68478-1-git-send-email-glider@google.com>
+Message-ID: <20160615114234.03390155@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 14, 2016 6:29:53 PM CEST Andrey Smirnov wrote:
->  DT_MACHINE_START(IMX35_DT, "Freescale i.MX35 (Device Tree Support)")
->         .map_io         = mx35_map_io,
->         .init_early     = imx35_init_early,
-> -       .init_irq       = imx35_irq_init,
-> +       .init_irq       = mx35_init_irq,
->         .dt_compat      = imx35_dt_board_compat,
-> +       .l2c_aux_val    = 0,
-> +       .l2c_aux_mask   = ~0,
->  MACHINE_END
+On Wed, 15 Jun 2016 11:55:23 +0200
+Alexander Potapenko <glider@google.com> wrote:
+
+> Add ARCH_HAS_KCOV to ARM64 config. To avoid potential crashes, disable
+> instrumentation of the files in arch/arm64/kvm/hyp/*.
 > 
+> Signed-off-by: Alexander Potapenko <glider@google.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Please keep the fields sorted the same way that they are defined in
-struct machine_desc, i.e. add the new fields at the top of this list.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Otherwise the whole series looks good to me now,
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+	M.
+-- 
+Jazz is not dead. It just smells funny.
