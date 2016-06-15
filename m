@@ -1,61 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 15 Jun 2016 23:11:20 +0200
-Subject: [PATCH v2 1/4] ASoC: sunxi: Add A10 I2S controller binding
- documentation
-In-Reply-To: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
-References: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160615211123.31068-2-maxime.ripard@free-electrons.com>
+Date: Wed, 15 Jun 2016 23:11:19 +0200
+Subject: [PATCH v2 0/4] ASoC: sunxi: Add i2s controller support
+Message-ID: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce the device tree binding for the I2S controller found in the
-Allwinner A10 and later SoCs.
+Hi everyone,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- .../devicetree/bindings/sound/sun4i-i2s.txt        | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+This is the second version of the I2S support for the controller found
+in the Allwinner A10 and later SoCs.
+
+Playback has been tested with an UDA1380 on an A20-Olinuxino. Capture
+is not implemented yet, but will come eventually.
+
+Let me know what you think,
+Maxime
+
+Changes from v1:
+  - Fixed bogus indentation and spurious whitespaces / newlines
+  - Moved the device initialisation in the probe to the startup function
+  - Disabled the device in shutdown
+  - Removed function to get wss and sr to inline them in hw_params
+  - Changed the way to access the divider array
+  - Checked clk_set_rate return code
+  - Fixed condition for invalid bclk and mclk dividers
+  - Added sound-dai-cells to the bindings documentation required properties
+
+Emilio L?pez (1):
+  ARM: sun7i: Add mod1 clock nodes
+
+Maxime Ripard (3):
+  ASoC: sunxi: Add A10 I2S controller binding documentation
+  ASoC: sunxi: Add Allwinner A10 Digital Audio driver
+  ARM: sun7i: Add DAI nodes
+
+ .../devicetree/bindings/sound/sun4i-i2s.txt        |  34 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  87 ++-
+ sound/soc/sunxi/Kconfig                            |   9 +
+ sound/soc/sunxi/Makefile                           |   2 +-
+ sound/soc/sunxi/sun4i-i2s.c                        | 703 +++++++++++++++++++++
+ 5 files changed, 832 insertions(+), 3 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+ create mode 100644 sound/soc/sunxi/sun4i-i2s.c
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-new file mode 100644
-index 000000000000..7b526ec64991
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-@@ -0,0 +1,34 @@
-+* Allwinner A10 I2S controller
-+
-+The I2S bus (Inter-IC sound bus) is a serial link for digital
-+audio data transfer between devices in the system.
-+
-+Required properties:
-+
-+- compatible: should be one of the followings
-+   - "allwinner,sun4i-a10-i2s"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: should contain the I2S interrupt.
-+- dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
-+	Documentation/devicetree/bindings/dma/dma.txt
-+- dma-names: should include "tx" and "rx".
-+- clocks: a list of phandle + clock-specifer pairs, one for each entry in clock-names.
-+- clock-names: should contain followings:
-+   - "apb" : clock for the I2S bus interface
-+   - "mod" : module clock for the I2S controller
-+- #sound-dai-cells : Must be equal to 0
-+
-+Example:
-+
-+i2s0: i2s at 01c22400 {
-+	#sound-dai-cells = <0>;
-+	compatible = "allwinner,sun4i-a10-i2s";
-+	reg = <0x01c22400 0x400>;
-+	interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&apb0_gates 3>, <&i2s0_clk>;
-+	clock-names = "apb", "mod";
-+	dmas = <&dma SUN4I_DMA_NORMAL 3>,
-+	       <&dma SUN4I_DMA_NORMAL 3>;
-+	dma-names = "rx", "tx";
-+};
 -- 
 2.9.0
