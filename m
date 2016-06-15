@@ -1,95 +1,146 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 15 Jun 2016 12:21:27 +0100
-Subject: [PATCH v2 4/7] iommu/of: Handle iommu-map property for PCI
-In-Reply-To: <20160614144559.GK19407@arm.com>
-References: <cover.1464966939.git.robin.murphy@arm.com>
- <69952eda726c370ed6e5739bdd2e32cdc4466bfb.1464966939.git.robin.murphy@arm.com>
- <20160614144559.GK19407@arm.com>
-Message-ID: <57613A37.6080600@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 Jun 2016 12:33:33 +0100
+Subject: [PATCH 3/8] arm64: pmu: Add support for probing with ACPI
+In-Reply-To: <1465511013-10742-4-git-send-email-jeremy.linton@arm.com>
+References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
+ <1465511013-10742-4-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20160615113333.GI24029@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/16 15:45, Will Deacon wrote:
-> On Fri, Jun 03, 2016 at 06:15:39PM +0100, Robin Murphy wrote:
->> Now that we have a way to pick up the RID translation and target IOMMU,
->> hook up of_iommu_configure() to bring PCI devices into the of_xlate
->> mechanism and allow them IOMMU-backed DMA ops without the need for
->> driver-specific handling.
->>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Frank Rowand <frowand.list@gmail.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v2: Skip disabled IOMMUs.
->>
->>   drivers/iommu/of_iommu.c | 44 +++++++++++++++++++++++++++++++++++++-------
->>   1 file changed, 37 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->> index 662f9a600f4f..5716131199b3 100644
->> --- a/drivers/iommu/of_iommu.c
->> +++ b/drivers/iommu/of_iommu.c
->> @@ -22,6 +22,7 @@
->>   #include <linux/limits.h>
->>   #include <linux/of.h>
->>   #include <linux/of_iommu.h>
->> +#include <linux/of_pci.h>
->>   #include <linux/slab.h>
->>
->>   static const struct of_device_id __iommu_of_table_sentinel
->> @@ -134,20 +135,49 @@ const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
->>   	return ops;
->>   }
->>
->> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->> +{
->> +	struct of_phandle_args *iommu_spec = data;
->> +
->> +	iommu_spec->args[0] = alias;
->> +	return iommu_spec->np == pdev->bus->dev.of_node;
->> +}
->> +
->>   const struct iommu_ops *of_iommu_configure(struct device *dev,
->>   					   struct device_node *master_np)
->>   {
->>   	struct of_phandle_args iommu_spec;
->> -	struct device_node *np;
->> +	struct device_node *np = NULL;
->>   	const struct iommu_ops *ops = NULL;
->>   	int idx;
->>
->> -	/*
->> -	 * We can't do much for PCI devices without knowing how
->> -	 * device IDs are wired up from the PCI bus to the IOMMU.
->> -	 */
->> -	if (dev_is_pci(dev))
->> -		return NULL;
->> +	if (dev_is_pci(dev)) {
->> +		/*
->> +		 * Start by tracing the RID alias down the PCI topology as
->> +		 * far as the host bridge whose OF node we have...
->> +		 */
->> +		iommu_spec.np = master_np;
->> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
->> +				       &iommu_spec);
->> +		/*
->> +		 * ...then find out what that becomes once it escapes the PCI
->> +		 * bus into the system beyond, and which IOMMU it ends up at.
->> +		 */
->> +		if (of_pci_map_rid(master_np, "iommu-map", iommu_spec.args[0],
->> +				   &np, iommu_spec.args) ||
->> +		    !of_device_is_available(np))
->> +			return NULL;
->
-> Hmm, do we need to of_node_put(np) in the case that it's not available?
+On Thu, Jun 09, 2016 at 05:23:28PM -0500, Jeremy Linton wrote:
+> From: Mark Salter <msalter@redhat.com>
+> 
+> In the case of ACPI, the PMU IRQ information is contained in the
+> MADT table. Also, since the PMU does not exist as a device in the
+> ACPI DSDT table, it is necessary to create a platform device so
+> that the appropriate driver probing is triggered.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+> 
+>  NOTE: Much of the code in pmu_acpi_init() is replaced in a later version
+>        of this patch. The later version of the patch cleans up some of the
+>        possible style/error handling issues that have been pointed out with
+>        this version.
+> 
+>  arch/arm64/kernel/smp.c      |  5 +++
+>  drivers/perf/Kconfig         |  4 ++
+>  drivers/perf/Makefile        |  1 +
+>  drivers/perf/arm_pmu_acpi.c  | 97 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/perf/arm_pmu.h |  7 ++++
+>  5 files changed, 114 insertions(+)
+>  create mode 100644 drivers/perf/arm_pmu_acpi.c
+> 
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 678e084..5c96d23 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -37,6 +37,7 @@
+>  #include <linux/completion.h>
+>  #include <linux/of.h>
+>  #include <linux/irq_work.h>
+> +#include <linux/perf/arm_pmu.h>
+>  
+>  #include <asm/alternative.h>
+>  #include <asm/atomic.h>
+> @@ -540,6 +541,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>  			return;
+>  		}
+>  		bootcpu_valid = true;
+> +		arm_pmu_parse_acpi(0, processor);
+>  		return;
+>  	}
+>  
+> @@ -560,6 +562,9 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>  	 */
+>  	acpi_set_mailbox_entry(cpu_count, processor);
+>  
+> +	/* get PMU irq info */
+> +	arm_pmu_parse_acpi(cpu_count, processor);
+> +
 
-Ah yes, now I see; I moved the put into the loop iteration for the 
-non-PCI case so that a "continue" does the job, but I've not handled the 
-equivalent here.
+Nit: the outer functions are now misnomers, since this has nothing to do
+with the GIC. It feels like acpi_parse_gic_cpu_interface could use some
+slight restructuring so that the MADT parsing looks less confused.
 
-Robin.
+> diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+> index acd2397..fd8090d 100644
+> --- a/drivers/perf/Makefile
+> +++ b/drivers/perf/Makefile
+> @@ -1 +1,2 @@
+>  obj-$(CONFIG_ARM_PMU) += arm_pmu.o
+> +obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+> new file mode 100644
+> index 0000000..98c452d
+> --- /dev/null
+> +++ b/drivers/perf/arm_pmu_acpi.c
+> @@ -0,0 +1,97 @@
+> +/*
+> + * PMU support
+> + *
+> + * Copyright (C) 2015 Red Hat Inc.
+> + * Author: Mark Salter <msalter@redhat.com>
+> + *
+> + * This work is licensed under the terms of the GNU GPL, version 2.  See
+> + * the COPYING file in the top-level directory.
+> + *
+> + */
+> +
+> +#include <linux/perf/arm_pmu.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/acpi.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqdesc.h>
+> +
+> +#define PMU_PDEV_NAME "armv8-pmu"
 
->
-> Will
->
+Stick this in include/linux/perf/arm_pmu.h where we can use it in the driver
+code too?
+
+> +
+> +struct pmu_irq {
+> +	int gsi;
+> +	int trigger;
+> +};
+> +
+> +static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
+> +
+> +void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
+> +{
+> +	pmu_irqs[cpu].gsi = gic->performance_interrupt;
+> +	if (gic->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
+> +		pmu_irqs[cpu].trigger = ACPI_EDGE_SENSITIVE;
+> +	else
+> +		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
+> +}
+> +
+> +static int __init pmu_acpi_init(void)
+> +{
+> +	struct platform_device *pdev;
+> +	struct pmu_irq *pirq = pmu_irqs;
+> +	struct resource	*res, *r;
+> +	int err = -ENOMEM;
+> +	int i, count, irq;
+> +
+> +	if (acpi_disabled)
+> +		return 0;
+> +
+> +	/* Must have irq for boot boot cpu, at least */
+
+boot boot
+
+> +	if (pirq->gsi == 0)
+> +		return -EINVAL;
+> +
+> +	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
+> +				ACPI_ACTIVE_HIGH);
+
+This is quite tricky to read, thanks to the aliasing of pirq and
+pmu_irqs[0]. Why is it necessary to register the first gsi separately,
+rather than just register it later in the loop with all the other
+interrupts?
+
+Will
