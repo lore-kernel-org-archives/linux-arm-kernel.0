@@ -1,91 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 15 Jun 2016 10:09:19 +0100
-Subject: [PATCH V6 0/7] Introduce ACPI world to ITS irqchip
-In-Reply-To: <1465828873-23498-1-git-send-email-tn@semihalf.com>
-References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
-Message-ID: <20160615100919.6b507b57@arm.com>
+From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
+Date: Wed, 15 Jun 2016 11:16:32 +0200
+Subject: [PATCH v3 2/2] ARM: dts: utilite-pro: add mmc card slot support
+In-Reply-To: <089d827c9de9426eab79a907a2043828@rwthex-s1-a.rwth-ad.de>
+References: <20160612232456.1621-1-christopher.spinrath@rwth-aachen.de>
+ <c25d8e5d113240c5ab78771f301d901a@rwthex-s1-b.rwth-ad.de>
+ <089d827c9de9426eab79a907a2043828@rwthex-s1-a.rwth-ad.de>
+Message-ID: <712bda47d095416f8b69f4eecbf979a5@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jun 2016 16:41:06 +0200
-Tomasz Nowicki <tn@semihalf.com> wrote:
+Hi Igor,
 
-> The series builds the PCI/MSI domain stack based on initial IORT driver
-> which is added in first place. As a reference please see IORT spec:
-> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+On 06/15/2016 08:40 AM, Igor Grinberg wrote:
+> Hi Christopher,
 > 
-> Patches were built on top of accepted ARM64 ACPI PCI support and can be found
-> all together here:
-> https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v6)
+> On 06/13/2016 02:24 AM, christopher.spinrath at rwth-aachen.de wrote:
+>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>>
+>> The Utilite Pro has a mmc card slot connected to the usdhc3
+>> controller. There is no card detection until hardware revision 1.3.
+>>
+>> Add support for it and signal the controller with the broken-cd
+>> property that polling has to be used to detect a card.
+>>
+>> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>> ---
+>>
+>> Notes:
+>>     Changes since v2:
+>>      - add Fabio's Reviewed-By
+>>     
+>>     Changes since v1:
+>>      - enhance commit message to explain to the broken-cd property
+>>
+>>  arch/arm/boot/dts/imx6q-utilite-pro.dts | 44 +++++++++++++++++++++++++++++++++
+>>  1 file changed, 44 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+>> index 7219745..6199063 100644
+>> --- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
+>> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
 > 
-> Tested on Cavium ThunderX server.
+> [...]
 > 
-> v5 -> v6
-> - added locking mechanism for IORT list with domain token
-> - IORT function name improvements
-> - extended IORT RID mapping helper
-> - reworked IORT to be more SMMU friendly
-> - IORT functions which map RID and find corresponding domain are not
->   PCI specific any more (struct pci_dev -> struct device)
-> - bug fixes
+>> @@ -151,3 +184,14 @@
+>>  	uart-has-rtscts;
+>>  	status = "okay";
+>>  };
+>> +
+>> +&usdhc3 {
+>> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+>> +	pinctrl-0 = <&pinctrl_usdhc3>;
+>> +	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
+>> +	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
+>> +	no-1-8-v;
+>> +	broken-cd;
 > 
-> v4 -> v5
-> - rebased against v4.7-rc1
-> - drop generic layer and call IORT functions directly
-> - improve resource abstraction and string formatting
-> 
-> v3 -> v4
-> - rebased against v4.5
-> - add ACPI support for IRQ domain handling on a per-device basis
-> - reorder domain setup step
-> - improve error handling
-> - code style improvements
-> 
-> v2 -> v3
-> - rebased on top of 4.4
-> - fixes and improvements for redistributor init via GICC structures
-> - fixes as per kbuild reports
-> 
-> v1 -> v2
-> - rebased on top of 4.4-rc4
-> - use pci_msi_domain_get_msi_rid for requester ID to device ID translation
-> 
-> Tomasz Nowicki (7):
->   ACPI: I/O Remapping Table (IORT) initial support
->   PCI/MSI: Setup MSI domain on a per-devices basis using IORT ACPI table
->   irqchip/gicv3-its: Cleanup for ITS domain initialization
->   irqchip/gicv3-its: Refator ITS DT init code to prepare for ACPI
->   irqchip/gicv3-its: Probe ITS in the ACPI way
->   irqchip/gicv3-its: Factor out code that might be reused for ACPI
->   irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
->     initialization
-> 
->  drivers/acpi/Kconfig                     |   3 +
->  drivers/acpi/Makefile                    |   1 +
->  drivers/acpi/iort.c                      | 386 +++++++++++++++++++++++++++++++
->  drivers/irqchip/Kconfig                  |   1 +
->  drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 +++++--
->  drivers/irqchip/irq-gic-v3-its.c         | 185 ++++++++++-----
->  drivers/irqchip/irq-gic-v3.c             |   7 +-
->  drivers/pci/msi.c                        |  11 +-
->  include/linux/iort.h                     |  38 +++
->  include/linux/irqchip/arm-gic-v3.h       |   4 +-
->  10 files changed, 646 insertions(+), 78 deletions(-)
->  create mode 100644 drivers/acpi/iort.c
->  create mode 100644 include/linux/iort.h
+> A wast majority of boards produced are of revision >=1.3.
+> Can we please have the default as revision 1.3 with cd?
+> And let the patch you have submitted to U-Boot do the job
+> for older revisions?
 > 
 
+Well, my board has revision 1.0. So I cannot test that and feel uneasy
+to put my Signed-off-by under such a patch. IMHO the best solution would
+be that someone with a revision >= 1.3 board sends a follow-up patch
+adding the cd-gpios.
 
-Once you've addressed the couple of remarks I had, and unless someone
-has further objections, this should be in a sane state.
+If I resend the patch with cd-gpios could you test it and provide a
+Tested-By?
 
-Of course, the following question would be "who merges this thing". I'm
-happy to take it (mostly because it makes my life easier on the ITS
-side), but it needs to be Acked by the usual suspects (Rafael, Bjorn,
-Lorenzo).
+The other question is: should the dts provide a working/sane
+configuration for all boards (which the broken-cd approach is)
+independently of the bootloader? Is it ok to put both, the  cd-gpios and
+the broken-cd property into the dts and let the bootloader remove the
+broken-cd property for revision >= 1.3 (due to the documentation it is
+not but the driver favourites the broken cd property - hence, it would
+work)?
 
 Thanks,
+Christopher
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+>> +	keep-power-in-suspend;
+>> +	status = "okay";
+>> +};
+>>
+> 
