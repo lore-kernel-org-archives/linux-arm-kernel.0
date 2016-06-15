@@ -1,45 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Jun 2016 12:44:39 +0100
-Subject: [PATCH v2] arm64: allow building with kcov coverage on ARM64
-In-Reply-To: <20160615092509.GA3984@leverpostej>
-References: <1465923441-107596-1-git-send-email-glider@google.com>
- <20160614175543.GA2468@leverpostej>
- <CAG_fn=X521a9uD1bthDZ-swO9hrfq=jE2C_LUvzkn6C_q5dBvA@mail.gmail.com>
- <20160615092509.GA3984@leverpostej>
-Message-ID: <20160615114438.GC3984@leverpostej>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Wed, 15 Jun 2016 13:49:36 +0200
+Subject: [PATCH 1/2] ARM: OMAP2+: Drop legacy board file for n900
+In-Reply-To: <20160615110201.GY22406@atomide.com>
+References: <1465987689-14812-1-git-send-email-tony@atomide.com>
+ <1465987689-14812-2-git-send-email-tony@atomide.com>
+ <20160615105552.GN29844@pali> <20160615110201.GY22406@atomide.com>
+Message-ID: <20160615114936.GO29844@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 10:25:10AM +0100, Mark Rutland wrote:
-> On Tue, Jun 14, 2016 at 08:16:08PM +0200, Alexander Potapenko wrote:
-> > On Tue, Jun 14, 2016 at 7:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > I built and booted (via EFI) a kernel with this feature enabled (also
-> > > with the boot/Makefile change removed). I haven't tested the feature
-> > > itself as such, as I'm not sure how to do that.
-> > You can test it by running the test program from Documentation/kcov.txt.
+On Wednesday 15 June 2016 04:02:02 Tony Lindgren wrote:
+> Hi,
 > 
-> Ah, I hadn't spotted that. If I get the chance I'll try to give that a
-> go.
+> * Pali Roh?r <pali.rohar@gmail.com> [160615 03:58]:
+> > Hi! I just quickly looked at N900 status matrix https://elinux.org/N900
+> > and there is still one thing not finished in DT: It is slot-name for
+> > omap_hsmmc driver. So switch from legacy board code to DT is regression.
+> 
+> That's fixed with the following in v4.7-rc series:
+> 
+> db863d896681 ("mmc: omap_hsmmc: Check if MMC slot name is passed in pdata")
+> 10c1f7d32bf4 ("ARM: OMAP2+: n900 needs MMC slot names for legacy user space")
 
-I just had a go (with this applied atop of v4.7-rc3), and I get:
+Great! Sorry, but now wiki is not fully updated with last changes and I
+do not have in my mind what was finished/merged and what not. It is
+going hard for me to track everything.
 
-root at ribbensteg:/home/nanook# ./kcov 
-mmap: No such device
-
-The device exists (it was able to open the fd, evidently):
-
-root at ribbensteg:/home/nanook# ls -al /sys/kernel/debug/kcov 
--rw------- 1 root root 0 Jan  1  1970 /sys/kernel/debug/kcov
-
-Strace show me:
-
-openat(AT_FDCWD, "/sys/kernel/debug/kcov", O_RDWR) = 3
-ioctl(3, CHIOMOVE or CM_IOCGATR, 0x10000) = 0
-mmap(NULL, 524288, PROT_READ|PROT_WRITE, MAP_SHARED, 3, 0) = -1 ENODEV (No such device)
-
-It doesn't look like the error paths in kcov_mmap are hitting.
-
-Any ideas?
-
-Thanks,
-Mark.
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
