@@ -1,9 +1,9 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 15 Jun 2016 11:17:56 +0100
-Subject: [PATCH v5 7/8] arm: add sysfs cpu_capacity attribute
+Date: Wed, 15 Jun 2016 11:17:57 +0100
+Subject: [PATCH v5 8/8] arm64: add sysfs cpu_capacity attribute
 In-Reply-To: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
 References: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
-Message-ID: <1465985877-18271-8-git-send-email-juri.lelli@arm.com>
+Message-ID: <1465985877-18271-9-git-send-email-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,17 +15,20 @@ The new attribute shows up as:
 
  /sys/devices/system/cpu/cpu*/cpu_capacity
 
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Brown <broonie@linaro.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 ---
- arch/arm/kernel/topology.c | 68 ++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/topology.c | 68 ++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 68 insertions(+)
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 2bab290..a240bbd 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -52,6 +52,74 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 780c2c7..33a35411 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -37,6 +37,74 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
  	per_cpu(cpu_scale, cpu) = capacity;
  }
  
@@ -97,8 +100,8 @@ index 2bab290..a240bbd 100644
 +late_initcall(register_cpu_capacity_sysctl);
 +#endif
 +
- #ifdef CONFIG_OF
- struct cpu_efficiency {
- 	const char *compatible;
+ static u32 capacity_scale;
+ static u32 *raw_capacity;
+ static bool cap_parsing_failed;
 -- 
 2.7.0
