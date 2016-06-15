@@ -1,54 +1,68 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 15 Jun 2016 15:11:06 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable Ethernet Switch drivers
-In-Reply-To: <1466026874-11971-1-git-send-email-andrew@lunn.ch>
-References: <1466026874-11971-1-git-send-email-andrew@lunn.ch>
-Message-ID: <5761D27A.4040706@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 16 Jun 2016 00:11:11 +0200
+Subject: [v2 PATCH 1/4] Documentation: bindings: add dt doc for Rockchip
+ USB Type-C PHY
+In-Reply-To: <1465810789-22303-2-git-send-email-zyw@rock-chips.com>
+References: <1465810789-22303-1-git-send-email-zyw@rock-chips.com>
+ <1465810789-22303-2-git-send-email-zyw@rock-chips.com>
+Message-ID: <2262175.XUeGlE1YsE@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2016 02:41 PM, Andrew Lunn wrote:
-> Kernelci now has two boards with Ethernet switches supported by DSA.
-> Enable DSA and the switch drivers so we get some boot testing.
-
-So this is going to create some conflicts with this commit which would
-be submitted for 4.8:
-
-https://github.com/Broadcom/stblinux/commit/0fa28995465cf9f9465a1ff69e8dfff17f9734ea
-
-So let's take yours and I will rework mine to just include the BCMGENET
-and SYSTEMPORT drivers inclusion.
-
+Am Montag, 13. Juni 2016, 17:39:46 schrieb Chris Zhong:
+> This patch adds a binding that describes the Rockchip USB Type-C PHY
+> for rk3399
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> 
 > ---
->  arch/arm/configs/multi_v7_defconfig | 4 ++++
->  1 file changed, 4 insertions(+)
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 8f857564657f..b45ac256b491 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -157,6 +157,8 @@ CONFIG_INET6_IPCOMP=m
->  CONFIG_IPV6_MIP6=m
->  CONFIG_IPV6_TUNNEL=m
->  CONFIG_IPV6_MULTIPLE_TABLES=y
-> +CONFIG_NET_DSA=y
-> +CONFIG_NET_SWITCHDEV=y
->  CONFIG_CAN=y
->  CONFIG_CAN_RAW=y
->  CONFIG_CAN_BCM=y
-> @@ -222,6 +224,8 @@ CONFIG_SATA_RCAR=y
->  CONFIG_NETDEVICES=y
->  CONFIG_VIRTIO_NET=y
->  CONFIG_HIX5HD2_GMAC=y
-> +CONFIG_NET_DSA_MV88E6XXX=y
-> +CONFIG_NET_DSA_BCM_SF2=y
->  CONFIG_SUN4I_EMAC=y
->  CONFIG_MACB=y
->  CONFIG_NET_CALXEDA_XGMAC=y
+> Changes in v2:
+> - add some registers description
 > 
+> Changes in v1:
+> - add extcon node description
+> - move the registers in phy driver
+> - remove the suffix of reset
+> 
+>  .../devicetree/bindings/phy/phy-rockchip-typec.txt | 77
+> ++++++++++++++++++++++ 1 file changed, 77 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt new file
+> mode 100644
+> index 0000000..430920c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> @@ -0,0 +1,77 @@
+> +* ROCKCHIP type-c PHY
+> +---------------------
+> +
+> +Required properties:
+> + - compatible : should be "rockchip,rk3399-typec-phy0" or
+> +			 "rockchip,rk3399-typec-phy1"
+> + - reg: Address and length of the usb phy control register set
+> + - rockchip,grf : phandle to the syscon managing the "general
+> +   register files"
+> + - clocks : phandle + clock specifier for the phy clocks
+> + - clock-names : string, clock name, must be "tcpdcore", "tcpdphy_ref";
+> + - resets : a list of phandle + reset specifier pairs
+> + - reset-names : string reset name, must be:
+> +		 "tcphy", "tcphy_pipe", "uphy_tcphy"
+> + - #phy-cells : Must be 0.  See ./phy-bindings.txt for details.
+> + - extcon : extcon specifier for the Power Delivery
+> +
+> +Note, there are 2 type-c phys for RK3399, and they are almost identical,
+> except +these registers(description below), every register node contains
+> 3 sections: +offset, enable bit, write mask bit.
+> + - rockchip,typec_conn_dir : the register of type-c connector direction,
+> +   for type-c phy0, it must be <0xe580 0 16>;
+> +   for type-c phy1, it must be <0xe58c 0 16>;
 
+I think I said this already, but these register-lists would be much happier 
+being defined inside the driver - see how Frank managed this on his usb2phy 
+please.
 
--- 
-Florian
+Heiko
