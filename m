@@ -1,33 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Jun 2016 12:14:49 +0100
-Subject: [PATCH 2/8] arm64: pmu: Probe default hw/cache counters
-In-Reply-To: <1465511013-10742-3-git-send-email-jeremy.linton@arm.com>
-References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
- <1465511013-10742-3-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20160615111449.GH24029@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 15 Jun 2016 13:20:19 +0200
+Subject: [PATCH v2] ARM: sunxi/dt: make the CHIP inherit from allwinner,
+ sun5i-a13
+Message-ID: <1465989619-2337-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 05:23:27PM -0500, Jeremy Linton wrote:
-> ARMv8 machines can identify the micro/arch defined counters
-> that are available on a machine. Add all these counters to the
-> default armv8 perf map. At run-time disable the counters which
-> are not available on the given PMU.
-> 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 45 ++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 41 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 917c3e2..e1a3bce 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -190,13 +190,23 @@
->  #define ARMV8_THUNDER_PERFCTR_L1I_CACHE_PREF_MISS		0xED
+The sun4i-timer driver registers its sched_clock only if the machine is
+compatible with "allwinner,sun5i-a13", "allwinner,sun5i-a10s" or
+"allwinner,sun4i-a10".
+Add the missing "allwinner,sun5i-a13" string to the machine compatible.
 
-Minus the last hunk (which I mentioned in the previous patch):
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Fixes: 5a33893dd079 ("ARM: sunxi/dt: make the CHIP inherit from allwinner,sun5i-a13")
+Cc: <stable@vger.kernel.org>
+---
+Changes since v1:
+- added the Fixes and Cc stable tags
+---
+ arch/arm/boot/dts/sun5i-r8-chip.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
+index a8d8b4582397..f694482bdeb6 100644
+--- a/arch/arm/boot/dts/sun5i-r8-chip.dts
++++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
+@@ -52,7 +52,7 @@
+ 
+ / {
+ 	model = "NextThing C.H.I.P.";
+-	compatible = "nextthing,chip", "allwinner,sun5i-r8";
++	compatible = "nextthing,chip", "allwinner,sun5i-r8", "allwinner,sun5i-a13";
+ 
+ 	aliases {
+ 		i2c0 = &i2c0;
+-- 
+2.7.4
