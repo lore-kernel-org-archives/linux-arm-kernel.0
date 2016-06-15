@@ -1,53 +1,61 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 15 Jun 2016 21:34:48 +0300
-Subject: [PATCH 1/2] ARM: OMAP2+: Drop legacy board file for n900
-In-Reply-To: <1465987689-14812-2-git-send-email-tony@atomide.com>
-References: <1465987689-14812-1-git-send-email-tony@atomide.com>
- <1465987689-14812-2-git-send-email-tony@atomide.com>
-Message-ID: <20160615183448.GB8398@raspberrypi.musicnaut.iki.fi>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 15 Jun 2016 20:46:28 +0200
+Subject: [PATCH] Revert "gpio: bail out silently on NULL descriptors"
+In-Reply-To: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
+References: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160615184628.GA5144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Jun 15, 2016 at 03:48:08AM -0700, Tony Lindgren wrote:
-> Let's drop the last two remaining omap3 legacy boot board files.
-> Let's only use the device tree based booting known to work for
-> these two boards.
+On Wed, Jun 15, 2016 at 08:22:34PM +0200, Hans de Goede wrote:
+> This reverts commit 54d77198fdfb("gpio: bail out silently on NULL
+> descriptors").
 > 
-> We still have two omap3 boards booting in legacy mode in addition
-> to device tree based booting. All the other ten or so omap2+ SoCs
-> have been booting using device tree mode only for years now. This
-> has allowed us to get rid of quite a bit of arch/arm/mach-omap2
-> related platform init code in favor of dts and driver changes.
+> This commit causes the following code to fail:
 > 
-> Pretty much the only remaining known users for omap3 legacy boot
-> board files are Kevin's and Russell's boot test systems, and N900
-> kernel tree maintained by Pali and Ivaylo. And all of them are
-> also supporting the device tree based booting. The legacy booting
-> mode has been kept around mostly to verify against regressions.
+> gpio_desc = devm_gpiod_get_optional(dev, ...);
+> gpio_irq  = gpiod_to_irq(gpio_desc);
+> if (gpio_irq >= 0) {
+> 	ret = devm_request_irq(dev, gpio_irq, ...);
 > 
-> As there is still a slim chance of possible other uses of the
-> mainline kernel for these boards, let's just drop the board
-> files for v4.8, and let's not touch the related platform init
-> code until around v4.9 time if no issues are found. This makes
-> it trivial for us to add back the board files with a simple revert.
+> And now ret is an error causing the probe function in question to bail.
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> The problem here is that gpiod_to_irq now returns 0 for a NULL
+> gpio_desc while 0 is a valid irq-nr. Also see:
+> commit 4c37ce8608a8("gpio: make gpiod_to_irq() return negative for NO_IRQ")
+> which specifically avoids returning 0.
 
-Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+0 is not a valid interrupt number.
 
-A.
+irq_find_mapping returns 0 in case of an error:
+http://lxr.free-electrons.com/source/kernel/irq/irqdomain.c#L657
 
-> ---
->  arch/arm/mach-omap2/Kconfig                  |    6 -
->  arch/arm/mach-omap2/Makefile                 |    3 -
->  arch/arm/mach-omap2/board-rx51-peripherals.c | 1317 --------------------------
->  arch/arm/mach-omap2/board-rx51-video.c       |   67 --
->  arch/arm/mach-omap2/board-rx51.c             |  141 ---
->  arch/arm/mach-omap2/board-rx51.h             |   11 -
->  6 files changed, 1545 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/board-rx51-peripherals.c
->  delete mode 100644 arch/arm/mach-omap2/board-rx51-video.c
->  delete mode 100644 arch/arm/mach-omap2/board-rx51.c
->  delete mode 100644 arch/arm/mach-omap2/board-rx51.h
+and see that mail from Linus:
+http://yarchive.net/comp/linux/zero.html
+
+"
+(On a PC, hardware irq 0 is a real irq too, but it's a _special_ irq, and
+it is set up by architecture-specific code. So as far as the generic
+kernel and all devices are concerned, "!dev->irq" means that the irq
+doesn't exist or hasn't been mapped for that device yet).
+"
+
+The proper way to solve this is to fix the driver, like Quentin did in
+that patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/435881.html
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/f23634f1/attachment.sig>
