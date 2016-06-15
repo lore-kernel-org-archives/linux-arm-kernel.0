@@ -1,35 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2016 17:55:23 +0200
-Subject: [PATCH] clk: sunxi: remove unused variable
-Message-ID: <20160615155537.3342366-1-arnd@arndb.de>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 15 Jun 2016 08:57:04 -0700
+Subject: [RESEND PATCH 0/2] hw_random: Add Amlogic Meson SoCs Random
+ Generator driver
+In-Reply-To: <1465984906-17840-1-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Wed, 15 Jun 2016 12:01:44 +0200")
+References: <1465984906-17840-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m2shweqwbz.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only use of the local num_parents variable was remove,
-so we now get a warning:
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-drivers/clk/sunxi/clk-sun4i-tcon-ch1.c: In function 'tcon_ch1_get_parent':
-drivers/clk/sunxi/clk-sun4i-tcon-ch1.c:82:6: error: unused variable 'num_parents' [-Werror=unused-variable]
+> NOTE: This is a resent of the DT Bindings and DTSI patches based on the Amlogic DT 64bit
+> GIT pull request from Kevin Hilman at [1].
+>
+> Changes since v2 at http://lkml.kernel.org/r/1465546915-24229-1-git-send-email-narmstrong at baylibre.com :
+> - Move rng peripheral node into periphs simple-bus node
 
-This removes the variable.
+Thanks for the update.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 4de2d58bc973 ("clk: sunxi: tcon-ch1: Do not return a negative error in get_parent")
----
- drivers/clk/sunxi/clk-sun4i-tcon-ch1.c | 1 -
- 1 file changed, 1 deletion(-)
+Applied to the dt64 branch of the amlogic tree.
 
-diff --git a/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
-index 248585238b1c..b6d29d1bedca 100644
---- a/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
-+++ b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
-@@ -79,7 +79,6 @@ static int tcon_ch1_is_enabled(struct clk_hw *hw)
- static u8 tcon_ch1_get_parent(struct clk_hw *hw)
- {
- 	struct tcon_ch1_clk *tclk = hw_to_tclk(hw);
--	int num_parents = clk_hw_get_num_parents(hw);
- 	u32 reg;
- 
- 	reg = readl(tclk->reg) >> TCON_CH1_SCLK2_MUX_SHIFT;
--- 
-2.9.0
+Kevin
