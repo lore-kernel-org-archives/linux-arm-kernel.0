@@ -1,35 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Jun 2016 20:13:52 +0100
-Subject: kexec failures with DEBUG_RODATA
-In-Reply-To: <20160615075508.GB21202@dhcppc6>
-References: <20160614175920.GD1041@n2100.armlinux.org.uk>
- <20160615075508.GB21202@dhcppc6>
-Message-ID: <20160615191352.GG1041@n2100.armlinux.org.uk>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Wed, 15 Jun 2016 21:15:27 +0200
+Subject: [PATCH 0/7] Chain crypto requests together at the DMA level
+Message-ID: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 01:25:08PM +0530, Pratyush Anand wrote:
-> Sure, having a header information would be handy to do it. Other alternative
-> could be that we define "HAVE_LIBZ" and then we can have something like
-> kexec-Image-arm.c which handles plane Image.  We can also have something like
-> get_zlib_decompressed_length() which can give us exact length we need for kernel
-> and then we can place initrd accordingly in zImage_arm_load().
+The Cryptographic Engines and Security Accelerators (CESA) supports
+the TDMA chained mode support. When this mode is enabled and crypto
+requests are chained at the DMA level, multiple crypto requests can be
+handled by the hardware engine without requiring any software
+intervention. This approach limits the number of interrupts generated
+by the engines thus improving its throughput and making the whole system
+behave nicely under heavy crypto load.
 
-I really don't want to do that.  There are things that the decompressor
-does which make it easier to deal with the zImage than the Image.
+Benchmarking results with dmcrypt
+=================================
+		I/O read	I/O write
+Before		81.7 MB/s	31.7 MB/s
+After		129  MB/s	39.8 MB/s
 
-> I see at least another issue clearly in ARM kernel code with CONFIG_DEBUG_RODATA
-> enabled.  When CONFIG_DEBUG_RODATA is enabled, we can not write text area.
-> kexec_start_address has been defined in relocate_kernel.S as a text area.
-> machine_kexec() writes at kexec_start_address with image->start. Similarly there
-> would be issues for overwriting of kexec_indirection_page, kexec_mach_type and
-> kexec_boot_atags. If arm mmu mapping configures text pages as RO, then we should
-> see an abort as soon as we do these writes.
+Improvement	+57.8 %		+25.5 %
 
-That's not a problem, because set_kernel_text_rw() is called immediately
-prior to writing, which has the effect of allowing these writes.
+
+
+Romain Perier (7):
+  crypto: marvell: Add a macro constant for the size of the crypto queue
+  crypto: marvell: Check engine is not already running when enabling a
+    req
+  crypto: marvell: Copy IV vectors by DMA transfers for acipher requests
+  crypto: marvell: Moving the tdma chain out of mv_cesa_tdma_req
+  crypto: marvell: Adding a complete operation for async requests
+  crypto: marvell: Adding load balancing between engines
+  crypto: marvell: Add support for chaining crypto requests in TDMA mode
+
+ drivers/crypto/marvell/cesa.c   | 142 ++++++++++++++++++++++++++++++----------
+ drivers/crypto/marvell/cesa.h   | 103 +++++++++++++++++++++++------
+ drivers/crypto/marvell/cipher.c | 141 +++++++++++++++++++++++----------------
+ drivers/crypto/marvell/hash.c   | 126 +++++++++++++++++------------------
+ drivers/crypto/marvell/tdma.c   | 120 +++++++++++++++++++++++++++++++--
+ 5 files changed, 452 insertions(+), 180 deletions(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
