@@ -1,57 +1,49 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 15 Jun 2016 11:34:11 -0400
-Subject: [RFC PATCH v3 2/2] ARM64/PCI: Start using quirks handling for ACPI
- based PCI host controller
-In-Reply-To: <1466004851-10214-1-git-send-email-cov@codeaurora.org>
-References: <1466004851-10214-1-git-send-email-cov@codeaurora.org>
-Message-ID: <1466004851-10214-2-git-send-email-cov@codeaurora.org>
+From: eric.engestrom@imgtec.com (Eric Engestrom)
+Date: Wed, 15 Jun 2016 16:35:24 +0100
+Subject: [PATCH v5 3/3] MAINTAINERS: Add entry for Mali-DP driver
+In-Reply-To: <1466002295-24813-4-git-send-email-Liviu.Dudau@arm.com>
+References: <1466002295-24813-1-git-send-email-Liviu.Dudau@arm.com>
+ <1466002295-24813-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20160615153524.GA21140@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Nowicki <tn@semihalf.com>
+On Wed, Jun 15, 2016 at 03:51:35PM +0100, Liviu Dudau wrote:
+> Add MAINTAINERS entry for ARM Mali-DP driver and update the
+> HDLCD file matching pattern to cover only HDLCD rather than
+> the whole drivers/gpu/drm/arm directory.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> ---
+>  MAINTAINERS | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 0bf119c..16deb07 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -865,9 +865,17 @@ F:	Documentation/devicetree/bindings/display/snps,arcpgu.txt
+>  ARM HDLCD DRM DRIVER
+>  M:	Liviu Dudau <liviu.dudau@arm.com>
+>  S:	Supported
+> -F:	drivers/gpu/drm/arm/
+> +F:	drivers/gpu/drm/arm/hdlcd_*
+>  F:	Documentation/devicetree/bindings/display/arm,hdlcd.txt
+>  
+> +ARM MALI-DP DRM DRIVER
+> +M:	Liviu Dudau <liviu.dudau@arm.com>
+> +M:	Brian Starkey <brian.starkey@arm.com>
+> +M:	Mali DP Maintainers <malidp@foss.arm.com>
+> +S:	Supported
+> +F:	drivers/gpu/drm/arm/
 
-pci_generic_ecam_ops is used by default. Since there are platforms
-which have non-compliant ECAM space we need to overwrite these
-accessors prior to PCI buses enumeration. In order to do that
-we call pci_mcfg_get_ops to retrieve pci_ecam_ops structure so that
-we can use proper PCI config space accessors and bus_shift.
+IIUC this will also catch `drivers/gpu/drm/arm/hdlcd_*`.
+Did you mean `drivers/gpu/drm/arm/malidp_*` ?
 
-pci_generic_ecam_ops is still used for platforms free from quirks.
-
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- arch/arm64/kernel/pci.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 94cd43c..a891bda 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -139,6 +139,7 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
- 	struct pci_config_window *cfg;
- 	struct resource cfgres;
- 	unsigned int bsz;
-+	struct pci_ecam_ops *ops;
- 
- 	/* Use address from _CBA if present, otherwise lookup MCFG */
- 	if (!root->mcfg_addr)
-@@ -150,12 +151,12 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
- 		return NULL;
- 	}
- 
--	bsz = 1 << pci_generic_ecam_ops.bus_shift;
-+	ops = pci_mcfg_get_ops(root);
-+	bsz = 1 << ops->bus_shift;
- 	cfgres.start = root->mcfg_addr + bus_res->start * bsz;
- 	cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
- 	cfgres.flags = IORESOURCE_MEM;
--	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
--			      &pci_generic_ecam_ops);
-+	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res, ops);
- 	if (IS_ERR(cfg)) {
- 		dev_err(&root->device->dev, "%04x:%pR error %ld mapping ECAM\n",
- 			seg, bus_res, PTR_ERR(cfg));
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> +F:	Documentation/devicetree/bindings/display/arm,malidp.txt
+> +
+>  ARM MFM AND FLOPPY DRIVERS
+>  M:	Ian Molton <spyro@f2s.com>
+>  S:	Maintained
+> -- 
+> 2.8.2
