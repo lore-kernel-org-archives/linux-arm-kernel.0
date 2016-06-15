@@ -1,131 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2016 17:45:46 +0200
-Subject: [PATCH v2 04/11] Kbuild: arch: look for generated headers in obtree
+Date: Wed, 15 Jun 2016 17:45:43 +0200
+Subject: [PATCH v2 01/11] Kbuild: don't add ../../ to include path
 In-Reply-To: <20160615154553.3177021-1-arnd@arndb.de>
 References: <20160615154553.3177021-1-arnd@arndb.de>
-Message-ID: <20160615154553.3177021-5-arnd@arndb.de>
+Message-ID: <20160615154553.3177021-2-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are very few files that need add an -I$(obj) gcc for the preprocessor
-or the assembler. For C files, we add always these for both the objtree and
-srctree, but for the other ones we require the Makefile to add them, and
-Kbuild then adds it for both trees.
+When we build with O=objdir and objdir is directly below the source tree,
+$(srctree) becomes '..'.
 
-As a preparation for changing the meaning of the -I$(obj) directive to
-only refer to the srctree, this changes the two instances in arch/x86 to use
-an explictit $(objtree) prefix where needed, otherwise we won't find the
-headers any more, as reported by the kbuild 0day builder.
+When a Makefile adds a CFLAGS option like -Ipath/to/headers and
+we are building with a separate object directory, Kbuild tries to
+add two -I options, one for the source tree and one for the object
+tree. An absolute path is treated as a special case, and don't add
+this one twice. This also normally catches -I$(srctree)/$(src)
+as $(srctree) usually is an absolute directory like /home/arnd/linux/.
 
-arch/x86/realmode/rm/realmode.lds.S:75:20: fatal error: pasyms.h: No such file or directory
+The combination of the two behaviors however results in an invalid
+path name to be included: we get both ../$(src) and ../../$(src),
+the latter one pointing outside of the source tree, usually to a
+nonexisting directory. Building with 'make W=1' makes this obvious:
+
+cc1: error: ../../arch/arm/mach-s3c24xx/include: No such file or directory [-Werror=missing-include-dirs]
+
+This adds another special case, treating path names starting with ../
+like those starting with / so we don't try to prefix that with
+$(srctree).
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/alpha/boot/Makefile           | 2 +-
- arch/powerpc/boot/Makefile         | 2 +-
- arch/powerpc/kvm/Makefile          | 2 +-
- arch/s390/boot/compressed/Makefile | 4 ++--
- arch/um/Makefile                   | 4 ++--
- arch/x86/boot/Makefile             | 2 +-
- arch/x86/realmode/rm/Makefile      | 2 +-
- 7 files changed, 9 insertions(+), 9 deletions(-)
+ scripts/Kbuild.include | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/alpha/boot/Makefile b/arch/alpha/boot/Makefile
-index 8399bd0e68e8..0cbe4c59d3ce 100644
---- a/arch/alpha/boot/Makefile
-+++ b/arch/alpha/boot/Makefile
-@@ -15,7 +15,7 @@ targets		:= vmlinux.gz vmlinux \
- OBJSTRIP	:= $(obj)/tools/objstrip
+diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+index 0f82314621f2..f8b45eb47ed3 100644
+--- a/scripts/Kbuild.include
++++ b/scripts/Kbuild.include
+@@ -202,7 +202,7 @@ hdr-inst := -f $(srctree)/scripts/Makefile.headersinst obj
+ # Prefix -I with $(srctree) if it is not an absolute path.
+ # skip if -I has no parameter
+ addtree = $(if $(patsubst -I%,%,$(1)), \
+-$(if $(filter-out -I/%,$(1)),$(patsubst -I%,-I$(srctree)/%,$(1))) $(1))
++$(if $(filter-out -I/% -I../%,$(1)),$(patsubst -I%,-I$(srctree)/%,$(1))) $(1))
  
- HOSTCFLAGS	:= -Wall -I$(objtree)/usr/include
--BOOTCFLAGS	+= -I$(obj) -I$(srctree)/$(obj)
-+BOOTCFLAGS	+= -I$(objtree)/$(obj) -I$(srctree)/$(obj)
- 
- # SRM bootable image.  Copy to offset 512 of a partition.
- $(obj)/bootimage: $(addprefix $(obj)/tools/,mkbb lxboot bootlx) $(obj)/vmlinux.nh
-diff --git a/arch/powerpc/boot/Makefile b/arch/powerpc/boot/Makefile
-index 8fe78a3efc92..ad3782610cf1 100644
---- a/arch/powerpc/boot/Makefile
-+++ b/arch/powerpc/boot/Makefile
-@@ -43,7 +43,7 @@ ifeq ($(call cc-option-yn, -fstack-protector),y)
- BOOTCFLAGS	+= -fno-stack-protector
- endif
- 
--BOOTCFLAGS	+= -I$(obj) -I$(srctree)/$(obj)
-+BOOTCFLAGS	+= -I$(objtree)/$(obj) -I$(srctree)/$(obj)
- 
- DTC_FLAGS	?= -p 1024
- 
-diff --git a/arch/powerpc/kvm/Makefile b/arch/powerpc/kvm/Makefile
-index eba0bea6e032..1f9e5529e692 100644
---- a/arch/powerpc/kvm/Makefile
-+++ b/arch/powerpc/kvm/Makefile
-@@ -20,7 +20,7 @@ common-objs-y += powerpc.o emulate.o emulate_loadstore.o
- obj-$(CONFIG_KVM_EXIT_TIMING) += timing.o
- obj-$(CONFIG_KVM_BOOK3S_HANDLER) += book3s_exports.o
- 
--AFLAGS_booke_interrupts.o := -I$(obj)
-+AFLAGS_booke_interrupts.o := -I$(objtree)/$(obj)
- 
- kvm-e500-objs := \
- 	$(common-objs-y) \
-diff --git a/arch/s390/boot/compressed/Makefile b/arch/s390/boot/compressed/Makefile
-index 1dd210347e12..2657a29a2026 100644
---- a/arch/s390/boot/compressed/Makefile
-+++ b/arch/s390/boot/compressed/Makefile
-@@ -31,10 +31,10 @@ quiet_cmd_sizes = GEN $@
- $(obj)/sizes.h: vmlinux
- 	$(call if_changed,sizes)
- 
--AFLAGS_head.o += -I$(obj)
-+AFLAGS_head.o += -I$(objtree)/$(obj)
- $(obj)/head.o: $(obj)/sizes.h
- 
--CFLAGS_misc.o += -I$(obj)
-+CFLAGS_misc.o += -I$(objtree)/$(obj)
- $(obj)/misc.o: $(obj)/sizes.h
- 
- OBJCOPYFLAGS_vmlinux.bin :=  -R .comment -S
-diff --git a/arch/um/Makefile b/arch/um/Makefile
-index e3abe6f3156d..0ca46ededfc7 100644
---- a/arch/um/Makefile
-+++ b/arch/um/Makefile
-@@ -78,8 +78,8 @@ include $(ARCH_DIR)/Makefile-os-$(OS)
- 
- KBUILD_CPPFLAGS += -I$(srctree)/$(HOST_DIR)/include \
- 		   -I$(srctree)/$(HOST_DIR)/include/uapi \
--		   -I$(HOST_DIR)/include/generated \
--		   -I$(HOST_DIR)/include/generated/uapi
-+		   -I$(objtree)/$(HOST_DIR)/include/generated \
-+		   -I$(objtree)/$(HOST_DIR)/include/generated/uapi
- 
- # -Derrno=kernel_errno - This turns all kernel references to errno into
- # kernel_errno to separate them from the libc errno.  This allows -fno-common
-diff --git a/arch/x86/boot/Makefile b/arch/x86/boot/Makefile
-index be8e688fa0d4..12ea8f8384f4 100644
---- a/arch/x86/boot/Makefile
-+++ b/arch/x86/boot/Makefile
-@@ -96,7 +96,7 @@ $(obj)/zoffset.h: $(obj)/compressed/vmlinux FORCE
- 	$(call if_changed,zoffset)
- 
- 
--AFLAGS_header.o += -I$(obj)
-+AFLAGS_header.o += -I$(objtree)/$(obj)
- $(obj)/header.o: $(obj)/zoffset.h
- 
- LDFLAGS_setup.elf	:= -T
-diff --git a/arch/x86/realmode/rm/Makefile b/arch/x86/realmode/rm/Makefile
-index c556c5ae8de5..25012abc3409 100644
---- a/arch/x86/realmode/rm/Makefile
-+++ b/arch/x86/realmode/rm/Makefile
-@@ -48,7 +48,7 @@ targets += realmode.lds
- $(obj)/realmode.lds: $(obj)/pasyms.h
- 
- LDFLAGS_realmode.elf := --emit-relocs -T
--CPPFLAGS_realmode.lds += -P -C -I$(obj)
-+CPPFLAGS_realmode.lds += -P -C -I$(objtree)/$(obj)
- 
- targets += realmode.elf
- $(obj)/realmode.elf: $(obj)/realmode.lds $(REALMODE_OBJS) FORCE
+ # Find all -I options and call addtree
+ flags = $(foreach o,$($(1)),$(if $(filter -I%,$(o)),$(call addtree,$(o)),$(o)))
 -- 
 2.9.0
