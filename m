@@ -1,91 +1,30 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 15 Jun 2016 11:17:54 +0100
-Subject: [PATCH v5 5/8] arm64, dts: add Juno cpu capacity-dmips-mhz information
-In-Reply-To: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
-References: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
-Message-ID: <1465985877-18271-6-git-send-email-juri.lelli@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 15 Jun 2016 12:23:10 +0200
+Subject: [PATCH v3 2/2] dt-bindings: clocksource: Add Add Oxford
+ Semiconductor RPS Timer bindings
+In-Reply-To: <1465985607-21231-3-git-send-email-narmstrong@baylibre.com>
+References: <1465985607-21231-1-git-send-email-narmstrong@baylibre.com>
+ <1465985607-21231-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <57612C8E.1030405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Juno cpu capacity-dmips-mhz bindings information.
+On 06/15/2016 12:13 PM, Neil Armstrong wrote:
+> Add DT bindings for the Oxford Semiconductor RPS dual Timer.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jon Medhurst <tixy@linaro.org>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Juri Lelli <juri.lelli@arm.com>
----
+Waiting for Rob's acked before picking the series.
 
-Changes from v1:
-  - capacity-scale removed
+Thanks !
 
-Changes from v4:
-  - binding changed to capacity-dmips-mhz
----
- arch/arm64/boot/dts/arm/juno.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+   -- Daniel
 
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index dcfcf15..ad07815 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -90,6 +90,7 @@
- 			next-level-cache = <&A57_L2>;
- 			clocks = <&scpi_dvfs 0>;
- 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <1024>;
- 		};
- 
- 		A57_1: cpu at 1 {
-@@ -100,6 +101,7 @@
- 			next-level-cache = <&A57_L2>;
- 			clocks = <&scpi_dvfs 0>;
- 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <1024>;
- 		};
- 
- 		A53_0: cpu at 100 {
-@@ -110,6 +112,7 @@
- 			next-level-cache = <&A53_L2>;
- 			clocks = <&scpi_dvfs 1>;
- 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <578>;
- 		};
- 
- 		A53_1: cpu at 101 {
-@@ -120,6 +123,7 @@
- 			next-level-cache = <&A53_L2>;
- 			clocks = <&scpi_dvfs 1>;
- 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <578>;
- 		};
- 
- 		A53_2: cpu at 102 {
-@@ -130,6 +134,7 @@
- 			next-level-cache = <&A53_L2>;
- 			clocks = <&scpi_dvfs 1>;
- 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <578>;
- 		};
- 
- 		A53_3: cpu at 103 {
-@@ -140,6 +145,7 @@
- 			next-level-cache = <&A53_L2>;
- 			clocks = <&scpi_dvfs 1>;
- 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <578>;
- 		};
- 
- 		A57_L2: l2-cache0 {
+
 -- 
-2.7.0
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
