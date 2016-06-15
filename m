@@ -1,85 +1,61 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 15 Jun 2016 23:10:08 +0200
-Subject: [PATCH v2 4/6] PM / Hibernate: Allow architectures to specify the
- hibernate/resume CPU
-In-Reply-To: <1466012148-7674-5-git-send-email-james.morse@arm.com>
-References: <1466012148-7674-1-git-send-email-james.morse@arm.com>
- <1466012148-7674-5-git-send-email-james.morse@arm.com>
-Message-ID: <CAJZ5v0ipRONyMe15k=-FhcKEGM6kMh5Vu35XQexBr0SMYQoktQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 15 Jun 2016 23:11:20 +0200
+Subject: [PATCH v2 1/4] ASoC: sunxi: Add A10 I2S controller binding
+ documentation
+In-Reply-To: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
+References: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160615211123.31068-2-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 7:35 PM, James Morse <james.morse@arm.com> wrote:
-> On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
-> user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
-> kernel will assign logical id 0 to a different physical CPU.
-> This breaks hibernate as hibernate and resume will be attempted on different
-> CPUs.
->
-> Define a weak symbol arch_hibernation_disable_cpus(), which defaults to
-> calling disable_nonboot_cpus). Architectures that allow CPU 0 to be
-> hotplugged can use this to control which CPU is used for hibernate/resume.
->
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> ---
-> If this approach is acceptable, this patch should go with 4&5 via the arm64
-> tree.
+Introduce the device tree binding for the I2S controller found in the
+Allwinner A10 and later SoCs.
 
-I'm not entirely happy with this, but if you absolutely need it and if
-you can't think about any cleaner way to achieve the goal, feel free
-to add my ACK to this patch if necessary.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ .../devicetree/bindings/sound/sun4i-i2s.txt        | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun4i-i2s.txt
 
->  kernel/power/hibernate.c | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
->
-> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-> index fca9254280ee..0e668a3207ec 100644
-> --- a/kernel/power/hibernate.c
-> +++ b/kernel/power/hibernate.c
-> @@ -70,6 +70,16 @@ bool hibernation_available(void)
->  }
->
->  /**
-> + * arch_hibernation_disable_cpus - Allow architectures to direct which CPU
-> + * is used for suspend or resume.
-> + * @suspend: True during hibernate, false for resume.
-> + */
-> +int __weak arch_hibernation_disable_cpus(__maybe_unused bool suspend)
-> +{
-> +       return disable_nonboot_cpus();
-> +}
-> +
-> +/**
->   * hibernation_set_ops - Set the global hibernate operations.
->   * @ops: Hibernation operations to use in subsequent hibernation transitions.
->   */
-> @@ -279,7 +289,7 @@ static int create_image(int platform_mode)
->         if (error || hibernation_test(TEST_PLATFORM))
->                 goto Platform_finish;
->
-> -       error = disable_nonboot_cpus();
-> +       error = arch_hibernation_disable_cpus(true);
->         if (error || hibernation_test(TEST_CPUS))
->                 goto Enable_cpus;
->
-> @@ -433,7 +443,7 @@ static int resume_target_kernel(bool platform_mode)
->         if (error)
->                 goto Cleanup;
->
-> -       error = disable_nonboot_cpus();
-> +       error = arch_hibernation_disable_cpus(false);
->         if (error)
->                 goto Enable_cpus;
->
-> @@ -551,7 +561,7 @@ int hibernation_platform_enter(void)
->         if (error)
->                 goto Platform_finish;
->
-> -       error = disable_nonboot_cpus();
-> +       error = arch_hibernation_disable_cpus(true);
->         if (error)
->                 goto Enable_cpus;
->
-> --
+diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+new file mode 100644
+index 000000000000..7b526ec64991
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+@@ -0,0 +1,34 @@
++* Allwinner A10 I2S controller
++
++The I2S bus (Inter-IC sound bus) is a serial link for digital
++audio data transfer between devices in the system.
++
++Required properties:
++
++- compatible: should be one of the followings
++   - "allwinner,sun4i-a10-i2s"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: should contain the I2S interrupt.
++- dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
++	Documentation/devicetree/bindings/dma/dma.txt
++- dma-names: should include "tx" and "rx".
++- clocks: a list of phandle + clock-specifer pairs, one for each entry in clock-names.
++- clock-names: should contain followings:
++   - "apb" : clock for the I2S bus interface
++   - "mod" : module clock for the I2S controller
++- #sound-dai-cells : Must be equal to 0
++
++Example:
++
++i2s0: i2s at 01c22400 {
++	#sound-dai-cells = <0>;
++	compatible = "allwinner,sun4i-a10-i2s";
++	reg = <0x01c22400 0x400>;
++	interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&apb0_gates 3>, <&i2s0_clk>;
++	clock-names = "apb", "mod";
++	dmas = <&dma SUN4I_DMA_NORMAL 3>,
++	       <&dma SUN4I_DMA_NORMAL 3>;
++	dma-names = "rx", "tx";
++};
+-- 
+2.9.0
