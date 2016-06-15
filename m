@@ -1,42 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 15 Jun 2016 14:49:38 +0100
-Subject: [PATCH v5 4/8] arm64: parse cpu capacity-dmips-mhz from DT
-In-Reply-To: <1465985877-18271-5-git-send-email-juri.lelli@arm.com>
-References: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
- <1465985877-18271-5-git-send-email-juri.lelli@arm.com>
-Message-ID: <20160615134938.GA2282@sirena.org.uk>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 15 Jun 2016 16:02:33 +0200
+Subject: [PATCH v5 00/18] Cleanup for populate default bus
+In-Reply-To: <CAL_JsqKesg9=Gc83ULcpGwWU_C3BO3o02fUcur=RO__BgLPpug@mail.gmail.com>
+References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
+ <CAL_JsqKesg9=Gc83ULcpGwWU_C3BO3o02fUcur=RO__BgLPpug@mail.gmail.com>
+Message-ID: <20160615140232.GN26566@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 11:17:53AM +0100, Juri Lelli wrote:
+On Wed, Jun 08, 2016 at 10:42:50AM -0500, Rob Herring wrote:
+> +Joerg, Will
+> 
+> On Wed, Jun 1, 2016 at 1:52 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
+> > This cleanup patchset cantains two parts.
+> >
+> > Firstly, introduce a new way to populate the default bus, then, we can
+> > drop unnecessary calls from the arch code, and do the same thing for
+> > of_iommu_init() in [1].
+> >
+> > Secondly, use helper of_platform_default_populate() in linux/of_platform
+> > when possible, instead of calling of_platform_populate() with default
+> > match table, After that, it is possible for driver code build as a module,
+> > and no need to export of_default_bus_match_table anymore.
+> >
+> > This patchset is based on Linux 4.7-rc1, and only test in arm/arm64 qemu
+> > with defconfig.
+> 
+> This series doesn't apply for me as it appears you had "of: iommu:
+> make of_iommu_init() postcore_initcall_sync" in your tree. Either we
+> need to phase these out over 2 releases or someone needs to take them
+> all (or we leave the minor conflicts for Linus).
 
-> +		if (!raw_capacity) {
-> +			raw_capacity = kzalloc(sizeof(*raw_capacity) *
-> +					num_possible_cpus(), GFP_KERNEL);
+Feel free to take the mentioned patch through your tree with my
 
-kcalloc()?
+Acked-by: Joerg Roedel <jroedel@suse.de>
 
-> +			if (!raw_capacity) {
-> +				pr_err("cpu_capacity: failed to allocate memory"
-> +				       " for raw capacities\n");
 
-It's normally better to avoid splitting errors message so people can
-grep if they see the error.
-
-> +	} else {
-> +		pr_err("cpu_capacity: missing %s raw capacity "
-> +		       "(fallback to 1024 for all CPUs)\n",
-> +				cpu_node->full_name);
-
-That's going to complain fairly loudly for all existing DTs isn't it and
-it's kind of redundant if all the cores have the same capacity (which is
-a very common case)?  How about printing an error only if we already
-found one, or printing a single warning at the end if we didn't get
-anything?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/7556dbd7/attachment-0001.sig>
+	Joerg
