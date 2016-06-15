@@ -1,61 +1,67 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 15 Jun 2016 21:08:30 +0200
-Subject: [PATCH] Revert "gpio: bail out silently on NULL descriptors"
-In-Reply-To: <20160615184628.GA5144@lukather>
-References: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
- <20160615184628.GA5144@lukather>
-Message-ID: <3a03fc91-b339-3e43-4e95-e1488197a8df@redhat.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 15 Jun 2016 21:12:54 +0200
+Subject: arm-soc boot: 619 boots: 11 failed, 605 passed with 2 offline, 1
+ conflict (v4.7-rc3-216-gec0776a212c1)
+In-Reply-To: <m2twgupbpl.fsf@baylibre.com>
+References: <5760acd0.571a1c0a.34a58.7333@mx.google.com>
+ <9297488.MELcTREXgu@wuerfel> <m2twgupbpl.fsf@baylibre.com>
+Message-ID: <20160615191254.GA19579@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 15, 2016 at 11:07:50AM -0700, Kevin Hilman wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > On Tuesday, June 14, 2016 6:18:08 PM CEST kernelci. org bot wrote:
+> >> arm:
+> >> 
+> >>     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
+> >>         exynos5410-odroidxu: 1 failed lab
+> >> 
+> >>     multi_v7_defconfig+CONFIG_LKDTM=y:
+> >>         exynos5410-odroidxu: 1 failed lab
+> >> 
+> >>     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y+CONFIG_ARM_MODULE_PLTS=y:
+> >>         exynos5410-odroidxu: 1 failed lab
+> >> 
+> >>     multi_v7_defconfig+CONFIG_EFI=y:
+> >>         exynos5410-odroidxu: 1 failed lab
+> >> 
+> >>     exynos_defconfig:
+> >>         exynos5410-odroidxu: 1 failed lab
+> >> 
+> >>     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
+> >>         exynos5410-odroidxu: 1 failed lab
+> >> 
+> >>     multi_v7_defconfig:
+> >>         exynos5410-odroidxu: 1 failed lab
+> >> 
+> >>     multi_v5_defconfig:
+> >>         at91sam9261ek: 1 failed lab
+> >>         at91sam9m10g45ek: 1 failed lab
+> >>         at91sam9x25ek: 1 failed lab
+> >>         at91sam9x35ek: 1 failed lab
+> >
+> > These all seem to have broken after yesterday's merges, adding
+> > Alexandre and Krzysztof to Cc here so they can have a look.
+> 
+> The exynos5410 fails look like the UART3 issue reported earlier and
+> which is also happening in linux-next.
+> 
+> Krzysztof posted a fix[1] that was tested by Javier and myself that
+> fixed the problem, but I don't see that upstream yet.
+> 
+> Krzysztof: did you get that fix submitted yet?
+> 
+> Kevin
+> 
+> [1] http://marc.info/?l=linux-kernel&m=146469459503940&w=2
 
-On 15-06-16 20:46, Maxime Ripard wrote:
-> Hi,
->
-> On Wed, Jun 15, 2016 at 08:22:34PM +0200, Hans de Goede wrote:
->> This reverts commit 54d77198fdfb("gpio: bail out silently on NULL
->> descriptors").
->>
->> This commit causes the following code to fail:
->>
->> gpio_desc = devm_gpiod_get_optional(dev, ...);
->> gpio_irq  = gpiod_to_irq(gpio_desc);
->> if (gpio_irq >= 0) {
->> 	ret = devm_request_irq(dev, gpio_irq, ...);
->>
->> And now ret is an error causing the probe function in question to bail.
->>
->> The problem here is that gpiod_to_irq now returns 0 for a NULL
->> gpio_desc while 0 is a valid irq-nr. Also see:
->> commit 4c37ce8608a8("gpio: make gpiod_to_irq() return negative for NO_IRQ")
->> which specifically avoids returning 0.
->
-> 0 is not a valid interrupt number.
+The v2 of it is here:
+https://patchwork.kernel.org/patch/9144897/
 
-Ok, so lets decouple the discussion a bit from whether or not 0
-is a valid interrupt number.
+I do not recall receiving any feedback nor confirmation of applying the patch.
+I guess it is time to resend. I'll do it on Thursday.
 
-> irq_find_mapping returns 0 in case of an error:
-> http://lxr.free-electrons.com/source/kernel/irq/irqdomain.c#L657
-
-Yes and in that case gpiod_to_irq() will explicitly return -ENXIO
-so as to not confuse callers.
-
-Which is the right thing to do, since almost all kernel functions
-have the semantic ret < 0 means error >= 0 means success.
-
-The patch I'm suggestion to revert however now has gpiod_to_irq()
-return 0 when it gets passed a NULL gpio_desc pointer, so this
-really has nothing to do with irq_find_mapping() at all (that never
-gets called in this case) and has everything to do with the
-patch I suggest we revert changing the behavior for
-gpiod_to_irq(NULL).
-
-Also not that that patch has a Cc: stable, so fix the driver is
-really not a good answer, stable patches should not change
-(internal) api behavior and break other code.
-
-Regards,
-
-Hans
+Best regards,
+Krzysztof
