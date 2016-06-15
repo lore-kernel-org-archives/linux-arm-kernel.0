@@ -1,52 +1,69 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 15 Jun 2016 21:29:38 +0200
-Subject: [PATCH v5 2/3] drm/arm: Add support for Mali Display Processors
-In-Reply-To: <20160615172104.GI9711@e106497-lin.cambridge.arm.com>
-References: <1466002295-24813-1-git-send-email-Liviu.Dudau@arm.com>
- <1466002295-24813-3-git-send-email-Liviu.Dudau@arm.com>
- <20160615152309.GI1338@phenom.ffwll.local>
- <20160615161758.GF9711@e106497-lin.cambridge.arm.com>
- <CAKMK7uENW3cU8LccHcqffX3cbzax2-5mzY0101yLfR7vtD4CoA@mail.gmail.com>
- <20160615172104.GI9711@e106497-lin.cambridge.arm.com>
-Message-ID: <CAKMK7uGFTmQERWcDeQ=V-ntbgQv6K1avGx1LKCGLcAWacmHKnA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 15 Jun 2016 21:30:23 +0200
+Subject: [PATCH v3 4/4] musb: sunxi: Simplify dr_mode handling
+In-Reply-To: <08af737c-f1f1-0966-0eca-24d4daa7423b@redhat.com>
+References: <1465138776-6003-1-git-send-email-hdegoede@redhat.com>
+ <1465138776-6003-4-git-send-email-hdegoede@redhat.com>
+ <20160608102325.GI14179@lukather>
+ <08af737c-f1f1-0966-0eca-24d4daa7423b@redhat.com>
+Message-ID: <20160615193023.GB5144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 7:21 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> On Wed, Jun 15, 2016 at 07:13:15PM +0200, Daniel Vetter wrote:
->> On Wed, Jun 15, 2016 at 6:17 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> > On Wed, Jun 15, 2016 at 05:23:10PM +0200, Daniel Vetter wrote:
->> >> On Wed, Jun 15, 2016 at 03:51:34PM +0100, Liviu Dudau wrote:
->> >> > Add support for the new family of Display Processors from ARM Ltd.
->> >> > This commit adds basic support for Mali DP500, DP550 and DP650
->> >> > parts, with only the display engine being supported at the moment.
->> >> >
->> >> > Cc: David Brown <David.Brown@arm.com>
->> >> > Cc: Brian Starkey <Brian.Starkey@arm.com>
->> >> >
->> >> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->> >>
->> >> Small thing I noticed: drm_dev_register/connector_register_all should be
->> >> the last step in your init code, and unregister the first. Atm it's
->> >> somewhere in the middle. But perfectly fine to do that as a follow-up.
->> >
->> > I've tried that, but the connector and encoder that gets registered as part
->> > of the component_bind_all() fails if there is no drm dev registered. You did
->> > comment on the v4 version about that and I did test your idea, sorry for
->> > forgeting to update you on that.
->>
->> Why does it fail? That shouldn't happen ... we need to be able to set
->> up everything first, before we register.
->
-> Could be the tda998x_drv fault, but I'm getting this splat:
+Hi,
 
-Yeah, tda9998x needs to be fixed to _not_ register it's connector
-before the overall (componentized) driver is ready. We need to make
-sure first ofc that all users of that driver do register connectors,
-but Chris' patch series will take care of that. But tda9998x needs to
-be fixed either way.
--Daniel
+On Wed, Jun 08, 2016 at 12:30:20PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 08-06-16 12:23, Maxime Ripard wrote:
+> >Hi,
+> >
+> >On Sun, Jun 05, 2016 at 04:59:36PM +0200, Hans de Goede wrote:
+> >>phy-sun4i-usb now has proper dr_mode handling, it always registers an
+> >>extcon, and sends a notify with the mode (even when in peripheral- /
+> >>host-only mode) at least once.
+> >>
+> >>So we can simply the sunxi musb glue by always registering its extcon
+> >>notifier and relying on sunxi_musb_work() to enable vbus when in
+> >>host-only mode.
+> >>
+> >>This also enables host- and peripheral-only mode with vbus monitoring.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >
+> >It's been a bit painful to track all the patches needed so that it
+> >applies properly, but I've finally been able to test it on a Sinlinx
+> >SinA33 with peripheral-only mUSB, and it works like a charm.
+> >
+> >You can add my Tested-by.
+> 
+> Great, thanks for testing.
+> 
+> This is the board which has an otg connector with vbus not connected,
+> right? Yet it does have a functional id-pin, right ?
+
+It's that one, yes.
+
+> In that case you should be able to put it in dual-role mode (only
+> specify the id-pin in the phy dts node, no vbus / vbus-monitoring)
+> and then it _should_ work in host mode if you use a powered hub.
+> 
+> I'm fine with putting in peripheral-only mode, but as said
+> dual-role might work with a powered hub.
+
+Good point, I'll test that.
+
+Thanks!
+Maxime
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/4ee36279/attachment-0001.sig>
