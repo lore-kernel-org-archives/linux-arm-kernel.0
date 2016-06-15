@@ -1,42 +1,35 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 15 Jun 2016 22:11:31 +0530
-Subject: [PATCH] dma: mv_xor_v2: new driver
-In-Reply-To: <20160615160837.64377829@free-electrons.com>
-References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160222032730.GU19598@localhost>
- <20160615160837.64377829@free-electrons.com>
-Message-ID: <20160615164131.GB16910@localhost>
+From: diego.dorta@nxp.com (Diego Dorta)
+Date: Wed, 15 Jun 2016 13:34:41 -0300
+Subject: [PATCH] ARM: dts: imx6ul-pico-hobbit: Fix Ethernet PHY reset GPIO
+Message-ID: <1466008481-10576-1-git-send-email-diego.dorta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 04:08:37PM +0200, Thomas Petazzoni wrote:
+According to the imx6ul-pico-hobbit schematics the Ethernet PHY reset GPIO
+is GPIO1_28, so fix it accordingly.
+
+Also adjust the reset duration to 1ms, because the KSZ8081 datasheet
+requires 500?s.
+
+Signed-off-by: Diego Dorta <diego.dorta@nxp.com>
+---
+ arch/arm/boot/dts/imx6ul-pico-hobbit.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+index 8ce1fec..e760cda 100644
+--- a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
++++ b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+@@ -151,8 +151,8 @@
+ 	phy-mode = "rmii";
+ 	phy-handle = <&ethphy1>;
+ 	status = "okay";
+-	phy-reset-gpios = <&gpio2 15 GPIO_ACTIVE_LOW>;
+-	phy-reset-duration = <11>;
++	phy-reset-gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
++	phy-reset-duration = <1>;
  
-> > > +			(xor_dev->desc_size * desq_ptr));
-> > > +
-> > > +	memcpy(dest_hw_desc, &sw_desc->hw_desc, xor_dev->desc_size);
-> > > +
-> > > +	/* update the DMA Engine with the new descriptor */
-> > > +	mv_xor_v2_add_desc_to_desq(xor_dev, 1);
-> > > +
-> > > +	/* unlock enqueue DESCQ */
-> > > +	spin_unlock_bh(&xor_dev->push_lock);  
-> > 
-> > and if IIUC, you are pushing this to HW as well, that is not quite right if
-> > thats the case. We need to do this in issue_pending
-> 
-> This is probably the only thing that I have not changed. The mv_xor
-> driver is already using the same strategy, and enqueuing in
-> issue_pending() would force us to add the request to a temporary linked
-> list, which would be dequeued in issue_pending(). This is quite a bit
-> of additional processing, while pushing the new requests directly to
-> the engine works fine.
-
-Well that is wrong! And patch is welcome for mv_xor as well :)
-
-The DMAengine API mandates that we should submit a descriptor to a queue and
-then push them by invoking issue_pending.
-
-The users are also expected to follow this
-
+ 	mdio {
+ 		#address-cells = <1>;
 -- 
-~Vinod
+2.7.4
