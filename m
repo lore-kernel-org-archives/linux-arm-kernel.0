@@ -1,18 +1,42 @@
 From: athorlton@sgi.com (Alex Thorlton)
-Date: Wed, 15 Jun 2016 14:04:15 -0500
-Subject: [PATCH 3/3] Update efi_thunk to use the the arch_efi_call_virt* macros
-In-Reply-To: <1466017455-236934-1-git-send-email-athorlton@sgi.com>
-References: <1466017455-236934-1-git-send-email-athorlton@sgi.com>
-Message-ID: <1466017455-236934-4-git-send-email-athorlton@sgi.com>
+Date: Wed, 15 Jun 2016 14:04:12 -0500
+Subject: [PATCHv2 0/3] x86/UV, x86/efi: Re-factor efi_call_virt for general use
+Message-ID: <1466017455-236934-1-git-send-email-athorlton@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the efi_thunk macro has some semi-duplicated code in it that
-can be replaced with the arch_efi_call_virt_setup/teardown macros. This
-commit simply replaces the duplicated code with those macros.
+Hey guys,
 
-Signed-off-by: Alex Thorlton <athorlton@sgi.com>
-Suggested-by: Matt Fleming <matt@codeblueprint.co.uk>
+This patchset creates a general purpose version of the efi_call_virt
+macro that does not assume that the function pointer being passed in is
+inside of efi.systab->runtime.  It also fixes up uv_bios_call to use the
+new functionality, and does a bit of cleanup in the efi_thunk macro.
+
+Quick breakdown of the patches:
+
+Patch 1) Move necessary macros to locations where we can access them.
+	 Remove hard-coded efi.systab reference from efi_call_virt.
+	 Rename/create new macros as needed.
+Patch 2) Simple change to allow UV code to utilize the new
+	 functionality.  Included a detailed explanation of how we got
+	 here.
+Patch 3) Replace a few bits of the efi_thunk macro with the
+	 arch_efi_call_setup/teardown macros.
+
+The first two have been tested on simulators and hardware, but the third
+has only been compile-tested.  I don't have any hardware to test that
+on.
+
+Updates for v2:
+
+- Fix up arm and arm64 versions of arch_efi_call_virt.  I missed these
+  on my first pass 
+- Add some more detail to the commit message for the uv_bios_call fix.
+- Change the third patch to use the arch_efi_call_setup/teardown macros
+  inside of the efi_thunk macro, instead of replacing efi_thunk entirely
+  for the CONFIG_EFI_MIXED case.
+
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
 Cc: Russ Anderson <rja@sgi.com>
 Cc: Dimitri Sivanich <sivanich@sgi.com>
 Cc: Russell King <linux@armlinux.org.uk>
@@ -27,35 +51,20 @@ Cc: Roy Franz <roy.franz@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-efi at vger.kernel.org
 Cc: x86 at kernel.org
----
- arch/x86/platform/efi/efi_64.c | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/x86/platform/efi/efi_64.c b/arch/x86/platform/efi/efi_64.c
-index 6e7242b..4cc2b96 100644
---- a/arch/x86/platform/efi/efi_64.c
-+++ b/arch/x86/platform/efi/efi_64.c
-@@ -469,18 +469,13 @@ extern efi_status_t efi64_thunk(u32, ...);
- 	unsigned long flags;						\
- 	u32 func;							\
- 									\
--	efi_sync_low_kernel_mappings();					\
- 	local_irq_save(flags);						\
--									\
--	efi_scratch.prev_cr3 = read_cr3();				\
--	write_cr3((unsigned long)efi_scratch.efi_pgt);			\
--	__flush_tlb_all();						\
-+	arch_efi_call_virt_setup();					\
- 									\
- 	func = runtime_service32(f);					\
--	__s = efi64_thunk(func, __VA_ARGS__);			\
-+	__s = efi64_thunk(func, __VA_ARGS__);				\
- 									\
--	write_cr3(efi_scratch.prev_cr3);				\
--	__flush_tlb_all();						\
-+	arch_efi_call_virt_teardown();					\
- 	local_irq_restore(flags);					\
- 									\
- 	__s;								\
+Alex Thorlton (3):
+  Convert efi_call_virt to efi_call_virt_pointer
+  Update uv_bios_call to use efi_call_virt_pointer
+  Update efi_thunk to use the the arch_efi_call_virt* macros
+
+ arch/arm/include/asm/efi.h              |  4 +--
+ arch/arm64/include/asm/efi.h            |  4 +--
+ arch/x86/include/asm/efi.h              |  9 +++---
+ arch/x86/platform/efi/efi_64.c          | 11 ++-----
+ arch/x86/platform/uv/bios_uv.c          |  3 +-
+ drivers/firmware/efi/runtime-wrappers.c | 53 +++++++--------------------------
+ include/linux/efi.h                     | 51 +++++++++++++++++++++++++++++++
+ 7 files changed, 73 insertions(+), 62 deletions(-)
+
 -- 
 1.8.5.6
