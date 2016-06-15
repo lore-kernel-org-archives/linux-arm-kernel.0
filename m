@@ -1,78 +1,54 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 15 Jun 2016 15:06:29 -0700
-Subject: [PATCH 4/5] remoteproc: core: Supply framework to request,
- declare and fetch shared memory
-In-Reply-To: <1462454983-13168-5-git-send-email-lee.jones@linaro.org>
-References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
- <1462454983-13168-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160615220629.GW1256@tuxbot>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 15 Jun 2016 15:11:06 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable Ethernet Switch drivers
+In-Reply-To: <1466026874-11971-1-git-send-email-andrew@lunn.ch>
+References: <1466026874-11971-1-git-send-email-andrew@lunn.ch>
+Message-ID: <5761D27A.4040706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
+On 06/15/2016 02:41 PM, Andrew Lunn wrote:
+> Kernelci now has two boards with Ethernet switches supported by DSA.
+> Enable DSA and the switch drivers so we get some boot testing.
 
-> Normally used for management of; carveout, devmem and trace memory.
+So this is going to create some conflicts with this commit which would
+be submitted for 4.8:
+
+https://github.com/Broadcom/stblinux/commit/0fa28995465cf9f9465a1ff69e8dfff17f9734ea
+
+So let's take yours and I will rework mine to just include the BCMGENET
+and SYSTEMPORT drivers inclusion.
+
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  drivers/remoteproc/remoteproc_core.c | 174 +++++++++++++++++++++++++++++++++--
->  1 file changed, 167 insertions(+), 7 deletions(-)
+>  arch/arm/configs/multi_v7_defconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-[..]
-> @@ -222,7 +223,8 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
-[..]
-> -	va = dma_alloc_coherent(dev->parent, size, &dma, GFP_KERNEL);
-> +	dma_dev = rproc_subdev_lookup(rproc, "vring");
-> +	va = dma_alloc_coherent(dma_dev, size, &dma, GFP_KERNEL);
-[..]
-> @@ -594,7 +599,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
-[..]
-> -	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
-> +	dma_dev = rproc_subdev_lookup(rproc, "carveout");
-> +	va = dma_alloc_coherent(dma_dev, rsc->len, &dma, GFP_KERNEL);
-[..]
-> +static int rproc_subdev_match(struct device *dev, void *data)
-> +{
-> +	char *sub_name;
-> +
-> +	if (!dev_name(dev))
-> +		return 0;
-> +
-> +	sub_name = strpbrk(dev_name(dev), "#");
-> +	if (!sub_name)
-> +		return 0;
-> +
-> +	return !strcmp(++sub_name, (char *)data);
-> +}
-> +
-[..]
-> +struct rproc_subdev *rproc_subdev_add(struct rproc *rproc, struct resource *res)
-> +{
-[..]
-> +	dev_set_name(&sub->dev, "%s#%s", dev_name(sub->dev.parent), res->name);
-> +	dev_set_drvdata(&sub->dev, sub);
-> +
-> +	ret = device_register(&sub->dev);
-[..]
-> +}
-> +EXPORT_SYMBOL(rproc_subdev_add);
-
-I worked up a prototype that allows remoteproc drivers to
-programmatically specify carveout resources, which then are matched and
-merged with entires from the resource table. I've given these
-programmatically allocated carveouts a device so that the associated
-allocation comes out of the specified region - or the rproc region if no
-match is found.
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 8f857564657f..b45ac256b491 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -157,6 +157,8 @@ CONFIG_INET6_IPCOMP=m
+>  CONFIG_IPV6_MIP6=m
+>  CONFIG_IPV6_TUNNEL=m
+>  CONFIG_IPV6_MULTIPLE_TABLES=y
+> +CONFIG_NET_DSA=y
+> +CONFIG_NET_SWITCHDEV=y
+>  CONFIG_CAN=y
+>  CONFIG_CAN_RAW=y
+>  CONFIG_CAN_BCM=y
+> @@ -222,6 +224,8 @@ CONFIG_SATA_RCAR=y
+>  CONFIG_NETDEVICES=y
+>  CONFIG_VIRTIO_NET=y
+>  CONFIG_HIX5HD2_GMAC=y
+> +CONFIG_NET_DSA_MV88E6XXX=y
+> +CONFIG_NET_DSA_BCM_SF2=y
+>  CONFIG_SUN4I_EMAC=y
+>  CONFIG_MACB=y
+>  CONFIG_NET_CALXEDA_XGMAC=y
+> 
 
 
-This solves my use case of carving out memory from two disjoint memory
-regions for one of my remoteprocs, but differs from your approach in
-that you specify one large carveout (and vrings) region and any
-carveouts (or vrings) will chip away from this.
-
-Would this approach work for you, or do you depend on having 1:N
-relationship between your memory region and your resources?
-
-Regards,
-Bjorn
+-- 
+Florian
