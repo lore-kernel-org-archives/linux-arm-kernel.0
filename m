@@ -1,55 +1,35 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 15 Jun 2016 17:18:05 +0900
-Subject: [PATCH 1/2] pinctrl: uniphier: prohibit drive control for pin 61-66
- of PH1-LD11
-In-Reply-To: <1465978686-28578-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1465978686-28578-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1465978686-28578-2-git-send-email-yamada.masahiro@socionext.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 15 Jun 2016 01:27:06 -0700
+Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
+ of aliases
+In-Reply-To: <20160615072404.GB26768@pengutronix.de>
+References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
+ <20160615072404.GB26768@pengutronix.de>
+Message-ID: <20160615082705.GW22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the hardware document, setting the drive control is
-prohibited for these pins (N-channel Open Drain pins).  Set their
-drive control attribute to "fixed".
+* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [160615 00:27]:
+> On Wed, Jun 15, 2016 at 08:56:58AM +0200, Linus Walleij wrote:
+> > The way forward is to use the character device and use gpiochip
+> > devices with offset indexes and look up GPIOs by name from the
+> > character devices. If nothing substantial happens I am merging the
+> > final pieces of the GPIO chardev ABI for v4.8 and that is doing all that
+> > sysfs was doing and then some. I just need to change a small thing
+> > before sending the final version for review.
+> 
+> Hmm, so /sys/class/gpio was obsoleted before the substitution was ready?
+> I'd say an overlapping of several kernel versions would be good as we
+> cannot expect that userspace changes as fast as the kernel.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Well the /sys/class/gpio is an interface, and we'll have to maintain
+it basically forever as we all know. It also works just fine for simple
+things, so let's make sure it is usable. Having it inconsistent can
+cause nasty side effects upgrading kernels.
 
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Naturally I don't have any objections for adding a character device :)
 
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-index 150942f..608cd73 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-@@ -151,22 +151,22 @@ static const struct pinctrl_pin_desc uniphier_ld11_pins[] = {
- 			     60, UNIPHIER_PIN_DRV_1BIT,
- 			     60, UNIPHIER_PIN_PULL_DOWN),
- 	UNIPHIER_PINCTRL_PIN(61, "DMDSDA0", 61,
--			     61, UNIPHIER_PIN_DRV_1BIT,
-+			     -1, UNIPHIER_PIN_DRV_FIXED4,
- 			     -1, UNIPHIER_PIN_PULL_NONE),
- 	UNIPHIER_PINCTRL_PIN(62, "DMDSCL0", 62,
--			     62, UNIPHIER_PIN_DRV_1BIT,
-+			     -1, UNIPHIER_PIN_DRV_FIXED4,
- 			     -1, UNIPHIER_PIN_PULL_NONE),
- 	UNIPHIER_PINCTRL_PIN(63, "SDA0", 63,
--			     63, UNIPHIER_PIN_DRV_1BIT,
-+			     -1, UNIPHIER_PIN_DRV_FIXED4,
- 			     -1, UNIPHIER_PIN_PULL_NONE),
- 	UNIPHIER_PINCTRL_PIN(64, "SCL0", 64,
--			     64, UNIPHIER_PIN_DRV_1BIT,
-+			     -1, UNIPHIER_PIN_DRV_FIXED4,
- 			     -1, UNIPHIER_PIN_PULL_NONE),
- 	UNIPHIER_PINCTRL_PIN(65, "SDA1", 65,
--			     65, UNIPHIER_PIN_DRV_1BIT,
-+			     -1, UNIPHIER_PIN_DRV_FIXED4,
- 			     -1, UNIPHIER_PIN_PULL_NONE),
- 	UNIPHIER_PINCTRL_PIN(66, "SCL1", 66,
--			     66, UNIPHIER_PIN_DRV_1BIT,
-+			     -1, UNIPHIER_PIN_DRV_FIXED4,
- 			     -1, UNIPHIER_PIN_PULL_NONE),
- 	UNIPHIER_PINCTRL_PIN(67, "HIN", 67,
- 			     -1, UNIPHIER_PIN_DRV_FIXED5,
--- 
-1.9.1
+Regards,
+
+Tony
