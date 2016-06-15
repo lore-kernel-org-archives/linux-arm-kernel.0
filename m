@@ -1,30 +1,59 @@
 From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Wed, 15 Jun 2016 10:19:04 +0800
-Subject: [PATCH v11 0/3] ARM: hisi: Add initial support for Hi3519 SOC
-Message-ID: <1465957147-32314-1-git-send-email-xuejiancheng@hisilicon.com>
+Date: Wed, 15 Jun 2016 10:19:05 +0800
+Subject: [PATCH v11 1/3] ARM: hisi: add compatible string for Hi3519 soc
+In-Reply-To: <1465957147-32314-1-git-send-email-xuejiancheng@hisilicon.com>
+References: <1465957147-32314-1-git-send-email-xuejiancheng@hisilicon.com>
+Message-ID: <1465957147-32314-2-git-send-email-xuejiancheng@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These three patches are abstracted from the patchset titled
-"[RESEND PATCH v10 0/6] ARM: hisi: Add initial support including
-clock driver for Hi3519 soc."(https://lkml.org/lkml/2016/3/31/175).
-The clock driver part was merged in v4.7-rc1. This patch set
-is mainly used to enable Hi3519 basic soc and add dts files.
+From: Jiancheng Xue <xuejiancheng@huawei.com>
 
-Jiancheng Xue (3):
-  ARM: hisi: add compatible string for Hi3519 soc
-  ARM: dt-bindings: add device tree bindings for Hi3519 sysctrl
-  ARM: dts: add dts files for Hi3519
+add compatible string for Hi3519 soc.
 
- .../bindings/arm/hisilicon/hi3519-sysctrl.txt      |  14 ++
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/hi3519-demb.dts                  |  42 +++++
- arch/arm/boot/dts/hi3519.dtsi                      | 187 +++++++++++++++++++++
- arch/arm/mach-hisi/hisilicon.c                     |  23 +--
- 5 files changed, 249 insertions(+), 19 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
- create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
- create mode 100644 arch/arm/boot/dts/hi3519.dtsi
+Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+---
+ arch/arm/mach-hisi/hisilicon.c | 23 ++++-------------------
+ 1 file changed, 4 insertions(+), 19 deletions(-)
 
+diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+index 8cc6215..00dae89 100644
+--- a/arch/arm/mach-hisi/hisilicon.c
++++ b/arch/arm/mach-hisi/hisilicon.c
+@@ -54,30 +54,15 @@ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+ 	.dt_compat	= hi3xxx_compat,
+ MACHINE_END
+ 
+-static const char *const hix5hd2_compat[] __initconst = {
++static const char *const hisilicon_compat[] __initconst = {
+ 	"hisilicon,hix5hd2",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(HIX5HD2_DT, "Hisilicon HIX5HD2 (Flattened Device Tree)")
+-	.dt_compat	= hix5hd2_compat,
+-MACHINE_END
+-
+-static const char *const hip04_compat[] __initconst = {
+ 	"hisilicon,hip04-d01",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(HIP04, "Hisilicon HiP04 (Flattened Device Tree)")
+-	.dt_compat	= hip04_compat,
+-MACHINE_END
+-
+-static const char *const hip01_compat[] __initconst = {
+ 	"hisilicon,hip01",
+ 	"hisilicon,hip01-ca9x2",
++	"hisilicon,hi3519",
+ 	NULL,
+ };
+ 
+-DT_MACHINE_START(HIP01, "Hisilicon HIP01 (Flattened Device Tree)")
+-	.dt_compat      = hip01_compat,
++DT_MACHINE_START(HISILICON_DT, "HiSilicon Soc")
++	.dt_compat	= hisilicon_compat,
+ MACHINE_END
 -- 
 1.9.1
