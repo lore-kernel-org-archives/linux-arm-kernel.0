@@ -1,249 +1,61 @@
-From: athorlton@sgi.com (Alex Thorlton)
-Date: Wed, 15 Jun 2016 14:04:13 -0500
-Subject: [PATCH 1/3] Convert efi_call_virt to efi_call_virt_pointer
-In-Reply-To: <1466017455-236934-1-git-send-email-athorlton@sgi.com>
-References: <1466017455-236934-1-git-send-email-athorlton@sgi.com>
-Message-ID: <1466017455-236934-2-git-send-email-athorlton@sgi.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 15 Jun 2016 21:08:30 +0200
+Subject: [PATCH] Revert "gpio: bail out silently on NULL descriptors"
+In-Reply-To: <20160615184628.GA5144@lukather>
+References: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
+ <20160615184628.GA5144@lukather>
+Message-ID: <3a03fc91-b339-3e43-4e95-e1488197a8df@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit makes a few slight modifications to the efi_call_virt macro
-to get it to work with function pointers that are stored in locations
-other than efi.systab->runtime, and renames the macro to
-efi_call_virt_pointer.  The majority of the changes here are to pull
-these macros up into header files so that they can be accessed from
-outside of drivers/firmware/efi/runtime-wrappers.c.
+Hi,
 
-The most significant change not directly related to the code move is to
-add an extra "p" argument into the appropriate efi_call macros, and use
-that new argument in place of the, formerly hard-coded,
-efi.systab->runtime pointer.
+On 15-06-16 20:46, Maxime Ripard wrote:
+> Hi,
+>
+> On Wed, Jun 15, 2016 at 08:22:34PM +0200, Hans de Goede wrote:
+>> This reverts commit 54d77198fdfb("gpio: bail out silently on NULL
+>> descriptors").
+>>
+>> This commit causes the following code to fail:
+>>
+>> gpio_desc = devm_gpiod_get_optional(dev, ...);
+>> gpio_irq  = gpiod_to_irq(gpio_desc);
+>> if (gpio_irq >= 0) {
+>> 	ret = devm_request_irq(dev, gpio_irq, ...);
+>>
+>> And now ret is an error causing the probe function in question to bail.
+>>
+>> The problem here is that gpiod_to_irq now returns 0 for a NULL
+>> gpio_desc while 0 is a valid irq-nr. Also see:
+>> commit 4c37ce8608a8("gpio: make gpiod_to_irq() return negative for NO_IRQ")
+>> which specifically avoids returning 0.
+>
+> 0 is not a valid interrupt number.
 
-The last piece of the puzzle was to add an efi_call_virt macro back into
-drivers/firmware/efi/runtime-wrappers.c to wrap around the new
-efi_call_virt_pointer macro - this was mainly to keep the code from
-looking too cluttered by adding a bunch of extra references to
-efi.systab->runtime everywhere.
+Ok, so lets decouple the discussion a bit from whether or not 0
+is a valid interrupt number.
 
-Note that I also broke up the code in the efi_call_virt_pointer macro a
-bit in the process of moving it.
+> irq_find_mapping returns 0 in case of an error:
+> http://lxr.free-electrons.com/source/kernel/irq/irqdomain.c#L657
 
-Signed-off-by: Alex Thorlton <athorlton@sgi.com>
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: Russ Anderson <rja@sgi.com>
-Cc: Dimitri Sivanich <sivanich@sgi.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Roy Franz <roy.franz@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-efi at vger.kernel.org
-Cc: x86 at kernel.org
----
- arch/arm/include/asm/efi.h              |  4 +--
- arch/arm64/include/asm/efi.h            |  4 +--
- arch/x86/include/asm/efi.h              |  9 +++---
- drivers/firmware/efi/runtime-wrappers.c | 53 +++++++--------------------------
- include/linux/efi.h                     | 51 +++++++++++++++++++++++++++++++
- 5 files changed, 69 insertions(+), 52 deletions(-)
+Yes and in that case gpiod_to_irq() will explicitly return -ENXIO
+so as to not confuse callers.
 
-diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
-index a708fa1..766bf9b 100644
---- a/arch/arm/include/asm/efi.h
-+++ b/arch/arm/include/asm/efi.h
-@@ -28,10 +28,10 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
- #define arch_efi_call_virt_setup()	efi_virtmap_load()
- #define arch_efi_call_virt_teardown()	efi_virtmap_unload()
- 
--#define arch_efi_call_virt(f, args...)					\
-+#define arch_efi_call_virt(p, f, args...)				\
- ({									\
- 	efi_##f##_t *__f;						\
--	__f = efi.systab->runtime->f;					\
-+	__f = p->f;							\
- 	__f(args);							\
- })
- 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 622db3c..bd88766 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -23,10 +23,10 @@ int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
- 	efi_virtmap_load();						\
- })
- 
--#define arch_efi_call_virt(f, args...)					\
-+#define arch_efi_call_virt(p, f, args...)				\
- ({									\
- 	efi_##f##_t *__f;						\
--	__f = efi.systab->runtime->f;					\
-+	__f = p->f;							\
- 	__f(args);							\
- })
- 
-diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
-index 78d1e74..55b4596 100644
---- a/arch/x86/include/asm/efi.h
-+++ b/arch/x86/include/asm/efi.h
-@@ -41,10 +41,9 @@ extern unsigned long asmlinkage efi_call_phys(void *, ...);
- /*
-  * Wrap all the virtual calls in a way that forces the parameters on the stack.
-  */
--#define arch_efi_call_virt(f, args...)					\
-+#define arch_efi_call_virt(p, f, args...)				\
- ({									\
--	((efi_##f##_t __attribute__((regparm(0)))*)			\
--		efi.systab->runtime->f)(args);				\
-+	((efi_##f##_t __attribute__((regparm(0)))*) p->f)(args);	\
- })
- 
- #define efi_ioremap(addr, size, type, attr)	ioremap_cache(addr, size)
-@@ -81,8 +80,8 @@ struct efi_scratch {
- 	}								\
- })
- 
--#define arch_efi_call_virt(f, args...)					\
--	efi_call((void *)efi.systab->runtime->f, args)			\
-+#define arch_efi_call_virt(p, f, args...)				\
-+	efi_call((void *)p->f, args)					\
- 
- #define arch_efi_call_virt_teardown()					\
- ({									\
-diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
-index 23bef6b..6a364f5 100644
---- a/drivers/firmware/efi/runtime-wrappers.c
-+++ b/drivers/firmware/efi/runtime-wrappers.c
-@@ -22,7 +22,16 @@
- #include <linux/stringify.h>
- #include <asm/efi.h>
- 
--static void efi_call_virt_check_flags(unsigned long flags, const char *call)
-+/*
-+ * Wrap around the new efi_call_virt_generic macros so that the
-+ * code doesn't get too cluttered
-+ */
-+#define efi_call_virt(f, args...)   \
-+	efi_call_virt_pointer(efi.systab->runtime, f, args)
-+#define __efi_call_virt(f, args...) \
-+	__efi_call_virt_pointer(efi.systab->runtime, f, args)
-+
-+void efi_call_virt_check_flags(unsigned long flags, const char *call)
- {
- 	unsigned long cur_flags, mismatch;
- 
-@@ -39,48 +48,6 @@ static void efi_call_virt_check_flags(unsigned long flags, const char *call)
- }
- 
- /*
-- * Arch code can implement the following three template macros, avoiding
-- * reptition for the void/non-void return cases of {__,}efi_call_virt:
-- *
-- *  * arch_efi_call_virt_setup
-- *
-- *    Sets up the environment for the call (e.g. switching page tables,
-- *    allowing kernel-mode use of floating point, if required).
-- *
-- *  * arch_efi_call_virt
-- *
-- *    Performs the call. The last expression in the macro must be the call
-- *    itself, allowing the logic to be shared by the void and non-void
-- *    cases.
-- *
-- *  * arch_efi_call_virt_teardown
-- *
-- *    Restores the usual kernel environment once the call has returned.
-- */
--
--#define efi_call_virt(f, args...)					\
--({									\
--	efi_status_t __s;						\
--	unsigned long flags;						\
--	arch_efi_call_virt_setup();					\
--	local_save_flags(flags);					\
--	__s = arch_efi_call_virt(f, args);				\
--	efi_call_virt_check_flags(flags, __stringify(f));		\
--	arch_efi_call_virt_teardown();					\
--	__s;								\
--})
--
--#define __efi_call_virt(f, args...)					\
--({									\
--	unsigned long flags;						\
--	arch_efi_call_virt_setup();					\
--	local_save_flags(flags);					\
--	arch_efi_call_virt(f, args);					\
--	efi_call_virt_check_flags(flags, __stringify(f));		\
--	arch_efi_call_virt_teardown();					\
--})
--
--/*
-  * According to section 7.1 of the UEFI spec, Runtime Services are not fully
-  * reentrant, and there are particular combinations of calls that need to be
-  * serialized. (source: UEFI Specification v2.4A)
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index f196dd0..3cf6afb 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -1465,4 +1465,55 @@ efi_status_t efi_setup_gop(efi_system_table_t *sys_table_arg,
- 			   unsigned long size);
- 
- bool efi_runtime_disabled(void);
-+extern void efi_call_virt_check_flags(unsigned long flags, const char *call);
-+
-+/*
-+ * Arch code can implement the following three template macros, avoiding
-+ * reptition for the void/non-void return cases of {__,}efi_call_virt:
-+ *
-+ *  * arch_efi_call_virt_setup
-+ *
-+ *    Sets up the environment for the call (e.g. switching page tables,
-+ *    allowing kernel-mode use of floating point, if required).
-+ *
-+ *  * arch_efi_call_virt
-+ *
-+ *    Performs the call. The last expression in the macro must be the call
-+ *    itself, allowing the logic to be shared by the void and non-void
-+ *    cases.
-+ *
-+ *  * arch_efi_call_virt_teardown
-+ *
-+ *    Restores the usual kernel environment once the call has returned.
-+ */
-+
-+#define efi_call_virt_pointer(p, f, args...)				\
-+({									\
-+	efi_status_t __s;						\
-+	unsigned long flags;						\
-+									\
-+	arch_efi_call_virt_setup();					\
-+									\
-+	local_save_flags(flags);					\
-+	__s = arch_efi_call_virt(p, f, args);				\
-+	efi_call_virt_check_flags(flags, __stringify(f));		\
-+									\
-+	arch_efi_call_virt_teardown();					\
-+									\
-+	__s;								\
-+})
-+
-+#define __efi_call_virt_pointer(p, f, args...)				\
-+({									\
-+	unsigned long flags;						\
-+									\
-+	arch_efi_call_virt_setup();					\
-+									\
-+	local_save_flags(flags);					\
-+	arch_efi_call_virt(p, f, args);					\
-+	efi_call_virt_check_flags(flags, __stringify(f));		\
-+									\
-+	arch_efi_call_virt_teardown();					\
-+})
-+
- #endif /* _LINUX_EFI_H */
--- 
-1.8.5.6
+Which is the right thing to do, since almost all kernel functions
+have the semantic ret < 0 means error >= 0 means success.
+
+The patch I'm suggestion to revert however now has gpiod_to_irq()
+return 0 when it gets passed a NULL gpio_desc pointer, so this
+really has nothing to do with irq_find_mapping() at all (that never
+gets called in this case) and has everything to do with the
+patch I suggest we revert changing the behavior for
+gpiod_to_irq(NULL).
+
+Also not that that patch has a Cc: stable, so fix the driver is
+really not a good answer, stable patches should not change
+(internal) api behavior and break other code.
+
+Regards,
+
+Hans
