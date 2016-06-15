@@ -1,135 +1,126 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 15 Jun 2016 13:25:08 +0530
-Subject: kexec failures with DEBUG_RODATA
-In-Reply-To: <20160614175920.GD1041@n2100.armlinux.org.uk>
-References: <20160614175920.GD1041@n2100.armlinux.org.uk>
-Message-ID: <20160615075508.GB21202@dhcppc6>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 15 Jun 2016 09:57:12 +0200
+Subject: [PATCH 2/7] ARM: dts: imx51-babbage: Switch using
+ simple-audio-card for audio support
+In-Reply-To: <1465621345-12597-2-git-send-email-shc_work@mail.ru>
+References: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
+ <1465621345-12597-2-git-send-email-shc_work@mail.ru>
+Message-ID: <20160615075712.GC11074@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Sat, Jun 11, 2016 at 08:02:20AM +0300, Alexander Shiyan wrote:
+> The sound support can be handled by "simple-audio-card" instead of
+> use a private driver.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/boot/dts/imx51-babbage.dts | 51 +++++++++++++++++++++++++++++++------
+>  1 file changed, 43 insertions(+), 8 deletions(-)
 
-On 14/06/2016:06:59:20 PM, Russell King - ARM Linux wrote:
-> Guys,
-> 
-> Having added Keystone2 support to kexec, and asking TI to validate
-> linux-next with mainline kexec-tools, I received two reports from
-> them.
-> 
-> The first was a report of success, but was kexecing a 4.4 kernel
-> from linux-next.
-> 
-> The second was a failure report, kexecing current linux-next from
-> linux-next on this platform.  However, my local tests (using my
-> 4.7-rc3 derived kernel) showed there to be no problem.
-> 
-> Building my 4.7-rc3 derived kernel with TI's configuration they
-> were using with linux-next similarly failed.  So, it came down to
-> a configuration difference.
-> 
-> After trialling several configurations, it turns out that the
-> failure is, in part, caused by CONFIG_DEBUG_RODATA being enabled
-> on TI's kernel but not mine.  Why should this make any difference?
+I just gave this a test. Playback still works on the right channel, left
+channel is silent. This behaviour hasn't changed with this patch, so
+consider this a:
+
+Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
 
 > 
-> Well, CONFIG_DEBUG_RODATA has the side effect that the kernel
-> contains a lot of additional padding - we pad out to section size
-> (1MB) the ELF sections with differing attributes.  This should not
-> normally be a problem, except kexec contains this assumption:
+> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+> index 018d24e..54c38ce 100644
+> --- a/arch/arm/boot/dts/imx51-babbage.dts
+> +++ b/arch/arm/boot/dts/imx51-babbage.dts
+> @@ -11,6 +11,8 @@
+>   */
+>  
+>  /dts-v1/;
+> +#include <dt-bindings/sound/fsl-imx-audmux.h>
+> +
+>  #include "imx51.dtsi"
+>  
+>  / {
+> @@ -141,17 +143,29 @@
+>  	};
+>  
+>  	sound {
+> -		compatible = "fsl,imx51-babbage-sgtl5000",
+> -			     "fsl,imx-audio-sgtl5000";
+> -		model = "imx51-babbage-sgtl5000";
+> -		ssi-controller = <&ssi2>;
+> -		audio-codec = <&sgtl5000>;
+> -		audio-routing =
+> +		compatible = "simple-audio-card";
+> +		simple-audio-card,name = "imx51-babbage-sgtl5000";
+> +		simple-audio-card,format = "i2s";
+> +		simple-audio-card,bitclock-master = <&master>;
+> +		simple-audio-card,frame-master = <&master>;
+> +		simple-audio-card,widgets =
+> +			"Microphone", "Mic Jack",
+> +			"Line", "Line In Jack",
+> +			"Headphone", "Headphone Jack",
+> +			"Speaker", "Line Out Jack",
+> +			"Speaker", "Ext Spk";
+> +		simple-audio-card,routing =
+>  			"MIC_IN", "Mic Jack",
+>  			"Mic Jack", "Mic Bias",
+>  			"Headphone Jack", "HP_OUT";
+> -		mux-int-port = <2>;
+> -		mux-ext-port = <3>;
+> +
+> +		simple-audio-card,cpu {
+> +			sound-dai = <&ssi2>;
+> +		};
+> +
+> +		master: simple-audio-card,codec {
+> +			sound-dai = <&sgtl5000>;
+> +		};
+>  	};
+>  
+>  	usbphy {
+> @@ -173,6 +187,26 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_audmux>;
+>  	status = "okay";
+> +
+> +	audmux_ssi1 {
+> +		fsl,audmux-port = <MX51_AUDMUX_PORT2_SSI1>;
+> +		fsl,port-config = <
+> +			(IMX_AUDMUX_V2_PTCR_TFSDIR |
+> +			IMX_AUDMUX_V2_PTCR_TFSEL(MX51_AUDMUX_PORT3) |
+> +			IMX_AUDMUX_V2_PTCR_TCLKDIR |
+> +			IMX_AUDMUX_V2_PTCR_TCSEL(MX51_AUDMUX_PORT3) |
+> +			IMX_AUDMUX_V2_PTCR_SYN)
+> +			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT3)
+> +		>;
+> +	};
+> +
+> +	audmux_aud3 {
+> +		fsl,audmux-port = <MX51_AUDMUX_PORT3>;
+> +		fsl,port-config = <
+> +			IMX_AUDMUX_V2_PTCR_SYN
+> +			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT2_SSI1)
+> +		>;
+> +	};
+>  };
+>  
+>  &ecspi1 {
+> @@ -339,6 +373,7 @@
+>  	status = "okay";
+>  
+>  	sgtl5000: codec at 0a {
+> +		#sound-dai-cells = <0>;
+>  		compatible = "fsl,sgtl5000";
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&pinctrl_clkcodec>;
+> -- 
+> 2.4.9
 > 
->                 /* Otherwise, assume the maximum kernel compression ratio
->                  * is 4, and just to be safe, place ramdisk after that */
->                 initrd_base = base + _ALIGN(len * 4, getpagesize());
 > 
-> Now, first things first.  Don't get misled by the comment - it's
-> totally false.  That may be what's desired, but that is far from
-> what actually happens in reality.
 > 
-> "base" is _not_ the address of the start of the kernel image, but
-> is the base address of the start of the region that the kernel is
-> to be loaded into - remember that the kernel is normally loaded
-> 32k higher than the start of memory.  This 32k offset is _not_
-> included in either "base" nor "len".  So, even if we did want to
-> assume that there was a maximum compression ratio of 4, the above
-> always calculates 32k short of that value.
-> 
-> The other invalid thing here is this whole "maximum kernel compression
-> ratio" assumption.  Consider this non-DEBUG_RODATA kernel image:
-> 
->    text    data     bss     dec     hex filename
-> 6583513 2273816  215344 9072673  8a7021 ../build/ks2/vmlinux
-> 
-> This results in an image and zimage of:
-> -rwxrwxr-x 1 rmk rmk 8871936 Jun 14 18:02 ../build/ks2/arch/arm/boot/Image
-> -rwxrwxr-x 1 rmk rmk 4381592 Jun 14 18:02 ../build/ks2/arch/arm/boot/zImage
-> 
-> which is a ratio of about a 49%.  On entry to the decompressor, the
-> compressed image will be relocated above the expected resulting
-> kernel size.  So, let's say that it's relocated to 9MB.  This means
-> the zImage will occupy around 9MB-14MB above the start of memory.
-> Going by the 4x ratio, we place the other images at 16.7MB.  This
-> leaves around 2.7MB free.  So that's probably fine... but think
-> about this.  We assumed a ratio of 4x, but really we're in a rather
-> tight squeeze - we actually have only about 50% of the compressed
-> image size spare.
-> 
-> Now let's look at the DEBUG_RODATA case:
-> 
->    text    data     bss     dec     hex filename
-> 6585305 2273952  215344 9074601  8a77a9 ../build/ks2/vmlinux
-> 
-> And the resulting sizes:
-> -rwxrwxr-x 1 rmk rmk 15024128 Jun 14 18:49 ../build/ks2/arch/arm/boot/Image
-> -rwxrwxr-x 1 rmk rmk  4399040 Jun 14 18:49 ../build/ks2/arch/arm/boot/zImage
-> 
-> That's a compression ratio of about 29%.  Still within the 4x limit,
-> but going through the same calculation above shows that we end up
-> totally overflowing the available space this time.
-> 
-> That's exactly the same kernel configuration except for
-> CONFIG_DEBUG_RODATA - enabling this has almost _doubled_ the
-> decompressed image size without affecting the compressed size.
-> 
-> We've known for some time that this ratio of 4x doesn't work - we
-> used to use the same assumption in the decompressor when self-
-> relocating, and we found that there are images which achieve a
-> better compression ratio and make this invalid.  Yet, the 4x thing
-> has persisted in kexec code... and buggily too.
-> 
-> Since the kernel now has CONFIG_DEBUG_RODATA by default, this means
-> that these kinds of ratio-based assumptions are even more invalid
-> than they have been.
-> 
-> Right now, a zImage doesn't advertise the size of its uncompressed
-> image, but I think with things like CONFIG_DEBUG_RODATA, we can no
-> longer make assumptions like we have done in the past, and we need
-> the zImage to provide this information so that the boot environment
-> can be setup sanely by boot loaders/kexec rather than relying on
-> broken heuristics like this.
-> 
-> Thoughts?
 
-Sure, having a header information would be handy to do it. Other alternative
-could be that we define "HAVE_LIBZ" and then we can have something like
-kexec-Image-arm.c which handles plane Image.  We can also have something like
-get_zlib_decompressed_length() which can give us exact length we need for kernel
-and then we can place initrd accordingly in zImage_arm_load().
-
-Other than that:
-
-I see at least another issue clearly in ARM kernel code with CONFIG_DEBUG_RODATA
-enabled.  When CONFIG_DEBUG_RODATA is enabled, we can not write text area.
-kexec_start_address has been defined in relocate_kernel.S as a text area.
-machine_kexec() writes at kexec_start_address with image->start. Similarly there
-would be issues for overwriting of kexec_indirection_page, kexec_mach_type and
-kexec_boot_atags. If arm mmu mapping configures text pages as RO, then we should
-see an abort as soon as we do these writes.
-
-I think there could be two alternatives to fix it (i) We pass all of above
-values as function argument to soft_restart() till relocate_new_kernel().  (ii)
-Remove kexec_start_address and others from relocate_new_kernel(). Now in
-machine_kexec(), copy kexec_start_address and friends directly to
-(reboot_code_buffer+relocate_new_kernel_size)
-
-
-~Pratyush
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
