@@ -1,50 +1,42 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 15 Jun 2016 15:47:42 +0200
-Subject: [PATCH 1/2] ARM: OMAP2+: Drop legacy board file for n900
-In-Reply-To: <1465987689-14812-2-git-send-email-tony@atomide.com>
-References: <1465987689-14812-1-git-send-email-tony@atomide.com>
- <1465987689-14812-2-git-send-email-tony@atomide.com>
-Message-ID: <20160615134741.GA16860@earth>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 15 Jun 2016 14:49:38 +0100
+Subject: [PATCH v5 4/8] arm64: parse cpu capacity-dmips-mhz from DT
+In-Reply-To: <1465985877-18271-5-git-send-email-juri.lelli@arm.com>
+References: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
+ <1465985877-18271-5-git-send-email-juri.lelli@arm.com>
+Message-ID: <20160615134938.GA2282@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 15, 2016 at 11:17:53AM +0100, Juri Lelli wrote:
 
-On Wed, Jun 15, 2016 at 03:48:08AM -0700, Tony Lindgren wrote:
-> Let's drop the last two remaining omap3 legacy boot board files.
-> Let's only use the device tree based booting known to work for
-> these two boards.
-> 
-> We still have two omap3 boards booting in legacy mode in addition
-> to device tree based booting. All the other ten or so omap2+ SoCs
-> have been booting using device tree mode only for years now. This
-> has allowed us to get rid of quite a bit of arch/arm/mach-omap2
-> related platform init code in favor of dts and driver changes.
-> 
-> Pretty much the only remaining known users for omap3 legacy boot
-> board files are Kevin's and Russell's boot test systems, and N900
-> kernel tree maintained by Pali and Ivaylo. And all of them are
-> also supporting the device tree based booting. The legacy booting
-> mode has been kept around mostly to verify against regressions.
-> 
-> As there is still a slim chance of possible other uses of the
-> mainline kernel for these boards, let's just drop the board
-> files for v4.8, and let's not touch the related platform init
-> code until around v4.9 time if no issues are found. This makes
-> it trivial for us to add back the board files with a simple revert.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> +		if (!raw_capacity) {
+> +			raw_capacity = kzalloc(sizeof(*raw_capacity) *
+> +					num_possible_cpus(), GFP_KERNEL);
 
-I don't remember when I last booted N900 without DT, must have been
-a couple of years :)
+kcalloc()?
 
-Acked-By: Sebastian Reichel <sre@kernel.org>
+> +			if (!raw_capacity) {
+> +				pr_err("cpu_capacity: failed to allocate memory"
+> +				       " for raw capacities\n");
 
--- Sebastian
+It's normally better to avoid splitting errors message so people can
+grep if they see the error.
+
+> +	} else {
+> +		pr_err("cpu_capacity: missing %s raw capacity "
+> +		       "(fallback to 1024 for all CPUs)\n",
+> +				cpu_node->full_name);
+
+That's going to complain fairly loudly for all existing DTs isn't it and
+it's kind of redundant if all the cores have the same capacity (which is
+a very common case)?  How about printing an error only if we already
+found one, or printing a single warning at the end if we didn't get
+anything?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/c3040af6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/7556dbd7/attachment-0001.sig>
