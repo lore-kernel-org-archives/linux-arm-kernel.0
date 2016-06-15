@@ -1,40 +1,41 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 15 Jun 2016 12:45:17 +0200
-Subject: [PATCH] ARM: oxnas: Change OX810SE default driver config
-Message-ID: <1465987517-24482-1-git-send-email-narmstrong@baylibre.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 15 Jun 2016 03:48:07 -0700
+Subject: [PATCH 0/2] Drop last two remaining omap3 legacy board files
+Message-ID: <1465987689-14812-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the SP804 timer changes will not been merged upstream, switch the
-default OX810SE config to the OXNAS RPS Timer driver configuration.
+Hi all,
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/mach-oxnas/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Here are two patches to drop the last remaining omap3 legacy boot
+files. We have device tree based booting working for these boards,
+and the legacy booting has been mostly kept around to validate
+against regressions.
 
-Dear arm-soc maintainers,
+Let's not touch the rest of the platform init code until around
+v4.9 so we can revert these two patches if needed.
 
-Daniel just accepted my patchset at :
-http://lkml.kernel.org/r/1465985607-21231-1-git-send-email-narmstrong at baylibre.com
+Cheers,
 
-And now the default config can be switched to OXNAS_RPS_TIMER without any
-device tree changes.
+Tony
 
-Neil
+Tony Lindgren (2):
+  ARM: OMAP2+: Drop legacy board file for n900
+  ARM: OMAP2+: Drop legacy board file for LDP
 
-diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
-index 4fff3c7..ffcab02 100644
---- a/arch/arm/mach-oxnas/Kconfig
-+++ b/arch/arm/mach-oxnas/Kconfig
-@@ -11,7 +11,7 @@ if ARCH_OXNAS
- 
- config MACH_OX810SE
- 	bool "Support OX810SE Based Products"
--	select ARM_TIMER_SP804
-+	select OXNAS_RPS_TIMER
- 	select COMMON_CLK_OXNAS
- 	select CPU_ARM926T
- 	select MFD_SYSCON
+ arch/arm/mach-omap2/Kconfig                  |   12 -
+ arch/arm/mach-omap2/Makefile                 |    4 -
+ arch/arm/mach-omap2/board-ldp.c              |  429 ---------
+ arch/arm/mach-omap2/board-rx51-peripherals.c | 1317 --------------------------
+ arch/arm/mach-omap2/board-rx51-video.c       |   67 --
+ arch/arm/mach-omap2/board-rx51.c             |  141 ---
+ arch/arm/mach-omap2/board-rx51.h             |   11 -
+ 7 files changed, 1981 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/board-ldp.c
+ delete mode 100644 arch/arm/mach-omap2/board-rx51-peripherals.c
+ delete mode 100644 arch/arm/mach-omap2/board-rx51-video.c
+ delete mode 100644 arch/arm/mach-omap2/board-rx51.c
+ delete mode 100644 arch/arm/mach-omap2/board-rx51.h
+
 -- 
-1.9.1
+2.8.1
