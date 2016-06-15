@@ -1,58 +1,38 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 15 Jun 2016 11:07:50 -0700
-Subject: arm-soc boot: 619 boots: 11 failed, 605 passed with 2 offline,
- 1 conflict (v4.7-rc3-216-gec0776a212c1)
-In-Reply-To: <9297488.MELcTREXgu@wuerfel> (Arnd Bergmann's message of "Wed, 15
- Jun 2016 11:10:29 +0200")
-References: <5760acd0.571a1c0a.34a58.7333@mx.google.com>
- <9297488.MELcTREXgu@wuerfel>
-Message-ID: <m2twgupbpl.fsf@baylibre.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 15 Jun 2016 13:13:26 -0500
+Subject: [PATCH] ARM: socfpga: enable PL330 DMA in socfpga_defconfig
+Message-ID: <1466014406-28469-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Enable the PL330 DMA on SoCFPGA.
 
-> On Tuesday, June 14, 2016 6:18:08 PM CEST kernelci. org bot wrote:
->> arm:
->> 
->>     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
->>         exynos5410-odroidxu: 1 failed lab
->> 
->>     multi_v7_defconfig+CONFIG_LKDTM=y:
->>         exynos5410-odroidxu: 1 failed lab
->> 
->>     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y+CONFIG_ARM_MODULE_PLTS=y:
->>         exynos5410-odroidxu: 1 failed lab
->> 
->>     multi_v7_defconfig+CONFIG_EFI=y:
->>         exynos5410-odroidxu: 1 failed lab
->> 
->>     exynos_defconfig:
->>         exynos5410-odroidxu: 1 failed lab
->> 
->>     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
->>         exynos5410-odroidxu: 1 failed lab
->> 
->>     multi_v7_defconfig:
->>         exynos5410-odroidxu: 1 failed lab
->> 
->>     multi_v5_defconfig:
->>         at91sam9261ek: 1 failed lab
->>         at91sam9m10g45ek: 1 failed lab
->>         at91sam9x25ek: 1 failed lab
->>         at91sam9x35ek: 1 failed lab
->
-> These all seem to have broken after yesterday's merges, adding
-> Alexandre and Krzysztof to Cc here so they can have a look.
+make savedefconfig says CONFIG_FHANDLE is not needed in the defconfig,
+remove it.
 
-The exynos5410 fails look like the UART3 issue reported earlier and
-which is also happening in linux-next.
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+---
+ arch/arm/configs/socfpga_defconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Krzysztof posted a fix[1] that was tested by Javier and myself that
-fixed the problem, but I don't see that upstream yet.
-
-Krzysztof: did you get that fix submitted yet?
-
-Kevin
-
-[1] http://marc.info/?l=linux-kernel&m=146469459503940&w=2
+diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+index c267137..541a729 100644
+--- a/arch/arm/configs/socfpga_defconfig
++++ b/arch/arm/configs/socfpga_defconfig
+@@ -1,5 +1,4 @@
+ CONFIG_SYSVIPC=y
+-CONFIG_FHANDLE=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+@@ -90,6 +89,8 @@ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_USB_GADGET=y
+ CONFIG_MMC=y
+ CONFIG_MMC_DW=y
++CONFIG_DMADEVICES=y
++CONFIG_PL330_DMA=y
+ CONFIG_FPGA=y
+ CONFIG_FPGA_MGR_SOCFPGA=y
+ CONFIG_EXT2_FS=y
+-- 
+1.9.1.315.g3f09db0
