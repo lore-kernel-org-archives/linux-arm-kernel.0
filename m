@@ -1,106 +1,458 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 15 Jun 2016 21:37:09 +0200
-Subject: [PATCH 2/7] crypto: marvell: Check engine is not already
- running when enabling a req
-In-Reply-To: <1466018134-10779-3-git-send-email-romain.perier@free-electrons.com>
-References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
- <1466018134-10779-3-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <20160615213709.3a060ff4@bbrezillon>
+From: smbarber@google.com (Steve Barber)
+Date: Wed, 15 Jun 2016 12:43:36 -0700
+Subject: [PATCH v5] ASoC: rockchip: Add machine driver for RK3399 GRU
+ Boards
+In-Reply-To: <1465807339-1100-1-git-send-email-zhengxing@rock-chips.com>
+References: <1465807339-1100-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <CADR9n49m7anZpDbbb3=ZGBaacOuXc4F=Yid0eyMey1LfEJx8Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jun 2016 21:15:29 +0200
-Romain Perier <romain.perier@free-electrons.com> wrote:
-
-> Adding BUG_ON() macro to be sure that the step operation is not about
-> to activate a request on the engine if the corresponding engine is
-> already processing a crypto request. This is helpful when the support
-> for chaining crypto requests will be added. Instead of hanging the
-> system when the engine is in an incoherent state, we add this macro
-
-You don't add the macro, you use it.
-
-> which throws an understandable error.
-
-How about rewording the commit message this way:
-
-"
-Add a BUG_ON() call when the driver tries to launch a crypto request
-while the engine is still processing the previous one. This replaces
-a silent system hang by a verbose kernel panic with the associated
-backtrace to let the user know that something went wrong in the CESA
-driver.
-"
-
-> 
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-
-Apart from the coding style issue mentioned below,
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
+On Mon, Jun 13, 2016 at 1:42 AM, Xing Zheng <zhengxing@rock-chips.com> wrote:
+> Because we need to support the multiple codecs (MAX98357A/RT5514/DA7219)
+> on the RK3399 GRU boards, this patch can help us to support these codecs.
+>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 > ---
->  drivers/crypto/marvell/cipher.c | 2 ++
->  drivers/crypto/marvell/hash.c   | 2 ++
->  drivers/crypto/marvell/tdma.c   | 2 ++
->  3 files changed, 6 insertions(+)
-> 
-> diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
-> index dcf1fce..8d0fabb 100644
-> --- a/drivers/crypto/marvell/cipher.c
-> +++ b/drivers/crypto/marvell/cipher.c
-> @@ -106,6 +106,8 @@ static void mv_cesa_ablkcipher_std_step(struct ablkcipher_request *req)
->  
->  	mv_cesa_set_int_mask(engine, CESA_SA_INT_ACCEL0_DONE);
->  	writel_relaxed(CESA_SA_CFG_PARA_DIS, engine->regs + CESA_SA_CFG);
-> +	BUG_ON(readl(engine->regs + CESA_SA_CMD)
-> +				  & CESA_SA_CMD_EN_CESA_SA_ACCL0);
+>
+> Changes in v5:
+> - fix the build warning for missing I2C/CLKDEV_LOOKUP dependency
+>
+> Changes in v4:
+> - the compatible name needs to be based on a single reference design,
+>   and the name of the board is called "GRU"
+> - use one i2sX card "rockchip,cpu = <&i2s0>" instead of array that is
+>   based on GRU
+> - rename DOC to rockchip,rk3399-gru-sound.txt
+> - rename compatible to rockchip,rk3399-gru-sound
+> - rename source code to rk3399_gru_sound.c
+>
+> Changes in v3:
+> - rename DOC to rockchip,rk3399-max98357a-rt5514-da7219.txt
+> - rename compatible to rockchip,rk3399-max98357a-rt5514-da7219
+> - rename source code to rk3399_max98357a_rt5514_da7219.c
+>
+> Changes in v2:
+> - use the FS 256 to set mclks of the max98357a and rt5514 danamically
+> - add more sample rate for da7219
+>
+>  .../bindings/sound/rockchip,rk3399-gru-sound.txt   |   15 +
+>  sound/soc/rockchip/Kconfig                         |   11 +
+>  sound/soc/rockchip/Makefile                        |    2 +
+>  sound/soc/rockchip/rk3399_gru_sound.c              |  339 ++++++++++++++++++++
+>  4 files changed, 367 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+>  create mode 100644 sound/soc/rockchip/rk3399_gru_sound.c
+>
+> diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+> new file mode 100644
+> index 0000000..f19b6c8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+> @@ -0,0 +1,15 @@
+> +ROCKCHIP with MAX98357A/RT5514/DA7219 codecs on GRU boards
+> +
+> +Required properties:
+> +- compatible: "rockchip,rk3399-gru-sound"
+> +- rockchip,cpu: The phandle of the Rockchip I2S controller that's
+> +  connected to the codecs
+> +- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
+> +
+> +Example:
+> +
+> +sound {
+> +       compatible = "rockchip,rk3399-gru-sound";
+> +       rockchip,cpu = <&i2s0>;
+> +       rockchip,codec = <&max98357a &rt5514 &da7219>;
+> +};
+> diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
+> index f1e0c70..6d39032 100644
+> --- a/sound/soc/rockchip/Kconfig
+> +++ b/sound/soc/rockchip/Kconfig
+> @@ -41,3 +41,14 @@ config SND_SOC_ROCKCHIP_RT5645
+>         help
+>           Say Y or M here if you want to add support for SoC audio on Rockchip
+>           boards using the RT5645/RT5650 codec, such as Veyron.
+> +
+> +config SND_SOC_RK3399_GRU_SOUND
+> +       tristate "ASoC support multiple codecs for Rockchip RK3399 GRU boards"
+> +       depends on SND_SOC_ROCKCHIP && I2C && GPIOLIB && CLKDEV_LOOKUP
+> +       select SND_SOC_ROCKCHIP_I2S
+> +       select SND_SOC_MAX98357A
+> +       select SND_SOC_RT5514
+> +       select SND_SOC_DA7219
+> +       help
+> +         Say Y or M here if you want to add support multiple codecs for SoC
+> +         audio on Rockchip RK3399 GRU boards.
+> diff --git a/sound/soc/rockchip/Makefile b/sound/soc/rockchip/Makefile
+> index c0bf560..84e5c7c 100644
+> --- a/sound/soc/rockchip/Makefile
+> +++ b/sound/soc/rockchip/Makefile
+> @@ -7,6 +7,8 @@ obj-$(CONFIG_SND_SOC_ROCKCHIP_SPDIF) += snd-soc-rockchip-spdif.o
+>
+>  snd-soc-rockchip-max98090-objs := rockchip_max98090.o
+>  snd-soc-rockchip-rt5645-objs := rockchip_rt5645.o
+> +snd-soc-rk3399-gru-sound-objs := rk3399_gru_sound.o
+>
+>  obj-$(CONFIG_SND_SOC_ROCKCHIP_MAX98090) += snd-soc-rockchip-max98090.o
+>  obj-$(CONFIG_SND_SOC_ROCKCHIP_RT5645) += snd-soc-rockchip-rt5645.o
+> +obj-$(CONFIG_SND_SOC_RK3399_GRU_SOUND) += snd-soc-rk3399-gru-sound.o
+> diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+> new file mode 100644
+> index 0000000..cc9b943
+> --- /dev/null
+> +++ b/sound/soc/rockchip/rk3399_gru_sound.c
+> @@ -0,0 +1,339 @@
+> +/*
+> + * Rockchip machine ASoC driver for boards using MAX98357A/RT5514/DA7219
+> + *
+> + * Copyright (c) 2016, ROCKCHIP CORPORATION.  All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/gpio.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/delay.h>
+> +#include <linux/spi/spi.h>
+> +#include <sound/core.h>
+> +#include <sound/jack.h>
+> +#include <sound/pcm.h>
+> +#include <sound/pcm_params.h>
+> +#include <sound/soc.h>
+> +#include "rockchip_i2s.h"
+> +#include "../codecs/da7219.h"
+> +#include "../codecs/da7219-aad.h"
+> +#include "../codecs/rt5514.h"
+> +
+> +#define DRV_NAME "rk3399-gru-sound"
+> +
+> +#define SOUND_FS       256
+> +
+> +static struct snd_soc_jack rockchip_sound_jack;
+> +
+> +static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
+> +       SND_SOC_DAPM_HP("Headphones", NULL),
+> +       SND_SOC_DAPM_SPK("Speakers", NULL),
+> +       SND_SOC_DAPM_MIC("Headset Mic", NULL),
+> +       SND_SOC_DAPM_MIC("Int Mic", NULL),
+> +};
+> +
+> +static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
+> +       /* Input Lines */
+> +       {"MIC", NULL, "Headset Mic"},
+> +       {"DMIC1L", NULL, "Int Mic"},
+> +       {"DMIC1R", NULL, "Int Mic"},
+> +
+> +       /* Output Lines */
+> +       {"Headphones", NULL, "HPL"},
+> +       {"Headphones", NULL, "HPR"},
+> +       {"Speakers", NULL, "Speakers"},
+> +};
+> +
+> +static const struct snd_kcontrol_new rockchip_controls[] = {
+> +       SOC_DAPM_PIN_SWITCH("Headphones"),
+> +       SOC_DAPM_PIN_SWITCH("Speakers"),
+> +       SOC_DAPM_PIN_SWITCH("Headset Mic"),
+> +       SOC_DAPM_PIN_SWITCH("Int Mic"),
+> +};
+> +
+> +static int rockchip_sound_max98357a_hw_params(struct snd_pcm_substream *substream,
+> +                            struct snd_pcm_hw_params *params)
+> +{
+> +       struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +       struct snd_soc_dapm_context *dapm = &rtd->card->dapm;
+> +       unsigned int mclk;
+> +       int ret;
+> +
+> +       snd_soc_dapm_disable_pin(dapm, "Headphones");
+> +       snd_soc_dapm_enable_pin(dapm, "Speakers");
+> +       snd_soc_dapm_sync(dapm);
+> +
+> +       /* max98357a supports these sample rates */
+> +       switch (params_rate(params)) {
+> +       case 8000:
+> +       case 16000:
+> +       case 48000:
+> +       case 96000:
+> +               mclk = params_rate(params) * SOUND_FS;
+> +               break;
+> +       default:
+> +               dev_err(rtd->card->dev, "%s() doesn't support this sample rate: %d\n",
+> +                               __func__, params_rate(params));
+> +               return -EINVAL;
+> +       }
+> +
+> +       ret = snd_soc_dai_set_sysclk(rtd->cpu_dai, 0, mclk, 0);
+> +       if (ret) {
+> +               dev_err(rtd->card->dev, "%s() error setting sysclk to %u: %d\n",
+> +                               __func__, mclk, ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int rockchip_sound_rt5514_hw_params(struct snd_pcm_substream *substream,
+> +                            struct snd_pcm_hw_params *params)
+> +{
+> +       struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +       struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+> +       struct snd_soc_dai *codec_dai = rtd->codec_dai;
+> +       struct snd_soc_dapm_context *dapm = &rtd->card->dapm;
+> +       unsigned int mclk;
+> +       int ret;
+> +
+> +       snd_soc_dapm_disable_pin(dapm, "Headset Mic");
+> +       snd_soc_dapm_enable_pin(dapm, "Int Mic");
+> +       snd_soc_dapm_sync(dapm);
+> +
+> +       mclk = params_rate(params) * SOUND_FS;
+> +
+> +       ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
+> +                                    SND_SOC_CLOCK_OUT);
+> +       if (ret < 0) {
+> +               dev_err(rtd->card->dev, "Can't set cpu clock out %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       ret = snd_soc_dai_set_sysclk(codec_dai, RT5514_SCLK_S_MCLK,
+> +                                    mclk, SND_SOC_CLOCK_IN);
+> +       if (ret) {
+> +               dev_err(rtd->card->dev, "%s() error setting sysclk to %u: %d\n",
+> +                               __func__, params_rate(params) * 512, ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int rockchip_sound_da7219_hw_params(struct snd_pcm_substream *substream,
+> +                            struct snd_pcm_hw_params *params)
+> +{
+> +       struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +       struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+> +       struct snd_soc_dai *codec_dai = rtd->codec_dai;
+> +       struct snd_soc_dapm_context *dapm = &rtd->card->dapm;
+> +       int mclk, ret;
+> +
+> +       snd_soc_dapm_disable_pin(dapm, "Speakers");
+> +       snd_soc_dapm_disable_pin(dapm, "Int Mic");
+> +       snd_soc_dapm_enable_pin(dapm, "Headphones");
+> +       snd_soc_dapm_enable_pin(dapm, "Headset Mic");
+> +       snd_soc_dapm_sync(dapm);
+> +
+> +       /* in bypass mode, the mclk has to be one of the frequencies below */
+> +       switch (params_rate(params)) {
+> +       case 8000:
+> +       case 16000:
+> +       case 24000:
+> +       case 32000:
+> +       case 48000:
+> +       case 64000:
+> +       case 96000:
+> +               mclk = 12288000;
+> +               break;
+> +       case 11025:
+> +       case 22050:
+> +       case 44100:
+> +       case 88200:
+> +               mclk = 11289600;
+> +               break;
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +
+> +       ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
+> +                                    SND_SOC_CLOCK_OUT);
+> +       if (ret < 0) {
+> +               dev_err(codec_dai->dev, "Can't set cpu clock out %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
+> +                                    SND_SOC_CLOCK_IN);
+> +       if (ret < 0) {
+> +               dev_err(codec_dai->dev, "Can't set codec clock in %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       ret = snd_soc_dai_set_pll(codec_dai, 0, DA7219_SYSCLK_MCLK, 0, 0);
+> +       if (ret < 0) {
+> +               dev_err(codec_dai->dev, "Can't set pll sysclk mclk %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int rockchip_sound_da7219_init(struct snd_soc_pcm_runtime *rtd)
+> +{
+> +       struct snd_soc_codec *codec = rtd->codec_dais[0]->codec;
+> +       int ret;
+> +
+> +       /* Enable Headset and 4 Buttons Jack detection */
+> +       ret = snd_soc_card_jack_new(rtd->card, "Headset Jack",
+> +                                   SND_JACK_HEADSET |
 
-Nit: please put the '&' operator at the end of the first line and
-align CESA_SA_CMD_EN_CESA_SA_ACCL0 on the open parenthesis.
+Should this also include SND_JACK_LINEOUT? da7219 differentiates
+between the two so not including lineout means, for example, we can
+miss jack insertion/removal events.
 
-	BUG_ON(readl(engine->regs + CESA_SA_CMD) &
-	       CESA_SA_CMD_EN_CESA_SA_ACCL0);
-
->  	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
->  }
->  
-> diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-> index 7ca2e0f..0fae351 100644
-> --- a/drivers/crypto/marvell/hash.c
-> +++ b/drivers/crypto/marvell/hash.c
-> @@ -237,6 +237,8 @@ static void mv_cesa_ahash_std_step(struct ahash_request *req)
->  
->  	mv_cesa_set_int_mask(engine, CESA_SA_INT_ACCEL0_DONE);
->  	writel_relaxed(CESA_SA_CFG_PARA_DIS, engine->regs + CESA_SA_CFG);
-> +	BUG_ON(readl(engine->regs + CESA_SA_CMD)
-> +				  & CESA_SA_CMD_EN_CESA_SA_ACCL0);
-
-Ditto.
-
->  	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
->  }
->  
-> diff --git a/drivers/crypto/marvell/tdma.c b/drivers/crypto/marvell/tdma.c
-> index 7642798..d493714 100644
-> --- a/drivers/crypto/marvell/tdma.c
-> +++ b/drivers/crypto/marvell/tdma.c
-> @@ -53,6 +53,8 @@ void mv_cesa_dma_step(struct mv_cesa_tdma_req *dreq)
->  		       engine->regs + CESA_SA_CFG);
->  	writel_relaxed(dreq->chain.first->cur_dma,
->  		       engine->regs + CESA_TDMA_NEXT_ADDR);
-> +	BUG_ON(readl(engine->regs + CESA_SA_CMD)
-> +				  & CESA_SA_CMD_EN_CESA_SA_ACCL0);
-
-Ditto.
-
->  	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
->  }
->  
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> +                                   SND_JACK_BTN_0 | SND_JACK_BTN_1 |
+> +                                   SND_JACK_BTN_2 | SND_JACK_BTN_3,
+> +                                   &rockchip_sound_jack, NULL, 0);
+> +
+> +       if (ret) {
+> +               dev_err(rtd->card->dev, "New Headset Jack failed! (%d)\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       da7219_aad_jack_det(codec, &rockchip_sound_jack);
+> +
+> +       return 0;
+> +}
+> +
+> +static struct snd_soc_ops rockchip_sound_max98357a_ops = {
+> +       .hw_params = rockchip_sound_max98357a_hw_params,
+> +};
+> +
+> +static struct snd_soc_ops rockchip_sound_rt5514_ops = {
+> +       .hw_params = rockchip_sound_rt5514_hw_params,
+> +};
+> +
+> +static struct snd_soc_ops rockchip_sound_da7219_ops = {
+> +       .hw_params = rockchip_sound_da7219_hw_params,
+> +};
+> +
+> +enum {
+> +       DAILINK_MAX98357A,
+> +       DAILINK_RT5514,
+> +       DAILINK_DA7219,
+> +};
+> +
+> +static struct snd_soc_dai_link rockchip_dailinks[] = {
+> +       [DAILINK_MAX98357A] = {
+> +               .name = "MAX98357A",
+> +               .stream_name = "MAX98357A PCM",
+> +               .codec_dai_name = "HiFi",
+> +               .ops = &rockchip_sound_max98357a_ops,
+> +               /* set max98357a as slave */
+> +               .dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+> +                       SND_SOC_DAIFMT_CBS_CFS,
+> +       },
+> +       [DAILINK_RT5514] = {
+> +               .name = "RT5514",
+> +               .stream_name = "RT5514 PCM",
+> +               .codec_dai_name = "rt5514-aif1",
+> +               .ops = &rockchip_sound_rt5514_ops,
+> +               /* set rt5514 as slave */
+> +               .dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+> +                       SND_SOC_DAIFMT_CBS_CFS,
+> +       },
+> +       [DAILINK_DA7219] = {
+> +               .name = "DA7219",
+> +               .stream_name = "DA7219 PCM",
+> +               .codec_dai_name = "da7219-hifi",
+> +               .init = rockchip_sound_da7219_init,
+> +               .ops = &rockchip_sound_da7219_ops,
+> +               /* set da7219 as slave */
+> +               .dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+> +                       SND_SOC_DAIFMT_CBS_CFS,
+> +       },
+> +};
+> +
+> +static struct snd_soc_card rockchip_sound_card = {
+> +       .name = "rk3399-gru-sound",
+> +       .owner = THIS_MODULE,
+> +       .dai_link = rockchip_dailinks,
+> +       .num_links =  ARRAY_SIZE(rockchip_dailinks),
+> +       .dapm_widgets = rockchip_dapm_widgets,
+> +       .num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
+> +       .dapm_routes = rockchip_dapm_routes,
+> +       .num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
+> +       .controls = rockchip_controls,
+> +       .num_controls = ARRAY_SIZE(rockchip_controls),
+> +};
+> +
+> +static int rockchip_sound_probe(struct platform_device *pdev)
+> +{
+> +       struct snd_soc_card *card = &rockchip_sound_card;
+> +       struct device_node *cpu_node;
+> +       int i, ret;
+> +
+> +       cpu_node = of_parse_phandle(pdev->dev.of_node, "rockchip,cpu", 0);
+> +       if (!cpu_node) {
+> +               dev_err(&pdev->dev, "Property 'rockchip,cpu' missing or invalid\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       for (i = 0; i < card->num_links; i++) {
+> +               rockchip_dailinks[i].platform_of_node = cpu_node;
+> +               rockchip_dailinks[i].cpu_of_node = cpu_node;
+> +
+> +               rockchip_dailinks[i].codec_of_node =
+> +                       of_parse_phandle(pdev->dev.of_node, "rockchip,codec", i);
+> +               if (!rockchip_dailinks[i].codec_of_node) {
+> +                       dev_err(&pdev->dev,
+> +                               "Property[%d] 'rockchip,codec' missing or invalid\n", i);
+> +                       return -EINVAL;
+> +               }
+> +       }
+> +
+> +       card->dev = &pdev->dev;
+> +       platform_set_drvdata(pdev, card);
+> +
+> +       ret = devm_snd_soc_register_card(&pdev->dev, card);
+> +       if (ret)
+> +               dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
+> +                       __func__, ret);
+> +
+> +       return ret;
+> +}
+> +
+> +static const struct of_device_id rockchip_sound_of_match[] = {
+> +       { .compatible = "rockchip,rk3399-gru-sound", },
+> +       {},
+> +};
+> +
+> +static struct platform_driver rockchip_sound_driver = {
+> +       .probe = rockchip_sound_probe,
+> +       .driver = {
+> +               .name = DRV_NAME,
+> +               .of_match_table = rockchip_sound_of_match,
+> +#ifdef CONFIG_PM
+> +               .pm = &snd_soc_pm_ops,
+> +#endif
+> +       },
+> +};
+> +
+> +module_platform_driver(rockchip_sound_driver);
+> +
+> +MODULE_AUTHOR("Xing Zheng <zhengxing@rock-chips.com>");
+> +MODULE_DESCRIPTION("Rockchip ASoC Machine Driver");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:" DRV_NAME);
+> +MODULE_DEVICE_TABLE(of, rockchip_sound_of_match);
+> --
+> 1.7.9.5
+>
+>
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
