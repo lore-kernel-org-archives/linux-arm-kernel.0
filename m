@@ -1,232 +1,317 @@
 From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Wed, 15 Jun 2016 20:04:43 +0800
-Subject: [PATCH v3 4/6] drm: rockchip: use common iommu api to attach iommu
+Date: Wed, 15 Jun 2016 20:04:44 +0800
+Subject: [PATCH v3 5/6] iommu/rockchip: use DMA API to map, to flush cache
 In-Reply-To: <1465992285-16187-1-git-send-email-zhengsq@rock-chips.com>
 References: <1465992285-16187-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1465992285-16187-5-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <1465992285-16187-6-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip DRM used the arm special API, arm_iommu_*(), to attach
-iommu for ARM32 SoCs. This patch convert to common iommu API
-so it would support ARM64 like RK3399.
+Use DMA API instead of architecture internal functions like
+__cpuc_flush_dcache_area() etc.
 
-The general idea is domain_alloc(), attach_device() and
-arch_setup_dma_ops() to set dma_ops manually for DRM at the last.
+To support the virtual device like DRM the virtual slave iommu
+added in the previous patch, attaching to which the DRM can use
+it own domain->dev for dma_map_*(), dma_sync_*() even VOP is disabled.
+
+With this patch, this driver is available for ARM64 like RK3399.
 
 Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 112 +++++++++++++++++-----------
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   1 +
- 2 files changed, 71 insertions(+), 42 deletions(-)
+ drivers/iommu/rockchip-iommu.c | 113 +++++++++++++++++++++++++++--------------
+ 1 file changed, 76 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index f5a68fc..b52c38d 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -14,16 +14,16 @@
-  * GNU General Public License for more details.
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index 82ecc99..b60b29e 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -4,8 +4,6 @@
+  * published by the Free Software Foundation.
   */
  
--#include <asm/dma-iommu.h>
--
- #include <drm/drmP.h>
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_fb_helper.h>
-+#include <linux/dma-iommu.h>
- #include <linux/dma-mapping.h>
- #include <linux/pm_runtime.h>
- #include <linux/module.h>
- #include <linux/of_graph.h>
- #include <linux/component.h>
-+#include <linux/iommu.h>
+-#include <asm/cacheflush.h>
+-#include <asm/pgtable.h>
+ #include <linux/compiler.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
+@@ -78,7 +76,9 @@
  
- #include "rockchip_drm_drv.h"
- #include "rockchip_drm_fb.h"
-@@ -46,7 +46,8 @@ static bool is_support_iommu = true;
- int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
- 				   struct device *dev)
- {
--	struct dma_iommu_mapping *mapping = drm_dev->dev->archdata.mapping;
-+	struct rockchip_drm_private *private = drm_dev->dev_private;
-+	struct iommu_domain *domain = private->domain;
- 	int ret;
+ struct rk_iommu_domain {
+ 	struct list_head iommus;
++	struct device *dev;
+ 	u32 *dt; /* page directory table */
++	dma_addr_t dt_dma;
+ 	spinlock_t iommus_lock; /* lock for iommus list */
+ 	spinlock_t dt_lock; /* lock for modifying page directory table */
  
- 	if (!is_support_iommu)
-@@ -58,16 +59,25 @@ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
- 
- 	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
- 
--	return arm_iommu_attach_device(dev, mapping);
-+	ret = iommu_attach_device(domain, dev);
-+	if (ret) {
-+		dev_err(dev, "Failed to attach iommu device\n");
-+		return ret;
-+	}
-+
-+	/* TODO(djkurtz): fetch the mapping start/size from somewhere */
-+	arch_setup_dma_ops(dev, 0x00000000, SZ_2G, dev->bus->iommu_ops, false);
-+	return 0;
+@@ -102,14 +102,12 @@ static inline bool rk_iommu_is_virtual(struct rk_iommu *iommu)
+ 	return iommu->num_mmu == 0;
  }
  
- void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
- 				    struct device *dev)
+-static inline void rk_table_flush(u32 *va, unsigned int count)
++static inline void rk_table_flush(struct device *dev, dma_addr_t dma,
++				  unsigned int count)
  {
--	if (!is_support_iommu)
--		return;
-+	struct rockchip_drm_private *private = drm_dev->dev_private;
-+	struct iommu_domain *domain = private->domain;
+-	phys_addr_t pa_start = virt_to_phys(va);
+-	phys_addr_t pa_end = virt_to_phys(va + count);
+-	size_t size = pa_end - pa_start;
++	size_t size = count * 4; /* count of entry, 4 bytes per entry */
  
--	arm_iommu_detach_device(dev);
-+	if (is_support_iommu)
-+		iommu_detach_device(domain, dev);
+-	__cpuc_flush_dcache_area(va, size);
+-	outer_flush_range(pa_start, pa_end);
++	dma_sync_single_for_device(dev, dma, size, DMA_TO_DEVICE);
  }
  
- int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
-@@ -132,10 +142,52 @@ static void rockchip_drm_crtc_disable_vblank(struct drm_device *dev,
- 		priv->crtc_funcs[pipe]->disable_vblank(crtc);
+ static struct rk_iommu_domain *to_rk_domain(struct iommu_domain *dom)
+@@ -192,10 +190,9 @@ static inline bool rk_dte_is_pt_valid(u32 dte)
+ 	return dte & RK_DTE_PT_VALID;
  }
  
-+static int rockchip_drm_init_iommu(struct drm_device *drm_dev)
-+{
-+	struct rockchip_drm_private *private = drm_dev->dev_private;
-+	struct device *dev = drm_dev->dev;
-+	int ret;
-+
-+	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms),
-+				      GFP_KERNEL);
-+	if (!dev->dma_parms)
-+		return -ENOMEM;
-+
-+	private->domain = iommu_domain_alloc(&platform_bus_type);
-+	if (!private->domain)
-+		return -ENOMEM;
-+
-+	/* TODO(djkurtz): fetch the mapping start/size from somewhere */
-+	ret = iommu_dma_init_domain(private->domain, 0x00000000, SZ_2G);
-+	if (ret) {
-+		dev_err(dev, "Failed to init domain\n");
-+		goto err_free_domain;
-+	}
-+
-+	ret = rockchip_drm_dma_attach_device(drm_dev, dev);
-+	if (ret) {
-+		dev_err(dev, "Failed to attach device\n");
-+		goto err_free_domain;
-+	}
-+
-+	return 0;
-+
-+err_free_domain:
-+	iommu_domain_free(private->domain);
-+
-+	return ret;
-+}
-+
-+static void rockchip_iommu_cleanup(struct drm_device *drm_dev)
-+{
-+	struct rockchip_drm_private *private = drm_dev->dev_private;
-+
-+	iommu_domain_free(private->domain);
-+}
-+
- static int rockchip_drm_load(struct drm_device *drm_dev, unsigned long flags)
+-static u32 rk_mk_dte(u32 *pt)
++static inline u32 rk_mk_dte(dma_addr_t pt_dma)
  {
- 	struct rockchip_drm_private *private;
--	struct dma_iommu_mapping *mapping = NULL;
- 	struct device *dev = drm_dev->dev;
- 	struct drm_connector *connector;
- 	int ret;
-@@ -153,38 +205,18 @@ static int rockchip_drm_load(struct drm_device *drm_dev, unsigned long flags)
+-	phys_addr_t pt_phys = virt_to_phys(pt);
+-	return (pt_phys & RK_DTE_PT_ADDRESS_MASK) | RK_DTE_PT_VALID;
++	return (pt_dma & RK_DTE_PT_ADDRESS_MASK) | RK_DTE_PT_VALID;
+ }
  
- 	rockchip_drm_mode_config_init(drm_dev);
+ /*
+@@ -613,12 +610,14 @@ static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
+ 				  dma_addr_t iova)
+ {
+ 	u32 *page_table, *dte_addr;
+-	u32 dte;
++	u32 dte_index, dte;
+ 	phys_addr_t pt_phys;
++	dma_addr_t pt_dma;
  
--	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms),
--				      GFP_KERNEL);
--	if (!dev->dma_parms) {
--		ret = -ENOMEM;
--		goto err_config_cleanup;
--	}
--
- 	if (is_support_iommu) {
--		/* TODO(djkurtz): fetch the mapping start/size from somewhere */
--		mapping = arm_iommu_create_mapping(&platform_bus_type,
--						   0x00000000,
--						   SZ_2G);
--		if (IS_ERR(mapping)) {
--			ret = PTR_ERR(mapping);
--			goto err_config_cleanup;
--		}
--
--		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
--		if (ret)
--			goto err_release_mapping;
--
--		dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
--
--		ret = arm_iommu_attach_device(dev, mapping);
-+		ret = rockchip_drm_init_iommu(drm_dev);
- 		if (ret)
--			goto err_release_mapping;
-+			goto err_config_cleanup;
+ 	assert_spin_locked(&rk_domain->dt_lock);
+ 
+-	dte_addr = &rk_domain->dt[rk_iova_dte_index(iova)];
++	dte_index = rk_iova_dte_index(iova);
++	dte_addr = &rk_domain->dt[dte_index];
+ 	dte = *dte_addr;
+ 	if (rk_dte_is_pt_valid(dte))
+ 		goto done;
+@@ -627,19 +626,28 @@ static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
+ 	if (!page_table)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	dte = rk_mk_dte(page_table);
+-	*dte_addr = dte;
++	pt_dma = dma_map_single(rk_domain->dev, page_table,
++				SPAGE_SIZE, DMA_TO_DEVICE);
++	if (dma_mapping_error(rk_domain->dev, pt_dma)) {
++		dev_err(rk_domain->dev,
++			"DMA mapping error while allocating page table\n");
++		free_page((unsigned long)page_table);
++		return ERR_PTR(-ENOMEM);
++	}
+ 
+-	rk_table_flush(page_table, NUM_PT_ENTRIES);
+-	rk_table_flush(dte_addr, 1);
++	dte = rk_mk_dte(pt_dma);
++	*dte_addr = dte;
+ 
++	rk_table_flush(rk_domain->dev, pt_dma, NUM_PT_ENTRIES);
++	rk_table_flush(rk_domain->dev, rk_domain->dt_dma + dte_index * 4, 1);
+ done:
+ 	pt_phys = rk_dte_pt_address(dte);
+ 	return (u32 *)phys_to_virt(pt_phys);
+ }
+ 
+ static size_t rk_iommu_unmap_iova(struct rk_iommu_domain *rk_domain,
+-				  u32 *pte_addr, dma_addr_t iova, size_t size)
++				  u32 *pte_addr, dma_addr_t pte_dma,
++				  size_t size)
+ {
+ 	unsigned int pte_count;
+ 	unsigned int pte_total = size / SPAGE_SIZE;
+@@ -654,14 +662,14 @@ static size_t rk_iommu_unmap_iova(struct rk_iommu_domain *rk_domain,
+ 		pte_addr[pte_count] = rk_mk_pte_invalid(pte);
  	}
  
- 	/* Try to bind all sub drivers. */
- 	ret = component_bind_all(dev, drm_dev);
--	if (ret)
--		goto err_detach_device;
-+	if (ret) {
-+		dev_err(dev, "Failed to bind components\n");
-+		goto err_iommu_cleanup;
-+	}
+-	rk_table_flush(pte_addr, pte_count);
++	rk_table_flush(rk_domain->dev, pte_dma, pte_count);
+ 
+ 	return pte_count * SPAGE_SIZE;
+ }
+ 
+ static int rk_iommu_map_iova(struct rk_iommu_domain *rk_domain, u32 *pte_addr,
+-			     dma_addr_t iova, phys_addr_t paddr, size_t size,
+-			     int prot)
++			     dma_addr_t pte_dma, dma_addr_t iova,
++			     phys_addr_t paddr, size_t size, int prot)
+ {
+ 	unsigned int pte_count;
+ 	unsigned int pte_total = size / SPAGE_SIZE;
+@@ -680,7 +688,7 @@ static int rk_iommu_map_iova(struct rk_iommu_domain *rk_domain, u32 *pte_addr,
+ 		paddr += SPAGE_SIZE;
+ 	}
+ 
+-	rk_table_flush(pte_addr, pte_count);
++	rk_table_flush(rk_domain->dev, pte_dma, pte_total);
  
  	/*
- 	 * All components are now added, we can publish the connector sysfs
-@@ -222,21 +254,17 @@ static int rockchip_drm_load(struct drm_device *drm_dev, unsigned long flags)
- 	if (ret)
- 		goto err_vblank_cleanup;
+ 	 * Zap the first and last iova to evict from iotlb any previously
+@@ -693,7 +701,8 @@ static int rk_iommu_map_iova(struct rk_iommu_domain *rk_domain, u32 *pte_addr,
+ 	return 0;
+ unwind:
+ 	/* Unmap the range of iovas that we just mapped */
+-	rk_iommu_unmap_iova(rk_domain, pte_addr, iova, pte_count * SPAGE_SIZE);
++	rk_iommu_unmap_iova(rk_domain, pte_addr, pte_dma,
++			    pte_count * SPAGE_SIZE);
  
--	if (is_support_iommu)
--		arm_iommu_release_mapping(mapping);
+ 	iova += pte_count * SPAGE_SIZE;
+ 	page_phys = rk_pte_page_address(pte_addr[pte_count]);
+@@ -708,8 +717,9 @@ static int rk_iommu_map(struct iommu_domain *domain, unsigned long _iova,
+ {
+ 	struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
+ 	unsigned long flags;
+-	dma_addr_t iova = (dma_addr_t)_iova;
++	dma_addr_t pte_dma, iova = (dma_addr_t)_iova;
+ 	u32 *page_table, *pte_addr;
++	u32 dte_index, pte_index;
+ 	int ret;
+ 
+ 	spin_lock_irqsave(&rk_domain->dt_lock, flags);
+@@ -727,8 +737,13 @@ static int rk_iommu_map(struct iommu_domain *domain, unsigned long _iova,
+ 		return PTR_ERR(page_table);
+ 	}
+ 
+-	pte_addr = &page_table[rk_iova_pte_index(iova)];
+-	ret = rk_iommu_map_iova(rk_domain, pte_addr, iova, paddr, size, prot);
++	dte_index = rk_domain->dt[rk_iova_dte_index(iova)];
++	pte_index = rk_iova_pte_index(iova);
++	pte_addr = &page_table[pte_index];
++	pte_dma = rk_dte_pt_address(dte_index) + pte_index * 4;
++	ret = rk_iommu_map_iova(rk_domain, pte_addr, pte_dma, iova,
++				paddr, size, prot);
++
+ 	spin_unlock_irqrestore(&rk_domain->dt_lock, flags);
+ 
+ 	return ret;
+@@ -739,7 +754,7 @@ static size_t rk_iommu_unmap(struct iommu_domain *domain, unsigned long _iova,
+ {
+ 	struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
+ 	unsigned long flags;
+-	dma_addr_t iova = (dma_addr_t)_iova;
++	dma_addr_t pte_dma, iova = (dma_addr_t)_iova;
+ 	phys_addr_t pt_phys;
+ 	u32 dte;
+ 	u32 *pte_addr;
+@@ -763,7 +778,8 @@ static size_t rk_iommu_unmap(struct iommu_domain *domain, unsigned long _iova,
+ 
+ 	pt_phys = rk_dte_pt_address(dte);
+ 	pte_addr = (u32 *)phys_to_virt(pt_phys) + rk_iova_pte_index(iova);
+-	unmap_size = rk_iommu_unmap_iova(rk_domain, pte_addr, iova, size);
++	pte_dma = pt_phys + rk_iova_pte_index(iova) * 4;
++	unmap_size = rk_iommu_unmap_iova(rk_domain, pte_addr, pte_dma, size);
+ 
+ 	spin_unlock_irqrestore(&rk_domain->dt_lock, flags);
+ 
+@@ -875,7 +891,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 	struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
+ 	unsigned long flags;
+ 	int ret, i;
+-	phys_addr_t dte_addr;
+ 
+ 	iommu = rk_iommu_from_dev(dev);
+ 
+@@ -886,6 +901,22 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 			return -ENOMEM;
+ 	}
+ 
++	/* Set the domain dev to virtual one if exist */
++	if (rk_iommu_is_virtual(iommu) || !rk_domain->dev)
++		rk_domain->dev = iommu->dev;
++
++	if (!rk_domain->dt_dma) {
++		rk_domain->dt_dma = dma_map_single(rk_domain->dev,
++				rk_domain->dt, SPAGE_SIZE, DMA_TO_DEVICE);
++		if (dma_mapping_error(rk_domain->dev, rk_domain->dt_dma)) {
++			dev_err(rk_domain->dev, "dma map error for DT\n");
++			return -ENOMEM;
++		}
++
++		rk_table_flush(rk_domain->dev, rk_domain->dt_dma,
++			       NUM_DT_ENTRIES);
++	}
++
+ 	iommu->domain = domain;
+ 	if (rk_iommu_is_virtual(iommu)) {
+ 		dev_dbg(dev, "Attach virtual device to iommu domain\n");
+@@ -894,28 +925,28 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 
+ 	ret = rk_iommu_enable_stall(iommu);
+ 	if (ret)
+-		return ret;
++		goto unmap;
+ 
+ 	ret = rk_iommu_force_reset(iommu);
+ 	if (ret)
+-		return ret;
++		goto unmap;
+ 
+ 
+ 	ret = devm_request_irq(iommu->dev, iommu->irq, rk_iommu_irq,
+ 			       IRQF_SHARED, dev_name(dev), iommu);
+ 	if (ret)
+-		return ret;
++		goto unmap;
+ 
+-	dte_addr = virt_to_phys(rk_domain->dt);
+ 	for (i = 0; i < iommu->num_mmu; i++) {
+-		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR, dte_addr);
++		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
++			       rk_domain->dt_dma);
+ 		rk_iommu_command(iommu->bases[i], RK_MMU_CMD_ZAP_CACHE);
+ 		rk_iommu_write(iommu->bases[i], RK_MMU_INT_MASK, RK_MMU_IRQ_MASK);
+ 	}
+ 
+ 	ret = rk_iommu_enable_paging(iommu);
+ 	if (ret)
+-		return ret;
++		goto unmap;
+ 
+ 	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+ 	list_add_tail(&iommu->node, &rk_domain->iommus);
+@@ -926,6 +957,11 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 	rk_iommu_disable_stall(iommu);
+ 
  	return 0;
 +
- err_vblank_cleanup:
- 	drm_vblank_cleanup(drm_dev);
- err_kms_helper_poll_fini:
- 	drm_kms_helper_poll_fini(drm_dev);
- err_unbind:
- 	component_unbind_all(dev, drm_dev);
--err_detach_device:
--	if (is_support_iommu)
--		arm_iommu_detach_device(dev);
--err_release_mapping:
-+err_iommu_cleanup:
- 	if (is_support_iommu)
--		arm_iommu_release_mapping(mapping);
-+		rockchip_iommu_cleanup(drm_dev);
- err_config_cleanup:
- 	drm_mode_config_cleanup(drm_dev);
- 	drm_dev->dev_private = NULL;
-@@ -252,7 +280,7 @@ static int rockchip_drm_unload(struct drm_device *drm_dev)
- 	drm_kms_helper_poll_fini(drm_dev);
- 	component_unbind_all(dev, drm_dev);
- 	if (is_support_iommu)
--		arm_iommu_detach_device(dev);
-+		rockchip_iommu_cleanup(drm_dev);
- 	drm_mode_config_cleanup(drm_dev);
- 	drm_dev->dev_private = NULL;
++unmap:
++	dma_unmap_single(rk_domain->dev, rk_domain->dt_dma, SPAGE_SIZE,
++			 DMA_TO_DEVICE);
++	return ret;
+ }
  
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index 56f43a3..1e2a666 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -70,6 +70,7 @@ struct rockchip_drm_private {
- 	const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
+ static void rk_iommu_detach_device(struct iommu_domain *domain,
+@@ -987,8 +1023,6 @@ static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
+ 	if (!rk_domain->dt)
+ 		goto err_dt;
  
- 	struct rockchip_atomic_commit commit;
-+	struct iommu_domain *domain;
- };
+-	rk_table_flush(rk_domain->dt, NUM_DT_ENTRIES);
+-
+ 	spin_lock_init(&rk_domain->iommus_lock);
+ 	spin_lock_init(&rk_domain->dt_lock);
+ 	INIT_LIST_HEAD(&rk_domain->iommus);
+@@ -1012,10 +1046,15 @@ static void rk_iommu_domain_free(struct iommu_domain *domain)
+ 		if (rk_dte_is_pt_valid(dte)) {
+ 			phys_addr_t pt_phys = rk_dte_pt_address(dte);
+ 			u32 *page_table = phys_to_virt(pt_phys);
++			dma_unmap_single(rk_domain->dev, pt_phys,
++					 SPAGE_SIZE, DMA_TO_DEVICE);
+ 			free_page((unsigned long)page_table);
+ 		}
+ 	}
  
- void rockchip_drm_atomic_work(struct work_struct *work);
++	if (!rk_domain->dt_dma)
++		dma_unmap_single(rk_domain->dev, rk_domain->dt_dma,
++				 SPAGE_SIZE, DMA_TO_DEVICE);
+ 	free_page((unsigned long)rk_domain->dt);
+ 
+ 	iommu_put_dma_cookie(&rk_domain->domain);
 -- 
 1.9.1
