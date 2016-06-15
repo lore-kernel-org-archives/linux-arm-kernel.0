@@ -1,83 +1,64 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 15 Jun 2016 09:19:54 -0400
-Subject: [PATCH V6 1/7] ACPI: I/O Remapping Table (IORT) initial support
-In-Reply-To: <1465828873-23498-2-git-send-email-tn@semihalf.com>
-References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
- <1465828873-23498-2-git-send-email-tn@semihalf.com>
-Message-ID: <576155FA.9080706@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 Jun 2016 14:22:46 +0100
+Subject: [PATCH 7/8] arm64: pmu: Enable multiple PMUs in an ACPI system
+In-Reply-To: <1465511013-10742-8-git-send-email-jeremy.linton@arm.com>
+References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
+ <1465511013-10742-8-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20160615132246.GL24029@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Thu, Jun 09, 2016 at 05:23:32PM -0500, Jeremy Linton wrote:
+> Its possible that an ACPI system has multiple CPU types in it
+> with differing PMU counters. Use the newly provided acpi_pmu routines
+> to detect that case, and instantiate more than one set of counters.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  drivers/perf/arm_pmu.c      |  7 +++-
+>  drivers/perf/arm_pmu_acpi.c | 98 ++++++++++++++++++++-------------------------
+>  2 files changed, 50 insertions(+), 55 deletions(-)
+> 
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 865a9db..97007ec 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -1049,7 +1049,12 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+>  		if (!ret)
+>  			ret = init_fn(pmu);
+>  	} else {
+> -		ret = probe_plat_pmu(pmu, probe_table, read_cpuid_id());
+> +		if (acpi_disabled) {
+> +			/* use the current cpu. */
+> +			ret = probe_plat_pmu(pmu, probe_table,
+> +					     read_cpuid_id());
+> +		} else
+> +			ret = probe_plat_pmu(pmu, probe_table, pdev->id);
+>  	}
+>  
+>  	if (ret) {
+> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+> index a257fc0..8f9bea3 100644
+> --- a/drivers/perf/arm_pmu_acpi.c
+> +++ b/drivers/perf/arm_pmu_acpi.c
+> @@ -35,6 +35,11 @@ struct pmu_types {
 
-> +static acpi_status
-> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
-> +{
-> +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
-> +		struct acpi_iort_root_complex *pci_rc;
-> +		struct pci_bus *bus;
-> +
-> +		bus = to_pci_bus(dev);
-> +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
-> +
-> +		/*
-> +		 * It is assumed that PCI segment numbers maps one-to-one
-> +		 * with root complexes. Each segment number can represent only
-> +		 * one root complex.
-> +		 */
-> +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
-> +			return AE_OK;
-> +
+[...]
 
-There is problem with the find_dev_node and callback for PCIe here. It assumes
-a one-to-one relationship between an SMMU and root complex. 
-
-Just checked with Charles offline to see if there is anything in the IORT spec that forces
-this. And, the answer was no. 
-
-Pasting the IORT requirements for you below.
-
-?The IORT was intended to be flexible enough to define static RID to SID mappings, which should cover 
-the following configurations:
--	Dedicated SMMU per RC
--	Multiple RC?s per SMMU (as you described)
--	Multiple SMMU?s per RC (with static RID:SID range per SMMU)
-
-The SMMU instance must be identified by either a device ID *or* a combination of 
-segment ID *and* Requestor ID. ?
-
-If a root complex has multiple SMMUs, this code is going to return the first SMMU. This needs
-to be corrected.
-
-> +		break;
-> +	}
-> +	}
+> +	pmus = kcalloc(num_possible_cpus(), sizeof(struct pmu_types),
+> +		       GFP_KERNEL);
 > +
-> +	return AE_NOT_FOUND;
-> +}
+> +	if (pmus) {
+> +		arm_pmu_acpi_determine_cpu_types(pmus);
 > +
+> +		for (j = 0; pmus[j].cpu_count; j++) {
+> +			pr_devel("CPU type %X, count %d\n", pmus[j].cpu_type,
+> +				 pmus[j].cpu_count);
+> +			res = kcalloc(pmus[j].cpu_count,
+> +				      sizeof(struct resource), GFP_KERNEL);
 
-> +
-> +static struct acpi_iort_node *
-> +iort_find_dev_node(struct device *dev)
-> +{
-> +	struct pci_bus *pbus;
-> +
-> +	if (!dev_is_pci(dev))
-> +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-> +				      iort_match_node_callback, dev);
-> +
-> +	/* Find a PCI root bus */
-> +	pbus = to_pci_dev(dev)->bus;
-> +	while (!pci_is_root_bus(pbus))
-> +		pbus = pbus->parent;
-> +
-> +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
-> +			      iort_match_node_callback, &pbus->dev);
-> +}
-> +
+Given that you already have dynamic allocation in here, why not use a
+linked-list for the pmus list, and avoid having a potentially huge temporary
+data structure?
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Will
