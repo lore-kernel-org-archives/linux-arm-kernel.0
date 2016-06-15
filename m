@@ -1,47 +1,75 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 15 Jun 2016 23:11:19 +0200
-Subject: [PATCH v2 0/4] ASoC: sunxi: Add i2s controller support
-Message-ID: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
+Date: Wed, 15 Jun 2016 23:11:23 +0200
+Subject: [PATCH v2 4/4] ARM: sun7i: Add DAI nodes
+In-Reply-To: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
+References: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160615211123.31068-5-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Add the new DAI blocks to the device tree.
 
-This is the second version of the I2S support for the controller found
-in the Allwinner A10 and later SoCs.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-Playback has been tested with an UDA1380 on an A20-Olinuxino. Capture
-is not implemented yet, but will come eventually.
-
-Let me know what you think,
-Maxime
-
-Changes from v1:
-  - Fixed bogus indentation and spurious whitespaces / newlines
-  - Moved the device initialisation in the probe to the startup function
-  - Disabled the device in shutdown
-  - Removed function to get wss and sr to inline them in hw_params
-  - Changed the way to access the divider array
-  - Checked clk_set_rate return code
-  - Fixed condition for invalid bclk and mclk dividers
-  - Added sound-dai-cells to the bindings documentation required properties
-
-Emilio L?pez (1):
-  ARM: sun7i: Add mod1 clock nodes
-
-Maxime Ripard (3):
-  ASoC: sunxi: Add A10 I2S controller binding documentation
-  ASoC: sunxi: Add Allwinner A10 Digital Audio driver
-  ARM: sun7i: Add DAI nodes
-
- .../devicetree/bindings/sound/sun4i-i2s.txt        |  34 +
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  87 ++-
- sound/soc/sunxi/Kconfig                            |   9 +
- sound/soc/sunxi/Makefile                           |   2 +-
- sound/soc/sunxi/sun4i-i2s.c                        | 703 +++++++++++++++++++++
- 5 files changed, 832 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/sun4i-i2s.txt
- create mode 100644 sound/soc/sunxi/sun4i-i2s.c
-
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 603fda5b7f94..b656bc20ce59 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -1361,6 +1361,32 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2s1: i2s at 01c22000 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun4i-a10-i2s";
++			reg = <0x01c22000 0x400>;
++			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&apb0_gates 4>, <&i2s1_clk>;
++			clock-names = "apb", "mod";
++			dmas = <&dma SUN4I_DMA_NORMAL 4>,
++			       <&dma SUN4I_DMA_NORMAL 4>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++		};
++
++		i2s0: i2s at 01c22400 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun4i-a10-i2s";
++			reg = <0x01c22400 0x400>;
++			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&apb0_gates 3>, <&i2s0_clk>;
++			clock-names = "apb", "mod";
++			dmas = <&dma SUN4I_DMA_NORMAL 3>,
++			       <&dma SUN4I_DMA_NORMAL 3>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++		};
++
+ 		lradc: lradc at 01c22800 {
+ 			compatible = "allwinner,sun4i-a10-lradc-keys";
+ 			reg = <0x01c22800 0x100>;
+@@ -1386,6 +1412,19 @@
+ 			reg = <0x01c23800 0x200>;
+ 		};
+ 
++		i2s2: i2s at 01c24400 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun4i-a10-i2s";
++			reg = <0x01c24400 0x400>;
++			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&apb0_gates 8>, <&i2s2_clk>;
++			clock-names = "apb", "mod";
++			dmas = <&dma SUN4I_DMA_NORMAL 6>,
++			       <&dma SUN4I_DMA_NORMAL 6>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++		};
++
+ 		rtp: rtp at 01c25000 {
+ 			compatible = "allwinner,sun5i-a13-ts";
+ 			reg = <0x01c25000 0x100>;
 -- 
 2.9.0
