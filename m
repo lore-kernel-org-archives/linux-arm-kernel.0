@@ -1,36 +1,58 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2016 17:45:51 +0200
-Subject: [PATCH v2 09/11] net: skfb: remove obsolete -I cflag
+Date: Wed, 15 Jun 2016 17:45:45 +0200
+Subject: [PATCH v2 03/11] Kbuild: always prefix objtree in LINUXINCLUDE
 In-Reply-To: <20160615154553.3177021-1-arnd@arndb.de>
 References: <20160615154553.3177021-1-arnd@arndb.de>
-Message-ID: <20160615154553.3177021-10-arnd@arndb.de>
+Message-ID: <20160615154553.3177021-4-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The skfp driver has been moved to drivers/net/fddi/skfp a long time
-ago, but we still attempt to include headers from the old location,
-which causes a warning when building with W=1:
+When $(LINUXINCLUDE) is added to the cflags of a target that
+normall doesn't have it (e.g. HOSTCFLAGS), each entry in the
+list is expanded so that we search both $(objtree) and $(srctree),
+which is a bit silly, as we already know which of the two we
+want for each entry in LINUXINCLUDE.
 
-cc1: error: /git/arm-soc/drivers/net/skfp: No such file or directory [-Werror=missing-include-dirs]
-cc1: error: drivers/net/skfp: No such file or directory [-Werror=missing-include-dirs]
+Also, a follow-up patch changes the behavior so we only look in
+$(srctree) for manually added include path, and that breaks finding
+the generated headers.
 
-Clearly this include directive is not needed any more, so we can
-just remove it now.
+This adds an explicit $(objtree) for each tree that we want to
+look for generated files.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/fddi/skfp/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Makefile | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/net/fddi/skfp/Makefile b/drivers/net/fddi/skfp/Makefile
-index b0be0234abf6..a957a1c7e5ba 100644
---- a/drivers/net/fddi/skfp/Makefile
-+++ b/drivers/net/fddi/skfp/Makefile
-@@ -17,4 +17,4 @@ skfp-objs :=  skfddi.o    hwmtm.o    fplustm.o  smt.o      cfm.o     \
- #   projects. To keep the source common for all those drivers (and
- #   thus simplify fixes to it), please do not clean it up!
+diff --git a/Makefile b/Makefile
+index 45159861e645..969924783543 100644
+--- a/Makefile
++++ b/Makefile
+@@ -377,19 +377,19 @@ CFLAGS_KCOV	:= $(call cc-option,-fsanitize-coverage=trace-pc,)
+ # Use USERINCLUDE when you must reference the UAPI directories only.
+ USERINCLUDE    := \
+ 		-I$(srctree)/arch/$(hdr-arch)/include/uapi \
+-		-Iarch/$(hdr-arch)/include/generated/uapi \
++		-I$(objtree)/arch/$(hdr-arch)/include/generated/uapi \
+ 		-I$(srctree)/include/uapi \
+-		-Iinclude/generated/uapi \
++		-I$(objtree)/include/generated/uapi \
+                 -include $(srctree)/include/linux/kconfig.h
  
--ccflags-y := -Idrivers/net/skfp -DPCI -DMEM_MAPPED_IO -Wno-strict-prototypes
-+ccflags-y := -DPCI -DMEM_MAPPED_IO -Wno-strict-prototypes
+ # Use LINUXINCLUDE when you must reference the include/ directory.
+ # Needed to be compatible with the O= option
+ LINUXINCLUDE    := \
+ 		-I$(srctree)/arch/$(hdr-arch)/include \
+-		-Iarch/$(hdr-arch)/include/generated/uapi \
+-		-Iarch/$(hdr-arch)/include/generated \
++		-I$(objtree)/arch/$(hdr-arch)/include/generated/uapi \
++		-I$(objtree)/arch/$(hdr-arch)/include/generated \
+ 		$(if $(KBUILD_SRC), -I$(srctree)/include) \
+-		-Iinclude
++		-I$(objtree)/include
+ 
+ LINUXINCLUDE	+= $(filter-out $(LINUXINCLUDE),$(USERINCLUDE))
+ 
 -- 
 2.9.0
