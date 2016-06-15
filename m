@@ -1,24 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 15 Jun 2016 13:29:43 +0900
-Subject: [PATCH v2 4/4] ARM: dts: r8a7790: lager: use demuxer for IIC3/I2C3
-In-Reply-To: <20160613143521.GD1603@katana>
-References: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
- <1465370066-8450-5-git-send-email-horms+renesas@verge.net.au>
- <20160613143521.GD1603@katana>
-Message-ID: <20160615042943.GC29110@verge.net.au>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 15 Jun 2016 11:43:31 +0530
+Subject: [tiL4.4-P PATCH] ARM: dts: am437x-sk-evm: Reduce i2c0 bus speed for
+ tps65218
+Message-ID: <1465971211-15994-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 04:35:21PM +0200, Wolfram Sang wrote:
-> 
-> >  		i2c9 = "i2cexio1";
-> >  		i2c10 = "i2chdmi";
-> >  		i2c11 = "gpioi2c";
-> > +		i2c12 = "i2cpwr";
-> 
-> To make it easier for users, we should maybe group them?
-> 
-> i2c8+9: additional gpio busses
-> i2c10-13: i2cexioX
+From: Dave Gerlach <d-gerlach@ti.com>
 
-Should we also group gpioi2cX?
+Based on the latest timing specifications for the TPS65218 from the data
+sheet, http://www.ti.com/lit/ds/symlink/tps65218.pdf, document SLDS206
+from November 2014, we must change the i2c bus speed to better fit within
+the minimum high SCL time required for proper i2c transfer.
+
+When running at 400khz, measurements show that SCL spends
+0.8125 uS/1.666 uS high/low which violates the requirement for minimum
+high period of SCL provided in datasheet Table 7.6 which is 1 uS.
+Switching to 100khz gives us 5 uS/5 uS high/low which both fall above
+the minimum given values for 100 khz, 4.0 uS/4.7 uS high/low.
+
+Without this patch occasionally a voltage set operation from the kernel
+will appear to have worked but the actual voltage reflected on the PMIC
+will not have updated, causing problems especially with cpufreq that may
+update to a higher OPP without actually raising the voltage on DCDC2,
+leading to a hang.
+
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+Signed-off-by: Aparna Balasubramanian <aparnab@ti.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ arch/arm/boot/dts/am437x-sk-evm.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+index 18a3445..5f67001 100644
+--- a/arch/arm/boot/dts/am437x-sk-evm.dts
++++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+@@ -490,7 +490,7 @@
+ 	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins>;
+-	clock-frequency = <400000>;
++	clock-frequency = <100000>;
+ 
+ 	tps at 24 {
+ 		compatible = "ti,tps65218";
+-- 
+1.9.1
