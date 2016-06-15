@@ -1,164 +1,151 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed, 15 Jun 2016 18:35:42 +0100
-Subject: [PATCH v2 0/6] arm64: hibernate: Fix DEBUG_PAGEALLOC and hibernate on
- non-boot cpu
-Message-ID: <1466012148-7674-1-git-send-email-james.morse@arm.com>
+Date: Wed, 15 Jun 2016 18:35:44 +0100
+Subject: [PATCH v2 2/6] arm64: Add .mmuoff.text section
+In-Reply-To: <1466012148-7674-1-git-send-email-james.morse@arm.com>
+References: <1466012148-7674-1-git-send-email-james.morse@arm.com>
+Message-ID: <1466012148-7674-3-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Resume from hibernate needs to clean any text executed by the kernel with
+the MMU off to the PoC. Collect these functions together into a new
+.mmuoff.text section.
 
-These patches improve the hibernate support for v4.8.
+This covers booting of secondary cores and the cpu_suspend() path used
+by cpu-idle and suspend-to-ram.
 
-Patches 1&2 fix the hibernate problem with DEBUG_PAGEALLOC reported by Will.
-This also addresses the outstanding comment from Catalin [0] regarding cleaning
-of the whole kernel to the PoC. Now we clean a new section '.mmuoff.text'.
+The bulk of head.S is not included, as the primary boot code is only ever
+executed once, the kernel never needs to ensure it is cleaned to a
+particular point in the cache.
 
-Patch one adds sections.h to avoid duplicate definitions of
-__hyp_idmap_text_start. (it looks like kprobes will duplicate this too [1)
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+This patch is new since v1.
 
-The rest of the patches fix hibernate/resume on any CPU as discussed on the
-list[2]. Suzuki's maxcpus improvements mean the CPU we hibernated on may be
-offline during boot, and kexec will allow the CPUs logical order to be shuffled.
-Log output below[3], suspend happens on cpu0, with mpidr 0x103. For
-resume, cpu5 is brought up as it has mpidr 0x103, and cpu0 is taken down.
-After resume, /proc/cpuinfo shows only the original cpu0.
+ arch/arm64/include/asm/sections.h | 1 +
+ arch/arm64/kernel/head.S          | 6 ++++--
+ arch/arm64/kernel/sleep.S         | 2 ++
+ arch/arm64/kernel/vmlinux.lds.S   | 3 +++
+ arch/arm64/mm/proc.S              | 4 ++++
+ 5 files changed, 14 insertions(+), 2 deletions(-)
 
-Changes since v1:
- * Fixed 'Brining' typo.
- * Added .mmuoff.text section and gathered functions together.
- * Put sections.h in alphabetical order.
-
-[v1] http://www.spinics.net/lists/arm-kernel/msg507805.html
-
-[0] http://www.spinics.net/lists/arm-kernel/msg499305.html
-[1] http://www.spinics.net/lists/arm-kernel/msg506451.html
-[2] http://www.spinics.net/lists/arm-kernel/msg499036.html
-[3] hotplug cpu0, kexec, hibernate, resume
--------------------------%<-------------------------
-root@ubuntu:~# echo disk > /sys/power/state
-PM: Syncing filesystems ... done.
-Freezing user space processes ... (elapsed 0.007 seconds) done.
-PM: Preallocating image memory... done (allocated 10112 pages)
-PM: Allocated 647168 kbytes in 2.69 seconds (240.58 MB/s)
-Freezing remaining freezable tasks ... (elapsed 0.005 seconds) done.
-PM: freeze of devices complete after 27.013 msecs
-PM: late freeze of devices complete after 20.624 msecs
-PM: noirq freeze of devices complete after 22.211 msecs
-Disabling non-boot CPUs ...
-PM: Creating hibernation image:
-PM: Need to copy 10103 pages
-PM: Hibernation image created (10103 pages copied)
-PM: noirq thaw of devices complete after 22.350 msecs
-PM: early thaw of devices complete after 23.680 msecs
-PM: thaw of devices complete after 98.331 msecs
-hibernate: Suspending on cpu 0 [mpidr:0x103]
-PM: Using 1 thread(s) for compression.
-PM: Compressing and saving image data (10105 pages)...
-PM: Image saving progress:   0%
-atkbd serio0: keyboard reset failed on 1c060000.kmi
-atkbd serio1: keyboard reset failed on 1c070000.kmi
-PM: Image saving progress:  10%
-PM: Image saving progress:  20%
-PM: Image saving progress:  30%
-PM: Image saving progress:  40%
-PM: Image saving progress:  50%
-PM: Image saving progress:  60%
-PM: Image saving progress:  70%
-PM: Image saving progress:  80%
-PM: Image saving progress:  90%
-PM: Image saving progress: 100%
-PM: Image saving done.
-PM: Wrote 646720 kbytes in 93.08 seconds (6.94 MB/s)
-PM: S|
-reboot: Power down
-
-[ ... ]
-
-Freezing user space processes ... (elapsed 0.000 seconds) done.
-PM: Using 1 thread(s) for decompression.
-PM: Loading and decompressing image data (10105 pages)...
-hibernate: Suspended on cpu 5 [mpidr:0x103]
-hibernate: Suspended on a CPU that is offline! Brining CPU up.
-Detected VIPT I-cache on CPU5
-CPU5: Booted secondary processor [410fd033]
-random: nonblocking pool is initialized
-PM: Image loading progress:   0%
-PM: Image loading progress:  10%
-PM: Image loading progress:  20%
-PM: Image loading progress:  30%
-PM: Image loading progress:  40%
-PM: Image loading progress:  50%
-PM: Image loading progress:  60%
-PM: Image loading progress:  70%
-PM: Image loading progress:  80%
-PM: Image loading progress:  90%
-PM: Image loading progress: 100%
-PM: Image loading done.
-PM: Read 646720 kbytes in 30.47 seconds (21.22 MB/s)
-PM: quiesce of devices complete after 32.958 msecs
-PM: late quiesce of devices complete after 11.574 msecs
-PM: noirq quiesce of devices complete after 24.918 msecs
-hibernate: Disabling secondary CPUs ...
-IRQ1 no longer affine to CPU0
-IRQ6 no longer affine to CPU0
-IRQ28 no longer affine to CPU0
-IRQ29 no longer affine to CPU0
-IRQ32 no longer affine to CPU0
-IRQ34 no longer affine to CPU0
-IRQ35 no longer affine to CPU0
-IRQ37 no longer affine to CPU0
-IRQ41 no longer affine to CPU0
-IRQ48 no longer affine to CPU0
-CPU0: shutdown
-
-psci: CPU0 killed.
-PM: noirq restore of devices complete after 27.419 msecs
-PM: early restore of devices complete after 23.554 msecs
-PM: restore of devices complete after 113.188 msecs
-Restarting tasks ... done.
-root at ubuntu:~# atkbd serio0: keyboard reset failed on 1c060000.kmi
-atkbd serio1: keyboard reset failed on 1c070000.kmi
-root at ubuntu:~# cat /proc/cpuinfo
-processor       : 0
-BogoMIPS        : 100.00
-Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32
-CPU implementer : 0x41
-CPU architecture: 8
-CPU variant     : 0x0
-CPU part        : 0xd03
-CPU revision    : 3
-
-root at ubuntu:~#
--------------------------%<-------------------------
-
-James Morse (6):
-  arm64: Create sections.h
-  arm64: Add .mmuoff.text section
-  arm64: hibernate: Support DEBUG_PAGEALLOC
-  PM / Hibernate: Allow architectures to specify the hibernate/resume
-    CPU
-  arm64: hibernate: Identify the CPU to resume on by its MPIDR
-  Revert "arm64: hibernate: Refuse to hibernate if the boot cpu is
-    offline"
-
- arch/arm64/Kconfig                |   1 -
- arch/arm64/include/asm/Kbuild     |   1 -
- arch/arm64/include/asm/sections.h |  29 ++++++++
- arch/arm64/include/asm/suspend.h  |   1 +
- arch/arm64/include/asm/traps.h    |   3 +-
- arch/arm64/include/asm/virt.h     |   5 +-
- arch/arm64/kernel/alternative.c   |   7 +-
- arch/arm64/kernel/head.S          |   6 +-
- arch/arm64/kernel/hibernate.c     | 137 ++++++++++++++++++++++++++++----------
- arch/arm64/kernel/sleep.S         |   2 +
- arch/arm64/kernel/vmlinux.lds.S   |   3 +
- arch/arm64/kvm/reset.c            |   3 +-
- arch/arm64/mm/pageattr.c          |  40 ++++++++++-
- arch/arm64/mm/proc.S              |   4 ++
- kernel/power/hibernate.c          |  16 ++++-
- 15 files changed, 202 insertions(+), 56 deletions(-)
- create mode 100644 arch/arm64/include/asm/sections.h
-
+diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
+index cb68eb348566..6f27c3f86a09 100644
+--- a/arch/arm64/include/asm/sections.h
++++ b/arch/arm64/include/asm/sections.h
+@@ -24,5 +24,6 @@ extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
+ extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+ extern char __hyp_text_start[], __hyp_text_end[];
+ extern char __idmap_text_start[], __idmap_text_end[];
++extern char __mmuoff_text_start[], __mmuoff_text_end[];
+ 
+ #endif /* __ASM_SECTIONS_H */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 2c6e598a94dc..ff37231e2054 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -477,6 +477,7 @@ ENTRY(kimage_vaddr)
+  * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
+  * booted in EL1 or EL2 respectively.
+  */
++	.pushsection ".mmuoff.text", "ax"
+ ENTRY(el2_setup)
+ 	mrs	x0, CurrentEL
+ 	cmp	x0, #CurrentEL_EL2
+@@ -604,7 +605,7 @@ install_el2_stub:
+ 	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
+ 	eret
+ ENDPROC(el2_setup)
+-
++	.popsection
+ /*
+  * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
+  * in x20. See arch/arm64/include/asm/virt.h for more info.
+@@ -656,6 +657,7 @@ ENDPROC(secondary_holding_pen)
+ 	 * Secondary entry point that jumps straight into the kernel. Only to
+ 	 * be used where CPUs are brought online dynamically by the kernel.
+ 	 */
++	.pushsection ".mmuoff.text", "ax"
+ ENTRY(secondary_entry)
+ 	bl	el2_setup			// Drop to EL1
+ 	bl	set_cpu_boot_mode_flag
+@@ -687,7 +689,7 @@ __secondary_switched:
+ 	mov	x29, #0
+ 	b	secondary_start_kernel
+ ENDPROC(__secondary_switched)
+-
++	.popsection
+ /*
+  * The booting CPU updates the failed status @__early_cpu_boot_status,
+  * with MMU turned off.
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index 9a3aec97ac09..e66ce9b7bbde 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -97,6 +97,7 @@ ENTRY(__cpu_suspend_enter)
+ ENDPROC(__cpu_suspend_enter)
+ 	.ltorg
+ 
++	.pushsection ".mmuoff.text", "ax"
+ ENTRY(cpu_resume)
+ 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+ 	/* enable the MMU early - so we can access sleep_save_stash by va */
+@@ -106,6 +107,7 @@ ENTRY(cpu_resume)
+ 	adrp	x26, swapper_pg_dir
+ 	b	__cpu_setup
+ ENDPROC(cpu_resume)
++	.popsection
+ 
+ ENTRY(_cpu_resume)
+ 	mrs	x1, mpidr_el1
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 435e820e898d..64fe907bcc5f 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -118,6 +118,9 @@ SECTIONS
+ 			__exception_text_end = .;
+ 			IRQENTRY_TEXT
+ 			SOFTIRQENTRY_TEXT
++			__mmuoff_text_start = .;
++			*(.mmuoff.text)
++			__mmuoff_text_end = .;
+ 			TEXT_TEXT
+ 			SCHED_TEXT
+ 			LOCK_TEXT
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index c4317879b938..655ff3ec90f2 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -83,6 +83,7 @@ ENDPROC(cpu_do_suspend)
+  *
+  * x0: Address of context pointer
+  */
++	.pushsection ".mmuoff.text", "ax"
+ ENTRY(cpu_do_resume)
+ 	ldp	x2, x3, [x0]
+ 	ldp	x4, x5, [x0, #16]
+@@ -111,6 +112,7 @@ ENTRY(cpu_do_resume)
+ 	isb
+ 	ret
+ ENDPROC(cpu_do_resume)
++	.popsection
+ #endif
+ 
+ /*
+@@ -172,6 +174,7 @@ ENDPROC(idmap_cpu_replace_ttbr1)
+  *	Initialise the processor for turning the MMU on.  Return in x0 the
+  *	value of the SCTLR_EL1 register.
+  */
++	.pushsection ".mmuoff.text", "ax"
+ ENTRY(__cpu_setup)
+ 	tlbi	vmalle1				// Invalidate local TLB
+ 	dsb	nsh
+@@ -255,3 +258,4 @@ ENDPROC(__cpu_setup)
+ crval:
+ 	.word	0xfcffffff			// clear
+ 	.word	0x34d5d91d			// set
++	.popsection
 -- 
 2.8.0.rc3
