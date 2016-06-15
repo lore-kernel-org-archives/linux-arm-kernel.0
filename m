@@ -1,65 +1,45 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 14 Jun 2016 23:48:54 -0700
-Subject: [PATCH v2 4/9] arm64: Add platform selection for BCM2835.
-In-Reply-To: <20160610095633.GA14961@e104818-lin.cambridge.arm.com>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <1464934708-24769-5-git-send-email-kraxel@redhat.com>
- <20160603112721.GC1128@e104818-lin.cambridge.arm.com>
- <87bn3gu3to.fsf@eliezer.anholt.net>
- <20160608091219.GA16322@e104818-lin.cambridge.arm.com>
- <87h9d1x59s.fsf@eliezer.anholt.net>
- <20160610095633.GA14961@e104818-lin.cambridge.arm.com>
-Message-ID: <87d1njq755.fsf@eliezer.anholt.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Jun 2016 08:56:58 +0200
+Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
+ of aliases
+In-Reply-To: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
+On Tue, Jun 14, 2016 at 12:03 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-> On Thu, Jun 09, 2016 at 05:21:35PM -0700, Eric Anholt wrote:
->> Catalin Marinas <catalin.marinas@arm.com> writes:
->> > On Sat, Jun 04, 2016 at 12:55:15PM -0700, Eric Anholt wrote:
->> >> Catalin Marinas <catalin.marinas@arm.com> writes:
->> >> > On Fri, Jun 03, 2016 at 08:18:23AM +0200, Gerd Hoffmann wrote:
->> >> >> +	  This SoC is used in the Raspberry Pi 3 device.
->> >> >
->> >> > I thought we would just use ARCH_BCM, or is it too generic?
->> >> 
->> >> Consensus last time around seemed to be to drop adding ARCH_BCM, in
->> >> favor of patch 1 of the series.
->> >
->> > I may have missed that discussion. My point was about consistency with
->> > existing ARCH_* definitions in the arm64 Kconfig.platforms. I can see
->> > why it's easier for you since some drivers are built based on
->> > ARCH_BCM2835. Looking at drivers/clk/bcm/Makefile, there is an
->> > inconsistent mix of CLK_BCM_* and ARCH_BCM_*. I would rather have a new
->> > CLK_BCM2835 that's selected/enabled accordingly (maybe simply depending
->> > on ARCH_BCM).
->> 
->> So I introduce a new ARCH_BCM here, that selects the just the 283x
->> family's core drivers?  That seems strange, but I'm willing if that's
->> what you want.
+> Traditionally the n-th gpio device probed by the omap gpio driver got
+> the gpio number range [n*32 .. n*32+31].
+> When order of the devices probed by the driver changes (which can happen
+> already now when some devices have a pinctrl and so the first probe
+> attempt returns -ENODEV) the numbering changes.
 >
-> I'll leave this decision to the arm-soc guys. What I want to avoid is
-> another ARCH_BCM283[89] when some clock or other device changes in a
-> future revision of this board (RPi4?). I also don't want fine-grained
-> SoC configuration *within* the arch/arm64 Kconfigs but rather just a
-> family ARCH_* entry with selectable individual drivers based on the SoC
-> revision you target (in case you want to avoid single Image).
->
-> We should in general try to give drivers their own Kconfig entries
-> separate from ARCH_* ones (with a "depend on ARCH_*" and default y if
-> you want it enabled).
+> To ensure a deterministical numbering use of_alias_get_id to determine
+> the number base for a given device. If no respective alias exists fall
+> back to the traditional numbering.
 
-OK, we haven't added separate ARCH_BCM283* for the 3 chip revs so far,
-so I think what you want is actually the status quo, and we're in
-serious agreement.  The name for the family just happens to be
-ARCH_BCM2835.
+I'm not too happy about this approach.
 
-Any chance we could get an ack on this?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160614/1d3740df/attachment.sig>
+The patch doesn't mention what practical problems it is trying to
+solve.
+
+I am very much suspecting the sysfs ABI to be what you're trying to
+get consistent, and that is OBSOLETED, see
+fe95046e960b4b76e73dc1486955d93f47276134
+"gpio: ABI: mark the sysfs ABI as obsolete"
+
+The GPIO numbering scheme is a matter of Linux internals and
+not about hardware description IMO.
+
+The way forward is to use the character device and use gpiochip
+devices with offset indexes and look up GPIOs by name from the
+character devices. If nothing substantial happens I am merging the
+final pieces of the GPIO chardev ABI for v4.8 and that is doing all that
+sysfs was doing and then some. I just need to change a small thing
+before sending the final version for review.
+
+Yours,
+Linus Walleij
