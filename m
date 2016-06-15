@@ -1,36 +1,39 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 15 Jun 2016 12:01:44 +0200
-Subject: [RESEND PATCH 0/2] hw_random: Add Amlogic Meson SoCs Random Generator
- driver
-Message-ID: <1465984906-17840-1-git-send-email-narmstrong@baylibre.com>
+Date: Wed, 15 Jun 2016 12:01:45 +0200
+Subject: [RESEND PATCH 1/2] dt-bindings: hwrng: Add Amlogic Meson Hardware
+ Random Generator bindings
+In-Reply-To: <1465984906-17840-1-git-send-email-narmstrong@baylibre.com>
+References: <1465984906-17840-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1465984906-17840-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NOTE: This is a resent of the DT Bindings and DTSI patches based on the Amlogic DT 64bit
-GIT pull request from Kevin Hilman at [1].
-
-Changes since v2 at http://lkml.kernel.org/r/1465546915-24229-1-git-send-email-narmstrong at baylibre.com :
-- Move rng peripheral node into periphs simple-bus node
-
-Add support for the Amlogic Meson SoCs Hardware Random generator as a hw_random char driver.
-The generator is a single 32bit wide register.
-Also adds the Meson GXBB SoC DTSI node and corresponding DT bindings.
-
-Changes since v1 at http://lkml.kernel.org/r/1464943621-18278-1-git-send-email-narmstrong at baylibre.com :
-- change to depend on ARCH_MESON || COMPILE_TEST
-- check buffer max size in read
-
-[1] [GIT PULL] Amlogic DT 64-bit changes for v4.8 : http://lkml.kernel.org/r/7hshwfbiit.fsf at baylibre.com
-
-Neil Armstrong (2):
-  dt-bindings: hwrng: Add Amlogic Meson Hardware Random Generator
-    bindings
-  ARM64: dts: meson-gxbb: Add Hardware Random Generator node
-
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
  .../devicetree/bindings/rng/amlogic,meson-rng.txt          | 14 ++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                |  5 +++++
- 2 files changed, 19 insertions(+)
+ 1 file changed, 14 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt
 
+diff --git a/Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt b/Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt
+new file mode 100644
+index 0000000..202f2d0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt
+@@ -0,0 +1,14 @@
++Amlogic Meson Random number generator
++=====================================
++
++Required properties:
++
++- compatible : should be "amlogic,meson-rng"
++- reg : Specifies base physical address and size of the registers.
++
++Example:
++
++rng {
++        compatible = "amlogic,meson-rng";
++        reg = <0x0 0xc8834000 0x0 0x4>;
++};
 -- 
 2.7.0
