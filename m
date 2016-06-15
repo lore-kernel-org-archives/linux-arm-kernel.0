@@ -1,37 +1,57 @@
-From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Wed, 15 Jun 2016 20:04:45 +0800
-Subject: [PATCH v3 6/6] iommu/rockchip: enable rockchip iommu on ARM64 platform
-In-Reply-To: <1465992285-16187-1-git-send-email-zhengsq@rock-chips.com>
-References: <1465992285-16187-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1465992285-16187-7-git-send-email-zhengsq@rock-chips.com>
+From: chris@chris-wilson.co.uk (Chris Wilson)
+Date: Wed, 15 Jun 2016 13:17:54 +0100
+Subject: [PATCH 09/44] drm/mediatek: Remove redundant calls to
+ drm_connector_register_all()
+In-Reply-To: <1465993109-19523-1-git-send-email-chris@chris-wilson.co.uk>
+References: <1465993109-19523-1-git-send-email-chris@chris-wilson.co.uk>
+Message-ID: <1465993109-19523-10-git-send-email-chris@chris-wilson.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Xue <xxm@rock-chips.com>
+Up to now, the recommendation was for drivers to call drm_dev_register()
+followed by drm_connector_register_all(). Now that
+drm_connector_register() is safe against multiple invocations, we can
+move drm_connector_register_all() to drm_dev_register() and not suffer
+from any backwards compatibility issues with drivers not following the
+more rigorous init ordering.
 
-This patch makes it possible to compile the rockchip-iommu driver on
-ARM64 platform to be used with 64-bit SoCs equipped with this type
-of IOMMU.
-
-Signed-off-by: Simon Xue <xxm@rock-chips.com>
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Chris Wilson <chris@chris-wilson.co.uk>
+Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: David Airlie <airlied@linux.ie>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mediatek at lists.infradead.org
 ---
- drivers/iommu/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index ad08603..5572621 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -218,7 +218,7 @@ config OMAP_IOMMU_DEBUG
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index c33bf98c5d5e..7ab91f4a200f 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -293,14 +293,8 @@ static int mtk_drm_bind(struct device *dev)
+ 	if (ret < 0)
+ 		goto err_deinit;
  
- config ROCKCHIP_IOMMU
- 	bool "Rockchip IOMMU Support"
--	depends on ARM
-+	depends on ARM || ARM64
- 	depends on ARCH_ROCKCHIP || COMPILE_TEST
- 	select IOMMU_API
- 	select ARM_DMA_USE_IOMMU
+-	ret = drm_connector_register_all(drm);
+-	if (ret < 0)
+-		goto err_unregister;
+-
+ 	return 0;
+ 
+-err_unregister:
+-	drm_dev_unregister(drm);
+ err_deinit:
+ 	mtk_drm_kms_deinit(drm);
+ err_free:
+@@ -455,7 +449,6 @@ static int mtk_drm_remove(struct platform_device *pdev)
+ 	struct drm_device *drm = private->drm;
+ 	int i;
+ 
+-	drm_connector_unregister_all(drm);
+ 	drm_dev_unregister(drm);
+ 	mtk_drm_kms_deinit(drm);
+ 	drm_dev_unref(drm);
 -- 
-1.9.1
+2.8.1
