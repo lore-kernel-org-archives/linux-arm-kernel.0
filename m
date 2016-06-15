@@ -1,158 +1,97 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 15 Jun 2016 10:07:24 -0500
-Subject: [PATCH 3/8] arm64: pmu: Add support for probing with ACPI
-In-Reply-To: <20160615113333.GI24029@arm.com>
-References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
- <1465511013-10742-4-git-send-email-jeremy.linton@arm.com>
- <20160615113333.GI24029@arm.com>
-Message-ID: <57616F2C.4020901@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 15 Jun 2016 11:12:57 -0400
+Subject: [PATCH 1/5] clk: max77686: Combine Maxim max77686 and max77802
+ driver
+In-Reply-To: <1466000018-16784-2-git-send-email-ldewangan@nvidia.com>
+References: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
+ <1466000018-16784-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <4ba85edd-203f-c27f-f11c-5b64f972acc0@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2016 06:33 AM, Will Deacon wrote:
-> On Thu, Jun 09, 2016 at 05:23:28PM -0500, Jeremy Linton wrote:
->> From: Mark Salter <msalter@redhat.com>
->>
->> In the case of ACPI, the PMU IRQ information is contained in the
->> MADT table. Also, since the PMU does not exist as a device in the
->> ACPI DSDT table, it is necessary to create a platform device so
->> that the appropriate driver probing is triggered.
->>
->> Signed-off-by: Mark Salter <msalter@redhat.com>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> ---
->>
->>   NOTE: Much of the code in pmu_acpi_init() is replaced in a later version
->>         of this patch. The later version of the patch cleans up some of the
->>         possible style/error handling issues that have been pointed out with
->>         this version.
->>
->>   arch/arm64/kernel/smp.c      |  5 +++
->>   drivers/perf/Kconfig         |  4 ++
->>   drivers/perf/Makefile        |  1 +
->>   drivers/perf/arm_pmu_acpi.c  | 97 ++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/perf/arm_pmu.h |  7 ++++
->>   5 files changed, 114 insertions(+)
->>   create mode 100644 drivers/perf/arm_pmu_acpi.c
->>
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index 678e084..5c96d23 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -37,6 +37,7 @@
->>   #include <linux/completion.h>
->>   #include <linux/of.h>
->>   #include <linux/irq_work.h>
->> +#include <linux/perf/arm_pmu.h>
->>
->>   #include <asm/alternative.h>
->>   #include <asm/atomic.h>
->> @@ -540,6 +541,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->>   			return;
->>   		}
->>   		bootcpu_valid = true;
->> +		arm_pmu_parse_acpi(0, processor);
->>   		return;
->>   	}
->>
->> @@ -560,6 +562,9 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->>   	 */
->>   	acpi_set_mailbox_entry(cpu_count, processor);
->>
->> +	/* get PMU irq info */
->> +	arm_pmu_parse_acpi(cpu_count, processor);
->> +
->
-> Nit: the outer functions are now misnomers, since this has nothing to do
-> with the GIC. It feels like acpi_parse_gic_cpu_interface could use some
-> slight restructuring so that the MADT parsing looks less confused.
+Hello Laxman,
 
+On 06/15/2016 10:13 AM, Laxman Dewangan wrote:
+> The clock IP used on the Maxim PMICs max77686 and max77802 are
+> same. The configuration of clock register is also same except
+> the number of clocks.
+> 
+> Part of common code utilisation, there is 3 files for these chips
+> clock driver, one for common and two files for driver registration.
+> 
+> Combine both drivers into single file and move common code into
+> same common file reduces the 2 files and make max77686 and max77802
+> clock driver in single fine. This driver does not depends on the
+> parent driver structure. The regmap handle is acquired through
+> regmap APIs for the register access.
+> 
+> This combination of driver helps on adding clock driver for different
+> Maxim PMICs which has similar clock IP like MAX77620 and MAX20024.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> CC: Javier Martinez Canillas <javier@dowhile0.org>
+> ---
 
-Ok, I will clean up the naming a bit.
+[snip]
 
+> diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
+> index 9b6f277..31ba726 100644
+> --- a/drivers/clk/clk-max77686.c
+> +++ b/drivers/clk/clk-max77686.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * clk-max77686.c - Clock driver for Maxim 77686
+> + * clk-max77686.c - Clock driver for Maxim 77686/MAX77802
+>   *
+>   * Copyright (C) 2012 Samsung Electornics
+>   * Jonghwa Lee <jonghwa3.lee@samsung.com>
+> @@ -13,13 +13,7 @@
+>   * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   * GNU General Public License for more details.
+> - *
+> - * You should have received a copy of the GNU General Public License
+> - * along with this program; if not, write to the Free Software
+> - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> - *
+>   */
+> -
 
->
->> diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
->> index acd2397..fd8090d 100644
->> --- a/drivers/perf/Makefile
->> +++ b/drivers/perf/Makefile
->> @@ -1 +1,2 @@
->>   obj-$(CONFIG_ARM_PMU) += arm_pmu.o
->> +obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
->> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
->> new file mode 100644
->> index 0000000..98c452d
->> --- /dev/null
->> +++ b/drivers/perf/arm_pmu_acpi.c
->> @@ -0,0 +1,97 @@
->> +/*
->> + * PMU support
->> + *
->> + * Copyright (C) 2015 Red Hat Inc.
->> + * Author: Mark Salter <msalter@redhat.com>
->> + *
->> + * This work is licensed under the terms of the GNU GPL, version 2.  See
->> + * the COPYING file in the top-level directory.
->> + *
->> + */
->> +
->> +#include <linux/perf/arm_pmu.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/acpi.h>
->> +#include <linux/irq.h>
->> +#include <linux/irqdesc.h>
->> +
->> +#define PMU_PDEV_NAME "armv8-pmu"
->
-> Stick this in include/linux/perf/arm_pmu.h where we can use it in the driver
-> code too?
+I think removing this part of the header is correct but it should be a
+separate patch.
 
-Sure..
+[snip]
 
->
->> +
->> +struct pmu_irq {
->> +	int gsi;
->> +	int trigger;
->> +};
->> +
->> +static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
->> +
->> +void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
->> +{
->> +	pmu_irqs[cpu].gsi = gic->performance_interrupt;
->> +	if (gic->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
->> +		pmu_irqs[cpu].trigger = ACPI_EDGE_SENSITIVE;
->> +	else
->> +		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
->> +}
->> +
->> +static int __init pmu_acpi_init(void)
->> +{
->> +	struct platform_device *pdev;
->> +	struct pmu_irq *pirq = pmu_irqs;
->> +	struct resource	*res, *r;
->> +	int err = -ENOMEM;
->> +	int i, count, irq;
->> +
->> +	if (acpi_disabled)
->> +		return 0;
->> +
->> +	/* Must have irq for boot boot cpu, at least */
->
-> boot boot
->
->> +	if (pirq->gsi == 0)
->> +		return -EINVAL;
->> +
->> +	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
->> +				ACPI_ACTIVE_HIGH);
->
-> This is quite tricky to read, thanks to the aliasing of pirq and
-> pmu_irqs[0]. Why is it necessary to register the first gsi separately,
-> rather than just register it later in the loop with all the other
-> interrupts?
+> +
+> +struct max_gen_hw_clk_data {
+> +	const char *name;
+> +	u32 reg;
+> +	u32 mask;
+> +	u32 flags;
+> +};
+> +
+> +struct max_gen_clk_data {
+> +	struct regmap *regmap;
+> +	struct clk_init_data clk_idata;
+> +	struct clk_hw hw;
+> +	u32 reg;
+> +	u32 mask;
+> +};
+> +
 
-	Short answer, no particular reason. If you notice patch 6, 
-arm_pmu_acpi_gsi_res() reworks this to register all the irqs for a 
-particular PMU at the same time.
+Probably now makes more sense to rename all the "max_gen_foo" structs and
+functions to just "max77686_foo" since now are all defined in the max77686
+so that naming is more consistent.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+I also tested on an Exynos5800 Peach Pi Chromebook that has a max77802 IP:
+
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
