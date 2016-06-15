@@ -1,37 +1,28 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 15 Jun 2016 16:36:19 +0100
-Subject: [PATCH] ARM: V7M: Add dsb before jumping in handler mode
-In-Reply-To: <1465827171-15847-1-git-send-email-alexandre.torgue@st.com>
-References: <1465827171-15847-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <576175F3.5080306@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 15 Jun 2016 23:35:18 +0800
+Subject: [PATCH 1/5] clk: max77686: Combine Maxim max77686 and max77802
+ driver
+In-Reply-To: <1466000018-16784-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <201606152336.8yLdCgO4%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/16 15:12, Alexandre TORGUE wrote:
-> According to ARM AN321 (section 4.12):
-> 
-> "If the vector table is in writable memory such as SRAM, either relocated
-> by VTOR or a device dependent memory remapping mechanism, then
-> architecturally a memory barrier instruction is required after the vector
-> table entry is updated, and if the exception is to be activated
-> immediately"
-> 
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
-> 
+Hi,
 
-Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+[auto build test WARNING on next-20160615]
+[also build test WARNING on v4.7-rc3]
+[cannot apply to clk/clk-next robh/for-next v4.7-rc3 v4.7-rc2 v4.7-rc1]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-> index 7229d8d..2ddc435 100644
-> --- a/arch/arm/mm/proc-v7m.S
-> +++ b/arch/arm/mm/proc-v7m.S
-> @@ -104,6 +104,7 @@ __v7m_setup:
->  	badr	r1, 1f
->  	ldr	r5, [r12, #11 * 4]	@ read the SVC vector entry
->  	str	r1, [r12, #11 * 4]	@ write the temporary SVC vector entry
-> +	dsb
->  	mov	r6, lr			@ save LR
->  	ldr	sp, =init_thread_union + THREAD_START_SP
->  	cpsie	i
-> 
+url:    https://github.com/0day-ci/linux/commits/Laxman-Dewangan/clk-Combine-MAX77686-and-MAX77802-driver-and-extend-for-MAX77620/20160615-223243
+
+
+coccinelle warnings: (new ones prefixed by >>)
+
+>> drivers/clk/clk-max77686.c:177:2-3: Unneeded semicolon
+
+Please review and possibly fold the followup patch.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
