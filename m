@@ -1,56 +1,52 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 15 Jun 2016 21:20:16 +0200
-Subject: [PATCH 1/7] crypto: marvell: Add a macro constant for the size
- of the crypto queue
-In-Reply-To: <1466018134-10779-2-git-send-email-romain.perier@free-electrons.com>
-References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
- <1466018134-10779-2-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <20160615212016.32fb8b9d@bbrezillon>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 15 Jun 2016 21:29:38 +0200
+Subject: [PATCH v5 2/3] drm/arm: Add support for Mali Display Processors
+In-Reply-To: <20160615172104.GI9711@e106497-lin.cambridge.arm.com>
+References: <1466002295-24813-1-git-send-email-Liviu.Dudau@arm.com>
+ <1466002295-24813-3-git-send-email-Liviu.Dudau@arm.com>
+ <20160615152309.GI1338@phenom.ffwll.local>
+ <20160615161758.GF9711@e106497-lin.cambridge.arm.com>
+ <CAKMK7uENW3cU8LccHcqffX3cbzax2-5mzY0101yLfR7vtD4CoA@mail.gmail.com>
+ <20160615172104.GI9711@e106497-lin.cambridge.arm.com>
+Message-ID: <CAKMK7uGFTmQERWcDeQ=V-ntbgQv6K1avGx1LKCGLcAWacmHKnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jun 2016 21:15:28 +0200
-Romain Perier <romain.perier@free-electrons.com> wrote:
+On Wed, Jun 15, 2016 at 7:21 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> On Wed, Jun 15, 2016 at 07:13:15PM +0200, Daniel Vetter wrote:
+>> On Wed, Jun 15, 2016 at 6:17 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+>> > On Wed, Jun 15, 2016 at 05:23:10PM +0200, Daniel Vetter wrote:
+>> >> On Wed, Jun 15, 2016 at 03:51:34PM +0100, Liviu Dudau wrote:
+>> >> > Add support for the new family of Display Processors from ARM Ltd.
+>> >> > This commit adds basic support for Mali DP500, DP550 and DP650
+>> >> > parts, with only the display engine being supported at the moment.
+>> >> >
+>> >> > Cc: David Brown <David.Brown@arm.com>
+>> >> > Cc: Brian Starkey <Brian.Starkey@arm.com>
+>> >> >
+>> >> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> >>
+>> >> Small thing I noticed: drm_dev_register/connector_register_all should be
+>> >> the last step in your init code, and unregister the first. Atm it's
+>> >> somewhere in the middle. But perfectly fine to do that as a follow-up.
+>> >
+>> > I've tried that, but the connector and encoder that gets registered as part
+>> > of the component_bind_all() fails if there is no drm dev registered. You did
+>> > comment on the v4 version about that and I did test your idea, sorry for
+>> > forgeting to update you on that.
+>>
+>> Why does it fail? That shouldn't happen ... we need to be able to set
+>> up everything first, before we register.
+>
+> Could be the tda998x_drv fault, but I'm getting this splat:
 
-> Adding a macro constant to be used for the size of the crypto queue,
-> instead of using a numeric value directly. It will be easier to
-> maintain in case we add more than one crypto queue of the same size.
-> 
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> ---
->  drivers/crypto/marvell/cesa.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-> index 056a754..fb403e1 100644
-> --- a/drivers/crypto/marvell/cesa.c
-> +++ b/drivers/crypto/marvell/cesa.c
-> @@ -31,6 +31,9 @@
->  
->  #include "cesa.h"
->  
-> +/* Limit of the crypto queue before reaching the backlog */
-> +#define CESA_CRYPTO_DEFAULT_MAX_QLEN 50
-> +
->  static int allhwsupport = !IS_ENABLED(CONFIG_CRYPTO_DEV_MV_CESA);
->  module_param_named(allhwsupport, allhwsupport, int, 0444);
->  MODULE_PARM_DESC(allhwsupport, "Enable support for all hardware (even it if overlaps with the mv_cesa driver)");
-> @@ -416,7 +419,7 @@ static int mv_cesa_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	spin_lock_init(&cesa->lock);
-> -	crypto_init_queue(&cesa->queue, 50);
-> +	crypto_init_queue(&cesa->queue, CESA_CRYPTO_DEFAULT_MAX_QLEN);
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
->  	cesa->regs = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(cesa->regs))
-
-
-
+Yeah, tda9998x needs to be fixed to _not_ register it's connector
+before the overall (componentized) driver is ready. We need to make
+sure first ofc that all users of that driver do register connectors,
+but Chris' patch series will take care of that. But tda9998x needs to
+be fixed either way.
+-Daniel
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
