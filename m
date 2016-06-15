@@ -1,83 +1,51 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 15 Jun 2016 09:22:14 +0800
-Subject: [PATCH v2 7/7] iommu/arm-smmu: Support non-PCI devices with SMMUv3
-In-Reply-To: <20160614151642.GC16531@arm.com>
-References: <cover.1464966939.git.robin.murphy@arm.com>
- <42a8a71932f766d70ea9dcae5d11d5f33dcc3652.1464966939.git.robin.murphy@arm.com>
- <20160614151642.GC16531@arm.com>
-Message-ID: <5760ADC6.8000803@huawei.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 14 Jun 2016 18:29:47 -0700
+Subject: [PATCH v2 0/6] i.MX L2-cache code cleanups and performance tweaks
+Message-ID: <1465954193-5894-1-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi everyone,
+
+Here's the second version of i.MX L2-cache related patches. Here's
+what's new from v1:
+
+ - Already existing, spelling error free (shame on me for not noticing
+   that in previous version!), symbolic constant defintions are used
+
+ - Increased scope of magic number replacement (additional instance in
+   cache-l2x0.c)
+
+ - Added patch to remove unnecessary bit clearing in cache-l2x0.c
+
+ - Added patch to implement a cleanup as suggested by Arnd
+
+ - Added patch to tweak prefetch settings to improve performance. I
+   was originally going to post this patch separately. But now that
+   there was a need for v2, I decided to include it in the series.
+
+All the feedback is much appreciated.
+
+Thank you,
+Andrey Smirnov
 
 
-On 2016/6/14 23:16, Will Deacon wrote:
-> [adding ThunderTown, since he might be able to test this for us]
+Andrey Smirnov (6):
+  i.MX: system.c: Convert goto to if statement
+  i.MX: system.c: Remove redundant errata 752271 code
+  i.MX: system.c: Replace magic numbers
+  ARM: cache-l2x0: Do not clear bit 23 in prefetch control register
+  i.MX: system.c: Tweak prefetch settings for performance
+  i.MX: Do not explicitly call l2x0_of_init()
 
-OK. I'm so glad to do it.
+ arch/arm/include/asm/hardware/cache-l2x0.h |  1 +
+ arch/arm/mach-imx/imx35-dt.c               | 10 +++----
+ arch/arm/mach-imx/mach-imx6q.c             |  2 ++
+ arch/arm/mach-imx/mach-imx6sl.c            |  2 ++
+ arch/arm/mach-imx/mach-imx6sx.c            |  2 ++
+ arch/arm/mach-imx/system.c                 | 42 ++++++++++++------------------
+ arch/arm/mm/cache-l2x0.c                   |  5 ++--
+ 7 files changed, 28 insertions(+), 36 deletions(-)
 
-> 
-> On Fri, Jun 03, 2016 at 06:15:42PM +0100, Robin Murphy wrote:
->> With the device <-> stream ID relationship suitably abstracted and
->> of_xlate() hooked up, we no longer have any PCI-specifics in play,
->> so adding support for the simpler kinds of platform device (a single
->> unique stream ID each) becomes trivial; let's do it!
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v2: New. Consider this one "extra bonus material" as I'm not sure there
->>     are even any suitable devices on our model to test it with (it
->>     _should_ be OK, given that I know the basic infrastructure on either
->>     side works...)
->>
->>  drivers/iommu/Kconfig       |  2 +-
->>  drivers/iommu/arm-smmu-v3.c | 36 ++++++++++++++++++++++++++++++------
->>  2 files changed, 31 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
->> index ad0860383cb3..d1c66afefeed 100644
->> --- a/drivers/iommu/Kconfig
->> +++ b/drivers/iommu/Kconfig
->> @@ -308,7 +308,7 @@ config ARM_SMMU
->>  
->>  config ARM_SMMU_V3
->>  	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
->> -	depends on ARM64 && PCI
->> +	depends on ARM64
->>  	select IOMMU_API
->>  	select IOMMU_IO_PGTABLE_LPAE
->>  	select GENERIC_MSI_IRQ_DOMAIN
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 28dcc5ca237e..6379f0ab24fc 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -35,6 +35,8 @@
->>  #include <linux/pci.h>
->>  #include <linux/platform_device.h>
->>  
->> +#include <linux/amba/bus.h>
->> +
->>  #include "io-pgtable.h"
->>  
->>  /* MMIO registers */
->> @@ -1773,6 +1775,22 @@ static void arm_smmu_remove_device(struct device *dev)
->>  	iommu_group_remove_device(dev);
->>  }
->>  
->> +static struct iommu_group *arm_smmu_device_group(struct device *dev)
->> +{
->> +	struct iommu_group *group;
->> +
->> +	/*
->> +	 * We've currently no means of grouping non-PCI masters, so
->> +	 * there'd better not be any non-unique stream IDs in the DT...
->> +	 */
-> 
-> Worse: what if a SID in the DT aliases with a PCI master? It might be
-> nice to have some basic snity checking, at least.
-> 
-> Will
-> 
-> .
-> 
+-- 
+2.5.5
