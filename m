@@ -1,82 +1,83 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 15 Jun 2016 21:17:49 +0800
-Subject: [PATCH v2 02/10] mfd: ac100: Add device tree bindings for
- X-Powers AC100 codec/RTC combo IC
-In-Reply-To: <20160615124943.GE4948@dell>
-References: <1465986467-14802-1-git-send-email-wens@csie.org>
- <1465986467-14802-3-git-send-email-wens@csie.org> <20160615124943.GE4948@dell>
-Message-ID: <CAGb2v66q0h_BZ-kkRZCneOs5yxvcADXKymMskr3CRc-N8Dqm1A@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 15 Jun 2016 09:19:54 -0400
+Subject: [PATCH V6 1/7] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <1465828873-23498-2-git-send-email-tn@semihalf.com>
+References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
+ <1465828873-23498-2-git-send-email-tn@semihalf.com>
+Message-ID: <576155FA.9080706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 8:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 15 Jun 2016, Chen-Yu Tsai wrote:
->
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  Documentation/devicetree/bindings/mfd/ac100.txt | 42 +++++++++++++++++++++++++
->>  1 file changed, 42 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/ac100.txt b/Documentation/devicetree/bindings/mfd/ac100.txt
->> new file mode 100644
->> index 000000000000..fbab623e6fba
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/ac100.txt
->> @@ -0,0 +1,42 @@
->> +X-Powers AC100 Codec/RTC IC device tree bindings
->> +
->> +AC100 is a audio codec and RTC subsystem combo IC. The 2 parts are
->> +separated, including power supplies and interrupt lines, but share
->> +a common register address space and host interface.
->> +
->> +Required properties:
->> +- compatible: "x-powers,ac100"
->> +- reg: The I2C slave address or RSB hardware address for the chip
->> +- sub-nodes:
->> +  - codec
->> +    - compatible: "x-powers,ac100-codec"
->> +    - interrupt-parent: The parent interrupt controller
->> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_AUDIO pin
->> +  - rtc
->> +    - compatible: "x-powers,ac100-rtc"
->> +    - interrupt-parent: The parent interrupt controller
->> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_RTC pin
->> +    - #clock-cells: shall be 1
->> +    - clock-output-names: "cko1_rtc", "cko2_rtc", "cko3_rtc"
->> +    - see clock/clock-bindings.txt for common clock bindings
->> +
->> +Example:
->> +
->> +ac100: codec at e89 {
->> +     compatible = "x-powers,ac100";
->> +     reg = <0xe89>;
->> +
->> +     ac100_codec {
->> +             compatible = "x-powers,ac100-codec";
->> +             interrupt-parent = <&nmi_intc>;
->> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->> +     };
->> +
->> +     ac100_rtc {
->> +             compatible = "x-powers,ac100-rtc";
->> +             interrupt-parent = <&nmi_intc>;
->> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->
-> Isn't this the same interrupt as above?  Is it shared?
+Hi Tomasz,
 
-Copy paste error... The codec uses a different line in the design.
+> +static acpi_status
+> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
+> +{
+> +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
+> +		struct acpi_iort_root_complex *pci_rc;
+> +		struct pci_bus *bus;
+> +
+> +		bus = to_pci_bus(dev);
+> +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+> +
+> +		/*
+> +		 * It is assumed that PCI segment numbers maps one-to-one
+> +		 * with root complexes. Each segment number can represent only
+> +		 * one root complex.
+> +		 */
+> +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+> +			return AE_OK;
+> +
 
-ChenYu
+There is problem with the find_dev_node and callback for PCIe here. It assumes
+a one-to-one relationship between an SMMU and root complex. 
 
->
->> +             #clock-cells = <1>;
->> +             clock-output-names = "cko1_rtc", "cko2_rtc", "cko3_rtc";
->> +     };
->> +};
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Just checked with Charles offline to see if there is anything in the IORT spec that forces
+this. And, the answer was no. 
+
+Pasting the IORT requirements for you below.
+
+?The IORT was intended to be flexible enough to define static RID to SID mappings, which should cover 
+the following configurations:
+-	Dedicated SMMU per RC
+-	Multiple RC?s per SMMU (as you described)
+-	Multiple SMMU?s per RC (with static RID:SID range per SMMU)
+
+The SMMU instance must be identified by either a device ID *or* a combination of 
+segment ID *and* Requestor ID. ?
+
+If a root complex has multiple SMMUs, this code is going to return the first SMMU. This needs
+to be corrected.
+
+> +		break;
+> +	}
+> +	}
+> +
+> +	return AE_NOT_FOUND;
+> +}
+> +
+
+> +
+> +static struct acpi_iort_node *
+> +iort_find_dev_node(struct device *dev)
+> +{
+> +	struct pci_bus *pbus;
+> +
+> +	if (!dev_is_pci(dev))
+> +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+> +				      iort_match_node_callback, dev);
+> +
+> +	/* Find a PCI root bus */
+> +	pbus = to_pci_dev(dev)->bus;
+> +	while (!pci_is_root_bus(pbus))
+> +		pbus = pbus->parent;
+> +
+> +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+> +			      iort_match_node_callback, &pbus->dev);
+> +}
+> +
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
