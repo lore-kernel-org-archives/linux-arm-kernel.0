@@ -1,45 +1,36 @@
 From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Wed, 15 Jun 2016 20:04:40 +0800
-Subject: [PATCH v3 1/6] iommu/rockchip: fix devm_{request,free}_irq parameter
+Date: Wed, 15 Jun 2016 20:04:41 +0800
+Subject: [PATCH v3 2/6] iommu/rockchip: add map_sg callback for rk_iommu_ops
 In-Reply-To: <1465992285-16187-1-git-send-email-zhengsq@rock-chips.com>
 References: <1465992285-16187-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1465992285-16187-2-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <1465992285-16187-3-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Simon Xue <xxm@rock-chips.com>
 
-Even though the iommu shares irq with its master, using the *dev of iommu
-instead of master's *dev for devm_{request,free}_irq makes things clear.
+The iommu_dma_alloc() in iommu/dma-iommu.c calls iommu_map_sg()
+that requires the callback iommu_ops .map_sg(). Adding the
+default_iommu_map_sg() to rockchip iommu accordingly.
 
 Signed-off-by: Simon Xue <xxm@rock-chips.com>
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Signed-off-by: Shunqian Zheng <xxm@rock-chips.com>
 Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 ---
- drivers/iommu/rockchip-iommu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/iommu/rockchip-iommu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index c7d6156..ec0ce62 100644
+index ec0ce62..3c16ec3 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -807,7 +807,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
- 
- 	iommu->domain = domain;
- 
--	ret = devm_request_irq(dev, iommu->irq, rk_iommu_irq,
-+	ret = devm_request_irq(iommu->dev, iommu->irq, rk_iommu_irq,
- 			       IRQF_SHARED, dev_name(dev), iommu);
- 	if (ret)
- 		return ret;
-@@ -860,7 +860,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
- 	}
- 	rk_iommu_disable_stall(iommu);
- 
--	devm_free_irq(dev, iommu->irq, iommu);
-+	devm_free_irq(iommu->dev, iommu->irq, iommu);
- 
- 	iommu->domain = NULL;
- 
+@@ -1022,6 +1022,7 @@ static const struct iommu_ops rk_iommu_ops = {
+ 	.detach_dev = rk_iommu_detach_device,
+ 	.map = rk_iommu_map,
+ 	.unmap = rk_iommu_unmap,
++	.map_sg = default_iommu_map_sg,
+ 	.add_device = rk_iommu_add_device,
+ 	.remove_device = rk_iommu_remove_device,
+ 	.iova_to_phys = rk_iommu_iova_to_phys,
 -- 
 1.9.1
