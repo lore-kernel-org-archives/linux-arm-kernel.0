@@ -1,69 +1,106 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 15 Jun 2016 21:30:23 +0200
-Subject: [PATCH v3 4/4] musb: sunxi: Simplify dr_mode handling
-In-Reply-To: <08af737c-f1f1-0966-0eca-24d4daa7423b@redhat.com>
-References: <1465138776-6003-1-git-send-email-hdegoede@redhat.com>
- <1465138776-6003-4-git-send-email-hdegoede@redhat.com>
- <20160608102325.GI14179@lukather>
- <08af737c-f1f1-0966-0eca-24d4daa7423b@redhat.com>
-Message-ID: <20160615193023.GB5144@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 15 Jun 2016 21:37:09 +0200
+Subject: [PATCH 2/7] crypto: marvell: Check engine is not already
+ running when enabling a req
+In-Reply-To: <1466018134-10779-3-git-send-email-romain.perier@free-electrons.com>
+References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
+ <1466018134-10779-3-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <20160615213709.3a060ff4@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 15 Jun 2016 21:15:29 +0200
+Romain Perier <romain.perier@free-electrons.com> wrote:
 
-On Wed, Jun 08, 2016 at 12:30:20PM +0200, Hans de Goede wrote:
-> Hi,
+> Adding BUG_ON() macro to be sure that the step operation is not about
+> to activate a request on the engine if the corresponding engine is
+> already processing a crypto request. This is helpful when the support
+> for chaining crypto requests will be added. Instead of hanging the
+> system when the engine is in an incoherent state, we add this macro
+
+You don't add the macro, you use it.
+
+> which throws an understandable error.
+
+How about rewording the commit message this way:
+
+"
+Add a BUG_ON() call when the driver tries to launch a crypto request
+while the engine is still processing the previous one. This replaces
+a silent system hang by a verbose kernel panic with the associated
+backtrace to let the user know that something went wrong in the CESA
+driver.
+"
+
 > 
-> On 08-06-16 12:23, Maxime Ripard wrote:
-> >Hi,
-> >
-> >On Sun, Jun 05, 2016 at 04:59:36PM +0200, Hans de Goede wrote:
-> >>phy-sun4i-usb now has proper dr_mode handling, it always registers an
-> >>extcon, and sends a notify with the mode (even when in peripheral- /
-> >>host-only mode) at least once.
-> >>
-> >>So we can simply the sunxi musb glue by always registering its extcon
-> >>notifier and relying on sunxi_musb_work() to enable vbus when in
-> >>host-only mode.
-> >>
-> >>This also enables host- and peripheral-only mode with vbus monitoring.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >
-> >It's been a bit painful to track all the patches needed so that it
-> >applies properly, but I've finally been able to test it on a Sinlinx
-> >SinA33 with peripheral-only mUSB, and it works like a charm.
-> >
-> >You can add my Tested-by.
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+
+Apart from the coding style issue mentioned below,
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+>  drivers/crypto/marvell/cipher.c | 2 ++
+>  drivers/crypto/marvell/hash.c   | 2 ++
+>  drivers/crypto/marvell/tdma.c   | 2 ++
+>  3 files changed, 6 insertions(+)
 > 
-> Great, thanks for testing.
-> 
-> This is the board which has an otg connector with vbus not connected,
-> right? Yet it does have a functional id-pin, right ?
+> diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
+> index dcf1fce..8d0fabb 100644
+> --- a/drivers/crypto/marvell/cipher.c
+> +++ b/drivers/crypto/marvell/cipher.c
+> @@ -106,6 +106,8 @@ static void mv_cesa_ablkcipher_std_step(struct ablkcipher_request *req)
+>  
+>  	mv_cesa_set_int_mask(engine, CESA_SA_INT_ACCEL0_DONE);
+>  	writel_relaxed(CESA_SA_CFG_PARA_DIS, engine->regs + CESA_SA_CFG);
+> +	BUG_ON(readl(engine->regs + CESA_SA_CMD)
+> +				  & CESA_SA_CMD_EN_CESA_SA_ACCL0);
 
-It's that one, yes.
+Nit: please put the '&' operator at the end of the first line and
+align CESA_SA_CMD_EN_CESA_SA_ACCL0 on the open parenthesis.
 
-> In that case you should be able to put it in dual-role mode (only
-> specify the id-pin in the phy dts node, no vbus / vbus-monitoring)
-> and then it _should_ work in host mode if you use a powered hub.
-> 
-> I'm fine with putting in peripheral-only mode, but as said
-> dual-role might work with a powered hub.
+	BUG_ON(readl(engine->regs + CESA_SA_CMD) &
+	       CESA_SA_CMD_EN_CESA_SA_ACCL0);
 
-Good point, I'll test that.
+>  	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
+>  }
+>  
+> diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
+> index 7ca2e0f..0fae351 100644
+> --- a/drivers/crypto/marvell/hash.c
+> +++ b/drivers/crypto/marvell/hash.c
+> @@ -237,6 +237,8 @@ static void mv_cesa_ahash_std_step(struct ahash_request *req)
+>  
+>  	mv_cesa_set_int_mask(engine, CESA_SA_INT_ACCEL0_DONE);
+>  	writel_relaxed(CESA_SA_CFG_PARA_DIS, engine->regs + CESA_SA_CFG);
+> +	BUG_ON(readl(engine->regs + CESA_SA_CMD)
+> +				  & CESA_SA_CMD_EN_CESA_SA_ACCL0);
 
-Thanks!
-Maxime
+Ditto.
+
+>  	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
+>  }
+>  
+> diff --git a/drivers/crypto/marvell/tdma.c b/drivers/crypto/marvell/tdma.c
+> index 7642798..d493714 100644
+> --- a/drivers/crypto/marvell/tdma.c
+> +++ b/drivers/crypto/marvell/tdma.c
+> @@ -53,6 +53,8 @@ void mv_cesa_dma_step(struct mv_cesa_tdma_req *dreq)
+>  		       engine->regs + CESA_SA_CFG);
+>  	writel_relaxed(dreq->chain.first->cur_dma,
+>  		       engine->regs + CESA_TDMA_NEXT_ADDR);
+> +	BUG_ON(readl(engine->regs + CESA_SA_CMD)
+> +				  & CESA_SA_CMD_EN_CESA_SA_ACCL0);
+
+Ditto.
+
+>  	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
+>  }
+>  
+
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160615/4ee36279/attachment-0001.sig>
