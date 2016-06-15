@@ -1,110 +1,201 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Wed, 15 Jun 2016 16:40:26 +0200
-Subject: [PATCH v3 2/2] ARM: dts: utilite-pro: add mmc card slot support
-In-Reply-To: <575994a0ec924e2db7282a2945d3355f@rwthex-s2-b.rwth-ad.de>
-References: <20160612232456.1621-1-christopher.spinrath@rwth-aachen.de>
- <c25d8e5d113240c5ab78771f301d901a@rwthex-s1-b.rwth-ad.de>
- <089d827c9de9426eab79a907a2043828@rwthex-s1-a.rwth-ad.de>
- <712bda47d095416f8b69f4eecbf979a5@rwthex-s1-b.rwth-ad.de>
- <575994a0ec924e2db7282a2945d3355f@rwthex-s2-b.rwth-ad.de>
-Message-ID: <2160fa6084b94c839b339a663334ae65@rwthex-s1-b.rwth-ad.de>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 15 Jun 2016 10:44:53 -0400
+Subject: [PATCH V6 1/7] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <20160615141355.GB766@red-moon>
+References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
+ <1465828873-23498-2-git-send-email-tn@semihalf.com>
+ <576155FA.9080706@codeaurora.org> <20160615133423.GA766@red-moon>
+ <57615C35.709@codeaurora.org> <20160615141355.GB766@red-moon>
+Message-ID: <576169E5.2050004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 6/15/2016 10:13 AM, Lorenzo Pieralisi wrote:
+> On Wed, Jun 15, 2016 at 09:46:29AM -0400, Sinan Kaya wrote:
+>> On 6/15/2016 9:34 AM, Lorenzo Pieralisi wrote:
+>>> On Wed, Jun 15, 2016 at 09:19:54AM -0400, Sinan Kaya wrote:
+>>>> Hi Tomasz,
+>>>>
+>>>>> +static acpi_status
+>>>>> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
+>>>>> +{
+>>>>> +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
+>>>>> +		struct acpi_iort_root_complex *pci_rc;
+>>>>> +		struct pci_bus *bus;
+>>>>> +
+>>>>> +		bus = to_pci_bus(dev);
+>>>>> +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+>>>>> +
+>>>>> +		/*
+>>>>> +		 * It is assumed that PCI segment numbers maps one-to-one
+>>>>> +		 * with root complexes. Each segment number can represent only
+>>>>> +		 * one root complex.
+>>>>> +		 */
+>>>>> +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+>>>>> +			return AE_OK;
+>>>>> +
+>>>>
+>>>> There is problem with the find_dev_node and callback for PCIe here. It assumes
+>>>> a one-to-one relationship between an SMMU and root complex. 
+>>>>
+>>>> Just checked with Charles offline to see if there is anything in the IORT spec that forces
+>>>> this. And, the answer was no. 
+>>>>
+>>>> Pasting the IORT requirements for you below.
+>>>>
+>>>> ?The IORT was intended to be flexible enough to define static RID to SID mappings, which should cover 
+>>>> the following configurations:
+>>>> -	Dedicated SMMU per RC
+>>>> -	Multiple RC?s per SMMU (as you described)
+>>>> -	Multiple SMMU?s per RC (with static RID:SID range per SMMU)
+>>>>
+>>>> The SMMU instance must be identified by either a device ID *or* a combination of 
+>>>> segment ID *and* Requestor ID. ?
+>>>>
+>>>> If a root complex has multiple SMMUs, this code is going to return the
+>>>> first SMMU. This needs to be corrected.
+>>>
+>>> What you say above is correct, but the problem is not here. This
+>>> callback returns either a named component IORT node or a root complex
+>>> IORT node corresponding to a device, the problem you are referring to is
+>>> related to detecting which SMMU a given named component or root
+>>> complex refers too, which is not done here, I will take care of that
+>>> on my SMMU series.
+>>>
+>>> When we look for the SMMU a PCI device is connected to, we must first
+>>> retrieve the IORT node of its root complex and walk its list of
+>>> mappings and match through RID range instead of picking the first
+>>> one, as I assumed, wrongly.
+>>>
+>>> Lorenzo
+>>>
+>>
+>> Thanks for posting. I was trying to be more explicit by a follow up
+>> email.  You sent before me. 
+>>
+>> The summary is that iort_find_dev_node function below will locate the
+>> wrong IORT root complex node in a multiple root port inside the same
+>> root complex configuration. 
+>>
+>> I wish I could share the picture Harb drew here. Let me put it in text.
+>>
+>> You can have a use case where you have two root ports in a single root complex.
+>>
+>> Each root port has its own SMMU. Root ports are described in the MCFG
+>> table and in the DSDT table as root bridge with their respective bus
+>> start and end addresses. They both participate in the same root
+>> complex with the same segment number.
+>>
+>> First root port requester id range (0x0-0x3ff) and second root port
+>> requester id range (0x400-0x7ff).
+> 
+> Ok, so why a single IORT node root complex entry with multiple node
+> mappings (with different RID ranges AND SMMU output references)
+> would not do here ?
 
-On 06/15/2016 12:33 PM, Igor Grinberg wrote:
-> Hi Christopher,
+Just talked to Harb following your recommendation. Your suggestion makes more sense.
+The mapping is an array. Spec-wise this is doable. 
+
+We assumed that you could only have one mapping under a PCIe RC node. That's why,
+we were thinking of multiple root complex nodes with a single unique mapping.
+It was an oversight from my side.
+
 > 
-> On 06/15/2016 12:16 PM, Christopher Spinrath wrote:
->> Hi Igor,
->>
->> On 06/15/2016 08:40 AM, Igor Grinberg wrote:
->>> Hi Christopher,
->>>
->>> On 06/13/2016 02:24 AM, christopher.spinrath at rwth-aachen.de wrote:
->>>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
->>>>
->>>> The Utilite Pro has a mmc card slot connected to the usdhc3
->>>> controller. There is no card detection until hardware revision 1.3.
->>>>
->>>> Add support for it and signal the controller with the broken-cd
->>>> property that polling has to be used to detect a card.
->>>>
->>>> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
->>>> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
->>>> ---
->>>>
->>>> Notes:
->>>>     Changes since v2:
->>>>      - add Fabio's Reviewed-By
->>>>     
->>>>     Changes since v1:
->>>>      - enhance commit message to explain to the broken-cd property
->>>>
->>>>  arch/arm/boot/dts/imx6q-utilite-pro.dts | 44 +++++++++++++++++++++++++++++++++
->>>>  1 file changed, 44 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
->>>> index 7219745..6199063 100644
->>>> --- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
->>>> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
->>>
->>> [...]
->>>
->>>> @@ -151,3 +184,14 @@
->>>>  	uart-has-rtscts;
->>>>  	status = "okay";
->>>>  };
->>>> +
->>>> +&usdhc3 {
->>>> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
->>>> +	pinctrl-0 = <&pinctrl_usdhc3>;
->>>> +	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
->>>> +	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
->>>> +	no-1-8-v;
->>>> +	broken-cd;
->>>
->>> A wast majority of boards produced are of revision >=1.3.
->>> Can we please have the default as revision 1.3 with cd?
->>> And let the patch you have submitted to U-Boot do the job
->>> for older revisions?
->>>
->>
->> Well, my board has revision 1.0. So I cannot test that and feel uneasy
->> to put my Signed-off-by under such a patch. IMHO the best solution would
->> be that someone with a revision >= 1.3 board sends a follow-up patch
->> adding the cd-gpios.
->>
->> If I resend the patch with cd-gpios could you test it and provide a
->> Tested-By?
+> Sorry for being blunt but I would like to understand where the
+> problem is here.
 > 
-> Yes. Absolutely.
+>> The IORT table has two root complex entries for each root port. The
+>> first entry describes the requester id range (0x0-0x3ff) and points to
+>> first smmu behind id.
+> 
+> I lost you here. Do you mean the IORT table has one root complex IORT
+> node with two node mappings ?
+
+Two root complex entries with one mapping.
+
+> 
+>> The second entry also describes the id range (0x400-0x7ff) and points to second smmu id.
+>>
+>> The iort_find_dev_node function tries to locate an IORT node for a given PCIe device id.
+>>
+>> If the requester id is 0x400 and segment id is 0, then this function
+>> will stop searching as soon as it finds the first node with segment id
+>> 0 as it only uses the segment id as a qualifier. 
+> 
+> Well yes. The question is whether we should have two root complexes
+> IORT nodes with the same segment id or a single root complex IORT node
+> with multiple mappings.
+> 
+> If we have one PCI root complex IORT node with multiple node mappings,
+> where is the problem ?
+
+No problem. That works. Let's make sure that the ITS and SMMU implementation allows this
+though. From the spec point of view and ACPI table point of view, multiple node mappings make
+perfect sense.
+
+Thanks
+
+> 
+> Thanks !
+> Lorenzo
+> 
+>>
+>> It will locate the PCIe root complex node with requester id range (0x0-0x3ff) and use the 
+>> wrong smmu to do the ITS device id mapping.
+>>
+>> "The SMMU instance must be identified by either a device ID *or* a combination of 
+>>   segment ID *and* Requestor ID. ?"
+>>
+>>
+>>>>
+>>>>> +		break;
+>>>>> +	}
+>>>>> +	}
+>>>>> +
+>>>>> +	return AE_NOT_FOUND;
+>>>>> +}
+>>>>> +
+>>>>
+>>>>> +
+>>>>> +static struct acpi_iort_node *
+>>>>> +iort_find_dev_node(struct device *dev)
+>>>>> +{
+>>>>> +	struct pci_bus *pbus;
+>>>>> +
+>>>>> +	if (!dev_is_pci(dev))
+>>>>> +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+>>>>> +				      iort_match_node_callback, dev);
+>>>>> +
+>>>>> +	/* Find a PCI root bus */
+>>>>> +	pbus = to_pci_dev(dev)->bus;
+>>>>> +	while (!pci_is_root_bus(pbus))
+>>>>> +		pbus = pbus->parent;
+>>>>> +
+>>>>> +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+>>>>> +			      iort_match_node_callback, &pbus->dev);
+>>>>> +}
+>>>>> +
+>>>>
+>>>> -- 
+>>>> Sinan Kaya
+>>>> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+>>>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+>>>>
+>>
+>>
+>> -- 
+>> Sinan Kaya
+>> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
 
-Can we have your opinion on that matter?
 
->>
->> The other question is: should the dts provide a working/sane
->> configuration for all boards (which the broken-cd approach is)
->> independently of the bootloader?
-> 
-> Well, no, I wouldn't go that way, as "why wouldn't we just use the
-> broken-cd approach on all boards and not bother with gpio-cds"...
-> We do want the gpio-cd to work as expected where it can.
-> 
->> Is it ok to put both, the  cd-gpios and
->> the broken-cd property into the dts and let the bootloader remove the
->> broken-cd property for revision >= 1.3 (due to the documentation it is
->> not but the driver favourites the broken cd property - hence, it would
->> work)?
-> 
-> That sounds sane from my POV (unless I'm missing something), but
-> will have to have comments explaining what is going on.
-> 
-> There are two main reasons why I would not want to have the broken-cd
-> as a default:
-> 1) It is not broken... It just does not exist prior to revision 1.3.
-> 2) There are more boards of revision >=1.3 then older ones outside and
->    we would want them to work as expected even with older U-Boot versions.
-> 
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
