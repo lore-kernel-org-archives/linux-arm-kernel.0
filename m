@@ -1,46 +1,63 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2016 17:45:49 +0200
-Subject: [PATCH v2 07/11] ARM: hide mach-*/ include for ARM_SINGLE_ARMV7M
+Date: Wed, 15 Jun 2016 17:45:47 +0200
+Subject: [PATCH v2 05/11] Kbuild: don't add obj tree in additional includes
 In-Reply-To: <20160615154553.3177021-1-arnd@arndb.de>
 References: <20160615154553.3177021-1-arnd@arndb.de>
-Message-ID: <20160615154553.3177021-8-arnd@arndb.de>
+Message-ID: <20160615154553.3177021-6-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The machine specific header files are exported for traditional
-platforms, but not for the ones that use ARCH_MULTIPLATFORM, as
-they could conflict with one another.
+When building with separate object directories and driver specific
+Makefiles that add additional header include paths, Kbuild adjusts
+the gcc flags so that we include both the directory in the source
+tree and in the object tree.
 
-In case of ARM_SINGLE_ARMV7M, we end up also exporting them,
-but that appears to be a mistake, and we should treat it the
-same way as ARCH_MULTIPLATFORM here.
+However, due to another bug I fixed earlier, this did not actually
+include the correct directory in the object tree, so we know that
+we only really need the source tree here. Also, including the
+object tree sometimes causes warnings about nonexisting directories
+when the include path only exists in the source.
 
-'make W=1' warns about this because it passes -Wmissing-includes
-to gcc and the directories are not actually present.
+This changes the logic to only emit the -I argument for the srctree,
+not for objects. We still need both $(srctree)/$(src) and $(obj)
+though, so I'm adding them manually.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Makefile | 2 ++
- 1 file changed, 2 insertions(+)
+ scripts/Kbuild.include | 2 +-
+ scripts/Makefile.lib   | 7 ++++---
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 510620186ee8..3982c7e2fe55 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -266,12 +266,14 @@ machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
- platdirs := $(patsubst %,arch/arm/plat-%/,$(sort $(plat-y)))
+diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+index f8b45eb47ed3..15b196fc2f49 100644
+--- a/scripts/Kbuild.include
++++ b/scripts/Kbuild.include
+@@ -202,7 +202,7 @@ hdr-inst := -f $(srctree)/scripts/Makefile.headersinst obj
+ # Prefix -I with $(srctree) if it is not an absolute path.
+ # skip if -I has no parameter
+ addtree = $(if $(patsubst -I%,%,$(1)), \
+-$(if $(filter-out -I/% -I../%,$(1)),$(patsubst -I%,-I$(srctree)/%,$(1))) $(1))
++$(if $(filter-out -I/% -I./% -I../%,$(1)),$(patsubst -I%,-I$(srctree)/%,$(1)),$(1)))
  
- ifneq ($(CONFIG_ARCH_MULTIPLATFORM),y)
-+ifneq ($(CONFIG_ARM_SINGLE_ARMV7M),y)
- ifeq ($(KBUILD_SRC),)
- KBUILD_CPPFLAGS += $(patsubst %,-I%include,$(machdirs) $(platdirs))
- else
- KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
+ # Find all -I options and call addtree
+ flags = $(foreach o,$($(1)),$(if $(filter -I%,$(o)),$(call addtree,$(o)),$(o)))
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 76494e15417b..0a07f9014944 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -155,9 +155,10 @@ else
+ # $(call addtree,-I$(obj)) locates .h files in srctree, from generated .c files
+ #   and locates generated .h files
+ # FIXME: Replace both with specific CFLAGS* statements in the makefiles
+-__c_flags	= $(call addtree,-I$(obj)) $(call flags,_c_flags)
+-__a_flags	=                          $(call flags,_a_flags)
+-__cpp_flags     =                          $(call flags,_cpp_flags)
++__c_flags	= $(if $(obj),-I$(srctree)/$(src) -I$(obj)) \
++		  $(call flags,_c_flags)
++__a_flags	= $(call flags,_a_flags)
++__cpp_flags     = $(call flags,_cpp_flags)
  endif
- endif
-+endif
  
- export	TEXT_OFFSET GZFLAGS MMUEXT
- 
+ c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
 -- 
 2.9.0
