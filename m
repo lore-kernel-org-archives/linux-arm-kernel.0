@@ -1,48 +1,152 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 15 Jun 2016 19:14:45 +0200
-Subject: [PATCH v5 2/3] drm/arm: Add support for Mali Display Processors
-In-Reply-To: <CAKMK7uENW3cU8LccHcqffX3cbzax2-5mzY0101yLfR7vtD4CoA@mail.gmail.com>
-References: <1466002295-24813-1-git-send-email-Liviu.Dudau@arm.com>
- <1466002295-24813-3-git-send-email-Liviu.Dudau@arm.com>
- <20160615152309.GI1338@phenom.ffwll.local>
- <20160615161758.GF9711@e106497-lin.cambridge.arm.com>
- <CAKMK7uENW3cU8LccHcqffX3cbzax2-5mzY0101yLfR7vtD4CoA@mail.gmail.com>
-Message-ID: <CAKMK7uGjfZAyzm6c6vsPZz79Tmx9mt4eewMyW6oCce9_-EezRg@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 15 Jun 2016 18:14:19 +0100
+Subject: [PATCH v18 04/13] arm64/kexec: Add pr_debug output
+In-Reply-To: <cfd2d457d5f1991c82b641970ce20475bcc6c7dd.1465502767.git.geoff@infradead.org>
+References: <cover.1465502767.git.geoff@infradead.org>
+ <cfd2d457d5f1991c82b641970ce20475bcc6c7dd.1465502767.git.geoff@infradead.org>
+Message-ID: <57618CEB.6040807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 7:13 PM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Wed, Jun 15, 2016 at 6:17 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> On Wed, Jun 15, 2016 at 05:23:10PM +0200, Daniel Vetter wrote:
->>> On Wed, Jun 15, 2016 at 03:51:34PM +0100, Liviu Dudau wrote:
->>> > Add support for the new family of Display Processors from ARM Ltd.
->>> > This commit adds basic support for Mali DP500, DP550 and DP650
->>> > parts, with only the display engine being supported at the moment.
->>> >
->>> > Cc: David Brown <David.Brown@arm.com>
->>> > Cc: Brian Starkey <Brian.Starkey@arm.com>
->>> >
->>> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->>>
->>> Small thing I noticed: drm_dev_register/connector_register_all should be
->>> the last step in your init code, and unregister the first. Atm it's
->>> somewhere in the middle. But perfectly fine to do that as a follow-up.
->>
->> I've tried that, but the connector and encoder that gets registered as part
->> of the component_bind_all() fails if there is no drm dev registered. You did
->> comment on the v4 version about that and I did test your idea, sorry for
->> forgeting to update you on that.
->
-> Why does it fail? That shouldn't happen ... we need to be able to set
-> up everything first, before we register.
+Hi Geoff,
 
-To clarify: As soon as drm_dev_register completes userspace can access
-the drm_device instance. If you add/init anything like crtc, planes or
-encoders later on it can blow up, since drm doesn't support hot-adding
-those at all. Therefore you _must_ delay the registering until all
-components are set up.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+On 09/06/16 21:08, Geoff Levand wrote:
+> To aid in debugging kexec problems or when adding new functionality to kexec add
+> a new routine kexec_image_info() and several inline pr_debug statements.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/kernel/machine_kexec.c | 63 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index 05f7c21..0a8b04d 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -11,6 +11,7 @@
+>  
+>  #include <linux/highmem.h>
+>  #include <linux/kexec.h>
+> +#include <linux/libfdt_env.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/slab.h>
+>  #include <linux/smp.h>
+> @@ -29,6 +30,47 @@ extern const unsigned long arm64_relocate_new_kernel_size;
+>  
+>  static unsigned long kimage_start;
+>  
+> +/**
+> + * kexec_is_dtb - Helper routine to check the device tree header signature.
+> + */
+> +static bool kexec_is_dtb(const void *dtb)
+> +{
+> +	__be32 magic;
+> +
+> +	if (get_user(magic, (__be32 *)dtb))
+> +		return false;
+> +
+
+You pass this function 'kimage->segment[i].buf', this looks like the user space
+memory that contained the dtb when kexec-tools first ran to load the image.
+
+This will work when you call it from machine_kexec_prepare(), but by the time we
+get to machine_kexec() that process is long gone, and this pointer should be
+considered junk.
+
+I don't think its possible to find this information from machine_kexec(), as the
+DTB will be split up into page size chunks and scattered through memory.
+
+
+> +	return fdt32_to_cpu(magic) == OF_DT_HEADER;
+> +}
+> +
+> +/**
+> + * kexec_image_info - For debugging output.
+> + */
+> +#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
+> +static void _kexec_image_info(const char *func, int line,
+> +	const struct kimage *kimage)
+> +{
+> +	unsigned long i;
+> +
+> +	pr_debug("%s:%d:\n", func, line);
+> +	pr_debug("  kexec kimage info:\n");
+> +	pr_debug("    type:        %d\n", kimage->type);
+> +	pr_debug("    start:       %lx\n", kimage->start);
+> +	pr_debug("    head:        %lx\n", kimage->head);
+> +	pr_debug("    nr_segments: %lu\n", kimage->nr_segments);
+> +
+> +	for (i = 0; i < kimage->nr_segments; i++) {
+> +		pr_debug("      segment[%lu]: %016lx - %016lx, 0x%lx bytes, %lu pages%s\n",
+> +			i,
+> +			kimage->segment[i].mem,
+> +			kimage->segment[i].mem + kimage->segment[i].memsz,
+> +			kimage->segment[i].memsz,
+> +			kimage->segment[i].memsz /  PAGE_SIZE,
+> +			(kexec_is_dtb(kimage->segment[i].buf) ?
+> +				", dtb segment" : ""));
+> +	}
+> +}
+> +
+>  void machine_kexec_cleanup(struct kimage *kimage)
+>  {
+>  	/* Empty routine needed to avoid build errors. */
+> @@ -65,6 +107,8 @@ int machine_kexec_prepare(struct kimage *kimage)
+>  		}
+>  	}
+>  
+> +	kexec_image_info(kimage);
+> +
+
+You want to put this at the start of machine_kexec_prepare(), otherwise we may
+return from:
+> #ifdef CONFIG_HOTPLUG_CPU
+> 	/* any_cpu as we don't mind being preempted */
+> 	int any_cpu = raw_smp_processor_id();
+>
+> 	if (cpu_ops[any_cpu]->cpu_die)
+> 		return 0;
+> #endif /* CONFIG_HOTPLUG_CPU */
+
+This maybe-return-an-error block needs to be the last thing in the function.
+
+
+I'm not sure if the debug output is actually useful this early: kexec-tools
+prints out exactly the same information shortly after this function returns.
+
+
+>  	return 0;
+>  }
+>  
+> @@ -140,6 +184,25 @@ void machine_kexec(struct kimage *kimage)
+>  	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+>  	reboot_code_buffer = kmap(kimage->control_code_page);
+>  
+> +	kexec_image_info(kimage);
+> +
+> +	pr_debug("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
+> +		kimage->control_code_page);
+> +	pr_debug("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
+> +		&reboot_code_buffer_phys);
+> +	pr_debug("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
+> +		reboot_code_buffer);
+> +	pr_debug("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
+> +		arm64_relocate_new_kernel);
+> +	pr_debug("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
+> +		__func__, __LINE__, arm64_relocate_new_kernel_size,
+> +		arm64_relocate_new_kernel_size);
+> +
+> +	pr_debug("%s:%d: kimage_head:              %lx\n", __func__, __LINE__,
+> +		kimage->head);
+> +	pr_debug("%s:%d: kimage_start:             %lx\n", __func__, __LINE__,
+> +		kimage_start);
+> +
+>  	/*
+>  	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
+>  	 * after the kernel is shut down.
+> 
+
+
+Thanks,
+
+James
