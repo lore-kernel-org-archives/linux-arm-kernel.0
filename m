@@ -1,23 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2016 23:06:26 +0200
-Subject: [PATCH] arm/arm64/irqchip/pci: fix PCI_MSI dependencies
-In-Reply-To: <20160615210211.GA17504@localhost>
-References: <8531046.3ceRqUA835@wuerfel> <20160615210211.GA17504@localhost>
-Message-ID: <6064404.Y6hC1iYELB@wuerfel>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Wed, 15 Jun 2016 14:09:26 -0700
+Subject: ARM and OMAP patches to avoid lockdep complaints
+Message-ID: <20160615210926.GA30957@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 15, 2016 4:02:11 PM CEST Bjorn Helgaas wrote:
-> I applied this to pci/msi, minus the crypto change that looks unrelated:
-> 
-> > @@ -1038,6 +1038,8 @@ source "arch/arm64/Kconfig.debug"
-> >  source "security/Kconfig"
-> >  
-> >  source "crypto/Kconfig"
-> > +if CRYPTO
-> >  source "arch/arm64/crypto/Kconfig"
-> > +endif
+Hello!
 
-Indeed, thanks for catching this!
+Ingo was not comfortable taking these through -tip, which is understandable,
+given that they don't depend on each other or on anything else not already
+in mainline, and that they don't have anything to do with -tip.
 
-	Arnd
+So what would you guys like to do with these?
+
+They may be pulled from 7c64cc0531fa (arm: Use _rcuidle for
+smp_cross_call() tracepoints) in my -rcu tree:
+
+	git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git
+
+							Thanx, Paul
