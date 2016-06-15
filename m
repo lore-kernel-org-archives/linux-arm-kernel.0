@@ -1,38 +1,42 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 15 Jun 2016 11:39:00 -0400
-Subject: [PATCH 5/5] ARM: config: Get rid of config COMMON_CLK_MAX77802
-In-Reply-To: <1466000018-16784-6-git-send-email-ldewangan@nvidia.com>
-References: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
- <1466000018-16784-6-git-send-email-ldewangan@nvidia.com>
-Message-ID: <3fa0a098-3b28-9baa-8950-a944cce86b65@osg.samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jun 2016 17:45:50 +0200
+Subject: [PATCH v2 08/11] drm: amd: remove broken include path
+In-Reply-To: <20160615154553.3177021-1-arnd@arndb.de>
+References: <20160615154553.3177021-1-arnd@arndb.de>
+Message-ID: <20160615154553.3177021-9-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Laxman,
+The AMD ACP driver adds "-I../acp -I../acp/include" to the gcc command
+line, which makes no sense, since these are evaluated relative to the
+build directory. When we build with "make W=1", they instead cause
+a warning:
 
-On 06/15/2016 10:13 AM, Laxman Dewangan wrote:
-> The clock driver used by Maxim PMIC MAX77802 is clk-max77686
-> which can be enabled with config CONFIG_COMMON_CLK_MAX77686.
-> 
-> Hence the config CONFIG_COMMON_CLK_MAX77802 is not required.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> CC: Javier Martinez Canillas <javier@dowhile0.org>
-> ---
->  arch/arm/configs/exynos_defconfig   | 1 -
->  arch/arm/configs/multi_v7_defconfig | 1 -
+cc1: error: ../acp/: No such file or directory [-Werror=missing-include-dirs]
+cc1: error: ../acp/include: No such file or directory [-Werror=missing-include-dirs]
+cc1: all warnings being treated as errors
+../scripts/Makefile.build:289: recipe for target 'drivers/gpu/drm/amd/amdgpu/amdgpu_drv.o' failed
+../scripts/Makefile.build:289: recipe for target 'drivers/gpu/drm/amd/amdgpu/amdgpu_device.o' failed
+../scripts/Makefile.build:289: recipe for target 'drivers/gpu/drm/amd/amdgpu/amdgpu_kms.o' failed
 
-Please split these two changes in separate patches, there are just
-cleanups needed after 1/5 and they can be picked separately.
+This removes the subdir-ccflags variable that evidently did not
+serve any purpose here.
 
-The change looks good to me though so feel free to add:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/gpu/drm/amd/acp/Makefile | 2 --
+ 1 file changed, 2 deletions(-)
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
+diff --git a/drivers/gpu/drm/amd/acp/Makefile b/drivers/gpu/drm/amd/acp/Makefile
+index 8363cb57915b..8a08e81ee90d 100644
+--- a/drivers/gpu/drm/amd/acp/Makefile
++++ b/drivers/gpu/drm/amd/acp/Makefile
+@@ -3,6 +3,4 @@
+ # of AMDSOC/AMDGPU drm driver.
+ # It provides the HW control for ACP related functionalities.
+ 
+-subdir-ccflags-y += -I$(AMDACPPATH)/ -I$(AMDACPPATH)/include
+-
+ AMD_ACP_FILES := $(AMDACPPATH)/acp_hw.o
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.9.0
