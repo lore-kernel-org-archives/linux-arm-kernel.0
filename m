@@ -1,56 +1,41 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 15 Jun 2016 16:02:11 -0500
-Subject: [PATCH] arm/arm64/irqchip/pci: fix PCI_MSI dependencies
-In-Reply-To: <8531046.3ceRqUA835@wuerfel>
-References: <8531046.3ceRqUA835@wuerfel>
-Message-ID: <20160615210211.GA17504@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Jun 2016 23:04:11 +0200
+Subject: [PATCH] Revert "gpio: bail out silently on NULL descriptors"
+In-Reply-To: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
+References: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CACRpkdaYscNgwVaxJVD=m8e+yMrwvRHxhAHM4LPvBtrPKxXCSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 10:09:38PM +0200, Arnd Bergmann wrote:
-> The PCI_MSI symbol is used inconsistently throughout the tree,
-> with some drivers using 'select' and others using 'depends on',
-> or using conditional selects. This keeps causing problems,
-> and the latest one is a result of ARCH_ALPINE using a 'select'
-> statement to enable its platform specific MSI driver but not
-> enabling MSI support first:
-> 
-> warning: (ARCH_ALPINE) selects ALPINE_MSI which has unmet direct dependencies (PCI && PCI_MSI)
-> drivers/irqchip/irq-alpine-msi.c:104:15: error: variable 'alpine_msix_domain_info' has initializer but incomplete type
->  static struct msi_domain_info alpine_msix_domain_info = {
->                ^~~~~~~~~~~~~~~
-> drivers/irqchip/irq-alpine-msi.c:105:2: error: unknown field 'flags' specified in initializer
->   .flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->   ^
-> drivers/irqchip/irq-alpine-msi.c:105:11: error: 'MSI_FLAG_USE_DEF_DOM_OPS' undeclared here (not in a function)
->   .flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->            ^~~~~~~~~~~~~~~~~~~~~~~~
-> 
-> There is little reason to enable PCI support for a platform that
-> uses MSI but then leaving MSI disabled at compile time.
-> 
-> I sent an earlier version that used 'select PCI_MSI' everywhere
-> in March, but that caused build regressions on x86.
-> 
-> This version instead selects PCI_MSI from irqchips that implement MSI,
-> and makes PCI host bridges that use MSI on ARM depend on PCI_MSI_IRQ_DOMAIN,
-> which in turn is now enabled by default on all three architectures that
-> support it, whenever MSI is enabled.
-> 
-> I think it makes most sense to merge this patch through the PCI tree,
-> as new PCI host drivers get added occasionally, and they all need to
-> be adapted for this change.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+On Wed, Jun 15, 2016 at 8:22 PM, Hans de Goede <hdegoede@redhat.com> wrote:
 
-I applied this to pci/msi, minus the crypto change that looks unrelated:
+> This reverts commit 54d77198fdfb("gpio: bail out silently on NULL
+> descriptors").
+>
+> This commit causes the following code to fail:
+>
+> gpio_desc = devm_gpiod_get_optional(dev, ...);
+> gpio_irq  = gpiod_to_irq(gpio_desc);
+> if (gpio_irq >= 0) {
+>         ret = devm_request_irq(dev, gpio_irq, ...);
+>
+> And now ret is an error causing the probe function in question to bail.
+>
+> The problem here is that gpiod_to_irq now returns 0 for a NULL
+> gpio_desc while 0 is a valid irq-nr. Also see:
+> commit 4c37ce8608a8("gpio: make gpiod_to_irq() return negative for NO_IRQ")
+> which specifically avoids returning 0.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-> @@ -1038,6 +1038,8 @@ source "arch/arm64/Kconfig.debug"
->  source "security/Kconfig"
->  
->  source "crypto/Kconfig"
-> +if CRYPTO
->  source "arch/arm64/crypto/Kconfig"
-> +endif
+The first commit was done to fix another regression so if I revert it I get
+back the first regression.
+
+I guess what we need to do is simply make gpiod_to_irq() a
+special case and have it behave the way expected for now?
+
+Hans: I sent a patch like that if it works for you could you give
+me your Tested-by?
+
+Yours,
+Linus Walleij
