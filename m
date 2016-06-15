@@ -1,41 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Jun 2016 23:04:11 +0200
-Subject: [PATCH] Revert "gpio: bail out silently on NULL descriptors"
-In-Reply-To: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
-References: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACRpkdaYscNgwVaxJVD=m8e+yMrwvRHxhAHM4LPvBtrPKxXCSA@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 15 Jun 2016 14:04:23 -0700
+Subject: [PATCH] arm64: defconfig: enable stmmac and realtek PHY as modules
+In-Reply-To: <CAOi56cUGq87cEm0uhfVS=tVnwPoUCKVF5YX-G0Z_wW_zezYXfA@mail.gmail.com>
+References: <1464993495-19018-1-git-send-email-khilman@baylibre.com>
+ <CAOi56cUGq87cEm0uhfVS=tVnwPoUCKVF5YX-G0Z_wW_zezYXfA@mail.gmail.com>
+Message-ID: <CAOi56cXzqp3uDRUsmies4PKgoZgDdZU3i1yrqt8y0=Qh+VSvSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 8:22 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-
-> This reverts commit 54d77198fdfb("gpio: bail out silently on NULL
-> descriptors").
+On Wed, Jun 15, 2016 at 11:27 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Hi Catalin, Will,
 >
-> This commit causes the following code to fail:
+> On Fri, Jun 3, 2016 at 3:38 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Some Amlogic GXBB boards use the stmmac ethernet driver.  Also, enable
+>> the realtek PHY used on meson-gxbb-odroidc2.  The micrel PHY used on the
+>> meson-gxbb-p20x boards is already enabled.
+>>
+>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 >
-> gpio_desc = devm_gpiod_get_optional(dev, ...);
-> gpio_irq  = gpiod_to_irq(gpio_desc);
-> if (gpio_irq >= 0) {
->         ret = devm_request_irq(dev, gpio_irq, ...);
->
-> And now ret is an error causing the probe function in question to bail.
->
-> The problem here is that gpiod_to_irq now returns 0 for a NULL
-> gpio_desc while 0 is a valid irq-nr. Also see:
-> commit 4c37ce8608a8("gpio: make gpiod_to_irq() return negative for NO_IRQ")
-> which specifically avoids returning 0.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Gentle reminder ping.
 
-The first commit was done to fix another regression so if I revert it I get
-back the first regression.
+Oops, nevermind.  I guess we've been taking these through arm-soc.
+Sorry for the noise.
 
-I guess what we need to do is simply make gpiod_to_irq() a
-special case and have it behave the way expected for now?
-
-Hans: I sent a patch like that if it works for you could you give
-me your Tested-by?
-
-Yours,
-Linus Walleij
+Kevin
