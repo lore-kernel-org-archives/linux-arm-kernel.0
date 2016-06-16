@@ -1,82 +1,59 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Thu, 16 Jun 2016 23:48:28 +0000
-Subject: [PATCH v19 07/13] arm64: limit memory regions based on DT property,
- usable-memory
+Subject: [PATCH v19 13/13] Documentation: dt: usable-memory and elfcorehdr
+ nodes for arm64 kexec
 In-Reply-To: <cover.1466120418.git.geoff@infradead.org>
 References: <cover.1466120418.git.geoff@infradead.org>
-Message-ID: <40e58a95d4b1f9c3024cc19f5a26c0ca54353e51.1466120418.git.geoff@infradead.org>
+Message-ID: <eedcb4f4fde3530a1a6745bf18a716330e077eba.1466120418.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+From: James Morse <james.morse@arm.com>
 
-Crash dump kernel will be run with a limited range of memory as System
-RAM.
+Add documentation for linux,usable-memory and linux,elfcorehdr chosen nodes
+used by arm64 kexec to decribe the kdump reserved area, and the elfcorehdr's
+location within it.
 
-On arm64, we will use a device-tree property under /chosen,
-   linux,usable-memory = <BASE SIZE>
-in order for primary kernel either on uefi or non-uefi (device tree only)
-system to hand over the information about usable memory region to crash
-dump kernel. This property will supercede entries in uefi memory map table
-and "memory" nodes in a device tree.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/mm/init.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ Documentation/devicetree/bindings/chosen.txt | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 45f1319..f679918 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -249,10 +249,48 @@ static int __init early_mem(char *p)
- }
- early_param("mem", early_mem);
- 
-+static int __init early_init_dt_scan_usablemem(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	struct memblock_region *usablemem = (struct memblock_region *)data;
-+	const __be32 *reg;
-+	int len;
+diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+index 6ae9d82..443f88b 100644
+--- a/Documentation/devicetree/bindings/chosen.txt
++++ b/Documentation/devicetree/bindings/chosen.txt
+@@ -52,3 +52,31 @@ This property is set (currently only on PowerPC, and only needed on
+ book3e) by some versions of kexec-tools to tell the new kernel that it
+ is being booted by kexec, as the booting environment may differ (e.g.
+ a different secondary CPU release mechanism)
 +
-+	usablemem->size = 0;
++linux,usable-memory
++-------------------
 +
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
++This property is set on PowerPC and arm64 by kexec-tools during kdump
++to tell the crash kernel the base address of its reserved area of memory, and
++the size. e.g.
 +
-+	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
++/ {
++	chosen {
++		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
++	};
++};
 +
-+	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
++linux,elfcorehdr
++----------------
 +
-+	return 1;
-+}
++This property is set (currently only on arm64) by kexec-tools during kdump
++to tell the crash kernel the address and size of the elfcorehdr that describes
++the old kernel's memory as an elf file. This memory must reside within the area
++described by 'linux,usable-memory'. e.g.
 +
-+static void __init fdt_enforce_memory_region(void)
-+{
-+	struct memblock_region reg;
-+
-+	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
-+
-+	if (reg.size) {
-+		memblock_remove(0, PAGE_ALIGN(reg.base));
-+		memblock_remove(round_down(reg.base + reg.size, PAGE_SIZE),
-+				ULLONG_MAX);
-+	}
-+}
-+
- void __init arm64_memblock_init(void)
- {
- 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
- 
-+	/* Handle linux,usable-memory property */
-+	fdt_enforce_memory_region();
-+
- 	/*
- 	 * Ensure that the linear region takes up exactly half of the kernel
- 	 * virtual address space. This way, we can distinguish a linear address
++/ {
++	chosen {
++		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
++		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
++	};
++};
 -- 
 2.5.0
