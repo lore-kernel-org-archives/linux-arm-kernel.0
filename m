@@ -1,76 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 16 Jun 2016 14:04:48 +0200
-Subject: [PATCH v2] ARM: mm: fix location of _etext
-In-Reply-To: <20160615202447.GA5005@www.outflux.net>
-References: <20160615202447.GA5005@www.outflux.net>
-Message-ID: <CAKv+Gu-my1pd43WO=A_gQFgvtG3efYD97Fh8P-vG93G9zmPynw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 16 Jun 2016 14:16:15 +0200
+Subject: [GIT PULL 4/8] ARM: exynos: Topic branch with driver changes for
+ v4.8
+In-Reply-To: <20160613214706.GB20845@localhost>
+References: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
+ <1465215933-22709-5-git-send-email-k.kozlowski@samsung.com>
+ <20160613214706.GB20845@localhost>
+Message-ID: <5762988F.7050108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 June 2016 at 22:24, Kees Cook <keescook@chromium.org> wrote:
-> The _etext position is defined to be the end of the kernel text code,
-> and should not include any part of the data segments. This interferes
-> with things that might check memory ranges and expect executable code
-> up to _etext. Just to be conservative, leave the kernel resource as
-> it was, using __init_begin instead of _etext as the end mark.
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
-> v2:
-> - Switched resource tracker to using __init_begin, rmk
+On 06/13/2016 11:47 PM, Olof Johansson wrote:
+> On Mon, Jun 06, 2016 at 02:25:29PM +0200, Krzysztof Kozlowski wrote:
+>> Hi,
+>>
+>> A topic branch for MultiFormat Codec driver. This pulls in
+>> an external dependency from media tree (Sylwester Nawrocki).
+>>
+>> Below you will find two pull-request-changelogs
+>>
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>
+>> ################################################################
+>> Samsung tree only changes:
+>> ################################################################
+>>
+>> The following changes since commit 04f776734c4e03e33111d3d5a994b589870df623:
+>>
+>>   media: s5p-mfc: add iommu support (2016-06-03 11:13:45 +0200)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-exynos-mfc-4.8
+>>
+>> for you to fetch changes up to 96167bd37dd604cbba0aed341765dda8556405b2:
+>>
+>>   ARM: dts: exynos: Enable MFC device on Exynos4412 Odroid boards (2016-06-06 09:30:43 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Topic branch for Exynos MFC changes for v4.8:
+>> Pull s5p-mfc changes from media tree so the arm/mach-exynos code
+>> could be removed. The bindings are converted to generic reserved memory
+>> bindings.
+> 
+> Hi,
+> 
+> Tis branch contains an external dependency but I don't see the toplevel
+> maintainer cc:d on the pull request. Just to avoid any confusion, I'd like to
+> double check and make sure this branch is expected to be stable.
+> 
+> Mauro, is that the case? The branch is:
+> Merge branch 'for-v4.8/media/exynos-mfc' of git://linuxtv.org/snawrocki/samsung into for-v4.8/exynos-mfc
+> 
+> I see it in -next, so I just want to make sure it's on a stable branch that
+> won't be rewritten. 
 
-Actually, Linus removed the x86 /proc/iomem resources for kernel segments in
+Good question. Mauro, could you confirm?
 
-c4004b02f8e5 ("x86: remove the kernel code/data/bss resources from /proc/iomem")
-
-so I wonder if we should not just do the same for ARM and arm64?
-
-
-
-> ---
->  arch/arm/kernel/setup.c       | 2 +-
->  arch/arm/kernel/vmlinux.lds.S | 4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 7b5350060612..dd84f03dc2d4 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -844,7 +844,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
->         struct resource *res;
->
->         kernel_code.start   = virt_to_phys(_text);
-> -       kernel_code.end     = virt_to_phys(_etext - 1);
-> +       kernel_code.end     = virt_to_phys(__init_begin - 1);
->         kernel_data.start   = virt_to_phys(_sdata);
->         kernel_data.end     = virt_to_phys(_end - 1);
->
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index e2c6da096cef..99420fc1f066 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -125,6 +125,8 @@ SECTIONS
->  #ifdef CONFIG_DEBUG_ALIGN_RODATA
->         . = ALIGN(1<<SECTION_SHIFT);
->  #endif
-> +       _etext = .;                     /* End of text section */
-> +
->         RO_DATA(PAGE_SIZE)
->
->         . = ALIGN(4);
-> @@ -155,8 +157,6 @@ SECTIONS
->
->         NOTES
->
-> -       _etext = .;                     /* End of text and rodata section */
-> -
->  #ifdef CONFIG_DEBUG_RODATA
->         . = ALIGN(1<<SECTION_SHIFT);
->  #else
-> --
-> 2.7.4
->
->
-> --
-> Kees Cook
-> Chrome OS & Brillo Security
+Best regards,
+Krzysztof
