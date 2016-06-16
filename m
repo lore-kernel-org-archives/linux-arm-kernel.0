@@ -1,46 +1,75 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 Jun 2016 15:42:27 +0200
-Subject: [PATCH 3/3] ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on
- Armada 385 Linksys
+Date: Thu, 16 Jun 2016 15:42:25 +0200
+Subject: [PATCH 1/3] ARM: mvebu: fix HW I/O coherency related deadlocks
 In-Reply-To: <1466084547-31343-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1466084547-31343-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1466084547-31343-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1466084547-31343-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the support for the Marvell crypto engine was added in the Device
-Tree of the various Armada 385 Device Tree files in commit
-d716f2e837ac6 ("ARM: mvebu: define crypto SRAM ranges for all armada-38x
-boards"), a typo was made in the MBus window attributes for the Armada
-385 Linksys board: 0x09/0x05 are used instead of 0x19/0x15. This commit
-fixes this typo, which makes the CESA engines operational on Armada 385
-Linksys boards.
+Until now, our understanding for HW I/O coherency to work on the
+Cortex-A9 based Marvell SoC was that only the PCIe regions should be
+mapped strongly-ordered. However, we were still encountering some
+deadlocks, especially when testing the CESA crypto engine. After
+checking with the HW designers, it was concluded that all the MMIO
+registers should be mapped as strongly ordered for the HW I/O coherency
+mechanism to work properly.
 
-Reported-by: Terry Stockert <stockert@inkblotadmirer.me>
+This fixes some easy to reproduce deadlocks with the CESA crypto engine
+driver (dmcrypt on a sufficiently large disk partition).
+
+Tested-by: Terry Stockert <stockert@inkblotadmirer.me>
+Tested-by: Romain Perier <romain.perier@free-electrons.com>
 Cc: Terry Stockert <stockert@inkblotadmirer.me>
-Cc: Imre Kaloz <kaloz@openwrt.org>
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Romain Perier <romain.perier@free-electrons.com>
 Cc: <stable@vger.kernel.org>
-Fixes: d716f2e837ac6 ("ARM: mvebu: define crypto SRAM ranges for all armada-38x boards")
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-385-linksys.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/coherency.c | 22 ++++++++--------------
+ 1 file changed, 8 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
-index 8450944..22f7a13 100644
---- a/arch/arm/boot/dts/armada-385-linksys.dtsi
-+++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
-@@ -58,8 +58,8 @@
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
--			  MBUS_ID(0x09, 0x09) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x05) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 7e989d6..474abff 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -162,22 +162,16 @@ exit:
+ }
  
- 		internal-regs {
+ /*
+- * This ioremap hook is used on Armada 375/38x to ensure that PCIe
+- * memory areas are mapped as MT_UNCACHED instead of MT_DEVICE. This
+- * is needed as a workaround for a deadlock issue between the PCIe
+- * interface and the cache controller.
++ * This ioremap hook is used on Armada 375/38x to ensure that all MMIO
++ * areas are mapped as MT_UNCACHED instead of MT_DEVICE. This is
++ * needed for the HW I/O coherency mechanism to work properly without
++ * deadlock.
+  */
+ static void __iomem *
+-armada_pcie_wa_ioremap_caller(phys_addr_t phys_addr, size_t size,
+-			      unsigned int mtype, void *caller)
++armada_wa_ioremap_caller(phys_addr_t phys_addr, size_t size,
++			 unsigned int mtype, void *caller)
+ {
+-	struct resource pcie_mem;
+-
+-	mvebu_mbus_get_pcie_mem_aperture(&pcie_mem);
+-
+-	if (pcie_mem.start <= phys_addr && (phys_addr + size) <= pcie_mem.end)
+-		mtype = MT_UNCACHED;
+-
++	mtype = MT_UNCACHED;
+ 	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
+ }
  
+@@ -186,7 +180,7 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
+ 	struct device_node *cache_dn;
+ 
+ 	coherency_cpu_base = of_iomap(np, 0);
+-	arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
++	arch_ioremap_caller = armada_wa_ioremap_caller;
+ 
+ 	/*
+ 	 * We should switch the PL310 to I/O coherency mode only if
 -- 
 2.7.4
