@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 16:14:19 +0200
+Date: Thu, 16 Jun 2016 16:15:45 +0200
 Subject: [PATCH v3 1/2] clocksource: Add Oxford Semiconductor RPS Dual
  Timer
 In-Reply-To: <5762AE08.50506@baylibre.com>
 References: <201606152333.eO0VmlRI%fengguang.wu@intel.com>
  <5762AAA3.8090304@linaro.org> <5762AE08.50506@baylibre.com>
-Message-ID: <5762B43B.9030104@linaro.org>
+Message-ID: <5762B491.7070805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -62,18 +62,9 @@ On 06/16/2016 03:47 PM, Neil Armstrong wrote:
 >
 > Should I push a v4 to keep COMPILE_TEST ?
 
-The easier way would be:
-	depends on !BLACKFIN
+Oh, actually with 'depends on GENERIC_CLOCKSOURCE', that should solve 
+both errors.
 
-I will take care of cleaning up this macro name collision when moving 
-the timer driver in drivers/clocksource (that's really in the future ...).
-
-The idea is to have all the drivers with the COMPILE_TEST option set, so 
-we can spot more issues at compile time earlier. This change reveals, of 
-course, some errors we were not facing before and at least it has the 
-benefit to enlighten some arch-shadowed drivers.
-
-   -- Daniel
 
 -- 
   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
