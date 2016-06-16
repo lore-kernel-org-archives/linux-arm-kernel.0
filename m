@@ -1,54 +1,82 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 16 Jun 2016 12:11:24 +0200
-Subject: [PATCH 4/5] clk: max77686: Add support for MAX77620 clocks
-In-Reply-To: <576276E5.5040500@nvidia.com>
-References: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
- <1466000018-16784-5-git-send-email-ldewangan@nvidia.com>
- <57627757.50101@samsung.com> <576276E5.5040500@nvidia.com>
-Message-ID: <57627B4C.7060609@samsung.com>
+From: mika.batsman@gmail.com (=?UTF-8?Q?Mika_B=C3=A5tsman?=)
+Date: Thu, 16 Jun 2016 13:13:03 +0300
+Subject: anatop_regulator probe returns -EINVAL if regulator is set to
+ bypass mode
+In-Reply-To: <1879329.hU2uRcWFRn@galactica.lan>
+References: <CACE3x1OUrK8ea78VDxf0bYxNnxBRrcH3xFE0amMsv2jYErRLmQ@mail.gmail.com>
+ <1879329.hU2uRcWFRn@galactica.lan>
+Message-ID: <CACE3x1NJMMUyjH26uWSmLFPFieKWOjN5o94G0H9EW0Z5mKhDMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2016 11:52 AM, Laxman Dewangan wrote:
-> Hi Krzysztof/Javier,
-> Thanks for review of the series.
-> 
-> I will post the V2 after taking care of all comment.
-> 
-> One query about the comment.
-> 
-> Thanks,
-> Laxman
-> 
-> On Thursday 16 June 2016 03:24 PM, Krzysztof Kozlowski wrote:
->> On 06/15/2016 04:13 PM, Laxman Dewangan wrote:
->>>   enum chip_name {
->>>       CHIP_MAX77686,
->>>       CHIP_MAX77802,
->>> +    CHIP_MAX77620,
->> Now it is more obvious why it is here. However I don't like the
->> duplication of device IDs, under different names and different values:
->> 1. include/linux/mfd/max77686-private.h
->> 2. include/linux/mfd/max77620.h
->> 3. here
->>
->> I was thinking about way of combining it... but these headers are
->> different. Unless there will be one header for all three devices.
->>
->> Anyway, please add the max77686 prefix to the enum.
-> 
-> so will it be:
-> 
-> enum max77686_chip_name {
->     CHIP_MAX77686,
->     CHIP_MAX77802,
->     CHIP_MAX77620,
-> };
-> 
-> 
-> Will it be fine here?
+Hi Markus,
 
-Yes, looks fine to me.
+good to know. I'll prepare a patch.
 
-Best regards,
-Krzysztof
+Thanks,
+Mika
+
+On Tue, Jun 14, 2016 at 10:37 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> Hi Mika,
+>
+> On 2016 M06 6, Mon 17:24:49 CEST Mika B?tsman wrote:
+>> Hi Philipp, hi Markus,
+>>
+>> there's a problem with anatop regulator driver that relates to
+>> functionality you have worked on. The related commits:
+>> da0607c8 regulator: anatop: Fail on invalid voltage selector
+>> d38018f2 regulator: anatop: Add bypass support to digital LDOs
+>>
+>>
+>> So in case bootloader set the regulator to bypass mode sreg->sel gets set
+>> to 0
+>>         sreg->sel = (val & rdesc->vsel_mask) >> sreg->vol_bit_shift;
+>>         if (sreg->sel == LDO_FET_FULL_ON) {
+>>             sreg->sel = 0;
+>>             sreg->bypass = true;
+>>         }
+>>
+>> and a little bit later it's causing EINVAL to be returned.
+>>         if (!sreg->sel) {
+>>             dev_err(&pdev->dev, "Failed to read a valid default voltage
+>> selector.\n");
+>>             return -EINVAL;
+>>         }
+>>
+>> Resulting in:
+>> anatop_regulator 20c8000.anatop:regulator-vddcore at 140: Failed to read a
+>> valid default voltage selector.
+>> anatop_regulator: probe of 20c8000.anatop:regulator-vddcore at 140 failed with
+>> error -22
+>> anatop_regulator 20c8000.anatop:regulator-vddsoc at 140: Failed to read a
+>> valid default voltage selector.
+>> anatop_regulator: probe of 20c8000.anatop:regulator-vddsoc at 140 failed with
+>> error -22
+>>
+>> Is that really the expected behaviour or should sreg->bypass be taken into
+>> account before returning EINVAL? Like this:
+>>
+>>         if (!sreg->bypass && !sreg->sel) {
+>
+> Thanks for spotting this. This condition seems better. A EINVAL error was not
+> intended for the bypass mode.
+>
+> Best Regards,
+>
+> Markus
+>
+>>             dev_err(&pdev->dev, "Failed to read a valid default voltage
+>> selector.\n");
+>>             return -EINVAL;
+>>         }
+>>
+>>
+>> Regards,
+>> Mika
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
