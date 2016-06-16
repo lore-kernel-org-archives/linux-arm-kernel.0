@@ -1,166 +1,76 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Thu, 16 Jun 2016 14:02:42 +0200
-Subject: [PATCH 4/7] crypto: marvell: Moving the tdma chain out of
- mv_cesa_tdma_req
-In-Reply-To: <20160615224249.3e1e477b@bbrezillon>
-References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
- <1466018134-10779-5-git-send-email-romain.perier@free-electrons.com>
- <20160615224249.3e1e477b@bbrezillon>
-Message-ID: <57629562.9030908@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 16 Jun 2016 14:04:48 +0200
+Subject: [PATCH v2] ARM: mm: fix location of _etext
+In-Reply-To: <20160615202447.GA5005@www.outflux.net>
+References: <20160615202447.GA5005@www.outflux.net>
+Message-ID: <CAKv+Gu-my1pd43WO=A_gQFgvtG3efYD97Fh8P-vG93G9zmPynw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Le 15/06/2016 22:42, Boris Brezillon a ?crit :
-> On Wed, 15 Jun 2016 21:15:31 +0200
-> Romain Perier <romain.perier@free-electrons.com> wrote:
+On 15 June 2016 at 22:24, Kees Cook <keescook@chromium.org> wrote:
+> The _etext position is defined to be the end of the kernel text code,
+> and should not include any part of the data segments. This interferes
+> with things that might check memory ranges and expect executable code
+> up to _etext. Just to be conservative, leave the kernel resource as
+> it was, using __init_begin instead of _etext as the end mark.
 >
->> Actually the only way to access the tdma chain is to use the 'req' union
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+> v2:
+> - Switched resource tracker to using __init_begin, rmk
+
+Actually, Linus removed the x86 /proc/iomem resources for kernel segments in
+
+c4004b02f8e5 ("x86: remove the kernel code/data/bss resources from /proc/iomem")
+
+so I wonder if we should not just do the same for ARM and arm64?
+
+
+
+> ---
+>  arch/arm/kernel/setup.c       | 2 +-
+>  arch/arm/kernel/vmlinux.lds.S | 4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 >
-> Currently, ...
-
-ok
-
-> Now that the dma specific fields are part of the base request there's no
-> reason to keep this union.
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 7b5350060612..dd84f03dc2d4 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -844,7 +844,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+>         struct resource *res;
 >
-> You can just put struct mv_cesa_req base; directly under struct
-> mv_cesa_ablkcipher_req, and move mv_cesa_ablkcipher_std_req fields in
-> mv_cesa_ablkcipher_req.
-
-
-Well, I think that I might keep the changes related to mv_cesa_tdma_req 
-in this commit (+ put struct mv_cesa_req base; direct under struct 
-mv_cesa_ablkcipher_req) and move the changes related to 
-mv_cesa_ablkcipher_std_req into another commit. What do you think ?
-
-
-> Initialize basereq earlier and pass it as the first argument of
-> mv_cesa_dma_process().
-
-ok
-
-
-
->> @@ -174,9 +174,9 @@ static inline void
->>   mv_cesa_ablkcipher_dma_prepare(struct ablkcipher_request *req)
->>   {
->>   	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(req);
->> -	struct mv_cesa_tdma_req *dreq = &creq->req.dma;
->> +	struct mv_cesa_req *dreq = &creq->req.base;
+>         kernel_code.start   = virt_to_phys(_text);
+> -       kernel_code.end     = virt_to_phys(_etext - 1);
+> +       kernel_code.end     = virt_to_phys(__init_begin - 1);
+>         kernel_data.start   = virt_to_phys(_sdata);
+>         kernel_data.end     = virt_to_phys(_end - 1);
 >
-> You named it basereq in mv_cesa_ablkcipher_step(). Try to be
-> consistent, no matter the name.
-
-ack
-
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index e2c6da096cef..99420fc1f066 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -125,6 +125,8 @@ SECTIONS
+>  #ifdef CONFIG_DEBUG_ALIGN_RODATA
+>         . = ALIGN(1<<SECTION_SHIFT);
+>  #endif
+> +       _etext = .;                     /* End of text section */
+> +
+>         RO_DATA(PAGE_SIZE)
 >
->>
->> -	mv_cesa_dma_prepare(dreq, dreq->base.engine);
->> +	mv_cesa_dma_prepare(dreq, dreq->engine);
->>   }
->>
->>   static inline void
->> @@ -199,7 +199,7 @@ static inline void mv_cesa_ablkcipher_prepare(struct crypto_async_request *req,
->>   	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(ablkreq);
->>   	creq->req.base.engine = engine;
->>
->> -	if (creq->req.base.type == CESA_DMA_REQ)
->> +	if (mv_cesa_req_get_type(&creq->req.base) == CESA_DMA_REQ)
->>   		mv_cesa_ablkcipher_dma_prepare(ablkreq);
->>   	else
->>   		mv_cesa_ablkcipher_std_prepare(ablkreq);
->> @@ -302,14 +302,13 @@ static int mv_cesa_ablkcipher_dma_req_init(struct ablkcipher_request *req,
->>   	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(req);
->>   	gfp_t flags = (req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP) ?
->>   		      GFP_KERNEL : GFP_ATOMIC;
->> -	struct mv_cesa_tdma_req *dreq = &creq->req.dma;
->> +	struct mv_cesa_req *dreq = &creq->req.base;
+>         . = ALIGN(4);
+> @@ -155,8 +157,6 @@ SECTIONS
 >
-> Ditto.
-
-ack
-
-
->> @@ -256,9 +256,9 @@ static int mv_cesa_ahash_std_process(struct ahash_request *req, u32 status)
->>   static inline void mv_cesa_ahash_dma_prepare(struct ahash_request *req)
->>   {
->>   	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
->> -	struct mv_cesa_tdma_req *dreq = &creq->req.dma.base;
->> +	struct mv_cesa_req *dreq = &creq->req.base;
+>         NOTES
 >
-> Ditto.
-
-ack
-
->> @@ -340,7 +340,7 @@ static void mv_cesa_ahash_prepare(struct crypto_async_request *req,
->>
->>   	creq->req.base.engine = engine;
->>
->> -	if (creq->req.base.type == CESA_DMA_REQ)
->> +	if (mv_cesa_req_get_type(&creq->req.base) == CESA_DMA_REQ)
->>   		mv_cesa_ahash_dma_prepare(ahashreq);
->>   	else
->>   		mv_cesa_ahash_std_prepare(ahashreq);
->> @@ -555,8 +555,7 @@ static int mv_cesa_ahash_dma_req_init(struct ahash_request *req)
->>   	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
->>   	gfp_t flags = (req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP) ?
->>   		      GFP_KERNEL : GFP_ATOMIC;
->> -	struct mv_cesa_ahash_dma_req *ahashdreq = &creq->req.dma;
->> -	struct mv_cesa_tdma_req *dreq = &ahashdreq->base;
->> +	struct mv_cesa_req *dreq = &creq->req.base;
+> -       _etext = .;                     /* End of text and rodata section */
+> -
+>  #ifdef CONFIG_DEBUG_RODATA
+>         . = ALIGN(1<<SECTION_SHIFT);
+>  #else
+> --
+> 2.7.4
 >
-> Ditto.
-
-ack
-
 >
->>   	struct mv_cesa_ahash_dma_iter iter;
->>   	struct mv_cesa_op_ctx *op = NULL;
->>   	unsigned int frag_len;
->> @@ -662,11 +661,6 @@ static int mv_cesa_ahash_req_init(struct ahash_request *req, bool *cached)
->>   	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
->>   	int ret;
->>
->> -	if (cesa_dev->caps->has_tdma)
->> -		creq->req.base.type = CESA_DMA_REQ;
->> -	else
->> -		creq->req.base.type = CESA_STD_REQ;
->> -
->
-> Hm, where is it decided now? I mean, I don't see this test anywhere
-> else in your patch, which means you're now always using standard mode.
-
-It has been replaced by mv_cesa_req_get_type() + initializing 
-chain.first to NULL in std_init. So, that's the same thing, no ?
-
->
->>   	creq->src_nents = sg_nents_for_len(req->src, req->nbytes);
->>   	if (creq->src_nents < 0) {
->>   		dev_err(cesa_dev->dev, "Invalid number of src SG");
->> @@ -680,7 +674,7 @@ static int mv_cesa_ahash_req_init(struct ahash_request *req, bool *cached)
->>   	if (*cached)
->>   		return 0;
->>
->> -	if (creq->req.base.type == CESA_DMA_REQ)
->> +	if (mv_cesa_req_get_type(&creq->req.base) == CESA_DMA_REQ)
->
-> Should be
->
-> 	if (cesa_dev->caps->has_tdma)
->
->>   		ret = mv_cesa_ahash_dma_req_init(req);
-
-Why ? mv_cesa_req_get_type() tests mv_cesa_req->chain and returns a code 
-depending on its value. This value is initialized according to what is 
-set un "has_tdma"...
-
-
-Thanks,
-Regards,
-Romain
--- 
-Romain Perier, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> --
+> Kees Cook
+> Chrome OS & Brillo Security
