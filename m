@@ -1,35 +1,20 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Thu, 16 Jun 2016 18:19:15 +0200
-Subject: [PATCH V2] ARM64: config: Enable MAX77620 pinctrl/gpio/rtc for
- Tegra210 P2180
-In-Reply-To: <5762A648.2040704@nvidia.com>
-References: <1465579176-32290-1-git-send-email-ldewangan@nvidia.com>
- <5762A648.2040704@nvidia.com>
-Message-ID: <20160616161914.GD19360@ulmo.ba.sec>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 16 Jun 2016 09:22:27 -0700
+Subject: [PATCH 1/7] dt-bindings: ata: rename brcm,sata-brcmstb.txt to
+ brcm,sata-brcm.txt
+In-Reply-To: <1466085215-10246-2-git-send-email-yendapally.reddy@broadcom.com>
+References: <1466085215-10246-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1466085215-10246-2-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <5762D243.6040108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 06:44:48PM +0530, Laxman Dewangan wrote:
-> Hi Thierry,
+On 06/16/2016 06:53 AM, Yendapally Reddy Dhananjaya Reddy wrote:
+> Renames the dt bindings document of Broadcom STB ahci driver to
+> common Broadcom ahci driver bindings document
 > 
-> On Friday 10 June 2016 10:49 PM, Laxman Dewangan wrote:
-> > NVIDIA's Tegra210 Jetson platform (P2180) uses the MAX77620 as PMIC.
-> > Enable GPIO, Pincontrol and RTC driver for this device.
-> > 
-> > Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> > ---
-> 
-> Are you picking this change?
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
 
-Can you please send this to linux-tegra at vger.kernel.org so that it can
-properly be tracked?
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160616/60a46df6/attachment.sig>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+-- 
+Florian
