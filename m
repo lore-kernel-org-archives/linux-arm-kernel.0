@@ -1,37 +1,30 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 17 Jun 2016 01:03:53 +0300
-Subject: [PATCH 2/2] ARM: dts: r8a7792: add JPU support
-In-Reply-To: <7346244.CEZI3u99oZ@wasted.cogentembedded.com>
-References: <7346244.CEZI3u99oZ@wasted.cogentembedded.com>
-Message-ID: <2415204.YUO4drecC0@wasted.cogentembedded.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 16 Jun 2016 17:19:14 -0500
+Subject: [PATCH v3 1/2] nxp/dts: add pcie aer interrupt-name property in
+ the dts
+In-Reply-To: <1465892645-32381-1-git-send-email-po.liu@nxp.com>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-1-git-send-email-po.liu@nxp.com>
+Message-ID: <20160616221914.GA2602@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe JPEG Processing Unit (JPU) in the R8A7792 device tree.
+On Tue, Jun 14, 2016 at 04:24:04PM +0800, Po Liu wrote:
+> NXP some platforms aer interrupt was not MSI/MSI-X/INTx
+> but using interrupt line independently. This patch add a "aer"
+> interrupt-names for aer interrupt.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Please put your explanation why this is okay to change in the commit 
+message.
 
----
- arch/arm/boot/dts/r8a7792.dtsi |    9 +++++++++
- 1 file changed, 9 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -246,6 +246,15 @@
- 			status = "disabled";
- 		};
- 
-+		jpu: jpeg-codec at fe980000 {
-+			compatible = "renesas,jpu-r8a7792",
-+				     "renesas,rcar-gen2-jpu";
-+			reg = <0 0xfe980000 0 0x10300>;
-+			interrupts = <GIC_SPI 272 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp1_clks R8A7792_CLK_JPU>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
- 		/* Special CPG clocks */
- 		cpg_clocks: cpg_clocks at e6150000 {
- 			compatible = "renesas,r8a7792-cpg-clocks",
+> 
+> Signed-off-by: Po Liu <po.liu@nxp.com>
+> ---
+> changes for v3:
+> 	- None;
+> 
+>  .../devicetree/bindings/pci/layerscape-pci.txt         |  4 ++--
+>  arch/arm/boot/dts/ls1021a.dtsi                         |  6 ++++--
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi         | 18 +++++++++---------
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi         | 16 ++++++++--------
+>  4 files changed, 23 insertions(+), 21 deletions(-)
