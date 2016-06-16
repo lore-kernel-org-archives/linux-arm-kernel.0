@@ -1,116 +1,101 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 16 Jun 2016 03:54:46 -0400 (EDT)
-Subject: [Linaro-acpi] [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space
- accessors against platfrom specific ECAM quirks
-In-Reply-To: <CADaLNDnjEuGvWxCMPb=9fiCeVMgF0RRzT2n1SjNw3o57gRUhcg@mail.gmail.com>
-References: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
- <1465822923-33599-2-git-send-email-liudongdong3@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F782C86@lhreml507-mbx>
- <e3174a09-e6f8-126d-d3c5-648d1cfd2b74@redhat.com>
- <CADaLNDnjEuGvWxCMPb=9fiCeVMgF0RRzT2n1SjNw3o57gRUhcg@mail.gmail.com>
-Message-ID: <891827D4-0ECE-4A55-B79D-E5C7C23A0B04@redhat.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Thu, 16 Jun 2016 09:56:32 +0200
+Subject: [PATCH] arm64: Add BCM2835 support to the defconfig.
+Message-ID: <1466063792-24710-1-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-:) We should be good with a match on XGENE (but be careful with substring matching) as long as future platforms change that to eg XGENE3 (which is a publicly announced future chip). What you want to avoid is a shorter match later triggering on a future generation.
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+---
+ arch/arm64/configs/defconfig | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-There are a lot of folks eagerly awaiting Moonshot running an upstream kernel in F25, both for 64 and 32-bit (VMs running 32-bit can replace older builders). I can picture a wonderful world in which this whole ARM server ecosystem works properly with folks doing what they should have three years ago and development happening on upstream kernels with ACPI. Then things become incredibly dull just like x86 - do the dev against upstream, pull into an enterprise distro after it is tested out in a Fedora cycle...and no random nonsense patches. Next thing we know there will be media reports covering silicon that won't end with a rant about how they couldn't get the right firmware and hacked up Ubuntu kernel booting.
-
-Best, and goodnight :)
-
-Jon.
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index fd2d74d..50e5afc 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -31,6 +31,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_ALPINE=y
++CONFIG_ARCH_BCM2835=y
+ CONFIG_ARCH_BCM_IPROC=y
+ CONFIG_ARCH_BERLIN=y
+ CONFIG_ARCH_EXYNOS=y
+@@ -171,6 +172,7 @@ CONFIG_VIRTIO_CONSOLE=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PCA954x=y
++CONFIG_I2C_BCM2835=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_IMX=y
+ CONFIG_I2C_MV64XXX=y
+@@ -179,6 +181,8 @@ CONFIG_I2C_TEGRA=y
+ CONFIG_I2C_UNIPHIER_F=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
++CONFIG_SPI_BCM2835=y
++CONFIG_SPI_BCM2835AUX=y
+ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_QUP=y
+@@ -202,6 +206,7 @@ CONFIG_THERMAL_EMULATION=y
+ CONFIG_EXYNOS_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_RENESAS_WDT=y
++CONFIG_BCM2835_WDT=y
+ CONFIG_MFD_SPMI_PMIC=y
+ CONFIG_MFD_SEC_CORE=y
+ CONFIG_MFD_HI655X_PMIC=y
+@@ -220,6 +225,7 @@ CONFIG_LOGO=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
++CONFIG_SND_BCM2835_SOC_I2S=y
+ CONFIG_SND_SOC_RCAR=y
+ CONFIG_SND_SOC_AK4613=y
+ CONFIG_USB=y
+@@ -248,12 +254,14 @@ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_OF_ESDHC=y
+ CONFIG_MMC_SDHCI_TEGRA=y
++CONFIG_MMC_SDHCI_BCM2835=y
+ CONFIG_MMC_SDHCI_MSM=y
+ CONFIG_MMC_SPI=y
+ CONFIG_MMC_DW=y
+ CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_MMC_DW_K3=y
+ CONFIG_MMC_SUNXI=y
++CONFIG_MMC_BCM2835_SDHOST=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+@@ -269,6 +277,7 @@ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_XGENE=y
+ CONFIG_DMADEVICES=y
++CONFIG_DMA_BCM2835=y
+ CONFIG_PL330_DMA=y
+ CONFIG_TEGRA20_APB_DMA=y
+ CONFIG_QCOM_BAM_DMA=y
+@@ -288,8 +297,10 @@ CONFIG_MSM_GCC_8916=y
+ CONFIG_HWSPINLOCK_QCOM=y
+ CONFIG_MAILBOX=y
+ CONFIG_ARM_MHU=y
++CONFIG_BCM2835_MBOX=y
+ CONFIG_HI6220_MBOX=y
+ CONFIG_ARM_SMMU=y
++CONFIG_RASPBERRYPI_POWER=y
+ CONFIG_QCOM_SMEM=y
+ CONFIG_QCOM_SMD=y
+ CONFIG_QCOM_SMD_RPM=y
+@@ -301,6 +312,7 @@ CONFIG_PHY_RCAR_GEN3_USB2=y
+ CONFIG_PHY_HI6220_USB=y
+ CONFIG_PHY_XGENE=y
+ CONFIG_ARM_SCPI_PROTOCOL=y
++CONFIG_RASPBERRYPI_FIRMWARE=y
+ CONFIG_ACPI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
 -- 
-Computer Architect | Sent from my 64-bit #ARM Powered phone
-
-> On Jun 16, 2016, at 03:46, Duc Dang <dhdang@apm.com> wrote:
-> 
->> On Wed, Jun 15, 2016 at 11:31 PM, Jon Masters <jcm@redhat.com> wrote:
->>> On 06/13/2016 09:54 AM, Gabriele Paoloni wrote:
->>> Hi Tomasz, Jon
->> 
->> Hi Gab,
->> 
->> Sorry for the lag in following up.
->> 
->> <snip>
->> 
->>> As you can see here Liudongdong has replaced oem_revision with
->>> oem_table_id.
->>> 
->>> Now it seems that there are some platforms that have already shipped
->>> using a matching based on the oem_revision (right Jon?)
->> 
->> Actually, it turns out (Cov is correct) that we can just match on OEM
->> Table ID. The revision should not generally be needed and the vendors
->> will just need to make sure that they change OEM Table ID in future
->> silicon. An example from two shipping platforms:
->> 
->> 1). AppliedMicro Mustang:
->> 
->> [000h 0000   4]                    Signature : "MCFG"    [Memory Mapped
->> Configuration table]
->> [004h 0004   4]                 Table Length : 0000003C
->> [008h 0008   1]                     Revision : 01
->> [009h 0009   1]                     Checksum : 4A
->> [00Ah 0010   6]                       Oem ID : "APM   "
->> [010h 0016   8]                 Oem Table ID : "XGENE   "
->> [018h 0024   4]                 Oem Revision : 00000002
->> [01Ch 0028   4]              Asl Compiler ID : "INTL"
->> [020h 0032   4]        Asl Compiler Revision : 20140724
->> 
->> 2). HP(E[0]) Moonshot:
->> 
->> [000h 0000   4]                    Signature : "MCFG"    [Memory Mapped
->> Configuration table]
->> [004h 0004   4]                 Table Length : 0000003C
->> [008h 0008   1]                     Revision : 01
->> [009h 0009   1]                     Checksum : 48
->> [00Ah 0010   6]                       Oem ID : "APM   "
->> [010h 0016   8]                 Oem Table ID : "XGENE   "
->> [018h 0024   4]                 Oem Revision : 00000001
->> [01Ch 0028   4]              Asl Compiler ID : "HP  "
->> [020h 0032   4]        Asl Compiler Revision : 00000001
->> 
->> I have pinged the semiconductor (Applied) and insisted upon a written
->> plan (which I have now) for handling the first affect generation(s) and
->> future chip roadmap stuff, along with how they plan to upstream this
->> immediately as part of this thread. I have also done similar with each
->> of the other vendors (this is something ARM or Linaro should be doing).
->> But I particularly care about X-Gene because I want it to be loved as
->> shipping silicon in production systems (Moonshot) that are sitting and
->> waiting in the Fedora Phoenix datacenter in large quantity to come
->> online if only an upstream kernel would actually boot on them :)
-> 
-> Thanks for the MCFG information on Moonshot system, Jon.
-> 
-> I will make sure the posted quirk for X-Gene takes care for HPE
-> Moonshot system as well.
-> 
-> Regards,
-> Duc Dang.
-> 
->> 
->>> However I guess that if in FW they have defined oem_table_id properly
->>> they should be able to use this mechanism without needing to a FW update.
->> 
->> Correct.
->> 
->>> Can these vendors confirm this?
->> 
->> I've checked all current shipping silicon and prototypes.
->> 
->>> Tomasz do you think this can work for Cavium Thunder?
->> 
->> Will let the vendors followup directly as well.
->> 
->> Jon.
->> 
->> [0] Fortunately that name change doesn't factor when using semiconductor
->> matching...hopefully none of the non-complaint IP companies in gen1
->> stuff get bought and change their table names. In the unlikely event
->> that that does happen, I will preemptively beat them up and ensure that
->> something crazy doesn't happen with table contents.
->> 
->> --
->> Computer Architect | Sent from my Fedora powered laptop
+1.8.3.1
