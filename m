@@ -1,61 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 16 Jun 2016 17:39:09 +0100
-Subject: [PATCH v2] arm64: allow building with kcov coverage on ARM64
-In-Reply-To: <20160616163258.GA1459@leverpostej>
-References: <CAG_fn=X521a9uD1bthDZ-swO9hrfq=jE2C_LUvzkn6C_q5dBvA@mail.gmail.com>
- <20160615092509.GA3984@leverpostej>
- <20160615114438.GC3984@leverpostej>
- <CAG_fn=U7-fUnw1GLwBbmqGTxnOWf4QcTjTyP4mGAORfEuWt3Eg@mail.gmail.com>
- <20160615142550.GA7971@leverpostej> <576283B9.9050900@arm.com>
- <CAG_fn=X=LSEN2FS0rapgW1PEEqkDLcSXLdxeKa=5ya9g0GJ23A@mail.gmail.com>
- <20160616154412.GC31477@leverpostej>
- <20160616162531.GF18752@e104818-lin.cambridge.arm.com>
- <20160616163258.GA1459@leverpostej>
-Message-ID: <20160616163909.GG18752@e104818-lin.cambridge.arm.com>
+From: glider@google.com (Alexander Potapenko)
+Date: Thu, 16 Jun 2016 18:39:52 +0200
+Subject: [PATCH v4] arm64: allow building with kcov coverage on ARM64
+Message-ID: <1466095192-106891-1-git-send-email-glider@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 05:32:59PM +0100, Mark Rutland wrote:
-> On Thu, Jun 16, 2016 at 05:25:31PM +0100, Catalin Marinas wrote:
-> > On Thu, Jun 16, 2016 at 04:44:12PM +0100, Mark Rutland wrote:
-> > > On Thu, Jun 16, 2016 at 05:20:03PM +0200, Alexander Potapenko wrote:
-> > > > I think it's time to ask now :)
-> > > > If I receive "Tested-by" or "Acked-by" responses, do I need to send
-> > > > out a patch adding them, or should I rely on the maintainer taking the
-> > > > patch to the tree?
-> > > > The first option reduces the amount of work done by the maintainer,
-> > > > while the second one reduces the traffic in the list.
-> > > > Sorry, I couldn't find the answer in the manuals.
-> > > 
-> > > It's up to the maintainer, so it varies. The best thing to do is to ask
-> > > the maintainer what they'd prefer.
-> > > 
-> > > From my experience, Catalin is usually happy to add tags, so I suspect
-> > > he'd be happy to do so for this patch (assuming he's happy to pick it
-> > > up). I'll leave it for him to say either way.
-> > 
-> > I usually cherry-pick tags that I see in reply to the *latest* version
-> > of the patch (I have a rudimentary script to do this).
-> > 
-> > I noticed that there was an ack on v1 form Marc Z that's missing in v2.
-> 
-> I believe Marc's reply [1] was to v3 [2], it's just that the version was
-> missing form the subject, and discussions continued on v2 in the mean
-> time.
+Add ARCH_HAS_KCOV to ARM64 config. To avoid potential crashes, disable
+instrumentation of the files in arch/arm64/kvm/hyp/*.
 
-OK, thanks for clarification. I thought the one with most replies was
-the latest ;).
+Signed-off-by: Alexander Potapenko <glider@google.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: James Morse <james.morse@arm.com>
+---
+v4: - added ack from Marc Zyngier and Tested-by from James Morse
+v3: - reverted arch/arm64/boot/Makefile, there's no code in that dir
+    - added ack from Mark Rutland
+v2: - disable instrumentation of arch/arm64/{boot,kvm/hyp}
+    - enable instrumentation of arch/arm64/lib/delay.c
+---
+ arch/arm64/Kconfig          | 1 +
+ arch/arm64/kvm/hyp/Makefile | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-> > Maybe it no longer applies, I can't tell, but I usually expect
-> > subsequent versions of a patch to include all the previously given acks
-> > (of course, if they still apply, sometimes a patch rewrite means
-> > dropping those tags).
-> 
-> I guess the simplest thing to do is for Alexander to send a v4 with the
-> tags accumulated, assuming James's Tested-by is applicable to v3 with
-> the boot/Makefile hunk removed. James?
-
-Even better.
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 5a0a691..eb0b0a0 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -7,6 +7,7 @@ config ARM64
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
++	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_SG_CHAIN
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_USE_CMPXCHG_LOCKREF
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 778d0ef..0c85feb 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -17,6 +17,10 @@ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
+ obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+ obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
+ 
++# KVM code is run at a different exception code with a different map, so
++# compiler instrumentation that inserts callbacks or checks into the code may
++# cause crashes. Just disable it.
+ GCOV_PROFILE	:= n
+ KASAN_SANITIZE	:= n
+ UBSAN_SANITIZE	:= n
++KCOV_INSTRUMENT	:= n
 -- 
-Catalin
+2.8.0.rc3.226.g39d4020
