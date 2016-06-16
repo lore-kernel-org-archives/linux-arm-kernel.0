@@ -1,30 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jun 2016 11:36:17 +0200
-Subject: [PATCH 5/6] video: ARM CLCD: add special board and panel hooks for
- Nomadik
+Date: Thu, 16 Jun 2016 11:36:18 +0200
+Subject: [PATCH 6/6] video: ARM CLCD: add special panel hook for Versatiles
 In-Reply-To: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
 References: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1466069778-16087-6-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1466069778-16087-7-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the .board_init() callback will set up a mux register in
-the Nomadik system controller. It so happens that the platform
-has two display output engines, and we have to poke a bit in
-a special register to make sure the right engine is muxed in
-as they are mutually exclusive.
+This adds a special panel init hook for the ARM reference designs
+Integrator (IM-PD1), Versatile and RealView, so we can configure
+a DPI panel from device tree and have it working without
+boardfiles for these machines.
 
-The Nomadik CLCD variant is instantiated on a platform where
-it is combined with a 800x480 TPO WVGA display. In the
-.panel_init() hook we will detect this display from the
-compatible string and set it up. We also add .enable() and
-.disable() callbacks for it as the sleep state is software
-controlled.
+Basically this is the same code as from the board files, just
+moved over to look up the syscon DT node and manipulate the
+special CLCD register from their regmap.
 
-The display is connected with a special 3-wire serial bus
-(this is sadly neither I2C or SPI) using three GPIO lines that
-we bitbang to detect the display and enable/disable sleep
-state.
+Tested on RealView PB11MPcore.
 
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Rob Herring <robh@kernel.org>
@@ -32,353 +24,485 @@ Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v2->v3:
-- Just rebased. No comments so no changes.
+- Just rebased. No comments on v2 so no changes.
 ChangeLog v1->v2:
-- No changes. Just reposting.
+- For Versatile: just detect the panel and look up and compare
+  the expected compatible string to what is provided by the device
+  tree. If the device tree does not match the hardware-detected
+  display, print a warning and continue anyways.
+- Make no attempt at actually switching the panel at runtime or
+  to modify the device tree at runtime.
 ---
- drivers/video/fbdev/Makefile            |   1 +
- drivers/video/fbdev/amba-clcd-nomadik.c | 257 ++++++++++++++++++++++++++++++++
- drivers/video/fbdev/amba-clcd-nomadik.h |  24 +++
- drivers/video/fbdev/amba-clcd.c         |   6 +-
- 4 files changed, 287 insertions(+), 1 deletion(-)
- create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.c
- create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.h
+ drivers/video/fbdev/Kconfig               |   2 +
+ drivers/video/fbdev/amba-clcd-versatile.c | 391 ++++++++++++++++++++++++++++++
+ drivers/video/fbdev/amba-clcd-versatile.h |  17 ++
+ drivers/video/fbdev/amba-clcd.c           |   4 +-
+ 4 files changed, 413 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/video/fbdev/amba-clcd-versatile.h
 
-diff --git a/drivers/video/fbdev/Makefile b/drivers/video/fbdev/Makefile
-index f6731867dd26..5550944f0ad7 100644
---- a/drivers/video/fbdev/Makefile
-+++ b/drivers/video/fbdev/Makefile
-@@ -79,6 +79,7 @@ obj-$(CONFIG_FB_ATMEL)		  += atmel_lcdfb.o
- obj-$(CONFIG_FB_PVR2)             += pvr2fb.o
- obj-$(CONFIG_FB_VOODOO1)          += sstfb.o
- obj-$(CONFIG_FB_ARMCLCD)	  += amba-clcd.o
-+obj-$(CONFIG_ARCH_NOMADIK)	  += amba-clcd-nomadik.o
- obj-$(CONFIG_PLAT_VERSATILE_CLCD) += amba-clcd-versatile.o
- obj-$(CONFIG_FB_GOLDFISH)         += goldfishfb.o
- obj-$(CONFIG_FB_68328)            += 68328fb.o
-diff --git a/drivers/video/fbdev/amba-clcd-nomadik.c b/drivers/video/fbdev/amba-clcd-nomadik.c
-new file mode 100644
-index 000000000000..243167c8ee15
---- /dev/null
-+++ b/drivers/video/fbdev/amba-clcd-nomadik.c
-@@ -0,0 +1,257 @@
-+#include <linux/amba/bus.h>
-+#include <linux/amba/clcd.h>
-+#include <linux/gpio/consumer.h>
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index 9b9a76b82c04..6c28ecc3958c 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -307,6 +307,8 @@ config PLAT_VERSATILE_CLCD
+ 	def_bool ARCH_VERSATILE || ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_INTEGRATOR
+ 	depends on ARM
+ 	depends on FB_ARMCLCD && FB=y
++	select REGMAP
++	select MFD_SYSCON
+ 
+ config FB_ACORN
+ 	bool "Acorn VIDC support"
+diff --git a/drivers/video/fbdev/amba-clcd-versatile.c b/drivers/video/fbdev/amba-clcd-versatile.c
+index a8a22daa3f9d..9a90817b1550 100644
+--- a/drivers/video/fbdev/amba-clcd-versatile.c
++++ b/drivers/video/fbdev/amba-clcd-versatile.c
+@@ -3,6 +3,12 @@
+ #include <linux/amba/bus.h>
+ #include <linux/amba/clcd.h>
+ #include <linux/platform_data/video-clcd-versatile.h>
 +#include <linux/of.h>
 +#include <linux/of_graph.h>
-+#include <linux/delay.h>
-+#include <linux/bitops.h>
-+#include <linux/mfd/syscon.h>
 +#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <linux/bitops.h>
++#include "amba-clcd-versatile.h"
+ 
+ static struct clcd_panel vga = {
+ 	.mode		= {
+@@ -178,3 +184,388 @@ void versatile_clcd_remove_dma(struct clcd_fb *fb)
+ 	dma_free_wc(&fb->dev->dev, fb->fb.fix.smem_len, fb->fb.screen_base,
+ 		    fb->fb.fix.smem_start);
+ }
 +
-+#include "amba-clcd-nomadik.h"
++#ifdef CONFIG_OF
 +
-+static struct gpio_desc *grestb;
-+static struct gpio_desc *scen;
-+static struct gpio_desc *scl;
-+static struct gpio_desc *sda;
++static struct regmap *versatile_syscon_map;
++static struct regmap *versatile_ib2_map;
 +
-+static u8 tpg110_readwrite_reg(bool write, u8 address, u8 outval)
++/*
++ * We detect the different syscon types from the compatible strings.
++ */
++enum versatile_clcd {
++	INTEGRATOR_CLCD_CM,
++	VERSATILE_CLCD,
++	REALVIEW_CLCD_EB,
++	REALVIEW_CLCD_PB1176,
++	REALVIEW_CLCD_PB11MP,
++	REALVIEW_CLCD_PBA8,
++	REALVIEW_CLCD_PBX,
++};
++
++static const struct of_device_id versatile_clcd_of_match[] = {
++	{
++		.compatible = "arm,core-module-integrator",
++		.data = (void *)INTEGRATOR_CLCD_CM,
++	},
++	{
++		.compatible = "arm,versatile-sysreg",
++		.data = (void *)VERSATILE_CLCD,
++	},
++	{
++		.compatible = "arm,realview-eb-syscon",
++		.data = (void *)REALVIEW_CLCD_EB,
++	},
++	{
++		.compatible = "arm,realview-pb1176-syscon",
++		.data = (void *)REALVIEW_CLCD_PB1176,
++	},
++	{
++		.compatible = "arm,realview-pb11mp-syscon",
++		.data = (void *)REALVIEW_CLCD_PB11MP,
++	},
++	{
++		.compatible = "arm,realview-pba8-syscon",
++		.data = (void *)REALVIEW_CLCD_PBA8,
++	},
++	{
++		.compatible = "arm,realview-pbx-syscon",
++		.data = (void *)REALVIEW_CLCD_PBX,
++	},
++	{},
++};
++
++/*
++ * Core module CLCD control on the Integrator/CP, bits
++ * 8 thru 19 of the CM_CONTROL register controls a bunch
++ * of CLCD settings.
++ */
++#define INTEGRATOR_HDR_CTRL_OFFSET	0x0C
++#define INTEGRATOR_CLCD_LCDBIASEN	BIT(8)
++#define INTEGRATOR_CLCD_LCDBIASUP	BIT(9)
++#define INTEGRATOR_CLCD_LCDBIASDN	BIT(10)
++/* Bits 11,12,13 controls the LCD type */
++#define INTEGRATOR_CLCD_LCDMUX_MASK	(BIT(11)|BIT(12)|BIT(13))
++#define INTEGRATOR_CLCD_LCDMUX_LCD24	BIT(11)
++#define INTEGRATOR_CLCD_LCDMUX_VGA565	BIT(12)
++#define INTEGRATOR_CLCD_LCDMUX_SHARP	(BIT(11)|BIT(12))
++#define INTEGRATOR_CLCD_LCDMUX_VGA555	BIT(13)
++#define INTEGRATOR_CLCD_LCDMUX_VGA24	(BIT(11)|BIT(12)|BIT(13))
++#define INTEGRATOR_CLCD_LCD0_EN		BIT(14)
++#define INTEGRATOR_CLCD_LCD1_EN		BIT(15)
++/* R/L flip on Sharp */
++#define INTEGRATOR_CLCD_LCD_STATIC1	BIT(16)
++/* U/D flip on Sharp */
++#define INTEGRATOR_CLCD_LCD_STATIC2	BIT(17)
++/* No connection on Sharp */
++#define INTEGRATOR_CLCD_LCD_STATIC	BIT(18)
++/* 0 = 24bit VGA, 1 = 18bit VGA */
++#define INTEGRATOR_CLCD_LCD_N24BITEN	BIT(19)
++
++#define INTEGRATOR_CLCD_MASK		(INTEGRATOR_CLCD_LCDMUX_MASK | \
++					 INTEGRATOR_CLCD_LCD0_EN | \
++					 INTEGRATOR_CLCD_LCD1_EN | \
++					 INTEGRATOR_CLCD_LCD_STATIC1 | \
++					 INTEGRATOR_CLCD_LCD_STATIC2 | \
++					 INTEGRATOR_CLCD_LCD_STATIC | \
++					 INTEGRATOR_CLCD_LCD_N24BITEN)
++
++static void integrator_clcd_enable(struct clcd_fb *fb)
 +{
-+	int i;
-+	u8 inval = 0;
++	struct fb_var_screeninfo *var = &fb->fb.var;
++	u32 val;
 +
-+	/* Assert SCEN */
-+	gpiod_set_value_cansleep(scen, 1);
-+	ndelay(150);
-+	/* Hammer out the address */
-+	for (i = 5; i >= 0; i--) {
-+		if (address & BIT(i))
-+			gpiod_set_value_cansleep(sda, 1);
++	dev_info(&fb->dev->dev, "enable Integrator CLCD connectors\n");
++
++	val = INTEGRATOR_CLCD_LCD_STATIC1 | INTEGRATOR_CLCD_LCD_STATIC2 |
++		INTEGRATOR_CLCD_LCD0_EN | INTEGRATOR_CLCD_LCD1_EN;
++	if (var->bits_per_pixel <= 8 ||
++	    (var->bits_per_pixel == 16 && var->green.length == 5))
++		/* Pseudocolor, RGB555, BGR555 */
++		val |= INTEGRATOR_CLCD_LCDMUX_VGA555;
++	else if (fb->fb.var.bits_per_pixel <= 16)
++		/* truecolor RGB565 */
++		val |= INTEGRATOR_CLCD_LCDMUX_VGA565;
++	else
++		val = 0; /* no idea for this, don't trust the docs */
++
++	regmap_update_bits(versatile_syscon_map,
++			   INTEGRATOR_HDR_CTRL_OFFSET,
++			   0,
++			   INTEGRATOR_CLCD_MASK);
++}
++
++/*
++ * This configuration register in the Versatile and RealView
++ * family is uniformly present but appears more and more
++ * unutilized starting with the RealView series.
++ */
++#define SYS_CLCD			0x50
++#define SYS_CLCD_MODE_MASK		(BIT(0)|BIT(1))
++#define SYS_CLCD_MODE_888		0
++#define SYS_CLCD_MODE_5551		BIT(0)
++#define SYS_CLCD_MODE_565_R_LSB		BIT(1)
++#define SYS_CLCD_MODE_565_B_LSB		(BIT(0)|BIT(1))
++#define SYS_CLCD_CONNECTOR_MASK		(BIT(2)|BIT(3)|BIT(4)|BIT(5))
++#define SYS_CLCD_NLCDIOON		BIT(2)
++#define SYS_CLCD_VDDPOSSWITCH		BIT(3)
++#define SYS_CLCD_PWR3V5SWITCH		BIT(4)
++#define SYS_CLCD_VDDNEGSWITCH		BIT(5)
++#define SYS_CLCD_TSNSS			BIT(6) /* touchscreen enable */
++#define SYS_CLCD_SSPEXP			BIT(7) /* SSP expansion enable */
++
++/* The Versatile can detect the connected panel type */
++#define SYS_CLCD_CLCDID_MASK		(BIT(8)|BIT(9)|BIT(10)|BIT(11)|BIT(12))
++#define SYS_CLCD_ID_SANYO_3_8		(0x00 << 8)
++#define SYS_CLCD_ID_SHARP_8_4		(0x01 << 8)
++#define SYS_CLCD_ID_EPSON_2_2		(0x02 << 8)
++#define SYS_CLCD_ID_SANYO_2_5		(0x07 << 8)
++#define SYS_CLCD_ID_VGA			(0x1f << 8)
++
++#define SYS_CLCD_TSNDAV			BIT(13) /* data ready from TS */
++
++/* IB2 control register for the Versatile daughterboard */
++#define IB2_CTRL			0x00
++#define IB2_CTRL_LCD_SD			BIT(1) /* 1 = shut down LCD */
++#define IB2_CTRL_LCD_BL_ON		BIT(0)
++#define IB2_CTRL_LCD_MASK		(BIT(0)|BIT(1))
++
++static void versatile_clcd_disable(struct clcd_fb *fb)
++{
++	dev_info(&fb->dev->dev, "disable Versatile CLCD connectors\n");
++	regmap_update_bits(versatile_syscon_map,
++			   SYS_CLCD,
++			   SYS_CLCD_CONNECTOR_MASK,
++			   0);
++
++	/* If we're on an IB2 daughterboard, turn off display */
++	if (versatile_ib2_map) {
++		dev_info(&fb->dev->dev, "disable IB2 display\n");
++		regmap_update_bits(versatile_ib2_map,
++				   IB2_CTRL,
++				   IB2_CTRL_LCD_MASK,
++				   IB2_CTRL_LCD_SD);
++	}
++}
++
++static void versatile_clcd_enable(struct clcd_fb *fb)
++{
++	struct fb_var_screeninfo *var = &fb->fb.var;
++	u32 val = 0;
++
++	dev_info(&fb->dev->dev, "enable Versatile CLCD connectors\n");
++	switch (var->green.length) {
++	case 5:
++		val |= SYS_CLCD_MODE_5551;
++		break;
++	case 6:
++		if (var->red.offset == 0)
++			val |= SYS_CLCD_MODE_565_R_LSB;
 +		else
-+			gpiod_set_value_cansleep(sda, 0);
-+		ndelay(150);
-+		/* Send an SCL pulse */
-+		gpiod_set_value_cansleep(scl, 1);
-+		ndelay(160);
-+		gpiod_set_value_cansleep(scl, 0);
-+		ndelay(160);
++			val |= SYS_CLCD_MODE_565_B_LSB;
++		break;
++	case 8:
++		val |= SYS_CLCD_MODE_888;
++		break;
 +	}
 +
-+	if (write) {
-+		/* WRITE */
-+		gpiod_set_value_cansleep(sda, 0);
-+	} else {
-+		/* READ */
-+		gpiod_set_value_cansleep(sda, 1);
++	/* Set up the MUX */
++	regmap_update_bits(versatile_syscon_map,
++			   SYS_CLCD,
++			   SYS_CLCD_MODE_MASK,
++			   val);
++
++	/* Then enable the display */
++	regmap_update_bits(versatile_syscon_map,
++			   SYS_CLCD,
++			   SYS_CLCD_CONNECTOR_MASK,
++			   SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH);
++
++	/* If we're on an IB2 daughterboard, turn on display */
++	if (versatile_ib2_map) {
++		dev_info(&fb->dev->dev, "enable IB2 display\n");
++		regmap_update_bits(versatile_ib2_map,
++				   IB2_CTRL,
++				   IB2_CTRL_LCD_MASK,
++				   IB2_CTRL_LCD_BL_ON);
 +	}
-+	ndelay(150);
-+	/* Send an SCL pulse */
-+	gpiod_set_value_cansleep(scl, 1);
-+	ndelay(160);
-+	gpiod_set_value_cansleep(scl, 0);
-+	ndelay(160);
++}
 +
-+	if (!write)
-+		/* HiZ turn-around cycle */
-+		gpiod_direction_input(sda);
-+	ndelay(150);
-+	/* Send an SCL pulse */
-+	gpiod_set_value_cansleep(scl, 1);
-+	ndelay(160);
-+	gpiod_set_value_cansleep(scl, 0);
-+	ndelay(160);
++static void versatile_clcd_decode(struct clcd_fb *fb, struct clcd_regs *regs)
++{
++	clcdfb_decode(fb, regs);
 +
-+	/* Hammer in/out the data */
-+	for (i = 7; i >= 0; i--) {
-+		int value;
++	/* Always clear BGR for RGB565: we do the routing externally */
++	if (fb->fb.var.green.length == 6)
++		regs->cntl &= ~CNTL_BGR;
++}
 +
-+		if (write) {
-+			value = !!(outval & BIT(i));
-+			gpiod_set_value_cansleep(sda, value);
-+		} else {
-+			value = gpiod_get_value(sda);
-+			if (value)
-+				inval |= BIT(i);
++static void realview_clcd_disable(struct clcd_fb *fb)
++{
++	dev_info(&fb->dev->dev, "disable RealView CLCD connectors\n");
++	regmap_update_bits(versatile_syscon_map,
++			   SYS_CLCD,
++			   SYS_CLCD_CONNECTOR_MASK,
++			   0);
++}
++
++static void realview_clcd_enable(struct clcd_fb *fb)
++{
++	dev_info(&fb->dev->dev, "enable RealView CLCD connectors\n");
++	regmap_update_bits(versatile_syscon_map,
++			   SYS_CLCD,
++			   SYS_CLCD_CONNECTOR_MASK,
++			   SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH);
++}
++
++struct versatile_panel {
++	u32 id;
++	char *compatible;
++	bool ib2;
++};
++
++static const struct versatile_panel versatile_panels[] = {
++	{
++		.id = SYS_CLCD_ID_VGA,
++		.compatible = "VGA",
++	},
++	{
++		.id = SYS_CLCD_ID_SANYO_3_8,
++		.compatible = "sanyo,tm38qv67a02a",
++	},
++	{
++		.id = SYS_CLCD_ID_SHARP_8_4,
++		.compatible = "sharp,lq084v1dg21",
++	},
++	{
++		.id = SYS_CLCD_ID_EPSON_2_2,
++		.compatible = "epson,l2f50113t00",
++	},
++	{
++		.id = SYS_CLCD_ID_SANYO_2_5,
++		.compatible = "sanyo,alr252rgt",
++		.ib2 = true,
++	},
++};
++
++static void versatile_panel_probe(struct device *dev,
++				  struct device_node *endpoint)
++{
++	struct versatile_panel const *vpanel = NULL;
++	struct device_node *panel = NULL;
++	u32 val;
++	int ret;
++	int i;
++
++	/*
++	 * The Versatile CLCD has a panel auto-detection mechanism.
++	 * We use this and look for the compatible panel in the
++	 * device tree.
++	 */
++	ret = regmap_read(versatile_syscon_map, SYS_CLCD, &val);
++	if (ret) {
++		dev_err(dev, "cannot read CLCD syscon register\n");
++		return;
++	}
++	val &= SYS_CLCD_CLCDID_MASK;
++
++	/* First find corresponding panel information */
++	for (i = 0; i < ARRAY_SIZE(versatile_panels); i++) {
++		vpanel = &versatile_panels[i];
++
++		if (val == vpanel->id) {
++			dev_err(dev, "autodetected panel \"%s\"\n",
++				vpanel->compatible);
++			break;
 +		}
-+		ndelay(150);
-+		/* Send an SCL pulse */
-+		gpiod_set_value_cansleep(scl, 1);
-+		ndelay(160);
-+		gpiod_set_value_cansleep(scl, 0);
-+		ndelay(160);
 +	}
-+
-+	gpiod_direction_output(sda, 0);
-+	/* Deassert SCEN */
-+	gpiod_set_value_cansleep(scen, 0);
-+	/* Satisfies SCEN pulse width */
-+	udelay(1);
-+
-+	return inval;
-+}
-+
-+static u8 tpg110_read_reg(u8 address)
-+{
-+	return tpg110_readwrite_reg(false, address, 0);
-+}
-+
-+static void tpg110_write_reg(u8 address, u8 outval)
-+{
-+	tpg110_readwrite_reg(true, address, outval);
-+}
-+
-+static void tpg110_startup(struct device *dev)
-+{
-+	u8 val;
-+
-+	dev_info(dev, "TPG110 display enable\n");
-+	/* De-assert the reset signal */
-+	gpiod_set_value_cansleep(grestb, 0);
-+	mdelay(1);
-+	dev_info(dev, "de-asserted GRESTB\n");
-+
-+	/* Test display communication */
-+	tpg110_write_reg(0x00, 0x55);
-+	val = tpg110_read_reg(0x00);
-+	if (val == 0x55)
-+		dev_info(dev, "passed communication test\n");
-+	val = tpg110_read_reg(0x01);
-+	dev_info(dev, "TPG110 chip ID: %d version: %d\n",
-+		val>>4, val&0x0f);
-+
-+	/* Show display resolution */
-+	val = tpg110_read_reg(0x02);
-+	val &= 7;
-+	switch (val) {
-+	case 0x0:
-+		dev_info(dev, "IN 400x240 RGB -> OUT 800x480 RGB (dual scan)");
-+		break;
-+	case 0x1:
-+		dev_info(dev, "IN 480x272 RGB -> OUT 800x480 RGB (dual scan)");
-+		break;
-+	case 0x4:
-+		dev_info(dev, "480x640 RGB");
-+		break;
-+	case 0x5:
-+		dev_info(dev, "480x272 RGB");
-+		break;
-+	case 0x6:
-+		dev_info(dev, "640x480 RGB");
-+		break;
-+	case 0x7:
-+		dev_info(dev, "800x480 RGB");
-+		break;
-+	default:
-+		dev_info(dev, "ILLEGAL RESOLUTION");
-+		break;
-+	}
-+
-+	val = tpg110_read_reg(0x03);
-+	dev_info(dev, "resolution is controlled by %s\n",
-+		(val & BIT(7)) ? "software" : "hardware");
-+}
-+
-+static void tpg110_enable(struct clcd_fb *fb)
-+{
-+	struct device *dev = &fb->dev->dev;
-+	static bool startup;
-+	u8 val;
-+
-+	if (!startup) {
-+		tpg110_startup(dev);
-+		startup = true;
-+	}
-+
-+	/* Take chip out of standby */
-+	val = tpg110_read_reg(0x03);
-+	val |= BIT(0);
-+	tpg110_write_reg(0x03, val);
-+}
-+
-+static void tpg110_disable(struct clcd_fb *fb)
-+{
-+	u8 val;
-+
-+	dev_info(&fb->dev->dev, "TPG110 display disable\n");
-+	val = tpg110_read_reg(0x03);
-+	/* Put into standby */
-+	val &= ~BIT(0);
-+	tpg110_write_reg(0x03, val);
-+}
-+
-+static void tpg110_init(struct device *dev, struct device_node *np,
-+			struct clcd_board *board)
-+{
-+	dev_info(dev, "TPG110 display init\n");
-+
-+	grestb = devm_get_gpiod_from_child(dev, "grestb", &np->fwnode);
-+	if (IS_ERR(grestb)) {
-+		dev_err(dev, "no GRESTB GPIO\n");
++	if (i == ARRAY_SIZE(versatile_panels)) {
++		dev_err(dev, "could not auto-detect panel\n");
 +		return;
 +	}
-+	/* This asserts the GRESTB signal, putting the display into reset */
-+	gpiod_direction_output(grestb, 1);
-+
-+	scen = devm_get_gpiod_from_child(dev, "scen", &np->fwnode);
-+	if (IS_ERR(scen)) {
-+		dev_err(dev, "no SCEN GPIO\n");
-+		return;
-+	}
-+	gpiod_direction_output(scen, 0);
-+	scl = devm_get_gpiod_from_child(dev, "scl", &np->fwnode);
-+	if (IS_ERR(scl)) {
-+		dev_err(dev, "no SCL GPIO\n");
-+		return;
-+	}
-+	gpiod_direction_output(scl, 0);
-+	sda = devm_get_gpiod_from_child(dev, "sda", &np->fwnode);
-+	if (IS_ERR(sda)) {
-+		dev_err(dev, "no SDA GPIO\n");
-+		return;
-+	}
-+	gpiod_direction_output(sda, 0);
-+	board->enable = tpg110_enable;
-+	board->disable = tpg110_disable;
-+}
-+
-+int nomadik_clcd_init_panel(struct clcd_fb *fb,
-+			    struct device_node *endpoint)
-+{
-+	struct device_node *panel;
 +
 +	panel = of_graph_get_remote_port_parent(endpoint);
-+	if (!panel)
-+		return -ENODEV;
-+
-+	if (of_device_is_compatible(panel, "tpo,tpg110"))
-+		tpg110_init(&fb->dev->dev, panel, fb->board);
-+	else
-+		dev_info(&fb->dev->dev, "unknown panel\n");
-+
-+	/* Unknown panel, fall through */
-+	return 0;
-+}
-+
-+#define PMU_CTRL_OFFSET 0x0000
-+#define PMU_CTRL_LCDNDIF BIT(26)
-+
-+int nomadik_clcd_init_board(struct amba_device *adev,
-+			    struct clcd_board *board)
-+{
-+	struct regmap *pmu_regmap;
-+
-+	dev_info(&adev->dev, "Nomadik CLCD board init\n");
-+	pmu_regmap =
-+		syscon_regmap_lookup_by_compatible("stericsson,nomadik-pmu");
-+	if (IS_ERR(pmu_regmap)) {
-+		dev_err(&adev->dev, "could not find PMU syscon regmap\n");
-+		return PTR_ERR(pmu_regmap);
++	if (!panel) {
++		dev_err(dev, "could not locate panel in DT\n");
++		return;
 +	}
-+	regmap_update_bits(pmu_regmap,
-+			   PMU_CTRL_OFFSET,
-+			   PMU_CTRL_LCDNDIF,
-+			   0);
-+	dev_info(&adev->dev, "set PMU mux to CLCD mode\n");
++	if (!of_device_is_compatible(panel, vpanel->compatible))
++		dev_err(dev, "panel in DT is not compatible with the "
++			"auto-detected panel, continuing anyway\n");
 +
-+	return 0;
++	/*
++	 * If we have a Sanyo 2.5" port
++	 * that we're running on an IB2 and proceed to look for the
++	 * IB2 syscon regmap.
++	 */
++	if (!vpanel->ib2)
++		return;
++
++	versatile_ib2_map = syscon_regmap_lookup_by_compatible(
++		"arm,versatile-ib2-syscon");
++	if (IS_ERR(versatile_ib2_map)) {
++		dev_err(dev, "could not locate IB2 control register\n");
++		versatile_ib2_map = NULL;
++		return;
++	}
 +}
-diff --git a/drivers/video/fbdev/amba-clcd-nomadik.h b/drivers/video/fbdev/amba-clcd-nomadik.h
-new file mode 100644
-index 000000000000..50aa9bda69fd
---- /dev/null
-+++ b/drivers/video/fbdev/amba-clcd-nomadik.h
-@@ -0,0 +1,24 @@
-+#ifndef _AMBA_CLCD_NOMADIK_H
-+#define _AMBA_CLCD_NOMADIK_H
 +
-+#include <linux/amba/bus.h>
-+
-+#ifdef CONFIG_ARCH_NOMADIK
-+int nomadik_clcd_init_board(struct amba_device *adev,
-+			     struct clcd_board *board);
-+int nomadik_clcd_init_panel(struct clcd_fb *fb,
-+			    struct device_node *endpoint);
-+#else
-+static inline int nomadik_clcd_init_board(struct amba_device *adev,
-+					  struct clcd_board *board)
++int versatile_clcd_init_panel(struct clcd_fb *fb,
++			      struct device_node *endpoint)
 +{
++	const struct of_device_id *clcd_id;
++	enum versatile_clcd versatile_clcd_type;
++	struct device_node *np;
++	struct regmap *map;
++	struct device *dev = &fb->dev->dev;
++
++	np = of_find_matching_node_and_match(NULL, versatile_clcd_of_match,
++					     &clcd_id);
++	if (!np) {
++		dev_err(dev, "no Versatile syscon node\n");
++		return -ENODEV;
++	}
++	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
++
++	map = syscon_node_to_regmap(np);
++	if (!map) {
++		dev_err(dev, "no Versatile syscon regmap\n");
++		return -ENODEV;
++	}
++
++	switch (versatile_clcd_type) {
++	case INTEGRATOR_CLCD_CM:
++		versatile_syscon_map = map;
++		fb->board->enable = integrator_clcd_enable;
++		/* Override the caps, we have only these */
++		fb->board->caps = CLCD_CAP_5551 | CLCD_CAP_RGB565 |
++			CLCD_CAP_888;
++		dev_info(dev, "set up callbacks for Integrator PL110\n");
++		break;
++	case VERSATILE_CLCD:
++		versatile_syscon_map = map;
++		fb->board->enable = versatile_clcd_enable;
++		fb->board->disable = versatile_clcd_disable;
++		fb->board->decode = versatile_clcd_decode;
++		versatile_panel_probe(dev, endpoint);
++		dev_info(dev, "set up callbacks for Versatile\n");
++		break;
++	case REALVIEW_CLCD_EB:
++	case REALVIEW_CLCD_PB1176:
++	case REALVIEW_CLCD_PB11MP:
++	case REALVIEW_CLCD_PBA8:
++	case REALVIEW_CLCD_PBX:
++		versatile_syscon_map = map;
++		fb->board->enable = realview_clcd_enable;
++		fb->board->disable = realview_clcd_disable;
++		dev_info(dev, "set up callbacks for RealView PL111\n");
++		break;
++	default:
++		dev_info(dev, "unknown Versatile system controller\n");
++		break;
++	}
++
 +	return 0;
 +}
-+static inline int nomadik_clcd_init_panel(struct clcd_fb *fb,
-+					  struct device_node *endpoint)
++
++#endif
+diff --git a/drivers/video/fbdev/amba-clcd-versatile.h b/drivers/video/fbdev/amba-clcd-versatile.h
+new file mode 100644
+index 000000000000..1b14359c2cf6
+--- /dev/null
++++ b/drivers/video/fbdev/amba-clcd-versatile.h
+@@ -0,0 +1,17 @@
++/*
++ * Special local versatile callbacks
++ */
++#include <linux/of.h>
++#include <linux/amba/bus.h>
++#include <linux/platform_data/video-clcd-versatile.h>
++
++#if defined(CONFIG_PLAT_VERSATILE_CLCD) && defined(CONFIG_OF)
++int versatile_clcd_init_panel(struct clcd_fb *fb,
++			      struct device_node *endpoint);
++#else
++static inline int versatile_clcd_init_panel(struct clcd_fb *fb,
++				struct device_node *endpoint)
 +{
 +	return 0;
 +}
 +#endif
-+
-+#endif /* inclusion guard */
 diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-index 371f4e2aea6c..2b45c7be4815 100644
+index 2b45c7be4815..c342ff370108 100644
 --- a/drivers/video/fbdev/amba-clcd.c
 +++ b/drivers/video/fbdev/amba-clcd.c
-@@ -35,6 +35,8 @@
- #include <video/of_display_timing.h>
+@@ -36,6 +36,7 @@
  #include <video/videomode.h>
  
-+#include "amba-clcd-nomadik.h"
-+
+ #include "amba-clcd-nomadik.h"
++#include "amba-clcd-versatile.h"
+ 
  #define to_clcd(info)	container_of(info, struct clcd_fb, fb)
  
- /* This is limited to 16 characters when displayed by X startup */
-@@ -997,7 +999,7 @@ static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (ret)
- 		goto free_fb;
+@@ -1036,7 +1037,8 @@ static int clcdfb_remove(struct amba_device *dev)
+ }
  
--	ret = clcdfb_register(fb); 
-+	ret = clcdfb_register(fb);
- 	if (ret == 0) {
- 		amba_set_drvdata(dev, fb);
- 		goto out;
-@@ -1041,6 +1043,8 @@ static struct clcd_vendor_data vendor_nomadik = {
- 	.clock_timregs = true,
- 	.packed_24_bit_pixels = true,
- 	.st_bitmux_control = true,
-+	.init_board = nomadik_clcd_init_board,
-+	.init_panel = nomadik_clcd_init_panel,
+ static struct clcd_vendor_data vendor_arm = {
+-	/* No special business */
++	/* Sets up the versatile board displays */
++	.init_panel = versatile_clcd_init_panel,
  };
  
- static struct amba_id clcdfb_id_table[] = {
+ static struct clcd_vendor_data vendor_nomadik = {
 -- 
 2.4.11
