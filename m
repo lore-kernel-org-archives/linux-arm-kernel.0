@@ -1,31 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 16 Jun 2016 11:34:50 +0200
-Subject: [PATCH 2/5] clk: Combine DT binding doc for max77686 and max77802
-In-Reply-To: <a9a4bf3b-7ece-f92f-9d49-d4745f512e3c@osg.samsung.com>
-References: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
- <1466000018-16784-3-git-send-email-ldewangan@nvidia.com>
- <a9a4bf3b-7ece-f92f-9d49-d4745f512e3c@osg.samsung.com>
-Message-ID: <576272BA.50800@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Jun 2016 11:36:12 +0200
+Subject: [PATCH 0/6] CLCD support for Nomadik and Versatile series
+Message-ID: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2016 05:19 PM, Javier Martinez Canillas wrote:
->> Remove the separate DT binding document file for maxim,max77802 and
->> move all information to maxim,max77686 DT binding document.
->>
-> 
-> Now, I wonder if this is the correct approach. A system integrator is
-> probably going to search for the bindings of the chip that is present
-> in their system. For example there are different DT bindings docs for
-> both the max77686 and max77802 PMIC even when support is implemented
-> by the same driver (drivers/mfd/max77686.c).
-> 
-> But maybe I'm wrong so I'll let people with more DT experience to say
-> if merging the bindings docs in a single one is the correct approach.
+This is a rebase and repost of my earlier "uncontroversial"
+series of patches to CLCD, which excludes the part where
+we deal with the Versatile autodetected displays. This makes
+it possible to handle Nomadik graphics and RealView with just
+device tree while keeping the Versatile specialties on hold.
 
-I personally prefer having one binding document for all devices because
-essentially it is almost the same device. For looking up I use git grep
-with compatible string (or device name) so it does not matter, IMHO.
+We got an earlier nod from Tomi on this series:
+http://marc.info/?l=linux-fbdev&m=145733624305361&w=2
 
-Best regards,
-Krzysztof
+Sorry for not getting around to revising and reposting sooner :(
+
+Linus Walleij (6):
+  video: ARM CLCD: backlight support for OF
+  video: ARM CLCD: support DT signal inversion flags
+  video: ARM CLCD: support pads connected in reverse order
+  video: ARM CLCD: support Nomadik variant
+  video: ARM CLCD: add special board and panel hooks for Nomadik
+  video: ARM CLCD: add special panel hook for Versatiles
+
+ drivers/video/fbdev/Kconfig               |   6 +-
+ drivers/video/fbdev/Makefile              |   1 +
+ drivers/video/fbdev/amba-clcd-nomadik.c   | 257 ++++++++++++++++++++
+ drivers/video/fbdev/amba-clcd-nomadik.h   |  24 ++
+ drivers/video/fbdev/amba-clcd-versatile.c | 391 ++++++++++++++++++++++++++++++
+ drivers/video/fbdev/amba-clcd-versatile.h |  17 ++
+ drivers/video/fbdev/amba-clcd.c           | 199 +++++++++++++--
+ include/linux/amba/clcd.h                 |  63 ++++-
+ 8 files changed, 937 insertions(+), 21 deletions(-)
+ create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.c
+ create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.h
+ create mode 100644 drivers/video/fbdev/amba-clcd-versatile.h
+
+-- 
+2.4.11
