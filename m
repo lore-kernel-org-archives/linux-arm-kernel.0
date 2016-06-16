@@ -1,55 +1,37 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 16 Jun 2016 15:25:18 +0300
-Subject: [PATCH] ARM: OMAP2+: timer: add probe for clocksources
-Message-ID: <1466079918-6810-1-git-send-email-t-kristo@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 16 Jun 2016 14:25:29 +0200
+Subject: [PATCH 5/5] ARM: config: Get rid of config COMMON_CLK_MAX77802
+In-Reply-To: <3fa0a098-3b28-9baa-8950-a944cce86b65@osg.samsung.com>
+References: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
+ <1466000018-16784-6-git-send-email-ldewangan@nvidia.com>
+ <3fa0a098-3b28-9baa-8950-a944cce86b65@osg.samsung.com>
+Message-ID: <57629AB9.2090506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few platforms are currently missing clocksource_probe() completely
-in their time_init functionality. On OMAP3430 for example, this is
-causing cpuidle to be pretty much dead, as the counter32k is not
-going to be registered and instead a gptimer is used as a clocksource.
-This will tick in periodic mode, preventing any deeper idle states.
+On 06/15/2016 05:39 PM, Javier Martinez Canillas wrote:
+> Hello Laxman,
+> 
+> On 06/15/2016 10:13 AM, Laxman Dewangan wrote:
+>> The clock driver used by Maxim PMIC MAX77802 is clk-max77686
+>> which can be enabled with config CONFIG_COMMON_CLK_MAX77686.
+>>
+>> Hence the config CONFIG_COMMON_CLK_MAX77802 is not required.
+>>
+>> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+>> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> CC: Javier Martinez Canillas <javier@dowhile0.org>
+>> ---
+>>  arch/arm/configs/exynos_defconfig   | 1 -
+>>  arch/arm/configs/multi_v7_defconfig | 1 -
+> 
+> Please split these two changes in separate patches, there are just
+> cleanups needed after 1/5 and they can be picked separately.
 
-While here, also drop one unnecessary check for populated DT before
-existing clocksource_probe() call.
+Not entirely separately. If we do not want to loose max77802 clocks on
+defconfigs, then it should go with the same tree or after driver get
+merged. I prefer the latter, similar case to 1898994229f8 ("ARM:
+multi_v7_defconfig: Switch max77693 to module").
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/timer.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 5b385bb..cb9497a 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -496,8 +496,7 @@ void __init omap_init_time(void)
- 	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
- 			2, "timer_sys_ck", NULL, false);
- 
--	if (of_have_populated_dt())
--		clocksource_probe();
-+	clocksource_probe();
- }
- 
- #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
-@@ -505,6 +504,8 @@ void __init omap3_secure_sync32k_timer_init(void)
- {
- 	__omap_sync32k_timer_init(12, "secure_32k_fck", "ti,timer-secure",
- 			2, "timer_sys_ck", NULL, false);
-+
-+	clocksource_probe();
- }
- #endif /* CONFIG_ARCH_OMAP3 */
- 
-@@ -513,6 +514,8 @@ void __init omap3_gptimer_timer_init(void)
- {
- 	__omap_sync32k_timer_init(2, "timer_sys_ck", NULL,
- 			1, "timer_sys_ck", "ti,timer-alwon", true);
-+
-+	clocksource_probe();
- }
- #endif
- 
--- 
-1.9.1
+Best regards,
+Krzysztof
