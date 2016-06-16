@@ -1,53 +1,47 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 16 Jun 2016 09:06:29 -0400
-Subject: [PATCH 5/5] ARM: config: Get rid of config COMMON_CLK_MAX77802
-In-Reply-To: <57629AB9.2090506@samsung.com>
-References: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
- <1466000018-16784-6-git-send-email-ldewangan@nvidia.com>
- <3fa0a098-3b28-9baa-8950-a944cce86b65@osg.samsung.com>
- <57629AB9.2090506@samsung.com>
-Message-ID: <ef0359c5-ecf2-cd31-4dd8-ed4f169c22be@osg.samsung.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 16 Jun 2016 14:11:40 +0100
+Subject: [PATCH] irqchip/bcm2836: make bcm2836_smp_boot_secondary static
+In-Reply-To: <20160616130549.GE6216@io.lakedaemon.net>
+References: <1465407697-8116-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20160613011852.GI24391@io.lakedaemon.net>
+ <0c23b47a-f718-1024-c93a-be8b15e2cd48@codethink.co.uk>
+ <20160616130549.GE6216@io.lakedaemon.net>
+Message-ID: <f6e74ffd-bc21-1057-e63f-b79ffea1ba07@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 06/16/2016 08:25 AM, Krzysztof Kozlowski wrote:
-> On 06/15/2016 05:39 PM, Javier Martinez Canillas wrote:
->> Hello Laxman,
->>
->> On 06/15/2016 10:13 AM, Laxman Dewangan wrote:
->>> The clock driver used by Maxim PMIC MAX77802 is clk-max77686
->>> which can be enabled with config CONFIG_COMMON_CLK_MAX77686.
+On 16/06/16 14:05, Jason Cooper wrote:
+> On Thu, Jun 16, 2016 at 01:48:45PM +0100, Ben Dooks wrote:
+>> On 13/06/16 02:18, Jason Cooper wrote:
+>>> Hey Ben,
 >>>
->>> Hence the config CONFIG_COMMON_CLK_MAX77802 is not required.
+>>> On Wed, Jun 08, 2016 at 06:41:37PM +0100, Ben Dooks wrote:
+>>>> The bcm2836_smp_boot_secondary() is not declared or used elsewhere
+>>>> so make it static to fix the following warning:
+>>>>
+>>>> drivers/irqchip/irq-bcm2836.c:227:12: warning: symbol 'bcm2836_smp_boot_secondary' was not declared. Should it be static?
+>>>>
+>>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>>>> ---
+>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> ---
+>>>>  drivers/irqchip/irq-bcm2836.c | 4 ++--
+>>>>  1 file changed, 2 insertions(+), 2 deletions(-)
 >>>
->>> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
->>> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> CC: Javier Martinez Canillas <javier@dowhile0.org>
->>> ---
->>>  arch/arm/configs/exynos_defconfig   | 1 -
->>>  arch/arm/configs/multi_v7_defconfig | 1 -
+>>> This, and the rest of the irqchip/ ones, applied to irqchip/misc.
 >>
->> Please split these two changes in separate patches, there are just
->> cleanups needed after 1/5 and they can be picked separately.
+>> Thank you, so hopefully it'll be included in -next soon?
 > 
-> Not entirely separately. If we do not want to loose max77802 clocks on
-> defconfigs, then it should go with the same tree or after driver get
-> merged. I prefer the latter, similar case to 1898994229f8 ("ARM:
-> multi_v7_defconfig: Switch max77693 to module").
->
+> hmmm, I just checked myself.  It appears that the series in irqchip/misc
+> has been in at least two runs of linux-next.  Do you see something
+> different?
 
-Agreed. Your latter example is what I tried to say (that can be picked
-as cleanups separately once 1/5 hits mainline). I just didn't express
-clearly.
- 
-> Best regards,
-> Krzysztof
-> 
+yes, I did git remote-update in a different git repo tree and then
+looked in a gitg on an different repo :(
 
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
