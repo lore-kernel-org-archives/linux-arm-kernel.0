@@ -1,66 +1,53 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 16 Jun 2016 11:47:21 +0100
-Subject: [PATCH v2] arm64: allow building with kcov coverage on ARM64
-In-Reply-To: <20160615142550.GA7971@leverpostej>
-References: <1465923441-107596-1-git-send-email-glider@google.com>
- <20160614175543.GA2468@leverpostej>
- <CAG_fn=X521a9uD1bthDZ-swO9hrfq=jE2C_LUvzkn6C_q5dBvA@mail.gmail.com>
- <20160615092509.GA3984@leverpostej> <20160615114438.GC3984@leverpostej>
- <CAG_fn=U7-fUnw1GLwBbmqGTxnOWf4QcTjTyP4mGAORfEuWt3Eg@mail.gmail.com>
- <20160615142550.GA7971@leverpostej>
-Message-ID: <576283B9.9050900@arm.com>
+From: po.liu@nxp.com (Po Liu)
+Date: Thu, 16 Jun 2016 10:50:23 +0000
+Subject: [PATCH v3 1/2] nxp/dts: add pcie aer interrupt-name property in
+ the dts
+In-Reply-To: <20160616003627.GJ20243@tiger>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-1-git-send-email-po.liu@nxp.com>
+ <20160616003627.GJ20243@tiger>
+Message-ID: <VI1PR0401MB1709B98EC43F035158CF022E92560@VI1PR0401MB1709.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/16 15:25, Mark Rutland wrote:
-> On Wed, Jun 15, 2016 at 01:53:03PM +0200, Alexander Potapenko wrote:
->> On Wed, Jun 15, 2016 at 1:44 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Wed, Jun 15, 2016 at 10:25:10AM +0100, Mark Rutland wrote:
->>>> On Tue, Jun 14, 2016 at 08:16:08PM +0200, Alexander Potapenko wrote:
->>>>> On Tue, Jun 14, 2016 at 7:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>>> I built and booted (via EFI) a kernel with this feature enabled (also
->>>>>> with the boot/Makefile change removed). I haven't tested the feature
->>>>>> itself as such, as I'm not sure how to do that.
->>>>> You can test it by running the test program from Documentation/kcov.txt.
->>>>
->>>> Ah, I hadn't spotted that. If I get the chance I'll try to give that a
->>>> go.
->>>
->>> I just had a go (with this applied atop of v4.7-rc3), and I get:
->>>
->>> root at ribbensteg:/home/nanook# ./kcov
->>> mmap: No such device
->>>
->>> The device exists (it was able to open the fd, evidently):
->>>
->>> root at ribbensteg:/home/nanook# ls -al /sys/kernel/debug/kcov
->>> -rw------- 1 root root 0 Jan  1  1970 /sys/kernel/debug/kcov
->>>
->>> Strace show me:
->>>
->>> openat(AT_FDCWD, "/sys/kernel/debug/kcov", O_RDWR) = 3
->>> ioctl(3, CHIOMOVE or CM_IOCGATR, 0x10000) = 0
->>> mmap(NULL, 524288, PROT_READ|PROT_WRITE, MAP_SHARED, 3, 0) = -1 ENODEV (No such device)
->>>
->>> It doesn't look like the error paths in kcov_mmap are hitting.
->>>
->>> Any ideas?
->> According to Dmitry (thanks, Dmitry!) this has regressed recently, but
->> there's a pending patch that should probably fix the problem:
->> http://lkml.iu.edu/hypermail/linux/kernel/1605.2/04379.html
-> 
-> Thanks for the pointer! With that applied, the program runs.
-> 
-> However, it looks like I missed a warning from the kernel build system, 
-> and my toolchain doesn't actually support -fsanitize-coverage=trace-pc,
-> so I'm not going to be able to test that further.
+Hi Shawn,
 
-I dusted off a compiler that supports this, and ran the sample program under
-Documentation with the above unproxify patch.
+>  -----Original Message-----
+>  From: Shawn Guo [mailto:shawnguo at kernel.org]
+>  Sent: Thursday, June 16, 2016 8:36 AM
+>  To: Po Liu
+>  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang; Arnd
+>  Bergmann; Marc Zyngier; Stuart Yoder; Yang-Leo Li; Minghuan Lian; Murali
+>  Karicheri; Bjorn Helgaas; Mingkai Hu
+>  Subject: Re: [PATCH v3 1/2] nxp/dts: add pcie aer interrupt-name
+>  property in the dts
+>  
+>  On Tue, Jun 14, 2016 at 04:24:04PM +0800, Po Liu wrote:
+>  > NXP some platforms aer interrupt was not MSI/MSI-X/INTx but using
+>  > interrupt line independently. This patch add a "aer"
+>  > interrupt-names for aer interrupt.
+>  >
+>  > Signed-off-by: Po Liu <po.liu@nxp.com>
+>  > ---
+>  > changes for v3:
+>  > 	- None;
+>  >
+>  >  .../devicetree/bindings/pci/layerscape-pci.txt         |  4 ++--
+>  
+>  The bindings shouldn't be part of dts patch but the driver patch who is
+>  actually using it.
+>  
+>  Shawn
 
-Tested-by: James Morse <james.morse@arm.com>
+Ok, I'll move the doc part to the driver patch.
 
-
-Thanks,
-
-James
+Po Liu
+>From NXP
+>  
+>  >  arch/arm/boot/dts/ls1021a.dtsi                         |  6 ++++--
+>  >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi         | 18
+>  +++++++++---------
+>  >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi         | 16 ++++++++-
+>  -------
+>  >  4 files changed, 23 insertions(+), 21 deletions(-)
