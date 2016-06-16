@@ -1,311 +1,171 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 16 Jun 2016 23:48:28 +0000
-Subject: [PATCH v19 08/13] arm64: kdump: implement machine_crash_shutdown()
+Date: Thu, 16 Jun 2016 23:48:27 +0000
+Subject: [PATCH v19 02/13] arm64: Add back cpu reset routines
 In-Reply-To: <cover.1466120418.git.geoff@infradead.org>
 References: <cover.1466120418.git.geoff@infradead.org>
-Message-ID: <b4710dfa43f174c99f48af671cbde98c711ec51e.1466120418.git.geoff@infradead.org>
+Message-ID: <8a085a77ee25789da3ea9ae389a5236016235f63.1466120418.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Commit 68234df4ea79 ("arm64: kill flush_cache_all()") removed the global
+arm64 routines cpu_reset() and cpu_soft_restart() needed by the arm64
+kexec and kdump support.  Add simplified versions of those two routines
+back with some changes needed for kexec in the new files cpu_reset.S,
+and cpu_reset.h.
 
-Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
-and save registers' status in per-cpu ELF notes before starting crash
-dump kernel. See kernel_kexec().
-Even if not all secondary cpus have shut down, we do kdump anyway.
+When a CPU is reset it needs to be put into the exception level it had when
+it entered the kernel. Update cpu_soft_restart() to accept an argument
+which signals if the reset address needs to be entered at EL1 or EL2, and
+add a new hypercall HVC_SOFT_RESTART which is used for the EL2 switch.
 
-As we don't have to make non-boot(crashed) cpus offline (to preserve
-correct status of cpus at crash dump) before shutting down, this patch
-also adds a variant of smp_send_stop().
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+Reviewed-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/hardirq.h  |  2 +-
- arch/arm64/include/asm/kexec.h    | 41 +++++++++++++++++++++++++-
- arch/arm64/include/asm/smp.h      |  4 +++
- arch/arm64/kernel/machine_kexec.c | 56 +++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/smp.c           | 61 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 159 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/virt.h |  5 ++++
+ arch/arm64/kernel/cpu-reset.S | 54 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpu-reset.h | 34 +++++++++++++++++++++++++++
+ arch/arm64/kernel/hyp-stub.S  | 10 +++++++-
+ 4 files changed, 102 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/cpu-reset.S
+ create mode 100644 arch/arm64/kernel/cpu-reset.h
 
-diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
-index 8740297..1473fc2 100644
---- a/arch/arm64/include/asm/hardirq.h
-+++ b/arch/arm64/include/asm/hardirq.h
-@@ -20,7 +20,7 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
- 
--#define NR_IPI	6
-+#define NR_IPI	7
- 
- typedef struct {
- 	unsigned int __softirq_pending;
-diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-index 04744dc..a908958 100644
---- a/arch/arm64/include/asm/kexec.h
-+++ b/arch/arm64/include/asm/kexec.h
-@@ -40,7 +40,46 @@
- static inline void crash_setup_regs(struct pt_regs *newregs,
- 				    struct pt_regs *oldregs)
- {
--	/* Empty routine needed to avoid build errors. */
-+	if (oldregs) {
-+		memcpy(newregs, oldregs, sizeof(*newregs));
-+	} else {
-+		u64 tmp1, tmp2;
-+
-+		__asm__ __volatile__ (
-+			"stp	 x0,   x1, [%2, #16 *  0]\n"
-+			"stp	 x2,   x3, [%2, #16 *  1]\n"
-+			"stp	 x4,   x5, [%2, #16 *  2]\n"
-+			"stp	 x6,   x7, [%2, #16 *  3]\n"
-+			"stp	 x8,   x9, [%2, #16 *  4]\n"
-+			"stp	x10,  x11, [%2, #16 *  5]\n"
-+			"stp	x12,  x13, [%2, #16 *  6]\n"
-+			"stp	x14,  x15, [%2, #16 *  7]\n"
-+			"stp	x16,  x17, [%2, #16 *  8]\n"
-+			"stp	x18,  x19, [%2, #16 *  9]\n"
-+			"stp	x20,  x21, [%2, #16 * 10]\n"
-+			"stp	x22,  x23, [%2, #16 * 11]\n"
-+			"stp	x24,  x25, [%2, #16 * 12]\n"
-+			"stp	x26,  x27, [%2, #16 * 13]\n"
-+			"stp	x28,  x29, [%2, #16 * 14]\n"
-+			"mov	 %0,  sp\n"
-+			"stp	x30,  %0,  [%2, #16 * 15]\n"
-+
-+			"/* faked current PSTATE */\n"
-+			"mrs	 %0, CurrentEL\n"
-+			"mrs	 %1, DAIF\n"
-+			"orr	 %0, %0, %1\n"
-+			"mrs	 %1, NZCV\n"
-+			"orr	 %0, %0, %1\n"
-+
-+			/* pc */
-+			"adr	 %1, 1f\n"
-+		"1:\n"
-+			"stp	 %1, %0,   [%2, #16 * 16]\n"
-+			: "=r" (tmp1), "=r" (tmp2), "+r" (newregs)
-+			:
-+			: "memory"
-+		);
-+	}
- }
- 
- #endif /* __ASSEMBLY__ */
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index 38712f4..979154a 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -134,6 +134,10 @@ static inline void cpu_panic_kernel(void)
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index dcbcf8d..bbc6a8c 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -34,6 +34,11 @@
   */
- bool cpus_are_stuck_in_kernel(void);
+ #define HVC_SET_VECTORS 1
  
-+#ifdef CONFIG_KEXEC_CORE
-+extern void smp_send_crash_stop(void);
-+#endif
-+
- #endif /* ifndef __ASSEMBLY__ */
- 
- #endif /* ifndef __ASM_SMP_H */
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 7372e58..f270967 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -9,6 +9,9 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
- #include <linux/kexec.h>
- #include <linux/smp.h>
- #include <linux/uaccess.h>
-@@ -23,6 +26,7 @@
- extern const unsigned char arm64_relocate_new_kernel[];
- extern const unsigned long arm64_relocate_new_kernel_size;
- 
-+bool in_crash_kexec;
- static unsigned long kimage_start;
- 
- /**
-@@ -161,7 +165,8 @@ void machine_kexec(struct kimage *kimage)
- 	/*
- 	 * New cpus may have become stuck_in_kernel after we loaded the image.
- 	 */
--	BUG_ON(cpus_are_stuck_in_kernel() && (num_online_cpus() > 1));
-+	BUG_ON(cpus_are_stuck_in_kernel() && (num_online_cpus() > 1) &&
-+			!WARN_ON(in_crash_kexec));
- 
- 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
- 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
-@@ -218,13 +223,58 @@ void machine_kexec(struct kimage *kimage)
- 	 * relocation is complete.
- 	 */
- 
--	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
-+	cpu_soft_restart(!in_crash_kexec, reboot_code_buffer_phys, kimage->head,
- 		kimage_start, 0);
- 
- 	BUG(); /* Should never get here. */
- }
- 
-+static void machine_kexec_mask_interrupts(void)
-+{
-+	unsigned int i;
-+	struct irq_desc *desc;
-+
-+	for_each_irq_desc(i, desc) {
-+		struct irq_chip *chip;
-+		int ret;
-+
-+		chip = irq_desc_get_chip(desc);
-+		if (!chip)
-+			continue;
-+
-+		/*
-+		 * First try to remove the active state. If this
-+		 * fails, try to EOI the interrupt.
-+		 */
-+		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
-+
-+		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
-+		    chip->irq_eoi)
-+			chip->irq_eoi(&desc->irq_data);
-+
-+		if (chip->irq_mask)
-+			chip->irq_mask(&desc->irq_data);
-+
-+		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
-+			chip->irq_disable(&desc->irq_data);
-+	}
-+}
-+
-+/**
-+ * machine_crash_shutdown - shutdown non-crashing cpus and save registers
++/*
++ * HVC_SOFT_RESTART - CPU soft reset, used by the cpu_soft_restart routine.
 + */
- void machine_crash_shutdown(struct pt_regs *regs)
- {
--	/* Empty routine needed to avoid build errors. */
-+	local_irq_disable();
++#define HVC_SOFT_RESTART 2
 +
-+	in_crash_kexec = true;
-+
-+	/* shutdown non-crashing cpus */
-+	smp_send_crash_stop();
-+
-+	/* for crashing cpu */
-+	crash_save_cpu(regs, smp_processor_id());
-+	machine_kexec_mask_interrupts();
-+
-+	pr_info("Starting crashdump kernel...\n");
- }
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index d0bcd55..f6461ef 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -37,6 +37,7 @@
- #include <linux/completion.h>
- #include <linux/of.h>
- #include <linux/irq_work.h>
-+#include <linux/kexec.h>
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
  
- #include <asm/alternative.h>
- #include <asm/atomic.h>
-@@ -71,6 +72,7 @@ enum ipi_msg_type {
- 	IPI_RESCHEDULE,
- 	IPI_CALL_FUNC,
- 	IPI_CPU_STOP,
-+	IPI_CPU_CRASH_STOP,
- 	IPI_TIMER,
- 	IPI_IRQ_WORK,
- 	IPI_WAKEUP
-@@ -726,6 +728,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
- 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
- 	S(IPI_CALL_FUNC, "Function call interrupts"),
- 	S(IPI_CPU_STOP, "CPU stop interrupts"),
-+	S(IPI_CPU_CRASH_STOP, "CPU stop (for crash dump) interrupts"),
- 	S(IPI_TIMER, "Timer broadcast interrupts"),
- 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
- 	S(IPI_WAKEUP, "CPU wake-up interrupts"),
-@@ -800,6 +803,28 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
- }
- 
-+#ifdef CONFIG_KEXEC_CORE
-+static atomic_t waiting_for_crash_ipi;
+diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
+new file mode 100644
+index 0000000..65f42d2
+--- /dev/null
++++ b/arch/arm64/kernel/cpu-reset.S
+@@ -0,0 +1,54 @@
++/*
++ * CPU reset routines
++ *
++ * Copyright (C) 2001 Deep Blue Solutions Ltd.
++ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2015 Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <asm/sysreg.h>
++#include <asm/virt.h>
++
++.text
++.pushsection    .idmap.text, "ax"
++
++/*
++ * __cpu_soft_restart(el2_switch, entry, arg0, arg1, arg2) - Helper for
++ * cpu_soft_restart.
++ *
++ * @el2_switch: Flag to indicate a swich to EL2 is needed.
++ * @entry: Location to jump to for soft reset.
++ * arg0: First argument passed to @entry.
++ * arg1: Second argument passed to @entry.
++ * arg2: Third argument passed to @entry.
++ *
++ * Put the CPU into the same state as it would be if it had been reset, and
++ * branch to what would be the reset vector. It must be executed with the
++ * flat identity mapping.
++ */
++ENTRY(__cpu_soft_restart)
++	/* Clear sctlr_el1 flags. */
++	mrs	x12, sctlr_el1
++	ldr	x13, =SCTLR_ELx_FLAGS
++	bic	x12, x12, x13
++	msr	sctlr_el1, x12
++	isb
++
++	cbz	x0, 1f				// el2_switch?
++	mov	x0, #HVC_SOFT_RESTART
++	hvc	#0				// no return
++
++1:	mov	x18, x1				// entry
++	mov	x0, x2				// arg0
++	mov	x1, x3				// arg1
++	mov	x2, x4				// arg2
++	br	x18
++ENDPROC(__cpu_soft_restart)
++
++.popsection
+diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
+new file mode 100644
+index 0000000..d4e9ecb
+--- /dev/null
++++ b/arch/arm64/kernel/cpu-reset.h
+@@ -0,0 +1,34 @@
++/*
++ * CPU reset routines
++ *
++ * Copyright (C) 2015 Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef _ARM64_CPU_RESET_H
++#define _ARM64_CPU_RESET_H
++
++#include <asm/virt.h>
++
++void __cpu_soft_restart(unsigned long el2_switch, unsigned long entry,
++	unsigned long arg0, unsigned long arg1, unsigned long arg2);
++
++static inline void __noreturn cpu_soft_restart(unsigned long el2_switch,
++	unsigned long entry, unsigned long arg0, unsigned long arg1,
++	unsigned long arg2)
 +{
-+	crash_save_cpu(regs, cpu);
++	typeof(__cpu_soft_restart) *restart;
 +
-+	atomic_dec(&waiting_for_crash_ipi);
++	el2_switch = el2_switch && !is_kernel_in_hyp_mode() &&
++		is_hyp_mode_available();
++	restart = (void *)virt_to_phys(__cpu_soft_restart);
 +
-+	local_irq_disable();
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+	if (cpu_ops[cpu]->cpu_die)
-+		cpu_ops[cpu]->cpu_die(cpu);
-+#endif
-+
-+	/* just in case */
-+	while (1)
-+		wfi();
++	cpu_install_idmap();
++	restart(el2_switch, entry, arg0, arg1, arg2);
++	unreachable();
 +}
-+#endif
 +
- /*
-  * Main handler for inter-processor interrupts
-  */
-@@ -830,6 +855,14 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		irq_exit();
- 		break;
++#endif
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index 8727f44..d3b5f75 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -71,8 +71,16 @@ el1_sync:
+ 	msr	vbar_el2, x1
+ 	b	9f
  
-+#ifdef CONFIG_KEXEC_CORE
-+	case IPI_CPU_CRASH_STOP:
-+		irq_enter();
-+		ipi_cpu_crash_stop(cpu, regs);
++2:	cmp	x0, #HVC_SOFT_RESTART
++	b.ne	3f
++	mov	x0, x2
++	mov	x2, x4
++	mov	x4, x1
++	mov	x1, x3
++	br	x4				// no return
 +
-+		unreachable();
-+#endif
-+
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
- 	case IPI_TIMER:
- 		irq_enter();
-@@ -902,6 +935,34 @@ void smp_send_stop(void)
- 			   cpumask_pr_args(cpu_online_mask));
- }
+ 	/* Someone called kvm_call_hyp() against the hyp-stub... */
+-2:	mov     x0, #ARM_EXCEPTION_HYP_GONE
++3:	mov	x0, #ARM_EXCEPTION_HYP_GONE
  
-+#ifdef CONFIG_KEXEC_CORE
-+void smp_send_crash_stop(void)
-+{
-+	cpumask_t mask;
-+	unsigned long timeout;
-+
-+	if (num_online_cpus() == 1)
-+		return;
-+
-+	cpumask_copy(&mask, cpu_online_mask);
-+	cpumask_clear_cpu(smp_processor_id(), &mask);
-+
-+	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-+
-+	pr_crit("SMP: stopping secondary CPUs\n");
-+	smp_cross_call(&mask, IPI_CPU_CRASH_STOP);
-+
-+	/* Wait up to one second for other CPUs to stop */
-+	timeout = USEC_PER_SEC;
-+	while ((atomic_read(&waiting_for_crash_ipi) > 0) && timeout--)
-+		udelay(1);
-+
-+	if (atomic_read(&waiting_for_crash_ipi) > 0)
-+		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
-+			   cpumask_pr_args(cpu_online_mask));
-+}
-+#endif
-+
- /*
-  * not supported here
-  */
+ 9:	eret
+ ENDPROC(el1_sync)
 -- 
 2.5.0
