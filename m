@@ -1,100 +1,75 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 16 Jun 2016 23:48:27 +0000
-Subject: [PATCH v19 05/13] arm64/kexec: Add pr_debug output
+Date: Thu, 16 Jun 2016 23:48:28 +0000
+Subject: [PATCH v19 12/13] arm64: kdump: update a kernel doc
 In-Reply-To: <cover.1466120418.git.geoff@infradead.org>
 References: <cover.1466120418.git.geoff@infradead.org>
-Message-ID: <dd245cadf97ea0d8fd5b0fe5743ecf9fa512d3c0.1466120418.git.geoff@infradead.org>
+Message-ID: <bcb00e384f2be62cb3fedf03dc08d8b531f91449.1466120418.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To aid in debugging kexec problems or when adding new functionality to
-kexec add a new routine kexec_image_info() and several inline pr_debug
-statements.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+This patch adds arch specific descriptions about kdump usage on arm64
+to kdump.txt.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/machine_kexec.c | 48 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ Documentation/kdump/kdump.txt | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index a6dcb9c..7372e58 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -11,6 +11,7 @@
+diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+index 88ff63d..5d6da09 100644
+--- a/Documentation/kdump/kdump.txt
++++ b/Documentation/kdump/kdump.txt
+@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
+ a remote system.
  
- #include <linux/kexec.h>
- #include <linux/smp.h>
-+#include <linux/uaccess.h>
+ Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
+-s390x and arm architectures.
++s390x, arm and arm64 architectures.
  
- #include <asm/cacheflush.h>
- #include <asm/cpu_ops.h>
-@@ -24,6 +25,32 @@ extern const unsigned long arm64_relocate_new_kernel_size;
+ When the system kernel boots, it reserves a small section of memory for
+ the dump-capture kernel. This ensures that ongoing Direct Memory Access
+@@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
  
- static unsigned long kimage_start;
+     AUTO_ZRELADDR=y
  
-+/**
-+ * kexec_image_info - For debugging output.
-+ */
-+#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
-+static void _kexec_image_info(const char *func, int line,
-+	const struct kimage *kimage)
-+{
-+	unsigned long i;
++Dump-capture kernel config options (Arch Dependent, arm64)
++----------------------------------------------------------
 +
-+	pr_debug("%s:%d:\n", func, line);
-+	pr_debug("  kexec kimage info:\n");
-+	pr_debug("    type:        %d\n", kimage->type);
-+	pr_debug("    start:       %lx\n", kimage->start);
-+	pr_debug("    head:        %lx\n", kimage->head);
-+	pr_debug("    nr_segments: %lu\n", kimage->nr_segments);
++1) Currently, kvm will not be enabled on the dump-capture kernel even
++   if it is configured.
 +
-+	for (i = 0; i < kimage->nr_segments; i++) {
-+		pr_debug("      segment[%lu]: %016lx - %016lx, 0x%lx bytes, %lu pages\n",
-+			i,
-+			kimage->segment[i].mem,
-+			kimage->segment[i].mem + kimage->segment[i].memsz,
-+			kimage->segment[i].memsz,
-+			kimage->segment[i].memsz /  PAGE_SIZE);
-+	}
-+}
-+
- void machine_kexec_cleanup(struct kimage *kimage)
- {
- 	/* Empty routine needed to avoid build errors. */
-@@ -40,6 +67,8 @@ int machine_kexec_prepare(struct kimage *kimage)
- {
- 	kimage_start = kimage->start;
+ Extended crashkernel syntax
+ ===========================
  
-+	kexec_image_info(kimage);
-+
- 	if (kimage->type != KEXEC_TYPE_CRASH) {
- 		if (cpus_are_stuck_in_kernel()) {
- 			pr_err("Can't kexec: failed CPUs are stuck in the kernel.\n");
-@@ -137,6 +166,25 @@ void machine_kexec(struct kimage *kimage)
- 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
- 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+@@ -305,6 +311,8 @@ Boot into System Kernel
+    kernel will automatically locate the crash kernel image within the
+    first 512MB of RAM if X is not given.
  
-+	kexec_image_info(kimage);
++   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
++   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
+ 
+ Load the Dump-capture Kernel
+ ============================
+@@ -327,6 +335,8 @@ For s390x:
+ 	- Use image or bzImage
+ For arm:
+ 	- Use zImage
++For arm64:
++	- Use vmlinux or Image
+ 
+ If you are using a uncompressed vmlinux image then use following command
+ to load dump-capture kernel.
+@@ -370,6 +380,9 @@ For s390x:
+ For arm:
+ 	"1 maxcpus=1 reset_devices"
+ 
++For arm64:
++	"1 maxcpus=1 reset_devices"
 +
-+	pr_debug("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
-+		kimage->control_code_page);
-+	pr_debug("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
-+		&reboot_code_buffer_phys);
-+	pr_debug("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
-+		reboot_code_buffer);
-+	pr_debug("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
-+		arm64_relocate_new_kernel);
-+	pr_debug("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
-+		__func__, __LINE__, arm64_relocate_new_kernel_size,
-+		arm64_relocate_new_kernel_size);
-+
-+	pr_debug("%s:%d: kimage_head:              %lx\n", __func__, __LINE__,
-+		kimage->head);
-+	pr_debug("%s:%d: kimage_start:             %lx\n", __func__, __LINE__,
-+		kimage_start);
-+
- 	/*
- 	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
- 	 * after the kernel is shut down.
+ Notes on loading the dump-capture kernel:
+ 
+ * By default, the ELF headers are stored in ELF64 format to support
 -- 
 2.5.0
