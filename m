@@ -1,88 +1,49 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 16 Jun 2016 14:51:44 +0100
-Subject: [PATCH RESEND 1/3] dt-bindings: add bindings documentation for
- PDC driver.
-In-Reply-To: <CAG4BRpnP_qqffLF9X+RusNQGnrtARap9HmK4RE4_jSVfO5juGQ@mail.gmail.com>
-References: <1465912965-35500-1-git-send-email-rob.rice@broadcom.com>
- <1465912965-35500-2-git-send-email-rob.rice@broadcom.com>
- <576017C7.50609@arm.com>
- <CAG4BRpnP_qqffLF9X+RusNQGnrtARap9HmK4RE4_jSVfO5juGQ@mail.gmail.com>
-Message-ID: <5762AEF0.9030203@arm.com>
+From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Thu, 16 Jun 2016 09:53:28 -0400
+Subject: [PATCH 0/7] Add SATA3 support for Broadcom NSP SoC
+Message-ID: <1466085215-10246-1-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch set adds support for SATA3 interface available in Broadcom
+NSP SoC.
 
+The first patch removes the "stb" references in the ahci documentation
+to make it generic for Broadcom SoC's. The second patch adds NSP support
+to the ahci documentation. The third patch adds the NSP SATA phy
+documentation.
 
-On 16/06/16 14:50, Rob Rice wrote:
->
->
-> On Tue, Jun 14, 2016 at 10:42 AM, Sudeep Holla <sudeep.holla@arm.com
-> <mailto:sudeep.holla@arm.com>> wrote:
->
->
->
->     On 14/06/16 15:02, Rob Rice wrote:
->
->         From: Rob Rice <rrice at broadcom.com <mailto:rrice@broadcom.com>>
->
->         Add the device tree binding documentation for the PDC hardware
->         in Broadcom iProc SoCs.
->
->         Signed-off-by: Rob Rice <rob.rice@broadcom.com
->         <mailto:rob.rice@broadcom.com>>
->         Acked-by: Rob Herring <robh at kernel.org <mailto:robh@kernel.org>>
->         Reviewed-by: Ray Jui <ray.jui@broadcom.com
->         <mailto:ray.jui@broadcom.com>>
->         Reviewed-by: Anup Patel <anup.patel@broadcom.com
->         <mailto:anup.patel@broadcom.com>>
->         Reviewed-by: Scott Branden <scott.branden@broadcom.com
->         <mailto:scott.branden@broadcom.com>>
->         ---
->            .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       | 23
->         ++++++++++++++++++++++
->            1 file changed, 23 insertions(+)
->            create mode 100644
->         Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
->
->         diff --git
->         a/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
->         b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
->         new file mode 100644
->         index 0000000..411ccf4
->         --- /dev/null
->         +++
->         b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
->         @@ -0,0 +1,23 @@
->         +The PDC driver manages data transfer to and from various
->         offload engines
->         +on some Broadcom SoCs. An SoC may have multiple PDC hardware
->         blocks. There is
->         +one device tree entry per block.
->         +
->         +Required properties:
->         +- compatible : Should be "brcm,iproc-pdc-mbox".
->         +- reg: Should contain PDC registers location and length.
->         +- interrupts: Should contain the IRQ line for the PDC.
->         +- #mbox-cells: 1
->         +- brcm,rx-status-len: Length of metadata preceding received
->         frames, in bytes.
->         +
->
->
->     Ideally the metadata is more associated with the software protocol built
->     on top of the mailbox controller.
->
->     Is this metadata added by the hardware ?
->
->     Otherwise it's better to make it part of the protocol rather than the
->     associating with the controller.
->
->
-> Yes, in fact this metadata is added by the PDC hardware itself. So it
-> seems correct for the DT property to be on the controller.
+The fourth patch renames the Broadcom stb ahci driver to common Broadcom
+ahci driver and fifth patch supports NSP ahci. The sixth patch adds
+support for NSP SATA3 phy.
 
-In that case, it's fine.
+The seventh patch contains the device tree changes for NSP SoC.
+
+This patch set has been tested on NSP bcm958625HR board.
+This patch set is based on v4.7.0-rc1 and is available from github
+repo: https://github.com/Broadcom/cygnus-linux.git
+branch: nsp-sata-v1
+
+Yendapally Reddy Dhananjaya Reddy (7):
+  dt-bindings: ata: rename brcm,sata-brcmstb.txt to brcm,sata-brcm.txt
+  dt-bindings: ata: add support for Broadcom NSP SoC ahci
+  dt-bindings: phy: Add documentation for NSP SATA PHY
+  ata: ahci_brcmstb: rename to support across Broadcom SoC's
+  ata: ahci_brcm: Add support for Broadcom NSP SoC
+  phy: Add SATA3 PHY support for Broadcom NSP SoC
+  ARM: dts: nsp: Add sata device tree entry
+
+ .../{brcm,sata-brcmstb.txt => brcm,sata-brcm.txt}  |  9 +--
+ .../devicetree/bindings/phy/brcm-sata-phy.txt      |  4 +-
+ arch/arm/boot/dts/bcm-nsp.dtsi                     | 42 +++++++++++
+ arch/arm/boot/dts/bcm958625k.dts                   | 12 ++++
+ drivers/ata/Kconfig                                |  8 +--
+ drivers/ata/Makefile                               |  2 +-
+ drivers/ata/{ahci_brcmstb.c => ahci_brcm.c}        | 46 +++++++++---
+ drivers/phy/phy-brcm-sata.c                        | 81 ++++++++++++++++++++++
+ 8 files changed, 184 insertions(+), 20 deletions(-)
+ rename Documentation/devicetree/bindings/ata/{brcm,sata-brcmstb.txt => brcm,sata-brcm.txt} (81%)
+ rename drivers/ata/{ahci_brcmstb.c => ahci_brcm.c} (91%)
 
 -- 
-Regards,
-Sudeep
+2.1.0
