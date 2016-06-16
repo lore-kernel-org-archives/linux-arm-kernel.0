@@ -1,82 +1,130 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 16 Jun 2016 08:54:20 -0500
-Subject: [PATCH v2 2/2] pci/aer: interrupt fixup in the quirk
-In-Reply-To: <1465884747-1517-2-git-send-email-po.liu@nxp.com>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <1465884747-1517-1-git-send-email-po.liu@nxp.com>
- <1465884747-1517-2-git-send-email-po.liu@nxp.com>
-Message-ID: <20160616135420.GA31343@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 16 Jun 2016 14:55:07 +0100
+Subject: [PATCH v2 2/6] arm64: Add .mmuoff.text section
+In-Reply-To: <5762A80D.1030705@arm.com>
+References: <1466012148-7674-1-git-send-email-james.morse@arm.com>
+ <1466012148-7674-3-git-send-email-james.morse@arm.com>
+ <20160616111007.GB6073@leverpostej> <5762A80D.1030705@arm.com>
+Message-ID: <20160616135507.GA31477@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 02:12:27PM +0800, Po Liu wrote:
-> On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-> When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-> maybe there is interrupt line for aer pme etc. Search the interrupt
-> number in the fdt file. Then fixup the dev->irq with it.
+On Thu, Jun 16, 2016 at 02:22:21PM +0100, James Morse wrote:
+> Hi Mark,
 > 
-> Signed-off-by: Po Liu <po.liu@nxp.com>
-> ---
-> changes for V2:
-> 	- Move to the quirk file
+> On 16/06/16 12:10, Mark Rutland wrote:
+> > On Wed, Jun 15, 2016 at 06:35:44PM +0100, James Morse wrote:
+> >> Resume from hibernate needs to clean any text executed by the kernel with
+> >> the MMU off to the PoC. Collect these functions together into a new
+> >> .mmuoff.text section.
+> >>
+> >> This covers booting of secondary cores and the cpu_suspend() path used
+> >> by cpu-idle and suspend-to-ram.
+> >>
+> >> The bulk of head.S is not included, as the primary boot code is only ever
+> >> executed once, the kernel never needs to ensure it is cleaned to a
+> >> particular point in the cache.
 > 
->  drivers/pci/quirks.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
 > 
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index ee72ebe..909d479 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-
-Is there any possibility of this part being used on different arches,
-or will it only ever be on arm64 (or whatever it is)?  If the latter,
-it could go somewhere like arch/arm64/kernel/quirks.c (which doesn't
-exist yet).
-
-> @@ -25,6 +25,7 @@
->  #include <linux/sched.h>
->  #include <linux/ktime.h>
->  #include <linux/mm.h>
-> +#include <linux/of_irq.h>
->  #include <asm/dma.h>	/* isa_dma_bridge_buggy */
->  #include "pci.h"
->  
-> @@ -4419,3 +4420,25 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
->  	}
->  }
->  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
-> +
-> +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-> + * but use standalone irq. Read the device tree for the aer
-> + * interrupt number.
-> + */
-> +static void quirk_aer_interrupt(struct pci_dev *dev)
-> +{
-> +	int ret;
-> +	struct device_node *np = NULL;
-> +
-> +	if (dev->bus->dev.of_node)
-> +		np = dev->bus->dev.of_node;
-> +
-> +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
-> +		ret = of_irq_get_byname(np, "aer");
-> +		if (ret > 0) {
-> +			dev->no_msi = 1;
-> +			dev->irq = ret;
-> +		}
-> +	}
-
-What does this mean for the other PCIe services, e.g., PME?  I
-guess this makes the existing AER code work unchanged.  But I thought
-PME had a similar situation and was connected up to a different
-interrupt than AER was.
-
-> +}
-> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_aer_interrupt);
-> -- 
-> 2.1.0.27.g96db324
+> >> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> >> index 2c6e598a94dc..ff37231e2054 100644
+> >> --- a/arch/arm64/kernel/head.S
+> >> +++ b/arch/arm64/kernel/head.S
+> >> @@ -656,6 +657,7 @@ ENDPROC(secondary_holding_pen)
+> >>  	 * Secondary entry point that jumps straight into the kernel. Only to
+> >>  	 * be used where CPUs are brought online dynamically by the kernel.
+> >>  	 */
+> >> +	.pushsection ".mmuoff.text", "ax"
+> >>  ENTRY(secondary_entry)
+> >>  	bl	el2_setup			// Drop to EL1
+> >>  	bl	set_cpu_boot_mode_flag
+> >> @@ -687,7 +689,7 @@ __secondary_switched:
+> >>  	mov	x29, #0
+> >>  	b	secondary_start_kernel
+> >>  ENDPROC(__secondary_switched)
+> >> -
+> >> +	.popsection
+> > 
+> > I think we also need to cover set_cpu_boot_mode_flag and
+> > __boot_cpu_mode.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Bother, yes.
+> How come cpu_resume doesn't call this? I guess we assume
+> psci_cpu_suspend_enter() will bring the core back at the same EL
+
+Hmm. It looks like we only bother to check once at boot time (in
+hyp_mode_check as part of smp_cpus_done), and otherwise never inspect
+the flag again.
+
+We should probably add checks to the hotplug-on path, and perhaps the
+idle cold return path. That's largely orthogonal to this series, though.
+
+I think we should for consistency we should place them in the mmuoff
+section regardless.
+
+> > Likewise secondary_holding_pen and secondary_holding_pen_release, in
+> > case you booted with maxcpus=1, suspended, resumed, then tried to bring
+> > secondaries up with spin-table.
+> 
+> Whoa! This must never happen!
+> With KASLR:
+> * relocate to location-1,
+> * release the secondary cores from firmware into
+>   location-1:secondary_holding_pen,
+> * resume from hibernate, at which point we are running from location-2,
+>   as the kaslr values are now from the hibernate kernel.
+> * location-2:secondary_holding_pen is empty,
+> * location-1:secondary_holding_pen now contains a user-space string, or some
+>   other horror.
+
+:(
+
+> This didn't come up during testing because maxcpus=1 was permanent before v4.7,
+> and we can't bundle cores back into the secondary_holding_pen. Hibernate without
+> PSCI (or some other cpu_die()) mechanism fails in the core code:
+> > [70648.097242] Disabling non-boot CPUs ...
+> > [70648.117277] Error taking CPU1 down: -95
+> > [70648.117286] Non-boot CPUs are not disabled
+> 
+> ... but if we never tried to boot those cpus, we don't hit this check, and the
+> cores are left in secondary_holding_pen after smp_prepare_cpus(), called well
+> before the late_initcall that kicks of resume.
+> 
+> This is broken on systems that load the kernel at a different address over a
+> reboot, (using KASLR or a fancy boot loader), and use spin-table for secondary
+> cores. (probably none in practice, but still worth fixing)
+> 
+> 
+> Thinking aloud:
+> cpus_stuck_in_kernel only indicates cores that we failed to fully bring up.
+> (incompatible translation granule etc). There could still be cores in the
+> kernel's secondary holding pen. We should prevent kexec/hibernate in this case.
+> (hibernate because we can't safely resume on such a machine)
+
+This sounds sensible to me.
+
+> kexec[0] currently checks for a cpu_die() call:
+> > if (num_online_cpus() > 1)
+> 
+> Changing this to 'num_possible_cpus() > 1' will cover the above case.
+> Similar code will need to be added to hibernate.
+
+That will also catch cases where CPUs failed to even enter the pen, but
+I don't think there's any reliable way to distinguish the two, so that's
+probably the best we can do.
+
+> An alternative is to increase cpus_stuck_in_kernel in
+> smp_spin_table_cpu_prepare(), but it stops being a counter at this point.
+
+I don't think we need it to be a counter. I'm happy to change the
+meaning slightly if we update the comment.
+
+> Thoughts?
+
+"Oh no", "aaarargarghargahgasdfsdfs". :(
+
+> Does this make sense, or do I have the wrong end of the stick somewhere!
+
+The above makes sense to me. Thanks for digging into this!
+
+Mark.
