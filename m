@@ -1,88 +1,109 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu, 16 Jun 2016 10:20:07 -0700
-Subject: [PATCH 1/2] ARM: drop kernel segment resources from /proc/iomem
-In-Reply-To: <1466080138-12193-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu, 16 Jun 2016 10:21:13 -0700
+Subject: [PATCH 2/2] arm64: drop kernel segment resources from /proc/iomem
+In-Reply-To: <CAKv+Gu8ZO3Pz8vq9mM-XSDa1-L877-mzD1pBhhhJw0Z5jXCk0Q@mail.gmail.com>
 References: <1466080138-12193-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAGXu5jLvcSv_GjAB3PKObcBHNX6B45RaO6D0sCj7zSRqdCSFFA@mail.gmail.com>
+ <1466080138-12193-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8ZO3Pz8vq9mM-XSDa1-L877-mzD1pBhhhJw0Z5jXCk0Q@mail.gmail.com>
+Message-ID: <CAGXu5jLWs0FiN1wri51WFSS__8kfLMMeYtUTspuHqi4pmFHEAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 5:28 AM, Ard Biesheuvel
+On Thu, Jun 16, 2016 at 5:32 AM, Ard Biesheuvel
 <ard.biesheuvel@linaro.org> wrote:
-> By the same reasoning as commit c4004b02f8e5 ("x86: remove the kernel
-> code/data/bss resources from /proc/iomem"), the kernel code and kernel
-> data entries in /proc/iomem probably do more harm than good on ARM as
-> well. So remove them.
+> (+ James)
 >
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/kernel/setup.c | 26 --------------------------
->  1 file changed, 26 deletions(-)
+> On 16 June 2016 at 14:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> By the same reasoning as commit c4004b02f8e5 ("x86: remove the kernel
+>> code/data/bss resources from /proc/iomem"), the kernel code and kernel
+>> data entries in /proc/iomem probably do more harm than good on arm64 as
+>> well. So remove them.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 >
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 7b5350060612..839797c4b454 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -171,24 +171,10 @@ static struct resource mem_res[] = {
->                 .start = 0,
->                 .end = 0,
->                 .flags = IORESOURCE_MEM
-> -       },
-> -       {
-> -               .name = "Kernel code",
-> -               .start = 0,
-> -               .end = 0,
-> -               .flags = IORESOURCE_SYSTEM_RAM
-> -       },
-> -       {
-> -               .name = "Kernel data",
-> -               .start = 0,
-> -               .end = 0,
-> -               .flags = IORESOURCE_SYSTEM_RAM
->         }
->  };
 >
->  #define video_ram   mem_res[0]
-> -#define kernel_code mem_res[1]
-> -#define kernel_data mem_res[2]
+> Actually, Linus's patch above has been reverted again, so we have to
+> consider whether the kexec case exists for us as well before we
+> consider this
 >
->  static struct resource io_res[] = {
->         {
-> @@ -843,11 +829,6 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
->         struct memblock_region *region;
->         struct resource *res;
->
-> -       kernel_code.start   = virt_to_phys(_text);
-> -       kernel_code.end     = virt_to_phys(_etext - 1);
-> -       kernel_data.start   = virt_to_phys(_sdata);
-> -       kernel_data.end     = virt_to_phys(_end - 1);
-> -
->         for_each_memblock(memory, region) {
->                 res = memblock_virt_alloc(sizeof(*res), 0);
->                 res->name  = "System RAM";
-> @@ -856,13 +837,6 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
->                 res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
->
->                 request_resource(&iomem_resource, res);
-> -
-> -               if (kernel_code.start >= res->start &&
-> -                   kernel_code.end <= res->end)
-> -                       request_resource(res, &kernel_code);
-> -               if (kernel_data.start >= res->start &&
-> -                   kernel_data.end <= res->end)
-> -                       request_resource(res, &kernel_data);
->         }
->
->         if (mdesc->video_start) {
-> --
-> 1.9.1
->
+> Apologies for failing to spot that before sending
 
-NAK, this is needed by kexec among other things.
-c4004b02f8e5b9ce357a0bb1641756cc86962664 was reverted in
-4046d6e81f33b7ef50d6668b78076d54c5e066b6.
+Please leave this as it was originally. The security exposure has been
+minimized and it would make arm64 differ from all other architectures.
+If we remove this, it needs to be coordinated across all
+architectures.
 
 -Kees
+
+>
+>
+>> ---
+>>  arch/arm64/kernel/setup.c | 33 ---------------------------------
+>>  1 file changed, 33 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index 3279defabaa2..f3ec301653a4 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -68,27 +68,6 @@
+>>  phys_addr_t __fdt_pointer __initdata;
+>>
+>>  /*
+>> - * Standard memory resources
+>> - */
+>> -static struct resource mem_res[] = {
+>> -       {
+>> -               .name = "Kernel code",
+>> -               .start = 0,
+>> -               .end = 0,
+>> -               .flags = IORESOURCE_SYSTEM_RAM
+>> -       },
+>> -       {
+>> -               .name = "Kernel data",
+>> -               .start = 0,
+>> -               .end = 0,
+>> -               .flags = IORESOURCE_SYSTEM_RAM
+>> -       }
+>> -};
+>> -
+>> -#define kernel_code mem_res[0]
+>> -#define kernel_data mem_res[1]
+>> -
+>> -/*
+>>   * The recorded values of x0 .. x3 upon kernel entry.
+>>   */
+>>  u64 __cacheline_aligned boot_args[4];
+>> @@ -201,11 +180,6 @@ static void __init request_standard_resources(void)
+>>         struct memblock_region *region;
+>>         struct resource *res;
+>>
+>> -       kernel_code.start   = virt_to_phys(_text);
+>> -       kernel_code.end     = virt_to_phys(_etext - 1);
+>> -       kernel_data.start   = virt_to_phys(_sdata);
+>> -       kernel_data.end     = virt_to_phys(_end - 1);
+>> -
+>>         for_each_memblock(memory, region) {
+>>                 res = alloc_bootmem_low(sizeof(*res));
+>>                 res->name  = "System RAM";
+>> @@ -214,13 +188,6 @@ static void __init request_standard_resources(void)
+>>                 res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+>>
+>>                 request_resource(&iomem_resource, res);
+>> -
+>> -               if (kernel_code.start >= res->start &&
+>> -                   kernel_code.end <= res->end)
+>> -                       request_resource(res, &kernel_code);
+>> -               if (kernel_data.start >= res->start &&
+>> -                   kernel_data.end <= res->end)
+>> -                       request_resource(res, &kernel_data);
+>>         }
+>>  }
+>>
+>> --
+>> 1.9.1
+>>
+
+
 
 -- 
 Kees Cook
