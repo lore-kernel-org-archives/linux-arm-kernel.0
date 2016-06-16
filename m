@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:27:09 +0200
-Subject: [PATCH V2 50/63] clocksource/drivers/timer-u300: Convert init
- function to return error
+Date: Thu, 16 Jun 2016 23:27:10 +0200
+Subject: [PATCH V2 51/63] clocksource/drivers/versatile: Convert init function
+ to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-51-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-52-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,93 +26,37 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-u300.c | 38 +++++++++++++++++++++++++++-----------
- 1 file changed, 27 insertions(+), 11 deletions(-)
+ drivers/clocksource/versatile.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/timer-u300.c b/drivers/clocksource/timer-u300.c
-index 1744b24..a6a0dec 100644
---- a/drivers/clocksource/timer-u300.c
-+++ b/drivers/clocksource/timer-u300.c
-@@ -359,27 +359,37 @@ static struct delay_timer u300_delay_timer;
- /*
-  * This sets up the system timers, clock source and clock event.
-  */
--static void __init u300_timer_init_of(struct device_node *np)
-+static int __init u300_timer_init_of(struct device_node *np)
- {
- 	unsigned int irq;
- 	struct clk *clk;
- 	unsigned long rate;
-+	int ret;
- 
- 	u300_timer_base = of_iomap(np, 0);
--	if (!u300_timer_base)
--		panic("could not ioremap system timer\n");
-+	if (!u300_timer_base) {
-+		pr_err("could not ioremap system timer\n");
-+		return -ENXIO;
-+	}
- 
- 	/* Get the IRQ for the GP1 timer */
- 	irq = irq_of_parse_and_map(np, 2);
--	if (!irq)
--		panic("no IRQ for system timer\n");
-+	if (!irq) {
-+		pr_err("no IRQ for system timer\n");
-+		return -EINVAL;
-+	}
- 
- 	pr_info("U300 GP1 timer @ base: %p, IRQ: %u\n", u300_timer_base, irq);
- 
- 	/* Clock the interrupt controller */
- 	clk = of_clk_get(np, 0);
--	BUG_ON(IS_ERR(clk));
--	clk_prepare_enable(clk);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret)
-+		return ret;
-+
- 	rate = clk_get_rate(clk);
- 
- 	u300_clockevent_data.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
-@@ -410,7 +420,9 @@ static void __init u300_timer_init_of(struct device_node *np)
- 		u300_timer_base + U300_TIMER_APP_RGPT1);
- 
- 	/* Set up the IRQ handler */
--	setup_irq(irq, &u300_timer_irq);
-+	ret = setup_irq(irq, &u300_timer_irq);
-+	if (ret)
-+		return ret;
- 
- 	/* Reset the General Purpose timer 2 */
- 	writel(U300_TIMER_APP_RGPT2_TIMER_RESET,
-@@ -428,9 +440,12 @@ static void __init u300_timer_init_of(struct device_node *np)
- 		u300_timer_base + U300_TIMER_APP_EGPT2);
- 
- 	/* Use general purpose timer 2 as clock source */
--	if (clocksource_mmio_init(u300_timer_base + U300_TIMER_APP_GPT2CC,
--			"GPT2", rate, 300, 32, clocksource_mmio_readl_up))
-+	ret = clocksource_mmio_init(u300_timer_base + U300_TIMER_APP_GPT2CC,
-+				    "GPT2", rate, 300, 32, clocksource_mmio_readl_up);
-+	if (ret) {
- 		pr_err("timer: failed to initialize U300 clock source\n");
-+		return ret;
-+	}
- 
- 	/* Configure and register the clockevent */
- 	clockevents_config_and_register(&u300_clockevent_data.cevd, rate,
-@@ -440,7 +455,8 @@ static void __init u300_timer_init_of(struct device_node *np)
- 	 * TODO: init and register the rest of the timers too, they can be
- 	 * used by hrtimers!
- 	 */
-+	return 0;
+diff --git a/drivers/clocksource/versatile.c b/drivers/clocksource/versatile.c
+index 0a26d3d..8daeffa 100644
+--- a/drivers/clocksource/versatile.c
++++ b/drivers/clocksource/versatile.c
+@@ -25,18 +25,20 @@ static u64 notrace versatile_sys_24mhz_read(void)
+ 	return readl(versatile_sys_24mhz);
  }
  
--CLOCKSOURCE_OF_DECLARE(u300_timer, "stericsson,u300-apptimer",
-+CLOCKSOURCE_OF_DECLARE_RET(u300_timer, "stericsson,u300-apptimer",
- 		       u300_timer_init_of);
+-static void __init versatile_sched_clock_init(struct device_node *node)
++static int __init versatile_sched_clock_init(struct device_node *node)
+ {
+ 	void __iomem *base = of_iomap(node, 0);
+ 
+ 	if (!base)
+-		return;
++		return -ENXIO;
+ 
+ 	versatile_sys_24mhz = base + SYS_24MHZ;
+ 
+ 	sched_clock_register(versatile_sys_24mhz_read, 32, 24000000);
++
++	return 0;
+ }
+-CLOCKSOURCE_OF_DECLARE(vexpress, "arm,vexpress-sysreg",
++CLOCKSOURCE_OF_DECLARE_RET(vexpress, "arm,vexpress-sysreg",
+ 		       versatile_sched_clock_init);
+-CLOCKSOURCE_OF_DECLARE(versatile, "arm,versatile-sysreg",
++CLOCKSOURCE_OF_DECLARE_RET(versatile, "arm,versatile-sysreg",
+ 		       versatile_sched_clock_init);
 -- 
 1.9.1
