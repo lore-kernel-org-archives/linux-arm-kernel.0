@@ -1,58 +1,35 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 16 Jun 2016 10:48:49 -0700
-Subject: [PATCH 2/2] arm64: drop kernel segment resources from /proc/iomem
-In-Reply-To: <CAKv+Gu84hr4d--cRUZzpGnA7NXr3pxE-VdRsaTGjUYX9aiet4A@mail.gmail.com>
-References: <1466080138-12193-1-git-send-email-ard.biesheuvel@linaro.org>
- <1466080138-12193-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu8ZO3Pz8vq9mM-XSDa1-L877-mzD1pBhhhJw0Z5jXCk0Q@mail.gmail.com>
- <CAGXu5jLWs0FiN1wri51WFSS__8kfLMMeYtUTspuHqi4pmFHEAA@mail.gmail.com>
- <CAKv+Gu84hr4d--cRUZzpGnA7NXr3pxE-VdRsaTGjUYX9aiet4A@mail.gmail.com>
-Message-ID: <CAGXu5jL=5csS1J1P_1D2LQLWGV__BW99fE3Z9CMwTRO17Ed6Zw@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 16 Jun 2016 19:56:38 +0200
+Subject: [PATCH 4/5] usb: pxa27x_udc: remove unused function argument
+In-Reply-To: <20160616113831.4108439-5-arnd@arndb.de> (Arnd Bergmann's message
+ of "Thu, 16 Jun 2016 13:38:25 +0200")
+References: <20160616113831.4108439-1-arnd@arndb.de>
+ <20160616113831.4108439-5-arnd@arndb.de>
+Message-ID: <877fdp9fvt.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 10:28 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 16 June 2016 at 19:21, Kees Cook <keescook@chromium.org> wrote:
->> On Thu, Jun 16, 2016 at 5:32 AM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> (+ James)
->>>
->>> On 16 June 2016 at 14:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>> By the same reasoning as commit c4004b02f8e5 ("x86: remove the kernel
->>>> code/data/bss resources from /proc/iomem"), the kernel code and kernel
->>>> data entries in /proc/iomem probably do more harm than good on arm64 as
->>>> well. So remove them.
->>>>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>
->>>
->>> Actually, Linus's patch above has been reverted again, so we have to
->>> consider whether the kexec case exists for us as well before we
->>> consider this
->>>
->>> Apologies for failing to spot that before sending
->>
->> Please leave this as it was originally. The security exposure has been
->> minimized and it would make arm64 differ from all other architectures.
->> If we remove this, it needs to be coordinated across all
->> architectures.
->>
+Arnd Bergmann <arnd@arndb.de> writes:
+
+> We get a warning for this when building with W=1 because the
+> argument gets assigned to something else but never read:
 >
-> OK, fair enough
+> drivers/usb/gadget/udc/pxa27x_udc.c: In function 'stop_activity':
+> drivers/usb/gadget/udc/pxa27x_udc.c:1828:74: error: parameter 'driver' set but not used [-Werror=unused-but-set-parameter]
+>
+> This remove the argument entirely.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Arnd,
 
-Thanks!
+I wonder if it'd worth adding this ... even if the word "Completes" would be more
+correct than "Fixes" :
+Fixes: 70189a63d408 ("usb: gadget: pxa27x_udc: convert to udc_start/udc_stop")
 
-One thing I _would_ like to see fixed on arm64 is the misplaced
-_etext, which is incorrectly covering rodata. I just sent a patch to
-fix this on arm, but on arm64, the _etext use is much more embedded.
+Apart form that:
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-I'd like to clean this up so that I can sanely use things like
-core_kernel_text() for checking addresses in the up-coming
-HARDENED_USERCOPY patch series.
+Cheers.
 
--Kees
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+--
+Robert
