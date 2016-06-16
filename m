@@ -1,59 +1,77 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 16 Jun 2016 15:59:08 +0100
-Subject: [PATCH v2 4/5] mfd: rn5t618: register power off callback
- optionally
-In-Reply-To: <20160608010429.19618-5-stefan@agner.ch>
-References: <20160608010429.19618-1-stefan@agner.ch>
- <20160608010429.19618-5-stefan@agner.ch>
-Message-ID: <20160616145907.GD4948@dell>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 16 Jun 2016 17:01:07 +0200
+Subject: [PATCH 2/3] ARM: mvebu: map PCI I/O regions strongly ordered
+In-Reply-To: <1466084547-31343-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Thu, 16 Jun 2016 15:42:26 +0200")
+References: <1466084547-31343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1466084547-31343-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87mvml9o0c.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Jun 2016, Stefan Agner wrote:
+Hi Thomas,
+ 
+ On jeu., juin 16 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-> Only register power off if the PMIC is defined as system power
-> controller (see Documentation/devicetree/bindings/power/
-> power-controller.txt).
-> 
-> Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> In order for HW I/O coherency to work on Cortex-A9 based Marvell SoCs,
+> all MMIO registers must be mapped strongly ordered. In commit
+> 1c8c3cf0b5239 ("ARM: 8060/1: mm: allow sub-architectures to override PCI
+> I/O memory type") we implemented a new function,
+> pci_ioremap_set_mem_type(), that allow sub-architecture code to override
+> the memory type used to map PCI I/O regions.
+>
+> In the discussion around this patch series [1], Arnd Bergmann made the
+> comment that maybe all PCI I/O regions should be mapped
+> strongly-ordered, which would have made our proposal to add
+> pci_ioremap_set_mem_type() irrelevant. So, we submitted a patch [2] that
+> did what Arnd suggested.
+>
+> However, Russell in the end merged our initial proposal to add
+> pci_ioremap_set_mem_type(), but it was never used anywhere. Further
+> discussion with Arnd and other folks on IRC lead to the conclusion that
+> in fact using strongly-ordered for all platforms was maybe not
+> desirable, and therefore, using pci_ioremap_set_mem_type() was the most
+> appropriate solution.
+>
+> As a consequence, this commit finally adds the
+> pci_ioremap_set_mem_type() call in the mach-mvebu platform code, which
+> was originally part of our initial patch series [3] and is necessary for
+> the whole mechanism to work.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256565.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256755.html
+> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256563.html
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-These should be chronological.
+Applied on mvebu/fixes
+
+Thanks,
+
+Gregory
 
 > ---
->  drivers/mfd/rn5t618.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mfd/rn5t618.c b/drivers/mfd/rn5t618.c
-> index 7607ced..d9b4d40 100644
-> --- a/drivers/mfd/rn5t618.c
-> +++ b/drivers/mfd/rn5t618.c
-> @@ -103,9 +103,13 @@ static int rn5t618_i2c_probe(struct i2c_client *i2c,
->  		return ret;
->  	}
+>  arch/arm/mach-mvebu/coherency.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index 474abff..e80f0dd 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -181,6 +181,7 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
 >  
-> -	if (!pm_power_off) {
-> -		rn5t618_pm_power_off = priv;
-> -		pm_power_off = rn5t618_power_off;
-> +	if (of_device_is_system_power_controller(i2c->dev.of_node)) {
-> +		if (!pm_power_off) {
-> +			rn5t618_pm_power_off = priv;
-> +			pm_power_off = rn5t618_power_off;
-> +		} else {
-> +			dev_err(&i2c->dev, "Failed to set poweroff capability, already defined\n");
-
-This is not an error.  Please use dev_warn() instead.
-
-Also, is this message actually accurate?  Your commit message would
-indicate that it's not.
-
-> +		}
->  	}
+>  	coherency_cpu_base = of_iomap(np, 0);
+>  	arch_ioremap_caller = armada_wa_ioremap_caller;
+> +	pci_ioremap_set_mem_type(MT_UNCACHED);
 >  
->  	return 0;
+>  	/*
+>  	 * We should switch the PL310 to I/O coherency mode only if
+> -- 
+> 2.7.4
+>
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
