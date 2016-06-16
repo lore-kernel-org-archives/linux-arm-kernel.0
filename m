@@ -1,56 +1,82 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Thu, 16 Jun 2016 23:48:28 +0000
-Subject: [PATCH v19 10/13] arm64: kdump: add VMCOREINFO's for user-space
- coredump tools
+Subject: [PATCH v19 07/13] arm64: limit memory regions based on DT property,
+ usable-memory
 In-Reply-To: <cover.1466120418.git.geoff@infradead.org>
 References: <cover.1466120418.git.geoff@infradead.org>
-Message-ID: <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
+Message-ID: <40e58a95d4b1f9c3024cc19f5a26c0ca54353e51.1466120418.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-For the current crash utility, we need to know, at least,
-  - kimage_voffset
-  - PHYS_OFFSET
-to handle the contents of core dump file (/proc/vmcore) correctly due to
-the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
-This patch puts them as VMCOREINFO's into the file.
+Crash dump kernel will be run with a limited range of memory as System
+RAM.
 
-  - VA_BITS
-is also added for makedumpfile command.
-More VMCOREINFO's may be added later.
+On arm64, we will use a device-tree property under /chosen,
+   linux,usable-memory = <BASE SIZE>
+in order for primary kernel either on uefi or non-uefi (device tree only)
+system to hand over the information about usable memory region to crash
+dump kernel. This property will supercede entries in uefi memory map table
+and "memory" nodes in a device tree.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/machine_kexec.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/mm/init.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index f270967..57a30fb 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -18,6 +18,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/cpu_ops.h>
-+#include <asm/memory.h>
- #include <asm/mmu_context.h>
- 
- #include "cpu-reset.h"
-@@ -278,3 +279,13 @@ void machine_crash_shutdown(struct pt_regs *regs)
- 
- 	pr_info("Starting crashdump kernel...\n");
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 45f1319..f679918 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -249,10 +249,48 @@ static int __init early_mem(char *p)
  }
-+
-+void arch_crash_save_vmcoreinfo(void)
+ early_param("mem", early_mem);
+ 
++static int __init early_init_dt_scan_usablemem(unsigned long node,
++		const char *uname, int depth, void *data)
 +{
-+	VMCOREINFO_NUMBER(VA_BITS);
-+	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
-+	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
-+						kimage_voffset);
-+	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
-+						PHYS_OFFSET);
++	struct memblock_region *usablemem = (struct memblock_region *)data;
++	const __be32 *reg;
++	int len;
++
++	usablemem->size = 0;
++
++	if (depth != 1 || strcmp(uname, "chosen") != 0)
++		return 0;
++
++	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &len);
++	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
++		return 1;
++
++	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
++	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
++
++	return 1;
 +}
++
++static void __init fdt_enforce_memory_region(void)
++{
++	struct memblock_region reg;
++
++	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
++
++	if (reg.size) {
++		memblock_remove(0, PAGE_ALIGN(reg.base));
++		memblock_remove(round_down(reg.base + reg.size, PAGE_SIZE),
++				ULLONG_MAX);
++	}
++}
++
+ void __init arm64_memblock_init(void)
+ {
+ 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
+ 
++	/* Handle linux,usable-memory property */
++	fdt_enforce_memory_region();
++
+ 	/*
+ 	 * Ensure that the linear region takes up exactly half of the kernel
+ 	 * virtual address space. This way, we can distinguish a linear address
 -- 
 2.5.0
