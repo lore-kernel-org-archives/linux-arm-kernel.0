@@ -1,20 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jun 2016 11:36:13 +0200
-Subject: [PATCH 1/6] video: ARM CLCD: backlight support for OF
+Date: Thu, 16 Jun 2016 11:36:14 +0200
+Subject: [PATCH 2/6] video: ARM CLCD: support DT signal inversion flags
 In-Reply-To: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
 References: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1466069778-16087-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1466069778-16087-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the device is probed from device tree, we can support
-backlight. This is used with some systems such as the
-ST Microelectronics Nomadik.
+The device tree bindings from display-timing.txt allows us to
+specify if data enable, hsync, vsync or the pixed clock should be
+inverted on the way to the display. The driver does not currently
+handle this so add support for those flags as it is needed for
+the Versatile Sanyo LCD display.
 
-We have to add HAS_IOMEM to the dependencies of CLCD since
-the backlight class device will now be selected, and if it
-gets selected on an arch that does not have IOMEM,
-compilation will fail.
+Note that the previous behaviour was to invert the pixel clock
+for all displays, so unless the pixel clock polarity is
+explicitly defined in the device tree (i.e. the timings node
+has the "pixelclk-active" property) we fall back to inverting
+the pixel clock. This needs some extra compatibility code.
+
+Since the timing flags have to be set up inside the struct
+clcd_panel, we need to refactor the code a bit to pass around
+the panel rather than just the mode.
 
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Rob Herring <robh@kernel.org>
@@ -22,134 +29,107 @@ Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v2->v3:
-- Rebased, no other changes.
+- Check if neither DISPLAY_FLAGS_PIXDATA_NEGEDGE or
+  DISPLAY_FLAGS_PIXDATA_POSEDGE to default to NEGEDGE and
+  avoid poking around in the device tree.
 ChangeLog v1->v2:
-- No changes.
+- No changes. Just reposting.
 ---
- drivers/video/fbdev/Kconfig     |  4 +++-
- drivers/video/fbdev/amba-clcd.c | 40 ++++++++++++++++++++++++++++++++++++++++
- include/linux/amba/clcd.h       |  3 +++
- 3 files changed, 46 insertions(+), 1 deletion(-)
+ drivers/video/fbdev/amba-clcd.c | 37 ++++++++++++++++++++++++++++++-------
+ 1 file changed, 30 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index 88b008fb8a4e..9b9a76b82c04 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -284,12 +284,14 @@ config FB_PM2_FIFO_DISCONNECT
- config FB_ARMCLCD
- 	tristate "ARM PrimeCell PL110 support"
- 	depends on ARM || ARM64 || COMPILE_TEST
--	depends on FB && ARM_AMBA
-+	depends on FB && ARM_AMBA && HAS_IOMEM
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
- 	select FB_MODE_HELPERS if OF
- 	select VIDEOMODE_HELPERS if OF
-+	select BACKLIGHT_LCD_SUPPORT if OF
-+	select BACKLIGHT_CLASS_DEVICE if OF
- 	help
- 	  This framebuffer device driver is for the ARM PrimeCell PL110
- 	  Colour LCD controller.  ARM PrimeCells provide the building
 diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-index 9b158869cb89..52a33d3926ac 100644
+index 52a33d3926ac..5bd20e8800bc 100644
 --- a/drivers/video/fbdev/amba-clcd.c
 +++ b/drivers/video/fbdev/amba-clcd.c
-@@ -30,6 +30,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_graph.h>
-+#include <linux/backlight.h>
- #include <video/display_timing.h>
- #include <video/of_display_timing.h>
- #include <video/videomode.h>
-@@ -71,6 +72,11 @@ static void clcdfb_disable(struct clcd_fb *fb)
- 	if (fb->board->disable)
- 		fb->board->disable(fb);
+@@ -565,7 +565,7 @@ static int clcdfb_register(struct clcd_fb *fb)
  
-+	if (fb->panel->backlight) {
-+		fb->panel->backlight->props.power = FB_BLANK_POWERDOWN;
-+		backlight_update_status(fb->panel->backlight);
-+	}
-+
- 	val = readl(fb->regs + fb->off_cntl);
- 	if (val & CNTL_LCDPWR) {
- 		val &= ~CNTL_LCDPWR;
-@@ -117,6 +123,14 @@ static void clcdfb_enable(struct clcd_fb *fb, u32 cntl)
- 	writel(cntl, fb->regs + fb->off_cntl);
- 
- 	/*
-+	 * Turn on backlight
-+	 */
-+	if (fb->panel->backlight) {
-+		fb->panel->backlight->props.power = FB_BLANK_UNBLANK;
-+		backlight_update_status(fb->panel->backlight);
-+	}
-+
-+	/*
- 	 * finally, enable the interface.
- 	 */
- 	if (fb->board->enable)
-@@ -576,6 +590,28 @@ static int clcdfb_snprintf_mode(char *buf, int size, struct fb_videomode *mode)
- 			mode->refresh);
- }
- 
-+static int clcdfb_of_get_backlight(struct device_node *endpoint,
-+				   struct clcd_panel *clcd_panel)
-+{
-+	struct device_node *panel;
-+	struct device_node *backlight;
-+
-+	panel = of_graph_get_remote_port_parent(endpoint);
-+	if (!panel)
-+		return -ENODEV;
-+
-+	/* Look up the optional backlight phandle */
-+	backlight = of_parse_phandle(panel, "backlight", 0);
-+	if (backlight) {
-+		clcd_panel->backlight = of_find_backlight_by_node(backlight);
-+		of_node_put(backlight);
-+
-+		if (!clcd_panel->backlight)
-+			return -EPROBE_DEFER;
-+	}
-+	return 0;
-+}
-+
- static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
- 		struct fb_videomode *mode)
+ #ifdef CONFIG_OF
+ static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
+-		struct fb_videomode *mode)
++		struct clcd_panel *clcd_panel)
  {
-@@ -662,6 +698,10 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
- 	if (!endpoint)
- 		return -ENODEV;
+ 	int err;
+ 	struct display_timing timing;
+@@ -577,10 +577,31 @@ static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
  
-+	err = clcdfb_of_get_backlight(endpoint, fb->panel);
-+	if (err)
-+		return err;
-+
- 	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, &fb->panel->mode);
+ 	videomode_from_timing(&timing, &video);
+ 
+-	err = fb_videomode_from_videomode(&video, mode);
++	err = fb_videomode_from_videomode(&video, &clcd_panel->mode);
  	if (err)
  		return err;
-diff --git a/include/linux/amba/clcd.h b/include/linux/amba/clcd.h
-index e82e3ee2c54a..e64c1ccebb76 100644
---- a/include/linux/amba/clcd.h
-+++ b/include/linux/amba/clcd.h
-@@ -93,6 +93,8 @@ enum {
- 	CLCD_CAP_ALL		= CLCD_CAP_BGR | CLCD_CAP_RGB,
- };
  
-+struct backlight_device;
++	/* Set up some inversion flags */
++	if (timing.flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
++		clcd_panel->tim2 |= TIM2_IPC;
++	else if (!(timing.flags & DISPLAY_FLAGS_PIXDATA_POSEDGE))
++		/*
++		 * To preserve backwards compatibility, the IPC (inverted
++		 * pixel clock) flag needs to be set on any display that
++		 * doesn't explicitly specify that the pixel clock is
++		 * active on the negative or positive edge.
++		 */
++		clcd_panel->tim2 |= TIM2_IPC;
 +
- struct clcd_panel {
- 	struct fb_videomode	mode;
- 	signed short		width;	/* width in mm */
-@@ -105,6 +107,7 @@ struct clcd_panel {
- 				fixedtimings:1,
- 				grayscale:1;
- 	unsigned int		connector;
-+	struct backlight_device	*backlight;
- };
++	if (timing.flags & DISPLAY_FLAGS_HSYNC_LOW)
++		clcd_panel->tim2 |= TIM2_IHS;
++
++	if (timing.flags & DISPLAY_FLAGS_VSYNC_LOW)
++		clcd_panel->tim2 |= TIM2_IVS;
++
++	if (timing.flags & DISPLAY_FLAGS_DE_LOW)
++		clcd_panel->tim2 |= TIM2_IOE;
++
+ 	return 0;
+ }
  
- struct clcd_regs {
+@@ -613,10 +634,11 @@ static int clcdfb_of_get_backlight(struct device_node *endpoint,
+ }
+ 
+ static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
+-		struct fb_videomode *mode)
++		struct clcd_panel *clcd_panel)
+ {
+ 	int err;
+ 	struct device_node *panel;
++	struct fb_videomode *mode;
+ 	char *name;
+ 	int len;
+ 
+@@ -626,11 +648,12 @@ static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
+ 
+ 	/* Only directly connected DPI panels supported for now */
+ 	if (of_device_is_compatible(panel, "panel-dpi"))
+-		err = clcdfb_of_get_dpi_panel_mode(panel, mode);
++		err = clcdfb_of_get_dpi_panel_mode(panel, clcd_panel);
+ 	else
+ 		err = -ENOENT;
+ 	if (err)
+ 		return err;
++	mode = &clcd_panel->mode;
+ 
+ 	len = clcdfb_snprintf_mode(NULL, 0, mode);
+ 	name = devm_kzalloc(dev, len + 1, GFP_KERNEL);
+@@ -661,8 +684,8 @@ static int clcdfb_of_init_tft_panel(struct clcd_fb *fb, u32 r0, u32 g0, u32 b0)
+ 	};
+ 	int i;
+ 
+-	/* Bypass pixel clock divider, data output on the falling edge */
+-	fb->panel->tim2 = TIM2_BCD | TIM2_IPC;
++	/* Bypass pixel clock divider */
++	fb->panel->tim2 |= TIM2_BCD;
+ 
+ 	/* TFT display, vert. comp. interrupt at the start of the back porch */
+ 	fb->panel->cntl |= CNTL_LCDTFT | CNTL_LCDVCOMP(1);
+@@ -702,7 +725,7 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
+ 	if (err)
+ 		return err;
+ 
+-	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, &fb->panel->mode);
++	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, fb->panel);
+ 	if (err)
+ 		return err;
+ 
 -- 
 2.4.11
