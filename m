@@ -1,39 +1,111 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 16 Jun 2016 10:08:03 -0700
-Subject: [PATCH v2] ARM: mm: fix location of _etext
-In-Reply-To: <CAKv+Gu-my1pd43WO=A_gQFgvtG3efYD97Fh8P-vG93G9zmPynw@mail.gmail.com>
-References: <20160615202447.GA5005@www.outflux.net>
- <CAKv+Gu-my1pd43WO=A_gQFgvtG3efYD97Fh8P-vG93G9zmPynw@mail.gmail.com>
-Message-ID: <CAGXu5jKuwkiaVCtTSbcY-UAE4_5rJDX0t0e22O1+A+NYDUZ9oA@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 16 Jun 2016 13:08:35 -0400
+Subject: [PATCH V7 7/9] vfio, platform: make reset driver a requirement by
+ default
+In-Reply-To: <8eaecc6e-aece-e859-281a-b02e2b6eced7@redhat.com>
+References: <1465792001-27960-1-git-send-email-okaya@codeaurora.org>
+ <1465792001-27960-8-git-send-email-okaya@codeaurora.org>
+ <8eaecc6e-aece-e859-281a-b02e2b6eced7@redhat.com>
+Message-ID: <5762DD13.8010501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 5:04 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 15 June 2016 at 22:24, Kees Cook <keescook@chromium.org> wrote:
->> The _etext position is defined to be the end of the kernel text code,
->> and should not include any part of the data segments. This interferes
->> with things that might check memory ranges and expect executable code
->> up to _etext. Just to be conservative, leave the kernel resource as
->> it was, using __init_begin instead of _etext as the end mark.
+On 6/16/2016 4:15 AM, Auger Eric wrote:
+
+> Unfortunately this causes a crash when the reset module is not
+> available. You should do the vfio_add_group_dev at the end. Something
+> like below.
+> 
+
+Thanks for testing. I'll post v8 with this change. 
+
+
+> Best Regards
+> 
+> Eric
+> 
+> ---
+>  drivers/vfio/platform/vfio_platform_common.c | 26
+> ++++++++++++--------------
+>  1 file changed, 12 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c
+> b/drivers/vfio/platform/vfio_platform_common.c
+> index d84c399..0928f7d 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -664,6 +664,14 @@ int vfio_platform_probe_common(struct
+> vfio_platform_device *vdev,
+>                 return ret;
+> 
+>         vdev->device = dev;
+> +       mutex_init(&vdev->igate);
+> +
+> +       ret = vfio_platform_get_reset(vdev);
+> +       if (ret && vdev->reset_required) {
+> +               pr_err("vfio: no reset function found for device %s\n",
+> +                      vdev->name);
+> +               return ret;
+> +       }
+> 
+>         group = iommu_group_get(dev);
+>         if (!group) {
+> @@ -672,22 +680,12 @@ int vfio_platform_probe_common(struct
+> vfio_platform_device *vdev,
+>         }
+> 
+>         ret = vfio_add_group_dev(dev, &vfio_platform_ops, vdev);
+> -       if (ret)
+> -               goto out;
+> -
+> -       ret = vfio_platform_get_reset(vdev);
+> -       if (ret && vdev->reset_required) {
+> -               pr_err("vfio: no reset function found for device %s\n",
+> -                      vdev->name);
+> -               goto out;
+> -       }
+> -
+> -       mutex_init(&vdev->igate);
+> +       if (ret) {
+> +               iommu_group_put(group);
+> +               return ret;
+> +       }
+> 
+>         return 0;
+> -out:
+> -       iommu_group_put(group);
+> -       return ret;
+>  }
+>  EXPORT_SYMBOL_GPL(vfio_platform_probe_common);
+> 
+> 
+> 
+>>  
+>>  	mutex_init(&vdev->igate);
+>>  
+>>  	return 0;
+>> +out:
+>> +	iommu_group_put(group);
+>> +	return ret;
+>>  }
+>>  EXPORT_SYMBOL_GPL(vfio_platform_probe_common);
+>>  
+>> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+>> index ba9e4f8..68fbc00 100644
+>> --- a/drivers/vfio/platform/vfio_platform_private.h
+>> +++ b/drivers/vfio/platform/vfio_platform_private.h
+>> @@ -50,6 +50,7 @@ struct vfio_platform_region {
+>>  };
+>>  
+>>  struct vfio_platform_device {
+>> +	bool				reset_required;
+>>  	struct vfio_platform_region	*regions;
+>>  	u32				num_regions;
+>>  	struct vfio_platform_irq	*irqs;
 >>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->> v2:
->> - Switched resource tracker to using __init_begin, rmk
->
-> Actually, Linus removed the x86 /proc/iomem resources for kernel segments in
->
-> c4004b02f8e5 ("x86: remove the kernel code/data/bss resources from /proc/iomem")
->
-> so I wonder if we should not just do the same for ARM and arm64?
 
-Nope, that got reverted. Removing it breaks things.
-
-4046d6e81f33b7ef50d6668b78076d54c5e066b6
-
--Kees
 
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
