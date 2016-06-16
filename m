@@ -1,35 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Jun 2016 14:27:57 +0200
-Subject: [PATCH] drm: rockchip: select DRM_GEM_CMA_HELPER
-Message-ID: <20160616122800.1174015-1-arnd@arndb.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 16 Jun 2016 14:28:57 +0200
+Subject: [PATCH 1/2] ARM: drop kernel segment resources from /proc/iomem
+Message-ID: <1466080138-12193-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rockchip drm driver started using drm_gem_cma_vm_ops, but that might
-not be part of the kernel, causing the link to fail:
+By the same reasoning as commit c4004b02f8e5 ("x86: remove the kernel
+code/data/bss resources from /proc/iomem"), the kernel code and kernel
+data entries in /proc/iomem probably do more harm than good on ARM as
+well. So remove them.
 
-drivers/gpu/built-in.o:(.data+0xb234): undefined reference to `drm_gem_cma_vm_ops'
-
-This adds a Kconfig 'select' statement to enable it like the other
-user do.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 80f67cd80add ("drm/rockchip: Use cma gem vm ops")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/gpu/drm/rockchip/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/kernel/setup.c | 26 --------------------------
+ 1 file changed, 26 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-index d30bdc38a760..e48611e83c03 100644
---- a/drivers/gpu/drm/rockchip/Kconfig
-+++ b/drivers/gpu/drm/rockchip/Kconfig
-@@ -2,6 +2,7 @@ config DRM_ROCKCHIP
- 	tristate "DRM Support for Rockchip"
- 	depends on DRM && ROCKCHIP_IOMMU
- 	depends on RESET_CONTROLLER
-+	select DRM_GEM_CMA_HELPER
- 	select DRM_KMS_HELPER
- 	select DRM_KMS_FB_HELPER
- 	select DRM_PANEL
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 7b5350060612..839797c4b454 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -171,24 +171,10 @@ static struct resource mem_res[] = {
+ 		.start = 0,
+ 		.end = 0,
+ 		.flags = IORESOURCE_MEM
+-	},
+-	{
+-		.name = "Kernel code",
+-		.start = 0,
+-		.end = 0,
+-		.flags = IORESOURCE_SYSTEM_RAM
+-	},
+-	{
+-		.name = "Kernel data",
+-		.start = 0,
+-		.end = 0,
+-		.flags = IORESOURCE_SYSTEM_RAM
+ 	}
+ };
+ 
+ #define video_ram   mem_res[0]
+-#define kernel_code mem_res[1]
+-#define kernel_data mem_res[2]
+ 
+ static struct resource io_res[] = {
+ 	{
+@@ -843,11 +829,6 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+ 	struct memblock_region *region;
+ 	struct resource *res;
+ 
+-	kernel_code.start   = virt_to_phys(_text);
+-	kernel_code.end     = virt_to_phys(_etext - 1);
+-	kernel_data.start   = virt_to_phys(_sdata);
+-	kernel_data.end     = virt_to_phys(_end - 1);
+-
+ 	for_each_memblock(memory, region) {
+ 		res = memblock_virt_alloc(sizeof(*res), 0);
+ 		res->name  = "System RAM";
+@@ -856,13 +837,6 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+ 		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+ 
+ 		request_resource(&iomem_resource, res);
+-
+-		if (kernel_code.start >= res->start &&
+-		    kernel_code.end <= res->end)
+-			request_resource(res, &kernel_code);
+-		if (kernel_data.start >= res->start &&
+-		    kernel_data.end <= res->end)
+-			request_resource(res, &kernel_data);
+ 	}
+ 
+ 	if (mdesc->video_start) {
 -- 
-2.9.0
+1.9.1
