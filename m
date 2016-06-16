@@ -1,45 +1,83 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 16 Jun 2016 16:14:00 +0200
-Subject: [PATCH v8 0/2]  Fix dma mapping when the cache is coherent
-In-Reply-To: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Tue, 12 Apr 2016 17:31:08 +0200")
-References: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87vb199q6v.fsf@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 16 Jun 2016 16:14:19 +0200
+Subject: [PATCH v3 1/2] clocksource: Add Oxford Semiconductor RPS Dual
+ Timer
+In-Reply-To: <5762AE08.50506@baylibre.com>
+References: <201606152333.eO0VmlRI%fengguang.wu@intel.com>
+ <5762AAA3.8090304@linaro.org> <5762AE08.50506@baylibre.com>
+Message-ID: <5762B43B.9030104@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
- 
- On mar., avril 12 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> Hi,
+On 06/16/2016 03:47 PM, Neil Armstrong wrote:
+> On 06/16/2016 03:33 PM, Daniel Lezcano wrote:
+>> On 06/15/2016 05:35 PM, kbuild test robot wrote:
+>>> Hi,
+>>>
+>>> [auto build test WARNING on tip/timers/core]
+>>> [also build test WARNING on v4.7-rc3 next-20160615]
+>>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>>>
+>>> url:    https://github.com/0day-ci/linux/commits/Neil-Armstrong/clocksource-Add-support-for-Oxford-Semiconductor-RPS-Dual-Timer/20160615-181650
+>>> config: blackfin-allmodconfig (attached as .config)
+>>> compiler: bfin-uclinux-gcc (GCC) 4.6.3
+>>> reproduce:
+>>>           wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>>>           chmod +x ~/bin/make.cross
+>>>           # save the attached .config to linux build tree
+>>>           make.cross ARCH=blackfin
+>>>
+>>> All warnings (new ones prefixed by >>):
+>>>
+>>>>> drivers/clocksource/timer-oxnas-rps.c:50:0: warning: "TIMER_ENABLE" redefined [enabled by default]
+>>>      arch/blackfin/mach-bf533/include/mach/defBF532.h:97:0: note: this is the location of the previous definition
+>>>
+>>> vim +/TIMER_ENABLE +50 drivers/clocksource/timer-oxnas-rps.c
+>>>
+>>>       34    /* TIMER1 used as tick
+>>>       35     * TIMER2 used as clocksource
+>>>       36     */
+>>>       37
+>>>       38    /* Registers definitions */
+>>>       39
+>>>       40    #define TIMER_LOAD_REG        0x0
+>>>       41    #define TIMER_CURR_REG        0x4
+>>>       42    #define TIMER_CTRL_REG        0x8
+>>>       43    #define TIMER_CLRINT_REG    0xC
+>>>       44
+>>>       45    #define TIMER_BITS        24
+>>>       46
+>>>       47    #define TIMER_MAX_VAL        (BIT(TIMER_BITS) - 1)
+>>>       48
+>>>       49    #define TIMER_PERIODIC        BIT(6)
+>>>     > 50    #define TIMER_ENABLE        BIT(7)
+>>
+>> It is already defined in the arch/blackfin/include dir.
+>>
 >
-> These two patches fixes the dma mapping functions when the system is
-> cache coherent. The first one allows to fix an issue we have on Armada
-> 375/38x with the PL310 that's why it is tagged for stable too.
+> Hi Daniel,
 >
-> Thanks,
-[..]
-> Gregory CLEMENT (2):
->   ARM: dma-mapping: Don't use outer_flush_range when the L2C is coherent
->   ARM: dma-mapping: Fix the coherent case when iommu is used
+> This should never happen due to the blackfin headers.
+> Actually the COMPILE_TEST option made these two happen.
+>
+> Should I push a v4 to keep COMPILE_TEST ?
 
-I submit these two patches to your patch system 2 months ago:
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8561/3
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8561/4
+The easier way would be:
+	depends on !BLACKFIN
 
-but they were not merged yet. Did you expect more change?
-What can I do to help them to be merged?
+I will take care of cleaning up this macro name collision when moving 
+the timer driver in drivers/clocksource (that's really in the future ...).
 
-I have just tested and these two patches still appply, as is, on the
-v4.7-rc3 so there is no need to rebase them.
+The idea is to have all the drivers with the COMPILE_TEST option set, so 
+we can spot more issues at compile time earlier. This change reveals, of 
+course, some errors we were not facing before and at least it has the 
+benefit to enlighten some arch-shadowed drivers.
 
-Thanks,
-
-Gregory
+   -- Daniel
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
