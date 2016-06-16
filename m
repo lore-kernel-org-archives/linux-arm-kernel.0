@@ -1,50 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 16 Jun 2016 11:23:08 +0200
-Subject: [PATCH v6] spi: orion.c: Add direct access mode
-In-Reply-To: <5717715D.6030701@denx.de> (Stefan Roese's message of "Wed, 20
- Apr 2016 14:09:01 +0200")
-References: <1461147068-4829-1-git-send-email-sr@denx.de>
- <87k2jswky0.fsf@free-electrons.com> <5717715D.6030701@denx.de>
-Message-ID: <87d1nhbi83.fsf@free-electrons.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 16 Jun 2016 12:23:40 +0300
+Subject: [PATCH] Revert "gpio: bail out silently on NULL descriptors"
+In-Reply-To: <3a03fc91-b339-3e43-4e95-e1488197a8df@redhat.com>
+References: <1466014954-17956-1-git-send-email-hdegoede@redhat.com>
+ <20160615184628.GA5144@lukather>
+ <3a03fc91-b339-3e43-4e95-e1488197a8df@redhat.com>
+Message-ID: <5762701C.4060409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
- 
- On mer., avril 20 2016, Stefan Roese <sr@denx.de> wrote:
+On 06/15/2016 10:08 PM, Hans de Goede wrote:
+> Hi,
+> 
+> On 15-06-16 20:46, Maxime Ripard wrote:
+>> Hi,
+>>
+>> On Wed, Jun 15, 2016 at 08:22:34PM +0200, Hans de Goede wrote:
+>>> This reverts commit 54d77198fdfb("gpio: bail out silently on NULL
+>>> descriptors").
+>>>
+>>> This commit causes the following code to fail:
+>>>
+>>> gpio_desc = devm_gpiod_get_optional(dev, ...);
 
+May be I missed smth., but in this example gpio_desc may contain err code.
 
->> As you don't submit any patch for the dtsi, I assume that you expect
->> that this part will be done at board level. In this case as I wrote
->> above we are sure that all the board continue working without any need
->> to test them.
->
-> No, this won't work without any changes to the Armada dtsi /
-> dts files. As the SPI controller node needs to get moved
-> for this 'reg' property to work (suggestion from Arnd).
->
-> I've submitted 2 patches for the dtsi / dts files a short while
-> ago:
->
-> http://www.spinics.net/lists/arm-kernel/msg495524.html
-> http://www.spinics.net/lists/arm-kernel/msg495523.html
->
-> When this SPI driver patch gets accepted, I'll send an updated
-> patchset for the dtsi / dts files.
+>>> gpio_irq  = gpiod_to_irq(gpio_desc);
+which, most probably will cause gpiod_to_irq() to crash
+	if (!desc) \
+		return 0; \
+	if (!desc->gdev) { \
+^^^^^^^^^^^^^ here
 
-Unless I am wrong the SPI driver patch got accepted, but I didn't see an
-updated patchset for the dtsi / dts files. Did I miss it?
-
-Else would you ming to send them? Then I will be able to apply them on
-the mvebu tree.
-
-Thanks,
-
-Gregory
+>>> if (gpio_irq >= 0) {
+>>>     ret = devm_request_irq(dev, gpio_irq, ...);
+>>>
+>>> And now ret is an error causing the probe function in question to bail.
+>>>
+>>> The problem here is that gpiod_to_irq now returns 0 for a NULL
+>>> gpio_desc while 0 is a valid irq-nr. Also see:
+>>> commit 4c37ce8608a8("gpio: make gpiod_to_irq() return negative for 
+>>> NO_IRQ")
+>>> which specifically avoids returning 0.
+>>
+>> 0 is not a valid interrupt number.
+> 
+> Ok, so lets decouple the discussion a bit from whether or not 0
+> is a valid interrupt number.
+> 
+>> irq_find_mapping returns 0 in case of an error:
+>> http://lxr.free-electrons.com/source/kernel/irq/irqdomain.c#L657
+> 
+> Yes and in that case gpiod_to_irq() will explicitly return -ENXIO
+> so as to not confuse callers.
+> 
+> Which is the right thing to do, since almost all kernel functions
+> have the semantic ret < 0 means error >= 0 means success.
+> 
+> The patch I'm suggestion to revert however now has gpiod_to_irq()
+> return 0 when it gets passed a NULL gpio_desc pointer, so this
+> really has nothing to do with irq_find_mapping() at all (that never
+> gets called in this case) and has everything to do with the
+> patch I suggest we revert changing the behavior for
+> gpiod_to_irq(NULL).
+> 
+> Also not that that patch has a Cc: stable, so fix the driver is
+> really not a good answer, stable patches should not change
+> (internal) api behavior and break other code.
+> 
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+regards,
+-grygorii
