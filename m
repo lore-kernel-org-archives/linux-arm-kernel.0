@@ -1,27 +1,18 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jun 2016 11:36:14 +0200
-Subject: [PATCH 2/6] video: ARM CLCD: support DT signal inversion flags
+Date: Thu, 16 Jun 2016 11:36:15 +0200
+Subject: [PATCH 3/6] video: ARM CLCD: support pads connected in reverse order
 In-Reply-To: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
 References: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1466069778-16087-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1466069778-16087-4-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree bindings from display-timing.txt allows us to
-specify if data enable, hsync, vsync or the pixed clock should be
-inverted on the way to the display. The driver does not currently
-handle this so add support for those flags as it is needed for
-the Versatile Sanyo LCD display.
-
-Note that the previous behaviour was to invert the pixel clock
-for all displays, so unless the pixel clock polarity is
-explicitly defined in the device tree (i.e. the timings node
-has the "pixelclk-active" property) we fall back to inverting
-the pixel clock. This needs some extra compatibility code.
-
-Since the timing flags have to be set up inside the struct
-clcd_panel, we need to refactor the code a bit to pass around
-the panel rather than just the mode.
+There are CLCDs connected with the pads in BGR rather than RGB
+order. It really doesn't matter since the CLCD has a flag and
+a bit to switch the position of the RGB and BGR components.
+This is needed to put something logical into the
+arm,pl11x,tft-r0g0b0-pads property of the device tree on the
+Nomadik which will then be <16 8 0>.
 
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Rob Herring <robh@kernel.org>
@@ -29,107 +20,83 @@ Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v2->v3:
-- Check if neither DISPLAY_FLAGS_PIXDATA_NEGEDGE or
-  DISPLAY_FLAGS_PIXDATA_POSEDGE to default to NEGEDGE and
-  avoid poking around in the device tree.
+- Russell noted that we could collapse two &=/|= operations into
+  a single ^= and save some arithmetics.
 ChangeLog v1->v2:
-- No changes. Just reposting.
+- No changes
 ---
- drivers/video/fbdev/amba-clcd.c | 37 ++++++++++++++++++++++++++++++-------
- 1 file changed, 30 insertions(+), 7 deletions(-)
+ drivers/video/fbdev/amba-clcd.c |  8 ++++++++
+ include/linux/amba/clcd.h       | 18 +++++++++++++++---
+ 2 files changed, 23 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-index 52a33d3926ac..5bd20e8800bc 100644
+index 5bd20e8800bc..080e8a246faf 100644
 --- a/drivers/video/fbdev/amba-clcd.c
 +++ b/drivers/video/fbdev/amba-clcd.c
-@@ -565,7 +565,7 @@ static int clcdfb_register(struct clcd_fb *fb)
+@@ -675,6 +675,7 @@ static int clcdfb_of_init_tft_panel(struct clcd_fb *fb, u32 r0, u32 g0, u32 b0)
+ 	} panels[] = {
+ 		{ 0x110, 1,  7, 13, CLCD_CAP_5551 },
+ 		{ 0x110, 0,  8, 16, CLCD_CAP_888 },
++		{ 0x110, 16, 8, 0,  CLCD_CAP_888 },
+ 		{ 0x111, 4, 14, 20, CLCD_CAP_444 },
+ 		{ 0x111, 3, 11, 19, CLCD_CAP_444 | CLCD_CAP_5551 },
+ 		{ 0x111, 3, 10, 19, CLCD_CAP_444 | CLCD_CAP_5551 |
+@@ -702,6 +703,13 @@ static int clcdfb_of_init_tft_panel(struct clcd_fb *fb, u32 r0, u32 g0, u32 b0)
+ 			fb->panel->caps = panels[i].caps;
+ 	}
  
- #ifdef CONFIG_OF
- static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
--		struct fb_videomode *mode)
-+		struct clcd_panel *clcd_panel)
- {
- 	int err;
- 	struct display_timing timing;
-@@ -577,10 +577,31 @@ static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
- 
- 	videomode_from_timing(&timing, &video);
- 
--	err = fb_videomode_from_videomode(&video, mode);
-+	err = fb_videomode_from_videomode(&video, &clcd_panel->mode);
- 	if (err)
- 		return err;
- 
-+	/* Set up some inversion flags */
-+	if (timing.flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
-+		clcd_panel->tim2 |= TIM2_IPC;
-+	else if (!(timing.flags & DISPLAY_FLAGS_PIXDATA_POSEDGE))
-+		/*
-+		 * To preserve backwards compatibility, the IPC (inverted
-+		 * pixel clock) flag needs to be set on any display that
-+		 * doesn't explicitly specify that the pixel clock is
-+		 * active on the negative or positive edge.
-+		 */
-+		clcd_panel->tim2 |= TIM2_IPC;
++	/*
++	 * If we actually physically connected the R lines to B and
++	 * vice versa
++	 */
++	if (r0 != 0 && b0 == 0)
++		fb->panel->bgr_connection = true;
 +
-+	if (timing.flags & DISPLAY_FLAGS_HSYNC_LOW)
-+		clcd_panel->tim2 |= TIM2_IHS;
-+
-+	if (timing.flags & DISPLAY_FLAGS_VSYNC_LOW)
-+		clcd_panel->tim2 |= TIM2_IVS;
-+
-+	if (timing.flags & DISPLAY_FLAGS_DE_LOW)
-+		clcd_panel->tim2 |= TIM2_IOE;
-+
- 	return 0;
+ 	return fb->panel->caps ? 0 : -EINVAL;
  }
  
-@@ -613,10 +634,11 @@ static int clcdfb_of_get_backlight(struct device_node *endpoint,
- }
+diff --git a/include/linux/amba/clcd.h b/include/linux/amba/clcd.h
+index e64c1ccebb76..8b64ec0d574b 100644
+--- a/include/linux/amba/clcd.h
++++ b/include/linux/amba/clcd.h
+@@ -108,6 +108,12 @@ struct clcd_panel {
+ 				grayscale:1;
+ 	unsigned int		connector;
+ 	struct backlight_device	*backlight;
++	/*
++	 * If the B/R lines are switched between the CLCD
++	 * and the panel we need to know this and not try to
++	 * compensate with the BGR bit in the control register.
++	 */
++	bool			bgr_connection;
+ };
  
- static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
--		struct fb_videomode *mode)
-+		struct clcd_panel *clcd_panel)
- {
- 	int err;
- 	struct device_node *panel;
-+	struct fb_videomode *mode;
- 	char *name;
- 	int len;
+ struct clcd_regs {
+@@ -234,16 +240,22 @@ static inline void clcdfb_decode(struct clcd_fb *fb, struct clcd_regs *regs)
+ 	if (var->grayscale)
+ 		val |= CNTL_LCDBW;
  
-@@ -626,11 +648,12 @@ static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
+-	if (fb->panel->caps && fb->board->caps &&
+-	    var->bits_per_pixel >= 16) {
++	if (fb->panel->caps && fb->board->caps && var->bits_per_pixel >= 16) {
+ 		/*
+ 		 * if board and panel supply capabilities, we can support
+-		 * changing BGR/RGB depending on supplied parameters
++		 * changing BGR/RGB depending on supplied parameters. Here
++		 * we switch to what the framebuffer is providing if need
++		 * be, so if the framebuffer is BGR but the display connection
++		 * is RGB (first case) we switch it around. Vice versa mutatis
++		 * mutandis if the framebuffer is RGB but the display connection
++		 * is BGR, we flip it around.
+ 		 */
+ 		if (var->red.offset == 0)
+ 			val &= ~CNTL_BGR;
+ 		else
+ 			val |= CNTL_BGR;
++		if (fb->panel->bgr_connection)
++			val ^= CNTL_BGR;
+ 	}
  
- 	/* Only directly connected DPI panels supported for now */
- 	if (of_device_is_compatible(panel, "panel-dpi"))
--		err = clcdfb_of_get_dpi_panel_mode(panel, mode);
-+		err = clcdfb_of_get_dpi_panel_mode(panel, clcd_panel);
- 	else
- 		err = -ENOENT;
- 	if (err)
- 		return err;
-+	mode = &clcd_panel->mode;
- 
- 	len = clcdfb_snprintf_mode(NULL, 0, mode);
- 	name = devm_kzalloc(dev, len + 1, GFP_KERNEL);
-@@ -661,8 +684,8 @@ static int clcdfb_of_init_tft_panel(struct clcd_fb *fb, u32 r0, u32 g0, u32 b0)
- 	};
- 	int i;
- 
--	/* Bypass pixel clock divider, data output on the falling edge */
--	fb->panel->tim2 = TIM2_BCD | TIM2_IPC;
-+	/* Bypass pixel clock divider */
-+	fb->panel->tim2 |= TIM2_BCD;
- 
- 	/* TFT display, vert. comp. interrupt at the start of the back porch */
- 	fb->panel->cntl |= CNTL_LCDTFT | CNTL_LCDVCOMP(1);
-@@ -702,7 +725,7 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
- 	if (err)
- 		return err;
- 
--	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, &fb->panel->mode);
-+	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, fb->panel);
- 	if (err)
- 		return err;
- 
+ 	switch (var->bits_per_pixel) {
 -- 
 2.4.11
