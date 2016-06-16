@@ -1,39 +1,62 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 16 Jun 2016 17:40:29 -0400
-Subject: [PATCH 0/6] [media] Fixes and improvements for VIDIOC_QUERYCAP in
- Samsung media drivers
-Message-ID: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
+Date: Thu, 16 Jun 2016 17:40:30 -0400
+Subject: [PATCH 1/6] [media] s5p-mfc: set capablity bus_info as required by
+ VIDIOC_QUERYCAP
+In-Reply-To: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
+References: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1466113235-25909-2-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The driver doesn't set the struct v4l2_capability bus_info field so the
+v4l2-compliance tool reports the following errors for VIDIOC_QUERYCAP:
 
-This series contains some fixes and improvements for the VIDIOC_QUERYCAP ioctl
-handler in different media platform drivers for IP blocks found in Exynos SoCs.
+Required ioctls:
+                VIDIOC_QUERYCAP returned 0 (Success)
+                fail: v4l2-compliance.cpp(304): string empty
+                fail: v4l2-compliance.cpp(528): check_ustring(vcap.bus_info, sizeof(vcap.bus_info))
+        test VIDIOC_QUERYCAP: FAIL
 
-Some of the issues were reported by the v4l2-compliance tool while others are
-things I noticed while looking at the Driver name, Card type and Bus info.
+This patch fixes by setting the field in VIDIOC_QUERYCAP ioctl handler:
 
-Best regards,
-Javier
+Required ioctls:
+                VIDIOC_QUERYCAP returned 0 (Success)
+        test VIDIOC_QUERYCAP: OK
 
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-Javier Martinez Canillas (6):
-  [media] s5p-mfc: set capablity bus_info as required by VIDIOC_QUERYCAP
-  [media] s5p-mfc: improve v4l2_capability driver and card fields
-  [media] s5p-jpeg: set capablity bus_info as required by
-    VIDIOC_QUERYCAP
-  [media] s5p-jpeg: only fill driver's name in capabilities driver field
-  [media] gsc-m2m: add device name sufix to bus_info capatiliby field
-  [media] gsc-m2m: improve v4l2_capability driver and card fields
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 3 ++-
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
- drivers/media/platform/exynos-gsc/gsc-m2m.c     | 7 ++++---
- drivers/media/platform/s5p-jpeg/jpeg-core.c     | 7 ++++---
- drivers/media/platform/s5p-mfc/s5p_mfc.c        | 1 -
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 2 ++
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    | 7 ++++---
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    | 7 ++++---
- 6 files changed, 18 insertions(+), 13 deletions(-)
-
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index f2d6376ce618..4a40df22fd63 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -267,7 +267,8 @@ static int vidioc_querycap(struct file *file, void *priv,
+ 
+ 	strncpy(cap->driver, dev->plat_dev->name, sizeof(cap->driver) - 1);
+ 	strncpy(cap->card, dev->plat_dev->name, sizeof(cap->card) - 1);
+-	cap->bus_info[0] = 0;
++	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
++		 dev_name(&dev->plat_dev->dev));
+ 	/*
+ 	 * This is only a mem-to-mem video device. The capture and output
+ 	 * device capability flags are left only for backward compatibility
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+index 034b5c1d35a1..dd466ea6429e 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+@@ -945,7 +945,8 @@ static int vidioc_querycap(struct file *file, void *priv,
+ 
+ 	strncpy(cap->driver, dev->plat_dev->name, sizeof(cap->driver) - 1);
+ 	strncpy(cap->card, dev->plat_dev->name, sizeof(cap->card) - 1);
+-	cap->bus_info[0] = 0;
++	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
++		 dev_name(&dev->plat_dev->dev));
+ 	/*
+ 	 * This is only a mem-to-mem video device. The capture and output
+ 	 * device capability flags are left only for backward compatibility
 -- 
 2.5.5
