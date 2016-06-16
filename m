@@ -1,66 +1,83 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 16 Jun 2016 11:13:09 +0100
-Subject: [PATCH] coresight: access conn->child_name only if it's initialised
-Message-ID: <1466071989-24663-1-git-send-email-sudeep.holla@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 16 Jun 2016 18:28:16 +0800
+Subject: [nomadik:pl08x-dma-mmc-sync-callback 5/5]
+ drivers/mmc/host/mmci.c:235:4: note: in expansion of macro 'pr_info'
+Message-ID: <201606161814.7XFbMAhu%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the addition of the coresight devices get deferred, then there's a
-window before child_name is populated by of_get_coresight_platform_data
-from the respective component driver's probe and the attempted to access
-the same from coresight_orphan_match resulting in kernel NULL pointer
-dereference as below:
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git pl08x-dma-mmc-sync-callback
+head:   42839b1b23fb2248fb6d305bfe956a1da8775392
+commit: 42839b1b23fb2248fb6d305bfe956a1da8775392 [5/5] MMC uglyhack
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 42839b1b23fb2248fb6d305bfe956a1da8775392
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Unable to handle kernel NULL pointer dereference at virtual address 0x0
-Internal error: Oops: 96000004 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 1038 Comm: kworker/0:1 Not tainted 4.7.0-rc3 #124
-Hardware name: ARM Juno development board (r2) (DT)
-Workqueue: events amba_deferred_retry_func
-PC is at strcmp+0x1c/0x160
-LR is at coresight_orphan_match+0x7c/0xd0
-Call trace:
- strcmp+0x1c/0x160
- bus_for_each_dev+0x60/0xa0
- coresight_register+0x264/0x2e0
- tmc_probe+0x130/0x310
- amba_probe+0xd4/0x1c8
- driver_probe_device+0x22c/0x418
- __device_attach_driver+0xbc/0x158
- bus_for_each_drv+0x58/0x98
- __device_attach+0xc4/0x160
- device_initial_probe+0x10/0x18
- bus_probe_device+0x94/0xa0
- device_add+0x344/0x580
- amba_device_try_add+0x194/0x238
- amba_deferred_retry_func+0x48/0xd0
- process_one_work+0x118/0x378
- worker_thread+0x48/0x498
- kthread+0xd0/0xe8
- ret_from_fork+0x10/0x40
+All warnings (new ones prefixed by >>):
 
-This patch adds a check for non-NULL conn->child_name before accessing
-the same.
+   In file included from include/linux/printk.h:6:0,
+                    from include/linux/kernel.h:13,
+                    from include/linux/list.h:8,
+                    from include/linux/module.h:9,
+                    from drivers/mmc/host/mmci.c:11:
+   drivers/mmc/host/mmci.c: In function 'mmci_dump_sg':
+>> include/linux/kern_levels.h:4:18: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'size_t {aka long unsigned int}' [-Wformat=]
+    #define KERN_SOH "\001"  /* ASCII Start Of Header */
+                     ^
+   include/linux/kern_levels.h:13:19: note: in expansion of macro 'KERN_SOH'
+    #define KERN_INFO KERN_SOH "6" /* informational */
+                      ^
+   include/linux/printk.h:271:9: note: in expansion of macro 'KERN_INFO'
+     printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
+            ^
+>> drivers/mmc/host/mmci.c:235:4: note: in expansion of macro 'pr_info'
+       pr_info("addr: %p, length: %08x\n",
+       ^
+   drivers/mmc/host/mmci.c: At top level:
+   drivers/mmc/host/mmci.c:226:13: warning: 'mmci_dump_sg' defined but not used [-Wunused-function]
+    static void mmci_dump_sg(struct mmc_data *data)
+                ^
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+vim +/pr_info +235 drivers/mmc/host/mmci.c
+
+   219		.pwrreg_powerup		= MCI_PWR_UP,
+   220		.f_max			= 208000000,
+   221		.explicit_mclk_control	= true,
+   222		.qcom_fifo		= true,
+   223		.qcom_dml		= true,
+   224	};
+   225	
+   226	static void mmci_dump_sg(struct mmc_data *data)
+   227	{
+   228	
+   229		unsigned int flags = SG_MITER_ATOMIC | SG_MITER_FROM_SG;
+   230		struct sg_mapping_iter miter;
+   231	
+   232		sg_miter_start(&miter, data->sg, data->sg_len, flags);
+   233		do {
+   234			if (miter.length > 0) {
+ > 235				pr_info("addr: %p, length: %08x\n",
+   236					miter.addr,
+   237					miter.length);
+   238				print_hex_dump(KERN_INFO, "data: ",
+   239					DUMP_PREFIX_OFFSET, 16, 1,
+   240					miter.addr, miter.length, true);
+   241			}
+   242		} while (sg_miter_next(&miter));
+   243		sg_miter_stop(&miter);
+
 ---
- drivers/hwtracing/coresight/coresight.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 5443d03a1eec..12ca4cd97f5b 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -722,7 +722,8 @@ static int coresight_orphan_match(struct device *dev, void *data)
- 		/* We have found at least one orphan connection */
- 		if (conn->child_dev == NULL) {
- 			/* Does it match this newly added device? */
--			if (!strcmp(dev_name(&csdev->dev), conn->child_name)) {
-+			if (conn->child_name &&
-+			    !strcmp(dev_name(&csdev->dev), conn->child_name)) {
- 				conn->child_dev = csdev;
- 			} else {
- 				/* This component still has an orphan */
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 25987 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160616/92cb84fb/attachment-0001.obj>
