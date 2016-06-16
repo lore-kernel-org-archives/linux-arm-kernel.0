@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:26:34 +0200
-Subject: [PATCH V2 15/63] clocksource/drivers/clksrc-dbx500: Convert init
+Date: Thu, 16 Jun 2016 23:26:55 +0200
+Subject: [PATCH V2 36/63] clocksource/drivers/time-orion: Convert init
  function to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-16-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-37-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,31 +26,45 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/clksrc-dbx500-prcmu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/clocksource/time-lpc32xx.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
-index dfad6eb..5a59d29 100644
---- a/drivers/clocksource/clksrc-dbx500-prcmu.c
-+++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-@@ -64,7 +64,7 @@ static u64 notrace dbx500_prcmu_sched_clock_read(void)
- 
- #endif
- 
--static void __init clksrc_dbx500_prcmu_init(struct device_node *node)
-+static int __init clksrc_dbx500_prcmu_init(struct device_node *node)
+diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
+index daae61e..cb5b866 100644
+--- a/drivers/clocksource/time-lpc32xx.c
++++ b/drivers/clocksource/time-lpc32xx.c
+@@ -288,16 +288,16 @@ err_clk_enable:
+  * This function asserts that we have exactly one clocksource and one
+  * clock_event_device in the end.
+  */
+-static void __init lpc32xx_timer_init(struct device_node *np)
++static int __init lpc32xx_timer_init(struct device_node *np)
  {
- 	clksrc_dbx500_timer_base = of_iomap(node, 0);
+ 	static int has_clocksource, has_clockevent;
+-	int ret;
++	int ret = 0;
  
-@@ -84,7 +84,7 @@ static void __init clksrc_dbx500_prcmu_init(struct device_node *node)
- #ifdef CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK
- 	sched_clock_register(dbx500_prcmu_sched_clock_read, 32, RATE_32K);
- #endif
--	clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
-+	return clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
+ 	if (!has_clocksource) {
+ 		ret = lpc32xx_clocksource_init(np);
+ 		if (!ret) {
+ 			has_clocksource = 1;
+-			return;
++			return 0;
+ 		}
+ 	}
+ 
+@@ -305,8 +305,10 @@ static void __init lpc32xx_timer_init(struct device_node *np)
+ 		ret = lpc32xx_clockevent_init(np);
+ 		if (!ret) {
+ 			has_clockevent = 1;
+-			return;
++			return 0;
+ 		}
+ 	}
++
++	return ret;
  }
--CLOCKSOURCE_OF_DECLARE(dbx500_prcmu, "stericsson,db8500-prcmu-timer-4",
-+CLOCKSOURCE_OF_DECLARE_RET(dbx500_prcmu, "stericsson,db8500-prcmu-timer-4",
- 		       clksrc_dbx500_prcmu_init);
+-CLOCKSOURCE_OF_DECLARE(lpc32xx_timer, "nxp,lpc3220-timer", lpc32xx_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(lpc32xx_timer, "nxp,lpc3220-timer", lpc32xx_timer_init);
 -- 
 1.9.1
