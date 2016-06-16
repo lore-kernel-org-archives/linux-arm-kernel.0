@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:26:27 +0200
-Subject: [PATCH V2 08/63] clocksource/drivers/st_lpc: Convert init function to
- return error
+Date: Thu, 16 Jun 2016 23:26:32 +0200
+Subject: [PATCH V2 13/63] clocksource/drivers/bcm2835_timer: Convert init
+ function to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-9-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-14-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,66 +26,85 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/clksrc_st_lpc.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+ drivers/clocksource/bcm2835_timer.c | 40 +++++++++++++++++++++++++------------
+ 1 file changed, 27 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/clocksource/clksrc_st_lpc.c b/drivers/clocksource/clksrc_st_lpc.c
-index 65ec467..c9022a9 100644
---- a/drivers/clocksource/clksrc_st_lpc.c
-+++ b/drivers/clocksource/clksrc_st_lpc.c
-@@ -92,7 +92,7 @@ static int __init st_clksrc_setup_clk(struct device_node *np)
- 	return 0;
+diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
+index 6f28229..2dcf896 100644
+--- a/drivers/clocksource/bcm2835_timer.c
++++ b/drivers/clocksource/bcm2835_timer.c
+@@ -80,19 +80,24 @@ static irqreturn_t bcm2835_time_interrupt(int irq, void *dev_id)
+ 	}
  }
  
--static void __init st_clksrc_of_register(struct device_node *np)
-+static int __init st_clksrc_of_register(struct device_node *np)
+-static void __init bcm2835_timer_init(struct device_node *node)
++static int __init bcm2835_timer_init(struct device_node *node)
  {
- 	int ret;
- 	uint32_t mode;
-@@ -100,32 +100,36 @@ static void __init st_clksrc_of_register(struct device_node *np)
- 	ret = of_property_read_u32(np, "st,lpc-mode", &mode);
- 	if (ret) {
- 		pr_err("clksrc-st-lpc: An LPC mode must be provided\n");
--		return;
-+		return ret;
- 	}
+ 	void __iomem *base;
+ 	u32 freq;
+-	int irq;
++	int irq, ret;
+ 	struct bcm2835_timer *timer;
  
- 	/* LPC can either run as a Clocksource or in RTC or WDT mode */
- 	if (mode != ST_LPC_MODE_CLKSRC)
--		return;
-+		return 0;
- 
- 	ddata.base = of_iomap(np, 0);
- 	if (!ddata.base) {
- 		pr_err("clksrc-st-lpc: Unable to map iomem\n");
--		return;
+ 	base = of_iomap(node, 0);
+-	if (!base)
+-		panic("Can't remap registers");
++	if (!base) {
++		pr_err("Can't remap registers");
 +		return -ENXIO;
- 	}
++	}
  
--	if (st_clksrc_setup_clk(np)) {
-+	ret = st_clksrc_setup_clk(np);
+-	if (of_property_read_u32(node, "clock-frequency", &freq))
+-		panic("Can't read clock-frequency");
++	ret = of_property_read_u32(node, "clock-frequency", &freq);
 +	if (ret) {
- 		iounmap(ddata.base);
--		return;
++		pr_err("Can't read clock-frequency");
 +		return ret;
- 	}
++	}
  
--	if (st_clksrc_init()) {
-+	ret = st_clksrc_init();
+ 	system_clock = base + REG_COUNTER_LO;
+ 	sched_clock_register(bcm2835_sched_read, 32, freq);
+@@ -101,12 +106,16 @@ static void __init bcm2835_timer_init(struct device_node *node)
+ 		freq, 300, 32, clocksource_mmio_readl_up);
+ 
+ 	irq = irq_of_parse_and_map(node, DEFAULT_TIMER);
+-	if (irq <= 0)
+-		panic("Can't parse IRQ");
++	if (irq <= 0) {
++		pr_err("Can't parse IRQ");
++		return -EINVAL;
++	}
+ 
+ 	timer = kzalloc(sizeof(*timer), GFP_KERNEL);
+-	if (!timer)
+-		panic("Can't allocate timer struct\n");
++	if (!timer) {
++		pr_err("Can't allocate timer struct\n");
++		return -ENOMEM;
++	}
+ 
+ 	timer->control = base + REG_CONTROL;
+ 	timer->compare = base + REG_COMPARE(DEFAULT_TIMER);
+@@ -121,12 +130,17 @@ static void __init bcm2835_timer_init(struct device_node *node)
+ 	timer->act.dev_id = timer;
+ 	timer->act.handler = bcm2835_time_interrupt;
+ 
+-	if (setup_irq(irq, &timer->act))
+-		panic("Can't set up timer IRQ\n");
++	ret = setup_irq(irq, &timer->act);
 +	if (ret) {
- 		clk_disable_unprepare(ddata.clk);
- 		clk_put(ddata.clk);
- 		iounmap(ddata.base);
--		return;
++		pr_err("Can't set up timer IRQ\n");
 +		return ret;
- 	}
++	}
  
- 	pr_info("clksrc-st-lpc: clocksource initialised - running @ %luHz\n",
- 		clk_get_rate(ddata.clk));
+ 	clockevents_config_and_register(&timer->evt, freq, 0xf, 0xffffffff);
+ 
+ 	pr_info("bcm2835: system timer (irq = %d)\n", irq);
 +
-+	return ret;
++	return 0;
  }
--CLOCKSOURCE_OF_DECLARE(ddata, "st,stih407-lpc", st_clksrc_of_register);
-+CLOCKSOURCE_OF_DECLARE_RET(ddata, "st,stih407-lpc", st_clksrc_of_register);
+-CLOCKSOURCE_OF_DECLARE(bcm2835, "brcm,bcm2835-system-timer",
++CLOCKSOURCE_OF_DECLARE_RET(bcm2835, "brcm,bcm2835-system-timer",
+ 			bcm2835_timer_init);
 -- 
 1.9.1
