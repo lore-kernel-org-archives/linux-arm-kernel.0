@@ -1,21 +1,21 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:26:31 +0200
-Subject: [PATCH V2 12/63] clocksource/drivers/armv7m_systick: Convert init
+Date: Thu, 16 Jun 2016 23:26:34 +0200
+Subject: [PATCH V2 15/63] clocksource/drivers/clksrc-dbx500: Convert init
  function to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-13-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-16-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The init functions do not return any error. They behave as the following:
 
- - panic, thus leading to a kernel crash while another timer may work and
-   make the system boot up correctly
+  - panic, thus leading to a kernel crash while another timer may work and
+       make the system boot up correctly
 
- or
+  or
 
- - print an error and let the caller unaware if the state of the system
+  - print an error and let the caller unaware if the state of the system
 
 Change that by converting the init functions to return an error conforming
 to the CLOCKSOURCE_OF_RET prototype.
@@ -26,71 +26,31 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/armv7m_systick.c | 18 ++++++++++++------
- 1 file changed, 12 insertions(+), 6 deletions(-)
+ drivers/clocksource/clksrc-dbx500-prcmu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clocksource/armv7m_systick.c b/drivers/clocksource/armv7m_systick.c
-index addfd2c..2b55410 100644
---- a/drivers/clocksource/armv7m_systick.c
-+++ b/drivers/clocksource/armv7m_systick.c
-@@ -21,7 +21,7 @@
+diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
+index dfad6eb..5a59d29 100644
+--- a/drivers/clocksource/clksrc-dbx500-prcmu.c
++++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
+@@ -64,7 +64,7 @@ static u64 notrace dbx500_prcmu_sched_clock_read(void)
  
- #define SYSTICK_LOAD_RELOAD_MASK 0x00FFFFFF
+ #endif
  
--static void __init system_timer_of_register(struct device_node *np)
-+static int __init system_timer_of_register(struct device_node *np)
+-static void __init clksrc_dbx500_prcmu_init(struct device_node *node)
++static int __init clksrc_dbx500_prcmu_init(struct device_node *node)
  {
- 	struct clk *clk = NULL;
- 	void __iomem *base;
-@@ -31,22 +31,26 @@ static void __init system_timer_of_register(struct device_node *np)
- 	base = of_iomap(np, 0);
- 	if (!base) {
- 		pr_warn("system-timer: invalid base address\n");
--		return;
-+		return -ENXIO;
- 	}
+ 	clksrc_dbx500_timer_base = of_iomap(node, 0);
  
- 	ret = of_property_read_u32(np, "clock-frequency", &rate);
- 	if (ret) {
- 		clk = of_clk_get(np, 0);
--		if (IS_ERR(clk))
-+		if (IS_ERR(clk)) {
-+			ret = PTR_ERR(clk);
- 			goto out_unmap;
-+		}
- 
- 		ret = clk_prepare_enable(clk);
- 		if (ret)
- 			goto out_clk_put;
- 
- 		rate = clk_get_rate(clk);
--		if (!rate)
-+		if (!rate) {
-+			ret = -EINVAL;
- 			goto out_clk_disable;
-+		}
- 	}
- 
- 	writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
-@@ -64,7 +68,7 @@ static void __init system_timer_of_register(struct device_node *np)
- 
- 	pr_info("ARM System timer initialized as clocksource\n");
- 
--	return;
-+	return 0;
- 
- out_clk_disable:
- 	clk_disable_unprepare(clk);
-@@ -73,7 +77,9 @@ out_clk_put:
- out_unmap:
- 	iounmap(base);
- 	pr_warn("ARM System timer register failed (%d)\n", ret);
-+
-+	return ret;
+@@ -84,7 +84,7 @@ static void __init clksrc_dbx500_prcmu_init(struct device_node *node)
+ #ifdef CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+ 	sched_clock_register(dbx500_prcmu_sched_clock_read, 32, RATE_32K);
+ #endif
+-	clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
++	return clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
  }
- 
--CLOCKSOURCE_OF_DECLARE(arm_systick, "arm,armv7m-systick",
-+CLOCKSOURCE_OF_DECLARE_RET(arm_systick, "arm,armv7m-systick",
- 			system_timer_of_register);
+-CLOCKSOURCE_OF_DECLARE(dbx500_prcmu, "stericsson,db8500-prcmu-timer-4",
++CLOCKSOURCE_OF_DECLARE_RET(dbx500_prcmu, "stericsson,db8500-prcmu-timer-4",
+ 		       clksrc_dbx500_prcmu_init);
 -- 
 1.9.1
