@@ -1,49 +1,41 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 16 Jun 2016 15:42:27 +0100
-Subject: [PATCH 2/3] arm64: dts: juno: add arm, primecell-periphid override
-In-Reply-To: <1465228765-14038-3-git-send-email-sudeep.holla@arm.com>
-References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
- <1465228765-14038-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <5762BAD3.6050405@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 16 Jun 2016 16:48:52 +0200
+Subject: [PATCH] serial: mvebu-uart: free the IRQ in ->shutdown()
+Message-ID: <1466088532-17093-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As suggested by the serial port infrastructure documentation, the IRQ is
+requested in ->startup(). However, it is never freed in the ->shutdown()
+hook.
 
+With simple systems that open the serial port once for all and always
+have at least one process that keep the serial port opened, there was no
+problem. But with a more complicated system (*cough* systemd *cough*),
+the serial port is opened/closed many times, which at some point no
+processes having the serial port open at all. Due to this ->startup()
+gets called again, tries to request_irq() again, which fails.
 
-On 06/06/16 16:59, Sudeep Holla wrote:
-> The Linux AMBA framework probes the peripheral ids when adding the amba
-> devices very early on the boot. Generally they are on APB bus and just
-> require APB clocks to be on even when most of the core logic of the IP
-> is powered down.
->
-> However on Juno, the entire debugsys domain needs to be ON to access
-> those CID/PID registers and hence broken by design. Accessing those
-> while debugsys power domain is off will lead to the bridge stalling the
-> transactions instead of returning the slave error.
->
-> Since keeping the power domain on by default affects the core power(by
-> preventing cores entering deeper idle states), it's not feasible
-> solution. Instead we can provide arm,primecell-periphid override in the
-> device tree that prevents accessing the device early in the boot.
->
+Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700 serial port")
+Cc: <stable@vger.kernel.org>
+Cc: Ofer Heifetz <oferh@marvell.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/tty/serial/mvebu-uart.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-OK, I recently found out that AMBA bus/infrastructure can deal with 
-powered off domains even while adding the devices. That makes this patch 
-redundant. I had missed it initially as I tested with !CONFIG_PM
-option.
-
-So I raised the issue with !CONFIG_PM option[1] and it was suggested to 
-make platform select the same[2] as there's no simple way to deal with
-that.
-
-Hence I will drop this patch but will post patch to select PM from
-ARCH_VEXPRESS to ensure we always have it enabled to deal with this
-platform issue.
-
+diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+index ce362bd..45b57c2 100644
+--- a/drivers/tty/serial/mvebu-uart.c
++++ b/drivers/tty/serial/mvebu-uart.c
+@@ -300,6 +300,8 @@ static int mvebu_uart_startup(struct uart_port *port)
+ static void mvebu_uart_shutdown(struct uart_port *port)
+ {
+ 	writel(0, port->membase + UART_CTRL);
++
++	free_irq(port->irq, port);
+ }
+ 
+ static void mvebu_uart_set_termios(struct uart_port *port,
 -- 
-Regards,
-Sudeep
-
-
-[1] http://marc.info/?l=linux-pm&m=146607608629880&w=2
-[2] http://marc.info/?l=linux-pm&m=146608125731479&w=2
+2.7.4
