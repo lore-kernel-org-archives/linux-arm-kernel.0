@@ -1,36 +1,41 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 16 Jun 2016 13:48:45 +0100
-Subject: [PATCH] irqchip/bcm2836: make bcm2836_smp_boot_secondary static
-In-Reply-To: <20160613011852.GI24391@io.lakedaemon.net>
-References: <1465407697-8116-1-git-send-email-ben.dooks@codethink.co.uk>
- <20160613011852.GI24391@io.lakedaemon.net>
-Message-ID: <0c23b47a-f718-1024-c93a-be8b15e2cd48@codethink.co.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 16 Jun 2016 14:57:07 +0200
+Subject: [PATCH 4/7] crypto: marvell: Moving the tdma chain out of
+ mv_cesa_tdma_req
+In-Reply-To: <57629562.9030908@free-electrons.com>
+References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
+ <1466018134-10779-5-git-send-email-romain.perier@free-electrons.com>
+ <20160615224249.3e1e477b@bbrezillon>
+ <57629562.9030908@free-electrons.com>
+Message-ID: <20160616145707.34ba532d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/16 02:18, Jason Cooper wrote:
-> Hey Ben,
-> 
-> On Wed, Jun 08, 2016 at 06:41:37PM +0100, Ben Dooks wrote:
->> The bcm2836_smp_boot_secondary() is not declared or used elsewhere
->> so make it static to fix the following warning:
->>
->> drivers/irqchip/irq-bcm2836.c:227:12: warning: symbol 'bcm2836_smp_boot_secondary' was not declared. Should it be static?
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> ---
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> ---
->>  drivers/irqchip/irq-bcm2836.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> This, and the rest of the irqchip/ ones, applied to irqchip/misc.
+On Thu, 16 Jun 2016 14:02:42 +0200
+Romain Perier <romain.perier@free-electrons.com> wrote:
 
-Thank you, so hopefully it'll be included in -next soon?
+> > Now that the dma specific fields are part of the base request there's no
+> > reason to keep this union.
+> >
+> > You can just put struct mv_cesa_req base; directly under struct
+> > mv_cesa_ablkcipher_req, and move mv_cesa_ablkcipher_std_req fields in
+> > mv_cesa_ablkcipher_req.  
+> 
+> 
+> Well, I think that I might keep the changes related to mv_cesa_tdma_req 
+> in this commit (+ put struct mv_cesa_req base; direct under struct 
+> mv_cesa_ablkcipher_req) and move the changes related to 
+> mv_cesa_ablkcipher_std_req into another commit. What do you think ?
+
+After re-reading the code, I'm not sure the last part (moving
+mv_cesa_ablkcipher_std_req fields into mv_cesa_ablkcipher_req) is a
+good idea anymore.
+
+So let's just kill the union, and move mv_cesa_ablkcipher_std_req and
+mv_cesa_req base in mv_cesa_ablkcipher_req (you'll also have to remove
+the base field from the mv_cesa_ablkcipher_std_req struct).
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
