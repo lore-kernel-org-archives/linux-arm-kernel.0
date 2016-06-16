@@ -1,18 +1,60 @@
-From: florian.fainelli@broadcom.com (Florian Fainelli)
-Date: Thu, 16 Jun 2016 09:27:54 -0700
-Subject: [PATCH 7/7] ARM: dts: nsp: Add sata device tree entry
-In-Reply-To: <1466085215-10246-8-git-send-email-yendapally.reddy@broadcom.com>
-References: <1466085215-10246-1-git-send-email-yendapally.reddy@broadcom.com>
- <1466085215-10246-8-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <5762D38A.5080207@broadcom.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 16 Jun 2016 17:32:59 +0100
+Subject: [PATCH v2] arm64: allow building with kcov coverage on ARM64
+In-Reply-To: <20160616162531.GF18752@e104818-lin.cambridge.arm.com>
+References: <20160614175543.GA2468@leverpostej>
+ <CAG_fn=X521a9uD1bthDZ-swO9hrfq=jE2C_LUvzkn6C_q5dBvA@mail.gmail.com>
+ <20160615092509.GA3984@leverpostej>
+ <20160615114438.GC3984@leverpostej>
+ <CAG_fn=U7-fUnw1GLwBbmqGTxnOWf4QcTjTyP4mGAORfEuWt3Eg@mail.gmail.com>
+ <20160615142550.GA7971@leverpostej> <576283B9.9050900@arm.com>
+ <CAG_fn=X=LSEN2FS0rapgW1PEEqkDLcSXLdxeKa=5ya9g0GJ23A@mail.gmail.com>
+ <20160616154412.GC31477@leverpostej>
+ <20160616162531.GF18752@e104818-lin.cambridge.arm.com>
+Message-ID: <20160616163258.GA1459@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2016 06:53 AM, Yendapally Reddy Dhananjaya Reddy wrote:
-> Add sata support to the Northstar Plus SoC device tree.
+On Thu, Jun 16, 2016 at 05:25:31PM +0100, Catalin Marinas wrote:
+> On Thu, Jun 16, 2016 at 04:44:12PM +0100, Mark Rutland wrote:
+> > On Thu, Jun 16, 2016 at 05:20:03PM +0200, Alexander Potapenko wrote:
+> > > I think it's time to ask now :)
+> > > If I receive "Tested-by" or "Acked-by" responses, do I need to send
+> > > out a patch adding them, or should I rely on the maintainer taking the
+> > > patch to the tree?
+> > > The first option reduces the amount of work done by the maintainer,
+> > > while the second one reduces the traffic in the list.
+> > > Sorry, I couldn't find the answer in the manuals.
+> > 
+> > It's up to the maintainer, so it varies. The best thing to do is to ask
+> > the maintainer what they'd prefer.
+> > 
+> > From my experience, Catalin is usually happy to add tags, so I suspect
+> > he'd be happy to do so for this patch (assuming he's happy to pick it
+> > up). I'll leave it for him to say either way.
 > 
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+> I usually cherry-pick tags that I see in reply to the *latest* version
+> of the patch (I have a rudimentary script to do this).
+> 
+> I noticed that there was an ack on v1 form Marc Z that's missing in v2.
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
--- 
-Florian
+I believe Marc's reply [1] was to v3 [2], it's just that the version was
+missing form the subject, and discussions continued on v2 in the mean
+time.
+
+> Maybe it no longer applies, I can't tell, but I usually expect
+> subsequent versions of a patch to include all the previously given acks
+> (of course, if they still apply, sometimes a patch rewrite means
+> dropping those tags).
+
+I guess the simplest thing to do is for Alexander to send a v4 with the
+tags accumulated, assuming James's Tested-by is applicable to v3 with
+the boot/Makefile hunk removed. James?
+
+My ack stands.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/436551.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/436512.html
