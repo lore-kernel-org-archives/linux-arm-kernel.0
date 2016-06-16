@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:27:21 +0200
-Subject: [PATCH V2 62/63] clocksource/drivers/oxnas-rps: Convert init function
- to return error
+Date: Thu, 16 Jun 2016 23:26:37 +0200
+Subject: [PATCH V2 18/63] clocksource/drivers/arm_global_timer: Convert init
+ function to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-63-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-19-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,89 +26,95 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-oxnas-rps.c | 33 ++++++++++++++++++++-------------
- 1 file changed, 20 insertions(+), 13 deletions(-)
+ drivers/clocksource/arm_global_timer.c | 28 ++++++++++++++++++----------
+ 1 file changed, 18 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/clocksource/timer-oxnas-rps.c b/drivers/clocksource/timer-oxnas-rps.c
-index c002e99..0d99f40 100644
---- a/drivers/clocksource/timer-oxnas-rps.c
-+++ b/drivers/clocksource/timer-oxnas-rps.c
-@@ -220,32 +220,37 @@ static int __init oxnas_rps_clocksource_init(struct oxnas_rps_timer *rps)
- 	return 0;
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index 9df0d16..40104fc 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -238,7 +238,7 @@ static void __init gt_delay_timer_init(void)
+ 	register_current_timer_delay(&gt_delay_timer);
  }
  
--static void __init oxnas_rps_timer_init(struct device_node *np)
-+static int __init oxnas_rps_timer_init(struct device_node *np)
+-static void __init gt_clocksource_init(void)
++static int __init gt_clocksource_init(void)
  {
- 	struct oxnas_rps_timer *rps;
- 	void __iomem *base;
- 	int ret;
+ 	writel(0, gt_base + GT_CONTROL);
+ 	writel(0, gt_base + GT_COUNTER0);
+@@ -249,7 +249,7 @@ static void __init gt_clocksource_init(void)
+ #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+ 	sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
+ #endif
+-	clocksource_register_hz(&gt_clocksource, gt_clk_rate);
++	return clocksource_register_hz(&gt_clocksource, gt_clk_rate);
+ }
  
- 	rps = kzalloc(sizeof(*rps), GFP_KERNEL);
--	if (!rps) {
--		pr_err("Failed to allocate rps structure\n");
+ static int gt_cpu_notify(struct notifier_block *self, unsigned long action,
+@@ -270,7 +270,7 @@ static struct notifier_block gt_cpu_nb = {
+ 	.notifier_call = gt_cpu_notify,
+ };
+ 
+-static void __init global_timer_of_register(struct device_node *np)
++static int __init global_timer_of_register(struct device_node *np)
+ {
+ 	struct clk *gt_clk;
+ 	int err = 0;
+@@ -283,19 +283,19 @@ static void __init global_timer_of_register(struct device_node *np)
+ 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9
+ 	    && (read_cpuid_id() & 0xf0000f) < 0x200000) {
+ 		pr_warn("global-timer: non support for this cpu version.\n");
 -		return;
--	}
-+	if (!rps)
-+		return -ENOMEM;
++		return -ENOSYS;
+ 	}
  
- 	rps->clk = of_clk_get(np, 0);
--	if (WARN_ON(IS_ERR(rps->clk)))
-+	if (IS_ERR(rps->clk)) {
-+		ret = PTR_ERR(rps->clk);
- 		goto err_alloc;
-+	}
+ 	gt_ppi = irq_of_parse_and_map(np, 0);
+ 	if (!gt_ppi) {
+ 		pr_warn("global-timer: unable to parse irq\n");
+-		return;
++		return -EINVAL;
+ 	}
  
--	if (WARN_ON(clk_prepare_enable(rps->clk)))
-+	ret = clk_prepare_enable(rps->clk);
-+	if (ret)
- 		goto err_clk;
+ 	gt_base = of_iomap(np, 0);
+ 	if (!gt_base) {
+ 		pr_warn("global-timer: invalid base address\n");
+-		return;
++		return -ENXIO;
+ 	}
  
- 	base = of_iomap(np, 0);
--	if (WARN_ON(!base))
-+	if (!base) {
-+		ret = -ENXIO;
- 		goto err_clk_prepare;
-+	}
+ 	gt_clk = of_clk_get(np, 0);
+@@ -332,11 +332,17 @@ static void __init global_timer_of_register(struct device_node *np)
+ 	}
  
- 	rps->irq = irq_of_parse_and_map(np, 0);
--	if (WARN_ON(rps->irq < 0))
-+	if (rps->irq < 0) {
-+		ret = -EINVAL;
- 		goto err_iomap;
-+	}
- 
- 	rps->clkevt_base = base + TIMER1_REG_OFFSET;
- 	rps->clksrc_base = base + TIMER2_REG_OFFSET;
-@@ -261,7 +266,7 @@ static void __init oxnas_rps_timer_init(struct device_node *np)
- 	ret = request_irq(rps->irq, oxnas_rps_timer_irq,
- 			  IRQF_TIMER | IRQF_IRQPOLL,
- 			  "rps-timer", rps);
--	if (WARN_ON(ret))
-+	if (ret)
- 		goto err_iomap;
- 
- 	ret = oxnas_rps_clocksource_init(rps);
-@@ -272,7 +277,7 @@ static void __init oxnas_rps_timer_init(struct device_node *np)
- 	if (ret)
- 		goto err_irqreq;
+ 	/* Immediately configure the timer on the boot CPU */
+-	gt_clocksource_init();
+-	gt_clockevents_init(this_cpu_ptr(gt_evt));
++	err = gt_clocksource_init();
++	if (err)
++		goto out_irq;
++	
++	err = gt_clockevents_init(this_cpu_ptr(gt_evt));
++	if (err)
++		goto out_irq;
++
+ 	gt_delay_timer_init();
  
 -	return;
 +	return 0;
  
- err_irqreq:
- 	free_irq(rps->irq, rps);
-@@ -284,7 +289,9 @@ err_clk:
- 	clk_put(rps->clk);
- err_alloc:
- 	kfree(rps);
+ out_irq:
+ 	free_percpu_irq(gt_ppi, gt_evt);
+@@ -347,8 +353,10 @@ out_clk:
+ out_unmap:
+ 	iounmap(gt_base);
+ 	WARN(err, "ARM Global timer register failed (%d)\n", err);
 +
-+	return ret;
++	return err;
  }
  
--CLOCKSOURCE_OF_DECLARE(ox810se_rps,
--		       "oxsemi,ox810se-rps-timer", oxnas_rps_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(ox810se_rps,
-+			   "oxsemi,ox810se-rps-timer", oxnas_rps_timer_init);
+ /* Only tested on r2p2 and r3p0  */
+-CLOCKSOURCE_OF_DECLARE(arm_gt, "arm,cortex-a9-global-timer",
++CLOCKSOURCE_OF_DECLARE_RET(arm_gt, "arm,cortex-a9-global-timer",
+ 			global_timer_of_register);
 -- 
 1.9.1
