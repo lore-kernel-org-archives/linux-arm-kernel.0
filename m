@@ -1,61 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Jun 2016 13:38:25 +0200
-Subject: [PATCH 4/5] usb: pxa27x_udc: remove unused function argument
-In-Reply-To: <20160616113831.4108439-1-arnd@arndb.de>
-References: <20160616113831.4108439-1-arnd@arndb.de>
-Message-ID: <20160616113831.4108439-5-arnd@arndb.de>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 16 Jun 2016 19:52:11 +0800
+Subject: [nomadik:nhk15-clcd 9/14]
+ drivers/video/fbdev/amba-clcd-nomadik.c:156:28: warning: unused variable
+ 'var'
+Message-ID: <201606161910.igFgJeqv%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get a warning for this when building with W=1 because the
-argument gets assigned to something else but never read:
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git nhk15-clcd
+head:   80109ac8700188687807bba720744d870440a551
+commit: 6be6baa6ab55e26554a9f42fe22eb8d8fb28f542 [9/14] videa: ARM CLCD: add special board and panel hooks for Nomadik
+config: arm-nhk8815_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 6be6baa6ab55e26554a9f42fe22eb8d8fb28f542
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-drivers/usb/gadget/udc/pxa27x_udc.c: In function 'stop_activity':
-drivers/usb/gadget/udc/pxa27x_udc.c:1828:74: error: parameter 'driver' set but not used [-Werror=unused-but-set-parameter]
+All warnings (new ones prefixed by >>):
 
-This remove the argument entirely.
+   drivers/video/fbdev/amba-clcd-nomadik.c: In function 'tpg110_enable':
+>> drivers/video/fbdev/amba-clcd-nomadik.c:156:28: warning: unused variable 'var' [-Wunused-variable]
+     struct fb_var_screeninfo *var = &fb->fb.var;
+                               ^
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+vim +/var +156 drivers/video/fbdev/amba-clcd-nomadik.c
+
+   140			break;
+   141		case 0x7:
+   142			dev_info(dev, "800x480 RGB");
+   143			break;
+   144		default:
+   145			dev_info(dev, "ILLEGAL RESOLUTION");
+   146			break;
+   147		}
+   148	
+   149		val = tpg110_read_reg(0x03);
+   150		dev_info(dev, "resolution is controlled by %s\n",
+   151			(val & BIT(7)) ? "software" : "hardware");
+   152	}
+   153	
+   154	static void tpg110_enable(struct clcd_fb *fb)
+   155	{
+ > 156		struct fb_var_screeninfo *var = &fb->fb.var;
+   157		struct device *dev = &fb->dev->dev;
+   158		static bool startup = false;
+   159		u8 val;
+   160	
+   161		if (!startup) {
+   162			tpg110_startup(dev);
+   163			startup = true;
+   164		}
+
 ---
- drivers/usb/gadget/udc/pxa27x_udc.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-index 001a3b74a993..ad140aa00132 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-@@ -1825,13 +1825,10 @@ fail:
-  * Disables all udc endpoints (even control endpoint), report disconnect to
-  * the gadget user.
-  */
--static void stop_activity(struct pxa_udc *udc, struct usb_gadget_driver *driver)
-+static void stop_activity(struct pxa_udc *udc)
- {
- 	int i;
- 
--	/* don't disconnect drivers more than once */
--	if (udc->gadget.speed == USB_SPEED_UNKNOWN)
--		driver = NULL;
- 	udc->gadget.speed = USB_SPEED_UNKNOWN;
- 
- 	for (i = 0; i < NR_USB_ENDPOINTS; i++)
-@@ -1848,7 +1845,7 @@ static int pxa27x_udc_stop(struct usb_gadget *g)
- {
- 	struct pxa_udc *udc = to_pxa(g);
- 
--	stop_activity(udc, NULL);
-+	stop_activity(udc);
- 	udc_disable(udc);
- 
- 	udc->driver = NULL;
-@@ -2296,7 +2293,7 @@ static void irq_udc_reset(struct pxa_udc *udc)
- 
- 	if ((udccr & UDCCR_UDA) == 0) {
- 		dev_dbg(udc->dev, "USB reset start\n");
--		stop_activity(udc, udc->driver);
-+		stop_activity(udc);
- 	}
- 	udc->gadget.speed = USB_SPEED_FULL;
- 	memset(&udc->stats, 0, sizeof udc->stats);
--- 
-2.9.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 15146 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160616/624ca207/attachment-0001.obj>
