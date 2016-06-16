@@ -1,21 +1,21 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:26:26 +0200
-Subject: [PATCH V2 07/63] clocksource/drivers/cadence_ttc: Convert init
+Date: Thu, 16 Jun 2016 23:26:30 +0200
+Subject: [PATCH V2 11/63] clocksource/drivers/digitcolor: Convert init
  function to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-12-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The init functions do not return any error. They behave as the following:
 
- - panic, thus leading to a kernel crash while another timer may work and
-   make the system boot up correctly
+  - panic, thus leading to a kernel crash while another timer may work and
+       make the system boot up correctly
 
- or
+  or
 
- - print an error and let the caller unaware if the state of the system
+  - print an error and let the caller unaware if the state of the system
 
 Change that by converting the init functions to return an error conforming
 to the CLOCKSOURCE_OF_RET prototype.
@@ -26,205 +26,64 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/cadence_ttc_timer.c | 76 ++++++++++++++++++++-------------
- 1 file changed, 47 insertions(+), 29 deletions(-)
+ drivers/clocksource/timer-digicolor.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-index 9be6018..e2e7631 100644
---- a/drivers/clocksource/cadence_ttc_timer.c
-+++ b/drivers/clocksource/cadence_ttc_timer.c
-@@ -322,22 +322,22 @@ static int ttc_rate_change_clocksource_cb(struct notifier_block *nb,
- 	return NOTIFY_DONE;
+diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
+index 96bb222..b929061 100644
+--- a/drivers/clocksource/timer-digicolor.c
++++ b/drivers/clocksource/timer-digicolor.c
+@@ -148,7 +148,7 @@ static u64 notrace digicolor_timer_sched_read(void)
+ 	return ~readl(dc_timer_dev.base + COUNT(TIMER_B));
  }
  
--static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base,
-+static int __init ttc_setup_clocksource(struct clk *clk, void __iomem *base,
- 					 u32 timer_width)
+-static void __init digicolor_timer_init(struct device_node *node)
++static int __init digicolor_timer_init(struct device_node *node)
  {
- 	struct ttc_timer_clocksource *ttccs;
- 	int err;
- 
- 	ttccs = kzalloc(sizeof(*ttccs), GFP_KERNEL);
--	if (WARN_ON(!ttccs))
+ 	unsigned long rate;
+ 	struct clk *clk;
+@@ -161,19 +161,19 @@ static void __init digicolor_timer_init(struct device_node *node)
+ 	dc_timer_dev.base = of_iomap(node, 0);
+ 	if (!dc_timer_dev.base) {
+ 		pr_err("Can't map registers");
 -		return;
-+	if (!ttccs)
-+		return -ENOMEM;
- 
- 	ttccs->ttc.clk = clk;
- 
- 	err = clk_prepare_enable(ttccs->ttc.clk);
--	if (WARN_ON(err)) {
-+	if (err) {
- 		kfree(ttccs);
--		return;
-+		return err;
- 	}
- 
- 	ttccs->ttc.freq = clk_get_rate(ttccs->ttc.clk);
-@@ -345,8 +345,10 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base,
- 	ttccs->ttc.clk_rate_change_nb.notifier_call =
- 		ttc_rate_change_clocksource_cb;
- 	ttccs->ttc.clk_rate_change_nb.next = NULL;
--	if (clk_notifier_register(ttccs->ttc.clk,
--				&ttccs->ttc.clk_rate_change_nb))
-+
-+	err = clk_notifier_register(ttccs->ttc.clk,
-+				    &ttccs->ttc.clk_rate_change_nb);
-+	if (err)
- 		pr_warn("Unable to register clock notifier.\n");
- 
- 	ttccs->ttc.base_addr = base;
-@@ -368,14 +370,16 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base,
- 		     ttccs->ttc.base_addr + TTC_CNT_CNTRL_OFFSET);
- 
- 	err = clocksource_register_hz(&ttccs->cs, ttccs->ttc.freq / PRESCALE);
--	if (WARN_ON(err)) {
-+	if (err) {
- 		kfree(ttccs);
--		return;
-+		return err;
- 	}
- 
- 	ttc_sched_clock_val_reg = base + TTC_COUNT_VAL_OFFSET;
- 	sched_clock_register(ttc_sched_clock_read, timer_width,
- 			     ttccs->ttc.freq / PRESCALE);
-+
-+	return 0;
- }
- 
- static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
-@@ -401,30 +405,35 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
- 	}
- }
- 
--static void __init ttc_setup_clockevent(struct clk *clk,
--						void __iomem *base, u32 irq)
-+static int __init ttc_setup_clockevent(struct clk *clk,
-+				       void __iomem *base, u32 irq)
- {
- 	struct ttc_timer_clockevent *ttcce;
- 	int err;
- 
- 	ttcce = kzalloc(sizeof(*ttcce), GFP_KERNEL);
--	if (WARN_ON(!ttcce))
--		return;
-+	if (!ttcce)
-+		return -ENOMEM;
- 
- 	ttcce->ttc.clk = clk;
- 
- 	err = clk_prepare_enable(ttcce->ttc.clk);
--	if (WARN_ON(err)) {
-+	if (err) {
- 		kfree(ttcce);
--		return;
-+		return err;
- 	}
- 
- 	ttcce->ttc.clk_rate_change_nb.notifier_call =
- 		ttc_rate_change_clockevent_cb;
- 	ttcce->ttc.clk_rate_change_nb.next = NULL;
--	if (clk_notifier_register(ttcce->ttc.clk,
--				&ttcce->ttc.clk_rate_change_nb))
-+
-+	err = clk_notifier_register(ttcce->ttc.clk,
-+				    &ttcce->ttc.clk_rate_change_nb);
-+	if (err) {
- 		pr_warn("Unable to register clock notifier.\n");
-+		return err;
-+	}
-+
- 	ttcce->ttc.freq = clk_get_rate(ttcce->ttc.clk);
- 
- 	ttcce->ttc.base_addr = base;
-@@ -451,13 +460,15 @@ static void __init ttc_setup_clockevent(struct clk *clk,
- 
- 	err = request_irq(irq, ttc_clock_event_interrupt,
- 			  IRQF_TIMER, ttcce->ce.name, ttcce);
--	if (WARN_ON(err)) {
-+	if (err) {
- 		kfree(ttcce);
--		return;
-+		return err;
- 	}
- 
- 	clockevents_config_and_register(&ttcce->ce,
- 			ttcce->ttc.freq / PRESCALE, 1, 0xfffe);
-+
-+	return 0;
- }
- 
- /**
-@@ -466,17 +477,17 @@ static void __init ttc_setup_clockevent(struct clk *clk,
-  * Initializes the timer hardware and register the clock source and clock event
-  * timers with Linux kernal timer framework
-  */
--static void __init ttc_timer_init(struct device_node *timer)
-+static int __init ttc_timer_init(struct device_node *timer)
- {
- 	unsigned int irq;
- 	void __iomem *timer_baseaddr;
- 	struct clk *clk_cs, *clk_ce;
- 	static int initialized;
--	int clksel;
-+	int clksel, ret;
- 	u32 timer_width = 16;
- 
- 	if (initialized)
--		return;
-+		return 0;
- 
- 	initialized = 1;
- 
-@@ -488,13 +499,13 @@ static void __init ttc_timer_init(struct device_node *timer)
- 	timer_baseaddr = of_iomap(timer, 0);
- 	if (!timer_baseaddr) {
- 		pr_err("ERROR: invalid timer base address\n");
--		BUG();
 +		return -ENXIO;
  	}
  
- 	irq = irq_of_parse_and_map(timer, 1);
+ 	irq = irq_of_parse_and_map(node, dc_timer_dev.timer_id);
  	if (irq <= 0) {
- 		pr_err("ERROR: invalid interrupt number\n");
--		BUG();
+ 		pr_err("Can't parse IRQ");
+-		return;
 +		return -EINVAL;
  	}
  
- 	of_property_read_u32(timer, "timer-width", &timer_width);
-@@ -504,7 +515,7 @@ static void __init ttc_timer_init(struct device_node *timer)
- 	clk_cs = of_clk_get(timer, clksel);
- 	if (IS_ERR(clk_cs)) {
- 		pr_err("ERROR: timer input clock not found\n");
--		BUG();
-+		return PTR_ERR(clk_cs);
+ 	clk = of_clk_get(node, 0);
+ 	if (IS_ERR(clk)) {
+ 		pr_err("Can't get timer clock");
+-		return;
++		return PTR_ERR(clk);
  	}
- 
- 	clksel = readl_relaxed(timer_baseaddr + 4 + TTC_CLK_CNTRL_OFFSET);
-@@ -512,13 +523,20 @@ static void __init ttc_timer_init(struct device_node *timer)
- 	clk_ce = of_clk_get(timer, clksel);
- 	if (IS_ERR(clk_ce)) {
- 		pr_err("ERROR: timer input clock not found\n");
--		BUG();
-+		return PTR_ERR(clk_cs);
- 	}
- 
--	ttc_setup_clocksource(clk_cs, timer_baseaddr, timer_width);
--	ttc_setup_clockevent(clk_ce, timer_baseaddr + 4, irq);
-+	ret = ttc_setup_clocksource(clk_cs, timer_baseaddr, timer_width);
-+	if (ret)
+ 	clk_prepare_enable(clk);
+ 	rate = clk_get_rate(clk);
+@@ -190,13 +190,17 @@ static void __init digicolor_timer_init(struct device_node *node)
+ 	ret = request_irq(irq, digicolor_timer_interrupt,
+ 			  IRQF_TIMER | IRQF_IRQPOLL, "digicolor_timerC",
+ 			  &dc_timer_dev.ce);
+-	if (ret)
++	if (ret) {
+ 		pr_warn("request of timer irq %d failed (%d)\n", irq, ret);
 +		return ret;
-+
-+	ret = ttc_setup_clockevent(clk_ce, timer_baseaddr + 4, irq);
-+	if (ret)
-+		return ret;
++	}
  
- 	pr_info("%s #0@%p, irq=%d\n", timer->name, timer_baseaddr, irq);
+ 	dc_timer_dev.ce.cpumask = cpu_possible_mask;
+ 	dc_timer_dev.ce.irq = irq;
+ 
+ 	clockevents_config_and_register(&dc_timer_dev.ce, rate, 0, 0xffffffff);
 +
 +	return 0;
  }
- 
--CLOCKSOURCE_OF_DECLARE(ttc, "cdns,ttc", ttc_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(ttc, "cdns,ttc", ttc_timer_init);
+-CLOCKSOURCE_OF_DECLARE(conexant_digicolor, "cnxt,cx92755-timer",
++CLOCKSOURCE_OF_DECLARE_RET(conexant_digicolor, "cnxt,cx92755-timer",
+ 		       digicolor_timer_init);
 -- 
 1.9.1
