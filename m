@@ -1,72 +1,45 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 16 Jun 2016 13:39:53 -0500
-Subject: [PATCHv3 4/7] Documentation: dt: socfpga: Add Arria10 Ethernet
- binding
-In-Reply-To: <1465852752-11018-5-git-send-email-tthayer@opensource.altera.com>
-References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
- <1465852752-11018-5-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20160616183953.GA6667@rob-hp-laptop>
+Date: Thu, 16 Jun 2016 13:42:30 -0500
+Subject: [PATCH v2 08/11] Documentation: phy: Let the rockchip eMMC PHY
+ get an exported card clock
+In-Reply-To: <1465859076-4868-9-git-send-email-dianders@chromium.org>
+References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
+ <1465859076-4868-9-git-send-email-dianders@chromium.org>
+Message-ID: <20160616184230.GA18869@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 04:19:09PM -0500, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+On Mon, Jun 13, 2016 at 04:04:32PM -0700, Douglas Anderson wrote:
+> As of an earlier change in this series ("Documentation: mmc:
+> sdhci-of-arasan: Add ability to export card clock") the SDHCI driver
+> used on Rockchip SoCs can now expose its clock.  Let's now specify that
+> the PHY can use it.
 > 
-> Add the device tree bindings needed to support the Altera Ethernet
-> FIFO buffers on the Arria10 chip.
+> Letting the PHY get access to this clock means it can adjust
+> phyctrl_frqsel field appropriately.  Although the Rockchip PHY appears
+> slightly different than the reference Arasan one, you can see that the
+> Arasan datasheet [1] had it defined as:
+>   Select the frequency range of DLL operation:
+>   3b'000 => 200MHz to 170 MHz
+>   3b'001 => 170MHz to 140 MHz
+>   3b'010 => 140MHz to 110 MHz
+>   3b'011 => 110MHz to 80MHz
+>   3b'100 => 80MHz to 50 MHz
+>   3b'101 => 275Mhz to 250MHz
+>   3b'110 => 250MHz to 225MHz
+>   3b'111 => 225MHz to 200MHz
 > 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> On the Rockchip version of the PHY we have less granularity but the idea
+> is the same.
+> 
+> [1]: https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 > ---
-> v2  No Change
-> v3  Change to common compatible string based on maintainer comments
->     Add local IRQ values.
-> ---
->  .../bindings/arm/altera/socfpga-eccmgr.txt         |   24 ++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+> Changes in v2:
+> - List out clocks and clock names (Rob)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-> index 15eb0df..e9febbb 100644
-> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-> @@ -82,6 +82,14 @@ Required Properties:
->  - interrupts : Should be single bit error interrupt, then double bit error
->  	interrupt, in this order.
->  
-> +Ethernet FIFO ECC
-> +Required Properties:
-> +- compatible : Should be "altr,socfpga-eth-mac-ecc"
-> +- reg        : Address and size for ECC block registers.
-> +- parent     : phandle to parent Ethernet node.
+>  Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 
-parent is too vague. How about altr,ethernet-mac.
-
-> +- interrupts : Should be single bit error interrupt, then double bit error
-> +	interrupt, in this order.
-> +
->  Example:
->  
->  	eccmgr: eccmgr at ffd06000 {
-> @@ -108,4 +116,20 @@ Example:
->  			interrupts = <1 IRQ_TYPE_LEVEL_HIGH>,
->  				     <33 IRQ_TYPE_LEVEL_HIGH> ;
->  		};
-> +
-> +		emac0-rx-ecc at ff8c0800 {
-> +			compatible = "altr,socfpga-eth-mac-ecc";
-> +			reg = <0xff8c0800 0x400>;
-> +			parent = <&gmac0>;
-> +			interrupts = <4 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <36 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		emac0-tx-ecc at ff8c0c00 {
-> +			compatible = "altr,socfpga-eth-mac-ecc";
-> +			reg = <0xff8c0c00 0x400>;
-> +			parent = <&gmac0>;
-> +			interrupts = <5 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <37 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
->  	};
-> -- 
-> 1.7.9.5
-> 
+Acked-by: Rob Herring <robh@kernel.org>
