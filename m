@@ -1,228 +1,452 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 16 Jun 2016 23:48:28 +0000
-Subject: [PATCH v19 09/13] arm64: kdump: add kdump support
+Date: Thu, 16 Jun 2016 23:48:27 +0000
+Subject: [PATCH v19 03/13] arm64/kexec: Add core kexec support
 In-Reply-To: <cover.1466120418.git.geoff@infradead.org>
 References: <cover.1466120418.git.geoff@infradead.org>
-Message-ID: <c506087ca07977d55056171e06dbb291fdddd31e.1466120418.git.geoff@infradead.org>
+Message-ID: <b5534d3ea3662d9f7fc5909b158ab36d135d8f6d.1466120418.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Add three new files, kexec.h, machine_kexec.c and relocate_kernel.S to the
+arm64 architecture that add support for the kexec re-boot mechanism
+(CONFIG_KEXEC) on arm64 platforms.
 
-On crash dump kernel, all the information about primary kernel's system
-memory (core image) is available in elf core header.
-The primary kernel will set aside this header with reserve_elfcorehdr()
-at boot time and inform crash dump kernel of its location via a new
-device-tree property, "linux,elfcorehdr".
-
-Please note that all other architectures use traditional "elfcorehdr="
-kernel parameter for this purpose.
-
-Then crash dump kernel will access the primary kernel's memory with
-copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-not reside in linear mapping on crash dump kernel.
-
-We also need our own elfcorehdr_read() here since the header is placed
-within crash dump kernel's usable memory.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/Kconfig             | 11 +++++++
- arch/arm64/kernel/Makefile     |  1 +
- arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/init.c           | 54 ++++++++++++++++++++++++++++++++
- 4 files changed, 137 insertions(+)
- create mode 100644 arch/arm64/kernel/crash_dump.c
+ arch/arm64/Kconfig                  |  10 ++
+ arch/arm64/include/asm/kexec.h      |  48 ++++++++++
+ arch/arm64/kernel/Makefile          |   2 +
+ arch/arm64/kernel/machine_kexec.c   | 182 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/relocate_kernel.S | 130 ++++++++++++++++++++++++++
+ include/uapi/linux/kexec.h          |   1 +
+ 6 files changed, 373 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kexec.h
+ create mode 100644 arch/arm64/kernel/machine_kexec.c
+ create mode 100644 arch/arm64/kernel/relocate_kernel.S
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 330786d..b5e0eb4 100644
+index 5a0a691..330786d 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -674,6 +674,17 @@ config KEXEC
- 	  but it is independent of the system firmware.   And like a reboot
- 	  you can start any kernel with it, not just Linux.
+@@ -664,6 +664,16 @@ config PARAVIRT_TIME_ACCOUNTING
  
-+config CRASH_DUMP
-+	bool "Build kdump crash kernel"
-+	help
-+	  Generate crash dump after being started by kexec. This should
-+	  be normally only set in special crash dump kernels which are
-+	  loaded in the main kernel with kexec-tools into a specially
-+	  reserved region and then later executed after a crash by
-+	  kdump/kexec.
-+
-+	  For more details see Documentation/kdump/kdump.txt
+ 	  If in doubt, say N here.
+ 
++config KEXEC
++	depends on PM_SLEEP_SMP
++	select KEXEC_CORE
++	bool "kexec system call"
++	---help---
++	  kexec is a system call that implements the ability to shutdown your
++	  current kernel, and to start another kernel.  It is like a reboot
++	  but it is independent of the system firmware.   And like a reboot
++	  you can start any kernel with it, not just Linux.
 +
  config XEN_DOM0
  	def_bool y
  	depends on XEN
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7700c0c..c13d3eb 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -48,6 +48,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
- arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
- arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
-+arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
 new file mode 100644
-index 0000000..2dc54d1
+index 0000000..04744dc
 --- /dev/null
-+++ b/arch/arm64/kernel/crash_dump.c
-@@ -0,0 +1,71 @@
++++ b/arch/arm64/include/asm/kexec.h
+@@ -0,0 +1,48 @@
 +/*
-+ * Routines for doing kexec-based kdump
++ * kexec for arm64
 + *
-+ * Copyright (C) 2014 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
++ * Copyright (C) Linaro.
++ * Copyright (C) Huawei Futurewei Technologies.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+#include <linux/crash_dump.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+#include <linux/memblock.h>
-+#include <linux/uaccess.h>
-+#include <asm/memory.h>
++#ifndef _ARM64_KEXEC_H
++#define _ARM64_KEXEC_H
++
++/* Maximum physical address we can use pages from */
++
++#define KEXEC_SOURCE_MEMORY_LIMIT (-1UL)
++
++/* Maximum address we can reach in physical address mode */
++
++#define KEXEC_DESTINATION_MEMORY_LIMIT (-1UL)
++
++/* Maximum address we can use for the control code buffer */
++
++#define KEXEC_CONTROL_MEMORY_LIMIT (-1UL)
++
++#define KEXEC_CONTROL_PAGE_SIZE 4096
++
++#define KEXEC_ARCH KEXEC_ARCH_AARCH64
++
++#ifndef __ASSEMBLY__
 +
 +/**
-+ * copy_oldmem_page() - copy one page from old kernel memory
-+ * @pfn: page frame number to be copied
-+ * @buf: buffer where the copied page is placed
-+ * @csize: number of bytes to copy
-+ * @offset: offset in bytes into the page
-+ * @userbuf: if set, @buf is in a user address space
++ * crash_setup_regs() - save registers for the panic kernel
 + *
-+ * This function copies one page from old kernel memory into buffer pointed by
-+ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-+ * copied or negative error in case of failure.
++ * @newregs: registers are saved here
++ * @oldregs: registers to be saved (may be %NULL)
 + */
-+ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-+			 size_t csize, unsigned long offset,
-+			 int userbuf)
++
++static inline void crash_setup_regs(struct pt_regs *newregs,
++				    struct pt_regs *oldregs)
 +{
-+	void *vaddr;
++	/* Empty routine needed to avoid build errors. */
++}
 +
-+	if (!csize)
-+		return 0;
++#endif /* __ASSEMBLY__ */
 +
-+	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-+	if (!vaddr)
-+		return -ENOMEM;
++#endif
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 2173149..7700c0c 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -46,6 +46,8 @@ arm64-obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL)	+= acpi_parking_protocol.o
+ arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+ arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
++arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
++					   cpu-reset.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+new file mode 100644
+index 0000000..a6dcb9c
+--- /dev/null
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -0,0 +1,182 @@
++/*
++ * kexec for arm64
++ *
++ * Copyright (C) Linaro.
++ * Copyright (C) Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+	if (userbuf) {
-+		if (copy_to_user(buf, vaddr + offset, csize)) {
-+			iounmap(vaddr);
-+			return -EFAULT;
++#include <linux/kexec.h>
++#include <linux/smp.h>
++
++#include <asm/cacheflush.h>
++#include <asm/cpu_ops.h>
++#include <asm/mmu_context.h>
++
++#include "cpu-reset.h"
++
++/* Global variables for the arm64_relocate_new_kernel routine. */
++extern const unsigned char arm64_relocate_new_kernel[];
++extern const unsigned long arm64_relocate_new_kernel_size;
++
++static unsigned long kimage_start;
++
++void machine_kexec_cleanup(struct kimage *kimage)
++{
++	/* Empty routine needed to avoid build errors. */
++}
++
++/**
++ * machine_kexec_prepare - Prepare for a kexec reboot.
++ *
++ * Called from the core kexec code when a kernel image is loaded.
++ * Forbid loading a kexec kernel if we have no way of hotplugging cpus or cpus
++ * are stuck in the kernel. This avoids a panic once we hit machine_kexec().
++ */
++int machine_kexec_prepare(struct kimage *kimage)
++{
++	kimage_start = kimage->start;
++
++	if (kimage->type != KEXEC_TYPE_CRASH) {
++		if (cpus_are_stuck_in_kernel()) {
++			pr_err("Can't kexec: failed CPUs are stuck in the kernel.\n");
++			return -EBUSY;
 +		}
-+	} else {
-+		memcpy(buf, vaddr + offset, csize);
++
++		if (num_online_cpus() > 1) {
++			if (IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
++				/* any_cpu as we don't mind being preempted */
++				int any_cpu = raw_smp_processor_id();
++
++				if (cpu_ops[any_cpu]->cpu_die)
++					return 0;
++			}
++
++			pr_err("Can't kexec: no mechanism to offline secondary CPUs.\n");
++			return -EBUSY;
++		}
 +	}
 +
-+	iounmap(vaddr);
-+
-+	return csize;
++	return 0;
 +}
 +
 +/**
-+ * elfcorehdr_read - read from ELF core header
-+ * @buf: buffer where the data is placed
-+ * @csize: number of bytes to read
-+ * @ppos: address in the memory
-+ *
-+ * This function reads @count bytes from elf core header which exists
-+ * on crash dump kernel's memory.
++ * kexec_list_flush - Helper to flush the kimage list and source pages to PoC.
 + */
-+ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
++static void kexec_list_flush(struct kimage *kimage)
 +{
-+	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
-+	return count;
++	kimage_entry_t *entry;
++
++	for (entry = &kimage->head; ; entry++) {
++		unsigned int flag;
++		void *addr;
++
++		__flush_dcache_area(entry, sizeof(kimage_entry_t));
++
++		flag = *entry & IND_FLAGS;
++		if (flag == IND_DONE)
++			break;
++
++		addr = phys_to_virt(*entry & PAGE_MASK);
++
++		switch (flag) {
++		case IND_INDIRECTION:
++			/* Set entry point just before the new list page. */
++			entry = (kimage_entry_t *)addr - 1;
++		case IND_SOURCE:
++			__flush_dcache_area(addr, PAGE_SIZE);
++			break;
++		case IND_DESTINATION:
++			break;
++		default:
++			BUG();
++		}
++	}
 +}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index f679918..0c38528 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -35,6 +35,7 @@
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
- #include <linux/kexec.h>
-+#include <linux/crash_dump.h>
- 
- #include <asm/boot.h>
- #include <asm/fixmap.h>
-@@ -136,6 +137,57 @@ static void __init reserve_crashkernel(void)
- }
- #endif /* CONFIG_KEXEC_CORE */
- 
-+#ifdef CONFIG_CRASH_DUMP
-+static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
-+		const char *uname, int depth, void *data)
++
++/**
++ * kexec_segment_flush - Helper to flush the kimage segments to PoC.
++ */
++static void kexec_segment_flush(const struct kimage *kimage)
 +{
-+	const __be32 *reg;
-+	int len;
++	unsigned long i;
 +
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
++	pr_debug("%s:\n", __func__);
 +
-+	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
++	for (i = 0; i < kimage->nr_segments; i++) {
++		pr_debug("  segment[%lu]: %016lx - %016lx, 0x%lx bytes, %lu pages\n",
++			i,
++			kimage->segment[i].mem,
++			kimage->segment[i].mem + kimage->segment[i].memsz,
++			kimage->segment[i].memsz,
++			kimage->segment[i].memsz /  PAGE_SIZE);
 +
-+	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+	return 1;
++		__flush_dcache_area(phys_to_virt(kimage->segment[i].mem),
++			kimage->segment[i].memsz);
++	}
 +}
++
++/**
++ * machine_kexec - Do the kexec reboot.
++ *
++ * Called from the core kexec code for a sys_reboot with LINUX_REBOOT_CMD_KEXEC.
++ */
++void machine_kexec(struct kimage *kimage)
++{
++	phys_addr_t reboot_code_buffer_phys;
++	void *reboot_code_buffer;
++
++	/*
++	 * New cpus may have become stuck_in_kernel after we loaded the image.
++	 */
++	BUG_ON(cpus_are_stuck_in_kernel() && (num_online_cpus() > 1));
++
++	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
++	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
++
++	/*
++	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
++	 * after the kernel is shut down.
++	 */
++	memcpy(reboot_code_buffer, arm64_relocate_new_kernel,
++		arm64_relocate_new_kernel_size);
++
++	/* Flush the reboot_code_buffer in preparation for its execution. */
++	__flush_dcache_area(reboot_code_buffer, arm64_relocate_new_kernel_size);
++	flush_icache_range((uintptr_t)reboot_code_buffer,
++		arm64_relocate_new_kernel_size);
++
++	/* Flush the kimage list. */
++	kexec_list_flush(kimage);
++
++	/* Flush the new image if already in place. */
++	if (kimage->head & IND_DONE)
++		kexec_segment_flush(kimage);
++
++	pr_info("Bye!\n");
++
++	/* Disable all DAIF exceptions. */
++	asm volatile ("msr daifset, #0xf" : : : "memory");
++
++	/*
++	 * cpu_soft_restart will shutdown the MMU, disable data caches, then
++	 * transfer control to the reboot_code_buffer which contains a copy of
++	 * the arm64_relocate_new_kernel routine.  arm64_relocate_new_kernel
++	 * uses physical addressing to relocate the new image to its final
++	 * position and transfers control to the image entry point when the
++	 * relocation is complete.
++	 */
++
++	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
++		kimage_start, 0);
++
++	BUG(); /* Should never get here. */
++}
++
++void machine_crash_shutdown(struct pt_regs *regs)
++{
++	/* Empty routine needed to avoid build errors. */
++}
+diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
+new file mode 100644
+index 0000000..51b73cd
+--- /dev/null
++++ b/arch/arm64/kernel/relocate_kernel.S
+@@ -0,0 +1,130 @@
++/*
++ * kexec for arm64
++ *
++ * Copyright (C) Linaro.
++ * Copyright (C) Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kexec.h>
++#include <linux/linkage.h>
++
++#include <asm/assembler.h>
++#include <asm/kexec.h>
++#include <asm/page.h>
++#include <asm/sysreg.h>
 +
 +/*
-+ * reserve_elfcorehdr() - reserves memory for elf core header
++ * arm64_relocate_new_kernel - Put a 2nd stage image in place and boot it.
 + *
-+ * This function reserves elf core header given in "elfcorehdr=" kernel
-+ * command line parameter. This region contains all the information about
-+ * primary kernel's core image and is used by a dump capture kernel to
-+ * access the system memory on primary kernel.
++ * The memory that the old kernel occupies may be overwritten when coping the
++ * new image to its final location.  To assure that the
++ * arm64_relocate_new_kernel routine which does that copy is not overwritten,
++ * all code and data needed by arm64_relocate_new_kernel must be between the
++ * symbols arm64_relocate_new_kernel and arm64_relocate_new_kernel_end.  The
++ * machine_kexec() routine will copy arm64_relocate_new_kernel to the kexec
++ * control_code_page, a special page which has been set up to be preserved
++ * during the copy operation.
 + */
-+static void __init reserve_elfcorehdr(void)
-+{
-+	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
++ENTRY(arm64_relocate_new_kernel)
 +
-+	if (!elfcorehdr_size)
-+		return;
++	/* Setup the list loop variables. */
++	mov	x17, x1				/* x17 = kimage_start */
++	mov	x16, x0				/* x16 = kimage_head */
++	dcache_line_size x15, x0		/* x15 = dcache line size */
++	mov	x14, xzr			/* x14 = entry ptr */
++	mov	x13, xzr			/* x13 = copy dest */
 +
-+	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
-+		pr_warn("elfcorehdr is overlapped\n");
-+		return;
-+	}
++	/* Clear the sctlr_el2 flags. */
++	mrs	x0, CurrentEL
++	cmp	x0, #CurrentEL_EL2
++	b.ne	1f
++	mrs	x0, sctlr_el2
++	ldr	x1, =SCTLR_ELx_FLAGS
++	bic	x0, x0, x1
++	msr	sctlr_el2, x0
++	isb
++1:
 +
-+	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
++	/* Check if the new image needs relocation. */
++	tbnz	x16, IND_DONE_BIT, .Ldone
 +
-+	pr_info("Reserving %lldKB of memory@0x%llx for elfcorehdr\n",
-+		elfcorehdr_size >> 10, elfcorehdr_addr);
-+}
-+#else
-+static void __init reserve_elfcorehdr(void)
-+{
-+	;
-+}
-+#endif /* CONFIG_CRASH_DUMP */
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -391,6 +443,8 @@ void __init arm64_memblock_init(void)
++.Lloop:
++	and	x12, x16, PAGE_MASK		/* x12 = addr */
++
++	/* Test the entry flags. */
++.Ltest_source:
++	tbz	x16, IND_SOURCE_BIT, .Ltest_indirection
++
++	/* Invalidate dest page to PoC. */
++	mov     x0, x13
++	add     x20, x0, #PAGE_SIZE
++	sub     x1, x15, #1
++	bic     x0, x0, x1
++2:	dc      ivac, x0
++	add     x0, x0, x15
++	cmp     x0, x20
++	b.lo    2b
++	dsb     sy
++
++	mov x20, x13
++	mov x21, x12
++	copy_page x20, x21, x0, x1, x2, x3, x4, x5, x6, x7
++
++	/* dest += PAGE_SIZE */
++	add	x13, x13, PAGE_SIZE
++	b	.Lnext
++
++.Ltest_indirection:
++	tbz	x16, IND_INDIRECTION_BIT, .Ltest_destination
++
++	/* ptr = addr */
++	mov	x14, x12
++	b	.Lnext
++
++.Ltest_destination:
++	tbz	x16, IND_DESTINATION_BIT, .Lnext
++
++	/* dest = addr */
++	mov	x13, x12
++
++.Lnext:
++	/* entry = *ptr++ */
++	ldr	x16, [x14], #8
++
++	/* while (!(entry & DONE)) */
++	tbz	x16, IND_DONE_BIT, .Lloop
++
++.Ldone:
++	/* wait for writes from copy_page to finish */
++	dsb	nsh
++	ic	iallu
++	dsb	nsh
++	isb
++
++	/* Start new image. */
++	mov	x0, xzr
++	mov	x1, xzr
++	mov	x2, xzr
++	mov	x3, xzr
++	br	x17
++
++ENDPROC(arm64_relocate_new_kernel)
++
++.ltorg
++
++.align 3	/* To keep the 64-bit values below naturally aligned. */
++
++.Lcopy_end:
++.org	KEXEC_CONTROL_PAGE_SIZE
++
++/*
++ * arm64_relocate_new_kernel_size - Number of bytes to copy to the
++ * control_code_page.
++ */
++.globl arm64_relocate_new_kernel_size
++arm64_relocate_new_kernel_size:
++	.quad	.Lcopy_end - arm64_relocate_new_kernel
+diff --git a/include/uapi/linux/kexec.h b/include/uapi/linux/kexec.h
+index 99048e5..aae5ebf 100644
+--- a/include/uapi/linux/kexec.h
++++ b/include/uapi/linux/kexec.h
+@@ -39,6 +39,7 @@
+ #define KEXEC_ARCH_SH      (42 << 16)
+ #define KEXEC_ARCH_MIPS_LE (10 << 16)
+ #define KEXEC_ARCH_MIPS    ( 8 << 16)
++#define KEXEC_ARCH_AARCH64 (183 << 16)
  
- 	reserve_crashkernel();
- 
-+	reserve_elfcorehdr();
-+
- 	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
+ /* The artificial cap on the number of segments passed to kexec_load. */
+ #define KEXEC_SEGMENT_MAX 16
 -- 
 2.5.0
