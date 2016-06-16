@@ -1,88 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 16 Jun 2016 14:45:10 +0200
-Subject: [PATCH 4/7] crypto: marvell: Moving the tdma chain out of
- mv_cesa_tdma_req
-In-Reply-To: <57629562.9030908@free-electrons.com>
-References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
- <1466018134-10779-5-git-send-email-romain.perier@free-electrons.com>
- <20160615224249.3e1e477b@bbrezillon>
- <57629562.9030908@free-electrons.com>
-Message-ID: <20160616144510.4d1f0f0f@bbrezillon>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 16 Jun 2016 13:47:31 +0100
+Subject: [QUERY] AMBA: PM domains when !CONFIG_PM
+In-Reply-To: <CAPDyKFoV5Y1mHuDZmWgynCicux2deV89npp-siTQDJr0uZFwcg@mail.gmail.com>
+References: <57628B31.3090901@arm.com>
+ <CAPDyKFoV5Y1mHuDZmWgynCicux2deV89npp-siTQDJr0uZFwcg@mail.gmail.com>
+Message-ID: <57629FE3.8050303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jun 2016 14:02:42 +0200
-Romain Perier <romain.perier@free-electrons.com> wrote:
 
-> > Now that the dma specific fields are part of the base request there's no
-> > reason to keep this union.
-> >
-> > You can just put struct mv_cesa_req base; directly under struct
-> > mv_cesa_ablkcipher_req, and move mv_cesa_ablkcipher_std_req fields in
-> > mv_cesa_ablkcipher_req.  
-> 
-> 
-> Well, I think that I might keep the changes related to mv_cesa_tdma_req 
-> in this commit (+ put struct mv_cesa_req base; direct under struct 
-> mv_cesa_ablkcipher_req) and move the changes related to 
-> mv_cesa_ablkcipher_std_req into another commit. What do you think ?
 
-Sounds good.
+On 16/06/16 13:33, Ulf Hansson wrote:
+>
+>
+> On 16 June 2016 at 13:19, Sudeep Holla <sudeep.holla@arm.com
+> <mailto:sudeep.holla@arm.com>> wrote:
+>
+>     Hi Ulf, Kevin,
+>
+>     I have a situation where we need to enable the power domain to access an
+>     AMBA device. This is all fine with patches from Ulf and Marek in
+>     amba/bus.c
+>
+>     The problem is when we disable CONFIG_PM, dev_pm_domain_attach
+>     returns -ENODEV irrespective of whether a DT node has a PM domain
+>     in it or not. If dev_pm_domain_attach returns anything other than
+>     -EPROBE_DEFER, we ignore the error and proceed to access the device
+>     which will explode.
+>
+>     Basically, we need a way to prevent addition of that amba device if DT
+>     node has PD specified but CONFIG_PM=n. Any thoughts ?
+>
+>
+> The solution TEGRA picked for a kind of similar issue was to enable
+> CONFIG_PM for a family of SoCs.
+>
+> I assume this would be applicable here as well, or are you saying this
+> platform actually is able to work *without* PM support?
+>
 
-> >  
-> >>   	struct mv_cesa_ahash_dma_iter iter;
-> >>   	struct mv_cesa_op_ctx *op = NULL;
-> >>   	unsigned int frag_len;
-> >> @@ -662,11 +661,6 @@ static int mv_cesa_ahash_req_init(struct ahash_request *req, bool *cached)
-> >>   	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
-> >>   	int ret;
-> >>
-> >> -	if (cesa_dev->caps->has_tdma)
-> >> -		creq->req.base.type = CESA_DMA_REQ;
-> >> -	else
-> >> -		creq->req.base.type = CESA_STD_REQ;
-> >> -  
-> >
-> > Hm, where is it decided now? I mean, I don't see this test anywhere
-> > else in your patch, which means you're now always using standard mode.  
-> 
-> It has been replaced by mv_cesa_req_get_type() + initializing 
-> chain.first to NULL in std_init. So, that's the same thing, no ?
+I agree, but if someone tries to boot with !CONFIG_PM, it just hangs
+without a clue, hence I raised this query. I am fine by forcing it to be
+ON always, but just wanted to check if this is something serious that it
+needs to be addressed.
 
-And that's exactly my point :-). When these fields are NULL the request
-is a STD request...
-
-> 
-> >  
-> >>   	creq->src_nents = sg_nents_for_len(req->src, req->nbytes);
-> >>   	if (creq->src_nents < 0) {
-> >>   		dev_err(cesa_dev->dev, "Invalid number of src SG");
-> >> @@ -680,7 +674,7 @@ static int mv_cesa_ahash_req_init(struct ahash_request *req, bool *cached)
-> >>   	if (*cached)
-> >>   		return 0;
-> >>
-> >> -	if (creq->req.base.type == CESA_DMA_REQ)
-> >> +	if (mv_cesa_req_get_type(&creq->req.base) == CESA_DMA_REQ)  
-
-... and here you're testing if it's a DMA request, which will always be
-false, since mv_cesa_ahash_dma_req_init() is the function supposed to
-fill the ->first and ->last fields.
-
-> >
-> > Should be
-> >
-> > 	if (cesa_dev->caps->has_tdma)
-> >  
-> >>   		ret = mv_cesa_ahash_dma_req_init(req);  
-> 
-> Why ? mv_cesa_req_get_type() tests mv_cesa_req->chain and returns a code 
-> depending on its value. This value is initialized according to what is 
-> set un "has_tdma"...
-
-As explained above, it's not ;).
-
+Thanks for the quick response.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Sudeep
