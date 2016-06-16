@@ -1,60 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 16 Jun 2016 12:00:56 +0200
-Subject: [PATCH] ARM: Kirkwood: make
- kirkwood_disable_mbus_error_propagation() static
-In-Reply-To: <1465473145-20826-1-git-send-email-ben.dooks@codethink.co.uk>
- (Ben Dooks's message of "Thu, 9 Jun 2016 12:52:25 +0100")
-References: <1465473145-20826-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <87ziqla1wn.fsf@free-electrons.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 16 Jun 2016 15:22:37 +0530
+Subject: [PATCH 4/5] clk: max77686: Add support for MAX77620 clocks
+In-Reply-To: <57627757.50101@samsung.com>
+References: <1466000018-16784-1-git-send-email-ldewangan@nvidia.com>
+ <1466000018-16784-5-git-send-email-ldewangan@nvidia.com>
+ <57627757.50101@samsung.com>
+Message-ID: <576276E5.5040500@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
- 
- On jeu., juin 09 2016, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+Hi Krzysztof/Javier,
+Thanks for review of the series.
 
-> The kirkwood_disable_mbus_error_propagation is not exported or declared
-> elsewhere, so make it static to avoid the following warning:
->
-> arch/arm/mach-mvebu/kirkwood.c:153:6: warning: symbol 'kirkwood_disable_mbus_error_propagation' was not declared. Should it be static?
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+I will post the V2 after taking care of all comment.
 
-Applied on mvebu/cleanup
+One query about the comment.
 
 Thanks,
+Laxman
 
-Gregory
-
-> ---
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/mach-mvebu/kirkwood.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Thursday 16 June 2016 03:24 PM, Krzysztof Kozlowski wrote:
+> On 06/15/2016 04:13 PM, Laxman Dewangan wrote:
+>>   enum chip_name {
+>>   	CHIP_MAX77686,
+>>   	CHIP_MAX77802,
+>> +	CHIP_MAX77620,
+> Now it is more obvious why it is here. However I don't like the
+> duplication of device IDs, under different names and different values:
+> 1. include/linux/mfd/max77686-private.h
+> 2. include/linux/mfd/max77620.h
+> 3. here
 >
-> diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
-> index f9d8e1e..a3f4029 100644
-> --- a/arch/arm/mach-mvebu/kirkwood.c
-> +++ b/arch/arm/mach-mvebu/kirkwood.c
-> @@ -150,7 +150,7 @@ eth_fixup_skip:
->   * causes mbus errors (which can occur for example for PCI aborts) to
->   * throw CPU aborts, which we're not set up to deal with.
->   */
-> -void kirkwood_disable_mbus_error_propagation(void)
-> +static void kirkwood_disable_mbus_error_propagation(void)
->  {
->  	void __iomem *cpu_config;
->  
-> -- 
-> 2.8.1
+> I was thinking about way of combining it... but these headers are
+> different. Unless there will be one header for all three devices.
 >
+> Anyway, please add the max77686 prefix to the enum.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+so will it be:
+
+enum max77686_chip_name {
+     CHIP_MAX77686,
+     CHIP_MAX77802,
+     CHIP_MAX77620,
+};
+
+
+Will it be fine here?
