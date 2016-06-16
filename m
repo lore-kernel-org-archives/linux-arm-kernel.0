@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:26:58 +0200
-Subject: [PATCH V2 39/63] clocksource/drivers/timer-atlas7: Convert init
+Date: Thu, 16 Jun 2016 23:27:04 +0200
+Subject: [PATCH V2 45/63] clocksource/drivers/timer-keystone: Convert init
  function to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-40-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-46-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,75 +26,61 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-atlas7.c | 32 +++++++++++++++++++-------------
- 1 file changed, 19 insertions(+), 13 deletions(-)
+ drivers/clocksource/timer-keystone.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clocksource/timer-atlas7.c b/drivers/clocksource/timer-atlas7.c
-index 27fa136..7b1a007 100644
---- a/drivers/clocksource/timer-atlas7.c
-+++ b/drivers/clocksource/timer-atlas7.c
-@@ -238,7 +238,7 @@ static struct notifier_block sirfsoc_cpu_nb = {
- 	.notifier_call = sirfsoc_cpu_notify,
- };
- 
--static void __init sirfsoc_clockevent_init(void)
-+static int __init sirfsoc_clockevent_init(void)
- {
- 	sirfsoc_clockevent = alloc_percpu(struct clock_event_device);
- 	BUG_ON(!sirfsoc_clockevent);
-@@ -246,11 +246,11 @@ static void __init sirfsoc_clockevent_init(void)
- 	BUG_ON(register_cpu_notifier(&sirfsoc_cpu_nb));
- 
- 	/* Immediately configure the timer on the boot CPU */
--	sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
-+	return sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
+diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
+index 1cea08c..4199823 100644
+--- a/drivers/clocksource/timer-keystone.c
++++ b/drivers/clocksource/timer-keystone.c
+@@ -144,7 +144,7 @@ static int keystone_set_periodic(struct clock_event_device *evt)
+ 	return 0;
  }
  
- /* initialize the kernel jiffy timer source */
--static void __init sirfsoc_atlas7_timer_init(struct device_node *np)
-+static int __init sirfsoc_atlas7_timer_init(struct device_node *np)
+-static void __init keystone_timer_init(struct device_node *np)
++static int __init keystone_timer_init(struct device_node *np)
  {
- 	struct clk *clk;
+ 	struct clock_event_device *event_dev = &timer.event_dev;
+ 	unsigned long rate;
+@@ -154,20 +154,20 @@ static void __init keystone_timer_init(struct device_node *np)
+ 	irq  = irq_of_parse_and_map(np, 0);
+ 	if (!irq) {
+ 		pr_err("%s: failed to map interrupts\n", __func__);
+-		return;
++		return -EINVAL;
+ 	}
  
-@@ -279,23 +279,29 @@ static void __init sirfsoc_atlas7_timer_init(struct device_node *np)
- 
- 	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, atlas7_timer_rate));
- 
--	sirfsoc_clockevent_init();
-+	return sirfsoc_clockevent_init();
- }
- 
--static void __init sirfsoc_of_timer_init(struct device_node *np)
-+static int __init sirfsoc_of_timer_init(struct device_node *np)
- {
- 	sirfsoc_timer_base = of_iomap(np, 0);
--	if (!sirfsoc_timer_base)
--		panic("unable to map timer cpu registers\n");
-+	if (!sirfsoc_timer_base) {
-+		pr_err("unable to map timer cpu registers\n");
+ 	timer.base = of_iomap(np, 0);
+ 	if (!timer.base) {
+ 		pr_err("%s: failed to map registers\n", __func__);
+-		return;
 +		return -ENXIO;
-+	}
+ 	}
  
- 	sirfsoc_timer_irq.irq = irq_of_parse_and_map(np, 0);
--	if (!sirfsoc_timer_irq.irq)
--		panic("No irq passed for timer0 via DT\n");
-+	if (!sirfsoc_timer_irq.irq) {
-+		pr_err("No irq passed for timer0 via DT\n");
-+		return -EINVAL;
-+	}
+ 	clk = of_clk_get(np, 0);
+ 	if (IS_ERR(clk)) {
+ 		pr_err("%s: failed to get clock\n", __func__);
+ 		iounmap(timer.base);
+-		return;
++		return PTR_ERR(clk);
+ 	}
  
- 	sirfsoc_timer1_irq.irq = irq_of_parse_and_map(np, 1);
--	if (!sirfsoc_timer1_irq.irq)
--		panic("No irq passed for timer1 via DT\n");
-+	if (!sirfsoc_timer1_irq.irq) {
-+		pr_err("No irq passed for timer1 via DT\n");
-+		return -EINVAL;
-+	}
+ 	error = clk_prepare_enable(clk);
+@@ -219,11 +219,12 @@ static void __init keystone_timer_init(struct device_node *np)
+ 	clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
  
--	sirfsoc_atlas7_timer_init(np);
-+	return sirfsoc_atlas7_timer_init(np);
+ 	pr_info("keystone timer clock @%lu Hz\n", rate);
+-	return;
++	return 0;
+ err:
+ 	clk_put(clk);
+ 	iounmap(timer.base);
++	return error;
  }
--CLOCKSOURCE_OF_DECLARE(sirfsoc_atlas7_timer, "sirf,atlas7-tick", sirfsoc_of_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(sirfsoc_atlas7_timer, "sirf,atlas7-tick", sirfsoc_of_timer_init);
+ 
+-CLOCKSOURCE_OF_DECLARE(keystone_timer, "ti,keystone-timer",
+-					keystone_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(keystone_timer, "ti,keystone-timer",
++			   keystone_timer_init);
 -- 
 1.9.1
