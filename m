@@ -1,64 +1,88 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 16 Jun 2016 15:47:52 +0200
-Subject: [PATCH v3 1/2] clocksource: Add Oxford Semiconductor RPS Dual
- Timer
-In-Reply-To: <5762AAA3.8090304@linaro.org>
-References: <201606152333.eO0VmlRI%fengguang.wu@intel.com>
- <5762AAA3.8090304@linaro.org>
-Message-ID: <5762AE08.50506@baylibre.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 16 Jun 2016 14:51:44 +0100
+Subject: [PATCH RESEND 1/3] dt-bindings: add bindings documentation for
+ PDC driver.
+In-Reply-To: <CAG4BRpnP_qqffLF9X+RusNQGnrtARap9HmK4RE4_jSVfO5juGQ@mail.gmail.com>
+References: <1465912965-35500-1-git-send-email-rob.rice@broadcom.com>
+ <1465912965-35500-2-git-send-email-rob.rice@broadcom.com>
+ <576017C7.50609@arm.com>
+ <CAG4BRpnP_qqffLF9X+RusNQGnrtARap9HmK4RE4_jSVfO5juGQ@mail.gmail.com>
+Message-ID: <5762AEF0.9030203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2016 03:33 PM, Daniel Lezcano wrote:
-> On 06/15/2016 05:35 PM, kbuild test robot wrote:
->> Hi,
->>
->> [auto build test WARNING on tip/timers/core]
->> [also build test WARNING on v4.7-rc3 next-20160615]
->> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->>
->> url:    https://github.com/0day-ci/linux/commits/Neil-Armstrong/clocksource-Add-support-for-Oxford-Semiconductor-RPS-Dual-Timer/20160615-181650
->> config: blackfin-allmodconfig (attached as .config)
->> compiler: bfin-uclinux-gcc (GCC) 4.6.3
->> reproduce:
->>          wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->>          chmod +x ~/bin/make.cross
->>          # save the attached .config to linux build tree
->>          make.cross ARCH=blackfin
->>
->> All warnings (new ones prefixed by >>):
->>
->>>> drivers/clocksource/timer-oxnas-rps.c:50:0: warning: "TIMER_ENABLE" redefined [enabled by default]
->>     arch/blackfin/mach-bf533/include/mach/defBF532.h:97:0: note: this is the location of the previous definition
->>
->> vim +/TIMER_ENABLE +50 drivers/clocksource/timer-oxnas-rps.c
->>
->>      34    /* TIMER1 used as tick
->>      35     * TIMER2 used as clocksource
->>      36     */
->>      37   
->>      38    /* Registers definitions */
->>      39   
->>      40    #define TIMER_LOAD_REG        0x0
->>      41    #define TIMER_CURR_REG        0x4
->>      42    #define TIMER_CTRL_REG        0x8
->>      43    #define TIMER_CLRINT_REG    0xC
->>      44   
->>      45    #define TIMER_BITS        24
->>      46   
->>      47    #define TIMER_MAX_VAL        (BIT(TIMER_BITS) - 1)
->>      48   
->>      49    #define TIMER_PERIODIC        BIT(6)
->>    > 50    #define TIMER_ENABLE        BIT(7)
-> 
-> It is already defined in the arch/blackfin/include dir.
-> 
 
-Hi Daniel,
 
-This should never happen due to the blackfin headers.
-Actually the COMPILE_TEST option made these two happen.
+On 16/06/16 14:50, Rob Rice wrote:
+>
+>
+> On Tue, Jun 14, 2016 at 10:42 AM, Sudeep Holla <sudeep.holla@arm.com
+> <mailto:sudeep.holla@arm.com>> wrote:
+>
+>
+>
+>     On 14/06/16 15:02, Rob Rice wrote:
+>
+>         From: Rob Rice <rrice at broadcom.com <mailto:rrice@broadcom.com>>
+>
+>         Add the device tree binding documentation for the PDC hardware
+>         in Broadcom iProc SoCs.
+>
+>         Signed-off-by: Rob Rice <rob.rice@broadcom.com
+>         <mailto:rob.rice@broadcom.com>>
+>         Acked-by: Rob Herring <robh at kernel.org <mailto:robh@kernel.org>>
+>         Reviewed-by: Ray Jui <ray.jui@broadcom.com
+>         <mailto:ray.jui@broadcom.com>>
+>         Reviewed-by: Anup Patel <anup.patel@broadcom.com
+>         <mailto:anup.patel@broadcom.com>>
+>         Reviewed-by: Scott Branden <scott.branden@broadcom.com
+>         <mailto:scott.branden@broadcom.com>>
+>         ---
+>            .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       | 23
+>         ++++++++++++++++++++++
+>            1 file changed, 23 insertions(+)
+>            create mode 100644
+>         Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+>
+>         diff --git
+>         a/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+>         b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+>         new file mode 100644
+>         index 0000000..411ccf4
+>         --- /dev/null
+>         +++
+>         b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+>         @@ -0,0 +1,23 @@
+>         +The PDC driver manages data transfer to and from various
+>         offload engines
+>         +on some Broadcom SoCs. An SoC may have multiple PDC hardware
+>         blocks. There is
+>         +one device tree entry per block.
+>         +
+>         +Required properties:
+>         +- compatible : Should be "brcm,iproc-pdc-mbox".
+>         +- reg: Should contain PDC registers location and length.
+>         +- interrupts: Should contain the IRQ line for the PDC.
+>         +- #mbox-cells: 1
+>         +- brcm,rx-status-len: Length of metadata preceding received
+>         frames, in bytes.
+>         +
+>
+>
+>     Ideally the metadata is more associated with the software protocol built
+>     on top of the mailbox controller.
+>
+>     Is this metadata added by the hardware ?
+>
+>     Otherwise it's better to make it part of the protocol rather than the
+>     associating with the controller.
+>
+>
+> Yes, in fact this metadata is added by the PDC hardware itself. So it
+> seems correct for the DT property to be on the controller.
 
-Should I push a v4 to keep COMPILE_TEST ?
+In that case, it's fine.
 
-Neil
+-- 
+Regards,
+Sudeep
