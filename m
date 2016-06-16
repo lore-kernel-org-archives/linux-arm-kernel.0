@@ -1,45 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Jun 2016 09:57:15 +0200
-Subject: [PATCH v2] ARM: sunxi/dt: make the CHIP inherit from
- allwinner,sun5i-a13
-In-Reply-To: <20160615132149.2587c195@bbrezillon>
-References: <1465989619-2337-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160615132149.2587c195@bbrezillon>
-Message-ID: <20160616075715.GF5144@lukather>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 16 Jun 2016 08:57:27 +0100
+Subject: [PATCH v5 2/3] drm/arm: Add support for Mali Display Processors
+In-Reply-To: <20160615201116.GI1041@n2100.armlinux.org.uk>
+References: <1466002295-24813-1-git-send-email-Liviu.Dudau@arm.com>
+ <1466002295-24813-3-git-send-email-Liviu.Dudau@arm.com>
+ <20160615152309.GI1338@phenom.ffwll.local>
+ <20160615161758.GF9711@e106497-lin.cambridge.arm.com>
+ <CAKMK7uENW3cU8LccHcqffX3cbzax2-5mzY0101yLfR7vtD4CoA@mail.gmail.com>
+ <20160615172104.GI9711@e106497-lin.cambridge.arm.com>
+ <20160615201116.GI1041@n2100.armlinux.org.uk>
+Message-ID: <20160616075727.GK9711@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 01:21:49PM +0200, Boris Brezillon wrote:
-> On Wed, 15 Jun 2016 13:20:19 +0200
-> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> 
-> > The sun4i-timer driver registers its sched_clock only if the machine is
-> > compatible with "allwinner,sun5i-a13", "allwinner,sun5i-a10s" or
-> > "allwinner,sun4i-a10".
-> > Add the missing "allwinner,sun5i-a13" string to the machine compatible.
+Hi Russell,
+
+On Wed, Jun 15, 2016 at 09:11:16PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 15, 2016 at 06:21:04PM +0100, Liviu Dudau wrote:
+> > Could be the tda998x_drv fault, but I'm getting this splat:
 > > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Fixes: 5a33893dd079 ("ARM: sunxi/dt: make the CHIP inherit from allwinner,sun5i-a13")
+> > [    1.347687] kobject_add_internal failed for card0-HDMI-A-1 (error: -2 parent: card0)
 > 
-> Should be
+> Right, so this is -ENOENT - I expect that it's complaining that the
+> parent does not exist before a child is attempted to be added.
 > 
-> Fixes: 465a225fb2af ("ARM: sun5i: Add C.H.I.P DTS")
-> 
-> Maxime, do you want me to resend it?
+> Hopefully, this isn't with -rc kernels, but is with -next.  I think
+> some folk need to Cc me with patches to tda998x, or at least talk to
+> me about what's changed in DRM so that tda998x can get fixed.
 
-No, it's fine. I fixed it and applied.
+This is with a new driver that just went into -next and I was trying a suggestion
+from Daniel to re-order the initialisation steps in preparation of the
+series that Chris Wilson is working on to make init time less racy.
+It is not a normal run splat and I will make sure that we work with
+you to get tda998x changed when we get there.
 
-Thanks!
-Maxime
+Other than the ticlcd driver that is (I think) being converted to atomic, do you
+use any other DRM driver with tda998x?
+
+Best regards,
+Liviu
+
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> 
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160616/03a1fe9c/attachment.sig>
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
