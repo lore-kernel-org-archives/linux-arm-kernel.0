@@ -1,58 +1,43 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 16 Jun 2016 08:57:27 +0100
-Subject: [PATCH v5 2/3] drm/arm: Add support for Mali Display Processors
-In-Reply-To: <20160615201116.GI1041@n2100.armlinux.org.uk>
-References: <1466002295-24813-1-git-send-email-Liviu.Dudau@arm.com>
- <1466002295-24813-3-git-send-email-Liviu.Dudau@arm.com>
- <20160615152309.GI1338@phenom.ffwll.local>
- <20160615161758.GF9711@e106497-lin.cambridge.arm.com>
- <CAKMK7uENW3cU8LccHcqffX3cbzax2-5mzY0101yLfR7vtD4CoA@mail.gmail.com>
- <20160615172104.GI9711@e106497-lin.cambridge.arm.com>
- <20160615201116.GI1041@n2100.armlinux.org.uk>
-Message-ID: <20160616075727.GK9711@e106497-lin.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Jun 2016 09:09:31 +0100
+Subject: [PATCH 3/5] ARM: dts: add L2CC and RPM with regulators for MSM8660
+In-Reply-To: <20160616001714.GN28218@codeaurora.org>
+References: <1465918259-11138-1-git-send-email-linus.walleij@linaro.org>
+ <1465918259-11138-4-git-send-email-linus.walleij@linaro.org>
+ <20160614185517.GG28218@codeaurora.org>
+ <20160614224807.GE1041@n2100.armlinux.org.uk>
+ <20160616001714.GN28218@codeaurora.org>
+Message-ID: <20160616080931.GM1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Wed, Jun 15, 2016 at 09:11:16PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 15, 2016 at 06:21:04PM +0100, Liviu Dudau wrote:
-> > Could be the tda998x_drv fault, but I'm getting this splat:
+On Wed, Jun 15, 2016 at 05:17:14PM -0700, Stephen Boyd wrote:
+> On 06/14, Russell King - ARM Linux wrote:
+> > On Tue, Jun 14, 2016 at 11:55:17AM -0700, Stephen Boyd wrote:
+> > > On 06/14, Linus Walleij wrote:
+> > > > +
+> > > > +			pm8901-regulators {
+> > > 
+> > > I'd rather have regulators at 8901 and regulators at 8058. That way the
+> > > node name is generic per ePAPR suggestions.
 > > 
-> > [    1.347687] kobject_add_internal failed for card0-HDMI-A-1 (error: -2 parent: card0)
+> > But ePAPR requires reg= if you specify a unit-address part of the
+> > node name.
+> > 
 > 
-> Right, so this is -ENOENT - I expect that it's complaining that the
-> parent does not exist before a child is attempted to be added.
+> It seems the ePAPR also leaves this open to interpretation
+> because it states:
 > 
-> Hopefully, this isn't with -rc kernels, but is with -next.  I think
-> some folk need to Cc me with patches to tda998x, or at least talk to
-> me about what's changed in DRM so that tda998x can get fixed.
-
-This is with a new driver that just went into -next and I was trying a suggestion
-from Daniel to re-order the initialisation steps in preparation of the
-series that Chris Wilson is working on to make init time less racy.
-It is not a normal run splat and I will make sure that we work with
-you to get tda998x changed when we get there.
-
-Other than the ticlcd driver that is (I think) being converted to atomic, do you
-use any other DRM driver with tda998x?
-
-Best regards,
-Liviu
-
+>   "The binding for a particular bus may specify additional, more
+>   specific requirements for the format of reg and unit-address."
 > 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
+> but we haven't done anything formal for the RPM "bus" so far. I'm
+> not worried either way, just a fun fact!
+
+Latest dtc with warnings enabled (W=1) warns if you don't follow what
+I quoted.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
