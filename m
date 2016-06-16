@@ -1,79 +1,66 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu, 16 Jun 2016 08:31:11 +0800
-Subject: [v2 PATCH 1/4] Documentation: bindings: add dt doc for Rockchip
- USB Type-C PHY
-In-Reply-To: <2262175.XUeGlE1YsE@phil>
-References: <1465810789-22303-1-git-send-email-zyw@rock-chips.com>
- <1465810789-22303-2-git-send-email-zyw@rock-chips.com>
- <2262175.XUeGlE1YsE@phil>
-Message-ID: <5761F34F.8040202@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 16 Jun 2016 08:32:25 +0800
+Subject: [PATCH] ARM: imx25-pinfunc: remove SION from all modes
+In-Reply-To: <20160613101616.GK26768@pengutronix.de>
+References: <1461095114-11745-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160419211958.GD19428@n2100.arm.linux.org.uk>
+ <20160420104617.15cf8461@ipc1.ka-ro>
+ <20160420085839.GI29108@pengutronix.de>
+ <20160603133247.GV26768@pengutronix.de>
+ <20160603140107.GA8659@tiger>
+ <20160603193148.GW26768@pengutronix.de>
+ <20160613101616.GK26768@pengutronix.de>
+Message-ID: <20160616003225.GI20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko
+On Mon, Jun 13, 2016 at 12:16:16PM +0200, Uwe Kleine-K?nig wrote:
+> Hello Shawn,
+> 
+> On Fri, Jun 03, 2016 at 09:31:48PM +0200, Uwe Kleine-K?nig wrote:
+> > On Fri, Jun 03, 2016 at 10:01:07PM +0800, Shawn Guo wrote:
+> > > On Fri, Jun 03, 2016 at 03:32:47PM +0200, Uwe Kleine-K?nig wrote:
+> > > > I found a regression of the patch under discussion (which was not
+> > > > applied, so no big problem). On the custom mx25 based hardware an
+> > > > SD-card isn't detected any more after removing SION from
+> > > > MX25_PAD_SD1_CMD__SD1_CMD. I verified the same happens on a tx25.
+> > > > 
+> > > > Is this expected? IMHO it's unfortunate (if not a silicon bug) that you
+> > > > need the SION bit here as the SION bit has some more side effects.  If
+> > > > you ask me, muxing a certain function for a pin should enable the input
+> > > > path to the respective module if the pin is bidirectional.
+> > > > 
+> > > > Is there a list of pin/function pairs that need the SION bit set? Shawn,
+> > > > would you agree to accept this patch with the high risk that it
+> > > > introduces regressions? Or maybe we should make the SION bit more easily
+> > > > overridable for board dts files (and default to off unless known it's
+> > > > needed)?
+> > > 
+> > > I would be conservative on this.  Can we just fix the SION bits that are
+> > > known doing harm?
+> > 
+> > I didn't do any measurements, but I'd expect that every SION bit that is
+> > set without good reason increases current consumption. So each SION bit
+> > does some harm. Plus debugging a missing SION bit is much easier than a
+> > SION bit that is set without need.
+> > 
+> > The first problem I debugged was an UART problem and the SION bit had to
+> > be removed from MX25_PAD_KPP_ROW3__GPIO_3_0 (plus back then
+> > MX25_PAD_KPP_ROW3__UART1_RI wasn't defined). The problem I had now was a
+> > broken SD card and I had to add SION to MX25_PAD_SD1_CMD__SD1_CMD.
+> > 
+> > So I expect my commit to (maybe) introduce some obvious and easy to
+> > debug regressions and to (probably) fix some harder to debug and not so
+> > obvious problems. I'd say it's a net win.
+> 
+> I didn't hear anything back from you on this topic. So I created a patch
+> that documents that SION is needed for MX25_PAD_SD1_CMD__SD1_CMD and
+> then rebased the patch under discussion on top of that. I will send the
+> resulting patches as reply to this mail. IMHO the first patch should not
+> be controversal.
+> 
+> I still think that the second patch is a good one, did your view change?
 
-On 06/16/2016 06:11 AM, Heiko Stuebner wrote:
-> Am Montag, 13. Juni 2016, 17:39:46 schrieb Chris Zhong:
->> This patch adds a binding that describes the Rockchip USB Type-C PHY
->> for rk3399
->>
->> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->>
->> ---
->>
->> Changes in v2:
->> - add some registers description
->>
->> Changes in v1:
->> - add extcon node description
->> - move the registers in phy driver
->> - remove the suffix of reset
->>
->>   .../devicetree/bindings/phy/phy-rockchip-typec.txt | 77
->> ++++++++++++++++++++++ 1 file changed, 77 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->>
->> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->> b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt new file
->> mode 100644
->> index 0000000..430920c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->> @@ -0,0 +1,77 @@
->> +* ROCKCHIP type-c PHY
->> +---------------------
->> +
->> +Required properties:
->> + - compatible : should be "rockchip,rk3399-typec-phy0" or
->> +			 "rockchip,rk3399-typec-phy1"
->> + - reg: Address and length of the usb phy control register set
->> + - rockchip,grf : phandle to the syscon managing the "general
->> +   register files"
->> + - clocks : phandle + clock specifier for the phy clocks
->> + - clock-names : string, clock name, must be "tcpdcore", "tcpdphy_ref";
->> + - resets : a list of phandle + reset specifier pairs
->> + - reset-names : string reset name, must be:
->> +		 "tcphy", "tcphy_pipe", "uphy_tcphy"
->> + - #phy-cells : Must be 0.  See ./phy-bindings.txt for details.
->> + - extcon : extcon specifier for the Power Delivery
->> +
->> +Note, there are 2 type-c phys for RK3399, and they are almost identical,
->> except +these registers(description below), every register node contains
->> 3 sections: +offset, enable bit, write mask bit.
->> + - rockchip,typec_conn_dir : the register of type-c connector direction,
->> +   for type-c phy0, it must be <0xe580 0 16>;
->> +   for type-c phy1, it must be <0xe58c 0 16>;
-> I think I said this already, but these register-lists would be much happier
-> being defined inside the driver - see how Frank managed this on his usb2phy
-> please.
->
-> Heiko
->
-Yes, I move them into driver in v1 patch, but Rob Herring and Guenter 
-Roeck recommend to put them back to dts.
-These phy0 and phy1 are exactly the same, except these grf registers.
+Okay, I chose to trust you and applied both patches :)
 
-
-
->
+Shawn
