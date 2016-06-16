@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:27:07 +0200
-Subject: [PATCH V2 48/63] clocksource/drivers/timer-sun5i: Convert init
+Date: Thu, 16 Jun 2016 23:27:06 +0200
+Subject: [PATCH V2 47/63] clocksource/drivers/timer-stm32: Convert init
  function to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-49-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-48-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,69 +26,55 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-sun5i.c | 37 +++++++++++++++++++++++--------------
- 1 file changed, 23 insertions(+), 14 deletions(-)
+ drivers/clocksource/timer-stm32.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index 24c83f9..f0a3ffb 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -311,33 +311,42 @@ err_free:
- 	return ret;
- }
+diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+index f3dcb76..d5bf352 100644
+--- a/drivers/clocksource/timer-stm32.c
++++ b/drivers/clocksource/timer-stm32.c
+@@ -98,7 +98,7 @@ static struct stm32_clock_event_ddata clock_event_ddata = {
+ 	},
+ };
  
--static void __init sun5i_timer_init(struct device_node *node)
-+static int __init sun5i_timer_init(struct device_node *node)
+-static void __init stm32_clockevent_init(struct device_node *np)
++static int __init stm32_clockevent_init(struct device_node *np)
  {
- 	struct reset_control *rstc;
- 	void __iomem *timer_base;
+ 	struct stm32_clock_event_ddata *data = &clock_event_ddata;
  	struct clk *clk;
--	int irq;
-+	int irq, ret;
+@@ -130,12 +130,14 @@ static void __init stm32_clockevent_init(struct device_node *np)
  
- 	timer_base = of_io_request_and_map(node, 0, of_node_full_name(node));
--	if (IS_ERR(timer_base))
--		panic("Can't map registers");
-+	if (IS_ERR(timer_base)) {
-+		pr_err("Can't map registers");
-+		return PTR_ERR(timer_base);;
-+	}
+ 	data->base = of_iomap(np, 0);
+ 	if (!data->base) {
++		ret = -ENXIO;
+ 		pr_err("failed to map registers for clockevent\n");
+ 		goto err_iomap;
+ 	}
  
- 	irq = irq_of_parse_and_map(node, 0);
--	if (irq <= 0)
--		panic("Can't parse IRQ");
-+	if (irq <= 0) {
-+		pr_err("Can't parse IRQ");
-+		return -EINVAL;
-+	}
+ 	irq = irq_of_parse_and_map(np, 0);
+ 	if (!irq) {
++		ret = -EINVAL;
+ 		pr_err("%s: failed to get irq.\n", np->full_name);
+ 		goto err_get_irq;
+ 	}
+@@ -173,7 +175,7 @@ static void __init stm32_clockevent_init(struct device_node *np)
+ 	pr_info("%s: STM32 clockevent driver initialized (%d bits)\n",
+ 			np->full_name, bits);
  
- 	clk = of_clk_get(node, 0);
--	if (IS_ERR(clk))
--		panic("Can't get timer clock");
-+	if (IS_ERR(clk)) {
-+		pr_err("Can't get timer clock");
-+		return PTR_ERR(clk);
-+	}
+-	return;
++	return ret;
  
- 	rstc = of_reset_control_get(node, NULL);
- 	if (!IS_ERR(rstc))
- 		reset_control_deassert(rstc);
- 
--	sun5i_setup_clocksource(node, timer_base, clk, irq);
--	sun5i_setup_clockevent(node, timer_base, clk, irq);
-+	ret = sun5i_setup_clocksource(node, timer_base, clk, irq);
-+	if (ret)
-+		return ret;
-+
-+	return sun5i_setup_clockevent(node, timer_base, clk, irq);
+ err_get_irq:
+ 	iounmap(data->base);
+@@ -182,7 +184,7 @@ err_iomap:
+ err_clk_enable:
+ 	clk_put(clk);
+ err_clk_get:
+-	return;
++	return ret;
  }
--CLOCKSOURCE_OF_DECLARE(sun5i_a13, "allwinner,sun5i-a13-hstimer",
--		       sun5i_timer_init);
--CLOCKSOURCE_OF_DECLARE(sun7i_a20, "allwinner,sun7i-a20-hstimer",
--		       sun5i_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(sun5i_a13, "allwinner,sun5i-a13-hstimer",
-+			   sun5i_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(sun7i_a20, "allwinner,sun7i-a20-hstimer",
-+			   sun5i_timer_init);
+ 
+-CLOCKSOURCE_OF_DECLARE(stm32, "st,stm32-timer", stm32_clockevent_init);
++CLOCKSOURCE_OF_DECLARE_RET(stm32, "st,stm32-timer", stm32_clockevent_init);
 -- 
 1.9.1
