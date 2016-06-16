@@ -1,218 +1,47 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Thu, 16 Jun 2016 10:29:30 +0200
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 16 Jun 2016 10:32:05 +0200
 Subject: [PATCH 3/7] crypto: marvell: Copy IV vectors by DMA transfers for
  acipher requests
-In-Reply-To: <20160615220716.6ad3b856@bbrezillon>
+In-Reply-To: <5762636A.2020800@free-electrons.com> (Romain Perier's message of
+ "Thu, 16 Jun 2016 10:29:30 +0200")
 References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
  <1466018134-10779-4-git-send-email-romain.perier@free-electrons.com>
  <20160615220716.6ad3b856@bbrezillon>
-Message-ID: <5762636A.2020800@free-electrons.com>
+ <5762636A.2020800@free-electrons.com>
+Message-ID: <87oa71bkl6.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Le 15/06/2016 22:07, Boris Brezillon a ?crit :
-> On Wed, 15 Jun 2016 21:15:30 +0200
-> Romain Perier <romain.perier@free-electrons.com> wrote:
->
->> Adding a TDMA descriptor at the end of the request for copying the
->> output IV vector via a DMA transfer. This is required for processing
->> cipher requests asynchroniously in chained mode, otherwise the content
->
-> 		  asynchronously
->
->> of the IV vector will be overwriten for each new finished request.
->
-> BTW, Not sure the term 'asynchronously' is appropriate here. The
-> standard (AKA non-DMA) processing is also asynchronous. The real reason
-> here is that you want to chain the requests and offload as much
-> processing as possible to the DMA and crypto engine. And as you
-> explained, this is only possible if we retrieve the updated IV using
-> DMA.
->
-
-What do you think of the following description ?
-"
-Adding a TDMA descriptor at the end of the request for copying the
-output IV vector via a DMA transfer. This is a good way for offloading
-as much as processing as possible to the DMA and the crypto engine.
-This is also required for processing multiple cipher requests
-in chained mode, otherwise the content of the IV vector would be
-overwritten by the last processed request.
-"
-
-This point is true if multiple chained requests are processed via TDMA, 
-the content of the "global" IV output vector would be overwritten
-by the last request.
-
-
->> diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
->> index 74071e4..74b84bd 100644
->> --- a/drivers/crypto/marvell/cesa.h
->> +++ b/drivers/crypto/marvell/cesa.h
->> @@ -275,6 +275,7 @@ struct mv_cesa_op_ctx {
->>   #define CESA_TDMA_DUMMY				0
->>   #define CESA_TDMA_DATA				1
->>   #define CESA_TDMA_OP				2
->> +#define CESA_TDMA_IV				4
->
-> Should be 3 and not 4: TDMA_TYPE is an enum, not a bit field.
-
-Ok
+Hi Romain,
+ 
+ On jeu., juin 16 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
 
 >
-> Sometime it's better to offend the < 80 characters rule than doing
-> funky stuff ;).
-
-I just wanted to make checkpatch happy :D
-Yeah, that's ugly, I agree. I will fix this.
-
+>>> diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
+>>> index 74071e4..74b84bd 100644
+>>> --- a/drivers/crypto/marvell/cesa.h
+>>> +++ b/drivers/crypto/marvell/cesa.h
+>>> @@ -275,6 +275,7 @@ struct mv_cesa_op_ctx {
+>>>   #define CESA_TDMA_DUMMY				0
+>>>   #define CESA_TDMA_DATA				1
+>>>   #define CESA_TDMA_OP				2
+>>> +#define CESA_TDMA_IV				4
+>>
+>> Should be 3 and not 4: TDMA_TYPE is an enum, not a bit field.
 >
->> +		memcpy_fromio(ablkreq->info, dreq->chain.last->data, ivsize);
->>   		return ret;
->> -
->> -	memcpy_fromio(ablkreq->info,
->> -		      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET,
->> -		      crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq)));
->> -
->> -	return 0;
->> +	}
->
-> Missing blank line.
-
-ack
-
->
->> +	return mv_cesa_ablkcipher_std_process(ablkreq, status);
->
-> This version is more readable IMHO:
->
-> 	struct mv_cesa_tdma_req *dreq;
-> 	unsigned int ivsize;
-> 	int ret;
->
-> 	if (creq->req.base.type == CESA_STD_REQ)
-> 		return mv_cesa_ablkcipher_std_process(ablkreq, status);
->
-> 	ret = mv_cesa_dma_process(&creq->req.dma, status);
-> 	if (ret)
-> 		return ret;
->
-> 	dreq = &creq->req.dma;
-> 	ivsize =
-> 	crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq));
-> 	memcpy_fromio(ablkreq->info, dreq->chain.last->data, ivsize);
->
-> 	return 0;
+> Ok
 >
 >>
->>   static void mv_cesa_ablkcipher_step(struct crypto_async_request *req)
->> @@ -302,6 +307,7 @@ static int mv_cesa_ablkcipher_dma_req_init(struct ablkcipher_request *req,
->>   	struct mv_cesa_tdma_chain chain;
->>   	bool skip_ctx = false;
->>   	int ret;
->> +	unsigned int ivsize;
->>
->>   	dreq->base.type = CESA_DMA_REQ;
->>   	dreq->chain.first = NULL;
->> @@ -360,6 +366,14 @@ static int mv_cesa_ablkcipher_dma_req_init(struct ablkcipher_request *req,
->>
->>   	} while (mv_cesa_ablkcipher_req_iter_next_op(&iter));
->>
->> +	/* Add output data for IV */
->> +	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(req));
->> +	ret = mv_cesa_dma_add_iv_op(&chain, CESA_SA_CRYPT_IV_SRAM_OFFSET,
->> +				    ivsize, CESA_TDMA_SRC_IN_SRAM, flags);
->> +
->> +	if (ret)
->> +		goto err_free_tdma;
->> +
->>   	dreq->chain = chain;
->>
->>   	return 0;
->> diff --git a/drivers/crypto/marvell/tdma.c b/drivers/crypto/marvell/tdma.c
->> index d493714..88c87be 100644
->> --- a/drivers/crypto/marvell/tdma.c
->> +++ b/drivers/crypto/marvell/tdma.c
->> @@ -68,6 +68,9 @@ void mv_cesa_dma_cleanup(struct mv_cesa_tdma_req *dreq)
->>   		if (tdma->flags & CESA_TDMA_OP)
+>> Sometime it's better to offend the < 80 characters rule than doing
+>> funky stuff ;).
 >
-> I realize this test is wrong.
->
-> It should be
-> 		type = tdma->flags & CESA_TDMA_TYPE_MSK;
-> 		if (type == CESA_TDMA_OP)
->
->>   			dma_pool_free(cesa_dev->dma->op_pool, tdma->op,
->>   				      le32_to_cpu(tdma->src));
->> +		else if (tdma->flags & CESA_TDMA_IV)
->
-> and here
+> I just wanted to make checkpatch happy :D
 
-I propose a separated commit to fix this problem. What do you think ?
+In this case you can use a temporary variable.
 
-> 		else if (type == CESA_TDMA_IV)
->
->> +			dma_pool_free(cesa_dev->dma->iv_pool, tdma->data,
->> +				      le32_to_cpu(tdma->dst));
->>
->>   		tdma = tdma->next;
->>   		dma_pool_free(cesa_dev->dma->tdma_desc_pool, old_tdma,
->> @@ -120,6 +123,32 @@ mv_cesa_dma_add_desc(struct mv_cesa_tdma_chain *chain, gfp_t flags)
->>   	return new_tdma;
->>   }
->>
->> +int mv_cesa_dma_add_iv_op(struct mv_cesa_tdma_chain *chain, dma_addr_t src,
->> +			  u32 size, u32 flags, gfp_t gfp_flags)
->> +{
->> +
->> +	struct mv_cesa_tdma_desc *tdma;
->> +	u8 *cache;
->
-> Why do you name that one cache? iv would be a better name.
 
-ok
-
->
->> +	dma_addr_t dma_handle;
->> +
->> +	tdma = mv_cesa_dma_add_desc(chain, gfp_flags);
->> +	if (IS_ERR(tdma))
->> +		return PTR_ERR(tdma);
->> +
->> +	cache = dma_pool_alloc(cesa_dev->dma->iv_pool, flags, &dma_handle);
->> +	if (!cache)
->> +		return -ENOMEM;
->> +
->> +	tdma->byte_cnt = cpu_to_le32(size | BIT(31));
->> +	tdma->src = src;
->> +	tdma->dst = cpu_to_le32(dma_handle);
->> +	tdma->data = cache;
->> +
->> +	flags &= (CESA_TDMA_DST_IN_SRAM | CESA_TDMA_SRC_IN_SRAM);
->> +	tdma->flags = flags | CESA_TDMA_DATA | CESA_TDMA_IV;
->
-> You should not mix 2 different types, it's either CESA_TDMA_DATA or
-> CESA_TDMA_IV, and in this case it should be CESA_TDMA_IV.
-
-good catch.
-
->
->> +	return 0;
->> +}
->> +
->>   struct mv_cesa_op_ctx *mv_cesa_dma_add_op(struct mv_cesa_tdma_chain *chain,
->>   					const struct mv_cesa_op_ctx *op_templ,
->>   					bool skip_ctx,
->
->
->
-
-Thanks,
-Regards,
-Romain
 -- 
-Romain Perier, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
