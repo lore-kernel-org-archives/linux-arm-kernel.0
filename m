@@ -1,61 +1,50 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Thu, 16 Jun 2016 11:20:32 +0200
-Subject: [RESEND PATCH v2 12/13] ARM: DT: STi: STiH407: clock configuration to
- address 720p and 1080p
-In-Reply-To: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1466068833-5055-13-git-send-email-gabriel.fernandez@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 16 Jun 2016 11:23:08 +0200
+Subject: [PATCH v6] spi: orion.c: Add direct access mode
+In-Reply-To: <5717715D.6030701@denx.de> (Stefan Roese's message of "Wed, 20
+ Apr 2016 14:09:01 +0200")
+References: <1461147068-4829-1-git-send-email-sr@denx.de>
+ <87k2jswky0.fsf@free-electrons.com> <5717715D.6030701@denx.de>
+Message-ID: <87d1nhbi83.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is necessary to properly configure these clocks in order
-to address 720p and 1080p HDMI resolution.
+Hi Stefan,
+ 
+ On mer., avril 20 2016, Stefan Roese <sr@denx.de> wrote:
 
-Signed-off-by: Vincent Abriou <vincent.abriou@st.com>
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
----
- arch/arm/boot/dts/stih407.dtsi | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index d60f0d8..291ffac 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -16,7 +16,10 @@
- 			#size-cells = <1>;
- 
- 			assigned-clocks	= <&clk_s_d2_quadfs 0>,
--					  <&clk_s_d2_quadfs 0>,
-+					  <&clk_s_d2_quadfs 1>,
-+					  <&clk_s_c0_pll1 0>,
-+					  <&clk_s_c0_flexgen CLK_COMPO_DVP>,
-+					  <&clk_s_c0_flexgen CLK_MAIN_DISP>,
- 					  <&clk_s_d2_flexgen CLK_PIX_MAIN_DISP>,
- 					  <&clk_s_d2_flexgen CLK_PIX_AUX_DISP>,
- 					  <&clk_s_d2_flexgen CLK_PIX_GDP1>,
-@@ -26,14 +29,21 @@
- 
- 			assigned-clock-parents = <0>,
- 						 <0>,
-+						 <0>,
-+						 <&clk_s_c0_pll1 0>,
-+						 <&clk_s_c0_pll1 0>,
- 						 <&clk_s_d2_quadfs 0>,
--						 <&clk_s_d2_quadfs 0>,
-+						 <&clk_s_d2_quadfs 1>,
- 						 <&clk_s_d2_quadfs 0>,
- 						 <&clk_s_d2_quadfs 0>,
- 						 <&clk_s_d2_quadfs 0>,
- 						 <&clk_s_d2_quadfs 0>;
- 
--			assigned-clock-rates = <297000000>, <297000000>;
-+			assigned-clock-rates = <297000000>,
-+					       <108000000>,
-+					       <0>,
-+					       <400000000>,
-+					       <400000000>;
- 
- 			ranges;
- 
+>> As you don't submit any patch for the dtsi, I assume that you expect
+>> that this part will be done at board level. In this case as I wrote
+>> above we are sure that all the board continue working without any need
+>> to test them.
+>
+> No, this won't work without any changes to the Armada dtsi /
+> dts files. As the SPI controller node needs to get moved
+> for this 'reg' property to work (suggestion from Arnd).
+>
+> I've submitted 2 patches for the dtsi / dts files a short while
+> ago:
+>
+> http://www.spinics.net/lists/arm-kernel/msg495524.html
+> http://www.spinics.net/lists/arm-kernel/msg495523.html
+>
+> When this SPI driver patch gets accepted, I'll send an updated
+> patchset for the dtsi / dts files.
+
+Unless I am wrong the SPI driver patch got accepted, but I didn't see an
+updated patchset for the dtsi / dts files. Did I miss it?
+
+Else would you ming to send them? Then I will be able to apply them on
+the mvebu tree.
+
+Thanks,
+
+Gregory
+
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
