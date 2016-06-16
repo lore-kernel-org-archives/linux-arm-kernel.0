@@ -1,96 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 16 Jun 2016 11:32:24 +0100
-Subject: [PATCH v2 03/10] mfd: ac100: Add driver for X-Powers AC100 audio
- codec / RTC combo IC
-In-Reply-To: <CAGb2v669g6G4aK5UssyLLve1a-AbdVfo4CPYrt+YWmCUURz9qQ@mail.gmail.com>
-References: <1465986467-14802-1-git-send-email-wens@csie.org>
- <1465986467-14802-4-git-send-email-wens@csie.org>
- <20160615123646.GD4948@dell>
- <CAGb2v669g6G4aK5UssyLLve1a-AbdVfo4CPYrt+YWmCUURz9qQ@mail.gmail.com>
-Message-ID: <20160616103224.GQ4948@dell>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Thu, 16 Jun 2016 10:44:18 +0000
+Subject: [PATCH 3/3] ARM: dts: imx7: add Toradex Colibri iMX7S/iMX7D
+ support
+In-Reply-To: <59f88a185c67034087f3eabf88da6c8c@agner.ch>
+References: <20160608023709.32090-1-stefan@agner.ch>
+ <20160608023709.32090-4-stefan@agner.ch> <20160612023100.GW20243@tiger>
+ <59f88a185c67034087f3eabf88da6c8c@agner.ch>
+Message-ID: <1466073856.3884.11.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jun 2016, Chen-Yu Tsai wrote:
+Sali Stefan
 
-> On Wed, Jun 15, 2016 at 8:36 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Wed, 15 Jun 2016, Chen-Yu Tsai wrote:
-> >
-> >> The AC100 is a multifunction device with an audio codec subsystem and
-> >> an RTC subsystem. These two subsystems share a common register space
-> >> and host interface.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >
-> > Change log?
+On Wed, 2016-06-15 at 22:37 -0700, Stefan Agner wrote:
+> On 2016-06-11 19:31, Shawn Guo wrote:
+> > 
+> > On Tue, Jun 07, 2016 at 07:37:09PM -0700, Stefan Agner wrote:
+> > > 
+> > <snip>
+> > > 
+> > > +/ {
+> > > +	model = "Toradex Colibri iMX7D on Colibri Evaluation
+> > > Board V3";
+> > > +	compatible = "toradex,colibri_imx7d-eval",
+> > > "toradex,colibri_imx7d", \
+> > We always use hyphen than underscore in compatible string.
+> We always used underscores, this goes back to the first Colibri
+> specific
+> device tree: tegra20-iris-512.dts.
 > 
-> Change log was in the cover letter. Changes were the addition of the
-> codec related register macros and regmap ranges.
+> I would rather prefer to not change this for the sake of
+> consistency...
+> What do you think?
 
-Patch specific change logs are more helpful.
+I have been there before when submitting a first Apalis TK1 version:
 
-> >>  drivers/mfd/Kconfig       |  10 +++
-> >>  drivers/mfd/Makefile      |   2 +
-> >>  drivers/mfd/ac100.c       | 135 +++++++++++++++++++++++++++++++++++
-> >>  include/linux/mfd/ac100.h | 176 ++++++++++++++++++++++++++++++++++++++++++++++
-> >>  4 files changed, 323 insertions(+)
-> >>  create mode 100644 drivers/mfd/ac100.c
-> >>  create mode 100644 include/linux/mfd/ac100.h
-> >>
-> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> >> index 1bcf601de5bc..bd83849a0c8d 100644
-> >> --- a/drivers/mfd/Kconfig
-> >> +++ b/drivers/mfd/Kconfig
-> >> @@ -101,6 +101,16 @@ config MFD_BCM590XX
-> >>       help
-> >>         Support for the BCM590xx PMUs from Broadcom
-> >>
-> >> +config MFD_AC100
-> >> +     tristate "X-Powers AC100"
-> >> +     select MFD_CORE
-> >> +     depends on SUNXI_RSB
-> >> +     help
-> >> +       If you say Y here you get support for the X-Powers AC100 audio codec
-> >> +       IC.
-> >> +       This driver include only the core APIs. You have to select individual
-> >> +       components like codecs or RTC under the corresponding menus.
-> >> +
-> >>  config MFD_AXP20X
-> >>       tristate
-> >>       select MFD_CORE
-> >> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> >> index 42a66e19e191..60f9a6b0557c 100644
-> >> --- a/drivers/mfd/Makefile
-> >> +++ b/drivers/mfd/Makefile
-> >> @@ -113,6 +113,8 @@ obj-$(CONFIG_PMIC_DA9052) += da9052-irq.o
-> >>  obj-$(CONFIG_PMIC_DA9052)    += da9052-core.o
-> >>  obj-$(CONFIG_MFD_DA9052_SPI) += da9052-spi.o
-> >>  obj-$(CONFIG_MFD_DA9052_I2C) += da9052-i2c.o
-> >> +
-> >> +obj-$(CONFIG_MFD_AC100)              += ac100.o
-> >>  obj-$(CONFIG_MFD_AXP20X)     += axp20x.o
-> >>  obj-$(CONFIG_MFD_AXP20X_I2C) += axp20x-i2c.o
-> >>  obj-$(CONFIG_MFD_AXP20X_RSB) += axp20x-rsb.o
-> >> diff --git a/drivers/mfd/ac100.c b/drivers/mfd/ac100.c
-> >> new file mode 100644
-> >> index 000000000000..15d24fa77771
-> >> --- /dev/null
-> >> +++ b/drivers/mfd/ac100.c
-> >> @@ -0,0 +1,135 @@
-> >> +/*
-> >> + * ac100.c - MFD core driver for X-Powers' AC100 Audio Codec IC
-> >
-> > Nit: Drop the filename here.
-> >
-> > Apart from that:
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Thanks.
-> ChenYu
+https://lkml.org/lkml/2016/5/16/288
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Upon Rob Herring's suggestion I changed it now all to dashes:
+
+https://lkml.org/lkml/2016/5/27/399
+
+Even in our downstream U-Boot:
+
+http://git.toradex.com/cgit/u-boot-toradex.git/commit/?h=2015.04-torade
+x-next&id=4ae2e657f3350422ad81b1632de156bdd9517206
+
+Of course for Colibri iMX7 one could argue that we already sold a
+couple hundred pieces still using underscores. However I guess we could
+still change to dashes now as those were all prototype, sample and/or
+beta.
+
+Cheers
+
+Marcel
