@@ -1,49 +1,52 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 16 Jun 2016 19:23:30 +0800
-Subject: [nomadik:nhk15-clcd 6/14] drivers/video/fbdev/amba-clcd.c:606:
- undefined reference to `of_find_backlight_by_node'
-Message-ID: <201606161928.GZfUQYBR%fengguang.wu@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Jun 2016 13:38:21 +0200
+Subject: [PATCH 0/5] treewide: fix unused-but-set warnings
+Message-ID: <20160616113831.4108439-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git nhk15-clcd
-head:   80109ac8700188687807bba720744d870440a551
-commit: 1f57a81fe4b0221b7a5b1ce9fad2b4d1492395ac [6/14] video: ARM CLCD: backlight support for OF
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 1f57a81fe4b0221b7a5b1ce9fad2b4d1492395ac
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+I did some test-builds with W=1 and the -Wunused-but-set-variable
+warnings appeared to be all fairly easy to address. In tons of
+randconfig builds, I only found five instances.
 
-All errors (new ones prefixed by >>):
+The warning was originally disabled by Dave Jones when we hit
+more instances with gcc-4.6, but apparently most of those have
+gotten addressed anyway.
 
-   drivers/built-in.o: In function `clcdfb_of_get_backlight':
->> drivers/video/fbdev/amba-clcd.c:606: undefined reference to `of_find_backlight_by_node'
-   drivers/video/fbdev/amba-clcd.c:606:(.text+0x68f1c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `of_find_backlight_by_node'
+All five patches can be applied independently, and in each case,
+the original code is not wrong, but the assignments are also useless,
+so I'd consider this warning marginally useful.
 
-vim +606 drivers/video/fbdev/amba-clcd.c
+I have a few other patch series for W=1 issues, and we can
+consider turning those on by default once all the patches are
+merged.
 
-   600		if (!panel)
-   601			return -ENODEV;
-   602	
-   603		/* Look up the optional backlight phandle */
-   604		backlight = of_parse_phandle(panel, "backlight", 0);
-   605		if (backlight) {
- > 606			clcd_panel->backlight = of_find_backlight_by_node(backlight);
-   607			of_node_put(backlight);
-   608	
-   609			if (!clcd_panel->backlight)
+	Arnd
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 25987 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160616/1244617c/attachment-0001.obj>
+Arnd Bergmann (5):
+  net: qlcnic: don't set unused function argument
+  net: tlan: don't set unused function argument
+  mic: remove unused function arg
+  usb: pxa27x_udc: remove unused function argument
+  fbmon: remove unused function argument
+
+ drivers/misc/mic/scif/scif_dma.c                    | 6 ++----
+ drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c | 1 -
+ drivers/net/ethernet/ti/tlan.c                      | 1 -
+ drivers/usb/gadget/udc/pxa27x_udc.c                 | 9 +++------
+ drivers/video/fbdev/core/fbmon.c                    | 1 -
+ 5 files changed, 5 insertions(+), 13 deletions(-)
+
+-- 
+2.9.0
+Cc: Sudeep Dutt <sudeep.dutt@intel.com>
+Cc: Ashutosh Dixit <ashutosh.dixit@intel.com>
+Cc: Dept-GELinuxNICDev at qlogic.com
+Cc: Samuel Chessman <chessman@tux.org>
+Cc: Felipe Balbi <balbi@kernel.org>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-usb at vger.kernel.org
+Cc: linux-fbdev at vger.kernel.org
+Cc: Dave Jones <davej@codemonkey.org.uk>
