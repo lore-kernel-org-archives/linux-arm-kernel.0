@@ -1,31 +1,60 @@
-From: Adam.Thomson.Opensource@diasemi.com (Opensource [Adam Thomson])
-Date: Thu, 16 Jun 2016 08:40:45 +0000
-Subject: [PATCH v5] ASoC: rockchip: Add machine driver for RK3399 GRU
- Boards
-In-Reply-To: <5761FDAA.1070802@rock-chips.com>
-References: <1465807339-1100-1-git-send-email-zhengxing@rock-chips.com>
- <CADR9n49m7anZpDbbb3=ZGBaacOuXc4F=Yid0eyMey1LfEJx8Pw@mail.gmail.com>
- <5761FDAA.1070802@rock-chips.com>
-Message-ID: <2E89032DDAA8B9408CB92943514A0337D4643174@SW-EX-MBX01.diasemi.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 16 Jun 2016 16:40:18 +0800
+Subject: [PATCH] arm64: dts: berlin4ct: Add L2 cache topology
+Message-ID: <1466066418-1141-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 June 2016 02:15, Xing Zheng wrote:
+This patch adds the L2 cache topology for berlin4ct which has 1MB L2
+cache.
 
-> >> +       /* Enable Headset and 4 Buttons Jack detection */
-> >> +       ret = snd_soc_card_jack_new(rtd->card, "Headset Jack",
-> >> +                                   SND_JACK_HEADSET |
-> > Should this also include SND_JACK_LINEOUT? da7219 differentiates
-> > between the two so not including lineout means, for example, we can
-> > miss jack insertion/removal events.
-> >
-> Hi Adam,
-> 
-> Could you please confirm Steve says that about SND_JACK_LINEOUT?
-> 
-> Thanks.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Hi Xing Zheng,
-
-Yes, as Steve mentioned DA7219 does support SND_JACK_LINEOUT so we should really
-include this here.
+diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+index 099ad93..c9e3a98 100644
+--- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
++++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+@@ -68,6 +68,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x0>;
+ 			enable-method = "psci";
++			next-level-cache = <&L2_0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
+ 		};
+ 
+@@ -76,6 +77,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x1>;
+ 			enable-method = "psci";
++			next-level-cache = <&L2_0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
+ 		};
+ 
+@@ -84,6 +86,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x2>;
+ 			enable-method = "psci";
++			next-level-cache = <&L2_0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
+ 		};
+ 
+@@ -92,9 +95,14 @@
+ 			device_type = "cpu";
+ 			reg = <0x3>;
+ 			enable-method = "psci";
++			next-level-cache = <&L2_0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
+ 		};
+ 
++		L2_0: l2-cache0 {
++			compatible = "cache";
++		};
++
+ 		idle-states {
+ 			entry-method = "psci";
+ 			CPU_SLEEP_0: cpu-sleep-0 {
+-- 
+2.8.1
