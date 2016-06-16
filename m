@@ -1,90 +1,74 @@
-From: glider@google.com (Alexander Potapenko)
-Date: Thu, 16 Jun 2016 17:20:03 +0200
-Subject: [PATCH v2] arm64: allow building with kcov coverage on ARM64
-In-Reply-To: <576283B9.9050900@arm.com>
-References: <1465923441-107596-1-git-send-email-glider@google.com>
- <20160614175543.GA2468@leverpostej>
- <CAG_fn=X521a9uD1bthDZ-swO9hrfq=jE2C_LUvzkn6C_q5dBvA@mail.gmail.com>
- <20160615092509.GA3984@leverpostej> <20160615114438.GC3984@leverpostej>
- <CAG_fn=U7-fUnw1GLwBbmqGTxnOWf4QcTjTyP4mGAORfEuWt3Eg@mail.gmail.com>
- <20160615142550.GA7971@leverpostej> <576283B9.9050900@arm.com>
-Message-ID: <CAG_fn=X=LSEN2FS0rapgW1PEEqkDLcSXLdxeKa=5ya9g0GJ23A@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 16 Jun 2016 09:22:07 -0600
+Subject: [PATCH] coresight: access conn->child_name only if it's
+ initialised
+In-Reply-To: <1466071989-24663-1-git-send-email-sudeep.holla@arm.com>
+References: <1466071989-24663-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CANLsYkxZx5C3Adt4o+-e2L++ycVFMQCW+ipP+kYXiTRmWEVjFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 12:47 PM, James Morse <james.morse@arm.com> wrote:
-> On 15/06/16 15:25, Mark Rutland wrote:
->> On Wed, Jun 15, 2016 at 01:53:03PM +0200, Alexander Potapenko wrote:
->>> On Wed, Jun 15, 2016 at 1:44 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>> On Wed, Jun 15, 2016 at 10:25:10AM +0100, Mark Rutland wrote:
->>>>> On Tue, Jun 14, 2016 at 08:16:08PM +0200, Alexander Potapenko wrote:
->>>>>> On Tue, Jun 14, 2016 at 7:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>>>> I built and booted (via EFI) a kernel with this feature enabled (also
->>>>>>> with the boot/Makefile change removed). I haven't tested the feature
->>>>>>> itself as such, as I'm not sure how to do that.
->>>>>> You can test it by running the test program from Documentation/kcov.txt.
->>>>>
->>>>> Ah, I hadn't spotted that. If I get the chance I'll try to give that a
->>>>> go.
->>>>
->>>> I just had a go (with this applied atop of v4.7-rc3), and I get:
->>>>
->>>> root at ribbensteg:/home/nanook# ./kcov
->>>> mmap: No such device
->>>>
->>>> The device exists (it was able to open the fd, evidently):
->>>>
->>>> root at ribbensteg:/home/nanook# ls -al /sys/kernel/debug/kcov
->>>> -rw------- 1 root root 0 Jan  1  1970 /sys/kernel/debug/kcov
->>>>
->>>> Strace show me:
->>>>
->>>> openat(AT_FDCWD, "/sys/kernel/debug/kcov", O_RDWR) = 3
->>>> ioctl(3, CHIOMOVE or CM_IOCGATR, 0x10000) = 0
->>>> mmap(NULL, 524288, PROT_READ|PROT_WRITE, MAP_SHARED, 3, 0) = -1 ENODEV (No such device)
->>>>
->>>> It doesn't look like the error paths in kcov_mmap are hitting.
->>>>
->>>> Any ideas?
->>> According to Dmitry (thanks, Dmitry!) this has regressed recently, but
->>> there's a pending patch that should probably fix the problem:
->>> http://lkml.iu.edu/hypermail/linux/kernel/1605.2/04379.html
->>
->> Thanks for the pointer! With that applied, the program runs.
->>
->> However, it looks like I missed a warning from the kernel build system,
->> and my toolchain doesn't actually support -fsanitize-coverage=trace-pc,
->> so I'm not going to be able to test that further.
+On 16 June 2016 at 04:13, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> If the addition of the coresight devices get deferred, then there's a
+> window before child_name is populated by of_get_coresight_platform_data
+> from the respective component driver's probe and the attempted to access
+> the same from coresight_orphan_match resulting in kernel NULL pointer
+> dereference as below:
 >
-> I dusted off a compiler that supports this, and ran the sample program under
-> Documentation with the above unproxify patch.
+> Unable to handle kernel NULL pointer dereference at virtual address 0x0
+> Internal error: Oops: 96000004 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 0 PID: 1038 Comm: kworker/0:1 Not tainted 4.7.0-rc3 #124
+> Hardware name: ARM Juno development board (r2) (DT)
+> Workqueue: events amba_deferred_retry_func
+> PC is at strcmp+0x1c/0x160
+> LR is at coresight_orphan_match+0x7c/0xd0
+> Call trace:
+>  strcmp+0x1c/0x160
+>  bus_for_each_dev+0x60/0xa0
+>  coresight_register+0x264/0x2e0
+>  tmc_probe+0x130/0x310
+>  amba_probe+0xd4/0x1c8
+>  driver_probe_device+0x22c/0x418
+>  __device_attach_driver+0xbc/0x158
+>  bus_for_each_drv+0x58/0x98
+>  __device_attach+0xc4/0x160
+>  device_initial_probe+0x10/0x18
+>  bus_probe_device+0x94/0xa0
+>  device_add+0x344/0x580
+>  amba_device_try_add+0x194/0x238
+>  amba_deferred_retry_func+0x48/0xd0
+>  process_one_work+0x118/0x378
+>  worker_thread+0x48/0x498
+>  kthread+0xd0/0xe8
+>  ret_from_fork+0x10/0x40
 >
-> Tested-by: James Morse <james.morse@arm.com>
-I think it's time to ask now :)
-If I receive "Tested-by" or "Acked-by" responses, do I need to send
-out a patch adding them, or should I rely on the maintainer taking the
-patch to the tree?
-The first option reduces the amount of work done by the maintainer,
-while the second one reduces the traffic in the list.
-Sorry, I couldn't find the answer in the manuals.
-
-Thank you,
-Alex
+> This patch adds a check for non-NULL conn->child_name before accessing
+> the same.
 >
-> Thanks,
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 >
-> James
+> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+> index 5443d03a1eec..12ca4cd97f5b 100644
+> --- a/drivers/hwtracing/coresight/coresight.c
+> +++ b/drivers/hwtracing/coresight/coresight.c
+> @@ -722,7 +722,8 @@ static int coresight_orphan_match(struct device *dev, void *data)
+>                 /* We have found at least one orphan connection */
+>                 if (conn->child_dev == NULL) {
+>                         /* Does it match this newly added device? */
+> -                       if (!strcmp(dev_name(&csdev->dev), conn->child_name)) {
+> +                       if (conn->child_name &&
+> +                           !strcmp(dev_name(&csdev->dev), conn->child_name)) {
+>                                 conn->child_dev = csdev;
+>                         } else {
+>                                 /* This component still has an orphan */
+> --
+> 2.7.4
+>
 
-
-
--- 
-Alexander Potapenko
-Software Engineer
-
-Google Germany GmbH
-Erika-Mann-Stra?e, 33
-80636 M?nchen
-
-Gesch?ftsf?hrer: Matthew Scott Sucherman, Paul Terence Manicle
-Registergericht und -nummer: Hamburg, HRB 86891
-Sitz der Gesellschaft: Hamburg
+Applied - thanks.
+Mathieu
