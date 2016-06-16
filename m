@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:26:44 +0200
-Subject: [PATCH V2 25/63] clocksource/drivers/mxs_timer: Convert init function
- to return error
+Date: Thu, 16 Jun 2016 23:26:41 +0200
+Subject: [PATCH V2 22/63] clocksource/drivers/mips-gic-timer: Convert init
+ function to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-26-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-23-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,58 +26,60 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/mps2-timer.c | 10 ++++++----
- drivers/clocksource/mxs_timer.c  |  2 +-
- 2 files changed, 7 insertions(+), 5 deletions(-)
+ drivers/clocksource/meson6_timer.c | 21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clocksource/mps2-timer.c b/drivers/clocksource/mps2-timer.c
-index 3d33a5e..c303fa9 100644
---- a/drivers/clocksource/mps2-timer.c
-+++ b/drivers/clocksource/mps2-timer.c
-@@ -250,7 +250,7 @@ out:
- 	return ret;
- }
+diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
+index 1fa22c4..3a6e78f 100644
+--- a/drivers/clocksource/meson6_timer.c
++++ b/drivers/clocksource/meson6_timer.c
+@@ -126,18 +126,22 @@ static struct irqaction meson6_timer_irq = {
+ 	.dev_id		= &meson6_clockevent,
+ };
  
--static void __init mps2_timer_init(struct device_node *np)
-+static int __init mps2_timer_init(struct device_node *np)
+-static void __init meson6_timer_init(struct device_node *node)
++static int __init meson6_timer_init(struct device_node *node)
  {
- 	static int has_clocksource, has_clockevent;
- 	int ret;
-@@ -259,7 +259,7 @@ static void __init mps2_timer_init(struct device_node *np)
- 		ret = mps2_clocksource_init(np);
- 		if (!ret) {
- 			has_clocksource = 1;
--			return;
-+			return 0;
- 		}
- 	}
+ 	u32 val;
+ 	int ret, irq;
  
-@@ -267,9 +267,11 @@ static void __init mps2_timer_init(struct device_node *np)
- 		ret = mps2_clockevent_init(np);
- 		if (!ret) {
- 			has_clockevent = 1;
--			return;
-+			return 0;
- 		}
- 	}
-+
+ 	timer_base = of_io_request_and_map(node, 0, "meson6-timer");
+-	if (IS_ERR(timer_base))
+-		panic("Can't map registers");
++	if (IS_ERR(timer_base)) {
++		pr_err("Can't map registers");
++		return -ENXIO;
++	}
+ 
+ 	irq = irq_of_parse_and_map(node, 0);
+-	if (irq <= 0)
+-		panic("Can't parse IRQ");
++	if (irq <= 0) {
++		pr_err("Can't parse IRQ");
++		return -EINVAL;
++	}
+ 
+ 	/* Set 1us for timer E */
+ 	val = readl(timer_base + TIMER_ISA_MUX);
+@@ -158,14 +162,17 @@ static void __init meson6_timer_init(struct device_node *node)
+ 	meson6_clkevt_time_stop(CED_ID);
+ 
+ 	ret = setup_irq(irq, &meson6_timer_irq);
+-	if (ret)
++	if (ret) {
+ 		pr_warn("failed to setup irq %d\n", irq);
++		return ret;
++	}
+ 
+ 	meson6_clockevent.cpumask = cpu_possible_mask;
+ 	meson6_clockevent.irq = irq;
+ 
+ 	clockevents_config_and_register(&meson6_clockevent, USEC_PER_SEC,
+ 					1, 0xfffe);
 +	return 0;
  }
- 
--CLOCKSOURCE_OF_DECLARE(mps2_timer, "arm,mps2-timer", mps2_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(mps2_timer, "arm,mps2-timer", mps2_timer_init);
-diff --git a/drivers/clocksource/mxs_timer.c b/drivers/clocksource/mxs_timer.c
-index f5ce296..16cf53b 100644
---- a/drivers/clocksource/mxs_timer.c
-+++ b/drivers/clocksource/mxs_timer.c
-@@ -226,7 +226,7 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
- 	return 0;
- }
- 
--static void __init mxs_timer_init(struct device_node *np)
-+static int __init mxs_timer_init(struct device_node *np)
- {
- 	struct clk *timer_clk;
- 	int irq;
+-CLOCKSOURCE_OF_DECLARE(meson6, "amlogic,meson6-timer",
++CLOCKSOURCE_OF_DECLARE_RET(meson6, "amlogic,meson6-timer",
+ 		       meson6_timer_init);
 -- 
 1.9.1
