@@ -1,41 +1,34 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 16 Jun 2016 11:03:30 +0200
-Subject: [PATCH 7/7] usb: dwc3: st: Inform the reset framework that our
- reset line may be shared
-In-Reply-To: <20160606155655.10860-8-lee.jones@linaro.org>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
- <20160606155655.10860-8-lee.jones@linaro.org>
-Message-ID: <1466067810.3343.13.camel@pengutronix.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 16 Jun 2016 12:14:26 +0300
+Subject: [GIT PULL] omap-gpmc fixes for v4.7 rc cycle
+Message-ID: <57626DF2.70907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 06.06.2016, 16:56 +0100 schrieb Lee Jones:
-> On the STiH410 B2120 development board the MiPHY28lp shares its reset
-> line with the Synopsys DWC3 SuperSpeed (SS) USB 3.0 Dual-Role-Device
-> (DRD).  New functionality in the reset subsystems forces consumers to
-> be explicit when requesting shared/exclusive reset lines.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/usb/dwc3/dwc3-st.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/dwc3/dwc3-st.c b/drivers/usb/dwc3/dwc3-st.c
-> index 5c0adb9..e77bacb 100644
-> --- a/drivers/usb/dwc3/dwc3-st.c
-> +++ b/drivers/usb/dwc3/dwc3-st.c
-> @@ -227,7 +227,8 @@ static int st_dwc3_probe(struct platform_device *pdev)
->  	dev_vdbg(&pdev->dev, "glue-logic addr 0x%p, syscfg-reg offset 0x%x\n",
->  		 dwc3_data->glue_base, dwc3_data->syscfg_reg_off);
->  
-> -	dwc3_data->rstc_pwrdn = devm_reset_control_get(dev, "powerdown");
-> +	dwc3_data->rstc_pwrdn =
-> +		devm_reset_control_get_exclusive(dev, "powerdown");
+Hi Arnd/Olof,
 
-This hunk is not critical. If you split it into a separate patch, this
-one doesn't depend on patch 2. The same applies to patch 8.
-That way I could take patches 1-5 through reset/next and you wouldn't
-have to wait for them to be merged into arm-soc.
+The following changes since commit 5edb56491d4812c42175980759da53388e5d86f5:
 
-regards
-Philipp
+  Linux 4.7-rc3 (2016-06-12 07:20:35 -0700)
+
+are available in the git repository at:
+
+  https://github.com/rogerq/linux.git tags/gpmc-omap-fixes-for-v4.7
+
+for you to fetch changes up to 8f50b8e57442d28e41bb736c173d8a2490549a82:
+
+  memory: omap-gpmc: Fix omap gpmc EXTRADELAY timing (2016-06-16 11:43:48 +0300)
+
+----------------------------------------------------------------
+OMAP-GPMC: Fixes for for v4.7-rc cycle:
+
+- Fix omap gpmc EXTRADELAY timing. The DT provided timings
+were wrongly used causing devices requiring extra delay timing
+to fail.
+
+----------------------------------------------------------------
+Ocquidant, Sebastien (1):
+      memory: omap-gpmc: Fix omap gpmc EXTRADELAY timing
+
+ drivers/memory/omap-gpmc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
