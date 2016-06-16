@@ -1,112 +1,47 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 16 Jun 2016 17:40:31 -0400
-Subject: [PATCH 2/6] [media] s5p-mfc: improve v4l2_capability driver and card
- fields
+Date: Thu, 16 Jun 2016 17:40:32 -0400
+Subject: [PATCH 3/6] [media] s5p-jpeg: set capablity bus_info as required by
+ VIDIOC_QUERYCAP
 In-Reply-To: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
 References: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1466113235-25909-3-git-send-email-javier@osg.samsung.com>
+Message-ID: <1466113235-25909-4-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the V4L2 documentation the driver and card fields should be
-used to identify the driver and the device but the s5p-mfc driver fills
-those field using the platform device name, which in turn is the name of
-the device DT node.
+The driver doesn't set the struct v4l2_capability cap_info field so the
+v4l2-compliance tool reports the following errors for VIDIOC_QUERYCAP:
 
-So not only the filled information isn't correct but also the same values
-are used in all the fields for both the encoder and decoder video devices.
+Required ioctls:
+                VIDIOC_QUERYCAP returned 0 (Success)
+                fail: v4l2-compliance.cpp(304): string empty
+                fail: v4l2-compliance.cpp(528): check_ustring(vcap.bus_info, sizeof(vcap.bus_info))
+        test VIDIOC_QUERYCAP: FAIL
 
-Before this patch:
+This patch fixes by setting the field in VIDIOC_QUERYCAP ioctl handler:
 
-Driver Info (not using libv4l2):
-        Driver name   : 11000000.codec
-        Card type     : 11000000.codec
-        Bus info      : platform:11000000.codec
-        Driver version: 4.7.0
-
-Driver Info (not using libv4l2):
-        Driver name   : 11000000.codec
-        Card type     : 11000000.codec
-        Bus info      : platform:11000000.codec
-        Driver version: 4.7.0
-
-After this patch:
-
-Driver Info (not using libv4l2):
-        Driver name   : s5p-mfc
-        Card type     : s5p-mfc-dec
-        Bus info      : platform:11000000.codec
-        Driver version: 4.7.0
-
-Driver Info (not using libv4l2):
-        Driver name   : s5p-mfc
-        Card type     : s5p-mfc-enc
-        Bus info      : platform:11000000.codec
-        Driver version: 4.7.0
+Required ioctls:
+                VIDIOC_QUERYCAP returned 0 (Success)
+        test VIDIOC_QUERYCAP: OK
 
 Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
 
- drivers/media/platform/s5p-mfc/s5p_mfc.c        | 1 -
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 2 ++
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    | 4 ++--
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    | 4 ++--
- 4 files changed, 6 insertions(+), 5 deletions(-)
+ drivers/media/platform/s5p-jpeg/jpeg-core.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index 6ee620ee8cd5..a936f89fa54a 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -35,7 +35,6 @@
- #include "s5p_mfc_cmd.h"
- #include "s5p_mfc_pm.h"
- 
--#define S5P_MFC_NAME		"s5p-mfc"
- #define S5P_MFC_DEC_NAME	"s5p-mfc-dec"
- #define S5P_MFC_ENC_NAME	"s5p-mfc-enc"
- 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-index 9eb2481ec292..a10dcd244ff0 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-@@ -25,6 +25,8 @@
- #include "regs-mfc.h"
- #include "regs-mfc-v8.h"
- 
-+#define S5P_MFC_NAME		"s5p-mfc"
-+
- /* Definitions related to MFC memory */
- 
- /* Offset base used to differentiate between CAPTURE and OUTPUT
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 4a40df22fd63..5793b0d8ee0c 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -265,8 +265,8 @@ static int vidioc_querycap(struct file *file, void *priv,
- {
- 	struct s5p_mfc_dev *dev = video_drvdata(file);
- 
--	strncpy(cap->driver, dev->plat_dev->name, sizeof(cap->driver) - 1);
--	strncpy(cap->card, dev->plat_dev->name, sizeof(cap->card) - 1);
-+	strncpy(cap->driver, S5P_MFC_NAME, sizeof(cap->driver) - 1);
-+	strncpy(cap->card, dev->vfd_dec->name, sizeof(cap->card) - 1);
- 	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
- 		 dev_name(&dev->plat_dev->dev));
- 	/*
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-index dd466ea6429e..1220559d4874 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-@@ -943,8 +943,8 @@ static int vidioc_querycap(struct file *file, void *priv,
- {
- 	struct s5p_mfc_dev *dev = video_drvdata(file);
- 
--	strncpy(cap->driver, dev->plat_dev->name, sizeof(cap->driver) - 1);
--	strncpy(cap->card, dev->plat_dev->name, sizeof(cap->card) - 1);
-+	strncpy(cap->driver, S5P_MFC_NAME, sizeof(cap->driver) - 1);
-+	strncpy(cap->card, dev->vfd_enc->name, sizeof(cap->card) - 1);
- 	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
- 		 dev_name(&dev->plat_dev->dev));
- 	/*
+diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+index 17bc94092864..e3ff3d4bd72e 100644
+--- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
++++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+@@ -1256,7 +1256,8 @@ static int s5p_jpeg_querycap(struct file *file, void *priv,
+ 		strlcpy(cap->card, S5P_JPEG_M2M_NAME " decoder",
+ 			sizeof(cap->card));
+ 	}
+-	cap->bus_info[0] = 0;
++	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
++		 dev_name(ctx->jpeg->dev));
+ 	cap->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M;
+ 	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
+ 	return 0;
 -- 
 2.5.5
