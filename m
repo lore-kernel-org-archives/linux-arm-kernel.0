@@ -1,124 +1,90 @@
-From: ellisys@163.com (Kever Yang)
-Date: Thu, 16 Jun 2016 20:43:33 +0800
-Subject: [v2 PATCH 1/4] Documentation: bindings: add dt doc for Rockchip
- USB Type-C PHY
-In-Reply-To: <1465810789-22303-2-git-send-email-zyw@rock-chips.com>
-References: <1465810789-22303-1-git-send-email-zyw@rock-chips.com>
- <1465810789-22303-2-git-send-email-zyw@rock-chips.com>
-Message-ID: <57629EF5.2050508@163.com>
+From: glider@google.com (Alexander Potapenko)
+Date: Thu, 16 Jun 2016 17:20:03 +0200
+Subject: [PATCH v2] arm64: allow building with kcov coverage on ARM64
+In-Reply-To: <576283B9.9050900@arm.com>
+References: <1465923441-107596-1-git-send-email-glider@google.com>
+ <20160614175543.GA2468@leverpostej>
+ <CAG_fn=X521a9uD1bthDZ-swO9hrfq=jE2C_LUvzkn6C_q5dBvA@mail.gmail.com>
+ <20160615092509.GA3984@leverpostej> <20160615114438.GC3984@leverpostej>
+ <CAG_fn=U7-fUnw1GLwBbmqGTxnOWf4QcTjTyP4mGAORfEuWt3Eg@mail.gmail.com>
+ <20160615142550.GA7971@leverpostej> <576283B9.9050900@arm.com>
+Message-ID: <CAG_fn=X=LSEN2FS0rapgW1PEEqkDLcSXLdxeKa=5ya9g0GJ23A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Thu, Jun 16, 2016 at 12:47 PM, James Morse <james.morse@arm.com> wrote:
+> On 15/06/16 15:25, Mark Rutland wrote:
+>> On Wed, Jun 15, 2016 at 01:53:03PM +0200, Alexander Potapenko wrote:
+>>> On Wed, Jun 15, 2016 at 1:44 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> On Wed, Jun 15, 2016 at 10:25:10AM +0100, Mark Rutland wrote:
+>>>>> On Tue, Jun 14, 2016 at 08:16:08PM +0200, Alexander Potapenko wrote:
+>>>>>> On Tue, Jun 14, 2016 at 7:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>>>>> I built and booted (via EFI) a kernel with this feature enabled (also
+>>>>>>> with the boot/Makefile change removed). I haven't tested the feature
+>>>>>>> itself as such, as I'm not sure how to do that.
+>>>>>> You can test it by running the test program from Documentation/kcov.txt.
+>>>>>
+>>>>> Ah, I hadn't spotted that. If I get the chance I'll try to give that a
+>>>>> go.
+>>>>
+>>>> I just had a go (with this applied atop of v4.7-rc3), and I get:
+>>>>
+>>>> root at ribbensteg:/home/nanook# ./kcov
+>>>> mmap: No such device
+>>>>
+>>>> The device exists (it was able to open the fd, evidently):
+>>>>
+>>>> root at ribbensteg:/home/nanook# ls -al /sys/kernel/debug/kcov
+>>>> -rw------- 1 root root 0 Jan  1  1970 /sys/kernel/debug/kcov
+>>>>
+>>>> Strace show me:
+>>>>
+>>>> openat(AT_FDCWD, "/sys/kernel/debug/kcov", O_RDWR) = 3
+>>>> ioctl(3, CHIOMOVE or CM_IOCGATR, 0x10000) = 0
+>>>> mmap(NULL, 524288, PROT_READ|PROT_WRITE, MAP_SHARED, 3, 0) = -1 ENODEV (No such device)
+>>>>
+>>>> It doesn't look like the error paths in kcov_mmap are hitting.
+>>>>
+>>>> Any ideas?
+>>> According to Dmitry (thanks, Dmitry!) this has regressed recently, but
+>>> there's a pending patch that should probably fix the problem:
+>>> http://lkml.iu.edu/hypermail/linux/kernel/1605.2/04379.html
+>>
+>> Thanks for the pointer! With that applied, the program runs.
+>>
+>> However, it looks like I missed a warning from the kernel build system,
+>> and my toolchain doesn't actually support -fsanitize-coverage=trace-pc,
+>> so I'm not going to be able to test that further.
+>
+> I dusted off a compiler that supports this, and ran the sample program under
+> Documentation with the above unproxify patch.
+>
+> Tested-by: James Morse <james.morse@arm.com>
+I think it's time to ask now :)
+If I receive "Tested-by" or "Acked-by" responses, do I need to send
+out a patch adding them, or should I rely on the maintainer taking the
+patch to the tree?
+The first option reduces the amount of work done by the maintainer,
+while the second one reduces the traffic in the list.
+Sorry, I couldn't find the answer in the manuals.
 
-On 06/13/2016 05:39 PM, Chris Zhong wrote:
-> This patch adds a binding that describes the Rockchip USB Type-C PHY
-> for rk3399
+Thank you,
+Alex
 >
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Thanks,
 >
-> ---
->
-> Changes in v2:
-> - add some registers description
->
-> Changes in v1:
-> - add extcon node description
-> - move the registers in phy driver
-> - remove the suffix of reset
->
->   .../devicetree/bindings/phy/phy-rockchip-typec.txt | 77 ++++++++++++++++++++++
->   1 file changed, 77 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->
-> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> new file mode 100644
-> index 0000000..430920c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> @@ -0,0 +1,77 @@
-> +* ROCKCHIP type-c PHY
-> +---------------------
-> +
-> +Required properties:
-> + - compatible : should be "rockchip,rk3399-typec-phy0" or
-> +			 "rockchip,rk3399-typec-phy1"
-should be "rockchip,rk3399-typec-phy"
-> + - reg: Address and length of the usb phy control register set
-> + - rockchip,grf : phandle to the syscon managing the "general
-> +   register files"
-> + - clocks : phandle + clock specifier for the phy clocks
-> + - clock-names : string, clock name, must be "tcpdcore", "tcpdphy_ref";
-> + - resets : a list of phandle + reset specifier pairs
-> + - reset-names : string reset name, must be:
-> +		 "tcphy", "tcphy_pipe", "uphy_tcphy"
-> + - #phy-cells : Must be 0.  See ./phy-bindings.txt for details.
-> + - extcon : extcon specifier for the Power Delivery
-> +
-> +Note, there are 2 type-c phys for RK3399, and they are almost identical, except
-> +these registers(description below), every register node contains 3 sections:
-> +offset, enable bit, write mask bit.
-> + - rockchip,typec_conn_dir : the register of type-c connector direction,
-> +   for type-c phy0, it must be <0xe580 0 16>;
-> +   for type-c phy1, it must be <0xe58c 0 16>;
-> + - rockchip,usb3tousb2_en : the register of type-c force usb3 to usb2 enable
-> +   control.
-> +   for type-c phy0, it must be <0xe580 3 19>;
-> +   for type-c phy1, it must be <0xe58c 3 19>;
-> + - rockchip,external_psm : the register of type-c phy external psm clock
-> +   selection.
-> +   for type-c phy0, it must be <0xe588 14 30>;
-> +   for type-c phy1, it must be <0xe594 14 30>;
-> + - rockchip,pipe_status : the register of type-c phy pipe status.
-> +   for type-c phy0, it must be <0xe5c0 0 0>;
-> +   for type-c phy1, it must be <0xe5c0 16 16>;
-> + - rockchip,uphy_dp_sel : the register of type-c phy selection for DP
-> +   for type-c phy0, it must be <0x6268 19 19>;
-> +   for type-c phy1, it must be <0x6268 3 19>;
-> +
-> +Example:
-> +	tcphy0: phy at ff7c0000 {
-> +		compatible = "rockchip,rk3399-typec-phy0";
-should be "rockchip,rk3399-typec-phy"
-> +		reg = <0x0 0xff7c0000 0x0 0x40000>;
-> +		#phy-cells = <0>;
-> +		extcon = <&fusb1>;
-> +		rockchip,grf = <&grf>;
-> +		clocks = <&cru SCLK_UPHY0_TCPDCORE>,
-> +			 <&cru SCLK_UPHY0_TCPDPHY_REF>;
-> +		clock-names = "tcpdcore", "tcpdphy_ref";
-> +		resets = <&cru SRST_UPHY0>,
-> +			 <&cru SRST_UPHY0_PIPE_L00>,
-> +			 <&cru SRST_P_UPHY0_TCPHY>;
-> +		reset-names = "tcphy", "tcphy_pipe", "uphy_tcphy";
-> +		rockchip,typec_conn_dir = <0xe580 0 16>;
-> +		rockchip,usb3tousb2_en = <0xe580 3 19>;
-> +		rockchip,external_psm = <0xe588 14 30>;
-> +		rockchip,pipe_status = <0xe5c0 0 0>;
-> +		rockchip,uphy_dp_sel = <0x6268 19 19>;
-> +	};
-> +
-> +	tcphy1: phy at ff800000 {
-> +		compatible = "rockchip,rk3399-typec-phy1";
-should be "rockchip,rk3399-typec-phy"
+> James
 
-Feel free to ad my Reviewed-by after these update.
 
-Thanks,
-- Kever
-> +		reg = <0x0 0xff800000 0x0 0x40000>;
-> +		#phy-cells = <0>;
-> +		rockchip,grf = <&grf>;
-> +		clocks = <&cru SCLK_UPHY1_TCPDCORE>,
-> +			 <&cru SCLK_UPHY1_TCPDPHY_REF>;
-> +		clock-names = "tcpdcore", "tcpdphy_ref";
-> +		resets = <&cru SRST_UPHY1>,
-> +		         <&cru SRST_UPHY1_PIPE_L00>,
-> +			 <&cru SRST_P_UPHY1_TCPHY>;
-> +		reset-names = "tcphy", "tcphy_pipe", "uphy_tcphy";
-> +		rockchip,typec_conn_dir = <0xe58c 0 16>;
-> +		rockchip,usb3tousb2_en = <0xe58c 3 19>;
-> +		rockchip,external_psm = <0xe594 14 30>;
-> +		rockchip,pipe_status = <0xe5c0 16 16>;
-> +		rockchip,uphy_dp_sel = <0x6268 3 19>;
-> +	};
+
+-- 
+Alexander Potapenko
+Software Engineer
+
+Google Germany GmbH
+Erika-Mann-Stra?e, 33
+80636 M?nchen
+
+Gesch?ftsf?hrer: Matthew Scott Sucherman, Paul Terence Manicle
+Registergericht und -nummer: Hamburg, HRB 86891
+Sitz der Gesellschaft: Hamburg
