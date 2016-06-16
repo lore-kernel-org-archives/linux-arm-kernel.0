@@ -1,56 +1,68 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Thu, 16 Jun 2016 10:44:18 +0000
-Subject: [PATCH 3/3] ARM: dts: imx7: add Toradex Colibri iMX7S/iMX7D
- support
-In-Reply-To: <59f88a185c67034087f3eabf88da6c8c@agner.ch>
-References: <20160608023709.32090-1-stefan@agner.ch>
- <20160608023709.32090-4-stefan@agner.ch> <20160612023100.GW20243@tiger>
- <59f88a185c67034087f3eabf88da6c8c@agner.ch>
-Message-ID: <1466073856.3884.11.camel@toradex.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 16 Jun 2016 16:17:11 +0530
+Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
+ encoder
+In-Reply-To: <574565ED.3060205@ti.com>
+References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
+ <1463648641-6931-2-git-send-email-vigneshr@ti.com>
+ <20160520163404.GC14951@dtor-ws> <5742CB03.8010805@ti.com>
+ <574565ED.3060205@ti.com>
+Message-ID: <576283AF.9090107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sali Stefan
+Hi Dmitry,
 
-On Wed, 2016-06-15 at 22:37 -0700, Stefan Agner wrote:
-> On 2016-06-11 19:31, Shawn Guo wrote:
-> > 
-> > On Tue, Jun 07, 2016 at 07:37:09PM -0700, Stefan Agner wrote:
-> > > 
-> > <snip>
-> > > 
-> > > +/ {
-> > > +	model = "Toradex Colibri iMX7D on Colibri Evaluation
-> > > Board V3";
-> > > +	compatible = "toradex,colibri_imx7d-eval",
-> > > "toradex,colibri_imx7d", \
-> > We always use hyphen than underscore in compatible string.
-> We always used underscores, this goes back to the first Colibri
-> specific
-> device tree: tegra20-iris-512.dts.
+On Wednesday 25 May 2016 02:14 PM, Vignesh R wrote:
+> Hi Dmitry,
 > 
-> I would rather prefer to not change this for the sake of
-> consistency...
-> What do you think?
+> On 05/23/2016 02:48 PM, R, Vignesh wrote:
+>>
+>>
+>> On 5/20/2016 10:04 PM, Dmitry Torokhov wrote:
+>>> On Thu, May 19, 2016 at 02:34:00PM +0530, Vignesh R wrote:
+>>>> There are rotary-encoders where GPIO lines reflect the actual position
+>>>> of the rotary encoder dial. For example, if dial points to 9, then four
+>>>> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
+>>>> Add support for such rotary-encoder.
+>>>> The driver relies on rotary-encoder,absolute-encoder DT property to
+>>>> detect such encoders.
+>>>> Since, GPIO IRQs are not necessary to work with
+>>>> such encoders, optional polling mode support is added using
+>>>> input_poll_dev skeleton. This is can be used by enabling
+>>>> CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT.
+>>>
+>>> Does this really belong to a rotary encoder and not a new driver that
+>>> simply translates gpio-encoded value into ABS* event?
+>>>
+>>
+>> Currently rotary encoder driver only supports incremental/step counting
+>> rotary devices. However, the device that is there on am335x-ice is an
+>> absolute encoder but, IMO, nevertheless a kind of rotary encoder. The
+>> only difference is that there is no need to count steps and the absolute
+>> position value is always available as binary encoded state of connected
+>> GPIOs.
+>> The hardware on am335x-ice is a mechanical rotary encoder switch
+>> connected over 4 GPIOs. It is same as binary encoder described at [1]
+>> (except there are 4 GPIO lines), so this lead me to add support in
+>> rotary-encoder.
+>>
+>> [1]https://en.wikipedia.org/wiki/Rotary_encoder#Standard_binary_encoding
+>>
+> 
+> Could you please comment on how would you like to support above
+> described encoder: As a new driver or with existing driver with new
+> compatible/mode setting via DT or as suggest by Uwe in another reply?
+> IMHO, supporting using existing driver with new mode/compatible string
+> looks a better option as the hardware is a kind of rotary-encoder.
+> 
 
-I have been there before when submitting a first Apalis TK1 version:
+It would be great if you could comment on how would you like to see
+support for absolute rotary-encoder(the one I described above)? As a new
+driver or handle it by adding new compatible to existing rotary-encoder
+driver?
 
-https://lkml.org/lkml/2016/5/16/288
 
-Upon Rob Herring's suggestion I changed it now all to dashes:
-
-https://lkml.org/lkml/2016/5/27/399
-
-Even in our downstream U-Boot:
-
-http://git.toradex.com/cgit/u-boot-toradex.git/commit/?h=2015.04-torade
-x-next&id=4ae2e657f3350422ad81b1632de156bdd9517206
-
-Of course for Colibri iMX7 one could argue that we already sold a
-couple hundred pieces still using underscores. However I guess we could
-still change to dashes now as those were all prototype, sample and/or
-beta.
-
-Cheers
-
-Marcel
+-- 
+Regards
+Vignesh
