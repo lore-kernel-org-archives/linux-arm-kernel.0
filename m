@@ -1,66 +1,121 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 16 Jun 2016 17:02:01 +0200
-Subject: [PATCH 3/3] ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on
- Armada 385 Linksys
-In-Reply-To: <1466084547-31343-4-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Thu, 16 Jun 2016 15:42:27 +0200")
-References: <1466084547-31343-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1466084547-31343-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87inx99nyu.fsf@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 16 Jun 2016 16:03:28 +0100
+Subject: [PATCH v2 5/5] mfd: rn5t618: register restart handler
+In-Reply-To: <20160608010429.19618-6-stefan@agner.ch>
+References: <20160608010429.19618-1-stefan@agner.ch>
+ <20160608010429.19618-6-stefan@agner.ch>
+Message-ID: <20160616150328.GE4948@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On jeu., juin 16 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Tue, 07 Jun 2016, Stefan Agner wrote:
 
-> When the support for the Marvell crypto engine was added in the Device
-> Tree of the various Armada 385 Device Tree files in commit
-> d716f2e837ac6 ("ARM: mvebu: define crypto SRAM ranges for all armada-38x
-> boards"), a typo was made in the MBus window attributes for the Armada
-> 385 Linksys board: 0x09/0x05 are used instead of 0x19/0x15. This commit
-> fixes this typo, which makes the CESA engines operational on Armada 385
-> Linksys boards.
->
-> Reported-by: Terry Stockert <stockert@inkblotadmirer.me>
-> Cc: Terry Stockert <stockert@inkblotadmirer.me>
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Cc: <stable@vger.kernel.org>
-> Fixes: d716f2e837ac6 ("ARM: mvebu: define crypto SRAM ranges for all armada-38x boards")
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Use the PMIC's repower capability for reboots. Register a restart
+> handler with use a default priority of 128.
 
-Applied on mvebu/fixes
+Care to elaborate as to why you're using 128?
 
-Thanks,
+> Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Gregory
+Chronological.
 
 > ---
->  arch/arm/boot/dts/armada-385-linksys.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
-> index 8450944..22f7a13 100644
-> --- a/arch/arm/boot/dts/armada-385-linksys.dtsi
-> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
-> @@ -58,8 +58,8 @@
->  	soc {
->  		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
->  			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
-> -			  MBUS_ID(0x09, 0x09) 0 0xf1100000 0x10000
-> -			  MBUS_ID(0x09, 0x05) 0 0xf1110000 0x10000>;
-> +			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
-> +			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
+>  drivers/mfd/rn5t618.c | 40 ++++++++++++++++++++++++++++++++++------
+>  1 file changed, 34 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mfd/rn5t618.c b/drivers/mfd/rn5t618.c
+> index d9b4d40..6bc0863 100644
+> --- a/drivers/mfd/rn5t618.c
+> +++ b/drivers/mfd/rn5t618.c
+> @@ -12,11 +12,13 @@
+>   * along with this program. If not, see <http://www.gnu.org/licenses/>.
+>   */
 >  
->  		internal-regs {
+> +#include <linux/delay.h>
+>  #include <linux/i2c.h>
+>  #include <linux/mfd/core.h>
+>  #include <linux/mfd/rn5t618.h>
+>  #include <linux/module.h>
+>  #include <linux/of_device.h>
+> +#include <linux/reboot.h>
+>  #include <linux/regmap.h>
 >  
-> -- 
-> 2.7.4
->
+>  static const struct mfd_cell rn5t618_cells[] = {
+> @@ -50,17 +52,34 @@ static const struct regmap_config rn5t618_regmap_config = {
+>  };
+>  
+>  static struct rn5t618 *rn5t618_pm_power_off;
+> +static struct notifier_block rn5t618_restart_handler;
+>  
+> -static void rn5t618_power_off(void)
+> +static void rn5t618_trigger_poweroff_sequence(bool repower)
+>  {
+>  	/* disable automatic repower-on */
+>  	regmap_update_bits(rn5t618_pm_power_off->regmap, RN5T618_REPCNT,
+> -			   RN5T618_REPCNT_REPWRON, 0);
+> +			   RN5T618_REPCNT_REPWRON, repower);
+>  	/* start power-off sequence */
+>  	regmap_update_bits(rn5t618_pm_power_off->regmap, RN5T618_SLPCNT,
+>  			   RN5T618_SLPCNT_SWPWROFF, RN5T618_SLPCNT_SWPWROFF);
+>  }
+>  
+> +static void rn5t618_power_off(void)
+> +{
+> +	rn5t618_trigger_poweroff_sequence(false);
+> +}
+> +
+> +static int rn5t618_restart(struct notifier_block *this,
+> +			    unsigned long mode, void *cmd)
+> +{
+> +	rn5t618_trigger_poweroff_sequence(true);
+> +
+> +	mdelay(10);
+
+Why 10ms?
+
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +
+>  static const struct of_device_id rn5t618_of_match[] = {
+>  	{ .compatible = "ricoh,rn5t567", .data = (void *)RN5T567 },
+>  	{ .compatible = "ricoh,rn5t618", .data = (void *)RN5T618 },
+> @@ -103,13 +122,22 @@ static int rn5t618_i2c_probe(struct i2c_client *i2c,
+>  		return ret;
+>  	}
+>  
+> +	rn5t618_pm_power_off = priv;
+>  	if (of_device_is_system_power_controller(i2c->dev.of_node)) {
+> -		if (!pm_power_off) {
+> -			rn5t618_pm_power_off = priv;
+> +		if (!pm_power_off)
+>  			pm_power_off = rn5t618_power_off;
+> -		} else {
+> +		else
+>  			dev_err(&i2c->dev, "Failed to set poweroff capability, already defined\n");
+> -		}
+> +	}
+> +
+> +	rn5t618_restart_handler.notifier_call = rn5t618_restart;
+> +	rn5t618_restart_handler.priority = 128;
+> +
+> +	ret = register_restart_handler(&rn5t618_restart_handler);
+> +	if (ret) {
+> +		dev_err(&i2c->dev, "%s: cannot register restart handler, %d\n",
+> +				__func__, ret);
+
+Don't use __func__ in log prints.
+
+Users don't care and developers know how to use `git grep`.
+
+> +		return ret;
+>  	}
+>  
+>  	return 0;
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
