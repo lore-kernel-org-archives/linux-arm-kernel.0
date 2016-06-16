@@ -1,47 +1,105 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Jun 2016 00:13:03 +0100
-Subject: kexec failures with DEBUG_RODATA
-In-Reply-To: <CAGXu5jLqNeYe_=7a5XC6UW4G3WiRQrrBvgernmugw_r2y0Nshg@mail.gmail.com>
-References: <20160614175920.GD1041@n2100.armlinux.org.uk>
- <CAGXu5j+5j32HO0rQtF2hcqMUBaa8cyxgLT4JvaZ6LL2WPj_zjw@mail.gmail.com>
- <20160615211359.GJ1041@n2100.armlinux.org.uk>
- <CAGXu5jKRBA9b6gos+FG7iV2ppxtAERstNPschxA0z=aDL_y1YA@mail.gmail.com>
- <20160615224228.GK1041@n2100.armlinux.org.uk>
- <CAGXu5jLqNeYe_=7a5XC6UW4G3WiRQrrBvgernmugw_r2y0Nshg@mail.gmail.com>
-Message-ID: <20160615231303.GL1041@n2100.armlinux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 16 Jun 2016 09:06:49 +0900
+Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <efac403f-3709-6a1a-aa02-a8ab26b21ffc@cogentembedded.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
+ <20160601005751.GG20527@verge.net.au>
+ <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
+ <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
+ <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
+ <20160610010245.GA10152@verge.net.au>
+ <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
+ <20160614004317.GC6456@verge.net.au>
+ <efac403f-3709-6a1a-aa02-a8ab26b21ffc@cogentembedded.com>
+Message-ID: <20160616000649.GA2709@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 03:54:38PM -0700, Kees Cook wrote:
-> On Wed, Jun 15, 2016 at 3:42 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > In fact, the apparent confusion over this reinforces my belief that we
-> > should _not_ give the size of the uncompressed image at all.
-> >
-> > The boot environment must be setup such that there is room for the
-> > uncompressed image (aligned currently to 256 bytes) followed by the
-> > size of the compressed image, with any appended DTBs included.
-> > Anything which is located below that is likely to get trampled by
-> > the decompressor.
+On Wed, Jun 15, 2016 at 12:08:21AM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Okay, sounds reasonable to me. :)
+> On 06/14/2016 03:43 AM, Simon Horman wrote:
+> 
+> >>>>[...]
+> >>>>
+> >>>>>>>And that the system behaves sanely on suspend/resume.
+> >>>>>>
+> >>>>>> I'd be thankful if you told me how to test that. :-)
+> >>>>>
+> >>>>>System suspend:
+> >>>>>
+> >>>>>  echo mem > /sys/power/state
+> >>>>
+> >>>>  Oh. I know that one! :-)
+> >>>>
+> >>>>>System resume: You're gonna need a "wakeup-source" in your DTS, e.g. gpio-keys.
+> >>>>>Serial should work too, echo "enabled" to the corresponding wakeup
+> >>>>>file in /sys first.
+> >>>>
+> >>>>  I'm afraid I couldn't find that file. All I saw were RPM controls...
+> >>>>
+> >>>>>In case of issues, try "echo 0 > /sys/module/printk/parameters/console_suspend".
+> >>>>
+> >>>>  There's no problems suspending, it's the resuming that's a problem for me.
+> >>>>
+> >>>>>Good luck!
+> >>>>
+> >>>>  As usual, there was no luck. :-)
+> >>>>
+> >>>>WBR, Sergei
+> >>>
+> >>>Does resume work for UP (i.e. without SMP)?
+> >>
+> >>   No. My problem with resume is I can't wake up the remote system. I don't
+> >>see the needed 'wakeup' file in
+> >>/sys/devices/platform/soc/e6e60000.serial/...
+> >>    However, if I enable CONFIG_PM_[ADVANCED_]DEBUG and do
+> >>
+> >>$ echo -n core /sys/.power/pm_test
+> >>
+> >>the system happily wakes up after a small delay (5 s), w/either SMP or UP kernel.
+> >
+> >That seems promising but it seems curious that there is no wakeup file.
+> >
+> >On Lager the following procedure works for me using
+> >renesas-devel-20160613-v4.7-rc3 and shmobile defconfig.
+> >
+> >0. Add wakeup-source property to serial at e6ce0000 node in DT
+> 
+>    Ah, stupid me, it was the piece that I'd overlooked!
+> 
+> >1. echo enabled > /sys/devices/platform/e6e60000.serial/tty/ttySC0/power/wakeup
+> >2. echo mem > /sys/power/state
+> >3. Provide input on serial console
+> >
+> >* Success! *
+> 
+>    Yeah, works now!
+>    Sorry, I had no previous experience with the PM. Was unsupported feature
+> back in MontaVista... :-)
 
-I should point out that this method should work for a zImage without
-an appended DTB, and we have no way to update this header block for
-the appended DTB case.
+Great, thanks for your persistence.
 
-So, an alternative standpoint is that we supply only the uncompressed
-image size.  Then, the boot environment needs to understand that they
-must allow for the compressed image and any appended DTB on top of that
-(which it would see as one - the size of the combined image.)
+FWIW, I always have to refer to some notes in order to exercise PM.
 
-However, while that may sound like a good idea, we're falling into the
-same trap that we've fallen into at the beginning of this thread: the
-boot environment has to understand how the decompressor currently works,
-and if we were to change that, this we're back to the calculation which
-the boot environment is using not matching reality.
+> >>>How did testing CPU hotplug go? Did it work for all CPUs?
+> >>
+> >>   Sure!
+> >
+> >Great!
+> >
+> >>   The only problem I'm seeing (again) is the RCAN clock failing to register:
+> >>
+> >>rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock (-12)
+> >>
+> >>   I was going to look at it yesterday but (wrongly) thought it somehow
+> >>cured itself... I'll look at it now.
+> >
+> >Is this resolved? If not perhaps you could consider removing the node
+> >in question for now.
+> 
+>    That's what I did in v5, i.e. removed the RCAN CPG clock (not the whole
+> node)...
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Great.
