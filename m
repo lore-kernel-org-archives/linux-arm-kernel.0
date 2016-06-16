@@ -1,134 +1,146 @@
 From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Thu, 16 Jun 2016 09:53:33 -0400
-Subject: [PATCH 5/7] ata: ahci_brcm: Add support for Broadcom NSP SoC
+Date: Thu, 16 Jun 2016 09:53:34 -0400
+Subject: [PATCH 6/7] phy: Add SATA3 PHY support for Broadcom NSP SoC
 In-Reply-To: <1466085215-10246-1-git-send-email-yendapally.reddy@broadcom.com>
 References: <1466085215-10246-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <1466085215-10246-6-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <1466085215-10246-7-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SATA3 support for Broadcom NSP SoC
+This patch adds support for Broadcom NSP SATA3 PHY in existing
+Broadcom SATA PHY driver.
 
 Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
 ---
- drivers/ata/Kconfig     |  2 +-
- drivers/ata/ahci_brcm.c | 46 ++++++++++++++++++++++++++++++++++++----------
- 2 files changed, 37 insertions(+), 11 deletions(-)
+ drivers/phy/phy-brcm-sata.c | 81 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
 
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 8fe06e6..2c8be74 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -100,7 +100,7 @@ config SATA_AHCI_PLATFORM
- 
- config AHCI_BRCM
- 	tristate "Broadcom AHCI SATA support"
--	depends on ARCH_BRCMSTB || BMIPS_GENERIC
-+	depends on ARCH_BRCMSTB || BMIPS_GENERIC || ARCH_BCM_NSP
- 	help
- 	  This option enables support for the AHCI SATA3 controller found on
- 	  Broadcom SoC's.
-diff --git a/drivers/ata/ahci_brcm.c b/drivers/ata/ahci_brcm.c
-index e87bcec..6f8a734 100644
---- a/drivers/ata/ahci_brcm.c
-+++ b/drivers/ata/ahci_brcm.c
-@@ -71,6 +71,12 @@
- 	(DATA_ENDIAN << DMADESC_ENDIAN_SHIFT) |		\
- 	(MMIO_ENDIAN << MMIO_ENDIAN_SHIFT))
- 
-+enum brcm_ahci_version {
-+	BRCM_SATA_BCM7425 = 1,
-+	BRCM_SATA_BCM7445,
-+	BRCM_SATA_NSP,
-+};
-+
- enum brcm_ahci_quirks {
- 	BRCM_AHCI_QUIRK_NO_NCQ		= BIT(0),
- 	BRCM_AHCI_QUIRK_SKIP_PHY_ENABLE	= BIT(1),
-@@ -81,6 +87,7 @@ struct brcm_ahci_priv {
- 	void __iomem *top_ctrl;
- 	u32 port_mask;
- 	u32 quirks;
-+	enum brcm_ahci_version version;
+diff --git a/drivers/phy/phy-brcm-sata.c b/drivers/phy/phy-brcm-sata.c
+index 6c4c5cb..18d6626 100644
+--- a/drivers/phy/phy-brcm-sata.c
++++ b/drivers/phy/phy-brcm-sata.c
+@@ -45,6 +45,7 @@ enum brcm_sata_phy_version {
+ 	BRCM_SATA_PHY_STB_28NM,
+ 	BRCM_SATA_PHY_STB_40NM,
+ 	BRCM_SATA_PHY_IPROC_NS2,
++	BRCM_SATA_PHY_IPROC_NSP,
  };
  
- static const struct ata_port_info ahci_brcm_port_info = {
-@@ -247,9 +254,19 @@ static u32 brcm_ahci_get_portmask(struct platform_device *pdev,
+ struct brcm_sata_port {
+@@ -73,6 +74,13 @@ enum sata_phy_regs {
  
- static void brcm_sata_init(struct brcm_ahci_priv *priv)
- {
-+	void __iomem *ctrl = priv->top_ctrl + SATA_TOP_CTRL_BUS_CTRL;
-+
- 	/* Configure endianness */
--	brcm_sata_writereg(BUS_CTRL_ENDIAN_CONF,
--			   priv->top_ctrl + SATA_TOP_CTRL_BUS_CTRL);
-+	if (priv->version ==  BRCM_SATA_NSP) {
-+		u32 data = brcm_sata_readreg(ctrl);
-+
-+		data &= ~((0x03 << DMADATA_ENDIAN_SHIFT) |
-+			(0x03 << DMADESC_ENDIAN_SHIFT));
-+		data |= (0x02 << DMADATA_ENDIAN_SHIFT) |
-+			(0x02 << DMADESC_ENDIAN_SHIFT);
-+		brcm_sata_writereg(data, ctrl);
-+	} else
-+		brcm_sata_writereg(BUS_CTRL_ENDIAN_CONF, ctrl);
- }
+ 	PLL_REG_BANK_0				= 0x050,
+ 	PLL_REG_BANK_0_PLLCONTROL_0		= 0x81,
++	PLLCONTROL_0_FREQ_DET_RESTART		= BIT(13),
++	PLLCONTROL_0_FREQ_MONITOR		= BIT(12),
++	PLLCONTROL_0_SEQ_START			= BIT(15),
++	PLL_CAP_CONTROL				= 0x85,
++	PLL_ACTRL2				= 0x8b,
++	PLL_ACTRL2_SELDIV_MASK			= 0x1f,
++	PLL_ACTRL2_SELDIV_SHIFT			= 9,
  
- #ifdef CONFIG_PM_SLEEP
-@@ -282,8 +299,17 @@ static struct scsi_host_template ahci_platform_sht = {
- 	AHCI_SHT(DRV_NAME),
- };
+ 	PLL1_REG_BANK				= 0x060,
+ 	PLL1_ACTRL2				= 0x82,
+@@ -80,6 +88,7 @@ enum sata_phy_regs {
+ 	PLL1_ACTRL4				= 0x84,
  
-+static const struct of_device_id ahci_of_match[] = {
-+	{.compatible = "brcm,bcm7425-ahci", .data = (void *)BRCM_SATA_BCM7425},
-+	{.compatible = "brcm,bcm7445-ahci", .data = (void *)BRCM_SATA_BCM7445},
-+	{.compatible = "brcm,bcm-nsp-ahci", .data = (void *)BRCM_SATA_NSP},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, ahci_of_match);
-+
- static int brcm_ahci_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *of_id;
- 	struct device *dev = &pdev->dev;
- 	struct brcm_ahci_priv *priv;
- 	struct ahci_host_priv *hpriv;
-@@ -293,6 +319,12 @@ static int brcm_ahci_probe(struct platform_device *pdev)
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
- 		return -ENOMEM;
-+
-+	of_id = of_match_node(ahci_of_match, pdev->dev.of_node);
-+	if (!of_id)
-+		return -ENODEV;
-+
-+	priv->version = (enum brcm_ahci_version)of_id->data;
- 	priv->dev = dev;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "top-ctrl");
-@@ -300,7 +332,8 @@ static int brcm_ahci_probe(struct platform_device *pdev)
- 	if (IS_ERR(priv->top_ctrl))
- 		return PTR_ERR(priv->top_ctrl);
- 
--	if (of_device_is_compatible(dev->of_node, "brcm,bcm7425-ahci")) {
-+	if ((priv->version == BRCM_SATA_BCM7425) ||
-+		(priv->version == BRCM_SATA_NSP)) {
- 		priv->quirks |= BRCM_AHCI_QUIRK_NO_NCQ;
- 		priv->quirks |= BRCM_AHCI_QUIRK_SKIP_PHY_ENABLE;
- 	}
-@@ -354,13 +387,6 @@ static int brcm_ahci_remove(struct platform_device *pdev)
+ 	OOB_REG_BANK				= 0x150,
++	OOB1_REG_BANK				= 0x160,
+ 	OOB_CTRL1				= 0x80,
+ 	OOB_CTRL1_BURST_MAX_MASK		= 0xf,
+ 	OOB_CTRL1_BURST_MAX_SHIFT		= 12,
+@@ -271,6 +280,73 @@ static int brcm_ns2_sata_init(struct brcm_sata_port *port)
  	return 0;
  }
  
--static const struct of_device_id ahci_of_match[] = {
--	{.compatible = "brcm,bcm7425-ahci"},
--	{.compatible = "brcm,bcm7445-ahci"},
--	{},
--};
--MODULE_DEVICE_TABLE(of, ahci_of_match);
--
- static SIMPLE_DEV_PM_OPS(ahci_brcm_pm_ops, brcm_ahci_suspend, brcm_ahci_resume);
- 
- static struct platform_driver brcm_ahci_driver = {
++static int brcm_nsp_sata_init(struct brcm_sata_port *port)
++{
++	struct brcm_sata_phy *priv = port->phy_priv;
++	struct device *dev = port->phy_priv->dev;
++	void __iomem *base = priv->phy_base;
++	unsigned int oob_bank;
++	unsigned int val, try;
++
++	/* Configure OOB control */
++	if (port->portnum == 0)
++		oob_bank = OOB_REG_BANK;
++	else if (port->portnum == 1)
++		oob_bank = OOB1_REG_BANK;
++	else
++		return -EINVAL;
++
++	val = 0x0;
++	val |= (0x0f << OOB_CTRL1_BURST_MAX_SHIFT);
++	val |= (0x06 << OOB_CTRL1_BURST_MIN_SHIFT);
++	val |= (0x0f << OOB_CTRL1_WAKE_IDLE_MAX_SHIFT);
++	val |= (0x06 << OOB_CTRL1_WAKE_IDLE_MIN_SHIFT);
++	brcm_sata_phy_wr(base, oob_bank, OOB_CTRL1, 0x0, val);
++
++	val = 0x0;
++	val |= (0x2e << OOB_CTRL2_RESET_IDLE_MAX_SHIFT);
++	val |= (0x02 << OOB_CTRL2_BURST_CNT_SHIFT);
++	val |= (0x16 << OOB_CTRL2_RESET_IDLE_MIN_SHIFT);
++	brcm_sata_phy_wr(base, oob_bank, OOB_CTRL2, 0x0, val);
++
++
++	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_ACTRL2,
++		~(PLL_ACTRL2_SELDIV_MASK << PLL_ACTRL2_SELDIV_SHIFT),
++		0x0c << PLL_ACTRL2_SELDIV_SHIFT);
++
++	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_CAP_CONTROL,
++						0xff0, 0x4f0);
++
++	val = PLLCONTROL_0_FREQ_DET_RESTART | PLLCONTROL_0_FREQ_MONITOR;
++	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_REG_BANK_0_PLLCONTROL_0,
++								~val, val);
++	val = PLLCONTROL_0_SEQ_START;
++	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_REG_BANK_0_PLLCONTROL_0,
++								~val, 0);
++	mdelay(10);
++	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_REG_BANK_0_PLLCONTROL_0,
++								~val, val);
++
++	/* Wait for pll_seq_done bit */
++	try = 50;
++	while (try--) {
++		val = brcm_sata_phy_rd(base, BLOCK0_REG_BANK,
++					BLOCK0_XGXSSTATUS);
++		if (val & BLOCK0_XGXSSTATUS_PLL_LOCK)
++			break;
++		msleep(20);
++	}
++	if (!try) {
++		/* PLL did not lock; give up */
++		dev_err(dev, "port%d PLL did not lock\n", port->portnum);
++		return -ETIMEDOUT;
++	}
++
++	dev_dbg(dev, "port%d initialized\n", port->portnum);
++
++	return 0;
++}
++
+ static int brcm_sata_phy_init(struct phy *phy)
+ {
+ 	int rc;
+@@ -284,6 +360,9 @@ static int brcm_sata_phy_init(struct phy *phy)
+ 	case BRCM_SATA_PHY_IPROC_NS2:
+ 		rc = brcm_ns2_sata_init(port);
+ 		break;
++	case BRCM_SATA_PHY_IPROC_NSP:
++		rc = brcm_nsp_sata_init(port);
++		break;
+ 	default:
+ 		rc = -ENODEV;
+ 	};
+@@ -303,6 +382,8 @@ static const struct of_device_id brcm_sata_phy_of_match[] = {
+ 	  .data = (void *)BRCM_SATA_PHY_STB_40NM },
+ 	{ .compatible	= "brcm,iproc-ns2-sata-phy",
+ 	  .data = (void *)BRCM_SATA_PHY_IPROC_NS2 },
++	{ .compatible = "brcm,iproc-nsp-sata-phy",
++	  .data = (void *)BRCM_SATA_PHY_IPROC_NSP },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, brcm_sata_phy_of_match);
 -- 
 2.1.0
