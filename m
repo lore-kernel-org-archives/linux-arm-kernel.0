@@ -1,110 +1,39 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 16 Jun 2016 10:21:13 -0700
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 16 Jun 2016 19:28:59 +0200
 Subject: [PATCH 2/2] arm64: drop kernel segment resources from /proc/iomem
-In-Reply-To: <CAKv+Gu8ZO3Pz8vq9mM-XSDa1-L877-mzD1pBhhhJw0Z5jXCk0Q@mail.gmail.com>
+In-Reply-To: <CAGXu5jLWs0FiN1wri51WFSS__8kfLMMeYtUTspuHqi4pmFHEAA@mail.gmail.com>
 References: <1466080138-12193-1-git-send-email-ard.biesheuvel@linaro.org>
  <1466080138-12193-2-git-send-email-ard.biesheuvel@linaro.org>
  <CAKv+Gu8ZO3Pz8vq9mM-XSDa1-L877-mzD1pBhhhJw0Z5jXCk0Q@mail.gmail.com>
-Message-ID: <CAGXu5jLWs0FiN1wri51WFSS__8kfLMMeYtUTspuHqi4pmFHEAA@mail.gmail.com>
+ <CAGXu5jLWs0FiN1wri51WFSS__8kfLMMeYtUTspuHqi4pmFHEAA@mail.gmail.com>
+Message-ID: <CAKv+Gu84hr4d--cRUZzpGnA7NXr3pxE-VdRsaTGjUYX9aiet4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 5:32 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> (+ James)
+On 16 June 2016 at 19:21, Kees Cook <keescook@chromium.org> wrote:
+> On Thu, Jun 16, 2016 at 5:32 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> (+ James)
+>>
+>> On 16 June 2016 at 14:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>> By the same reasoning as commit c4004b02f8e5 ("x86: remove the kernel
+>>> code/data/bss resources from /proc/iomem"), the kernel code and kernel
+>>> data entries in /proc/iomem probably do more harm than good on arm64 as
+>>> well. So remove them.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>>
+>> Actually, Linus's patch above has been reverted again, so we have to
+>> consider whether the kexec case exists for us as well before we
+>> consider this
+>>
+>> Apologies for failing to spot that before sending
 >
-> On 16 June 2016 at 14:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> By the same reasoning as commit c4004b02f8e5 ("x86: remove the kernel
->> code/data/bss resources from /proc/iomem"), the kernel code and kernel
->> data entries in /proc/iomem probably do more harm than good on arm64 as
->> well. So remove them.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Please leave this as it was originally. The security exposure has been
+> minimized and it would make arm64 differ from all other architectures.
+> If we remove this, it needs to be coordinated across all
+> architectures.
 >
->
-> Actually, Linus's patch above has been reverted again, so we have to
-> consider whether the kexec case exists for us as well before we
-> consider this
->
-> Apologies for failing to spot that before sending
 
-Please leave this as it was originally. The security exposure has been
-minimized and it would make arm64 differ from all other architectures.
-If we remove this, it needs to be coordinated across all
-architectures.
-
--Kees
-
->
->
->> ---
->>  arch/arm64/kernel/setup.c | 33 ---------------------------------
->>  1 file changed, 33 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 3279defabaa2..f3ec301653a4 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -68,27 +68,6 @@
->>  phys_addr_t __fdt_pointer __initdata;
->>
->>  /*
->> - * Standard memory resources
->> - */
->> -static struct resource mem_res[] = {
->> -       {
->> -               .name = "Kernel code",
->> -               .start = 0,
->> -               .end = 0,
->> -               .flags = IORESOURCE_SYSTEM_RAM
->> -       },
->> -       {
->> -               .name = "Kernel data",
->> -               .start = 0,
->> -               .end = 0,
->> -               .flags = IORESOURCE_SYSTEM_RAM
->> -       }
->> -};
->> -
->> -#define kernel_code mem_res[0]
->> -#define kernel_data mem_res[1]
->> -
->> -/*
->>   * The recorded values of x0 .. x3 upon kernel entry.
->>   */
->>  u64 __cacheline_aligned boot_args[4];
->> @@ -201,11 +180,6 @@ static void __init request_standard_resources(void)
->>         struct memblock_region *region;
->>         struct resource *res;
->>
->> -       kernel_code.start   = virt_to_phys(_text);
->> -       kernel_code.end     = virt_to_phys(_etext - 1);
->> -       kernel_data.start   = virt_to_phys(_sdata);
->> -       kernel_data.end     = virt_to_phys(_end - 1);
->> -
->>         for_each_memblock(memory, region) {
->>                 res = alloc_bootmem_low(sizeof(*res));
->>                 res->name  = "System RAM";
->> @@ -214,13 +188,6 @@ static void __init request_standard_resources(void)
->>                 res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
->>
->>                 request_resource(&iomem_resource, res);
->> -
->> -               if (kernel_code.start >= res->start &&
->> -                   kernel_code.end <= res->end)
->> -                       request_resource(res, &kernel_code);
->> -               if (kernel_data.start >= res->start &&
->> -                   kernel_data.end <= res->end)
->> -                       request_resource(res, &kernel_data);
->>         }
->>  }
->>
->> --
->> 1.9.1
->>
-
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+OK, fair enough
