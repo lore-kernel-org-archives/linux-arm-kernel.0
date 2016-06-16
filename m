@@ -1,47 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 16 Jun 2016 10:32:05 +0200
-Subject: [PATCH 3/7] crypto: marvell: Copy IV vectors by DMA transfers for
- acipher requests
-In-Reply-To: <5762636A.2020800@free-electrons.com> (Romain Perier's message of
- "Thu, 16 Jun 2016 10:29:30 +0200")
-References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
- <1466018134-10779-4-git-send-email-romain.perier@free-electrons.com>
- <20160615220716.6ad3b856@bbrezillon>
- <5762636A.2020800@free-electrons.com>
-Message-ID: <87oa71bkl6.fsf@free-electrons.com>
+From: Adam.Thomson.Opensource@diasemi.com (Opensource [Adam Thomson])
+Date: Thu, 16 Jun 2016 08:40:45 +0000
+Subject: [PATCH v5] ASoC: rockchip: Add machine driver for RK3399 GRU
+ Boards
+In-Reply-To: <5761FDAA.1070802@rock-chips.com>
+References: <1465807339-1100-1-git-send-email-zhengxing@rock-chips.com>
+ <CADR9n49m7anZpDbbb3=ZGBaacOuXc4F=Yid0eyMey1LfEJx8Pw@mail.gmail.com>
+ <5761FDAA.1070802@rock-chips.com>
+Message-ID: <2E89032DDAA8B9408CB92943514A0337D4643174@SW-EX-MBX01.diasemi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
- 
- On jeu., juin 16 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
+On 16 June 2016 02:15, Xing Zheng wrote:
 
->
->>> diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
->>> index 74071e4..74b84bd 100644
->>> --- a/drivers/crypto/marvell/cesa.h
->>> +++ b/drivers/crypto/marvell/cesa.h
->>> @@ -275,6 +275,7 @@ struct mv_cesa_op_ctx {
->>>   #define CESA_TDMA_DUMMY				0
->>>   #define CESA_TDMA_DATA				1
->>>   #define CESA_TDMA_OP				2
->>> +#define CESA_TDMA_IV				4
->>
->> Should be 3 and not 4: TDMA_TYPE is an enum, not a bit field.
->
-> Ok
->
->>
->> Sometime it's better to offend the < 80 characters rule than doing
->> funky stuff ;).
->
-> I just wanted to make checkpatch happy :D
+> >> +       /* Enable Headset and 4 Buttons Jack detection */
+> >> +       ret = snd_soc_card_jack_new(rtd->card, "Headset Jack",
+> >> +                                   SND_JACK_HEADSET |
+> > Should this also include SND_JACK_LINEOUT? da7219 differentiates
+> > between the two so not including lineout means, for example, we can
+> > miss jack insertion/removal events.
+> >
+> Hi Adam,
+> 
+> Could you please confirm Steve says that about SND_JACK_LINEOUT?
+> 
+> Thanks.
 
-In this case you can use a temporary variable.
+Hi Xing Zheng,
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yes, as Steve mentioned DA7219 does support SND_JACK_LINEOUT so we should really
+include this here.
