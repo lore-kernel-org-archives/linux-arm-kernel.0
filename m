@@ -1,25 +1,103 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 17 Jun 2016 01:36:45 +0200
-Subject: [PATCH 3/4] phy: rockchip-emmc: configure default output tap delay
-In-Reply-To: <1463092986-61777-3-git-send-email-briannorris@chromium.org>
-References: <1463092986-61777-1-git-send-email-briannorris@chromium.org>
- <1463092986-61777-3-git-send-email-briannorris@chromium.org>
-Message-ID: <1614232.pce5aJ6WZ3@phil>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Thu, 16 Jun 2016 18:35:04 -0500
+Subject: [PATCH 2/2] arm64: dts: ls2080a: Add cache nodes for cacheinfo support
+In-Reply-To: <1466120104-12023-1-git-send-email-leoyang.li@nxp.com>
+References: <1466120104-12023-1-git-send-email-leoyang.li@nxp.com>
+Message-ID: <1466120104-12023-2-git-send-email-leoyang.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 12. Mai 2016, 15:43:05 schrieb Brian Norris:
-> The output tap delay controls helps maintain the hold requirements for
-> eMMC. The exact value is dependent on the SoC and other factors, though
-> it isn't really an exact science. But the default of 0 is not very good,
-> as it doesn't give the eMMC much hold time, so let's bump up to 4
-> (approx 90 degree phase?). If we need to configure this any further
-> (e.g., based on board or speed factors), we may need to consider a
-> device tree representation.
-> 
-> Suggested-by: Shawn Lin <shawn.lin@rock-chips.com>
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+Adds the cache nodes and next-level-cache property for the
+cacheinfo to work.
 
-on my rk3399-evb board the emmc still runs nicely with this patch, so
+Signed-off-by: Li Yang <leoyang.li@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 3187c82..0f4b9c1 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -67,6 +67,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x0>;
+ 			clocks = <&clockgen 1 0>;
++			next-level-cache = <&cluster0_l2>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -74,6 +75,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x1>;
+ 			clocks = <&clockgen 1 0>;
++			next-level-cache = <&cluster0_l2>;
+ 		};
+ 
+ 		cpu at 100 {
+@@ -81,6 +83,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x100>;
+ 			clocks = <&clockgen 1 1>;
++			next-level-cache = <&cluster1_l2>;
+ 		};
+ 
+ 		cpu at 101 {
+@@ -88,6 +91,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x101>;
+ 			clocks = <&clockgen 1 1>;
++			next-level-cache = <&cluster1_l2>;
+ 		};
+ 
+ 		cpu at 200 {
+@@ -95,6 +99,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x200>;
+ 			clocks = <&clockgen 1 2>;
++			next-level-cache = <&cluster2_l2>;
+ 		};
+ 
+ 		cpu at 201 {
+@@ -102,6 +107,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x201>;
+ 			clocks = <&clockgen 1 2>;
++			next-level-cache = <&cluster2_l2>;
+ 		};
+ 
+ 		cpu at 300 {
+@@ -109,6 +115,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x300>;
+ 			clocks = <&clockgen 1 3>;
++			next-level-cache = <&cluster3_l2>;
+ 		};
+ 
+ 		cpu at 301 {
+@@ -116,6 +123,23 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x301>;
+ 			clocks = <&clockgen 1 3>;
++			next-level-cache = <&cluster3_l2>;
++		};
++
++		cluster0_l2: l2-cache0 {
++			compatible = "cache";
++		};
++
++		cluster1_l2: l2-cache1 {
++			compatible = "cache";
++		};
++
++		cluster2_l2: l2-cache2 {
++			compatible = "cache";
++		};
++
++		cluster3_l2: l2-cache3 {
++			compatible = "cache";
+ 		};
+ 	};
+ 
+-- 
+1.9.0
