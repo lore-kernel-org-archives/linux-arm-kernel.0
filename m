@@ -1,36 +1,80 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Jun 2016 10:19:35 +0200
-Subject: [PATCH] ARM: dts: sun8i-q8-common: Add support for USB wifi
- controllers
-In-Reply-To: <1466015030-18091-1-git-send-email-hdegoede@redhat.com>
-References: <1466015030-18091-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160616081935.GI5144@lukather>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Thu, 16 Jun 2016 09:20:42 +0100
+Subject: [PATCH v5 1/8] Documentation: arm: define DT cpu
+ capacity-dmips-mhz bindings
+In-Reply-To: <CAL_JsqJwQVsn3=6vQus4Q2OhnLUsJVN70j2+f3QoJejcb=p9YA@mail.gmail.com>
+References: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
+ <1465985877-18271-2-git-send-email-juri.lelli@arm.com>
+ <CAL_JsqJwQVsn3=6vQus4Q2OhnLUsJVN70j2+f3QoJejcb=p9YA@mail.gmail.com>
+Message-ID: <20160616082042.GI5981@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 08:23:50PM +0200, Hans de Goede wrote:
-> Some of the sun8i q8 boards have an usb wifi controller, on other
-> variants this will result in an used usb root-hub, but the best
-> way to deal with wifi on this boards is to simply let the kernel
-> auto-detect usb or sdio wifi controllers.
+Hi,
+
+On 15/06/16 17:11, Rob Herring wrote:
+> On Wed, Jun 15, 2016 at 5:17 AM, Juri Lelli <juri.lelli@arm.com> wrote:
+
+[...]
+
+> > +==========================================
+> > +2 - CPU capacity definition
+> > +==========================================
+> > +
+> > +CPU capacity is a number that provides the scheduler information about CPUs
+> > +heterogeneity. Such heterogeneity can come from micro-architectural differences
+> > +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
+> > +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
+> > +context is about differing performance characteristics; this binding tries to
+> > +capture a first-order approximation of the relative performance of CPUs.
+> > +
+> > +CPU capacities are obtained by running a suitable benchmark. This binding makes
+> > +no aspersions on the validity or suitability of any particular benchmark, the
+> > +final capacity should, however, be:
+> > +
+> > +* A "single-threaded" or CPU affine benchmark
+> > +* Divided by the running frequency of the CPU executing the benchmark
+> > +* Not subject to dynamic frequency scaling of the CPU
+> > +
+> > +For the time being we however advise usage of the Dhrystone benchmark. What
+> > +above thus becomes:
+> > +
+> > +CPU capacities are obtained by running the Dhrystone benchmark on each CPU at
+> > +max frequency. The obtained DMIPS score is then divided by the frequency (in
+> > +MHz) at which the benchmark has been run, so that DMIPS/MHz are obtained.
+> > +Such values are then normalized w.r.t. the highest score obtained in the
+> > +system.
 > 
-> This has been tested on an a23 based q8 tablet with a RTL8188ETV wifi
-> controller.
+> So the property says it represents DMIPS/MHz, but we take that and
+> "normalize" them back to a made up numbers?
+
+The normalization step is required if one wants to prevent
+cross-platform comparisons (I think that's what vendors generally want).
+They are not made up, they still come from measured DMIPS/MHz values.
+
+> Perhaps that step should
+> be optional. Then paranoid Si vendors can put their fake numbers in
+> and end users can update the dts files with real numbers.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Applied, thanks.
+But, you can also decide to skip that step and put non normalized
+numbers in. This documentation is advising people for what seems to be
+be the most common way of coming up with values that, once in a DT,
+won't be used to compare perf of different platforms.
 
-Maxime
+Maybe we want to add a paragraph clearly stating this point?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160616/1ff6172a/attachment.sig>
+> Is there any point in allowing people to pick their own scale? Why not
+> just 100 (as in percent)?
+> 
+
+I think we agreed that not picking any particular scale is more flexible
+and easier to use. For example, if there is a 2x factor between you cpus
+you can simply put 1 and 2 there. But, if you need higher "resolution"
+you can put whatever suits you better and we'll use the max as scale.
+
+Thanks a lot for the review.
+
+Best,
+
+- Juri
