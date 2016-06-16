@@ -1,82 +1,66 @@
-From: mika.batsman@gmail.com (=?UTF-8?Q?Mika_B=C3=A5tsman?=)
-Date: Thu, 16 Jun 2016 13:13:03 +0300
-Subject: anatop_regulator probe returns -EINVAL if regulator is set to
- bypass mode
-In-Reply-To: <1879329.hU2uRcWFRn@galactica.lan>
-References: <CACE3x1OUrK8ea78VDxf0bYxNnxBRrcH3xFE0amMsv2jYErRLmQ@mail.gmail.com>
- <1879329.hU2uRcWFRn@galactica.lan>
-Message-ID: <CACE3x1NJMMUyjH26uWSmLFPFieKWOjN5o94G0H9EW0Z5mKhDMQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 16 Jun 2016 11:13:09 +0100
+Subject: [PATCH] coresight: access conn->child_name only if it's initialised
+Message-ID: <1466071989-24663-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+If the addition of the coresight devices get deferred, then there's a
+window before child_name is populated by of_get_coresight_platform_data
+from the respective component driver's probe and the attempted to access
+the same from coresight_orphan_match resulting in kernel NULL pointer
+dereference as below:
 
-good to know. I'll prepare a patch.
+Unable to handle kernel NULL pointer dereference at virtual address 0x0
+Internal error: Oops: 96000004 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 1038 Comm: kworker/0:1 Not tainted 4.7.0-rc3 #124
+Hardware name: ARM Juno development board (r2) (DT)
+Workqueue: events amba_deferred_retry_func
+PC is at strcmp+0x1c/0x160
+LR is at coresight_orphan_match+0x7c/0xd0
+Call trace:
+ strcmp+0x1c/0x160
+ bus_for_each_dev+0x60/0xa0
+ coresight_register+0x264/0x2e0
+ tmc_probe+0x130/0x310
+ amba_probe+0xd4/0x1c8
+ driver_probe_device+0x22c/0x418
+ __device_attach_driver+0xbc/0x158
+ bus_for_each_drv+0x58/0x98
+ __device_attach+0xc4/0x160
+ device_initial_probe+0x10/0x18
+ bus_probe_device+0x94/0xa0
+ device_add+0x344/0x580
+ amba_device_try_add+0x194/0x238
+ amba_deferred_retry_func+0x48/0xd0
+ process_one_work+0x118/0x378
+ worker_thread+0x48/0x498
+ kthread+0xd0/0xe8
+ ret_from_fork+0x10/0x40
 
-Thanks,
-Mika
+This patch adds a check for non-NULL conn->child_name before accessing
+the same.
 
-On Tue, Jun 14, 2016 at 10:37 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> Hi Mika,
->
-> On 2016 M06 6, Mon 17:24:49 CEST Mika B?tsman wrote:
->> Hi Philipp, hi Markus,
->>
->> there's a problem with anatop regulator driver that relates to
->> functionality you have worked on. The related commits:
->> da0607c8 regulator: anatop: Fail on invalid voltage selector
->> d38018f2 regulator: anatop: Add bypass support to digital LDOs
->>
->>
->> So in case bootloader set the regulator to bypass mode sreg->sel gets set
->> to 0
->>         sreg->sel = (val & rdesc->vsel_mask) >> sreg->vol_bit_shift;
->>         if (sreg->sel == LDO_FET_FULL_ON) {
->>             sreg->sel = 0;
->>             sreg->bypass = true;
->>         }
->>
->> and a little bit later it's causing EINVAL to be returned.
->>         if (!sreg->sel) {
->>             dev_err(&pdev->dev, "Failed to read a valid default voltage
->> selector.\n");
->>             return -EINVAL;
->>         }
->>
->> Resulting in:
->> anatop_regulator 20c8000.anatop:regulator-vddcore at 140: Failed to read a
->> valid default voltage selector.
->> anatop_regulator: probe of 20c8000.anatop:regulator-vddcore at 140 failed with
->> error -22
->> anatop_regulator 20c8000.anatop:regulator-vddsoc at 140: Failed to read a
->> valid default voltage selector.
->> anatop_regulator: probe of 20c8000.anatop:regulator-vddsoc at 140 failed with
->> error -22
->>
->> Is that really the expected behaviour or should sreg->bypass be taken into
->> account before returning EINVAL? Like this:
->>
->>         if (!sreg->bypass && !sreg->sel) {
->
-> Thanks for spotting this. This condition seems better. A EINVAL error was not
-> intended for the bypass mode.
->
-> Best Regards,
->
-> Markus
->
->>             dev_err(&pdev->dev, "Failed to read a valid default voltage
->> selector.\n");
->>             return -EINVAL;
->>         }
->>
->>
->> Regards,
->> Mika
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/hwtracing/coresight/coresight.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 5443d03a1eec..12ca4cd97f5b 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -722,7 +722,8 @@ static int coresight_orphan_match(struct device *dev, void *data)
+ 		/* We have found at least one orphan connection */
+ 		if (conn->child_dev == NULL) {
+ 			/* Does it match this newly added device? */
+-			if (!strcmp(dev_name(&csdev->dev), conn->child_name)) {
++			if (conn->child_name &&
++			    !strcmp(dev_name(&csdev->dev), conn->child_name)) {
+ 				conn->child_dev = csdev;
+ 			} else {
+ 				/* This component still has an orphan */
+-- 
+2.7.4
