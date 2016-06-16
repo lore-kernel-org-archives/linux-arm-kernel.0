@@ -1,31 +1,95 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 16 Jun 2016 16:13:18 +0800
-Subject: [PATCH] dt-bindings: ci-hdrc-usb2: s/gadget-itc-setting/itc-setting
- in example
-Message-ID: <1466064798-867-1-git-send-email-jszhang@marvell.com>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Thu, 16 Jun 2016 10:18:45 +0200
+Subject: [PATCH 2/7] crypto: marvell: Check engine is not already running
+ when enabling a req
+In-Reply-To: <20160615213709.3a060ff4@bbrezillon>
+References: <1466018134-10779-1-git-send-email-romain.perier@free-electrons.com>
+ <1466018134-10779-3-git-send-email-romain.perier@free-electrons.com>
+ <20160615213709.3a060ff4@bbrezillon>
+Message-ID: <576260E5.2000402@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-What the code expect is "itc-setting" rather than "gadget-itc-setting",
-and this is also correctly described in the optional properties.
+Hello,
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Le 15/06/2016 21:37, Boris Brezillon a ?crit :
+>
+> "
+> Add a BUG_ON() call when the driver tries to launch a crypto request
+> while the engine is still processing the previous one. This replaces
+> a silent system hang by a verbose kernel panic with the associated
+> backtrace to let the user know that something went wrong in the CESA
+> driver.
+> "
 
-diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-index 1084e2b..341dc67 100644
---- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-+++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-@@ -93,7 +93,7 @@ Example:
- 		phys = <&usb_phy0>;
- 		phy-names = "usb-phy";
- 		vbus-supply = <&reg_usb0_vbus>;
--		gadget-itc-setting = <0x4>; /* 4 micro-frames */
-+		itc-setting = <0x4>; /* 4 micro-frames */
- 		 /* Incremental burst of unspecified length */
- 		ahb-burst-config = <0x0>;
- 		tx-burst-size-dword = <0x10>; /* 64 bytes */
+thanks
+
+>
+>> ---
+>>   drivers/crypto/marvell/cipher.c | 2 ++
+>>   drivers/crypto/marvell/hash.c   | 2 ++
+>>   drivers/crypto/marvell/tdma.c   | 2 ++
+>>   3 files changed, 6 insertions(+)
+>>
+>> diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
+>> index dcf1fce..8d0fabb 100644
+>> --- a/drivers/crypto/marvell/cipher.c
+>> +++ b/drivers/crypto/marvell/cipher.c
+>> @@ -106,6 +106,8 @@ static void mv_cesa_ablkcipher_std_step(struct ablkcipher_request *req)
+>>
+>>   	mv_cesa_set_int_mask(engine, CESA_SA_INT_ACCEL0_DONE);
+>>   	writel_relaxed(CESA_SA_CFG_PARA_DIS, engine->regs + CESA_SA_CFG);
+>> +	BUG_ON(readl(engine->regs + CESA_SA_CMD)
+>> +				  & CESA_SA_CMD_EN_CESA_SA_ACCL0);
+>
+> Nit: please put the '&' operator at the end of the first line and
+> align CESA_SA_CMD_EN_CESA_SA_ACCL0 on the open parenthesis.
+
+Arf, ok I will fix this.
+
+>
+> 	BUG_ON(readl(engine->regs + CESA_SA_CMD) &
+> 	       CESA_SA_CMD_EN_CESA_SA_ACCL0);
+>
+>>   	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
+>>   }
+>>
+>> diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
+>> index 7ca2e0f..0fae351 100644
+>> --- a/drivers/crypto/marvell/hash.c
+>> +++ b/drivers/crypto/marvell/hash.c
+>> @@ -237,6 +237,8 @@ static void mv_cesa_ahash_std_step(struct ahash_request *req)
+>>
+>>   	mv_cesa_set_int_mask(engine, CESA_SA_INT_ACCEL0_DONE);
+>>   	writel_relaxed(CESA_SA_CFG_PARA_DIS, engine->regs + CESA_SA_CFG);
+>> +	BUG_ON(readl(engine->regs + CESA_SA_CMD)
+>> +				  & CESA_SA_CMD_EN_CESA_SA_ACCL0);
+>
+> Ditto.
+
+ack
+
+>
+>>   	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
+>>   }
+>>
+>> diff --git a/drivers/crypto/marvell/tdma.c b/drivers/crypto/marvell/tdma.c
+>> index 7642798..d493714 100644
+>> --- a/drivers/crypto/marvell/tdma.c
+>> +++ b/drivers/crypto/marvell/tdma.c
+>> @@ -53,6 +53,8 @@ void mv_cesa_dma_step(struct mv_cesa_tdma_req *dreq)
+>>   		       engine->regs + CESA_SA_CFG);
+>>   	writel_relaxed(dreq->chain.first->cur_dma,
+>>   		       engine->regs + CESA_TDMA_NEXT_ADDR);
+>> +	BUG_ON(readl(engine->regs + CESA_SA_CMD)
+>> +				  & CESA_SA_CMD_EN_CESA_SA_ACCL0);
+>
+> Ditto.
+ack
+
+Regards,
+Romain
 -- 
-2.8.1
+Romain Perier, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
