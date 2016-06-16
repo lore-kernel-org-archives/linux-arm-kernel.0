@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Jun 2016 23:27:04 +0200
-Subject: [PATCH V2 45/63] clocksource/drivers/timer-keystone: Convert init
- function to return error
+Date: Thu, 16 Jun 2016 23:27:21 +0200
+Subject: [PATCH V2 62/63] clocksource/drivers/oxnas-rps: Convert init function
+ to return error
 In-Reply-To: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466112442-31105-46-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466112442-31105-63-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,61 +26,89 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-keystone.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ drivers/clocksource/timer-oxnas-rps.c | 33 ++++++++++++++++++++-------------
+ 1 file changed, 20 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
-index 1cea08c..4199823 100644
---- a/drivers/clocksource/timer-keystone.c
-+++ b/drivers/clocksource/timer-keystone.c
-@@ -144,7 +144,7 @@ static int keystone_set_periodic(struct clock_event_device *evt)
+diff --git a/drivers/clocksource/timer-oxnas-rps.c b/drivers/clocksource/timer-oxnas-rps.c
+index c002e99..0d99f40 100644
+--- a/drivers/clocksource/timer-oxnas-rps.c
++++ b/drivers/clocksource/timer-oxnas-rps.c
+@@ -220,32 +220,37 @@ static int __init oxnas_rps_clocksource_init(struct oxnas_rps_timer *rps)
  	return 0;
  }
  
--static void __init keystone_timer_init(struct device_node *np)
-+static int __init keystone_timer_init(struct device_node *np)
+-static void __init oxnas_rps_timer_init(struct device_node *np)
++static int __init oxnas_rps_timer_init(struct device_node *np)
  {
- 	struct clock_event_device *event_dev = &timer.event_dev;
- 	unsigned long rate;
-@@ -154,20 +154,20 @@ static void __init keystone_timer_init(struct device_node *np)
- 	irq  = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
- 		pr_err("%s: failed to map interrupts\n", __func__);
+ 	struct oxnas_rps_timer *rps;
+ 	void __iomem *base;
+ 	int ret;
+ 
+ 	rps = kzalloc(sizeof(*rps), GFP_KERNEL);
+-	if (!rps) {
+-		pr_err("Failed to allocate rps structure\n");
 -		return;
-+		return -EINVAL;
- 	}
+-	}
++	if (!rps)
++		return -ENOMEM;
  
- 	timer.base = of_iomap(np, 0);
- 	if (!timer.base) {
- 		pr_err("%s: failed to map registers\n", __func__);
--		return;
-+		return -ENXIO;
- 	}
+ 	rps->clk = of_clk_get(np, 0);
+-	if (WARN_ON(IS_ERR(rps->clk)))
++	if (IS_ERR(rps->clk)) {
++		ret = PTR_ERR(rps->clk);
+ 		goto err_alloc;
++	}
  
- 	clk = of_clk_get(np, 0);
- 	if (IS_ERR(clk)) {
- 		pr_err("%s: failed to get clock\n", __func__);
- 		iounmap(timer.base);
--		return;
-+		return PTR_ERR(clk);
- 	}
+-	if (WARN_ON(clk_prepare_enable(rps->clk)))
++	ret = clk_prepare_enable(rps->clk);
++	if (ret)
+ 		goto err_clk;
  
- 	error = clk_prepare_enable(clk);
-@@ -219,11 +219,12 @@ static void __init keystone_timer_init(struct device_node *np)
- 	clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
+ 	base = of_iomap(np, 0);
+-	if (WARN_ON(!base))
++	if (!base) {
++		ret = -ENXIO;
+ 		goto err_clk_prepare;
++	}
  
- 	pr_info("keystone timer clock @%lu Hz\n", rate);
+ 	rps->irq = irq_of_parse_and_map(np, 0);
+-	if (WARN_ON(rps->irq < 0))
++	if (rps->irq < 0) {
++		ret = -EINVAL;
+ 		goto err_iomap;
++	}
+ 
+ 	rps->clkevt_base = base + TIMER1_REG_OFFSET;
+ 	rps->clksrc_base = base + TIMER2_REG_OFFSET;
+@@ -261,7 +266,7 @@ static void __init oxnas_rps_timer_init(struct device_node *np)
+ 	ret = request_irq(rps->irq, oxnas_rps_timer_irq,
+ 			  IRQF_TIMER | IRQF_IRQPOLL,
+ 			  "rps-timer", rps);
+-	if (WARN_ON(ret))
++	if (ret)
+ 		goto err_iomap;
+ 
+ 	ret = oxnas_rps_clocksource_init(rps);
+@@ -272,7 +277,7 @@ static void __init oxnas_rps_timer_init(struct device_node *np)
+ 	if (ret)
+ 		goto err_irqreq;
+ 
 -	return;
 +	return 0;
- err:
- 	clk_put(clk);
- 	iounmap(timer.base);
-+	return error;
+ 
+ err_irqreq:
+ 	free_irq(rps->irq, rps);
+@@ -284,7 +289,9 @@ err_clk:
+ 	clk_put(rps->clk);
+ err_alloc:
+ 	kfree(rps);
++
++	return ret;
  }
  
--CLOCKSOURCE_OF_DECLARE(keystone_timer, "ti,keystone-timer",
--					keystone_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(keystone_timer, "ti,keystone-timer",
-+			   keystone_timer_init);
+-CLOCKSOURCE_OF_DECLARE(ox810se_rps,
+-		       "oxsemi,ox810se-rps-timer", oxnas_rps_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(ox810se_rps,
++			   "oxsemi,ox810se-rps-timer", oxnas_rps_timer_init);
 -- 
 1.9.1
