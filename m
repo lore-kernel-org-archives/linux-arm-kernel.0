@@ -1,72 +1,42 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 16 Jun 2016 11:05:44 +0800
-Subject: [linux-sunxi] [PATCH] [V2] ARM: dts: sun7i: Add dts file for
- Bananapi M1 Plus board
-In-Reply-To: <20160615205223.GC5144@lukather>
-References: <20160602023623.5761-1-luoyi.ly@gmail.com>
- <CAGRGNgUiGaxoVxtq=k8NG5mCqEXS9fd-ry1vvVJfzb+R2ATMTA@mail.gmail.com>
- <20160602081638.GG4908@lukather> <574FF94B.3020309@web.de>
- <20160610093851.GQ5242@lukather>
- <CAGb2v64PYU9H7Ag45ogwtjJAO87D6saTFv5-4P_E7d1xobQXXA@mail.gmail.com>
- <20160615205223.GC5144@lukather>
-Message-ID: <CAGb2v64gAJ_bJvNonjDO_rCzoTA6p0L9JxAgyw+K0tNOpGUc9Q@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 16 Jun 2016 11:15:10 +0800
+Subject: [PATCH 1/1] ARM: imx_v6_v7_defconfig: build in usbnet to support
+ NFS for non-ethernet board
+In-Reply-To: <CAL411-phKBkqu8hC72F3FGZMvrCZpPprXJf6CCt0m7gzAjpjsg@mail.gmail.com>
+References: <1464937924-11683-1-git-send-email-peter.chen@nxp.com>
+ <CAL411-phKBkqu8hC72F3FGZMvrCZpPprXJf6CCt0m7gzAjpjsg@mail.gmail.com>
+Message-ID: <20160616031510.GB29560@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 4:52 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Chen-Yu,
->
-> On Mon, Jun 13, 2016 at 11:01:53AM +0800, Chen-Yu Tsai wrote:
->> On Fri, Jun 10, 2016 at 5:38 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Thu, Jun 02, 2016 at 11:15:55AM +0200, Bernhard Nortmann wrote:
->> >> Am 02.06.2016 um 10:16 schrieb Maxime Ripard:
->> >> >[...]
->> >> >Yes, everything that is shared with the banana-pro (which, judging
->> >> >from Bernhard, is pretty much everything but a GPIO) should be merged
->> >> >in the banapro DT.
->> >> >
->> >> >Maxime
->> >> >
->> >>
->> >> Don't take my word for granted, as I do not own this hardware or know it
->> >> particularly well. There is no doubt that "BPi-M1+" and "Banana Pro" are
->> >> very similar, but if in doubt the information form the wiki should be
->> >> verified.
->> >
->> > Hmmmm, ok. Chen-Yu, any input on this? You know the banana-pis much
->> > more than I do.
->>
->> I did a comparison of the "Banana Pro" vs the "BPi-M1+".
->>
->> The differences are similar to what we have with any other development
->> board, say the Cubietruck:
->>
->>   - A different WiFi chip is used, and the BT part is not hooked up.
->>   - Different GPIOs for external power regulator/switches
->>   - Different GPIOs for LEDs
->>   - Different peripherals exposed on the headers.
->>
->> IMO There's no need to merge or have a common .dtsi for the two boards.
->
-> Ok.
->
->> They (and all the other development boards) look similar because
->> everyone is following the basic set by Allwinner's reference design,
->> like which MMC controller and pins are used for SD/MMC, which ones
->> are used for SDIO-based WiFi, and so on.
->>
->> I did a version completely from scratch using just the schematics:
->>
->>   https://github.com/wens/linux/commits/bpi-m1-plus
->
-> So, what do you mean by that? Do you have some comments on that patch,
-> or should I merge it, and you'll post your additions on top of it?
+On Thu, Jun 16, 2016 at 10:40:14AM +0800, Peter Chen wrote:
+> On Fri, Jun 3, 2016 at 3:12 PM, Peter Chen <peter.chen@nxp.com> wrote:
+> > At some boards, it has no ethernet support. As an alternative, we can use
+> > USB Ethernet card to support NFS (u-boot supports it too). It supports
+> > AXIS cards which are used most frequently.
+> >
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > ---
+> >  arch/arm/configs/imx_v6_v7_defconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> > index 21339ce..eaabae2 100644
+> > --- a/arch/arm/configs/imx_v6_v7_defconfig
+> > +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> > @@ -146,7 +146,7 @@ CONFIG_MICREL_PHY=y
+> >  CONFIG_USB_PEGASUS=m
+> >  CONFIG_USB_RTL8150=m
+> >  CONFIG_USB_RTL8152=m
+> > -CONFIG_USB_USBNET=m
+> > +CONFIG_USB_USBNET=y
+> >  CONFIG_USB_NET_CDC_EEM=m
+> >  CONFIG_BRCMFMAC=m
+> >  CONFIG_WL12XX=m
+> > --
+> 
+> ping...
 
-I'd like Luo to send a new version, based on what was his updated v1.
+Applied.  Thanks for reminding.
 
-I'll reply to that one with some comments.
-
-
-ChenYu
+Shawn
