@@ -1,60 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 16 Jun 2016 16:07:27 +0100
-Subject: [PATCH v7 1/6] mfd: max8997: Use regmap to access registers
-In-Reply-To: <57582C1F.5040306@samsung.com>
-References: <1464773339-756-1-git-send-email-k.kozlowski@samsung.com>
- <1464774841-1439-1-git-send-email-k.kozlowski@samsung.com>
- <20160608142621.GG14888@dell> <57582C1F.5040306@samsung.com>
-Message-ID: <20160616150727.GF4948@dell>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 16 Jun 2016 17:11:22 +0200
+Subject: [PATCH] arm64: configs: enable PCIe driver for Armada 7K/8K
+In-Reply-To: <1463659894-20585-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Thu, 19 May 2016 14:11:34 +0200")
+References: <1463659894-20585-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87eg7x9nj9.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 08 Jun 2016, Krzysztof Kozlowski wrote:
+Hi Thomas,
+ 
+ On jeu., mai 19 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-> On 06/08/2016 04:26 PM, Lee Jones wrote:
-> > On Wed, 01 Jun 2016, Krzysztof Kozlowski wrote:
-> > 
-> >> From: Robert Baldyga <r.baldyga@samsung.com>
-> >>
-> >> This patch modifies max8997 driver and each associated function driver,
-> >> to use regmap instead of operating directly on i2c bus. It will allow to
-> >> simplify IRQ handling using regmap-irq.
-> >>
-> >> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-> >> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >>
-> >> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
-> >> Acked-by: Bryan Wu <cooloney@gmail.com>
-> >> Acked-by: Lee Jones <lee.jones@linaro.org>
-> >> Acked-by: Sebastian Reichel <sre@kernel.org>
-> >> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> >> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >> [k.kozlowski: Collect acks, rebase on v4.6-rc6]
-> >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >> Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
-> >> ---
-> >>  drivers/extcon/extcon-max8997.c       |  31 ++++----
-> >>  drivers/input/misc/max8997_haptic.c   |  34 ++++----
-> >>  drivers/leds/leds-max8997.c           |  13 ++--
-> >>  drivers/mfd/Kconfig                   |   1 +
-> >>  drivers/mfd/max8997-irq.c             |  64 ++++++---------
-> >>  drivers/mfd/max8997.c                 | 141 +++++++++++++++-------------------
-> >>  drivers/power/max8997_charger.c       |  33 ++++----
-> >>  drivers/regulator/max8997-regulator.c |  87 ++++++++++-----------
-> > 
-> > Is it just Mark's Ack you require?
-> 
-> Yes, only Mark's is missing here. All other patches got everything they
-> need.
+> This patch enables the driver for the PCIe host controller found on
+> the Marvell Armada 7K/8K ARM64 SoCs.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-I think you'd better re-submit and get Mark's attention.
+Applied on mvebu/defconfig
 
-Also indicate that his Ack is all you need.
+Thanks,
 
-Once received, I can take the set.
+Gregory
+
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 0bd559a..23821c2 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -63,6 +63,7 @@ CONFIG_PCI_XGENE=y
+>  CONFIG_PCI_LAYERSCAPE=y
+>  CONFIG_PCI_HISI=y
+>  CONFIG_PCIE_QCOM=y
+> +CONFIG_PCIE_ARMADA_8K=y
+>  CONFIG_ARM64_VA_BITS_48=y
+>  CONFIG_SCHED_MC=y
+>  CONFIG_PREEMPT=y
+> -- 
+> 2.7.4
+>
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
