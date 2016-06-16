@@ -1,57 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 16 Jun 2016 21:48:26 +0200
-Subject: [PATCH 2/2] arm64: drop kernel segment resources from /proc/iomem
-In-Reply-To: <CAGXu5jL=5csS1J1P_1D2LQLWGV__BW99fE3Z9CMwTRO17Ed6Zw@mail.gmail.com>
-References: <1466080138-12193-1-git-send-email-ard.biesheuvel@linaro.org>
- <1466080138-12193-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu8ZO3Pz8vq9mM-XSDa1-L877-mzD1pBhhhJw0Z5jXCk0Q@mail.gmail.com>
- <CAGXu5jLWs0FiN1wri51WFSS__8kfLMMeYtUTspuHqi4pmFHEAA@mail.gmail.com>
- <CAKv+Gu84hr4d--cRUZzpGnA7NXr3pxE-VdRsaTGjUYX9aiet4A@mail.gmail.com>
- <CAGXu5jL=5csS1J1P_1D2LQLWGV__BW99fE3Z9CMwTRO17Ed6Zw@mail.gmail.com>
-Message-ID: <87C0780E-9DAB-47C7-98AC-1118CB59CEFD@linaro.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 17 Jun 2016 03:52:16 +0800
+Subject: [nomadik:pl08x-dma-mmc-sync-callback 5/5]
+ drivers/mmc/host/mmci.c:1023:4: error: implicit declaration of function
+ 'mmci_dma_dataend_irq'
+Message-ID: <201606170314.U9EkgGiz%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git pl08x-dma-mmc-sync-callback
+head:   42839b1b23fb2248fb6d305bfe956a1da8775392
+commit: 42839b1b23fb2248fb6d305bfe956a1da8775392 [5/5] MMC uglyhack
+config: arm-realview_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 42839b1b23fb2248fb6d305bfe956a1da8775392
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> On 16 jun. 2016, at 19:48, Kees Cook <keescook@chromium.org> wrote:
-> 
-> On Thu, Jun 16, 2016 at 10:28 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 16 June 2016 at 19:21, Kees Cook <keescook@chromium.org> wrote:
->>> On Thu, Jun 16, 2016 at 5:32 AM, Ard Biesheuvel
->>> <ard.biesheuvel@linaro.org> wrote:
->>>> (+ James)
->>>> 
->>>>> On 16 June 2016 at 14:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>> By the same reasoning as commit c4004b02f8e5 ("x86: remove the kernel
->>>>> code/data/bss resources from /proc/iomem"), the kernel code and kernel
->>>>> data entries in /proc/iomem probably do more harm than good on arm64 as
->>>>> well. So remove them.
->>>>> 
->>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> 
->>>> 
->>>> Actually, Linus's patch above has been reverted again, so we have to
->>>> consider whether the kexec case exists for us as well before we
->>>> consider this
->>>> 
->>>> Apologies for failing to spot that before sending
->>> 
->>> Please leave this as it was originally. The security exposure has been
->>> minimized and it would make arm64 differ from all other architectures.
->>> If we remove this, it needs to be coordinated across all
->>> architectures.
->> 
->> OK, fair enough
-> 
-> Thanks!
-> 
-> One thing I _would_ like to see fixed on arm64 is the misplaced
-> _etext, which is incorrectly covering rodata. I just sent a patch to
-> fix this on arm, but on arm64, the _etext use is much more embedded.
-> 
-> I'd like to clean this up so that I can sanely use things like
-> core_kernel_text() for checking addresses in the up-coming
-> HARDENED_USERCOPY patch series.
+All errors (new ones prefixed by >>):
 
-Let me look into that
+   drivers/mmc/host/mmci.c: In function 'mmci_data_irq':
+>> drivers/mmc/host/mmci.c:1023:4: error: implicit declaration of function 'mmci_dma_dataend_irq' [-Werror=implicit-function-declaration]
+       mmci_dma_dataend_irq(host);
+       ^
+   drivers/mmc/host/mmci.c: At top level:
+   drivers/mmc/host/mmci.c:226:13: warning: 'mmci_dump_sg' defined but not used [-Wunused-function]
+    static void mmci_dump_sg(struct mmc_data *data)
+                ^
+   cc1: some warnings being treated as errors
+
+vim +/mmci_dma_dataend_irq +1023 drivers/mmc/host/mmci.c
+
+  1017	
+  1018		if (status & MCI_DATABLOCKEND)
+  1019			dev_err(mmc_dev(host->mmc), "stray MCI_DATABLOCKEND interrupt\n");
+  1020	
+  1021		if (status & MCI_DATAEND || data->error) {
+  1022			if (dma_inprogress(host))
+> 1023				mmci_dma_dataend_irq(host);
+  1024			mmci_stop_data(host);
+  1025	
+  1026			if (!data->error) {
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 17260 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160617/fd7b3fc3/attachment-0001.obj>
