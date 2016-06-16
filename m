@@ -1,57 +1,46 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 Jun 2016 15:42:26 +0200
-Subject: [PATCH 2/3] ARM: mvebu: map PCI I/O regions strongly ordered
+Date: Thu, 16 Jun 2016 15:42:27 +0200
+Subject: [PATCH 3/3] ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on
+ Armada 385 Linksys
 In-Reply-To: <1466084547-31343-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1466084547-31343-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1466084547-31343-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1466084547-31343-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for HW I/O coherency to work on Cortex-A9 based Marvell SoCs,
-all MMIO registers must be mapped strongly ordered. In commit
-1c8c3cf0b5239 ("ARM: 8060/1: mm: allow sub-architectures to override PCI
-I/O memory type") we implemented a new function,
-pci_ioremap_set_mem_type(), that allow sub-architecture code to override
-the memory type used to map PCI I/O regions.
+When the support for the Marvell crypto engine was added in the Device
+Tree of the various Armada 385 Device Tree files in commit
+d716f2e837ac6 ("ARM: mvebu: define crypto SRAM ranges for all armada-38x
+boards"), a typo was made in the MBus window attributes for the Armada
+385 Linksys board: 0x09/0x05 are used instead of 0x19/0x15. This commit
+fixes this typo, which makes the CESA engines operational on Armada 385
+Linksys boards.
 
-In the discussion around this patch series [1], Arnd Bergmann made the
-comment that maybe all PCI I/O regions should be mapped
-strongly-ordered, which would have made our proposal to add
-pci_ioremap_set_mem_type() irrelevant. So, we submitted a patch [2] that
-did what Arnd suggested.
-
-However, Russell in the end merged our initial proposal to add
-pci_ioremap_set_mem_type(), but it was never used anywhere. Further
-discussion with Arnd and other folks on IRC lead to the conclusion that
-in fact using strongly-ordered for all platforms was maybe not
-desirable, and therefore, using pci_ioremap_set_mem_type() was the most
-appropriate solution.
-
-As a consequence, this commit finally adds the
-pci_ioremap_set_mem_type() call in the mach-mvebu platform code, which
-was originally part of our initial patch series [3] and is necessary for
-the whole mechanism to work.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256565.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256755.html
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256563.html
-
+Reported-by: Terry Stockert <stockert@inkblotadmirer.me>
+Cc: Terry Stockert <stockert@inkblotadmirer.me>
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: <stable@vger.kernel.org>
+Fixes: d716f2e837ac6 ("ARM: mvebu: define crypto SRAM ranges for all armada-38x boards")
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/armada-385-linksys.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 474abff..e80f0dd 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -181,6 +181,7 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
+diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
+index 8450944..22f7a13 100644
+--- a/arch/arm/boot/dts/armada-385-linksys.dtsi
++++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+@@ -58,8 +58,8 @@
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+-			  MBUS_ID(0x09, 0x09) 0 0xf1100000 0x10000
+-			  MBUS_ID(0x09, 0x05) 0 0xf1110000 0x10000>;
++			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
++			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
  
- 	coherency_cpu_base = of_iomap(np, 0);
- 	arch_ioremap_caller = armada_wa_ioremap_caller;
-+	pci_ioremap_set_mem_type(MT_UNCACHED);
+ 		internal-regs {
  
- 	/*
- 	 * We should switch the PL310 to I/O coherency mode only if
 -- 
 2.7.4
