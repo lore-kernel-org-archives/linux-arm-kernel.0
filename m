@@ -1,56 +1,83 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 17 Jun 2016 03:52:16 +0800
-Subject: [nomadik:pl08x-dma-mmc-sync-callback 5/5]
- drivers/mmc/host/mmci.c:1023:4: error: implicit declaration of function
- 'mmci_dma_dataend_irq'
-Message-ID: <201606170314.U9EkgGiz%fengguang.wu@intel.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Thu, 16 Jun 2016 21:56:30 +0200
+Subject: [PATCH] arm: omap1: fix ams-delta FIQ handler to work with sparse IRQ
+Message-ID: <1466106990-9556-1-git-send-email-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git pl08x-dma-mmc-sync-callback
-head:   42839b1b23fb2248fb6d305bfe956a1da8775392
-commit: 42839b1b23fb2248fb6d305bfe956a1da8775392 [5/5] MMC uglyhack
-config: arm-realview_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 42839b1b23fb2248fb6d305bfe956a1da8775392
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+After OMAP1 IRQ definitions have been changed by commit 685e2d08c54b
+("ARM: OMAP1: Change interrupt numbering for sparse IRQ") introduced
+in v4.2, ams-delta FIQ handler which depends on them no longer works
+as expected. Fix it.
 
-All errors (new ones prefixed by >>):
+Created and tested on Amstrad Delta against Linux-4.7-rc3
 
-   drivers/mmc/host/mmci.c: In function 'mmci_data_irq':
->> drivers/mmc/host/mmci.c:1023:4: error: implicit declaration of function 'mmci_dma_dataend_irq' [-Werror=implicit-function-declaration]
-       mmci_dma_dataend_irq(host);
-       ^
-   drivers/mmc/host/mmci.c: At top level:
-   drivers/mmc/host/mmci.c:226:13: warning: 'mmci_dump_sg' defined but not used [-Wunused-function]
-    static void mmci_dump_sg(struct mmc_data *data)
-                ^
-   cc1: some warnings being treated as errors
-
-vim +/mmci_dma_dataend_irq +1023 drivers/mmc/host/mmci.c
-
-  1017	
-  1018		if (status & MCI_DATABLOCKEND)
-  1019			dev_err(mmc_dev(host->mmc), "stray MCI_DATABLOCKEND interrupt\n");
-  1020	
-  1021		if (status & MCI_DATAEND || data->error) {
-  1022			if (dma_inprogress(host))
-> 1023				mmci_dma_dataend_irq(host);
-  1024			mmci_stop_data(host);
-  1025	
-  1026			if (!data->error) {
-
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 17260 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160617/fd7b3fc3/attachment-0001.obj>
+ arch/arm/mach-omap1/ams-delta-fiq-handler.S      | 6 +++---
+ arch/arm/mach-omap1/ams-delta-fiq.c              | 5 +++--
+ arch/arm/mach-omap1/include/mach/ams-delta-fiq.h | 2 ++
+ 3 files changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/ams-delta-fiq-handler.S b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
+index 5d7fb59..bf60844 100644
+--- a/arch/arm/mach-omap1/ams-delta-fiq-handler.S
++++ b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
+@@ -43,8 +43,8 @@
+ #define OTHERS_MASK			(MODEM_IRQ_MASK | HOOK_SWITCH_MASK)
+ 
+ /* IRQ handler register bitmasks */
+-#define DEFERRED_FIQ_MASK		(0x1 << (INT_DEFERRED_FIQ % IH2_BASE))
+-#define GPIO_BANK1_MASK  		(0x1 << INT_GPIO_BANK1)
++#define DEFERRED_FIQ_MASK		OMAP_IRQ_BIT(INT_DEFERRED_FIQ)
++#define GPIO_BANK1_MASK  		OMAP_IRQ_BIT(INT_GPIO_BANK1)
+ 
+ /* Driver buffer byte offsets */
+ #define BUF_MASK			(FIQ_MASK * 4)
+@@ -110,7 +110,7 @@ ENTRY(qwerty_fiqin_start)
+ 	mov r8, #2				@ reset FIQ agreement
+ 	str r8, [r12, #IRQ_CONTROL_REG_OFFSET]
+ 
+-	cmp r10, #INT_GPIO_BANK1		@ is it GPIO bank interrupt?
++	cmp r10, #(INT_GPIO_BANK1 - NR_IRQS_LEGACY)	@ is it GPIO interrupt?
+ 	beq gpio				@ yes - process it
+ 
+ 	mov r8, #1
+diff --git a/arch/arm/mach-omap1/ams-delta-fiq.c b/arch/arm/mach-omap1/ams-delta-fiq.c
+index d1f1209..ec760ae 100644
+--- a/arch/arm/mach-omap1/ams-delta-fiq.c
++++ b/arch/arm/mach-omap1/ams-delta-fiq.c
+@@ -109,7 +109,8 @@ void __init ams_delta_init_fiq(void)
+ 	 * Since no set_type() method is provided by OMAP irq chip,
+ 	 * switch to edge triggered interrupt type manually.
+ 	 */
+-	offset = IRQ_ILR0_REG_OFFSET + INT_DEFERRED_FIQ * 0x4;
++	offset = IRQ_ILR0_REG_OFFSET +
++			((INT_DEFERRED_FIQ - NR_IRQS_LEGACY) & 0x1f) * 0x4;
+ 	val = omap_readl(DEFERRED_FIQ_IH_BASE + offset) & ~(1 << 1);
+ 	omap_writel(val, DEFERRED_FIQ_IH_BASE + offset);
+ 
+@@ -149,7 +150,7 @@ void __init ams_delta_init_fiq(void)
+ 	/*
+ 	 * Redirect GPIO interrupts to FIQ
+ 	 */
+-	offset = IRQ_ILR0_REG_OFFSET + INT_GPIO_BANK1 * 0x4;
++	offset = IRQ_ILR0_REG_OFFSET + (INT_GPIO_BANK1 - NR_IRQS_LEGACY) * 0x4;
+ 	val = omap_readl(OMAP_IH1_BASE + offset) | 1;
+ 	omap_writel(val, OMAP_IH1_BASE + offset);
+ }
+diff --git a/arch/arm/mach-omap1/include/mach/ams-delta-fiq.h b/arch/arm/mach-omap1/include/mach/ams-delta-fiq.h
+index adb5e76..6dfc3e1 100644
+--- a/arch/arm/mach-omap1/include/mach/ams-delta-fiq.h
++++ b/arch/arm/mach-omap1/include/mach/ams-delta-fiq.h
+@@ -14,6 +14,8 @@
+ #ifndef __AMS_DELTA_FIQ_H
+ #define __AMS_DELTA_FIQ_H
+ 
++#include <mach/irqs.h>
++
+ /*
+  * Interrupt number used for passing control from FIQ to IRQ.
+  * IRQ12, described as reserved, has been selected.
+-- 
+2.7.3
