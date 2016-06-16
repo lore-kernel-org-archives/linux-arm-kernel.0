@@ -1,101 +1,45 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Thu, 16 Jun 2016 09:56:32 +0200
-Subject: [PATCH] arm64: Add BCM2835 support to the defconfig.
-Message-ID: <1466063792-24710-1-git-send-email-kraxel@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 16 Jun 2016 09:57:15 +0200
+Subject: [PATCH v2] ARM: sunxi/dt: make the CHIP inherit from
+ allwinner,sun5i-a13
+In-Reply-To: <20160615132149.2587c195@bbrezillon>
+References: <1465989619-2337-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160615132149.2587c195@bbrezillon>
+Message-ID: <20160616075715.GF5144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
----
- arch/arm64/configs/defconfig | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On Wed, Jun 15, 2016 at 01:21:49PM +0200, Boris Brezillon wrote:
+> On Wed, 15 Jun 2016 13:20:19 +0200
+> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> 
+> > The sun4i-timer driver registers its sched_clock only if the machine is
+> > compatible with "allwinner,sun5i-a13", "allwinner,sun5i-a10s" or
+> > "allwinner,sun4i-a10".
+> > Add the missing "allwinner,sun5i-a13" string to the machine compatible.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Fixes: 5a33893dd079 ("ARM: sunxi/dt: make the CHIP inherit from allwinner,sun5i-a13")
+> 
+> Should be
+> 
+> Fixes: 465a225fb2af ("ARM: sun5i: Add C.H.I.P DTS")
+> 
+> Maxime, do you want me to resend it?
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fd2d74d..50e5afc 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_ALPINE=y
-+CONFIG_ARCH_BCM2835=y
- CONFIG_ARCH_BCM_IPROC=y
- CONFIG_ARCH_BERLIN=y
- CONFIG_ARCH_EXYNOS=y
-@@ -171,6 +172,7 @@ CONFIG_VIRTIO_CONSOLE=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PCA954x=y
-+CONFIG_I2C_BCM2835=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_IMX=y
- CONFIG_I2C_MV64XXX=y
-@@ -179,6 +181,8 @@ CONFIG_I2C_TEGRA=y
- CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
-+CONFIG_SPI_BCM2835=y
-+CONFIG_SPI_BCM2835AUX=y
- CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
- CONFIG_SPI_QUP=y
-@@ -202,6 +206,7 @@ CONFIG_THERMAL_EMULATION=y
- CONFIG_EXYNOS_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_RENESAS_WDT=y
-+CONFIG_BCM2835_WDT=y
- CONFIG_MFD_SPMI_PMIC=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_HI655X_PMIC=y
-@@ -220,6 +225,7 @@ CONFIG_LOGO=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-+CONFIG_SND_BCM2835_SOC_I2S=y
- CONFIG_SND_SOC_RCAR=y
- CONFIG_SND_SOC_AK4613=y
- CONFIG_USB=y
-@@ -248,12 +254,14 @@ CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_OF_ESDHC=y
- CONFIG_MMC_SDHCI_TEGRA=y
-+CONFIG_MMC_SDHCI_BCM2835=y
- CONFIG_MMC_SDHCI_MSM=y
- CONFIG_MMC_SPI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_K3=y
- CONFIG_MMC_SUNXI=y
-+CONFIG_MMC_BCM2835_SDHOST=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-@@ -269,6 +277,7 @@ CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_XGENE=y
- CONFIG_DMADEVICES=y
-+CONFIG_DMA_BCM2835=y
- CONFIG_PL330_DMA=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_QCOM_BAM_DMA=y
-@@ -288,8 +297,10 @@ CONFIG_MSM_GCC_8916=y
- CONFIG_HWSPINLOCK_QCOM=y
- CONFIG_MAILBOX=y
- CONFIG_ARM_MHU=y
-+CONFIG_BCM2835_MBOX=y
- CONFIG_HI6220_MBOX=y
- CONFIG_ARM_SMMU=y
-+CONFIG_RASPBERRYPI_POWER=y
- CONFIG_QCOM_SMEM=y
- CONFIG_QCOM_SMD=y
- CONFIG_QCOM_SMD_RPM=y
-@@ -301,6 +312,7 @@ CONFIG_PHY_RCAR_GEN3_USB2=y
- CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_XGENE=y
- CONFIG_ARM_SCPI_PROTOCOL=y
-+CONFIG_RASPBERRYPI_FIRMWARE=y
- CONFIG_ACPI=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
+No, it's fine. I fixed it and applied.
+
+Thanks!
+Maxime
+
 -- 
-1.8.3.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160616/03a1fe9c/attachment.sig>
