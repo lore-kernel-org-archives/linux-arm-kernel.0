@@ -1,188 +1,191 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 17 Jun 2016 15:08:57 +0200
-Subject: [PATCH v2 06/10] crypto: marvell: Add a complete operation for
- async requests
-In-Reply-To: <1466162649-29911-7-git-send-email-romain.perier@free-electrons.com>
-References: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
- <1466162649-29911-7-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <20160617150857.66354079@bbrezillon>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 17 Jun 2016 18:42:32 +0530
+Subject: [PATCH v3 2/4] phy-sun4i-usb: Add support for peripheral-only mode
+In-Reply-To: <1465138776-6003-2-git-send-email-hdegoede@redhat.com>
+References: <1465138776-6003-1-git-send-email-hdegoede@redhat.com>
+ <1465138776-6003-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <5763F740.1000700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jun 2016 13:24:05 +0200
-Romain Perier <romain.perier@free-electrons.com> wrote:
 
-> So far, the 'process' operation was used to check if the current request
-> was correctly handled by the engine, if it was the case it copied
-> information from the SRAM to the main memory. Now, we split this
-> operation. We keep the 'process' operation, which still checks if the
-> request was correctly handled by the engine or not, then we add a new
-> operation for completion. The 'complete' method copies the content of
-> the SRAM to memory. This will soon become useful if we want to call
-> the process and the complete operations from different locations
-> depending on the type of the request (different cleanup logic).
+
+On Sunday 05 June 2016 08:29 PM, Hans de Goede wrote:
+> Use the new of_usb_get_dr_mode_by_phy() function to get the dr_mode
+> from the musb controller node instead of assuming that having an id_det
+> gpio means otg mode, and not having one means host mode.
 > 
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+> Implement peripheral-only mode by adding a sun4i_usb_phy0_get_id_det
+> helper which looks at the dr_mode, always registering our extcon and
+> always monitoring vbus.
+> 
+> If dr_mode is not specified in the dts, do not register phy0 as we then
+> do not know how to treat it. This is actually a good thing as this means
+> we will not be registering phy0 on devices where the otg controller is
+> not enabled in the devicetree.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
-> 
 > Changes in v2:
+> -Adjust for of_usb_get_dr_mode_by_phy now taking an args0 parameter
+> Changes in v3:
+> -Only toggle the phy vbus-det bit on id-change on systems without vbus-det
+>  when in otg mode
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 68 ++++++++++++++++++++++++++++++---------------
+>  1 file changed, 46 insertions(+), 22 deletions(-)
 > 
->   - Removed useless cosmetic change added for checkpatch (which
->     had nothing to do with the patch itself)
->   - Removed duplicated initialization of 'ivsize'
->     mv_cesa_ablkcipher_complete.
->   - Replace memcpy_fromio by memcpy in mv_cesa_ablkcipher_complete
-> 
->  drivers/crypto/marvell/cesa.c   |  1 +
->  drivers/crypto/marvell/cesa.h   |  3 +++
->  drivers/crypto/marvell/cipher.c | 28 +++++++++++++++++++++++-----
->  drivers/crypto/marvell/hash.c   | 22 ++++++++++++----------
->  4 files changed, 39 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-> index fe04d1b..af96426 100644
-> --- a/drivers/crypto/marvell/cesa.c
-> +++ b/drivers/crypto/marvell/cesa.c
-> @@ -98,6 +98,7 @@ static irqreturn_t mv_cesa_int(int irq, void *priv)
->  				engine->req = NULL;
->  				mv_cesa_dequeue_req_unlocked(engine);
->  				spin_unlock_bh(&engine->lock);
-> +				ctx->ops->complete(req);
->  				ctx->ops->cleanup(req);
->  				local_bh_disable();
->  				req->complete(req, res);
-> diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
-> index e67e3f1..c463528 100644
-> --- a/drivers/crypto/marvell/cesa.h
-> +++ b/drivers/crypto/marvell/cesa.h
-> @@ -456,6 +456,8 @@ struct mv_cesa_engine {
->   *		code)
->   * @step:	launch the crypto operation on the next chunk
->   * @cleanup:	cleanup the crypto request (release associated data)
-> + * @complete:	complete the request, i.e copy result from sram or contexts
-> + * 		when it is needed.
-
-You mean "copy result or context from sram when needed", right?
-
->   */
->  struct mv_cesa_req_ops {
->  	void (*prepare)(struct crypto_async_request *req,
-> @@ -463,6 +465,7 @@ struct mv_cesa_req_ops {
->  	int (*process)(struct crypto_async_request *req, u32 status);
->  	void (*step)(struct crypto_async_request *req);
->  	void (*cleanup)(struct crypto_async_request *req);
-> +	void (*complete)(struct crypto_async_request *req);
->  };
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index bae54f7..e3cbaae 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -40,6 +40,7 @@
+>  #include <linux/power_supply.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/reset.h>
+> +#include <linux/usb/of.h>
+>  #include <linux/workqueue.h>
 >  
->  /**
-> diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
-> index ffe0f4a..175ce76 100644
-> --- a/drivers/crypto/marvell/cipher.c
-> +++ b/drivers/crypto/marvell/cipher.c
-> @@ -118,7 +118,6 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
->  	struct mv_cesa_ablkcipher_std_req *sreq = &creq->std;
->  	struct mv_cesa_engine *engine = creq->base.engine;
->  	size_t len;
-> -	unsigned int ivsize;
+>  #define REG_ISCR			0x00
+> @@ -109,6 +110,7 @@ struct sun4i_usb_phy_cfg {
+>  struct sun4i_usb_phy_data {
+>  	void __iomem *base;
+>  	const struct sun4i_usb_phy_cfg *cfg;
+> +	enum usb_dr_mode dr_mode;
+>  	struct mutex mutex;
+>  	struct sun4i_usb_phy {
+>  		struct phy *phy;
+> @@ -119,6 +121,7 @@ struct sun4i_usb_phy_data {
+>  		bool regulator_on;
+>  		int index;
+>  	} phys[MAX_PHYS];
+> +	int first_phy;
+>  	/* phy0 / otg related variables */
+>  	struct extcon_dev *extcon;
+>  	bool phy0_init;
+> @@ -285,16 +288,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>  		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_DPDM_PULLUP_EN);
+>  		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_ID_PULLUP_EN);
 >  
->  	len = sg_pcopy_from_buffer(req->dst, creq->dst_nents,
->  				   engine->sram + CESA_SA_DATA_SRAM_OFFSET,
-> @@ -128,10 +127,6 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
->  	if (sreq->offset < req->nbytes)
->  		return -EINPROGRESS;
+> -		if (data->id_det_gpio) {
+> -			/* OTG mode, force ISCR and cable state updates */
+> -			data->id_det = -1;
+> -			data->vbus_det = -1;
+> -			queue_delayed_work(system_wq, &data->detect, 0);
+> -		} else {
+> -			/* Host only mode */
+> -			sun4i_usb_phy0_set_id_detect(_phy, 0);
+> -			sun4i_usb_phy0_set_vbus_detect(_phy, 1);
+> -		}
+> +		/* Force ISCR and cable state updates */
+> +		data->id_det = -1;
+> +		data->vbus_det = -1;
+> +		queue_delayed_work(system_wq, &data->detect, 0);
+>  	}
 >  
-> -	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(req));
-> -	memcpy_fromio(req->info,
-> -		      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET, ivsize);
-> -
+>  	return 0;
+> @@ -319,6 +316,19 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
 >  	return 0;
 >  }
 >  
-> @@ -211,11 +206,34 @@ mv_cesa_ablkcipher_req_cleanup(struct crypto_async_request *req)
->  	mv_cesa_ablkcipher_cleanup(ablkreq);
->  }
->  
-> +static void
-> +mv_cesa_ablkcipher_complete(struct crypto_async_request *req)
+> +static int sun4i_usb_phy0_get_id_det(struct sun4i_usb_phy_data *data)
 > +{
-> +	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
-> +	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(ablkreq);
-> +	struct mv_cesa_engine *engine = creq->base.engine;
-> +	unsigned int ivsize;
-> +
-> +	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq));
-> +
-> +	if (mv_cesa_req_get_type(&creq->base) == CESA_DMA_REQ) {
-> +		struct mv_cesa_req *basereq;
-> +
-> +		basereq = &creq->base;
-> +		memcpy(ablkreq->info, basereq->chain.last->data, ivsize);
-> +	} else {
-> +		memcpy_fromio(ablkreq->info,
-> +			      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET,
-> +			      ivsize);
+> +	switch (data->dr_mode) {
+> +	case USB_DR_MODE_OTG:
+> +		return gpiod_get_value_cansleep(data->id_det_gpio);
+> +	case USB_DR_MODE_HOST:
+> +		return 0;
+> +	case USB_DR_MODE_PERIPHERAL:
+> +	default:
+> +		return 1;
 > +	}
 > +}
 > +
->  static const struct mv_cesa_req_ops mv_cesa_ablkcipher_req_ops = {
->  	.step = mv_cesa_ablkcipher_step,
->  	.process = mv_cesa_ablkcipher_process,
->  	.prepare = mv_cesa_ablkcipher_prepare,
->  	.cleanup = mv_cesa_ablkcipher_req_cleanup,
-> +	.complete = mv_cesa_ablkcipher_complete,
->  };
->  
->  static int mv_cesa_ablkcipher_cra_init(struct crypto_tfm *tfm)
-> diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-> index 21a4737..09665a7 100644
-> --- a/drivers/crypto/marvell/hash.c
-> +++ b/drivers/crypto/marvell/hash.c
-> @@ -287,17 +287,20 @@ static int mv_cesa_ahash_process(struct crypto_async_request *req, u32 status)
+>  static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
 >  {
->  	struct ahash_request *ahashreq = ahash_request_cast(req);
->  	struct mv_cesa_ahash_req *creq = ahash_request_ctx(ahashreq);
-> -	struct mv_cesa_engine *engine = creq->base.engine;
-> -	unsigned int digsize;
-> -	int ret, i;
+>  	if (data->vbus_det_gpio)
+> @@ -414,7 +424,10 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+>  	struct phy *phy0 = data->phys[0].phy;
+>  	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
 >  
->  	if (mv_cesa_req_get_type(&creq->base) == CESA_DMA_REQ)
-> -		ret = mv_cesa_dma_process(&creq->base, status);
-> -	else
-> -		ret = mv_cesa_ahash_std_process(ahashreq, status);
-> +		return mv_cesa_dma_process(&creq->base, status);
->  
-> -	if (ret == -EINPROGRESS)
-> -		return ret;
-> +	return mv_cesa_ahash_std_process(ahashreq, status);
-> +}
+> -	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
+> +	if (phy0 == NULL)
+> +		return;
 > +
-> +static void mv_cesa_ahash_complete(struct crypto_async_request *req)
-> +{
-> +	struct ahash_request *ahashreq = ahash_request_cast(req);
-> +	struct mv_cesa_ahash_req *creq = ahash_request_ctx(ahashreq);
-> +	struct mv_cesa_engine *engine = creq->base.engine;
-> +	unsigned int digsize;
-> +	int i;
+> +	id_det = sun4i_usb_phy0_get_id_det(data);
+>  	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
 >  
->  	digsize = crypto_ahash_digestsize(crypto_ahash_reqtfm(ahashreq));
->  	for (i = 0; i < digsize / 4; i++)
-> @@ -326,8 +329,6 @@ static int mv_cesa_ahash_process(struct crypto_async_request *req, u32 status)
->  				result[i] = cpu_to_be32(creq->state[i]);
->  		}
+>  	mutex_lock(&phy0->mutex);
+> @@ -430,7 +443,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+>  		 * without vbus detection report vbus low for long enough for
+>  		 * the musb-ip to end the current device session.
+>  		 */
+> -		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
+> +		if (data->dr_mode == USB_DR_MODE_OTG &&
+> +		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
+>  			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
+>  			msleep(200);
+>  			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
+> @@ -456,7 +470,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+>  		 * without vbus detection report vbus low for long enough to
+>  		 * the musb-ip to end the current host session.
+>  		 */
+> -		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
+> +		if (data->dr_mode == USB_DR_MODE_OTG &&
+> +		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
+>  			mutex_lock(&phy0->mutex);
+>  			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
+>  			msleep(1000);
+> @@ -501,7 +516,8 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+>  {
+>  	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+>  
+> -	if (args->args[0] >= data->cfg->num_phys)
+> +	if (args->args[0] < data->first_phy ||
+> +	    args->args[0] >= data->cfg->num_phys)
+>  		return ERR_PTR(-ENODEV);
+>  
+>  	return data->phys[args->args[0]].phy;
+> @@ -575,13 +591,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  			return -EPROBE_DEFER;
 >  	}
+>  
+> -	/* vbus_det without id_det makes no sense, and is not supported */
+> -	if (sun4i_usb_phy0_have_vbus_det(data) && !data->id_det_gpio) {
+> -		dev_err(dev, "usb0_id_det missing or invalid\n");
+> -		return -ENODEV;
+> -	}
 > -
-> -	return ret;
->  }
+> -	if (data->id_det_gpio) {
+> +	data->dr_mode = of_usb_get_dr_mode_by_phy(np, 0);
+> +	switch (data->dr_mode) {
+> +	case USB_DR_MODE_OTG:
+> +		/* otg without id_det makes no sense, and is not supported */
+> +		if (!data->id_det_gpio) {
+> +			dev_err(dev, "usb0_id_det missing or invalid\n");
+> +			return -ENODEV;
+> +		}
+> +		/* fall through */
+> +	case USB_DR_MODE_HOST:
+> +	case USB_DR_MODE_PERIPHERAL:
+>  		data->extcon = devm_extcon_dev_allocate(dev,
+>  							sun4i_usb_phy0_cable);
+>  		if (IS_ERR(data->extcon))
+> @@ -592,9 +612,13 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  			dev_err(dev, "failed to register extcon: %d\n", ret);
+>  			return ret;
+>  		}
+> +		break;
+> +	default:
+> +		dev_info(dev, "dr_mode unknown, not registering usb phy0\n");
+> +		data->first_phy = 1;
+>  	}
 >  
->  static void mv_cesa_ahash_prepare(struct crypto_async_request *req,
-> @@ -366,6 +367,7 @@ static const struct mv_cesa_req_ops mv_cesa_ahash_req_ops = {
->  	.process = mv_cesa_ahash_process,
->  	.prepare = mv_cesa_ahash_prepare,
->  	.cleanup = mv_cesa_ahash_req_cleanup,
-> +	.complete = mv_cesa_ahash_complete,
->  };
+> -	for (i = 0; i < data->cfg->num_phys; i++) {
+> +	for (i = data->first_phy; i < data->cfg->num_phys; i++) {
+>  		struct sun4i_usb_phy *phy = data->phys + i;
+>  		char name[16];
 >  
->  static int mv_cesa_ahash_init(struct ahash_request *req,
+> 
