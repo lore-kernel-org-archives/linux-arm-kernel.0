@@ -1,39 +1,37 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 17 Jun 2016 16:05:13 +0100
-Subject: [PATCH 9/9] [RFC] pci: include <asm/dma.h> for isa_dma_bridge_buggy
+Date: Fri, 17 Jun 2016 16:05:06 +0100
+Subject: [PATCH 2/9] ARM: fix missing include of <asm/insn.h> in
+ arch/arm/kernel/insn.c
 In-Reply-To: <1466175913-19067-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1466175913-19067-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1466175913-19067-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1466175913-19067-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least on arm, <asm/dma.h> does not get included when building
-drivers/pci/pci.o. This causes the following build warning which
-can be fixed by including <asm/dma.h>:
+Fix the warning by including <asm/insn.h> for the declaration
+of __arm_gen_branch().
 
-drivers/pci/pci.c:37:5: warning: symbol 'isa_dma_bridge_buggy' was not declared. Should it be static?
+arm/kernel/insn.c:56:1: warning: symbol '__arm_gen_branch' was not declared. Should it be static?
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: linux-pci at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/pci/pci.c | 1 +
+ arch/arm/kernel/insn.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 9add285..86b538d 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -26,6 +26,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/pci_hotplug.h>
- #include <asm/setup.h>
-+#include <asm/dma.h>
- #include <linux/aer.h>
- #include "pci.h"
+diff --git a/arch/arm/kernel/insn.c b/arch/arm/kernel/insn.c
+index b760340..5438934 100644
+--- a/arch/arm/kernel/insn.c
++++ b/arch/arm/kernel/insn.c
+@@ -1,6 +1,7 @@
+ #include <linux/bug.h>
+ #include <linux/kernel.h>
+ #include <asm/opcodes.h>
++#include <asm/insn.h>
  
+ static unsigned long
+ __arm_gen_branch_thumb2(unsigned long pc, unsigned long addr, bool link)
 -- 
 2.8.1
