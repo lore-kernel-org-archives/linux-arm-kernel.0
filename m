@@ -1,41 +1,45 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 17 Jun 2016 02:14:50 +0000
-Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <87eg80d1m9.wl%kuninori.morimoto.gx@renesas.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
- <20160601005751.GG20527@verge.net.au>
- <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
- <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
- <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
- <20160610010245.GA10152@verge.net.au>
- <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
- <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
- <1b9a4cf4-1101-ccbf-772b-49b8a689a1b6@cogentembedded.com>
- <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
- <87eg80d1m9.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87a8iko9dm.wl%kuninori.morimoto.gx@renesas.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 17 Jun 2016 08:09:20 +0530
+Subject: [PATCH] dma: mv_xor_v2: new driver
+In-Reply-To: <20160616144224.2e687a14@free-electrons.com>
+References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160222032730.GU19598@localhost>
+ <20160615160837.64377829@free-electrons.com>
+ <20160615164131.GB16910@localhost>
+ <20160616144224.2e687a14@free-electrons.com>
+Message-ID: <20160617023920.GE16910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Geert
-
-> > Right, I had forgotten about that.
-> > Fortunately the clk-rcar-gen2 driver has a sane failure mode for this case ;-)
-> > 
-> > it seems the RCAN clock can just be modeled as a fixed clock. However,
-> > its divider value isn't clear to me, as 15.9 MHz cannot be generated from PLL1
-> > using an integer divider. Morimoto-san, can you please ask for clarification?
+On Thu, Jun 16, 2016 at 02:42:24PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> OK.
-> Now, I asked to HW team about that.
-> Please wait.
+> On Wed, 15 Jun 2016 22:11:31 +0530, Vinod Koul wrote:
+> 
+> > > This is probably the only thing that I have not changed. The mv_xor
+> > > driver is already using the same strategy, and enqueuing in
+> > > issue_pending() would force us to add the request to a temporary linked
+> > > list, which would be dequeued in issue_pending(). This is quite a bit
+> > > of additional processing, while pushing the new requests directly to
+> > > the engine works fine.  
+> > 
+> > Well that is wrong! And patch is welcome for mv_xor as well :)
+> > 
+> > The DMAengine API mandates that we should submit a descriptor to a queue and
+> > then push them by invoking issue_pending.
+> > 
+> > The users are also expected to follow this
+> 
+> I have just sent a v4 that fixes this for the mv_xor_v2 driver. Now, in
+> ->tx_submit() we only fill in the HW descriptors, but do not tell the
+> engine to process them. It's only at ->issue_pending() time that we
+> tell the engine that there N new descriptors to process.
 
-RCAN divider is fixed for 1/49
+Okay that sounds good to me, I will take a look at it..
+> 
+> I'll have a look at mv_xor a bit later.
 
-PLL1 (= 1560MHz) 
-  -> 1/2 (= 780MHz)
-    -> RCAN divider 1/49 (= 15.9183..MHz)
+Sounds fair enough
 
-Is this clear for you ?
+-- 
+~Vinod
