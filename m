@@ -1,118 +1,45 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 17 Jun 2016 12:16:59 +0100
-Subject: [PATCH 1/2] arm64: smp: Add function to determine if cpus are
- stuck in the kernel
-In-Reply-To: <20160617102713.GA14524@leverpostej>
-References: <1466156097-20028-1-git-send-email-james.morse@arm.com>
- <1466156097-20028-2-git-send-email-james.morse@arm.com>
- <20160617102713.GA14524@leverpostej>
-Message-ID: <5763DC2B.5030705@arm.com>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Fri, 17 Jun 2016 13:23:59 +0200
+Subject: [PATCH v2 00/10] Chain crypto requests together at the DMA level
+Message-ID: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/16 11:27, Mark Rutland wrote:
-> On Fri, Jun 17, 2016 at 10:34:56AM +0100, James Morse wrote:
->> kernel/smp.c has a fancy counter that keeps track of the number of CPUs
->> it marked as not-present and left in cpu_park_loop(). If there are any
->> CPUs spinning in here, features like kexec or hibernate may release them
->> by overwriting this memory.
->>
->> This problem also occurs on machines using spin-tables to release
->> secondary cores.
->> After commit 44dbcc93ab67 ("arm64: Fix behavior of maxcpus=N")
->> we bring all known cpus into the secondary holding pen, but may not bring
->> them up depending on 'maxcpus'. This memory can't be re-used by kexec
->> or hibernate.
->>
->> Add a function cpus_are_stuck_in_kernel() to determine if either of these
->> cases have occurred.
->>
->> Signed-off-by: James Morse <james.morse@arm.com>
->> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm64/include/asm/smp.h | 20 ++++++++++++++++++++
->>   arch/arm64/kernel/smp.c      | 13 +++++++++++++
->>   2 files changed, 33 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
->> index 433e50405274..4be755bcc07a 100644
->> --- a/arch/arm64/include/asm/smp.h
->> +++ b/arch/arm64/include/asm/smp.h
->> @@ -124,6 +124,26 @@ static inline void cpu_panic_kernel(void)
->>   	cpu_park_loop();
->>   }
->>
->> +/*
->> + * Kernel features such as hibernate and kexec depend on cpu hotplug to know
->> + * they can replace any kernel memory they are not using themselves.
->> + *
->> + * There are two corner cases:
->> + * If a secondary CPU fails to come online, (e.g. due to mismatched features),
->> + * it will try to call cpu_die(). If this fails, it increases the counter
->> + * cpus_stuck_in_kernel and sits in cpu_park_loop(). The memory containing
->> + * this function must not be re-used for anything else as the 'stuck' core
->> + * is executing it.
->
-> It might also be stuck in __no_granule_support, if it never made it to C
-> code. In that case, the CPU in charge of bringing up that new CPU will
-> increment the counter in __cpu_up.
+The Cryptographic Engines and Security Accelerators (CESA) supports
+the TDMA chained mode support. When this mode is enabled and crypto
+requests are chained at the DMA level, multiple crypto requests can be
+handled by the hardware engine without requiring any software
+intervention. This approach limits the number of interrupts generated
+by the engines thus improving its throughput and making the whole system
+behave nicely under heavy crypto load.
 
-Just to clarify, *in all the cases*, the CPU in charge of bringing up updates
-the cpus_stuck_in_kernel.
+Benchmarking results with dmcrypt
+=================================
+		I/O read	I/O write
+Before		81.7 MB/s	31.7 MB/s
+After		129  MB/s	39.8 MB/s
 
->
-> There might be other reasons we do something like that in future, so it
-> might be better to be a little less specific and say something like:
->
-> 	If a secondary CPU enters the kernel but fails to come online,
-> 	(e.g. due to mismatched features), and cannot exit the kernel,
-> 	we increment cpus_stuck_in_kernel and leave the CPU in a
-> 	quiesecent loop within the kernel text. The memory containing
-> 	this loop must not be re-used for anything else as the 'stuck'
-> 	core is executing it.
+Improvement	+57.8 %		+25.5 %
 
-Agree.
+Romain Perier (10):
+  crypto: marvell: Add a macro constant for the size of the crypto queue
+  crypto: marvell: Check engine is not already running when enabling a
+    req
+  crypto: marvell: Fix wrong type check in dma functions
+  crypto: marvell: Copy IV vectors by DMA transfers for acipher requests
+  crypto: marvell: Move tdma chain out of mv_cesa_tdma_req and remove it
+  crypto: marvell: Add a complete operation for async requests
+  crypto: marvell: Move SRAM I/O operations to step functions
+  crypto: marvell: Add load balancing between engines
+  crypto: marvell: Add support for chaining crypto requests in TDMA mode
+  crypto: marvell: Increase the size of the crypto queue
 
->> +bool cpus_are_stuck_in_kernel(void);
->> +
->>   #endif /* ifndef __ASSEMBLY__ */
->>
->>   #endif /* ifndef __ASM_SMP_H */
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index 678e0842cb3b..e197502f94fd 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -909,3 +909,16 @@ int setup_profiling_timer(unsigned int multiplier)
->>   {
->>   	return -EINVAL;
->>   }
->> +
->> +bool cpus_are_stuck_in_kernel(void)
->> +{
->> +	bool ret = !!cpus_stuck_in_kernel;
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +	int any_cpu = raw_smp_processor_id();
->> +
->> +	if (num_possible_cpus() > 1 && !cpu_ops[any_cpu]->cpu_die)
->> +		ret = true;
->> +#endif
+ drivers/crypto/marvell/cesa.c   | 142 +++++++++++++++++++++++++++---------
+ drivers/crypto/marvell/cesa.h   | 120 +++++++++++++++++++++---------
+ drivers/crypto/marvell/cipher.c | 157 ++++++++++++++++++++++++----------------
+ drivers/crypto/marvell/hash.c   | 150 ++++++++++++++++++--------------------
+ drivers/crypto/marvell/tdma.c   | 132 +++++++++++++++++++++++++++++++--
+ 5 files changed, 483 insertions(+), 218 deletions(-)
 
-Minor nit: Moving the cpu_die check to a static inline function with
-an obvious name might make the code look better.
-
-	return !!cpus_stuck_in_kernel || !have_cpu_die() ?
-
-Eitherway,
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Cheers
-Suzuki
-
->> +
->> +	return ret;
->> +}
->> --
->> 2.8.0.rc3
->>
->
+-- 
+2.7.4
