@@ -1,56 +1,72 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Fri, 17 Jun 2016 08:45:55 +0200
-Subject: [PATCH 3/6] [media] s5p-jpeg: set capablity bus_info as required
- by VIDIOC_QUERYCAP
-In-Reply-To: <1466113235-25909-4-git-send-email-javier@osg.samsung.com>
-References: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
- <1466113235-25909-4-git-send-email-javier@osg.samsung.com>
-Message-ID: <57639CA3.5010105@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 17 Jun 2016 08:52:50 +0200
+Subject: [PATCH V2 35/63] clocksource/drivers/time-lpc32xx: Convert init
+ function to return error
+In-Reply-To: <1466112442-31105-36-git-send-email-daniel.lezcano@linaro.org>
+References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
+ <1466112442-31105-36-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20160617065250.GU26048@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Hello Daniel,
 
-On 06/16/2016 11:40 PM, Javier Martinez Canillas wrote:
-> The driver doesn't set the struct v4l2_capability cap_info field so the
-> v4l2-compliance tool reports the following errors for VIDIOC_QUERYCAP:
->
-> Required ioctls:
->                  VIDIOC_QUERYCAP returned 0 (Success)
->                  fail: v4l2-compliance.cpp(304): string empty
->                  fail: v4l2-compliance.cpp(528): check_ustring(vcap.bus_info, sizeof(vcap.bus_info))
->          test VIDIOC_QUERYCAP: FAIL
->
-> This patch fixes by setting the field in VIDIOC_QUERYCAP ioctl handler:
->
-> Required ioctls:
->                  VIDIOC_QUERYCAP returned 0 (Success)
->          test VIDIOC_QUERYCAP: OK
->
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+$Subject ~= s/lpc32xx/efm32/
+
+On Thu, Jun 16, 2016 at 11:26:54PM +0200, Daniel Lezcano wrote:
+> The init functions do not return any error. They behave as the following:
+> 
+>   - panic, thus leading to a kernel crash while another timer may work and
+>        make the system boot up correctly
+> 
+>   or
+> 
+>   - print an error and let the caller unaware if the state of the system
+
+These are both wrong for efm32. It doesn't panic and doesn't print an
+error message (obviously the "let the caller unaware" part is true).
+
+> Change that by converting the init functions to return an error conforming
+> to the CLOCKSOURCE_OF_RET prototype.
+> 
+> Proper error handling (rollback, errno value) will be changed later case
+> by case, thus this change just return back an error or success in the init
+> function.
+
+Apart from the comment below the error handling is already fine in this
+driver.
+
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
->
->   drivers/media/platform/s5p-jpeg/jpeg-core.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> index 17bc94092864..e3ff3d4bd72e 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> @@ -1256,7 +1256,8 @@ static int s5p_jpeg_querycap(struct file *file, void *priv,
->   		strlcpy(cap->card, S5P_JPEG_M2M_NAME " decoder",
->   			sizeof(cap->card));
->   	}
-> -	cap->bus_info[0] = 0;
-> +	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
-> +		 dev_name(ctx->jpeg->dev));
->   	cap->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M;
->   	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
->   	return 0;
->
+>  drivers/clocksource/time-efm32.c | 20 +++++++++++++-------
+>  1 file changed, 13 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/clocksource/time-efm32.c b/drivers/clocksource/time-efm32.c
+> index b06e4c2..b71ffc6 100644
+> --- a/drivers/clocksource/time-efm32.c
+> +++ b/drivers/clocksource/time-efm32.c
+> @@ -233,7 +233,11 @@ static int __init efm32_clockevent_init(struct device_node *np)
+>  					DIV_ROUND_CLOSEST(rate, 1024),
+>  					0xf, 0xffff);
+>  
+> -	setup_irq(irq, &efm32_clock_event_irq);
+> +	ret = setup_irq(irq, &efm32_clock_event_irq);
+> +	if (ret) {
+> +		pr_err("Failed setup irq");
+> +		goto err_get_irq;
 
-Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+I would prefer to introduce another label "err_setup_irq" at the same
+place as err_get_irq and use it here.
+
+> +	}
+>  
+>  	return 0;
+>  
+
+Best regards
+Uwe
+
 
 -- 
-Best regards,
-Jacek Anaszewski
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
