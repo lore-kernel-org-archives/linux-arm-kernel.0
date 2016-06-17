@@ -1,151 +1,91 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 17 Jun 2016 18:12:34 +0530
-Subject: [PATCH 6/7] phy: Add SATA3 PHY support for Broadcom NSP SoC
-In-Reply-To: <1466085215-10246-7-git-send-email-yendapally.reddy@broadcom.com>
-References: <1466085215-10246-1-git-send-email-yendapally.reddy@broadcom.com>
- <1466085215-10246-7-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <5763F03A.3070800@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 17 Jun 2016 14:49:13 +0200
+Subject: [PATCH v2 04/10] crypto: marvell: Copy IV vectors by DMA
+ transfers for acipher requests
+In-Reply-To: <1466162649-29911-5-git-send-email-romain.perier@free-electrons.com>
+References: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
+ <1466162649-29911-5-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <20160617144913.1f70ed75@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 17 Jun 2016 13:24:03 +0200
+Romain Perier <romain.perier@free-electrons.com> wrote:
 
-
-On Thursday 16 June 2016 07:23 PM, Yendapally Reddy Dhananjaya Reddy wrote:
-> This patch adds support for Broadcom NSP SATA3 PHY in existing
-> Broadcom SATA PHY driver.
+> Add a TDMA descriptor at the end of the request for copying the
+> output IV vector via a DMA transfer. This is a good way for offloading
+> as much as processing as possible to the DMA and the crypto engine.
+> This is also required for processing multiple cipher requests
+> in chained mode, otherwise the content of the IV vector would be
+> overwritten by the last processed request.
 > 
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+After fixing the coding style issue,
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
->  drivers/phy/phy-brcm-sata.c | 81 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 81 insertions(+)
 > 
-> diff --git a/drivers/phy/phy-brcm-sata.c b/drivers/phy/phy-brcm-sata.c
-> index 6c4c5cb..18d6626 100644
-> --- a/drivers/phy/phy-brcm-sata.c
-> +++ b/drivers/phy/phy-brcm-sata.c
-> @@ -45,6 +45,7 @@ enum brcm_sata_phy_version {
->  	BRCM_SATA_PHY_STB_28NM,
->  	BRCM_SATA_PHY_STB_40NM,
->  	BRCM_SATA_PHY_IPROC_NS2,
-> +	BRCM_SATA_PHY_IPROC_NSP,
->  };
+> Changes in v2:
+>   - Reworded the commit message, the term 'asynchronously' was
+> ambigous
+>   - Changed the value of CESA_TDMA_IV from 4 to 3
+>   - Adding missing blank lines
+>   - Rewrote the function mv_cesa_ablkcipher_process to something more
+>     readable.
+>   - Fixed a bug about how the type of a TDMA operation was tested in
+>     mv_cesa_dma_cleanup and mv_cesa_dma_prepare, I created a separated
+>     commit for that (see PATCH 03/10)
+>   - Renamed variables in mv_cesa_dma_add_iv_op
+>   - Removed the flag CESA_TDMA_DATA from mv_cesa_dma_add_iv_op (not
+> needed)
+> 
+>  drivers/crypto/marvell/cesa.c   |  4 ++++
+>  drivers/crypto/marvell/cesa.h   |  5 +++++
+>  drivers/crypto/marvell/cipher.c | 32 +++++++++++++++++++++++---------
+>  drivers/crypto/marvell/tdma.c   | 29 +++++++++++++++++++++++++++++
+>  4 files changed, 61 insertions(+), 9 deletions(-)
+> 
+
+[...]
+
+> @@ -135,21 +140,21 @@ static int mv_cesa_ablkcipher_process(struct
+> crypto_async_request *req, {
+>  	struct ablkcipher_request *ablkreq =
+> ablkcipher_request_cast(req); struct mv_cesa_ablkcipher_req *creq =
+> ablkcipher_request_ctx(ablkreq);
+> -	struct mv_cesa_ablkcipher_std_req *sreq = &creq->req.std;
+> -	struct mv_cesa_engine *engine = sreq->base.engine;
+> +	struct mv_cesa_tdma_req *dreq;
+> +	unsigned int ivsize;
+>  	int ret;
 >  
->  struct brcm_sata_port {
-> @@ -73,6 +74,13 @@ enum sata_phy_regs {
+> -	if (creq->req.base.type == CESA_DMA_REQ)
+> -		ret = mv_cesa_dma_process(&creq->req.dma, status);
+> -	else
+> -		ret = mv_cesa_ablkcipher_std_process(ablkreq,
+> status);
+> +	if (creq->req.base.type == CESA_STD_REQ)
+> +		return mv_cesa_ablkcipher_std_process(ablkreq,
+> status); 
+> +	ret = mv_cesa_dma_process(&creq->req.dma, status);
+>  	if (ret)
+>  		return ret;
 >  
->  	PLL_REG_BANK_0				= 0x050,
->  	PLL_REG_BANK_0_PLLCONTROL_0		= 0x81,
-> +	PLLCONTROL_0_FREQ_DET_RESTART		= BIT(13),
-> +	PLLCONTROL_0_FREQ_MONITOR		= BIT(12),
-> +	PLLCONTROL_0_SEQ_START			= BIT(15),
-> +	PLL_CAP_CONTROL				= 0x85,
-> +	PLL_ACTRL2				= 0x8b,
-> +	PLL_ACTRL2_SELDIV_MASK			= 0x1f,
-> +	PLL_ACTRL2_SELDIV_SHIFT			= 9,
+> -	memcpy_fromio(ablkreq->info,
+> -		      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET,
+> -
+> crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq)));
+> +	dreq = &creq->req.dma;
+> +	ivsize =
+> +	crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq));
+
+My bad, my mailer wrapped the line: please put the assignment on the
+same line and use a temporary variable if it exceeds 80 chars.
+
+
+> +	memcpy_fromio(ablkreq->info, dreq->chain.last->data, ivsize);
 >  
->  	PLL1_REG_BANK				= 0x060,
->  	PLL1_ACTRL2				= 0x82,
-> @@ -80,6 +88,7 @@ enum sata_phy_regs {
->  	PLL1_ACTRL4				= 0x84,
->  
->  	OOB_REG_BANK				= 0x150,
-> +	OOB1_REG_BANK				= 0x160,
->  	OOB_CTRL1				= 0x80,
->  	OOB_CTRL1_BURST_MAX_MASK		= 0xf,
->  	OOB_CTRL1_BURST_MAX_SHIFT		= 12,
-> @@ -271,6 +280,73 @@ static int brcm_ns2_sata_init(struct brcm_sata_port *port)
 >  	return 0;
 >  }
->  
-> +static int brcm_nsp_sata_init(struct brcm_sata_port *port)
-> +{
-> +	struct brcm_sata_phy *priv = port->phy_priv;
-> +	struct device *dev = port->phy_priv->dev;
-> +	void __iomem *base = priv->phy_base;
-> +	unsigned int oob_bank;
-> +	unsigned int val, try;
-> +
-> +	/* Configure OOB control */
-> +	if (port->portnum == 0)
-> +		oob_bank = OOB_REG_BANK;
-> +	else if (port->portnum == 1)
-> +		oob_bank = OOB1_REG_BANK;
-> +	else
-> +		return -EINVAL;
-> +
-> +	val = 0x0;
-> +	val |= (0x0f << OOB_CTRL1_BURST_MAX_SHIFT);
-> +	val |= (0x06 << OOB_CTRL1_BURST_MIN_SHIFT);
-> +	val |= (0x0f << OOB_CTRL1_WAKE_IDLE_MAX_SHIFT);
-> +	val |= (0x06 << OOB_CTRL1_WAKE_IDLE_MIN_SHIFT);
-> +	brcm_sata_phy_wr(base, oob_bank, OOB_CTRL1, 0x0, val);
-> +
-> +	val = 0x0;
-> +	val |= (0x2e << OOB_CTRL2_RESET_IDLE_MAX_SHIFT);
-> +	val |= (0x02 << OOB_CTRL2_BURST_CNT_SHIFT);
-> +	val |= (0x16 << OOB_CTRL2_RESET_IDLE_MIN_SHIFT);
-> +	brcm_sata_phy_wr(base, oob_bank, OOB_CTRL2, 0x0, val);
-> +
-> +
-> +	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_ACTRL2,
-> +		~(PLL_ACTRL2_SELDIV_MASK << PLL_ACTRL2_SELDIV_SHIFT),
-> +		0x0c << PLL_ACTRL2_SELDIV_SHIFT);
-> +
-> +	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_CAP_CONTROL,
-> +						0xff0, 0x4f0);
-> +
-> +	val = PLLCONTROL_0_FREQ_DET_RESTART | PLLCONTROL_0_FREQ_MONITOR;
-> +	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_REG_BANK_0_PLLCONTROL_0,
-> +								~val, val);
-> +	val = PLLCONTROL_0_SEQ_START;
-> +	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_REG_BANK_0_PLLCONTROL_0,
-> +								~val, 0);
-> +	mdelay(10);
-> +	brcm_sata_phy_wr(base, PLL_REG_BANK_0, PLL_REG_BANK_0_PLLCONTROL_0,
-> +								~val, val);
-> +
-> +	/* Wait for pll_seq_done bit */
-> +	try = 50;
-> +	while (try--) {
-> +		val = brcm_sata_phy_rd(base, BLOCK0_REG_BANK,
-> +					BLOCK0_XGXSSTATUS);
-> +		if (val & BLOCK0_XGXSSTATUS_PLL_LOCK)
-> +			break;
-> +		msleep(20);
-> +	}
-> +	if (!try) {
-> +		/* PLL did not lock; give up */
-> +		dev_err(dev, "port%d PLL did not lock\n", port->portnum);
-> +		return -ETIMEDOUT;
-> +	}
-> +
-> +	dev_dbg(dev, "port%d initialized\n", port->portnum);
-> +
-> +	return 0;
-> +}
-> +
->  static int brcm_sata_phy_init(struct phy *phy)
->  {
->  	int rc;
-> @@ -284,6 +360,9 @@ static int brcm_sata_phy_init(struct phy *phy)
->  	case BRCM_SATA_PHY_IPROC_NS2:
->  		rc = brcm_ns2_sata_init(port);
->  		break;
-> +	case BRCM_SATA_PHY_IPROC_NSP:
-> +		rc = brcm_nsp_sata_init(port);
-> +		break;
->  	default:
->  		rc = -ENODEV;
->  	};
-> @@ -303,6 +382,8 @@ static const struct of_device_id brcm_sata_phy_of_match[] = {
->  	  .data = (void *)BRCM_SATA_PHY_STB_40NM },
->  	{ .compatible	= "brcm,iproc-ns2-sata-phy",
->  	  .data = (void *)BRCM_SATA_PHY_IPROC_NS2 },
-> +	{ .compatible = "brcm,iproc-nsp-sata-phy",
-> +	  .data = (void *)BRCM_SATA_PHY_IPROC_NSP },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, brcm_sata_phy_of_match);
-> 
