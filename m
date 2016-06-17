@@ -1,37 +1,37 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 17 Jun 2016 16:05:05 +0100
-Subject: [PATCH 1/9] ARM/PCI: Add declaration of pcibios_report_status
+Date: Fri, 17 Jun 2016 16:05:08 +0100
+Subject: [PATCH 4/9] ARM: fix missing <asm/vga.h> in arch/arm/mm/iomap.c
 In-Reply-To: <1466175913-19067-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1466175913-19067-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1466175913-19067-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1466175913-19067-5-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function pcibios_report_status() needs a declaration to avoid
-the following warning, so declare it in <asm/pci.h>.
+The vga_base is exported but has no declaration, so fix the
+warning by including the declaration in <asm/vga.h>.
 
-/home/ben/kernel/linux/arch/arm/kernel/bios32.c:58:6: warning: symbol 'pcibios_report_status' was not declared. Should it be static?
+arch/arm/mm/iomap.c:12:15: warning: symbol 'vga_base' was not declared. Should it be static?
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
-Cc: linux-arm-kernel at lists.infradead.org
 Cc: Russell King <linux@armlinux.org.uk>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/include/asm/pci.h | 2 ++
+ arch/arm/mm/iomap.c | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/include/asm/pci.h b/arch/arm/include/asm/pci.h
-index 057d381..4b5ea93 100644
---- a/arch/arm/include/asm/pci.h
-+++ b/arch/arm/include/asm/pci.h
-@@ -37,5 +37,7 @@ static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
- 	return channel ? 15 : 14;
- }
+diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
+index 4614208..af177d6 100644
+--- a/arch/arm/mm/iomap.c
++++ b/arch/arm/mm/iomap.c
+@@ -9,6 +9,8 @@
+ #include <linux/ioport.h>
+ #include <linux/io.h>
  
-+extern void pcibios_report_status(unsigned int status_mask, int warn);
++#include <asm/vga.h>
 +
- #endif /* __KERNEL__ */
- #endif
+ unsigned long vga_base;
+ EXPORT_SYMBOL(vga_base);
+ 
 -- 
 2.8.1
