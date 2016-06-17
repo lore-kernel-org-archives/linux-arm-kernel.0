@@ -1,60 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Jun 2016 07:46:07 +0200
-Subject: [PATCH] ARM: dts: sun8i: Add dts file for inet86dz board
-In-Reply-To: <f080dda9-6410-ec79-f083-29a20d147d61@redhat.com>
-References: <1465754150-16753-1-git-send-email-hdegoede@redhat.com>
- <CAGb2v66cbx0jta1unrKeYm1t9JKO9Unw8z75rXbW3JSi2=NuMw@mail.gmail.com>
- <f080dda9-6410-ec79-f083-29a20d147d61@redhat.com>
-Message-ID: <20160617054607.GN5144@lukather>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 17 Jun 2016 07:58:27 +0200
+Subject: [PATCH V2 2/4] clk: Combine DT binding doc for max77686 and
+ max77802
+In-Reply-To: <1466083407-28793-3-git-send-email-ldewangan@nvidia.com>
+References: <1466083407-28793-1-git-send-email-ldewangan@nvidia.com>
+ <1466083407-28793-3-git-send-email-ldewangan@nvidia.com>
+Message-ID: <57639183.2070508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 11:35:15AM +0200, Hans de Goede wrote:
-> Hi
+On 06/16/2016 03:23 PM, Laxman Dewangan wrote:
+> The clock IP used on the Maxim PMICs max77686 and max77802 are
+> same. The configuration of clock register is also same except
+> the number of clocks.
 > 
-> On 13-06-16 05:16, Chen-Yu Tsai wrote:
-> >Hi,
-> >
-> >On Mon, Jun 13, 2016 at 1:55 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> >>The inet86dz board is a board used in 7" tablets from various oems.
-> >>
-> >>These tablets are a23 based 7" tablets featuring a 1024x600 LCD,
-> >>512MB RAM, 4G NAND, rtl8188etv usb wifi, gsl1680 touchschreen,
-> >>micro-sd slot, 3.5mm headphone jack and a micro-usb otg connector
-> >>which doubles as charging port.
-> >
-> >This seems awfully similar to the sun8i-a23-q8-tablet, any reason
-> >not to include that or sun8i-q8-common.dtsi?
+> Define the common DT binding file for the clocks of Maxim PMICs
+> MAX77686 and MAX77802. For this, remove the separate DT binding
+> document file for maxim,max77802 and move all information to
+> maxim,max77686 DT binding document.
 > 
-> So to answer this both for this board and for the Polaroid MID2407PXE03
-> one, these are not q8 tablets, they are not using the standard q8 casing
-> at least. So using q8 for them would seem to be a bit confusing to users
-> and figuring out how to do proper autodetect is already hard enough without
-> throwing these into the mix too.
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> CC: Javier Martinez Canillas <javier@dowhile0.org>
 > 
-> OTOH you are right that there is a lot of code duplication here. Since I
-> plan to start working on touchscreen autodetect soon-ish, let me see how
-> that goes first.
+> ---
+> Changes from V1:
+> - Rewrite description to remvoe ref to driver.
+> - Taken care of comment from Krzysztof on the supported clocks and
+>   DT bindings.
+> ---
+>  .../devicetree/bindings/clock/maxim,max77686.txt   | 82 ++++++++++++++++------
+>  .../devicetree/bindings/clock/maxim,max77802.txt   | 44 ------------
+>  2 files changed, 59 insertions(+), 67 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
 
-For reference, I'm not really against having similar boards having
-similar-yet-duplicated DT. This is just data, and sometimes trying to
-factorise things also make it less trivial and easy to understand.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> Maxime can you drop the Polaroid MID2407PXE03 patch for now ?
-
-Done.
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160617/d8d89bc0/attachment.sig>
+Best regards,
+Krzysztof
