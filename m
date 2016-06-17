@@ -1,37 +1,70 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 17 Jun 2016 08:58:28 +0200
-Subject: [PATCH V2 62/63] clocksource/drivers/oxnas-rps: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-63-git-send-email-daniel.lezcano@linaro.org>
-References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-63-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <57639F94.9010400@baylibre.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 17 Jun 2016 09:11:31 +0200
+Subject: [PATCH 1/6] [media] s5p-mfc: set capablity bus_info as required
+ by VIDIOC_QUERYCAP
+In-Reply-To: <1466113235-25909-2-git-send-email-javier@osg.samsung.com>
+References: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
+ <1466113235-25909-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <5763A2A3.7000401@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2016 11:27 PM, Daniel Lezcano wrote:
-> The init functions do not return any error. They behave as the following:
+On 06/16/2016 11:40 PM, Javier Martinez Canillas wrote:
+> The driver doesn't set the struct v4l2_capability bus_info field so the
+> v4l2-compliance tool reports the following errors for VIDIOC_QUERYCAP:
 > 
->   - panic, thus leading to a kernel crash while another timer may work and
->        make the system boot up correctly
+> Required ioctls:
+>                 VIDIOC_QUERYCAP returned 0 (Success)
+>                 fail: v4l2-compliance.cpp(304): string empty
+>                 fail: v4l2-compliance.cpp(528): check_ustring(vcap.bus_info, sizeof(vcap.bus_info))
+>         test VIDIOC_QUERYCAP: FAIL
 > 
->   or
+> This patch fixes by setting the field in VIDIOC_QUERYCAP ioctl handler:
 > 
->   - print an error and let the caller unaware if the state of the system
+> Required ioctls:
+>                 VIDIOC_QUERYCAP returned 0 (Success)
+>         test VIDIOC_QUERYCAP: OK
 > 
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
-> 
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+
+Thanks!
+
+	Hans
+
 > ---
->  drivers/clocksource/timer-oxnas-rps.c | 33 ++++++++++++++++++++-------------
->  1 file changed, 20 insertions(+), 13 deletions(-)
-
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
-
-Thanks,
-Neil
+> 
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 3 ++-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 3 ++-
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index f2d6376ce618..4a40df22fd63 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -267,7 +267,8 @@ static int vidioc_querycap(struct file *file, void *priv,
+>  
+>  	strncpy(cap->driver, dev->plat_dev->name, sizeof(cap->driver) - 1);
+>  	strncpy(cap->card, dev->plat_dev->name, sizeof(cap->card) - 1);
+> -	cap->bus_info[0] = 0;
+> +	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
+> +		 dev_name(&dev->plat_dev->dev));
+>  	/*
+>  	 * This is only a mem-to-mem video device. The capture and output
+>  	 * device capability flags are left only for backward compatibility
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> index 034b5c1d35a1..dd466ea6429e 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> @@ -945,7 +945,8 @@ static int vidioc_querycap(struct file *file, void *priv,
+>  
+>  	strncpy(cap->driver, dev->plat_dev->name, sizeof(cap->driver) - 1);
+>  	strncpy(cap->card, dev->plat_dev->name, sizeof(cap->card) - 1);
+> -	cap->bus_info[0] = 0;
+> +	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
+> +		 dev_name(&dev->plat_dev->dev));
+>  	/*
+>  	 * This is only a mem-to-mem video device. The capture and output
+>  	 * device capability flags are left only for backward compatibility
+> 
