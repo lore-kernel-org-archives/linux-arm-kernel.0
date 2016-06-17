@@ -1,217 +1,59 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 18 Jun 2016 00:35:46 +0300
-Subject: [PATCH] userspace API definitions for auto-focus coil
-In-Reply-To: <20160613191753.GA17459@amd>
-References: <20160601220840.GA21946@amd>
- <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
- <20160602193027.GB7984@amd>
- <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
- <20160605190716.GA11321@amd> <575512E5.5030000@gmail.com>
- <20160611220654.GC26360@valkosipuli.retiisi.org.uk>
- <20160612084811.GA27446@amd>
- <20160612112253.GD26360@valkosipuli.retiisi.org.uk>
- <20160613191753.GA17459@amd>
-Message-ID: <20160617213545.GH24980@valkosipuli.retiisi.org.uk>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Fri, 17 Jun 2016 16:05:33 -0700
+Subject: [PATCH 01/20] clk: fixed-factor: Pass clk rates change to the
+ parent
+In-Reply-To: <1463402840-17062-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1463402840-17062-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20160617230533.27203.82622@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Quoting Maxime Ripard (2016-05-16 05:47:01)
+> A fixed factor clock, if it needs to change its rate, by definition do not
+> have any choice but to modify its parent rate.
 
-On Mon, Jun 13, 2016 at 09:17:53PM +0200, Pavel Machek wrote:
-> On Sun 2016-06-12 14:22:53, Sakari Ailus wrote:
-> > Hi Pavel,
-> > 
-> > On Sun, Jun 12, 2016 at 10:48:11AM +0200, Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > > > >Add userspace API definitions.
-> > > > > >
-> > > > > >Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > > > > >
-> > > > > >diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-> > > > > >index b6a357a..23011cc 100644
-> > > > > >--- a/include/uapi/linux/v4l2-controls.h
-> > > > > >+++ b/include/uapi/linux/v4l2-controls.h
-> > > > > >@@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
-> > > > > >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
-> > > > > >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
-> > > > > >
-> > > > > >+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-> > > > > >+#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
-> > > > 
-> > > > Please check V4L2_CID_USER_*_BASE. That's how custom controls are handled
-> > > > nowadays.
-> > > 
-> > > So something like this?
-> > > 
-> > > Thanks,
-> > > 									Pavel
-> > > 
-> > > diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
-> > > index 2efa5dc1..b04b471 100644
-> > > --- a/drivers/media/i2c/ad5820.c
-> > > +++ b/drivers/media/i2c/ad5820.c
-> > > @@ -40,6 +40,11 @@
-> > >  #define AD5820_RAMP_MODE_LINEAR		(0 << 3)
-> > >  #define AD5820_RAMP_MODE_64_16		(1 << 3)
-> > >  
-> > > +/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-> > > +#define V4L2_CID_FOCUS_AD5820_RAMP_TIME		(V4L2_CID_USER_AD5820_BASE+0)
-> > > +#define V4L2_CID_FOCUS_AD5820_RAMP_MODE		(V4L2_CID_FOCUS_AD5820_BASE+1)
-> > > +
-> > > +
-> > 
-> > We could still define these in a header file that can be included by the
-> > user space. Please use V4L2_CID_AD5820 prefix.
-> 
-> Not V4L2_CID_USER_AD5820...?
+Logically it makes sense to always propagate the rate-change request up
+to the parent for a fixed-factor clock if we desire to change its rate.
+However, I wonder if doing this for all users of fixed-factor-clock in
+DT is safe? Some users may be counting on it not changing.
 
-The rest of the controls have no USER as part of the macro name, so I
-wouldn't use it here either.
+There are 397 instances of fixed-factor-clock in .dts[i] today, so this
+change worries me a bit.
 
 > 
-> > A separate header file should be used,
-> >  e.g. include/uapi/linux/ad5820.h.
+> Add the CLK_SET_RATE_PARENT flag to that clock so that it can happen
 > 
-> Ok, separate header file for 2 lines seemed like a bit of overkill,
-> but why not.
-
-That follows an existing pattern of how controls have been implemented in
-other drivers.
-
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/clk-fixed-factor.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> Something like this?
-
-Yes. A few minor comments below.
-
-Could you merge this with the driver patch? I've dropped that from my ad5820
-branch as it does not compile.
-
-> 
-> commit 8dd701d2580e41b06bb2285e6bd59a4f1702b4d8
-> Author: Pavel <pavel@ucw.cz>
-> Date:   Mon Jun 13 21:17:15 2016 +0200
-> 
->     Userspace api, as Sakari asked.
-> 
-> diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
-> index 2efa5dc1..ed3facc 100644
-> --- a/drivers/media/i2c/ad5820.c
-> +++ b/drivers/media/i2c/ad5820.c
-> @@ -32,6 +32,8 @@
->  #include <media/v4l2-device.h>
->  #include <media/v4l2-subdev.h>
+> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> index 75cd6c792cb8..3363abd9b4ae 100644
+> --- a/drivers/clk/clk-fixed-factor.c
+> +++ b/drivers/clk/clk-fixed-factor.c
+> @@ -167,7 +167,8 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
+>         of_property_read_string(node, "clock-output-names", &clk_name);
+>         parent_name = of_clk_get_parent_name(node, 0);
 >  
-> +#include <uapi/linux/ad5820.h>
-> +
->  #define AD5820_NAME		"ad5820"
->  
->  /* Register definitions */
-> @@ -40,6 +42,8 @@
->  #define AD5820_RAMP_MODE_LINEAR		(0 << 3)
->  #define AD5820_RAMP_MODE_64_16		(1 << 3)
->  
-> +
-> +
+> -       clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
+> +       clk = clk_register_fixed_factor(NULL, clk_name, parent_name,
+> +                                       CLK_SET_RATE_PARENT,
 
-Extra newlines.
+An alternative would be to pass in the flags you want, somehow. For the
+clock you are trying to fix, is it inside of the SoC or external? If it
+is internal, and part of a larger clock controller driver, is this for
+the legacy style allwinner clock drivers that put everything in DT? If
+not, it would better to initialize it statically and shove this flag
+into the struct clk_init_data storage.
 
->  #define CODE_TO_RAMP_US(s)	((s) == 0 ? 0 : (1 << ((s) - 1)) * 50)
->  #define RAMP_US_TO_CODE(c)	fls(((c) + ((c)>>1)) / 50)
->  
-> @@ -165,13 +169,13 @@ static int ad5820_set_ctrl(struct v4l2_ctrl *ctrl)
->  		coil->focus_absolute = ctrl->val;
->  		return ad5820_update_hw(coil);
->  
-> -	case V4L2_CID_FOCUS_AD5820_RAMP_TIME:
-> +	case V4L2_CID_AD5820_RAMP_TIME:
->  		code = RAMP_US_TO_CODE(ctrl->val);
->  		ctrl->val = CODE_TO_RAMP_US(code);
->  		coil->focus_ramp_time = ctrl->val;
->  		break;
->  
-> -	case V4L2_CID_FOCUS_AD5820_RAMP_MODE:
-> +	case V4L2_CID_AD5820_RAMP_MODE:
->  		coil->focus_ramp_mode = ctrl->val;
->  		break;
->  	}
-> @@ -191,7 +195,7 @@ static const char * const ad5820_focus_menu[] = {
->  static const struct v4l2_ctrl_config ad5820_ctrls[] = {
->  	{
->  		.ops		= &ad5820_ctrl_ops,
-> -		.id		= V4L2_CID_FOCUS_AD5820_RAMP_TIME,
-> +		.id		= V4L2_CID_AD5820_RAMP_TIME,
->  		.type		= V4L2_CTRL_TYPE_INTEGER,
->  		.name		= "Focus ramping time [us]",
->  		.min		= 0,
-> @@ -202,7 +206,7 @@ static const struct v4l2_ctrl_config ad5820_ctrls[] = {
->  	},
->  	{
->  		.ops		= &ad5820_ctrl_ops,
-> -		.id		= V4L2_CID_FOCUS_AD5820_RAMP_MODE,
-> +		.id		= V4L2_CID_AD5820_RAMP_MODE,
->  		.type		= V4L2_CTRL_TYPE_MENU,
->  		.name		= "Focus ramping mode",
->  		.min		= 0,
-> diff --git a/include/uapi/linux/ad5820.h b/include/uapi/linux/ad5820.h
-> new file mode 100644
-> index 0000000..d44ba9c
-> --- /dev/null
-> +++ b/include/uapi/linux/ad5820.h
-> @@ -0,0 +1,18 @@
-> +/*
-> + * AD5820 DAC driver for camera voice coil focus.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __LINUX_AD5820_H
-> +#define __LINUX_AD5820_H
-> +
-> +#include <linux/v4l2-controls.h>
-> +
-> +/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-> +#define V4L2_CID_AD5820_RAMP_TIME	(V4L2_CID_AD5820_BASE+0)
-
-(V4L2_CID_AD5820_BASE + 0)
-
-Same below.
-
-> +#define V4L2_CID_AD5820_RAMP_MODE	(V4L2_CID_AD5820_BASE+1)
-> +
-> +#endif
-> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-> index 23011cc..015e90b 100644
-> --- a/include/uapi/linux/v4l2-controls.h
-> +++ b/include/uapi/linux/v4l2-controls.h
-> @@ -181,6 +181,10 @@ enum v4l2_colorfx {
->   * We reserve 16 controls for this driver. */
->  #define V4L2_CID_USER_TC358743_BASE		(V4L2_CID_USER_BASE + 0x1080)
->  
-> +/* The base for the ad5820 driver controls.
-> + * We reserve 16 controls for this driver. */
-> +#define V4L2_CID_AD5820_BASE			(V4L2_CID_USER_BASE + 0x1090)
-> +
->  /* MPEG-class control IDs */
->  /* The MPEG controls are applicable to all codec controls
->   * and the 'MPEG' part of the define is historical */
-> @@ -986,9 +990,4 @@ enum v4l2_detect_md_mode {
->  #define V4L2_CID_MODE_SENSITIVITY		(V4L2_CID_MODE_CLASS_BASE+6)
->  #define V4L2_CID_MODE_OPSYSCLOCK		(V4L2_CID_MODE_CLASS_BASE+7)
->  
-> -/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-> -#define V4L2_CID_FOCUS_AD5820_BASE 		(V4L2_CTRL_CLASS_CAMERA | 0x10af)
-> -#define V4L2_CID_FOCUS_AD5820_RAMP_TIME		(V4L2_CID_FOCUS_AD5820_BASE+0)
-> -#define V4L2_CID_FOCUS_AD5820_RAMP_MODE		(V4L2_CID_FOCUS_AD5820_BASE+1)
-> -
->  #endif
-> 
-> 
-
--- 
 Regards,
+Mike
 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+>                                         mult, div);
+>         if (!IS_ERR(clk))
+>                 of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> -- 
+> 2.8.2
+> 
