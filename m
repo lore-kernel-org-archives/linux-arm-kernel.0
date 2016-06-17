@@ -1,72 +1,31 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 17 Jun 2016 19:29:28 +0200
-Subject: [PATCHv3 6/7] EDAC, altera: Add Arria10 Ethernet EDAC support
-In-Reply-To: <1465852752-11018-7-git-send-email-tthayer@opensource.altera.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Fri, 17 Jun 2016 12:37:54 -0500
+Subject: [PATCHv3 3/7] EDAC, altera: Share Arria10 check_deps & IRQ
+ functions
+In-Reply-To: <20160617171120.GI3912@pd.tnic>
 References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
- <1465852752-11018-7-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20160617172928.GK3912@pd.tnic>
+ <1465852752-11018-4-git-send-email-tthayer@opensource.altera.com>
+ <20160617170050.GG3912@pd.tnic> <57642EE7.4060109@opensource.altera.com>
+ <20160617171120.GI3912@pd.tnic>
+Message-ID: <57643572.7050805@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 04:19:11PM -0500, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
-> 
-> Add Altera Arria10 Ethernet FIFO memory EDAC support. Update
-> to support a common compatibility string for all ethernet
-> FIFOs in the DT.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
-> v2  Remove (void *) cast from altr_edac_device_of_match[]
->     Addition of panic flag to ethernet private data.
-> v3  Use common compatiblity string.
->     Simplify socfpga_init_ethernet_ecc().
-> ---
->  drivers/edac/Kconfig       |    7 +++++++
->  drivers/edac/altera_edac.c |   38 ++++++++++++++++++++++++++++++++++++--
->  drivers/edac/altera_edac.h |    3 +++
->  3 files changed, 46 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-> index 6ca7474..d0c1dab 100644
-> --- a/drivers/edac/Kconfig
-> +++ b/drivers/edac/Kconfig
-> @@ -391,6 +391,13 @@ config EDAC_ALTERA_OCRAM
->  	  Support for error detection and correction on the
->  	  Altera On-Chip RAM Memory for Altera SoCs.
->  
-> +config EDAC_ALTERA_ETHERNET
-> +	bool "Altera Ethernet FIFO ECC"
-> +	depends on EDAC_ALTERA=y
-> +	help
-> +	  Support for error detection and correction on the
-> +	  Altera Ethernet FIFO Memory for Altera SoCs.
-> +
->  config EDAC_SYNOPSYS
->  	tristate "Synopsys DDR Memory Controller"
->  	depends on EDAC_MM_EDAC && ARCH_ZYNQ
-> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-> index f27bb29..14f99ae 100644
-> --- a/drivers/edac/altera_edac.c
-> +++ b/drivers/edac/altera_edac.c
-> @@ -1260,6 +1260,34 @@ const struct edac_device_prv_data a10_l2ecc_data = {
->  
->  #endif	/* CONFIG_EDAC_ALTERA_L2C */
->  
-> +/********************* Ethernet Device Functions ********************/
-> +
-> +#ifdef CONFIG_EDAC_ALTERA_ETHERNET
-> +
-> +const struct edac_device_prv_data a10_enet0rxecc_data = {
+Hi Boris,
 
-This needs to be "static const" and then you don't need to init panic to
-false.
+On 06/17/2016 12:11 PM, Borislav Petkov wrote:
+> On Fri, Jun 17, 2016 at 12:09:59PM -0500, Thor Thayer wrote:
+>> Since each peripheral's EDAC can be individually selected, the build
+>> generates a warning of an unused function if just L2 cache was selected.
+>>
+>> The ifdeffery is ugly but it removes that warning in the L2 only case.
+>
+> You could add __maybe_unused to the function definition but I guess you
+> don't want that code in there if only L2 is selected.
+>
+> Ok.
+>
+I like that because otherwise I'll need to add the other peripheral 
+defines in the future so this will be a multi-line #ifdef
 
-Your other edac_device_prv_data things are not static too, please
-convert them in a separate patch too.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+I wasn't aware of that macro but it is much cleaner. I'll use that. Thanks!
