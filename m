@@ -1,1589 +1,1286 @@
-From: garlic.tseng@mediatek.com (Garlic Tseng)
-Date: Fri, 17 Jun 2016 15:43:57 +0800
-Subject: [alsa-devel] [PATCH v5 6/9] ASoC: mediatek: add mt2701 platform
- driver implementation.
-In-Reply-To: <1466149440-23889-1-git-send-email-garlic.tseng@mediatek.com>
-References: <1466149440-23889-1-git-send-email-garlic.tseng@mediatek.com>
-Message-ID: <1466149440-23889-7-git-send-email-garlic.tseng@mediatek.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 17 Jun 2016 08:53:49 +0100
+Subject: [RESEND v7 1/6] mfd: max8997: Use regmap to access registers
+In-Reply-To: <1466143833-5856-2-git-send-email-k.kozlowski@samsung.com>
+References: <1466143833-5856-1-git-send-email-k.kozlowski@samsung.com>
+ <1466143833-5856-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160617075349.GE21702@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mt2701 platform driver implementation for playback and capture.
-The implement follow DAPM structure (memory interface as FE and I2S
-as BE).
-Because of the hardware design, i2s out required to be enabled when
-we need to enable i2s in. This patch includes the implementation.
+FAO Mark,
 
-Signed-off-by: Garlic Tseng <garlic.tseng@mediatek.com>
----
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 1559 ++++++++++++++++++++++++++++
- 1 file changed, 1559 insertions(+)
- create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+Just your Ack missing on this set.
 
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-new file mode 100644
-index 0000000..deb5f82
---- /dev/null
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-@@ -0,0 +1,1559 @@
-+/*
-+ * Mediatek ALSA SoC AFE platform driver for 2701
-+ *
-+ * Copyright (c) 2016 MediaTek Inc.
-+ * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-+ *             Ir Lian <ir.lian@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/pm_runtime.h>
-+#include <sound/soc.h>
-+
-+#include "mt2701-afe-common.h"
-+
-+#include "mt2701-afe-clock-ctrl.h"
-+#include "../common/mtk-afe-platform-driver.h"
-+#include "../common/mtk-afe-fe-dai.h"
-+
-+#define AFE_IRQ_STATUS_BITS	0xff
-+
-+static const struct snd_pcm_hardware mt2701_afe_hardware = {
-+	.info = SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED
-+		| SNDRV_PCM_INFO_RESUME | SNDRV_PCM_INFO_MMAP_VALID,
-+	.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE
-+		   | SNDRV_PCM_FMTBIT_S32_LE,
-+	.period_bytes_min = 1024,
-+	.period_bytes_max = 1024 * 256,
-+	.periods_min = 4,
-+	.periods_max = 1024,
-+	.buffer_bytes_max = 1024 * 1024 * 16,
-+	.fifo_size = 0,
-+};
-+
-+struct mt2701_afe_rate {
-+	unsigned int rate;
-+	unsigned int regvalue;
-+};
-+
-+static const struct mt2701_afe_rate mt2701_afe_i2s_rates[] = {
-+	{ .rate = 8000, .regvalue = 0 },
-+	{ .rate = 12000, .regvalue = 1 },
-+	{ .rate = 16000, .regvalue = 2 },
-+	{ .rate = 24000, .regvalue = 3 },
-+	{ .rate = 32000, .regvalue = 4 },
-+	{ .rate = 48000, .regvalue = 5 },
-+	{ .rate = 96000, .regvalue = 6 },
-+	{ .rate = 192000, .regvalue = 7 },
-+	{ .rate = 384000, .regvalue = 8 },
-+	{ .rate = 7350, .regvalue = 16 },
-+	{ .rate = 11025, .regvalue = 17 },
-+	{ .rate = 14700, .regvalue = 18 },
-+	{ .rate = 22050, .regvalue = 19 },
-+	{ .rate = 29400, .regvalue = 20 },
-+	{ .rate = 44100, .regvalue = 21 },
-+	{ .rate = 88200, .regvalue = 22 },
-+	{ .rate = 176400, .regvalue = 23 },
-+	{ .rate = 352800, .regvalue = 24 },
-+};
-+
-+int mt2701_dai_num_to_i2s(struct mtk_base_afe *afe, int num)
-+{
-+	int val = num - MT2701_IO_I2S;
-+
-+	if (val < 0 || val >= MT2701_I2S_NUM) {
-+		dev_err(afe->dev, "%s, num not available, num %d, val %d\n",
-+			__func__, num, val);
-+		return -EINVAL;
-+	}
-+	return val;
-+}
-+
-+static int mt2701_afe_i2s_fs(unsigned int sample_rate)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(mt2701_afe_i2s_rates); i++)
-+		if (mt2701_afe_i2s_rates[i].rate == sample_rate)
-+			return mt2701_afe_i2s_rates[i].regvalue;
-+
-+	return -EINVAL;
-+}
-+
-+static int mt2701_afe_i2s_startup(struct snd_pcm_substream *substream,
-+				  struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	struct mt2701_afe_private *afe_priv = afe->platform_priv;
-+	int i2s_num = mt2701_dai_num_to_i2s(afe, dai->id);
-+	int clk_num = MT2701_AUD_AUD_I2S1_MCLK + i2s_num;
-+	int ret = 0;
-+
-+	if (i2s_num < 0)
-+		return i2s_num;
-+
-+	/* enable mclk */
-+	ret = clk_prepare_enable(afe_priv->clocks[clk_num]);
-+	if (ret)
-+		dev_err(afe->dev, "Failed to enable mclk for I2S: %d\n",
-+			i2s_num);
-+
-+	return ret;
-+}
-+
-+static int mt2701_afe_i2s_path_shutdown(struct snd_pcm_substream *substream,
-+					struct snd_soc_dai *dai,
-+					int dir_invert)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	struct mt2701_afe_private *afe_priv = afe->platform_priv;
-+	int i2s_num = mt2701_dai_num_to_i2s(afe, dai->id);
-+	struct mt2701_i2s_path *i2s_path;
-+	const struct mt2701_i2s_data *i2s_data;
-+	int stream_dir = substream->stream;
-+
-+	if (i2s_num < 0)
-+		return i2s_num;
-+
-+	i2s_path = &afe_priv->i2s_path[i2s_num];
-+
-+	if (dir_invert)	{
-+		if (stream_dir == SNDRV_PCM_STREAM_PLAYBACK)
-+			stream_dir = SNDRV_PCM_STREAM_CAPTURE;
-+		else
-+			stream_dir = SNDRV_PCM_STREAM_PLAYBACK;
-+	}
-+	i2s_data = i2s_path->i2s_data[stream_dir];
-+
-+	i2s_path->on[stream_dir]--;
-+	if (i2s_path->on[stream_dir] < 0) {
-+		dev_warn(afe->dev, "i2s_path->on: %d, dir: %d\n",
-+			 i2s_path->on[stream_dir], stream_dir);
-+		i2s_path->on[stream_dir] = 0;
-+	}
-+	if (i2s_path->on[stream_dir])
-+		return 0;
-+
-+	/* disable i2s */
-+	regmap_update_bits(afe->regmap, i2s_data->i2s_ctrl_reg,
-+			   ASYS_I2S_CON_I2S_EN, 0);
-+	regmap_update_bits(afe->regmap, AUDIO_TOP_CON4,
-+			   1 << i2s_data->i2s_pwn_shift,
-+			   1 << i2s_data->i2s_pwn_shift);
-+	return 0;
-+}
-+
-+static void mt2701_afe_i2s_shutdown(struct snd_pcm_substream *substream,
-+				    struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	struct mt2701_afe_private *afe_priv = afe->platform_priv;
-+	int i2s_num = mt2701_dai_num_to_i2s(afe, dai->id);
-+	struct mt2701_i2s_path *i2s_path;
-+	int clk_num = MT2701_AUD_AUD_I2S1_MCLK + i2s_num;
-+
-+	if (i2s_num < 0)
-+		return;
-+
-+	i2s_path = &afe_priv->i2s_path[i2s_num];
-+
-+	if (i2s_path->occupied[substream->stream])
-+		i2s_path->occupied[substream->stream] = 0;
-+	else
-+		goto I2S_UNSTART;
-+
-+	mt2701_afe_i2s_path_shutdown(substream, dai, 0);
-+
-+	/* need to disable i2s-out path when disable i2s-in */
-+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-+		mt2701_afe_i2s_path_shutdown(substream, dai, 1);
-+
-+I2S_UNSTART:
-+	/* disable mclk */
-+	clk_disable_unprepare(afe_priv->clocks[clk_num]);
-+}
-+
-+static int mt2701_i2s_path_prepare_enable(struct snd_pcm_substream *substream,
-+					  struct snd_soc_dai *dai,
-+					  int dir_invert)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	struct mt2701_afe_private *afe_priv = afe->platform_priv;
-+	int i2s_num = mt2701_dai_num_to_i2s(afe, dai->id);
-+	struct mt2701_i2s_path *i2s_path;
-+	const struct mt2701_i2s_data *i2s_data;
-+	struct snd_pcm_runtime * const runtime = substream->runtime;
-+	int reg, fs, w_len = 1;
-+	int stream_dir = substream->stream;
-+	unsigned int mask = 0, val = 0;
-+
-+	if (i2s_num < 0)
-+		return i2s_num;
-+
-+	i2s_path = &afe_priv->i2s_path[i2s_num];
-+
-+	if (dir_invert) {
-+		if (stream_dir == SNDRV_PCM_STREAM_PLAYBACK)
-+			stream_dir = SNDRV_PCM_STREAM_CAPTURE;
-+		else
-+			stream_dir = SNDRV_PCM_STREAM_PLAYBACK;
-+	}
-+	i2s_data = i2s_path->i2s_data[stream_dir];
-+
-+	/* no need to enable if already done */
-+	i2s_path->on[stream_dir]++;
-+
-+	if (i2s_path->on[stream_dir] != 1)
-+		return 0;
-+
-+	fs = mt2701_afe_i2s_fs(runtime->rate);
-+
-+	if (i2s_path->div_bck_to_lrck == 32)
-+		w_len = 0;
-+	else if (i2s_path->div_bck_to_lrck == 64)
-+		w_len = 1;
-+	else
-+		dev_warn(dai->dev, "%s() bad bit count %d\n", __func__,
-+			 afe_priv->i2s_path[i2s_num].div_bck_to_lrck);
-+
-+	mask = ASYS_I2S_CON_FS |
-+	       ASYS_I2S_CON_I2S_COUPLE_MODE | /* 0 */
-+	       ASYS_I2S_CON_I2S_MODE |
-+	       ASYS_I2S_CON_WIDE_MODE;
-+
-+	val = ASYS_I2S_CON_FS_SET(fs) |
-+	      ASYS_I2S_CON_I2S_MODE |
-+	      ASYS_I2S_CON_WIDE_MODE_SET(w_len);
-+
-+	if (stream_dir == SNDRV_PCM_STREAM_CAPTURE) {
-+		mask |= ASYS_I2S_IN_PHASE_FIX;
-+		val |= ASYS_I2S_IN_PHASE_FIX;
-+	}
-+
-+	regmap_update_bits(afe->regmap, i2s_data->i2s_ctrl_reg, mask, val);
-+
-+	if (stream_dir == SNDRV_PCM_STREAM_PLAYBACK)
-+		reg = ASMO_TIMING_CON1;
-+	else
-+		reg = ASMI_TIMING_CON1;
-+
-+	regmap_update_bits(afe->regmap, reg,
-+			   i2s_data->i2s_asrc_fs_mask
-+			   << i2s_data->i2s_asrc_fs_shift,
-+			   fs << i2s_data->i2s_asrc_fs_shift);
-+
-+	/* enable i2s */
-+	regmap_update_bits(afe->regmap, AUDIO_TOP_CON4,
-+			   1 << i2s_data->i2s_pwn_shift,
-+			   0 << i2s_data->i2s_pwn_shift);
-+
-+	/* reset i2s hw status before enable */
-+	regmap_update_bits(afe->regmap, i2s_data->i2s_ctrl_reg,
-+			   ASYS_I2S_CON_RESET, ASYS_I2S_CON_RESET);
-+	udelay(1);
-+	regmap_update_bits(afe->regmap, i2s_data->i2s_ctrl_reg,
-+			   ASYS_I2S_CON_RESET, 0);
-+	udelay(1);
-+	regmap_update_bits(afe->regmap, i2s_data->i2s_ctrl_reg,
-+			   ASYS_I2S_CON_I2S_EN, ASYS_I2S_CON_I2S_EN);
-+	return 0;
-+}
-+
-+static int mt2701_afe_i2s_prepare(struct snd_pcm_substream *substream,
-+				  struct snd_soc_dai *dai)
-+{
-+	int clk_domain;
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	struct mt2701_afe_private *afe_priv = afe->platform_priv;
-+	int i2s_num = mt2701_dai_num_to_i2s(afe, dai->id);
-+	struct mt2701_i2s_path *i2s_path;
-+	int mclk_rate;
-+
-+	if (i2s_num < 0)
-+		return i2s_num;
-+
-+	i2s_path = &afe_priv->i2s_path[i2s_num];
-+	mclk_rate = i2s_path->mclk_rate;
-+
-+	if (i2s_path->occupied[substream->stream])
-+		return -EBUSY;
-+	i2s_path->occupied[substream->stream] = 1;
-+
-+	if (MT2701_PLL_DOMAIN_0_RATE % mclk_rate == 0) {
-+		clk_domain = 0;
-+	} else if (MT2701_PLL_DOMAIN_1_RATE % mclk_rate == 0) {
-+		clk_domain = 1;
-+	} else {
-+		dev_err(dai->dev, "%s() bad mclk rate %d\n",
-+			__func__, mclk_rate);
-+		return -EINVAL;
-+	}
-+	mt2701_mclk_configuration(afe, i2s_num, clk_domain, mclk_rate);
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+		mt2701_i2s_path_prepare_enable(substream, dai, 0);
-+	} else {
-+		/* need to enable i2s-out path when enable i2s-in */
-+		/* prepare for another direction "out" */
-+		mt2701_i2s_path_prepare_enable(substream, dai, 1);
-+		/* prepare for "in" */
-+		mt2701_i2s_path_prepare_enable(substream, dai, 0);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mt2701_afe_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
-+				     unsigned int freq, int dir)
-+{
-+	struct mtk_base_afe *afe = dev_get_drvdata(dai->dev);
-+	struct mt2701_afe_private *afe_priv = afe->platform_priv;
-+	int i2s_num = mt2701_dai_num_to_i2s(afe, dai->id);
-+
-+	if (i2s_num < 0)
-+		return i2s_num;
-+
-+	/* mclk */
-+	if (dir == SND_SOC_CLOCK_IN) {
-+		dev_warn(dai->dev,
-+			 "%s() warning: mt2701 doesn't support mclk input\n",
-+			__func__);
-+		return -EINVAL;
-+	}
-+	afe_priv->i2s_path[i2s_num].mclk_rate = freq;
-+	return 0;
-+}
-+
-+static int mt2701_afe_i2s_set_clkdiv(struct snd_soc_dai *dai, int div_id,
-+				     int div)
-+{
-+	struct mtk_base_afe *afe = dev_get_drvdata(dai->dev);
-+	struct mt2701_afe_private *afe_priv = afe->platform_priv;
-+	int i2s_num = mt2701_dai_num_to_i2s(afe, dai->id);
-+
-+	if (i2s_num < 0)
-+		return i2s_num;
-+
-+	switch (div_id) {
-+	case DIV_ID_MCLK_TO_BCK:
-+		afe_priv->i2s_path[i2s_num].div_mclk_to_bck = div;
-+		break;
-+	case DIV_ID_BCK_TO_LRCK:
-+		afe_priv->i2s_path[i2s_num].div_bck_to_lrck = div;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static int mt2701_afe_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
-+{
-+	struct mtk_base_afe *afe = dev_get_drvdata(dai->dev);
-+	struct mt2701_afe_private *afe_priv = afe->platform_priv;
-+	int i2s_num = mt2701_dai_num_to_i2s(afe, dai->id);
-+
-+	if (i2s_num < 0)
-+		return i2s_num;
-+
-+	afe_priv->i2s_path[i2s_num].format = fmt;
-+	return 0;
-+}
-+
-+static int mt2701_simple_fe_startup(struct snd_pcm_substream *substream,
-+				    struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	int stream_dir = substream->stream;
-+	int memif_num = rtd->cpu_dai->id;
-+	struct mtk_base_afe_memif *memif_tmp;
-+
-+	/* can't run single DL & DLM at the same time */
-+	if (stream_dir == SNDRV_PCM_STREAM_PLAYBACK) {
-+		memif_tmp = &afe->memif[MT2701_MEMIF_DLM];
-+		if (memif_tmp->substream) {
-+			dev_warn(afe->dev, "%s memif is not available, stream_dir %d, memif_num %d\n",
-+				 __func__, stream_dir, memif_num);
-+			return -EBUSY;
-+		}
-+	}
-+	return mtk_afe_fe_startup(substream, dai);
-+}
-+
-+static int mt2701_simple_fe_hw_params(struct snd_pcm_substream *substream,
-+				      struct snd_pcm_hw_params *params,
-+				      struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	int stream_dir = substream->stream;
-+
-+	/* single DL use PAIR_INTERLEAVE */
-+	if (stream_dir == SNDRV_PCM_STREAM_PLAYBACK) {
-+		regmap_update_bits(afe->regmap,
-+				   AFE_MEMIF_PBUF_SIZE,
-+				   AFE_MEMIF_PBUF_SIZE_DLM_MASK,
-+				   AFE_MEMIF_PBUF_SIZE_PAIR_INTERLEAVE);
-+	}
-+	return mtk_afe_fe_hw_params(substream, params, dai);
-+}
-+
-+static int mt2701_dlm_fe_startup(struct snd_pcm_substream *substream,
-+				 struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	struct mtk_base_afe_memif *memif_tmp;
-+	const struct mtk_base_memif_data *memif_data;
-+	int i;
-+
-+	for (i = MT2701_MEMIF_DL1; i < MT2701_MEMIF_DL_SINGLE_NUM; ++i) {
-+		memif_tmp = &afe->memif[i];
-+		if (memif_tmp->substream)
-+			return -EBUSY;
-+	}
-+
-+	/* enable agent for all signal DL (due to hw design) */
-+	for (i = MT2701_MEMIF_DL1; i < MT2701_MEMIF_DL_SINGLE_NUM; ++i) {
-+		memif_data = afe->memif[i].data;
-+		regmap_update_bits(afe->regmap,
-+				   memif_data->agent_disable_reg,
-+				   1 << memif_data->agent_disable_shift,
-+				   0 << memif_data->agent_disable_shift);
-+	}
-+
-+	return mtk_afe_fe_startup(substream, dai);
-+}
-+
-+static void mt2701_dlm_fe_shutdown(struct snd_pcm_substream *substream,
-+				   struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	const struct mtk_base_memif_data *memif_data;
-+	int i;
-+
-+	for (i = MT2701_MEMIF_DL1; i < MT2701_MEMIF_DL_SINGLE_NUM; ++i) {
-+		memif_data = afe->memif[i].data;
-+		regmap_update_bits(afe->regmap,
-+				   memif_data->agent_disable_reg,
-+				   1 << memif_data->agent_disable_shift,
-+				   1 << memif_data->agent_disable_shift);
-+	}
-+	return mtk_afe_fe_shutdown(substream, dai);
-+}
-+
-+static int mt2701_dlm_fe_hw_params(struct snd_pcm_substream *substream,
-+				   struct snd_pcm_hw_params *params,
-+				   struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	int channels = params_channels(params);
-+
-+	regmap_update_bits(afe->regmap,
-+			   AFE_MEMIF_PBUF_SIZE,
-+			   AFE_MEMIF_PBUF_SIZE_DLM_MASK,
-+			   AFE_MEMIF_PBUF_SIZE_FULL_INTERLEAVE);
-+	regmap_update_bits(afe->regmap,
-+			   AFE_MEMIF_PBUF_SIZE,
-+			   AFE_MEMIF_PBUF_SIZE_DLM_BYTE_MASK,
-+			   AFE_MEMIF_PBUF_SIZE_DLM_32BYTES);
-+	regmap_update_bits(afe->regmap,
-+			   AFE_MEMIF_PBUF_SIZE,
-+			   AFE_MEMIF_PBUF_SIZE_DLM_CH_MASK,
-+			   AFE_MEMIF_PBUF_SIZE_DLM_CH(channels));
-+
-+	return mtk_afe_fe_hw_params(substream, params, dai);
-+}
-+
-+static int mt2701_dlm_fe_trigger(struct snd_pcm_substream *substream,
-+				 int cmd, struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-+	struct mtk_base_afe_memif *memif_tmp = &afe->memif[MT2701_MEMIF_DL1];
-+
-+	switch (cmd) {
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_RESUME:
-+		regmap_update_bits(afe->regmap, memif_tmp->data->enable_reg,
-+				   1 << memif_tmp->data->enable_shift,
-+				   1 << memif_tmp->data->enable_shift);
-+		mtk_afe_fe_trigger(substream, cmd, dai);
-+		return 0;
-+	case SNDRV_PCM_TRIGGER_STOP:
-+	case SNDRV_PCM_TRIGGER_SUSPEND:
-+		mtk_afe_fe_trigger(substream, cmd, dai);
-+		regmap_update_bits(afe->regmap, memif_tmp->data->enable_reg,
-+				   1 << memif_tmp->data->enable_shift, 0);
-+
-+		return 0;
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+static int mt2701_memif_fs(struct snd_pcm_substream *substream,
-+			   unsigned int rate)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	int fs;
-+
-+	if (rtd->cpu_dai->id != MT2701_MEMIF_ULBT)
-+		fs = mt2701_afe_i2s_fs(rate);
-+	else
-+		fs = (rate == 16000 ? 1 : 0);
-+	return fs;
-+}
-+
-+static int mt2701_irq_fs(struct snd_pcm_substream *substream, unsigned int rate)
-+{
-+	return mt2701_afe_i2s_fs(rate);
-+}
-+
-+/* FE DAIs */
-+static const struct snd_soc_dai_ops mt2701_single_memif_dai_ops = {
-+	.startup	= mt2701_simple_fe_startup,
-+	.shutdown	= mtk_afe_fe_shutdown,
-+	.hw_params	= mt2701_simple_fe_hw_params,
-+	.hw_free	= mtk_afe_fe_hw_free,
-+	.prepare	= mtk_afe_fe_prepare,
-+	.trigger	= mtk_afe_fe_trigger,
-+
-+};
-+
-+static const struct snd_soc_dai_ops mt2701_dlm_memif_dai_ops = {
-+	.startup	= mt2701_dlm_fe_startup,
-+	.shutdown	= mt2701_dlm_fe_shutdown,
-+	.hw_params	= mt2701_dlm_fe_hw_params,
-+	.hw_free	= mtk_afe_fe_hw_free,
-+	.prepare	= mtk_afe_fe_prepare,
-+	.trigger	= mt2701_dlm_fe_trigger,
-+};
-+
-+/* I2S BE DAIs */
-+static const struct snd_soc_dai_ops mt2701_afe_i2s_ops = {
-+	.startup	= mt2701_afe_i2s_startup,
-+	.shutdown	= mt2701_afe_i2s_shutdown,
-+	.prepare	= mt2701_afe_i2s_prepare,
-+	.set_sysclk	= mt2701_afe_i2s_set_sysclk,
-+	.set_clkdiv	= mt2701_afe_i2s_set_clkdiv,
-+	.set_fmt	= mt2701_afe_i2s_set_fmt,
-+};
-+
-+static struct snd_soc_dai_driver mt2701_afe_pcm_dais[] = {
-+	/* FE DAIs: memory intefaces to CPU */
-+	{
-+		.name = "PCM_multi",
-+		.id = MT2701_MEMIF_DLM,
-+		.suspend = mtk_afe_dai_suspend,
-+		.resume = mtk_afe_dai_resume,
-+		.playback = {
-+			.stream_name = "DLM",
-+			.channels_min = 1,
-+			.channels_max = 8,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+
-+		},
-+		.ops = &mt2701_dlm_memif_dai_ops,
-+	},
-+	{
-+		.name = "PCM0",
-+		.id = MT2701_MEMIF_UL1,
-+		.suspend = mtk_afe_dai_suspend,
-+		.resume = mtk_afe_dai_resume,
-+		.capture = {
-+			.stream_name = "UL1",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_48000,
-+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+		},
-+		.ops = &mt2701_single_memif_dai_ops,
-+	},
-+	{
-+		.name = "PCM1",
-+		.id = MT2701_MEMIF_UL2,
-+		.suspend = mtk_afe_dai_suspend,
-+		.resume = mtk_afe_dai_resume,
-+		.capture = {
-+			.stream_name = "UL2",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+
-+		},
-+		.ops = &mt2701_single_memif_dai_ops,
-+	},
-+	/* BE DAIs */
-+	{
-+		.name = "I2S0",
-+		.id = MT2701_IO_I2S,
-+		.playback = {
-+			.stream_name = "I2S0 Playback",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+
-+		},
-+		.capture = {
-+			.stream_name = "I2S0 Capture",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+
-+		},
-+		.ops = &mt2701_afe_i2s_ops,
-+		.symmetric_rates = 1,
-+	},
-+	{
-+		.name = "I2S1",
-+		.id = MT2701_IO_2ND_I2S,
-+		.playback = {
-+			.stream_name = "I2S1 Playback",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+			},
-+		.capture = {
-+			.stream_name = "I2S1 Capture",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+			},
-+		.ops = &mt2701_afe_i2s_ops,
-+		.symmetric_rates = 1,
-+	},
-+	{
-+		.name = "I2S2",
-+		.id = MT2701_IO_3RD_I2S,
-+		.playback = {
-+			.stream_name = "I2S2 Playback",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+			},
-+		.capture = {
-+			.stream_name = "I2S2 Capture",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+			},
-+		.ops = &mt2701_afe_i2s_ops,
-+		.symmetric_rates = 1,
-+	},
-+	{
-+		.name = "I2S3",
-+		.id = MT2701_IO_4TH_I2S,
-+		.playback = {
-+			.stream_name = "I2S3 Playback",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+			},
-+		.capture = {
-+			.stream_name = "I2S3 Capture",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE
-+				| SNDRV_PCM_FMTBIT_S24_LE
-+				| SNDRV_PCM_FMTBIT_S32_LE)
-+			},
-+		.ops = &mt2701_afe_i2s_ops,
-+		.symmetric_rates = 1,
-+	},
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o00_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I00 Switch", AFE_CONN0, 0, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o01_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I01 Switch", AFE_CONN1, 1, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o02_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I02 Switch", AFE_CONN2, 2, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o03_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I03 Switch", AFE_CONN3, 3, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o14_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I26 Switch", AFE_CONN14, 26, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o15_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I12 Switch", AFE_CONN15, 12, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o16_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I13 Switch", AFE_CONN16, 13, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o17_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I14 Switch", AFE_CONN17, 14, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o18_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I15 Switch", AFE_CONN18, 15, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o19_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I16 Switch", AFE_CONN19, 16, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o20_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I17 Switch", AFE_CONN20, 17, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o21_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I18 Switch", AFE_CONN21, 18, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o22_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I19 Switch", AFE_CONN22, 19, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o23_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I20 Switch", AFE_CONN23, 20, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o24_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I21 Switch", AFE_CONN24, 21, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_o31_mix[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("I35 Switch", AFE_CONN41, 9, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_i02_mix[] = {
-+	SOC_DAPM_SINGLE("I2S0 Switch", SND_SOC_NOPM, 0, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_i2s0[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Multich I2S0 Out Switch",
-+				    ASYS_I2SO1_CON, 26, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_i2s1[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Multich I2S1 Out Switch",
-+				    ASYS_I2SO2_CON, 26, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_i2s2[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Multich I2S2 Out Switch",
-+				    PWR2_TOP_CON, 17, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_i2s3[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Multich I2S3 Out Switch",
-+				    PWR2_TOP_CON, 18, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_i2s4[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Multich I2S4 Out Switch",
-+				    PWR2_TOP_CON, 19, 1, 0),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_asrc0[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Asrc0 out Switch", AUDIO_TOP_CON4, 14, 1,
-+				    1),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_asrc1[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Asrc1 out Switch", AUDIO_TOP_CON4, 15, 1,
-+				    1),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_asrc2[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Asrc2 out Switch", PWR2_TOP_CON, 6, 1,
-+				    1),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_asrc3[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Asrc3 out Switch", PWR2_TOP_CON, 7, 1,
-+				    1),
-+};
-+
-+static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_asrc4[] = {
-+	SOC_DAPM_SINGLE_AUTODISABLE("Asrc4 out Switch", PWR2_TOP_CON, 8, 1,
-+				    1),
-+};
-+
-+static const struct snd_soc_dapm_widget mt2701_afe_pcm_widgets[] = {
-+	/* inter-connections */
-+	SND_SOC_DAPM_MIXER("I00", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I01", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I02", SND_SOC_NOPM, 0, 0, mt2701_afe_i02_mix,
-+			   ARRAY_SIZE(mt2701_afe_i02_mix)),
-+	SND_SOC_DAPM_MIXER("I03", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I12", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I13", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I14", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I15", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I16", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I17", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I18", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I19", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I26", SND_SOC_NOPM, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_MIXER("I35", SND_SOC_NOPM, 0, 0, NULL, 0),
-+
-+	SND_SOC_DAPM_MIXER("O00", SND_SOC_NOPM, 0, 0, mt2701_afe_o00_mix,
-+			   ARRAY_SIZE(mt2701_afe_o00_mix)),
-+	SND_SOC_DAPM_MIXER("O01", SND_SOC_NOPM, 0, 0, mt2701_afe_o01_mix,
-+			   ARRAY_SIZE(mt2701_afe_o01_mix)),
-+	SND_SOC_DAPM_MIXER("O02", SND_SOC_NOPM, 0, 0, mt2701_afe_o02_mix,
-+			   ARRAY_SIZE(mt2701_afe_o02_mix)),
-+	SND_SOC_DAPM_MIXER("O03", SND_SOC_NOPM, 0, 0, mt2701_afe_o03_mix,
-+			   ARRAY_SIZE(mt2701_afe_o03_mix)),
-+	SND_SOC_DAPM_MIXER("O14", SND_SOC_NOPM, 0, 0, mt2701_afe_o14_mix,
-+			   ARRAY_SIZE(mt2701_afe_o14_mix)),
-+	SND_SOC_DAPM_MIXER("O15", SND_SOC_NOPM, 0, 0, mt2701_afe_o15_mix,
-+			   ARRAY_SIZE(mt2701_afe_o15_mix)),
-+	SND_SOC_DAPM_MIXER("O16", SND_SOC_NOPM, 0, 0, mt2701_afe_o16_mix,
-+			   ARRAY_SIZE(mt2701_afe_o16_mix)),
-+	SND_SOC_DAPM_MIXER("O17", SND_SOC_NOPM, 0, 0, mt2701_afe_o17_mix,
-+			   ARRAY_SIZE(mt2701_afe_o17_mix)),
-+	SND_SOC_DAPM_MIXER("O18", SND_SOC_NOPM, 0, 0, mt2701_afe_o18_mix,
-+			   ARRAY_SIZE(mt2701_afe_o18_mix)),
-+	SND_SOC_DAPM_MIXER("O19", SND_SOC_NOPM, 0, 0, mt2701_afe_o19_mix,
-+			   ARRAY_SIZE(mt2701_afe_o19_mix)),
-+	SND_SOC_DAPM_MIXER("O20", SND_SOC_NOPM, 0, 0, mt2701_afe_o20_mix,
-+			   ARRAY_SIZE(mt2701_afe_o20_mix)),
-+	SND_SOC_DAPM_MIXER("O21", SND_SOC_NOPM, 0, 0, mt2701_afe_o21_mix,
-+			   ARRAY_SIZE(mt2701_afe_o21_mix)),
-+	SND_SOC_DAPM_MIXER("O22", SND_SOC_NOPM, 0, 0, mt2701_afe_o22_mix,
-+			   ARRAY_SIZE(mt2701_afe_o22_mix)),
-+	SND_SOC_DAPM_MIXER("O31", SND_SOC_NOPM, 0, 0, mt2701_afe_o31_mix,
-+			   ARRAY_SIZE(mt2701_afe_o31_mix)),
-+
-+	SND_SOC_DAPM_MIXER("I12I13", SND_SOC_NOPM, 0, 0,
-+			   mt2701_afe_multi_ch_out_i2s0,
-+			   ARRAY_SIZE(mt2701_afe_multi_ch_out_i2s0)),
-+	SND_SOC_DAPM_MIXER("I14I15", SND_SOC_NOPM, 0, 0,
-+			   mt2701_afe_multi_ch_out_i2s1,
-+			   ARRAY_SIZE(mt2701_afe_multi_ch_out_i2s1)),
-+	SND_SOC_DAPM_MIXER("I16I17", SND_SOC_NOPM, 0, 0,
-+			   mt2701_afe_multi_ch_out_i2s2,
-+			   ARRAY_SIZE(mt2701_afe_multi_ch_out_i2s2)),
-+	SND_SOC_DAPM_MIXER("I18I19", SND_SOC_NOPM, 0, 0,
-+			   mt2701_afe_multi_ch_out_i2s3,
-+			   ARRAY_SIZE(mt2701_afe_multi_ch_out_i2s3)),
-+
-+	SND_SOC_DAPM_MIXER("ASRC_O0", SND_SOC_NOPM, 0, 0,
-+			   mt2701_afe_multi_ch_out_asrc0,
-+			   ARRAY_SIZE(mt2701_afe_multi_ch_out_asrc0)),
-+	SND_SOC_DAPM_MIXER("ASRC_O1", SND_SOC_NOPM, 0, 0,
-+			   mt2701_afe_multi_ch_out_asrc1,
-+			   ARRAY_SIZE(mt2701_afe_multi_ch_out_asrc1)),
-+	SND_SOC_DAPM_MIXER("ASRC_O2", SND_SOC_NOPM, 0, 0,
-+			   mt2701_afe_multi_ch_out_asrc2,
-+			   ARRAY_SIZE(mt2701_afe_multi_ch_out_asrc2)),
-+	SND_SOC_DAPM_MIXER("ASRC_O3", SND_SOC_NOPM, 0, 0,
-+			   mt2701_afe_multi_ch_out_asrc3,
-+			   ARRAY_SIZE(mt2701_afe_multi_ch_out_asrc3)),
-+};
-+
-+static const struct snd_soc_dapm_route mt2701_afe_pcm_routes[] = {
-+	{"I12", NULL, "DL1"},
-+	{"I13", NULL, "DL1"},
-+	{"I35", NULL, "DLBT"},
-+
-+	{"I2S0 Playback", NULL, "O15"},
-+	{"I2S0 Playback", NULL, "O16"},
-+
-+	{"I2S1 Playback", NULL, "O17"},
-+	{"I2S1 Playback", NULL, "O18"},
-+	{"I2S2 Playback", NULL, "O19"},
-+	{"I2S2 Playback", NULL, "O20"},
-+	{"I2S3 Playback", NULL, "O21"},
-+	{"I2S3 Playback", NULL, "O22"},
-+	{"BT Playback", NULL, "O31"},
-+
-+	{"UL1", NULL, "O00"},
-+	{"UL1", NULL, "O01"},
-+	{"UL2", NULL, "O02"},
-+	{"UL2", NULL, "O03"},
-+	{"ULBT", NULL, "O14"},
-+
-+	{"I00", NULL, "I2S0 Capture"},
-+	{"I01", NULL, "I2S0 Capture"},
-+
-+	{"I02", NULL, "I2S1 Capture"},
-+	{"I03", NULL, "I2S1 Capture"},
-+	/* I02,03 link to UL2, also need to open I2S0 */
-+	{"I02", "I2S0 Switch", "I2S0 Capture"},
-+
-+	{"I26", NULL, "BT Capture"},
-+
-+	{"ASRC_O0", "Asrc0 out Switch", "DLM"},
-+	{"ASRC_O1", "Asrc1 out Switch", "DLM"},
-+	{"ASRC_O2", "Asrc2 out Switch", "DLM"},
-+	{"ASRC_O3", "Asrc3 out Switch", "DLM"},
-+
-+	{"I12I13", "Multich I2S0 Out Switch", "ASRC_O0"},
-+	{"I14I15", "Multich I2S1 Out Switch", "ASRC_O1"},
-+	{"I16I17", "Multich I2S2 Out Switch", "ASRC_O2"},
-+	{"I18I19", "Multich I2S3 Out Switch", "ASRC_O3"},
-+
-+	{ "I12", NULL, "I12I13" },
-+	{ "I13", NULL, "I12I13" },
-+	{ "I14", NULL, "I14I15" },
-+	{ "I15", NULL, "I14I15" },
-+	{ "I16", NULL, "I16I17" },
-+	{ "I17", NULL, "I16I17" },
-+	{ "I18", NULL, "I18I19" },
-+	{ "I19", NULL, "I18I19" },
-+
-+	{ "O00", "I00 Switch", "I00" },
-+	{ "O01", "I01 Switch", "I01" },
-+	{ "O02", "I02 Switch", "I02" },
-+	{ "O03", "I03 Switch", "I03" },
-+	{ "O14", "I26 Switch", "I26" },
-+	{ "O15", "I12 Switch", "I12" },
-+	{ "O16", "I13 Switch", "I13" },
-+	{ "O17", "I14 Switch", "I14" },
-+	{ "O18", "I15 Switch", "I15" },
-+	{ "O19", "I16 Switch", "I16" },
-+	{ "O20", "I17 Switch", "I17" },
-+	{ "O21", "I18 Switch", "I18" },
-+	{ "O22", "I19 Switch", "I19" },
-+	{ "O31", "I35 Switch", "I35" },
-+
-+};
-+
-+static const struct snd_soc_component_driver mt2701_afe_pcm_dai_component = {
-+	.name = "mt2701-afe-pcm-dai",
-+	.dapm_widgets = mt2701_afe_pcm_widgets,
-+	.num_dapm_widgets = ARRAY_SIZE(mt2701_afe_pcm_widgets),
-+	.dapm_routes = mt2701_afe_pcm_routes,
-+	.num_dapm_routes = ARRAY_SIZE(mt2701_afe_pcm_routes),
-+};
-+
-+static const struct mtk_base_memif_data memif_data[MT2701_MEMIF_NUM] = {
-+	{
-+		.name = "DL1",
-+		.id = MT2701_MEMIF_DL1,
-+		.reg_ofs_base = AFE_DL1_BASE,
-+		.reg_ofs_cur = AFE_DL1_CUR,
-+		.fs_reg = AFE_DAC_CON1,
-+		.fs_shift = 0,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON3,
-+		.mono_shift = 16,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 1,
-+		.hd_reg = AFE_MEMIF_HD_CON0,
-+		.hd_shift = 0,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 6,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "DL2",
-+		.id = MT2701_MEMIF_DL2,
-+		.reg_ofs_base = AFE_DL2_BASE,
-+		.reg_ofs_cur = AFE_DL2_CUR,
-+		.fs_reg = AFE_DAC_CON1,
-+		.fs_shift = 5,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON3,
-+		.mono_shift = 17,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 2,
-+		.hd_reg = AFE_MEMIF_HD_CON0,
-+		.hd_shift = 2,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 7,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "DL3",
-+		.id = MT2701_MEMIF_DL3,
-+		.reg_ofs_base = AFE_DL3_BASE,
-+		.reg_ofs_cur = AFE_DL3_CUR,
-+		.fs_reg = AFE_DAC_CON1,
-+		.fs_shift = 10,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON3,
-+		.mono_shift = 18,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 3,
-+		.hd_reg = AFE_MEMIF_HD_CON0,
-+		.hd_shift = 4,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 8,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "DL4",
-+		.id = MT2701_MEMIF_DL4,
-+		.reg_ofs_base = AFE_DL4_BASE,
-+		.reg_ofs_cur = AFE_DL4_CUR,
-+		.fs_reg = AFE_DAC_CON1,
-+		.fs_shift = 15,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON3,
-+		.mono_shift = 19,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 4,
-+		.hd_reg = AFE_MEMIF_HD_CON0,
-+		.hd_shift = 6,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 9,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "DL5",
-+		.id = MT2701_MEMIF_DL5,
-+		.reg_ofs_base = AFE_DL5_BASE,
-+		.reg_ofs_cur = AFE_DL5_CUR,
-+		.fs_reg = AFE_DAC_CON1,
-+		.fs_shift = 20,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON3,
-+		.mono_shift = 20,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 5,
-+		.hd_reg = AFE_MEMIF_HD_CON0,
-+		.hd_shift = 8,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 10,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "DLM",
-+		.id = MT2701_MEMIF_DLM,
-+		.reg_ofs_base = AFE_DLMCH_BASE,
-+		.reg_ofs_cur = AFE_DLMCH_CUR,
-+		.fs_reg = AFE_DAC_CON1,
-+		.fs_shift = 0,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = -1,
-+		.mono_shift = -1,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 7,
-+		.hd_reg = AFE_MEMIF_PBUF_SIZE,
-+		.hd_shift = 28,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 12,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "UL1",
-+		.id = MT2701_MEMIF_UL1,
-+		.reg_ofs_base = AFE_VUL_BASE,
-+		.reg_ofs_cur = AFE_VUL_CUR,
-+		.fs_reg = AFE_DAC_CON2,
-+		.fs_shift = 0,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON4,
-+		.mono_shift = 0,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 10,
-+		.hd_reg = AFE_MEMIF_HD_CON1,
-+		.hd_shift = 0,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 0,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "UL2",
-+		.id = MT2701_MEMIF_UL2,
-+		.reg_ofs_base = AFE_UL2_BASE,
-+		.reg_ofs_cur = AFE_UL2_CUR,
-+		.fs_reg = AFE_DAC_CON2,
-+		.fs_shift = 5,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON4,
-+		.mono_shift = 2,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 11,
-+		.hd_reg = AFE_MEMIF_HD_CON1,
-+		.hd_shift = 2,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 1,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "UL3",
-+		.id = MT2701_MEMIF_UL3,
-+		.reg_ofs_base = AFE_UL3_BASE,
-+		.reg_ofs_cur = AFE_UL3_CUR,
-+		.fs_reg = AFE_DAC_CON2,
-+		.fs_shift = 10,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON4,
-+		.mono_shift = 4,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 12,
-+		.hd_reg = AFE_MEMIF_HD_CON0,
-+		.hd_shift = 0,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 2,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "UL4",
-+		.id = MT2701_MEMIF_UL4,
-+		.reg_ofs_base = AFE_UL4_BASE,
-+		.reg_ofs_cur = AFE_UL4_CUR,
-+		.fs_reg = AFE_DAC_CON2,
-+		.fs_shift = 15,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON4,
-+		.mono_shift = 6,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 13,
-+		.hd_reg = AFE_MEMIF_HD_CON0,
-+		.hd_shift = 6,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 3,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "UL5",
-+		.id = MT2701_MEMIF_UL5,
-+		.reg_ofs_base = AFE_UL5_BASE,
-+		.reg_ofs_cur = AFE_UL5_CUR,
-+		.fs_reg = AFE_DAC_CON2,
-+		.fs_shift = 20,
-+		.mono_reg = AFE_DAC_CON4,
-+		.mono_shift = 8,
-+		.fs_maskbit = 0x1f,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 14,
-+		.hd_reg = AFE_MEMIF_HD_CON0,
-+		.hd_shift = 8,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 4,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "DLBT",
-+		.id = MT2701_MEMIF_DLBT,
-+		.reg_ofs_base = AFE_ARB1_BASE,
-+		.reg_ofs_cur = AFE_ARB1_CUR,
-+		.fs_reg = AFE_DAC_CON3,
-+		.fs_shift = 10,
-+		.fs_maskbit = 0x1f,
-+		.mono_reg = AFE_DAC_CON3,
-+		.mono_shift = 22,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 8,
-+		.hd_reg = AFE_MEMIF_HD_CON0,
-+		.hd_shift = 14,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 13,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+	{
-+		.name = "ULBT",
-+		.id = MT2701_MEMIF_ULBT,
-+		.reg_ofs_base = AFE_DAI_BASE,
-+		.reg_ofs_cur = AFE_DAI_CUR,
-+		.fs_reg = AFE_DAC_CON2,
-+		.fs_shift = 30,
-+		.fs_maskbit = 0x1,
-+		.mono_reg = -1,
-+		.mono_shift = -1,
-+		.enable_reg = AFE_DAC_CON0,
-+		.enable_shift = 17,
-+		.hd_reg = AFE_MEMIF_HD_CON1,
-+		.hd_shift = 20,
-+		.agent_disable_reg = AUDIO_TOP_CON5,
-+		.agent_disable_shift = 16,
-+		.msb_reg = -1,
-+		.msb_shift = -1,
-+	},
-+};
-+
-+static const struct mtk_base_irq_data irq_data[MT2701_IRQ_ASYS_END] = {
-+	{
-+		.id = MT2701_IRQ_ASYS_IRQ1,
-+		.irq_cnt_reg = ASYS_IRQ1_CON,
-+		.irq_cnt_shift = 0,
-+		.irq_cnt_maskbit = 0xffffff,
-+		.irq_fs_reg = ASYS_IRQ1_CON,
-+		.irq_fs_shift = 24,
-+		.irq_fs_maskbit = 0x1f,
-+		.irq_en_reg = ASYS_IRQ1_CON,
-+		.irq_en_shift = 31,
-+		.irq_clr_reg = ASYS_IRQ_CLR,
-+		.irq_clr_shift = 0,
-+	},
-+	{
-+		.id = MT2701_IRQ_ASYS_IRQ2,
-+		.irq_cnt_reg = ASYS_IRQ2_CON,
-+		.irq_cnt_shift = 0,
-+		.irq_cnt_maskbit = 0xffffff,
-+		.irq_fs_reg = ASYS_IRQ2_CON,
-+		.irq_fs_shift = 24,
-+		.irq_fs_maskbit = 0x1f,
-+		.irq_en_reg = ASYS_IRQ2_CON,
-+		.irq_en_shift = 31,
-+		.irq_clr_reg = ASYS_IRQ_CLR,
-+		.irq_clr_shift = 1,
-+	},
-+	{
-+		.id = MT2701_IRQ_ASYS_IRQ3,
-+		.irq_cnt_reg = ASYS_IRQ3_CON,
-+		.irq_cnt_shift = 0,
-+		.irq_cnt_maskbit = 0xffffff,
-+		.irq_fs_reg = ASYS_IRQ3_CON,
-+		.irq_fs_shift = 24,
-+		.irq_fs_maskbit = 0x1f,
-+		.irq_en_reg = ASYS_IRQ3_CON,
-+		.irq_en_shift = 31,
-+		.irq_clr_reg = ASYS_IRQ_CLR,
-+		.irq_clr_shift = 2,
-+	}
-+};
-+
-+static const struct mt2701_i2s_data mt2701_i2s_data[MT2701_I2S_NUM][2] = {
-+	{
-+		{
-+			.i2s_ctrl_reg = ASYS_I2SO1_CON,
-+			.i2s_pwn_shift = 6,
-+			.i2s_asrc_fs_shift = 0,
-+			.i2s_asrc_fs_mask = 0x1f,
-+
-+		},
-+		{
-+			.i2s_ctrl_reg = ASYS_I2SIN1_CON,
-+			.i2s_pwn_shift = 0,
-+			.i2s_asrc_fs_shift = 0,
-+			.i2s_asrc_fs_mask = 0x1f,
-+
-+		},
-+	},
-+	{
-+		{
-+			.i2s_ctrl_reg = ASYS_I2SO2_CON,
-+			.i2s_pwn_shift = 7,
-+			.i2s_asrc_fs_shift = 5,
-+			.i2s_asrc_fs_mask = 0x1f,
-+
-+		},
-+		{
-+			.i2s_ctrl_reg = ASYS_I2SIN2_CON,
-+			.i2s_pwn_shift = 1,
-+			.i2s_asrc_fs_shift = 5,
-+			.i2s_asrc_fs_mask = 0x1f,
-+
-+		},
-+	},
-+	{
-+		{
-+			.i2s_ctrl_reg = ASYS_I2SO3_CON,
-+			.i2s_pwn_shift = 8,
-+			.i2s_asrc_fs_shift = 10,
-+			.i2s_asrc_fs_mask = 0x1f,
-+
-+		},
-+		{
-+			.i2s_ctrl_reg = ASYS_I2SIN3_CON,
-+			.i2s_pwn_shift = 2,
-+			.i2s_asrc_fs_shift = 10,
-+			.i2s_asrc_fs_mask = 0x1f,
-+
-+		},
-+	},
-+	{
-+		{
-+			.i2s_ctrl_reg = ASYS_I2SO4_CON,
-+			.i2s_pwn_shift = 9,
-+			.i2s_asrc_fs_shift = 15,
-+			.i2s_asrc_fs_mask = 0x1f,
-+
-+		},
-+		{
-+			.i2s_ctrl_reg = ASYS_I2SIN4_CON,
-+			.i2s_pwn_shift = 3,
-+			.i2s_asrc_fs_shift = 15,
-+			.i2s_asrc_fs_mask = 0x1f,
-+
-+		},
-+	},
-+};
-+
-+static const struct regmap_config mt2701_afe_regmap_config = {
-+	.reg_bits = 32,
-+	.reg_stride = 4,
-+	.val_bits = 32,
-+	.max_register = AFE_END_ADDR,
-+	.cache_type = REGCACHE_NONE,
-+};
-+
-+static irqreturn_t mt2701_asys_isr(int irq_id, void *dev)
-+{
-+	int id;
-+	struct mtk_base_afe *afe = dev;
-+	struct mtk_base_afe_memif *memif;
-+	struct mtk_base_afe_irq *irq;
-+	u32 status;
-+
-+	regmap_read(afe->regmap, ASYS_IRQ_STATUS, &status);
-+	regmap_write(afe->regmap, ASYS_IRQ_CLR, status);
-+
-+	for (id = 0; id < MT2701_MEMIF_NUM; ++id) {
-+		memif = &afe->memif[id];
-+		if (memif->irq_usage < 0)
-+			continue;
-+		irq = &afe->irqs[memif->irq_usage];
-+		if (status & 1 << (irq->irq_data->irq_clr_shift))
-+			snd_pcm_period_elapsed(memif->substream);
-+	}
-+	return IRQ_HANDLED;
-+}
-+
-+static int mt2701_afe_runtime_suspend(struct device *dev)
-+{
-+	struct mtk_base_afe *afe = dev_get_drvdata(dev);
-+
-+	mt2701_afe_disable_clock(afe);
-+	return 0;
-+}
-+
-+static int mt2701_afe_runtime_resume(struct device *dev)
-+{
-+	struct mtk_base_afe *afe = dev_get_drvdata(dev);
-+
-+	return mt2701_afe_enable_clock(afe);
-+}
-+
-+static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
-+{
-+	int ret, i;
-+	unsigned int irq_id;
-+	struct mtk_base_afe *afe;
-+	struct mt2701_afe_private *afe_priv;
-+	struct resource *res;
-+	struct device *dev;
-+
-+	ret = 0;
-+	afe = devm_kzalloc(&pdev->dev, sizeof(*afe), GFP_KERNEL);
-+	afe->platform_priv = devm_kzalloc(&pdev->dev, sizeof(*afe_priv),
-+					  GFP_KERNEL);
-+	afe_priv = afe->platform_priv;
-+	if (!afe)
-+		return -ENOMEM;
-+
-+	afe->dev = &pdev->dev;
-+	dev = afe->dev;
-+
-+	irq_id = platform_get_irq(pdev, 0);
-+	if (!irq_id) {
-+		dev_err(dev, "%s no irq found\n", dev->of_node->name);
-+		return -ENXIO;
-+	}
-+	ret = devm_request_irq(dev, irq_id, mt2701_asys_isr,
-+			       IRQF_TRIGGER_NONE, "asys-isr", (void *)afe);
-+	if (ret) {
-+		dev_err(dev, "could not request_irq for asys-isr\n");
-+		return ret;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	afe->base_addr = devm_ioremap_resource(&pdev->dev, res);
-+
-+	if (IS_ERR(afe->base_addr))
-+		return PTR_ERR(afe->base_addr);
-+
-+	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->base_addr,
-+		&mt2701_afe_regmap_config);
-+	if (IS_ERR(afe->regmap))
-+		return PTR_ERR(afe->regmap);
-+
-+	mutex_init(&afe->irq_alloc_lock);
-+
-+	/* memif initialize */
-+	afe->memif_size = MT2701_MEMIF_NUM;
-+	afe->memif = devm_kcalloc(dev, afe->memif_size, sizeof(*afe->memif),
-+				  GFP_KERNEL);
-+
-+	if (!afe->memif)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < afe->memif_size; i++) {
-+		afe->memif[i].data = &memif_data[i];
-+		afe->memif[i].irq_usage = -1;
-+	}
-+
-+	/* irq initialize */
-+	afe->irqs_size = MT2701_IRQ_ASYS_END;
-+	afe->irqs = devm_kcalloc(dev, afe->irqs_size, sizeof(*afe->irqs),
-+				 GFP_KERNEL);
-+
-+	if (!afe->irqs)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < afe->irqs_size; i++)
-+		afe->irqs[i].irq_data = &irq_data[i];
-+
-+	/* I2S initialize */
-+	for (i = 0; i < MT2701_I2S_NUM; i++) {
-+		afe_priv->i2s_path[i].i2s_data[I2S_OUT]
-+			= &mt2701_i2s_data[i][I2S_OUT];
-+		afe_priv->i2s_path[i].i2s_data[I2S_IN]
-+			= &mt2701_i2s_data[i][I2S_IN];
-+	}
-+
-+	afe->mtk_afe_hardware = &mt2701_afe_hardware;
-+	afe->memif_fs = mt2701_memif_fs;
-+	afe->irq_fs = mt2701_irq_fs;
-+
-+	afe->reg_back_up_list = mt2701_afe_backup_list;
-+	afe->reg_back_up_list_num = ARRAY_SIZE(mt2701_afe_backup_list);
-+	afe->runtime_resume = mt2701_afe_runtime_resume;
-+	afe->runtime_suspend = mt2701_afe_runtime_suspend;
-+
-+	/* initial audio related clock */
-+	ret = mt2701_init_clock(afe);
-+	if (ret) {
-+		dev_err(dev, "init clock error\n");
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, afe);
-+	pm_runtime_enable(&pdev->dev);
-+	if (!pm_runtime_enabled(&pdev->dev))
-+		goto err_pm_disable;
-+
-+	ret = snd_soc_register_platform(&pdev->dev, &mtk_afe_pcm_platform);
-+	if (ret) {
-+		dev_warn(dev, "err_platform\n");
-+		goto err_platform;
-+	}
-+
-+	ret = snd_soc_register_component(&pdev->dev,
-+					 &mt2701_afe_pcm_dai_component,
-+					 mt2701_afe_pcm_dais,
-+					 ARRAY_SIZE(mt2701_afe_pcm_dais));
-+	if (ret) {
-+		dev_warn(dev, "err_dai_component\n");
-+		goto err_dai_component;
-+	}
-+
-+	mt2701_afe_runtime_resume(&pdev->dev);
-+
-+	return 0;
-+
-+err_dai_component:
-+	snd_soc_unregister_component(&pdev->dev);
-+
-+err_platform:
-+	snd_soc_unregister_platform(&pdev->dev);
-+
-+err_pm_disable:
-+	pm_runtime_disable(&pdev->dev);
-+
-+	return ret;
-+}
-+
-+static int mt2701_afe_pcm_dev_remove(struct platform_device *pdev)
-+{
-+	struct mtk_base_afe *afe = platform_get_drvdata(pdev);
-+
-+	pm_runtime_disable(&pdev->dev);
-+	if (!pm_runtime_status_suspended(&pdev->dev))
-+		mt2701_afe_runtime_suspend(&pdev->dev);
-+
-+	snd_soc_unregister_component(&pdev->dev);
-+	snd_soc_unregister_platform(&pdev->dev);
-+	/* disable afe clock */
-+	mt2701_afe_disable_clock(afe);
-+	return 0;
-+}
-+
-+static const struct of_device_id mt2701_afe_pcm_dt_match[] = {
-+	{ .compatible = "mediatek,mt2701-audio", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, mt2701_afe_pcm_dt_match);
-+
-+static const struct dev_pm_ops mt2701_afe_pm_ops = {
-+	SET_RUNTIME_PM_OPS(mt2701_afe_runtime_suspend,
-+			   mt2701_afe_runtime_resume, NULL)
-+};
-+
-+static struct platform_driver mt2701_afe_pcm_driver = {
-+	.driver = {
-+		   .name = "mt2701-audio",
-+		   .of_match_table = mt2701_afe_pcm_dt_match,
-+#ifdef CONFIG_PM
-+		   .pm = &mt2701_afe_pm_ops,
-+#endif
-+	},
-+	.probe = mt2701_afe_pcm_dev_probe,
-+	.remove = mt2701_afe_pcm_dev_remove,
-+};
-+
-+module_platform_driver(mt2701_afe_pcm_driver);
-+
-+MODULE_DESCRIPTION("Mediatek ALSA SoC AFE platform driver for 2701");
-+MODULE_AUTHOR("Garlic Tseng <garlic.tseng@mediatek.com>");
-+MODULE_LICENSE("GPL v2");
-+
+> From: Robert Baldyga <r.baldyga@samsung.com>
+> 
+> This patch modifies max8997 driver and each associated function driver,
+> to use regmap instead of operating directly on i2c bus. It will allow to
+> simplify IRQ handling using regmap-irq.
+> 
+> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Bryan Wu <cooloney@gmail.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Acked-by: Sebastian Reichel <sre@kernel.org>
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> [k.kozlowski: Collect acks, rebase on v4.6-rc6]
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+> ---
+>  drivers/extcon/extcon-max8997.c       |  31 ++++----
+>  drivers/input/misc/max8997_haptic.c   |  34 ++++----
+>  drivers/leds/leds-max8997.c           |  13 ++--
+>  drivers/mfd/Kconfig                   |   1 +
+>  drivers/mfd/max8997-irq.c             |  64 ++++++---------
+>  drivers/mfd/max8997.c                 | 141 +++++++++++++++-------------------
+>  drivers/power/max8997_charger.c       |  33 ++++----
+>  drivers/regulator/max8997-regulator.c |  87 ++++++++++-----------
+>  drivers/rtc/rtc-max8997.c             |  56 ++++++++------
+>  include/linux/mfd/max8997-private.h   |  17 ++--
+>  10 files changed, 228 insertions(+), 249 deletions(-)
+> 
+> diff --git a/drivers/extcon/extcon-max8997.c b/drivers/extcon/extcon-max8997.c
+> index 9a89320d09a8..fc812257bfc7 100644
+> --- a/drivers/extcon/extcon-max8997.c
+> +++ b/drivers/extcon/extcon-max8997.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/mfd/max8997-private.h>
+>  #include <linux/extcon.h>
+>  #include <linux/irqdomain.h>
+> +#include <linux/regmap.h>
+>  
+>  #define	DEV_NAME			"max8997-muic"
+>  #define	DELAY_MS_DEFAULT		20000		/* unit: millisecond */
+> @@ -116,7 +117,7 @@ enum max8997_muic_charger_type {
+>  
+>  struct max8997_muic_info {
+>  	struct device *dev;
+> -	struct i2c_client *muic;
+> +	struct max8997_dev *max8997;
+>  	struct extcon_dev *edev;
+>  	int prev_cable_type;
+>  	int prev_chg_type;
+> @@ -174,10 +175,10 @@ static int max8997_muic_set_debounce_time(struct max8997_muic_info *info,
+>  	case ADC_DEBOUNCE_TIME_10MS:
+>  	case ADC_DEBOUNCE_TIME_25MS:
+>  	case ADC_DEBOUNCE_TIME_38_62MS:
+> -		ret = max8997_update_reg(info->muic,
+> +		ret = regmap_update_bits(info->max8997->regmap_muic,
+>  					  MAX8997_MUIC_REG_CONTROL3,
+> -					  time << CONTROL3_ADCDBSET_SHIFT,
+> -					  CONTROL3_ADCDBSET_MASK);
+> +					  CONTROL3_ADCDBSET_MASK,
+> +					  time << CONTROL3_ADCDBSET_SHIFT);
+>  		if (ret) {
+>  			dev_err(info->dev, "failed to set ADC debounce time\n");
+>  			return ret;
+> @@ -212,8 +213,8 @@ static int max8997_muic_set_path(struct max8997_muic_info *info,
+>  	else
+>  		ctrl1 = CONTROL1_SW_OPEN;
+>  
+> -	ret = max8997_update_reg(info->muic,
+> -			MAX8997_MUIC_REG_CONTROL1, ctrl1, COMP_SW_MASK);
+> +	ret = regmap_update_bits(info->max8997->regmap_muic,
+> +			MAX8997_MUIC_REG_CONTROL1, COMP_SW_MASK, ctrl1);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "failed to update MUIC register\n");
+>  		return ret;
+> @@ -224,9 +225,9 @@ static int max8997_muic_set_path(struct max8997_muic_info *info,
+>  	else
+>  		ctrl2 |= CONTROL2_LOWPWR_MASK;	/* LowPwr=1, CPEn=0 */
+>  
+> -	ret = max8997_update_reg(info->muic,
+> -			MAX8997_MUIC_REG_CONTROL2, ctrl2,
+> -			CONTROL2_LOWPWR_MASK | CONTROL2_CPEN_MASK);
+> +	ret = regmap_update_bits(info->max8997->regmap_muic,
+> +			MAX8997_MUIC_REG_CONTROL2,
+> +			CONTROL2_LOWPWR_MASK | CONTROL2_CPEN_MASK, ctrl2);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "failed to update MUIC register\n");
+>  		return ret;
+> @@ -530,8 +531,8 @@ static void max8997_muic_irq_work(struct work_struct *work)
+>  		if (info->irq == muic_irqs[i].virq)
+>  			irq_type = muic_irqs[i].irq;
+>  
+> -	ret = max8997_bulk_read(info->muic, MAX8997_MUIC_REG_STATUS1,
+> -				2, info->status);
+> +	ret = regmap_bulk_read(info->max8997->regmap_muic,
+> +				MAX8997_MUIC_REG_STATUS1, info->status, 2);
+>  	if (ret) {
+>  		dev_err(info->dev, "failed to read muic register\n");
+>  		mutex_unlock(&info->mutex);
+> @@ -590,8 +591,8 @@ static int max8997_muic_detect_dev(struct max8997_muic_info *info)
+>  	mutex_lock(&info->mutex);
+>  
+>  	/* Read STATUSx register to detect accessory */
+> -	ret = max8997_bulk_read(info->muic,
+> -			MAX8997_MUIC_REG_STATUS1, 2, info->status);
+> +	ret = regmap_bulk_read(info->max8997->regmap_muic,
+> +			MAX8997_MUIC_REG_STATUS1, info->status, 2);
+>  	if (ret) {
+>  		dev_err(info->dev, "failed to read MUIC register\n");
+>  		mutex_unlock(&info->mutex);
+> @@ -650,7 +651,7 @@ static int max8997_muic_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	info->dev = &pdev->dev;
+> -	info->muic = max8997->muic;
+> +	info->max8997 = max8997;
+>  
+>  	platform_set_drvdata(pdev, info);
+>  	mutex_init(&info->mutex);
+> @@ -700,7 +701,7 @@ static int max8997_muic_probe(struct platform_device *pdev)
+>  
+>  		/* Initialize registers according to platform data */
+>  		for (i = 0; i < muic_pdata->num_init_data; i++) {
+> -			max8997_write_reg(info->muic,
+> +			regmap_write(info->max8997->regmap_muic,
+>  					muic_pdata->init_data[i].addr,
+>  					muic_pdata->init_data[i].data);
+>  		}
+> diff --git a/drivers/input/misc/max8997_haptic.c b/drivers/input/misc/max8997_haptic.c
+> index 99bc762881d5..b1c81cdde240 100644
+> --- a/drivers/input/misc/max8997_haptic.c
+> +++ b/drivers/input/misc/max8997_haptic.c
+> @@ -31,6 +31,7 @@
+>  #include <linux/mfd/max8997-private.h>
+>  #include <linux/mfd/max8997.h>
+>  #include <linux/regulator/consumer.h>
+> +#include <linux/regmap.h>
+>  
+>  /* Haptic configuration 2 register */
+>  #define MAX8997_MOTOR_TYPE_SHIFT	7
+> @@ -45,7 +46,7 @@
+>  
+>  struct max8997_haptic {
+>  	struct device *dev;
+> -	struct i2c_client *client;
+> +	struct max8997_dev *max8997;
+>  	struct input_dev *input_dev;
+>  	struct regulator *regulator;
+>  
+> @@ -86,19 +87,19 @@ static int max8997_haptic_set_duty_cycle(struct max8997_haptic *chip)
+>  		}
+>  		switch (chip->internal_mode_pattern) {
+>  		case 0:
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_SIGPWMDC1, duty_index);
+>  			break;
+>  		case 1:
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_SIGPWMDC2, duty_index);
+>  			break;
+>  		case 2:
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_SIGPWMDC3, duty_index);
+>  			break;
+>  		case 3:
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_SIGPWMDC4, duty_index);
+>  			break;
+>  		default:
+> @@ -115,50 +116,51 @@ static void max8997_haptic_configure(struct max8997_haptic *chip)
+>  	value = chip->type << MAX8997_MOTOR_TYPE_SHIFT |
+>  		chip->enabled << MAX8997_ENABLE_SHIFT |
+>  		chip->mode << MAX8997_MODE_SHIFT | chip->pwm_divisor;
+> -	max8997_write_reg(chip->client, MAX8997_HAPTIC_REG_CONF2, value);
+> +	regmap_write(chip->max8997->regmap_haptic,
+> +		MAX8997_HAPTIC_REG_CONF2, value);
+>  
+>  	if (chip->mode == MAX8997_INTERNAL_MODE && chip->enabled) {
+>  		value = chip->internal_mode_pattern << MAX8997_CYCLE_SHIFT |
+>  			chip->internal_mode_pattern << MAX8997_SIG_PERIOD_SHIFT |
+>  			chip->internal_mode_pattern << MAX8997_SIG_DUTY_SHIFT |
+>  			chip->internal_mode_pattern << MAX8997_PWM_DUTY_SHIFT;
+> -		max8997_write_reg(chip->client,
+> +		regmap_write(chip->max8997->regmap_haptic,
+>  			MAX8997_HAPTIC_REG_DRVCONF, value);
+>  
+>  		switch (chip->internal_mode_pattern) {
+>  		case 0:
+>  			value = chip->pattern_cycle << 4;
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_CYCLECONF1, value);
+>  			value = chip->pattern_signal_period;
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_SIGCONF1, value);
+>  			break;
+>  
+>  		case 1:
+>  			value = chip->pattern_cycle;
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_CYCLECONF1, value);
+>  			value = chip->pattern_signal_period;
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_SIGCONF2, value);
+>  			break;
+>  
+>  		case 2:
+>  			value = chip->pattern_cycle << 4;
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_CYCLECONF2, value);
+>  			value = chip->pattern_signal_period;
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_SIGCONF3, value);
+>  			break;
+>  
+>  		case 3:
+>  			value = chip->pattern_cycle;
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_CYCLECONF2, value);
+>  			value = chip->pattern_signal_period;
+> -			max8997_write_reg(chip->client,
+> +			regmap_write(chip->max8997->regmap_haptic,
+>  				MAX8997_HAPTIC_REG_SIGCONF4, value);
+>  			break;
+>  
+> @@ -279,7 +281,7 @@ static int max8997_haptic_probe(struct platform_device *pdev)
+>  	INIT_WORK(&chip->work, max8997_haptic_play_effect_work);
+>  	mutex_init(&chip->mutex);
+>  
+> -	chip->client = iodev->haptic;
+> +	chip->max8997 = iodev;
+>  	chip->dev = &pdev->dev;
+>  	chip->input_dev = input_dev;
+>  	chip->pwm_period = haptic_pdata->pwm_period;
+> diff --git a/drivers/leds/leds-max8997.c b/drivers/leds/leds-max8997.c
+> index 4edf74f1d6d4..e5f0dc2e9edf 100644
+> --- a/drivers/leds/leds-max8997.c
+> +++ b/drivers/leds/leds-max8997.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/mfd/max8997.h>
+>  #include <linux/mfd/max8997-private.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+>  
+>  #define MAX8997_LED_FLASH_SHIFT			3
+>  #define MAX8997_LED_FLASH_CUR_MASK		0xf8
+> @@ -52,7 +53,6 @@ static void max8997_led_set_mode(struct max8997_led *led,
+>  			enum max8997_led_mode mode)
+>  {
+>  	int ret;
+> -	struct i2c_client *client = led->iodev->i2c;
+>  	u8 mask = 0, val;
+>  
+>  	switch (mode) {
+> @@ -88,8 +88,8 @@ static void max8997_led_set_mode(struct max8997_led *led,
+>  	}
+>  
+>  	if (mask) {
+> -		ret = max8997_update_reg(client, MAX8997_REG_LEN_CNTL, val,
+> -					 mask);
+> +		ret = regmap_update_bits(led->iodev->regmap,
+> +					MAX8997_REG_LEN_CNTL, mask, val);
+>  		if (ret)
+>  			dev_err(led->iodev->dev,
+>  				"failed to update register(%d)\n", ret);
+> @@ -101,7 +101,6 @@ static void max8997_led_set_mode(struct max8997_led *led,
+>  static void max8997_led_enable(struct max8997_led *led, bool enable)
+>  {
+>  	int ret;
+> -	struct i2c_client *client = led->iodev->i2c;
+>  	u8 val = 0, mask = MAX8997_LED_BOOST_ENABLE_MASK;
+>  
+>  	if (led->enabled == enable)
+> @@ -109,7 +108,8 @@ static void max8997_led_enable(struct max8997_led *led, bool enable)
+>  
+>  	val = enable ? MAX8997_LED_BOOST_ENABLE_MASK : 0;
+>  
+> -	ret = max8997_update_reg(client, MAX8997_REG_BOOST_CNTL, val, mask);
+> +	ret = regmap_update_bits(led->iodev->regmap,
+> +				MAX8997_REG_BOOST_CNTL, mask, val);
+>  	if (ret)
+>  		dev_err(led->iodev->dev,
+>  			"failed to update register(%d)\n", ret);
+> @@ -121,7 +121,6 @@ static void max8997_led_set_current(struct max8997_led *led,
+>  				enum led_brightness value)
+>  {
+>  	int ret;
+> -	struct i2c_client *client = led->iodev->i2c;
+>  	u8 val = 0, mask = 0, reg = 0;
+>  
+>  	switch (led->led_mode) {
+> @@ -142,7 +141,7 @@ static void max8997_led_set_current(struct max8997_led *led,
+>  	}
+>  
+>  	if (mask) {
+> -		ret = max8997_update_reg(client, reg, val, mask);
+> +		ret = regmap_update_bits(led->iodev->regmap, reg, mask, val);
+>  		if (ret)
+>  			dev_err(led->iodev->dev,
+>  				"failed to update register(%d)\n", ret);
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 1bcf601de5bc..d7c6491ce3b9 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -621,6 +621,7 @@ config MFD_MAX8997
+>  	bool "Maxim Semiconductor MAX8997/8966 PMIC Support"
+>  	depends on I2C=y
+>  	select MFD_CORE
+> +	select REGMAP_I2C
+>  	select IRQ_DOMAIN
+>  	help
+>  	  Say yes here to add support for Maxim Semiconductor MAX8997/8966.
+> diff --git a/drivers/mfd/max8997-irq.c b/drivers/mfd/max8997-irq.c
+> index b95a46d79b9d..6ab5f955c510 100644
+> --- a/drivers/mfd/max8997-irq.c
+> +++ b/drivers/mfd/max8997-irq.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/mfd/max8997.h>
+>  #include <linux/mfd/max8997-private.h>
+> +#include <linux/regmap.h>
+>  
+>  static const u8 max8997_mask_reg[] = {
+>  	[PMIC_INT1] = MAX8997_REG_INT1MSK,
+> @@ -41,25 +42,6 @@ static const u8 max8997_mask_reg[] = {
+>  	[FLASH_STATUS] = MAX8997_REG_INVALID,
+>  };
+>  
+> -static struct i2c_client *get_i2c(struct max8997_dev *max8997,
+> -				enum max8997_irq_source src)
+> -{
+> -	switch (src) {
+> -	case PMIC_INT1 ... PMIC_INT4:
+> -		return max8997->i2c;
+> -	case FUEL_GAUGE:
+> -		return NULL;
+> -	case MUIC_INT1 ... MUIC_INT3:
+> -		return max8997->muic;
+> -	case GPIO_LOW ... GPIO_HI:
+> -		return max8997->i2c;
+> -	case FLASH_STATUS:
+> -		return max8997->i2c;
+> -	default:
+> -		return ERR_PTR(-EINVAL);
+> -	}
+> -}
+> -
+>  struct max8997_irq_data {
+>  	int mask;
+>  	enum max8997_irq_source group;
+> @@ -124,15 +106,20 @@ static void max8997_irq_sync_unlock(struct irq_data *data)
+>  	int i;
+>  
+>  	for (i = 0; i < MAX8997_IRQ_GROUP_NR; i++) {
+> +		struct regmap *map;
+>  		u8 mask_reg = max8997_mask_reg[i];
+> -		struct i2c_client *i2c = get_i2c(max8997, i);
+> +
+> +		if (i >= MUIC_INT1 && i <= MUIC_INT3)
+> +			map = max8997->regmap_muic;
+> +		else
+> +			map = max8997->regmap;
+>  
+>  		if (mask_reg == MAX8997_REG_INVALID ||
+> -				IS_ERR_OR_NULL(i2c))
+> +				IS_ERR_OR_NULL(map))
+>  			continue;
+>  		max8997->irq_masks_cache[i] = max8997->irq_masks_cur[i];
+>  
+> -		max8997_write_reg(i2c, max8997_mask_reg[i],
+> +		regmap_write(map, max8997_mask_reg[i],
+>  				max8997->irq_masks_cur[i]);
+>  	}
+>  
+> @@ -180,11 +167,11 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
+>  {
+>  	struct max8997_dev *max8997 = data;
+>  	u8 irq_reg[MAX8997_IRQ_GROUP_NR] = {};
+> -	u8 irq_src;
+> +	unsigned int irq_src;
+>  	int ret;
+>  	int i, cur_irq;
+>  
+> -	ret = max8997_read_reg(max8997->i2c, MAX8997_REG_INTSRC, &irq_src);
+> +	ret = regmap_read(max8997->regmap, MAX8997_REG_INTSRC, &irq_src);
+>  	if (ret < 0) {
+>  		dev_err(max8997->dev, "Failed to read interrupt source: %d\n",
+>  				ret);
+> @@ -193,8 +180,8 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
+>  
+>  	if (irq_src & MAX8997_IRQSRC_PMIC) {
+>  		/* PMIC INT1 ~ INT4 */
+> -		max8997_bulk_read(max8997->i2c, MAX8997_REG_INT1, 4,
+> -				&irq_reg[PMIC_INT1]);
+> +		regmap_bulk_read(max8997->regmap, MAX8997_REG_INT1,
+> +				&irq_reg[PMIC_INT1], 4);
+>  	}
+>  	if (irq_src & MAX8997_IRQSRC_FUELGAUGE) {
+>  		/*
+> @@ -214,8 +201,8 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
+>  	}
+>  	if (irq_src & MAX8997_IRQSRC_MUIC) {
+>  		/* MUIC INT1 ~ INT3 */
+> -		max8997_bulk_read(max8997->muic, MAX8997_MUIC_REG_INT1, 3,
+> -				&irq_reg[MUIC_INT1]);
+> +		regmap_bulk_read(max8997->regmap_muic, MAX8997_MUIC_REG_INT1,
+> +				&irq_reg[MUIC_INT1], 3);
+>  	}
+>  	if (irq_src & MAX8997_IRQSRC_GPIO) {
+>  		/* GPIO Interrupt */
+> @@ -224,8 +211,8 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
+>  		irq_reg[GPIO_LOW] = 0;
+>  		irq_reg[GPIO_HI] = 0;
+>  
+> -		max8997_bulk_read(max8997->i2c, MAX8997_REG_GPIOCNTL1,
+> -				MAX8997_NUM_GPIO, gpio_info);
+> +		regmap_bulk_read(max8997->regmap, MAX8997_REG_GPIOCNTL1,
+> +				gpio_info, MAX8997_NUM_GPIO);
+>  		for (i = 0; i < MAX8997_NUM_GPIO; i++) {
+>  			bool interrupt = false;
+>  
+> @@ -259,8 +246,10 @@ static irqreturn_t max8997_irq_thread(int irq, void *data)
+>  	}
+>  	if (irq_src & MAX8997_IRQSRC_FLASH) {
+>  		/* Flash Status Interrupt */
+> -		ret = max8997_read_reg(max8997->i2c, MAX8997_REG_FLASHSTATUS,
+> -				&irq_reg[FLASH_STATUS]);
+> +		unsigned int data;
+> +		ret = regmap_read(max8997->regmap,
+> +				MAX8997_REG_FLASHSTATUS, &data);
+> +		irq_reg[FLASH_STATUS] = data;
+>  	}
+>  
+>  	/* Apply masking */
+> @@ -308,7 +297,7 @@ int max8997_irq_init(struct max8997_dev *max8997)
+>  	struct irq_domain *domain;
+>  	int i;
+>  	int ret;
+> -	u8 val;
+> +	unsigned int val;
+>  
+>  	if (!max8997->irq) {
+>  		dev_warn(max8997->dev, "No interrupt specified.\n");
+> @@ -319,22 +308,19 @@ int max8997_irq_init(struct max8997_dev *max8997)
+>  
+>  	/* Mask individual interrupt sources */
+>  	for (i = 0; i < MAX8997_IRQ_GROUP_NR; i++) {
+> -		struct i2c_client *i2c;
+> -
+>  		max8997->irq_masks_cur[i] = 0xff;
+>  		max8997->irq_masks_cache[i] = 0xff;
+> -		i2c = get_i2c(max8997, i);
+>  
+> -		if (IS_ERR_OR_NULL(i2c))
+> +		if (IS_ERR_OR_NULL(max8997->regmap))
+>  			continue;
+>  		if (max8997_mask_reg[i] == MAX8997_REG_INVALID)
+>  			continue;
+>  
+> -		max8997_write_reg(i2c, max8997_mask_reg[i], 0xff);
+> +		regmap_write(max8997->regmap, max8997_mask_reg[i], 0xff);
+>  	}
+>  
+>  	for (i = 0; i < MAX8997_NUM_GPIO; i++) {
+> -		max8997->gpio_status[i] = (max8997_read_reg(max8997->i2c,
+> +		max8997->gpio_status[i] = (regmap_read(max8997->regmap,
+>  						MAX8997_REG_GPIOCNTL1 + i,
+>  						&val)
+>  					& MAX8997_GPIO_DATA_MASK) ?
+> diff --git a/drivers/mfd/max8997.c b/drivers/mfd/max8997.c
+> index f316348e3d98..f1c82110b2ab 100644
+> --- a/drivers/mfd/max8997.c
+> +++ b/drivers/mfd/max8997.c
+> @@ -33,6 +33,7 @@
+>  #include <linux/mfd/core.h>
+>  #include <linux/mfd/max8997.h>
+>  #include <linux/mfd/max8997-private.h>
+> +#include <linux/regmap.h>
+>  
+>  #define I2C_ADDR_PMIC	(0xCC >> 1)
+>  #define I2C_ADDR_MUIC	(0x4A >> 1)
+> @@ -58,81 +59,29 @@ static const struct of_device_id max8997_pmic_dt_match[] = {
+>  MODULE_DEVICE_TABLE(of, max8997_pmic_dt_match);
+>  #endif
+>  
+> -int max8997_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest)
+> -{
+> -	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
+> -	int ret;
+> -
+> -	mutex_lock(&max8997->iolock);
+> -	ret = i2c_smbus_read_byte_data(i2c, reg);
+> -	mutex_unlock(&max8997->iolock);
+> -	if (ret < 0)
+> -		return ret;
+> -
+> -	ret &= 0xff;
+> -	*dest = ret;
+> -	return 0;
+> -}
+> -EXPORT_SYMBOL_GPL(max8997_read_reg);
+> -
+> -int max8997_bulk_read(struct i2c_client *i2c, u8 reg, int count, u8 *buf)
+> -{
+> -	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
+> -	int ret;
+> -
+> -	mutex_lock(&max8997->iolock);
+> -	ret = i2c_smbus_read_i2c_block_data(i2c, reg, count, buf);
+> -	mutex_unlock(&max8997->iolock);
+> -	if (ret < 0)
+> -		return ret;
+> -
+> -	return 0;
+> -}
+> -EXPORT_SYMBOL_GPL(max8997_bulk_read);
+> -
+> -int max8997_write_reg(struct i2c_client *i2c, u8 reg, u8 value)
+> -{
+> -	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
+> -	int ret;
+> -
+> -	mutex_lock(&max8997->iolock);
+> -	ret = i2c_smbus_write_byte_data(i2c, reg, value);
+> -	mutex_unlock(&max8997->iolock);
+> -	return ret;
+> -}
+> -EXPORT_SYMBOL_GPL(max8997_write_reg);
+> -
+> -int max8997_bulk_write(struct i2c_client *i2c, u8 reg, int count, u8 *buf)
+> -{
+> -	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
+> -	int ret;
+> +static const struct regmap_config max8997_regmap_config = {
+> +	.reg_bits = 8,
+> +	.val_bits = 8,
+> +	.max_register = MAX8997_REG_PMIC_END,
+> +};
+>  
+> -	mutex_lock(&max8997->iolock);
+> -	ret = i2c_smbus_write_i2c_block_data(i2c, reg, count, buf);
+> -	mutex_unlock(&max8997->iolock);
+> -	if (ret < 0)
+> -		return ret;
+> +static const struct regmap_config max8997_regmap_rtc_config = {
+> +	.reg_bits = 8,
+> +	.val_bits = 8,
+> +	.max_register = MAX8997_RTC_REG_END,
+> +};
+>  
+> -	return 0;
+> -}
+> -EXPORT_SYMBOL_GPL(max8997_bulk_write);
+> +static const struct regmap_config max8997_regmap_haptic_config = {
+> +	.reg_bits = 8,
+> +	.val_bits = 8,
+> +	.max_register = MAX8997_HAPTIC_REG_END,
+> +};
+>  
+> -int max8997_update_reg(struct i2c_client *i2c, u8 reg, u8 val, u8 mask)
+> -{
+> -	struct max8997_dev *max8997 = i2c_get_clientdata(i2c);
+> -	int ret;
+> -
+> -	mutex_lock(&max8997->iolock);
+> -	ret = i2c_smbus_read_byte_data(i2c, reg);
+> -	if (ret >= 0) {
+> -		u8 old_val = ret & 0xff;
+> -		u8 new_val = (val & mask) | (old_val & (~mask));
+> -		ret = i2c_smbus_write_byte_data(i2c, reg, new_val);
+> -	}
+> -	mutex_unlock(&max8997->iolock);
+> -	return ret;
+> -}
+> -EXPORT_SYMBOL_GPL(max8997_update_reg);
+> +static const struct regmap_config max8997_regmap_muic_config = {
+> +	.reg_bits = 8,
+> +	.val_bits = 8,
+> +	.max_register = MAX8997_MUIC_REG_END,
+> +};
+>  
+>  /*
+>   * Only the common platform data elements for max8997 are parsed here from the
+> @@ -231,6 +180,41 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
+>  	}
+>  	i2c_set_clientdata(max8997->muic, max8997);
+>  
+> +	max8997->regmap = devm_regmap_init_i2c(i2c, &max8997_regmap_config);
+> +	if (IS_ERR(max8997->regmap)) {
+> +		ret = PTR_ERR(max8997->regmap);
+> +		dev_err(max8997->dev,
+> +				"failed to allocate register map: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	max8997->regmap_rtc = devm_regmap_init_i2c(max8997->rtc,
+> +					&max8997_regmap_rtc_config);
+> +	if (IS_ERR(max8997->regmap_rtc)) {
+> +		ret = PTR_ERR(max8997->regmap_rtc);
+> +		dev_err(max8997->dev,
+> +				"failed to allocate register map: %d\n", ret);
+> +		goto err_regmap;
+> +	}
+> +
+> +	max8997->regmap_haptic = devm_regmap_init_i2c(max8997->haptic,
+> +					&max8997_regmap_haptic_config);
+> +	if (IS_ERR(max8997->regmap_haptic)) {
+> +		ret = PTR_ERR(max8997->regmap_haptic);
+> +		dev_err(max8997->dev,
+> +				"failed to allocate register map: %d\n", ret);
+> +		goto err_regmap;
+> +	}
+> +
+> +	max8997->regmap_muic = devm_regmap_init_i2c(max8997->muic,
+> +					&max8997_regmap_muic_config);
+> +	if (IS_ERR(max8997->regmap_muic)) {
+> +		ret = PTR_ERR(max8997->regmap_muic);
+> +		dev_err(max8997->dev,
+> +				"failed to allocate register map: %d\n", ret);
+> +		goto err_regmap;
+> +	}
+> +
+>  	pm_runtime_set_active(max8997->dev);
+>  
+>  	max8997_irq_init(max8997);
+> @@ -255,6 +239,7 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
+>  
+>  err_mfd:
+>  	mfd_remove_devices(max8997->dev);
+> +err_regmap:
+>  	i2c_unregister_device(max8997->muic);
+>  err_i2c_muic:
+>  	i2c_unregister_device(max8997->haptic);
+> @@ -442,15 +427,15 @@ static int max8997_freeze(struct device *dev)
+>  	int i;
+>  
+>  	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_pmic); i++)
+> -		max8997_read_reg(i2c, max8997_dumpaddr_pmic[i],
+> +		regmap_read(max8997->regmap, max8997_dumpaddr_pmic[i],
+>  				&max8997->reg_dump[i]);
+>  
+>  	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_muic); i++)
+> -		max8997_read_reg(i2c, max8997_dumpaddr_muic[i],
+> +		regmap_read(max8997->regmap_muic, max8997_dumpaddr_muic[i],
+>  				&max8997->reg_dump[i + MAX8997_REG_PMIC_END]);
+>  
+>  	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_haptic); i++)
+> -		max8997_read_reg(i2c, max8997_dumpaddr_haptic[i],
+> +		regmap_read(max8997->regmap_haptic, max8997_dumpaddr_haptic[i],
+>  				&max8997->reg_dump[i + MAX8997_REG_PMIC_END +
+>  				MAX8997_MUIC_REG_END]);
+>  
+> @@ -464,15 +449,15 @@ static int max8997_restore(struct device *dev)
+>  	int i;
+>  
+>  	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_pmic); i++)
+> -		max8997_write_reg(i2c, max8997_dumpaddr_pmic[i],
+> +		regmap_write(max8997->regmap, max8997_dumpaddr_pmic[i],
+>  				max8997->reg_dump[i]);
+>  
+>  	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_muic); i++)
+> -		max8997_write_reg(i2c, max8997_dumpaddr_muic[i],
+> +		regmap_write(max8997->regmap_muic, max8997_dumpaddr_muic[i],
+>  				max8997->reg_dump[i + MAX8997_REG_PMIC_END]);
+>  
+>  	for (i = 0; i < ARRAY_SIZE(max8997_dumpaddr_haptic); i++)
+> -		max8997_write_reg(i2c, max8997_dumpaddr_haptic[i],
+> +		regmap_write(max8997->regmap_haptic, max8997_dumpaddr_haptic[i],
+>  				max8997->reg_dump[i + MAX8997_REG_PMIC_END +
+>  				MAX8997_MUIC_REG_END]);
+>  
+> diff --git a/drivers/power/max8997_charger.c b/drivers/power/max8997_charger.c
+> index 0b2eab571528..a9f5ddcf83a8 100644
+> --- a/drivers/power/max8997_charger.c
+> +++ b/drivers/power/max8997_charger.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/power_supply.h>
+>  #include <linux/mfd/max8997.h>
+>  #include <linux/mfd/max8997-private.h>
+> +#include <linux/regmap.h>
+>  
+>  struct charger_data {
+>  	struct device *dev;
+> @@ -45,14 +46,14 @@ static int max8997_battery_get_property(struct power_supply *psy,
+>  		union power_supply_propval *val)
+>  {
+>  	struct charger_data *charger = power_supply_get_drvdata(psy);
+> -	struct i2c_client *i2c = charger->iodev->i2c;
+>  	int ret;
+> -	u8 reg;
+> +	unsigned int reg;
+>  
+>  	switch (psp) {
+>  	case POWER_SUPPLY_PROP_STATUS:
+>  		val->intval = 0;
+> -		ret = max8997_read_reg(i2c, MAX8997_REG_STATUS4, &reg);
+> +		ret = regmap_read(charger->iodev->regmap,
+> +				MAX8997_REG_STATUS4, &reg);
+>  		if (ret)
+>  			return ret;
+>  		if ((reg & (1 << 0)) == 0x1)
+> @@ -61,7 +62,8 @@ static int max8997_battery_get_property(struct power_supply *psy,
+>  		break;
+>  	case POWER_SUPPLY_PROP_PRESENT:
+>  		val->intval = 0;
+> -		ret = max8997_read_reg(i2c, MAX8997_REG_STATUS4, &reg);
+> +		ret = regmap_read(charger->iodev->regmap,
+> +				MAX8997_REG_STATUS4, &reg);
+>  		if (ret)
+>  			return ret;
+>  		if ((reg & (1 << 2)) == 0x0)
+> @@ -70,7 +72,8 @@ static int max8997_battery_get_property(struct power_supply *psy,
+>  		break;
+>  	case POWER_SUPPLY_PROP_ONLINE:
+>  		val->intval = 0;
+> -		ret = max8997_read_reg(i2c, MAX8997_REG_STATUS4, &reg);
+> +		ret = regmap_read(charger->iodev->regmap,
+> +				MAX8997_REG_STATUS4, &reg);
+>  		if (ret)
+>  			return ret;
+>  		/* DCINOK */
+> @@ -111,8 +114,8 @@ static int max8997_battery_probe(struct platform_device *pdev)
+>  		if (val > 0xf)
+>  			val = 0xf;
+>  
+> -		ret = max8997_update_reg(iodev->i2c,
+> -				MAX8997_REG_MBCCTRL5, val, 0xf);
+> +		ret = regmap_update_bits(iodev->regmap,
+> +				MAX8997_REG_MBCCTRL5, 0xf, val);
+>  		if (ret < 0) {
+>  			dev_err(&pdev->dev, "Cannot use i2c bus.\n");
+>  			return ret;
+> @@ -121,20 +124,20 @@ static int max8997_battery_probe(struct platform_device *pdev)
+>  
+>  	switch (pdata->timeout) {
+>  	case 5:
+> -		ret = max8997_update_reg(iodev->i2c, MAX8997_REG_MBCCTRL1,
+> -				0x2 << 4, 0x7 << 4);
+> +		ret = regmap_update_bits(iodev->regmap,
+> +				MAX8997_REG_MBCCTRL1, 0x7 << 4, 0x2 << 4);
+>  		break;
+>  	case 6:
+> -		ret = max8997_update_reg(iodev->i2c, MAX8997_REG_MBCCTRL1,
+> -				0x3 << 4, 0x7 << 4);
+> +		ret = regmap_update_bits(iodev->regmap,
+> +				MAX8997_REG_MBCCTRL1, 0x7 << 4, 0x3 << 4);
+>  		break;
+>  	case 7:
+> -		ret = max8997_update_reg(iodev->i2c, MAX8997_REG_MBCCTRL1,
+> -				0x4 << 4, 0x7 << 4);
+> +		ret = regmap_update_bits(iodev->regmap,
+> +				MAX8997_REG_MBCCTRL1, 0x7 << 4, 0x4 << 4);
+>  		break;
+>  	case 0:
+> -		ret = max8997_update_reg(iodev->i2c, MAX8997_REG_MBCCTRL1,
+> -				0x7 << 4, 0x7 << 4);
+> +		ret = regmap_update_bits(iodev->regmap,
+> +				MAX8997_REG_MBCCTRL1, 0x7 << 4, 0x7 << 4);
+>  		break;
+>  	default:
+>  		dev_err(&pdev->dev, "incorrect timeout value (%d)\n",
+> diff --git a/drivers/regulator/max8997-regulator.c b/drivers/regulator/max8997-regulator.c
+> index efabc0ea0e96..362d85a849d5 100644
+> --- a/drivers/regulator/max8997-regulator.c
+> +++ b/drivers/regulator/max8997-regulator.c
+> @@ -33,6 +33,7 @@
+>  #include <linux/mfd/max8997.h>
+>  #include <linux/mfd/max8997-private.h>
+>  #include <linux/regulator/of_regulator.h>
+> +#include <linux/regmap.h>
+>  
+>  struct max8997_data {
+>  	struct device *dev;
+> @@ -50,7 +51,7 @@ struct max8997_data {
+>  	int buck125_gpioindex;
+>  	bool ignore_gpiodvs_side_effect;
+>  
+> -	u8 saved_states[MAX8997_REG_MAX];
+> +	unsigned int saved_states[MAX8997_REG_MAX];
+>  };
+>  
+>  static const unsigned int safeoutvolt[] = {
+> @@ -257,15 +258,14 @@ static int max8997_get_enable_register(struct regulator_dev *rdev,
+>  static int max8997_reg_is_enabled(struct regulator_dev *rdev)
+>  {
+>  	struct max8997_data *max8997 = rdev_get_drvdata(rdev);
+> -	struct i2c_client *i2c = max8997->iodev->i2c;
+>  	int ret, reg, mask, pattern;
+> -	u8 val;
+> +	unsigned int val;
+>  
+>  	ret = max8997_get_enable_register(rdev, &reg, &mask, &pattern);
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = max8997_read_reg(i2c, reg, &val);
+> +	ret = regmap_read(max8997->iodev->regmap, reg, &val);
+>  	if (ret)
+>  		return ret;
+>  
+> @@ -275,27 +275,25 @@ static int max8997_reg_is_enabled(struct regulator_dev *rdev)
+>  static int max8997_reg_enable(struct regulator_dev *rdev)
+>  {
+>  	struct max8997_data *max8997 = rdev_get_drvdata(rdev);
+> -	struct i2c_client *i2c = max8997->iodev->i2c;
+>  	int ret, reg, mask, pattern;
+>  
+>  	ret = max8997_get_enable_register(rdev, &reg, &mask, &pattern);
+>  	if (ret)
+>  		return ret;
+>  
+> -	return max8997_update_reg(i2c, reg, pattern, mask);
+> +	return regmap_update_bits(max8997->iodev->regmap, reg, mask, pattern);
+>  }
+>  
+>  static int max8997_reg_disable(struct regulator_dev *rdev)
+>  {
+>  	struct max8997_data *max8997 = rdev_get_drvdata(rdev);
+> -	struct i2c_client *i2c = max8997->iodev->i2c;
+>  	int ret, reg, mask, pattern;
+>  
+>  	ret = max8997_get_enable_register(rdev, &reg, &mask, &pattern);
+>  	if (ret)
+>  		return ret;
+>  
+> -	return max8997_update_reg(i2c, reg, ~pattern, mask);
+> +	return regmap_update_bits(max8997->iodev->regmap, reg, mask, ~pattern);
+>  }
+>  
+>  static int max8997_get_voltage_register(struct regulator_dev *rdev,
+> @@ -367,15 +365,14 @@ static int max8997_get_voltage_register(struct regulator_dev *rdev,
+>  static int max8997_get_voltage_sel(struct regulator_dev *rdev)
+>  {
+>  	struct max8997_data *max8997 = rdev_get_drvdata(rdev);
+> -	struct i2c_client *i2c = max8997->iodev->i2c;
+>  	int reg, shift, mask, ret;
+> -	u8 val;
+> +	unsigned int val;
+>  
+>  	ret = max8997_get_voltage_register(rdev, &reg, &shift, &mask);
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = max8997_read_reg(i2c, reg, &val);
+> +	ret = regmap_read(max8997->iodev->regmap, reg, &val);
+>  	if (ret)
+>  		return ret;
+>  
+> @@ -412,7 +409,6 @@ static int max8997_set_voltage_charger_cv(struct regulator_dev *rdev,
+>  		int min_uV, int max_uV, unsigned *selector)
+>  {
+>  	struct max8997_data *max8997 = rdev_get_drvdata(rdev);
+> -	struct i2c_client *i2c = max8997->iodev->i2c;
+>  	int rid = rdev_get_id(rdev);
+>  	int lb, ub;
+>  	int reg, shift = 0, mask, ret = 0;
+> @@ -454,7 +450,8 @@ static int max8997_set_voltage_charger_cv(struct regulator_dev *rdev,
+>  
+>  	*selector = val;
+>  
+> -	ret = max8997_update_reg(i2c, reg, val << shift, mask);
+> +	ret = regmap_update_bits(max8997->iodev->regmap,
+> +				reg, mask, val << shift);
+>  
+>  	return ret;
+>  }
+> @@ -467,7 +464,6 @@ static int max8997_set_voltage_ldobuck(struct regulator_dev *rdev,
+>  		int min_uV, int max_uV, unsigned *selector)
+>  {
+>  	struct max8997_data *max8997 = rdev_get_drvdata(rdev);
+> -	struct i2c_client *i2c = max8997->iodev->i2c;
+>  	const struct voltage_map_desc *desc;
+>  	int rid = rdev_get_id(rdev);
+>  	int i, reg, shift, mask, ret;
+> @@ -499,7 +495,8 @@ static int max8997_set_voltage_ldobuck(struct regulator_dev *rdev,
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = max8997_update_reg(i2c, reg, i << shift, mask << shift);
+> +	ret = regmap_update_bits(max8997->iodev->regmap,
+> +				reg, mask << shift, i << shift);
+>  	*selector = i;
+>  
+>  	return ret;
+> @@ -709,7 +706,6 @@ static int max8997_set_voltage_safeout_sel(struct regulator_dev *rdev,
+>  					   unsigned selector)
+>  {
+>  	struct max8997_data *max8997 = rdev_get_drvdata(rdev);
+> -	struct i2c_client *i2c = max8997->iodev->i2c;
+>  	int rid = rdev_get_id(rdev);
+>  	int reg, shift = 0, mask, ret;
+>  
+> @@ -720,13 +716,13 @@ static int max8997_set_voltage_safeout_sel(struct regulator_dev *rdev,
+>  	if (ret)
+>  		return ret;
+>  
+> -	return max8997_update_reg(i2c, reg, selector << shift, mask << shift);
+> +	return regmap_update_bits(max8997->iodev->regmap,
+> +				reg, mask << shift, selector << shift);
+>  }
+>  
+>  static int max8997_reg_disable_suspend(struct regulator_dev *rdev)
+>  {
+>  	struct max8997_data *max8997 = rdev_get_drvdata(rdev);
+> -	struct i2c_client *i2c = max8997->iodev->i2c;
+>  	int ret, reg, mask, pattern;
+>  	int rid = rdev_get_id(rdev);
+>  
+> @@ -734,20 +730,22 @@ static int max8997_reg_disable_suspend(struct regulator_dev *rdev)
+>  	if (ret)
+>  		return ret;
+>  
+> -	max8997_read_reg(i2c, reg, &max8997->saved_states[rid]);
+> +	regmap_read(max8997->iodev->regmap,
+> +			reg, &max8997->saved_states[rid]);
+>  
+>  	if (rid == MAX8997_LDO1 ||
+>  			rid == MAX8997_LDO10 ||
+>  			rid == MAX8997_LDO21) {
+>  		dev_dbg(&rdev->dev, "Conditional Power-Off for %s\n",
+>  				rdev->desc->name);
+> -		return max8997_update_reg(i2c, reg, 0x40, mask);
+> +		return regmap_update_bits(max8997->iodev->regmap,
+> +				reg, mask, 0x40);
+>  	}
+>  
+>  	dev_dbg(&rdev->dev, "Full Power-Off for %s (%xh -> %xh)\n",
+>  			rdev->desc->name, max8997->saved_states[rid] & mask,
+>  			(~pattern) & mask);
+> -	return max8997_update_reg(i2c, reg, ~pattern, mask);
+> +	return regmap_update_bits(max8997->iodev->regmap, reg, mask, ~pattern);
+>  }
+>  
+>  static struct regulator_ops max8997_ldo_ops = {
+> @@ -1031,7 +1029,6 @@ static int max8997_pmic_probe(struct platform_device *pdev)
+>  	struct regulator_config config = { };
+>  	struct regulator_dev *rdev;
+>  	struct max8997_data *max8997;
+> -	struct i2c_client *i2c;
+>  	int i, ret, nr_dvs;
+>  	u8 max_buck1 = 0, max_buck2 = 0, max_buck5 = 0;
+>  
+> @@ -1055,7 +1052,6 @@ static int max8997_pmic_probe(struct platform_device *pdev)
+>  	max8997->iodev = iodev;
+>  	max8997->num_regulators = pdata->num_regulators;
+>  	platform_set_drvdata(pdev, max8997);
+> -	i2c = max8997->iodev->i2c;
+>  
+>  	max8997->buck125_gpioindex = pdata->buck125_default_idx;
+>  	max8997->buck1_gpiodvs = pdata->buck1_gpiodvs;
+> @@ -1105,25 +1101,25 @@ static int max8997_pmic_probe(struct platform_device *pdev)
+>  
+>  	/* For the safety, set max voltage before setting up */
+>  	for (i = 0; i < 8; i++) {
+> -		max8997_update_reg(i2c, MAX8997_REG_BUCK1DVS1 + i,
+> -				max_buck1, 0x3f);
+> -		max8997_update_reg(i2c, MAX8997_REG_BUCK2DVS1 + i,
+> -				max_buck2, 0x3f);
+> -		max8997_update_reg(i2c, MAX8997_REG_BUCK5DVS1 + i,
+> -				max_buck5, 0x3f);
+> +		regmap_update_bits(max8997->iodev->regmap,
+> +				MAX8997_REG_BUCK1DVS1 + i, 0x3f, max_buck1);
+> +		regmap_update_bits(max8997->iodev->regmap,
+> +				MAX8997_REG_BUCK2DVS1 + i, 0x3f, max_buck2);
+> +		regmap_update_bits(max8997->iodev->regmap,
+> +				MAX8997_REG_BUCK5DVS1 + i, 0x3f, max_buck5);
+>  	}
+>  
+>  	/* Initialize all the DVS related BUCK registers */
+>  	for (i = 0; i < nr_dvs; i++) {
+> -		max8997_update_reg(i2c, MAX8997_REG_BUCK1DVS1 + i,
+> -				max8997->buck1_vol[i],
+> -				0x3f);
+> -		max8997_update_reg(i2c, MAX8997_REG_BUCK2DVS1 + i,
+> -				max8997->buck2_vol[i],
+> -				0x3f);
+> -		max8997_update_reg(i2c, MAX8997_REG_BUCK5DVS1 + i,
+> -				max8997->buck5_vol[i],
+> -				0x3f);
+> +		regmap_update_bits(max8997->iodev->regmap,
+> +				MAX8997_REG_BUCK1DVS1 + i,
+> +				0x3f, max8997->buck1_vol[i]);
+> +		regmap_update_bits(max8997->iodev->regmap,
+> +				MAX8997_REG_BUCK2DVS1 + i,
+> +				0x3f, max8997->buck2_vol[i]);
+> +		regmap_update_bits(max8997->iodev->regmap,
+> +				MAX8997_REG_BUCK5DVS1 + i,
+> +				0x3f, max8997->buck5_vol[i]);
+>  	}
+>  
+>  	/*
+> @@ -1167,16 +1163,17 @@ static int max8997_pmic_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* DVS-GPIO disabled */
+> -	max8997_update_reg(i2c, MAX8997_REG_BUCK1CTRL, (pdata->buck1_gpiodvs) ?
+> -			(1 << 1) : (0 << 1), 1 << 1);
+> -	max8997_update_reg(i2c, MAX8997_REG_BUCK2CTRL, (pdata->buck2_gpiodvs) ?
+> -			(1 << 1) : (0 << 1), 1 << 1);
+> -	max8997_update_reg(i2c, MAX8997_REG_BUCK5CTRL, (pdata->buck5_gpiodvs) ?
+> -			(1 << 1) : (0 << 1), 1 << 1);
+> +	regmap_update_bits(max8997->iodev->regmap, MAX8997_REG_BUCK1CTRL,
+> +			1 << 1, (pdata->buck1_gpiodvs) ? (1 << 1) : (0 << 1));
+> +	regmap_update_bits(max8997->iodev->regmap, MAX8997_REG_BUCK2CTRL,
+> +			1 << 1, (pdata->buck2_gpiodvs) ? (1 << 1) : (0 << 1));
+> +	regmap_update_bits(max8997->iodev->regmap, MAX8997_REG_BUCK5CTRL,
+> +			1 << 1, (pdata->buck5_gpiodvs) ? (1 << 1) : (0 << 1));
+>  
+>  	/* Misc Settings */
+>  	max8997->ramp_delay = 10; /* set 10mV/us, which is the default */
+> -	max8997_write_reg(i2c, MAX8997_REG_BUCKRAMP, (0xf << 4) | 0x9);
+> +	regmap_write(max8997->iodev->regmap,
+> +			MAX8997_REG_BUCKRAMP, (0xf << 4) | 0x9);
+>  
+>  	for (i = 0; i < pdata->num_regulators; i++) {
+>  		const struct voltage_map_desc *desc;
+> diff --git a/drivers/rtc/rtc-max8997.c b/drivers/rtc/rtc-max8997.c
+> index db984d4bf952..d017a34a9f70 100644
+> --- a/drivers/rtc/rtc-max8997.c
+> +++ b/drivers/rtc/rtc-max8997.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/mfd/max8997-private.h>
+>  #include <linux/irqdomain.h>
+> +#include <linux/regmap.h>
+>  
+>  /* Module parameter for WTSR function control */
+>  static int wtsr_en = 1;
+> @@ -70,7 +71,6 @@ enum {
+>  struct max8997_rtc_info {
+>  	struct device		*dev;
+>  	struct max8997_dev	*max8997;
+> -	struct i2c_client	*rtc;
+>  	struct rtc_device	*rtc_dev;
+>  	struct mutex		lock;
+>  	int virq;
+> @@ -120,8 +120,8 @@ static inline int max8997_rtc_set_update_reg(struct max8997_rtc_info *info)
+>  {
+>  	int ret;
+>  
+> -	ret = max8997_write_reg(info->rtc, MAX8997_RTC_UPDATE1,
+> -						RTC_UDR_MASK);
+> +	ret = regmap_write(info->max8997->regmap_rtc,
+> +				MAX8997_RTC_UPDATE1, RTC_UDR_MASK);
+>  	if (ret < 0)
+>  		dev_err(info->dev, "%s: fail to write update reg(%d)\n",
+>  				__func__, ret);
+> @@ -142,7 +142,8 @@ static int max8997_rtc_read_time(struct device *dev, struct rtc_time *tm)
+>  	int ret;
+>  
+>  	mutex_lock(&info->lock);
+> -	ret = max8997_bulk_read(info->rtc, MAX8997_RTC_SEC, RTC_NR_TIME, data);
+> +	ret = regmap_bulk_read(info->max8997->regmap_rtc,
+> +				MAX8997_RTC_SEC, data, RTC_NR_TIME);
+>  	mutex_unlock(&info->lock);
+>  
+>  	if (ret < 0) {
+> @@ -168,7 +169,8 @@ static int max8997_rtc_set_time(struct device *dev, struct rtc_time *tm)
+>  
+>  	mutex_lock(&info->lock);
+>  
+> -	ret = max8997_bulk_write(info->rtc, MAX8997_RTC_SEC, RTC_NR_TIME, data);
+> +	ret = regmap_bulk_write(info->max8997->regmap_rtc,
+> +				MAX8997_RTC_SEC, data, RTC_NR_TIME);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s: fail to write time reg(%d)\n", __func__,
+>  				ret);
+> @@ -185,13 +187,13 @@ static int max8997_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+>  {
+>  	struct max8997_rtc_info *info = dev_get_drvdata(dev);
+>  	u8 data[RTC_NR_TIME];
+> -	u8 val;
+> +	unsigned int val;
+>  	int i, ret;
+>  
+>  	mutex_lock(&info->lock);
+>  
+> -	ret = max8997_bulk_read(info->rtc, MAX8997_RTC_ALARM1_SEC, RTC_NR_TIME,
+> -			data);
+> +	ret = regmap_bulk_read(info->max8997->regmap_rtc,
+> +				MAX8997_RTC_ALARM1_SEC, data, RTC_NR_TIME);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s:%d fail to read alarm reg(%d)\n",
+>  				__func__, __LINE__, ret);
+> @@ -209,7 +211,8 @@ static int max8997_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+>  	}
+>  
+>  	alrm->pending = 0;
+> -	ret = max8997_read_reg(info->max8997->i2c, MAX8997_REG_STATUS1, &val);
+> +	ret = regmap_read(info->max8997->regmap_rtc,
+> +			       MAX8997_REG_STATUS1, &val);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s:%d fail to read status1 reg(%d)\n",
+>  				__func__, __LINE__, ret);
+> @@ -232,8 +235,8 @@ static int max8997_rtc_stop_alarm(struct max8997_rtc_info *info)
+>  	if (!mutex_is_locked(&info->lock))
+>  		dev_warn(info->dev, "%s: should have mutex locked\n", __func__);
+>  
+> -	ret = max8997_bulk_read(info->rtc, MAX8997_RTC_ALARM1_SEC, RTC_NR_TIME,
+> -				data);
+> +	ret = regmap_bulk_read(info->max8997->regmap_rtc,
+> +				MAX8997_RTC_ALARM1_SEC, data, RTC_NR_TIME);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s: fail to read alarm reg(%d)\n",
+>  				__func__, ret);
+> @@ -243,8 +246,8 @@ static int max8997_rtc_stop_alarm(struct max8997_rtc_info *info)
+>  	for (i = 0; i < RTC_NR_TIME; i++)
+>  		data[i] &= ~ALARM_ENABLE_MASK;
+>  
+> -	ret = max8997_bulk_write(info->rtc, MAX8997_RTC_ALARM1_SEC, RTC_NR_TIME,
+> -				 data);
+> +	ret = regmap_bulk_write(info->max8997->regmap_rtc,
+> +				 MAX8997_RTC_ALARM1_SEC, data, RTC_NR_TIME);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s: fail to write alarm reg(%d)\n",
+>  				__func__, ret);
+> @@ -264,8 +267,8 @@ static int max8997_rtc_start_alarm(struct max8997_rtc_info *info)
+>  	if (!mutex_is_locked(&info->lock))
+>  		dev_warn(info->dev, "%s: should have mutex locked\n", __func__);
+>  
+> -	ret = max8997_bulk_read(info->rtc, MAX8997_RTC_ALARM1_SEC, RTC_NR_TIME,
+> -				data);
+> +	ret = regmap_bulk_read(info->max8997->regmap_rtc,
+> +				MAX8997_RTC_ALARM1_SEC, data, RTC_NR_TIME);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s: fail to read alarm reg(%d)\n",
+>  				__func__, ret);
+> @@ -283,8 +286,8 @@ static int max8997_rtc_start_alarm(struct max8997_rtc_info *info)
+>  	if (data[RTC_DATE] & 0x1f)
+>  		data[RTC_DATE] |= (1 << ALARM_ENABLE_SHIFT);
+>  
+> -	ret = max8997_bulk_write(info->rtc, MAX8997_RTC_ALARM1_SEC, RTC_NR_TIME,
+> -				 data);
+> +	ret = regmap_bulk_write(info->max8997->regmap_rtc,
+> +				 MAX8997_RTC_ALARM1_SEC, data, RTC_NR_TIME);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s: fail to write alarm reg(%d)\n",
+>  				__func__, ret);
+> @@ -315,8 +318,8 @@ static int max8997_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+>  	if (ret < 0)
+>  		goto out;
+>  
+> -	ret = max8997_bulk_write(info->rtc, MAX8997_RTC_ALARM1_SEC, RTC_NR_TIME,
+> -				data);
+> +	ret = regmap_bulk_write(info->max8997->regmap_rtc,
+> +				 MAX8997_RTC_ALARM1_SEC, data, RTC_NR_TIME);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s: fail to write alarm reg(%d)\n",
+>  				__func__, ret);
+> @@ -387,7 +390,8 @@ static void max8997_rtc_enable_wtsr(struct max8997_rtc_info *info, bool enable)
+>  	dev_info(info->dev, "%s: %s WTSR\n", __func__,
+>  			enable ? "enable" : "disable");
+>  
+> -	ret = max8997_update_reg(info->rtc, MAX8997_RTC_WTSR_SMPL, val, mask);
+> +	ret = regmap_update_bits(info->max8997->regmap_rtc,
+> +				 MAX8997_RTC_WTSR_SMPL, mask, val);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s: fail to update WTSR reg(%d)\n",
+>  				__func__, ret);
+> @@ -400,7 +404,7 @@ static void max8997_rtc_enable_wtsr(struct max8997_rtc_info *info, bool enable)
+>  static void max8997_rtc_enable_smpl(struct max8997_rtc_info *info, bool enable)
+>  {
+>  	int ret;
+> -	u8 val, mask;
+> +	unsigned int val, mask;
+>  
+>  	if (!smpl_en)
+>  		return;
+> @@ -415,7 +419,8 @@ static void max8997_rtc_enable_smpl(struct max8997_rtc_info *info, bool enable)
+>  	dev_info(info->dev, "%s: %s SMPL\n", __func__,
+>  			enable ? "enable" : "disable");
+>  
+> -	ret = max8997_update_reg(info->rtc, MAX8997_RTC_WTSR_SMPL, val, mask);
+> +	ret = regmap_update_bits(info->max8997->regmap_rtc,
+> +				 MAX8997_RTC_WTSR_SMPL, mask, val);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s: fail to update SMPL reg(%d)\n",
+>  				__func__, ret);
+> @@ -425,7 +430,8 @@ static void max8997_rtc_enable_smpl(struct max8997_rtc_info *info, bool enable)
+>  	max8997_rtc_set_update_reg(info);
+>  
+>  	val = 0;
+> -	max8997_read_reg(info->rtc, MAX8997_RTC_WTSR_SMPL, &val);
+> +	regmap_read(info->max8997->regmap_rtc,
+> +			 MAX8997_RTC_WTSR_SMPL, &val);
+>  	pr_info("WTSR_SMPL(0x%02x)\n", val);
+>  }
+>  
+> @@ -440,7 +446,8 @@ static int max8997_rtc_init_reg(struct max8997_rtc_info *info)
+>  
+>  	info->rtc_24hr_mode = 1;
+>  
+> -	ret = max8997_bulk_write(info->rtc, MAX8997_RTC_CTRLMASK, 2, data);
+> +	ret = regmap_bulk_write(info->max8997->regmap_rtc,
+> +				 MAX8997_RTC_CTRLMASK, data, 2);
+>  	if (ret < 0) {
+>  		dev_err(info->dev, "%s: fail to write controlm reg(%d)\n",
+>  				__func__, ret);
+> @@ -465,7 +472,6 @@ static int max8997_rtc_probe(struct platform_device *pdev)
+>  	mutex_init(&info->lock);
+>  	info->dev = &pdev->dev;
+>  	info->max8997 = max8997;
+> -	info->rtc = max8997->rtc;
+>  
+>  	platform_set_drvdata(pdev, info);
+>  
+> diff --git a/include/linux/mfd/max8997-private.h b/include/linux/mfd/max8997-private.h
+> index 78c76cd4d37b..ea80ef80dbf8 100644
+> --- a/include/linux/mfd/max8997-private.h
+> +++ b/include/linux/mfd/max8997-private.h
+> @@ -309,6 +309,8 @@ enum max8997_rtc_reg {
+>  	MAX8997_RTC_ALARM2_MONTH	= 0x22,
+>  	MAX8997_RTC_ALARM2_YEAR		= 0x23,
+>  	MAX8997_RTC_ALARM2_DAY_OF_MONTH	= 0x24,
+> +
+> +	MAX8997_RTC_REG_END		= 0x25,
+>  };
+>  
+>  enum max8997_irq_source {
+> @@ -390,6 +392,11 @@ struct max8997_dev {
+>  	unsigned long type;
+>  	struct platform_device *battery; /* battery control (not fuel gauge) */
+>  
+> +	struct regmap *regmap;
+> +	struct regmap *regmap_rtc;
+> +	struct regmap *regmap_haptic;
+> +	struct regmap *regmap_muic;
+> +
+>  	int irq;
+>  	int ono;
+>  	struct irq_domain *irq_domain;
+> @@ -398,7 +405,7 @@ struct max8997_dev {
+>  	int irq_masks_cache[MAX8997_IRQ_GROUP_NR];
+>  
+>  	/* For hibernation */
+> -	u8 reg_dump[MAX8997_REG_PMIC_END + MAX8997_MUIC_REG_END +
+> +	unsigned int reg_dump[MAX8997_REG_PMIC_END + MAX8997_MUIC_REG_END +
+>  		MAX8997_HAPTIC_REG_END];
+>  
+>  	bool gpio_status[MAX8997_NUM_GPIO];
+> @@ -413,14 +420,6 @@ extern int max8997_irq_init(struct max8997_dev *max8997);
+>  extern void max8997_irq_exit(struct max8997_dev *max8997);
+>  extern int max8997_irq_resume(struct max8997_dev *max8997);
+>  
+> -extern int max8997_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest);
+> -extern int max8997_bulk_read(struct i2c_client *i2c, u8 reg, int count,
+> -				u8 *buf);
+> -extern int max8997_write_reg(struct i2c_client *i2c, u8 reg, u8 value);
+> -extern int max8997_bulk_write(struct i2c_client *i2c, u8 reg, int count,
+> -				u8 *buf);
+> -extern int max8997_update_reg(struct i2c_client *i2c, u8 reg, u8 val, u8 mask);
+> -
+>  #define MAX8997_GPIO_INT_BOTH	(0x3 << 4)
+>  #define MAX8997_GPIO_INT_RISE	(0x2 << 4)
+>  #define MAX8997_GPIO_INT_FALL	(0x1 << 4)
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
