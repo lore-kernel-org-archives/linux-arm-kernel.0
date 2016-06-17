@@ -1,26 +1,26 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 17 Jun 2016 18:54:05 +0200
-Subject: [PATCHv3 1/7] EDAC, altera: Check parent status for Arria10 EDAC
- block
-In-Reply-To: <57642B2C.3090109@opensource.altera.com>
-References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
- <1465852752-11018-2-git-send-email-tthayer@opensource.altera.com>
- <20160617164632.GD3912@pd.tnic>
- <57642B2C.3090109@opensource.altera.com>
-Message-ID: <20160617165404.GF3912@pd.tnic>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 17 Jun 2016 18:00:13 +0100
+Subject: [PATCH] arm64: Implement optimised IP checksum helpers
+In-Reply-To: <6ca77904d1eced60d86145dc5da361f3aefc6fec.1463062758.git.robin.murphy@arm.com>
+References: <6ca77904d1eced60d86145dc5da361f3aefc6fec.1463062758.git.robin.murphy@arm.com>
+Message-ID: <20160617170012.GA24589@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 11:54:04AM -0500, Thor Thayer wrote:
-> Yes. Thanks! I will make the change.
+On Thu, May 12, 2016 at 03:26:48PM +0100, Robin Murphy wrote:
+> AArch64 is capable of 128-bit memory accesses without alignment
+> restrictions, which makes it both possible and highly practical to slurp
+> up a typical 20-byte IP header in just 2 loads. Implement our own
+> version of ip_fast_checksum() to take advantage of that, resulting in
+> considerably fewer instructions and memory accesses than the generic
+> version. We can also get more optimal code generation for csum_fold() by
+> defining it a slightly different way round from the generic version, so
+> throw that into the mix too.
+> 
+> Suggested-by: Luke Starrett <luke.starrett@broadcom.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-No need, already did and applied. You can drop this patch from your
-queue.
-
-Thanks.
+Queued for 4.8. Thanks.
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+Catalin
