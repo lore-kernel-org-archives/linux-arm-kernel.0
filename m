@@ -1,45 +1,43 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Fri, 17 Jun 2016 12:34:44 +0200
-Subject: [PATCH v3 00/13] sunxi spi fixes
-In-Reply-To: <20160613195716.GD9354@lukather>
-References: <cover.1465490774.git.hramrach@gmail.com>
- <20160613195716.GD9354@lukather>
-Message-ID: <CAOMqctS6ZQ3_a97sE2e7H34ZCny2aDE38V1tQA=-SBZwF2sbDQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 17 Jun 2016 12:42:08 +0200
+Subject: [PATCH 0/4] ARM: dts: Add support for the WP8548 and mangOH Board
+Message-ID: <1466160132-24574-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+In order to support the Qualcomm MDM9615 in the Sierra Wireless WP8548
+Modules, and on the open hardware mangOH board WP8548 DTSI, mangOH board DTS
+and corresponding dt-bindings..
 
-On 13 June 2016 at 21:57, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Jun 13, 2016 at 05:46:48PM -0000, Michal Suchanek wrote:
->> Hello,
->>
->> This is update of the sunxi spi patches that should give full-featured SPI
->> driver.
->>
->> First three patches fix issues with the current driver and can be of use for
->> stable kernels so adding cc for those.
->>
->> I merged the sun4i and sun6i driver because there several issues that need to
->> be fixed in both separately and they are even out of sync wrt some fixes.
->> I guess some of the merge patches can be squashed.
->>
->> I tested this with A10s Olinuxino Micro. I have no sun6i device so I cannot
->> tell if that side was broken by this patchset - especially the last patch that
->> adds DMA was afaik never tested on sun6i.
->
+This patchset depends on pinctrl [1], clk [2], pmic [3], arm-soc [4],
+arm-soc-dt [5], usb-hsic [6], gpio-sx150x [7] patchsets.
 
->
-> For the record, I'm still very much opposed to such a merge.
->
+This patchset is part of a global SoC + Module + Board support for the
+Sierra Wireless mangOH Board support with the WP8548 module.
 
-What is the reason against the merge? I did not find the original discussion.
+[1] http://lkml.kernel.org/r/1466158535-17962-1-git-send-email-narmstrong at baylibre.com
+[2] http://lkml.kernel.org/r/1466157875-14428-1-git-send-email-narmstrong at baylibre.com
+[3] http://lkml.kernel.org/r/1466158929-19524-1-git-send-email-narmstrong at baylibre.com
+[4] http://lkml.kernel.org/r/1466159484-21858-1-git-send-email-narmstrong at baylibre.com
+[5] http://lkml.kernel.org/r/1466159704-22774-1-git-send-email-narmstrong at baylibre.com
+[6] http://lkml.kernel.org/r/1466159119-20310-1-git-send-email-narmstrong at baylibre.com
+[7] http://lkml.kernel.org/r/1466157063-10955-1-git-send-email-narmstrong at baylibre.com
 
-I tried to rename everything in the drivers from sun4i and sun6i to
-sunxi to look at a clean diff and found about 5 differences 2 of which
-look like a bug.
+Neil Armstrong (4):
+  dt-bindings: vendor-prefixes: Add Sierra Wireless
+  dt-bindings: arm: Add Sierra Wireless modules bindings
+  ARM: dts: Add Sierra Wireless WP8548 dtsi
+  ARM: dts: Add WP8548 based MangOH Green board DTS
 
-Thanks
+ Documentation/devicetree/bindings/arm/swi.txt      |  12 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/swi-wp8548-mangoh-green.dts      | 290 +++++++++++++++++++++
+ arch/arm/boot/dts/swi-wp8548.dtsi                  | 182 +++++++++++++
+ 5 files changed, 487 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/swi.txt
+ create mode 100644 arch/arm/boot/dts/swi-wp8548-mangoh-green.dts
+ create mode 100644 arch/arm/boot/dts/swi-wp8548.dtsi
 
-Michal
+-- 
+1.9.1
