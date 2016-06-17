@@ -1,36 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Jun 2016 17:42:13 +0100
-Subject: [PATCH 1/2] arm64: smp: Add function to determine if cpus are
- stuck in the kernel
-In-Reply-To: <1466181432.7965.2.camel@infradead.org>
-References: <1466156097-20028-1-git-send-email-james.morse@arm.com>
- <1466156097-20028-2-git-send-email-james.morse@arm.com>
- <1466181432.7965.2.camel@infradead.org>
-Message-ID: <20160617164213.GE32754@leverpostej>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 17 Jun 2016 18:46:32 +0200
+Subject: [PATCHv3 1/7] EDAC, altera: Check parent status for Arria10 EDAC
+ block
+In-Reply-To: <1465852752-11018-2-git-send-email-tthayer@opensource.altera.com>
+References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
+ <1465852752-11018-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160617164632.GD3912@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 09:37:12AM -0700, Geoff Levand wrote:
-> On Fri, 2016-06-17 at 10:34 +0100, James Morse wrote:
-> > +bool cpus_are_stuck_in_kernel(void)
-> > +{
-> > +> 	> bool ret = !!cpus_stuck_in_kernel;
-> > +#ifdef CONFIG_HOTPLUG_CPU
+On Mon, Jun 13, 2016 at 04:19:06PM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> How about using 'if (IS_ENABLED(CONFIG_HOTPLUG_CPU))' here?
+> In preparation for the Arria10 ECC modules, check the status
+> of the parent in the device tree to ensure the block is enabled.
+> Skip if no parent phandle is set in the device tree.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2  No change
+> v3  Move check into validate_parent_available().
+> ---
+>  drivers/edac/altera_edac.c |   17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+> index 6f5d586..926bcaf 100644
+> --- a/drivers/edac/altera_edac.c
+> +++ b/drivers/edac/altera_edac.c
+> @@ -1125,6 +1125,20 @@ static void altr_edac_a10_irq_handler(struct irq_desc *desc)
+>  	chained_irq_exit(chip, desc);
+>  }
+>  
+> +static int validate_parent_available(struct device_node *np)
+> +{
+> +	struct device_node *parent;
+> +
+> +	/* Ensure parent device is enabled if parent node exists */
+> +	parent = of_parse_phandle(np, "parent", 0);
+> +	if (parent && !of_device_is_available(parent)) {
+> +		of_node_put(parent);
+> +		return -ENODEV;
+> +	}
+> +	of_node_put(parent);
+> +	return 0;
+> +}
 
-I wanted to suggest that too, but ...
+How about this - it is a bit simpler:
 
-> > +	int any_cpu = raw_smp_processor_id();
-> > +
-> > +> 	> if (num_possible_cpus() > 1 && !cpu_ops[any_cpu]->cpu_die)
-> > +> 	> 	> ret = true;
+static int validate_parent_available(struct device_node *np)
+{
+        struct device_node *parent;
+        int ret = 0;
 
-... here we'd blow up as cpu_ops::cpu_die is only defined when
-CONFIG_HOTPLUG_CPU is selected.
+        /* Ensure parent device is enabled if parent node exists */
+        parent = of_parse_phandle(np, "parent", 0);
+        if (parent && !of_device_is_available(parent))
+                ret = -ENODEV;
 
-So we'll have to use an ifdef, but we could instead ifdef a whole stub
-function (e.g. have_cpu_die()), as Suzuki suggested.
+        of_node_put(parent);
+        return ret;
+}
 
-Thanks,
-Mark.
+?
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
