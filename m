@@ -1,57 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Jun 2016 11:28:23 +0100
-Subject: [PATCH 2/2] arm64: hibernate: Don't hibernate on systems with
- stuck CPUs
-In-Reply-To: <1466156097-20028-3-git-send-email-james.morse@arm.com>
-References: <1466156097-20028-1-git-send-email-james.morse@arm.com>
- <1466156097-20028-3-git-send-email-james.morse@arm.com>
-Message-ID: <20160617102823.GB14524@leverpostej>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 17 Jun 2016 12:31:22 +0200
+Subject: [PATCH 0/2] ARM: qcom: Add support for the MDM9615
+Message-ID: <1466159484-21858-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 10:34:57AM +0100, James Morse wrote:
-> Hibernate relies on cpu hotplug to prevent secondary cores executing
-> the kernel text while it is being restored.
-> 
-> Add a call to cpus_are_stuck_in_kernel() to determine if there are
-> CPUs not counted by 'num_online_cpus()', and prevent hibernate in this
-> case.
-> 
-> Fixes: 82869ac57b5 ("arm64: kernel: Add support for hibernate/suspend-to-disk")
-> Signed-off-by: James Morse <james.morse@arm.com>
+In order to support the Qualcomm MDM9615 in the Sierra Wireless WP8548
+Modules, add the MDM9615 compatible entry, configs and bindings.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+This patchset depends on pinctrl [1], clk [2] and pmic [3] patchsets.
 
-Mark.
+This patchset is part of a global SoC + Module + Board support for the
+Sierra Wireless mangOH Board support with the WP8548 module.
 
-> ---
->  arch/arm64/kernel/hibernate.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> index f8df75d740f4..21ab5df9fa76 100644
-> --- a/arch/arm64/kernel/hibernate.c
-> +++ b/arch/arm64/kernel/hibernate.c
-> @@ -33,6 +33,7 @@
->  #include <asm/pgtable.h>
->  #include <asm/pgtable-hwdef.h>
->  #include <asm/sections.h>
-> +#include <asm/smp.h>
->  #include <asm/suspend.h>
->  #include <asm/virt.h>
->  
-> @@ -236,6 +237,11 @@ int swsusp_arch_suspend(void)
->  	unsigned long flags;
->  	struct sleep_stack_data state;
->  
-> +	if (cpus_are_stuck_in_kernel()) {
-> +		pr_err("Can't hibernate: no mechanism to offline secondary CPUs.\n");
-> +		return -EBUSY;
-> +	}
-> +
->  	local_dbg_save(flags);
->  
->  	if (__cpu_suspend_enter(&state)) {
-> -- 
-> 2.8.0.rc3
-> 
+[1] http://lkml.kernel.org/r/1466158535-17962-1-git-send-email-narmstrong at baylibre.com
+[2] http://lkml.kernel.org/r/1466157875-14428-1-git-send-email-narmstrong at baylibre.com
+[3] http://lkml.kernel.org/r/1466158929-19524-1-git-send-email-narmstrong at baylibre.com
+
+Neil Armstrong (2):
+  ARM: qcom: Add support for MDM9615
+  ARM: configs: qualcomm: Add MDM9615 missing defconfigs
+
+ arch/arm/configs/qcom_defconfig | 14 ++++++++++++++
+ arch/arm/mach-qcom/Kconfig      |  4 ++++
+ arch/arm/mach-qcom/board.c      |  1 +
+ 3 files changed, 19 insertions(+)
+
+-- 
+1.9.1
