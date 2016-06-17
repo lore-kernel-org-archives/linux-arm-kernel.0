@@ -1,63 +1,72 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 17 Jun 2016 18:25:02 +0100
-Subject: [PATCH 6/6] arm64: trap userspace "dc cvau" cache operation on
- errata-affected core
-In-Reply-To: <c5d47238-6391-8468-b9d7-6a28e82a3edc@arm.com>
-References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
- <1462812590-4494-7-git-send-email-andre.przywara@arm.com>
- <57602DF2.1040501@arm.com> <c5d47238-6391-8468-b9d7-6a28e82a3edc@arm.com>
-Message-ID: <5764326E.1080702@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 17 Jun 2016 19:29:28 +0200
+Subject: [PATCHv3 6/7] EDAC, altera: Add Arria10 Ethernet EDAC support
+In-Reply-To: <1465852752-11018-7-git-send-email-tthayer@opensource.altera.com>
+References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
+ <1465852752-11018-7-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160617172928.GK3912@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/16 18:20, Andre Przywara wrote:
-> Hi Suzuki,
->
-> thanks for having a look!
->
-> On 14/06/16 17:16, Suzuki K Poulose wrote:
->> On 09/05/16 17:49, Andre Przywara wrote:
->>> The ARM errata 819472, 826319, 827319 and 824069 for affected
->>> Cortex-A53 cores demand to promote "dc cvau" instructions to
->>> "dc civac". Since we allow userspace to also emit those instructions,
->>> we should make sure that "dc cvau" gets promoted there too.
->>> So lets grasp the nettle here and actually trap every userland cache
->>> maintenance instruction once we detect at least one affected core in
->>> the system.
-            __user_cache_maint("dc civac", address, ret);
->>> +            break;
->>> +        case 10:        /* DC CVAC, gets promoted */
->>> +            __user_cache_maint("dc civac", address, ret);
->>> +            break;
->>> +        case 14:        /* DC CIVAC */
->>> +            __user_cache_maint("dc civac", address, ret);
->>> +            break;
->>> +        case 5:            /* IC IVAU */
->>> +            __user_cache_maint("ic ivau", address, ret);
->>> +            break;
->>> +        default:
->>> +            force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
->>> +            return;
->>> +        }
->>> +    } else {
->>> +        force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
->>> +        return;
->>
->> Correct me if I am wrong, I think we should handle DC ZVA and emulate
->> the same ?
->> Thats the only EL0 accessible instruction we don't handle above.
->
-> Mmmh, but why should we care?
-> 1) DC ZVA is not trapped by setting SCTLR.UCI - instead it has its own
-> bit (SCTLR.DZE).
+On Mon, Jun 13, 2016 at 04:19:11PM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> Add Altera Arria10 Ethernet FIFO memory EDAC support. Update
+> to support a common compatibility string for all ethernet
+> FIFOs in the DT.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2  Remove (void *) cast from altr_edac_device_of_match[]
+>     Addition of panic flag to ethernet private data.
+> v3  Use common compatiblity string.
+>     Simplify socfpga_init_ethernet_ecc().
+> ---
+>  drivers/edac/Kconfig       |    7 +++++++
+>  drivers/edac/altera_edac.c |   38 ++++++++++++++++++++++++++++++++++++--
+>  drivers/edac/altera_edac.h |    3 +++
+>  3 files changed, 46 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+> index 6ca7474..d0c1dab 100644
+> --- a/drivers/edac/Kconfig
+> +++ b/drivers/edac/Kconfig
+> @@ -391,6 +391,13 @@ config EDAC_ALTERA_OCRAM
+>  	  Support for error detection and correction on the
+>  	  Altera On-Chip RAM Memory for Altera SoCs.
+>  
+> +config EDAC_ALTERA_ETHERNET
+> +	bool "Altera Ethernet FIFO ECC"
+> +	depends on EDAC_ALTERA=y
+> +	help
+> +	  Support for error detection and correction on the
+> +	  Altera Ethernet FIFO Memory for Altera SoCs.
+> +
+>  config EDAC_SYNOPSYS
+>  	tristate "Synopsys DDR Memory Controller"
+>  	depends on EDAC_MM_EDAC && ARCH_ZYNQ
+> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+> index f27bb29..14f99ae 100644
+> --- a/drivers/edac/altera_edac.c
+> +++ b/drivers/edac/altera_edac.c
+> @@ -1260,6 +1260,34 @@ const struct edac_device_prv_data a10_l2ecc_data = {
+>  
+>  #endif	/* CONFIG_EDAC_ALTERA_L2C */
+>  
+> +/********************* Ethernet Device Functions ********************/
+> +
+> +#ifdef CONFIG_EDAC_ALTERA_ETHERNET
+> +
+> +const struct edac_device_prv_data a10_enet0rxecc_data = {
 
-You are right. I was thinking that UCI traps all DC operations. It only
-traps  DC CVAU, DC CIVAC, DC CVAC, and IC IVAU.
+This needs to be "static const" and then you don't need to init panic to
+false.
 
+Your other edac_device_prv_data things are not static too, please
+convert them in a separate patch too.
 
+-- 
+Regards/Gruss,
+    Boris.
 
-
-
-
-Cheers
-Suzuki
+ECO tip #101: Trim your mails when you reply.
