@@ -1,97 +1,91 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 17 Jun 2016 10:13:57 -0400
-Subject: [RFC PATCH v3 2/2] ARM64/PCI: Start using quirks handling for
- ACPI based PCI host controller
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F790346@lhreml507-mbx>
-References: <1466004851-10214-1-git-send-email-cov@codeaurora.org>
- <1466004851-10214-2-git-send-email-cov@codeaurora.org>
- <20160616174856.GB32388@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F790346@lhreml507-mbx>
-Message-ID: <576405A5.3010407@codeaurora.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 17 Jun 2016 15:15:36 +0100
+Subject: [RFC PATCH v2 03/15] arm64: mm: change IOMMU notifier action to
+ attach DMA ops
+In-Reply-To: <5763C27A.9030306@arm.com>
+References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <5763C27A.9030306@arm.com>
+Message-ID: <20160617141536.GA24840@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2016 04:01 AM, Gabriele Paoloni wrote:
-> Hi Lorenzo and All
+Hi Robin,
+
+On Fri, Jun 17, 2016 at 10:27:22AM +0100, Robin Murphy wrote:
+> Hi Lorenzo,
 > 
->> -----Original Message-----
->> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
->> Sent: 16 June 2016 18:49
->> To: Christopher Covington
->> Cc: Tomasz Nowicki; Duc Dang; liudongdong (C); Sinan Kaya; Jeff Hugo;
->> Gabriele Paoloni; Jon Masters; Mark Salter; Suravee Suthikulpanit;
->> Jayachandran C; David Daney; Robert Richter; Hanjun Guo; linux-arm-
->> kernel at lists.infradead.org; Catalin Marinas; Will Deacon; Bjorn Helgaas;
->> Ganapatrao Kulkarni; linux-kernel at vger.kernel.org
->> Subject: Re: [RFC PATCH v3 2/2] ARM64/PCI: Start using quirks handling
->> for ACPI based PCI host controller
->>
->> On Wed, Jun 15, 2016 at 11:34:11AM -0400, Christopher Covington wrote:
->>> From: Tomasz Nowicki <tn@semihalf.com>
->>>
->>> pci_generic_ecam_ops is used by default. Since there are platforms
->>> which have non-compliant ECAM space we need to overwrite these
->>> accessors prior to PCI buses enumeration. In order to do that
->>> we call pci_mcfg_get_ops to retrieve pci_ecam_ops structure so that
->>> we can use proper PCI config space accessors and bus_shift.
->>>
->>> pci_generic_ecam_ops is still used for platforms free from quirks.
->>>
->>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>> ---
->>>  arch/arm64/kernel/pci.c | 7 ++++---
->>>  1 file changed, 4 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
->>> index 94cd43c..a891bda 100644
->>> --- a/arch/arm64/kernel/pci.c
->>> +++ b/arch/arm64/kernel/pci.c
->>> @@ -139,6 +139,7 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root
->> *root)
->>>  	struct pci_config_window *cfg;
->>>  	struct resource cfgres;
->>>  	unsigned int bsz;
->>> +	struct pci_ecam_ops *ops;
->>>
->>>  	/* Use address from _CBA if present, otherwise lookup MCFG */
->>>  	if (!root->mcfg_addr)
->>> @@ -150,12 +151,12 @@ pci_acpi_setup_ecam_mapping(struct
->> acpi_pci_root *root)
->>>  		return NULL;
->>>  	}
->>>
->>> -	bsz = 1 << pci_generic_ecam_ops.bus_shift;
->>> +	ops = pci_mcfg_get_ops(root);
->>> +	bsz = 1 << ops->bus_shift;
->>>  	cfgres.start = root->mcfg_addr + bus_res->start * bsz;
->>>  	cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
->>>  	cfgres.flags = IORESOURCE_MEM;
->>> -	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
->>> -			      &pci_generic_ecam_ops);
->>> +	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res, ops);
->>
->> Arnd pointed this out already, I think that's the only pending question
->> here.
->>
->> pci_ecam_create() maps ECAM space for config regions retrieved from
->> the MCFG, which are *supposed* to be ECAM compliant.
->>
->> Do we think that's *always* correct/safe regardless of the kind
->> of quirk we are currently fixing up ?
+> I think this patch makes sense even independent of the rest of the
+> series, one nit inline notwithstanding.
 
-> From my perspective I think the easiest solution is to keep this
-> quirk mechanism in place and then review vendor by vendor solution
-> as they are pushed to the mailing list; if some vendors are abusing
-> of some addresses/resources then they can be rejected...
+Thanks. Yes I added it to this series since it is not strictly
+necessary (ie it does not fix anything) in the mainline, but
+it *is* necessary for this whole series to function when we
+boot through ACPI.
 
-Using pci_ecam_create() works well for QDF2432:
+I will send it out in a separate patch and fold changes you
+request below, it would be good to have some coverage for
+it before merging it.
 
-https://us.codeaurora.org/cgit/quic/server/kernel/commit/?h=cov/4.7-rc3-testing&id=ca7439a54ddd8612b435c797ffc54f4e19f03e2b
+Thank you !
+Lorenzo
 
-Cheers,
-Cov
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Marek; I'm curious as to whether this could make the workaround in
+> 722ec35f7 obsolete as well, or are all the drivers also bound
+> super-early in the setup you had there?
+> 
+> On 07/06/16 14:30, Lorenzo Pieralisi wrote:
+> >Current bus notifier in ARM64 (__iommu_attach_notifier)
+> >attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
+> >action notification.
+> >
+> >This causes issues on ACPI based systems, where PCI devices
+> >can be added before the IOMMUs the devices are attached to
+> >had a chance to be probed, causing failures on attempts to
+> >attach dma_ops in that the domain for the respective IOMMU
+> >may not be set-up yet by the time the bus notifier is run.
+> >
+> >Devices dma_ops do not require to be set-up till the matching
+> >device drivers are probed. This means that instead of running
+> >the notifier attaching dma_ops to devices (__iommu_attach_notifier)
+> >on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
+> >device driver is bound to the device in question (on action
+> >BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
+> >group and domain are set-up accordingly at the time the
+> >notifier is triggered.
+> >
+> >This patch changes the notifier action upon which dma_ops
+> >are attached to devices and defer it to driver binding time,
+> >so that IOMMU devices have a chance to be probed and to register
+> >their bus notifiers before the dma_ops attach sequence for a
+> >device is actually carried out.
+> >
+> >Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >Cc: Will Deacon <will.deacon@arm.com>
+> >Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >Cc: Robin Murphy <robin.murphy@arm.com>
+> >---
+> >  arch/arm64/mm/dma-mapping.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> >diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> >index c566ec8..79b0882 100644
+> >--- a/arch/arm64/mm/dma-mapping.c
+> >+++ b/arch/arm64/mm/dma-mapping.c
+> >@@ -848,7 +848,7 @@ static int __iommu_attach_notifier(struct notifier_block *nb,
+> >  {
+> >  	struct iommu_dma_notifier_data *master, *tmp;
+> >
+> >-	if (action != BUS_NOTIFY_ADD_DEVICE)
+> >+	if (action != BUS_NOTIFY_BIND_DRIVER)
+> 
+> With this, you can also get rid of the priority setting and big fat
+> explanatory comment in register_iommu_dma_ops_notifier().
+> 
+> Robin.
+> 
+> >  		return 0;
+> >
+> >  	mutex_lock(&iommu_dma_notifier_lock);
+> >
+> 
