@@ -1,88 +1,57 @@
 From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 17 Jun 2016 16:57:22 +0900
-Subject: [PATCH 2/5] spi: s3c64xx: group the CS signalling writes in a single
- function
+Date: Fri, 17 Jun 2016 16:57:21 +0900
+Subject: [PATCH 1/5] spi: do not fail if the CS line is not connected
 In-Reply-To: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
 References: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1466150245-2648-3-git-send-email-andi.shyti@samsung.com>
+Message-ID: <1466150245-2648-2-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable/disable the CS line, the driver performs a writel in
-the S3C64XX_SPI_SLAVE_SEL registers. Put together all the writes
-in that register in a single function.
+Some SPI connected devices do not have any CS line connected as
+some devices are alway enabled. Indeed, until now, a common
+workaround was to assign to num_chipselect a -1 value or 255
+(num_chipselect is unsigned).
+
+In this case do not fail and defer to the SPI device drivers the
+responsibility to check whether the num-cs is '0'.
 
 Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c | 36 ++++++++++++++++++++++++++----------
- 1 file changed, 26 insertions(+), 10 deletions(-)
+ drivers/spi/spi.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 5a76a50..972367d 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -310,6 +310,28 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
- 	dma_async_issue_pending(dma->ch);
- }
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 77e6e45..f22dc27 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -504,8 +504,13 @@ int spi_add_device(struct spi_device *spi)
+ 	struct device *dev = master->dev.parent;
+ 	int status;
  
-+static void s3c64xx_spi_set_cs(struct spi_device *spi, bool enable)
-+{
-+	struct s3c64xx_spi_driver_data *sdd =
-+					spi_master_get_devdata(spi->master);
-+
-+	if (enable) {
-+		if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO)) {
-+			writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
-+		} else {
-+			u32 ssel = readl(sdd->regs + S3C64XX_SPI_SLAVE_SEL);
-+
-+			ssel |= (S3C64XX_SPI_SLAVE_AUTO |
-+						S3C64XX_SPI_SLAVE_NSC_CNT_2);
-+			writel(ssel, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
-+		}
-+	} else {
-+		if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
-+		writel(S3C64XX_SPI_SLAVE_SIG_INACT,
-+		sdd->regs + S3C64XX_SPI_SLAVE_SEL);
-+	}
-+}
-+
- static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
- {
- 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
-@@ -706,12 +728,7 @@ static int s3c64xx_spi_transfer_one(struct spi_master *master,
- 	enable_datapath(sdd, spi, xfer, use_dma);
+-	/* Chipselects are numbered 0..max; validate. */
+-	if (spi->chip_select >= master->num_chipselect) {
++	/*
++	 * Chipselects are numbered 0..max; validate.
++	 * If there is no chip select (i.e. num_chipselect == 0),
++	 * the comparison doesn't make sense.
++	 */
++	if (master->num_chipselect &&
++				spi->chip_select >= master->num_chipselect) {
+ 		dev_err(dev, "cs%d >= max %d\n",
+ 			spi->chip_select,
+ 			master->num_chipselect);
+@@ -1851,12 +1856,6 @@ int spi_register_master(struct spi_master *master)
+ 	if (status)
+ 		return status;
  
- 	/* Start the signals */
--	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
--		writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
--	else
--		writel(readl(sdd->regs + S3C64XX_SPI_SLAVE_SEL)
--			| S3C64XX_SPI_SLAVE_AUTO | S3C64XX_SPI_SLAVE_NSC_CNT_2,
--			sdd->regs + S3C64XX_SPI_SLAVE_SEL);
-+	s3c64xx_spi_set_cs(spi, true);
+-	/* even if it's just one always-selected device, there must
+-	 * be at least one chipselect
+-	 */
+-	if (master->num_chipselect == 0)
+-		return -EINVAL;
+-
+ 	if ((master->bus_num < 0) && master->dev.of_node)
+ 		master->bus_num = of_alias_get_id(master->dev.of_node, "spi");
  
- 	spin_unlock_irqrestore(&sdd->lock, flags);
- 
-@@ -861,16 +878,15 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
- 
- 	pm_runtime_mark_last_busy(&sdd->pdev->dev);
- 	pm_runtime_put_autosuspend(&sdd->pdev->dev);
--	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
--		writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
-+	s3c64xx_spi_set_cs(spi, false);
-+
- 	return 0;
- 
- setup_exit:
- 	pm_runtime_mark_last_busy(&sdd->pdev->dev);
- 	pm_runtime_put_autosuspend(&sdd->pdev->dev);
- 	/* setup() returns with device de-selected */
--	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
--		writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
-+	s3c64xx_spi_set_cs(spi, false);
- 
- 	if (gpio_is_valid(spi->cs_gpio))
- 		gpio_free(spi->cs_gpio);
 -- 
 2.8.1
