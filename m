@@ -1,50 +1,44 @@
-From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
-Date: Sat, 18 Jun 2016 01:29:05 +0200
-Subject: [PATCH 00/12] power: add generic power sequence framework
-In-Reply-To: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
-References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <576487C1.5050807@maciej.szmigiero.name>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 17 Jun 2016 18:36:12 -0500
+Subject: [PATCH] PCI: mvebu: Don't try to add an MBus window that already
+ exists
+In-Reply-To: <20160603093042.26e325d1@free-electrons.com>
+References: <20160602125247.17566-1-sr@denx.de>
+ <20160602151818.0989ee50@free-electrons.com>
+ <57511C4E.5040501@denx.de>
+ <20160603093042.26e325d1@free-electrons.com>
+Message-ID: <20160617233612.GC21200@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Fri, Jun 03, 2016 at 09:30:42AM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Fri, 3 Jun 2016 07:57:34 +0200, Stefan Roese wrote:
+> 
+> > > The pci-mvebu driver deletes the MBus windows for a given PCI device
+> > > when invalid memory base/limits are set in the emulated PCI bridge.
+> > > Shouldn't this happen over a rescan?  
+> > 
+> > I'm not sure what *should* happen upon rescan. But testing shows, that
+> > no MBus window is removed upon rescan. I just tested what happens,
+> > if the PCI devices are "removed" via sysfs. And this also does not
+> > delete any of the MBus windows.
+> 
+> Then maybe that's a question for the PCI folks. Is it normal that when
+> a PCI device gets removed, the configuration of the PCI bridge does not
+> get adjusted accordingly?
 
-On 17.06.2016 12:09, Peter Chen wrote:
-> Hi all,
-> 
-> We have an well-known problem that the device needs to do some power
-> sequence before it can be recognized by related host, the typical
-> example like hard-wired mmc devices and usb devices. This power
-> sequence is hard to be described at device tree and handled by
-> related host driver, so we have created a common power sequence
-> framework to handle this requirement. The generic code is supplied
-> some common helpers from host driver, and individual power sequence
-> driver handles kinds of power sequence for devices.
-> 
-> Since the MMC has already done the similar things, and this power
-> sequence handling can be generic, we use mmc power sequence code
-> as base to create this framework.
-> 
-> This patch set is based on Krzysztof Kozlowski's RFC patch set (v4.7-rc1)
-> [1], and making some changes which can let it be generic. After that,
-> we create a generic power sequence driver for USB devices which handles
-> below things, it includes all input signals for devices I can consider.
-> 
-> - Clock and its frequencies
-> - GPIO for reset and the duration time
-> - GPIO for enable
-> - Regulator for power
-> 
-> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> two hot-plug devices to simulate this use case. The udoo board changes
-> were tested using my last power sequence patch set. [2]
-> 
-> @Maciej S. Szmigiero, Oscar, would you please test them on imx6qdl udoo
-> boards?
+I'm not sure I completely understand the question.
 
-Thanks for the patch set, just tested them on my UDOO Quad board and can
-confirm that USB and on-board hub work fine.
+When a PCI device is removed, I don't think we touch any upstream
+devices.  The device is gone; there's no reason to change any bridge
+windows leading to it.
 
-Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+When we rescan, we should try to assign resources to BARs of any new
+devices we find.  Theoretically that could involve configuring windows
+of upstream bridges, but I don't think we actually do that, because
+we'd have to be careful not to break any active devices, and I don't
+think we're smart enough for that.
 
-Maciej
+Bjorn
