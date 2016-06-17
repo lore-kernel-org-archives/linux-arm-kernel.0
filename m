@@ -1,114 +1,254 @@
-From: lukas@wunner.de (Lukas Wunner)
-Date: Fri, 17 Jun 2016 16:07:38 +0200
-Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
- support
-In-Reply-To: <CAJZ5v0h71xxvzex2D6s9W8Qvq3+BqOQnTJRKy32gMu=tuQLxDA@mail.gmail.com>
-References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
- <1466144820-6286-3-git-send-email-m.szyprowski@samsung.com>
- <20160617103620.GA1626@wunner.de>
- <CAJZ5v0h71xxvzex2D6s9W8Qvq3+BqOQnTJRKy32gMu=tuQLxDA@mail.gmail.com>
-Message-ID: <20160617140738.GA1809@wunner.de>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 17 Jun 2016 16:06:13 +0200
+Subject: [PATCH V6 1/7] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <20160615093127.01c0a2af@arm.com>
+References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
+ <1465828873-23498-2-git-send-email-tn@semihalf.com>
+ <20160615093127.01c0a2af@arm.com>
+Message-ID: <576403D5.1070902@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
-> On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
-> > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
-> > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
-> > We also have such a functional dependency for Thunderbolt on Macs:
-> > On resume from system sleep, the PCIe hotplug ports may not resume
-> > before the thunderbolt driver has reestablished the PCI tunnels.
-> > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
-> > in drivers/pci/quirks.c. It would be good if we could represent
-> > this dependency using something like Rafael's approach instead of
-> > open coding it, however one detail in Rafael's patches is problematic:
-> >
-> > > New links are added by calling device_link_add() which may happen
-> > > either before the consumer device is probed or when probing it, in
-> > > which case the caller needs to ensure that the driver of the
-> > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
-> > > flag should be passed to device_link_add() to reflect that.
-> >
-> > The thunderbolt driver cannot call device_link_add() before the
-> > PCIe hotplug ports are bound to a driver unless we amend portdrv
-> > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
-> > if the thunderbolt driver isn't loaded.
-> >
-> > It would therefore be beneficial if device_link_add() can be
-> > called even *after* the consumer is bound.
-> 
-> I don't quite follow.
-> 
-> Who's the provider and who's the consumer here?
+On 15.06.2016 10:31, Marc Zyngier wrote:
+> On Mon, 13 Jun 2016 16:41:07 +0200
+> Tomasz Nowicki <tn@semihalf.com> wrote:
+>
+>> IORT shows representation of IO topology for ARM based systems.
+>> It describes how various components are connected together on
+>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+>>
+>> Initial support allows to:
+>> - register ITS MSI chip along with ITS translation ID and domain token
+>> - deregister ITS MSI chip based on ITS translation ID
+>> - find registered domain token based on ITS translation ID
+>> - map MSI RID for a device
+>> - find domain token for a device
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>   drivers/acpi/Kconfig  |   3 +
+>>   drivers/acpi/Makefile |   1 +
+>>   drivers/acpi/iort.c   | 386 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/iort.h  |  38 +++++
+>>   4 files changed, 428 insertions(+)
+>>   create mode 100644 drivers/acpi/iort.c
+>>   create mode 100644 include/linux/iort.h
+>>
 
-thunderbolt.ko is the supplier. The PCIe hotplug ports of Thunderbolt
-host controllers are the consumers.
+[...]
 
-If thunderbolt.ko is not loaded, no special precautions are needed for
-the hotplug ports.
+>> +
+>> +static struct acpi_iort_node *
+>> +iort_node_map_rid(struct acpi_iort_node *node, u32 rid_in,
+>> +		  u32 *rid_out, u8 type)
+>> +{
+>> +
+>> +	if (!node)
+>> +		goto out;
+>> +
+>> +	/* Go upstream */
+>> +	while (node->type != type) {
+>> +		struct acpi_iort_id_mapping *id;
+>> +		int i, found = 0;
+>> +
+>> +		/* Exit when no mapping array */
+>> +		if (!node->mapping_offset || !node->mapping_count)
+>> +			return NULL;
+>> +
+>> +		id = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
+>> +				  node->mapping_offset);
+>> +
+>> +		for (i = 0, found = 0; i < node->mapping_count; i++, id++) {
+>> +			/*
+>> +			 * Single mapping is not translation rule,
+>> +			 * lets move on for this case
+>> +			 */
+>> +			if (id->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+>> +				if (node->type != ACPI_IORT_NODE_SMMU) {
+>> +					rid_in = id->output_base;
+>> +					found = 1;
+>> +					break;
+>> +				}
+>> +
+>> +				pr_warn(FW_BUG "[node %p type %d] SINGLE MAPPING flag not allowed for SMMU node, skipping ID map\n",
+>> +					node, node->type);
+>> +				continue;
+>> +			}
+>> +
+>> +			if (rid_in < id->input_base ||
+>> +			    (rid_in > id->input_base + id->id_count))
+>> +				continue;
+>> +
+>> +			rid_in = id->output_base + (rid_in - id->input_base);
+>> +			found = 1;
+>> +			break;
+>> +		}
+>> +
+>> +		if (!found)
+>> +			return NULL;
+>
+> Why this special case? It would make more sense to use the normal
+> epilogue, and update rid_out. Unless not finding a translation for a
+> given rid is illegal?
 
-However *if* it is loaded and the system is suspended and there are
-Thunderbolt devices plugged in, then on resume the hotplug ports must
-wait for thunderbolt.ko to reestablish the PCI tunnels. If they do not
-wait, things will go south because when pci_pm_resume_noirq() is called
-for the devices *below* the hotplug port, we will try to put them into D0
-(via pci_pm_default_resume_early()) and call pci_restore_state() even
-though those hotplugged devices are not yet reachable.
+We can use the same strategy as __of_msi_map_rid() which means we simply 
+use rid_in in case of any error. I will update accordingly.
 
-So what I'd like to do is call device_link_add() when thunderbolt.ko
-is loaded to shove a dependency onto the hotplug ports. But the hotplug
-ports will long since have been bound at that point (to portdrv).
-So it should be allowed to call device_link_add() ex post facto, after
-the consumer has been bound.
+>
+>> +
+>> +		/* Firmware bug! */
+>> +		if (!id->output_reference) {
+>> +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
+>> +			       node, node->type);
+>> +			return NULL;
+>> +		}
+>> +
+>> +		node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+>> +				    id->output_reference);
+>> +	}
+>> +
+>> +out:
+>> +	if (rid_out)
+>> +		*rid_out = rid_in;
+>> +	return node;
+>> +}
+>> +
+>> +static struct acpi_iort_node *
+>> +iort_find_dev_node(struct device *dev)
+>> +{
+>> +	struct pci_bus *pbus;
+>> +
+>> +	if (!dev_is_pci(dev))
+>> +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+>> +				      iort_match_node_callback, dev);
+>> +
+>> +	/* Find a PCI root bus */
+>> +	pbus = to_pci_dev(dev)->bus;
+>> +	while (!pci_is_root_bus(pbus))
+>> +		pbus = pbus->parent;
+>> +
+>> +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+>> +			      iort_match_node_callback, &pbus->dev);
+>> +}
+>> +
+>> +/**
+>> + * iort_msi_map_rid() - Map a MSI requester ID for a device
+>> + * @dev: The device for which the mapping is to be done.
+>> + * @req_id: The device requester ID.
+>> + *
+>> + * Returns: mapped MSI RID on success, input requester ID otherwise
+>> + */
+>> +u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+>> +{
+>> +	struct acpi_iort_node *node;
+>> +	u32 dev_id;
+>> +
+>> +	if (!iort_table)
+>> +		return req_id;
+>> +
+>> +	node = iort_find_dev_node(dev);
+>> +	if (!node) {
+>> +		dev_err(dev, "can't find related IORT node\n");
+>> +		return req_id;
+>> +	}
+>> +
+>> +	if (!iort_node_map_rid(node, req_id, &dev_id,
+>> +			       ACPI_IORT_NODE_ITS_GROUP))
+>> +		return req_id;
+>
+> And once you've fixed the special case in iort_node_map_rid, you can
+> unconditionally return dev_id.
 
-Let me know if I still failed to convey the problem in an intelligible
-way.
+Right.
 
-I had a similar problem with the Runtime PM for Thunderbolt series
-(which BTW is still awaiting reviews):
-http://www.spinics.net/lists/linux-pci/msg51158.html
+>
+>> +
+>> +	return dev_id;
+>> +}
+>> +
+>> +/**
+>> + * iort_dev_find_its_id() - Find the ITS identifier for a device
+>> + * @dev: The device.
+>> + * @idx: Index of the ITS identifier list.
+>> + * @its_id: ITS identifier.
+>> + *
+>> + * Returns: 0 on success, appropriate error value otherwise
+>> + */
+>> +static int
+>> +iort_dev_find_its_id(struct device *dev, u32 req_id, unsigned int idx,
+>> +		     int *its_id)
+>> +{
+>> +	struct acpi_iort_its_group *its;
+>> +	struct acpi_iort_node *node;
+>> +
+>> +	node = iort_find_dev_node(dev);
+>> +	if (!node) {
+>> +		dev_err(dev, "can't find related IORT node\n");
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
+>> +	if (!node) {
+>> +		dev_err(dev, "can't find related ITS node\n");
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	/* Move to ITS specific data */
+>> +	its = (struct acpi_iort_its_group *)node->node_data;
+>> +	if (idx > its->its_count) {
+>> +		dev_err(dev, "requested ITS ID index [%d] is greater than available [%d]\n",
+>> +			idx, its->its_count);
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	*its_id = its->identifiers[idx];
+>> +	return 0;
+>> +}
+>> +
+>> +/**
+>> + * iort_get_device_domain() - Find MSI domain related to a device
+>> + * @dev: The device.
+>> + * @req_id: Requester ID for the device.
+>> + *
+>> + * Returns: the MSI domain for this device, NULL otherwise
+>> + */
+>> +struct irq_domain *
+>> +iort_get_device_domain(struct device *dev, u32 req_id)
+>> +{
+>> +	static struct fwnode_handle *handle;
+>> +	int its_id;
+>> +
+>> +	if (!iort_table)
+>> +		return NULL;
+>> +
+>> +	if (iort_dev_find_its_id(dev, req_id, 0, &its_id))
+>> +		return NULL;
+>> +
+>> +	handle = iort_find_domain_token(its_id);
+>> +	if (!handle)
+>> +		return NULL;
+>
+> Can this actually happen? I can't see how, unless you have a race
+> between iort_dev_find_its_id and iort_find_domain_token. And given that
+> both these functions are only called from here, maybe you're better off
+> having a single function:
+>
+> struct fwnode_handle *iort_dev_find_its_domain_token(struct device *dev,
+> 						     u32 rid);
+>
+> which returns the atomic lookup of the ITS handle. Or is there any
+> constraints preventing us from holding the lock?
 
-The PM core allows calls to dev_pm_domain_set() only during ->probe or
-if the device is unbound. Same constraint as with device_link_add().
-This constraint was a major obstacle for me and I had to jump through
-numerous additional hoops to work around it:
+Yes this may happen, let's say we have one ITS with ID = 0:
+1. iort_register_domain_token() fails because of lack of memory (-ENOMEM)
+2. iort_dev_find_its_id() would point us to ITS with ID = 0
+3. iort_find_domain_token() return NULL due to no element on the list 
+for ITS ID = 0
 
-Thunderbolt controllers on Macs can be put into D3cold, but not with
-standard ACPI methods, so platform_pci_power_manageable() is false for
-these devices. Now this nothing unusual, the same applies to dual GPU
-laptops (custom ACPI DSMs for Nvidia Optimus and AMD PowerXpress).
-
-For such discrete GPUs, a struct dev_pm_domain is set during ->probe
-(drivers/gpu/vga/vga_switcheroo.c: vga_switcheroo_init_domain_pm_ops()).
-But I can't do that for Thunderbolt because the device in question is
-a PCIe upstream port. Ideally I would shove a dev_pm_domain on the
-upstream port when thunderbolt.ko loads, but again at that point
-the port has long since been bound (to portdrv) so I can't call
-dev_pm_domain_set().
-
-The workaround I settled on is to attach to the upstream port as a
-service driver, call down to the service driver's ->runtime_suspend
-hooks when the port runtime suspends and power the controller down.
-In addition, I had to make sure that saved_state isn't clobbered on
-resume (patch [09/13]).
-
-It would be good if someone who has a bird's eye view of the PM core
-(i.e., you) could make a decision
-(1) if it's possible and worthwhile to allow dev_pm_domain_set() for
-    already bound devices, and
-(2) if the PCI core should be be able to deal with devices which are
-    runtime suspended to D3cold but not by the platform (because that's
-    what patch [09/13] does).
-
-If the answer to (2) is yes then there's some more stuff to fix:
-Discrete GPUs on dual GPU laptops can be manually suspended to D3cold
-behind the PM core's back by loading nouveau / radeon / amdgpu with
-runpm=0 and writing OFF to the vga_switcheroo debugfs interface.
-This is currently broken in conjunction with system sleep (the GPU
-is no longer accessible after resume) because pci_pm_resume_noirq()
-calls pci_restore_state() even though the device is in D3cold and not
-power-manageable by the platform.
+Actually iort_dev_find_its_id() finds out ITS ID related to a given 
+device, it only interact with IORT content but not with 
+iort_msi_chip_list list. iort_find_domain_token() has its own lock for 
+iort_msi_chip_list so I am not sure why we need lock.
 
 Thanks,
-
-Lukas
+Tomasz
