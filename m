@@ -1,125 +1,41 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 17 Jun 2016 10:04:26 +0800
-Subject: [PATCH v7 15/15] acpi, numa: Enable ACPI based NUMA on ARM64
-In-Reply-To: <5759C7C0.3050508@suse.com>
-References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
- <1464129345-18985-16-git-send-email-ddaney.cavm@gmail.com>
- <5759C7C0.3050508@suse.com>
-Message-ID: <57635AAA.6050602@huawei.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 17 Jun 2016 02:14:50 +0000
+Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <87eg80d1m9.wl%kuninori.morimoto.gx@renesas.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
+ <20160601005751.GG20527@verge.net.au>
+ <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
+ <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
+ <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
+ <20160610010245.GA10152@verge.net.au>
+ <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
+ <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
+ <1b9a4cf4-1101-ccbf-772b-49b8a689a1b6@cogentembedded.com>
+ <CAMuHMdV6f5ZzPxySzCgi7L+Sr1_4Ph1sLLyQ_j-sJ0tmBOvrHg@mail.gmail.com>
+ <87eg80d1m9.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87a8iko9dm.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/10 3:47, Matthias Brugger wrote:
->
->
-> On 25/05/16 00:35, David Daney wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> Add function needed for cpu to node mapping, and enable ACPI based
->> NUMA for ARM64 in Kconfig
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Signed-off-by: Robert Richter <rrichter@cavium.com>
->> [david.daney at cavium.com added ACPI_NUMA default to y for ARM64]
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> ---
->>   drivers/acpi/Kconfig |  4 ++--
->>   drivers/acpi/numa.c  | 37 ++++++++++++++++++++++++++++++++++++-
->>   include/linux/acpi.h | 17 ++++++++++++++++-
->>   3 files changed, 54 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->> index b7e2e77..dd76b36 100644
->> --- a/drivers/acpi/Kconfig
->> +++ b/drivers/acpi/Kconfig
->> @@ -291,8 +291,8 @@ config ACPI_THERMAL
->>   config ACPI_NUMA
->>       bool "NUMA support"
->>       depends on NUMA
->> -    depends on (X86 || IA64)
->> -    default y if IA64_GENERIC || IA64_SGI_SN2
->> +    depends on (X86 || IA64 || ARM64)
->> +    default y if IA64_GENERIC || IA64_SGI_SN2 || ARM64
->>
->>   config ACPI_CUSTOM_DSDT_FILE
->>       string "Custom DSDT Table file to include"
->> diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
->> index fad6d28..9b7ce40 100644
->> --- a/drivers/acpi/numa.c
->> +++ b/drivers/acpi/numa.c
->> @@ -170,6 +170,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
->>           }
->>           break;
->>
->> +    case ACPI_SRAT_TYPE_GICC_AFFINITY:
->> +        {
->> +            struct acpi_srat_gicc_affinity *p =
->> +                (struct acpi_srat_gicc_affinity *)header;
->> +            pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
->> +                 p->acpi_processor_uid,
->> +                 p->proximity_domain,
->> +                 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
->> +                 "enabled" : "disabled");
->> +        }
->> +        break;
->> +
->>       default:
->>           pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
->>               header->type);
->> @@ -360,6 +372,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
->>       return 0;
->>   }
->>
->> +static int __init
->> +acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
->> +             const unsigned long end)
->> +{
->> +    struct acpi_srat_gicc_affinity *processor_affinity;
->> +
->> +    processor_affinity = (struct acpi_srat_gicc_affinity *)header;
->> +    if (!processor_affinity)
->> +        return -EINVAL;
->> +
->> +    acpi_table_print_srat_entry(header);
->> +
->> +    /* let architecture-dependent part to do it */
->> +    acpi_numa_gicc_affinity_init(processor_affinity);
->> +
->> +    return 0;
->> +}
->> +
->>   static int __initdata parsed_numa_memblks;
->>
->>   static int __init
->> @@ -404,6 +434,9 @@ int __init acpi_numa_init(void)
->>   {
->>       int cnt = 0;
->>
->> +    if (acpi_disabled)
->> +        return -EINVAL;
->> +
->>       /*
->>        * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
->>        * SRAT cpu entries could have different order with that in MADT.
->> @@ -412,13 +445,15 @@ int __init acpi_numa_init(void)
->>
->>       /* SRAT: Static Resource Affinity Table */
->>       if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
->> -        struct acpi_subtable_proc srat_proc[2];
->> +        struct acpi_subtable_proc srat_proc[3];
->>
->>           memset(srat_proc, 0, sizeof(srat_proc));
->>           srat_proc[0].id = ACPI_SRAT_TYPE_CPU_AFFINITY;
->>           srat_proc[0].handler = acpi_parse_processor_affinity;
->>           srat_proc[1].id = ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY;
->>           srat_proc[1].handler = acpi_parse_x2apic_affinity;
->> +        srat_proc[1].id = ACPI_SRAT_TYPE_GICC_AFFINITY;
->> +        srat_proc[1].handler = acpi_parse_gicc_affinity;
->
-> Should be srat_proc[2].id and srat_proc[2].handler, right?
 
-Good catch, will send a updated version shortly.
+Hi Geert
 
-Thanks
-Hanjun
+> > Right, I had forgotten about that.
+> > Fortunately the clk-rcar-gen2 driver has a sane failure mode for this case ;-)
+> > 
+> > it seems the RCAN clock can just be modeled as a fixed clock. However,
+> > its divider value isn't clear to me, as 15.9 MHz cannot be generated from PLL1
+> > using an integer divider. Morimoto-san, can you please ask for clarification?
+> 
+> OK.
+> Now, I asked to HW team about that.
+> Please wait.
+
+RCAN divider is fixed for 1/49
+
+PLL1 (= 1560MHz) 
+  -> 1/2 (= 780MHz)
+    -> RCAN divider 1/49 (= 15.9183..MHz)
+
+Is this clear for you ?
