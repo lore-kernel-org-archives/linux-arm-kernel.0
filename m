@@ -1,49 +1,33 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 17 Jun 2016 08:10:27 +0200
-Subject: [RESEND v7 0/6] regulator: mfd: max8997: Add regmap
-Message-ID: <1466143833-5856-1-git-send-email-k.kozlowski@samsung.com>
+Date: Fri, 17 Jun 2016 08:10:32 +0200
+Subject: [RESEND v7 5/6] rtc: max8997: Check for ERRNO of regmap_irq_get_virq()
+In-Reply-To: <1466143833-5856-1-git-send-email-k.kozlowski@samsung.com>
+References: <1466143833-5856-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1466143833-5856-6-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark,
+The regmap_irq_get_virq() can return zero or negative ERRNO, so it is
+insufficient to check only for non-zero value.
 
-I'm pushing old Robert's work and I miss only ack from you.
-Could you take a look at patch 1/6?
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/rtc/rtc-max8997.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Changes since v6
-================
-1. Add some acks.
-2. Remove patches already applied.
-
-
-Best regards,
-Krzysztof
-
-
-Krzysztof Kozlowski (3):
-  extcon: max8997: Fix handling error code of regmap_irq_get_virq()
-  rtc: max8997: Check for ERRNO of regmap_irq_get_virq()
-  extcon: max8997: Fix inconsistent indenting
-
-Robert Baldyga (3):
-  mfd: max8997: Use regmap to access registers
-  mfd: max8997: handle IRQs using regmap
-  mfd: max8997: Change irq names to upper case
-
- drivers/extcon/extcon-max8997.c       |  72 +++----
- drivers/input/misc/max8997_haptic.c   |  34 +--
- drivers/leds/leds-max8997.c           |  13 +-
- drivers/mfd/Kconfig                   |   3 +-
- drivers/mfd/Makefile                  |   2 +-
- drivers/mfd/max8997-irq.c             | 383 ----------------------------------
- drivers/mfd/max8997.c                 | 245 +++++++++++++++-------
- drivers/power/max8997_charger.c       |  33 +--
- drivers/regulator/max8997-regulator.c |  87 ++++----
- drivers/rtc/rtc-max8997.c             |  60 +++---
- include/linux/mfd/max8997-private.h   |  82 ++++++--
- 11 files changed, 385 insertions(+), 629 deletions(-)
- delete mode 100644 drivers/mfd/max8997-irq.c
-
+diff --git a/drivers/rtc/rtc-max8997.c b/drivers/rtc/rtc-max8997.c
+index 4998aee0f07f..1a06e17ebe9b 100644
+--- a/drivers/rtc/rtc-max8997.c
++++ b/drivers/rtc/rtc-max8997.c
+@@ -497,7 +497,7 @@ static int max8997_rtc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	virq = regmap_irq_get_virq(max8997->irq_data, MAX8997_PMICIRQ_RTCA1);
+-	if (!virq) {
++	if (virq <= 0) {
+ 		dev_err(&pdev->dev, "Failed to create mapping alarm IRQ\n");
+ 		ret = -ENXIO;
+ 		goto err_out;
 -- 
 1.9.1
