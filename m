@@ -1,41 +1,34 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 17 Jun 2016 11:41:47 -0600
-Subject: [PATCH] coresight: add PM runtime calls to coresight_simple_func()
-Message-ID: <1466185307-19539-1-git-send-email-mathieu.poirier@linaro.org>
+From: weiyj_lk@163.com (weiyj_lk at 163.com)
+Date: Fri, 17 Jun 2016 18:10:03 +0000
+Subject: [PATCH -next] PM / devfreq: event: Fix return value check in
+ exynos_nocp_parse_dt()
+Message-ID: <1466187003-19823-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is mandatory to enable a coresight block's power domain before
-trying to access management registers.  Otherwise the transaction
-simply stalls, leading to a system hang.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+In case of error, the function platform_get_resource() returns NULL
+pointer not ERR_PTR(). Remove unneeded error handling on the result
+of a call to platform_get_resource() since the value is passed to
+devm_ioremap_resource().
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- drivers/hwtracing/coresight/coresight-priv.h | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/devfreq/event/exynos-nocp.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index ad975c58080d..b047241e7496 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -16,6 +16,7 @@
- #include <linux/bitops.h>
- #include <linux/io.h>
- #include <linux/coresight.h>
-+#include <linux/pm_runtime.h>
+diff --git a/drivers/devfreq/event/exynos-nocp.c b/drivers/devfreq/event/exynos-nocp.c
+index 6b6a5f3..a584140 100644
+--- a/drivers/devfreq/event/exynos-nocp.c
++++ b/drivers/devfreq/event/exynos-nocp.c
+@@ -220,9 +220,6 @@ static int exynos_nocp_parse_dt(struct platform_device *pdev,
  
- /*
-  * Coresight management registers (0xf00-0xfcc)
-@@ -42,8 +43,10 @@ static ssize_t name##_show(struct device *_dev,				\
- 			   struct device_attribute *attr, char *buf)	\
- {									\
- 	type *drvdata = dev_get_drvdata(_dev->parent);			\
-+	pm_runtime_get_sync(_dev->parent);				\
- 	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
- 			 readl_relaxed(drvdata->base + offset));	\
-+	pm_runtime_put_sync(_dev->parent);				\
- }									\
- static DEVICE_ATTR_RO(name)
- 
--- 
-2.5.0
+ 	/* Maps the memory mapped IO to control nocp register */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (IS_ERR(res))
+-		return PTR_ERR(res);
+-
+ 	base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(base))
+ 		return PTR_ERR(base);
