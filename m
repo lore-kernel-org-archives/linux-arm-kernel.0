@@ -1,40 +1,47 @@
 From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 17 Jun 2016 16:57:20 +0900
-Subject: [PATCH 0/5] SPI CS line logical change and s3c64xx code rework
-Message-ID: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
+Date: Fri, 17 Jun 2016 16:57:23 +0900
+Subject: [PATCH 3/5] spi: s3c64xx: consider the case where the CS line is not
+ connected
+In-Reply-To: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
+References: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
+Message-ID: <1466150245-2648-4-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When the CS line is not connected, it is not needed to enable or
+disable the chip selection functionality from the s3c64xx
+devices. Keep et enable already at the initialization (by writing
+'0' in the S3C64XX_SPI_SLAVE_SEL register) and never disable it.
 
-the main goal of the patchset is to support SPI cnnected device
-without CS line link.
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+---
+ drivers/spi/spi-s3c64xx.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-The first patch removes two 'if' conditions in the spi core
-framework, leaving this way the responsibility for checking
-whether the CS line is connected to the specific SPI driver.
-Because the spi core doesn't allow a disconnected CS line, the
-drivers were assigning -1 or 255 as number of CS lines, which is
-not correct also considering the variables type.
-
-The second and third patches enable this case in the s3c64xx
-driver.
-
-The fourth and fith patches are code rework related to the
-s3c64xx driver.
-
-Andi
-
-Andi Shyti (5):
-  spi: do not fail if the CS line is not connected
-  spi: s3c64xx: group the CS signalling writes in a single function
-  spi: s3c64xx: consider the case where the CS line is not connected
-  spi: s3c64xx: do not configure the device twice
-  spi: s3c63xx: simplify if statement in prepare_transfer function
-
- drivers/spi/spi-s3c64xx.c | 104 ++++++++++++++++++++++++----------------------
- drivers/spi/spi.c         |  15 ++++---
- 2 files changed, 62 insertions(+), 57 deletions(-)
-
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 972367d..3d54c5f 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -315,6 +315,9 @@ static void s3c64xx_spi_set_cs(struct spi_device *spi, bool enable)
+ 	struct s3c64xx_spi_driver_data *sdd =
+ 					spi_master_get_devdata(spi->master);
+ 
++	if (!sdd->master->num_chipselect)
++		return;
++
+ 	if (enable) {
+ 		if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO)) {
+ 			writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+@@ -960,7 +963,9 @@ static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd, int channel)
+ 
+ 	sdd->cur_speed = 0;
+ 
+-	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
++	if (!sdd->master->num_chipselect)
++		writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
++	else if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
+ 		writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+ 
+ 	/* Disable Interrupts - we use Polling if not DMA mode */
 -- 
 2.8.1
