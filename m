@@ -1,41 +1,32 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 17 Jun 2016 16:13:57 +0100
-Subject: [PATCH 00/16] arm64: dts: msm8996: add more device support
-Message-ID: <1466176454-28084-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Fri, 17 Jun 2016 16:13:58 +0100
+Subject: [PATCH 01/16] arm64: dts: msm8996: add msmgpio label
+In-Reply-To: <1466176454-28084-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1466176454-28084-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1466176454-28084-2-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+This patch adds msmgpio label for pin and gpio controller so that
+it can referenced in dedicated pins file and other board level gpios.
 
-Here is a patchset for msm8996 which enables more support to serial, i2c, spi,
-sd card and pinctrl on msm8996. I was able to test i2c/sdcard with this patchset
-on a APQ8096 based board on mainline.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-srini
-
-Srinivas Kandagatla (16):
-  arm64: dts: msm8996: add msmgpio label
-  arm64: dts: msm8996: add blsp2_uart1 pinctrl
-  arm64: dts: msm8996: add blsp2_uart2 pinctrl nodes.
-  arm64: dts: msm8996: add support blsp2_uart2
-  arm64: dts: msm8996: add blsp1_i2c2 pinctrl nodes.
-  arm64: dts: msm8996: add support to blsp1_i2c2 device
-  arm64: dts: msm8996: add blsp2_i2c1 pinctrl
-  arm64: dts: msm8996: add support to blsp2_i2c1
-  arm64: dts: msm8996: add support to blsp2_i2c0 pinctrl
-  arm64: dts: msm8996: add support to blsp2_i2c0
-  arm64: dts: msm8996: add support to blsp1_spi0 pinctrl
-  arm64: dts: msm8996: add support to blsp1_spi0
-  arm64: dts: msm8996: add support to blsp2_spi5 pinctrl
-  arm64: dts: msm8996: add support to blsp2_spi5
-  arm64: dts: msm8996: add sdc2 pinctrl
-  arm64: dts: msm8996: add sdc2 support
-
- arch/arm64/boot/dts/qcom/msm8996-pins.dtsi | 303 +++++++++++++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8996.dtsi      | 103 +++++++++-
- 2 files changed, 405 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
-
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 0506fb8..8bf382f 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -161,7 +161,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		pinctrl at 1010000 {
++		msmgpio: pinctrl at 1010000 {
+ 			compatible = "qcom,msm8996-pinctrl";
+ 			reg = <0x01010000 0x300000>;
+ 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.7.4
