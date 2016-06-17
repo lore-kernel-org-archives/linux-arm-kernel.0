@@ -1,45 +1,69 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Fri, 17 Jun 2016 13:23:59 +0200
-Subject: [PATCH v2 00/10] Chain crypto requests together at the DMA level
-Message-ID: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
+Date: Fri, 17 Jun 2016 13:24:01 +0200
+Subject: [PATCH v2 02/10] crypto: marvell: Check engine is not already running
+ when enabling a req
+In-Reply-To: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
+References: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <1466162649-29911-3-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cryptographic Engines and Security Accelerators (CESA) supports
-the TDMA chained mode support. When this mode is enabled and crypto
-requests are chained at the DMA level, multiple crypto requests can be
-handled by the hardware engine without requiring any software
-intervention. This approach limits the number of interrupts generated
-by the engines thus improving its throughput and making the whole system
-behave nicely under heavy crypto load.
+Add a BUG_ON() call when the driver tries to launch a crypto request
+while the engine is still processing the previous one. This replaces
+a silent system hang by a verbose kernel panic with the associated
+backtrace to let the user know that something went wrong in the CESA
+driver.
 
-Benchmarking results with dmcrypt
-=================================
-		I/O read	I/O write
-Before		81.7 MB/s	31.7 MB/s
-After		129  MB/s	39.8 MB/s
+Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+---
 
-Improvement	+57.8 %		+25.5 %
+Changes in v2:
+  - Reworded the commit message
+  - Fixed cosmetic changes
 
-Romain Perier (10):
-  crypto: marvell: Add a macro constant for the size of the crypto queue
-  crypto: marvell: Check engine is not already running when enabling a
-    req
-  crypto: marvell: Fix wrong type check in dma functions
-  crypto: marvell: Copy IV vectors by DMA transfers for acipher requests
-  crypto: marvell: Move tdma chain out of mv_cesa_tdma_req and remove it
-  crypto: marvell: Add a complete operation for async requests
-  crypto: marvell: Move SRAM I/O operations to step functions
-  crypto: marvell: Add load balancing between engines
-  crypto: marvell: Add support for chaining crypto requests in TDMA mode
-  crypto: marvell: Increase the size of the crypto queue
+ drivers/crypto/marvell/cipher.c | 2 ++
+ drivers/crypto/marvell/hash.c   | 2 ++
+ drivers/crypto/marvell/tdma.c   | 2 ++
+ 3 files changed, 6 insertions(+)
 
- drivers/crypto/marvell/cesa.c   | 142 +++++++++++++++++++++++++++---------
- drivers/crypto/marvell/cesa.h   | 120 +++++++++++++++++++++---------
- drivers/crypto/marvell/cipher.c | 157 ++++++++++++++++++++++++----------------
- drivers/crypto/marvell/hash.c   | 150 ++++++++++++++++++--------------------
- drivers/crypto/marvell/tdma.c   | 132 +++++++++++++++++++++++++++++++--
- 5 files changed, 483 insertions(+), 218 deletions(-)
-
+diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
+index dcf1fce..ec23609 100644
+--- a/drivers/crypto/marvell/cipher.c
++++ b/drivers/crypto/marvell/cipher.c
+@@ -106,6 +106,8 @@ static void mv_cesa_ablkcipher_std_step(struct ablkcipher_request *req)
+ 
+ 	mv_cesa_set_int_mask(engine, CESA_SA_INT_ACCEL0_DONE);
+ 	writel_relaxed(CESA_SA_CFG_PARA_DIS, engine->regs + CESA_SA_CFG);
++	BUG_ON(readl(engine->regs + CESA_SA_CMD) &
++		     CESA_SA_CMD_EN_CESA_SA_ACCL0);
+ 	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
+ }
+ 
+diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
+index 7ca2e0f..80bddd7 100644
+--- a/drivers/crypto/marvell/hash.c
++++ b/drivers/crypto/marvell/hash.c
+@@ -237,6 +237,8 @@ static void mv_cesa_ahash_std_step(struct ahash_request *req)
+ 
+ 	mv_cesa_set_int_mask(engine, CESA_SA_INT_ACCEL0_DONE);
+ 	writel_relaxed(CESA_SA_CFG_PARA_DIS, engine->regs + CESA_SA_CFG);
++	BUG_ON(readl(engine->regs + CESA_SA_CMD) &
++	       CESA_SA_CMD_EN_CESA_SA_ACCL0);
+ 	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
+ }
+ 
+diff --git a/drivers/crypto/marvell/tdma.c b/drivers/crypto/marvell/tdma.c
+index 7642798..8c86bb6 100644
+--- a/drivers/crypto/marvell/tdma.c
++++ b/drivers/crypto/marvell/tdma.c
+@@ -53,6 +53,8 @@ void mv_cesa_dma_step(struct mv_cesa_tdma_req *dreq)
+ 		       engine->regs + CESA_SA_CFG);
+ 	writel_relaxed(dreq->chain.first->cur_dma,
+ 		       engine->regs + CESA_TDMA_NEXT_ADDR);
++	BUG_ON(readl(engine->regs + CESA_SA_CMD) &
++	       CESA_SA_CMD_EN_CESA_SA_ACCL0);
+ 	writel(CESA_SA_CMD_EN_CESA_SA_ACCL0, engine->regs + CESA_SA_CMD);
+ }
+ 
 -- 
 2.7.4
