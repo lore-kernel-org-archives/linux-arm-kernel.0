@@ -1,236 +1,125 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 17 Jun 2016 09:58:13 +0800
-Subject: [PATCH v2 1/2] drm/mediatek: Add gamma correction
-In-Reply-To: <1466128694-11208-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1466128694-11208-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1466128694-11208-2-git-send-email-bibby.hsieh@mediatek.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 17 Jun 2016 10:04:26 +0800
+Subject: [PATCH v7 15/15] acpi, numa: Enable ACPI based NUMA on ARM64
+In-Reply-To: <5759C7C0.3050508@suse.com>
+References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
+ <1464129345-18985-16-git-send-email-ddaney.cavm@gmail.com>
+ <5759C7C0.3050508@suse.com>
+Message-ID: <57635AAA.6050602@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apply gamma function to correct brightness values.
-It applies arbitrary mapping curve to compensate the
-incorrect transfer function of the panel.
+On 2016/6/10 3:47, Matthias Brugger wrote:
+>
+>
+> On 25/05/16 00:35, David Daney wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> Add function needed for cpu to node mapping, and enable ACPI based
+>> NUMA for ARM64 in Kconfig
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Robert Richter <rrichter@cavium.com>
+>> [david.daney at cavium.com added ACPI_NUMA default to y for ARM64]
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> ---
+>>   drivers/acpi/Kconfig |  4 ++--
+>>   drivers/acpi/numa.c  | 37 ++++++++++++++++++++++++++++++++++++-
+>>   include/linux/acpi.h | 17 ++++++++++++++++-
+>>   3 files changed, 54 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index b7e2e77..dd76b36 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -291,8 +291,8 @@ config ACPI_THERMAL
+>>   config ACPI_NUMA
+>>       bool "NUMA support"
+>>       depends on NUMA
+>> -    depends on (X86 || IA64)
+>> -    default y if IA64_GENERIC || IA64_SGI_SN2
+>> +    depends on (X86 || IA64 || ARM64)
+>> +    default y if IA64_GENERIC || IA64_SGI_SN2 || ARM64
+>>
+>>   config ACPI_CUSTOM_DSDT_FILE
+>>       string "Custom DSDT Table file to include"
+>> diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+>> index fad6d28..9b7ce40 100644
+>> --- a/drivers/acpi/numa.c
+>> +++ b/drivers/acpi/numa.c
+>> @@ -170,6 +170,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
+>>           }
+>>           break;
+>>
+>> +    case ACPI_SRAT_TYPE_GICC_AFFINITY:
+>> +        {
+>> +            struct acpi_srat_gicc_affinity *p =
+>> +                (struct acpi_srat_gicc_affinity *)header;
+>> +            pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
+>> +                 p->acpi_processor_uid,
+>> +                 p->proximity_domain,
+>> +                 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
+>> +                 "enabled" : "disabled");
+>> +        }
+>> +        break;
+>> +
+>>       default:
+>>           pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
+>>               header->type);
+>> @@ -360,6 +372,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
+>>       return 0;
+>>   }
+>>
+>> +static int __init
+>> +acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
+>> +             const unsigned long end)
+>> +{
+>> +    struct acpi_srat_gicc_affinity *processor_affinity;
+>> +
+>> +    processor_affinity = (struct acpi_srat_gicc_affinity *)header;
+>> +    if (!processor_affinity)
+>> +        return -EINVAL;
+>> +
+>> +    acpi_table_print_srat_entry(header);
+>> +
+>> +    /* let architecture-dependent part to do it */
+>> +    acpi_numa_gicc_affinity_init(processor_affinity);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>>   static int __initdata parsed_numa_memblks;
+>>
+>>   static int __init
+>> @@ -404,6 +434,9 @@ int __init acpi_numa_init(void)
+>>   {
+>>       int cnt = 0;
+>>
+>> +    if (acpi_disabled)
+>> +        return -EINVAL;
+>> +
+>>       /*
+>>        * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
+>>        * SRAT cpu entries could have different order with that in MADT.
+>> @@ -412,13 +445,15 @@ int __init acpi_numa_init(void)
+>>
+>>       /* SRAT: Static Resource Affinity Table */
+>>       if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
+>> -        struct acpi_subtable_proc srat_proc[2];
+>> +        struct acpi_subtable_proc srat_proc[3];
+>>
+>>           memset(srat_proc, 0, sizeof(srat_proc));
+>>           srat_proc[0].id = ACPI_SRAT_TYPE_CPU_AFFINITY;
+>>           srat_proc[0].handler = acpi_parse_processor_affinity;
+>>           srat_proc[1].id = ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY;
+>>           srat_proc[1].handler = acpi_parse_x2apic_affinity;
+>> +        srat_proc[1].id = ACPI_SRAT_TYPE_GICC_AFFINITY;
+>> +        srat_proc[1].handler = acpi_parse_gicc_affinity;
+>
+> Should be srat_proc[2].id and srat_proc[2].handler, right?
 
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |    8 +++
- drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |    1 +
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |   89 ++++++++++++++++++++++++++-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   10 +++
- 4 files changed, 106 insertions(+), 2 deletions(-)
+Good catch, will send a updated version shortly.
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index 24aa3ba..ee219bb 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -409,6 +409,10 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
- 	}
- 	if (pending_planes)
- 		mtk_crtc->pending_planes = true;
-+	if (crtc->state->color_mgmt_changed)
-+		for (i = 0; i < mtk_crtc->ddp_comp_nr; i++)
-+			mtk_ddp_gamma_set(mtk_crtc->ddp_comp[i], crtc->state);
-+
- }
- 
- static const struct drm_crtc_funcs mtk_crtc_funcs = {
-@@ -418,6 +422,7 @@ static const struct drm_crtc_funcs mtk_crtc_funcs = {
- 	.reset			= mtk_drm_crtc_reset,
- 	.atomic_duplicate_state	= mtk_drm_crtc_duplicate_state,
- 	.atomic_destroy_state	= mtk_drm_crtc_destroy_state,
-+	.gamma_set		= drm_atomic_helper_legacy_gamma_set,
- };
- 
- static const struct drm_crtc_helper_funcs mtk_crtc_helper_funcs = {
-@@ -569,6 +574,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
- 	if (ret < 0)
- 		goto unprepare;
- 
-+	drm_mode_crtc_set_gamma_size(&mtk_crtc->base, MTK_LUT_SIZE);
-+	drm_helper_crtc_enable_color_mgmt(&mtk_crtc->base, MTK_LUT_SIZE,
-+					  MTK_LUT_SIZE);
- 	priv->crtc[pipe] = &mtk_crtc->base;
- 	priv->num_pipes++;
- 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-index 81e5566..d332564 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-@@ -19,6 +19,7 @@
- #include "mtk_drm_plane.h"
- 
- #define OVL_LAYER_NR	4
-+#define MTK_LUT_SIZE	512
- 
- int mtk_drm_crtc_enable_vblank(struct drm_device *drm, unsigned int pipe);
- void mtk_drm_crtc_disable_vblank(struct drm_device *drm, unsigned int pipe);
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-index 3970fcf..56c5894 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-@@ -24,6 +24,7 @@
- #include "mtk_drm_drv.h"
- #include "mtk_drm_plane.h"
- #include "mtk_drm_ddp_comp.h"
-+#include "mtk_drm_crtc.h"
- 
- #define DISP_OD_EN				0x0000
- #define DISP_OD_INTEN				0x0008
-@@ -38,6 +39,21 @@
- #define DISP_COLOR_WIDTH			0x0c50
- #define DISP_COLOR_HEIGHT			0x0c54
- 
-+#define DISP_AAL_EN				0x000
-+#define DISP_AAL_SIZE				0x030
-+
-+#define DISP_GAMMA_EN				0x000
-+#define DISP_GAMMA_CFG				0x020
-+#define DISP_GAMMA_SIZE				0x030
-+#define DISP_GAMMA_LUT				0x700
-+
-+#define LUT_10BIT_MASK				0x3ff
-+
-+#define AAL_EN			BIT(0)
-+
-+#define GAMMA_EN		BIT(0)
-+#define GAMMA_LUT_EN		BIT(1)
-+
- #define	OD_RELAY_MODE		BIT(0)
- 
- #define	UFO_BYPASS		BIT(2)
-@@ -76,6 +92,61 @@ static void mtk_ufoe_start(struct mtk_ddp_comp *comp)
- 	writel(UFO_BYPASS, comp->regs + DISP_REG_UFO_START);
- }
- 
-+static void mtk_aal_config(struct mtk_ddp_comp *comp, unsigned int w,
-+			   unsigned int h, unsigned int vrefresh)
-+{
-+	writel(h << 16 | w, comp->regs + DISP_AAL_SIZE);
-+}
-+
-+static void mtk_aal_start(struct mtk_ddp_comp *comp)
-+{
-+	writel(AAL_EN, comp->regs  + DISP_AAL_EN);
-+}
-+
-+static void mtk_aal_stop(struct mtk_ddp_comp *comp)
-+{
-+	writel_relaxed(0x0, comp->regs  + DISP_AAL_EN);
-+}
-+
-+static void mtk_gamma_config(struct mtk_ddp_comp *comp, unsigned int w,
-+			     unsigned int h, unsigned int vrefresh)
-+{
-+	writel(h << 16 | w, comp->regs + DISP_GAMMA_SIZE);
-+}
-+
-+static void mtk_gamma_start(struct mtk_ddp_comp *comp)
-+{
-+	writel(GAMMA_EN, comp->regs  + DISP_GAMMA_EN);
-+}
-+
-+static void mtk_gamma_stop(struct mtk_ddp_comp *comp)
-+{
-+	writel_relaxed(0x0, comp->regs  + DISP_GAMMA_EN);
-+}
-+
-+static void mtk_gamma_set(struct mtk_ddp_comp *comp,
-+			  struct drm_crtc_state *state)
-+{
-+	unsigned int i, reg;
-+	struct drm_color_lut *lut;
-+	void __iomem *lut_base;
-+	u32 word;
-+
-+	if (state->gamma_lut) {
-+		reg = readl(comp->regs + DISP_GAMMA_CFG);
-+		reg = reg | GAMMA_LUT_EN;
-+		writel(reg, comp->regs + DISP_GAMMA_CFG);
-+		lut_base = comp->regs + DISP_GAMMA_LUT;
-+		lut = (struct drm_color_lut *)state->gamma_lut->data;
-+		for (i = 0; i < MTK_LUT_SIZE; i++) {
-+			word = (((lut[i].red >> 6) & LUT_10BIT_MASK) << 20) +
-+			      (((lut[i].green >> 6) & LUT_10BIT_MASK) << 10) +
-+			      ((lut[i].blue >> 6) & LUT_10BIT_MASK);
-+			writel(word, (lut_base + i * 4));
-+		}
-+	}
-+}
-+
- static const struct mtk_ddp_comp_funcs ddp_color = {
- 	.config = mtk_color_config,
- 	.start = mtk_color_start,
-@@ -90,6 +161,20 @@ static const struct mtk_ddp_comp_funcs ddp_ufoe = {
- 	.start = mtk_ufoe_start,
- };
- 
-+static const struct mtk_ddp_comp_funcs ddp_aal = {
-+	.gamma_set = mtk_gamma_set,
-+	.config = mtk_aal_config,
-+	.start = mtk_aal_start,
-+	.stop = mtk_aal_stop,
-+};
-+
-+static const struct mtk_ddp_comp_funcs ddp_gamma = {
-+	.gamma_set = mtk_gamma_set,
-+	.config = mtk_gamma_config,
-+	.start = mtk_gamma_start,
-+	.stop = mtk_gamma_stop,
-+};
-+
- static const char * const mtk_ddp_comp_stem[MTK_DDP_COMP_TYPE_MAX] = {
- 	[MTK_DISP_OVL] = "ovl",
- 	[MTK_DISP_RDMA] = "rdma",
-@@ -112,13 +197,13 @@ struct mtk_ddp_comp_match {
- };
- 
- static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
--	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, NULL },
-+	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
- 	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
- 	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
- 	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
- 	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
- 	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
--	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, NULL },
-+	[DDP_COMPONENT_GAMMA]	= { MTK_DISP_GAMMA,	0, &ddp_gamma },
- 	[DDP_COMPONENT_OD]	= { MTK_DISP_OD,	0, &ddp_od },
- 	[DDP_COMPONENT_OVL0]	= { MTK_DISP_OVL,	0, NULL },
- 	[DDP_COMPONENT_OVL1]	= { MTK_DISP_OVL,	1, NULL },
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-index 6b13ba9..07e17fe 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-@@ -20,6 +20,7 @@ struct device;
- struct device_node;
- struct drm_crtc;
- struct drm_device;
-+struct drm_crtc_state;
- struct mtk_plane_state;
- 
- enum mtk_ddp_comp_type {
-@@ -73,6 +74,8 @@ struct mtk_ddp_comp_funcs {
- 	void (*layer_off)(struct mtk_ddp_comp *comp, unsigned int idx);
- 	void (*layer_config)(struct mtk_ddp_comp *comp, unsigned int idx,
- 			     struct mtk_plane_state *state);
-+	void (*gamma_set)(struct mtk_ddp_comp *comp,
-+			  struct drm_crtc_state *state);
- };
- 
- struct mtk_ddp_comp {
-@@ -139,6 +142,13 @@ static inline void mtk_ddp_comp_layer_config(struct mtk_ddp_comp *comp,
- 		comp->funcs->layer_config(comp, idx, state);
- }
- 
-+static inline void mtk_ddp_gamma_set(struct mtk_ddp_comp *comp,
-+				     struct drm_crtc_state *state)
-+{
-+	if (comp->funcs && comp->funcs->gamma_set)
-+		comp->funcs->gamma_set(comp, state);
-+}
-+
- int mtk_ddp_comp_get_id(struct device_node *node,
- 			enum mtk_ddp_comp_type comp_type);
- int mtk_ddp_comp_init(struct device *dev, struct device_node *comp_node,
--- 
-1.7.9.5
+Thanks
+Hanjun
