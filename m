@@ -1,100 +1,72 @@
 From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Fri, 17 Jun 2016 12:42:39 -0500
-Subject: [PATCHv3 5/7] EDAC, altera: Add Arria10 ECC memory init functions
-In-Reply-To: <20160617172150.GJ3912@pd.tnic>
+Date: Fri, 17 Jun 2016 12:43:39 -0500
+Subject: [PATCHv3 6/7] EDAC, altera: Add Arria10 Ethernet EDAC support
+In-Reply-To: <20160617172928.GK3912@pd.tnic>
 References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
- <1465852752-11018-6-git-send-email-tthayer@opensource.altera.com>
- <20160617172150.GJ3912@pd.tnic>
-Message-ID: <5764368F.6040800@opensource.altera.com>
+ <1465852752-11018-7-git-send-email-tthayer@opensource.altera.com>
+ <20160617172928.GK3912@pd.tnic>
+Message-ID: <576436CB.6070002@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Boris,
 
-
-On 06/17/2016 12:21 PM, Borislav Petkov wrote:
-> On Mon, Jun 13, 2016 at 04:19:10PM -0500, tthayer at opensource.altera.com wrote:
+On 06/17/2016 12:29 PM, Borislav Petkov wrote:
+> On Mon, Jun 13, 2016 at 04:19:11PM -0500, tthayer at opensource.altera.com wrote:
 >> From: Thor Thayer <tthayer@opensource.altera.com>
 >>
->> In preparation for additional memory module ECCs, add the
->> memory initialization functions and helper functions used
->> for memory initialization.
+>> Add Altera Arria10 Ethernet FIFO memory EDAC support. Update
+>> to support a common compatibility string for all ethernet
+>> FIFOs in the DT.
 >>
 >> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 >> ---
->> v2: Specify INTMODE selection -> IRQ on each ECC error.
->>      Insert functions above memory-specific functions so that function
->>      declarations are not required.
->>      Use ERRINTENS & ERRINTENR registers instead of read/modify/write.
->> v3: Changes for common compatibility string:
->>      - Pass node instead of compatibility string.
->>      - New altr_init_a10_ecc_device_type() for peripherals.
->>      - Add __init to altr_init_a10_ecc_block().
->>      - Add a10_get_irq_mask().
+>> v2  Remove (void *) cast from altr_edac_device_of_match[]
+>>      Addition of panic flag to ethernet private data.
+>> v3  Use common compatiblity string.
+>>      Simplify socfpga_init_ethernet_ecc().
 >> ---
->>   drivers/edac/altera_edac.c |  197 ++++++++++++++++++++++++++++++++++++++++++++
->>   drivers/edac/altera_edac.h |    8 ++
->>   2 files changed, 205 insertions(+)
->
->> +/*
->> + * This function uses the memory initialization block in the Arria10 ECC
->> + * controller to initialize/clear the entire memory data and ECC data.
->> + */
->> +static int altr_init_memory_port(void __iomem *ioaddr, int port)
->> +{
->> +	int limit = ALTR_A10_ECC_INIT_WATCHDOG_10US;
->> +	u32 init_mask = ALTR_A10_ECC_INITA;
->> +	u32 stat_mask = ALTR_A10_ECC_INITCOMPLETEA;
->> +	u32 clear_mask = ALTR_A10_ECC_ERRPENA_MASK;
->> +	int ret = 0;
+>>   drivers/edac/Kconfig       |    7 +++++++
+>>   drivers/edac/altera_edac.c |   38 ++++++++++++++++++++++++++++++++++++--
+>>   drivers/edac/altera_edac.h |    3 +++
+>>   3 files changed, 46 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+>> index 6ca7474..d0c1dab 100644
+>> --- a/drivers/edac/Kconfig
+>> +++ b/drivers/edac/Kconfig
+>> @@ -391,6 +391,13 @@ config EDAC_ALTERA_OCRAM
+>>   	  Support for error detection and correction on the
+>>   	  Altera On-Chip RAM Memory for Altera SoCs.
+>>
+>> +config EDAC_ALTERA_ETHERNET
+>> +	bool "Altera Ethernet FIFO ECC"
+>> +	depends on EDAC_ALTERA=y
+>> +	help
+>> +	  Support for error detection and correction on the
+>> +	  Altera Ethernet FIFO Memory for Altera SoCs.
 >> +
->> +	if (port) {
->> +		init_mask = ALTR_A10_ECC_INITB;
->> +		stat_mask = ALTR_A10_ECC_INITCOMPLETEB;
->> +		clear_mask = ALTR_A10_ECC_ERRPENB_MASK;
->> +	}
->
-> Do a
-> 	u32 init_mask, stat_mask, clear_mask;
->
-> 	if (port) {
-> 		init_mask = ALTR_A10_ECC_INITB;
-> 		...
-> 	} else {
-> 		init_mask = ALTR_A10_ECC_INITA;
-> 		...
-> 	}
->
-> so that you don't have to repeat the assignments in the if (port) case.
->
-OK. I only have one PORTB peripheral so normally the if (port) branch 
-won't execute but I see your point.
-
+>>   config EDAC_SYNOPSYS
+>>   	tristate "Synopsys DDR Memory Controller"
+>>   	depends on EDAC_MM_EDAC && ARCH_ZYNQ
+>> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+>> index f27bb29..14f99ae 100644
+>> --- a/drivers/edac/altera_edac.c
+>> +++ b/drivers/edac/altera_edac.c
+>> @@ -1260,6 +1260,34 @@ const struct edac_device_prv_data a10_l2ecc_data = {
+>>
+>>   #endif	/* CONFIG_EDAC_ALTERA_L2C */
+>>
+>> +/********************* Ethernet Device Functions ********************/
 >> +
->> +	ecc_set_bits(init_mask, (ioaddr + ALTR_A10_ECC_CTRL_OFST));
->> +	while (limit--) {
->> +		if (ecc_test_bits(stat_mask,
->> +				  (ioaddr + ALTR_A10_ECC_INITSTAT_OFST)))
->> +			break;
->> +		udelay(1);
->> +	}
->> +	if (limit < 0)
->> +		ret = -EBUSY;
+>> +#ifdef CONFIG_EDAC_ALTERA_ETHERNET
 >> +
->> +	/* Clear any pending ECC interrupts */
->> +	writel(clear_mask, (ioaddr + ALTR_A10_ECC_INTSTAT_OFST));
->> +
->> +	return ret;
->> +}
->> +
->> +/*
->> + * Aside from the L2 ECC, the Arria10 ECC memories have a common register
->> + * layout so the following functions can be shared between all peripherals.
+>> +const struct edac_device_prv_data a10_enet0rxecc_data = {
 >
-> I don't understand - we're here under
+> This needs to be "static const" and then you don't need to init panic to
+> false.
 >
-> #if defined(CONFIG_EDAC_ALTERA_ETHERNET)
+> Your other edac_device_prv_data things are not static too, please
+> convert them in a separate patch too.
 >
-> What sharing do you mean?
->
-I'll be adding a number of peripheral FIFOs in future patches but I 
-agree that the comment is misleading in this case. I'll fix it.
+OK, I'll make the change. Thanks!
