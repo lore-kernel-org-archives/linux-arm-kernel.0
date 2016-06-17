@@ -1,33 +1,44 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 17 Jun 2016 13:20:50 +0100
-Subject: [PATCH v5] ASoC: rockchip: Add machine driver for RK3399 GRU
- Boards
-In-Reply-To: <CAL_JsqKEDw14HmbW=78_4P03nFDfmT7kOn4RsTF-PrBi+jWr0g@mail.gmail.com>
-References: <1465807339-1100-1-git-send-email-zhengxing@rock-chips.com>
- <20160614223810.GA7925@rob-hp-laptop>
- <20160615095312.GY2282@sirena.org.uk>
- <CAL_JsqKEDw14HmbW=78_4P03nFDfmT7kOn4RsTF-PrBi+jWr0g@mail.gmail.com>
-Message-ID: <20160617122050.GL26099@sirena.org.uk>
+Date: Fri, 17 Jun 2016 13:28:03 +0100
+Subject: [PATCH 1/5] spi: do not fail if the CS line is not connected
+In-Reply-To: <20160617113622.GA10760@jack.zhora.eu>
+References: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
+ <1466150245-2648-2-git-send-email-andi.shyti@samsung.com>
+ <20160617104725.GC26099@sirena.org.uk>
+ <20160617113622.GA10760@jack.zhora.eu>
+Message-ID: <20160617122803.GN26099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 07:44:32AM -0500, Rob Herring wrote:
-> On Wed, Jun 15, 2016 at 4:53 AM, Mark Brown <broonie@kernel.org> wrote:
+On Fri, Jun 17, 2016 at 08:36:22PM +0900, Andi Shyti wrote:
 
-> > There's no point in standard property names if the interpretation has to
-> > be non-standard.
+> > > In this case do not fail and defer to the SPI device drivers the
+> > > responsibility to check whether the num-cs is '0'.
 
-> Okay, I agree with the system specific interpretation part. However, I
-> don't think using simple-card or not determines using common
-> properties.
+> > A SPI controller always has one chip seelct, it may not be controllable
+> > but it's at least logically present.
 
-The point here is that if those properties were to have a standard
-meaning the system would be using simple-card anyway, the meaning is
-entirely in the context of the card.
+> This is true, but there are cases where the CS is not connected
+> and this case needs to be treated separately to allow the device
+> to work.
+
+In what way?  It is just as easy for a device with no physical chip
+select to have a logical chip select of 0 that it does nothing with as
+it is for that device to handle any other number.
+
+> This is the case of:
+
+> ./drivers/spi/spi-mpc52xx-psc.c:391: master->num_chipselect = 255;
+> ./drivers/spi/spi-oc-tiny.c:256:        master->num_chipselect = 255;
+
+> ./drivers/spi/spi-pxa2xx-pci.c:64:              .num_chipselect = -1,
+> ./drivers/spi/spi-bcm2835aux.c:436:     master->num_chipselect = -1;
+
+These need fixing.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160617/8982dd54/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160617/04fd2797/attachment.sig>
