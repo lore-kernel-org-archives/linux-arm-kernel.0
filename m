@@ -1,153 +1,33 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 17 Jun 2016 11:53:02 +0800
-Subject: [PATCH update v7 15/15] acpi, numa: Enable ACPI based NUMA on ARM64
-Message-ID: <1466135582-37520-1-git-send-email-guohanjun@huawei.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 Jun 2016 21:07:09 -0700
+Subject: ARM and OMAP patches to avoid lockdep complaints
+In-Reply-To: <20160615210926.GA30957@linux.vnet.ibm.com>
+References: <20160615210926.GA30957@linux.vnet.ibm.com>
+Message-ID: <20160617040708.GA22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+Hi,
 
-Add function needed for cpu to node mapping, and enable ACPI based
-NUMA for ARM64 in Kconfig
+* Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160615 14:11]:
+> Hello!
+> 
+> Ingo was not comfortable taking these through -tip, which is understandable,
+> given that they don't depend on each other or on anything else not already
+> in mainline, and that they don't have anything to do with -tip.
+> 
+> So what would you guys like to do with these?
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
-[david.daney at cavium.com added ACPI_NUMA default to y for ARM64]
-Signed-off-by: David Daney <david.daney@cavium.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
+I'll merge it into omap-for-v4.7/fixes thanks.
 
-update version:
-Address the comment from Matthias which was wrongly set srat_proc[1]
-but should be srat_proc[2].
+Regards,
 
-Rafael, this patch is beased on your linux-next branch.
+Tony
 
- drivers/acpi/Kconfig |  4 ++--
- drivers/acpi/numa.c  | 37 ++++++++++++++++++++++++++++++++++++-
- include/linux/acpi.h | 17 ++++++++++++++++-
- 3 files changed, 54 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index b7e2e77..dd76b36 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -291,8 +291,8 @@ config ACPI_THERMAL
- config ACPI_NUMA
- 	bool "NUMA support"
- 	depends on NUMA
--	depends on (X86 || IA64)
--	default y if IA64_GENERIC || IA64_SGI_SN2
-+	depends on (X86 || IA64 || ARM64)
-+	default y if IA64_GENERIC || IA64_SGI_SN2 || ARM64
- 
- config ACPI_CUSTOM_DSDT_FILE
- 	string "Custom DSDT Table file to include"
-diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-index fad6d28..ce3a7a1 100644
---- a/drivers/acpi/numa.c
-+++ b/drivers/acpi/numa.c
-@@ -170,6 +170,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
- 		}
- 		break;
- 
-+	case ACPI_SRAT_TYPE_GICC_AFFINITY:
-+		{
-+			struct acpi_srat_gicc_affinity *p =
-+			    (struct acpi_srat_gicc_affinity *)header;
-+			pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
-+				 p->acpi_processor_uid,
-+				 p->proximity_domain,
-+				 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
-+				 "enabled" : "disabled");
-+		}
-+		break;
-+
- 	default:
- 		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
- 			header->type);
-@@ -360,6 +372,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
- 	return 0;
- }
- 
-+static int __init
-+acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
-+			 const unsigned long end)
-+{
-+	struct acpi_srat_gicc_affinity *processor_affinity;
-+
-+	processor_affinity = (struct acpi_srat_gicc_affinity *)header;
-+	if (!processor_affinity)
-+		return -EINVAL;
-+
-+	acpi_table_print_srat_entry(header);
-+
-+	/* let architecture-dependent part to do it */
-+	acpi_numa_gicc_affinity_init(processor_affinity);
-+
-+	return 0;
-+}
-+
- static int __initdata parsed_numa_memblks;
- 
- static int __init
-@@ -404,6 +434,9 @@ int __init acpi_numa_init(void)
- {
- 	int cnt = 0;
- 
-+	if (acpi_disabled)
-+		return -EINVAL;
-+
- 	/*
- 	 * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
- 	 * SRAT cpu entries could have different order with that in MADT.
-@@ -412,13 +445,15 @@ int __init acpi_numa_init(void)
- 
- 	/* SRAT: Static Resource Affinity Table */
- 	if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
--		struct acpi_subtable_proc srat_proc[2];
-+		struct acpi_subtable_proc srat_proc[3];
- 
- 		memset(srat_proc, 0, sizeof(srat_proc));
- 		srat_proc[0].id = ACPI_SRAT_TYPE_CPU_AFFINITY;
- 		srat_proc[0].handler = acpi_parse_processor_affinity;
- 		srat_proc[1].id = ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY;
- 		srat_proc[1].handler = acpi_parse_x2apic_affinity;
-+		srat_proc[2].id = ACPI_SRAT_TYPE_GICC_AFFINITY;
-+		srat_proc[2].handler = acpi_parse_gicc_affinity;
- 
- 		acpi_table_parse_entries_array(ACPI_SIG_SRAT,
- 					sizeof(struct acpi_table_srat),
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 8010b26..9515db6 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -232,10 +232,25 @@ int acpi_table_parse_madt(enum acpi_madt_type id,
- int acpi_parse_mcfg (struct acpi_table_header *header);
- void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
- 
--/* the following four functions are architecture-dependent */
-+/* the following numa functions are architecture-dependent */
- void acpi_numa_slit_init (struct acpi_table_slit *slit);
-+
-+#if defined(CONFIG_X86) || defined(CONFIG_IA64)
- void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa) { }
-+#endif
-+
- void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
-+
-+#ifdef CONFIG_ARM64
-+void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
-+#endif
-+
- int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
- 
- #ifndef PHYS_CPUID_INVALID
--- 
-1.7.12.4
+> They may be pulled from 7c64cc0531fa (arm: Use _rcuidle for
+> smp_cross_call() tracepoints) in my -rcu tree:
+> 
+> 	git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git
+> 
+> 							Thanx, Paul
+> 
