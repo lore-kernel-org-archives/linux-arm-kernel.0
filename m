@@ -1,88 +1,111 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Fri, 17 Jun 2016 18:09:25 +0800
-Subject: [PATCH 12/12] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
- property
-In-Reply-To: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
-References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1466158165-9380-13-git-send-email-peter.chen@nxp.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 17 Jun 2016 11:27:13 +0100
+Subject: [PATCH 1/2] arm64: smp: Add function to determine if cpus are
+ stuck in the kernel
+In-Reply-To: <1466156097-20028-2-git-send-email-james.morse@arm.com>
+References: <1466156097-20028-1-git-send-email-james.morse@arm.com>
+ <1466156097-20028-2-git-send-email-james.morse@arm.com>
+Message-ID: <20160617102713.GA14524@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Chen <peter.chen@freescale.com>
+On Fri, Jun 17, 2016 at 10:34:56AM +0100, James Morse wrote:
+> kernel/smp.c has a fancy counter that keeps track of the number of CPUs
+> it marked as not-present and left in cpu_park_loop(). If there are any
+> CPUs spinning in here, features like kexec or hibernate may release them
+> by overwriting this memory.
+> 
+> This problem also occurs on machines using spin-tables to release
+> secondary cores.
+> After commit 44dbcc93ab67 ("arm64: Fix behavior of maxcpus=N")
+> we bring all known cpus into the secondary holding pen, but may not bring
+> them up depending on 'maxcpus'. This memory can't be re-used by kexec
+> or hibernate.
+> 
+> Add a function cpus_are_stuck_in_kernel() to determine if either of these
+> cases have occurred.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/smp.h | 20 ++++++++++++++++++++
+>  arch/arm64/kernel/smp.c      | 13 +++++++++++++
+>  2 files changed, 33 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+> index 433e50405274..4be755bcc07a 100644
+> --- a/arch/arm64/include/asm/smp.h
+> +++ b/arch/arm64/include/asm/smp.h
+> @@ -124,6 +124,26 @@ static inline void cpu_panic_kernel(void)
+>  	cpu_park_loop();
+>  }
+>  
+> +/*
+> + * Kernel features such as hibernate and kexec depend on cpu hotplug to know
+> + * they can replace any kernel memory they are not using themselves.
+> + *
+> + * There are two corner cases:
+> + * If a secondary CPU fails to come online, (e.g. due to mismatched features),
+> + * it will try to call cpu_die(). If this fails, it increases the counter
+> + * cpus_stuck_in_kernel and sits in cpu_park_loop(). The memory containing
+> + * this function must not be re-used for anything else as the 'stuck' core
+> + * is executing it.
 
-The current dts describes USB HUB's property at USB controller's
-entry, it is improper. The USB HUB should be the child node
-under USB controller, with "usb-pwrseq" phandle to handle power
-sequence stuffs.
+It might also be stuck in __no_granule_support, if it never made it to C
+code. In that case, the CPU in charge of bringing up that new CPU will
+increment the counter in __cpu_up.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
-Signed-off-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
----
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 30 +++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 13 deletions(-)
+There might be other reasons we do something like that in future, so it
+might be better to be a little less specific and say something like:
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index 3bee2f9..f921174 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -9,6 +9,8 @@
-  *
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	aliases {
- 		backlight = &backlight;
-@@ -58,17 +60,6 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		reg_usb_h1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
--			gpio = <&gpio7 12 0>;
--		};
--
- 		reg_panel: regulator at 1 {
- 			compatible = "regulator-fixed";
- 			reg = <1>;
-@@ -89,6 +80,13 @@
- 		mux-int-port = <1>;
- 		mux-ext-port = <6>;
- 	};
-+
-+	usb2415_pwrseq: usb2415_pwrseq {
-+		compatible = "usb-pwrseq-generic";
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &fec {
-@@ -259,9 +257,15 @@
- &usbh1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh>;
--	vbus-supply = <&reg_usb_h1_vbus>;
--	clocks = <&clks IMX6QDL_CLK_CKO>;
- 	status = "okay";
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	hub: usb2415 at 1 {
-+		compatible = "usb424,2514";
-+		reg = <1>;
-+		usb-pwrseq = <&usb2415_pwrseq>;
-+	};
- };
- 
- &usdhc3 {
--- 
-1.9.1
+	If a secondary CPU enters the kernel but fails to come online,
+	(e.g. due to mismatched features), and cannot exit the kernel,
+	we increment cpus_stuck_in_kernel and leave the CPU in a
+	quiesecent loop within the kernel text. The memory containing
+	this loop must not be re-used for anything else as the 'stuck'
+	core is executing it.
+
+Otherwise, this looks good. FWIW, either way:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> + *
+> + * CPUs are also considered stuck in the kernel if we have multiple CPUs
+> + * and no way to offline secondary CPUs. This happens when secondaries
+> + * are released via spin-table, these CPUs are moved into the kernel's
+> + * secondary_holding_pen, which must not be overwritten.
+> + *
+> + * This function is used to inhibit features like kexec and hibernate.
+> + */
+> +bool cpus_are_stuck_in_kernel(void);
+> +
+>  #endif /* ifndef __ASSEMBLY__ */
+>  
+>  #endif /* ifndef __ASM_SMP_H */
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 678e0842cb3b..e197502f94fd 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -909,3 +909,16 @@ int setup_profiling_timer(unsigned int multiplier)
+>  {
+>  	return -EINVAL;
+>  }
+> +
+> +bool cpus_are_stuck_in_kernel(void)
+> +{
+> +	bool ret = !!cpus_stuck_in_kernel;
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +	int any_cpu = raw_smp_processor_id();
+> +
+> +	if (num_possible_cpus() > 1 && !cpu_ops[any_cpu]->cpu_die)
+> +		ret = true;
+> +#endif
+> +
+> +	return ret;
+> +}
+> -- 
+> 2.8.0.rc3
+> 
