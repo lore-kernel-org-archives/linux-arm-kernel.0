@@ -1,74 +1,73 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 17 Jun 2016 10:27:22 +0100
-Subject: [RFC PATCH v2 03/15] arm64: mm: change IOMMU notifier action to
- attach DMA ops
-In-Reply-To: <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <5763C27A.9030306@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 17 Jun 2016 10:34:55 +0100
+Subject: [PATCH 0/2] Fix hibernate on SMP spin-table systems
+Message-ID: <1466156097-20028-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hi all,
 
-I think this patch makes sense even independent of the rest of the 
-series, one nit inline notwithstanding.
+These two patches prevent hibernate on systems that use spin-tables and
+have multiple CPUs. It also wires up 'cpus_stuck_in_kernel' which was
+added for v4.7.
 
-Marek; I'm curious as to whether this could make the workaround in 
-722ec35f7 obsolete as well, or are all the drivers also bound 
-super-early in the setup you had there?
+Prior to 44dbcc93ab67 ("arm64: Fix behavior of maxcpus=N"), we would
+bring all the CPUs we would ever have up during boot. On a system with
+spin tables and multiple CPUS the core hibernate code would prevent
+hibernation because it can't disable secondary CPUs.
 
-On 07/06/16 14:30, Lorenzo Pieralisi wrote:
-> Current bus notifier in ARM64 (__iommu_attach_notifier)
-> attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
-> action notification.
->
-> This causes issues on ACPI based systems, where PCI devices
-> can be added before the IOMMUs the devices are attached to
-> had a chance to be probed, causing failures on attempts to
-> attach dma_ops in that the domain for the respective IOMMU
-> may not be set-up yet by the time the bus notifier is run.
->
-> Devices dma_ops do not require to be set-up till the matching
-> device drivers are probed. This means that instead of running
-> the notifier attaching dma_ops to devices (__iommu_attach_notifier)
-> on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
-> device driver is bound to the device in question (on action
-> BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
-> group and domain are set-up accordingly at the time the
-> notifier is triggered.
->
-> This patch changes the notifier action upon which dma_ops
-> are attached to devices and defer it to driver binding time,
-> so that IOMMU devices have a chance to be probed and to register
-> their bus notifiers before the dma_ops attach sequence for a
-> device is actually carried out.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> ---
->   arch/arm64/mm/dma-mapping.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index c566ec8..79b0882 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -848,7 +848,7 @@ static int __iommu_attach_notifier(struct notifier_block *nb,
->   {
->   	struct iommu_dma_notifier_data *master, *tmp;
->
-> -	if (action != BUS_NOTIFY_ADD_DEVICE)
-> +	if (action != BUS_NOTIFY_BIND_DRIVER)
+After 44dbcc93ab67, when we boot with 'maxcpus=1', we no longer bring
+all the CPUs up, but we do move them into the secondary_holding_pen.
+Resuming from hibernate will overwrite the secondary_holding_pen,
+potentially releasing the secondary CPUs. If the kernel has been
+loaded at a different physical address over hibernate and resume
+the secondary_holding_pen may be at a different location after resume.
+The core code can't help us with this, because these CPUs don't show
+up in 'num_online_cpus()'
 
-With this, you can also get rid of the priority setting and big fat 
-explanatory comment in register_iommu_dma_ops_notifier().
+These two patches fix the problem by detecting multiple 'possible cpus'
+that we have no mechanism to take offline and preventing hibernate [2].
+This only happens for spin-table systems with multiple CPUs.
 
-Robin.
+Kexec needs the same checks, so the 'or spin-tables' logic[0] got added
+to the helper function.
 
->   		return 0;
->
->   	mutex_lock(&iommu_dma_notifier_lock);
->
+(This problem was spotted on another thread [1])
+
+
+[0] http://www.spinics.net/lists/arm-kernel/msg510097.html
+[1] http://www.spinics.net/lists/arm-kernel/msg511880.html
+[2] Failing to hibernate an SMP spin-tables system booted with maxcpus=1
+---------------------%<---------------------
+root@localhost:~# echo disk > /sys/power/state
+[12248.197718] PM: Syncing filesystems ... done.
+[12248.197727] Freezing user space processes ... (elapsed 0.001 seconds) done.
+[12248.203197] PM: Preallocating image memory... done (allocated 50769 pages)
+[12261.838699] PM: Allocated 203076 kbytes in 13.63 seconds (14.89 MB/s)
+[12261.838760] Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+[12261.840732] Suspending console(s) (use no_console_suspend to debug)
+[12261.842540] PM: freeze of devices complete after 1.732 msecs
+[12261.843897] PM: late freeze of devices complete after 1.333 msecs
+[12261.845191] PM: noirq freeze of devices complete after 1.272 msecs
+[12261.845201] Disabling non-boot CPUs ...
+[12261.845206] hibernate: Can't hibernate: no mechanism to offline secondary CPUs.
+[12261.845206] PM: Error -16 creating hibernation image
+[12261.846140] PM: noirq recover of devices complete after 0.908 msecs
+[12261.847160] PM: early recover of devices complete after 0.940 msecs
+[12262.765886] PM: recover of devices complete after 1.452 msecs
+[12262.769191] Restarting tasks ... done.
+-bash: echo: write error: Device or resource busy
+root at localhost:~#
+---------------------%<---------------------
+
+James Morse (2):
+  arm64: smp: Add function to determine if cpus are stuck in the kernel
+  arm64: hibernate: Don't hibernate on systems with stuck CPUs
+
+ arch/arm64/include/asm/smp.h  | 20 ++++++++++++++++++++
+ arch/arm64/kernel/hibernate.c |  6 ++++++
+ arch/arm64/kernel/smp.c       | 13 +++++++++++++
+ 3 files changed, 39 insertions(+)
+
+-- 
+2.8.0.rc3
