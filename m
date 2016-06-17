@@ -1,39 +1,33 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 17 Jun 2016 08:10:31 +0200
-Subject: [RESEND v7 4/6] extcon: max8997: Fix handling error code of
- regmap_irq_get_virq()
+Date: Fri, 17 Jun 2016 08:10:33 +0200
+Subject: [RESEND v7 6/6] extcon: max8997: Fix inconsistent indenting
 In-Reply-To: <1466143833-5856-1-git-send-email-k.kozlowski@samsung.com>
 References: <1466143833-5856-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1466143833-5856-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1466143833-5856-7-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regmap_irq_get_virq() can return negative ERRNO, so its result
-should not be stored in unsigned int because error would be ignored.
+Fix smatch warning:
+	max8997_muic_probe() warn: inconsistent indenting
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/extcon/extcon-max8997.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/extcon/extcon-max8997.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/extcon/extcon-max8997.c b/drivers/extcon/extcon-max8997.c
-index 68754ac2c8ea..0afa3e8b5dc3 100644
+index 0afa3e8b5dc3..cf8de5be2405 100644
 --- a/drivers/extcon/extcon-max8997.c
 +++ b/drivers/extcon/extcon-max8997.c
-@@ -660,11 +660,11 @@ static int max8997_muic_probe(struct platform_device *pdev)
+@@ -737,7 +737,7 @@ static int max8997_muic_probe(struct platform_device *pdev)
+ 	}
  
- 	for (i = 0; i < ARRAY_SIZE(muic_irqs); i++) {
- 		struct max8997_muic_irq *muic_irq = &muic_irqs[i];
--		unsigned int virq = 0;
-+		int virq = 0;
+ 	/* Set initial path for UART */
+-	 max8997_muic_set_path(info, info->path_uart, true);
++	max8997_muic_set_path(info, info->path_uart, true);
  
- 		virq = regmap_irq_get_virq(max8997->irq_data_muic,
- 					muic_irq->irq);
--		if (!virq) {
-+		if (virq <= 0) {
- 			ret = -EINVAL;
- 			goto err_irq;
- 		}
+ 	/* Set ADC debounce time */
+ 	max8997_muic_set_debounce_time(info, ADC_DEBOUNCE_TIME_25MS);
 -- 
 1.9.1
