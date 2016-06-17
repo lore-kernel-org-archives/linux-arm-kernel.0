@@ -1,77 +1,61 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 17 Jun 2016 17:48:35 +0100
-Subject: [PATCH 1/2] arm64: smp: Add function to determine if cpus are
- stuck in the kernel
-In-Reply-To: <5763DC2B.5030705@arm.com>
-References: <1466156097-20028-1-git-send-email-james.morse@arm.com>
- <1466156097-20028-2-git-send-email-james.morse@arm.com>
- <20160617102713.GA14524@leverpostej> <5763DC2B.5030705@arm.com>
-Message-ID: <576429E3.3010206@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 17 Jun 2016 18:51:31 +0200
+Subject: [PATCHv3 2/7] EDAC, altera: Add panic flag check to A10 IRQ
+In-Reply-To: <1465852752-11018-3-git-send-email-tthayer@opensource.altera.com>
+References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
+ <1465852752-11018-3-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160617165131.GE3912@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-On 17/06/16 12:16, Suzuki K Poulose wrote:
-> On 17/06/16 11:27, Mark Rutland wrote:
->> On Fri, Jun 17, 2016 at 10:34:56AM +0100, James Morse wrote:
->>> kernel/smp.c has a fancy counter that keeps track of the number of CPUs
->>> it marked as not-present and left in cpu_park_loop(). If there are any
->>> CPUs spinning in here, features like kexec or hibernate may release them
->>> by overwriting this memory.
->>>
->>> This problem also occurs on machines using spin-tables to release
->>> secondary cores.
->>> After commit 44dbcc93ab67 ("arm64: Fix behavior of maxcpus=N")
->>> we bring all known cpus into the secondary holding pen, but may not bring
->>> them up depending on 'maxcpus'. This memory can't be re-used by kexec
->>> or hibernate.
->>>
->>> Add a function cpus_are_stuck_in_kernel() to determine if either of these
->>> cases have occurred.
-
->> It might also be stuck in __no_granule_support, if it never made it to C
->> code. In that case, the CPU in charge of bringing up that new CPU will
->> increment the counter in __cpu_up.
+On Mon, Jun 13, 2016 at 04:19:07PM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Just to clarify, *in all the cases*, the CPU in charge of bringing up updates
-> the cpus_stuck_in_kernel.
-
-Ah, my mistake. I will switch it for Mark's suggestion.
-
-
->>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->>> index 678e0842cb3b..e197502f94fd 100644
->>> --- a/arch/arm64/kernel/smp.c
->>> +++ b/arch/arm64/kernel/smp.c
->>> @@ -909,3 +909,16 @@ int setup_profiling_timer(unsigned int multiplier)
->>>   {
->>>       return -EINVAL;
->>>   }
->>> +
->>> +bool cpus_are_stuck_in_kernel(void)
->>> +{
->>> +    bool ret = !!cpus_stuck_in_kernel;
->>> +#ifdef CONFIG_HOTPLUG_CPU
->>> +    int any_cpu = raw_smp_processor_id();
->>> +
->>> +    if (num_possible_cpus() > 1 && !cpu_ops[any_cpu]->cpu_die)
->>> +        ret = true;
->>> +#endif
+> In preparation for additional memory module ECCs, the
+> IRQ function will check a panic flag before doing a
+> kernel panic on double bit errors. ECCs on buffers
+> will not cause a kernel panic on DBERRs.
 > 
-> Minor nit: Moving the cpu_die check to a static inline function with
-> an obvious name might make the code look better.
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2  New patch. Add panic flag to IRQ function.
+> v3  No change
+> ---
+>  drivers/edac/altera_edac.c |    4 +++-
+>  drivers/edac/altera_edac.h |    1 +
+>  2 files changed, 4 insertions(+), 1 deletion(-)
 > 
->     return !!cpus_stuck_in_kernel || !have_cpu_die() ?
-> 
+> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+> index 926bcaf..a9d8fa7 100644
+> --- a/drivers/edac/altera_edac.c
+> +++ b/drivers/edac/altera_edac.c
+> @@ -897,7 +897,8 @@ static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
+>  		writel(ALTR_A10_ECC_DERRPENA,
+>  		       base + ALTR_A10_ECC_INTSTAT_OFST);
+>  		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
+> -		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
+> +		if (dci->data->panic)
+> +			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
+>  
+>  		return IRQ_HANDLED;
+>  	}
+> @@ -936,6 +937,7 @@ const struct edac_device_prv_data a10_ocramecc_data = {
+>  	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
+>  	.ecc_irq_handler = altr_edac_a10_ecc_irq,
+>  	.inject_fops = &altr_edac_a10_device_inject_fops,
+> +	.panic = true,
 
-That would be better!
+So I could use a bit more detailed explanation here why OCRAM must panic
+and the others don't. Consider me an external guy who doesn't know the
+hardware and is looking at the driver and is wondering why this IP must
+panic on double-bit errors and the others don't.
 
+:-)
 
-> Eitherway,
-> 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Thanks.
 
-Thanks,
+-- 
+Regards/Gruss,
+    Boris.
 
-James
+ECO tip #101: Trim your mails when you reply.
