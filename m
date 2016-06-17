@@ -1,358 +1,675 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 17 Jun 2016 13:08:39 +0100
-Subject: [PATCH v6 07/15] KVM: arm64: introduce ITS emulation file with MMIO
- framework
+Date: Fri, 17 Jun 2016 13:08:37 +0100
+Subject: [PATCH v6 05/15] KVM: arm/arm64: VGIC: add refcounting for IRQs
 In-Reply-To: <1466165327-32060-1-git-send-email-andre.przywara@arm.com>
 References: <1466165327-32060-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1466165327-32060-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <1466165327-32060-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM GICv3 ITS emulation code goes into a separate file, but needs
-to be connected to the GICv3 emulation, of which it is an option.
-The ITS MMIO handlers require the respective ITS pointer to be passed in,
-so we amend the existing VGIC MMIO framework to let it cope with that.
-Also we introduce the basic ITS data structure and initialize it, but
-don't return any success yet, as we are not yet ready for the show.
+In the moment our struct vgic_irq's are statically allocated at guest
+creation time. So getting a pointer to an IRQ structure is trivial and
+safe. LPIs are more dynamic, they can be mapped and unmapped at any time
+during the guest's _runtime_.
+In preparation for supporting LPIs we introduce reference counting to
+those structures. Since private IRQs and SPIs are statically allocated,
+the reqcount never drops to 0 at the moment, but we increase it when an
+IRQ gets onto a VCPU list and decrease it when it gets removed.
+Also vgic_get_irq() gets changed to take the irq_lock already, this is
+later needed to avoid a race between a potential LPI unmap and the
+window between us getting the pointer and locking the IRQ.
+This introduces vgic_put_irq(), which just does the unlock and makes
+the new locking sequence look more symmetrical.
+This approach deviates from the classical Linux refcounting with using
+atomic_* types and functions, because the users of vgic_get_irq() take
+the irq_lock anyway, so we just use an int and adjust the refcount while
+holding the lock.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/kvm/Makefile            |   1 +
- include/kvm/vgic/vgic.h            |  13 ++++-
- include/linux/irqchip/arm-gic-v3.h |   1 +
- virt/kvm/arm/vgic/vgic-its.c       | 107 +++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio-v3.c   |  38 ++++++++++++-
- virt/kvm/arm/vgic/vgic-mmio.c      |  25 ++++++---
- virt/kvm/arm/vgic/vgic-mmio.h      |   4 ++
- virt/kvm/arm/vgic/vgic.h           |   7 +++
- 8 files changed, 187 insertions(+), 9 deletions(-)
- create mode 100644 virt/kvm/arm/vgic/vgic-its.c
+ include/kvm/vgic/vgic.h          |  1 +
+ virt/kvm/arm/vgic/vgic-init.c    |  2 +
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 21 +++++------
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 26 ++++++-------
+ virt/kvm/arm/vgic/vgic-mmio.c    | 55 ++++++++++++++++-----------
+ virt/kvm/arm/vgic/vgic-v2.c      |  4 +-
+ virt/kvm/arm/vgic/vgic-v3.c      |  4 +-
+ virt/kvm/arm/vgic/vgic.c         | 81 +++++++++++++++++++++++++---------------
+ virt/kvm/arm/vgic/vgic.h         |  7 +++-
+ 9 files changed, 116 insertions(+), 85 deletions(-)
 
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index a7a958c..2755d17 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -30,6 +30,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
- else
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
 diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index dc7f2fd..a66ba9a 100644
+index 2f26f37..e488a369 100644
 --- a/include/kvm/vgic/vgic.h
 +++ b/include/kvm/vgic/vgic.h
-@@ -111,12 +111,23 @@ struct vgic_register_region;
+@@ -96,6 +96,7 @@ struct vgic_irq {
+ 	bool active;			/* not used for LPIs */
+ 	bool enabled;
+ 	bool hw;			/* Tied to HW IRQ */
++	int refcnt;			/* Used only for LPIs */
+ 	u32 hwintid;			/* HW INTID number */
+ 	union {
+ 		u8 targets;			/* GICv2 target VCPUs mask */
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 90cae48..c4a8df6 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -177,6 +177,7 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+ 		spin_lock_init(&irq->irq_lock);
+ 		irq->vcpu = NULL;
+ 		irq->target_vcpu = vcpu0;
++		irq->refcnt = 1;
+ 		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
+ 			irq->targets = 0;
+ 		else
+@@ -211,6 +212,7 @@ static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 		irq->vcpu = NULL;
+ 		irq->target_vcpu = vcpu;
+ 		irq->targets = 1U << vcpu->vcpu_id;
++		irq->refcnt = 1;
+ 		if (vgic_irq_is_sgi(i)) {
+ 			/* SGIs */
+ 			irq->enabled = 1;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index a213936..7bb3e94 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -97,11 +97,10 @@ static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
  
- struct vgic_io_device {
- 	gpa_t base_addr;
--	struct kvm_vcpu *redist_vcpu;
-+	union {
-+		struct kvm_vcpu *redist_vcpu;
-+		struct vgic_its *its;
-+	};
- 	const struct vgic_register_region *regions;
- 	int nr_regions;
- 	struct kvm_io_device dev;
- };
+ 		irq = vgic_get_irq(source_vcpu->kvm, vcpu, intid);
  
-+struct vgic_its {
-+	/* The base address of the ITS control register frame */
-+	gpa_t			vgic_its_base;
-+
-+	bool			enabled;
-+	struct vgic_io_device	iodev;
-+};
-+
- struct vgic_dist {
- 	bool			in_kernel;
- 	bool			ready;
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 64e8c70..92d5da8 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -176,6 +176,7 @@
- #define GITS_CWRITER			0x0088
- #define GITS_CREADR			0x0090
- #define GITS_BASER			0x0100
-+#define GITS_IDREGS_BASE		0xffd0
- #define GITS_PIDR2			GICR_PIDR2
+-		spin_lock(&irq->irq_lock);
+ 		irq->pending = true;
+ 		irq->source |= 1U << source_vcpu->vcpu_id;
  
- #define GITS_TRANSLATER			0x10040
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-new file mode 100644
-index 0000000..c02d9df
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -0,0 +1,107 @@
-+/*
-+ * GICv3 ITS emulation
-+ *
-+ * Copyright (C) 2015,2016 ARM Ltd.
-+ * Author: Andre Przywara <andre.przywara@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+-		vgic_queue_irq_unlock(source_vcpu->kvm, irq);
++		vgic_queue_irq_put(source_vcpu->kvm, irq);
+ 	}
+ }
+ 
+@@ -116,6 +115,8 @@ static unsigned long vgic_mmio_read_target(struct kvm_vcpu *vcpu,
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+ 		val |= (u64)irq->targets << (i * 8);
 +
-+#include <linux/cpu.h>
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+#include <linux/interrupt.h>
++		vgic_put_irq(irq);
+ 	}
+ 
+ 	return val;
+@@ -136,13 +137,11 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid + i);
+ 		int target;
+ 
+-		spin_lock(&irq->irq_lock);
+-
+ 		irq->targets = (val >> (i * 8)) & 0xff;
+ 		target = irq->targets ? __ffs(irq->targets) : 0;
+ 		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
+ 
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
+ 	}
+ }
+ 
+@@ -157,6 +156,8 @@ static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+ 		val |= (u64)irq->source << (i * 8);
 +
-+#include <linux/irqchip/arm-gic-v3.h>
-+
-+#include <asm/kvm_emulate.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_mmu.h>
-+
-+#include "vgic.h"
-+#include "vgic-mmio.h"
-+
-+#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
-+{								\
-+	.reg_offset = off,					\
-+	.len = length,						\
-+	.access_flags = acc,					\
-+	.read = NULL,						\
-+	.write = NULL,						\
-+	.its_read = rd,						\
-+	.its_write = wr,					\
-+}
-+
-+static unsigned long its_mmio_read_raz(struct kvm *kvm, struct vgic_its *its,
-+				       gpa_t addr, unsigned int len)
-+{
-+	return 0;
-+}
-+
-+static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
-+			      gpa_t addr, unsigned int len, unsigned long val)
-+{
-+	/* Ignore */
-+}
-+
-+struct vgic_register_region its_registers[] = {
-+	REGISTER_ITS_DESC(GITS_CTLR,
-+		its_mmio_read_raz, its_mmio_write_wi, 4,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_ITS_DESC(GITS_IIDR,
-+		its_mmio_read_raz, its_mmio_write_wi, 4,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_ITS_DESC(GITS_TYPER,
-+		its_mmio_read_raz, its_mmio_write_wi, 8,
-+		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-+	REGISTER_ITS_DESC(GITS_CBASER,
-+		its_mmio_read_raz, its_mmio_write_wi, 8,
-+		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-+	REGISTER_ITS_DESC(GITS_CWRITER,
-+		its_mmio_read_raz, its_mmio_write_wi, 8,
-+		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-+	REGISTER_ITS_DESC(GITS_CREADR,
-+		its_mmio_read_raz, its_mmio_write_wi, 8,
-+		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-+	REGISTER_ITS_DESC(GITS_BASER,
-+		its_mmio_read_raz, its_mmio_write_wi, 0x40,
-+		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-+	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
-+		its_mmio_read_raz, its_mmio_write_wi, 0x30,
-+		VGIC_ACCESS_32bit),
-+};
-+
-+int vits_register(struct kvm *kvm, struct vgic_its *its)
-+{
-+	struct vgic_io_device *iodev = &its->iodev;
-+	int ret;
-+
-+	iodev->regions = its_registers;
-+	iodev->nr_regions = ARRAY_SIZE(its_registers);
-+	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
-+
-+	iodev->base_addr = its->vgic_its_base;
-+	iodev->its = its;
-+	mutex_lock(&kvm->slots_lock);
-+	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
-+				      SZ_64K, &iodev->dev);
-+	mutex_unlock(&kvm->slots_lock);
-+
-+	return ret;
-+}
-+
-+void vits_destroy(struct kvm *kvm, struct vgic_its *its)
-+{
-+
-+	its->enabled = false;
-+}
++		vgic_put_irq(irq);
+ 	}
+ 	return val;
+ }
+@@ -171,13 +172,11 @@ static void vgic_mmio_write_sgipendc(struct kvm_vcpu *vcpu,
+ 	for (i = 0; i < len; i++) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+-		spin_lock(&irq->irq_lock);
+-
+ 		irq->source &= ~((val >> (i * 8)) & 0xff);
+ 		if (!irq->source)
+ 			irq->pending = false;
+ 
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
+ 	}
+ }
+ 
+@@ -191,15 +190,13 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+ 	for (i = 0; i < len; i++) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+-		spin_lock(&irq->irq_lock);
+-
+ 		irq->source |= (val >> (i * 8)) & 0xff;
+ 
+ 		if (irq->source) {
+ 			irq->pending = true;
+-			vgic_queue_irq_unlock(vcpu->kvm, irq);
++			vgic_queue_irq_put(vcpu->kvm, irq);
+ 		} else {
+-			spin_unlock(&irq->irq_lock);
++			vgic_put_irq(irq);
+ 		}
+ 	}
+ }
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 8cd7190..4eee0d7 100644
+index fc7b6c9..c38302d 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -42,6 +42,16 @@ static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
- 	return reg | ((u64)val << lower);
- }
- 
-+bool vgic_has_its(struct kvm *kvm)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+
-+	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
-+		return false;
-+
-+	return false;
-+}
-+
- static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
- 					    gpa_t addr, unsigned int len)
+@@ -80,15 +80,17 @@ static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
  {
-@@ -126,6 +136,32 @@ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
- 	vgic_put_irq(irq);
+ 	int intid = VGIC_ADDR_TO_INTID(addr, 64);
+ 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
++	unsigned long ret = 0;
+ 
+ 	if (!irq)
+ 		return 0;
+ 
+ 	/* The upper word is RAZ for us. */
+-	if (addr & 4)
+-		return 0;
++	if (!(addr & 4))
++		ret = extract_bytes(READ_ONCE(irq->mpidr), addr & 7, len);
+ 
+-	return extract_bytes(READ_ONCE(irq->mpidr), addr & 7, len);
++	vgic_put_irq(irq);
++	return ret;
  }
  
-+static unsigned long vgic_mmio_read_v3r_ctlr(struct kvm_vcpu *vcpu,
-+					     gpa_t addr, unsigned int len)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+
-+	return vgic_cpu->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
-+}
-+
-+
-+static void vgic_mmio_write_v3r_ctlr(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len,
-+				     unsigned long val)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	bool was_enabled = vgic_cpu->lpis_enabled;
-+
-+	if (!vgic_has_its(vcpu->kvm))
-+		return;
-+
-+	vgic_cpu->lpis_enabled = val & GICR_CTLR_ENABLE_LPIS;
-+
-+	if (!was_enabled && vgic_cpu->lpis_enabled) {
-+		/* Eventually do something */
+ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
+@@ -102,16 +104,13 @@ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
+ 		return;
+ 
+ 	/* The upper word is WI for us since we don't implement Aff3. */
+-	if (addr & 4)
+-		return;
+-
+-	spin_lock(&irq->irq_lock);
+-
+-	/* We only care about and preserve Aff0, Aff1 and Aff2. */
+-	irq->mpidr = val & GENMASK(23, 0);
+-	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, irq->mpidr);
++	if (!(addr & 4)) {
++		/* We only care about and preserve Aff0, Aff1 and Aff2. */
++		irq->mpidr = val & GENMASK(23, 0);
++		irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, irq->mpidr);
 +	}
-+}
-+
- static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
- 					      gpa_t addr, unsigned int len)
- {
-@@ -325,7 +361,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
  
- static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
-+		vgic_mmio_read_v3r_ctlr, vgic_mmio_write_v3r_ctlr, 4,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
- 		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
+-	spin_unlock(&irq->irq_lock);
++	vgic_put_irq(irq);
+ }
+ 
+ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+@@ -441,9 +440,8 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+ 
+ 		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
+ 
+-		spin_lock(&irq->irq_lock);
+ 		irq->pending = true;
+ 
+-		vgic_queue_irq_unlock(vcpu->kvm, irq);
++		vgic_queue_irq_put(vcpu->kvm, irq);
+ 	}
+ }
 diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 4050c1c..c98a4fd 100644
+index 9f6fab7..4050c1c 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -461,8 +461,7 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
- {
- 	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
- 	const struct vgic_register_region *region;
--	struct kvm_vcpu *r_vcpu;
--	unsigned long data;
-+	unsigned long data = 0;
+@@ -56,6 +56,8 @@ unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
  
- 	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
- 				       addr - iodev->base_addr);
-@@ -471,8 +470,15 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+ 		if (irq->enabled)
+ 			value |= (1U << i);
++
++		vgic_put_irq(irq);
+ 	}
+ 
+ 	return value;
+@@ -71,9 +73,9 @@ void vgic_mmio_write_senable(struct kvm_vcpu *vcpu,
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+-		spin_lock(&irq->irq_lock);
+ 		irq->enabled = true;
+-		vgic_queue_irq_unlock(vcpu->kvm, irq);
++
++		vgic_queue_irq_put(vcpu->kvm, irq);
+ 	}
+ }
+ 
+@@ -87,11 +89,9 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+-		spin_lock(&irq->irq_lock);
+-
+ 		irq->enabled = false;
+ 
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
+ 	}
+ }
+ 
+@@ -108,6 +108,8 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
+ 
+ 		if (irq->pending)
+ 			value |= (1U << i);
++
++		vgic_put_irq(irq);
+ 	}
+ 
+ 	return value;
+@@ -123,12 +125,11 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+-		spin_lock(&irq->irq_lock);
+ 		irq->pending = true;
+ 		if (irq->config == VGIC_CONFIG_LEVEL)
+ 			irq->soft_pending = true;
+ 
+-		vgic_queue_irq_unlock(vcpu->kvm, irq);
++		vgic_queue_irq_put(vcpu->kvm, irq);
+ 	}
+ }
+ 
+@@ -142,8 +143,6 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+-		spin_lock(&irq->irq_lock);
+-
+ 		if (irq->config == VGIC_CONFIG_LEVEL) {
+ 			irq->soft_pending = false;
+ 			irq->pending = irq->line_level;
+@@ -151,7 +150,7 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+ 			irq->pending = false;
+ 		}
+ 
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
+ 	}
+ }
+ 
+@@ -168,15 +167,17 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
+ 
+ 		if (irq->active)
+ 			value |= (1U << i);
++
++		vgic_put_irq(irq);
+ 	}
+ 
+ 	return value;
+ }
+ 
+-static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+-				    bool new_active_state)
++static void vgic_mmio_change_active_put(struct kvm_vcpu *vcpu,
++					struct vgic_irq *irq,
++					bool new_active_state)
+ {
+-	spin_lock(&irq->irq_lock);
+ 	/*
+ 	 * If this virtual IRQ was written into a list register, we
+ 	 * have to make sure the CPU that runs the VCPU thread has
+@@ -190,15 +191,17 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	 * IRQ, so we release and re-acquire the spin_lock to let the
+ 	 * other thread sync back the IRQ.
+ 	 */
++	irq->refcnt++;
+ 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
+ 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
+ 		cond_resched_lock(&irq->irq_lock);
+ 
++	irq->refcnt--;
+ 	irq->active = new_active_state;
+ 	if (new_active_state)
+-		vgic_queue_irq_unlock(vcpu->kvm, irq);
++		vgic_queue_irq_put(vcpu->kvm, irq);
+ 	else
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
+ }
+ 
+ /*
+@@ -241,7 +244,8 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+ 	vgic_change_active_prepare(vcpu, intid);
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+-		vgic_mmio_change_active(vcpu, irq, false);
++
++		vgic_mmio_change_active_put(vcpu, irq, false);
+ 	}
+ 	vgic_change_active_finish(vcpu, intid);
+ }
+@@ -256,7 +260,8 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 	vgic_change_active_prepare(vcpu, intid);
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+-		vgic_mmio_change_active(vcpu, irq, true);
++
++		vgic_mmio_change_active_put(vcpu, irq, true);
+ 	}
+ 	vgic_change_active_finish(vcpu, intid);
+ }
+@@ -272,6 +277,8 @@ unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+ 		val |= (u64)irq->priority << (i * 8);
++
++		vgic_put_irq(irq);
+ 	}
+ 
+ 	return val;
+@@ -294,10 +301,10 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+ 	for (i = 0; i < len; i++) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+-		spin_lock(&irq->irq_lock);
+ 		/* Narrow the priority range to what we actually support */
+ 		irq->priority = (val >> (i * 8)) & GENMASK(7, 8 - VGIC_PRI_BITS);
+-		spin_unlock(&irq->irq_lock);
++
++		vgic_put_irq(irq);
+ 	}
+ }
+ 
+@@ -313,6 +320,8 @@ unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
+ 
+ 		if (irq->config == VGIC_CONFIG_EDGE)
+ 			value |= (2U << (i * 2));
++
++		vgic_put_irq(irq);
+ 	}
+ 
+ 	return value;
+@@ -326,7 +335,7 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+ 	int i;
+ 
+ 	for (i = 0; i < len * 4; i++) {
+-		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++		struct vgic_irq *irq;
+ 
+ 		/*
+ 		 * The configuration cannot be changed for SGIs in general,
+@@ -337,14 +346,16 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+ 		if (intid + i < VGIC_NR_PRIVATE_IRQS)
+ 			continue;
+ 
+-		spin_lock(&irq->irq_lock);
++		irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
+ 		if (test_bit(i * 2 + 1, &val)) {
+ 			irq->config = VGIC_CONFIG_EDGE;
+ 		} else {
+ 			irq->config = VGIC_CONFIG_LEVEL;
+ 			irq->pending = irq->line_level | irq->soft_pending;
+ 		}
+-		spin_unlock(&irq->irq_lock);
++
++		vgic_put_irq(irq);
+ 	}
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 80313de..2147576 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -94,8 +94,6 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 
+ 		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+ 
+-		spin_lock(&irq->irq_lock);
+-
+ 		/* Always preserve the active bit */
+ 		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
+ 
+@@ -123,7 +121,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 			irq->pending = irq->line_level || irq->soft_pending;
+ 		}
+ 
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
+ 	}
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index e48a22e..21d84e9 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -82,8 +82,6 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 			intid = val & GICH_LR_VIRTUALID;
+ 		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+ 
+-		spin_lock(&irq->irq_lock);
+-
+ 		/* Always preserve the active bit */
+ 		irq->active = !!(val & ICH_LR_ACTIVE_BIT);
+ 
+@@ -112,7 +110,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 			irq->pending = irq->line_level || irq->soft_pending;
+ 		}
+ 
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
+ 	}
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 69b61ab..90f2543 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -48,13 +48,20 @@ struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid)
+ {
+-	/* SGIs and PPIs */
+-	if (intid <= VGIC_MAX_PRIVATE)
+-		return &vcpu->arch.vgic_cpu.private_irqs[intid];
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	struct vgic_irq *irq;
+ 
+-	/* SPIs */
+-	if (intid <= VGIC_MAX_SPI)
+-		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
++	if (intid <= VGIC_MAX_PRIVATE) {        /* SGIs and PPIs */
++		irq = &vcpu->arch.vgic_cpu.private_irqs[intid];
++		spin_lock(&irq->irq_lock);
++		return irq;
++	}
++
++	if (intid <= VGIC_MAX_SPI) {            /* SPIs */
++		irq = &dist->spis[intid - VGIC_NR_PRIVATE_IRQS];
++		spin_lock(&irq->irq_lock);
++		return irq;
++	}
+ 
+ 	/* LPIs are not yet covered */
+ 	if (intid >= VGIC_MIN_LPI)
+@@ -183,9 +190,10 @@ static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
+  * Needs to be entered with the IRQ lock already held, but will return
+  * with all locks dropped.
+  */
+-bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
++bool vgic_queue_irq_put(struct kvm *kvm, struct vgic_irq *irq)
+ {
+-	struct kvm_vcpu *vcpu;
++	struct kvm_vcpu *vcpu, *irq_vcpu = irq->target_vcpu;
++	u32 intid = irq->intid;
+ 
+ 	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+ 
+@@ -201,7 +209,7 @@ retry:
+ 		 * not need to be inserted into an ap_list and there is also
+ 		 * no more work for us to do.
+ 		 */
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
+ 		return false;
+ 	}
+ 
+@@ -209,12 +217,18 @@ retry:
+ 	 * We must unlock the irq lock to take the ap_list_lock where
+ 	 * we are going to insert this new pending interrupt.
+ 	 */
+-	spin_unlock(&irq->irq_lock);
++	vgic_put_irq(irq);
+ 
+ 	/* someone can do stuff here, which we re-check below */
+ 
+ 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
+-	spin_lock(&irq->irq_lock);
++	irq = vgic_get_irq(kvm, irq_vcpu, intid);
++
++	if (!irq) {
++		/* The LPI has been unmapped, nothing left to do. */
++		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
++		return false;
++	}
+ 
+ 	/*
+ 	 * Did something change behind our backs?
+@@ -229,17 +243,21 @@ retry:
+ 	 */
+ 
+ 	if (unlikely(irq->vcpu || vcpu != vgic_target_oracle(irq))) {
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
+ 		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ 
+-		spin_lock(&irq->irq_lock);
++		irq = vgic_get_irq(kvm, irq_vcpu, intid);
++		if (!irq)
++			return false;
++
+ 		goto retry;
+ 	}
+ 
+ 	list_add_tail(&irq->ap_list, &vcpu->arch.vgic_cpu.ap_list_head);
++	irq->refcnt++;
+ 	irq->vcpu = vcpu;
+ 
+-	spin_unlock(&irq->irq_lock);
++	vgic_put_irq(irq);
+ 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ 
+ 	kvm_vcpu_kick(vcpu);
+@@ -269,14 +287,14 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ 	if (!irq)
+ 		return -EINVAL;
+ 
+-	if (irq->hw != mapped_irq)
++	if (irq->hw != mapped_irq) {
++		vgic_put_irq(irq);
+ 		return -EINVAL;
+-
+-	spin_lock(&irq->irq_lock);
++	}
+ 
+ 	if (!vgic_validate_injection(irq, level)) {
+ 		/* Nothing to see here, move along... */
+-		spin_unlock(&irq->irq_lock);
++		vgic_put_irq(irq);
  		return 0;
  	}
  
--	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
--	data = region->read(r_vcpu, addr, len);
-+	if (region->read) {
-+		struct kvm_vcpu *r_vcpu;
-+
-+		r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
-+		data = region->read(r_vcpu, addr, len);
-+	} else if (region->its_read) {
-+		data = region->its_read(vcpu->kvm, iodev->its, addr, len);
-+	}
-+
- 	vgic_data_host_to_mmio_bus(val, len, data);
+@@ -287,7 +305,7 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ 		irq->pending = true;
+ 	}
+ 
+-	vgic_queue_irq_unlock(kvm, irq);
++	vgic_queue_irq_put(kvm, irq);
+ 
  	return 0;
  }
-@@ -482,7 +488,6 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+@@ -324,31 +342,28 @@ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
+ 
+ 	BUG_ON(!irq);
+ 
+-	spin_lock(&irq->irq_lock);
+-
+ 	irq->hw = true;
+ 	irq->hwintid = phys_irq;
+ 
+-	spin_unlock(&irq->irq_lock);
++	vgic_put_irq(irq);
+ 
+ 	return 0;
+ }
+ 
+ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
  {
- 	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
- 	const struct vgic_register_region *region;
--	struct kvm_vcpu *r_vcpu;
- 	unsigned long data = vgic_data_mmio_bus_to_host(val, len);
+-	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
+-
+-	BUG_ON(!irq);
++	struct vgic_irq *irq;
  
- 	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
-@@ -493,8 +498,14 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
- 	if (!check_region(region, addr, len))
- 		return 0;
+ 	if (!vgic_initialized(vcpu->kvm))
+ 		return -EAGAIN;
  
--	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
--	region->write(r_vcpu, addr, len, data);
-+	if (region->write) {
-+		struct kvm_vcpu *r_vcpu;
-+
-+		r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
-+		region->write(r_vcpu, addr, len, data);
-+	} else if (region->its_write) {
-+		region->its_write(vcpu->kvm, iodev->its, addr, len, data);
-+	}
+-	spin_lock(&irq->irq_lock);
++	irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	BUG_ON(!irq);
+ 
+ 	irq->hw = false;
+ 	irq->hwintid = 0;
+ 
+-	spin_unlock(&irq->irq_lock);
++	vgic_put_irq(irq);
+ 
  	return 0;
  }
+@@ -378,14 +393,21 @@ retry:
  
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 8509014..6dfc2f0 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -25,6 +25,10 @@ struct vgic_register_region {
- 			      unsigned int len);
- 	void (*write)(struct kvm_vcpu *vcpu, gpa_t addr, unsigned int len,
- 		      unsigned long val);
-+	unsigned long (*its_read)(struct kvm *kvm, struct vgic_its *its,
-+				  gpa_t addr, unsigned int len);
-+	void (*its_write)(struct kvm *kvm, struct vgic_its *its,
-+			  gpa_t addr, unsigned int len, unsigned long val);
- };
+ 		target_vcpu = vgic_target_oracle(irq);
  
- extern struct kvm_io_device_ops kvm_io_gic_ops;
+-		if (!target_vcpu) {
++		if (!target_vcpu || irq->refcnt == 1) {
++			bool free_irq = false;
++
+ 			/*
+ 			 * We don't need to process this interrupt any
+ 			 * further, move it off the list.
+ 			 */
+ 			list_del(&irq->ap_list);
+ 			irq->vcpu = NULL;
++			irq->refcnt--;
++			if (!irq->refcnt)
++				free_irq = true;
+ 			spin_unlock(&irq->irq_lock);
++			if (free_irq)
++				kfree(irq);
+ 			continue;
+ 		}
+ 
+@@ -611,9 +633,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+ 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
+ 	bool map_is_active;
+ 
+-	spin_lock(&irq->irq_lock);
+ 	map_is_active = irq->hw && irq->active;
+-	spin_unlock(&irq->irq_lock);
++	vgic_put_irq(irq);
+ 
+ 	return map_is_active;
+ }
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index fa2d225..b09590d 100644
+index c752152..fa2d225 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -76,6 +76,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
- int vgic_v3_probe(const struct gic_kvm_info *info);
- int vgic_v3_map_resources(struct kvm *kvm);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
-+bool vgic_has_its(struct kvm *kvm);
- #else
- static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
- {
-@@ -127,6 +128,12 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
- {
- 	return -ENODEV;
- }
-+
-+static inline bool vgic_has_its(struct kvm *kvm)
+@@ -38,7 +38,12 @@ struct vgic_vmcr {
+ 
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
+-bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
++static inline void vgic_put_irq(struct vgic_irq *irq)
 +{
-+	return false;
++	spin_unlock(&irq->irq_lock);
 +}
 +
- #endif
++bool vgic_queue_irq_put(struct kvm *kvm, struct vgic_irq *irq);
+ void vgic_kick_vcpus(struct kvm *kvm);
  
- int kvm_register_vgic_device(unsigned long type);
+ void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
 -- 
 2.8.2
