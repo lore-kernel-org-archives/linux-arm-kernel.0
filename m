@@ -1,209 +1,109 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 17 Jun 2016 12:05:49 +0200
-Subject: [PATCH 4/4] tty/serial: atmel: enforce tasklet init and termination
- sequences
-In-Reply-To: <cover.1466157015.git.nicolas.ferre@atmel.com>
-References: <cover.1466157015.git.nicolas.ferre@atmel.com>
-Message-ID: <5a52e1fbd8ec126bebfcd00f35bfe5af605ee914.1466157015.git.nicolas.ferre@atmel.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Fri, 17 Jun 2016 18:09:13 +0800
+Subject: [PATCH 00/12] power: add generic power sequence framework
+Message-ID: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As some race conditions are identified in the termination process of tasklets,
-enforce the atmel_shutdown() sequence. This way we make sure that no new
-tasklets or software timer are scheduled during shutdown process.
+Hi all,
 
-An atomic flag is positioned to give this information throughout the code.
+We have an well-known problem that the device needs to do some power
+sequence before it can be recognized by related host, the typical
+example like hard-wired mmc devices and usb devices. This power
+sequence is hard to be described at device tree and handled by
+related host driver, so we have created a common power sequence
+framework to handle this requirement. The generic code is supplied
+some common helpers from host driver, and individual power sequence
+driver handles kinds of power sequence for devices.
 
-We also remove tasklet_disable() calls that were leading to deadlocks while
-stopping the driver. A simpler init/kill sequence is used.
+Since the MMC has already done the similar things, and this power
+sequence handling can be generic, we use mmc power sequence code
+as base to create this framework.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/tty/serial/atmel_serial.c | 61 ++++++++++++++++++++++++---------------
- 1 file changed, 38 insertions(+), 23 deletions(-)
+This patch set is based on Krzysztof Kozlowski's RFC patch set (v4.7-rc1)
+[1], and making some changes which can let it be generic. After that,
+we create a generic power sequence driver for USB devices which handles
+below things, it includes all input signals for devices I can consider.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 857016367a7a..00c4365e6239 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -153,6 +153,7 @@ struct atmel_uart_port {
- 	struct scatterlist		sg_rx;
- 	struct tasklet_struct	tasklet_rx;
- 	struct tasklet_struct	tasklet_tx;
-+	atomic_t		tasklet_shutdown;
- 	unsigned int		irq_status_prev;
- 	unsigned int		tx_len;
- 
-@@ -286,6 +287,13 @@ static bool atmel_use_fifo(struct uart_port *port)
- 	return atmel_port->fifo_size;
- }
- 
-+static void atmel_tasklet_schedule(struct atmel_uart_port *atmel_port,
-+				   struct tasklet_struct *t)
-+{
-+	if (!atomic_read(&atmel_port->tasklet_shutdown))
-+		tasklet_schedule(t);
-+}
-+
- static unsigned int atmel_get_lines_status(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-@@ -715,7 +723,7 @@ static void atmel_rx_chars(struct uart_port *port)
- 		status = atmel_uart_readl(port, ATMEL_US_CSR);
- 	}
- 
--	tasklet_schedule(&atmel_port->tasklet_rx);
-+	atmel_tasklet_schedule(atmel_port, &atmel_port->tasklet_rx);
- }
- 
- /*
-@@ -786,7 +794,7 @@ static void atmel_complete_tx_dma(void *arg)
- 	 * remaining data from the beginning of xmit->buf to xmit->head.
- 	 */
- 	if (!uart_circ_empty(xmit))
--		tasklet_schedule(&atmel_port->tasklet_tx);
-+		atmel_tasklet_schedule(atmel_port, &atmel_port->tasklet_tx);
- 
- 	spin_unlock_irqrestore(&port->lock, flags);
- }
-@@ -971,7 +979,7 @@ static void atmel_complete_rx_dma(void *arg)
- 	struct uart_port *port = arg;
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
--	tasklet_schedule(&atmel_port->tasklet_rx);
-+	atmel_tasklet_schedule(atmel_port, &atmel_port->tasklet_rx);
- }
- 
- static void atmel_release_rx_dma(struct uart_port *port)
-@@ -1011,7 +1019,7 @@ static void atmel_rx_from_dma(struct uart_port *port)
- 	if (dmastat == DMA_ERROR) {
- 		dev_dbg(port->dev, "Get residue error, restart tasklet\n");
- 		atmel_uart_writel(port, ATMEL_US_IER, ATMEL_US_TIMEOUT);
--		tasklet_schedule(&atmel_port->tasklet_rx);
-+		atmel_tasklet_schedule(atmel_port, &atmel_port->tasklet_rx);
- 		return;
- 	}
- 
-@@ -1165,8 +1173,11 @@ static void atmel_uart_timer_callback(unsigned long data)
- 	struct uart_port *port = (void *)data;
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
--	tasklet_schedule(&atmel_port->tasklet_rx);
--	mod_timer(&atmel_port->uart_timer, jiffies + uart_poll_timeout(port));
-+	if (!atomic_read(&atmel_port->tasklet_shutdown)) {
-+		tasklet_schedule(&atmel_port->tasklet_rx);
-+		mod_timer(&atmel_port->uart_timer,
-+			  jiffies + uart_poll_timeout(port));
-+	}
- }
- 
- /*
-@@ -1188,7 +1199,8 @@ atmel_handle_receive(struct uart_port *port, unsigned int pending)
- 		if (pending & (ATMEL_US_ENDRX | ATMEL_US_TIMEOUT)) {
- 			atmel_uart_writel(port, ATMEL_US_IDR,
- 					  (ATMEL_US_ENDRX | ATMEL_US_TIMEOUT));
--			tasklet_schedule(&atmel_port->tasklet_rx);
-+			atmel_tasklet_schedule(atmel_port,
-+					       &atmel_port->tasklet_rx);
- 		}
- 
- 		if (pending & (ATMEL_US_RXBRK | ATMEL_US_OVRE |
-@@ -1200,7 +1212,8 @@ atmel_handle_receive(struct uart_port *port, unsigned int pending)
- 		if (pending & ATMEL_US_TIMEOUT) {
- 			atmel_uart_writel(port, ATMEL_US_IDR,
- 					  ATMEL_US_TIMEOUT);
--			tasklet_schedule(&atmel_port->tasklet_rx);
-+			atmel_tasklet_schedule(atmel_port,
-+					       &atmel_port->tasklet_rx);
- 		}
- 	}
- 
-@@ -1230,7 +1243,7 @@ atmel_handle_transmit(struct uart_port *port, unsigned int pending)
- 		/* Either PDC or interrupt transmission */
- 		atmel_uart_writel(port, ATMEL_US_IDR,
- 				  atmel_port->tx_done_mask);
--		tasklet_schedule(&atmel_port->tasklet_tx);
-+		atmel_tasklet_schedule(atmel_port, &atmel_port->tasklet_tx);
- 	}
- }
- 
-@@ -1791,8 +1804,11 @@ static int atmel_startup(struct uart_port *port)
- 		return retval;
- 	}
- 
--	tasklet_enable(&atmel_port->tasklet_rx);
--	tasklet_enable(&atmel_port->tasklet_tx);
-+	atomic_set(&atmel_port->tasklet_shutdown, 0);
-+	tasklet_init(&atmel_port->tasklet_rx, atmel_tasklet_rx_func,
-+			(unsigned long)port);
-+	tasklet_init(&atmel_port->tasklet_tx, atmel_tasklet_tx_func,
-+			(unsigned long)port);
- 
- 	/*
- 	 * Initialize DMA (if necessary)
-@@ -1911,31 +1927,36 @@ static void atmel_shutdown(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
-+	/* Disable interrupts at device level */
-+	atmel_uart_writel(port, ATMEL_US_IDR, -1);
-+
-+	/* Prevent spurious interrupts from scheduling the tasklet */
-+	atomic_inc(&atmel_port->tasklet_shutdown);
-+
- 	/*
- 	 * Prevent any tasklets being scheduled during
- 	 * cleanup
- 	 */
- 	del_timer_sync(&atmel_port->uart_timer);
- 
-+	/* Make sure that no interrupt is on the fly */
-+	synchronize_irq(port->irq);
-+
- 	/*
- 	 * Clear out any scheduled tasklets before
- 	 * we destroy the buffers
- 	 */
--	tasklet_disable(&atmel_port->tasklet_rx);
--	tasklet_disable(&atmel_port->tasklet_tx);
- 	tasklet_kill(&atmel_port->tasklet_rx);
- 	tasklet_kill(&atmel_port->tasklet_tx);
- 
- 	/*
- 	 * Ensure everything is stopped and
--	 * disable all interrupts, port and break condition.
-+	 * disable port and break condition.
- 	 */
- 	atmel_stop_rx(port);
- 	atmel_stop_tx(port);
- 
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA);
--	atmel_uart_writel(port, ATMEL_US_IDR, -1);
--
- 
- 	/*
- 	 * Shut-down the DMA.
-@@ -2319,13 +2340,6 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
- 	port->irq	= pdev->resource[1].start;
- 	port->rs485_config	= atmel_config_rs485;
- 
--	tasklet_init(&atmel_port->tasklet_rx, atmel_tasklet_rx_func,
--			(unsigned long)port);
--	tasklet_init(&atmel_port->tasklet_tx, atmel_tasklet_tx_func,
--			(unsigned long)port);
--	tasklet_disable(&atmel_port->tasklet_rx);
--	tasklet_disable(&atmel_port->tasklet_tx);
--
- 	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
- 
- 	if (pdata && pdata->regs) {
-@@ -2710,6 +2724,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 	atmel_port->uart.line = ret;
- 	atmel_serial_probe_fifos(atmel_port, pdev);
- 
-+	atomic_set(&port->tasklet_shutdown, 0);
- 	spin_lock_init(&atmel_port->lock_suspended);
- 
- 	ret = atmel_init_port(atmel_port, pdev);
+- Clock and its frequencies
+- GPIO for reset and the duration time
+- GPIO for enable
+- Regulator for power
+
+This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+two hot-plug devices to simulate this use case. The udoo board changes
+were tested using my last power sequence patch set. [2]
+
+@Maciej S. Szmigiero, Oscar, would you please test them on imx6qdl udoo
+boards?
+@Krzysztof Kozlowski, I have not written changes for your case since I
+find the other sequences have already at drivers/usb/misc/usb3503.c,
+this driver should be the place for your power sequence, I am not
+sure if enable regualator at usb core is suitable for you or not.
+@others, it is better you can help test this patch set for MMC devices
+and your USB devices with dts changes.
+
+Thank you for your time!
+
+[1] http://www.spinics.net/lists/linux-usb/msg142351.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/413580.html
+
+Krzysztof Kozlowski (5):
+  power/mmc: Move pwrseq drivers to power/pwrseq
+  MAINTAINERS: Retain Ulf Hansson as the same maintainer of pwrseq
+  power: pwrseq: Enable COMPILE_TEST for drivers
+  power: pwrseq: Remove mmc prefix from mmc_pwrseq
+  power: pwrseq: Generalize mmc_pwrseq operations by removing mmc prefix
+
+Peter Chen (7):
+  power: pwrseq: change common helpers as generic
+  power: pwrseq: rename file name for generic driver
+  doc: binding: pwrseq-usb-generic: add binding doc for generic usb
+    power sequence driver
+  power: pwrseq: pwrseq_usb_generic: add generic power sequence support
+    for USB deivces
+  usb: core: add power sequence handling for USB devices
+  usb: chipidea: host: let the hcd know's parent device node
+  ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
+
+ .../{mmc => power/pwrseq}/mmc-pwrseq-simple.txt    |   0
+ .../pwrseq/pwrseq-emmc.txt}                        |   0
+ .../bindings/power/pwrseq/pwrseq-usb-generic.txt   |  31 ++++
+ .../devicetree/bindings/usb/usb-device.txt         |   2 +
+ MAINTAINERS                                        |   9 +
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  30 +--
+ drivers/mmc/Kconfig                                |   2 -
+ drivers/mmc/core/Kconfig                           |  24 ---
+ drivers/mmc/core/Makefile                          |   3 -
+ drivers/mmc/core/core.c                            |   8 +-
+ drivers/mmc/core/host.c                            |  10 +-
+ drivers/mmc/core/pwrseq.h                          |  52 ------
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/power/pwrseq/Kconfig                       |  43 +++++
+ drivers/power/pwrseq/Makefile                      |   4 +
+ drivers/{mmc/core/pwrseq.c => power/pwrseq/core.c} |  71 ++++----
+ drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c   |  17 +-
+ .../pwrseq/pwrseq_mmc_simple.c}                    |  33 ++--
+ drivers/power/pwrseq/pwrseq_usb_generic.c          | 202 +++++++++++++++++++++
+ drivers/usb/chipidea/host.c                        |  18 +-
+ drivers/usb/core/hub.c                             |  73 +++++++-
+ drivers/usb/core/hub.h                             |   1 +
+ include/linux/mmc/host.h                           |   4 +-
+ include/linux/pwrseq.h                             |  61 +++++++
+ 25 files changed, 527 insertions(+), 173 deletions(-)
+ rename Documentation/devicetree/bindings/{mmc => power/pwrseq}/mmc-pwrseq-simple.txt (100%)
+ rename Documentation/devicetree/bindings/{mmc/mmc-pwrseq-emmc.txt => power/pwrseq/pwrseq-emmc.txt} (100%)
+ create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+ delete mode 100644 drivers/mmc/core/Kconfig
+ delete mode 100644 drivers/mmc/core/pwrseq.h
+ create mode 100644 drivers/power/pwrseq/Kconfig
+ create mode 100644 drivers/power/pwrseq/Makefile
+ rename drivers/{mmc/core/pwrseq.c => power/pwrseq/core.c} (51%)
+ rename drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c (88%)
+ rename drivers/{mmc/core/pwrseq_simple.c => power/pwrseq/pwrseq_mmc_simple.c} (81%)
+ create mode 100644 drivers/power/pwrseq/pwrseq_usb_generic.c
+ create mode 100644 include/linux/pwrseq.h
+
 -- 
-2.9.0
+1.9.1
