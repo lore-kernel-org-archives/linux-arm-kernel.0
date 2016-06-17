@@ -1,41 +1,57 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 17 Jun 2016 17:16:02 +0900
-Subject: [PATCH] clk: samsung: exynos5433: use clock_ignore_unused flag for
- SPI3 related clocks
-Message-ID: <1466151362-2881-1-git-send-email-andi.shyti@samsung.com>
+From: chris@chris-wilson.co.uk (Chris Wilson)
+Date: Fri, 17 Jun 2016 09:25:21 +0100
+Subject: [PATCH 5/7] drm/mediatek: Remove redundant calls to
+ drm_connector_register_all()
+In-Reply-To: <1466151923-1572-1-git-send-email-chris@chris-wilson.co.uk>
+References: <1466151923-1572-1-git-send-email-chris@chris-wilson.co.uk>
+Message-ID: <1466151923-1572-6-git-send-email-chris@chris-wilson.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jaehoon Chung <jh80.chung@samsung.com>
+Up to now, the recommendation was for drivers to call drm_dev_register()
+followed by drm_connector_register_all(). Now that
+drm_connector_register() is safe against multiple invocations, we can
+move drm_connector_register_all() to drm_dev_register() and not suffer
+from any backwards compatibility issues with drivers not following the
+more rigorous init ordering.
 
-The SPI 3 bus uses two clocks, a bus clock and an input clock.
-Do not disable the clocks when unused in order to allow access to
-the SPI 3 device.
-
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Signed-off-by: Chris Wilson <chris@chris-wilson.co.uk>
+Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: David Airlie <airlied@linux.ie>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mediatek at lists.infradead.org
 ---
- drivers/clk/samsung/clk-exynos5433.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-index 128527b..7c1fa09 100644
---- a/drivers/clk/samsung/clk-exynos5433.c
-+++ b/drivers/clk/samsung/clk-exynos5433.c
-@@ -1641,11 +1641,12 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
- 	GATE(CLK_SCLK_IOCLK_SPI4, "sclk_ioclk_spi4", "ioclk_spi4_clk_in",
- 			ENABLE_SCLK_PERIC, 21, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_IOCLK_SPI3, "sclk_ioclk_spi3", "ioclk_spi3_clk_in",
--			ENABLE_SCLK_PERIC, 20, CLK_SET_RATE_PARENT, 0),
-+			ENABLE_SCLK_PERIC, 20,
-+			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_SPI4, "sclk_spi4", "sclk_spi4_peric", ENABLE_SCLK_PERIC,
- 			19, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_SPI3, "sclk_spi3", "sclk_spi3_peric", ENABLE_SCLK_PERIC,
--			18, CLK_SET_RATE_PARENT, 0),
-+			18, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_SCI, "sclk_sci", "div_sclk_sci", ENABLE_SCLK_PERIC,
- 			17, 0, 0),
- 	GATE(CLK_SCLK_SC_IN, "sclk_sc_in", "div_sclk_sc_in", ENABLE_SCLK_PERIC,
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index c33bf98c5d5e..7ab91f4a200f 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -293,14 +293,8 @@ static int mtk_drm_bind(struct device *dev)
+ 	if (ret < 0)
+ 		goto err_deinit;
+ 
+-	ret = drm_connector_register_all(drm);
+-	if (ret < 0)
+-		goto err_unregister;
+-
+ 	return 0;
+ 
+-err_unregister:
+-	drm_dev_unregister(drm);
+ err_deinit:
+ 	mtk_drm_kms_deinit(drm);
+ err_free:
+@@ -455,7 +449,6 @@ static int mtk_drm_remove(struct platform_device *pdev)
+ 	struct drm_device *drm = private->drm;
+ 	int i;
+ 
+-	drm_connector_unregister_all(drm);
+ 	drm_dev_unregister(drm);
+ 	mtk_drm_kms_deinit(drm);
+ 	drm_dev_unref(drm);
 -- 
 2.8.1
