@@ -1,77 +1,52 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 17 Jun 2016 13:44:18 +0200
-Subject: [PATCH v4.7-rc] ARM: dts: STi: stih407-family: Disable
- reserved-memory co-processor nodes
-Message-ID: <1466163858-13819-1-git-send-email-maxime.coquelin@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Jun 2016 13:53:56 +0200
+Subject: [PATCH] arm64: Kconfig: select PM for ARCH_VEXPRESS
+In-Reply-To: <1466090128-24425-1-git-send-email-sudeep.holla@arm.com>
+References: <1466090128-24425-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <4148732.Pd5phtR9Qh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
+On Thursday, June 16, 2016 4:15:28 PM CEST Sudeep Holla wrote:
+> The Linux AMBA bus framework probes the peripheral IDs when adding the
+> AMBA devices very early on the boot. Generally they are on APB bus and
+> just require APB clocks to be on even when most of the core logic of the
+> IP is powered down.
+> 
+> However on Juno, the entire debugsys domain needs to be ON to access
+> even the coresight components' CID/PID registers and hence broken by
+> design. Accessing those while debugsys power domain is off will lead to
+> the bridge stalling the transactions instead of returning the slave error.
+> 
+> Further, the AMBA framework can't deal with !CONFIG_PM case: it ignores
+> the error and proceeds to access the device region. It was suggested to
+> always enable CONFIG_PM in order to handle this scenario.
+> 
+> Suggested-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm64/Kconfig.platforms | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> Hi ARM-SoC team,
+> 
+> The discussion on this happened on linux-pm list[1]. This is need on
+> Juno once we introduce coresight components in the DT. With !CONFIG_PM,
+> the board stalls on boot and hence this patch is needed. This shouldn't
+> change any thing in the defconfig as couple of other platforms already
+> do the same. It's needed in case all other ARCH_* configs are disabled.
+> 
+> Without this, we need a dirty trick in the DT[2] to handle !CONFIG_PM.
+> 
+> Can you please pick this for v4.8 ?
 
-This patch fixes a non-booting issue in Mainline.
+Question: if AMBA cannot deal with CONFIG_PM disabled, should 
+the 'select' be done from CONFIG_ARM_AMBA instead?
 
-When booting with a compressed kernel, we need to be careful how we
-populate memory close to DDR start.  AUTO_ZRELADDR is enabled by default
-in multi-arch enabled configurations, which place some restrictions on
-where the kernel is placed and where it will be uncompressed to on boot.
+I also feel a little uncomfortable with just adding 'select PM', given
+that this option is normally just implied by CONFIG_SUSPEND ||
+CONFIG_HIBERNATE_CALLBACKS, but not selected individually, so we
+might run into regressions when we get configurations that were
+invalid before. Then again ARCH_RENESAS seems to already do this.
 
-AUTO_ZRELADDR takes the decompressor code's start address and masks out
-the bottom 28 bits to obtain an address to uncompress the kernel to
-(thus a load address of 0x42000000 means that the kernel will be
-uncompressed to 0x40000000 i.e. DDR START on this platform).
-
-Even changing the load address to after the co-processor's shared memory
-won't render a booting platform, since the AUTO_ZRELADDR algorithm still
-ensures the kernel is uncompressed into memory shared with the first
-co-processor (0x40000000).
-
-Another option would be to move loading to 0x4A000000, since this will
-mean the decompressor will decompress the kernel to 0x48000000. However,
-this would mean a large chunk (0x44000000 => 0x48000000 (64MB)) of
-memory would essentially be wasted for no good reason.
-
-Until we can work with ST to find a suitable memory location to
-relocate co-processor shared memory, let's disable the shared memory
-nodes.  This will ensure a working platform in the mean time.
-
-NB: The more observant of you will notice that we're leaving the DMU
-shared memory node enabled; this is because a) it is the only one in
-active use at the time of this writing and b) it is not affected by
-the current default behaviour which is causing issues.
-
-Fixes: fe135c6 (ARM: dts: STiH407: Move over to using the 'reserved-memory' API for obtaining DMA memory)
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by Peter Griffin <peter.griffin@linaro.org>
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- arch/arm/boot/dts/stih407-family.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index ad8ba10764a3..d294e82447a2 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -24,18 +24,21 @@
- 			compatible = "shared-dma-pool";
- 			reg = <0x40000000 0x01000000>;
- 			no-map;
-+			status = "disabled";
- 		};
- 
- 		gp1_reserved: rproc at 41000000 {
- 			compatible = "shared-dma-pool";
- 			reg = <0x41000000 0x01000000>;
- 			no-map;
-+			status = "disabled";
- 		};
- 
- 		audio_reserved: rproc at 42000000 {
- 			compatible = "shared-dma-pool";
- 			reg = <0x42000000 0x01000000>;
- 			no-map;
-+			status = "disabled";
- 		};
- 
- 		dmu_reserved: rproc at 43000000 {
--- 
-1.9.1
+	Arnd
