@@ -1,50 +1,26 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 17 Jun 2016 12:16:48 -0500
-Subject: [PATCH 08/12] doc: binding: pwrseq-usb-generic: add binding doc
- for generic usb power sequence driver
-In-Reply-To: <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
-References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
- <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
-Message-ID: <CAL_JsqLvs0s2TyfqPM5vtmyY81_X84VjCGjsGYbTgT4syOfp9Q@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 17 Jun 2016 18:18:15 +0100
+Subject: [PATCH 1/2] arm64: mm: dump: make page table dumping reusable
+In-Reply-To: <1464702542-24394-2-git-send-email-mark.rutland@arm.com>
+References: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
+ <1464702542-24394-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160617171815.GC24589@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 5:09 AM, Peter Chen <peter.chen@nxp.com> wrote:
-> Add binding doc for generic usb power sequence driver, and update
-> generic usb device binding-doc accordingly.
->
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> ---
->  .../bindings/power/pwrseq/pwrseq-usb-generic.txt   | 31 ++++++++++++++++++++++
->  .../devicetree/bindings/usb/usb-device.txt         |  2 ++
->  2 files changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
->
-> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
-> new file mode 100644
-> index 0000000..8ad98382
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
-> @@ -0,0 +1,31 @@
-> +The power sequence for generic USB Devices
-> +
-> +Some hard-wired USB devices need to do power sequence to let the
-> +device work normally, the typical power sequence like: enable USB
-> +PHY clock, toggle reset pin, etc. But current Linux USB driver
-> +lacks of such code to do it, it may cause some hard-wired USB devices
-> +works abnormal or can't be recognized by controller at all. The
-> +power sequence will be done before this device can be found at USB
-> +bus.
-> +
-> +Required properties:
-> +- compatible : contains "usb-pwrseq-generic".
+On Tue, May 31, 2016 at 02:49:01PM +0100, Mark Rutland wrote:
+> For debugging purposes, it would be nice if we could export page tables
+> other than the swapper_pg_dir to userspace. To enable this, this patch
+> refactors the arm64 page table dumping code such that multiple tables
+> may be registered with the framework, and exported under debugfs.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Laura Abbott <labbott@fedoraproject.org>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-In case I have not been clear, no.
+Queued for 4.8. Thanks.
 
-I am not going to accept anything along the lines of the current mmc
-pwrseq. I am basically okay with Krzysztof's proposal as it is *only*
-an added property and not a duplication of information. I'd suggest
-you figure out how to make the kernel work with that rather than
-trying to work-around whatever kernel limitations there are.
-
-Rob
+-- 
+Catalin
