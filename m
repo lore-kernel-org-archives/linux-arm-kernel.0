@@ -1,208 +1,30 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 17 Jun 2016 12:42:11 +0200
-Subject: [PATCH 3/4] ARM: dts: Add Sierra Wireless WP8548 dtsi
+Date: Fri, 17 Jun 2016 12:42:09 +0200
+Subject: [PATCH 1/4] dt-bindings: vendor-prefixes: Add Sierra Wireless
 In-Reply-To: <1466160132-24574-1-git-send-email-narmstrong@baylibre.com>
 References: <1466160132-24574-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1466160132-24574-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1466160132-24574-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support the Sierra Wireless WP8548 module based on the
-Qualcomm MDM9615 SoC, add a dtsi file.
+Add Sierra Wireless as swi vendor prefix.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/boot/dts/swi-wp8548.dtsi | 182 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 182 insertions(+)
- create mode 100644 arch/arm/boot/dts/swi-wp8548.dtsi
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/swi-wp8548.dtsi b/arch/arm/boot/dts/swi-wp8548.dtsi
-new file mode 100644
-index 0000000..7448915
---- /dev/null
-+++ b/arch/arm/boot/dts/swi-wp8548.dtsi
-@@ -0,0 +1,182 @@
-+/*
-+ * Device Tree Source for Sierra Wireless WP8548 Module
-+ *
-+ * Copyright (C) 2016 BayLibre, SAS.
-+ * Author : Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "qcom-mdm9615.dtsi"
-+
-+/ {
-+	model = "Sierra Wireless WP8548 Module";
-+	compatible = "swi,wp8548", "qcom,mdm9615";
-+
-+	memory {
-+		reg = <0x48000000 0x7F00000>;
-+	};
-+};
-+
-+&msmgpio {
-+	pinctrl-0 = <&reset_out_pins>;
-+	pinctrl-names = "default";
-+
-+	gsbi3_pins: gsbi3_pins {
-+		mux {
-+			pins = "gpio8", "gpio9", "gpio10", "gpio11";
-+			function = "gsbi3";
-+			drive-strength = <8>;
-+			bias-disable;
-+		};
-+	};
-+
-+	gsbi4_pins: gsbi4_pins {
-+		mux {
-+			pins = "gpio12", "gpio13", "gpio14", "gpio15";
-+			function = "gsbi4";
-+			drive-strength = <8>;
-+			bias-disable;
-+		};
-+	};
-+
-+	gsbi5_i2c_pins: gsbi5_i2c_pins {
-+		pin16 {
-+			pins = "gpio16";
-+			function = "gsbi5_i2c";
-+			drive-strength = <8>;
-+			bias-disable;
-+		};
-+
-+		pin17 {
-+			pins = "gpio17";
-+			function = "gsbi5_i2c";
-+			drive-strength = <2>;
-+			bias-disable;
-+		};
-+	};
-+
-+	gsbi5_uart_pins: gsbi5_uart_pins {
-+		mux {
-+			pins = "gpio18", "gpio19";
-+			function = "gsbi5_uart";
-+			drive-strength = <8>;
-+			bias-disable;
-+		};
-+	};
-+
-+	reset_out_pins: reset_out_pins {
-+		pins {
-+			pins = "gpio66";
-+			function = "gpio";
-+			drive-strength = <2>;
-+			bias-pull-up;
-+			output-high;
-+		};
-+	};
-+};
-+
-+&pmicgpio {
-+	usb_vbus_5v_pins: usb_vbus_5v_pins {
-+		pins = "gpio4";
-+		function = "normal";
-+		output-high;
-+		bias-disable;
-+		qcom,drive-strength = <1>;
-+		power-source = <2>;
-+	};
-+};
-+
-+&gsbi3 {
-+	status = "ok";
-+	qcom,mode = <GSBI_PROT_SPI>;
-+};
-+
-+&gsbi3_spi {
-+	status = "ok";
-+	pinctrl-0 = <&gsbi3_pins>;
-+	pinctrl-names = "default";
-+	assigned-clocks = <&gcc GSBI3_QUP_CLK>;
-+	assigned-clock-rates = <24000000>;
-+};
-+
-+&gsbi4 {
-+	status = "ok";
-+	qcom,mode = <GSBI_PROT_UART_W_FC>;
-+};
-+
-+&gsbi4_serial {
-+	status = "ok";
-+	pinctrl-0 = <&gsbi4_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&gsbi5 {
-+	status = "ok";
-+	qcom,mode = <GSBI_PROT_I2C_UART>;
-+};
-+
-+&gsbi5_i2c {
-+	status = "ok";
-+	clock-frequency = <200000>;
-+	pinctrl-0 = <&gsbi5_i2c_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&gsbi5_serial {
-+	status = "ok";
-+	pinctrl-0 = <&gsbi5_uart_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&sdcc1 {
-+	status = "ok";
-+};
-+
-+&usb1_phy {
-+	status = "ok";
-+};
-+
-+&usb1 {
-+	status = "ok";
-+};
-+
-+&gadget1 {
-+	status = "ok";
-+};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 2c2500d..45bccd2 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -250,6 +250,7 @@ st	STMicroelectronics
+ startek	Startek
+ ste	ST-Ericsson
+ stericsson	ST-Ericsson
++swi	Sierra Wireless
+ syna	Synaptics Inc.
+ synology	Synology, Inc.
+ SUNW	Sun Microsystems, Inc
 -- 
 1.9.1
