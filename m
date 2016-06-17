@@ -1,79 +1,42 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 17 Jun 2016 18:16:02 +0200
-Subject: [PATCH V2 04/63] clocksource/drivers/mkt_timer: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-5-git-send-email-daniel.lezcano@linaro.org>
-References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-5-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <57642242.2050607@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 17 Jun 2016 18:19:58 +0200
+Subject: [PATCH v4 03/13] soc: renesas: rcar-sysc: Make rcar_sysc_init()
+ init the PM domains
+In-Reply-To: <CAO3366zM=x5HSOMZ6WqEhTr5piQQdSV6vnr7qE48c=Bvm612LQ@mail.gmail.com>
+References: <1466072862-28030-1-git-send-email-geert+renesas@glider.be>
+ <1466072862-28030-4-git-send-email-geert+renesas@glider.be>
+ <CAO3366zM=x5HSOMZ6WqEhTr5piQQdSV6vnr7qE48c=Bvm612LQ@mail.gmail.com>
+Message-ID: <CAMuHMdXm63mXvhAmjcNg-jLavB0s5Vsq1Jg49Zaxv2Q2MptpmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ulrich,
 
+On Fri, Jun 17, 2016 at 5:57 PM, Ulrich Hecht <ulrich.hecht@gmail.com> wrote:
+>> --- a/drivers/soc/renesas/rcar-sysc.c
+>> +++ b/drivers/soc/renesas/rcar-sysc.c
+>> @@ -164,15 +164,6 @@ static bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
+>>         return false;
+>>  }
+>>
+>> -void __iomem *rcar_sysc_init(phys_addr_t base)
+>> -{
+>> -       rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
+>> -       if (!rcar_sysc_base)
+>> -               panic("unable to ioremap R-Car SYSC hardware block\n");
+>
+> Is this check no longer necessary?
 
-On 16/06/16 23:26, Daniel Lezcano wrote:
-> The init functions do not return any error. They behave as the following:
->
->   - panic, thus leading to a kernel crash while another timer may work and
->     make the system boot up correctly
->
->   or
->
->   - print an error and let the caller unaware if the state of the system
->
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
->
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->   drivers/clocksource/mtk_timer.c | 10 ++++++----
->   1 file changed, 6 insertions(+), 4 deletions(-)
->
+If this failed (out of memory) this early in the boot process, we're gonna die
+anyway.
 
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+Gr{oetje,eeting}s,
 
-> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> index 7e583f8..432a2c0 100644
-> --- a/drivers/clocksource/mtk_timer.c
-> +++ b/drivers/clocksource/mtk_timer.c
-> @@ -181,7 +181,7 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
->   			evt->gpt_base + GPT_IRQ_EN_REG);
->   }
->
-> -static void __init mtk_timer_init(struct device_node *node)
-> +static int __init mtk_timer_init(struct device_node *node)
->   {
->   	struct mtk_clock_event_device *evt;
->   	struct resource res;
-> @@ -190,7 +190,7 @@ static void __init mtk_timer_init(struct device_node *node)
->
->   	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
->   	if (!evt)
-> -		return;
-> +		return -ENOMEM;
->
->   	evt->dev.name = "mtk_tick";
->   	evt->dev.rating = 300;
-> @@ -248,7 +248,7 @@ static void __init mtk_timer_init(struct device_node *node)
->
->   	mtk_timer_enable_irq(evt, GPT_CLK_EVT);
->
-> -	return;
-> +	return 0;
->
->   err_clk_disable:
->   	clk_disable_unprepare(clk);
-> @@ -262,5 +262,7 @@ err_mem:
->   	release_mem_region(res.start, resource_size(&res));
->   err_kzalloc:
->   	kfree(evt);
-> +
-> +	return -EINVAL;
->   }
-> -CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
-> +CLOCKSOURCE_OF_DECLARE_RET(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
->
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
