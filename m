@@ -1,44 +1,68 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 17 Jun 2016 18:36:12 -0500
+Date: Fri, 17 Jun 2016 18:46:45 -0500
 Subject: [PATCH] PCI: mvebu: Don't try to add an MBus window that already
  exists
-In-Reply-To: <20160603093042.26e325d1@free-electrons.com>
+In-Reply-To: <57511C4E.5040501@denx.de>
 References: <20160602125247.17566-1-sr@denx.de>
  <20160602151818.0989ee50@free-electrons.com>
  <57511C4E.5040501@denx.de>
- <20160603093042.26e325d1@free-electrons.com>
-Message-ID: <20160617233612.GC21200@localhost>
+Message-ID: <20160617234645.GD21200@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 09:30:42AM +0200, Thomas Petazzoni wrote:
-> Hello,
+On Fri, Jun 03, 2016 at 07:57:34AM +0200, Stefan Roese wrote:
+> Hi Thomas,
 > 
-> On Fri, 3 Jun 2016 07:57:34 +0200, Stefan Roese wrote:
+> On 02.06.2016 15:18, Thomas Petazzoni wrote:
+> >On Thu,  2 Jun 2016 14:52:47 +0200, Stefan Roese wrote:
+> >>Add a check to mvebu_pcie_add_windows() to detect, if an MBus window is
+> >>already configured. If this is the case (base address, size, target and
+> >>attribute are identical), then this window is not created. This fixes
+> >>a problem I'm currently seeing on a custom Armada XP based board, which
+> >>generates this error upon PCI rescanning (in this case via sysfs):
+> >>
+> >>$ echo 1 > /sys/bus/pci/rescan
+> >>mvebu_mbus: cannot add window '4:e8', conflicts with another window
+> >>mvebu-pcie soc:pcie-controller: Could not create MBus window at [mem 0x9e000000-0x9e0fffff]: -22
+> >
+> >Thanks for the patch. I am not familiar with what happens during a PCI
+> >rescan, but shouldn't the MBus windows be deleted and then re-added?
 > 
-> > > The pci-mvebu driver deletes the MBus windows for a given PCI device
-> > > when invalid memory base/limits are set in the emulated PCI bridge.
-> > > Shouldn't this happen over a rescan?  
-> > 
-> > I'm not sure what *should* happen upon rescan. But testing shows, that
-> > no MBus window is removed upon rescan. I just tested what happens,
-> > if the PCI devices are "removed" via sysfs. And this also does not
-> > delete any of the MBus windows.
+> It does not happen in this rescan case.
 > 
-> Then maybe that's a question for the PCI folks. Is it normal that when
-> a PCI device gets removed, the configuration of the PCI bridge does not
-> get adjusted accordingly?
+> >The pci-mvebu driver deletes the MBus windows for a given PCI device
+> >when invalid memory base/limits are set in the emulated PCI bridge.
+> >Shouldn't this happen over a rescan?
+> 
+> I'm not sure what *should* happen upon rescan. But testing shows, that
+> no MBus window is removed upon rescan. I just tested what happens,
+> if the PCI devices are "removed" via sysfs. And this also does not
+> delete any of the MBus windows.
+> 
+> >If it doesn't, then the other question is whether the check you're
+> >adding should be done in the PCI driver or in the MBus driver.
+> >
+> >In commit b566e782be32145664d96ada3e389f17d32742e5, we already relaxed
+> >the checks done by the MBus driver, and since this commit we allow
+> >different windows to have the same target/attribute.
+> >
+> >Should the MBus driver also allow re-creating a	window that
+> >already exists, if all its properties are the same?
+> 
+> This sounds like a good idea to me. To move this detection / decision
+> one layer up. So that it will work for other drivers using this
+> MBus interface as well.
 
-I'm not sure I completely understand the question.
+I don't know how you want to solve it, but it definitely should be
+safe to write the bridge window registers multiple times, either with
+the same values, a new invalid base/limit pair, or a new valid
+base/limit pair.
 
-When a PCI device is removed, I don't think we touch any upstream
-devices.  The device is gone; there's no reason to change any bridge
-windows leading to it.
+A complete emulation should handle all those, including disposing of
+an old valid window and replacing it with a new, different, valid
+window.
 
-When we rescan, we should try to assign resources to BARs of any new
-devices we find.  Theoretically that could involve configuring windows
-of upstream bridges, but I don't think we actually do that, because
-we'd have to be careful not to break any active devices, and I don't
-think we're smart enough for that.
+And of course, it should handle individual 16-bit writes for the
+base/limit of the 32-bit windows.
 
 Bjorn
