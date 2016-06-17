@@ -1,29 +1,96 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Fri, 17 Jun 2016 17:21:16 +0000
-Subject: [PATCH -next] mtd: mtk-nor: remove duplicated include from
- mtk-quadspi.c
-Message-ID: <1466184076-11714-1-git-send-email-weiyj_lk@163.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 17 Jun 2016 19:21:50 +0200
+Subject: [PATCHv3 5/7] EDAC, altera: Add Arria10 ECC memory init functions
+In-Reply-To: <1465852752-11018-6-git-send-email-tthayer@opensource.altera.com>
+References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
+ <1465852752-11018-6-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160617172150.GJ3912@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Mon, Jun 13, 2016 at 04:19:10PM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> In preparation for additional memory module ECCs, add the
+> memory initialization functions and helper functions used
+> for memory initialization.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2: Specify INTMODE selection -> IRQ on each ECC error.
+>     Insert functions above memory-specific functions so that function
+>     declarations are not required.
+>     Use ERRINTENS & ERRINTENR registers instead of read/modify/write.
+> v3: Changes for common compatibility string:
+>     - Pass node instead of compatibility string.
+>     - New altr_init_a10_ecc_device_type() for peripherals.
+>     - Add __init to altr_init_a10_ecc_block().
+>     - Add a10_get_irq_mask().
+> ---
+>  drivers/edac/altera_edac.c |  197 ++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/edac/altera_edac.h |    8 ++
+>  2 files changed, 205 insertions(+)
 
-Remove duplicated include.
+> +/*
+> + * This function uses the memory initialization block in the Arria10 ECC
+> + * controller to initialize/clear the entire memory data and ECC data.
+> + */
+> +static int altr_init_memory_port(void __iomem *ioaddr, int port)
+> +{
+> +	int limit = ALTR_A10_ECC_INIT_WATCHDOG_10US;
+> +	u32 init_mask = ALTR_A10_ECC_INITA;
+> +	u32 stat_mask = ALTR_A10_ECC_INITCOMPLETEA;
+> +	u32 clear_mask = ALTR_A10_ECC_ERRPENA_MASK;
+> +	int ret = 0;
+> +
+> +	if (port) {
+> +		init_mask = ALTR_A10_ECC_INITB;
+> +		stat_mask = ALTR_A10_ECC_INITCOMPLETEB;
+> +		clear_mask = ALTR_A10_ECC_ERRPENB_MASK;
+> +	}
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/mtd/spi-nor/mtk-quadspi.c | 1 -
- 1 file changed, 1 deletion(-)
+Do a
+	u32 init_mask, stat_mask, clear_mask;
 
-diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
-index 21c31b3..e661877 100644
---- a/drivers/mtd/spi-nor/mtk-quadspi.c
-+++ b/drivers/mtd/spi-nor/mtk-quadspi.c
-@@ -21,7 +21,6 @@
- #include <linux/ioport.h>
- #include <linux/math64.h>
- #include <linux/module.h>
--#include <linux/mtd/mtd.h>
- #include <linux/mutex.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
+	if (port) {
+		init_mask = ALTR_A10_ECC_INITB;
+		...
+	} else {
+		init_mask = ALTR_A10_ECC_INITA;
+		...
+	}
+
+so that you don't have to repeat the assignments in the if (port) case.
+
+> +
+> +	ecc_set_bits(init_mask, (ioaddr + ALTR_A10_ECC_CTRL_OFST));
+> +	while (limit--) {
+> +		if (ecc_test_bits(stat_mask,
+> +				  (ioaddr + ALTR_A10_ECC_INITSTAT_OFST)))
+> +			break;
+> +		udelay(1);
+> +	}
+> +	if (limit < 0)
+> +		ret = -EBUSY;
+> +
+> +	/* Clear any pending ECC interrupts */
+> +	writel(clear_mask, (ioaddr + ALTR_A10_ECC_INTSTAT_OFST));
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+> + * Aside from the L2 ECC, the Arria10 ECC memories have a common register
+> + * layout so the following functions can be shared between all peripherals.
+
+I don't understand - we're here under
+
+#if defined(CONFIG_EDAC_ALTERA_ETHERNET)
+
+What sharing do you mean?
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
