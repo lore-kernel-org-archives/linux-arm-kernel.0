@@ -1,42 +1,31 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 17 Jun 2016 18:19:58 +0200
-Subject: [PATCH v4 03/13] soc: renesas: rcar-sysc: Make rcar_sysc_init()
- init the PM domains
-In-Reply-To: <CAO3366zM=x5HSOMZ6WqEhTr5piQQdSV6vnr7qE48c=Bvm612LQ@mail.gmail.com>
-References: <1466072862-28030-1-git-send-email-geert+renesas@glider.be>
- <1466072862-28030-4-git-send-email-geert+renesas@glider.be>
- <CAO3366zM=x5HSOMZ6WqEhTr5piQQdSV6vnr7qE48c=Bvm612LQ@mail.gmail.com>
-Message-ID: <CAMuHMdXm63mXvhAmjcNg-jLavB0s5Vsq1Jg49Zaxv2Q2MptpmQ@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 17 Jun 2016 12:26:06 -0400
+Subject: [RFC PATCH 4/4] stm: Mark the functions of writing buffer with
+ notrace
+In-Reply-To: <1464779939-24986-5-git-send-email-zhang.chunyan@linaro.org>
+References: <1464779939-24986-1-git-send-email-zhang.chunyan@linaro.org>
+ <1464779939-24986-5-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <20160617122606.417cf5a0@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulrich,
+On Wed,  1 Jun 2016 19:18:59 +0800
+Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
 
-On Fri, Jun 17, 2016 at 5:57 PM, Ulrich Hecht <ulrich.hecht@gmail.com> wrote:
->> --- a/drivers/soc/renesas/rcar-sysc.c
->> +++ b/drivers/soc/renesas/rcar-sysc.c
->> @@ -164,15 +164,6 @@ static bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
->>         return false;
->>  }
->>
->> -void __iomem *rcar_sysc_init(phys_addr_t base)
->> -{
->> -       rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
->> -       if (!rcar_sysc_base)
->> -               panic("unable to ioremap R-Car SYSC hardware block\n");
->
-> Is this check no longer necessary?
+> If CONFIG_STM_FTRACE is selected, Function trace data would be
+> writen to STM buffer, all  functions that related to writing data
+> packets to STM buffer should be marked 'notrace' to avoid being
+> traced by Ftrace, otherwise the program would stall into an endless loop.
+> 
+> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-stm.c |  2 +-
+>  drivers/hwtracing/intel_th/sth.c            | 11 +++++++----
+>  drivers/hwtracing/stm/core.c                |  7 ++++---
+>  drivers/hwtracing/stm/dummy_stm.c           |  2 +-
+>  include/linux/stm.h                         |  4 ++--
+>  5 files changed, 15 insertions(+), 11 deletions(-)
 
-If this failed (out of memory) this early in the boot process, we're gonna die
-anyway.
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- Steve
