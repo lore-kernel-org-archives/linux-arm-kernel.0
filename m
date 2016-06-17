@@ -1,31 +1,23 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 17 Jun 2016 09:13:14 +0200
-Subject: [PATCH 4/6] [media] s5p-jpeg: only fill driver's name in
- capabilities driver field
-In-Reply-To: <1466113235-25909-5-git-send-email-javier@osg.samsung.com>
+Date: Fri, 17 Jun 2016 09:13:29 +0200
+Subject: [PATCH 5/6] [media] gsc-m2m: add device name sufix to bus_info
+ capatiliby field
+In-Reply-To: <1466113235-25909-6-git-send-email-javier@osg.samsung.com>
 References: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
- <1466113235-25909-5-git-send-email-javier@osg.samsung.com>
-Message-ID: <5763A30A.5060201@xs4all.nl>
+ <1466113235-25909-6-git-send-email-javier@osg.samsung.com>
+Message-ID: <5763A319.6020504@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/16/2016 11:40 PM, Javier Martinez Canillas wrote:
-> The driver fills in both the struct v4l2_capability driver and card fields
-> the same values, that is the driver's name plus the information if the dev
-> is a decoder or an encoder.
+> The driver doesn't set the device in the struct v4l2_capability bus_info
+> field so v4l2-compliance reports the following error for VIDIOC_QUERYCAP:
 > 
-> But the driver field has a fixed length of 16 bytes so the filled data is
-> truncated:
+> Required ioctls:
+>                 fail: v4l2-compliance.cpp(537): missing bus_info prefix ('platform')
+>         test VIDIOC_QUERYCAP: FAIL
 > 
-> Driver Info (not using libv4l2):
->         Driver name   : s5p-jpeg decode
->         Card type     : s5p-jpeg decoder
->         Bus info      : platform:11f50000.jpeg
->         Driver version: 4.7.0
-> 
-> Also, this field should only contain the driver's name so use just that.
-> The information if the device is a decoder or an encoder is in the card
-> type field anyways.
+> This patch fixes this by filling also the device besides the bus.
 > 
 > Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
@@ -37,26 +29,21 @@ Hans
 
 > ---
 > 
->  drivers/media/platform/s5p-jpeg/jpeg-core.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/media/platform/exynos-gsc/gsc-m2m.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> index e3ff3d4bd72e..f9fb52a53e79 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> @@ -1246,12 +1246,12 @@ static int s5p_jpeg_querycap(struct file *file, void *priv,
->  	struct s5p_jpeg_ctx *ctx = fh_to_ctx(priv);
+> diff --git a/drivers/media/platform/exynos-gsc/gsc-m2m.c b/drivers/media/platform/exynos-gsc/gsc-m2m.c
+> index a600e32e2543..af81383086b8 100644
+> --- a/drivers/media/platform/exynos-gsc/gsc-m2m.c
+> +++ b/drivers/media/platform/exynos-gsc/gsc-m2m.c
+> @@ -281,7 +281,8 @@ static int gsc_m2m_querycap(struct file *file, void *fh,
 >  
->  	if (ctx->mode == S5P_JPEG_ENCODE) {
-> -		strlcpy(cap->driver, S5P_JPEG_M2M_NAME " encoder",
-> +		strlcpy(cap->driver, S5P_JPEG_M2M_NAME,
->  			sizeof(cap->driver));
->  		strlcpy(cap->card, S5P_JPEG_M2M_NAME " encoder",
->  			sizeof(cap->card));
->  	} else {
-> -		strlcpy(cap->driver, S5P_JPEG_M2M_NAME " decoder",
-> +		strlcpy(cap->driver, S5P_JPEG_M2M_NAME,
->  			sizeof(cap->driver));
->  		strlcpy(cap->card, S5P_JPEG_M2M_NAME " decoder",
->  			sizeof(cap->card));
+>  	strlcpy(cap->driver, gsc->pdev->name, sizeof(cap->driver));
+>  	strlcpy(cap->card, gsc->pdev->name, sizeof(cap->card));
+> -	strlcpy(cap->bus_info, "platform", sizeof(cap->bus_info));
+> +	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
+> +		 dev_name(&gsc->pdev->dev));
+>  	cap->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M_MPLANE |
+>  		V4L2_CAP_VIDEO_CAPTURE_MPLANE |	V4L2_CAP_VIDEO_OUTPUT_MPLANE;
+>  
 > 
