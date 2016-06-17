@@ -1,16 +1,16 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 17 Jun 2016 09:19:21 +0200
-Subject: [PATCH 1/2] ARM: dts: r8a7792: add JPU clocks
-In-Reply-To: <8298805.L3k84jpzv2@wasted.cogentembedded.com>
+Date: Fri, 17 Jun 2016 09:20:42 +0200
+Subject: [PATCH 2/2] ARM: dts: r8a7792: add JPU support
+In-Reply-To: <2415204.YUO4drecC0@wasted.cogentembedded.com>
 References: <7346244.CEZI3u99oZ@wasted.cogentembedded.com>
- <8298805.L3k84jpzv2@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdWdcenxu-riFhpjZ3JbBYvkKjRWLvijVVBZvXy1tJHQ5w@mail.gmail.com>
+ <2415204.YUO4drecC0@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUgS1L2UHMeN4CDj_MJ4uYKB57xE5rMQDXp+WjRAi1adw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 12:02 AM, Sergei Shtylyov
+On Fri, Jun 17, 2016 at 12:03 AM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Add JPU clock and its parent, M2 clock to the R8A7792 device tree.
+> Describe JPEG Processing Unit (JPU) in the R8A7792 device tree.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
