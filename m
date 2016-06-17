@@ -1,33 +1,36 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 17 Jun 2016 12:10:53 -0400
-Subject: [PATCH] ata: fix "ering" sysfs time printing
-In-Reply-To: <20160617153739.429055-1-arnd@arndb.de>
-References: <20160617153739.429055-1-arnd@arndb.de>
-Message-ID: <20160617161053.GK3262@mtj.duckdns.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 Jun 2016 18:11:11 +0200
+Subject: [PATCH V2 50/63] clocksource/drivers/timer-u300: Convert init
+ function to return error
+In-Reply-To: <1466112442-31105-51-git-send-email-daniel.lezcano@linaro.org>
+References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
+ <1466112442-31105-51-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CACRpkdbYR9kV2UjVS9ugqnM9Y_2r3xiZL8WFPsb_34-8vFv1cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 05:37:12PM +0200, Arnd Bergmann wrote:
-> The sysfs file for the libata error handling has multiple issues
-> in the way it prints time stamps:
-> 
->  * it prints a 9-digit nanosecond value using a %06lu format string,
->    which drops some leading zeroes
->  * it converts a 64-bit jiffes value to a timespec using
->    jiffies_to_timespec(), which takes a 'long' argument, so the
->    result is wrong after a jiffies overflow (49 days).
->  * we try to avoid using timespec because that generally overflows
->    in 2038, although this particular usage is ok.
-> 
-> This replaces the jiffies_to_timespec call with an open-coded
-> implementation that gets it right.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Thu, Jun 16, 2016 at 11:27 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
 
-Heh, I'm not even sure why we're exposing this but it's already there.
-Applied to libata/for-4.8.
+> The init functions do not return any error. They behave as the following:
+>
+>   - panic, thus leading to a kernel crash while another timer may work and
+>        make the system boot up correctly
+>
+>   or
+>
+>   - print an error and let the caller unaware if the state of the system
+>
+> Change that by converting the init functions to return an error conforming
+> to the CLOCKSOURCE_OF_RET prototype.
+>
+> Proper error handling (rollback, errno value) will be changed later case
+> by case, thus this change just return back an error or success in the init
+> function.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Thanks!
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
--- 
-tejun
+Yours,
+Linus Walleij
