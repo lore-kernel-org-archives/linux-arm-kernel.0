@@ -1,104 +1,153 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Fri, 17 Jun 2016 03:30:56 +0000
-Subject: [PATCH v2 2/2] pci/aer: interrupt fixup in the quirk
-In-Reply-To: <20160616135420.GA31343@localhost>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <1465884747-1517-1-git-send-email-po.liu@nxp.com>
- <1465884747-1517-2-git-send-email-po.liu@nxp.com>
- <20160616135420.GA31343@localhost>
-Message-ID: <VI1PR0401MB1709A9CA2424515B867940E392570@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 17 Jun 2016 11:53:02 +0800
+Subject: [PATCH update v7 15/15] acpi, numa: Enable ACPI based NUMA on ARM64
+Message-ID: <1466135582-37520-1-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
+Add function needed for cpu to node mapping, and enable ACPI based
+NUMA for ARM64 in Kconfig
 
->  -----Original Message-----
->  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
->  Sent: Thursday, June 16, 2016 9:54 PM
->  To: Po Liu
->  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Bjorn Helgaas;
->  Shawn Guo; Marc Zyngier; Rob Herring; Roy Zang; Mingkai Hu; Stuart Yoder;
->  Yang-Leo Li; Arnd Bergmann; Minghuan Lian; Murali Karicheri
->  Subject: Re: [PATCH v2 2/2] pci/aer: interrupt fixup in the quirk
->  
->  On Tue, Jun 14, 2016 at 02:12:27PM +0800, Po Liu wrote:
->  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
->  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
->  > maybe there is interrupt line for aer pme etc. Search the interrupt
->  > number in the fdt file. Then fixup the dev->irq with it.
->  >
->  > Signed-off-by: Po Liu <po.liu@nxp.com>
->  > ---
->  > changes for V2:
->  > 	- Move to the quirk file
->  >
->  >  drivers/pci/quirks.c | 23 +++++++++++++++++++++++
->  >  1 file changed, 23 insertions(+)
->  >
->  > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
->  > ee72ebe..909d479 100644
->  > --- a/drivers/pci/quirks.c
->  > +++ b/drivers/pci/quirks.c
->  
->  Is there any possibility of this part being used on different arches, or
->  will it only ever be on arm64 (or whatever it is)?  If the latter, it
->  could go somewhere like arch/arm64/kernel/quirks.c (which doesn't exist
->  yet).
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+[david.daney at cavium.com added ACPI_NUMA default to y for ARM64]
+Signed-off-by: David Daney <david.daney@cavium.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
 
-NXP Layerscape1 is base on the arm 32bit design. Also need the fixup.
+update version:
+Address the comment from Matthias which was wrongly set srat_proc[1]
+but should be srat_proc[2].
 
->  
->  > @@ -25,6 +25,7 @@
->  >  #include <linux/sched.h>
->  >  #include <linux/ktime.h>
->  >  #include <linux/mm.h>
->  > +#include <linux/of_irq.h>
->  >  #include <asm/dma.h>	/* isa_dma_bridge_buggy */
->  >  #include "pci.h"
->  >
->  > @@ -4419,3 +4420,25 @@ static void quirk_intel_qat_vf_cap(struct
->  pci_dev *pdev)
->  >  	}
->  >  }
->  >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443,
->  > quirk_intel_qat_vf_cap);
->  > +
->  > +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
->  > + * but use standalone irq. Read the device tree for the aer
->  > + * interrupt number.
->  > + */
->  > +static void quirk_aer_interrupt(struct pci_dev *dev) {
->  > +	int ret;
->  > +	struct device_node *np = NULL;
->  > +
->  > +	if (dev->bus->dev.of_node)
->  > +		np = dev->bus->dev.of_node;
->  > +
->  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
->  > +		ret = of_irq_get_byname(np, "aer");
->  > +		if (ret > 0) {
->  > +			dev->no_msi = 1;
->  > +			dev->irq = ret;
->  > +		}
->  > +	}
->  
->  What does this mean for the other PCIe services, e.g., PME?  I guess
->  this makes the existing AER code work unchanged.  But I thought PME had
->  a similar situation and was connected up to a different interrupt than
->  AER was.
+Rafael, this patch is beased on your linux-next branch.
 
-Yes, PME is similar, HP is not support. I think better to disable the PME service irq in the quirk.
-But seems it is no use because quirk fixup is only running in init phase time(except suspend, resume).
+ drivers/acpi/Kconfig |  4 ++--
+ drivers/acpi/numa.c  | 37 ++++++++++++++++++++++++++++++++++++-
+ include/linux/acpi.h | 17 ++++++++++++++++-
+ 3 files changed, 54 insertions(+), 4 deletions(-)
 
->  
->  > +}
->  > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,
->  > +quirk_aer_interrupt);
->  > --
->  > 2.1.0.27.g96db324
->  >
->  > --
->  > To unsubscribe from this list: send the line "unsubscribe linux-pci"
->  > in the body of a message to majordomo at vger.kernel.org More majordomo
->  > info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index b7e2e77..dd76b36 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -291,8 +291,8 @@ config ACPI_THERMAL
+ config ACPI_NUMA
+ 	bool "NUMA support"
+ 	depends on NUMA
+-	depends on (X86 || IA64)
+-	default y if IA64_GENERIC || IA64_SGI_SN2
++	depends on (X86 || IA64 || ARM64)
++	default y if IA64_GENERIC || IA64_SGI_SN2 || ARM64
+ 
+ config ACPI_CUSTOM_DSDT_FILE
+ 	string "Custom DSDT Table file to include"
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index fad6d28..ce3a7a1 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -170,6 +170,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
+ 		}
+ 		break;
+ 
++	case ACPI_SRAT_TYPE_GICC_AFFINITY:
++		{
++			struct acpi_srat_gicc_affinity *p =
++			    (struct acpi_srat_gicc_affinity *)header;
++			pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
++				 p->acpi_processor_uid,
++				 p->proximity_domain,
++				 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
++				 "enabled" : "disabled");
++		}
++		break;
++
+ 	default:
+ 		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
+ 			header->type);
+@@ -360,6 +372,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
+ 	return 0;
+ }
+ 
++static int __init
++acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
++			 const unsigned long end)
++{
++	struct acpi_srat_gicc_affinity *processor_affinity;
++
++	processor_affinity = (struct acpi_srat_gicc_affinity *)header;
++	if (!processor_affinity)
++		return -EINVAL;
++
++	acpi_table_print_srat_entry(header);
++
++	/* let architecture-dependent part to do it */
++	acpi_numa_gicc_affinity_init(processor_affinity);
++
++	return 0;
++}
++
+ static int __initdata parsed_numa_memblks;
+ 
+ static int __init
+@@ -404,6 +434,9 @@ int __init acpi_numa_init(void)
+ {
+ 	int cnt = 0;
+ 
++	if (acpi_disabled)
++		return -EINVAL;
++
+ 	/*
+ 	 * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
+ 	 * SRAT cpu entries could have different order with that in MADT.
+@@ -412,13 +445,15 @@ int __init acpi_numa_init(void)
+ 
+ 	/* SRAT: Static Resource Affinity Table */
+ 	if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
+-		struct acpi_subtable_proc srat_proc[2];
++		struct acpi_subtable_proc srat_proc[3];
+ 
+ 		memset(srat_proc, 0, sizeof(srat_proc));
+ 		srat_proc[0].id = ACPI_SRAT_TYPE_CPU_AFFINITY;
+ 		srat_proc[0].handler = acpi_parse_processor_affinity;
+ 		srat_proc[1].id = ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY;
+ 		srat_proc[1].handler = acpi_parse_x2apic_affinity;
++		srat_proc[2].id = ACPI_SRAT_TYPE_GICC_AFFINITY;
++		srat_proc[2].handler = acpi_parse_gicc_affinity;
+ 
+ 		acpi_table_parse_entries_array(ACPI_SIG_SRAT,
+ 					sizeof(struct acpi_table_srat),
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 8010b26..9515db6 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -232,10 +232,25 @@ int acpi_table_parse_madt(enum acpi_madt_type id,
+ int acpi_parse_mcfg (struct acpi_table_header *header);
+ void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
+ 
+-/* the following four functions are architecture-dependent */
++/* the following numa functions are architecture-dependent */
+ void acpi_numa_slit_init (struct acpi_table_slit *slit);
++
++#if defined(CONFIG_X86) || defined(CONFIG_IA64)
+ void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
++#else
++static inline void
++acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa) { }
++#endif
++
+ void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
++
++#ifdef CONFIG_ARM64
++void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
++#else
++static inline void
++acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
++#endif
++
+ int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
+ 
+ #ifndef PHYS_CPUID_INVALID
+-- 
+1.7.12.4
