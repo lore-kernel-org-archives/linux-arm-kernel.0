@@ -1,53 +1,44 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 17 Jun 2016 10:59:11 +0200
-Subject: [RFC PATCH 13/15] memory: samsung: endian fixes for IO
-In-Reply-To: <20160608183110.13851-14-matthew@mattleach.net>
-References: <20160608183110.13851-1-matthew@mattleach.net>
- <20160608183110.13851-14-matthew@mattleach.net>
-Message-ID: <5763BBDF.106@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 17 Jun 2016 11:04:03 +0200
+Subject: [RFC] can: c_can: Update D_CAN TX and RX functions to 32 bit.
+In-Reply-To: <1466093419-27575-2-git-send-email-tthayer@opensource.altera.com>
+References: <1466093419-27575-1-git-send-email-tthayer@opensource.altera.com>
+ <1466093419-27575-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <612130a4-30ea-ed73-ac8e-dabe7919ec35@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2016 08:31 PM, Matthew Leach wrote:
-> From: Ben Dooks <ben.dooks@codethink.co.uk>
+On 06/16/2016 06:10 PM, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Use the relaxed versions of the IO accessors to avoid any issues
-> if running in big endian.
+> When testing CAN write floods on Altera's CycloneV, the
+> first 2 bytes are sometimes 0x00, 0x00 or corrupted
+> instead of the values sent. Also observed bytes 4 & 5
+> were corrupted in some cases.
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
-> Cc: Pavel Fedin <p.fedin@samsung.com>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Cc: linux-arm-kernel at lists.codethink.co.uk
-> ---
->  drivers/memory/samsung/exynos-srom.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> The D_CAN Data registers are 32 bits and changing from
+> 16 bit writes to 32 bit writes fixes the problem.
 > 
-> diff --git a/drivers/memory/samsung/exynos-srom.c b/drivers/memory/samsung/exynos-srom.c
-> index 96756fb..ac8f79c 100644
-> --- a/drivers/memory/samsung/exynos-srom.c
-> +++ b/drivers/memory/samsung/exynos-srom.c
-> @@ -91,11 +91,11 @@ static int exynos_srom_configure_bank(struct exynos_srom *srom,
->  	if (width == 2)
->  		cs |= 1 << EXYNOS_SROM_BW__DATAWIDTH__SHIFT;
->  
-> -	bw = __raw_readl(srom->reg_base + EXYNOS_SROM_BW);
-> +	bw = readl_relaxed(srom->reg_base + EXYNOS_SROM_BW);
->  	bw = (bw & ~(EXYNOS_SROM_BW__CS_MASK << bank)) | (cs << bank);
-> -	__raw_writel(bw, srom->reg_base + EXYNOS_SROM_BW);
-> +	writel_relaxed(bw, srom->reg_base + EXYNOS_SROM_BW);
->  
-> -	__raw_writel(pmc | (timing[0] << EXYNOS_SROM_BCX__TACP__SHIFT) |
-> +	writel_relaxed(pmc | (timing[0] << EXYNOS_SROM_BCX__TACP__SHIFT) |
->  		    (timing[1] << EXYNOS_SROM_BCX__TCAH__SHIFT) |
->  		    (timing[2] << EXYNOS_SROM_BCX__TCOH__SHIFT) |
->  		    (timing[3] << EXYNOS_SROM_BCX__TACC__SHIFT) |
+> Testing performed on Altera CycloneV (D_CAN).
+> Requesting tests on other C_CAN & D_CAN platforms.
+> 
+> Reported-by: Richard Andrysek <richard.andrysek@gomtec.de>
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 
-It breaks indentation of arguments. With that change and Matthew's SoB:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Applied to can with stable on Cc.
 
-I can take it through samsung-soc tree after fixing above.
+Marc
 
-Best regards,
-Krzysztof
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160617/fcc0cd34/attachment.sig>
