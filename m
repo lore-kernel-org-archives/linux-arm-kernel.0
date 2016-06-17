@@ -1,34 +1,38 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Fri, 17 Jun 2016 18:10:03 +0000
-Subject: [PATCH -next] PM / devfreq: event: Fix return value check in
- exynos_nocp_parse_dt()
-Message-ID: <1466187003-19823-1-git-send-email-weiyj_lk@163.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 18 Jun 2016 02:21:23 +0800
+Subject: [PATCH 4/4] ARM: dts: meson8b: Add Meson8b PWM Controller nodes
+In-Reply-To: <1466173784-15625-5-git-send-email-narmstrong@baylibre.com>
+Message-ID: <201606180219.HabMMLCO%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Hi,
 
-In case of error, the function platform_get_resource() returns NULL
-pointer not ERR_PTR(). Remove unneeded error handling on the result
-of a call to platform_get_resource() since the value is passed to
-devm_ioremap_resource().
+[auto build test ERROR on next-20160617]
+[cannot apply to pwm/for-next robh/for-next v4.7-rc3 v4.7-rc2 v4.7-rc1 v4.7-rc3]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+url:    https://github.com/0day-ci/linux/commits/Neil-Armstrong/pwm-Add-Amlogic-Meson-SoC-PWM-Controller/20160617-223758
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/meson8b.dtsi:167.17-18 syntax error
+   FATAL ERROR: Unable to parse input tree
+
 ---
- drivers/devfreq/event/exynos-nocp.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/drivers/devfreq/event/exynos-nocp.c b/drivers/devfreq/event/exynos-nocp.c
-index 6b6a5f3..a584140 100644
---- a/drivers/devfreq/event/exynos-nocp.c
-+++ b/drivers/devfreq/event/exynos-nocp.c
-@@ -220,9 +220,6 @@ static int exynos_nocp_parse_dt(struct platform_device *pdev,
- 
- 	/* Maps the memory mapped IO to control nocp register */
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (IS_ERR(res))
--		return PTR_ERR(res);
--
- 	base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(base))
- 		return PTR_ERR(base);
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 37970 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160618/1f7b4a03/attachment-0001.obj>
