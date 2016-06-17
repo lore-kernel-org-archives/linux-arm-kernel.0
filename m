@@ -1,91 +1,64 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 17 Jun 2016 15:15:36 +0100
-Subject: [RFC PATCH v2 03/15] arm64: mm: change IOMMU notifier action to
- attach DMA ops
-In-Reply-To: <5763C27A.9030306@arm.com>
-References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
- <5763C27A.9030306@arm.com>
-Message-ID: <20160617141536.GA24840@red-moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Jun 2016 16:16:59 +0200
+Subject: [PATCH] arm64: Kconfig: select PM for ARCH_VEXPRESS
+In-Reply-To: <5763FD58.3090300@arm.com>
+References: <1466090128-24425-1-git-send-email-sudeep.holla@arm.com>
+ <4148732.Pd5phtR9Qh@wuerfel> <5763FD58.3090300@arm.com>
+Message-ID: <3892833.90HLNUPjM3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Friday, June 17, 2016 2:38:32 PM CEST Sudeep Holla wrote:
+> On 17/06/16 12:53, Arnd Bergmann wrote:
+> >> The discussion on this happened on linux-pm list[1]. This is need on
+> >> Juno once we introduce coresight components in the DT. With !CONFIG_PM,
+> >> the board stalls on boot and hence this patch is needed. This shouldn't
+> >> change any thing in the defconfig as couple of other platforms already
+> >> do the same. It's needed in case all other ARCH_* configs are disabled.
+> >>
+> >> Without this, we need a dirty trick in the DT[2] to handle !CONFIG_PM.
+> >>
+> >> Can you please pick this for v4.8 ?
+> >
+> > Question: if AMBA cannot deal with CONFIG_PM disabled, should
+> > the 'select' be done from CONFIG_ARM_AMBA instead?
+> >
+> 
+> But few platforms using AMBA may not want PM at all.
 
-On Fri, Jun 17, 2016 at 10:27:22AM +0100, Robin Murphy wrote:
-> Hi Lorenzo,
-> 
-> I think this patch makes sense even independent of the rest of the
-> series, one nit inline notwithstanding.
+Ok, then I just misunderstood what you meant with "the AMBA framework can't
+deal with !CONFIG_PM case".
 
-Thanks. Yes I added it to this series since it is not strictly
-necessary (ie it does not fix anything) in the mainline, but
-it *is* necessary for this whole series to function when we
-boot through ACPI.
+> > I also feel a little uncomfortable with just adding 'select PM', given
+> > that this option is normally just implied by CONFIG_SUSPEND ||
+> > CONFIG_HIBERNATE_CALLBACKS,
+> 
+> On that analogy, for the current requirement I would say 
+> PM_GENERIC_DOMAINS should select but it just depends on PM.
 
-I will send it out in a separate patch and fold changes you
-request below, it would be good to have some coverage for
-it before merging it.
+Possibly, it's not entirely clear what the dependency is used for
+here, or what CONFIG_PM actually means. I'm also still unsure what
+aspect of CONFIG_PM you actually rely on here. Is this about the
+amba_pm_runtime_suspend/amba_pm_runtime_resume operations or something
+else?
 
-Thank you !
-Lorenzo
+> > so we might run into regressionswhen we get configurations that
+> > were invalid before.
+> 
+> Sorry my build/config knowledge is limited, I don't understand what you
+> mean by the above. I am asking just to improve my knowledge.
 
-> Marek; I'm curious as to whether this could make the workaround in
-> 722ec35f7 obsolete as well, or are all the drivers also bound
-> super-early in the setup you had there?
+If today, CONFIG_PM is only set when CONFIG_PM_SLEEP is set and
+we introduce a case where we have PM without PM_SLEEP, a lot of
+drivers that incorrectly make the assumption that PM_SLEEP is mean
+with CONFIG_PM may behave in new unexpected ways.
+
+> > Then again  ARCH_RENESAS seems to already do this.
 > 
-> On 07/06/16 14:30, Lorenzo Pieralisi wrote:
-> >Current bus notifier in ARM64 (__iommu_attach_notifier)
-> >attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
-> >action notification.
-> >
-> >This causes issues on ACPI based systems, where PCI devices
-> >can be added before the IOMMUs the devices are attached to
-> >had a chance to be probed, causing failures on attempts to
-> >attach dma_ops in that the domain for the respective IOMMU
-> >may not be set-up yet by the time the bus notifier is run.
-> >
-> >Devices dma_ops do not require to be set-up till the matching
-> >device drivers are probed. This means that instead of running
-> >the notifier attaching dma_ops to devices (__iommu_attach_notifier)
-> >on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
-> >device driver is bound to the device in question (on action
-> >BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
-> >group and domain are set-up accordingly at the time the
-> >notifier is triggered.
-> >
-> >This patch changes the notifier action upon which dma_ops
-> >are attached to devices and defer it to driver binding time,
-> >so that IOMMU devices have a chance to be probed and to register
-> >their bus notifiers before the dma_ops attach sequence for a
-> >device is actually carried out.
-> >
-> >Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >Cc: Will Deacon <will.deacon@arm.com>
-> >Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >Cc: Robin Murphy <robin.murphy@arm.com>
-> >---
-> >  arch/arm64/mm/dma-mapping.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> >diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> >index c566ec8..79b0882 100644
-> >--- a/arch/arm64/mm/dma-mapping.c
-> >+++ b/arch/arm64/mm/dma-mapping.c
-> >@@ -848,7 +848,7 @@ static int __iommu_attach_notifier(struct notifier_block *nb,
-> >  {
-> >  	struct iommu_dma_notifier_data *master, *tmp;
-> >
-> >-	if (action != BUS_NOTIFY_ADD_DEVICE)
-> >+	if (action != BUS_NOTIFY_BIND_DRIVER)
-> 
-> With this, you can also get rid of the priority setting and big fat
-> explanatory comment in register_iommu_dma_ops_notifier().
-> 
-> Robin.
-> 
-> >  		return 0;
-> >
-> >  	mutex_lock(&iommu_dma_notifier_lock);
-> >
-> 
+> Yes, it was hard to find get !CONFIG_PM as many platforms select it
+> directly or indirectly.
+
+Starting from an allmodconfig build, I just needed to disable
+ARCH_RENESAS, ARCH_OMAP2PLUS_TYPICAL, SUSPEND and HIBERNATE.
+
+	Arnd
