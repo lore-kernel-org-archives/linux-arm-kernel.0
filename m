@@ -1,114 +1,114 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 17 Jun 2016 13:08:33 +0100
-Subject: [PATCH v6 01/15] KVM: arm/arm64: move redistributor kvm_io_devices
+Date: Fri, 17 Jun 2016 13:08:43 +0100
+Subject: [PATCH v6 11/15] KVM: arm64: read initial LPI pending table
 In-Reply-To: <1466165327-32060-1-git-send-email-andre.przywara@arm.com>
 References: <1466165327-32060-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1466165327-32060-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <1466165327-32060-12-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Logically a GICv3 redistributor is assigned to a (v)CPU, so we should
-aim to keep redistributor related variables out of our struct vgic_dist.
-
-Let's start by replacing the redistributor related kvm_io_device array
-with two members in our existing struct vgic_cpu, which are naturally
-per-VCPU and thus don't require any allocation / freeing.
-So apart from the better fit with the redistributor design this saves
-some code as well.
+The LPI pending status for a GICv3 redistributor is held in a table
+in (guest) memory. To achieve reasonable performance, we cache this
+data in our struct vgic_irq. The initial pending state must be read
+from guest memory upon enabling LPIs for this redistributor.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/vgic/vgic.h          |  8 +++++++-
- virt/kvm/arm/vgic/vgic-init.c    |  1 -
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 22 ++++++++--------------
- 3 files changed, 15 insertions(+), 16 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h     |  6 ++++++
+ 2 files changed, 49 insertions(+)
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 3fbd175..2f26f37 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -145,7 +145,6 @@ struct vgic_dist {
- 	struct vgic_irq		*spis;
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 9ef951f7..ba2af85 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -149,6 +149,43 @@ struct its_itte {
  
- 	struct vgic_io_device	dist_iodev;
--	struct vgic_io_device	*redist_iodevs;
- };
- 
- struct vgic_v2_cpu_if {
-@@ -193,6 +192,13 @@ struct vgic_cpu {
- 	struct list_head ap_list_head;
- 
- 	u64 live_lrs;
+ #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
+ #define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
++#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
 +
-+	/*
-+	 * Members below are used with GICv3 emulation only and represent
-+	 * parts of the redistributor.
-+	 */
-+	struct vgic_io_device	rd_iodev;
-+	struct vgic_io_device	sgi_iodev;
++/*
++ * Scan the whole LPI pending table and sync the pending bit in there
++ * with our own data structures. This relies on the LPI being
++ * mapped before.
++ */
++static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
++{
++	gpa_t pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	struct vgic_irq *irq;
++	u8 pendmask;
++	int ret = 0;
++
++	mutex_lock(&dist->lpi_list_lock);
++	list_for_each_entry(irq, &dist->lpi_list_head, lpi_entry) {
++		int byte_offset, bit_nr;
++
++		byte_offset = irq->intid / BITS_PER_BYTE;
++		bit_nr = irq->intid % BITS_PER_BYTE;
++
++		ret = kvm_read_guest(vcpu->kvm, pendbase + byte_offset,
++				     &pendmask, 1);
++		if (ret)
++			goto out_unlock;
++
++		spin_lock(&irq->irq_lock);
++		irq->pending = pendmask & (1U << bit_nr);
++		vgic_queue_irq_put(vcpu->kvm, irq);
++	}
++
++out_unlock:
++	mutex_unlock(&dist->lpi_list_lock);
++
++	return ret;
++}
+ 
+ #define ITS_FRAME(addr) ((addr) & ~(SZ_64K - 1))
+ 
+@@ -454,6 +491,12 @@ struct vgic_register_region its_registers[] = {
+ 		VGIC_ACCESS_32bit),
  };
  
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index a1442f7..90cae48 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -271,7 +271,6 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
- 	dist->initialized = false;
- 
- 	kfree(dist->spis);
--	kfree(dist->redist_iodevs);
- 	dist->nr_spis = 0;
- 
- 	mutex_unlock(&kvm->lock);
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index a0c515a..fc7b6c9 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -285,21 +285,14 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
- 
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
++/* This is called on setting the LPI enable bit in the redistributor. */
++void vgic_enable_lpis(struct kvm_vcpu *vcpu)
++{
++	its_sync_lpi_pending_table(vcpu);
++}
++
+ static int vits_register(struct kvm *kvm, struct vgic_its *its)
  {
--	int nr_vcpus = atomic_read(&kvm->online_vcpus);
- 	struct kvm_vcpu *vcpu;
--	struct vgic_io_device *devices;
- 	int c, ret = 0;
+ 	struct vgic_io_device *iodev = &its->iodev;
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 558252d..8c2105a 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -25,6 +25,7 @@
+ #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
  
--	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
--			  GFP_KERNEL);
--	if (!devices)
--		return -ENOMEM;
--
- 	kvm_for_each_vcpu(c, vcpu, kvm) {
- 		gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
- 		gpa_t sgi_base = rd_base + SZ_64K;
--		struct vgic_io_device *rd_dev = &devices[c * 2];
--		struct vgic_io_device *sgi_dev = &devices[c * 2 + 1];
-+		struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
-+		struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
+ #define INTERRUPT_ID_BITS_SPIS	10
++#define INTERRUPT_ID_BITS_ITS	16
+ #define VGIC_PRI_BITS		5
  
- 		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
- 		rd_dev->base_addr = rd_base;
-@@ -335,14 +328,15 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
- 	if (ret) {
- 		/* The current c failed, so we start with the previous one. */
- 		for (c--; c >= 0; c--) {
-+			struct vgic_cpu *vgic_cpu;
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+@@ -82,6 +83,7 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+ bool vgic_has_its(struct kvm *kvm);
+ int kvm_vgic_register_its_device(void);
+ struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid);
++void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+ #else
+ static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+ {
+@@ -148,6 +150,10 @@ static inline struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
+ {
+ 	return NULL;
+ }
 +
-+			vcpu = kvm_get_vcpu(kvm, c);
-+			vgic_cpu = &vcpu->arch.vgic_cpu;
- 			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
--						  &devices[c * 2].dev);
-+						  &vgic_cpu->rd_iodev.dev);
- 			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
--						  &devices[c * 2 + 1].dev);
-+						  &vgic_cpu->sgi_iodev.dev);
- 		}
--		kfree(devices);
--	} else {
--		kvm->arch.vgic.redist_iodevs = devices;
- 	}
++static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
++{
++}
+ #endif
  
- 	return ret;
+ int kvm_register_vgic_device(unsigned long type);
 -- 
 2.8.2
