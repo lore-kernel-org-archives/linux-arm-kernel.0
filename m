@@ -1,55 +1,50 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 17 Jun 2016 18:24:57 -0500
-Subject: [PATCH v8 0/4] ACPI: parse the SPCR table
-In-Reply-To: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <CAOZdJXVMZCFtppMOdruD9sY_EzkATv9XWBqi_NqZ-p2zEo8+2Q@mail.gmail.com>
+From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
+Date: Sat, 18 Jun 2016 01:29:05 +0200
+Subject: [PATCH 00/12] power: add generic power sequence framework
+In-Reply-To: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
+References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <576487C1.5050807@maciej.szmigiero.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 8:03 AM, Aleksey Makarov
-<aleksey.makarov@linaro.org> wrote:
-> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port Console
-> Redirection Table) [2] as a mandatory ACPI table that specifies the
-> configuration of serial console.
->
-> Move "earlycon" early_param handling to earlycon.c to parse this option once
->
-> Parse SPCR table, setup earlycon and register specified console.
->
-> Enable parsing this table on ARM64.  Earlycon should be set up as early as
-> possible.  ACPI boot tables are mapped in
-> arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch() and
-> that's where we parse spcr.  So it has to be opted-in per-arch. When
-> ACPI_SPCR_TABLE is defined initialization of DT earlycon is deferred until the
-> DT/ACPI decision is done.
->
-> Implement console_match() for pl011.
->
-> Based on the work by Leif Lindholm [3]
-> Thanks to Peter Hurley for explaining how this should work.
->
-> Should be applied to next-20160520
-> Tested on QEMU and ThunderX.
-> SPCR support is included in QEMU's ARM64 mach-virt since 2.4 release.
->
-> v8:
-> - rebase to next-20160520
-> - remove the patch "ACPICA: Headers: Add new constants for the DBG2 ACPI table"
->   as it have got to linux-next
-> - add Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Reviewed-by:
->   Peter Hurley <peter@hurleysoftware.com> (but see below)
-> - fix the patch "serial: pl011: add console matching function".  The patch by
->   Christopher Covington [4] specifies that SBSA uart does 32-bit access to
->   registers and this breaks the match function.  In this series the function
->   was changed to match when SPCR specifies both mmio32 and mmio access.
->   I removed Acked-by: Greg from this patch because of these changes.
+Hi Peter,
 
-All four patches:
+On 17.06.2016 12:09, Peter Chen wrote:
+> Hi all,
+> 
+> We have an well-known problem that the device needs to do some power
+> sequence before it can be recognized by related host, the typical
+> example like hard-wired mmc devices and usb devices. This power
+> sequence is hard to be described at device tree and handled by
+> related host driver, so we have created a common power sequence
+> framework to handle this requirement. The generic code is supplied
+> some common helpers from host driver, and individual power sequence
+> driver handles kinds of power sequence for devices.
+> 
+> Since the MMC has already done the similar things, and this power
+> sequence handling can be generic, we use mmc power sequence code
+> as base to create this framework.
+> 
+> This patch set is based on Krzysztof Kozlowski's RFC patch set (v4.7-rc1)
+> [1], and making some changes which can let it be generic. After that,
+> we create a generic power sequence driver for USB devices which handles
+> below things, it includes all input signals for devices I can consider.
+> 
+> - Clock and its frequencies
+> - GPIO for reset and the duration time
+> - GPIO for enable
+> - Regulator for power
+> 
+> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> two hot-plug devices to simulate this use case. The udoo board changes
+> were tested using my last power sequence patch set. [2]
+> 
+> @Maciej S. Szmigiero, Oscar, would you please test them on imx6qdl udoo
+> boards?
 
-Tested-by: Timur Tabi <timur@codeaurora.org>
+Thanks for the patch set, just tested them on my UDOO Quad board and can
+confirm that USB and on-board hub work fine.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+
+Maciej
