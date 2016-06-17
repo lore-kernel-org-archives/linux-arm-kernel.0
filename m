@@ -1,40 +1,128 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 17 Jun 2016 07:58:27 +0200
-Subject: [PATCH V2 2/4] clk: Combine DT binding doc for max77686 and
- max77802
-In-Reply-To: <1466083407-28793-3-git-send-email-ldewangan@nvidia.com>
-References: <1466083407-28793-1-git-send-email-ldewangan@nvidia.com>
- <1466083407-28793-3-git-send-email-ldewangan@nvidia.com>
-Message-ID: <57639183.2070508@samsung.com>
+From: rnayak@codeaurora.org (Nayak, Rajendra)
+Date: Fri, 17 Jun 2016 11:29:15 +0530
+Subject: [PATCH v6 00/11] qcom: Add support for TSENS driver
+In-Reply-To: <575A57F8.6060004@codeaurora.org>
+References: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
+ <575A57F8.6060004@codeaurora.org>
+Message-ID: <576391B3.7090508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2016 03:23 PM, Laxman Dewangan wrote:
-> The clock IP used on the Maxim PMICs max77686 and max77802 are
-> same. The configuration of clock register is also same except
-> the number of clocks.
-> 
-> Define the common DT binding file for the clocks of Maxim PMICs
-> MAX77686 and MAX77802. For this, remove the separate DT binding
-> document file for maxim,max77802 and move all information to
-> maxim,max77686 DT binding document.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> CC: Javier Martinez Canillas <javier@dowhile0.org>
-> 
-> ---
-> Changes from V1:
-> - Rewrite description to remvoe ref to driver.
-> - Taken care of comment from Krzysztof on the supported clocks and
->   DT bindings.
-> ---
->  .../devicetree/bindings/clock/maxim,max77686.txt   | 82 ++++++++++++++++------
->  .../devicetree/bindings/clock/maxim,max77802.txt   | 44 ------------
->  2 files changed, 59 insertions(+), 67 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
+Hey Eduardo,
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On 6/10/2016 11:32 AM, Rajendra Nayak wrote:
+> Eduardo,
+>
+> On 05/05/2016 02:21 PM, Rajendra Nayak wrote:
+>> Current set of patches apply on 4.6-rc6. Fixes for the nvmem apis
+>> are now posted [1] and queued in -next [2]
+>> Patches [1-6] will need to be merged via thermal tree/Eduardo.
+>
+> Any plans to pull these in for 4.8?
 
-Best regards,
-Krzysztof
+These patches have been on the list for quite a while, and they
+do not have any outstanding dependencies or comments to be
+addressed. I would really hope to see these in for 4.8.
+Let me know if there is something you want me to address before
+you pull them in.
+
+regards,
+Rajendra
+
+>
+> regards,
+> Rajendra
+>
+>> Patches [7-11] will need to go via qcom-msm tree/Andy.
+>>
+>> Changes since v5:
+>> * Minor review fixes from Eduardo
+>>
+>> Changes since v4:
+>> * dropped qcom,tsens-slopes binding, used coefficients instead
+>> * dropped qcom,sensor-id binding
+>> * Added support for msm8996 family
+>> * Other minor review fixes from v4
+>>
+>> Changes since v3:
+>> * Dropped 'clk: qcom: create virtual child device for TSENS' which
+>> is picked up by Stephen
+>> * Updated GCC bindings with optional TSENS properties
+>>
+>> Changes since v2:
+>> * Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
+>>
+>> Changes since v1:
+>> * Created virtual tsens device from gcc driver for 8960,
+>> with DT having a single node for gcc and tsens
+>> * Minor fixes with rebasing on 4.3-rc1
+>>
+>> Changes since RFC:
+>> * Added support for 8916 and 8084
+>> * Based off the latest nvmem framework patches [1]
+>> * Minor review fixes for comments mostly from Lina
+>>
+>> This is an attempt to have a single TSENS driver for
+>> the different versions of the TSENS IP that exist, on
+>> different qcom msm/apq SoCs'
+>> Support is added for msm8916, msm8960, msm8974 and msm8996 families.
+>>
+>> A lot of the work is based of original code from Stephen Boyd
+>> and Siddartha Mohanadoss. I have also picked some of what
+>> Narendran Rajan did in his attempt to upstream the support
+>> for 8960 family. I could not keep the original authorship on
+>> any of the patches because I ended up moving the code around
+>> quite a bit in an effort to have a single driver for the
+>> various devices. I would be glad to change the authorship
+>> for any of the patches if needed.
+>>
+>> [1] https://lkml.org/lkml/2016/4/24/103
+>> [2] git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git char-misc-next
+>>
+>> Rajendra Nayak (11):
+>>    thermal: qcom: tsens: Add a skeletal TSENS drivers
+>>    thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+>>    thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+>>    thermal: core: export apis to get slope and offset
+>>    thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+>>    thermal: qcom: tsens-8996: Add support for 8996 family of SoCs
+>>    arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+>>    arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+>>    arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+>>    arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
+>>    arm64: dts: msm8996: Add thermal zones, tsens and qfprom nodes
+>>
+>>   .../devicetree/bindings/clock/qcom,gcc.txt         |  18 ++
+>>   .../devicetree/bindings/thermal/qcom-tsens.txt     |  21 ++
+>>   Documentation/thermal/sysfs-api.txt                |  12 +
+>>   arch/arm/boot/dts/qcom-apq8064.dtsi                | 103 ++++++++
+>>   arch/arm/boot/dts/qcom-apq8084.dtsi                | 103 ++++++++
+>>   arch/arm/boot/dts/qcom-msm8974.dtsi                | 103 ++++++++
+>>   arch/arm64/boot/dts/qcom/msm8916.dtsi              |  64 +++++
+>>   arch/arm64/boot/dts/qcom/msm8996.dtsi              |  92 +++++++
+>>   drivers/thermal/Kconfig                            |   5 +
+>>   drivers/thermal/Makefile                           |   1 +
+>>   drivers/thermal/qcom/Kconfig                       |  11 +
+>>   drivers/thermal/qcom/Makefile                      |   2 +
+>>   drivers/thermal/qcom/tsens-8916.c                  | 113 ++++++++
+>>   drivers/thermal/qcom/tsens-8960.c                  | 292 +++++++++++++++++++++
+>>   drivers/thermal/qcom/tsens-8974.c                  | 244 +++++++++++++++++
+>>   drivers/thermal/qcom/tsens-8996.c                  |  84 ++++++
+>>   drivers/thermal/qcom/tsens-common.c                | 141 ++++++++++
+>>   drivers/thermal/qcom/tsens.c                       | 200 ++++++++++++++
+>>   drivers/thermal/qcom/tsens.h                       |  92 +++++++
+>>   drivers/thermal/thermal_core.c                     |  30 +++
+>>   include/linux/thermal.h                            |   8 +
+>>   21 files changed, 1739 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+>>   create mode 100644 drivers/thermal/qcom/Kconfig
+>>   create mode 100644 drivers/thermal/qcom/Makefile
+>>   create mode 100644 drivers/thermal/qcom/tsens-8916.c
+>>   create mode 100644 drivers/thermal/qcom/tsens-8960.c
+>>   create mode 100644 drivers/thermal/qcom/tsens-8974.c
+>>   create mode 100644 drivers/thermal/qcom/tsens-8996.c
+>>   create mode 100644 drivers/thermal/qcom/tsens-common.c
+>>   create mode 100644 drivers/thermal/qcom/tsens.c
+>>   create mode 100644 drivers/thermal/qcom/tsens.h
+>>
+>
