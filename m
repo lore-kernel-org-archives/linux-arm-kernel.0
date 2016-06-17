@@ -1,44 +1,209 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Fri, 17 Jun 2016 13:24:00 +0200
-Subject: [PATCH v2 01/10] crypto: marvell: Add a macro constant for the size
- of the crypto queue
+Date: Fri, 17 Jun 2016 13:24:03 +0200
+Subject: [PATCH v2 04/10] crypto: marvell: Copy IV vectors by DMA transfers
+ for acipher requests
 In-Reply-To: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
 References: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <1466162649-29911-2-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <1466162649-29911-5-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding a macro constant to be used for the size of the crypto queue,
-instead of using a numeric value directly. It will be easier to
-maintain in case we add more than one crypto queue of the same size.
+Add a TDMA descriptor at the end of the request for copying the
+output IV vector via a DMA transfer. This is a good way for offloading
+as much as processing as possible to the DMA and the crypto engine.
+This is also required for processing multiple cipher requests
+in chained mode, otherwise the content of the IV vector would be
+overwritten by the last processed request.
 
 Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 ---
- drivers/crypto/marvell/cesa.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+
+Changes in v2:
+  - Reworded the commit message, the term 'asynchronously' was ambigous
+  - Changed the value of CESA_TDMA_IV from 4 to 3
+  - Adding missing blank lines
+  - Rewrote the function mv_cesa_ablkcipher_process to something more
+    readable.
+  - Fixed a bug about how the type of a TDMA operation was tested in
+    mv_cesa_dma_cleanup and mv_cesa_dma_prepare, I created a separated
+    commit for that (see PATCH 03/10)
+  - Renamed variables in mv_cesa_dma_add_iv_op
+  - Removed the flag CESA_TDMA_DATA from mv_cesa_dma_add_iv_op (not needed)
+
+ drivers/crypto/marvell/cesa.c   |  4 ++++
+ drivers/crypto/marvell/cesa.h   |  5 +++++
+ drivers/crypto/marvell/cipher.c | 32 +++++++++++++++++++++++---------
+ drivers/crypto/marvell/tdma.c   | 29 +++++++++++++++++++++++++++++
+ 4 files changed, 61 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-index 056a754..fb403e1 100644
+index fb403e1..93700cd 100644
 --- a/drivers/crypto/marvell/cesa.c
 +++ b/drivers/crypto/marvell/cesa.c
-@@ -31,6 +31,9 @@
- 
- #include "cesa.h"
- 
-+/* Limit of the crypto queue before reaching the backlog */
-+#define CESA_CRYPTO_DEFAULT_MAX_QLEN 50
-+
- static int allhwsupport = !IS_ENABLED(CONFIG_CRYPTO_DEV_MV_CESA);
- module_param_named(allhwsupport, allhwsupport, int, 0444);
- MODULE_PARM_DESC(allhwsupport, "Enable support for all hardware (even it if overlaps with the mv_cesa driver)");
-@@ -416,7 +419,7 @@ static int mv_cesa_probe(struct platform_device *pdev)
+@@ -312,6 +312,10 @@ static int mv_cesa_dev_dma_init(struct mv_cesa_dev *cesa)
+ 	if (!dma->padding_pool)
  		return -ENOMEM;
  
- 	spin_lock_init(&cesa->lock);
--	crypto_init_queue(&cesa->queue, 50);
-+	crypto_init_queue(&cesa->queue, CESA_CRYPTO_DEFAULT_MAX_QLEN);
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
- 	cesa->regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(cesa->regs))
++	dma->iv_pool = dmam_pool_create("cesa_iv", dev, 16, 1, 0);
++	if (!dma->iv_pool)
++		return -ENOMEM;
++
+ 	cesa->dma = dma;
+ 
+ 	return 0;
+diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
+index 74071e4..685a627 100644
+--- a/drivers/crypto/marvell/cesa.h
++++ b/drivers/crypto/marvell/cesa.h
+@@ -275,6 +275,7 @@ struct mv_cesa_op_ctx {
+ #define CESA_TDMA_DUMMY				0
+ #define CESA_TDMA_DATA				1
+ #define CESA_TDMA_OP				2
++#define CESA_TDMA_IV				3
+ 
+ /**
+  * struct mv_cesa_tdma_desc - TDMA descriptor
+@@ -390,6 +391,7 @@ struct mv_cesa_dev_dma {
+ 	struct dma_pool *op_pool;
+ 	struct dma_pool *cache_pool;
+ 	struct dma_pool *padding_pool;
++	struct dma_pool *iv_pool;
+ };
+ 
+ /**
+@@ -790,6 +792,9 @@ mv_cesa_tdma_desc_iter_init(struct mv_cesa_tdma_chain *chain)
+ 	memset(chain, 0, sizeof(*chain));
+ }
+ 
++int mv_cesa_dma_add_iv_op(struct mv_cesa_tdma_chain *chain, dma_addr_t src,
++			  u32 size, u32 flags, gfp_t gfp_flags);
++
+ struct mv_cesa_op_ctx *mv_cesa_dma_add_op(struct mv_cesa_tdma_chain *chain,
+ 					const struct mv_cesa_op_ctx *op_templ,
+ 					bool skip_ctx,
+diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
+index ec23609..ded5feb 100644
+--- a/drivers/crypto/marvell/cipher.c
++++ b/drivers/crypto/marvell/cipher.c
+@@ -118,6 +118,7 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
+ 	struct mv_cesa_ablkcipher_std_req *sreq = &creq->req.std;
+ 	struct mv_cesa_engine *engine = sreq->base.engine;
+ 	size_t len;
++	unsigned int ivsize;
+ 
+ 	len = sg_pcopy_from_buffer(req->dst, creq->dst_nents,
+ 				   engine->sram + CESA_SA_DATA_SRAM_OFFSET,
+@@ -127,6 +128,10 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
+ 	if (sreq->offset < req->nbytes)
+ 		return -EINPROGRESS;
+ 
++	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(req));
++	memcpy_fromio(req->info,
++		      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET, ivsize);
++
+ 	return 0;
+ }
+ 
+@@ -135,21 +140,21 @@ static int mv_cesa_ablkcipher_process(struct crypto_async_request *req,
+ {
+ 	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
+ 	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(ablkreq);
+-	struct mv_cesa_ablkcipher_std_req *sreq = &creq->req.std;
+-	struct mv_cesa_engine *engine = sreq->base.engine;
++	struct mv_cesa_tdma_req *dreq;
++	unsigned int ivsize;
+ 	int ret;
+ 
+-	if (creq->req.base.type == CESA_DMA_REQ)
+-		ret = mv_cesa_dma_process(&creq->req.dma, status);
+-	else
+-		ret = mv_cesa_ablkcipher_std_process(ablkreq, status);
++	if (creq->req.base.type == CESA_STD_REQ)
++		return mv_cesa_ablkcipher_std_process(ablkreq, status);
+ 
++	ret = mv_cesa_dma_process(&creq->req.dma, status);
+ 	if (ret)
+ 		return ret;
+ 
+-	memcpy_fromio(ablkreq->info,
+-		      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET,
+-		      crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq)));
++	dreq = &creq->req.dma;
++	ivsize =
++	crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq));
++	memcpy_fromio(ablkreq->info, dreq->chain.last->data, ivsize);
+ 
+ 	return 0;
+ }
+@@ -302,6 +307,7 @@ static int mv_cesa_ablkcipher_dma_req_init(struct ablkcipher_request *req,
+ 	struct mv_cesa_tdma_chain chain;
+ 	bool skip_ctx = false;
+ 	int ret;
++	unsigned int ivsize;
+ 
+ 	dreq->base.type = CESA_DMA_REQ;
+ 	dreq->chain.first = NULL;
+@@ -360,6 +366,14 @@ static int mv_cesa_ablkcipher_dma_req_init(struct ablkcipher_request *req,
+ 
+ 	} while (mv_cesa_ablkcipher_req_iter_next_op(&iter));
+ 
++	/* Add output data for IV */
++	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(req));
++	ret = mv_cesa_dma_add_iv_op(&chain, CESA_SA_CRYPT_IV_SRAM_OFFSET,
++				    ivsize, CESA_TDMA_SRC_IN_SRAM, flags);
++
++	if (ret)
++		goto err_free_tdma;
++
+ 	dreq->chain = chain;
+ 
+ 	return 0;
+diff --git a/drivers/crypto/marvell/tdma.c b/drivers/crypto/marvell/tdma.c
+index de8c253..01dda58 100644
+--- a/drivers/crypto/marvell/tdma.c
++++ b/drivers/crypto/marvell/tdma.c
+@@ -69,6 +69,9 @@ void mv_cesa_dma_cleanup(struct mv_cesa_tdma_req *dreq)
+ 		if (type == CESA_TDMA_OP)
+ 			dma_pool_free(cesa_dev->dma->op_pool, tdma->op,
+ 				      le32_to_cpu(tdma->src));
++		else if (type == CESA_TDMA_IV)
++			dma_pool_free(cesa_dev->dma->iv_pool, tdma->data,
++				      le32_to_cpu(tdma->dst));
+ 
+ 		tdma = tdma->next;
+ 		dma_pool_free(cesa_dev->dma->tdma_desc_pool, old_tdma,
+@@ -121,6 +124,32 @@ mv_cesa_dma_add_desc(struct mv_cesa_tdma_chain *chain, gfp_t flags)
+ 	return new_tdma;
+ }
+ 
++int mv_cesa_dma_add_iv_op(struct mv_cesa_tdma_chain *chain, dma_addr_t src,
++			  u32 size, u32 flags, gfp_t gfp_flags)
++{
++
++	struct mv_cesa_tdma_desc *tdma;
++	u8 *iv;
++	dma_addr_t dma_handle;
++
++	tdma = mv_cesa_dma_add_desc(chain, gfp_flags);
++	if (IS_ERR(tdma))
++		return PTR_ERR(tdma);
++
++	iv = dma_pool_alloc(cesa_dev->dma->iv_pool, flags, &dma_handle);
++	if (!iv)
++		return -ENOMEM;
++
++	tdma->byte_cnt = cpu_to_le32(size | BIT(31));
++	tdma->src = src;
++	tdma->dst = cpu_to_le32(dma_handle);
++	tdma->data = iv;
++
++	flags &= (CESA_TDMA_DST_IN_SRAM | CESA_TDMA_SRC_IN_SRAM);
++	tdma->flags = flags | CESA_TDMA_IV;
++	return 0;
++}
++
+ struct mv_cesa_op_ctx *mv_cesa_dma_add_op(struct mv_cesa_tdma_chain *chain,
+ 					const struct mv_cesa_op_ctx *op_templ,
+ 					bool skip_ctx,
 -- 
 2.7.4
