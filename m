@@ -1,45 +1,47 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 17 Jun 2016 08:09:20 +0530
-Subject: [PATCH] dma: mv_xor_v2: new driver
-In-Reply-To: <20160616144224.2e687a14@free-electrons.com>
-References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160222032730.GU19598@localhost>
- <20160615160837.64377829@free-electrons.com>
- <20160615164131.GB16910@localhost>
- <20160616144224.2e687a14@free-electrons.com>
-Message-ID: <20160617023920.GE16910@localhost>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 17 Jun 2016 06:15:07 +0300
+Subject: [PATCH V2 11/63] clocksource/drivers/digitcolor: Convert init
+ function to return error
+In-Reply-To: <1466112442-31105-12-git-send-email-daniel.lezcano@linaro.org>
+References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
+ <1466112442-31105-12-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20160617031507.GQ2749@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 02:42:24PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Wed, 15 Jun 2016 22:11:31 +0530, Vinod Koul wrote:
-> 
-> > > This is probably the only thing that I have not changed. The mv_xor
-> > > driver is already using the same strategy, and enqueuing in
-> > > issue_pending() would force us to add the request to a temporary linked
-> > > list, which would be dequeued in issue_pending(). This is quite a bit
-> > > of additional processing, while pushing the new requests directly to
-> > > the engine works fine.  
-> > 
-> > Well that is wrong! And patch is welcome for mv_xor as well :)
-> > 
-> > The DMAengine API mandates that we should submit a descriptor to a queue and
-> > then push them by invoking issue_pending.
-> > 
-> > The users are also expected to follow this
-> 
-> I have just sent a v4 that fixes this for the mv_xor_v2 driver. Now, in
-> ->tx_submit() we only fill in the HW descriptors, but do not tell the
-> engine to process them. It's only at ->issue_pending() time that we
-> tell the engine that there N new descriptors to process.
+Hi Daniel,
 
-Okay that sounds good to me, I will take a look at it..
+On Thu, Jun 16, 2016 at 11:26:30PM +0200, Daniel Lezcano wrote:
+> The init functions do not return any error. They behave as the following:
 > 
-> I'll have a look at mv_xor a bit later.
+>   - panic, thus leading to a kernel crash while another timer may work and
+>        make the system boot up correctly
+> 
+>   or
+> 
+>   - print an error and let the caller unaware if the state of the system
+> 
+> Change that by converting the init functions to return an error conforming
+> to the CLOCKSOURCE_OF_RET prototype.
+> 
+> Proper error handling (rollback, errno value) will be changed later case
+> by case, thus this change just return back an error or success in the init
+> function.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Sounds fair enough
+It would be nice to have at least LAKL on Cc of the cover letter as well, so 
+we can get the big picture. I found it at 
+http://article.gmane.org/gmane.linux.kernel/2246137.
+
+But anyway, for this and the final patch:
+
+Acked-by: Baruch Siach <baruch@tkos.co.il>
+
+Thanks,
+baruch
 
 -- 
-~Vinod
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
