@@ -1,88 +1,93 @@
-From: loic.pallardy@st.com (loic pallardy)
-Date: Fri, 17 Jun 2016 21:53:08 +0200
-Subject: [STLinux Kernel] [PATCH 5/5] remoteproc: core: Clip carveout if
- it's too big
-In-Reply-To: <20160510192129.GL1256@tuxbot>
-References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
- <1462454983-13168-6-git-send-email-lee.jones@linaro.org>
- <20160510192129.GL1256@tuxbot>
-Message-ID: <57645524.1030200@st.com>
+From: diego.dorta@nxp.com (Diego Dorta)
+Date: Fri, 17 Jun 2016 17:09:40 -0300
+Subject: [PATCH 1/4] ARM: dts: imx7d: Add SPI support
+Message-ID: <1466194183-31076-1-git-send-email-diego.dorta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add ecspi nodes and aliases.
 
-Hi,
+Signed-off-by: Diego Dorta <diego.dorta@nxp.com>
+---
+ arch/arm/boot/dts/imx7d.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-On 05/10/2016 09:21 PM, Bjorn Andersson wrote:
-> On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
->
->> Carveout size is primarily extracted from the firmware binary.  However,
->> DT can over-ride this by providing a different (smaller) size.  We're
->> adding protection here to ensure the we only allocate the smaller of the
->> two provided sizes in order to decrease the risk of clashes.
->>
->
-> Is this really the right thing to do?
->
-> The firmware is bundled with a resource table stating a certain size of
-> this the carveout and this would "silently" give it less space. On some
-> systems an IOMMU will save us (killing the firmware) but on others I
-> fear the firmware might just access memory outside its expected buffer.
-
-Agree with Bjorn, not it is not possible to silently clip carveout 
-memory.Firmware resource table should contain exact coprocessor needs. 
-If resources are not available, firmware loading must failed with 
-explicit message.
-
-Regards,
-Loic
-
->
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>   drivers/remoteproc/remoteproc_core.c | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> [..]
->> @@ -600,6 +601,14 @@ static int rproc_handle_carveout(struct rproc *rproc,
->>   		return -ENOMEM;
->>
->>   	dma_dev = rproc_subdev_lookup(rproc, "carveout");
->> +	sub = dev_get_drvdata(dma_dev);
->> +
->> +	if (rsc->len > resource_size(sub->res)) {
->> +		dev_warn(dev, "carveout too big (0x%x): clipping to 0x%x\n",
->> +			 rsc->len, resource_size(sub->res));
->> +		rsc->len = resource_size(sub->res);
->> +	}
->
-> I would rather expect this to say:
->
-> if (resource_size(sub->res) < rsc->len) {
-> 	dev_err(dev, "defined carveout to small for firmware\n");
-> 	return -EINVAL;
-> }
->
-> Unless we trust the remote firmware to dynamically follow what we put in
-> the resource table. (And how does it tell us if that limit isn't
-> enough?)
->
->> +
->>   	va = dma_alloc_coherent(dma_dev, rsc->len, &dma, GFP_KERNEL);
->>   	if (!va) {
->>   		dev_err(dev->parent, "dma_alloc_coherent err: %d\n", rsc->len);
->
->
-> Apart from this concern I'm still need to review the subdev patch; here
-> related the part that there's only room for one carveout with only one
-> size.
->
-> Regards,
-> Bjorn
->
-> _______________________________________________
-> Kernel mailing list
-> Kernel at stlinux.com
-> http://www.stlinux.com/mailman/listinfo/kernel
->
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index d70d55d..f30885e 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -69,6 +69,10 @@
+ 		serial4 = &uart5;
+ 		serial5 = &uart6;
+ 		serial6 = &uart7;
++		spi0 = &ecspi1;
++		spi1 = &ecspi2;
++		spi2 = &ecspi3;
++		spi3 = &ecspi4;
+ 	};
+ 
+ 	cpus {
+@@ -608,6 +612,18 @@
+ 				status = "disabled";
+ 			};
+ 
++			ecspi4: ecspi at 30630000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx7d-ecspi", "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
++				reg = <0x30630000 0x10000>;
++				interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_ECSPI4_ROOT_CLK>,
++					<&clks IMX7D_ECSPI4_ROOT_CLK>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
+ 			pwm1: pwm at 30660000 {
+ 				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
+ 				reg = <0x30660000 0x10000>;
+@@ -671,6 +687,42 @@
+ 			reg = <0x30800000 0x400000>;
+ 			ranges;
+ 
++			ecspi1: ecspi at 30820000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx7d-ecspi", "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
++				reg = <0x30820000 0x10000>;
++				interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_ECSPI1_ROOT_CLK>,
++					<&clks IMX7D_ECSPI1_ROOT_CLK>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
++			ecspi2: ecspi at 30830000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx7d-ecspi", "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
++				reg = <0x30830000 0x10000>;
++				interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_ECSPI2_ROOT_CLK>,
++					<&clks IMX7D_ECSPI2_ROOT_CLK>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
++			ecspi3: ecspi at 30840000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx7d-ecspi", "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
++				reg = <0x30840000 0x10000>;
++				interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_ECSPI3_ROOT_CLK>,
++					<&clks IMX7D_ECSPI3_ROOT_CLK>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
+ 			uart1: serial at 30860000 {
+ 				compatible = "fsl,imx7d-uart",
+ 					     "fsl,imx6q-uart";
+-- 
+2.7.4
