@@ -1,49 +1,120 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 17 Jun 2016 22:28:06 +0200
-Subject: [PATCH 2/7] ARM: dts: add SDCC5 to Qualcomm MSM8660
+Date: Fri, 17 Jun 2016 22:28:07 +0200
+Subject: [PATCH 3/7] ARM: dts: add L2CC and RPM with regulators for MSM8660
 In-Reply-To: <1466195292-28236-1-git-send-email-linus.walleij@linaro.org>
 References: <1466195292-28236-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1466195292-28236-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1466195292-28236-4-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDCC5 SD/MMC controller is used for a second uSD slot
-on the APQ8060 Dragonboard. On most other systems it is just
-dark silicon so define it and leave it as "disabled" in the core
-SoC file.
+This adds the L2CC IPC resource and RPM devices plus the nodes
+for the PM8901 and PM8058 regulators to the MSM8660 device tree.
+This was tested on the APQ8060 Dragonboard.
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/qcom-msm8660.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 89 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 89 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 6a62b62ad980..a5a38820554a 100644
+index a5a38820554a..e7c6e2942f47 100644
 --- a/arch/arm/boot/dts/qcom-msm8660.dtsi
 +++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -262,6 +262,22 @@
- 				no-1-8-v;
- 				vmmc-supply = <&vsdcc_fixed>;
+@@ -215,6 +215,95 @@
  			};
-+
-+			sdcc5: sdcc at 12200000 {
-+				compatible	= "arm,pl18x", "arm,primecell";
-+				arm,primecell-periphid = <0x00051180>;
-+				status		= "disabled";
-+				reg		= <0x12200000 0x8000>;
-+				interrupts	= <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names	= "cmd_irq";
-+				clocks		= <&gcc SDC5_CLK>, <&gcc SDC5_H_CLK>;
-+				clock-names	= "mclk", "apb_pclk";
-+				bus-width	= <4>;
-+				cap-sd-highspeed;
-+				cap-mmc-highspeed;
-+				max-frequency	= <48000000>;
-+				vmmc-supply = <&vsdcc_fixed>;
-+			};
  		};
  
- 		tcsr: syscon at 1a400000 {
++		l2cc: clock-controller at 2082000 {
++			compatible	= "syscon";
++			reg		= <0x02082000 0x1000>;
++		};
++
++		rpm: rpm at 104000 {
++			compatible	= "qcom,rpm-msm8660";
++			reg		= <0x00104000 0x1000>;
++			qcom,ipc	= <&l2cc 0x8 2>;
++
++			interrupts	= <GIC_SPI 19 IRQ_TYPE_EDGE_RISING>,
++					  <GIC_SPI 21 IRQ_TYPE_EDGE_RISING>,
++					  <GIC_SPI 22 IRQ_TYPE_EDGE_RISING>;
++			interrupt-names	= "ack", "err", "wakeup";
++			clocks = <&gcc RPM_MSG_RAM_H_CLK>;
++			clock-names = "ram";
++
++			rpmcc: clock-controller {
++				compatible	= "qcom,rpmcc-apq8660", "qcom,rpmcc";
++				#clock-cells = <1>;
++			};
++
++			pm8901-regulators {
++				compatible = "qcom,rpm-pm8901-regulators";
++
++				pm8901_l0: l0 {};
++				pm8901_l1: l1 {};
++				pm8901_l2: l2 {};
++				pm8901_l3: l3 {};
++				pm8901_l4: l4 {};
++				pm8901_l5: l5 {};
++				pm8901_l6: l6 {};
++
++				/* S0 and S1 Handled as SAW regulators by SPM */
++				pm8901_s2: s2 {};
++				pm8901_s3: s3 {};
++				pm8901_s4: s4 {};
++
++				pm8901_lvs0: lvs0 {};
++				pm8901_lvs1: lvs1 {};
++				pm8901_lvs2: lvs2 {};
++				pm8901_lvs3: lvs3 {};
++
++				pm8901_mvs: mvs {};
++			};
++
++			pm8058-regulators {
++				compatible = "qcom,rpm-pm8058-regulators";
++
++				pm8058_l0: l0 {};
++				pm8058_l1: l1 {};
++				pm8058_l2: l2 {};
++				pm8058_l3: l3 {};
++				pm8058_l4: l4 {};
++				pm8058_l5: l5 {};
++				pm8058_l6: l6 {};
++				pm8058_l7: l7 {};
++				pm8058_l8: l8 {};
++				pm8058_l9: l9 {};
++				pm8058_l10: l10 {};
++				pm8058_l11: l11 {};
++				pm8058_l12: l12 {};
++				pm8058_l13: l13 {};
++				pm8058_l14: l14 {};
++				pm8058_l15: l15 {};
++				pm8058_l16: l16 {};
++				pm8058_l17: l17 {};
++				pm8058_l18: l18 {};
++				pm8058_l19: l19 {};
++				pm8058_l20: l20 {};
++				pm8058_l21: l21 {};
++				pm8058_l22: l22 {};
++				pm8058_l23: l23 {};
++				pm8058_l24: l24 {};
++				pm8058_l25: l25 {};
++
++				pm8058_s0: s0 {};
++				pm8058_s1: s1 {};
++				pm8058_s2: s2 {};
++				pm8058_s3: s3 {};
++				pm8058_s4: s4 {};
++
++				pm8058_lvs0: lvs0 {};
++				pm8058_lvs1: lvs1 {};
++
++				pm8058_ncp: ncp {};
++			};
++		};
++
+ 		/* Temporary fixed regulator */
+ 		vsdcc_fixed: vsdcc-regulator {
+ 			compatible = "regulator-fixed";
 -- 
 2.4.11
