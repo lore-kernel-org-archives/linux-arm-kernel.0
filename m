@@ -1,46 +1,68 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Fri, 17 Jun 2016 18:09:20 +0800
-Subject: [PATCH 07/12] power: pwrseq: rename file name for generic driver
+Date: Fri, 17 Jun 2016 18:09:24 +0800
+Subject: [PATCH 11/12] usb: chipidea: host: let the hcd know's parent device
+ node
 In-Reply-To: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
 References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1466158165-9380-8-git-send-email-peter.chen@nxp.com>
+Message-ID: <1466158165-9380-12-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The individual driver file name is better to contain module name.
+From: Peter Chen <peter.chen@freescale.com>
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Since the hcd (chipidea core device) has no device node, so
+if we want to describe the child node under the hcd, we had
+to put it under its parent's node (glue layer device), and
+in the code, we need to let the hcd knows glue layer's code,
+then the USB core can handle this node.
+
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
 ---
- .../power/pwrseq/{pwrseq-simple.txt => mmc-pwrseq-simple.txt}         | 0
- drivers/power/pwrseq/Makefile                                         | 4 ++--
- drivers/power/pwrseq/{pwrseq.c => core.c}                             | 0
- drivers/power/pwrseq/{pwrseq_simple.c => pwrseq_mmc_simple.c}         | 0
- 4 files changed, 2 insertions(+), 2 deletions(-)
- rename Documentation/devicetree/bindings/power/pwrseq/{pwrseq-simple.txt => mmc-pwrseq-simple.txt} (100%)
- rename drivers/power/pwrseq/{pwrseq.c => core.c} (100%)
- rename drivers/power/pwrseq/{pwrseq_simple.c => pwrseq_mmc_simple.c} (100%)
+ drivers/usb/chipidea/host.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt b/Documentation/devicetree/bindings/power/pwrseq/mmc-pwrseq-simple.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt
-rename to Documentation/devicetree/bindings/power/pwrseq/mmc-pwrseq-simple.txt
-diff --git a/drivers/power/pwrseq/Makefile b/drivers/power/pwrseq/Makefile
-index 9e40e4b..d475e01 100644
---- a/drivers/power/pwrseq/Makefile
-+++ b/drivers/power/pwrseq/Makefile
-@@ -1,3 +1,3 @@
--obj-$(CONFIG_POWER_SEQ)		+= pwrseq.o
--obj-$(CONFIG_POWER_SEQ_SIMPLE)	+= pwrseq_simple.o
-+obj-$(CONFIG_POWER_SEQ)		+= core.o
-+obj-$(CONFIG_POWER_SEQ_SIMPLE)	+= pwrseq_mmc_simple.o
- obj-$(CONFIG_POWER_SEQ_EMMC)	+= pwrseq_emmc.o
-diff --git a/drivers/power/pwrseq/pwrseq.c b/drivers/power/pwrseq/core.c
-similarity index 100%
-rename from drivers/power/pwrseq/pwrseq.c
-rename to drivers/power/pwrseq/core.c
-diff --git a/drivers/power/pwrseq/pwrseq_simple.c b/drivers/power/pwrseq/pwrseq_mmc_simple.c
-similarity index 100%
-rename from drivers/power/pwrseq/pwrseq_simple.c
-rename to drivers/power/pwrseq/pwrseq_mmc_simple.c
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 053bac9..55120ef 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -109,15 +109,25 @@ static int host_start(struct ci_hdrc *ci)
+ 	struct ehci_hcd *ehci;
+ 	struct ehci_ci_priv *priv;
+ 	int ret;
++	struct device *dev = ci->dev;
+ 
+-	if (usb_disabled())
++	if (usb_disabled() || !dev)
+ 		return -ENODEV;
+ 
+-	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
++	/*
++	 * USB Core will try to get child node under roothub,
++	 * but chipidea core has no of_node, and the child node
++	 * for controller is located at glue layer's node which
++	 * is chipidea core's parent.
++	 */
++	if (dev->parent && dev->parent->of_node)
++		dev->of_node = dev->parent->of_node;
++
++	hcd = usb_create_hcd(&ci_ehci_hc_driver, dev, dev_name(dev));
+ 	if (!hcd)
+ 		return -ENOMEM;
+ 
+-	dev_set_drvdata(ci->dev, ci);
++	dev_set_drvdata(dev, ci);
+ 	hcd->rsrc_start = ci->hw_bank.phys;
+ 	hcd->rsrc_len = ci->hw_bank.size;
+ 	hcd->regs = ci->hw_bank.abs;
+@@ -143,7 +153,7 @@ static int host_start(struct ci_hdrc *ci)
+ 		if (ci->platdata->flags & CI_HDRC_TURN_VBUS_EARLY_ON) {
+ 			ret = regulator_enable(ci->platdata->reg_vbus);
+ 			if (ret) {
+-				dev_err(ci->dev,
++				dev_err(dev,
+ 				"Failed to enable vbus regulator, ret=%d\n",
+ 									ret);
+ 				goto put_hcd;
 -- 
 1.9.1
