@@ -1,38 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 18 Jun 2016 02:21:23 +0800
-Subject: [PATCH 4/4] ARM: dts: meson8b: Add Meson8b PWM Controller nodes
-In-Reply-To: <1466173784-15625-5-git-send-email-narmstrong@baylibre.com>
-Message-ID: <201606180219.HabMMLCO%fengguang.wu@intel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 17 Jun 2016 12:59:36 -0600
+Subject: [PATCH 1/2] DT: bindings: remove bcm2835-sdhci
+In-Reply-To: <1995060523.43076.c268f06d-da3c-427e-800f-fbc65895c323.open-xchange@email.1und1.de>
+References: <1464983233-27001-1-git-send-email-stefan.wahren@i2se.com>
+ <1464983233-27001-2-git-send-email-stefan.wahren@i2se.com>
+ <5751E1F1.5020202@wwwdotorg.org>
+ <1995060523.43076.c268f06d-da3c-427e-800f-fbc65895c323.open-xchange@email.1und1.de>
+Message-ID: <57644898.60402@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/09/2016 12:11 PM, Stefan Wahren wrote:
+> Hi Stephen,
+>
+>> Stephen Warren <swarren@wwwdotorg.org> hat am 3. Juni 2016 um 22:00
+>> geschrieben:
+>>
+>>
+>> On 06/03/2016 01:47 PM, Stefan Wahren wrote:
+>>> The sdhci-iproc also supports bcm2835. So this binding is obsolete.
+>>
+>> sdhci-iproc supports this binding, so I don't believe the binding is
+>> obsolete. The duplicate implementations (drivers) can possibly be
+>> removed, but not the binding doc, which is (or at least could be) still
+>> in use.
+>
+> sorry for my late reply.
+>
+> So the brcm,bcm2835-sdhci.txt must be kept, even if the compatible string
+> "brcm,bcm2835-sdhci" has been added to brcm,sdhci-iproc.txt?
 
-[auto build test ERROR on next-20160617]
-[cannot apply to pwm/for-next robh/for-next v4.7-rc3 v4.7-rc2 v4.7-rc1 v4.7-rc3]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Sorry for the slow reply; I was on vacation.
 
-url:    https://github.com/0day-ci/linux/commits/Neil-Armstrong/pwm-Add-Amlogic-Meson-SoC-PWM-Controller/20160617-223758
-config: arm-multi_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/meson8b.dtsi:167.17-18 syntax error
-   FATAL ERROR: Unable to parse input tree
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 37970 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160618/1f7b4a03/attachment-0001.obj>
+So, if the binding documentation has been collapsed into the other 
+binding document, then it's OK to remove this one. I took a look at the 
+iproc binding doc and it looks completely compatible with this removed 
+binding doc, so I think this patch is OK.
