@@ -1,64 +1,114 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Jun 2016 16:16:59 +0200
-Subject: [PATCH] arm64: Kconfig: select PM for ARCH_VEXPRESS
-In-Reply-To: <5763FD58.3090300@arm.com>
-References: <1466090128-24425-1-git-send-email-sudeep.holla@arm.com>
- <4148732.Pd5phtR9Qh@wuerfel> <5763FD58.3090300@arm.com>
-Message-ID: <3892833.90HLNUPjM3@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 17 Jun 2016 15:27:42 +0100
+Subject: [PATCH] arm64: barrier: implement wfe-base smp_cond_load_acquire
+In-Reply-To: <1466169136-28672-1-git-send-email-will.deacon@arm.com>
+References: <1466169136-28672-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20160617142738.GA20181@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 17, 2016 2:38:32 PM CEST Sudeep Holla wrote:
-> On 17/06/16 12:53, Arnd Bergmann wrote:
-> >> The discussion on this happened on linux-pm list[1]. This is need on
-> >> Juno once we introduce coresight components in the DT. With !CONFIG_PM,
-> >> the board stalls on boot and hence this patch is needed. This shouldn't
-> >> change any thing in the defconfig as couple of other platforms already
-> >> do the same. It's needed in case all other ARCH_* configs are disabled.
-> >>
-> >> Without this, we need a dirty trick in the DT[2] to handle !CONFIG_PM.
-> >>
-> >> Can you please pick this for v4.8 ?
-> >
-> > Question: if AMBA cannot deal with CONFIG_PM disabled, should
-> > the 'select' be done from CONFIG_ARM_AMBA instead?
-> >
+Hi Will,
+
+On Fri, Jun 17, 2016 at 02:12:15PM +0100, Will Deacon wrote:
+> smp_cond_load_acquire is used to spin on a variable until some
+> expression involving that variable becomes true.
 > 
-> But few platforms using AMBA may not want PM at all.
-
-Ok, then I just misunderstood what you meant with "the AMBA framework can't
-deal with !CONFIG_PM case".
-
-> > I also feel a little uncomfortable with just adding 'select PM', given
-> > that this option is normally just implied by CONFIG_SUSPEND ||
-> > CONFIG_HIBERNATE_CALLBACKS,
+> On arm64, we can build this using WFE and LDXR, since clearing of the
+> exclusive monitor as a result of the variable being changed by another
+> CPU generates an event, which will wake us up out of WFE.
 > 
-> On that analogy, for the current requirement I would say 
-> PM_GENERIC_DOMAINS should select but it just depends on PM.
-
-Possibly, it's not entirely clear what the dependency is used for
-here, or what CONFIG_PM actually means. I'm also still unsure what
-aspect of CONFIG_PM you actually rely on here. Is this about the
-amba_pm_runtime_suspend/amba_pm_runtime_resume operations or something
-else?
-
-> > so we might run into regressionswhen we get configurations that
-> > were invalid before.
+> This patch implements smp_cond_load_acquire using LDAXR and WFE, which
+> themselves are contained in an internal __cmpwait_acquire function.
 > 
-> Sorry my build/config knowledge is limited, I don't understand what you
-> mean by the above. I am asking just to improve my knowledge.
-
-If today, CONFIG_PM is only set when CONFIG_PM_SLEEP is set and
-we introduce a case where we have PM without PM_SLEEP, a lot of
-drivers that incorrectly make the assumption that PM_SLEEP is mean
-with CONFIG_PM may behave in new unexpected ways.
-
-> > Then again  ARCH_RENESAS seems to already do this.
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
 > 
-> Yes, it was hard to find get !CONFIG_PM as many platforms select it
-> directly or indirectly.
+> Based on Peter's locking/core branch.
+> 
+>  arch/arm64/include/asm/barrier.h | 13 ++++++++++
+>  arch/arm64/include/asm/cmpxchg.h | 52 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 65 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+> index dae5c49618db..4bb2b09f8ca9 100644
+> --- a/arch/arm64/include/asm/barrier.h
+> +++ b/arch/arm64/include/asm/barrier.h
+> @@ -91,6 +91,19 @@ do {									\
+>  	__u.__val;							\
+>  })
+>  
+> +#define smp_cond_load_acquire(ptr, cond_expr)				\
+> +({									\
+> +	typeof(ptr) __PTR = (ptr);					\
+> +	typeof(*ptr) VAL;						\
 
-Starting from an allmodconfig build, I just needed to disable
-ARCH_RENESAS, ARCH_OMAP2PLUS_TYPICAL, SUSPEND and HIBERNATE.
+I was going to mention that the use of __PTR and VAL looked inconsistent
+with the res of the arm64 routines, but I see that's part of the API for
+the use of cond_expr, per [1].
 
-	Arnd
+> +	for (;;) {							\
+> +		VAL = smp_load_acquire(__PTR);				\
+> +		if (cond_expr)						\
+> +			break;						\
+> +		__cmpwait_acquire(__PTR, VAL);				\
+> +	}								\
+> +	VAL;								\
+> +})
+> +
+>  #include <asm-generic/barrier.h>
+>  
+>  #endif	/* __ASSEMBLY__ */
+> diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+> index 510c7b404454..84b83e521edc 100644
+> --- a/arch/arm64/include/asm/cmpxchg.h
+> +++ b/arch/arm64/include/asm/cmpxchg.h
+> @@ -224,4 +224,56 @@ __CMPXCHG_GEN(_mb)
+>  	__ret;								\
+>  })
+>  
+> +#define __CMPWAIT_CASE(w, sz, name, acq, cl)				\
+> +static inline void __cmpwait_case_##name(volatile void *ptr,		\
+> +					 unsigned long val)		\
+> +{									\
+> +	unsigned long tmp;						\
+> +									\
+> +	asm volatile(							\
+> +	"	ld" #acq "xr" #sz "\t%" #w "[tmp], %[v]\n"		\
+> +	"	eor	%" #w "[tmp], %" #w "[tmp], %" #w "[val]\n"	\
+> +	"	cbnz	%" #w "[tmp], 1f\n"				\
+> +	"	wfe\n"							\
+> +	"1:"								\
+> +	: [tmp] "=&r" (tmp), [v] "+Q" (*(unsigned long *)ptr)		\
+> +	: [val] "r" (val)						\
+> +	: cl);								\
+> +}
+> +
+> +__CMPWAIT_CASE(w, b, acq_1, a, "memory");
+> +__CMPWAIT_CASE(w, h, acq_2, a, "memory");
+> +__CMPWAIT_CASE(w,  , acq_4, a, "memory");
+> +__CMPWAIT_CASE( ,  , acq_8, a, "memory");
+> +
+> +#undef __CMPWAIT_CASE
+
+>From my understanding of the intent, I believe that the asm is correct.
+
+I'm guessing from the way this and __CMPWAIT_GEN are parameterised that
+there is a plan for variants of this with different ordering semantics,
+though I'm having difficulty envisioning them. Perhaps I lack
+imagination. ;)
+
+Is there any case for waiting with anything other than acquire
+semantics? If not, we could fold the acq parameter and acq_ prefix from
+the name parameter.
+
+Do we expect this to be used outside of smp_cond_load_acquire? If not,
+can't we rely on the prior smp_load_acquire for the acquire semantics
+(and use pain LDXR* here)? Then the acq part can go from the cmpwait
+cases entirely.
+
+Is there any case where we wouldn't want the memory clobber?
+
+Thanks,
+Mark.
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/peterz/queue.git/commit/?h=locking/core&id=c1b003e1416e46640f6613952da2fe65c5522f4d
