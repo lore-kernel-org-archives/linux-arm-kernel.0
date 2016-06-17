@@ -1,47 +1,104 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 17 Jun 2016 06:15:07 +0300
-Subject: [PATCH V2 11/63] clocksource/drivers/digitcolor: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-12-git-send-email-daniel.lezcano@linaro.org>
-References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-12-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20160617031507.GQ2749@tarshish>
+From: po.liu@nxp.com (Po Liu)
+Date: Fri, 17 Jun 2016 03:30:56 +0000
+Subject: [PATCH v2 2/2] pci/aer: interrupt fixup in the quirk
+In-Reply-To: <20160616135420.GA31343@localhost>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <1465884747-1517-1-git-send-email-po.liu@nxp.com>
+ <1465884747-1517-2-git-send-email-po.liu@nxp.com>
+ <20160616135420.GA31343@localhost>
+Message-ID: <VI1PR0401MB1709A9CA2424515B867940E392570@VI1PR0401MB1709.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
 
-On Thu, Jun 16, 2016 at 11:26:30PM +0200, Daniel Lezcano wrote:
-> The init functions do not return any error. They behave as the following:
-> 
->   - panic, thus leading to a kernel crash while another timer may work and
->        make the system boot up correctly
-> 
->   or
-> 
->   - print an error and let the caller unaware if the state of the system
-> 
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
-> 
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-It would be nice to have at least LAKL on Cc of the cover letter as well, so 
-we can get the big picture. I found it at 
-http://article.gmane.org/gmane.linux.kernel/2246137.
+>  -----Original Message-----
+>  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+>  Sent: Thursday, June 16, 2016 9:54 PM
+>  To: Po Liu
+>  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Bjorn Helgaas;
+>  Shawn Guo; Marc Zyngier; Rob Herring; Roy Zang; Mingkai Hu; Stuart Yoder;
+>  Yang-Leo Li; Arnd Bergmann; Minghuan Lian; Murali Karicheri
+>  Subject: Re: [PATCH v2 2/2] pci/aer: interrupt fixup in the quirk
+>  
+>  On Tue, Jun 14, 2016 at 02:12:27PM +0800, Po Liu wrote:
+>  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+>  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
+>  > maybe there is interrupt line for aer pme etc. Search the interrupt
+>  > number in the fdt file. Then fixup the dev->irq with it.
+>  >
+>  > Signed-off-by: Po Liu <po.liu@nxp.com>
+>  > ---
+>  > changes for V2:
+>  > 	- Move to the quirk file
+>  >
+>  >  drivers/pci/quirks.c | 23 +++++++++++++++++++++++
+>  >  1 file changed, 23 insertions(+)
+>  >
+>  > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
+>  > ee72ebe..909d479 100644
+>  > --- a/drivers/pci/quirks.c
+>  > +++ b/drivers/pci/quirks.c
+>  
+>  Is there any possibility of this part being used on different arches, or
+>  will it only ever be on arm64 (or whatever it is)?  If the latter, it
+>  could go somewhere like arch/arm64/kernel/quirks.c (which doesn't exist
+>  yet).
 
-But anyway, for this and the final patch:
+NXP Layerscape1 is base on the arm 32bit design. Also need the fixup.
 
-Acked-by: Baruch Siach <baruch@tkos.co.il>
+>  
+>  > @@ -25,6 +25,7 @@
+>  >  #include <linux/sched.h>
+>  >  #include <linux/ktime.h>
+>  >  #include <linux/mm.h>
+>  > +#include <linux/of_irq.h>
+>  >  #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+>  >  #include "pci.h"
+>  >
+>  > @@ -4419,3 +4420,25 @@ static void quirk_intel_qat_vf_cap(struct
+>  pci_dev *pdev)
+>  >  	}
+>  >  }
+>  >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443,
+>  > quirk_intel_qat_vf_cap);
+>  > +
+>  > +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
+>  > + * but use standalone irq. Read the device tree for the aer
+>  > + * interrupt number.
+>  > + */
+>  > +static void quirk_aer_interrupt(struct pci_dev *dev) {
+>  > +	int ret;
+>  > +	struct device_node *np = NULL;
+>  > +
+>  > +	if (dev->bus->dev.of_node)
+>  > +		np = dev->bus->dev.of_node;
+>  > +
+>  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
+>  > +		ret = of_irq_get_byname(np, "aer");
+>  > +		if (ret > 0) {
+>  > +			dev->no_msi = 1;
+>  > +			dev->irq = ret;
+>  > +		}
+>  > +	}
+>  
+>  What does this mean for the other PCIe services, e.g., PME?  I guess
+>  this makes the existing AER code work unchanged.  But I thought PME had
+>  a similar situation and was connected up to a different interrupt than
+>  AER was.
 
-Thanks,
-baruch
+Yes, PME is similar, HP is not support. I think better to disable the PME service irq in the quirk.
+But seems it is no use because quirk fixup is only running in init phase time(except suspend, resume).
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+>  
+>  > +}
+>  > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,
+>  > +quirk_aer_interrupt);
+>  > --
+>  > 2.1.0.27.g96db324
+>  >
+>  > --
+>  > To unsubscribe from this list: send the line "unsubscribe linux-pci"
+>  > in the body of a message to majordomo at vger.kernel.org More majordomo
+>  > info at  http://vger.kernel.org/majordomo-info.html
