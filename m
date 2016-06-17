@@ -1,35 +1,33 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 17 Jun 2016 08:26:57 +0200
-Subject: [PATCH v2 07/10] driver core: Add support for links to already probed
- drivers
+Date: Fri, 17 Jun 2016 08:26:59 +0200
+Subject: [PATCH v2 09/10] iommu/exynos: Remove excessive, useless debug
 In-Reply-To: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
 References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1466144820-6286-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1466144820-6286-10-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set proper link state if link is created between already probed supplier
-device and to be probed consumer device.
+Remove excessive, useless debug about skipping TLB invalidation, which
+is a normal situation when more aggressive power management is enabled.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/base/core.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/iommu/exynos-iommu.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/base/core.c b/drivers/base/core.c
-index 4e778539b750..d9c5c5542a6b 100644
---- a/drivers/base/core.c
-+++ b/drivers/base/core.c
-@@ -125,7 +125,9 @@ struct devlink *device_link_add(struct device *consumer,
- 
- 	link->flags = flags;
- 	link->status = (flags & DEVICE_LINK_PROBE_TIME) ?
--			DEVICE_LINK_CONSUMER_PROBE : DEVICE_LINK_DORMANT;
-+			DEVICE_LINK_CONSUMER_PROBE :
-+			(supplier->driver ? DEVICE_LINK_AVAILABLE :
-+			 DEVICE_LINK_DORMANT);
- 	spin_lock_init(&link->lock);
- 
- 	/*
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 633e6d023c0d..9d1a14f88891 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -574,9 +574,6 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
+ 			sysmmu_unblock(data);
+ 		}
+ 		clk_disable(data->clk_master);
+-	} else {
+-		dev_dbg(data->master,
+-			"disabled. Skipping TLB invalidation @ %#x\n", iova);
+ 	}
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ }
 -- 
 1.9.1
