@@ -1,52 +1,70 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 17 Jun 2016 14:41:04 +0200
-Subject: [PATCH v2 03/10] crypto: marvell: Fix wrong type check in dma
- functions
-In-Reply-To: <1466162649-29911-4-git-send-email-romain.perier@free-electrons.com>
-References: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
- <1466162649-29911-4-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <20160617144104.1a877445@bbrezillon>
+From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
+Date: Fri, 17 Jun 2016 13:35:43 +0100
+Subject: [PATCH v3] arm64: dts: r8a7795: Add CAN FD support
+In-Reply-To: <1456906550-4849-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+References: <1456906550-4849-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+Message-ID: <1466166943-17670-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jun 2016 13:24:02 +0200
-Romain Perier <romain.perier@free-electrons.com> wrote:
+Adds CAN FD controller node for r8a7795.
 
-> So far, the way that the type of a TDMA operation was checked was
-> wrong. We have to use the type mask in order to get the right part of
-> the flag containing the type of the operation.
-> 
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+Note: CAN FD controller register base address specified in R-Car Gen3
+Hardware User Manual v0.5E is incorrect. The correct address is:
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+CAN FD - 0xe66c0000
 
-Thanks for fixing it.
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+---
 
-> ---
->  drivers/crypto/marvell/tdma.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/crypto/marvell/tdma.c
-> b/drivers/crypto/marvell/tdma.c index 8c86bb6..de8c253 100644
-> --- a/drivers/crypto/marvell/tdma.c
-> +++ b/drivers/crypto/marvell/tdma.c
-> @@ -64,8 +64,9 @@ void mv_cesa_dma_cleanup(struct mv_cesa_tdma_req
-> *dreq) 
->  	for (tdma = dreq->chain.first; tdma;) {
->  		struct mv_cesa_tdma_desc *old_tdma = tdma;
-> +		u32 type = tdma->flags & CESA_TDMA_TYPE_MSK;
->  
-> -		if (tdma->flags & CESA_TDMA_OP)
-> +		if (type == CESA_TDMA_OP)
->  			dma_pool_free(cesa_dev->dma->op_pool,
-> tdma->op, le32_to_cpu(tdma->src));
->  
-> @@ -90,7 +91,7 @@ void mv_cesa_dma_prepare(struct mv_cesa_tdma_req
-> *dreq, if (tdma->flags & CESA_TDMA_SRC_IN_SRAM)
->  			tdma->src = cpu_to_le32(tdma->src +
-> engine->sram_dma); 
-> -		if (tdma->flags & CESA_TDMA_OP)
-> +		if ((tdma->flags & CESA_TDMA_TYPE_MSK) ==
-> CESA_TDMA_OP) mv_cesa_adjust_op(engine, tdma->op);
->  	}
->  }
+Note:
+Bindings already Acked-by: Rob H on driver patch set
+(https://www.mail-archive.com/netdev at vger.kernel.org/msg102789.html)
+
+Changes since v2:
+	Rebased to Simon's latest tag:renesas-devel-20160616-v4.7-rc3
+
+Changes since v1:
+	As suggested by Sergei, Simon - changed node name from canfd@ to can@
+
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index fad6dd8..b902356 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -583,6 +583,30 @@
+ 			status = "disabled";
+ 		};
+ 
++		canfd: can at e66c0000 {
++			compatible = "renesas,r8a7795-canfd",
++				     "renesas,rcar-gen3-canfd";
++			reg = <0 0xe66c0000 0 0x8000>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
++				   <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 914>,
++			       <&cpg CPG_CORE R8A7795_CLK_CANFD>,
++			       <&can_clk>;
++			clock-names = "fck", "canfd", "can_clk";
++			assigned-clocks = <&cpg CPG_CORE R8A7795_CLK_CANFD>;
++			assigned-clock-rates = <40000000>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			status = "disabled";
++
++			channel0 {
++				status = "disabled";
++			};
++
++			channel1 {
++				status = "disabled";
++			};
++		};
++
+ 		hscif0: serial at e6540000 {
+ 			compatible = "renesas,hscif-r8a7795",
+ 				     "renesas,rcar-gen3-hscif",
+-- 
+1.9.1
