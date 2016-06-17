@@ -1,384 +1,181 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 17 Jun 2016 08:27:00 +0200
-Subject: [PATCH v2 10/10] iommu/exynos: Add proper runtime pm support
+Date: Fri, 17 Jun 2016 08:26:53 +0200
+Subject: [PATCH v2 03/10] PM core: Make async suspend/resume of devices use
+ device links
 In-Reply-To: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
 References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1466144820-6286-11-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1466144820-6286-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses recently introduced device links to track the runtime pm
-state of the master's device. This way each SYSMMU controller is runtime
-active its master's device is active and can save/restore its state
-instead of being enabled all the time. This way SYSMMU controllers no
-longer prevents respective power domains to be turned off when master's
-device is not used.
+From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
 
+Make the device suspend/resume part of the core system
+suspend/resume code use device links to ensure that supplier
+and consumer devices will be suspended and resumed in the right
+order in case of async suspend/resume.
+
+The idea, roughly, is to use dpm_wait() to wait for all consumers
+before a supplier device suspend and to wait for all suppliers
+before a consumer device resume.
+
+Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 218 ++++++++++++++++++++-----------------------
- 1 file changed, 99 insertions(+), 119 deletions(-)
+ drivers/base/base.h       |  2 ++
+ drivers/base/core.c       |  4 +--
+ drivers/base/power/main.c | 68 ++++++++++++++++++++++++++++++++++++++++++-----
+ 3 files changed, 66 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 9d1a14f88891..80b7f1e7268c 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -233,8 +233,8 @@ struct sysmmu_drvdata {
- 	struct clk *aclk;		/* SYSMMU's aclk clock */
- 	struct clk *pclk;		/* SYSMMU's pclk clock */
- 	struct clk *clk_master;		/* master's device clock */
--	int activations;		/* number of calls to sysmmu_enable */
- 	spinlock_t lock;		/* lock for modyfying state */
-+	int active;			/* current status */
- 	struct exynos_iommu_domain *domain; /* domain we belong to */
- 	struct list_head domain_node;	/* node for domain clients list */
- 	struct list_head owner_node;	/* node for owner controllers list */
-@@ -247,25 +247,6 @@ static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
- 	return container_of(dom, struct exynos_iommu_domain, domain);
+diff --git a/drivers/base/base.h b/drivers/base/base.h
+index cccb1d211541..123b986eb061 100644
+--- a/drivers/base/base.h
++++ b/drivers/base/base.h
+@@ -163,3 +163,5 @@ extern void device_links_driver_gone(struct device *dev);
+ extern void device_links_no_driver(struct device *dev);
+ extern bool device_links_busy(struct device *dev);
+ extern void device_links_unbind_consumers(struct device *dev);
++extern int device_links_read_lock(void);
++extern void device_links_read_unlock(int idx);
+diff --git a/drivers/base/core.c b/drivers/base/core.c
+index 416341df3268..51a479ed68b5 100644
+--- a/drivers/base/core.c
++++ b/drivers/base/core.c
+@@ -163,12 +163,12 @@ void device_link_del(struct devlink *link)
  }
+ EXPORT_SYMBOL_GPL(device_link_del);
  
--static bool set_sysmmu_active(struct sysmmu_drvdata *data)
--{
--	/* return true if the System MMU was not active previously
--	   and it needs to be initialized */
--	return ++data->activations == 1;
--}
--
--static bool set_sysmmu_inactive(struct sysmmu_drvdata *data)
--{
--	/* return true if the System MMU is needed to be disabled */
--	BUG_ON(data->activations < 1);
--	return --data->activations == 0;
--}
--
--static bool is_sysmmu_active(struct sysmmu_drvdata *data)
--{
--	return data->activations > 0;
--}
--
- static void sysmmu_unblock(struct sysmmu_drvdata *data)
+-static int device_links_read_lock(void)
++int device_links_read_lock(void)
  {
- 	writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
-@@ -384,7 +365,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
- 	unsigned short reg_status, reg_clear;
- 	int ret = -ENOSYS;
- 
--	WARN_ON(!is_sysmmu_active(data));
-+	WARN_ON(!data->active);
- 
- 	if (MMU_MAJ_VER(data->version) < 5) {
- 		reg_status = REG_INT_STATUS;
-@@ -430,7 +411,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
+ 	return srcu_read_lock(&device_links_srcu);
  }
  
--static void __sysmmu_disable_nocount(struct sysmmu_drvdata *data)
-+static void __sysmmu_disable(struct sysmmu_drvdata *data)
+-static void device_links_read_unlock(int idx)
++void device_links_read_unlock(int idx)
  {
- 	clk_enable(data->clk_master);
- 
-@@ -440,32 +421,6 @@ static void __sysmmu_disable_nocount(struct sysmmu_drvdata *data)
- 	__sysmmu_disable_clocks(data);
+ 	return srcu_read_unlock(&device_links_srcu, idx);
+ }
+diff --git a/drivers/base/power/main.c b/drivers/base/power/main.c
+index e44944f4be77..9470ccd87f11 100644
+--- a/drivers/base/power/main.c
++++ b/drivers/base/power/main.c
+@@ -244,6 +244,62 @@ static void dpm_wait_for_children(struct device *dev, bool async)
+        device_for_each_child(dev, &async, dpm_wait_fn);
  }
  
--static bool __sysmmu_disable(struct sysmmu_drvdata *data)
--{
--	bool disabled;
--	unsigned long flags;
--
--	spin_lock_irqsave(&data->lock, flags);
--
--	disabled = set_sysmmu_inactive(data);
--
--	if (disabled) {
--		data->pgtable = 0;
--		data->domain = NULL;
--
--		__sysmmu_disable_nocount(data);
--
--		dev_dbg(data->sysmmu, "Disabled\n");
--	} else  {
--		dev_dbg(data->sysmmu, "%d times left to disable\n",
--					data->activations);
--	}
--
--	spin_unlock_irqrestore(&data->lock, flags);
--
--	return disabled;
--}
--
- static void __sysmmu_init_config(struct sysmmu_drvdata *data)
- {
- 	unsigned int cfg;
-@@ -480,7 +435,7 @@ static void __sysmmu_init_config(struct sysmmu_drvdata *data)
- 	writel(cfg, data->sfrbase + REG_MMU_CFG);
- }
- 
--static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
-+static void __sysmmu_enable(struct sysmmu_drvdata *data)
- {
- 	__sysmmu_enable_clocks(data);
- 
-@@ -501,34 +456,6 @@ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
- 	clk_disable(data->clk_master);
- }
- 
--static int __sysmmu_enable(struct sysmmu_drvdata *data, phys_addr_t pgtable,
--			   struct exynos_iommu_domain *domain)
--{
--	int ret = 0;
--	unsigned long flags;
--
--	spin_lock_irqsave(&data->lock, flags);
--	if (set_sysmmu_active(data)) {
--		data->pgtable = pgtable;
--		data->domain = domain;
--
--		__sysmmu_enable_nocount(data);
--
--		dev_dbg(data->sysmmu, "Enabled\n");
--	} else {
--		ret = (pgtable == data->pgtable) ? 1 : -EBUSY;
--
--		dev_dbg(data->sysmmu, "already enabled\n");
--	}
--
--	if (WARN_ON(ret < 0))
--		set_sysmmu_inactive(data); /* decrement count */
--
--	spin_unlock_irqrestore(&data->lock, flags);
--
--	return ret;
--}
--
- static void sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
- 					    sysmmu_iova_t iova)
- {
-@@ -536,7 +463,7 @@ static void sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
- 
- 
- 	spin_lock_irqsave(&data->lock, flags);
--	if (is_sysmmu_active(data) && data->version >= MAKE_MMU_VER(3, 3)) {
-+	if (data->active && data->version >= MAKE_MMU_VER(3, 3)) {
- 		clk_enable(data->clk_master);
- 		__sysmmu_tlb_invalidate_entry(data, iova, 1);
- 		clk_disable(data->clk_master);
-@@ -551,7 +478,7 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&data->lock, flags);
--	if (is_sysmmu_active(data)) {
-+	if (data->active) {
- 		unsigned int num_inv = 1;
- 
- 		clk_enable(data->clk_master);
-@@ -652,40 +579,78 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- 	}
- 
- 	pm_runtime_enable(dev);
--
- 	of_iommu_set_ops(dev->of_node, &exynos_iommu_ops);
- 
- 	return 0;
- }
- 
--#ifdef CONFIG_PM_SLEEP
-+static int exynos_sysmmu_runtime_suspend(struct device *dev)
++static void dpm_wait_for_suppliers(struct device *dev, bool async)
 +{
-+	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-+	unsigned long flags;
++	struct devlink *link;
++	int idx;
 +
-+	spin_lock_irqsave(&data->lock, flags);
-+	if (data->master) {
-+		dev_dbg(data->sysmmu, "runtime pm: saving state\n");
-+		__sysmmu_disable(data);
-+		data->active = false;
-+	}
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int exynos_sysmmu_runtime_resume(struct device *dev)
-+{
-+	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+	if (data->master) {
-+		dev_dbg(data->sysmmu, "runtime pm: restoring state\n");
-+		__sysmmu_enable(data);
-+		data->active = true;
-+	}
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
- static int exynos_sysmmu_suspend(struct device *dev)
- {
- 	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-+	unsigned long flags;
- 
--	dev_dbg(dev, "suspend\n");
--	if (is_sysmmu_active(data)) {
--		__sysmmu_disable_nocount(data);
--		pm_runtime_put(dev);
-+	spin_lock_irqsave(&data->lock, flags);
-+	if (data->active) {
-+		dev_dbg(data->sysmmu, "saving state\n");
-+		__sysmmu_disable(data);
- 	}
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
- 	return 0;
- }
- 
- static int exynos_sysmmu_resume(struct device *dev)
- {
- 	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-+	unsigned long flags;
- 
--	dev_dbg(dev, "resume\n");
--	if (is_sysmmu_active(data)) {
--		pm_runtime_get_sync(dev);
--		__sysmmu_enable_nocount(data);
-+	spin_lock_irqsave(&data->lock, flags);
-+	if (data->active) {
-+		dev_dbg(data->sysmmu, "restoring state\n");
-+		__sysmmu_enable(data);
- 	}
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
- 	return 0;
- }
--#endif
- 
- static const struct dev_pm_ops sysmmu_pm_ops = {
--	SET_LATE_SYSTEM_SLEEP_PM_OPS(exynos_sysmmu_suspend, exynos_sysmmu_resume)
-+	SET_RUNTIME_PM_OPS(exynos_sysmmu_runtime_suspend,
-+			   exynos_sysmmu_runtime_resume, NULL)
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(exynos_sysmmu_suspend,
-+				     exynos_sysmmu_resume)
- };
- 
- static const struct of_device_id sysmmu_of_match[] __initconst = {
-@@ -789,9 +754,16 @@ static void exynos_iommu_domain_free(struct iommu_domain *iommu_domain)
- 	spin_lock_irqsave(&domain->lock, flags);
- 
- 	list_for_each_entry_safe(data, next, &domain->clients, domain_node) {
--		if (__sysmmu_disable(data))
--			data->master = NULL;
-+		spin_lock(&data->lock);
-+		if (WARN_ON(data->active)) {
-+			__sysmmu_disable(data);
-+			data->active = false;
-+		}
-+		data->master = NULL;
-+		data->pgtable = 0;
-+		data->domain = NULL;
- 		list_del_init(&data->domain_node);
-+		spin_unlock(&data->lock);
- 	}
- 
- 	spin_unlock_irqrestore(&domain->lock, flags);
-@@ -832,18 +804,22 @@ static void exynos_iommu_detach_device(struct iommu_domain *iommu_domain,
- 
- 	spin_lock_irqsave(&domain->lock, flags);
- 	list_for_each_entry_safe(data, next, &domain->clients, domain_node) {
-+		spin_lock(&data->lock);
- 		if (data->master == dev) {
--			if (__sysmmu_disable(data)) {
--				data->master = NULL;
--				list_del_init(&data->domain_node);
--			}
--			pm_runtime_put(data->sysmmu);
- 			found = true;
-+			if (data->active) {
-+				__sysmmu_disable(data);
-+				data->active = false;
-+			}
-+			data->master = NULL;
-+			data->pgtable = 0;
-+			data->domain = NULL;
-+			list_del_init(&data->domain_node);
- 		}
-+		spin_unlock(&data->lock);
- 	}
--	spin_unlock_irqrestore(&domain->lock, flags);
--
- 	owner->domain = NULL;
-+	spin_unlock_irqrestore(&domain->lock, flags);
- 
- 	if (found)
- 		dev_dbg(dev, "%s: Detached IOMMU with pgtable %pa\n",
-@@ -860,7 +836,6 @@ static int exynos_iommu_attach_device(struct iommu_domain *iommu_domain,
- 	struct sysmmu_drvdata *data;
- 	phys_addr_t pagetable = virt_to_phys(domain->pgtable);
- 	unsigned long flags;
--	int ret = -ENODEV;
- 
- 	if (!has_sysmmu(dev))
- 		return -ENODEV;
-@@ -868,29 +843,26 @@ static int exynos_iommu_attach_device(struct iommu_domain *iommu_domain,
- 	if (owner->domain)
- 		exynos_iommu_detach_device(owner->domain, dev);
- 
-+	spin_lock_irqsave(&domain->lock, flags);
- 	list_for_each_entry(data, &owner->controllers, owner_node) {
--		pm_runtime_get_sync(data->sysmmu);
--		ret = __sysmmu_enable(data, pagetable, domain);
--		if (ret >= 0) {
--			data->master = dev;
--
--			spin_lock_irqsave(&domain->lock, flags);
--			list_add_tail(&data->domain_node, &domain->clients);
--			spin_unlock_irqrestore(&domain->lock, flags);
-+		spin_lock(&data->lock);
-+		data->master = dev;
-+		data->pgtable = pagetable;
-+		data->domain = domain;
-+		list_add_tail(&data->domain_node, &domain->clients);
-+		if (pm_runtime_active(data->sysmmu)) {
-+			__sysmmu_enable(data);
-+			data->active = true;
- 		}
-+		spin_unlock(&data->lock);
- 	}
--
--	if (ret < 0) {
--		dev_err(dev, "%s: Failed to attach IOMMU with pgtable %pa\n",
--					__func__, &pagetable);
--		return ret;
--	}
--
- 	owner->domain = iommu_domain;
--	dev_dbg(dev, "%s: Attached IOMMU with pgtable %pa %s\n",
--		__func__, &pagetable, (ret == 0) ? "" : ", again");
-+	spin_unlock_irqrestore(&domain->lock, flags);
- 
--	return ret;
-+	dev_dbg(dev, "%s: Attached IOMMU with pgtable %pa\n",
-+		__func__, &pagetable);
-+
-+	return 0;
- }
- 
- static sysmmu_pte_t *alloc_lv2entry(struct exynos_iommu_domain *domain,
-@@ -1265,6 +1237,14 @@ static int exynos_iommu_of_xlate(struct device *dev,
- 	}
- 
- 	list_add_tail(&data->owner_node, &owner->controllers);
++	idx = device_links_read_lock();
 +
 +	/*
-+	 * SYSMMU will be runtime enabled via device link (dependency) to its
-+	 * master device, so there are no direct calls to pm_runtime_get/put
-+	 * in this driver
++	 * If the supplier goes away right after we've checked the link to it,
++	 * we'll wait for its completion to change the state, but that's fine,
++	 * because the only things that will block as a result are the SRCU
++	 * callbacks freeing the link objects for the links in the list we're
++	 * walking.
 +	 */
-+	device_link_add(dev, &sysmmu->dev, DEVICE_LINK_PERSISTENT |
-+					   DEVICE_LINK_PM_RUNTIME);
- 	return 0;
- }
++	list_for_each_entry_rcu(link, &dev->consumer_links, c_node)
++		if (link->status != DEVICE_LINK_DORMANT)
++			dpm_wait(link->supplier, async);
++
++	device_links_read_unlock(idx);
++}
++
++static void dpm_wait_for_superior(struct device *dev, bool async)
++{
++	dpm_wait(dev->parent, async);
++	dpm_wait_for_suppliers(dev, async);
++}
++
++static void dpm_wait_for_consumers(struct device *dev, bool async)
++{
++	struct devlink *link;
++	int idx;
++
++	idx = device_links_read_lock();
++
++	/*
++	 * The status of a device link can only be changed from "dormant" by a
++	 * probe, but that cannot happen during system suspend/resume.  In
++	 * theory it can change to "dormant" at that time, but then it is
++	 * reasonable to wait for the target device anyway (eg. if it goes
++	 * away, it's better to wait for it to go away completely and then
++	 * continue instead of trying to continue in parallel with its
++	 * unregistration).
++	 */
++	list_for_each_entry_rcu(link, &dev->supplier_links, s_node)
++		if (link->status != DEVICE_LINK_DORMANT)
++			dpm_wait(link->consumer, async);
++
++	device_links_read_unlock(idx);
++}
++
++static void dpm_wait_for_subordinate(struct device *dev, bool async)
++{
++	dpm_wait_for_children(dev, async);
++	dpm_wait_for_consumers(dev, async);
++}
++
+ /**
+  * pm_op - Return the PM operation appropriate for given PM event.
+  * @ops: PM operations to choose from.
+@@ -488,7 +544,7 @@ static int device_resume_noirq(struct device *dev, pm_message_t state, bool asyn
+ 	if (!dev->power.is_noirq_suspended)
+ 		goto Out;
  
+-	dpm_wait(dev->parent, async);
++	dpm_wait_for_superior(dev, async);
+ 
+ 	if (dev->pm_domain) {
+ 		info = "noirq power domain ";
+@@ -618,7 +674,7 @@ static int device_resume_early(struct device *dev, pm_message_t state, bool asyn
+ 	if (!dev->power.is_late_suspended)
+ 		goto Out;
+ 
+-	dpm_wait(dev->parent, async);
++	dpm_wait_for_superior(dev, async);
+ 
+ 	if (dev->pm_domain) {
+ 		info = "early power domain ";
+@@ -750,7 +806,7 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
+ 		goto Complete;
+ 	}
+ 
+-	dpm_wait(dev->parent, async);
++	dpm_wait_for_superior(dev, async);
+ 	dpm_watchdog_set(&wd, dev);
+ 	device_lock(dev);
+ 
+@@ -1038,7 +1094,7 @@ static int __device_suspend_noirq(struct device *dev, pm_message_t state, bool a
+ 	if (dev->power.syscore || dev->power.direct_complete)
+ 		goto Complete;
+ 
+-	dpm_wait_for_children(dev, async);
++	dpm_wait_for_subordinate(dev, async);
+ 
+ 	if (dev->pm_domain) {
+ 		info = "noirq power domain ";
+@@ -1185,7 +1241,7 @@ static int __device_suspend_late(struct device *dev, pm_message_t state, bool as
+ 	if (dev->power.syscore || dev->power.direct_complete)
+ 		goto Complete;
+ 
+-	dpm_wait_for_children(dev, async);
++	dpm_wait_for_subordinate(dev, async);
+ 
+ 	if (dev->pm_domain) {
+ 		info = "late power domain ";
+@@ -1358,7 +1414,7 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
+ 	TRACE_DEVICE(dev);
+ 	TRACE_SUSPEND(0);
+ 
+-	dpm_wait_for_children(dev, async);
++	dpm_wait_for_subordinate(dev, async);
+ 
+ 	if (async_error)
+ 		goto Complete;
 -- 
 1.9.1
