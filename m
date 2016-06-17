@@ -1,49 +1,23 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 17 Jun 2016 10:34:57 +0100
-Subject: [PATCH 2/2] arm64: hibernate: Don't hibernate on systems with stuck
- CPUs
-In-Reply-To: <1466156097-20028-1-git-send-email-james.morse@arm.com>
-References: <1466156097-20028-1-git-send-email-james.morse@arm.com>
-Message-ID: <1466156097-20028-3-git-send-email-james.morse@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 Jun 2016 02:39:45 -0700
+Subject: [PATCH] arm: omap1: fix ams-delta FIQ handler to work with
+ sparse IRQ
+In-Reply-To: <1466106990-9556-1-git-send-email-jmkrzyszt@gmail.com>
+References: <1466106990-9556-1-git-send-email-jmkrzyszt@gmail.com>
+Message-ID: <20160617093944.GB22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hibernate relies on cpu hotplug to prevent secondary cores executing
-the kernel text while it is being restored.
+* Janusz Krzysztofik <jmkrzyszt@gmail.com> [160616 13:00]:
+> After OMAP1 IRQ definitions have been changed by commit 685e2d08c54b
+> ("ARM: OMAP1: Change interrupt numbering for sparse IRQ") introduced
+> in v4.2, ams-delta FIQ handler which depends on them no longer works
+> as expected. Fix it.
 
-Add a call to cpus_are_stuck_in_kernel() to determine if there are
-CPUs not counted by 'num_online_cpus()', and prevent hibernate in this
-case.
+Applying into omap-for-v4.7/fixes thanks. Good to hear you got it
+working, I recall being a bit worried about what all I might break
+with the sparse IRQ conversion.. Sorry about that.
 
-Fixes: 82869ac57b5 ("arm64: kernel: Add support for hibernate/suspend-to-disk")
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/kernel/hibernate.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Regards,
 
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index f8df75d740f4..21ab5df9fa76 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -33,6 +33,7 @@
- #include <asm/pgtable.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/sections.h>
-+#include <asm/smp.h>
- #include <asm/suspend.h>
- #include <asm/virt.h>
- 
-@@ -236,6 +237,11 @@ int swsusp_arch_suspend(void)
- 	unsigned long flags;
- 	struct sleep_stack_data state;
- 
-+	if (cpus_are_stuck_in_kernel()) {
-+		pr_err("Can't hibernate: no mechanism to offline secondary CPUs.\n");
-+		return -EBUSY;
-+	}
-+
- 	local_dbg_save(flags);
- 
- 	if (__cpu_suspend_enter(&state)) {
--- 
-2.8.0.rc3
+Tony
