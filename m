@@ -1,9 +1,9 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 17 Jun 2016 16:14:12 +0100
-Subject: [PATCH 15/16] arm64: dts: msm8996: add sdc2 pinctrl
+Date: Fri, 17 Jun 2016 16:14:13 +0100
+Subject: [PATCH 15/16] arm64: dts: msm8996: add sdhci2 pinctrl
 In-Reply-To: <1466176454-28084-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1466176454-28084-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1466176454-28084-16-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1466176454-28084-17-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
