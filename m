@@ -1,28 +1,101 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 17 Jun 2016 09:20:42 +0200
-Subject: [PATCH 2/2] ARM: dts: r8a7792: add JPU support
-In-Reply-To: <2415204.YUO4drecC0@wasted.cogentembedded.com>
-References: <7346244.CEZI3u99oZ@wasted.cogentembedded.com>
- <2415204.YUO4drecC0@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdUgS1L2UHMeN4CDj_MJ4uYKB57xE5rMQDXp+WjRAi1adw@mail.gmail.com>
+From: garlic.tseng@mediatek.com (Garlic Tseng)
+Date: Fri, 17 Jun 2016 15:43:51 +0800
+Subject: [alsa-devel] [PATCH v5 0/9] ASoC: Mediatek: Add support for MT2701 SOC
+Message-ID: <1466149440-23889-1-git-send-email-garlic.tseng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 12:03 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Describe JPEG Processing Unit (JPU) in the R8A7792 device tree.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+This patch adds basic support for Mediatek AFE for MT2701 SoC.
+The patch is based on broonie tree "for-next" branch.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Change since v4:
 
-Gr{oetje,eeting}s,
+* remove SND_SOC_MEDIATEK config prompt
+* fix config prompt to meaningful one for SND_SOC_MT2701_CS42448
+* remove some unnecessary random space change
 
-                        Geert
+Change since v3:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+* fix comments style.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Change since v2:
+
+* fix comments style.
+* replace EXPORT_SYMBOL with EXPORT_SYMBOL_GPL
+* reduce debug message
+* move mutex lock for irq-allocated to AFE struct
+* remove func mtk_simple_isr and call snd_pcm_period_elapsed directly
+* mt2701 driver probe will fail if clock initial error
+* fix dapm on/off switch control naming
+
+Change since v1:
+
+implement common private structure, fe dai and platform driver.
+let mt8173 and mt2701 use the common structure.
+
+
+Garlic Tseng (9):
+  ASoC: mediatek: Refine mt8173 driver and change config option
+  ASoC: mediatek: implement mediatek common structure
+  ASoC: mediatek: let mt8173 use mediatek common structure
+  ASoC: mediatek: add documents for mt2701
+  ASoC: mediatek: add structure define and clock control for 2701
+  ASoC: mediatek: add mt2701 platform driver implementation.
+  ASoC: bt-sco: extend rate and add a general compatible string
+  ASoC: mediatek: add BT implementation
+  ASoC: mediatek: Add mt2701-cs42448 driver and config option.
+
+ Documentation/devicetree/bindings/sound/bt-sco.txt |    2 +-
+ .../devicetree/bindings/sound/mt2701-afe-pcm.txt   |  150 ++
+ .../devicetree/bindings/sound/mt2701-cs42448.txt   |   43 +
+ sound/soc/codecs/bt-sco.c                          |    5 +-
+ sound/soc/mediatek/Kconfig                         |   37 +-
+ sound/soc/mediatek/Makefile                        |   10 +-
+ sound/soc/mediatek/common/Makefile                 |   16 +
+ sound/soc/mediatek/common/mtk-afe-fe-dai.c         |  379 +++++
+ sound/soc/mediatek/common/mtk-afe-fe-dai.h         |   45 +
+ .../soc/mediatek/common/mtk-afe-platform-driver.c  |   90 ++
+ .../soc/mediatek/common/mtk-afe-platform-driver.h  |   23 +
+ sound/soc/mediatek/common/mtk-base-afe.h           |  104 ++
+ sound/soc/mediatek/mt2701/Makefile                 |   19 +
+ sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c  |  464 ++++++
+ sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h  |   38 +
+ sound/soc/mediatek/mt2701/mt2701-afe-common.h      |  181 +++
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c         | 1698 ++++++++++++++++++++
+ sound/soc/mediatek/mt2701/mt2701-cs42448.c         |  422 +++++
+ sound/soc/mediatek/mt2701/mt2701-reg.h             |  186 +++
+ sound/soc/mediatek/mt8173/Makefile                 |    7 +
+ sound/soc/mediatek/mt8173/mt8173-afe-common.h      |   73 +
+ .../{mtk-afe-pcm.c => mt8173/mt8173-afe-pcm.c}     |  921 +++++------
+ sound/soc/mediatek/{ => mt8173}/mt8173-max98090.c  |    2 +-
+ .../mediatek/{ => mt8173}/mt8173-rt5650-rt5514.c   |    2 +-
+ .../mediatek/{ => mt8173}/mt8173-rt5650-rt5676.c   |    4 +-
+ sound/soc/mediatek/{ => mt8173}/mt8173-rt5650.c    |    2 +-
+ sound/soc/mediatek/mtk-afe-common.h                |  101 --
+ 27 files changed, 4390 insertions(+), 634 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/mt2701-cs42448.txt
+ create mode 100644 sound/soc/mediatek/common/Makefile
+ create mode 100644 sound/soc/mediatek/common/mtk-afe-fe-dai.c
+ create mode 100644 sound/soc/mediatek/common/mtk-afe-fe-dai.h
+ create mode 100644 sound/soc/mediatek/common/mtk-afe-platform-driver.c
+ create mode 100644 sound/soc/mediatek/common/mtk-afe-platform-driver.h
+ create mode 100644 sound/soc/mediatek/common/mtk-base-afe.h
+ create mode 100644 sound/soc/mediatek/mt2701/Makefile
+ create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
+ create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h
+ create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-common.h
+ create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+ create mode 100644 sound/soc/mediatek/mt2701/mt2701-cs42448.c
+ create mode 100644 sound/soc/mediatek/mt2701/mt2701-reg.h
+ create mode 100644 sound/soc/mediatek/mt8173/Makefile
+ create mode 100644 sound/soc/mediatek/mt8173/mt8173-afe-common.h
+ rename sound/soc/mediatek/{mtk-afe-pcm.c => mt8173/mt8173-afe-pcm.c} (51%)
+ rename sound/soc/mediatek/{ => mt8173}/mt8173-max98090.c (99%)
+ rename sound/soc/mediatek/{ => mt8173}/mt8173-rt5650-rt5514.c (99%)
+ rename sound/soc/mediatek/{ => mt8173}/mt8173-rt5650-rt5676.c (99%)
+ rename sound/soc/mediatek/{ => mt8173}/mt8173-rt5650.c (99%)
+ delete mode 100644 sound/soc/mediatek/mtk-afe-common.h
+
+-- 
+1.9.1
