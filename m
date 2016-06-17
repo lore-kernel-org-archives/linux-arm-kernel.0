@@ -1,45 +1,61 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 17 Jun 2016 16:14:07 +0100
-Subject: [PATCH 10/16] arm64: dts: msm8996: add support to blsp2_i2c0
+Date: Fri, 17 Jun 2016 16:14:10 +0100
+Subject: [PATCH 13/16] arm64: dts: msm8996: add support to blsp2_spi5 pinctrl
 In-Reply-To: <1466176454-28084-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1466176454-28084-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1466176454-28084-11-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1466176454-28084-14-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to blsp2_i2c0, which is used on some of the
-APQ8096 based boards.
+This patch adds pinctrl required for blsp2_spi5 device.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8996-pins.dtsi | 34 ++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index ef3c370..675888f 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -151,6 +151,21 @@
- 			reg = <0x300000 0x90000>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
+index 9fd37a0..551707a 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
+@@ -218,4 +218,38 @@
+ 			bias-disable;
  		};
- 
-+		blsp2_i2c0: i2c at 075b5000 {
-+			compatible = "qcom,i2c-qup-v2.2.1";
-+			reg = <0x075b5000 0x1000>;
-+			interrupts = <GIC_SPI 101 0>;
-+			clocks = <&gcc GCC_BLSP2_AHB_CLK>,
-+				<&gcc GCC_BLSP2_QUP1_I2C_APPS_CLK>;
-+			clock-names = "iface", "core";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&blsp2_i2c0_default>;
-+			pinctrl-1 = <&blsp2_i2c0_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
+ 	};
 +
- 		blsp2_uart1: serial at 75b0000 {
- 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
- 			reg = <0x75b0000 0x1000>;
++	blsp2_spi5_default: blsp2_spi5_default {
++		pinmux {
++			function = "blsp_spi12";
++			pins = "gpio85", "gpio86", "gpio88";
++		};
++		pinmux_cs {
++			function = "gpio";
++			pins = "gpio87";
++		};
++		pinconf {
++			pins = "gpio85", "gpio86", "gpio88";
++			drive-strength = <12>;
++			bias-disable;
++		};
++		pinconf_cs {
++			pins = "gpio87";
++			drive-strength = <16>;
++			bias-disable;
++			output-high;
++		};
++	};
++
++	blsp2_spi5_sleep: blsp2_spi5_sleep {
++		pinmux {
++			function = "gpio";
++			pins = "gpio85", "gpio86", "gpio87", "gpio88";
++		};
++		pinconf {
++			pins = "gpio85", "gpio86", "gpio87", "gpio88";
++			drive-strength = <2>;
++			bias-pull-down;
++		};
++	};
+ };
 -- 
 2.7.4
