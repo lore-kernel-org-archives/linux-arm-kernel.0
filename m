@@ -1,58 +1,50 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 17 Jun 2016 16:34:18 +0100
-Subject: [PATCH] ARM: at91: fix warnings in pm.c
-Message-ID: <1466177658-26179-1-git-send-email-ben.dooks@codethink.co.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 17 Jun 2016 08:37:15 -0700
+Subject: [PATCH v2 0/11] Changes to support 150 MHz eMMC on rk3399
+In-Reply-To: <5763EF68.1040307@ti.com>
+References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
+ <5763EF68.1040307@ti.com>
+Message-ID: <CAD=FV=XK=YTyj=yfZ2bXq-W2OeEFi+h3X0SypXmLqVaEmNf5bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a pair of missing statics on un-exported functions and
-include <linux/platform_data/atmel.h> to provide the declaration
-of at91_suspend_entering_slow_clock() to fix the following
-sparse warnings:
+Kishon,
 
-arch/arm/mach-at91/pm.c:127:5: warning: symbol 'at91_suspend_entering_slow_clock' was not declared. Should it be static?
-arch/arm/mach-at91/pm.c:358:6: warning: symbol 'at91rm9200_idle' was not declared. Should it be static?
-arch/arm/mach-at91/pm.c:367:6: warning: symbol 'at91sam9_idle' was not declared. Should it be static?
+On Fri, Jun 17, 2016 at 5:39 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Tuesday 14 June 2016 04:34 AM, Douglas Anderson wrote:
+>> The theme of this series of patches is to try to allow running the eMMC
+>> at 150 MHz on the rk3399 SoC, though the changes should still be correct
+>> and have merit on their own.  The motivation for running at 150 MHz is
+>> that doing so improves signal integrity and (with some eMMC devices)
+>> doesn't affect throughput.
+>>
+>> These patches have been structured to keep things as separate as
+>> possible, but nevertheless there are still some dependencies between
+>> patches.  It probably makes the most sense for all of the non-device
+>> tree patches to go through a single tree.  If others agree, perhaps the
+>> most sane would be to get Acks from PHY maintainers and then to land the
+>> patches in the MMC tree.  Device tree patches should be able to be
+>> landed separately and the worst what would happen is a warning in the
+>> kernel log if you have the code without the device tree.
+>>
+>> The code patches are based on Ulf's mmc-next, then 4 patches that are
+>> outstanding / ready to land.  Specifically:
+>> - https://patchwork.kernel.org/patch/9086501/
+>>   phy: rockchip-emmc: give DLL some extra time to be ready
+>> - https://patchwork.kernel.org/patch/9093681/
+>>   phy: rockchip-emmc: configure frequency range and drive impedance
+>> - https://patchwork.kernel.org/patch/9086511/
+>>   phy: rockchip-emmc: configure default output tap delay
+>> - https://patchwork.kernel.org/patch/9086531/
+>>   phy: rockchip-emmc: reindent the register definitions
+>
+> Do you want all these "phy: rockchip-emmc:" along with the patch in this series
+> to go in MMC tree? Or I can take all the phy part in my linux-phy -next branch?
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/mach-at91/pm.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+If Ulf is amenable, I was hoping that these could all go through the
+MMC tree with your blessing.  ...then "dts" patches would go through
+Heiko's tree.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index f062701..b4332b7 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -22,6 +22,7 @@
- #include <linux/of_platform.h>
- #include <linux/of_address.h>
- #include <linux/platform_device.h>
-+#include <linux/platform_data/atmel.h>
- #include <linux/io.h>
- #include <linux/clk/at91_pmc.h>
- 
-@@ -355,7 +356,7 @@ static __init void at91_dt_ramc(void)
- 	at91_pm_set_standby(standby);
- }
- 
--void at91rm9200_idle(void)
-+static void at91rm9200_idle(void)
- {
- 	/*
- 	 * Disable the processor clock.  The processor will be automatically
-@@ -364,7 +365,7 @@ void at91rm9200_idle(void)
- 	writel(AT91_PMC_PCK, pmc + AT91_PMC_SCDR);
- }
- 
--void at91sam9_idle(void)
-+static void at91sam9_idle(void)
- {
- 	writel(AT91_PMC_PCK, pmc + AT91_PMC_SCDR);
- 	cpu_do_idle();
--- 
-2.8.1
+-Doug
