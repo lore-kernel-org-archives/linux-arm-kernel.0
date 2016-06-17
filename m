@@ -1,57 +1,109 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 17 Jun 2016 18:54:16 +0530
-Subject: [PATCH] phy: phy-sun4i-usb: Fix optional gpios failing probe
-In-Reply-To: <1465818348-29499-1-git-send-email-quentin.schulz@free-electrons.com>
-References: <1465818348-29499-1-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <5763FA00.8030205@ti.com>
+Date: Fri, 17 Jun 2016 18:55:52 +0530
+Subject: [PATCH] phy-sun4i-usb: fix missing __iomem *
+In-Reply-To: <651219bb-fbab-18f8-fe89-bacd86c15e0d@redhat.com>
+References: <1465319696-1275-1-git-send-email-ben.dooks@codethink.co.uk>
+ <651219bb-fbab-18f8-fe89-bacd86c15e0d@redhat.com>
+Message-ID: <5763FA60.1010900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Monday 13 June 2016 05:15 PM, Quentin Schulz wrote:
-> The interrupt 0 is not a valid interrupt number. In the event where the
-> retrieval of the vbus-det gpio would return null, the gpiod_to_irq
-> callback would return 0, while the current code makes the assumption
-> that it is a valid interrupt, and would go on calling request_irq.
-> Obviously, this would fail, preventing the driver from probing properly,
-> while the vbus and id gpios are optional.
+On Wednesday 08 June 2016 03:39 PM, Hans de Goede wrote:
+> Hi,
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> On 07-06-16 19:14, Ben Dooks wrote:
+>> Fix the missing __iomem attribute in sun4i_usb_phy_write()
+>> function. This fixes the following sparse warnings:
+>>
+>> drivers/phy/phy-sun4i-usb.c:178:39: warning: incorrect type in initializer
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:178:39:    expected void *phyctl
+>> drivers/phy/phy-sun4i-usb.c:178:39:    got void [noderef] <asn:2>*
+>> drivers/phy/phy-sun4i-usb.c:185:17: warning: incorrect type in argument 2
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:185:17:    expected void volatile [noderef]
+>> <asn:2>*addr
+>> drivers/phy/phy-sun4i-usb.c:185:17:    got void *phyctl
+>> drivers/phy/phy-sun4i-usb.c:189:24: warning: incorrect type in argument 1
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:189:24:    expected void const volatile [noderef]
+>> <asn:2>*addr
+>> drivers/phy/phy-sun4i-usb.c:189:24:    got void *phyctl
+>> drivers/phy/phy-sun4i-usb.c:196:17: warning: incorrect type in argument 2
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:196:17:    expected void volatile [noderef]
+>> <asn:2>*addr
+>> drivers/phy/phy-sun4i-usb.c:196:17:    got void *phyctl
+>> drivers/phy/phy-sun4i-usb.c:199:24: warning: incorrect type in argument 1
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:199:24:    expected void const volatile [noderef]
+>> <asn:2>*addr
+>> drivers/phy/phy-sun4i-usb.c:199:24:    got void *phyctl
+>> drivers/phy/phy-sun4i-usb.c:205:17: warning: incorrect type in argument 2
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:205:17:    expected void volatile [noderef]
+>> <asn:2>*addr
+>> drivers/phy/phy-sun4i-usb.c:205:17:    got void *phyctl
+>> drivers/phy/phy-sun4i-usb.c:208:24: warning: incorrect type in argument 1
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:208:24:    expected void const volatile [noderef]
+>> <asn:2>*addr
+>> drivers/phy/phy-sun4i-usb.c:208:24:    got void *phyctl
+>> drivers/phy/phy-sun4i-usb.c:210:17: warning: incorrect type in argument 2
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:210:17:    expected void volatile [noderef]
+>> <asn:2>*addr
+>> drivers/phy/phy-sun4i-usb.c:210:17:    got void *phyctl
+>> drivers/phy/phy-sun4i-usb.c:212:24: warning: incorrect type in argument 1
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:212:24:    expected void const volatile [noderef]
+>> <asn:2>*addr
+>> drivers/phy/phy-sun4i-usb.c:212:24:    got void *phyctl
+>> drivers/phy/phy-sun4i-usb.c:214:17: warning: incorrect type in argument 2
+>> (different address spaces)
+>> drivers/phy/phy-sun4i-usb.c:214:17:    expected void volatile [noderef]
+>> <asn:2>*addr
+>> drivers/phy/phy-sun4i-usb.c:214:17:    got void *phyctl
+>>
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> 
+> Thanks for catching this:
+> 
+> Acked-by: Hans de Goede <hdegoede@redhat.com>
 
 applied, thanks.
 
 -Kishon
-> ---
->  drivers/phy/phy-sun4i-usb.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index bae54f7..45f01d6 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -645,11 +645,11 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  
->  	data->id_det_irq = gpiod_to_irq(data->id_det_gpio);
->  	data->vbus_det_irq = gpiod_to_irq(data->vbus_det_gpio);
-> -	if ((data->id_det_gpio && data->id_det_irq < 0) ||
-> -	    (data->vbus_det_gpio && data->vbus_det_irq < 0))
-> +	if ((data->id_det_gpio && data->id_det_irq <= 0) ||
-> +	    (data->vbus_det_gpio && data->vbus_det_irq <= 0))
->  		data->phy0_poll = true;
->  
-> -	if (data->id_det_irq >= 0) {
-> +	if (data->id_det_irq > 0) {
->  		ret = devm_request_irq(dev, data->id_det_irq,
->  				sun4i_usb_phy0_id_vbus_det_irq,
->  				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-> @@ -660,7 +660,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> -	if (data->vbus_det_irq >= 0) {
-> +	if (data->vbus_det_irq > 0) {
->  		ret = devm_request_irq(dev, data->vbus_det_irq,
->  				sun4i_usb_phy0_id_vbus_det_irq,
->  				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> Regards,
 > 
+> Hans
+> 
+> 
+>> ---
+>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Cc: Chen-Yu Tsai <wens@csie.org>
+>> Cc: Hans de Goede <hdegoede@redhat.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>>  drivers/phy/phy-sun4i-usb.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>> index bae54f7..9de9991 100644
+>> --- a/drivers/phy/phy-sun4i-usb.c
+>> +++ b/drivers/phy/phy-sun4i-usb.c
+>> @@ -175,7 +175,7 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy
+>> *phy, u32 addr, u32 data,
+>>  {
+>>      struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
+>>      u32 temp, usbc_bit = BIT(phy->index * 2);
+>> -    void *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
+>> +    void __iomem *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
+>>      int i;
+>>
+>>      mutex_lock(&phy_data->mutex);
+>>
