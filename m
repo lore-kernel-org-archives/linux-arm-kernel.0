@@ -1,59 +1,55 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 17 Jun 2016 16:05:33 -0700
-Subject: [PATCH 01/20] clk: fixed-factor: Pass clk rates change to the
- parent
-In-Reply-To: <1463402840-17062-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160617230533.27203.82622@quark.deferred.io>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 17 Jun 2016 18:24:57 -0500
+Subject: [PATCH v8 0/4] ACPI: parse the SPCR table
+In-Reply-To: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAOZdJXVMZCFtppMOdruD9sY_EzkATv9XWBqi_NqZ-p2zEo8+2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2016-05-16 05:47:01)
-> A fixed factor clock, if it needs to change its rate, by definition do not
-> have any choice but to modify its parent rate.
+On Fri, May 20, 2016 at 8:03 AM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port Console
+> Redirection Table) [2] as a mandatory ACPI table that specifies the
+> configuration of serial console.
+>
+> Move "earlycon" early_param handling to earlycon.c to parse this option once
+>
+> Parse SPCR table, setup earlycon and register specified console.
+>
+> Enable parsing this table on ARM64.  Earlycon should be set up as early as
+> possible.  ACPI boot tables are mapped in
+> arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch() and
+> that's where we parse spcr.  So it has to be opted-in per-arch. When
+> ACPI_SPCR_TABLE is defined initialization of DT earlycon is deferred until the
+> DT/ACPI decision is done.
+>
+> Implement console_match() for pl011.
+>
+> Based on the work by Leif Lindholm [3]
+> Thanks to Peter Hurley for explaining how this should work.
+>
+> Should be applied to next-20160520
+> Tested on QEMU and ThunderX.
+> SPCR support is included in QEMU's ARM64 mach-virt since 2.4 release.
+>
+> v8:
+> - rebase to next-20160520
+> - remove the patch "ACPICA: Headers: Add new constants for the DBG2 ACPI table"
+>   as it have got to linux-next
+> - add Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Reviewed-by:
+>   Peter Hurley <peter@hurleysoftware.com> (but see below)
+> - fix the patch "serial: pl011: add console matching function".  The patch by
+>   Christopher Covington [4] specifies that SBSA uart does 32-bit access to
+>   registers and this breaks the match function.  In this series the function
+>   was changed to match when SPCR specifies both mmio32 and mmio access.
+>   I removed Acked-by: Greg from this patch because of these changes.
 
-Logically it makes sense to always propagate the rate-change request up
-to the parent for a fixed-factor clock if we desire to change its rate.
-However, I wonder if doing this for all users of fixed-factor-clock in
-DT is safe? Some users may be counting on it not changing.
+All four patches:
 
-There are 397 instances of fixed-factor-clock in .dts[i] today, so this
-change worries me a bit.
+Tested-by: Timur Tabi <timur@codeaurora.org>
 
-> 
-> Add the CLK_SET_RATE_PARENT flag to that clock so that it can happen
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/clk-fixed-factor.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> index 75cd6c792cb8..3363abd9b4ae 100644
-> --- a/drivers/clk/clk-fixed-factor.c
-> +++ b/drivers/clk/clk-fixed-factor.c
-> @@ -167,7 +167,8 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
->         of_property_read_string(node, "clock-output-names", &clk_name);
->         parent_name = of_clk_get_parent_name(node, 0);
->  
-> -       clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
-> +       clk = clk_register_fixed_factor(NULL, clk_name, parent_name,
-> +                                       CLK_SET_RATE_PARENT,
-
-An alternative would be to pass in the flags you want, somehow. For the
-clock you are trying to fix, is it inside of the SoC or external? If it
-is internal, and part of a larger clock controller driver, is this for
-the legacy style allwinner clock drivers that put everything in DT? If
-not, it would better to initialize it statically and shove this flag
-into the struct clk_init_data storage.
-
-Regards,
-Mike
-
->                                         mult, div);
->         if (!IS_ERR(clk))
->                 of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> -- 
-> 2.8.2
-> 
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
