@@ -1,44 +1,87 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 17 Jun 2016 12:31:23 +0200
-Subject: [PATCH 1/2] ARM: qcom: Add support for MDM9615
+Date: Fri, 17 Jun 2016 12:31:24 +0200
+Subject: [PATCH 2/2] ARM: configs: qualcomm: Add MDM9615 missing defconfigs
 In-Reply-To: <1466159484-21858-1-git-send-email-narmstrong@baylibre.com>
 References: <1466159484-21858-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1466159484-21858-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1466159484-21858-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Qualcomm MDM9615 in Kconfig and in DT match list.
-
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/mach-qcom/Kconfig | 4 ++++
- arch/arm/mach-qcom/board.c | 1 +
- 2 files changed, 5 insertions(+)
+ arch/arm/configs/qcom_defconfig | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-index 7349450..46ed10a 100644
---- a/arch/arm/mach-qcom/Kconfig
-+++ b/arch/arm/mach-qcom/Kconfig
-@@ -23,4 +23,8 @@ config ARCH_MSM8974
- 	bool "Enable support for MSM8974"
- 	select HAVE_ARM_ARCH_TIMER
- 
-+config ARCH_MDM9615
-+	bool "Enable support for MDM9615"
-+	select CLKSRC_QCOM
-+
- endif
-diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
-index 6d8bbf7..d8060df 100644
---- a/arch/arm/mach-qcom/board.c
-+++ b/arch/arm/mach-qcom/board.c
-@@ -22,6 +22,7 @@ static const char * const qcom_dt_match[] __initconst = {
- 	"qcom,ipq8064",
- 	"qcom,msm8660-surf",
- 	"qcom,msm8960-cdp",
-+	"qcom,mdm9615",
- 	NULL
- };
- 
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 7bff7bf..0a357f2 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -23,6 +23,7 @@ CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_MSM8X60=y
+ CONFIG_ARCH_MSM8960=y
+ CONFIG_ARCH_MSM8974=y
++CONFIG_ARCH_MDM9615=y
+ CONFIG_SMP=y
+ CONFIG_HAVE_ARM_ARCH_TIMER=y
+ CONFIG_PREEMPT=y
+@@ -94,6 +95,7 @@ CONFIG_SERIO_LIBPS2=y
+ CONFIG_SERIAL_MSM=y
+ CONFIG_SERIAL_MSM_CONSOLE=y
+ CONFIG_HW_RANDOM=y
++CONFIG_HW_RANDOM_MSM=y
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_QUP=y
+@@ -104,6 +106,7 @@ CONFIG_PINCTRL_APQ8064=y
+ CONFIG_PINCTRL_APQ8084=y
+ CONFIG_PINCTRL_IPQ8064=y
+ CONFIG_PINCTRL_MSM8960=y
++CONFIG_PINCTRL_MDM9615=y
+ CONFIG_PINCTRL_MSM8X74=y
+ CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+ CONFIG_PINCTRL_QCOM_SSBI_PMIC=y
+@@ -114,6 +117,7 @@ CONFIG_CHARGER_QCOM_SMBB=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_MSM=y
+ CONFIG_THERMAL=y
++CONFIG_MFD_PM8XXX=y
+ CONFIG_MFD_PM8921_CORE=y
+ CONFIG_MFD_QCOM_RPM=y
+ CONFIG_MFD_SPMI_PMIC=y
+@@ -132,17 +136,25 @@ CONFIG_SND_DYNAMIC_MINORS=y
+ CONFIG_SND_SOC=y
+ CONFIG_HID_BATTERY_STRENGTH=y
+ CONFIG_USB=y
++CONFIG_USB_PHY=y
+ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+ CONFIG_USB_MON=y
+ CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_MSM=y
+ CONFIG_USB_ACM=y
+ CONFIG_USB_SERIAL=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_GADGET_DEBUG_FILES=y
+ CONFIG_USB_GADGET_VBUS_DRAW=500
++CONFIG_USB_CHIPIDEA=y
++CONFIG_USB_CHIPIDEA_OF=y
++CONFIG_USB_MSM_OTG=y
++CONFIG_USB_QCOM_HSIC_PHY=y
++CONFIG_USB_CHIPIDEA_UDC=y
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=32
+ CONFIG_MMC_ARMMMCI=y
++CONFIG_MMC_QCOM_DML=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_MSM=y
+@@ -156,6 +168,8 @@ CONFIG_APQ_MMCC_8084=y
+ CONFIG_IPQ_LCC_806X=y
+ CONFIG_MSM_GCC_8660=y
+ CONFIG_MSM_LCC_8960=y
++CONFIG_MSM_GCC_9615=y
++CONFIG_MSM_LCC_9615=y
+ CONFIG_MSM_MMCC_8960=y
+ CONFIG_MSM_MMCC_8974=y
+ CONFIG_HWSPINLOCK_QCOM=y
 -- 
 1.9.1
