@@ -1,31 +1,63 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 17 Jun 2016 16:29:40 +0200
-Subject: [PATCH 0/4] pwm: Add Amlogic Meson SoC PWM Controller
-Message-ID: <1466173784-15625-1-git-send-email-narmstrong@baylibre.com>
+Date: Fri, 17 Jun 2016 16:29:43 +0200
+Subject: [PATCH 3/4] ARM64: dts: meson-gxbb: Add Meson GXBB PWM Controller
+ nodes
+In-Reply-To: <1466173784-15625-1-git-send-email-narmstrong@baylibre.com>
+References: <1466173784-15625-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1466173784-15625-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the PWM controller found in Amlogic Meson SoCs.
-This controller provides a dual PWM output with 4 selectable clock source
-and a two level divider to achieve a better PWM range.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Currently Meson8b and GXBB SoCs are supported.
-
-Neil Armstrong (4):
-  pwm: Add support for Meson PWM Controller
-  dt-bindings: pwm: Add bindings for Meson PWM Controller
-  ARM64: dts: meson-gxbb: Add Meson GXBB PWM Controller nodes
-  ARM: dts: meson8b: Add Meson8b PWM Controller nodes
-
- .../devicetree/bindings/pwm/pwm-meson.txt          |  21 +
- arch/arm/boot/dts/meson8b.dtsi                     |  21 +
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  28 ++
- drivers/pwm/Kconfig                                |   9 +
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/pwm-meson.c                            | 492 +++++++++++++++++++++
- 6 files changed, 572 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-meson.txt
- create mode 100644 drivers/pwm/pwm-meson.c
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 806b903..2eacef0 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -153,6 +153,27 @@
+ 				status = "disabled";
+ 			};
+ 
++			pwm_ab: pwm at 8550 {
++				compatible = "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x08550 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
++
++			pwm_cd: pwm at 8650 {
++				compatible = "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x08650 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
++
++			pwm_ef: pwm at 86c0 {
++				compatible = "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x086c0 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
++
+ 			uart_C: serial at 8700 {
+ 				compatible = "amlogic,meson-uart";
+ 				reg = <0x0 0x8700 0x0 0x14>;
+@@ -212,6 +233,13 @@
+ 				clocks = <&xtal>;
+ 				status = "disabled";
+ 			};
++
++			pwm_ab_AO: pwm at 550 {
++				compatible = "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x0550 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		periphs: periphs at c8834000 {
 -- 
 2.7.0
