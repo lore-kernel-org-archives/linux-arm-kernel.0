@@ -1,180 +1,428 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Fri, 17 Jun 2016 13:24:05 +0200
-Subject: [PATCH v2 06/10] crypto: marvell: Add a complete operation for async
- requests
+Date: Fri, 17 Jun 2016 13:24:07 +0200
+Subject: [PATCH v2 08/10] crypto: marvell: Add load balancing between engines
 In-Reply-To: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
 References: <1466162649-29911-1-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <1466162649-29911-7-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <1466162649-29911-9-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, the 'process' operation was used to check if the current request
-was correctly handled by the engine, if it was the case it copied
-information from the SRAM to the main memory. Now, we split this
-operation. We keep the 'process' operation, which still checks if the
-request was correctly handled by the engine or not, then we add a new
-operation for completion. The 'complete' method copies the content of
-the SRAM to memory. This will soon become useful if we want to call
-the process and the complete operations from different locations
-depending on the type of the request (different cleanup logic).
+This commits adds support for fine grained load balancing on
+multi-engine IPs. The engine is pre-selected based on its current load
+and on the weight of the crypto request that is about to be processed.
+The global crypto queue is also moved to each engine. These changes are
+required to allow chaining crypto requests at the DMA level. By using
+a crypto queue per engine, we make sure that we keep the state of the
+tdma chain synchronized with the crypto queue. We also reduce contention
+on 'cesa_dev->lock' and improve parallelism.
 
 Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 ---
 
 Changes in v2:
 
-  - Removed useless cosmetic change added for checkpatch (which
-    had nothing to do with the patch itself)
-  - Removed duplicated initialization of 'ivsize'
-    mv_cesa_ablkcipher_complete.
-  - Replace memcpy_fromio by memcpy in mv_cesa_ablkcipher_complete
+  - Reworded the commit message
+  - Moved the code about SRAM I/O operations from this commit to
+    a separated commit (see PATCH 07/10).
 
- drivers/crypto/marvell/cesa.c   |  1 +
- drivers/crypto/marvell/cesa.h   |  3 +++
- drivers/crypto/marvell/cipher.c | 28 +++++++++++++++++++++++-----
- drivers/crypto/marvell/hash.c   | 22 ++++++++++++----------
- 4 files changed, 39 insertions(+), 15 deletions(-)
+ drivers/crypto/marvell/cesa.c   | 30 ++++++++++------------
+ drivers/crypto/marvell/cesa.h   | 29 +++++++++++++++++----
+ drivers/crypto/marvell/cipher.c | 57 ++++++++++++++++++-----------------------
+ drivers/crypto/marvell/hash.c   | 50 ++++++++++++++----------------------
+ 4 files changed, 82 insertions(+), 84 deletions(-)
 
 diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-index fe04d1b..af96426 100644
+index af96426..f9e6688 100644
 --- a/drivers/crypto/marvell/cesa.c
 +++ b/drivers/crypto/marvell/cesa.c
-@@ -98,6 +98,7 @@ static irqreturn_t mv_cesa_int(int irq, void *priv)
- 				engine->req = NULL;
- 				mv_cesa_dequeue_req_unlocked(engine);
- 				spin_unlock_bh(&engine->lock);
-+				ctx->ops->complete(req);
- 				ctx->ops->cleanup(req);
- 				local_bh_disable();
- 				req->complete(req, res);
+@@ -45,11 +45,9 @@ static void mv_cesa_dequeue_req_unlocked(struct mv_cesa_engine *engine)
+ 	struct crypto_async_request *req, *backlog;
+ 	struct mv_cesa_ctx *ctx;
+ 
+-	spin_lock_bh(&cesa_dev->lock);
+-	backlog = crypto_get_backlog(&cesa_dev->queue);
+-	req = crypto_dequeue_request(&cesa_dev->queue);
++	backlog = crypto_get_backlog(&engine->queue);
++	req = crypto_dequeue_request(&engine->queue);
+ 	engine->req = req;
+-	spin_unlock_bh(&cesa_dev->lock);
+ 
+ 	if (!req)
+ 		return;
+@@ -58,7 +56,6 @@ static void mv_cesa_dequeue_req_unlocked(struct mv_cesa_engine *engine)
+ 		backlog->complete(backlog, -EINPROGRESS);
+ 
+ 	ctx = crypto_tfm_ctx(req->tfm);
+-	ctx->ops->prepare(req, engine);
+ 	ctx->ops->step(req);
+ }
+ 
+@@ -116,21 +113,19 @@ int mv_cesa_queue_req(struct crypto_async_request *req,
+ 		      struct mv_cesa_req *creq)
+ {
+ 	int ret;
+-	int i;
++	struct mv_cesa_engine *engine = creq->engine;
+ 
+-	spin_lock_bh(&cesa_dev->lock);
+-	ret = crypto_enqueue_request(&cesa_dev->queue, req);
+-	spin_unlock_bh(&cesa_dev->lock);
++	spin_lock_bh(&engine->lock);
++	ret = crypto_enqueue_request(&engine->queue, req);
++	spin_unlock_bh(&engine->lock);
+ 
+ 	if (ret != -EINPROGRESS)
+ 		return ret;
+ 
+-	for (i = 0; i < cesa_dev->caps->nengines; i++) {
+-		spin_lock_bh(&cesa_dev->engines[i].lock);
+-		if (!cesa_dev->engines[i].req)
+-			mv_cesa_dequeue_req_unlocked(&cesa_dev->engines[i]);
+-		spin_unlock_bh(&cesa_dev->engines[i].lock);
+-	}
++	spin_lock_bh(&engine->lock);
++	if (!engine->req)
++		mv_cesa_dequeue_req_unlocked(engine);
++	spin_unlock_bh(&engine->lock);
+ 
+ 	return -EINPROGRESS;
+ }
+@@ -425,7 +420,7 @@ static int mv_cesa_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	spin_lock_init(&cesa->lock);
+-	crypto_init_queue(&cesa->queue, CESA_CRYPTO_DEFAULT_MAX_QLEN);
++
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
+ 	cesa->regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(cesa->regs))
+@@ -498,6 +493,9 @@ static int mv_cesa_probe(struct platform_device *pdev)
+ 						engine);
+ 		if (ret)
+ 			goto err_cleanup;
++
++		crypto_init_queue(&engine->queue, CESA_CRYPTO_DEFAULT_MAX_QLEN);
++		atomic_set(&engine->load, 0);
+ 	}
+ 
+ 	cesa_dev = cesa;
 diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
-index e67e3f1..c463528 100644
+index c463528..644be35 100644
 --- a/drivers/crypto/marvell/cesa.h
 +++ b/drivers/crypto/marvell/cesa.h
-@@ -456,6 +456,8 @@ struct mv_cesa_engine {
-  *		code)
-  * @step:	launch the crypto operation on the next chunk
-  * @cleanup:	cleanup the crypto request (release associated data)
-+ * @complete:	complete the request, i.e copy result from sram or contexts
-+ * 		when it is needed.
+@@ -400,7 +400,6 @@ struct mv_cesa_dev_dma {
+  * @regs:	device registers
+  * @sram_size:	usable SRAM size
+  * @lock:	device lock
+- * @queue:	crypto request queue
+  * @engines:	array of engines
+  * @dma:	dma pools
+  *
+@@ -412,7 +411,6 @@ struct mv_cesa_dev {
+ 	struct device *dev;
+ 	unsigned int sram_size;
+ 	spinlock_t lock;
+-	struct crypto_queue queue;
+ 	struct mv_cesa_engine *engines;
+ 	struct mv_cesa_dev_dma *dma;
+ };
+@@ -431,6 +429,8 @@ struct mv_cesa_dev {
+  * @int_mask:		interrupt mask cache
+  * @pool:		memory pool pointing to the memory region reserved in
+  *			SRAM
++ * @queue:		fifo of the pending crypto requests
++ * @load:		engine load counter, useful for load balancing
+  *
+  * Structure storing CESA engine information.
   */
- struct mv_cesa_req_ops {
- 	void (*prepare)(struct crypto_async_request *req,
-@@ -463,6 +465,7 @@ struct mv_cesa_req_ops {
- 	int (*process)(struct crypto_async_request *req, u32 status);
- 	void (*step)(struct crypto_async_request *req);
- 	void (*cleanup)(struct crypto_async_request *req);
-+	void (*complete)(struct crypto_async_request *req);
+@@ -446,11 +446,12 @@ struct mv_cesa_engine {
+ 	size_t max_req_len;
+ 	u32 int_mask;
+ 	struct gen_pool *pool;
++	struct crypto_queue queue;
++	atomic_t load;
  };
  
  /**
-diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
-index ffe0f4a..175ce76 100644
---- a/drivers/crypto/marvell/cipher.c
-+++ b/drivers/crypto/marvell/cipher.c
-@@ -118,7 +118,6 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
- 	struct mv_cesa_ablkcipher_std_req *sreq = &creq->std;
- 	struct mv_cesa_engine *engine = creq->base.engine;
- 	size_t len;
--	unsigned int ivsize;
+  * struct mv_cesa_req_ops - CESA request operations
+- * @prepare:	prepare a request to be executed on the specified engine
+  * @process:	process a request chunk result (should return 0 if the
+  *		operation, -EINPROGRESS if it needs more steps or an error
+  *		code)
+@@ -460,8 +461,6 @@ struct mv_cesa_engine {
+  * 		when it is needed.
+  */
+ struct mv_cesa_req_ops {
+-	void (*prepare)(struct crypto_async_request *req,
+-			struct mv_cesa_engine *engine);
+ 	int (*process)(struct crypto_async_request *req, u32 status);
+ 	void (*step)(struct crypto_async_request *req);
+ 	void (*cleanup)(struct crypto_async_request *req);
+@@ -690,6 +689,26 @@ static inline bool mv_cesa_mac_op_is_first_frag(const struct mv_cesa_op_ctx *op)
+ int mv_cesa_queue_req(struct crypto_async_request *req,
+ 		      struct mv_cesa_req *creq);
  
- 	len = sg_pcopy_from_buffer(req->dst, creq->dst_nents,
- 				   engine->sram + CESA_SA_DATA_SRAM_OFFSET,
-@@ -128,10 +127,6 @@ static int mv_cesa_ablkcipher_std_process(struct ablkcipher_request *req,
- 	if (sreq->offset < req->nbytes)
- 		return -EINPROGRESS;
- 
--	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(req));
--	memcpy_fromio(req->info,
--		      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET, ivsize);
--
- 	return 0;
- }
- 
-@@ -211,11 +206,34 @@ mv_cesa_ablkcipher_req_cleanup(struct crypto_async_request *req)
- 	mv_cesa_ablkcipher_cleanup(ablkreq);
- }
- 
-+static void
-+mv_cesa_ablkcipher_complete(struct crypto_async_request *req)
++static inline struct mv_cesa_engine *mv_cesa_select_engine(int weight)
 +{
-+	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
-+	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(ablkreq);
-+	struct mv_cesa_engine *engine = creq->base.engine;
-+	unsigned int ivsize;
++	int i;
++	u32 min_load = U32_MAX;
++	struct mv_cesa_engine *selected = NULL;
 +
-+	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq));
-+
-+	if (mv_cesa_req_get_type(&creq->base) == CESA_DMA_REQ) {
-+		struct mv_cesa_req *basereq;
-+
-+		basereq = &creq->base;
-+		memcpy(ablkreq->info, basereq->chain.last->data, ivsize);
-+	} else {
-+		memcpy_fromio(ablkreq->info,
-+			      engine->sram + CESA_SA_CRYPT_IV_SRAM_OFFSET,
-+			      ivsize);
++	for (i = 0; i < cesa_dev->caps->nengines; i++) {
++		struct mv_cesa_engine *engine = cesa_dev->engines + i;
++		u32 load = atomic_read(&engine->load);
++		if (load < min_load) {
++			min_load = load;
++			selected = engine;
++		}
 +	}
++
++	atomic_add(weight, &selected->load);
++
++	return selected;
 +}
 +
+ /*
+  * Helper function that indicates whether a crypto request needs to be
+  * cleaned up or not after being enqueued using mv_cesa_queue_req().
+diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
+index 79d4175..28894be 100644
+--- a/drivers/crypto/marvell/cipher.c
++++ b/drivers/crypto/marvell/cipher.c
+@@ -214,6 +214,7 @@ mv_cesa_ablkcipher_complete(struct crypto_async_request *req)
+ 	struct mv_cesa_engine *engine = creq->base.engine;
+ 	unsigned int ivsize;
+ 
++	atomic_sub(ablkreq->nbytes, &engine->load);
+ 	ivsize = crypto_ablkcipher_ivsize(crypto_ablkcipher_reqtfm(ablkreq));
+ 
+ 	if (mv_cesa_req_get_type(&creq->base) == CESA_DMA_REQ) {
+@@ -231,7 +232,6 @@ mv_cesa_ablkcipher_complete(struct crypto_async_request *req)
  static const struct mv_cesa_req_ops mv_cesa_ablkcipher_req_ops = {
  	.step = mv_cesa_ablkcipher_step,
  	.process = mv_cesa_ablkcipher_process,
- 	.prepare = mv_cesa_ablkcipher_prepare,
+-	.prepare = mv_cesa_ablkcipher_prepare,
  	.cleanup = mv_cesa_ablkcipher_req_cleanup,
-+	.complete = mv_cesa_ablkcipher_complete,
+ 	.complete = mv_cesa_ablkcipher_complete,
  };
+@@ -456,29 +456,41 @@ static int mv_cesa_ablkcipher_req_init(struct ablkcipher_request *req,
+ 	return ret;
+ }
  
- static int mv_cesa_ablkcipher_cra_init(struct crypto_tfm *tfm)
-diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-index 21a4737..09665a7 100644
---- a/drivers/crypto/marvell/hash.c
-+++ b/drivers/crypto/marvell/hash.c
-@@ -287,17 +287,20 @@ static int mv_cesa_ahash_process(struct crypto_async_request *req, u32 status)
+-static int mv_cesa_des_op(struct ablkcipher_request *req,
+-			  struct mv_cesa_op_ctx *tmpl)
++static int mv_cesa_ablkcipher_queue_req(struct ablkcipher_request *req,
++					struct mv_cesa_op_ctx *tmpl)
  {
- 	struct ahash_request *ahashreq = ahash_request_cast(req);
- 	struct mv_cesa_ahash_req *creq = ahash_request_ctx(ahashreq);
--	struct mv_cesa_engine *engine = creq->base.engine;
--	unsigned int digsize;
--	int ret, i;
+-	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(req);
+-	struct mv_cesa_des_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
+ 	int ret;
+-
+-	mv_cesa_update_op_cfg(tmpl, CESA_SA_DESC_CFG_CRYPTM_DES,
+-			      CESA_SA_DESC_CFG_CRYPTM_MSK);
+-
+-	memcpy(tmpl->ctx.blkcipher.key, ctx->key, DES_KEY_SIZE);
++	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(req);
++	struct mv_cesa_engine *engine;
  
- 	if (mv_cesa_req_get_type(&creq->base) == CESA_DMA_REQ)
--		ret = mv_cesa_dma_process(&creq->base, status);
--	else
--		ret = mv_cesa_ahash_std_process(ahashreq, status);
-+		return mv_cesa_dma_process(&creq->base, status);
+ 	ret = mv_cesa_ablkcipher_req_init(req, tmpl);
+ 	if (ret)
+ 		return ret;
  
--	if (ret == -EINPROGRESS)
--		return ret;
-+	return mv_cesa_ahash_std_process(ahashreq, status);
++	engine = mv_cesa_select_engine(req->nbytes);
++	mv_cesa_ablkcipher_prepare(&req->base, engine);
++
+ 	ret = mv_cesa_queue_req(&req->base, &creq->base);
++
+ 	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+ 		mv_cesa_ablkcipher_cleanup(req);
+ 
+ 	return ret;
+ }
+ 
++static int mv_cesa_des_op(struct ablkcipher_request *req,
++			  struct mv_cesa_op_ctx *tmpl)
++{
++	struct mv_cesa_des_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
++
++	mv_cesa_update_op_cfg(tmpl, CESA_SA_DESC_CFG_CRYPTM_DES,
++			      CESA_SA_DESC_CFG_CRYPTM_MSK);
++
++	memcpy(tmpl->ctx.blkcipher.key, ctx->key, DES_KEY_SIZE);
++
++	return mv_cesa_ablkcipher_queue_req(req, tmpl);
 +}
 +
-+static void mv_cesa_ahash_complete(struct crypto_async_request *req)
-+{
-+	struct ahash_request *ahashreq = ahash_request_cast(req);
-+	struct mv_cesa_ahash_req *creq = ahash_request_ctx(ahashreq);
-+	struct mv_cesa_engine *engine = creq->base.engine;
-+	unsigned int digsize;
-+	int i;
+ static int mv_cesa_ecb_des_encrypt(struct ablkcipher_request *req)
+ {
+ 	struct mv_cesa_op_ctx tmpl;
+@@ -580,24 +592,14 @@ struct crypto_alg mv_cesa_cbc_des_alg = {
+ static int mv_cesa_des3_op(struct ablkcipher_request *req,
+ 			   struct mv_cesa_op_ctx *tmpl)
+ {
+-	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(req);
+ 	struct mv_cesa_des3_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
+-	int ret;
  
- 	digsize = crypto_ahash_digestsize(crypto_ahash_reqtfm(ahashreq));
- 	for (i = 0; i < digsize / 4; i++)
-@@ -326,8 +329,6 @@ static int mv_cesa_ahash_process(struct crypto_async_request *req, u32 status)
+ 	mv_cesa_update_op_cfg(tmpl, CESA_SA_DESC_CFG_CRYPTM_3DES,
+ 			      CESA_SA_DESC_CFG_CRYPTM_MSK);
+ 
+ 	memcpy(tmpl->ctx.blkcipher.key, ctx->key, DES3_EDE_KEY_SIZE);
+ 
+-	ret = mv_cesa_ablkcipher_req_init(req, tmpl);
+-	if (ret)
+-		return ret;
+-
+-	ret = mv_cesa_queue_req(&req->base, &creq->base);
+-	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+-		mv_cesa_ablkcipher_cleanup(req);
+-
+-	return ret;
++	return mv_cesa_ablkcipher_queue_req(req, tmpl);
+ }
+ 
+ static int mv_cesa_ecb_des3_ede_encrypt(struct ablkcipher_request *req)
+@@ -707,9 +709,8 @@ struct crypto_alg mv_cesa_cbc_des3_ede_alg = {
+ static int mv_cesa_aes_op(struct ablkcipher_request *req,
+ 			  struct mv_cesa_op_ctx *tmpl)
+ {
+-	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(req);
+ 	struct mv_cesa_aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
+-	int ret, i;
++	int i;
+ 	u32 *key;
+ 	u32 cfg;
+ 
+@@ -732,15 +733,7 @@ static int mv_cesa_aes_op(struct ablkcipher_request *req,
+ 			      CESA_SA_DESC_CFG_CRYPTM_MSK |
+ 			      CESA_SA_DESC_CFG_AES_LEN_MSK);
+ 
+-	ret = mv_cesa_ablkcipher_req_init(req, tmpl);
+-	if (ret)
+-		return ret;
+-
+-	ret = mv_cesa_queue_req(&req->base, &creq->base);
+-	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+-		mv_cesa_ablkcipher_cleanup(req);
+-
+-	return ret;
++	return mv_cesa_ablkcipher_queue_req(req, tmpl);
+ }
+ 
+ static int mv_cesa_ecb_aes_encrypt(struct ablkcipher_request *req)
+diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
+index e1f8acd..b7cfc42 100644
+--- a/drivers/crypto/marvell/hash.c
++++ b/drivers/crypto/marvell/hash.c
+@@ -335,6 +335,8 @@ static void mv_cesa_ahash_complete(struct crypto_async_request *req)
  				result[i] = cpu_to_be32(creq->state[i]);
  		}
  	}
--
--	return ret;
++
++	atomic_sub(ahashreq->nbytes, &engine->load);
  }
  
  static void mv_cesa_ahash_prepare(struct crypto_async_request *req,
-@@ -366,6 +367,7 @@ static const struct mv_cesa_req_ops mv_cesa_ahash_req_ops = {
+@@ -365,7 +367,6 @@ static void mv_cesa_ahash_req_cleanup(struct crypto_async_request *req)
+ static const struct mv_cesa_req_ops mv_cesa_ahash_req_ops = {
+ 	.step = mv_cesa_ahash_step,
  	.process = mv_cesa_ahash_process,
- 	.prepare = mv_cesa_ahash_prepare,
+-	.prepare = mv_cesa_ahash_prepare,
  	.cleanup = mv_cesa_ahash_req_cleanup,
-+	.complete = mv_cesa_ahash_complete,
+ 	.complete = mv_cesa_ahash_complete,
  };
+@@ -682,13 +683,13 @@ static int mv_cesa_ahash_req_init(struct ahash_request *req, bool *cached)
+ 	return ret;
+ }
  
- static int mv_cesa_ahash_init(struct ahash_request *req,
+-static int mv_cesa_ahash_update(struct ahash_request *req)
++static int mv_cesa_ahash_queue_req(struct ahash_request *req)
+ {
+ 	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
++	struct mv_cesa_engine *engine;
+ 	bool cached = false;
+ 	int ret;
+ 
+-	creq->len += req->nbytes;
+ 	ret = mv_cesa_ahash_req_init(req, &cached);
+ 	if (ret)
+ 		return ret;
+@@ -696,61 +697,48 @@ static int mv_cesa_ahash_update(struct ahash_request *req)
+ 	if (cached)
+ 		return 0;
+ 
++	engine = mv_cesa_select_engine(req->nbytes);
++	mv_cesa_ahash_prepare(&req->base, engine);
++
+ 	ret = mv_cesa_queue_req(&req->base, &creq->base);
++
+ 	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+ 		mv_cesa_ahash_cleanup(req);
+ 
+ 	return ret;
+ }
+ 
++static int mv_cesa_ahash_update(struct ahash_request *req)
++{
++	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
++
++	creq->len += req->nbytes;
++
++	return mv_cesa_ahash_queue_req(req);
++}
++
+ static int mv_cesa_ahash_final(struct ahash_request *req)
+ {
+ 	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
+ 	struct mv_cesa_op_ctx *tmpl = &creq->op_tmpl;
+-	bool cached = false;
+-	int ret;
+ 
+ 	mv_cesa_set_mac_op_total_len(tmpl, creq->len);
+ 	creq->last_req = true;
+ 	req->nbytes = 0;
+ 
+-	ret = mv_cesa_ahash_req_init(req, &cached);
+-	if (ret)
+-		return ret;
+-
+-	if (cached)
+-		return 0;
+-
+-	ret = mv_cesa_queue_req(&req->base, &creq->base);
+-	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+-		mv_cesa_ahash_cleanup(req);
+-
+-	return ret;
++	return mv_cesa_ahash_queue_req(req);
+ }
+ 
+ static int mv_cesa_ahash_finup(struct ahash_request *req)
+ {
+ 	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
+ 	struct mv_cesa_op_ctx *tmpl = &creq->op_tmpl;
+-	bool cached = false;
+-	int ret;
+ 
+ 	creq->len += req->nbytes;
+ 	mv_cesa_set_mac_op_total_len(tmpl, creq->len);
+ 	creq->last_req = true;
+ 
+-	ret = mv_cesa_ahash_req_init(req, &cached);
+-	if (ret)
+-		return ret;
+-
+-	if (cached)
+-		return 0;
+-
+-	ret = mv_cesa_queue_req(&req->base, &creq->base);
+-	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+-		mv_cesa_ahash_cleanup(req);
+-
+-	return ret;
++	return mv_cesa_ahash_queue_req(req);
+ }
+ 
+ static int mv_cesa_ahash_export(struct ahash_request *req, void *hash,
 -- 
 2.7.4
