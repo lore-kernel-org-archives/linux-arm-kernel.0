@@ -1,42 +1,130 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 17 Jun 2016 13:56:11 +0200
-Subject: [PATCH v10 0/8] add i2c driver supported for rk3399
-In-Reply-To: <1463407063-41218-1-git-send-email-david.wu@rock-chips.com>
-References: <1463407063-41218-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20160617115611.GC6876@tetsubishi>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 17 Jun 2016 13:08:34 +0100
+Subject: [PATCH v6 02/15] KVM: arm/arm64: check return value for
+ kvm_register_vgic_device
+In-Reply-To: <1466165327-32060-1-git-send-email-andre.przywara@arm.com>
+References: <1466165327-32060-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1466165327-32060-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2016 at 09:57:35PM +0800, David Wu wrote:
-> There are three points differert from others:
->  - new method to caculate i2c timings for rk3399
->  - pclk and function clk are separated at rk3399
->  - add fast-plus mode supported for rk3399
-> 
-> David Wu (8):
->   i2c: rk3x: add documentation to fields in "struct rk3x_i2c"
->   i2c: rk3x: use struct "rk3x_i2c_calced_timings"
->   i2c: rk3x: Remove redundant rk3x_i2c_clean_ipd()
->   i2c: rk3x: Change SoC data to not use array
->   i2c: rk3x: Move spec timing data to "static const" structs
->   dt-bindings: i2c: rk3x: add support for rk3399
->   i2c: rk3x: add i2c support for rk3399 soc
->   i2c: rk3x: support fast-mode plus for rk3399
-> 
->  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |  16 +-
+kvm_register_device_ops() can return an error, so lets check its return
+value and propagate this up the call chain.
 
-Applied whole series to for-next, thanks! This was nicely refactored and
-easy to review, thanks. Also thanks to all reviewers who helped this
-series. I fixed one checkpatch issue for you, though:
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 15 +++++++++------
+ virt/kvm/arm/vgic/vgic-v2.c         |  7 ++++++-
+ virt/kvm/arm/vgic/vgic-v3.c         | 15 +++++++++++++--
+ virt/kvm/arm/vgic/vgic.h            |  2 +-
+ 4 files changed, 29 insertions(+), 10 deletions(-)
 
-WARNING: Statements should start on a tabstop
-#278: FILE: drivers/i2c/busses/i2c-rk3x.c:789:
-+	 if (min_div_for_hold >= min_total_div) {
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160617/7db97d4c/attachment.sig>
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 0130c4b..2f24f13 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -210,20 +210,24 @@ static void vgic_destroy(struct kvm_device *dev)
+ 	kfree(dev);
+ }
+ 
+-void kvm_register_vgic_device(unsigned long type)
++int kvm_register_vgic_device(unsigned long type)
+ {
++	int ret = -ENODEV;
++
+ 	switch (type) {
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
+-		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+-					KVM_DEV_TYPE_ARM_VGIC_V2);
++		ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
++					      KVM_DEV_TYPE_ARM_VGIC_V2);
+ 		break;
+ #ifdef CONFIG_KVM_ARM_VGIC_V3
+ 	case KVM_DEV_TYPE_ARM_VGIC_V3:
+-		kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
+-					KVM_DEV_TYPE_ARM_VGIC_V3);
++		ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
++					      KVM_DEV_TYPE_ARM_VGIC_V3);
+ 		break;
+ #endif
+ 	}
++
++	return ret;
+ }
+ 
+ /** vgic_attr_regs_access: allows user space to read/write VGIC registers
+@@ -428,4 +432,3 @@ struct kvm_device_ops kvm_arm_vgic_v3_ops = {
+ };
+ 
+ #endif /* CONFIG_KVM_ARM_VGIC_V3 */
+-
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index e31405e..80313de 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -344,7 +344,12 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 	}
+ 
+ 	kvm_vgic_global_state.can_emulate_gicv2 = true;
+-	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++	if (ret) {
++		kvm_err("Cannot register GICv2 KVM device\n");
++		iounmap(kvm_vgic_global_state.vctrl_base);
++		return ret;
++	}
+ 
+ 	kvm_vgic_global_state.vcpu_base = info->vcpu.start;
+ 	kvm_vgic_global_state.type = VGIC_V2;
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 346b4ad..e48a22e 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -296,6 +296,7 @@ out:
+ int vgic_v3_probe(const struct gic_kvm_info *info)
+ {
+ 	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
++	int ret;
+ 
+ 	/*
+ 	 * The ListRegs field is 5 bits, but there is a architectural
+@@ -319,12 +320,22 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	} else {
+ 		kvm_vgic_global_state.vcpu_base = info->vcpu.start;
+ 		kvm_vgic_global_state.can_emulate_gicv2 = true;
+-		kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++		ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++		if (ret) {
++			kvm_err("Cannot register GICv2 KVM device.\n");
++			return ret;
++		}
+ 		kvm_info("vgic-v2@%llx\n", info->vcpu.start);
+ 	}
++	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V3);
++	if (ret) {
++		kvm_err("Cannot register GICv3 KVM device.\n");
++		kvm_unregister_device_ops(KVM_DEV_TYPE_ARM_VGIC_V2);
++		return ret;
++	}
++
+ 	if (kvm_vgic_global_state.vcpu_base == 0)
+ 		kvm_info("disabling GICv2 emulation\n");
+-	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V3);
+ 
+ 	kvm_vgic_global_state.vctrl_base = NULL;
+ 	kvm_vgic_global_state.type = VGIC_V3;
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 7b300ca..c752152 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -124,7 +124,7 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+ }
+ #endif
+ 
+-void kvm_register_vgic_device(unsigned long type);
++int kvm_register_vgic_device(unsigned long type);
+ int vgic_lazy_init(struct kvm *kvm);
+ int vgic_init(struct kvm *kvm);
+ 
+-- 
+2.8.2
