@@ -1,26 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 17 Jun 2016 18:00:13 +0100
-Subject: [PATCH] arm64: Implement optimised IP checksum helpers
-In-Reply-To: <6ca77904d1eced60d86145dc5da361f3aefc6fec.1463062758.git.robin.murphy@arm.com>
-References: <6ca77904d1eced60d86145dc5da361f3aefc6fec.1463062758.git.robin.murphy@arm.com>
-Message-ID: <20160617170012.GA24589@e104818-lin.cambridge.arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 17 Jun 2016 19:00:50 +0200
+Subject: [PATCHv3 3/7] EDAC, altera: Share Arria10 check_deps & IRQ
+ functions
+In-Reply-To: <1465852752-11018-4-git-send-email-tthayer@opensource.altera.com>
+References: <1465852752-11018-1-git-send-email-tthayer@opensource.altera.com>
+ <1465852752-11018-4-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160617170050.GG3912@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 03:26:48PM +0100, Robin Murphy wrote:
-> AArch64 is capable of 128-bit memory accesses without alignment
-> restrictions, which makes it both possible and highly practical to slurp
-> up a typical 20-byte IP header in just 2 loads. Implement our own
-> version of ip_fast_checksum() to take advantage of that, resulting in
-> considerably fewer instructions and memory accesses than the generic
-> version. We can also get more optimal code generation for csum_fold() by
-> defining it a slightly different way round from the generic version, so
-> throw that into the mix too.
+On Mon, Jun 13, 2016 at 04:19:08PM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Suggested-by: Luke Starrett <luke.starrett@broadcom.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> In preparation for additional memory module ECCs, the IRQ and
+> check_deps() functions are being made available to all the memory
+> buffers. Move them outside of the OCRAM only area.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2  New patch. Move shared functions outside OCRAM only area.
+> v3  Change title line - check_deps & IRQ.
+> ---
+>  drivers/edac/altera_edac.c |   62 ++++++++++++++++++++++++--------------------
+>  1 file changed, 34 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+> index a9d8fa7..a3f490d 100644
+> --- a/drivers/edac/altera_edac.c
+> +++ b/drivers/edac/altera_edac.c
+> @@ -825,9 +825,9 @@ static struct platform_driver altr_edac_device_driver = {
+>  };
+>  module_platform_driver(altr_edac_device_driver);
+>  
+> -/*********************** OCRAM EDAC Device Functions *********************/
+> +/******************* Arria10 Device ECC Shared Functions *****************/
+>  
+> -#ifdef CONFIG_EDAC_ALTERA_OCRAM
+> +#if defined(CONFIG_EDAC_ALTERA_OCRAM) || defined(CONFIG_EDAC_ALTERA_ETHERNET)
 
-Queued for 4.8. Thanks.
+Do you need the ifdeffery here at all?
+
+IOW, can we leave this function compiled-in unconditionally?
 
 -- 
-Catalin
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
