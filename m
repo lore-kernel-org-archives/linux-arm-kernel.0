@@ -1,36 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 17 Jun 2016 18:11:11 +0200
-Subject: [PATCH V2 50/63] clocksource/drivers/timer-u300: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-51-git-send-email-daniel.lezcano@linaro.org>
-References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-51-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CACRpkdbYR9kV2UjVS9ugqnM9Y_2r3xiZL8WFPsb_34-8vFv1cA@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 17 Jun 2016 12:12:03 -0400 (EDT)
+Subject: [PATCH 10/12] usb: core: add power sequence handling for USB
+ devices
+In-Reply-To: <1466158165-9380-11-git-send-email-peter.chen@nxp.com>
+Message-ID: <Pine.LNX.4.44L0.1606171209310.1589-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 11:27 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
+On Fri, 17 Jun 2016, Peter Chen wrote:
 
-> The init functions do not return any error. They behave as the following:
->
->   - panic, thus leading to a kernel crash while another timer may work and
->        make the system boot up correctly
->
->   or
->
->   - print an error and let the caller unaware if the state of the system
->
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
->
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Some hard-wired USB devices need to do power sequence to let the
+> device work normally, the typical power sequence like: enable USB
+> PHY clock, toggle reset pin, etc. But current Linux USB driver
+> lacks of such code to do it, it may cause some hard-wired USB devices
+> works abnormal or can't be recognized by controller at all.
+> 
+> In this patch, it will do power on sequence at hub's probe for all
+> devices under this hub (includes root hub) if this device is described
+> at dts and there is a phandle "usb-pwrseq" for it.
+> 
+> At hub_disconnect, it will do power off sequence which is at powered on
+> list.
+> 
+> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> ---
+>  drivers/usb/core/hub.c | 73 +++++++++++++++++++++++++++++++++++++++++++++++---
+>  drivers/usb/core/hub.h |  1 +
+>  include/linux/pwrseq.h |  6 +++++
+>  3 files changed, 77 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+> index bee1351..cc0f942 100644
+> --- a/drivers/usb/core/hub.c
+> +++ b/drivers/usb/core/hub.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/mutex.h>
+>  #include <linux/random.h>
+>  #include <linux/pm_qos.h>
+> +#include <linux/pwrseq.h>
+>  
+>  #include <asm/uaccess.h>
+>  #include <asm/byteorder.h>
+> @@ -1684,6 +1685,66 @@ static void hub_release(struct kref *kref)
+>  
+>  static unsigned highspeed_hubs;
+>  
+> +static void hub_of_pwrseq_off(struct usb_interface *intf)
+> +{
+> +	struct usb_hub *hub = usb_get_intfdata(intf);
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+It would be easier to pass hub as the argument instead of intf.
 
-Yours,
-Linus Walleij
+Otherwise this looks okay to me.
+
+Alan Stern
