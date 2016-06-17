@@ -1,226 +1,245 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Fri, 17 Jun 2016 18:09:18 +0800
-Subject: [PATCH 05/12] power: pwrseq: Generalize mmc_pwrseq operations by
- removing mmc prefix
+Date: Fri, 17 Jun 2016 18:09:19 +0800
+Subject: [PATCH 06/12] power: pwrseq: change common helpers as generic
 In-Reply-To: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
 References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1466158165-9380-6-git-send-email-peter.chen@nxp.com>
+Message-ID: <1466158165-9380-7-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+These helpers are only used by mmc now, change them as generic and
+do corresponding changes at mmc code.
 
-The power sequence hooks (mmc_pwrseq_pre_power_on(),
-mmc_pwrseq_post_power_on() and mmc_pwrseq_power_off()) can be made more
-generic to allow re-use in other subsystems. They do not need to take
-pointer to struct mmc_host but instead the struct pwrseq should be
-sufficient.
+Meanwhile, change return value of helper pwrseq_pre_power_on since
+it may occur error during enable clock/regulator, etc.
 
-Remove the "mmc" prefix and use the pointer to struct pwrseq as
-argument.
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
 ---
- drivers/mmc/core/core.c              |  6 +++---
- drivers/power/pwrseq/pwrseq.c        | 24 +++++++++---------------
- drivers/power/pwrseq/pwrseq_emmc.c   |  6 ++----
- drivers/power/pwrseq/pwrseq_simple.c | 14 ++++++--------
- include/linux/pwrseq.h               | 18 +++++++++---------
- 5 files changed, 29 insertions(+), 39 deletions(-)
+ drivers/mmc/core/host.c              |  8 +++++--
+ drivers/power/pwrseq/pwrseq.c        | 45 ++++++++++++++++++------------------
+ drivers/power/pwrseq/pwrseq_simple.c | 10 +++++---
+ include/linux/pwrseq.h               | 31 ++++++++++++++-----------
+ 4 files changed, 52 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index edefc3f..09a4722 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1719,7 +1719,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
- 	if (host->ios.power_mode == MMC_POWER_ON)
- 		return;
+diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+index 1db7d58..c8ffd9b 100644
+--- a/drivers/mmc/core/host.c
++++ b/drivers/mmc/core/host.c
+@@ -322,7 +322,11 @@ int mmc_of_parse(struct mmc_host *host)
+ 		host->dsr_req = 0;
+ 	}
  
--	mmc_pwrseq_pre_power_on(host);
-+	pwrseq_pre_power_on(host->pwrseq);
+-	return mmc_pwrseq_alloc(host);
++	host->pwrseq = pwrseq_alloc(host->parent->of_node, "mmc-pwrseq");
++	if (IS_ERR(host->pwrseq))
++		return PTR_ERR(host->pwrseq);
++	else
++		return 0;
+ }
  
- 	host->ios.vdd = fls(ocr) - 1;
- 	host->ios.power_mode = MMC_POWER_UP;
-@@ -1740,7 +1740,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
- 	 */
- 	mmc_delay(10);
+ EXPORT_SYMBOL(mmc_of_parse);
+@@ -462,7 +466,7 @@ EXPORT_SYMBOL(mmc_remove_host);
+  */
+ void mmc_free_host(struct mmc_host *host)
+ {
+-	mmc_pwrseq_free(host);
++	pwrseq_free(host->pwrseq);
+ 	put_device(&host->class_dev);
+ }
  
--	mmc_pwrseq_post_power_on(host);
-+	pwrseq_post_power_on(host->pwrseq);
- 
- 	host->ios.clock = host->f_init;
- 
-@@ -1759,7 +1759,7 @@ void mmc_power_off(struct mmc_host *host)
- 	if (host->ios.power_mode == MMC_POWER_OFF)
- 		return;
- 
--	mmc_pwrseq_power_off(host);
-+	pwrseq_power_off(host->pwrseq);
- 
- 	host->ios.clock = 0;
- 	host->ios.vdd = 0;
 diff --git a/drivers/power/pwrseq/pwrseq.c b/drivers/power/pwrseq/pwrseq.c
-index 9c66582..495a19d 100644
+index 495a19d..25e4dfd 100644
 --- a/drivers/power/pwrseq/pwrseq.c
 +++ b/drivers/power/pwrseq/pwrseq.c
-@@ -52,32 +52,26 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
- }
- EXPORT_SYMBOL_GPL(mmc_pwrseq_alloc);
- 
--void mmc_pwrseq_pre_power_on(struct mmc_host *host)
-+void pwrseq_pre_power_on(struct pwrseq *pwrseq)
- {
--	struct pwrseq *pwrseq = host->pwrseq;
--
- 	if (pwrseq && pwrseq->ops->pre_power_on)
--		pwrseq->ops->pre_power_on(host);
-+		pwrseq->ops->pre_power_on(pwrseq);
- }
--EXPORT_SYMBOL_GPL(mmc_pwrseq_pre_power_on);
-+EXPORT_SYMBOL_GPL(pwrseq_pre_power_on);
- 
--void mmc_pwrseq_post_power_on(struct mmc_host *host)
-+void pwrseq_post_power_on(struct pwrseq *pwrseq)
- {
--	struct pwrseq *pwrseq = host->pwrseq;
--
- 	if (pwrseq && pwrseq->ops->post_power_on)
--		pwrseq->ops->post_power_on(host);
-+		pwrseq->ops->post_power_on(pwrseq);
- }
--EXPORT_SYMBOL_GPL(mmc_pwrseq_post_power_on);
-+EXPORT_SYMBOL_GPL(pwrseq_post_power_on);
- 
--void mmc_pwrseq_power_off(struct mmc_host *host)
-+void pwrseq_power_off(struct pwrseq *pwrseq)
- {
--	struct pwrseq *pwrseq = host->pwrseq;
--
- 	if (pwrseq && pwrseq->ops->power_off)
--		pwrseq->ops->power_off(host);
-+		pwrseq->ops->power_off(pwrseq);
- }
--EXPORT_SYMBOL_GPL(mmc_pwrseq_power_off);
-+EXPORT_SYMBOL_GPL(pwrseq_power_off);
- 
- void mmc_pwrseq_free(struct mmc_host *host)
- {
-diff --git a/drivers/power/pwrseq/pwrseq_emmc.c b/drivers/power/pwrseq/pwrseq_emmc.c
-index a68ac9a..dbb7e75 100644
---- a/drivers/power/pwrseq/pwrseq_emmc.c
-+++ b/drivers/power/pwrseq/pwrseq_emmc.c
-@@ -19,8 +19,6 @@
- #include <linux/reboot.h>
+@@ -5,37 +5,38 @@
+  *
+  * License terms: GNU General Public License (GPL) version 2
+  *
+- *  MMC power sequence management
++ * Power sequence management helpers
+  */
++
++#include <linux/device.h>
+ #include <linux/kernel.h>
+ #include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
  #include <linux/pwrseq.h>
  
 -#include <linux/mmc/host.h>
--
- struct mmc_pwrseq_emmc {
- 	struct pwrseq pwrseq;
- 	struct notifier_block reset_nb;
-@@ -37,9 +35,9 @@ static void __mmc_pwrseq_emmc_reset(struct mmc_pwrseq_emmc *pwrseq)
- 	udelay(200);
- }
  
--static void mmc_pwrseq_emmc_reset(struct mmc_host *host)
-+static void mmc_pwrseq_emmc_reset(struct pwrseq *_pwrseq)
+ static DEFINE_MUTEX(pwrseq_list_mutex);
+ static LIST_HEAD(pwrseq_list);
+ 
+-int mmc_pwrseq_alloc(struct mmc_host *host)
++struct pwrseq *pwrseq_alloc(const struct device_node *node,
++	const char *phandle_name)
  {
--	struct mmc_pwrseq_emmc *pwrseq =  to_pwrseq_emmc(host->pwrseq);
-+	struct mmc_pwrseq_emmc *pwrseq = to_pwrseq_emmc(_pwrseq);
+ 	struct device_node *np;
+-	struct pwrseq *p;
++	struct pwrseq *p, *pwrseq = NULL;
  
- 	__mmc_pwrseq_emmc_reset(pwrseq);
+-	np = of_parse_phandle(host->parent->of_node, "mmc-pwrseq", 0);
++	np = of_parse_phandle(node, phandle_name, 0);
+ 	if (!np)
+-		return 0;
++		return NULL;
+ 
+ 	mutex_lock(&pwrseq_list_mutex);
+ 	list_for_each_entry(p, &pwrseq_list, pwrseq_node) {
+ 		if (p->dev->of_node == np) {
+ 			if (!try_module_get(p->owner))
+-				dev_err(host->parent,
++				dev_err(p->dev,
+ 					"increasing module refcount failed\n");
+ 			else
+-				host->pwrseq = p;
+-
++				pwrseq = p;
+ 			break;
+ 		}
+ 	}
+@@ -43,19 +44,21 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
+ 	of_node_put(np);
+ 	mutex_unlock(&pwrseq_list_mutex);
+ 
+-	if (!host->pwrseq)
+-		return -EPROBE_DEFER;
++	if (!pwrseq)
++		return ERR_PTR(-EPROBE_DEFER);
+ 
+-	dev_info(host->parent, "allocated mmc-pwrseq\n");
++	dev_info(p->dev, "pwrseq is allocated\n");
+ 
+-	return 0;
++	return pwrseq;
  }
+-EXPORT_SYMBOL_GPL(mmc_pwrseq_alloc);
++EXPORT_SYMBOL_GPL(pwrseq_alloc);
+ 
+-void pwrseq_pre_power_on(struct pwrseq *pwrseq)
++int pwrseq_pre_power_on(struct pwrseq *pwrseq)
+ {
+ 	if (pwrseq && pwrseq->ops->pre_power_on)
+-		pwrseq->ops->pre_power_on(pwrseq);
++		return pwrseq->ops->pre_power_on(pwrseq);
++	else
++		return 0;
+ }
+ EXPORT_SYMBOL_GPL(pwrseq_pre_power_on);
+ 
+@@ -73,16 +76,12 @@ void pwrseq_power_off(struct pwrseq *pwrseq)
+ }
+ EXPORT_SYMBOL_GPL(pwrseq_power_off);
+ 
+-void mmc_pwrseq_free(struct mmc_host *host)
++void pwrseq_free(struct pwrseq *pwrseq)
+ {
+-	struct pwrseq *pwrseq = host->pwrseq;
+-
+-	if (pwrseq) {
++	if (pwrseq)
+ 		module_put(pwrseq->owner);
+-		host->pwrseq = NULL;
+-	}
+ }
+-EXPORT_SYMBOL_GPL(mmc_pwrseq_free);
++EXPORT_SYMBOL_GPL(pwrseq_free);
+ 
+ int pwrseq_register(struct pwrseq *pwrseq)
+ {
 diff --git a/drivers/power/pwrseq/pwrseq_simple.c b/drivers/power/pwrseq/pwrseq_simple.c
-index d5fbd65..93807a6 100644
+index 93807a6..349443f 100644
 --- a/drivers/power/pwrseq/pwrseq_simple.c
 +++ b/drivers/power/pwrseq/pwrseq_simple.c
-@@ -18,8 +18,6 @@
- #include <linux/gpio/consumer.h>
- #include <linux/pwrseq.h>
- 
--#include <linux/mmc/host.h>
--
- struct mmc_pwrseq_simple {
- 	struct pwrseq pwrseq;
- 	bool clk_enabled;
-@@ -46,9 +44,9 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
+@@ -44,16 +44,20 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
  	}
  }
  
--static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
-+static void mmc_pwrseq_simple_pre_power_on(struct pwrseq *_pwrseq)
+-static void mmc_pwrseq_simple_pre_power_on(struct pwrseq *_pwrseq)
++static int mmc_pwrseq_simple_pre_power_on(struct pwrseq *_pwrseq)
  {
--	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
-+	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(_pwrseq);
+ 	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(_pwrseq);
++	int ret = 0;
  
  	if (!IS_ERR(pwrseq->ext_clk) && !pwrseq->clk_enabled) {
- 		clk_prepare_enable(pwrseq->ext_clk);
-@@ -58,16 +56,16 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
- 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
- }
- 
--static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
-+static void mmc_pwrseq_simple_post_power_on(struct pwrseq *_pwrseq)
- {
--	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
-+	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(_pwrseq);
- 
- 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
- }
- 
--static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
-+static void mmc_pwrseq_simple_power_off(struct pwrseq *_pwrseq)
- {
--	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
-+	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(_pwrseq);
+-		clk_prepare_enable(pwrseq->ext_clk);
+-		pwrseq->clk_enabled = true;
++		ret = clk_prepare_enable(pwrseq->ext_clk);
++		if (!ret)
++			pwrseq->clk_enabled = true;
+ 	}
  
  	mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
++
++	return 0;
+ }
  
+ static void mmc_pwrseq_simple_post_power_on(struct pwrseq *_pwrseq)
 diff --git a/include/linux/pwrseq.h b/include/linux/pwrseq.h
-index 6d2d2a4..fcc8fd8 100644
+index fcc8fd8..f726e7e 100644
 --- a/include/linux/pwrseq.h
 +++ b/include/linux/pwrseq.h
-@@ -11,9 +11,9 @@
- #include <linux/mmc/host.h>
+@@ -8,14 +8,6 @@
+ #ifndef _LINUX_PWRSEQ_H
+ #define _LINUX_PWRSEQ_H
  
- struct pwrseq_ops {
--	void (*pre_power_on)(struct mmc_host *host);
--	void (*post_power_on)(struct mmc_host *host);
--	void (*power_off)(struct mmc_host *host);
-+	void (*pre_power_on)(struct pwrseq *pwrseq);
-+	void (*post_power_on)(struct pwrseq *pwrseq);
-+	void (*power_off)(struct pwrseq *pwrseq);
+-#include <linux/mmc/host.h>
+-
+-struct pwrseq_ops {
+-	void (*pre_power_on)(struct pwrseq *pwrseq);
+-	void (*post_power_on)(struct pwrseq *pwrseq);
+-	void (*power_off)(struct pwrseq *pwrseq);
+-};
+-
+ struct pwrseq {
+ 	const struct pwrseq_ops *ops;
+ 	struct device *dev;
+@@ -23,16 +15,23 @@ struct pwrseq {
+ 	struct module *owner;
  };
  
- struct pwrseq {
-@@ -28,10 +28,10 @@ struct pwrseq {
++struct pwrseq_ops {
++	int (*pre_power_on)(struct pwrseq *pwrseq);
++	void (*post_power_on)(struct pwrseq *pwrseq);
++	void (*power_off)(struct pwrseq *pwrseq);
++};
++
+ #ifdef CONFIG_POWER_SEQ
+ 
  int pwrseq_register(struct pwrseq *pwrseq);
  void pwrseq_unregister(struct pwrseq *pwrseq);
  
-+void pwrseq_pre_power_on(struct pwrseq *pwrseq);
-+void pwrseq_post_power_on(struct pwrseq *pwrseq);
-+void pwrseq_power_off(struct pwrseq *pwrseq);
- int mmc_pwrseq_alloc(struct mmc_host *host);
--void mmc_pwrseq_pre_power_on(struct mmc_host *host);
--void mmc_pwrseq_post_power_on(struct mmc_host *host);
--void mmc_pwrseq_power_off(struct mmc_host *host);
- void mmc_pwrseq_free(struct mmc_host *host);
+-void pwrseq_pre_power_on(struct pwrseq *pwrseq);
++int pwrseq_pre_power_on(struct pwrseq *pwrseq);
+ void pwrseq_post_power_on(struct pwrseq *pwrseq);
+ void pwrseq_power_off(struct pwrseq *pwrseq);
+-int mmc_pwrseq_alloc(struct mmc_host *host);
+-void mmc_pwrseq_free(struct mmc_host *host);
++struct pwrseq *pwrseq_alloc(const struct device_node *node,
++	const char *phandle_name);
++void pwrseq_free(struct pwrseq *pwrseq);
  
  #else /* CONFIG_POWER_SEQ */
-@@ -41,10 +41,10 @@ static inline int pwrseq_register(struct pwrseq *pwrseq)
+ 
+@@ -41,11 +40,15 @@ static inline int pwrseq_register(struct pwrseq *pwrseq)
  	return -ENOSYS;
  }
  static inline void pwrseq_unregister(struct pwrseq *pwrseq) {}
-+static inline void pwrseq_pre_power_on(struct pwrseq *pwrseq) {}
-+static inline void pwrseq_post_power_on(struct pwrseq *pwrseq) {}
-+static inline void pwrseq_power_off(struct pwrseq *pwrseq) {}
- static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
--static inline void mmc_pwrseq_pre_power_on(struct mmc_host *host) {}
--static inline void mmc_pwrseq_post_power_on(struct mmc_host *host) {}
--static inline void mmc_pwrseq_power_off(struct mmc_host *host) {}
- static inline void mmc_pwrseq_free(struct mmc_host *host) {}
+-static inline void pwrseq_pre_power_on(struct pwrseq *pwrseq) {}
++static inline int pwrseq_pre_power_on(struct pwrseq *pwrseq) {}
+ static inline void pwrseq_post_power_on(struct pwrseq *pwrseq) {}
+ static inline void pwrseq_power_off(struct pwrseq *pwrseq) {}
+-static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
+-static inline void mmc_pwrseq_free(struct mmc_host *host) {}
++static inline struct pwrseq *pwrseq_alloc(const struct device_node *node,
++	const char *phandle_name)
++{
++	return NULL;
++}
++static inline void pwrseq_free(struct mmc_host *host) {}
  
  #endif /* CONFIG_POWER_SEQ */
+ 
 -- 
 1.9.1
