@@ -1,64 +1,36 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 18 Jun 2016 12:38:38 +0200
-Subject: [PATCH V2 03/63] clocksource/drivers/rockchip_timer: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-4-git-send-email-daniel.lezcano@linaro.org>
-References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-4-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <2572341.0UcvQ6PvRt@diego>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 18 Jun 2016 12:39:57 +0200
+Subject: 4.5-rc0 regression: GPRS breaks after very short while
+In-Reply-To: <20160520041258.GB22076@earth>
+References: <20160518074924.GA20652@amd> <20160518141624.GA8025@earth>
+ <20160518201251.GA22015@amd> <20160520041258.GB22076@earth>
+Message-ID: <20160618103957.GA20130@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 16. Juni 2016, 23:26:22 schrieb Daniel Lezcano:
-> The init functions do not return any error. They behave as the following:
+On Fri 2016-05-20 06:12:59, Sebastian Reichel wrote:
+> Hi,
 > 
->  - panic, thus leading to a kernel crash while another timer may work and
->    make the system boot up correctly
+> On Wed, May 18, 2016 at 10:12:51PM +0200, Pavel Machek wrote:
+> > > The last one only changes a comment, so not relevant, the other
+> > > two fix error handling during initialization and are most likely
+> > > also not the problem. Can you try to bisect the problem?
+> > 
+> > It will not be fun, but I guess it is doable. But before I start it
+> > would be good to know -- does it work for you?
 > 
->  or
+> I currently don't have a second SIM card with network access for my
+> dev phone, so I usually only test without gprs connection. As a
+> result I don't really know if longer data connection would work.
 > 
->  - print an error and let the caller unaware if the state of the system
-> 
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
-> 
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/clocksource/rockchip_timer.c | 26 ++++++++++++++------------
->  1 file changed, 14 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/clocksource/rockchip_timer.c
-> b/drivers/clocksource/rockchip_timer.c index a3f22b0..d10bdee 100644
-> --- a/drivers/clocksource/rockchip_timer.c
-> +++ b/drivers/clocksource/rockchip_timer.c
-> @@ -113,17 +113,17 @@ static irqreturn_t rk_timer_interrupt(int irq, void
-> *dev_id) return IRQ_HANDLED;
->  }
-> 
-> -static void __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
-> +static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
->  {
->  	struct clock_event_device *ce = &bc_timer.ce;
->  	struct clk *timer_clk;
->  	struct clk *pclk;
-> -	int ret, irq;
-> +	int ret = -EINVAL, irq;
-> 
->  	bc_timer.base = of_iomap(np, 0);
->  	if (!bc_timer.base) {
->  		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
-> -		return;
-> +		return -ENXIO;
->  	}
->  	bc_timer.ctrl = bc_timer.base + ctrl_reg;
+> Also I'm quite busy until next weekend with other stuff. If you did
+> not find anything until then, I will do some testing/debugging.
 
-wouldn't it be nicer to also save the error values from all the intermediate
-clock calls (ret = PTR_ERR(pclk) and so on).
-Right now it will be always -EINVAL for all those clk calls and also
-the irq_of_parse_and_map.
+Ok, it looks like problems got less reproducible for me.
 
-Heiko
+Best regards,
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
