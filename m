@@ -1,34 +1,23 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 18 Jun 2016 16:13:28 +0200
-Subject: [PATCH v4 2/2] i2c: qup: support SMBus block read
-In-Reply-To: <1465409985-17113-2-git-send-email-austinwc@codeaurora.org>
-References: <1465409985-17113-1-git-send-email-austinwc@codeaurora.org>
- <1465409985-17113-2-git-send-email-austinwc@codeaurora.org>
-Message-ID: <20160618141328.GC1430@tetsubishi>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 18 Jun 2016 23:31:23 +0900
+Subject: [PATCH] clk: samsung: exynos5433: use clock_ignore_unused flag
+ for SPI3 related clocks
+In-Reply-To: <1466151362-2881-1-git-send-email-andi.shyti@samsung.com>
+References: <1466151362-2881-1-git-send-email-andi.shyti@samsung.com>
+Message-ID: <CA+Ln22F9eskcpnFkrnVFc3dJqCJcJ5O-STfXC-8Om5MK-THwNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 12:19:45PM -0600, Austin Christ wrote:
-> From: Naveen Kaje <nkaje@codeaurora.org>
-> 
-> I2C QUP driver relies on SMBus emulation support from the framework.
-> To handle SMBus block reads, the driver should check I2C_M_RECV_LEN
-> flag and should read the first byte received as the message length.
-> 
-> The driver configures the QUP hardware to read one byte. Once the
-> message length is known from this byte, the QUP hardware is configured
-> to read the rest.
-> 
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> Signed-off-by: Austin Christ <austinwc@codeaurora.org>
-> Reviewed-by: sricharan at codeaurora.org
+Hi Andi, Jaehoon,
 
-Missing name here, too. Looks good otherwise.
+2016-06-17 17:16 GMT+09:00 Andi Shyti <andi.shyti@samsung.com>:
+> From: Jaehoon Chung <jh80.chung@samsung.com>
+>
+> The SPI 3 bus uses two clocks, a bus clock and an input clock.
+> Do not disable the clocks when unused in order to allow access to
+> the SPI 3 device.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160618/7ad69151/attachment.sig>
+If unused, why would access to SPI 3 device needed?
+
+Best regards,
+Tomasz
