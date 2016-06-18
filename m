@@ -1,42 +1,24 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 18 Jun 2016 23:37:31 +0900
-Subject: [PATCH] clk: samsung: Suppress unbinding to prevent theoretical
- attacks
-In-Reply-To: <1463469974-13340-1-git-send-email-k.kozlowski@samsung.com>
-References: <1463469974-13340-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CA+Ln22E13nm4nsgWoi6gNc_Jh+UqqE5MgwANH02GZF7bQye+yw@mail.gmail.com>
+Date: Sat, 18 Jun 2016 23:40:05 +0900
+Subject: [PATCH 1/3] clk: samsung: exynos5433: prepare for adding CPU
+ clocks
+In-Reply-To: <1464095957-25851-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1464095957-25851-1-git-send-email-b.zolnierkie@samsung.com>
+ <1464095957-25851-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <CA+Ln22GmeuHaNwpHOMxP0SA9-KaJp4D4sM5aF3bVRWm5Xb72fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Bartlomiej,
 
-2016-05-17 16:26 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> Although unbinding a driver requires root privileges but it still might
-> be used theoretically in certain attacks (by triggering NULL pointer
-> exception or memory corruption if driver does not provide proper remove
-> callbacks or core does not handle it).
->
-> Samsung clock drivers are essential for system operation so their
-> removal is not expected. More over, the Exynos3250 ISP clock driver does
-> not implement remove() driver callback and it is not buildable as
-> modules.
->
-> Suppress the unbind interface for Exynos3250 ISP and S3C2410 DCLK clock
-> drivers.
->
-> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos3250.c   | 1 +
->  drivers/clk/samsung/clk-s3c2410-dclk.c | 5 +++--
->  2 files changed, 4 insertions(+), 2 deletions(-)
+2016-05-24 22:19 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> Open-code samsung_cmu_register_one() calls for CMU_APOLLO and
+> CMU_ATLAS setup code as a preparation for adding CPU clocks
+> support for Exynos5433.
 
-Makes sense. (By the way, I wonder if we ever see a solution for the
-unbind problem with .remove implemented and some resources that can't
-be released at the time .unbind is attempted...)
-
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+Why do we need to open code it? Even if it's really necessary, it
+would make sense to state it in the commit description for lazy
+readers reviewing the patches in order. :)
 
 Best regards,
 Tomasz
