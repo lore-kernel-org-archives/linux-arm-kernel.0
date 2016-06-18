@@ -1,132 +1,191 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 18 Jun 2016 11:28:07 +0200
-Subject: [PATCH v5 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy
- block
+Date: Sat, 18 Jun 2016 11:28:08 +0200
+Subject: [PATCH v5 2/4] phy-sun4i-usb: Add support for peripheral-only mode
 In-Reply-To: <1466242090-22264-1-git-send-email-hdegoede@redhat.com>
 References: <1466242090-22264-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1466242090-22264-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1466242090-22264-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs have a single phy-hw-block with multiple phys, this is
-modelled by a single phy dts node, so we end up with multiple
-controller nodes with a phys property pointing to the phy-node
-of the otg-phy.
+Use the new of_usb_get_dr_mode_by_phy() function to get the dr_mode
+from the musb controller node instead of assuming that having an id_det
+gpio means otg mode, and not having one means host mode.
 
-Only one of these controllers typically is an otg controller, yet we
-were checking the first controller who uses a phy from the block and
-then end up looking for a dr_mode property in e.g. the ehci controller.
+Implement peripheral-only mode by adding a sun4i_usb_phy0_get_id_det
+helper which looks at the dr_mode, always registering our extcon and
+always monitoring vbus.
 
-This commit fixes this by adding an arg0 parameter to
-of_usb_get_dr_mode_by_phy and make of_usb_get_dr_mode_by_phy
-check that this matches the phandle args[0] value when looking for
-the otg controller.
+If dr_mode is not specified in the dts, do not register phy0 as we then
+do not know how to treat it. This is actually a good thing as this means
+we will not be registering phy0 on devices where the otg controller is
+not enabled in the devicetree.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
 Changes in v2:
--Add a arg0 parameter instead of looking for nodes with a dr_mode property
+-Adjust for of_usb_get_dr_mode_by_phy now taking an args0 parameter
 Changes in v3:
--No changes
+-Only toggle the phy vbus-det bit on id-change on systems without vbus-det
+ when in otg mode
 Changes in v4:
--When arg0 == -1, use of_parse_phandle instead of of_parse_phandle_with_args
- because using of_parse_phandle_with_args breaks phy's which use the usb-phy
- bindings instead of the generic phy bindings
-Changes in v5:
 -No changes
+Changes in v5:
+-Added Kishon's Acked-by
 ---
- drivers/usb/common/common.c  | 26 ++++++++++++++++++++------
- drivers/usb/phy/phy-am335x.c |  2 +-
- include/linux/usb/of.h       |  4 ++--
- 3 files changed, 23 insertions(+), 9 deletions(-)
+ drivers/phy/phy-sun4i-usb.c | 68 ++++++++++++++++++++++++++++++---------------
+ 1 file changed, 46 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/usb/common/common.c b/drivers/usb/common/common.c
-index e3d0161..5ef8da6 100644
---- a/drivers/usb/common/common.c
-+++ b/drivers/usb/common/common.c
-@@ -131,15 +131,17 @@ EXPORT_SYMBOL_GPL(usb_get_dr_mode);
-  * of_usb_get_dr_mode_by_phy - Get dual role mode for the controller device
-  * which is associated with the given phy device_node
-  * @np:	Pointer to the given phy device_node
-+ * @arg0: phandle args[0] for phy's with #phy-cells >= 1, or -1 for
-+ *        phys which do not have phy-cells
-  *
-  * In dts a usb controller associates with phy devices.  The function gets
-  * the string from property 'dr_mode' of the controller associated with the
-  * given phy device node, and returns the correspondig enum usb_dr_mode.
-  */
--enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
-+enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0)
- {
- 	struct device_node *controller = NULL;
--	struct device_node *phy;
-+	struct of_phandle_args args;
- 	const char *dr_mode;
- 	int index;
- 	int err;
-@@ -148,12 +150,24 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
- 		controller = of_find_node_with_property(controller, "phys");
- 		index = 0;
- 		do {
--			phy = of_parse_phandle(controller, "phys", index);
--			of_node_put(phy);
--			if (phy == phy_np)
-+			if (arg0 == -1) {
-+				args.np = of_parse_phandle(controller, "phys",
-+							index);
-+				args.args_count = 0;
-+			} else {
-+				err = of_parse_phandle_with_args(controller,
-+							"phys", "#phy-cells",
-+							index, &args);
-+				if (err)
-+					break;
-+			}
-+
-+			of_node_put(args.np);
-+			if (args.np == np && (args.args_count == 0 ||
-+					      args.args[0] == arg0))
- 				goto finish;
- 			index++;
--		} while (phy);
-+		} while (args.np);
- 	} while (controller);
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index 7390294..9f97b61 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -40,6 +40,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/reset.h>
++#include <linux/usb/of.h>
+ #include <linux/workqueue.h>
  
- finish:
-diff --git a/drivers/usb/phy/phy-am335x.c b/drivers/usb/phy/phy-am335x.c
-index a262a43..7e5aece 100644
---- a/drivers/usb/phy/phy-am335x.c
-+++ b/drivers/usb/phy/phy-am335x.c
-@@ -54,7 +54,7 @@ static int am335x_phy_probe(struct platform_device *pdev)
- 		return am_phy->id;
+ #define REG_ISCR			0x00
+@@ -109,6 +110,7 @@ struct sun4i_usb_phy_cfg {
+ struct sun4i_usb_phy_data {
+ 	void __iomem *base;
+ 	const struct sun4i_usb_phy_cfg *cfg;
++	enum usb_dr_mode dr_mode;
+ 	struct mutex mutex;
+ 	struct sun4i_usb_phy {
+ 		struct phy *phy;
+@@ -119,6 +121,7 @@ struct sun4i_usb_phy_data {
+ 		bool regulator_on;
+ 		int index;
+ 	} phys[MAX_PHYS];
++	int first_phy;
+ 	/* phy0 / otg related variables */
+ 	struct extcon_dev *extcon;
+ 	bool phy0_init;
+@@ -285,16 +288,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_DPDM_PULLUP_EN);
+ 		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_ID_PULLUP_EN);
+ 
+-		if (data->id_det_gpio) {
+-			/* OTG mode, force ISCR and cable state updates */
+-			data->id_det = -1;
+-			data->vbus_det = -1;
+-			queue_delayed_work(system_wq, &data->detect, 0);
+-		} else {
+-			/* Host only mode */
+-			sun4i_usb_phy0_set_id_detect(_phy, 0);
+-			sun4i_usb_phy0_set_vbus_detect(_phy, 1);
+-		}
++		/* Force ISCR and cable state updates */
++		data->id_det = -1;
++		data->vbus_det = -1;
++		queue_delayed_work(system_wq, &data->detect, 0);
  	}
  
--	am_phy->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node);
-+	am_phy->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node, -1);
- 
- 	ret = usb_phy_gen_create_phy(dev, &am_phy->usb_phy_gen, NULL);
- 	if (ret)
-diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
-index de3237f..5ff9032 100644
---- a/include/linux/usb/of.h
-+++ b/include/linux/usb/of.h
-@@ -12,7 +12,7 @@
- #include <linux/usb/phy.h>
- 
- #if IS_ENABLED(CONFIG_OF)
--enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np);
-+enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0);
- bool of_usb_host_tpl_support(struct device_node *np);
- int of_usb_update_otg_caps(struct device_node *np,
- 			struct usb_otg_caps *otg_caps);
-@@ -20,7 +20,7 @@ struct device_node *usb_of_get_child_node(struct device_node *parent,
- 			int portnum);
- #else
- static inline enum usb_dr_mode
--of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
-+of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0)
- {
- 	return USB_DR_MODE_UNKNOWN;
+ 	return 0;
+@@ -319,6 +316,19 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
+ 	return 0;
  }
+ 
++static int sun4i_usb_phy0_get_id_det(struct sun4i_usb_phy_data *data)
++{
++	switch (data->dr_mode) {
++	case USB_DR_MODE_OTG:
++		return gpiod_get_value_cansleep(data->id_det_gpio);
++	case USB_DR_MODE_HOST:
++		return 0;
++	case USB_DR_MODE_PERIPHERAL:
++	default:
++		return 1;
++	}
++}
++
+ static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
+ {
+ 	if (data->vbus_det_gpio)
+@@ -414,7 +424,10 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	struct phy *phy0 = data->phys[0].phy;
+ 	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
+ 
+-	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
++	if (phy0 == NULL)
++		return;
++
++	id_det = sun4i_usb_phy0_get_id_det(data);
+ 	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
+ 
+ 	mutex_lock(&phy0->mutex);
+@@ -430,7 +443,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 		 * without vbus detection report vbus low for long enough for
+ 		 * the musb-ip to end the current device session.
+ 		 */
+-		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
++		if (data->dr_mode == USB_DR_MODE_OTG &&
++		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
+ 			msleep(200);
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
+@@ -456,7 +470,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 		 * without vbus detection report vbus low for long enough to
+ 		 * the musb-ip to end the current host session.
+ 		 */
+-		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
++		if (data->dr_mode == USB_DR_MODE_OTG &&
++		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
+ 			mutex_lock(&phy0->mutex);
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
+ 			msleep(1000);
+@@ -501,7 +516,8 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+ {
+ 	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+ 
+-	if (args->args[0] >= data->cfg->num_phys)
++	if (args->args[0] < data->first_phy ||
++	    args->args[0] >= data->cfg->num_phys)
+ 		return ERR_PTR(-ENODEV);
+ 
+ 	return data->phys[args->args[0]].phy;
+@@ -575,13 +591,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 			return -EPROBE_DEFER;
+ 	}
+ 
+-	/* vbus_det without id_det makes no sense, and is not supported */
+-	if (sun4i_usb_phy0_have_vbus_det(data) && !data->id_det_gpio) {
+-		dev_err(dev, "usb0_id_det missing or invalid\n");
+-		return -ENODEV;
+-	}
+-
+-	if (data->id_det_gpio) {
++	data->dr_mode = of_usb_get_dr_mode_by_phy(np, 0);
++	switch (data->dr_mode) {
++	case USB_DR_MODE_OTG:
++		/* otg without id_det makes no sense, and is not supported */
++		if (!data->id_det_gpio) {
++			dev_err(dev, "usb0_id_det missing or invalid\n");
++			return -ENODEV;
++		}
++		/* fall through */
++	case USB_DR_MODE_HOST:
++	case USB_DR_MODE_PERIPHERAL:
+ 		data->extcon = devm_extcon_dev_allocate(dev,
+ 							sun4i_usb_phy0_cable);
+ 		if (IS_ERR(data->extcon))
+@@ -592,9 +612,13 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 			dev_err(dev, "failed to register extcon: %d\n", ret);
+ 			return ret;
+ 		}
++		break;
++	default:
++		dev_info(dev, "dr_mode unknown, not registering usb phy0\n");
++		data->first_phy = 1;
+ 	}
+ 
+-	for (i = 0; i < data->cfg->num_phys; i++) {
++	for (i = data->first_phy; i < data->cfg->num_phys; i++) {
+ 		struct sun4i_usb_phy *phy = data->phys + i;
+ 		char name[16];
+ 
 -- 
 2.7.4
