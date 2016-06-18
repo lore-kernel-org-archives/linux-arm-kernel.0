@@ -1,52 +1,24 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sat, 18 Jun 2016 02:54:28 +0300
-Subject: [PATCH 19/19] arm64:ilp32: add ARM64_ILP32 to Kconfig
-In-Reply-To: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1466207668-10549-20-git-send-email-ynorov@caviumnetworks.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 18 Jun 2016 10:02:38 +0200
+Subject: [PATCH 1/2] pinctrl: uniphier: prohibit drive control for pin
+ 61-66 of PH1-LD11
+In-Reply-To: <1465978686-28578-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1465978686-28578-1-git-send-email-yamada.masahiro@socionext.com>
+ <1465978686-28578-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdYjGXN1753bbHx-sQfekzUQWg+QSORTMNg4yrSyjFfnqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+On Wed, Jun 15, 2016 at 10:18 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-This patch adds the config option for ILP32.
+> According to the hardware document, setting the drive control is
+> prohibited for these pins (N-channel Open Drain pins).  Set their
+> drive control attribute to "fixed".
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
----
- arch/arm64/Kconfig | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+Patch applied.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index f5735ec..2897648 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -972,7 +972,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	bool
--	depends on AARCH32_EL0
-+	depends on AARCH32_EL0 || ARM64_ILP32
- 
- config AARCH32_EL0
- 	bool "Kernel support for 32-bit EL0"
-@@ -994,6 +994,14 @@ config AARCH32_EL0
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config ARM64_ILP32
-+	bool "Kernel support for ILP32"
-+	select COMPAT
-+	help
-+	  This option enables support for AArch64 ILP32 user space.  ILP32
-+	  is an ABI where long and pointers are 32bits but it uses the AARCH64
-+	  instruction set.
-+
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
--- 
-2.7.4
+Yours,
+Linus Walleij
