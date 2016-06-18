@@ -1,42 +1,88 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 18 Jun 2016 19:59:47 +0200
-Subject: [PATCH v2 04/11] mmc: sdhci-of-arasan: Properly set
- corecfg_baseclkfreq on rk3399
-In-Reply-To: <1465859076-4868-5-git-send-email-dianders@chromium.org>
-References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
- <1465859076-4868-5-git-send-email-dianders@chromium.org>
-Message-ID: <2413456.oe4vm1F1Mq@phil>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Sat, 18 Jun 2016 13:07:35 -0500
+Subject: [PATCH v1 00/25] PCI: Request host bridge window resources
+In-Reply-To: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20160618180735.GB20504@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 13. Juni 2016, 16:04:28 schrieb Douglas Anderson:
-> In the the earlier change in this series ("Documentation: mmc:
-> sdhci-of-arasan: Add soc-ctl-syscon for corecfg regs") we can see the
-> mechansim for specifying a syscon to properly set corecfg registers in
-> sdhci-of-arasan.  Now let's use this mechanism to properly set
-> corecfg_baseclkfreq on rk3399.
+On Mon, Jun 06, 2016 at 06:04:44PM -0500, Bjorn Helgaas wrote:
+> Several host bridge drivers (designware and all derivatives, iproc,
+> xgene, xilinx, and xilinx-nwl) don't request the MMIO and I/O port
+> windows they forward downstream to the PCI bus.
 > 
-> From [1] the corecfg_baseclkfreq is supposed to be set to:
->   Base Clock Frequency for SD Clock.
->   This is the frequency of the xin_clk.
+> That means the PCI core can't request resources for PCI bridge
+> windows and PCI BARs.
 > 
-> This is a relatively easy thing to do.  Note that we assume that xin_clk
-> is not dynamic and we can check the clock at probe time.  If any real
-> devices have a dynamic xin_clk future patches could register for
-> notifiers for the clock.
+> Several other drivers (altera, generic, mvebu, rcar, tegra) do request
+> the windows, but use some duplicated code to do it.
 > 
-> At the moment, setting corecfg_baseclkfreq is only supported for rk3399
-> since we need a specific map for each implementation.  The code is
-> written in a generic way that should make this easy to extend to other
-> SoCs.  Note that a specific compatible string for rk3399 is already in
-> use and so we add that to the table to match rk3399.
+> This adds a new devm_request_pci_bus_resources() interface and changes
+> these drivers to use it.  It also fixes several error paths where we failed
+> to free the resource list allocated by of_pci_get_host_bridge_resources().
 > 
-> [1]:
-> https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
+> Tegra guys, please take a look at "PCI: tegra: Remove top-level resource
+> from hierarchy" in particular.  Removing the top-level resource definitely
+> makes /proc/iomem look uglier (although it will look more like that of
+> other drivers).  A short-term fix could be to include device information in
+> the resource name.  I think a better long-term fix would be to make the DT
+> or platform device core request all the resources from the DT.
 > 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> Comments welcome.  I expect we'll trip over something here, so I marked
+> this "v1" and I don't plan to put it into -next for a while.
+> 
+> This is on my pci/host-request-windows branch, which you can pull or view
+> at https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-request-windows
 
-this looks nice and versatile for other socs hopefully using that in the 
-future.
+I merged this to my -next branch, so it should show up in linux-next
+in a couple days.  Let me know if you see any problems.
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Bjorn Helgaas (25):
+>       PCI: Add devm_request_pci_bus_resources()
+>       PCI: designware: Free bridge resource list on failure
+>       PCI: designware: Request host bridge window resources
+>       PCI: designware: Simplify host bridge window iteration
+>       PCI: iproc: Request host bridge window resources
+>       PCI: xgene: Free bridge resource list on failure
+>       PCI: xgene: Request host bridge window resources
+>       PCI: xilinx: Free bridge resource list on failure
+>       PCI: xilinx: Request host bridge window resources
+>       PCI: xilinx-nwl: Free bridge resource list on failure
+>       PCI: xilinx-nwl: Request host bridge window resources
+>       PCI: xilinx-nwl: Use dev_printk() when possible
+>       PCI: altera: Request host bridge window resources with core function
+>       PCI: altera: Simplify host bridge window iteration
+>       PCI: generic: Free resource list close to where it's allocated
+>       PCI: generic: Request host bridge window resources with core function
+>       PCI: generic: Simplify host bridge window iteration
+>       PCI: mvebu: Request host bridge window resources with core function
+>       PCI: rcar Gen2: Request host bridge window resources
+>       PCI: rcar: Request host bridge window resources with core function
+>       PCI: rcar: Simplify host bridge window iteration
+>       PCI: tegra: Remove top-level resource from hierarchy
+>       PCI: tegra: Request host bridge window resources with core function
+>       PCI: versatile: Request host bridge window resources with core function
+>       PCI: versatile: Simplify host bridge window iteration
+> 
+> 
+>  drivers/pci/bus.c                  |   29 +++++++++++++++++
+>  drivers/pci/host/pci-host-common.c |   61 +++++++++++++++---------------------
+>  drivers/pci/host/pci-mvebu.c       |   17 ++++------
+>  drivers/pci/host/pci-rcar-gen2.c   |    4 ++
+>  drivers/pci/host/pci-tegra.c       |   35 +++------------------
+>  drivers/pci/host/pci-versatile.c   |   29 ++++++-----------
+>  drivers/pci/host/pci-xgene.c       |   16 ++++++++-
+>  drivers/pci/host/pcie-altera.c     |   35 ++++++---------------
+>  drivers/pci/host/pcie-designware.c |   34 +++++++++++++-------
+>  drivers/pci/host/pcie-iproc.c      |    4 ++
+>  drivers/pci/host/pcie-rcar.c       |   33 +++++--------------
+>  drivers/pci/host/pcie-xilinx-nwl.c |   20 +++++++++---
+>  drivers/pci/host/pcie-xilinx.c     |   16 ++++++++-
+>  include/linux/pci.h                |    5 ++-
+>  14 files changed, 170 insertions(+), 168 deletions(-)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
