@@ -1,103 +1,42 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 18 Jun 2016 12:58:45 -0500
-Subject: [PATCH v1 00/25] PCI: Request host bridge window resources
-In-Reply-To: <20160607131105.GA2543@localhost>
-References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <3416214.BpvATlfaN7@wuerfel> <20160607131105.GA2543@localhost>
-Message-ID: <20160618175845.GA20504@localhost>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 18 Jun 2016 19:59:47 +0200
+Subject: [PATCH v2 04/11] mmc: sdhci-of-arasan: Properly set
+ corecfg_baseclkfreq on rk3399
+In-Reply-To: <1465859076-4868-5-git-send-email-dianders@chromium.org>
+References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
+ <1465859076-4868-5-git-send-email-dianders@chromium.org>
+Message-ID: <2413456.oe4vm1F1Mq@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 08:11:05AM -0500, Bjorn Helgaas wrote:
-> On Tue, Jun 07, 2016 at 10:21:36AM +0200, Arnd Bergmann wrote:
-> > On Monday, June 6, 2016 6:04:44 PM CEST Bjorn Helgaas wrote:
-> > > Several host bridge drivers (designware and all derivatives, iproc,
-> > > xgene, xilinx, and xilinx-nwl) don't request the MMIO and I/O port
-> > > windows they forward downstream to the PCI bus.
-> > > 
-> > > That means the PCI core can't request resources for PCI bridge
-> > > windows and PCI BARs.
-> > > 
-> > > Several other drivers (altera, generic, mvebu, rcar, tegra) do request
-> > > the windows, but use some duplicated code to do it.
-> > > 
-> > > This adds a new devm_request_pci_bus_resources() interface and changes
-> > > these drivers to use it.  It also fixes several error paths where we failed
-> > > to free the resource list allocated by of_pci_get_host_bridge_resources().
-> > > 
-> > > Tegra guys, please take a look at "PCI: tegra: Remove top-level resource
-> > > from hierarchy" in particular.  Removing the top-level resource definitely
-> > > makes /proc/iomem look uglier (although it will look more like that of
-> > > other drivers).  A short-term fix could be to include device information in
-> > > the resource name.  I think a better long-term fix would be to make the DT
-> > > or platform device core request all the resources from the DT.
-> > > 
-> > > Comments welcome.  I expect we'll trip over something here, so I marked
-> > > this "v1" and I don't plan to put it into -next for a while.
-> > > 
-> > > This is on my pci/host-request-windows branch, which you can pull or view
-> > > at https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-request-windows
-> > 
-> > This looks very nice. There is one related aspect that I have been
-> > grumbling about for a while, but I don't know what the driver is
-> > actually supposed to do there:
-> > 
-> > For the IORESOURCE_IO resources, some drivers request the MMIO address
-> > that the window is mapped into, some drivers request the PIO range, and
-> > some of them request both. I also believe the resource that gets put
-> > into the bridge resources list is not always the same one (or maybe
-> > that got fixed by now).
-> > 
-> > What do you think is the correct behavior here, should the driver only
-> > request the PIO range with parent=ioport_resource, or should it also
-> > request the MMIO window for the I/O ports with parent=iomem_resource?
-> > In the latter case, any idea how that can be generalized?
+Am Montag, 13. Juni 2016, 16:04:28 schrieb Douglas Anderson:
+> In the the earlier change in this series ("Documentation: mmc:
+> sdhci-of-arasan: Add soc-ctl-syscon for corecfg regs") we can see the
+> mechansim for specifying a syscon to properly set corecfg registers in
+> sdhci-of-arasan.  Now let's use this mechanism to properly set
+> corecfg_baseclkfreq on rk3399.
 > 
-> I think it should request both because I think iomem_resource should
-> contain everything in the memory map.  This would be required if we ever
-> did any significant reassignment of top-level devices, e.g., ACPI devices.
-> For example, on ia64, we do this:
+> From [1] the corecfg_baseclkfreq is supposed to be set to:
+>   Base Clock Frequency for SD Clock.
+>   This is the frequency of the xin_clk.
 > 
->   /proc/ioports:
->   00000000-00003fff : PCI Bus 0000:00
->   00004000-00009fff : PCI Bus 0000:80
->   0000a000-0000bfff : PCI Bus 0000:a0
->   0000c000-0000ffff : PCI Bus 0000:c0
+> This is a relatively easy thing to do.  Note that we assume that xin_clk
+> is not dynamic and we can check the clock at probe time.  If any real
+> devices have a dynamic xin_clk future patches could register for
+> notifiers for the clock.
 > 
->   /proc/iomem:
->   80000000-9fffffff : PCI Bus 0000:00
->   a0000000-cfffffff : PCI Bus 0000:80
->   d0000000-dfffffff : PCI Bus 0000:a0
->   e0000000-fdffffff : PCI Bus 0000:c0
->   80004000000-80103fffffe : PCI Bus 0000:00
->   c0004000000-c0103fffffe : PCI Bus 0000:80
->   d0004000000-d0103fffffe : PCI Bus 0000:a0
->   e0004000000-e0103fffffe : PCI Bus 0000:c0
->   3fffffc000000-3fffffcffffff : PCI Bus 0000:00 I/O Ports 00000000-00003fff
->   3fffffd000000-3fffffe7fffff : PCI Bus 0000:80 I/O Ports 00004000-00009fff
->   3fffffe800000-3fffffeffffff : PCI Bus 0000:a0 I/O Ports 0000a000-0000bfff
->   3ffffff000000-3ffffffffffff : PCI Bus 0000:c0 I/O Ports 0000c000-0000ffff
+> At the moment, setting corecfg_baseclkfreq is only supported for rk3399
+> since we need a specific map for each implementation.  The code is
+> written in a generic way that should make this easy to extend to other
+> SoCs.  Note that a specific compatible string for rk3399 is already in
+> use and so we add that to the table to match rk3399.
 > 
-> > Another aspect is that we already have the
-> > gen_pci_parse_request_of_pci_ranges() function that does the same as your
-> > new devm_request_pci_bus_resources() and then a few other things. I
-> > have been wondering whether we could move that function into common
-> > code convert drivers to use that wherever possible, but I guess we can
-> > always do that as a follow-up after this series.
+> [1]:
+> https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
 > 
-> Oh, I didn't notice that; thanks for pointing it out.  That should be
-> consolidated somehow.  It also checks to be sure there is a
-> non-prefetchable memory resource.  A few other drivers also do that, but
-> most don't.  I suppose that will mostly catch DT errors.
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
-Coming back to this, I did actually change
-gen_pci_parse_request_of_pci_ranges() to call my new function in
-[16/25] "PCI: generic: Request host bridge window resources with core
-function".
+this looks nice and versatile for other socs hopefully using that in the 
+future.
 
-The gen_pci_parse_request_of_pci_ranges() is still there and it still
-contains the loop to deal with the I/O port space and to validate that
-a non-prefetchable memory window exists.  Both of those could probably
-be made more generic later.
-
-Bjorn
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
