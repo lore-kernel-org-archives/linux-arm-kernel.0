@@ -1,24 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 18 Jun 2016 10:30:18 +0200
-Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
- of aliases
-In-Reply-To: <5761265F.2050508@ti.com>
-References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
- <20160615072404.GB26768@pengutronix.de> <20160615082705.GW22406@atomide.com>
- <5761265F.2050508@ti.com>
-Message-ID: <CACRpkdZ178-P=uVx7PTZdR4ut6fToNbNn+d70y21QRKtwrk9Dg@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 18 Jun 2016 11:28:06 +0200
+Subject: [PATCH v5 0/4] usb: musb: sunxi: Fixes + peripheral-only mode
+Message-ID: <1466242090-22264-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 11:56 AM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
+Hi Kishon,
 
-> Wouldn't gpio-line-names be helpful for such cases as mentioned in [1],[2]
-> But I don't know it these properties were exposed in legacy GPIO sysfs interface also.
+I noticed that you've merged a phy-sun4i-usb fix into your linux-phy/fixes
+branch, this caused a conflict in the 3th patch of this set, so I'm
+posting a new rebased version here.
 
-The line names only expose through the chardev interface because the
-sysfs ABI is frozen and should not be extended.
+Since these patches depend on each other and now also depend on changes
+in your fixes branch, can you please merge all 4 for next through your
+tree?
 
-Yours,
-Linus Walleij
+Thanks & Regards,
+
+Hans
