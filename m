@@ -1,41 +1,44 @@
-From: andi@etezian.org (Andi Shyti)
-Date: Sun, 19 Jun 2016 15:09:02 +0900
-Subject: [PATCH 1/5] spi: do not fail if the CS line is not connected
-In-Reply-To: <20160617122803.GN26099@sirena.org.uk>
-References: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
- <1466150245-2648-2-git-send-email-andi.shyti@samsung.com>
- <20160617104725.GC26099@sirena.org.uk>
- <20160617113622.GA10760@jack.zhora.eu>
- <20160617122803.GN26099@sirena.org.uk>
-Message-ID: <20160619060902.GB424@jack.zhora.eu>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 18 Jun 2016 22:58:48 -0700
+Subject: [GIT PULL] omap fixes for v4.7-rc cycle
+In-Reply-To: <20160614081101.GV22406@atomide.com>
+References: <20160614081101.GV22406@atomide.com>
+Message-ID: <20160619055848.GA16376@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-> > > > In this case do not fail and defer to the SPI device drivers the
-> > > > responsibility to check whether the num-cs is '0'.
+On Tue, Jun 14, 2016 at 01:11:02AM -0700, Tony Lindgren wrote:
+> The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
 > 
-> > > A SPI controller always has one chip seelct, it may not be controllable
-> > > but it's at least logically present.
+>   Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
 > 
-> > This is true, but there are cases where the CS is not connected
-> > and this case needs to be treated separately to allow the device
-> > to work.
+> are available in the git repository at:
 > 
-> In what way?  It is just as easy for a device with no physical chip
-> select to have a logical chip select of 0 that it does nothing with as
-> it is for that device to handle any other number.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.7/fixes-powedomain
+> 
+> for you to fetch changes up to 6b41d44862e8f3a4b95102c6ff6cad3fccc7994b:
+> 
+>   ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_mem_ret (2016-06-13 01:04:01 -0700)
+> 
+> ----------------------------------------------------------------
+> Fixes for omaps for v4.7-rc cycle:
+> 
+> - Fix dra7 for hardware issues limiting L4Per and L3init power domains
+>   to on state. Without this the devices may not work correctly after
+>   some time of use because of asymmetric aging. And related to this,
+>   let's also remove the unusable states.
+> 
+> - Always select omap interconnect for am43x as otherwise the am43x
+>   only configurations will not boot properly. This can happen easily
+>   for any product kernels that leave out other SoCs to save memory.
+> 
+> - Fix DSS PLL2 addresses that have gone unused for now
+> 
+> - Select erratum 430973 for omap3, this is now safe to do and can
+>   save quite a bit of debugging time for people who may have left
+>   it out.
 
-That is indeed my case: the s3c64xx doesn't send anything, unless
-I manually enable CS (from the next patches I need to write '0'
-in the CS register). But I need smoething to tell to the
-device that the CS line is not connected, for example a flag in
-the DTS.
+Grmbl, our fixes branch was only at -rc1, but I merged this anyway.
 
-It comes natural to me to set "num-cs = <0>" instead of defining
-a new property. In this case I will consider that there is no CS
-line, even though there is a CS controller.
 
-Thanks,
-Andi
+-Olof
