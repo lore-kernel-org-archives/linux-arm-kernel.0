@@ -1,62 +1,20 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 19 Jun 2016 22:52:36 +0800
-Subject: [PATCH v2 2/2] mtd: nand: sunxi: add reset line support
-In-Reply-To: <20160619145236.43769-1-icenowy@aosc.xyz>
-References: <20160619145236.43769-1-icenowy@aosc.xyz>
-Message-ID: <20160619145236.43769-2-icenowy@aosc.xyz>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 19 Jun 2016 09:54:56 -0500
+Subject: [PATCH] dt-bindings: ci-hdrc-usb2:
+ s/gadget-itc-setting/itc-setting in example
+In-Reply-To: <1466064798-867-1-git-send-email-jszhang@marvell.com>
+References: <1466064798-867-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20160619145456.GA24770@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND controller on some sun8i chips needs its reset line to be deasserted
-before they can enter working state. This commit added the reset line process
-to the driver.
+On Thu, Jun 16, 2016 at 04:13:18PM +0800, Jisheng Zhang wrote:
+> What the code expect is "itc-setting" rather than "gadget-itc-setting",
+> and this is also correctly described in the optional properties.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes in v2:
-  - Corrected the error checking code of reset line.
-
- drivers/mtd/nand/sunxi_nand.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index a83a690..d178c1a 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -39,6 +39,7 @@
- #include <linux/gpio.h>
- #include <linux/interrupt.h>
- #include <linux/iopoll.h>
-+#include <linux/reset.h>
- 
- #define NFC_REG_CTL		0x0000
- #define NFC_REG_ST		0x0004
-@@ -269,6 +270,7 @@ struct sunxi_nfc {
- 	void __iomem *regs;
- 	struct clk *ahb_clk;
- 	struct clk *mod_clk;
-+	struct reset_control *reset;
- 	unsigned long assigned_cs;
- 	unsigned long clk_rate;
- 	struct list_head chips;
-@@ -1871,6 +1873,18 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out_ahb_clk_unprepare;
- 
-+	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
-+	if (PTR_ERR(nfc->reset) != -ENOENT)
-+		return PTR_ERR(nfc->reset);
-+
-+	if (!IS_ERR(nfc->reset)) {
-+		ret = reset_control_deassert(nfc->reset);
-+		if (ret) {
-+			dev_err(dev, "reset err %d\n", ret);
-+			goto out_mod_clk_unprepare;
-+		}
-+	}
-+
- 	ret = sunxi_nfc_rst(nfc);
- 	if (ret)
- 		goto out_mod_clk_unprepare;
--- 
-2.9.0
+Acked-by: Rob Herring <robh@kernel.org>
