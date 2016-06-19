@@ -1,46 +1,46 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Sat, 18 Jun 2016 17:31:05 -0700
-Subject: [PATCH v3 2/5] i.MX: system.c: Remove redundant errata 752271 code
+Date: Sat, 18 Jun 2016 17:31:04 -0700
+Subject: [PATCH 2/2] ARM: cache-l2x0.c: Do not clear bit 23 in prefetch
+ control register
 In-Reply-To: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
 References: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <1466296268-27099-5-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <1466296268-27099-4-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Applying a fix for ARM errata 752271 would already be taken care by a
-call to a 'fixup' hook as a part of l2x0_of_init() -> __l2c_init() call
-chain. Moreso the code in 'fixup' function would do that based on the
-PL310's revsion information, whereas removed code does so based on SoC
-version which does not work very well on i.MX6Q+ which identifies itself
-as i.MX6Q as well but is not affected by 752271.
+As per L2C-310 TRM[1]:
+
+"... You can control this feature using bits 30,27 and 23 of the
+Prefetch Control Register. Bit 23 and 27 are only used if you set bit 30
+HIGH..."
+
+which means there is no need to clear bit 23 if bit 30 is being cleared.
+
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246e/CJAJACBJ.html
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/mach-imx/system.c | 11 -----------
- 1 file changed, 11 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index d9f8b0e..b153376 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -110,17 +110,6 @@ void __init imx_init_l2cache(void)
- 		/* Configure the L2 PREFETCH and POWER registers */
- 		val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
- 		val |= 0x70800000;
--		/*
--		 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
--		 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
--		 * But according to ARM PL310 errata: 752271
--		 * ID: 752271: Double linefill feature can cause data corruption
--		 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
--		 * Workaround: The only workaround to this erratum is to disable the
--		 * double linefill feature. This is the default behavior.
--		 */
--		if (cpu_is_imx6q())
--			val &= ~(1 << 30 | 1 << 23);
- 		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
- 	}
- 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 30e2012..12c1ba7 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -715,11 +715,8 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	if (revision >= L310_CACHE_ID_RTL_R3P0 &&
+ 	    revision < L310_CACHE_ID_RTL_R3P2) {
+ 		u32 val = l2x0_saved_regs.prefetch_ctrl;
+-		/* I don't think bit23 is required here... but iMX6 does so */
+-		if (val & (L310_PREFETCH_CTRL_DBL_LINEFILL |
+-			   L310_PREFETCH_CTRL_DBL_LINEFILL_INCR)) {
+-			val &= ~(L310_PREFETCH_CTRL_DBL_LINEFILL |
+-				 L310_PREFETCH_CTRL_DBL_LINEFILL_INCR);
++		if (val & L310_PREFETCH_CTRL_DBL_LINEFILL) {
++			val &= ~L310_PREFETCH_CTRL_DBL_LINEFILL;
+ 			l2x0_saved_regs.prefetch_ctrl = val;
+ 			errata[n++] = "752271";
+ 		}
 -- 
 2.5.5
