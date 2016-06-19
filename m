@@ -1,127 +1,39 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Sat, 18 Jun 2016 17:31:08 -0700
-Subject: [PATCH v3 5/5] i.MX: Do not explicitly call l2x0_of_init()
-In-Reply-To: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
-References: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <1466296268-27099-8-git-send-email-andrew.smirnov@gmail.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Sun, 19 Jun 2016 03:00:02 +0200
+Subject: [PATCH v4 3/3] ARM: tegra: enable sgtl5000 audio
+In-Reply-To: <1466298002-12576-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1466298002-12576-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <1466298002-12576-4-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to explicitly call l2x0_of_init() since it will be
-called as a part of init_IRQ() (see arch/arm/kernel/irq.c for
-details). This way we can simplify imx_init_l2cache() and ditch the call
-to it on i.MX35 (which does not claim compatibility with
-"arm,pl310-cache") alltogether.
+The NVIDIA Tegra 3 aka T30 based Apalis T30 and Colibri T30 as well as
+the new Tegra K1 aka TK1 based Apalis TK1 modules contain a Freescale
+SGTL5000 analogue audio codec.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 ---
- arch/arm/mach-imx/imx35-dt.c    | 10 +++-------
- arch/arm/mach-imx/mach-imx6q.c  |  2 ++
- arch/arm/mach-imx/mach-imx6sl.c |  2 ++
- arch/arm/mach-imx/mach-imx6sx.c |  2 ++
- arch/arm/mach-imx/system.c      | 12 ++++--------
- 5 files changed, 13 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-imx/imx35-dt.c b/arch/arm/mach-imx/imx35-dt.c
-index e939603..99bb63d 100644
---- a/arch/arm/mach-imx/imx35-dt.c
-+++ b/arch/arm/mach-imx/imx35-dt.c
-@@ -20,20 +20,16 @@
- #include "common.h"
- #include "mx35.h"
- 
--static void __init imx35_irq_init(void)
--{
--	imx_init_l2cache();
--	mx35_init_irq();
--}
--
- static const char * const imx35_dt_board_compat[] __initconst = {
- 	"fsl,imx35",
- 	NULL
- };
- 
- DT_MACHINE_START(IMX35_DT, "Freescale i.MX35 (Device Tree Support)")
-+	.l2c_aux_val 	= 0,
-+	.l2c_aux_mask	= ~0,
- 	.map_io		= mx35_map_io,
- 	.init_early	= imx35_init_early,
--	.init_irq	= imx35_irq_init,
-+	.init_irq	= mx35_init_irq,
- 	.dt_compat	= imx35_dt_board_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index cb27d56..b31890f 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -407,6 +407,8 @@ static const char * const imx6q_dt_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad/DualLite (Device Tree)")
-+	.l2c_aux_val 	= 0,
-+	.l2c_aux_mask	= ~0,
- 	.smp		= smp_ops(imx_smp_ops),
- 	.map_io		= imx6q_map_io,
- 	.init_irq	= imx6q_init_irq,
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index 3003263..f9a9a36 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -75,6 +75,8 @@ static const char * const imx6sl_dt_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite (Device Tree)")
-+	.l2c_aux_val 	= 0,
-+	.l2c_aux_mask	= ~0,
- 	.init_irq	= imx6sl_init_irq,
- 	.init_machine	= imx6sl_init_machine,
- 	.init_late      = imx6sl_init_late,
-diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
-index 6a0b061..07a3a34 100644
---- a/arch/arm/mach-imx/mach-imx6sx.c
-+++ b/arch/arm/mach-imx/mach-imx6sx.c
-@@ -103,6 +103,8 @@ static const char * const imx6sx_dt_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(IMX6SX, "Freescale i.MX6 SoloX (Device Tree)")
-+	.l2c_aux_val 	= 0,
-+	.l2c_aux_mask	= ~0,
- 	.init_irq	= imx6sx_init_irq,
- 	.init_machine	= imx6sx_init_machine,
- 	.dt_compat	= imx6sx_dt_compat,
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index d1300b9..a6212f0 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -98,13 +98,11 @@ void __init imx_init_l2cache(void)
- 
- 	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
- 	if (!np)
--		goto out;
-+		return;
- 
- 	l2x0_base = of_iomap(np, 0);
--	if (!l2x0_base) {
--		of_node_put(np);
--		goto out;
--	}
-+	if (!l2x0_base)
-+		goto put_node;
- 
- 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
- 		/* Configure the L2 PREFETCH and POWER registers */
-@@ -121,9 +119,7 @@ void __init imx_init_l2cache(void)
- 	}
- 
- 	iounmap(l2x0_base);
-+put_node:
- 	of_node_put(np);
--
--out:
--	l2x0_of_init(0, ~0);
- }
- #endif
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
+
+ arch/arm/configs/tegra_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index bc80a47..c1d0f91 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -216,6 +216,7 @@ CONFIG_SND_SOC_TEGRA_WM9712=y
+ CONFIG_SND_SOC_TEGRA_TRIMSLICE=y
+ CONFIG_SND_SOC_TEGRA_ALC5632=y
+ CONFIG_SND_SOC_TEGRA_MAX98090=y
++CONFIG_SND_SOC_TEGRA_SGTL5000=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_TEGRA=y
 -- 
 2.5.5
