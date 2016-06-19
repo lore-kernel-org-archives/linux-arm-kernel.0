@@ -1,78 +1,107 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 19 Jun 2016 17:52:18 +0200
-Subject: [PATCH v4 2/2] mtd: nand: sunxi: add reset line support
-In-Reply-To: <20160619154035.45658-2-icenowy@aosc.xyz>
-References: <20160619154035.45658-1-icenowy@aosc.xyz>
- <20160619154035.45658-2-icenowy@aosc.xyz>
-Message-ID: <20160619175218.61f6eb88@bbrezillon>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Sun, 19 Jun 2016 18:11:47 +0200
+Subject: [PATCH v10 7/9] irqchip/gicv3-its: register the MSI global
+ doorbell
+In-Reply-To: <20160617163327.GA26522@e106794-lin.localdomain>
+References: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
+ <1465315288-5931-8-git-send-email-eric.auger@redhat.com>
+ <20160617163327.GA26522@e106794-lin.localdomain>
+Message-ID: <eabd5d27-f19d-b641-2db6-775830bffc50@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 19 Jun 2016 23:40:35 +0800
-Icenowy Zheng <icenowy@aosc.xyz> wrote:
+Hi Jean-Philippe,
 
-> The NAND controller on some sun8i chips needs its reset line to be deasserted
-> before they can enter working state. This commit added the reset line process
-> to the driver.
+On 17/06/2016 18:33, Jean-Philippe Brucker wrote:
+> Hi Eric,
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> Changes in v2:
->   - Corrected the error checking code of reset line.
+> On Tue, Jun 07, 2016 at 04:01:26PM +0000, Eric Auger wrote:
+>> This patch adds the registration of the MSI global doorbell in
+>> gicv3-its driver.
+>>
+>> This will allow the msi layer to iommu_map this doorbell when
+>> requested.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 5eb1f9e..ed9dfce 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -29,6 +29,8 @@
+>>  #include <linux/of_platform.h>
+>>  #include <linux/percpu.h>
+>>  #include <linux/slab.h>
+>> +#include <linux/iommu.h>
+>> +#include <linux/msi-doorbell.h>
+>>  
+>>  #include <linux/irqchip.h>
+>>  #include <linux/irqchip/arm-gic-v3.h>
+>> @@ -1607,6 +1609,7 @@ static int __init its_probe(struct device_node *node,
+>>  
+>>  	if (of_property_read_bool(node, "msi-controller")) {
+>>  		struct msi_domain_info *info;
+>> +		phys_addr_t translater;
+>>  
+>>  		info = kzalloc(sizeof(*info), GFP_KERNEL);
+>>  		if (!info) {
+>> @@ -1614,10 +1617,21 @@ static int __init its_probe(struct device_node *node,
+>>  			goto out_free_tables;
+>>  		}
+>>  
+>> +		translater = its->phys_base + GITS_TRANSLATER;
+>> +		err = msi_doorbell_register_global(its, translater,
+>> +						sizeof(u32),
+>> +						IOMMU_WRITE | IOMMU_MMIO, true);
 > 
-> Changes in v3:
->   - Corrected a more serious error brought in the "fix" of v2.
-> 
-> Changes in v4:
->   - Removed unneeded code block after "else".
-> 
->  drivers/mtd/nand/sunxi_nand.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index a83a690..b37075b 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-> @@ -39,6 +39,7 @@
->  #include <linux/gpio.h>
->  #include <linux/interrupt.h>
->  #include <linux/iopoll.h>
-> +#include <linux/reset.h>
->  
->  #define NFC_REG_CTL		0x0000
->  #define NFC_REG_ST		0x0004
-> @@ -269,6 +270,7 @@ struct sunxi_nfc {
->  	void __iomem *regs;
->  	struct clk *ahb_clk;
->  	struct clk *mod_clk;
-> +	struct reset_control *reset;
->  	unsigned long assigned_cs;
->  	unsigned long clk_rate;
->  	struct list_head chips;
-> @@ -1871,6 +1873,19 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto out_ahb_clk_unprepare;
->  
-> +	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
-> +
-> +	if (!IS_ERR(nfc->reset)) {
-> +		ret = reset_control_deassert(nfc->reset);
-> +		if (ret) {
-> +			dev_err(dev, "reset err %d\n", ret);
-> +			goto out_mod_clk_unprepare;
-> +		}
-> +	}
-> +	else if (PTR_ERR(nfc->reset) != -ENOENT) {
+> This doesn't work :(
 
-	} else if (...) {
+Sorry to hear that.
 
-> +		return PTR_ERR(nfc->reset);
-> +	}
-> +
->  	ret = sunxi_nfc_rst(nfc);
->  	if (ret)
->  		goto out_mod_clk_unprepare;
+Thank you for testing with ITS. As mentioned in the part 3 cover letter,
+I could not test assignment with this MSI controller; I now have access
+to it so I am going to test it from next release onwards.
+> 
+> First we have its_probe registering the global mapping with
+> doorbell->chip_data = its, which is a pointer to an its_node structure.
+> 
+> But when enabling MSIs for a device, its_irq_domain_alloc puts a pointer
+> to an *its_device* into irq_data->chip_data. This seems to be a
+> per-device structure, allocated by its_msi_prepare.
+Hum OK, I missed the fact the chip_data was overwritten on
+its_irq_domain_alloc. I will investigate what we have as other alternatives.
+
+Thank you for the time spent on debugging that ;-)
+
+Best Regards
+
+Eric
 
 
-And you should probably reassert the reset line in case of errors and
-in the ->remove() hook.
+> 
+> The following call to msi_doorbell_lookup won't ever succeed, because it
+> will compare its_node to its_device. I can't figure out how to fix it
+> cleanly at the moment.
+> 
+> Jean-Philippe
+> 
+>> +		if (err)  {
+>> +			kfree(info);
+>> +			goto out_free_tables;
+>> +		}
+>> +
+>> +
+>>  		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
+>>  		if (!inner_domain) {
+>>  			err = -ENOMEM;
+>>  			kfree(info);
+>> +			msi_doorbell_unregister(its);
+>>  			goto out_free_tables;
+>>  		}
+>>  
+>> -- 
+>> 1.9.1
+>>
