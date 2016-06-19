@@ -1,36 +1,46 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Sat, 18 Jun 2016 17:31:02 -0700
-Subject: [PATCH 1/2] ARM: cache-l2x0.c: Replace magic numbers
+Date: Sat, 18 Jun 2016 17:31:05 -0700
+Subject: [PATCH v3 2/5] i.MX: system.c: Remove redundant errata 752271 code
 In-Reply-To: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
 References: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <1466296268-27099-2-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <1466296268-27099-5-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace magic numbers used for L310 Prefetch Control Register
+Applying a fix for ARM errata 752271 would already be taken care by a
+call to a 'fixup' hook as a part of l2x0_of_init() -> __l2c_init() call
+chain. Moreso the code in 'fixup' function would do that based on the
+PL310's revsion information, whereas removed code does so based on SoC
+version which does not work very well on i.MX6Q+ which identifies itself
+as i.MX6Q as well but is not affected by 752271.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/mm/cache-l2x0.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/system.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 9f9d542..30e2012 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -716,8 +716,10 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
- 	    revision < L310_CACHE_ID_RTL_R3P2) {
- 		u32 val = l2x0_saved_regs.prefetch_ctrl;
- 		/* I don't think bit23 is required here... but iMX6 does so */
--		if (val & (BIT(30) | BIT(23))) {
--			val &= ~(BIT(30) | BIT(23));
-+		if (val & (L310_PREFETCH_CTRL_DBL_LINEFILL |
-+			   L310_PREFETCH_CTRL_DBL_LINEFILL_INCR)) {
-+			val &= ~(L310_PREFETCH_CTRL_DBL_LINEFILL |
-+				 L310_PREFETCH_CTRL_DBL_LINEFILL_INCR);
- 			l2x0_saved_regs.prefetch_ctrl = val;
- 			errata[n++] = "752271";
- 		}
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index d9f8b0e..b153376 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -110,17 +110,6 @@ void __init imx_init_l2cache(void)
+ 		/* Configure the L2 PREFETCH and POWER registers */
+ 		val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
+ 		val |= 0x70800000;
+-		/*
+-		 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
+-		 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
+-		 * But according to ARM PL310 errata: 752271
+-		 * ID: 752271: Double linefill feature can cause data corruption
+-		 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
+-		 * Workaround: The only workaround to this erratum is to disable the
+-		 * double linefill feature. This is the default behavior.
+-		 */
+-		if (cpu_is_imx6q())
+-			val &= ~(1 << 30 | 1 << 23);
+ 		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
+ 	}
+ 
 -- 
 2.5.5
