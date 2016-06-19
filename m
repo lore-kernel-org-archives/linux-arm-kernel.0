@@ -1,68 +1,48 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Sat, 18 Jun 2016 17:31:03 -0700
-Subject: [PATCH v3 1/5] i.MX: system.c: Convert goto to if statement
+Date: Sat, 18 Jun 2016 17:31:07 -0700
+Subject: [PATCH v3 4/5] i.MX: system.c: Tweak prefetch settings for performance
 In-Reply-To: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
 References: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <1466296268-27099-3-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <1466296268-27099-7-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using goto here doesn't bring any advantages and only makes the code
-flow less clear. No functional changes.
+Update Prefetch Control Register settings to match that of Freescale's
+Linux tree. As the commit e3addf1b773964eac7f797e8538c69481be4279c
+states (author Nitin Garg):
+
+"... set Prefetch offset to 15, since it improves memcpy performance by
+35%. Don't enable Incr double Linefill enable since it adversely affects
+memcpy performance by about 32MB/s and reads by 90MB/s. Tested with 4K
+to 16MB sized src and dst aligned buffer..."
+
+Those results are also corroborated by our own testing.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Chris Healy <cphealy@gmail.com>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/mach-imx/system.c | 36 +++++++++++++++++-------------------
- 1 file changed, 17 insertions(+), 19 deletions(-)
+ arch/arm/mach-imx/system.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 105d1ce..d9f8b0e 100644
+index 7ba9dc8..d1300b9 100644
 --- a/arch/arm/mach-imx/system.c
 +++ b/arch/arm/mach-imx/system.c
-@@ -106,26 +106,24 @@ void __init imx_init_l2cache(void)
- 		goto out;
+@@ -111,8 +111,12 @@ void __init imx_init_l2cache(void)
+ 		val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
+ 		val |= L310_PREFETCH_CTRL_DBL_
+ 			L310_PREFETCH_CTRL_INSTR_PREFETCH |
+-			L310_PREFETCH_CTRL_DATA_PREFETCH |
+-			L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
++			L310_PREFETCH_CTRL_DATA_PREFETCH;
++
++		/* Set perfetch offset to improve performance */
++		val &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
++		val |= 15;
++
+ 		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
  	}
- 
--	if (readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)
--		goto skip_if_enabled;
--
--	/* Configure the L2 PREFETCH and POWER registers */
--	val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
--	val |= 0x70800000;
--	/*
--	 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
--	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
--	 * But according to ARM PL310 errata: 752271
--	 * ID: 752271: Double linefill feature can cause data corruption
--	 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
--	 * Workaround: The only workaround to this erratum is to disable the
--	 * double linefill feature. This is the default behavior.
--	 */
--	if (cpu_is_imx6q())
--		val &= ~(1 << 30 | 1 << 23);
--	writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
-+	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-+		/* Configure the L2 PREFETCH and POWER registers */
-+		val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
-+		val |= 0x70800000;
-+		/*
-+		 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
-+		 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
-+		 * But according to ARM PL310 errata: 752271
-+		 * ID: 752271: Double linefill feature can cause data corruption
-+		 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
-+		 * Workaround: The only workaround to this erratum is to disable the
-+		 * double linefill feature. This is the default behavior.
-+		 */
-+		if (cpu_is_imx6q())
-+			val &= ~(1 << 30 | 1 << 23);
-+		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
-+	}
- 
--skip_if_enabled:
- 	iounmap(l2x0_base);
- 	of_node_put(np);
  
 -- 
 2.5.5
