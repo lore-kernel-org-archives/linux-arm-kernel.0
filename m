@@ -1,44 +1,38 @@
-From: clive.messer@digitaldreamtime.co.uk (Clive Messer)
-Date: Sun, 19 Jun 2016 18:52:19 +0100
-Subject: [PATCH 1/1] ASoC: bcm2835-i2s: Support 384k sample rate
-Message-ID: <1466358739-31669-1-git-send-email-clive.messer@digitaldreamtime.co.uk>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Sun, 19 Jun 2016 10:53:13 -0700
+Subject: [PATCH v3 0/5] i.MX L2-cache code cleanups and performance tweaks
+In-Reply-To: <114981982.VXDIiN0rdz@wuerfel>
+References: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
+ <114981982.VXDIiN0rdz@wuerfel>
+Message-ID: <CAHQ1cqGQm1jXAx0C97qODGEOM_r91aRZ50c_p5vJfHifOL3hiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for sample rates up to 384k to bcm2835-i2s driver,
-with SNDRV_PCM_RATE_CONTINUOUS and specifying 8k min and 384k max,
-for both playback and capture.
+ One more question, less about your patches than the existing code:
+>
+> After going through the current users of l2x0_init for board files,
+> I noticed that imx35 enables l2x0 for both dts and all the board files
+> and has an arm,l210-cache node in its dts, but imx31 only enables
+> it for the board file and in the dt case doesn't init the cache nor
+> does it have the dts node.
+>
+> I'm guessing this is a bug on i.mx31 dt support, right?
 
-Signed-off-by: Clive Messer <clive.messer@digitaldreamtime.co.uk>
----
- sound/soc/bcm/bcm2835-i2s.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+I would agree that it is. OTOH, I can't find any i.MX31 boards that
+use device tree. The only file that references imx31.dtsi is
+imx31-bug.dts, but at the same time that board has a dedicated board
+file (mach-bug.c) so I wonder if it was ever used.
 
-diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-index 6ba2049..4a67db2 100644
---- a/sound/soc/bcm/bcm2835-i2s.c
-+++ b/sound/soc/bcm/bcm2835-i2s.c
-@@ -578,7 +578,9 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
- 	.playback = {
- 		.channels_min = 2,
- 		.channels_max = 2,
--		.rates =	SNDRV_PCM_RATE_8000_192000,
-+		.rates =	SNDRV_PCM_RATE_CONTINUOUS,
-+		.rate_min =	8000,
-+		.rate_max =	384000,
- 		.formats =	SNDRV_PCM_FMTBIT_S16_LE
- 				| SNDRV_PCM_FMTBIT_S24_LE
- 				| SNDRV_PCM_FMTBIT_S32_LE
-@@ -586,7 +588,9 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
- 	.capture = {
- 		.channels_min = 2,
- 		.channels_max = 2,
--		.rates =	SNDRV_PCM_RATE_8000_192000,
-+		.rates =	SNDRV_PCM_RATE_CONTINUOUS,
-+		.rate_min =	8000,
-+		.rate_max =	384000,
- 		.formats =	SNDRV_PCM_FMTBIT_S16_LE
- 				| SNDRV_PCM_FMTBIT_S24_LE
- 				| SNDRV_PCM_FMTBIT_S32_LE
--- 
-2.5.5
+It looks like Sacha was the author of i.MX31, Sascha do you have any
+comment on this?
+
+There's also another small cleanup opportunity in collapsing
+imx31_dt_timer_init() and mx31_clocks_init_dt() into a single function
+given how the latter always returns 0 and can be converted to void.
+
+I am more than happy to make both changes and include them in the set,
+but I only have i.MX6 HW, and would only be able to do a compile-test,
+so I am not sure if I should.
+
+Thanks,
+Andrey Smirnov
