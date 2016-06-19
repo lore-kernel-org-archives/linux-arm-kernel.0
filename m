@@ -1,65 +1,67 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 19 Jun 2016 23:01:28 +0800
-Subject: [PATCH v3 2/2] mtd: nand: sunxi: add reset line support
-Message-ID: <20160619150128.44443-1-icenowy@aosc.xyz>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 19 Jun 2016 10:04:58 -0500
+Subject: [RESEND PATCH v2 02/13] drivers: clk: st: Simplify clock binding
+ of STiH4xx platforms
+In-Reply-To: <1466068833-5055-3-git-send-email-gabriel.fernandez@linaro.org>
+References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1466068833-5055-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20160619150458.GA26824@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND controller on some sun8i chips needs its reset line to be deasserted
-before they can enter working state. This commit added the reset line process
-to the driver.
+On Thu, Jun 16, 2016 at 11:20:22AM +0200, Gabriel Fernandez wrote:
+> This patch reworks the clock binding to avoid too much detail in DT.
+> Now we have only compatible string per type of clock
+> (remark from Rob https://lkml.org/lkml/2016/5/25/492)
+>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes in v1:
-  - Corrected the error checking code of reset line.
-
-Changes in v2:
-  - Corrected a more serious error brought in the "fix" of v1.
-
- drivers/mtd/nand/sunxi_nand.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index a83a690..8fb5899 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -39,6 +39,7 @@
- #include <linux/gpio.h>
- #include <linux/interrupt.h>
- #include <linux/iopoll.h>
-+#include <linux/reset.h>
+I have no idea what the clock trees and clock controller in these chips 
+look like, so it's hard to say if the changes here are good. It still 
+looks like things are somewhat fine grained clocks in DT. I'll leave 
+it up to the platform maintainers to decide...
  
- #define NFC_REG_CTL		0x0000
- #define NFC_REG_ST		0x0004
-@@ -269,6 +270,7 @@ struct sunxi_nfc {
- 	void __iomem *regs;
- 	struct clk *ahb_clk;
- 	struct clk *mod_clk;
-+	struct reset_control *reset;
- 	unsigned long assigned_cs;
- 	unsigned long clk_rate;
- 	struct list_head chips;
-@@ -1871,6 +1873,20 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out_ahb_clk_unprepare;
- 
-+	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
-+
-+	if (!IS_ERR(nfc->reset)) {
-+		ret = reset_control_deassert(nfc->reset);
-+		if (ret) {
-+			dev_err(dev, "reset err %d\n", ret);
-+			goto out_mod_clk_unprepare;
-+		}
-+	}
-+	else {
-+		if (PTR_ERR(nfc->reset) != -ENOENT)
-+			return PTR_ERR(nfc->reset);
-+	}
-+
- 	ret = sunxi_nfc_rst(nfc);
- 	if (ret)
- 		goto out_mod_clk_unprepare;
--- 
-2.9.0
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  2 +-
+>  .../devicetree/bindings/clock/st/st,clkgen-pll.txt | 11 ++--
+>  .../devicetree/bindings/clock/st/st,clkgen.txt     |  2 +-
+>  .../devicetree/bindings/clock/st/st,quadfs.txt     |  6 +--
+>  drivers/clk/st/clkgen-fsyn.c                       | 41 ++++++--------
+>  drivers/clk/st/clkgen-mux.c                        | 28 ++++------
+>  drivers/clk/st/clkgen-pll.c                        | 62 ++++++++++------------
+>  7 files changed, 65 insertions(+), 87 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+> index 4d277d6..9a46cb1d7 100644
+> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+> @@ -10,7 +10,7 @@ This binding uses the common clock binding[1].
+>  Required properties:
+>  
+>  - compatible : shall be:
+> -	"st,stih407-clkgen-a9-mux",	"st,clkgen-mux"
+> +	"st,stih407-clkgen-a9-mux"
+>  
+>  - #clock-cells : from common clock binding; shall be set to 0.
+>  
+> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+> index c9fd674..be0b043 100644
+> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+> @@ -9,11 +9,10 @@ Base address is located to the parent node. See clock binding[2]
+>  Required properties:
+>  
+>  - compatible : shall be:
+> -	"st,stih407-plls-c32-a0",	"st,clkgen-plls-c32"
+> -	"st,stih407-plls-c32-a9",	"st,clkgen-plls-c32"
+> -	"sst,plls-c32-cx_0",		"st,clkgen-plls-c32"
+> -	"sst,plls-c32-cx_1",		"st,clkgen-plls-c32"
+> -	"st,stih418-plls-c28-a9",	"st,clkgen-plls-c32"
+
+> +	"st,clkgen-pll0"
+> +	"st,clkgen-pll0"
+
+Repeated. Supposed to be 0 and 1? This seems a bit generic, too.
+
+> +	"st,stih407-clkgen-plla9"
+> +	"st,stih418-clkgen-plla9"
