@@ -1,10 +1,12 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 19 Jun 2016 13:04:58 +0200
+Date: Sun, 19 Jun 2016 13:06:10 +0200
 Subject: Auto-detecting touchscreen controller and dealing with hw
  configuration differences on q8 tablets
-Message-ID: <7875aa56-2fa1-16f6-7410-d36bf93f1f89@redhat.com>
+Message-ID: <bc978925-46a4-c069-8793-903a87ec70b8@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+<resend with Pantelis' email address fixed>
 
 Hi All,
 
@@ -94,7 +96,7 @@ I tend towards doing the auto-detect in u-boot, since that will give the greates
 flexibility (the dtb is fully read-writable in u-boot) and I can easily access
 things like i2c-busses, soc id/version register, etc. there.
 
-But before syncing a lot of time in either one of these I first wanted to discuss
+But before sinking a lot of time in either one of these I first wanted to discuss
 this, if the consensus is that an in kernel overlay manager is the way to go
 I will take a shot at that instead.
 
