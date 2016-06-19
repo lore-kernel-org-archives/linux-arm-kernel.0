@@ -1,20 +1,33 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 19 Jun 2016 09:54:56 -0500
-Subject: [PATCH] dt-bindings: ci-hdrc-usb2:
- s/gadget-itc-setting/itc-setting in example
-In-Reply-To: <1466064798-867-1-git-send-email-jszhang@marvell.com>
-References: <1466064798-867-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160619145456.GA24770@rob-hp-laptop>
+Date: Sun, 19 Jun 2016 09:57:04 -0500
+Subject: [RESEND PATCH v2 01/13] drivers: clk: st: Remove stih415-416
+ clock support
+In-Reply-To: <1466068833-5055-2-git-send-email-gabriel.fernandez@linaro.org>
+References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1466068833-5055-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20160619145704.GA25768@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 04:13:18PM +0800, Jisheng Zhang wrote:
-> What the code expect is "itc-setting" rather than "gadget-itc-setting",
-> and this is also correctly described in the optional properties.
+On Thu, Jun 16, 2016 at 11:20:21AM +0200, Gabriel Fernandez wrote:
+> STiH415 and STiH416 platforms are no longer used.
+> these platforms will be deprecated for the next kernel.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 > ---
->  Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  .../bindings/clock/st/st,clkgen-divmux.txt         |  49 --
+>  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  18 +-
+>  .../devicetree/bindings/clock/st/st,clkgen-pll.txt |  26 +-
+>  .../bindings/clock/st/st,clkgen-prediv.txt         |  36 -
+>  .../devicetree/bindings/clock/st/st,clkgen-vcc.txt |  61 --
+>  .../devicetree/bindings/clock/st/st,clkgen.txt     |  54 +-
+>  .../devicetree/bindings/clock/st/st,quadfs.txt     |  27 +-
+>  drivers/clk/st/clkgen-fsyn.c                       | 260 --------
+>  drivers/clk/st/clkgen-mux.c                        | 726 +--------------------
+>  drivers/clk/st/clkgen-pll.c                        | 418 ------------
+>  10 files changed, 37 insertions(+), 1638 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-divmux.txt
+>  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-prediv.txt
+>  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
