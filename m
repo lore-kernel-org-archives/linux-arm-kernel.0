@@ -1,44 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 18 Jun 2016 22:58:48 -0700
-Subject: [GIT PULL] omap fixes for v4.7-rc cycle
-In-Reply-To: <20160614081101.GV22406@atomide.com>
-References: <20160614081101.GV22406@atomide.com>
-Message-ID: <20160619055848.GA16376@localhost>
+Date: Sat, 18 Jun 2016 23:01:06 -0700
+Subject: [GIT PULL] omap-gpmc fixes for v4.7 rc cycle
+In-Reply-To: <57626DF2.70907@ti.com>
+References: <57626DF2.70907@ti.com>
+Message-ID: <20160619060106.GB16376@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 01:11:02AM -0700, Tony Lindgren wrote:
-> The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
+On Thu, Jun 16, 2016 at 12:14:26PM +0300, Roger Quadros wrote:
+> Hi Arnd/Olof,
 > 
->   Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
+> The following changes since commit 5edb56491d4812c42175980759da53388e5d86f5:
+> 
+>   Linux 4.7-rc3 (2016-06-12 07:20:35 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.7/fixes-powedomain
+>   https://github.com/rogerq/linux.git tags/gpmc-omap-fixes-for-v4.7
 > 
-> for you to fetch changes up to 6b41d44862e8f3a4b95102c6ff6cad3fccc7994b:
+> for you to fetch changes up to 8f50b8e57442d28e41bb736c173d8a2490549a82:
 > 
->   ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_mem_ret (2016-06-13 01:04:01 -0700)
+>   memory: omap-gpmc: Fix omap gpmc EXTRADELAY timing (2016-06-16 11:43:48 +0300)
 > 
 > ----------------------------------------------------------------
-> Fixes for omaps for v4.7-rc cycle:
+> OMAP-GPMC: Fixes for for v4.7-rc cycle:
 > 
-> - Fix dra7 for hardware issues limiting L4Per and L3init power domains
->   to on state. Without this the devices may not work correctly after
->   some time of use because of asymmetric aging. And related to this,
->   let's also remove the unusable states.
-> 
-> - Always select omap interconnect for am43x as otherwise the am43x
->   only configurations will not boot properly. This can happen easily
->   for any product kernels that leave out other SoCs to save memory.
-> 
-> - Fix DSS PLL2 addresses that have gone unused for now
-> 
-> - Select erratum 430973 for omap3, this is now safe to do and can
->   save quite a bit of debugging time for people who may have left
->   it out.
+> - Fix omap gpmc EXTRADELAY timing. The DT provided timings
+> were wrongly used causing devices requiring extra delay timing
+> to fail.
 
-Grmbl, our fixes branch was only at -rc1, but I merged this anyway.
+So, our fixes branch is at 4.7-rc1, so now you force us to bring in -rc3 just
+because of this one patch. That's a little annoying. Base your branch on an
+older release if it makes sense, and/or take a look at what release our
+branch is on if you think of it. :)
+
+It's not a huge deal but the main disadvantage is that git request-pull
+sometimes gets confused of what's actually in the branch and not, so it might
+produce an incorrect pull request. We normally don't have to deal with that on
+fixes, only what we stage for the merge windows.
+
+Anyhow, I've merged this for now.
 
 
 -Olof
