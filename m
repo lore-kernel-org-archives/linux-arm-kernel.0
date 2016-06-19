@@ -1,46 +1,35 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Sat, 18 Jun 2016 17:31:04 -0700
-Subject: [PATCH 2/2] ARM: cache-l2x0.c: Do not clear bit 23 in prefetch
- control register
+Date: Sat, 18 Jun 2016 17:31:06 -0700
+Subject: [PATCH v3 3/5] i.MX: system.c: Replace magic numbers
 In-Reply-To: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
 References: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <1466296268-27099-4-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <1466296268-27099-6-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per L2C-310 TRM[1]:
-
-"... You can control this feature using bits 30,27 and 23 of the
-Prefetch Control Register. Bit 23 and 27 are only used if you set bit 30
-HIGH..."
-
-which means there is no need to clear bit 23 if bit 30 is being cleared.
-
-[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246e/CJAJACBJ.html
+Replace magic numbers used to form L310 Prefetch Control Register value.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/mm/cache-l2x0.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ arch/arm/mach-imx/system.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 30e2012..12c1ba7 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -715,11 +715,8 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
- 	if (revision >= L310_CACHE_ID_RTL_R3P0 &&
- 	    revision < L310_CACHE_ID_RTL_R3P2) {
- 		u32 val = l2x0_saved_regs.prefetch_ctrl;
--		/* I don't think bit23 is required here... but iMX6 does so */
--		if (val & (L310_PREFETCH_CTRL_DBL_LINEFILL |
--			   L310_PREFETCH_CTRL_DBL_LINEFILL_INCR)) {
--			val &= ~(L310_PREFETCH_CTRL_DBL_LINEFILL |
--				 L310_PREFETCH_CTRL_DBL_LINEFILL_INCR);
-+		if (val & L310_PREFETCH_CTRL_DBL_LINEFILL) {
-+			val &= ~L310_PREFETCH_CTRL_DBL_LINEFILL;
- 			l2x0_saved_regs.prefetch_ctrl = val;
- 			errata[n++] = "752271";
- 		}
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index b153376..7ba9dc8 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -109,7 +109,10 @@ void __init imx_init_l2cache(void)
+ 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+ 		/* Configure the L2 PREFETCH and POWER registers */
+ 		val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
+-		val |= 0x70800000;
++		val |= L310_PREFETCH_CTRL_DBL_
++			L310_PREFETCH_CTRL_INSTR_PREFETCH |
++			L310_PREFETCH_CTRL_DATA_PREFETCH |
++			L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
+ 		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
+ 	}
+ 
 -- 
 2.5.5
