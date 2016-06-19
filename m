@@ -1,108 +1,44 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 20 Jun 2016 00:14:35 +0800
-Subject: [PATCH v5 2/2] mtd: nand: sunxi: add reset line support
-In-Reply-To: <20160619161435.50404-1-icenowy@aosc.xyz>
-References: <20160619161435.50404-1-icenowy@aosc.xyz>
-Message-ID: <20160619161435.50404-2-icenowy@aosc.xyz>
+From: clive.messer@digitaldreamtime.co.uk (Clive Messer)
+Date: Sun, 19 Jun 2016 18:52:19 +0100
+Subject: [PATCH 1/1] ASoC: bcm2835-i2s: Support 384k sample rate
+Message-ID: <1466358739-31669-1-git-send-email-clive.messer@digitaldreamtime.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND controller on some sun8i chips needs its reset line to be
-deasserted before they can enter working state.
+Add support for sample rates up to 384k to bcm2835-i2s driver,
+with SNDRV_PCM_RATE_CONTINUOUS and specifying 8k min and 384k max,
+for both playback and capture.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Clive Messer <clive.messer@digitaldreamtime.co.uk>
 ---
-Changes in v2:
-  - Corrected the error checking code of reset line.
+ sound/soc/bcm/bcm2835-i2s.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Changes in v3:
-  - Corrected a more serious error brought in the "fix" of v2.
-
-Changes in v4:
-  - Removed unneeded code block after "else".
-
-Changes in v5:
-  - Added reassertion code in case of initialization error and device
-    remove.
-
- drivers/mtd/nand/sunxi_nand.c | 27 ++++++++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index a83a690..3b40186 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -39,6 +39,7 @@
- #include <linux/gpio.h>
- #include <linux/interrupt.h>
- #include <linux/iopoll.h>
-+#include <linux/reset.h>
- 
- #define NFC_REG_CTL		0x0000
- #define NFC_REG_ST		0x0004
-@@ -269,6 +270,7 @@ struct sunxi_nfc {
- 	void __iomem *regs;
- 	struct clk *ahb_clk;
- 	struct clk *mod_clk;
-+	struct reset_control *reset;
- 	unsigned long assigned_cs;
- 	unsigned long clk_rate;
- 	struct list_head chips;
-@@ -1871,26 +1873,41 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out_ahb_clk_unprepare;
- 
-+	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
-+
-+	if (!IS_ERR(nfc->reset)) {
-+		ret = reset_control_deassert(nfc->reset);
-+		if (ret) {
-+			dev_err(dev, "reset err %d\n", ret);
-+			goto out_mod_clk_unprepare;
-+		}
-+	} else if (PTR_ERR(nfc->reset) != -ENOENT) {
-+		return PTR_ERR(nfc->reset);
-+	}
-+
- 	ret = sunxi_nfc_rst(nfc);
- 	if (ret)
--		goto out_mod_clk_unprepare;
-+		goto out_ahb_reset_reassert;
- 
- 	writel(0, nfc->regs + NFC_REG_INT);
- 	ret = devm_request_irq(dev, irq, sunxi_nfc_interrupt,
- 			       0, "sunxi-nand", nfc);
- 	if (ret)
--		goto out_mod_clk_unprepare;
-+		goto out_ahb_reset_reassert;
- 
- 	platform_set_drvdata(pdev, nfc);
- 
- 	ret = sunxi_nand_chips_init(dev, nfc);
- 	if (ret) {
- 		dev_err(dev, "failed to init nand chips\n");
--		goto out_mod_clk_unprepare;
-+		goto out_ahb_reset_reassert;
- 	}
- 
- 	return 0;
- 
-+out_ahb_reset_reassert:
-+	if (!IS_ERR(nfc->reset))
-+		reset_control_assert(nfc->reset);
- out_mod_clk_unprepare:
- 	clk_disable_unprepare(nfc->mod_clk);
- out_ahb_clk_unprepare:
-@@ -1904,6 +1921,10 @@ static int sunxi_nfc_remove(struct platform_device *pdev)
- 	struct sunxi_nfc *nfc = platform_get_drvdata(pdev);
- 
- 	sunxi_nand_chips_cleanup(nfc);
-+
-+	if (!IS_ERR(nfc->reset))
-+		reset_control_assert(nfc->reset);
-+
- 	clk_disable_unprepare(nfc->mod_clk);
- 	clk_disable_unprepare(nfc->ahb_clk);
- 
+diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
+index 6ba2049..4a67db2 100644
+--- a/sound/soc/bcm/bcm2835-i2s.c
++++ b/sound/soc/bcm/bcm2835-i2s.c
+@@ -578,7 +578,9 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
+ 	.playback = {
+ 		.channels_min = 2,
+ 		.channels_max = 2,
+-		.rates =	SNDRV_PCM_RATE_8000_192000,
++		.rates =	SNDRV_PCM_RATE_CONTINUOUS,
++		.rate_min =	8000,
++		.rate_max =	384000,
+ 		.formats =	SNDRV_PCM_FMTBIT_S16_LE
+ 				| SNDRV_PCM_FMTBIT_S24_LE
+ 				| SNDRV_PCM_FMTBIT_S32_LE
+@@ -586,7 +588,9 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
+ 	.capture = {
+ 		.channels_min = 2,
+ 		.channels_max = 2,
+-		.rates =	SNDRV_PCM_RATE_8000_192000,
++		.rates =	SNDRV_PCM_RATE_CONTINUOUS,
++		.rate_min =	8000,
++		.rate_max =	384000,
+ 		.formats =	SNDRV_PCM_FMTBIT_S16_LE
+ 				| SNDRV_PCM_FMTBIT_S24_LE
+ 				| SNDRV_PCM_FMTBIT_S32_LE
 -- 
-2.9.0
+2.5.5
