@@ -1,55 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 19 Jun 2016 10:12:24 +0800
-Subject: [PATCH v3 3/5] i.MX: system.c: Replace magic numbers
-In-Reply-To: <1466296268-27099-6-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <201606191030.ZUZAsi57%fengguang.wu@intel.com>
+From: khiem.nguyen.xt@rvc.renesas.com (Khiem Nguyen)
+Date: Sun, 19 Jun 2016 11:12:33 +0700
+Subject: [PATCH/RFC 0/3] thermal: rcar_gen3_thermal: Apply shared interrupts
+ for thermal sensors
+In-Reply-To: <57661211.7010900@rvc.renesas.com>
+References: <57661211.7010900@rvc.renesas.com>
+Message-ID: <57661BB1.3060401@rvc.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset intents to improve thermal driver operation in interrupt mode,
+which has been introduced in [1].
 
-[auto build test ERROR on shawnguo/for-next]
-[also build test ERROR on v4.7-rc3 next-20160617]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+The original idea is using 1 interrupt for each thermal sensor, to detect both up
+and down temperature. It caused issue when the temperature is changing rapidly.
 
-url:    https://github.com/0day-ci/linux/commits/Andrey-Smirnov/i-MX-L2-cache-code-cleanups-and-performance-tweaks/20160619-083620
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: arm-multi_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+The new idea is about using shared interrupt I/F for all three sensors.
+Two interrupts will be set to detect temperature up and down. When interrupt occurs,
+the temperature will be updated in all 3 sensors, if the temperature value is changed. 
 
-All errors (new ones prefixed by >>):
+All comments are welcome.
 
-   arch/arm/mach-imx/system.c: In function 'imx_init_l2cache':
->> arch/arm/mach-imx/system.c:112:10: error: implicit declaration of function 'L310_PREFETCH_CTRL_DBL_' [-Werror=implicit-function-declaration]
-      val |= L310_PREFETCH_CTRL_DBL_
-             ^
-   cc1: some warnings being treated as errors
+[1]
+[PATCH 0/4] thermal: rcar_gen3_thermal: Add R-Car Gen3 thermal support
+https://www.spinics.net/lists/kernel/msg2282663.html
 
-vim +/L310_PREFETCH_CTRL_DBL_ +112 arch/arm/mach-imx/system.c
+--
+Gaku Inami (3):
+  thermal: rcar_gen3_thermal: Modify the shared irq with initialization
+  thermal: rcar_gen3_thermal: Modify the way to detect the interrupts
+  arm64: dts: r8a7795: Support shared irq for thermal sensors
 
-   106			goto out;
-   107		}
-   108	
-   109		if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-   110			/* Configure the L2 PREFETCH and POWER registers */
-   111			val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
- > 112			val |= L310_PREFETCH_CTRL_DBL_
-   113				L310_PREFETCH_CTRL_INSTR_PREFETCH |
-   114				L310_PREFETCH_CTRL_DATA_PREFETCH |
-   115				L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi |  9 ++--
+ drivers/thermal/rcar_gen3_thermal.c      | 89 ++++++++++++++++++++------------
+ 2 files changed, 63 insertions(+), 35 deletions(-)
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 37700 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160619/fa9cf85e/attachment-0001.obj>
+-- 
+1.9.1
