@@ -1,56 +1,51 @@
-From: khiem.nguyen.xt@rvc.renesas.com (Khiem Nguyen)
-Date: Sun, 19 Jun 2016 11:16:45 +0700
-Subject: [PATCH/RFC 3/3] arm64: dts: r8a7795: Support shared irq for thermal
- sensors
-In-Reply-To: <57661BB1.3060401@rvc.renesas.com>
-References: <57661211.7010900@rvc.renesas.com>
- <57661BB1.3060401@rvc.renesas.com>
-Message-ID: <57661CAD.8040807@rvc.renesas.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 18 Jun 2016 21:20:05 -0700
+Subject: [PATCH 1/3] ARM: dts: imx7d: create i.MX 7Solo base device tree
+In-Reply-To: <20160612013526.GV20243@tiger>
+References: <20160608023709.32090-1-stefan@agner.ch>
+ <20160608023709.32090-2-stefan@agner.ch> <20160612013526.GV20243@tiger>
+Message-ID: <9d870fb1be40772a50f08d467df048dc@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the shared interrupts for thermal sensors
-TSC1/TSC2/TSC3.
+On 2016-06-11 18:35, Shawn Guo wrote:
+> On Tue, Jun 07, 2016 at 07:37:07PM -0700, Stefan Agner wrote:
+>> The i.MX 7 series currently consists of two SoCs: i.MX 7Solo and
+>> 7Dual. The i.MX 7Solo implements a subset of features available on
+>> i.MX 7Dual, hence create imx7s.dtsi as the base device tree. The
+>> i.MX 7Dual's additional features over i.MX 7Solo are:
+>> - Second Cortex-A7 core
+>> - Second Gigabit Ethernet controller
+>> - EPD (Electronc Paper Display, not yet part of the device tree)
+>> - PCIe (not yet part of the device tree)
+>> - Additional USB2.0 OTG controller
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  arch/arm/boot/dts/imx7d.dtsi | 923 +++----------------------------------------
+>>  arch/arm/boot/dts/imx7s.dtsi | 880 +++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 928 insertions(+), 875 deletions(-)
+> 
+> We should probably have a beforehand patch to rename the file, so that
+> we can avoid this dramatic diffstat.
 
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Signed-off-by: Khiem Nguyen <khiem.nguyen.xt@rvc.renesas.com>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+If I delete imx7d.dtsi and add imx7s.dtsi in a single commit, and then
+readd imx7d.dtsi in a second commit, it would break bisect-ability. All
+existing device trees which include imx7d.dtsi would fail to build.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index db203db..761df2b 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1628,7 +1628,8 @@
- 			compatible = "renesas,thermal-r8a7795",
- 				"renesas,rcar-gen3-thermal";
- 			reg = <0 0xe6198000 0 0x5c>;
--			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 522>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			#thermal-sensor-cells = <0>;
-@@ -1639,7 +1640,8 @@
- 			compatible = "renesas,thermal-r8a7795",
- 				"renesas,rcar-gen3-thermal";
- 			reg = <0 0xe61a0000 0 0x5c>;
--			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 522>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			#thermal-sensor-cells = <0>;
-@@ -1650,7 +1652,8 @@
- 			compatible = "renesas,thermal-r8a7795",
- 				"renesas,rcar-gen3-thermal";
- 			reg = <0 0xe61a8000 0 0x5c>;
--			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 522>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			#thermal-sensor-cells = <0>;
--- 
-1.9.1
+As soon as I keep imx7d.dtsi around, even if it only includes
+imx7s.dtsi, git diff stats look dramatic with git default options.
+
+Using -B -M makes the diff stat a bit less dramatic:
+
+ arch/arm/boot/dts/imx7d.dtsi                 | 1083
++++++++++++---------------------------------------------------------------------------
+ arch/arm/boot/dts/{imx7d.dtsi => imx7s.dtsi} |   79 +------
+ 2 files changed, 130 insertions(+), 1032 deletions(-)
+
+However, that is only for stats, and only when using those options...
+
+I would rather prefer to keep it in a single commit. What do you think?
+
+--
+Stefan
