@@ -1,30 +1,20 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 19 Jun 2016 22:44:20 +0900
-Subject: [PATCH] clk: samsung: exynos5433: use clock_ignore_unused flag
- for SPI3 related clocks
-In-Reply-To: <20160619055921.GA424@jack.zhora.eu>
-References: <1466151362-2881-1-git-send-email-andi.shyti@samsung.com>
- <CA+Ln22F9eskcpnFkrnVFc3dJqCJcJ5O-STfXC-8Om5MK-THwNg@mail.gmail.com>
- <20160619055921.GA424@jack.zhora.eu>
-Message-ID: <CA+Ln22HHNnPuEq1WVs+iiEEbAhdvkADhVkj99pqgR0qJODFUXw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 19 Jun 2016 09:22:11 -0500
+Subject: [PATCH v4,2/5] dt-bindings: mt8173-mtu3: add devicetree bindings
+In-Reply-To: <1465960040-768-3-git-send-email-chunfeng.yun@mediatek.com>
+References: <1465960040-768-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1465960040-768-3-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <20160619142211.GA6306@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-06-19 14:59 GMT+09:00 Andi Shyti <andi@etezian.org>:
-> Hi Tomasz,
->
->> > The SPI 3 bus uses two clocks, a bus clock and an input clock.
->> > Do not disable the clocks when unused in order to allow access to
->> > the SPI 3 device.
->>
->> If unused, why would access to SPI 3 device needed?
->
-> because next I will submit a small driver which uses the SPI3.
-> Actually in the exynos5433 boards all the SPI are used but not all
-> the drivers are ported to mainline.
+On Wed, Jun 15, 2016 at 11:07:17AM +0800, Chunfeng Yun wrote:
+> add a DT binding doc for MediaTek USB3 DRD driver
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../devicetree/bindings/usb/mt8173-mtu3.txt        |   86 ++++++++++++++++++++
+>  1 file changed, 86 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
 
-Then shouldn't the driver request the clocks and enable them? Or I'm
-missing something obvious? :)
-
-Best regards,
-Tomasz
+Acked-by: Rob Herring <robh@kernel.org>
