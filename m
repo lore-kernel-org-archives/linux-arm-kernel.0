@@ -1,32 +1,62 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 19 Jun 2016 22:52:35 +0800
-Subject: [PATCH v2 1/2] mtd: nand: sunxi: update DT bindings
-Message-ID: <20160619145236.43769-1-icenowy@aosc.xyz>
+Date: Sun, 19 Jun 2016 22:52:36 +0800
+Subject: [PATCH v2 2/2] mtd: nand: sunxi: add reset line support
+In-Reply-To: <20160619145236.43769-1-icenowy@aosc.xyz>
+References: <20160619145236.43769-1-icenowy@aosc.xyz>
+Message-ID: <20160619145236.43769-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the reset lines
+The NAND controller on some sun8i chips needs its reset line to be deasserted
+before they can enter working state. This commit added the reset line process
+to the driver.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
 Changes in v2:
-  - Nothing.
+  - Corrected the error checking code of reset line.
 
- Documentation/devicetree/bindings/mtd/sunxi-nand.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/mtd/nand/sunxi_nand.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-index 086d6f4..a328fbb 100644
---- a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-@@ -15,6 +15,8 @@ Optional children nodes:
- Children nodes represent the available nand chips.
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index a83a690..d178c1a 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -39,6 +39,7 @@
+ #include <linux/gpio.h>
+ #include <linux/interrupt.h>
+ #include <linux/iopoll.h>
++#include <linux/reset.h>
  
- Optional properties:
-+- reset : phandle + reset specifier pair
-+- reset-names : must contain "ahb"
- - allwinner,rb : shall contain the native Ready/Busy ids.
-  or
- - rb-gpios : shall contain the gpios used as R/B pins.
+ #define NFC_REG_CTL		0x0000
+ #define NFC_REG_ST		0x0004
+@@ -269,6 +270,7 @@ struct sunxi_nfc {
+ 	void __iomem *regs;
+ 	struct clk *ahb_clk;
+ 	struct clk *mod_clk;
++	struct reset_control *reset;
+ 	unsigned long assigned_cs;
+ 	unsigned long clk_rate;
+ 	struct list_head chips;
+@@ -1871,6 +1873,18 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto out_ahb_clk_unprepare;
+ 
++	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
++	if (PTR_ERR(nfc->reset) != -ENOENT)
++		return PTR_ERR(nfc->reset);
++
++	if (!IS_ERR(nfc->reset)) {
++		ret = reset_control_deassert(nfc->reset);
++		if (ret) {
++			dev_err(dev, "reset err %d\n", ret);
++			goto out_mod_clk_unprepare;
++		}
++	}
++
+ 	ret = sunxi_nfc_rst(nfc);
+ 	if (ret)
+ 		goto out_mod_clk_unprepare;
 -- 
 2.9.0
