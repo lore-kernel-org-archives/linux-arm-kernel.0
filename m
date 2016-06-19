@@ -1,79 +1,55 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 18 Jun 2016 18:08:54 -0700
-Subject: [PATCH v2 4/5] mfd: rn5t618: register power off callback
- optionally
-In-Reply-To: <20160616145907.GD4948@dell>
-References: <20160608010429.19618-1-stefan@agner.ch>
- <20160608010429.19618-5-stefan@agner.ch> <20160616145907.GD4948@dell>
-Message-ID: <876c6fc0a1e300e95eda616c8c71a3ec@agner.ch>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 19 Jun 2016 10:12:24 +0800
+Subject: [PATCH v3 3/5] i.MX: system.c: Replace magic numbers
+In-Reply-To: <1466296268-27099-6-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <201606191030.ZUZAsi57%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-06-16 07:59, Lee Jones wrote:
-> On Tue, 07 Jun 2016, Stefan Agner wrote:
-> 
->> Only register power off if the PMIC is defined as system power
->> controller (see Documentation/devicetree/bindings/power/
->> power-controller.txt).
->>
->> Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> These should be chronological.
-> 
+Hi,
 
-Has been discussed already here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/345835.html
+[auto build test ERROR on shawnguo/for-next]
+[also build test ERROR on v4.7-rc3 next-20160617]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-It's an artifact of my development process, I keep the commits in my
-local branches without signed off lines and add them before sending out
-patches. So whenever I prepare a new revision, collected acks, sobs are
-chronological, but end up before my sob.
+url:    https://github.com/0day-ci/linux/commits/Andrey-Smirnov/i-MX-L2-cache-code-cleanups-and-performance-tweaks/20160619-083620
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-But since you are the second maintainer which has objection to that
-style I probably should change that...
+All errors (new ones prefixed by >>):
 
->> ---
->>  drivers/mfd/rn5t618.c | 10 +++++++---
->>  1 file changed, 7 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/mfd/rn5t618.c b/drivers/mfd/rn5t618.c
->> index 7607ced..d9b4d40 100644
->> --- a/drivers/mfd/rn5t618.c
->> +++ b/drivers/mfd/rn5t618.c
->> @@ -103,9 +103,13 @@ static int rn5t618_i2c_probe(struct i2c_client *i2c,
->>  		return ret;
->>  	}
->>
->> -	if (!pm_power_off) {
->> -		rn5t618_pm_power_off = priv;
->> -		pm_power_off = rn5t618_power_off;
->> +	if (of_device_is_system_power_controller(i2c->dev.of_node)) {
->> +		if (!pm_power_off) {
->> +			rn5t618_pm_power_off = priv;
->> +			pm_power_off = rn5t618_power_off;
->> +		} else {
->> +			dev_err(&i2c->dev, "Failed to set poweroff capability, already defined\n");
-> 
-> This is not an error.  Please use dev_warn() instead.
-> 
+   arch/arm/mach-imx/system.c: In function 'imx_init_l2cache':
+>> arch/arm/mach-imx/system.c:112:10: error: implicit declaration of function 'L310_PREFETCH_CTRL_DBL_' [-Werror=implicit-function-declaration]
+      val |= L310_PREFETCH_CTRL_DBL_
+             ^
+   cc1: some warnings being treated as errors
 
-Hm, I agree... FWIW, I copied the code (and that message) from here,
-where dev_err is probably also not appropriate:
-drivers/regulator/act8865-regulator.c
+vim +/L310_PREFETCH_CTRL_DBL_ +112 arch/arm/mach-imx/system.c
 
+   106			goto out;
+   107		}
+   108	
+   109		if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+   110			/* Configure the L2 PREFETCH and POWER registers */
+   111			val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
+ > 112			val |= L310_PREFETCH_CTRL_DBL_
+   113				L310_PREFETCH_CTRL_INSTR_PREFETCH |
+   114				L310_PREFETCH_CTRL_DATA_PREFETCH |
+   115				L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
 
-> Also, is this message actually accurate?  Your commit message would
-> indicate that it's not.
-
-Hm, maybe we should bail out with an error in that case since DT
-explicitly asks to be power controller... Is that what you mean?
-
---
-Stefan
-
-> 
->> +		}
->>  	}
->>
->>  	return 0;
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 37700 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160619/fa9cf85e/attachment-0001.obj>
