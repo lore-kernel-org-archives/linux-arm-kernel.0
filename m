@@ -1,20 +1,19 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 19 Jun 2016 09:22:11 -0500
-Subject: [PATCH v4,2/5] dt-bindings: mt8173-mtu3: add devicetree bindings
-In-Reply-To: <1465960040-768-3-git-send-email-chunfeng.yun@mediatek.com>
-References: <1465960040-768-1-git-send-email-chunfeng.yun@mediatek.com>
- <1465960040-768-3-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <20160619142211.GA6306@rob-hp-laptop>
+Date: Sun, 19 Jun 2016 09:34:20 -0500
+Subject: [PATCH v2 02/10] mfd: ac100: Add device tree bindings for
+ X-Powers AC100 codec/RTC combo IC
+In-Reply-To: <1465986467-14802-3-git-send-email-wens@csie.org>
+References: <1465986467-14802-1-git-send-email-wens@csie.org>
+ <1465986467-14802-3-git-send-email-wens@csie.org>
+Message-ID: <20160619143420.GA14554@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 11:07:17AM +0800, Chunfeng Yun wrote:
-> add a DT binding doc for MediaTek USB3 DRD driver
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+On Wed, Jun 15, 2016 at 06:27:39PM +0800, Chen-Yu Tsai wrote:
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  .../devicetree/bindings/usb/mt8173-mtu3.txt        |   86 ++++++++++++++++++++
->  1 file changed, 86 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+>  Documentation/devicetree/bindings/mfd/ac100.txt | 42 +++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
