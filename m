@@ -1,99 +1,103 @@
-From: hias@horus.com (Matthias Reichl)
-Date: Sun, 19 Jun 2016 12:39:49 +0200
-Subject: [PATCH 2/2] dmaengine: bcm2835: Avoid splitting periods into
- very small chunks
-In-Reply-To: <8760tcwe8m.fsf@eliezer.anholt.net>
-References: <1465472504-10191-1-git-send-email-hias@horus.com>
- <1465472504-10191-3-git-send-email-hias@horus.com>
- <8760tcwe8m.fsf@eliezer.anholt.net>
-Message-ID: <20160619103949.GA6050@camel2.lan>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 19 Jun 2016 13:04:58 +0200
+Subject: Auto-detecting touchscreen controller and dealing with hw
+ configuration differences on q8 tablets
+Message-ID: <7875aa56-2fa1-16f6-7410-d36bf93f1f89@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 10:06:49PM -0700, Eric Anholt wrote:
-> Matthias Reichl <hias@horus.com> writes:
-> 
-> > The current cyclic DMA period splitting implementation can generate
-> > very small chunks at the end of each period. For example a 65536 byte
-> > period will be split into a 65532 byte chunk and a 4 byte chunk on
-> > the "lite" DMA channels.
-> >
-> > This increases pressure on the RAM controller as the DMA controller
-> > needs to fetch two control blocks from RAM in quick succession and
-> > could potentially cause latency issues if the RAM is tied up by other
-> > devices.
-> >
-> > We can easily avoid these situations by distributing the remaining
-> > length evenly between the last-but-one and the last chunk, making
-> > sure that split chunks will be at least half the maximum length the
-> > DMA controller can handle.
-> >
-> > This patch checks if the last chunk would be less than half of
-> > the maximum DMA length and if yes distributes the max len+4...max_len*1.5
-> > bytes evenly between the last 2 chunks. This results in chunk sizes
-> > between max_len/2 and max_len*0.75 bytes.
-> >
-> > Signed-off-by: Matthias Reichl <hias@horus.com>
-> > Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> > Tested-by: Clive Messer <clive.messer@digitaldreamtime.co.uk>
-> > ---
-> >  drivers/dma/bcm2835-dma.c | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> >
-> > diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-> > index 344bcf92..36b998d 100644
-> > --- a/drivers/dma/bcm2835-dma.c
-> > +++ b/drivers/dma/bcm2835-dma.c
-> > @@ -252,6 +252,20 @@ static void bcm2835_dma_create_cb_set_length(
-> >  
-> >  	/* have we filled in period_length yet? */
-> >  	if (*total_len + control_block->length < period_len) {
-> > +		/*
-> > +		 * If the next control block is the last in the period
-> > +		 * and it's length would be less than half of max_len
-> > +		 * change it so that both control blocks are (almost)
-> > +		 * equally long. This avoids generating very short
-> > +		 * control blocks (worst case would be 4 bytes) which
-> > +		 * might be problematic. We also have to make sure the
-> > +		 * new length is a multiple of 4 bytes.
-> > +		 */
-> > +		if (*total_len + control_block->length + max_len / 2 >
-> > +		    period_len) {
-> > +			control_block->length =
-> > +				DIV_ROUND_UP(period_len - *total_len, 8) * 4;
-> > +		}
-> >  		/* update number of bytes in this period so far */
-> >  		*total_len += control_block->length;
-> >  		return;
-> 
-> It seems to me like this would all be a lot simpler if we always split
-> the last 2 control blocks evenly (other than 4-byte rounding):
+Hi All,
 
-Agreed and thanks a lot for the feedback!
+The sunxi support in the kernel supports (amongst many other devices) the quite
+popular low cost q8 form factor 7" tablets.
 
-I'll do it that way and then send out a v2.
+These are all based on the same case, with an allwinner SoC inside (there
+are non allwinner versions, but those are out of scope) and typically all based on
+the same reference design.
 
-> u32 period_remaining = period_len - *total_len;
-> 
-> /* Early exit if we aren't finishing this period */
-> if (period_remaining >= max_len) {
+Currently we support any such tablet with 4 u-boot defconfigs / 4 dts files:
 
-This has to be > max_len, but the rest seems fine. We want to split
-if we have more than max_len but less than max_len*2 bytes.
+q8_a13_tablet
+q8_a23_tablet_800x480
+q8_a33_tablet_800x480
+q8_a33_tablet_1026x600
 
-> 	/*
-> 	 * Split the length between the last 2 CBs, to help hide the
-> 	 * latency of fetching the CBs.
-> 	 */
-> 	if (period_remaining < max_len * 2) {
-> 		control_block->length =
->                 	DIV_ROUND_UP(period_remaining, 8) * 4;
->         }
-> 	/* update number of bytes in this period so far */
-> 	*total_len += control_block->length;
-> }
-> 
-> I'm about to go semi-AFK for a couple weeks.  If there's a good reason
-> to only do this when the last block is very short, I'm fine with:
-> 
-> Acked-by: Eric Anholt <eric@anholt.net>
+So all the user needs to know to get mainline running on these is which SoC his
+tablet is using and which resolution his lcd has.
+
+However the reference design gets completed by the manufacturers with whatever
+accelerometer, wifi chip and touchscreen controller are cheapest for the batch
+being produced that week.
+
+The plan is (was ?) to use auto-detection to figure out which components are
+used and adjust the dts using e.g. overlays.
+
+Recently I've been working together with some students from my local university
+to get a driver for the gsl1680 touchscreen controller used in most of these
+tablets upstream.
+
+So now I've been testing the touschscreen on all q8 tablets I own and
+unfortunately things are not so easy. The gsl1680 is quite flexible, it features
+a number of capacitive sense pins and these can be routed in random order to
+sense lines in the display, during init the controller gets feed a configuration
+data file with which pins go where and various lookup tables.
+
+Here is a table of all tablets I've tested:
+
+a13-94v-0:		a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600 inverted-x
+a13-tzx-713b-v2.1:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600
+a23-q8h-v3:		a082 a23-tj-a23-q88-v4.0_20140815/GSL1688_A70_FW.fw	 800x480 swapped-x-y
+a23-tj-a23-q88-v4.0:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600
+a23-ippo-q8h-v1.2:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1688_A70_FW.fw	 800x480 swapped-x-y
+a33-ippo-q8h-v1.2:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1688_A70_FW.fw	 800x480 swapped-x-y
+a33-tzx-723q4:		b482 a33-Q8_V2.4_1118/GSL1680_FW_D702.fw		 960x480 inverted-x
+a33-q8-v2.4-1118:	b482 a33-Q8_V2.4_1118/GSL1680_FW_D702.fw		 960x480
+a33-q8h-v1.5:		b482 a33-q8h-v1.5/GSL1688_A70_FW.fw			 960x480
+
+
+The first column is <soc>-<pcb-marking>, the second is the chip-id from the gsl1680 (this can be read
+via i2c), the third column is the configdata file used for testing, the directory-name it is prefixed
+with is from which board's android image the firmware file was extracted. The 4th column shows
+the resolution of the reported coordinates and any necessary flags.
+
+Note that the resolution and if we need swapped-x-y actually is fixed for a given fw file, so
+we need to keep this information paired.
+
+So as you can see which fw file to use, and whether x is inverted or not vary from board to board.
+
+This leaves us with 2 options:
+
+1) Move to 1 dts file per PCB variant solution, of ALL the q8 tablets I've seen I've only ever
+had 2 with identical PCB-s and those were from the same batch, so this seems unmaintainable.
+Which leaves us with:
+
+2) Give the user some way to override the dts settings.
+
+Which after a somewhat long intro brings me to the actual purpose of this thread, discuss
+how to best deal with this. I again see 2 options:
+
+1) Put a disabled gsl1680 node in the dts file, have a q8_autodetect.c in u-boot
+which probes i2c and if it finds the gsl1680 nodes enables it, and patches in a best-effort
+default for which fw file to use. Allow the user to set a touchscreen_fw u-boot env
+variable which will override this. Also allow the user to set a touchscreen_inverted_x env
+variable to add inverted-x to the dt node for the gsl1680.
+
+2) Write an in kernel overlay manager which does auto-detect as described by 1, and
+loads an overlay for the detected touchscreen controller, with module options to allow
+specifying the fw-file, x-inversion, etc.
+
+One things which worries me about 2. is that we would need to have 2 overlay files
+per fw-file, one regular config, one inverted-x, or is it possible for the overlay
+manager to modify an overlay before applying it ?
+
+I tend towards doing the auto-detect in u-boot, since that will give the greatest
+flexibility (the dtb is fully read-writable in u-boot) and I can easily access
+things like i2c-busses, soc id/version register, etc. there.
+
+But before syncing a lot of time in either one of these I first wanted to discuss
+this, if the consensus is that an in kernel overlay manager is the way to go
+I will take a shot at that instead.
+
+Regards,
+
+Hans
