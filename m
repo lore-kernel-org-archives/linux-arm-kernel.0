@@ -1,52 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 18 Jun 2016 22:21:13 -0700
-Subject: [PATCH v4.7-rc] ARM: dts: STi: stih407-family: Disable
- reserved-memory co-processor nodes
-In-Reply-To: <1466163858-13819-1-git-send-email-maxime.coquelin@st.com>
-References: <1466163858-13819-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <20160619052113.GB11958@localhost>
+Date: Sat, 18 Jun 2016 22:22:27 -0700
+Subject: [GIT PULL] omap rcu and fiq fixes for v4.7 merge window
+In-Reply-To: <20160617160754.GF22406@atomide.com>
+References: <20160617160754.GF22406@atomide.com>
+Message-ID: <20160619052227.GC11958@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 01:44:18PM +0200, Maxime Coquelin wrote:
-> From: Lee Jones <lee.jones@linaro.org>
+On Fri, Jun 17, 2016 at 09:07:54AM -0700, Tony Lindgren wrote:
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 > 
-> This patch fixes a non-booting issue in Mainline.
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 > 
-> When booting with a compressed kernel, we need to be careful how we
-> populate memory close to DDR start.  AUTO_ZRELADDR is enabled by default
-> in multi-arch enabled configurations, which place some restrictions on
-> where the kernel is placed and where it will be uncompressed to on boot.
+> are available in the git repository at:
 > 
-> AUTO_ZRELADDR takes the decompressor code's start address and masks out
-> the bottom 28 bits to obtain an address to uncompress the kernel to
-> (thus a load address of 0x42000000 means that the kernel will be
-> uncompressed to 0x40000000 i.e. DDR START on this platform).
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-rcu-fiq-signed
 > 
-> Even changing the load address to after the co-processor's shared memory
-> won't render a booting platform, since the AUTO_ZRELADDR algorithm still
-> ensures the kernel is uncompressed into memory shared with the first
-> co-processor (0x40000000).
+> for you to fetch changes up to d279f7a7e95af6bb4b5eaea3527d1f85a28c5cf6:
 > 
-> Another option would be to move loading to 0x4A000000, since this will
-> mean the decompressor will decompress the kernel to 0x48000000. However,
-> this would mean a large chunk (0x44000000 => 0x48000000 (64MB)) of
-> memory would essentially be wasted for no good reason.
+>   ARM: dts: am437x-sk-evm: Reduce i2c0 bus speed for tps65218 (2016-06-17 02:59:04 -0700)
 > 
-> Until we can work with ST to find a suitable memory location to
-> relocate co-processor shared memory, let's disable the shared memory
-> nodes.  This will ensure a working platform in the mean time.
+> ----------------------------------------------------------------
+> Fixes for omaps for v4.7-rc cycle:
 > 
-> NB: The more observant of you will notice that we're leaving the DMU
-> shared memory node enabled; this is because a) it is the only one in
-> active use at the time of this writing and b) it is not affected by
-> the current default behaviour which is causing issues.
+> - Two boot warning fixes from the RCU tree that should have gotten
+>   merged several weeks ago already but did not because of issues
+>   with who merges them. Paul has now split the RCU warning fixes into
+>   sets for various maintainers.
 > 
-> Fixes: fe135c6 (ARM: dts: STiH407: Move over to using the 'reserved-memory' API for obtaining DMA memory)
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> Reviewed-by Peter Griffin <peter.griffin@linaro.org>
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> - Fix ams-delta FIQ regression caused by omap1 sparse IRQ changes
+> 
+> - Fix PM for omap3 boards using timer12 and gptimer, like the
+>   original beagleboard
+> 
+> - Fix hangs on am437x-sk-evm by lowering the I2C bus speed
 
-Applied, thanks.
+Merged, thanks!
+
 
 -Olof
