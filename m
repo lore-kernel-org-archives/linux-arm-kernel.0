@@ -1,19 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 19 Jun 2016 09:34:20 -0500
-Subject: [PATCH v2 02/10] mfd: ac100: Add device tree bindings for
- X-Powers AC100 codec/RTC combo IC
-In-Reply-To: <1465986467-14802-3-git-send-email-wens@csie.org>
-References: <1465986467-14802-1-git-send-email-wens@csie.org>
- <1465986467-14802-3-git-send-email-wens@csie.org>
-Message-ID: <20160619143420.GA14554@rob-hp-laptop>
+Date: Sun, 19 Jun 2016 09:37:54 -0500
+Subject: [PATCH v2 1/4] ASoC: sunxi: Add A10 I2S controller binding
+ documentation
+In-Reply-To: <20160615211123.31068-2-maxime.ripard@free-electrons.com>
+References: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
+ <20160615211123.31068-2-maxime.ripard@free-electrons.com>
+Message-ID: <20160619143738.GA15829@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 06:27:39PM +0800, Chen-Yu Tsai wrote:
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Wed, Jun 15, 2016 at 11:11:20PM +0200, Maxime Ripard wrote:
+> Introduce the device tree binding for the I2S controller found in the
+> Allwinner A10 and later SoCs.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/mfd/ac100.txt | 42 +++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
+>  .../devicetree/bindings/sound/sun4i-i2s.txt        | 34 ++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/sun4i-i2s.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
