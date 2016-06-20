@@ -1,56 +1,95 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 20 Jun 2016 09:35:53 +0200
-Subject: [GIT PULL 5/7] Broadcom maintainers changes for 4.8 Part 1
-In-Reply-To: <20160620055143.GH2329@localhost>
-References: <1466128575-5378-1-git-send-email-f.fainelli@gmail.com>
- <1466128575-5378-5-git-send-email-f.fainelli@gmail.com>
- <20160620055143.GH2329@localhost>
-Message-ID: <CACna6rxXQuU7MqFomqK8tUoyFgiH-nC-M9UEyvKk1rXs8yS64A@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Mon, 20 Jun 2016 09:39:31 +0200
+Subject: [PATCH V2 08/63] clocksource/drivers/st_lpc: Convert init
+ function to return error
+In-Reply-To: <1466112442-31105-9-git-send-email-daniel.lezcano@linaro.org>
+References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
+ <1466112442-31105-9-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <57679DB2.4040102@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2016 at 07:51, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Jun 16, 2016 at 06:56:13PM -0700, Florian Fainelli wrote:
->> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
->>
->>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
->>
->> are available in the git repository at:
->>
->>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.8/maintainers
->>
->> for you to fetch changes up to f6d925c8f8bb2e01c16dd5cd0e3d773beb84554d:
->>
->>   MAINTAINERS: Update entry for BCM5301X ARM (2016-06-10 11:30:24 -0700)
->>
->> ----------------------------------------------------------------
->> This pull request contains MAINTAINERS file updates for Broadcom SoCs:
->>
->> - Rafal updates the BCM5301x entry wih the typical Broadcom mailing-list
->>
->> ----------------------------------------------------------------
->> Rafa?? Mi??ecki (1):
->>       MAINTAINERS: Update entry for BCM5301X ARM
->
-> Is bcm-kernel-feedback-list at broadcom.com a list that the public can subscribe
-> to, or is it an internal list that the team is on?
->
-> If it's the latter then it shouldn't be a mailing list in the maintainers
-> file. There's a dual purpose to the L: entries -- one is where to cc the
-> patches to, the other is what list to figure out how to subscribe to if you
-> care about patches for that platform...
->
-> Not merged until the above is clarified.
+Hi Daniel
 
-I was asked by Florian to add bcm-kernel-feedback-list@ but indeed he
-didn't specify if this should be L: entry.
-[21:24:43] <[florian]> rmilecki: also submit a patch that includes
-bcm-kernel-feedback-list at broadcom.com in the MAINTAINERS file for
-BCM5310X
-[21:36:51] <rmilecki> [florian]: I wasn't sure if I'm supposed to do that
-[21:36:53] <rmilecki> i can try I guess
+On 06/16/2016 11:26 PM, Daniel Lezcano wrote:
+> The init functions do not return any error. They behave as the following:
+>
+>   - panic, thus leading to a kernel crash while another timer may work and
+>     make the system boot up correctly
+>
+>   or
+>
+>   - print an error and let the caller unaware if the state of the system
+>
+> Change that by converting the init functions to return an error conforming
+> to the CLOCKSOURCE_OF_RET prototype.
+>
+> Proper error handling (rollback, errno value) will be changed later case
+> by case, thus this change just return back an error or success in the init
+> function.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>   drivers/clocksource/clksrc_st_lpc.c | 22 +++++++++++++---------
+>   1 file changed, 13 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/clocksource/clksrc_st_lpc.c b/drivers/clocksource/clksrc_st_lpc.c
+> index 65ec467..c9022a9 100644
+> --- a/drivers/clocksource/clksrc_st_lpc.c
+> +++ b/drivers/clocksource/clksrc_st_lpc.c
+> @@ -92,7 +92,7 @@ static int __init st_clksrc_setup_clk(struct device_node *np)
+>   	return 0;
+>   }
+>   
+> -static void __init st_clksrc_of_register(struct device_node *np)
+> +static int __init st_clksrc_of_register(struct device_node *np)
+>   {
+>   	int ret;
+>   	uint32_t mode;
+> @@ -100,32 +100,36 @@ static void __init st_clksrc_of_register(struct device_node *np)
+>   	ret = of_property_read_u32(np, "st,lpc-mode", &mode);
+>   	if (ret) {
+>   		pr_err("clksrc-st-lpc: An LPC mode must be provided\n");
+> -		return;
+> +		return ret;
+>   	}
+>   
+>   	/* LPC can either run as a Clocksource or in RTC or WDT mode */
+>   	if (mode != ST_LPC_MODE_CLKSRC)
+> -		return;
+> +		return 0;
+>   
+>   	ddata.base = of_iomap(np, 0);
+>   	if (!ddata.base) {
+>   		pr_err("clksrc-st-lpc: Unable to map iomem\n");
+> -		return;
+> +		return -ENXIO;
+>   	}
+>   
+> -	if (st_clksrc_setup_clk(np)) {
+> +	ret = st_clksrc_setup_clk(np);
+> +	if (ret) {
+>   		iounmap(ddata.base);
+> -		return;
+> +		return ret;
+>   	}
+>   
+> -	if (st_clksrc_init()) {
+> +	ret = st_clksrc_init();
+> +	if (ret) {
+>   		clk_disable_unprepare(ddata.clk);
+>   		clk_put(ddata.clk);
+>   		iounmap(ddata.base);
+> -		return;
+> +		return ret;
+>   	}
+>   
+>   	pr_info("clksrc-st-lpc: clocksource initialised - running @ %luHz\n",
+>   		clk_get_rate(ddata.clk));
+> +
+> +	return ret;
+>   }
+> -CLOCKSOURCE_OF_DECLARE(ddata, "st,stih407-lpc", st_clksrc_of_register);
+> +CLOCKSOURCE_OF_DECLARE_RET(ddata, "st,stih407-lpc", st_clksrc_of_register);
 
-I'm afraid this mailing list is closed. Would M: entry work for it?
-
--- 
-Rafa?
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
