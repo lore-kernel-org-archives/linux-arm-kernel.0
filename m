@@ -1,44 +1,39 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Mon, 20 Jun 2016 09:19:09 -0700
-Subject: [PATCH 1/4] phy: rockchip-emmc: give DLL some extra time to be
- ready
-In-Reply-To: <5767EB7E.3040606@ti.com>
-References: <1463092986-61777-1-git-send-email-briannorris@chromium.org>
- <5767EB7E.3040606@ti.com>
-Message-ID: <20160620161908.GA30459@google.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Mon, 20 Jun 2016 18:20:04 +0200
+Subject: [PATCH v3 0/5] Add support for the STM32F4 I2C
+Message-ID: <1466439609-1814-1-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-mmc, Ulf
+This patchset adds support for the I2C controller embedded in STM32F4xx SoC.
+It enables I2C transfer in interrupt mode with Standard-mode and Fast-mode bus
+speed.
 
-On Mon, Jun 20, 2016 at 06:41:26PM +0530, Kishon Vijay Abraham I wrote:
-> On Friday 13 May 2016 04:13 AM, Brian Norris wrote:
-> > From: Shawn Lin <shawn.lin@rock-chips.com>
-> > 
-> > According to the databook, 10.2us is the max time for dll to be ready to
-> > work. However in testing, some chips need 20us for dll to be ready. This
-> > patch adds some extra margin for dllrdy to be ready, fixing our
-> > -ETIMEDOUT issues.
-> > 
-> > Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> > Signed-off-by: Brian Norris <briannorris@chromium.org>
-> 
-> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+Changes since v2:
+- Group I2C pins definitions in the device tree (Maxime)
+- Suffix I2C phandle with part number (Maxime)
+- Remov busy variable as not used (Rajeev)
+- Rename STM32F4_I2C_TRISE_TRISE macro (Rajeev)
+- Remove magic number during rise time computation (Rajeev)
+- Simplify speed mode function computation
 
-Thanks! I take it that to mean you're agreeing with Doug's suggestion
-here:
+M'boumba Cedric Madianga (5):
+  dt-bindings: Document the STM32 I2C bindings
+  i2c: Add STM32F4 I2C driver
+  ARM: dts: Add I2C1 support for STM32F429 SoC
+  ARM: dts: Add I2C1 support for STM32429 eval board
+  ARM: configs: Add I2C support for STM32 defconfig
 
-https://lkml.org/lkml/2016/6/13/1067
+ .../devicetree/bindings/i2c/i2c-stm32.txt          |  33 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   6 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |  22 +
+ arch/arm/configs/stm32_defconfig                   |   3 +
+ drivers/i2c/busses/Kconfig                         |  10 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-stm32f4.c                   | 863 +++++++++++++++++++++
+ 7 files changed, 938 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+ create mode 100644 drivers/i2c/busses/i2c-stm32f4.c
 
-"Since [the $subject series patches] aren't in 4.7-rc1 presumably they
-would also make sense to take through the MMC tree if others agree."
-
-Ulf,
-
-I see I didn't CC you or linux-mmc on this patch series. Please let me
-know if I should resend, or if you can pick these up off of LKML -- Doug
-gave nice patchwork links in his linked series. NB: patch 2 has a
-version 2, while the others were left unmodified.
-
-Regards,
-Brian
+-- 
+1.9.1
