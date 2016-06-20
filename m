@@ -1,103 +1,86 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 20 Jun 2016 07:15:32 +0200
-Subject: [PATCH 03/10] i2c: designware-platdrv: Unconditionally enable
- runtime PM
-In-Reply-To: <334641d7-10e4-9dcb-5e99-3f244070645f@linux.intel.com>
-References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
- <1465916848-8207-4-git-send-email-ulf.hansson@linaro.org>
- <334641d7-10e4-9dcb-5e99-3f244070645f@linux.intel.com>
-Message-ID: <CAPDyKFo6PPE21GrsB8CE9QCkg3-E4vWhqZMfbgfoeTSFJRGEVA@mail.gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 20 Jun 2016 11:02:22 +0530
+Subject: [PATCH v19 10/13] arm64: kdump: add VMCOREINFO's for user-space
+ coredump tools
+In-Reply-To: <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
+References: <cover.1466120418.git.geoff@infradead.org>
+ <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
+Message-ID: <20160620053222.GB14309@dhcppc9>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 June 2016 at 14:47, Jarkko Nikula <jarkko.nikula@linux.intel.com> wrote:
-> On 06/14/2016 06:07 PM, Ulf Hansson wrote:
->>
->> In cases when the designware specific flag "pm_runtime_disable" is set,
->> ->probe() calls pm_runtime_forbid() for the device, but without enabling
->> runtime PM. This increases the runtime PM usage count for the device, but
->> as runtime PM is disabled it's pointless.
->>
-> As far as I remember reason for that was to prevent suspending the device
-> when unloading the driver.
++Atsushi
 
-Hmm. To me that's a weird way of implementing this.
+Hi Takahiro,
 
-Moreover, as i2c_dw_disable() indeed is called in ->remove() how will
-the pm_runtime_forbid() help to avoid that from happen?
+On 16/06/2016:11:48:28 PM, Geoff Levand wrote:
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> 
+> For the current crash utility, we need to know, at least,
+>   - kimage_voffset
+>   - PHYS_OFFSET
+> to handle the contents of core dump file (/proc/vmcore) correctly due to
+> the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
+> This patch puts them as VMCOREINFO's into the file.
+> 
+>   - VA_BITS
+> is also added for makedumpfile command.
 
->
->> Let's instead convert to unconditionally enable runtime PM, which has the
->> effect of making a parent device aware of its child.
->>
->> To also maintain the old behaviour when the "pm_runtime_disable" flag is
->> set, which prevents userspace to enable runtime PM suspend via sysfs,
->> switch from calling pm_runtime_forbid() into pm_runtime_get_noresume()
->> during ->probe().
->>
->> While changing this, let's also also correct the error path in ->probe()
->> and fix ->remove(), as to decrease the runtime PM usage count when it has
->> been in increased by pm_runtime_forbid() (after this change, by
->> pm_runtime_get_noresume()).
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  drivers/i2c/busses/i2c-designware-platdrv.c | 25
->> +++++++++++++------------
->>  1 file changed, 13 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
->> b/drivers/i2c/busses/i2c-designware-platdrv.c
->> index 19174e7..94ff953 100644
->> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
->> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
->> @@ -236,21 +236,21 @@ static int dw_i2c_plat_probe(struct platform_device
->> *pdev)
->>         adap->dev.of_node = pdev->dev.of_node;
->
-> ...
->>
->> +       if (dev->pm_runtime_disabled)
->> +               pm_runtime_get_noresume(&pdev->dev);
->
->
->> @@ -267,10 +267,11 @@ static int dw_i2c_plat_remove(struct platform_device
->> *pdev)
->>
->>         i2c_dw_disable(dev);
->>
->> +       if (dev->pm_runtime_disabled)
->> +               pm_runtime_put_noidle(&pdev->dev);
->
->
-> That will trigger power down after returning from dw_i2c_plat_remove() by
-> looking at debug print from acpi_device_set_power() but now I don't find
-> what call chain is actually causing it.
+Thanks for adding them. They are quite helpful for makedumpfile as well.
 
-Oh, I didn't realize that by power down you meant the acpi power down.
+> More VMCOREINFO's may be added later.
 
-Can you elaborate on why power down needs to be prevented?
+Yes, we will need to pass VMCOREINFO_SYMBOL(_text) and VMCOREINFO_SYMBOL(_end)
+in order to work with makedumpfile.
 
-Is there a problem to power on the device again in the next ->probe() attempt?
+I already have makedumpfile patches [1]  which uses _text and _end, but not
+sending them to makedumpfile upstream, until you will be agreeing to take [2] in
+future. Please let me know your opinion about it. If it would be acceptable then
+I may send aarch64 makedumpfile improvements to upstream.
 
->
-> Must be something to do with drivers/acpi/acpi_lpss.c and notifier calls
-> from drivers/base/dd.c. Also I was wondering why RPM usage counts don't
-> increase monotonically over repeated module load/unload cycle.
+[1] https://github.com/pratyushanand/makedumpfile/commit/d9590fec049976b8fee0d6b4e66e6f3e99ff1113
+[2] https://github.com/pratyushanand/linux/commit/1d94df20c575c725910c9c29a129b9f14e7e900b
 
-$subject patch changes this, as I didn't think that was really the
-wanted behaviour.
+~Pratyush
 
-Perhaps acpi doesn't power down the device in case the runtime PM
-usage count > 0. I will have look and see what I can dig out.
-
->
-> I had a few paper notes about these when I last time looked and debugged PM
-> in i2c-designware but throw away them :-(
-
-Okay, I see.
-
-Seems like we definitely need to do some more testing on acpi enabled platforms.
-
-Kind regards
-Uffe
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/kernel/machine_kexec.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index f270967..57a30fb 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -18,6 +18,7 @@
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/cpu_ops.h>
+> +#include <asm/memory.h>
+>  #include <asm/mmu_context.h>
+>  
+>  #include "cpu-reset.h"
+> @@ -278,3 +279,13 @@ void machine_crash_shutdown(struct pt_regs *regs)
+>  
+>  	pr_info("Starting crashdump kernel...\n");
+>  }
+> +
+> +void arch_crash_save_vmcoreinfo(void)
+> +{
+> +	VMCOREINFO_NUMBER(VA_BITS);
+> +	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
+> +	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
+> +						kimage_voffset);
+> +	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
+> +						PHYS_OFFSET);
+> +}
+> -- 
+> 2.5.0
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
