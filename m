@@ -1,39 +1,40 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Jun 2016 13:52:07 +0200
-Subject: [PATCH 0/3] mtd: nand: sunxi: fix SLC NAND support
-In-Reply-To: <1465214354-31493-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1465214354-31493-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160620135207.5559196a@bbrezillon>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 20 Jun 2016 14:07:55 +0200
+Subject: [PATCH 1/7] reset: Reorder inline reset_control_get*() wrappers
+In-Reply-To: <20160606155655.10860-2-lee.jones@linaro.org>
+References: <20160606155655.10860-1-lee.jones@linaro.org>
+ <20160606155655.10860-2-lee.jones@linaro.org>
+Message-ID: <1466424475.6070.43.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  6 Jun 2016 13:59:11 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Am Montag, den 06.06.2016, 16:56 +0100 schrieb Lee Jones:
+> We're about to split the current API into two, where consumers will
+> be forced to be explicit when requesting reset lines.  The choice
+> will be to either the call the *_exclusive or *_shared variant
+> depending on whether they can actually tolorate not being asserted
+> when that request is made.
+> 
+> The new API will look like this once reorded and complete:
+> 
+>   reset_control_get_exclusive()
+>   reset_control_get_shared()
+>   reset_control_get_optional_exclusive()
+>   reset_control_get_optional_shared()
+>   of_reset_control_get_exclusive()
+>   of_reset_control_get_shared()
+>   of_reset_control_get_exclusive_by_index()
+>   of_reset_control_get_shared_by_index()
+>   devm_reset_control_get_exclusive()
+>   devm_reset_control_get_shared()
+>   devm_reset_control_get_optional_exclusive()
+>   devm_reset_control_get_optional_shared()
+>   devm_reset_control_get_exclusive_by_index()
+>   devm_reset_control_get_shared_by_index()
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> Hello,
-> 
-> Those 3 patches aims a fixing support for SLC NANDs with rather small
-> NAND pages (<= 4k).
-> 
-> The first patch promote 512 bytes ECC steps to 1k steps, which should
-> both save a few OOB bytes and provide stronger ECC.
-> The second patch checks the ECC step value, and rejects any NAND that
-> requires ECC steps != 512 | 1024.
-> The last patch implements ecc->write_subpage(), thus fixing a NULL
-> pointer dereference when the NAND chip supports subpage write.
+I have applied patches 1-5 to my reset/next branch.
 
-Applied.
-
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Boris Brezillon (3):
->   mtd: nand: sunxi: prefer 1k ECC blocks when applicable
->   mtd: nand: sunxi: check ecc->size values
->   mtd: nand: sunxi: fix subpage write
-> 
->  drivers/mtd/nand/sunxi_nand.c | 42 +++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 41 insertions(+), 1 deletion(-)
-> 
+regards
+Philipp
