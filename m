@@ -1,23 +1,25 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon, 20 Jun 2016 13:32:15 +0200
-Subject: [PATCH V2 47/63] clocksource/drivers/timer-stm32: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-48-git-send-email-daniel.lezcano@linaro.org>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 20 Jun 2016 13:32:53 +0200
+Subject: [PATCH V2 18/63] clocksource/drivers/arm_global_timer: Convert
+ init function to return error
+In-Reply-To: <1466112442-31105-19-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-48-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CALszF6AfU3js=xzSjtACc_H+bbYXBgXXtnVb3H+BwXAr7zzOZg@mail.gmail.com>
+ <1466112442-31105-19-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <5767D465.8010506@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-06-16 23:27 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+
+
+On 06/16/2016 11:26 PM, Daniel Lezcano wrote:
 > The init functions do not return any error. They behave as the following:
 >
->   - panic, thus leading to a kernel crash while another timer may work and
->        make the system boot up correctly
+>    - panic, thus leading to a kernel crash while another timer may work and
+>         make the system boot up correctly
 >
->   or
+>    or
 >
->   - print an error and let the caller unaware if the state of the system
+>    - print an error and let the caller unaware if the state of the system
 >
 > Change that by converting the init functions to return an error conforming
 > to the CLOCKSOURCE_OF_RET prototype.
@@ -28,11 +30,12 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >
 > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
->  drivers/clocksource/timer-stm32.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
+>   drivers/clocksource/arm_global_timer.c | 28 ++++++++++++++++++----------
+>   1 file changed, 18 insertions(+), 10 deletions(-)
+>
+>
 
-
-Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
 Thanks!
 Maxime
