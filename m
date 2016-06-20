@@ -1,41 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 20 Jun 2016 18:06:10 +0100
-Subject: [PATCH 08/12] doc: binding: pwrseq-usb-generic: add binding doc
- for generic usb power sequence driver
-In-Reply-To: <20160620161607.GA11427@rob-hp-laptop>
-References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
- <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
- <CAL_JsqLvs0s2TyfqPM5vtmyY81_X84VjCGjsGYbTgT4syOfp9Q@mail.gmail.com>
- <20160620112651.GA26936@shlinux2>
- <20160620161607.GA11427@rob-hp-laptop>
-Message-ID: <20160620170609.GA26099@sirena.org.uk>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 20 Jun 2016 13:08:54 -0400
+Subject: [PATCH V2 36/63] clocksource/drivers/time-orion: Convert init
+ function to return error
+In-Reply-To: <1466112442-31105-37-git-send-email-daniel.lezcano@linaro.org>
+References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
+ <1466112442-31105-37-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1466442534.1887.7.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 11:16:07AM -0500, Rob Herring wrote:
-> On Mon, Jun 20, 2016 at 07:26:51PM +0800, Peter Chen wrote:
+On Thu, 2016-06-16 at 23:26 +0200, Daniel Lezcano wrote:
+> The init functions do not return any error. They behave as the following:
+> 
+>   - panic, thus leading to a kernel crash while another timer may work and
+>        make the system boot up correctly
+> 
+>   or
+> 
+>   - print an error and let the caller unaware if the state of the system
+> 
+> Change that by converting the init functions to return an error conforming
+> to the CLOCKSOURCE_OF_RET prototype.
+> 
+> Proper error handling (rollback, errno value) will be changed later case
+> by case, thus this change just return back an error or success in the init
+> function.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  drivers/clocksource/time-lpc32xx.c | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
+> index daae61e..cb5b866 100644
+> --- a/drivers/clocksource/time-lpc32xx.c
+> +++ b/drivers/clocksource/time-lpc32xx.c
+> @@ -288,16 +288,16 @@ err_clk_enable:
 
-> > If the node has property "power-sequence", the pwrseq core will create
-> > related platform device, and the driver under pwrseq driver will handle
-> > power sequence stuffs. 
+[...]
 
-> This I have issue with. If you are creating a platform device here, you 
-> are trying to work-around limitations in the linux driver model. Either 
-> we need some sort of pre-probe hook to the drivers to call or each 
-> parent node driver is responsible for checking and calling pwr-seq 
-> functions for child nodes. e.g. The host controller calls pwr-seq for 
-> the hub, the hub driver calls the power seq for the asix chip. Soon as 
-> we have a case too complex for the generic pwr-seq, we're going to need 
-> the pre-probe hook as I don't want to see a continual expansion of 
-> generic pwr-seq binding for ever more complex cases.
+Hi Daniel,
 
-I think it's fairly clear that we need one or both of these mechanisms
-for enumerable buses in embedded contexts - it's something that keeps
-croping up.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160620/fb903add/attachment.sig>
+please update the patch subject
+(i.e. replace "time-orion" by "time-lpc32xx).
+
+You can add my "Acked-by" to the V3 patch:
+Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
