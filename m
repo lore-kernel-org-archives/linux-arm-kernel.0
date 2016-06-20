@@ -1,184 +1,133 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 20 Jun 2016 18:38:30 +0530
-Subject: [PATCH v2 10/11] phy: rockchip-emmc: Set phyctrl_frqsel based on
- card clock
-In-Reply-To: <1465859076-4868-11-git-send-email-dianders@chromium.org>
-References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
- <1465859076-4868-11-git-send-email-dianders@chromium.org>
-Message-ID: <5767EACE.6030304@ti.com>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Mon, 20 Jun 2016 16:08:47 +0300
+Subject: [linux-sunxi] Auto-detecting touchscreen controller and dealing
+ with hw configuration differences on q8 tablets
+In-Reply-To: <b16c2b42-5628-c0b9-6486-f8a4728a0a33@redhat.com>
+References: <bc978925-46a4-c069-8793-903a87ec70b8@redhat.com>
+ <5E70AD96-4E8E-4430-AF99-0AA0FCF5F8E7@konsulko.com>
+ <17e69e9e-06be-dc4f-cd47-152f6290d2ec@redhat.com>
+ <7FA186CB-9BF2-47A6-835C-06AD63CF8837@konsulko.com>
+ <b16c2b42-5628-c0b9-6486-f8a4728a0a33@redhat.com>
+Message-ID: <19098CD8-6BC1-4FFE-858F-A6DF4BE655D5@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Hans,
 
+> On Jun 20, 2016, at 16:02 , Hans de Goede <hdegoede@redhat.com> wrote:
+> 
+> Hi,
+> 
+> On 20-06-16 14:22, Pantelis Antoniou wrote:
+>> Hi Hans,
+>> 
+>>> On Jun 20, 2016, at 14:03 , Hans de Goede <hdegoede@redhat.com> wrote:
+>>> 
+>>> Hi,
+>>> 
+>>> On 20-06-16 11:27, Pantelis Antoniou wrote:
+> 
+> <snip>
+> 
+>>>> Yes, it?s quite possible. You can even have stacked overlays.
+>>> 
+>>> Ok, is there any example code how to change an overlay before applying it out there,
+>>> or if not can you point to the functions to use to do this ?
+>>> 
+>> 
+>> The canonical place for all the dynamic DT stuff is
+>> 
+>> https://github.com/pantoniou/linux-beagle-track-mainline/tree/bbb-overlays
+>> 
+>> The beaglebone cape manager is here.
+>> 
+>> https://github.com/pantoniou/linux-beagle-track-mainline/commit/5028d1ed3beb8c75b28fce37b1bb5ee551b2ae9e
+>> 
+>>> Specifically my plan is to:
+>>> 
+>>> 1) Have a single overlay for q8 tablets with gsl1680 tablets
+>>> 
+>>> 2) Write an in kernel overlay manager which when it detects a gsl1680 touchscreen
+>>> will pick a best-default firmware-file + matching resolution + swap-x-y based on
+>>> which SoC (A13/A23/A33) the tablet is based on as well as the gsl1680's chip-id
+>>> and will then "patch" this info into the overlay before applying it. This
+>>> means being able to set / modify several string, int and bool dt properties.
+>>> 
+>>> 3) Offer a kernel-module option for the overlaymanager which will allows
+>>> overriding the defaults for the firmware-filename, etc. This is also
+>>> why I want to go with the patch approach instead of having multiple
+>>> dt-overlay files.
+>>> 
+>> 
+>> Hmm, your problem appears to be simpler. You already know all the possible
+>> parts that your touchscreen/video/thingy is going to use.
+>> 
+>> You don?t have to use an overlay then. Overlays are built on top of
+>> changesets.
+>> 
+>> For example, let?s say that you have various options for a touchscreen out
+>> of a finite set.
+>> 
+>> You just put the basic configuration for each in a disable node and your
+>> manager only needs to update the properties and set the status to enabled
+>> for it to be enabled.
+>> 
+>> For instance let?s say you have an option of two devices (only one of them
+>> being present).
+>> 
+>> devA {
+>> 	status = ?disabled?;
+>> 	compatible = ?foo,A?;
+>> };
+>> 
+>> devB {
+>> 	status = ?disabled?;
+>> 	compatible = ?bar,B?;
+>> };
+>> 
+>> Your manager can simply use a changeset to enable A and put a property there
+>> (example done using the extended helper API for clarity).
+>> 
+>> 	struct of_changeset cset;
+>> 	struct device_node *np = of_find_node_by_path(?/devA?);
+>> 
+>> 	of_changeset_init(&cset);
+>> 	of_changeset_add_property_bool(&cset, np, ?invert-x?);
+>> 	of_changeset_update_property_string(&cset, np, ?status?, ?okay?);
+>> 
+>> 	of_changeset_apply(&cset);
+> 
+> Cool that looks quite nice / easy. 2 questions on the above:
+> 
+> 1) Is the functionality needed by the above snippet in mainline ?
 
-On Tuesday 14 June 2016 04:34 AM, Douglas Anderson wrote:
-> The "phyctrl_frqsel" is described in the Arasan datasheet [1] as "the
-> frequency range of DLL operation".  Although the Rockchip variant of
-> this PHY has different ranges than the reference Arasan PHY it appears
-> as if the functionality is similar.  We should set this phyctrl field
-> properly.
-> 
-> Note: as per Rockchip engineers, apparently the "phyctrl_frqsel" is
-> actually only useful in HS200 / HS400 modes even though the DLL itself
-> it used for some purposes in all modes.  See the discussion in the
-> earlier change in this series: ("mmc: sdhci-of-arasan: Always power the
-> PHY off/on when clock changes").  In any case, it shouldn't hurt to set
-> this always.
-> 
-> Note that this change should allow boards to run at HS200 / HS400 speed
-> modes while running at 100 MHz or 150 MHz.  In fact, running HS400 at
-> 150 MHz (giving 300 MB/s) is the main motivation of this series, since
-> performance is still good but signal integrity problems are less
-> prevelant at 150 MHz.
-> 
-> [1]: https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Changesets are in mainline; The extended API for the example above is not.
+So you?ll have to create the property/ies to pass to the bare 
+of_changeset_update_property/of_changeset_add_property methods.
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
-> Changes in v2:
-> - Warn if we're more than 15 MHz from ideal rate (Shawn)
-> - Move code cleanup before set phyctrl_frqsel based on card clock (Shawn)
-> - Fix typo USB => SDHCI (Shawn)
+Dig into the bbb-overlays branch and you?ll figure it out.
+
+> 2) I assume you'vc e left out error handling from the above
+> for simplicity. I assume that of_changeset_apply() needs some
+> error return checking ? What about the others ?
+
+Error checking is removed for clarity. On error you simply
+destroy the changeset. Changes to the tree apply atomically
+or not at all.
+
 > 
->  drivers/phy/phy-rockchip-emmc.c | 82 ++++++++++++++++++++++++++++++++++-------
->  1 file changed, 69 insertions(+), 13 deletions(-)
+> And one new question, the overlay manager will need access
+> to (several) i2c busses, preferably I can pass in a phandle
+> to these in devicetree, do you have any experience with /
+> examples of doing such a thing ?
+
+No problems there. There?s an I2C API to get the bus from a phandle.
+
 > 
-> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-> index 23fe50864526..51ddd543fd04 100644
-> --- a/drivers/phy/phy-rockchip-emmc.c
-> +++ b/drivers/phy/phy-rockchip-emmc.c
-> @@ -14,6 +14,7 @@
->   * GNU General Public License for more details.
->   */
->  
-> +#include <linux/clk.h>
->  #include <linux/delay.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/module.h>
-> @@ -78,16 +79,73 @@
->  struct rockchip_emmc_phy {
->  	unsigned int	reg_offset;
->  	struct regmap	*reg_base;
-> +	struct clk	*emmcclk;
->  };
->  
-> -static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
-> -				   bool on_off)
-> +static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
->  {
-> +	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
->  	unsigned int caldone;
->  	unsigned int dllrdy;
-> +	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
->  	unsigned long timeout;
->  
->  	/*
-> +	 * We purposely get the clock here and not in probe to avoid the
-> +	 * circular dependency problem.  We expect:
-> +	 * - PHY driver to probe
-> +	 * - SDHCI driver to start probe
-> +	 * - SDHCI driver to register it's clock
-> +	 * - SDHCI driver to get the PHY
-> +	 * - SDHCI driver to power on the PHY
-> +	 */
-> +	if (!rk_phy->emmcclk) {
-> +		rk_phy->emmcclk = devm_clk_get(&phy->dev, "emmcclk");
-> +
-> +		/* Don't expect defer at this point; try next time */
-> +		if (PTR_ERR(rk_phy->emmcclk) == -EPROBE_DEFER) {
-> +			dev_warn(&phy->dev, "Unexpected emmcclk defer\n");
-> +			rk_phy->emmcclk = NULL;
-> +		}
-> +	}
-> +
-> +	if (!IS_ERR_OR_NULL(rk_phy->emmcclk)) {
-> +		unsigned long rate = clk_get_rate(rk_phy->emmcclk);
-> +		unsigned long ideal_rate;
-> +		unsigned long diff;
-> +
-> +		switch (rate) {
-> +		case 0 ... 74999999:
-> +			ideal_rate = 50000000;
-> +			freqsel = PHYCTRL_FREQSEL_50M;
-> +			break;
-> +		case 75000000 ... 124999999:
-> +			ideal_rate = 100000000;
-> +			freqsel = PHYCTRL_FREQSEL_100M;
-> +			break;
-> +		case 125000000 ... 174999999:
-> +			ideal_rate = 150000000;
-> +			freqsel = PHYCTRL_FREQSEL_150M;
-> +			break;
-> +		default:
-> +			ideal_rate = 200000000;
-> +			break;
-> +		};
-> +
-> +		diff = (rate > ideal_rate) ?
-> +			rate - ideal_rate : ideal_rate - rate;
-> +
-> +		/*
-> +		 * In order for tuning delays to be accurate we need to be
-> +		 * pretty spot on for the DLL range, so warn if we're too
-> +		 * far off.  Also warn if we're above the 200 MHz max.  Don't
-> +		 * warn for really slow rates since we won't be tuning then.
-> +		 */
-> +		if ((rate > 50000000 && diff > 15000000) || (rate > 200000000))
-> +			dev_warn(&phy->dev, "Unsupported rate: %lu\n", rate);
-> +	}
-> +
-> +	/*
->  	 * Keep phyctrl_pdb and phyctrl_endll low to allow
->  	 * initialization of CALIO state M/C DFFs
->  	 */
-> @@ -132,6 +190,13 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
->  		return -ETIMEDOUT;
->  	}
->  
-> +	/* Set the frequency of the DLL operation */
-> +	regmap_write(rk_phy->reg_base,
-> +		     rk_phy->reg_offset + GRF_EMMCPHY_CON0,
-> +		     HIWORD_UPDATE(freqsel, PHYCTRL_FREQSEL_MASK,
-> +				   PHYCTRL_FREQSEL_SHIFT));
-> +
-> +	/* Turn on the DLL */
->  	regmap_write(rk_phy->reg_base,
->  		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
->  		     HIWORD_UPDATE(PHYCTRL_ENDLL_ENABLE,
-> @@ -168,23 +233,14 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
->  
->  static int rockchip_emmc_phy_power_off(struct phy *phy)
->  {
-> -	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
-> -
->  	/* Power down emmc phy analog blocks */
-> -	return rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_OFF);
-> +	return rockchip_emmc_phy_power(phy, PHYCTRL_PDB_PWR_OFF);
->  }
->  
->  static int rockchip_emmc_phy_power_on(struct phy *phy)
->  {
->  	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
->  
-> -	/* DLL operation: 200 MHz */
-> -	regmap_write(rk_phy->reg_base,
-> -		     rk_phy->reg_offset + GRF_EMMCPHY_CON0,
-> -		     HIWORD_UPDATE(PHYCTRL_FREQSEL_200M,
-> -				   PHYCTRL_FREQSEL_MASK,
-> -				   PHYCTRL_FREQSEL_SHIFT));
-> -
->  	/* Drive impedance: 50 Ohm */
->  	regmap_write(rk_phy->reg_base,
->  		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
-> @@ -207,7 +263,7 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
->  				   PHYCTRL_OTAPDLYSEL_SHIFT));
->  
->  	/* Power up emmc phy analog blocks */
-> -	return rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_ON);
-> +	return rockchip_emmc_phy_power(phy, PHYCTRL_PDB_PWR_ON);
->  }
->  
->  static const struct phy_ops ops = {
+> Regards,
 > 
+> Hans
+
+Regards
+
+? Pantelis
