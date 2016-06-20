@@ -1,158 +1,184 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 20 Jun 2016 11:51:17 -0400
-Subject: [PATCH V8 7/9] vfio,
- platform: make reset driver a requirement by default
-In-Reply-To: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
-References: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1466437879-32182-8-git-send-email-okaya@codeaurora.org>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 20 Jun 2016 19:04:28 +0300
+Subject: [PATCH v8 0/4] ACPI: parse the SPCR table
+In-Reply-To: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <8f19dd0d-c31e-d898-e3fe-577eaf0bbee1@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code was allowing platform devices to be used without a supporting
-VFIO reset driver. The hardware can be left in some inconsistent state
-after a guest machine abort.
 
-The reset driver will put the hardware back to safe state and disable
-interrupts before returning the control back to the host machine.
+On 05/20/2016 04:03 PM, Aleksey Makarov wrote:
 
-Adding a new reset_required kernel module option to AMBA and platform
-VFIO drivers with a default value of true.
+Hi Rafael,
 
-New requirements are:
-1. A reset function needs to be implemented by the corresponding driver
-via DT/ACPI.
-2. The reset function needs to be discovered via DT/ACPI.
+Can you consider this patch set for queuing up please?
 
-The probe of the driver will fail if any of the above conditions are
-not satisfied.
+You approved ACPI part. I believe it's 2/4 and 3/4.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/vfio/platform/vfio_amba.c             |  5 +++++
- drivers/vfio/platform/vfio_platform.c         |  5 +++++
- drivers/vfio/platform/vfio_platform_common.c  | 24 ++++++++++++++++--------
- drivers/vfio/platform/vfio_platform_private.h |  1 +
- 4 files changed, 27 insertions(+), 8 deletions(-)
+	https://lkml.kernel.org/g/CAJZ5v0hdoLTfjrD8+WxSoxM48dqbZK2KwY_h+63kHKHKgO=JFA at mail.gmail.com
 
-diff --git a/drivers/vfio/platform/vfio_amba.c b/drivers/vfio/platform/vfio_amba.c
-index a66479b..7585902 100644
---- a/drivers/vfio/platform/vfio_amba.c
-+++ b/drivers/vfio/platform/vfio_amba.c
-@@ -23,6 +23,10 @@
- #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
- #define DRIVER_DESC     "VFIO for AMBA devices - User Level meta-driver"
- 
-+static bool reset_required = true;
-+module_param(reset_required, bool, 0644);
-+MODULE_PARM_DESC(reset_required, "override reset requirement (default: 1)");
-+
- /* probing devices from the AMBA bus */
- 
- static struct resource *get_amba_resource(struct vfio_platform_device *vdev,
-@@ -68,6 +72,7 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
- 	vdev->get_resource = get_amba_resource;
- 	vdev->get_irq = get_amba_irq;
- 	vdev->parent_module = THIS_MODULE;
-+	vdev->reset_required = reset_required;
- 
- 	ret = vfio_platform_probe_common(vdev, &adev->dev);
- 	if (ret) {
-diff --git a/drivers/vfio/platform/vfio_platform.c b/drivers/vfio/platform/vfio_platform.c
-index b1cc3a7..ef89146 100644
---- a/drivers/vfio/platform/vfio_platform.c
-+++ b/drivers/vfio/platform/vfio_platform.c
-@@ -23,6 +23,10 @@
- #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
- #define DRIVER_DESC     "VFIO for platform devices - User Level meta-driver"
- 
-+static bool reset_required = true;
-+module_param(reset_required, bool, 0644);
-+MODULE_PARM_DESC(reset_required, "override reset requirement (default: 1)");
-+
- /* probing devices from the linux platform bus */
- 
- static struct resource *get_platform_resource(struct vfio_platform_device *vdev,
-@@ -66,6 +70,7 @@ static int vfio_platform_probe(struct platform_device *pdev)
- 	vdev->get_resource = get_platform_resource;
- 	vdev->get_irq = get_platform_irq;
- 	vdev->parent_module = THIS_MODULE;
-+	vdev->reset_required = reset_required;
- 
- 	ret = vfio_platform_probe_common(vdev, &pdev->dev);
- 	if (ret)
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index 1d771a6..b9ffed4 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -128,10 +128,10 @@ static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
- 	return vdev->of_reset ? true : false;
- }
- 
--static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
-+static int vfio_platform_get_reset(struct vfio_platform_device *vdev)
- {
- 	if (vdev->acpihid)
--		return;
-+		return vfio_platform_acpi_has_reset(vdev) ? 0 : -ENOENT;
- 
- 	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
- 						    &vdev->reset_module);
-@@ -140,6 +140,8 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
- 		vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
- 							&vdev->reset_module);
- 	}
-+
-+	return vdev->of_reset ? 0 : -ENOENT;
- }
- 
- static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
-@@ -663,6 +665,13 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 
- 	vdev->device = dev;
- 
-+	ret = vfio_platform_get_reset(vdev);
-+	if (ret && vdev->reset_required) {
-+		pr_err("vfio: no reset function found for device %s\n",
-+		       vdev->name);
-+		return ret;
-+	}
-+
- 	group = iommu_group_get(dev);
- 	if (!group) {
- 		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
-@@ -670,16 +679,15 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 	}
- 
- 	ret = vfio_add_group_dev(dev, &vfio_platform_ops, vdev);
--	if (ret) {
--		iommu_group_put(group);
--		return ret;
--	}
--
--	vfio_platform_get_reset(vdev);
-+	if (ret)
-+		goto out;
- 
- 	mutex_init(&vdev->igate);
- 
- 	return 0;
-+out:
-+	iommu_group_put(group);
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(vfio_platform_probe_common);
- 
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index ba9e4f8..68fbc00 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -50,6 +50,7 @@ struct vfio_platform_region {
- };
- 
- struct vfio_platform_device {
-+	bool				reset_required;
- 	struct vfio_platform_region	*regions;
- 	u32				num_regions;
- 	struct vfio_platform_irq	*irqs;
--- 
-1.8.2.1
+1/4 is ACKed by Rob Herring and Greg Kroah-Hartman
+
+As for 4/4 it had an ACK from Greg but since then I had to make a small
+change.  For details look at
+
+	https://lkml.kernel.org/g/c37d62c7-1e1b-0b10-a083-c5207fbbb820 at gmail.com
+
+Thank you
+Aleksey Makarov
+
+> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port Console
+> Redirection Table) [2] as a mandatory ACPI table that specifies the
+> configuration of serial console.
+> 
+> Move "earlycon" early_param handling to earlycon.c to parse this option once
+> 
+> Parse SPCR table, setup earlycon and register specified console.
+> 
+> Enable parsing this table on ARM64.  Earlycon should be set up as early as
+> possible.  ACPI boot tables are mapped in
+> arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch() and
+> that's where we parse spcr.  So it has to be opted-in per-arch. When
+> ACPI_SPCR_TABLE is defined initialization of DT earlycon is deferred until the
+> DT/ACPI decision is done.
+> 
+> Implement console_match() for pl011.
+> 
+> Based on the work by Leif Lindholm [3]
+> Thanks to Peter Hurley for explaining how this should work.
+> 
+> Should be applied to next-20160520
+> Tested on QEMU and ThunderX.
+> SPCR support is included in QEMU's ARM64 mach-virt since 2.4 release.
+> 
+> v8:
+> - rebase to next-20160520
+> - remove the patch "ACPICA: Headers: Add new constants for the DBG2 ACPI table"
+>   as it have got to linux-next
+> - add Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Reviewed-by:
+>   Peter Hurley <peter@hurleysoftware.com> (but see below)
+> - fix the patch "serial: pl011: add console matching function".  The patch by
+>   Christopher Covington [4] specifies that SBSA uart does 32-bit access to
+>   registers and this breaks the match function.  In this series the function
+>   was changed to match when SPCR specifies both mmio32 and mmio access.
+>   I removed Acked-by: Greg from this patch because of these changes.
+> 
+> v7:
+> https://lkml.kernel.org/g/1459431629-27934-1-git-send-email-aleksey.makarov at linaro.org
+> - add Acked-by: Rob Herring for "of/serial: move earlycon early_param handling
+>   to serial"
+> - call DT earlycon initialization from the arch ACPI code, not from parse_spcr()
+>   (Rafael J. Wysocki)
+> - fix a few minor issues (Rafael J. Wysocki)
+> 
+> v6:
+> https://lkml.kernel.org/g/1458823925-19560-1-git-send-email-aleksey.makarov at linaro.org
+> - add documentation for parse_spcr() functioin (Yury Norov)
+> - don't initialize err variable (Yury Norov)
+> - add __initdata for the earlycon_init_is_deferred flag variable
+> - rename the function exported in "of/serial: move earlycon early_param handling
+>   to serial" to avoid clash with the function from arch/microblaze/kernel/prom.c
+> - defer initialization of DT earlycon until DT/ACPI decision is made
+>   (Rob Herring, Peter Hurley)
+> - use snprintf instead of sprintf (Andy Shevchenko)
+> - drop patch that adds EARLYCON_DECLARE for pl011 as EARLYCON_DECLARE is
+>   equivalent to OF_EARLYCON_DECLARE for 4.6+ (Peter Hurley).  This means that
+>   SPCR earlycon will not work on the kernels before 4.6
+> 
+> v5:
+> https://lkml.kernel.org/g/1458643595-14719-1-git-send-email-aleksey.makarov at linaro.org
+> - drop patch "serial: pl011: use ACPI SPCR to setup 32-bit access" because
+>   it is ugly. Also because Christopher Covington came with a better solution [4]
+> - remove error message when the table is not provided by ACPI (Andy Shevchenko)
+> - rewrite spcr.c following the suggestions by Peter Hurley
+> - add console_match() for pl011 in a separate patch
+> - add EARLYCON_DECLARE for pl011 in a separate patch
+> - add patch "of/serial: move earlycon early_param handling to serial" from
+>   the GDB2 series
+> 
+> v4:
+> https://lkml.kernel.org/g/1456747355-15692-1-git-send-email-aleksey.makarov at linaro.org
+> - drop patch "ACPI: change __init to __ref for early_acpi_os_unmap_memory()"
+>   ACPI developers work on a new API and asked not to do that.
+>   Instead, use acpi_get_table_with_size()/early_acpi_os_unmap_memory() once
+>   and cache the result. (Lv Zheng)
+> - fix some style issues (Yury Norov)
+> 
+> v3:
+> https://lkml.kernel.org/g/1455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
+> 
+> Greg Kroah-Hartman did not like v2 so I have rewritten this patchset:
+> 
+> - drop acpi_match() member of struct console
+> - drop implementations of this member for pl011 and 8250
+> - drop the patch that renames some vars in printk.c as it is not needed anymore
+> - drop patch that introduces system wide acpi_table_parse2().
+>   Instead introduce a custom acpi_table_parse_spcr() in spcr.c
+> 
+> Instead of introducing a new match_acpi() member of struct console,
+> this patchset introduces a new function acpi_console_check().
+> This function is called when a new uart is registered at serial_core.c
+> the same way OF code checks for console.  If the registered uart is the
+> console specified by SPCR table, this function calls add_preferred_console()
+> 
+> The restrictions of this approach are:
+> 
+> - only serial consoles can be set up
+> - only consoles specified by the memory/io address can be set up
+>   (SPCR can specify devices by PCI id/PCI address)
+> 
+> v2:
+> https://lkml.kernel.org/g/1455299022-11641-1-git-send-email-aleksey.makarov at linaro.org
+> - don't use SPCR if user specified console in command line
+> - fix initialization order of newcon->index = 0
+> - rename some variables at printk.c (Joe Perches, Peter Hurley)
+> - enable ACPI_SPCR_TABLE in a separate patch (Andy Shevchenko)
+> - remove the retry loop for console registering (Peter Hurley).
+>   Instead, obtain SPCR with acpi_get_table().  That works after
+>   call to acpi_early_init() i. e. in any *_initcall()
+> - describe design decision behind introducing acpi_match() (Peter Hurley)
+> - fix compilation for x86 + ACPI (Graeme Gregory)
+> - introduce DBG2 constants in a separate patch (Andy Shevchenko)
+> - fix a typo in DBG2 constants (Andy Shevchenko)
+> - add ACPI_DBG2_ARM_SBSA_32BIT constant (Christopher Covington)
+> - add support for ACPI_DBG2_ARM_SBSA_* consoles (Christopher Covington)
+> - add documentation for functions
+> - add a patch that uses SPCR to find if SBSA serial driver should use 32-bit
+>   accessor functions (Christopher Covington)
+> - change __init to __ref for early_acpi_os_unmap_memory() in a separate patch
+> - introduce acpi_table_parse2() in a separate patch
+> - fix fetching the SPCR table early (Mark Salter)
+> - add a patch from Mark Salter that introduces support for matching 8250-based
+>   consoles
+> 
+> v1:
+> https://lkml.kernel.org/g/1453722324-22407-1-git-send-email-aleksey.makarov at linaro.org
+> 
+> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+> [3] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
+> [4] https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
+> 
+> Aleksey Makarov (3):
+>   ACPI: parse SPCR and enable matching console
+>   ARM64: ACPI: enable ACPI_SPCR_TABLE
+>   serial: pl011: add console matching function
+> 
+> Leif Lindholm (1):
+>   of/serial: move earlycon early_param handling to serial
+> 
+>  arch/arm64/Kconfig              |   1 +
+>  arch/arm64/kernel/acpi.c        |  11 +++-
+>  drivers/acpi/Kconfig            |   3 ++
+>  drivers/acpi/Makefile           |   1 +
+>  drivers/acpi/spcr.c             | 111 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/of/fdt.c                |  11 +---
+>  drivers/tty/serial/amba-pl011.c |  56 ++++++++++++++++++++
+>  drivers/tty/serial/earlycon.c   |  19 ++++++-
+>  include/linux/acpi.h            |   6 +++
+>  include/linux/of_fdt.h          |   2 +
+>  include/linux/serial_core.h     |   6 +++
+>  11 files changed, 214 insertions(+), 13 deletions(-)
+>  create mode 100644 drivers/acpi/spcr.c
+> 
