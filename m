@@ -1,86 +1,53 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 20 Jun 2016 11:02:22 +0530
-Subject: [PATCH v19 10/13] arm64: kdump: add VMCOREINFO's for user-space
- coredump tools
-In-Reply-To: <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
-References: <cover.1466120418.git.geoff@infradead.org>
- <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
-Message-ID: <20160620053222.GB14309@dhcppc9>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Mon, 20 Jun 2016 14:41:57 +0900
+Subject: [PATCH] clk: samsung: exynos5433: use clock_ignore_unused flag for
+ SPI3 related clocks
+In-Reply-To: <CA+Ln22HHNnPuEq1WVs+iiEEbAhdvkADhVkj99pqgR0qJODFUXw@mail.gmail.com>
+References: <1466151362-2881-1-git-send-email-andi.shyti@samsung.com>
+ <CA+Ln22F9eskcpnFkrnVFc3dJqCJcJ5O-STfXC-8Om5MK-THwNg@mail.gmail.com>
+ <20160619055921.GA424@jack.zhora.eu>
+ <CGME20160619134424epcas1p31493dfce45a8c817bc353702a07fa4bb@epcas1p3.samsung.com>
+ <CA+Ln22HHNnPuEq1WVs+iiEEbAhdvkADhVkj99pqgR0qJODFUXw@mail.gmail.com>
+Message-ID: <20160620054157.GA6498@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Atsushi
+Hi Tomasz,
 
-Hi Takahiro,
-
-On 16/06/2016:11:48:28 PM, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >> > The SPI 3 bus uses two clocks, a bus clock and an input clock.
+> >> > Do not disable the clocks when unused in order to allow access to
+> >> > the SPI 3 device.
+> >>
+> >> If unused, why would access to SPI 3 device needed?
+> >
+> > because next I will submit a small driver which uses the SPI3.
+> > Actually in the exynos5433 boards all the SPI are used but not all
+> > the drivers are ported to mainline.
 > 
-> For the current crash utility, we need to know, at least,
->   - kimage_voffset
->   - PHYS_OFFSET
-> to handle the contents of core dump file (/proc/vmcore) correctly due to
-> the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
-> This patch puts them as VMCOREINFO's into the file.
-> 
->   - VA_BITS
-> is also added for makedumpfile command.
+> Then shouldn't the driver request the clocks and enable them? Or I'm
+> missing something obvious? :)
 
-Thanks for adding them. They are quite helpful for makedumpfile as well.
+the reason is that...
 
-> More VMCOREINFO's may be added later.
+[ from the patch ]
 
-Yes, we will need to pass VMCOREINFO_SYMBOL(_text) and VMCOREINFO_SYMBOL(_end)
-in order to work with makedumpfile.
+>         GATE(CLK_SCLK_IOCLK_SPI3, "sclk_ioclk_spi3", "ioclk_spi3_clk_in",
+> -                       ENABLE_SCLK_PERIC, 20, CLK_SET_RATE_PARENT, 0),
+> +                       ENABLE_SCLK_PERIC, 20,
+> +                       CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
 
-I already have makedumpfile patches [1]  which uses _text and _end, but not
-sending them to makedumpfile upstream, until you will be agreeing to take [2] in
-future. Please let me know your opinion about it. If it would be acceptable then
-I may send aarch64 makedumpfile improvements to upstream.
+... the sclk_ioclk_spi3 is new in exynos5433 and there is no
+implementation for enabling/disabling that particular clock...
 
-[1] https://github.com/pratyushanand/makedumpfile/commit/d9590fec049976b8fee0d6b4e66e6f3e99ff1113
-[2] https://github.com/pratyushanand/linux/commit/1d94df20c575c725910c9c29a129b9f14e7e900b
+>         GATE(CLK_SCLK_SPI3, "sclk_spi3", "sclk_spi3_peric", ENABLE_SCLK_PERIC,
+> -                       18, CLK_SET_RATE_PARENT, 0),
+> +                       18, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
 
-~Pratyush
+... while in this case your question makes sense, but it depends
+on which clock the device (s3c64xx) is requesting (from the DTS).
+In any case, I kept it consistent with the SPI1, which falls in
+the same case, as in mainline we don't have any DTS for
+exynos5433 (yet!).
 
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/kernel/machine_kexec.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index f270967..57a30fb 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -18,6 +18,7 @@
->  
->  #include <asm/cacheflush.h>
->  #include <asm/cpu_ops.h>
-> +#include <asm/memory.h>
->  #include <asm/mmu_context.h>
->  
->  #include "cpu-reset.h"
-> @@ -278,3 +279,13 @@ void machine_crash_shutdown(struct pt_regs *regs)
->  
->  	pr_info("Starting crashdump kernel...\n");
->  }
-> +
-> +void arch_crash_save_vmcoreinfo(void)
-> +{
-> +	VMCOREINFO_NUMBER(VA_BITS);
-> +	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
-> +	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
-> +						kimage_voffset);
-> +	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
-> +						PHYS_OFFSET);
-> +}
-> -- 
-> 2.5.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Andi
