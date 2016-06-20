@@ -1,103 +1,75 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 20 Jun 2016 11:21:37 +0200
-Subject: [PATCH v3 1/2] usb: ohci-at91: Forcibly suspend ports while USB
- suspend
-In-Reply-To: <20160620085205.GN5809@piout.net>
-References: <1465359311-14544-1-git-send-email-wenyou.yang@atmel.com>
- <1465359311-14544-2-git-send-email-wenyou.yang@atmel.com>
- <20160608202651.GA23604@rob-hp-laptop> <20160608203810.GF2466@piout.net>
- <B256D81BAE5131468A838E5D7A24364101650C3632@penmbx01>
- <20160617135448.GI5809@piout.net>
- <B256D81BAE5131468A838E5D7A24364101650C5253@penmbx01>
- <20160620080334.GL5809@piout.net>
- <B256D81BAE5131468A838E5D7A24364101650C547F@penmbx01>
- <20160620085205.GN5809@piout.net>
-Message-ID: <5767B5A1.4040307@atmel.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Mon, 20 Jun 2016 17:22:41 +0800
+Subject: [RFC PATCH 2/4] trace: Introduce an output interface from ftrace
+ to STM
+In-Reply-To: <87inxlqpqe.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1464779939-24986-1-git-send-email-zhang.chunyan@linaro.org>
+ <1464779939-24986-3-git-send-email-zhang.chunyan@linaro.org>
+ <87inxlqpqe.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CAG2=9p95EWUTh-SPs38RDAyn3YJ=ADSLba2EM-5TvDt1_tBaGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/06/2016 10:52, Alexandre Belloni a ?crit :
-> On 20/06/2016 at 08:46:02 +0000, Yang, Wenyou wrote :
->> Hi Alexandre & Nicolas,
->>
->>> -----Original Message-----
->>> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
->>> Sent: 2016?6?20? 16:04
->>> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
->>> Cc: Rob Herring <robh@kernel.org>; Alan Stern <stern@rowland.harvard.edu>;
->>> Greg Kroah-Hartman <gregkh@linuxfoundation.org>; Ferre, Nicolas
->>> <Nicolas.FERRE@atmel.com>; Pawel Moll <pawel.moll@arm.com>; Mark Brown
->>> <broonie@kernel.org>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
->>> Gala <galak@codeaurora.org>; linux-kernel at vger.kernel.org;
->>> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->>> usb at vger.kernel.org
->>> Subject: Re: [PATCH v3 1/2] usb: ohci-at91: Forcibly suspend ports while USB
->>> suspend
->>>
->>> On 20/06/2016 at 03:16:35 +0000, Yang, Wenyou wrote :
->>>>> Sure, what I mean is that you can try to get the regmap for the SFR in every
->>> case.
->>>>> Depending on whether you were able to get it, you can decide to call
->>>>> ohci_at91_port_suspend/resume or not (just test for sfr_regmap != NULL).
->>>>
->>>> I don't think so. The SFR includes a lot of miscellaneous functions, more than
->>> this one.
->>>>
->>>
->>> I know but this is irrelevant to this discussion. If you need to use the SFR from
->>> another driver you will simply get it from that other driver.
->>>
->>> I that case, you will try to get "atmel,sama5d2-sfr". It is only present on sama5d2
->>> so you have enough information to know whether or not you can use it to
->>> suspend/resume.
->>
->> I understand what your meaning :).
->> Use "atmel,sama5d2-sfr" compatible to distinguish whether forcibly suspend USB port via SFR or not.
->>
->> I am not sure if it is a better solution.
->>
-> 
-> It is definitively superior. There is only one lookup in the device tree
-> instead of two because whatever happens, you will have to get the SFR
-> regmap and you don't need to add a compatible string for an IP that
-> didn't change.
-> 
->> Nicolas, could you give your opinion?
+On Tue, Jun 7, 2016 at 6:04 PM, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>
+>> This patch is introducing a new function to print Ftrace messages
+>> to STM buffer when the traces happen.  In order to reduce the
+>> effect on timing overhead as much as possible, only the current
+>> function and its parent ip address will be recorded into STM in
+>> this patch.  This idea was first introduced by Philippe Langlais
+>> at ST-Microelectronics a long time ago[1].
+>
+> So why is this useful? The value of trace points is in their payload.
 
-I'll paraphrase Alexandre but this is what I understood:
+>From what I understand, we have no way to log as much information as
+Ftrace has done if we want to control the overhead of writing STM in a
+limited/acceptable range.  Exporting information to STM is much more
+time-consuming than writing ring buffer, the thought was simply that
+export as much useful information as possible while taking a limited
+bytes.
 
-Having the information in one place and not having to managed the
-synchronization with 2 potential sources of information is clearly an
-advantage of Alexandre's solution.
+Thanks,
+Chunyan
 
-If the next SoC has the same workaround/feature, we will anyway have a
-different SFR string to cling to...
-So it won't change much and we won't have the confusion of having the
-same sama5d2 compatible string on the OHCI side (same behavior) and
-different compatible string on the SFR side (probably a new SFR for a
-new SoC...).
-
-If the next SoC doesn't have this workaround/feature... well, it's
-simple, we don't look for the SFR, we don't use the bits, and we come
-back to the situation that we've always experienced ; with the same
-compatibility sting for OHCI as the IP never actually changed...
-
-In conclusion: try Alexandre's solution and we'll certainly find that
-it's actually simpler.
-
-Bonus point: it voids the discussion on the OHCI compatible string
-descriptions!
-
-Bye,
-
->>> Alexandre Belloni, Free Electrons
->>> Embedded Linux, Kernel and Android engineering http://free-electrons.com
->>
->>
->> Best Regards,
->> Wenyou Yang
-> 
-
-
--- 
-Nicolas Ferre
+>
+>> +#define STM_FTRACE_CHAN 0
+>
+> This is why we have the stm master/channel allocation policy, which
+> should already assign a channel to your stm_source device when it is
+> linked to an stm device.
+>
+> Also, why is this a separate compilation unit from the stm_ftrace.o?
+>
+>> +
+>> +void ftrace_stm_func(unsigned long ip, unsigned long parent_ip)
+>> +{
+>> +     unsigned long ip_array[2] = {ip, parent_ip};
+>> +
+>> +     stm_ftrace_write((char *)ip_array, sizeof(unsigned long) * 2,
+>> +                      STM_FTRACE_CHAN);
+>> +}
+>> +EXPORT_SYMBOL_GPL(ftrace_stm_func);
+>> diff --git a/kernel/trace/trace_output_stm.h b/kernel/trace/trace_output_stm.h
+>> new file mode 100644
+>> index 0000000..fc3f989
+>> --- /dev/null
+>> +++ b/kernel/trace/trace_output_stm.h
+>> @@ -0,0 +1,14 @@
+>> +#ifndef __TRACE_OUTPUT_STM_H
+>> +#define __TRACE_OUTPUT_STM_H
+>> +
+>> +#include <linux/module.h>
+>> +
+>> +#ifdef CONFIG_STM_FTRACE
+>> +extern void stm_ftrace_write(const char *buf, unsigned int len,
+>> +                          unsigned int chan);
+>> +extern void ftrace_stm_func(unsigned long ip, unsigned long parent_ip);
+>> +#else
+>> +static inline void ftrace_stm_func(unsigned long ip, unsigned long parent_ip) {}
+>> +#endif
+>> +
+>> +#endif /* __TRACE_OUTPUT_STM_H */
+>> --
+>> 1.9.1
