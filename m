@@ -1,146 +1,104 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 20 Jun 2016 15:26:39 +0300
-Subject: [PATCH v8 4/4] serial: pl011: add console matching function
-In-Reply-To: <c37d62c7-1e1b-0b10-a083-c5207fbbb820@gmail.com>
-References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
- <1463749405-11640-5-git-send-email-aleksey.makarov@linaro.org>
- <c37d62c7-1e1b-0b10-a083-c5207fbbb820@gmail.com>
-Message-ID: <fd9443e7-67f1-93e7-834b-445f9c29d876@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 20 Jun 2016 20:29:55 +0800
+Subject: [PATCH 08/12] doc: binding: pwrseq-usb-generic: add binding doc
+ for generic usb power sequence driver
+In-Reply-To: <20160620112651.GA26936@shlinux2>
+References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
+ <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
+ <CAL_JsqLvs0s2TyfqPM5vtmyY81_X84VjCGjsGYbTgT4syOfp9Q@mail.gmail.com>
+ <20160620112651.GA26936@shlinux2>
+Message-ID: <CAGb2v65nuVyHjQY7-shvygCTVxG6eHbwGygr_Cw2Hg7mg+rAwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 06/02/2016 09:02 PM, Aleksey Makarov wrote:
-> 
-> On 05/20/2016 04:03 PM, Aleksey Makarov wrote:
-
-Hi Russell,
-
-Can you review this patch please?
-
-Thank you
-Aleksey Makarov
-
->> This patch adds function pl011_console_match() that implements
->> method match of struct console.  It allows to match consoles against
->> data specified in a string, for example taken from command line or
->> compiled by ACPI SPCR table handler.
+On Mon, Jun 20, 2016 at 7:26 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
+> On Fri, Jun 17, 2016 at 12:16:48PM -0500, Rob Herring wrote:
+>> On Fri, Jun 17, 2016 at 5:09 AM, Peter Chen <peter.chen@nxp.com> wrote:
+>> > Add binding doc for generic usb power sequence driver, and update
+>> > generic usb device binding-doc accordingly.
+>> >
+>> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+>> > ---
+>> >  .../bindings/power/pwrseq/pwrseq-usb-generic.txt   | 31 ++++++++++++++++++++++
+>> >  .../devicetree/bindings/usb/usb-device.txt         |  2 ++
+>> >  2 files changed, 33 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+>> > new file mode 100644
+>> > index 0000000..8ad98382
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+>> > @@ -0,0 +1,31 @@
+>> > +The power sequence for generic USB Devices
+>> > +
+>> > +Some hard-wired USB devices need to do power sequence to let the
+>> > +device work normally, the typical power sequence like: enable USB
+>> > +PHY clock, toggle reset pin, etc. But current Linux USB driver
+>> > +lacks of such code to do it, it may cause some hard-wired USB devices
+>> > +works abnormal or can't be recognized by controller at all. The
+>> > +power sequence will be done before this device can be found at USB
+>> > +bus.
+>> > +
+>> > +Required properties:
+>> > +- compatible : contains "usb-pwrseq-generic".
 >>
->> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-> 
-> Hi Greg, Russell,
-> 
-> Can you review this patch and consider ACKing it please?
-> It had an ACK from Greg in v7 but since then I changed it a bit.
-> 
-> The patch by Christopher Covington [1] specifies that SBSA uart 
-> does 32-bit access to registers and this breaks the match function.  
-> In this series the function was changed to match when SPCR specifies
-> both mmio32 and mmio access.  I removed Acked-by: Greg from this
-> patch because of these changes.
-> 
-> The difference between v7 and v8:
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 4139b64..388edc8 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2328,10 +2329,10 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
->  
->                 port = &amba_ports[i]->port;
->  
-> -               if (port->iotype != iotype)
-> +               if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
->                         continue;
-> -               if ((iotype == UPIO_MEM || iotype == UPIO_MEM32) &&
-> -                   (port->mapbase != addr))
-> +
-> +               if (port->mapbase != addr)
->                         continue;
->  
->                 co->index = i;
-> 
-> [1] https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
-> 
-> Thank you
-> Aleksey Makarov
-> 
->> ---
->>  drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 56 insertions(+)
+>> In case I have not been clear, no.
 >>
->> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
->> index a2aa655..388edc8 100644
->> --- a/drivers/tty/serial/amba-pl011.c
->> +++ b/drivers/tty/serial/amba-pl011.c
->> @@ -2288,12 +2288,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
->>  	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
->>  }
->>  
->> +/**
->> + *	pl011_console_match - non-standard console matching
->> + *	@co:	  registering console
->> + *	@name:	  name from console command line
->> + *	@idx:	  index from console command line
->> + *	@options: ptr to option string from console command line
->> + *
->> + *	Only attempts to match console command lines of the form:
->> + *	    console=pl011,mmio|mmio32,<addr>[,<options>]
->> + *	    console=pl011,0x<addr>[,<options>]
->> + *	This form is used to register an initial earlycon boot console and
->> + *	replace it with the amba_console at pl011 driver init.
->> + *
->> + *	Performs console setup for a match (as required by interface)
->> + *	If no <options> are specified, then assume the h/w is already setup.
->> + *
->> + *	Returns 0 if console matches; otherwise non-zero to use default matching
->> + */
->> +static int __init pl011_console_match(struct console *co, char *name, int idx,
->> +				      char *options)
->> +{
->> +	char match[] = "pl011";	/* pl011-specific earlycon name */
->> +	unsigned char iotype;
->> +	unsigned long addr;
->> +	int i;
->> +
->> +	if (strncmp(name, match, 5) != 0)
->> +		return -ENODEV;
->> +
->> +	if (uart_parse_earlycon(options, &iotype, &addr, &options))
->> +		return -ENODEV;
->> +
->> +	/* try to match the port specified on the command line */
->> +	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
->> +		struct uart_port *port;
->> +
->> +		if (!amba_ports[i])
->> +			continue;
->> +
->> +		port = &amba_ports[i]->port;
->> +
->> +		if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
->> +			continue;
->> +
->> +		if (port->mapbase != addr)
->> +			continue;
->> +
->> +		co->index = i;
->> +		port->cons = co;
->> +		return pl011_console_setup(co, options);
->> +	}
->> +
->> +	return -ENODEV;
->> +}
->> +
->>  static struct uart_driver amba_reg;
->>  static struct console amba_console = {
->>  	.name		= "ttyAMA",
->>  	.write		= pl011_console_write,
->>  	.device		= uart_console_device,
->>  	.setup		= pl011_console_setup,
->> +	.match		= pl011_console_match,
->>  	.flags		= CON_PRINTBUFFER,
->>  	.index		= -1,
->>  	.data		= &amba_reg,
+>> I am not going to accept anything along the lines of the current mmc
+>> pwrseq. I am basically okay with Krzysztof's proposal as it is *only*
+>> an added property and not a duplication of information. I'd suggest
+>> you figure out how to make the kernel work with that rather than
+>> trying to work-around whatever kernel limitations there are.
 >>
+>
+> I see.
+>
+> Would you agree with below:
+>
+> &usbotg1 {
+>         vbus-supply = <&reg_usb_otg1_vbus>;
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_usb_otg1_id>;
+>         status = "okay";
+>
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+>         hub: genesys at 1 {
+>                 compatible = "usb5e3,608";
+>                 reg = <1>;
+>
+>                 power-sequence;
+>                 reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
+>                 reset-duration-us = <10>;
+>                 clocks = <&clks IMX6SX_CLK_CKO>;
+>
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>                 ethernet: asix at 1 {
+>                         compatible = "usbb95,1708";
+>                         reg = <1>;
+>
+>                         power-sequence;
+>                         reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
+>                         reset-duration-us = <15>;
+>                         clocks = <&clks IMX6SX_CLK_IPG>;
+>                 };
+>         };
+> };
+>
+> If the node has property "power-sequence", the pwrseq core will create
+> related platform device, and the driver under pwrseq driver will handle
+> power sequence stuffs. The property below "power-sequence" will be
+> handled at pwrseq driver.
+
+Isn't this binding what Krzysztof proposed? His series also provides example
+code for enabling USB device power sequencing. Does it not work for you?
+
+Having 2 series by 2 separate people doing the same thing but slightly
+different is very confusing.
+
+Regards
+ChenYu
