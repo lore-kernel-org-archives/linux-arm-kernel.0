@@ -1,172 +1,383 @@
-From: pranav.sawargaonkar@gmail.com (Pranav Sawargaonkar)
-Date: Mon, 20 Jun 2016 21:12:58 +0530
-Subject: [PATCH v9 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
- 3/3: vfio changes
-In-Reply-To: <e379ffed-6a73-d18a-1af9-a49b096d3f60@redhat.com>
-References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
- <573F34CA.5080308@linaro.org>
- <875b5791-f7c9-97ca-46de-4b1474fe65e0@linaro.org>
- <20160608150609.7e28d63d@ul30vt.home>
- <e379ffed-6a73-d18a-1af9-a49b096d3f60@redhat.com>
-Message-ID: <CAP_HG2umBnV_88WGW20_oQ2X9zMxZKQJ952tQY_0=023R2AKjg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 20 Jun 2016 17:44:52 +0200
+Subject: [PATCH] ARM: sun8i: Add Parrot Board DTS
+In-Reply-To: <CAGb2v67JGG35odB7kEAoF0kGes=KRGoREOSTc_GM0B4A+8cKWg@mail.gmail.com>
+References: <1465812931-22824-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1465812931-22824-2-git-send-email-quentin.schulz@free-electrons.com>
+ <CAGb2v64jduBijEXzsKbOpSvLd9YHwO=qpSyPSDuYtMPg8wfKzA@mail.gmail.com>
+ <575FFFBE.5090107@free-electrons.com>
+ <CAGb2v67JGG35odB7kEAoF0kGes=KRGoREOSTc_GM0B4A+8cKWg@mail.gmail.com>
+Message-ID: <20160620154452.GL26668@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi,
 
-Tested this series on APM X-Gene2 with E1000 and sata sil card.
-Tested-By: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
+On Tue, Jun 14, 2016 at 09:19:58PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Jun 14, 2016 at 8:59 PM, Quentin Schulz
+> <quentin.schulz@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On 13/06/2016 15:04, Chen-Yu Tsai wrote:
+> >> Hi,
+> >>
+> >> On Mon, Jun 13, 2016 at 6:15 PM, Quentin Schulz
+> >> <quentin.schulz@free-electrons.com> wrote:
+> >>> The Parrot Board is an evaluation board with an Allwinner R16 (assumed
+> >>> to be close to an Allwinner A33), 4GB of NAND, 512MB of RAM, USB host
+> >>
+> >> You say NAND here, but you enable mmc2 for eMMC below. Please correct it.
+> >>
+> >
+> > ACK.
+> >
+> >>> and OTG, a WiFi/Bluetooth combo chip, a micro SD Card reader, 2
+> >>> controllable buttons, an LVDS port with separated backlight and
+> >>> capacitive touch panel ports, an audio/microphone jack, a camera CSI
+> >>> port, 2 sets of 22 GPIOs and an accelerometer.
+> >>
+> >> I assume the board is this one:
+> >>
+> >> https://world.taobao.com/item/530374411673.htm
+> >>
+> >
+> > Definitely looks like it.
+> >
+> >>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> >>> ---
+> >>>  arch/arm/boot/dts/Makefile             |   1 +
+> >>>  arch/arm/boot/dts/sun8i-r16-parrot.dts | 333 +++++++++++++++++++++++++++++++++
+> >>>  2 files changed, 334 insertions(+)
+> >>>  create mode 100644 arch/arm/boot/dts/sun8i-r16-parrot.dts
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >>> index 06b6c2d..1149512 100644
+> >>> --- a/arch/arm/boot/dts/Makefile
+> >>> +++ b/arch/arm/boot/dts/Makefile
+> >>> @@ -760,6 +760,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+> >>>         sun8i-a33-ippo-q8h-v1.2.dtb \
+> >>>         sun8i-a33-q8-tablet.dtb \
+> >>>         sun8i-a33-sinlinx-sina33.dtb \
+> >>> +       sun8i-r16-parrot.dtb \
+> >>>         sun8i-a83t-allwinner-h8homlet-v2.dtb \
+> >>>         sun8i-a83t-cubietruck-plus.dtb \
+> >>>         sun8i-h3-orangepi-2.dtb \
+> >>> diff --git a/arch/arm/boot/dts/sun8i-r16-parrot.dts b/arch/arm/boot/dts/sun8i-r16-parrot.dts
+> >>> new file mode 100644
+> >>> index 0000000..75e2420
+> >>> --- /dev/null
+> >>> +++ b/arch/arm/boot/dts/sun8i-r16-parrot.dts
+> >>> @@ -0,0 +1,333 @@
+> >>> +/*
+> >>> + * Copyright 2015 Quentin Schulz
+> >>> + *
+> >>> + * Quentin Schulz <quentin.schulz@free-electrons.com>
+> >>> + *
+> >>> + * This file is dual-licensed: you can use it either under the terms
+> >>> + * of the GPL or the X11 license, at your option. Note that this dual
+> >>> + * licensing only applies to this file, and not this project as a
+> >>> + * whole.
+> >>> + *
+> >>> + *  a) This file is free software; you can redistribute it and/or
+> >>> + *     modify it under the terms of the GNU General Public License as
+> >>> + *     published by the Free Software Foundation; either version 2 of the
+> >>> + *     License, or (at your option) any later version.
+> >>> + *
+> >>> + *     This file is distributed in the hope that it will be useful,
+> >>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>> + *     GNU General Public License for more details.
+> >>> + *
+> >>> + * Or, alternatively,
+> >>> + *
+> >>> + *  b) Permission is hereby granted, free of charge, to any person
+> >>> + *     obtaining a copy of this software and associated documentation
+> >>> + *     files (the "Software"), to deal in the Software without
+> >>> + *     restriction, including without limitation the rights to use,
+> >>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> >>> + *     sell copies of the Software, and to permit persons to whom the
+> >>> + *     Software is furnished to do so, subject to the following
+> >>> + *     conditions:
+> >>> + *
+> >>> + *     The above copyright notice and this permission notice shall be
+> >>> + *     included in all copies or substantial portions of the Software.
+> >>> + *
+> >>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >>> + *     OTHER DEALINGS IN THE SOFTWARE.
+> >>> + */
+> >>> +
+> >>> +/dts-v1/;
+> >>> +#include "sun8i-a33.dtsi"
+> >>> +#include "sunxi-common-regulators.dtsi"
+> >>> +
+> >>> +#include <dt-bindings/gpio/gpio.h>
+> >>> +#include <dt-bindings/input/input.h>
+> >>> +
+> >>> +/ {
+> >>> +       model = "Allwinner Parrot EVB R16";
+> >>> +       compatible = "allwinner,parrot-evb-r16", "allwinner,sun8i-a33";
+> >>> +
+> >>> +       aliases {
+> >>> +               serial0 = &uart0;
+> >>> +       };
+> >>> +
+> >>> +       chosen {
+> >>> +               stdout-path = "serial0:115200n8";
+> >>> +       };
+> >>> +
+> >>> +       leds {
+> >>> +               compatible = "gpio-leds";
+> >>> +               pinctrl-names = "default";
+> >>> +               pinctrl-0 = <&led_pins_r16>;
+> >>
+> >> IMO r16 is too generic. You may want to add parrot_ or parrot_evb_ to it.
+> >> Same goes for all the other r16 identifier names.
+> >>
+> >
+> > ACK.
+> >
+> >>> +
+> >>> +               led1 {
+> >>> +                       label = "r16:led1:usr";
+> >>> +                       gpio = <&pio 4 17 GPIO_ACTIVE_HIGH>; /* PE17 */
+> >>> +               };
+> >>> +
+> >>> +               led2 {
+> >>> +                       label = "r16:led2:usr";
+> >>> +                       gpio = <&pio 4 16 GPIO_ACTIVE_HIGH>; /* PE16 */
+> >>> +               };
+> >>> +       };
+> >>> +
+> >>> +       wifi_pwrseq: wifi_pwrseq {
+> >>> +               compatible = "mmc-pwrseq-simple";
+> >>> +               reset-gpios = <&r_pio 0 6 GPIO_ACTIVE_LOW>; /* PL06 */
+> >>> +       };
+> >>> +
+> >>> +};
+> >>> +
+> >>> +&ehci0 {
+> >>> +       status = "okay";
+> >>> +};
+> >>> +
+> >>> +&i2c1 {
+> >>> +       pinctrl-names = "default";
+> >>> +       pinctrl-0 = <&i2c1_pins_a>;
+> >>> +       status = "okay";
+> >>
+> >> Nothing connected? A comment mentioning which connector this is on
+> >> if it's not directly connecting something on the board would be nice.
+> >>
+> >
+> > An accelerometer is connected to this i2c, but:
+> > 1) The given address of the i2c device given by i2cdetect is not the
+> > same as specified in both fex and schematics.
+> > 2) The accelerometer has a "product reference" on the schematics for a
+> > Broadcom BMA250 but the associated driver does not work with it.
+> >
+> > So there is an accelerometer connected to this i2c but I've not found
+> > yet what can drive it. I could add a comment specifying the
+> > accelerometer is attached to this i2c or remove the node?
+> 
+> A comment will suffice, until you figure out what exactly is on there.
+> 
+> >
+> >>> +};
+> >>> +
+> >>> +&lradc {
+> >>> +       vref-supply = <&reg_aldo3>;
+> >>> +       status = "okay";
+> >>> +
+> >>> +       button at 0 {
+> >>> +               label = "V+";
+> >>> +               linux,code = <KEY_VOLUMEUP>;
+> >>> +               channel = <0>;
+> >>> +               voltage = <190000>;
+> >>> +       };
+> >>> +
+> >>> +       button at 1 {
+> >>> +               label = "V-";
+> >>> +               linux,code = <KEY_VOLUMEDOWN>;
+> >>> +               channel = <0>;
+> >>> +               voltage = <390000>;
+> >>> +       };
+> >>> +
+> >>> +};
+> >>> +
+> >>> +&mmc0 {
+> >>> +       pinctrl-names = "default";
+> >>> +       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_parrot>;
+> >>> +       vmmc-supply = <&reg_dcdc1>;
+> >>> +       cd-gpios = <&pio 3 14 GPIO_ACTIVE_LOW>; /* PD14 */
+> >>> +       bus-width = <4>;
+> >>> +       status = "okay";
+> >>> +};
+> >>> +
+> >>> +&mmc1 {
+> >>> +       pinctrl-names = "default";
+> >>> +       pinctrl-0 = <&mmc1_pins_a>, <&wifi_reset_pin_r16>;
+> >>> +       vmmc-supply = <&reg_aldo1>;
+> >>
+> >> This looks fishy. See below.
+> >>
+> >>> +       mmc-pwrseq = <&wifi_pwrseq>;
+> >>> +       bus-width = <4>;
+> >>> +       non-removable;
+> >>> +       status = "okay";
+> >>> +};
+> >>> +
+> >>> +&mmc2 {
+> >>> +       pinctrl-names = "default";
+> >>> +       pinctrl-0 = <&mmc2_8bit_pins>;
+> >>> +       vmmc-supply = <&reg_dcdc1>;
+> >>> +       bus-width = <8>;
+> >>> +       non-removable;
+> >>> +       cap-mmc-hw-reset;
+> >>> +       status = "okay";
+> >>> +};
+> >>> +
+> >>> +&mmc2_8bit_pins {
+> >>> +       allwinner,drive = <SUN4I_PINCTRL_40_MA>;
+> >>> +       allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> >>> +};
+> >>> +
+> >>> +&ohci0 {
+> >>> +       status = "okay";
+> >>> +};
+> >>> +
+> >>> +&pio {
+> >>> +       mmc0_cd_pin_parrot: mmc0_cd_pin at 0 {
+> >>
+> >> _parrot suffix works as well.
+> >>
+> >>> +               allwinner,pins = "PD14";
+> >>> +               allwinner,function = "gpio_in";
+> >>> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> >>> +               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> >>> +       };
+> >>> +
+> >>> +       led_pins_r16: led_pins at 0 {
+> >>> +               allwinner,pins = "PE16", "PE17";
+> >>> +               allwinner,function = "gpio_out";
+> >>> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> >>> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> >>> +       };
+> >>> +
+> >>> +       usb0_id_det: usb0_id_detect_pin at 0 {
+> >>> +               allwinner,pins = "PD10";
+> >>> +               allwinner,function = "gpio_in";
+> >>> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> >>> +               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> >>> +       };
+> >>> +
+> >>> +       usb1_vbus_pin_r16: usb1_vbus_pin at 0 {
+> >>> +               allwinner,pins = "PD12";
+> >>> +               allwinner,function = "gpio_out";
+> >>> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> >>> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> >>> +       };
+> >>> +};
+> >>> +
+> >>> +&r_pio {
+> >>> +       wifi_reset_pin_r16: wifi_reset_pin at 3 {
+> >>
+> >> Why @3?
+> >>
+> >
+> > This is a typo, I'll correct it.
+> >
+> >>> +               allwinner,pins = "PL6";
+> >>> +               allwinner,function = "gpio_out";
+> >>> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> >>> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> >>> +       };
+> >>> +};
+> >>> +
+> >>> +&r_rsb {
+> >>> +       status = "okay";
+> >>> +
+> >>> +       axp22x: pmic at 3a3 {
+> >>> +               compatible = "x-powers,axp223";
+> >>> +               reg = <0x3a3>;
+> >>> +               interrupt-parent = <&nmi_intc>;
+> >>> +               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> >>> +               eldoin-supply = <&reg_dcdc1>;
+> >>
+> >> A drivevbus-supply referencing reg_vcc5v0 here would be better.
+> >>
+> >
+> > ACK.
+> >
+> >>> +               x-powers,drive-vbus-en;
+> >>> +       };
+> >>> +};
+> >>> +
+> >>> +#include "axp22x.dtsi"
+> >>> +
+> >>> +&reg_aldo1 {
+> >>> +       regulator-always-on;
+> >>> +       regulator-min-microvolt = <3000000>;
+> >>> +       regulator-max-microvolt = <3000000>;
+> >>> +       regulator-name = "aldo1";
+> >>
+> >> What is this for exactly? Would turning it off render the system inoperable?
+> >> How was it referenced in the fex file?
+> >>
+> >> If this is for WiFi I/O VCC, then you should specify it in mmc1 with
+> >> vqmmc-supply.
+> >>
+> >
+> > In the fex, aldo1 is one of the three power inputs for the WiFi (the
+> > others being dldo1 and dldo2) and in the schematics it is linked to
+> > both VCC-USB and VCC-IO-WIFI.
+> >
+> > I tried to turn it off and, indeed, the system becomes inoperable.
+> >
+> > I'll add vqmmc-supply in mmc1 with aldo1 regulator. However, I am
+> > wondering what to put in vmmc-supply for mmc1 since the WiFi module has
+> > three power inputs: dldo1, dldo2 and aldo1. In the fex, they are
+> > referenced as, respectively, module_power1, module_power2 and
+> > module_power3 and in the schematics dldo1 and dldo2 are named VCC-WIFI
+> > while aldo1 is used for VCC-IO-WIFI (if it can help in any way).
+> >
+> > VCC-WIFI is connected to pin VBAT of the Broadcom AP6212 WiFi chip.
+> > VCC-IO-WIFI is connected to pin VDDIO of the chip.
+> 
+> VCC-IO-WIFI is vqmmc, and VCC-WIFI is vmmc.
 
-Thanks,
-Pranav
+Isn't vmmc supposed to be always powered at 3.3v, and vqmmc the one
+used to drop to 1.8V with the UHS cards?
 
+In which case, VCC-IO-WIFI is vmmc, and VCC-WIFI is just one of the
+wifi chip power rail, to be handled by a power sequence.
 
-On Thu, Jun 9, 2016 at 1:25 PM, Auger Eric <eric.auger@redhat.com> wrote:
-> Alex,
->> On Wed, 8 Jun 2016 10:29:35 +0200
->> Auger Eric <eric.auger@linaro.org> wrote:
->>
->>> Dear all,
->>> Le 20/05/2016 ? 18:01, Eric Auger a ?crit :
->>>> Alex, Robin,
->>>>
->>>> While my 3 part series primarily addresses the problematic of mapping
->>>> MSI doorbells into arm-smmu, it fails in :
->>>>
->>>> 1) determining whether the MSI controller is downstream or upstream to
->>>> the IOMMU,
->>>>     => indicates whether the MSI doorbell must be mapped
->>>>     => participates in the decision about 2)
->>>>
->>>> 2) determining whether it is safe to assign a PCIe device.
->>>>
->>>> I think we share this understanding with Robin. All above of course
->>>> stands for ARM.
->>>>
->>>> I get stuck with those 2 issues and I have few questions about iommu
->>>> group setup, PCIe, iommu dt/ACPI description. I would be grateful to you
->>>> if you could answer part of those questions and advise about the
->>>> strategy to fix those.
->>>
->>> gentle reminder about the questions below; hope I did not miss any reply.
->>> If anybody has some time to spent on this topic...
->>>
->>>>
->>>> Best Regards
->>>>
->>>> Eric
->>>>
->>>> QUESTIONS:
->>>>
->>>> 1) Robin, you pointed some host controllers which also are MSI
->>>> controllers
->>>> (http://thread.gmane.org/gmane.linux.kernel.pci/47174/focus=47268). In
->>>> that case MSIs never reach the IOMMU. I failed in finding anything about
->>>> MSIs in PCIe ACS spec. What should be the iommu groups in that
->>>> situation. Isn't the upstreamed code able to see some DMA transfers are
->>>> not properly isolated and alias devices in the same group? According to
->>>> your security warning, Alex, I would think the code does not recognize
->>>> it, can you confirm please?
->>> my current understanding is end points would be in separate groups (assuming
->>> ACS support) although MSI controller frame is not properly protected.
->>
->> We don't currently consider MSI differently from other DMA and we don't
->> currently have any sort of concept of a device within the intermediate
->> fabric as being a DMA target.  We expect fabric devices to only be
->> transaction routers.  We use ACS to determine whether there's any
->> possibility of DMA being redirected before it reaches the IOMMU, but it
->> seems that a DMA being consumed by an interrupt controller before it
->> reaches the IOMMU would be another cause for an isolation breach.
->>
-> OK thank you for the confirmation
->>>> 2) can other PCIe components be MSI controllers?
->>
->> I'm not even entirely sure what this means.  Would a DMA write from an
->> endpoint target the MMIO space of an intermediate, fabric device?
-> With the example provided by Robin we have a host controller acting as
-> an MSI controller. I wondered whether we could have some other fabric
-> devices (downstream to the host controller in PCIe terminology) also
-> likely to act as MSI controllers.
->>
->>>> 3) Am I obliged to consider arbitrary topologies where an MSI controller
->>>> stands between the PCIe host and the iommu? in the PCIe space or
->>>> platform space? If this only relates to PCIe couldn' I check if an MSI
->>>> controller exists in the PCIe tree?
->>> In my last series, I consider the assignment of platform device unsafe as
->>> soon as there is a GICv2m. This is a change in the user experience compared to
->>> what we have before.
->>
->> If the MSI controller is downstream of our DMA translation, it doesn't
->> seem like we have much choice but to mark it unsafe.  The endpoint is
->> fully able to attempt to exploit it.
-> OK the orginal question was related to non PCIe topologies:
->
-> - we know some PCIe fabric topologies where the PCIe host controller
-> implements MSI controller.
-> - Shall we be prepared to address the same kind of issues with platform
-> MSI controllers. Are there some SOCs where we would put an unsafe MSI
-> platform controller before IOMMU translation. Or do we consider it is a
-> platform topology we don't support for assignment?
->
->>
->>>> 4) Robin suggested in a private thread to enumerate through a list of
->>>> "registered" doorbells and if any belongs to an unsafe MSI controller,
->>>> consider the assignment is unsafe. This would be a first step before
->>>> doing something more complex. Alex, would that be acceptable to you for
->>>> issue #2?
->>> I implemented this technique in my last series waiting for more discussion
->>> on 4, 5.
->>
->> Seems sufficient.  I don't mind taking a broad swing versus all the
->> extra complexity of defining which devices are safe vs unsafe.
-> OK
->>
->>>> 5) About issue #1: don't we miss tools in dt/ACPI to describe the
->>>> location of the iommu on ARM? This is not needed on x86 because
->>>> irq_remapping and IOMMU are at the same place but my understanding is
->>>> that it is on ARM where
->>>> - there is no connection between the MSI controller - which implements
->>>> irq remapping - and the iommu
->>>> - MSI are conveyed on the same address space as standard memory
->>>> transactions.
->>
->> It seems pretty dubious to me to have fixed address, unprotected MSI
->> controllers sitting in the DMA space of a device before IOMMU
->> translation.
-> same for me ;-)
->   Seems like you not only need to mark interrupts as
->> unsafe, but exclude the address space of the MSI controller from the
->> available IOVA space to the user.
-> I currently do not see how to achieve that. The guest can program the
-> assigned device DMA target address with the MSI frame PA. there is no
-> IOMMU to protect. How can we make it if we don't trap on DMA programming?
->>
->>>> 6)  can't we live with iommu/MSI controller respective location uncertainty?
->>>>
->>>> - in my current series, with the above Xilinx MSI controller, I would
->>>> see there is an arm-smmu requiring mapping behind the PCI host, would
->>>> query the characteristics of the MSI doorbell (not implemented by that
->>>> controller), so no mapping would be done. So it would work I think.
->>>> - However in case we have this topology: PCIe host -> MSI controller
->>>> generally used behind an IOMMU (so registering a doorbell) -> IOMMU,
->>>> this wouldn't work since the doorbell would be mapped.
->>
->> I'm a little confused which direction "behind" is here, but it seems
->> like any time the MSI controller lives in the DMA address space of the
->> endpoint, both interfering with the available IOVA space to the user
->> and potentially an attack vector for the user, we need to call it out
->> as unsafe.  Maybe some of them are for exclusive use of the device and
->> the attack vector is relatively contained, but they still affect the
->> IOVA space of the user.  Such a configuration might be safe, but as I
->> said I'm not opposed to being pretty liberal in applying the unsafe
->> requirement if the platform has done something unfriendly.  Thanks,
-> OK that's clear.
->
-> Thank you for your feedbacks
->
-> Best Regards
->
-> Eric
->>
->> Alex
->>
+> About having 2 regulators, Maxime is working on a solution. In the
+> meantime, you could have dldo1/dldo2 always-on, and put a TODO
+> comment on them.
+
+Yep.
+
+> Not sure about it also linked to VCC-USB though. Is VCC-USB connected
+> to the SoC or just a trace on the board? If it's the latter, it might
+> also be designed to work with a USB based WiFi module.
+
+It seems to be one of the inputs of the SoC.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160620/50bcc6c4/attachment-0001.sig>
