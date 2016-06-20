@@ -1,48 +1,55 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Mon, 20 Jun 2016 13:08:54 -0400
-Subject: [PATCH V2 36/63] clocksource/drivers/time-orion: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-37-git-send-email-daniel.lezcano@linaro.org>
-References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-37-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1466442534.1887.7.camel@localhost>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Jun 2016 19:11:24 +0200
+Subject: [PATCH v2] arm: tegra124: remove commas from unit addresses
+In-Reply-To: <57681DC3.9090801@wwwdotorg.org>
+References: <1466298275-15753-1-git-send-email-marcel.ziswiler@toradex.com>
+ <576810C2.1030401@wwwdotorg.org>
+ <20160620164057.GD6175@ulmo.ba.sec>
+ <57681DC3.9090801@wwwdotorg.org>
+Message-ID: <20160620171124.GA6333@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-06-16 at 23:26 +0200, Daniel Lezcano wrote:
-> The init functions do not return any error. They behave as the following:
+On Mon, Jun 20, 2016 at 10:45:55AM -0600, Stephen Warren wrote:
+> On 06/20/2016 10:40 AM, Thierry Reding wrote:
+> > On Mon, Jun 20, 2016 at 09:50:26AM -0600, Stephen Warren wrote:
+> > > On 06/18/2016 07:04 PM, Marcel Ziswiler wrote:
+> > > > Remove commas from unit addresses as suggested by Rob Herring upon me
+> > > > posting initial Apalis TK1 support:
+> > > > 
+> > > > http://article.gmane.org/gmane.linux.ports.tegra/26608
+> > > 
+> > > Acked-by: Stephen Warren <swarren@nvidia.com>
+> > 
+> > I'm confused now. I posted almost exactly the same patch a while ago and
+> > we agreed that we couldn't do this because the node names were to be
+> > considered part of the ABI.
+> > 
+> > Is it or is it not?
 > 
->   - panic, thus leading to a kernel crash while another timer may work and
->        make the system boot up correctly
+> The particular case where it matters is the GPU node, which U-Boot
+> manipulates. This revised patch version no longer renames the GPU node and
+> so in practice avoids any issues that I'm aware of.
 > 
->   or
-> 
->   - print an error and let the caller unaware if the state of the system
-> 
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
-> 
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/clocksource/time-lpc32xx.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
-> index daae61e..cb5b866 100644
-> --- a/drivers/clocksource/time-lpc32xx.c
-> +++ b/drivers/clocksource/time-lpc32xx.c
-> @@ -288,16 +288,16 @@ err_clk_enable:
+> If there's a more general rule that node names are part of the ABI, then
+> indeed we shouldn't take this patch.
 
-[...]
+I'm somewhat uncomfortable with this notion. Just because we don't know
+of any other cases doesn't mean there aren't any. My understanding is
+that it's fairly common to look up device tree nodes by name, however
+brittle that may be.
 
-Hi Daniel,
+There's also the matter of consistency to consider here. I suspect that
+if we make this change somebody will notice the odd one out and send
+patches to "fix it up". So if we get confirmation about this change
+being okay, I'd request that a comment be added to the GPU node as to
+why it is not converted.
 
-please update the patch subject
-(i.e. replace "time-orion" by "time-lpc32xx).
-
-You can add my "Acked-by" to the V3 patch:
-Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160620/0f13c31c/attachment-0001.sig>
