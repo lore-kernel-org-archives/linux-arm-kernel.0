@@ -1,117 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 20 Jun 2016 11:16:07 -0500
-Subject: [PATCH 08/12] doc: binding: pwrseq-usb-generic: add binding doc
- for generic usb power sequence driver
-In-Reply-To: <20160620112651.GA26936@shlinux2>
-References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
- <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
- <CAL_JsqLvs0s2TyfqPM5vtmyY81_X84VjCGjsGYbTgT4syOfp9Q@mail.gmail.com>
- <20160620112651.GA26936@shlinux2>
-Message-ID: <20160620161607.GA11427@rob-hp-laptop>
+From: briannorris@chromium.org (Brian Norris)
+Date: Mon, 20 Jun 2016 09:19:09 -0700
+Subject: [PATCH 1/4] phy: rockchip-emmc: give DLL some extra time to be
+ ready
+In-Reply-To: <5767EB7E.3040606@ti.com>
+References: <1463092986-61777-1-git-send-email-briannorris@chromium.org>
+ <5767EB7E.3040606@ti.com>
+Message-ID: <20160620161908.GA30459@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 07:26:51PM +0800, Peter Chen wrote:
-> On Fri, Jun 17, 2016 at 12:16:48PM -0500, Rob Herring wrote:
-> > On Fri, Jun 17, 2016 at 5:09 AM, Peter Chen <peter.chen@nxp.com> wrote:
-> > > Add binding doc for generic usb power sequence driver, and update
-> > > generic usb device binding-doc accordingly.
-> > >
-> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > > ---
-> > >  .../bindings/power/pwrseq/pwrseq-usb-generic.txt   | 31 ++++++++++++++++++++++
-> > >  .../devicetree/bindings/usb/usb-device.txt         |  2 ++
-> > >  2 files changed, 33 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
-> > > new file mode 100644
-> > > index 0000000..8ad98382
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
-> > > @@ -0,0 +1,31 @@
-> > > +The power sequence for generic USB Devices
-> > > +
-> > > +Some hard-wired USB devices need to do power sequence to let the
-> > > +device work normally, the typical power sequence like: enable USB
-> > > +PHY clock, toggle reset pin, etc. But current Linux USB driver
-> > > +lacks of such code to do it, it may cause some hard-wired USB devices
-> > > +works abnormal or can't be recognized by controller at all. The
-> > > +power sequence will be done before this device can be found at USB
-> > > +bus.
-> > > +
-> > > +Required properties:
-> > > +- compatible : contains "usb-pwrseq-generic".
++ linux-mmc, Ulf
+
+On Mon, Jun 20, 2016 at 06:41:26PM +0530, Kishon Vijay Abraham I wrote:
+> On Friday 13 May 2016 04:13 AM, Brian Norris wrote:
+> > From: Shawn Lin <shawn.lin@rock-chips.com>
 > > 
-> > In case I have not been clear, no.
+> > According to the databook, 10.2us is the max time for dll to be ready to
+> > work. However in testing, some chips need 20us for dll to be ready. This
+> > patch adds some extra margin for dllrdy to be ready, fixing our
+> > -ETIMEDOUT issues.
 > > 
-> > I am not going to accept anything along the lines of the current mmc
-> > pwrseq. I am basically okay with Krzysztof's proposal as it is *only*
-> > an added property and not a duplication of information. I'd suggest
-> > you figure out how to make the kernel work with that rather than
-> > trying to work-around whatever kernel limitations there are.
-> > 
+> > Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> > Signed-off-by: Brian Norris <briannorris@chromium.org>
 > 
-> I see.
-> 
-> Would you agree with below:
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-In general, yes. There are some points being discussed in the other 
-thread.
+Thanks! I take it that to mean you're agreeing with Doug's suggestion
+here:
 
-> &usbotg1 {
-> 	vbus-supply = <&reg_usb_otg1_vbus>;
-> 	pinctrl-names = "default";
-> 	pinctrl-0 = <&pinctrl_usb_otg1_id>;
-> 	status = "okay";
-> 
-> 	#address-cells = <1>;
-> 	#size-cells = <0>;
-> 	hub: genesys at 1 {
-> 		compatible = "usb5e3,608";
-> 		reg = <1>;
-> 
-> 		power-sequence;
-> 		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
-> 		reset-duration-us = <10>;
+https://lkml.org/lkml/2016/6/13/1067
 
-I wonder if this really needs to be specified. A sufficiently long 
-default should be good enough for 90 something % of devices.
+"Since [the $subject series patches] aren't in 4.7-rc1 presumably they
+would also make sense to take through the MMC tree if others agree."
 
-> 		clocks = <&clks IMX6SX_CLK_CKO>;
-> 
-> 		#address-cells = <1>;
-> 		#size-cells = <0>;
-> 		ethernet: asix at 1 {
-> 			compatible = "usbb95,1708";
-> 			reg = <1>;
-> 
-> 			power-sequence;
-> 			reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
-> 			reset-duration-us = <15>;
-> 			clocks = <&clks IMX6SX_CLK_IPG>;
-> 		};
-> 	};
-> };
-> 
-> If the node has property "power-sequence", the pwrseq core will create
-> related platform device, and the driver under pwrseq driver will handle
-> power sequence stuffs. 
+Ulf,
 
-This I have issue with. If you are creating a platform device here, you 
-are trying to work-around limitations in the linux driver model. Either 
-we need some sort of pre-probe hook to the drivers to call or each 
-parent node driver is responsible for checking and calling pwr-seq 
-functions for child nodes. e.g. The host controller calls pwr-seq for 
-the hub, the hub driver calls the power seq for the asix chip. Soon as 
-we have a case too complex for the generic pwr-seq, we're going to need 
-the pre-probe hook as I don't want to see a continual expansion of 
-generic pwr-seq binding for ever more complex cases.
+I see I didn't CC you or linux-mmc on this patch series. Please let me
+know if I should resend, or if you can pick these up off of LKML -- Doug
+gave nice patchwork links in his linked series. NB: patch 2 has a
+version 2, while the others were left unmodified.
 
-> The property below "power-sequence" will be
-> handled at pwrseq driver.
-
-You cannot rely on order other than for logical readability. There are 
-no guarantees of either the dtb or kernel ordering of properties.
-
-Rob
+Regards,
+Brian
