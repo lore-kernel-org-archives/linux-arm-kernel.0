@@ -1,65 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Jun 2016 01:07:55 +0200
-Subject: [PATCH v3 0/5] i.MX L2-cache code cleanups and performance tweaks
-In-Reply-To: <CAHQ1cqGQm1jXAx0C97qODGEOM_r91aRZ50c_p5vJfHifOL3hiQ@mail.gmail.com>
-References: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
- <114981982.VXDIiN0rdz@wuerfel>
- <CAHQ1cqGQm1jXAx0C97qODGEOM_r91aRZ50c_p5vJfHifOL3hiQ@mail.gmail.com>
-Message-ID: <4896650.lS63LY4PpR@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 20 Jun 2016 16:23:52 -0700
+Subject: [PATCH 1/8] arm64: dts: db820c: add basic board support
+In-Reply-To: <1466452907-23290-2-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1466452907-23290-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1466452907-23290-2-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <57687B08.9060900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, June 19, 2016 10:53:13 AM CEST Andrey Smirnov wrote:
->  One more question, less about your patches than the existing code:
-> >
-> > After going through the current users of l2x0_init for board files,
-> > I noticed that imx35 enables l2x0 for both dts and all the board files
-> > and has an arm,l210-cache node in its dts, but imx31 only enables
-> > it for the board file and in the dt case doesn't init the cache nor
-> > does it have the dts node.
-> >
-> > I'm guessing this is a bug on i.mx31 dt support, right?
-> 
-> I would agree that it is. OTOH, I can't find any i.MX31 boards that
-> use device tree. The only file that references imx31.dtsi is
-> imx31-bug.dts, but at the same time that board has a dedicated board
-> file (mach-bug.c) so I wonder if it was ever used.
+On 06/20/2016 01:01 PM, Srinivas Kandagatla wrote:
+> This patch adds apq8096 db820c basic support with serial port.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  arch/arm64/boot/dts/qcom/Makefile            |  2 +-
+>  arch/arm64/boot/dts/qcom/apq8096-db820c.dts  | 21 +++++++++++++++++
+>  arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 34 ++++++++++++++++++++++++++++
+>  3 files changed, 56 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/boot/dts/qcom/apq8096-db820c.dts
+>  create mode 100644 arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+> index fa1f661..80ecdfe 100644
+> --- a/arch/arm64/boot/dts/qcom/Makefile
+> +++ b/arch/arm64/boot/dts/qcom/Makefile
+> @@ -1,5 +1,5 @@
+>  dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb msm8916-mtp.dtb
+> -dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
+> +dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb apq8096-db820c.dtb
 
-My understanding is that many of the i.mx dts files were introduced
-a few years ago as conversions of the board files, and we are now
-in the (slow) process of removing the board files, assuming that
-everyone has had time for migration if they still run that hardware
-on new kernels, or that it doesn't hurt if nobody uses it.
+We should do a new line for each board as other arm64 vendors have done?
 
-This one was added with the comment
+> diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
+> new file mode 100644
+> index 0000000..e1a55b1
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
+> @@ -0,0 +1,21 @@
+> +/*
+> + * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "apq8096-db820c.dtsi"
+> +
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. DB820c";
+> +	compatible = "qcom,apq8096-db820c";
 
-    arm/dts: Add support for i.MX31 bug 1.x board from buglabs.
-    
-    Only the main UART and the memory node information are added.
+Should be qcom,apq8096-sbc? At least I have to use that on my board to
+match the board ids.
 
-and it's unclear if that has ever been tested. A few device nodes
-were added to the imx31.dtsi file later, indicating that it probably
-had /some/ testing, but no other board file was ever added as you
-say. The only difference I see between mach-bug.c and imx31-bug.dts
-is the configuration of the uart pins. I don't know if that is
-required in the dts, because I'd assume that the boot loader would
-leave the pinmux in a state in which the console uart works.
-
-> It looks like Sacha was the author of i.MX31, Sascha do you have any
-> comment on this?
-> 
-> There's also another small cleanup opportunity in collapsing
-> imx31_dt_timer_init() and mx31_clocks_init_dt() into a single function
-> given how the latter always returns 0 and can be converted to void.
-
-Or we could go one step further and use CLK_OF_DECLARE() to remove
-that init function entirely. Same thing for mx31_init_irq and
-IRQCHIP_DECLARE().
-
-> I am more than happy to make both changes and include them in the set,
-> but I only have i.MX6 HW, and would only be able to do a compile-test,
-> so I am not sure if I should.
-
-Let's wait for Sascha to reply.
-
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
