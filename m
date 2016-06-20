@@ -1,78 +1,45 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 20 Jun 2016 15:10:25 +0100
-Subject: [PATCH] arm64: Kconfig: select PM for ARCH_VEXPRESS
-In-Reply-To: <5060882.N5elh1FlkW@wuerfel>
-References: <1466090128-24425-1-git-send-email-sudeep.holla@arm.com>
- <5285733.mW80cUVgAV@wuerfel> <57641C0E.2010700@arm.com>
- <5060882.N5elh1FlkW@wuerfel>
-Message-ID: <5767F951.1000305@arm.com>
+From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Mon, 20 Jun 2016 10:14:31 -0400
+Subject: [PATCH v3 0/3] pwm support for Broadcom iProc SoC's
+Message-ID: <1466432074-7780-1-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset contains the pwm support for the Broadcom's iProc SoC's.
+
+The first patch provides the documentation details and the
+second patch contains the controller support details. The third patch
+contains the enable method for Northstar Plus SoC.
+
+This patch series has been tested on NSP bcm958625HR board.
+The pwm is not enabled for this board as the pins are open and not used.
+
+This patch series is based on v4.7.0-rc1 and is available from github
+repo: https://github.com/Broadcom/cygnus-linux.git
+branch: iproc-pwm-v3
 
 
-On 17/06/16 20:38, Arnd Bergmann wrote:
-> On Friday, June 17, 2016 4:49:34 PM CEST Sudeep Holla wrote:
->>
->> On 17/06/16 16:07, Arnd Bergmann wrote:
->>> On Friday, June 17, 2016 3:59:34 PM CEST Sudeep Holla wrote:
->>
->> [...]
->>
->>>> To be more precise genpd/runtime code return same error -ENODEV when
->>>> PM_GENERIC_DOMAINS=n and if the no power domain is found with
->>>> PM_GENERIC_DOMAINS=y . The AMBA bus code just checks for -EPROBE_DEFER
->>>> to stop adding devices, while proceeds to access the device otherwise.
->>>>
->>>> However on Juno, the coresight needs to powered up before accessing it.
->>>> Well all is fine if you specify power domains in DT and have
->>>> PM_GENERIC_DOMAINS=y. However if PM_GENERIC_DOMAINS=n the AMBA ignores
->>>> the error(-ENODEV) from runtime PM and access the device resulting in
->>>> boot hang when adding amba devices.
->>>>
->>>> I thought we need is to have code to check for power domains in DT for
->>>> the device even when PM_GENERIC_DOMAINS=n and return an error that can
->>>> be used to skip registering the device and clearly identifies with other
->>>> allowed errors. It may need a bit of surgery and closer look IMO. But
->>>> when asked for opinion, I was suggested to do this. I admit that I
->>>> didn't propose my thoughts then :)
->>>
->>> Ok, so we also need PM_GENERIC_DOMAINS, not just PM, right?
->>>
->> Yes, but latter won't select former. Generally I have seen domain
->> controller code selecting PM_GENERIC_DOMAINS if PM=y
->
-> Then at least we need the vexpress code to select both as well,
-> otherwise you could end up with PM_GENERIC_DOMAINS disabled in
-> configurations that have none of the other code.
->
+Changes since v2
+Rebased on v4.7.0-rc1
 
-True, will add it.
+Changes since v1
+Addressed the review comments from Thierry
+ 1. Use separate driver for iProc SoC's.
+ 2. Added Robs ack to the Documentation patch
 
->>> It also sounds like there is no easy way to just turn on the clocks
->>> in the amba bus handler when PM_GENERIC_DOMAINS is turned off, other
->>> than reimplementing PM_GENERIC_DOMAINS?
->>>
->>
->> Turn on power domain, not just clocks(just to be precise), yes. It needs
->> some thoughts as there are some assumptions on which existing platform
->> work. Adding the support to handle the scenario I mentioned earlier is
->> not trivial. Also the driver to handle the device may not be compiled in
->> when PM_GENERIC_DOMAINS=n or when PM=n. So I was thinking of not
->> accessing the device and hence skip adding it.
->
-> I see. Another idea I had is flawed, too: we can't easily make ARM_AMBA
-> depend on PM_GENERIC_DOMAINS, because the main relevant use case I
-> can see for !PM builds is a kernel that is only used in virtual machines,
-> but we still want to use the PL01x serial port driver in that configuration.
->
-> I'd say let's select both PM_GENERIC_DOMAINS and PM on VEXPRESS for now,
-> (almost) as you have in your patch.
->
+Yendapally Reddy Dhananjaya Reddy (3):
+  Documentation: dt: Add Broadcom iproc pwm controller binding
+  pwm: iproc: Add support for Broadcom iproc pwm controller
+  ARM: dts: NSP: Add PWM Support to DT
 
-OK, thanks for taking time to review. I understand it's not the best
-solution but *just OK* for now. I will repost with suggested change.
+ .../devicetree/bindings/pwm/brcm,iproc-pwm.txt     |  21 ++
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |   8 +
+ drivers/pwm/Kconfig                                |  10 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-bcm-iproc.c                        | 327 +++++++++++++++++++++
+ 5 files changed, 367 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/brcm,iproc-pwm.txt
+ create mode 100644 drivers/pwm/pwm-bcm-iproc.c
 
 -- 
-Regards,
-Sudeep
+2.1.0
