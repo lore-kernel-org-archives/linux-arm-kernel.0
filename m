@@ -1,71 +1,80 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 20 Jun 2016 14:43:02 -0700
-Subject: [GIT PULL 6/7] Broadcom defconfig changes for 4.8 Part 1
-In-Reply-To: <20160620055416.GI2329@localhost>
-References: <1466128575-5378-1-git-send-email-f.fainelli@gmail.com>
- <1466128575-5378-6-git-send-email-f.fainelli@gmail.com>
- <20160620055416.GI2329@localhost>
-Message-ID: <57686366.1020200@broadcom.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 20 Jun 2016 16:44:31 -0500
+Subject: [PATCH 7/8] arm64: pmu: Enable multiple PMUs in an ACPI system
+In-Reply-To: <87h9cn6ckw.fsf@e105922-lin.cambridge.arm.com>
+References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
+ <1465511013-10742-8-git-send-email-jeremy.linton@arm.com>
+ <87h9cn6ckw.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <576863BF.6040800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Punit,
 
-On 16-06-19 10:54 PM, Olof Johansson wrote:
-> On Thu, Jun 16, 2016 at 06:56:14PM -0700, Florian Fainelli wrote:
->> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
->>
->>    Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
->>
->> are available in the git repository at:
->>
->>    http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.8/defconfig
->>
->> for you to fetch changes up to 41463c3e6eae3dfa4377069966ed02b4ba378e79:
->>
->>    ARM: Remove bcm_defconfig (2016-06-16 13:40:49 -0700)
->>
->> ----------------------------------------------------------------
->> This pull request contains defconfig changes for Broadcom ARM-based SoCs:
->>
->> - Florian enables support for the BCM63xx DSL SoCs basic peripherals, enables
->>    the networking subsystems for Set Top Box SoCs, enables the PWM, watchdog and
->>    the AHCI controller and SATA PHY drivers
->>
->> - Florian removes the bcm_defconfig file which is no longer useful and updates
->>    multi_v7_defconfig to include the Kona watchdog to provide proper reboot for the
->>    Broadcom Kona platforms
->>
->> Please note that Tejun Heo has queued a patch which renames AHCI_BRCMSTB into
->> AHCI_BRCM, to avoid two patches in a row, we just enable AHCI_BRCM to be future
->> proof
+On 06/20/2016 11:37 AM, Punit Agrawal wrote:
+> Jeremy Linton <jeremy.linton@arm.com> writes:
 >
-> So, you say that bcm_defconfig is no longer useful. While I'm happy to see the
-> number of defconfigs go down, I'd like to clarify that we do still see per-SoC
-> defconfigs somewhat useful, in that they are a lot closer to what someone would
-> want to use for defconfig in a product kernel based on the SoC. It's easier to
-> start from the SoC-specific defconfig and remove pieces that aren't needed than
-> to start from multi_v7_defconfig.
-I completely agree that per-SoC defconfigs are extremely useful. I 
-attempted to do so for Cygnus and would like to for other Broadcom SoCs 
-as well. Unfortunately Arnd's policy was one defconfig per company. This 
-prevents use from doing so. Broadcom has a variety of SoCs and families. 
-Some share technology, others are entirely different. On the projects I 
-work with we don't use multi_v7_defconfig nor do our customers. We use 
-per SoC defconfigs.
+>> Its possible that an ACPI system has multiple CPU types in it
+>> with differing PMU counters. Use the newly provided acpi_pmu routines
+>> to detect that case, and instantiate more than one set of counters.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   drivers/perf/arm_pmu.c      |  7 +++-
+>>   drivers/perf/arm_pmu_acpi.c | 98 ++++++++++++++++++++-------------------------
+>>   2 files changed, 50 insertions(+), 55 deletions(-)
+>>
+>
+> [...]
+>
+>> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+>> index a257fc0..8f9bea3 100644
+>> --- a/drivers/perf/arm_pmu_acpi.c
+>> +++ b/drivers/perf/arm_pmu_acpi.c
+>> @@ -35,6 +35,11 @@ struct pmu_types {
+>>
+>>   static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
+>>
+>> +/*
+>> + * Called from acpi_map_gic_cpu_interface()'s MADT parsing during boot.
+>> + * This routine saves off the GSI's and their trigger state for use when we are
+>> + * ready to build the PMU platform device.
+>> +*/
+>>   void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
+>>   {
+>>   	pmu_irqs[cpu].gsi = gic->performance_interrupt;
+>
+>
+> This hunk should be in Patch 3.
 
-So, as it stands bcm_defconfig is of little use to us. We are able to 
-upstream everything into the kernel except for the defconfig file. We 
-are forced to maintain these internally. Yet we are able to upstream dts 
-files which are per board...
+
+Ok...
+
 >
-> That being said, I'm happy to remove it if you think that's what works best for
-> your platform.
+>> @@ -47,7 +52,7 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
+>>   }
+>>
+>>   /* Count number and type of CPU cores in the system. */
+>> -void __init arm_pmu_acpi_determine_cpu_types(struct pmu_types *pmus)
+>> +static void __init arm_pmu_acpi_determine_cpu_types(struct pmu_types *pmus)
+>>   {
+>>   	int i, j;
+>>
 >
-> Merged into next/defconfig.
+> Please move this and the following two hunks to the previous patch where you
+> introduce the functions.
+
+
+Oh, I did this on purpose to avoid:
+
+"warning: 'xxx' defined but not used" messages.
+
+
+
 >
->
-> -Olof
->
-Regards,
-  Scott
+>> @@ -74,7 +79,7 @@ void __init arm_pmu_acpi_determine_cpu_types(struct pmu_types *pmus)
+>>    * Registers the group of PMU interfaces which corrispond to the 'last_cpu_id'.
+>>    * This group utlizes 'count' resources in the 'res'.
+>>    */
+>> -int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
+>> +static int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
