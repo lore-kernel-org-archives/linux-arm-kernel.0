@@ -1,48 +1,53 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 20 Jun 2016 14:33:31 -0700
-Subject: [GIT PULL 5/7] Broadcom maintainers changes for 4.8 Part 1
-In-Reply-To: <CAOesGMgAM3MW0ha07HNbBz-QsXwWU=GU8pd6L-HdZ2gJ0Gp4Yw@mail.gmail.com>
-References: <1466128575-5378-1-git-send-email-f.fainelli@gmail.com>
- <20160620055143.GH2329@localhost>
- <CACna6rxXQuU7MqFomqK8tUoyFgiH-nC-M9UEyvKk1rXs8yS64A@mail.gmail.com>
- <3965618.mynEkqfry0@wuerfel>
- <CAOesGMgAM3MW0ha07HNbBz-QsXwWU=GU8pd6L-HdZ2gJ0Gp4Yw@mail.gmail.com>
-Message-ID: <5768612B.1010507@broadcom.com>
+From: chris.brand@broadcom.com (Chris Brand)
+Date: Mon, 20 Jun 2016 14:35:07 -0700
+Subject: [PATCH 4/4] MAINTAINERS: Update BCM281XX/BCM11XXX/BCM216XX entry
+In-Reply-To: <1466456857-11969-5-git-send-email-jon.mason@broadcom.com>
+References: <1466456857-11969-1-git-send-email-jon.mason@broadcom.com>
+ <1466456857-11969-5-git-send-email-jon.mason@broadcom.com>
+Message-ID: <CAMsMSK-7WOuzVNASmLdAsm8PzRARJCZB5zVReZmfZPCYLtg=HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof/Rafal
-
-On 16-06-20 08:30 AM, Olof Johansson wrote:
-> On Mon, Jun 20, 2016 at 12:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Monday, June 20, 2016 9:35:53 AM CEST Rafa? Mi?ecki wrote:
->>>
->>> I was asked by Florian to add bcm-kernel-feedback-list@ but indeed he
->>> didn't specify if this should be L: entry.
->>> [21:24:43] <[florian]> rmilecki: also submit a patch that includes
->>> bcm-kernel-feedback-list at broadcom.com in the MAINTAINERS file for
->>> BCM5310X
->>> [21:36:51] <rmilecki> [florian]: I wasn't sure if I'm supposed to do that
->>> [21:36:53] <rmilecki> i can try I guess
->>>
->>> I'm afraid this mailing list is closed. Would M: entry work for it?
->>
->>
->> I think M: is better, we have a couple of examples like that (x86 at kernel.org,
->> Dept-GELinuxNICDev at qlogic.com, linux-wimax at intel.com, ...).
+On Mon, Jun 20, 2016 at 2:07 PM, Jon Mason <jon.mason@broadcom.com> wrote:
+> There are many clock, pinctl, and misc others that should be covered
+> under the BCM281XX/BCM11XXX/BCM216XX ARM listing.  Change the entry to
+> use regex's that should cover all the files.
 >
-> Yep, having it as a M: entry would be fine with me as well. Please
-> respin the patch/branch -- we can apply a patch directly instead of
-> doing a merge if that's easier for you.
-
-If M: is supposed to be used for bcm-kernel-feedback-list then a new 
-patch applied to multiple locations in the MAINTAINERS file would solve 
-the problem.
-
+> Also, remove the bcm_defconfig entry (as the file is being removed), and
+> arch/arm64/boot/dts/broadcom reference (as that is not accurate for this
+> group of maintainers and all the device trees under it should now be
+> covered by other maintainer entries).
 >
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> ---
+>  MAINTAINERS | 11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
 >
-> -Olof
->
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 28a35f4..01382ce 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2481,14 +2481,11 @@ M:      Scott Branden <sbranden@broadcom.com>
+>  L:     bcm-kernel-feedback-list at broadcom.com
+>  T:     git git://github.com/broadcom/mach-bcm
+>  S:     Maintained
+> +N:     bcm281*
+> +N:     bcm113*
+> +N:     bcm216*
+> +N:     kona
 
-Regards,
-  Scott
+Hmmm. We should probably add bcm23550 here, too.
+
+>  F:     arch/arm/mach-bcm/
+> -F:     arch/arm/boot/dts/bcm113*
+> -F:     arch/arm/boot/dts/bcm216*
+> -F:     arch/arm/boot/dts/bcm281*
+> -F:     arch/arm64/boot/dts/broadcom/
+> -F:     arch/arm/configs/bcm_defconfig
+> -F:     drivers/mmc/host/sdhci-bcm-kona.c
+> -F:     drivers/clocksource/bcm_kona_timer.c
+>
+>  BROADCOM BCM2835 ARM ARCHITECTURE
+>  M:     Stephen Warren <swarren@wwwdotorg.org>
+
+Chris
