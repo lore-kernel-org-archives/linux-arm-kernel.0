@@ -1,53 +1,71 @@
-From: chris.brand@broadcom.com (Chris Brand)
-Date: Mon, 20 Jun 2016 14:35:07 -0700
-Subject: [PATCH 4/4] MAINTAINERS: Update BCM281XX/BCM11XXX/BCM216XX entry
-In-Reply-To: <1466456857-11969-5-git-send-email-jon.mason@broadcom.com>
-References: <1466456857-11969-1-git-send-email-jon.mason@broadcom.com>
- <1466456857-11969-5-git-send-email-jon.mason@broadcom.com>
-Message-ID: <CAMsMSK-7WOuzVNASmLdAsm8PzRARJCZB5zVReZmfZPCYLtg=HQ@mail.gmail.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Mon, 20 Jun 2016 14:43:02 -0700
+Subject: [GIT PULL 6/7] Broadcom defconfig changes for 4.8 Part 1
+In-Reply-To: <20160620055416.GI2329@localhost>
+References: <1466128575-5378-1-git-send-email-f.fainelli@gmail.com>
+ <1466128575-5378-6-git-send-email-f.fainelli@gmail.com>
+ <20160620055416.GI2329@localhost>
+Message-ID: <57686366.1020200@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 2:07 PM, Jon Mason <jon.mason@broadcom.com> wrote:
-> There are many clock, pinctl, and misc others that should be covered
-> under the BCM281XX/BCM11XXX/BCM216XX ARM listing.  Change the entry to
-> use regex's that should cover all the files.
->
-> Also, remove the bcm_defconfig entry (as the file is being removed), and
-> arch/arm64/boot/dts/broadcom reference (as that is not accurate for this
-> group of maintainers and all the device trees under it should now be
-> covered by other maintainer entries).
->
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> ---
->  MAINTAINERS | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 28a35f4..01382ce 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2481,14 +2481,11 @@ M:      Scott Branden <sbranden@broadcom.com>
->  L:     bcm-kernel-feedback-list at broadcom.com
->  T:     git git://github.com/broadcom/mach-bcm
->  S:     Maintained
-> +N:     bcm281*
-> +N:     bcm113*
-> +N:     bcm216*
-> +N:     kona
+Hi Olof,
 
-Hmmm. We should probably add bcm23550 here, too.
-
->  F:     arch/arm/mach-bcm/
-> -F:     arch/arm/boot/dts/bcm113*
-> -F:     arch/arm/boot/dts/bcm216*
-> -F:     arch/arm/boot/dts/bcm281*
-> -F:     arch/arm64/boot/dts/broadcom/
-> -F:     arch/arm/configs/bcm_defconfig
-> -F:     drivers/mmc/host/sdhci-bcm-kona.c
-> -F:     drivers/clocksource/bcm_kona_timer.c
+On 16-06-19 10:54 PM, Olof Johansson wrote:
+> On Thu, Jun 16, 2016 at 06:56:14PM -0700, Florian Fainelli wrote:
+>> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+>>
+>>    Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.8/defconfig
+>>
+>> for you to fetch changes up to 41463c3e6eae3dfa4377069966ed02b4ba378e79:
+>>
+>>    ARM: Remove bcm_defconfig (2016-06-16 13:40:49 -0700)
+>>
+>> ----------------------------------------------------------------
+>> This pull request contains defconfig changes for Broadcom ARM-based SoCs:
+>>
+>> - Florian enables support for the BCM63xx DSL SoCs basic peripherals, enables
+>>    the networking subsystems for Set Top Box SoCs, enables the PWM, watchdog and
+>>    the AHCI controller and SATA PHY drivers
+>>
+>> - Florian removes the bcm_defconfig file which is no longer useful and updates
+>>    multi_v7_defconfig to include the Kona watchdog to provide proper reboot for the
+>>    Broadcom Kona platforms
+>>
+>> Please note that Tejun Heo has queued a patch which renames AHCI_BRCMSTB into
+>> AHCI_BRCM, to avoid two patches in a row, we just enable AHCI_BRCM to be future
+>> proof
 >
->  BROADCOM BCM2835 ARM ARCHITECTURE
->  M:     Stephen Warren <swarren@wwwdotorg.org>
+> So, you say that bcm_defconfig is no longer useful. While I'm happy to see the
+> number of defconfigs go down, I'd like to clarify that we do still see per-SoC
+> defconfigs somewhat useful, in that they are a lot closer to what someone would
+> want to use for defconfig in a product kernel based on the SoC. It's easier to
+> start from the SoC-specific defconfig and remove pieces that aren't needed than
+> to start from multi_v7_defconfig.
+I completely agree that per-SoC defconfigs are extremely useful. I 
+attempted to do so for Cygnus and would like to for other Broadcom SoCs 
+as well. Unfortunately Arnd's policy was one defconfig per company. This 
+prevents use from doing so. Broadcom has a variety of SoCs and families. 
+Some share technology, others are entirely different. On the projects I 
+work with we don't use multi_v7_defconfig nor do our customers. We use 
+per SoC defconfigs.
 
-Chris
+So, as it stands bcm_defconfig is of little use to us. We are able to 
+upstream everything into the kernel except for the defconfig file. We 
+are forced to maintain these internally. Yet we are able to upstream dts 
+files which are per board...
+>
+> That being said, I'm happy to remove it if you think that's what works best for
+> your platform.
+>
+> Merged into next/defconfig.
+>
+>
+> -Olof
+>
+Regards,
+  Scott
