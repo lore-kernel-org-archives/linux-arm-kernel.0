@@ -1,112 +1,103 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 20 Jun 2016 12:48:38 +0800
-Subject: [PATCH v6 2/2] mtd: nand: sunxi: add reset line support
-In-Reply-To: <20160620044838.56904-1-icenowy@aosc.xyz>
-References: <20160620044838.56904-1-icenowy@aosc.xyz>
-Message-ID: <20160620044838.56904-2-icenowy@aosc.xyz>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 20 Jun 2016 07:15:32 +0200
+Subject: [PATCH 03/10] i2c: designware-platdrv: Unconditionally enable
+ runtime PM
+In-Reply-To: <334641d7-10e4-9dcb-5e99-3f244070645f@linux.intel.com>
+References: <1465916848-8207-1-git-send-email-ulf.hansson@linaro.org>
+ <1465916848-8207-4-git-send-email-ulf.hansson@linaro.org>
+ <334641d7-10e4-9dcb-5e99-3f244070645f@linux.intel.com>
+Message-ID: <CAPDyKFo6PPE21GrsB8CE9QCkg3-E4vWhqZMfbgfoeTSFJRGEVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND controller on some sun8i chips needs its reset line to be
-deasserted before they can enter working state.
+On 15 June 2016 at 14:47, Jarkko Nikula <jarkko.nikula@linux.intel.com> wrote:
+> On 06/14/2016 06:07 PM, Ulf Hansson wrote:
+>>
+>> In cases when the designware specific flag "pm_runtime_disable" is set,
+>> ->probe() calls pm_runtime_forbid() for the device, but without enabling
+>> runtime PM. This increases the runtime PM usage count for the device, but
+>> as runtime PM is disabled it's pointless.
+>>
+> As far as I remember reason for that was to prevent suspending the device
+> when unloading the driver.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- ?Changes in v2:
- ???- Corrected the error checking code of reset line.
+Hmm. To me that's a weird way of implementing this.
 
- ?Changes in v3:
- ???- Corrected a more serious error brought in the "fix" of v2.
+Moreover, as i2c_dw_disable() indeed is called in ->remove() how will
+the pm_runtime_forbid() help to avoid that from happen?
 
- ?Changes in v4:
- ???- Removed unneeded code block after "else".
+>
+>> Let's instead convert to unconditionally enable runtime PM, which has the
+>> effect of making a parent device aware of its child.
+>>
+>> To also maintain the old behaviour when the "pm_runtime_disable" flag is
+>> set, which prevents userspace to enable runtime PM suspend via sysfs,
+>> switch from calling pm_runtime_forbid() into pm_runtime_get_noresume()
+>> during ->probe().
+>>
+>> While changing this, let's also also correct the error path in ->probe()
+>> and fix ->remove(), as to decrease the runtime PM usage count when it has
+>> been in increased by pm_runtime_forbid() (after this change, by
+>> pm_runtime_get_noresume()).
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/i2c/busses/i2c-designware-platdrv.c | 25
+>> +++++++++++++------------
+>>  1 file changed, 13 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
+>> b/drivers/i2c/busses/i2c-designware-platdrv.c
+>> index 19174e7..94ff953 100644
+>> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+>> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+>> @@ -236,21 +236,21 @@ static int dw_i2c_plat_probe(struct platform_device
+>> *pdev)
+>>         adap->dev.of_node = pdev->dev.of_node;
+>
+> ...
+>>
+>> +       if (dev->pm_runtime_disabled)
+>> +               pm_runtime_get_noresume(&pdev->dev);
+>
+>
+>> @@ -267,10 +267,11 @@ static int dw_i2c_plat_remove(struct platform_device
+>> *pdev)
+>>
+>>         i2c_dw_disable(dev);
+>>
+>> +       if (dev->pm_runtime_disabled)
+>> +               pm_runtime_put_noidle(&pdev->dev);
+>
+>
+> That will trigger power down after returning from dw_i2c_plat_remove() by
+> looking at debug print from acpi_device_set_power() but now I don't find
+> what call chain is actually causing it.
 
- ?Changes in v5:
- ???- Added reassertion code in case of initialization error and device
- ?????remove.
+Oh, I didn't realize that by power down you meant the acpi power down.
 
-  Changes in v6:
-    - Fixed a resource leak by not using goto to exit in case of error.
+Can you elaborate on why power down needs to be prevented?
 
- drivers/mtd/nand/sunxi_nand.c | 28 +++++++++++++++++++++++++---
- 1 file changed, 25 insertions(+), 3 deletions(-)
+Is there a problem to power on the device again in the next ->probe() attempt?
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index a83a690..08d5e88 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -39,6 +39,7 @@
- #include <linux/gpio.h>
- #include <linux/interrupt.h>
- #include <linux/iopoll.h>
-+#include <linux/reset.h>
- 
- #define NFC_REG_CTL		0x0000
- #define NFC_REG_ST		0x0004
-@@ -269,6 +270,7 @@ struct sunxi_nfc {
- 	void __iomem *regs;
- 	struct clk *ahb_clk;
- 	struct clk *mod_clk;
-+	struct reset_control *reset;
- 	unsigned long assigned_cs;
- 	unsigned long clk_rate;
- 	struct list_head chips;
-@@ -1871,26 +1873,42 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out_ahb_clk_unprepare;
- 
-+	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
-+
-+	if (!IS_ERR(nfc->reset)) {
-+		ret = reset_control_deassert(nfc->reset);
-+		if (ret) {
-+			dev_err(dev, "reset err %d\n", ret);
-+			goto out_mod_clk_unprepare;
-+		}
-+	} else if (PTR_ERR(nfc->reset) != -ENOENT) {
-+		ret = PTR_ERR(nfc->reset);
-+		goto out_mod_clk_unprepare;
-+	}
-+
- 	ret = sunxi_nfc_rst(nfc);
- 	if (ret)
--		goto out_mod_clk_unprepare;
-+		goto out_ahb_reset_reassert;
- 
- 	writel(0, nfc->regs + NFC_REG_INT);
- 	ret = devm_request_irq(dev, irq, sunxi_nfc_interrupt,
- 			       0, "sunxi-nand", nfc);
- 	if (ret)
--		goto out_mod_clk_unprepare;
-+		goto out_ahb_reset_reassert;
- 
- 	platform_set_drvdata(pdev, nfc);
- 
- 	ret = sunxi_nand_chips_init(dev, nfc);
- 	if (ret) {
- 		dev_err(dev, "failed to init nand chips\n");
--		goto out_mod_clk_unprepare;
-+		goto out_ahb_reset_reassert;
- 	}
- 
- 	return 0;
- 
-+out_ahb_reset_reassert:
-+	if (!IS_ERR(nfc->reset))
-+		reset_control_assert(nfc->reset);
- out_mod_clk_unprepare:
- 	clk_disable_unprepare(nfc->mod_clk);
- out_ahb_clk_unprepare:
-@@ -1904,6 +1922,10 @@ static int sunxi_nfc_remove(struct platform_device *pdev)
- 	struct sunxi_nfc *nfc = platform_get_drvdata(pdev);
- 
- 	sunxi_nand_chips_cleanup(nfc);
-+
-+	if (!IS_ERR(nfc->reset))
-+		reset_control_assert(nfc->reset);
-+
- 	clk_disable_unprepare(nfc->mod_clk);
- 	clk_disable_unprepare(nfc->ahb_clk);
- 
--- 
-2.9.0
+>
+> Must be something to do with drivers/acpi/acpi_lpss.c and notifier calls
+> from drivers/base/dd.c. Also I was wondering why RPM usage counts don't
+> increase monotonically over repeated module load/unload cycle.
+
+$subject patch changes this, as I didn't think that was really the
+wanted behaviour.
+
+Perhaps acpi doesn't power down the device in case the runtime PM
+usage count > 0. I will have look and see what I can dig out.
+
+>
+> I had a few paper notes about these when I last time looked and debugged PM
+> in i2c-designware but throw away them :-(
+
+Okay, I see.
+
+Seems like we definitely need to do some more testing on acpi enabled platforms.
+
+Kind regards
+Uffe
