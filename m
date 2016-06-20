@@ -1,23 +1,25 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Jun 2016 16:39:10 -0700
-Subject: [PATCH 3/7] ARM: dts: add L2CC and RPM with regulators for MSM8660
-In-Reply-To: <1466195292-28236-4-git-send-email-linus.walleij@linaro.org>
-References: <1466195292-28236-1-git-send-email-linus.walleij@linaro.org>
- <1466195292-28236-4-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160620233910.GB14735@codeaurora.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 21 Jun 2016 07:49:29 +0800
+Subject: [PATCH 01/28] crypto: omap-aes: Fix registration of algorithms
+In-Reply-To: <5767DD8A.9010107@ti.com>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+ <1464771389-10640-2-git-send-email-t-kristo@ti.com>
+ <20160607104821.GA520@gondor.apana.org.au>
+ <5767DD8A.9010107@ti.com>
+Message-ID: <20160620234929.GB18131@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17, Linus Walleij wrote:
-> This adds the L2CC IPC resource and RPM devices plus the nodes
-> for the PM8901 and PM8058 regulators to the MSM8660 device tree.
-> This was tested on the APQ8060 Dragonboard.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
+On Mon, Jun 20, 2016 at 03:11:54PM +0300, Tero Kristo wrote:
+>
+> Did you check the rest of the series? I only got feedback for this
+> and patch #2 on the series, shall I repost the remainder of the
+> series as a whole or...?
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Yes please repost them.
 
+Thanks,
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
