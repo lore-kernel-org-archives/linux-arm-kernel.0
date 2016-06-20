@@ -1,56 +1,76 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jun 2016 22:31:56 -0700
-Subject: [GIT PULL] Amlogic DT 64-bit changes for v4.8
-In-Reply-To: <7hshwfbiit.fsf@baylibre.com>
-References: <7hshwfbiit.fsf@baylibre.com>
-Message-ID: <20160620053156.GB2329@localhost>
+Date: Sun, 19 Jun 2016 22:40:42 -0700
+Subject: [GIT PULL 4/8] ARM: exynos: Topic branch with driver changes for
+ v4.8
+In-Reply-To: <5762A2FC.3040208@samsung.com>
+References: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
+ <1465215933-22709-5-git-send-email-k.kozlowski@samsung.com>
+ <20160613214706.GB20845@localhost> <5762988F.7050108@samsung.com>
+ <5762A2FC.3040208@samsung.com>
+Message-ID: <20160620054042.GC2329@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 01:52:10PM -0700, Kevin Hilman wrote:
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+On Thu, Jun 16, 2016 at 03:00:44PM +0200, Sylwester Nawrocki wrote:
+> On 06/16/2016 02:16 PM, Krzysztof Kozlowski wrote:
+> > On 06/13/2016 11:47 PM, Olof Johansson wrote:
+> >> > On Mon, Jun 06, 2016 at 02:25:29PM +0200, Krzysztof Kozlowski wrote:
+> >>> >> Hi,
+> >>> >>
+> >>> >> A topic branch for MultiFormat Codec driver. This pulls in
+> >>> >> an external dependency from media tree (Sylwester Nawrocki).
+> >>> >>
+> >>> >> Below you will find two pull-request-changelogs
+> >>> >>
+> >>> >>
+> >>> >> Best regards,
+> >>> >> Krzysztof
+> >>> >>
+> >>> >>
+> >>> >> ################################################################
+> >>> >> Samsung tree only changes:
+> >>> >> ################################################################
+> >>> >>
+> >>> >> The following changes since commit 04f776734c4e03e33111d3d5a994b589870df623:
+> >>> >>
+> >>> >>   media: s5p-mfc: add iommu support (2016-06-03 11:13:45 +0200)
+> >>> >>
+> >>> >> are available in the git repository at:
+> >>> >>
+> >>> >>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-exynos-mfc-4.8
+> >>> >>
+> >>> >> for you to fetch changes up to 96167bd37dd604cbba0aed341765dda8556405b2:
+> >>> >>
+> >>> >>   ARM: dts: exynos: Enable MFC device on Exynos4412 Odroid boards (2016-06-06 09:30:43 +0200)
+> >>> >>
+> >>> >> ----------------------------------------------------------------
+> >>> >> Topic branch for Exynos MFC changes for v4.8:
+> >>> >> Pull s5p-mfc changes from media tree so the arm/mach-exynos code
+> >>> >> could be removed. The bindings are converted to generic reserved memory
+> >>> >> bindings.
+> >> > 
+> >> > Hi,
+> >> > 
+> >> > Tis branch contains an external dependency but I don't see the toplevel
+> >> > maintainer cc:d on the pull request. Just to avoid any confusion, I'd like to
+> >> > double check and make sure this branch is expected to be stable.
+> >> > 
+> >> > Mauro, is that the case? The branch is:
+> >> > Merge branch 'for-v4.8/media/exynos-mfc' of git://linuxtv.org/snawrocki/samsung into for-v4.8/exynos-mfc
+> >> > 
+> >> > I see it in -next, so I just want to make sure it's on a stable branch that
+> >> > won't be rewritten. 
+> >
+> > Good question. Mauro, could you confirm?
 > 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
-> 
-> for you to fetch changes up to 6d1a5c9381eb022104442b2e036124f12ac748e4:
-> 
->   ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms (2016-06-01 10:57:35 -0700)
-> 
-> ----------------------------------------------------------------
-> Amlogic DT 64-bit changes for v4.8
-> - add pinctrl driver and pins for several devices
-> - add reset driver
+> The above branch is stable and won't be changed, it's already merged
+> to the media tree.
 
-Merged, thanks!
+I'd be happier with a reply from Mauro, given that the tree it's merged into
+is his, but I'll take your work for it.
 
-> 
-> ----------------------------------------------------------------
-> Carlo Caione (3):
->       ARM64: dts: amlogic: Add hiu and periphs buses
->       documentation: Add compatibles for Amlogic Meson GXBB pin controllers
->       ARM64: dts: amlogic: Enable pin controller on GXBB-based platforms
-> 
-> Kevin Hilman (3):
->       ARM64: dts: amlogic: add pins for EMMC, SD
->       ARM64: dts: amlogic: gxbb: pinctrl: add/update UART
->       ARM64: dts: amlogic: gxbb: add ethernet
-> 
-> Neil Armstrong (1):
->       ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms
-> 
->  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt |   2 ++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts         |  20 ++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi            |   9 ++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi        |   3 ++
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                 | 159 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+Merged.
 
-If you redirect git request-pull to a file, or pipe it through cat,
-it'll make the histogram fit 80 characters. Longer lines isn't a problem
-at all, just sharing a trick.
 
 
 -Olof
