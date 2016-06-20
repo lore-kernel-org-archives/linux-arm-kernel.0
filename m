@@ -1,85 +1,41 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 20 Jun 2016 12:57:36 -0700
-Subject: [PATCH 01/20] clk: fixed-factor: Pass clk rates change to the
- parent
-In-Reply-To: <20160620085458.GI26668@lukather>
-References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160617230533.27203.82622@quark.deferred.io>
- <20160620085458.GI26668@lukather>
-Message-ID: <20160620195736.24587.45566@quark.deferred.io>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 20 Jun 2016 21:01:39 +0100
+Subject: [PATCH 0/8] arm64: dts: db820c: Add basic board support
+Message-ID: <1466452907-23290-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2016-06-20 01:54:58)
-> On Fri, Jun 17, 2016 at 04:05:33PM -0700, Michael Turquette wrote:
-> > Quoting Maxime Ripard (2016-05-16 05:47:01)
-> > > A fixed factor clock, if it needs to change its rate, by definition do not
-> > > have any choice but to modify its parent rate.
-> > 
-> > Logically it makes sense to always propagate the rate-change request up
-> > to the parent for a fixed-factor clock if we desire to change its rate.
-> > However, I wonder if doing this for all users of fixed-factor-clock in
-> > DT is safe? Some users may be counting on it not changing.
-> > 
-> > There are 397 instances of fixed-factor-clock in .dts[i] today, so this
-> > change worries me a bit.
-> 
-> Understood.
-> 
-> > 
-> > > 
-> > > Add the CLK_SET_RATE_PARENT flag to that clock so that it can happen
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > >  drivers/clk/clk-fixed-factor.c | 3 ++-
-> > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> > > index 75cd6c792cb8..3363abd9b4ae 100644
-> > > --- a/drivers/clk/clk-fixed-factor.c
-> > > +++ b/drivers/clk/clk-fixed-factor.c
-> > > @@ -167,7 +167,8 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
-> > >         of_property_read_string(node, "clock-output-names", &clk_name);
-> > >         parent_name = of_clk_get_parent_name(node, 0);
-> > >  
-> > > -       clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
-> > > +       clk = clk_register_fixed_factor(NULL, clk_name, parent_name,
-> > > +                                       CLK_SET_RATE_PARENT,
-> > 
-> > An alternative would be to pass in the flags you want, somehow. For the
-> > clock you are trying to fix, is it inside of the SoC or external? If it
-> > is internal, and part of a larger clock controller driver, is this for
-> > the legacy style allwinner clock drivers that put everything in DT?
-> 
-> It is :(
-> 
-> What we could do, is have an extra compatible for that clock (like
-> "allwinner,sun4i-a10-pll3-x2" in that case), and set the flag only for
-> that compatible.
-> 
-> Would that work for you
+Hi Andy, 
 
-Yes, I think that is the best way forward.
+This patchset adds basic board support with uart/i2c/spi/sd card for db820c
+board based on apq8096. I have tested this patchset on top of msm8996
+patches at [1].
+With this patchset am able to boot the board with sdcard and able to
+play with i2c devices.
 
-> 
-> > If not, it would better to initialize it statically and shove this
-> > flag into the struct clk_init_data storage.
-> 
-> Hopefully, yes, that should be addressed by the new framework, but I
-> need reviews to get it merged ;)
+Thanks,
+srini
+[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1170562.html
 
-Will do!
 
-Regards,
-Mike
+Srinivas Kandagatla (8):
+  arm64: dts: db820c: add basic board support
+  arm64: dts: db820c: add support to LS-UART0
+  arm64: dts: db820c: add support to LS-I2C0
+  arm64: dts: db820c: add support to LS-I2C1
+  arm64: dts: db820c: add support to I2C on HS
+  arm64: dts: db820c: add support to LS-SPI0
+  arm64: dts: db820c: add support to SPI on HS
+  arm64: dts: db820c: add support to external sd card.
 
-> 
-> Thanks!
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+ arch/arm64/boot/dts/qcom/Makefile                 |  2 +-
+ arch/arm64/boot/dts/qcom/apq8096-db820c-pins.dtsi | 39 ++++++++++
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dts       | 21 ++++++
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi      | 88 +++++++++++++++++++++++
+ 4 files changed, 149 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/qcom/apq8096-db820c-pins.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/apq8096-db820c.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+
+-- 
+2.7.4
