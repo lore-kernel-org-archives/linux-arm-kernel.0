@@ -1,102 +1,103 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Mon, 20 Jun 2016 10:15:06 +0100
-Subject: [PATCH V2 25/63] clocksource/drivers/mxs_timer: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-26-git-send-email-daniel.lezcano@linaro.org>
-References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-26-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20160620091506.GO9711@e106497-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 20 Jun 2016 11:21:37 +0200
+Subject: [PATCH v3 1/2] usb: ohci-at91: Forcibly suspend ports while USB
+ suspend
+In-Reply-To: <20160620085205.GN5809@piout.net>
+References: <1465359311-14544-1-git-send-email-wenyou.yang@atmel.com>
+ <1465359311-14544-2-git-send-email-wenyou.yang@atmel.com>
+ <20160608202651.GA23604@rob-hp-laptop> <20160608203810.GF2466@piout.net>
+ <B256D81BAE5131468A838E5D7A24364101650C3632@penmbx01>
+ <20160617135448.GI5809@piout.net>
+ <B256D81BAE5131468A838E5D7A24364101650C5253@penmbx01>
+ <20160620080334.GL5809@piout.net>
+ <B256D81BAE5131468A838E5D7A24364101650C547F@penmbx01>
+ <20160620085205.GN5809@piout.net>
+Message-ID: <5767B5A1.4040307@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 11:26:44PM +0200, Daniel Lezcano wrote:
-> The init functions do not return any error. They behave as the following:
+Le 20/06/2016 10:52, Alexandre Belloni a ?crit :
+> On 20/06/2016 at 08:46:02 +0000, Yang, Wenyou wrote :
+>> Hi Alexandre & Nicolas,
+>>
+>>> -----Original Message-----
+>>> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+>>> Sent: 2016?6?20? 16:04
+>>> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+>>> Cc: Rob Herring <robh@kernel.org>; Alan Stern <stern@rowland.harvard.edu>;
+>>> Greg Kroah-Hartman <gregkh@linuxfoundation.org>; Ferre, Nicolas
+>>> <Nicolas.FERRE@atmel.com>; Pawel Moll <pawel.moll@arm.com>; Mark Brown
+>>> <broonie@kernel.org>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
+>>> Gala <galak@codeaurora.org>; linux-kernel at vger.kernel.org;
+>>> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+>>> usb at vger.kernel.org
+>>> Subject: Re: [PATCH v3 1/2] usb: ohci-at91: Forcibly suspend ports while USB
+>>> suspend
+>>>
+>>> On 20/06/2016 at 03:16:35 +0000, Yang, Wenyou wrote :
+>>>>> Sure, what I mean is that you can try to get the regmap for the SFR in every
+>>> case.
+>>>>> Depending on whether you were able to get it, you can decide to call
+>>>>> ohci_at91_port_suspend/resume or not (just test for sfr_regmap != NULL).
+>>>>
+>>>> I don't think so. The SFR includes a lot of miscellaneous functions, more than
+>>> this one.
+>>>>
+>>>
+>>> I know but this is irrelevant to this discussion. If you need to use the SFR from
+>>> another driver you will simply get it from that other driver.
+>>>
+>>> I that case, you will try to get "atmel,sama5d2-sfr". It is only present on sama5d2
+>>> so you have enough information to know whether or not you can use it to
+>>> suspend/resume.
+>>
+>> I understand what your meaning :).
+>> Use "atmel,sama5d2-sfr" compatible to distinguish whether forcibly suspend USB port via SFR or not.
+>>
+>> I am not sure if it is a better solution.
+>>
 > 
->   - panic, thus leading to a kernel crash while another timer may work and
->        make the system boot up correctly
+> It is definitively superior. There is only one lookup in the device tree
+> instead of two because whatever happens, you will have to get the SFR
+> regmap and you don't need to add a compatible string for an IP that
+> didn't change.
 > 
->   or
-> 
->   - print an error and let the caller unaware if the state of the system
-> 
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
-> 
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/clocksource/mps2-timer.c | 10 ++++++----
->  drivers/clocksource/mxs_timer.c  |  2 +-
->  2 files changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/clocksource/mps2-timer.c b/drivers/clocksource/mps2-timer.c
-> index 3d33a5e..c303fa9 100644
-> --- a/drivers/clocksource/mps2-timer.c
-> +++ b/drivers/clocksource/mps2-timer.c
-> @@ -250,7 +250,7 @@ out:
->  	return ret;
->  }
->  
-> -static void __init mps2_timer_init(struct device_node *np)
-> +static int __init mps2_timer_init(struct device_node *np)
->  {
->  	static int has_clocksource, has_clockevent;
->  	int ret;
-> @@ -259,7 +259,7 @@ static void __init mps2_timer_init(struct device_node *np)
->  		ret = mps2_clocksource_init(np);
->  		if (!ret) {
->  			has_clocksource = 1;
-> -			return;
-> +			return 0;
->  		}
->  	}
->  
-> @@ -267,9 +267,11 @@ static void __init mps2_timer_init(struct device_node *np)
->  		ret = mps2_clockevent_init(np);
->  		if (!ret) {
->  			has_clockevent = 1;
-> -			return;
-> +			return 0;
->  		}
->  	}
-> +
-> +	return 0;
->  }
->  
-> -CLOCKSOURCE_OF_DECLARE(mps2_timer, "arm,mps2-timer", mps2_timer_init);
-> +CLOCKSOURCE_OF_DECLARE_RET(mps2_timer, "arm,mps2-timer", mps2_timer_init);
-> diff --git a/drivers/clocksource/mxs_timer.c b/drivers/clocksource/mxs_timer.c
-> index f5ce296..16cf53b 100644
-> --- a/drivers/clocksource/mxs_timer.c
-> +++ b/drivers/clocksource/mxs_timer.c
-> @@ -226,7 +226,7 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
->  	return 0;
->  }
->  
-> -static void __init mxs_timer_init(struct device_node *np)
-> +static int __init mxs_timer_init(struct device_node *np)
->  {
->  	struct clk *timer_clk;
->  	int irq;
-> -- 
-> 1.9.1
+>> Nicolas, could you give your opinion?
+
+I'll paraphrase Alexandre but this is what I understood:
+
+Having the information in one place and not having to managed the
+synchronization with 2 potential sources of information is clearly an
+advantage of Alexandre's solution.
+
+If the next SoC has the same workaround/feature, we will anyway have a
+different SFR string to cling to...
+So it won't change much and we won't have the confusion of having the
+same sama5d2 compatible string on the OHCI side (same behavior) and
+different compatible string on the SFR side (probably a new SFR for a
+new SoC...).
+
+If the next SoC doesn't have this workaround/feature... well, it's
+simple, we don't look for the SFR, we don't use the bits, and we come
+back to the situation that we've always experienced ; with the same
+compatibility sting for OHCI as the IP never actually changed...
+
+In conclusion: try Alexandre's solution and we'll certainly find that
+it's actually simpler.
+
+Bonus point: it voids the discussion on the OHCI compatible string
+descriptions!
+
+Bye,
+
+>>> Alexandre Belloni, Free Electrons
+>>> Embedded Linux, Kernel and Android engineering http://free-electrons.com
+>>
+>>
+>> Best Regards,
+>> Wenyou Yang
 > 
 
-This patch needs rework as it is changing (incompletely) two files that have different
-maintainers.
-
-Best regards,
-Liviu
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Nicolas Ferre
