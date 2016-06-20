@@ -1,95 +1,26 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 20 Jun 2016 09:39:31 +0200
-Subject: [PATCH V2 08/63] clocksource/drivers/st_lpc: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-9-git-send-email-daniel.lezcano@linaro.org>
-References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-9-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <57679DB2.4040102@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Jun 2016 09:42:04 +0200
+Subject: [PATCH] ARM: remove unused CONFIG_ARCH_HAS_BARRIERS
+In-Reply-To: <CAK7LNARgob3qEvoxdLWxeg15tPB8n5zLk1WYX-AUroPgkH0e5g@mail.gmail.com>
+References: <1465820748-7369-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNARgob3qEvoxdLWxeg15tPB8n5zLk1WYX-AUroPgkH0e5g@mail.gmail.com>
+Message-ID: <6670425.p1zbzhN2C7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel
+On Monday, June 20, 2016 10:28:29 AM CEST Masahiro Yamada wrote:
+> Hi.
+> 
+> I have not had any comment on this patch,
+> but it looks correct to me.
 
-On 06/16/2016 11:26 PM, Daniel Lezcano wrote:
-> The init functions do not return any error. They behave as the following:
->
->   - panic, thus leading to a kernel crash while another timer may work and
->     make the system boot up correctly
->
->   or
->
->   - print an error and let the caller unaware if the state of the system
->
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
->
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->   drivers/clocksource/clksrc_st_lpc.c | 22 +++++++++++++---------
->   1 file changed, 13 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/clocksource/clksrc_st_lpc.c b/drivers/clocksource/clksrc_st_lpc.c
-> index 65ec467..c9022a9 100644
-> --- a/drivers/clocksource/clksrc_st_lpc.c
-> +++ b/drivers/clocksource/clksrc_st_lpc.c
-> @@ -92,7 +92,7 @@ static int __init st_clksrc_setup_clk(struct device_node *np)
->   	return 0;
->   }
->   
-> -static void __init st_clksrc_of_register(struct device_node *np)
-> +static int __init st_clksrc_of_register(struct device_node *np)
->   {
->   	int ret;
->   	uint32_t mode;
-> @@ -100,32 +100,36 @@ static void __init st_clksrc_of_register(struct device_node *np)
->   	ret = of_property_read_u32(np, "st,lpc-mode", &mode);
->   	if (ret) {
->   		pr_err("clksrc-st-lpc: An LPC mode must be provided\n");
-> -		return;
-> +		return ret;
->   	}
->   
->   	/* LPC can either run as a Clocksource or in RTC or WDT mode */
->   	if (mode != ST_LPC_MODE_CLKSRC)
-> -		return;
-> +		return 0;
->   
->   	ddata.base = of_iomap(np, 0);
->   	if (!ddata.base) {
->   		pr_err("clksrc-st-lpc: Unable to map iomem\n");
-> -		return;
-> +		return -ENXIO;
->   	}
->   
-> -	if (st_clksrc_setup_clk(np)) {
-> +	ret = st_clksrc_setup_clk(np);
-> +	if (ret) {
->   		iounmap(ddata.base);
-> -		return;
-> +		return ret;
->   	}
->   
-> -	if (st_clksrc_init()) {
-> +	ret = st_clksrc_init();
-> +	if (ret) {
->   		clk_disable_unprepare(ddata.clk);
->   		clk_put(ddata.clk);
->   		iounmap(ddata.base);
-> -		return;
-> +		return ret;
->   	}
->   
->   	pr_info("clksrc-st-lpc: clocksource initialised - running @ %luHz\n",
->   		clk_get_rate(ddata.clk));
-> +
-> +	return ret;
->   }
-> -CLOCKSOURCE_OF_DECLARE(ddata, "st,stih407-lpc", st_clksrc_of_register);
-> +CLOCKSOURCE_OF_DECLARE_RET(ddata, "st,stih407-lpc", st_clksrc_of_register);
+Yes, I agree. Feel free to add my 
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+> I will put it into Russell's patch tracker
+> if nobody is against it.
+
+Ok, thanks!
+
+	Arnd
