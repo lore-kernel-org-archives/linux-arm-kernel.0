@@ -1,65 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Jun 2016 16:23:52 -0700
-Subject: [PATCH 1/8] arm64: dts: db820c: add basic board support
-In-Reply-To: <1466452907-23290-2-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1466452907-23290-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1466452907-23290-2-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <57687B08.9060900@codeaurora.org>
+Date: Mon, 20 Jun 2016 16:38:20 -0700
+Subject: [PATCH 5/7] ARM: dts: fix the MSM8660 RTC base address
+In-Reply-To: <1466195292-28236-7-git-send-email-linus.walleij@linaro.org>
+References: <1466195292-28236-1-git-send-email-linus.walleij@linaro.org>
+ <1466195292-28236-7-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160620233820.GA14735@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2016 01:01 PM, Srinivas Kandagatla wrote:
-> This patch adds apq8096 db820c basic support with serial port.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On 06/17, Linus Walleij wrote:
+> The RTC was defined on 0x11d but on the MSM8660/APQ8060 it is
+> actually on 0x1e8. We were saved by the fact that the driver does
+> not use the reg parameter: instead it uses the compatible string
+> to figure out where the RTC is.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm64/boot/dts/qcom/Makefile            |  2 +-
->  arch/arm64/boot/dts/qcom/apq8096-db820c.dts  | 21 +++++++++++++++++
->  arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 34 ++++++++++++++++++++++++++++
->  3 files changed, 56 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/boot/dts/qcom/apq8096-db820c.dts
->  create mode 100644 arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
->
-> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
-> index fa1f661..80ecdfe 100644
-> --- a/arch/arm64/boot/dts/qcom/Makefile
-> +++ b/arch/arm64/boot/dts/qcom/Makefile
-> @@ -1,5 +1,5 @@
->  dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb msm8916-mtp.dtb
-> -dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
-> +dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb apq8096-db820c.dtb
 
-We should do a new line for each board as other arm64 vendors have done?
-
-> diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
-> new file mode 100644
-> index 0000000..e1a55b1
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "apq8096-db820c.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm Technologies, Inc. DB820c";
-> +	compatible = "qcom,apq8096-db820c";
-
-Should be qcom,apq8096-sbc? At least I have to use that on my board to
-match the board ids.
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
