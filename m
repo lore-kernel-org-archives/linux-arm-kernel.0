@@ -1,181 +1,87 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 20 Jun 2016 17:37:35 +0100
-Subject: [PATCH 7/8] arm64: pmu: Enable multiple PMUs in an ACPI system
-In-Reply-To: <1465511013-10742-8-git-send-email-jeremy.linton@arm.com> (Jeremy
- Linton's message of "Thu, 9 Jun 2016 17:23:32 -0500")
-References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
- <1465511013-10742-8-git-send-email-jeremy.linton@arm.com>
-Message-ID: <87h9cn6ckw.fsf@e105922-lin.cambridge.arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 20 Jun 2016 10:39:16 -0600
+Subject: [PATCH] coresight-stm: support mmapping channel regions with
+ mmio_addr
+In-Reply-To: <1465870615-10215-1-git-send-email-zhang.chunyan@linaro.org>
+References: <1465870615-10215-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <CANLsYkzsHXDTSn5AJFhBgUkpiS+EF9O589gDLUqkNU0vPoWx8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeremy Linton <jeremy.linton@arm.com> writes:
-
-> Its possible that an ACPI system has multiple CPU types in it
-> with differing PMU counters. Use the newly provided acpi_pmu routines
-> to detect that case, and instantiate more than one set of counters.
+On 13 June 2016 at 20:16, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+> CoreSight STM device allows direct mapping of the channel regions to
+> userspace for zero-copy writing. To support this ability, the STM
+> freamwork has provided a hook 'mmio_addr', this patch just implemented
+> this hook for CoreSight STM.
 >
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> This patch also added an item into 'channel_space' to save the start
+> physical address of channel region which mmap operation needs to know.
+>
+> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 > ---
->  drivers/perf/arm_pmu.c      |  7 +++-
->  drivers/perf/arm_pmu_acpi.c | 98 ++++++++++++++++++++-------------------------
->  2 files changed, 50 insertions(+), 55 deletions(-)
+>  drivers/hwtracing/coresight/coresight-stm.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
 >
-
-[...]
-
-> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-> index a257fc0..8f9bea3 100644
-> --- a/drivers/perf/arm_pmu_acpi.c
-> +++ b/drivers/perf/arm_pmu_acpi.c
-> @@ -35,6 +35,11 @@ struct pmu_types {
->  
->  static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
->  
-> +/*
-> + * Called from acpi_map_gic_cpu_interface()'s MADT parsing during boot.
-> + * This routine saves off the GSI's and their trigger state for use when we are
-> + * ready to build the PMU platform device.
-> +*/
->  void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
->  {
->  	pmu_irqs[cpu].gsi = gic->performance_interrupt;
-
-
-This hunk should be in Patch 3.
-
-> @@ -47,7 +52,7 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
->  }
->  
->  /* Count number and type of CPU cores in the system. */
-> -void __init arm_pmu_acpi_determine_cpu_types(struct pmu_types *pmus)
-> +static void __init arm_pmu_acpi_determine_cpu_types(struct pmu_types *pmus)
->  {
->  	int i, j;
->  
-
-Please move this and the following two hunks to the previous patch where you
-introduce the functions.
-
-> @@ -74,7 +79,7 @@ void __init arm_pmu_acpi_determine_cpu_types(struct pmu_types *pmus)
->   * Registers the group of PMU interfaces which corrispond to the 'last_cpu_id'.
->   * This group utlizes 'count' resources in the 'res'.
+> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+> index 73be58a..4e70478 100644
+> --- a/drivers/hwtracing/coresight/coresight-stm.c
+> +++ b/drivers/hwtracing/coresight/coresight-stm.c
+> @@ -109,6 +109,7 @@ module_param_named(
 >   */
-> -int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
-> +static int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
->  					    int last_cpu_id)
->  {
->  	int i;
-> @@ -121,7 +126,7 @@ int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
->   * them to the resource structure. Return the number of GSI's contained
->   * in the res structure, and the id of the last CPU/PMU we added.
->   */
-> -int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
-> +static int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
->  				       struct resource *res, int *last_cpu_id)
->  {
->  	int i, count;
-> @@ -164,63 +169,48 @@ int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
->  
->  static int __init pmu_acpi_init(void)
->  {
-> -	struct platform_device *pdev;
-> -	struct pmu_irq *pirq = pmu_irqs;
-> -	struct resource	*res, *r;
-> +	struct resource	*res;
->  	int err = -ENOMEM;
-> -	int i, count, irq;
-> +	int count;
-> +	int j, last_cpu_id;
-> +	struct pmu_types *pmus;
->  
-> +	pr_debug("Prepare registration\n");
->  	if (acpi_disabled)
->  		return 0;
->  
-> -	/* Must have irq for boot boot cpu, at least */
-> -	if (pirq->gsi == 0)
-> -		return -EINVAL;
-> -
-> -	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
-> -				ACPI_ACTIVE_HIGH);
-> -
-> -	if (irq_is_percpu(irq))
-> -		count = 1;
-> -	else
-> -		for (i = 1, count = 1; i < NR_CPUS; i++)
-> -			if (pmu_irqs[i].gsi)
-> -				++count;
-> -
-> -	pdev = platform_device_alloc(PMU_PDEV_NAME, -1);
-> -	if (!pdev)
-> -		goto err_free_gsi;
-> -
-> -	res = kcalloc(count, sizeof(*res), GFP_KERNEL);
-> -	if (!res)
-> -		goto err_free_device;
-> -
-> -	for (i = 0, r = res; i < count; i++, pirq++, r++) {
-> -		if (i)
-> -			irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
-> -						ACPI_ACTIVE_HIGH);
-> -		r->start = r->end = irq;
-> -		r->flags = IORESOURCE_IRQ;
-> -		if (pirq->trigger == ACPI_EDGE_SENSITIVE)
-> -			r->flags |= IORESOURCE_IRQ_HIGHEDGE;
-> -		else
-> -			r->flags |= IORESOURCE_IRQ_HIGHLEVEL;
-> -	}
-> -
-> -	err = platform_device_add_resources(pdev, res, count);
-> -	if (!err)
-> -		err = platform_device_add(pdev);
-> -	kfree(res);
-> -	if (!err)
-> -		return 0;
-> -
-> -err_free_device:
-> -	platform_device_put(pdev);
-> -
-> -err_free_gsi:
-> -	for (i = 0; i < count; i++)
-> -		acpi_unregister_gsi(pmu_irqs[i].gsi);
-> +	pmus = kcalloc(num_possible_cpus(), sizeof(struct pmu_types),
-> +		       GFP_KERNEL);
-> +
-> +	if (pmus) {
+>  struct channel_space {
+>         void __iomem            *base;
+> +       phys_addr_t             phys;
 
-Instead, check for error here. That should allow you to reduce
-indentation on the block below.
+Please document this new field the same way @base and @guaranteed are.
 
-> +		arm_pmu_acpi_determine_cpu_types(pmus);
-> +
-> +		for (j = 0; pmus[j].cpu_count; j++) {
-> +			pr_devel("CPU type %X, count %d\n", pmus[j].cpu_type,
-> +				 pmus[j].cpu_count);
-> +			res = kcalloc(pmus[j].cpu_count,
-> +				      sizeof(struct resource), GFP_KERNEL);
-> +
-> +			/* for a given PMU type collect all the GSIs. */
-> +			if (res) {
-> +				count = arm_pmu_acpi_gsi_res(&pmus[j], res,
-> +							     &last_cpu_id);
-> +				/*
-> +				 * register this set of interrupts
-> +				 * with a new PMU device
-> +				 */
-> +				err = arm_pmu_acpi_register_pmu(count,
-> +								res,
-> +								last_cpu_id);
-> +				kfree(res);
-> +			} else
-> +				pr_warn("PMU unable to allocate interrupt resource space\n");
-> +		}
->  
-> +		kfree(pmus);
-> +	} else
-> +		pr_warn("PMU: Unable to allocate pmu count structures\n");
->  	return err;
+Thanks,
+Mathieu
+
+>         unsigned long           *guaranteed;
+>  };
+>
+> @@ -356,6 +357,23 @@ static void stm_generic_unlink(struct stm_data *stm_data,
+>         stm_disable(drvdata->csdev);
 >  }
+>
+> +static phys_addr_t
+> +stm_mmio_addr(struct stm_data *stm_data, unsigned int master,
+> +             unsigned int channel, unsigned int nr_chans)
+> +{
+> +       struct stm_drvdata *drvdata = container_of(stm_data,
+> +                                                  struct stm_drvdata, stm);
+> +       phys_addr_t addr;
 > +
->  arch_initcall(pmu_acpi_init);
+> +       addr = drvdata->chs.phys + channel * BYTES_PER_CHANNEL;
+> +
+> +       if (offset_in_page(addr) ||
+> +           offset_in_page(nr_chans * BYTES_PER_CHANNEL))
+> +               return 0;
+> +
+> +       return addr;
+> +}
+> +
+>  static long stm_generic_set_options(struct stm_data *stm_data,
+>                                     unsigned int master,
+>                                     unsigned int channel,
+> @@ -761,7 +779,9 @@ static void stm_init_generic_data(struct stm_drvdata *drvdata)
+>         drvdata->stm.sw_end = 1;
+>         drvdata->stm.hw_override = true;
+>         drvdata->stm.sw_nchannels = drvdata->numsp;
+> +       drvdata->stm.sw_mmiosz = BYTES_PER_CHANNEL;
+>         drvdata->stm.packet = stm_generic_packet;
+> +       drvdata->stm.mmio_addr = stm_mmio_addr;
+>         drvdata->stm.link = stm_generic_link;
+>         drvdata->stm.unlink = stm_generic_unlink;
+>         drvdata->stm.set_options = stm_generic_set_options;
+> @@ -808,6 +828,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
+>         ret = stm_get_resource_byname(np, "stm-stimulus-base", &ch_res);
+>         if (ret)
+>                 return ret;
+> +       drvdata->chs.phys = ch_res.start;
+>
+>         base = devm_ioremap_resource(dev, &ch_res);
+>         if (IS_ERR(base))
+> --
+> 1.9.1
+>
