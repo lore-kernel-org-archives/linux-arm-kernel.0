@@ -1,104 +1,59 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 20 Jun 2016 13:17:33 -0400
-Subject: [RFC PATCH v3 2/2] ARM64/PCI: Start using quirks handling for
- ACPI based PCI host controller
-In-Reply-To: <20160620094227.GA27594@red-moon>
-References: <CADaLNDkziZgM-yAiK2MCqfBRzhWpLmCyPmDZEGsvwd-7nfRfLw@mail.gmail.com>
- <20160620094227.GA27594@red-moon>
-Message-ID: <5768252D.7090206@codeaurora.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 20 Jun 2016 18:22:40 +0100
+Subject: [PATCH v1 15/25] PCI: generic: Free resource list close to where
+ it's allocated
+In-Reply-To: <CANMBJr41muA9mTNAa6MtWuMmeNLQxT4NjLe45=ExdFiH8vwzyw@mail.gmail.com>
+References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <20160606230636.20936.29083.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <CANMBJr41muA9mTNAa6MtWuMmeNLQxT4NjLe45=ExdFiH8vwzyw@mail.gmail.com>
+Message-ID: <20160620172240.GA30625@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Duc,
-
-On 06/20/2016 05:42 AM, Lorenzo Pieralisi wrote:
-> On Fri, Jun 17, 2016 at 02:37:02PM -0700, Duc Dang wrote:
->> On Thu, Jun 16, 2016 at 10:48 AM, Lorenzo Pieralisi
->> <lorenzo.pieralisi@arm.com> wrote:
->>> On Wed, Jun 15, 2016 at 11:34:11AM -0400, Christopher Covington wrote:
->>>> From: Tomasz Nowicki <tn@semihalf.com>
->>>>
->>>> pci_generic_ecam_ops is used by default. Since there are platforms
->>>> which have non-compliant ECAM space we need to overwrite these
->>>> accessors prior to PCI buses enumeration. In order to do that
->>>> we call pci_mcfg_get_ops to retrieve pci_ecam_ops structure so that
->>>> we can use proper PCI config space accessors and bus_shift.
->>>>
->>>> pci_generic_ecam_ops is still used for platforms free from quirks.
->>>>
->>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>>> ---
->>>>  arch/arm64/kernel/pci.c | 7 ++++---
->>>>  1 file changed, 4 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
->>>> index 94cd43c..a891bda 100644
->>>> --- a/arch/arm64/kernel/pci.c
->>>> +++ b/arch/arm64/kernel/pci.c
->>>> @@ -139,6 +139,7 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
->>>>       struct pci_config_window *cfg;
->>>>       struct resource cfgres;
->>>>       unsigned int bsz;
->>>> +     struct pci_ecam_ops *ops;
->>>>
->>>>       /* Use address from _CBA if present, otherwise lookup MCFG */
->>>>       if (!root->mcfg_addr)
->>>> @@ -150,12 +151,12 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
->>>>               return NULL;
->>>>       }
->>>>
->>>> -     bsz = 1 << pci_generic_ecam_ops.bus_shift;
->>>> +     ops = pci_mcfg_get_ops(root);
->>>> +     bsz = 1 << ops->bus_shift;
->>>>       cfgres.start = root->mcfg_addr + bus_res->start * bsz;
->>>>       cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
->>>>       cfgres.flags = IORESOURCE_MEM;
->>>> -     cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
->>>> -                           &pci_generic_ecam_ops);
->>>> +     cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res, ops);
->>>
->>> Arnd pointed this out already, I think that's the only pending question
->>> here.
->>>
->>> pci_ecam_create() maps ECAM space for config regions retrieved from
->>> the MCFG, which are *supposed* to be ECAM compliant.
->>>
->>> Do we think that's *always* correct/safe regardless of the kind
->>> of quirk we are currently fixing up ?
->>>
->>> Or we do think that configuration space regions should come from
->>> a different resource declared in the ACPI namespace if the regions
->>> are not MCFG/ECAM compliant (ie config space is not defined through
->>> MCFG at all - possibly through a _CRS method for a vendor specific
->>> _HID under the PNP0A03 node ?)
->>
->> Hi Lorenzo,
->>
->> For X-Gene: the ECAM space is used to access the configuration space
->> of PCIe devices, with additional help from controller register to
->> specify the bus, device and function number. Below is the RFC patch
->> that implements ECAM fixup for X-Gene PCIe controller on top of this
->> RFC ECAM quirk v3 for your and others reference.
+On Mon, Jun 20, 2016 at 09:56:45AM -0700, Tyler Baker wrote:
+> Hi Bjorn,
 > 
-> Yes, you have an additional resource in the PNP0A03 _CRS to describe
-> your register that is a deliberate abuse of the ACPI standard in
-> that the _CRS is meant to describe resources that are passed on
-> to secondary buses
+> On 6 June 2016 at 16:06, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> > Previously we allocated the PCI resource list in
+> > gen_pci_parse_request_of_pci_ranges(), but if we had an error, we freed it
+> > on error in gen_pci_init().
+> >
+> > Reorder gen_pci_init() so we can take care of error path cleanup in
+> > gen_pci_parse_request_of_pci_ranges() instead.
+> >
+> > Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> The kernelci.org bot has reported[0] new qemu-aarch64
+> (arm64-defconfig) boot failures[1][2] in next-20160620. I've
+> bisected[3] this boot failure down to this patch, and confirmed
+> reverting it on top of next-20160620 resolves the boot issue.
+> 
+> I have not investigated further, but you can easily reproduce[4] the
+> boot failure on an x86 host running qemu-system-aarch64 (I'm running
+> qemu-system 2.6).
 
-A potential alternative came up in an off-list discussion: Would it be
-better to hard code the information in the quirk workaround than look it
-up from a repurposed ACPI resource?
+That's most likely because pci_ecam_create() requires the bus_range
+resource (its busr parameter) to be initialized when it is called
+and that's not the case after this patch is applied if I read it
+correctly.
 
-Supporting quirk workarounds for early, non-compliant hardware is
-helpful and perhaps necessary for bootstrapping the ecosystem in a
-timely manner. But we don't really want to provide an expandable or
-reusable interface that would make it easy for new hardware to remain
-non-compliant.
+It is probably a NULL pointer dereference in pci_ecam_create().
 
-Regards,
-Cov
+Thanks,
+Lorenzo
 
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> 
+> Cheers,
+> 
+> Tyler
+> 
+> [0] https://kernelci.org/boot/all/job/next/kernel/next-20160620/
+> [1] https://storage.kernelci.org/next/next-20160620/arm64-defconfig/lab-cambridge/boot-apm-mustang-kvm-guest.txt
+> [2] https://storage.kernelci.org/next/next-20160620/arm64-defconfig/lab-tbaker/boot-qemu-aarch64,legacy.txt
+> [3] http://hastebin.com/segiruribu.vbs
+> [4] http://hastebin.com/dafuzicuyi.avrasm
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
