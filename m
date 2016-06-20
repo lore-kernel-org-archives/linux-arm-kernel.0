@@ -1,29 +1,42 @@
-From: jroedel@suse.de (Joerg Roedel)
-Date: Mon, 20 Jun 2016 15:52:41 +0200
-Subject: next-20160620 build: 2 failures 9 warnings (next-20160620)
-In-Reply-To: <20160620134200.GU26099@sirena.org.uk>
-References: <E1bEwGe-0004DR-4p@optimist> <20160620134200.GU26099@sirena.org.uk>
-Message-ID: <20160620135241.GN29948@suse.de>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 20 Jun 2016 15:54:53 +0200
+Subject: [PATCH 2/3] clk: samsung: cpu: prepare for adding Exynos5433 CPU
+ clocks
+In-Reply-To: <CA+Ln22FwQ_e5OHg_8WHEWGER=X8g_Yq+NpVLONgb0ZAShJLjzA@mail.gmail.com>
+References: <1464095957-25851-1-git-send-email-b.zolnierkie@samsung.com>
+ <1464095957-25851-3-git-send-email-b.zolnierkie@samsung.com>
+ <CA+Ln22FwQ_e5OHg_8WHEWGER=X8g_Yq+NpVLONgb0ZAShJLjzA@mail.gmail.com>
+Message-ID: <5297672.nIMnaEh2jc@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 02:42:00PM +0100, Mark Brown wrote:
-> On Mon, Jun 20, 2016 at 11:17:20AM +0100, Build bot for Mark Brown wrote:
+
+On Saturday, June 18, 2016 11:53:36 PM Tomasz Figa wrote:
+> Hi Bart,
+
+Hi Tomek,
+
+> 2016-05-24 22:19 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> > Exynos5433 uses different register layout for CPU clock registers
+> > than earlier SoCs so add new code for handling this layout.  Also
+> > add new CLK_CPU_HAS_E5433_REGS_LAYOUT flag to request using it.
 > 
-> Today's -next fails to build due to:
-> 
-> > 	arm64-allmodconfig
-> > ../drivers/iommu/mtk_iommu.c:27:32: fatal error: linux/of_component.h: No such file or directory
-> 
-> which is triggered by da4d6e6d3b3ef (iommu/mediatek: Convert DT
-> component matching to component_match_add_release()) - there is
-> presumably a dependency on some other patch series that is still in
-> review.
+> Have you considered abstracting this? Comparing existing code with
 
-Yes, this came to my attention already. I will remove that patch from
-the iommu tree.
+Yes, I have considered abstracting this but I've decided that there is
+sufficient number of differences to justify adding new code.
 
+> newly added one, the differences don't really seem to be that huge and
+> it looks like there is more common code than different, except maybe
+> some numeric constants that could be put into a struct.
 
-Thanks,
+It is not only that, HPM clock sourcing checking would also need to be
+abstracted somehow.  Anyway there is not a lot of new code and it so
+much easier to follow by not being shared that I would prefer to keep
+it that way.
 
-	Joerg
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
