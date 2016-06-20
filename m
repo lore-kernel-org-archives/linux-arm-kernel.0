@@ -1,32 +1,70 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 20 Jun 2016 10:45:55 -0600
-Subject: [PATCH v2] arm: tegra124: remove commas from unit addresses
-In-Reply-To: <20160620164057.GD6175@ulmo.ba.sec>
-References: <1466298275-15753-1-git-send-email-marcel.ziswiler@toradex.com>
- <576810C2.1030401@wwwdotorg.org> <20160620164057.GD6175@ulmo.ba.sec>
-Message-ID: <57681DC3.9090801@wwwdotorg.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 20 Jun 2016 17:47:48 +0100
+Subject: [PATCH 0/8] arm64: pmu: Detect multiple PMU types in an ACPI
+ system
+In-Reply-To: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com> (Jeremy
+ Linton's message of "Thu, 9 Jun 2016 17:23:25 -0500")
+References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <87eg7r6c3v.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2016 10:40 AM, Thierry Reding wrote:
-> On Mon, Jun 20, 2016 at 09:50:26AM -0600, Stephen Warren wrote:
->> On 06/18/2016 07:04 PM, Marcel Ziswiler wrote:
->>> Remove commas from unit addresses as suggested by Rob Herring upon me
->>> posting initial Apalis TK1 support:
->>>
->>> http://article.gmane.org/gmane.linux.ports.tegra/26608
->>
->> Acked-by: Stephen Warren <swarren@nvidia.com>
->
-> I'm confused now. I posted almost exactly the same patch a while ago and
-> we agreed that we couldn't do this because the node names were to be
-> considered part of the ABI.
->
-> Is it or is it not?
+Jeremy Linton <jeremy.linton@arm.com> writes:
 
-The particular case where it matters is the GPU node, which U-Boot 
-manipulates. This revised patch version no longer renames the GPU node 
-and so in practice avoids any issues that I'm aware of.
+> v5:
+> Remove list of CPU types for ACPI systems. We now match a generic
+> event list, and use the PMCIED[01] to select events which exist on
+> the given PMU. This avoids the need to update the kernel every-time
+> a new CPU is released.
+> Update the maintainers list to include the new file.
+>
+> v4:
+> Correct build issues with ARM (!ARM64) kernels.
+> Add ThunderX to list of PMU types.
+>
+> v3:
+> Enable ARM performance monitoring units on ACPI/arm64 machines.
+>
+> This patch expands and reworks the patches published by Mark Salter
+> in order to clean up a few of the previous review comments, as well as
+> add support for newer CPUs and big/little configurations.
+>
 
-If there's a more general rule that node names are part of the ABI, then 
-indeed we shouldn't take this patch.
+Hi Jeremy,
+
+I have a few comments on the individual patches but overall I found the
+patches a bit confusing due to introduction of functionality and then
+changing them in later patches.
+
+IMHO, some patch re-organisation to make the series better as a whole will
+help in review (even though it may lead to more invasive changes
+to Mark's patches).
+
+Thanks,
+Punit
+
+
+> Jeremy Linton (6):
+>   arm64: pmu: Probe default hw/cache counters
+>   arm: arm64: Add routine to determine cpuid of other cpus
+>   arm: arm64: pmu: Assign platform PMU CPU affinity
+>   arm64: pmu: Add routines for detecting differing PMU types in the
+>   arm64: pmu: Enable multiple PMUs in an ACPI system
+>   MAINTAINERS: Tweak ARM PMU maintainers
+>
+> Mark Salter (2):
+>   arm64: pmu: add fallback probe table
+>   arm64: pmu: Add support for probing with ACPI
+>
+>  MAINTAINERS                      |   3 +-
+>  arch/arm/include/asm/cputype.h   |   6 +-
+>  arch/arm64/include/asm/cputype.h |   4 +
+>  arch/arm64/kernel/perf_event.c   |  51 ++++++++-
+>  arch/arm64/kernel/smp.c          |   5 +
+>  drivers/perf/Kconfig             |   4 +
+>  drivers/perf/Makefile            |   1 +
+>  drivers/perf/arm_pmu.c           |  57 +++++++++--
+>  drivers/perf/arm_pmu_acpi.c      | 216 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/perf/arm_pmu.h     |  10 ++
+>  10 files changed, 341 insertions(+), 16 deletions(-)
+>  create mode 100644 drivers/perf/arm_pmu_acpi.c
