@@ -1,26 +1,39 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 20 Jun 2016 12:49:00 +0100
-Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
- ESRT table in memory
-In-Reply-To: <CAKv+Gu-7FQ-34Ruhxc+RcKK9ycp9LW4_HdsD8Gb-+Y4XE7vNoQ@mail.gmail.com>
-References: <20160218134324.GG2651@codeblueprint.co.uk>
- <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
- <20160218141544.GH2651@codeblueprint.co.uk>
- <20160218191624.GA1515@redhat.com>
- <20160226144114.GA7475@codeblueprint.co.uk>
- <20160301233040.GA31476@codeblueprint.co.uk>
- <20160304062524.GA19010@dhcp-128-65.nay.redhat.com>
- <CAKv+Gu_ekP+44FJjR7BY_MFqx2jQgc6Tk9W4SBL__ttdvQ55VQ@mail.gmail.com>
- <20160518085348.GG21993@codeblueprint.co.uk>
- <CAKv+Gu-7FQ-34Ruhxc+RcKK9ycp9LW4_HdsD8Gb-+Y4XE7vNoQ@mail.gmail.com>
-Message-ID: <20160620114900.GP2658@codeblueprint.co.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Jun 2016 13:52:07 +0200
+Subject: [PATCH 0/3] mtd: nand: sunxi: fix SLC NAND support
+In-Reply-To: <1465214354-31493-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1465214354-31493-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160620135207.5559196a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jun, at 03:47:30PM, Ard Biesheuvel wrote:
-> 
-> Hi Matt,
-> 
-> Any progress here?
+On Mon,  6 Jun 2016 13:59:11 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-Expect something to be posted this week.
+> Hello,
+> 
+> Those 3 patches aims a fixing support for SLC NANDs with rather small
+> NAND pages (<= 4k).
+> 
+> The first patch promote 512 bytes ECC steps to 1k steps, which should
+> both save a few OOB bytes and provide stronger ECC.
+> The second patch checks the ECC step value, and rejects any NAND that
+> requires ECC steps != 512 | 1024.
+> The last patch implements ecc->write_subpage(), thus fixing a NULL
+> pointer dereference when the NAND chip supports subpage write.
+
+Applied.
+
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> Boris Brezillon (3):
+>   mtd: nand: sunxi: prefer 1k ECC blocks when applicable
+>   mtd: nand: sunxi: check ecc->size values
+>   mtd: nand: sunxi: fix subpage write
+> 
+>  drivers/mtd/nand/sunxi_nand.c | 42 +++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 41 insertions(+), 1 deletion(-)
+> 
