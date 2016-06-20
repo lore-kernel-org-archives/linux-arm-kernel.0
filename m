@@ -1,15 +1,15 @@
 From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Mon, 20 Jun 2016 10:13:53 +0100
-Subject: [PATCH V2 51/63] clocksource/drivers/versatile: Convert init
+Date: Mon, 20 Jun 2016 10:15:06 +0100
+Subject: [PATCH V2 25/63] clocksource/drivers/mxs_timer: Convert init
  function to return error
-In-Reply-To: <1466112442-31105-52-git-send-email-daniel.lezcano@linaro.org>
+In-Reply-To: <1466112442-31105-26-git-send-email-daniel.lezcano@linaro.org>
 References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-52-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20160620091353.GN9711@e106497-lin.cambridge.arm.com>
+ <1466112442-31105-26-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20160620091506.GO9711@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 11:27:10PM +0200, Daniel Lezcano wrote:
+On Thu, Jun 16, 2016 at 11:26:44PM +0200, Daniel Lezcano wrote:
 > The init functions do not return any error. They behave as the following:
 > 
 >   - panic, thus leading to a kernel crash while another timer may work and
@@ -28,43 +28,68 @@ On Thu, Jun 16, 2016 at 11:27:10PM +0200, Daniel Lezcano wrote:
 > 
 > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
->  drivers/clocksource/versatile.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
+>  drivers/clocksource/mps2-timer.c | 10 ++++++----
+>  drivers/clocksource/mxs_timer.c  |  2 +-
+>  2 files changed, 7 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/clocksource/versatile.c b/drivers/clocksource/versatile.c
-> index 0a26d3d..8daeffa 100644
-> --- a/drivers/clocksource/versatile.c
-> +++ b/drivers/clocksource/versatile.c
-> @@ -25,18 +25,20 @@ static u64 notrace versatile_sys_24mhz_read(void)
->  	return readl(versatile_sys_24mhz);
+> diff --git a/drivers/clocksource/mps2-timer.c b/drivers/clocksource/mps2-timer.c
+> index 3d33a5e..c303fa9 100644
+> --- a/drivers/clocksource/mps2-timer.c
+> +++ b/drivers/clocksource/mps2-timer.c
+> @@ -250,7 +250,7 @@ out:
+>  	return ret;
 >  }
 >  
-> -static void __init versatile_sched_clock_init(struct device_node *node)
-> +static int __init versatile_sched_clock_init(struct device_node *node)
+> -static void __init mps2_timer_init(struct device_node *np)
+> +static int __init mps2_timer_init(struct device_node *np)
 >  {
->  	void __iomem *base = of_iomap(node, 0);
+>  	static int has_clocksource, has_clockevent;
+>  	int ret;
+> @@ -259,7 +259,7 @@ static void __init mps2_timer_init(struct device_node *np)
+>  		ret = mps2_clocksource_init(np);
+>  		if (!ret) {
+>  			has_clocksource = 1;
+> -			return;
+> +			return 0;
+>  		}
+>  	}
 >  
->  	if (!base)
-> -		return;
-> +		return -ENXIO;
->  
->  	versatile_sys_24mhz = base + SYS_24MHZ;
->  
->  	sched_clock_register(versatile_sys_24mhz_read, 32, 24000000);
+> @@ -267,9 +267,11 @@ static void __init mps2_timer_init(struct device_node *np)
+>  		ret = mps2_clockevent_init(np);
+>  		if (!ret) {
+>  			has_clockevent = 1;
+> -			return;
+> +			return 0;
+>  		}
+>  	}
 > +
 > +	return 0;
 >  }
-> -CLOCKSOURCE_OF_DECLARE(vexpress, "arm,vexpress-sysreg",
-> +CLOCKSOURCE_OF_DECLARE_RET(vexpress, "arm,vexpress-sysreg",
->  		       versatile_sched_clock_init);
-> -CLOCKSOURCE_OF_DECLARE(versatile, "arm,versatile-sysreg",
-> +CLOCKSOURCE_OF_DECLARE_RET(versatile, "arm,versatile-sysreg",
->  		       versatile_sched_clock_init);
+>  
+> -CLOCKSOURCE_OF_DECLARE(mps2_timer, "arm,mps2-timer", mps2_timer_init);
+> +CLOCKSOURCE_OF_DECLARE_RET(mps2_timer, "arm,mps2-timer", mps2_timer_init);
+> diff --git a/drivers/clocksource/mxs_timer.c b/drivers/clocksource/mxs_timer.c
+> index f5ce296..16cf53b 100644
+> --- a/drivers/clocksource/mxs_timer.c
+> +++ b/drivers/clocksource/mxs_timer.c
+> @@ -226,7 +226,7 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
+>  	return 0;
+>  }
+>  
+> -static void __init mxs_timer_init(struct device_node *np)
+> +static int __init mxs_timer_init(struct device_node *np)
+>  {
+>  	struct clk *timer_clk;
+>  	int irq;
 > -- 
 > 1.9.1
 > 
 
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+This patch needs rework as it is changing (incompletely) two files that have different
+maintainers.
+
+Best regards,
+Liviu
 
 -- 
 ====================
