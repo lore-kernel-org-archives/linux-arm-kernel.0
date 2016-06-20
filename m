@@ -1,74 +1,78 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 20 Jun 2016 13:03:18 +0200
-Subject: Auto-detecting touchscreen controller and dealing with hw
- configuration differences on q8 tablets
-In-Reply-To: <5E70AD96-4E8E-4430-AF99-0AA0FCF5F8E7@konsulko.com>
-References: <bc978925-46a4-c069-8793-903a87ec70b8@redhat.com>
- <5E70AD96-4E8E-4430-AF99-0AA0FCF5F8E7@konsulko.com>
-Message-ID: <17e69e9e-06be-dc4f-cd47-152f6290d2ec@redhat.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 20 Jun 2016 13:02:13 +0200
+Subject: [PATCH V7 0/8] Introduce ACPI world to ITS irqchip
+Message-ID: <1466420541-20101-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The series builds the PCI/MSI domain stack based on initial IORT driver
+which is added in first place. As a reference please see IORT spec:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 
-On 20-06-16 11:27, Pantelis Antoniou wrote:
-> Hi Hans,
->
-> I?m going to commend only on the overlay related parts since I?m not I
-> get all the nuances right.
+Tested on Cavium ThunderX server. The patches can be found here:
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v7)
 
-No problem and thanks for the answer anyways!
+v6 -> v7
+- rebased against irq/irqchip-4.8
+- improvements for IORT ID mapping
+- call IORT init call from acpi_init() instead of arch_initcall()
+- split IORT driver in to two parts: core and ITS/MSI
 
->> On Jun 19, 2016, at 14:06 , Hans de Goede <hdegoede@redhat.com> wrote:
+v5 -> v6
+- added locking mechanism for IORT list with domain token
+- IORT function name improvements
+- extended IORT RID mapping helper
+- reworked IORT to be more SMMU friendly
+- IORT functions which map RID and find corresponding domain are not
+  PCI specific any more (struct pci_dev -> struct device)
+- bug fixes
 
-<snip>
+v4 -> v5
+- rebased against v4.7-rc1
+- drop generic layer and call IORT functions directly
+- improve resource abstraction and string formatting
 
->> 2) Give the user some way to override the dts settings.
->>
->> Which after a somewhat long intro brings me to the actual purpose of this thread, discuss
->> how to best deal with this. I again see 2 options:
->>
->> 1) Put a disabled gsl1680 node in the dts file, have a q8_autodetect.c in u-boot
->> which probes i2c and if it finds the gsl1680 nodes enables it, and patches in a best-effort
->> default for which fw file to use. Allow the user to set a touchscreen_fw u-boot env
->> variable which will override this. Also allow the user to set a touchscreen_inverted_x env
->> variable to add inverted-x to the dt node for the gsl1680.
->>
->
-> That can work. The problem is that having anything requiring smarts in u-boot always
-> leads to trouble with users. It all depends on your user?s technical proficiency, if
-> they are comfortable tweaking things in u-boot it?s fine. If it?s not, expect lots of
-> bricked boards when they mess up.
->
->> 2) Write an in kernel overlay manager which does auto-detect as described by 1, and
->> loads an overlay for the detected touchscreen controller, with module options to allow
->> specifying the fw-file, x-inversion, etc.
->>
->> One things which worries me about 2. is that we would need to have 2 overlay files
->> per fw-file, one regular config, one inverted-x, or is it possible for the overlay
->> manager to modify an overlay before applying it ?
->>
->
-> Yes, it?s quite possible. You can even have stacked overlays.
+v3 -> v4
+- rebased against v4.5
+- add ACPI support for IRQ domain handling on a per-device basis
+- reorder domain setup step
+- improve error handling
+- code style improvements
 
-Ok, is there any example code how to change an overlay before applying it out there,
-or if not can you point to the functions to use to do this ?
+v2 -> v3
+- rebased on top of 4.4
+- fixes and improvements for redistributor init via GICC structures
+- fixes as per kbuild reports
 
-Specifically my plan is to:
+v1 -> v2
+- rebased on top of 4.4-rc4
+- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
 
-1) Have a single overlay for q8 tablets with gsl1680 tablets
+Tomasz Nowicki (8):
+  ACPI: I/O Remapping Table (IORT) initial support
+  ACPI: Add new IORT functions to support MSI domain handling
+  PCI/MSI: Setup MSI domain on a per-device basis using IORT ACPI table
+  irqchip/gicv3-its: Cleanup for ITS domain initialization
+  irqchip/gicv3-its: Refactor ITS DT init code to prepare for ACPI
+  irqchip/gicv3-its: Probe ITS in the ACPI way
+  irqchip/gicv3-its: Factor out code that might be reused for ACPI
+  irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
+    initialization
 
-2) Write an in kernel overlay manager which when it detects a gsl1680 touchscreen
-will pick a best-default firmware-file + matching resolution + swap-x-y based on
-which SoC (A13/A23/A33) the tablet is based on as well as the gsl1680's chip-id
-and will then "patch" this info into the overlay before applying it. This
-means being able to set / modify several string, int and bool dt properties.
+ drivers/acpi/Kconfig                     |   3 +
+ drivers/acpi/Makefile                    |   1 +
+ drivers/acpi/bus.c                       |   2 +
+ drivers/acpi/iort.c                      | 389 +++++++++++++++++++++++++++++++
+ drivers/irqchip/Kconfig                  |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 +++++--
+ drivers/irqchip/irq-gic-v3-its.c         | 169 ++++++++++----
+ drivers/irqchip/irq-gic-v3.c             |   7 +-
+ drivers/pci/msi.c                        |  11 +-
+ include/linux/iort.h                     |  41 ++++
+ include/linux/irqchip/arm-gic-v3.h       |   4 +-
+ 11 files changed, 646 insertions(+), 70 deletions(-)
+ create mode 100644 drivers/acpi/iort.c
+ create mode 100644 include/linux/iort.h
 
-3) Offer a kernel-module option for the overlaymanager which will allows
-overriding the defaults for the firmware-filename, etc. This is also
-why I want to go with the patch approach instead of having multiple
-dt-overlay files.
-
-Thanks & Regards,
-
-Hans
+-- 
+1.9.1
