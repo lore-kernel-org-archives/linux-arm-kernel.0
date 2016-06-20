@@ -1,76 +1,46 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jun 2016 22:40:42 -0700
-Subject: [GIT PULL 4/8] ARM: exynos: Topic branch with driver changes for
- v4.8
-In-Reply-To: <5762A2FC.3040208@samsung.com>
-References: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
- <1465215933-22709-5-git-send-email-k.kozlowski@samsung.com>
- <20160613214706.GB20845@localhost> <5762988F.7050108@samsung.com>
- <5762A2FC.3040208@samsung.com>
-Message-ID: <20160620054042.GC2329@localhost>
+Date: Sun, 19 Jun 2016 22:45:05 -0700
+Subject: [GIT PULL 3/7] Broadcom devicetree changes for 4.8 Part 1
+In-Reply-To: <1466128575-5378-3-git-send-email-f.fainelli@gmail.com>
+References: <1466128575-5378-1-git-send-email-f.fainelli@gmail.com>
+ <1466128575-5378-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20160620054505.GF2329@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 03:00:44PM +0200, Sylwester Nawrocki wrote:
-> On 06/16/2016 02:16 PM, Krzysztof Kozlowski wrote:
-> > On 06/13/2016 11:47 PM, Olof Johansson wrote:
-> >> > On Mon, Jun 06, 2016 at 02:25:29PM +0200, Krzysztof Kozlowski wrote:
-> >>> >> Hi,
-> >>> >>
-> >>> >> A topic branch for MultiFormat Codec driver. This pulls in
-> >>> >> an external dependency from media tree (Sylwester Nawrocki).
-> >>> >>
-> >>> >> Below you will find two pull-request-changelogs
-> >>> >>
-> >>> >>
-> >>> >> Best regards,
-> >>> >> Krzysztof
-> >>> >>
-> >>> >>
-> >>> >> ################################################################
-> >>> >> Samsung tree only changes:
-> >>> >> ################################################################
-> >>> >>
-> >>> >> The following changes since commit 04f776734c4e03e33111d3d5a994b589870df623:
-> >>> >>
-> >>> >>   media: s5p-mfc: add iommu support (2016-06-03 11:13:45 +0200)
-> >>> >>
-> >>> >> are available in the git repository at:
-> >>> >>
-> >>> >>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-exynos-mfc-4.8
-> >>> >>
-> >>> >> for you to fetch changes up to 96167bd37dd604cbba0aed341765dda8556405b2:
-> >>> >>
-> >>> >>   ARM: dts: exynos: Enable MFC device on Exynos4412 Odroid boards (2016-06-06 09:30:43 +0200)
-> >>> >>
-> >>> >> ----------------------------------------------------------------
-> >>> >> Topic branch for Exynos MFC changes for v4.8:
-> >>> >> Pull s5p-mfc changes from media tree so the arm/mach-exynos code
-> >>> >> could be removed. The bindings are converted to generic reserved memory
-> >>> >> bindings.
-> >> > 
-> >> > Hi,
-> >> > 
-> >> > Tis branch contains an external dependency but I don't see the toplevel
-> >> > maintainer cc:d on the pull request. Just to avoid any confusion, I'd like to
-> >> > double check and make sure this branch is expected to be stable.
-> >> > 
-> >> > Mauro, is that the case? The branch is:
-> >> > Merge branch 'for-v4.8/media/exynos-mfc' of git://linuxtv.org/snawrocki/samsung into for-v4.8/exynos-mfc
-> >> > 
-> >> > I see it in -next, so I just want to make sure it's on a stable branch that
-> >> > won't be rewritten. 
-> >
-> > Good question. Mauro, could you confirm?
+On Thu, Jun 16, 2016 at 06:56:11PM -0700, Florian Fainelli wrote:
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
-> The above branch is stable and won't be changed, it's already merged
-> to the media tree.
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.8/devicetree
+> 
+> for you to fetch changes up to 2df1808dc0e2b5358e13beb95192b15200017776:
+> 
+>   ARM: dts: BCM5310x: Enable switch ports on SmartRG SR400AC (2016-06-13 12:44:46 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request contains Device Tree changes for Broadcom ARM-based SoCs:
+> 
+> - Chris provides documentation and DTS fixes for the bcm11351 CPU enable-method in preparation
+>   for adding support for the BCM23550 SoC and its corresponding documentation, SoC dtsi
+>   and the Sparrow board DTS file
+> 
+> - Jon adds MSI support to the PCI nodes, updates the secondary cores boot address for the B0
+>   production revision of the Northstar Plus SoC, adds a DTS for the BCM958625HR board, another
+>   one for the BCM958525XMC board, and finally adds the PL330 DMA controller to the NSP DTS
+> 
+> - Rafal enables the SPI NOR flash on dual flash systems (NAND + SPI) on the BCM5301x SoCs
+>   and devices
+> 
+> - Florian adds support for the BCM5301x built-in Ethernet switch by adding nodes for the
+>   Gigabit MAC controllers and the Switch Register Access block, and finally updates the
+>   SmartRG SR-400AC board with its switch port layout
+> 
 
-I'd be happier with a reply from Mauro, given that the tree it's merged into
-is his, but I'll take your work for it.
-
-Merged.
-
+Good tag text, thanks! Merged.
 
 
 -Olof
