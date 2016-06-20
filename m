@@ -1,40 +1,33 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 20 Jun 2016 14:07:55 +0200
-Subject: [PATCH 1/7] reset: Reorder inline reset_control_get*() wrappers
-In-Reply-To: <20160606155655.10860-2-lee.jones@linaro.org>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
- <20160606155655.10860-2-lee.jones@linaro.org>
-Message-ID: <1466424475.6070.43.camel@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Jun 2016 05:10:28 -0700
+Subject: [RESEND PATCHv2 00/28] clk: ti: hwmod clock type support
+In-Reply-To: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
+References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20160620121027.GG22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 06.06.2016, 16:56 +0100 schrieb Lee Jones:
-> We're about to split the current API into two, where consumers will
-> be forced to be explicit when requesting reset lines.  The choice
-> will be to either the call the *_exclusive or *_shared variant
-> depending on whether they can actually tolorate not being asserted
-> when that request is made.
+* Tero Kristo <t-kristo@ti.com> [160613 12:07]:
+> Hi,
 > 
-> The new API will look like this once reorded and complete:
+> Resending the series as it didn't get that much attention last time.
+> This has just been rebased on top of 4.7-rc1, no other changes.
 > 
->   reset_control_get_exclusive()
->   reset_control_get_shared()
->   reset_control_get_optional_exclusive()
->   reset_control_get_optional_shared()
->   of_reset_control_get_exclusive()
->   of_reset_control_get_shared()
->   of_reset_control_get_exclusive_by_index()
->   of_reset_control_get_shared_by_index()
->   devm_reset_control_get_exclusive()
->   devm_reset_control_get_shared()
->   devm_reset_control_get_optional_exclusive()
->   devm_reset_control_get_optional_shared()
->   devm_reset_control_get_exclusive_by_index()
->   devm_reset_control_get_shared_by_index()
+> This series adds support for hwmod module clocks, which are currently
+> directly handled by hwmod core. This addresses following issues:
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>  * one step closer of removing hwmod core / data from kernel
+>  * unblock Tony's interconnect driver work (this is also required
+>    for removing hwmod codebase)
+>  * add proper clock support for the hardware modules currently handled
+>    by hwmod core; use counting for clocks, ability to share clocks
+>    between multiple modules, etc.
+>  * add helper clock APIs for removing most of the clock aliases under
+>    drivers/clk/ti/clk-xyz.c files
 
-I have applied patches 1-5 to my reset/next branch.
+Mike & Stephen, are you guys OK with this approach? If so, we should
+put this into an immutable branch to avoid merge conflicts.
 
-regards
-Philipp
+Regards,
+
+Tony
