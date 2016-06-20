@@ -1,121 +1,96 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 20 Jun 2016 18:41:51 +0800
-Subject: [PATCH v8 2/3] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
-References: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
- <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
-Message-ID: <1466419311.27959.12.camel@mtksdaap41>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 20 Jun 2016 13:56:08 +0300
+Subject: [PATCH v4 0/5] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+Message-ID: <20160620105615.15538-1-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, HS:
+Hi Rafael,
 
-One comment inline.
+You said you are ok with the ACPI part of the patches [4].
+The patchset has received ACK from Will [5].  Can you consider pulling it please?
 
-On Mon, 2016-05-30 at 11:19 +0800, HS Liao wrote:
-> This patch is first version of Mediatek Command Queue(CMDQ) driver. The
-> CMDQ is used to help read/write registers with critical time limitation,
-> such as updating display configuration during the vblank. It controls
-> Global Command Engine (GCE) hardware to achieve this requirement.
-> Currently, CMDQ only supports display related hardwares, but we expect
-> it can be extended to other hardwares for future requirements.
-> 
-> Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> Signed-off-by: CK Hu <ck.hu@mediatek.com>
-> ---
->  drivers/soc/mediatek/Kconfig    |  10 +
->  drivers/soc/mediatek/Makefile   |   1 +
->  drivers/soc/mediatek/mtk-cmdq.c | 943 ++++++++++++++++++++++++++++++++++++++++
->  include/soc/mediatek/cmdq.h     | 197 +++++++++
->  4 files changed, 1151 insertions(+)
->  create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
->  create mode 100644 include/soc/mediatek/cmdq.h
-> 
-> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> index 0a4ea80..c4ad75c 100644
-> --- a/drivers/soc/mediatek/Kconfig
-> +++ b/drivers/soc/mediatek/Kconfig
-> @@ -1,6 +1,16 @@
->  #
->  # MediaTek SoC drivers
->  #
-> +config MTK_CMDQ
-> +	bool "MediaTek CMDQ Support"
-> +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> +	select MTK_INFRACFG
-> +	help
-> +	  Say yes here to add support for the MediaTek Command Queue (CMDQ)
-> +	  driver. The CMDQ is used to help read/write registers with critical
-> +	  time limitation, such as updating display configuration during the
-> +	  vblank.
-> +
->  config MTK_INFRACFG
->  	bool "MediaTek INFRACFG Support"
->  	depends on ARCH_MEDIATEK || COMPILE_TEST
-> diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-> index 12998b0..f7397ef 100644
-> --- a/drivers/soc/mediatek/Makefile
-> +++ b/drivers/soc/mediatek/Makefile
+Thank you
+Aleksey Makarov
 
-[Snip...]
+This patchset adds support for ACPI_TABLE_UPGRADE for ARM64
 
-> +
-> +static int cmdq_eng_get_thread(u64 flag)
-> +{
-> +	if (flag & BIT_ULL(CMDQ_ENG_DISP_DSI0))
-> +		return CMDQ_THR_DISP_MAIN_IDX;
-> +	else if (flag & BIT_ULL(CMDQ_ENG_DISP_DPI0))
-> +		return CMDQ_THR_DISP_SUB_IDX;
-> +	else
-> +		return CMDQ_THR_DISP_MISC_IDX;
-> +}
+These patches help with:
 
-I think cmdq should not have knowledge of client. These statement show
-that cmdq know that DSI0-tasks is different with DPI0-tasks. I propose
-the 'session' to replace engine flag. For example, main display create
-one cmdq_session and external display create another cmdq_session. For
-client driver, every tasks created by main display is bound to main
-display session. For cmdq driver, it should dynamically bind a session
-to a HW thread, and then dispatch tasks of this session to this HW
-thread. After HW thread run out of tasks of this session, detach this
-session with this thread.
-For the problem of remove wfe cmd, I think a session can have a property
-of merge_wfe_cmd. For display session, session->merge_wfe_cmd = true.
-For other client, it's false.
+1). During development of a platform, it is much easier to debug
+problems with tables if you can test replacement ones without having to
+respin the firmware. In the server world, you usually don't have the
+firmware source code, so to get it respun could be days-weeks even if
+you are working with the authors closely. We have practically used this
+feature on a number of platforms already and it will continue.
 
-Here is the sample code to create cmdq_rec with session.
+2). They empower (advanced) users and developers to work around problems
+that they find on platforms. Sure, we want firmware to always be fixed
+and working well, but it is better if folks have the tools.
 
-merge_wfe_cmd = true;
-cmdq_session_create(merge_wfe_cmd, &primary_display_session);
-cmdq_rec_create(dev, primary_display_session, &rec);
+It's also required for parity with x86 functionality on servers as Redhat
+use that method in their tooling.
 
+The patchset refactors the code introduced by the patches by Lv Zheng [1],
+fixes access to the destination of new ACPI tables as suggested
+by Mark Rutland [2] and enables the feature for ARM64
 
-Therefore, the below definition can be removed.
+It was first sent by Jon Masters [3] to linaro-acpi in December 2015
 
-> +
-> +enum cmdq_eng {
-> +	CMDQ_ENG_DISP_AAL,
-> +	CMDQ_ENG_DISP_COLOR0,
-> +	CMDQ_ENG_DISP_COLOR1,
-> +	CMDQ_ENG_DISP_DPI0,
-> +	CMDQ_ENG_DISP_DSI0,
-> +	CMDQ_ENG_DISP_DSI1,
-> +	CMDQ_ENG_DISP_GAMMA,
-> +	CMDQ_ENG_DISP_OD,
-> +	CMDQ_ENG_DISP_OVL0,
-> +	CMDQ_ENG_DISP_OVL1,
-> +	CMDQ_ENG_DISP_PWM0,
-> +	CMDQ_ENG_DISP_PWM1,
-> +	CMDQ_ENG_DISP_RDMA0,
-> +	CMDQ_ENG_DISP_RDMA1,
-> +	CMDQ_ENG_DISP_RDMA2,
-> +	CMDQ_ENG_DISP_UFOE,
-> +	CMDQ_ENG_DISP_WDMA0,
-> +	CMDQ_ENG_DISP_WDMA1,
-> +	CMDQ_ENG_MAX,
-> +};
-> +
+Tested on QEMU (arm64 and x86) and ThunderX
+Should be applied to next-20160620
 
+v4:
+- rebase to next-20160620
+- add Acked-by: Will Deacon <will.deacon@arm.com>
+- add Acked-by: Lv Zheng <lv.zheng@intel.com> for [2/5]
 
-Regards,
-CK
+v3:
+https://lkml.kernel.org/g/20160602174910.30428-1-aleksey.makarov at linaro.org -- only [5/5]
+- change PFN_PHYS(max_pfn) to MEMBLOCK_ALLOC_ACCESSIBLE. (Catalin Marinas)
+
+v2:
+https://lkml.kernel.org/g/1463674518-22477-1-git-send-email-aleksey.makarov at linaro.org
+- add Acked-by: Lv Zheng <lv.zheng@intel.com>
+- replace the original patch "ACPI: table upgrade: move early_initrd_acpi_init()
+  to header file" with the patch "ACPI: table upgrade: refactor function
+  definitions".  This new patch is just the original one rewritten following the
+  suggestion by Lv Zheng to use initrd_start, inird_end directly in
+  acpi_table_initrd_init().  It simplifies things noticeably.
+- add Jon's explanations to the cover of the patchset and my explanations
+  to "ACPI: ARM64: support for ACPI_TABLE_UPGRADE"
+- introduce ARCH_HAS_ACPI_TABLE_UPGRADE in a separate patch (Mark Rutland)
+- move arch-specific definition to an arch-specific header in a separate patch
+  (Mark Rutland)
+
+v1:
+https://lkml.kernel.org/g/1463486765-31827-1-git-send-email-aleksey.makarov at linaro.org
+
+[1]: https://lkml.kernel.org/g/cover.1460340514.git.lv.zheng at intel.com
+[2]: https://lists.linaro.org/pipermail/linaro-acpi/2015-December/006101.html
+[3]: https://lists.linaro.org/pipermail/linaro-acpi/2015-December/006099.html
+[4]: https://lkml.kernel.org/g/CAJZ5v0is7c833aQkRm-D+TwLM+eUYeKEAdLOOdrEdT-hrC_M1A at mail.gmail.com
+[5]: https://lkml.kernel.org/g/20160614164116.GF16531 at arm.com
+
+Aleksey Makarov (4):
+  ACPI: table upgrade: use cacheable map for tables
+  ACPI: table upgrade: refactor function definitions
+  ACPI: table upgrade: move arch-specific symbol to asm/acpi.h
+  ACPI: table upgrade: introduce ARCH_HAS_ACPI_TABLE_UPGRADE
+
+Jon Masters (1):
+  ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+
+ arch/arm64/Kconfig            |  1 +
+ arch/arm64/include/asm/acpi.h |  2 ++
+ arch/arm64/kernel/setup.c     |  6 ++++--
+ arch/x86/Kconfig              |  1 +
+ arch/x86/include/asm/acpi.h   |  2 ++
+ arch/x86/kernel/setup.c       |  9 +--------
+ drivers/acpi/Kconfig          |  5 ++++-
+ drivers/acpi/tables.c         | 23 +++++++++--------------
+ include/linux/acpi.h          |  8 ++++++--
+ 9 files changed, 30 insertions(+), 27 deletions(-)
+
+-- 
+2.8.3
