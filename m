@@ -1,17 +1,15 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 20 Jun 2016 15:45:26 +0100
-Subject: [GIT PULL] ARM: vexpress: fixes for v4.8
-Message-ID: <57680186.7040105@arm.com>
+Date: Mon, 20 Jun 2016 15:45:48 +0100
+Subject: [GIT PULL] arm64: dts: juno updates for v4.8
+Message-ID: <5768019C.40009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi ARM-SoC team,
 
-Here are the few changes for fixing build with W=1 option on Vexpress
-platforms for v4.8. Not sure whether this should be categorized as
-cleanups or fixes. Please pull !
+Please pull Juno platform DT updates for v4.8
 
--- 
+--
 Regards,
 Sudeep
 
@@ -22,29 +20,33 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
-tags/vexpress-fixes-4.8
+tags/juno-dt-4.8
 
-for you to fetch changes up to 0a14d280e17ef3db75254439dfc83f1bc65fca6f:
+for you to fetch changes up to da63398bec2be7c247b5e94c9cabc4339fb65e28:
 
-   power: vexpress: make dev_attr_active static (2016-06-13 09:55:51 +0100)
-
-----------------------------------------------------------------
-ARMv7 VExpress fixes for v4.8
-
-Few fixes to remove build warnings with W=1
+   arm64: dts: juno: add thermal zones for scpi sensors (2016-06-17 
+16:38:49 +0100)
 
 ----------------------------------------------------------------
-Ben Dooks (4):
-       ARM: vexpress/hotplug: fix missing core.h include
-       ARM: versatile: fix missing <plat/platsmp.h> include
-       ARM: vexpress/spc: fix missing include of spc.h
-       power: vexpress: make dev_attr_active static
+ARMv8 Vexpress/Juno DT updates for v4.8
 
-Sudeep Holla (1):
-       ARM: vexpress/spc: remove unused variable perf_stat_reg
+1. Adds various coreSight debug components on Juno boards
 
-  arch/arm/mach-vexpress/hotplug.c        | 2 ++
-  arch/arm/mach-vexpress/spc.c            | 6 +++---
-  arch/arm/plat-versatile/platsmp.c       | 2 ++
-  drivers/power/reset/vexpress-poweroff.c | 4 ++--
-  4 files changed, 9 insertions(+), 5 deletions(-)
+2. Adds SCPI device power domains and use them for coresight components
+
+3. Adds thermal zones for SCPI sensors on Juno
+
+----------------------------------------------------------------
+Javi Merino (1):
+       arm64: dts: juno: add thermal zones for scpi sensors
+
+Sudeep Holla (2):
+       arm64: dts: juno: add coresight support
+       arm64: dts: juno: add SCPI power domains for device power management
+
+  arch/arm64/boot/dts/arm/juno-base.dtsi | 357 
++++++++++++++++++++++++++++++++++
+  arch/arm64/boot/dts/arm/juno-r1.dts    |  40 ++++
+  arch/arm64/boot/dts/arm/juno-r2.dts    |  40 ++++
+  arch/arm64/boot/dts/arm/juno.dts       |  24 +++
+  4 files changed, 461 insertions(+)
