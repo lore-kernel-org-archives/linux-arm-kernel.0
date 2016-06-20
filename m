@@ -1,71 +1,194 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Jun 2016 11:07:04 +0200
-Subject: [GIT PULL] Allwinner sun4i DRM fixes for 4.7
-Message-ID: <20160620090704.GA18304@lukather>
+From: 00moses.alexander00@gmail.com (Alexandru Moise)
+Date: Mon, 20 Jun 2016 12:12:58 +0300
+Subject: [PATCH] devpts: remove DEVPTS_MULTIPLE_INSTANCES from all configs
+Message-ID: <20160620091258.11233-1-00moses.alexander00@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+As each mount of devpts is now an independent filesystem,
+the DEVPTS_MULTIPLE_INSTANCES config option no longer exists.
+So remove it.
 
-Please pull the following tag for the 4.7 release cycle.
+Signed-off-by: Alexandru Moise <00moses.alexander00@gmail.com>
+---
+ arch/arc/configs/tb10x_defconfig            | 1 -
+ arch/arm/configs/mxs_defconfig              | 1 -
+ arch/mips/configs/ip27_defconfig            | 1 -
+ arch/mips/configs/nlm_xlp_defconfig         | 1 -
+ arch/mips/configs/nlm_xlr_defconfig         | 1 -
+ arch/parisc/configs/generic-64bit_defconfig | 1 -
+ arch/powerpc/configs/powernv_defconfig      | 1 -
+ arch/powerpc/configs/pseries_defconfig      | 1 -
+ arch/s390/configs/default_defconfig         | 1 -
+ arch/s390/configs/gcov_defconfig            | 1 -
+ arch/s390/configs/performance_defconfig     | 1 -
+ arch/sh/configs/sh7785lcr_32bit_defconfig   | 1 -
+ arch/xtensa/configs/iss_defconfig           | 1 -
+ tools/testing/selftests/mount/config        | 1 -
+ 14 files changed, 14 deletions(-)
 
-Thanks!
-Maxime
-
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drm-fixes-for-4.7
-
-for you to fetch changes up to 13fef095bde04228316046f997eb963285d8532e:
-
-  drm: sun4i: do cleanup if RGB output init fails (2016-05-30 08:28:33 +0200)
-
-----------------------------------------------------------------
-Allwinner sun4i DRM driver fixes
-
-A bunch of fixes that address:
-  - Compilation errors in various corner cases
-  - Move to helpers
-  - Fix the pixel clock computation
-  - Fix our panel probe
-
-----------------------------------------------------------------
-Arnd Bergmann (3):
-      drm/sun4i: add COMMON_CLK dependency
-      drm: sun4i: print DMA address correctly
-      drm: sun4i: fix probe error handling
-
-Chen-Yu Tsai (1):
-      drm: sun4i: do cleanup if RGB output init fails
-
-Maxime Ripard (6):
-      drm/sun4i: request exact rates to our parents
-      drm/sun4i: rgb: Validate the clock rate
-      drm/sun4i: defer only if we didn't find our panel
-      drm/sun4i: rgb: panel is an error pointer
-      drm/sun4i: remove simplefb at probe
-      drm/sun4i: Convert to connector register helpers
-
- drivers/gpu/drm/sun4i/Kconfig          |  2 +-
- drivers/gpu/drm/sun4i/sun4i_backend.c  |  4 +--
- drivers/gpu/drm/sun4i/sun4i_dotclock.c | 39 +++++++++++++++++++++++---
- drivers/gpu/drm/sun4i/sun4i_drv.c      | 50 ++++++++++++++--------------------
- drivers/gpu/drm/sun4i/sun4i_rgb.c      | 16 ++++++++++-
- drivers/gpu/drm/sun4i/sun4i_tcon.c     | 23 ++++++++++------
- 6 files changed, 88 insertions(+), 46 deletions(-)
-
+diff --git a/arch/arc/configs/tb10x_defconfig b/arch/arc/configs/tb10x_defconfig
+index 4c51183..be0b4fb 100644
+--- a/arch/arc/configs/tb10x_defconfig
++++ b/arch/arc/configs/tb10x_defconfig
+@@ -58,7 +58,6 @@ CONFIG_STMMAC_ETH=y
+ # CONFIG_INPUT is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_VT is not set
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_8250=y
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index 6e0f751..65a84b4 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -77,7 +77,6 @@ CONFIG_INPUT_EVDEV=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_TSC2007=m
+ # CONFIG_SERIO is not set
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_AMBA_PL011=y
+diff --git a/arch/mips/configs/ip27_defconfig b/arch/mips/configs/ip27_defconfig
+index 2b74aee..df11563 100644
+--- a/arch/mips/configs/ip27_defconfig
++++ b/arch/mips/configs/ip27_defconfig
+@@ -266,7 +266,6 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_EXTENDED=y
+ CONFIG_SERIAL_8250_MANY_PORTS=y
+ CONFIG_SERIAL_8250_SHARE_IRQ=y
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ CONFIG_HW_RANDOM_TIMERIOMEM=m
+ CONFIG_I2C_CHARDEV=m
+ CONFIG_I2C_ALI1535=m
+diff --git a/arch/mips/configs/nlm_xlp_defconfig b/arch/mips/configs/nlm_xlp_defconfig
+index b496c25..5c40b48 100644
+--- a/arch/mips/configs/nlm_xlp_defconfig
++++ b/arch/mips/configs/nlm_xlp_defconfig
+@@ -409,7 +409,6 @@ CONFIG_SERIO_SERPORT=m
+ CONFIG_SERIO_LIBPS2=y
+ CONFIG_SERIO_RAW=m
+ CONFIG_VT_HW_CONSOLE_BINDING=y
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ CONFIG_LEGACY_PTY_COUNT=0
+ CONFIG_SERIAL_NONSTANDARD=y
+ CONFIG_N_HDLC=m
+diff --git a/arch/mips/configs/nlm_xlr_defconfig b/arch/mips/configs/nlm_xlr_defconfig
+index 8e99ad8..47a2756 100644
+--- a/arch/mips/configs/nlm_xlr_defconfig
++++ b/arch/mips/configs/nlm_xlr_defconfig
+@@ -347,7 +347,6 @@ CONFIG_SERIO_SERPORT=m
+ CONFIG_SERIO_LIBPS2=y
+ CONFIG_SERIO_RAW=m
+ CONFIG_VT_HW_CONSOLE_BINDING=y
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ CONFIG_LEGACY_PTY_COUNT=0
+ CONFIG_SERIAL_NONSTANDARD=y
+ CONFIG_N_HDLC=m
+diff --git a/arch/parisc/configs/generic-64bit_defconfig b/arch/parisc/configs/generic-64bit_defconfig
+index e945c08..69aa66c 100644
+--- a/arch/parisc/configs/generic-64bit_defconfig
++++ b/arch/parisc/configs/generic-64bit_defconfig
+@@ -166,7 +166,6 @@ CONFIG_INPUT_MISC=y
+ CONFIG_SERIO_SERPORT=m
+ # CONFIG_HP_SDC is not set
+ CONFIG_SERIO_RAW=m
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_NOZOMI=m
+ # CONFIG_DEVKMEM is not set
+diff --git a/arch/powerpc/configs/powernv_defconfig b/arch/powerpc/configs/powernv_defconfig
+index 0450310..2fd6bbe 100644
+--- a/arch/powerpc/configs/powernv_defconfig
++++ b/arch/powerpc/configs/powernv_defconfig
+@@ -176,7 +176,6 @@ CONFIG_PPP_SYNC_TTY=m
+ CONFIG_INPUT_EVDEV=m
+ CONFIG_INPUT_MISC=y
+ # CONFIG_SERIO_SERPORT is not set
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_JSM=m
+diff --git a/arch/powerpc/configs/pseries_defconfig b/arch/powerpc/configs/pseries_defconfig
+index 36871a4..3c325ba 100644
+--- a/arch/powerpc/configs/pseries_defconfig
++++ b/arch/powerpc/configs/pseries_defconfig
+@@ -180,7 +180,6 @@ CONFIG_INPUT_EVDEV=m
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_PCSPKR=m
+ # CONFIG_SERIO_SERPORT is not set
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_ICOM=m
+diff --git a/arch/s390/configs/default_defconfig b/arch/s390/configs/default_defconfig
+index d5ec71b..501e93a 100644
+--- a/arch/s390/configs/default_defconfig
++++ b/arch/s390/configs/default_defconfig
+@@ -453,7 +453,6 @@ CONFIG_PPP_SYNC_TTY=m
+ # CONFIG_INPUT_KEYBOARD is not set
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_SERIO is not set
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ CONFIG_LEGACY_PTY_COUNT=0
+ CONFIG_HW_RANDOM_VIRTIO=m
+ CONFIG_RAW_DRIVER=m
+diff --git a/arch/s390/configs/gcov_defconfig b/arch/s390/configs/gcov_defconfig
+index f46a351..bd34600 100644
+--- a/arch/s390/configs/gcov_defconfig
++++ b/arch/s390/configs/gcov_defconfig
+@@ -447,7 +447,6 @@ CONFIG_PPP_SYNC_TTY=m
+ # CONFIG_INPUT_KEYBOARD is not set
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_SERIO is not set
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ CONFIG_LEGACY_PTY_COUNT=0
+ CONFIG_HW_RANDOM_VIRTIO=m
+ CONFIG_RAW_DRIVER=m
+diff --git a/arch/s390/configs/performance_defconfig b/arch/s390/configs/performance_defconfig
+index ba0f2a5..cfb7c50 100644
+--- a/arch/s390/configs/performance_defconfig
++++ b/arch/s390/configs/performance_defconfig
+@@ -447,7 +447,6 @@ CONFIG_PPP_SYNC_TTY=m
+ # CONFIG_INPUT_KEYBOARD is not set
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_SERIO is not set
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ CONFIG_LEGACY_PTY_COUNT=0
+ CONFIG_HW_RANDOM_VIRTIO=m
+ CONFIG_RAW_DRIVER=m
+diff --git a/arch/sh/configs/sh7785lcr_32bit_defconfig b/arch/sh/configs/sh7785lcr_32bit_defconfig
+index 9bdcf72..48df495 100644
+--- a/arch/sh/configs/sh7785lcr_32bit_defconfig
++++ b/arch/sh/configs/sh7785lcr_32bit_defconfig
+@@ -79,7 +79,6 @@ CONFIG_VT_HW_CONSOLE_BINDING=y
+ CONFIG_SERIAL_SH_SCI=y
+ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+diff --git a/arch/xtensa/configs/iss_defconfig b/arch/xtensa/configs/iss_defconfig
+index 44c6764..d7b905a 100644
+--- a/arch/xtensa/configs/iss_defconfig
++++ b/arch/xtensa/configs/iss_defconfig
+@@ -374,7 +374,6 @@ CONFIG_DEVKMEM=y
+ #
+ # CONFIG_SERIAL_TIMBERDALE is not set
+ CONFIG_UNIX98_PTYS=y
+-# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
+ CONFIG_LEGACY_PTYS=y
+ CONFIG_LEGACY_PTY_COUNT=256
+ # CONFIG_IPMI_HANDLER is not set
+diff --git a/tools/testing/selftests/mount/config b/tools/testing/selftests/mount/config
+index b5d881e..416bd53 100644
+--- a/tools/testing/selftests/mount/config
++++ b/tools/testing/selftests/mount/config
+@@ -1,2 +1 @@
+ CONFIG_USER_NS=y
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160620/4826954f/attachment-0001.sig>
+2.8.3
