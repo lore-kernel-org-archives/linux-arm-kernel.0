@@ -1,39 +1,65 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 21 Jun 2016 06:53:13 +0800
-Subject: [PATCH 8/8] arm64: dts: db820c: add support to external sd card.
-In-Reply-To: <1466452907-23290-9-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <201606210654.D5Ed8YnA%fengguang.wu@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Jun 2016 01:07:55 +0200
+Subject: [PATCH v3 0/5] i.MX L2-cache code cleanups and performance tweaks
+In-Reply-To: <CAHQ1cqGQm1jXAx0C97qODGEOM_r91aRZ50c_p5vJfHifOL3hiQ@mail.gmail.com>
+References: <1466296268-27099-1-git-send-email-andrew.smirnov@gmail.com>
+ <114981982.VXDIiN0rdz@wuerfel>
+ <CAHQ1cqGQm1jXAx0C97qODGEOM_r91aRZ50c_p5vJfHifOL3hiQ@mail.gmail.com>
+Message-ID: <4896650.lS63LY4PpR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sunday, June 19, 2016 10:53:13 AM CEST Andrey Smirnov wrote:
+>  One more question, less about your patches than the existing code:
+> >
+> > After going through the current users of l2x0_init for board files,
+> > I noticed that imx35 enables l2x0 for both dts and all the board files
+> > and has an arm,l210-cache node in its dts, but imx31 only enables
+> > it for the board file and in the dt case doesn't init the cache nor
+> > does it have the dts node.
+> >
+> > I'm guessing this is a bug on i.mx31 dt support, right?
+> 
+> I would agree that it is. OTOH, I can't find any i.MX31 boards that
+> use device tree. The only file that references imx31.dtsi is
+> imx31-bug.dts, but at the same time that board has a dedicated board
+> file (mach-bug.c) so I wonder if it was ever used.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.7-rc4 next-20160620]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+My understanding is that many of the i.mx dts files were introduced
+a few years ago as conversions of the board files, and we are now
+in the (slow) process of removing the board files, assuming that
+everyone has had time for migration if they still run that hardware
+on new kernels, or that it doesn't hurt if nobody uses it.
 
-url:    https://github.com/0day-ci/linux/commits/Srinivas-Kandagatla/arm64-dts-db820c-Add-basic-board-support/20160621-041430
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+This one was added with the comment
 
-All errors (new ones prefixed by >>):
+    arm/dts: Add support for i.MX31 bug 1.x board from buglabs.
+    
+    Only the main UART and the memory node information are added.
 
->> Error: arch/arm64/boot/dts/qcom/apq8096-db820c-pins.dtsi:13.1-9 Label or path msmgpio not found
-   FATAL ERROR: Syntax error parsing input tree
+and it's unclear if that has ever been tested. A few device nodes
+were added to the imx31.dtsi file later, indicating that it probably
+had /some/ testing, but no other board file was ever added as you
+say. The only difference I see between mach-bug.c and imx31-bug.dts
+is the configuration of the uart pins. I don't know if that is
+required in the dts, because I'd assume that the boot loader would
+leave the pinmux in a state in which the console uart works.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 25985 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160621/39f1d1e1/attachment-0001.obj>
+> It looks like Sacha was the author of i.MX31, Sascha do you have any
+> comment on this?
+> 
+> There's also another small cleanup opportunity in collapsing
+> imx31_dt_timer_init() and mx31_clocks_init_dt() into a single function
+> given how the latter always returns 0 and can be converted to void.
+
+Or we could go one step further and use CLK_OF_DECLARE() to remove
+that init function entirely. Same thing for mx31_init_irq and
+IRQCHIP_DECLARE().
+
+> I am more than happy to make both changes and include them in the set,
+> but I only have i.MX6 HW, and would only be able to do a compile-test,
+> so I am not sure if I should.
+
+Let's wait for Sascha to reply.
+
+	Arnd
