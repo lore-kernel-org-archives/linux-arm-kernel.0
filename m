@@ -1,43 +1,117 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 20 Jun 2016 11:05:40 -0500
-Subject: [PATCHv2] ARM: socfpga: enable PL330 DMA in socfpga_defconfig
-Message-ID: <1466438740-28709-1-git-send-email-dinguyen@opensource.altera.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 20 Jun 2016 11:16:07 -0500
+Subject: [PATCH 08/12] doc: binding: pwrseq-usb-generic: add binding doc
+ for generic usb power sequence driver
+In-Reply-To: <20160620112651.GA26936@shlinux2>
+References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
+ <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
+ <CAL_JsqLvs0s2TyfqPM5vtmyY81_X84VjCGjsGYbTgT4syOfp9Q@mail.gmail.com>
+ <20160620112651.GA26936@shlinux2>
+Message-ID: <20160620161607.GA11427@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Mon, Jun 20, 2016 at 07:26:51PM +0800, Peter Chen wrote:
+> On Fri, Jun 17, 2016 at 12:16:48PM -0500, Rob Herring wrote:
+> > On Fri, Jun 17, 2016 at 5:09 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> > > Add binding doc for generic usb power sequence driver, and update
+> > > generic usb device binding-doc accordingly.
+> > >
+> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > > ---
+> > >  .../bindings/power/pwrseq/pwrseq-usb-generic.txt   | 31 ++++++++++++++++++++++
+> > >  .../devicetree/bindings/usb/usb-device.txt         |  2 ++
+> > >  2 files changed, 33 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+> > > new file mode 100644
+> > > index 0000000..8ad98382
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+> > > @@ -0,0 +1,31 @@
+> > > +The power sequence for generic USB Devices
+> > > +
+> > > +Some hard-wired USB devices need to do power sequence to let the
+> > > +device work normally, the typical power sequence like: enable USB
+> > > +PHY clock, toggle reset pin, etc. But current Linux USB driver
+> > > +lacks of such code to do it, it may cause some hard-wired USB devices
+> > > +works abnormal or can't be recognized by controller at all. The
+> > > +power sequence will be done before this device can be found at USB
+> > > +bus.
+> > > +
+> > > +Required properties:
+> > > +- compatible : contains "usb-pwrseq-generic".
+> > 
+> > In case I have not been clear, no.
+> > 
+> > I am not going to accept anything along the lines of the current mmc
+> > pwrseq. I am basically okay with Krzysztof's proposal as it is *only*
+> > an added property and not a duplication of information. I'd suggest
+> > you figure out how to make the kernel work with that rather than
+> > trying to work-around whatever kernel limitations there are.
+> > 
+> 
+> I see.
+> 
+> Would you agree with below:
 
-Enable the PL330 DMA and DMATEST on SoCFPGA.
+In general, yes. There are some points being discussed in the other 
+thread.
 
-make savedefconfig says CONFIG_FHANDLE is not needed in the defconfig,
-remove it.
+> &usbotg1 {
+> 	vbus-supply = <&reg_usb_otg1_vbus>;
+> 	pinctrl-names = "default";
+> 	pinctrl-0 = <&pinctrl_usb_otg1_id>;
+> 	status = "okay";
+> 
+> 	#address-cells = <1>;
+> 	#size-cells = <0>;
+> 	hub: genesys at 1 {
+> 		compatible = "usb5e3,608";
+> 		reg = <1>;
+> 
+> 		power-sequence;
+> 		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
+> 		reset-duration-us = <10>;
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
-v2: Also enable DMATEST as a kernel module
----
- arch/arm/configs/socfpga_defconfig |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+I wonder if this really needs to be specified. A sufficiently long 
+default should be good enough for 90 something % of devices.
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index e37c18b..9f84be5 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -1,5 +1,4 @@
- CONFIG_SYSVIPC=y
--CONFIG_FHANDLE=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
-@@ -98,6 +97,9 @@ CONFIG_NOP_USB_XCEIV=y
- CONFIG_USB_GADGET=y
- CONFIG_MMC=y
- CONFIG_MMC_DW=y
-+CONFIG_DMADEVICES=y
-+CONFIG_PL330_DMA=y
-+CONFIG_DMATEST=m
- CONFIG_FPGA=y
- CONFIG_FPGA_MGR_SOCFPGA=y
- CONFIG_EXT2_FS=y
--- 
-1.7.9.5
+> 		clocks = <&clks IMX6SX_CLK_CKO>;
+> 
+> 		#address-cells = <1>;
+> 		#size-cells = <0>;
+> 		ethernet: asix at 1 {
+> 			compatible = "usbb95,1708";
+> 			reg = <1>;
+> 
+> 			power-sequence;
+> 			reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
+> 			reset-duration-us = <15>;
+> 			clocks = <&clks IMX6SX_CLK_IPG>;
+> 		};
+> 	};
+> };
+> 
+> If the node has property "power-sequence", the pwrseq core will create
+> related platform device, and the driver under pwrseq driver will handle
+> power sequence stuffs. 
+
+This I have issue with. If you are creating a platform device here, you 
+are trying to work-around limitations in the linux driver model. Either 
+we need some sort of pre-probe hook to the drivers to call or each 
+parent node driver is responsible for checking and calling pwr-seq 
+functions for child nodes. e.g. The host controller calls pwr-seq for 
+the hub, the hub driver calls the power seq for the asix chip. Soon as 
+we have a case too complex for the generic pwr-seq, we're going to need 
+the pre-probe hook as I don't want to see a continual expansion of 
+generic pwr-seq binding for ever more complex cases.
+
+> The property below "power-sequence" will be
+> handled at pwrseq driver.
+
+You cannot rely on order other than for logical readability. There are 
+no guarantees of either the dtb or kernel ordering of properties.
+
+Rob
