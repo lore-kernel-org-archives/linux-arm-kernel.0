@@ -1,136 +1,43 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 20 Jun 2016 17:07:11 +0100
-Subject: [PATCH v19 06/13] arm64: kdump: reserve memory for crash dump
- kernel
-In-Reply-To: <d0486ff8419e38844ecb524d0ac86ea81a6ec67d.1466120418.git.geoff@infradead.org>
-References: <cover.1466120418.git.geoff@infradead.org>
- <d0486ff8419e38844ecb524d0ac86ea81a6ec67d.1466120418.git.geoff@infradead.org>
-Message-ID: <576814AF.5060307@arm.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Mon, 20 Jun 2016 11:05:40 -0500
+Subject: [PATCHv2] ARM: socfpga: enable PL330 DMA in socfpga_defconfig
+Message-ID: <1466438740-28709-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-On 17/06/16 00:48, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> 
-> On the startup of primary kernel, the memory region used by crash dump
-> kernel must be specified by "crashkernel=" kernel parameter.
-> reserve_crashkernel() will allocate and reserve the region for later use.
-> 
-> User space tools, like kexec-tools, will be able to find that region marked
-> as "Crash kernel" in /proc/iomem.
+Enable the PL330 DMA and DMATEST on SoCFPGA.
 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index d45f862..45f1319 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -34,6 +34,7 @@
->  #include <linux/dma-contiguous.h>
->  #include <linux/efi.h>
->  #include <linux/swiotlb.h>
-> +#include <linux/kexec.h>
->  
->  #include <asm/boot.h>
->  #include <asm/fixmap.h>
-> @@ -76,6 +77,65 @@ static int __init early_initrd(char *p)
->  early_param("initrd", early_initrd);
->  #endif
->  
-> +#ifdef CONFIG_KEXEC_CORE
-> +/*
-> + * reserve_crashkernel() - reserves memory for crash kernel
-> + *
-> + * This function reserves memory area given in "crashkernel=" kernel command
-> + * line parameter. The memory reserved is used by dump capture kernel when
-> + * primary kernel is crashing.
-> + */
-> +static void __init reserve_crashkernel(void)
-> +{
-> +	unsigned long long crash_size = 0, crash_base = 0;
-> +	int ret;
-> +
-> +	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> +				&crash_size, &crash_base);
-> +	/* no crashkernel= or invalid value specified */
-> +	if (!crash_size)
-> +		return;
+make savedefconfig says CONFIG_FHANDLE is not needed in the defconfig,
+remove it.
 
-Should we check ret too?
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+v2: Also enable DMATEST as a kernel module
+---
+ arch/arm/configs/socfpga_defconfig |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-
-> +
-> +	if (crash_base == 0) {
-> +		/* Current arm64 boot protocol requires 2MB alignment */
-> +		crash_base = memblock_find_in_range(0,
-> +				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-> +		if (crash_base == 0) {
-> +			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> +				crash_size);
-> +			return;
-> +		}
-> +		memblock_reserve(crash_base, crash_size);
-
-What if memblock_reserve() fails?
-
-
-> +
-> +	} else {
-> +		/* User specifies base address explicitly. */
-> +		if (!memblock_is_region_memory(crash_base, crash_size) ||
-> +			memblock_is_region_reserved(crash_base, crash_size)) {
-> +			pr_warn("crashkernel has wrong address or size\n");
-> +			return;
-> +		}
-> +
-> +		if (IS_ALIGNED(crash_base, SZ_2M)) {
-
-!IS_ALIGNED()...
-
-
-> +			pr_warn("crashkernel base address is not 2MB aligned\n");
-> +			return;
-> +		}
-> +
-> +		memblock_reserve(crash_base, crash_size);
-
-What if memblock_reserve() fails?
-
-
-> +	}
-> +
-> +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> +		crash_size >> 20, crash_base >> 20);
-> +
-> +	crashk_res.start = crash_base;
-> +	crashk_res.end = crash_base + crash_size - 1;
-> +}
-> +#else
-> +static void __init reserve_crashkernel(void)
-> +{
-> +	;
-> +}
-> +#endif /* CONFIG_KEXEC_CORE */
-> +
->  /*
->   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
->   * currently assumes that for memory starting above 4G, 32-bit devices will
-> @@ -291,6 +351,8 @@ void __init arm64_memblock_init(void)
->  	}
->  #endif
->  
-> +	reserve_crashkernel();
-> +
->  	early_init_fdt_scan_reserved_mem();
->  
->  	/* 4GB maximum for 32-bit only capable devices */
-> 
-
-
-With those,
-Reviewed-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
+diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+index e37c18b..9f84be5 100644
+--- a/arch/arm/configs/socfpga_defconfig
++++ b/arch/arm/configs/socfpga_defconfig
+@@ -1,5 +1,4 @@
+ CONFIG_SYSVIPC=y
+-CONFIG_FHANDLE=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+@@ -98,6 +97,9 @@ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_USB_GADGET=y
+ CONFIG_MMC=y
+ CONFIG_MMC_DW=y
++CONFIG_DMADEVICES=y
++CONFIG_PL330_DMA=y
++CONFIG_DMATEST=m
+ CONFIG_FPGA=y
+ CONFIG_FPGA_MGR_SOCFPGA=y
+ CONFIG_EXT2_FS=y
+-- 
+1.7.9.5
