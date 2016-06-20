@@ -1,79 +1,56 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Mon, 20 Jun 2016 09:29:18 +0200
-Subject: [RESEND PATCH v2 02/13] drivers: clk: st: Simplify clock binding
- of STiH4xx platforms
-In-Reply-To: <20160619150458.GA26824@rob-hp-laptop>
-References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
- <1466068833-5055-3-git-send-email-gabriel.fernandez@linaro.org>
- <20160619150458.GA26824@rob-hp-laptop>
-Message-ID: <CAG374jD+qChVC+6QJEHSXSzXGVVtAxvZ3V6zNpQDUyuJ2yCjMw@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Mon, 20 Jun 2016 09:35:53 +0200
+Subject: [GIT PULL 5/7] Broadcom maintainers changes for 4.8 Part 1
+In-Reply-To: <20160620055143.GH2329@localhost>
+References: <1466128575-5378-1-git-send-email-f.fainelli@gmail.com>
+ <1466128575-5378-5-git-send-email-f.fainelli@gmail.com>
+ <20160620055143.GH2329@localhost>
+Message-ID: <CACna6rxXQuU7MqFomqK8tUoyFgiH-nC-M9UEyvKk1rXs8yS64A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 20 June 2016 at 07:51, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Jun 16, 2016 at 06:56:13PM -0700, Florian Fainelli wrote:
+>> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+>>
+>>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.8/maintainers
+>>
+>> for you to fetch changes up to f6d925c8f8bb2e01c16dd5cd0e3d773beb84554d:
+>>
+>>   MAINTAINERS: Update entry for BCM5301X ARM (2016-06-10 11:30:24 -0700)
+>>
+>> ----------------------------------------------------------------
+>> This pull request contains MAINTAINERS file updates for Broadcom SoCs:
+>>
+>> - Rafal updates the BCM5301x entry wih the typical Broadcom mailing-list
+>>
+>> ----------------------------------------------------------------
+>> Rafa?? Mi??ecki (1):
+>>       MAINTAINERS: Update entry for BCM5301X ARM
+>
+> Is bcm-kernel-feedback-list at broadcom.com a list that the public can subscribe
+> to, or is it an internal list that the team is on?
+>
+> If it's the latter then it shouldn't be a mailing list in the maintainers
+> file. There's a dual purpose to the L: entries -- one is where to cc the
+> patches to, the other is what list to figure out how to subscribe to if you
+> care about patches for that platform...
+>
+> Not merged until the above is clarified.
 
-On 19 June 2016 at 17:04, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Jun 16, 2016 at 11:20:22AM +0200, Gabriel Fernandez wrote:
->> This patch reworks the clock binding to avoid too much detail in DT.
->> Now we have only compatible string per type of clock
->> (remark from Rob https://lkml.org/lkml/2016/5/25/492)
->>
->
-> I have no idea what the clock trees and clock controller in these chips
-> look like, so it's hard to say if the changes here are good. It still
-> looks like things are somewhat fine grained clocks in DT. I'll leave
-> it up to the platform maintainers to decide...
->
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->> ---
->>  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  2 +-
->>  .../devicetree/bindings/clock/st/st,clkgen-pll.txt | 11 ++--
->>  .../devicetree/bindings/clock/st/st,clkgen.txt     |  2 +-
->>  .../devicetree/bindings/clock/st/st,quadfs.txt     |  6 +--
->>  drivers/clk/st/clkgen-fsyn.c                       | 41 ++++++--------
->>  drivers/clk/st/clkgen-mux.c                        | 28 ++++------
->>  drivers/clk/st/clkgen-pll.c                        | 62 ++++++++++------------
->>  7 files changed, 65 insertions(+), 87 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
->> index 4d277d6..9a46cb1d7 100644
->> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
->> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
->> @@ -10,7 +10,7 @@ This binding uses the common clock binding[1].
->>  Required properties:
->>
->>  - compatible : shall be:
->> -     "st,stih407-clkgen-a9-mux",     "st,clkgen-mux"
->> +     "st,stih407-clkgen-a9-mux"
->>
->>  - #clock-cells : from common clock binding; shall be set to 0.
->>
->> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
->> index c9fd674..be0b043 100644
->> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
->> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
->> @@ -9,11 +9,10 @@ Base address is located to the parent node. See clock binding[2]
->>  Required properties:
->>
->>  - compatible : shall be:
->> -     "st,stih407-plls-c32-a0",       "st,clkgen-plls-c32"
->> -     "st,stih407-plls-c32-a9",       "st,clkgen-plls-c32"
->> -     "sst,plls-c32-cx_0",            "st,clkgen-plls-c32"
->> -     "sst,plls-c32-cx_1",            "st,clkgen-plls-c32"
->> -     "st,stih418-plls-c28-a9",       "st,clkgen-plls-c32"
->
->> +     "st,clkgen-pll0"
->> +     "st,clkgen-pll0"
->
-> Repeated. Supposed to be 0 and 1? This seems a bit generic, too.
-Yes you are right, it's 0 and 1.
-I wait remarks from Mike or Stephen before send a V3.
+I was asked by Florian to add bcm-kernel-feedback-list@ but indeed he
+didn't specify if this should be L: entry.
+[21:24:43] <[florian]> rmilecki: also submit a patch that includes
+bcm-kernel-feedback-list at broadcom.com in the MAINTAINERS file for
+BCM5310X
+[21:36:51] <rmilecki> [florian]: I wasn't sure if I'm supposed to do that
+[21:36:53] <rmilecki> i can try I guess
 
-Thanks Rob
+I'm afraid this mailing list is closed. Would M: entry work for it?
 
-BR
-Gabriel
-
->
->> +     "st,stih407-clkgen-plla9"
->> +     "st,stih418-clkgen-plla9"
+-- 
+Rafa?
