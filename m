@@ -1,92 +1,79 @@
-From: Jeremy.Linton@arm.com (Jeremy Linton)
-Date: Mon, 20 Jun 2016 16:49:11 +0000
-Subject: [PATCH 5/8] arm: arm64: pmu: Assign platform PMU CPU affinity
-In-Reply-To: <87fus76cff.fsf@e105922-lin.cambridge.arm.com>
-References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
- <1465511013-10742-6-git-send-email-jeremy.linton@arm.com>
- <87fus76cff.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <DB5PR08MB12227A8B98AD708F7C780324F72A0@DB5PR08MB1222.eurprd08.prod.outlook.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 20 Jun 2016 09:49:43 -0700
+Subject: [PATCH v19 03/13] arm64/kexec: Add core kexec support
+In-Reply-To: <57680D94.6080704@arm.com>
+References: <cover.1466120418.git.geoff@infradead.org>
+ <b5534d3ea3662d9f7fc5909b158ab36d135d8f6d.1466120418.git.geoff@infradead.org>
+ <57680D94.6080704@arm.com>
+Message-ID: <1466441383.7965.15.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+On Mon, 2016-06-20 at 16:36 +0100, James Morse wrote:
+> +> 	> 	> switch (flag) {
+> > +> > 	> > 	> > case IND_INDIRECTION:
+> > +> > 	> > 	> > 	> > /* Set entry point just before the new list page. */
+> > +> > 	> > 	> > 	> > entry = (kimage_entry_t *)addr - 1;
+> 
+> Ah, after this restructuring we end up cleaning this page as we fall-through,
+> and one kimage_entry_t at a time as we walk the list.
+> 
+> 	> 	> 	> break;
+> ?
+
+I added this in, but that missing break shouldn't cause any problems.
 
 
-|-----Original Message-----
-|From: Punit Agrawal [mailto:punit.agrawal at arm.com]
-|Sent: Monday, June 20, 2016 11:41 AM
-|To: Jeremy Linton
-|Cc: linux-arm-kernel at lists.infradead.org; Mark Rutland; Lorenzo Pieralisi;
-|mlangsdorf at redhat.com; peterz at infradead.org; Catalin Marinas; Will
-|Deacon; acme at kernel.org; linux-acpi at vger.kernel.org;
-|alexander.shishkin at linux.intel.com; mingo at redhat.com
-|Subject: Re: [PATCH 5/8] arm: arm64: pmu: Assign platform PMU CPU affinity
-|
-|Jeremy Linton <jeremy.linton@arm.com> writes:
-|
-|> On systems with multiple PMU types the PMU to CPU affinity needs to be
-|> detected and set. The CPU to interrupt affinity should also be set.
-|>
-|
-|One comment below.
-|
-|> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-|> ---
-|>  drivers/perf/arm_pmu.c | 52
-|++++++++++++++++++++++++++++++++++++++++----------
-|>  1 file changed, 42 insertions(+), 10 deletions(-)
-|>
-|> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-|> index fee4be0e8..865a9db 100644
-|> --- a/drivers/perf/arm_pmu.c
-|> +++ b/drivers/perf/arm_pmu.c
-|
-|[...]
-|
-|> @@ -872,25 +874,56 @@ static void cpu_pmu_destroy(struct arm_pmu
-|*cpu_pmu)
-|>  }
-|>
-|>  /*
-|> - * CPU PMU identification and probing.
-|> + * CPU PMU identification and probing. Its possible to have
-|> + * multiple CPU types in an ARM machine. Assure that we are
-|> + * picking the right PMU types based on the CPU in question
-|>   */
-|> -static int probe_current_pmu(struct arm_pmu *pmu,
-|> -     const struct pmu_probe_info *info)
-|> +static int probe_plat_pmu(struct arm_pmu *pmu,
-|> +     const struct pmu_probe_info *info,
-|> +     unsigned int pmuid)
-|>  {
-|> -int cpu = get_cpu();
-|> -unsigned int cpuid = read_cpuid_id();
-|>  int ret = -ENODEV;
-|> +int cpu;
-|> +int aff_ctr = 0;
-|> +struct platform_device *pdev = pmu->plat_device;
-|> +int irq = platform_get_irq(pdev, 0);
-|>
-|> -pr_info("probing PMU on CPU %d\n", cpu);
-|> +if (irq >= 0 && !irq_is_percpu(irq)) {
-|> +pmu->irq_affinity = kcalloc(pdev->num_resources,
-|sizeof(int),
-|> +    GFP_KERNEL);
-|> +if (!pmu->irq_affinity)
-|> +return -ENOMEM;
-|> +}
-|> +
-|> +for_each_possible_cpu(cpu) {
-|> +unsigned int cpuid = read_specific_cpuid(cpu);
-|> +
-|> +if (cpuid == pmuid) {
-|> +cpumask_set_cpu(cpu, &pmu->supported_cpus);
-|> +pr_devel("enable pmu on cpu %d\n", cpu);
-|> +if (pmu->irq_affinity) {
-|
-|The check for irq_affinity can be dropped as you already do that earlier.
+> > +> > 	> > 	> > case IND_SOURCE:
+> > +> > 	> > 	> > 	> > __flush_dcache_area(addr, PAGE_SIZE);
+> > +> > 	> > 	> > 	> > break;
+> > +> > 	> > 	> > case IND_DESTINATION:
+> > +> > 	> > 	> > 	> > break;
+> > +> > 	> > 	> > default:
+> > +> > 	> > 	> > 	> > BUG();
+> > +> > 	> > 	> > }
+> > +> > 	> > }
+> > +}
+> 
+> 
+> > diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
+> > new file mode 100644
+> > index 0000000..51b73cd
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/relocate_kernel.S
+> 
+> [ ... ]
+> 
+> > +.ltorg
+> > +
+> > +.align 3> > 	> > /* To keep the 64-bit values below naturally aligned. */
+> > +
+> > +.Lcopy_end:
+> > +.org> > 	> > KEXEC_CONTROL_PAGE_SIZE
+> 
+> 
+> On 16/06/16 23:41, Geoff Levand wrote:
+> > This is to check if arm64_relocate_new_kernel gets too
+> > big.  The assembler should give an error if the location
+> > counter is set backwards.
+> 
+> Cunning. (probably worth a comment).
 
-There isn't an irq_affinity structure for machines with PMU's using PPI's, that is why the check is there...
+I thought this was the standard way to do it...
 
-Thanks,
+> This looks like it is need because we hard-coded KEXEC_CONTROL_PAGE_SIZE in
+> kexec.h, so the code must be smaller than that size.
+> It looks like this value is only ever passed to get_order(), could we just pass
+> the actual size? It shouldn't matter if it grows >4K, as the core code will
+> allocate enough memory, and the memcpy() in machine_kexec() uses the size too.
 
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+I thought 4K would be enough, but if some debugging code is
+added it could get too big.
+
+> Reviewed-by: James Morse <james.morse@arm.com>
+
+Thanks for your comments.
+
+-Geoff
