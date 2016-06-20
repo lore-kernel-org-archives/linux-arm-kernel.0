@@ -1,12 +1,12 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Jun 2016 14:27:10 +0100
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Jun 2016 14:30:02 +0100
 Subject: [RFC PATCH] clocksource: arm_arch_timer: disable the evtstrm via
  the cmdline
 In-Reply-To: <5767E89F.5020809@linaro.org>
 References: <1466171011-30468-1-git-send-email-will.deacon@arm.com>
  <5766FBC6.6000405@linaro.org> <20160620082157.GC29165@arm.com>
  <5767E89F.5020809@linaro.org>
-Message-ID: <20160620132710.GA9246@leverpostej>
+Message-ID: <20160620133001.GE29165@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,43 +27,30 @@ On Mon, Jun 20, 2016 at 02:59:11PM +0200, Daniel Lezcano wrote:
 > >kernel isn't necessarily an option. There are plenty of "no*" kernel
 > >parameters already that fall into a similar category.
 > 
-> Hi Will,
-> 
-> if the kernel is in development and debug, why this option can't be
-> part of debugging code ?
+> if the kernel is in development and debug, why this option can't be part of
+> debugging code ?
 > 
 > If recompiling isn't an option, how this can be for "debugging and
 > development" ?
 
-We already have the config option for the cases you wish to set this at
-build time, and people use it.
+Sorry, I wasn't very clear. The sort of use-case I'm envisaging is where
+somebody is running a distro kernel on non-public hardware and sends me an
+email about spinlock performance. Being able to disable the event stream
+easily is a powerful tool in the small box of remote debugging tools and
+would be useful in pinning down things like missing events.
 
-There are situations where you do not know at build time that you want
-this, e.g. debugging in the field, for which recompilation may change
-the code in other ways (e.g. layout of data and functions).
+So when I say "development and debug" I'm really thinking about *remote*
+debug via a user, and then potentially the subsequent development of a
+patch.
 
-For example, if we get a bug report that a production kernel wedges in
-spinlock code after running for 10 hours, being able to say "pass
-noevstrm" is much better than trying to get the end-user to recompile
-their kernel, which may or may not be possible, and may (for other
-reasons), mask the issue we wish to debug.
+> I'm not a big fan of the all the specific driver options for the kernel
+> parameters. If there is a real need to disable some parts of a driver, it
+> would be much more interesting to write a framework for that and then use it
+> from arm_arch_timer, thus giving the other drivers the opportunity to
+> provide the same feature.
 
-The code size impact is negligible, and there is no runtime performance
-impact if this option is not used.
+Such a framework sounds horribly ill-specified and far beyond the scope
+of the simple change I'm proposing here. Are you planning to submit
+patches for this?
 
-> I'm not a big fan of the all the specific driver options for the
-> kernel parameters. If there is a real need to disable some parts of
-> a driver, it would be much more interesting to write a framework for
-> that and then use it from arm_arch_timer, thus giving the other
-> drivers the opportunity to provide the same feature.
-
-I'm not aware of other devices which have an event stream option.
-
-Additionally, the architected timer is at least slightly special in that
-it is architected, and this HW features was designed with architectural
-implications in mind (e.g. the behaviour of locking primitives). So
-while this happens to live in the driver code, it's in effect an
-architecture option (note that we have HWCAP_EVTSTREAM).
-
-Thanks,
-Mark.
+Will
