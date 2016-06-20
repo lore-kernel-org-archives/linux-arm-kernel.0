@@ -1,29 +1,35 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Mon, 20 Jun 2016 15:28:18 +0000
-Subject: SMMU driver and stall vs terminate mode
-Message-ID: <HE1PR04MB1641B0F8442061E3437037628D2A0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 20 Jun 2016 08:30:21 -0700
+Subject: [GIT PULL 5/7] Broadcom maintainers changes for 4.8 Part 1
+In-Reply-To: <3965618.mynEkqfry0@wuerfel>
+References: <1466128575-5378-1-git-send-email-f.fainelli@gmail.com>
+ <20160620055143.GH2329@localhost>
+ <CACna6rxXQuU7MqFomqK8tUoyFgiH-nC-M9UEyvKk1rXs8yS64A@mail.gmail.com>
+ <3965618.mynEkqfry0@wuerfel>
+Message-ID: <CAOesGMgAM3MW0ha07HNbBz-QsXwWU=GU8pd6L-HdZ2gJ0Gp4Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robin/Will,
+On Mon, Jun 20, 2016 at 12:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday, June 20, 2016 9:35:53 AM CEST Rafa? Mi?ecki wrote:
+>>
+>> I was asked by Florian to add bcm-kernel-feedback-list@ but indeed he
+>> didn't specify if this should be L: entry.
+>> [21:24:43] <[florian]> rmilecki: also submit a patch that includes
+>> bcm-kernel-feedback-list at broadcom.com in the MAINTAINERS file for
+>> BCM5310X
+>> [21:36:51] <rmilecki> [florian]: I wasn't sure if I'm supposed to do that
+>> [21:36:53] <rmilecki> i can try I guess
+>>
+>> I'm afraid this mailing list is closed. Would M: entry work for it?
+>
+>
+> I think M: is better, we have a couple of examples like that (x86 at kernel.org,
+> Dept-GELinuxNICDev at qlogic.com, linux-wimax at intel.com, ...).
 
-Right now the SMMU driver is hardcoded to configure 'stall' mode for
-context faults:
+Yep, having it as a M: entry would be fine with me as well. Please
+respin the patch/branch -- we can apply a patch directly instead of
+doing a merge if that's easier for you.
 
-      /* SCTLR */
-      reg = SCTLR_CFCFG | SCTLR_CFIE | SCTLR_CFRE | SCTLR_M | SCTLR_EAE_SBOP;
 
-We are running into an issue with a device where it seems behave sanely
-when SCTLR_CFCFG=0 ...i.e. 'terminate' mode, but in stall mode seems to be
-unaware that an access violation occurred.
-
-Is there really some assumption that all devices that send transcactions
-through the SMMU _must_ be able to handle stall mode?  I am trying to
-find out from our hw designers what is going on at the signal level for
-the device in question, but it seems to me that 'terminate' mode exists
-for a reason and I wonder what your thoughts are about providing a
-configuration option to allow configuration of terminate mode if a particular
-SoC requires it.
-
-Thanks,
-Stuart
+-Olof
