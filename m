@@ -1,39 +1,27 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 20 Jun 2016 15:35:47 +0200
-Subject: [PATCH 1/3] clk: samsung: exynos5433: prepare for adding CPU
- clocks
-In-Reply-To: <CA+Ln22GmeuHaNwpHOMxP0SA9-KaJp4D4sM5aF3bVRWm5Xb72fA@mail.gmail.com>
-References: <1464095957-25851-1-git-send-email-b.zolnierkie@samsung.com>
- <1464095957-25851-2-git-send-email-b.zolnierkie@samsung.com>
- <CA+Ln22GmeuHaNwpHOMxP0SA9-KaJp4D4sM5aF3bVRWm5Xb72fA@mail.gmail.com>
-Message-ID: <1687314.R0ikIvAotG@amdc1976>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 20 Jun 2016 14:42:00 +0100
+Subject: next-20160620 build: 2 failures 9 warnings (next-20160620)
+In-Reply-To: <E1bEwGe-0004DR-4p@optimist>
+References: <E1bEwGe-0004DR-4p@optimist>
+Message-ID: <20160620134200.GU26099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 20, 2016 at 11:17:20AM +0100, Build bot for Mark Brown wrote:
 
-Hi Tomasz,
+Today's -next fails to build due to:
 
-On Saturday, June 18, 2016 11:40:05 PM Tomasz Figa wrote:
-> Hi Bartlomiej,
-> 
-> 2016-05-24 22:19 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> > Open-code samsung_cmu_register_one() calls for CMU_APOLLO and
-> > CMU_ATLAS setup code as a preparation for adding CPU clocks
-> > support for Exynos5433.
-> 
-> Why do we need to open code it? Even if it's really necessary, it
+> 	arm64-allmodconfig
+> ../drivers/iommu/mtk_iommu.c:27:32: fatal error: linux/of_component.h: No such file or directory
 
-We want to register CPU clock before calling samsung_clk_sleep_init()
-and samsung_clk_of_add_provider() (just as we do it on other Exynos
-SoCs) so we cannot use samsung_cmu_register_one() helper.
-
-> would make sense to state it in the commit description for lazy
-> readers reviewing the patches in order. :)
-
-Right, sorry about that.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+which is triggered by da4d6e6d3b3ef (iommu/mediatek: Convert DT
+component matching to component_match_add_release()) - there is
+presumably a dependency on some other patch series that is still in
+review.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160620/c9fc8ac5/attachment.sig>
