@@ -1,12 +1,12 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Jun 2016 14:30:02 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 20 Jun 2016 14:30:03 +0100
 Subject: [RFC PATCH] clocksource: arm_arch_timer: disable the evtstrm via
  the cmdline
 In-Reply-To: <5767E89F.5020809@linaro.org>
 References: <1466171011-30468-1-git-send-email-will.deacon@arm.com>
  <5766FBC6.6000405@linaro.org> <20160620082157.GC29165@arm.com>
  <5767E89F.5020809@linaro.org>
-Message-ID: <20160620133001.GE29165@arm.com>
+Message-ID: <20160620133002.GB20071@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,19 +29,17 @@ On Mon, Jun 20, 2016 at 02:59:11PM +0200, Daniel Lezcano wrote:
 > 
 > if the kernel is in development and debug, why this option can't be part of
 > debugging code ?
-> 
-> If recompiling isn't an option, how this can be for "debugging and
-> development" ?
 
-Sorry, I wasn't very clear. The sort of use-case I'm envisaging is where
-somebody is running a distro kernel on non-public hardware and sends me an
-email about spinlock performance. Being able to disable the event stream
-easily is a powerful tool in the small box of remote debugging tools and
-would be useful in pinning down things like missing events.
+Because we may actually be debugging the hardware rather than the
+software. With the event stream enabled, WFE is woken up periodically.
+This can be a handy feature for user locking primitives or a simple
+workaround for hardware bugs (and we've seen them before). But the side
+effect is that it may be potentially hiding hardware issues.
 
-So when I say "development and debug" I'm really thinking about *remote*
-debug via a user, and then potentially the subsequent development of a
-patch.
+For hardware testing/validation, you'd want to sometimes disable this
+feature to check whether your event generation (usually as a result of
+exclusive monitor clearing) is working as expected. It's much easier to
+do with a command line option.
 
 > I'm not a big fan of the all the specific driver options for the kernel
 > parameters. If there is a real need to disable some parts of a driver, it
@@ -49,8 +47,8 @@ patch.
 > from arm_arch_timer, thus giving the other drivers the opportunity to
 > provide the same feature.
 
-Such a framework sounds horribly ill-specified and far beyond the scope
-of the simple change I'm proposing here. Are you planning to submit
-patches for this?
+Well, how many non-ARM timer drivers have an exclusive monitor event
+stream feature to make sense for a framework?
 
-Will
+-- 
+Catalin
