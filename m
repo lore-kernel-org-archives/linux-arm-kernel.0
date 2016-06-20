@@ -1,46 +1,38 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 20 Jun 2016 12:03:54 +0200
-Subject: [PATCH] clk: Fix return value check in oxnas_stdclk_probe()
-In-Reply-To: <1466184263-17890-1-git-send-email-weiyj_lk@163.com>
-References: <1466184263-17890-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <5767BF8A.6080204@baylibre.com>
+Date: Mon, 20 Jun 2016 12:06:34 +0200
+Subject: [PATCH 4/4] ARM: dts: meson8b: Add Meson8b PWM Controller nodes
+In-Reply-To: <201606180219.HabMMLCO%fengguang.wu@intel.com>
+References: <201606180219.HabMMLCO%fengguang.wu@intel.com>
+Message-ID: <5767C02A.50700@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2016 07:24 PM, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 06/17/2016 08:21 PM, kbuild test robot wrote:
+> Hi,
 > 
-> In case of error, the function syscon_node_to_regmap() returns
-> ERR_PTR() and never returns NULL. The NULL test in the return
-> value check should be replaced with IS_ERR().
+> [auto build test ERROR on next-20160617]
+> [cannot apply to pwm/for-next robh/for-next v4.7-rc3 v4.7-rc2 v4.7-rc1 v4.7-rc3]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 > 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> url:    https://github.com/0day-ci/linux/commits/Neil-Armstrong/pwm-Add-Amlogic-Meson-SoC-PWM-Controller/20160617-223758
+> config: arm-multi_v7_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>>> Error: arch/arm/boot/dts/meson8b.dtsi:167.17-18 syntax error
+>    FATAL ERROR: Unable to parse input tree
+> 
 > ---
->  drivers/clk/clk-oxnas.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 > 
-> diff --git a/drivers/clk/clk-oxnas.c b/drivers/clk/clk-oxnas.c
-> index efba7d4..79bcb2e 100644
-> --- a/drivers/clk/clk-oxnas.c
-> +++ b/drivers/clk/clk-oxnas.c
-> @@ -144,9 +144,9 @@ static int oxnas_stdclk_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	regmap = syscon_node_to_regmap(of_get_parent(np));
-> -	if (!regmap) {
-> +	if (IS_ERR(regmap)) {
->  		dev_err(&pdev->dev, "failed to have parent regmap\n");
-> -		return -EINVAL;
-> +		return PTR_ERR(regmap);
->  	}
->  
->  	for (i = 0; i < ARRAY_SIZE(clk_oxnas_init); i++) {
-> 
-> 
-> 
-Correct.
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+I'll fix this for V2.
 
-Thanks,
 Neil
