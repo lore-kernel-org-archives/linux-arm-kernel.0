@@ -1,110 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Jun 2016 15:55:35 +0100
-Subject: [PATCH 2/2] arm64: dts: Add device-tree for ARM's AEMv8A-AEMv8A
- FVP Base model
-In-Reply-To: <1466433277.2833.33.camel@linaro.org>
-References: <1466424796-13769-1-git-send-email-tixy@linaro.org>
- <1466424796-13769-2-git-send-email-tixy@linaro.org>
- <20160620123906.GC26152@leverpostej>
- <1466433277.2833.33.camel@linaro.org>
-Message-ID: <20160620145535.GC9246@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 20 Jun 2016 15:56:09 +0100
+Subject: [PATCH v2] arm64: Kconfig: select PM{,
+ _GENERIC_DOMAINS} for ARCH_VEXPRESS
+Message-ID: <1466434569-26449-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 03:34:37PM +0100, Jon Medhurst (Tixy) wrote:
-> On Mon, 2016-06-20 at 13:39 +0100, Mark Rutland wrote:
-> > Hi,
-> > 
-> > On Mon, Jun 20, 2016 at 01:13:16PM +0100, Jon Medhurst wrote:
-> > > Fixed Virtual Platform (FVP) Base models are simulations of systems
-> > > that resemble Versatile Express or Juno hardware.
-> > > 
-> > > This adds a device-tree for the model variant that has two clusters of
-> > > Architecture Envelope Model (AEM) v8-A CPUs. The peripheral devices that
-> > > are common to all variants of Base models have been placed in a separate
-> > > file (fvp-base.dtsi) to facilitate creating device-trees for other
-> > > models.
-> > > 
-> > > It is desirable to use simulations for code testing purposes and so it
-> > > is beneficial to include nodes for things that are timing and power
-> > > consumption related, even when these don't otherwise have relevance or
-> > > accuracy. Where these have been included here (e.g. idle-states) entries
-> > > have been copied from real hardware platforms such as Juno.
-> > 
-> > Which firmware are you using,
-> 
-> ARM Trusted Firmware
-> 
-> >  and what precisely does it do w.r.t.
-> > those idle states?
-> 
-> I don't know, will check. Those states are also in the ARM TF
-> device-tree for the Base FVP [2] but I admit I didn't verify they were
-> correct. (Unlike real 'hardware' dt nodes, for which I methodically went
-> through documentation and LISA files to check and fix).
-> 
-> [2] https://github.com/ARM-software/arm-trusted-firmware/blob/master/fdts/fvp-base-gicv3-psci.dts
-> 
-> >  Judging by the FVP ATF pm code [1], those state IDs
-> > aren't valid (though perhaps the comment is wrong, or I've misunderstood
-> > something).
-> 
-> I'm not sure which comment you are referring to, that link [1] doesn't
-> seem to anchor to a particular source line in my web browser, and I
-> don't spot anything relevant scanning by eye.
+The Linux AMBA bus framework probes the peripheral IDs when adding the
+AMBA devices very early on the boot. Generally they are on APB bus and
+just require APB clocks to be on even when most of the core logic of the
+IP is powered down.
 
-Aargh, the web interface appears to have given me a duff URL. Let's try
-again [3]. ;)
+However on Juno, the entire debugsys domain needs to be ON to access
+even the coresight components' CID/PID registers and hence broken by
+design. Accessing those while debugsys power domain is off will lead to
+the bridge stalling the transactions instead of returning the slave error.
 
-The comments note state-ids 0x01, 0x02, and 0x22, which don't appear to
-match the DT. It might be that I've just misunderstood, but it could be
-that every attempt to idle simply fails if we're passing the wrong
-state-ids, and that's somewhat sub-optimal.
+Further, the AMBA framework can't deal with !CONFIG_PM_GENERIC_DOMAINS
+case: it ignores the error and proceeds to access the device region.
+It was suggested to always enable CONFIG_PM{,_GENERIC_DOMAINS} in order
+to handle above explained scenario.
 
-I'm not sure if there's a simple diagnostic for that. Lorenzo, any idea
-if/how we can detect when the FW rejects an idle state it doesn't
-recognise?
+Cc: Arnd Bergmann <arnd@arndb.de>
+Suggested-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/Kconfig.platforms | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> > People use the FVPs with a variety of FW and bootloaders, so I'm not
-> > keen on putting anything FW or bootloader specific into the canonical
-> > FVP DT files.
-> 
-> I can agree about bootloaders, but would anyone be using FVP's without
-> ARM Trusted firmware?
+(Resending as I missed ALKML before)
+Hi ARM-SoC team,
 
-Yes. I know of several people just using the bootwrapper [4], with
-custom DTs.
+The discussion on this happened on linux-pm list[1]. This is need on
+Juno once we introduce coresight components in the DT. With
+!PM_GENERIC_DOMAINS, the board stalls on boot and hence this patch is
+needed. This shouldn't change any thing in the defconfig as couple of
+other platforms already do the same. It's needed in case all other
+ARCH_* configs are disabled.
 
-> And if they aren't using using that, can we still assume a PSCI
-> capable firmware for things like CPU enable-method?
+Without this, we need a dirty trick in the DT[2] to handle
+!PM_GENERIC_DOMAINS
 
-I was counting that under "FW or bootloader specific", so no.
+Can you please pick this for v4.8 directly ?
 
-> I'm asking to get an idea where the line is as I have changes for
-> Foundation model too. Also, want something to say to the people who
-> asked me to 'upstream the FVP DTs' as I expect they think people are
-> using the One True Way which involves ARM's Trusted Firmware and other
-> sacred tomes passed down to them ;-)
+Regards,
+Sudeep
 
-Ideally, the Base stuff is meant to be all fixed, so we should be able
-to support the default configuration.
+v1->v2: Also added PM_GENERIC_DOMAINS dependency as suggested by Arnd[3]
 
-To handle different FWs and bootloaders, I think we should have a DT
-without the enable-method, PSCI node, and idle states, for the default
-FVP Base configuration.
+[1] http://marc.info/?l=linux-pm&m=146607608629880&w=2
+[2] https://marc.info/?l=linux-arm-kernel&m=146522896503670&w=2
+[3] https://marc.info/?l=linux-arm-kernel&m=146619230406662&w=2
 
-We can *also* have a DT for the default FVP Base + ATF configuration (so
-long as clearly named as such), with the appropriate nodes and
-properties.
-
-> I'll fix your other comment on the DT, so snipping email here.
-
-Sure, cheers!
-
-Thanks,
-Mark.
-
-> > [1] https://github.com/ARM-software/arm-trusted-firmware/commit/6355f2347aec8bf6ad74867c2b0c996e10546ad4#L53 
-
-[3] https://github.com/ARM-software/arm-trusted-firmware/blob/6355f2347aec8bf6ad74867c2b0c996e10546ad4/plat/arm/board/fvp/fvp_pm.c#L53
-[4] https://git.kernel.org/cgit/linux/kernel/git/cmarinas/boot-wrapper-aarch64.git/
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 7ef1d05859ae..25c4595589af 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -160,6 +160,8 @@ config ARCH_VEXPRESS
+ 	bool "ARMv8 software model (Versatile Express)"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select COMMON_CLK_VERSATILE
++	select PM
++	select PM_GENERIC_DOMAINS
+ 	select POWER_RESET_VEXPRESS
+ 	select VEXPRESS_CONFIG
+ 	help
+--
+2.7.4
