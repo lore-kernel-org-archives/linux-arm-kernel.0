@@ -1,77 +1,88 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 20 Jun 2016 10:56:41 -0700
-Subject: [PATCH v3 02/15] phy: rockchip-emmc: configure frequency range and
- drive impedance
+Date: Mon, 20 Jun 2016 10:56:44 -0700
+Subject: [PATCH v3 05/15] phy: rockchip-emmc: Increase lock time allowance
 In-Reply-To: <1466445414-11974-1-git-send-email-dianders@chromium.org>
 References: <1466445414-11974-1-git-send-email-dianders@chromium.org>
-Message-ID: <1466445414-11974-3-git-send-email-dianders@chromium.org>
+Message-ID: <1466445414-11974-6-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Lin <shawn.lin@rock-chips.com>
+Previous PHY code waited a fixed amount of time for the DLL to lock at
+power on time.  Unfortunately, the time for the DLL to lock is actually
+a bit more dynamic and can be longer if the card clock is slower.
 
-Signal integrity analysis has suggested we set these values. Do this in
-power_on(), so that they get reconfigured after suspend/resume.
+Instead of waiting a fixed 30 us, let's now dynamically wait until the
+lock bit gets set.  We'll wait up to 10 ms which should be OK even if
+the card clock is at the super slow 100 kHz.
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-Signed-off-by: Brian Norris <briannorris@chromium.org>
+On its own, this change makes the PHY power on code a little more
+robust.  Before this change the PHY was relying on the eMMC code to make
+sure the PHY was only powered on when the card clock was set to at least
+50 MHz before, though this reliance wasn't documented anywhere.
+
+This change will be even more useful in future changes where we actually
+need to be able to wait for a DLL lock at slower clock speeds.
+
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
 Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
 Changes in v3:
-- Add Brian's PHY patches into my series
+- Add collected tags
 
 Changes in v2:
-- Drop 170 MHz comment (only applicable to a subtly different Arasan PHY)
+- Indicate that 5.1 ms is calculated (Shawn).
 
- drivers/phy/phy-rockchip-emmc.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/phy/phy-rockchip-emmc.c | 28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-index 48cbe691a889..f2f75cf69af1 100644
+index a69f53630e67..2d059c046978 100644
 --- a/drivers/phy/phy-rockchip-emmc.c
 +++ b/drivers/phy/phy-rockchip-emmc.c
-@@ -56,6 +56,19 @@
- #define PHYCTRL_DLLRDY_SHIFT	0x5
- #define PHYCTRL_DLLRDY_DONE	0x1
- #define PHYCTRL_DLLRDY_GOING	0x0
-+#define PHYCTRL_FREQSEL_200M	0x0
-+#define PHYCTRL_FREQSEL_50M	0x1
-+#define PHYCTRL_FREQSEL_100M	0x2
-+#define PHYCTRL_FREQSEL_150M	0x3
-+#define PHYCTRL_FREQSEL_MASK	0x3
-+#define PHYCTRL_FREQSEL_SHIFT	0xc
-+#define PHYCTRL_DR_MASK		0x7
-+#define PHYCTRL_DR_SHIFT	0x4
-+#define PHYCTRL_DR_50OHM	0x0
-+#define PHYCTRL_DR_33OHM	0x1
-+#define PHYCTRL_DR_66OHM	0x2
-+#define PHYCTRL_DR_100OHM	0x3
-+#define PHYCTRL_DR_40OHM	0x4
+@@ -85,6 +85,7 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+ {
+ 	unsigned int caldone;
+ 	unsigned int dllrdy;
++	unsigned long timeout;
  
- struct rockchip_emmc_phy {
- 	unsigned int	reg_offset;
-@@ -154,6 +167,20 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
- 	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
- 	int ret = 0;
- 
-+	/* DLL operation: 200 MHz */
-+	regmap_write(rk_phy->reg_base,
-+		     rk_phy->reg_offset + GRF_EMMCPHY_CON0,
-+		     HIWORD_UPDATE(PHYCTRL_FREQSEL_200M,
-+				   PHYCTRL_FREQSEL_MASK,
-+				   PHYCTRL_FREQSEL_SHIFT));
+ 	/*
+ 	 * Keep phyctrl_pdb and phyctrl_endll low to allow
+@@ -137,15 +138,26 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+ 				   PHYCTRL_ENDLL_MASK,
+ 				   PHYCTRL_ENDLL_SHIFT));
+ 	/*
+-	 * After enable analog DLL circuits, we need an extra 10.2us
+-	 * for dll to be ready for work. But according to testing, we
+-	 * find some chips need more than 25us.
++	 * After enabling analog DLL circuits docs say that we need 10.2 us if
++	 * our source clock is at 50 MHz and that lock time scales linearly
++	 * with clock speed.  If we are powering on the PHY and the card clock
++	 * is super slow (like 100 kHZ) this could take as long as 5.1 ms as
++	 * per the math: 10.2 us * (50000000 Hz / 100000 Hz) => 5.1 ms
++	 * Hopefully we won't be running at 100 kHz, but we should still make
++	 * sure we wait long enough.
+ 	 */
+-	udelay(30);
+-	regmap_read(rk_phy->reg_base,
+-		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+-		    &dllrdy);
+-	dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
++	timeout = jiffies + msecs_to_jiffies(10);
++	do {
++		udelay(1);
 +
-+	/* Drive impedance: 50 Ohm */
-+	regmap_write(rk_phy->reg_base,
-+		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
-+		     HIWORD_UPDATE(PHYCTRL_DR_50OHM,
-+				   PHYCTRL_DR_MASK,
-+				   PHYCTRL_DR_SHIFT));
++		regmap_read(rk_phy->reg_base,
++			rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
++			&dllrdy);
++		dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
++		if (dllrdy == PHYCTRL_DLLRDY_DONE)
++			break;
++	} while (!time_after(jiffies, timeout));
 +
- 	/* Power up emmc phy analog blocks */
- 	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_ON);
- 	if (ret)
+ 	if (dllrdy != PHYCTRL_DLLRDY_DONE) {
+ 		pr_err("rockchip_emmc_phy_power: dllrdy timeout.\n");
+ 		return -ETIMEDOUT;
 -- 
 2.8.0.rc3.226.g39d4020
