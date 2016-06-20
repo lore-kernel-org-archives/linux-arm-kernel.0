@@ -1,33 +1,41 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Mon, 20 Jun 2016 20:08:20 +0200
-Subject: [PATCH 2/6] documentation: Add secure monitor bindings
- documentation
-In-Reply-To: <20160620180640.GA12422@rob-hp-laptop>
-References: <1466339944-602-1-git-send-email-carlo@caione.org>
- <1466339944-602-3-git-send-email-carlo@caione.org>
- <20160620180640.GA12422@rob-hp-laptop>
-Message-ID: <CAL9uMOGqXCPF==CjeBubrdTVZLYy_dr6LLwJYHoye1LTBoj-og@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 20 Jun 2016 20:14:52 +0200
+Subject: [PATCH v3 14/15] phy: rockchip-emmc: Set phyctrl_frqsel based on
+ card clock
+In-Reply-To: <1466445414-11974-15-git-send-email-dianders@chromium.org>
+References: <1466445414-11974-1-git-send-email-dianders@chromium.org>
+ <1466445414-11974-15-git-send-email-dianders@chromium.org>
+Message-ID: <2890767.K8G0sjVPM4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 8:06 PM, Rob Herring <robh@kernel.org> wrote:
-> On Sun, Jun 19, 2016 at 02:39:00PM +0200, Carlo Caione wrote:
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> Add the binding documentation for the Amlogic secure monitor driver.
->>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->> ---
->>  .../devicetree/bindings/firmware/meson/meson_sm.txt       | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
->
-> Please add acks when reposting.
+Am Montag, 20. Juni 2016, 10:56:53 schrieb Douglas Anderson:
+> The "phyctrl_frqsel" is described in the Arasan datasheet [1] as "the
+> frequency range of DLL operation".  Although the Rockchip variant of
+> this PHY has different ranges than the reference Arasan PHY it appears
+> as if the functionality is similar.  We should set this phyctrl field
+> properly.
+> 
+> Note: as per Rockchip engineers, apparently the "phyctrl_frqsel" is
+> actually only useful in HS200 / HS400 modes even though the DLL itself
+> it used for some purposes in all modes.  See the discussion in the
+> earlier change in this series: ("mmc: sdhci-of-arasan: Always power the
+> PHY off/on when clock changes").  In any case, it shouldn't hurt to set
+> this always.
+> 
+> Note that this change should allow boards to run at HS200 / HS400 speed
+> modes while running at 100 MHz or 150 MHz.  In fact, running HS400 at
+> 150 MHz (giving 300 MB/s) is the main motivation of this series, since
+> performance is still good but signal integrity problems are less
+> prevelant at 150 MHz.
+> 
+> [1]: https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-I didn't add your ACK since the patch is slightly different.
-I'll add it back in the next revision.
+> ---
+> Changes in v3:
+> - Use phy_init / phy_exit (Heiko)
 
-Thanks,
-
--- 
-Carlo Caione  |  +39.340.80.30.096  |  Endless
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
