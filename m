@@ -1,76 +1,46 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Mon, 20 Jun 2016 09:48:29 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIXSByZW1vdmUgcGFnZV9tYXBwaW5nIGNoZWNrIGluIF9f?=
- =?gb2312?B?c3luY19pY2FjaGVfZGNhY2hl?=
-In-Reply-To: <20160620092121.GA20071@e104818-lin.cambridge.arm.com>
-References: <07890E72BF5A6C44976E3EB9981B18780245260A@SZXEMA509-MBX.china.huawei.com>
- <20160620092121.GA20071@e104818-lin.cambridge.arm.com>
-Message-ID: <07890E72BF5A6C44976E3EB9981B1878024526CF@SZXEMA509-MBX.china.huawei.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 20 Jun 2016 12:03:54 +0200
+Subject: [PATCH] clk: Fix return value check in oxnas_stdclk_probe()
+In-Reply-To: <1466184263-17890-1-git-send-email-weiyj_lk@163.com>
+References: <1466184263-17890-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <5767BF8A.6080204@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin
-
-Thanks for your suggestion.
-	
--> Minor updates required here, replacing L2cache with PoU.
-->
-->We also need a cc stable so that the patch is cherry-picked for earlier kernel versions (even though it may fail to apply, at least we'll be asked by the stable maintainers to provide  back-port).
-  I agree it and I change it now.
-
--> Will is handling the 4.7 kernel release but he's away at a conference this week, so I may push this upstream if he does that time.
-->
--> Anyway, could you please post the patch with the above Reviewed/cc tags to linux-arm-kernel at lists.infradead.org?
-  Ok, next patch will be posted to linux-arm-kernel at lists.infradead.org.
-
-Best regards
-Shaokun zhang
-
------????-----
-???: Catalin Marinas [mailto:catalin.marinas at arm.com] 
-????: 2016?6?20? 17:21
-???: Zhangshaokun
-??: mark.rutland at arm.com; Will Deacon; Linuxarm; Zhanweitao
-??: Re: [PATCH] remove page_mapping check in __sync_icache_dcache
-
-On Mon, Jun 20, 2016 at 06:14:56AM +0000, Zhangshaokun wrote:
-> In aarch64 sync icache and dcache, if anonymous pages hold 
-> self-modified code and these pages are migrated, it also should be 
-> flushed dcache and invalided icache. Therefore,page_mapping(page) 
-> check should be removed, otherwise icache maybe fetch stale 
-> instruction frome L2cache.
-
-Minor updates required here, replacing L2cache with PoU.
-
-We also need a cc stable so that the patch is cherry-picked for earlier kernel versions (even though it may fail to apply, at least we'll be asked by the stable maintainers to provide  back-port).
-
-> Signed-off-by:zhangshaokun <zhangshaokun@hisilicon.com>
-> ---
->  arch/arm64/mm/flush.c | 4 ----
->  1 file changed, 4 deletions(-)
+On 06/17/2016 07:24 PM, weiyj_lk at 163.com wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c index 
-> dbd12ea..43a76b0 100644
-> --- a/arch/arm64/mm/flush.c
-> +++ b/arch/arm64/mm/flush.c
-> @@ -71,10 +71,6 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)  {
->  	struct page *page = pte_page(pte);
+> In case of error, the function syscon_node_to_regmap() returns
+> ERR_PTR() and never returns NULL. The NULL test in the return
+> value check should be replaced with IS_ERR().
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  drivers/clk/clk-oxnas.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-oxnas.c b/drivers/clk/clk-oxnas.c
+> index efba7d4..79bcb2e 100644
+> --- a/drivers/clk/clk-oxnas.c
+> +++ b/drivers/clk/clk-oxnas.c
+> @@ -144,9 +144,9 @@ static int oxnas_stdclk_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
 >  
-> -	/* no flushing needed for anonymous pages */
-> -	if (!page_mapping(page))
-> -		return;
-> -
->  	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
->  		sync_icache_aliases(page_address(page),
->  				    PAGE_SIZE << compound_order(page));
+>  	regmap = syscon_node_to_regmap(of_get_parent(np));
+> -	if (!regmap) {
+> +	if (IS_ERR(regmap)) {
+>  		dev_err(&pdev->dev, "failed to have parent regmap\n");
+> -		return -EINVAL;
+> +		return PTR_ERR(regmap);
+>  	}
+>  
+>  	for (i = 0; i < ARRAY_SIZE(clk_oxnas_init); i++) {
+> 
+> 
+> 
+Correct.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Will is handling the 4.7 kernel release but he's away at a conference this week, so I may push this upstream if he does that time.
-
-Anyway, could you please post the patch with the above Reviewed/cc tags to linux-arm-kernel at lists.infradead.org?
-
-Thanks.
-
---
-Catalin
+Thanks,
+Neil
