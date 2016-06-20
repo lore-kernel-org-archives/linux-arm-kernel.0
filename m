@@ -1,52 +1,63 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 20 Jun 2016 09:50:52 -0500
-Subject: [PATCHv4 7/7] ARM: dts: Add Arria10 Ethernet EDAC devicetree entry
-In-Reply-To: <1466434252-26107-1-git-send-email-tthayer@opensource.altera.com>
-References: <1466434252-26107-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1466434252-26107-8-git-send-email-tthayer@opensource.altera.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 20 Jun 2016 15:48:13 +0100
+Subject: [GIT PULL] drivers: firmware: scpi updates for v4.8
+Message-ID: <5768022D.2010506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+Hi ARM-SoC team,
 
-Add the device tree entries needed to support the Altera Ethernet
-FIFO buffer EDAC on the Arria10 chip.
+Here are few updates for SCPI drivers for v4.8. The DT binding have been
+ACKed by DT maintainer.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
-v2  No change
-v3  Add interrupts for SBERR and DBERR.
-v4  No change
----
- arch/arm/boot/dts/socfpga_arria10.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Also as most of the genpd code is in drivers/soc and SCPI can be used on
+any SoC, runtime PM maintainer agreed to keep the SCPI genpd based power
+domain driver in drivers/firmware for now. It also carries their
+ACK.
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 21f6c3c..5cf4dc5 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -628,6 +628,22 @@
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH>,
- 					     <33 IRQ_TYPE_LEVEL_HIGH>;
- 			};
-+
-+			emac0-rx-ecc at ff8c0800 {
-+				compatible = "altr,socfpga-eth-mac-ecc";
-+				reg = <0xff8c0800 0x400>;
-+				parent = <&gmac0>;
-+				interrupts = <4 IRQ_TYPE_LEVEL_HIGH>,
-+					     <36 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			emac0-tx-ecc at ff8c0c00 {
-+				compatible = "altr,socfpga-eth-mac-ecc";
-+				reg = <0xff8c0c00 0x400>;
-+				parent = <&gmac0>;
-+				interrupts = <5 IRQ_TYPE_LEVEL_HIGH>,
-+					     <37 IRQ_TYPE_LEVEL_HIGH>;
-+			};
- 		};
- 
- 		rst: rstmgr at ffd05000 {
+Please pull !
+
 -- 
-1.7.9.5
+Regards,
+Sudeep
+
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+
+   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
+tags/scpi-updates-4.8
+
+for you to fetch changes up to 0e6a9e12dc2f300c53bdd909e9a837be77733090:
+
+   firmware: scpi: add device power domain support using genpd 
+(2016-06-17 16:24:22 +0100)
+
+----------------------------------------------------------------
+SCPI updates and fixes for v4.8
+
+1. Adds support for device power state management using generic power
+    domains and runtime PM
+
+2. Other minor/miscellaneous fixes to the driver
+
+----------------------------------------------------------------
+Sudeep Holla (6):
+       firmware: arm_scpi: remove dvfs_get packed structure
+       firmware: arm_scpi: mark scpi_get_sensor_value as static
+       firmware: arm_scpi: make it depend on MAILBOX instead of ARM_MHU
+       firmware: arm_scpi: add support for device power state management
+       Documentation: add DT bindings for ARM SCPI power domains
+       firmware: scpi: add device power domain support using genpd
+
+  Documentation/devicetree/bindings/arm/arm,scpi.txt |  34 +++++
+  drivers/firmware/Kconfig                           |  12 +-
+  drivers/firmware/Makefile                          |   1 +
+  drivers/firmware/arm_scpi.c                        |  42 ++++--
+  drivers/firmware/scpi_pm_domain.c                  | 152 
++++++++++++++++++++++
+  include/linux/scpi_protocol.h                      |   2 +
+  6 files changed, 234 insertions(+), 9 deletions(-)
+  create mode 100644 drivers/firmware/scpi_pm_domain.c
