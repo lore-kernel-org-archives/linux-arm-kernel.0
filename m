@@ -1,20 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 20 Jun 2016 17:30:13 +0900
-Subject: [PATCH 0/2] Add R8A7792 JPEG codec support
-In-Reply-To: <7346244.CEZI3u99oZ@wasted.cogentembedded.com>
-References: <7346244.CEZI3u99oZ@wasted.cogentembedded.com>
-Message-ID: <20160620083013.GE17292@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 20 Jun 2016 09:34:53 +0100
+Subject: [RFC PATCH] clocksource: arm_arch_timer: disable the evtstrm
+ via the cmdline
+In-Reply-To: <20160620082157.GC29165@arm.com>
+References: <1466171011-30468-1-git-send-email-will.deacon@arm.com>
+ <5766FBC6.6000405@linaro.org> <20160620082157.GC29165@arm.com>
+Message-ID: <20160620093453.214edd8e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 01:00:36AM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-20160616-v4.7-rc3' tag. We add the device tree support for
-> the R8A7792 JPEG Processing Unit (JPU).
-> 
-> [1/2] ARM: dts: r8a7792: add JPU clocks
-> [2/2] ARM: dts: r8a7792: add JPU support
+On Mon, 20 Jun 2016 09:21:57 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-Thanks, I have queued these up.
+> On Sun, Jun 19, 2016 at 10:08:38PM +0200, Daniel Lezcano wrote:
+> > On 06/17/2016 03:43 PM, Will Deacon wrote:
+> > 
+> > [ Cc'ed tglx ]
+> > 
+> > >Disabling the eventstream can be useful for debugging and development
+> > >purposes
+> > 
+> > If it is for debugging and development, why upstream this change ?
+> 
+> Mainly because it's desirable to be able to debug systems remotely, on
+> machines that you don't have direct access to and where recompiling the
+> kernel isn't necessarily an option. There are plenty of "no*" kernel
+> parameters already that fall into a similar category.
+
+I would add that being able to toggle this without affecting the memory
+layout or any of the code paths is extremely valuable. The event stream
+can have an effect on the spinlock behaviour (through the WFE
+instruction), so having a way to exercise it without changing anything
+else is pretty cool. Also, being able to debug a production kernel at
+zero cost is rare enough to make me jump on the opportunity.
+
+So for this patch, and Mark's suggestion of adding some documentation
+to it:
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
