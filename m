@@ -1,32 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Jun 2016 10:56:08 +0200
-Subject: [PATCH v6 2/2] mtd: nand: sunxi: add reset line support
-In-Reply-To: <20160620044838.56904-2-icenowy@aosc.xyz>
-References: <20160620044838.56904-1-icenowy@aosc.xyz>
- <20160620044838.56904-2-icenowy@aosc.xyz>
-Message-ID: <20160620085608.GK26668@lukather>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 20 Jun 2016 10:57:45 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Build Atmel maXTouch driver as
+ a module
+In-Reply-To: <1465939232-19156-1-git-send-email-javier@osg.samsung.com>
+References: <1465939232-19156-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1466413065.8812.3.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 12:48:38PM +0800, Icenowy Zheng wrote:
-> The NAND controller on some sun8i chips needs its reset line to be
-> deasserted before they can enter working state.
+Hey,
+
+On Tue, 2016-06-14 at 17:20 -0400, Javier Martinez Canillas wrote:
+> The driver is for a trackpad device so is not needed for booting and
+> makes more sense to have it as module to reduce the kernel image
+> size.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> It was probably enabled as built-in because module autoload was not
+> working when the I2C device was registered by OF but this got fixed
+> in commit b7d21058b40b ("Input: atmel_mxt_ts - add maxtouch to I2C
+> table for module autoload") so it's safe to enable as a module now.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Thanks,
-Maxime
+Make sense to me,
+Reviewed-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> ---
+> 
+> ?arch/arm/configs/multi_v7_defconfig | 2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig
+> b/arch/arm/configs/multi_v7_defconfig
+> index ee7c884ab5d8..c29bdd070721 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -269,7 +269,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
+> ?CONFIG_MOUSE_CYAPA=m
+> ?CONFIG_MOUSE_ELAN_I2C=y
+> ?CONFIG_INPUT_TOUCHSCREEN=y
+> -CONFIG_TOUCHSCREEN_ATMEL_MXT=y
+> +CONFIG_TOUCHSCREEN_ATMEL_MXT=m
+> ?CONFIG_TOUCHSCREEN_MMS114=m
+> ?CONFIG_TOUCHSCREEN_ST1232=m
+> ?CONFIG_TOUCHSCREEN_STMPE=y
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160620/625d192b/attachment.sig>
+
+Sjoerd Simons
+Collabora Ltd.
