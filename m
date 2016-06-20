@@ -1,60 +1,26 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 20 Jun 2016 19:27:37 +0800
-Subject: [PATCH 00/12] power: add generic power sequence framework
-In-Reply-To: <576487C1.5050807@maciej.szmigiero.name>
-References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
- <576487C1.5050807@maciej.szmigiero.name>
-Message-ID: <20160620112737.GB26936@shlinux2>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Mon, 20 Jun 2016 12:49:00 +0100
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <CAKv+Gu-7FQ-34Ruhxc+RcKK9ycp9LW4_HdsD8Gb-+Y4XE7vNoQ@mail.gmail.com>
+References: <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+ <20160218191624.GA1515@redhat.com>
+ <20160226144114.GA7475@codeblueprint.co.uk>
+ <20160301233040.GA31476@codeblueprint.co.uk>
+ <20160304062524.GA19010@dhcp-128-65.nay.redhat.com>
+ <CAKv+Gu_ekP+44FJjR7BY_MFqx2jQgc6Tk9W4SBL__ttdvQ55VQ@mail.gmail.com>
+ <20160518085348.GG21993@codeblueprint.co.uk>
+ <CAKv+Gu-7FQ-34Ruhxc+RcKK9ycp9LW4_HdsD8Gb-+Y4XE7vNoQ@mail.gmail.com>
+Message-ID: <20160620114900.GP2658@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 18, 2016 at 01:29:05AM +0200, Maciej S. Szmigiero wrote:
-> Hi Peter,
+On Thu, 16 Jun, at 03:47:30PM, Ard Biesheuvel wrote:
 > 
-> On 17.06.2016 12:09, Peter Chen wrote:
-> > Hi all,
-> > 
-> > We have an well-known problem that the device needs to do some power
-> > sequence before it can be recognized by related host, the typical
-> > example like hard-wired mmc devices and usb devices. This power
-> > sequence is hard to be described at device tree and handled by
-> > related host driver, so we have created a common power sequence
-> > framework to handle this requirement. The generic code is supplied
-> > some common helpers from host driver, and individual power sequence
-> > driver handles kinds of power sequence for devices.
-> > 
-> > Since the MMC has already done the similar things, and this power
-> > sequence handling can be generic, we use mmc power sequence code
-> > as base to create this framework.
-> > 
-> > This patch set is based on Krzysztof Kozlowski's RFC patch set (v4.7-rc1)
-> > [1], and making some changes which can let it be generic. After that,
-> > we create a generic power sequence driver for USB devices which handles
-> > below things, it includes all input signals for devices I can consider.
-> > 
-> > - Clock and its frequencies
-> > - GPIO for reset and the duration time
-> > - GPIO for enable
-> > - Regulator for power
-> > 
-> > This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> > two hot-plug devices to simulate this use case. The udoo board changes
-> > were tested using my last power sequence patch set. [2]
-> > 
-> > @Maciej S. Szmigiero, Oscar, would you please test them on imx6qdl udoo
-> > boards?
+> Hi Matt,
 > 
-> Thanks for the patch set, just tested them on my UDOO Quad board and can
-> confirm that USB and on-board hub work fine.
-> 
-> Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> 
-> Maciej
-> 
+> Any progress here?
 
-Many thanks, Maciej.
-
--- 
-
-Best Regards,
-Peter Chen
+Expect something to be posted this week.
