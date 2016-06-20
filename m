@@ -1,34 +1,79 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 20 Jun 2016 09:50:11 -0700
-Subject: [PATCH v19 05/13] arm64/kexec: Add pr_debug output
-In-Reply-To: <5768147E.1050900@arm.com>
-References: <cover.1466120418.git.geoff@infradead.org>
- <dd245cadf97ea0d8fd5b0fe5743ecf9fa512d3c0.1466120418.git.geoff@infradead.org>
- <5768147E.1050900@arm.com>
-Message-ID: <1466441411.7965.17.camel@infradead.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 20 Jun 2016 17:49:41 +0100
+Subject: [PATCH 4/8] arm: arm64: Add routine to determine cpuid of other
+ cpus
+In-Reply-To: <1465511013-10742-5-git-send-email-jeremy.linton@arm.com> (Jeremy
+ Linton's message of "Thu, 9 Jun 2016 17:23:29 -0500")
+References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
+ <1465511013-10742-5-git-send-email-jeremy.linton@arm.com>
+Message-ID: <87d1nb6c0q.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-06-20 at 17:06 +0100, James Morse wrote:
-> --- a/arch/arm64/kernel/machine_kexec.c
-> > +++ b/arch/arm64/kernel/machine_kexec.c
-> > @@ -11,6 +11,7 @@
-> >  
-> >  #include 
-> >  #include 
-> > +#include 
-> 
-> Now that the get_user(maybe_dtb_addr,.. has gone, I don't think we need this header.
+Jeremy Linton <jeremy.linton@arm.com> writes:
 
-No, we don't.  I have already fixed that in my master branch.
+> It is helpful if we can read the cpuid/midr of other CPUs
+> in the system independent of arm/arm64.
+>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm/include/asm/cputype.h   | 6 +++++-
+>  arch/arm64/include/asm/cputype.h | 4 ++++
+>  2 files changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index 1ee94c7..e391b67 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -81,6 +81,8 @@
+>  #define ARM_CPU_XSCALE_ARCH_V2		0x4000
+>  #define ARM_CPU_XSCALE_ARCH_V3		0x6000
+>  
+> +#define ARM_PARTNUM(cpuid_id) (cpuid_id & ARM_CPU_PART_MASK)
+> +
+>  extern unsigned int processor_id;
+>  
+>  #ifdef CONFIG_CPU_CP15
+> @@ -180,7 +182,7 @@ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
+>   */
+>  static inline unsigned int __attribute_const__ read_cpuid_part(void)
+>  {
+> -	return read_cpuid_id() & ARM_CPU_PART_MASK;
+> +	return ARM_PARTNUM(read_cpuid_id());
+>  }
+>  
+>  static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
+> @@ -208,6 +210,8 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
+>  	return read_cpuid(CPUID_MPIDR);
+>  }
+>  
+> +#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->cpuid
 
-> >  
-> >  #include 
-> >  #include 
-> 
-> 
-> Reviewed-by: James Morse <james.morse@arm.com>
+IMO, something like read_cpuid_of might be better name.
 
-Thanks again.
-
--Geoff
+> +
+>  /*
+>   * Intel's XScale3 core supports some v6 features (supersections, L2)
+>   * but advertises itself as v5 as it does not support the v6 ISA.  For
+> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> index 87e1985..56fd8c1 100644
+> --- a/arch/arm64/include/asm/cputype.h
+> +++ b/arch/arm64/include/asm/cputype.h
+> @@ -38,6 +38,7 @@
+>  #define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
+>  #define MIDR_PARTNUM(midr)	\
+>  	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
+> +#define ARM_PARTNUM MIDR_PARTNUM
+>  #define MIDR_ARCHITECTURE_SHIFT	16
+>  #define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
+>  #define MIDR_ARCHITECTURE(midr)	\
+> @@ -126,6 +127,9 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+>  {
+>  	return read_cpuid(CTR_EL0);
+>  }
+> +
+> +#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->reg_midr
+> +
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif
