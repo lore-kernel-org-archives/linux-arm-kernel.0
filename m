@@ -1,104 +1,135 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 20 Jun 2016 20:29:55 +0800
-Subject: [PATCH 08/12] doc: binding: pwrseq-usb-generic: add binding doc
- for generic usb power sequence driver
-In-Reply-To: <20160620112651.GA26936@shlinux2>
-References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
- <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
- <CAL_JsqLvs0s2TyfqPM5vtmyY81_X84VjCGjsGYbTgT4syOfp9Q@mail.gmail.com>
- <20160620112651.GA26936@shlinux2>
-Message-ID: <CAGb2v65nuVyHjQY7-shvygCTVxG6eHbwGygr_Cw2Hg7mg+rAwg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Jun 2016 13:39:06 +0100
+Subject: [PATCH 2/2] arm64: dts: Add device-tree for ARM's AEMv8A-AEMv8A
+ FVP Base model
+In-Reply-To: <1466424796-13769-2-git-send-email-tixy@linaro.org>
+References: <1466424796-13769-1-git-send-email-tixy@linaro.org>
+ <1466424796-13769-2-git-send-email-tixy@linaro.org>
+Message-ID: <20160620123906.GC26152@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Jun 20, 2016 at 7:26 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> On Fri, Jun 17, 2016 at 12:16:48PM -0500, Rob Herring wrote:
->> On Fri, Jun 17, 2016 at 5:09 AM, Peter Chen <peter.chen@nxp.com> wrote:
->> > Add binding doc for generic usb power sequence driver, and update
->> > generic usb device binding-doc accordingly.
->> >
->> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
->> > ---
->> >  .../bindings/power/pwrseq/pwrseq-usb-generic.txt   | 31 ++++++++++++++++++++++
->> >  .../devicetree/bindings/usb/usb-device.txt         |  2 ++
->> >  2 files changed, 33 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
->> > new file mode 100644
->> > index 0000000..8ad98382
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
->> > @@ -0,0 +1,31 @@
->> > +The power sequence for generic USB Devices
->> > +
->> > +Some hard-wired USB devices need to do power sequence to let the
->> > +device work normally, the typical power sequence like: enable USB
->> > +PHY clock, toggle reset pin, etc. But current Linux USB driver
->> > +lacks of such code to do it, it may cause some hard-wired USB devices
->> > +works abnormal or can't be recognized by controller at all. The
->> > +power sequence will be done before this device can be found at USB
->> > +bus.
->> > +
->> > +Required properties:
->> > +- compatible : contains "usb-pwrseq-generic".
->>
->> In case I have not been clear, no.
->>
->> I am not going to accept anything along the lines of the current mmc
->> pwrseq. I am basically okay with Krzysztof's proposal as it is *only*
->> an added property and not a duplication of information. I'd suggest
->> you figure out how to make the kernel work with that rather than
->> trying to work-around whatever kernel limitations there are.
->>
->
-> I see.
->
-> Would you agree with below:
->
-> &usbotg1 {
->         vbus-supply = <&reg_usb_otg1_vbus>;
->         pinctrl-names = "default";
->         pinctrl-0 = <&pinctrl_usb_otg1_id>;
->         status = "okay";
->
->         #address-cells = <1>;
->         #size-cells = <0>;
->         hub: genesys at 1 {
->                 compatible = "usb5e3,608";
->                 reg = <1>;
->
->                 power-sequence;
->                 reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
->                 reset-duration-us = <10>;
->                 clocks = <&clks IMX6SX_CLK_CKO>;
->
->                 #address-cells = <1>;
->                 #size-cells = <0>;
->                 ethernet: asix at 1 {
->                         compatible = "usbb95,1708";
->                         reg = <1>;
->
->                         power-sequence;
->                         reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
->                         reset-duration-us = <15>;
->                         clocks = <&clks IMX6SX_CLK_IPG>;
->                 };
->         };
-> };
->
-> If the node has property "power-sequence", the pwrseq core will create
-> related platform device, and the driver under pwrseq driver will handle
-> power sequence stuffs. The property below "power-sequence" will be
-> handled at pwrseq driver.
+On Mon, Jun 20, 2016 at 01:13:16PM +0100, Jon Medhurst wrote:
+> Fixed Virtual Platform (FVP) Base models are simulations of systems
+> that resemble Versatile Express or Juno hardware.
+> 
+> This adds a device-tree for the model variant that has two clusters of
+> Architecture Envelope Model (AEM) v8-A CPUs. The peripheral devices that
+> are common to all variants of Base models have been placed in a separate
+> file (fvp-base.dtsi) to facilitate creating device-trees for other
+> models.
+> 
+> It is desirable to use simulations for code testing purposes and so it
+> is beneficial to include nodes for things that are timing and power
+> consumption related, even when these don't otherwise have relevance or
+> accuracy. Where these have been included here (e.g. idle-states) entries
+> have been copied from real hardware platforms such as Juno.
 
-Isn't this binding what Krzysztof proposed? His series also provides example
-code for enabling USB device power sequencing. Does it not work for you?
+Which firmware are you using, and what precisely does it do w.r.t.
+those idle states? Judging by the FVP ATF pm code [1], those state IDs
+aren't valid (though perhaps the comment is wrong, or I've misunderstood
+something).
 
-Having 2 series by 2 separate people doing the same thing but slightly
-different is very confusing.
+People use the FVPs with a variety of FW and bootloaders, so I'm not
+keen on putting anything FW or bootloader specific into the canonical
+FVP DT files.
 
-Regards
-ChenYu
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
+>  arch/arm64/boot/dts/arm/Makefile                   |   1 +
+>  arch/arm64/boot/dts/arm/fvp-base-aemv8a-aemv8a.dts | 221 +++++++++++++++++
+>  arch/arm64/boot/dts/arm/fvp-base.dtsi              | 267 +++++++++++++++++++++
+>  3 files changed, 489 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
+> index 75cc2aa..7531001 100644
+> --- a/arch/arm64/boot/dts/arm/Makefile
+> +++ b/arch/arm64/boot/dts/arm/Makefile
+> @@ -1,4 +1,5 @@
+>  dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb foundation-v8-gicv3.dtb
+> +dtb-$(CONFIG_ARCH_VEXPRESS) += fvp-base-aemv8a-aemv8a.dtb
+>  dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb juno-r2.dtb
+>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
+>  dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2f-1xv7-ca53x2.dtb
+> diff --git a/arch/arm64/boot/dts/arm/fvp-base-aemv8a-aemv8a.dts b/arch/arm64/boot/dts/arm/fvp-base-aemv8a-aemv8a.dts
+> new file mode 100644
+> index 0000000..2acfd26
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/arm/fvp-base-aemv8a-aemv8a.dts
+> @@ -0,0 +1,221 @@
+> +/*
+> + * ARM Ltd. Fixed Virtual Platform (FVP) Base model with dual cluster
+> + * Architecture Envelope Model (AEM) v8-A CPUs
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	compatible = "arm,fvp-base,aemv8a-aemv8a", "arm,fvp-base", "arm,vexpress";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	chosen { };
+
+Please add stdout-path, e.g.
+
+	stdout-path = "serial0:115200";
+
+> +
+> +	aliases {
+> +		serial0 = &bp_serial0;
+> +		serial1 = &bp_serial1;
+> +		serial2 = &bp_serial2;
+> +		serial3 = &bp_serial3;
+> +	};
+
+[...]
+
+> +		idle-states {
+> +			entry-method = "arm,psci";
+> +
+> +			CPU_SLEEP_0: cpu-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2000>;
+> +			};
+> +
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x1010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2500>;
+> +			};
+> +		};
+
+[...]
+
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+
+The cpumask shouldn't be there (it's not valid for GICv3).
+
+> +		clock-frequency = <100000000>;
+
+FW should program CNTFRQ correctly, so we should drop the
+clock-frequency property. We should never have had it in the first place
+for the original RTSM DT.
+
+Thanks,
+Mark.
+
+[1] https://github.com/ARM-software/arm-trusted-firmware/commit/6355f2347aec8bf6ad74867c2b0c996e10546ad4#L53
