@@ -1,134 +1,122 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Mon, 20 Jun 2016 12:27:11 +0300
-Subject: Auto-detecting touchscreen controller and dealing with hw
- configuration differences on q8 tablets
-In-Reply-To: <bc978925-46a4-c069-8793-903a87ec70b8@redhat.com>
-References: <bc978925-46a4-c069-8793-903a87ec70b8@redhat.com>
-Message-ID: <5E70AD96-4E8E-4430-AF99-0AA0FCF5F8E7@konsulko.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 20 Jun 2016 11:34:29 +0200
+Subject: [PATCH V6 1/7] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <20160615110427.GD30560@red-moon>
+References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
+ <1465828873-23498-2-git-send-email-tn@semihalf.com>
+ <20160615110427.GD30560@red-moon>
+Message-ID: <5767B8A5.7020706@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On 06/15/2016 01:04 PM, Lorenzo Pieralisi wrote:
+> On Mon, Jun 13, 2016 at 04:41:07PM +0200, Tomasz Nowicki wrote:
+>> IORT shows representation of IO topology for ARM based systems.
+>> It describes how various components are connected together on
+>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+>>
+>> Initial support allows to:
+>> - register ITS MSI chip along with ITS translation ID and domain token
+>> - deregister ITS MSI chip based on ITS translation ID
+>> - find registered domain token based on ITS translation ID
+>> - map MSI RID for a device
+>> - find domain token for a device
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>   drivers/acpi/Kconfig  |   3 +
+>>   drivers/acpi/Makefile |   1 +
+>>   drivers/acpi/iort.c   | 386 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/iort.h  |  38 +++++
+>>   4 files changed, 428 insertions(+)
+>>   create mode 100644 drivers/acpi/iort.c
+>>   create mode 100644 include/linux/iort.h
+>>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index f98c328..111dd50 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
+>>   config ACPI_CCA_REQUIRED
+>>   	bool
+>>   
+>> +config IORT_TABLE
+>> +	bool
+>> +
+>>   config ACPI_DEBUGGER
+>>   	bool "AML debugger interface"
+>>   	select ACPI_DEBUG
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index 632e81f..0390f27 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -83,6 +83,7 @@ obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
+>>   obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+>>   obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
+>>   obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
+>> +obj-$(CONFIG_IORT_TABLE) 	+= iort.o
+>>   
+>>   # processor has its own "processor." module_param namespace
+>>   processor-y			:= processor_driver.o
+>> diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
+>> new file mode 100644
+>> index 0000000..5bccbc8
+>> --- /dev/null
+>> +++ b/drivers/acpi/iort.c
+>> @@ -0,0 +1,386 @@
+>> +/*
+>> + * Copyright (C) 2016, Semihalf
+>> + *	Author: Tomasz Nowicki <tn@semihalf.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * This file implements early detection/parsing of I/O mapping
+>> + * reported to OS through firmware via I/O Remapping Table (IORT)
+>> + * IORT document number: ARM DEN 0049A
+>> + */
+>> +
+>> +#define pr_fmt(fmt)	"ACPI: IORT: " fmt
+>> +
+>> +#include <linux/export.h>
+>> +#include <linux/iort.h>
+>> +#include <linux/irqdomain.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/pci.h>
+>> +
+>> +struct iort_its_msi_chip {
+>> +	struct list_head	list;
+>> +	struct fwnode_handle	*fw_node;
+>> +	u32			translation_id;
+>> +};
+>> +
+>> +typedef acpi_status (*iort_find_node_callback)
+>> +	(struct acpi_iort_node *node, void *context);
+>> +
+>> +/* Root pointer to the mapped IORT table */
+>> +static struct acpi_table_header *iort_table;
+> A question to be sorted out:
+>
+> We assume we can rely on the iort_table pointer, obtained through
+> acpi_get_table(), since we assume acpi_glb_permanent_mmap is set (?),
+> correct ?
 
-I?m going to commend only on the overlay related parts since I?m not I
-get all the nuances right.
+Correct.
 
-> On Jun 19, 2016, at 14:06 , Hans de Goede <hdegoede@redhat.com> wrote:
-> 
-> <resend with Pantelis' email address fixed>
-> 
-> Hi All,
-> 
-> The sunxi support in the kernel supports (amongst many other devices) the quite
-> popular low cost q8 form factor 7" tablets.
-> 
-> These are all based on the same case, with an allwinner SoC inside (there
-> are non allwinner versions, but those are out of scope) and typically all based on
-> the same reference design.
-> 
-> Currently we support any such tablet with 4 u-boot defconfigs / 4 dts files:
-> 
-> q8_a13_tablet
-> q8_a23_tablet_800x480
-> q8_a33_tablet_800x480
-> q8_a33_tablet_1026x600
-> 
-> So all the user needs to know to get mainline running on these is which SoC his
-> tablet is using and which resolution his lcd has.
-> 
-> However the reference design gets completed by the manufacturers with whatever
-> accelerometer, wifi chip and touchscreen controller are cheapest for the batch
-> being produced that week.
-> 
-> The plan is (was ?) to use auto-detection to figure out which components are
-> used and adjust the dts using e.g. overlays.
-> 
-> Recently I've been working together with some students from my local university
-> to get a driver for the gsl1680 touchscreen controller used in most of these
-> tablets upstream.
-> 
-> So now I've been testing the touschscreen on all q8 tablets I own and
-> unfortunately things are not so easy. The gsl1680 is quite flexible, it features
-> a number of capacitive sense pins and these can be routed in random order to
-> sense lines in the display, during init the controller gets feed a configuration
-> data file with which pins go where and various lookup tables.
-> 
-> Here is a table of all tablets I've tested:
-> 
-> a13-94v-0:		a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600 inverted-x
-> a13-tzx-713b-v2.1:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600
-> a23-q8h-v3:		a082 a23-tj-a23-q88-v4.0_20140815/GSL1688_A70_FW.fw	 800x480 swapped-x-y
-> a23-tj-a23-q88-v4.0:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600
-> a23-ippo-q8h-v1.2:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1688_A70_FW.fw	 800x480 swapped-x-y
-> a33-ippo-q8h-v1.2:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1688_A70_FW.fw	 800x480 swapped-x-y
-> a33-tzx-723q4:		b482 a33-Q8_V2.4_1118/GSL1680_FW_D702.fw		 960x480 inverted-x
-> a33-q8-v2.4-1118:	b482 a33-Q8_V2.4_1118/GSL1680_FW_D702.fw		 960x480
-> a33-q8h-v1.5:		b482 a33-q8h-v1.5/GSL1688_A70_FW.fw			 960x480
-> 
-> 
-> The first column is <soc>-<pcb-marking>, the second is the chip-id from the gsl1680 (this can be read
-> via i2c), the third column is the configdata file used for testing, the directory-name it is prefixed
-> with is from which board's android image the firmware file was extracted. The 4th column shows
-> the resolution of the reported coordinates and any necessary flags.
-> 
-> Note that the resolution and if we need swapped-x-y actually is fixed for a given fw file, so
-> we need to keep this information paired.
-> 
-> So as you can see which fw file to use, and whether x is inverted or not vary from board to board.
-> 
-> This leaves us with 2 options:
-> 
-> 1) Move to 1 dts file per PCB variant solution, of ALL the q8 tablets I've seen I've only ever
-> had 2 with identical PCB-s and those were from the same batch, so this seems unmaintainable.
-> Which leaves us with:
-> 
+>
+> x86 DMAR code seems to rely on that (without even checking
+> acpi_gbl_permanent_mmap) and this has consequences on when
+> we can really start parsing IORT entries through this patch
+> (because if acpi_gbl_permanent_mmap is not set while using
+> IORT nodes we would dereference unmapped pointers).
+>
+> @Rafael: can you confirm that's the right approach ?
 
-Yeah, you?re going to be fighting a losing battle.
-
-> 2) Give the user some way to override the dts settings.
-> 
-> Which after a somewhat long intro brings me to the actual purpose of this thread, discuss
-> how to best deal with this. I again see 2 options:
-> 
-> 1) Put a disabled gsl1680 node in the dts file, have a q8_autodetect.c in u-boot
-> which probes i2c and if it finds the gsl1680 nodes enables it, and patches in a best-effort
-> default for which fw file to use. Allow the user to set a touchscreen_fw u-boot env
-> variable which will override this. Also allow the user to set a touchscreen_inverted_x env
-> variable to add inverted-x to the dt node for the gsl1680.
-> 
-
-That can work. The problem is that having anything requiring smarts in u-boot always
-leads to trouble with users. It all depends on your user?s technical proficiency, if
-they are comfortable tweaking things in u-boot it?s fine. If it?s not, expect lots of
-bricked boards when they mess up.
-
-> 2) Write an in kernel overlay manager which does auto-detect as described by 1, and
-> loads an overlay for the detected touchscreen controller, with module options to allow
-> specifying the fw-file, x-inversion, etc.
-> 
-> One things which worries me about 2. is that we would need to have 2 overlay files
-> per fw-file, one regular config, one inverted-x, or is it possible for the overlay
-> manager to modify an overlay before applying it ?
-> 
-
-Yes, it?s quite possible. You can even have stacked overlays.
-
-> I tend towards doing the auto-detect in u-boot, since that will give the greatest
-> flexibility (the dtb is fully read-writable in u-boot) and I can easily access
-> things like i2c-busses, soc id/version register, etc. there.
-> 
-
-u-boot will work, but you will get into trouble if you demand users to drop to u-boot
-to make changes.
-
-> But before sinking a lot of time in either one of these I first wanted to discuss
-> this, if the consensus is that an in kernel overlay manager is the way to go
-> I will take a shot at that instead.
-> 
-> Regards,
-> 
-> Hans
-
-Regards
-
-? Pantelis
+Thanks,
+Tomasz
