@@ -1,43 +1,78 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Jun 2016 16:09:56 +0200
-Subject: [PULL] drm/bridge: sii902x driver
-Message-ID: <20160620160956.438e1c17@bbrezillon>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 20 Jun 2016 15:10:25 +0100
+Subject: [PATCH] arm64: Kconfig: select PM for ARCH_VEXPRESS
+In-Reply-To: <5060882.N5elh1FlkW@wuerfel>
+References: <1466090128-24425-1-git-send-email-sudeep.holla@arm.com>
+ <5285733.mW80cUVgAV@wuerfel> <57641C0E.2010700@arm.com>
+ <5060882.N5elh1FlkW@wuerfel>
+Message-ID: <5767F951.1000305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
 
-This pull request contains 2 patches adding support for the sii902x
-bridge.
 
+On 17/06/16 20:38, Arnd Bergmann wrote:
+> On Friday, June 17, 2016 4:49:34 PM CEST Sudeep Holla wrote:
+>>
+>> On 17/06/16 16:07, Arnd Bergmann wrote:
+>>> On Friday, June 17, 2016 3:59:34 PM CEST Sudeep Holla wrote:
+>>
+>> [...]
+>>
+>>>> To be more precise genpd/runtime code return same error -ENODEV when
+>>>> PM_GENERIC_DOMAINS=n and if the no power domain is found with
+>>>> PM_GENERIC_DOMAINS=y . The AMBA bus code just checks for -EPROBE_DEFER
+>>>> to stop adding devices, while proceeds to access the device otherwise.
+>>>>
+>>>> However on Juno, the coresight needs to powered up before accessing it.
+>>>> Well all is fine if you specify power domains in DT and have
+>>>> PM_GENERIC_DOMAINS=y. However if PM_GENERIC_DOMAINS=n the AMBA ignores
+>>>> the error(-ENODEV) from runtime PM and access the device resulting in
+>>>> boot hang when adding amba devices.
+>>>>
+>>>> I thought we need is to have code to check for power domains in DT for
+>>>> the device even when PM_GENERIC_DOMAINS=n and return an error that can
+>>>> be used to skip registering the device and clearly identifies with other
+>>>> allowed errors. It may need a bit of surgery and closer look IMO. But
+>>>> when asked for opinion, I was suggested to do this. I admit that I
+>>>> didn't propose my thoughts then :)
+>>>
+>>> Ok, so we also need PM_GENERIC_DOMAINS, not just PM, right?
+>>>
+>> Yes, but latter won't select former. Generally I have seen domain
+>> controller code selecting PM_GENERIC_DOMAINS if PM=y
+>
+> Then at least we need the vexpress code to select both as well,
+> otherwise you could end up with PM_GENERIC_DOMAINS disabled in
+> configurations that have none of the other code.
+>
+
+True, will add it.
+
+>>> It also sounds like there is no easy way to just turn on the clocks
+>>> in the amba bus handler when PM_GENERIC_DOMAINS is turned off, other
+>>> than reimplementing PM_GENERIC_DOMAINS?
+>>>
+>>
+>> Turn on power domain, not just clocks(just to be precise), yes. It needs
+>> some thoughts as there are some assumptions on which existing platform
+>> work. Adding the support to handle the scenario I mentioned earlier is
+>> not trivial. Also the driver to handle the device may not be compiled in
+>> when PM_GENERIC_DOMAINS=n or when PM=n. So I was thinking of not
+>> accessing the device and hence skip adding it.
+>
+> I see. Another idea I had is flawed, too: we can't easily make ARM_AMBA
+> depend on PM_GENERIC_DOMAINS, because the main relevant use case I
+> can see for !PM builds is a kernel that is only used in virtual machines,
+> but we still want to use the PL01x serial port driver in that configuration.
+>
+> I'd say let's select both PM_GENERIC_DOMAINS and PM on VEXPRESS for now,
+> (almost) as you have in your patch.
+>
+
+OK, thanks for taking time to review. I understand it's not the best
+solution but *just OK* for now. I will repost with suggested change.
+
+-- 
 Regards,
-
-Boris
-
-The following changes since commit a0877f52035280370707bdefeddc6faa6478b892:
-
-  Merge tag 'topic/drm-misc-2016-06-15' of git://anongit.freedesktop.org/drm-intel into drm-next (2016-06-16 05:49:32 +1000)
-
-are available in the git repository at:
-
-  git at github.com:bbrezillon/linux-at91.git tags/drm-sii902x
-
-for you to fetch changes up to b7eaa9ffa6a44c4efabdd9d430e882d67c92c5e8:
-
-  drm/bridge: Add sii902x DT bindings doc (2016-06-20 15:57:06 +0200)
-
-----------------------------------------------------------------
-Add basic support for the sii902x RGB -> HDMI bridge.
-
-----------------------------------------------------------------
-Boris Brezillon (2):
-      drm/bridge: Add sii902x driver
-      drm/bridge: Add sii902x DT bindings doc
-
- Documentation/devicetree/bindings/display/bridge/sii902x.txt |  35 +++++++++++++
- drivers/gpu/drm/bridge/Kconfig                               |   8 +++
- drivers/gpu/drm/bridge/Makefile                              |   1 +
- drivers/gpu/drm/bridge/sii902x.c                             | 467 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++	+++++++++++++++++++++++++
- 4 files changed, 511 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/sii902x.txt
- create mode 100644 drivers/gpu/drm/bridge/sii902x.c
+Sudeep
