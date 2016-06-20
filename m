@@ -1,99 +1,255 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 20 Jun 2016 14:39:11 +0800
-Subject: [PATCH v4 00/14] fix some type infos and bugs for arm64/of numa
-In-Reply-To: <20160614142220.GC14654@e104818-lin.cambridge.arm.com>
-References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
- <20160607135852.GA20477@arm.com> <5757DE57.10700@huawei.com>
- <20160614142220.GC14654@e104818-lin.cambridge.arm.com>
-Message-ID: <57678F8F.6060303@huawei.com>
+From: stefan.mavrodiev@gmail.com (Stefan Mavrodiev)
+Date: Mon, 20 Jun 2016 09:42:42 +0300
+Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for Olimex A33-OLinuXino
+Message-ID: <1466404962-13613-1-git-send-email-stefan.mavrodiev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+A33-OLinuXino is A33 development board designed by Olimex LTD.
 
+It has AXP233 PMU, 1GB DRAM, a micro SD card, one USB-OTG connector,
+headphone and mic jacks, connector for LiPo battery and optional
+4GB NAND Flash.
 
-On 2016/6/14 22:22, Catalin Marinas wrote:
-> On Wed, Jun 08, 2016 at 04:59:03PM +0800, Leizhen (ThunderTown) wrote:
->> On 2016/6/7 21:58, Will Deacon wrote:
->>> On Tue, Jun 07, 2016 at 04:08:04PM +0800, Zhen Lei wrote:
->>>> v3 -> v4:
->>>> 1. Packed three patches of Kefeng Wang, patch6-8.
->>>> 2. Add 6 new patches(9-15) to enhance the numa on arm64.
->>>>
->>>> v2 -> v3:
->>>> 1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
->>>>    patches looks more well. The final code have no change. 
->>>>
->>>> v1 -> v2:
->>>> 1. Base on https://lkml.org/lkml/2016/5/24/679
->>>
->>> If you want bug fixes to land in 4.7, you'll need to base them on a
->>> mainline kernel.
->>
->> I heared that David Daney's acpi numa patch series was accepted and
->> put into next branch(Linux 4.8).
->> Otherwise I will suggest him sending his patch6-7 to mainline first.
->> So that, only a very small conflict will be exist.
->>
->> I also tested that:
->> 1. git am David Daney's patch6-7, then git am all of my patches on a
->> branch, named branch A.
->> 2. git am David Daney's patch6-7 on another branch, named branch B.
->> 3. when I git merge B into branch A, it's still conflict. So I guess
->> git merge is based on source code, rather than patches.
->>
->> So at present, unless the maintainers are willing to resolve the
->> conflict, otherwise I update my patches will not work.
-> 
-> It usually depends on how complex the conflict is and whether your
-> patches functionally depend on the other patches. I have no idea what
-> the dependency is here since I haven't tried applying them to mainline.
-> 
->> Fortunately, these patches are not particularly urgent. So I think I
->> can wait until Linux 4.8 start, then send these patches again. But I'm
->> not sure whether these patches can be merged into Linux 4.8, I really
->> hope.
-> 
-> If there are fixes to the arm64 ACPI NUMA patches that Rafael queued
-> into linux-next, they should be sent to him and potentially being queued
-> on top ahead of the 4.8 merging window or shortly after 4.8-rc1.
-> Non-ACPI NUMA patches (as I can see, most of these patches are DT
-> specific) could be merged independently.
-> 
-> So how many patches do you have in each category below:
-> 
-> 1. NUMA fixes against current mainline (4.7-rc3)
-> 2. NUMA fixes against the arm64 ACPI NUMA patches queued by Rafael
-My patches have not fixed any bugs for ACPI NUMA, but just based on it.
-There are only three related patches:
-[PATCH v7 06_15] arm64, numa  rework numa_add_memblk()
-[PATCH v7 07_15] arm64, numa  Cleanup NUMA disabled messages.
-[PATCH v7 14_15] arm64, acpi, numa  NUMA support based on SRAT and SLIT
+It has two 40-pin headers. One for LCD panel, and one for
+additional modules. Also there is CSI/DSI connector.
 
-arch/arm64/mm/numa.c          |  28 ++++--
-drivers/of/of_numa.c          |   4 +-
+Signed-off-by: Stefan Mavrodiev <stefan.mavrodiev@gmail.com>
+---
+Changes for v2:
+	- Removed unused power nodes
+	- Removed default-trigger for green led
+	- Removed "always-on" option for LCD power
 
-My patches 1-5, 8, 11 will confict with it.
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/sun8i-a33-olinuxino.dts | 207 ++++++++++++++++++++++++++++++
+ 2 files changed, 208 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-a33-olinuxino.dts
 
-> 3. New functionality or clean-up. Are these against mainline or ACPI
->    NUMA patches?
-Hi, Catalin
-I'm sorry to reply this email too late. Because I have been thinking if
-there are any other solutions.
-
-I try to adjust the sequence of my patches as below:
-1. New functionality 		//queued in your branch  (my patches 9-14, and 6, 6 is clean-up)
-2. 4.8-rc1			//apci numa series and my new functionality had been merged
-3. bug fixes			//other 4.8-rc versions	 (my patches 1-5)
-4. clean-up (pr_fmt)		//queued in 4.9		 (my patches 7-8)
-
-And there only one confliction exist:
-++<<<<<<< HEAD
- +static u8 numa_distance[MAX_NUMNODES][MAX_NUMNODES];			//choose this
- +static int numa_off;
-++=======
-+ static int numa_distance_cnt;
-+ static u8 *numa_distance;
-+ static bool numa_off;							//choose this
-++>>>>>>> acpi
-
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 970e906..b78f363 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -760,6 +760,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a33-ippo-q8h-v1.2.dtb \
+ 	sun8i-a33-q8-tablet.dtb \
+ 	sun8i-a33-sinlinx-sina33.dtb \
++	sun8i-a33-olinuxino.dtb \
+ 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+ 	sun8i-a83t-cubietruck-plus.dtb \
+ 	sun8i-h3-orangepi-2.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-a33-olinuxino.dts b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
+new file mode 100644
+index 0000000..14fa801
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
+@@ -0,0 +1,207 @@
++/*
++ * Copyright 2016 - Stefan Mavrodiev <stefan.mavrodiev@gmail.com>
++ *                  Olimex LTD. <support@olimex.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-a33.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "A33-OLinuXino";
++	compatible = "allwinner,sun8i-a33";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pin_olinuxino>;
++
++		green {
++			label = "olinuxino:green:usr";
++			gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* LED2 */
++		};
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxino>;
++	vmmc-supply = <&reg_dcdc1>;
++	bus-width = <4>;
++	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
++	cd-inverted;
++	status = "okay";
++};
++
++&pio {
++	mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
++		allwinner,pins = "PB4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	led_pin_olinuxino: led_pins at 0 {
++		allwinner,pins = "PB7";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&r_rsb {
++	status = "okay";
++
++	axp22x: pmic at 3a3 {
++		compatible = "x-powers,axp223";
++		reg = <0x3a3>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		eldoin-supply = <&reg_dcdc1>;
++	};
++};
++
++#include "axp22x.dtsi"
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-dsi";
++};
++
++&reg_dc1sw {
++	regulator-name = "vcc-lcd";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dc5ldo {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_aldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-io";
++};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <2350000>;
++	regulator-max-microvolt = <2650000>;
++	regulator-name = "vdd-dll";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-avcc";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_b>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usbphy {
++	usb0_vbus-supply = <&reg_vcc5v0>;
++	status = "okay";
++
++};
++
++&simplefb_lcd {
++	vcc-lcd-supply = <&reg_dc1sw>;
++};
+-- 
+2.8.1
