@@ -1,97 +1,23 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 20 Jun 2016 09:28:10 +0800
-Subject: [RFC PATCH] clocksource: arm_arch_timer: disable the evtstrm via
- the cmdline
-In-Reply-To: <20160617143610.GA32087@leverpostej>
-References: <1466171011-30468-1-git-send-email-will.deacon@arm.com>
- <20160617143610.GA32087@leverpostej>
-Message-ID: <576746AA.70208@huawei.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Mon, 20 Jun 2016 10:18:19 +0800
+Subject: [PATCH v10 0/8] add i2c driver supported for rk3399
+In-Reply-To: <20160617115611.GC6876@tetsubishi>
+References: <1463407063-41218-1-git-send-email-david.wu@rock-chips.com>
+ <20160617115611.GC6876@tetsubishi>
+Message-ID: <cc893dec-0796-d5f4-4702-bebd6d8819d7@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Wolfram?
 
+? 2016/6/17 19:56, Wolfram Sang ??:
+> Applied whole series to for-next, thanks! This was nicely refactored and
+> easy to review, thanks. Also thanks to all reviewers who helped this
+> series. I fixed one checkpatch issue for you, though:
+>
+> WARNING: Statements should start on a tabstop
+> #278: FILE: drivers/i2c/busses/i2c-rk3x.c:789:
+> +	 if (min_div_for_hold >= min_total_div) {
+>
 
-On 2016/6/17 22:36, Mark Rutland wrote:
-> On Fri, Jun 17, 2016 at 02:43:31PM +0100, Will Deacon wrote:
->> Disabling the eventstream can be useful for debugging and development
->> purposes and is currently controlled via a Kconfig option
->> (CONFIG_ARM_ARCH_TIMER_EVTSTREAM). Whilst this does the trick, it's
->> often desirable to toggle the feature on the command line, so this patch
->> adds a "noevtstrm" command line option to do just that.
-> 
-> I think anything that allows for better debugging on a production
-> kernels is great, so FWIW:
-
-Agree, I run linux in arm esl and the linux can't boot up without
-ARM_ARCH_TIMER_EVTSTREAM recently.
-
-The esl guys is looking into the issue, and it is useful to debug issue
-with one Image(dynamic switching in cmdline).
-
-BRs,
-Kefeng
-
-
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> We might want to drop something in Documentation/kernel-parameters.txt
-> 
-> Mark.
-> 
->>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
->> ---
->>
->> Sending as an RFC because we might want to remove the Kconfig option
->> altogether if we have this.
->>
->>  drivers/clocksource/arm_arch_timer.c | 11 ++++++++++-
->>  1 file changed, 10 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index 4814446a0024..f579c0da7423 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -79,6 +79,15 @@ static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
->>  static bool arch_timer_c3stop;
->>  static bool arch_timer_mem_use_virtual;
->>  
->> +static bool evtstrm_disable;
->> +
->> +static int __init early_evtstrm_disable(char *buf)
->> +{
->> +	evtstrm_disable = true;
->> +	return 0;
->> +}
->> +early_param("noevtstrm", early_evtstrm_disable);
->> +
->>  /*
->>   * Architected system timer support.
->>   */
->> @@ -372,7 +381,7 @@ static int arch_timer_setup(struct clock_event_device *clk)
->>  		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
->>  
->>  	arch_counter_set_user_access();
->> -	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM))
->> +	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM) && !evtstrm_disable)
->>  		arch_timer_configure_evtstream();
->>  
->>  	return 0;
->> -- 
->> 2.1.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> .
-> 
+Thanks for your final review?
