@@ -1,184 +1,49 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 20 Jun 2016 19:04:28 +0300
-Subject: [PATCH v8 0/4] ACPI: parse the SPCR table
-In-Reply-To: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <8f19dd0d-c31e-d898-e3fe-577eaf0bbee1@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Jun 2016 18:08:22 +0200
+Subject: [PATCH] ARM: mvebu: compile pm code conditionally
+Message-ID: <20160620160931.2714557-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+A cleanup to include the headers correctly caused another build problem:
 
-On 05/20/2016 04:03 PM, Aleksey Makarov wrote:
+arch/arm/mach-mvebu/kirkwood-pm.c:70:13: error: redefinition of 'kirkwood_pm_init'
+arch/arm/mach-mvebu/kirkwood-pm.h:23:20: note: previous definition of 'kirkwood_pm_init' was here
 
-Hi Rafael,
+The underlying issue is that kirkwood-pm.o is not actually meant to be
+used when CONFIG_PM is disabled, so we should also leave it out of the
+Makefile.
 
-Can you consider this patch set for queuing up please?
+The same seems to be true for the PM code in MACH_MVEBU_V7, and I'm
+treating it the same way here.
 
-You approved ACPI part. I believe it's 2/4 and 3/4.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: d705c1a66e15 ("ARM: Kirkwood: fix kirkwood_pm_init() declaration/type")
+---
+ arch/arm/mach-mvebu/Makefile | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-	https://lkml.kernel.org/g/CAJZ5v0hdoLTfjrD8+WxSoxM48dqbZK2KwY_h+63kHKHKgO=JFA at mail.gmail.com
-
-1/4 is ACKed by Rob Herring and Greg Kroah-Hartman
-
-As for 4/4 it had an ACK from Greg but since then I had to make a small
-change.  For details look at
-
-	https://lkml.kernel.org/g/c37d62c7-1e1b-0b10-a083-c5207fbbb820 at gmail.com
-
-Thank you
-Aleksey Makarov
-
-> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port Console
-> Redirection Table) [2] as a mandatory ACPI table that specifies the
-> configuration of serial console.
-> 
-> Move "earlycon" early_param handling to earlycon.c to parse this option once
-> 
-> Parse SPCR table, setup earlycon and register specified console.
-> 
-> Enable parsing this table on ARM64.  Earlycon should be set up as early as
-> possible.  ACPI boot tables are mapped in
-> arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch() and
-> that's where we parse spcr.  So it has to be opted-in per-arch. When
-> ACPI_SPCR_TABLE is defined initialization of DT earlycon is deferred until the
-> DT/ACPI decision is done.
-> 
-> Implement console_match() for pl011.
-> 
-> Based on the work by Leif Lindholm [3]
-> Thanks to Peter Hurley for explaining how this should work.
-> 
-> Should be applied to next-20160520
-> Tested on QEMU and ThunderX.
-> SPCR support is included in QEMU's ARM64 mach-virt since 2.4 release.
-> 
-> v8:
-> - rebase to next-20160520
-> - remove the patch "ACPICA: Headers: Add new constants for the DBG2 ACPI table"
->   as it have got to linux-next
-> - add Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Reviewed-by:
->   Peter Hurley <peter@hurleysoftware.com> (but see below)
-> - fix the patch "serial: pl011: add console matching function".  The patch by
->   Christopher Covington [4] specifies that SBSA uart does 32-bit access to
->   registers and this breaks the match function.  In this series the function
->   was changed to match when SPCR specifies both mmio32 and mmio access.
->   I removed Acked-by: Greg from this patch because of these changes.
-> 
-> v7:
-> https://lkml.kernel.org/g/1459431629-27934-1-git-send-email-aleksey.makarov at linaro.org
-> - add Acked-by: Rob Herring for "of/serial: move earlycon early_param handling
->   to serial"
-> - call DT earlycon initialization from the arch ACPI code, not from parse_spcr()
->   (Rafael J. Wysocki)
-> - fix a few minor issues (Rafael J. Wysocki)
-> 
-> v6:
-> https://lkml.kernel.org/g/1458823925-19560-1-git-send-email-aleksey.makarov at linaro.org
-> - add documentation for parse_spcr() functioin (Yury Norov)
-> - don't initialize err variable (Yury Norov)
-> - add __initdata for the earlycon_init_is_deferred flag variable
-> - rename the function exported in "of/serial: move earlycon early_param handling
->   to serial" to avoid clash with the function from arch/microblaze/kernel/prom.c
-> - defer initialization of DT earlycon until DT/ACPI decision is made
->   (Rob Herring, Peter Hurley)
-> - use snprintf instead of sprintf (Andy Shevchenko)
-> - drop patch that adds EARLYCON_DECLARE for pl011 as EARLYCON_DECLARE is
->   equivalent to OF_EARLYCON_DECLARE for 4.6+ (Peter Hurley).  This means that
->   SPCR earlycon will not work on the kernels before 4.6
-> 
-> v5:
-> https://lkml.kernel.org/g/1458643595-14719-1-git-send-email-aleksey.makarov at linaro.org
-> - drop patch "serial: pl011: use ACPI SPCR to setup 32-bit access" because
->   it is ugly. Also because Christopher Covington came with a better solution [4]
-> - remove error message when the table is not provided by ACPI (Andy Shevchenko)
-> - rewrite spcr.c following the suggestions by Peter Hurley
-> - add console_match() for pl011 in a separate patch
-> - add EARLYCON_DECLARE for pl011 in a separate patch
-> - add patch "of/serial: move earlycon early_param handling to serial" from
->   the GDB2 series
-> 
-> v4:
-> https://lkml.kernel.org/g/1456747355-15692-1-git-send-email-aleksey.makarov at linaro.org
-> - drop patch "ACPI: change __init to __ref for early_acpi_os_unmap_memory()"
->   ACPI developers work on a new API and asked not to do that.
->   Instead, use acpi_get_table_with_size()/early_acpi_os_unmap_memory() once
->   and cache the result. (Lv Zheng)
-> - fix some style issues (Yury Norov)
-> 
-> v3:
-> https://lkml.kernel.org/g/1455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
-> 
-> Greg Kroah-Hartman did not like v2 so I have rewritten this patchset:
-> 
-> - drop acpi_match() member of struct console
-> - drop implementations of this member for pl011 and 8250
-> - drop the patch that renames some vars in printk.c as it is not needed anymore
-> - drop patch that introduces system wide acpi_table_parse2().
->   Instead introduce a custom acpi_table_parse_spcr() in spcr.c
-> 
-> Instead of introducing a new match_acpi() member of struct console,
-> this patchset introduces a new function acpi_console_check().
-> This function is called when a new uart is registered at serial_core.c
-> the same way OF code checks for console.  If the registered uart is the
-> console specified by SPCR table, this function calls add_preferred_console()
-> 
-> The restrictions of this approach are:
-> 
-> - only serial consoles can be set up
-> - only consoles specified by the memory/io address can be set up
->   (SPCR can specify devices by PCI id/PCI address)
-> 
-> v2:
-> https://lkml.kernel.org/g/1455299022-11641-1-git-send-email-aleksey.makarov at linaro.org
-> - don't use SPCR if user specified console in command line
-> - fix initialization order of newcon->index = 0
-> - rename some variables at printk.c (Joe Perches, Peter Hurley)
-> - enable ACPI_SPCR_TABLE in a separate patch (Andy Shevchenko)
-> - remove the retry loop for console registering (Peter Hurley).
->   Instead, obtain SPCR with acpi_get_table().  That works after
->   call to acpi_early_init() i. e. in any *_initcall()
-> - describe design decision behind introducing acpi_match() (Peter Hurley)
-> - fix compilation for x86 + ACPI (Graeme Gregory)
-> - introduce DBG2 constants in a separate patch (Andy Shevchenko)
-> - fix a typo in DBG2 constants (Andy Shevchenko)
-> - add ACPI_DBG2_ARM_SBSA_32BIT constant (Christopher Covington)
-> - add support for ACPI_DBG2_ARM_SBSA_* consoles (Christopher Covington)
-> - add documentation for functions
-> - add a patch that uses SPCR to find if SBSA serial driver should use 32-bit
->   accessor functions (Christopher Covington)
-> - change __init to __ref for early_acpi_os_unmap_memory() in a separate patch
-> - introduce acpi_table_parse2() in a separate patch
-> - fix fetching the SPCR table early (Mark Salter)
-> - add a patch from Mark Salter that introduces support for matching 8250-based
->   consoles
-> 
-> v1:
-> https://lkml.kernel.org/g/1453722324-22407-1-git-send-email-aleksey.makarov at linaro.org
-> 
-> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
-> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
-> [3] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
-> [4] https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
-> 
-> Aleksey Makarov (3):
->   ACPI: parse SPCR and enable matching console
->   ARM64: ACPI: enable ACPI_SPCR_TABLE
->   serial: pl011: add console matching function
-> 
-> Leif Lindholm (1):
->   of/serial: move earlycon early_param handling to serial
-> 
->  arch/arm64/Kconfig              |   1 +
->  arch/arm64/kernel/acpi.c        |  11 +++-
->  drivers/acpi/Kconfig            |   3 ++
->  drivers/acpi/Makefile           |   1 +
->  drivers/acpi/spcr.c             | 111 ++++++++++++++++++++++++++++++++++++++++
->  drivers/of/fdt.c                |  11 +---
->  drivers/tty/serial/amba-pl011.c |  56 ++++++++++++++++++++
->  drivers/tty/serial/earlycon.c   |  19 ++++++-
->  include/linux/acpi.h            |   6 +++
->  include/linux/of_fdt.h          |   2 +
->  include/linux/serial_core.h     |   6 +++
->  11 files changed, 214 insertions(+), 13 deletions(-)
->  create mode 100644 drivers/acpi/spcr.c
-> 
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 568863e1513c..6c6497e80a7b 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -6,9 +6,15 @@ CFLAGS_pmsu.o			:= -march=armv7-a
+ obj-$(CONFIG_MACH_MVEBU_ANY)	 += system-controller.o mvebu-soc-id.o
+ 
+ ifeq ($(CONFIG_MACH_MVEBU_V7),y)
+-obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o pm.o pm-board.o
++obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
++
++obj-$(CONFIG_PM)		 += pm.o pm-board.o
+ obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
+ endif
+ 
+ obj-$(CONFIG_MACH_DOVE)		 += dove.o
+-obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
++
++ifeq ($(CONFIG_MACH_KIRKWOOD),y)
++obj-y				 += kirkwood.o
++obj-$(CONFIG_PM)		 += kirkwood-pm.o
++endif
+-- 
+2.9.0
