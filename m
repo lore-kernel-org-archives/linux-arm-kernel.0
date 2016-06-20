@@ -1,18 +1,17 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Jun 2016 16:38:20 -0700
-Subject: [PATCH 5/7] ARM: dts: fix the MSM8660 RTC base address
-In-Reply-To: <1466195292-28236-7-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 20 Jun 2016 16:39:10 -0700
+Subject: [PATCH 3/7] ARM: dts: add L2CC and RPM with regulators for MSM8660
+In-Reply-To: <1466195292-28236-4-git-send-email-linus.walleij@linaro.org>
 References: <1466195292-28236-1-git-send-email-linus.walleij@linaro.org>
- <1466195292-28236-7-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160620233820.GA14735@codeaurora.org>
+ <1466195292-28236-4-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160620233910.GB14735@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/17, Linus Walleij wrote:
-> The RTC was defined on 0x11d but on the MSM8660/APQ8060 it is
-> actually on 0x1e8. We were saved by the fact that the driver does
-> not use the reg parameter: instead it uses the compatible string
-> to figure out where the RTC is.
+> This adds the L2CC IPC resource and RPM devices plus the nodes
+> for the PM8901 and PM8058 regulators to the MSM8660 device tree.
+> This was tested on the APQ8060 Dragonboard.
 > 
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
