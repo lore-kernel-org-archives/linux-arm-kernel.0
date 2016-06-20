@@ -1,122 +1,230 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 20 Jun 2016 11:34:29 +0200
-Subject: [PATCH V6 1/7] ACPI: I/O Remapping Table (IORT) initial support
-In-Reply-To: <20160615110427.GD30560@red-moon>
-References: <1465828873-23498-1-git-send-email-tn@semihalf.com>
- <1465828873-23498-2-git-send-email-tn@semihalf.com>
- <20160615110427.GD30560@red-moon>
-Message-ID: <5767B8A5.7020706@semihalf.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Mon, 20 Jun 2016 16:51:12 +0800
+Subject: [RFC v3 3/5] drm/mediatek: add shadow register support
+In-Reply-To: <1465800183.27253.4.camel@mtksdaap41>
+References: <1465401825-43642-1-git-send-email-yt.shen@mediatek.com>
+ <1465401825-43642-4-git-send-email-yt.shen@mediatek.com>
+ <1465800183.27253.4.camel@mtksdaap41>
+Message-ID: <1466412672.14292.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2016 01:04 PM, Lorenzo Pieralisi wrote:
-> On Mon, Jun 13, 2016 at 04:41:07PM +0200, Tomasz Nowicki wrote:
->> IORT shows representation of IO topology for ARM based systems.
->> It describes how various components are connected together on
->> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
->>
->> Initial support allows to:
->> - register ITS MSI chip along with ITS translation ID and domain token
->> - deregister ITS MSI chip based on ITS translation ID
->> - find registered domain token based on ITS translation ID
->> - map MSI RID for a device
->> - find domain token for a device
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> ---
->>   drivers/acpi/Kconfig  |   3 +
->>   drivers/acpi/Makefile |   1 +
->>   drivers/acpi/iort.c   | 386 ++++++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/iort.h  |  38 +++++
->>   4 files changed, 428 insertions(+)
->>   create mode 100644 drivers/acpi/iort.c
->>   create mode 100644 include/linux/iort.h
->>
->> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->> index f98c328..111dd50 100644
->> --- a/drivers/acpi/Kconfig
->> +++ b/drivers/acpi/Kconfig
->> @@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
->>   config ACPI_CCA_REQUIRED
->>   	bool
->>   
->> +config IORT_TABLE
->> +	bool
->> +
->>   config ACPI_DEBUGGER
->>   	bool "AML debugger interface"
->>   	select ACPI_DEBUG
->> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
->> index 632e81f..0390f27 100644
->> --- a/drivers/acpi/Makefile
->> +++ b/drivers/acpi/Makefile
->> @@ -83,6 +83,7 @@ obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
->>   obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
->>   obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
->>   obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
->> +obj-$(CONFIG_IORT_TABLE) 	+= iort.o
->>   
->>   # processor has its own "processor." module_param namespace
->>   processor-y			:= processor_driver.o
->> diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
->> new file mode 100644
->> index 0000000..5bccbc8
->> --- /dev/null
->> +++ b/drivers/acpi/iort.c
->> @@ -0,0 +1,386 @@
->> +/*
->> + * Copyright (C) 2016, Semihalf
->> + *	Author: Tomasz Nowicki <tn@semihalf.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * This file implements early detection/parsing of I/O mapping
->> + * reported to OS through firmware via I/O Remapping Table (IORT)
->> + * IORT document number: ARM DEN 0049A
->> + */
->> +
->> +#define pr_fmt(fmt)	"ACPI: IORT: " fmt
->> +
->> +#include <linux/export.h>
->> +#include <linux/iort.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/kernel.h>
->> +#include <linux/pci.h>
->> +
->> +struct iort_its_msi_chip {
->> +	struct list_head	list;
->> +	struct fwnode_handle	*fw_node;
->> +	u32			translation_id;
->> +};
->> +
->> +typedef acpi_status (*iort_find_node_callback)
->> +	(struct acpi_iort_node *node, void *context);
->> +
->> +/* Root pointer to the mapped IORT table */
->> +static struct acpi_table_header *iort_table;
-> A question to be sorted out:
->
-> We assume we can rely on the iort_table pointer, obtained through
-> acpi_get_table(), since we assume acpi_glb_permanent_mmap is set (?),
-> correct ?
+Hi CK,
 
-Correct.
+On Mon, 2016-06-13 at 14:43 +0800, CK Hu wrote:
+> Hi, YT:
+> 
+> One comment inline.
+> 
+> On Thu, 2016-06-09 at 00:03 +0800, YT Shen wrote:
+> > We need to acquire mutex before using the resources,
+> > and need to release it after finished.
+> > So we don't need to write registers in the blanking period.
+> > 
+> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_drm_crtc.c |   75 +++++++++++++++++++------------
+> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c  |   22 +++++++++
+> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |    2 +
+> >  drivers/gpu/drm/mediatek/mtk_drm_drv.c  |    1 +
+> >  drivers/gpu/drm/mediatek/mtk_drm_drv.h  |    1 +
+> >  5 files changed, 72 insertions(+), 29 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> > index 24aa3ba..80d9641 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> > @@ -315,6 +315,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
+> >  	pm_runtime_put(drm->dev);
+> >  }
+> >  
+> > +static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
+> > +{
+> > +	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> > +	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
+> > +	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
+> > +	unsigned int i;
+> > +
+> > +	/*
+> > +	 * TODO: instead of updating the registers here, we should prepare
+> > +	 * working registers in atomic_commit and let the hardware command
+> > +	 * queue update module registers on vblank.
+> > +	 */
+> > +	if (state->pending_config) {
+> > +		mtk_ddp_comp_config(ovl, state->pending_width,
+> > +				    state->pending_height,
+> > +				    state->pending_vrefresh);
+> > +
+> > +		state->pending_config = false;
+> > +	}
+> > +
+> > +	if (mtk_crtc->pending_planes) {
+> > +		for (i = 0; i < OVL_LAYER_NR; i++) {
+> > +			struct drm_plane *plane = &mtk_crtc->planes[i].base;
+> > +			struct mtk_plane_state *plane_state;
+> > +
+> > +			plane_state = to_mtk_plane_state(plane->state);
+> > +
+> > +			if (plane_state->pending.config) {
+> > +				mtk_ddp_comp_layer_config(ovl, i, plane_state);
+> > +				plane_state->pending.config = false;
+> > +			}
+> > +		}
+> > +		mtk_crtc->pending_planes = false;
+> > +	}
+> > +}
+> > +
+> >  static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
+> >  {
+> >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> > @@ -391,6 +427,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+> >  				      struct drm_crtc_state *old_crtc_state)
+> >  {
+> >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> > +	struct mtk_drm_private *priv = crtc->dev->dev_private;
+> >  	unsigned int pending_planes = 0;
+> >  	int i;
+> >  
+> > @@ -409,6 +446,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+> >  	}
+> >  	if (pending_planes)
+> >  		mtk_crtc->pending_planes = true;
+> > +
+> > +	if (priv->data->shadow_register) {
+> > +		mtk_disp_mutex_acquire(mtk_crtc->mutex);
+> > +		mtk_crtc_ddp_config(crtc);
+> > +		mtk_disp_mutex_release(mtk_crtc->mutex);
+> > +	}
+> >  }
+> >  
+> >  static const struct drm_crtc_funcs mtk_crtc_funcs = {
+> > @@ -453,36 +496,10 @@ err_cleanup_crtc:
+> >  void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
+> >  {
+> >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> > -	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
+> > -	unsigned int i;
+> > +	struct mtk_drm_private *priv = crtc->dev->dev_private;
+> >  
+> > -	/*
+> > -	 * TODO: instead of updating the registers here, we should prepare
+> > -	 * working registers in atomic_commit and let the hardware command
+> > -	 * queue update module registers on vblank.
+> > -	 */
+> > -	if (state->pending_config) {
+> > -		mtk_ddp_comp_config(ovl, state->pending_width,
+> > -				    state->pending_height,
+> > -				    state->pending_vrefresh);
+> > -
+> > -		state->pending_config = false;
+> > -	}
+> > -
+> > -	if (mtk_crtc->pending_planes) {
+> > -		for (i = 0; i < OVL_LAYER_NR; i++) {
+> > -			struct drm_plane *plane = &mtk_crtc->planes[i].base;
+> > -			struct mtk_plane_state *plane_state;
+> > -
+> > -			plane_state = to_mtk_plane_state(plane->state);
+> > -
+> > -			if (plane_state->pending.config) {
+> > -				mtk_ddp_comp_layer_config(ovl, i, plane_state);
+> > -				plane_state->pending.config = false;
+> > -			}
+> > -		}
+> > -		mtk_crtc->pending_planes = false;
+> > -	}
+> > +	if (!priv->data->shadow_register)
+> > +		mtk_crtc_ddp_config(crtc);
+> >  
+> >  	mtk_drm_finish_page_flip(mtk_crtc);
+> >  }
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > index 8030769..fa53806 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > @@ -12,6 +12,7 @@
+> >   */
+> >  
+> >  #include <linux/clk.h>
+> > +#include <linux/iopoll.h>
+> >  #include <linux/module.h>
+> >  #include <linux/of_device.h>
+> >  #include <linux/platform_device.h>
+> > @@ -32,6 +33,7 @@
+> >  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+> >  
+> >  #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
+> > +#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+> >  #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+> >  #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+> >  #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
+> > @@ -300,6 +302,26 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
+> >  	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+> >  }
+> >  
+> > +void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
+> > +{
+> > +	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
+> > +					   mutex[mutex->id]);
+> > +	u32 tmp;
+> > +
+> > +	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+> > +	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
+> > +	readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id), tmp,
+> > +				  tmp & 0x2, 1, 10000);
+> > +}
+> > +
+> > +void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex)
+> > +{
+> > +	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
+> > +					   mutex[mutex->id]);
+> > +
+> > +	writel(0, ddp->regs + DISP_REG_MUTEX(mutex->id));
+> > +}
+> > +
+> >  static int mtk_ddp_probe(struct platform_device *pdev)
+> >  {
+> >  	struct device *dev = &pdev->dev;
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+> > index 92c1175..f9a7991 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+> > @@ -37,5 +37,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
+> >  				enum mtk_ddp_comp_id id);
+> >  void mtk_disp_mutex_unprepare(struct mtk_disp_mutex *mutex);
+> >  void mtk_disp_mutex_put(struct mtk_disp_mutex *mutex);
+> > +void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex);
+> > +void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex);
+> >  
+> >  #endif /* MTK_DRM_DDP_H */
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > index 80b4f54..e9eb535 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > @@ -133,6 +133,7 @@ static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+> >  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
+> >  	.ext_path = mt8173_mtk_ddp_ext,
+> >  	.ext_len = ARRAY_SIZE(mt8173_mtk_ddp_ext),
+> > +	.shadow_register = false,
+> 
+> global data is initialized as zero.
+OK, I will update it in the next version.
 
->
-> x86 DMAR code seems to rely on that (without even checking
-> acpi_gbl_permanent_mmap) and this has consequences on when
-> we can really start parsing IORT entries through this patch
-> (because if acpi_gbl_permanent_mmap is not set while using
-> IORT nodes we would dereference unmapped pointers).
->
-> @Rafael: can you confirm that's the right approach ?
-
-Thanks,
-Tomasz
+> 
+> >  };
+> >  
+> >  static int mtk_drm_kms_init(struct drm_device *drm)
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> > index fa0b106..94f8b66 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> > @@ -33,6 +33,7 @@ struct mtk_mmsys_driver_data {
+> >  	unsigned int main_len;
+> >  	const enum mtk_ddp_comp_id *ext_path;
+> >  	unsigned int ext_len;
+> > +	bool shadow_register;
+> >  };
+> >  
+> >  struct mtk_drm_private {
+> 
+> 
