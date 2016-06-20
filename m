@@ -1,79 +1,29 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 20 Jun 2016 17:49:41 +0100
-Subject: [PATCH 4/8] arm: arm64: Add routine to determine cpuid of other
- cpus
-In-Reply-To: <1465511013-10742-5-git-send-email-jeremy.linton@arm.com> (Jeremy
- Linton's message of "Thu, 9 Jun 2016 17:23:29 -0500")
-References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
- <1465511013-10742-5-git-send-email-jeremy.linton@arm.com>
-Message-ID: <87d1nb6c0q.fsf@e105922-lin.cambridge.arm.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Mon, 20 Jun 2016 09:50:19 -0700
+Subject: [PATCH 1/4] phy: rockchip-emmc: give DLL some extra time to be
+ ready
+In-Reply-To: <CAD=FV=X73R759Rum3AEUfD_yjswoD8iXQqrow_gpCu=6XJs7Sg@mail.gmail.com>
+References: <1463092986-61777-1-git-send-email-briannorris@chromium.org>
+ <5767EB7E.3040606@ti.com> <20160620161908.GA30459@google.com>
+ <CAD=FV=X73R759Rum3AEUfD_yjswoD8iXQqrow_gpCu=6XJs7Sg@mail.gmail.com>
+Message-ID: <20160620165019.GA37207@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeremy Linton <jeremy.linton@arm.com> writes:
+On Mon, Jun 20, 2016 at 09:25:18AM -0700, Doug Anderson wrote:
+> On Mon, Jun 20, 2016 at 9:19 AM, Brian Norris <briannorris@chromium.org> wrote:
+> > Ulf,
+> >
+> > I see I didn't CC you or linux-mmc on this patch series. Please let me
+> > know if I should resend, or if you can pick these up off of LKML -- Doug
+> > gave nice patchwork links in his linked series. NB: patch 2 has a
+> > version 2, while the others were left unmodified.
+> 
+> I actually need to spin my series to address a small bit of feedback
+> from Heiko.  Since Brian's original patches weren't on linux-mmc, I'll
+> include them in my series (along with collected tags) to make it easy.
+> Hope this is OK.
 
-> It is helpful if we can read the cpuid/midr of other CPUs
-> in the system independent of arm/arm64.
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm/include/asm/cputype.h   | 6 +++++-
->  arch/arm64/include/asm/cputype.h | 4 ++++
->  2 files changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index 1ee94c7..e391b67 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -81,6 +81,8 @@
->  #define ARM_CPU_XSCALE_ARCH_V2		0x4000
->  #define ARM_CPU_XSCALE_ARCH_V3		0x6000
->  
-> +#define ARM_PARTNUM(cpuid_id) (cpuid_id & ARM_CPU_PART_MASK)
-> +
->  extern unsigned int processor_id;
->  
->  #ifdef CONFIG_CPU_CP15
-> @@ -180,7 +182,7 @@ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
->   */
->  static inline unsigned int __attribute_const__ read_cpuid_part(void)
->  {
-> -	return read_cpuid_id() & ARM_CPU_PART_MASK;
-> +	return ARM_PARTNUM(read_cpuid_id());
->  }
->  
->  static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
-> @@ -208,6 +210,8 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
->  	return read_cpuid(CPUID_MPIDR);
->  }
->  
-> +#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->cpuid
+Fine with me. Thanks.
 
-IMO, something like read_cpuid_of might be better name.
-
-> +
->  /*
->   * Intel's XScale3 core supports some v6 features (supersections, L2)
->   * but advertises itself as v5 as it does not support the v6 ISA.  For
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index 87e1985..56fd8c1 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -38,6 +38,7 @@
->  #define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
->  #define MIDR_PARTNUM(midr)	\
->  	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
-> +#define ARM_PARTNUM MIDR_PARTNUM
->  #define MIDR_ARCHITECTURE_SHIFT	16
->  #define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
->  #define MIDR_ARCHITECTURE(midr)	\
-> @@ -126,6 +127,9 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
->  {
->  	return read_cpuid(CTR_EL0);
->  }
-> +
-> +#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->reg_midr
-> +
->  #endif /* __ASSEMBLY__ */
->  
->  #endif
+Brian
