@@ -1,67 +1,29 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 20 Jun 2016 18:34:19 +0530
-Subject: [PATCH v2 09/11] phy: rockchip-emmc: Minor code cleanup in
- rockchip_emmc_phy_power_on/off()
-In-Reply-To: <1465859076-4868-10-git-send-email-dianders@chromium.org>
-References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
- <1465859076-4868-10-git-send-email-dianders@chromium.org>
-Message-ID: <5767E9D3.7080407@ti.com>
+From: tuomas@tuxera.com (Tuomas Tynkkynen)
+Date: Mon, 20 Jun 2016 16:04:13 +0300
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable AHCI_IMX
+Message-ID: <1466427854-21265-1-git-send-email-tuomas@tuxera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Wandboard Quad comes with a SATA port. Enable the IMX SATA driver by
+default to make it easy to have the root filesystem on it.
 
+Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-On Tuesday 14 June 2016 04:34 AM, Douglas Anderson wrote:
-> There's no reason to store the return value of rockchip_emmc_phy_power()
-> in a variable nor to check it.  Just return it.
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
-> Changes in v2:
-> - Move code cleanup before set phyctrl_frqsel based on card clock (Shawn)
-> 
->  drivers/phy/phy-rockchip-emmc.c | 14 ++------------
->  1 file changed, 2 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-> index 2d059c046978..23fe50864526 100644
-> --- a/drivers/phy/phy-rockchip-emmc.c
-> +++ b/drivers/phy/phy-rockchip-emmc.c
-> @@ -169,20 +169,14 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
->  static int rockchip_emmc_phy_power_off(struct phy *phy)
->  {
->  	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
-> -	int ret = 0;
->  
->  	/* Power down emmc phy analog blocks */
-> -	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_OFF);
-> -	if (ret)
-> -		return ret;
-> -
-> -	return 0;
-> +	return rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_OFF);
->  }
->  
->  static int rockchip_emmc_phy_power_on(struct phy *phy)
->  {
->  	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
-> -	int ret = 0;
->  
->  	/* DLL operation: 200 MHz */
->  	regmap_write(rk_phy->reg_base,
-> @@ -213,11 +207,7 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
->  				   PHYCTRL_OTAPDLYSEL_SHIFT));
->  
->  	/* Power up emmc phy analog blocks */
-> -	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_ON);
-> -	if (ret)
-> -		return ret;
-> -
-> -	return 0;
-> +	return rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_ON);
->  }
->  
->  static const struct phy_ops ops = {
-> 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index ee7c884..6efcbc7 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -214,6 +214,7 @@ CONFIG_ATA=y
+ CONFIG_SATA_AHCI=y
+ CONFIG_SATA_AHCI_PLATFORM=y
+ CONFIG_AHCI_ST=y
++CONFIG_AHCI_IMX=y
+ CONFIG_AHCI_SUNXI=y
+ CONFIG_AHCI_TEGRA=y
+ CONFIG_SATA_HIGHBANK=y
+-- 
+2.8.2
