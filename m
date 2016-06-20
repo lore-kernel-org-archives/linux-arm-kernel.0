@@ -1,42 +1,52 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 20 Jun 2016 17:06:22 +0100
-Subject: [PATCH v19 05/13] arm64/kexec: Add pr_debug output
-In-Reply-To: <dd245cadf97ea0d8fd5b0fe5743ecf9fa512d3c0.1466120418.git.geoff@infradead.org>
-References: <cover.1466120418.git.geoff@infradead.org>
- <dd245cadf97ea0d8fd5b0fe5743ecf9fa512d3c0.1466120418.git.geoff@infradead.org>
-Message-ID: <5768147E.1050900@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 20 Jun 2016 17:08:45 +0100
+Subject: SMMU driver and stall vs terminate mode
+In-Reply-To: <HE1PR04MB1641B0F8442061E3437037628D2A0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+References: <HE1PR04MB1641B0F8442061E3437037628D2A0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+Message-ID: <5768150D.2070705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Hi Stuart,
 
-On 17/06/16 00:48, Geoff Levand wrote:
-> To aid in debugging kexec problems or when adding new functionality to
-> kexec add a new routine kexec_image_info() and several inline pr_debug
-> statements.
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
+On 20/06/16 16:28, Stuart Yoder wrote:
+> Robin/Will,
+>
+> Right now the SMMU driver is hardcoded to configure 'stall' mode for
+> context faults:
+>
+>        /* SCTLR */
+>        reg = SCTLR_CFCFG | SCTLR_CFIE | SCTLR_CFRE | SCTLR_M | SCTLR_EAE_SBOP;
+>
+> We are running into an issue with a device where it seems behave sanely
+> when SCTLR_CFCFG=0 ...i.e. 'terminate' mode, but in stall mode seems to be
+> unaware that an access violation occurred.
 
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index a6dcb9c..7372e58 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -11,6 +11,7 @@
->  
->  #include <linux/kexec.h>
->  #include <linux/smp.h>
-> +#include <linux/uaccess.h>
+Does the device keep issuing transactions after the initial faulting 
+one, by any chance? Brian (+cc) has seen similar-sounding issues in the 
+past (albeit with backports to some horrible Android kernel), and I 
+think we concluded that there's an inherent race window between writing 
+RESUME and acking the interrupt in which MMU-500 can process another 
+faulting transaction and reassert the IRQ without Linux realising, which 
+then gets lost and things go out of whack.
 
-Now that the get_user(maybe_dtb_addr,.. has gone, I don't think we need this header.
+> Is there really some assumption that all devices that send transcactions
+> through the SMMU _must_ be able to handle stall mode?  I am trying to
+> find out from our hw designers what is going on at the signal level for
+> the device in question, but it seems to me that 'terminate' mode exists
+> for a reason and I wonder what your thoughts are about providing a
+> configuration option to allow configuration of terminate mode if a particular
+> SoC requires it.
 
->  
->  #include <asm/cacheflush.h>
->  #include <asm/cpu_ops.h>
+Personally, I'd quite happily leave it turned off (MMU-400/401 don't 
+support stalling anyway), but I recall Will having a fairly 
+reasonable-sounding argument in favour, which I now can't remember the 
+details of. Hopefully he might remind us, unless his conference is too 
+enthralling.
 
+Robin.
 
-Reviewed-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
+>
+> Thanks,
+> Stuart
+>
