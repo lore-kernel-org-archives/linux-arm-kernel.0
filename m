@@ -1,86 +1,72 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 20 Jun 2016 15:25:41 +0100
-Subject: [PATCH] coresight: always use stashed trace id value in etm4_trace_id
-Message-ID: <1466432741-24452-1-git-send-email-sudeep.holla@arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 20 Jun 2016 15:34:37 +0100
+Subject: [PATCH 2/2] arm64: dts: Add device-tree for ARM's AEMv8A-AEMv8A
+ FVP Base model
+In-Reply-To: <20160620123906.GC26152@leverpostej>
+References: <1466424796-13769-1-git-send-email-tixy@linaro.org>
+ <1466424796-13769-2-git-send-email-tixy@linaro.org>
+ <20160620123906.GC26152@leverpostej>
+Message-ID: <1466433277.2833.33.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-etm4_trace_id is not guaranteed to be executed on the CPU whose ETM is
-being accessed. This leads to exception similar to below one if the
-CPU whose ETM is being accessed is in deeper idle states. So it must
-be executed on the CPU whose ETM is being accessed.
+On Mon, 2016-06-20 at 13:39 +0100, Mark Rutland wrote:
+> Hi,
+> 
+> On Mon, Jun 20, 2016 at 01:13:16PM +0100, Jon Medhurst wrote:
+> > Fixed Virtual Platform (FVP) Base models are simulations of systems
+> > that resemble Versatile Express or Juno hardware.
+> > 
+> > This adds a device-tree for the model variant that has two clusters of
+> > Architecture Envelope Model (AEM) v8-A CPUs. The peripheral devices that
+> > are common to all variants of Base models have been placed in a separate
+> > file (fvp-base.dtsi) to facilitate creating device-trees for other
+> > models.
+> > 
+> > It is desirable to use simulations for code testing purposes and so it
+> > is beneficial to include nodes for things that are timing and power
+> > consumption related, even when these don't otherwise have relevance or
+> > accuracy. Where these have been included here (e.g. idle-states) entries
+> > have been copied from real hardware platforms such as Juno.
+> 
+> Which firmware are you using,
 
-Unhandled fault: synchronous external abort (0x96000210) at 0xffff000008db4040
-Internal error: : 96000210 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 5 PID: 5979 Comm: etm.sh Not tainted 4.7.0-rc3 #159
-Hardware name: ARM Juno development board (r2) (DT)
-task: ffff80096dd34b00 ti: ffff80096dfe4000 task.ti: ffff80096dfe4000
-PC is at etm4_trace_id+0x5c/0x90
-LR is at etm4_trace_id+0x3c/0x90
-Call trace:
- etm4_trace_id+0x5c/0x90
- coresight_id_match+0x78/0xa8
- bus_for_each_dev+0x60/0xa0
- coresight_enable+0xc0/0x1b8
- enable_source_store+0x3c/0x70
- dev_attr_store+0x18/0x28
- sysfs_kf_write+0x48/0x58
- kernfs_fop_write+0x14c/0x1e0
- __vfs_write+0x1c/0x100
- vfs_write+0xa0/0x1b8
- SyS_write+0x44/0xa0
- el0_svc_naked+0x24/0x28
+ARM Trusted Firmware
 
-However, TRCTRACEIDR is not guaranteed to hold the previous programmed
-trace id if it enters deeper idle states. Further, the trace id that is
-computed in etm4_init_trace_id is programmed into TRCTRACEIDR only in
-etm4_enable_hw which happens much later in the sequence after
-coresight_id_match is executed from enable_source_store.
+>  and what precisely does it do w.r.t.
+> those idle states?
 
-This patch simplifies etm4_trace_id by returning the stashed trace id
-value similar to etm4_cpu_id.
+I don't know, will check. Those states are also in the ARM TF
+device-tree for the Base FVP [2] but I admit I didn't verify they were
+correct. (Unlike real 'hardware' dt nodes, for which I methodically went
+through documentation and LISA files to check and fix).
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 16 +---------------
- 1 file changed, 1 insertion(+), 15 deletions(-)
+[2] https://github.com/ARM-software/arm-trusted-firmware/blob/master/fdts/fvp-base-gicv3-psci.dts
 
-Hi Mathieu,
+>  Judging by the FVP ATF pm code [1], those state IDs
+> aren't valid (though perhaps the comment is wrong, or I've misunderstood
+> something).
 
-While trying to support ETM with CPUIdle active, I faced this issue.
+I'm not sure which comment you are referring to, that link [1] doesn't
+seem to anchor to a particular source line in my web browser, and I
+don't spot anything relevant scanning by eye.
 
-Regards,
-Sudeep
+> People use the FVPs with a variety of FW and bootloaders, so I'm not
+> keen on putting anything FW or bootloader specific into the canonical
+> FVP DT files.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 43fa3beaa0df..d6f1d6d874eb 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -77,22 +77,8 @@ static int etm4_cpu_id(struct coresight_device *csdev)
- static int etm4_trace_id(struct coresight_device *csdev)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
--	unsigned long flags;
--	int trace_id = -1;
+I can agree about bootloaders, but would anyone be using FVP's without
+ARM Trusted firmware? And if they aren't using using that, can we still
+assume a PSCI capable firmware for things like CPU enable-method? I'm
+asking to get an idea where the line is as I have changes for Foundation
+model too. Also, want something to say to the people who asked me to
+'upstream the FVP DTs' as I expect they think people are using the One
+True Way which involves ARM's Trusted Firmware and other sacred tomes
+passed down to them ;-)
 
--	if (!local_read(&drvdata->mode))
--		return drvdata->trcid;
--
--	spin_lock_irqsave(&drvdata->spinlock, flags);
--
--	CS_UNLOCK(drvdata->base);
--	trace_id = readl_relaxed(drvdata->base + TRCTRACEIDR);
--	trace_id &= ETM_TRACEID_MASK;
--	CS_LOCK(drvdata->base);
--
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
--
--	return trace_id;
-+	return drvdata->trcid;
- }
+I'll fix your other comment on the DT, so snipping email here.
 
- static void etm4_enable_hw(void *info)
---
-2.7.4
+> [1] https://github.com/ARM-software/arm-trusted-firmware/commit/6355f2347aec8bf6ad74867c2b0c996e10546ad4#L53 
+
+-- 
+Tixy
