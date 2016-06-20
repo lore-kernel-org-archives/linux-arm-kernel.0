@@ -1,49 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Jun 2016 18:08:22 +0200
-Subject: [PATCH] ARM: mvebu: compile pm code conditionally
-Message-ID: <20160620160931.2714557-1-arnd@arndb.de>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 20 Jun 2016 17:06:22 +0100
+Subject: [PATCH v19 05/13] arm64/kexec: Add pr_debug output
+In-Reply-To: <dd245cadf97ea0d8fd5b0fe5743ecf9fa512d3c0.1466120418.git.geoff@infradead.org>
+References: <cover.1466120418.git.geoff@infradead.org>
+ <dd245cadf97ea0d8fd5b0fe5743ecf9fa512d3c0.1466120418.git.geoff@infradead.org>
+Message-ID: <5768147E.1050900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A cleanup to include the headers correctly caused another build problem:
+Hi Geoff,
 
-arch/arm/mach-mvebu/kirkwood-pm.c:70:13: error: redefinition of 'kirkwood_pm_init'
-arch/arm/mach-mvebu/kirkwood-pm.h:23:20: note: previous definition of 'kirkwood_pm_init' was here
+On 17/06/16 00:48, Geoff Levand wrote:
+> To aid in debugging kexec problems or when adding new functionality to
+> kexec add a new routine kexec_image_info() and several inline pr_debug
+> statements.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
 
-The underlying issue is that kirkwood-pm.o is not actually meant to be
-used when CONFIG_PM is disabled, so we should also leave it out of the
-Makefile.
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index a6dcb9c..7372e58 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -11,6 +11,7 @@
+>  
+>  #include <linux/kexec.h>
+>  #include <linux/smp.h>
+> +#include <linux/uaccess.h>
 
-The same seems to be true for the PM code in MACH_MVEBU_V7, and I'm
-treating it the same way here.
+Now that the get_user(maybe_dtb_addr,.. has gone, I don't think we need this header.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: d705c1a66e15 ("ARM: Kirkwood: fix kirkwood_pm_init() declaration/type")
----
- arch/arm/mach-mvebu/Makefile | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/cpu_ops.h>
 
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 568863e1513c..6c6497e80a7b 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -6,9 +6,15 @@ CFLAGS_pmsu.o			:= -march=armv7-a
- obj-$(CONFIG_MACH_MVEBU_ANY)	 += system-controller.o mvebu-soc-id.o
- 
- ifeq ($(CONFIG_MACH_MVEBU_V7),y)
--obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o pm.o pm-board.o
-+obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
-+
-+obj-$(CONFIG_PM)		 += pm.o pm-board.o
- obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
- endif
- 
- obj-$(CONFIG_MACH_DOVE)		 += dove.o
--obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
-+
-+ifeq ($(CONFIG_MACH_KIRKWOOD),y)
-+obj-y				 += kirkwood.o
-+obj-$(CONFIG_PM)		 += kirkwood-pm.o
-+endif
--- 
-2.9.0
+
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
