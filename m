@@ -1,58 +1,76 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 20 Jun 2016 09:54:02 +0900
-Subject: [PATCH -next] PM / devfreq: event: Fix return value check in
- exynos_nocp_parse_dt()
-In-Reply-To: <1466187003-19823-1-git-send-email-weiyj_lk@163.com>
-References: <CGME20160617181052epcas1p34d888fccc7f58186cd2b0e2b1fed3e39@epcas1p3.samsung.com>
- <1466187003-19823-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <57673EAA.2020506@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 20 Jun 2016 10:28:29 +0900
+Subject: [PATCH] ARM: remove unused CONFIG_ARCH_HAS_BARRIERS
+In-Reply-To: <1465820748-7369-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1465820748-7369-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNARgob3qEvoxdLWxeg15tPB8n5zLk1WYX-AUroPgkH0e5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+Hi.
 
-On 2016? 06? 18? 03:10, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function platform_get_resource() returns NULL
-> pointer not ERR_PTR(). Remove unneeded error handling on the result
-> of a call to platform_get_resource() since the value is passed to
-> devm_ioremap_resource().
+I have not had any comment on this patch,
+but it looks correct to me.
 
-This same patch was already merged to devfreq git[1].
+I will put it into Russell's patch tracker
+if nobody is against it.
 
-[1] https://git.kernel.org/cgit/linux/kernel/git/mzx/devfreq.git/commit/?h=fixes&id=482c27865b9784831dad45b31c2b0a5c42376802
 
-Thanks,
-Chanwoo Choi
 
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+2016-06-13 21:25 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Since commit 2b749cb3a515 ("ARM: realview: remove private barrier
+> implementation"), this config is not used by any platform.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
->  drivers/devfreq/event/exynos-nocp.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/drivers/devfreq/event/exynos-nocp.c b/drivers/devfreq/event/exynos-nocp.c
-> index 6b6a5f3..a584140 100644
-> --- a/drivers/devfreq/event/exynos-nocp.c
-> +++ b/drivers/devfreq/event/exynos-nocp.c
-> @@ -220,9 +220,6 @@ static int exynos_nocp_parse_dt(struct platform_device *pdev,
->  
->  	/* Maps the memory mapped IO to control nocp register */
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (IS_ERR(res))
-> -		return PTR_ERR(res);
+>
+>  arch/arm/include/asm/barrier.h | 4 +---
+>  arch/arm/mm/Kconfig            | 6 ------
+>  2 files changed, 1 insertion(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+> index 112cc1a..f5d6981 100644
+> --- a/arch/arm/include/asm/barrier.h
+> +++ b/arch/arm/include/asm/barrier.h
+> @@ -44,9 +44,7 @@ extern void arm_heavy_mb(void);
+>  #define __arm_heavy_mb(x...) dsb(x)
+>  #endif
+>
+> -#ifdef CONFIG_ARCH_HAS_BARRIERS
+> -#include <mach/barriers.h>
+> -#elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+> +#if defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+>  #define mb()           __arm_heavy_mb()
+>  #define rmb()          dsb()
+>  #define wmb()          __arm_heavy_mb(st)
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index cb569b6..d15a7fe 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -1025,12 +1025,6 @@ config ARM_DMA_MEM_BUFFERABLE
+>
+>           You are recommended say 'Y' here and debug any affected drivers.
+>
+> -config ARCH_HAS_BARRIERS
+> -       bool
+> -       help
+> -         This option allows the use of custom mandatory barriers
+> -         included via the mach/barriers.h file.
 > -
->  	base = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(base))
->  		return PTR_ERR(base);
-> 
-> 
-> 
+>  config ARM_HEAVY_MB
+>         bool
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
