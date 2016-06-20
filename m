@@ -1,52 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jun 2016 22:54:16 -0700
-Subject: [GIT PULL 6/7] Broadcom defconfig changes for 4.8 Part 1
-In-Reply-To: <1466128575-5378-6-git-send-email-f.fainelli@gmail.com>
+Date: Sun, 19 Jun 2016 22:48:46 -0700
+Subject: [GIT PULL 4/7] Broadcom devicetree-arm64 changes for 4.8 Part 1
+In-Reply-To: <1466128575-5378-4-git-send-email-f.fainelli@gmail.com>
 References: <1466128575-5378-1-git-send-email-f.fainelli@gmail.com>
- <1466128575-5378-6-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20160620055416.GI2329@localhost>
+ <1466128575-5378-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20160620054846.GG2329@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 06:56:14PM -0700, Florian Fainelli wrote:
+On Thu, Jun 16, 2016 at 06:56:12PM -0700, Florian Fainelli wrote:
 > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
 >   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 > 
 > are available in the git repository at:
 > 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.8/defconfig
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.8/devicetree-arm64
 > 
-> for you to fetch changes up to 41463c3e6eae3dfa4377069966ed02b4ba378e79:
+> for you to fetch changes up to 5dcc9c7618dff61de243ca9bbac7de18ef92f49b:
 > 
->   ARM: Remove bcm_defconfig (2016-06-16 13:40:49 -0700)
+>   arm64: dts: NS2: Add CCI-400 PMU support (2016-05-31 11:00:28 -0700)
 > 
 > ----------------------------------------------------------------
-> This pull request contains defconfig changes for Broadcom ARM-based SoCs:
+> This pull request contains Device Tree changes for Broadcom ARM64-based SoCS:
 > 
-> - Florian enables support for the BCM63xx DSL SoCs basic peripherals, enables
->   the networking subsystems for Set Top Box SoCs, enables the PWM, watchdog and
->   the AHCI controller and SATA PHY drivers
+> - Anup adds nodes for the AHCI and SATA3 PHY peripherals to the Northstar2 SoCs
 > 
-> - Florian removes the bcm_defconfig file which is no longer useful and updates
->   multi_v7_defconfig to include the Kona watchdog to provide proper reboot for the
->   Broadcom Kona platforms
+> - Dhanajay enables pinctrl for the Northstar2 SoCs
 > 
-> Please note that Tejun Heo has queued a patch which renames AHCI_BRCMSTB into
-> AHCI_BRCM, to avoid two patches in a row, we just enable AHCI_BRCM to be future
-> proof
+> - Jon Mason enables all of the UART peripherals found in the NS2 SVK and
+>   finally adds the CCI-400 and PMU nodes
 
-So, you say that bcm_defconfig is no longer useful. While I'm happy to see the
-number of defconfigs go down, I'd like to clarify that we do still see per-SoC
-defconfigs somewhat useful, in that they are a lot closer to what someone would
-want to use for defconfig in a product kernel based on the SoC. It's easier to
-start from the SoC-specific defconfig and remove pieces that aren't needed than
-to start from multi_v7_defconfig.
-
-That being said, I'm happy to remove it if you think that's what works best for
-your platform.
-
-Merged into next/defconfig.
+Merged, thanks.
 
 
 -Olof
