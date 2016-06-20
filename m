@@ -1,124 +1,120 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Mon, 20 Jun 2016 22:03:52 +0300
-Subject: [U-Boot] [linux-sunxi] Auto-detecting touchscreen controller and
- dealing with hw configuration differences on q8 tablets
-In-Reply-To: <20160620182026.GA14012@rob-hp-laptop>
-References: <bc978925-46a4-c069-8793-903a87ec70b8@redhat.com>
- <5E70AD96-4E8E-4430-AF99-0AA0FCF5F8E7@konsulko.com>
- <17e69e9e-06be-dc4f-cd47-152f6290d2ec@redhat.com>
- <7FA186CB-9BF2-47A6-835C-06AD63CF8837@konsulko.com>
- <b16c2b42-5628-c0b9-6486-f8a4728a0a33@redhat.com>
- <19098CD8-6BC1-4FFE-858F-A6DF4BE655D5@konsulko.com>
- <20160620182026.GA14012@rob-hp-laptop>
-Message-ID: <13802A8D-F214-4D00-BA87-D3746D882317@konsulko.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 20 Jun 2016 12:12:24 -0700
+Subject: [RFC PATCH v3 2/2] ARM64/PCI: Start using quirks handling for
+ ACPI based PCI host controller
+In-Reply-To: <5768252D.7090206@codeaurora.org>
+References: <CADaLNDkziZgM-yAiK2MCqfBRzhWpLmCyPmDZEGsvwd-7nfRfLw@mail.gmail.com>
+ <20160620094227.GA27594@red-moon> <5768252D.7090206@codeaurora.org>
+Message-ID: <CADaLNDme9VCrM0Mk-3eOhai-TSQtzwHfo_CGqO9eLZFkzi1JGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Mon, Jun 20, 2016 at 10:17 AM, Christopher Covington
+<cov@codeaurora.org> wrote:
+> Hi Duc,
+>
+> On 06/20/2016 05:42 AM, Lorenzo Pieralisi wrote:
+>> On Fri, Jun 17, 2016 at 02:37:02PM -0700, Duc Dang wrote:
+>>> On Thu, Jun 16, 2016 at 10:48 AM, Lorenzo Pieralisi
+>>> <lorenzo.pieralisi@arm.com> wrote:
+>>>> On Wed, Jun 15, 2016 at 11:34:11AM -0400, Christopher Covington wrote:
+>>>>> From: Tomasz Nowicki <tn@semihalf.com>
+>>>>>
+>>>>> pci_generic_ecam_ops is used by default. Since there are platforms
+>>>>> which have non-compliant ECAM space we need to overwrite these
+>>>>> accessors prior to PCI buses enumeration. In order to do that
+>>>>> we call pci_mcfg_get_ops to retrieve pci_ecam_ops structure so that
+>>>>> we can use proper PCI config space accessors and bus_shift.
+>>>>>
+>>>>> pci_generic_ecam_ops is still used for platforms free from quirks.
+>>>>>
+>>>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>>>> ---
+>>>>>  arch/arm64/kernel/pci.c | 7 ++++---
+>>>>>  1 file changed, 4 insertions(+), 3 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>>>>> index 94cd43c..a891bda 100644
+>>>>> --- a/arch/arm64/kernel/pci.c
+>>>>> +++ b/arch/arm64/kernel/pci.c
+>>>>> @@ -139,6 +139,7 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
+>>>>>       struct pci_config_window *cfg;
+>>>>>       struct resource cfgres;
+>>>>>       unsigned int bsz;
+>>>>> +     struct pci_ecam_ops *ops;
+>>>>>
+>>>>>       /* Use address from _CBA if present, otherwise lookup MCFG */
+>>>>>       if (!root->mcfg_addr)
+>>>>> @@ -150,12 +151,12 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
+>>>>>               return NULL;
+>>>>>       }
+>>>>>
+>>>>> -     bsz = 1 << pci_generic_ecam_ops.bus_shift;
+>>>>> +     ops = pci_mcfg_get_ops(root);
+>>>>> +     bsz = 1 << ops->bus_shift;
+>>>>>       cfgres.start = root->mcfg_addr + bus_res->start * bsz;
+>>>>>       cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
+>>>>>       cfgres.flags = IORESOURCE_MEM;
+>>>>> -     cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
+>>>>> -                           &pci_generic_ecam_ops);
+>>>>> +     cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res, ops);
+>>>>
+>>>> Arnd pointed this out already, I think that's the only pending question
+>>>> here.
+>>>>
+>>>> pci_ecam_create() maps ECAM space for config regions retrieved from
+>>>> the MCFG, which are *supposed* to be ECAM compliant.
+>>>>
+>>>> Do we think that's *always* correct/safe regardless of the kind
+>>>> of quirk we are currently fixing up ?
+>>>>
+>>>> Or we do think that configuration space regions should come from
+>>>> a different resource declared in the ACPI namespace if the regions
+>>>> are not MCFG/ECAM compliant (ie config space is not defined through
+>>>> MCFG at all - possibly through a _CRS method for a vendor specific
+>>>> _HID under the PNP0A03 node ?)
+>>>
+>>> Hi Lorenzo,
+>>>
+>>> For X-Gene: the ECAM space is used to access the configuration space
+>>> of PCIe devices, with additional help from controller register to
+>>> specify the bus, device and function number. Below is the RFC patch
+>>> that implements ECAM fixup for X-Gene PCIe controller on top of this
+>>> RFC ECAM quirk v3 for your and others reference.
+>>
+>> Yes, you have an additional resource in the PNP0A03 _CRS to describe
+>> your register that is a deliberate abuse of the ACPI standard in
+>> that the _CRS is meant to describe resources that are passed on
+>> to secondary buses
+>
+> A potential alternative came up in an off-list discussion: Would it be
+> better to hard code the information in the quirk workaround than look it
+> up from a repurposed ACPI resource?
 
-> On Jun 20, 2016, at 21:20 , Rob Herring <robh@kernel.org> wrote:
-> 
-> On Mon, Jun 20, 2016 at 04:08:47PM +0300, Pantelis Antoniou wrote:
->> Hi Hans,
->> 
->>> On Jun 20, 2016, at 16:02 , Hans de Goede <hdegoede@redhat.com> wrote:
->>> 
->>> Hi,
->>> 
->>> On 20-06-16 14:22, Pantelis Antoniou wrote:
->>>> Hi Hans,
->>>> 
->>>>> On Jun 20, 2016, at 14:03 , Hans de Goede <hdegoede@redhat.com> wrote:
->>>>> 
->>>>> Hi,
->>>>> 
->>>>> On 20-06-16 11:27, Pantelis Antoniou wrote:
->>> 
->>> <snip>
->>> 
->>>>>> Yes, it?s quite possible. You can even have stacked overlays.
->>>>> 
->>>>> Ok, is there any example code how to change an overlay before applying it out there,
->>>>> or if not can you point to the functions to use to do this ?
->>>>> 
->>>> 
->>>> The canonical place for all the dynamic DT stuff is
->>>> 
->>>> https://github.com/pantoniou/linux-beagle-track-mainline/tree/bbb-overlays
->>>> 
->>>> The beaglebone cape manager is here.
->>>> 
->>>> https://github.com/pantoniou/linux-beagle-track-mainline/commit/5028d1ed3beb8c75b28fce37b1bb5ee551b2ae9e
->>>> 
->>>>> Specifically my plan is to:
->>>>> 
->>>>> 1) Have a single overlay for q8 tablets with gsl1680 tablets
->>>>> 
->>>>> 2) Write an in kernel overlay manager which when it detects a gsl1680 touchscreen
->>>>> will pick a best-default firmware-file + matching resolution + swap-x-y based on
->>>>> which SoC (A13/A23/A33) the tablet is based on as well as the gsl1680's chip-id
->>>>> and will then "patch" this info into the overlay before applying it. This
->>>>> means being able to set / modify several string, int and bool dt properties.
->>>>> 
->>>>> 3) Offer a kernel-module option for the overlaymanager which will allows
->>>>> overriding the defaults for the firmware-filename, etc. This is also
->>>>> why I want to go with the patch approach instead of having multiple
->>>>> dt-overlay files.
->>>>> 
->>>> 
->>>> Hmm, your problem appears to be simpler. You already know all the possible
->>>> parts that your touchscreen/video/thingy is going to use.
->>>> 
->>>> You don?t have to use an overlay then. Overlays are built on top of
->>>> changesets.
->>>> 
->>>> For example, let?s say that you have various options for a touchscreen out
->>>> of a finite set.
->>>> 
->>>> You just put the basic configuration for each in a disable node and your
->>>> manager only needs to update the properties and set the status to enabled
->>>> for it to be enabled.
->>>> 
->>>> For instance let?s say you have an option of two devices (only one of them
->>>> being present).
->>>> 
->>>> devA {
->>>> 	status = ?disabled?;
->>>> 	compatible = ?foo,A?;
->>>> };
->>>> 
->>>> devB {
->>>> 	status = ?disabled?;
->>>> 	compatible = ?bar,B?;
->>>> };
->>>> 
->>>> Your manager can simply use a changeset to enable A and put a property there
->>>> (example done using the extended helper API for clarity).
->>>> 
->>>> 	struct of_changeset cset;
->>>> 	struct device_node *np = of_find_node_by_path(?/devA?);
->>>> 
->>>> 	of_changeset_init(&cset);
->>>> 	of_changeset_add_property_bool(&cset, np, ?invert-x?);
->>>> 	of_changeset_update_property_string(&cset, np, ?status?, ?okay?);
->>>> 
->>>> 	of_changeset_apply(&cset);
->>> 
->>> Cool that looks quite nice / easy. 2 questions on the above:
->>> 
->>> 1) Is the functionality needed by the above snippet in mainline ?
->> 
->> Changesets are in mainline; The extended API for the example above is not.
-> 
-> The reason being that you sent it just before the merge window and there 
-> was a comment on it that has not been addressed.
-> 
+Hi Chris, Lorenzo,
 
-True. I ran out of time and $JOB interfered. I hope I?ll be able to sent out
-a new patchset this week.
+Thanks for looking into this.
 
-> Rob
+Yes, I am open for this approach and I think it may work. I can
++ check the pci_config_window resource start address (cfg->res.start)
+to figure out the controller and then get the fixed controller
+register address
+or
++ using the domain number to identify the controller.
 
-Regards
-
-? Pantelis
+Regards,
+Duc Dang.
+>
+> Supporting quirk workarounds for early, non-compliant hardware is
+> helpful and perhaps necessary for bootstrapping the ecosystem in a
+> timely manner. But we don't really want to provide an expandable or
+> reusable interface that would make it easy for new hardware to remain
+> non-compliant.
+>
+> Regards,
+> Cov
+>
+> --
+> Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
