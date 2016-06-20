@@ -1,131 +1,146 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Mon, 20 Jun 2016 15:22:21 +0300
-Subject: Auto-detecting touchscreen controller and dealing with hw
- configuration differences on q8 tablets
-In-Reply-To: <17e69e9e-06be-dc4f-cd47-152f6290d2ec@redhat.com>
-References: <bc978925-46a4-c069-8793-903a87ec70b8@redhat.com>
- <5E70AD96-4E8E-4430-AF99-0AA0FCF5F8E7@konsulko.com>
- <17e69e9e-06be-dc4f-cd47-152f6290d2ec@redhat.com>
-Message-ID: <7FA186CB-9BF2-47A6-835C-06AD63CF8837@konsulko.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 20 Jun 2016 15:26:39 +0300
+Subject: [PATCH v8 4/4] serial: pl011: add console matching function
+In-Reply-To: <c37d62c7-1e1b-0b10-a083-c5207fbbb820@gmail.com>
+References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+ <1463749405-11640-5-git-send-email-aleksey.makarov@linaro.org>
+ <c37d62c7-1e1b-0b10-a083-c5207fbbb820@gmail.com>
+Message-ID: <fd9443e7-67f1-93e7-834b-445f9c29d876@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
 
-> On Jun 20, 2016, at 14:03 , Hans de Goede <hdegoede@redhat.com> wrote:
+On 06/02/2016 09:02 PM, Aleksey Makarov wrote:
 > 
-> Hi,
+> On 05/20/2016 04:03 PM, Aleksey Makarov wrote:
+
+Hi Russell,
+
+Can you review this patch please?
+
+Thank you
+Aleksey Makarov
+
+>> This patch adds function pl011_console_match() that implements
+>> method match of struct console.  It allows to match consoles against
+>> data specified in a string, for example taken from command line or
+>> compiled by ACPI SPCR table handler.
+>>
+>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
 > 
-> On 20-06-16 11:27, Pantelis Antoniou wrote:
->> Hi Hans,
->> 
->> I?m going to commend only on the overlay related parts since I?m not I
->> get all the nuances right.
+> Hi Greg, Russell,
 > 
-> No problem and thanks for the answer anyways!
+> Can you review this patch and consider ACKing it please?
+> It had an ACK from Greg in v7 but since then I changed it a bit.
 > 
->>> On Jun 19, 2016, at 14:06 , Hans de Goede <hdegoede@redhat.com> wrote:
+> The patch by Christopher Covington [1] specifies that SBSA uart 
+> does 32-bit access to registers and this breaks the match function.  
+> In this series the function was changed to match when SPCR specifies
+> both mmio32 and mmio access.  I removed Acked-by: Greg from this
+> patch because of these changes.
 > 
-> <snip>
+> The difference between v7 and v8:
 > 
->>> 2) Give the user some way to override the dts settings.
->>> 
->>> Which after a somewhat long intro brings me to the actual purpose of this thread, discuss
->>> how to best deal with this. I again see 2 options:
->>> 
->>> 1) Put a disabled gsl1680 node in the dts file, have a q8_autodetect.c in u-boot
->>> which probes i2c and if it finds the gsl1680 nodes enables it, and patches in a best-effort
->>> default for which fw file to use. Allow the user to set a touchscreen_fw u-boot env
->>> variable which will override this. Also allow the user to set a touchscreen_inverted_x env
->>> variable to add inverted-x to the dt node for the gsl1680.
->>> 
->> 
->> That can work. The problem is that having anything requiring smarts in u-boot always
->> leads to trouble with users. It all depends on your user?s technical proficiency, if
->> they are comfortable tweaking things in u-boot it?s fine. If it?s not, expect lots of
->> bricked boards when they mess up.
->> 
->>> 2) Write an in kernel overlay manager which does auto-detect as described by 1, and
->>> loads an overlay for the detected touchscreen controller, with module options to allow
->>> specifying the fw-file, x-inversion, etc.
->>> 
->>> One things which worries me about 2. is that we would need to have 2 overlay files
->>> per fw-file, one regular config, one inverted-x, or is it possible for the overlay
->>> manager to modify an overlay before applying it ?
->>> 
->> 
->> Yes, it?s quite possible. You can even have stacked overlays.
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 4139b64..388edc8 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2328,10 +2329,10 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
+>  
+>                 port = &amba_ports[i]->port;
+>  
+> -               if (port->iotype != iotype)
+> +               if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
+>                         continue;
+> -               if ((iotype == UPIO_MEM || iotype == UPIO_MEM32) &&
+> -                   (port->mapbase != addr))
+> +
+> +               if (port->mapbase != addr)
+>                         continue;
+>  
+>                 co->index = i;
 > 
-> Ok, is there any example code how to change an overlay before applying it out there,
-> or if not can you point to the functions to use to do this ?
+> [1] https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
 > 
-
-The canonical place for all the dynamic DT stuff is
-
-https://github.com/pantoniou/linux-beagle-track-mainline/tree/bbb-overlays
-
-The beaglebone cape manager is here.
-
-https://github.com/pantoniou/linux-beagle-track-mainline/commit/5028d1ed3beb8c75b28fce37b1bb5ee551b2ae9e
-
-> Specifically my plan is to:
+> Thank you
+> Aleksey Makarov
 > 
-> 1) Have a single overlay for q8 tablets with gsl1680 tablets
-> 
-> 2) Write an in kernel overlay manager which when it detects a gsl1680 touchscreen
-> will pick a best-default firmware-file + matching resolution + swap-x-y based on
-> which SoC (A13/A23/A33) the tablet is based on as well as the gsl1680's chip-id
-> and will then "patch" this info into the overlay before applying it. This
-> means being able to set / modify several string, int and bool dt properties.
-> 
-> 3) Offer a kernel-module option for the overlaymanager which will allows
-> overriding the defaults for the firmware-filename, etc. This is also
-> why I want to go with the patch approach instead of having multiple
-> dt-overlay files.
-> 
-
-Hmm, your problem appears to be simpler. You already know all the possible
-parts that your touchscreen/video/thingy is going to use.
-
-You don?t have to use an overlay then. Overlays are built on top of
-changesets.
-
-For example, let?s say that you have various options for a touchscreen out
-of a finite set.
-
-You just put the basic configuration for each in a disable node and your
-manager only needs to update the properties and set the status to enabled
-for it to be enabled.
-
-For instance let?s say you have an option of two devices (only one of them
-being present).
-
-devA {
-	status = ?disabled?;
-	compatible = ?foo,A?;
-};
-
-devB {
-	status = ?disabled?;
-	compatible = ?bar,B?;
-};
-
-Your manager can simply use a changeset to enable A and put a property there
-(example done using the extended helper API for clarity).
-
-	struct of_changeset cset;
-	struct device_node *np = of_find_node_by_path(?/devA?);
-
-	of_changeset_init(&cset);
-	of_changeset_add_property_bool(&cset, np, ?invert-x?);
-	of_changeset_update_property_string(&cset, np, ?status?, ?okay?);
-
-	of_changeset_apply(&cset);
-
-> Thanks & Regards,
-> 
-> Hans
-
-Regards
-
-? Pantelis
+>> ---
+>>  drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 56 insertions(+)
+>>
+>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>> index a2aa655..388edc8 100644
+>> --- a/drivers/tty/serial/amba-pl011.c
+>> +++ b/drivers/tty/serial/amba-pl011.c
+>> @@ -2288,12 +2288,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
+>>  	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
+>>  }
+>>  
+>> +/**
+>> + *	pl011_console_match - non-standard console matching
+>> + *	@co:	  registering console
+>> + *	@name:	  name from console command line
+>> + *	@idx:	  index from console command line
+>> + *	@options: ptr to option string from console command line
+>> + *
+>> + *	Only attempts to match console command lines of the form:
+>> + *	    console=pl011,mmio|mmio32,<addr>[,<options>]
+>> + *	    console=pl011,0x<addr>[,<options>]
+>> + *	This form is used to register an initial earlycon boot console and
+>> + *	replace it with the amba_console at pl011 driver init.
+>> + *
+>> + *	Performs console setup for a match (as required by interface)
+>> + *	If no <options> are specified, then assume the h/w is already setup.
+>> + *
+>> + *	Returns 0 if console matches; otherwise non-zero to use default matching
+>> + */
+>> +static int __init pl011_console_match(struct console *co, char *name, int idx,
+>> +				      char *options)
+>> +{
+>> +	char match[] = "pl011";	/* pl011-specific earlycon name */
+>> +	unsigned char iotype;
+>> +	unsigned long addr;
+>> +	int i;
+>> +
+>> +	if (strncmp(name, match, 5) != 0)
+>> +		return -ENODEV;
+>> +
+>> +	if (uart_parse_earlycon(options, &iotype, &addr, &options))
+>> +		return -ENODEV;
+>> +
+>> +	/* try to match the port specified on the command line */
+>> +	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
+>> +		struct uart_port *port;
+>> +
+>> +		if (!amba_ports[i])
+>> +			continue;
+>> +
+>> +		port = &amba_ports[i]->port;
+>> +
+>> +		if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
+>> +			continue;
+>> +
+>> +		if (port->mapbase != addr)
+>> +			continue;
+>> +
+>> +		co->index = i;
+>> +		port->cons = co;
+>> +		return pl011_console_setup(co, options);
+>> +	}
+>> +
+>> +	return -ENODEV;
+>> +}
+>> +
+>>  static struct uart_driver amba_reg;
+>>  static struct console amba_console = {
+>>  	.name		= "ttyAMA",
+>>  	.write		= pl011_console_write,
+>>  	.device		= uart_console_device,
+>>  	.setup		= pl011_console_setup,
+>> +	.match		= pl011_console_match,
+>>  	.flags		= CON_PRINTBUFFER,
+>>  	.index		= -1,
+>>  	.data		= &amba_reg,
+>>
