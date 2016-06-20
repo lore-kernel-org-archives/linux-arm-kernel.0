@@ -1,77 +1,51 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 20 Jun 2016 10:56:51 -0700
-Subject: [PATCH v3 12/15] Documentation: phy: Let the rockchip eMMC PHY get an
- exported card clock
+Date: Mon, 20 Jun 2016 10:56:54 -0700
+Subject: [PATCH v3 15/15] arm64: dts: rockchip: Provide emmcclk to PHY for
+ rk3399
 In-Reply-To: <1466445414-11974-1-git-send-email-dianders@chromium.org>
 References: <1466445414-11974-1-git-send-email-dianders@chromium.org>
-Message-ID: <1466445414-11974-13-git-send-email-dianders@chromium.org>
+Message-ID: <1466445414-11974-16-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of an earlier change in this series ("Documentation: mmc:
-sdhci-of-arasan: Add ability to export card clock") the SDHCI driver
-used on Rockchip SoCs can now expose its clock.  Let's now specify that
-the PHY can use it.
-
-Letting the PHY get access to this clock means it can adjust
-phyctrl_frqsel field appropriately.  Although the Rockchip PHY appears
-slightly different than the reference Arasan one, you can see that the
-Arasan datasheet [1] had it defined as:
-  Select the frequency range of DLL operation:
-  3b'000 => 200MHz to 170 MHz
-  3b'001 => 170MHz to 140 MHz
-  3b'010 => 140MHz to 110 MHz
-  3b'011 => 110MHz to 80MHz
-  3b'100 => 80MHz to 50 MHz
-  3b'101 => 275Mhz to 250MHz
-  3b'110 => 250MHz to 225MHz
-  3b'111 => 225MHz to 200MHz
-
-On the Rockchip version of the PHY we have less granularity but the idea
-is the same.
-
-[1]: https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
+Previous changes in this series allowed exposing the card clock from the
+rk3399 SDHCI device and allowed consuming the card clock in the rk3399
+eMMC PHY.  Hook things up in the main rk3399 dtsi file.
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
 Changes in v3:
 - Add collected tags
 
-Changes in v2:
-- List out clocks and clock names (Rob)
+Changes in v2: None
 
- Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
-index 555cb0f40690..e3ea55763b0a 100644
---- a/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
-@@ -7,6 +7,13 @@ Required properties:
-  - reg: PHY register address offset and length in "general
-    register files"
- 
-+Optional clocks using the clock bindings (see ../clock/clock-bindings.txt),
-+specified by name:
-+ - clock-names: Should contain "emmcclk".  Although this is listed as optional
-+		(because most boards can get basic functionality without having
-+		access to it), it is strongly suggested.
-+ - clocks: Should have a phandle to the card clock exported by the SDHCI driver.
-+
- Example:
- 
- 
-@@ -20,6 +27,8 @@ grf: syscon at ff770000 {
- 	emmcphy: phy at f780 {
- 		compatible = "rockchip,rk3399-emmc-phy";
- 		reg = <0xf780 0x20>;
-+		clocks = <&sdhci>;
-+		clock-names = "emmcclk";
- 		#phy-cells = <0>;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 1b57e92e0093..004b599ca285 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -225,8 +225,10 @@
+ 		assigned-clock-rates = <200000000>;
+ 		clocks = <&cru SCLK_EMMC>, <&cru ACLK_EMMC>;
+ 		clock-names = "clk_xin", "clk_ahb";
++		clock-output-names = "emmc_cardclock";
+ 		phys = <&emmc_phy>;
+ 		phy-names = "phy_arasan";
++		#clock-cells = <0>;
+ 		status = "disabled";
  	};
- };
+ 
+@@ -621,6 +623,8 @@
+ 		emmc_phy: phy at f780 {
+ 			compatible = "rockchip,rk3399-emmc-phy";
+ 			reg = <0xf780 0x24>;
++			clocks = <&sdhci>;
++			clock-names = "emmcclk";
+ 			#phy-cells = <0>;
+ 			status = "disabled";
+ 		};
 -- 
 2.8.0.rc3.226.g39d4020
