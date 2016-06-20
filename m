@@ -1,37 +1,86 @@
-From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Mon, 20 Jun 2016 10:14:34 -0400
-Subject: [PATCH v3 3/3] ARM: dts: NSP: Add PWM Support to DT
-In-Reply-To: <1466432074-7780-1-git-send-email-yendapally.reddy@broadcom.com>
-References: <1466432074-7780-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <1466432074-7780-4-git-send-email-yendapally.reddy@broadcom.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 20 Jun 2016 15:25:41 +0100
+Subject: [PATCH] coresight: always use stashed trace id value in etm4_trace_id
+Message-ID: <1466432741-24452-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PWM support to the device tree for the Broadcom Northstar Plus SoC.
+etm4_trace_id is not guaranteed to be executed on the CPU whose ETM is
+being accessed. This leads to exception similar to below one if the
+CPU whose ETM is being accessed is in deeper idle states. So it must
+be executed on the CPU whose ETM is being accessed.
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+Unhandled fault: synchronous external abort (0x96000210) at 0xffff000008db4040
+Internal error: : 96000210 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 5 PID: 5979 Comm: etm.sh Not tainted 4.7.0-rc3 #159
+Hardware name: ARM Juno development board (r2) (DT)
+task: ffff80096dd34b00 ti: ffff80096dfe4000 task.ti: ffff80096dfe4000
+PC is at etm4_trace_id+0x5c/0x90
+LR is at etm4_trace_id+0x3c/0x90
+Call trace:
+ etm4_trace_id+0x5c/0x90
+ coresight_id_match+0x78/0xa8
+ bus_for_each_dev+0x60/0xa0
+ coresight_enable+0xc0/0x1b8
+ enable_source_store+0x3c/0x70
+ dev_attr_store+0x18/0x28
+ sysfs_kf_write+0x48/0x58
+ kernfs_fop_write+0x14c/0x1e0
+ __vfs_write+0x1c/0x100
+ vfs_write+0xa0/0x1b8
+ SyS_write+0x44/0xa0
+ el0_svc_naked+0x24/0x28
+
+However, TRCTRACEIDR is not guaranteed to hold the previous programmed
+trace id if it enters deeper idle states. Further, the trace id that is
+computed in etm4_init_trace_id is programmed into TRCTRACEIDR only in
+etm4_enable_hw which happens much later in the sequence after
+coresight_id_match is executed from enable_source_store.
+
+This patch simplifies etm4_trace_id by returning the stashed trace id
+value similar to etm4_cpu_id.
+
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/boot/dts/bcm-nsp.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index def9e78..f9c8341 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -206,6 +206,14 @@
- 			brcm,nand-has-wp;
- 		};
- 
-+		pwm: pwm at 31000 {
-+			compatible = "brcm,iproc-pwm";
-+			reg = <0x31000 0x28>;
-+			clocks = <&osc>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
- 		ccbtimer0: timer at 34000 {
- 			compatible = "arm,sp804";
- 			reg = <0x34000 0x1000>;
--- 
-2.1.0
+Hi Mathieu,
+
+While trying to support ETM with CPUIdle active, I faced this issue.
+
+Regards,
+Sudeep
+
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 43fa3beaa0df..d6f1d6d874eb 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -77,22 +77,8 @@ static int etm4_cpu_id(struct coresight_device *csdev)
+ static int etm4_trace_id(struct coresight_device *csdev)
+ {
+ 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+-	unsigned long flags;
+-	int trace_id = -1;
+
+-	if (!local_read(&drvdata->mode))
+-		return drvdata->trcid;
+-
+-	spin_lock_irqsave(&drvdata->spinlock, flags);
+-
+-	CS_UNLOCK(drvdata->base);
+-	trace_id = readl_relaxed(drvdata->base + TRCTRACEIDR);
+-	trace_id &= ETM_TRACEID_MASK;
+-	CS_LOCK(drvdata->base);
+-
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-
+-	return trace_id;
++	return drvdata->trcid;
+ }
+
+ static void etm4_enable_hw(void *info)
+--
+2.7.4
