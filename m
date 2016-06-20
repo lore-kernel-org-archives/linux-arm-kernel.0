@@ -1,194 +1,77 @@
-From: 00moses.alexander00@gmail.com (Alexandru Moise)
-Date: Mon, 20 Jun 2016 12:12:58 +0300
-Subject: [PATCH] devpts: remove DEVPTS_MULTIPLE_INSTANCES from all configs
-Message-ID: <20160620091258.11233-1-00moses.alexander00@gmail.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Mon, 20 Jun 2016 10:13:53 +0100
+Subject: [PATCH V2 51/63] clocksource/drivers/versatile: Convert init
+ function to return error
+In-Reply-To: <1466112442-31105-52-git-send-email-daniel.lezcano@linaro.org>
+References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
+ <1466112442-31105-52-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20160620091353.GN9711@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As each mount of devpts is now an independent filesystem,
-the DEVPTS_MULTIPLE_INSTANCES config option no longer exists.
-So remove it.
+On Thu, Jun 16, 2016 at 11:27:10PM +0200, Daniel Lezcano wrote:
+> The init functions do not return any error. They behave as the following:
+> 
+>   - panic, thus leading to a kernel crash while another timer may work and
+>        make the system boot up correctly
+> 
+>   or
+> 
+>   - print an error and let the caller unaware if the state of the system
+> 
+> Change that by converting the init functions to return an error conforming
+> to the CLOCKSOURCE_OF_RET prototype.
+> 
+> Proper error handling (rollback, errno value) will be changed later case
+> by case, thus this change just return back an error or success in the init
+> function.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  drivers/clocksource/versatile.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clocksource/versatile.c b/drivers/clocksource/versatile.c
+> index 0a26d3d..8daeffa 100644
+> --- a/drivers/clocksource/versatile.c
+> +++ b/drivers/clocksource/versatile.c
+> @@ -25,18 +25,20 @@ static u64 notrace versatile_sys_24mhz_read(void)
+>  	return readl(versatile_sys_24mhz);
+>  }
+>  
+> -static void __init versatile_sched_clock_init(struct device_node *node)
+> +static int __init versatile_sched_clock_init(struct device_node *node)
+>  {
+>  	void __iomem *base = of_iomap(node, 0);
+>  
+>  	if (!base)
+> -		return;
+> +		return -ENXIO;
+>  
+>  	versatile_sys_24mhz = base + SYS_24MHZ;
+>  
+>  	sched_clock_register(versatile_sys_24mhz_read, 32, 24000000);
+> +
+> +	return 0;
+>  }
+> -CLOCKSOURCE_OF_DECLARE(vexpress, "arm,vexpress-sysreg",
+> +CLOCKSOURCE_OF_DECLARE_RET(vexpress, "arm,vexpress-sysreg",
+>  		       versatile_sched_clock_init);
+> -CLOCKSOURCE_OF_DECLARE(versatile, "arm,versatile-sysreg",
+> +CLOCKSOURCE_OF_DECLARE_RET(versatile, "arm,versatile-sysreg",
+>  		       versatile_sched_clock_init);
+> -- 
+> 1.9.1
+> 
 
-Signed-off-by: Alexandru Moise <00moses.alexander00@gmail.com>
----
- arch/arc/configs/tb10x_defconfig            | 1 -
- arch/arm/configs/mxs_defconfig              | 1 -
- arch/mips/configs/ip27_defconfig            | 1 -
- arch/mips/configs/nlm_xlp_defconfig         | 1 -
- arch/mips/configs/nlm_xlr_defconfig         | 1 -
- arch/parisc/configs/generic-64bit_defconfig | 1 -
- arch/powerpc/configs/powernv_defconfig      | 1 -
- arch/powerpc/configs/pseries_defconfig      | 1 -
- arch/s390/configs/default_defconfig         | 1 -
- arch/s390/configs/gcov_defconfig            | 1 -
- arch/s390/configs/performance_defconfig     | 1 -
- arch/sh/configs/sh7785lcr_32bit_defconfig   | 1 -
- arch/xtensa/configs/iss_defconfig           | 1 -
- tools/testing/selftests/mount/config        | 1 -
- 14 files changed, 14 deletions(-)
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-diff --git a/arch/arc/configs/tb10x_defconfig b/arch/arc/configs/tb10x_defconfig
-index 4c51183..be0b4fb 100644
---- a/arch/arc/configs/tb10x_defconfig
-+++ b/arch/arc/configs/tb10x_defconfig
-@@ -58,7 +58,6 @@ CONFIG_STMMAC_ETH=y
- # CONFIG_INPUT is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_DEVKMEM is not set
- CONFIG_SERIAL_8250=y
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 6e0f751..65a84b4 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -77,7 +77,6 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_TSC2007=m
- # CONFIG_SERIO is not set
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_DEVKMEM is not set
- CONFIG_SERIAL_AMBA_PL011=y
-diff --git a/arch/mips/configs/ip27_defconfig b/arch/mips/configs/ip27_defconfig
-index 2b74aee..df11563 100644
---- a/arch/mips/configs/ip27_defconfig
-+++ b/arch/mips/configs/ip27_defconfig
-@@ -266,7 +266,6 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_EXTENDED=y
- CONFIG_SERIAL_8250_MANY_PORTS=y
- CONFIG_SERIAL_8250_SHARE_IRQ=y
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- CONFIG_HW_RANDOM_TIMERIOMEM=m
- CONFIG_I2C_CHARDEV=m
- CONFIG_I2C_ALI1535=m
-diff --git a/arch/mips/configs/nlm_xlp_defconfig b/arch/mips/configs/nlm_xlp_defconfig
-index b496c25..5c40b48 100644
---- a/arch/mips/configs/nlm_xlp_defconfig
-+++ b/arch/mips/configs/nlm_xlp_defconfig
-@@ -409,7 +409,6 @@ CONFIG_SERIO_SERPORT=m
- CONFIG_SERIO_LIBPS2=y
- CONFIG_SERIO_RAW=m
- CONFIG_VT_HW_CONSOLE_BINDING=y
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- CONFIG_LEGACY_PTY_COUNT=0
- CONFIG_SERIAL_NONSTANDARD=y
- CONFIG_N_HDLC=m
-diff --git a/arch/mips/configs/nlm_xlr_defconfig b/arch/mips/configs/nlm_xlr_defconfig
-index 8e99ad8..47a2756 100644
---- a/arch/mips/configs/nlm_xlr_defconfig
-+++ b/arch/mips/configs/nlm_xlr_defconfig
-@@ -347,7 +347,6 @@ CONFIG_SERIO_SERPORT=m
- CONFIG_SERIO_LIBPS2=y
- CONFIG_SERIO_RAW=m
- CONFIG_VT_HW_CONSOLE_BINDING=y
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- CONFIG_LEGACY_PTY_COUNT=0
- CONFIG_SERIAL_NONSTANDARD=y
- CONFIG_N_HDLC=m
-diff --git a/arch/parisc/configs/generic-64bit_defconfig b/arch/parisc/configs/generic-64bit_defconfig
-index e945c08..69aa66c 100644
---- a/arch/parisc/configs/generic-64bit_defconfig
-+++ b/arch/parisc/configs/generic-64bit_defconfig
-@@ -166,7 +166,6 @@ CONFIG_INPUT_MISC=y
- CONFIG_SERIO_SERPORT=m
- # CONFIG_HP_SDC is not set
- CONFIG_SERIO_RAW=m
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_NOZOMI=m
- # CONFIG_DEVKMEM is not set
-diff --git a/arch/powerpc/configs/powernv_defconfig b/arch/powerpc/configs/powernv_defconfig
-index 0450310..2fd6bbe 100644
---- a/arch/powerpc/configs/powernv_defconfig
-+++ b/arch/powerpc/configs/powernv_defconfig
-@@ -176,7 +176,6 @@ CONFIG_PPP_SYNC_TTY=m
- CONFIG_INPUT_EVDEV=m
- CONFIG_INPUT_MISC=y
- # CONFIG_SERIO_SERPORT is not set
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_JSM=m
-diff --git a/arch/powerpc/configs/pseries_defconfig b/arch/powerpc/configs/pseries_defconfig
-index 36871a4..3c325ba 100644
---- a/arch/powerpc/configs/pseries_defconfig
-+++ b/arch/powerpc/configs/pseries_defconfig
-@@ -180,7 +180,6 @@ CONFIG_INPUT_EVDEV=m
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_PCSPKR=m
- # CONFIG_SERIO_SERPORT is not set
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_ICOM=m
-diff --git a/arch/s390/configs/default_defconfig b/arch/s390/configs/default_defconfig
-index d5ec71b..501e93a 100644
---- a/arch/s390/configs/default_defconfig
-+++ b/arch/s390/configs/default_defconfig
-@@ -453,7 +453,6 @@ CONFIG_PPP_SYNC_TTY=m
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- CONFIG_LEGACY_PTY_COUNT=0
- CONFIG_HW_RANDOM_VIRTIO=m
- CONFIG_RAW_DRIVER=m
-diff --git a/arch/s390/configs/gcov_defconfig b/arch/s390/configs/gcov_defconfig
-index f46a351..bd34600 100644
---- a/arch/s390/configs/gcov_defconfig
-+++ b/arch/s390/configs/gcov_defconfig
-@@ -447,7 +447,6 @@ CONFIG_PPP_SYNC_TTY=m
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- CONFIG_LEGACY_PTY_COUNT=0
- CONFIG_HW_RANDOM_VIRTIO=m
- CONFIG_RAW_DRIVER=m
-diff --git a/arch/s390/configs/performance_defconfig b/arch/s390/configs/performance_defconfig
-index ba0f2a5..cfb7c50 100644
---- a/arch/s390/configs/performance_defconfig
-+++ b/arch/s390/configs/performance_defconfig
-@@ -447,7 +447,6 @@ CONFIG_PPP_SYNC_TTY=m
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- CONFIG_LEGACY_PTY_COUNT=0
- CONFIG_HW_RANDOM_VIRTIO=m
- CONFIG_RAW_DRIVER=m
-diff --git a/arch/sh/configs/sh7785lcr_32bit_defconfig b/arch/sh/configs/sh7785lcr_32bit_defconfig
-index 9bdcf72..48df495 100644
---- a/arch/sh/configs/sh7785lcr_32bit_defconfig
-+++ b/arch/sh/configs/sh7785lcr_32bit_defconfig
-@@ -79,7 +79,6 @@ CONFIG_VT_HW_CONSOLE_BINDING=y
- CONFIG_SERIAL_SH_SCI=y
- CONFIG_SERIAL_SH_SCI_NR_UARTS=6
- CONFIG_SERIAL_SH_SCI_CONSOLE=y
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
-diff --git a/arch/xtensa/configs/iss_defconfig b/arch/xtensa/configs/iss_defconfig
-index 44c6764..d7b905a 100644
---- a/arch/xtensa/configs/iss_defconfig
-+++ b/arch/xtensa/configs/iss_defconfig
-@@ -374,7 +374,6 @@ CONFIG_DEVKMEM=y
- #
- # CONFIG_SERIAL_TIMBERDALE is not set
- CONFIG_UNIX98_PTYS=y
--# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
- CONFIG_LEGACY_PTYS=y
- CONFIG_LEGACY_PTY_COUNT=256
- # CONFIG_IPMI_HANDLER is not set
-diff --git a/tools/testing/selftests/mount/config b/tools/testing/selftests/mount/config
-index b5d881e..416bd53 100644
---- a/tools/testing/selftests/mount/config
-+++ b/tools/testing/selftests/mount/config
-@@ -1,2 +1 @@
- CONFIG_USER_NS=y
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
 -- 
-2.8.3
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
