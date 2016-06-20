@@ -1,52 +1,73 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 20 Jun 2016 15:45:48 +0100
-Subject: [GIT PULL] arm64: dts: juno updates for v4.8
-Message-ID: <5768019C.40009@arm.com>
+From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
+Date: Mon, 20 Jun 2016 09:50:46 -0500
+Subject: [PATCHv4 1/7] EDAC, altera: Add panic flag check to A10 IRQ
+In-Reply-To: <1466434252-26107-1-git-send-email-tthayer@opensource.altera.com>
+References: <1466434252-26107-1-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1466434252-26107-2-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC team,
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-Please pull Juno platform DT updates for v4.8
+In preparation for additional memory module ECCs, the
+IRQ function will check a panic flag before doing a
+kernel panic on double bit errors.
 
---
-Regards,
-Sudeep
+OCRAM uncorrectable errors cause a panic because sleep/resume
+functions and FPGA contents during sleep are stored in OCRAM.
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+ECCs on peripheral FIFO buffers will not cause a kernel panic
+on DBERRs because the packet can be retried and therefore
+recovered.
 
-   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+---
+v2  New patch. Add panic flag to IRQ function.
+v3  No change
+v4  Add reasons to panic on DBERR in OCRAM.
+---
+ drivers/edac/altera_edac.c |    9 ++++++++-
+ drivers/edac/altera_edac.h |    1 +
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
-tags/juno-dt-4.8
-
-for you to fetch changes up to da63398bec2be7c247b5e94c9cabc4339fb65e28:
-
-   arm64: dts: juno: add thermal zones for scpi sensors (2016-06-17 
-16:38:49 +0100)
-
-----------------------------------------------------------------
-ARMv8 Vexpress/Juno DT updates for v4.8
-
-1. Adds various coreSight debug components on Juno boards
-
-2. Adds SCPI device power domains and use them for coresight components
-
-3. Adds thermal zones for SCPI sensors on Juno
-
-----------------------------------------------------------------
-Javi Merino (1):
-       arm64: dts: juno: add thermal zones for scpi sensors
-
-Sudeep Holla (2):
-       arm64: dts: juno: add coresight support
-       arm64: dts: juno: add SCPI power domains for device power management
-
-  arch/arm64/boot/dts/arm/juno-base.dtsi | 357 
-+++++++++++++++++++++++++++++++++
-  arch/arm64/boot/dts/arm/juno-r1.dts    |  40 ++++
-  arch/arm64/boot/dts/arm/juno-r2.dts    |  40 ++++
-  arch/arm64/boot/dts/arm/juno.dts       |  24 +++
-  4 files changed, 461 insertions(+)
+diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+index 926bcaf..ced7c55 100644
+--- a/drivers/edac/altera_edac.c
++++ b/drivers/edac/altera_edac.c
+@@ -897,7 +897,8 @@ static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
+ 		writel(ALTR_A10_ECC_DERRPENA,
+ 		       base + ALTR_A10_ECC_INTSTAT_OFST);
+ 		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
+-		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
++		if (dci->data->panic)
++			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
+ 
+ 		return IRQ_HANDLED;
+ 	}
+@@ -936,6 +937,12 @@ const struct edac_device_prv_data a10_ocramecc_data = {
+ 	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
+ 	.ecc_irq_handler = altr_edac_a10_ecc_irq,
+ 	.inject_fops = &altr_edac_a10_device_inject_fops,
++	/*
++	 * OCRAM panic on uncorrectable error because sleep/resume
++	 * functions and FPGA contents are stored in OCRAM. Prefer
++	 * a kernel panic over executing/loading corrupted data.
++	 */
++	.panic = true,
+ };
+ 
+ #endif	/* CONFIG_EDAC_ALTERA_OCRAM */
+diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
+index 62b0fa0..cf4e8cb 100644
+--- a/drivers/edac/altera_edac.h
++++ b/drivers/edac/altera_edac.h
+@@ -298,6 +298,7 @@ struct edac_device_prv_data {
+ 	irqreturn_t (*ecc_irq_handler)(int irq, void *dev_id);
+ 	int trig_alloc_sz;
+ 	const struct file_operations *inject_fops;
++	bool panic;
+ };
+ 
+ struct altr_edac_device_dev {
+-- 
+1.7.9.5
