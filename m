@@ -1,38 +1,27 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 20 Jun 2016 12:06:34 +0200
-Subject: [PATCH 4/4] ARM: dts: meson8b: Add Meson8b PWM Controller nodes
-In-Reply-To: <201606180219.HabMMLCO%fengguang.wu@intel.com>
-References: <201606180219.HabMMLCO%fengguang.wu@intel.com>
-Message-ID: <5767C02A.50700@baylibre.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Mon, 20 Jun 2016 19:13:05 +0900
+Subject: [PATCH] clk: samsung: exynos5433: use clock_ignore_unused flag for
+ SPI3 related clocks
+In-Reply-To: <CA+Ln22FcKQTq4XhHQPd=Y-B_cUMzFd51ZPkgwrtP_KsqUVxnJA@mail.gmail.com>
+References: <1466151362-2881-1-git-send-email-andi.shyti@samsung.com>
+ <CA+Ln22F9eskcpnFkrnVFc3dJqCJcJ5O-STfXC-8Om5MK-THwNg@mail.gmail.com>
+ <20160619055921.GA424@jack.zhora.eu>
+ <CGME20160619134424epcas1p31493dfce45a8c817bc353702a07fa4bb@epcas1p3.samsung.com>
+ <CA+Ln22HHNnPuEq1WVs+iiEEbAhdvkADhVkj99pqgR0qJODFUXw@mail.gmail.com>
+ <20160620054157.GA6498@samsunx.samsung>
+ <CA+Ln22FcKQTq4XhHQPd=Y-B_cUMzFd51ZPkgwrtP_KsqUVxnJA@mail.gmail.com>
+Message-ID: <20160620101305.GA6783@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2016 08:21 PM, kbuild test robot wrote:
-> Hi,
-> 
-> [auto build test ERROR on next-20160617]
-> [cannot apply to pwm/for-next robh/for-next v4.7-rc3 v4.7-rc2 v4.7-rc1 v4.7-rc3]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Neil-Armstrong/pwm-Add-Amlogic-Meson-SoC-PWM-Controller/20160617-223758
-> config: arm-multi_v7_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
-> 
-> All errors (new ones prefixed by >>):
-> 
->>> Error: arch/arm/boot/dts/meson8b.dtsi:167.17-18 syntax error
->    FATAL ERROR: Unable to parse input tree
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
+> Unfortunately I have to NAK this patch. Please add proper support for
+> them to the SPI driver.
 
-I'll fix this for V2.
+I agree, this is quite a lazy solution.
 
-Neil
+But your comment is giving me more work than what I was willing
+to have, also because in this driver the SPI1 is aslo using
+CLK_IGNORE_UNUSED :)
+
+Thanks for your review,
+Andi
