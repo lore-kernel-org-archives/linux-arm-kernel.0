@@ -1,83 +1,124 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Jun 2016 20:35:43 +0200
-Subject: [PATCH] ARM: sun8i: Add Parrot Board DTS
-In-Reply-To: <CAGb2v66_iUMd5V=9Np4Kqqv+yqq2HbjoPhC3Z6cpHFrMzkddvw@mail.gmail.com>
-References: <1465812931-22824-1-git-send-email-quentin.schulz@free-electrons.com>
- <1465812931-22824-2-git-send-email-quentin.schulz@free-electrons.com>
- <CAGb2v64jduBijEXzsKbOpSvLd9YHwO=qpSyPSDuYtMPg8wfKzA@mail.gmail.com>
- <575FFFBE.5090107@free-electrons.com>
- <CAGb2v67JGG35odB7kEAoF0kGes=KRGoREOSTc_GM0B4A+8cKWg@mail.gmail.com>
- <20160620154452.GL26668@lukather>
- <CAGb2v66_iUMd5V=9Np4Kqqv+yqq2HbjoPhC3Z6cpHFrMzkddvw@mail.gmail.com>
-Message-ID: <20160620183543.GM26668@lukather>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Mon, 20 Jun 2016 22:03:52 +0300
+Subject: [U-Boot] [linux-sunxi] Auto-detecting touchscreen controller and
+ dealing with hw configuration differences on q8 tablets
+In-Reply-To: <20160620182026.GA14012@rob-hp-laptop>
+References: <bc978925-46a4-c069-8793-903a87ec70b8@redhat.com>
+ <5E70AD96-4E8E-4430-AF99-0AA0FCF5F8E7@konsulko.com>
+ <17e69e9e-06be-dc4f-cd47-152f6290d2ec@redhat.com>
+ <7FA186CB-9BF2-47A6-835C-06AD63CF8837@konsulko.com>
+ <b16c2b42-5628-c0b9-6486-f8a4728a0a33@redhat.com>
+ <19098CD8-6BC1-4FFE-858F-A6DF4BE655D5@konsulko.com>
+ <20160620182026.GA14012@rob-hp-laptop>
+Message-ID: <13802A8D-F214-4D00-BA87-D3746D882317@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 12:30:25AM +0800, Chen-Yu Tsai wrote:
-> >> >>> +&reg_aldo1 {
-> >> >>> +       regulator-always-on;
-> >> >>> +       regulator-min-microvolt = <3000000>;
-> >> >>> +       regulator-max-microvolt = <3000000>;
-> >> >>> +       regulator-name = "aldo1";
-> >> >>
-> >> >> What is this for exactly? Would turning it off render the system inoperable?
-> >> >> How was it referenced in the fex file?
-> >> >>
-> >> >> If this is for WiFi I/O VCC, then you should specify it in mmc1 with
-> >> >> vqmmc-supply.
-> >> >>
-> >> >
-> >> > In the fex, aldo1 is one of the three power inputs for the WiFi (the
-> >> > others being dldo1 and dldo2) and in the schematics it is linked to
-> >> > both VCC-USB and VCC-IO-WIFI.
-> >> >
-> >> > I tried to turn it off and, indeed, the system becomes inoperable.
-> >> >
-> >> > I'll add vqmmc-supply in mmc1 with aldo1 regulator. However, I am
-> >> > wondering what to put in vmmc-supply for mmc1 since the WiFi module has
-> >> > three power inputs: dldo1, dldo2 and aldo1. In the fex, they are
-> >> > referenced as, respectively, module_power1, module_power2 and
-> >> > module_power3 and in the schematics dldo1 and dldo2 are named VCC-WIFI
-> >> > while aldo1 is used for VCC-IO-WIFI (if it can help in any way).
-> >> >
-> >> > VCC-WIFI is connected to pin VBAT of the Broadcom AP6212 WiFi chip.
-> >> > VCC-IO-WIFI is connected to pin VDDIO of the chip.
-> >>
-> >> VCC-IO-WIFI is vqmmc, and VCC-WIFI is vmmc.
-> >
-> > Isn't vmmc supposed to be always powered at 3.3v, and vqmmc the one
-> > used to drop to 1.8V with the UHS cards?
+Hi Rob,
+
+> On Jun 20, 2016, at 21:20 , Rob Herring <robh@kernel.org> wrote:
 > 
-> For eMMC, vmmc and vqmmc correspond to the pins on the eMMC chip.
-> vmmc provides power to the internals, while vqmmc provides power to the
-> I/O buffers on both sides. With SD this is a bit less clear. IIUC the SD
-> card itself supplies I/O voltage, dropping it to 1.8V if necessary, from
-> VDD (vmmc). vqmmc only affects the host side, and whatever external pull-ups
-> that might exist.
-
-Ok.
-
-> > In which case, VCC-IO-WIFI is vmmc, and VCC-WIFI is just one of the
-> > wifi chip power rail, to be handled by a power sequence.
+> On Mon, Jun 20, 2016 at 04:08:47PM +0300, Pantelis Antoniou wrote:
+>> Hi Hans,
+>> 
+>>> On Jun 20, 2016, at 16:02 , Hans de Goede <hdegoede@redhat.com> wrote:
+>>> 
+>>> Hi,
+>>> 
+>>> On 20-06-16 14:22, Pantelis Antoniou wrote:
+>>>> Hi Hans,
+>>>> 
+>>>>> On Jun 20, 2016, at 14:03 , Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>> 
+>>>>> Hi,
+>>>>> 
+>>>>> On 20-06-16 11:27, Pantelis Antoniou wrote:
+>>> 
+>>> <snip>
+>>> 
+>>>>>> Yes, it?s quite possible. You can even have stacked overlays.
+>>>>> 
+>>>>> Ok, is there any example code how to change an overlay before applying it out there,
+>>>>> or if not can you point to the functions to use to do this ?
+>>>>> 
+>>>> 
+>>>> The canonical place for all the dynamic DT stuff is
+>>>> 
+>>>> https://github.com/pantoniou/linux-beagle-track-mainline/tree/bbb-overlays
+>>>> 
+>>>> The beaglebone cape manager is here.
+>>>> 
+>>>> https://github.com/pantoniou/linux-beagle-track-mainline/commit/5028d1ed3beb8c75b28fce37b1bb5ee551b2ae9e
+>>>> 
+>>>>> Specifically my plan is to:
+>>>>> 
+>>>>> 1) Have a single overlay for q8 tablets with gsl1680 tablets
+>>>>> 
+>>>>> 2) Write an in kernel overlay manager which when it detects a gsl1680 touchscreen
+>>>>> will pick a best-default firmware-file + matching resolution + swap-x-y based on
+>>>>> which SoC (A13/A23/A33) the tablet is based on as well as the gsl1680's chip-id
+>>>>> and will then "patch" this info into the overlay before applying it. This
+>>>>> means being able to set / modify several string, int and bool dt properties.
+>>>>> 
+>>>>> 3) Offer a kernel-module option for the overlaymanager which will allows
+>>>>> overriding the defaults for the firmware-filename, etc. This is also
+>>>>> why I want to go with the patch approach instead of having multiple
+>>>>> dt-overlay files.
+>>>>> 
+>>>> 
+>>>> Hmm, your problem appears to be simpler. You already know all the possible
+>>>> parts that your touchscreen/video/thingy is going to use.
+>>>> 
+>>>> You don?t have to use an overlay then. Overlays are built on top of
+>>>> changesets.
+>>>> 
+>>>> For example, let?s say that you have various options for a touchscreen out
+>>>> of a finite set.
+>>>> 
+>>>> You just put the basic configuration for each in a disable node and your
+>>>> manager only needs to update the properties and set the status to enabled
+>>>> for it to be enabled.
+>>>> 
+>>>> For instance let?s say you have an option of two devices (only one of them
+>>>> being present).
+>>>> 
+>>>> devA {
+>>>> 	status = ?disabled?;
+>>>> 	compatible = ?foo,A?;
+>>>> };
+>>>> 
+>>>> devB {
+>>>> 	status = ?disabled?;
+>>>> 	compatible = ?bar,B?;
+>>>> };
+>>>> 
+>>>> Your manager can simply use a changeset to enable A and put a property there
+>>>> (example done using the extended helper API for clarity).
+>>>> 
+>>>> 	struct of_changeset cset;
+>>>> 	struct device_node *np = of_find_node_by_path(?/devA?);
+>>>> 
+>>>> 	of_changeset_init(&cset);
+>>>> 	of_changeset_add_property_bool(&cset, np, ?invert-x?);
+>>>> 	of_changeset_update_property_string(&cset, np, ?status?, ?okay?);
+>>>> 
+>>>> 	of_changeset_apply(&cset);
+>>> 
+>>> Cool that looks quite nice / easy. 2 questions on the above:
+>>> 
+>>> 1) Is the functionality needed by the above snippet in mainline ?
+>> 
+>> Changesets are in mainline; The extended API for the example above is not.
 > 
-> For the WiFi chip, there is a separate IO-VCC rail, which is VCC-IO-WIFI.
-> This, from what I understand of the datasheet, is for I/O signaling, and
-> thus vqmmc. VCC-WIFI is what powers the chip, which is what vmmc is.
+> The reason being that you sent it just before the merge window and there 
+> was a comment on it that has not been addressed.
+> 
 
-Ok. but there's still the issue of the two regulators that needs to be
-kept in sync. Before, that, I'd rather stice to not tying them to the
-MMC bus, and putting a comment on top.
+True. I ran out of time and $JOB interfered. I hope I?ll be able to sent out
+a new patchset this week.
 
-Maxime
+> Rob
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160620/310ffe78/attachment.sig>
+Regards
+
+? Pantelis
