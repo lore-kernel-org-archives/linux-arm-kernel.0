@@ -1,121 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 20 Jun 2016 08:25:08 -0500
-Subject: [PATCH v5 2/2] [media] atmel-isc: DT binding for Image Sensor
- Controller driver
-In-Reply-To: <1466153854-30272-3-git-send-email-songjun.wu@atmel.com>
-References: <1466153854-30272-1-git-send-email-songjun.wu@atmel.com>
- <1466153854-30272-3-git-send-email-songjun.wu@atmel.com>
-Message-ID: <20160620132508.GA32585@rob-hp-laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Jun 2016 14:27:10 +0100
+Subject: [RFC PATCH] clocksource: arm_arch_timer: disable the evtstrm via
+ the cmdline
+In-Reply-To: <5767E89F.5020809@linaro.org>
+References: <1466171011-30468-1-git-send-email-will.deacon@arm.com>
+ <5766FBC6.6000405@linaro.org> <20160620082157.GC29165@arm.com>
+ <5767E89F.5020809@linaro.org>
+Message-ID: <20160620132710.GA9246@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 04:57:14PM +0800, Songjun Wu wrote:
-> DT binding documentation for ISC driver.
+On Mon, Jun 20, 2016 at 02:59:11PM +0200, Daniel Lezcano wrote:
+> On 06/20/2016 10:21 AM, Will Deacon wrote:
+> >On Sun, Jun 19, 2016 at 10:08:38PM +0200, Daniel Lezcano wrote:
+> >>On 06/17/2016 03:43 PM, Will Deacon wrote:
+> >>
+> >>[ Cc'ed tglx ]
+> >>
+> >>>Disabling the eventstream can be useful for debugging and development
+> >>>purposes
+> >>
+> >>If it is for debugging and development, why upstream this change ?
+> >
+> >Mainly because it's desirable to be able to debug systems remotely, on
+> >machines that you don't have direct access to and where recompiling the
+> >kernel isn't necessarily an option. There are plenty of "no*" kernel
+> >parameters already that fall into a similar category.
 > 
-> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
-> ---
+> Hi Will,
 > 
-> Changes in v5:
-> - Add clock names.
+> if the kernel is in development and debug, why this option can't be
+> part of debugging code ?
 > 
-> Changes in v4:
-> - Remove the isc clock nodes.
-> 
-> Changes in v3:
-> - Remove the 'atmel,sensor-preferred'.
-> - Modify the isc clock node according to the Rob's remarks.
-> 
-> Changes in v2:
-> - Remove the unit address of the endpoint.
-> - Add the unit address to the clock node.
-> - Avoid using underscores in node names.
-> - Drop the "0x" in the unit address of the i2c node.
-> - Modify the description of 'atmel,sensor-preferred'.
-> - Add the description for the ISC internal clock.
-> 
->  .../devicetree/bindings/media/atmel-isc.txt        | 64 ++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
-> new file mode 100644
-> index 0000000..9558a77
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
-> @@ -0,0 +1,64 @@
-> +Atmel Image Sensor Controller (ISC)
-> +----------------------------------------------
-> +
-> +Required properties for ISC:
-> +- compatible
-> +	Must be "atmel,sama5d2-isc".
-> +- reg
-> +	Physical base address and length of the registers set for the device.
-> +- interrupts
-> +	Should contain IRQ line for the ISC.
-> +- clocks
-> +	List of clock specifiers, corresponding to entries in
-> +	the clock-names property;
-> +	Please refer to clock-bindings.txt.
-> +- clock-names
-> +	Required elements: "hclock".
+> If recompiling isn't an option, how this can be for "debugging and
+> development" ?
 
-What about the 2 other clocks in the example?
+We already have the config option for the cases you wish to set this at
+build time, and people use it.
 
-> +- #clock-cells
-> +	Should be 0.
-> +- clock-output-names
-> +	Should contain the name of the clock driving the sensor master clock.
+There are situations where you do not know at build time that you want
+this, e.g. debugging in the field, for which recompilation may change
+the code in other ways (e.g. layout of data and functions).
 
-State what the name is.
+For example, if we get a bug report that a production kernel wedges in
+spinlock code after running for 10 hours, being able to say "pass
+noevstrm" is much better than trying to get the end-user to recompile
+their kernel, which may or may not be possible, and may (for other
+reasons), mask the issue we wish to debug.
 
-> +- pinctrl-names, pinctrl-0
-> +	Please refer to pinctrl-bindings.txt.
-> +
-> +ISC supports a single port node with parallel bus. It should contain one
-> +'port' child node with child 'endpoint' node. Please refer to the bindings
-> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +
-> +Example:
-> +isc: isc at f0008000 {
-> +	compatible = "atmel,sama5d2-isc";
-> +	reg = <0xf0008000 0x4000>;
-> +	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
-> +	clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
-> +	clock-names = "hclock", "iscck", "gck";
-> +	#clock-cells = <0>;
-> +	clock-output-names = "isc-mck";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_isc_base &pinctrl_isc_data_8bit &pinctrl_isc_data_9_10 &pinctrl_isc_data_11_12>;
-> +
-> +	port {
-> +		isc_0: endpoint {
-> +			remote-endpoint = <&ov7740_0>;
-> +			hsync-active = <1>;
-> +			vsync-active = <0>;
-> +			pclk-sample = <1>;
-> +		};
-> +	};
-> +};
-> +
-> +i2c1: i2c at fc028000 {
-> +	ov7740: camera at 21 {
-> +	compatible = "ovti,ov7740";
+The code size impact is negligible, and there is no runtime performance
+impact if this option is not used.
 
-Indentation is still wrong here...
+> I'm not a big fan of the all the specific driver options for the
+> kernel parameters. If there is a real need to disable some parts of
+> a driver, it would be much more interesting to write a framework for
+> that and then use it from arm_arch_timer, thus giving the other
+> drivers the opportunity to provide the same feature.
 
-> +	reg = <0x21>;
-> +	clocks = <&isc>;
-> +	clock-names = "xvclk";
-> +	assigned-clocks = <&isc>;
-> +	assigned-clock-rates = <24000000>;
-> +
-> +	port {
-> +		ov7740_0: endpoint {
-> +			remote-endpoint = <&isc_0>;
-> +		};
-> +	};
-> +};
-> -- 
-> 2.7.4
-> 
+I'm not aware of other devices which have an event stream option.
+
+Additionally, the architected timer is at least slightly special in that
+it is architected, and this HW features was designed with architectural
+implications in mind (e.g. the behaviour of locking primitives). So
+while this happens to live in the driver code, it's in effect an
+architecture option (note that we have HWCAP_EVTSTREAM).
+
+Thanks,
+Mark.
