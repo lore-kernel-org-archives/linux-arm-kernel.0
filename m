@@ -1,44 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 20 Jun 2016 14:48:20 +0200
-Subject: [PATCH 07/12] power: pwrseq: rename file name for generic driver
-In-Reply-To: <1466158165-9380-8-git-send-email-peter.chen@nxp.com>
-References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
- <1466158165-9380-8-git-send-email-peter.chen@nxp.com>
-Message-ID: <5767E614.5030002@samsung.com>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Mon, 20 Jun 2016 18:18:41 +0530
+Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
+In-Reply-To: <20160618163228.GG3017@tetsubishi>
+References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
+ <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
+ <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
+ <934365f2bd30f242d8548e2a27483679@codeaurora.org>
+ <20160512051347.GE8453@hector.attlocal.net>
+ <20160512061843.GA6187@chewinlnx07.qualcomm.com>
+ <20160512175830.GA32019@hector>
+ <20160512193229.GA10499@chewinlnx07.qualcomm.com>
+ <CAPBZ5QdD6knEzQVW-BAgRSMcd=Gqv9_1Xt2LNc+qWgtre_2ZXQ@mail.gmail.com>
+ <20160512202755.GA3680@chewinlnx07.qualcomm.com>
+ <20160618163228.GG3017@tetsubishi>
+Message-ID: <7c979c4e5b5c1652211405ce1e93fe72@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2016 12:09 PM, Peter Chen wrote:
-> The individual driver file name is better to contain module name.
+On 2016-06-18 22:02, Wolfram Sang wrote:
+>> We run the command i2cdetect for address 0x3 to 0x77. The QUP 
+>> generates
+>> write error for address 0x3 to 0x7 apart from other bus errors since
+>> these are reserved addresses. I was getting the crash in non DMA mode
+>> and BAM hang in DMA mode before putting the fix.
+>> 
+>> Also we have connected the I2C TPM and run the following script
+>> overnight for both DMA and Non DMA mode.  The script checks for
+>> all transfer length and we are generating multiple NACK and
+>> Non NACK error before each valid transfer.
+>> 
+>> a=1
+>> 
+>> while [ $a -lt 4096 ]
+>> do
+>>    echo $a
+>>    i2cdetect -y -a -r 0 0x03 0x77
+>>    tpm-manager get_random $a
+>>    i2cdetect -y -a -r 1 0x03 0x77
+>>    a=`expr $a + 1`
+>> done
 > 
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> ---
->  .../power/pwrseq/{pwrseq-simple.txt => mmc-pwrseq-simple.txt}         | 0
->  drivers/power/pwrseq/Makefile                                         | 4 ++--
->  drivers/power/pwrseq/{pwrseq.c => core.c}                             | 0
->  drivers/power/pwrseq/{pwrseq_simple.c => pwrseq_mmc_simple.c}         | 0
->  4 files changed, 2 insertions(+), 2 deletions(-)
->  rename Documentation/devicetree/bindings/power/pwrseq/{pwrseq-simple.txt => mmc-pwrseq-simple.txt} (100%)
->  rename drivers/power/pwrseq/{pwrseq.c => core.c} (100%)
->  rename drivers/power/pwrseq/{pwrseq_simple.c => pwrseq_mmc_simple.c} (100%)
-> 
-> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt b/Documentation/devicetree/bindings/power/pwrseq/mmc-pwrseq-simple.txt
-> similarity index 100%
-> rename from Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt
-> rename to Documentation/devicetree/bindings/power/pwrseq/mmc-pwrseq-simple.txt
-> diff --git a/drivers/power/pwrseq/Makefile b/drivers/power/pwrseq/Makefile
-> index 9e40e4b..d475e01 100644
-> --- a/drivers/power/pwrseq/Makefile
-> +++ b/drivers/power/pwrseq/Makefile
-> @@ -1,3 +1,3 @@
-> -obj-$(CONFIG_POWER_SEQ)		+= pwrseq.o
-> -obj-$(CONFIG_POWER_SEQ_SIMPLE)	+= pwrseq_simple.o
-> +obj-$(CONFIG_POWER_SEQ)		+= core.o
-> +obj-$(CONFIG_POWER_SEQ_SIMPLE)	+= pwrseq_mmc_simple.o
+> So, what is the outcome of this discussion?
 
-Although the driver was developed for MMC but it is quite generic (or
-rather - mmc independent). The name of the driver is just
-"pwrseq_simple" so I think MMC prefix is not needed.
-
-Best regards,
-Krzysztof
+Discussion was regarding resetting the QUP state in ISR and it is the 
+part of
+existing code itself. The current patch only added the error checking 
+for bus
+errors so we can go ahead with this patch. I have shared the script 
+which we
+are using for testing error path.
