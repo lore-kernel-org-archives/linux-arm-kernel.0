@@ -1,54 +1,79 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 20 Jun 2016 10:22:59 +0300
-Subject: [GIT PULL] omap-gpmc fixes for v4.7 rc cycle
-In-Reply-To: <20160619060106.GB16376@localhost>
-References: <57626DF2.70907@ti.com> <20160619060106.GB16376@localhost>
-Message-ID: <576799D3.8000107@ti.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Mon, 20 Jun 2016 09:29:18 +0200
+Subject: [RESEND PATCH v2 02/13] drivers: clk: st: Simplify clock binding
+ of STiH4xx platforms
+In-Reply-To: <20160619150458.GA26824@rob-hp-laptop>
+References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1466068833-5055-3-git-send-email-gabriel.fernandez@linaro.org>
+ <20160619150458.GA26824@rob-hp-laptop>
+Message-ID: <CAG374jD+qChVC+6QJEHSXSzXGVVtAxvZ3V6zNpQDUyuJ2yCjMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Rob,
 
-On 19/06/16 09:01, Olof Johansson wrote:
-> On Thu, Jun 16, 2016 at 12:14:26PM +0300, Roger Quadros wrote:
->> Hi Arnd/Olof,
+On 19 June 2016 at 17:04, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Jun 16, 2016 at 11:20:22AM +0200, Gabriel Fernandez wrote:
+>> This patch reworks the clock binding to avoid too much detail in DT.
+>> Now we have only compatible string per type of clock
+>> (remark from Rob https://lkml.org/lkml/2016/5/25/492)
 >>
->> The following changes since commit 5edb56491d4812c42175980759da53388e5d86f5:
+>
+> I have no idea what the clock trees and clock controller in these chips
+> look like, so it's hard to say if the changes here are good. It still
+> looks like things are somewhat fine grained clocks in DT. I'll leave
+> it up to the platform maintainers to decide...
+>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>> ---
+>>  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  2 +-
+>>  .../devicetree/bindings/clock/st/st,clkgen-pll.txt | 11 ++--
+>>  .../devicetree/bindings/clock/st/st,clkgen.txt     |  2 +-
+>>  .../devicetree/bindings/clock/st/st,quadfs.txt     |  6 +--
+>>  drivers/clk/st/clkgen-fsyn.c                       | 41 ++++++--------
+>>  drivers/clk/st/clkgen-mux.c                        | 28 ++++------
+>>  drivers/clk/st/clkgen-pll.c                        | 62 ++++++++++------------
+>>  7 files changed, 65 insertions(+), 87 deletions(-)
 >>
->>   Linux 4.7-rc3 (2016-06-12 07:20:35 -0700)
+>> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+>> index 4d277d6..9a46cb1d7 100644
+>> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+>> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+>> @@ -10,7 +10,7 @@ This binding uses the common clock binding[1].
+>>  Required properties:
 >>
->> are available in the git repository at:
+>>  - compatible : shall be:
+>> -     "st,stih407-clkgen-a9-mux",     "st,clkgen-mux"
+>> +     "st,stih407-clkgen-a9-mux"
 >>
->>   https://github.com/rogerq/linux.git tags/gpmc-omap-fixes-for-v4.7
+>>  - #clock-cells : from common clock binding; shall be set to 0.
 >>
->> for you to fetch changes up to 8f50b8e57442d28e41bb736c173d8a2490549a82:
+>> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+>> index c9fd674..be0b043 100644
+>> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+>> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+>> @@ -9,11 +9,10 @@ Base address is located to the parent node. See clock binding[2]
+>>  Required properties:
 >>
->>   memory: omap-gpmc: Fix omap gpmc EXTRADELAY timing (2016-06-16 11:43:48 +0300)
->>
->> ----------------------------------------------------------------
->> OMAP-GPMC: Fixes for for v4.7-rc cycle:
->>
->> - Fix omap gpmc EXTRADELAY timing. The DT provided timings
->> were wrongly used causing devices requiring extra delay timing
->> to fail.
-> 
-> So, our fixes branch is at 4.7-rc1, so now you force us to bring in -rc3 just
-> because of this one patch. That's a little annoying. Base your branch on an
-> older release if it makes sense, and/or take a look at what release our
-> branch is on if you think of it. :)
+>>  - compatible : shall be:
+>> -     "st,stih407-plls-c32-a0",       "st,clkgen-plls-c32"
+>> -     "st,stih407-plls-c32-a9",       "st,clkgen-plls-c32"
+>> -     "sst,plls-c32-cx_0",            "st,clkgen-plls-c32"
+>> -     "sst,plls-c32-cx_1",            "st,clkgen-plls-c32"
+>> -     "st,stih418-plls-c28-a9",       "st,clkgen-plls-c32"
+>
+>> +     "st,clkgen-pll0"
+>> +     "st,clkgen-pll0"
+>
+> Repeated. Supposed to be 0 and 1? This seems a bit generic, too.
+Yes you are right, it's 0 and 1.
+I wait remarks from Mike or Stephen before send a V3.
 
-My apologies for not checking that your fixes branch is at v4.7-rc1.
+Thanks Rob
 
-> 
-> It's not a huge deal but the main disadvantage is that git request-pull
-> sometimes gets confused of what's actually in the branch and not, so it might
-> produce an incorrect pull request. We normally don't have to deal with that on
-> fixes, only what we stage for the merge windows.
-> 
-> Anyhow, I've merged this for now.
-> 
+BR
+Gabriel
 
-Thanks a lot :).
-
-cheers,
--roger
+>
+>> +     "st,stih407-clkgen-plla9"
+>> +     "st,stih418-clkgen-plla9"
