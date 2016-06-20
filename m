@@ -1,59 +1,43 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 20 Jun 2016 15:57:23 +0200
-Subject: [PATCH 3/3] clk: samsung: exynos5433: add CPU clocks configuration
- data and instantiate CPU clocks
-In-Reply-To: <CA+Ln22GZu9GEyCzkywkeQz8v-dq5cpVkeGRxk15spUo=JqvgTA@mail.gmail.com>
-References: <1464095957-25851-1-git-send-email-b.zolnierkie@samsung.com>
- <1464095957-25851-4-git-send-email-b.zolnierkie@samsung.com>
- <CA+Ln22GZu9GEyCzkywkeQz8v-dq5cpVkeGRxk15spUo=JqvgTA@mail.gmail.com>
-Message-ID: <5185433.qVhfPjJi8E@amdc1976>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Jun 2016 16:09:56 +0200
+Subject: [PULL] drm/bridge: sii902x driver
+Message-ID: <20160620160956.438e1c17@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, June 18, 2016 11:57:30 PM Tomasz Figa wrote:
-> Hi Bart,
+Hi Dave,
 
-Hi Tomek,
+This pull request contains 2 patches adding support for the sii902x
+bridge.
 
-> 2016-05-24 22:19 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> > Add the CPU clocks configuration data and instantiate the CPU clocks
-> > type for Exynos5433.
-> >
-> > Cc: Kukjin Kim <kgene@kernel.org>
-> > CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  drivers/clk/samsung/clk-exynos5433.c | 72 ++++++++++++++++++++++++++++++++----
-> >  1 file changed, 64 insertions(+), 8 deletions(-)
-> 
-> Please see my comments inline.
-> 
-> > diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-> > index 6dd81ed..9ff6160 100644
-> > --- a/drivers/clk/samsung/clk-exynos5433.c
-> > +++ b/drivers/clk/samsung/clk-exynos5433.c
-> [snip]
-> >  static void __init exynos5433_cmu_apollo_init(struct device_node *np)
-> > @@ -3620,6 +3640,12 @@ static void __init exynos5433_cmu_apollo_init(struct device_node *np)
-> >                                  ARRAY_SIZE(apollo_div_clks));
-> >         samsung_clk_register_gate(ctx, apollo_gate_clks,
-> >                                   ARRAY_SIZE(apollo_gate_clks));
-> > +
-> > +       exynos_register_cpu_clock(ctx, CLK_SCLK_APOLLO, "apolloclk",
-> > +               mout_apollo_p[0], mout_apollo_p[1], 0x200,
-> > +               exynos5433_apolloclk_d, ARRAY_SIZE(exynos5433_apolloclk_d),
-> > +               CLK_CPU_HAS_E5433_REGS_LAYOUT);
-> 
-> Hmm, I guess the reason for patch 1/3 was that
-> exynos_register_cpu_clock() has to be called with the ctx pointer.
-> However samsung_cmu_register_one() returns the ctx pointer, so I guess
-> you could use that to avoid open-coding?
+Regards,
 
-It is more than need to use ctx pointer.  Please see me reply to your
-review of patch 1/3.
+Boris
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+The following changes since commit a0877f52035280370707bdefeddc6faa6478b892:
+
+  Merge tag 'topic/drm-misc-2016-06-15' of git://anongit.freedesktop.org/drm-intel into drm-next (2016-06-16 05:49:32 +1000)
+
+are available in the git repository at:
+
+  git at github.com:bbrezillon/linux-at91.git tags/drm-sii902x
+
+for you to fetch changes up to b7eaa9ffa6a44c4efabdd9d430e882d67c92c5e8:
+
+  drm/bridge: Add sii902x DT bindings doc (2016-06-20 15:57:06 +0200)
+
+----------------------------------------------------------------
+Add basic support for the sii902x RGB -> HDMI bridge.
+
+----------------------------------------------------------------
+Boris Brezillon (2):
+      drm/bridge: Add sii902x driver
+      drm/bridge: Add sii902x DT bindings doc
+
+ Documentation/devicetree/bindings/display/bridge/sii902x.txt |  35 +++++++++++++
+ drivers/gpu/drm/bridge/Kconfig                               |   8 +++
+ drivers/gpu/drm/bridge/Makefile                              |   1 +
+ drivers/gpu/drm/bridge/sii902x.c                             | 467 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++	+++++++++++++++++++++++++
+ 4 files changed, 511 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/sii902x.txt
+ create mode 100644 drivers/gpu/drm/bridge/sii902x.c
