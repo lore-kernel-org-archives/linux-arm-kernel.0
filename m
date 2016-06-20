@@ -1,90 +1,200 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 20 Jun 2016 13:02:21 +0200
-Subject: [PATCH V7 8/8] irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI
- domain initialization
-In-Reply-To: <1466420541-20101-1-git-send-email-tn@semihalf.com>
-References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
-Message-ID: <1466420541-20101-9-git-send-email-tn@semihalf.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 20 Jun 2016 12:13:52 +0100
+Subject: [PATCH 4/6] nvmem: amlogic: Add Amlogic Meson EFUSE driver
+In-Reply-To: <1466339944-602-5-git-send-email-carlo@caione.org>
+References: <1466339944-602-1-git-send-email-carlo@caione.org>
+ <1466339944-602-5-git-send-email-carlo@caione.org>
+Message-ID: <5767CFF0.5040102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let ACPI build ITS PCI MSI domain. ACPI code is responsible for retrieving
-inner domain token and passing it on to its_pci_msi_init_one generic
-init call.
+Hi Carlo,
 
-IORT maintains list of registered domain tokens and allows to find
-corresponding domain based on MADT ITS subtable ID info.
+On 19/06/16 13:39, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> Add Amlogic EFUSE driver to access hardware data like ethernet address,
+> serial number or IDs.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>   drivers/nvmem/Kconfig       |  11 ++++
+>   drivers/nvmem/Makefile      |   2 +
+>   drivers/nvmem/meson-efuse.c | 130 ++++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 143 insertions(+)
+>   create mode 100644 drivers/nvmem/meson-efuse.c
+>
+> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+> index ca52952..ef17bc9 100644
+> --- a/drivers/nvmem/Kconfig
+> +++ b/drivers/nvmem/Kconfig
+> @@ -102,4 +102,15 @@ config NVMEM_VF610_OCOTP
+>   	  This driver can also be build as a module. If so, the module will
+>   	  be called nvmem-vf610-ocotp.
+>
+> +config MESON_EFUSE
+> +	tristate "Amlogic eFuse Support"
+> +	depends on ARCH_MESON || COMPILE_TEST
+> +	select REGMAP_MMIO
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its-pci-msi.c | 44 ++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+NVMEM recently moved out of using regmap, as regmap did not provide 
+better abstraction, could you rebase your patch on top of mainline.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index d2c2496..ae7221c 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/iort.h>
- #include <linux/msi.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
-@@ -144,9 +145,52 @@ static int __init its_pci_of_msi_init(void)
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+
-+static int __init
-+its_pci_msi_parse_madt(struct acpi_subtable_header *header,
-+		       const unsigned long end)
-+{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *dom_handle;
-+	const char *node_name;
-+	int err = -ENXIO;
-+
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-+			      (long)its_entry->base_address);
-+	dom_handle = iort_find_domain_token(its_entry->translation_id);
-+	if (!dom_handle) {
-+		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-+		goto out;
-+	}
-+
-+	err = its_pci_msi_init_one(dom_handle, node_name);
-+	if (!err)
-+		pr_info("PCI/MSI: %s domain created\n", node_name);
-+
-+out:
-+	kfree(node_name);
-+	return err;
-+}
-+
-+static int __init its_pci_acpi_msi_init(void)
-+{
-+	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+			      its_pci_msi_parse_madt, 0);
-+	return 0;
-+}
-+#else
-+static int __init its_pci_acpi_msi_init(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int __init its_pci_msi_init(void)
- {
- 	its_pci_of_msi_init();
-+	its_pci_acpi_msi_init();
- 
- 	return 0;
- }
--- 
-1.9.1
+Thanks,
+srini
+
+> +	help
+> +	  This is a driver to retrieve specific values from the eFuse found on
+> +	  the Amlogic Meson SoCs.
+> +
+> +	  This driver can also be built as a module. If so, the module
+> +	  will be called nvmem_meson_efuse.
+> +
+>   endif
+> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
+> index 45ab1ae..8f942a0 100644
+> --- a/drivers/nvmem/Makefile
+> +++ b/drivers/nvmem/Makefile
+> @@ -22,3 +22,5 @@ obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
+>   nvmem_sunxi_sid-y		:= sunxi_sid.o
+>   obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
+>   nvmem-vf610-ocotp-y		:= vf610-ocotp.o
+> +obj-$(CONFIG_MESON_EFUSE)	+= nvmem_meson_efuse.o
+> +nvmem_meson_efuse-y		:= meson-efuse.o
+> diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
+> new file mode 100644
+> index 0000000..7c80e1c
+> --- /dev/null
+> +++ b/drivers/nvmem/meson-efuse.c
+> @@ -0,0 +1,130 @@
+> +/*
+> + * Amlogic eFuse Driver
+> + *
+> + * Copyright (c) 2016 Endless Computers, Inc.
+> + * Author: Carlo Caione <carlo@endlessm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of version 2 of the GNU General Public License as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+> + * more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/nvmem-provider.h>
+> +#include <linux/slab.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +
+> +#include <linux/firmware/meson/meson_sm.h>
+> +
+> +static struct meson_sm_firmware *fw;
+> +
+> +static int meson_efuse_write(void *context, const void *data, size_t count)
+> +{
+> +	/* Nothing TBD, Read-Only */
+> +	return 0;
+> +}
+> +
+> +static int meson_efuse_read(void *context,
+> +			    const void *reg, size_t reg_size,
+> +			    void *val, size_t val_size)
+> +{
+> +	unsigned int offset = *(u32 *)reg;
+> +	u8 *buf = val;
+> +	int ret;
+> +
+> +	ret = meson_sm_call_read(fw, buf, SM_EFUSE_READ, offset,
+> +				 val_size, 0, 0, 0);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct nvmem_config econfig = {
+> +	.name = "meson-efuse",
+> +	.owner = THIS_MODULE,
+> +	.read_only = true,
+> +};
+> +
+> +static struct regmap_bus meson_efuse_bus = {
+> +	.read = meson_efuse_read,
+> +	.write = meson_efuse_write,
+> +	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
+> +	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
+> +};
+> +
+> +static struct regmap_config meson_efuse_regmap_config = {
+> +	.reg_bits = 32,
+> +	.reg_stride = 1,
+> +	.val_bits = 8,
+> +};
+> +
+> +static const struct of_device_id meson_efuse_match[] = {
+> +	{ .compatible = "amlogic,meson-gxbb-efuse", },
+> +	{ /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, meson_efuse_match);
+> +
+> +static int meson_efuse_probe(struct platform_device *pdev)
+> +{
+> +	struct nvmem_device *nvmem;
+> +	struct regmap *regmap;
+> +	unsigned int size;
+> +
+> +	fw = meson_sm_get_fw();
+> +	if (!fw)
+> +		return -EPROBE_DEFER;
+> +
+> +	if (meson_sm_call(fw, SM_EFUSE_USER_MAX, &size, 0, 0, 0, 0, 0) < 0)
+> +		return -EINVAL;
+> +	meson_efuse_regmap_config.max_register = size - 1;
+> +
+> +	regmap = devm_regmap_init(&pdev->dev, &meson_efuse_bus,
+> +				  NULL, &meson_efuse_regmap_config);
+> +	if (IS_ERR(regmap)) {
+> +		dev_err(&pdev->dev, "regmap init failed\n");
+> +		return PTR_ERR(regmap);
+> +	}
+> +
+> +	econfig.dev = &pdev->dev;
+> +	nvmem = nvmem_register(&econfig);
+> +	if (IS_ERR(nvmem))
+> +		return PTR_ERR(nvmem);
+> +
+> +	platform_set_drvdata(pdev, nvmem);
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_efuse_remove(struct platform_device *pdev)
+> +{
+> +	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+> +
+> +	return nvmem_unregister(nvmem);
+> +}
+> +
+> +static struct platform_driver meson_efuse_driver = {
+> +	.probe = meson_efuse_probe,
+> +	.remove = meson_efuse_remove,
+> +	.driver = {
+> +		.name = "meson-efuse",
+> +		.of_match_table = meson_efuse_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(meson_efuse_driver);
+> +
+> +MODULE_AUTHOR("Carlo Caione <carlo@endlessm.com>");
+> +MODULE_DESCRIPTION("Amlogic Meson NVMEM driver");
+> +MODULE_LICENSE("GPL v2");
+>
