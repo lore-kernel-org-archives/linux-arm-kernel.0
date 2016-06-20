@@ -1,110 +1,49 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 20 Jun 2016 07:49:24 +0000
-Subject: [PATCH v3 1/2] usb: ohci-at91: Forcibly suspend ports while USB
- suspend
-In-Reply-To: <5757F753.8010408@atmel.com>
-References: <1465359311-14544-1-git-send-email-wenyou.yang@atmel.com>
- <1465359311-14544-2-git-send-email-wenyou.yang@atmel.com>
- <5757EDB4.3020806@atmel.com> <5757F753.8010408@atmel.com>
-Message-ID: <B256D81BAE5131468A838E5D7A24364101650C53B8@penmbx01>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 20 Jun 2016 09:53:56 +0200
+Subject: [PATCH/RFC 3/3] arm64: dts: r8a7795: Support shared irq for
+ thermal sensors
+In-Reply-To: <57661CAD.8040807@rvc.renesas.com>
+References: <57661211.7010900@rvc.renesas.com>
+ <57661BB1.3060401@rvc.renesas.com>
+ <57661CAD.8040807@rvc.renesas.com>
+Message-ID: <CAMuHMdXvSYFcMzpptrN2AKdeO88P38Ts8-p1CXXYVaGiXvqw5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ferre, Nicolas
-> Sent: 2016?6?8? 18:46
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>; Alan Stern
-> <stern@rowland.harvard.edu>; Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org>; Rob Herring <robh+dt@kernel.org>; Alexandre
-> Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>; Mark Brown <broonie@kernel.org>; Ian
-> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
-> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-usb at vger.kernel.org
-> Subject: Re: [PATCH v3 1/2] usb: ohci-at91: Forcibly suspend ports while USB
-> suspend
-> 
-> Le 08/06/2016 12:04, Nicolas Ferre a ?crit :
-> > Le 08/06/2016 06:15, Wenyou Yang a ?crit :
-> >> In order to the save power consumption, as a workaround, suspend
-> >> forcibly the USB PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI
-> >> Interrupt Configuration Register in the SFRs while OHCI USB suspend.
-> >>
-> >> This suspend operation must be done before the USB clock is disabled,
-> >> resume after the USB clock is enabled.
-> >>
-> >> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> >
-> > Little nitpicking below...
-> >
-> >> ---
-> >>
-> >> Changes in v3:
-> >>  - Change the compatible description for more precise.
-> >>
-> >> Changes in v2:
-> >>  - Add compatible to support forcibly suspend the ports.
-> >>  - Add soc/at91/at91_sfr.h to accommodate the defines.
-> >>  - Add error checking for .sfr_regmap.
-> >>  - Remove unnecessary regmap_read() statement.
-> >>
-> >>  .../devicetree/bindings/usb/atmel-usb.txt          |  6 +-
-> >>  drivers/usb/host/ohci-at91.c                       | 80 +++++++++++++++++++++-
-> >>  include/soc/at91/at91_sfr.h                        | 29 ++++++++
-> 
-> Oops sorry, additional comment which is not nitpicking, this one:
-> 
-> We already have SFR header file in this patch:
-> 
-> Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> Date:   Thu Mar 17 17:04:00 2016 +0100
-> 
->     ARM: dts: at91: sama5d2: add SFR node
-> 
->     This SFR node is looked up by the I2S controller driver to tune the
->     SFR_I2SCLKSEL register.
-> 
->     Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->     Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->     Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->     Acked-by: Rob Herring <robh@kernel.org>
->     Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Which is already accepted by arm-soc guys for 4.7... So my ack transforms into a
-> nack, sorry...
-> 
-> We will have to coordinate the effort and maybe take the whole series with us. But
-> for sure, you'll have to use the existing include/soc/at91/atmel-sfr.h file and build
-> on top of it...
+Hi Khiem,
 
-Sorry, not notice this file.
+On Sun, Jun 19, 2016 at 6:16 AM, Khiem Nguyen
+<khiem.nguyen.xt@rvc.renesas.com> wrote:
+> This patch adds the shared interrupts for thermal sensors
+> TSC1/TSC2/TSC3.
+>
+> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+> Signed-off-by: Khiem Nguyen <khiem.nguyen.xt@rvc.renesas.com>
+> ---
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> index db203db..761df2b 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> @@ -1628,7 +1628,8 @@
+>                         compatible = "renesas,thermal-r8a7795",
+>                                 "renesas,rcar-gen3-thermal";
+>                         reg = <0 0xe6198000 0 0x5c>;
+> -                       interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+> +                       interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
 
-I will built it on this file.
+If you make this change, the DT bindings should be updated first.
 
-> 
-> Bye,
-> 
-> >>  3 files changed, 112 insertions(+), 3 deletions(-)  create mode
-> >> 100644 include/soc/at91/at91_sfr.h
-> 
-> [..]
-> 
-> >
-> > But you can take my:
-> >
-> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >
-> > with the little corrections listed.
-> >
-> > Alan, We plan to take the second patch of this series with AT91 git
-> > tree through arm-soc. Do you agree to take this one through yours?
-> 
-> Alan, forget this request, we'll have to coordinate differently.
-> 
-> Sorry for the noise. Bye,
-> --
-> Nicolas Ferre
+Gr{oetje,eeting}s,
 
+                        Geert
 
-Best Regards,
-Wenyou Yang
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
