@@ -1,50 +1,87 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 20 Jun 2016 10:57:45 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Build Atmel maXTouch driver as
- a module
-In-Reply-To: <1465939232-19156-1-git-send-email-javier@osg.samsung.com>
-References: <1465939232-19156-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1466413065.8812.3.camel@collabora.co.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 20 Jun 2016 10:00:46 +0100
+Subject: [PATCH v2 4/5] mfd: rn5t618: register power off callback
+ optionally
+In-Reply-To: <876c6fc0a1e300e95eda616c8c71a3ec@agner.ch>
+References: <20160608010429.19618-1-stefan@agner.ch>
+ <20160608010429.19618-5-stefan@agner.ch>
+ <20160616145907.GD4948@dell>
+ <876c6fc0a1e300e95eda616c8c71a3ec@agner.ch>
+Message-ID: <20160620090046.GC1465@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
+On Sat, 18 Jun 2016, Stefan Agner wrote:
 
-On Tue, 2016-06-14 at 17:20 -0400, Javier Martinez Canillas wrote:
-> The driver is for a trackpad device so is not needed for booting and
-> makes more sense to have it as module to reduce the kernel image
-> size.
+> On 2016-06-16 07:59, Lee Jones wrote:
+> > On Tue, 07 Jun 2016, Stefan Agner wrote:
+> > 
+> >> Only register power off if the PMIC is defined as system power
+> >> controller (see Documentation/devicetree/bindings/power/
+> >> power-controller.txt).
+> >>
+> >> Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > 
+> > These should be chronological.
+> > 
 > 
-> It was probably enabled as built-in because module autoload was not
-> working when the I2C device was registered by OF but this got fixed
-> in commit b7d21058b40b ("Input: atmel_mxt_ts - add maxtouch to I2C
-> table for module autoload") so it's safe to enable as a module now.
+> Has been discussed already here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/345835.html
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> It's an artifact of my development process, I keep the commits in my
+> local branches without signed off lines and add them before sending out
+> patches. So whenever I prepare a new revision, collected acks, sobs are
+> chronological, but end up before my sob.
+> 
+> But since you are the second maintainer which has objection to that
+> style I probably should change that...
 
-Make sense to me,
-Reviewed-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
+It would make your life easier in the long run. :)
+
+> >> ---
+> >>  drivers/mfd/rn5t618.c | 10 +++++++---
+> >>  1 file changed, 7 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/mfd/rn5t618.c b/drivers/mfd/rn5t618.c
+> >> index 7607ced..d9b4d40 100644
+> >> --- a/drivers/mfd/rn5t618.c
+> >> +++ b/drivers/mfd/rn5t618.c
+> >> @@ -103,9 +103,13 @@ static int rn5t618_i2c_probe(struct i2c_client *i2c,
+> >>  		return ret;
+> >>  	}
+> >>
+> >> -	if (!pm_power_off) {
+> >> -		rn5t618_pm_power_off = priv;
+> >> -		pm_power_off = rn5t618_power_off;
+> >> +	if (of_device_is_system_power_controller(i2c->dev.of_node)) {
+> >> +		if (!pm_power_off) {
+> >> +			rn5t618_pm_power_off = priv;
+> >> +			pm_power_off = rn5t618_power_off;
+> >> +		} else {
+> >> +			dev_err(&i2c->dev, "Failed to set poweroff capability, already defined\n");
+> > 
+> > This is not an error.  Please use dev_warn() instead.
+> > 
 > 
-> ?arch/arm/configs/multi_v7_defconfig | 2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
+> Hm, I agree... FWIW, I copied the code (and that message) from here,
+> where dev_err is probably also not appropriate:
+> drivers/regulator/act8865-regulator.c
+
+Mark (Regulator maintainer) also accepts patches.
+
+> > Also, is this message actually accurate?  Your commit message would
+> > indicate that it's not.
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig
-> b/arch/arm/configs/multi_v7_defconfig
-> index ee7c884ab5d8..c29bdd070721 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -269,7 +269,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
-> ?CONFIG_MOUSE_CYAPA=m
-> ?CONFIG_MOUSE_ELAN_I2C=y
-> ?CONFIG_INPUT_TOUCHSCREEN=y
-> -CONFIG_TOUCHSCREEN_ATMEL_MXT=y
-> +CONFIG_TOUCHSCREEN_ATMEL_MXT=m
-> ?CONFIG_TOUCHSCREEN_MMS114=m
-> ?CONFIG_TOUCHSCREEN_ST1232=m
-> ?CONFIG_TOUCHSCREEN_STMPE=y
+> Hm, maybe we should bail out with an error in that case since DT
+> explicitly asks to be power controller... Is that what you mean?
+
+I think I misunderstood the message.  To fix this I would reword it.
+
+"Poweroff call-back already defined"
 
 -- 
-
-Sjoerd Simons
-Collabora Ltd.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
