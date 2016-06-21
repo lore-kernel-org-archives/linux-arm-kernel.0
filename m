@@ -1,102 +1,128 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 21 Jun 2016 14:45:30 +0800
-Subject: [PATCH 1/4] ARM: dts: imx7d: Add SPI support
-In-Reply-To: <1466194183-31076-1-git-send-email-diego.dorta@nxp.com>
+Date: Tue, 21 Jun 2016 14:48:10 +0800
+Subject: [PATCH 2/4] ARM: dts: imx7d-sdb: Add display support
+In-Reply-To: <1466194183-31076-2-git-send-email-diego.dorta@nxp.com>
 References: <1466194183-31076-1-git-send-email-diego.dorta@nxp.com>
-Message-ID: <20160621064530.GE21364@tiger>
+ <1466194183-31076-2-git-send-email-diego.dorta@nxp.com>
+Message-ID: <20160621064810.GF21364@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 05:09:40PM -0300, Diego Dorta wrote:
-> Add ecspi nodes and aliases.
+On Fri, Jun 17, 2016 at 05:09:41PM -0300, Diego Dorta wrote:
+> Add support for the LCD8000-43T display.
 > 
 > Signed-off-by: Diego Dorta <diego.dorta@nxp.com>
 > ---
->  arch/arm/boot/dts/imx7d.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
+>  arch/arm/boot/dts/imx7d-sdb.dts | 84 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 84 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index d70d55d..f30885e 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -69,6 +69,10 @@
->  		serial4 = &uart5;
->  		serial5 = &uart6;
->  		serial6 = &uart7;
-> +		spi0 = &ecspi1;
-> +		spi1 = &ecspi2;
-> +		spi2 = &ecspi3;
-> +		spi3 = &ecspi4;
+> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+> index d6da506..c9cf9b0 100644
+> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+> @@ -272,6 +272,45 @@
 >  	};
+>  };
 >  
->  	cpus {
-> @@ -608,6 +612,18 @@
->  				status = "disabled";
->  			};
->  
-> +			ecspi4: ecspi at 30630000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,imx7d-ecspi", "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
+> +&lcdif {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_lcdif_dat
+> +		     &pinctrl_lcdif_ctrl>;
 
-There is no much point to have "fsl,imx6sx-ecspi".  Please drop it.
+Do we have any particular reason to split the lcdif pins into two sets?
 
 Shawn
 
-> +				reg = <0x30630000 0x10000>;
-> +				interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_ECSPI4_ROOT_CLK>,
-> +					<&clks IMX7D_ECSPI4_ROOT_CLK>;
-> +				clock-names = "ipg", "per";
-> +				status = "disabled";
-> +			};
+> +	display = <&display0>;
+> +	status = "okay";
 > +
->  			pwm1: pwm at 30660000 {
->  				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
->  				reg = <0x30660000 0x10000>;
-> @@ -671,6 +687,42 @@
->  			reg = <0x30800000 0x400000>;
->  			ranges;
+> +	display0: display {
+> +		bits-per-pixel = <16>;
+> +		bus-width = <24>;
+> +
+> +		display-timings {
+> +			native-mode = <&timing0>;
+> +
+> +			timing0: timing0 {
+> +				clock-frequency = <9200000>;
+> +				hactive = <480>;
+> +				vactive = <272>;
+> +				hfront-porch = <8>;
+> +				hback-porch = <4>;
+> +				hsync-len = <41>;
+> +				vback-porch = <2>;
+> +				vfront-porch = <4>;
+> +				vsync-len = <10>;
+> +				hsync-active = <0>;
+> +				vsync-active = <0>;
+> +				de-active = <1>;
+> +				pixelclk-active = <0>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&pwm1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm1>;
+> +	status = "okay";
+> +};
+> +
+>  &uart1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart1>;
+> @@ -396,6 +435,51 @@
+>  			>;
+>  		};
 >  
-> +			ecspi1: ecspi at 30820000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,imx7d-ecspi", "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
-> +				reg = <0x30820000 0x10000>;
-> +				interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_ECSPI1_ROOT_CLK>,
-> +					<&clks IMX7D_ECSPI1_ROOT_CLK>;
-> +				clock-names = "ipg", "per";
-> +				status = "disabled";
-> +			};
+> +		pinctrl_lcdif_dat: lcdifdatgrp {
+> +			fsl,pins = <
+> +				MX7D_PAD_LCD_DATA00__LCD_DATA0		0x79
+> +				MX7D_PAD_LCD_DATA01__LCD_DATA1		0x79
+> +				MX7D_PAD_LCD_DATA02__LCD_DATA2		0x79
+> +				MX7D_PAD_LCD_DATA03__LCD_DATA3		0x79
+> +				MX7D_PAD_LCD_DATA04__LCD_DATA4		0x79
+> +				MX7D_PAD_LCD_DATA05__LCD_DATA5		0x79
+> +				MX7D_PAD_LCD_DATA06__LCD_DATA6		0x79
+> +				MX7D_PAD_LCD_DATA07__LCD_DATA7		0x79
+> +				MX7D_PAD_LCD_DATA08__LCD_DATA8		0x79
+> +				MX7D_PAD_LCD_DATA09__LCD_DATA9		0x79
+> +				MX7D_PAD_LCD_DATA10__LCD_DATA10		0x79
+> +				MX7D_PAD_LCD_DATA11__LCD_DATA11		0x79
+> +				MX7D_PAD_LCD_DATA12__LCD_DATA12		0x79
+> +				MX7D_PAD_LCD_DATA13__LCD_DATA13		0x79
+> +				MX7D_PAD_LCD_DATA14__LCD_DATA14		0x79
+> +				MX7D_PAD_LCD_DATA15__LCD_DATA15		0x79
+> +				MX7D_PAD_LCD_DATA16__LCD_DATA16		0x79
+> +				MX7D_PAD_LCD_DATA17__LCD_DATA17		0x79
+> +				MX7D_PAD_LCD_DATA18__LCD_DATA18		0x79
+> +				MX7D_PAD_LCD_DATA19__LCD_DATA19		0x79
+> +				MX7D_PAD_LCD_DATA20__LCD_DATA20		0x79
+> +				MX7D_PAD_LCD_DATA21__LCD_DATA21		0x79
+> +				MX7D_PAD_LCD_DATA22__LCD_DATA22		0x79
+> +				MX7D_PAD_LCD_DATA23__LCD_DATA23		0x79
+> +			>;
+> +		};
 > +
-> +			ecspi2: ecspi at 30830000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,imx7d-ecspi", "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
-> +				reg = <0x30830000 0x10000>;
-> +				interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_ECSPI2_ROOT_CLK>,
-> +					<&clks IMX7D_ECSPI2_ROOT_CLK>;
-> +				clock-names = "ipg", "per";
-> +				status = "disabled";
-> +			};
+> +		pinctrl_lcdif_ctrl: lcdifctrlgrp {
+> +			fsl,pins = <
+> +				MX7D_PAD_LCD_CLK__LCD_CLK		0x79
+> +				MX7D_PAD_LCD_ENABLE__LCD_ENABLE		0x79
+> +				MX7D_PAD_LCD_VSYNC__LCD_VSYNC		0x79
+> +				MX7D_PAD_LCD_HSYNC__LCD_HSYNC		0x79
+> +				MX7D_PAD_LCD_RESET__LCD_RESET		0x79
+> +			>;
+> +		};
 > +
-> +			ecspi3: ecspi at 30840000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,imx7d-ecspi", "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
-> +				reg = <0x30840000 0x10000>;
-> +				interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_ECSPI3_ROOT_CLK>,
-> +					<&clks IMX7D_ECSPI3_ROOT_CLK>;
-> +				clock-names = "ipg", "per";
-> +				status = "disabled";
-> +			};
+> +		pinctrl_pwm1: pwm1grp {
+> +			fsl,pins = <
+> +				MX7D_PAD_GPIO1_IO01__PWM1_OUT		0x110b0
+> +			>;
+> +		};
 > +
->  			uart1: serial at 30860000 {
->  				compatible = "fsl,imx7d-uart",
->  					     "fsl,imx6q-uart";
+>  		pinctrl_uart1: uart1grp {
+>  			fsl,pins = <
+>  				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
 > -- 
 > 2.7.4
 > 
