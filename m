@@ -1,38 +1,71 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 21 Jun 2016 15:25:15 +0200
-Subject: Warning when compiling DTB on X-Gene platform with dtc
- 1.4.1-g53bf130b
-In-Reply-To: <CADaLNDnfH8Weo=9jVNAW7LQCvAw23-z5fafwWcer4FSKeYH=ug@mail.gmail.com>
-References: <CADaLNDnfH8Weo=9jVNAW7LQCvAw23-z5fafwWcer4FSKeYH=ug@mail.gmail.com>
-Message-ID: <20160621132515.GC22350@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 21 Jun 2016 08:29:58 -0500
+Subject: [PATCH] can: rcar_canfd: Add Classical CAN only mode support
+In-Reply-To: <1466434007-50873-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+References: <1466434007-50873-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+Message-ID: <20160621132958.GA5283@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 02:02:44AM -0700, Duc Dang wrote:
-> Hi Rob,
+On Mon, Jun 20, 2016 at 03:46:47PM +0100, Ramesh Shanmugasundaram wrote:
+> The controller can operate in one of the two global modes
+>  - CAN FD only mode (default)
+>  - Classical CAN (CAN2.0) only mode
 > 
-> I got warning on unit_address_vs_reg similar to this
-> https://lkml.org/lkml/2016/3/7/43 when using v4.7-rc2 dtc to build dtb
-> for X-Gene Mustang:
+> This patch adds support for Classical CAN only mode. It can be enabled
+> by defining the optional device tree property "renesas,can-nofd" of this
+> node.
 > 
-> dhdang at xgene-next=>./scripts/dtc/dtc -O dtb -R 16 -o mustang.dtb
-> arch/arm64/boot/dts/apm/apm-mustang.dts
->   Warning (unit_address_vs_reg): Node /soc/reboot at 17000014 has a unit
-> name, but no reg property
->   Warning (unit_address_vs_reg): Node /memory has a reg or ranges
-> property, but no unit name
->   Warning (unit_address_vs_reg): Node /gpio-keys/button at 1 has a unit
-> name, but no reg property
+> Note: R-Car Gen3 h/w manual v0.51E shows bit6 of RSCFDnCFDGCFG as
+> reserved, which is incorrect. This bit is same as RSCFDnGCFG.
 > 
-> There are nodes that I cannot change the node-name due to backward
-> compatible with old firmware reason (/soc/reboot at 17000014 as an
-> example). Is there any other way to avoid the warning?
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> ---
+> Hi Marc, All,
+> 
+>    This patch is based on top of can-next(tag:linux-can-next-for-4.8-20160617).
+> 
+> Thanks,
+> Ramesh.
+> ---
+>  .../devicetree/bindings/net/can/rcar_canfd.txt     |   9 +-
+>  drivers/net/can/rcar/rcar_canfd.c                  | 355 ++++++++++++++-------
+>  2 files changed, 249 insertions(+), 115 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/can/rcar_canfd.txt b/Documentation/devicetree/bindings/net/can/rcar_canfd.txt
+> index d45182b..a343359 100644
+> --- a/Documentation/devicetree/bindings/net/can/rcar_canfd.txt
+> +++ b/Documentation/devicetree/bindings/net/can/rcar_canfd.txt
+> @@ -32,6 +32,12 @@ below properties.
+>  - assigned-clocks: phandle of canfd clock.
+>  - assigned-clock-rates: maximum frequency of this clock.
+>  
+> +Optional property:
+> +The controller can operate in either CAN FD only mode (default) or
+> +Classical CAN only mode. The mode is global to both the channels. In order to
+> +enable the later, define the following optional property.
+> + - renesas,can-nofd: puts the controller in Classical CAN only mode.
 
-I think you have that backwards around. The Kernel needs to be
-backwards compatible with old DT blobs. DT blobs don't generally need
-to be backwards compatible to older kernels.
+renesas,no-can-fd would be a bit more readable.
 
-However, the kernel should however be happy with or without the unit
-name. The unit name is pointless in this case.
+> +
+>  Example
+>  -------
+>  
+> @@ -63,11 +69,12 @@ SoC common .dtsi file:
+>  
+>  Board specific .dts file:
+>  
+> -E.g. below enables Channel 1 alone in the board.
+> +E.g. below enables Channel 1 alone in the board in Classical CAN only mode.
+>  
+>  &canfd {
+>          pinctrl-0 = <&canfd1_pins>;
+>          pinctrl-names = "default";
+> +	renesas,can-nofd;
 
-	Andrew
+Now we have a mixture of tabs and spaces.
+
+>          status = "okay";
+>  
+>  	channel1 {
