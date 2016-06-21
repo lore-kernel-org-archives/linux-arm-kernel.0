@@ -1,36 +1,35 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 21 Jun 2016 09:07:59 -0700
-Subject: [PATCH 0/4] Get kexec working on SMP omap variants
-In-Reply-To: <1466495565-17480-1-git-send-email-tony@atomide.com>
-References: <1466495565-17480-1-git-send-email-tony@atomide.com>
-Message-ID: <cfc75c15-ab10-22ee-35b8-529e28d2773c@oracle.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Jun 2016 17:09:09 +0100
+Subject: [PATCH 0/3] arm64: Kill ESR_LNX_EXEC
+In-Reply-To: <1464694383-31700-1-git-send-email-mark.rutland@arm.com>
+References: <1464694383-31700-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160621160908.GF14542@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/21/2016 12:52 AM, Tony Lindgren wrote:
-> Hi all,
->
-> Here are some patches to make kexec work for SMP omaps. To test
-> these you need to use the latest kexec-tools.git kexec with
-> Russell's recent patches in "[PATCH 0/2] Simple fix to the ARM
-> kexec tools implementation" thread fixed for 6x. Or else you
-> need to use appended DTB.
->
-> I've tested these so far on 4430 duovero, omap5-uevm, and
-> beagle-x15.
->
+On Tue, May 31, 2016 at 12:33:00PM +0100, Mark Rutland wrote:
+> Currently we (ab)use a reserved bit in ESR_ELx for our own purposes as
+> ESR_LNX_EXEC, which isn't ideal, especially as we're inconsistent with our
+> mnemonic usage. This series removes ESR_LNX_EXEC entirely, avoiding (ab)use of
+> reserved ESR_ELx bits, and makes things a little more consistent.
+> 
+> I've extracted this from my entry-deasm branch [1], and rebased to v4.7-rc1.
+> I've split the KVM changes as the KVM code is undergoing rapid change these
+> days, and it should be possible to take those as a subsequent cleanup rather
+> than forcing a painful merging process.
+> 
+> Thanks,
+> Mark.
+> 
+> [1] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/entry-deasm
+> 
+> 
+> Mark Rutland (3):
+>   arm64: add macro to extract ESR_ELx.EC
+>   arm64/kvm: use ESR_ELx_EC to extract EC
+>   arm64: kill ESR_LNX_EXEC
 
->
->
-> Tony Lindgren (4):
->   ARM: OMAP4+: Initialize SAR RAM base early for proper CPU1 reset for
->     kexec
->   ARM: OMAP4+: Prevent CPU1 related hang with kexec
->   ARM: OMAP4+: Reset CPU1 properly for kexec
->   ARM: OMAP4+: Allow kexec on SMP variants
->
+I queued these 3 patches for 4.8. Thanks.
 
-I suggest to do bit wider testing including PM. From
-quick scan, the series looks fine to me.
-
-FWIW, Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+-- 
+Catalin
