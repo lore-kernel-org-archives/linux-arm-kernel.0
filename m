@@ -1,57 +1,35 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 21 Jun 2016 12:02:47 +0200
-Subject: [RFC PATCH v2 2/9] dt-bindings: mailbox: Add Amlogic Meson MHU
- Bindings
+Date: Tue, 21 Jun 2016 12:02:48 +0200
+Subject: [RFC PATCH v2 3/9] ARM64: dts: meson-gxbb: Add Meson MHU Node
 In-Reply-To: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
 References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1466503374-28841-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1466503374-28841-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../devicetree/bindings/mailbox/meson-mhu.txt      | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/meson-mhu.txt
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/meson-mhu.txt b/Documentation/devicetree/bindings/mailbox/meson-mhu.txt
-new file mode 100644
-index 0000000..4a80b44
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/meson-mhu.txt
-@@ -0,0 +1,33 @@
-+Amlogic Meson MHU Mailbox Driver
-+================================
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 806b903..77381d0 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -315,6 +315,14 @@
+ 			#address-cells = <2>;
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xc883c000 0x0 0x2000>;
 +
-+The Amlogic's Meson SoCs Message-Handling-Unit (MHU) is a mailbox controller
-+that has 2 independent channels/links to communicate with remote processor(s).
-+MHU links are hardwired on a platform. A link raises interrupt for any
-+received data. However, there is no specified way of knowing if the sent
-+data has been read by the remote. This driver assumes the sender polls
-+STAT register and the remote clears it after having read the data.
-+
-+Mailbox Device Node:
-+====================
-+
-+Required properties:
-+--------------------
-+- compatible:		Shall be "amlogic,meson-gxbb-mhu"
-+- reg:			Contains the mailbox register address range (base
-+			address and length)
-+- #mbox-cells		Shall be 1 - the index of the channel needed.
-+- interrupts:		Contains the interrupt information corresponding to
-+			each of the 2 links of MHU.
-+
-+Example:
-+--------
-+
-+	mailbox: mailbox at c883c400 {
-+		#mbox-cells = <1>;
-+		compatible = "amlogic,meson-gxbb-mhu";
-+		reg = <0 0xc883c400 0 0x4c>;
-+		interrupts = <0 209 IRQ_TYPE_EDGE_RISING>,
-+			   <0 210 IRQ_TYPE_EDGE_RISING>;
-+		#mbox-cells = <1>;
-+	};
++			mailbox: mailbox at 400 {
++				compatible = "amlogic,meson-gxbb-mhu";
++				reg = <0 0x400 0 0x4c>;
++				interrupts = <0 209 IRQ_TYPE_EDGE_RISING>,
++					     <0 210 IRQ_TYPE_EDGE_RISING>;
++				#mbox-cells = <1>;
++			 };
+ 		};
+ 
+ 		apb: apb at d0000000 {
 -- 
 2.7.0
