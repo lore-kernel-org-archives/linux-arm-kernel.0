@@ -1,52 +1,39 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 21 Jun 2016 10:19:49 +0800
-Subject: [PATCH 07/12] power: pwrseq: rename file name for generic driver
-In-Reply-To: <5767E614.5030002@samsung.com>
-References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
- <1466158165-9380-8-git-send-email-peter.chen@nxp.com>
- <5767E614.5030002@samsung.com>
-Message-ID: <20160621021949.GF26936@shlinux2>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 21 Jun 2016 10:37:16 +0800
+Subject: [PATCH] ARM: imx6q: export cpuidle functions needed by fec driver
+Message-ID: <1466476636-25204-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 02:48:20PM +0200, Krzysztof Kozlowski wrote:
-> On 06/17/2016 12:09 PM, Peter Chen wrote:
-> > The individual driver file name is better to contain module name.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > ---
-> >  .../power/pwrseq/{pwrseq-simple.txt => mmc-pwrseq-simple.txt}         | 0
-> >  drivers/power/pwrseq/Makefile                                         | 4 ++--
-> >  drivers/power/pwrseq/{pwrseq.c => core.c}                             | 0
-> >  drivers/power/pwrseq/{pwrseq_simple.c => pwrseq_mmc_simple.c}         | 0
-> >  4 files changed, 2 insertions(+), 2 deletions(-)
-> >  rename Documentation/devicetree/bindings/power/pwrseq/{pwrseq-simple.txt => mmc-pwrseq-simple.txt} (100%)
-> >  rename drivers/power/pwrseq/{pwrseq.c => core.c} (100%)
-> >  rename drivers/power/pwrseq/{pwrseq_simple.c => pwrseq_mmc_simple.c} (100%)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt b/Documentation/devicetree/bindings/power/pwrseq/mmc-pwrseq-simple.txt
-> > similarity index 100%
-> > rename from Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt
-> > rename to Documentation/devicetree/bindings/power/pwrseq/mmc-pwrseq-simple.txt
-> > diff --git a/drivers/power/pwrseq/Makefile b/drivers/power/pwrseq/Makefile
-> > index 9e40e4b..d475e01 100644
-> > --- a/drivers/power/pwrseq/Makefile
-> > +++ b/drivers/power/pwrseq/Makefile
-> > @@ -1,3 +1,3 @@
-> > -obj-$(CONFIG_POWER_SEQ)		+= pwrseq.o
-> > -obj-$(CONFIG_POWER_SEQ_SIMPLE)	+= pwrseq_simple.o
-> > +obj-$(CONFIG_POWER_SEQ)		+= core.o
-> > +obj-$(CONFIG_POWER_SEQ_SIMPLE)	+= pwrseq_mmc_simple.o
-> 
-> Although the driver was developed for MMC but it is quite generic (or
-> rather - mmc independent). The name of the driver is just
-> "pwrseq_simple" so I think MMC prefix is not needed.
-> 
+Export cpuidle functions needed by fec driver to fix the issue below
+seen with fec module build.
 
-It is may be common for MMC, but not USB, or others. Eg, its reset-gpios
-is just like enable-gpios. Some reset chip process needs to toggle gpio.
+ERROR: "imx6q_cpuidle_fec_irqs_unused" [drivers/net/ethernet/freescale/fec.ko] undefined!
+ERROR: "imx6q_cpuidle_fec_irqs_used" [drivers/net/ethernet/freescale/fec.ko] undefined!
 
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+---
+ arch/arm/mach-imx/cpuidle-imx6q.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+index c3cc8ca8d2ff..eed176e6d65e 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6q.c
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -72,11 +72,13 @@ void imx6q_cpuidle_fec_irqs_used(void)
+ {
+ 	imx6q_cpuidle_driver.states[1].disabled = true;
+ }
++EXPORT_SYMBOL_GPL(imx6q_cpuidle_fec_irqs_used);
+ 
+ void imx6q_cpuidle_fec_irqs_unused(void)
+ {
+ 	imx6q_cpuidle_driver.states[1].disabled = false;
+ }
++EXPORT_SYMBOL_GPL(imx6q_cpuidle_fec_irqs_unused);
+ 
+ int __init imx6q_cpuidle_init(void)
+ {
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
