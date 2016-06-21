@@ -1,116 +1,37 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 21 Jun 2016 12:11:45 -0500
-Subject: [PATCH 07/11] arm: arm64: pmu: Assign platform PMU CPU affinity
-In-Reply-To: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
-References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1466529109-21715-8-git-send-email-jeremy.linton@arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 21 Jun 2016 18:12:39 +0100
+Subject: [PATCH] dmaengine: ti-dma-crossbar: make omap_dmaxbar_init static
+Message-ID: <1466529159-10359-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems with multiple PMU types the PMU to CPU affinity
-needs to be detected and set. The CPU to interrupt affinity
-should also be set.
+The omap_dmaxbar_init() function is not exported or declared outside
+the driver, so make it static to fix the following sparse warning:
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+drivers/dma/ti-dma-crossbar.c:455:5: warning: symbol 'omap_dmaxbar_init' was not declared. Should it be static?
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- drivers/perf/arm_pmu.c | 53 ++++++++++++++++++++++++++++++++++++++++----------
- 1 file changed, 43 insertions(+), 10 deletions(-)
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: dmaengine at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/dma/ti-dma-crossbar.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 2286cbf..28cac3a 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -11,6 +11,7 @@
-  */
- #define pr_fmt(fmt) "hw perfevents: " fmt
+diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
+index e107779..5ae294b 100644
+--- a/drivers/dma/ti-dma-crossbar.c
++++ b/drivers/dma/ti-dma-crossbar.c
+@@ -452,7 +452,7 @@ static struct platform_driver ti_dma_xbar_driver = {
+ 	.probe	= ti_dma_xbar_probe,
+ };
  
-+#include <linux/acpi.h>
- #include <linux/bitmap.h>
- #include <linux/cpumask.h>
- #include <linux/cpu_pm.h>
-@@ -24,6 +25,7 @@
- #include <linux/irq.h>
- #include <linux/irqdesc.h>
- 
-+#include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/irq_regs.h>
- 
-@@ -872,25 +874,57 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
- }
- 
- /*
-- * CPU PMU identification and probing.
-+ * CPU PMU identification and probing. Its possible to have
-+ * multiple CPU types in an ARM machine. Assure that we are
-+ * picking the right PMU types based on the CPU in question
-  */
--static int probe_current_pmu(struct arm_pmu *pmu,
--			     const struct pmu_probe_info *info)
-+static int probe_plat_pmu(struct arm_pmu *pmu,
-+			     const struct pmu_probe_info *info,
-+			     unsigned int pmuid)
+-int omap_dmaxbar_init(void)
++static int omap_dmaxbar_init(void)
  {
--	int cpu = get_cpu();
--	unsigned int cpuid = read_cpuid_id();
- 	int ret = -ENODEV;
-+	int cpu;
-+	int aff_ctr = 0;
-+	static int duplicate_pmus;
-+	struct platform_device *pdev = pmu->plat_device;
-+	int irq = platform_get_irq(pdev, 0);
-+
-+	if (irq >= 0 && !irq_is_percpu(irq)) {
-+		pmu->irq_affinity = kcalloc(pdev->num_resources, sizeof(int),
-+					    GFP_KERNEL);
-+		if (!pmu->irq_affinity)
-+			return -ENOMEM;
-+	}
-+
-+	for_each_possible_cpu(cpu) {
-+		unsigned int cpuid = read_specific_cpuid(cpu);
- 
--	pr_info("probing PMU on CPU %d\n", cpu);
-+		if (cpuid == pmuid) {
-+			cpumask_set_cpu(cpu, &pmu->supported_cpus);
-+			if (pmu->irq_affinity) {
-+				pmu->irq_affinity[aff_ctr] = cpu;
-+				aff_ctr++;
-+			}
-+		}
-+	}
- 
-+	/* find the type of PMU given the CPU */
- 	for (; info->init != NULL; info++) {
--		if ((cpuid & info->mask) != info->cpuid)
-+		if ((pmuid & info->mask) != info->cpuid)
- 			continue;
- 		ret = info->init(pmu);
-+		if ((!info->cpuid) && (duplicate_pmus)) {
-+			pmu->name = kasprintf(GFP_KERNEL, "%s_%d",
-+					    pmu->name, duplicate_pmus);
-+			if (!pmu->name) {
-+				kfree(pmu->irq_affinity);
-+				ret = -ENOMEM;
-+			}
-+		}
-+		duplicate_pmus++;
- 		break;
- 	}
- 
--	put_cpu();
- 	return ret;
+ 	return platform_driver_register(&ti_dma_xbar_driver);
  }
- 
-@@ -1010,8 +1044,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 		if (!ret)
- 			ret = init_fn(pmu);
- 	} else if (probe_table) {
--		cpumask_setall(&pmu->supported_cpus);
--		ret = probe_current_pmu(pmu, probe_table);
-+		ret = probe_plat_pmu(pmu, probe_table, read_cpuid_id());
- 	}
- 
- 	if (ret) {
 -- 
-2.5.5
+2.8.1
