@@ -1,21 +1,77 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 21 Jun 2016 16:40:59 -0500
-Subject: [PATCH 15/16] arm64: dts: msm8996: add sdc2 pinctrl
-In-Reply-To: <1466176454-28084-16-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1466176454-28084-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1466176454-28084-16-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160621214059.GB11867@hector.attlocal.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Jun 2016 22:51:41 +0100
+Subject: [PATCH 2/2] arm: fix kernel image size
+In-Reply-To: <20160621165523.GY22406@atomide.com>
+References: <20160617194405.GN1041@n2100.armlinux.org.uk>
+ <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
+ <20160621074319.GH22406@atomide.com>
+ <20160621094737.GA5783@n2100.arm.linux.org.uk>
+ <20160621103810.GI22406@atomide.com>
+ <20160621105720.GK22406@atomide.com>
+ <20160621154407.GB5783@n2100.arm.linux.org.uk>
+ <20160621165523.GY22406@atomide.com>
+Message-ID: <20160621215141.GC5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 04:14:12PM +0100, Srinivas Kandagatla wrote:
-> This patch adds pinctrl required for sdhci for external sd card
-> controller.
+On Tue, Jun 21, 2016 at 09:55:25AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@armlinux.org.uk> [160621 08:46]:
+> > On Tue, Jun 21, 2016 at 03:57:20AM -0700, Tony Lindgren wrote:
+> > > 
+> > > Maybe zImage size + MAX_RODATA_SZ + 4x zImage size?
+> > > 
+> > > Then the MAX_RODATA_SZ could be 2 or 4 MB or whatever we
+> > > think is sufficient to kick the can until we have a better
+> > > solution.
+> > 
+> > Maybe if you give some details about your failing case - you omitted any
+> > details about the uncompressed image size...
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
+> Looks like we currently have this:
+> 
+> Memory: 2033088K/2095100K available (7376K kernel code, 784K rwdata,
+> 2312K rodata, 1024K init, 8117K bss, 45628K reserved,
+> 16384K cma-reserved, 1292284K highmem)
+> Virtual kernel memory layout:
+>     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+>     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+>     vmalloc : 0xf0800000 - 0xff800000   ( 240 MB)
+>     lowmem  : 0xc0000000 - 0xf0000000   ( 768 MB)
+>     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+>     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+>       .text : 0xc0008000 - 0xc0a762a4   (10681 kB)
+>       .init : 0xc0b00000 - 0xc0c00000   (1024 kB)
+>       .data : 0xc0c00000 - 0xc0cc411c   ( 785 kB)
+>        .bss : 0xc0cc6000 - 0xc14b37f8   (8118 kB)
 
-I presume this is the right patch 15?  As it matches the subject in your cover
-letter?
+So that's 20.7MB, and the zImage was 3.6MB.  You're getting an
+expansion ratio of 5.7x.
 
-Andy
+To fix that, we'd need to up it to 7x, but the problem with upping
+it in this way is that it increases the requirements for the
+crashdump region too.  We can play with this number, but there will
+always be cases where it doesn't work - either because the ratio is
+too big or too small.
+
+By way of illustration, "zImage size + MAX_RODATA_SZ + 4x zImage size"
+doesn't even work for this case, since you need about 25MB.  Your
+calculation comes out at 22MB, which is 3MB short.  Not only that, but
+it introduces (from what I can see) an irrelevant fudge factor of
+"MAX_RODATA_SZ" which has no basis in what's really going on here, and
+I'm left wondering what "MAX_RODATA_SZ" is actually referring to.
+
+So... I'm of the opinion that we shouldn't play with it - but instead
+try to come up with a solution which *doesn't* involve teaching kexec
+a whole load of internals about how the ARM kernel booting happens.
+
+What's more worrying to me at the moment, though, is that the kexec code
+only tries to find memory for the actual "kernel" size, not the actual
+space required to decompress the kernel.  It could find a chunk of
+memory large enough to fit the kernel image to be loaded, but is not big
+enough to allow its decompression.  kexec is really quite a mess on
+ARM. :(
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
