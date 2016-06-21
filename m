@@ -1,66 +1,41 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 21 Jun 2016 09:50:45 +0100
-Subject: [GIT PULL] arm64: dts: juno updates for v4.8
-In-Reply-To: <CAOesGMiRiR9Kk6w7O5iPoMCndpN_PpGSJFqYM2pLeEQ5SQ2_+w@mail.gmail.com>
-References: <5768019C.40009@arm.com>
- <CAOesGMiRiR9Kk6w7O5iPoMCndpN_PpGSJFqYM2pLeEQ5SQ2_+w@mail.gmail.com>
-Message-ID: <5768FFE5.2030206@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Jun 2016 10:56:21 +0200
+Subject: linux-next: manual merge of the net-next tree with the arm-soc
+ tree
+In-Reply-To: <20160621111839.34936836@canb.auug.org.au>
+References: <20160621111839.34936836@canb.auug.org.au>
+Message-ID: <4384645.F021K1OoaK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday, June 21, 2016 11:18:39 AM CEST Stephen Rothwell wrote:
+> Today's linux-next merge of the net-next tree got conflicts in:
+> 
+>   arch/arm64/boot/dts/broadcom/ns2-svk.dts
+>   arch/arm64/boot/dts/broadcom/ns2.dtsi
+> 
+> between commits:
+> 
+>   97b1504a30b3 ("arm64: dts: enable pinctrl for Broadcom NS2 SoC")
+>   5dcc9c7618df ("arm64: dts: NS2: Add CCI-400 PMU support")
+> 
+> from the arm-soc tree and commit:
+> 
+>   5f1a067bfa0a ("dt: mdio-mux: Add mdio multiplexer driver node")
+> 
+> from the net-next tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary. This
+> is now fixed as far as linux-next is concerned, but any non trivial
+> conflicts should be mentioned to your upstream maintainer when your tree
+> is submitted for merging.  You may also want to consider cooperating
+> with the maintainer of the conflicting tree to minimise any particularly
+> complex conflicts.
 
+Looks good to me, thanks!
 
-On 21/06/16 06:42, Olof Johansson wrote:
-> Hi,
->
->
-> On Mon, Jun 20, 2016 at 7:45 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi ARM-SoC team,
->>
->> Please pull Juno platform DT updates for v4.8
->>
->> --
->> Regards,
->> Sudeep
->>
->> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
->>
->>    Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
->> tags/juno-dt-4.8
->>
->> for you to fetch changes up to da63398bec2be7c247b5e94c9cabc4339fb65e28:
->>
->>    arm64: dts: juno: add thermal zones for scpi sensors (2016-06-17 16:38:49
->> +0100)
->
-> Didn't merge because:
->
->>
->> ----------------------------------------------------------------
->> ARMv8 Vexpress/Juno DT updates for v4.8
->>
->> 1. Adds various coreSight debug components on Juno boards
->>
->> 2. Adds SCPI device power domains and use them for coresight components
->>
->> 3. Adds thermal zones for SCPI sensors on Juno
->>
->> ----------------------------------------------------------------
->> Javi Merino (1):
->>        arm64: dts: juno: add thermal zones for scpi sensors
->>
->> Sudeep Holla (2):
->>        arm64: dts: juno: add coresight support
->
-> I commented directly on the patch on the list, please see that reply.
->
+I don't see a good way to resolve the conflict before the merge window,
+but it's simple enough that we can just send it this way and let
+Linus handle it.
 
-OK, I will have a look and respond/incorporate the comments.
-
--- 
-Regards,
-Sudeep
+	Arnd
