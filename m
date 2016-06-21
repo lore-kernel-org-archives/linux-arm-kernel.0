@@ -1,86 +1,66 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 21 Jun 2016 09:44:28 +0100
-Subject: [PATCH 1/3] arm64: dts: juno: add coresight support
-In-Reply-To: <CAOesGMjQNEOcmYpUAxUxBJLyUYZQuRKK48a31Ys9LuTJFWqMFA@mail.gmail.com>
-References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
- <1465228765-14038-2-git-send-email-sudeep.holla@arm.com>
- <CAOesGMjQNEOcmYpUAxUxBJLyUYZQuRKK48a31Ys9LuTJFWqMFA@mail.gmail.com>
-Message-ID: <5768FE6C.3080809@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 21 Jun 2016 09:50:45 +0100
+Subject: [GIT PULL] arm64: dts: juno updates for v4.8
+In-Reply-To: <CAOesGMiRiR9Kk6w7O5iPoMCndpN_PpGSJFqYM2pLeEQ5SQ2_+w@mail.gmail.com>
+References: <5768019C.40009@arm.com>
+ <CAOesGMiRiR9Kk6w7O5iPoMCndpN_PpGSJFqYM2pLeEQ5SQ2_+w@mail.gmail.com>
+Message-ID: <5768FFE5.2030206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/06/16 06:41, Olof Johansson wrote:
-
-Hi Olof,
 
 
->> +       /*
->> +        * Juno TRMs specify the size for these coresight components as 64K.
->> +        * The actual size is just 4K though 64K is reserved. Access to the
->> +        * unmapped reserved region results in a DECERR response.
->> +        */
->> +       etf at 20010000 {
->
-
-
-> Would it make sense to name it something like trace-fifo instead? We
-> normally name the nodes based on type of device (ethernet@, pci@,
-> etc).
-
-ETF (Embedded Trace FIFO) is one of the modes[1] in which you can configure
-the Coresight TMC at integration time. The other available modes are
-ETR(Embedded Trace Router) and ETB(Embedded Trace Buffer).
-
+On 21/06/16 06:42, Olof Johansson wrote:
+> Hi,
 >
 >
->> +               compatible = "arm,coresight-tmc", "arm,primecell";
+> On Mon, Jun 20, 2016 at 7:45 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> Hi ARM-SoC team,
+>>
+>> Please pull Juno platform DT updates for v4.8
+>>
+>> --
+>> Regards,
+>> Sudeep
+>>
+>> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+>>
+>>    Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+>> tags/juno-dt-4.8
+>>
+>> for you to fetch changes up to da63398bec2be7c247b5e94c9cabc4339fb65e28:
+>>
+>>    arm64: dts: juno: add thermal zones for scpi sensors (2016-06-17 16:38:49
+>> +0100)
 >
-> Is there a more specific compatible needed here, or does
-> arm,coresight-tmc give you all the information you need on how to use
-> this interface?
-
-The coresight TMC driver will read the "configured mode" to determine
-the mode of operation and initialise it accordingly. Hence we don't
-need a specific compatible.
-
+> Didn't merge because:
 >
-> The bindings doc is sort of sparse in this area, all it says is "you
-> might use one of these compatibles".
-
-I agree.
-
+>>
+>> ----------------------------------------------------------------
+>> ARMv8 Vexpress/Juno DT updates for v4.8
+>>
+>> 1. Adds various coreSight debug components on Juno boards
+>>
+>> 2. Adds SCPI device power domains and use them for coresight components
+>>
+>> 3. Adds thermal zones for SCPI sensors on Juno
+>>
+>> ----------------------------------------------------------------
+>> Javi Merino (1):
+>>        arm64: dts: juno: add thermal zones for scpi sensors
+>>
+>> Sudeep Holla (2):
+>>        arm64: dts: juno: add coresight support
 >
->> +       tpiu at 20030000 {
->
-> Again, these names are not great. Luckily they don't affect the
-> binding, so they can be fixed. What would be a more human readable and
-> functionally describing name here?
-
-Again, TPIU (Trace Port Interface Unit), is standard Coresight component in
-Coresight architecture. [2]
-
-
->> +
->> +       etr at 20070000 {
->
-> Again..
+> I commented directly on the patch on the list, please see that reply.
 >
 
-Same as ETF [1]
+OK, I will have a look and respond/incorporate the comments.
 
->> +
->> +       etm0: etm at 22040000 {
->
-> If this file is sorted on reg values, then this node and the two after
-> are out of order.
-
-They are numbered after the CPU which they are associated with. This is used
-to reuse the dts for Juno-r0/r1 vs r2 (where we have A72 replacing A57).
-
-
-[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0461b/CACECIII.html
-[2] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0314h/Babhdhfb.html
-
-
-Cheers
-Suzuki
+-- 
+Regards,
+Sudeep
