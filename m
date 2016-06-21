@@ -1,26 +1,43 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Tue, 21 Jun 2016 16:29:21 +0200
-Subject: [PATCH] ARM: BCM5301X: Set GPIO enabling USB power on Netgear
- R7000
-In-Reply-To: <CACna6rxm0euw=nVyHZzZa2+Q9U9S4t+aVy34ZvL0Lrx27B8-eA@mail.gmail.com>
-References: <1466509358-25498-1-git-send-email-zajec5@gmail.com>
- <op.yjepy3mr2s3iss@ecaz>
- <CACna6rxm0euw=nVyHZzZa2+Q9U9S4t+aVy34ZvL0Lrx27B8-eA@mail.gmail.com>
-Message-ID: <op.yjevu7en2s3iss@ecaz>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Tue, 21 Jun 2016 14:33:35 +0000
+Subject: SMMU driver and stall vs terminate mode
+In-Reply-To: <5768150D.2070705@arm.com>
+References: <HE1PR04MB1641B0F8442061E3437037628D2A0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+ <5768150D.2070705@arm.com>
+Message-ID: <HE1PR04MB1641D09BBF8029ED98BE18D38D2B0@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jun 2016 14:26:11 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-
-> On 21 June 2016 at 14:22, Imre Kaloz <kaloz@openwrt.org> wrote:
->> Is there any reason you are not handling this properly as a regulator  
->> with
->> usb-nop-xceiv?
->
-> We can't use USB NOP PHY as we need a specific PHY driver for Broadcom's  
-> USB.
-
-I see. That shouldn't stop you from addressing the regulator part, tho ;)
 
 
-Imre
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Monday, June 20, 2016 11:09 AM
+> To: Stuart Yoder <stuart.yoder@nxp.com>; Will Deacon <Will.Deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-foundation.org; Nipun Gupta
+> <nipun.gupta@nxp.com>; Bharat Bhushan <bharat.bhushan@nxp.com>; Brian Starkey <brian.starkey@arm.com>
+> Subject: Re: SMMU driver and stall vs terminate mode
+> 
+> Hi Stuart,
+> 
+> On 20/06/16 16:28, Stuart Yoder wrote:
+> > Robin/Will,
+> >
+> > Right now the SMMU driver is hardcoded to configure 'stall' mode for
+> > context faults:
+> >
+> >        /* SCTLR */
+> >        reg = SCTLR_CFCFG | SCTLR_CFIE | SCTLR_CFRE | SCTLR_M | SCTLR_EAE_SBOP;
+> >
+> > We are running into an issue with a device where it seems behave sanely
+> > when SCTLR_CFCFG=0 ...i.e. 'terminate' mode, but in stall mode seems to be
+> > unaware that an access violation occurred.
+> 
+> Does the device keep issuing transactions after the initial faulting
+> one, by any chance?
+
+In the case we are seeing, it is a unit test type scenario and I think
+there is only one transaction, so software doesn't try to continue issuing
+transactions.
+
+Stuart
