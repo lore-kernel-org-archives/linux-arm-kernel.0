@@ -1,66 +1,30 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 22 Jun 2016 00:32:46 +0200
-Subject: camera application for testing (was Re: v4l subdevs without big
- device)
-In-Reply-To: <20160501140831.GH26360@valkosipuli.retiisi.org.uk>
-References: <20160428084546.GA9957@amd> <20160429071525.GA4823@amd>
- <57230DE7.3020701@xs4all.nl> <20160429221359.GA29297@amd>
- <20160501140831.GH26360@valkosipuli.retiisi.org.uk>
-Message-ID: <20160621223246.GA10929@amd>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 22 Jun 2016 01:07:29 +0200
+Subject: [PATCH 0/5] Fix and improve clock controller for the RK322x SoCs
+In-Reply-To: <1466484811-26923-1-git-send-email-zhengxing@rock-chips.com>
+References: <1466484811-26923-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <13345941.K3V3BNYxTY@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Am Dienstag, 21. Juni 2016, 12:53:26 schrieb Xing Zheng:
+> Hi,
+>   These patchset fix some clocks bugs, and improve clock configuration
+> for i2s/spdif/MAC on RK322x SoCs.
 
-> > What is reasonable camera application for testing?
-> > 
-> > N900 looks like a low-end digital camera. I have now have the hardware
-> > working (can set focus to X cm using command line), but that's not
-> > going to be useful for taking photos.
-> 
-> I guess you already knew about omap3camd; it's proprietary but from purely
-> practical point of view it'd be an option to support taking photos on the
-> N900. That would not be extensible any way, the best possible functionality
-> is limited what the daemon implements.
-> 
-> I'm just mentioning the option of implementing wrapper for the omap3camd so
-> that it can work with upsteam APIs, I don't propose that however.
-> 
-> > 
-> > In particular, who is going to do computation neccessary for
-> > autofocus, whitebalance and exposure/gain?
-> 
-> I think libv4l itself has algorithms to control at least some of these. It
-> relies on the image data so the CPU time consumption will be high.
-> 
-> AFAIR Laurent has also worked on implementing some algorithms that use the
-> histogram and some of the statistics. Add him to cc list.
+applied to my clock-branch with the following changes:
 
-Ok, so I played a bit... and have something working. I modified
-fcam-dev to work with the current kernel, and removed most
-functionality in the process. Then I re-did sharpness and autogain
-computations in software, and it seems to work somehow... but its
-rather slow. (But good news is that's because code is stupid; the
-computations should be fast enough.)
+- fixed the error in patch1 - missing ")" in
+      COMPOSITE_FRAC(0, "i2s1_frac", "i2s1_src", CLK_SET_RATE_PARENT,
+-                       RK3288_CLKSEL_CON(7), 0,
+-                       RK3288_CLKGATE_CON(0), 11, GFLAGS),
++                       RK2928_CLKSEL_CON(7), 0,
++                       RK2928_CLKGATE_CON(0), 11, GFLAGS,
 
-In particular, it takes cca 10 seconds to take a picture. I guess
-there's a room for improvement :-).
+- adapted patch2 accordingly
+- split out clock id addition into separate patches, as they need a shared 
+branch. Xing please remember to add clock-ids to the header in separate 
+patches.
 
-> > There's http://fcam.garage.maemo.org/gettingStarted.html that should
-> > work on maemo, but a) it is not in Debian, b) it has non-trivial
-> > dependencies and c) will be a lot of fun to get working...
-> > 
-> > (and d), will not be too useful, anyway, due to 1sec shutter lag:
-> 
-> I believe this will be shorter nowadays. I don't remember the exact
-> technical solution which the text below refers to but I'm pretty sure it'll
-> be better with the current upstream. API-wise, there's work to be done there
-> (to port FCAM to upsteram APIs) but it's a possibility.
 
-So far I have really horrible hacks.
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Heiko
