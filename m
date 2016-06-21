@@ -1,69 +1,72 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 21 Jun 2016 15:33:32 +0800
-Subject: [PATCH V7 3/8] PCI/MSI: Setup MSI domain on a per-device basis
- using IORT ACPI table
-In-Reply-To: <1466420541-20101-4-git-send-email-tn@semihalf.com>
-References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
- <1466420541-20101-4-git-send-email-tn@semihalf.com>
-Message-ID: <9d449ab6-e4b3-1638-558c-59cef4baa108@linaro.org>
+From: loic.pallardy@st.com (loic pallardy)
+Date: Tue, 21 Jun 2016 09:33:39 +0200
+Subject: [STLinux Kernel] [PATCH 4/5] remoteproc: core: Supply framework
+ to request, declare and fetch shared memory
+In-Reply-To: <20160615220629.GW1256@tuxbot>
+References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
+ <1462454983-13168-5-git-send-email-lee.jones@linaro.org>
+ <20160615220629.GW1256@tuxbot>
+Message-ID: <5768EDD3.3050203@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/20 19:02, Tomasz Nowicki wrote:
-> It is possible to provide information about which MSI controller to
-> use on a per-device basis for DT. This patch supply this with ACPI support.
->
-> Currently, IORT is the only one ACPI table which can provide such mapping.
-> In order to plug IORT into MSI infrastructure we are adding ACPI
-> equivalents for finding PCI device domain and its RID translation
-> (pci_msi_domain_get_msi_rid and pci_msi_domain_get_msi_rid calls).
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/pci/msi.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index a080f44..1d45e81 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -18,6 +18,7 @@
->  #include <linux/smp.h>
->  #include <linux/errno.h>
->  #include <linux/io.h>
-> +#include <linux/iort.h>
->  #include <linux/slab.h>
->  #include <linux/irqdomain.h>
->  #include <linux/of_irq.h>
-> @@ -1364,8 +1365,8 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
->  	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
->
->  	of_node = irq_domain_get_of_node(domain);
-> -	if (of_node)
-> -		rid = of_msi_map_rid(&pdev->dev, of_node, rid);
-> +	rid = of_node ? of_msi_map_rid(&pdev->dev, of_node, rid) :
-> +			iort_msi_map_rid(&pdev->dev, rid);
->
->  	return rid;
->  }
-> @@ -1381,9 +1382,13 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
->   */
->  struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
->  {
-> +	struct irq_domain *dom;
->  	u32 rid = 0;
->
->  	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
-> -	return of_msi_map_get_device_domain(&pdev->dev, rid);
-> +	dom = of_msi_map_get_device_domain(&pdev->dev, rid);
-> +	if (!dom)
-> +		dom = iort_get_device_domain(&pdev->dev, rid);
-> +	return dom;
->  }
->  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Thanks
-Hanjun
+On 06/16/2016 12:06 AM, Bjorn Andersson wrote:
+> On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
+>
+>> Normally used for management of; carveout, devmem and trace memory.
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> ---
+>>   drivers/remoteproc/remoteproc_core.c | 174 +++++++++++++++++++++++++++++++++--
+>>   1 file changed, 167 insertions(+), 7 deletions(-)
+>>
+[..]
+>> +}
+>> +EXPORT_SYMBOL(rproc_subdev_add);
+>
+Hi Bjorn,
+
+> I worked up a prototype that allows remoteproc drivers to
+> programmatically specify carveout resources, which then are matched and
+> merged with entires from the resource table. I've given these
+> programmatically allocated carveouts a device so that the associated
+> allocation comes out of the specified region - or the rproc region if no
+> match is found.
+>
+No sure to catch your exact use case, but let me try to explain what we 
+have today.
+There are different rproc in ST. Some request a large chunk of memory 
+for code and data, some have several dedicated memories like IRAM and DRAM.
+In that case carevout memories are defined as subdev (like vrings).
+Association is done thanks to carevout name in firmware resource table 
+(in rproc_handle_carveout).
+
+Moreover, as our coprocessors have no iommu, we add some check on 
+allocated buffer to verify it fit with resource table declaration (pa).
+This allows to guarantee complete alignment between resources needed by 
+firmware and ones allocated by Linux kernel.
+>
+> This solves my use case of carving out memory from two disjoint memory
+> regions for one of my remoteprocs, but differs from your approach in
+> that you specify one large carveout (and vrings) region and any
+> carveouts (or vrings) will chip away from this.
+>
+> Would this approach work for you, or do you depend on having 1:N
+> relationship between your memory region and your resources?
+>
+
+Is this approach covering your needs?
+
+Regards,
+Loic
+
+> Regards,
+> Bjorn
+>
+> _______________________________________________
+> Kernel mailing list
+> Kernel at stlinux.com
+> http://www.stlinux.com/mailman/listinfo/kernel
+>
