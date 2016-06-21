@@ -1,49 +1,66 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 22 Jun 2016 01:03:22 +0300
-Subject: [PATCH] ARM: dts: r8a7794: add SMP support
-In-Reply-To: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
-References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
-Message-ID: <27171008.uuY7altQup@wasted.cogentembedded.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 22 Jun 2016 00:32:46 +0200
+Subject: camera application for testing (was Re: v4l subdevs without big
+ device)
+In-Reply-To: <20160501140831.GH26360@valkosipuli.retiisi.org.uk>
+References: <20160428084546.GA9957@amd> <20160429071525.GA4823@amd>
+ <57230DE7.3020701@xs4all.nl> <20160429221359.GA29297@amd>
+ <20160501140831.GH26360@valkosipuli.retiisi.org.uk>
+Message-ID: <20160621223246.GA10929@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree node for the Advanced Power Management Unit (APMU).
-Use the "enable-method" prop to  point out that the APMU should be used
-for the SMP support.
+Hi!
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > What is reasonable camera application for testing?
+> > 
+> > N900 looks like a low-end digital camera. I have now have the hardware
+> > working (can set focus to X cm using command line), but that's not
+> > going to be useful for taking photos.
+> 
+> I guess you already knew about omap3camd; it's proprietary but from purely
+> practical point of view it'd be an option to support taking photos on the
+> N900. That would not be extensible any way, the best possible functionality
+> is limited what the daemon implements.
+> 
+> I'm just mentioning the option of implementing wrapper for the omap3camd so
+> that it can work with upsteam APIs, I don't propose that however.
+> 
+> > 
+> > In particular, who is going to do computation neccessary for
+> > autofocus, whitebalance and exposure/gain?
+> 
+> I think libv4l itself has algorithms to control at least some of these. It
+> relies on the image data so the CPU time consumption will be high.
+> 
+> AFAIR Laurent has also worked on implementing some algorithms that use the
+> histogram and some of the statistics. Add him to cc list.
 
----
-This patch is against the 'renesas-devel-20160621-v4.7-rc4' tag of Simon
-Horman's 'renesas.git' repo.  It depends on Magnus'/Geert's SMP patchset...
+Ok, so I played a bit... and have something working. I modified
+fcam-dev to work with the current kernel, and removed most
+functionality in the process. Then I re-did sharpness and autogain
+computations in software, and it seems to work somehow... but its
+rather slow. (But good news is that's because code is stupid; the
+computations should be fast enough.)
 
-SMP/PM basically works but you can't offline CPU0 (system hangs)...
+In particular, it takes cca 10 seconds to take a picture. I guess
+there's a room for improvement :-).
 
- arch/arm/boot/dts/r8a7794.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+> > There's http://fcam.garage.maemo.org/gettingStarted.html that should
+> > work on maemo, but a) it is not in Debian, b) it has non-trivial
+> > dependencies and c) will be a lot of fun to get working...
+> > 
+> > (and d), will not be too useful, anyway, due to 1sec shutter lag:
+> 
+> I believe this will be shorter nowadays. I don't remember the exact
+> technical solution which the text below refers to but I'm pretty sure it'll
+> be better with the current upstream. API-wise, there's work to be done there
+> (to port FCAM to upsteram APIs) but it's a possibility.
 
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -37,6 +37,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "renesas,apmu";
- 
- 		cpu0: cpu at 0 {
- 			device_type = "cpu";
-@@ -65,6 +66,12 @@
- 		};
- 	};
- 
-+	apmu at e6151000 {
-+		compatible = "renesas,r8a7794-apmu", "renesas,apmu";
-+		reg = <0 0xe6151000 0 0x188>;
-+		cpus = <&cpu0 &cpu1>;
-+	};
-+
- 	gic: interrupt-controller at f1001000 {
- 		compatible = "arm,gic-400";
- 		#interrupt-cells = <3>;
+So far I have really horrible hacks.
+
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
