@@ -1,19 +1,14 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Jun 2016 17:46:24 -0700
-Subject: [PATCH] clk: hi6220: fix missing clk.h include
-In-Reply-To: <1465307648-15660-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465307648-15660-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160621004624.GI1521@codeaurora.org>
+Date: Mon, 20 Jun 2016 17:47:13 -0700
+Subject: [PATCH 1/1] clk: Remove unused variable
+In-Reply-To: <20160607122502.32168-1-lee.jones@linaro.org>
+References: <20160607122502.32168-1-lee.jones@linaro.org>
+Message-ID: <20160621004713.GJ1521@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07, Ben Dooks wrote:
-> Fix the warning from missing "clk.h" include which
-> defines hi6220_register_clkdiv() function.
-> 
-> drivers/clk/hisilicon/clkdivider-hi6220.c:102:12: warning: symbol 'hi6220_register_clkdiv' was not declared. Should it be static?
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+On 06/07, Lee Jones wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
 
 Applied to clk-next
