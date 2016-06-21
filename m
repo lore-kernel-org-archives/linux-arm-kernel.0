@@ -1,72 +1,107 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Tue, 21 Jun 2016 11:56:27 +0800
-Subject: [PATCH net-next 07/19] net: hns: select Hilink before serdes loopback
- for HNS V2
+Date: Tue, 21 Jun 2016 11:56:29 +0800
+Subject: [PATCH net-next 09/19] net: hns: fix the wrong speed for bond
 In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1466481399-70080-8-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1466481399-70080-10-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kejian Yan <yankejian@huawei.com>
+From: Qianqian Xie <xieqianqian@huawei.com>
 
-As Hilink3 and Hilink4 use the same xge training and xge u adaptor for
-HNSv2, it needs to select which Hilink to be set before relative serdes
-being configed. The hilink_access_sel is the register to do that.
+For debug-ports,there are two non-synchronized processes:
+Speed-Auto-Negotiation and Link-Update-Status. The two
+processes are towed by two different state machines.
+Bond reads the speed when link up, but the speed maybe
+not update the right value at that time.That make for bond's
+wrong speed. Thus only one state machine should be used and
+if phy_state_machine is used, it does not need to do
+hns_nic_update_link_status().
 
-Signed-off-by: Kejian Yan <yankejian@huawei.com>
+Signed-off-by: Qianqian Xie <xieqianqian@huawei.com>
 Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 26 +++++++++++++++++-----
- 1 file changed, 20 insertions(+), 6 deletions(-)
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c    | 43 +++++++++++++-----------
+ drivers/net/ethernet/hisilicon/hns/hns_ethtool.c |  2 +-
+ 2 files changed, 25 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-index 09e60d6..aff9d77 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-@@ -435,11 +435,6 @@ int hns_mac_get_sfp_prsnt(struct hns_mac_cb *mac_cb, int *sfp_prsnt)
-  */
- static int hns_mac_config_sds_loopback(struct hns_mac_cb *mac_cb, bool en)
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+index 00e529f..cef9d12 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+@@ -991,8 +991,26 @@ static void hns_nic_adjust_link(struct net_device *ndev)
  {
--	/* port 0-3 hilink4 base is serdes_vaddr + 0x00280000
--	 * port 4-7 hilink3 base is serdes_vaddr + 0x00200000
--	 */
--	u8 *base_addr = (u8 *)mac_cb->serdes_vaddr +
--		       (mac_cb->mac_id <= 3 ? 0x00280000 : 0x00200000);
- 	const u8 lane_id[] = {
- 		0,	/* mac 0 -> lane 0 */
- 		1,	/* mac 1 -> lane 1 */
-@@ -465,11 +460,30 @@ static int hns_mac_config_sds_loopback(struct hns_mac_cb *mac_cb, bool en)
- 	}
- 
- 	if (mac_cb->serdes_ctrl) {
--		u32 origin = dsaf_read_syscon(mac_cb->serdes_ctrl, reg_offset);
-+		u32 origin;
+ 	struct hns_nic_priv *priv = netdev_priv(ndev);
+ 	struct hnae_handle *h = priv->ae_handle;
++	int state = 1;
 +
-+		if (!AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver)) {
-+#define HILINK_ACCESS_SEL_CFG		0x40008
-+			/* hilink4 & hilink3 use the same xge training and
-+			 * xge u adaptor. There is a hilink access sel cfg
-+			 * register to select which one to be configed
-+			 */
-+			if ((!HNS_DSAF_IS_DEBUG(mac_cb->dsaf_dev)) &&
-+			    (mac_cb->mac_id <= 3))
-+				dsaf_write_syscon(mac_cb->serdes_ctrl,
-+						  HILINK_ACCESS_SEL_CFG, 0);
-+			else
-+				dsaf_write_syscon(mac_cb->serdes_ctrl,
-+						  HILINK_ACCESS_SEL_CFG, 3);
++	if (priv->phy) {
++		h->dev->ops->adjust_link(h, ndev->phydev->speed,
++					 ndev->phydev->duplex);
++		state = priv->phy->link;
++	}
++	state = state && h->dev->ops->get_status(h);
+ 
+-	h->dev->ops->adjust_link(h, ndev->phydev->speed, ndev->phydev->duplex);
++	if (state != priv->link) {
++		if (state) {
++			netif_carrier_on(ndev);
++			netif_tx_wake_all_queues(ndev);
++			netdev_info(ndev, "link up\n");
++		} else {
++			netif_carrier_off(ndev);
++			netdev_info(ndev, "link down\n");
 +		}
-+
-+		origin = dsaf_read_syscon(mac_cb->serdes_ctrl, reg_offset);
++		priv->link = state;
++	}
+ }
  
- 		dsaf_set_field(origin, 1ull << 10, 10, en);
- 		dsaf_write_syscon(mac_cb->serdes_ctrl, reg_offset, origin);
- 	} else {
-+		u8 *base_addr = (u8 *)mac_cb->serdes_vaddr +
-+				(mac_cb->mac_id <= 3 ? 0x00280000 : 0x00200000);
- 		dsaf_set_reg_field(base_addr, reg_offset, 1ull << 10, 10, en);
+ /**
+@@ -1577,27 +1595,14 @@ static void hns_nic_update_link_status(struct net_device *netdev)
+ 	struct hns_nic_priv *priv = netdev_priv(netdev);
+ 
+ 	struct hnae_handle *h = priv->ae_handle;
+-	int state = 1;
+ 
+-	if (priv->phy) {
+-		if (!genphy_update_link(priv->phy))
+-			state = priv->phy->link;
+-		else
+-			state = 0;
+-	}
+-	state = state && h->dev->ops->get_status(h);
++	if (h->phy_dev) {
++		if (h->phy_if != PHY_INTERFACE_MODE_XGMII)
++			return;
+ 
+-	if (state != priv->link) {
+-		if (state) {
+-			netif_carrier_on(netdev);
+-			netif_tx_wake_all_queues(netdev);
+-			netdev_info(netdev, "link up\n");
+-		} else {
+-			netif_carrier_off(netdev);
+-			netdev_info(netdev, "link down\n");
+-		}
+-		priv->link = state;
++		(void)genphy_read_status(h->phy_dev);
  	}
++	hns_nic_adjust_link(netdev);
+ }
  
+ /* for dumping key regs*/
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c b/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
+index 5b3dccb..564ae1e 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
+@@ -49,7 +49,7 @@ static u32 hns_nic_get_link(struct net_device *net_dev)
+ 	h = priv->ae_handle;
+ 
+ 	if (priv->phy) {
+-		if (!genphy_update_link(priv->phy))
++		if (!genphy_read_status(priv->phy))
+ 			link_stat = priv->phy->link;
+ 		else
+ 			link_stat = 0;
 -- 
 1.9.1
