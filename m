@@ -1,169 +1,92 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 21 Jun 2016 15:13:55 +0800
-Subject: [PATCH] net: stmmac: dwmac-rk: add rk322x-specific data
-Message-ID: <1466493235-17789-1-git-send-email-zhengxing@rock-chips.com>
+Date: Tue, 21 Jun 2016 15:20:51 +0800
+Subject: [PATCH 1/3] ARM: dts: rockchip: add i2s nodes for RK3228 SoCs
+In-Reply-To: <1466493653-18611-1-git-send-email-zhengxing@rock-chips.com>
+References: <1466493653-18611-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1466493653-18611-2-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add constants and callback functions for the dwmac on rk322x socs.
-As can be seen, the base structure is the same, only registers and
-the bits in them moved slightly.
+This patch add the i2s dt nodes for rk3228 SoCs.
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 ---
 
- .../devicetree/bindings/net/rockchip-dwmac.txt     |    3 +-
- drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     |  117 ++++++++++++++++++++
- 2 files changed, 119 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3228.dtsi |   55 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-index 93eac7c..5040ed4 100644
---- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-+++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-@@ -3,7 +3,8 @@ Rockchip SoC RK3288 10/100/1000 Ethernet driver(GMAC)
- The device node has following properties.
+diff --git a/arch/arm/boot/dts/rk3228.dtsi b/arch/arm/boot/dts/rk3228.dtsi
+index e23a22e..e224147 100644
+--- a/arch/arm/boot/dts/rk3228.dtsi
++++ b/arch/arm/boot/dts/rk3228.dtsi
+@@ -239,6 +239,47 @@
+ 		status = "disabled";
+ 	};
  
- Required properties:
-- - compatible: Can be one of "rockchip,rk3288-gmac", "rockchip,rk3368-gmac"
-+ - compatible: Can be one of "rockchip,rk322x-gmac", "rockchip,rk3288-gmac",
-+                             "rockchip,rk3368-gmac"
-  - reg: addresses and length of the register sets for the device.
-  - interrupts: Should contain the GMAC interrupts.
-  - interrupt-names: Should contain the interrupt names "macirq".
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-index 0cd3ecf..7f045db 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-@@ -72,6 +72,122 @@ struct rk_priv_data {
- #define GRF_BIT(nr)	(BIT(nr) | BIT(nr+16))
- #define GRF_CLR_BIT(nr)	(BIT(nr+16))
++	i2s1: i2s1 at 100b0000 {
++		compatible = "rockchip,rk3229-i2s", "rockchip,rk3066-i2s";
++		reg = <0x100b0000 0x4000>;
++		interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2s_clk", "i2s_hclk";
++		clocks = <&cru SCLK_I2S1>, <&cru HCLK_I2S1_8CH>;
++		dmas = <&pdma 14>, <&pdma 15>;
++		dma-names = "tx", "rx";
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2s1_bus>;
++		status = "disabled";
++	};
++
++	i2s0: i2s0 at 100c0000 {
++		compatible = "rockchip,rk3229-i2s", "rockchip,rk3066-i2s";
++		reg = <0x100c0000 0x4000>;
++		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2s_clk", "i2s_hclk";
++		clocks = <&cru SCLK_I2S0>, <&cru HCLK_I2S0_8CH>;
++		dmas = <&pdma 11>, <&pdma 12>;
++		dma-names = "tx", "rx";
++		status = "disabled";
++	};
++
++	i2s2: i2s2 at 100e0000 {
++		compatible = "rockchip,rk3229-i2s", "rockchip,rk3066-i2s";
++		reg = <0x100e0000 0x4000>;
++		interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2s_clk", "i2s_hclk";
++		clocks = <&cru SCLK_I2S2>, <&cru HCLK_I2S2_2CH>;
++		dmas = <&pdma 0>, <&pdma 1>;
++		dma-names = "tx", "rx";
++		status = "disabled";
++	};
++
+ 	pwm0: pwm at 110b0000 {
+ 		compatible = "rockchip,rk3288-pwm";
+ 		reg = <0x110b0000 0x10>;
+@@ -509,6 +550,20 @@
+ 			};
+ 		};
  
-+#define RK322X_GRF_MAC_CON0	0x0900
-+#define RK322X_GRF_MAC_CON1	0x0904
++		i2s1 {
++			i2s1_bus: i2s1-bus {
++				rockchip,pins = <0 8 RK_FUNC_1 &pcfg_pull_none>,
++						<0 9 RK_FUNC_1 &pcfg_pull_none>,
++						<0 11 RK_FUNC_1 &pcfg_pull_none>,
++						<0 12 RK_FUNC_1 &pcfg_pull_none>,
++						<0 13 RK_FUNC_1 &pcfg_pull_none>,
++						<0 14 RK_FUNC_1 &pcfg_pull_none>,
++						<1 2 RK_FUNC_1 &pcfg_pull_none>,
++						<1 4 RK_FUNC_1 &pcfg_pull_none>,
++						<1 5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
 +
-+/* RK322X_GRF_MAC_CON0 */
-+#define RK322X_GMAC_CLK_RX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 7)
-+#define RK322X_GMAC_CLK_TX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 0)
-+
-+/* RK322X_GRF_MAC_CON1 */
-+#define RK322X_GMAC_PHY_INTF_SEL_RGMII	\
-+		(GRF_BIT(4) | GRF_CLR_BIT(5) | GRF_CLR_BIT(6))
-+#define RK322X_GMAC_PHY_INTF_SEL_RMII	\
-+		(GRF_CLR_BIT(4) | GRF_CLR_BIT(5) | GRF_BIT(6))
-+#define RK322X_GMAC_FLOW_CTRL		GRF_BIT(3)
-+#define RK322X_GMAC_FLOW_CTRL_CLR	GRF_CLR_BIT(3)
-+#define RK322X_GMAC_SPEED_10M		GRF_CLR_BIT(2)
-+#define RK322X_GMAC_SPEED_100M		GRF_BIT(2)
-+#define RK322X_GMAC_RMII_CLK_25M	GRF_BIT(7)
-+#define RK322X_GMAC_RMII_CLK_2_5M	GRF_CLR_BIT(7)
-+#define RK322X_GMAC_CLK_125M		(GRF_CLR_BIT(8) | GRF_CLR_BIT(9))
-+#define RK322X_GMAC_CLK_25M		(GRF_BIT(8) | GRF_BIT(9))
-+#define RK322X_GMAC_CLK_2_5M		(GRF_CLR_BIT(8) | GRF_BIT(9))
-+#define RK322X_GMAC_RMII_MODE		GRF_BIT(10)
-+#define RK322X_GMAC_RMII_MODE_CLR	GRF_CLR_BIT(10)
-+#define RK322X_GMAC_TXCLK_DLY_ENABLE	GRF_BIT(0)
-+#define RK322X_GMAC_TXCLK_DLY_DISABLE	GRF_CLR_BIT(0)
-+#define RK322X_GMAC_RXCLK_DLY_ENABLE	GRF_BIT(1)
-+#define RK322X_GMAC_RXCLK_DLY_DISABLE	GRF_CLR_BIT(1)
-+
-+static void rk322x_set_to_rgmii(struct rk_priv_data *bsp_priv,
-+				int tx_delay, int rx_delay)
-+{
-+	struct device *dev = &bsp_priv->pdev->dev;
-+
-+	if (IS_ERR(bsp_priv->grf)) {
-+		dev_err(dev, "Missing rockchip,grf property\n");
-+		return;
-+	}
-+
-+	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-+		     RK322X_GMAC_PHY_INTF_SEL_RGMII |
-+		     RK322X_GMAC_RMII_MODE_CLR |
-+		     RK322X_GMAC_RXCLK_DLY_ENABLE |
-+		     RK322X_GMAC_TXCLK_DLY_ENABLE);
-+
-+	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON0,
-+		     RK322X_GMAC_CLK_RX_DL_CFG(rx_delay) |
-+		     RK322X_GMAC_CLK_TX_DL_CFG(tx_delay));
-+}
-+
-+static void rk322x_set_to_rmii(struct rk_priv_data *bsp_priv)
-+{
-+	struct device *dev = &bsp_priv->pdev->dev;
-+
-+	if (IS_ERR(bsp_priv->grf)) {
-+		dev_err(dev, "Missing rockchip,grf property\n");
-+		return;
-+	}
-+
-+	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-+		     RK322X_GMAC_PHY_INTF_SEL_RMII |
-+		     RK322X_GMAC_RMII_MODE);
-+
-+	/* set MAC to RMII mode */
-+	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1, GRF_BIT(11));
-+}
-+
-+static void rk322x_set_rgmii_speed(struct rk_priv_data *bsp_priv, int speed)
-+{
-+	struct device *dev = &bsp_priv->pdev->dev;
-+
-+	if (IS_ERR(bsp_priv->grf)) {
-+		dev_err(dev, "Missing rockchip,grf property\n");
-+		return;
-+	}
-+
-+	if (speed == 10)
-+		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-+			     RK322X_GMAC_CLK_2_5M);
-+	else if (speed == 100)
-+		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-+			     RK322X_GMAC_CLK_25M);
-+	else if (speed == 1000)
-+		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-+			     RK322X_GMAC_CLK_125M);
-+	else
-+		dev_err(dev, "unknown speed value for RGMII! speed=%d", speed);
-+}
-+
-+static void rk322x_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
-+{
-+	struct device *dev = &bsp_priv->pdev->dev;
-+
-+	if (IS_ERR(bsp_priv->grf)) {
-+		dev_err(dev, "Missing rockchip,grf property\n");
-+		return;
-+	}
-+
-+	if (speed == 10)
-+		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-+			     RK322X_GMAC_RMII_CLK_2_5M |
-+			     RK322X_GMAC_SPEED_10M);
-+	else if (speed == 100)
-+		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-+			     RK322X_GMAC_RMII_CLK_25M |
-+			     RK322X_GMAC_SPEED_100M);
-+	else
-+		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
-+}
-+
-+static const struct rk_gmac_ops rk322x_ops = {
-+	.set_to_rgmii = rk322x_set_to_rgmii,
-+	.set_to_rmii = rk322x_set_to_rmii,
-+	.set_rgmii_speed = rk322x_set_rgmii_speed,
-+	.set_rmii_speed = rk322x_set_rmii_speed,
-+};
-+
- #define RK3288_GRF_SOC_CON1	0x0248
- #define RK3288_GRF_SOC_CON3	0x0250
- 
-@@ -604,6 +720,7 @@ static int rk_gmac_probe(struct platform_device *pdev)
- }
- 
- static const struct of_device_id rk_gmac_dwmac_match[] = {
-+	{ .compatible = "rockchip,rk322x-gmac", .data = &rk322x_ops },
- 	{ .compatible = "rockchip,rk3288-gmac", .data = &rk3288_ops },
- 	{ .compatible = "rockchip,rk3368-gmac", .data = &rk3368_ops },
- 	{ }
+ 		pwm0 {
+ 			pwm0_pin: pwm0-pin {
+ 				rockchip,pins = <3 21 RK_FUNC_1 &pcfg_pull_none>;
 -- 
 1.7.9.5
