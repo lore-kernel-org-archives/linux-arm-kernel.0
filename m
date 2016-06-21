@@ -1,95 +1,32 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 21 Jun 2016 16:19:21 +0800
-Subject: [PATCH V7 8/8] irqchip/gicv3-its: Use MADT ITS subtable to do
- PCI/MSI domain initialization
-In-Reply-To: <1466420541-20101-9-git-send-email-tn@semihalf.com>
-References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
- <1466420541-20101-9-git-send-email-tn@semihalf.com>
-Message-ID: <d5dbe248-673e-698a-7e92-cf4ccdd2051f@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Jun 2016 09:20:33 +0100
+Subject: [PATCH 0/2] Simple fix to the ARM kexec tools implementation
+In-Reply-To: <20160621061128.GC29309@dhcppc9>
+References: <20160617194405.GN1041@n2100.armlinux.org.uk>
+ <20160621061128.GC29309@dhcppc9>
+Message-ID: <20160621082033.GS1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/20 19:02, Tomasz Nowicki wrote:
-> Let ACPI build ITS PCI MSI domain. ACPI code is responsible for retrieving
-> inner domain token and passing it on to its_pci_msi_init_one generic
-> init call.
->
-> IORT maintains list of registered domain tokens and allows to find
-> corresponding domain based on MADT ITS subtable ID info.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its-pci-msi.c | 44 ++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->
-> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> index d2c2496..ae7221c 100644
-> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> @@ -15,6 +15,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->
-> +#include <linux/iort.h>
->  #include <linux/msi.h>
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
-> @@ -144,9 +145,52 @@ static int __init its_pci_of_msi_init(void)
->  	return 0;
->  }
->
-> +#ifdef CONFIG_ACPI
-> +
-> +static int __init
-> +its_pci_msi_parse_madt(struct acpi_subtable_header *header,
-> +		       const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_translator *its_entry;
-> +	struct fwnode_handle *dom_handle;
-> +	const char *node_name;
-> +	int err = -ENXIO;
-> +
-> +	its_entry = (struct acpi_madt_generic_translator *)header;
-> +	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-> +			      (long)its_entry->base_address);
-> +	dom_handle = iort_find_domain_token(its_entry->translation_id);
-> +	if (!dom_handle) {
-> +		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-> +		goto out;
-> +	}
-> +
-> +	err = its_pci_msi_init_one(dom_handle, node_name);
-> +	if (!err)
-> +		pr_info("PCI/MSI: %s domain created\n", node_name);
-> +
-> +out:
-> +	kfree(node_name);
-> +	return err;
-> +}
-> +
-> +static int __init its_pci_acpi_msi_init(void)
-> +{
-> +	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-> +			      its_pci_msi_parse_madt, 0);
-> +	return 0;
-> +}
-> +#else
-> +static int __init its_pci_acpi_msi_init(void)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
->  static int __init its_pci_msi_init(void)
->  {
->  	its_pci_of_msi_init();
-> +	its_pci_acpi_msi_init();
->
->  	return 0;
->  }
+On Tue, Jun 21, 2016 at 11:41:28AM +0530, Pratyush Anand wrote:
+> Yes, so until we have proper header for zImage, these patches looks
+> fine to me.
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+If you read my last email in the "kexec failures with DEBUG_RODATA"
+thread, you'll see that I'm unhappy with this idea, because adding a
+"proper header" still results in some kind of assumption about how
+the zImage decompressor works being needed by the boot environment.
 
-Thanks
-Hanjun
+> For both of the patches:
+> 
+> Reviewed-by: Pratyush Anand <panand@redhat.com>
+
+Thanks.
+
+Simon, do you need me to resend with the r-b tag, or will you pick
+these two up and the documentation fix patch you asked for?
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
