@@ -1,72 +1,130 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 22 Jun 2016 00:01:07 +0800
-Subject: [PATCH 1/5] clk: rockchip: rk3228: fix incorrect clock node names
-In-Reply-To: <1466484811-26923-2-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <201606212335.VFvzq20R%fengguang.wu@intel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 21 Jun 2016 17:06:47 +0100
+Subject: [RFC PATCH v2 03/15] arm64: mm: change IOMMU notifier action to
+ attach DMA ops
+In-Reply-To: <03c537e7-0acf-edca-d0e0-369490c828df@samsung.com>
+References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <5763C27A.9030306@arm.com>
+ <03c537e7-0acf-edca-d0e0-369490c828df@samsung.com>
+Message-ID: <20160621160637.GA31761@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marek,
 
-[auto build test ERROR on rockchip/for-next]
-[also build test ERROR on v4.7-rc4 next-20160621]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On Tue, Jun 21, 2016 at 09:53:20AM +0200, Marek Szyprowski wrote:
+> Hi Robin,
+> 
+> 
+> On 2016-06-17 11:27, Robin Murphy wrote:
+> >Hi Lorenzo,
+> >
+> >I think this patch makes sense even independent of the rest of the
+> >series, one nit inline notwithstanding.
+> >
+> >Marek; I'm curious as to whether this could make the workaround in
+> >722ec35f7 obsolete as well, or are all the drivers also bound
+> >super-early in the setup you had there?
+> 
+> Yes, this will solve that problem too. I will also hide some possible
+> deferred probe issues, because the moment at which IOMMU is activated
+> will be postponed. The only drawback with this approach is the fact
+> that is drivers won't be allowed to do any dma-mapping operations on
+> devices, which they don't own. This should not be a big issue, but
+> this was the reason to setup IOMMU on device add instead of driver
+> bind.
+> 
+> While at it, please make sure that the case of failed client driver
+> probe will be handled properly. IOMMU might do some operations while
+> setting up and if the client driver fails to probe (for whatever
+> reason, might be a deferred probe too), those operation has to be
+> undone. However the current code of the driver core won't call any
+> notifier (like BUS_NOTIFY_UNBOUND_DRIVER or whatever else) in such
+> case.
 
-url:    https://github.com/0day-ci/linux/commits/Xing-Zheng/Fix-and-improve-clock-controller-for-the-RK322x-SoCs/20160621-130641
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Isn't Andy's commit 14b6257a5f3d enough ? Is that what you had in
+mind ?
 
-Note: the linux-review/Xing-Zheng/Fix-and-improve-clock-controller-for-the-RK322x-SoCs/20160621-130641 HEAD 46fe9dec31bc488791124a6237caa95c0cd75a30 builds fine.
-      It only hurts bisectibility.
+> Long time ago I used BUS_NOTIFY_BIND_DRIVER based approach for my
+> Exynos IOMMU patches and had to extend bus core with such patch:
+> https://patchwork.kernel.org/patch/4678181/ to properly cleanup
+> after failed client driver probe and avoid leaking resources. Please
+> read the discussion, because some changes were requested to it.
 
-All error/warnings (new ones prefixed by >>):
+It looks like commit 14b6257a5f3d ("device core: add
+BUS_NOTIFY_DRIVER_NOT_BOUND notification") does what you
+are requesting, please let me know if that's enough.
 
->> drivers/clk/rockchip/clk-rk3228.c:667:0: error: unterminated argument list invoking macro "COMPOSITE_FRAC"
-    CLK_OF_DECLARE(rk3228_cru, "rockchip,rk3228-cru", rk3228_clk_init);
-    ^
->> drivers/clk/rockchip/clk-rk3228.c:392:2: error: 'COMPOSITE_FRAC' undeclared here (not in a function)
-     COMPOSITE_FRAC(0, "i2s1_frac", "i2s1_src", CLK_SET_RATE_PARENT,
-     ^
->> drivers/clk/rockchip/clk-rk3228.c:392:2: error: expected '}' at end of input
->> drivers/clk/rockchip/clk-rk3228.c:104:42: warning: 'rk3228_cpuclk_rates' defined but not used [-Wunused-variable]
-    static struct rockchip_cpuclk_rate_table rk3228_cpuclk_rates[] __initdata = {
-                                             ^
->> drivers/clk/rockchip/clk-rk3228.c:158:34: warning: 'rk3228_pll_clks' defined but not used [-Wunused-variable]
-    static struct rockchip_pll_clock rk3228_pll_clks[] __initdata = {
-                                     ^
->> drivers/clk/rockchip/clk-rk3228.c:173:35: warning: 'rk3228_clk_branches' defined but not used [-Wunused-variable]
-    static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
-                                      ^
+I will revert the changes in 722ec35f7 and fold them in the
+new version along with Robin's suggestions.
 
-vim +/COMPOSITE_FRAC +667 drivers/clk/rockchip/clk-rk3228.c
+Thanks,
+Lorenzo
 
-307a2e9ac Jeffy Chen 2015-12-11  661  				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-307a2e9ac Jeffy Chen 2015-12-11  662  
-ef1d9feec Xing Zheng 2016-03-09  663  	rockchip_register_restart_notifier(ctx, RK3228_GLB_SRST_FST, NULL);
-ef1d9feec Xing Zheng 2016-03-09  664  
-ef1d9feec Xing Zheng 2016-03-09  665  	rockchip_clk_of_add_provider(np, ctx);
-307a2e9ac Jeffy Chen 2015-12-11  666  }
-307a2e9ac Jeffy Chen 2015-12-11 @667  CLK_OF_DECLARE(rk3228_cru, "rockchip,rk3228-cru", rk3228_clk_init);
-
-:::::: The code at line 667 was first introduced by commit
-:::::: 307a2e9ac524bbec707c0e2b47ca50adaecc23f2 clk: rockchip: add clock controller for rk3228
-
-:::::: TO: Jeffy Chen <jeffy.chen@rock-chips.com>
-:::::: CC: Heiko Stuebner <heiko@sntech.de>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 25985 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/4dba437b/attachment-0001.obj>
+> 
+> 
+> Best regards
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+> 
+> >
+> >On 07/06/16 14:30, Lorenzo Pieralisi wrote:
+> >>Current bus notifier in ARM64 (__iommu_attach_notifier)
+> >>attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
+> >>action notification.
+> >>
+> >>This causes issues on ACPI based systems, where PCI devices
+> >>can be added before the IOMMUs the devices are attached to
+> >>had a chance to be probed, causing failures on attempts to
+> >>attach dma_ops in that the domain for the respective IOMMU
+> >>may not be set-up yet by the time the bus notifier is run.
+> >>
+> >>Devices dma_ops do not require to be set-up till the matching
+> >>device drivers are probed. This means that instead of running
+> >>the notifier attaching dma_ops to devices (__iommu_attach_notifier)
+> >>on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
+> >>device driver is bound to the device in question (on action
+> >>BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
+> >>group and domain are set-up accordingly at the time the
+> >>notifier is triggered.
+> >>
+> >>This patch changes the notifier action upon which dma_ops
+> >>are attached to devices and defer it to driver binding time,
+> >>so that IOMMU devices have a chance to be probed and to register
+> >>their bus notifiers before the dma_ops attach sequence for a
+> >>device is actually carried out.
+> >>
+> >>Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>Cc: Will Deacon <will.deacon@arm.com>
+> >>Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >>Cc: Robin Murphy <robin.murphy@arm.com>
+> >>---
+> >>  arch/arm64/mm/dma-mapping.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >>diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> >>index c566ec8..79b0882 100644
+> >>--- a/arch/arm64/mm/dma-mapping.c
+> >>+++ b/arch/arm64/mm/dma-mapping.c
+> >>@@ -848,7 +848,7 @@ static int __iommu_attach_notifier(struct
+> >>notifier_block *nb,
+> >>  {
+> >>      struct iommu_dma_notifier_data *master, *tmp;
+> >>
+> >>-    if (action != BUS_NOTIFY_ADD_DEVICE)
+> >>+    if (action != BUS_NOTIFY_BIND_DRIVER)
+> >
+> >With this, you can also get rid of the priority setting and big
+> >fat explanatory comment in register_iommu_dma_ops_notifier().
+> >
+> >Robin.
+> >
+> >>          return 0;
+> >>
+> >>      mutex_lock(&iommu_dma_notifier_lock);
+> >>
+> >
+> >
+> >
+> 
