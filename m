@@ -1,48 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 Jun 2016 21:43:49 -0700
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable AHCI_IMX
-In-Reply-To: <1466427854-21265-1-git-send-email-tuomas@tuxera.com>
-References: <1466427854-21265-1-git-send-email-tuomas@tuxera.com>
-Message-ID: <20160621044349.GA24293@localhost>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Tue, 21 Jun 2016 12:53:30 +0800
+Subject: [PATCH 4/5] clk: rockchip: rk3228: rename sclk_macphy_50m to
+ sclk_mac_extclk
+In-Reply-To: <1466484811-26923-1-git-send-email-zhengxing@rock-chips.com>
+References: <1466484811-26923-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1466484811-26923-5-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Toumas,
+The sclk_macphy_50m is confusing, the sclk_mac_extclk describes
+a external clock  clearly.
 
-We can apply this directly but I prefer to get an acked-by from the
-platform maintainer that it affects. I didn't even see them cc:d here
-so would you mind resubmit with them on the line? Alternatively send it
-to them and they can apply and feed up to us with other defconfig changes.
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
+ drivers/clk/rockchip/clk-rk3228.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
--Olof
-
-On Mon, Jun 20, 2016 at 04:04:13PM +0300, Tuomas Tynkkynen wrote:
-> The Wandboard Quad comes with a SATA port. Enable the IMX SATA driver by
-> default to make it easy to have the root filesystem on it.
-> 
-> Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index ee7c884..6efcbc7 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -214,6 +214,7 @@ CONFIG_ATA=y
->  CONFIG_SATA_AHCI=y
->  CONFIG_SATA_AHCI_PLATFORM=y
->  CONFIG_AHCI_ST=y
-> +CONFIG_AHCI_IMX=y
->  CONFIG_AHCI_SUNXI=y
->  CONFIG_AHCI_TEGRA=y
->  CONFIG_SATA_HIGHBANK=y
-> -- 
-> 2.8.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+index 79a3db1..980d0da 100644
+--- a/drivers/clk/rockchip/clk-rk3228.c
++++ b/drivers/clk/rockchip/clk-rk3228.c
+@@ -151,8 +151,8 @@ PNAME(mux_uart0_p)		= { "uart0_src", "uart0_frac", "xin24m" };
+ PNAME(mux_uart1_p)		= { "uart1_src", "uart1_frac", "xin24m" };
+ PNAME(mux_uart2_p)		= { "uart2_src", "uart2_frac", "xin24m" };
+ 
+-PNAME(mux_sclk_macphy_50m_p)	= { "ext_gmac", "phy_50m_out" };
+-PNAME(mux_sclk_gmac_pre_p)	= { "sclk_gmac_src", "sclk_macphy_50m" };
++PNAME(mux_sclk_mac_extclk_p)	= { "ext_gmac", "phy_50m_out" };
++PNAME(mux_sclk_gmac_pre_p)	= { "sclk_gmac_src", "sclk_mac_extclk" };
+ PNAME(mux_sclk_macphy_p)	= { "sclk_gmac_src", "ext_gmac" };
+ 
+ static struct rockchip_pll_clock rk3228_pll_clks[] __initdata = {
+@@ -502,7 +502,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "sclk_gmac_src", mux_pll_src_2plls_p, 0,
+ 			RK2928_CLKSEL_CON(5), 7, 1, MFLAGS, 0, 5, DFLAGS,
+ 			RK2928_CLKGATE_CON(1), 7, GFLAGS),
+-	MUX(0, "sclk_macphy_50m", mux_sclk_macphy_50m_p, 0,
++	MUX(0, "sclk_mac_extclk", mux_sclk_mac_extclk_p, 0,
+ 			RK2928_CLKSEL_CON(29), 10, 1, MFLAGS),
+ 	MUX(0, "sclk_gmac_pre", mux_sclk_gmac_pre_p, 0,
+ 			RK2928_CLKSEL_CON(5), 5, 1, MFLAGS),
+-- 
+1.7.9.5
