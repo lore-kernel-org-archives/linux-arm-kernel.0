@@ -1,17 +1,17 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Tue, 21 Jun 2016 11:56:24 +0800
-Subject: [PATCH net-next 04/19] net: hns: typo fix of annotation info for
- hns_nic_reset_subtask()
+Date: Tue, 21 Jun 2016 11:56:26 +0800
+Subject: [PATCH net-next 06/19] net: hns: fix the error info when
+ dma_set_mask_and_coherent fail
 In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1466481399-70080-5-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1466481399-70080-7-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Qianqian Xie <xieqianqian@huawei.com>
 
-The annotation info for hns_nic_reset_subtask() should be
-"for resetting subtask" instead of "for resetting suntask".
+The error info should be printed as "set mask to 64bit fail!" instead of
+"set mask to 32bit fail!" in dma_set_mask_and_coherent().
 
 Signed-off-by: Qianqian Xie <xieqianqian@huawei.com>
 Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
@@ -20,17 +20,17 @@ Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-index 15200e4..b978db4 100644
+index b978db4..00e529f 100644
 --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
 +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-@@ -1633,7 +1633,7 @@ static void hns_nic_dump(struct hns_nic_priv *priv)
- 	}
- }
+@@ -1972,7 +1972,7 @@ static int hns_nic_dev_probe(struct platform_device *pdev)
+ 	if (!dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)))
+ 		dev_dbg(dev, "set mask to 64bit\n");
+ 	else
+-		dev_err(dev, "set mask to 32bit fail!\n");
++		dev_err(dev, "set mask to 64bit fail!\n");
  
--/* for resetting suntask*/
-+/* for resetting subtask */
- static void hns_nic_reset_subtask(struct hns_nic_priv *priv)
- {
- 	enum hnae_port_type type = priv->ae_handle->port_type;
+ 	/* carrier off reporting is important to ethtool even BEFORE open */
+ 	netif_carrier_off(ndev);
 -- 
 1.9.1
