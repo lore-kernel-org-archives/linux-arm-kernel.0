@@ -1,35 +1,30 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Jun 2016 10:47:38 +0100
-Subject: [PATCH 2/2] arm: fix kernel image size
-In-Reply-To: <20160621074319.GH22406@atomide.com>
-References: <20160617194405.GN1041@n2100.armlinux.org.uk>
- <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
- <20160621074319.GH22406@atomide.com>
-Message-ID: <20160621094737.GA5783@n2100.arm.linux.org.uk>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 21 Jun 2016 11:57:48 +0200
+Subject: [PATCH v4 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for
+ mt2701
+In-Reply-To: <1465379461-14757-6-git-send-email-honghui.zhang@mediatek.com>
+References: <1465379461-14757-1-git-send-email-honghui.zhang@mediatek.com>
+ <1465379461-14757-6-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20160621095748.GE28248@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 12:43:21AM -0700, Tony Lindgren wrote:
-> Hi,
+On Wed, Jun 08, 2016 at 05:51:01PM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
 > 
-> * Russell King <rmk@armlinux.org.uk> [160617 12:52]:
-> > If we want to assume that the compressed image will expand by a maximum
-> > of 4x, we actually need to reserve 5x the space, since we need to keep
-> > a copy of the compessed image around while decompressing.
+> Add the dtsi node of iommu and smi for mt2701.
 > 
-> Looks like 5x is not enough with omap2plus_defconfig at least..
-> This one needs to be set to 6x for that. Maybe we should just make
-> it go all the way to 11 :)
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt2701.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
 
-That's not really what this commit is about - it's about making the
-code consistent with the comments in the file.  I could have instead
-changed the comment saying "4x" to "3x" instead.
+Okay, I pushed my arm/mediatek branch to my tree at
 
-There isn't really an answer which will always work for this problem,
-as I've already detailed in a previous thread discussing the issue.
-Adding a zImage header don't fix the problem.
+	git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Please base the patch on that branch and re-send.
+
+Thanks,
+
+	Joerg
