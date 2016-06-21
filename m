@@ -1,143 +1,72 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 21 Jun 2016 15:08:50 +0100
-Subject: [RFC PATCH 8/8] PM / Domains: Add support for removing PM domains
-In-Reply-To: <CAPDyKFrKCB00hHhpSaJZ57wThPFRjnp+3xMz_YW9k+zqafppHg@mail.gmail.com>
-References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
- <1457090634-14785-9-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFrKCB00hHhpSaJZ57wThPFRjnp+3xMz_YW9k+zqafppHg@mail.gmail.com>
-Message-ID: <57694A72.6090202@nvidia.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 21 Jun 2016 15:27:04 +0100
+Subject: [RFC PATCH v2 00/15] ACPI IORT ARM SMMU v3 support
+In-Reply-To: <b00f33ad-be24-21a9-b03b-611756bbc8e9@linaro.org>
+References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <b00f33ad-be24-21a9-b03b-611756bbc8e9@linaro.org>
+Message-ID: <20160621142704.GA31593@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Hanjun,
 
-On 15/06/16 15:33, Ulf Hansson wrote:
-> On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
->> The genpd framework allows users to add PM domains via the pm_genpd_init()
->> function, however, there is no corresponding function to remove a PM
->> domain. For most devices this may be fine as the PM domains are never
->> removed, however, for devices that wish to populate the PM domains from
->> within a driver, having the ability to remove a PM domain if the probing
->> of the device fails or the driver is unloaded is necessary.
->>
->> Add the function pm_genpd_remove() to remove a PM domain by referencing
->> it's generic_pm_domain structure.
->>
->> If a device supports nested or subdomains, then the PM domains
->> should be removed in reverse order to ensure that the subdomains are
->> removed first. Hence, add the function pm_genpd_remove_tail() to remove
->> the last PM domain added by a given provider and return the
->> generic_pm_domain structure for the PM domain that was removed.
+On Tue, Jun 21, 2016 at 06:37:17PM +0800, Hanjun Guo wrote:
+> Hi Lorenzo,
 > 
-> Perhaps split this up, so the pm_genpd_remove_tail() gets added in a
-> separate patch on top.
-
-OK.
-
->>
->> PM domains can only be removed if they are not a parent domain to
->> another PM domain and have no devices associated with them.
->>
->> When removing PM domains, the PM domain will also be removed from the
->> list of providers, if it was registered.
->>
->> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->> ---
->>  drivers/base/power/domain.c | 96 +++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/pm_domain.h   | 12 ++++++
->>  2 files changed, 108 insertions(+)
->>
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index 9b33377bf01b..17090e1c91d6 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -1556,6 +1556,102 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
->>  }
->>  EXPORT_SYMBOL_GPL(pm_genpd_init);
->>
->> +/**
->> + * __pm_genpd_remove - Remove a generic I/O PM domain
->> + * @genpd: Pointer to PM domain that is to be removed.
->> + *
->> + * To remove the PM domain, this function:
->> + *  - Removes the PM domain from the list of providers, if registered.
->> + *  - Removes the PM domain as a subdomain to any parent domains,
->> + *    if it was added.
->> + *  - Removes the PM domain from the list of registered PM domains.
->> + *
->> + * The PM domain will only be removed, if it is not a parent to any
->> + * other PM domain and has no devices associated with it. Must be called
->> + * with the gpd_list_lock held.
->> + */
->> +static int __pm_genpd_remove(struct generic_pm_domain *genpd)
+> On 2016/6/7 21:30, Lorenzo Pieralisi wrote:
+> >This RFC patch series is v2 of a previous posting:
+> >
+> >https://lkml.org/lkml/2016/4/14/702
+> >
+> >v1 -> v2:
+> >	- Rebased on top of dependencies series [1][2][3](v4.7-rc1)
+> >	- Removed IOMMU fwnode generalization
+> >	- Implemented ARM SMMU v3 ACPI probing instead of ARM SMMU v2
+> >	  owing to patch series dependencies [1]
+> >	- Moved platform device creation logic to IORT code to
+> >	  generalize its usage for ARM SMMU v1-v2-v3 components
+> >	- Removed reliance on ACPI early device probing
+> >	- Created IORT specific iommu_xlate() translation hook leaving
+> >	  OF code unchanged according to v1 reviews
+> >
+> >The ACPI IORT table provides information that allows instantiating
+> >ARM SMMU devices and carrying out id mappings between components on
+> >ARM based systems (devices, IOMMUs, interrupt controllers).
+> >
+> >http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+> >
+> >Building on basic IORT support, available through [2]:
+> >
+> >this patchset enables ARM SMMU v3 support on ACPI systems.
 > 
-> Please rename to genpd_remove() as it's a static function.
+> I'm trying to test your patches on D03 (SMMUv3 based) but ...
 
-OK.
+What do you mean by "I am trying.." :), have you actually tested
+this series ?
 
->> +{
->> +       struct gpd_link *l, *link;
->> +       int ret = 0;
->> +
->> +       if (IS_ERR_OR_NULL(genpd))
->> +               return -EINVAL;
->> +
->> +       if (genpd->provider_data)
->> +               of_genpd_del_provider_by_data(genpd->provider_data);
->> +
->> +       mutex_lock(&genpd->lock);
->> +
->> +       if (!list_empty(&genpd->master_links) || genpd->device_count) {
->> +               mutex_unlock(&genpd->lock);
->> +               pr_err("%s: unable to remove %s\n", __func__, genpd->name);
->> +               return -EBUSY;
->> +       }
->> +
->> +       list_for_each_entry_safe(link, l, &genpd->slave_links, slave_node) {
->> +               list_del(&link->master_node);
->> +               list_del(&link->slave_node);
->> +               kfree(link);
->> +       }
->> +
->> +       list_del(&genpd->gpd_list_node);
->> +       mutex_unlock(&genpd->lock);
->> +       cancel_work_sync(&genpd->power_off_work);
->> +       pr_debug("%s: removed %s\n", __func__, genpd->name);
->> +
->> +       return ret;
->> +}
->> +
->> +/**
->> + * pm_genpd_remove - Remove a generic I/O PM domain
->> + * @genpd: Pointer to PM domain that is to be removed.
->> + */
->> +int pm_genpd_remove(struct generic_pm_domain *genpd)
->> +{
->> +       int ret;
->> +
->> +       mutex_lock(&gpd_list_lock);
->> +       ret = __pm_genpd_remove(genpd);
->> +       mutex_unlock(&gpd_list_lock);
->> +
->> +       return ret;
->> +}
->> +
->> +/**
->> + * pm_genpd_remove_tail - Remove the last PM domain registered for a provider
->> + * @provider: Pointer to device structure associated with provider
->> + *
->> + * Find the last PM domain that was added by the provider whose 'provider'
->> + * device structure matches the device structure given. The 'provider'
->> + * device structure for a given PM domain should be initialised by the
->> + * device that is creating the PM domains and hence, calling
->> + * pm_genpd_init().
+> [...]
+> >[1] R.Murphy "Generic DT bindings for PCI and ARM SMMU v3"
+> >    http://marc.info/?l=linux-arm-kernel&m=146497432413816&w=2
 > 
-> Maybe make this a bigger "Important note" as what is needed to
-> actually benefit from using this function.
+> ...This patch set is still in discussion and seems not work
+> for non-PCI devices.
 
-Yes, good point. Will update.
+Can you be more specific please ? Yes, both series are work
+in progress.
 
-Cheers
-Jon
+> >[2] T.Nowicki "Introduce ACPI world to ITS irqchip" v5
+> >    http://marc.info/?l=linux-acpi&m=146469369703684&w=2
+> 
+> Tomasz sent out the v7 and included patches in your series.
+> 
+> I think a updated version before the test makes sense, what
+> do you think? Let me know your thoughts.
 
--- 
-nvpublic
+I am working with Robin so that the xlate() mechanism works
+properly and seamlessly for both DT and ACPI, given the
+dependencies I think it makes more sense to wait for Tomasz
+and Robin patches to get merged or at least stabilize before
+doing anything else, I am curently working on a v3.
+
+Thanks,
+Lorenzo
