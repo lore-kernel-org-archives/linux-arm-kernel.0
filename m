@@ -1,82 +1,97 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Jun 2016 08:14:43 -0500
-Subject: [PATCH v3 2/8] mfd: ac100: Add device tree bindings for X-Powers
- AC100 codec/RTC combo IC
-In-Reply-To: <1466391138-12862-3-git-send-email-wens@csie.org>
-References: <1466391138-12862-1-git-send-email-wens@csie.org>
- <1466391138-12862-3-git-send-email-wens@csie.org>
-Message-ID: <20160621131443.GA29350@rob-hp-laptop>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 21 Jun 2016 15:15:51 +0200
+Subject: [PATCH 1/3] mmc: mmc: use ops->card_busy() to check card status
+ in __mmc_switch()
+In-Reply-To: <1463647662-27426-2-git-send-email-chaotian.jing@mediatek.com>
+References: <1463647662-27426-1-git-send-email-chaotian.jing@mediatek.com>
+ <1463647662-27426-2-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFrAKuv2x-mnt-r=RWKZVci=mBTcJeG0=CfLtdG-voWyxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 10:52:12AM +0800, Chen-Yu Tsai wrote:
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On 19 May 2016 at 10:47, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> some MMC host do not support MMC_CAP_WAIT_WHILE_BUSY but provides
+> ops->card_busy(), So, add this method to check card status after
+> switch command.
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+
+Thanks, applied for next! (With some minor updates to the change log)
+
+Kind regards
+Uffe
+
 > ---
-> Changes since v2:
-> 
->   - Fix interrupt line for ac100_codec in provided example.
-> 
-> ---
->  Documentation/devicetree/bindings/mfd/ac100.txt | 42 +++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/ac100.txt b/Documentation/devicetree/bindings/mfd/ac100.txt
-> new file mode 100644
-> index 000000000000..a793954bb952
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/ac100.txt
-> @@ -0,0 +1,42 @@
-> +X-Powers AC100 Codec/RTC IC device tree bindings
-> +
-> +AC100 is a audio codec and RTC subsystem combo IC. The 2 parts are
-> +separated, including power supplies and interrupt lines, but share
-> +a common register address space and host interface.
-> +
-> +Required properties:
-> +- compatible: "x-powers,ac100"
-> +- reg: The I2C slave address or RSB hardware address for the chip
-> +- sub-nodes:
-> +  - codec
-> +    - compatible: "x-powers,ac100-codec"
-> +    - interrupt-parent: The parent interrupt controller
-> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_AUDIO pin
-> +  - rtc
-> +    - compatible: "x-powers,ac100-rtc"
-> +    - interrupt-parent: The parent interrupt controller
-> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_RTC pin
-> +    - #clock-cells: shall be 1
-> +    - clock-output-names: "cko1_rtc", "cko2_rtc", "cko3_rtc"
-> +    - see clock/clock-bindings.txt for common clock bindings
-> +
-> +Example:
-> +
-> +ac100: codec at e89 {
-> +	compatible = "x-powers,ac100";
-> +	reg = <0xe89>;
-> +
-> +	ac100_codec {
-
-Use generic node names and no underscores:
-
-codec {
-
-> +		compatible = "x-powers,ac100-codec";
-> +		interrupt-parent = <&r_pio>;
-> +		interrupts = <0 9 IRQ_TYPE_LEVEL_LOW>; /* PL9 */
-> +	};
-> +
-> +	ac100_rtc {
-
-rtc {
-
-> +		compatible = "x-powers,ac100-rtc";
-> +		interrupt-parent = <&nmi_intc>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +		#clock-cells = <1>;
-> +		clock-output-names = "cko1_rtc", "cko2_rtc", "cko3_rtc";
-> +	};
-> +};
-> -- 
-> 2.8.1
-> 
+>  drivers/mmc/core/mmc_ops.c | 25 ++++++++++++++++---------
+>  1 file changed, 16 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 62355bd..32de144 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -480,6 +480,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>         u32 status = 0;
+>         bool use_r1b_resp = use_busy_signal;
+>         bool expired = false;
+> +       bool busy = false;
+>
+>         mmc_retune_hold(host);
+>
+> @@ -535,19 +536,24 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>         /* Must check status to be sure of no errors. */
+>         timeout = jiffies + msecs_to_jiffies(timeout_ms);
+>         do {
+> +               /*
+> +                * Due to the possibility of being preempted after
+> +                * sending the status command, check the expiration
+> +                * time first.
+> +                */
+> +               expired = time_after(jiffies, timeout);
+>                 if (send_status) {
+> -                       /*
+> -                        * Due to the possibility of being preempted after
+> -                        * sending the status command, check the expiration
+> -                        * time first.
+> -                        */
+> -                       expired = time_after(jiffies, timeout);
+>                         err = __mmc_send_status(card, &status, ignore_crc);
+>                         if (err)
+>                                 goto out;
+>                 }
+>                 if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp)
+>                         break;
+> +               if (host->ops->card_busy) {
+> +                       if (!host->ops->card_busy(host))
+> +                               break;
+> +                       busy = true;
+> +               }
+>                 if (mmc_host_is_spi(host))
+>                         break;
+>
+> @@ -556,19 +562,20 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>                  * does'nt support MMC_CAP_WAIT_WHILE_BUSY, then we can only
+>                  * rely on waiting for the stated timeout to be sufficient.
+>                  */
+> -               if (!send_status) {
+> +               if (!send_status && !host->ops->card_busy) {
+>                         mmc_delay(timeout_ms);
+>                         goto out;
+>                 }
+>
+>                 /* Timeout if the device never leaves the program state. */
+> -               if (expired && R1_CURRENT_STATE(status) == R1_STATE_PRG) {
+> +               if (expired &&
+> +                   (R1_CURRENT_STATE(status) == R1_STATE_PRG || busy)) {
+>                         pr_err("%s: Card stuck in programming state! %s\n",
+>                                 mmc_hostname(host), __func__);
+>                         err = -ETIMEDOUT;
+>                         goto out;
+>                 }
+> -       } while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
+> +       } while (R1_CURRENT_STATE(status) == R1_STATE_PRG || busy);
+>
+>         err = mmc_switch_status_error(host, status);
+>  out:
+> --
+> 1.8.1.1.dirty
+>
