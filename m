@@ -1,180 +1,35 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 21 Jun 2016 11:43:59 +0200
-Subject: [PATCH] net: stmmac: dwmac-rk: add rk322x-specific data
-In-Reply-To: <1466493235-17789-1-git-send-email-zhengxing@rock-chips.com>
-References: <1466493235-17789-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <3520853.j0ALyW964u@diego>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Jun 2016 10:47:38 +0100
+Subject: [PATCH 2/2] arm: fix kernel image size
+In-Reply-To: <20160621074319.GH22406@atomide.com>
+References: <20160617194405.GN1041@n2100.armlinux.org.uk>
+ <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
+ <20160621074319.GH22406@atomide.com>
+Message-ID: <20160621094737.GA5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 21. Juni 2016, 15:13:55 schrieb Xing Zheng:
-> Add constants and callback functions for the dwmac on rk322x socs.
-> As can be seen, the base structure is the same, only registers and
-> the bits in them moved slightly.
+On Tue, Jun 21, 2016 at 12:43:21AM -0700, Tony Lindgren wrote:
+> Hi,
 > 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> ---
+> * Russell King <rmk@armlinux.org.uk> [160617 12:52]:
+> > If we want to assume that the compressed image will expand by a maximum
+> > of 4x, we actually need to reserve 5x the space, since we need to keep
+> > a copy of the compessed image around while decompressing.
 > 
->  .../devicetree/bindings/net/rockchip-dwmac.txt     |    3 +-
->  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     |  117
-> ++++++++++++++++++++ 2 files changed, 119 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt index
-> 93eac7c..5040ed4 100644
-> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> @@ -3,7 +3,8 @@ Rockchip SoC RK3288 10/100/1000 Ethernet driver(GMAC)
->  The device node has following properties.
-> 
->  Required properties:
-> - - compatible: Can be one of "rockchip,rk3288-gmac", "rockchip,rk3368-gmac"
-> + - compatible: Can be one of "rockchip,rk322x-gmac",
+> Looks like 5x is not enough with omap2plus_defconfig at least..
+> This one needs to be set to 6x for that. Maybe we should just make
+> it go all the way to 11 :)
 
-devicetree names are normally expected to be real, aka no "x" as catchall. So 
-I guess either just add compatibles for both the rk3228 and rk3229 which point 
-to the same structure in the driver. (So driver-side can stay as it is below, 
-just add a second compatible).
+That's not really what this commit is about - it's about making the
+code consistent with the comments in the file.  I could have instead
+changed the comment saying "4x" to "3x" instead.
 
+There isn't really an answer which will always work for this problem,
+as I've already detailed in a previous thread discussing the issue.
+Adding a zImage header don't fix the problem.
 
-> "rockchip,rk3288-gmac", +                            
-> "rockchip,rk3368-gmac"
->   - reg: addresses and length of the register sets for the device.
->   - interrupts: Should contain the GMAC interrupts.
->   - interrupt-names: Should contain the interrupt names "macirq".
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-> b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c index 0cd3ecf..7f045db
-> 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-> @@ -72,6 +72,122 @@ struct rk_priv_data {
->  #define GRF_BIT(nr)	(BIT(nr) | BIT(nr+16))
->  #define GRF_CLR_BIT(nr)	(BIT(nr+16))
-> 
-> +#define RK322X_GRF_MAC_CON0	0x0900
-> +#define RK322X_GRF_MAC_CON1	0x0904
-> +
-> +/* RK322X_GRF_MAC_CON0 */
-> +#define RK322X_GMAC_CLK_RX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 7)
-> +#define RK322X_GMAC_CLK_TX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 0)
-> +
-> +/* RK322X_GRF_MAC_CON1 */
-> +#define RK322X_GMAC_PHY_INTF_SEL_RGMII	\
-> +		(GRF_BIT(4) | GRF_CLR_BIT(5) | GRF_CLR_BIT(6))
-> +#define RK322X_GMAC_PHY_INTF_SEL_RMII	\
-> +		(GRF_CLR_BIT(4) | GRF_CLR_BIT(5) | GRF_BIT(6))
-> +#define RK322X_GMAC_FLOW_CTRL		GRF_BIT(3)
-> +#define RK322X_GMAC_FLOW_CTRL_CLR	GRF_CLR_BIT(3)
-> +#define RK322X_GMAC_SPEED_10M		GRF_CLR_BIT(2)
-> +#define RK322X_GMAC_SPEED_100M		GRF_BIT(2)
-> +#define RK322X_GMAC_RMII_CLK_25M	GRF_BIT(7)
-> +#define RK322X_GMAC_RMII_CLK_2_5M	GRF_CLR_BIT(7)
-> +#define RK322X_GMAC_CLK_125M		(GRF_CLR_BIT(8) | GRF_CLR_BIT(9))
-> +#define RK322X_GMAC_CLK_25M		(GRF_BIT(8) | GRF_BIT(9))
-> +#define RK322X_GMAC_CLK_2_5M		(GRF_CLR_BIT(8) | GRF_BIT(9))
-> +#define RK322X_GMAC_RMII_MODE		GRF_BIT(10)
-> +#define RK322X_GMAC_RMII_MODE_CLR	GRF_CLR_BIT(10)
-> +#define RK322X_GMAC_TXCLK_DLY_ENABLE	GRF_BIT(0)
-> +#define RK322X_GMAC_TXCLK_DLY_DISABLE	GRF_CLR_BIT(0)
-> +#define RK322X_GMAC_RXCLK_DLY_ENABLE	GRF_BIT(1)
-> +#define RK322X_GMAC_RXCLK_DLY_DISABLE	GRF_CLR_BIT(1)
-> +
-> +static void rk322x_set_to_rgmii(struct rk_priv_data *bsp_priv,
-> +				int tx_delay, int rx_delay)
-> +{
-> +	struct device *dev = &bsp_priv->pdev->dev;
-> +
-> +	if (IS_ERR(bsp_priv->grf)) {
-> +		dev_err(dev, "Missing rockchip,grf property\n");
-> +		return;
-> +	}
-> +
-> +	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-> +		     RK322X_GMAC_PHY_INTF_SEL_RGMII |
-> +		     RK322X_GMAC_RMII_MODE_CLR |
-> +		     RK322X_GMAC_RXCLK_DLY_ENABLE |
-> +		     RK322X_GMAC_TXCLK_DLY_ENABLE);
-> +
-> +	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON0,
-> +		     RK322X_GMAC_CLK_RX_DL_CFG(rx_delay) |
-> +		     RK322X_GMAC_CLK_TX_DL_CFG(tx_delay));
-> +}
-> +
-> +static void rk322x_set_to_rmii(struct rk_priv_data *bsp_priv)
-> +{
-> +	struct device *dev = &bsp_priv->pdev->dev;
-> +
-> +	if (IS_ERR(bsp_priv->grf)) {
-> +		dev_err(dev, "Missing rockchip,grf property\n");
-> +		return;
-> +	}
-> +
-> +	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-> +		     RK322X_GMAC_PHY_INTF_SEL_RMII |
-> +		     RK322X_GMAC_RMII_MODE);
-> +
-> +	/* set MAC to RMII mode */
-> +	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1, GRF_BIT(11));
-> +}
-> +
-> +static void rk322x_set_rgmii_speed(struct rk_priv_data *bsp_priv, int
-> speed) +{
-> +	struct device *dev = &bsp_priv->pdev->dev;
-> +
-> +	if (IS_ERR(bsp_priv->grf)) {
-> +		dev_err(dev, "Missing rockchip,grf property\n");
-> +		return;
-> +	}
-> +
-> +	if (speed == 10)
-> +		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-> +			     RK322X_GMAC_CLK_2_5M);
-> +	else if (speed == 100)
-> +		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-> +			     RK322X_GMAC_CLK_25M);
-> +	else if (speed == 1000)
-> +		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-> +			     RK322X_GMAC_CLK_125M);
-> +	else
-> +		dev_err(dev, "unknown speed value for RGMII! speed=%d", speed);
-> +}
-> +
-> +static void rk322x_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
-> +{
-> +	struct device *dev = &bsp_priv->pdev->dev;
-> +
-> +	if (IS_ERR(bsp_priv->grf)) {
-> +		dev_err(dev, "Missing rockchip,grf property\n");
-> +		return;
-> +	}
-> +
-> +	if (speed == 10)
-> +		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-> +			     RK322X_GMAC_RMII_CLK_2_5M |
-> +			     RK322X_GMAC_SPEED_10M);
-> +	else if (speed == 100)
-> +		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
-> +			     RK322X_GMAC_RMII_CLK_25M |
-> +			     RK322X_GMAC_SPEED_100M);
-> +	else
-> +		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
-> +}
-> +
-> +static const struct rk_gmac_ops rk322x_ops = {
-> +	.set_to_rgmii = rk322x_set_to_rgmii,
-> +	.set_to_rmii = rk322x_set_to_rmii,
-> +	.set_rgmii_speed = rk322x_set_rgmii_speed,
-> +	.set_rmii_speed = rk322x_set_rmii_speed,
-> +};
-> +
->  #define RK3288_GRF_SOC_CON1	0x0248
->  #define RK3288_GRF_SOC_CON3	0x0250
-> 
-> @@ -604,6 +720,7 @@ static int rk_gmac_probe(struct platform_device *pdev)
->  }
-> 
->  static const struct of_device_id rk_gmac_dwmac_match[] = {
-> +	{ .compatible = "rockchip,rk322x-gmac", .data = &rk322x_ops },
->  	{ .compatible = "rockchip,rk3288-gmac", .data = &rk3288_ops },
->  	{ .compatible = "rockchip,rk3368-gmac", .data = &rk3368_ops },
->  	{ }
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
