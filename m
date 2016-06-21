@@ -1,67 +1,40 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 21 Jun 2016 12:01:50 -0500
-Subject: [PATCH 2/2] PCI: rcar: Drop gen2 dummy I/O port region
-In-Reply-To: <20160621165646.7997.44001.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20160621165646.7997.44001.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20160621170150.7997.4821.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 21 Jun 2016 19:03:06 +0200
+Subject: [GIT PULL] ARM: at91: drivers for 4.8 #2
+Message-ID: <20160621170306.GA15727@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously we added a dummy I/O port region even though the R-Car
-controller doesn't support PCI port I/O.  This resulted in bogus root bus
-resources like this:
+Arnd, Olof, Kevin,
 
-  pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
-  pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
+Here are two simple fixes for our memory drivers.
 
-Drop the unused dummy I/O port region and set struct hw_pci.io_optional so
-the ARM PCI code doesn't add a default one for us.
+The following changes since commit 1fdab21d1d52a85c31f932844242fec5fb81daac:
 
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- drivers/pci/host/pci-rcar-gen2.c |   11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
+  memory: atmel-ebi: add DT bindings documentation (2016-06-02 08:32:25 +0200)
 
-diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
-index 9980a4b..ddf7765 100644
---- a/drivers/pci/host/pci-rcar-gen2.c
-+++ b/drivers/pci/host/pci-rcar-gen2.c
-@@ -97,7 +97,6 @@
- struct rcar_pci_priv {
- 	struct device *dev;
- 	void __iomem *reg;
--	struct resource io_res;
- 	struct resource mem_res;
- 	struct resource *cfg_res;
- 	unsigned busnr;
-@@ -273,7 +272,6 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
- 		rcar_pci_setup_errirq(priv);
- 
- 	/* Add PCI resources */
--	pci_add_resource(&sys->resources, &priv->io_res);
- 	pci_add_resource(&sys->resources, &priv->mem_res);
- 
- 	/* Setup bus number based on platform device id / of bus-range */
-@@ -371,14 +369,6 @@ static int rcar_pci_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	priv->mem_res = *mem_res;
--	/*
--	 * The controller does not support/use port I/O,
--	 * so setup a dummy port I/O region here.
--	 */
--	priv->io_res.start = priv->mem_res.start;
--	priv->io_res.end = priv->mem_res.end;
--	priv->io_res.flags = IORESOURCE_IO;
--
- 	priv->cfg_res = cfg_res;
- 
- 	priv->irq = platform_get_irq(pdev, 0);
-@@ -421,6 +411,7 @@ static int rcar_pci_probe(struct platform_device *pdev)
- 	hw_private[0] = priv;
- 	memset(&hw, 0, sizeof(hw));
- 	hw.nr_controllers = ARRAY_SIZE(hw_private);
-+	hw.io_optional = 1;
- 	hw.private_data = hw_private;
- 	hw.map_irq = rcar_pci_map_irq;
- 	hw.ops = &rcar_pci_ops;
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-drivers2
+
+for you to fetch changes up to 8a86a093ca3b924e6c2d5267cffb809965582a8d:
+
+  memory: atmel-ebi: make it explicitly non-modular (2016-06-21 17:17:45 +0200)
+
+----------------------------------------------------------------
+Drivers for 4.8 #2:
+ - Make memory drivers explicitly non-modular
+
+----------------------------------------------------------------
+Paul Gortmaker (2):
+      memory: atmel-sdramc: make it explicitly non-modular
+      memory: atmel-ebi: make it explicitly non-modular
+
+ drivers/memory/atmel-ebi.c    |  9 ++-------
+ drivers/memory/atmel-sdramc.c | 11 ++++-------
+ 2 files changed, 6 insertions(+), 14 deletions(-)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
