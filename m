@@ -1,48 +1,47 @@
-From: ssantosh@kernel.org (Santosh Shilimkar)
-Date: Tue, 21 Jun 2016 09:52:01 -0700
-Subject: [GIT PULL 1/3] ARM: Keystone DTS update for 4.8
-Message-ID: <1466527923-8689-1-git-send-email-ssantosh@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 21 Jun 2016 09:55:25 -0700
+Subject: [PATCH 2/2] arm: fix kernel image size
+In-Reply-To: <20160621154407.GB5783@n2100.arm.linux.org.uk>
+References: <20160617194405.GN1041@n2100.armlinux.org.uk>
+ <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
+ <20160621074319.GH22406@atomide.com>
+ <20160621094737.GA5783@n2100.arm.linux.org.uk>
+ <20160621103810.GI22406@atomide.com>
+ <20160621105720.GK22406@atomide.com>
+ <20160621154407.GB5783@n2100.arm.linux.org.uk>
+Message-ID: <20160621165523.GY22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
+* Russell King - ARM Linux <linux@armlinux.org.uk> [160621 08:46]:
+> On Tue, Jun 21, 2016 at 03:57:20AM -0700, Tony Lindgren wrote:
+> > 
+> > Maybe zImage size + MAX_RODATA_SZ + 4x zImage size?
+> > 
+> > Then the MAX_RODATA_SZ could be 2 or 4 MB or whatever we
+> > think is sufficient to kick the can until we have a better
+> > solution.
+> 
+> Maybe if you give some details about your failing case - you omitted any
+> details about the uncompressed image size...
 
-  Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
+Looks like we currently have this:
 
-are available in the git repository at:
+Memory: 2033088K/2095100K available (7376K kernel code, 784K rwdata,
+2312K rodata, 1024K init, 8117K bss, 45628K reserved,
+16384K cma-reserved, 1292284K highmem)
+Virtual kernel memory layout:
+    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+    fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+    vmalloc : 0xf0800000 - 0xff800000   ( 240 MB)
+    lowmem  : 0xc0000000 - 0xf0000000   ( 768 MB)
+    pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+    modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+      .text : 0xc0008000 - 0xc0a762a4   (10681 kB)
+      .init : 0xc0b00000 - 0xc0c00000   (1024 kB)
+      .data : 0xc0c00000 - 0xc0cc411c   ( 785 kB)
+       .bss : 0xc0cc6000 - 0xc14b37f8   (8118 kB)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.8
+Regards,
 
-for you to fetch changes up to 30220085a4b471e555f9233f861f43e4f24a0750:
-
-  ARM: dts: k2g-evm: Add pinmuxing for UART0 (2016-06-09 09:40:21 -0700)
-
-----------------------------------------------------------------
-ARM: Keystone DTS update for 4.8
-
-	- Pinmux entries for K2G
-	- PCI DTS entry fixup
-
-----------------------------------------------------------------
-Keerthy (1):
-      ARM: dts: keystone-k2l: Add pinctrl node
-
-Lokesh Vutla (2):
-      ARM: dts: keystone: Header file for pinctrl constants
-      ARM: dts: k2g-evm: Add pinmuxing for UART0
-
-Murali Karicheri (2):
-      ARM: dts: keystone: remove bogus IO resource entry from PCI binding
-      ARM: dts: keystone: add interrupt property to PCI controller bindings
-
-Vitaly Andrianov (1):
-      ARM: dts: k2g: Add pinctrl support
-
- arch/arm/boot/dts/keystone-k2e.dtsi    |   7 +-
- arch/arm/boot/dts/keystone-k2g-evm.dts |  11 +++
- arch/arm/boot/dts/keystone-k2g.dtsi    |   8 ++
- arch/arm/boot/dts/keystone-k2l.dtsi    | 149 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/keystone.dtsi        |   7 +-
- include/dt-bindings/pinctrl/keystone.h |  39 +++++++++
- 6 files changed, 217 insertions(+), 4 deletions(-)
- create mode 100644 include/dt-bindings/pinctrl/keystone.h
+Tony
