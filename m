@@ -1,67 +1,48 @@
-From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Tue, 21 Jun 2016 11:56:20 +0800
-Subject: [PATCH net-next 00/19] net: hns: fix some bugs in hns driver
-Message-ID: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 20 Jun 2016 21:43:49 -0700
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable AHCI_IMX
+In-Reply-To: <1466427854-21265-1-git-send-email-tuomas@tuxera.com>
+References: <1466427854-21265-1-git-send-email-tuomas@tuxera.com>
+Message-ID: <20160621044349.GA24293@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes some bugs fixed. All these patches needs to be
-applied after the patchset about ACPI support, so this series is 
-floated to net-next list.
+Hi Toumas,
 
-The patches are:
- > from Daode, fixes about pfc pause frame, getting coaslesce, led 
-control logic, TSO on|off and tcam table configuration.
+We can apply this directly but I prefer to get an acked-by from the
+platform maintainer that it affects. I didn't even see them cc:d here
+so would you mind resubmit with them on the line? Alternatively send it
+to them and they can apply and feed up to us with other defconfig changes.
 
- > from Jun He, fix the potential leak to port unavailable
 
- > from Kejian, fix bug of loopback and failing to test ping6
+-Olof
 
- > from Qianqian, fix the several typo in hns driver
-
-For more details, please see individual patches.
-
-MBR.
-
-Daode Huang (9):
-  net: hns: bugfix about pfc pause frame statistics
-  net: hns: add spin lock for tcam table operation
-  net: hns: fix bug of getting the wrong tcam data
-  net: hns: add get_coalesce_range api for hns
-  net: hns: delete redundancy ring enable operations
-  net: hns: bug fix about led control logic when link down
-  net: hns: fix sbm default parameters config error
-  net: hns: change the default coalesce usecs
-  net: hns: bug fix about TSO on|off when there is traffic
-
-Jun He (1):
-  net: hns: fix bug that alloc skb fail lead to port unavailable
-
-Kejian Yan (3):
-  net: hns: add skb_reset_mac_header() after skb being alloc
-  net: hns: select Hilink before serdes loopback for HNS V2
-  net: hns: fix ethtool loopback fail bug
-
-Qianqian Xie (6):
-  net: hns: bug fix of ge reset sequence
-  net: hns: fix hns dsaf v1 dont support tx_pause close
-  net: hns: typo fix of annotation info for hns_nic_reset_subtask()
-  net: hns: Remove unnecessary device resource free
-  net: hns: fix the error info when dma_set_mask_and_coherent fail
-  net: hns: fix the wrong speed for bond
-
- drivers/net/ethernet/hisilicon/hns/hnae.c          |   1 -
- drivers/net/ethernet/hisilicon/hns/hnae.h          |   6 +-
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  53 ++++--
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 190 ++++++++++++++-------
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  12 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |  44 +++--
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c  |   2 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h  |   2 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  21 ++-
- drivers/net/ethernet/hisilicon/hns/hns_enet.c      |  68 ++++----
- drivers/net/ethernet/hisilicon/hns/hns_ethtool.c   |  47 ++---
- 11 files changed, 291 insertions(+), 155 deletions(-)
-
--- 
-1.9.1
+On Mon, Jun 20, 2016 at 04:04:13PM +0300, Tuomas Tynkkynen wrote:
+> The Wandboard Quad comes with a SATA port. Enable the IMX SATA driver by
+> default to make it easy to have the root filesystem on it.
+> 
+> Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index ee7c884..6efcbc7 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -214,6 +214,7 @@ CONFIG_ATA=y
+>  CONFIG_SATA_AHCI=y
+>  CONFIG_SATA_AHCI_PLATFORM=y
+>  CONFIG_AHCI_ST=y
+> +CONFIG_AHCI_IMX=y
+>  CONFIG_AHCI_SUNXI=y
+>  CONFIG_AHCI_TEGRA=y
+>  CONFIG_SATA_HIGHBANK=y
+> -- 
+> 2.8.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
