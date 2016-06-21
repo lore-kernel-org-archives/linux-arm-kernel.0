@@ -1,120 +1,206 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 21 Jun 2016 22:03:41 +0530
-Subject: [PATCH 2/4] dmaengine: vdma: Add support for mulit-channel dma
- mode
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A5B8248@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
- <1465549954-30220-3-git-send-email-appanad@xilinx.com>
- <20160621155502.GB16910@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A5B8248@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20160621163340.GE16910@localhost>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 21 Jun 2016 10:30:59 -0600
+Subject: [PATCH 1/3] arm64: dts: juno: add coresight support
+In-Reply-To: <57692488.2030507@arm.com>
+References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
+ <1465228765-14038-2-git-send-email-sudeep.holla@arm.com>
+ <CAOesGMjQNEOcmYpUAxUxBJLyUYZQuRKK48a31Ys9LuTJFWqMFA@mail.gmail.com>
+ <57692488.2030507@arm.com>
+Message-ID: <CANLsYkwKo6kVx9C7pCWn6u-rf17mDbpWg3V9GNnwwNEVpWT2yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 04:02:05PM +0000, Appana Durga Kedareswara Rao wrote:
-> Hi Vinod,
-> 
-> 	Thanks for the review...
-> 
-> > 
-> > On Fri, Jun 10, 2016 at 02:42:32PM +0530, Kedareswara rao Appana wrote:
-> > > This patch adds support for AXI DMA multi-channel dma mode
-> > > Multichannel mode enables DMA to connect to multiple masters And
-> > > slaves on the streaming side.
-> > > In Multichannel mode AXI DMA supports 2D transfers.
-> > 
-> > Funny formatting!
-> 
-> Will fix in next version...
-> 
-> > 
-> > Can you elobrate what you meant by Multichannel mode? This patch seems to
-> > do two things, one is to add interleaved dma support and something else. Can
-> > you explain the latter part?
-> 
-> AXI DMA has two Stream interfaces (Memory to Stream MM2S and Stream to Memory S2MM)
+On 21 June 2016 at 05:27, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 21/06/16 06:41, Olof Johansson wrote:
+>>
+>> Hi,
+>>
+>> Some nits below.
+>>
+>
+> My bad, I blindly copy-pasted it from vexpress TC2 platform.
+>
+>> On Mon, Jun 6, 2016 at 8:59 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>> Most of the debug-related components on Juno are located in the coreSight
+>>> subsystem while others are located in the Cortex-Axx clusters, the SCP
+>>> subsystem, and in the main system.
+>>>
+>>> Each core in the two processor clusters contain an Embedded Trace
+>>> Macrocell(ETM) which generates real-time trace information that trace
+>>> tools can use and an ATB trace output that is sent to a funnel before
+>>> going to the CoreSight subsystem.
+>>>
+>>> The trace output signals combine with two trace expansions using another
+>>> funnel and fed into the Embedded Trace FIFO(ETF0).
+>>>
+>>> The output trace data stream of the funnel is then replicated before it
+>>> is sent to either the:
+>>> - Trace Port Interface Unit(TPIU), that sends it out using the trace
+>>> port.
+>>> - ETR that can write the trace data to memory located in the application
+>>>    memory space
+>>>
+>>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: devicetree at vger.kernel.org
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>> ---
+>>>   arch/arm64/boot/dts/arm/juno-base.dtsi | 296
+>>> +++++++++++++++++++++++++++++++++
+>>>   arch/arm64/boot/dts/arm/juno-r1.dts    |  24 +++
+>>>   arch/arm64/boot/dts/arm/juno-r2.dts    |  24 +++
+>>>   arch/arm64/boot/dts/arm/juno.dts       |  24 +++
+>>>   4 files changed, 368 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi
+>>> b/arch/arm64/boot/dts/arm/juno-base.dtsi
+>>> index dee2386d3b9b..90a8710f7032 100644
+>>> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+>>> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+>>> @@ -56,6 +56,302 @@
+>>>                               <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) |
+>>> IRQ_TYPE_LEVEL_LOW)>;
+>>>          };
+>>>
+>>> +       /*
+>>> +        * Juno TRMs specify the size for these coresight components as
+>>> 64K.
+>>> +        * The actual size is just 4K though 64K is reserved. Access to
+>>> the
+>>> +        * unmapped reserved region results in a DECERR response.
+>>> +        */
+>>> +       etf at 20010000 {
+>>
+>>
+>> Would it make sense to name it something like trace-fifo instead? We
+>> normally name the nodes based on type of device (ethernet@, pci@,
+>> etc).
+>>
+>
+> As Suzuki already pointed out, these are standard acronyms used in
+> various CoreSight specifications. Let me know if you need them to be
+> expanded instead of abbreviations.
+>
+>>
+>>> +               compatible = "arm,coresight-tmc", "arm,primecell";
+>>
+>>
+>> Is there a more specific compatible needed here, or does
+>> arm,coresight-tmc give you all the information you need on how to use
+>> this interface?
+>>
+>> The bindings doc is sort of sparse in this area, all it says is "you
+>> might use one of these compatibles".
+>>
+>
+> Again Suzuki commented on that. I will leave it to Mathieu who is the
+> author of the binding to comment further(if any).
+>
+> But I agree, it would be good to have one line description on each of
+> them as they are pretty much standard primecells or even URL to their
+> specifications.
 
-what is a stream in this context?
+I initially wrote the bindings from a developer's point of view, or
+someone implementing CoreSight on their system.  As such there would
+be no doubts about the acronyms found in the bindings as the same
+nomenclature is used throughout the documentation.
 
-> In Multi-Channel dma mode each stream interface can be configured up to 16 channels.
-> In Multi-channel DMA mode IP supports only interleaved transfers (2-D transfers).
+But from an onlooker's perspective I can see how they can be
+confusing.  As Sudeep suggested I will add a short description for
+each binding.
 
+>
+>>> +       tpiu at 20030000 {
+>>
+>>
+>> Again, these names are not great. Luckily they don't affect the
+>> binding, so they can be fixed. What would be a more human readable and
+>> functionally describing name here?
+>>
+>>> +               compatible = "arm,coresight-tpiu", "arm,primecell";
+>>> +               reg = <0 0x20030000 0 0x1000>;
+>>> +
+>>> +               clocks = <&soc_smc50mhz>;
+>>> +               clock-names = "apb_pclk";
+>>> +               port {
+>>> +                       tpiu_in_port: endpoint {
+>>> +                               slave-mode;
+>>> +                               remote-endpoint =
+>>> <&replicator_out_port0>;
+>>> +                       };
+>>> +               };
+>>> +       };
+>>> +
+>>> +       main_funnel at 20040000 {
+>>
+>>
+>> Underscores are usually frowned upon. funnel@ or ideally a better more
+>> descriptive name should be used here.
+>> Use dashes if you really have to.
+>>
+>
+> Agreed and fixed locally now.
+>
+> [...]
+>
+>>> +               compatible = "arm,coresight-tmc", "arm,primecell";
+>>> +               reg = <0 0x20070000 0 0x1000>;
+>>> +
+>>> +               clocks = <&soc_smc50mhz>;
+>>> +               clock-names = "apb_pclk";
+>>> +               port {
+>>> +                       etr_in_port: endpoint {
+>>> +                               slave-mode;
+>>> +                               remote-endpoint =
+>>> <&replicator_out_port1>;
+>>> +                       };
+>>> +               };
+>>> +       };
+>>> +
+>>> +       coresight-replicator {
+>>
+>>
+>> Hm. It'd sort of be nice to stick all the coresight stuff under one
+>> node instead of having them all at the toplevel, but that doesn't
+>> really go with the concept of having each device where it's at in the
+>> bus/address hierarchy.
 
-> 
-> > 
-> > >  /**
-> > > + * struct xilinx_mcdma_config - DMA Multi channel configuration
-> > > +structure
-> > > + * @tdest: Channel to operate on
-> > > + * @tid:   Channel configuration
-> > > + * @tuser: Tuser configuration
-> > > + * @ax_user: ax_user value
-> > > + * @ax_cache: ax_cache value
-> > > + */
-> > > +struct xilinx_mcdma_config {
-> > > +	u8 tdest;
-> > > +	u8 tid;
-> > > +	u8 tuser;
-> > > +	u8 ax_user;
-> > > +	u8 ax_cache;
-> > 
-> > can you describe these in details, what do these do, what are the values to be
-> > programmed?
-> 
-> As said above In Multi-Channel Mode each Stream interface can be 
-> Configured up to 16 channels each channel is differentiated based on the tdest and tid values.
+I thought long and hard about this when initially working on the
+bindings. All CoreSight blocks are independent from one another and
+they don't need a bus to be accessed or configured.
 
-Then why are you not registering 16 channels for this? That should give you
-channel to operate on!
-
-> 
-> tdest:
-> TDEST provides routing information for the data stream.
-
-pls elobrate
-
-> TDEST values are static for the entire packet.
-
-what do these mean
-
-> 
-> tid:
-> Provides a stream identifier. TID values are static for entire packet.
-> TID values provided in the TX descriptor field are presented on
-> TID signals of the streaming side.
-
-what is this used for?
-
-> 
-> tuser:
-> Sideband signals used for user-defined information.
-> TUSER values are static for entire packet. TUSER values provided in the TX
-> Descriptor field are presented on TUSER signals of streaming side.
-
-what is this used for?
-
-> 
-> ax_user: 
-> Sideband signals used for user-defined information
-> ARUSER values and their interpretations are user-defined
-
-How is it used by client?
-
-> 
-> ax_cache:
-> Cache type this signal provides additional information about the cacheable
-> Characteristics of the transfer.
-
-and what are those...
-
-> 
-> In the above parameters tdest and tid are mandatory to differentiate b/w different channels
-> Other parameters are optional please let me know if you don't want me to 
-> Include other optional parameters will remove in the next version.
-
-dmaengine provides channel as an argument so it is quite odd that you need
-to differentiate b/w different channels. This only makes me worry that
-things are not standard and fishy
-
--- 
-~Vinod
+>>
+>
+> I understand.
+>
+>> Should _all_ the nodes be at the toplevel though? Looks like you have
+>> a few address ranges that most of the toplevel devices are at, is
+>> there really not a physical bus they're each connected to that you can
+>> describe?
+>>
+>
+> I need to look at the Juno documents again and refine. It may affect
+> other devices too. Can that be addressed later separately ?
+>
+> [...]
+>
+>
+>>> +
+>>> +       etm0: etm at 22040000 {
+>>
+>>
+>> If this file is sorted on reg values, then this node and the two after
+>> are out of order.
+>>
+>
+> Yes that was the intent, will fix it. But I see some oddities, may be
+> will fix those once I address the address/bus hierarchy.
+>
+> --
+> --
+> Regards,
+> Sudeep
