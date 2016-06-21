@@ -1,58 +1,86 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 21 Jun 2016 11:20:31 +0100
-Subject: [[PATCH v2] 10/11] [V2] memory: samsung: endian fixes for IO
+Date: Tue, 21 Jun 2016 11:20:22 +0100
+Subject: [[PATCH v2] 01/11] ARM: EXYNOS: fixup debug macros for big-endian
 In-Reply-To: <1466504432-24187-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1466504432-24187-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1466504432-24187-11-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1466504432-24187-2-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the relaxed versions of the IO accessors to avoid any issues
-if running in big endian.
+The exynos low-level debug macros need to be fixed if the system is being
+built big endian. Add the necessary endian swaps for accessing the registers
+to get output working again
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
-V1..V2: Fix indentation changes
----
-Cc: Pavel Fedin <p.fedin@samsung.com>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Pankaj Dubey <pankaj.dubey@samsung.com>
-Cc: linux-arm-kernel at lists.codethink.co.uk
----
- drivers/memory/samsung/exynos-srom.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/include/debug/samsung.S | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/memory/samsung/exynos-srom.c b/drivers/memory/samsung/exynos-srom.c
-index 96756fb..5714bdf 100644
---- a/drivers/memory/samsung/exynos-srom.c
-+++ b/drivers/memory/samsung/exynos-srom.c
-@@ -91,17 +91,17 @@ static int exynos_srom_configure_bank(struct exynos_srom *srom,
- 	if (width == 2)
- 		cs |= 1 << EXYNOS_SROM_BW__DATAWIDTH__SHIFT;
+diff --git a/arch/arm/include/debug/samsung.S b/arch/arm/include/debug/samsung.S
+index 8d8d922..f4eeed2 100644
+--- a/arch/arm/include/debug/samsung.S
++++ b/arch/arm/include/debug/samsung.S
+@@ -15,11 +15,13 @@
  
--	bw = __raw_readl(srom->reg_base + EXYNOS_SROM_BW);
-+	bw = readl_relaxed(srom->reg_base + EXYNOS_SROM_BW);
- 	bw = (bw & ~(EXYNOS_SROM_BW__CS_MASK << bank)) | (cs << bank);
--	__raw_writel(bw, srom->reg_base + EXYNOS_SROM_BW);
--
--	__raw_writel(pmc | (timing[0] << EXYNOS_SROM_BCX__TACP__SHIFT) |
--		    (timing[1] << EXYNOS_SROM_BCX__TCAH__SHIFT) |
--		    (timing[2] << EXYNOS_SROM_BCX__TCOH__SHIFT) |
--		    (timing[3] << EXYNOS_SROM_BCX__TACC__SHIFT) |
--		    (timing[4] << EXYNOS_SROM_BCX__TCOS__SHIFT) |
--		    (timing[5] << EXYNOS_SROM_BCX__TACS__SHIFT),
--		    srom->reg_base + EXYNOS_SROM_BC0 + bank);
-+	writel_relaxed(bw, srom->reg_base + EXYNOS_SROM_BW);
-+
-+	writel_relaxed(pmc | (timing[0] << EXYNOS_SROM_BCX__TACP__SHIFT) |
-+		       (timing[1] << EXYNOS_SROM_BCX__TCAH__SHIFT) |
-+		       (timing[2] << EXYNOS_SROM_BCX__TCOH__SHIFT) |
-+		       (timing[3] << EXYNOS_SROM_BCX__TACC__SHIFT) |
-+		       (timing[4] << EXYNOS_SROM_BCX__TCOS__SHIFT) |
-+		       (timing[5] << EXYNOS_SROM_BCX__TACS__SHIFT),
-+		       srom->reg_base + EXYNOS_SROM_BC0 + bank);
+ 	.macro fifo_level_s5pv210 rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
++ARM_BE8(rev \rd, \rd)
+ 		and	\rd, \rd, #S5PV210_UFSTAT_TXMASK
+ 	.endm
  
- 	return 0;
- }
+ 	.macro  fifo_full_s5pv210 rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
++ARM_BE8(rev \rd, \rd)
+ 		tst	\rd, #S5PV210_UFSTAT_TXFULL
+ 	.endm
+ 
+@@ -28,6 +30,7 @@
+ 
+ 	.macro fifo_level_s3c2440 rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
++ARM_BE8(rev \rd, \rd)
+ 		and	\rd, \rd, #S3C2440_UFSTAT_TXMASK
+ 	.endm
+ 
+@@ -37,6 +40,7 @@
+ 
+ 	.macro  fifo_full_s3c2440 rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
++ARM_BE8(rev \rd, \rd)
+ 		tst	\rd, #S3C2440_UFSTAT_TXFULL
+ 	.endm
+ 
+@@ -50,6 +54,7 @@
+ 
+ 	.macro	busyuart, rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFCON]
++ARM_BE8(rev \rd, \rd)
+ 		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
+ 		beq	1001f				@
+ 		@ FIFO enabled...
+@@ -61,6 +66,7 @@
+ 1001:
+ 		@ busy waiting for non fifo
+ 		ldr	\rd, [\rx, # S3C2410_UTRSTAT]
++ARM_BE8(rev \rd, \rd)
+ 		tst	\rd, #S3C2410_UTRSTAT_TXFE
+ 		beq	1001b
+ 
+@@ -69,6 +75,7 @@
+ 
+ 	.macro	waituart,rd,rx
+ 		ldr	\rd, [\rx, # S3C2410_UFCON]
++ARM_BE8(rev \rd, \rd)
+ 		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
+ 		beq	1001f				@
+ 		@ FIFO enabled...
+@@ -80,6 +87,7 @@
+ 1001:
+ 		@ idle waiting for non fifo
+ 		ldr	\rd, [\rx, # S3C2410_UTRSTAT]
++ARM_BE8(rev \rd, \rd)
+ 		tst	\rd, #S3C2410_UTRSTAT_TXFE
+ 		beq	1001b
+ 
 -- 
 2.8.1
