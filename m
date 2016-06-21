@@ -1,89 +1,81 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 21 Jun 2016 08:40:18 -0600
-Subject: [PATCH V2] coresight-stm: support mmapping channel regions with
- mmio_addr
-In-Reply-To: <1466475876-5937-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1466475876-5937-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <CANLsYkxaiKLjtanLVNnYREuv8zsL1eioMdTyod2F3D+rc0C32A@mail.gmail.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Tue, 21 Jun 2016 09:46:40 -0500
+Subject: [PATCHv4 4/7] Documentation: dt: socfpga: Add Arria10 Ethernet
+ binding
+In-Reply-To: <20160621133340.GA9073@rob-hp-laptop>
+References: <1466434252-26107-1-git-send-email-tthayer@opensource.altera.com>
+ <1466434252-26107-5-git-send-email-tthayer@opensource.altera.com>
+ <20160621133340.GA9073@rob-hp-laptop>
+Message-ID: <57695350.3050404@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2016 at 20:24, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
-> CoreSight STM device allows direct mapping of the channel regions to
-> userspace for zero-copy writing. To support this ability, the STM
-> framework has provided a hook 'mmio_addr', this patch just implemented
-> this hook for CoreSight STM.
->
-> This patch also added an item into 'channel_space' to save the physical
-> base address of channel region which mmap operation needs to know.
->
-> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> ---
->  drivers/hwtracing/coresight/coresight-stm.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-> index 73be58a..482c8bb 100644
-> --- a/drivers/hwtracing/coresight/coresight-stm.c
-> +++ b/drivers/hwtracing/coresight/coresight-stm.c
-> @@ -105,10 +105,12 @@ module_param_named(
->  /**
->   * struct channel_space - central management entity for extended ports
->   * @base:              memory mapped base address where channels start.
-> + * @phys:              physical base address of channel region.
->   * @guaraneed:         is the channel delivery guaranteed.
->   */
->  struct channel_space {
->         void __iomem            *base;
-> +       phys_addr_t             phys;
->         unsigned long           *guaranteed;
->  };
->
-> @@ -356,6 +358,23 @@ static void stm_generic_unlink(struct stm_data *stm_data,
->         stm_disable(drvdata->csdev);
->  }
->
-> +static phys_addr_t
-> +stm_mmio_addr(struct stm_data *stm_data, unsigned int master,
-> +             unsigned int channel, unsigned int nr_chans)
-> +{
-> +       struct stm_drvdata *drvdata = container_of(stm_data,
-> +                                                  struct stm_drvdata, stm);
-> +       phys_addr_t addr;
-> +
-> +       addr = drvdata->chs.phys + channel * BYTES_PER_CHANNEL;
-> +
-> +       if (offset_in_page(addr) ||
-> +           offset_in_page(nr_chans * BYTES_PER_CHANNEL))
-> +               return 0;
-> +
-> +       return addr;
-> +}
-> +
->  static long stm_generic_set_options(struct stm_data *stm_data,
->                                     unsigned int master,
->                                     unsigned int channel,
-> @@ -761,7 +780,9 @@ static void stm_init_generic_data(struct stm_drvdata *drvdata)
->         drvdata->stm.sw_end = 1;
->         drvdata->stm.hw_override = true;
->         drvdata->stm.sw_nchannels = drvdata->numsp;
-> +       drvdata->stm.sw_mmiosz = BYTES_PER_CHANNEL;
->         drvdata->stm.packet = stm_generic_packet;
-> +       drvdata->stm.mmio_addr = stm_mmio_addr;
->         drvdata->stm.link = stm_generic_link;
->         drvdata->stm.unlink = stm_generic_unlink;
->         drvdata->stm.set_options = stm_generic_set_options;
-> @@ -808,6 +829,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
->         ret = stm_get_resource_byname(np, "stm-stimulus-base", &ch_res);
->         if (ret)
->                 return ret;
-> +       drvdata->chs.phys = ch_res.start;
->
->         base = devm_ioremap_resource(dev, &ch_res);
->         if (IS_ERR(base))
-> --
-> 1.9.1
->
+Hi Rob,
 
-Applied - thanks.
-Mathieu
+On 06/21/2016 08:33 AM, Rob Herring wrote:
+> On Mon, Jun 20, 2016 at 09:50:49AM -0500, tthayer at opensource.altera.com wrote:
+>> From: Thor Thayer <tthayer@opensource.altera.com>
+>>
+>> Add the device tree bindings needed to support the Altera Ethernet
+>> FIFO buffers on the Arria10 chip.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>> ---
+>> v2  No Change
+>> v3  Change to common compatible string based on maintainer comments
+>>      Add local IRQ values.
+>> v4  Add compatible string for parent node.
+>> ---
+>>   .../bindings/arm/altera/socfpga-eccmgr.txt         |   24 ++++++++++++++++++++
+>>   1 file changed, 24 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+>> index 15eb0df..7c714ba 100644
+>> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+>> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+>> @@ -82,6 +82,14 @@ Required Properties:
+>>   - interrupts : Should be single bit error interrupt, then double bit error
+>>   	interrupt, in this order.
+>>
+>> +Ethernet FIFO ECC
+>> +Required Properties:
+>> +- compatible : Should be "altr,socfpga-eth-mac-ecc"
+>> +- reg        : Address and size for ECC block registers.
+>> +- parent     : phandle to parent (altr,socfpga-stmmac) Ethernet node.
+>
+> Sorry if I wasn't clear before, but I was suggesting changing 'parent'
+> to 'altr,ethernet-mac':
+>
+> altr,ethernet-mac = <&gmac0>;
+>
+> Rob
+>
+Ahh, I see what you're saying.
+
+I used parent as the tag because I have a generic function for 
+validating that the parent status is "okay" using the "parent" string in 
+my validate_parent_available() function (see below).
+
+I will be submitting other peripheral FIFOs with EDAC protection in 
+future patches (USB, DMA, etc).
+
+static int validate_parent_available(struct device_node *np)
+{
+	struct device_node *parent;
+	int ret = 0;
+
+	/* Ensure parent device is enabled if parent node exists */
+	parent = of_parse_phandle(np, "parent", 0);
+	if (parent && !of_device_is_available(parent))
+		ret = -ENODEV;
+	of_node_put(parent);
+	return ret;
+}
+
+
+I can change this to using a passed in data string but the code won't be 
+as straightforward.
+
+Thanks for reviewing,
+
+Thor
