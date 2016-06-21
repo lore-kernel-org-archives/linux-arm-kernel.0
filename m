@@ -1,51 +1,49 @@
 From: tfiga@chromium.org (Tomasz Figa)
-Date: Tue, 21 Jun 2016 13:34:33 +0900
-Subject: [PATCH v4 0/8] iommu/rockchip: Fix bugs and enable on ARM64
-Message-ID: <1466483681-36110-1-git-send-email-tfiga@chromium.org>
+Date: Tue, 21 Jun 2016 13:34:34 +0900
+Subject: [PATCH v4 1/8] iommu/rockchip: Fix devm_{request,free}_irq parameter
+In-Reply-To: <1466483681-36110-1-git-send-email-tfiga@chromium.org>
+References: <1466483681-36110-1-git-send-email-tfiga@chromium.org>
+Message-ID: <1466483681-36110-2-git-send-email-tfiga@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series intends mostly to enable support for ARM64 architecture
-in the rockchip-iommu driver. On the way to do so, some bugs are also
-fixed.
+From: Simon Xue <xxm@rock-chips.com>
 
-The most important changes here are:
- - making the Rockchip IOMMU driver use DMA API for managing cache
-   coherency of page tables,
- - making the Rockchip DRM driver not use DMA API on behalf of a virtual
-   device (behind a virtual IOMMU) to allocate and map buffers, but
-   instead proper DRM helpers and IOMMU API directly.
+Even though the IOMMU shares IRQ with its master, the struct device
+passed to {request,free}_irq is supposed to represent the device that is
+signalling the interrupt. This patch makes the driver use IOMMU device
+instead of master's device to make things clear.
 
-Changes since v3:
- - Drop the idea of virtual IOMMU. Instead replace hacky allocation code
-   in DRM driver, with proper management of IOMMU domain.
- - Add one more fix for allocation of IOMMU register base addresses.
-Changes since v2:
- - Instead of registering virtual IOMMU from DTS, create it when
-   attaching.
- - Fix some bugs found in internal review.
+Signed-off-by: Simon Xue <xxm@rock-chips.com>
+Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Reviewed-on: https://chromium-review.googlesource.com/346325
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+---
+ drivers/iommu/rockchip-iommu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Shunqian Zheng (4):
-  iommu/rockchip: Fix allocation of bases array in driver probe
-  iommu/rockchip: Use DMA API to manage coherency
-  iommu/rockchip: Prepare to support generic DMA mapping
-  drm/rockchip: Use common IOMMU API to attach devices
-
-Simon Xue (3):
-  iommu/rockchip: Fix devm_{request,free}_irq parameter
-  iommu/rockchip: Add map_sg callback for rk_iommu_ops
-  iommu/rockchip: Enable Rockchip IOMMU on ARM64
-
-Tomasz Figa (1):
-  drm/rockchip: Do not use DMA mapping API if attached to IOMMU domain
-
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 100 ++++++------
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   3 +
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 236 ++++++++++++++++++++++++++--
- drivers/gpu/drm/rockchip/rockchip_drm_gem.h |   9 ++
- drivers/iommu/Kconfig                       |   2 +-
- drivers/iommu/rockchip-iommu.c              | 180 +++++++++++++++------
- 6 files changed, 427 insertions(+), 103 deletions(-)
-
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index 25b4627..5a9659a 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -807,7 +807,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 
+ 	iommu->domain = domain;
+ 
+-	ret = devm_request_irq(dev, iommu->irq, rk_iommu_irq,
++	ret = devm_request_irq(iommu->dev, iommu->irq, rk_iommu_irq,
+ 			       IRQF_SHARED, dev_name(dev), iommu);
+ 	if (ret)
+ 		return ret;
+@@ -860,7 +860,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+ 	}
+ 	rk_iommu_disable_stall(iommu);
+ 
+-	devm_free_irq(dev, iommu->irq, iommu);
++	devm_free_irq(iommu->dev, iommu->irq, iommu);
+ 
+ 	iommu->domain = NULL;
+ 
 -- 
 2.8.0.rc3.226.g39d4020
