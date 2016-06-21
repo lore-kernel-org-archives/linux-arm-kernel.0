@@ -1,19 +1,91 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 21 Jun 2016 21:35:37 +0530
-Subject: [PATCH 0/8]  Various dmaengine cleanups
-In-Reply-To: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
-References: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160621160537.GD16910@localhost>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Tue, 21 Jun 2016 16:02:05 +0000
+Subject: [PATCH 2/4] dmaengine: vdma: Add support for mulit-channel dma
+ mode
+In-Reply-To: <20160621155502.GB16910@localhost>
+References: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
+ <1465549954-30220-3-git-send-email-appanad@xilinx.com>
+ <20160621155502.GB16910@localhost>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5B8248@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 06:38:33PM +0100, Peter Griffin wrote:
-> Hi Vinod,
+Hi Vinod,
+
+	Thanks for the review...
+
 > 
-> This series is a bunch of cleanup updates to various
-> dmaengine drivers, based on some of the review feeback to my fdma series.
+> On Fri, Jun 10, 2016 at 02:42:32PM +0530, Kedareswara rao Appana wrote:
+> > This patch adds support for AXI DMA multi-channel dma mode
+> > Multichannel mode enables DMA to connect to multiple masters And
+> > slaves on the streaming side.
+> > In Multichannel mode AXI DMA supports 2D transfers.
+> 
+> Funny formatting!
 
-Good cleanup, Applied, thanks
+Will fix in next version...
 
--- 
-~Vinod
+> 
+> Can you elobrate what you meant by Multichannel mode? This patch seems to
+> do two things, one is to add interleaved dma support and something else. Can
+> you explain the latter part?
+
+AXI DMA has two Stream interfaces (Memory to Stream MM2S and Stream to Memory S2MM)
+In Multi-Channel dma mode each stream interface can be configured up to 16 channels.
+In Multi-channel DMA mode IP supports only interleaved transfers (2-D transfers).
+
+> 
+> >  /**
+> > + * struct xilinx_mcdma_config - DMA Multi channel configuration
+> > +structure
+> > + * @tdest: Channel to operate on
+> > + * @tid:   Channel configuration
+> > + * @tuser: Tuser configuration
+> > + * @ax_user: ax_user value
+> > + * @ax_cache: ax_cache value
+> > + */
+> > +struct xilinx_mcdma_config {
+> > +	u8 tdest;
+> > +	u8 tid;
+> > +	u8 tuser;
+> > +	u8 ax_user;
+> > +	u8 ax_cache;
+> 
+> can you describe these in details, what do these do, what are the values to be
+> programmed?
+
+As said above In Multi-Channel Mode each Stream interface can be 
+Configured up to 16 channels each channel is differentiated based on the tdest and tid values.
+
+tdest:
+TDEST provides routing information for the data stream.
+TDEST values are static for the entire packet.
+
+tid:
+Provides a stream identifier. TID values are static for entire packet.
+TID values provided in the TX descriptor field are presented on
+TID signals of the streaming side.
+
+tuser:
+Sideband signals used for user-defined information.
+TUSER values are static for entire packet. TUSER values provided in the TX
+Descriptor field are presented on TUSER signals of streaming side.
+
+ax_user: 
+Sideband signals used for user-defined information
+ARUSER values and their interpretations are user-defined
+
+ax_cache:
+Cache type this signal provides additional information about the cacheable
+Characteristics of the transfer.
+
+In the above parameters tdest and tid are mandatory to differentiate b/w different channels
+Other parameters are optional please let me know if you don't want me to 
+Include other optional parameters will remove in the next version.
+
+Regards,
+Kedar.
+
+> 
+> --
+> ~Vinod
