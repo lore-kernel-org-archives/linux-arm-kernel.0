@@ -1,42 +1,40 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 21 Jun 2016 18:22:44 +0100
-Subject: [PATCH v2 3/8] arm64: dts: db820c: add support to LS-I2C0
+Date: Tue, 21 Jun 2016 18:22:45 +0100
+Subject: [PATCH v2 4/8] arm64: dts: db820c: add support to LS-I2C1
 In-Reply-To: <1466529769-2674-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1466529769-2674-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1466529769-2674-4-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1466529769-2674-5-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to LS-I2C0 on LS expansion connector.
+This patch adds support to LS_I2C1 on LS expansion connector.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-index 2851442..0d78c4e 100644
+index 0d78c4e..3114710 100644
 --- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
 +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-@@ -17,6 +17,7 @@
- 	aliases {
+@@ -18,6 +18,7 @@
  		serial0 = &blsp2_uart1;
  		serial1 = &blsp2_uart2;
-+		i2c0	= &blsp1_i2c2;
+ 		i2c0	= &blsp1_i2c2;
++		i2c1	= &blsp2_i2c1;
  	};
  
  	chosen {
-@@ -39,5 +40,12 @@
- 			pinctrl-0 = <&blsp2_uart2_4pins_default>;
- 			pinctrl-1 = <&blsp2_uart2_4pins_sleep>;
+@@ -47,5 +48,10 @@
+ 			status = "okay";
  		};
-+
-+		i2c at 07577000 {
+ 
++		i2c at 075b6000 {
 +		/* On Low speed expansion */
-+			label = "LS-I2C0";
++			label = "LS-I2C1";
 +			status = "okay";
 +		};
-+
  	};
  };
 -- 
