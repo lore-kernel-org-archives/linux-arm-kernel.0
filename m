@@ -1,59 +1,111 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 Jun 2016 00:52:45 -0700
-Subject: [PATCH 4/4] ARM: OMAP4+: Allow kexec on SMP variants
-In-Reply-To: <1466495565-17480-1-git-send-email-tony@atomide.com>
-References: <1466495565-17480-1-git-send-email-tony@atomide.com>
-Message-ID: <1466495565-17480-5-git-send-email-tony@atomide.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 21 Jun 2016 09:53:20 +0200
+Subject: [RFC PATCH v2 03/15] arm64: mm: change IOMMU notifier action to
+ attach DMA ops
+In-Reply-To: <5763C27A.9030306@arm.com>
+References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <5763C27A.9030306@arm.com>
+Message-ID: <03c537e7-0acf-edca-d0e0-369490c828df@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kexec needs omap4_cpu_kill, otherwise kexec will produce on SMP:
+Hi Robin,
 
-kexec_load failed: Invalid argument
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/common.h       | 1 +
- arch/arm/mach-omap2/omap-hotplug.c | 6 ++++++
- arch/arm/mach-omap2/omap-smp.c     | 1 +
- 3 files changed, 8 insertions(+)
+On 2016-06-17 11:27, Robin Murphy wrote:
+> Hi Lorenzo,
+>
+> I think this patch makes sense even independent of the rest of the 
+> series, one nit inline notwithstanding.
+>
+> Marek; I'm curious as to whether this could make the workaround in 
+> 722ec35f7 obsolete as well, or are all the drivers also bound 
+> super-early in the setup you had there?
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 0136405..deed42e 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -272,6 +272,7 @@ extern void omap_auxcoreboot_addr(u32 cpu_addr);
- extern u32 omap_read_auxcoreboot0(void);
- 
- extern void omap4_cpu_die(unsigned int cpu);
-+extern int omap4_cpu_kill(unsigned int cpu);
- 
- extern const struct smp_operations omap4_smp_ops;
- 
-diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
-index 593fec7..d3fb566 100644
---- a/arch/arm/mach-omap2/omap-hotplug.c
-+++ b/arch/arm/mach-omap2/omap-hotplug.c
-@@ -64,3 +64,9 @@ void omap4_cpu_die(unsigned int cpu)
- 		pr_debug("CPU%u: spurious wakeup call\n", cpu);
- 	}
- }
-+
-+/* Needed by kexec and platform_can_cpu_hotplug() */
-+int omap4_cpu_kill(unsigned int cpu)
-+{
-+	return 1;
-+}
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 81bb053..d53a0de 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -329,5 +329,6 @@ const struct smp_operations omap4_smp_ops __initconst = {
- 	.smp_boot_secondary	= omap4_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= omap4_cpu_die,
-+	.cpu_kill		= omap4_cpu_kill,
- #endif
- };
--- 
-2.8.1
+Yes, this will solve that problem too. I will also hide some possible
+deferred probe issues, because the moment at which IOMMU is activated
+will be postponed. The only drawback with this approach is the fact
+that is drivers won't be allowed to do any dma-mapping operations on
+devices, which they don't own. This should not be a big issue, but
+this was the reason to setup IOMMU on device add instead of driver
+bind.
+
+While at it, please make sure that the case of failed client driver
+probe will be handled properly. IOMMU might do some operations while
+setting up and if the client driver fails to probe (for whatever
+reason, might be a deferred probe too), those operation has to be
+undone. However the current code of the driver core won't call any
+notifier (like BUS_NOTIFY_UNBOUND_DRIVER or whatever else) in such
+case.
+
+Long time ago I used BUS_NOTIFY_BIND_DRIVER based approach for my
+Exynos IOMMU patches and had to extend bus core with such patch:
+https://patchwork.kernel.org/patch/4678181/ to properly cleanup
+after failed client driver probe and avoid leaking resources. Please
+read the discussion, because some changes were requested to it.
+
+
+Best regards
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
+
+>
+> On 07/06/16 14:30, Lorenzo Pieralisi wrote:
+>> Current bus notifier in ARM64 (__iommu_attach_notifier)
+>> attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
+>> action notification.
+>>
+>> This causes issues on ACPI based systems, where PCI devices
+>> can be added before the IOMMUs the devices are attached to
+>> had a chance to be probed, causing failures on attempts to
+>> attach dma_ops in that the domain for the respective IOMMU
+>> may not be set-up yet by the time the bus notifier is run.
+>>
+>> Devices dma_ops do not require to be set-up till the matching
+>> device drivers are probed. This means that instead of running
+>> the notifier attaching dma_ops to devices (__iommu_attach_notifier)
+>> on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
+>> device driver is bound to the device in question (on action
+>> BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
+>> group and domain are set-up accordingly at the time the
+>> notifier is triggered.
+>>
+>> This patch changes the notifier action upon which dma_ops
+>> are attached to devices and defer it to driver binding time,
+>> so that IOMMU devices have a chance to be probed and to register
+>> their bus notifiers before the dma_ops attach sequence for a
+>> device is actually carried out.
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   arch/arm64/mm/dma-mapping.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>> index c566ec8..79b0882 100644
+>> --- a/arch/arm64/mm/dma-mapping.c
+>> +++ b/arch/arm64/mm/dma-mapping.c
+>> @@ -848,7 +848,7 @@ static int __iommu_attach_notifier(struct 
+>> notifier_block *nb,
+>>   {
+>>       struct iommu_dma_notifier_data *master, *tmp;
+>>
+>> -    if (action != BUS_NOTIFY_ADD_DEVICE)
+>> +    if (action != BUS_NOTIFY_BIND_DRIVER)
+>
+> With this, you can also get rid of the priority setting and big fat 
+> explanatory comment in register_iommu_dma_ops_notifier().
+>
+> Robin.
+>
+>>           return 0;
+>>
+>>       mutex_lock(&iommu_dma_notifier_lock);
+>>
+>
+>
+>
