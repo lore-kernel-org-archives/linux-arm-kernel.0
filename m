@@ -1,47 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Jun 2016 08:33:40 -0500
-Subject: [PATCHv4 4/7] Documentation: dt: socfpga: Add Arria10 Ethernet
- binding
-In-Reply-To: <1466434252-26107-5-git-send-email-tthayer@opensource.altera.com>
-References: <1466434252-26107-1-git-send-email-tthayer@opensource.altera.com>
- <1466434252-26107-5-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20160621133340.GA9073@rob-hp-laptop>
+Date: Tue, 21 Jun 2016 08:35:18 -0500
+Subject: [PATCH v3 1/5] dt-bindings: Document the STM32 I2C bindings
+In-Reply-To: <1466439609-1814-2-git-send-email-cedric.madianga@gmail.com>
+References: <1466439609-1814-1-git-send-email-cedric.madianga@gmail.com>
+ <1466439609-1814-2-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20160621133518.GA10968@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 09:50:49AM -0500, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+On Mon, Jun 20, 2016 at 06:20:05PM +0200, M'boumba Cedric Madianga wrote:
+> This patch adds documentation of device tree bindings for the STM32 I2C
+> controller.
 > 
-> Add the device tree bindings needed to support the Altera Ethernet
-> FIFO buffers on the Arria10 chip.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 > ---
-> v2  No Change
-> v3  Change to common compatible string based on maintainer comments
->     Add local IRQ values.
-> v4  Add compatible string for parent node.
-> ---
->  .../bindings/arm/altera/socfpga-eccmgr.txt         |   24 ++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-> index 15eb0df..7c714ba 100644
-> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-> @@ -82,6 +82,14 @@ Required Properties:
->  - interrupts : Should be single bit error interrupt, then double bit error
->  	interrupt, in this order.
->  
-> +Ethernet FIFO ECC
-> +Required Properties:
-> +- compatible : Should be "altr,socfpga-eth-mac-ecc"
-> +- reg        : Address and size for ECC block registers.
-> +- parent     : phandle to parent (altr,socfpga-stmmac) Ethernet node.
+>  .../devicetree/bindings/i2c/i2c-stm32.txt          | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
 
-Sorry if I wasn't clear before, but I was suggesting changing 'parent' 
-to 'altr,ethernet-mac':
-
-altr,ethernet-mac = <&gmac0>;
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
