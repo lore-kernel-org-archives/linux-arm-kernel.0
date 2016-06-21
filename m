@@ -1,39 +1,73 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 21 Jun 2016 18:38:21 +0100
-Subject: [PATCH] pinctrl: rockchip: make rockchip_irq_gc_mask_set_bit static
-Message-ID: <1466530701-26685-1-git-send-email-ben.dooks@codethink.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Jun 2016 19:07:56 +0100
+Subject: [PATCH 1/2] arm64: smp: Add function to determine if cpus are
+ stuck in the kernel
+In-Reply-To: <576429E3.3010206@arm.com>
+References: <1466156097-20028-1-git-send-email-james.morse@arm.com>
+ <1466156097-20028-2-git-send-email-james.morse@arm.com>
+ <20160617102713.GA14524@leverpostej> <5763DC2B.5030705@arm.com>
+ <576429E3.3010206@arm.com>
+Message-ID: <20160621180756.GR29165@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rockchip_irq_gc_mask_set_bit() function is not exported our used
-outside of ppinctrl-rockchip.c so fix the following sparse error by
-making it static:
+HI James,
 
-drivers/pinctrl/pinctrl-rockchip.c:2010:6: warning: symbol 'rockchip_irq_gc_mask_set_bit' was not declared. Should it be static?
+On Fri, Jun 17, 2016 at 05:48:35PM +0100, James Morse wrote:
+> On 17/06/16 12:16, Suzuki K Poulose wrote:
+> > On 17/06/16 11:27, Mark Rutland wrote:
+> >> On Fri, Jun 17, 2016 at 10:34:56AM +0100, James Morse wrote:
+> >>> kernel/smp.c has a fancy counter that keeps track of the number of CPUs
+> >>> it marked as not-present and left in cpu_park_loop(). If there are any
+> >>> CPUs spinning in here, features like kexec or hibernate may release them
+> >>> by overwriting this memory.
+> >>>
+> >>> This problem also occurs on machines using spin-tables to release
+> >>> secondary cores.
+> >>> After commit 44dbcc93ab67 ("arm64: Fix behavior of maxcpus=N")
+> >>> we bring all known cpus into the secondary holding pen, but may not bring
+> >>> them up depending on 'maxcpus'. This memory can't be re-used by kexec
+> >>> or hibernate.
+> >>>
+> >>> Add a function cpus_are_stuck_in_kernel() to determine if either of these
+> >>> cases have occurred.
+> 
+> >> It might also be stuck in __no_granule_support, if it never made it to C
+> >> code. In that case, the CPU in charge of bringing up that new CPU will
+> >> increment the counter in __cpu_up.
+> > 
+> > Just to clarify, *in all the cases*, the CPU in charge of bringing up updates
+> > the cpus_stuck_in_kernel.
+> 
+> Ah, my mistake. I will switch it for Mark's suggestion.
+> 
+> >>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> >>> index 678e0842cb3b..e197502f94fd 100644
+> >>> --- a/arch/arm64/kernel/smp.c
+> >>> +++ b/arch/arm64/kernel/smp.c
+> >>> @@ -909,3 +909,16 @@ int setup_profiling_timer(unsigned int multiplier)
+> >>>   {
+> >>>       return -EINVAL;
+> >>>   }
+> >>> +
+> >>> +bool cpus_are_stuck_in_kernel(void)
+> >>> +{
+> >>> +    bool ret = !!cpus_stuck_in_kernel;
+> >>> +#ifdef CONFIG_HOTPLUG_CPU
+> >>> +    int any_cpu = raw_smp_processor_id();
+> >>> +
+> >>> +    if (num_possible_cpus() > 1 && !cpu_ops[any_cpu]->cpu_die)
+> >>> +        ret = true;
+> >>> +#endif
+> > 
+> > Minor nit: Moving the cpu_die check to a static inline function with
+> > an obvious name might make the code look better.
+> > 
+> >     return !!cpus_stuck_in_kernel || !have_cpu_die() ?
+> > 
+> 
+> That would be better!
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-gpio at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
----
- drivers/pinctrl/pinctrl-rockchip.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Can you post a new version of this, please?
 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index a91026e..7d679c2 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -2007,7 +2007,7 @@ static void rockchip_irq_gc_mask_clr_bit(struct irq_data *d)
- 	irq_gc_mask_clr_bit(d);
- }
- 
--void rockchip_irq_gc_mask_set_bit(struct irq_data *d)
-+static void rockchip_irq_gc_mask_set_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct rockchip_pin_bank *bank = gc->private;
--- 
-2.8.1
+Will
