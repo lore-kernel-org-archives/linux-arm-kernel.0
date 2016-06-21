@@ -1,52 +1,67 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Tue, 21 Jun 2016 11:56:32 +0800
-Subject: [PATCH net-next 12/19] net: hns: fix bug of getting the wrong tcam
- data
-In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1466481399-70080-13-git-send-email-Yisen.Zhuang@huawei.com>
+Date: Tue, 21 Jun 2016 11:56:20 +0800
+Subject: [PATCH net-next 00/19] net: hns: fix some bugs in hns driver
+Message-ID: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daode Huang <huangdaode@hisilicon.com>
+This series includes some bugs fixed. All these patches needs to be
+applied after the patchset about ACPI support, so this series is 
+floated to net-next list.
 
-The current driver stores the high bit value of tcam data register
-to the tcam data low element, stores the low bit value of tcam data
-register to tcam data high element, this patch fixes this bug.
+The patches are:
+ > from Daode, fixes about pfc pause frame, getting coaslesce, led 
+control logic, TSO on|off and tcam table configuration.
 
-Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
-Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ > from Jun He, fix the potential leak to port unavailable
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-index 0958ceb..7f5c248 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-@@ -975,9 +975,9 @@ static void hns_dsaf_tcam_uc_get(
- 
- 	/*read tcam data*/
- 	ptbl_tcam_data->tbl_tcam_data_high
--		= dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_LOW_0_REG);
--	ptbl_tcam_data->tbl_tcam_data_low
- 		= dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_HIGH_0_REG);
-+	ptbl_tcam_data->tbl_tcam_data_low
-+		= dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_LOW_0_REG);
- 
- 	/*read tcam mcast*/
- 	tcam_read_data0 = dsaf_read_dev(dsaf_dev,
-@@ -1027,9 +1027,9 @@ static void hns_dsaf_tcam_mc_get(
- 
- 	/*read tcam data*/
- 	ptbl_tcam_data->tbl_tcam_data_high =
--		dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_LOW_0_REG);
--	ptbl_tcam_data->tbl_tcam_data_low =
- 		dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_HIGH_0_REG);
-+	ptbl_tcam_data->tbl_tcam_data_low =
-+		dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_LOW_0_REG);
- 
- 	/*read tcam mcast*/
- 	ptbl_tcam_mcast->tbl_mcast_port_msk[0] =
+ > from Kejian, fix bug of loopback and failing to test ping6
+
+ > from Qianqian, fix the several typo in hns driver
+
+For more details, please see individual patches.
+
+MBR.
+
+Daode Huang (9):
+  net: hns: bugfix about pfc pause frame statistics
+  net: hns: add spin lock for tcam table operation
+  net: hns: fix bug of getting the wrong tcam data
+  net: hns: add get_coalesce_range api for hns
+  net: hns: delete redundancy ring enable operations
+  net: hns: bug fix about led control logic when link down
+  net: hns: fix sbm default parameters config error
+  net: hns: change the default coalesce usecs
+  net: hns: bug fix about TSO on|off when there is traffic
+
+Jun He (1):
+  net: hns: fix bug that alloc skb fail lead to port unavailable
+
+Kejian Yan (3):
+  net: hns: add skb_reset_mac_header() after skb being alloc
+  net: hns: select Hilink before serdes loopback for HNS V2
+  net: hns: fix ethtool loopback fail bug
+
+Qianqian Xie (6):
+  net: hns: bug fix of ge reset sequence
+  net: hns: fix hns dsaf v1 dont support tx_pause close
+  net: hns: typo fix of annotation info for hns_nic_reset_subtask()
+  net: hns: Remove unnecessary device resource free
+  net: hns: fix the error info when dma_set_mask_and_coherent fail
+  net: hns: fix the wrong speed for bond
+
+ drivers/net/ethernet/hisilicon/hns/hnae.c          |   1 -
+ drivers/net/ethernet/hisilicon/hns/hnae.h          |   6 +-
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  53 ++++--
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 190 ++++++++++++++-------
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  12 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |  44 +++--
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c  |   2 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h  |   2 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  21 ++-
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c      |  68 ++++----
+ drivers/net/ethernet/hisilicon/hns/hns_ethtool.c   |  47 ++---
+ 11 files changed, 291 insertions(+), 155 deletions(-)
+
 -- 
 1.9.1
