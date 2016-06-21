@@ -1,39 +1,43 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 21 Jun 2016 10:44:00 +0900
-Subject: [PATCH] arm64: add boot image dependencies to not generate invalid
- images
-Message-ID: <1466473440-18887-1-git-send-email-yamada.masahiro@socionext.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 20 Jun 2016 18:48:16 -0700
+Subject: [PATCH v2 00/15] clk: sunxi: introduce "modern" clock support
+In-Reply-To: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
+References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160621014816.GT1521@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I fixed boot image dependencies for arch/arm in commit 3939f3345050
-("ARM: 8418/1: add boot image dependencies to not generate invalid
-images").
+On 06/07, Maxime Ripard wrote:
+> 
+> The current code has been tested on the H3 and an Orange Pi PC,
+> including making sure that MMC still works, so the general approach
+> seems ok.
+> 
+> Let me know what you think,
 
-I see a similar problem for arch/arm64; "make -jN Image Image.gz"
-would sometimes end up generating bad images where N > 1.
+Overall this looks pretty good. Thanks for taking the time to
+rework the driver.
 
-Fix the dependency in arch/arm64/Makefile to avoid the race
-between "make Image" and "make Image.*".
+The macro nesting is sort of concerning, but if you're willing to
+live with a maze of macros I'm not too worried. Also, I don't see
+why we have to use the ccu_common structure everywhere even when
+we're not gaining from it, but it's not a huge problem either
+way. The non-mmio clks could be split off from the mmio list and
+then registered in two lists, or there could be mmio list that
+sets up the base address and then a larger list of clk_hw
+pointers that we just run through and register.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+It would be great if we could squeeze some more code reuse out of
+the basic types too, but I'm not sure if there's much more that
+can be done. Sometimes I'm seeing the same code multiple times
+for handling muxes with parents and dividers or muxes without
+dividers, etc. But that seems like future work that isn't going
+to block anything here.
 
- arch/arm64/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Finally, can you please use the clk_hw_register() APIs that we've
+recently added. That will save us some time converting a new
+driver over to use the new style of registering clks.
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 7085e32..648a32c 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -95,7 +95,7 @@ boot := arch/arm64/boot
- Image: vmlinux
- 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
- 
--Image.%: vmlinux
-+Image.%: Image
- 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
- 
- zinstall install:
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
