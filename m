@@ -1,77 +1,71 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 21 Jun 2016 12:01:41 -0500
-Subject: [PATCH 1/2] ARM: Make PCI I/O space optional
-In-Reply-To: <20160621165646.7997.44001.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20160621165646.7997.44001.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20160621170141.7997.22278.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 21 Jun 2016 20:01:36 +0300
+Subject: [PATCH 1/2 v2] gpio: omap: make gpio numbering deterministical by
+ using of aliases
+In-Reply-To: <1465930632-18941-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1465930632-18941-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1465930632-18941-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <576972F0.7090207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For callers of pci_common_init_dev(), we previously always required a PCI
-I/O port resource.  If the caller's ->setup() function had added an I/O
-resource, we used that; otherwise, we added a default 64K I/O port space
-for it.
+On 06/14/2016 09:57 PM, Uwe Kleine-K?nig wrote:
+> Traditionally the n-th gpio device probed by the omap gpio driver got
+> the gpio number range [n*32 .. n*32+31].
+> When order of the devices probed by the driver changes (which can happen
+> already now when some devices have a pinctrl and so the first probe
+> attempt returns -ENODEV) the numbering changes.
+>
+> To ensure a deterministical numbering use of_alias_get_id to determine
+> the base for a given device. If no respective alias exists fall back to
+> the traditional numbering.
+>
+> For the unusual case where only a part of the gpio devices have a
+> matching alias some of them might fail to probe. But if none of them has
+> an alias or all, there is no conflict which should be good enough to
+> maintain backward compatibility.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>   drivers/gpio/gpio-omap.c | 19 ++++++++++++++++++-
+>   1 file changed, 18 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index b98ede78c9d8..4d91792e7266 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1053,9 +1053,26 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
+>   			bank->chip.parent = &omap_mpuio_device.dev;
+>   		bank->chip.base = OMAP_MPUIO(0);
+>   	} else {
+> +		int gpio_alias_id __maybe_unused;
+> +
+>   		bank->chip.label = "gpio";
+> -		bank->chip.base = gpio;
+> +
+> +#if defined(CONFIG_OF_GPIO)
+> +		/*
+> +		 * Traditionally the base is given out in first-come-first-serve
+> +		 * order.  This might shuffle the numbering of gpios if the
+> +		 * probe order changes.  So make the base deterministical if the
+> +		 * device tree specifies alias ids.
+> +		 */
+> +		gpio_alias_id = of_alias_get_id(bank->chip.of_node, "gpio");
+> +		if (gpio_alias_id >= 0)
+> +			bank->chip.base = bank->width * gpio_alias_id;
+> +		else
+> +#endif
+> +			bank->chip.base = gpio;
+>   	}
+> +
+> +
+>   	bank->chip.ngpio = bank->width;
+>
+>   	ret = gpiochip_add_data(&bank->chip, bank);
+>
 
-There are PCI host bridges that do not support I/O port space, and we
-should not add fictitious spaces for them.
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-If a caller sets struct hw_pci.io_optional, assume it is responsible for
-adding any I/O port resource it desires, and do not add any default I/O
-port space.
-
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- arch/arm/include/asm/mach/pci.h |    1 +
- arch/arm/kernel/bios32.c        |   13 +++++++++++--
- 2 files changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 0070e85..2d88af5 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -22,6 +22,7 @@ struct hw_pci {
- 	struct msi_controller *msi_ctrl;
- 	struct pci_ops	*ops;
- 	int		nr_controllers;
-+	unsigned int	io_optional:1;
- 	void		**private_data;
- 	int		(*setup)(int nr, struct pci_sys_data *);
- 	struct pci_bus *(*scan)(int nr, struct pci_sys_data *);
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 05e61a2..65f12ef 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -410,7 +410,8 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- 	return irq;
- }
- 
--static int pcibios_init_resources(int busnr, struct pci_sys_data *sys)
-+static int pcibios_init_resource(int busnr, struct pci_sys_data *sys,
-+				 int io_optional)
- {
- 	int ret;
- 	struct resource_entry *window;
-@@ -420,6 +421,14 @@ static int pcibios_init_resources(int busnr, struct pci_sys_data *sys)
- 			 &iomem_resource, sys->mem_offset);
- 	}
- 
-+	/*
-+	 * If a platform says I/O port support is optional, we don't add
-+	 * the default I/O space.  The platform is responsible for adding
-+	 * any I/O space it needs.
-+	 */
-+	if (io_optional)
-+		return 0;
-+
- 	resource_list_for_each_entry(window, &sys->resources)
- 		if (resource_type(window->res) == IORESOURCE_IO)
- 			return 0;
-@@ -466,7 +475,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 		if (ret > 0) {
- 			struct pci_host_bridge *host_bridge;
- 
--			ret = pcibios_init_resources(nr, sys);
-+			ret = pcibios_init_resource(nr, sys, hw->io_optional);
- 			if (ret)  {
- 				kfree(sys);
- 				break;
+-- 
+regards,
+-grygorii
