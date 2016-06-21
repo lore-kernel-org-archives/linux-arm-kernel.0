@@ -1,33 +1,32 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 21 Jun 2016 17:23:18 +0200
-Subject: [PATCH] ARM: BCM5301X: Set GPIO enabling USB power on Netgear
- R7000
-In-Reply-To: <op.yjevu7en2s3iss@ecaz>
-References: <1466509358-25498-1-git-send-email-zajec5@gmail.com>
- <op.yjepy3mr2s3iss@ecaz>
- <CACna6rxm0euw=nVyHZzZa2+Q9U9S4t+aVy34ZvL0Lrx27B8-eA@mail.gmail.com>
- <op.yjevu7en2s3iss@ecaz>
-Message-ID: <CACna6ryrABjF3ie8uE6_q-pfNjhQaGbRhNR9jWMEPKwaUt88hQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Jun 2016 17:31:13 +0200
+Subject: [PATCH 2/2] bus: mvebu-mbus: make mvebu_mbus_syscore_ops static
+In-Reply-To: <1466522179-22198-2-git-send-email-ben.dooks@codethink.co.uk>
+References: <1466522179-22198-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1466522179-22198-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <9446011.bTD6e4eDRY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2016 at 16:29, Imre Kaloz <kaloz@openwrt.org> wrote:
-> On Tue, 21 Jun 2016 14:26:11 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->
->> On 21 June 2016 at 14:22, Imre Kaloz <kaloz@openwrt.org> wrote:
->>>
->>> Is there any reason you are not handling this properly as a regulator
->>> with
->>> usb-nop-xceiv?
->>
->>
->> We can't use USB NOP PHY as we need a specific PHY driver for Broadcom's
->> USB.
->
->
-> I see. That shouldn't stop you from addressing the regulator part, tho ;)
+On Tuesday, June 21, 2016 4:16:19 PM CEST Ben Dooks wrote:
+> 
+> -struct syscore_ops mvebu_mbus_syscore_ops = {
+> +static struct syscore_ops mvebu_mbus_syscore_ops = {
+>         .suspend        = mvebu_mbus_suspend,
+>         .resume         = mvebu_mbus_resume,
+>  };
+> 
 
-How? Be more specific please.
 
--- 
-Rafa?
+Looks good, but I immediately thought it should be "const" as well.
+Unfortunately there is a list_head in them, so that isn't easy,
+but if anyone has an idea for how to make these all const, that
+would be nice.
+
+Anyway, that shouldn't stop your patch from getting merged, so
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+(also for patch 1/2).
+
+	Arnd
