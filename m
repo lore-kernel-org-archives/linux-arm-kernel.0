@@ -1,22 +1,44 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 21 Jun 2016 09:08:58 -0700
-Subject: [PATCH] ARM: keystone: fix missing keystone.h in pm_domain.c
-In-Reply-To: <1466510751-23913-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1466510751-23913-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <76697156-9e36-a7df-44ca-206e738d8a37@oracle.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 21 Jun 2016 17:10:47 +0100
+Subject: [PATCH v3 0/7] coresight: Miscellaneous fixes
+Message-ID: <1466525454-14702-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/21/2016 5:05 AM, Ben Dooks wrote:
-> The declaration of keystone_pm_runtime_init() is not included
-> from keystone.h in pm_domain.c. Including the file fixes the
-> following sparse warning:
->
-> arch/arm/mach-keystone/pm_domain.c:37:12: warning: symbol 'keystone_pm_runtime_init' was not declared. Should it be static?
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
-Looks good. Will pick it up.
+This is a collection of cleanups and minor enhancements to the
+coresight driver. Applies on v4.7-rc4
 
-Regards,
-Santosh
+Changes since V2:
+ - Removed patches already queued as fixes for 4.7
+ - Addressed comments on V2.
+
+Changes since V1:
+ - Added a patch to limit the trace data
+ - Added a patch to fix tmc_read_unprepare_etr (another crash)
+ - Split the patch to remove erraneous dma_free_coherent.
+ - Use consistent error message format for coresight_timeout cleanup.
+ - Fixed checkpatch warnings on the commit description, there are
+   some errors reported on the "crash output" in the commit description.
+   May be the checkpatch needs to be fixed ?
+
+
+Suzuki K Poulose (7):
+  coresight: Remove erroneous dma_free_coherent in tmc_probe
+  coresight: Consolidate error handling path for tmc_probe
+  coresight: Fix csdev connections initialisation
+  coresight: tmc: Limit the trace to available data
+  coresight: etmv4: Fix ETMv4x peripheral ID table
+  coresight: Cleanup TMC status check
+  coresight: Add better messages for coresight_timeout
+
+ drivers/hwtracing/coresight/coresight-etb10.c   |  6 +--
+ drivers/hwtracing/coresight/coresight-etm4x.c   | 14 +++----
+ drivers/hwtracing/coresight/coresight-tmc-etf.c |  2 +
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 12 ++++--
+ drivers/hwtracing/coresight/coresight-tmc.c     | 51 +++++++++++--------------
+ drivers/hwtracing/coresight/coresight-tmc.h     |  4 +-
+ drivers/hwtracing/coresight/coresight.c         | 24 +++++++-----
+ 7 files changed, 58 insertions(+), 55 deletions(-)
+
+-- 
+1.9.1
