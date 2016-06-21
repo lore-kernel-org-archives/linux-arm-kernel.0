@@ -1,40 +1,105 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 21 Jun 2016 19:03:06 +0200
-Subject: [GIT PULL] ARM: at91: drivers for 4.8 #2
-Message-ID: <20160621170306.GA15727@piout.net>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 21 Jun 2016 11:05:02 -0600
+Subject: [PATCH] coresight: always use stashed trace id value in
+ etm4_trace_id
+In-Reply-To: <1466432741-24452-1-git-send-email-sudeep.holla@arm.com>
+References: <1466432741-24452-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CANLsYkxE3qf0n8N_RvA7a=hX7eWeF+ZjqQZ33Rc7Sh_AsJrnSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On 20 June 2016 at 08:25, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> etm4_trace_id is not guaranteed to be executed on the CPU whose ETM is
+> being accessed. This leads to exception similar to below one if the
+> CPU whose ETM is being accessed is in deeper idle states. So it must
+> be executed on the CPU whose ETM is being accessed.
+>
+> Unhandled fault: synchronous external abort (0x96000210) at 0xffff000008db4040
+> Internal error: : 96000210 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 5 PID: 5979 Comm: etm.sh Not tainted 4.7.0-rc3 #159
+> Hardware name: ARM Juno development board (r2) (DT)
+> task: ffff80096dd34b00 ti: ffff80096dfe4000 task.ti: ffff80096dfe4000
+> PC is at etm4_trace_id+0x5c/0x90
+> LR is at etm4_trace_id+0x3c/0x90
+> Call trace:
+>  etm4_trace_id+0x5c/0x90
+>  coresight_id_match+0x78/0xa8
+>  bus_for_each_dev+0x60/0xa0
+>  coresight_enable+0xc0/0x1b8
+>  enable_source_store+0x3c/0x70
+>  dev_attr_store+0x18/0x28
+>  sysfs_kf_write+0x48/0x58
+>  kernfs_fop_write+0x14c/0x1e0
+>  __vfs_write+0x1c/0x100
+>  vfs_write+0xa0/0x1b8
+>  SyS_write+0x44/0xa0
+>  el0_svc_naked+0x24/0x28
+>
+> However, TRCTRACEIDR is not guaranteed to hold the previous programmed
+> trace id if it enters deeper idle states. Further, the trace id that is
+> computed in etm4_init_trace_id is programmed into TRCTRACEIDR only in
+> etm4_enable_hw which happens much later in the sequence after
+> coresight_id_match is executed from enable_source_store.
+>
+> This patch simplifies etm4_trace_id by returning the stashed trace id
+> value similar to etm4_cpu_id.
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm4x.c | 16 +---------------
+>  1 file changed, 1 insertion(+), 15 deletions(-)
+>
+> Hi Mathieu,
+>
+> While trying to support ETM with CPUIdle active, I faced this issue.
+>
+> Regards,
+> Sudeep
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+> index 43fa3beaa0df..d6f1d6d874eb 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+> @@ -77,22 +77,8 @@ static int etm4_cpu_id(struct coresight_device *csdev)
+>  static int etm4_trace_id(struct coresight_device *csdev)
+>  {
+>         struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+> -       unsigned long flags;
+> -       int trace_id = -1;
+>
+> -       if (!local_read(&drvdata->mode))
+> -               return drvdata->trcid;
+> -
+> -       spin_lock_irqsave(&drvdata->spinlock, flags);
+> -
+> -       CS_UNLOCK(drvdata->base);
+> -       trace_id = readl_relaxed(drvdata->base + TRCTRACEIDR);
+> -       trace_id &= ETM_TRACEID_MASK;
+> -       CS_LOCK(drvdata->base);
+> -
+> -       spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> -
+> -       return trace_id;
+> +       return drvdata->trcid;
+>  }
 
-Here are two simple fixes for our memory drivers.
+This code was written prior to the integration with the Perf core.  To
+make sure the correct active value was return to users it goes to the
+HW if the IP is in use.  With the integration with Perf the code was
+moved around and the traceID is no longer called on the CPU (as you
+noticed) and has lost the required PM runtime operation.
 
-The following changes since commit 1fdab21d1d52a85c31f932844242fec5fb81daac:
+Always returning the stashed value has drawbacks when operating from
+sysFS but I think that's fine since this mode is for advanced users.
+As such I'll apply this to my next tree.
 
-  memory: atmel-ebi: add DT bindings documentation (2016-06-02 08:32:25 +0200)
+Thanks,
+Mathieu
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-drivers2
-
-for you to fetch changes up to 8a86a093ca3b924e6c2d5267cffb809965582a8d:
-
-  memory: atmel-ebi: make it explicitly non-modular (2016-06-21 17:17:45 +0200)
-
-----------------------------------------------------------------
-Drivers for 4.8 #2:
- - Make memory drivers explicitly non-modular
-
-----------------------------------------------------------------
-Paul Gortmaker (2):
-      memory: atmel-sdramc: make it explicitly non-modular
-      memory: atmel-ebi: make it explicitly non-modular
-
- drivers/memory/atmel-ebi.c    |  9 ++-------
- drivers/memory/atmel-sdramc.c | 11 ++++-------
- 2 files changed, 6 insertions(+), 14 deletions(-)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+>  static void etm4_enable_hw(void *info)
+> --
+> 2.7.4
+>
