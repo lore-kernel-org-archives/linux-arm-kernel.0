@@ -1,30 +1,31 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 21 Jun 2016 14:55:23 +0800
-Subject: [PATCH] arm64: Add support ARCH_SUPPORTS_INT128
-Message-ID: <1466492123-3356-1-git-send-email-wangkefeng.wang@huawei.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 21 Jun 2016 09:10:55 +0200
+Subject: [PATCH] ARM: dts: r8a7792: add SMP support
+In-Reply-To: <1627631.X1bJtVQHBF@wasted.cogentembedded.com>
+References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
+ <1627631.X1bJtVQHBF@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXQ9rN8Gp0geqiubjcniodtEdo2S6-fMJx0YLtgXZHuDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gcc support __SIZEOF_INT128__ and __int128 in arm64, thus,
-enable ARCH_SUPPORTS_INT128 to make mul_u64_u32_shr() a bit
-more efficient in scheduler.
+On Tue, Jun 21, 2016 at 12:31 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add the device tree nodes for the Advanced Power Management Unit (APMU)
+> and the second Cortex-A15 CPU core.
+> Use the "enable-method" prop  to point out that the APMU should be used
+> for the SMP support.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 5a0a691..ab319eb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -11,6 +11,7 @@ config ARM64
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_USE_CMPXCHG_LOCKREF
- 	select ARCH_SUPPORTS_ATOMIC_RMW
-+	select ARCH_SUPPORTS_INT128
- 	select ARCH_SUPPORTS_NUMA_BALANCING
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
--- 
-1.7.12.4
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
