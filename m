@@ -1,79 +1,138 @@
-From: chris@chris-wilson.co.uk (Chris Wilson)
-Date: Tue, 21 Jun 2016 10:28:03 +0100
-Subject: [PATCH 3/3] drm/sun4i: Remove open-coded drm_connector_register_all()
-In-Reply-To: <1466501283-19976-1-git-send-email-chris@chris-wilson.co.uk>
-References: <1466501283-19976-1-git-send-email-chris@chris-wilson.co.uk>
-Message-ID: <1466501283-19976-4-git-send-email-chris@chris-wilson.co.uk>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 21 Jun 2016 02:29:20 -0700
+Subject: [RFC PATCH v3 2/2] ARM64/PCI: Start using quirks handling for
+ ACPI based PCI host controller
+In-Reply-To: <20160621092627.GA31277@red-moon>
+References: <CADaLNDkziZgM-yAiK2MCqfBRzhWpLmCyPmDZEGsvwd-7nfRfLw@mail.gmail.com>
+ <20160620094227.GA27594@red-moon> <5768252D.7090206@codeaurora.org>
+ <CADaLNDme9VCrM0Mk-3eOhai-TSQtzwHfo_CGqO9eLZFkzi1JGQ@mail.gmail.com>
+ <20160621092627.GA31277@red-moon>
+Message-ID: <CADaLNDnwYKyQdyCpEU5vhYzLRQ43DxOJg+vSANk5sgFoJJHGDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm_dev_register() will now register all known connectors, so we no
-longer have to do so manually.
+On Tue, Jun 21, 2016 at 2:26 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Mon, Jun 20, 2016 at 12:12:24PM -0700, Duc Dang wrote:
+>> On Mon, Jun 20, 2016 at 10:17 AM, Christopher Covington
+>> <cov@codeaurora.org> wrote:
+>> > Hi Duc,
+>> >
+>> > On 06/20/2016 05:42 AM, Lorenzo Pieralisi wrote:
+>> >> On Fri, Jun 17, 2016 at 02:37:02PM -0700, Duc Dang wrote:
+>> >>> On Thu, Jun 16, 2016 at 10:48 AM, Lorenzo Pieralisi
+>> >>> <lorenzo.pieralisi@arm.com> wrote:
+>> >>>> On Wed, Jun 15, 2016 at 11:34:11AM -0400, Christopher Covington wrote:
+>> >>>>> From: Tomasz Nowicki <tn@semihalf.com>
+>> >>>>>
+>> >>>>> pci_generic_ecam_ops is used by default. Since there are platforms
+>> >>>>> which have non-compliant ECAM space we need to overwrite these
+>> >>>>> accessors prior to PCI buses enumeration. In order to do that
+>> >>>>> we call pci_mcfg_get_ops to retrieve pci_ecam_ops structure so that
+>> >>>>> we can use proper PCI config space accessors and bus_shift.
+>> >>>>>
+>> >>>>> pci_generic_ecam_ops is still used for platforms free from quirks.
+>> >>>>>
+>> >>>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> >>>>> ---
+>> >>>>>  arch/arm64/kernel/pci.c | 7 ++++---
+>> >>>>>  1 file changed, 4 insertions(+), 3 deletions(-)
+>> >>>>>
+>> >>>>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> >>>>> index 94cd43c..a891bda 100644
+>> >>>>> --- a/arch/arm64/kernel/pci.c
+>> >>>>> +++ b/arch/arm64/kernel/pci.c
+>> >>>>> @@ -139,6 +139,7 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
+>> >>>>>       struct pci_config_window *cfg;
+>> >>>>>       struct resource cfgres;
+>> >>>>>       unsigned int bsz;
+>> >>>>> +     struct pci_ecam_ops *ops;
+>> >>>>>
+>> >>>>>       /* Use address from _CBA if present, otherwise lookup MCFG */
+>> >>>>>       if (!root->mcfg_addr)
+>> >>>>> @@ -150,12 +151,12 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
+>> >>>>>               return NULL;
+>> >>>>>       }
+>> >>>>>
+>> >>>>> -     bsz = 1 << pci_generic_ecam_ops.bus_shift;
+>> >>>>> +     ops = pci_mcfg_get_ops(root);
+>> >>>>> +     bsz = 1 << ops->bus_shift;
+>> >>>>>       cfgres.start = root->mcfg_addr + bus_res->start * bsz;
+>> >>>>>       cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
+>> >>>>>       cfgres.flags = IORESOURCE_MEM;
+>> >>>>> -     cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
+>> >>>>> -                           &pci_generic_ecam_ops);
+>> >>>>> +     cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res, ops);
+>> >>>>
+>> >>>> Arnd pointed this out already, I think that's the only pending question
+>> >>>> here.
+>> >>>>
+>> >>>> pci_ecam_create() maps ECAM space for config regions retrieved from
+>> >>>> the MCFG, which are *supposed* to be ECAM compliant.
+>> >>>>
+>> >>>> Do we think that's *always* correct/safe regardless of the kind
+>> >>>> of quirk we are currently fixing up ?
+>> >>>>
+>> >>>> Or we do think that configuration space regions should come from
+>> >>>> a different resource declared in the ACPI namespace if the regions
+>> >>>> are not MCFG/ECAM compliant (ie config space is not defined through
+>> >>>> MCFG at all - possibly through a _CRS method for a vendor specific
+>> >>>> _HID under the PNP0A03 node ?)
+>> >>>
+>> >>> Hi Lorenzo,
+>> >>>
+>> >>> For X-Gene: the ECAM space is used to access the configuration space
+>> >>> of PCIe devices, with additional help from controller register to
+>> >>> specify the bus, device and function number. Below is the RFC patch
+>> >>> that implements ECAM fixup for X-Gene PCIe controller on top of this
+>> >>> RFC ECAM quirk v3 for your and others reference.
+>> >>
+>> >> Yes, you have an additional resource in the PNP0A03 _CRS to describe
+>> >> your register that is a deliberate abuse of the ACPI standard in
+>> >> that the _CRS is meant to describe resources that are passed on
+>> >> to secondary buses
+>> >
+>> > A potential alternative came up in an off-list discussion: Would it be
+>> > better to hard code the information in the quirk workaround than look it
+>> > up from a repurposed ACPI resource?
+>>
+>> Hi Chris, Lorenzo,
+>>
+>> Thanks for looking into this.
+>>
+>> Yes, I am open for this approach and I think it may work. I can +
+>> check the pci_config_window resource start address (cfg->res.start) to
+>> figure out the controller and then get the fixed controller register
+>> address or + using the domain number to identify the controller.
+>
+> First thing to do is to remove config space entry from PNP0A03
+> _CRS, that's a FW bug.
 
-Signed-off-by: Chris Wilson <chris@chris-wilson.co.uk>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/gpu/drm/sun4i/sun4i_drv.c | 34 ----------------------------------
- 1 file changed, 34 deletions(-)
+Yes, I will remove it in the next version of firmware release.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 68e9d85085fb..59cd8b27ee02 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -24,34 +24,6 @@
- #include "sun4i_layer.h"
- #include "sun4i_tcon.h"
- 
--static int sun4i_drv_connector_plug_all(struct drm_device *drm)
--{
--	struct drm_connector *connector, *failed;
--	int ret;
--
--	mutex_lock(&drm->mode_config.mutex);
--	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
--		ret = drm_connector_register(connector);
--		if (ret) {
--			failed = connector;
--			goto err;
--		}
--	}
--	mutex_unlock(&drm->mode_config.mutex);
--	return 0;
--
--err:
--	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
--		if (failed == connector)
--			break;
--
--		drm_connector_unregister(connector);
--	}
--	mutex_unlock(&drm->mode_config.mutex);
--
--	return ret;
--}
--
- static int sun4i_drv_enable_vblank(struct drm_device *drm, unsigned int pipe)
- {
- 	struct sun4i_drv *drv = drm->dev_private;
-@@ -187,14 +159,8 @@ static int sun4i_drv_bind(struct device *dev)
- 	if (ret)
- 		goto free_drm;
- 
--	ret = sun4i_drv_connector_plug_all(drm);
--	if (ret)
--		goto unregister_drm;
--
- 	return 0;
- 
--unregister_drm:
--	drm_dev_unregister(drm);
- free_drm:
- 	drm_dev_unref(drm);
- 	return ret;
--- 
-2.8.1
+>
+> You could use the {bus-range, domain} to get that register address,
+> anyway, that's not the main concern here.
+>
+> Thanks,
+> Lorenzo
+>
+>> Regards,
+>> Duc Dang.
+>> >
+>> > Supporting quirk workarounds for early, non-compliant hardware is
+>> > helpful and perhaps necessary for bootstrapping the ecosystem in a
+>> > timely manner. But we don't really want to provide an expandable or
+>> > reusable interface that would make it easy for new hardware to remain
+>> > non-compliant.
+>> >
+>> > Regards,
+>> > Cov
+>> >
+>> > --
+>> > Qualcomm Innovation Center, Inc.
+>> > Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+>> > a Linux Foundation Collaborative Project
+>>
+Regards,
+Duc Dang.
