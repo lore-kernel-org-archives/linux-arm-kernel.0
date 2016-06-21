@@ -1,77 +1,75 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Jun 2016 22:51:41 +0100
-Subject: [PATCH 2/2] arm: fix kernel image size
-In-Reply-To: <20160621165523.GY22406@atomide.com>
-References: <20160617194405.GN1041@n2100.armlinux.org.uk>
- <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
- <20160621074319.GH22406@atomide.com>
- <20160621094737.GA5783@n2100.arm.linux.org.uk>
- <20160621103810.GI22406@atomide.com>
- <20160621105720.GK22406@atomide.com>
- <20160621154407.GB5783@n2100.arm.linux.org.uk>
- <20160621165523.GY22406@atomide.com>
-Message-ID: <20160621215141.GC5783@n2100.arm.linux.org.uk>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 22 Jun 2016 00:57:23 +0300
+Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
+In-Reply-To: <1466512742.2114.9.camel@localhost>
+References: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
+ <b499570f-e624-cbe1-4fca-44ba0e701054@mleia.com>
+ <1466512742.2114.9.camel@localhost>
+Message-ID: <c2b2d8f7-8e9a-c61b-45c9-5a588d3cc761@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 09:55:25AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@armlinux.org.uk> [160621 08:46]:
-> > On Tue, Jun 21, 2016 at 03:57:20AM -0700, Tony Lindgren wrote:
-> > > 
-> > > Maybe zImage size + MAX_RODATA_SZ + 4x zImage size?
-> > > 
-> > > Then the MAX_RODATA_SZ could be 2 or 4 MB or whatever we
-> > > think is sufficient to kick the can until we have a better
-> > > solution.
-> > 
-> > Maybe if you give some details about your failing case - you omitted any
-> > details about the uncompressed image size...
+Hi Sylvain,
+
+On 21.06.2016 15:39, Sylvain Lemieux wrote:
+> Hi Vladimir,
 > 
-> Looks like we currently have this:
+> On Tue, 2016-06-21 at 05:11 +0300, Vladimir Zapolskiy wrote:
+>> Hi Sylvain,
+>>
+>> On 03.06.2016 22:37, Sylvain Lemieux wrote:
+>>> From: Sylvain Lemieux <slemieux@tycoint.com>
+>>>
+>>> If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
+>>> disable the PWM, the PWM output is always set as a logic 1.
+>>>
+>>> Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
+>>> the PWM_PIN_LEVEL bit was always clear when the PWM was disable
+>>> and a 0 logic level was apply to the output.
+>>>
+>>> According to the LPC32x0 User Manual [1],
+>>> the default value for bit 30 (PWM_PIN_LEVEL) is 0.
+>>>
+>>> This change initialize the pin level to 0 (default value) and
+>>> update the register value accordingly during the disable process.
+>>>
+>>> [1] http://www.nxp.com/documents/user_manual/UM10326.pdf
+>>>
+>>> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+>>
+>> It looks like a pin control setting, but because it depends
+>> on PWM enabled/disabled status, I suppose it is good enough to
+>> manage it from the PWM driver.
+>>
+>> I think here a new optional DTS property should be introduced,
+>> which if present indicates that PWM_OUT pin value is high when
+>> PWM is disabled. And if the property is not found then
+>> PWMx_PIN_LEVEL is set to 0 on driver probe.
+>>
+> I will add this option and submit a new revision of the patch.
 > 
-> Memory: 2033088K/2095100K available (7376K kernel code, 784K rwdata,
-> 2312K rodata, 1024K init, 8117K bss, 45628K reserved,
-> 16384K cma-reserved, 1292284K highmem)
-> Virtual kernel memory layout:
->     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
->     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
->     vmalloc : 0xf0800000 - 0xff800000   ( 240 MB)
->     lowmem  : 0xc0000000 - 0xf0000000   ( 768 MB)
->     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
->     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
->       .text : 0xc0008000 - 0xc0a762a4   (10681 kB)
->       .init : 0xc0b00000 - 0xc0c00000   (1024 kB)
->       .data : 0xc0c00000 - 0xc0cc411c   ( 785 kB)
->        .bss : 0xc0cc6000 - 0xc14b37f8   (8118 kB)
+>> By convention the property name should be prefixed by "nxp,",
+>> what name is good? May be "nxp,pwm-disabled-level-high" ?
+>> Or add a property "nxp,pwm-disabled-level" with valid values 0/1?
+>>
+> I prefer to use "nxp,pwm-disabled-level-high".
+> 
 
-So that's 20.7MB, and the zImage was 3.6MB.  You're getting an
-expansion ratio of 5.7x.
+nice, for v2 please add documentation devicetree bindings bits and
+add devicetree mailing list to Cc, hopefully Rob will find time
+to review the name.
 
-To fix that, we'd need to up it to 7x, but the problem with upping
-it in this way is that it increases the requirements for the
-crashdump region too.  We can play with this number, but there will
-always be cases where it doesn't work - either because the ratio is
-too big or too small.
+Have you tried to set PWMx_PIN_LEVEL only once on probe()?
+I think there is no need to set/unset it every time when PWM is
+enabled or disabled. If it works, then the newly introduced local
+state storage can be removed.
 
-By way of illustration, "zImage size + MAX_RODATA_SZ + 4x zImage size"
-doesn't even work for this case, since you need about 25MB.  Your
-calculation comes out at 22MB, which is 3MB short.  Not only that, but
-it introduces (from what I can see) an irrelevant fudge factor of
-"MAX_RODATA_SZ" which has no basis in what's really going on here, and
-I'm left wondering what "MAX_RODATA_SZ" is actually referring to.
+>> Also note someone may want to switch the default behaviour
+>> in runtime, but this feature may be added later on.
+>>
+> I agree with you, this can be done later.
 
-So... I'm of the opinion that we shouldn't play with it - but instead
-try to come up with a solution which *doesn't* involve teaching kexec
-a whole load of internals about how the ARM kernel booting happens.
 
-What's more worrying to me at the moment, though, is that the kexec code
-only tries to find memory for the actual "kernel" size, not the actual
-space required to decompress the kernel.  It could find a chunk of
-memory large enough to fit the kernel image to be loaded, but is not big
-enough to allow its decompression.  kexec is really quite a mess on
-ARM. :(
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+--
+With best wishes,
+Vladimir
