@@ -1,17 +1,40 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 21 Jun 2016 04:54:30 -0400 (EDT)
-Subject: [PATCH net-next 00/19] net: hns: fix some bugs in hns driver
-In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <20160621.045430.89527380163991526.davem@davemloft.net>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 21 Jun 2016 09:55:17 +0100
+Subject: [GIT PULL] drivers: firmware: scpi updates for v4.8
+In-Reply-To: <20160621055247.GC24293@localhost>
+References: <5768022D.2010506@arm.com> <20160621055247.GC24293@localhost>
+Message-ID: <576900F5.5090907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yisen Zhuang <Yisen.Zhuang@huawei.com>
-Date: Tue, 21 Jun 2016 11:56:20 +0800
 
-> This series includes some bugs fixed. All these patches needs to be
-> applied after the patchset about ACPI support, so this series is 
-> floated to net-next list.
 
-Series applied, thanks.
+On 21/06/16 06:52, Olof Johansson wrote:
+> On Mon, Jun 20, 2016 at 03:48:13PM +0100, Sudeep Holla wrote:
+>> Hi ARM-SoC team,
+>>
+>> Here are few updates for SCPI drivers for v4.8. The DT binding have been
+>> ACKed by DT maintainer.
+>>
+>> Also as most of the genpd code is in drivers/soc and SCPI can be used on
+>> any SoC, runtime PM maintainer agreed to keep the SCPI genpd based power
+>> domain driver in drivers/firmware for now. It also carries their
+>> ACK.
+>
+> Am I missing something here? The only Acked-by I see on any patch is the one
+> from Mark Rutland on the bindings.
+>
+
+Ah sorry by mad for misleading. Ulf reviewed and provided Reviewed-by tag.
+
+Also Kevin H provided Reviewed-by with couple of minor nits to be fixed
+last evening. I will fix them and re-spin this pull request.
+
+Since they agreed to keep it in drivers/firmware, I assume that's whey
+no acks but just Reviewed-by.
+
+Thanks for the patience.
+
+-- 
+Regards,
+Sudeep
