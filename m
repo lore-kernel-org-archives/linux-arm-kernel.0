@@ -1,45 +1,37 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue, 21 Jun 2016 10:08:31 +0200
-Subject: [PATCH v3 01/10] crypto: marvell: Add a macro constant for the size
- of the crypto queue
+Date: Tue, 21 Jun 2016 10:08:40 +0200
+Subject: [PATCH v3 10/10] crypto: marvell: Increase the size of the crypto
+ queue
 In-Reply-To: <1466496520-28806-1-git-send-email-romain.perier@free-electrons.com>
 References: <1466496520-28806-1-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <1466496520-28806-2-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <1466496520-28806-11-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding a macro constant to be used for the size of the crypto queue,
-instead of using a numeric value directly. It will be easier to
-maintain in case we add more than one crypto queue of the same size.
+Now that crypto requests are chained together at the DMA level, we
+increase the size of the crypto queue for each engine. The result is
+that as the backlog list is reached later, it does not stop the crypto
+stack from sending asychronous requests, so more cryptographic tasks
+are processed by the engines.
 
 Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/crypto/marvell/cesa.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/crypto/marvell/cesa.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-index 056a754..fb403e1 100644
+index bb91156..5147073 100644
 --- a/drivers/crypto/marvell/cesa.c
 +++ b/drivers/crypto/marvell/cesa.c
-@@ -31,6 +31,9 @@
- 
+@@ -32,7 +32,7 @@
  #include "cesa.h"
  
-+/* Limit of the crypto queue before reaching the backlog */
-+#define CESA_CRYPTO_DEFAULT_MAX_QLEN 50
-+
+ /* Limit of the crypto queue before reaching the backlog */
+-#define CESA_CRYPTO_DEFAULT_MAX_QLEN 50
++#define CESA_CRYPTO_DEFAULT_MAX_QLEN 128
+ 
  static int allhwsupport = !IS_ENABLED(CONFIG_CRYPTO_DEV_MV_CESA);
  module_param_named(allhwsupport, allhwsupport, int, 0444);
- MODULE_PARM_DESC(allhwsupport, "Enable support for all hardware (even it if overlaps with the mv_cesa driver)");
-@@ -416,7 +419,7 @@ static int mv_cesa_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	spin_lock_init(&cesa->lock);
--	crypto_init_queue(&cesa->queue, 50);
-+	crypto_init_queue(&cesa->queue, CESA_CRYPTO_DEFAULT_MAX_QLEN);
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
- 	cesa->regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(cesa->regs))
 -- 
 2.7.4
