@@ -1,39 +1,49 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 21 Jun 2016 15:18:49 +0200
-Subject: [PATCH v4 0/8] iommu/rockchip: Fix bugs and enable on ARM64
-In-Reply-To: <20160621125435.GE11432@8bytes.org>
-References: <1466483681-36110-1-git-send-email-tfiga@chromium.org>
- <CAAFQd5B8sxbZ6MymwDKL4vZkfQ-ej_bNh7tS1OhRC=X7-eie+Q@mail.gmail.com>
- <20160621125435.GE11432@8bytes.org>
-Message-ID: <2015742.xhx642kbrC@diego>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 21 Jun 2016 15:19:12 +0200
+Subject: [PATCH] drm: mediatek: remove IOMMU_DMA select
+In-Reply-To: <3436915.Zo8cThvXaA@wuerfel>
+References: <1462982509-342936-1-git-send-email-arnd@arndb.de>
+ <1462997501-982363-1-git-send-email-arnd@arndb.de>
+ <3436915.Zo8cThvXaA@wuerfel>
+Message-ID: <20160621131912.GA6060@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 21. Juni 2016, 14:54:35 schrieb Joerg Roedel:
-> Hi Tomasz,
-> 
-> On Tue, Jun 21, 2016 at 09:42:16PM +0900, Tomasz Figa wrote:
-> > In simple words, DRM patches depend on IOMMU patches.
+On Wed, May 11, 2016 at 10:15:20PM +0200, Arnd Bergmann wrote:
+> On Wednesday 11 May 2016 22:11:07 Arnd Bergmann wrote:
+> > We get a harmless build warning when trying to use the mediatek
+> > DRM driver with IOMMU support disabled:
 > > 
-> > More precisely: The IOMMU patches alone are supposed to not break
-> > anything. Same goes for the first DRM patch (7/8). Only second DRM
-> > patch (8/8) depends on changes introduced by its predecessors.
+> > warning: (DRM_MEDIATEK) selects IOMMU_DMA which has unmet direct dependencies (IOMMU_SUPPORT)
+> > 
+> > However, the IOMMU_DMA symbol is not meant to be used by drivers
+> > at all, and this driver doesn't seem to have a strict dependency
+> > on it other than using the mediatek IOMMU driver that does.
+> > 
+> > Since we also want to be able to do compile tests with the
+> > driver on other platforms, the IOMMU_DMA symbol should not
+> > be selected here.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > If someone has a better explanation about why the 'select' is here,
+> > let me know, it certainly seems out of place.
 > 
-> The first DRM patch is 6/7, so it is 7/8 with the iommu dependency,
-> right? Anyway, I think the best is I take the iommu patches when Heiko
-> is ok with them and then the DRM tree can merge that branch in to apply
-> the DRM patches.
+> Sorry, I didn't mean to send this as a reply to "More build fixes for
+> omapdrm in current -next", I copied the wrong command line.
 > 
-> But first Heiko should have a look at the patches.
+> I'll resend it if necessary.
 
-I think from all his previous work on the rockchip iommus Tomasz is a lot more 
-qualified to judge them - which I guess he did when picking up the ones from 
-Rockchip devs :-) .
+That's probably the reason why patchwork didn't include the commit
+message in the downloaded mbox. I've pieced it together manually and
+applied this to topic/drm-misc.
 
->From a style-side, please don't carry the Reviewed-on gerrit tags over to 
-mainline patches (patches 1 and 2).
-
-Other than that, I didn't see anything jump out and it looks all pretty nice.
-
-
-Heiko
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160621/563249f9/attachment.sig>
