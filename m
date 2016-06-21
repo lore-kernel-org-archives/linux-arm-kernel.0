@@ -1,43 +1,143 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 21 Jun 2016 15:52:02 +0200
-Subject: [PATCH v4 0/8] iommu/rockchip: Fix bugs and enable on ARM64
-In-Reply-To: <2015742.xhx642kbrC@diego>
-References: <1466483681-36110-1-git-send-email-tfiga@chromium.org>
- <CAAFQd5B8sxbZ6MymwDKL4vZkfQ-ej_bNh7tS1OhRC=X7-eie+Q@mail.gmail.com>
- <20160621125435.GE11432@8bytes.org> <2015742.xhx642kbrC@diego>
-Message-ID: <20160621135202.GK28248@8bytes.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 21 Jun 2016 15:08:50 +0100
+Subject: [RFC PATCH 8/8] PM / Domains: Add support for removing PM domains
+In-Reply-To: <CAPDyKFrKCB00hHhpSaJZ57wThPFRjnp+3xMz_YW9k+zqafppHg@mail.gmail.com>
+References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
+ <1457090634-14785-9-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFrKCB00hHhpSaJZ57wThPFRjnp+3xMz_YW9k+zqafppHg@mail.gmail.com>
+Message-ID: <57694A72.6090202@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 03:18:49PM +0200, Heiko St?bner wrote:
-> Am Dienstag, 21. Juni 2016, 14:54:35 schrieb Joerg Roedel:
-> > Hi Tomasz,
-> > 
-> > On Tue, Jun 21, 2016 at 09:42:16PM +0900, Tomasz Figa wrote:
-> > > In simple words, DRM patches depend on IOMMU patches.
-> > > 
-> > > More precisely: The IOMMU patches alone are supposed to not break
-> > > anything. Same goes for the first DRM patch (7/8). Only second DRM
-> > > patch (8/8) depends on changes introduced by its predecessors.
-> > 
-> > The first DRM patch is 6/7, so it is 7/8 with the iommu dependency,
-> > right? Anyway, I think the best is I take the iommu patches when Heiko
-> > is ok with them and then the DRM tree can merge that branch in to apply
-> > the DRM patches.
-> > 
-> > But first Heiko should have a look at the patches.
+
+On 15/06/16 15:33, Ulf Hansson wrote:
+> On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
+>> The genpd framework allows users to add PM domains via the pm_genpd_init()
+>> function, however, there is no corresponding function to remove a PM
+>> domain. For most devices this may be fine as the PM domains are never
+>> removed, however, for devices that wish to populate the PM domains from
+>> within a driver, having the ability to remove a PM domain if the probing
+>> of the device fails or the driver is unloaded is necessary.
+>>
+>> Add the function pm_genpd_remove() to remove a PM domain by referencing
+>> it's generic_pm_domain structure.
+>>
+>> If a device supports nested or subdomains, then the PM domains
+>> should be removed in reverse order to ensure that the subdomains are
+>> removed first. Hence, add the function pm_genpd_remove_tail() to remove
+>> the last PM domain added by a given provider and return the
+>> generic_pm_domain structure for the PM domain that was removed.
 > 
-> I think from all his previous work on the rockchip iommus Tomasz is a lot more 
-> qualified to judge them - which I guess he did when picking up the ones from 
-> Rockchip devs :-) .
+> Perhaps split this up, so the pm_genpd_remove_tail() gets added in a
+> separate patch on top.
 
-In that case you guys should probably co-maintain that driver?
+OK.
+
+>>
+>> PM domains can only be removed if they are not a parent domain to
+>> another PM domain and have no devices associated with them.
+>>
+>> When removing PM domains, the PM domain will also be removed from the
+>> list of providers, if it was registered.
+>>
+>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>> ---
+>>  drivers/base/power/domain.c | 96 +++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pm_domain.h   | 12 ++++++
+>>  2 files changed, 108 insertions(+)
+>>
+>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>> index 9b33377bf01b..17090e1c91d6 100644
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -1556,6 +1556,102 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+>>  }
+>>  EXPORT_SYMBOL_GPL(pm_genpd_init);
+>>
+>> +/**
+>> + * __pm_genpd_remove - Remove a generic I/O PM domain
+>> + * @genpd: Pointer to PM domain that is to be removed.
+>> + *
+>> + * To remove the PM domain, this function:
+>> + *  - Removes the PM domain from the list of providers, if registered.
+>> + *  - Removes the PM domain as a subdomain to any parent domains,
+>> + *    if it was added.
+>> + *  - Removes the PM domain from the list of registered PM domains.
+>> + *
+>> + * The PM domain will only be removed, if it is not a parent to any
+>> + * other PM domain and has no devices associated with it. Must be called
+>> + * with the gpd_list_lock held.
+>> + */
+>> +static int __pm_genpd_remove(struct generic_pm_domain *genpd)
 > 
-> >From a style-side, please don't carry the Reviewed-on gerrit tags over to 
-> mainline patches (patches 1 and 2).
+> Please rename to genpd_remove() as it's a static function.
 
-Okay.
+OK.
 
+>> +{
+>> +       struct gpd_link *l, *link;
+>> +       int ret = 0;
+>> +
+>> +       if (IS_ERR_OR_NULL(genpd))
+>> +               return -EINVAL;
+>> +
+>> +       if (genpd->provider_data)
+>> +               of_genpd_del_provider_by_data(genpd->provider_data);
+>> +
+>> +       mutex_lock(&genpd->lock);
+>> +
+>> +       if (!list_empty(&genpd->master_links) || genpd->device_count) {
+>> +               mutex_unlock(&genpd->lock);
+>> +               pr_err("%s: unable to remove %s\n", __func__, genpd->name);
+>> +               return -EBUSY;
+>> +       }
+>> +
+>> +       list_for_each_entry_safe(link, l, &genpd->slave_links, slave_node) {
+>> +               list_del(&link->master_node);
+>> +               list_del(&link->slave_node);
+>> +               kfree(link);
+>> +       }
+>> +
+>> +       list_del(&genpd->gpd_list_node);
+>> +       mutex_unlock(&genpd->lock);
+>> +       cancel_work_sync(&genpd->power_off_work);
+>> +       pr_debug("%s: removed %s\n", __func__, genpd->name);
+>> +
+>> +       return ret;
+>> +}
+>> +
+>> +/**
+>> + * pm_genpd_remove - Remove a generic I/O PM domain
+>> + * @genpd: Pointer to PM domain that is to be removed.
+>> + */
+>> +int pm_genpd_remove(struct generic_pm_domain *genpd)
+>> +{
+>> +       int ret;
+>> +
+>> +       mutex_lock(&gpd_list_lock);
+>> +       ret = __pm_genpd_remove(genpd);
+>> +       mutex_unlock(&gpd_list_lock);
+>> +
+>> +       return ret;
+>> +}
+>> +
+>> +/**
+>> + * pm_genpd_remove_tail - Remove the last PM domain registered for a provider
+>> + * @provider: Pointer to device structure associated with provider
+>> + *
+>> + * Find the last PM domain that was added by the provider whose 'provider'
+>> + * device structure matches the device structure given. The 'provider'
+>> + * device structure for a given PM domain should be initialised by the
+>> + * device that is creating the PM domains and hence, calling
+>> + * pm_genpd_init().
+> 
+> Maybe make this a bigger "Important note" as what is needed to
+> actually benefit from using this function.
 
+Yes, good point. Will update.
 
-	Joerg
+Cheers
+Jon
+
+-- 
+nvpublic
