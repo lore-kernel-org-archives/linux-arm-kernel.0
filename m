@@ -1,58 +1,47 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Jun 2016 08:22:57 -0500
-Subject: [PATCH 1/2] Documentation: bindings: Add DT bindings for ARM's
- FVP models.
-In-Reply-To: <1466424796-13769-1-git-send-email-tixy@linaro.org>
-References: <1466424796-13769-1-git-send-email-tixy@linaro.org>
-Message-ID: <20160621132257.GA2263@rob-hp-laptop>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 21 Jun 2016 16:25:14 +0300
+Subject: [PATCH net-next 16/19] net: hns: fix bug that alloc skb fail lead
+ to port unavailable
+In-Reply-To: <1466481399-70080-17-git-send-email-Yisen.Zhuang@huawei.com>
+References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <1466481399-70080-17-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <097b1147-3587-9579-0f94-f42be130773c@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 01:13:15PM +0100, Jon Medhurst wrote:
-> List the required properties used to describe ARM's FVP models.
-> 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+Hello.
+
+On 6/21/2016 6:56 AM, Yisen Zhuang wrote:
+
+> From: Jun He <hjat2005@huawei.com>
+>
+> When hns_nic_poll_rx_skb alloc skb fail, it will break receive cycle and
+> read new fbd_num to start new receive cycle. It recomputes cycle num is
+> fbd_num minus clean_count, actually this cycle num is too big because
+> it drop out receive cycle. It brings about the port unavailable.
+>
+> So we will goto out when alloc skb fail to fix this bug.
+>
+> Signed-off-by: Jun He <hjat2005@huawei.com>
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 > ---
->  Documentation/devicetree/bindings/arm/arm-boards | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
-> index ab318a5..4639a9b 100644
-> --- a/Documentation/devicetree/bindings/arm/arm-boards
-> +++ b/Documentation/devicetree/bindings/arm/arm-boards
-> @@ -234,3 +234,24 @@ Example:
->  	};
->  
->  };
-> +
-> +ARM Fixed Virtual Platforms (FVP)
-> +---------------------------------
-> +FVPs are simulated platforms produced by ARM to aid software development without
-> +the requirement for actual hardware. They come in several families, each of
-> +which (usually) contain variants for different configurations of simulated
-> +hardware. These are documented in the Fixed Virtual Platforms FVP Reference
-> +Guide (reference number ARM DUI0837H).
-> +
-> +Required properties (in root node):
-> +- compatible value:
-> +	compatible = "arm,<family>,<variant>", "arm,<family>";
-> +  where <family> is one of:
-> +  - "fvp-base" for the Base FVP
-> +  - "fvp-ve" for the VE FVP
-> +  and <variant> is the part of the model's executable filename with the family
-> +  name omitted, converted to lower case, and with non-alphanumeric characters
-> +  replaced with '-'. E.g. the Base FVP that has two AEMv8 CPU clusters has an
-> +  executable file called FVP_Base_AEMv8A-AEMv8A, so the compatible value for
+>  drivers/net/ethernet/hisilicon/hns/hns_enet.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+> index f49246d..c0ce37b 100644
+> --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+> +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+> @@ -768,10 +768,10 @@ recv:
+>  			clean_count = 0;
+>  		}
+>
+> -		/* poll one pkg*/
+> +		/* poll one pkt*/
 
-Naming conventions of the exe aren't going to change?
+    How about adding a space before */?
 
-> +  this would be:
-> +	compatible = "arm,fvp-base,aemv8a-aemv8a", "arm,fvp-base";
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+[...]
+
+MBR, Sergei
