@@ -1,72 +1,50 @@
-From: loic.pallardy@st.com (loic pallardy)
-Date: Tue, 21 Jun 2016 09:33:39 +0200
-Subject: [STLinux Kernel] [PATCH 4/5] remoteproc: core: Supply framework
- to request, declare and fetch shared memory
-In-Reply-To: <20160615220629.GW1256@tuxbot>
-References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
- <1462454983-13168-5-git-send-email-lee.jones@linaro.org>
- <20160615220629.GW1256@tuxbot>
-Message-ID: <5768EDD3.3050203@st.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Tue, 21 Jun 2016 15:32:57 +0800
+Subject: [PATCH v2] arm64: mm: remove page_mapping check in
+ __sync_icache_dcache
+Message-ID: <1466494377-33358-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Shaokun Zhang <zhangshaokun@hisilicon.com>
 
+In aarch64 sync icache and dcache, if anonymous pages hold self-modified
+code and these pages are migrated, it also should be flushed dcache and
+invalided icache.
 
-On 06/16/2016 12:06 AM, Bjorn Andersson wrote:
-> On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
->
->> Normally used for management of; carveout, devmem and trace memory.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>   drivers/remoteproc/remoteproc_core.c | 174 +++++++++++++++++++++++++++++++++--
->>   1 file changed, 167 insertions(+), 7 deletions(-)
->>
-[..]
->> +}
->> +EXPORT_SYMBOL(rproc_subdev_add);
->
-Hi Bjorn,
+Therefore, page_mapping(page) check should be removed, otherwise icache
+maybe fetch stale instruction from PoU.
 
-> I worked up a prototype that allows remoteproc drivers to
-> programmatically specify carveout resources, which then are matched and
-> merged with entires from the resource table. I've given these
-> programmatically allocated carveouts a device so that the associated
-> allocation comes out of the specified region - or the rproc region if no
-> match is found.
->
-No sure to catch your exact use case, but let me try to explain what we 
-have today.
-There are different rproc in ST. Some request a large chunk of memory 
-for code and data, some have several dedicated memories like IRAM and DRAM.
-In that case carevout memories are defined as subdev (like vrings).
-Association is done thanks to carevout name in firmware resource table 
-(in rproc_handle_carveout).
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: stable at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+---
 
-Moreover, as our coprocessors have no iommu, we add some check on 
-allocated buffer to verify it fit with resource table declaration (pa).
-This allows to guarantee complete alignment between resources needed by 
-firmware and ones allocated by Linux kernel.
->
-> This solves my use case of carving out memory from two disjoint memory
-> regions for one of my remoteprocs, but differs from your approach in
-> that you specify one large carveout (and vrings) region and any
-> carveouts (or vrings) will chip away from this.
->
-> Would this approach work for you, or do you depend on having 1:N
-> relationship between your memory region and your resources?
->
+Change from v1:
+- update changelog suggested by Catalin.
+- add stable maillist 
 
-Is this approach covering your needs?
+ arch/arm64/mm/flush.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-Regards,
-Loic
-
-> Regards,
-> Bjorn
->
-> _______________________________________________
-> Kernel mailing list
-> Kernel at stlinux.com
-> http://www.stlinux.com/mailman/listinfo/kernel
->
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index dbd12ea..43a76b0 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -71,10 +71,6 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
+ {
+ 	struct page *page = pte_page(pte);
+ 
+-	/* no flushing needed for anonymous pages */
+-	if (!page_mapping(page))
+-		return;
+-
+ 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+ 		sync_icache_aliases(page_address(page),
+ 				    PAGE_SIZE << compound_order(page));
+-- 
+1.7.12.4
