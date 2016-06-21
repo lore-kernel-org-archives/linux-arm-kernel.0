@@ -1,66 +1,57 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Tue, 21 Jun 2016 20:07:50 +0200
-Subject: [PATCH] pci: Add support for unbinding the generic PCI host controller
-Message-ID: <57698276.6050606@siemens.com>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Tue, 21 Jun 2016 11:08:28 -0700
+Subject: [PATCH] ata: ahci_platform: Add ACPI support for APM X-Gene AHCI
+ controller v3 hardware.
+In-Reply-To: <6691907.FIx2xYmxSs@wuerfel>
+References: <stripathi@apm.com>
+ <1466034240-22694-1-git-send-email-stripathi@apm.com>
+ <6691907.FIx2xYmxSs@wuerfel>
+Message-ID: <CAOHikRCB4c79okd0q3=Lqwk7LKwZ6EDnWfHRH_oXokrB4PHcyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Particularly useful when working in virtual environments where the
-controller may come and go, but possibly not only there.
+On Wed, Jun 15, 2016 at 11:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Wednesday, June 15, 2016 5:44:00 PM CEST suman-tripathi wrote:
+> > This patch adds ACPI support for APM X-Gene AHCI controller in
+> > ahci_platform driver for v3 hardware. APM X-Gene AHCI controller
+> > v3 hardware is fully compliant with ahci_platform driver and requires
+> > no workaround quirk.
+> >
+> > Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> > ---
+> >  drivers/ata/ahci_platform.c |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> > index 62a04c8..3395baf 100644
+> > --- a/drivers/ata/ahci_platform.c
+> > +++ b/drivers/ata/ahci_platform.c
+> > @@ -86,6 +86,7 @@ MODULE_DEVICE_TABLE(of, ahci_of_match);
+> >
+> >  static const struct acpi_device_id ahci_acpi_match[] = {
+> >         { ACPI_DEVICE_CLASS(PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff) },
+> > +       { "APMC0D33", 0},
+> >         {},
+> >  };
+> >  MODULE_DEVICE_TABLE(acpi, ahci_acpi_match);
+> >
+>
+> Doesn't the ACPI_DEVICE_CLASS entry take care of this? I thought it had been
 
-Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
----
- drivers/pci/ecam.h                  |  1 +
- drivers/pci/host/pci-host-common.c  | 13 +++++++++++++
- drivers/pci/host/pci-host-generic.c |  1 +
- 3 files changed, 15 insertions(+)
 
-diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
-index 9878beb..5a5f607 100644
---- a/drivers/pci/ecam.h
-+++ b/drivers/pci/ecam.h
-@@ -63,5 +63,6 @@ extern struct pci_ecam_ops pci_generic_ecam_ops;
- /* for DT-based PCI controllers that support ECAM */
- int pci_host_common_probe(struct platform_device *pdev,
- 			  struct pci_ecam_ops *ops);
-+int pci_host_common_remove(struct platform_device *pdev);
- #endif
- #endif
-diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
-index 8cba7ab..c0ff4b1 100644
---- a/drivers/pci/host/pci-host-common.c
-+++ b/drivers/pci/host/pci-host-common.c
-@@ -164,6 +164,19 @@ int pci_host_common_probe(struct platform_device *pdev,
- 	}
- 
- 	pci_bus_add_devices(bus);
-+	platform_set_drvdata(pdev, bus);
-+	return 0;
-+}
-+
-+int pci_host_common_remove(struct platform_device *pdev)
-+{
-+	struct pci_bus *bus = platform_get_drvdata(pdev);
-+
-+	pci_lock_rescan_remove();
-+	pci_stop_root_bus(bus);
-+	pci_remove_root_bus(bus);
-+	pci_unlock_rescan_remove();
-+
- 	return 0;
- }
- 
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index 6eaceab..0a2e75b 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -65,6 +65,7 @@ static struct platform_driver gen_pci_driver = {
- 		.of_match_table = gen_pci_of_match,
- 	},
- 	.probe = gen_pci_probe,
-+	.remove = pci_host_common_remove,
- };
- module_platform_driver(gen_pci_driver);
- 
+yeah it also works. Just thought that we need something different as
+our's is a non-PCI SATA.
+>
+> added specifically for this purpose. It doesn't seem right to add vendor
+> specific entries for generic hardware in each generic driver.
+>
+>         Arnd
+
+
+
+
 -- 
-2.1.4
+Thanks,
+with regards,
+Suman Tripathi
