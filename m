@@ -1,38 +1,60 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 21 Jun 2016 12:57:13 +0100
-Subject: [PATCH] ARM: highbank: fix missing core.h include
-Message-ID: <1466510233-8409-1-git-send-email-ben.dooks@codethink.co.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 21 Jun 2016 14:00:51 +0200
+Subject: [PATCH] drm: atmel-hlcdc: Fix OF graph parsing
+In-Reply-To: <1464938795-1838-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1464938795-1838-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <57692C73.8020109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pm code is missing the declaration of highbank_pm_init()
-so include the local core.h it is defined in to fix the following
-warning:
+Le 03/06/2016 09:26, Boris Brezillon a ?crit :
+> atmel_hlcdc_create_outputs() iterates over OF graph nodes and releases
+> the node (using of_node_put()) after each iteration, which is wrong
+> since for_each_endpoint_of_node() is already taking care of that.
+> 
+> Move the of_node_put() call in the error path.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Fixes: 17a8e03e7e97 ("drm: atmel-hlcdc: rework the output code to support drm bridges")
 
-arch/arm/mach-highbank/pm.c:54:13: warning: symbol 'highbank_pm_init' was not declared. Should it be static?
+Reviewed-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Rob Herring <robh@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> index 39802c0..3d34fc4 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> @@ -266,9 +266,10 @@ int atmel_hlcdc_create_outputs(struct drm_device *dev)
+>  		if (!ret)
+>  			ret = atmel_hlcdc_check_endpoint(dev, &ep);
+>  
+> -		of_node_put(ep_np);
+> -		if (ret)
+> +		if (ret) {
+> +			of_node_put(ep_np);
+>  			return ret;
+> +		}
+>  	}
+>  
+>  	for_each_endpoint_of_node(dev->dev->of_node, ep_np) {
+> @@ -276,9 +277,10 @@ int atmel_hlcdc_create_outputs(struct drm_device *dev)
+>  		if (!ret)
+>  			ret = atmel_hlcdc_attach_endpoint(dev, &ep);
+>  
+> -		of_node_put(ep_np);
+> -		if (ret)
+> +		if (ret) {
+> +			of_node_put(ep_np);
+>  			return ret;
+> +		}
+>  	}
+>  
+>  	return 0;
+> 
 
-cC:
----
- arch/arm/mach-highbank/pm.c | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
-index 4003116..3580dde 100644
---- a/arch/arm/mach-highbank/pm.c
-+++ b/arch/arm/mach-highbank/pm.c
-@@ -23,6 +23,8 @@
- 
- #include <uapi/linux/psci.h>
- 
-+#include "core.h"
-+
- #define HIGHBANK_SUSPEND_PARAM \
- 	((0 << PSCI_0_2_POWER_STATE_ID_SHIFT) | \
- 	 (1 << PSCI_0_2_POWER_STATE_AFFL_SHIFT) | \
 -- 
-2.8.1
+Nicolas Ferre
