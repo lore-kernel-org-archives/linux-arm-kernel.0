@@ -1,36 +1,40 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 21 Jun 2016 11:35:43 +0200
-Subject: [PATCH] MAINTAINERS: update STi maintainer list
-Message-ID: <1466501743-21597-1-git-send-email-maxime.coquelin@st.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 21 Jun 2016 11:40:44 +0200
+Subject: [PATCH v2 00/15] clk: sunxi: introduce "modern" clock support
+In-Reply-To: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
+References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160621114044.811e2136eca5c1d863d79ac6@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove myself as STi maintainer as I will no longer have access to
-STi platforms, and remove Srini too, who now works on other
-platforms.
+On Tue,  7 Jun 2016 22:41:39 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Patrice will manage the pull requests.
+> The current code has been tested on the H3 and an Orange Pi PC,
+> including making sure that MMC still works, so the general approach
+> seems ok.
+> 
+> Let me know what you think,
 
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- MAINTAINERS | 2 --
- 1 file changed, 2 deletions(-)
+Hi Maxime,
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7304d2e37a98..1ea14565d9d8 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1689,8 +1689,6 @@ S:	Maintained
- F:	drivers/edac/altera_edac.
- 
- ARM/STI ARCHITECTURE
--M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
--M:	Maxime Coquelin <maxime.coquelin@st.com>
- M:	Patrice Chotard <patrice.chotard@st.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	kernel at stlinux.com
+I used your code in both the H3 and A83T, and it worked fine for the
+current clocks.
+
+But I had some problems with some features as the 'mode select' in the
+A83T MMC2 clock.
+Also, I think that you did not go far enough in the changes.
+For example, most clock gates as well as most resets could be removed
+from the DT and automatically set/de-asserted on clock prepare or clock
+enable.
+
+So, I am rewriting a generic sunxi clock driver into one file (about
+1000 lines) and I have the full (simpler and clearer) description of
+the H3 and the A863T clocks.
+
+Coding is not finished yet. I will submit a RFC as soon as I will have
+something working.
+
 -- 
-1.9.1
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
