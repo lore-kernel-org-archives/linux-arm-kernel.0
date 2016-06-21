@@ -1,167 +1,38 @@
-From: valentine.barshak@cogentembedded.com (Valentine Barshak)
-Date: Tue, 21 Jun 2016 18:41:00 +0300
-Subject: [PATCH v1 19/25] PCI: rcar Gen2: Request host bridge window
- resources
-In-Reply-To: <20160621142623.GA29966@localhost>
-References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <20160606230706.20936.13086.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <CAMuHMdVgLfTD-BjRZ+gVKgYE8dkDZzQ6DnYtkUs+jVPthJsEdQ@mail.gmail.com>
- <20160621142623.GA29966@localhost>
-Message-ID: <20160621154100.GA4782@cogentembedded.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Jun 2016 16:44:08 +0100
+Subject: [PATCH 2/2] arm: fix kernel image size
+In-Reply-To: <20160621105720.GK22406@atomide.com>
+References: <20160617194405.GN1041@n2100.armlinux.org.uk>
+ <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
+ <20160621074319.GH22406@atomide.com>
+ <20160621094737.GA5783@n2100.arm.linux.org.uk>
+ <20160621103810.GI22406@atomide.com>
+ <20160621105720.GK22406@atomide.com>
+Message-ID: <20160621154407.GB5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 09:26:23AM -0500, Bjorn Helgaas wrote:
-> [+cc Valentine]
-> 
-
-Hi Bjorn,
-
-> Hi Geert,
-> 
-> Thanks a lot for testing this, and sorry for the breakage.
-> 
-> On Tue, Jun 21, 2016 at 12:41:31PM +0200, Geert Uytterhoeven wrote:
-> > On Tue, Jun 7, 2016 at 1:07 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> > > Request host bridge window resources so they appear in ioport_resource and
-> > > iomem_resource and are reflected in /proc/ioports and /proc/iomem.
-> > >
-> > > Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> > > ---
-> > >  drivers/pci/host/pci-rcar-gen2.c |    4 ++++
-> > >  1 file changed, 4 insertions(+)
-> > >
-> > > diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
-> > > index 9980a4b..617a6b2 100644
-> > > --- a/drivers/pci/host/pci-rcar-gen2.c
-> > > +++ b/drivers/pci/host/pci-rcar-gen2.c
-> > > @@ -194,6 +194,7 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
-> > >         struct rcar_pci_priv *priv = sys->private_data;
-> > >         void __iomem *reg = priv->reg;
-> > >         u32 val;
-> > > +       int ret;
-> > >
-> > >         pm_runtime_enable(priv->dev);
-> > >         pm_runtime_get_sync(priv->dev);
-> > > @@ -275,6 +276,9 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
-> > >         /* Add PCI resources */
-> > >         pci_add_resource(&sys->resources, &priv->io_res);
-> > >         pci_add_resource(&sys->resources, &priv->mem_res);
-> > > +       ret = devm_request_pci_bus_resources(priv->dev, &sys->resources);
-> > > +       if (ret < 0)
-> > > +               return ret;
-> > >
-> > >         /* Setup bus number based on platform device id / of bus-range */
-> > >         sys->busnr = priv->busnr;
+On Tue, Jun 21, 2016 at 03:57:20AM -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [160621 03:41]:
+> > * Russell King - ARM Linux <linux@armlinux.org.uk> [160621 02:50]:
+> > > 
+> > > There isn't really an answer which will always work for this problem,
+> > > as I've already detailed in a previous thread discussing the issue.
+> > > Adding a zImage header don't fix the problem.
 > > 
-> > This patch (commit 1bd019707b7c9249d34c5d348f1ef75eb4d83e89 in pci/next)
-> > broke PCI on r8a7791/koelsch. Dmesg differences are:
-> > 
-> >  pci-rcar-gen2 ee090000.pci: PCI: bus0 revision 11
-> > -pci-rcar-gen2 ee090000.pci: PCI host bridge to bus 0000:00
-> > -pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
-> > -pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
+> > Well how about we change both comments and code to use a value
+> > that works?
 > 
-> This is probably a result of this code in drivers/pci/host/pci-rcar-gen2.c:
+> Maybe zImage size + MAX_RODATA_SZ + 4x zImage size?
 > 
->         /*
->          * The controller does not support/use port I/O,
->          * so setup a dummy port I/O region here.
->          */
->         priv->io_res.start = priv->mem_res.start;
->         priv->io_res.end = priv->mem_res.end;
->         priv->io_res.flags = IORESOURCE_IO;
-> 
-> We try to avoid adding dummy regions like this, but maybe we missed
-> this one.  I haven't found any email discussion about it yet, so I
-> don't know what the reason for this one is.  Valentine, do you
-> remember?
+> Then the MAX_RODATA_SZ could be 2 or 4 MB or whatever we
+> think is sufficient to kick the can until we have a better
+> solution.
 
-I do not, but I think I've found something in my mailbox.
-Below is the quote from the original conversation with:
-(Re: [PATCH] pci: Add R-Car Gen2 internal PCI support)
-
-[quote starts]
- >>+    priv->mem_res = *mem_res;
- >>+    /*
- >>+     * The controller does not support/use port I/O,
- >>+     * so setup a dummy port I/O region here.
- >>+     */
- >>+    priv->io_res.start = priv->mem_res.start;
- >>+    priv->io_res.end = priv->mem_res.end;
- >>+    priv->io_res.flags = IORESOURCE_IO;
- >>
- > I don't understand this.  There's no requirement (at least as far as the
- > PCI core is concerned) to supply an I/O aperture at all, and I think it
- > would be better if you didn't.
- >
- > Oh, I see ... maybe pcibios_init_resources() forces you to have an
- > I/O resource to avoid having it give you a default one?  And I
- > suppose that since you have several host bridges, these dummy I/O
- > regions have to be distinct.  Ugh.  Well, I guess this is something
- > you'd have to fix here or in the ARM code, it's up to you what to do.
-
- Exactly. This is to avoid assigning default I/O resources.
-[quote ends]
-
-> 
-> Can you try the patch below (apply it before the 1bd019707b7c patch
-> that broke things)?
-> 
-> 
-> commit b64dc28f5f2b3afe47ee4a42fb79db84ec4227f8
-> Author: Bjorn Helgaas <bhelgaas@google.com>
-> Date:   Tue Jun 21 09:19:34 2016 -0500
-> 
->     PCI: rcar: Drop gen2 dummy I/O port region
->     
->     Previously we added a dummy I/O port region even though the R-Car
->     controller doesn't support PCI port I/O.  This resulted in bogus root bus
->     resources like this:
->     
->       pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
->       pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
->     
->     Drop the unused dummy I/O port region.
->     
->     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
-> index 9980a4b..53ae619 100644
-> --- a/drivers/pci/host/pci-rcar-gen2.c
-> +++ b/drivers/pci/host/pci-rcar-gen2.c
-> @@ -97,7 +97,6 @@
->  struct rcar_pci_priv {
->  	struct device *dev;
->  	void __iomem *reg;
-> -	struct resource io_res;
->  	struct resource mem_res;
->  	struct resource *cfg_res;
->  	unsigned busnr;
-> @@ -273,7 +272,6 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
->  		rcar_pci_setup_errirq(priv);
->  
->  	/* Add PCI resources */
-> -	pci_add_resource(&sys->resources, &priv->io_res);
->  	pci_add_resource(&sys->resources, &priv->mem_res);
->  
->  	/* Setup bus number based on platform device id / of bus-range */
-> @@ -371,14 +369,6 @@ static int rcar_pci_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	priv->mem_res = *mem_res;
-> -	/*
-> -	 * The controller does not support/use port I/O,
-> -	 * so setup a dummy port I/O region here.
-> -	 */
-> -	priv->io_res.start = priv->mem_res.start;
-> -	priv->io_res.end = priv->mem_res.end;
-> -	priv->io_res.flags = IORESOURCE_IO;
-> -
->  	priv->cfg_res = cfg_res;
->  
->  	priv->irq = platform_get_irq(pdev, 0);
+Maybe if you give some details about your failing case - you omitted any
+details about the uncompressed image size...
 
 -- 
-Thanks,
-Val.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
