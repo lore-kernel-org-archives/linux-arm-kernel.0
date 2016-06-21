@@ -1,70 +1,38 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 21 Jun 2016 18:50:58 +0100
-Subject: [GIT PULL v2] drivers: firmware: scpi updates for v4.8
-Message-ID: <57697E82.7010009@arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 21 Jun 2016 18:52:54 +0100
+Subject: [PATCH] usb: renesas_usbhs: make usbhs_write32() static
+Message-ID: <1466531574-3096-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC team,
+The usbhs_write32 function is not used outside of the rcar3.c
+file, so fix the following sparse warning by making it static:
 
-Here are few updates for SCPI drivers for v4.8.
+drivers/usb/renesas_usbhs/rcar3.c:26:6: warning: symbol 'usbhs_write32' was not declared. Should it be static?
 
-The DT binding have been Acked by DT maintainer(Mark R)
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-usb at vger.kernel.org
+Cc: linux-renesas-soc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/usb/renesas_usbhs/rcar3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Also as most of the genpd code is in drivers/soc and SCPI can be used on
-any SoC, runtime PM maintainers(Ulf and Kevin H) have agreed to keep the 
-SCPI genpd based power domain driver in drivers/firmware for now.
-They have provided their Reviewed-by tags.
-
-Please pull !
-
-v1->v2:
-	- Incorporated couple of minor nits suggested by Kevin
-	- Added Kevin's Reviewed-by tag[1]
-
+diff --git a/drivers/usb/renesas_usbhs/rcar3.c b/drivers/usb/renesas_usbhs/rcar3.c
+index 38b01f2..1d70add 100644
+--- a/drivers/usb/renesas_usbhs/rcar3.c
++++ b/drivers/usb/renesas_usbhs/rcar3.c
+@@ -23,7 +23,7 @@
+ #define UGCTRL2_RESERVED_3	0x00000001	/* bit[3:0] should be B'0001 */
+ #define UGCTRL2_USB0SEL_OTG	0x00000030
+ 
+-void usbhs_write32(struct usbhs_priv *priv, u32 reg, u32 data)
++static void usbhs_write32(struct usbhs_priv *priv, u32 reg, u32 data)
+ {
+ 	iowrite32(data, priv->base + reg);
+ }
 -- 
-Regards,
-Sudeep
-
-[1] https://marc.info/?l=linux-kernel&m=146644540232320&w=2
-
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-
-   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
-tags/scpi-updates-4.8
-
-for you to fetch changes up to 8bec4337ad4023b26de35d3b0c3a3b2735ffc5c7:
-
-   firmware: scpi: add device power domain support using genpd 
-(2016-06-21 10:26:51 +0100)
-
-----------------------------------------------------------------
-SCPI updates and fixes for v4.8
-
-1. Adds support for device power state management using generic power
-    domains and runtime PM
-
-2. Other minor/miscellaneous fixes to the driver
-
-----------------------------------------------------------------
-Sudeep Holla (6):
-       firmware: arm_scpi: remove dvfs_get packed structure
-       firmware: arm_scpi: mark scpi_get_sensor_value as static
-       firmware: arm_scpi: make it depend on MAILBOX instead of ARM_MHU
-       firmware: arm_scpi: add support for device power state management
-       Documentation: add DT bindings for ARM SCPI power domains
-       firmware: scpi: add device power domain support using genpd
-
-  Documentation/devicetree/bindings/arm/arm,scpi.txt |  34 +++++
-  drivers/firmware/Kconfig                           |  12 +-
-  drivers/firmware/Makefile                          |   1 +
-  drivers/firmware/arm_scpi.c                        |  42 +++++-
-  drivers/firmware/scpi_pm_domain.c                  | 163 
-+++++++++++++++++++++
-  include/linux/scpi_protocol.h                      |   2 +
-  6 files changed, 245 insertions(+), 9 deletions(-)
-  create mode 100644 drivers/firmware/scpi_pm_domain.c
+2.8.1
