@@ -1,40 +1,52 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 21 Jun 2016 12:29:05 +0800
-Subject: [PATCH] dt-bindings: ci-hdrc-usb2:
- s/gadget-itc-setting/itc-setting in example
-In-Reply-To: <1466064798-867-1-git-send-email-jszhang@marvell.com>
-References: <1466064798-867-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160621042905.GH26936@shlinux2>
+From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
+Date: Tue, 21 Jun 2016 11:56:32 +0800
+Subject: [PATCH net-next 12/19] net: hns: fix bug of getting the wrong tcam
+ data
+In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
+References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1466481399-70080-13-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 04:13:18PM +0800, Jisheng Zhang wrote:
-> What the code expect is "itc-setting" rather than "gadget-itc-setting",
-> and this is also correctly described in the optional properties.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> index 1084e2b..341dc67 100644
-> --- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> @@ -93,7 +93,7 @@ Example:
->  		phys = <&usb_phy0>;
->  		phy-names = "usb-phy";
->  		vbus-supply = <&reg_usb0_vbus>;
-> -		gadget-itc-setting = <0x4>; /* 4 micro-frames */
-> +		itc-setting = <0x4>; /* 4 micro-frames */
->  		 /* Incremental burst of unspecified length */
->  		ahb-burst-config = <0x0>;
->  		tx-burst-size-dword = <0x10>; /* 64 bytes */
-> -- 
+From: Daode Huang <huangdaode@hisilicon.com>
 
-Applied, thanks.
+The current driver stores the high bit value of tcam data register
+to the tcam data low element, stores the low bit value of tcam data
+register to tcam data high element, this patch fixes this bug.
 
+Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
+---
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+index 0958ceb..7f5c248 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+@@ -975,9 +975,9 @@ static void hns_dsaf_tcam_uc_get(
+ 
+ 	/*read tcam data*/
+ 	ptbl_tcam_data->tbl_tcam_data_high
+-		= dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_LOW_0_REG);
+-	ptbl_tcam_data->tbl_tcam_data_low
+ 		= dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_HIGH_0_REG);
++	ptbl_tcam_data->tbl_tcam_data_low
++		= dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_LOW_0_REG);
+ 
+ 	/*read tcam mcast*/
+ 	tcam_read_data0 = dsaf_read_dev(dsaf_dev,
+@@ -1027,9 +1027,9 @@ static void hns_dsaf_tcam_mc_get(
+ 
+ 	/*read tcam data*/
+ 	ptbl_tcam_data->tbl_tcam_data_high =
+-		dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_LOW_0_REG);
+-	ptbl_tcam_data->tbl_tcam_data_low =
+ 		dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_HIGH_0_REG);
++	ptbl_tcam_data->tbl_tcam_data_low =
++		dsaf_read_dev(dsaf_dev, DSAF_TBL_TCAM_RDATA_LOW_0_REG);
+ 
+ 	/*read tcam mcast*/
+ 	ptbl_tcam_mcast->tbl_mcast_port_msk[0] =
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
