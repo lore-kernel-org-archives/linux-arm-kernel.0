@@ -1,51 +1,84 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 21 Jun 2016 11:20:23 +0100
-Subject: [[PATCH v2] 02/11] ARM: Samsung: fixup endian issues in cpu detection
+Date: Tue, 21 Jun 2016 11:20:25 +0100
+Subject: [[PATCH v2] 04/11] ARM: EXYNOS: fixup endian in pm/pmu
 In-Reply-To: <1466504432-24187-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1466504432-24187-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1466504432-24187-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1466504432-24187-5-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the system is built for big endian, then the cpu identificaiton register
-will be read in the wrong order. Fix this by using readl_relaxed() on the
-register.
+Fix the PMU code endian access code to deal with kernels built for big endian
+operation.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/plat-samsung/cpu.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-exynos/common.h     | 4 ++--
+ arch/arm/mach-exynos/pm.c         | 4 ++--
+ arch/arm/mach-exynos/pm_domains.c | 6 +++---
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/cpu.c b/arch/arm/plat-samsung/cpu.c
-index 71333bb..bd12a55 100644
---- a/arch/arm/plat-samsung/cpu.c
-+++ b/arch/arm/plat-samsung/cpu.c
-@@ -29,14 +29,14 @@ EXPORT_SYMBOL(samsung_rev);
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 5365bf1..19e9d25 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -174,12 +174,12 @@ extern int exynos_get_boot_addr(u32 core_id, unsigned long *boot_addr);
  
- void __init s3c64xx_init_cpu(void)
+ static inline void pmu_raw_writel(u32 val, u32 offset)
  {
--	samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0x118);
-+	samsung_cpu_id = readl_relaxed(S3C_VA_SYS + 0x118);
- 	if (!samsung_cpu_id) {
- 		/*
- 		 * S3C6400 has the ID register in a different place,
- 		 * and needs a write before it can be read.
- 		 */
--		__raw_writel(0x0, S3C_VA_SYS + 0xA1C);
--		samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0xA1C);
-+		writel_relaxed(0x0, S3C_VA_SYS + 0xA1C);
-+		samsung_cpu_id = readl_relaxed(S3C_VA_SYS + 0xA1C);
+-	__raw_writel(val, pmu_base_addr + offset);
++	writel_relaxed(val, pmu_base_addr + offset);
+ }
+ 
+ static inline u32 pmu_raw_readl(u32 offset)
+ {
+-	return __raw_readl(pmu_base_addr + offset);
++	return readl_relaxed(pmu_base_addr + offset);
+ }
+ 
+ #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index c43b776..52d78eb 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -132,9 +132,9 @@ static void exynos_set_wakeupmask(long mask)
+ 
+ static void exynos_cpu_set_boot_vector(long flags)
+ {
+-	__raw_writel(virt_to_phys(exynos_cpu_resume),
++	writel_relaxed(virt_to_phys(exynos_cpu_resume),
+ 		     exynos_boot_vector_addr());
+-	__raw_writel(flags, exynos_boot_vector_flag());
++	writel_relaxed(flags, exynos_boot_vector_flag());
+ }
+ 
+ static int exynos_aftr_finisher(unsigned long flags)
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 875a2ba..0e075d9 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -70,12 +70,12 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
  	}
  
- 	samsung_cpu_rev = 0;
-@@ -46,7 +46,7 @@ void __init s3c64xx_init_cpu(void)
+ 	pwr = power_on ? INT_LOCAL_PWR_EN : 0;
+-	__raw_writel(pwr, base);
++	writel_relaxed(pwr, base);
  
- void __init s5p_init_cpu(void __iomem *cpuid_addr)
- {
--	samsung_cpu_id = __raw_readl(cpuid_addr);
-+	samsung_cpu_id = readl_relaxed(cpuid_addr);
- 	samsung_cpu_rev = samsung_cpu_id & 0xFF;
+ 	/* Wait max 1ms */
+ 	timeout = 10;
  
- 	pr_info("Samsung CPU ID: 0x%08lx\n", samsung_cpu_id);
+-	while ((__raw_readl(base + 0x4) & INT_LOCAL_PWR_EN) != pwr) {
++	while ((readl_relaxed(base + 0x4) & INT_LOCAL_PWR_EN) != pwr) {
+ 		if (!timeout) {
+ 			op = (power_on) ? "enable" : "disable";
+ 			pr_err("Power domain %s %s failed\n", domain->name, op);
+@@ -185,7 +185,7 @@ static __init int exynos4_pm_init_power_domain(void)
+ 			clk_put(pd->oscclk);
+ 
+ no_clk:
+-		on = __raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN;
++		on = readl_relaxed(pd->base + 0x4) & INT_LOCAL_PWR_EN;
+ 
+ 		pm_genpd_init(&pd->pd, NULL, !on);
+ 		of_genpd_add_provider_simple(np, &pd->pd);
 -- 
 2.8.1
