@@ -1,39 +1,98 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 21 Jun 2016 17:10:48 +0100
-Subject: [PATCH v3 1/7] coresight: Remove erroneous dma_free_coherent in
- tmc_probe
+Date: Tue, 21 Jun 2016 17:10:54 +0100
+Subject: [PATCH v3 7/7] coresight: Add better messages for coresight_timeout
 In-Reply-To: <1466525454-14702-1-git-send-email-suzuki.poulose@arm.com>
 References: <1466525454-14702-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1466525454-14702-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1466525454-14702-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
-removed the static allocation of buffer for the trace data in ETR mode in
-tmc_probe. However it failed to remove the "devm_free_coherent" in
-tmc_probe when the probe fails due to other reasons. This patch gets
-rid of the incorrect dma_free_coherent() call.
+When we encounter a timeout waiting for a status change via
+coresight_timeout, the caller always print the offset which
+was tried. This is pretty much useless as it doesn't specify
+the bit position we wait for. Also, one needs to lookup the
+TRM to figure out, what was wrong. This patch changes all
+such error messages to print something more meaningful.
 
-Fixes: commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 6 ++----
+ drivers/hwtracing/coresight/coresight-etm4x.c | 6 ++----
+ drivers/hwtracing/coresight/coresight-tmc.c   | 6 ++----
+ 3 files changed, 6 insertions(+), 12 deletions(-)
 
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 4d20b0b..3b483e3 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -184,8 +184,7 @@ static void etb_disable_hw(struct etb_drvdata *drvdata)
+ 
+ 	if (coresight_timeout(drvdata->base, ETB_FFCR, ETB_FFCR_BIT, 0)) {
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			ETB_FFCR);
++		"timeout while waiting for completion of Manual Flush\n");
+ 	}
+ 
+ 	/* disable trace capture */
+@@ -193,8 +192,7 @@ static void etb_disable_hw(struct etb_drvdata *drvdata)
+ 
+ 	if (coresight_timeout(drvdata->base, ETB_FFSR, ETB_FFSR_BIT, 1)) {
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			ETB_FFCR);
++			"timeout while waiting for Formatter to Stop\n");
+ 	}
+ 
+ 	CS_LOCK(drvdata->base);
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 88947f3..c8b44c6 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -111,8 +111,7 @@ static void etm4_enable_hw(void *info)
+ 	/* wait for TRCSTATR.IDLE to go up */
+ 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 1))
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			TRCSTATR);
++			"timeout while waiting for Idle Trace Status\n");
+ 
+ 	writel_relaxed(config->pe_sel, drvdata->base + TRCPROCSELR);
+ 	writel_relaxed(config->cfg, drvdata->base + TRCCONFIGR);
+@@ -184,8 +183,7 @@ static void etm4_enable_hw(void *info)
+ 	/* wait for TRCSTATR.IDLE to go back down to '0' */
+ 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 0))
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			TRCSTATR);
++			"timeout while waiting for Idle Trace Status\n");
+ 
+ 	CS_LOCK(drvdata->base);
+ 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 9e02ac9..3978cbb 100644
+index b3275bb..84052c7 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -388,9 +388,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- err_misc_register:
- 	coresight_unregister(drvdata->csdev);
- err_devm_kzalloc:
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
--		dma_free_coherent(dev, drvdata->size,
--				drvdata->vaddr, drvdata->paddr);
- 	return ret;
+@@ -38,8 +38,7 @@ void tmc_wait_for_tmcready(struct tmc_drvdata *drvdata)
+ 	if (coresight_timeout(drvdata->base,
+ 			      TMC_STS, TMC_STS_TMCREADY_BIT, 1)) {
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			TMC_STS);
++			"timeout while waiting for TMC to be Ready\n");
+ 	}
  }
  
+@@ -56,8 +55,7 @@ void tmc_flush_and_stop(struct tmc_drvdata *drvdata)
+ 	if (coresight_timeout(drvdata->base,
+ 			      TMC_FFCR, TMC_FFCR_FLUSHMAN_BIT, 0)) {
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			TMC_FFCR);
++		"timeout while waiting for completion of Manual Flush\n");
+ 	}
+ 
+ 	tmc_wait_for_tmcready(drvdata);
 -- 
 1.9.1
