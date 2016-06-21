@@ -1,67 +1,83 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 21 Jun 2016 15:45:09 +0100
-Subject: [RFC PATCH 6/8] PM / Domains: Remove a provider by referencing
- the data pointer
-In-Reply-To: <1457090634-14785-7-git-send-email-jonathanh@nvidia.com>
-References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
- <1457090634-14785-7-git-send-email-jonathanh@nvidia.com>
-Message-ID: <576952F5.5020808@nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 21 Jun 2016 16:47:52 +0200
+Subject: [PATCH v2 00/15] clk: sunxi: introduce "modern" clock support
+In-Reply-To: <20160621114044.811e2136eca5c1d863d79ac6@free.fr>
+References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
+ <20160621114044.811e2136eca5c1d863d79ac6@free.fr>
+Message-ID: <20160621144752.GR26668@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jean-Francois,
 
-On 04/03/16 11:23, Jon Hunter wrote:
-> To remove a PM domain from the system, it is necessary to ensure
-> that any PM domain providers associated with the PM domain have
-> been removed. Otherwise it could be possible to obtain a pointer
-> to a PM domain structure that has been removed.
+On Tue, Jun 21, 2016 at 11:40:44AM +0200, Jean-Francois Moine wrote:
+> On Tue,  7 Jun 2016 22:41:39 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> PM domains now have a reference to the pointer for the PM domain
-> provider's data variable. Add a function so that a PM domain can
-> remove a PM domain provider by referencing the data pointer.
+> > The current code has been tested on the H3 and an Orange Pi PC,
+> > including making sure that MMC still works, so the general approach
+> > seems ok.
+> > 
+> > Let me know what you think,
 > 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  drivers/base/power/domain.c | 24 ++++++++++++++++++++++++
->  include/linux/pm_domain.h   |  2 ++
->  2 files changed, 26 insertions(+)
+> Hi Maxime,
 > 
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 72055fef6256..438885f2455f 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1738,6 +1738,30 @@ void of_genpd_del_provider(struct device_node *np)
->  EXPORT_SYMBOL_GPL(of_genpd_del_provider);
->  
->  /**
-> + * of_genpd_del_provider_by_data() - Remove a registered PM domain provider
-> + * @data: Pointer to the data associated with the PM domain provider
-> + *
-> + * Look up a PM domain provider based upon a pointer to it's data and
-> + * remove the PM domain provider from the list of providers.
-> + */
-> +void of_genpd_del_provider_by_data(void *data)
-> +{
-> +	struct of_genpd_provider *c, *cp;
-> +
-> +	mutex_lock(&of_genpd_mutex);
-> +	list_for_each_entry_safe(cp, c, &of_genpd_providers, link) {
-> +		if (cp->data == data) {
-> +			list_del(&cp->link);
-> +			of_node_put(cp->node);
-> +			kfree(cp);
-> +			break;
-> +		}
-> +	}
-> +	mutex_unlock(&of_genpd_mutex);
+> I used your code in both the H3 and A83T, and it worked fine for the
+> current clocks.
 
-On further the thought I believe that the above does not need to be safe
-variant of list_for_each_entry because we are breaking out of the loop
-when we find the one we are looking for. of_genpd_del_provider() does
-the same.
+I'm glad it works :)
 
-Cheers
-Jon
+Your reviews have been appreciated, I'll address them in my v3.
+
+> But I had some problems with some features as the 'mode select' in the
+> A83T MMC2 clock.
+> Also, I think that you did not go far enough in the changes.
+
+At some point, you also have to support what's used out there,
+otherwise it just becomes an un-maintainable mess. Plus, it really
+doesn't have to be perfect from day one, it just has to works as it
+used to, we can always add more stuff later on.
+
+At it works way better than what we had.
+
+The question also is: is there anyone that we depend on using it
+(mainline u-boot)? and is it something we need? If both answers are
+no, then it's just dead code, which shouldn't be here in the first
+place.
+
+> For example, most clock gates as well as most resets could be removed
+> from the DT and automatically set/de-asserted on clock prepare or clock
+> enable.
+
+No. The semantics are completely different between the bus gates, bus
+resets and the module clocks. For example, the module clock can be
+shut down while retaining the register state, while the gate clock
+can't. And drivers are already using that semantic.
+
+Some other problems arise from that as well: this would break the DT
+ABI, and it deviates way too much from what the other SoCs are doing
+(which is the whole reason for that rework in the first place).
+
+> So, I am rewriting a generic sunxi clock driver into one file (about
+> 1000 lines) and I have the full (simpler and clearer) description of
+> the H3 and the A863T clocks.
+> 
+> Coding is not finished yet. I will submit a RFC as soon as I will have
+> something working.
+
+Please don't. I don't want to waste any more time on this, this is way
+overdue.
+
+Maxime
 
 -- 
-nvpublic
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160621/296447dd/attachment.sig>
