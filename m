@@ -1,35 +1,32 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Tue, 21 Jun 2016 17:55:00 +0800
-Subject: [PATCH v4 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for
- mt2701
-In-Reply-To: <20160621094116.GD28248@8bytes.org>
-References: <1465379461-14757-1-git-send-email-honghui.zhang@mediatek.com>
- <1465379461-14757-6-git-send-email-honghui.zhang@mediatek.com>
- <20160621094116.GD28248@8bytes.org>
-Message-ID: <1466502900.8787.2.camel@mtksdaap41>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 21 Jun 2016 11:59:44 +0200
+Subject: [RFC PATCH 15/15] iommu/exynos: update to use iommu big-endian
+In-Reply-To: <20160608183110.13851-16-matthew@mattleach.net>
+References: <20160608183110.13851-1-matthew@mattleach.net>
+ <20160608183110.13851-16-matthew@mattleach.net>
+Message-ID: <20160621095944.GF28248@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-06-21 at 11:41 +0200, Joerg Roedel wrote:
-> On Wed, Jun 08, 2016 at 05:51:01PM +0800, honghui.zhang at mediatek.com wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > 
-> > Add the dtsi node of iommu and smi for mt2701.
-> > 
-> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > ---
-> >  arch/arm/boot/dts/mt2701.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 51 insertions(+)
+On Wed, Jun 08, 2016 at 07:31:10PM +0100, Matthew Leach wrote:
+> From: Ben Dooks <ben.dooks@codethink.co.uk>
 > 
-> Applied the series, except this last patch. It didn't apply cleanly and
-> I was not sure how to correctly fix that. Can you please resubmit the
-> patch based on my arm/mediatek branch once I pushed it?
+> Add initial support for big endian by always writing the pte
+> in le32. Note, revisit if hardware capable of doing big endian
+> fetches.
 > 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: iommu at lists.linux-foundation.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org (open list)
+> ---
+>  drivers/iommu/exynos-iommu.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
-I will rebase this one later after your push.
-Thanks.
-
-> Thanks,
-> 
-> 	Joerg
-> 
+Applied, thanks.
