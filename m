@@ -1,47 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 21 Jun 2016 16:25:14 +0300
-Subject: [PATCH net-next 16/19] net: hns: fix bug that alloc skb fail lead
- to port unavailable
-In-Reply-To: <1466481399-70080-17-git-send-email-Yisen.Zhuang@huawei.com>
-References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
- <1466481399-70080-17-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <097b1147-3587-9579-0f94-f42be130773c@cogentembedded.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 21 Jun 2016 15:25:15 +0200
+Subject: Warning when compiling DTB on X-Gene platform with dtc
+ 1.4.1-g53bf130b
+In-Reply-To: <CADaLNDnfH8Weo=9jVNAW7LQCvAw23-z5fafwWcer4FSKeYH=ug@mail.gmail.com>
+References: <CADaLNDnfH8Weo=9jVNAW7LQCvAw23-z5fafwWcer4FSKeYH=ug@mail.gmail.com>
+Message-ID: <20160621132515.GC22350@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Jun 21, 2016 at 02:02:44AM -0700, Duc Dang wrote:
+> Hi Rob,
+> 
+> I got warning on unit_address_vs_reg similar to this
+> https://lkml.org/lkml/2016/3/7/43 when using v4.7-rc2 dtc to build dtb
+> for X-Gene Mustang:
+> 
+> dhdang at xgene-next=>./scripts/dtc/dtc -O dtb -R 16 -o mustang.dtb
+> arch/arm64/boot/dts/apm/apm-mustang.dts
+>   Warning (unit_address_vs_reg): Node /soc/reboot at 17000014 has a unit
+> name, but no reg property
+>   Warning (unit_address_vs_reg): Node /memory has a reg or ranges
+> property, but no unit name
+>   Warning (unit_address_vs_reg): Node /gpio-keys/button at 1 has a unit
+> name, but no reg property
+> 
+> There are nodes that I cannot change the node-name due to backward
+> compatible with old firmware reason (/soc/reboot at 17000014 as an
+> example). Is there any other way to avoid the warning?
 
-On 6/21/2016 6:56 AM, Yisen Zhuang wrote:
+I think you have that backwards around. The Kernel needs to be
+backwards compatible with old DT blobs. DT blobs don't generally need
+to be backwards compatible to older kernels.
 
-> From: Jun He <hjat2005@huawei.com>
->
-> When hns_nic_poll_rx_skb alloc skb fail, it will break receive cycle and
-> read new fbd_num to start new receive cycle. It recomputes cycle num is
-> fbd_num minus clean_count, actually this cycle num is too big because
-> it drop out receive cycle. It brings about the port unavailable.
->
-> So we will goto out when alloc skb fail to fix this bug.
->
-> Signed-off-by: Jun He <hjat2005@huawei.com>
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
-> ---
->  drivers/net/ethernet/hisilicon/hns/hns_enet.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-> index f49246d..c0ce37b 100644
-> --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-> +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-> @@ -768,10 +768,10 @@ recv:
->  			clean_count = 0;
->  		}
->
-> -		/* poll one pkg*/
-> +		/* poll one pkt*/
+However, the kernel should however be happy with or without the unit
+name. The unit name is pointless in this case.
 
-    How about adding a space before */?
-
-[...]
-
-MBR, Sergei
+	Andrew
