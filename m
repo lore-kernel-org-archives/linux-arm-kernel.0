@@ -1,58 +1,120 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 21 Jun 2016 17:10:52 +0100
-Subject: [PATCH v3 5/7] coresight: etmv4: Fix ETMv4x peripheral ID table
-In-Reply-To: <1466525454-14702-1-git-send-email-suzuki.poulose@arm.com>
-References: <1466525454-14702-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1466525454-14702-6-git-send-email-suzuki.poulose@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 21 Jun 2016 22:03:41 +0530
+Subject: [PATCH 2/4] dmaengine: vdma: Add support for mulit-channel dma
+ mode
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A5B8248@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
+ <1465549954-30220-3-git-send-email-appanad@xilinx.com>
+ <20160621155502.GB16910@localhost>
+ <C246CAC1457055469EF09E3A7AC4E11A4A5B8248@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20160621163340.GE16910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up the peripheral id table for different ETMv4
-implementations.
+On Tue, Jun 21, 2016 at 04:02:05PM +0000, Appana Durga Kedareswara Rao wrote:
+> Hi Vinod,
+> 
+> 	Thanks for the review...
+> 
+> > 
+> > On Fri, Jun 10, 2016 at 02:42:32PM +0530, Kedareswara rao Appana wrote:
+> > > This patch adds support for AXI DMA multi-channel dma mode
+> > > Multichannel mode enables DMA to connect to multiple masters And
+> > > slaves on the streaming side.
+> > > In Multichannel mode AXI DMA supports 2D transfers.
+> > 
+> > Funny formatting!
+> 
+> Will fix in next version...
+> 
+> > 
+> > Can you elobrate what you meant by Multichannel mode? This patch seems to
+> > do two things, one is to add interleaved dma support and something else. Can
+> > you explain the latter part?
+> 
+> AXI DMA has two Stream interfaces (Memory to Stream MM2S and Stream to Memory S2MM)
 
-As per Cortex-A53 TRM, the ETM has following id values:
+what is a stream in this context?
 
-Peripheral ID0	0x5D	0xFE0
-Peripheral ID1	0xB9	0xFE4
-Peripheral ID2	0x4B	0xFE8
-Peripheral ID3	0x00	0xFEC
+> In Multi-Channel dma mode each stream interface can be configured up to 16 channels.
+> In Multi-channel DMA mode IP supports only interleaved transfers (2-D transfers).
 
-where, PID2: has the following format:
 
-[7:4]   Revision
-[3]     JEDEC   0b1     res1. Indicates a JEP106 identity code is used
-[2:0]   DES_1   0b011   ARM Limited. This is bits[6:4] of JEP106 ID code
+> 
+> > 
+> > >  /**
+> > > + * struct xilinx_mcdma_config - DMA Multi channel configuration
+> > > +structure
+> > > + * @tdest: Channel to operate on
+> > > + * @tid:   Channel configuration
+> > > + * @tuser: Tuser configuration
+> > > + * @ax_user: ax_user value
+> > > + * @ax_cache: ax_cache value
+> > > + */
+> > > +struct xilinx_mcdma_config {
+> > > +	u8 tdest;
+> > > +	u8 tid;
+> > > +	u8 tuser;
+> > > +	u8 ax_user;
+> > > +	u8 ax_cache;
+> > 
+> > can you describe these in details, what do these do, what are the values to be
+> > programmed?
+> 
+> As said above In Multi-Channel Mode each Stream interface can be 
+> Configured up to 16 channels each channel is differentiated based on the tdest and tid values.
 
-The existing table entry checks only the bits [1:0], which is not
-sufficient enough. Fix it to match bits [3:0], just like the other
-entries do. While at it, correct the comment for A57 and the A53 entry.
+Then why are you not registering 16 channels for this? That should give you
+channel to operate on!
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> tdest:
+> TDEST provides routing information for the data stream.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 462f0dc..88947f3 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -815,12 +815,12 @@ err_arch_supported:
- }
- 
- static struct amba_id etm4_ids[] = {
--	{       /* ETM 4.0 - Qualcomm */
--		.id	= 0x0003b95d,
--		.mask	= 0x0003ffff,
-+	{       /* ETM 4.0 - Cortex-A53  */
-+		.id	= 0x000bb95d,
-+		.mask	= 0x000fffff,
- 		.data	= "ETM 4.0",
- 	},
--	{       /* ETM 4.0 - Juno board */
-+	{       /* ETM 4.0 - Cortex-A57 */
- 		.id	= 0x000bb95e,
- 		.mask	= 0x000fffff,
- 		.data	= "ETM 4.0",
+pls elobrate
+
+> TDEST values are static for the entire packet.
+
+what do these mean
+
+> 
+> tid:
+> Provides a stream identifier. TID values are static for entire packet.
+> TID values provided in the TX descriptor field are presented on
+> TID signals of the streaming side.
+
+what is this used for?
+
+> 
+> tuser:
+> Sideband signals used for user-defined information.
+> TUSER values are static for entire packet. TUSER values provided in the TX
+> Descriptor field are presented on TUSER signals of streaming side.
+
+what is this used for?
+
+> 
+> ax_user: 
+> Sideband signals used for user-defined information
+> ARUSER values and their interpretations are user-defined
+
+How is it used by client?
+
+> 
+> ax_cache:
+> Cache type this signal provides additional information about the cacheable
+> Characteristics of the transfer.
+
+and what are those...
+
+> 
+> In the above parameters tdest and tid are mandatory to differentiate b/w different channels
+> Other parameters are optional please let me know if you don't want me to 
+> Include other optional parameters will remove in the next version.
+
+dmaengine provides channel as an argument so it is quite odd that you need
+to differentiate b/w different channels. This only makes me worry that
+things are not standard and fishy
+
 -- 
-1.9.1
+~Vinod
