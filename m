@@ -1,41 +1,64 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Tue, 21 Jun 2016 11:56:21 +0800
-Subject: [PATCH net-next 01/19] net: hns: bug fix of ge reset sequence
+Date: Tue, 21 Jun 2016 11:56:35 +0800
+Subject: [PATCH net-next 15/19] net: hns: bug fix about led control logic when
+ link down
 In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1466481399-70080-2-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1466481399-70080-16-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qianqian Xie <xieqianqian@huawei.com>
+From: Daode Huang <huangdaode@hisilicon.com>
 
-The bit fileds of PPE reset register are different between HNS v1 and
-HNS v2, but the current procedure just only match HNS v1. Here is a
-patch to fix it.
+The default driver sets anchor led bit to 0 when link down,
+actually, the anchor bit should be set to 1, so fixes it when
+link status is down.
+Secondly, change the return value of cpld_set_led_id to 0, which
+means leave the cpld to control led blink frequece other than the
+driver itself.
 
-Signed-off-by: Kejian Yan <yankejian@huawei.com>
-Signed-off-by: Qianqian Xie <xieqianqian@huawei.com>
+Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
 Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-index 96cb628..09e60d6 100644
+index aff9d77..8473287 100644
 --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
 +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-@@ -271,7 +271,11 @@ static void hns_dsaf_ge_srst_by_port(struct dsaf_device *dsaf_dev, u32 port,
+@@ -86,9 +86,10 @@ static void hns_cpld_set_led(struct hns_mac_cb *mac_cb, int link_status,
+ 			mac_cb->cpld_led_value = value;
  		}
  	} else {
- 		reg_val_1 = 0x15540 << dsaf_dev->reset_offset;
--		reg_val_2 = 0x100 << dsaf_dev->reset_offset;
-+
-+		if (AE_IS_VER1(dsaf_dev->dsaf_ver))
-+			reg_val_2 = 0x100 << dsaf_dev->reset_offset;
-+		else
-+			reg_val_2 = 0x40 << dsaf_dev->reset_offset;
+-		dsaf_write_syscon(mac_cb->cpld_ctrl, mac_cb->cpld_ctrl_reg,
+-				  CPLD_LED_DEFAULT_VALUE);
+-		mac_cb->cpld_led_value = CPLD_LED_DEFAULT_VALUE;
++		value = (mac_cb->cpld_led_value) & (0x1 << DSAF_LED_ANCHOR_B);
++		dsaf_write_syscon(mac_cb->cpld_ctrl,
++				  mac_cb->cpld_ctrl_reg, value);
++		mac_cb->cpld_led_value = value;
+ 	}
+ }
  
- 		if (!dereset) {
- 			dsaf_write_sub(dsaf_dev, DSAF_SUB_SC_GE_RESET_REQ1_REG,
+@@ -114,7 +115,7 @@ static int cpld_set_led_id(struct hns_mac_cb *mac_cb,
+ 			     CPLD_LED_ON_VALUE);
+ 		dsaf_write_syscon(mac_cb->cpld_ctrl, mac_cb->cpld_ctrl_reg,
+ 				  mac_cb->cpld_led_value);
+-		return 2;
++		break;
+ 	case HNAE_LED_INACTIVE:
+ 		dsaf_set_bit(mac_cb->cpld_led_value, DSAF_LED_ANCHOR_B,
+ 			     CPLD_LED_DEFAULT_VALUE);
+@@ -122,7 +123,8 @@ static int cpld_set_led_id(struct hns_mac_cb *mac_cb,
+ 				  mac_cb->cpld_led_value);
+ 		break;
+ 	default:
+-		break;
++		dev_err(mac_cb->dev, "invalid led state: %d!", status);
++		return -EINVAL;
+ 	}
+ 
+ 	return 0;
 -- 
 1.9.1
