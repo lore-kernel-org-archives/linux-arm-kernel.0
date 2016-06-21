@@ -1,73 +1,59 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 21 Jun 2016 12:11:44 -0500
-Subject: [PATCH 06/11] arm: arm64: Add routine to determine cpuid of other cpus
+Date: Tue, 21 Jun 2016 12:11:46 -0500
+Subject: [PATCH 08/11] arm64: pmu: Provide cpumask attribute for PMU
 In-Reply-To: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
 References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1466529109-21715-7-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1466529109-21715-9-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is helpful if we can read the cpuid/midr of other CPUs
-in the system independent of arm/arm64.
+With heterogeneous PMUs its helpful to know which PMUs are bound
+to each CPU. Provide that information with a cpumask sysfs entry
+similar to other PMUs.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm/include/asm/cputype.h   | 6 +++++-
- arch/arm64/include/asm/cputype.h | 4 ++++
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/perf_event.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 1ee94c7..e391b67 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -81,6 +81,8 @@
- #define ARM_CPU_XSCALE_ARCH_V2		0x4000
- #define ARM_CPU_XSCALE_ARCH_V3		0x6000
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 356fa6c..dae73ea 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -533,6 +533,26 @@ static struct attribute_group armv8_pmuv3_events_attr_group = {
  
-+#define ARM_PARTNUM(cpuid_id) (cpuid_id & ARM_CPU_PART_MASK)
+ PMU_FORMAT_ATTR(event, "config:0-9");
+ 
++static ssize_t
++cpumask_show(struct device *dev, struct device_attribute *attr, char *page)
++{
++	struct pmu *pmu = dev_get_drvdata(dev);
++	struct arm_pmu *cpu_pmu = container_of(pmu, struct arm_pmu, pmu);
 +
- extern unsigned int processor_id;
- 
- #ifdef CONFIG_CPU_CP15
-@@ -180,7 +182,7 @@ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
-  */
- static inline unsigned int __attribute_const__ read_cpuid_part(void)
- {
--	return read_cpuid_id() & ARM_CPU_PART_MASK;
-+	return ARM_PARTNUM(read_cpuid_id());
- }
- 
- static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
-@@ -208,6 +210,8 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
- 	return read_cpuid(CPUID_MPIDR);
- }
- 
-+#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->cpuid
++	return cpumap_print_to_pagebuf(true, page, &cpu_pmu->supported_cpus);
++}
++static DEVICE_ATTR_RO(cpumask);
 +
- /*
-  * Intel's XScale3 core supports some v6 features (supersections, L2)
-  * but advertises itself as v5 as it does not support the v6 ISA.  For
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 87e1985..56fd8c1 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -38,6 +38,7 @@
- #define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
- #define MIDR_PARTNUM(midr)	\
- 	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
-+#define ARM_PARTNUM MIDR_PARTNUM
- #define MIDR_ARCHITECTURE_SHIFT	16
- #define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
- #define MIDR_ARCHITECTURE(midr)	\
-@@ -126,6 +127,9 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
- {
- 	return read_cpuid(CTR_EL0);
- }
++static struct attribute *armv8_pmuv3_attrs[] = {
++	 &dev_attr_cpumask.attr,
++	 NULL,
++};
 +
-+#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->reg_midr
++static struct attribute_group armv8_pmuv3_attr_group = {
++	.attrs = armv8_pmuv3_attrs,
++};
 +
- #endif /* __ASSEMBLY__ */
++
+ static struct attribute *armv8_pmuv3_format_attrs[] = {
+ 	&format_attr_event.attr,
+ 	NULL,
+@@ -544,6 +564,7 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
+ };
  
- #endif
+ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
++	&armv8_pmuv3_attr_group,
+ 	&armv8_pmuv3_events_attr_group,
+ 	&armv8_pmuv3_format_attr_group,
+ 	NULL,
 -- 
 2.5.5
