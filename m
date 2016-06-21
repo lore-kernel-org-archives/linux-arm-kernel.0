@@ -1,86 +1,39 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 21 Jun 2016 15:16:03 +0200
-Subject: [PATCH 2/3] mmc: mmc: do not use CMD13 to get status after speed
- mode switch
-In-Reply-To: <1463647662-27426-3-git-send-email-chaotian.jing@mediatek.com>
-References: <1463647662-27426-1-git-send-email-chaotian.jing@mediatek.com>
- <1463647662-27426-3-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFqaba9D4XtuDnPLcq2D4dpO6Cq9-RfhwoEu_vO=Pt9wEQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 21 Jun 2016 15:18:49 +0200
+Subject: [PATCH v4 0/8] iommu/rockchip: Fix bugs and enable on ARM64
+In-Reply-To: <20160621125435.GE11432@8bytes.org>
+References: <1466483681-36110-1-git-send-email-tfiga@chromium.org>
+ <CAAFQd5B8sxbZ6MymwDKL4vZkfQ-ej_bNh7tS1OhRC=X7-eie+Q@mail.gmail.com>
+ <20160621125435.GE11432@8bytes.org>
+Message-ID: <2015742.xhx642kbrC@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2016 at 10:47, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> Per JEDEC spec, it is not recommended to use CMD13 to get card status
-> after speed mode switch. below are two reason about this:
-> 1. CMD13 cannot be guaranteed due to the asynchronous operation.
-> Therefore it is not recommended to use CMD13 to check busy completion
-> of the timing change indication.
-> 2. After switch to HS200, CMD13 will get response of 0x800, and even the
-> busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+Am Dienstag, 21. Juni 2016, 14:54:35 schrieb Joerg Roedel:
+> Hi Tomasz,
+> 
+> On Tue, Jun 21, 2016 at 09:42:16PM +0900, Tomasz Figa wrote:
+> > In simple words, DRM patches depend on IOMMU patches.
+> > 
+> > More precisely: The IOMMU patches alone are supposed to not break
+> > anything. Same goes for the first DRM patch (7/8). Only second DRM
+> > patch (8/8) depends on changes introduced by its predecessors.
+> 
+> The first DRM patch is 6/7, so it is 7/8 with the iommu dependency,
+> right? Anyway, I think the best is I take the iommu patches when Heiko
+> is ok with them and then the DRM tree can merge that branch in to apply
+> the DRM patches.
+> 
+> But first Heiko should have a look at the patches.
 
-Thanks, applied for next! (With a minor change, see below)
+I think from all his previous work on the rockchip iommus Tomasz is a lot more 
+qualified to judge them - which I guess he did when picking up the ones from 
+Rockchip devs :-) .
 
-[...]
+>From a style-side, please don't carry the Reviewed-on gerrit tags over to 
+mainline patches (patches 1 and 2).
 
->
->         /* Switch HS to HS200 */
->         val = EXT_CSD_TIMING_HS200 |
->               card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
->         err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
->                            val, card->ext_csd.generic_cmd6_time, true,
-> -                          send_status, true);
-> +                          false, true);
+Other than that, I didn't see anything jump out and it looks all pretty nice.
 
-To keep consistency with other calls to __mmc_switch(), I change these lines to:
 
-err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
-                       val, card->ext_csd.generic_cmd6_time,
-                       true, false, true);
-
->         if (err)
->                 goto out_err;
->
->         mmc_set_timing(host, MMC_TIMING_MMC_HS200);
->
-> -       if (!send_status) {
-> -               err = mmc_switch_status(card);
-> -               if (err)
-> -                       goto out_err;
-> -       }
-> +       err = mmc_switch_status(card);
-> +       if (err)
-> +               goto out_err;
->
->         mmc_set_bus_speed(card);
->
-> @@ -1243,7 +1227,6 @@ static void mmc_select_driver_type(struct mmc_card *card)
->  static int mmc_select_hs200(struct mmc_card *card)
->  {
->         struct mmc_host *host = card->host;
-> -       bool send_status = true;
->         unsigned int old_timing;
->         int err = -EINVAL;
->         u8 val;
-> @@ -1260,9 +1243,6 @@ static int mmc_select_hs200(struct mmc_card *card)
->
->         mmc_select_driver_type(card);
->
-> -       if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
-> -               send_status = false;
-> -
->         /*
->          * Set the bus width(4 or 8) with host's support and
->          * switch to HS200 mode if bus width is set successfully.
-> @@ -1274,20 +1254,18 @@ static int mmc_select_hs200(struct mmc_card *card)
->                 err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->                                    EXT_CSD_HS_TIMING, val,
->                                    card->ext_csd.generic_cmd6_time,
-> -                                  true, send_status, true);
-> +                                  true, false, true);
-
-[...]
-
-Kind regards
-Uffe
+Heiko
