@@ -1,65 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Jun 2016 15:28:00 -0500
-Subject: [PATCH 02/48] ARM: at91: Document new TCB bindings
-In-Reply-To: <20160615092955.261f14fb@bbrezillon>
-References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1465596231-21766-3-git-send-email-alexandre.belloni@free-electrons.com>
- <20160614214737.GA10294@rob-hp-laptop>
- <20160615092955.261f14fb@bbrezillon>
-Message-ID: <20160621202800.GB22435@rob-hp-laptop>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 21 Jun 2016 14:40:13 -0600
+Subject: [PATCH] coresight: delay initialisation when children are missing
+Message-ID: <1466541613-25815-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 09:29:55AM +0200, Boris Brezillon wrote:
-> On Tue, 14 Jun 2016 16:47:37 -0500
-> Rob Herring <robh@kernel.org> wrote:
-> 
-> > On Sat, Jun 11, 2016 at 12:03:05AM +0200, Alexandre Belloni wrote:
-> > > The current binding for the TCB is not flexible enough for some use cases
-> > > and prevents proper utilization of all the channels.
-> > > 
-> > > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > > Cc: Thierry Reding <thierry.reding@gmail.com>
-> > > Cc: linux-pwm at vger.kernel.org
-> > > Cc: Rob Herring <robh+dt@kernel.org>
-> > > Cc: devicetree at vger.kernel.org
-> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > > ---
-> > >  .../devicetree/bindings/arm/atmel-at91.txt         | 32 -----------
-> > >  .../devicetree/bindings/mfd/atmel-tcb.txt          | 62 ++++++++++++++++++++++
-> > >  .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
-> > >  3 files changed, 69 insertions(+), 37 deletions(-)
-> > >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt  
-> > 
-> > [...]
+Depending on when CoreSight device are discovered it is possible
+that some IP block may be referencing devices that have not been
+added to the bus yet.  The end result is missing nodes in the
+CoreSight topology even when the devices are present and properly
+initialised.
 
+This patch solves the problem by asking the driver core to
+try initialising the device at a later time when the children
+of a CoreSight node are missing.
 
-> > > diff --git a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-> > > index 8031148bcf85..ab8fbd5ba184 100644
-> > > --- a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-> > > +++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-> > > @@ -2,15 +2,17 @@ Atmel TCB PWM controller
-> > >  
-> > >  Required properties:
-> > >  - compatible: should be "atmel,tcb-pwm"
-> > > +- reg: tcb channel to use. Each channel can export 2 PWMs  
-> > 
-> > Is there a difference in channels? If not, then this compatible should 
-> > go.
-> 
-> This one I don't understand.
-> The TCB (Timer Counter Block) is an MFD containing 3 Timer Counter
-> devices. Each of these devices (also called channels) can be assigned a
-> specific mode:
-> - timer mode (free-running of programmable)
-> - waveform generator mode (IOW, a PWM)
-> - capture mode (an IIO device, but we don't have any driver for that
->   right now)
-> 
-> So each sub-device of the TCB is represented as a sub-node with its own
-> compatible. Is there a problem with that?
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/of_coresight.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Missed this in my first reply. I guess for purposes of referencing pwm 
-from other nodes this is okay.
-
-Rob
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index b68da1888fd5..18f1c8c4776b 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -166,7 +166,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 
+ 			rdev = of_coresight_get_endpoint_device(rparent);
+ 			if (!rdev)
+-				continue;
++				return ERR_PTR(-EPROBE_DEFER);
+ 
+ 			pdata->child_names[i] = dev_name(rdev);
+ 			pdata->child_ports[i] = rendpoint.id;
+-- 
+2.7.4
