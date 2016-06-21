@@ -1,158 +1,137 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Tue, 21 Jun 2016 11:56:31 +0800
-Subject: [PATCH net-next 11/19] net: hns: add spin lock for tcam table
- operation
+Date: Tue, 21 Jun 2016 11:56:34 +0800
+Subject: [PATCH net-next 14/19] net: hns: delete redundancy ring enable
+ operations
 In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1466481399-70080-12-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1466481399-70080-15-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Daode Huang <huangdaode@hisilicon.com>
 
-This patch adds spin lock for tcam table operation,
-there maybe a race condition happens when more than
-one thread try to change the tcam talbe entries.
+When network interface is enabled, the ring enable operation is
+conducted twice. This patch deletes the redundancy code of ring enable,
+and integrates hnae_ae_ops.toggle_queue_status other functions to
+hns_ae_start.
 
 Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
 Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 25 ++++++++++++++++++++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  2 ++
- 2 files changed, 27 insertions(+)
+ drivers/net/ethernet/hisilicon/hns/hnae.c         |  1 -
+ drivers/net/ethernet/hisilicon/hns/hnae.h         |  1 -
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c | 22 +++++++++-------------
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c     |  7 +------
+ 4 files changed, 10 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-index 0edea9c..0958ceb 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-@@ -860,6 +860,8 @@ static void hns_dsaf_single_line_tbl_cfg(
- 	struct dsaf_device *dsaf_dev,
- 	u32 address, struct dsaf_tbl_line_cfg *ptbl_line)
+diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.c b/drivers/net/ethernet/hisilicon/hns/hnae.c
+index 5d3047c..c54c6fa 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hnae.c
++++ b/drivers/net/ethernet/hisilicon/hns/hnae.c
+@@ -400,7 +400,6 @@ int hnae_ae_register(struct hnae_ae_dev *hdev, struct module *owner)
+ 
+ 	if (!hdev->ops || !hdev->ops->get_handle ||
+ 	    !hdev->ops->toggle_ring_irq ||
+-	    !hdev->ops->toggle_queue_status ||
+ 	    !hdev->ops->get_status || !hdev->ops->adjust_link)
+ 		return -EINVAL;
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.h b/drivers/net/ethernet/hisilicon/hns/hnae.h
+index 962e445..3869322 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hnae.h
++++ b/drivers/net/ethernet/hisilicon/hns/hnae.h
+@@ -454,7 +454,6 @@ struct hnae_ae_ops {
+ 	int (*get_info)(struct hnae_handle *handle,
+ 			u8 *auto_neg, u16 *speed, u8 *duplex);
+ 	void (*toggle_ring_irq)(struct hnae_ring *ring, u32 val);
+-	void (*toggle_queue_status)(struct hnae_queue *queue, u32 val);
+ 	void (*adjust_link)(struct hnae_handle *handle, int speed, int duplex);
+ 	int (*set_loopback)(struct hnae_handle *handle,
+ 			    enum hnae_loop loop_mode, int en);
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+index 6b3796f..835521b 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+@@ -247,12 +247,21 @@ static void hns_ae_set_tso_stats(struct hnae_handle *handle, int enable)
+ static int hns_ae_start(struct hnae_handle *handle)
  {
-+	spin_lock_bh(&dsaf_dev->tcam_lock);
-+
- 	/*Write Addr*/
- 	hns_dsaf_tbl_line_addr_cfg(dsaf_dev, address);
+ 	int ret;
++	int k;
+ 	struct hns_mac_cb *mac_cb = hns_get_mac_cb(handle);
  
-@@ -868,6 +870,8 @@ static void hns_dsaf_single_line_tbl_cfg(
- 
- 	/*Write Plus*/
- 	hns_dsaf_tbl_line_pul(dsaf_dev);
-+
-+	spin_unlock_bh(&dsaf_dev->tcam_lock);
- }
- 
- /**
-@@ -881,6 +885,8 @@ static void hns_dsaf_tcam_uc_cfg(
- 	struct dsaf_tbl_tcam_data *ptbl_tcam_data,
- 	struct dsaf_tbl_tcam_ucast_cfg *ptbl_tcam_ucast)
- {
-+	spin_lock_bh(&dsaf_dev->tcam_lock);
-+
- 	/*Write Addr*/
- 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
- 	/*Write Tcam Data*/
-@@ -889,6 +895,8 @@ static void hns_dsaf_tcam_uc_cfg(
- 	hns_dsaf_tbl_tcam_ucast_cfg(dsaf_dev, ptbl_tcam_ucast);
- 	/*Write Plus*/
- 	hns_dsaf_tbl_tcam_data_ucast_pul(dsaf_dev);
-+
-+	spin_unlock_bh(&dsaf_dev->tcam_lock);
- }
- 
- /**
-@@ -903,6 +911,8 @@ static void hns_dsaf_tcam_mc_cfg(
- 	struct dsaf_tbl_tcam_data *ptbl_tcam_data,
- 	struct dsaf_tbl_tcam_mcast_cfg *ptbl_tcam_mcast)
- {
-+	spin_lock_bh(&dsaf_dev->tcam_lock);
-+
- 	/*Write Addr*/
- 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
- 	/*Write Tcam Data*/
-@@ -911,6 +921,8 @@ static void hns_dsaf_tcam_mc_cfg(
- 	hns_dsaf_tbl_tcam_mcast_cfg(dsaf_dev, ptbl_tcam_mcast);
- 	/*Write Plus*/
- 	hns_dsaf_tbl_tcam_data_mcast_pul(dsaf_dev);
-+
-+	spin_unlock_bh(&dsaf_dev->tcam_lock);
- }
- 
- /**
-@@ -920,6 +932,8 @@ static void hns_dsaf_tcam_mc_cfg(
-  */
- static void hns_dsaf_tcam_mc_invld(struct dsaf_device *dsaf_dev, u32 address)
- {
-+	spin_lock_bh(&dsaf_dev->tcam_lock);
-+
- 	/*Write Addr*/
- 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
- 
-@@ -932,6 +946,8 @@ static void hns_dsaf_tcam_mc_invld(struct dsaf_device *dsaf_dev, u32 address)
- 
- 	/*Write Plus*/
- 	hns_dsaf_tbl_tcam_mcast_pul(dsaf_dev);
-+
-+	spin_unlock_bh(&dsaf_dev->tcam_lock);
- }
- 
- /**
-@@ -949,6 +965,8 @@ static void hns_dsaf_tcam_uc_get(
- 	u32 tcam_read_data0;
- 	u32 tcam_read_data4;
- 
-+	spin_lock_bh(&dsaf_dev->tcam_lock);
-+
- 	/*Write Addr*/
- 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
- 
-@@ -981,6 +999,8 @@ static void hns_dsaf_tcam_uc_get(
- 				 DSAF_TBL_UCAST_CFG1_OUT_PORT_S);
- 	ptbl_tcam_ucast->tbl_ucast_dvc
- 		= dsaf_get_bit(tcam_read_data0, DSAF_TBL_UCAST_CFG1_DVC_S);
-+
-+	spin_unlock_bh(&dsaf_dev->tcam_lock);
- }
- 
- /**
-@@ -997,6 +1017,8 @@ static void hns_dsaf_tcam_mc_get(
- {
- 	u32 data_tmp;
- 
-+	spin_lock_bh(&dsaf_dev->tcam_lock);
-+
- 	/*Write Addr*/
- 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
- 
-@@ -1027,6 +1049,8 @@ static void hns_dsaf_tcam_mc_get(
- 	ptbl_tcam_mcast->tbl_mcast_port_msk[4] =
- 		dsaf_get_field(data_tmp, DSAF_TBL_MCAST_CFG4_VM128_112_M,
- 			       DSAF_TBL_MCAST_CFG4_VM128_112_S);
-+
-+	spin_unlock_bh(&dsaf_dev->tcam_lock);
- }
- 
- /**
-@@ -1351,6 +1375,7 @@ static int hns_dsaf_init(struct dsaf_device *dsaf_dev)
- 	if (HNS_DSAF_IS_DEBUG(dsaf_dev))
- 		return 0;
- 
-+	spin_lock_init(&dsaf_dev->tcam_lock);
- 	ret = hns_dsaf_init_hw(dsaf_dev);
+ 	ret = hns_mac_vm_config_bc_en(mac_cb, 0, true);
  	if (ret)
  		return ret;
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
-index 00a13de..1daf018 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
-@@ -322,6 +322,8 @@ struct dsaf_device {
  
- 	struct dsaf_hw_stats hw_stats[DSAF_NODE_NUM];
- 	struct dsaf_int_stat int_stat;
-+	/* make sure tcam table config spinlock */
-+	spinlock_t tcam_lock;
- };
++	for (k = 0; k < handle->q_num; k++) {
++		if (AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver))
++			hns_rcb_int_clr_hw(handle->qs[k],
++					   RCB_INT_FLAG_TX | RCB_INT_FLAG_RX);
++		else
++			hns_rcbv2_int_clr_hw(handle->qs[k],
++					     RCB_INT_FLAG_TX | RCB_INT_FLAG_RX);
++	}
+ 	hns_ae_ring_enable_all(handle, 1);
+ 	msleep(100);
  
- static inline void *hns_dsaf_dev_priv(const struct dsaf_device *dsaf_dev)
+@@ -313,18 +322,6 @@ static void hns_aev2_toggle_ring_irq(struct hnae_ring *ring, u32 mask)
+ 	hns_rcbv2_int_ctrl_hw(ring->q, flag, mask);
+ }
+ 
+-static void hns_ae_toggle_queue_status(struct hnae_queue *queue, u32 val)
+-{
+-	struct dsaf_device *dsaf_dev = hns_ae_get_dsaf_dev(queue->dev);
+-
+-	if (AE_IS_VER1(dsaf_dev->dsaf_ver))
+-		hns_rcb_int_clr_hw(queue, RCB_INT_FLAG_TX | RCB_INT_FLAG_RX);
+-	else
+-		hns_rcbv2_int_clr_hw(queue, RCB_INT_FLAG_TX | RCB_INT_FLAG_RX);
+-
+-	hns_rcb_start(queue, val);
+-}
+-
+ static int hns_ae_get_link_status(struct hnae_handle *handle)
+ {
+ 	u32 link_status;
+@@ -808,7 +805,6 @@ static struct hnae_ae_ops hns_dsaf_ops = {
+ 	.stop = hns_ae_stop,
+ 	.reset = hns_ae_reset,
+ 	.toggle_ring_irq = hns_ae_toggle_ring_irq,
+-	.toggle_queue_status = hns_ae_toggle_queue_status,
+ 	.get_status = hns_ae_get_link_status,
+ 	.get_info = hns_ae_get_mac_info,
+ 	.adjust_link = hns_ae_adjust_link,
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+index cef9d12..f49246d 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+@@ -1200,7 +1200,7 @@ static int hns_nic_net_up(struct net_device *ndev)
+ {
+ 	struct hns_nic_priv *priv = netdev_priv(ndev);
+ 	struct hnae_handle *h = priv->ae_handle;
+-	int i, j, k;
++	int i, j;
+ 	int ret;
+ 
+ 	ret = hns_nic_init_irq(priv);
+@@ -1215,9 +1215,6 @@ static int hns_nic_net_up(struct net_device *ndev)
+ 			goto out_has_some_queues;
+ 	}
+ 
+-	for (k = 0; k < h->q_num; k++)
+-		h->dev->ops->toggle_queue_status(h->qs[k], 1);
+-
+ 	ret = h->dev->ops->set_mac_addr(h, ndev->dev_addr);
+ 	if (ret)
+ 		goto out_set_mac_addr_err;
+@@ -1237,8 +1234,6 @@ static int hns_nic_net_up(struct net_device *ndev)
+ out_start_err:
+ 	netif_stop_queue(ndev);
+ out_set_mac_addr_err:
+-	for (k = 0; k < h->q_num; k++)
+-		h->dev->ops->toggle_queue_status(h->qs[k], 0);
+ out_has_some_queues:
+ 	for (j = i - 1; j >= 0; j--)
+ 		hns_nic_ring_close(ndev, j);
 -- 
 1.9.1
