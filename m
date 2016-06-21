@@ -1,98 +1,37 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 21 Jun 2016 17:10:49 +0100
-Subject: [PATCH v3 2/7] coresight: Consolidate error handling path for
+Date: Tue, 21 Jun 2016 17:10:48 +0100
+Subject: [PATCH v3 1/7] coresight: Remove erroneous dma_free_coherent in
  tmc_probe
 In-Reply-To: <1466525454-14702-1-git-send-email-suzuki.poulose@arm.com>
 References: <1466525454-14702-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1466525454-14702-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1466525454-14702-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up the error handling path for tmc_probe
-as a side effect of the removal of the spurious dma_free_coherent().
+commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
+removed the static allocation of buffer for the trace data in ETR mode in
+tmc_probe. However it failed to remove the "devm_free_coherent" in
+tmc_probe when the probe fails due to other reasons. This patch gets
+rid of the incorrect dma_free_coherent() call.
 
+Fixes: commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 36 ++++++++++++++---------------
- 1 file changed, 17 insertions(+), 19 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 3978cbb..1b47258 100644
+index 9e02ac9..3978cbb 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -309,22 +309,31 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	if (np) {
- 		pdata = of_get_coresight_platform_data(dev, np);
--		if (IS_ERR(pdata))
--			return PTR_ERR(pdata);
-+		if (IS_ERR(pdata)) {
-+			ret = PTR_ERR(pdata);
-+			goto out;
-+		}
- 		adev->dev.platform_data = pdata;
- 	}
- 
-+	ret = -ENOMEM;
- 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
- 	if (!drvdata)
--		return -ENOMEM;
-+		goto out;
-+
-+	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
-+	if (!desc)
-+		goto out;
- 
- 	drvdata->dev = &adev->dev;
- 	dev_set_drvdata(dev, drvdata);
- 
- 	/* Validity for the resource is already checked by the AMBA core */
- 	base = devm_ioremap_resource(dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	if (IS_ERR(base)) {
-+		ret = PTR_ERR(base);
-+		goto out;
-+	}
- 
- 	drvdata->base = base;
- 
-@@ -347,12 +356,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	pm_runtime_put(&adev->dev);
- 
--	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
--	if (!desc) {
--		ret = -ENOMEM;
--		goto err_devm_kzalloc;
--	}
--
- 	desc->pdata = pdata;
- 	desc->dev = dev;
- 	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
-@@ -373,7 +376,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 	drvdata->csdev = coresight_register(desc);
- 	if (IS_ERR(drvdata->csdev)) {
- 		ret = PTR_ERR(drvdata->csdev);
--		goto err_devm_kzalloc;
-+		goto out;
- 	}
- 
- 	drvdata->miscdev.name = pdata->name;
-@@ -381,13 +384,8 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 	drvdata->miscdev.fops = &tmc_fops;
- 	ret = misc_register(&drvdata->miscdev);
- 	if (ret)
--		goto err_misc_register;
--
--	return 0;
--
--err_misc_register:
--	coresight_unregister(drvdata->csdev);
--err_devm_kzalloc:
-+		coresight_unregister(drvdata->csdev);
-+out:
+@@ -388,9 +388,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ err_misc_register:
+ 	coresight_unregister(drvdata->csdev);
+ err_devm_kzalloc:
+-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
+-		dma_free_coherent(dev, drvdata->size,
+-				drvdata->vaddr, drvdata->paddr);
  	return ret;
  }
  
