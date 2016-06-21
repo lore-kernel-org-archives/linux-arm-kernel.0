@@ -1,39 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 21 Jun 2016 14:26:35 +0200
-Subject: [PULL] drm: atmel-hlcdc: Fixes for 4.7-rc5
-Message-ID: <20160621142635.43c79952@bbrezillon>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 21 Jun 2016 13:28:53 +0100
+Subject: [PATCH] ARM: hisi: make unexported symbols static
+Message-ID: <1466512133-31751-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+The two functions hix5hd2_set_scu_boot_addr() and
+hip01_set_boot_addr() are not declared or exported
+outside arch/arm/mach-hisi/platsmp.c file. Avoid
+the following warnings by making them static:
 
-Here is a PR containing two fixes for 4.7.
+arch/arm/mach-hisi/platsmp.c:142:6: warning: symbol 'hip01_set_boot_addr' was not declared. Should it be static?
+arch/arm/mach-hisi/platsmp.c:106:6: warning: symbol 'hix5hd2_set_scu_boot_addr' was not declared. Should it be static?
 
-Regards,
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: Wei Xu <xuwei5@hisilicon.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-hisi/platsmp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Boris
-
-The following changes since commit 58a2ab3af722550b2e4e8155eb08660e16c20ee6:
-
-  drm: atmel-hlcdc: fix a NULL check (2016-06-01 15:59:36 +0200)
-
-are available in the git repository at:
-
-  git at github.com:bbrezillon/linux-at91.git tags/drm-atmel-hlcdc-fixes/for-4.7-rc5
-
-for you to fetch changes up to 0b1e1eb76220afa043b2733dfe61f5927cf0e458:
-
-  drm: atmel-hlcdc: Fix OF graph parsing (2016-06-21 14:15:45 +0200)
-
-----------------------------------------------------------------
-Two bug fixes for the atmel-hlcdc driver.
-
-----------------------------------------------------------------
-Boris Brezillon (2):
-      drm: atmel-hlcdc: actually disable scaling when no scaling is required
-      drm: atmel-hlcdc: Fix OF graph parsing
-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 10 ++++++----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  |  2 ++
- 2 files changed, 8 insertions(+), 4 deletions(-)
-	
+diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
+index 47ed32c..e1d6764 100644
+--- a/arch/arm/mach-hisi/platsmp.c
++++ b/arch/arm/mach-hisi/platsmp.c
+@@ -103,7 +103,7 @@ static void __init hisi_common_smp_prepare_cpus(unsigned int max_cpus)
+ 	hisi_enable_scu_a9();
+ }
+ 
+-void hix5hd2_set_scu_boot_addr(phys_addr_t start_addr, phys_addr_t jump_addr)
++static void hix5hd2_set_scu_boot_addr(phys_addr_t start_addr, phys_addr_t jump_addr)
+ {
+ 	void __iomem *virt;
+ 
+@@ -139,7 +139,7 @@ static const struct smp_operations hix5hd2_smp_ops __initconst = {
+ #define HIP01_BOOT_ADDRESS     0x80000000
+ #define REG_SC_CTRL            0x000
+ 
+-void hip01_set_boot_addr(phys_addr_t start_addr, phys_addr_t jump_addr)
++static void hip01_set_boot_addr(phys_addr_t start_addr, phys_addr_t jump_addr)
+ {
+ 	void __iomem *virt;
+ 
+-- 
+2.8.1
