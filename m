@@ -1,64 +1,36 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Tue, 21 Jun 2016 11:56:35 +0800
-Subject: [PATCH net-next 15/19] net: hns: bug fix about led control logic when
- link down
+Date: Tue, 21 Jun 2016 11:56:24 +0800
+Subject: [PATCH net-next 04/19] net: hns: typo fix of annotation info for
+ hns_nic_reset_subtask()
 In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1466481399-70080-16-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1466481399-70080-5-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daode Huang <huangdaode@hisilicon.com>
+From: Qianqian Xie <xieqianqian@huawei.com>
 
-The default driver sets anchor led bit to 0 when link down,
-actually, the anchor bit should be set to 1, so fixes it when
-link status is down.
-Secondly, change the return value of cpld_set_led_id to 0, which
-means leave the cpld to control led blink frequece other than the
-driver itself.
+The annotation info for hns_nic_reset_subtask() should be
+"for resetting subtask" instead of "for resetting suntask".
 
-Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+Signed-off-by: Qianqian Xie <xieqianqian@huawei.com>
 Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-index aff9d77..8473287 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-@@ -86,9 +86,10 @@ static void hns_cpld_set_led(struct hns_mac_cb *mac_cb, int link_status,
- 			mac_cb->cpld_led_value = value;
- 		}
- 	} else {
--		dsaf_write_syscon(mac_cb->cpld_ctrl, mac_cb->cpld_ctrl_reg,
--				  CPLD_LED_DEFAULT_VALUE);
--		mac_cb->cpld_led_value = CPLD_LED_DEFAULT_VALUE;
-+		value = (mac_cb->cpld_led_value) & (0x1 << DSAF_LED_ANCHOR_B);
-+		dsaf_write_syscon(mac_cb->cpld_ctrl,
-+				  mac_cb->cpld_ctrl_reg, value);
-+		mac_cb->cpld_led_value = value;
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+index 15200e4..b978db4 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+@@ -1633,7 +1633,7 @@ static void hns_nic_dump(struct hns_nic_priv *priv)
  	}
  }
  
-@@ -114,7 +115,7 @@ static int cpld_set_led_id(struct hns_mac_cb *mac_cb,
- 			     CPLD_LED_ON_VALUE);
- 		dsaf_write_syscon(mac_cb->cpld_ctrl, mac_cb->cpld_ctrl_reg,
- 				  mac_cb->cpld_led_value);
--		return 2;
-+		break;
- 	case HNAE_LED_INACTIVE:
- 		dsaf_set_bit(mac_cb->cpld_led_value, DSAF_LED_ANCHOR_B,
- 			     CPLD_LED_DEFAULT_VALUE);
-@@ -122,7 +123,8 @@ static int cpld_set_led_id(struct hns_mac_cb *mac_cb,
- 				  mac_cb->cpld_led_value);
- 		break;
- 	default:
--		break;
-+		dev_err(mac_cb->dev, "invalid led state: %d!", status);
-+		return -EINVAL;
- 	}
- 
- 	return 0;
+-/* for resetting suntask*/
++/* for resetting subtask */
+ static void hns_nic_reset_subtask(struct hns_nic_priv *priv)
+ {
+ 	enum hnae_port_type type = priv->ae_handle->port_type;
 -- 
 1.9.1
