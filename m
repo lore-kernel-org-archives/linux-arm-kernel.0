@@ -1,206 +1,255 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 21 Jun 2016 10:30:59 -0600
-Subject: [PATCH 1/3] arm64: dts: juno: add coresight support
-In-Reply-To: <57692488.2030507@arm.com>
-References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
- <1465228765-14038-2-git-send-email-sudeep.holla@arm.com>
- <CAOesGMjQNEOcmYpUAxUxBJLyUYZQuRKK48a31Ys9LuTJFWqMFA@mail.gmail.com>
- <57692488.2030507@arm.com>
-Message-ID: <CANLsYkwKo6kVx9C7pCWn6u-rf17mDbpWg3V9GNnwwNEVpWT2yA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 21 Jun 2016 22:08:54 +0530
+Subject: [PATCH v10 2/2] dmaengine: Add Xilinx zynqmp dma engine driver
+ support
+In-Reply-To: <03CA77BA8AF6F1469AEDFBDA1322A7B74A18BAE8@XAP-PVEXMBX02.xlnx.xilinx.com>
+References: <1464765839-29018-1-git-send-email-appanad@xilinx.com>
+ <1464765839-29018-2-git-send-email-appanad@xilinx.com>
+ <20160607070841.GJ16910@localhost>
+ <C246CAC1457055469EF09E3A7AC4E11A4A5B4FA9@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160613055012.GC16910@localhost>
+ <C246CAC1457055469EF09E3A7AC4E11A4A5B6441@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160615165004.GC16910@localhost>
+ <C246CAC1457055469EF09E3A7AC4E11A4A5B6CAD@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160621154103.GA16910@localhost>
+ <03CA77BA8AF6F1469AEDFBDA1322A7B74A18BAE8@XAP-PVEXMBX02.xlnx.xilinx.com>
+Message-ID: <20160621163854.GF16910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2016 at 05:27, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 21/06/16 06:41, Olof Johansson wrote:
->>
->> Hi,
->>
->> Some nits below.
->>
->
-> My bad, I blindly copy-pasted it from vexpress TC2 platform.
->
->> On Mon, Jun 6, 2016 at 8:59 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>
->>> Most of the debug-related components on Juno are located in the coreSight
->>> subsystem while others are located in the Cortex-Axx clusters, the SCP
->>> subsystem, and in the main system.
->>>
->>> Each core in the two processor clusters contain an Embedded Trace
->>> Macrocell(ETM) which generates real-time trace information that trace
->>> tools can use and an ATB trace output that is sent to a funnel before
->>> going to the CoreSight subsystem.
->>>
->>> The trace output signals combine with two trace expansions using another
->>> funnel and fed into the Embedded Trace FIFO(ETF0).
->>>
->>> The output trace data stream of the funnel is then replicated before it
->>> is sent to either the:
->>> - Trace Port Interface Unit(TPIU), that sends it out using the trace
->>> port.
->>> - ETR that can write the trace data to memory located in the application
->>>    memory space
->>>
->>> Cc: Liviu Dudau <liviu.dudau@arm.com>
->>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: devicetree at vger.kernel.org
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>   arch/arm64/boot/dts/arm/juno-base.dtsi | 296
->>> +++++++++++++++++++++++++++++++++
->>>   arch/arm64/boot/dts/arm/juno-r1.dts    |  24 +++
->>>   arch/arm64/boot/dts/arm/juno-r2.dts    |  24 +++
->>>   arch/arm64/boot/dts/arm/juno.dts       |  24 +++
->>>   4 files changed, 368 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi
->>> b/arch/arm64/boot/dts/arm/juno-base.dtsi
->>> index dee2386d3b9b..90a8710f7032 100644
->>> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
->>> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
->>> @@ -56,6 +56,302 @@
->>>                               <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) |
->>> IRQ_TYPE_LEVEL_LOW)>;
->>>          };
->>>
->>> +       /*
->>> +        * Juno TRMs specify the size for these coresight components as
->>> 64K.
->>> +        * The actual size is just 4K though 64K is reserved. Access to
->>> the
->>> +        * unmapped reserved region results in a DECERR response.
->>> +        */
->>> +       etf at 20010000 {
->>
->>
->> Would it make sense to name it something like trace-fifo instead? We
->> normally name the nodes based on type of device (ethernet@, pci@,
->> etc).
->>
->
-> As Suzuki already pointed out, these are standard acronyms used in
-> various CoreSight specifications. Let me know if you need them to be
-> expanded instead of abbreviations.
->
->>
->>> +               compatible = "arm,coresight-tmc", "arm,primecell";
->>
->>
->> Is there a more specific compatible needed here, or does
->> arm,coresight-tmc give you all the information you need on how to use
->> this interface?
->>
->> The bindings doc is sort of sparse in this area, all it says is "you
->> might use one of these compatibles".
->>
->
-> Again Suzuki commented on that. I will leave it to Mathieu who is the
-> author of the binding to comment further(if any).
->
-> But I agree, it would be good to have one line description on each of
-> them as they are pretty much standard primecells or even URL to their
-> specifications.
+On Tue, Jun 21, 2016 at 04:19:38PM +0000, Punnaiah Choudary Kalluri wrote:
+> > > > > > > mode Earlier In the driver this configuration is read from the
+> > > > > > > device-tree But as per lars and your suggestion moved it as runtime
+> > config
+> > > > parameters.
+> > > > > >
+> > > > > > If sg mode is available why would anyone _not_ want it?
+> > > > > >
+> > > > > > I do not think there is point to have this
+> > > > >
+> > > > > You mean always keep the device in SG mode and provide an option
+> > For
+> > > > > simple dma mode if user want to use simple DMA mode??
+> > > >
+> > > > Yes, why would anyone want to use single if sg is available?
+> >
+> > If you have sg mode always enabled, but sg_list is size 1, that its
+> > essentially a single
+> >
+> 
+> True. As we said, simple mode ha few additional features like write only
+> And read only dma. So, if user want then here is the provision.
+> 
+> > Btw SPI is a slave case, not a memcpy!
+> >
+> 
+> Correct. We are working on slave dma support and will patch to this driver.
 
-I initially wrote the bindings from a developer's point of view, or
-someone implementing CoreSight on their system.  As such there would
-be no doubts about the acronyms found in the bindings as the same
-nomenclature is used throughout the documentation.
+And in slave cases, you can use slave config to pass the values which are
+required, so we dont need this custome interface!
 
-But from an onlooker's perspective I can see how they can be
-confusing.  As Sudeep suggested I will add a short description for
-each binding.
+> 
+> > > > > There are few features that are available in the simple DMA mode
+> > won't
+> > > > > Available in SG mode like write only DMA , read only DMA mode etc...
+> > > >
+> > > > Can you explain what these are, how they are used by clients?
+> > >
+> > > Currently it is not implemented but there are cases like,
+> > >
+> > > We want to initialize the some region with known value, then write only
+> > dma helps
+> > > We want to read dummy data from the fifo, then read only dma helps.
+> >
+> > Read will be another transfer, perhpas sg lnegth = 1
+> >
+> 
+> 
+> In sg case, both source and destination locations need to be configured.
+> In simple dma and read-only mode, only source address is required. Simple
+> Dma just read the data from source location and discard that data. It will save
+> Unnecessary write to destination here.
+> 
+> > > Best case is SPI fifo.
+> >
+> > Nope
+> >
+> 
+> Why?
 
->
->>> +       tpiu at 20030000 {
->>
->>
->> Again, these names are not great. Luckily they don't affect the
->> binding, so they can be fixed. What would be a more human readable and
->> functionally describing name here?
->>
->>> +               compatible = "arm,coresight-tpiu", "arm,primecell";
->>> +               reg = <0 0x20030000 0 0x1000>;
->>> +
->>> +               clocks = <&soc_smc50mhz>;
->>> +               clock-names = "apb_pclk";
->>> +               port {
->>> +                       tpiu_in_port: endpoint {
->>> +                               slave-mode;
->>> +                               remote-endpoint =
->>> <&replicator_out_port0>;
->>> +                       };
->>> +               };
->>> +       };
->>> +
->>> +       main_funnel at 20040000 {
->>
->>
->> Underscores are usually frowned upon. funnel@ or ideally a better more
->> descriptive name should be used here.
->> Use dashes if you really have to.
->>
->
-> Agreed and fixed locally now.
->
-> [...]
->
->>> +               compatible = "arm,coresight-tmc", "arm,primecell";
->>> +               reg = <0 0x20070000 0 0x1000>;
->>> +
->>> +               clocks = <&soc_smc50mhz>;
->>> +               clock-names = "apb_pclk";
->>> +               port {
->>> +                       etr_in_port: endpoint {
->>> +                               slave-mode;
->>> +                               remote-endpoint =
->>> <&replicator_out_port1>;
->>> +                       };
->>> +               };
->>> +       };
->>> +
->>> +       coresight-replicator {
->>
->>
->> Hm. It'd sort of be nice to stick all the coresight stuff under one
->> node instead of having them all at the toplevel, but that doesn't
->> really go with the concept of having each device where it's at in the
->> bus/address hierarchy.
+beacuse you are messing with APIs. SPI will be slave where we know how to
+program the values!
 
-I thought long and hard about this when initially working on the
-bindings. All CoreSight blocks are independent from one another and
-they don't need a bus to be accessed or configured.
+> 
+> 
+> > >
+> > > >
+> > > > > > > > > +       chan->config.ratectrl = cfg->ratectrl;
+> > > > > > > > > +       chan->config.src_issue = cfg->src_issue;
+> > > > > > > > > +       chan->config.src_burst_len = cfg->src_burst_len;
+> > > > > > > > > +       chan->config.dst_burst_len = cfg->dst_burst_len;
+> > > > > > > >
+> > > > > > > > can you describe these parameters?
+> > > > > > > ratectl:
+> > > > > > > Rate control can be independently enabled per channel. When rate
+> > > > > > > control is enabled, the DMA channel uses the rate control count to
+> > > > > > > schedule
+> > > > > > successive data read transactions.
+> > > > > >
+> > > > > > And how is this used by client?
+> > > > >
+> > > > > When rate control is enabled, ZDMA channel uses the rate control
+> > count
+> > > > > To schedule successive data read transactions I mean kind of flow
+> > > > > control to schedule Transactions at fixed intervals instead of pumping
+> > > > > the transfers without delay or whenever bus is available
+> > > > >
+> > > > > Rate control count register definition (11:0):
+> > > > > Scheduling interval for SRC AXI transaction, only used if rate control
+> > > > > is enabled
+> > > >
+> > > > Okay, why would anyone want transactions at fixed interval. We are
+> > talking
+> > > > about DMA, so please give me transfers without delay or whenever bus
+> > is
+> > > > available!
+> > >
+> > > Could be that there are certain IPs that requires delay in b/w transactions.
+> > > Since IP is providing this feature we are exploring it to the user.
+> >
+> > I kind of don't agree to that!
+> >
+> 
+> It's a kind of rate control mechanism. We can aslo use this feature to prioritize other
+> Channel by deliberately controlling the current channel transfer scheduling.
+> 
+> > >
+> > > >
+> > > >
+> > > > > > > src_issue:
+> > > > > > > Tells outstanding transaction on SRC.
+> > > > > >
+> > > > > > This should be read only then, right?
+> > > > >
+> > > > > It is a Read/Write register
+> > > > > http://www.xilinx.com/html_docs/registers/ug1087/ug1087-zynq-
+> > ultrascal
+> > > > > e-registers.html By default it is configured for Max transactions.
+> > > > > If user want to limit it they can limit it using this config option.
+> > > >
+> > > > And why would they want that?
+> > >
+> > > Could be that there are certain IPs that my not support burst operations or
+> > > May not support all burst lengths it will be helpful.
+> > > Since IP is providing the feature, we are exploring it to the user.
+> > >
+> > > >
+> > > > > > > Burst_len:
+> > > > > > > Configures the burst length of the src and dst transfers...
+> > > > > >
+> > > > > > Hmmm, but you are on memcpy, so that should be programmed for
+> > > > throughput?
+> > > > >
+> > > > > Yes...
+> > > >
+> > > > So max burst lengths then, why would anyone configure lesser?
+> > >
+> > > Depends on the destination and source IPs.
+> >
+> > Not for memory copy
+> >
+> 
+> Depends on the system and how source and destination IPs are interconnected.
+> Sometimes there is a limitation from interconnection also.
+> Also some flash controllers providing linear access to NAND or NOR memories may
+> Have limitation in burst length but still user can use memory copy with desired burst
+> Length.
 
->>
->
-> I understand.
->
->> Should _all_ the nodes be at the toplevel though? Looks like you have
->> a few address ranges that most of the toplevel devices are at, is
->> there really not a physical bus they're each connected to that you can
->> describe?
->>
->
-> I need to look at the Juno documents again and refine. It may affect
-> other devices too. Can that be addressed later separately ?
->
-> [...]
->
->
->>> +
->>> +       etm0: etm at 22040000 {
->>
->>
->> If this file is sorted on reg values, then this node and the two after
->> are out of order.
->>
->
-> Yes that was the intent, will fix it. But I see some oddities, may be
-> will fix those once I address the address/bus hierarchy.
->
-> --
-> --
+Some of those cases are treated as slave for obvious reasons.
+
+Please check existing solutions before inventing new ones. Everyone thinks
+that their hardware and thereby driver is a novel case, but on closer
+inspection that is usually not the case, different falvour yes, novel no!
+
+Okay I am convince now this is not right approach. Please remove this
+custom interface and then implement slave for required slave scenarios!
+
+> 
+> >
+> > >
+> > > >
+> > > > > > > > How would a client know how to configure them?
+> > > > > > >
+> > > > > > > With the default values of the config parameters driver will work.
+> > > > > >
+> > > > > > But how will client know what is default!
+> > > > >
+> > > > > Default values means IP default state after reset.
+> > > > > If user not aware of the above parameters also still the driver will work
+> > for
+> > > > basic functionality.
+> > > > > Do you want me to implement one more API get_config so that
+> > Whenever
+> > > > > user will call the get_config he will know the default values Of the
+> > > > > config parameters?
+> > > >
+> > > > Looking at above I think we do not warrant programming them. Assume
+> > defaults
+> > > > in your driver for performance. Like max burst lengths, Max transactions,
+> > > > without delay scheduling.
+> > > >
+> > > > If you disagree, which is fine, please provide the cases where a client
+> > would
+> > > > need to program these to different values.
+> > >
+> > > As said above there are use cases for SPI and others but currently we didn't
+> > tested
+> > > It.
+> > >
+> > > >
+> > > > > > > If user has specific requirement to change these parameters they
+> > > > > > > can pass It to the driver using set_config API and all these
+> > > > > > > parameters are Documented in the include/linux/dma/xilinx_dma.h
+> > file...
+> > > > > >
+> > > > > > Can you give me an example where user would like to do that
+> > > > >
+> > > > > I am using customized dma test client.
+> > > > > There I am calling this set_config API before triggering memcpy/SG
+> > > > operations.
+> > > >
+> > > > Well that is precisely a  problem. The generic applications wont know
+> > "your"
+> > > > custom API and will not configure that!
+> > >
+> > > As said above, generic application can work with default values.
+> > > These are not custom parameters and we can say these are the dma
+> > parameters.
+> > > i.e we can generalize these and provide it to user as generic API.
+> >
+> > No it doesn't make it generic API. With generic API the IP should be usable
+> > with any generic interface without specfic hoops to go thru. People are
+> > going to test upstream dmatest on your IP and find it not working or
+> > degraded perf, so better stick with generic API.
+> >
+> 
+> By default driver configures the optimized settings and it works with upstream
+> Dmatest. Even with customized settings it works with dmatest only thing it might
+> Gain/loss performance but that's up to the configuration user may want.
+> 
+> This dma controller was designed to provide more flexibility to the user by providing
+> the all possible dma parameters configurable.
+> 
 > Regards,
-> Sudeep
+> Punnaiah
+> > --
+> > ~Vinod
+> 
+> 
+> This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+
+Really!
+
+
+-- 
+~Vinod
