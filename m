@@ -1,40 +1,28 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 21 Jun 2016 09:55:17 +0100
-Subject: [GIT PULL] drivers: firmware: scpi updates for v4.8
-In-Reply-To: <20160621055247.GC24293@localhost>
-References: <5768022D.2010506@arm.com> <20160621055247.GC24293@localhost>
-Message-ID: <576900F5.5090907@arm.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 21 Jun 2016 02:02:44 -0700
+Subject: Warning when compiling DTB on X-Gene platform with dtc 1.4.1-g53bf130b
+Message-ID: <CADaLNDnfH8Weo=9jVNAW7LQCvAw23-z5fafwWcer4FSKeYH=ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
 
+I got warning on unit_address_vs_reg similar to this
+https://lkml.org/lkml/2016/3/7/43 when using v4.7-rc2 dtc to build dtb
+for X-Gene Mustang:
 
-On 21/06/16 06:52, Olof Johansson wrote:
-> On Mon, Jun 20, 2016 at 03:48:13PM +0100, Sudeep Holla wrote:
->> Hi ARM-SoC team,
->>
->> Here are few updates for SCPI drivers for v4.8. The DT binding have been
->> ACKed by DT maintainer.
->>
->> Also as most of the genpd code is in drivers/soc and SCPI can be used on
->> any SoC, runtime PM maintainer agreed to keep the SCPI genpd based power
->> domain driver in drivers/firmware for now. It also carries their
->> ACK.
->
-> Am I missing something here? The only Acked-by I see on any patch is the one
-> from Mark Rutland on the bindings.
->
+dhdang at xgene-next=>./scripts/dtc/dtc -O dtb -R 16 -o mustang.dtb
+arch/arm64/boot/dts/apm/apm-mustang.dts
+  Warning (unit_address_vs_reg): Node /soc/reboot at 17000014 has a unit
+name, but no reg property
+  Warning (unit_address_vs_reg): Node /memory has a reg or ranges
+property, but no unit name
+  Warning (unit_address_vs_reg): Node /gpio-keys/button at 1 has a unit
+name, but no reg property
 
-Ah sorry by mad for misleading. Ulf reviewed and provided Reviewed-by tag.
+There are nodes that I cannot change the node-name due to backward
+compatible with old firmware reason (/soc/reboot at 17000014 as an
+example). Is there any other way to avoid the warning?
 
-Also Kevin H provided Reviewed-by with couple of minor nits to be fixed
-last evening. I will fix them and re-spin this pull request.
-
-Since they agreed to keep it in drivers/firmware, I assume that's whey
-no acks but just Reviewed-by.
-
-Thanks for the patience.
-
--- 
 Regards,
-Sudeep
+Duc Dang.
