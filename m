@@ -1,83 +1,169 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 21 Jun 2016 15:12:57 +0800
-Subject: [PATCH V7 1/8] ACPI: I/O Remapping Table (IORT) initial support
-In-Reply-To: <1466420541-20101-2-git-send-email-tn@semihalf.com>
-References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
- <1466420541-20101-2-git-send-email-tn@semihalf.com>
-Message-ID: <372d3b78-2bc5-94d1-49f6-c9229affa65d@linaro.org>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Tue, 21 Jun 2016 15:13:55 +0800
+Subject: [PATCH] net: stmmac: dwmac-rk: add rk322x-specific data
+Message-ID: <1466493235-17789-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Add constants and callback functions for the dwmac on rk322x socs.
+As can be seen, the base structure is the same, only registers and
+the bits in them moved slightly.
 
-Sorry for jumping out late, just one comment below.
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-On 2016/6/20 19:02, Tomasz Nowicki wrote:
-> IORT shows representation of IO topology for ARM based systems.
-> It describes how various components are connected together on
-> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
->
-> Initial support allows to detect IORT table presence and save its
-> root pointer obtained through acpi_get_table(). The pointer validity
-> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
-> is not set while using IORT nodes we would dereference unmapped pointers.
->
-> For the aforementioned reason call iort_table_detect() from acpi_init()
-> which guarantees acpi_gbl_permanent_mmap to be set at that point.
->
-> Add generic helpers which are helpful for scanning and retrieving
-> information from IORT table content. List of the most important helpers:
-> - iort_find_dev_node() finds IORT node for a given device
-> - iort_node_map_rid() maps device RID and returns IORT node which provides
->   final translation
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/acpi/Kconfig  |   3 +
->  drivers/acpi/Makefile |   1 +
->  drivers/acpi/bus.c    |   2 +
->  drivers/acpi/iort.c   | 220 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/iort.h  |  30 +++++++
+ .../devicetree/bindings/net/rockchip-dwmac.txt     |    3 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     |  117 ++++++++++++++++++++
+ 2 files changed, 119 insertions(+), 1 deletion(-)
 
-[...]
-
-> +static acpi_status
-> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
-> +{
-> +	struct device *dev = context;
-> +
-> +	switch (node->type) {
-> +	case ACPI_IORT_NODE_NAMED_COMPONENT: {
-> +		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-
-ACPI_ALLOCATE_BUFFER is used here, so ...
-
-> +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
-> +		struct acpi_iort_named_component *ncomp;
-> +
-> +		if (!adev)
-> +			break;
-> +
-> +		ncomp = (struct acpi_iort_named_component *)node->node_data;
-> +
-> +		if (ACPI_FAILURE(acpi_get_name(adev->handle,
-> +					       ACPI_FULL_PATHNAME, &buffer))) {
-> +			dev_warn(dev, "Can't get device full path name\n");
-> +			break;
-> +		}
-> +
-> +		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
-> +			return AE_OK;
-
-... we need to kfree(buffer.pointer) before we return or break.
-
-With this fixed,
-
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
-
-> +
-> +		break;
-> +	}
+diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+index 93eac7c..5040ed4 100644
+--- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
++++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+@@ -3,7 +3,8 @@ Rockchip SoC RK3288 10/100/1000 Ethernet driver(GMAC)
+ The device node has following properties.
+ 
+ Required properties:
+- - compatible: Can be one of "rockchip,rk3288-gmac", "rockchip,rk3368-gmac"
++ - compatible: Can be one of "rockchip,rk322x-gmac", "rockchip,rk3288-gmac",
++                             "rockchip,rk3368-gmac"
+  - reg: addresses and length of the register sets for the device.
+  - interrupts: Should contain the GMAC interrupts.
+  - interrupt-names: Should contain the interrupt names "macirq".
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+index 0cd3ecf..7f045db 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+@@ -72,6 +72,122 @@ struct rk_priv_data {
+ #define GRF_BIT(nr)	(BIT(nr) | BIT(nr+16))
+ #define GRF_CLR_BIT(nr)	(BIT(nr+16))
+ 
++#define RK322X_GRF_MAC_CON0	0x0900
++#define RK322X_GRF_MAC_CON1	0x0904
++
++/* RK322X_GRF_MAC_CON0 */
++#define RK322X_GMAC_CLK_RX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 7)
++#define RK322X_GMAC_CLK_TX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 0)
++
++/* RK322X_GRF_MAC_CON1 */
++#define RK322X_GMAC_PHY_INTF_SEL_RGMII	\
++		(GRF_BIT(4) | GRF_CLR_BIT(5) | GRF_CLR_BIT(6))
++#define RK322X_GMAC_PHY_INTF_SEL_RMII	\
++		(GRF_CLR_BIT(4) | GRF_CLR_BIT(5) | GRF_BIT(6))
++#define RK322X_GMAC_FLOW_CTRL		GRF_BIT(3)
++#define RK322X_GMAC_FLOW_CTRL_CLR	GRF_CLR_BIT(3)
++#define RK322X_GMAC_SPEED_10M		GRF_CLR_BIT(2)
++#define RK322X_GMAC_SPEED_100M		GRF_BIT(2)
++#define RK322X_GMAC_RMII_CLK_25M	GRF_BIT(7)
++#define RK322X_GMAC_RMII_CLK_2_5M	GRF_CLR_BIT(7)
++#define RK322X_GMAC_CLK_125M		(GRF_CLR_BIT(8) | GRF_CLR_BIT(9))
++#define RK322X_GMAC_CLK_25M		(GRF_BIT(8) | GRF_BIT(9))
++#define RK322X_GMAC_CLK_2_5M		(GRF_CLR_BIT(8) | GRF_BIT(9))
++#define RK322X_GMAC_RMII_MODE		GRF_BIT(10)
++#define RK322X_GMAC_RMII_MODE_CLR	GRF_CLR_BIT(10)
++#define RK322X_GMAC_TXCLK_DLY_ENABLE	GRF_BIT(0)
++#define RK322X_GMAC_TXCLK_DLY_DISABLE	GRF_CLR_BIT(0)
++#define RK322X_GMAC_RXCLK_DLY_ENABLE	GRF_BIT(1)
++#define RK322X_GMAC_RXCLK_DLY_DISABLE	GRF_CLR_BIT(1)
++
++static void rk322x_set_to_rgmii(struct rk_priv_data *bsp_priv,
++				int tx_delay, int rx_delay)
++{
++	struct device *dev = &bsp_priv->pdev->dev;
++
++	if (IS_ERR(bsp_priv->grf)) {
++		dev_err(dev, "Missing rockchip,grf property\n");
++		return;
++	}
++
++	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
++		     RK322X_GMAC_PHY_INTF_SEL_RGMII |
++		     RK322X_GMAC_RMII_MODE_CLR |
++		     RK322X_GMAC_RXCLK_DLY_ENABLE |
++		     RK322X_GMAC_TXCLK_DLY_ENABLE);
++
++	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON0,
++		     RK322X_GMAC_CLK_RX_DL_CFG(rx_delay) |
++		     RK322X_GMAC_CLK_TX_DL_CFG(tx_delay));
++}
++
++static void rk322x_set_to_rmii(struct rk_priv_data *bsp_priv)
++{
++	struct device *dev = &bsp_priv->pdev->dev;
++
++	if (IS_ERR(bsp_priv->grf)) {
++		dev_err(dev, "Missing rockchip,grf property\n");
++		return;
++	}
++
++	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
++		     RK322X_GMAC_PHY_INTF_SEL_RMII |
++		     RK322X_GMAC_RMII_MODE);
++
++	/* set MAC to RMII mode */
++	regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1, GRF_BIT(11));
++}
++
++static void rk322x_set_rgmii_speed(struct rk_priv_data *bsp_priv, int speed)
++{
++	struct device *dev = &bsp_priv->pdev->dev;
++
++	if (IS_ERR(bsp_priv->grf)) {
++		dev_err(dev, "Missing rockchip,grf property\n");
++		return;
++	}
++
++	if (speed == 10)
++		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
++			     RK322X_GMAC_CLK_2_5M);
++	else if (speed == 100)
++		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
++			     RK322X_GMAC_CLK_25M);
++	else if (speed == 1000)
++		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
++			     RK322X_GMAC_CLK_125M);
++	else
++		dev_err(dev, "unknown speed value for RGMII! speed=%d", speed);
++}
++
++static void rk322x_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
++{
++	struct device *dev = &bsp_priv->pdev->dev;
++
++	if (IS_ERR(bsp_priv->grf)) {
++		dev_err(dev, "Missing rockchip,grf property\n");
++		return;
++	}
++
++	if (speed == 10)
++		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
++			     RK322X_GMAC_RMII_CLK_2_5M |
++			     RK322X_GMAC_SPEED_10M);
++	else if (speed == 100)
++		regmap_write(bsp_priv->grf, RK322X_GRF_MAC_CON1,
++			     RK322X_GMAC_RMII_CLK_25M |
++			     RK322X_GMAC_SPEED_100M);
++	else
++		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
++}
++
++static const struct rk_gmac_ops rk322x_ops = {
++	.set_to_rgmii = rk322x_set_to_rgmii,
++	.set_to_rmii = rk322x_set_to_rmii,
++	.set_rgmii_speed = rk322x_set_rgmii_speed,
++	.set_rmii_speed = rk322x_set_rmii_speed,
++};
++
+ #define RK3288_GRF_SOC_CON1	0x0248
+ #define RK3288_GRF_SOC_CON3	0x0250
+ 
+@@ -604,6 +720,7 @@ static int rk_gmac_probe(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id rk_gmac_dwmac_match[] = {
++	{ .compatible = "rockchip,rk322x-gmac", .data = &rk322x_ops },
+ 	{ .compatible = "rockchip,rk3288-gmac", .data = &rk3288_ops },
+ 	{ .compatible = "rockchip,rk3368-gmac", .data = &rk3368_ops },
+ 	{ }
+-- 
+1.7.9.5
