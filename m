@@ -1,108 +1,129 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 21 Jun 2016 15:20:52 +0800
-Subject: [PATCH 2/3] ARM: dts: rockchip: add GMAC nodes for RK3228 SoCs
+Date: Tue, 21 Jun 2016 15:20:53 +0800
+Subject: [PATCH 3/3] ARM: dts: rockchip: add support rk3229 evb board
 In-Reply-To: <1466493653-18611-1-git-send-email-zhengxing@rock-chips.com>
 References: <1466493653-18611-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1466493653-18611-3-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1466493653-18611-4-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the GMAC dt nodes for rk3228 SoCs.
+Initial release for rk3229 evb board, and turn the GMAC on.
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 ---
 
- arch/arm/boot/dts/rk3228.dtsi |   64 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+ arch/arm/boot/dts/Makefile       |    1 +
+ arch/arm/boot/dts/rk3229-evb.dts |   90 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 91 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3229-evb.dts
 
-diff --git a/arch/arm/boot/dts/rk3228.dtsi b/arch/arm/boot/dts/rk3228.dtsi
-index e224147..4c0223c 100644
---- a/arch/arm/boot/dts/rk3228.dtsi
-+++ b/arch/arm/boot/dts/rk3228.dtsi
-@@ -417,6 +417,28 @@
- 		status = "disabled";
- 	};
- 
-+	gmac: eth at 30200000 {
-+		compatible = "rockchip,rk322x-gmac";
-+		reg = <0x30200000 0x10000>;
-+		rockchip,grf = <&grf>;
-+		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "macirq";
-+		clocks = <&cru SCLK_MAC>, <&cru SCLK_MAC_RX>,
-+			<&cru SCLK_MAC_TX>, <&cru SCLK_MAC_REF>,
-+			<&cru SCLK_MAC_REFOUT>, <&cru ACLK_GMAC>,
-+			<&cru PCLK_GMAC>;
-+		clock-names = "stmmaceth", "mac_clk_rx",
-+			"mac_clk_tx", "clk_mac_ref",
-+			"clk_mac_refout", "aclk_mac",
-+			"pclk_mac";
-+		resets = <&cru SRST_GMAC>;
-+		reset-names = "stmmaceth";
-+		phy-mode = "rgmii";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&rgmii_pins>;
-+		status = "disabled";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 06b6c2d..5e0833f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -602,6 +602,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+ 	rk3066a-rayeager.dtb \
+ 	rk3188-radxarock.dtb \
+ 	rk3228-evb.dtb \
++	rk3229-evb.dtb \
+ 	rk3288-evb-act8846.dtb \
+ 	rk3288-evb-rk808.dtb \
+ 	rk3288-firefly-beta.dtb \
+diff --git a/arch/arm/boot/dts/rk3229-evb.dts b/arch/arm/boot/dts/rk3229-evb.dts
+new file mode 100644
+index 0000000..bb97de9
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3229-evb.dts
+@@ -0,0 +1,90 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "rk3228.dtsi"
++
++/ {
++	model = "Rockchip RK3229 Evaluation board";
++	compatible = "rockchip,rk3229-evb", "rockchip,rk3229";
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x40000000>;
 +	};
 +
- 	gic: interrupt-controller at 32010000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
-@@ -501,6 +523,10 @@
- 			bias-disable;
- 		};
- 
-+		pcfg_pull_none_drv_12ma: pcfg-pull-none-drv-12ma {
-+			drive-strength = <12>;
-+		};
++	ext_gmac: ext_gmac {
++		compatible = "fixed-clock";
++		clock-frequency = <125000000>;
++		clock-output-names = "ext_gmac";
++		#clock-cells = <0>;
++	};
 +
- 		emmc {
- 			emmc_clk: emmc-clk {
- 				rockchip,pins = <2 7 RK_FUNC_2 &pcfg_pull_none>;
-@@ -522,6 +548,44 @@
- 			};
- 		};
- 
-+		gmac {
-+			rgmii_pins: rgmii-pins {
-+				rockchip,pins = <2 14 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 12 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 25 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 19 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
-+						<2 18 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
-+						<2 22 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
-+						<2 23 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
-+						<2 9 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
-+						<2 13 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
-+						<2 17 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 16 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 21 RK_FUNC_2 &pcfg_pull_none>,
-+						<2 20 RK_FUNC_2 &pcfg_pull_none>,
-+						<2 11 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 8 RK_FUNC_1 &pcfg_pull_none>;
-+			};
++	vcc_phy: vcc-phy-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		regulator-name = "vcc_phy";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++};
 +
-+			rmii_pins: rmii-pins {
-+				rockchip,pins = <2 14 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 12 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 25 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 19 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
-+						<2 18 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
-+						<2 13 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
-+						<2 17 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 16 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 8 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 15 RK_FUNC_1 &pcfg_pull_none>;
-+			};
++&gmac {
++	phy-supply = <&vcc_phy>;
++	phy-mode = "rgmii";
++	clock_in_out = "input";
++	snps,reset-gpio = <&gpio2 24 GPIO_ACTIVE_LOW>;
++	snps,reset-active-low;
++	snps,reset-delays-us = <0 10000 1000000>;
++	assigned-clocks = <&cru SCLK_MAC_EXTCLK>, <&cru SCLK_MAC>;
++	assigned-clock-parents = <&ext_gmac>, <&cru SCLK_MAC_EXTCLK>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>;
++	tx_delay = <0x30>;
++	rx_delay = <0x10>;
++	status = "okay";
++};
 +
-+			phy_pins: phy-pins {
-+				rockchip,pins = <2 14 RK_FUNC_2 &pcfg_pull_none>,
-+						<2 8 RK_FUNC_2 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
- 				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
++&uart2 {
++	status = "okay";
++};
 -- 
 1.7.9.5
