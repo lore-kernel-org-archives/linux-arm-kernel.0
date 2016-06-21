@@ -1,50 +1,101 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 21 Jun 2016 12:02:52 +0200
-Subject: [RFC PATCH v2 7/9] dt-bindings: arm: Update arm,
- scpi bindings with Meson GXBB SCPI
+Date: Tue, 21 Jun 2016 12:02:54 +0200
+Subject: [RFC PATCH v2 9/9] ARM64: dts: meson-gxbb: Add SCPI with cpufreq &
+ sensors Nodes
 In-Reply-To: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
 References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1466503374-28841-8-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1466503374-28841-10-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add the vcpu DVFS clock, the SCPU shared SRAM and the SCPI sensors nodes.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- Documentation/devicetree/bindings/arm/arm,scpi.txt | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 36 +++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-index 313dabd..fe58212 100644
---- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
-+++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-@@ -7,7 +7,7 @@ by Linux to initiate various system control and power operations.
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 913ba86..0f2596e 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -61,6 +61,7 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
++			clocks = <&scpi_dvfs 0>;
+ 		};
  
- Required properties:
+ 		cpu1: cpu at 1 {
+@@ -68,6 +69,7 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x1>;
+ 			enable-method = "psci";
++			clocks = <&scpi_dvfs 0>;
+ 		};
  
--- compatible : should be "arm,scpi"
-+- compatible : should be "arm,scpi" or "amlogic,meson-gxbb-scpi"
- - mboxes: List of phandle and mailbox channel specifiers
- 	  All the channels reserved by remote SCP firmware for use by
- 	  SCPI message protocol should be specified in any order
-@@ -60,7 +60,8 @@ A small area of SRAM is reserved for SCPI communication between application
- processors and SCP.
+ 		cpu2: cpu at 2 {
+@@ -75,6 +77,7 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x2>;
+ 			enable-method = "psci";
++			clocks = <&scpi_dvfs 0>;
+ 		};
  
- Required properties:
--- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
-+- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno,
-+		or "amlogic,meson-gxbb-sram" for Amlogic GXBB SoC.
+ 		cpu3: cpu at 3 {
+@@ -82,6 +85,7 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x3>;
+ 			enable-method = "psci";
++			clocks = <&scpi_dvfs 0>;
+ 		};
+ 	};
  
- The rest of the properties should follow the generic mmio-sram description
- found in ../../sram/sram.txt
-@@ -70,7 +71,8 @@ Each sub-node represents the reserved area for SCPI.
- Required sub-node properties:
- - reg : The base offset and size of the reserved area with the SRAM
- - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
--	       shared memory on Juno platforms
-+	       shared memory on Juno platforms or
-+	       "amlogic,meson-gxbb-scp-shmem" for Amlogic GXBB SoC.
+@@ -99,6 +103,28 @@
+ 		method = "smc";
+ 	};
  
- Sensor bindings for the sensors based on SCPI Message Protocol
- --------------------------------------------------------------
++	scpi {
++		compatible = "amlogic,meson-gxbb-scpi";
++		mboxes = <&mailbox 0 &mailbox 1>;
++		shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
++
++		clocks {
++			compatible = "arm,scpi-clocks";
++
++			scpi_dvfs: scpi_clocks at 0 {
++				compatible = "arm,scpi-dvfs-clocks";
++				#clock-cells = <1>;
++				clock-indices = <0>;
++				clock-output-names = "vcpu";
++	   		};
++		};
++
++		scpi_sensors: sensors {
++			compatible = "arm,scpi-sensors";
++			#thermal-sensor-cells = <1>;
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
+@@ -131,6 +157,16 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges = <0 0x0 0xc8000000 0x14000>;
++
++			cpu_scp_lpri: scp-shmem at 0 {
++				compatible = "amlogic,meson-gxbb-scp-shmem";
++				reg = <0x13000 0x400>;
++			};
++
++			cpu_scp_hpri: scp-shmem at 200 {
++				compatible = "amlogic,meson-gxbb-scp-shmem";
++				reg = <0x13400 0x400>;
++			};
+ 		};
+ 
+ 		cbus: cbus at c1100000 {
 -- 
 2.7.0
