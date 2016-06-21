@@ -1,67 +1,116 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 Jun 2016 00:43:21 -0700
-Subject: [PATCH 2/2] arm: fix kernel image size
-In-Reply-To: <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
-References: <20160617194405.GN1041@n2100.armlinux.org.uk>
- <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
-Message-ID: <20160621074319.GH22406@atomide.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 21 Jun 2016 15:44:09 +0800
+Subject: [PATCH V7 4/8] irqchip/gicv3-its: Cleanup for ITS domain
+ initialization
+In-Reply-To: <1466420541-20101-5-git-send-email-tn@semihalf.com>
+References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
+ <1466420541-20101-5-git-send-email-tn@semihalf.com>
+Message-ID: <7718646e-4f4c-eee9-30fd-02578679e3d6@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2016/6/20 19:02, Tomasz Nowicki wrote:
+> There is no point to initialize ITS without having msi-controller
+> property in corresponding DT node. However, its_probe is checking
+> msi-controller presence at the end, so we can save our time and do that
+> check prior to its_probe call. Also, for the code clarity purpose,
+> we put domain initialization to separate function.
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 57 ++++++++++++++++++++++++----------------
+>  1 file changed, 34 insertions(+), 23 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 7ceaba8..bd43de1 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1609,13 +1609,37 @@ static void its_enable_quirks(struct its_node *its)
+>  	gic_enable_quirks(iidr, its_quirks, its);
+>  }
+>
+> +static int its_init_domain(struct device_node *node, struct its_node *its,
+> +			   struct irq_domain *parent)
+> +{
+> +	struct irq_domain *inner_domain;
+> +	struct msi_domain_info *info;
+> +
+> +	info = kzalloc(sizeof(*info), GFP_KERNEL);
+> +	if (!info)
+> +		return -ENOMEM;
+> +
+> +	inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
+> +	if (!inner_domain) {
+> +		kfree(info);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	inner_domain->parent = parent;
+> +	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+> +	info->ops = &its_msi_domain_ops;
+> +	info->data = its;
+> +	inner_domain->host_data = info;
+> +
+> +	return 0;
+> +}
+> +
+>  static int __init its_probe(struct device_node *node,
+>  			    struct irq_domain *parent)
+>  {
+>  	struct resource res;
+>  	struct its_node *its;
+>  	void __iomem *its_base;
+> -	struct irq_domain *inner_domain;
+>  	u32 val;
+>  	u64 baser, tmp;
+>  	int err;
+> @@ -1707,28 +1731,9 @@ static int __init its_probe(struct device_node *node,
+>  	writeq_relaxed(0, its->base + GITS_CWRITER);
+>  	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
+>
+> -	if (of_property_read_bool(node, "msi-controller")) {
+> -		struct msi_domain_info *info;
+> -
+> -		info = kzalloc(sizeof(*info), GFP_KERNEL);
+> -		if (!info) {
+> -			err = -ENOMEM;
+> -			goto out_free_tables;
+> -		}
+> -
+> -		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
+> -		if (!inner_domain) {
+> -			err = -ENOMEM;
+> -			kfree(info);
+> -			goto out_free_tables;
+> -		}
+> -
+> -		inner_domain->parent = parent;
+> -		inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+> -		info->ops = &its_msi_domain_ops;
+> -		info->data = its;
+> -		inner_domain->host_data = info;
+> -	}
+> +	err = its_init_domain(node, its, parent);
+> +	if (err)
+> +		goto out_free_tables;
+>
+>  	spin_lock(&its_lock);
+>  	list_add(&its->entry, &its_nodes);
+> @@ -1779,6 +1784,12 @@ int __init its_init(struct device_node *node, struct rdists *rdists,
+>
+>  	for (np = of_find_matching_node(node, its_device_id); np;
+>  	     np = of_find_matching_node(np, its_device_id)) {
+> +		if (!of_property_read_bool(np, "msi-controller")) {
+> +			pr_warn("%s: no msi-controller property, ITS ignored\n",
+> +				np->full_name);
+> +			continue;
+> +		}
+> +
+>  		its_probe(np, parent_domain);
+>  	}
 
-* Russell King <rmk@armlinux.org.uk> [160617 12:52]:
-> If we want to assume that the compressed image will expand by a maximum
-> of 4x, we actually need to reserve 5x the space, since we need to keep
-> a copy of the compessed image around while decompressing.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Looks like 5x is not enough with omap2plus_defconfig at least..
-This one needs to be set to 6x for that. Maybe we should just make
-it go all the way to 11 :)
-
-Otherwise we get this without initrd:
-
-kernel: 0xb6c2d008 kernel_size: 0x3a4418
-MEMORY RANGES
-0000000080000000-00000000bfdfffff (0)
-kexec_load: entry = 0x80008000 flags = 0x280000
-nr_segments = 2
-segment[0].buf   = 0xb6c2d008
-segment[0].bufsz = 0x3a4418
-segment[0].mem   = 0x80008000
-segment[0].memsz = 0x3a5000
-segment[1].buf   = 0xadf80
-segment[1].bufsz = 0xe000
-segment[1].mem   = 0x8123f000
-segment[1].memsz = 0xe000
-[   32.886077] kexec_core: Starting new kernel
-[   32.890502] Disabling non-boot CPUs ...
-[   32.926696] CPU1: shutdown
-[   32.991882] Bye!
-Warning: Neither atags nor dtb found
-
-And we get this with initrd:
-
-kernel: 0xb6bf4008 kernel_size: 0x3a4418
-MEMORY RANGES
-0000000080000000-00000000fedfffff (0)
-kexec_load: entry = 0x80008000 flags = 0x280000
-nr_segments = 3
-segment[0].buf   = 0xb6bf4008
-segment[0].bufsz = 0x3a4418
-segment[0].mem   = 0x80008000
-segment[0].memsz = 0x3a5000
-segment[1].buf   = 0xb6686008
-segment[1].bufsz = 0x56dba2
-segment[1].mem   = 0x8123e000
-segment[1].memsz = 0x56e000
-segment[2].buf   = 0xadf80
-segment[2].bufsz = 0xd080
-segment[2].mem   = 0x817ac000
-segment[2].memsz = 0xe000
-...
-INITRD: 0x8123e000+0x0056dba2 overlaps in-use memory region - disabling initrd
-
-Regards,
-
-Tony
+Thanks
+Hanjun
