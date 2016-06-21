@@ -1,71 +1,67 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 21 Jun 2016 20:01:36 +0300
-Subject: [PATCH 1/2 v2] gpio: omap: make gpio numbering deterministical by
- using of aliases
-In-Reply-To: <1465930632-18941-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1465930632-18941-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1465930632-18941-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <576972F0.7090207@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 21 Jun 2016 12:01:50 -0500
+Subject: [PATCH 2/2] PCI: rcar: Drop gen2 dummy I/O port region
+In-Reply-To: <20160621165646.7997.44001.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20160621165646.7997.44001.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20160621170150.7997.4821.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2016 09:57 PM, Uwe Kleine-K?nig wrote:
-> Traditionally the n-th gpio device probed by the omap gpio driver got
-> the gpio number range [n*32 .. n*32+31].
-> When order of the devices probed by the driver changes (which can happen
-> already now when some devices have a pinctrl and so the first probe
-> attempt returns -ENODEV) the numbering changes.
->
-> To ensure a deterministical numbering use of_alias_get_id to determine
-> the base for a given device. If no respective alias exists fall back to
-> the traditional numbering.
->
-> For the unusual case where only a part of the gpio devices have a
-> matching alias some of them might fail to probe. But if none of them has
-> an alias or all, there is no conflict which should be good enough to
-> maintain backward compatibility.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->   drivers/gpio/gpio-omap.c | 19 ++++++++++++++++++-
->   1 file changed, 18 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index b98ede78c9d8..4d91792e7266 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1053,9 +1053,26 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->   			bank->chip.parent = &omap_mpuio_device.dev;
->   		bank->chip.base = OMAP_MPUIO(0);
->   	} else {
-> +		int gpio_alias_id __maybe_unused;
-> +
->   		bank->chip.label = "gpio";
-> -		bank->chip.base = gpio;
-> +
-> +#if defined(CONFIG_OF_GPIO)
-> +		/*
-> +		 * Traditionally the base is given out in first-come-first-serve
-> +		 * order.  This might shuffle the numbering of gpios if the
-> +		 * probe order changes.  So make the base deterministical if the
-> +		 * device tree specifies alias ids.
-> +		 */
-> +		gpio_alias_id = of_alias_get_id(bank->chip.of_node, "gpio");
-> +		if (gpio_alias_id >= 0)
-> +			bank->chip.base = bank->width * gpio_alias_id;
-> +		else
-> +#endif
-> +			bank->chip.base = gpio;
->   	}
-> +
-> +
->   	bank->chip.ngpio = bank->width;
->
->   	ret = gpiochip_add_data(&bank->chip, bank);
->
+Previously we added a dummy I/O port region even though the R-Car
+controller doesn't support PCI port I/O.  This resulted in bogus root bus
+resources like this:
 
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+  pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
+  pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
 
--- 
-regards,
--grygorii
+Drop the unused dummy I/O port region and set struct hw_pci.io_optional so
+the ARM PCI code doesn't add a default one for us.
+
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+---
+ drivers/pci/host/pci-rcar-gen2.c |   11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
+
+diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
+index 9980a4b..ddf7765 100644
+--- a/drivers/pci/host/pci-rcar-gen2.c
++++ b/drivers/pci/host/pci-rcar-gen2.c
+@@ -97,7 +97,6 @@
+ struct rcar_pci_priv {
+ 	struct device *dev;
+ 	void __iomem *reg;
+-	struct resource io_res;
+ 	struct resource mem_res;
+ 	struct resource *cfg_res;
+ 	unsigned busnr;
+@@ -273,7 +272,6 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
+ 		rcar_pci_setup_errirq(priv);
+ 
+ 	/* Add PCI resources */
+-	pci_add_resource(&sys->resources, &priv->io_res);
+ 	pci_add_resource(&sys->resources, &priv->mem_res);
+ 
+ 	/* Setup bus number based on platform device id / of bus-range */
+@@ -371,14 +369,6 @@ static int rcar_pci_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	priv->mem_res = *mem_res;
+-	/*
+-	 * The controller does not support/use port I/O,
+-	 * so setup a dummy port I/O region here.
+-	 */
+-	priv->io_res.start = priv->mem_res.start;
+-	priv->io_res.end = priv->mem_res.end;
+-	priv->io_res.flags = IORESOURCE_IO;
+-
+ 	priv->cfg_res = cfg_res;
+ 
+ 	priv->irq = platform_get_irq(pdev, 0);
+@@ -421,6 +411,7 @@ static int rcar_pci_probe(struct platform_device *pdev)
+ 	hw_private[0] = priv;
+ 	memset(&hw, 0, sizeof(hw));
+ 	hw.nr_controllers = ARRAY_SIZE(hw_private);
++	hw.io_optional = 1;
+ 	hw.private_data = hw_private;
+ 	hw.map_irq = rcar_pci_map_irq;
+ 	hw.ops = &rcar_pci_ops;
