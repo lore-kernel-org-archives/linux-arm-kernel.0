@@ -1,81 +1,67 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Tue, 21 Jun 2016 09:46:40 -0500
-Subject: [PATCHv4 4/7] Documentation: dt: socfpga: Add Arria10 Ethernet
- binding
-In-Reply-To: <20160621133340.GA9073@rob-hp-laptop>
-References: <1466434252-26107-1-git-send-email-tthayer@opensource.altera.com>
- <1466434252-26107-5-git-send-email-tthayer@opensource.altera.com>
- <20160621133340.GA9073@rob-hp-laptop>
-Message-ID: <57695350.3050404@opensource.altera.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 21 Jun 2016 15:45:09 +0100
+Subject: [RFC PATCH 6/8] PM / Domains: Remove a provider by referencing
+ the data pointer
+In-Reply-To: <1457090634-14785-7-git-send-email-jonathanh@nvidia.com>
+References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
+ <1457090634-14785-7-git-send-email-jonathanh@nvidia.com>
+Message-ID: <576952F5.5020808@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-On 06/21/2016 08:33 AM, Rob Herring wrote:
-> On Mon, Jun 20, 2016 at 09:50:49AM -0500, tthayer at opensource.altera.com wrote:
->> From: Thor Thayer <tthayer@opensource.altera.com>
->>
->> Add the device tree bindings needed to support the Altera Ethernet
->> FIFO buffers on the Arria10 chip.
->>
->> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
->> ---
->> v2  No Change
->> v3  Change to common compatible string based on maintainer comments
->>      Add local IRQ values.
->> v4  Add compatible string for parent node.
->> ---
->>   .../bindings/arm/altera/socfpga-eccmgr.txt         |   24 ++++++++++++++++++++
->>   1 file changed, 24 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->> index 15eb0df..7c714ba 100644
->> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->> @@ -82,6 +82,14 @@ Required Properties:
->>   - interrupts : Should be single bit error interrupt, then double bit error
->>   	interrupt, in this order.
->>
->> +Ethernet FIFO ECC
->> +Required Properties:
->> +- compatible : Should be "altr,socfpga-eth-mac-ecc"
->> +- reg        : Address and size for ECC block registers.
->> +- parent     : phandle to parent (altr,socfpga-stmmac) Ethernet node.
->
-> Sorry if I wasn't clear before, but I was suggesting changing 'parent'
-> to 'altr,ethernet-mac':
->
-> altr,ethernet-mac = <&gmac0>;
->
-> Rob
->
-Ahh, I see what you're saying.
+On 04/03/16 11:23, Jon Hunter wrote:
+> To remove a PM domain from the system, it is necessary to ensure
+> that any PM domain providers associated with the PM domain have
+> been removed. Otherwise it could be possible to obtain a pointer
+> to a PM domain structure that has been removed.
+> 
+> PM domains now have a reference to the pointer for the PM domain
+> provider's data variable. Add a function so that a PM domain can
+> remove a PM domain provider by referencing the data pointer.
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  drivers/base/power/domain.c | 24 ++++++++++++++++++++++++
+>  include/linux/pm_domain.h   |  2 ++
+>  2 files changed, 26 insertions(+)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 72055fef6256..438885f2455f 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1738,6 +1738,30 @@ void of_genpd_del_provider(struct device_node *np)
+>  EXPORT_SYMBOL_GPL(of_genpd_del_provider);
+>  
+>  /**
+> + * of_genpd_del_provider_by_data() - Remove a registered PM domain provider
+> + * @data: Pointer to the data associated with the PM domain provider
+> + *
+> + * Look up a PM domain provider based upon a pointer to it's data and
+> + * remove the PM domain provider from the list of providers.
+> + */
+> +void of_genpd_del_provider_by_data(void *data)
+> +{
+> +	struct of_genpd_provider *c, *cp;
+> +
+> +	mutex_lock(&of_genpd_mutex);
+> +	list_for_each_entry_safe(cp, c, &of_genpd_providers, link) {
+> +		if (cp->data == data) {
+> +			list_del(&cp->link);
+> +			of_node_put(cp->node);
+> +			kfree(cp);
+> +			break;
+> +		}
+> +	}
+> +	mutex_unlock(&of_genpd_mutex);
 
-I used parent as the tag because I have a generic function for 
-validating that the parent status is "okay" using the "parent" string in 
-my validate_parent_available() function (see below).
+On further the thought I believe that the above does not need to be safe
+variant of list_for_each_entry because we are breaking out of the loop
+when we find the one we are looking for. of_genpd_del_provider() does
+the same.
 
-I will be submitting other peripheral FIFOs with EDAC protection in 
-future patches (USB, DMA, etc).
+Cheers
+Jon
 
-static int validate_parent_available(struct device_node *np)
-{
-	struct device_node *parent;
-	int ret = 0;
-
-	/* Ensure parent device is enabled if parent node exists */
-	parent = of_parse_phandle(np, "parent", 0);
-	if (parent && !of_device_is_available(parent))
-		ret = -ENODEV;
-	of_node_put(parent);
-	return ret;
-}
-
-
-I can change this to using a passed in data string but the code won't be 
-as straightforward.
-
-Thanks for reviewing,
-
-Thor
+-- 
+nvpublic
