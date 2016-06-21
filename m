@@ -1,151 +1,26 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 21 Jun 2016 10:23:42 +0900
-Subject: [PATCH v19 06/13] arm64: kdump: reserve memory for crash dump
- kernel
-In-Reply-To: <576814AF.5060307@arm.com>
-References: <cover.1466120418.git.geoff@infradead.org>
- <d0486ff8419e38844ecb524d0ac86ea81a6ec67d.1466120418.git.geoff@infradead.org>
- <576814AF.5060307@arm.com>
-Message-ID: <20160621012337.GV20774@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 21 Jun 2016 10:38:37 +0900
+Subject: [PATCH v3] arm64: dts: r8a7795: Add CAN FD support
+In-Reply-To: <1466166943-17670-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+References: <1456906550-4849-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <1466166943-17670-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+Message-ID: <20160621013834.GA18247@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 05:07:11PM +0100, James Morse wrote:
-> Hi,
+On Fri, Jun 17, 2016 at 01:35:43PM +0100, Ramesh Shanmugasundaram wrote:
+> Adds CAN FD controller node for r8a7795.
 > 
-> On 17/06/16 00:48, Geoff Levand wrote:
-> > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > 
-> > On the startup of primary kernel, the memory region used by crash dump
-> > kernel must be specified by "crashkernel=" kernel parameter.
-> > reserve_crashkernel() will allocate and reserve the region for later use.
-> > 
-> > User space tools, like kexec-tools, will be able to find that region marked
-> > as "Crash kernel" in /proc/iomem.
+> Note: CAN FD controller register base address specified in R-Car Gen3
+> Hardware User Manual v0.5E is incorrect. The correct address is:
 > 
-> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > index d45f862..45f1319 100644
-> > --- a/arch/arm64/mm/init.c
-> > +++ b/arch/arm64/mm/init.c
-> > @@ -34,6 +34,7 @@
-> >  #include <linux/dma-contiguous.h>
-> >  #include <linux/efi.h>
-> >  #include <linux/swiotlb.h>
-> > +#include <linux/kexec.h>
-> >  
-> >  #include <asm/boot.h>
-> >  #include <asm/fixmap.h>
-> > @@ -76,6 +77,65 @@ static int __init early_initrd(char *p)
-> >  early_param("initrd", early_initrd);
-> >  #endif
-> >  
-> > +#ifdef CONFIG_KEXEC_CORE
-> > +/*
-> > + * reserve_crashkernel() - reserves memory for crash kernel
-> > + *
-> > + * This function reserves memory area given in "crashkernel=" kernel command
-> > + * line parameter. The memory reserved is used by dump capture kernel when
-> > + * primary kernel is crashing.
-> > + */
-> > +static void __init reserve_crashkernel(void)
-> > +{
-> > +	unsigned long long crash_size = 0, crash_base = 0;
-> > +	int ret;
-> > +
-> > +	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> > +				&crash_size, &crash_base);
-> > +	/* no crashkernel= or invalid value specified */
-> > +	if (!crash_size)
-> > +		return;
+> CAN FD - 0xe66c0000
 > 
-> Should we check ret too?
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> ---
+> 
+> Note:
+> Bindings already Acked-by: Rob H on driver patch set
+> (https://www.mail-archive.com/netdev at vger.kernel.org/msg102789.html)
 
-I thought that it was almost OK, but there is the only erroneous case,
-"crashkernel=SIZE@". Will fix it.
-
-> 
-> > +
-> > +	if (crash_base == 0) {
-> > +		/* Current arm64 boot protocol requires 2MB alignment */
-> > +		crash_base = memblock_find_in_range(0,
-> > +				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-> > +		if (crash_base == 0) {
-> > +			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> > +				crash_size);
-> > +			return;
-> > +		}
-> > +		memblock_reserve(crash_base, crash_size);
-> 
-> What if memblock_reserve() fails?
-
-I don't think it fails because the region has been allocated
-by memblock_find_in_range() just before.
-> 
-> > +
-> > +	} else {
-> > +		/* User specifies base address explicitly. */
-> > +		if (!memblock_is_region_memory(crash_base, crash_size) ||
-> > +			memblock_is_region_reserved(crash_base, crash_size)) {
-> > +			pr_warn("crashkernel has wrong address or size\n");
-> > +			return;
-> > +		}
-> > +
-> > +		if (IS_ALIGNED(crash_base, SZ_2M)) {
-> 
-> !IS_ALIGNED()...
-
-Oops, will fix it.
-
-> 
-> > +			pr_warn("crashkernel base address is not 2MB aligned\n");
-> > +			return;
-> > +		}
-> > +
-> > +		memblock_reserve(crash_base, crash_size);
-> 
-> What if memblock_reserve() fails?
-
-The region has been checked with memblock_is_region_reserved().
-
-> 
-> > +	}
-> > +
-> > +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> > +		crash_size >> 20, crash_base >> 20);
-> > +
-> > +	crashk_res.start = crash_base;
-> > +	crashk_res.end = crash_base + crash_size - 1;
-> > +}
-> > +#else
-> > +static void __init reserve_crashkernel(void)
-> > +{
-> > +	;
-> > +}
-> > +#endif /* CONFIG_KEXEC_CORE */
-> > +
-> >  /*
-> >   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-> >   * currently assumes that for memory starting above 4G, 32-bit devices will
-> > @@ -291,6 +351,8 @@ void __init arm64_memblock_init(void)
-> >  	}
-> >  #endif
-> >  
-> > +	reserve_crashkernel();
-> > +
-> >  	early_init_fdt_scan_reserved_mem();
-> >  
-> >  	/* 4GB maximum for 32-bit only capable devices */
-> > 
-> 
-> 
-> With those,
-> Reviewed-by: James Morse <james.morse@arm.com>
-
-Thanks,
--Takahiro AKASHI
-
-> 
-> Thanks,
-> 
-> James
-> 
+Thanks, I have queued this up.
