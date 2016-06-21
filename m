@@ -1,37 +1,37 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Tue, 21 Jun 2016 21:42:16 +0900
-Subject: [PATCH v4 0/8] iommu/rockchip: Fix bugs and enable on ARM64
-In-Reply-To: <20160621091732.GB28248@8bytes.org>
-References: <1466483681-36110-1-git-send-email-tfiga@chromium.org>
- <20160621091732.GB28248@8bytes.org>
-Message-ID: <CAAFQd5B8sxbZ6MymwDKL4vZkfQ-ej_bNh7tS1OhRC=X7-eie+Q@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 21 Jun 2016 13:43:40 +0100
+Subject: [PATCH] ARM: prima2: fix missing <linux/rtc/sirfsoc_rtciobrg.h> in
+ rtciobrg.c
+Message-ID: <1466513020-21334-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+The header file <linux/rtc/sirfsoc_rtciobrg.h> declares two functions
+exported from the rtciobrg.c file, so include it to fix the following
+warnings:
 
-On Tue, Jun 21, 2016 at 6:17 PM, Joerg Roedel <joro@8bytes.org> wrote:
->
-> On Tue, Jun 21, 2016 at 01:34:33PM +0900, Tomasz Figa wrote:
-> > This series intends mostly to enable support for ARM64 architecture
-> > in the rockchip-iommu driver. On the way to do so, some bugs are also
-> > fixed.
-> >
-> > The most important changes here are:
-> >  - making the Rockchip IOMMU driver use DMA API for managing cache
-> >    coherency of page tables,
-> >  - making the Rockchip DRM driver not use DMA API on behalf of a virtual
-> >    device (behind a virtual IOMMU) to allocate and map buffers, but
-> >    instead proper DRM helpers and IOMMU API directly.
->
-> Are these two parts dependent on each other or can the IOMMU and the DRM
-> part merged independently?
+arch/arm/mach-prima2/rtciobrg.c:41:6: warning: symbol 'sirfsoc_rtc_iobrg_besyncing' was not declared. Should it be static?
+arch/arm/mach-prima2/rtciobrg.c:91:6: warning: symbol 'sirfsoc_rtc_iobrg_writel' was not declared. Should it be static?
 
-In simple words, DRM patches depend on IOMMU patches.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: Barry Song <baohua@kernel.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-prima2/rtciobrg.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-More precisely: The IOMMU patches alone are supposed to not break
-anything. Same goes for the first DRM patch (7/8). Only second DRM
-patch (8/8) depends on changes introduced by its predecessors.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/mach-prima2/rtciobrg.c b/arch/arm/mach-prima2/rtciobrg.c
+index d4852d2..89d5f4d3 100644
+--- a/arch/arm/mach-prima2/rtciobrg.c
++++ b/arch/arm/mach-prima2/rtciobrg.c
+@@ -15,6 +15,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+ #include <linux/of_platform.h>
++#include <linux/rtc/sirfsoc_rtciobrg.h>
+ 
+ #define SIRFSOC_CPUIOBRG_CTRL           0x00
+ #define SIRFSOC_CPUIOBRG_WRBE           0x04
+-- 
+2.8.1
