@@ -1,130 +1,26 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 21 Jun 2016 09:26:23 -0500
-Subject: [PATCH v1 19/25] PCI: rcar Gen2: Request host bridge window
- resources
-In-Reply-To: <CAMuHMdVgLfTD-BjRZ+gVKgYE8dkDZzQ6DnYtkUs+jVPthJsEdQ@mail.gmail.com>
-References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <20160606230706.20936.13086.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <CAMuHMdVgLfTD-BjRZ+gVKgYE8dkDZzQ6DnYtkUs+jVPthJsEdQ@mail.gmail.com>
-Message-ID: <20160621142623.GA29966@localhost>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Tue, 21 Jun 2016 16:29:21 +0200
+Subject: [PATCH] ARM: BCM5301X: Set GPIO enabling USB power on Netgear
+ R7000
+In-Reply-To: <CACna6rxm0euw=nVyHZzZa2+Q9U9S4t+aVy34ZvL0Lrx27B8-eA@mail.gmail.com>
+References: <1466509358-25498-1-git-send-email-zajec5@gmail.com>
+ <op.yjepy3mr2s3iss@ecaz>
+ <CACna6rxm0euw=nVyHZzZa2+Q9U9S4t+aVy34ZvL0Lrx27B8-eA@mail.gmail.com>
+Message-ID: <op.yjevu7en2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Valentine]
+On Tue, 21 Jun 2016 14:26:11 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
 
-Hi Geert,
+> On 21 June 2016 at 14:22, Imre Kaloz <kaloz@openwrt.org> wrote:
+>> Is there any reason you are not handling this properly as a regulator  
+>> with
+>> usb-nop-xceiv?
+>
+> We can't use USB NOP PHY as we need a specific PHY driver for Broadcom's  
+> USB.
 
-Thanks a lot for testing this, and sorry for the breakage.
-
-On Tue, Jun 21, 2016 at 12:41:31PM +0200, Geert Uytterhoeven wrote:
-> On Tue, Jun 7, 2016 at 1:07 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> > Request host bridge window resources so they appear in ioport_resource and
-> > iomem_resource and are reflected in /proc/ioports and /proc/iomem.
-> >
-> > Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> > ---
-> >  drivers/pci/host/pci-rcar-gen2.c |    4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
-> > index 9980a4b..617a6b2 100644
-> > --- a/drivers/pci/host/pci-rcar-gen2.c
-> > +++ b/drivers/pci/host/pci-rcar-gen2.c
-> > @@ -194,6 +194,7 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
-> >         struct rcar_pci_priv *priv = sys->private_data;
-> >         void __iomem *reg = priv->reg;
-> >         u32 val;
-> > +       int ret;
-> >
-> >         pm_runtime_enable(priv->dev);
-> >         pm_runtime_get_sync(priv->dev);
-> > @@ -275,6 +276,9 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
-> >         /* Add PCI resources */
-> >         pci_add_resource(&sys->resources, &priv->io_res);
-> >         pci_add_resource(&sys->resources, &priv->mem_res);
-> > +       ret = devm_request_pci_bus_resources(priv->dev, &sys->resources);
-> > +       if (ret < 0)
-> > +               return ret;
-> >
-> >         /* Setup bus number based on platform device id / of bus-range */
-> >         sys->busnr = priv->busnr;
-> 
-> This patch (commit 1bd019707b7c9249d34c5d348f1ef75eb4d83e89 in pci/next)
-> broke PCI on r8a7791/koelsch. Dmesg differences are:
-> 
->  pci-rcar-gen2 ee090000.pci: PCI: bus0 revision 11
-> -pci-rcar-gen2 ee090000.pci: PCI host bridge to bus 0000:00
-> -pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
-> -pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
-
-This is probably a result of this code in drivers/pci/host/pci-rcar-gen2.c:
-
-        /*
-         * The controller does not support/use port I/O,
-         * so setup a dummy port I/O region here.
-         */
-        priv->io_res.start = priv->mem_res.start;
-        priv->io_res.end = priv->mem_res.end;
-        priv->io_res.flags = IORESOURCE_IO;
-
-We try to avoid adding dummy regions like this, but maybe we missed
-this one.  I haven't found any email discussion about it yet, so I
-don't know what the reason for this one is.  Valentine, do you
-remember?
-
-Can you try the patch below (apply it before the 1bd019707b7c patch
-that broke things)?
+I see. That shouldn't stop you from addressing the regulator part, tho ;)
 
 
-commit b64dc28f5f2b3afe47ee4a42fb79db84ec4227f8
-Author: Bjorn Helgaas <bhelgaas@google.com>
-Date:   Tue Jun 21 09:19:34 2016 -0500
-
-    PCI: rcar: Drop gen2 dummy I/O port region
-    
-    Previously we added a dummy I/O port region even though the R-Car
-    controller doesn't support PCI port I/O.  This resulted in bogus root bus
-    resources like this:
-    
-      pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
-      pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
-    
-    Drop the unused dummy I/O port region.
-    
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-
-diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
-index 9980a4b..53ae619 100644
---- a/drivers/pci/host/pci-rcar-gen2.c
-+++ b/drivers/pci/host/pci-rcar-gen2.c
-@@ -97,7 +97,6 @@
- struct rcar_pci_priv {
- 	struct device *dev;
- 	void __iomem *reg;
--	struct resource io_res;
- 	struct resource mem_res;
- 	struct resource *cfg_res;
- 	unsigned busnr;
-@@ -273,7 +272,6 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
- 		rcar_pci_setup_errirq(priv);
- 
- 	/* Add PCI resources */
--	pci_add_resource(&sys->resources, &priv->io_res);
- 	pci_add_resource(&sys->resources, &priv->mem_res);
- 
- 	/* Setup bus number based on platform device id / of bus-range */
-@@ -371,14 +369,6 @@ static int rcar_pci_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	priv->mem_res = *mem_res;
--	/*
--	 * The controller does not support/use port I/O,
--	 * so setup a dummy port I/O region here.
--	 */
--	priv->io_res.start = priv->mem_res.start;
--	priv->io_res.end = priv->mem_res.end;
--	priv->io_res.flags = IORESOURCE_IO;
--
- 	priv->cfg_res = cfg_res;
- 
- 	priv->irq = platform_get_irq(pdev, 0);
+Imre
