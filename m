@@ -1,28 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 Jun 2016 15:38:03 +0100
-Subject: [v3 PATCH] arm64: kasan: instrument user memory access API
-In-Reply-To: <1465422056-20531-1-git-send-email-yang.shi@linaro.org>
-References: <1465422056-20531-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20160621143802.GB14542@e104818-lin.cambridge.arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 21 Jun 2016 08:40:18 -0600
+Subject: [PATCH V2] coresight-stm: support mmapping channel regions with
+ mmio_addr
+In-Reply-To: <1466475876-5937-1-git-send-email-zhang.chunyan@linaro.org>
+References: <1466475876-5937-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <CANLsYkxaiKLjtanLVNnYREuv8zsL1eioMdTyod2F3D+rc0C32A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 02:40:56PM -0700, Yang Shi wrote:
-> The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
-> ("x86/kasan: instrument user memory access API") added KASAN instrument to
-> x86 user memory access API, so added such instrument to ARM64 too.
-> 
-> Define __copy_to/from_user in C in order to add kasan_check_read/write call,
-> rename assembly implementation to __arch_copy_to/from_user.
-> 
-> Tested by test_kasan module.
-> 
-> Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+On 20 June 2016 at 20:24, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+> CoreSight STM device allows direct mapping of the channel regions to
+> userspace for zero-copy writing. To support this ability, the STM
+> framework has provided a hook 'mmio_addr', this patch just implemented
+> this hook for CoreSight STM.
+>
+> This patch also added an item into 'channel_space' to save the physical
+> base address of channel region which mmap operation needs to know.
+>
+> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-stm.c | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+> index 73be58a..482c8bb 100644
+> --- a/drivers/hwtracing/coresight/coresight-stm.c
+> +++ b/drivers/hwtracing/coresight/coresight-stm.c
+> @@ -105,10 +105,12 @@ module_param_named(
+>  /**
+>   * struct channel_space - central management entity for extended ports
+>   * @base:              memory mapped base address where channels start.
+> + * @phys:              physical base address of channel region.
+>   * @guaraneed:         is the channel delivery guaranteed.
+>   */
+>  struct channel_space {
+>         void __iomem            *base;
+> +       phys_addr_t             phys;
+>         unsigned long           *guaranteed;
+>  };
+>
+> @@ -356,6 +358,23 @@ static void stm_generic_unlink(struct stm_data *stm_data,
+>         stm_disable(drvdata->csdev);
+>  }
+>
+> +static phys_addr_t
+> +stm_mmio_addr(struct stm_data *stm_data, unsigned int master,
+> +             unsigned int channel, unsigned int nr_chans)
+> +{
+> +       struct stm_drvdata *drvdata = container_of(stm_data,
+> +                                                  struct stm_drvdata, stm);
+> +       phys_addr_t addr;
+> +
+> +       addr = drvdata->chs.phys + channel * BYTES_PER_CHANNEL;
+> +
+> +       if (offset_in_page(addr) ||
+> +           offset_in_page(nr_chans * BYTES_PER_CHANNEL))
+> +               return 0;
+> +
+> +       return addr;
+> +}
+> +
+>  static long stm_generic_set_options(struct stm_data *stm_data,
+>                                     unsigned int master,
+>                                     unsigned int channel,
+> @@ -761,7 +780,9 @@ static void stm_init_generic_data(struct stm_drvdata *drvdata)
+>         drvdata->stm.sw_end = 1;
+>         drvdata->stm.hw_override = true;
+>         drvdata->stm.sw_nchannels = drvdata->numsp;
+> +       drvdata->stm.sw_mmiosz = BYTES_PER_CHANNEL;
+>         drvdata->stm.packet = stm_generic_packet;
+> +       drvdata->stm.mmio_addr = stm_mmio_addr;
+>         drvdata->stm.link = stm_generic_link;
+>         drvdata->stm.unlink = stm_generic_unlink;
+>         drvdata->stm.set_options = stm_generic_set_options;
+> @@ -808,6 +829,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
+>         ret = stm_get_resource_byname(np, "stm-stimulus-base", &ch_res);
+>         if (ret)
+>                 return ret;
+> +       drvdata->chs.phys = ch_res.start;
+>
+>         base = devm_ioremap_resource(dev, &ch_res);
+>         if (IS_ERR(base))
+> --
+> 1.9.1
+>
 
-Queued for 4.8. Thanks.
-
--- 
-Catalin
+Applied - thanks.
+Mathieu
