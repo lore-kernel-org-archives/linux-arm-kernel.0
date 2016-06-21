@@ -1,43 +1,62 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Tue, 21 Jun 2016 14:33:35 +0000
-Subject: SMMU driver and stall vs terminate mode
-In-Reply-To: <5768150D.2070705@arm.com>
-References: <HE1PR04MB1641B0F8442061E3437037628D2A0@HE1PR04MB1641.eurprd04.prod.outlook.com>
- <5768150D.2070705@arm.com>
-Message-ID: <HE1PR04MB1641D09BBF8029ED98BE18D38D2B0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Tue, 21 Jun 2016 10:34:45 -0400
+Subject: [PATCH 4/4] MAINTAINERS: Update BCM281XX/BCM11XXX/BCM216XX entry
+In-Reply-To: <CAMsMSK-7WOuzVNASmLdAsm8PzRARJCZB5zVReZmfZPCYLtg=HQ@mail.gmail.com>
+References: <1466456857-11969-1-git-send-email-jon.mason@broadcom.com>
+ <1466456857-11969-5-git-send-email-jon.mason@broadcom.com>
+ <CAMsMSK-7WOuzVNASmLdAsm8PzRARJCZB5zVReZmfZPCYLtg=HQ@mail.gmail.com>
+Message-ID: <CAC3K-4qpqWBVAj=kXC3rt7WoDDOgSFKE92DmTy6cJw7eXBwVEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 20, 2016 at 5:35 PM, Chris Brand <chris.brand@broadcom.com> wrote:
+> On Mon, Jun 20, 2016 at 2:07 PM, Jon Mason <jon.mason@broadcom.com> wrote:
+>> There are many clock, pinctl, and misc others that should be covered
+>> under the BCM281XX/BCM11XXX/BCM216XX ARM listing.  Change the entry to
+>> use regex's that should cover all the files.
+>>
+>> Also, remove the bcm_defconfig entry (as the file is being removed), and
+>> arch/arm64/boot/dts/broadcom reference (as that is not accurate for this
+>> group of maintainers and all the device trees under it should now be
+>> covered by other maintainer entries).
+>>
+>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+>> ---
+>>  MAINTAINERS | 11 ++++-------
+>>  1 file changed, 4 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 28a35f4..01382ce 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -2481,14 +2481,11 @@ M:      Scott Branden <sbranden@broadcom.com>
+>>  L:     bcm-kernel-feedback-list at broadcom.com
+>>  T:     git git://github.com/broadcom/mach-bcm
+>>  S:     Maintained
+>> +N:     bcm281*
+>> +N:     bcm113*
+>> +N:     bcm216*
+>> +N:     kona
+>
+> Hmmm. We should probably add bcm23550 here, too.
 
+Sure, I'll be happy to ammend this patch to add "N:    bcm23550",
+which appears to cover all of the newly added files.  Also, does it
+make sense to add you to the list of maintainers above?
 
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Monday, June 20, 2016 11:09 AM
-> To: Stuart Yoder <stuart.yoder@nxp.com>; Will Deacon <Will.Deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-foundation.org; Nipun Gupta
-> <nipun.gupta@nxp.com>; Bharat Bhushan <bharat.bhushan@nxp.com>; Brian Starkey <brian.starkey@arm.com>
-> Subject: Re: SMMU driver and stall vs terminate mode
-> 
-> Hi Stuart,
-> 
-> On 20/06/16 16:28, Stuart Yoder wrote:
-> > Robin/Will,
-> >
-> > Right now the SMMU driver is hardcoded to configure 'stall' mode for
-> > context faults:
-> >
-> >        /* SCTLR */
-> >        reg = SCTLR_CFCFG | SCTLR_CFIE | SCTLR_CFRE | SCTLR_M | SCTLR_EAE_SBOP;
-> >
-> > We are running into an issue with a device where it seems behave sanely
-> > when SCTLR_CFCFG=0 ...i.e. 'terminate' mode, but in stall mode seems to be
-> > unaware that an access violation occurred.
-> 
-> Does the device keep issuing transactions after the initial faulting
-> one, by any chance?
+Thanks,
+Jon
 
-In the case we are seeing, it is a unit test type scenario and I think
-there is only one transaction, so software doesn't try to continue issuing
-transactions.
-
-Stuart
+>>  F:     arch/arm/mach-bcm/
+>> -F:     arch/arm/boot/dts/bcm113*
+>> -F:     arch/arm/boot/dts/bcm216*
+>> -F:     arch/arm/boot/dts/bcm281*
+>> -F:     arch/arm64/boot/dts/broadcom/
+>> -F:     arch/arm/configs/bcm_defconfig
+>> -F:     drivers/mmc/host/sdhci-bcm-kona.c
+>> -F:     drivers/clocksource/bcm_kona_timer.c
+>>
+>>  BROADCOM BCM2835 ARM ARCHITECTURE
+>>  M:     Stephen Warren <swarren@wwwdotorg.org>
+>
+> Chris
