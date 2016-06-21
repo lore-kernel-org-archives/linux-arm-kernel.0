@@ -1,40 +1,45 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue, 21 Jun 2016 10:05:57 +0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable USB FFS gadget
-Message-ID: <1466496357-17006-1-git-send-email-gary.bisson@boundarydevices.com>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Tue, 21 Jun 2016 10:08:30 +0200
+Subject: [PATCH v3 00/10] Chain crypto requests together at the DMA level
+Message-ID: <1466496520-28806-1-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB Function FS gadget can be very useful for debugging.
+The Cryptographic Engines and Security Accelerators (CESA) supports
+the TDMA chained mode support. When this mode is enabled and crypto
+requests are chained at the DMA level, multiple crypto requests can be
+handled by the hardware engine without requiring any software
+intervention. This approach limits the number of interrupts generated
+by the engines thus improving its throughput and making the whole system
+behave nicely under heavy crypto load.
 
-For instance, the adbd daemon can leverage this gadget to
-offer an ADB connection to the platform over USB.
+Benchmarking results with dmcrypt
+=================================
+		I/O read	I/O write
+Before		81.7 MB/s	31.7 MB/s
+After		129  MB/s	39.8 MB/s
 
-Note that adbd is available on many OS/build systems:
-- Ubuntu: see android-tools-adbd package [1]
-- Yocto: see meta-smartphone android-tools recipe [2]
-- Buildroot: see android-tools package [3]
+Improvement	+57.8 %		+25.5 %
 
-[1] http://packages.ubuntu.com/trusty/android-tools-adbd
-[2] https://github.com/shr-distribution/meta-smartphone/tree/shr/meta-android/recipes-android/android-tools
-[3] https://git.buildroot.net/buildroot/tree/package/android-tools
+Romain Perier (10):
+  crypto: marvell: Add a macro constant for the size of the crypto queue
+  crypto: marvell: Check engine is not already running when enabling a
+    req
+  crypto: marvell: Fix wrong type check in dma functions
+  crypto: marvell: Copy IV vectors by DMA transfers for acipher requests
+  crypto: marvell: Move tdma chain out of mv_cesa_tdma_req and remove it
+  crypto: marvell: Add a complete operation for async requests
+  crypto: marvell: Move SRAM I/O operations to step functions
+  crypto: marvell: Add load balancing between engines
+  crypto: marvell: Add support for chaining crypto requests in TDMA mode
+  crypto: marvell: Increase the size of the crypto queue
 
-Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/crypto/marvell/cesa.c   | 142 +++++++++++++++++++++++++++---------
+ drivers/crypto/marvell/cesa.h   | 120 +++++++++++++++++++++---------
+ drivers/crypto/marvell/cipher.c | 157 ++++++++++++++++++++++++----------------
+ drivers/crypto/marvell/hash.c   | 150 ++++++++++++++++++--------------------
+ drivers/crypto/marvell/tdma.c   | 132 +++++++++++++++++++++++++++++++--
+ 5 files changed, 483 insertions(+), 218 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index eaabae2..89424a7 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -296,6 +296,7 @@ CONFIG_USB_ZERO=m
- CONFIG_USB_ETH=m
- CONFIG_USB_G_NCM=m
- CONFIG_USB_GADGETFS=m
-+CONFIG_USB_FUNCTIONFS=m
- CONFIG_USB_MASS_STORAGE=m
- CONFIG_USB_G_SERIAL=m
- CONFIG_MMC=y
 -- 
-2.8.1
+2.7.4
