@@ -1,207 +1,190 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 21 Jun 2016 12:11:43 -0500
-Subject: [PATCH 05/11] arm64: pmu: Add support for probing with ACPI
+Date: Tue, 21 Jun 2016 12:11:47 -0500
+Subject: [PATCH 09/11] arm64: pmu: Add routines for detecting differing PMU
+ types in the system
 In-Reply-To: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
 References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1466529109-21715-6-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1466529109-21715-10-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+In preparation for enabling heterogeneous PMUs on ACPI systems
+add routines that detect this and group the resulting PMUs and
+interrupts.
 
-In the case of ACPI, the PMU IRQ information is contained in the
-MADT table. Also, since the PMU does not exist as a device in the
-ACPI DSDT table, it is necessary to create a platform device so
-that the appropriate driver probing is triggered.
-
-Signed-off-by: Mark Salter <msalter@redhat.com>
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
+ drivers/perf/arm_pmu_acpi.c | 137 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 134 insertions(+), 3 deletions(-)
 
-NOTE: Much of the code in pmu_acpi_init() is replaced in patches 0009 and
-      0010 this set. The later version of the patch cleans up most of the
-      possible style/error handling issues that have been pointed out with
-      this version.
-
- arch/arm64/kernel/smp.c      |   5 +++
- drivers/perf/Kconfig         |   4 ++
- drivers/perf/Makefile        |   1 +
- drivers/perf/arm_pmu_acpi.c  | 100 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/perf/arm_pmu.h |   7 +++
- 5 files changed, 117 insertions(+)
- create mode 100644 drivers/perf/arm_pmu_acpi.c
-
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 319f48b..49ec927 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -37,6 +37,7 @@
- #include <linux/completion.h>
- #include <linux/of.h>
- #include <linux/irq_work.h>
-+#include <linux/perf/arm_pmu.h>
- 
- #include <asm/alternative.h>
- #include <asm/atomic.h>
-@@ -541,6 +542,7 @@ acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
- 			return;
- 		}
- 		bootcpu_valid = true;
-+		arm_pmu_parse_acpi(0, processor);
- 		return;
- 	}
- 
-@@ -561,6 +563,9 @@ acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
- 	 */
- 	acpi_set_mailbox_entry(cpu_count, processor);
- 
-+	/* get PMU irq info */
-+	arm_pmu_parse_acpi(cpu_count, processor);
-+
- 	early_map_cpu_to_node(cpu_count, acpi_numa_get_nid(cpu_count, hwid));
- 
- 	cpu_count++;
-diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-index 04e2653..818fa3b 100644
---- a/drivers/perf/Kconfig
-+++ b/drivers/perf/Kconfig
-@@ -12,4 +12,8 @@ config ARM_PMU
- 	  Say y if you want to use CPU performance monitors on ARM-based
- 	  systems.
- 
-+config ARM_PMU_ACPI
-+	def_bool y
-+	depends on ARM_PMU && ACPI
-+
- endmenu
-diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-index acd2397..fd8090d 100644
---- a/drivers/perf/Makefile
-+++ b/drivers/perf/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_ARM_PMU) += arm_pmu.o
-+obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
 diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-new file mode 100644
-index 0000000..a24cdd0
---- /dev/null
+index a24cdd0..482a54d 100644
+--- a/drivers/perf/arm_pmu_acpi.c
 +++ b/drivers/perf/arm_pmu_acpi.c
-@@ -0,0 +1,100 @@
-+/*
-+ * PMU support
-+ *
-+ * Copyright (C) 2015 Red Hat Inc.
-+ * Author: Mark Salter <msalter@redhat.com>
-+ *
-+ * This work is licensed under the terms of the GNU GPL, version 2.  See
-+ * the COPYING file in the top-level directory.
-+ *
-+ */
+@@ -1,23 +1,36 @@
+ /*
+- * PMU support
++ * ARM ACPI PMU support
+  *
+  * Copyright (C) 2015 Red Hat Inc.
++ * Copyright (C) 2016 ARM Ltd.
+  * Author: Mark Salter <msalter@redhat.com>
++ *         Jeremy Linton <jeremy.linton@arm.com>
+  *
+  * This work is licensed under the terms of the GNU GPL, version 2.  See
+  * the COPYING file in the top-level directory.
+  *
+  */
+ 
++#define pr_fmt(fmt) "ACPI-PMU: " fmt
 +
-+#include <linux/perf/arm_pmu.h>
-+#include <linux/platform_device.h>
-+#include <linux/acpi.h>
-+#include <linux/irq.h>
-+#include <linux/irqdesc.h>
-+
-+struct pmu_irq {
-+	int gsi;
-+	int trigger;
++#include <asm/cpu.h>
+ #include <linux/perf/arm_pmu.h>
+ #include <linux/platform_device.h>
+ #include <linux/acpi.h>
+ #include <linux/irq.h>
+ #include <linux/irqdesc.h>
++#include <linux/list.h>
+ 
+ struct pmu_irq {
+-	int gsi;
+-	int trigger;
++	int  gsi;
++	int  trigger;
++	bool registered;
 +};
 +
-+static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
-+
-+/*
-+ * Called from acpi_map_gic_cpu_interface()'s MADT parsing during boot.
-+ * This routine saves off the GSI's and their trigger state for use when we are
-+ * ready to build the PMU platform device.
-+*/
-+void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
++struct pmu_types {
++	struct list_head list;
++	int		 cpu_type;
++	int		 cpu_count;
+ };
+ 
+ static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
+@@ -36,6 +49,124 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
+ 		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
+ }
+ 
++/* Count number and type of CPU cores in the system. */
++void __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
 +{
-+	pmu_irqs[cpu].gsi = gic->performance_interrupt;
-+	if (gic->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
-+		pmu_irqs[cpu].trigger = ACPI_EDGE_SENSITIVE;
-+	else
-+		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
++	int i;
++
++	for_each_possible_cpu(i) {
++		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
++		u32 partnum = MIDR_PARTNUM(cinfo->reg_midr);
++		struct pmu_types *pmu;
++
++		list_for_each_entry(pmu, pmus, list) {
++			if (pmu->cpu_type == partnum) {
++				pmu->cpu_count++;
++				break;
++			}
++		}
++
++		/* we didn't find the CPU type, add an entry to identify it */
++		if (&pmu->list == pmus) {
++			pmu = kcalloc(1, sizeof(struct pmu_types), GFP_KERNEL);
++			if (!pmu) {
++				pr_warn("Unable to allocate pmu_types\n");
++			} else {
++				pmu->cpu_type = partnum;
++				pmu->cpu_count++;
++				list_add_tail(&pmu->list, pmus);
++			}
++		}
++	}
 +}
 +
-+static int __init pmu_acpi_init(void)
++/*
++ * Registers the group of PMU interfaces which correspond to the 'last_cpu_id'.
++ * This group utilizes 'count' resources in the 'res'.
++ */
++int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
++					    int last_cpu_id)
 +{
-+	struct platform_device *pdev;
-+	struct pmu_irq *pirq = pmu_irqs;
-+	struct resource	*res, *r;
++	int i;
 +	int err = -ENOMEM;
-+	int i, count, irq;
++	bool free_gsi = false;
++	struct platform_device *pdev;
 +
-+	if (acpi_disabled)
-+		return 0;
-+
-+	/* Must have irq for boot cpu, at least */
-+	if (pirq->gsi == 0)
-+		return -EINVAL;
-+
-+	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
-+				ACPI_ACTIVE_HIGH);
-+
-+	if (irq_is_percpu(irq))
-+		count = 1;
-+	else
-+		for (i = 1, count = 1; i < NR_CPUS; i++)
-+			if (pmu_irqs[i].gsi)
-+				++count;
-+
-+	pdev = platform_device_alloc(ARMV8_PMU_PDEV_NAME, -1);
-+	if (!pdev)
-+		goto err_free_gsi;
-+
-+	res = kcalloc(count, sizeof(*res), GFP_KERNEL);
-+	if (!res)
-+		goto err_free_device;
-+
-+	for (i = 0, r = res; i < count; i++, pirq++, r++) {
-+		if (i)
-+			irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
-+						ACPI_ACTIVE_HIGH);
-+		r->start = r->end = irq;
-+		r->flags = IORESOURCE_IRQ;
-+		if (pirq->trigger == ACPI_EDGE_SENSITIVE)
-+			r->flags |= IORESOURCE_IRQ_HIGHEDGE;
-+		else
-+			r->flags |= IORESOURCE_IRQ_HIGHLEVEL;
++	if (count) {
++		pdev = platform_device_alloc(ARMV8_PMU_PDEV_NAME, last_cpu_id);
++		if (pdev) {
++			err = platform_device_add_resources(pdev, res, count);
++			if (!err) {
++				err = platform_device_add(pdev);
++				if (err) {
++					pr_warn("Unable to register PMU device\n");
++					free_gsi = true;
++				}
++			} else {
++				pr_warn("Unable to add resources to device\n");
++				free_gsi = true;
++				platform_device_put(pdev);
++			}
++		} else {
++			pr_warn("Unable to allocate platform device\n");
++			free_gsi = true;
++		}
 +	}
 +
-+	err = platform_device_add_resources(pdev, res, count);
-+	if (!err)
-+		err = platform_device_add(pdev);
-+	kfree(res);
-+	if (!err)
-+		return 0;
-+
-+err_free_device:
-+	platform_device_put(pdev);
-+
-+err_free_gsi:
-+	for (i = 0; i < count; i++)
-+		acpi_unregister_gsi(pmu_irqs[i].gsi);
++	/* unmark (and possibly unregister) registered GSIs */
++	for_each_possible_cpu(i) {
++		if (pmu_irqs[i].registered) {
++			if (free_gsi)
++				acpi_unregister_gsi(pmu_irqs[i].gsi);
++			pmu_irqs[i].registered = false;
++		}
++	}
 +
 +	return err;
 +}
-+arch_initcall(pmu_acpi_init);
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 0ef963b..0e86dfb 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -158,4 +158,11 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 
- #endif /* CONFIG_ARM_PMU */
- 
-+#ifdef CONFIG_ARM_PMU_ACPI
-+struct acpi_madt_generic_interrupt;
-+void arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic);
-+#else
-+#define arm_pmu_parse_acpi(a, b) do { } while (0)
-+#endif /* CONFIG_ARM_PMU_ACPI */
 +
- #endif /* __ARM_PMU_H__ */
++/*
++ * For the given cpu/pmu type, walk all known GSIs, register them, and add
++ * them to the resource structure. Return the number of GSI's contained
++ * in the res structure, and the id of the last CPU/PMU we added.
++ */
++int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
++				       struct resource *res, int *last_cpu_id)
++{
++	int i, count;
++	int irq;
++
++	pr_info("Setting up %d PMUs for CPU type %X\n", pmus->cpu_count,
++							pmus->cpu_type);
++	/* lets group all the PMU's from similar CPU's together */
++	count = 0;
++	for_each_possible_cpu(i) {
++		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
++
++		if (pmus->cpu_type == MIDR_PARTNUM(cinfo->reg_midr)) {
++			if (pmu_irqs[i].gsi == 0)
++				continue;
++
++			irq = acpi_register_gsi(NULL, pmu_irqs[i].gsi,
++						pmu_irqs[i].trigger,
++						ACPI_ACTIVE_HIGH);
++
++			res[count].start = res[count].end = irq;
++			res[count].flags = IORESOURCE_IRQ;
++
++			if (pmu_irqs[i].trigger == ACPI_EDGE_SENSITIVE)
++				res[count].flags |= IORESOURCE_IRQ_HIGHEDGE;
++			else
++				res[count].flags |= IORESOURCE_IRQ_HIGHLEVEL;
++
++			pmu_irqs[i].registered = true;
++			count++;
++			(*last_cpu_id) = cinfo->reg_midr;
++		}
++	}
++	return count;
++}
++
+ static int __init pmu_acpi_init(void)
+ {
+ 	struct platform_device *pdev;
 -- 
 2.5.5
