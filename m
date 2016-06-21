@@ -1,37 +1,152 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 Jun 2016 03:38:11 -0700
-Subject: [PATCH 2/2] arm: fix kernel image size
-In-Reply-To: <20160621094737.GA5783@n2100.arm.linux.org.uk>
-References: <20160617194405.GN1041@n2100.armlinux.org.uk>
- <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
- <20160621074319.GH22406@atomide.com>
- <20160621094737.GA5783@n2100.arm.linux.org.uk>
-Message-ID: <20160621103810.GI22406@atomide.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 21 Jun 2016 12:41:31 +0200
+Subject: [PATCH v1 19/25] PCI: rcar Gen2: Request host bridge window
+ resources
+In-Reply-To: <20160606230706.20936.13086.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <20160606230706.20936.13086.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <CAMuHMdVgLfTD-BjRZ+gVKgYE8dkDZzQ6DnYtkUs+jVPthJsEdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [160621 02:50]:
-> On Tue, Jun 21, 2016 at 12:43:21AM -0700, Tony Lindgren wrote:
-> > Hi,
-> > 
-> > * Russell King <rmk@armlinux.org.uk> [160617 12:52]:
-> > > If we want to assume that the compressed image will expand by a maximum
-> > > of 4x, we actually need to reserve 5x the space, since we need to keep
-> > > a copy of the compessed image around while decompressing.
-> > 
-> > Looks like 5x is not enough with omap2plus_defconfig at least..
-> > This one needs to be set to 6x for that. Maybe we should just make
-> > it go all the way to 11 :)
-> 
-> That's not really what this commit is about - it's about making the
-> code consistent with the comments in the file.  I could have instead
-> changed the comment saying "4x" to "3x" instead.
-> 
-> There isn't really an answer which will always work for this problem,
-> as I've already detailed in a previous thread discussing the issue.
-> Adding a zImage header don't fix the problem.
+Hi Bjorn,
 
-Well how about we change both comments and code to use a value
-that works?
+On Tue, Jun 7, 2016 at 1:07 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> Request host bridge window resources so they appear in ioport_resource and
+> iomem_resource and are reflected in /proc/ioports and /proc/iomem.
+>
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  drivers/pci/host/pci-rcar-gen2.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
+> index 9980a4b..617a6b2 100644
+> --- a/drivers/pci/host/pci-rcar-gen2.c
+> +++ b/drivers/pci/host/pci-rcar-gen2.c
+> @@ -194,6 +194,7 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
+>         struct rcar_pci_priv *priv = sys->private_data;
+>         void __iomem *reg = priv->reg;
+>         u32 val;
+> +       int ret;
+>
+>         pm_runtime_enable(priv->dev);
+>         pm_runtime_get_sync(priv->dev);
+> @@ -275,6 +276,9 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
+>         /* Add PCI resources */
+>         pci_add_resource(&sys->resources, &priv->io_res);
+>         pci_add_resource(&sys->resources, &priv->mem_res);
+> +       ret = devm_request_pci_bus_resources(priv->dev, &sys->resources);
+> +       if (ret < 0)
+> +               return ret;
+>
+>         /* Setup bus number based on platform device id / of bus-range */
+>         sys->busnr = priv->busnr;
 
-Tony
+This patch (commit 1bd019707b7c9249d34c5d348f1ef75eb4d83e89 in pci/next)
+broke PCI on r8a7791/koelsch. Dmesg differences are:
+
+ pci-rcar-gen2 ee090000.pci: PCI: bus0 revision 11
+-pci-rcar-gen2 ee090000.pci: PCI host bridge to bus 0000:00
+-pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
+-pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
+-pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
+-pci 0000:00:00.0: [1033:0000] type 00 class 0x060000
+-pci 0000:00:00.0: reg 0x10: [mem 0xee090800-0xee090bff]
+-pci 0000:00:00.0: reg 0x14: [mem 0x40000000-0x7fffffff pref]
+-pci 0000:00:01.0: [1033:0035] type 00 class 0x0c0310
+-pci 0000:00:01.0: reg 0x10: [mem 0x00000000-0x00000fff]
+-pci 0000:00:01.0: supports D1 D2
+-pci 0000:00:01.0: PME# supported from D0 D1 D2 D3hot
+-pci 0000:00:02.0: [1033:00e0] type 00 class 0x0c0320
+-pci 0000:00:02.0: reg 0x10: [mem 0x00000000-0x000000ff]
+-pci 0000:00:02.0: supports D1 D2
+-pci 0000:00:02.0: PME# supported from D0 D1 D2 D3hot
+-PCI: bus0: Fast back to back transfers disabled
+-pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 00
+-pci 0000:00:01.0: BAR 0: assigned [mem 0xee080000-0xee080fff]
+-pci 0000:00:02.0: BAR 0: assigned [mem 0xee081000-0xee0810ff]
++pci-rcar-gen2 ee090000.pci: resource collision: [io
+0xee080000-0xee0810ff] conflicts with PCI IO [io  0x0000-0xfffff]
+
+and:
+
+ pci-rcar-gen2 ee0d0000.pci: PCI: bus0 revision 11
+-pci-rcar-gen2 ee0d0000.pci: PCI host bridge to bus 0001:01
+-pci_bus 0001:01: root bus resource [io  0xee0c0000-0xee0c10ff]
+-pci_bus 0001:01: root bus resource [mem 0xee0c0000-0xee0c10ff]
+-pci_bus 0001:01: No busn resource found for root bus, will use [bus 01-ff]
+-pci 0001:01:00.0: [1033:0000] type 00 class 0x060000
+-pci 0001:01:00.0: reg 0x10: [mem 0xee0d0800-0xee0d0bff]
+-pci 0001:01:00.0: reg 0x14: [mem 0x40000000-0x7fffffff pref]
+-pci 0001:01:01.0: [1033:0035] type 00 class 0x0c0310
+-pci 0001:01:01.0: reg 0x10: [mem 0x00000000-0x00000fff]
+-pci 0001:01:01.0: supports D1 D2
+-pci 0001:01:01.0: PME# supported from D0 D1 D2 D3hot
+-pci 0001:01:02.0: [1033:00e0] type 00 class 0x0c0320
+-pci 0001:01:02.0: reg 0x10: [mem 0x00000000-0x000000ff]
+-pci 0001:01:02.0: supports D1 D2
+-pci 0001:01:02.0: PME# supported from D0 D1 D2 D3hot
+-PCI: bus1: Fast back to back transfers disabled
+-pci_bus 0001:01: busn_res: [bus 01-ff] end is updated to 01
+-pci 0001:01:01.0: BAR 0: assigned [mem 0xee0c0000-0xee0c0fff]
+-pci 0001:01:02.0: BAR 0: assigned [mem 0xee0c1000-0xee0c10ff]
++pci-rcar-gen2 ee0d0000.pci: resource collision: [io
+0xee0c0000-0xee0c10ff] conflicts with PCI IO [io  0x0000-0xfffff]
+
+# cat /proc/iomem
+30000000-37ffffff : /pcie at fe000000
+38000000-3fffffff : /pcie at fe000000
+40000000-6fffffff : System RAM
+  40008000-40a1c15b : Kernel code
+  40e00000-40e9ea97 : Kernel data
+e6060000-e606024f : /pfc at e6060000
+e60b0000-e60b0424 : /i2c at e60b0000
+e6150000-e6150fff : /clock-controller at e6150000
+e61f0000-e61f0013 : /thermal at e61f0000
+e61f0100-e61f0137 : /thermal at e61f0000
+e6530000-e653003f : /i2c at e6530000
+e6590000-e65900ff : /usb at e6590000
+e6590100-e65901ff : /usb-phy at e6590100
+e65a0000-e65a00ff : /dma-controller at e65a0000
+e65b0000-e65b00ff : /dma-controller at e65b0000
+e6700000-e671ffff : /dma-controller at e6700000
+e6720000-e673ffff : /dma-controller at e6720000
+e6b10000-e6b1002b : /spi at e6b10000
+e6e20000-e6e20063 : /spi at e6e20000
+e6e60000-e6e6003f : e6e60000.serial
+e6e68000-e6e6803f : e6e68000.serial
+e6ef1000-e6ef1fff : /video at e6ef1000
+ec500000-ec500fff : scu
+ec540000-ec540fff : ssiu
+ec541000-ec54127f : ssi
+ec5a0000-ec5a00ff : adg
+ec700000-ec70ffff : /dma-controller at ec700000
+ec720000-ec72ffff : /dma-controller at ec720000
+ec740000-ec7401ff : audmapp
+ee090000-ee090bff : /pci at ee090000
+ee0d0000-ee0d0bff : /pci at ee0d0000
+ee300000-ee301fff : /sata at ee300000
+ee700000-ee7003ff : /ethernet at ee700000
+fe000000-fe07ffff : /pcie at fe000000
+fe200000-fe3fffff : /pcie at fe000000
+fe928000-fe92ffff : /vsp1 at fe928000
+fe930000-fe937fff : /vsp1 at fe930000
+fe938000-fe93ffff : /vsp1 at fe938000
+fe980000-fe9902ff : /jpeg-codec at fe980000
+feb00000-feb3ffff : du
+feb90000-feb9001b : lvds.0
+# cat /proc/ioports
+00000000-000fffff : /pcie at fe000000
+#
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
