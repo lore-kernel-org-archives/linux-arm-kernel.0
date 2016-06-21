@@ -1,130 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 21 Jun 2016 17:06:47 +0100
-Subject: [RFC PATCH v2 03/15] arm64: mm: change IOMMU notifier action to
- attach DMA ops
-In-Reply-To: <03c537e7-0acf-edca-d0e0-369490c828df@samsung.com>
-References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
- <5763C27A.9030306@arm.com>
- <03c537e7-0acf-edca-d0e0-369490c828df@samsung.com>
-Message-ID: <20160621160637.GA31761@red-moon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Jun 2016 17:06:25 +0100
+Subject: [PATCH] arm64: mm: only initialize swiotlb when necessary
+In-Reply-To: <3518191.m1tVRlZvU1@wuerfel>
+References: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
+ <20160608120829.GB16322@e104818-lin.cambridge.arm.com>
+ <3518191.m1tVRlZvU1@wuerfel>
+Message-ID: <20160621160625.GE14542@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Wed, Jun 08, 2016 at 05:49:59PM +0200, Arnd Bergmann wrote:
+> On Wednesday, June 8, 2016 1:08:29 PM CEST Catalin Marinas wrote:
+> > On Wed, Jun 08, 2016 at 03:53:46PM +0800, Jisheng Zhang wrote:
+> > >  static int __init arm64_dma_init(void)
+> > >  {
+> > > +     if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
+> > > +             swiotlb = 1;
+> > > +
+> > >       return atomic_pool_init();
+> > >  }
+> > 
+> > So any platform with RAM larger than 4GB would still initialise swiotlb.
+> > I wouldn't say it's an issue, 64MB is not a significant loss on such
+> > systems.
+> > 
+> > An alternative would be to defer the freeing until we are aware of all
+> > possible dma masks for the populated devices (e.g. from DT), though I'm
+> > not sure that's enough, drivers may try to change such masks when
+> > probed.
+> 
+> Right, this is a hard problem, because you can in theory have odd devices
+> that require a DMA mask lower than the limit of ZONE_DMA.
 
-On Tue, Jun 21, 2016 at 09:53:20AM +0200, Marek Szyprowski wrote:
-> Hi Robin,
-> 
-> 
-> On 2016-06-17 11:27, Robin Murphy wrote:
-> >Hi Lorenzo,
-> >
-> >I think this patch makes sense even independent of the rest of the
-> >series, one nit inline notwithstanding.
-> >
-> >Marek; I'm curious as to whether this could make the workaround in
-> >722ec35f7 obsolete as well, or are all the drivers also bound
-> >super-early in the setup you had there?
-> 
-> Yes, this will solve that problem too. I will also hide some possible
-> deferred probe issues, because the moment at which IOMMU is activated
-> will be postponed. The only drawback with this approach is the fact
-> that is drivers won't be allowed to do any dma-mapping operations on
-> devices, which they don't own. This should not be a big issue, but
-> this was the reason to setup IOMMU on device add instead of driver
-> bind.
-> 
-> While at it, please make sure that the case of failed client driver
-> probe will be handled properly. IOMMU might do some operations while
-> setting up and if the client driver fails to probe (for whatever
-> reason, might be a deferred probe too), those operation has to be
-> undone. However the current code of the driver core won't call any
-> notifier (like BUS_NOTIFY_UNBOUND_DRIVER or whatever else) in such
-> case.
+I'm not sure what we can do about such devices even with swiotlb. The
+bounce buffer is allocated from ZONE_DMA and currently it assumes a
+32-bit mask from the start of RAM, so it is not guaranteed to support a
+smaller mask. We may need to come up with some DT memory node attribute
+to define the minimum DMA-able memory and restrict ZONE_DMA during early
+boot but I would rather wait until we hit a real issue in practice.
 
-Isn't Andy's commit 14b6257a5f3d enough ? Is that what you had in
-mind ?
+Anyway, I plan to merge this patch as is, we can improve the logic in
+the future if we have a better idea.
 
-> Long time ago I used BUS_NOTIFY_BIND_DRIVER based approach for my
-> Exynos IOMMU patches and had to extend bus core with such patch:
-> https://patchwork.kernel.org/patch/4678181/ to properly cleanup
-> after failed client driver probe and avoid leaking resources. Please
-> read the discussion, because some changes were requested to it.
-
-It looks like commit 14b6257a5f3d ("device core: add
-BUS_NOTIFY_DRIVER_NOT_BOUND notification") does what you
-are requesting, please let me know if that's enough.
-
-I will revert the changes in 722ec35f7 and fold them in the
-new version along with Robin's suggestions.
-
-Thanks,
-Lorenzo
-
-> 
-> 
-> Best regards
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
-> 
-> >
-> >On 07/06/16 14:30, Lorenzo Pieralisi wrote:
-> >>Current bus notifier in ARM64 (__iommu_attach_notifier)
-> >>attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
-> >>action notification.
-> >>
-> >>This causes issues on ACPI based systems, where PCI devices
-> >>can be added before the IOMMUs the devices are attached to
-> >>had a chance to be probed, causing failures on attempts to
-> >>attach dma_ops in that the domain for the respective IOMMU
-> >>may not be set-up yet by the time the bus notifier is run.
-> >>
-> >>Devices dma_ops do not require to be set-up till the matching
-> >>device drivers are probed. This means that instead of running
-> >>the notifier attaching dma_ops to devices (__iommu_attach_notifier)
-> >>on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
-> >>device driver is bound to the device in question (on action
-> >>BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
-> >>group and domain are set-up accordingly at the time the
-> >>notifier is triggered.
-> >>
-> >>This patch changes the notifier action upon which dma_ops
-> >>are attached to devices and defer it to driver binding time,
-> >>so that IOMMU devices have a chance to be probed and to register
-> >>their bus notifiers before the dma_ops attach sequence for a
-> >>device is actually carried out.
-> >>
-> >>Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>Cc: Will Deacon <will.deacon@arm.com>
-> >>Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >>Cc: Robin Murphy <robin.murphy@arm.com>
-> >>---
-> >>  arch/arm64/mm/dma-mapping.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >>diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> >>index c566ec8..79b0882 100644
-> >>--- a/arch/arm64/mm/dma-mapping.c
-> >>+++ b/arch/arm64/mm/dma-mapping.c
-> >>@@ -848,7 +848,7 @@ static int __iommu_attach_notifier(struct
-> >>notifier_block *nb,
-> >>  {
-> >>      struct iommu_dma_notifier_data *master, *tmp;
-> >>
-> >>-    if (action != BUS_NOTIFY_ADD_DEVICE)
-> >>+    if (action != BUS_NOTIFY_BIND_DRIVER)
-> >
-> >With this, you can also get rid of the priority setting and big
-> >fat explanatory comment in register_iommu_dma_ops_notifier().
-> >
-> >Robin.
-> >
-> >>          return 0;
-> >>
-> >>      mutex_lock(&iommu_dma_notifier_lock);
-> >>
-> >
-> >
-> >
-> 
+-- 
+Catalin
