@@ -1,46 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Jun 2016 22:13:45 +0200
-Subject: [PATCH] arm64: mm: only initialize swiotlb when necessary
-In-Reply-To: <20160621160625.GE14542@e104818-lin.cambridge.arm.com>
-References: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
- <3518191.m1tVRlZvU1@wuerfel>
- <20160621160625.GE14542@e104818-lin.cambridge.arm.com>
-Message-ID: <4203245.3RUrvgiPFd@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 21 Jun 2016 15:28:00 -0500
+Subject: [PATCH 02/48] ARM: at91: Document new TCB bindings
+In-Reply-To: <20160615092955.261f14fb@bbrezillon>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1465596231-21766-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160614214737.GA10294@rob-hp-laptop>
+ <20160615092955.261f14fb@bbrezillon>
+Message-ID: <20160621202800.GB22435@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 21, 2016 5:06:25 PM CEST Catalin Marinas wrote:
-> On Wed, Jun 08, 2016 at 05:49:59PM +0200, Arnd Bergmann wrote:
-> > On Wednesday, June 8, 2016 1:08:29 PM CEST Catalin Marinas wrote:
-> > > On Wed, Jun 08, 2016 at 03:53:46PM +0800, Jisheng Zhang wrote:
-> > > >  static int __init arm64_dma_init(void)
-> > > >  {
-> > > > +     if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
-> > > > +             swiotlb = 1;
-> > > > +
-> > > >       return atomic_pool_init();
-> > > >  }
-> > > 
-> > > So any platform with RAM larger than 4GB would still initialise swiotlb.
-> > > I wouldn't say it's an issue, 64MB is not a significant loss on such
-> > > systems.
-> > > 
-> > > An alternative would be to defer the freeing until we are aware of all
-> > > possible dma masks for the populated devices (e.g. from DT), though I'm
-> > > not sure that's enough, drivers may try to change such masks when
-> > > probed.
-> > 
-> > Right, this is a hard problem, because you can in theory have odd devices
-> > that require a DMA mask lower than the limit of ZONE_DMA.
+On Wed, Jun 15, 2016 at 09:29:55AM +0200, Boris Brezillon wrote:
+> On Tue, 14 Jun 2016 16:47:37 -0500
+> Rob Herring <robh@kernel.org> wrote:
 > 
-> I'm not sure what we can do about such devices even with swiotlb. The
-> bounce buffer is allocated from ZONE_DMA and currently it assumes a
-> 32-bit mask from the start of RAM, so it is not guaranteed to support a
-> smaller mask. We may need to come up with some DT memory node attribute
-> to define the minimum DMA-able memory and restrict ZONE_DMA during early
-> boot but I would rather wait until we hit a real issue in practice.
+> > On Sat, Jun 11, 2016 at 12:03:05AM +0200, Alexandre Belloni wrote:
+> > > The current binding for the TCB is not flexible enough for some use cases
+> > > and prevents proper utilization of all the channels.
+> > > 
+> > > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > > Cc: linux-pwm at vger.kernel.org
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: devicetree at vger.kernel.org
+> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > > ---
+> > >  .../devicetree/bindings/arm/atmel-at91.txt         | 32 -----------
+> > >  .../devicetree/bindings/mfd/atmel-tcb.txt          | 62 ++++++++++++++++++++++
+> > >  .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
+> > >  3 files changed, 69 insertions(+), 37 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt  
+> > 
+> > [...]
 
-The bounce buffer is allocated at early boot time in order to get an address
-as low as possible, in the hope that it is small enough for those cases.
 
-	Arnd
+> > > diff --git a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+> > > index 8031148bcf85..ab8fbd5ba184 100644
+> > > --- a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+> > > +++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+> > > @@ -2,15 +2,17 @@ Atmel TCB PWM controller
+> > >  
+> > >  Required properties:
+> > >  - compatible: should be "atmel,tcb-pwm"
+> > > +- reg: tcb channel to use. Each channel can export 2 PWMs  
+> > 
+> > Is there a difference in channels? If not, then this compatible should 
+> > go.
+> 
+> This one I don't understand.
+> The TCB (Timer Counter Block) is an MFD containing 3 Timer Counter
+> devices. Each of these devices (also called channels) can be assigned a
+> specific mode:
+> - timer mode (free-running of programmable)
+> - waveform generator mode (IOW, a PWM)
+> - capture mode (an IIO device, but we don't have any driver for that
+>   right now)
+> 
+> So each sub-device of the TCB is represented as a sub-node with its own
+> compatible. Is there a problem with that?
+
+Missed this in my first reply. I guess for purposes of referencing pwm 
+from other nodes this is okay.
+
+Rob
