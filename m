@@ -1,28 +1,39 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Tue, 21 Jun 2016 02:02:44 -0700
-Subject: Warning when compiling DTB on X-Gene platform with dtc 1.4.1-g53bf130b
-Message-ID: <CADaLNDnfH8Weo=9jVNAW7LQCvAw23-z5fafwWcer4FSKeYH=ug@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 21 Jun 2016 11:10:10 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.7 (#1)
+Message-ID: <87wpli9abx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi,
 
-I got warning on unit_address_vs_reg similar to this
-https://lkml.org/lkml/2016/3/7/43 when using v4.7-rc2 dtc to build dtb
-for X-Gene Mustang:
+Here is the first pull request for fixes for mvebu for v4.7.
 
-dhdang at xgene-next=>./scripts/dtc/dtc -O dtb -R 16 -o mustang.dtb
-arch/arm64/boot/dts/apm/apm-mustang.dts
-  Warning (unit_address_vs_reg): Node /soc/reboot at 17000014 has a unit
-name, but no reg property
-  Warning (unit_address_vs_reg): Node /memory has a reg or ranges
-property, but no unit name
-  Warning (unit_address_vs_reg): Node /gpio-keys/button at 1 has a unit
-name, but no reg property
+Gregory
 
-There are nodes that I cannot change the node-name due to backward
-compatible with old firmware reason (/soc/reboot at 17000014 as an
-example). Is there any other way to avoid the warning?
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-Regards,
-Duc Dang.
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.7-1
+
+for you to fetch changes up to 929e604efa3dc0522214e0dc18984be23993e9f0:
+
+  ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on Armada 385 Linksys (2016-06-16 17:01:28 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.7 (part 1)
+
+Various I/O memory fix for Cortex A9 based SoCs
+
+----------------------------------------------------------------
+Thomas Petazzoni (3):
+      ARM: mvebu: fix HW I/O coherency related deadlocks
+      ARM: mvebu: map PCI I/O regions strongly ordered
+      ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on Armada 385 Linksys
+
+ arch/arm/boot/dts/armada-385-linksys.dtsi |  4 ++--
+ arch/arm/mach-mvebu/coherency.c           | 23 +++++++++--------------
+ 2 files changed, 11 insertions(+), 16 deletions(-)
