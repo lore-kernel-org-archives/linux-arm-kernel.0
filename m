@@ -1,83 +1,94 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Jun 2016 16:47:52 +0200
-Subject: [PATCH v2 00/15] clk: sunxi: introduce "modern" clock support
-In-Reply-To: <20160621114044.811e2136eca5c1d863d79ac6@free.fr>
-References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
- <20160621114044.811e2136eca5c1d863d79ac6@free.fr>
-Message-ID: <20160621144752.GR26668@lukather>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Tue, 21 Jun 2016 15:47:42 +0100
+Subject: SMMU driver and stall vs terminate mode
+In-Reply-To: <HE1PR04MB16414F95D83077B75F3000188D2B0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+References: <HE1PR04MB1641B0F8442061E3437037628D2A0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+ <5768150D.2070705@arm.com> <20160621094237.GL29165@arm.com>
+ <HE1PR04MB16414F95D83077B75F3000188D2B0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+Message-ID: <20160621144742.GA23672@e106950-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Francois,
+Hi,
 
-On Tue, Jun 21, 2016 at 11:40:44AM +0200, Jean-Francois Moine wrote:
-> On Tue,  7 Jun 2016 22:41:39 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > The current code has been tested on the H3 and an Orange Pi PC,
-> > including making sure that MMC still works, so the general approach
-> > seems ok.
-> > 
-> > Let me know what you think,
-> 
-> Hi Maxime,
-> 
-> I used your code in both the H3 and A83T, and it worked fine for the
-> current clocks.
+On Tue, Jun 21, 2016 at 02:36:17PM +0000, Stuart Yoder wrote:
+>
+>
+>> -----Original Message-----
+>> From: Will Deacon [mailto:will.deacon at arm.com]
+>> Sent: Tuesday, June 21, 2016 4:43 AM
+>> To: Robin Murphy <robin.murphy@arm.com>
+>> Cc: Stuart Yoder <stuart.yoder@nxp.com>; linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
+>> foundation.org; Nipun Gupta <nipun.gupta@nxp.com>; Bharat Bhushan <bharat.bhushan@nxp.com>; Brian
+>> Starkey <brian.starkey@arm.com>
+>> Subject: Re: SMMU driver and stall vs terminate mode
+>>
+>> On Mon, Jun 20, 2016 at 05:08:45PM +0100, Robin Murphy wrote:
+>> > On 20/06/16 16:28, Stuart Yoder wrote:
+>> > >Right now the SMMU driver is hardcoded to configure 'stall' mode for
+>> > >context faults:
+>> > >
+>> > >       /* SCTLR */
+>> > >       reg = SCTLR_CFCFG | SCTLR_CFIE | SCTLR_CFRE | SCTLR_M | SCTLR_EAE_SBOP;
+>> > >
+>> > >We are running into an issue with a device where it seems behave sanely
+>> > >when SCTLR_CFCFG=0 ...i.e. 'terminate' mode, but in stall mode seems to be
+>> > >unaware that an access violation occurred.
+>> >
+>> > Does the device keep issuing transactions after the initial faulting one, by
+>> > any chance? Brian (+cc) has seen similar-sounding issues in the past (albeit
+>> > with backports to some horrible Android kernel), and I think we concluded
+>> > that there's an inherent race window between writing RESUME and acking the
+>> > interrupt in which MMU-500 can process another faulting transaction and
+>> > reassert the IRQ without Linux realising, which then gets lost and things go
+>> > out of whack.
 
-I'm glad it works :)
+The problem in my case ended up being that one of the IRQ lines for the
+MMU wasn't actually wired up - so the MMU driver never knew there was an
+IRQ to handle and so never un-stalled the transactions.
+I think it was the context bank's line, so global faults worked fine but
+not context faults.
 
-Your reviews have been appreciated, I'll address them in my v3.
+Of course, there may also be a race on RESUME.
 
-> But I had some problems with some features as the 'mode select' in the
-> A83T MMC2 clock.
-> Also, I think that you did not go far enough in the changes.
+>>
+>> Do we not detect this with the MULTI bit in the FSR?
+>>
+>> > >Is there really some assumption that all devices that send transcactions
+>> > >through the SMMU _must_ be able to handle stall mode?  I am trying to
+>> > >find out from our hw designers what is going on at the signal level for
+>> > >the device in question, but it seems to me that 'terminate' mode exists
+>> > >for a reason and I wonder what your thoughts are about providing a
+>> > >configuration option to allow configuration of terminate mode if a particular
+>> > >SoC requires it.
+>> >
+>> > Personally, I'd quite happily leave it turned off (MMU-400/401 don't support
+>> > stalling anyway), but I recall Will having a fairly reasonable-sounding
+>> > argument in favour, which I now can't remember the details of. Hopefully he
+>> > might remind us, unless his conference is too enthralling.
+>>
+>> Given that we don't do anything particularly useful in the context fault
+>> handler, I also wouldn't object to turning this off (and removing the
+>> retry/reporting machinery). However, I'd want t better description of
+>> *why* it's causing problems first, so that we can justify the decision
+>> in case anybody is using this out of tree.
 
-At some point, you also have to support what's used out there,
-otherwise it just becomes an un-maintainable mess. Plus, it really
-doesn't have to be perfect from day one, it just has to works as it
-used to, we can always add more stuff later on.
+Is map-on-fault a valid enough use-case?
+Drivers can register their own fault handlers, so even if arm-smmu isn't
+doing anything interesting, I think the master's driver might.
 
-At it works way better than what we had.
+>
+>I am trying to get more details from HW owners of this device as to
+>its behavior in these 2 different SMMU modes.
+>
 
-The question also is: is there anyone that we depend on using it
-(mainline u-boot)? and is it something we need? If both answers are
-no, then it's just dead code, which shouldn't be here in the first
-place.
+My understanding is that it should be transparent to the hardware. It
+just looks like translation is taking a particularly long time (before
+ultimately faulting). As long as the MMU IRQ handler is running as it
+should, the transactions will eventually fault as normal.
 
-> For example, most clock gates as well as most resets could be removed
-> from the DT and automatically set/de-asserted on clock prepare or clock
-> enable.
+Thanks,
+Brian
 
-No. The semantics are completely different between the bus gates, bus
-resets and the module clocks. For example, the module clock can be
-shut down while retaining the register state, while the gate clock
-can't. And drivers are already using that semantic.
-
-Some other problems arise from that as well: this would break the DT
-ABI, and it deviates way too much from what the other SoCs are doing
-(which is the whole reason for that rework in the first place).
-
-> So, I am rewriting a generic sunxi clock driver into one file (about
-> 1000 lines) and I have the full (simpler and clearer) description of
-> the H3 and the A863T clocks.
-> 
-> Coding is not finished yet. I will submit a RFC as soon as I will have
-> something working.
-
-Please don't. I don't want to waste any more time on this, this is way
-overdue.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160621/296447dd/attachment.sig>
+>Stuart
+>
