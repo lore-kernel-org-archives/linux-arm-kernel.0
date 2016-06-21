@@ -1,116 +1,201 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 21 Jun 2016 15:44:09 +0800
-Subject: [PATCH V7 4/8] irqchip/gicv3-its: Cleanup for ITS domain
- initialization
-In-Reply-To: <1466420541-20101-5-git-send-email-tn@semihalf.com>
-References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
- <1466420541-20101-5-git-send-email-tn@semihalf.com>
-Message-ID: <7718646e-4f4c-eee9-30fd-02578679e3d6@linaro.org>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Tue, 21 Jun 2016 15:46:11 +0800
+Subject: [PATCH v8 2/3] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <1466474580.6214.29.camel@mtksdaap41>
+References: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
+ <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
+ <1466419311.27959.12.camel@mtksdaap41>
+ <1466421720.1918.11.camel@mtksdaap41> <1466474580.6214.29.camel@mtksdaap41>
+Message-ID: <1466495171.8045.27.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/20 19:02, Tomasz Nowicki wrote:
-> There is no point to initialize ITS without having msi-controller
-> property in corresponding DT node. However, its_probe is checking
-> msi-controller presence at the end, so we can save our time and do that
-> check prior to its_probe call. Also, for the code clarity purpose,
-> we put domain initialization to separate function.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 57 ++++++++++++++++++++++++----------------
->  1 file changed, 34 insertions(+), 23 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 7ceaba8..bd43de1 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1609,13 +1609,37 @@ static void its_enable_quirks(struct its_node *its)
->  	gic_enable_quirks(iidr, its_quirks, its);
->  }
->
-> +static int its_init_domain(struct device_node *node, struct its_node *its,
-> +			   struct irq_domain *parent)
-> +{
-> +	struct irq_domain *inner_domain;
-> +	struct msi_domain_info *info;
-> +
-> +	info = kzalloc(sizeof(*info), GFP_KERNEL);
-> +	if (!info)
-> +		return -ENOMEM;
-> +
-> +	inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
-> +	if (!inner_domain) {
-> +		kfree(info);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	inner_domain->parent = parent;
-> +	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
-> +	info->ops = &its_msi_domain_ops;
-> +	info->data = its;
-> +	inner_domain->host_data = info;
-> +
-> +	return 0;
-> +}
-> +
->  static int __init its_probe(struct device_node *node,
->  			    struct irq_domain *parent)
->  {
->  	struct resource res;
->  	struct its_node *its;
->  	void __iomem *its_base;
-> -	struct irq_domain *inner_domain;
->  	u32 val;
->  	u64 baser, tmp;
->  	int err;
-> @@ -1707,28 +1731,9 @@ static int __init its_probe(struct device_node *node,
->  	writeq_relaxed(0, its->base + GITS_CWRITER);
->  	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
->
-> -	if (of_property_read_bool(node, "msi-controller")) {
-> -		struct msi_domain_info *info;
-> -
-> -		info = kzalloc(sizeof(*info), GFP_KERNEL);
-> -		if (!info) {
-> -			err = -ENOMEM;
-> -			goto out_free_tables;
-> -		}
-> -
-> -		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
-> -		if (!inner_domain) {
-> -			err = -ENOMEM;
-> -			kfree(info);
-> -			goto out_free_tables;
-> -		}
-> -
-> -		inner_domain->parent = parent;
-> -		inner_domain->bus_token = DOMAIN_BUS_NEXUS;
-> -		info->ops = &its_msi_domain_ops;
-> -		info->data = its;
-> -		inner_domain->host_data = info;
-> -	}
-> +	err = its_init_domain(node, its, parent);
-> +	if (err)
-> +		goto out_free_tables;
->
->  	spin_lock(&its_lock);
->  	list_add(&its->entry, &its_nodes);
-> @@ -1779,6 +1784,12 @@ int __init its_init(struct device_node *node, struct rdists *rdists,
->
->  	for (np = of_find_matching_node(node, its_device_id); np;
->  	     np = of_find_matching_node(np, its_device_id)) {
-> +		if (!of_property_read_bool(np, "msi-controller")) {
-> +			pr_warn("%s: no msi-controller property, ITS ignored\n",
-> +				np->full_name);
-> +			continue;
-> +		}
-> +
->  		its_probe(np, parent_domain);
->  	}
+On Tue, 2016-06-21 at 10:03 +0800, CK Hu wrote:
+> On Mon, 2016-06-20 at 19:22 +0800, Horng-Shyang Liao wrote:
+> > On Mon, 2016-06-20 at 18:41 +0800, CK Hu wrote:
+> > > Hi, HS:
+> > > 
+> > > One comment inline.
+> > > 
+> > > On Mon, 2016-05-30 at 11:19 +0800, HS Liao wrote:
+> > > > This patch is first version of Mediatek Command Queue(CMDQ) driver. The
+> > > > CMDQ is used to help read/write registers with critical time limitation,
+> > > > such as updating display configuration during the vblank. It controls
+> > > > Global Command Engine (GCE) hardware to achieve this requirement.
+> > > > Currently, CMDQ only supports display related hardwares, but we expect
+> > > > it can be extended to other hardwares for future requirements.
+> > > > 
+> > > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> > > > Signed-off-by: CK Hu <ck.hu@mediatek.com>
+> > > > ---
+> > > >  drivers/soc/mediatek/Kconfig    |  10 +
+> > > >  drivers/soc/mediatek/Makefile   |   1 +
+> > > >  drivers/soc/mediatek/mtk-cmdq.c | 943 ++++++++++++++++++++++++++++++++++++++++
+> > > >  include/soc/mediatek/cmdq.h     | 197 +++++++++
+> > > >  4 files changed, 1151 insertions(+)
+> > > >  create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
+> > > >  create mode 100644 include/soc/mediatek/cmdq.h
+> > > > 
+> > > > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> > > > index 0a4ea80..c4ad75c 100644
+> > > > --- a/drivers/soc/mediatek/Kconfig
+> > > > +++ b/drivers/soc/mediatek/Kconfig
+> > > > @@ -1,6 +1,16 @@
+> > > >  #
+> > > >  # MediaTek SoC drivers
+> > > >  #
+> > > > +config MTK_CMDQ
+> > > > +	bool "MediaTek CMDQ Support"
+> > > > +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > > > +	select MTK_INFRACFG
+> > > > +	help
+> > > > +	  Say yes here to add support for the MediaTek Command Queue (CMDQ)
+> > > > +	  driver. The CMDQ is used to help read/write registers with critical
+> > > > +	  time limitation, such as updating display configuration during the
+> > > > +	  vblank.
+> > > > +
+> > > >  config MTK_INFRACFG
+> > > >  	bool "MediaTek INFRACFG Support"
+> > > >  	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > > > diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
+> > > > index 12998b0..f7397ef 100644
+> > > > --- a/drivers/soc/mediatek/Makefile
+> > > > +++ b/drivers/soc/mediatek/Makefile
+> > > 
+> > > [Snip...]
+> > > 
+> > > > +
+> > > > +static int cmdq_eng_get_thread(u64 flag)
+> > > > +{
+> > > > +	if (flag & BIT_ULL(CMDQ_ENG_DISP_DSI0))
+> > > > +		return CMDQ_THR_DISP_MAIN_IDX;
+> > > > +	else if (flag & BIT_ULL(CMDQ_ENG_DISP_DPI0))
+> > > > +		return CMDQ_THR_DISP_SUB_IDX;
+> > > > +	else
+> > > > +		return CMDQ_THR_DISP_MISC_IDX;
+> > > > +}
+> > > 
+> > > I think cmdq should not have knowledge of client. These statement show
+> > > that cmdq know that DSI0-tasks is different with DPI0-tasks. I propose
+> > > the 'session' to replace engine flag. For example, main display create
+> > > one cmdq_session and external display create another cmdq_session. For
+> > > client driver, every tasks created by main display is bound to main
+> > > display session. For cmdq driver, it should dynamically bind a session
+> > > to a HW thread, and then dispatch tasks of this session to this HW
+> > > thread. After HW thread run out of tasks of this session, detach this
+> > > session with this thread.
+> > > For the problem of remove wfe cmd, I think a session can have a property
+> > > of merge_wfe_cmd. For display session, session->merge_wfe_cmd = true.
+> > > For other client, it's false.
+> > 
+> > Hi CK,
+> > 
+> > I think your suggestion is similar to CMDQ 'scenarios',
+> > which was removed from CMDQ v2.
+> > 
+> > Daniel suggests to use engine flags instead of scenarios.
+> > Quote from https://patchwork.kernel.org/patch/8068311/ .
+> > 'Instead of encoding policy (these arbitrary "scenarios"), perhaps the
+> >  cmdq driver should just provide these flag bits, and the display
+> >  subsystem can use them to build the "flag" parameter itself.
+> > 
+> >  After all, the exact configuration of mmsys components is somewhat
+> >  flexible.'
+> > 
+> > Therefore, it would be better to discuss with Daniel before we change
+> > it.
+> > 
+> > 
+> > Hi Daniel,
+> > 
+> > Do you think we should use scenarios or sessions instead of flags?
+> > 
+> > Thanks,
+> > HS
+> > 
+> 
+> Hi, HS:
+> 
+> 'session' is not similar to 'scenarios'.
+> 
+> In 'scenarios' mechanism, client bind a task with scenarios and send to
+> cmdq. Cmdq transfer scenarios to engine flag, and use engine flag to
+> dispatch task to HW thread.
+> 
+> 
+> In 'engine flag' mechanism, proposed by Daniel, client bind a task
+> directly with engine flag. Cmdq directly use engine flag to dispatch
+> task to HW thread without any translation.
+> 
+> But neither 'scenarios' mechanism nor 'engine flag' mechanism get rid of
+> engine flag, which make cmdq have knowledge of client.
+> 
+> In 'session' mechanism, there is no engine flag any more. Client bind
+> time-sequential tasks to the same session and tasks in different session
+> can execute parallelly. One thing cmdq need to know is to dispatch tasks
+> with the same session to the same HW thread, so cmdq does not have any
+> knowledge of client.
+> 
+> Daniel focus on reduce translating scenarios to engine flag. I think
+> 'session' mechanism does not conflict with his opinion because we does
+> not translate 'session' to engine flag. Therefore, I think 'session' is
+> the best of these three mechanism.
+> 
+> Regards,
+> CK
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Hi CK,
 
-Thanks
-Hanjun
+'Session' looks like a group of options for CMDQ.
+CMDQ driver can just follow the options to run its flow,
+and doesn't need to know its client(s).
+
+We don't have many options now, but it has good flexibility to extend
+for future requirements.
+
+I will add it in next version.
+
+Thanks,
+HS
+
+> > > Here is the sample code to create cmdq_rec with session.
+> > > 
+> > > merge_wfe_cmd = true;
+> > > cmdq_session_create(merge_wfe_cmd, &primary_display_session);
+> > > cmdq_rec_create(dev, primary_display_session, &rec);
+> > > 
+> > > 
+> > > Therefore, the below definition can be removed.
+> > > 
+> > > > +
+> > > > +enum cmdq_eng {
+> > > > +	CMDQ_ENG_DISP_AAL,
+> > > > +	CMDQ_ENG_DISP_COLOR0,
+> > > > +	CMDQ_ENG_DISP_COLOR1,
+> > > > +	CMDQ_ENG_DISP_DPI0,
+> > > > +	CMDQ_ENG_DISP_DSI0,
+> > > > +	CMDQ_ENG_DISP_DSI1,
+> > > > +	CMDQ_ENG_DISP_GAMMA,
+> > > > +	CMDQ_ENG_DISP_OD,
+> > > > +	CMDQ_ENG_DISP_OVL0,
+> > > > +	CMDQ_ENG_DISP_OVL1,
+> > > > +	CMDQ_ENG_DISP_PWM0,
+> > > > +	CMDQ_ENG_DISP_PWM1,
+> > > > +	CMDQ_ENG_DISP_RDMA0,
+> > > > +	CMDQ_ENG_DISP_RDMA1,
+> > > > +	CMDQ_ENG_DISP_RDMA2,
+> > > > +	CMDQ_ENG_DISP_UFOE,
+> > > > +	CMDQ_ENG_DISP_WDMA0,
+> > > > +	CMDQ_ENG_DISP_WDMA1,
+> > > > +	CMDQ_ENG_MAX,
+> > > > +};
+> > > > +
+> > > 
+> > > 
+> > > Regards,
+> > > CK
+> > > 
+> > 
+> > 
+> 
+> 
