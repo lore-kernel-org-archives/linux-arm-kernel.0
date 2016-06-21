@@ -1,42 +1,33 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 21 Jun 2016 16:16:19 +0100
-Subject: [PATCH 2/2] bus: mvebu-mbus: make mvebu_mbus_syscore_ops static
-In-Reply-To: <1466522179-22198-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1466522179-22198-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1466522179-22198-2-git-send-email-ben.dooks@codethink.co.uk>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 21 Jun 2016 17:23:18 +0200
+Subject: [PATCH] ARM: BCM5301X: Set GPIO enabling USB power on Netgear
+ R7000
+In-Reply-To: <op.yjevu7en2s3iss@ecaz>
+References: <1466509358-25498-1-git-send-email-zajec5@gmail.com>
+ <op.yjepy3mr2s3iss@ecaz>
+ <CACna6rxm0euw=nVyHZzZa2+Q9U9S4t+aVy34ZvL0Lrx27B8-eA@mail.gmail.com>
+ <op.yjevu7en2s3iss@ecaz>
+Message-ID: <CACna6ryrABjF3ie8uE6_q-pfNjhQaGbRhNR9jWMEPKwaUt88hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make mvebu_mbus_syscore_ops static as it does not get
-used or declared outside mvebu-mbus.c to fix the following
-sparse warning:
+On 21 June 2016 at 16:29, Imre Kaloz <kaloz@openwrt.org> wrote:
+> On Tue, 21 Jun 2016 14:26:11 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+>
+>> On 21 June 2016 at 14:22, Imre Kaloz <kaloz@openwrt.org> wrote:
+>>>
+>>> Is there any reason you are not handling this properly as a regulator
+>>> with
+>>> usb-nop-xceiv?
+>>
+>>
+>> We can't use USB NOP PHY as we need a specific PHY driver for Broadcom's
+>> USB.
+>
+>
+> I see. That shouldn't stop you from addressing the regulator part, tho ;)
 
-linux/drivers/bus/mvebu-mbus.c:1092:20: warning: symbol 'mvebu_mbus_syscore_ops' was not declared. Should it be static?
+How? Be more specific please.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Evan Wang <xswang@marvell.com>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/bus/mvebu-mbus.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 8cac3b8..c7f3969 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -1089,7 +1089,7 @@ static void mvebu_mbus_resume(void)
- 	}
- }
- 
--struct syscore_ops mvebu_mbus_syscore_ops = {
-+static struct syscore_ops mvebu_mbus_syscore_ops = {
- 	.suspend	= mvebu_mbus_suspend,
- 	.resume		= mvebu_mbus_resume,
- };
 -- 
-2.8.1
+Rafa?
