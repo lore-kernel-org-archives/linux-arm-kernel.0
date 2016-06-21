@@ -1,81 +1,167 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Jun 2016 16:37:51 +0100
-Subject: kexec failures with DEBUG_RODATA
-In-Reply-To: <20160621114849.GF29309@dhcppc9>
-References: <20160614175920.GD1041@n2100.armlinux.org.uk>
- <CAGXu5j+5j32HO0rQtF2hcqMUBaa8cyxgLT4JvaZ6LL2WPj_zjw@mail.gmail.com>
- <20160615211359.GJ1041@n2100.armlinux.org.uk>
- <CAGXu5jKRBA9b6gos+FG7iV2ppxtAERstNPschxA0z=aDL_y1YA@mail.gmail.com>
- <20160615224228.GK1041@n2100.armlinux.org.uk>
- <CAGXu5jLqNeYe_=7a5XC6UW4G3WiRQrrBvgernmugw_r2y0Nshg@mail.gmail.com>
- <20160615231303.GL1041@n2100.armlinux.org.uk>
- <20160621114849.GF29309@dhcppc9>
-Message-ID: <20160621153751.GT1041@n2100.armlinux.org.uk>
+From: valentine.barshak@cogentembedded.com (Valentine Barshak)
+Date: Tue, 21 Jun 2016 18:41:00 +0300
+Subject: [PATCH v1 19/25] PCI: rcar Gen2: Request host bridge window
+ resources
+In-Reply-To: <20160621142623.GA29966@localhost>
+References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <20160606230706.20936.13086.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <CAMuHMdVgLfTD-BjRZ+gVKgYE8dkDZzQ6DnYtkUs+jVPthJsEdQ@mail.gmail.com>
+ <20160621142623.GA29966@localhost>
+Message-ID: <20160621154100.GA4782@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 05:18:49PM +0530, Pratyush Anand wrote:
-> On 16/06/2016:12:13:03 AM, Russell King - ARM Linux wrote:
-> > I should point out that this method should work for a zImage without
-> > an appended DTB, and we have no way to update this header block for
-> > the appended DTB case.
+On Tue, Jun 21, 2016 at 09:26:23AM -0500, Bjorn Helgaas wrote:
+> [+cc Valentine]
 > 
-> Well, I might be missing with my limited knowledge. So, just to clarify, zImage
-> is "compressed image + uncompressor". In some cases it might have "+DTB".
-> So, zImage should be located atleast "aligned uncompressed size" above "kernel
-> base" and, initrd should be placed at "kernel base" +  "aligned uncompressed
-> size" + "compressed image size" + "uncompressor size" + DTB(if any).
+
+Hi Bjorn,
+
+> Hi Geert,
 > 
-> However, I am unable to understand that why can't we have a flag in zImage
-> header block, which tells that whether a DTB has been appended in the zImage or
-> not?
-
-cat zImage foo.dtb > newImage
-
-obviously doesn't result in the header block inside zImage being modified.
-The only way around that is to have a tool which concatenates the two
-and updates the header.  At that point, it's no longer simply a
-concatenation.
-
-> > So, an alternative standpoint is that we supply only the uncompressed
-> > image size.  Then, the boot environment needs to understand that they
-> > must allow for the compressed image and any appended DTB on top of that
-> > (which it would see as one - the size of the combined image.)
+> Thanks a lot for testing this, and sorry for the breakage.
 > 
-> So, why not we can have all three information in header ie. "uncompressed image
-> size", "compressed image size" and "DTB size" if appended flag is set.
-
-How big is the DTB size?  Without a tool to update the header, there's
-no way to really know.
-
-> > However, while that may sound like a good idea, we're falling into the
-> > same trap that we've fallen into at the beginning of this thread: the
-> > boot environment has to understand how the decompressor currently works,
-> > and if we were to change that, this we're back to the calculation which
-> > the boot environment is using not matching reality.
+> On Tue, Jun 21, 2016 at 12:41:31PM +0200, Geert Uytterhoeven wrote:
+> > On Tue, Jun 7, 2016 at 1:07 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> > > Request host bridge window resources so they appear in ioport_resource and
+> > > iomem_resource and are reflected in /proc/ioports and /proc/iomem.
+> > >
+> > > Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> > > ---
+> > >  drivers/pci/host/pci-rcar-gen2.c |    4 ++++
+> > >  1 file changed, 4 insertions(+)
+> > >
+> > > diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
+> > > index 9980a4b..617a6b2 100644
+> > > --- a/drivers/pci/host/pci-rcar-gen2.c
+> > > +++ b/drivers/pci/host/pci-rcar-gen2.c
+> > > @@ -194,6 +194,7 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
+> > >         struct rcar_pci_priv *priv = sys->private_data;
+> > >         void __iomem *reg = priv->reg;
+> > >         u32 val;
+> > > +       int ret;
+> > >
+> > >         pm_runtime_enable(priv->dev);
+> > >         pm_runtime_get_sync(priv->dev);
+> > > @@ -275,6 +276,9 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
+> > >         /* Add PCI resources */
+> > >         pci_add_resource(&sys->resources, &priv->io_res);
+> > >         pci_add_resource(&sys->resources, &priv->mem_res);
+> > > +       ret = devm_request_pci_bus_resources(priv->dev, &sys->resources);
+> > > +       if (ret < 0)
+> > > +               return ret;
+> > >
+> > >         /* Setup bus number based on platform device id / of bus-range */
+> > >         sys->busnr = priv->busnr;
+> > 
+> > This patch (commit 1bd019707b7c9249d34c5d348f1ef75eb4d83e89 in pci/next)
+> > broke PCI on r8a7791/koelsch. Dmesg differences are:
+> > 
+> >  pci-rcar-gen2 ee090000.pci: PCI: bus0 revision 11
+> > -pci-rcar-gen2 ee090000.pci: PCI host bridge to bus 0000:00
+> > -pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
+> > -pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
 > 
-> Currently we are discussing between 4 times to 11 times. So, if we know
-> *atleast* "uncompressed image size" then this heuristic variation can be
-> minimized a lot. If we do not provide header, then may be we can provide library
-> to the kexec-tools which will enable us to know the length of "uncompressed
-> image" when "compressed image" is provided as input.
+> This is probably a result of this code in drivers/pci/host/pci-rcar-gen2.c:
+> 
+>         /*
+>          * The controller does not support/use port I/O,
+>          * so setup a dummy port I/O region here.
+>          */
+>         priv->io_res.start = priv->mem_res.start;
+>         priv->io_res.end = priv->mem_res.end;
+>         priv->io_res.flags = IORESOURCE_IO;
+> 
+> We try to avoid adding dummy regions like this, but maybe we missed
+> this one.  I haven't found any email discussion about it yet, so I
+> don't know what the reason for this one is.  Valentine, do you
+> remember?
 
-If we provide the uncompressed size, then we know how big the uncompressed
-image will be.  That much is fine, but there's more than that.
+I do not, but I think I've found something in my mailbox.
+Below is the quote from the original conversation with:
+(Re: [PATCH] pci: Add R-Car Gen2 internal PCI support)
 
-What is the padding applied to the uncompressed size?  Where does the
-compressed image self-relocate to?  Where does the compressed image
-relocate the DTB to?  What is the spacing between the DTB and the
-compressed image?
+[quote starts]
+ >>+    priv->mem_res = *mem_res;
+ >>+    /*
+ >>+     * The controller does not support/use port I/O,
+ >>+     * so setup a dummy port I/O region here.
+ >>+     */
+ >>+    priv->io_res.start = priv->mem_res.start;
+ >>+    priv->io_res.end = priv->mem_res.end;
+ >>+    priv->io_res.flags = IORESOURCE_IO;
+ >>
+ > I don't understand this.  There's no requirement (at least as far as the
+ > PCI core is concerned) to supply an I/O aperture at all, and I think it
+ > would be better if you didn't.
+ >
+ > Oh, I see ... maybe pcibios_init_resources() forces you to have an
+ > I/O resource to avoid having it give you a default one?  And I
+ > suppose that since you have several host bridges, these dummy I/O
+ > regions have to be distinct.  Ugh.  Well, I guess this is something
+ > you'd have to fix here or in the ARM code, it's up to you what to do.
 
-All those are knowledge which is internal to the decompressor code.
-If we supply, say, the padded uncompressed size, then we can work
-around not knowing the padding in kexec.  However, we still need to
-know the other details - so we still end up needing to code into
-kexec (or other boot environment) a load of details specific to the
-current decompressor implementation.
+ Exactly. This is to avoid assigning default I/O resources.
+[quote ends]
+
+> 
+> Can you try the patch below (apply it before the 1bd019707b7c patch
+> that broke things)?
+> 
+> 
+> commit b64dc28f5f2b3afe47ee4a42fb79db84ec4227f8
+> Author: Bjorn Helgaas <bhelgaas@google.com>
+> Date:   Tue Jun 21 09:19:34 2016 -0500
+> 
+>     PCI: rcar: Drop gen2 dummy I/O port region
+>     
+>     Previously we added a dummy I/O port region even though the R-Car
+>     controller doesn't support PCI port I/O.  This resulted in bogus root bus
+>     resources like this:
+>     
+>       pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
+>       pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
+>     
+>     Drop the unused dummy I/O port region.
+>     
+>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
+> index 9980a4b..53ae619 100644
+> --- a/drivers/pci/host/pci-rcar-gen2.c
+> +++ b/drivers/pci/host/pci-rcar-gen2.c
+> @@ -97,7 +97,6 @@
+>  struct rcar_pci_priv {
+>  	struct device *dev;
+>  	void __iomem *reg;
+> -	struct resource io_res;
+>  	struct resource mem_res;
+>  	struct resource *cfg_res;
+>  	unsigned busnr;
+> @@ -273,7 +272,6 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
+>  		rcar_pci_setup_errirq(priv);
+>  
+>  	/* Add PCI resources */
+> -	pci_add_resource(&sys->resources, &priv->io_res);
+>  	pci_add_resource(&sys->resources, &priv->mem_res);
+>  
+>  	/* Setup bus number based on platform device id / of bus-range */
+> @@ -371,14 +369,6 @@ static int rcar_pci_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	priv->mem_res = *mem_res;
+> -	/*
+> -	 * The controller does not support/use port I/O,
+> -	 * so setup a dummy port I/O region here.
+> -	 */
+> -	priv->io_res.start = priv->mem_res.start;
+> -	priv->io_res.end = priv->mem_res.end;
+> -	priv->io_res.flags = IORESOURCE_IO;
+> -
+>  	priv->cfg_res = cfg_res;
+>  
+>  	priv->irq = platform_get_irq(pdev, 0);
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Val.
