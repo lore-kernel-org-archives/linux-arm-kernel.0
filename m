@@ -1,29 +1,130 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Jun 2016 18:15:37 -0700
-Subject: [PATCH v2 04/15] clk: sunxi-ng: Add fixed factor clock support
-In-Reply-To: <20160607204154.31967-5-maxime.ripard@free-electrons.com>
-References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
- <20160607204154.31967-5-maxime.ripard@free-electrons.com>
-Message-ID: <20160621011537.GP1521@codeaurora.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 21 Jun 2016 11:18:39 +1000
+Subject: linux-next: manual merge of the net-next tree with the arm-soc tree
+Message-ID: <20160621111839.34936836@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07, Maxime Ripard wrote:
-> +
-> +#include <linux/clk-provider.h>
-> +
-> +#include "ccu_common.h"
-> +
-> +struct ccu_fixed_factor {
-> +	u16			div;
-> +	u16			mult;
-> +
-> +	struct ccu_common	common;
+Hi all,
 
-Does this use the common structure although we have no usage for
-the members of struct ccu_common except struct clk_hw? I suppose
-this is done so registering a bunch of clks is easy?
+Today's linux-next merge of the net-next tree got conflicts in:
+
+  arch/arm64/boot/dts/broadcom/ns2-svk.dts
+  arch/arm64/boot/dts/broadcom/ns2.dtsi
+
+between commits:
+
+  97b1504a30b3 ("arm64: dts: enable pinctrl for Broadcom NS2 SoC")
+  5dcc9c7618df ("arm64: dts: NS2: Add CCI-400 PMU support")
+
+from the arm-soc tree and commit:
+
+  5f1a067bfa0a ("dt: mdio-mux: Add mdio multiplexer driver node")
+
+from the net-next tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm64/boot/dts/broadcom/ns2-svk.dts
+index b062a44a39c7,ea5603fd106a..000000000000
+--- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@@ -161,11 -141,10 +169,19 @@@
+  	};
+  };
+  
+ +&pinctrl {
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&nand_sel>;
+ +	nand_sel: nand_sel {
+ +		function = "nand";
+ +		groups = "nand_grp";
+ +	};
+ +};
+++
++ &mdio_mux_iproc {
++ 	mdio at 10 {
++ 		gphy0: eth-phy at 10 {
++ 			reg = <0x10>;
++ 		};
++ 	};
++ };
+diff --cc arch/arm64/boot/dts/broadcom/ns2.dtsi
+index d1dc812daaab,46b78fa89f4c..000000000000
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@@ -279,26 -263,45 +279,65 @@@
+  				      IRQ_TYPE_LEVEL_HIGH)>;
+  		};
+  
+ +		cci at 65590000 {
+ +			compatible = "arm,cci-400";
+ +			#address-cells = <1>;
+ +			#size-cells = <1>;
+ +			reg = <0x65590000 0x1000>;
+ +			ranges = <0 0x65590000 0x10000>;
+ +
+ +			pmu at 9000 {
+ +				compatible = "arm,cci-400-pmu,r1",
+ +					     "arm,cci-400-pmu";
+ +				reg = <0x9000 0x4000>;
+ +				interrupts = <GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH>,
+ +					     <GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>,
+ +					     <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH>,
+ +					     <GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH>,
+ +					     <GIC_SPI 348 IRQ_TYPE_LEVEL_HIGH>,
+ +					     <GIC_SPI 349 IRQ_TYPE_LEVEL_HIGH>;
+ +			};
+ +		};
+ +
++ 		mdio_mux_iproc: mdio-mux at 6602023c {
++ 			compatible = "brcm,mdio-mux-iproc";
++ 			reg = <0x6602023c 0x14>;
++ 			#address-cells = <1>;
++ 			#size-cells = <0>;
++ 
++ 			mdio at 0 {
++ 				reg = <0x0>;
++ 				#address-cells = <1>;
++ 				#size-cells = <0>;
++ 
++ 				pci_phy0: pci-phy at 0 {
++ 					compatible = "brcm,ns2-pcie-phy";
++ 					reg = <0x0>;
++ 					#phy-cells = <0>;
++ 					status = "disabled";
++ 				};
++ 			};
++ 
++ 			mdio at 7 {
++ 				reg = <0x7>;
++ 				#address-cells = <1>;
++ 				#size-cells = <0>;
++ 
++ 				pci_phy1: pci-phy at 0 {
++ 					compatible = "brcm,ns2-pcie-phy";
++ 					reg = <0x0>;
++ 					#phy-cells = <0>;
++ 					status = "disabled";
++ 				};
++ 			};
++ 
++ 			mdio at 10 {
++ 				reg = <0x10>;
++ 				#address-cells = <1>;
++ 				#size-cells = <0>;
++ 			};
++ 		};
++ 
+  		timer0: timer at 66030000 {
+  			compatible = "arm,sp804", "arm,primecell";
+  			reg = <0x66030000 0x1000>;
