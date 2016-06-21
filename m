@@ -1,50 +1,83 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 21 Jun 2016 09:11:35 +0200
-Subject: [PATCH v4 13/13] ARM: dts: r8a7793: Add APMU node and second CPU
- core
-In-Reply-To: <d862ed53-b57b-47b7-f783-bbeceb6eae3e@cogentembedded.com>
-References: <1466072862-28030-1-git-send-email-geert+renesas@glider.be>
- <1466072862-28030-14-git-send-email-geert+renesas@glider.be>
- <d862ed53-b57b-47b7-f783-bbeceb6eae3e@cogentembedded.com>
-Message-ID: <CAMuHMdVJD0rFJLPFUeUk=8giXw+OkgMb=Ko5r++MCJd6mcuqtA@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 21 Jun 2016 15:12:57 +0800
+Subject: [PATCH V7 1/8] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <1466420541-20101-2-git-send-email-tn@semihalf.com>
+References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
+ <1466420541-20101-2-git-send-email-tn@semihalf.com>
+Message-ID: <372d3b78-2bc5-94d1-49f6-c9229affa65d@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Tomasz,
 
-On Mon, Jun 20, 2016 at 11:05 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
->> diff --git a/arch/arm/boot/dts/r8a7793.dtsi
->> b/arch/arm/boot/dts/r8a7793.dtsi
->> index 9b55c1c6ee31a49d..fce310c54efa88eb 100644
->> --- a/arch/arm/boot/dts/r8a7793.dtsi
->> +++ b/arch/arm/boot/dts/r8a7793.dtsi
+Sorry for jumping out late, just one comment below.
+
+On 2016/6/20 19:02, Tomasz Nowicki wrote:
+> IORT shows representation of IO topology for ARM based systems.
+> It describes how various components are connected together on
+> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
 >
-> [...]
->>
->> @@ -56,6 +57,13 @@
->>                         next-level-cache = <&L2_CA15>;
->>                 };
->>
->> +               cpu1: cpu at 1 {
->> +                       device_type = "cpu";
->> +                       compatible = "arm,cortex-a15";
->> +                       reg = <1>;
->> +                       clock-frequency = <1500000000>;
+> Initial support allows to detect IORT table presence and save its
+> root pointer obtained through acpi_get_table(). The pointer validity
+> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+> is not set while using IORT nodes we would dereference unmapped pointers.
 >
->    Why no "power-domains??
+> For the aforementioned reason call iort_table_detect() from acpi_init()
+> which guarantees acpi_gbl_permanent_mmap to be set at that point.
+>
+> Add generic helpers which are helpful for scanning and retrieving
+> information from IORT table content. List of the most important helpers:
+> - iort_find_dev_node() finds IORT node for a given device
+> - iort_node_map_rid() maps device RID and returns IORT node which provides
+>   final translation
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>  drivers/acpi/Kconfig  |   3 +
+>  drivers/acpi/Makefile |   1 +
+>  drivers/acpi/bus.c    |   2 +
+>  drivers/acpi/iort.c   | 220 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/iort.h  |  30 +++++++
 
-Because the original patch predates that, and I forgot to update it...
+[...]
 
-Thanks!
+> +static acpi_status
+> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
+> +{
+> +	struct device *dev = context;
+> +
+> +	switch (node->type) {
+> +	case ACPI_IORT_NODE_NAMED_COMPONENT: {
+> +		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 
-Gr{oetje,eeting}s,
+ACPI_ALLOCATE_BUFFER is used here, so ...
 
-                        Geert
+> +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+> +		struct acpi_iort_named_component *ncomp;
+> +
+> +		if (!adev)
+> +			break;
+> +
+> +		ncomp = (struct acpi_iort_named_component *)node->node_data;
+> +
+> +		if (ACPI_FAILURE(acpi_get_name(adev->handle,
+> +					       ACPI_FULL_PATHNAME, &buffer))) {
+> +			dev_warn(dev, "Can't get device full path name\n");
+> +			break;
+> +		}
+> +
+> +		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
+> +			return AE_OK;
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+... we need to kfree(buffer.pointer) before we return or break.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+With this fixed,
+
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
+
+> +
+> +		break;
+> +	}
