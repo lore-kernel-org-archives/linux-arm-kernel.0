@@ -1,65 +1,42 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Tue, 21 Jun 2016 11:56:39 +0800
-Subject: [PATCH net-next 19/19] net: hns: bug fix about TSO on|off when there
- is traffic
+Date: Tue, 21 Jun 2016 11:56:22 +0800
+Subject: [PATCH net-next 02/19] net: hns: fix hns dsaf v1 dont support
+ tx_pause close
 In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1466481399-70080-20-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1466481399-70080-3-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daode Huang <huangdaode@hisilicon.com>
+From: Qianqian Xie <xieqiaqian@huawei.com>
 
-When enable/disable tso, the driver tries to access the hardware register,
-but this operation will cause the port unavalible when there is traffic.
-This patch tries to enable TSO when initialize, then control tso through
-TSE bit in transmit descriptor.
+For service port, hns dsaf v1 support to close tx_pause.
+However, the port will be invalid when it run command
+ethtool to close tx_pause. This patch will fix it.
 
-Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+Signed-off-by: Qianqian Xie <xieqiaqian@huawei.com>
 Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_enet.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-index c0ce37b..d5297ec 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-@@ -1441,7 +1441,6 @@ static int hns_nic_set_features(struct net_device *netdev,
- 				netdev_features_t features)
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+index ac03c4a..422f97d 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+@@ -1114,10 +1114,10 @@ int hns_dsaf_set_rx_mac_pause_en(struct dsaf_device *dsaf_dev, int mac_id,
+ 				 u32 en)
  {
- 	struct hns_nic_priv *priv = netdev_priv(netdev);
--	struct hnae_handle *h = priv->ae_handle;
- 
- 	switch (priv->enet_ver) {
- 	case AE_VERSION_1:
-@@ -1454,11 +1453,9 @@ static int hns_nic_set_features(struct net_device *netdev,
- 			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tso;
- 			/* The chip only support 7*4096 */
- 			netif_set_gso_max_size(netdev, 7 * 4096);
--			h->dev->ops->set_tso_stats(h, 1);
- 		} else {
- 			priv->ops.fill_desc = fill_v2_desc;
- 			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tx;
--			h->dev->ops->set_tso_stats(h, 0);
- 		}
- 		break;
+ 	if (AE_IS_VER1(dsaf_dev->dsaf_ver)) {
+-		if (!en)
++		if (!en) {
+ 			dev_err(dsaf_dev->dev, "dsafv1 can't close rx_pause!\n");
+-
+-		return -EINVAL;
++			return -EINVAL;
++		}
  	}
-@@ -1804,11 +1801,14 @@ static void hns_nic_set_priv_ops(struct net_device *netdev)
- 			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tso;
- 			/* This chip only support 7*4096 */
- 			netif_set_gso_max_size(netdev, 7 * 4096);
--			h->dev->ops->set_tso_stats(h, 1);
- 		} else {
- 			priv->ops.fill_desc = fill_v2_desc;
- 			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tx;
- 		}
-+		/* enable tso when init
-+		 * control tso on/off through TSE bit in bd
-+		 */
-+		h->dev->ops->set_tso_stats(h, 1);
- 	}
- }
  
+ 	dsaf_set_dev_bit(dsaf_dev, DSAF_PAUSE_CFG_REG + mac_id * 4,
 -- 
 1.9.1
