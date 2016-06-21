@@ -1,68 +1,116 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 21 Jun 2016 11:20:54 +0800
-Subject: [PATCH 1/3] ARM: dts: imx7d: create i.MX 7Solo base device tree
-In-Reply-To: <9d870fb1be40772a50f08d467df048dc@agner.ch>
-References: <20160608023709.32090-1-stefan@agner.ch>
- <20160608023709.32090-2-stefan@agner.ch>
- <20160612013526.GV20243@tiger>
- <9d870fb1be40772a50f08d467df048dc@agner.ch>
-Message-ID: <20160621032053.GB21364@tiger>
+From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
+Date: Tue, 21 Jun 2016 11:56:25 +0800
+Subject: [PATCH net-next 05/19] net: hns: Remove unnecessary device resource
+ free
+In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
+References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1466481399-70080-6-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 18, 2016 at 09:20:05PM -0700, Stefan Agner wrote:
-> On 2016-06-11 18:35, Shawn Guo wrote:
-> > On Tue, Jun 07, 2016 at 07:37:07PM -0700, Stefan Agner wrote:
-> >> The i.MX 7 series currently consists of two SoCs: i.MX 7Solo and
-> >> 7Dual. The i.MX 7Solo implements a subset of features available on
-> >> i.MX 7Dual, hence create imx7s.dtsi as the base device tree. The
-> >> i.MX 7Dual's additional features over i.MX 7Solo are:
-> >> - Second Cortex-A7 core
-> >> - Second Gigabit Ethernet controller
-> >> - EPD (Electronc Paper Display, not yet part of the device tree)
-> >> - PCIe (not yet part of the device tree)
-> >> - Additional USB2.0 OTG controller
-> >>
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >> ---
-> >>  arch/arm/boot/dts/imx7d.dtsi | 923 +++----------------------------------------
-> >>  arch/arm/boot/dts/imx7s.dtsi | 880 +++++++++++++++++++++++++++++++++++++++++
-> >>  2 files changed, 928 insertions(+), 875 deletions(-)
-> > 
-> > We should probably have a beforehand patch to rename the file, so that
-> > we can avoid this dramatic diffstat.
-> 
-> If I delete imx7d.dtsi and add imx7s.dtsi in a single commit, and then
-> readd imx7d.dtsi in a second commit, it would break bisect-ability. All
-> existing device trees which include imx7d.dtsi would fail to build.
+From: Qianqian Xie <xieqianqian@huawei.com>
 
-I was thinking that we would patch imx7d.dtsi users to include
-imx7s.dtsi in the first patch that does renaming, and then patch them
-back in the second patch that adds imx7d.dtsi.  It sounds a bit silly,
-but it really helps to make the history clear and diffstats nice.  It
-looks like something below.
+The driver uses devm_ioremap_resource, it will unmap the map
+automatically, remove the unnecessary the resource free.
 
-commit 49669c3630183bb1a36fcaf4bef324a7d839a5fd
-Date:   Tue Jun 21 11:13:02 2016 +0800
+Signed-off-by: Qianqian Xie <xieqianqian@huawei.com>
+Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
+---
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 39 +++-------------------
+ 1 file changed, 4 insertions(+), 35 deletions(-)
 
-    add imx7d.dtsi and patch users back
-
- arch/arm/boot/dts/imx7d-cl-som-imx7.dts |  2 +-
- arch/arm/boot/dts/imx7d-nitrogen7.dts   |  2 +-
- arch/arm/boot/dts/imx7d-sdb.dts         |  2 +-
- arch/arm/boot/dts/imx7d.dtsi            | 11 +++++++++++
- arch/arm/boot/dts/imx7s.dtsi            |  6 ------
- 5 files changed, 14 insertions(+), 9 deletions(-)
-
-commit 7e1c82e1aee3d6e694901cea3dd74e9b4ec6643e
-Date:   Tue Jun 21 11:04:02 2016 +0800
-
-    rename imx7d.dtsi to imx7s.dtsi
-
- arch/arm/boot/dts/imx7d-cl-som-imx7.dts      | 2 +-
- arch/arm/boot/dts/imx7d-nitrogen7.dts        | 2 +-
- arch/arm/boot/dts/imx7d-sdb.dts              | 2 +-
- arch/arm/boot/dts/{imx7d.dtsi => imx7s.dtsi} | 0
- 4 files changed, 3 insertions(+), 3 deletions(-)
-
-Shawn
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+index 422f97d..b8b2ff9 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+@@ -176,7 +176,7 @@ int hns_dsaf_get_cfg(struct dsaf_device *dsaf_dev)
+ 	    desc_num > HNS_DSAF_MAX_DESC_CNT) {
+ 		dev_err(dsaf_dev->dev, "get desc-num(%d) fail, ret=%d!\n",
+ 			desc_num, ret);
+-		goto unmap_base_addr;
++		return -EINVAL;
+ 	}
+ 	dsaf_dev->desc_num = desc_num;
+ 
+@@ -192,7 +192,7 @@ int hns_dsaf_get_cfg(struct dsaf_device *dsaf_dev)
+ 	if (ret < 0) {
+ 		dev_err(dsaf_dev->dev,
+ 			"get buf-size fail, ret=%d!\r\n", ret);
+-		goto unmap_base_addr;
++		return ret;
+ 	}
+ 	dsaf_dev->buf_size = buf_size;
+ 
+@@ -200,7 +200,7 @@ int hns_dsaf_get_cfg(struct dsaf_device *dsaf_dev)
+ 	if (dsaf_dev->buf_size_type < 0) {
+ 		dev_err(dsaf_dev->dev,
+ 			"buf_size(%d) is wrong!\n", buf_size);
+-		goto unmap_base_addr;
++		return -EINVAL;
+ 	}
+ 
+ 	dsaf_dev->misc_op = hns_misc_op_get(dsaf_dev);
+@@ -213,32 +213,6 @@ int hns_dsaf_get_cfg(struct dsaf_device *dsaf_dev)
+ 		dev_err(dsaf_dev->dev, "set mask to 64bit fail!\n");
+ 
+ 	return 0;
+-
+-unmap_base_addr:
+-	if (dsaf_dev->io_base)
+-		iounmap(dsaf_dev->io_base);
+-	if (dsaf_dev->ppe_base)
+-		iounmap(dsaf_dev->ppe_base);
+-	if (dsaf_dev->sds_base)
+-		iounmap(dsaf_dev->sds_base);
+-	if (dsaf_dev->sc_base)
+-		iounmap(dsaf_dev->sc_base);
+-	return ret;
+-}
+-
+-static void hns_dsaf_free_cfg(struct dsaf_device *dsaf_dev)
+-{
+-	if (dsaf_dev->io_base)
+-		iounmap(dsaf_dev->io_base);
+-
+-	if (dsaf_dev->ppe_base)
+-		iounmap(dsaf_dev->ppe_base);
+-
+-	if (dsaf_dev->sds_base)
+-		iounmap(dsaf_dev->sds_base);
+-
+-	if (dsaf_dev->sc_base)
+-		iounmap(dsaf_dev->sc_base);
+ }
+ 
+ /**
+@@ -2645,7 +2619,7 @@ static int hns_dsaf_probe(struct platform_device *pdev)
+ 
+ 	ret = hns_dsaf_init(dsaf_dev);
+ 	if (ret)
+-		goto free_cfg;
++		goto free_dev;
+ 
+ 	ret = hns_mac_init(dsaf_dev);
+ 	if (ret)
+@@ -2670,9 +2644,6 @@ uninit_mac:
+ uninit_dsaf:
+ 	hns_dsaf_free(dsaf_dev);
+ 
+-free_cfg:
+-	hns_dsaf_free_cfg(dsaf_dev);
+-
+ free_dev:
+ 	hns_dsaf_free_dev(dsaf_dev);
+ 
+@@ -2695,8 +2666,6 @@ static int hns_dsaf_remove(struct platform_device *pdev)
+ 
+ 	hns_dsaf_free(dsaf_dev);
+ 
+-	hns_dsaf_free_cfg(dsaf_dev);
+-
+ 	hns_dsaf_free_dev(dsaf_dev);
+ 
+ 	return 0;
+-- 
+1.9.1
