@@ -1,19 +1,39 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 21 Jun 2016 14:26:11 +0200
-Subject: [PATCH] ARM: BCM5301X: Set GPIO enabling USB power on Netgear
- R7000
-In-Reply-To: <op.yjepy3mr2s3iss@ecaz>
-References: <1466509358-25498-1-git-send-email-zajec5@gmail.com>
- <op.yjepy3mr2s3iss@ecaz>
-Message-ID: <CACna6rxm0euw=nVyHZzZa2+Q9U9S4t+aVy34ZvL0Lrx27B8-eA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 21 Jun 2016 14:26:35 +0200
+Subject: [PULL] drm: atmel-hlcdc: Fixes for 4.7-rc5
+Message-ID: <20160621142635.43c79952@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2016 at 14:22, Imre Kaloz <kaloz@openwrt.org> wrote:
-> Is there any reason you are not handling this properly as a regulator with
-> usb-nop-xceiv?
+Hi Dave,
 
-We can't use USB NOP PHY as we need a specific PHY driver for Broadcom's USB.
+Here is a PR containing two fixes for 4.7.
 
-I sent patch for this:
-https://patchwork.kernel.org/patch/9148097/
+Regards,
+
+Boris
+
+The following changes since commit 58a2ab3af722550b2e4e8155eb08660e16c20ee6:
+
+  drm: atmel-hlcdc: fix a NULL check (2016-06-01 15:59:36 +0200)
+
+are available in the git repository at:
+
+  git at github.com:bbrezillon/linux-at91.git tags/drm-atmel-hlcdc-fixes/for-4.7-rc5
+
+for you to fetch changes up to 0b1e1eb76220afa043b2733dfe61f5927cf0e458:
+
+  drm: atmel-hlcdc: Fix OF graph parsing (2016-06-21 14:15:45 +0200)
+
+----------------------------------------------------------------
+Two bug fixes for the atmel-hlcdc driver.
+
+----------------------------------------------------------------
+Boris Brezillon (2):
+      drm: atmel-hlcdc: actually disable scaling when no scaling is required
+      drm: atmel-hlcdc: Fix OF graph parsing
+
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 10 ++++++----
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  |  2 ++
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+	
