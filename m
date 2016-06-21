@@ -1,62 +1,81 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Tue, 21 Jun 2016 16:40:49 -0700
-Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.8 - part1
-Message-ID: <CADaLNDmLXF3Y7bcabHzzu5eXXqQ8R98QUgO8yKTnCcqCRXPnDg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 22 Jun 2016 02:59:40 +0300
+Subject: camera application for testing (was Re: v4l subdevs without big
+ device)
+In-Reply-To: <20160501140831.GH26360@valkosipuli.retiisi.org.uk>
+References: <20160428084546.GA9957@amd> <20160429221359.GA29297@amd>
+ <20160501140831.GH26360@valkosipuli.retiisi.org.uk>
+Message-ID: <1500395.gQ70N9eqVS@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Sakari,
 
-This is the first part of DTS changes for X-Gene platforms targeted for 4.8
+On Sunday 01 May 2016 17:08:31 Sakari Ailus wrote:
+> On Sat, Apr 30, 2016 at 12:13:59AM +0200, Pavel Machek wrote:
+> > Hi!
+> > 
+> > What is reasonable camera application for testing?
+> > 
+> > N900 looks like a low-end digital camera. I have now have the hardware
+> > working (can set focus to X cm using command line), but that's not
+> > going to be useful for taking photos.
+> 
+> I guess you already knew about omap3camd; it's proprietary but from purely
+> practical point of view it'd be an option to support taking photos on the
+> N900. That would not be extensible any way, the best possible functionality
+> is limited what the daemon implements.
+> 
+> I'm just mentioning the option of implementing wrapper for the omap3camd so
+> that it can work with upsteam APIs, I don't propose that however.
+> 
+> > In particular, who is going to do computation neccessary for
+> > autofocus, whitebalance and exposure/gain?
+> 
+> I think libv4l itself has algorithms to control at least some of these. It
+> relies on the image data so the CPU time consumption will be high.
+> 
+> AFAIR Laurent has also worked on implementing some algorithms that use the
+> histogram and some of the statistics. Add him to cc list.
 
-The changes includes
-+ 2 clean-up and style fix from Bjorn with Rob's ACK [1]
-+ A timer interrupt polarity fix for X-Gene 2 (refer to Marc's
-arm/arm64 arch timer fix [2])
-+ Clean up an unused clk node (qmlclk) for X-Gene 1
+http://git.ideasonboard.org/omap3-isp-live.git
 
-Marc's arch timer series [2] has a change in apm-storm.dtsi file. I
-verified and the order of applying Marc's apm-storm.dtsi change and
-the DT changes in xgene-next did not cause any conflict.
+That's outdated and might not run or compile anymore. The code is more of a 
+proof of concept implementation, but it could be used as a starting point. 
+With an infinite amount of free time I'd love to work on an open-source 
+project for computational cameras, integrating it with libv4l.
 
-[1]: (https://lkml.org/lkml/2016/6/14/340
-[2]: http://www.spinics.net/lists/linux-samsung-soc/msg53533.html
+> > There's http://fcam.garage.maemo.org/gettingStarted.html that should
+> > work on maemo, but a) it is not in Debian, b) it has non-trivial
+> > dependencies and c) will be a lot of fun to get working...
+> > (and d), will not be too useful, anyway, due to 1sec shutter lag:
+>
+> I believe this will be shorter nowadays. I don't remember the exact
+> technical solution which the text below refers to but I'm pretty sure it'll
+> be better with the current upstream. API-wise, there's work to be done there
+> (to port FCAM to upsteram APIs) but it's a possibility.
+> 
+> > Fast resolution switching (less shutter lag)
+> > FCam is built on top of V4L2, which doesn't handle rapidly varying
+> > resolutions. When a Shot with a different resolution to the previous
+> > one comes down the pipeline, FCam currently flushes the entire V4L2
+> > pipeline, shuts down and restarts the whole camera subsystem, then
+> > starts streaming at the new resolution. This takes a long time (nearly
+> > a second), and is the cause of the horrible shutter lag on the N900. A
+> > brave kernel hacker may be able to reduce this time by fiddling with
+> > the FCam ISP kernel modules and the guts of the FCam library source
+> > (primarily Daemon.cpp).
+> > Anyone who solves this one will have our undying gratitude. An ideal
+> > solution would be able to insert a 5MP capture into a stream of
+> > 640x480 frames running at 30fps, without skipping more than the frame
+> > time of the 5MP capture. That is, the viewfinder would effectively
+> > stay live while taking a photograph.
+> > 
+> > )
+> > 
+> > Any other application I should look at? Thanks,
 
+-- 
 Regards,
-Duc Dang.
-------
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-
-are available in the git repository at:
-
-  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.8-part1
-
-for you to fetch changes up to ddbc71d96012fbcc4b9e42fd1c131f185875f73f:
-
-  arm64: dts: apm: Remove unused qmlclk node on X-Gene 1 (2016-06-20
-18:41:49 -0700)
-
-----------------------------------------------------------------
-First part of X-Gene DTS changes queued for v4.8
-
-The changes include:
-+ 2 clean-up and style-fix patches from Bjorn
-+ Correct timer interrupt polarity for X-Gene 2
-+ Remove unused qmlclk node on X-Gene 1
-
-----------------------------------------------------------------
-Bjorn Helgaas (2):
-      arm64: dts: apm: Use lowercase consistently for hex constants
-      arm64: dts: apm: Remove leading '0x' from unit addresses
-
-Duc Dang (2):
-      arm64: dts: apm: Fix timer interrupt polarity for X-Gene 2 SoC
-      arm64: dts: apm: Remove unused qmlclk node on X-Gene 1
-
- .../devicetree/bindings/net/apm-xgene-enet.txt     |  4 +-
- arch/arm64/boot/dts/apm/apm-shadowcat.dtsi         | 68 +++++++++++-----------
- arch/arm64/boot/dts/apm/apm-storm.dtsi             | 44 ++++++--------
- 3 files changed, 53 insertions(+), 63 deletions(-)
+Laurent Pinchart
