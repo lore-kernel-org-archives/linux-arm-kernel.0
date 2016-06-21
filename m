@@ -1,62 +1,55 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 21 Jun 2016 12:41:26 -0600
-Subject: [PATCH] coresight: document binding acronyms
-Message-ID: <1466534486-22422-1-git-send-email-mathieu.poirier@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 21 Jun 2016 12:51:49 -0600
+Subject: [PATCH] ARM: tegra: import latest Jetson TK1 spreadsheet
+Message-ID: <20160621185149.20625-1-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It can be hard for people not familiar with the CoreSight IP blocks
-to make sense of the acronyms found in the current bindings.  As such
-this patch expands each acronym in the hope of providing a better
-description of the IP block they represent.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+This imports v11 of "Jetson TK1 Development Platform Pin Mux" from
+https://developer.nvidia.com/embedded/downloads.
+
+The new version defines the mux option for the MIPI pad ctrl selection.
+The OWR pin no longer has an entry in the configuration table because
+the only mux option it support is OWR, that feature isn't supported, and
+hence can't conflict with any other pin. This pin can only usefully be
+used as a GPIO.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- .../devicetree/bindings/arm/coresight.txt          | 32 ++++++++++++++++------
- 1 file changed, 24 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 93147c0c8a0e..c73a7f773998 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -12,14 +12,30 @@ its hardware characteristcs.
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 941f36263c8f..24bab492a9ca 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1356,14 +1356,6 @@
+ 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+ 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+ 			};
+-			owr {
+-				nvidia,pins = "owr";
+-				nvidia,function = "rsvd2";
+-				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
+-				nvidia,tristate = <TEGRA_PIN_ENABLE>;
+-				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+-				nvidia,rcv-sel = <TEGRA_PIN_DISABLE>;
+-			};
+ 			clk_32k_in {
+ 				nvidia,pins = "clk_32k_in";
+ 				nvidia,function = "clk";
+@@ -1378,6 +1370,10 @@
+ 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+ 				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+ 			};
++			dsi_b {
++				nvidia,pins = "mipi_pad_ctrl_dsi_b";
++				nvidia,function = "dsi_b";
++			};
+ 		};
+ 	};
  
- 	* compatible: These have to be supplemented with "arm,primecell" as
- 	  drivers are using the AMBA bus interface.  Possible values include:
--		- "arm,coresight-etb10", "arm,primecell";
--		- "arm,coresight-tpiu", "arm,primecell";
--		- "arm,coresight-tmc", "arm,primecell";
--		- "arm,coresight-funnel", "arm,primecell";
--		- "arm,coresight-etm3x", "arm,primecell";
--		- "arm,coresight-etm4x", "arm,primecell";
--		- "qcom,coresight-replicator1x", "arm,primecell";
--		- "arm,coresight-stm", "arm,primecell"; [1]
-+		- Embedded Trace Buffer (version 1.0):
-+			"arm,coresight-etb10", "arm,primecell";
-+
-+		- Trace Port Interface Unit:
-+			"arm,coresight-tpiu", "arm,primecell";
-+
-+		- Trace Memory Controller (ETB, ETF, ETR):
-+			"arm,coresight-tmc", "arm,primecell";
-+
-+		- Trace Funnel:
-+			"arm,coresight-funnel", "arm,primecell";
-+
-+		- Embedded Trace Macrocell (version 3.x) and
-+					Program Flow Trace Macrocell:
-+			"arm,coresight-etm3x", "arm,primecell";
-+
-+		- Embedded Trace Macrocell (version 4.x):
-+			"arm,coresight-etm4x", "arm,primecell";
-+
-+		- Qualcomm Configurable Replicator (version 1.x):
-+			"qcom,coresight-replicator1x", "arm,primecell";
-+
-+		- System Trace Macrocell:
-+			"arm,coresight-stm", "arm,primecell"; [1]
- 
- 	* reg: physical base address and length of the register
- 	  set(s) of the component.
 -- 
-2.7.4
+2.9.0
