@@ -1,45 +1,57 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 21 Jun 2016 19:36:09 +0900
-Subject: [PATCH] arm64: add boot image dependencies to not generate
- invalid images
-In-Reply-To: <20160621103217.GA14542@e104818-lin.cambridge.arm.com>
-References: <1466473440-18887-1-git-send-email-yamada.masahiro@socionext.com>
- <20160621103217.GA14542@e104818-lin.cambridge.arm.com>
-Message-ID: <CAK7LNASgDjtw6gbOfrz7pNrXLhrPGV2U8WTBd-eHN=srRQENGA@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 21 Jun 2016 18:37:17 +0800
+Subject: [RFC PATCH v2 00/15] ACPI IORT ARM SMMU v3 support
+In-Reply-To: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <b00f33ad-be24-21a9-b03b-611756bbc8e9@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-06-21 19:32 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
-> On Tue, Jun 21, 2016 at 10:44:00AM +0900, Masahiro Yamada wrote:
->> I fixed boot image dependencies for arch/arm in commit 3939f3345050
->> ("ARM: 8418/1: add boot image dependencies to not generate invalid
->> images").
->>
->> I see a similar problem for arch/arm64; "make -jN Image Image.gz"
->> would sometimes end up generating bad images where N > 1.
->>
->> Fix the dependency in arch/arm64/Makefile to avoid the race
->> between "make Image" and "make Image.*".
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Hi Lorenzo,
+
+On 2016/6/7 21:30, Lorenzo Pieralisi wrote:
+> This RFC patch series is v2 of a previous posting:
 >
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> https://lkml.org/lkml/2016/4/14/702
 >
-> Will, could you please pick this up for 4.7? Maybe with a cc stable.
-> Thanks.
+> v1 -> v2:
+> 	- Rebased on top of dependencies series [1][2][3](v4.7-rc1)
+> 	- Removed IOMMU fwnode generalization
+> 	- Implemented ARM SMMU v3 ACPI probing instead of ARM SMMU v2
+> 	  owing to patch series dependencies [1]
+> 	- Moved platform device creation logic to IORT code to
+> 	  generalize its usage for ARM SMMU v1-v2-v3 components
+> 	- Removed reliance on ACPI early device probing
+> 	- Created IORT specific iommu_xlate() translation hook leaving
+> 	  OF code unchanged according to v1 reviews
+>
+> The ACPI IORT table provides information that allows instantiating
+> ARM SMMU devices and carrying out id mappings between components on
+> ARM based systems (devices, IOMMUs, interrupt controllers).
+>
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>
+> Building on basic IORT support, available through [2]:
+>
+> this patchset enables ARM SMMU v3 support on ACPI systems.
 
+I'm trying to test your patches on D03 (SMMUv3 based) but ...
 
-If possible, could you change the subject?
+[...]
+> [1] R.Murphy "Generic DT bindings for PCI and ARM SMMU v3"
+>     http://marc.info/?l=linux-arm-kernel&m=146497432413816&w=2
 
+...This patch set is still in discussion and seems not work
+for non-PCI devices.
 
-arm64: add boot image dependencies to not generate invalid images
+>
+> [2] T.Nowicki "Introduce ACPI world to ITS irqchip" v5
+>     http://marc.info/?l=linux-acpi&m=146469369703684&w=2
 
- --->
+Tomasz sent out the v7 and included patches in your series.
 
-arm64: fix boot image dependencies to not generate invalid images
+I think a updated version before the test makes sense, what
+do you think? Let me know your thoughts.
 
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks
+Hanjun
