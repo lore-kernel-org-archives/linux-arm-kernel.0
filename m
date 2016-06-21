@@ -1,38 +1,42 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Tue, 21 Jun 2016 13:34:59 +0200
-Subject: [PATCH 08/19] arm64: introduce is_a32_task and is_a32_thread (for
- AArch32 compat)
-In-Reply-To: <576915B0.5040706@huawei.com> (Zhangjian's message of "Tue, 21
- Jun 2016 18:23:44 +0800")
-References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
- <1466207668-10549-9-git-send-email-ynorov@caviumnetworks.com>
- <576915B0.5040706@huawei.com>
-Message-ID: <mvmk2hipyfw.fsf@hawking.suse.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 21 Jun 2016 13:39:45 +0200
+Subject: [PATCH v6 2/4] power: reset: add reboot mode driver
+In-Reply-To: <57691E92.5090205@rock-chips.com>
+References: <1458646525-491-1-git-send-email-andy.yan@rock-chips.com>
+ <1458646642-591-1-git-send-email-andy.yan@rock-chips.com>
+ <CAJKOXPcKzGTAicbsXK-cC9WQT0vBhpSG_q2GCn37+72x2hdhsQ@mail.gmail.com>
+ <57691E92.5090205@rock-chips.com>
+Message-ID: <57692781.4070506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Zhangjian (Bamvor)" <bamvor.zhangjian@huawei.com> writes:
+On 06/21/2016 01:01 PM, Andy Yan wrote:
 
->> @@ -78,9 +79,9 @@
->>
->>   #ifdef CONFIG_COMPAT
->>   #define TASK_SIZE_32		UL(0x100000000)
->> -#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
->> +#define TASK_SIZE		(is_compat_task() ?		\
->>   				TASK_SIZE_32 : TASK_SIZE_64)
->> -#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
->> +#define TASK_SIZE_OF(tsk)	(is_compat_thread(tsk) ? \
-> It should be
-> +#define TASK_SIZE_OF(tsk)      (is_compat_thread(task_thread_info(tsk)) ? \
-> is_compat_thread takes "struct thread_info *thread" while TASK_SIZE_OF takes
-> "struct task_struct *tsk"tsk.
+(...)
 
-If that doesn't throw an error does that mean that TASK_SIZE_OF is
-unused?
+>>> +MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
+>>> +MODULE_DESCRIPTION("System reboot mode driver");
+>>> +MODULE_LICENSE("GPL v2");
+>>> diff --git a/drivers/power/reset/reboot-mode.h
+>>> b/drivers/power/reset/reboot-mode.h
+>>> new file mode 100644
+>>> index 0000000..44ed34f
+>>> --- /dev/null
+>>> +++ b/drivers/power/reset/reboot-mode.h
+>>> @@ -0,0 +1,6 @@
+>>> +#ifndef __REBOOT_MODE_H__
+>>> +#define __REBOOT_MODE_H__
+>>> +
+>>> +int reboot_mode_register(struct device *dev, int (*write)(int));
+>> Documentation would be appreciated. Although it is local header but
+>> you decoupled them and you are exporting the function.
+> 
+>    You want this driver being a module in V9, so you may also want
+>  I document this function when a exporting it. Where I should write the
+>  documentation, and would you please give me some example?
 
-Andreas.
+Follow kernel-doc (kernel-doc-nano-HOWTO.txt). There is an example. Put
+the documentation of functions next to them in source file (not header).
 
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+Best regards,
+Krzysztof
