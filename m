@@ -1,31 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 Jun 2016 04:28:59 -0700
-Subject: [PATCH 1/2 v2] gpio: omap: make gpio numbering deterministical
- by using of aliases
-In-Reply-To: <1465930632-18941-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1465930632-18941-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1465930632-18941-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20160621112858.GO22406@atomide.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Tue, 21 Jun 2016 13:29:44 +0200
+Subject: [PATCH 1/2] ARM: OMAP2+: Drop legacy board file for n900
+In-Reply-To: <20160621112535.GN22406@atomide.com>
+References: <1465987689-14812-1-git-send-email-tony@atomide.com>
+ <1465987689-14812-2-git-send-email-tony@atomide.com>
+ <20160615105552.GN29844@pali> <20160615110201.GY22406@atomide.com>
+ <20160615114936.GO29844@pali> <20160615120556.GZ22406@atomide.com>
+ <20160621112535.GN22406@atomide.com>
+Message-ID: <20160621112944.GV29844@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [160614 12:03]:
-> Traditionally the n-th gpio device probed by the omap gpio driver got
-> the gpio number range [n*32 .. n*32+31].
-> When order of the devices probed by the driver changes (which can happen
-> already now when some devices have a pinctrl and so the first probe
-> attempt returns -ENODEV) the numbering changes.
+On Tuesday 21 June 2016 04:25:36 Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [160615 05:08]:
+> > * Pali Roh?r <pali.rohar@gmail.com> [160615 04:52]:
+> > > On Wednesday 15 June 2016 04:02:02 Tony Lindgren wrote:
+> > > > Hi,
+> > > > 
+> > > > * Pali Roh?r <pali.rohar@gmail.com> [160615 03:58]:
+> > > > > Hi! I just quickly looked at N900 status matrix https://elinux.org/N900
+> > > > > and there is still one thing not finished in DT: It is slot-name for
+> > > > > omap_hsmmc driver. So switch from legacy board code to DT is regression.
+> > > > 
+> > > > That's fixed with the following in v4.7-rc series:
+> > > > 
+> > > > db863d896681 ("mmc: omap_hsmmc: Check if MMC slot name is passed in pdata")
+> > > > 10c1f7d32bf4 ("ARM: OMAP2+: n900 needs MMC slot names for legacy user space")
+> > > 
+> > > Great! Sorry, but now wiki is not fully updated with last changes and I
+> > > do not have in my mind what was finished/merged and what not. It is
+> > > going hard for me to track everything.
+> > 
+> > OK well maybe take one more look and then ack if no more issues.
 > 
-> To ensure a deterministical numbering use of_alias_get_id to determine
-> the base for a given device. If no respective alias exists fall back to
-> the traditional numbering.
-> 
-> For the unusual case where only a part of the gpio devices have a
-> matching alias some of them might fail to probe. But if none of them has
-> an alias or all, there is no conflict which should be good enough to
-> maintain backward compatibility.
+> Pali, any news on this?
 
-I think doing this is a good idea to prevent nasty suprises when
-upgrading a kernel on some device:
+I have not looked at this deeply yet. Please give me some more time.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
