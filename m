@@ -1,96 +1,183 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 21 Jun 2016 05:11:07 +0300
-Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
-In-Reply-To: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <b499570f-e624-cbe1-4fca-44ba0e701054@mleia.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 21 Jun 2016 10:11:17 +0800
+Subject: [PATCH 08/12] doc: binding: pwrseq-usb-generic: add binding doc
+ for generic usb power sequence driver
+In-Reply-To: <20160620161607.GA11427@rob-hp-laptop>
+References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
+ <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
+ <CAL_JsqLvs0s2TyfqPM5vtmyY81_X84VjCGjsGYbTgT4syOfp9Q@mail.gmail.com>
+ <20160620112651.GA26936@shlinux2>
+ <20160620161607.GA11427@rob-hp-laptop>
+Message-ID: <20160621021117.GD26936@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
-
-On 03.06.2016 22:37, Sylvain Lemieux wrote:
-> From: Sylvain Lemieux <slemieux@tycoint.com>
+On Mon, Jun 20, 2016 at 11:16:07AM -0500, Rob Herring wrote:
+> On Mon, Jun 20, 2016 at 07:26:51PM +0800, Peter Chen wrote:
+> > On Fri, Jun 17, 2016 at 12:16:48PM -0500, Rob Herring wrote:
+> > > On Fri, Jun 17, 2016 at 5:09 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> > > > Add binding doc for generic usb power sequence driver, and update
+> > > > generic usb device binding-doc accordingly.
+> > > >
+> > > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > > > ---
+> > > >  .../bindings/power/pwrseq/pwrseq-usb-generic.txt   | 31 ++++++++++++++++++++++
+> > > >  .../devicetree/bindings/usb/usb-device.txt         |  2 ++
+> > > >  2 files changed, 33 insertions(+)
+> > > >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+> > > >
+> > > > diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+> > > > new file mode 100644
+> > > > index 0000000..8ad98382
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-usb-generic.txt
+> > > > @@ -0,0 +1,31 @@
+> > > > +The power sequence for generic USB Devices
+> > > > +
+> > > > +Some hard-wired USB devices need to do power sequence to let the
+> > > > +device work normally, the typical power sequence like: enable USB
+> > > > +PHY clock, toggle reset pin, etc. But current Linux USB driver
+> > > > +lacks of such code to do it, it may cause some hard-wired USB devices
+> > > > +works abnormal or can't be recognized by controller at all. The
+> > > > +power sequence will be done before this device can be found at USB
+> > > > +bus.
+> > > > +
+> > > > +Required properties:
+> > > > +- compatible : contains "usb-pwrseq-generic".
+> > > 
+> > > In case I have not been clear, no.
+> > > 
+> > > I am not going to accept anything along the lines of the current mmc
+> > > pwrseq. I am basically okay with Krzysztof's proposal as it is *only*
+> > > an added property and not a duplication of information. I'd suggest
+> > > you figure out how to make the kernel work with that rather than
+> > > trying to work-around whatever kernel limitations there are.
+> > > 
+> > 
+> > I see.
+> > 
+> > Would you agree with below:
 > 
-> If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
-> disable the PWM, the PWM output is always set as a logic 1.
+> In general, yes. There are some points being discussed in the other 
+> thread.
 > 
-> Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
-> the PWM_PIN_LEVEL bit was always clear when the PWM was disable
-> and a 0 logic level was apply to the output.
+> > &usbotg1 {
+> > 	vbus-supply = <&reg_usb_otg1_vbus>;
+> > 	pinctrl-names = "default";
+> > 	pinctrl-0 = <&pinctrl_usb_otg1_id>;
+> > 	status = "okay";
+> > 
+> > 	#address-cells = <1>;
+> > 	#size-cells = <0>;
+> > 	hub: genesys at 1 {
+> > 		compatible = "usb5e3,608";
+> > 		reg = <1>;
+> > 
+> > 		power-sequence;
+> > 		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
+> > 		reset-duration-us = <10>;
 > 
-> According to the LPC32x0 User Manual [1],
-> the default value for bit 30 (PWM_PIN_LEVEL) is 0.
-> 
-> This change initialize the pin level to 0 (default value) and
-> update the register value accordingly during the disable process.
-> 
-> [1] http://www.nxp.com/documents/user_manual/UM10326.pdf
-> 
-> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
-
-It looks like a pin control setting, but because it depends
-on PWM enabled/disabled status, I suppose it is good enough to
-manage it from the PWM driver.
-
-I think here a new optional DTS property should be introduced,
-which if present indicates that PWM_OUT pin value is high when
-PWM is disabled. And if the property is not found then
-PWMx_PIN_LEVEL is set to 0 on driver probe.
-
-By convention the property name should be prefixed by "nxp,",
-what name is good? May be "nxp,pwm-disabled-level-high" ?
-Or add a property "nxp,pwm-disabled-level" with valid values 0/1?
-
-Also note someone may want to switch the default behaviour
-in runtime, but this feature may be added later on.
-
-> ---
->  drivers/pwm/pwm-lpc32xx.c | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pwm/pwm-lpc32xx.c b/drivers/pwm/pwm-lpc32xx.c
-> index 4d470c1..dbf93a1 100644
-> --- a/drivers/pwm/pwm-lpc32xx.c
-> +++ b/drivers/pwm/pwm-lpc32xx.c
-> @@ -22,9 +22,11 @@ struct lpc32xx_pwm_chip {
->  	struct pwm_chip chip;
->  	struct clk *clk;
->  	void __iomem *base;
-> +	unsigned int pin_state;
->  };
->  
->  #define PWM_ENABLE	BIT(31)
-> +#define PWM_PIN_LEVEL	BIT(30)
->  
->  #define to_lpc32xx_pwm_chip(_chip) \
->  	container_of(_chip, struct lpc32xx_pwm_chip, chip)
-> @@ -85,7 +87,14 @@ static void lpc32xx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	u32 val;
->  
->  	val = readl(lpc32xx->base + (pwm->hwpwm << 2));
-> -	val &= ~PWM_ENABLE;
-> +	val &= ~(PWM_ENABLE | PWM_PIN_LEVEL);
-> +
-> +	/*
-> +	 * When the PWM is disable, we have to ensure the output is configured
-> +	 * correctly:
-> +	 */
-> +	if(lpc32xx->pin_state)
-> +		val |= PWM_PIN_LEVEL;
->  	writel(val, lpc32xx->base + (pwm->hwpwm << 2));
->  
->  	clk_disable_unprepare(lpc32xx->clk);
-> @@ -121,6 +130,7 @@ static int lpc32xx_pwm_probe(struct platform_device *pdev)
->  	lpc32xx->chip.ops = &lpc32xx_pwm_ops;
->  	lpc32xx->chip.npwm = 1;
->  	lpc32xx->chip.base = -1;
-> +	lpc32xx->pin_state = 0;
->  
->  	ret = pwmchip_add(&lpc32xx->chip);
->  	if (ret < 0) {
+> I wonder if this really needs to be specified. A sufficiently long 
+> default should be good enough for 90 something % of devices.
 > 
 
---
-With best wishes,
-Vladimir
+This property is optional, there is a default value in pwrseq driver.
+
+> > 		clocks = <&clks IMX6SX_CLK_CKO>;
+> > 
+> > 		#address-cells = <1>;
+> > 		#size-cells = <0>;
+> > 		ethernet: asix at 1 {
+> > 			compatible = "usbb95,1708";
+> > 			reg = <1>;
+> > 
+> > 			power-sequence;
+> > 			reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
+> > 			reset-duration-us = <15>;
+> > 			clocks = <&clks IMX6SX_CLK_IPG>;
+> > 		};
+> > 	};
+> > };
+> > 
+> > If the node has property "power-sequence", the pwrseq core will create
+> > related platform device, and the driver under pwrseq driver will handle
+> > power sequence stuffs. 
+> 
+> This I have issue with. If you are creating a platform device here, you 
+> are trying to work-around limitations in the linux driver model.
+
+My current solution like below, but it seems you didn't agree with that.
+I just double confirm here, if you don't, I give up the solution for
+using generic power sequence framework.
+
+In drivers/usb/core/hub.c
+
+	for_each_child_of_node(parent->of_node, node) {
+		hdev_pwrseq = pwrseq_alloc(node, "usb_pwrseq_generic");
+		if (!IS_ERR_OR_NULL(hdev_pwrseq)) {
+			pwrseq_node = kzalloc(sizeof(pwrseq_node), GFP_KERNEL);
+			if (!pwrseq_node) {
+				ret = -ENOMEM;
+				goto err1;
+			}
+			/* power on sequence */
+			ret = pwrseq_pre_power_on(hdev_pwrseq);
+			if (ret)
+				goto err2;
+
+			pwrseq_node->pwrseq_on = hdev_pwrseq;
+			list_add(&pwrseq_node->list, &hub->pwrseq_list);
+		} else if (IS_ERR(hdev_pwrseq)) {
+			return PTR_ERR(hdev_pwrseq);
+		}
+	}
+
+In drivers/power/pwrseq/core.c
+
+struct pwrseq *pwrseq_alloc(struct device_node *np, const char *dev_name)
+{
+	struct pwrseq *p, *pwrseq = NULL;
+	bool created;
+
+	/* If there is no device is associated with this node, create it */
+	if (!of_find_device_by_node(np)) {
+		if (of_platform_device_create(np, dev_name, NULL))
+			created = true;
+		else
+			return ERR_PTR(-ENODEV);
+	}
+
+	mutex_lock(&pwrseq_list_mutex);
+	list_for_each_entry(p, &pwrseq_list, pwrseq_node) {
+		if (p->dev->of_node == np) {
+			if (!try_module_get(p->owner))
+				dev_err(p->dev,
+					"increasing module refcount failed\n");
+			else
+				pwrseq = p;
+			break;
+		}
+	}
+
+And there is a platform driver at drivers/power/pwrseq/pwrseq_usb_generic.c
+to handle these pwrseq properties, see my patch 9/12.
+
+> Either 
+> we need some sort of pre-probe hook to the drivers to call or each 
+> parent node driver is responsible for checking and calling pwr-seq 
+> functions for child nodes. e.g. The host controller calls pwr-seq for 
+> the hub, the hub driver calls the power seq for the asix chip. Soon as 
+> we have a case too complex for the generic pwr-seq, we're going to need 
+> the pre-probe hook as I don't want to see a continual expansion of 
+> generic pwr-seq binding for ever more complex cases.
+> 
+
+How the driver know what it needs to handle (eg, gpio, clock) if there
+is no device for it? The most important we need to consider is which
+device owns there power sequence properties, then the corresponding
+driver can handle it.
+
+-- 
+
+Best Regards,
+Peter Chen
