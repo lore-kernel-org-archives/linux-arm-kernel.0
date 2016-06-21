@@ -1,111 +1,65 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 21 Jun 2016 09:53:20 +0200
-Subject: [RFC PATCH v2 03/15] arm64: mm: change IOMMU notifier action to
- attach DMA ops
-In-Reply-To: <5763C27A.9030306@arm.com>
-References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
- <5763C27A.9030306@arm.com>
-Message-ID: <03c537e7-0acf-edca-d0e0-369490c828df@samsung.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Tue, 21 Jun 2016 07:56:41 +0000
+Subject: [PATCH v2] arm: tegra124: remove commas from unit addresses
+In-Reply-To: <20160620171124.GA6333@ulmo.ba.sec>
+References: <1466298275-15753-1-git-send-email-marcel.ziswiler@toradex.com>
+ <576810C2.1030401@wwwdotorg.org> <20160620164057.GD6175@ulmo.ba.sec>
+ <57681DC3.9090801@wwwdotorg.org> <20160620171124.GA6333@ulmo.ba.sec>
+Message-ID: <1466495800.4742.1.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Mon, 2016-06-20 at 19:11 +0200, Thierry Reding wrote:
+> On Mon, Jun 20, 2016 at 10:45:55AM -0600, Stephen Warren wrote:
+> > 
+> > On 06/20/2016 10:40 AM, Thierry Reding wrote:
+> > > 
+> > > On Mon, Jun 20, 2016 at 09:50:26AM -0600, Stephen Warren wrote:
+> > > > 
+> > > > On 06/18/2016 07:04 PM, Marcel Ziswiler wrote:
+> > > > > 
+> > > > > Remove commas from unit addresses as suggested by Rob Herring
+> > > > > upon me
+> > > > > posting initial Apalis TK1 support:
+> > > > > 
+> > > > > http://article.gmane.org/gmane.linux.ports.tegra/26608
+> > > > Acked-by: Stephen Warren <swarren@nvidia.com>
+> > > I'm confused now. I posted almost exactly the same patch a while
+> > > ago and
+> > > we agreed that we couldn't do this because the node names were to
+> > > be
+> > > considered part of the ABI.
+> > > 
+> > > Is it or is it not?
+> > The particular case where it matters is the GPU node, which U-Boot
+> > manipulates. This revised patch version no longer renames the GPU
+> > node and
+> > so in practice avoids any issues that I'm aware of.
+> > 
+> > If there's a more general rule that node names are part of the ABI,
+> > then
+> > indeed we shouldn't take this patch.
+> I'm somewhat uncomfortable with this notion. Just because we don't
+> know
+> of any other cases doesn't mean there aren't any. My understanding is
+> that it's fairly common to look up device tree nodes by name, however
+> brittle that may be.
+> 
+> There's also the matter of consistency to consider here. I suspect
+> that
+> if we make this change somebody will notice the odd one out and send
+> patches to "fix it up". So if we get confirmation about this change
+> being okay, I'd request that a comment be added to the GPU node as to
+> why it is not converted.
+
+Sure, let me add such a comment in a v3 that it is crystal clear why we
+did so.
+
+> Thierry
 
 
-On 2016-06-17 11:27, Robin Murphy wrote:
-> Hi Lorenzo,
->
-> I think this patch makes sense even independent of the rest of the 
-> series, one nit inline notwithstanding.
->
-> Marek; I'm curious as to whether this could make the workaround in 
-> 722ec35f7 obsolete as well, or are all the drivers also bound 
-> super-early in the setup you had there?
+Thanks Thierry.
 
-Yes, this will solve that problem too. I will also hide some possible
-deferred probe issues, because the moment at which IOMMU is activated
-will be postponed. The only drawback with this approach is the fact
-that is drivers won't be allowed to do any dma-mapping operations on
-devices, which they don't own. This should not be a big issue, but
-this was the reason to setup IOMMU on device add instead of driver
-bind.
+Cheers
 
-While at it, please make sure that the case of failed client driver
-probe will be handled properly. IOMMU might do some operations while
-setting up and if the client driver fails to probe (for whatever
-reason, might be a deferred probe too), those operation has to be
-undone. However the current code of the driver core won't call any
-notifier (like BUS_NOTIFY_UNBOUND_DRIVER or whatever else) in such
-case.
-
-Long time ago I used BUS_NOTIFY_BIND_DRIVER based approach for my
-Exynos IOMMU patches and had to extend bus core with such patch:
-https://patchwork.kernel.org/patch/4678181/ to properly cleanup
-after failed client driver probe and avoid leaking resources. Please
-read the discussion, because some changes were requested to it.
-
-
-Best regards
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
-
->
-> On 07/06/16 14:30, Lorenzo Pieralisi wrote:
->> Current bus notifier in ARM64 (__iommu_attach_notifier)
->> attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
->> action notification.
->>
->> This causes issues on ACPI based systems, where PCI devices
->> can be added before the IOMMUs the devices are attached to
->> had a chance to be probed, causing failures on attempts to
->> attach dma_ops in that the domain for the respective IOMMU
->> may not be set-up yet by the time the bus notifier is run.
->>
->> Devices dma_ops do not require to be set-up till the matching
->> device drivers are probed. This means that instead of running
->> the notifier attaching dma_ops to devices (__iommu_attach_notifier)
->> on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
->> device driver is bound to the device in question (on action
->> BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
->> group and domain are set-up accordingly at the time the
->> notifier is triggered.
->>
->> This patch changes the notifier action upon which dma_ops
->> are attached to devices and defer it to driver binding time,
->> so that IOMMU devices have a chance to be probed and to register
->> their bus notifiers before the dma_ops attach sequence for a
->> device is actually carried out.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   arch/arm64/mm/dma-mapping.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index c566ec8..79b0882 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -848,7 +848,7 @@ static int __iommu_attach_notifier(struct 
->> notifier_block *nb,
->>   {
->>       struct iommu_dma_notifier_data *master, *tmp;
->>
->> -    if (action != BUS_NOTIFY_ADD_DEVICE)
->> +    if (action != BUS_NOTIFY_BIND_DRIVER)
->
-> With this, you can also get rid of the priority setting and big fat 
-> explanatory comment in register_iommu_dma_ops_notifier().
->
-> Robin.
->
->>           return 0;
->>
->>       mutex_lock(&iommu_dma_notifier_lock);
->>
->
->
->
+Marcel
