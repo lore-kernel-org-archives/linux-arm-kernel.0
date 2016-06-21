@@ -1,184 +1,96 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 21 Jun 2016 10:03:00 +0800
-Subject: [PATCH v8 2/3] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1466421720.1918.11.camel@mtksdaap41>
-References: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
- <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
- <1466419311.27959.12.camel@mtksdaap41>
- <1466421720.1918.11.camel@mtksdaap41>
-Message-ID: <1466474580.6214.29.camel@mtksdaap41>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 21 Jun 2016 05:11:07 +0300
+Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
+In-Reply-To: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
+References: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <b499570f-e624-cbe1-4fca-44ba0e701054@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-06-20 at 19:22 +0800, Horng-Shyang Liao wrote:
-> On Mon, 2016-06-20 at 18:41 +0800, CK Hu wrote:
-> > Hi, HS:
-> > 
-> > One comment inline.
-> > 
-> > On Mon, 2016-05-30 at 11:19 +0800, HS Liao wrote:
-> > > This patch is first version of Mediatek Command Queue(CMDQ) driver. The
-> > > CMDQ is used to help read/write registers with critical time limitation,
-> > > such as updating display configuration during the vblank. It controls
-> > > Global Command Engine (GCE) hardware to achieve this requirement.
-> > > Currently, CMDQ only supports display related hardwares, but we expect
-> > > it can be extended to other hardwares for future requirements.
-> > > 
-> > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> > > Signed-off-by: CK Hu <ck.hu@mediatek.com>
-> > > ---
-> > >  drivers/soc/mediatek/Kconfig    |  10 +
-> > >  drivers/soc/mediatek/Makefile   |   1 +
-> > >  drivers/soc/mediatek/mtk-cmdq.c | 943 ++++++++++++++++++++++++++++++++++++++++
-> > >  include/soc/mediatek/cmdq.h     | 197 +++++++++
-> > >  4 files changed, 1151 insertions(+)
-> > >  create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
-> > >  create mode 100644 include/soc/mediatek/cmdq.h
-> > > 
-> > > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> > > index 0a4ea80..c4ad75c 100644
-> > > --- a/drivers/soc/mediatek/Kconfig
-> > > +++ b/drivers/soc/mediatek/Kconfig
-> > > @@ -1,6 +1,16 @@
-> > >  #
-> > >  # MediaTek SoC drivers
-> > >  #
-> > > +config MTK_CMDQ
-> > > +	bool "MediaTek CMDQ Support"
-> > > +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > > +	select MTK_INFRACFG
-> > > +	help
-> > > +	  Say yes here to add support for the MediaTek Command Queue (CMDQ)
-> > > +	  driver. The CMDQ is used to help read/write registers with critical
-> > > +	  time limitation, such as updating display configuration during the
-> > > +	  vblank.
-> > > +
-> > >  config MTK_INFRACFG
-> > >  	bool "MediaTek INFRACFG Support"
-> > >  	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > > diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-> > > index 12998b0..f7397ef 100644
-> > > --- a/drivers/soc/mediatek/Makefile
-> > > +++ b/drivers/soc/mediatek/Makefile
-> > 
-> > [Snip...]
-> > 
-> > > +
-> > > +static int cmdq_eng_get_thread(u64 flag)
-> > > +{
-> > > +	if (flag & BIT_ULL(CMDQ_ENG_DISP_DSI0))
-> > > +		return CMDQ_THR_DISP_MAIN_IDX;
-> > > +	else if (flag & BIT_ULL(CMDQ_ENG_DISP_DPI0))
-> > > +		return CMDQ_THR_DISP_SUB_IDX;
-> > > +	else
-> > > +		return CMDQ_THR_DISP_MISC_IDX;
-> > > +}
-> > 
-> > I think cmdq should not have knowledge of client. These statement show
-> > that cmdq know that DSI0-tasks is different with DPI0-tasks. I propose
-> > the 'session' to replace engine flag. For example, main display create
-> > one cmdq_session and external display create another cmdq_session. For
-> > client driver, every tasks created by main display is bound to main
-> > display session. For cmdq driver, it should dynamically bind a session
-> > to a HW thread, and then dispatch tasks of this session to this HW
-> > thread. After HW thread run out of tasks of this session, detach this
-> > session with this thread.
-> > For the problem of remove wfe cmd, I think a session can have a property
-> > of merge_wfe_cmd. For display session, session->merge_wfe_cmd = true.
-> > For other client, it's false.
+Hi Sylvain,
+
+On 03.06.2016 22:37, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
 > 
-> Hi CK,
+> If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
+> disable the PWM, the PWM output is always set as a logic 1.
 > 
-> I think your suggestion is similar to CMDQ 'scenarios',
-> which was removed from CMDQ v2.
+> Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
+> the PWM_PIN_LEVEL bit was always clear when the PWM was disable
+> and a 0 logic level was apply to the output.
 > 
-> Daniel suggests to use engine flags instead of scenarios.
-> Quote from https://patchwork.kernel.org/patch/8068311/ .
-> 'Instead of encoding policy (these arbitrary "scenarios"), perhaps the
->  cmdq driver should just provide these flag bits, and the display
->  subsystem can use them to build the "flag" parameter itself.
+> According to the LPC32x0 User Manual [1],
+> the default value for bit 30 (PWM_PIN_LEVEL) is 0.
 > 
->  After all, the exact configuration of mmsys components is somewhat
->  flexible.'
+> This change initialize the pin level to 0 (default value) and
+> update the register value accordingly during the disable process.
 > 
-> Therefore, it would be better to discuss with Daniel before we change
-> it.
+> [1] http://www.nxp.com/documents/user_manual/UM10326.pdf
 > 
+> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+
+It looks like a pin control setting, but because it depends
+on PWM enabled/disabled status, I suppose it is good enough to
+manage it from the PWM driver.
+
+I think here a new optional DTS property should be introduced,
+which if present indicates that PWM_OUT pin value is high when
+PWM is disabled. And if the property is not found then
+PWMx_PIN_LEVEL is set to 0 on driver probe.
+
+By convention the property name should be prefixed by "nxp,",
+what name is good? May be "nxp,pwm-disabled-level-high" ?
+Or add a property "nxp,pwm-disabled-level" with valid values 0/1?
+
+Also note someone may want to switch the default behaviour
+in runtime, but this feature may be added later on.
+
+> ---
+>  drivers/pwm/pwm-lpc32xx.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
 > 
-> Hi Daniel,
-> 
-> Do you think we should use scenarios or sessions instead of flags?
-> 
-> Thanks,
-> HS
+> diff --git a/drivers/pwm/pwm-lpc32xx.c b/drivers/pwm/pwm-lpc32xx.c
+> index 4d470c1..dbf93a1 100644
+> --- a/drivers/pwm/pwm-lpc32xx.c
+> +++ b/drivers/pwm/pwm-lpc32xx.c
+> @@ -22,9 +22,11 @@ struct lpc32xx_pwm_chip {
+>  	struct pwm_chip chip;
+>  	struct clk *clk;
+>  	void __iomem *base;
+> +	unsigned int pin_state;
+>  };
+>  
+>  #define PWM_ENABLE	BIT(31)
+> +#define PWM_PIN_LEVEL	BIT(30)
+>  
+>  #define to_lpc32xx_pwm_chip(_chip) \
+>  	container_of(_chip, struct lpc32xx_pwm_chip, chip)
+> @@ -85,7 +87,14 @@ static void lpc32xx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  	u32 val;
+>  
+>  	val = readl(lpc32xx->base + (pwm->hwpwm << 2));
+> -	val &= ~PWM_ENABLE;
+> +	val &= ~(PWM_ENABLE | PWM_PIN_LEVEL);
+> +
+> +	/*
+> +	 * When the PWM is disable, we have to ensure the output is configured
+> +	 * correctly:
+> +	 */
+> +	if(lpc32xx->pin_state)
+> +		val |= PWM_PIN_LEVEL;
+>  	writel(val, lpc32xx->base + (pwm->hwpwm << 2));
+>  
+>  	clk_disable_unprepare(lpc32xx->clk);
+> @@ -121,6 +130,7 @@ static int lpc32xx_pwm_probe(struct platform_device *pdev)
+>  	lpc32xx->chip.ops = &lpc32xx_pwm_ops;
+>  	lpc32xx->chip.npwm = 1;
+>  	lpc32xx->chip.base = -1;
+> +	lpc32xx->pin_state = 0;
+>  
+>  	ret = pwmchip_add(&lpc32xx->chip);
+>  	if (ret < 0) {
 > 
 
-Hi, HS:
-
-'session' is not similar to 'scenarios'.
-
-In 'scenarios' mechanism, client bind a task with scenarios and send to
-cmdq. Cmdq transfer scenarios to engine flag, and use engine flag to
-dispatch task to HW thread.
-
-
-In 'engine flag' mechanism, proposed by Daniel, client bind a task
-directly with engine flag. Cmdq directly use engine flag to dispatch
-task to HW thread without any translation.
-
-But neither 'scenarios' mechanism nor 'engine flag' mechanism get rid of
-engine flag, which make cmdq have knowledge of client.
-
-In 'session' mechanism, there is no engine flag any more. Client bind
-time-sequential tasks to the same session and tasks in different session
-can execute parallelly. One thing cmdq need to know is to dispatch tasks
-with the same session to the same HW thread, so cmdq does not have any
-knowledge of client.
-
-Daniel focus on reduce translating scenarios to engine flag. I think
-'session' mechanism does not conflict with his opinion because we does
-not translate 'session' to engine flag. Therefore, I think 'session' is
-the best of these three mechanism.
-
-Regards,
-CK
-
-> > Here is the sample code to create cmdq_rec with session.
-> > 
-> > merge_wfe_cmd = true;
-> > cmdq_session_create(merge_wfe_cmd, &primary_display_session);
-> > cmdq_rec_create(dev, primary_display_session, &rec);
-> > 
-> > 
-> > Therefore, the below definition can be removed.
-> > 
-> > > +
-> > > +enum cmdq_eng {
-> > > +	CMDQ_ENG_DISP_AAL,
-> > > +	CMDQ_ENG_DISP_COLOR0,
-> > > +	CMDQ_ENG_DISP_COLOR1,
-> > > +	CMDQ_ENG_DISP_DPI0,
-> > > +	CMDQ_ENG_DISP_DSI0,
-> > > +	CMDQ_ENG_DISP_DSI1,
-> > > +	CMDQ_ENG_DISP_GAMMA,
-> > > +	CMDQ_ENG_DISP_OD,
-> > > +	CMDQ_ENG_DISP_OVL0,
-> > > +	CMDQ_ENG_DISP_OVL1,
-> > > +	CMDQ_ENG_DISP_PWM0,
-> > > +	CMDQ_ENG_DISP_PWM1,
-> > > +	CMDQ_ENG_DISP_RDMA0,
-> > > +	CMDQ_ENG_DISP_RDMA1,
-> > > +	CMDQ_ENG_DISP_RDMA2,
-> > > +	CMDQ_ENG_DISP_UFOE,
-> > > +	CMDQ_ENG_DISP_WDMA0,
-> > > +	CMDQ_ENG_DISP_WDMA1,
-> > > +	CMDQ_ENG_MAX,
-> > > +};
-> > > +
-> > 
-> > 
-> > Regards,
-> > CK
-> > 
-> 
-> 
+--
+With best wishes,
+Vladimir
