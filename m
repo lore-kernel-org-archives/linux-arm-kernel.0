@@ -1,82 +1,52 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Tue, 21 Jun 2016 10:24:36 +0800
-Subject: [PATCH V2] coresight-stm: support mmapping channel regions with
- mmio_addr
-Message-ID: <1466475876-5937-1-git-send-email-zhang.chunyan@linaro.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 21 Jun 2016 10:19:49 +0800
+Subject: [PATCH 07/12] power: pwrseq: rename file name for generic driver
+In-Reply-To: <5767E614.5030002@samsung.com>
+References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
+ <1466158165-9380-8-git-send-email-peter.chen@nxp.com>
+ <5767E614.5030002@samsung.com>
+Message-ID: <20160621021949.GF26936@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CoreSight STM device allows direct mapping of the channel regions to
-userspace for zero-copy writing. To support this ability, the STM
-framework has provided a hook 'mmio_addr', this patch just implemented
-this hook for CoreSight STM.
+On Mon, Jun 20, 2016 at 02:48:20PM +0200, Krzysztof Kozlowski wrote:
+> On 06/17/2016 12:09 PM, Peter Chen wrote:
+> > The individual driver file name is better to contain module name.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > ---
+> >  .../power/pwrseq/{pwrseq-simple.txt => mmc-pwrseq-simple.txt}         | 0
+> >  drivers/power/pwrseq/Makefile                                         | 4 ++--
+> >  drivers/power/pwrseq/{pwrseq.c => core.c}                             | 0
+> >  drivers/power/pwrseq/{pwrseq_simple.c => pwrseq_mmc_simple.c}         | 0
+> >  4 files changed, 2 insertions(+), 2 deletions(-)
+> >  rename Documentation/devicetree/bindings/power/pwrseq/{pwrseq-simple.txt => mmc-pwrseq-simple.txt} (100%)
+> >  rename drivers/power/pwrseq/{pwrseq.c => core.c} (100%)
+> >  rename drivers/power/pwrseq/{pwrseq_simple.c => pwrseq_mmc_simple.c} (100%)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt b/Documentation/devicetree/bindings/power/pwrseq/mmc-pwrseq-simple.txt
+> > similarity index 100%
+> > rename from Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt
+> > rename to Documentation/devicetree/bindings/power/pwrseq/mmc-pwrseq-simple.txt
+> > diff --git a/drivers/power/pwrseq/Makefile b/drivers/power/pwrseq/Makefile
+> > index 9e40e4b..d475e01 100644
+> > --- a/drivers/power/pwrseq/Makefile
+> > +++ b/drivers/power/pwrseq/Makefile
+> > @@ -1,3 +1,3 @@
+> > -obj-$(CONFIG_POWER_SEQ)		+= pwrseq.o
+> > -obj-$(CONFIG_POWER_SEQ_SIMPLE)	+= pwrseq_simple.o
+> > +obj-$(CONFIG_POWER_SEQ)		+= core.o
+> > +obj-$(CONFIG_POWER_SEQ_SIMPLE)	+= pwrseq_mmc_simple.o
+> 
+> Although the driver was developed for MMC but it is quite generic (or
+> rather - mmc independent). The name of the driver is just
+> "pwrseq_simple" so I think MMC prefix is not needed.
+> 
 
-This patch also added an item into 'channel_space' to save the physical
-base address of channel region which mmap operation needs to know.
+It is may be common for MMC, but not USB, or others. Eg, its reset-gpios
+is just like enable-gpios. Some reset chip process needs to toggle gpio.
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
----
- drivers/hwtracing/coresight/coresight-stm.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 73be58a..482c8bb 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -105,10 +105,12 @@ module_param_named(
- /**
-  * struct channel_space - central management entity for extended ports
-  * @base:		memory mapped base address where channels start.
-+ * @phys:		physical base address of channel region.
-  * @guaraneed:		is the channel delivery guaranteed.
-  */
- struct channel_space {
- 	void __iomem		*base;
-+	phys_addr_t		phys;
- 	unsigned long		*guaranteed;
- };
- 
-@@ -356,6 +358,23 @@ static void stm_generic_unlink(struct stm_data *stm_data,
- 	stm_disable(drvdata->csdev);
- }
- 
-+static phys_addr_t
-+stm_mmio_addr(struct stm_data *stm_data, unsigned int master,
-+	      unsigned int channel, unsigned int nr_chans)
-+{
-+	struct stm_drvdata *drvdata = container_of(stm_data,
-+						   struct stm_drvdata, stm);
-+	phys_addr_t addr;
-+
-+	addr = drvdata->chs.phys + channel * BYTES_PER_CHANNEL;
-+
-+	if (offset_in_page(addr) ||
-+	    offset_in_page(nr_chans * BYTES_PER_CHANNEL))
-+		return 0;
-+
-+	return addr;
-+}
-+
- static long stm_generic_set_options(struct stm_data *stm_data,
- 				    unsigned int master,
- 				    unsigned int channel,
-@@ -761,7 +780,9 @@ static void stm_init_generic_data(struct stm_drvdata *drvdata)
- 	drvdata->stm.sw_end = 1;
- 	drvdata->stm.hw_override = true;
- 	drvdata->stm.sw_nchannels = drvdata->numsp;
-+	drvdata->stm.sw_mmiosz = BYTES_PER_CHANNEL;
- 	drvdata->stm.packet = stm_generic_packet;
-+	drvdata->stm.mmio_addr = stm_mmio_addr;
- 	drvdata->stm.link = stm_generic_link;
- 	drvdata->stm.unlink = stm_generic_unlink;
- 	drvdata->stm.set_options = stm_generic_set_options;
-@@ -808,6 +829,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
- 	ret = stm_get_resource_byname(np, "stm-stimulus-base", &ch_res);
- 	if (ret)
- 		return ret;
-+	drvdata->chs.phys = ch_res.start;
- 
- 	base = devm_ioremap_resource(dev, &ch_res);
- 	if (IS_ERR(base))
 -- 
-1.9.1
+
+Best Regards,
+Peter Chen
