@@ -1,21 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Jun 2016 08:35:18 -0500
-Subject: [PATCH v3 1/5] dt-bindings: Document the STM32 I2C bindings
-In-Reply-To: <1466439609-1814-2-git-send-email-cedric.madianga@gmail.com>
-References: <1466439609-1814-1-git-send-email-cedric.madianga@gmail.com>
- <1466439609-1814-2-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <20160621133518.GA10968@rob-hp-laptop>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 21 Jun 2016 14:38:32 +0100
+Subject: [PATCH 1/2] Documentation: bindings: Add DT bindings for ARM's
+ FVP models.
+In-Reply-To: <20160621132257.GA2263@rob-hp-laptop>
+References: <1466424796-13769-1-git-send-email-tixy@linaro.org>
+ <20160621132257.GA2263@rob-hp-laptop>
+Message-ID: <1466516312.2856.27.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 06:20:05PM +0200, M'boumba Cedric Madianga wrote:
-> This patch adds documentation of device tree bindings for the STM32 I2C
-> controller.
+On Tue, 2016-06-21 at 08:22 -0500, Rob Herring wrote:
+> > +Required properties (in root node):
+> > +- compatible value:
+> > +     compatible = "arm,<family>,<variant>", "arm,<family>";
+> > +  where <family> is one of:
+> > +  - "fvp-base" for the Base FVP
+> > +  - "fvp-ve" for the VE FVP
+> > +  and <variant> is the part of the model's executable filename with
+> the family
+> > +  name omitted, converted to lower case, and with non-alphanumeric
+> characters
+> > +  replaced with '-'. E.g. the Base FVP that has two AEMv8 CPU
+> clusters has an
+> > +  executable file called FVP_Base_AEMv8A-AEMv8A, so the compatible
+> value for
 > 
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> ---
->  .../devicetree/bindings/i2c/i2c-stm32.txt          | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+> Naming conventions of the exe aren't going to change?
 
-Acked-by: Rob Herring <robh@kernel.org>
+Almost certainly will at some point, as will the very name Fixed Virtual
+Platform, what 'families' ARM produce and their naming, and the
+configuration of the 'hardware' compiled into the models.
+
+These are software models, so can be changed easily at the whim of
+marketing, or current perceived requirements from engineers and
+managers. So generally, it's a moving target, that doesn't fit nicely
+into the needs producing device-trees.
+
+-- 
+Tixy
