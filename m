@@ -1,65 +1,144 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Tue, 21 Jun 2016 07:56:41 +0000
-Subject: [PATCH v2] arm: tegra124: remove commas from unit addresses
-In-Reply-To: <20160620171124.GA6333@ulmo.ba.sec>
-References: <1466298275-15753-1-git-send-email-marcel.ziswiler@toradex.com>
- <576810C2.1030401@wwwdotorg.org> <20160620164057.GD6175@ulmo.ba.sec>
- <57681DC3.9090801@wwwdotorg.org> <20160620171124.GA6333@ulmo.ba.sec>
-Message-ID: <1466495800.4742.1.camel@toradex.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 21 Jun 2016 16:03:54 +0800
+Subject: [PATCH V7 6/8] irqchip/gicv3-its: Probe ITS in the ACPI way
+In-Reply-To: <1466420541-20101-7-git-send-email-tn@semihalf.com>
+References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
+ <1466420541-20101-7-git-send-email-tn@semihalf.com>
+Message-ID: <bebbe715-19df-be34-40d9-6845f38b9c2f@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-06-20 at 19:11 +0200, Thierry Reding wrote:
-> On Mon, Jun 20, 2016 at 10:45:55AM -0600, Stephen Warren wrote:
-> > 
-> > On 06/20/2016 10:40 AM, Thierry Reding wrote:
-> > > 
-> > > On Mon, Jun 20, 2016 at 09:50:26AM -0600, Stephen Warren wrote:
-> > > > 
-> > > > On 06/18/2016 07:04 PM, Marcel Ziswiler wrote:
-> > > > > 
-> > > > > Remove commas from unit addresses as suggested by Rob Herring
-> > > > > upon me
-> > > > > posting initial Apalis TK1 support:
-> > > > > 
-> > > > > http://article.gmane.org/gmane.linux.ports.tegra/26608
-> > > > Acked-by: Stephen Warren <swarren@nvidia.com>
-> > > I'm confused now. I posted almost exactly the same patch a while
-> > > ago and
-> > > we agreed that we couldn't do this because the node names were to
-> > > be
-> > > considered part of the ABI.
-> > > 
-> > > Is it or is it not?
-> > The particular case where it matters is the GPU node, which U-Boot
-> > manipulates. This revised patch version no longer renames the GPU
-> > node and
-> > so in practice avoids any issues that I'm aware of.
-> > 
-> > If there's a more general rule that node names are part of the ABI,
-> > then
-> > indeed we shouldn't take this patch.
-> I'm somewhat uncomfortable with this notion. Just because we don't
-> know
-> of any other cases doesn't mean there aren't any. My understanding is
-> that it's fairly common to look up device tree nodes by name, however
-> brittle that may be.
-> 
-> There's also the matter of consistency to consider here. I suspect
-> that
-> if we make this change somebody will notice the odd one out and send
-> patches to "fix it up". So if we get confirmation about this change
-> being okay, I'd request that a comment be added to the GPU node as to
-> why it is not converted.
+On 2016/6/20 19:02, Tomasz Nowicki wrote:
+> ITS is prepared for being initialized different than DT,
+> therefore we can initialize it in ACPI way. We collect register base
+> address from MADT table and pass mandatory info to firmware-agnostic
+> ITS init call.
+>
+> Use here IORT lib to register ITS domain which then can be found and
+> used on to build another PCI MSI domain in hierarchical stack domain.
+>
+> NOTE: Waiting for proper ITS and NUMA node relation description in IORT
+> table, we pass around NUMA_NO_NODE to the its_probe_one init call.
+> This means that Cavium ThunderX erratum 23144 (pass1.1 only)
+> is not supported for ACPI boot method yet.
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/Kconfig          |  1 +
+>  drivers/irqchip/irq-gic-v3-its.c | 59 +++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 59 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index 5495a5b..fd4b8b8 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -38,6 +38,7 @@ config ARM_GIC_V3
+>  config ARM_GIC_V3_ITS
+>  	bool
+>  	select PCI_MSI_IRQ_DOMAIN
+> +	select IORT_TABLE if ACPI
+>
+>  config ARM_NVIC
+>  	bool
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 1e0888d..c5c8616 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -15,10 +15,13 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>
+> +#include <linux/acpi.h>
+>  #include <linux/bitmap.h>
+>  #include <linux/cpu.h>
+>  #include <linux/delay.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/iort.h>
+>  #include <linux/log2.h>
+>  #include <linux/mm.h>
+>  #include <linux/msi.h>
+> @@ -1438,6 +1441,11 @@ static int its_irq_gic_domain_alloc(struct irq_domain *domain,
+>  		fwspec.param[0] = GIC_IRQ_TYPE_LPI;
+>  		fwspec.param[1] = hwirq;
+>  		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
+> +	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
+> +		fwspec.fwnode = domain->parent->fwnode;
+> +		fwspec.param_count = 2;
+> +		fwspec.param[0] = hwirq;
+> +		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
+>  	} else {
+>  		return -EINVAL;
+>  	}
+> @@ -1792,6 +1800,55 @@ static int __init its_of_probe(struct device_node *node)
+>  	return 0;
+>  }
+>
+> +#ifdef CONFIG_ACPI
+> +
+> +#define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
+> +
+> +static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+> +					  const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_translator *its_entry;
+> +	struct fwnode_handle *dom_handle;
+> +	struct resource res;
+> +	int err;
+> +
+> +	its_entry = (struct acpi_madt_generic_translator *)header;
+> +	res.start = its_entry->base_address;
+> +	res.end = its_entry->base_address + ACPI_GICV3_ITS_MEM_SIZE - 1;
+> +
+> +	dom_handle = irq_domain_alloc_fwnode((void *)its_entry->base_address);
+> +	if (!dom_handle) {
+> +		pr_err("ITS@%pa: Unable to allocate GICv3 ITS domain token\n",
+> +		       &res.start);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
+> +	if (err) {
+> +		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
+> +		       &res.start, its_entry->translation_id);
+> +		goto dom_err;
+> +	}
+> +
+> +	err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
+> +	if (!err)
+> +		return 0;
+> +
+> +	iort_deregister_domain_token(its_entry->translation_id);
+> +dom_err:
+> +	irq_domain_free_fwnode(dom_handle);
+> +	return err;
+> +}
+> +
+> +static void __init its_acpi_probe(void)
+> +{
+> +	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+> +			      gic_acpi_parse_madt_its, 0);
+> +}
+> +#else
+> +static void __init its_acpi_probe(void) { }
+> +#endif
+> +
+>  int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+>  		    struct irq_domain *parent_domain)
+>  {
+> @@ -1802,7 +1859,7 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+>  	if (of_node)
+>  		its_of_probe(of_node);
+>  	else
+> -		return -ENODEV;
+> +		its_acpi_probe();
+>
+>  	if (list_empty(&its_nodes)) {
+>  		pr_warn("ITS: No ITS available, not enabling LPIs\n");
+>
 
-Sure, let me add such a comment in a v3 that it is crystal clear why we
-did so.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-> Thierry
-
-
-Thanks Thierry.
-
-Cheers
-
-Marcel
+Thanks
+Hanjun
