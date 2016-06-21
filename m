@@ -1,31 +1,82 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 21 Jun 2016 14:54:35 +0200
-Subject: [PATCH v4 0/8] iommu/rockchip: Fix bugs and enable on ARM64
-In-Reply-To: <CAAFQd5B8sxbZ6MymwDKL4vZkfQ-ej_bNh7tS1OhRC=X7-eie+Q@mail.gmail.com>
-References: <1466483681-36110-1-git-send-email-tfiga@chromium.org>
- <20160621091732.GB28248@8bytes.org>
- <CAAFQd5B8sxbZ6MymwDKL4vZkfQ-ej_bNh7tS1OhRC=X7-eie+Q@mail.gmail.com>
-Message-ID: <20160621125435.GE11432@8bytes.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 21 Jun 2016 08:14:43 -0500
+Subject: [PATCH v3 2/8] mfd: ac100: Add device tree bindings for X-Powers
+ AC100 codec/RTC combo IC
+In-Reply-To: <1466391138-12862-3-git-send-email-wens@csie.org>
+References: <1466391138-12862-1-git-send-email-wens@csie.org>
+ <1466391138-12862-3-git-send-email-wens@csie.org>
+Message-ID: <20160621131443.GA29350@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On Tue, Jun 21, 2016 at 09:42:16PM +0900, Tomasz Figa wrote:
-> In simple words, DRM patches depend on IOMMU patches.
+On Mon, Jun 20, 2016 at 10:52:12AM +0800, Chen-Yu Tsai wrote:
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes since v2:
 > 
-> More precisely: The IOMMU patches alone are supposed to not break
-> anything. Same goes for the first DRM patch (7/8). Only second DRM
-> patch (8/8) depends on changes introduced by its predecessors.
+>   - Fix interrupt line for ac100_codec in provided example.
+> 
+> ---
+>  Documentation/devicetree/bindings/mfd/ac100.txt | 42 +++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/ac100.txt b/Documentation/devicetree/bindings/mfd/ac100.txt
+> new file mode 100644
+> index 000000000000..a793954bb952
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/ac100.txt
+> @@ -0,0 +1,42 @@
+> +X-Powers AC100 Codec/RTC IC device tree bindings
+> +
+> +AC100 is a audio codec and RTC subsystem combo IC. The 2 parts are
+> +separated, including power supplies and interrupt lines, but share
+> +a common register address space and host interface.
+> +
+> +Required properties:
+> +- compatible: "x-powers,ac100"
+> +- reg: The I2C slave address or RSB hardware address for the chip
+> +- sub-nodes:
+> +  - codec
+> +    - compatible: "x-powers,ac100-codec"
+> +    - interrupt-parent: The parent interrupt controller
+> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_AUDIO pin
+> +  - rtc
+> +    - compatible: "x-powers,ac100-rtc"
+> +    - interrupt-parent: The parent interrupt controller
+> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_RTC pin
+> +    - #clock-cells: shall be 1
+> +    - clock-output-names: "cko1_rtc", "cko2_rtc", "cko3_rtc"
+> +    - see clock/clock-bindings.txt for common clock bindings
+> +
+> +Example:
+> +
+> +ac100: codec at e89 {
+> +	compatible = "x-powers,ac100";
+> +	reg = <0xe89>;
+> +
+> +	ac100_codec {
 
-The first DRM patch is 6/7, so it is 7/8 with the iommu dependency,
-right? Anyway, I think the best is I take the iommu patches when Heiko
-is ok with them and then the DRM tree can merge that branch in to apply
-the DRM patches.
+Use generic node names and no underscores:
 
-But first Heiko should have a look at the patches.
+codec {
 
+> +		compatible = "x-powers,ac100-codec";
+> +		interrupt-parent = <&r_pio>;
+> +		interrupts = <0 9 IRQ_TYPE_LEVEL_LOW>; /* PL9 */
+> +	};
+> +
+> +	ac100_rtc {
 
-Thanks,
+rtc {
 
-	Joerg
+> +		compatible = "x-powers,ac100-rtc";
+> +		interrupt-parent = <&nmi_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +		#clock-cells = <1>;
+> +		clock-output-names = "cko1_rtc", "cko2_rtc", "cko3_rtc";
+> +	};
+> +};
+> -- 
+> 2.8.1
+> 
