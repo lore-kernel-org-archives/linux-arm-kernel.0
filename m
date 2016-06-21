@@ -1,150 +1,54 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 21 Jun 2016 12:53:28 +0800
-Subject: [PATCH 2/5] clk: rockchip: rk3228: include downstream muxes into
- fractional dividers
+Date: Tue, 21 Jun 2016 12:53:29 +0800
+Subject: [PATCH 3/5] clk: rockchip: rk3228: export related i2s/spdif clocks
 In-Reply-To: <1466484811-26923-1-git-send-email-zhengxing@rock-chips.com>
 References: <1466484811-26923-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1466484811-26923-3-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1466484811-26923-4-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the initial conversion to the newly introduced combined fractional
-dividers+muxes the rk3228 clocks were left out, so convert them now.
+This patch exports related i2s/spdif clocks for dts reference.
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 ---
 
- drivers/clk/rockchip/clk-rk3228.c |   79 ++++++++++++++++++++++++-------------
- 1 file changed, 51 insertions(+), 28 deletions(-)
+ drivers/clk/rockchip/clk-rk3228.c      |    8 ++++----
+ include/dt-bindings/clock/rk3228-cru.h |    4 ++++
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
-index 2f1442f..72bcdba 100644
+index 72bcdba..79a3db1 100644
 --- a/drivers/clk/rockchip/clk-rk3228.c
 +++ b/drivers/clk/rockchip/clk-rk3228.c
-@@ -170,6 +170,34 @@ static struct rockchip_pll_clock rk3228_pll_clks[] __initdata = {
- #define DFLAGS CLK_DIVIDER_HIWORD_MASK
- #define GFLAGS (CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE)
+@@ -581,10 +581,10 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 	GATE(0, "aclk_bus_noc", "aclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(10), 1, GFLAGS),
  
-+static struct rockchip_clk_branch rk3228_i2s0_fracmux __initdata =
-+	MUX(0, "i2s0_pre", mux_i2s0_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(9), 8, 2, MFLAGS);
-+
-+static struct rockchip_clk_branch rk3228_i2s1_fracmux __initdata =
-+	MUX(0, "i2s1_pre", mux_i2s1_pre_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(3), 8, 2, MFLAGS);
-+
-+static struct rockchip_clk_branch rk3228_i2s2_fracmux __initdata =
-+	MUX(0, "i2s2_pre", mux_i2s2_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(16), 8, 2, MFLAGS);
-+
-+static struct rockchip_clk_branch rk3228_spdif_fracmux __initdata =
-+	MUX(SCLK_SPDIF, "sclk_spdif", mux_sclk_spdif_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(6), 8, 2, MFLAGS);
-+
-+static struct rockchip_clk_branch rk3228_uart0_fracmux __initdata =
-+	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(13), 8, 2, MFLAGS);
-+
-+static struct rockchip_clk_branch rk3228_uart1_fracmux __initdata =
-+	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(14), 8, 2, MFLAGS);
-+
-+static struct rockchip_clk_branch rk3228_uart2_fracmux __initdata =
-+	MUX(SCLK_UART2, "sclk_uart2", mux_uart2_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(15), 8, 2, MFLAGS);
-+
- static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
- 	/*
- 	 * Clock-Architecture Diagram 1
-@@ -379,22 +407,21 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
- 	COMPOSITE(0, "i2s0_src", mux_pll_src_2plls_p, 0,
- 			RK2928_CLKSEL_CON(9), 15, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK2928_CLKGATE_CON(0), 3, GFLAGS),
--	COMPOSITE_FRAC(0, "i2s0_frac", "i2s0_src", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "i2s0_frac", "i2s0_src", CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(8), 0,
--			RK2928_CLKGATE_CON(0), 4, GFLAGS),
--	COMPOSITE_NODIV(SCLK_I2S0, "sclk_i2s0", mux_i2s0_p, 0,
--			RK2928_CLKSEL_CON(9), 8, 2, MFLAGS,
-+			RK2928_CLKGATE_CON(0), 4, GFLAGS,
-+			&rk3228_i2s0_fracmux),
-+	GATE(SCLK_I2S0, "sclk_i2s0", "i2s0_pre", CLK_SET_RATE_PARENT,
- 			RK2928_CLKGATE_CON(0), 5, GFLAGS),
+ 	GATE(0, "hclk_rom", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 3, GFLAGS),
+-	GATE(0, "hclk_i2s0_8ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 7, GFLAGS),
+-	GATE(0, "hclk_i2s1_8ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 8, GFLAGS),
+-	GATE(0, "hclk_i2s2_2ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 9, GFLAGS),
+-	GATE(0, "hclk_spdif_8ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 10, GFLAGS),
++	GATE(HCLK_I2S0_8CH, "hclk_i2s0_8ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 7, GFLAGS),
++	GATE(HCLK_I2S1_8CH, "hclk_i2s1_8ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 8, GFLAGS),
++	GATE(HCLK_I2S2_2CH, "hclk_i2s2_2ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 9, GFLAGS),
++	GATE(HCLK_SPDIF_8CH, "hclk_spdif_8ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 10, GFLAGS),
+ 	GATE(0, "hclk_tsp", "hclk_cpu", 0, RK2928_CLKGATE_CON(10), 11, GFLAGS),
+ 	GATE(0, "hclk_crypto_mst", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 11, GFLAGS),
+ 	GATE(0, "hclk_crypto_slv", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 12, GFLAGS),
+diff --git a/include/dt-bindings/clock/rk3228-cru.h b/include/dt-bindings/clock/rk3228-cru.h
+index 5d43ed9..c992f3e 100644
+--- a/include/dt-bindings/clock/rk3228-cru.h
++++ b/include/dt-bindings/clock/rk3228-cru.h
+@@ -84,6 +84,10 @@
+ #define PCLK_HDMI_PHY		365
  
- 	COMPOSITE(0, "i2s1_src", mux_pll_src_2plls_p, 0,
- 			RK2928_CLKSEL_CON(3), 15, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK2928_CLKGATE_CON(0), 10, GFLAGS),
--	COMPOSITE_FRAC(0, "i2s1_frac", "i2s1_src", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "i2s1_frac", "i2s1_src", CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(7), 0,
- 			RK2928_CLKGATE_CON(0), 11, GFLAGS,
--	MUX(0, "i2s1_pre", mux_i2s1_pre_p, 0,
--			RK2928_CLKSEL_CON(3), 8, 2, MFLAGS),
--	GATE(SCLK_I2S1, "sclk_i2s1", "i2s1_pre", 0,
-+			&rk3228_i2s1_fracmux),
-+	GATE(SCLK_I2S1, "sclk_i2s1", "i2s1_pre", CLK_SET_RATE_PARENT,
- 			RK2928_CLKGATE_CON(0), 14, GFLAGS),
- 	COMPOSITE_NODIV(SCLK_I2S_OUT, "i2s_out", mux_i2s_out_p, 0,
- 			RK2928_CLKSEL_CON(3), 12, 1, MFLAGS,
-@@ -403,21 +430,20 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
- 	COMPOSITE(0, "i2s2_src", mux_pll_src_2plls_p, 0,
- 			RK2928_CLKSEL_CON(16), 15, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK2928_CLKGATE_CON(0), 7, GFLAGS),
--	COMPOSITE_FRAC(0, "i2s2_frac", "i2s2_src", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "i2s2_frac", "i2s2_src", CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(30), 0,
--			RK2928_CLKGATE_CON(0), 8, GFLAGS),
--	COMPOSITE_NODIV(SCLK_I2S2, "sclk_i2s2", mux_i2s2_p, 0,
--			RK2928_CLKSEL_CON(16), 8, 2, MFLAGS,
-+			RK2928_CLKGATE_CON(0), 8, GFLAGS,
-+			&rk3228_i2s2_fracmux),
-+	GATE(SCLK_I2S2, "sclk_i2s2", "i2s2_pre", CLK_SET_RATE_PARENT,
- 			RK2928_CLKGATE_CON(0), 9, GFLAGS),
- 
- 	COMPOSITE(0, "sclk_spdif_src", mux_pll_src_2plls_p, 0,
- 			RK2928_CLKSEL_CON(6), 15, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK2928_CLKGATE_CON(2), 10, GFLAGS),
--	COMPOSITE_FRAC(0, "spdif_frac", "sclk_spdif_src", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "spdif_frac", "sclk_spdif_src", CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(20), 0,
--			RK2928_CLKGATE_CON(2), 12, GFLAGS),
--	MUX(SCLK_SPDIF, "sclk_spdif", mux_sclk_spdif_p, 0,
--			RK2928_CLKSEL_CON(6), 8, 2, MFLAGS),
-+			RK2928_CLKGATE_CON(2), 12, GFLAGS,
-+			&rk3228_spdif_fracmux),
- 
- 	GATE(0, "jtag", "ext_jtag", 0,
- 			RK2928_CLKGATE_CON(1), 3, GFLAGS),
-@@ -456,21 +482,18 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
- 	COMPOSITE(0, "uart2_src", mux_pll_src_cpll_gpll_usb480m_p,
- 			0, RK2928_CLKSEL_CON(15), 12, 2,
- 			MFLAGS, 0, 7, DFLAGS, RK2928_CLKGATE_CON(1), 12, GFLAGS),
--	COMPOSITE_FRAC(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(17), 0,
--			RK2928_CLKGATE_CON(1), 9, GFLAGS),
--	COMPOSITE_FRAC(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
-+			RK2928_CLKGATE_CON(1), 9, GFLAGS,
-+			&rk3228_uart0_fracmux),
-+	COMPOSITE_FRACMUX(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(18), 0,
--			RK2928_CLKGATE_CON(1), 11, GFLAGS),
--	COMPOSITE_FRAC(0, "uart2_frac", "uart2_src", CLK_SET_RATE_PARENT,
-+			RK2928_CLKGATE_CON(1), 11, GFLAGS,
-+			&rk3228_uart1_fracmux),
-+	COMPOSITE_FRACMUX(0, "uart2_frac", "uart2_src", CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(19), 0,
--			RK2928_CLKGATE_CON(1), 13, GFLAGS),
--	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
--			RK2928_CLKSEL_CON(13), 8, 2, MFLAGS),
--	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
--			RK2928_CLKSEL_CON(14), 8, 2, MFLAGS),
--	MUX(SCLK_UART2, "sclk_uart2", mux_uart2_p, CLK_SET_RATE_PARENT,
--			RK2928_CLKSEL_CON(15), 8, 2, MFLAGS),
-+			RK2928_CLKGATE_CON(1), 13, GFLAGS,
-+			&rk3228_uart2_fracmux),
- 
- 	COMPOSITE(SCLK_NANDC, "sclk_nandc", mux_pll_src_2plls_p, 0,
- 			RK2928_CLKSEL_CON(2), 14, 1, MFLAGS, 8, 5, DFLAGS,
+ /* hclk gates */
++#define HCLK_I2S0_8CH		442
++#define HCLK_I2S1_8CH		443
++#define HCLK_I2S2_2CH		444
++#define HCLK_SPDIF_8CH		445
+ #define HCLK_VOP		452
+ #define HCLK_NANDC		453
+ #define HCLK_SDMMC		456
 -- 
 1.7.9.5
