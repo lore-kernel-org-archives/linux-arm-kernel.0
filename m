@@ -1,45 +1,46 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue, 21 Jun 2016 10:08:30 +0200
-Subject: [PATCH v3 00/10] Chain crypto requests together at the DMA level
-Message-ID: <1466496520-28806-1-git-send-email-romain.perier@free-electrons.com>
+Date: Tue, 21 Jun 2016 10:08:33 +0200
+Subject: [PATCH v3 03/10] crypto: marvell: Fix wrong type check in dma
+ functions
+In-Reply-To: <1466496520-28806-1-git-send-email-romain.perier@free-electrons.com>
+References: <1466496520-28806-1-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <1466496520-28806-4-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cryptographic Engines and Security Accelerators (CESA) supports
-the TDMA chained mode support. When this mode is enabled and crypto
-requests are chained at the DMA level, multiple crypto requests can be
-handled by the hardware engine without requiring any software
-intervention. This approach limits the number of interrupts generated
-by the engines thus improving its throughput and making the whole system
-behave nicely under heavy crypto load.
+So far, the way that the type of a TDMA operation was checked was wrong.
+We have to use the type mask in order to get the right part of the flag
+containing the type of the operation.
 
-Benchmarking results with dmcrypt
-=================================
-		I/O read	I/O write
-Before		81.7 MB/s	31.7 MB/s
-After		129  MB/s	39.8 MB/s
+Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/crypto/marvell/tdma.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Improvement	+57.8 %		+25.5 %
-
-Romain Perier (10):
-  crypto: marvell: Add a macro constant for the size of the crypto queue
-  crypto: marvell: Check engine is not already running when enabling a
-    req
-  crypto: marvell: Fix wrong type check in dma functions
-  crypto: marvell: Copy IV vectors by DMA transfers for acipher requests
-  crypto: marvell: Move tdma chain out of mv_cesa_tdma_req and remove it
-  crypto: marvell: Add a complete operation for async requests
-  crypto: marvell: Move SRAM I/O operations to step functions
-  crypto: marvell: Add load balancing between engines
-  crypto: marvell: Add support for chaining crypto requests in TDMA mode
-  crypto: marvell: Increase the size of the crypto queue
-
- drivers/crypto/marvell/cesa.c   | 142 +++++++++++++++++++++++++++---------
- drivers/crypto/marvell/cesa.h   | 120 +++++++++++++++++++++---------
- drivers/crypto/marvell/cipher.c | 157 ++++++++++++++++++++++++----------------
- drivers/crypto/marvell/hash.c   | 150 ++++++++++++++++++--------------------
- drivers/crypto/marvell/tdma.c   | 132 +++++++++++++++++++++++++++++++--
- 5 files changed, 483 insertions(+), 218 deletions(-)
-
+diff --git a/drivers/crypto/marvell/tdma.c b/drivers/crypto/marvell/tdma.c
+index 8c86bb6..de8c253 100644
+--- a/drivers/crypto/marvell/tdma.c
++++ b/drivers/crypto/marvell/tdma.c
+@@ -64,8 +64,9 @@ void mv_cesa_dma_cleanup(struct mv_cesa_tdma_req *dreq)
+ 
+ 	for (tdma = dreq->chain.first; tdma;) {
+ 		struct mv_cesa_tdma_desc *old_tdma = tdma;
++		u32 type = tdma->flags & CESA_TDMA_TYPE_MSK;
+ 
+-		if (tdma->flags & CESA_TDMA_OP)
++		if (type == CESA_TDMA_OP)
+ 			dma_pool_free(cesa_dev->dma->op_pool, tdma->op,
+ 				      le32_to_cpu(tdma->src));
+ 
+@@ -90,7 +91,7 @@ void mv_cesa_dma_prepare(struct mv_cesa_tdma_req *dreq,
+ 		if (tdma->flags & CESA_TDMA_SRC_IN_SRAM)
+ 			tdma->src = cpu_to_le32(tdma->src + engine->sram_dma);
+ 
+-		if (tdma->flags & CESA_TDMA_OP)
++		if ((tdma->flags & CESA_TDMA_TYPE_MSK) == CESA_TDMA_OP)
+ 			mv_cesa_adjust_op(engine, tdma->op);
+ 	}
+ }
 -- 
 2.7.4
