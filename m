@@ -1,136 +1,158 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Tue, 21 Jun 2016 11:56:37 +0800
-Subject: [PATCH net-next 17/19] net: hns: fix sbm default parameters config
- error
+Date: Tue, 21 Jun 2016 11:56:31 +0800
+Subject: [PATCH net-next 11/19] net: hns: add spin lock for tcam table
+ operation
 In-Reply-To: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1466481399-70080-18-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1466481399-70080-12-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Daode Huang <huangdaode@hisilicon.com>
 
-The default sbm config parameter leaves little buffer when there is heavy
-traffic, which will cause packets drop. This patch changes them to make
-enough buffers for handling packets.
+This patch adds spin lock for tcam table operation,
+there maybe a race condition happens when more than
+one thread try to change the tcam talbe entries.
 
 Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
 Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 40 ++++++++++++++--------
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  | 16 +++++++--
- 2 files changed, 39 insertions(+), 17 deletions(-)
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 25 ++++++++++++++++++++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  2 ++
+ 2 files changed, 27 insertions(+)
 
 diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-index 7f5c248..67e8e13 100644
+index 0edea9c..0958ceb 100644
 --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
 +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-@@ -516,10 +516,10 @@ static void hns_dsafv2_sbm_bp_wl_cfg(struct dsaf_device *dsaf_dev)
- 		o_sbm_bp_cfg = dsaf_read_dev(dsaf_dev, reg);
- 		dsaf_set_field(o_sbm_bp_cfg,
- 			       DSAFV2_SBM_CFG3_SET_BUF_NUM_NO_PFC_M,
--			       DSAFV2_SBM_CFG3_SET_BUF_NUM_NO_PFC_S, 110);
-+			       DSAFV2_SBM_CFG3_SET_BUF_NUM_NO_PFC_S, 48);
- 		dsaf_set_field(o_sbm_bp_cfg,
- 			       DSAFV2_SBM_CFG3_RESET_BUF_NUM_NO_PFC_M,
--			       DSAFV2_SBM_CFG3_RESET_BUF_NUM_NO_PFC_S, 160);
-+			       DSAFV2_SBM_CFG3_RESET_BUF_NUM_NO_PFC_S, 80);
- 		dsaf_write_dev(dsaf_dev, reg, o_sbm_bp_cfg);
- 
- 		/* for no enable pfc mode */
-@@ -527,29 +527,39 @@ static void hns_dsafv2_sbm_bp_wl_cfg(struct dsaf_device *dsaf_dev)
- 		o_sbm_bp_cfg = dsaf_read_dev(dsaf_dev, reg);
- 		dsaf_set_field(o_sbm_bp_cfg,
- 			       DSAFV2_SBM_CFG4_SET_BUF_NUM_NO_PFC_M,
--			       DSAFV2_SBM_CFG4_SET_BUF_NUM_NO_PFC_S, 128);
-+			       DSAFV2_SBM_CFG4_SET_BUF_NUM_NO_PFC_S, 192);
- 		dsaf_set_field(o_sbm_bp_cfg,
- 			       DSAFV2_SBM_CFG4_RESET_BUF_NUM_NO_PFC_M,
--			       DSAFV2_SBM_CFG4_RESET_BUF_NUM_NO_PFC_S, 192);
-+			       DSAFV2_SBM_CFG4_RESET_BUF_NUM_NO_PFC_S, 240);
- 		dsaf_write_dev(dsaf_dev, reg, o_sbm_bp_cfg);
- 	}
- 
- 	/* PPE */
--	reg = DSAF_SBM_BP_CFG_2_PPE_REG_0_REG + 0x80 * i;
--	o_sbm_bp_cfg = dsaf_read_dev(dsaf_dev, reg);
--	dsaf_set_field(o_sbm_bp_cfg, DSAFV2_SBM_CFG2_SET_BUF_NUM_M,
--		       DSAFV2_SBM_CFG2_SET_BUF_NUM_S, 10);
--	dsaf_set_field(o_sbm_bp_cfg, DSAFV2_SBM_CFG2_RESET_BUF_NUM_M,
--		       DSAFV2_SBM_CFG2_RESET_BUF_NUM_S, 12);
--	dsaf_write_dev(dsaf_dev, reg, o_sbm_bp_cfg);
-+	for (i = 0; i < DSAFV2_SBM_PPE_CHN; i++) {
-+		reg = DSAF_SBM_BP_CFG_2_PPE_REG_0_REG + 0x80 * i;
-+		o_sbm_bp_cfg = dsaf_read_dev(dsaf_dev, reg);
-+		dsaf_set_field(o_sbm_bp_cfg,
-+			       DSAFV2_SBM_CFG2_PPE_SET_BUF_NUM_M,
-+			       DSAFV2_SBM_CFG2_PPE_SET_BUF_NUM_S, 2);
-+		dsaf_set_field(o_sbm_bp_cfg,
-+			       DSAFV2_SBM_CFG2_PPE_RESET_BUF_NUM_M,
-+			       DSAFV2_SBM_CFG2_PPE_RESET_BUF_NUM_S, 3);
-+		dsaf_set_field(o_sbm_bp_cfg,
-+			       DSAFV2_SBM_CFG2_PPE_CFG_USEFUL_NUM_M,
-+			       DSAFV2_SBM_CFG2_PPE_CFG_USEFUL_NUM_S, 52);
-+		dsaf_write_dev(dsaf_dev, reg, o_sbm_bp_cfg);
-+	}
+@@ -860,6 +860,8 @@ static void hns_dsaf_single_line_tbl_cfg(
+ 	struct dsaf_device *dsaf_dev,
+ 	u32 address, struct dsaf_tbl_line_cfg *ptbl_line)
+ {
++	spin_lock_bh(&dsaf_dev->tcam_lock);
 +
- 	/* RoCEE */
- 	for (i = 0; i < DASFV2_ROCEE_CRD_NUM; i++) {
- 		reg = DSAFV2_SBM_BP_CFG_2_ROCEE_REG_0_REG + 0x80 * i;
- 		o_sbm_bp_cfg = dsaf_read_dev(dsaf_dev, reg);
--		dsaf_set_field(o_sbm_bp_cfg, DSAFV2_SBM_CFG2_SET_BUF_NUM_M,
--			       DSAFV2_SBM_CFG2_SET_BUF_NUM_S, 2);
--		dsaf_set_field(o_sbm_bp_cfg, DSAFV2_SBM_CFG2_RESET_BUF_NUM_M,
--			       DSAFV2_SBM_CFG2_RESET_BUF_NUM_S, 4);
-+		dsaf_set_field(o_sbm_bp_cfg,
-+			       DSAFV2_SBM_CFG2_ROCEE_SET_BUF_NUM_M,
-+			       DSAFV2_SBM_CFG2_ROCEE_SET_BUF_NUM_S, 2);
-+		dsaf_set_field(o_sbm_bp_cfg,
-+			       DSAFV2_SBM_CFG2_ROCEE_RESET_BUF_NUM_M,
-+			       DSAFV2_SBM_CFG2_ROCEE_RESET_BUF_NUM_S, 4);
- 		dsaf_write_dev(dsaf_dev, reg, o_sbm_bp_cfg);
- 	}
+ 	/*Write Addr*/
+ 	hns_dsaf_tbl_line_addr_cfg(dsaf_dev, address);
+ 
+@@ -868,6 +870,8 @@ static void hns_dsaf_single_line_tbl_cfg(
+ 
+ 	/*Write Plus*/
+ 	hns_dsaf_tbl_line_pul(dsaf_dev);
++
++	spin_unlock_bh(&dsaf_dev->tcam_lock);
  }
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-index e35d0cb..235f744 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-@@ -32,7 +32,7 @@
- #define DSAFV2_SBM_NUM		8
- #define DSAFV2_SBM_XGE_CHN    6
- #define DSAFV2_SBM_PPE_CHN    1
--#define DASFV2_ROCEE_CRD_NUM  8
-+#define DASFV2_ROCEE_CRD_NUM  1
  
- #define DSAF_VOQ_NUM		DSAF_NODE_NUM
- #define DSAF_INODE_NUM		DSAF_NODE_NUM
-@@ -178,7 +178,7 @@
- #define DSAF_SBM_BP_CFG_2_XGE_REG_0_REG		0x200C
- #define DSAF_SBM_BP_CFG_2_PPE_REG_0_REG		0x230C
- #define DSAF_SBM_BP_CFG_2_ROCEE_REG_0_REG	0x260C
--#define DSAFV2_SBM_BP_CFG_2_ROCEE_REG_0_REG		 0x238C
-+#define DSAFV2_SBM_BP_CFG_2_ROCEE_REG_0_REG	0x238C
- #define DSAF_SBM_FREE_CNT_0_0_REG		0x2010
- #define DSAF_SBM_FREE_CNT_1_0_REG		0x2014
- #define DSAF_SBM_BP_CNT_0_0_REG			0x2018
-@@ -796,6 +796,18 @@
- #define DSAFV2_SBM_CFG4_RESET_BUF_NUM_NO_PFC_S 9
- #define DSAFV2_SBM_CFG4_RESET_BUF_NUM_NO_PFC_M (((1ULL << 9) - 1) << 9)
- 
-+#define DSAFV2_SBM_CFG2_ROCEE_SET_BUF_NUM_S 0
-+#define DSAFV2_SBM_CFG2_ROCEE_SET_BUF_NUM_M (((1ULL << 8) - 1) << 0)
-+#define DSAFV2_SBM_CFG2_ROCEE_RESET_BUF_NUM_S 8
-+#define DSAFV2_SBM_CFG2_ROCEE_RESET_BUF_NUM_M (((1ULL << 8) - 1) << 8)
+ /**
+@@ -881,6 +885,8 @@ static void hns_dsaf_tcam_uc_cfg(
+ 	struct dsaf_tbl_tcam_data *ptbl_tcam_data,
+ 	struct dsaf_tbl_tcam_ucast_cfg *ptbl_tcam_ucast)
+ {
++	spin_lock_bh(&dsaf_dev->tcam_lock);
 +
-+#define DSAFV2_SBM_CFG2_PPE_SET_BUF_NUM_S (0)
-+#define DSAFV2_SBM_CFG2_PPE_SET_BUF_NUM_M (((1ULL << 6) - 1) << 0)
-+#define DSAFV2_SBM_CFG2_PPE_RESET_BUF_NUM_S (6)
-+#define DSAFV2_SBM_CFG2_PPE_RESET_BUF_NUM_M (((1ULL << 6) - 1) << 6)
-+#define DSAFV2_SBM_CFG2_PPE_CFG_USEFUL_NUM_S (12)
-+#define DSAFV2_SBM_CFG2_PPE_CFG_USEFUL_NUM_M (((1ULL << 6) - 1) << 12)
+ 	/*Write Addr*/
+ 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
+ 	/*Write Tcam Data*/
+@@ -889,6 +895,8 @@ static void hns_dsaf_tcam_uc_cfg(
+ 	hns_dsaf_tbl_tcam_ucast_cfg(dsaf_dev, ptbl_tcam_ucast);
+ 	/*Write Plus*/
+ 	hns_dsaf_tbl_tcam_data_ucast_pul(dsaf_dev);
 +
- #define DSAF_TBL_TCAM_ADDR_S 0
- #define DSAF_TBL_TCAM_ADDR_M ((1ULL << 9) - 1)
++	spin_unlock_bh(&dsaf_dev->tcam_lock);
+ }
  
+ /**
+@@ -903,6 +911,8 @@ static void hns_dsaf_tcam_mc_cfg(
+ 	struct dsaf_tbl_tcam_data *ptbl_tcam_data,
+ 	struct dsaf_tbl_tcam_mcast_cfg *ptbl_tcam_mcast)
+ {
++	spin_lock_bh(&dsaf_dev->tcam_lock);
++
+ 	/*Write Addr*/
+ 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
+ 	/*Write Tcam Data*/
+@@ -911,6 +921,8 @@ static void hns_dsaf_tcam_mc_cfg(
+ 	hns_dsaf_tbl_tcam_mcast_cfg(dsaf_dev, ptbl_tcam_mcast);
+ 	/*Write Plus*/
+ 	hns_dsaf_tbl_tcam_data_mcast_pul(dsaf_dev);
++
++	spin_unlock_bh(&dsaf_dev->tcam_lock);
+ }
+ 
+ /**
+@@ -920,6 +932,8 @@ static void hns_dsaf_tcam_mc_cfg(
+  */
+ static void hns_dsaf_tcam_mc_invld(struct dsaf_device *dsaf_dev, u32 address)
+ {
++	spin_lock_bh(&dsaf_dev->tcam_lock);
++
+ 	/*Write Addr*/
+ 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
+ 
+@@ -932,6 +946,8 @@ static void hns_dsaf_tcam_mc_invld(struct dsaf_device *dsaf_dev, u32 address)
+ 
+ 	/*Write Plus*/
+ 	hns_dsaf_tbl_tcam_mcast_pul(dsaf_dev);
++
++	spin_unlock_bh(&dsaf_dev->tcam_lock);
+ }
+ 
+ /**
+@@ -949,6 +965,8 @@ static void hns_dsaf_tcam_uc_get(
+ 	u32 tcam_read_data0;
+ 	u32 tcam_read_data4;
+ 
++	spin_lock_bh(&dsaf_dev->tcam_lock);
++
+ 	/*Write Addr*/
+ 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
+ 
+@@ -981,6 +999,8 @@ static void hns_dsaf_tcam_uc_get(
+ 				 DSAF_TBL_UCAST_CFG1_OUT_PORT_S);
+ 	ptbl_tcam_ucast->tbl_ucast_dvc
+ 		= dsaf_get_bit(tcam_read_data0, DSAF_TBL_UCAST_CFG1_DVC_S);
++
++	spin_unlock_bh(&dsaf_dev->tcam_lock);
+ }
+ 
+ /**
+@@ -997,6 +1017,8 @@ static void hns_dsaf_tcam_mc_get(
+ {
+ 	u32 data_tmp;
+ 
++	spin_lock_bh(&dsaf_dev->tcam_lock);
++
+ 	/*Write Addr*/
+ 	hns_dsaf_tbl_tcam_addr_cfg(dsaf_dev, address);
+ 
+@@ -1027,6 +1049,8 @@ static void hns_dsaf_tcam_mc_get(
+ 	ptbl_tcam_mcast->tbl_mcast_port_msk[4] =
+ 		dsaf_get_field(data_tmp, DSAF_TBL_MCAST_CFG4_VM128_112_M,
+ 			       DSAF_TBL_MCAST_CFG4_VM128_112_S);
++
++	spin_unlock_bh(&dsaf_dev->tcam_lock);
+ }
+ 
+ /**
+@@ -1351,6 +1375,7 @@ static int hns_dsaf_init(struct dsaf_device *dsaf_dev)
+ 	if (HNS_DSAF_IS_DEBUG(dsaf_dev))
+ 		return 0;
+ 
++	spin_lock_init(&dsaf_dev->tcam_lock);
+ 	ret = hns_dsaf_init_hw(dsaf_dev);
+ 	if (ret)
+ 		return ret;
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
+index 00a13de..1daf018 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
+@@ -322,6 +322,8 @@ struct dsaf_device {
+ 
+ 	struct dsaf_hw_stats hw_stats[DSAF_NODE_NUM];
+ 	struct dsaf_int_stat int_stat;
++	/* make sure tcam table config spinlock */
++	spinlock_t tcam_lock;
+ };
+ 
+ static inline void *hns_dsaf_dev_priv(const struct dsaf_device *dsaf_dev)
 -- 
 1.9.1
