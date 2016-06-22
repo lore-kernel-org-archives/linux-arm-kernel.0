@@ -1,60 +1,336 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Wed, 22 Jun 2016 15:45:47 +0800
-Subject: [PATCH v4 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for
- mt2701
-In-Reply-To: <1466574342.27791.8.camel@mtksdaap41>
-References: <1465379461-14757-1-git-send-email-honghui.zhang@mediatek.com>
- <1465379461-14757-6-git-send-email-honghui.zhang@mediatek.com>
- <20160621095748.GE28248@8bytes.org> <1466574342.27791.8.camel@mtksdaap41>
-Message-ID: <1466581547.8787.18.camel@mtksdaap41>
+From: amit.pundir@linaro.org (Amit Pundir)
+Date: Wed, 22 Jun 2016 13:23:39 +0530
+Subject: [PATCH] config: Add android config fragments
+In-Reply-To: <1465403951-32454-1-git-send-email-robh@kernel.org>
+References: <1465403951-32454-1-git-send-email-robh@kernel.org>
+Message-ID: <CAMi1Hd3VDnK+yA6tXLFELCqnnrsPtPHnmov9O9MpJuBpfkcC=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-06-22 at 13:45 +0800, Eddie Huang wrote:
-> On Tue, 2016-06-21 at 17:57 +0800, Joerg Roedel wrote:
-> > On Wed, Jun 08, 2016 at 05:51:01PM +0800, honghui.zhang at mediatek.com wrote:
-> > > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > > 
-> > > Add the dtsi node of iommu and smi for mt2701.
-> > > 
-> > > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > > ---
-> > >  arch/arm/boot/dts/mt2701.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++++
-> > >  1 file changed, 51 insertions(+)
-> > 
-> > Okay, I pushed my arm/mediatek branch to my tree at
-> > 
-> > 	git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git
-> > 
-> > Please base the patch on that branch and re-send.
-> > 
-> 
-> I think it is better let Mediatek SoC maintainer Matthias to accept dtsi
-> patch like other drivers. This can avoid dtsi conflict. As I
-> remember,last time MT8173 IOMMU dtsi patch accepted in iommu tree and
-> mt8173.dtsi had conflict with arm soc tree at the merge window. Honghui
-> should resend this patch to Matthias, and elaborate your dependency with
-> clock and power domain dtsi, then Matthias know the merge sequence. 
-> 
+On 8 June 2016 at 22:09, Rob Herring <robh@kernel.org> wrote:
+> Copy the config fragments from the AOSP common kernel tree. It is
+> becoming possible to run mainline kernels with Android, but the kernel
+> defconfigs don't work as-is and debugging missing config options is a
+> pain. Adding the config fragments into the kernel tree, makes
+> configuring a mainline kernel as simple as:
+>
+> make ARCH=arm multi_v7_defconfig android-base.config android-recommended.config
+>
+> Cc: Amit Pundir <amit.pundir@linaro.org>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Rom Lemarchand <romlem@android.com>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  kernel/configs/android-base.config        | 161 ++++++++++++++++++++++++++++++
+>  kernel/configs/android-recommended.config | 121 ++++++++++++++++++++++
+>  2 files changed, 282 insertions(+)
+>  create mode 100644 kernel/configs/android-base.config
+>  create mode 100644 kernel/configs/android-recommended.config
+>
+> diff --git a/kernel/configs/android-base.config b/kernel/configs/android-base.config
+> new file mode 100644
+> index 0000000..44fa01d
+> --- /dev/null
+> +++ b/kernel/configs/android-base.config
+> @@ -0,0 +1,161 @@
+> +#  KEEP ALPHABETICALLY SORTED
+> +# CONFIG_DEVKMEM is not set
+> +# CONFIG_DEVMEM is not set
+> +# CONFIG_INET_LRO is not set
+> +# CONFIG_MODULES is not set
+> +# CONFIG_OABI_COMPAT is not set
+> +# CONFIG_SYSVIPC is not set
+> +CONFIG_ANDROID=y
+> +CONFIG_ANDROID_BINDER_IPC=y
+> +CONFIG_ANDROID_LOW_MEMORY_KILLER=y
+> +CONFIG_ARMV8_DEPRECATED=y
+> +CONFIG_ASHMEM=y
+> +CONFIG_AUDIT=y
+> +CONFIG_BLK_DEV_DM=y
+> +CONFIG_BLK_DEV_INITRD=y
+> +CONFIG_CGROUPS=y
+> +CONFIG_CGROUP_CPUACCT=y
+> +CONFIG_CGROUP_DEBUG=y
+> +CONFIG_CGROUP_FREEZER=y
+> +CONFIG_CGROUP_SCHED=y
+> +CONFIG_CP15_BARRIER_EMULATION=y
+> +CONFIG_DM_CRYPT=y
+> +CONFIG_DM_VERITY=y
+> +CONFIG_EMBEDDED=y
+> +CONFIG_FB=y
+> +CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_INET6_AH=y
+> +CONFIG_INET6_ESP=y
+> +CONFIG_INET6_IPCOMP=y
+> +CONFIG_INET=y
+> +CONFIG_INET_ESP=y
+> +CONFIG_INET_XFRM_MODE_TUNNEL=y
+> +CONFIG_IP6_NF_FILTER=y
+> +CONFIG_IP6_NF_IPTABLES=y
+> +CONFIG_IP6_NF_MANGLE=y
+> +CONFIG_IP6_NF_RAW=y
+> +CONFIG_IP6_NF_TARGET_REJECT=y
+> +CONFIG_IP6_NF_TARGET_REJECT_SKERR=y
+> +CONFIG_IPV6=y
+> +CONFIG_IPV6_MIP6=y
+> +CONFIG_IPV6_MULTIPLE_TABLES=y
+> +CONFIG_IPV6_OPTIMISTIC_DAD=y
+> +CONFIG_IPV6_PRIVACY=y
+> +CONFIG_IPV6_ROUTER_PREF=y
+> +CONFIG_IPV6_ROUTE_INFO=y
+> +CONFIG_IP_ADVANCED_ROUTER=y
+> +CONFIG_IP_MULTIPLE_TABLES=y
+> +CONFIG_IP_NF_ARPFILTER=y
+> +CONFIG_IP_NF_ARPTABLES=y
+> +CONFIG_IP_NF_ARP_MANGLE=y
+> +CONFIG_IP_NF_FILTER=y
+> +CONFIG_IP_NF_IPTABLES=y
+> +CONFIG_IP_NF_MANGLE=y
+> +CONFIG_IP_NF_MATCH_AH=y
+> +CONFIG_IP_NF_MATCH_ECN=y
+> +CONFIG_IP_NF_MATCH_TTL=y
+> +CONFIG_IP_NF_RAW=y
+> +CONFIG_IP_NF_SECURITY=y
+> +CONFIG_IP_NF_TARGET_MASQUERADE=y
+> +CONFIG_IP_NF_TARGET_NETMAP=y
+> +CONFIG_IP_NF_TARGET_REDIRECT=y
+> +CONFIG_IP_NF_TARGET_REJECT=y
+> +CONFIG_IP_NF_TARGET_REJECT_SKERR=y
+> +CONFIG_NET=y
+> +CONFIG_NETDEVICES=y
+> +CONFIG_NETFILTER=y
+> +CONFIG_NETFILTER_TPROXY=y
+> +CONFIG_NETFILTER_XT_MATCH_COMMENT=y
+> +CONFIG_NETFILTER_XT_MATCH_CONNLIMIT=y
+> +CONFIG_NETFILTER_XT_MATCH_CONNMARK=y
+> +CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
+> +CONFIG_NETFILTER_XT_MATCH_HASHLIMIT=y
+> +CONFIG_NETFILTER_XT_MATCH_HELPER=y
+> +CONFIG_NETFILTER_XT_MATCH_IPRANGE=y
+> +CONFIG_NETFILTER_XT_MATCH_LENGTH=y
+> +CONFIG_NETFILTER_XT_MATCH_LIMIT=y
+> +CONFIG_NETFILTER_XT_MATCH_MAC=y
+> +CONFIG_NETFILTER_XT_MATCH_MARK=y
+> +CONFIG_NETFILTER_XT_MATCH_PKTTYPE=y
+> +CONFIG_NETFILTER_XT_MATCH_POLICY=y
+> +CONFIG_NETFILTER_XT_MATCH_QTAGUID=y
+> +CONFIG_NETFILTER_XT_MATCH_QUOTA2=y
+> +CONFIG_NETFILTER_XT_MATCH_QUOTA2_LOG=y
+> +CONFIG_NETFILTER_XT_MATCH_QUOTA=y
+> +CONFIG_NETFILTER_XT_MATCH_SOCKET=y
+> +CONFIG_NETFILTER_XT_MATCH_STATE=y
+> +CONFIG_NETFILTER_XT_MATCH_STATISTIC=y
+> +CONFIG_NETFILTER_XT_MATCH_STRING=y
+> +CONFIG_NETFILTER_XT_MATCH_TIME=y
+> +CONFIG_NETFILTER_XT_MATCH_U32=y
+> +CONFIG_NETFILTER_XT_TARGET_CLASSIFY=y
+> +CONFIG_NETFILTER_XT_TARGET_CONNMARK=y
+> +CONFIG_NETFILTER_XT_TARGET_CONNSECMARK=y
+> +CONFIG_NETFILTER_XT_TARGET_IDLETIMER=y
+> +CONFIG_NETFILTER_XT_TARGET_MARK=y
+> +CONFIG_NETFILTER_XT_TARGET_NFLOG=y
+> +CONFIG_NETFILTER_XT_TARGET_NFQUEUE=y
+> +CONFIG_NETFILTER_XT_TARGET_SECMARK=y
+> +CONFIG_NETFILTER_XT_TARGET_TCPMSS=y
+> +CONFIG_NETFILTER_XT_TARGET_TPROXY=y
+> +CONFIG_NETFILTER_XT_TARGET_TRACE=y
+> +CONFIG_NET_CLS_ACT=y
+> +CONFIG_NET_CLS_U32=y
+> +CONFIG_NET_EMATCH=y
+> +CONFIG_NET_EMATCH_U32=y
+> +CONFIG_NET_KEY=y
+> +CONFIG_NET_SCHED=y
+> +CONFIG_NET_SCH_HTB=y
+> +CONFIG_NF_CONNTRACK=y
+> +CONFIG_NF_CONNTRACK_AMANDA=y
+> +CONFIG_NF_CONNTRACK_EVENTS=y
+> +CONFIG_NF_CONNTRACK_FTP=y
+> +CONFIG_NF_CONNTRACK_H323=y
+> +CONFIG_NF_CONNTRACK_IPV4=y
+> +CONFIG_NF_CONNTRACK_IPV6=y
+> +CONFIG_NF_CONNTRACK_IRC=y
+> +CONFIG_NF_CONNTRACK_NETBIOS_NS=y
+> +CONFIG_NF_CONNTRACK_PPTP=y
+> +CONFIG_NF_CONNTRACK_SANE=y
+> +CONFIG_NF_CONNTRACK_SECMARK=y
+> +CONFIG_NF_CONNTRACK_TFTP=y
+> +CONFIG_NF_CT_NETLINK=y
+> +CONFIG_NF_CT_PROTO_DCCP=y
+> +CONFIG_NF_CT_PROTO_SCTP=y
+> +CONFIG_NF_CT_PROTO_UDPLITE=y
+> +CONFIG_NF_NAT=y
+> +CONFIG_NO_HZ=y
+> +CONFIG_PACKET=y
+> +CONFIG_PM_AUTOSLEEP=y
+> +CONFIG_PM_WAKELOCKS=y
+> +CONFIG_PPP=y
+> +CONFIG_PPPOLAC=y
+> +CONFIG_PPPOPNS=y
+> +CONFIG_PPP_BSDCOMP=y
+> +CONFIG_PPP_DEFLATE=y
+> +CONFIG_PPP_MPPE=y
+> +CONFIG_PREEMPT=y
+> +CONFIG_RESOURCE_COUNTERS=y
+> +CONFIG_RTC_CLASS=y
+> +CONFIG_RT_GROUP_SCHED=y
+> +CONFIG_SECURITY=y
+> +CONFIG_SECURITY_NETWORK=y
+> +CONFIG_SECURITY_SELINUX=y
+> +CONFIG_SETEND_EMULATION=y
+> +CONFIG_STAGING=y
+> +CONFIG_SWITCH=y
 
-Thanks, Eddie.
+Switch Class support is dropped from kernel/common/android-4.4 sometime back.
 
-Hi, Joerg, 
-This one is based on CCF "arm: dts: mt2701: Add clock controller device
-nodes"[1] and power domain patch "Mediatek MT2701 SCPSYS power domain
-support v7"[2],
-But these two patchset are still being review now.
+> +CONFIG_SWP_EMULATION=y
+> +CONFIG_SYNC=y
+> +CONFIG_TUN=y
+> +CONFIG_UNIX=y
+> +CONFIG_USB_GADGET=y
+> +CONFIG_USB_CONFIGFS=y
+> +CONFIG_USB_CONFIGFS_F_FS=y
+> +CONFIG_USB_CONFIGFS_F_MTP=y
+> +CONFIG_USB_CONFIGFS_F_PTP=y
+> +CONFIG_USB_CONFIGFS_F_ACC=y
+> +CONFIG_USB_CONFIGFS_F_AUDIO_SRC=y
+> +CONFIG_USB_CONFIGFS_UEVENT=y
+> +CONFIG_USB_CONFIGFS_F_MIDI=y
+> +CONFIG_USB_OTG_WAKELOCK=y
+> +CONFIG_XFRM_USER=y
+> diff --git a/kernel/configs/android-recommended.config b/kernel/configs/android-recommended.config
+> new file mode 100644
+> index 0000000..76527a5
+> --- /dev/null
+> +++ b/kernel/configs/android-recommended.config
+> @@ -0,0 +1,121 @@
+> +#  KEEP ALPHABETICALLY SORTED
+> +# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> +# CONFIG_INPUT_MOUSE is not set
+> +# CONFIG_LEGACY_PTYS is not set
+> +# CONFIG_NF_CONNTRACK_SIP is not set
+> +# CONFIG_PM_WAKELOCKS_GC is not set
+> +# CONFIG_VT is not set
+> +CONFIG_ARM_KERNMEM_PERMS=y
+> +CONFIG_BACKLIGHT_LCD_SUPPORT=y
+> +CONFIG_BLK_DEV_LOOP=y
+> +CONFIG_BLK_DEV_RAM=y
+> +CONFIG_BLK_DEV_RAM_SIZE=8192
+> +CONFIG_COMPACTION=y
+> +CONFIG_DEBUG_RODATA=y
+> +CONFIG_DM_UEVENT=y
+> +CONFIG_ENABLE_DEFAULT_TRACERS=y
+> +CONFIG_EXT4_FS=y
+> +CONFIG_EXT4_FS_SECURITY=y
+> +CONFIG_FUSE_FS=y
+> +CONFIG_GREENASIA_FF=y
+> +CONFIG_HIDRAW=y
+> +CONFIG_HID_A4TECH=y
+> +CONFIG_HID_ACRUX=y
+> +CONFIG_HID_ACRUX_FF=y
+> +CONFIG_HID_APPLE=y
+> +CONFIG_HID_BELKIN=y
+> +CONFIG_HID_CHERRY=y
+> +CONFIG_HID_CHICONY=y
+> +CONFIG_HID_CYPRESS=y
+> +CONFIG_HID_DRAGONRISE=y
+> +CONFIG_HID_ELECOM=y
+> +CONFIG_HID_EMS_FF=y
+> +CONFIG_HID_EZKEY=y
+> +CONFIG_HID_GREENASIA=y
+> +CONFIG_HID_GYRATION=y
+> +CONFIG_HID_HOLTEK=y
+> +CONFIG_HID_KENSINGTON=y
+> +CONFIG_HID_KEYTOUCH=y
+> +CONFIG_HID_KYE=y
+> +CONFIG_HID_LCPOWER=y
+> +CONFIG_HID_LOGITECH=y
+> +CONFIG_HID_LOGITECH_DJ=y
+> +CONFIG_HID_MAGICMOUSE=y
+> +CONFIG_HID_MICROSOFT=y
+> +CONFIG_HID_MONTEREY=y
+> +CONFIG_HID_MULTITOUCH=y
+> +CONFIG_HID_NTRIG=y
+> +CONFIG_HID_ORTEK=y
+> +CONFIG_HID_PANTHERLORD=y
+> +CONFIG_HID_PETALYNX=y
+> +CONFIG_HID_PICOLCD=y
+> +CONFIG_HID_PRIMAX=y
+> +CONFIG_HID_PRODIKEYS=y
+> +CONFIG_HID_ROCCAT=y
+> +CONFIG_HID_SAITEK=y
+> +CONFIG_HID_SAMSUNG=y
+> +CONFIG_HID_SMARTJOYPLUS=y
+> +CONFIG_HID_SONY=y
+> +CONFIG_HID_SPEEDLINK=y
+> +CONFIG_HID_SUNPLUS=y
+> +CONFIG_HID_THRUSTMASTER=y
+> +CONFIG_HID_TIVO=y
+> +CONFIG_HID_TOPSEED=y
+> +CONFIG_HID_TWINHAN=y
+> +CONFIG_HID_UCLOGIC=y
+> +CONFIG_HID_WACOM=y
+> +CONFIG_HID_WALTOP=y
+> +CONFIG_HID_WIIMOTE=y
+> +CONFIG_HID_ZEROPLUS=y
+> +CONFIG_HID_ZYDACRON=y
+> +CONFIG_INPUT_EVDEV=y
+> +CONFIG_INPUT_GPIO=y
+> +CONFIG_INPUT_JOYSTICK=y
+> +CONFIG_INPUT_KEYCHORD=y
+> +CONFIG_INPUT_KEYRESET=y
+> +CONFIG_INPUT_MISC=y
+> +CONFIG_INPUT_TABLET=y
+> +CONFIG_INPUT_UINPUT=y
+> +CONFIG_ION=y
+> +CONFIG_JOYSTICK_XPAD=y
+> +CONFIG_JOYSTICK_XPAD_FF=y
+> +CONFIG_JOYSTICK_XPAD_LEDS=y
+> +CONFIG_KALLSYMS_ALL=y
+> +CONFIG_KSM=y
+> +CONFIG_LOGIG940_FF=y
+> +CONFIG_LOGIRUMBLEPAD2_FF=y
+> +CONFIG_LOGITECH_FF=y
+> +CONFIG_MD=y
+> +CONFIG_MEDIA_SUPPORT=y
+> +CONFIG_MSDOS_FS=y
+> +CONFIG_PANIC_TIMEOUT=5
+> +CONFIG_PANTHERLORD_FF=y
+> +CONFIG_PERF_EVENTS=y
+> +CONFIG_PM_DEBUG=y
+> +CONFIG_PM_RUNTIME=y
+> +CONFIG_PM_WAKELOCKS_LIMIT=0
+> +CONFIG_POWER_SUPPLY=y
+> +CONFIG_PSTORE=y
+> +CONFIG_PSTORE_CONSOLE=y
+> +CONFIG_PSTORE_RAM=y
+> +CONFIG_SCHEDSTATS=y
+> +CONFIG_SMARTJOYPLUS_FF=y
+> +CONFIG_SND=y
+> +CONFIG_SOUND=y
+> +CONFIG_SUSPEND_TIME=y
+> +CONFIG_TABLET_USB_ACECAD=y
+> +CONFIG_TABLET_USB_AIPTEK=y
+> +CONFIG_TABLET_USB_GTCO=y
+> +CONFIG_TABLET_USB_HANWANG=y
+> +CONFIG_TABLET_USB_KBTAB=y
+> +CONFIG_TABLET_USB_WACOM=y
+> +CONFIG_TIMER_STATS=y
+> +CONFIG_TMPFS=y
+> +CONFIG_TMPFS_POSIX_ACL=y
+> +CONFIG_UHID=y
+> +CONFIG_UID_STAT=y
 
-Do you think it's better that I send this one later after ccf and power
-domain patch got merged, and let Matthias take it?
+UID based network stats reporting is gone too.
 
+Regards,
+Amit Pundir
 
-Thanks.
-[1] https://patchwork.kernel.org/patch/9109081
-[2]
-http://lists.infradead.org/pipermail/linux-mediatek/2016-May/005429.html
-
-> Eddie
-> Thanks 
-> 
-> 
+> +CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+> +CONFIG_USB_EHCI_HCD=y
+> +CONFIG_USB_HIDDEV=y
+> +CONFIG_USB_USBNET=y
+> +CONFIG_VFAT_FS=y
+> --
+> 2.7.4
+>
