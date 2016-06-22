@@ -1,114 +1,102 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 22 Jun 2016 12:00:22 +0100
-Subject: [RFC PATCH 1/8] PM / Domains: Add new helper functions for
- device-tree
-In-Reply-To: <1457090634-14785-2-git-send-email-jonathanh@nvidia.com>
-References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
- <1457090634-14785-2-git-send-email-jonathanh@nvidia.com>
-Message-ID: <576A6FC6.4000307@nvidia.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 22 Jun 2016 13:04:14 +0200
+Subject: [PATCH 09/12] mmc: sdhci-xenon: add initial Xenon eMMC driver
+In-Reply-To: <575FC206.4030903@intel.com>
+References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+ <1465456218-28354-10-git-send-email-gregory.clement@free-electrons.com>
+ <575FA9BF.6070703@intel.com> <878ty8chdr.fsf@free-electrons.com>
+ <575FC206.4030903@intel.com>
+Message-ID: <CAPDyKFotN0LhR=Vm03HYDCzsRi0Bj_eXrT-JA=zOra4+TTEzPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 14 June 2016 at 10:36, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> On 14/06/16 11:19, Gregory CLEMENT wrote:
+>> Hi Adrian,
+>>
+>>  On mar., juin 14 2016, Adrian Hunter <adrian.hunter@intel.com> wrote:
+>>
+>>> On 09/06/16 10:10, Gregory CLEMENT wrote:
+>>>> From: Victor Gu <xigu@marvell.com>
+>>>>
+>>>> This path adds the driver for the Marvell Xenon eMMC host controller
+>>>> which supports eMMC 5.1, SD 3.0.
+>>>>
+>>>> However this driver supports only up to eMMC 5.0 since the command queue
+>>>> feature is not included (yet) in the driver.
+>>>>
+>>>> [gregory.clement at free-electrons.com:
+>>>>  - reformulate commit log
+>>>>  - overload the sdhci_set_uhs_signaling function instead of using a quirk
+>>>>  - fix a kconfig dependency
+>>>>  - remove dead code]
+>>>>
+>>>> Signed-off-by: Victor Gu <xigu@marvell.com>
+>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>> ---
+>>>>  drivers/mmc/host/Kconfig       |   10 +
+>>>>  drivers/mmc/host/Makefile      |    1 +
+>>>>  drivers/mmc/host/sdhci-xenon.c | 1164 ++++++++++++++++++++++++++++++++++++++++
+>>>>  3 files changed, 1175 insertions(+)
+>>>>  create mode 100644 drivers/mmc/host/sdhci-xenon.c
+>>>>
+>>>
+>>> <SNIP>
+>>>
+>>>> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+>>>> new file mode 100644
+>>>> index 000000000000..43c06db95872
+>>>> --- /dev/null
+>>>> +++ b/drivers/mmc/host/sdhci-xenon.c
+>>>
+>>> <SNIP>
+>>>
+>>>> +static int sdhci_xenon_delay_adj_test(struct sdhci_host *host,
+>>>> +           struct mmc_card *card, unsigned int delay,
+>>>> +           bool invert, bool phase)
+>>>> +{
+>>>> +   int ret;
+>>>> +   struct mmc_card *oldcard;
+>>>> +
+>>>> +   sdhci_xenon_set_fix_delay(host, delay, invert, phase);
+>>>> +
+>>>> +   /*
+>>>> +    * If the card is not yet associated to the host, we
+>>>> +    * temporally do it
+>>>> +    */
+>>>> +   oldcard = card->host->card;
+>>>> +   if (!oldcard)
+>>>> +           card->host->card = card;
+>>>> +   ret =  card_alive(card);
+>>>
+>>> This looks like an abuse of bus_ops->alive().  You will need to get
+>>> agreement with Ulf how to handle this.  I will wait for Ulf's comments
+>>> before reviewing this patch set further.
+>>
+>> Actually I modified this part of the driver to use
+>> bus_ops->alive(). Initially, the alive() code was more or less copied
+>> and paste from the mmc core with ugly include from mmc_ops.h and
+>> sdio_ops.h to make it work. I find it cleaner to directly access the
+>> alive() function.
+>>
+>> Could you explain why it is an abuse of  bus_ops->alive()?
 
-On 04/03/16 11:23, Jon Hunter wrote:
-> Ideally, if we are returning a reference to a PM domain via a call to
-> of_genpd_get_from_provider(), then we should keep track of such
-> references via a reference count. The reference count could then be used
-> to determine if a PM domain can be safely removed. Alternatively, it is
-> possible to avoid such external references by providing APIs to access
-> the PM domain and hence, eliminate any calls to
-> of_genpd_get_from_provider().
-> 
-> Add new helper functions for adding a device and a subdomain to a PM
-> domain when using device-tree, so that external calls to
-> of_genpd_get_from_provider() can be removed.
-> 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  drivers/base/power/domain.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/pm_domain.h   | 16 ++++++++++++++++
->  2 files changed, 60 insertions(+)
-> 
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 5bdb42bf40f4..b24893499454 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1706,6 +1706,50 @@ struct generic_pm_domain *of_genpd_get_from_provider(
->  EXPORT_SYMBOL_GPL(of_genpd_get_from_provider);
->  
->  /**
-> + * of_genpd_add_device() - Add a device to an I/O PM domain
-> + * @genpdspec: OF phandle args to use for look-up PM domain
-> + * @dev: Device to be added.
-> + *
-> + * Looks-up an I/O PM domain based upon phandle args provided and adds
-> + * the device to the PM domain. Returns a negative error code on failure.
-> + */
-> +int of_genpd_add_device(struct of_phandle_args *genpdspec, struct device *dev)
-> +{
-> +	struct generic_pm_domain *genpd;
-> +
-> +	genpd = of_genpd_get_from_provider(genpdspec);
-> +	if (IS_ERR(genpd))
-> +		return PTR_ERR(genpd);
-> +
-> +	return pm_genpd_add_device(genpd, dev);
-> +}
-> +
-> +/**
-> + * of_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
-> + * @parent_spec: OF phandle args to use for parent PM domain look-up
-> + * @subdomain_spec: OF phandle args to use for subdomain look-up
-> + *
-> + * Looks-up a parent PM domain and subdomain based upon phandle args
-> + * provided and adds the subdomain to the parent PM domain. Returns a
-> + * negative error code on failure.
-> + */
-> +int of_genpd_add_subdomain(struct of_phandle_args *parent_spec,
-> +			   struct of_phandle_args *subdomain_spec)
-> +{
-> +	struct generic_pm_domain *parent, *subdomain;
-> +
-> +	parent = of_genpd_get_from_provider(parent_spec);
-> +	if (IS_ERR(parent))
-> +		return PTR_ERR(parent);
-> +
-> +	subdomain = of_genpd_get_from_provider(subdomain_spec);
-> +	if (IS_ERR(subdomain))
-> +		return PTR_ERR(subdomain);
-> +
-> +	return pm_genpd_add_subdomain(parent, subdomain);
-> +}
-> +
-> +/**
->   * genpd_dev_pm_detach - Detach a device from its PM domain.
->   * @dev: Device to detach.
->   * @power_off: Currently not used
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 49cd8890b873..2b6ee670b231 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -210,6 +210,10 @@ struct generic_pm_domain *__of_genpd_xlate_simple(
->  struct generic_pm_domain *__of_genpd_xlate_onecell(
->  					struct of_phandle_args *genpdspec,
->  					void *data);
-> +extern int of_genpd_add_device(struct of_phandle_args *args,
-> +			       struct device *dev);
-> +extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
-> +				  struct of_phandle_args *new_subdomain);
->  
->  int genpd_dev_pm_attach(struct device *dev);
->  #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
-> @@ -229,6 +233,18 @@ static inline struct generic_pm_domain *of_genpd_get_from_provider(
->  #define __of_genpd_xlate_simple		NULL
->  #define __of_genpd_xlate_onecell	NULL
->  
-> +static inline int of_pm_genpd_add_device(struct of_phandle_args *args,
-> +					 struct device *dev)
+Because it's an internal callback to be used only by the mmc core.
 
-This should be of_genpd_add_device. Will fix.
+>
+> bus_ops->alive() is used to determine if the card is present and able to
+> respond.  You seem to be using it for a different purpose.  I will wait for
+> Ulf's comments.
+>
 
-Jon
+I looked briefly at your code, which uses the ->alive() ops. Indeed
+it's a workaround which I cannot accept.
 
--- 
-nvpublic
+Could you elaborate why you need to send a CMD13 from your host driver?
+
+It's the responsibility of the mmc core to know/implement the
+(e)MMC/SD/SDIO protocols. Is there something missing in core to be
+able to support your host driver?
+
+Kind regards
+Uffe
