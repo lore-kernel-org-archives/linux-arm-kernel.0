@@ -1,28 +1,82 @@
-From: bruherrera@gmail.com (Bruno Herrera)
-Date: Tue, 21 Jun 2016 23:25:49 -0300
-Subject: [PATCH 3/3] dt-bindings: Document the STM32 USB OTG DWC2 core binding
-In-Reply-To: <1466562349-5043-1-git-send-email-bruherrera@gmail.com>
-References: <1466562349-5043-1-git-send-email-bruherrera@gmail.com>
-Message-ID: <1466562349-5043-3-git-send-email-bruherrera@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 22 Jun 2016 10:45:05 +0800
+Subject: [RFC PATCH v2 00/15] ACPI IORT ARM SMMU v3 support
+In-Reply-To: <20160621142704.GA31593@red-moon>
+References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <b00f33ad-be24-21a9-b03b-611756bbc8e9@linaro.org>
+ <20160621142704.GA31593@red-moon>
+Message-ID: <e9d5d68a-3e1d-4517-7f67-b7941e74eddd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
----
- Documentation/devicetree/bindings/usb/dwc2.txt | 1 +
- 1 file changed, 1 insertion(+)
+On 2016/6/21 22:27, Lorenzo Pieralisi wrote:
+> Hi Hanjun,
+>
+> On Tue, Jun 21, 2016 at 06:37:17PM +0800, Hanjun Guo wrote:
+>> Hi Lorenzo,
+>>
+>> On 2016/6/7 21:30, Lorenzo Pieralisi wrote:
+>>> This RFC patch series is v2 of a previous posting:
+>>>
+>>> https://lkml.org/lkml/2016/4/14/702
+>>>
+>>> v1 -> v2:
+>>> 	- Rebased on top of dependencies series [1][2][3](v4.7-rc1)
+>>> 	- Removed IOMMU fwnode generalization
+>>> 	- Implemented ARM SMMU v3 ACPI probing instead of ARM SMMU v2
+>>> 	  owing to patch series dependencies [1]
+>>> 	- Moved platform device creation logic to IORT code to
+>>> 	  generalize its usage for ARM SMMU v1-v2-v3 components
+>>> 	- Removed reliance on ACPI early device probing
+>>> 	- Created IORT specific iommu_xlate() translation hook leaving
+>>> 	  OF code unchanged according to v1 reviews
+>>>
+>>> The ACPI IORT table provides information that allows instantiating
+>>> ARM SMMU devices and carrying out id mappings between components on
+>>> ARM based systems (devices, IOMMUs, interrupt controllers).
+>>>
+>>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>>>
+>>> Building on basic IORT support, available through [2]:
+>>>
+>>> this patchset enables ARM SMMU v3 support on ACPI systems.
+>>
+>> I'm trying to test your patches on D03 (SMMUv3 based) but ...
+>
+> What do you mean by "I am trying.." :), have you actually tested
+> this series ?
 
-diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
-index 20a68bf..79e5370 100644
---- a/Documentation/devicetree/bindings/usb/dwc2.txt
-+++ b/Documentation/devicetree/bindings/usb/dwc2.txt
-@@ -11,6 +11,7 @@ Required properties:
-   - "lantiq,arx100-usb": The DWC2 USB controller instance in Lantiq ARX SoCs;
-   - "lantiq,xrx200-usb": The DWC2 USB controller instance in Lantiq XRX SoCs;
-   - snps,dwc2: A generic DWC2 USB controller with default parameters.
-+  - st,stm32-fsotg: The DWC2 USB controller instance in STM32F4 SoCs in FS mode;
- - reg : Should contain 1 register range (address and length)
- - interrupts : Should contain 1 interrupt
- - clocks: clock provider specifier
--- 
-2.7.4 (Apple Git-66)
+I was rebasing this series on top of Tomasz's latest ITS patchset,
+and found that patch 1~2,5 are not needed, and also have conflicts
+(expected), so I think it's better to wait for the updated version
+from you :)
+
+>
+>> [...]
+>>> [1] R.Murphy "Generic DT bindings for PCI and ARM SMMU v3"
+>>>    http://marc.info/?l=linux-arm-kernel&m=146497432413816&w=2
+>>
+>> ...This patch set is still in discussion and seems not work
+>> for non-PCI devices.
+>
+> Can you be more specific please ? Yes, both series are work
+> in progress.
+>
+>>> [2] T.Nowicki "Introduce ACPI world to ITS irqchip" v5
+>>>    http://marc.info/?l=linux-acpi&m=146469369703684&w=2
+>>
+>> Tomasz sent out the v7 and included patches in your series.
+>>
+>> I think a updated version before the test makes sense, what
+>> do you think? Let me know your thoughts.
+>
+> I am working with Robin so that the xlate() mechanism works
+> properly and seamlessly for both DT and ACPI, given the
+> dependencies I think it makes more sense to wait for Tomasz
+> and Robin patches to get merged or at least stabilize before
+> doing anything else, I am curently working on a v3.
+
+OK.
+
+Thanks
+Hanjun
