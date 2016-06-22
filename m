@@ -1,53 +1,34 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Wed, 22 Jun 2016 08:58:59 -0500
-Subject: [PATCHv5 8/8] ARM: dts: Add Arria10 Ethernet EDAC devicetree entry
-In-Reply-To: <1466603939-7526-1-git-send-email-tthayer@opensource.altera.com>
-References: <1466603939-7526-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1466603939-7526-9-git-send-email-tthayer@opensource.altera.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 22 Jun 2016 15:56:58 +0200
+Subject: [PATCH] MAINTAINERS: update STM32 maintainers list
+Message-ID: <1466603818-7902-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+I will have less time to work on STM32 platform, so I propose
+Alexandre as co-maintainer.
 
-Add the device tree entries needed to support the Altera Ethernet
-FIFO buffer EDAC on the Arria10 chip.
+Alex is working in the STMicroelectronics division in charge of STM32
+family, so he will have access to all technical information and
+hardware.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Cc: Alexandre Torgue <alexandre.torgue@st.com>
 ---
-v2  No change
-v3  Add interrupts for SBERR and DBERR.
-v4  No change
-v5  Change "parent" phandle to "altr,ecc-parent"
----
- arch/arm/boot/dts/socfpga_arria10.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 21f6c3c..228f663 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -628,6 +628,22 @@
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH>,
- 					     <33 IRQ_TYPE_LEVEL_HIGH>;
- 			};
-+
-+			emac0-rx-ecc at ff8c0800 {
-+				compatible = "altr,socfpga-eth-mac-ecc";
-+				reg = <0xff8c0800 0x400>;
-+				altr,ecc-parent = <&gmac0>;
-+				interrupts = <4 IRQ_TYPE_LEVEL_HIGH>,
-+					     <36 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			emac0-tx-ecc at ff8c0c00 {
-+				compatible = "altr,socfpga-eth-mac-ecc";
-+				reg = <0xff8c0c00 0x400>;
-+				altr,ecc-parent = <&gmac0>;
-+				interrupts = <5 IRQ_TYPE_LEVEL_HIGH>,
-+					     <37 IRQ_TYPE_LEVEL_HIGH>;
-+			};
- 		};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7304d2e37a98..4504331809ac 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1723,6 +1723,7 @@ F:	drivers/ata/ahci_st.c
  
- 		rst: rstmgr at ffd05000 {
+ ARM/STM32 ARCHITECTURE
+ M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
++M:	Alexandre Torgue <alexandre.torgue@st.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
 -- 
-1.7.9.5
+1.9.1
