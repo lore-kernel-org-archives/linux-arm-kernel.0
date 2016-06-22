@@ -1,113 +1,35 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 22 Jun 2016 10:46:53 +0800
-Subject: [PATCH V2 4/4] stm: Mark the functions of writing buffer with notrace
-In-Reply-To: <1466563613-31578-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1466563613-31578-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1466563613-31578-5-git-send-email-zhang.chunyan@linaro.org>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 22 Jun 2016 10:53:58 +0800
+Subject: [PATCH v3 0/4] Add the eDP/VOP device node for rk3399
+Message-ID: <1466564038-18021-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_STM_FTRACE is selected, Function trace data would be
-writen to STM buffer, all  functions that related to writing data
-packets to STM buffer should be marked 'notrace' to avoid being
-traced by Ftrace, otherwise the program would stall into an endless loop.
+This thread is rely on Mark's VOP thread[1] and Yakir's eDP thread[2].
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
----
- drivers/hwtracing/coresight/coresight-stm.c |  2 +-
- drivers/hwtracing/intel_th/sth.c            | 11 +++++++----
- drivers/hwtracing/stm/core.c                |  7 ++++---
- drivers/hwtracing/stm/dummy_stm.c           |  2 +-
- include/linux/stm.h                         |  4 ++--
- 5 files changed, 15 insertions(+), 11 deletions(-)
+[1]: https://lkml.org/lkml/2016/4/20/36
+[2]: https://patchwork.kernel.org/patch/9175613/
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 73be58a..345c81e 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -386,7 +386,7 @@ static long stm_generic_set_options(struct stm_data *stm_data,
- 	return 0;
- }
- 
--static ssize_t stm_generic_packet(struct stm_data *stm_data,
-+static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
- 				  unsigned int master,
- 				  unsigned int channel,
- 				  unsigned int packet,
-diff --git a/drivers/hwtracing/intel_th/sth.c b/drivers/hwtracing/intel_th/sth.c
-index e1aee61..b034446 100644
---- a/drivers/hwtracing/intel_th/sth.c
-+++ b/drivers/hwtracing/intel_th/sth.c
-@@ -67,10 +67,13 @@ static void sth_iowrite(void __iomem *dest, const unsigned char *payload,
- 	}
- }
- 
--static ssize_t sth_stm_packet(struct stm_data *stm_data, unsigned int master,
--			      unsigned int channel, unsigned int packet,
--			      unsigned int flags, unsigned int size,
--			      const unsigned char *payload)
-+static ssize_t notrace sth_stm_packet(struct stm_data *stm_data,
-+				      unsigned int master,
-+				      unsigned int channel,
-+				      unsigned int packet,
-+				      unsigned int flags,
-+				      unsigned int size,
-+				      const unsigned char *payload)
- {
- 	struct sth_device *sth = container_of(stm_data, struct sth_device, stm);
- 	struct intel_th_channel __iomem *out =
-diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-index ff31108..3139b01 100644
---- a/drivers/hwtracing/stm/core.c
-+++ b/drivers/hwtracing/stm/core.c
-@@ -424,7 +424,7 @@ static int stm_file_assign(struct stm_file *stmf, char *id, unsigned int width)
- 	return ret;
- }
- 
--static ssize_t stm_write(struct stm_data *data, unsigned int master,
-+static ssize_t notrace stm_write(struct stm_data *data, unsigned int master,
- 			  unsigned int channel, const char *buf, size_t count)
- {
- 	unsigned int flags = STP_PACKET_TIMESTAMPED;
-@@ -1069,8 +1069,9 @@ void stm_source_unregister_device(struct stm_source_data *data)
- }
- EXPORT_SYMBOL_GPL(stm_source_unregister_device);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count)
-+int notrace stm_source_write(struct stm_source_data *data,
-+			     unsigned int chan,
-+			     const char *buf, size_t count)
- {
- 	struct stm_source_device *src = data->src;
- 	struct stm_device *stm;
-diff --git a/drivers/hwtracing/stm/dummy_stm.c b/drivers/hwtracing/stm/dummy_stm.c
-index a86612d..c5f94ca 100644
---- a/drivers/hwtracing/stm/dummy_stm.c
-+++ b/drivers/hwtracing/stm/dummy_stm.c
-@@ -21,7 +21,7 @@
- #include <linux/slab.h>
- #include <linux/stm.h>
- 
--static ssize_t
-+static ssize_t notrace
- dummy_stm_packet(struct stm_data *stm_data, unsigned int master,
- 		 unsigned int channel, unsigned int packet, unsigned int flags,
- 		 unsigned int size, const unsigned char *payload)
-diff --git a/include/linux/stm.h b/include/linux/stm.h
-index 2b6639a..80c60da 100644
---- a/include/linux/stm.h
-+++ b/include/linux/stm.h
-@@ -140,7 +140,7 @@ int stm_source_register_device(struct device *parent,
- 			       struct stm_source_data *data);
- void stm_source_unregister_device(struct stm_source_data *data);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count);
-+int notrace stm_source_write(struct stm_source_data *data, unsigned int chan,
-+			     const char *buf, size_t count);
- 
- #endif /* _STM_H_ */
+Changes in v3:
+- Add this patch in v3, due to another patch[0] need.
+  [0]: https://patchwork.kernel.org/patch/9191737/
+
+Changes in v2:
+- provide some minimal patch description (Heiko)
+- provide some minimal patch description (Heiko)
+- provide some minimal patch description (Heiko)
+
+Mark Yao (1):
+  arm64: dts: rockchip: add VOP and VOP iommu node for rk3399
+
+Yakir Yang (3):
+  arm64: dts: rockchip: add eDP device node for rk3399
+  arm64: dts: rockchip: add backlight support for rk3399 evb board
+  arm64: dtsi: rockchip: introduce pclk_vio_grf in eDP device node
+
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  40 ++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 110 ++++++++++++++++++++++++++++
+ 2 files changed, 150 insertions(+)
+
 -- 
 1.9.1
