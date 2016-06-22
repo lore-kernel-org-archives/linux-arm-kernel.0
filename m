@@ -1,10 +1,10 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 22 Jun 2016 10:54:40 +0800
-Subject: [PATCH v3 4/4] arm64: dtsi: rockchip: introduce pclk_vio_grf in eDP
+Date: Wed, 22 Jun 2016 11:01:12 +0800
+Subject: [PATCH v3.1 4/4] arm64: dts: rockchip: introduce pclk_vio_grf in eDP
  device node
 In-Reply-To: <1466564038-18021-1-git-send-email-ykk@rock-chips.com>
 References: <1466564038-18021-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1466564080-18351-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1466564472-19389-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,6 +13,10 @@ would failed to operate the VIO GRF registers.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
+Changes in v3.1:
+- Correct the commit message.
+  "arm64: dtsi: ..."   --->   "arm64: dts: ..."
+
 Changes in v3:
 - Add this patch in v3, due to another patch[0] need.
   [0]: https://patchwork.kernel.org/patch/9191737/
