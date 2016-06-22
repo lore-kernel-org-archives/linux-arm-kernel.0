@@ -1,42 +1,54 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed, 22 Jun 2016 09:26:04 -0400
-Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
-In-Reply-To: <20160622123222.GD26943@ulmo.ba.sec>
-References: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
- <20160622123222.GD26943@ulmo.ba.sec>
-Message-ID: <1466601964.5316.19.camel@localhost>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 22 Jun 2016 15:34:57 +0200
+Subject: [PATCH] ARM: tegra: remove board_init_funcs array
+In-Reply-To: <40780752.S2fyoFjsUW@wuerfel>
+References: <20160622124052.1263574-1-arnd@arndb.de>
+ <20160622125013.GH26943@ulmo.ba.sec> <40780752.S2fyoFjsUW@wuerfel>
+Message-ID: <20160622133457.GM26943@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-On Wed, 2016-06-22 at 14:32 +0200, Thierry Reding wrote:
-> On Fri, Jun 03, 2016 at 03:37:57PM -0400, Sylvain Lemieux wrote:
-> > From: Sylvain Lemieux <slemieux@tycoint.com>
+On Wed, Jun 22, 2016 at 03:05:35PM +0200, Arnd Bergmann wrote:
+> On Wednesday, June 22, 2016 2:50:13 PM CEST Thierry Reding wrote:
 > > 
-> > If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
-> > disable the PWM, the PWM output is always set as a logic 1.
+> > Not enough information to check signature validity.
+> > On Wed, Jun 22, 2016 at 02:39:41PM +0200, Arnd Bergmann wrote:
+> > > In a configuration that enables CONFIG_UBSAN_SANITIZE_ALL, I am getting
+> > > a section mismatch warning for tegra20:
+> > > 
+> > > WARNING: arch/arm/mach-tegra/built-in.o(.data+0x6e0): Section mismatch in reference from the variable board_init_funcs to the function .init.text:paz00_init()
+> > > 
+> > > The array is no longer useful here since there is only one entry,
+> > > so we can simply call the function directly after checking
+> > > of_machine_is_compatible(). This fixes the section mismatch
+> > > and is easier to read.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > ---
+> > >  arch/arm/mach-tegra/tegra.c | 24 +++---------------------
+> > >  1 file changed, 3 insertions(+), 21 deletions(-)
+> > 
+> > Shouldn't these section mismatches show up with default builds? I
+> > haven't seen any when building Tegra configurations.
+> > 
+> > I'm going to apply this patch because I think it's useful, but it sure
+> > would be nice to know why I need to enable this new UBSAN stuff to get
+> > these warnings now.
 > 
-> I presume there's a reason why the bootloader set this bit to 1. Why do
-> you assume it's the right thing to clear it?
+> It depends on the how aggressive the inlining works. Without UBSAN,
+> gcc seems to completely optimze away the loop and just the function
+> directly, which it can do because 'board_init_funcs' is static.
 > 
-There is an alternative mode for the PWM output pin; using the 
-PWM_PIN_LEVEL bit to control the PWM output (logical 0 or 1 on 
-output) when the PWM is disable.
+> I assume that the UBSAN object overflow check has the effect of
+> not dropping the symbol so it can check the size.
 
-In this case, the bootloader is using the PWM_PIN_LEVEL bit
-to control the PWM output (always 1) to enable the LCD; the 
-application is using the PWM to control the intensity of the 
-LCD output. When disabling the PWM, the line level should be 
-setup to 0.
+Ah, I see. Thanks.
 
-A version 2 of this patch will be send with support to select 
-the alternate PWM disable level high from the device tree.
-
-For details, you can refer to:
-http://thread.gmane.org/gmane.linux.pwm/3882/focus=508758
-
-
-Sylvain
-
-> Thierry
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/772f5b9b/attachment-0001.sig>
