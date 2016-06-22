@@ -1,59 +1,408 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 22 Jun 2016 16:41:10 +0200
-Subject: [PATCH 0/5] mmc: bcm2835-sdhost: Add new driver for the internal
- SD controller.
-In-Reply-To: <1466595738-2229-1-git-send-email-kraxel@redhat.com>
-References: <1466595738-2229-1-git-send-email-kraxel@redhat.com>
-Message-ID: <CAPDyKFpak075H7aAH14-LLzKFtE6-n+x5u+k_dvT6Oi5=sgXeQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Jun 2016 15:48:56 +0100
+Subject: [PATCH v6 07/15] KVM: arm64: introduce ITS emulation file with
+ MMIO framework
+In-Reply-To: <1466165327-32060-8-git-send-email-andre.przywara@arm.com>
+References: <1466165327-32060-1-git-send-email-andre.przywara@arm.com>
+ <1466165327-32060-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <576AA558.2000208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 June 2016 at 13:42, Gerd Hoffmann <kraxel@redhat.com> wrote:
->   Hi,
->
-> Here is the bcm2835-sdhost driver.  Patches 1+2 are unmodified from
-> Eric, patches 3+4 are incremental fixes.  Left them separate for now,
-> to make it easier to review, should probably squashed in for the final
-> version.  Patch 5 adds it to the device tree, in disabled state.
->
-> Actually enabling the thing depends on a bunch of changes in the gpio
-> handling of the device tree.  Leaving that for another day ...
+On 17/06/16 13:08, Andre Przywara wrote:
+> The ARM GICv3 ITS emulation code goes into a separate file, but needs
+> to be connected to the GICv3 emulation, of which it is an option.
+> The ITS MMIO handlers require the respective ITS pointer to be passed in,
+> so we amend the existing VGIC MMIO framework to let it cope with that.
+> Also we introduce the basic ITS data structure and initialize it, but
+> don't return any success yet, as we are not yet ready for the show.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm64/kvm/Makefile            |   1 +
+>  include/kvm/vgic/vgic.h            |  13 ++++-
+>  include/linux/irqchip/arm-gic-v3.h |   1 +
+>  virt/kvm/arm/vgic/vgic-its.c       | 107 +++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c   |  38 ++++++++++++-
+>  virt/kvm/arm/vgic/vgic-mmio.c      |  25 ++++++---
+>  virt/kvm/arm/vgic/vgic-mmio.h      |   4 ++
+>  virt/kvm/arm/vgic/vgic.h           |   7 +++
+>  8 files changed, 187 insertions(+), 9 deletions(-)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-its.c
+> 
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index a7a958c..2755d17 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -30,6 +30,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
+> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
+>  else
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index dc7f2fd..a66ba9a 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -111,12 +111,23 @@ struct vgic_register_region;
+>  
+>  struct vgic_io_device {
+>  	gpa_t base_addr;
+> -	struct kvm_vcpu *redist_vcpu;
+> +	union {
+> +		struct kvm_vcpu *redist_vcpu;
+> +		struct vgic_its *its;
+> +	};
+>  	const struct vgic_register_region *regions;
+>  	int nr_regions;
+>  	struct kvm_io_device dev;
+>  };
+>  
+> +struct vgic_its {
+> +	/* The base address of the ITS control register frame */
+> +	gpa_t			vgic_its_base;
+> +
+> +	bool			enabled;
+> +	struct vgic_io_device	iodev;
+> +};
 
-Why did you post this?
+You may want to move this definition before struct vgic_io_device, some
+compilers are more picky than some others.
 
-I think you should be adopting sdhci-iproc - in case there are issues
-with its bcm2835 support, right!?
+> +
+>  struct vgic_dist {
+>  	bool			in_kernel;
+>  	bool			ready;
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 64e8c70..92d5da8 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -176,6 +176,7 @@
+>  #define GITS_CWRITER			0x0088
+>  #define GITS_CREADR			0x0090
+>  #define GITS_BASER			0x0100
+> +#define GITS_IDREGS_BASE		0xffd0
 
-Kind regards
-Uffe
+Please make all the changes to the core GIC code in a separate patch,
+which I can pick independently.
 
->
-> cheers,
->   Gerd
->
-> Eric Anholt (2):
->   dt-bindings: Add binding for brcm,bcm2835-sdhost.
->   mmc: bcm2835-sdhost: Add new driver for the internal SD controller.
->
-> Gerd Hoffmann (3):
->   mmc: bcm2835-sdhost: zap mmiowb() [fixup]
->   mmc: bcm2835-sdhost: reset tweaks. [fixup]
->   mmc: bcm2835-sdhost: add to devicetree
->
->  .../devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt |    3 +
->  .../bindings/mmc/brcm,bcm2835-sdhost.txt           |   24 +
->  arch/arm/boot/dts/bcm283x.dtsi                     |    8 +
->  drivers/mmc/host/Kconfig                           |    9 +
->  drivers/mmc/host/Makefile                          |    1 +
->  drivers/mmc/host/bcm2835-sdhost.c                  | 1652 ++++++++++++++++++++
->  6 files changed, 1697 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
->  create mode 100644 drivers/mmc/host/bcm2835-sdhost.c
->
-> --
-> 1.8.3.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  #define GITS_PIDR2			GICR_PIDR2
+>  
+>  #define GITS_TRANSLATER			0x10040
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> new file mode 100644
+> index 0000000..c02d9df
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -0,0 +1,107 @@
+> +/*
+> + * GICv3 ITS emulation
+> + *
+> + * Copyright (C) 2015,2016 ARM Ltd.
+> + * Author: Andre Przywara <andre.przywara@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +#include <linux/interrupt.h>
+> +
+> +#include <linux/irqchip/arm-gic-v3.h>
+> +
+> +#include <asm/kvm_emulate.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_mmu.h>
+> +
+> +#include "vgic.h"
+> +#include "vgic-mmio.h"
+> +
+> +#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
+> +{								\
+> +	.reg_offset = off,					\
+> +	.len = length,						\
+> +	.access_flags = acc,					\
+> +	.read = NULL,						\
+> +	.write = NULL,						\
+> +	.its_read = rd,						\
+> +	.its_write = wr,					\
+
+Meh. That's not very nice... Why can't they be a union?
+
+> +}
+> +
+> +static unsigned long its_mmio_read_raz(struct kvm *kvm, struct vgic_its *its,
+> +				       gpa_t addr, unsigned int len)
+> +{
+> +	return 0;
+> +}
+> +
+> +static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+> +			      gpa_t addr, unsigned int len, unsigned long val)
+> +{
+> +	/* Ignore */
+> +}
+> +
+> +struct vgic_register_region its_registers[] = {
+
+Shouldn't this be static?
+
+> +	REGISTER_ITS_DESC(GITS_CTLR,
+> +		its_mmio_read_raz, its_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_ITS_DESC(GITS_IIDR,
+> +		its_mmio_read_raz, its_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_ITS_DESC(GITS_TYPER,
+> +		its_mmio_read_raz, its_mmio_write_wi, 8,
+> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> +	REGISTER_ITS_DESC(GITS_CBASER,
+> +		its_mmio_read_raz, its_mmio_write_wi, 8,
+> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> +	REGISTER_ITS_DESC(GITS_CWRITER,
+> +		its_mmio_read_raz, its_mmio_write_wi, 8,
+> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> +	REGISTER_ITS_DESC(GITS_CREADR,
+> +		its_mmio_read_raz, its_mmio_write_wi, 8,
+> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> +	REGISTER_ITS_DESC(GITS_BASER,
+> +		its_mmio_read_raz, its_mmio_write_wi, 0x40,
+> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> +	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
+> +		its_mmio_read_raz, its_mmio_write_wi, 0x30,
+> +		VGIC_ACCESS_32bit),
+> +};
+> +
+> +int vits_register(struct kvm *kvm, struct vgic_its *its)
+> +{
+> +	struct vgic_io_device *iodev = &its->iodev;
+> +	int ret;
+> +
+> +	iodev->regions = its_registers;
+> +	iodev->nr_regions = ARRAY_SIZE(its_registers);
+> +	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
+> +
+> +	iodev->base_addr = its->vgic_its_base;
+> +	iodev->its = its;
+> +	mutex_lock(&kvm->slots_lock);
+> +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
+> +				      SZ_64K, &iodev->dev);
+> +	mutex_unlock(&kvm->slots_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +void vits_destroy(struct kvm *kvm, struct vgic_its *its)
+> +{
+> +
+> +	its->enabled = false;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 8cd7190..4eee0d7 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -42,6 +42,16 @@ static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+>  	return reg | ((u64)val << lower);
+>  }
+>  
+> +bool vgic_has_its(struct kvm *kvm)
+> +{
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +
+> +	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
+> +		return false;
+> +
+> +	return false;
+> +}
+> +
+>  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+>  					    gpa_t addr, unsigned int len)
+>  {
+> @@ -126,6 +136,32 @@ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
+>  	vgic_put_irq(irq);
+>  }
+>  
+> +static unsigned long vgic_mmio_read_v3r_ctlr(struct kvm_vcpu *vcpu,
+> +					     gpa_t addr, unsigned int len)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	return vgic_cpu->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
+> +}
+> +
+> +
+> +static void vgic_mmio_write_v3r_ctlr(struct kvm_vcpu *vcpu,
+> +				     gpa_t addr, unsigned int len,
+> +				     unsigned long val)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	bool was_enabled = vgic_cpu->lpis_enabled;
+> +
+> +	if (!vgic_has_its(vcpu->kvm))
+> +		return;
+> +
+> +	vgic_cpu->lpis_enabled = val & GICR_CTLR_ENABLE_LPIS;
+> +
+> +	if (!was_enabled && vgic_cpu->lpis_enabled) {
+> +		/* Eventually do something */
+> +	}
+> +}
+> +
+>  static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+>  					      gpa_t addr, unsigned int len)
+>  {
+> @@ -325,7 +361,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+>  
+>  static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
+> +		vgic_mmio_read_v3r_ctlr, vgic_mmio_write_v3r_ctlr, 4,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
+>  		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index 4050c1c..c98a4fd 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -461,8 +461,7 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  {
+>  	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
+>  	const struct vgic_register_region *region;
+> -	struct kvm_vcpu *r_vcpu;
+> -	unsigned long data;
+> +	unsigned long data = 0;
+>  
+>  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+>  				       addr - iodev->base_addr);
+> @@ -471,8 +470,15 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  		return 0;
+>  	}
+>  
+> -	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
+> -	data = region->read(r_vcpu, addr, len);
+> +	if (region->read) {
+> +		struct kvm_vcpu *r_vcpu;
+> +
+> +		r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
+> +		data = region->read(r_vcpu, addr, len);
+> +	} else if (region->its_read) {
+> +		data = region->its_read(vcpu->kvm, iodev->its, addr, len);
+> +	}
+
+I'd rather have a flag somewhere that allows us to identify the type of
+device we're dealing with. You could have something like:
+
+enum iodev_type {
+	IODEV_VGIC_DISTRIBUTOR,
+	IODEV_VGIC_REDISTRIBUTOR,
+	IODEV_VGIC_ITS,
+};
+
+assign the type to each region we have, and then have something like:
+
+	switch (region->iodev_type) {
+	case IODEV_VGIC_DISTRIBUTOR:
+		data = region->read(vcpu, addr, len);
+		break;
+	case IODEV_VGIC_REDISTRIBUTOR:
+		data = region->read(iodev->redist_vcpu, addr, len);
+		break;
+	case IODEV_VGIC_ITS:
+		data = region->its_read(vcpu->kvm, iodev->its, addr, len);
+		break;
+	}
+
+It would make it extensible *and* readable.
+
+> +
+>  	vgic_data_host_to_mmio_bus(val, len, data);
+>  	return 0;
+>  }
+> @@ -482,7 +488,6 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  {
+>  	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
+>  	const struct vgic_register_region *region;
+> -	struct kvm_vcpu *r_vcpu;
+>  	unsigned long data = vgic_data_mmio_bus_to_host(val, len);
+>  
+>  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+> @@ -493,8 +498,14 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  	if (!check_region(region, addr, len))
+>  		return 0;
+>  
+> -	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
+> -	region->write(r_vcpu, addr, len, data);
+> +	if (region->write) {
+> +		struct kvm_vcpu *r_vcpu;
+> +
+> +		r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
+> +		region->write(r_vcpu, addr, len, data);
+> +	} else if (region->its_write) {
+> +		region->its_write(vcpu->kvm, iodev->its, addr, len, data);
+> +	}
+
+Same here.
+
+>  	return 0;
+>  }
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 8509014..6dfc2f0 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -25,6 +25,10 @@ struct vgic_register_region {
+>  			      unsigned int len);
+>  	void (*write)(struct kvm_vcpu *vcpu, gpa_t addr, unsigned int len,
+>  		      unsigned long val);
+> +	unsigned long (*its_read)(struct kvm *kvm, struct vgic_its *its,
+> +				  gpa_t addr, unsigned int len);
+> +	void (*its_write)(struct kvm *kvm, struct vgic_its *its,
+> +			  gpa_t addr, unsigned int len, unsigned long val);
+>  };
+>  
+>  extern struct kvm_io_device_ops kvm_io_gic_ops;
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index fa2d225..b09590d 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -76,6 +76,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
+>  int vgic_v3_probe(const struct gic_kvm_info *info);
+>  int vgic_v3_map_resources(struct kvm *kvm);
+>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+> +bool vgic_has_its(struct kvm *kvm);
+>  #else
+>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+> @@ -127,6 +128,12 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+>  {
+>  	return -ENODEV;
+>  }
+> +
+> +static inline bool vgic_has_its(struct kvm *kvm)
+> +{
+> +	return false;
+> +}
+> +
+>  #endif
+>  
+>  int kvm_register_vgic_device(unsigned long type);
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
