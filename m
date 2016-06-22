@@ -1,57 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Jun 2016 11:02:54 +0100
-Subject: [PATCH v2 2/2] arm64: hibernate: Don't hibernate on systems with
- stuck CPUs
-In-Reply-To: <1466586373-11836-3-git-send-email-james.morse@arm.com>
-References: <1466586373-11836-1-git-send-email-james.morse@arm.com>
- <1466586373-11836-3-git-send-email-james.morse@arm.com>
-Message-ID: <20160622100253.GB25837@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Jun 2016 03:04:46 -0700
+Subject: [PATCH] ARM: AMx3xx: Allow low level debugging on all UARTs
+In-Reply-To: <20160621120758.28732-1-lokeshvutla@ti.com>
+References: <20160621120758.28732-1-lokeshvutla@ti.com>
+Message-ID: <20160622100444.GH22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2016 at 10:06:13AM +0100, James Morse wrote:
-> Hibernate relies on cpu hotplug to prevent secondary cores executing
-> the kernel text while it is being restored.
-> 
-> Add a call to cpus_are_stuck_in_kernel() to determine if there are
-> CPUs not counted by 'num_online_cpus()', and prevent hibernate in this
-> case.
-> 
-> Fixes: 82869ac57b5 ("arm64: kernel: Add support for hibernate/suspend-to-disk")
-> Signed-off-by: James Morse <james.morse@arm.com>
+* Lokesh Vutla <lokeshvutla@ti.com> [160621 05:10]:
+> AM33xx/AM43xx Soc has 6 UART interfaces. Any of these 6 UARTs can be used as
+> serial console as defined by the specific board design and passing a proper
+> console bootarg. Given this, we should be able to use any UART(that is
+> used as serial console) for low level debugging. Currently only UART1 can
+> be used for low level debugging. So, adding support for all other UARTs
+> instead of waiting for new board with a different UART console.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Well we should just switch over to the standard 8250 debug code
+instead. With multiarch the port detection for debug_ll port is
+no longer needed. And we can still keep the Kconfig options for
+various ports.
 
-Mark.
+Regards,
 
-> ---
->  arch/arm64/kernel/hibernate.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> index f8df75d740f4..21ab5df9fa76 100644
-> --- a/arch/arm64/kernel/hibernate.c
-> +++ b/arch/arm64/kernel/hibernate.c
-> @@ -33,6 +33,7 @@
->  #include <asm/pgtable.h>
->  #include <asm/pgtable-hwdef.h>
->  #include <asm/sections.h>
-> +#include <asm/smp.h>
->  #include <asm/suspend.h>
->  #include <asm/virt.h>
->  
-> @@ -236,6 +237,11 @@ int swsusp_arch_suspend(void)
->  	unsigned long flags;
->  	struct sleep_stack_data state;
->  
-> +	if (cpus_are_stuck_in_kernel()) {
-> +		pr_err("Can't hibernate: no mechanism to offline secondary CPUs.\n");
-> +		return -EBUSY;
-> +	}
-> +
->  	local_dbg_save(flags);
->  
->  	if (__cpu_suspend_enter(&state)) {
-> -- 
-> 2.8.0.rc3
-> 
+Tony
