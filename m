@@ -1,79 +1,90 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:40 +0300
-Subject: [PATCHv2 07/27] crypto: omap-sham: implement context export/import
- APIs
+Date: Wed, 22 Jun 2016 16:23:41 +0300
+Subject: [PATCHv2 08/27] crypto: omap-des: Fix support for unequal lengths
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-8-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Context export/import are now required for ahash algorithms due to
-required support in algif_hash. Implement these for OMAP SHA driver,
-saving and restoring the internal state of the driver.
+From: Lokesh Vutla <a0131933@ti.com>
 
+For cases where total length of an input SGs is not same as
+length of the input data for encryption, omap-des driver
+crashes. This happens in the case when IPsec is trying to use
+omap-des driver.
+
+To avoid this, we copy all the pages from the input SG list
+into a contiguous buffer and prepare a single element SG list
+for this buffer with length as the total bytes to crypt, which is
+similar thing that is done in case of unaligned lengths.
+
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Tested-by: Aparna Balasubramanian <aparnab@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-sham.c | 40 ++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 38 insertions(+), 2 deletions(-)
+ drivers/crypto/omap-des.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index 84a0027..683f825 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -1325,6 +1325,35 @@ static void omap_sham_cra_exit(struct crypto_tfm *tfm)
- 	}
+diff --git a/drivers/crypto/omap-des.c b/drivers/crypto/omap-des.c
+index 3eedb03..e4c87bc 100644
+--- a/drivers/crypto/omap-des.c
++++ b/drivers/crypto/omap-des.c
+@@ -521,29 +521,36 @@ static int omap_des_crypt_dma_stop(struct omap_des_dev *dd)
+ 	return 0;
  }
  
-+static int omap_sham_export(struct ahash_request *req, void *out)
-+{
-+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
-+	struct omap_sham_ctx *ctx = crypto_ahash_ctx(tfm);
-+	struct omap_sham_hmac_ctx *bctx = ctx->base;
-+
-+	memcpy(out, rctx, sizeof(*rctx) + BUFLEN);
-+	memcpy(out + sizeof(*rctx) + BUFLEN, ctx, sizeof(*ctx));
-+	memcpy(out + sizeof(*rctx) + BUFLEN + sizeof(*ctx), bctx,
-+	       sizeof(*bctx));
-+
-+	return 0;
-+}
-+
-+static int omap_sham_import(struct ahash_request *req, const void *in)
-+{
-+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
-+	struct omap_sham_ctx *ctx = crypto_ahash_ctx(tfm);
-+	struct omap_sham_hmac_ctx *bctx = ctx->base;
-+
-+	memcpy(rctx, in, sizeof(*rctx) + BUFLEN);
-+	memcpy(ctx, in + sizeof(*rctx) + BUFLEN, sizeof(*ctx));
-+	memcpy(bctx, in + sizeof(*rctx) + BUFLEN + sizeof(*ctx), sizeof(*bctx));
-+
-+	return 0;
-+}
-+
- static struct ahash_alg algs_sha1_md5[] = {
+-static int omap_des_copy_needed(struct scatterlist *sg)
++static int omap_des_copy_needed(struct scatterlist *sg, int total)
  {
- 	.init		= omap_sham_init,
-@@ -1979,8 +2008,15 @@ static int omap_sham_probe(struct platform_device *pdev)
- 
- 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
- 		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
--			err = crypto_register_ahash(
--					&dd->pdata->algs_info[i].algs_list[j]);
-+			struct ahash_alg *alg;
++	int len = 0;
 +
-+			alg = &dd->pdata->algs_info[i].algs_list[j];
-+			alg->export = omap_sham_export;
-+			alg->import = omap_sham_import;
-+			alg->halg.statesize = sizeof(struct omap_sham_reqctx) +
-+				sizeof(struct omap_sham_ctx) +
-+				sizeof(struct omap_sham_hmac_ctx) + BUFLEN;
-+			err = crypto_register_ahash(alg);
- 			if (err)
- 				goto err_algs;
++	if (!IS_ALIGNED(total, DES_BLOCK_SIZE))
++		return -1;
++
+ 	while (sg) {
+ 		if (!IS_ALIGNED(sg->offset, 4))
+ 			return -1;
+ 		if (!IS_ALIGNED(sg->length, DES_BLOCK_SIZE))
+ 			return -1;
++
++		len += sg->length;
+ 		sg = sg_next(sg);
+ 	}
++
++	if (len != total)
++		return -1;
++
+ 	return 0;
+ }
  
+ static int omap_des_copy_sgs(struct omap_des_dev *dd)
+ {
+ 	void *buf_in, *buf_out;
+-	int pages;
+-
+-	pages = dd->total >> PAGE_SHIFT;
+-
+-	if (dd->total & (PAGE_SIZE-1))
+-		pages++;
++	int pages, total;
+ 
+-	BUG_ON(!pages);
++	total = ALIGN(dd->total, DES_BLOCK_SIZE);
++	pages = get_order(total);
+ 
+ 	buf_in = (void *)__get_free_pages(GFP_ATOMIC, pages);
+ 	buf_out = (void *)__get_free_pages(GFP_ATOMIC, pages);
+@@ -595,8 +602,8 @@ static int omap_des_prepare_req(struct crypto_engine *engine,
+ 	dd->in_sg = req->src;
+ 	dd->out_sg = req->dst;
+ 
+-	if (omap_des_copy_needed(dd->in_sg) ||
+-	    omap_des_copy_needed(dd->out_sg)) {
++	if (omap_des_copy_needed(dd->in_sg, dd->total) ||
++	    omap_des_copy_needed(dd->out_sg, dd->total)) {
+ 		if (omap_des_copy_sgs(dd))
+ 			pr_err("Failed to copy SGs for unaligned cases\n");
+ 		dd->sgs_copied = 1;
 -- 
 1.9.1
