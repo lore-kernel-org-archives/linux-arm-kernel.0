@@ -1,177 +1,156 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 22 Jun 2016 07:04:28 +0000
-Subject: [PATCH 2/4] dmaengine: vdma: Add support for mulit-channel dma
- mode
-In-Reply-To: <20160621163340.GE16910@localhost>
-References: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
- <1465549954-30220-3-git-send-email-appanad@xilinx.com>
- <20160621155502.GB16910@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A5B8248@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160621163340.GE16910@localhost>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5B84A9@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 22 Jun 2016 16:11:52 +0900
+Subject: [RFC PATCH v2 6/6] drm/rockchip: Add dmc notifier in vop driver
+In-Reply-To: <1465207986-17888-7-git-send-email-hl@rock-chips.com>
+References: <1465207986-17888-1-git-send-email-hl@rock-chips.com>
+ <CGME20160606101348epcas1p468b2019b1d69887a154b60c3afa2edce@epcas1p4.samsung.com>
+ <1465207986-17888-7-git-send-email-hl@rock-chips.com>
+Message-ID: <576A3A38.3000306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi,
+
+On 2016? 06? 06? 19:13, Lin Huang wrote:
+> when in ddr frequency scaling process, vop can not do
+> enable or disable operate, since dcf will base on vop vblank
+> time to do frequency scaling and need to get vop irq if there
+> have vop enabled. So need register to dmc notifier, and we can
+> get the dmc status.
+
+If you want to know when ddr frequency is chanaged,
+you can use the DEVFREQ_TRANSITION_NOTIFIER notifier[1] (merged to v4.7-rc1)
+which includes the following notification:
+- DEVFREQ_PRECHANGE
+- DEVFREQ_POSTCHANGE	
+
+[1] "PM / devfreq: Add new DEVFREQ_TRANSITION_NOTIFIER notifier"
+- https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=0fe3a66410a3ba96679be903f1e287d7a0a264a9
+
+Thanks,
+Chanwoo Choi
 
 > 
-> On Tue, Jun 21, 2016 at 04:02:05PM +0000, Appana Durga Kedareswara Rao
-> wrote:
-> > Hi Vinod,
-> >
-> > 	Thanks for the review...
-> >
-> > >
-> > > On Fri, Jun 10, 2016 at 02:42:32PM +0530, Kedareswara rao Appana wrote:
-> > > > This patch adds support for AXI DMA multi-channel dma mode
-> > > > Multichannel mode enables DMA to connect to multiple masters And
-> > > > slaves on the streaming side.
-> > > > In Multichannel mode AXI DMA supports 2D transfers.
-> > >
-> > > Funny formatting!
-> >
-> > Will fix in next version...
-> >
-> > >
-> > > Can you elobrate what you meant by Multichannel mode? This patch
-> > > seems to do two things, one is to add interleaved dma support and
-> > > something else. Can you explain the latter part?
-> >
-> > AXI DMA has two Stream interfaces (Memory to Stream MM2S and Stream to
-> > Memory S2MM)
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
 > 
-> what is a stream in this context?
-
-Stream means I/O transfer (Memory to I/O and I/O to Memory).
-Sorry if I confused you.
-
+> Changes in v2:
+> - None
 > 
-> > In Multi-Channel dma mode each stream interface can be configured up to 16
-> channels.
-> > In Multi-channel DMA mode IP supports only interleaved transfers (2-D
-> transfers).
+> Changes in v1:
+> - use wait_event instead usleep
 > 
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 43 +++++++++++++++++++++++++++--
+>  1 file changed, 41 insertions(+), 2 deletions(-)
 > 
-> >
-> > >
-> > > >  /**
-> > > > + * struct xilinx_mcdma_config - DMA Multi channel configuration
-> > > > +structure
-> > > > + * @tdest: Channel to operate on
-> > > > + * @tid:   Channel configuration
-> > > > + * @tuser: Tuser configuration
-> > > > + * @ax_user: ax_user value
-> > > > + * @ax_cache: ax_cache value
-> > > > + */
-> > > > +struct xilinx_mcdma_config {
-> > > > +	u8 tdest;
-> > > > +	u8 tid;
-> > > > +	u8 tuser;
-> > > > +	u8 ax_user;
-> > > > +	u8 ax_cache;
-> > >
-> > > can you describe these in details, what do these do, what are the
-> > > values to be programmed?
-> >
-> > As said above In Multi-Channel Mode each Stream interface can be
-> > Configured up to 16 channels each channel is differentiated based on the tdest
-> and tid values.
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 1c4d5b5..8286048 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -31,6 +31,8 @@
+>  #include <linux/reset.h>
+>  #include <linux/delay.h>
+>  
+> +#include <soc/rockchip/rockchip_dmc.h>
+> +
+>  #include "rockchip_drm_drv.h"
+>  #include "rockchip_drm_gem.h"
+>  #include "rockchip_drm_fb.h"
+> @@ -116,6 +118,10 @@ struct vop {
+>  
+>  	const struct vop_data *data;
+>  
+> +	struct notifier_block dmc_nb;
+> +	int dmc_in_process;
+> +	wait_queue_head_t	wait_dmc_queue;
+> +
+>  	uint32_t *regsbak;
+>  	void __iomem *regs;
+>  
+> @@ -426,6 +432,21 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
+>  	spin_unlock_irqrestore(&vop->irq_lock, flags);
+>  }
+>  
+> +static int dmc_notify(struct notifier_block *nb, unsigned long event,
+> +		      void *data)
+> +{
+> +	struct vop *vop = container_of(nb, struct vop, dmc_nb);
+> +
+> +	if (event == DMCFREQ_ADJUST) {
+> +		vop->dmc_in_process = 1;
+> +	} else if (event == DMCFREQ_FINISH) {
+> +		vop->dmc_in_process = 0;
+> +		wake_up(&vop->wait_dmc_queue);
+> +	}
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+>  static void vop_enable(struct drm_crtc *crtc)
+>  {
+>  	struct vop *vop = to_vop(crtc);
+> @@ -434,6 +455,13 @@ static void vop_enable(struct drm_crtc *crtc)
+>  	if (vop->is_enabled)
+>  		return;
+>  
+> +	/*
+> +	 * if in dmc scaling frequency process, wait until it finish
+> +	 * use 100ms as timeout time.
+> +	 */
+> +	wait_event_timeout(vop->wait_dmc_queue,
+> +			   !vop->dmc_in_process, HZ / 10);
+> +
+>  	ret = pm_runtime_get_sync(vop->dev);
+>  	if (ret < 0) {
+>  		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
+> @@ -485,6 +513,7 @@ static void vop_enable(struct drm_crtc *crtc)
+>  	enable_irq(vop->irq);
+>  
+>  	drm_crtc_vblank_on(crtc);
+> +	rockchip_dmc_get(&vop->dmc_nb);
+>  
+>  	return;
+>  
+> @@ -505,6 +534,13 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+>  		return;
+>  
+>  	/*
+> +	 * if in dmc scaling frequency process, wait until it finish
+> +	 * use 100ms as timeout time.
+> +	 */
+> +	wait_event_timeout(vop->wait_dmc_queue,
+> +			   !vop->dmc_in_process, HZ / 10);
+> +
+> +	/*
+>  	 * We need to make sure that all windows are disabled before we
+>  	 * disable that crtc. Otherwise we might try to scan from a destroyed
+>  	 * buffer later.
+> @@ -517,7 +553,7 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+>  		VOP_WIN_SET(vop, win, enable, 0);
+>  		spin_unlock(&vop->reg_lock);
+>  	}
+> -
+> +	rockchip_dmc_put(&vop->dmc_nb);
+>  	drm_crtc_vblank_off(crtc);
+>  
+>  	/*
+> @@ -1243,7 +1279,7 @@ static int vop_create_crtc(struct vop *vop)
+>  		ret = -ENOENT;
+>  		goto err_cleanup_crtc;
+>  	}
+> -
+> +	vop->dmc_nb.notifier_call = dmc_notify;
+>  	init_completion(&vop->dsp_hold_completion);
+>  	init_completion(&vop->wait_update_complete);
+>  	crtc->port = port;
+> @@ -1465,6 +1501,9 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+>  	/* IRQ is initially disabled; it gets enabled in power_on */
+>  	disable_irq(vop->irq);
+>  
+> +	init_waitqueue_head(&vop->wait_dmc_queue);
+> +	vop->dmc_in_process = 0;
+> +
+>  	ret = vop_create_crtc(vop);
+>  	if (ret)
+>  		return ret;
 > 
-> Then why are you not registering 16 channels for this? That should give you
-> channel to operate on!
-
-The number of channels are configurable.
-We are registering number of Channels that h/w configured for.
-
-Will fix in the next version. Will remove this config.
-And based on the channel type will configure the h/w.
-
-> 
-> >
-> > tdest:
-> > TDEST provides routing information for the data stream.
-> 
-> pls elobrate
-
-Need to configure this with the channel number that
-We would like to transfer data.
-
-> 
-> > TDEST values are static for the entire packet.
-> 
-> what do these mean
-
-We shouldn't modify this value when a transfer is going on...
-Providing it in the config option user may not aware of all this possibilities.
-Will remove this config and will handle this in the driver itself.
-
-> 
-> >
-> > tid:
-> > Provides a stream identifier. TID values are static for entire packet.
-> > TID values provided in the TX descriptor field are presented on TID
-> > signals of the streaming side.
-> 
-> what is this used for?
-
-Currently I am not using this parameter will remove this config.
-But usually it is used as a packet identifier.
-
-> 
-> >
-> > tuser:
-> > Sideband signals used for user-defined information.
-> > TUSER values are static for entire packet. TUSER values provided in
-> > the TX Descriptor field are presented on TUSER signals of streaming side.
-> 
-> what is this used for?
-
-Used for user-defined information.
-Currently I am not using it will remove this in the next version...
-
-> 
-> >
-> > ax_user:
-> > Sideband signals used for user-defined information ARUSER values and
-> > their interpretations are user-defined
-> 
-> How is it used by client?
-
-Currently I am not using it will remove this in the next version...
-
-> 
-> >
-> > ax_cache:
-> > Cache type this signal provides additional information about the
-> > cacheable Characteristics of the transfer.
-> 
-> and what are those...
-
-It is a 4-bit filed.
-Bit 0: Bufferable
-Bit 1: Modifiable
-Bit 2: Non-cacheable
-Bit 3: Normal
-
-Currently I am not using it will remove this in the next version...
-
-> 
-> >
-> > In the above parameters tdest and tid are mandatory to differentiate
-> > b/w different channels Other parameters are optional please let me
-> > know if you don't want me to Include other optional parameters will remove in
-> the next version.
-> 
-> dmaengine provides channel as an argument so it is quite odd that you need to
-> differentiate b/w different channels. This only makes me worry that things are
-> not standard and fishy
-
-Will fix in the next version will handle
-Based on the channel type only.
-
-Regards,
-Kedar.
-
-> 
-> --
-> ~Vinod
