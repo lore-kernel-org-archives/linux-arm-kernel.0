@@ -1,75 +1,45 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Jun 2016 19:59:08 +0200
-Subject: [PATCH] mmc: pwrseq-simple: Add an optional post-power-on-delay
-Message-ID: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 22 Jun 2016 19:59:59 +0200
+Subject: [PATCH 1/2] ARM: OMAP2+: Drop legacy board file for n900
+In-Reply-To: <201606221848.41305@pali>
+References: <1465987689-14812-1-git-send-email-tony@atomide.com>
+ <20160621112944.GV29844@pali> <20160621113215.GP22406@atomide.com>
+ <201606221848.41305@pali>
+Message-ID: <20160622175959.GA21075@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices need a while to boot their firmware after providing clks /
-de-asserting resets before they are ready to receive sdio commands.
+Hi!
 
-This commits adds a post-power-on-delay-ms devicetree property to
-mmc-pwrseq-simple for use with such devices.
+> > OK I'd like to apply this series by Monday if no issues to have
+> > enough time for it in Linux next. Does that sound OK to you?
+> > 
+> > Regards,
+> > 
+> > Tony
+> 
+> Ok, now I looked at it and tested current version from torvalds tree.
+> 
+> There is still missing fixed support for IR, but that is waiting in 
+> media tree queue for next merge window.
+> 
+> So after IR patches land in torvalds tree, I'm fine with dropping legacy 
+> board code for n900 and you can add my Acked-by.
+> 
+> Sorry that it look so long time, but Nokia N900 is omap3 device with 
+> most features & drivers.
+> 
+> I need to say that Nokia N900 support has good support in mainline 
+> kernel, probably the best from all mobile phones. It is almost feature 
+> complete, missing parts are: DSP, both cameras, bluetooth and RM
+> radio.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
- drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
- 2 files changed, 11 insertions(+)
+...and graphics acceleration and power management. But who needs
+accelerated graphics, and power management will be solved. So yes,
+N900 is the best phone :-).
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-index ce0e767..e254368 100644
---- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-@@ -16,6 +16,8 @@ Optional properties:
-   See ../clocks/clock-bindings.txt for details.
- - clock-names : Must include the following entry:
-   "ext_clock" (External clock provided to the card).
-+- post-power-on-delay-ms : Delay in ms after powering the card and
-+	de-asserting the reset-gpios (if any)
- 
- Example:
- 
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index 450d907..1304160 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -16,6 +16,8 @@
- #include <linux/device.h>
- #include <linux/err.h>
- #include <linux/gpio/consumer.h>
-+#include <linux/delay.h>
-+#include <linux/property.h>
- 
- #include <linux/mmc/host.h>
- 
-@@ -24,6 +26,7 @@
- struct mmc_pwrseq_simple {
- 	struct mmc_pwrseq pwrseq;
- 	bool clk_enabled;
-+	u32 post_power_on_delay_ms;
- 	struct clk *ext_clk;
- 	struct gpio_descs *reset_gpios;
- };
-@@ -64,6 +67,9 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
- 	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
- 
- 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
-+
-+	if (pwrseq->post_power_on_delay_ms)
-+		msleep(pwrseq->post_power_on_delay_ms);
- }
- 
- static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
-@@ -111,6 +117,9 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
- 		return PTR_ERR(pwrseq->reset_gpios);
- 	}
- 
-+	device_property_read_u32(dev, "post-power-on-delay-ms",
-+				 &pwrseq->post_power_on_delay_ms);
-+
- 	pwrseq->pwrseq.dev = dev;
- 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
- 	pwrseq->pwrseq.owner = THIS_MODULE;
+									Pavel
+
 -- 
-2.7.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
