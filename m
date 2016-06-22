@@ -1,120 +1,87 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Wed, 22 Jun 2016 16:26:46 +0100
-Subject: [PATCH] xen/arm: register clocks used by the hypervisor
-In-Reply-To: <1466504165-9214-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1466504165-9214-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <576AAE36.9070501@arm.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Wed, 22 Jun 2016 11:30:47 -0400
+Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
+In-Reply-To: <5d139118-5b9c-954c-3f3c-310c1a7342f5@mleia.com>
+References: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
+ <20160622123222.GD26943@ulmo.ba.sec> <1466601964.5316.19.camel@localhost>
+ <20160622143650.GO26943@ulmo.ba.sec>
+ <5d139118-5b9c-954c-3f3c-310c1a7342f5@mleia.com>
+Message-ID: <1466609447.17162.6.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Dirk,
+Hi Thierry,
 
-On 21/06/16 11:16, Dirk Behme wrote:
-> Some clocks might be used by the Xen hypervisor and not by the Linux
-> kernel. If these are not registered by the Linux kernel, they might be
-> disabled by clk_disable_unused() as the kernel doesn't know that they
-> are used. The clock of the serial console handled by Xen is one
-> example for this. It might be disabled by clk_disable_unused() which
-> stops the whole serial output, even from Xen, then.
->
-> Up to now, the workaround for this has been to use the Linux kernel
-> command line parameter 'clk_ignore_unused'. See Xen bug
->
-> http://bugs.xenproject.org/xen/bug/45
->
-> too.
->
-> To fix this, we will add the "unused" clocks in Xen to the hypervisor
-> node. The Linux kernel has to register the clocks from the hypervisor
-> node, then.
->
-> Therefore, check if there is a "clocks" entry in the hypervisor node
-> and if so register the given clocks to the Linux kernel clock
-> framework and with this mark them as used. This prevents the clocks
-> from being disabled.
+On Wed, 2016-06-22 at 18:10 +0300, Vladimir Zapolskiy wrote:
+> Hi Thierry,
+> 
+> On 22.06.2016 17:36, Thierry Reding wrote:
+> > On Wed, Jun 22, 2016 at 09:26:04AM -0400, Sylvain Lemieux wrote:
+> >> Hi Thierry,
+> >>
+> >> On Wed, 2016-06-22 at 14:32 +0200, Thierry Reding wrote:
+> >>> On Fri, Jun 03, 2016 at 03:37:57PM -0400, Sylvain Lemieux wrote:
+> >>>> From: Sylvain Lemieux <slemieux@tycoint.com>
+> >>>>
+> >>>> If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
+> >>>> disable the PWM, the PWM output is always set as a logic 1.
+> >>>
+> >>> I presume there's a reason why the bootloader set this bit to 1. Why do
+> >>> you assume it's the right thing to clear it?
+> >>>
+> >> There is an alternative mode for the PWM output pin; using the 
+> >> PWM_PIN_LEVEL bit to control the PWM output (logical 0 or 1 on 
+> >> output) when the PWM is disable.
+> >>
+> >> In this case, the bootloader is using the PWM_PIN_LEVEL bit
+> >> to control the PWM output (always 1) to enable the LCD; the 
+> >> application is using the PWM to control the intensity of the 
+> >> LCD output. When disabling the PWM, the line level should be 
+> >> setup to 0.
+> > 
+> > But doesn't that mean that if the pin is used in PWM mode there's never
+> > a use-case for having it go high when disabled? Given that this is a PWM
+> > driver I don't see how we'd ever be in the case where the alternate
+> > setting makes sense.
+> > 
+> 
+> to some extend when PWM is disabled, both options of pin output high
+> and low level values are valid if we consider variable PWM polarity
+> setting in general, however this particular controller does not have
+> this control and thus there is no need to extend it to 2-cell type.
+> 
+> Another alternative to avoid a new property may be to extend period_ns
+> to its apparently valid boundaries - 0 and duty_ns, both options are not
+> supported properly in the driver at the moment. But then the question
+> what to do with it on boot is still open, just leaving it untouched
+> is nondeterministic in my opinion.
+> 
+> >> A version 2 of this patch will be send with support to select 
+> >> the alternate PWM disable level high from the device tree.
+> >>
+> >> For details, you can refer to:
+> >> http://thread.gmane.org/gmane.linux.pwm/3882/focus=508758
+> > 
+> > Given the above I don't think we should add this new device tree
+> > property until we encounter a setup where it's needed.
+> > 
+I am currently having this problem as our bootloader is using 
+the pin output control when the PWM is disabled to setup the
+PWM output (0 or 1) and the application is using the PWM to 
+control the output. In this case the application need to be 
+sure the value of the PWM_PIN_LEVEL bit is configured properly.
 
-This new property would need to be documented in:
-    - linux/Documentation/devicetree/bindings/arm/xen.txt
-    - xen/docs/misc/arm/device-tree/guest.txt
+Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
+the PWM_PIN_LEVEL bit was always clear when the PWM was disable
+and a 0 logic level was apply to the output.
 
->
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-> ---
->   arch/arm/xen/enlighten.c | 35 +++++++++++++++++++++++++++++++++++
->   1 file changed, 35 insertions(+)
->
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 75cd734..ee6e81f 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -22,6 +22,7 @@
->   #include <linux/of.h>
->   #include <linux/of_irq.h>
->   #include <linux/of_address.h>
-> +#include <linux/clk-provider.h>
->   #include <linux/cpuidle.h>
->   #include <linux/cpufreq.h>
->   #include <linux/cpu.h>
-> @@ -381,6 +382,40 @@ static int __init xen_pm_init(void)
->   }
->   late_initcall(xen_pm_init);
->
-> +/*
-> + * Check if we want to register some clocks, that they
-> + * are not freed because unused by clk_disable_unused().
-> + * E.g. the serial console clock.
-> + */
-> +static int __init xen_arm_register_clks(void)
-> +{
-> +	struct clk *clk;
-> +	unsigned int i, count;
-> +	int ret;
-> +
-> +	count = of_clk_get_parent_count(xen_node);
+I am ready to submit a version 2 with this new device tree
+property; should I go ahead with the submit?
 
-The code in this file has changed quite a lot with the support of ACPI. 
-For instance "xen_node" is not anymore a global variable. Can you rebase 
-your rework on top of the branch for-linus-4.8?
-
-You can find the branch in:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip.git
-
-> +	if (!count)
-> +		return 0;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		clk = of_clk_get(xen_node, i);
-> +		if (IS_ERR(clk)) {
-> +			pr_err("Xen failed to register clock %i. Error: %li\n",
-> +			       i, PTR_ERR(clk));
-> +			return PTR_ERR(clk);
-> +		}
-> +
-> +		ret = clk_prepare_enable(clk);
-
-I am not sure why we would want Linux to enable the clock. Should not it 
-be already done either by the firmware or Xen?
-
-Would it be possible to use the flags CLK_IGNORE_UNUSED instead? So the 
-clock will be ignored by clk_disable_unused_subtree.
-
-> +		if (ret < 0) {
-> +			pr_err("Xen failed to enable clock %i. Error: %i\n",
-> +			       i, ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +late_initcall(xen_arm_register_clks);
->
->   /* empty stubs */
->   void xen_arch_pre_suspend(void) { }
->
 
 Regards,
-
--- 
-Julien Grall
+Sylvain
+> 
+> --
+> With best wishes,
+> Vladimir
