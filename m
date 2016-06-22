@@ -1,49 +1,114 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 22 Jun 2016 10:06:13 +0100
-Subject: [PATCH v2 2/2] arm64: hibernate: Don't hibernate on systems with
- stuck CPUs
-In-Reply-To: <1466586373-11836-1-git-send-email-james.morse@arm.com>
-References: <1466586373-11836-1-git-send-email-james.morse@arm.com>
-Message-ID: <1466586373-11836-3-git-send-email-james.morse@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 22 Jun 2016 11:09:13 +0200
+Subject: [PATCH 08/12] doc: binding: pwrseq-usb-generic: add binding doc
+ for generic usb power sequence driver
+In-Reply-To: <20160621212653.GA22764@rob-hp-laptop>
+References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
+ <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
+ <CAL_JsqLvs0s2TyfqPM5vtmyY81_X84VjCGjsGYbTgT4syOfp9Q@mail.gmail.com>
+ <20160620112651.GA26936@shlinux2> <20160620161607.GA11427@rob-hp-laptop>
+ <20160621021117.GD26936@shlinux2> <20160621212653.GA22764@rob-hp-laptop>
+Message-ID: <CAPDyKFroH6AGObKGZoZ-6=Sb3Zii6gXdm_wO3fuc2BAx6fpFHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hibernate relies on cpu hotplug to prevent secondary cores executing
-the kernel text while it is being restored.
+On 21 June 2016 at 23:26, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Jun 21, 2016 at 10:11:17AM +0800, Peter Chen wrote:
+>> On Mon, Jun 20, 2016 at 11:16:07AM -0500, Rob Herring wrote:
+>> > On Mon, Jun 20, 2016 at 07:26:51PM +0800, Peter Chen wrote:
+>> > > On Fri, Jun 17, 2016 at 12:16:48PM -0500, Rob Herring wrote:
+>> > > > On Fri, Jun 17, 2016 at 5:09 AM, Peter Chen <peter.chen@nxp.com> wrote:
+>> > > > > Add binding doc for generic usb power sequence driver, and update
+>> > > > > generic usb device binding-doc accordingly.
+>
+> [...]
+>
+>> > >           clocks = <&clks IMX6SX_CLK_CKO>;
+>> > >
+>> > >           #address-cells = <1>;
+>> > >           #size-cells = <0>;
+>> > >           ethernet: asix at 1 {
+>> > >                   compatible = "usbb95,1708";
+>> > >                   reg = <1>;
+>> > >
+>> > >                   power-sequence;
+>> > >                   reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
+>> > >                   reset-duration-us = <15>;
+>> > >                   clocks = <&clks IMX6SX_CLK_IPG>;
+>> > >           };
+>> > >   };
+>> > > };
+>> > >
+>> > > If the node has property "power-sequence", the pwrseq core will create
+>> > > related platform device, and the driver under pwrseq driver will handle
+>> > > power sequence stuffs.
+>> >
+>> > This I have issue with. If you are creating a platform device here, you
+>> > are trying to work-around limitations in the linux driver model.
 
-Add a call to cpus_are_stuck_in_kernel() to determine if there are
-CPUs not counted by 'num_online_cpus()', and prevent hibernate in this
-case.
+I somewhat understand your point.
 
-Fixes: 82869ac57b5 ("arm64: kernel: Add support for hibernate/suspend-to-disk")
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/kernel/hibernate.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Although, having the option to use a driver (which requires a device)
+has turned out to be quite convenient from many aspects - at least in
+the mmc case.
 
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index f8df75d740f4..21ab5df9fa76 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -33,6 +33,7 @@
- #include <asm/pgtable.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/sections.h>
-+#include <asm/smp.h>
- #include <asm/suspend.h>
- #include <asm/virt.h>
- 
-@@ -236,6 +237,11 @@ int swsusp_arch_suspend(void)
- 	unsigned long flags;
- 	struct sleep_stack_data state;
- 
-+	if (cpus_are_stuck_in_kernel()) {
-+		pr_err("Can't hibernate: no mechanism to offline secondary CPUs.\n");
-+		return -EBUSY;
-+	}
-+
- 	local_dbg_save(flags);
- 
- 	if (__cpu_suspend_enter(&state)) {
--- 
-2.8.0.rc3
+Certainly one can do without it, but in the end using a driver avoids
+open coding.
+
+>>
+>> My current solution like below, but it seems you didn't agree with that.
+>> I just double confirm here, if you don't, I give up the solution for
+>> using generic power sequence framework.
+>>
+>> In drivers/usb/core/hub.c
+>>
+>>       for_each_child_of_node(parent->of_node, node) {
+>>               hdev_pwrseq = pwrseq_alloc(node, "usb_pwrseq_generic");
+>>               if (!IS_ERR_OR_NULL(hdev_pwrseq)) {
+>>                       pwrseq_node = kzalloc(sizeof(pwrseq_node), GFP_KERNEL);
+>>                       if (!pwrseq_node) {
+>>                               ret = -ENOMEM;
+>>                               goto err1;
+>>                       }
+>>                       /* power on sequence */
+>>                       ret = pwrseq_pre_power_on(hdev_pwrseq);
+>
+> Why does this function need to do anything more than:
+>
+> - Check if the child has a "power-sequence" property
+> - Get the "reset-gpios" GPIO
+> - Assert reset for specified/default time
+> - Deassert reset
+>
+> Then continue on as normal. That seems straight-forward to me.
+>
+> There is no reason you need a platform device in the mix. Perhaps trying
+> to move the MMC pwr-seq code is pointless as it adds needless
+> complexity.
+
+Complexity?
+
+The problem we are tying to solve, is to make the various platform/SoC
+specific power sequences to be able to live in generic drivers.
+
+One could decide to encode the sequences inside the driver code
+itself, but it will soon turn into a mess and more importantly, lots
+of open coding as to support different platforms/SoCs. To most kernel
+hackers I don't think this is an option to consider.
+
+The MMC pwr-seq code/drivers tries to address these issues - in a
+somewhat generic way.
+Initially we have decided to start with only a few flavours of
+supported sequences and so far these have been sufficient.
+
+Finally, I am indeed concerned that it so hard to agree on a solution
+to deal with generic power sequences. There have been many attempts
+throughout the last ~4-5 years, but peoples strong opinions about
+different approaches mad them all fail. Isn't it time to finally just
+pick a solution and stick with it, even if it doesn't meet all peoples
+expectations?
+
+[...]
+
+Kind regards
+Uffe
