@@ -1,48 +1,34 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:36 +0300
-Subject: [PATCHv2 03/27] crypto: omap: do not call dmaengine_terminate_all
+Date: Wed, 22 Jun 2016 16:23:39 +0300
+Subject: [PATCHv2 06/27] crypto: ahash: increase the maximum allowed statesize
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+The statesize is used to determine the maximum size for saved ahash
+context. In some cases, this can be much larger than what is currently
+allocated for it, for example omap-sham driver uses a buffer size of
+PAGE_SIZE. Increase the statesize to accommodate this.
 
-The extra call to dmaengine_terminate_all is not needed, as the DMA
-is not running at this point. This improves performance slightly.
-
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-aes.c  | 2 --
- drivers/crypto/omap-sham.c | 1 -
- 2 files changed, 3 deletions(-)
+ crypto/ahash.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 4a0e6a5..8178632 100644
---- a/drivers/crypto/omap-aes.c
-+++ b/drivers/crypto/omap-aes.c
-@@ -528,8 +528,6 @@ static int omap_aes_crypt_dma_stop(struct omap_aes_dev *dd)
+diff --git a/crypto/ahash.c b/crypto/ahash.c
+index 3887a98..375bbd7 100644
+--- a/crypto/ahash.c
++++ b/crypto/ahash.c
+@@ -536,7 +536,7 @@ static int ahash_prepare_alg(struct ahash_alg *alg)
+ 	struct crypto_alg *base = &alg->halg.base;
  
- 	omap_aes_dma_stop(dd);
+ 	if (alg->halg.digestsize > PAGE_SIZE / 8 ||
+-	    alg->halg.statesize > PAGE_SIZE / 8 ||
++	    alg->halg.statesize > PAGE_SIZE * 2 ||
+ 	    alg->halg.statesize == 0)
+ 		return -EINVAL;
  
--	dmaengine_terminate_all(dd->dma_lch_in);
--	dmaengine_terminate_all(dd->dma_lch_out);
- 
- 	return 0;
- }
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index 2b0a1bd..fd3cac3 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -815,7 +815,6 @@ static int omap_sham_update_dma_stop(struct omap_sham_dev *dd)
- {
- 	struct omap_sham_reqctx *ctx = ahash_request_ctx(dd->req);
- 
--	dmaengine_terminate_all(dd->dma_lch);
- 
- 	if (ctx->flags & BIT(FLAGS_SG)) {
- 		dma_unmap_sg(dd->dev, ctx->sg, 1, DMA_TO_DEVICE);
 -- 
 1.9.1
