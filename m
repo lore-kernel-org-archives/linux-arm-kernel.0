@@ -1,45 +1,59 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 22 Jun 2016 19:59:59 +0200
-Subject: [PATCH 1/2] ARM: OMAP2+: Drop legacy board file for n900
-In-Reply-To: <201606221848.41305@pali>
-References: <1465987689-14812-1-git-send-email-tony@atomide.com>
- <20160621112944.GV29844@pali> <20160621113215.GP22406@atomide.com>
- <201606221848.41305@pali>
-Message-ID: <20160622175959.GA21075@amd>
+From: ttnguyen@apm.com (Tai Nguyen)
+Date: Wed, 22 Jun 2016 11:06:55 -0700
+Subject: [PATCH v4 0/4] perf: Add APM X-Gene SoC Performance Monitoring Unit
+ driver
+Message-ID: <1466618819-2697-1-git-send-email-ttnguyen@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+In addition to the X-Gene ARM CPU performance monitoring unit (PMU), there
+are PMU for the SoC system devices such as L3 cache(s), I/O bridge(s),
+memory controller bridges and memory. These PMU devices are loosely
+architected to follow the same model as the PMU for ARM cores.
 
-> > OK I'd like to apply this series by Monday if no issues to have
-> > enough time for it in Linux next. Does that sound OK to you?
-> > 
-> > Regards,
-> > 
-> > Tony
-> 
-> Ok, now I looked at it and tested current version from torvalds tree.
-> 
-> There is still missing fixed support for IR, but that is waiting in 
-> media tree queue for next merge window.
-> 
-> So after IR patches land in torvalds tree, I'm fine with dropping legacy 
-> board code for n900 and you can add my Acked-by.
-> 
-> Sorry that it look so long time, but Nokia N900 is omap3 device with 
-> most features & drivers.
-> 
-> I need to say that Nokia N900 support has good support in mainline 
-> kernel, probably the best from all mobile phones. It is almost feature 
-> complete, missing parts are: DSP, both cameras, bluetooth and RM
-> radio.
+Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+---
+v4:
+ * Alphabetically sorting header files
+ * Remove dynamic allocation for PMU format and event attribute groups
+   Create shared constant attribute groups per each class
+ * Remove perf_sample_data as this perf driver doesn't support sampling
+ * Consistently use the PCP_PMU_V{1,2} defines
+ * Set affinity to make sure the overflow interrupt is handled by the
+   same assigned CPU
 
-...and graphics acceleration and power management. But who needs
-accelerated graphics, and power management will be solved. So yes,
-N900 is the best phone :-).
+v3:
+ * Remove index property use in PMU device sub nodes
 
-									Pavel
+v2:
+ * Use bitmask for event asignned counter mask pmu_dev->cntr_assign_mask
+ * Remove unnecessary spinlocks in perf add/del operations
+ * Remove unnecessary condition checks
+ * Enforce CPU assignment to one CPU for perf operarations
+ * Set the task_ctx_nr to perf_invalid_context for perf driver
+ * Remove irrelevant pt_rregs
+ * Change perf sysfs attributes to be fixed instead of dynamic
+ * Fix checking for an ACPI companion device instead of EFI enable
+ * Add documentation for config/config1 fields format and perf tool example
+
+---
+Tai Nguyen (4):
+  MAINTAINERS: Add entry for APM X-Gene SoC PMU driver
+  Documentation: Add documentation for APM X-Gene SoC PMU DTS binding
+  perf: xgene: Add APM X-Gene SoC Performance Monitoring Unit driver
+  arm64: dts: apm: Add APM X-Gene SoC PMU DTS entries
+
+ .../devicetree/bindings/perf/apm-xgene-pmu.txt     |  112 ++
+ Documentation/perf/xgene-pmu.txt                   |   48 +
+ MAINTAINERS                                        |    8 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   58 +
+ drivers/perf/Kconfig                               |    7 +
+ drivers/perf/Makefile                              |    1 +
+ drivers/perf/xgene_pmu.c                           | 1437 ++++++++++++++++++++
+ 7 files changed, 1671 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+ create mode 100644 Documentation/perf/xgene-pmu.txt
+ create mode 100644 drivers/perf/xgene_pmu.c
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
