@@ -1,71 +1,73 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:43 +0300
-Subject: [PATCHv2 10/27] crypto: omap-aes: Add support for multiple cores
+Date: Wed, 22 Jun 2016 16:23:45 +0300
+Subject: [PATCHv2 12/27] crypto: engine: avoid unnecessary context switches
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-11-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-13-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+Crypto engine will now hi-jack the currently running thread for executing
+crypto functionality. Only if we are not running a thread (in interrupt
+context) the kthread will be scheduled.
 
-Some SoCs like omap4/omap5/dra7 contain multiple AES crypto accelerator
-cores. Adapt the driver to support this. The driver picks the last used
-device from a list of AES devices.
+This will improve performance of crypto operations using crypto engine.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-[t-kristo at ti.com: forward ported to 4.7 kernel]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-aes.c | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+ crypto/crypto_engine.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index cf53d3f..f710602 100644
---- a/drivers/crypto/omap-aes.c
-+++ b/drivers/crypto/omap-aes.c
-@@ -319,20 +319,12 @@ static void omap_aes_dma_stop(struct omap_aes_dev *dd)
+diff --git a/crypto/crypto_engine.c b/crypto/crypto_engine.c
+index a55c82d..aac5870 100644
+--- a/crypto/crypto_engine.c
++++ b/crypto/crypto_engine.c
+@@ -136,6 +136,14 @@ static void crypto_pump_work(struct kthread_work *work)
+ 	crypto_pump_requests(engine, true);
+ }
  
- static struct omap_aes_dev *omap_aes_find_dev(struct omap_aes_ctx *ctx)
- {
--	struct omap_aes_dev *dd = NULL, *tmp;
-+	struct omap_aes_dev *dd;
++static void queue_pump_work(struct crypto_engine *engine)
++{
++	if (in_interrupt())
++		queue_kthread_work(&engine->kworker, &engine->pump_requests);
++	else
++		crypto_pump_requests(engine, true);
++}
++
+ /**
+  * crypto_transfer_request - transfer the new request into the engine queue
+  * @engine: the hardware engine
+@@ -156,10 +164,11 @@ int crypto_transfer_request(struct crypto_engine *engine,
  
- 	spin_lock_bh(&list_lock);
--	if (!ctx->dd) {
--		list_for_each_entry(tmp, &dev_list, list) {
--			/* FIXME: take fist available aes core */
--			dd = tmp;
--			break;
--		}
--		ctx->dd = dd;
--	} else {
--		/* already found before */
--		dd = ctx->dd;
--	}
-+	dd = list_first_entry(&dev_list, struct omap_aes_dev, list);
-+	list_move_tail(&dd->list, &dev_list);
-+	ctx->dd = dd;
- 	spin_unlock_bh(&list_lock);
+ 	ret = ablkcipher_enqueue_request(&engine->queue, req);
  
- 	return dd;
-@@ -600,7 +592,7 @@ static int omap_aes_prepare_req(struct crypto_engine *engine,
- {
- 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
- 			crypto_ablkcipher_reqtfm(req));
--	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
-+	struct omap_aes_dev *dd = ctx->dd;
- 	struct omap_aes_reqctx *rctx;
- 	int len;
++	spin_unlock_irqrestore(&engine->queue_lock, flags);
++
+ 	if (!engine->busy && need_pump)
+-		queue_kthread_work(&engine->kworker, &engine->pump_requests);
++		queue_pump_work(engine);
  
-@@ -644,7 +636,7 @@ static int omap_aes_crypt_req(struct crypto_engine *engine,
- {
- 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
- 			crypto_ablkcipher_reqtfm(req));
--	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
-+	struct omap_aes_dev *dd = ctx->dd;
+-	spin_unlock_irqrestore(&engine->queue_lock, flags);
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(crypto_transfer_request);
+@@ -210,7 +219,7 @@ void crypto_finalize_request(struct crypto_engine *engine,
  
- 	if (!dd)
- 		return -ENODEV;
+ 	req->base.complete(&req->base, err);
+ 
+-	queue_kthread_work(&engine->kworker, &engine->pump_requests);
++	queue_pump_work(engine);
+ }
+ EXPORT_SYMBOL_GPL(crypto_finalize_request);
+ 
+@@ -234,7 +243,7 @@ int crypto_engine_start(struct crypto_engine *engine)
+ 	engine->running = true;
+ 	spin_unlock_irqrestore(&engine->queue_lock, flags);
+ 
+-	queue_kthread_work(&engine->kworker, &engine->pump_requests);
++	queue_pump_work(engine);
+ 
+ 	return 0;
+ }
 -- 
 1.9.1
