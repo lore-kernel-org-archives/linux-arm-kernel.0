@@ -1,56 +1,307 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 22 Jun 2016 16:36:50 +0200
-Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
-In-Reply-To: <1466601964.5316.19.camel@localhost>
-References: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
- <20160622123222.GD26943@ulmo.ba.sec>
- <1466601964.5316.19.camel@localhost>
-Message-ID: <20160622143650.GO26943@ulmo.ba.sec>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 22 Jun 2016 15:39:23 +0100
+Subject: [PATCH v6 06/15] KVM: arm64: handle ITS related GICv3
+ redistributor registers
+In-Reply-To: <576A9BB4.3000800@arm.com>
+References: <1466165327-32060-1-git-send-email-andre.przywara@arm.com>
+ <1466165327-32060-7-git-send-email-andre.przywara@arm.com>
+ <576A9BB4.3000800@arm.com>
+Message-ID: <16599085-afb1-cf45-fb08-1f3843e73283@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2016 at 09:26:04AM -0400, Sylvain Lemieux wrote:
-> Hi Thierry,
+Hi Marc,
+
+On 22/06/16 15:07, Marc Zyngier wrote:
+> On 17/06/16 13:08, Andre Przywara wrote:
+>> In the GICv3 redistributor there are the PENDBASER and PROPBASER
+>> registers which we did not emulate so far, as they only make sense
+>> when having an ITS. In preparation for that emulate those MMIO
+>> accesses by storing the 64-bit data written into it into a variable
+>> which we later read in the ITS emulation.
+>> We also sanitise the registers, making sure RES0 regions are respected
+>> and checking for valid memory attributes.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/vgic/vgic.h            |  13 +++++
+>>  include/linux/irqchip/arm-gic-v3.h |   1 +
+>>  virt/kvm/arm/vgic/vgic-mmio-v3.c   | 112 ++++++++++++++++++++++++++++++++++++-
+>>  3 files changed, 124 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+>> index e488a369..dc7f2fd 100644
+>> --- a/include/kvm/vgic/vgic.h
+>> +++ b/include/kvm/vgic/vgic.h
+>> @@ -146,6 +146,14 @@ struct vgic_dist {
+>>  	struct vgic_irq		*spis;
+>>  
+>>  	struct vgic_io_device	dist_iodev;
+>> +
+>> +	/*
+>> +	 * Contains the address of the LPI configuration table.
+>> +	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
+>> +	 * one address across all redistributors.
+>> +	 * GICv3 spec: 6.1.2 "LPI Configuration tables"
+>> +	 */
+>> +	u64			propbaser;
+>>  };
+>>  
+>>  struct vgic_v2_cpu_if {
+>> @@ -200,6 +208,11 @@ struct vgic_cpu {
+>>  	 */
+>>  	struct vgic_io_device	rd_iodev;
+>>  	struct vgic_io_device	sgi_iodev;
+>> +
+>> +	/* Points to the LPI pending tables for the redistributor */
+>> +	u64 pendbaser;
+>> +
+>> +	bool lpis_enabled;
+>>  };
+>>  
+>>  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index bfbd707..64e8c70 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -124,6 +124,7 @@
+>>  #define GICR_PROPBASER_WaWb		(5U << 7)
+>>  #define GICR_PROPBASER_RaWaWt		(6U << 7)
+>>  #define GICR_PROPBASER_RaWaWb		(7U << 7)
+>> +#define GICR_PROPBASER_CACHEABILITY_SHIFT (7)
+>>  #define GICR_PROPBASER_CACHEABILITY_MASK (7U << 7)
+>>  #define GICR_PROPBASER_IDBITS_MASK	(0x1f)
+>>  
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> index c38302d..8cd7190 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> @@ -29,6 +29,19 @@ static unsigned long extract_bytes(unsigned long data, unsigned int offset,
+>>  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
+>>  }
+>>  
+>> +/* allows updates of any half of a 64-bit register (or the whole thing) */
+>> +static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+>> +			    unsigned long val)
+>> +{
+>> +	int lower = (offset & 4) * 8;
+>> +	int upper = lower + 8 * len - 1;
+>> +
+>> +	reg &= ~GENMASK_ULL(upper, lower);
+>> +	val &= GENMASK_ULL(len * 8 - 1, 0);
+>> +
+>> +	return reg | ((u64)val << lower);
+>> +}
+>> +
+>>  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+>>  					    gpa_t addr, unsigned int len)
+>>  {
+>> @@ -146,6 +159,101 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
+>>  	return 0;
+>>  }
+>>  
+>> +/* We don't have any constraints about the shareability attributes. */
+>> +static void vgic_sanitise_shareability(u64 *reg)
 > 
-> On Wed, 2016-06-22 at 14:32 +0200, Thierry Reding wrote:
-> > On Fri, Jun 03, 2016 at 03:37:57PM -0400, Sylvain Lemieux wrote:
-> > > From: Sylvain Lemieux <slemieux@tycoint.com>
-> > > 
-> > > If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
-> > > disable the PWM, the PWM output is always set as a logic 1.
-> > 
-> > I presume there's a reason why the bootloader set this bit to 1. Why do
-> > you assume it's the right thing to clear it?
-> > 
-> There is an alternative mode for the PWM output pin; using the 
-> PWM_PIN_LEVEL bit to control the PWM output (logical 0 or 1 on 
-> output) when the PWM is disable.
+> Which register is that for?
+
+I was under the assumption that any shareability constraints would apply
+to _all_ registers that use that mechanism:
+PENDBASER, PROPBASER, BASER(device), BASER(collection), CBASER.
+That's why this common function.
+
+>> +{
+>> +}
 > 
-> In this case, the bootloader is using the PWM_PIN_LEVEL bit
-> to control the PWM output (always 1) to enable the LCD; the 
-> application is using the PWM to control the intensity of the 
-> LCD output. When disabling the PWM, the line level should be 
-> setup to 0.
+> We may not have constraints, but we don't want to let the luser go wild
+> either... ;-) The notion of outer sharable is pretty useless on ARMv8,
+> and I'd rather not pretend it is supported in any way. Can you please
+> make this support all values but OS?
 
-But doesn't that mean that if the pin is used in PWM mode there's never
-a use-case for having it go high when disabled? Given that this is a PWM
-driver I don't see how we'd ever be in the case where the alternate
-setting makes sense.
+Sure, actually I was hoping for your guidance here, since I couldn't
+really wrap my mind around shareability in this virtualisation context.
 
-> A version 2 of this patch will be send with support to select 
-> the alternate PWM disable level high from the device tree.
+>> +
+>> +#define GIC_CACHE_PROP_ATTR(x) ((x) >> GICR_PROPBASER_CACHEABILITY_SHIFT)
+>> +#define GIC_CACHE_PROP_MASK \
+>> +	((u64)(GIC_CACHE_PROP_ATTR(GICR_PROPBASER_CACHEABILITY_MASK)))
+>> +
+>> +static void vgic_sanitise_outer_cacheability(u64 *reg, int reg_shift)
 > 
-> For details, you can refer to:
-> http://thread.gmane.org/gmane.linux.pwm/3882/focus=508758
+> I assume this is for GICR_PROPBASER?
 
-Given the above I don't think we should add this new device tree
-property until we encounter a setup where it's needed.
+Again this is for all registers as listed above. Do we need separate
+constraints for different registers?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/de943625/attachment.sig>
+>> +{
+>> +	switch (*reg >> reg_shift) {
+> 
+> What about the upper bits?
+
+Pah ;-)
+Will fix it ...
+
+>> +	case GIC_CACHE_PROP_ATTR(GICR_PROPBASER_nC):
+>> +		*reg &= ~(GIC_CACHE_PROP_MASK << reg_shift);
+>> +		*reg |= GIC_CACHE_PROP_ATTR(GICR_PROPBASER_WaWb) << reg_shift;
+>> +		break;
+> 
+> Why would you force things to be cacheable? Specially outer cacheable?
+
+To be honest, I couldn't really make out what "outer cacheability"
+actually means in the context of a guest having user space memory mapped.
+
+> 
+> Frankly, I'd rather stick to either 000 (same as inner cacheability) and
+> 001 (outer non-cacheable).
+
+Sure.
+
+> 
+>> +	default:
+>> +		/* We are fine with the other attributes. */
+>> +		break;
+>> +	}
+>> +}
+>> +
+>> +static void vgic_sanitise_inner_cacheability(u64 *reg, int reg_shift)
+>> +{
+>> +	switch (*reg >> reg_shift) {
+>> +	case GIC_CACHE_PROP_ATTR(GICR_PROPBASER_nCnB):
+>> +	case GIC_CACHE_PROP_ATTR(GICR_PROPBASER_nC):
+>> +		*reg &= ~(GIC_CACHE_PROP_MASK << reg_shift);
+>> +		*reg |= GIC_CACHE_PROP_ATTR(GICR_PROPBASER_WaWb) << reg_shift;
+>> +		break;
+>> +	default:
+>> +		/* We are fine with the other attributes. */
+>> +		break;
+>> +	}
+> 
+> I fail to see the difference with the previous function, 
+
+The meaning of 000 is different: for inner cacheability it means Device,
+for outer it means "same as inner". So we need two functions here to
+differentiate, don't we? Unless our constraints happen to be the same
+for the two (by coincidence)?
+Also I think you just requested different constraints for outer and
+inner cacheability? Or did I miss something?
+
+> and it has the
+> same bugs. As for the cacheability, we definitely want to enforce it, so
+> you should make both Device-nGnRnE and Normal-nC unsupported.
+
+Isn't that what the function does? If the value is 000 or 001, it
+changes it to WaWb, otherwise it keeps the value. At least that was what
+I had in mind. WaWb is what the Linux ITS driver prefers, so this serves
+as some sensible value here (I hope). It's a bit weird that these bits
+are not a bitfield, so the ITS cannot report back a set of supported
+attributes easily at once.
+
+>> +}
+>> +
+>> +static void vgic_sanitise_redist_baser(u64 *reg)
+> 
+> Which base register? Please name them entierely (gicr_propbaser) so that
+> we know what you are messing with.
+
+This is for BASER (both for collections and devices). It's a bit
+unfortunate that this one just consists of the stem which the other
+registers also share, so it's a bit hard to differentiate without
+inventing a new name. I can add a comment, though.
+
+>> +{
+>> +	vgic_sanitise_shareability(reg);
+>> +	vgic_sanitise_inner_cacheability(reg,
+>> +					 GICR_PROPBASER_CACHEABILITY_SHIFT);
+>> +	vgic_sanitise_outer_cacheability(reg, 56);
+> 
+> Care to define this bit field?
+
+Sure.
+
+> 
+>> +}
+>> +
+>> +#define PROPBASER_RES0_MASK 0xf8f0000000000060
+>> +#define PENDBASER_RES0_MASK 0xb8f000000000f07f
+> 
+> Please build those using GENMASK_ULL. I can't process long hex values,
+> but I can read something that matches the spec.
+
+OK.
+
+Thanks for having a look!
+
+Andre.
+
+>> +
+>> +static unsigned long vgic_mmio_read_propbase(struct kvm_vcpu *vcpu,
+>> +					     gpa_t addr, unsigned int len)
+>> +{
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +
+>> +	return extract_bytes(dist->propbaser, addr & 7, len);
+>> +}
+>> +
+>> +static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
+>> +				     gpa_t addr, unsigned int len,
+>> +				     unsigned long val)
+>> +{
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>> +
+>> +	/* Storing a value with LPIs already enabled is undefined */
+>> +	if (vgic_cpu->lpis_enabled)
+>> +		return;
+>> +
+>> +	dist->propbaser = update_64bit_reg(dist->propbaser, addr & 4, len, val);
+>> +	dist->propbaser &= ~PROPBASER_RES0_MASK;
+>> +	vgic_sanitise_redist_baser(&dist->propbaser);
+>> +}
+>> +
+>> +static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
+>> +					     gpa_t addr, unsigned int len)
+>> +{
+>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>> +
+>> +	return extract_bytes(vgic_cpu->pendbaser, addr & 7, len);
+>> +}
+>> +
+>> +static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+>> +				     gpa_t addr, unsigned int len,
+>> +				     unsigned long val)
+>> +{
+>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>> +
+>> +	/* Storing a value with LPIs already enabled is undefined */
+>> +	if (vgic_cpu->lpis_enabled)
+>> +		return;
+>> +
+>> +	vgic_cpu->pendbaser = update_64bit_reg(vgic_cpu->pendbaser,
+>> +					       addr & 4, len, val);
+>> +	vgic_cpu->pendbaser &= ~PENDBASER_RES0_MASK;
+>> +	vgic_sanitise_redist_baser(&vgic_cpu->pendbaser);
+>> +}
+>> +
+>>  /*
+>>   * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+>>   * redistributors, while SPIs are covered by registers in the distributor
+>> @@ -226,10 +334,10 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+>>  		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
+>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+>> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+>> +		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
+>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>  	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
+>> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+>> +		vgic_mmio_read_pendbase, vgic_mmio_write_pendbase, 8,
+>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>  	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
+>>  		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
