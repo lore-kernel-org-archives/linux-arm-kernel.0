@@ -1,41 +1,21 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 22 Jun 2016 16:07:52 +0530
-Subject: [PATCH 1/2] cpufreq: exynos: use relaxed IO accesors
-In-Reply-To: <CAJKOXPfFaAq4te5Jp2sXkK7MfS-NxmWnx931dDojFfBW34ofeQ@mail.gmail.com>
-References: <1466587984-14105-1-git-send-email-ben.dooks@codethink.co.uk>
- <3668897.kYSEflAvDO@wuerfel>
- <CAJKOXPfFaAq4te5Jp2sXkK7MfS-NxmWnx931dDojFfBW34ofeQ@mail.gmail.com>
-Message-ID: <20160622103752.GG5458@vireshk-i7>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 22 Jun 2016 18:37:05 +0800
+Subject: [[PATCH v2] 11/11] hwrng: exynos - fixup IO accesors
+In-Reply-To: <1466504432-24187-12-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20160622103705.GA30967@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22-06-16, 12:36, Krzysztof Kozlowski wrote:
-> On Wed, Jun 22, 2016 at 11:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday, June 22, 2016 10:33:03 AM CEST Ben Dooks wrote:
-> >> The use of __raw IO accesors is not endian safe and should be used
-> >> sparingly. The relaxed variants should be as lightweight and also
-> >> are endian safe.
-> >>
-> >> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> >>
-> >
-> > Why not use the normal readl/writel() here instead of the relaxed version?
-> >
-> > Either one should work here, but in general I'd recommend using the
-> > non-relaxed version unless code is particularly performance sensitive.
-> >
-> > The main argument for that is to not let people get used to using
-> > _relaxed() all the time because it causes some very hard to debug
-> > problems in the cases where you actually need the barriers.
+Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> The __raw IO functions are not endian safe, so use the readl_relaxed
+> and writel_relaxed versions of these.
 > 
-> I think that would be actually different patch, not endian related.
-> The concurrent operations here are excluded by mutexes so this looks
-> safe.
-> 
-> Viresh,
-> I saw your ack. Do you prefer me to take the set through samsung-soc?
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Sure.
+This patch has already been merged.
 
+Cheers,
 -- 
-viresh
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
