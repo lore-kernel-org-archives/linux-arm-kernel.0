@@ -1,85 +1,147 @@
-From: ttnguyen@apm.com (Tai Nguyen)
-Date: Wed, 22 Jun 2016 11:06:59 -0700
-Subject: [PATCH v4 4/4] arm64: dts: apm: Add APM X-Gene SoC PMU DTS entries
-In-Reply-To: <1466618819-2697-1-git-send-email-ttnguyen@apm.com>
-References: <1466618819-2697-1-git-send-email-ttnguyen@apm.com>
-Message-ID: <1466618819-2697-5-git-send-email-ttnguyen@apm.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 22 Jun 2016 14:16:25 -0400
+Subject: [PATCH v13 09/10] arm64: Add kernel return probes support
+ (kretprobes)
+In-Reply-To: <20160607192836.20d94e0838ef72ebc729a054@kernel.org>
+References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
+ <1464924384-15269-10-git-send-email-dave.long@linaro.org>
+ <20160607192836.20d94e0838ef72ebc729a054@kernel.org>
+Message-ID: <576AD5F9.9090905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi | 58 ++++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+On 06/07/2016 06:28 AM, Masami Hiramatsu wrote:
+> On Thu,  2 Jun 2016 23:26:23 -0400
+> David Long <dave.long@linaro.org> wrote:
+>
+>> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+>>
+>> The pre-handler of this special 'trampoline' kprobe executes the return
+>> probe handler functions and restores original return address in ELR_EL1.
+>> This way the saved pt_regs still hold the original register context to be
+>> carried back to the probed kernel function.
+>>
+>> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>> ---
+>>   arch/arm64/Kconfig          |  1 +
+>>   arch/arm64/kernel/kprobes.c | 75 ++++++++++++++++++++++++++++++++++++++++++++-
+>>   2 files changed, 75 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 5496b75..47989eb 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -89,6 +89,7 @@ config ARM64
+>>   	select HAVE_RCU_TABLE_FREE
+>>   	select HAVE_SYSCALL_TRACEPOINTS
+>>   	select HAVE_KPROBES
+>> +	select HAVE_KRETPROBES if HAVE_KPROBES
+>>   	select IOMMU_DMA if IOMMU_SUPPORT
+>>   	select IRQ_DOMAIN
+>>   	select IRQ_FORCED_THREADING
+>> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+>> index b35f76f..c116904 100644
+>> --- a/arch/arm64/kernel/kprobes.c
+>> +++ b/arch/arm64/kernel/kprobes.c
+>> @@ -577,7 +577,80 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
+>>
+>>   void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
+>>   {
+>> -	return NULL;
+>> +	struct kretprobe_instance *ri = NULL;
+>> +	struct hlist_head *head, empty_rp;
+>> +	struct hlist_node *tmp;
+>> +	unsigned long flags, orig_ret_addr = 0;
+>> +	unsigned long trampoline_address =
+>> +		(unsigned long)&kretprobe_trampoline;
+>> +
+>> +	INIT_HLIST_HEAD(&empty_rp);
+>> +	kretprobe_hash_lock(current, &head, &flags);
+>> +
+>> +	/*
+>> +	 * It is possible to have multiple instances associated with a given
+>> +	 * task either because multiple functions in the call path have
+>> +	 * a return probe installed on them, and/or more than one return
+>> +	 * probe was registered for a target function.
+>> +	 *
+>> +	 * We can handle this because:
+>> +	 *     - instances are always inserted at the head of the list
+>> +	 *     - when multiple return probes are registered for the same
+>> +	 *       function, the first instance's ret_addr will point to the
+>> +	 *       real return address, and all the rest will point to
+>> +	 *       kretprobe_trampoline
+>> +	 */
+>> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
+>> +		if (ri->task != current)
+>> +			/* another task is sharing our hash bucket */
+>> +			continue;
+>> +
+>> +		if (ri->rp && ri->rp->handler) {
+>> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
+>> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
+>> +			ri->rp->handler(ri, regs);
+>> +			__this_cpu_write(current_kprobe, NULL);
+>> +		}
+>> +
+>> +		orig_ret_addr = (unsigned long)ri->ret_addr;
+>> +		recycle_rp_inst(ri, &empty_rp);
+>> +
+>> +		if (orig_ret_addr != trampoline_address)
+>> +			/*
+>> +			 * This is the real return address. Any other
+>> +			 * instances associated with this task are for
+>> +			 * other calls deeper on the call stack
+>> +			 */
+>> +			break;
+>> +	}
+>
+> This looks not included an improvement done by Syuhei, see
+> commit 737480a0d525 ("kprobes/x86: Fix the return address of multiple kretprobes")
+>
+> Thank you!
+>
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index fe30f76..62806e0 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -566,6 +566,64 @@
- 			};
- 		};
- 
-+		pmu: pmu at 78810000 {
-+			compatible = "apm,xgene-pmu-v2";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+			regmap-csw = <&csw>;
-+			regmap-mcba = <&mcba>;
-+			regmap-mcbb = <&mcbb>;
-+			reg = <0x0 0x78810000 0x0 0x1000>;
-+			interrupts = <0x0 0x22 0x4>;
-+
-+			pmul3c at 7e610000 {
-+				compatible = "apm,xgene-pmu-l3c";
-+				reg = <0x0 0x7e610000 0x0 0x1000>;
-+			};
-+
-+			pmuiob at 7e940000 {
-+				compatible = "apm,xgene-pmu-iob";
-+				reg = <0x0 0x7e940000 0x0 0x1000>;
-+			};
-+
-+			pmucmcb at 7e710000 {
-+				compatible = "apm,xgene-pmu-mcb";
-+				reg = <0x0 0x7e710000 0x0 0x1000>;
-+				enable-bit-index = <0>;
-+			};
-+
-+			pmucmcb at 7e730000 {
-+				compatible = "apm,xgene-pmu-mcb";
-+				reg = <0x0 0x7e730000 0x0 0x1000>;
-+				enable-bit-index = <1>;
-+			};
-+
-+			pmucmc at 7e810000 {
-+				compatible = "apm,xgene-pmu-mc";
-+				reg = <0x0 0x7e810000 0x0 0x1000>;
-+				enable-bit-index = <0>;
-+			};
-+
-+			pmucmc at 7e850000 {
-+				compatible = "apm,xgene-pmu-mc";
-+				reg = <0x0 0x7e850000 0x0 0x1000>;
-+				enable-bit-index = <1>;
-+			};
-+
-+			pmucmc at 7e890000 {
-+				compatible = "apm,xgene-pmu-mc";
-+				reg = <0x0 0x7e890000 0x0 0x1000>;
-+				enable-bit-index = <2>;
-+			};
-+
-+			pmucmc at 7e8d0000 {
-+				compatible = "apm,xgene-pmu-mc";
-+				reg = <0x0 0x7e8d0000 0x0 0x1000>;
-+				enable-bit-index = <3>;
-+			};
-+		};
-+
- 		pcie0: pcie at 1f2b0000 {
- 			status = "disabled";
- 			device_type = "pci";
--- 
-1.9.1
+I've updated the relevant part of this function with the current x86 
+version  of the code.
+
+>> +
+>> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
+>> +	/* restore the original return address */
+>> +	instruction_pointer(regs) = orig_ret_addr;
+>> +	reset_current_kprobe();
+>> +	kretprobe_hash_unlock(current, &flags);
+>> +
+>> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
+>> +		hlist_del(&ri->hlist);
+>> +		kfree(ri);
+>> +	}
+>> +
+>> +	/* return 1 so that post handlers not called */
+>> +	return (void *) orig_ret_addr;
+>> +}
+>> +
+>> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
+>> +				      struct pt_regs *regs)
+>> +{
+>> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
+>> +
+>> +	/* replace return addr (x30) with trampoline */
+>> +	regs->regs[30] = (long)&kretprobe_trampoline;
+>> +}
+>> +
+>> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
+>> +{
+>> +	return 0;
+>>   }
+>>
+>>   int __init arch_init_kprobes(void)
+>> --
+>> 2.5.0
+>>
+>
+>
+
+
+Thanks,
+-dl
