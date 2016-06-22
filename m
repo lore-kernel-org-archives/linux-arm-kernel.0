@@ -1,53 +1,48 @@
 From: Yisen.zhuang@huawei.com (Yisen Zhuang)
-Date: Wed, 22 Jun 2016 09:33:24 +0800
-Subject: [PATCH net-next 01/19] net: hns: bug fix of ge reset sequence
-In-Reply-To: <1466505306.30123.203.camel@linux.intel.com>
+Date: Wed, 22 Jun 2016 09:41:43 +0800
+Subject: [PATCH net-next 16/19] net: hns: fix bug that alloc skb fail lead
+ to port unavailable
+In-Reply-To: <097b1147-3587-9579-0f94-f42be130773c@cogentembedded.com>
 References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
- <1466481399-70080-2-git-send-email-Yisen.Zhuang@huawei.com>
- <1466505306.30123.203.camel@linux.intel.com>
-Message-ID: <5769EAE4.2010507@huawei.com>
+ <1466481399-70080-17-git-send-email-Yisen.Zhuang@huawei.com>
+ <097b1147-3587-9579-0f94-f42be130773c@cogentembedded.com>
+Message-ID: <5769ECD7.8080303@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2016/6/21 18:35, Andy Shevchenko ??:
-> On Tue, 2016-06-21 at 11:56 +0800, Yisen Zhuang wrote:
->> From: Qianqian Xie <xieqianqian@huawei.com>
+? 2016/6/21 21:25, Sergei Shtylyov ??:
+> Hello.
+> 
+> On 6/21/2016 6:56 AM, Yisen Zhuang wrote:
+> 
+>> From: Jun He <hjat2005@huawei.com>
 >>
->> The bit fileds of PPE reset register are different between HNS v1 and
->> HNS v2, but the current procedure just only match HNS v1. Here is a
->> patch to fix it.
+>> When hns_nic_poll_rx_skb alloc skb fail, it will break receive cycle and
+>> read new fbd_num to start new receive cycle. It recomputes cycle num is
+>> fbd_num minus clean_count, actually this cycle num is too big because
+>> it drop out receive cycle. It brings about the port unavailable.
 >>
->> Signed-off-by: Kejian Yan <yankejian@huawei.com>
->> Signed-off-by: Qianqian Xie <xieqianqian@huawei.com>
+>> So we will goto out when alloc skb fail to fix this bug.
+>>
+>> Signed-off-by: Jun He <hjat2005@huawei.com>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 >> Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 >> ---
->>  drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 6 +++++-
->>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>  drivers/net/ethernet/hisilicon/hns/hns_enet.c | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
 >>
->> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
->> b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
->> index 96cb628..09e60d6 100644
->> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
->> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
->> @@ -271,7 +271,11 @@ static void hns_dsaf_ge_srst_by_port(struct
->> dsaf_device *dsaf_dev, u32 port,
->>  		}
->>  	} else {
->>  		reg_val_1 = 0x15540 << dsaf_dev->reset_offset;
->> -		reg_val_2 = 0x100 << dsaf_dev->reset_offset;
->> +
->> +		if (AE_IS_VER1(dsaf_dev->dsaf_ver))
->> +			reg_val_2 = 0x100 << dsaf_dev->reset_offset;
->> +		else
->> +			reg_val_2 = 0x40 << dsaf_dev->reset_offset;
-> 
-> reg_val_1 = 0x15540;
-> reg_val_2 = AE_IS_VER1(dsaf_dev->dsaf_ver) ? 0x100 : 0x40;
-> 
-> reg_val_1 <<= dsaf_dev->reset_offset;
-> reg_val_2 <<= dsaf_dev-
+>> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+>> index f49246d..c0ce37b 100644
+>> --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+>> +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+>> @@ -768,10 +768,10 @@ recv:
+>>              clean_count = 0;
+>>          }
+>>
+>> -        /* poll one pkg*/
+>> +        /* poll one pkt*/
 
 I will fix it with a new patch.
 
@@ -55,11 +50,13 @@ Thanks,
 
 Yisen
 
->> reset_offset;
+> 
+>    How about adding a space before */?
+> 
+> [...]
+> 
+> MBR, Sergei
 > 
 > 
->>  
->>  		if (!dereset) {
->>  			dsaf_write_sub(dsaf_dev,
->> DSAF_SUB_SC_GE_RESET_REQ1_REG,
+> .
 > 
