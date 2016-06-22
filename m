@@ -1,40 +1,71 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:51 +0300
-Subject: [PATCHv2 18/27] ARM: dts: DRA7: Add DT node for RNG IP
+Date: Wed, 22 Jun 2016 16:23:43 +0300
+Subject: [PATCHv2 10/27] crypto: omap-aes: Add support for multiple cores
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-19-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-11-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lokesh Vutla <lokeshvutla@ti.com>
 
-Adding dt node for hardware random number generator IP.
+Some SoCs like omap4/omap5/dra7 contain multiple AES crypto accelerator
+cores. Adapt the driver to support this. The driver picks the last used
+device from a list of AES devices.
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+[t-kristo at ti.com: forward ported to 4.7 kernel]
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/crypto/omap-aes.c | 20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 64759e1..16ff083 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1787,6 +1787,15 @@
- 			clocks = <&l3_iclk_div>;
- 			clock-names = "fck";
- 		};
-+
-+		rng: rng at 48090000 {
-+			compatible = "ti,omap4-rng";
-+			ti,hwmods = "rng";
-+			reg = <0x48090000 0x2000>;
-+			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&l3_iclk_div>;
-+			clock-names = "fck";
-+		};
- 	};
+diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+index cf53d3f..f710602 100644
+--- a/drivers/crypto/omap-aes.c
++++ b/drivers/crypto/omap-aes.c
+@@ -319,20 +319,12 @@ static void omap_aes_dma_stop(struct omap_aes_dev *dd)
  
- 	thermal_zones: thermal-zones {
+ static struct omap_aes_dev *omap_aes_find_dev(struct omap_aes_ctx *ctx)
+ {
+-	struct omap_aes_dev *dd = NULL, *tmp;
++	struct omap_aes_dev *dd;
+ 
+ 	spin_lock_bh(&list_lock);
+-	if (!ctx->dd) {
+-		list_for_each_entry(tmp, &dev_list, list) {
+-			/* FIXME: take fist available aes core */
+-			dd = tmp;
+-			break;
+-		}
+-		ctx->dd = dd;
+-	} else {
+-		/* already found before */
+-		dd = ctx->dd;
+-	}
++	dd = list_first_entry(&dev_list, struct omap_aes_dev, list);
++	list_move_tail(&dd->list, &dev_list);
++	ctx->dd = dd;
+ 	spin_unlock_bh(&list_lock);
+ 
+ 	return dd;
+@@ -600,7 +592,7 @@ static int omap_aes_prepare_req(struct crypto_engine *engine,
+ {
+ 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
+ 			crypto_ablkcipher_reqtfm(req));
+-	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
++	struct omap_aes_dev *dd = ctx->dd;
+ 	struct omap_aes_reqctx *rctx;
+ 	int len;
+ 
+@@ -644,7 +636,7 @@ static int omap_aes_crypt_req(struct crypto_engine *engine,
+ {
+ 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
+ 			crypto_ablkcipher_reqtfm(req));
+-	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
++	struct omap_aes_dev *dd = ctx->dd;
+ 
+ 	if (!dd)
+ 		return -ENODEV;
 -- 
 1.9.1
