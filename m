@@ -1,27 +1,52 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 22 Jun 2016 09:24:58 -0400
-Subject: [PATCH 1/2] arm64: Refactor vDSO time functions
-In-Reply-To: <1462797421-33103-2-git-send-email-kevin.brodsky@arm.com>
-References: <1462797421-33103-1-git-send-email-kevin.brodsky@arm.com>
- <1462797421-33103-2-git-send-email-kevin.brodsky@arm.com>
-Message-ID: <576A91AA.1040608@codeaurora.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 22 Jun 2016 16:23:52 +0300
+Subject: [PATCHv2 19/27] ARM: dts: AM43xx: clk: Add RNG clk node
+In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-20-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-On 05/09/2016 08:37 AM, Kevin Brodsky wrote:
-> Time functions are directly implemented in assembly in arm64, and it
-> is desirable to keep it this way for performance reasons (everything
-> fits in registers, so that the stack is not used at all). However, the
+Add clk node for RNG module.
 
-Why do you say that? My simple tests indicate passing -O1 to GCC (4.8)
-is sufficient to make it only spill to the stack when necessary.
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
+ drivers/clk/ti/clk-43xx.c            | 1 +
+ 2 files changed, 9 insertions(+)
 
-Cheers,
-Cov
-
+diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
+index 7630ba1..d1d73b7 100644
+--- a/arch/arm/boot/dts/am43xx-clocks.dtsi
++++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+@@ -104,6 +104,14 @@
+ 		clock-div = <1>;
+ 	};
+ 
++	rng_fck: rng_fck {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&sys_clkin_ck>;
++		clock-mult = <1>;
++		clock-div = <1>;
++	};
++
+ 	ehrpwm0_tbclk: ehrpwm0_tbclk at 664 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,gate-clock";
+diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
+index 097fc90..3f157a4 100644
+--- a/drivers/clk/ti/clk-43xx.c
++++ b/drivers/clk/ti/clk-43xx.c
+@@ -58,6 +58,7 @@ static struct ti_dt_clk am43xx_clks[] = {
+ 	DT_CLK(NULL, "smartreflex1_fck", "smartreflex1_fck"),
+ 	DT_CLK(NULL, "sha0_fck", "sha0_fck"),
+ 	DT_CLK(NULL, "aes0_fck", "aes0_fck"),
++	DT_CLK(NULL, "rng_fck", "rng_fck"),
+ 	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
+ 	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
+ 	DT_CLK(NULL, "timer3_fck", "timer3_fck"),
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
