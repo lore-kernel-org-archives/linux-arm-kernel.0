@@ -1,112 +1,94 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 22 Jun 2016 17:43:58 -0500
-Subject: [PATCH v3 4/4] ARM/PCI: remove arch specific
- pcibios_enable_device()
-In-Reply-To: <1465383890-13538-5-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Wed, 22 Jun 2016 18:01:51 -0500
+Subject: [PATCH v3 0/4] ARM/ARM64: PCI: PCI_PROBE_ONLY clean-up
+In-Reply-To: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465383890-13538-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160622224358.GG25485@localhost>
+Message-ID: <20160622230151.GH25485@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 12:04:50PM +0100, Lorenzo Pieralisi wrote:
-> The arm pcibios_enable_device() implementation exists solely
-> to prevent enabling PCI resources on PCI_PROBE_ONLY systems, since
-> on those systems the PCI resources are currently not claimed (ie
-> inserted in the PCI resource tree - which means their parent
-> pointer is not correctly set-up) therefore they can not be enabled
-> since this would trigger PCI set-ups failures.
+On Wed, Jun 08, 2016 at 12:04:46PM +0100, Lorenzo Pieralisi wrote:
+> Current arm/arm64 code prevents enabling resources in the respective
+> pcibios_enable_device() callbacks if the PCI_PROBE_ONLY flag is set,
+> in that on those platforms the resources tree was not validated properly
+> since PCI resources are not currently claimed on arm/arm64 PCI_PROBE_ONLY
+> systems.
 > 
-> After removing the pci=firmware command line option in:
+> This is a temporary kludge, in that PCI_PROBE_ONLY flag is used to
+> describe systems with fixed resources, that can nonetheless be enabled
+> through the standard pci_enable_resources() call present in PCI core code,
+> (ie via the generic pcibios_enable_device() call).
 > 
-> commit 903589ca7165 ("ARM: 8554/1: kernel: pci: remove pci=firmware
-> command line parameter handling")
+> To remove the PCI_PROBE_ONLY flag in arm/arm64 pcibios_enable_device()
+> callbacks, the PCI host controllers that can be used with
+> PCI_PROBE_ONLY configurations must make sure that devices resources are
+> validated and inserted in the kernel resource tree even on PCI_PROBE_ONLY
+> systems so that the generic pcibios_enable_device() generic code, while
+> enabling resources (pci_enable_resources()), does not find dangling
+> resources pointers (ie missing parent pointers) that are omens of
+> an incomplete resource tree, causing failures in resources enablement.
 > 
-> (that was used to set the PCI_PROBE_ONLY flag through the command line)
-> and by introducing resources claiming in the PCI host controllers
-> set-ups that have PCI_PROBE_ONLY as a probe option, there is no need for
-> arch specific pcibios_enable_device() implementations anymore in that
-> the kernel can rely on the generic pcibios_enable_device()
-> implementation without resorting to arch specific code to work around
-> the missing resources claiming enumeration step.
+> PCI core code provides interfaces to assign/reassign/reallocate PCI
+> bus resources but it is currently lacking an interface to claim
+> resources for a specific bus. Arches implement resources claiming through
+> ad-hoc code built on top of pci_claim_resource() API, but that code
+> cannot be leveraged on architectures like arm/arm64 that rely on the
+> generic PCI infrastructure to carry out resources claiming/assignment.
 > 
-> On !PCI_PROBE_ONLY PCI bus set-ups, resources are always assigned
-> either in pcibios initialization code or PCI host controllers drivers;
-> since the PCI resource assignment API takes care of inserting the
-> assigned resources in the resource tree, the resources parent pointers
-> are correctly set-up, which means that this patch leaves behaviour
-> unchanged for all arm PCI set-ups that do not set the PCI_PROBE_ONLY
-> flag.
+> Therefore, to clean up the arm/arm64 resources enablement on
+> PCI_PROBE_ONLY systems this patchset implements four patches:
 > 
-> Remove the pcibios_enable_device() function from the arm arch back-end
-> so that the kernel now uses its generic implementation.
+> PATCH 1: Create PCI core code infrastructure to claim bus resources
+> PATCH 2: Leverage the infrastructure in PATCH 1 to claim resources in
+>          the PCI generic host controller on PCI_PROBE_ONLY systems
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> ---
->  arch/arm/kernel/bios32.c | 12 ------------
->  1 file changed, 12 deletions(-)
+> PATCH 3: Remove the PCI_PROBE_ONLY kludge from the arm64 PCI back-end to
+>          complete the clean-up and leverage the PCI generic
+>          pcibios_enable_device() implementation
 > 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 05e61a2..488545f 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -590,18 +590,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->  	return start;
->  }
->  
-> -/**
-> - * pcibios_enable_device - Enable I/O and memory.
-> - * @dev: PCI device to be enabled
-> - */
-> -int pcibios_enable_device(struct pci_dev *dev, int mask)
-> -{
-> -	if (pci_has_flag(PCI_PROBE_ONLY))
-> -		return 0;
-> -
-> -	return pci_enable_resources(dev, mask);
-> -}
-
-This looks great.
-
-What about the PCI_PROBE_ONLY test in pci_common_init_dev()?  Don't we
-need to either remove that test (if it's impossible to get there with
-PCI_PROBE_ONLY set), or add a pci_bus_claim_resources() call as we did
-in pci_host_common_probe()?
-
-I think it's unlikely that we'd get to pci_common_init_dev() with
-PCI_PROBE_ONLY set:
-
-  - the only way to set PCI_PROBE_ONLY on ARM is to call
-    of_pci_check_probe_only(),
-
-  - the only ARM caller of of_pci_check_probe_only() is
-    pci_host_common_probe(),
-
-  - pci_host_common_probe() doesn't call pci_common_init_dev().
-
-But I guess it's possible to imagine a platform with both a generic
-PCI bridge and a MVEBU, R-Car, or Tegra bridge.  Then
-pci_host_common_probe() could set PCI_PROBE_ONLY, and we'd claim
-resources under the generic bridge via the previous patch, but still
-not claim those under the MVEBU bridge.  Then enabling the MVEBU
-devices would fail.
-
-I know this is a ridiculous scenario, but the code looks inconsistent
-as it is.
-
->  int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
->  			enum pci_mmap_state mmap_state, int write_combine)
->  {
-> -- 
-> 2.6.4
+> PATCH 4: Remove the PCI_PROBE_ONLY kludge from the arm PCI back-end to
+>          complete the clean-up and leverage the PCI generic
+>          pcibios_enable_device() implementation
 > 
+> Tested on arm/arm64 systems with kvmtool and PCI host generic.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> v2 -> v3
+> 
+> - Split patch 3 in two patches so that arm and arm64 are handled
+>   in different patches
+> - Improved commits logs, clarified resource parent assignment
+> - Rebased against v4.7-rc2
+> 
+> v2: https://patchwork.ozlabs.org/patch/590556/
+> 
+> v1 -> v2
+> 
+> - Rewrote patch 1 to recursively claim resources for the whole PCI bus
+>   hierarchy
+> - Updated commits logs/tags
+> - Rebased against v4.5-rc6
+> 
+> v1: https://patchwork.ozlabs.org/patch/545669/
+> 
+> Lorenzo Pieralisi (4):
+>   PCI: add generic code to claim bus resources
+>   PCI: host-generic: claim bus resources on PCI_PROBE_ONLY set-ups
+>   ARM64/PCI: remove arch specific pcibios_enable_device()
+>   ARM/PCI: remove arch specific pcibios_enable_device()
+> 
+>  arch/arm/kernel/bios32.c           | 12 -------
+>  arch/arm64/kernel/pci.c            | 13 --------
+>  drivers/pci/host/pci-host-common.c | 27 +++++++++++++--
+>  drivers/pci/setup-bus.c            | 68 ++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci.h                |  1 +
+>  5 files changed, 94 insertions(+), 27 deletions(-)
+
+I applied these to pci/resource for v4.8, thanks, Lorenzo!
+
+It's awesome to get rid of that PCI_PROBE_ONLY hack.
+
+We might still tweak this a little based on my question about
+pci_common_init_dev(), so don't build things on top of this yet (good
+advice in general for my branches: I often rebase and remerge them, so
+it's best to base things on my "master" branch unless you actually
+depend on something that's not in there.)
