@@ -1,29 +1,38 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 22 Jun 2016 15:35:06 +0300
-Subject: [PATCH v3 11/15] mmc: sdhci-of-arasan: Add ability to export card
- clock
-In-Reply-To: <1466445414-11974-12-git-send-email-dianders@chromium.org>
-References: <1466445414-11974-1-git-send-email-dianders@chromium.org>
- <1466445414-11974-12-git-send-email-dianders@chromium.org>
-Message-ID: <576A85FA.2000309@intel.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 22 Jun 2016 14:40:28 +0200
+Subject: [PATCH V7 1/8] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <1466598909-27504-1-git-send-email-tn@semihalf.com>
+References: <1466420541-20101-2-git-send-email-tn@semihalf.com>
+ <1466598909-27504-1-git-send-email-tn@semihalf.com>
+Message-ID: <576A873C.3050107@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/16 20:56, Douglas Anderson wrote:
-> Some SD/eMMC PHYs (like the PHY from Arasan that is designed to work
-> with arasan,sdhci-5.1) need to know the card clock in order to function
-> properly.  Let's add the ability to expose this clock.  Any PHY that
-> needs to know the clock rate can add a reference and query the clock
-> rate.
-> 
-> At the moment we register a CLK_GET_RATE_NOCACHE clock that simply
-> allows querying the clock.  This allows us to be less intrusive with
-> regards to the main SDHCI driver, which has complex logic for adjusting
-> the SD clock.  Right now we always fully power cycle the PHY when the
-> clock changes and that gives the PHY a good chance to query our clock.
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
+On 22.06.2016 14:35, Tomasz Nowicki wrote:
+> IORT shows representation of IO topology for ARM based systems.
+> It describes how various components are connected together on
+> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>
+> Initial support allows to detect IORT table presence and save its
+> root pointer obtained through acpi_get_table(). The pointer validity
+> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+> is not set while using IORT nodes we would dereference unmapped pointers.
+>
+> For the aforementioned reason call iort_table_detect() from acpi_init()
+> which guarantees acpi_gbl_permanent_mmap to be set at that point.
+>
+> Add generic helpers which are helpful for scanning and retrieving
+> information from IORT table content. List of the most important helpers:
+> - iort_find_dev_node() finds IORT node for a given device
+> - iort_node_map_rid() maps device RID and returns IORT node which provides
+>    final translation
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+The updated patch incorporates fixes and addresses Lorenzo's comments.
+The whole series is here:
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v7.1)
+
+Thanks,
+Tomasz
