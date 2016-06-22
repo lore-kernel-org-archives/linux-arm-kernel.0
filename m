@@ -1,74 +1,80 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Wed, 22 Jun 2016 08:58:53 -0500
-Subject: [PATCHv5 2/8] EDAC, altera: Add panic flag check to A10 IRQ
+Date: Wed, 22 Jun 2016 08:58:54 -0500
+Subject: [PATCHv5 3/8] EDAC,
+ altera: Make all private data structures static const.
 In-Reply-To: <1466603939-7526-1-git-send-email-tthayer@opensource.altera.com>
 References: <1466603939-7526-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1466603939-7526-3-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1466603939-7526-4-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-In preparation for additional memory module ECCs, the
-IRQ function will check a panic flag before doing a
-kernel panic on double bit errors.
-
-OCRAM uncorrectable errors cause a panic because sleep/resume
-functions and FPGA contents during sleep are stored in OCRAM.
-
-ECCs on peripheral FIFO buffers will not cause a kernel panic
-on DBERRs because the packet can be retried and therefore
-recovered.
+The device private data structures should be converted from const
+struct edac_device_prv_data to static const struct edac_device_prv_data.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
-v2  New patch. Add panic flag to IRQ function.
-v3  No change
-v4  Add reasons to panic on DBERR in OCRAM.
+v4  New patch added for conversion.
 v5  No change
 ---
- drivers/edac/altera_edac.c |    9 ++++++++-
- drivers/edac/altera_edac.h |    1 +
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ drivers/edac/altera_edac.c |   16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index 0101dd0..75451bc 100644
+index 75451bc..dcedc4a 100644
 --- a/drivers/edac/altera_edac.c
 +++ b/drivers/edac/altera_edac.c
-@@ -897,7 +897,8 @@ static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
- 		writel(ALTR_A10_ECC_DERRPENA,
- 		       base + ALTR_A10_ECC_INTSTAT_OFST);
- 		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
--		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
-+		if (dci->data->panic)
-+			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
+@@ -550,10 +550,10 @@ module_platform_driver(altr_edac_driver);
+  * trigger testing are different for each memory.
+  */
  
- 		return IRQ_HANDLED;
- 	}
-@@ -936,6 +937,12 @@ const struct edac_device_prv_data a10_ocramecc_data = {
- 	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
- 	.ecc_irq_handler = altr_edac_a10_ecc_irq,
- 	.inject_fops = &altr_edac_a10_device_inject_fops,
-+	/*
-+	 * OCRAM panic on uncorrectable error because sleep/resume
-+	 * functions and FPGA contents are stored in OCRAM. Prefer
-+	 * a kernel panic over executing/loading corrupted data.
-+	 */
-+	.panic = true,
+-const struct edac_device_prv_data ocramecc_data;
+-const struct edac_device_prv_data l2ecc_data;
+-const struct edac_device_prv_data a10_ocramecc_data;
+-const struct edac_device_prv_data a10_l2ecc_data;
++static const struct edac_device_prv_data ocramecc_data;
++static const struct edac_device_prv_data l2ecc_data;
++static const struct edac_device_prv_data a10_ocramecc_data;
++static const struct edac_device_prv_data a10_l2ecc_data;
+ 
+ static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
+ {
+@@ -908,7 +908,7 @@ static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
+-const struct edac_device_prv_data ocramecc_data = {
++static const struct edac_device_prv_data ocramecc_data = {
+ 	.setup = altr_check_ecc_deps,
+ 	.ce_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_SERR),
+ 	.ue_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_DERR),
+@@ -924,7 +924,7 @@ const struct edac_device_prv_data ocramecc_data = {
+ 	.inject_fops = &altr_edac_device_inject_fops,
  };
  
- #endif	/* CONFIG_EDAC_ALTERA_OCRAM */
-diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
-index 62b0fa0..cf4e8cb 100644
---- a/drivers/edac/altera_edac.h
-+++ b/drivers/edac/altera_edac.h
-@@ -298,6 +298,7 @@ struct edac_device_prv_data {
- 	irqreturn_t (*ecc_irq_handler)(int irq, void *dev_id);
- 	int trig_alloc_sz;
- 	const struct file_operations *inject_fops;
-+	bool panic;
+-const struct edac_device_prv_data a10_ocramecc_data = {
++static const struct edac_device_prv_data a10_ocramecc_data = {
+ 	.setup = altr_check_ecc_deps,
+ 	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
+ 	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
+@@ -1028,7 +1028,7 @@ static irqreturn_t altr_edac_a10_l2_irq(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
+-const struct edac_device_prv_data l2ecc_data = {
++static const struct edac_device_prv_data l2ecc_data = {
+ 	.setup = altr_l2_check_deps,
+ 	.ce_clear_mask = 0,
+ 	.ue_clear_mask = 0,
+@@ -1043,7 +1043,7 @@ const struct edac_device_prv_data l2ecc_data = {
+ 	.inject_fops = &altr_edac_device_inject_fops,
  };
  
- struct altr_edac_device_dev {
+-const struct edac_device_prv_data a10_l2ecc_data = {
++static const struct edac_device_prv_data a10_l2ecc_data = {
+ 	.setup = altr_l2_check_deps,
+ 	.ce_clear_mask = ALTR_A10_L2_ECC_SERR_CLR,
+ 	.ue_clear_mask = ALTR_A10_L2_ECC_MERR_CLR,
 -- 
 1.7.9.5
