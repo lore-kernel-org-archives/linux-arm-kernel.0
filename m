@@ -1,45 +1,43 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 22 Jun 2016 10:01:40 +0530
-Subject: [RFC PATCH v2 1/9] mailbox: Add Amlogic Meson
- Message-Handling-Unit
-In-Reply-To: <1466503374-28841-2-git-send-email-narmstrong@baylibre.com>
-References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
- <1466503374-28841-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CABb+yY3r3_B9wbW6D-do8h8xMKCANQWfz1gFGyre1oWadd7A8Q@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 21 Jun 2016 21:49:16 -0700
+Subject: [PATCH v2 1/8] arm64: dts: db820c: add basic board support
+In-Reply-To: <1466529769-2674-2-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1466529769-2674-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1466529769-2674-2-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160622044916.GF1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 3:32 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> Add Amlogic Meson SoCs Message-Handling-Unit as mailbox controller
-> with 2 independent channels/links to communicate with a remote processor.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+On Tue 21 Jun 10:22 PDT 2016, Srinivas Kandagatla wrote:
 
-.....
+[..]
+> diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
+[..]
+> +
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. DB820c";
+> +	compatible = "qcom,apq8096-sbc";
 
-> +++ b/drivers/mailbox/meson_mhu.c
-> @@ -0,0 +1,199 @@
-> +/*
-> + * Copyright (C) 2016 BayLibre SAS.
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + * Heavily based on meson_mhu.c from :
-> + * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
-> + * Copyright (C) 2015 Linaro Ltd.
-> + * Author: Jassi Brar <jaswinder.singh@linaro.org>
+I'm still not buying the concept of this being the one and only
+single-board-computer.
 
-.........
-> +
-> +#define INTR_SET_OFS   0x0
-> +#define INTR_STAT_OFS  0x4
-> +#define INTR_CLR_OFS   0x8
-> +
-> +#define MHU_LP_OFFSET  0x10
-> +#define MHU_HP_OFFSET  0x1c
-> +
-> +#define TX_REG_OFFSET  0x24
-> +
-It seems only some register offsets have changed from arm_mhu. So
-maybe just adapt the arm_mhu driver to look for IP variant and assign
-corresponding offsets to set,stat,clr registers.
+If this compatible fully and exclusively identifies this particular
+board then dtbTool should be updated to follow the product name
+"qcom,apq8096-db820c". If on the other hand this identifies a class of
+single-board-computers, then the compatible should list both
+"qcom,apq8096-dtb820c" and "qcom,apq8096-sbc".
 
-Cheers.
+
+
+Further more, the ePAPR defines this property as:
+"Specifies a list of platform architectures with which this platform is
+compatible. This property can be used by operating systems in selecting
+platform specific code."
+
+So I think we should follow the common pattern of having the least
+significant entry being "qcom,apq8096".
+
+> +};
+
+Regards,
+Bjorn
