@@ -1,27 +1,22 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 22 Jun 2016 10:37:42 +0100
-Subject: [PATCH 1/2] cpufreq: exynos: use relaxed IO accesors
-In-Reply-To: <20160622093552.GD5458@vireshk-i7>
-References: <1466587984-14105-1-git-send-email-ben.dooks@codethink.co.uk>
- <20160622093552.GD5458@vireshk-i7>
-Message-ID: <2513e267-5bec-1aef-a222-785903f3789d@codethink.co.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jun 2016 10:38:09 +0100
+Subject: IPI_CPU_BACKTRACE - disable tracing patch
+In-Reply-To: <455510402.66471466575502201.JavaMail.weblogic@ep2mlwas09b>
+References: <455510402.66471466575502201.JavaMail.weblogic@ep2mlwas09b>
+Message-ID: <20160622093809.GW1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/16 10:35, Viresh Kumar wrote:
-> On 22-06-16, 10:33, Ben Dooks wrote:
->> The use of __raw IO accesors is not endian safe and should be used
->> sparingly. The relaxed variants should be as lightweight and also
->> are endian safe.
-> 
-> I am not sure if exynos's code is required to be endian safe at all or
-> not, but this change wouldn't harm as well.
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Wed, Jun 22, 2016 at 06:05:02AM +0000, AMIT NAGAL wrote:
+> Hi
+> As discussed  here :: http://www.spinics.net/lists/arm-kernel/msg484384.html , 
+> IPI_CPU_BACKTRACE is special and is not traceable . 
+> is the patch enclosed in above discussion finalized and queued up for release on kernel.org ?
+> As I see , it has not been released till v4.7-rc4 .
 
-It is better for any of the ARMv7 and later to do this. We've been
-fixing some of the exynos and other code to be endian safe.
+I don't know.  It's not appeared in the patch system.
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
