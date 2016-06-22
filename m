@@ -1,45 +1,113 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 22 Jun 2016 17:19:27 +0800
-Subject: [PATCH] rcu: Use rcu_gp_kthread_wake() to wake up grace period
- kthreads again
-Message-ID: <1466587167-3541-1-git-send-email-jszhang@marvell.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 22 Jun 2016 10:33:03 +0100
+Subject: [PATCH 1/2] cpufreq: exynos: use relaxed IO accesors
+Message-ID: <1466587984-14105-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit abedf8e2419f ("rcu: Use simple wait queues where possible in
-rcutree") converts wait queues in rcutree to use simple wait queues,
-but it incorrectly reverts the commit 2aa792e6faf1 ("rcu: Use
-rcu_gp_kthread_wake() to wake up grace period kthreads").
+The use of __raw IO accesors is not endian safe and should be used
+sparingly. The relaxed variants should be as lightweight and also
+are endian safe.
 
-This patch tries to fix the above issue by useing rcu_gp_kthread_wake()
-to wake up grace period kthreads again.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- kernel/rcu/tree.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-pm at vger.kernel.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/cpufreq/exynos5440-cpufreq.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
-index c7f1bc4..c270ce0 100644
---- a/kernel/rcu/tree.c
-+++ b/kernel/rcu/tree.c
-@@ -2333,7 +2333,7 @@ static void rcu_report_qs_rsp(struct rcu_state *rsp, unsigned long flags)
- 	WARN_ON_ONCE(!rcu_gp_in_progress(rsp));
- 	WRITE_ONCE(rsp->gp_flags, READ_ONCE(rsp->gp_flags) | RCU_GP_FLAG_FQS);
- 	raw_spin_unlock_irqrestore_rcu_node(rcu_get_root(rsp), flags);
--	swake_up(&rsp->gp_wq);  /* Memory barrier implied by swake_up() path. */
-+	rcu_gp_kthread_wake(rsp);
- }
+diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+index c0f3373..7a5707f 100644
+--- a/drivers/cpufreq/exynos5440-cpufreq.c
++++ b/drivers/cpufreq/exynos5440-cpufreq.c
+@@ -155,7 +155,7 @@ static int init_div_table(void)
+ 		tmp = (clk_div | ema_div | (volt_id << P0_7_VDD_SHIFT)
+ 			| ((freq / FREQ_UNIT) << P0_7_FREQ_SHIFT));
  
- /*
-@@ -2961,7 +2961,7 @@ static void force_quiescent_state(struct rcu_state *rsp)
+-		__raw_writel(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 *
++		writel_relaxed(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 *
+ 						(pos - freq_tbl));
  	}
- 	WRITE_ONCE(rsp->gp_flags, READ_ONCE(rsp->gp_flags) | RCU_GP_FLAG_FQS);
- 	raw_spin_unlock_irqrestore_rcu_node(rnp_old, flags);
--	swake_up(&rsp->gp_wq); /* Memory barrier implied by swake_up() path. */
-+	rcu_gp_kthread_wake(rsp);
+ 
+@@ -169,17 +169,17 @@ static void exynos_enable_dvfs(unsigned int cur_frequency)
+ 	struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
+ 	struct cpufreq_frequency_table *pos;
+ 	/* Disable DVFS */
+-	__raw_writel(0,	dvfs_info->base + XMU_DVFS_CTRL);
++	writel_relaxed(0,	dvfs_info->base + XMU_DVFS_CTRL);
+ 
+ 	/* Enable PSTATE Change Event */
+-	tmp = __raw_readl(dvfs_info->base + XMU_PMUEVTEN);
++	tmp = readl_relaxed(dvfs_info->base + XMU_PMUEVTEN);
+ 	tmp |= (1 << PSTATE_CHANGED_EVTEN_SHIFT);
+-	 __raw_writel(tmp, dvfs_info->base + XMU_PMUEVTEN);
++	 writel_relaxed(tmp, dvfs_info->base + XMU_PMUEVTEN);
+ 
+ 	/* Enable PSTATE Change IRQ */
+-	tmp = __raw_readl(dvfs_info->base + XMU_PMUIRQEN);
++	tmp = readl_relaxed(dvfs_info->base + XMU_PMUIRQEN);
+ 	tmp |= (1 << PSTATE_CHANGED_IRQEN_SHIFT);
+-	 __raw_writel(tmp, dvfs_info->base + XMU_PMUIRQEN);
++	 writel_relaxed(tmp, dvfs_info->base + XMU_PMUIRQEN);
+ 
+ 	/* Set initial performance index */
+ 	cpufreq_for_each_entry(pos, freq_table)
+@@ -197,14 +197,14 @@ static void exynos_enable_dvfs(unsigned int cur_frequency)
+ 						cur_frequency);
+ 
+ 	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+-		tmp = __raw_readl(dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
++		tmp = readl_relaxed(dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
+ 		tmp &= ~(P_VALUE_MASK << C0_3_PSTATE_NEW_SHIFT);
+ 		tmp |= ((pos - freq_table) << C0_3_PSTATE_NEW_SHIFT);
+-		__raw_writel(tmp, dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
++		writel_relaxed(tmp, dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
+ 	}
+ 
+ 	/* Enable DVFS */
+-	__raw_writel(1 << XMU_DVFS_CTRL_EN_SHIFT,
++	writel_relaxed(1 << XMU_DVFS_CTRL_EN_SHIFT,
+ 				dvfs_info->base + XMU_DVFS_CTRL);
  }
  
- /*
+@@ -223,11 +223,11 @@ static int exynos_target(struct cpufreq_policy *policy, unsigned int index)
+ 
+ 	/* Set the target frequency in all C0_3_PSTATE register */
+ 	for_each_cpu(i, policy->cpus) {
+-		tmp = __raw_readl(dvfs_info->base + XMU_C0_3_PSTATE + i * 4);
++		tmp = readl_relaxed(dvfs_info->base + XMU_C0_3_PSTATE + i * 4);
+ 		tmp &= ~(P_VALUE_MASK << C0_3_PSTATE_NEW_SHIFT);
+ 		tmp |= (index << C0_3_PSTATE_NEW_SHIFT);
+ 
+-		__raw_writel(tmp, dvfs_info->base + XMU_C0_3_PSTATE + i * 4);
++		writel_relaxed(tmp, dvfs_info->base + XMU_C0_3_PSTATE + i * 4);
+ 	}
+ 	mutex_unlock(&cpufreq_lock);
+ 	return 0;
+@@ -246,7 +246,7 @@ static void exynos_cpufreq_work(struct work_struct *work)
+ 	mutex_lock(&cpufreq_lock);
+ 	freqs.old = policy->cur;
+ 
+-	cur_pstate = __raw_readl(dvfs_info->base + XMU_P_STATUS);
++	cur_pstate = readl_relaxed(dvfs_info->base + XMU_P_STATUS);
+ 	if (cur_pstate >> C0_3_PSTATE_VALID_SHIFT & 0x1)
+ 		index = (cur_pstate >> C0_3_PSTATE_CURR_SHIFT) & P_VALUE_MASK;
+ 	else
+@@ -270,9 +270,9 @@ static irqreturn_t exynos_cpufreq_irq(int irq, void *id)
+ {
+ 	unsigned int tmp;
+ 
+-	tmp = __raw_readl(dvfs_info->base + XMU_PMUIRQ);
++	tmp = readl_relaxed(dvfs_info->base + XMU_PMUIRQ);
+ 	if (tmp >> PSTATE_CHANGED_SHIFT & 0x1) {
+-		__raw_writel(tmp, dvfs_info->base + XMU_PMUIRQ);
++		writel_relaxed(tmp, dvfs_info->base + XMU_PMUIRQ);
+ 		disable_irq_nosync(irq);
+ 		schedule_work(&dvfs_info->irq_work);
+ 	}
 -- 
 2.8.1
