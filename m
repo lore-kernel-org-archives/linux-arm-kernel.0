@@ -1,67 +1,53 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 22 Jun 2016 18:10:10 +0300
-Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
-In-Reply-To: <20160622143650.GO26943@ulmo.ba.sec>
-References: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
- <20160622123222.GD26943@ulmo.ba.sec> <1466601964.5316.19.camel@localhost>
- <20160622143650.GO26943@ulmo.ba.sec>
-Message-ID: <5d139118-5b9c-954c-3f3c-310c1a7342f5@mleia.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 22 Jun 2016 11:21:26 -0400
+Subject: [PATCH] PM / suspend: show workqueues busy name in suspend flow
+In-Reply-To: <1466586509-32400-1-git-send-email-roger.lu@mediatek.com>
+References: <1466586509-32400-1-git-send-email-roger.lu@mediatek.com>
+Message-ID: <20160622152126.GV3262@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Hello,
 
-On 22.06.2016 17:36, Thierry Reding wrote:
-> On Wed, Jun 22, 2016 at 09:26:04AM -0400, Sylvain Lemieux wrote:
->> Hi Thierry,
->>
->> On Wed, 2016-06-22 at 14:32 +0200, Thierry Reding wrote:
->>> On Fri, Jun 03, 2016 at 03:37:57PM -0400, Sylvain Lemieux wrote:
->>>> From: Sylvain Lemieux <slemieux@tycoint.com>
->>>>
->>>> If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
->>>> disable the PWM, the PWM output is always set as a logic 1.
->>>
->>> I presume there's a reason why the bootloader set this bit to 1. Why do
->>> you assume it's the right thing to clear it?
->>>
->> There is an alternative mode for the PWM output pin; using the 
->> PWM_PIN_LEVEL bit to control the PWM output (logical 0 or 1 on 
->> output) when the PWM is disable.
->>
->> In this case, the bootloader is using the PWM_PIN_LEVEL bit
->> to control the PWM output (always 1) to enable the LCD; the 
->> application is using the PWM to control the intensity of the 
->> LCD output. When disabling the PWM, the line level should be 
->> setup to 0.
+On Wed, Jun 22, 2016 at 05:08:29PM +0800, Roger Lu wrote:
+> When suspend flow is aborted because of workqueues busy,
+> show workqueues busy name for debug purpose.
 > 
-> But doesn't that mean that if the pin is used in PWM mode there's never
-> a use-case for having it go high when disabled? Given that this is a PWM
-> driver I don't see how we'd ever be in the case where the alternate
-> setting makes sense.
+> Signed-off-by: Roger Lu <roger.lu@mediatek.com>
+> ---
+>  include/linux/workqueue.h |  1 +
+>  kernel/power/process.c    |  3 +++
+>  kernel/workqueue.c        | 35 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 39 insertions(+)
 > 
+> diff --git a/include/linux/workqueue.h b/include/linux/workqueue.h
+> index ca73c50..c9f9b24 100644
+> --- a/include/linux/workqueue.h
+> +++ b/include/linux/workqueue.h
+> @@ -609,6 +609,7 @@ long work_on_cpu(int cpu, long (*fn)(void *), void
+>  *arg);
+>  #ifdef CONFIG_FREEZER
+>  extern void freeze_workqueues_begin(void);
+>  extern bool freeze_workqueues_busy(void);
+> +extern void show_workqueues_busy(void);
+>  extern void thaw_workqueues(void);
+>  #endif /* CONFIG_FREEZER */
+>  
+> diff --git a/kernel/power/process.c b/kernel/power/process.c
+> index df058be..b538881 100644
+> --- a/kernel/power/process.c
+> +++ b/kernel/power/process.c
+> @@ -89,6 +89,9 @@ static int try_to_freeze_tasks(bool user_only)
+>  		       elapsed_msecs / 1000, elapsed_msecs % 1000,
+>  		       todo - wq_busy, wq_busy);
+>  
+> +		if (wq_busy)
+> +			show_workqueues_busy();
 
-to some extend when PWM is disabled, both options of pin output high
-and low level values are valid if we consider variable PWM polarity
-setting in general, however this particular controller does not have
-this control and thus there is no need to extend it to 2-cell type.
+I think it'd probably be better to call show_workqueue_state() instead
+so that we can get a full picture of what's going on.
 
-Another alternative to avoid a new property may be to extend period_ns
-to its apparently valid boundaries - 0 and duty_ns, both options are not
-supported properly in the driver at the moment. But then the question
-what to do with it on boot is still open, just leaving it untouched
-is nondeterministic in my opinion.
+Thanks.
 
->> A version 2 of this patch will be send with support to select 
->> the alternate PWM disable level high from the device tree.
->>
->> For details, you can refer to:
->> http://thread.gmane.org/gmane.linux.pwm/3882/focus=508758
-> 
-> Given the above I don't think we should add this new device tree
-> property until we encounter a setup where it's needed.
-> 
-
---
-With best wishes,
-Vladimir
+-- 
+tejun
