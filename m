@@ -1,103 +1,107 @@
-From: Yisen.zhuang@huawei.com (Yisen Zhuang)
-Date: Wed, 22 Jun 2016 09:43:49 +0800
-Subject: [PATCH net-next 10/19] net: hns: bugfix about pfc pause frame
- statistics
-In-Reply-To: <1466505178.30123.201.camel@linux.intel.com>
-References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
- <1466481399-70080-11-git-send-email-Yisen.Zhuang@huawei.com>
- <1466505178.30123.201.camel@linux.intel.com>
-Message-ID: <5769ED55.3000408@huawei.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 22 Jun 2016 09:55:55 +0800
+Subject: [PATCH v4 00/14] fix some type infos and bugs for arm64/of numa
+In-Reply-To: <57678F8F.6060303@huawei.com>
+References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160607135852.GA20477@arm.com> <5757DE57.10700@huawei.com>
+ <20160614142220.GC14654@e104818-lin.cambridge.arm.com>
+ <57678F8F.6060303@huawei.com>
+Message-ID: <5769F02B.7090705@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2016/6/21 18:32, Andy Shevchenko ??:
-> On Tue, 2016-06-21 at 11:56 +0800, Yisen Zhuang wrote:
->> From: Daode Huang <huangdaode@hisilicon.com>
+On 2016/6/20 14:39, Leizhen (ThunderTown) wrote:
+> 
+> 
+> On 2016/6/14 22:22, Catalin Marinas wrote:
+>> On Wed, Jun 08, 2016 at 04:59:03PM +0800, Leizhen (ThunderTown) wrote:
+>>> On 2016/6/7 21:58, Will Deacon wrote:
+>>>> On Tue, Jun 07, 2016 at 04:08:04PM +0800, Zhen Lei wrote:
+>>>>> v3 -> v4:
+>>>>> 1. Packed three patches of Kefeng Wang, patch6-8.
+>>>>> 2. Add 6 new patches(9-15) to enhance the numa on arm64.
+>>>>>
+>>>>> v2 -> v3:
+>>>>> 1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
+>>>>>    patches looks more well. The final code have no change. 
+>>>>>
+>>>>> v1 -> v2:
+>>>>> 1. Base on https://lkml.org/lkml/2016/5/24/679
+>>>>
+>>>> If you want bug fixes to land in 4.7, you'll need to base them on a
+>>>> mainline kernel.
+>>>
+>>> I heared that David Daney's acpi numa patch series was accepted and
+>>> put into next branch(Linux 4.8).
+>>> Otherwise I will suggest him sending his patch6-7 to mainline first.
+>>> So that, only a very small conflict will be exist.
+>>>
+>>> I also tested that:
+>>> 1. git am David Daney's patch6-7, then git am all of my patches on a
+>>> branch, named branch A.
+>>> 2. git am David Daney's patch6-7 on another branch, named branch B.
+>>> 3. when I git merge B into branch A, it's still conflict. So I guess
+>>> git merge is based on source code, rather than patches.
+>>>
+>>> So at present, unless the maintainers are willing to resolve the
+>>> conflict, otherwise I update my patches will not work.
 >>
->> For SoC hip06, PFC pause handled in dsaf, while hip05 in XGMAC,
->> so change the statistics of pfc pause in dsaf and remove the old
->> pfc pause frame statistics.
+>> It usually depends on how complex the conflict is and whether your
+>> patches functionally depend on the other patches. I have no idea what
+>> the dependency is here since I haven't tried applying them to mainline.
 >>
+>>> Fortunately, these patches are not particularly urgent. So I think I
+>>> can wait until Linux 4.8 start, then send these patches again. But I'm
+>>> not sure whether these patches can be merged into Linux 4.8, I really
+>>> hope.
+>>
+>> If there are fixes to the arm64 ACPI NUMA patches that Rafael queued
+>> into linux-next, they should be sent to him and potentially being queued
+>> on top ahead of the 4.8 merging window or shortly after 4.8-rc1.
+>> Non-ACPI NUMA patches (as I can see, most of these patches are DT
+>> specific) could be merged independently.
+>>
+>> So how many patches do you have in each category below:
+>>
+>> 1. NUMA fixes against current mainline (4.7-rc3)
+>> 2. NUMA fixes against the arm64 ACPI NUMA patches queued by Rafael
+> My patches have not fixed any bugs for ACPI NUMA, but just based on it.
+> There are only three related patches:
+> [PATCH v7 06_15] arm64, numa  rework numa_add_memblk()
+> [PATCH v7 07_15] arm64, numa  Cleanup NUMA disabled messages.
+> [PATCH v7 14_15] arm64, acpi, numa  NUMA support based on SRAT and SLIT
 > 
+> arch/arm64/mm/numa.c          |  28 ++++--
+> drivers/of/of_numa.c          |   4 +-
 > 
->> +static char *hns_dsaf_get_node_stats_strings(char *data, int node,
->> +					     struct dsaf_device
->> *dsaf_dev)
->>  {
->>  	char *buff = data;
->> +	int i;
->> +	bool is_ver1 = AE_IS_VER1(dsaf_dev->dsaf_ver);
->>  
->>  	snprintf(buff, ETH_GSTRING_LEN, "innod%d_pad_drop_pkts",
->> node);
->>  	buff = buff + ETH_GSTRING_LEN;
->> @@ -2502,6 +2530,18 @@ static char
->> *hns_dsaf_get_node_stats_strings(char *data, int node)
->>  	buff = buff + ETH_GSTRING_LEN;
->>  	snprintf(buff, ETH_GSTRING_LEN, "innod%d_stp_drop_pkts",
->> node);
->>  	buff = buff + ETH_GSTRING_LEN;
->> +	if ((node < DSAF_SERVICE_NW_NUM) && (!is_ver1)) {
+> My patches 1-5, 8, 11 will confict with it.
 > 
-> Redundant parens.
+>> 3. New functionality or clean-up. Are these against mainline or ACPI
+>>    NUMA patches?
+> Hi, Catalin
+> I'm sorry to reply this email too late. Because I have been thinking if
+> there are any other solutions.
 > 
->> +		for (i = 0; i < DSAF_PRIO_NR; i++) {
->> +			snprintf(buff, ETH_GSTRING_LEN,
->> +				 "inod%d_pfc_prio%d_pkts", node, i);
->> +			buff = buff + ETH_GSTRING_LEN;
-> 
-> buff += ...
-> 
->> +		}
->> +		for (i = 0; i < DSAF_PRIO_NR; i++) {
->> +			snprintf(buff, ETH_GSTRING_LEN,
->> +				 "onod%d_pfc_prio%d_pkts", node, i);
->> +			buff = buff + ETH_GSTRING_LEN;
-> 
-> Ditto.
-> 
->>  {
->>  	u64 *p = data;
->> +	int i;
->>  	struct dsaf_hw_stats *hw_stats = &ddev->hw_stats[node_num];
->> +	bool is_ver1 = AE_IS_VER1(ddev->dsaf_ver);
->>  
->>  	p[0] = hw_stats->pad_drop;
->>  	p[1] = hw_stats->man_pkts;
->> @@ -2527,8 +2569,16 @@ static u64 *hns_dsaf_get_node_stats(struct
->> dsaf_device *ddev, u64 *data,
->>  	p[10] = hw_stats->local_addr_false;
->>  	p[11] = hw_stats->vlan_drop;
->>  	p[12] = hw_stats->stp_drop;
->> -	p[13] = hw_stats->tx_pkts;
->> +	if ((node_num < DSAF_SERVICE_NW_NUM) && (!is_ver1)) {
->> +		for (i = 0; i < DSAF_PRIO_NR; i++) {
->> +			p[13 + i] = hw_stats->rx_pfc[i];
->> +			p[13 + i + DSAF_PRIO_NR] = hw_stats-
->>> tx_pfc[i];
->> +		}
-> 
-> Two different approaches how to assign data. Above uses 2 for-loops,
-> here you put everything to one.
+> I try to adjust the sequence of my patches as below:
+> 1. New functionality 		//queued in your branch  (my patches 9-14, and 6, 6 is clean-up)
+> 2. 4.8-rc1			//apci numa series and my new functionality had been merged
+> 3. bug fixes			//other 4.8-rc versions	 (my patches 1-5)
+> 4. clean-up (pr_fmt)		//queued in 4.9		 (my patches 7-8)
 
-Above cann't be merged to 1 for-loop, because lenght of the string is unknowable.
-
-And here we put everything to one to reduce codes.
-
-I will generate a new patch to fix other comments.
-
-Thanks,
-
-Yisen
+Hi, Catalin
+  What about your opinion? Are you agree?
 
 > 
->> +		p[29] = hw_stats->tx_pkts;
->> +		return &p[30];
->> +	}
->>  
->> +	p[13] = hw_stats->tx_pkts;
->>  	return &p[14];
->>  }
+> And there only one confliction exist:
+> ++<<<<<<< HEAD
+>  +static u8 numa_distance[MAX_NUMNODES][MAX_NUMNODES];			//choose this
+>  +static int numa_off;
+> ++=======
+> + static int numa_distance_cnt;
+> + static u8 *numa_distance;
+> + static bool numa_off;							//choose this
+> ++>>>>>>> acpi
 > 
+>>
