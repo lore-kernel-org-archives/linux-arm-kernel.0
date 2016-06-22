@@ -1,148 +1,155 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 21 Jun 2016 17:31:16 -0700
-Subject: [PATCH] clk: rockchip: add flag CLK_SET_RATE_PARENT for
- dclk_vop0_div on RK3399
-In-Reply-To: <2376423.L1zs1HaIGm@diego>
-References: <1465724928-14611-1-git-send-email-zhengxing@rock-chips.com>
- <2376423.L1zs1HaIGm@diego>
-Message-ID: <CAD=FV=V5UvQGtYQ26gZ+U7+TygEWuqRoHhiH8SiQSK7GcvkF5w@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Wed, 22 Jun 2016 09:52:08 +0900
+Subject: Boot failure on emev2/kzm9d (was: Re: [PATCH v2 11/11] mm/slab:
+ lockless decision to grow cache)
+In-Reply-To: <20160621125406.GF3923@linux.vnet.ibm.com>
+References: <20160614062456.GB13753@js1304-P5Q-DELUXE>
+ <CAMuHMdWipquaVFKYLd=2KhTx6djwH7NXpzL-RjtikCE=G8KTbA@mail.gmail.com>
+ <20160614081125.GA17700@js1304-P5Q-DELUXE>
+ <CAMuHMdXc=XN4z96vr_FNcUzFb0203ovHgcfD95Q5LPebr1z0ZQ@mail.gmail.com>
+ <20160615022325.GA19863@js1304-P5Q-DELUXE>
+ <CAMuHMdVi-F0n-GjnUqEEd58UcWxw67g8ZJO838fvo31Ttr5E1g@mail.gmail.com>
+ <20160620063942.GA13747@js1304-P5Q-DELUXE>
+ <20160620131254.GO3923@linux.vnet.ibm.com>
+ <20160621064302.GA20635@js1304-P5Q-DELUXE>
+ <20160621125406.GF3923@linux.vnet.ibm.com>
+Message-ID: <20160622005208.GB25106@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+On Tue, Jun 21, 2016 at 05:54:06AM -0700, Paul E. McKenney wrote:
+> On Tue, Jun 21, 2016 at 03:43:02PM +0900, Joonsoo Kim wrote:
+> > On Mon, Jun 20, 2016 at 06:12:54AM -0700, Paul E. McKenney wrote:
+> > > On Mon, Jun 20, 2016 at 03:39:43PM +0900, Joonsoo Kim wrote:
+> > > > CCing Paul to ask some question.
+> > > > 
+> > > > On Wed, Jun 15, 2016 at 10:39:47AM +0200, Geert Uytterhoeven wrote:
+> > > > > Hi Joonsoo,
+> > > > > 
+> > > > > On Wed, Jun 15, 2016 at 4:23 AM, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+> > > > > > On Tue, Jun 14, 2016 at 12:45:14PM +0200, Geert Uytterhoeven wrote:
+> > > > > >> On Tue, Jun 14, 2016 at 10:11 AM, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+> > > > > >> > On Tue, Jun 14, 2016 at 09:31:23AM +0200, Geert Uytterhoeven wrote:
+> > > > > >> >> On Tue, Jun 14, 2016 at 8:24 AM, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+> > > > > >> >> > On Mon, Jun 13, 2016 at 09:43:13PM +0200, Geert Uytterhoeven wrote:
+> > > > > >> >> >> On Tue, Apr 12, 2016 at 6:51 AM,  <js1304@gmail.com> wrote:
+> > > > > >> >> >> > From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> > > > > >> >> >> > To check whther free objects exist or not precisely, we need to grab a
+> > > > > >> >> >> > lock.  But, accuracy isn't that important because race window would be
+> > > > > >> >> >> > even small and if there is too much free object, cache reaper would reap
+> > > > > >> >> >> > it.  So, this patch makes the check for free object exisistence not to
+> > > > > >> >> >> > hold a lock.  This will reduce lock contention in heavily allocation case.
+> > > > > 
+> > > > > >> >> >> I've bisected a boot failure (no output at all) in v4.7-rc2 on emev2/kzm9d
+> > > > > >> >> >> (Renesas dual Cortex A9) to this patch, which is upstream commit
+> > > > > >> >> >> 801faf0db8947e01877920e848a4d338dd7a99e7.
+> > > > > 
+> > > > > > It's curious that synchronize_sched() has some effect in this early
+> > > > > > phase. In synchronize_sched(), rcu_blocking_is_gp() is called and
+> > > > > > it checks num_online_cpus <= 1. If so, synchronize_sched() does nothing.
+> > > > > >
+> > > > > > It would be related to might_sleep() in rcu_blocking_is_gp() but I'm not sure now.
+> > > > > >
+> > > > > > First, I'd like to confirm that num_online_cpus() is correct.
+> > > > > > Could you try following patch and give me a dmesg?
+> > > > > >
+> > > > > > Thanks.
+> > > > > >
+> > > > > > ------->8----------
+> > > > > > diff --git a/mm/slab.c b/mm/slab.c
+> > > > > > index 763096a..5b7300a 100644
+> > > > > > --- a/mm/slab.c
+> > > > > > +++ b/mm/slab.c
+> > > > > > @@ -964,8 +964,10 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
+> > > > > >          * guaranteed to be valid until irq is re-enabled, because it will be
+> > > > > >          * freed after synchronize_sched().
+> > > > > >          */
+> > > > > > -       if (force_change)
+> > > > > > -               synchronize_sched();
+> > > > > > +       if (force_change) {
+> > > > > > +               WARN_ON_ONCE(num_online_cpus() <= 1);
+> > > > > > +               WARN_ON_ONCE(num_online_cpus() > 1);
+> > > > > > +       }
+> > > > > 
+> > > > > Full dmesg output below.
+> > > > > 
+> > > > > I also tested whether it's the call to synchronize_sched() before or after
+> > > > > secondary CPU bringup that hangs.
+> > > > > 
+> > > > >         if (force_change && num_online_cpus() <= 1)
+> > > > >                 synchronize_sched();
+> > > > > 
+> > > > > boots.
+> > > > > 
+> > > > >         if (force_change && num_online_cpus() > 1)
+> > > > >                 synchronize_sched();
+> > > > > 
+> > > > > hangs.
+> > > > 
+> > > > Hello, Paul.
+> > > > 
+> > > > I changed slab.c to use synchronize_sched() for full memory barrier. First
+> > > > call happens on kmem_cache_init_late() and it would not be a problem
+> > > > because, at this time, num_online_cpus() <= 1 and synchronize_sched()
+> > > > would return immediately. Second call site would be shmem_init()
+> > > > and it seems that system hangs on it. Since smp is already initialized
+> > > > at that time, there would be some effect of synchronize_sched() but I
+> > > > can't imagine what's wrong here. Is it invalid moment to call
+> > > > synchronize_sched()?
+> > > > 
+> > > > Note that my x86 virtual machine works fine even if
+> > > > synchronize_sched() is called in shmem_init() but Geert's some ARM
+> > > > machines (not all ARM machine) don't work well with it.
+> > > 
+> > > Color me confused.
+> > > 
+> > > Is Geert's ARM system somehow adding the second CPU before
+> > > rcu_spawn_gp_kthread() is called, that is, before or during
+> > > early_initcall() time?
+> > 
+> > Hang would happen on shmem_init() which is called in do_basic_setup().
+> > do_basic_setup() is called after early_initcall().
+> 
+> Thank you for the info!
+> 
+> That should be lat enough that the RCU kthreads are alive and well.
+> 
+> Can you get sysalt-t output?
+> 
+> > Hmm... Is it okay to call synchronize_sched() by kernel thread?
+> 
+> Yes, it can, in fact, rcutorture does this all the time.  As do any
+> number of other kthreads.
 
-On Mon, Jun 13, 2016 at 3:46 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Sonntag, 12. Juni 2016, 17:48:48 schrieb Xing Zheng:
->> The functions and features VOP0 more complete than VOP1's, we need to
->> use it dclk_vop0_div operate VPLLI, and let VOP0 as the default primary
->> screen.
->>
->> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
->> ---
->>
->>  drivers/clk/rockchip/clk-rk3399.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/rockchip/clk-rk3399.c
->> b/drivers/clk/rockchip/clk-rk3399.c index 7ecb12c3..6affa75 100644
->> --- a/drivers/clk/rockchip/clk-rk3399.c
->> +++ b/drivers/clk/rockchip/clk-rk3399.c
->> @@ -1157,7 +1157,7 @@ static struct rockchip_clk_branch
->> rk3399_clk_branches[] __initdata = { GATE(HCLK_VOP0_NOC, "hclk_vop0_noc",
->> "hclk_vop0_pre", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(28), 0, GFLAGS),
->>
->> -     COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, 0,
->> +     COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p,
->> CLK_SET_RATE_PARENT, RK3399_CLKSEL_CON(49), 8, 2, MFLAGS, 0, 8, DFLAGS,
->>                       RK3399_CLKGATE_CON(10), 12, GFLAGS),
->
-> The vpll is a possible source for multiple clocks (cci, aclk_vop0, dclk_vop0,
-> clk_vop0_pwm, aclk_vop1, dclk_vop1, clk_vop1_pwm), so allowing one clock to
-> hog the rate setting, might influence the other consumers of the vpll as well.
+Paul, thanks for confirmation.
 
-OK, so let's think this through.
+Geert, we need to try more debugging.
 
-1. If we want to be able to support a wide variety of devices plugged
-into an external display connector, we need _some_ type of PLL that
-can change dynamically when the system is up.  On rk3399 there are new
-fractional clocks available (yay!) but only for low speed pixel clocks
-(boo!).  On rk3288 even those weren't there.
+Could you try below patch to check who causes the hang?
 
-2. There are no PLLs dedicated to be used only for the pixel clock.
-No matter what PLL we choose to use we _might_ end up changing some
-else's rate when we change the pixel clock since someone else could be
-a child.
+And, if sysalt-t works when hang, could you get sysalt-t output? I haven't
+used it before but Paul could find some culprit on it. :)
 
-2a) If we are careful with our clock tree we actually _can_ totally
-avoid changing people's rates.  On rk3288 there's nothing else in the
-system that really _needs_ NPLL and on rk3388 nothing really _needs_
-VPLL.
-
-2b) We could also try to do something dynamic like you proposed in
-<https://patchwork.kernel.org/patch/8993811>, but presumably if a
-child of NPLL/VPLL is really flexible about its rate (and thus could
-handle this new rate), we'd be better off just starting that child off
-parented somewhere else.  This relies on the fact that nothing really
-_needs_ NPLL/VPLL.  Note that in rk3399, all muxings that include vpll
-also include at least cpll and gpll; in rk3288 all muxings that
-include npll also include at least cpll and gpll
-
-2c) So, this means that if we are on a system that needs to support a
-wide range of pixels clocks, we should ahead of time reparent everyone
-else on another PLL and leave NPLL/VPLL as dynamic.
-
----
-
-Let's think about use cases.  As far as I can think of, we have these.
-Note that I'll call VPLL (rk3399) / NPLL (rk3288) the "dynamic" PLL.
-
-
-A) There is some other important non-pixel-clock use of the "dynamic"
-PLL where it's sub-optimal (or impossible) to use another PLL.
-
-B) No important non-pixel-clock use for the "dynamic PLL".  Support
-for arbitrary pixel clocks not important at all.
-
-C) No important non-pixel-clock use for the "dynamic PLL".  Support
-for arbitrary pixel clocks important for one display, not for the
-other.
-
-D) No important non-pixel-clock use for the "dynamic PLL".  Support
-for arbitrary pixel clocks important for two displays.
-
-
-I don't know of anyone in use case A), but if you do then please yell.
-
-For B) we might have other things currently parented from the
-"dynamic" PLL, but presumably these clocks are either not used or
-could be reparented elsewhere.
-
-Case C) is a device with a builtin display where the builtin display
-can run fine on a pixel clock derived from CPLL or GPLL.  We might
-need something like
-<https://chromium-review.googlesource.com/#/c/354165/2>
-
-Case D) is a device with two external connectors which might be used
-at the same time.  You either need to pick one connector to get the
-dynamic pixel clock (at boot? first come first served? userspace?) or
-somehow rejigger your PLLs to allow two PLLs to be dynamic (don't
-laugh, potentially GPLL could run at 1188 MHz and then you could
-divide by 3 and get roughly 396 MHz, so you could actually just parent
-everything on GPLL and make CPLL a second dynamic PLL).
-
----
-
-OK, so what do we do?  Personally I can't see us coming up with a
-one-size fits all approach, can you?  That means some type of
-configuration.  ...and, as seen by the assigned-clocks device tree
-binding, _some_ types of configuration is allowed in the device tree
-presuming it is well thought out and describing how the designers of
-the hardware "intended" it to be used.
-
-So maybe:
-
-i) Unless there's a counter example, I see no reason to let any clocks
-other than the VOP display clocks parent on the "dynamic" PLL.  If we
-later find a counter example then presumably we should add a device
-tree property on that board.  We could have code at boot time that
-goes through all clocks parented on "dynamic" PLL and reparents them
-(trying to keep the rate?), they disallows future muxing to the
-"dynamic" PLL.
-
-ii) It seems sane to me to add a device tree property to the board
-that will effectively enable CLK_SET_RATE_PARENT on one of the
-dclk_vop clocks and forcing it to the "dynamic" PLL (no
-auto-remuxing).  Maybe we would add something to the HDMI node, for
-instance, like "rockchip,intended-dclk-pll = <&...>".  Then somehow
-this would need to affect whichever VOP was assigned to HDMI.
-
-iii) If later someone can propose how to handle D) above, we can
-handle it then.  Until a solution is proposed those boards would work
-like today.
-
----
-
-OK, what was long.  Thoughts?
+Thanks.
 
 
--Doug
+----->8-----
+diff --git a/mm/slab.c b/mm/slab.c
+index 763096a..9652d38 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -964,8 +964,13 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
+         * guaranteed to be valid until irq is re-enabled, because it will be
+         * freed after synchronize_sched().
+         */
+-       if (force_change)
++       if (force_change) {
++               if (num_online_cpus() > 1)
++                       dump_stack();
+                synchronize_sched();
++               if (num_online_cpus() > 1)
++                       dump_stack();
++       }
+ 
+ fail:
+        kfree(old_shared);
