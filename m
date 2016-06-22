@@ -1,80 +1,121 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Wed, 22 Jun 2016 08:58:54 -0500
-Subject: [PATCHv5 3/8] EDAC,
- altera: Make all private data structures static const.
+Date: Wed, 22 Jun 2016 08:58:55 -0500
+Subject: [PATCHv5 4/8] EDAC, altera: Share Arria10 check_deps & IRQ functions
 In-Reply-To: <1466603939-7526-1-git-send-email-tthayer@opensource.altera.com>
 References: <1466603939-7526-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1466603939-7526-4-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1466603939-7526-5-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-The device private data structures should be converted from const
-struct edac_device_prv_data to static const struct edac_device_prv_data.
+In preparation for additional memory module ECCs, the IRQ and
+check_deps() functions are being made available to all the memory
+buffers. Move them outside of the OCRAM only area.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
-v4  New patch added for conversion.
+v2  New patch. Move shared functions outside OCRAM only area.
+v3  Change title line - check_deps & IRQ.
+v4  Replace #ifdeffery with __maybe_unused macro.
 v5  No change
 ---
- drivers/edac/altera_edac.c |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/edac/altera_edac.c |   62 +++++++++++++++++++++++---------------------
+ 1 file changed, 33 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index 75451bc..dcedc4a 100644
+index dcedc4a..2e5940e 100644
 --- a/drivers/edac/altera_edac.c
 +++ b/drivers/edac/altera_edac.c
-@@ -550,10 +550,10 @@ module_platform_driver(altr_edac_driver);
-  * trigger testing are different for each memory.
+@@ -825,16 +825,16 @@ static struct platform_driver altr_edac_device_driver = {
+ };
+ module_platform_driver(altr_edac_device_driver);
+ 
+-/*********************** OCRAM EDAC Device Functions *********************/
++/******************* Arria10 Device ECC Shared Functions *****************/
+ 
+-#ifdef CONFIG_EDAC_ALTERA_OCRAM
+ /*
+  *  Test for memory's ECC dependencies upon entry because platform specific
+  *  startup should have initialized the memory and enabled the ECC.
+  *  Can't turn on ECC here because accessing un-initialized memory will
+  *  cause CE/UE errors possibly causing an ABORT.
   */
- 
--const struct edac_device_prv_data ocramecc_data;
--const struct edac_device_prv_data l2ecc_data;
--const struct edac_device_prv_data a10_ocramecc_data;
--const struct edac_device_prv_data a10_l2ecc_data;
-+static const struct edac_device_prv_data ocramecc_data;
-+static const struct edac_device_prv_data l2ecc_data;
-+static const struct edac_device_prv_data a10_ocramecc_data;
-+static const struct edac_device_prv_data a10_l2ecc_data;
- 
- static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
+-static int altr_check_ecc_deps(struct altr_edac_device_dev *device)
++static int __maybe_unused
++altr_check_ecc_deps(struct altr_edac_device_dev *device)
  {
-@@ -908,7 +908,7 @@ static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
- 	return IRQ_NONE;
+ 	void __iomem  *base = device->base;
+ 	const struct edac_device_prv_data *prv = device->data;
+@@ -848,6 +848,36 @@ static int altr_check_ecc_deps(struct altr_edac_device_dev *device)
+ 	return -ENODEV;
  }
  
--const struct edac_device_prv_data ocramecc_data = {
-+static const struct edac_device_prv_data ocramecc_data = {
++static irqreturn_t __maybe_unused altr_edac_a10_ecc_irq(int irq, void *dev_id)
++{
++	struct altr_edac_device_dev *dci = dev_id;
++	void __iomem  *base = dci->base;
++
++	if (irq == dci->sb_irq) {
++		writel(ALTR_A10_ECC_SERRPENA,
++		       base + ALTR_A10_ECC_INTSTAT_OFST);
++		edac_device_handle_ce(dci->edac_dev, 0, 0, dci->edac_dev_name);
++
++		return IRQ_HANDLED;
++	} else if (irq == dci->db_irq) {
++		writel(ALTR_A10_ECC_DERRPENA,
++		       base + ALTR_A10_ECC_INTSTAT_OFST);
++		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
++		if (dci->data->panic)
++			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
++
++		return IRQ_HANDLED;
++	}
++
++	WARN_ON(1);
++
++	return IRQ_NONE;
++}
++
++/*********************** OCRAM EDAC Device Functions *********************/
++
++#ifdef CONFIG_EDAC_ALTERA_OCRAM
++
+ static void *ocram_alloc_mem(size_t size, void **other)
+ {
+ 	struct device_node *np;
+@@ -882,32 +912,6 @@ static void ocram_free_mem(void *p, size_t size, void *other)
+ 	gen_pool_free((struct gen_pool *)other, (u32)p, size);
+ }
+ 
+-static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
+-{
+-	struct altr_edac_device_dev *dci = dev_id;
+-	void __iomem  *base = dci->base;
+-
+-	if (irq == dci->sb_irq) {
+-		writel(ALTR_A10_ECC_SERRPENA,
+-		       base + ALTR_A10_ECC_INTSTAT_OFST);
+-		edac_device_handle_ce(dci->edac_dev, 0, 0, dci->edac_dev_name);
+-
+-		return IRQ_HANDLED;
+-	} else if (irq == dci->db_irq) {
+-		writel(ALTR_A10_ECC_DERRPENA,
+-		       base + ALTR_A10_ECC_INTSTAT_OFST);
+-		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
+-		if (dci->data->panic)
+-			panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
+-
+-		return IRQ_HANDLED;
+-	}
+-
+-	WARN_ON(1);
+-
+-	return IRQ_NONE;
+-}
+-
+ static const struct edac_device_prv_data ocramecc_data = {
  	.setup = altr_check_ecc_deps,
  	.ce_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_SERR),
- 	.ue_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_DERR),
-@@ -924,7 +924,7 @@ const struct edac_device_prv_data ocramecc_data = {
- 	.inject_fops = &altr_edac_device_inject_fops,
- };
- 
--const struct edac_device_prv_data a10_ocramecc_data = {
-+static const struct edac_device_prv_data a10_ocramecc_data = {
- 	.setup = altr_check_ecc_deps,
- 	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
- 	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
-@@ -1028,7 +1028,7 @@ static irqreturn_t altr_edac_a10_l2_irq(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
--const struct edac_device_prv_data l2ecc_data = {
-+static const struct edac_device_prv_data l2ecc_data = {
- 	.setup = altr_l2_check_deps,
- 	.ce_clear_mask = 0,
- 	.ue_clear_mask = 0,
-@@ -1043,7 +1043,7 @@ const struct edac_device_prv_data l2ecc_data = {
- 	.inject_fops = &altr_edac_device_inject_fops,
- };
- 
--const struct edac_device_prv_data a10_l2ecc_data = {
-+static const struct edac_device_prv_data a10_l2ecc_data = {
- 	.setup = altr_l2_check_deps,
- 	.ce_clear_mask = ALTR_A10_L2_ECC_SERR_CLR,
- 	.ue_clear_mask = ALTR_A10_L2_ECC_MERR_CLR,
 -- 
 1.7.9.5
