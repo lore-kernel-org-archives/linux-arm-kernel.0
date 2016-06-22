@@ -1,51 +1,102 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed, 22 Jun 2016 13:42:17 +0200
-Subject: [PATCH 4/5] mmc: bcm2835-sdhost: reset tweaks. [fixup]
+Date: Wed, 22 Jun 2016 13:42:16 +0200
+Subject: [PATCH 3/5] mmc: bcm2835-sdhost: zap mmiowb() [fixup]
 In-Reply-To: <1466595738-2229-1-git-send-email-kraxel@redhat.com>
 References: <1466595738-2229-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1466595738-2229-5-git-send-email-kraxel@redhat.com>
+Message-ID: <1466595738-2229-4-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kill any pending stuff before calling reset_internal(), so there
-shouldn't be any completion callbacks interfering.  This allows
-to call reset_internal without lock, which in turn allows to
-turn the mdelay calls into msleep calls.  Also adjust the time
-from 10ms to 20ms as checkpatch warns about the 10ms.
+Arnd asked why they are needed.  Seems they are not needed at all.
+Things are still working fine if I remove them.  Guess the arm{,64}
+versions of writel() & friends take care already.
 
 Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 ---
- drivers/mmc/host/bcm2835-sdhost.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/mmc/host/bcm2835-sdhost.c | 15 ---------------
+ 1 file changed, 15 deletions(-)
 
 diff --git a/drivers/mmc/host/bcm2835-sdhost.c b/drivers/mmc/host/bcm2835-sdhost.c
-index 8a05c02..a895561 100644
+index cafe6ad..8a05c02 100644
 --- a/drivers/mmc/host/bcm2835-sdhost.c
 +++ b/drivers/mmc/host/bcm2835-sdhost.c
-@@ -321,9 +321,9 @@ static void bcm2835_sdhost_reset_internal(struct bcm2835_host *host)
- 	temp |= (FIFO_READ_THRESHOLD << SDEDM_READ_THRESHOLD_SHIFT) |
- 		(FIFO_WRITE_THRESHOLD << SDEDM_WRITE_THRESHOLD_SHIFT);
- 	bcm2835_sdhost_write(host, temp, SDEDM);
--	mdelay(10);
-+	msleep(20);
- 	bcm2835_sdhost_set_power(host, true);
--	mdelay(10);
-+	msleep(20);
+@@ -327,7 +327,6 @@ static void bcm2835_sdhost_reset_internal(struct bcm2835_host *host)
  	host->clock = 0;
  	bcm2835_sdhost_write(host, host->hcfg, SDHCFG);
  	bcm2835_sdhost_write(host, host->cdiv, SDCDIV);
-@@ -334,9 +334,10 @@ static void bcm2835_sdhost_reset(struct mmc_host *mmc)
- 	struct bcm2835_host *host = mmc_priv(mmc);
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&host->lock, flags);
-+	if (host->dma_chan)
-+		dmaengine_terminate_sync(host->dma_chan);
-+	tasklet_kill(&host->finish_tasklet);
- 	bcm2835_sdhost_reset_internal(host);
--	spin_unlock_irqrestore(&host->lock, flags);
+-	mmiowb();
  }
  
- static void bcm2835_sdhost_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
+ static void bcm2835_sdhost_reset(struct mmc_host *mmc)
+@@ -1035,8 +1034,6 @@ static void bcm2835_sdhost_timeout(unsigned long data)
+ 			tasklet_schedule(&host->finish_tasklet);
+ 		}
+ 	}
+-
+-	mmiowb();
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
+ 
+@@ -1187,8 +1184,6 @@ static irqreturn_t bcm2835_sdhost_irq(int irq, void *dev_id)
+ 		result = IRQ_HANDLED;
+ 	}
+ 
+-	mmiowb();
+-
+ 	spin_unlock(&host->lock);
+ 
+ 	return result;
+@@ -1303,7 +1298,6 @@ static void bcm2835_sdhost_request(struct mmc_host *mmc,
+ 		bcm2835_sdhost_dumpregs(host);
+ 		mrq->cmd->error = -EILSEQ;
+ 		tasklet_schedule(&host->finish_tasklet);
+-		mmiowb();
+ 		spin_unlock_irqrestore(&host->lock, flags);
+ 		return;
+ 	}
+@@ -1324,8 +1318,6 @@ static void bcm2835_sdhost_request(struct mmc_host *mmc,
+ 			bcm2835_sdhost_finish_command(host, &flags);
+ 	}
+ 
+-	mmiowb();
+-
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
+ 
+@@ -1353,8 +1345,6 @@ static void bcm2835_sdhost_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 
+ 	bcm2835_sdhost_write(host, host->hcfg, SDHCFG);
+ 
+-	mmiowb();
+-
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
+ 
+@@ -1383,8 +1373,6 @@ static void bcm2835_sdhost_cmd_wait_work(struct work_struct *work)
+ 
+ 	bcm2835_sdhost_finish_command(host, &flags);
+ 
+-	mmiowb();
+-
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
+ 
+@@ -1415,8 +1403,6 @@ static void bcm2835_sdhost_tasklet_finish(unsigned long param)
+ 	host->cmd = NULL;
+ 	host->data = NULL;
+ 
+-	mmiowb();
+-
+ 	host->dma_desc = NULL;
+ 	terminate_chan = host->dma_chan;
+ 	host->dma_chan = NULL;
+@@ -1515,7 +1501,6 @@ int bcm2835_sdhost_add_host(struct bcm2835_host *host)
+ 		goto untasklet;
+ 	}
+ 
+-	mmiowb();
+ 	mmc_add_host(mmc);
+ 
+ 	pio_limit_string[0] = '\0';
 -- 
 1.8.3.1
