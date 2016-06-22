@@ -1,129 +1,41 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 22 Jun 2016 23:45:48 +0300
-Subject: [PATCH v8 4/4] serial: pl011: add console matching function
-In-Reply-To: <7CC4D455-323E-4B33-A931-2104E2DDDC0D@hurleysoftware.com>
-References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
- <1463749405-11640-5-git-send-email-aleksey.makarov@linaro.org>
- <20160622121813.GA20023@yury-N73SV>
- <7CC4D455-323E-4B33-A931-2104E2DDDC0D@hurleysoftware.com>
-Message-ID: <20160622204548.GB28766@yury-N73SV>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 22 Jun 2016 17:25:03 -0500
+Subject: [PATCH] mmc: pwrseq-simple: Add an optional post-power-on-delay
+In-Reply-To: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
+References: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAL_JsqJ0XVJb=Q9FT8g_OUTbgZWr-E58xQS0iCR4hv-9EHCcPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter, 
+On Wed, Jun 22, 2016 at 12:59 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Some devices need a while to boot their firmware after providing clks /
+> de-asserting resets before they are ready to receive sdio commands.
+>
+> This commits adds a post-power-on-delay-ms devicetree property to
+> mmc-pwrseq-simple for use with such devices.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+>  drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
+>  2 files changed, 11 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+> index ce0e767..e254368 100644
+> --- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+> +++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+> @@ -16,6 +16,8 @@ Optional properties:
+>    See ../clocks/clock-bindings.txt for details.
+>  - clock-names : Must include the following entry:
+>    "ext_clock" (External clock provided to the card).
+> +- post-power-on-delay-ms : Delay in ms after powering the card and
+> +       de-asserting the reset-gpios (if any)
 
-Nice to meet you.
+Presumably you need this delay post any reset, not just after power on
+if you are waiting for firmware to boot. So the name is not all that
+clear. How about a "reset-timing-ms" property that takes 3 values for
+pre-assert time (normally 0), assertion time, post assert time. Of
+course, I can still think of ways that breaks like when in this
+sequence do clocks need to be turned on.
 
-On Wed, Jun 22, 2016 at 07:08:33AM -0700, Peter Hurley wrote:
-> 
-> 
-> > On Jun 22, 2016, at 5:18 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> > 
-> >> On Fri, May 20, 2016 at 04:03:23PM +0300, Aleksey Makarov wrote:
-> >> This patch adds function pl011_console_match() that implements
-> >> method match of struct console.  It allows to match consoles against
-> >> data specified in a string, for example taken from command line or
-> >> compiled by ACPI SPCR table handler.
-> >> 
-> >> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> >> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-> >> ---
-> >> drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
-> >> 1 file changed, 56 insertions(+)
-> >> 
-> >> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> >> index a2aa655..388edc8 100644
-> >> --- a/drivers/tty/serial/amba-pl011.c
-> >> +++ b/drivers/tty/serial/amba-pl011.c
-> >> @@ -2288,12 +2288,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
-> >>    return uart_set_options(&uap->port, co, baud, parity, bits, flow);
-> >> }
-> >> 
-> >> +/**
-> >> + *    pl011_console_match - non-standard console matching
-> >> + *    @co:      registering console
-> >> + *    @name:      name from console command line
-> >> + *    @idx:      index from console command line
-> >> + *    @options: ptr to option string from console command line
-> >> + *
-> >> + *    Only attempts to match console command lines of the form:
-> >> + *        console=pl011,mmio|mmio32,<addr>[,<options>]
-> >> + *        console=pl011,0x<addr>[,<options>]
-> >> + *    This form is used to register an initial earlycon boot console and
-> >> + *    replace it with the amba_console at pl011 driver init.
-> >> + *
-> >> + *    Performs console setup for a match (as required by interface)
-> >> + *    If no <options> are specified, then assume the h/w is already setup.
-> >> + *
-> >> + *    Returns 0 if console matches; otherwise non-zero to use default matching
-> >> + */
-> >> +static int __init pl011_console_match(struct console *co, char *name, int idx,
-> >> +                      char *options)
-> >> +{
-> >> +    char match[] = "pl011";    /* pl011-specific earlycon name */
-> >> +    unsigned char iotype;
-> >> +    unsigned long addr;
-> >> +    int i;
-> >> +
-> >> +    if (strncmp(name, match, 5) != 0)
-> >> +        return -ENODEV;
-> >> +
-> >> +    if (uart_parse_earlycon(options, &iotype, &addr, &options))
-> >> +        return -ENODEV;
-> >> +
-> >> +    /* try to match the port specified on the command line */
-> >> +    for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-> >> +        struct uart_port *port;
-> >> +
-> >> +        if (!amba_ports[i])
-> >> +            continue;
-> >> +
-> >> +        port = &amba_ports[i]->port;
-> >> +
-> >> +        if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
-> >> +            continue;
-> > 
-> > So it looks like iotype is constant inside the loop, and UPIO_MEM
-> > and UPIO_MEM32 too, of course. It means you can move this check out of
-> > cycle and avoid ports traversing at all in specific case. Am I wrong?
-> > 
-> 
-> No you're not wrong but I'd prefer if we don't use assumptions like that in port enumeration.
-
-I don't think this is an assumption. I think this is solid fact.
-There's no a single chance for stack-allocated variable to be
-shared with other thread of execution, or be unexpectedly changed
-somehow else. So this code not only decreases performance (I don't
-think it's really hot path), but also confuses reader, and makes him
-spend more time on reading this than it deserves.
-
-If you still insist on current version, I'd ask you or Alexey to add
-clear description why we check the same condition again and again
-inside the loop.
-
-Yury.
-
-> >> +
-> >> +        if (port->mapbase != addr)
-> >> +            continue;
-> >> +
-> >> +        co->index = i;
-> >> +        port->cons = co;
-> >> +        return pl011_console_setup(co, options);
-> >> +    }
-> >> +
-> >> +    return -ENODEV;
-> >> +}
-> >> +
-> >> static struct uart_driver amba_reg;
-> >> static struct console amba_console = {
-> >>    .name        = "ttyAMA",
-> >>    .write        = pl011_console_write,
-> >>    .device        = uart_console_device,
-> >>    .setup        = pl011_console_setup,
-> >> +    .match        = pl011_console_match,
-> >>    .flags        = CON_PRINTBUFFER,
-> >>    .index        = -1,
-> >>    .data        = &amba_reg,
-> >> -- 
-> >> 2.8.2
+Rob
