@@ -1,293 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Jun 2016 15:22:22 +0200
-Subject: [PATCH v3] ARM: dts: sun8i: Add dts file for Olimex A33-OLinuXino
-In-Reply-To: <1466418769-8384-1-git-send-email-stefan.mavrodiev@gmail.com>
-References: <1466418769-8384-1-git-send-email-stefan.mavrodiev@gmail.com>
-Message-ID: <20160622132222.GX26668@lukather>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 22 Jun 2016 15:23:27 +0200
+Subject: [PATCH] arm64: Add support ARCH_SUPPORTS_INT128
+In-Reply-To: <20160622105749.GA6521@e104818-lin.cambridge.arm.com>
+References: <1466492123-3356-1-git-send-email-wangkefeng.wang@huawei.com>
+ <20160622105749.GA6521@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu_08ayHihvTVL_MEvr3uAk5MTBr8afWpBC2eOa3nkdu9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 22 June 2016 at 12:57, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Jun 21, 2016 at 02:55:23PM +0800, Kefeng Wang wrote:
+>> The gcc support __SIZEOF_INT128__ and __int128 in arm64, thus,
+>> enable ARCH_SUPPORTS_INT128 to make mul_u64_u32_shr() a bit
+>> more efficient in scheduler.
+>>
+>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>> ---
+>>  arch/arm64/Kconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 5a0a691..ab319eb 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -11,6 +11,7 @@ config ARM64
+>>       select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+>>       select ARCH_USE_CMPXCHG_LOCKREF
+>>       select ARCH_SUPPORTS_ATOMIC_RMW
+>> +     select ARCH_SUPPORTS_INT128
+>>       select ARCH_SUPPORTS_NUMA_BALANCING
+>>       select ARCH_WANT_OPTIONAL_GPIOLIB
+>>       select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+>
+> With this patch and UBSAN+KASAN enabled, Linux fails to link with:
+>
+> lib/built-in.o: In function `get_signed_val':
+> lib/ubsan.c:93: undefined reference to `__ashlti3'
+> lib/ubsan.c:93: undefined reference to `__ashrti3'
+>
+> It succeeds if I revert commit d67703a8a69e ("arm64: kill off the libgcc
+> dependency"). We may have to revisit that decision or implement the
+> required library functions in the kernel. In general, I'd like to reduce
+> the amount of code duplication if the functionality can be found
+> elsewhere like in libgcc. There is a risk of not knowing precisely what
+> ligbcc relies on (like libc functions), though there are other
+> architectures linking against it.
+>
 
-On Mon, Jun 20, 2016 at 01:32:49PM +0300, Stefan Mavrodiev wrote:
-> A33-OLinuXino is A33 development board designed by Olimex LTD.
-> 
-> It has AXP233 PMU, 1GB DRAM, a micro SD card, one USB-OTG connector,
-> headphone and mic jacks, connector for LiPo battery and optional
-> 4GB NAND Flash.
-> 
-> It has two 40-pin headers. One for LCD panel, and one for
-> additional modules. Also there is CSI/DSI connector.
-
-Oh? So it ships already? Nice!
-
-> Signed-off-by: Stefan Mavrodiev <stefan.mavrodiev@gmail.com>
-> ---
-> Changes for v2:
-> 	- Removed unused power nodes
-> 	- Removed default-trigger for green led
-> 	- Removed "always-on" option for LCD power
-> 
-> Changes for v3:
-> 	- Nodes are sorted alphabetically
-> 
->  arch/arm/boot/dts/Makefile                |   1 +
->  arch/arm/boot/dts/sun8i-a33-olinuxino.dts | 207 ++++++++++++++++++++++++++++++
->  2 files changed, 208 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-a33-olinuxino.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 970e906..b78f363 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -760,6 +760,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->  	sun8i-a33-ippo-q8h-v1.2.dtb \
->  	sun8i-a33-q8-tablet.dtb \
->  	sun8i-a33-sinlinx-sina33.dtb \
-> +	sun8i-a33-olinuxino.dtb \
-
-This should be ordered alphabetically.
-
->  	sun8i-a83t-allwinner-h8homlet-v2.dtb \
->  	sun8i-a83t-cubietruck-plus.dtb \
->  	sun8i-h3-orangepi-2.dtb \
-> diff --git a/arch/arm/boot/dts/sun8i-a33-olinuxino.dts b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
-> new file mode 100644
-> index 0000000..586ffd3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
-> @@ -0,0 +1,207 @@
-> +/*
-> + * Copyright 2016 - Stefan Mavrodiev <stefan.mavrodiev@gmail.com>
-> + *                  Olimex LTD. <support@olimex.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun8i-a33.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +
-> +/ {
-> +	model = "A33-OLinuXino";
-
-Olimex A33-Olinuxino
-
-> +	compatible = "allwinner,sun8i-a33";
-
-And you should have an extra compatible for your board here.
-
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pin_olinuxino>;
-> +
-> +		green {
-> +			label = "olinuxino:green:usr";
-
-The first part of the label is usually the board name, a33-olinuxino
-in that case.
-
-> +			gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* LED2 */
-> +		};
-> +	};
-> +};
-> +
-> +&ehci0 {
-> +	status = "okay";
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxino>;
-> +	vmmc-supply = <&reg_dcdc1>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
-> +	cd-inverted;
-> +	status = "okay";
-> +};
-> +
-> +&ohci0 {
-> +	status = "okay";
-> +};
-> +
-> +&pio {
-> +	led_pin_olinuxino: led_pins at 0 {
-> +		allwinner,pins = "PB7";
-> +	        allwinner,function = "gpio_out";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +    };
-> +
-> +	mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
-> +		allwinner,pins = "PB4";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +	};
-> +};
-> +
-> +&r_rsb {
-> +	status = "okay";
-> +
-> +	axp22x: pmic at 3a3 {
-> +		compatible = "x-powers,axp223";
-> +		reg = <0x3a3>;
-> +		interrupt-parent = <&nmi_intc>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +		eldoin-supply = <&reg_dcdc1>;
-> +	};
-> +};
-> +
-> +#include "axp22x.dtsi"
-> +
-> +&reg_aldo1 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-io";
-> +};
-> +
-> +&reg_aldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <2350000>;
-> +	regulator-max-microvolt = <2650000>;
-> +	regulator-name = "vdd-dll";
-> +};
-> +
-> +&reg_aldo3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-avcc";
-> +};
-> +
-> +&reg_dc1sw {
-> +	regulator-name = "vcc-lcd";
-> +};
-> +
-> +&reg_dc5ldo {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <900000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-cpus";
-> +};
-> +
-> +&reg_dcdc1 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-dsi";
-> +};
-> +
-> +&reg_dcdc2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <900000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-sys";
-> +};
-> +
-> +&reg_dcdc3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <900000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-cpu";
-> +};
-> +
-> +&reg_dcdc5 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1500000>;
-> +	regulator-max-microvolt = <1500000>;
-> +	regulator-name = "vcc-dram";
-> +};
-> +
-> +&reg_rtc_ldo {
-> +	regulator-name = "vcc-rtc";
-> +};
-> +
-> +&simplefb_lcd {
-> +	vcc-lcd-supply = <&reg_dc1sw>;
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_b>;
-> +	status = "okay";
-> +};
-> +
-> +&usb_otg {
-> +	dr_mode = "host";
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	usb0_vbus-supply = <&reg_vcc5v0>;
-> +	status = "okay";
-> +
-> +};
-
-It doesn't work as USB OTG ?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/abfae6f1/attachment-0001.sig>
+I wonder if this change is such a huge win if we simply end up
+invoking support routines in libgcc to implement the 128-bit
+arithmetic. Do we have any benchmark results?
