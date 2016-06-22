@@ -1,46 +1,40 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Wed, 22 Jun 2016 19:19:24 +0800
-Subject: [PATCH v5 0/5] Thermal: Support for hardware-tracked trip points
-In-Reply-To: <1466565939.2379.5.camel@intel.com>
-References: <1465213489-14898-1-git-send-email-wxt@rock-chips.com>
- <57689B82.3000902@gmail.com> <1466565939.2379.5.camel@intel.com>
-Message-ID: <576A743C.7080401@gmail.com>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Wed, 22 Jun 2016 13:23:39 +0200
+Subject: [PATCH v3 02/10] crypto: marvell: Check engine is not already
+ running when enabling a req
+In-Reply-To: <20160622103324.GA30918@gondor.apana.org.au>
+References: <20160622103324.GA30918@gondor.apana.org.au>
+Message-ID: <576A753B.7070507@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-On 2016?06?22? 11:25, Zhang Rui wrote:
-> On ?, 2016-06-21 at 09:42 +0800, Caesar Wang wrote:
->> Do you have other ideas for the following patches? :-)
->> Even if only took two weeks feel after a long time.
->>
->> 9157919 New          [v5,1/5] thermal: Add support for hardware-
->> tracked trip points
->> 9157917 New          [v5,2/5] thermal: of: implement .set_trips for
->> device tree thermal zones
->> 9161129 New          [v5.1,3/5] thermal: streamline get_trend
->> callbacks
->> 9157929 New          [v5,4/5] thermal: bang-bang governor: act on
->> lower trip boundary
->> 9157925 New          [v5,5/5] thermal: rockchip: add the set_trips
->> function
->> ---
->>
-> I have no objections to this patch set, except one change in patch 1/5.
-> But as this also touches of_thermal and rockchip thermal driver. I'd
-> leave this patch set for Eduardo to review and take.
-> BTW, Eduardo is traveling recently, so you may still need to wait some
-> time.
-
-Okay, thanks for your reminder. and sorry for the noise.:-)
-
--
-Caesar
-
+Le 22/06/2016 12:33, Herbert Xu a ?crit :
+> Romain Perier <romain.perier@free-electrons.com> wrote:
+>> Add a BUG_ON() call when the driver tries to launch a crypto request
+>> while the engine is still processing the previous one. This replaces
+>> a silent system hang by a verbose kernel panic with the associated
+>> backtrace to let the user know that something went wrong in the CESA
+>> driver.
 >
-> Thanks,
-> rui
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> Hmm, so how can this happen?
+If it is triggerable then we better
+> try to recover from it more gracefully.  If it is not triggerable
+> then why bother?
+>
+
+Well, It does not happen with the current driver (in mainline). This is 
+bug I had when I added support to chain requests. Take a look at the 
+patch 008/010, it changes the way the requests are "prepared". If you 
+really enable a request while the engine is running, that's very hard to 
+debug. This is more useful to have a backtrace to let the user know that 
+something is wrong instead of having a silent system hang. That's easier 
+to debug and you can detect regressions.
+
+Regards,
+Romain
+-- 
+Romain Perier, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
