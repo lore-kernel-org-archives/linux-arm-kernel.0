@@ -1,26 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 22 Jun 2016 14:32:22 +0200
-Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
-In-Reply-To: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <20160622123222.GD26943@ulmo.ba.sec>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Wed, 22 Jun 2016 08:32:11 -0400
+Subject: [PATCH] ARM: dts: lpc32xx: set default parent clock for pwm1 & pwm2
+Message-ID: <1466598731-5144-1-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 03:37:57PM -0400, Sylvain Lemieux wrote:
-> From: Sylvain Lemieux <slemieux@tycoint.com>
-> 
-> If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
-> disable the PWM, the PWM output is always set as a logic 1.
+From: Sylvain Lemieux <slemieux@tycoint.com>
 
-I presume there's a reason why the bootloader set this bit to 1. Why do
-you assume it's the right thing to clear it?
+The change setup the peripheral clock (PERIPH_CLK) as the default 
+parent clock for PWM1 & PWM2.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/6ba5f7b9/attachment.sig>
+Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+---
+Dependencies:
+- clk: lpc32xx: allow peripheral clock selection in device tree
+  http://thread.gmane.org/gmane.linux.kernel.clk/6938
+
+ arch/arm/boot/dts/lpc32xx.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+index e295e1e..ed85b95 100644
+--- a/arch/arm/boot/dts/lpc32xx.dtsi
++++ b/arch/arm/boot/dts/lpc32xx.dtsi
+@@ -469,6 +469,9 @@
+ 				compatible = "nxp,lpc3220-pwm";
+ 				reg = <0x4005C000 0x4>;
+ 				clocks = <&clk LPC32XX_CLK_PWM1>;
++				assigned-clocks = <&clk LPC32XX_CLK_PWM1>,
++						  <&clk LPC32XX_CLK_PERIPH>;
++				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -476,6 +479,9 @@
+ 				compatible = "nxp,lpc3220-pwm";
+ 				reg = <0x4005C004 0x4>;
+ 				clocks = <&clk LPC32XX_CLK_PWM2>;
++				assigned-clocks = <&clk LPC32XX_CLK_PWM2>,
++						  <&clk LPC32XX_CLK_PERIPH>;
++				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.8.3.1
