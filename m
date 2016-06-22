@@ -1,26 +1,33 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:33 +0300
-Subject: [PATCHv2 00/27] crypto: fixes for omap family of devices
-Message-ID: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+Date: Wed, 22 Jun 2016 16:23:35 +0300
+Subject: [PATCHv2 02/27] crypto: omap-sham: change queue size from 1 to 10
+In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Change crypto queue size from 1 to 10 for omap SHA driver. This should
+allow clients to enqueue requests more effectively to avoid serializing
+whole crypto sequences, giving extra performance.
 
-Changes compared to v1 of the series:
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ drivers/crypto/omap-sham.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-- dropped first patch from the series (crypto: omap-aes: Fix registration of
-  algorithms) as it was queued by Herbert already
-- modified the second (now first) patch of the series to use runtime auto-
-  suspend instead of getting static sync over a cra lifetime
-- re-ordered the DTS / hwmod changes in the series, the merge order of
-  these must be maintained to avoid issues
-
-Patches #01 .. #14 should be merged via crypto tree, the rest should be
-handled by Tony.
-
-Merging the omap / dts parts can be done safely separately, assuming
-you just use omap2plus_defconfig (enabling crypto features will
-cause some issues without the driver level fixes.)
-
-- Tero
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index 8831613..2b0a1bd 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -175,7 +175,7 @@ struct omap_sham_ctx {
+ 	struct omap_sham_hmac_ctx base[0];
+ };
+ 
+-#define OMAP_SHAM_QUEUE_LENGTH	1
++#define OMAP_SHAM_QUEUE_LENGTH	10
+ 
+ struct omap_sham_algs_info {
+ 	struct ahash_alg	*algs_list;
+-- 
+1.9.1
