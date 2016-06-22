@@ -1,34 +1,79 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:39 +0300
-Subject: [PATCHv2 06/27] crypto: ahash: increase the maximum allowed statesize
+Date: Wed, 22 Jun 2016 16:23:40 +0300
+Subject: [PATCHv2 07/27] crypto: omap-sham: implement context export/import
+ APIs
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-7-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-8-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The statesize is used to determine the maximum size for saved ahash
-context. In some cases, this can be much larger than what is currently
-allocated for it, for example omap-sham driver uses a buffer size of
-PAGE_SIZE. Increase the statesize to accommodate this.
+Context export/import are now required for ahash algorithms due to
+required support in algif_hash. Implement these for OMAP SHA driver,
+saving and restoring the internal state of the driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- crypto/ahash.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/crypto/omap-sham.c | 40 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
 
-diff --git a/crypto/ahash.c b/crypto/ahash.c
-index 3887a98..375bbd7 100644
---- a/crypto/ahash.c
-+++ b/crypto/ahash.c
-@@ -536,7 +536,7 @@ static int ahash_prepare_alg(struct ahash_alg *alg)
- 	struct crypto_alg *base = &alg->halg.base;
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index 84a0027..683f825 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -1325,6 +1325,35 @@ static void omap_sham_cra_exit(struct crypto_tfm *tfm)
+ 	}
+ }
  
- 	if (alg->halg.digestsize > PAGE_SIZE / 8 ||
--	    alg->halg.statesize > PAGE_SIZE / 8 ||
-+	    alg->halg.statesize > PAGE_SIZE * 2 ||
- 	    alg->halg.statesize == 0)
- 		return -EINVAL;
++static int omap_sham_export(struct ahash_request *req, void *out)
++{
++	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
++	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
++	struct omap_sham_ctx *ctx = crypto_ahash_ctx(tfm);
++	struct omap_sham_hmac_ctx *bctx = ctx->base;
++
++	memcpy(out, rctx, sizeof(*rctx) + BUFLEN);
++	memcpy(out + sizeof(*rctx) + BUFLEN, ctx, sizeof(*ctx));
++	memcpy(out + sizeof(*rctx) + BUFLEN + sizeof(*ctx), bctx,
++	       sizeof(*bctx));
++
++	return 0;
++}
++
++static int omap_sham_import(struct ahash_request *req, const void *in)
++{
++	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
++	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
++	struct omap_sham_ctx *ctx = crypto_ahash_ctx(tfm);
++	struct omap_sham_hmac_ctx *bctx = ctx->base;
++
++	memcpy(rctx, in, sizeof(*rctx) + BUFLEN);
++	memcpy(ctx, in + sizeof(*rctx) + BUFLEN, sizeof(*ctx));
++	memcpy(bctx, in + sizeof(*rctx) + BUFLEN + sizeof(*ctx), sizeof(*bctx));
++
++	return 0;
++}
++
+ static struct ahash_alg algs_sha1_md5[] = {
+ {
+ 	.init		= omap_sham_init,
+@@ -1979,8 +2008,15 @@ static int omap_sham_probe(struct platform_device *pdev)
+ 
+ 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
+ 		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
+-			err = crypto_register_ahash(
+-					&dd->pdata->algs_info[i].algs_list[j]);
++			struct ahash_alg *alg;
++
++			alg = &dd->pdata->algs_info[i].algs_list[j];
++			alg->export = omap_sham_export;
++			alg->import = omap_sham_import;
++			alg->halg.statesize = sizeof(struct omap_sham_reqctx) +
++				sizeof(struct omap_sham_ctx) +
++				sizeof(struct omap_sham_hmac_ctx) + BUFLEN;
++			err = crypto_register_ahash(alg);
+ 			if (err)
+ 				goto err_algs;
  
 -- 
 1.9.1
