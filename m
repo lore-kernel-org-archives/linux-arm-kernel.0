@@ -1,110 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Jun 2016 11:50:39 +0100
-Subject: [PATCH V7 1/8] ACPI: I/O Remapping Table (IORT) initial support
-In-Reply-To: <372d3b78-2bc5-94d1-49f6-c9229affa65d@linaro.org>
-References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
- <1466420541-20101-2-git-send-email-tn@semihalf.com>
- <372d3b78-2bc5-94d1-49f6-c9229affa65d@linaro.org>
-Message-ID: <576A6D7F.6010407@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Jun 2016 11:57:50 +0100
+Subject: [PATCH] arm64: Add support ARCH_SUPPORTS_INT128
+In-Reply-To: <1466492123-3356-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1466492123-3356-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160622105749.GA6521@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/06/16 08:12, Hanjun Guo wrote:
-> Hi Tomasz,
+On Tue, Jun 21, 2016 at 02:55:23PM +0800, Kefeng Wang wrote:
+> The gcc support __SIZEOF_INT128__ and __int128 in arm64, thus,
+> enable ARCH_SUPPORTS_INT128 to make mul_u64_u32_shr() a bit
+> more efficient in scheduler.
 > 
-> Sorry for jumping out late, just one comment below.
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/arm64/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> On 2016/6/20 19:02, Tomasz Nowicki wrote:
->> IORT shows representation of IO topology for ARM based systems.
->> It describes how various components are connected together on
->> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
->>
->> Initial support allows to detect IORT table presence and save its
->> root pointer obtained through acpi_get_table(). The pointer validity
->> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
->> is not set while using IORT nodes we would dereference unmapped pointers.
->>
->> For the aforementioned reason call iort_table_detect() from acpi_init()
->> which guarantees acpi_gbl_permanent_mmap to be set at that point.
->>
->> Add generic helpers which are helpful for scanning and retrieving
->> information from IORT table content. List of the most important helpers:
->> - iort_find_dev_node() finds IORT node for a given device
->> - iort_node_map_rid() maps device RID and returns IORT node which provides
->>   final translation
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> ---
->>  drivers/acpi/Kconfig  |   3 +
->>  drivers/acpi/Makefile |   1 +
->>  drivers/acpi/bus.c    |   2 +
->>  drivers/acpi/iort.c   | 220 ++++++++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/iort.h  |  30 +++++++
-> 
-> [...]
-> 
->> +static acpi_status
->> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
->> +{
->> +	struct device *dev = context;
->> +
->> +	switch (node->type) {
->> +	case ACPI_IORT_NODE_NAMED_COMPONENT: {
->> +		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-> 
-> ACPI_ALLOCATE_BUFFER is used here, so ...
-> 
->> +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
->> +		struct acpi_iort_named_component *ncomp;
->> +
->> +		if (!adev)
->> +			break;
->> +
->> +		ncomp = (struct acpi_iort_named_component *)node->node_data;
->> +
->> +		if (ACPI_FAILURE(acpi_get_name(adev->handle,
->> +					       ACPI_FULL_PATHNAME, &buffer))) {
->> +			dev_warn(dev, "Can't get device full path name\n");
->> +			break;
->> +		}
->> +
->> +		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
->> +			return AE_OK;
-> 
-> ... we need to kfree(buffer.pointer) before we return or break.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 5a0a691..ab319eb 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -11,6 +11,7 @@ config ARM64
+>  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+>  	select ARCH_USE_CMPXCHG_LOCKREF
+>  	select ARCH_SUPPORTS_ATOMIC_RMW
+> +	select ARCH_SUPPORTS_INT128
+>  	select ARCH_SUPPORTS_NUMA_BALANCING
+>  	select ARCH_WANT_OPTIONAL_GPIOLIB
+>  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
 
-For the record, I've queued this patch on top:
+With this patch and UBSAN+KASAN enabled, Linux fails to link with:
 
-diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
-index 496dcf6..3b9e55b 100644
---- a/drivers/acpi/iort.c
-+++ b/drivers/acpi/iort.c
-@@ -158,11 +158,15 @@ iort_match_node_callback(struct acpi_iort_node *node, void *context)
- 		if (ACPI_FAILURE(acpi_get_name(adev->handle,
- 					       ACPI_FULL_PATHNAME, &buffer))) {
- 			dev_warn(dev, "Can't get device full path name\n");
--			break;
--		}
-+		} else {
-+			int match;
- 
--		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
--			return AE_OK;
-+			match = !strcmp(ncomp->device_name, buffer.pointer);
-+			acpi_os_free(&buffer);
-+
-+			if (match)
-+				return AE_OK;
-+		}
- 
- 		break;
- 	}
+lib/built-in.o: In function `get_signed_val':
+lib/ubsan.c:93: undefined reference to `__ashlti3'
+lib/ubsan.c:93: undefined reference to `__ashrti3'
 
+It succeeds if I revert commit d67703a8a69e ("arm64: kill off the libgcc
+dependency"). We may have to revisit that decision or implement the
+required library functions in the kernel. In general, I'd like to reduce
+the amount of code duplication if the functionality can be found
+elsewhere like in libgcc. There is a risk of not knowing precisely what
+ligbcc relies on (like libc functions), though there are other
+architectures linking against it.
 
-assuming that Rafael is OK with the general approach, of course.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
