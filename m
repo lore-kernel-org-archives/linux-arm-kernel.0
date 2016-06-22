@@ -1,76 +1,187 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:47 +0300
-Subject: [PATCHv2 14/27] crypto: omap-des: fix crypto engine initialization
- order
+Date: Wed, 22 Jun 2016 16:24:00 +0300
+Subject: [PATCHv2 27/27] ARM: AMx3xx: hwmod: Add data for RNG
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-15-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-28-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The crypto engine must be initialized before registering algorithms,
-otherwise the test manager will crash as it attempts to execute
-tests for the algos while they are being registered.
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-Fixes: f1b77aaca85a ("crypto: omap-des - Integrate with the crypto engine framework")
+Hardware random number generator is present in both AM33xx and AM43xx
+SoC's. So moving the hwmod data to common data.
+
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-des.c | 28 +++++++++++++++-------------
- 1 file changed, 15 insertions(+), 13 deletions(-)
+ .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  2 ++
+ .../omap_hwmod_33xx_43xx_interconnect_data.c       |  8 +++++
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 29 ++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         | 35 ----------------------
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  1 +
+ arch/arm/mach-omap2/prcm43xx.h                     |  1 +
+ 6 files changed, 41 insertions(+), 35 deletions(-)
 
-diff --git a/drivers/crypto/omap-des.c b/drivers/crypto/omap-des.c
-index e4c87bc..f5bf0d1 100644
---- a/drivers/crypto/omap-des.c
-+++ b/drivers/crypto/omap-des.c
-@@ -1079,6 +1079,17 @@ static int omap_des_probe(struct platform_device *pdev)
- 	list_add_tail(&dd->list, &dev_list);
- 	spin_unlock(&list_lock);
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+index 7f73796..968ce46 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+@@ -77,6 +77,7 @@ extern struct omap_hwmod_ocp_if am33xx_l4_ls__uart6;
+ extern struct omap_hwmod_ocp_if am33xx_l3_main__ocmc;
+ extern struct omap_hwmod_ocp_if am33xx_l3_main__sha0;
+ extern struct omap_hwmod_ocp_if am33xx_l3_main__aes0;
++extern struct omap_hwmod_ocp_if am33xx_l4_per__rng;
  
-+	/* Initialize des crypto engine */
-+	dd->engine = crypto_engine_alloc_init(dev, 1);
-+	if (!dd->engine)
-+		goto err_engine;
+ extern struct omap_hwmod am33xx_l3_main_hwmod;
+ extern struct omap_hwmod am33xx_l3_s_hwmod;
+@@ -89,6 +90,7 @@ extern struct omap_hwmod am33xx_gfx_hwmod;
+ extern struct omap_hwmod am33xx_prcm_hwmod;
+ extern struct omap_hwmod am33xx_aes0_hwmod;
+ extern struct omap_hwmod am33xx_sha0_hwmod;
++extern struct omap_hwmod am33xx_rng_hwmod;
+ extern struct omap_hwmod am33xx_ocmcram_hwmod;
+ extern struct omap_hwmod am33xx_smartreflex0_hwmod;
+ extern struct omap_hwmod am33xx_smartreflex1_hwmod;
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
+index 1c210cb..b99d6ea 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
+@@ -611,3 +611,11 @@ struct omap_hwmod_ocp_if am33xx_l3_main__aes0 = {
+ 	.addr		= am33xx_aes0_addrs,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
 +
-+	dd->engine->prepare_request = omap_des_prepare_req;
-+	dd->engine->crypt_one_request = omap_des_crypt_req;
-+	err = crypto_engine_start(dd->engine);
-+	if (err)
-+		goto err_engine;
-+
- 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
- 		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
- 			algp = &dd->pdata->algs_info[i].algs_list[j];
-@@ -1094,27 +1105,18 @@ static int omap_des_probe(struct platform_device *pdev)
- 		}
- 	}
++/* l4 per -> rng */
++struct omap_hwmod_ocp_if am33xx_l4_per__rng = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am33xx_rng_hwmod,
++	.clk		= "rng_fck",
++	.user		= OCP_USER_MPU,
++};
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+index aed3362..d2f0bb4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+@@ -267,6 +267,33 @@ struct omap_hwmod am33xx_sha0_hwmod = {
+ 	},
+ };
  
--	/* Initialize des crypto engine */
--	dd->engine = crypto_engine_alloc_init(dev, 1);
--	if (!dd->engine)
--		goto err_algs;
++/* rng */
++static struct omap_hwmod_class_sysconfig am33xx_rng_sysc = {
++	.rev_offs	= 0x1fe0,
++	.sysc_offs	= 0x1fe4,
++	.sysc_flags	= SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE,
++	.idlemodes	= SIDLE_FORCE | SIDLE_NO,
++	.sysc_fields	= &omap_hwmod_sysc_type1,
++};
++
++static struct omap_hwmod_class am33xx_rng_hwmod_class = {
++	.name		= "rng",
++	.sysc		= &am33xx_rng_sysc,
++};
++
++struct omap_hwmod am33xx_rng_hwmod = {
++	.name		= "rng",
++	.class		= &am33xx_rng_hwmod_class,
++	.clkdm_name	= "l4ls_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE,
++	.main_clk	= "rng_fck",
++	.prcm		= {
++		.omap4	= {
++			.modulemode	= MODULEMODE_SWCTRL,
++		},
++	},
++};
++
+ /* ocmcram */
+ static struct omap_hwmod_class am33xx_ocmcram_hwmod_class = {
+ 	.name = "ocmcram",
+@@ -1397,6 +1424,7 @@ static void omap_hwmod_am33xx_clkctrl(void)
+ 	CLKCTRL(am33xx_ocmcram_hwmod , AM33XX_CM_PER_OCMCRAM_CLKCTRL_OFFSET);
+ 	CLKCTRL(am33xx_sha0_hwmod , AM33XX_CM_PER_SHA0_CLKCTRL_OFFSET);
+ 	CLKCTRL(am33xx_aes0_hwmod , AM33XX_CM_PER_AES0_CLKCTRL_OFFSET);
++	CLKCTRL(am33xx_rng_hwmod, AM33XX_CM_PER_RNG_CLKCTRL_OFFSET);
+ }
+ 
+ static void omap_hwmod_am33xx_rst(void)
+@@ -1470,6 +1498,7 @@ static void omap_hwmod_am43xx_clkctrl(void)
+ 	CLKCTRL(am33xx_ocmcram_hwmod , AM43XX_CM_PER_OCMCRAM_CLKCTRL_OFFSET);
+ 	CLKCTRL(am33xx_sha0_hwmod , AM43XX_CM_PER_SHA0_CLKCTRL_OFFSET);
+ 	CLKCTRL(am33xx_aes0_hwmod , AM43XX_CM_PER_AES0_CLKCTRL_OFFSET);
++	CLKCTRL(am33xx_rng_hwmod, AM43XX_CM_PER_RNG_CLKCTRL_OFFSET);
+ }
+ 
+ static void omap_hwmod_am43xx_rst(void)
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index cc0791d..f43ab86 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -503,41 +503,6 @@ static struct omap_hwmod_ocp_if am33xx_l3_s__usbss = {
+ 	.flags		= OCPIF_SWSUP_IDLE,
+ };
+ 
+-/* rng */
+-static struct omap_hwmod_class_sysconfig am33xx_rng_sysc = {
+-	.rev_offs	= 0x1fe0,
+-	.sysc_offs	= 0x1fe4,
+-	.sysc_flags	= SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE,
+-	.idlemodes	= SIDLE_FORCE | SIDLE_NO,
+-	.sysc_fields	= &omap_hwmod_sysc_type1,
+-};
 -
--	dd->engine->prepare_request = omap_des_prepare_req;
--	dd->engine->crypt_one_request = omap_des_crypt_req;
--	err = crypto_engine_start(dd->engine);
--	if (err)
--		goto err_engine;
+-static struct omap_hwmod_class am33xx_rng_hwmod_class = {
+-	.name		= "rng",
+-	.sysc		= &am33xx_rng_sysc,
+-};
 -
- 	return 0;
- 
--err_engine:
--	crypto_engine_exit(dd->engine);
- err_algs:
- 	for (i = dd->pdata->algs_info_size - 1; i >= 0; i--)
- 		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
- 			crypto_unregister_alg(
- 					&dd->pdata->algs_info[i].algs_list[j]);
- 
-+err_engine:
-+	if (dd->engine)
-+		crypto_engine_exit(dd->engine);
-+
- 	omap_des_dma_cleanup(dd);
- err_irq:
- 	tasklet_kill(&dd->done_task);
+-static struct omap_hwmod am33xx_rng_hwmod = {
+-	.name		= "rng",
+-	.class		= &am33xx_rng_hwmod_class,
+-	.clkdm_name	= "l4ls_clkdm",
+-	.flags		= HWMOD_SWSUP_SIDLE,
+-	.main_clk	= "rng_fck",
+-	.prcm		= {
+-		.omap4	= {
+-			.clkctrl_offs	= AM33XX_CM_PER_RNG_CLKCTRL_OFFSET,
+-			.modulemode	= MODULEMODE_SWCTRL,
+-		},
+-	},
+-};
+-
+-static struct omap_hwmod_ocp_if am33xx_l4_per__rng = {
+-	.master		= &am33xx_l4_ls_hwmod,
+-	.slave		= &am33xx_rng_hwmod,
+-	.clk		= "rng_fck",
+-	.user		= OCP_USER_MPU,
+-};
+-
+ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l3_main__emif,
+ 	&am33xx_mpu__l3_main,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index b54eeaa..1cb12ea 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -994,6 +994,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l4_per__i2c2,
+ 	&am33xx_l4_per__i2c3,
+ 	&am33xx_l4_per__mailbox,
++	&am33xx_l4_per__rng,
+ 	&am33xx_l4_ls__mcasp0,
+ 	&am33xx_l4_ls__mcasp1,
+ 	&am33xx_l4_ls__mmc0,
+diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+index 593482e..75976b4 100644
+--- a/arch/arm/mach-omap2/prcm43xx.h
++++ b/arch/arm/mach-omap2/prcm43xx.h
+@@ -91,6 +91,7 @@
+ #define AM43XX_CM_PER_MAILBOX0_CLKCTRL_OFFSET		0x04b8
+ #define AM43XX_CM_PER_MMC0_CLKCTRL_OFFSET		0x04c0
+ #define AM43XX_CM_PER_MMC1_CLKCTRL_OFFSET		0x04c8
++#define AM43XX_CM_PER_RNG_CLKCTRL_OFFSET		0x04e0
+ #define AM43XX_CM_PER_SPI0_CLKCTRL_OFFSET		0x0500
+ #define AM43XX_CM_PER_SPI1_CLKCTRL_OFFSET		0x0508
+ #define AM43XX_CM_PER_SPINLOCK_CLKCTRL_OFFSET		0x0528
 -- 
 1.9.1
