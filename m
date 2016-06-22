@@ -1,66 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Jun 2016 07:06:39 +0100
-Subject: [PATCH] pci: Add support for unbinding the generic PCI host
- controller
-In-Reply-To: <57698276.6050606@siemens.com>
-References: <57698276.6050606@siemens.com>
-Message-ID: <20160622060638.GY29165@arm.com>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Wed, 22 Jun 2016 11:41:50 +0530
+Subject: [PATCH v3 0/3] Add Broadcom iproc-static-adc controller driver
+Message-ID: <1466575913-5027-1-git-send-email-raveendra.padasalagi@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan,
+This patchset contains initial driver for Broadcom's
+iproc static adc controller. The patchset is based on v4.7-rc1
+tag and its tested on Broadcom Cygnus SoC.
 
-On Tue, Jun 21, 2016 at 08:07:50PM +0200, Jan Kiszka wrote:
-> Particularly useful when working in virtual environments where the
-> controller may come and go, but possibly not only there.
-> 
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> ---
->  drivers/pci/ecam.h                  |  1 +
->  drivers/pci/host/pci-host-common.c  | 13 +++++++++++++
->  drivers/pci/host/pci-host-generic.c |  1 +
->  3 files changed, 15 insertions(+)
-> 
-> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
-> index 9878beb..5a5f607 100644
-> --- a/drivers/pci/ecam.h
-> +++ b/drivers/pci/ecam.h
-> @@ -63,5 +63,6 @@ extern struct pci_ecam_ops pci_generic_ecam_ops;
->  /* for DT-based PCI controllers that support ECAM */
->  int pci_host_common_probe(struct platform_device *pdev,
->  			  struct pci_ecam_ops *ops);
-> +int pci_host_common_remove(struct platform_device *pdev);
->  #endif
->  #endif
-> diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
-> index 8cba7ab..c0ff4b1 100644
-> --- a/drivers/pci/host/pci-host-common.c
-> +++ b/drivers/pci/host/pci-host-common.c
-> @@ -164,6 +164,19 @@ int pci_host_common_probe(struct platform_device *pdev,
->  	}
->  
->  	pci_bus_add_devices(bus);
-> +	platform_set_drvdata(pdev, bus);
-> +	return 0;
-> +}
-> +
-> +int pci_host_common_remove(struct platform_device *pdev)
-> +{
-> +	struct pci_bus *bus = platform_get_drvdata(pdev);
-> +
-> +	pci_lock_rescan_remove();
-> +	pci_stop_root_bus(bus);
-> +	pci_remove_root_bus(bus);
-> +	pci_unlock_rescan_remove();
+The patches can be fetched from iproc-adc-v3 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-A couple of comments/questions about this:
+Changes since v2:
+ - Addressed various comments given by Jonathan Cameron and
+   Peter Meerwald-Stadler on driver source code related to linux
+   coding style and clean-up of code. Lot of source code change
+   happened especially due to redefining the #defines.
+ - Added code to support IIO_CHAN_INFO_SCALE mask to return
+   scale value in iproc_adc_read_raw().
+ - Removed #address-cells, #size-cells properties in DT binding
+   document and dts file as adc will not have any child nodes as
+   noticed by Rob Herring.
 
-  - The probe path seems to have some stateful operations outside of PCI
-    resources. For example, kzalloc'ing the bus_range resource in
-    of_pci_get_host_bridge_resources. Do we need to clean these up
-    explicitly?
+Changes since v1:
+ - Modified Kconfig file to add more informative information
+   in Broadcom Adc driver configuration menu.
+ - Added Broadcom Adc driver menu config in the alphabetical
+   order in Kconfig
+ - Addressed various comments given by Peter Meerwald-Stadler
+   on driver source code, Including issues related to linux
+   coding style and race conditions.
 
-  - Similarly, we don't seem to tear-down the config space mappings and
-    data structures for that, so we leak VA space afaict.
+Raveendra Padasalagi (3):
+  Documentation: DT: Add iproc-static-adc binding
+  iio: Add driver for Broadcom iproc-static-adc
+  ARM:dts-Add dt node for Broadcom iproc-static-adc
 
-Will
+ .../bindings/iio/adc/brcm,iproc-static-adc.txt     |  38 ++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  11 +
+ drivers/iio/adc/Kconfig                            |  12 +
+ drivers/iio/adc/Makefile                           |   1 +
+ drivers/iio/adc/bcm_iproc_adc.c                    | 648 +++++++++++++++++++++
+ 5 files changed, 710 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
+ create mode 100644 drivers/iio/adc/bcm_iproc_adc.c
+
+-- 
+1.9.1
