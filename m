@@ -1,147 +1,68 @@
 From: dave.long@linaro.org (David Long)
-Date: Wed, 22 Jun 2016 14:16:25 -0400
-Subject: [PATCH v13 09/10] arm64: Add kernel return probes support
- (kretprobes)
-In-Reply-To: <20160607192836.20d94e0838ef72ebc729a054@kernel.org>
+Date: Wed, 22 Jun 2016 14:28:25 -0400
+Subject: [PATCH v13 05/10] arm64: Kprobes with single stepping support
+In-Reply-To: <20160614094559.51a7865fa30f3f31f6a70e37@kernel.org>
 References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
- <1464924384-15269-10-git-send-email-dave.long@linaro.org>
- <20160607192836.20d94e0838ef72ebc729a054@kernel.org>
-Message-ID: <576AD5F9.9090905@linaro.org>
+ <1464924384-15269-6-git-send-email-dave.long@linaro.org>
+ <20160608100714.4abbcebcf356eb72173d0ce3@kernel.org>
+ <575E3235.1020904@linaro.org>
+ <20160613155017.860097875e8bc86563a065ce@kernel.org>
+ <575ECFC7.10207@linaro.org>
+ <20160614094559.51a7865fa30f3f31f6a70e37@kernel.org>
+Message-ID: <576AD8C9.7050109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2016 06:28 AM, Masami Hiramatsu wrote:
-> On Thu,  2 Jun 2016 23:26:23 -0400
+On 06/13/2016 08:45 PM, Masami Hiramatsu wrote:
+> On Mon, 13 Jun 2016 11:22:47 -0400
 > David Long <dave.long@linaro.org> wrote:
 >
->> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+>> On 06/13/2016 02:50 AM, Masami Hiramatsu wrote:
+>>> On Mon, 13 Jun 2016 00:10:29 -0400
+>>> David Long <dave.long@linaro.org> wrote:
+>>>
+>>>>>> ---
+>>>>>>     arch/arm64/Kconfig                      |   1 +
+>>>>>>     arch/arm64/include/asm/debug-monitors.h |   5 +
+>>>>>>     arch/arm64/include/asm/insn.h           |   4 +-
+>>>>>>     arch/arm64/include/asm/kprobes.h        |  60 ++++
+>>>>>>     arch/arm64/include/asm/probes.h         |  44 +++
+>>>>>>     arch/arm64/kernel/Makefile              |   1 +
+>>>>>>     arch/arm64/kernel/debug-monitors.c      |  18 +-
+>>>>>>     arch/arm64/kernel/kprobes-arm64.c       | 144 +++++++++
+>>>>>>     arch/arm64/kernel/kprobes-arm64.h       |  35 +++
+>>>>>>     arch/arm64/kernel/kprobes.c             | 526 ++++++++++++++++++++++++++++++++
+>>>>>
+>>>>> Not sure why kprobes.c and kprobes-arm64.c are splitted.
+>>>>>
+>>>>>
+>>>>
+>>>> This comes from the model of the arm32 kprobes code where handling of
+>>>> the low-level instruction simulation is implemented in separate files
+>>>> for 32-bit vs. thumb instructions.  It should make a little more sense
+>>>> in the future when additional instruction simulation code will hopefully
+>>>> be added for those instructions we cannot currently single-step
+>>>> out-of-line.  It also probably *could* be merged into one file.
+>>>
+>>> Hmm, at least the name of arch/arm64/kernel/kprobes-arm64.c is
+>>> meaningless. As we've done in x86, I think we can make it
+>>> arch/arm64/kernel/kprobes/decode-insn.{c,h}
+>>>
 >>
->> The pre-handler of this special 'trampoline' kprobe executes the return
->> probe handler functions and restores original return address in ELR_EL1.
->> This way the saved pt_regs still hold the original register context to be
->> carried back to the probed kernel function.
->>
->> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
->> ---
->>   arch/arm64/Kconfig          |  1 +
->>   arch/arm64/kernel/kprobes.c | 75 ++++++++++++++++++++++++++++++++++++++++++++-
->>   2 files changed, 75 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 5496b75..47989eb 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -89,6 +89,7 @@ config ARM64
->>   	select HAVE_RCU_TABLE_FREE
->>   	select HAVE_SYSCALL_TRACEPOINTS
->>   	select HAVE_KPROBES
->> +	select HAVE_KRETPROBES if HAVE_KPROBES
->>   	select IOMMU_DMA if IOMMU_SUPPORT
->>   	select IRQ_DOMAIN
->>   	select IRQ_FORCED_THREADING
->> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
->> index b35f76f..c116904 100644
->> --- a/arch/arm64/kernel/kprobes.c
->> +++ b/arch/arm64/kernel/kprobes.c
->> @@ -577,7 +577,80 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
->>
->>   void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
->>   {
->> -	return NULL;
->> +	struct kretprobe_instance *ri = NULL;
->> +	struct hlist_head *head, empty_rp;
->> +	struct hlist_node *tmp;
->> +	unsigned long flags, orig_ret_addr = 0;
->> +	unsigned long trampoline_address =
->> +		(unsigned long)&kretprobe_trampoline;
->> +
->> +	INIT_HLIST_HEAD(&empty_rp);
->> +	kretprobe_hash_lock(current, &head, &flags);
->> +
->> +	/*
->> +	 * It is possible to have multiple instances associated with a given
->> +	 * task either because multiple functions in the call path have
->> +	 * a return probe installed on them, and/or more than one return
->> +	 * probe was registered for a target function.
->> +	 *
->> +	 * We can handle this because:
->> +	 *     - instances are always inserted at the head of the list
->> +	 *     - when multiple return probes are registered for the same
->> +	 *       function, the first instance's ret_addr will point to the
->> +	 *       real return address, and all the rest will point to
->> +	 *       kretprobe_trampoline
->> +	 */
->> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
->> +		if (ri->task != current)
->> +			/* another task is sharing our hash bucket */
->> +			continue;
->> +
->> +		if (ri->rp && ri->rp->handler) {
->> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
->> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
->> +			ri->rp->handler(ri, regs);
->> +			__this_cpu_write(current_kprobe, NULL);
->> +		}
->> +
->> +		orig_ret_addr = (unsigned long)ri->ret_addr;
->> +		recycle_rp_inst(ri, &empty_rp);
->> +
->> +		if (orig_ret_addr != trampoline_address)
->> +			/*
->> +			 * This is the real return address. Any other
->> +			 * instances associated with this task are for
->> +			 * other calls deeper on the call stack
->> +			 */
->> +			break;
->> +	}
+>> I've changed the name to kprobe-decode-insn.[hc], or do you feel
+>> strongly the three kprobes source files in arch/arm64/kernel need their
+>> own subdirectory?
 >
-> This looks not included an improvement done by Syuhei, see
-> commit 737480a0d525 ("kprobes/x86: Fix the return address of multiple kretprobes")
+> Yes, especially when we start working on kprobes-on-ftrace support,
+> it is better to have a separate file for that.
 >
+
+I've reorganized the kprobes source files into their own subdirectory 
+and changed some of their names.
+
 > Thank you!
 >
-
-I've updated the relevant part of this function with the current x86 
-version  of the code.
-
->> +
->> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
->> +	/* restore the original return address */
->> +	instruction_pointer(regs) = orig_ret_addr;
->> +	reset_current_kprobe();
->> +	kretprobe_hash_unlock(current, &flags);
->> +
->> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
->> +		hlist_del(&ri->hlist);
->> +		kfree(ri);
->> +	}
->> +
->> +	/* return 1 so that post handlers not called */
->> +	return (void *) orig_ret_addr;
->> +}
->> +
->> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
->> +				      struct pt_regs *regs)
->> +{
->> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
->> +
->> +	/* replace return addr (x30) with trampoline */
->> +	regs->regs[30] = (long)&kretprobe_trampoline;
->> +}
->> +
->> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
->> +{
->> +	return 0;
->>   }
->>
->>   int __init arch_init_kprobes(void)
->> --
->> 2.5.0
->>
 >
->
-
 
 Thanks,
 -dl
