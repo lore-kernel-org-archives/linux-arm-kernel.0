@@ -1,137 +1,90 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 22 Jun 2016 13:36:44 -0600
-Subject: [PATCH 09/14] PM / cpu_domains: Add PM Domain governor for CPUs
-In-Reply-To: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
-References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1466624209-27432-10-git-send-email-lina.iyer@linaro.org>
+From: diego.dorta@nxp.com (Diego Dorta)
+Date: Wed, 22 Jun 2016 16:37:09 -0300
+Subject: [PATCH v2 3/4] ARM: dts: imx7d-sdb: Add support for touchscreen
+In-Reply-To: <1466624230-16191-1-git-send-email-diego.dorta@nxp.com>
+References: <1466624230-16191-1-git-send-email-diego.dorta@nxp.com>
+Message-ID: <1466624230-16191-3-git-send-email-diego.dorta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A PM domain comprising of CPUs may be powered off when all the CPUs in
-the domain are powered down. Powering down a CPU domain is generally a
-expensive operation and therefore the power performance trade offs
-should be considered. The time between the last CPU powering down and
-the first CPU powering up in a domain, is the time available for the
-domain to sleep. Ideally, the sleep time of the domain should fulfill
-the residency requirement of the domains' idle state.
+Add support for tsc2046 touchscreen.
 
-To do this effectively, read the time before the wakeup of the cluster's
-CPUs and ensure that the domain's idle state sleep time guarantees the
-QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
-state's residency.
-
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Signed-off-by: Diego Dorta <diego.dorta@nxp.com>
 ---
- drivers/base/power/cpu_domains.c | 80 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 79 insertions(+), 1 deletion(-)
+Changes since v1:
+- Merged pinctrl_ecspi3 and pinctrl_ecspi3_cs in one pinctrl.
+- Used GPIO_ACTIVE_HIGH macro for polarity.
+- Put the unit-address for 'reg' property.
+- Replaced 'linux,wakeup' for 'wakeup-source'.
 
-diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
-index 63dd45d..1803fde 100644
---- a/drivers/base/power/cpu_domains.c
-+++ b/drivers/base/power/cpu_domains.c
-@@ -17,9 +17,12 @@
- #include <linux/list.h>
- #include <linux/of.h>
- #include <linux/pm_domain.h>
-+#include <linux/pm_qos.h>
-+#include <linux/pm_runtime.h>
- #include <linux/rculist.h>
- #include <linux/rcupdate.h>
- #include <linux/slab.h>
-+#include <linux/tick.h>
+ arch/arm/boot/dts/imx7d-sdb.dts | 41 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 8f6a539..6bd8203 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -111,6 +111,32 @@
+ 	arm-supply = <&sw1a_reg>;
+ };
  
- #define CPU_PD_NAME_MAX 36
- 
-@@ -52,6 +55,81 @@ struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
- 	return res;
- }
- 
-+static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
-+{
-+	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-+	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
-+	int qos_ns = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
-+	u64 sleep_ns;
-+	ktime_t earliest, next_wakeup;
-+	int cpu;
-+	int i;
++&ecspi3 {
++	fsl,spi-num-chipselects = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi3>;
++	cs-gpios = <&gpio5 9 GPIO_ACTIVE_HIGH>;
++	status = "okay";
 +
-+	/* Reset the last set genpd state, default to index 0 */
-+	genpd->state_idx = 0;
-+
-+	/* We don't want to power down, if QoS is 0 */
-+	if (!qos_ns)
-+		return false;
-+
-+	/*
-+	 * Find the sleep time for the cluster.
-+	 * The time between now and the first wake up of any CPU that
-+	 * are in this domain hierarchy is the time available for the
-+	 * domain to be idle.
-+	 *
-+	 * We only care about the next wakeup for any online CPU in that
-+	 * cluster. Hotplug off any of the CPUs that we care about will
-+	 * wait on the genpd lock, until we are done. Any other CPU hotplug
-+	 * is not of consequence to our sleep time.
-+	 */
-+	earliest = ktime_set(KTIME_SEC_MAX, 0);
-+	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
-+		next_wakeup = tick_nohz_get_next_wakeup(cpu);
-+		if (earliest.tv64 > next_wakeup.tv64)
-+			earliest = next_wakeup;
-+	}
-+
-+	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
-+	if (sleep_ns <= 0)
-+		return false;
-+
-+	/*
-+	 * Find the deepest sleep state that satisfies the residency
-+	 * requirement and the QoS constraint
-+	 */
-+	for (i = genpd->state_count - 1; i >= 0; i--) {
-+		u64 state_sleep_ns;
-+
-+		state_sleep_ns = genpd->states[i].power_off_latency_ns +
-+			genpd->states[i].power_on_latency_ns +
-+			genpd->states[i].residency_ns;
-+
-+		/*
-+		 * If we can't sleep to save power in the state, move on
-+		 * to the next lower idle state.
-+		 */
-+		if (state_sleep_ns > sleep_ns)
-+			continue;
-+
-+		/*
-+		 * We also don't want to sleep more than we should to
-+		 * gaurantee QoS.
-+		 */
-+		if (state_sleep_ns < (qos_ns * NSEC_PER_USEC))
-+			break;
-+	}
-+
-+	if (i >= 0)
-+		genpd->state_idx = i;
-+
-+	return (i >= 0);
-+}
-+
-+static struct dev_power_governor cpu_pd_gov = {
-+	.power_down_ok = cpu_pd_down_ok,
++	tsc2046 at 0 {
++		compatible = "ti,tsc2046";
++		reg = <0>;
++		spi-max-frequency = <1000000>;
++		pinctrl-names ="default";
++		pinctrl-0 = <&pinctrl_tsc2046_pendown>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <29 0>;
++		pendown-gpio = <&gpio2 29 GPIO_ACTIVE_HIGH>;
++		ti,x-min = /bits/ 16 <0>;
++		ti,x-max = /bits/ 16 <0>;
++		ti,y-min = /bits/ 16 <0>;
++		ti,y-max = /bits/ 16 <0>;
++		ti,pressure-max = /bits/ 16 <0>;
++		ti,x-plat-ohms = /bits/ 16 <400>;
++		wakeup-source;
++	};
 +};
 +
- static int cpu_pd_attach_cpu(struct cpu_pm_domain *cpu_pd, int cpu)
- {
- 	int ret;
-@@ -144,7 +222,7 @@ static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
+ &fec1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet1>;
+@@ -363,6 +389,15 @@
+ 	pinctrl-0 = <&pinctrl_hog>;
  
- 	/* Register the CPU genpd */
- 	pr_debug("adding %s as CPU PM domain\n", pd->genpd->name);
--	ret = pm_genpd_init(pd->genpd, &simple_qos_governor, false);
-+	ret = pm_genpd_init(pd->genpd, &cpu_pd_gov, false);
- 	if (ret) {
- 		pr_err("Unable to initialize domain %s\n", dn->full_name);
- 		goto fail;
+ 	imx7d-sdb {
++		pinctrl_ecspi3: ecspi3grp {
++			fsl,pins = <
++				MX7D_PAD_SAI2_TX_SYNC__ECSPI3_MISO	0x2
++				MX7D_PAD_SAI2_TX_BCLK__ECSPI3_MOSI	0x2
++				MX7D_PAD_SAI2_RX_DATA__ECSPI3_SCLK	0x2
++				MX7D_PAD_SD2_CD_B__GPIO5_IO9		0x59
++			>;
++		};
++
+ 		pinctrl_enet1: enet1grp {
+ 			fsl,pins = <
+ 				MX7D_PAD_GPIO1_IO10__ENET1_MDIO			0x3
+@@ -474,6 +509,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_tsc2046_pendown: tsc2046_pendown {
++			fsl,pins = <
++				MX7D_PAD_EPDC_BDR1__GPIO2_IO29		0x59
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
 -- 
 2.7.4
