@@ -1,62 +1,201 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Jun 2016 14:43:44 +0100
-Subject: [PATCH] arm64: Add support ARCH_SUPPORTS_INT128
-In-Reply-To: <20160622124323.GZ29165@arm.com>
-References: <1466492123-3356-1-git-send-email-wangkefeng.wang@huawei.com>
- <20160622105749.GA6521@e104818-lin.cambridge.arm.com>
- <20160622124323.GZ29165@arm.com>
-Message-ID: <20160622134344.GB6521@e104818-lin.cambridge.arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 22 Jun 2016 15:52:36 +0200
+Subject: [PATCH V7 1/8] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <576A91CC.3000101@arm.com>
+References: <1466420541-20101-2-git-send-email-tn@semihalf.com>
+ <1466598909-27504-1-git-send-email-tn@semihalf.com>
+ <576A91CC.3000101@arm.com>
+Message-ID: <576A9824.1060400@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2016 at 01:43:23PM +0100, Will Deacon wrote:
-> On Wed, Jun 22, 2016 at 11:57:50AM +0100, Catalin Marinas wrote:
-> > On Tue, Jun 21, 2016 at 02:55:23PM +0800, Kefeng Wang wrote:
-> > > The gcc support __SIZEOF_INT128__ and __int128 in arm64, thus,
-> > > enable ARCH_SUPPORTS_INT128 to make mul_u64_u32_shr() a bit
-> > > more efficient in scheduler.
-> > > 
-> > > Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> > > ---
-> > >  arch/arm64/Kconfig | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > > index 5a0a691..ab319eb 100644
-> > > --- a/arch/arm64/Kconfig
-> > > +++ b/arch/arm64/Kconfig
-> > > @@ -11,6 +11,7 @@ config ARM64
-> > >  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-> > >  	select ARCH_USE_CMPXCHG_LOCKREF
-> > >  	select ARCH_SUPPORTS_ATOMIC_RMW
-> > > +	select ARCH_SUPPORTS_INT128
-> > >  	select ARCH_SUPPORTS_NUMA_BALANCING
-> > >  	select ARCH_WANT_OPTIONAL_GPIOLIB
-> > >  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
-> > 
-> > With this patch and UBSAN+KASAN enabled, Linux fails to link with:
-> > 
-> > lib/built-in.o: In function `get_signed_val':
-> > lib/ubsan.c:93: undefined reference to `__ashlti3'
-> > lib/ubsan.c:93: undefined reference to `__ashrti3'
-> > 
-> > It succeeds if I revert commit d67703a8a69e ("arm64: kill off the libgcc
-> > dependency"). We may have to revisit that decision or implement the
-> > required library functions in the kernel. In general, I'd like to reduce
-> > the amount of code duplication if the functionality can be found
-> > elsewhere like in libgcc. There is a risk of not knowing precisely what
-> > ligbcc relies on (like libc functions), though there are other
-> > architectures linking against it.
-> 
-> Linking agianst libgcc is pretty scary if we're starting to use plugins
-> for the compiler[1], but IANAL.
+On 22.06.2016 15:25, Marc Zyngier wrote:
+> On 22/06/16 13:35, Tomasz Nowicki wrote:
+>> IORT shows representation of IO topology for ARM based systems.
+>> It describes how various components are connected together on
+>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>>
+>> Initial support allows to detect IORT table presence and save its
+>> root pointer obtained through acpi_get_table(). The pointer validity
+>> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+>> is not set while using IORT nodes we would dereference unmapped pointers.
+>>
+>> For the aforementioned reason call iort_table_detect() from acpi_init()
+>> which guarantees acpi_gbl_permanent_mmap to be set at that point.
+>>
+>> Add generic helpers which are helpful for scanning and retrieving
+>> information from IORT table content. List of the most important helpers:
+>> - iort_find_dev_node() finds IORT node for a given device
+>> - iort_node_map_rid() maps device RID and returns IORT node which provides
+>>    final translation
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>   drivers/acpi/Kconfig  |   3 +
+>>   drivers/acpi/Makefile |   1 +
+>>   drivers/acpi/bus.c    |   2 +
+>>   drivers/acpi/iort.c   | 217 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/iort.h  |  30 +++++++
+>>   5 files changed, 253 insertions(+)
+>>   create mode 100644 drivers/acpi/iort.c
+>>   create mode 100644 include/linux/iort.h
+>>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index b7e2e77..848471f 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
+>>   config ACPI_CCA_REQUIRED
+>>   	bool
+>>
+>> +config IORT_TABLE
+>> +	bool
+>> +
+>>   config ACPI_DEBUGGER
+>>   	bool "AML debugger interface"
+>>   	select ACPI_DEBUG
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index 251ce85..c7c9b29 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -82,6 +82,7 @@ obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
+>>   obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+>>   obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
+>>   obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
+>> +obj-$(CONFIG_IORT_TABLE) 	+= iort.o
+>>
+>>   # processor has its own "processor." module_param namespace
+>>   processor-y			:= processor_driver.o
+>> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+>> index 31e8da6..176c17d 100644
+>> --- a/drivers/acpi/bus.c
+>> +++ b/drivers/acpi/bus.c
+>> @@ -33,6 +33,7 @@
+>>   #ifdef CONFIG_X86
+>>   #include <asm/mpspec.h>
+>>   #endif
+>> +#include <linux/iort.h>
+>>   #include <linux/pci.h>
+>>   #include <acpi/apei.h>
+>>   #include <linux/dmi.h>
+>> @@ -1118,6 +1119,7 @@ static int __init acpi_init(void)
+>>   	}
+>>
+>>   	pci_mmcfg_late_init();
+>> +	iort_table_detect();
+>>   	acpi_scan_init();
+>>   	acpi_ec_init();
+>>   	acpi_debugfs_init();
+>> diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
+>> new file mode 100644
+>> index 0000000..fcfa008f
+>> --- /dev/null
+>> +++ b/drivers/acpi/iort.c
+>> @@ -0,0 +1,217 @@
+>> +/*
+>> + * Copyright (C) 2016, Semihalf
+>> + *	Author: Tomasz Nowicki <tn@semihalf.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * This file implements early detection/parsing of I/O mapping
+>> + * reported to OS through firmware via I/O Remapping Table (IORT)
+>> + * IORT document number: ARM DEN 0049A
+>> + */
+>> +
+>> +#define pr_fmt(fmt)	"ACPI: IORT: " fmt
+>> +
+>> +#include <linux/iort.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/pci.h>
+>> +
+>> +typedef acpi_status (*iort_find_node_callback)
+>> +	(struct acpi_iort_node *node, void *context);
+>> +
+>> +/* Root pointer to the mapped IORT table */
+>> +static struct acpi_table_header *iort_table;
+>> +
+>> +static struct acpi_iort_node *
+>> +iort_scan_node(enum acpi_iort_node_type type,
+>> +	       iort_find_node_callback callback, void *context)
+>> +{
+>> +	struct acpi_iort_node *iort_node, *iort_end;
+>> +	struct acpi_table_iort *iort;
+>> +	int i;
+>> +
+>> +	/* Get the first IORT node */
+>> +	iort = (struct acpi_table_iort *)iort_table;
+>> +	iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort,
+>> +				 iort->node_offset);
+>> +	iort_end = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+>> +				iort_table->length);
+>> +
+>> +	for (i = 0; i < iort->node_count; i++) {
+>> +		if (WARN_TAINT(iort_node >= iort_end, TAINT_FIRMWARE_WORKAROUND,
+>> +			       "IORT node pointer overflows, bad table!\n"))
+>> +			return NULL;
+>> +
+>> +		if (iort_node->type == type) {
+>> +			if (ACPI_SUCCESS(callback(iort_node, context)))
+>> +				return iort_node;
+>> +		}
+>> +
+>> +		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+>> +					 iort_node->length);
+>> +	}
+>> +
+>> +	return NULL;
+>> +}
+>> +
+>> +static acpi_status
+>> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
+>> +{
+>> +	struct device *dev = context;
+>> +
+>> +	switch (node->type) {
+>> +	case ACPI_IORT_NODE_NAMED_COMPONENT: {
+>> +		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+>> +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+>> +		struct acpi_iort_named_component *ncomp;
+>> +
+>> +		if (!adev)
+>> +			break;
+>> +
+>> +		ncomp = (struct acpi_iort_named_component *)node->node_data;
+>> +
+>> +		if (ACPI_FAILURE(acpi_get_name(adev->handle,
+>> +					       ACPI_FULL_PATHNAME, &buffer))) {
+>> +			dev_warn(dev, "Can't get device full path name\n");
+>> +		} else {
+>> +			int match;
+>> +
+>> +			match = !strcmp(ncomp->device_name, buffer.pointer);
+>> +			kfree(buffer.pointer);
+>
+> Why did you change this to a naked kfree? The ACPI code clearly states:
+>
+> /*
+>   * Allocate a new buffer. We directectly call acpi_os_allocate here to
+>   * purposefully bypass the (optionally enabled) internal allocation
+>   * tracking mechanism since we only want to track internal
+>   * allocations. Note: The caller should use acpi_os_free to free this
+>   * buffer created via ACPI_ALLOCATE_BUFFER.
+>   */
 
-At a quick grep, there are 9 other architectures linking the kernel
-image against libgcc. I wonder what they do about it.
+Yes we should use symmetric free function to acpi_os_allocate here, 
+which means acpi_os_free should be used here.
 
-For the time being, I'm reverting this patch. It's probably not that
-hard to add the int128 variants of these functions to the kernel (in a
-GPLv2 variant).
+My main motivation was to free buffer.pointer instead of &buffer
 
--- 
-Catalin
+Would you mind to fix that (s/kfree/acpi_os_free) before merging ?
+
+Thanks,
+Tomasz
