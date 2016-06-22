@@ -1,63 +1,62 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 22 Jun 2016 16:22:51 +0100
-Subject: [RFC PATCH 1/8] PM / Domains: Add new helper functions for
- device-tree
-In-Reply-To: <CAPDyKFqEis0OX68eFD0dbneYOngGQfvu4JYbWzm7tTbs8WPS5A@mail.gmail.com>
-References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
- <1457090634-14785-2-git-send-email-jonathanh@nvidia.com>
- <576AA7B2.5030004@nvidia.com>
- <CAPDyKFqEis0OX68eFD0dbneYOngGQfvu4JYbWzm7tTbs8WPS5A@mail.gmail.com>
-Message-ID: <576AAD4B.2020905@nvidia.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 22 Jun 2016 17:23:12 +0200
+Subject: [PATCH v2] mmc: core: Only change mode if mmc_select_bus_width()
+ is successful.
+In-Reply-To: <1465381672-9772-1-git-send-email-peter.griffin@linaro.org>
+References: <1465381672-9772-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CAPDyKFoJN0a36wJZyUggQVPYycu2NbpR6S=LfX2qSFD4tm6Uwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 8 June 2016 at 12:27, Peter Griffin <peter.griffin@linaro.org> wrote:
+> mmc_select_bus_width() returns bus width (4 or 8) on success or
+> zero if unsupported. So only change mode if setting the bus width
+> is successful.
+>
+> Fixes f741494 mmc: fix mmc mode selection for HS-DDR and higher
+> Fixes: 287980e (remove lots of IS_ERR_VALUE abuses)
+>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+>
 
-On 22/06/16 16:08, Ulf Hansson wrote:
-> On 22 June 2016 at 16:58, Jon Hunter <jonathanh@nvidia.com> wrote:
->> Hi Ulf,
->>
->> On 04/03/16 11:23, Jon Hunter wrote:
->>> Ideally, if we are returning a reference to a PM domain via a call to
->>> of_genpd_get_from_provider(), then we should keep track of such
->>> references via a reference count. The reference count could then be used
->>> to determine if a PM domain can be safely removed. Alternatively, it is
->>> possible to avoid such external references by providing APIs to access
->>> the PM domain and hence, eliminate any calls to
->>> of_genpd_get_from_provider().
->>>
->>> Add new helper functions for adding a device and a subdomain to a PM
->>> domain when using device-tree, so that external calls to
->>> of_genpd_get_from_provider() can be removed.
->>
->> While we are at it, does it make sense to add helpers for
->> of_genpd_remove_device/subdomain() as well? Seems that these could be
->> useful for doing the inverse when cleaning up.
-> 
-> I would prefer if we could avoid adding new APIs until we really see
-> the need for it.
-> 
-> Moreover, I would like to avoid us adding OF specific APIs, unless
-> those can be really justified.
-> Hope that made sense.
+Thanks, applied for next! Updated the changelog to remove the "fixes"
+tags and the Cc, as those shouldn't be relevant.
 
-Yes makes sense. However, after this series, the
-pm_genpd_remove_device/subdomain really become provider only APIs
-because clients can no longer get access to the genpd struct. Although
-today none of the users of the new of_genpd_add_device/subdomain do any
-clean-up on failure, it is possible that someone may. Therefore, I was
-thinking that we should have a way for a client to remove a subdomain or
-device it has added.
+Kind regards
+Uffe
 
-Does that make sense? I guess we could always add those as needed.
-
-I am looking at a use-case for usb where we are populating the
-pm-domains at runtime and we may need to clean-up on failure. However, I
-can always wait to add more APIs until we really need them.
-
-Let me know what you think about my response to patch 6/8.
-
-Cheers
-Jon
-
--- 
-nvpublic
+> ---
+>
+> v2: Rebase on v4.7-rc2 which includes a fix from Chen-Yu and update
+>     commit message.
+> ---
+>  drivers/mmc/core/mmc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index 5d438ad..aafb73d 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
+>          * switch to HS200 mode if bus width is set successfully.
+>          */
+>         err = mmc_select_bus_width(card);
+> -       if (err >= 0) {
+> +       if (err > 0) {
+>                 val = EXT_CSD_TIMING_HS200 |
+>                       card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
+>                 err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+> @@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>         } else if (mmc_card_hs(card)) {
+>                 /* Select the desired bus width optionally */
+>                 err = mmc_select_bus_width(card);
+> -               if (err >= 0) {
+> +               if (err > 0) {
+>                         err = mmc_select_hs_ddr(card);
+>                         if (err)
+>                                 goto free_card;
+> --
+> 1.9.1
+>
