@@ -1,38 +1,49 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 23 Jun 2016 02:41:08 +0800
-Subject: [arm64:for-next/core 5/12] ubsan.c:undefined reference to `__ashlti3'
-Message-ID: <201606230207.Hzx423fS%fengguang.wu@intel.com>
+From: richard.andrysek@gomtec.de (Richard Andrysek)
+Date: Wed, 22 Jun 2016 18:43:01 +0000
+Subject: AW: [RFC] can: c_can: Update D_CAN TX and RX functions to 32 bit.
+In-Reply-To: <612130a4-30ea-ed73-ac8e-dabe7919ec35@pengutronix.de>
+References: <1466093419-27575-1-git-send-email-tthayer@opensource.altera.com>
+ <1466093419-27575-2-git-send-email-tthayer@opensource.altera.com>
+ <612130a4-30ea-ed73-ac8e-dabe7919ec35@pengutronix.de>
+Message-ID: <0120733A154AE74CA608A286CE7FFD2621E13EB5@rg-contact.RG.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/core
-head:   d770b5a04790a4ec1c0864621eef95f5afe773cf
-commit: 6b14c517a2a866c8407e9864c1cd3fcc6fed55ab [5/12] arm64: Add support ARCH_SUPPORTS_INT128
-config: arm64-allyesconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 6b14c517a2a866c8407e9864c1cd3fcc6fed55ab
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Sorry for a delay. I've run my test with 16 messages per channel (can0, can1 concurrently) with a cycle time 2.8ms, 1Mbps. And it works now properly.
 
-Note: the arm64/for-next/core HEAD d770b5a04790a4ec1c0864621eef95f5afe773cf builds fine.
-      It only hurts bisectibility.
+Thank you all participated on this issue
 
-All errors (new ones prefixed by >>):
+Richard
 
-   lib/built-in.o: In function `get_signed_val':
->> ubsan.c:(.text.unlikely+0x1568): undefined reference to `__ashlti3'
->> ubsan.c:(.text.unlikely+0x1570): undefined reference to `__ashrti3'
+-----Urspr?ngliche Nachricht-----
+Von: Marc Kleine-Budde [mailto:mkl at pengutronix.de] 
+Gesendet: Freitag, 17. Juni 2016 11:04
+An: tthayer at opensource.altera.com; socketcan at hartkopp.net; wg at grandegger.com; Richard Andrysek <richard.andrysek@gomtec.de>
+Cc: anilkumar at ti.com; linux-can at vger.kernel.org; linux-arm-kernel at lists.infradead.org; tthayer.linux at gmail.com
+Betreff: Re: [RFC] can: c_can: Update D_CAN TX and RX functions to 32 bit.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 50245 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160623/5a72762e/attachment-0001.obj>
+On 06/16/2016 06:10 PM, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> When testing CAN write floods on Altera's CycloneV, the first 2 bytes 
+> are sometimes 0x00, 0x00 or corrupted instead of the values sent. Also 
+> observed bytes 4 & 5 were corrupted in some cases.
+> 
+> The D_CAN Data registers are 32 bits and changing from
+> 16 bit writes to 32 bit writes fixes the problem.
+> 
+> Testing performed on Altera CycloneV (D_CAN).
+> Requesting tests on other C_CAN & D_CAN platforms.
+> 
+> Reported-by: Richard Andrysek <richard.andrysek@gomtec.de>
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+
+Applied to can with stable on Cc.
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
