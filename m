@@ -1,90 +1,66 @@
 From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 22 Jun 2016 10:46:50 +0800
-Subject: [PATCH V2 1/4] trace: Introduce an output interface from ftrace to STM
+Date: Wed, 22 Jun 2016 10:46:51 +0800
+Subject: [PATCH V2 2/4] STM Ftrace: Adding generic buffer interface driver
 In-Reply-To: <1466563613-31578-1-git-send-email-zhang.chunyan@linaro.org>
 References: <1466563613-31578-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1466563613-31578-2-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <1466563613-31578-3-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is introducing a new output to print Ftrace messages
-to STM buffer when the traces happen.  In order to reduce the
-effect on timing overhead as much as possible, only the current
-function and its parent's instruction pointer will be recorded
-into STM. This idea was first introduced by Philippe Langlais
-at ST-Microelectronics a long time ago[1].
-
-[1] http://thread.gmane.org/gmane.linux.kernel/1114274/focus=1114275
+This patch adds a driver that models itself as an stm_source and
+who's sole purpose is to be an interface to the rest of the
+kernel.  Once the stm and stm_source have been linked via sysfs,
+everything that is passed to the interface will endup in the STM
+trace engine.
 
 Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 ---
- include/linux/stm.h              |  7 +++++++
- include/linux/trace_output_stm.h | 17 +++++++++++++++++
- kernel/trace/Makefile            |  1 +
- kernel/trace/trace_output_stm.c  | 41 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 66 insertions(+)
- create mode 100644 include/linux/trace_output_stm.h
- create mode 100644 kernel/trace/trace_output_stm.c
+ drivers/hwtracing/stm/Kconfig  | 10 ++++++
+ drivers/hwtracing/stm/Makefile |  2 ++
+ drivers/hwtracing/stm/ftrace.c | 77 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 89 insertions(+)
+ create mode 100644 drivers/hwtracing/stm/ftrace.c
 
-diff --git a/include/linux/stm.h b/include/linux/stm.h
-index 8369d8a..2b6639a 100644
---- a/include/linux/stm.h
-+++ b/include/linux/stm.h
-@@ -129,6 +129,13 @@ struct stm_source_data {
- 	void			(*unlink)(struct stm_source_data *data);
- };
+diff --git a/drivers/hwtracing/stm/Kconfig b/drivers/hwtracing/stm/Kconfig
+index 847a39b..f4c69d2 100644
+--- a/drivers/hwtracing/stm/Kconfig
++++ b/drivers/hwtracing/stm/Kconfig
+@@ -39,4 +39,14 @@ config STM_SOURCE_HEARTBEAT
+ 	  If you want to send heartbeat messages over STM devices,
+ 	  say Y.
  
-+struct stm_ftrace {
-+	struct stm_source_data	data;
-+	void (*write)(struct stm_source_data *data, const char *buf,
-+		      unsigned int len, unsigned int chan);
-+	bool available;
-+};
++config STM_SOURCE_FTRACE
++	tristate "Copy the output from kernel Ftrace to STM engine"
++	help
++	  This option can be used to copy the output from kernel Ftrace
++	  to STM engine. Enabling this option will introduce a slight
++	  timing effect.
 +
- int stm_source_register_device(struct device *parent,
- 			       struct stm_source_data *data);
- void stm_source_unregister_device(struct stm_source_data *data);
-diff --git a/include/linux/trace_output_stm.h b/include/linux/trace_output_stm.h
++	  If you want to send kernel Ftrace messages over STM devices,
++	  say Y.
++
+ endif
+diff --git a/drivers/hwtracing/stm/Makefile b/drivers/hwtracing/stm/Makefile
+index a9ce3d4..3abd84c 100644
+--- a/drivers/hwtracing/stm/Makefile
++++ b/drivers/hwtracing/stm/Makefile
+@@ -6,6 +6,8 @@ obj-$(CONFIG_STM_DUMMY)	+= dummy_stm.o
+ 
+ obj-$(CONFIG_STM_SOURCE_CONSOLE)	+= stm_console.o
+ obj-$(CONFIG_STM_SOURCE_HEARTBEAT)	+= stm_heartbeat.o
++obj-$(CONFIG_STM_SOURCE_FTRACE)		+= stm_ftrace.o
+ 
+ stm_console-y		:= console.o
+ stm_heartbeat-y		:= heartbeat.o
++stm_ftrace-y		:= ftrace.o
+diff --git a/drivers/hwtracing/stm/ftrace.c b/drivers/hwtracing/stm/ftrace.c
 new file mode 100644
-index 0000000..7edc680
+index 0000000..ccce91e
 --- /dev/null
-+++ b/include/linux/trace_output_stm.h
-@@ -0,0 +1,17 @@
-+#ifndef __TRACE_OUTPUT_STM_H
-+#define __TRACE_OUTPUT_STM_H
-+
-+#include <linux/module.h>
-+
-+#if IS_ENABLED(CONFIG_STM_SOURCE_FTRACE)
-+struct stm_ftrace;
-+extern void
-+trace_func_to_stm(unsigned long ip, unsigned long parent_ip);
-+extern void trace_add_output(struct stm_ftrace *stm);
-+extern void trace_rm_output(void);
-+#else
-+static inline void
-+trace_func_to_stm(unsigned long ip, unsigned long parent_ip) {}
-+#endif
-+
-+#endif /* __TRACE_OUTPUT_STM_H */
-diff --git a/kernel/trace/Makefile b/kernel/trace/Makefile
-index 979e7bf..5330803 100644
---- a/kernel/trace/Makefile
-+++ b/kernel/trace/Makefile
-@@ -69,4 +69,5 @@ obj-$(CONFIG_UPROBE_EVENT) += trace_uprobe.o
- 
- obj-$(CONFIG_TRACEPOINT_BENCHMARK) += trace_benchmark.o
- 
-+obj-$(CONFIG_TRACING) += trace_output_stm.o
- libftrace-y := ftrace.o
-diff --git a/kernel/trace/trace_output_stm.c b/kernel/trace/trace_output_stm.c
-new file mode 100644
-index 0000000..dc04952
---- /dev/null
-+++ b/kernel/trace/trace_output_stm.c
-@@ -0,0 +1,41 @@
++++ b/drivers/hwtracing/stm/ftrace.c
+@@ -0,0 +1,77 @@
 +/*
-+ * Output interface from Ftrace to STM buffer
++ * Simple kernel driver to link kernel Ftrace and an STM device
 + * Copyright (c) 2016, Linaro Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify it
@@ -98,31 +74,67 @@ index 0000000..dc04952
 + */
 +
 +#include <linux/stm.h>
++#include <linux/trace_output_stm.h>
 +
-+/* Offset above the start channel number */
-+#define STM_FTRACE_CHAN 0
++#define STM_FTRACE_NR_CHANNELS 1
 +
-+static struct stm_ftrace *trace_output;
++static int stm_ftrace_link(struct stm_source_data *data);
++static void stm_ftrace_unlink(struct stm_source_data *data);
++static void stm_ftrace_write(struct stm_source_data *data, const char *buf,
++			     unsigned int len, unsigned int chan);
 +
-+void trace_func_to_stm(unsigned long ip, unsigned long parent_ip)
++static struct stm_ftrace ftrace = {
++	.data	= {
++		.name		= "ftrace",
++		.nr_chans	= STM_FTRACE_NR_CHANNELS,
++		.link		= stm_ftrace_link,
++		.unlink		= stm_ftrace_unlink,
++	},
++	.write			= stm_ftrace_write,
++};
++
++/**
++ * stm_ftrace_write() - write data to STM via 'stm_ftrace' source
++ * @buf:	buffer containing the data packet
++ * @len:	length of the data packet
++ * @chan:	offset above the start channel number allocated to 'stm_ftrace'
++ */
++static void notrace stm_ftrace_write(struct stm_source_data *data,
++				     const char *buf, unsigned int len,
++				     unsigned int chan)
 +{
-+	unsigned long ip_array[2] = {ip, parent_ip};
-+
-+	if (trace_output)
-+		trace_output->write(&trace_output->data, (char *)ip_array,
-+				    sizeof(unsigned long) * 2, STM_FTRACE_CHAN);
++	stm_source_write(data, chan, buf, len);
 +}
 +
-+void trace_add_output(struct stm_ftrace *stm)
++static int stm_ftrace_link(struct stm_source_data *data)
 +{
-+	trace_output = stm;
-+}
-+EXPORT_SYMBOL_GPL(trace_add_output);
++	struct stm_ftrace *sf = container_of(data, struct stm_ftrace, data);
 +
-+void trace_rm_output(void)
-+{
-+	trace_output = NULL;
++	trace_add_output(sf);
++
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(trace_rm_output);
++
++static void stm_ftrace_unlink(struct stm_source_data *data)
++{
++	trace_rm_output();
++}
++
++static int __init stm_ftrace_init(void)
++{
++	return stm_source_register_device(NULL, &ftrace.data);
++}
++
++static void __exit stm_ftrace_exit(void)
++{
++	stm_source_unregister_device(&ftrace.data);
++}
++
++module_init(stm_ftrace_init);
++module_exit(stm_ftrace_exit);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("stm_ftrace driver");
++MODULE_AUTHOR("Chunyan Zhang <zhang.chunyan@linaro.org>");
 -- 
 1.9.1
