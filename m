@@ -1,124 +1,42 @@
-From: matthew@mattleach.net (Matthew Leach)
-Date: Wed, 22 Jun 2016 17:57:03 +0100
-Subject: [PATCH v2 3/3] tty: serial: samsung: add byte-order aware bit
- functions
-In-Reply-To: <20160622165703.7775-1-matthew@mattleach.net>
-References: <20160622165703.7775-1-matthew@mattleach.net>
-Message-ID: <20160622165703.7775-4-matthew@mattleach.net>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Wed, 22 Jun 2016 19:02:07 +0200
+Subject: [PATCH 0/5] mmc: bcm2835-sdhost: Add new driver for the
+ internal SD controller.
+In-Reply-To: <CAPDyKFpak075H7aAH14-LLzKFtE6-n+x5u+k_dvT6Oi5=sgXeQ@mail.gmail.com>
+References: <1466595738-2229-1-git-send-email-kraxel@redhat.com>
+ <CAPDyKFpak075H7aAH14-LLzKFtE6-n+x5u+k_dvT6Oi5=sgXeQ@mail.gmail.com>
+Message-ID: <1466614927.16954.66.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver makes use of the __set_bit() and __clear_bit() functions.
-When running under big-endian, these functions don't convert the bit
-indexes when working with peripheral registers, leading to the
-incorrect bits being set and cleared when running big-endian.
+On Mi, 2016-06-22 at 16:41 +0200, Ulf Hansson wrote:
+> On 22 June 2016 at 13:42, Gerd Hoffmann <kraxel@redhat.com> wrote:
+> >   Hi,
+> >
+> > Here is the bcm2835-sdhost driver.  Patches 1+2 are unmodified from
+> > Eric, patches 3+4 are incremental fixes.  Left them separate for now,
+> > to make it easier to review, should probably squashed in for the final
+> > version.  Patch 5 adds it to the device tree, in disabled state.
+> >
+> > Actually enabling the thing depends on a bunch of changes in the gpio
+> > handling of the device tree.  Leaving that for another day ...
 
-Add two new driver functions for setting and clearing bits that are
-byte-order aware.
+> Why did you post this?
 
-Signed-off-by: Matthew Leach <matthew@mattleach.net>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
-CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-CC: Jiri Slaby <jslaby@suse.com>
-CC: linux-serial at vger.kernel.org
-CC: linux-kernel at vger.kernel.org
----
- drivers/tty/serial/samsung.c | 16 +++++++---------
- drivers/tty/serial/samsung.h | 28 ++++++++++++++++++++++++++++
- 2 files changed, 35 insertions(+), 9 deletions(-)
+See patch 2/5:
 
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 99bb231..e4f53d5 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -169,8 +169,7 @@ static void s3c24xx_serial_stop_tx(struct uart_port *port)
- 		return;
- 
- 	if (s3c24xx_serial_has_interrupt_mask(port))
--		__set_bit(S3C64XX_UINTM_TXD,
--			portaddrl(port, S3C64XX_UINTM));
-+		s3c24xx_set_bit(port, S3C64XX_UINTM_TXD, S3C64XX_UINTM);
- 	else
- 		disable_irq_nosync(ourport->tx_irq);
- 
-@@ -235,8 +234,7 @@ static void enable_tx_dma(struct s3c24xx_uart_port *ourport)
- 
- 	/* Mask Tx interrupt */
- 	if (s3c24xx_serial_has_interrupt_mask(port))
--		__set_bit(S3C64XX_UINTM_TXD,
--			  portaddrl(port, S3C64XX_UINTM));
-+		s3c24xx_set_bit(port, S3C64XX_UINTM_TXD, S3C64XX_UINTM);
- 	else
- 		disable_irq_nosync(ourport->tx_irq);
- 
-@@ -269,8 +267,8 @@ static void enable_tx_pio(struct s3c24xx_uart_port *ourport)
- 
- 	/* Unmask Tx interrupt */
- 	if (s3c24xx_serial_has_interrupt_mask(port))
--		__clear_bit(S3C64XX_UINTM_TXD,
--			    portaddrl(port, S3C64XX_UINTM));
-+		s3c24xx_clear_bit(port, S3C64XX_UINTM_TXD,
-+				  S3C64XX_UINTM);
- 	else
- 		enable_irq(ourport->tx_irq);
- 
-@@ -397,8 +395,8 @@ static void s3c24xx_serial_stop_rx(struct uart_port *port)
- 	if (rx_enabled(port)) {
- 		dbg("s3c24xx_serial_stop_rx: port=%p\n", port);
- 		if (s3c24xx_serial_has_interrupt_mask(port))
--			__set_bit(S3C64XX_UINTM_RXD,
--				portaddrl(port, S3C64XX_UINTM));
-+			s3c24xx_set_bit(port, S3C64XX_UINTM_RXD,
-+					S3C64XX_UINTM);
- 		else
- 			disable_irq_nosync(ourport->rx_irq);
- 		rx_enabled(port) = 0;
-@@ -1069,7 +1067,7 @@ static int s3c64xx_serial_startup(struct uart_port *port)
- 	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	/* Enable Rx Interrupt */
--	__clear_bit(S3C64XX_UINTM_RXD, portaddrl(port, S3C64XX_UINTM));
-+	s3c24xx_clear_bit(port, S3C64XX_UINTM_RXD, S3C64XX_UINTM);
- 
- 	dbg("s3c64xx_serial_startup ok\n");
- 	return ret;
-diff --git a/drivers/tty/serial/samsung.h b/drivers/tty/serial/samsung.h
-index 8f96b71..2ae4fce 100644
---- a/drivers/tty/serial/samsung.h
-+++ b/drivers/tty/serial/samsung.h
-@@ -123,4 +123,32 @@ struct s3c24xx_uart_port {
- #define wr_regb(port, reg, val) writeb_relaxed(val, portaddr(port, reg))
- #define wr_regl(port, reg, val) writel_relaxed(val, portaddr(port, reg))
- 
-+/* Byte-order aware bit setting/clearing functions. */
-+
-+static inline void s3c24xx_set_bit(struct uart_port *port, int idx,
-+				   unsigned int reg)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	local_irq_save(flags);
-+	val = rd_regl(port, reg);
-+	val |= (1 << idx);
-+	wr_regl(port, reg, val);
-+	local_irq_restore(flags);
-+}
-+
-+static inline void s3c24xx_clear_bit(struct uart_port *port, int idx,
-+				     unsigned int reg)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	local_irq_save(flags);
-+	val = rd_regl(port, reg);
-+	val &= ~(1 << idx);
-+	wr_regl(port, reg, val);
-+	local_irq_restore(flags);
-+}
-+
- #endif
--- 
-2.8.3
+<quote>
+The 2835 has two SD controllers: The Arasan SDHCI controller that we
+currently use, and a custom SD controller.  The custom one runs faster
+</quote>
+
+> I think you should be adopting sdhci-iproc - in case there are issues
+> with its bcm2835 support, right!?
+
+sdhci-iproc drives the sdhci controller just fine, the new driver is for
+the custom controller.  On the rpi3 you can even use both in parallel,
+with the sdcard handled via custom sd controller and the wifi handled by
+sdhci-iproc.
+
+cheers,
+  Gerd
