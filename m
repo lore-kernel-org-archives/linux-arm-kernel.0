@@ -1,44 +1,55 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:38 +0300
-Subject: [PATCHv2 05/27] crypto: omap-sham: avoid executing tasklet where not
- needed
+Date: Wed, 22 Jun 2016 16:23:37 +0300
+Subject: [PATCHv2 04/27] crypto: omap-sham: set sw fallback to 240 bytes
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the call paths of OMAP SHA driver can avoid executing the next
-step of the crypto queue under tasklet; instead, execute the next step
-directly via function call. This avoids a costly round-trip via the
-scheduler giving a slight performance boost.
+From: Bin Liu <b-liu@ti.com>
 
+Adds software fallback support for small crypto requests. In these cases,
+it is undesirable to use DMA, as setting it up itself is rather heavy
+operation. Gives about 40% extra performance in ipsec usecase.
+
+Signed-off-by: Bin Liu <b-liu@ti.com>
+[t-kristo at ti.com: dropped the extra traces, updated some comments
+ on the code]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-sham.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/crypto/omap-sham.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index 6247887..84a0027 100644
+index fd3cac3..6247887 100644
 --- a/drivers/crypto/omap-sham.c
 +++ b/drivers/crypto/omap-sham.c
-@@ -242,6 +242,8 @@ static struct omap_sham_drv sham = {
- 	.lock = __SPIN_LOCK_UNLOCKED(sham.lock),
- };
+@@ -1095,7 +1095,7 @@ static int omap_sham_update(struct ahash_request *req)
+ 	ctx->offset = 0;
  
-+static void omap_sham_done_task(unsigned long data);
-+
- static inline u32 omap_sham_read(struct omap_sham_dev *dd, u32 offset)
- {
- 	return __raw_readl(dd->io_base + offset);
-@@ -1007,7 +1009,7 @@ static void omap_sham_finish_req(struct ahash_request *req, int err)
- 		req->base.complete(&req->base, err);
+ 	if (ctx->flags & BIT(FLAGS_FINUP)) {
+-		if ((ctx->digcnt + ctx->bufcnt + ctx->total) < 9) {
++		if ((ctx->digcnt + ctx->bufcnt + ctx->total) < 240) {
+ 			/*
+ 			* OMAP HW accel works only with buffers >= 9
+ 			* will switch to bypass in final()
+@@ -1151,9 +1151,13 @@ static int omap_sham_final(struct ahash_request *req)
+ 	if (ctx->flags & BIT(FLAGS_ERROR))
+ 		return 0; /* uncompleted hash is not needed */
  
- 	/* handle new request */
--	tasklet_schedule(&dd->done_task);
-+	omap_sham_done_task((unsigned long)dd);
- }
- 
- static int omap_sham_handle_queue(struct omap_sham_dev *dd,
+-	/* OMAP HW accel works only with buffers >= 9 */
+-	/* HMAC is always >= 9 because ipad == block size */
+-	if ((ctx->digcnt + ctx->bufcnt) < 9)
++	/*
++	 * OMAP HW accel works only with buffers >= 9.
++	 * HMAC is always >= 9 because ipad == block size.
++	 * If buffersize is less than 240, we use fallback SW encoding,
++	 * as using DMA + HW in this case doesn't provide any benefit.
++	 */
++	if ((ctx->digcnt + ctx->bufcnt) < 240)
+ 		return omap_sham_final_shash(req);
+ 	else if (ctx->bufcnt)
+ 		return omap_sham_enqueue(req, OP_FINAL);
 -- 
 1.9.1
