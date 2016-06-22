@@ -1,43 +1,26 @@
-From: mathieu.malaterre@gmail.com (Mathieu Malaterre)
-Date: Wed, 22 Jun 2016 09:55:49 +0200
-Subject: [PATCH] usb: renesas_usbhs: make usbhs_write32() static
-In-Reply-To: <1466531574-3096-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1466531574-3096-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <CA+7wUsxSypNQTCQ-p0VkD=dciPFDGKCX6WGqhFjQ_CEbcTZ0fg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Jun 2016 00:58:36 -0700
+Subject: [PATCH 23/28] ARM: dts: DRA7: Add DT node for DES IP
+In-Reply-To: <57697FBF.7020709@ti.com>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+ <1464772006-11254-1-git-send-email-t-kristo@ti.com>
+ <1464772006-11254-4-git-send-email-t-kristo@ti.com>
+ <20160610113836.GF22406@atomide.com> <57697FBF.7020709@ti.com>
+Message-ID: <20160622075834.GC22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 7:52 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> The usbhs_write32 function is not used outside of the rcar3.c
-> file, so fix the following sparse warning by making it static:
->
-> drivers/usb/renesas_usbhs/rcar3.c:26:6: warning: symbol 'usbhs_write32' was not declared. Should it be static?
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
-> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/usb/renesas_usbhs/rcar3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/usb/renesas_usbhs/rcar3.c b/drivers/usb/renesas_usbhs/rcar3.c
-> index 38b01f2..1d70add 100644
-> --- a/drivers/usb/renesas_usbhs/rcar3.c
-> +++ b/drivers/usb/renesas_usbhs/rcar3.c
-> @@ -23,7 +23,7 @@
->  #define UGCTRL2_RESERVED_3     0x00000001      /* bit[3:0] should be B'0001 */
->  #define UGCTRL2_USB0SEL_OTG    0x00000030
->
-> -void usbhs_write32(struct usbhs_priv *priv, u32 reg, u32 data)
-> +static void usbhs_write32(struct usbhs_priv *priv, u32 reg, u32 data)
->  {
->         iowrite32(data, priv->base + reg);
->  }
-> --
-> 2.8.1
+* Tero Kristo <t-kristo@ti.com> [160621 10:58]:
+> 
+> Do you want to pick-up the DTS changes from this revision of series as is or
+> shall I repost those also? I think the series would require a re-ordering of
+> posting the DTS changes before the hwmod data.
 
-static inline ?
+I'll pick the dts changes from this series into omap-for-v4.8/dt
+thanks. Please split the rest of the patches into separate hwmod
+and driver changes and describe if there's a dependency with the
+order they should get merged.
+
+Regards,
+
+Tony
