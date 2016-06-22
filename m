@@ -1,59 +1,68 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 22 Jun 2016 17:09:53 +0100
-Subject: [PATCH v6 3/5] arm64: cpuidle: drop __init section marker to
- arm_cpuidle_init
-In-Reply-To: <1465915719-8409-4-git-send-email-sudeep.holla@arm.com>
-References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
- <1465915719-8409-4-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20160622160953.GA3976@red-moon>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 22 Jun 2016 18:09:37 +0200
+Subject: [PATCH] ARM: dts: sun8i: Add dts file for inet86dz board
+In-Reply-To: <CAGb2v67TUUZSj2bCQPvogG8rNfdxBcnZwRVLVLxw6Tjg4o+kDA@mail.gmail.com>
+References: <1465754150-16753-1-git-send-email-hdegoede@redhat.com>
+ <CAGb2v66cbx0jta1unrKeYm1t9JKO9Unw8z75rXbW3JSi2=NuMw@mail.gmail.com>
+ <f080dda9-6410-ec79-f083-29a20d147d61@redhat.com>
+ <20160617054607.GN5144@lukather>
+ <CAGb2v67TUUZSj2bCQPvogG8rNfdxBcnZwRVLVLxw6Tjg4o+kDA@mail.gmail.com>
+Message-ID: <3d9acb4f-93ac-5345-88f2-0b260dd86d6f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 03:48:37PM +0100, Sudeep Holla wrote:
-> Commit ea389daa7fd9 ("arm64: cpuidle: add __init section marker to
-> arm_cpuidle_init") added the __init annotation to arm_cpuidle_init
-> as it was not needed after booting which was correct at that time.
-> 
-> However with the introduction of ACPI LPI support, this will be used
-> from cpuhotplug path in ACPI processor driver.
-> 
-> This patch drops the __init annotation from arm_cpuidle_init to avoid
-> the following warning:
-> 
-> WARNING: vmlinux.o(.text+0x113c8): Section mismatch in reference from the
-> 	function acpi_processor_ffh_lpi_probe() to the function
-> 	.init.text:arm_cpuidle_init()
-> The function acpi_processor_ffh_lpi_probe() references
-> the function __init arm_cpuidle_init().
-> This is often because acpi_processor_ffh_lpi_probe lacks a __init
-> annotation or the annotation of arm_cpuidle_init is wrong.
-> 
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Hi,
 
-Depending on acceptance of other patches in this series:
+On 22-06-16 08:40, Chen-Yu Tsai wrote:
+> On Fri, Jun 17, 2016 at 1:46 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Mon, Jun 13, 2016 at 11:35:15AM +0200, Hans de Goede wrote:
+>>> Hi
+>>>
+>>> On 13-06-16 05:16, Chen-Yu Tsai wrote:
+>>>> Hi,
+>>>>
+>>>> On Mon, Jun 13, 2016 at 1:55 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>> The inet86dz board is a board used in 7" tablets from various oems.
+>>>>>
+>>>>> These tablets are a23 based 7" tablets featuring a 1024x600 LCD,
+>>>>> 512MB RAM, 4G NAND, rtl8188etv usb wifi, gsl1680 touchschreen,
+>>>>> micro-sd slot, 3.5mm headphone jack and a micro-usb otg connector
+>>>>> which doubles as charging port.
+>>>>
+>>>> This seems awfully similar to the sun8i-a23-q8-tablet, any reason
+>>>> not to include that or sun8i-q8-common.dtsi?
+>>>
+>>> So to answer this both for this board and for the Polaroid MID2407PXE03
+>>> one, these are not q8 tablets, they are not using the standard q8 casing
+>>> at least. So using q8 for them would seem to be a bit confusing to users
+>>> and figuring out how to do proper autodetect is already hard enough without
+>>> throwing these into the mix too.
+>>>
+>>> OTOH you are right that there is a lot of code duplication here. Since I
+>>> plan to start working on touchscreen autodetect soon-ish, let me see how
+>>> that goes first.
+>>
+>> For reference, I'm not really against having similar boards having
+>> similar-yet-duplicated DT. This is just data, and sometimes trying to
+>> factorise things also make it less trivial and easy to understand.
+>
+> It seems most if not all Allwinner based tablets use the reference design
+> Allwinner provides. The design specifies how components are connected,
+> what models could be used, etc.. Maybe we could rename sun*i-q8-common to
+> sun*i-reference-design and use that? We'd still have board.dts files
+> including it, and providing the board name.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Ok, so as the thread I started on this shows, doing auto-detect is actually
+more or less impossible when it comes to the touchscreens, so I do believe
+that having separate dts files for clearly identifiable non q8 boards is
+best.
 
-> ---
->  arch/arm64/kernel/cpuidle.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-> index e11857fce05f..06786fdaadeb 100644
-> --- a/arch/arm64/kernel/cpuidle.c
-> +++ b/arch/arm64/kernel/cpuidle.c
-> @@ -15,7 +15,7 @@
->  #include <asm/cpuidle.h>
->  #include <asm/cpu_ops.h>
->  
-> -int __init arm_cpuidle_init(unsigned int cpu)
-> +int arm_cpuidle_init(unsigned int cpu)
->  {
->  	int ret = -EOPNOTSUPP;
->  
-> -- 
-> 2.7.4
-> 
+I do like the idea of sharing some more stuff though, I'll do a v2 of
+the Polaroid MID2407PXE03 and inet86dz dts additions based on first
+introducing a sun8i-reference-design-tablet.dtsi which will take most
+of the content currently in sun8i-q8-common.dtsi
+
+Regards,
+
+Hans
