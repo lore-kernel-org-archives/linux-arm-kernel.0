@@ -1,65 +1,50 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 22 Jun 2016 12:07:16 +0100
-Subject: [PATCH] coresight: etm4x: request to retain power to the trace
- unit when active
-In-Reply-To: <576A6C84.4090304@arm.com>
-References: <1466590513-22505-1-git-send-email-sudeep.holla@arm.com>
- <576A6C84.4090304@arm.com>
-Message-ID: <576A7164.9090504@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Jun 2016 12:13:45 +0100
+Subject: [PATCH] arm64: mm: simplify memblock numa node extraction
+Message-ID: <1466594025-27682-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We currently open-code extracting the NUMA node of a memblock region,
+which requires an ifdef to cater for !CONFIG_NUMA builds where the
+memblock_region::nid field does not exist.
 
+The generic memblock_get_region_node helper is intended to cater for
+this. For CONFIG_HAVE_MEMBLOCK_NODE_MAP, builds this returns reg->nid,
+and for for !CONFIG_HAVE_MEMBLOCK_NODE_MAP builds this is a static
+inline that returns 0. Note that for arm64,
+CONFIG_HAVE_MEMBLOCK_NODE_MAP is selected iff CONFIG_NUMA is.
 
-On 22/06/16 11:46, Suzuki K Poulose wrote:
-> On 22/06/16 11:15, Sudeep Holla wrote:
->> The Coresight ETMv4 architecture provides a way to request to keep the
->> power to the trace unit. This might help to collect the traces without
->> the need to disable the CPU power management(entering/exiting deeper
->> idle states).
->>
->> Trace PowerDown Control Register provides powerup request bit which when
->> set requests the system to retain power to the trace unit and emulate
->> the powerdown request.
->>
->> Typically, a trace unit drives a signal to the power controller to
->> request that the trace unit core power domain is powered up. However,
->> if the trace unit and the CPU are in the same power domain then the
->> implementation might combine the trace unit power up status with a
->> signal from the CPU.
->>
->> This patch requests to retain power to the trace unit when active and
->> to remove when inactive. Note this change will only request but the
->> behaviour depends on the implementation. However, it matches the
->> exact behaviour expected when the external debugger is connected with
->> respect to CPU power states.
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->
->
-> Thanks for debugging this issue patiently and fixing it :)
-> One comment below.
->
+This patch makes use of memblock_get_region_node to simplify the arm64
+code. At the same time, we can move the nid variable definition into the
+loop, as this is the only place it is used.
 
-[...]
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Steve Capper <steve.capper@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/init.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
->>
->> @@ -293,6 +299,9 @@ static void etm4_disable_hw(void *info)
->
->>
->> +    /* power can be removed from the trace unit now */
->> +    writel_relaxed(0, drvdata->base + TRCPDCR);
->> +
->
-> At the moment the other bits in TRCPDCR are reserved (RES0). However
-> to prevent issues in the future, it would be safer to read the value
-> and set/clear the Bit of our interest than blindly writing those values.
-
-Agreed, I had done exactly like than when I wrote it initially and then
-change seeing few other writes in the driver. Anyways fixed now and v2
-on its way.
-
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index d45f862..0652d60 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -160,12 +160,10 @@ static void __init arm64_memory_present(void)
+ static void __init arm64_memory_present(void)
+ {
+ 	struct memblock_region *reg;
+-	int nid = 0;
+ 
+ 	for_each_memblock(memory, reg) {
+-#ifdef CONFIG_NUMA
+-		nid = reg->nid;
+-#endif
++		int nid = memblock_get_region_node(reg);
++
+ 		memory_present(nid, memblock_region_memory_base_pfn(reg),
+ 				memblock_region_memory_end_pfn(reg));
+ 	}
 -- 
-Regards,
-Sudeep
+1.9.1
