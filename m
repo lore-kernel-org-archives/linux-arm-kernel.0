@@ -1,157 +1,68 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 22 Jun 2016 16:42:05 +0800
-Subject: [PATCH v6 5/5] thermal: rockchip: add the set_trips function
-In-Reply-To: <1466584925-4829-1-git-send-email-wxt@rock-chips.com>
-References: <1466584925-4829-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1466584925-4829-6-git-send-email-wxt@rock-chips.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 22 Jun 2016 09:43:41 +0100
+Subject: [PATCH 1/2] Documentation: bindings: Add DT bindings for ARM's
+ FVP models.
+In-Reply-To: <20160621213318.GA32655@rob-hp-laptop>
+References: <1466424796-13769-1-git-send-email-tixy@linaro.org>
+ <20160621132257.GA2263@rob-hp-laptop> <1466516312.2856.27.camel@linaro.org>
+ <20160621213318.GA32655@rob-hp-laptop>
+Message-ID: <1466585021.3026.24.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever the current temperature is updated, the trip points immediately
-below and above the current temperature are found. A sensor driver
-callback `set_trips' is then called with the temperatures.
-Lastly, The sensor will trigger the hardware high temperature interrupts
-to increase the sampleing rate and throttle frequency to limit the
-temperature rising When performing passive cooling.
+On Tue, 2016-06-21 at 16:33 -0500, Rob Herring wrote:
+> On Tue, Jun 21, 2016 at 02:38:32PM +0100, Jon Medhurst (Tixy) wrote:
+> > On Tue, 2016-06-21 at 08:22 -0500, Rob Herring wrote:
+> > > > +Required properties (in root node):
+> > > > +- compatible value:
+> > > > +     compatible = "arm,<family>,<variant>", "arm,<family>";
+> > > > +  where <family> is one of:
+> > > > +  - "fvp-base" for the Base FVP
+> > > > +  - "fvp-ve" for the VE FVP
+> > > > +  and <variant> is the part of the model's executable filename with
+> > > the family
+> > > > +  name omitted, converted to lower case, and with non-alphanumeric
+> > > characters
+> > > > +  replaced with '-'. E.g. the Base FVP that has two AEMv8 CPU
+> > > clusters has an
+> > > > +  executable file called FVP_Base_AEMv8A-AEMv8A, so the compatible
+> > > value for
+> > > 
+> > > Naming conventions of the exe aren't going to change?
+> > 
+> > Almost certainly will at some point, as will the very name Fixed Virtual
+> > Platform, what 'families' ARM produce and their naming, and the
+> > configuration of the 'hardware' compiled into the models.
+> > 
+> > These are software models, so can be changed easily at the whim of
+> > marketing, or current perceived requirements from engineers and
+> > managers. So generally, it's a moving target, that doesn't fit nicely
+> > into the needs producing device-trees.
+> 
+> Then do we even need to specify something so specific? The kernel 
+> probably doesn't even care.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: linux-pm at vger.kernel.org
-Tested-by: Stephen Barber <smbarber@chromium.org>
+Well, it would certainly be easier if we could just use a simple
+'arm,fvp' for compatible and model name and not worry about the 100 or
+so current variants. (Some are 32-bit, some 64-bit with just about every
+current ARM CPU represented, plus various peripheral sets with regard to
+display, iommu, dma, etc.
 
----
 
-Changes in v6: None
-Changes in v5:
-- add the tested by Steve.
+>  Are you going to upstream new strings 
+> everytime there's a new one (that's public)?
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+I've only been asked to upstream a device-tree for the one that ARM
+targets in its 'platform release' [1]. Note, all 100+ models are equally
+'public' in the sense that they are available to people are pay (like
+real hardware supported by Linux).
 
- drivers/thermal/rockchip_thermal.c | 39 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+[1] https://community.arm.com/docs/DOC-10803)
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index 5d491f1..8175cdb 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -96,6 +96,7 @@ struct chip_tsadc_table {
-  * @initialize: SoC special initialize tsadc controller method
-  * @irq_ack: clear the interrupt
-  * @get_temp: get the temperature
-+ * @set_alarm_temp: set the high temperature interrupt
-  * @set_tshut_temp: set the hardware-controlled shutdown temperature
-  * @set_tshut_mode: set the hardware-controlled shutdown mode
-  * @table: the chip-specific conversion table
-@@ -119,6 +120,8 @@ struct rockchip_tsadc_chip {
- 	/* Per-sensor methods */
- 	int (*get_temp)(struct chip_tsadc_table table,
- 			int chn, void __iomem *reg, int *temp);
-+	void (*set_alarm_temp)(struct chip_tsadc_table table,
-+			       int chn, void __iomem *reg, int temp);
- 	void (*set_tshut_temp)(struct chip_tsadc_table table,
- 			       int chn, void __iomem *reg, int temp);
- 	void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
-@@ -183,6 +186,7 @@ struct rockchip_thermal_data {
- #define TSADCV2_INT_EN				0x08
- #define TSADCV2_INT_PD				0x0c
- #define TSADCV2_DATA(chn)			(0x20 + (chn) * 0x04)
-+#define TSADCV2_COMP_INT(chn)		        (0x30 + (chn) * 0x04)
- #define TSADCV2_COMP_SHUT(chn)		        (0x40 + (chn) * 0x04)
- #define TSADCV2_HIGHT_INT_DEBOUNCE		0x60
- #define TSADCV2_HIGHT_TSHUT_DEBOUNCE		0x64
-@@ -628,6 +632,20 @@ static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
- 	return rk_tsadcv2_code_to_temp(table, val, temp);
- }
- 
-+static void rk_tsadcv2_alarm_temp(struct chip_tsadc_table table,
-+				  int chn, void __iomem *regs, int temp)
-+{
-+	u32 alarm_value, int_en;
-+
-+	alarm_value = rk_tsadcv2_temp_to_code(table, temp);
-+	writel_relaxed(alarm_value & table.data_mask,
-+		       regs + TSADCV2_COMP_INT(chn));
-+
-+	int_en = readl_relaxed(regs + TSADCV2_INT_EN);
-+	int_en |= TSADCV2_INT_SRC_EN(chn);
-+	writel_relaxed(int_en, regs + TSADCV2_INT_EN);
-+}
-+
- static void rk_tsadcv2_tshut_temp(struct chip_tsadc_table table,
- 				  int chn, void __iomem *regs, int temp)
- {
-@@ -670,6 +688,7 @@ static const struct rockchip_tsadc_chip rk3228_tsadc_data = {
- 	.irq_ack = rk_tsadcv3_irq_ack,
- 	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -694,6 +713,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
- 	.irq_ack = rk_tsadcv2_irq_ack,
- 	.control = rk_tsadcv2_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -718,6 +738,7 @@ static const struct rockchip_tsadc_chip rk3366_tsadc_data = {
- 	.irq_ack = rk_tsadcv3_irq_ack,
- 	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -742,6 +763,7 @@ static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
- 	.irq_ack = rk_tsadcv2_irq_ack,
- 	.control = rk_tsadcv2_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -766,6 +788,7 @@ static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
- 	.irq_ack = rk_tsadcv3_irq_ack,
- 	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -826,6 +849,21 @@ static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
-+static int rockchip_thermal_set_trips(void *_sensor, int low, int high)
-+{
-+	struct rockchip_thermal_sensor *sensor = _sensor;
-+	struct rockchip_thermal_data *thermal = sensor->thermal;
-+	const struct rockchip_tsadc_chip *tsadc = thermal->chip;
-+
-+	dev_dbg(&thermal->pdev->dev, "%s: sensor %d: low: %d, high %d\n",
-+		__func__, sensor->id, low, high);
-+
-+	tsadc->set_alarm_temp(tsadc->table,
-+			      sensor->id, thermal->regs, high);
-+
-+	return 0;
-+}
-+
- static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
- {
- 	struct rockchip_thermal_sensor *sensor = _sensor;
-@@ -843,6 +881,7 @@ static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
- 
- static const struct thermal_zone_of_device_ops rockchip_of_thermal_ops = {
- 	.get_temp = rockchip_thermal_get_temp,
-+	.set_trips = rockchip_thermal_set_trips,
- };
- 
- static int rockchip_configure_from_dt(struct device *dev,
+> 
+> We've had models supported upstream for a long time. What's changed now?
+
+ARM's software releases are targeting a different model.
+
 -- 
-1.9.1
+Tixy
