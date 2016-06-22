@@ -1,102 +1,26 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 22 Jun 2016 15:18:13 +0300
-Subject: [PATCH v8 4/4] serial: pl011: add console matching function
-In-Reply-To: <1463749405-11640-5-git-send-email-aleksey.makarov@linaro.org>
-References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
- <1463749405-11640-5-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <20160622121813.GA20023@yury-N73SV>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 22 Jun 2016 14:32:22 +0200
+Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
+In-Reply-To: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
+References: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <20160622123222.GD26943@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 04:03:23PM +0300, Aleksey Makarov wrote:
-> This patch adds function pl011_console_match() that implements
-> method match of struct console.  It allows to match consoles against
-> data specified in a string, for example taken from command line or
-> compiled by ACPI SPCR table handler.
+On Fri, Jun 03, 2016 at 03:37:57PM -0400, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
 > 
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-> ---
->  drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 56 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index a2aa655..388edc8 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2288,12 +2288,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
->  	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
->  }
->  
-> +/**
-> + *	pl011_console_match - non-standard console matching
-> + *	@co:	  registering console
-> + *	@name:	  name from console command line
-> + *	@idx:	  index from console command line
-> + *	@options: ptr to option string from console command line
-> + *
-> + *	Only attempts to match console command lines of the form:
-> + *	    console=pl011,mmio|mmio32,<addr>[,<options>]
-> + *	    console=pl011,0x<addr>[,<options>]
-> + *	This form is used to register an initial earlycon boot console and
-> + *	replace it with the amba_console at pl011 driver init.
-> + *
-> + *	Performs console setup for a match (as required by interface)
-> + *	If no <options> are specified, then assume the h/w is already setup.
-> + *
-> + *	Returns 0 if console matches; otherwise non-zero to use default matching
-> + */
-> +static int __init pl011_console_match(struct console *co, char *name, int idx,
-> +				      char *options)
-> +{
-> +	char match[] = "pl011";	/* pl011-specific earlycon name */
-> +	unsigned char iotype;
-> +	unsigned long addr;
-> +	int i;
-> +
-> +	if (strncmp(name, match, 5) != 0)
-> +		return -ENODEV;
-> +
-> +	if (uart_parse_earlycon(options, &iotype, &addr, &options))
-> +		return -ENODEV;
-> +
-> +	/* try to match the port specified on the command line */
-> +	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-> +		struct uart_port *port;
-> +
-> +		if (!amba_ports[i])
-> +			continue;
-> +
-> +		port = &amba_ports[i]->port;
-> +
-> +		if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
-> +			continue;
+> If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
+> disable the PWM, the PWM output is always set as a logic 1.
 
-So it looks like iotype is constant inside the loop, and UPIO_MEM
-and UPIO_MEM32 too, of course. It means you can move this check out of
-cycle and avoid ports traversing at all in specific case. Am I wrong?
+I presume there's a reason why the bootloader set this bit to 1. Why do
+you assume it's the right thing to clear it?
 
-> +
-> +		if (port->mapbase != addr)
-> +			continue;
-> +
-> +		co->index = i;
-> +		port->cons = co;
-> +		return pl011_console_setup(co, options);
-> +	}
-> +
-> +	return -ENODEV;
-> +}
-> +
->  static struct uart_driver amba_reg;
->  static struct console amba_console = {
->  	.name		= "ttyAMA",
->  	.write		= pl011_console_write,
->  	.device		= uart_console_device,
->  	.setup		= pl011_console_setup,
-> +	.match		= pl011_console_match,
->  	.flags		= CON_PRINTBUFFER,
->  	.index		= -1,
->  	.data		= &amba_reg,
-> -- 
-> 2.8.2
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/6ba5f7b9/attachment.sig>
