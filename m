@@ -1,75 +1,109 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Jun 2016 11:15:54 +0200
-Subject: [PATCH 1/2] clk: fixed-factor: Allow for a few clocks to change the
- parent rate
-Message-ID: <20160622091555.18415-1-maxime.ripard@free-electrons.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 22 Jun 2016 12:17:09 +0300
+Subject: [PATCH 02/28] crypto: omap-sham: Don't idle/start SHA device
+ between Encrypt operations
+In-Reply-To: <5756BD0B.4030506@ti.com>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+ <1464771389-10640-3-git-send-email-t-kristo@ti.com> <574EB091.6040001@ti.com>
+ <574F69D8.1010809@ti.com> <20160607100837.GA30875@gondor.apana.org.au>
+ <5756B584.2000900@ti.com> <5756BD0B.4030506@ti.com>
+Message-ID: <576A5795.5030300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only way for a fixed factor clock to change its rate would be to change
-its parent rate.
+On 07/06/16 15:24, Grygorii Strashko wrote:
+> On 06/07/2016 02:52 PM, Tero Kristo wrote:
+>> On 07/06/16 13:08, Herbert Xu wrote:
+>>> On Wed, Jun 01, 2016 at 06:03:52PM -0500, Dave Gerlach wrote:
+>>>> On 06/01/2016 04:53 AM, Grygorii Strashko wrote:
+>>>>> On 06/01/2016 11:56 AM, Tero Kristo wrote:
+>>>>>> From: Lokesh Vutla <lokeshvutla@ti.com>
+>>>>>>
+>>>>>> Calling runtime PM API for every block causes serious perf hit to
+>>>>>> crypto operations that are done on a long buffer.
+>>>>>> As crypto is performed on a page boundary, encrypting large buffers
+>>>>>> can
+>>>>>> cause a series of crypto operations divided by page. The runtime PM
+>>>>>> API
+>>>>>> is also called those many times.
+>>>>>>
+>>>>>> We call runtime_pm_get_sync only at beginning on the session
+>>>>>> (cra_init)
+>>>>>> and runtime_pm_put at the end. This result in upto a 50% speedup.
+>>>>>> This doesn't make the driver to keep the system awake as runtime
+>>>>>> get/put
+>>>>>> is only called during a crypto session which completes usually
+>>>>>> quickly.
+>>>>>>
+>>>>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>>>>> ---
+>>>>>>   drivers/crypto/omap-sham.c | 27 +++++++++++++++++----------
+>>>>>>   1 file changed, 17 insertions(+), 10 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+>>>>>> index 6eefaa2..bd0258f 100644
+>>>>>> --- a/drivers/crypto/omap-sham.c
+>>>>>> +++ b/drivers/crypto/omap-sham.c
+>>>>>> @@ -360,14 +360,6 @@ static void omap_sham_copy_ready_hash(struct
+>>>>>> ahash_request *req)
+>>>>>>
+>>>>>>   static int omap_sham_hw_init(struct omap_sham_dev *dd)
+>>>>>>   {
+>>>>>> -    int err;
+>>>>>> -
+>>>>>> -    err = pm_runtime_get_sync(dd->dev);
+>>>>>> -    if (err < 0) {
+>>>>>> -        dev_err(dd->dev, "failed to get sync: %d\n", err);
+>>>>>> -        return err;
+>>>>>> -    }
+>>>>>> -
+>>>>
+>>>> Would it be worth it to investigate a pm_runtime autosuspend
+>>>> approach rather than knocking runtime PM out here completely? I am
+>>>> not clear if the overhead is coming from the pm_runtime calls
+>>>> themselves or the actual idling of the IP, but if it's the idling of
+>>>> the IP causing the slowdown, with a large enough autosuspend_delay
+>>>> we don't actually sleep between each block but after a long enough
+>>>> period of idle time we would actually suspend.
+>>>
+>>> Indeed, I think this patch is bogus.  cra_init is associated
+>>> with the tfm object which is usually long-lived.  So doing power
+>>> management there makes no sense.
+>>>
+>>> Cheers,
+>>>
+>>
+>> I can investigate this further, but I believe this patch itself gave a
+>> noticeable performance boost.
+>>
+>> This is an optimization anyway, and not critical for functionality.
+>>
+>
+> It is not critical only if below code would not introduce races
 
-Since passing blindly CLK_SET_RATE_PARENT might break a lot of platforms
-that were relying on the fact that the parent rate wouldn't change,
-introduce a compatible-based whitelist that will allow clocks to opt-in
-that flag.
+I don't get your point here. This patch is an optimization, and the 
+driver works fine without it.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- .../devicetree/bindings/clock/fixed-factor-clock.txt          |  4 ++++
- drivers/clk/clk-fixed-factor.c                                | 11 ++++++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+> +    spin_lock_bh(&sham.lock);
+> +    list_for_each_entry(dd, &sham.dev_list, list) {
+> +        break;
+> +    }
+> +    spin_unlock_bh(&sham.lock);
+>
+> Is it guaranteed that dd will alive always at this moment?
 
-diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
-index 1bae8527eb9b..189467a7188a 100644
---- a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
-@@ -14,6 +14,10 @@ Required properties:
- Optional properties:
- - clock-output-names : From common clock binding.
- 
-+Some clocks that require special treatments are also handled by that
-+driver, with the compatibles:
-+  - allwinner,sun4i-a10-pll3-2x-clk
-+
- Example:
- 	clock {
- 		compatible = "fixed-factor-clock";
-diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-index 75cd6c792cb8..4db3be214077 100644
---- a/drivers/clk/clk-fixed-factor.c
-+++ b/drivers/clk/clk-fixed-factor.c
-@@ -142,6 +142,11 @@ void clk_hw_unregister_fixed_factor(struct clk_hw *hw)
- EXPORT_SYMBOL_GPL(clk_hw_unregister_fixed_factor);
- 
- #ifdef CONFIG_OF
-+static const struct of_device_id set_rate_parent_matches[] = {
-+	{ .compatible = "allwinner,sun4i-a10-pll3-2x-clk" },
-+	{ /* Sentinel */ },
-+};
-+
- /**
-  * of_fixed_factor_clk_setup() - Setup function for simple fixed factor clock
-  */
-@@ -150,6 +155,7 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
- 	struct clk *clk;
- 	const char *clk_name = node->name;
- 	const char *parent_name;
-+	unsigned long flags = 0;
- 	u32 div, mult;
- 
- 	if (of_property_read_u32(node, "clock-div", &div)) {
-@@ -167,7 +173,10 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 	parent_name = of_clk_get_parent_name(node, 0);
- 
--	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
-+	if (of_match_node(set_rate_parent_matches, node))
-+		flags |= CLK_SET_RATE_PARENT;
-+
-+	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, flags,
- 					mult, div);
- 	if (!IS_ERR(clk))
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
--- 
-2.9.0
+Typically yes, but I think there might be a race condition here if the 
+driver is removed during operation. Anyway, I'll drop this patch and 
+change the optimization to use autosuspend as Dave suggested; that gives 
+almost the same performance boost as this one (I miss a couple of 
+percent in the overall performance, but I can live with that.)
+
+-Tero
+
+>
+> +
+> +    pm_runtime_get_sync(dd->dev);
+>
+>
+>
