@@ -1,17 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Jun 2016 03:06:05 -0700
-Subject: [PATCH] ARM: OMAP: make ti81xx_rtc_hwmod static
-In-Reply-To: <1466513236-23528-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1466513236-23528-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160622100604.GI22406@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 22 Jun 2016 13:08:32 +0300
+Subject: [PATCH] ARM: dts: r8a7794: add SMP support
+In-Reply-To: <CAMuHMdWcVRBxZO85_MhYVvODcbi-GYDNKfQH9LJEcrJRd=p7Vw@mail.gmail.com>
+References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
+ <27171008.uuY7altQup@wasted.cogentembedded.com>
+ <CAMuHMdWcVRBxZO85_MhYVvODcbi-GYDNKfQH9LJEcrJRd=p7Vw@mail.gmail.com>
+Message-ID: <adbc6358-d3fb-c608-15c2-c425332435f3@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ben Dooks <ben.dooks@codethink.co.uk> [160621 05:50]:
-> The ti81xx_rtc_hwmod is not exported, or declared outside the file
-> arch/arm/mach-omap2/omap_hwmod_81xx_data.c so make it static to
-> avoid the following warning:
+On 6/22/2016 10:20 AM, Geert Uytterhoeven wrote:
 
-Thanks applying into omap-for-v4.8/soc.
+>> Add the device tree node for the Advanced Power Management Unit (APMU).
+>> Use the "enable-method" prop to  point out that the APMU should be used
+>> for the SMP support.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+>> SMP/PM basically works but you can't offline CPU0 (system hangs)...
+>
+> On #renesas-soc you said it hangs on SILK only, and succeeds on Porter,
+> with a WARNING in the clk core (which one?) during suspend?
 
-Tony
+    Porter is based on R8A7791 (WARNING seemed to be caused by the CAN 
+driver). :-)
+
+> Thanks!
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+
+MBR, Sergei
