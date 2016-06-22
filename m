@@ -1,102 +1,112 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 22 Jun 2016 13:04:14 +0200
-Subject: [PATCH 09/12] mmc: sdhci-xenon: add initial Xenon eMMC driver
-In-Reply-To: <575FC206.4030903@intel.com>
-References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
- <1465456218-28354-10-git-send-email-gregory.clement@free-electrons.com>
- <575FA9BF.6070703@intel.com> <878ty8chdr.fsf@free-electrons.com>
- <575FC206.4030903@intel.com>
-Message-ID: <CAPDyKFotN0LhR=Vm03HYDCzsRi0Bj_eXrT-JA=zOra4+TTEzPQ@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 22 Jun 2016 13:06:05 +0200
+Subject: [PATCH V7 1/8] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <576A6D7F.6010407@arm.com>
+References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
+ <1466420541-20101-2-git-send-email-tn@semihalf.com>
+ <372d3b78-2bc5-94d1-49f6-c9229affa65d@linaro.org> <576A6D7F.6010407@arm.com>
+Message-ID: <576A711D.5080206@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 June 2016 at 10:36, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> On 14/06/16 11:19, Gregory CLEMENT wrote:
->> Hi Adrian,
+On 22.06.2016 12:50, Marc Zyngier wrote:
+> On 21/06/16 08:12, Hanjun Guo wrote:
+>> Hi Tomasz,
 >>
->>  On mar., juin 14 2016, Adrian Hunter <adrian.hunter@intel.com> wrote:
+>> Sorry for jumping out late, just one comment below.
 >>
->>> On 09/06/16 10:10, Gregory CLEMENT wrote:
->>>> From: Victor Gu <xigu@marvell.com>
->>>>
->>>> This path adds the driver for the Marvell Xenon eMMC host controller
->>>> which supports eMMC 5.1, SD 3.0.
->>>>
->>>> However this driver supports only up to eMMC 5.0 since the command queue
->>>> feature is not included (yet) in the driver.
->>>>
->>>> [gregory.clement at free-electrons.com:
->>>>  - reformulate commit log
->>>>  - overload the sdhci_set_uhs_signaling function instead of using a quirk
->>>>  - fix a kconfig dependency
->>>>  - remove dead code]
->>>>
->>>> Signed-off-by: Victor Gu <xigu@marvell.com>
->>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>> ---
->>>>  drivers/mmc/host/Kconfig       |   10 +
->>>>  drivers/mmc/host/Makefile      |    1 +
->>>>  drivers/mmc/host/sdhci-xenon.c | 1164 ++++++++++++++++++++++++++++++++++++++++
->>>>  3 files changed, 1175 insertions(+)
->>>>  create mode 100644 drivers/mmc/host/sdhci-xenon.c
->>>>
+>> On 2016/6/20 19:02, Tomasz Nowicki wrote:
+>>> IORT shows representation of IO topology for ARM based systems.
+>>> It describes how various components are connected together on
+>>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
 >>>
->>> <SNIP>
+>>> Initial support allows to detect IORT table presence and save its
+>>> root pointer obtained through acpi_get_table(). The pointer validity
+>>> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+>>> is not set while using IORT nodes we would dereference unmapped pointers.
 >>>
->>>> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
->>>> new file mode 100644
->>>> index 000000000000..43c06db95872
->>>> --- /dev/null
->>>> +++ b/drivers/mmc/host/sdhci-xenon.c
+>>> For the aforementioned reason call iort_table_detect() from acpi_init()
+>>> which guarantees acpi_gbl_permanent_mmap to be set at that point.
 >>>
->>> <SNIP>
+>>> Add generic helpers which are helpful for scanning and retrieving
+>>> information from IORT table content. List of the most important helpers:
+>>> - iort_find_dev_node() finds IORT node for a given device
+>>> - iort_node_map_rid() maps device RID and returns IORT node which provides
+>>>    final translation
 >>>
->>>> +static int sdhci_xenon_delay_adj_test(struct sdhci_host *host,
->>>> +           struct mmc_card *card, unsigned int delay,
->>>> +           bool invert, bool phase)
->>>> +{
->>>> +   int ret;
->>>> +   struct mmc_card *oldcard;
->>>> +
->>>> +   sdhci_xenon_set_fix_delay(host, delay, invert, phase);
->>>> +
->>>> +   /*
->>>> +    * If the card is not yet associated to the host, we
->>>> +    * temporally do it
->>>> +    */
->>>> +   oldcard = card->host->card;
->>>> +   if (!oldcard)
->>>> +           card->host->card = card;
->>>> +   ret =  card_alive(card);
->>>
->>> This looks like an abuse of bus_ops->alive().  You will need to get
->>> agreement with Ulf how to handle this.  I will wait for Ulf's comments
->>> before reviewing this patch set further.
+>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>> ---
+>>>   drivers/acpi/Kconfig  |   3 +
+>>>   drivers/acpi/Makefile |   1 +
+>>>   drivers/acpi/bus.c    |   2 +
+>>>   drivers/acpi/iort.c   | 220 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>   include/linux/iort.h  |  30 +++++++
 >>
->> Actually I modified this part of the driver to use
->> bus_ops->alive(). Initially, the alive() code was more or less copied
->> and paste from the mmc core with ugly include from mmc_ops.h and
->> sdio_ops.h to make it work. I find it cleaner to directly access the
->> alive() function.
+>> [...]
 >>
->> Could you explain why it is an abuse of  bus_ops->alive()?
-
-Because it's an internal callback to be used only by the mmc core.
-
+>>> +static acpi_status
+>>> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
+>>> +{
+>>> +	struct device *dev = context;
+>>> +
+>>> +	switch (node->type) {
+>>> +	case ACPI_IORT_NODE_NAMED_COMPONENT: {
+>>> +		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+>>
+>> ACPI_ALLOCATE_BUFFER is used here, so ...
+>>
+>>> +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+>>> +		struct acpi_iort_named_component *ncomp;
+>>> +
+>>> +		if (!adev)
+>>> +			break;
+>>> +
+>>> +		ncomp = (struct acpi_iort_named_component *)node->node_data;
+>>> +
+>>> +		if (ACPI_FAILURE(acpi_get_name(adev->handle,
+>>> +					       ACPI_FULL_PATHNAME, &buffer))) {
+>>> +			dev_warn(dev, "Can't get device full path name\n");
+>>> +			break;
+>>> +		}
+>>> +
+>>> +		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
+>>> +			return AE_OK;
+>>
+>> ... we need to kfree(buffer.pointer) before we return or break.
 >
-> bus_ops->alive() is used to determine if the card is present and able to
-> respond.  You seem to be using it for a different purpose.  I will wait for
-> Ulf's comments.
+> For the record, I've queued this patch on top:
+>
+> diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
+> index 496dcf6..3b9e55b 100644
+> --- a/drivers/acpi/iort.c
+> +++ b/drivers/acpi/iort.c
+> @@ -158,11 +158,15 @@ iort_match_node_callback(struct acpi_iort_node *node, void *context)
+>   		if (ACPI_FAILURE(acpi_get_name(adev->handle,
+>   					       ACPI_FULL_PATHNAME, &buffer))) {
+>   			dev_warn(dev, "Can't get device full path name\n");
+> -			break;
+> -		}
+> +		} else {
+> +			int match;
+>
+> -		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
+> -			return AE_OK;
+> +			match = !strcmp(ncomp->device_name, buffer.pointer);
+> +			acpi_os_free(&buffer);
+> +
+> +			if (match)
+> +				return AE_OK;
+> +		}
+>
+>   		break;
+>   	}
+>
+>
+> assuming that Rafael is OK with the general approach, of course.
 >
 
-I looked briefly at your code, which uses the ->alive() ops. Indeed
-it's a workaround which I cannot accept.
+Thanks Marc. As Lorenzo pointed out, we need another fix for 
+iort_node_map_rid(). Do you want me to refresh the whole series or this 
+patch only?
 
-Could you elaborate why you need to send a CMD13 from your host driver?
-
-It's the responsibility of the mmc core to know/implement the
-(e)MMC/SD/SDIO protocols. Is there something missing in core to be
-able to support your host driver?
-
-Kind regards
-Uffe
+Tomasz
