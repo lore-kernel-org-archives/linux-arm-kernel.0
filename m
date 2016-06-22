@@ -1,37 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Jun 2016 12:02:06 +0200
-Subject: [PATCH v3 5/8] rtc: ac100: Add clk output support
-In-Reply-To: <1466391138-12862-6-git-send-email-wens@csie.org>
-References: <1466391138-12862-1-git-send-email-wens@csie.org>
- <1466391138-12862-6-git-send-email-wens@csie.org>
-Message-ID: <20160622100206.GV26668@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Jun 2016 11:02:54 +0100
+Subject: [PATCH v2 2/2] arm64: hibernate: Don't hibernate on systems with
+ stuck CPUs
+In-Reply-To: <1466586373-11836-3-git-send-email-james.morse@arm.com>
+References: <1466586373-11836-1-git-send-email-james.morse@arm.com>
+ <1466586373-11836-3-git-send-email-james.morse@arm.com>
+Message-ID: <20160622100253.GB25837@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 22, 2016 at 10:06:13AM +0100, James Morse wrote:
+> Hibernate relies on cpu hotplug to prevent secondary cores executing
+> the kernel text while it is being restored.
+> 
+> Add a call to cpus_are_stuck_in_kernel() to determine if there are
+> CPUs not counted by 'num_online_cpus()', and prevent hibernate in this
+> case.
+> 
+> Fixes: 82869ac57b5 ("arm64: kernel: Add support for hibernate/suspend-to-disk")
+> Signed-off-by: James Morse <james.morse@arm.com>
 
-On Mon, Jun 20, 2016 at 10:52:15AM +0800, Chen-Yu Tsai wrote:
-> +	/*
-> +	 * The ADDA 4 MHz clock is from the codec side of the AC100,
-> +	 * which is likely a different power domain. However, boards
-> +	 * always have both sides powered on, so it is impossible to
-> +	 * test this.
-> +	 */
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-If that ADDA clock is exposed by the codec, why are you putting it in
-the RTC?
+Mark.
 
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/fd8b1f0f/attachment-0001.sig>
+> ---
+>  arch/arm64/kernel/hibernate.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+> index f8df75d740f4..21ab5df9fa76 100644
+> --- a/arch/arm64/kernel/hibernate.c
+> +++ b/arch/arm64/kernel/hibernate.c
+> @@ -33,6 +33,7 @@
+>  #include <asm/pgtable.h>
+>  #include <asm/pgtable-hwdef.h>
+>  #include <asm/sections.h>
+> +#include <asm/smp.h>
+>  #include <asm/suspend.h>
+>  #include <asm/virt.h>
+>  
+> @@ -236,6 +237,11 @@ int swsusp_arch_suspend(void)
+>  	unsigned long flags;
+>  	struct sleep_stack_data state;
+>  
+> +	if (cpus_are_stuck_in_kernel()) {
+> +		pr_err("Can't hibernate: no mechanism to offline secondary CPUs.\n");
+> +		return -EBUSY;
+> +	}
+> +
+>  	local_dbg_save(flags);
+>  
+>  	if (__cpu_suspend_enter(&state)) {
+> -- 
+> 2.8.0.rc3
+> 
