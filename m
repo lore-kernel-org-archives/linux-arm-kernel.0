@@ -1,27 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Jun 2016 11:53:32 +0200
-Subject: [PATCH 1/2] cpufreq: exynos: use relaxed IO accesors
-In-Reply-To: <1466587984-14105-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1466587984-14105-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <3668897.kYSEflAvDO@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 22 Jun 2016 11:52:03 +0200
+Subject: [PATCH 4.7 fix] ARM: dts: sunxi: Add pll3 to simplefb nodes
+ clocks lists
+In-Reply-To: <1466456242-22841-1-git-send-email-hdegoede@redhat.com>
+References: <1466456242-22841-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160622095203.GT26668@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 22, 2016 10:33:03 AM CEST Ben Dooks wrote:
-> The use of __raw IO accesors is not endian safe and should be used
-> sparingly. The relaxed variants should be as lightweight and also
-> are endian safe.
+On Mon, Jun 20, 2016 at 10:57:22PM +0200, Hans de Goede wrote:
+> Now that we've a clock node describing pll3 we must add it to the
+> simplefb nodes clocks lists to avoid it getting turned off when
+> simplefb is used.
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> This fixes the screen going black when using simplefb.
 > 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Why not use the normal readl/writel() here instead of the relaxed version?
+Applied, thanks!
+Maxime
 
-Either one should work here, but in general I'd recommend using the
-non-relaxed version unless code is particularly performance sensitive.
-
-The main argument for that is to not let people get used to using
-_relaxed() all the time because it causes some very hard to debug
-problems in the cases where you actually need the barriers.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/68cec676/attachment-0001.sig>
