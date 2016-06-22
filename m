@@ -1,46 +1,66 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:58 +0300
-Subject: [PATCHv2 25/27] ARM: OMAP: DRA7xx: Make L4SEC clock domain SWSUP only
+Date: Wed, 22 Jun 2016 16:23:42 +0300
+Subject: [PATCHv2 09/27] crypto: omap-aes - Fix enabling clocks
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-26-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-10-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joel Fernandes <joelf@ti.com>
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-Using HWSUP for l4sec clock domain is causing warnings in HWMOD code for
-DRA7. Based on some observations, once the clock domain goes into an IDLE
-state (because of no activity etc), the IDLEST for the module goes to '0x2'
-value which means Interface IDLE condition. So far so go, however once the
-MODULEMODE is set to disabled for the particular IP, the IDLEST for the
-module should go to '0x3', per the HW AUTO IDLE protocol. However this is
-not observed and there is no reason per the protocl for the transition to
-not happen. This could potentially be a bug in the HW AUTO state-machine.
+Enable clocks for all cores before starting session.
+Driver has to pic the aes core dynamically based on the queue length.
 
-Work around for this is to use SWSUP only for the particular clockdomain.
-With this all the transitions of IDLEST happen correctly and warnings
-don't occur.
-
-Signed-off-by: Joel Fernandes <joelf@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clockdomains7xx_data.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/crypto/omap-aes.c | 23 +++++++----------------
+ 1 file changed, 7 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomains7xx_data.c b/arch/arm/mach-omap2/clockdomains7xx_data.c
-index ef9ed36..6c67965 100644
---- a/arch/arm/mach-omap2/clockdomains7xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains7xx_data.c
-@@ -409,7 +409,7 @@ static struct clockdomain l4sec_7xx_clkdm = {
- 	.dep_bit	  = DRA7XX_L4SEC_STATDEP_SHIFT,
- 	.wkdep_srcs	  = l4sec_wkup_sleep_deps,
- 	.sleepdep_srcs	  = l4sec_wkup_sleep_deps,
--	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
-+	.flags		  = CLKDM_CAN_SWSUP,
- };
+diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+index 8178632..cf53d3f 100644
+--- a/drivers/crypto/omap-aes.c
++++ b/drivers/crypto/omap-aes.c
+@@ -760,18 +760,13 @@ static int omap_aes_cra_init(struct crypto_tfm *tfm)
+ 	struct omap_aes_dev *dd = NULL;
+ 	int err;
  
- static struct clockdomain l3main1_7xx_clkdm = {
+-	/* Find AES device, currently picks the first device */
+-	spin_lock_bh(&list_lock);
+ 	list_for_each_entry(dd, &dev_list, list) {
+-		break;
+-	}
+-	spin_unlock_bh(&list_lock);
+-
+-	err = pm_runtime_get_sync(dd->dev);
+-	if (err < 0) {
+-		dev_err(dd->dev, "%s: failed to get_sync(%d)\n",
+-			__func__, err);
+-		return err;
++		err = pm_runtime_get_sync(dd->dev);
++		if (err < 0) {
++			dev_err(dd->dev, "%s: failed to get_sync(%d)\n",
++				__func__, err);
++			return err;
++		}
+ 	}
+ 
+ 	tfm->crt_ablkcipher.reqsize = sizeof(struct omap_aes_reqctx);
+@@ -783,14 +778,10 @@ static void omap_aes_cra_exit(struct crypto_tfm *tfm)
+ {
+ 	struct omap_aes_dev *dd = NULL;
+ 
+-	/* Find AES device, currently picks the first device */
+-	spin_lock_bh(&list_lock);
+ 	list_for_each_entry(dd, &dev_list, list) {
+-		break;
++		pm_runtime_put_sync(dd->dev);
+ 	}
+-	spin_unlock_bh(&list_lock);
+ 
+-	pm_runtime_put_sync(dd->dev);
+ }
+ 
+ /* ********************** ALGS ************************************ */
 -- 
 1.9.1
