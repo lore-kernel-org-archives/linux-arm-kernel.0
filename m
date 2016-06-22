@@ -1,21 +1,21 @@
-From: diego.dorta@nxp.com (Diego Dorta)
-Date: Wed, 22 Jun 2016 19:53:13 +0000
-Subject: [PATCH 1/4] ARM: dts: imx7d: Add SPI support
-In-Reply-To: <20160621064530.GE21364@tiger>
-References: <1466194183-31076-1-git-send-email-diego.dorta@nxp.com>,
- <20160621064530.GE21364@tiger>
-Message-ID: <HE1PR04MB2140905361677C2E0003F3CCF12C0@HE1PR04MB2140.eurprd04.prod.outlook.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 22 Jun 2016 16:25:42 -0400 (EDT)
+Subject: [PATCH 1/2] net: ethernet: sun4i-emac: use phydev from struct
+ net_device
+In-Reply-To: <1466255740-20999-1-git-send-email-tremyfr@gmail.com>
+References: <1466255740-20999-1-git-send-email-tremyfr@gmail.com>
+Message-ID: <20160622.162542.1929166668685308741.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Philippe Reynes <tremyfr@gmail.com>
+Date: Sat, 18 Jun 2016 15:15:39 +0200
 
-On Wed, Jun 21, 2016 at 16:44:40PM -0300, Shawn Guo wrote:
+> The private structure contain a pointer to phydev, but the structure
+> net_device already contain such pointer. So we can remove the pointer
+> phydev in the private structure, and update the driver to use the
+> one contained in struct net_device.
+> 
+> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 
-> There is no much point to have "fsl,imx6sx-ecspi".  Please drop it.
-> Shawn
-
-I just sent v2 patches including all your suggestion.
-However, because of some clock issues I didn't get 100% success during the tests.
-I am updating the list with v2 just to share my work so far.
-
-Diego
+Applied
