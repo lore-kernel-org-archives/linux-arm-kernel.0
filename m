@@ -1,117 +1,43 @@
-From: diego.dorta@nxp.com (Diego Dorta)
-Date: Wed, 22 Jun 2016 16:37:08 -0300
-Subject: [PATCH v2 2/4] ARM: dts: imx7d-sdb: Add display support
-In-Reply-To: <1466624230-16191-1-git-send-email-diego.dorta@nxp.com>
-References: <1466624230-16191-1-git-send-email-diego.dorta@nxp.com>
-Message-ID: <1466624230-16191-2-git-send-email-diego.dorta@nxp.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 22 Jun 2016 13:36:40 -0600
+Subject: [PATCH 05/14] PM / doc: update device documentation for devices in
+ IRQ safe PM domains
+In-Reply-To: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
+References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1466624209-27432-6-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the LCD8000-43T display.
+Update documentation to reflect the changes made to support IRQ safe PM
+domains.
 
-Signed-off-by: Diego Dorta <diego.dorta@nxp.com>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
-Changes since v1:
-- Merged pinctrl_lcdif_dat and pinctrl_lcdif_ctrl in one pin set.
+ Documentation/power/devices.txt | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/imx7d-sdb.dts | 78 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 78 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index d6da506..8f6a539 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -272,6 +272,44 @@
- 	};
- };
+diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
+index 8ba6625..a622136 100644
+--- a/Documentation/power/devices.txt
++++ b/Documentation/power/devices.txt
+@@ -607,7 +607,17 @@ individually.  Instead, a set of devices sharing a power resource can be put
+ into a low-power state together at the same time by turning off the shared
+ power resource.  Of course, they also need to be put into the full-power state
+ together, by turning the shared power resource on.  A set of devices with this
+-property is often referred to as a power domain.
++property is often referred to as a power domain. A power domain may also be
++nested inside another power domain.
++
++Devices, by default, operate in process context. If a device can operate in
++IRQ safe context that has to be explicitly indicated by setting the irq_safe
++boolean inside struct generic_pm_domain to be true. Power domains by default,
++operate in process context but could have devices that are IRQ safe. Such
++power domains cannot be powered on/off during runtime PM. On the other hand,
++IRQ safe PM domains that have IRQ safe devices may be powered off when all
++the devices are in idle. An IRQ safe domain may only be attached as a
++subdomain to another IRQ safe domain.
  
-+&lcdif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_lcdif>;
-+	display = <&display0>;
-+	status = "okay";
-+
-+	display0: display {
-+		bits-per-pixel = <16>;
-+		bus-width = <24>;
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+
-+			timing0: timing0 {
-+				clock-frequency = <9200000>;
-+				hactive = <480>;
-+				vactive = <272>;
-+				hfront-porch = <8>;
-+				hback-porch = <4>;
-+				hsync-len = <41>;
-+				vback-porch = <2>;
-+				vfront-porch = <4>;
-+				vsync-len = <10>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+&pwm1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm1>;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -396,6 +434,46 @@
- 			>;
- 		};
- 
-+		pinctrl_lcdif: lcdifgrp {
-+			fsl,pins = <
-+				MX7D_PAD_LCD_DATA00__LCD_DATA0		0x79
-+				MX7D_PAD_LCD_DATA01__LCD_DATA1		0x79
-+				MX7D_PAD_LCD_DATA02__LCD_DATA2		0x79
-+				MX7D_PAD_LCD_DATA03__LCD_DATA3		0x79
-+				MX7D_PAD_LCD_DATA04__LCD_DATA4		0x79
-+				MX7D_PAD_LCD_DATA05__LCD_DATA5		0x79
-+				MX7D_PAD_LCD_DATA06__LCD_DATA6		0x79
-+				MX7D_PAD_LCD_DATA07__LCD_DATA7		0x79
-+				MX7D_PAD_LCD_DATA08__LCD_DATA8		0x79
-+				MX7D_PAD_LCD_DATA09__LCD_DATA9		0x79
-+				MX7D_PAD_LCD_DATA10__LCD_DATA10		0x79
-+				MX7D_PAD_LCD_DATA11__LCD_DATA11		0x79
-+				MX7D_PAD_LCD_DATA12__LCD_DATA12		0x79
-+				MX7D_PAD_LCD_DATA13__LCD_DATA13		0x79
-+				MX7D_PAD_LCD_DATA14__LCD_DATA14		0x79
-+				MX7D_PAD_LCD_DATA15__LCD_DATA15		0x79
-+				MX7D_PAD_LCD_DATA16__LCD_DATA16		0x79
-+				MX7D_PAD_LCD_DATA17__LCD_DATA17		0x79
-+				MX7D_PAD_LCD_DATA18__LCD_DATA18		0x79
-+				MX7D_PAD_LCD_DATA19__LCD_DATA19		0x79
-+				MX7D_PAD_LCD_DATA20__LCD_DATA20		0x79
-+				MX7D_PAD_LCD_DATA21__LCD_DATA21		0x79
-+				MX7D_PAD_LCD_DATA22__LCD_DATA22		0x79
-+				MX7D_PAD_LCD_DATA23__LCD_DATA23		0x79
-+				MX7D_PAD_LCD_CLK__LCD_CLK		0x79
-+				MX7D_PAD_LCD_ENABLE__LCD_ENABLE		0x79
-+				MX7D_PAD_LCD_VSYNC__LCD_VSYNC		0x79
-+				MX7D_PAD_LCD_HSYNC__LCD_HSYNC		0x79
-+				MX7D_PAD_LCD_RESET__LCD_RESET		0x79
-+			>;
-+		};
-+
-+		pinctrl_pwm1: pwm1grp {
-+			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO01__PWM1_OUT		0x110b0
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
+ Support for power domains is provided through the pm_domain field of struct
+ device.  This field is a pointer to an object of type struct dev_pm_domain,
 -- 
 2.7.4
