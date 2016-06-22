@@ -1,68 +1,50 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 22 Jun 2016 09:43:41 +0100
-Subject: [PATCH 1/2] Documentation: bindings: Add DT bindings for ARM's
- FVP models.
-In-Reply-To: <20160621213318.GA32655@rob-hp-laptop>
-References: <1466424796-13769-1-git-send-email-tixy@linaro.org>
- <20160621132257.GA2263@rob-hp-laptop> <1466516312.2856.27.camel@linaro.org>
- <20160621213318.GA32655@rob-hp-laptop>
-Message-ID: <1466585021.3026.24.camel@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Jun 2016 01:51:07 -0700
+Subject: [PATCH 2/2] arm: fix kernel image size
+In-Reply-To: <20160622082958.GD5783@n2100.arm.linux.org.uk>
+References: <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
+ <20160621074319.GH22406@atomide.com>
+ <20160621094737.GA5783@n2100.arm.linux.org.uk>
+ <20160621103810.GI22406@atomide.com>
+ <20160621105720.GK22406@atomide.com>
+ <20160621154407.GB5783@n2100.arm.linux.org.uk>
+ <20160621165523.GY22406@atomide.com>
+ <20160621215141.GC5783@n2100.arm.linux.org.uk>
+ <20160622073614.GZ22406@atomide.com>
+ <20160622082958.GD5783@n2100.arm.linux.org.uk>
+Message-ID: <20160622085105.GE22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-06-21 at 16:33 -0500, Rob Herring wrote:
-> On Tue, Jun 21, 2016 at 02:38:32PM +0100, Jon Medhurst (Tixy) wrote:
-> > On Tue, 2016-06-21 at 08:22 -0500, Rob Herring wrote:
-> > > > +Required properties (in root node):
-> > > > +- compatible value:
-> > > > +     compatible = "arm,<family>,<variant>", "arm,<family>";
-> > > > +  where <family> is one of:
-> > > > +  - "fvp-base" for the Base FVP
-> > > > +  - "fvp-ve" for the VE FVP
-> > > > +  and <variant> is the part of the model's executable filename with
-> > > the family
-> > > > +  name omitted, converted to lower case, and with non-alphanumeric
-> > > characters
-> > > > +  replaced with '-'. E.g. the Base FVP that has two AEMv8 CPU
-> > > clusters has an
-> > > > +  executable file called FVP_Base_AEMv8A-AEMv8A, so the compatible
-> > > value for
-> > > 
-> > > Naming conventions of the exe aren't going to change?
-> > 
-> > Almost certainly will at some point, as will the very name Fixed Virtual
-> > Platform, what 'families' ARM produce and their naming, and the
-> > configuration of the 'hardware' compiled into the models.
-> > 
-> > These are software models, so can be changed easily at the whim of
-> > marketing, or current perceived requirements from engineers and
-> > managers. So generally, it's a moving target, that doesn't fit nicely
-> > into the needs producing device-trees.
+* Russell King - ARM Linux <linux@armlinux.org.uk> [160622 01:32]:
+> When CONFIG_DEBUG_RODATA is enabled, we align the text, read-only data,
+> data, and so on to 1MB boundaries so that we can change the permissions
+> of the sections to enforce the properties of the various ELF segments.
+> This padding massively inflates the size of the run-time kernel image,
+> and can result in megabytes of wastage (if we're as little as one byte
+> into 1MB, we have to round up to the next megabyte.)
+
+Yes understood, and looks like we cannot make any assumptions about
+what the alignment might be.
+
+> The padding, being a string of zeros, is very compressable, and this
+> increases the compression ratio.
 > 
-> Then do we even need to specify something so specific? The kernel 
-> probably doesn't even care.
-
-Well, it would certainly be easier if we could just use a simple
-'arm,fvp' for compatible and model name and not worry about the 100 or
-so current variants. (Some are 32-bit, some 64-bit with just about every
-current ARM CPU represented, plus various peripheral sets with regard to
-display, iommu, dma, etc.
-
-
->  Are you going to upstream new strings 
-> everytime there's a new one (that's public)?
-
-I've only been asked to upstream a device-tree for the one that ARM
-targets in its 'platform release' [1]. Note, all 100+ models are equally
-'public' in the sense that they are available to people are pay (like
-real hardware supported by Linux).
-
-[1] https://community.arm.com/docs/DOC-10803)
-
+> The BSS is not included in the compressed image, but needs to be taken
+> account of when avoiding overwriting the DTB.
 > 
-> We've had models supported upstream for a long time. What's changed now?
+> > How about we check the size of RAM available, and if there is plenty
+> > of RAM we use a safe compression ratio of 8. If RAM is a problem,
+> > we could make the compression ratio smaller and warn about it. And
+> > we could also allow passing the compression ratio to kexec as an
+> > option.
+> 
+> You do know that you can already pass the "size" of the kernel to be
+> reserved to kexec.  --image-size.  It's not documented in --help, but
+> it is there (which is another annoying thing about ARM kexec...)
 
-ARM's software releases are targeting a different model.
+Oh ok that's nice.
 
--- 
-Tixy
+Regards,
+
+Tony
