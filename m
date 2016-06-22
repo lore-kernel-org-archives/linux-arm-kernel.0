@@ -1,38 +1,85 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:53 +0300
-Subject: [PATCHv2 20/27] ARM: dts: AM43xx: Add node for RNG
+Date: Wed, 22 Jun 2016 16:23:54 +0300
+Subject: [PATCHv2 21/27] ARM: DRA7: hwmod: Add data for DES IP
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-21-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-22-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+From: Joel Fernandes <joelf@ti.com>
 
-Adding DT node for hardware random number generator.
+DRA7 SoC contains DES crypto hardware accelerator. Add hwmod data for
+this IP so that it can be utilized by crypto frameworks.
 
+Signed-off-by: Joel Fernandes <joelf@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/am4372.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 37 +++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 12fcde4..a44ee94 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -843,6 +843,13 @@
- 			dma-names = "tx", "rx";
- 		};
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index d0e7e525..13e4ea2 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -2541,6 +2541,34 @@ static struct omap_hwmod dra7xx_uart10_hwmod = {
+ 	},
+ };
  
-+		rng: rng at 48310000 {
-+			compatible = "ti,omap4-rng";
-+			ti,hwmods = "rng";
-+			reg = <0x48310000 0x2000>;
-+			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+		};
++/* DES (the 'P' (public) device) */
++static struct omap_hwmod_class_sysconfig dra7xx_des_sysc = {
++	.rev_offs	= 0x0030,
++	.sysc_offs	= 0x0034,
++	.syss_offs	= 0x0038,
++	.sysc_flags	= SYSS_HAS_RESET_STATUS,
++};
 +
- 		mcasp0: mcasp at 48038000 {
- 			compatible = "ti,am33xx-mcasp-audio";
- 			ti,hwmods = "mcasp0";
++static struct omap_hwmod_class dra7xx_des_hwmod_class = {
++	.name	= "des",
++	.sysc	= &dra7xx_des_sysc,
++};
++
++/* DES */
++static struct omap_hwmod dra7xx_des_hwmod = {
++	.name		= "des",
++	.class		= &dra7xx_des_hwmod_class,
++	.clkdm_name	= "l4sec_clkdm",
++	.main_clk	= "l3_iclk_div",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_L4SEC_DES3DES_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_L4SEC_DES3DES_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++};
++
+ /*
+  * 'usb_otg_ss' class
+  *
+@@ -3683,6 +3711,14 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per2__uart7 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l4_per1 -> des */
++static struct omap_hwmod_ocp_if dra7xx_l4_per1__des = {
++	.master		= &dra7xx_l4_per1_hwmod,
++	.slave		= &dra7xx_des_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ /* l4_per2 -> uart8 */
+ static struct omap_hwmod_ocp_if dra7xx_l4_per2__uart8 = {
+ 	.master		= &dra7xx_l4_per2_hwmod,
+@@ -3916,6 +3952,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_per2__uart8,
+ 	&dra7xx_l4_per2__uart9,
+ 	&dra7xx_l4_wkup__uart10,
++	&dra7xx_l4_per1__des,
+ 	&dra7xx_l4_per3__usb_otg_ss1,
+ 	&dra7xx_l4_per3__usb_otg_ss2,
+ 	&dra7xx_l4_per3__usb_otg_ss3,
 -- 
 1.9.1
