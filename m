@@ -1,50 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 22 Jun 2016 12:20:57 +0200
-Subject: [PATCH] ARM: dts: r8a7794: add SMP support
-In-Reply-To: <adbc6358-d3fb-c608-15c2-c425332435f3@cogentembedded.com>
-References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
- <27171008.uuY7altQup@wasted.cogentembedded.com>
- <CAMuHMdWcVRBxZO85_MhYVvODcbi-GYDNKfQH9LJEcrJRd=p7Vw@mail.gmail.com>
- <adbc6358-d3fb-c608-15c2-c425332435f3@cogentembedded.com>
-Message-ID: <CAMuHMdWY+hZMFQo7iGaeZkbVnK1cZ9=oyM7RvX_8mhyCuCxD9Q@mail.gmail.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Wed, 22 Jun 2016 12:21:03 +0200
+Subject: [PATCH] ARM: BCM5301X: Set GPIO enabling USB power on Netgear
+ R7000
+In-Reply-To: <CACna6ryrABjF3ie8uE6_q-pfNjhQaGbRhNR9jWMEPKwaUt88hQ@mail.gmail.com>
+References: <1466509358-25498-1-git-send-email-zajec5@gmail.com>
+ <op.yjepy3mr2s3iss@ecaz>
+ <CACna6rxm0euw=nVyHZzZa2+Q9U9S4t+aVy34ZvL0Lrx27B8-eA@mail.gmail.com>
+ <op.yjevu7en2s3iss@ecaz>
+ <CACna6ryrABjF3ie8uE6_q-pfNjhQaGbRhNR9jWMEPKwaUt88hQ@mail.gmail.com>
+Message-ID: <op.yjge1dkz2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Tue, 21 Jun 2016 17:23:18 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
 
-On Wed, Jun 22, 2016 at 12:08 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 6/22/2016 10:20 AM, Geert Uytterhoeven wrote:
->
->>> Add the device tree node for the Advanced Power Management Unit (APMU).
->>> Use the "enable-method" prop to  point out that the APMU should be used
->>> for the SMP support.
+> On 21 June 2016 at 16:29, Imre Kaloz <kaloz@openwrt.org> wrote:
+>> On Tue, 21 Jun 2016 14:26:11 +0200, Rafa? Mi?ecki <zajec5@gmail.com>  
+>> wrote:
+>>
+>>> On 21 June 2016 at 14:22, Imre Kaloz <kaloz@openwrt.org> wrote:
+>>>>
+>>>> Is there any reason you are not handling this properly as a regulator
+>>>> with
+>>>> usb-nop-xceiv?
 >>>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>
+>>> We can't use USB NOP PHY as we need a specific PHY driver for  
+>>> Broadcom's
+>>> USB.
 >>
 >>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->>> SMP/PM basically works but you can't offline CPU0 (system hangs)...
->>
->>
->> On #renesas-soc you said it hangs on SILK only, and succeeds on Porter,
->> with a WARNING in the clk core (which one?) during suspend?
+>> I see. That shouldn't stop you from addressing the regulator part, tho  
+>> ;)
 >
->    Porter is based on R8A7791 (WARNING seemed to be caused by the CAN
-> driver). :-)
+> How? Be more specific please.
+>
 
-Oh right, mixing up boards.
+Instead of blindly enabling a GPIO, you should define that GPIO line as a  
+fixed regulator and make the USB phy driver handle it. Take a look at  
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7776ab70d75ff9857343e44e428744d81c30ce1b  
+for example.
 
-Will try on (remote) ALT when I find some time...
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Imre
