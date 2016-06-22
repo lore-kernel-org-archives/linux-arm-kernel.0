@@ -1,112 +1,150 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 22 Jun 2016 13:06:05 +0200
-Subject: [PATCH V7 1/8] ACPI: I/O Remapping Table (IORT) initial support
-In-Reply-To: <576A6D7F.6010407@arm.com>
-References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
- <1466420541-20101-2-git-send-email-tn@semihalf.com>
- <372d3b78-2bc5-94d1-49f6-c9229affa65d@linaro.org> <576A6D7F.6010407@arm.com>
-Message-ID: <576A711D.5080206@semihalf.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Jun 2016 04:06:42 -0700
+Subject: [GIT PULL] device tree updates for omaps for v4.8 merge window
+Message-ID: <20160622110640.GD22353@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.06.2016 12:50, Marc Zyngier wrote:
-> On 21/06/16 08:12, Hanjun Guo wrote:
->> Hi Tomasz,
->>
->> Sorry for jumping out late, just one comment below.
->>
->> On 2016/6/20 19:02, Tomasz Nowicki wrote:
->>> IORT shows representation of IO topology for ARM based systems.
->>> It describes how various components are connected together on
->>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
->>>
->>> Initial support allows to detect IORT table presence and save its
->>> root pointer obtained through acpi_get_table(). The pointer validity
->>> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
->>> is not set while using IORT nodes we would dereference unmapped pointers.
->>>
->>> For the aforementioned reason call iort_table_detect() from acpi_init()
->>> which guarantees acpi_gbl_permanent_mmap to be set at that point.
->>>
->>> Add generic helpers which are helpful for scanning and retrieving
->>> information from IORT table content. List of the most important helpers:
->>> - iort_find_dev_node() finds IORT node for a given device
->>> - iort_node_map_rid() maps device RID and returns IORT node which provides
->>>    final translation
->>>
->>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>> ---
->>>   drivers/acpi/Kconfig  |   3 +
->>>   drivers/acpi/Makefile |   1 +
->>>   drivers/acpi/bus.c    |   2 +
->>>   drivers/acpi/iort.c   | 220 ++++++++++++++++++++++++++++++++++++++++++++++++++
->>>   include/linux/iort.h  |  30 +++++++
->>
->> [...]
->>
->>> +static acpi_status
->>> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
->>> +{
->>> +	struct device *dev = context;
->>> +
->>> +	switch (node->type) {
->>> +	case ACPI_IORT_NODE_NAMED_COMPONENT: {
->>> +		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
->>
->> ACPI_ALLOCATE_BUFFER is used here, so ...
->>
->>> +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
->>> +		struct acpi_iort_named_component *ncomp;
->>> +
->>> +		if (!adev)
->>> +			break;
->>> +
->>> +		ncomp = (struct acpi_iort_named_component *)node->node_data;
->>> +
->>> +		if (ACPI_FAILURE(acpi_get_name(adev->handle,
->>> +					       ACPI_FULL_PATHNAME, &buffer))) {
->>> +			dev_warn(dev, "Can't get device full path name\n");
->>> +			break;
->>> +		}
->>> +
->>> +		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
->>> +			return AE_OK;
->>
->> ... we need to kfree(buffer.pointer) before we return or break.
->
-> For the record, I've queued this patch on top:
->
-> diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
-> index 496dcf6..3b9e55b 100644
-> --- a/drivers/acpi/iort.c
-> +++ b/drivers/acpi/iort.c
-> @@ -158,11 +158,15 @@ iort_match_node_callback(struct acpi_iort_node *node, void *context)
->   		if (ACPI_FAILURE(acpi_get_name(adev->handle,
->   					       ACPI_FULL_PATHNAME, &buffer))) {
->   			dev_warn(dev, "Can't get device full path name\n");
-> -			break;
-> -		}
-> +		} else {
-> +			int match;
->
-> -		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
-> -			return AE_OK;
-> +			match = !strcmp(ncomp->device_name, buffer.pointer);
-> +			acpi_os_free(&buffer);
-> +
-> +			if (match)
-> +				return AE_OK;
-> +		}
->
->   		break;
->   	}
->
->
-> assuming that Rafael is OK with the general approach, of course.
->
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-Thanks Marc. As Lorenzo pointed out, we need another fix for 
-iort_node_map_rid(). Do you want me to refresh the whole series or this 
-patch only?
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
-Tomasz
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/dt-part1-signed-v2
+
+for you to fetch changes up to 52c7c91319e469142628199548852198bcc3150f:
+
+  ARM: dts: AM43xx: Add node for RNG (2016-06-22 00:44:16 -0700)
+
+----------------------------------------------------------------
+Device tree changes for omaps for v4.8 merge window:
+
+- PWM binding updates and related dts changes
+
+- OCM RAM updates for dra7
+
+- Enable n900 lirc-rx51 driver
+
+- omap3-gta04 updates for backlight, bma180, itg3200, hmc5843 and wifi
+
+- am335x, am437x and am57xx operating point updates and additions
+
+- am335x-icev2 pca9536 node
+
+- dra72-evm regulator updates
+
+- edma spelling fixes
+
+- am335x and am437x ethernet phy update
+
+- a series of mcbsp updates
+
+- omap3-gta04 eeprom
+
+- dra7 PCIe unit address fix
+
+- stdout-path for beaglebone variants
+
+- crypto accelerator nodes for am335x, am437x and dra7
+
+----------------------------------------------------------------
+Andrew F. Davis (2):
+      ARM: dts: am437x-idk-evm: Mark MAC as having only one PHY
+      ARM: dts: am335x-bone-common: Mark MAC as having only one PHY
+
+Dave Gerlach (10):
+      ARM: dts: dra7: Add ocmcram nodes
+      ARM: dts: dra7: Add ti,secure-ram node to ocmcram1 node
+      ARM: dts: am335x: Update MPU regulator range for TI boards
+      ARM: dts: am33xx: Move to operating-points-v2 table and ti-cpufreq driver
+      ARM: dts: am335x-boneblack: Enable 1GHz OPP for cpu
+      ARM: dts: am4372: Add operating-points-v2 table
+      ARM: dts: am437x-gp-evm: Hook dcdc2 as the cpu0-supply
+      ARM: dts: dra7: Add dt node for the syscon control module wkup
+      ARM: dts: dra7: Move cpus node to parent dts for dra74x and dra72x
+      ARM: dts: dra7: Move to operating-points-v2 table
+
+Enric Balletbo i Serra (1):
+      ARM: dts: am335x-bone-common: use stdout-path in Beaglebone boards.
+
+Franklin S Cooper Jr (5):
+      ARM: dts: am437x: Add missing compatibles to PWM binding documents
+      pwm: pwm-tiehrpwm: Update dt binding document to use generic node name
+      pwm: pwm-tiecap: Update dt binding document to use proper unit address
+      ARM: dts: am437x/am33xx/da850: Add new ECAP and EPWM bindings
+      ARM: dts: am437x/am33xx: Remove hwmod entries for ECAP and EPWM nodes
+
+H. Nikolaus Schaller (5):
+      ARM: dts: omap3-gta04: Define and use bma180 irq pin
+      ARM: dta: omap3-gta04: Define and use itg3200  irq pin
+      ARM: dta: omap3-gta04: Define and use hmc5843 irq pin
+      ARM: dts: omap3-gat04: Fix wifi handling
+      ARM: dts: omap3-gta04: Add RFID eeprom node
+
+Ivaylo Dimitrov (1):
+      ARM: dts: n900: enable lirc-rx51 driver
+
+Joel Fernandes (2):
+      ARM: dts: DRA7: Add DT node for DES IP
+      ARM: dts: DRA7: Add DT nodes for AES IP
+
+Kishon Vijay Abraham I (1):
+      ARM: dts: DRA7: fix unit address of second PCIe instance
+
+Lokesh Vutla (4):
+      ARM: dts: DRA7: Add support for SHA IP
+      ARM: dts: DRA7: Add DT node for RNG IP
+      ARM: dts: AM43xx: clk: Add RNG clk node
+      ARM: dts: AM43xx: Add node for RNG
+
+Marek Belisko (1):
+      ARM: dts: omap3-gta04: Add backlight support
+
+Misael Lopez Cruz (1):
+      ARM: dts: dra72-evm: Rename 3.3V regulator tag
+
+Peter Ujfalusi (6):
+      ARM: dts: omap3: Add clocks to McBSP nodes
+      ARM: dts: omap5-board-common: Add pdmclk binding for audio
+      ARM: dts: omap4-panda-common: Add pdmclk binding for audio
+      ARM: dts: omap4-sdp: Add pdmclk binding for audio
+      ARM: dts: omap4-var-som-om44: Add pdmclk binding for audio
+      ARM: dts: omap4-duovero: Add pdmclk binding for audio
+
+Robert P. J. Day (1):
+      ARM: dts: Correct misspelling, "emda3" -> "edma3"
+
+Vignesh R (2):
+      ARM: dts: DRA7: Add dt nodes for PWMSS
+      ARM: dts: am335x-icev2: Add DT node for TI PCA9536
+
+ Documentation/devicetree/bindings/dma/ti-edma.txt  |   4 +-
+ .../devicetree/bindings/pwm/pwm-tiecap.txt         |  38 +++-
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  38 +++-
+ .../devicetree/bindings/pwm/pwm-tipwmss.txt        |  33 ++-
+ arch/arm/boot/dts/am335x-bone-common.dtsi          |  12 +-
+ arch/arm/boot/dts/am335x-boneblack.dts             |  11 +
+ arch/arm/boot/dts/am335x-evm.dts                   |   2 +-
+ arch/arm/boot/dts/am335x-evmsk.dts                 |   2 +-
+ arch/arm/boot/dts/am335x-icev2.dts                 |   7 +
+ arch/arm/boot/dts/am33xx.dtsi                      | 126 ++++++++---
+ arch/arm/boot/dts/am4372.dtsi                      | 111 ++++++++--
+ arch/arm/boot/dts/am437x-gp-evm.dts                |   4 +
+ arch/arm/boot/dts/am437x-idk-evm.dts               |   1 +
+ arch/arm/boot/dts/am43xx-clocks.dtsi               |   8 +
+ arch/arm/boot/dts/dm814x.dtsi                      |   2 +-
+ arch/arm/boot/dts/dra7.dtsi                        | 242 ++++++++++++++++++++-
+ arch/arm/boot/dts/dra72-evm-common.dtsi            |  12 +-
+ arch/arm/boot/dts/dra72x.dtsi                      |  16 --
+ arch/arm/boot/dts/dra74x.dtsi                      |  25 +--
+ arch/arm/boot/dts/omap3-gta04.dtsi                 |  66 +++++-
+ arch/arm/boot/dts/omap3-n900.dts                   |  12 +
+ arch/arm/boot/dts/omap3.dtsi                       |  10 +
+ arch/arm/boot/dts/omap4-duovero.dtsi               |   5 +
+ arch/arm/boot/dts/omap4-panda-common.dtsi          |   5 +
+ arch/arm/boot/dts/omap4-sdp.dts                    |   5 +
+ arch/arm/boot/dts/omap4-var-som-om44.dtsi          |   5 +
+ arch/arm/boot/dts/omap5-board-common.dtsi          |   5 +
+ drivers/clk/ti/clk-43xx.c                          |   1 +
+ 28 files changed, 681 insertions(+), 127 deletions(-)
