@@ -1,45 +1,129 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 22 Jun 2016 22:34:09 +0200
-Subject: [PATCH v2 0/2] can: rcar_canfd: Add Classical CAN & lower state
- transition support
-In-Reply-To: <1466598707-44076-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
-References: <1466434007-50873-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <1466598707-44076-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
-Message-ID: <602d4286-754f-f02f-4bd2-3e238cc4789a@pengutronix.de>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 22 Jun 2016 23:45:48 +0300
+Subject: [PATCH v8 4/4] serial: pl011: add console matching function
+In-Reply-To: <7CC4D455-323E-4B33-A931-2104E2DDDC0D@hurleysoftware.com>
+References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+ <1463749405-11640-5-git-send-email-aleksey.makarov@linaro.org>
+ <20160622121813.GA20023@yury-N73SV>
+ <7CC4D455-323E-4B33-A931-2104E2DDDC0D@hurleysoftware.com>
+Message-ID: <20160622204548.GB28766@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/2016 02:31 PM, Ramesh Shanmugasundaram wrote:
-> This patch is based on latest can-next(tag:linux-can-next-for-4.8-20160617).
+Hi Peter, 
+
+Nice to meet you.
+
+On Wed, Jun 22, 2016 at 07:08:33AM -0700, Peter Hurley wrote:
 > 
-> Changes since v1:
->  - property named changed from "can-nofd" to "no-can-fd" (Rob H)
->  - added new patch(0002) that support lower state transitions (Wolfgang G)
->    (http://marc.info/?l=linux-can&m=146650325116971&w=2)
 > 
-> Ramesh Shanmugasundaram (2):
->   can: rcar_canfd: Add Classical CAN only mode support
->   can: rcar_canfd: Add back-to-error-active support
+> > On Jun 22, 2016, at 5:18 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> > 
+> >> On Fri, May 20, 2016 at 04:03:23PM +0300, Aleksey Makarov wrote:
+> >> This patch adds function pl011_console_match() that implements
+> >> method match of struct console.  It allows to match consoles against
+> >> data specified in a string, for example taken from command line or
+> >> compiled by ACPI SPCR table handler.
+> >> 
+> >> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> >> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> >> ---
+> >> drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
+> >> 1 file changed, 56 insertions(+)
+> >> 
+> >> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> >> index a2aa655..388edc8 100644
+> >> --- a/drivers/tty/serial/amba-pl011.c
+> >> +++ b/drivers/tty/serial/amba-pl011.c
+> >> @@ -2288,12 +2288,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
+> >>    return uart_set_options(&uap->port, co, baud, parity, bits, flow);
+> >> }
+> >> 
+> >> +/**
+> >> + *    pl011_console_match - non-standard console matching
+> >> + *    @co:      registering console
+> >> + *    @name:      name from console command line
+> >> + *    @idx:      index from console command line
+> >> + *    @options: ptr to option string from console command line
+> >> + *
+> >> + *    Only attempts to match console command lines of the form:
+> >> + *        console=pl011,mmio|mmio32,<addr>[,<options>]
+> >> + *        console=pl011,0x<addr>[,<options>]
+> >> + *    This form is used to register an initial earlycon boot console and
+> >> + *    replace it with the amba_console at pl011 driver init.
+> >> + *
+> >> + *    Performs console setup for a match (as required by interface)
+> >> + *    If no <options> are specified, then assume the h/w is already setup.
+> >> + *
+> >> + *    Returns 0 if console matches; otherwise non-zero to use default matching
+> >> + */
+> >> +static int __init pl011_console_match(struct console *co, char *name, int idx,
+> >> +                      char *options)
+> >> +{
+> >> +    char match[] = "pl011";    /* pl011-specific earlycon name */
+> >> +    unsigned char iotype;
+> >> +    unsigned long addr;
+> >> +    int i;
+> >> +
+> >> +    if (strncmp(name, match, 5) != 0)
+> >> +        return -ENODEV;
+> >> +
+> >> +    if (uart_parse_earlycon(options, &iotype, &addr, &options))
+> >> +        return -ENODEV;
+> >> +
+> >> +    /* try to match the port specified on the command line */
+> >> +    for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
+> >> +        struct uart_port *port;
+> >> +
+> >> +        if (!amba_ports[i])
+> >> +            continue;
+> >> +
+> >> +        port = &amba_ports[i]->port;
+> >> +
+> >> +        if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
+> >> +            continue;
+> > 
+> > So it looks like iotype is constant inside the loop, and UPIO_MEM
+> > and UPIO_MEM32 too, of course. It means you can move this check out of
+> > cycle and avoid ports traversing at all in specific case. Am I wrong?
+> > 
 > 
->  .../devicetree/bindings/net/can/rcar_canfd.txt     |  21 +-
->  drivers/net/can/rcar/rcar_canfd.c                  | 429 ++++++++++++++-------
->  2 files changed, 310 insertions(+), 140 deletions(-)
+> No you're not wrong but I'd prefer if we don't use assumptions like that in port enumeration.
 
-Applied to can-next.
+I don't think this is an assumption. I think this is solid fact.
+There's no a single chance for stack-allocated variable to be
+shared with other thread of execution, or be unexpectedly changed
+somehow else. So this code not only decreases performance (I don't
+think it's really hot path), but also confuses reader, and makes him
+spend more time on reading this than it deserves.
 
-Tnx,
-Marc
+If you still insist on current version, I'd ask you or Alexey to add
+clear description why we check the same condition again and again
+inside the loop.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Yury.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/1f4270e1/attachment.sig>
+> >> +
+> >> +        if (port->mapbase != addr)
+> >> +            continue;
+> >> +
+> >> +        co->index = i;
+> >> +        port->cons = co;
+> >> +        return pl011_console_setup(co, options);
+> >> +    }
+> >> +
+> >> +    return -ENODEV;
+> >> +}
+> >> +
+> >> static struct uart_driver amba_reg;
+> >> static struct console amba_console = {
+> >>    .name        = "ttyAMA",
+> >>    .write        = pl011_console_write,
+> >>    .device        = uart_console_device,
+> >>    .setup        = pl011_console_setup,
+> >> +    .match        = pl011_console_match,
+> >>    .flags        = CON_PRINTBUFFER,
+> >>    .index        = -1,
+> >>    .data        = &amba_reg,
+> >> -- 
+> >> 2.8.2
