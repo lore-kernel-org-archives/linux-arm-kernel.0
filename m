@@ -1,97 +1,75 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 22 Jun 2016 14:59:41 +0900
-Subject: [PATCH v19 10/13] arm64: kdump: add VMCOREINFO's for user-space
- coredump tools
-In-Reply-To: <20160620053222.GB14309@dhcppc9>
-References: <cover.1466120418.git.geoff@infradead.org>
- <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
- <20160620053222.GB14309@dhcppc9>
-Message-ID: <20160622055940.GY20774@linaro.org>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 22 Jun 2016 08:56:04 +0300
+Subject: [PATCH V2 1/4] trace: Introduce an output interface from ftrace
+ to STM
+In-Reply-To: <1466563613-31578-2-git-send-email-zhang.chunyan@linaro.org>
+References: <1466563613-31578-1-git-send-email-zhang.chunyan@linaro.org>
+ <1466563613-31578-2-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <87mvmdu5qj.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 11:02:22AM +0530, Pratyush Anand wrote:
-> +Atsushi
-> 
-> Hi Takahiro,
-> 
-> On 16/06/2016:11:48:28 PM, Geoff Levand wrote:
-> > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > 
-> > For the current crash utility, we need to know, at least,
-> >   - kimage_voffset
-> >   - PHYS_OFFSET
-> > to handle the contents of core dump file (/proc/vmcore) correctly due to
-> > the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
-> > This patch puts them as VMCOREINFO's into the file.
-> > 
-> >   - VA_BITS
-> > is also added for makedumpfile command.
-> 
-> Thanks for adding them. They are quite helpful for makedumpfile as well.
-> 
-> > More VMCOREINFO's may be added later.
-> 
-> Yes, we will need to pass VMCOREINFO_SYMBOL(_text) and VMCOREINFO_SYMBOL(_end)
-> in order to work with makedumpfile.
+[adding Felipe for his sudden interest in the subject matter]
 
-I know that adding those symbols is the easiest way, but
-theoretically, if we know the physical address of "swapper_pg_dir",
-instead of its virtual address, we can access all the memory pointed to
-by any kernel virtual address.
-How do you rationalize that we need to know "_text" and "_end"?
+Chunyan Zhang <zhang.chunyan@linaro.org> writes:
 
-Thanks,
--Takahiro AKASHI
+> +static struct stm_ftrace *trace_output;
 
-> I already have makedumpfile patches [1]  which uses _text and _end, but not
-> sending them to makedumpfile upstream, until you will be agreeing to take [2] in
-> future. Please let me know your opinion about it. If it would be acceptable then
-> I may send aarch64 makedumpfile improvements to upstream.
-> 
-> [1] https://github.com/pratyushanand/makedumpfile/commit/d9590fec049976b8fee0d6b4e66e6f3e99ff1113
-> [2] https://github.com/pratyushanand/linux/commit/1d94df20c575c725910c9c29a129b9f14e7e900b
-> 
-> ~Pratyush
-> 
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > ---
-> >  arch/arm64/kernel/machine_kexec.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> > index f270967..57a30fb 100644
-> > --- a/arch/arm64/kernel/machine_kexec.c
-> > +++ b/arch/arm64/kernel/machine_kexec.c
-> > @@ -18,6 +18,7 @@
-> >  
-> >  #include <asm/cacheflush.h>
-> >  #include <asm/cpu_ops.h>
-> > +#include <asm/memory.h>
-> >  #include <asm/mmu_context.h>
-> >  
-> >  #include "cpu-reset.h"
-> > @@ -278,3 +279,13 @@ void machine_crash_shutdown(struct pt_regs *regs)
-> >  
-> >  	pr_info("Starting crashdump kernel...\n");
-> >  }
-> > +
-> > +void arch_crash_save_vmcoreinfo(void)
-> > +{
-> > +	VMCOREINFO_NUMBER(VA_BITS);
-> > +	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
-> > +	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
-> > +						kimage_voffset);
-> > +	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
-> > +						PHYS_OFFSET);
-> > +}
-> > -- 
-> > 2.5.0
-> > 
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+What you want is a possibility to have different ftrace outputs, not
+different STM outputs for ftrace (again, STM core already does this).
+In other words, here, you want to have the notion of "output" be
+stm-agnostic, but be a generalized output driver object.
+
+> +
+> +void trace_func_to_stm(unsigned long ip, unsigned long parent_ip)
+> +{
+> +	unsigned long ip_array[2] = {ip, parent_ip};
+> +
+> +	if (trace_output)
+> +		trace_output->write(&trace_output->data, (char *)ip_array,
+> +				    sizeof(unsigned long) * 2, STM_FTRACE_CHAN);
+> +}
+
+The ip+parent_ip pair is still not a useful output from ftrace
+data. Moreover, doing this is basically like inventing another binary
+protocol for ftrace data over stm, where ftrace is in and of itself
+already a binary protocol, why not just use that? The decoder will
+basically depend on the kernel binary from whence the traces are
+coming, but this is a requirement even if we want to decypher the
+ip+parent_ip data you're proposing.
+
+We would need to take some time to think this through. What we might
+consider is:
+
+ * bypassing ftrace ring buffer, sending data directly to an "output",
+   which has a drawback of ending up in a driver callback, which needs
+   to serialize on its driver stuff and write registers (I did try to
+   make stm_write as light as possible when I wrote it, though); the
+   good part is that data goes into the wire as soon as it is produced
+   instead of being buffered along the way;
+ * starting a work (or multiple works) that would traverse new data in
+   ftrace buffer and feed it to an "output", such as stm; this has a
+   problem of producers being potentially faster than consumers
+   (consider 'function' tracer, for example) and hogging the cpus by
+   simply exporting trace data; this also botches the stm timestamps,
+   which will then be representative of nothing in particular.
+
+> +
+> +void trace_add_output(struct stm_ftrace *stm)
+> +{
+> +	trace_output = stm;
+> +}
+> +EXPORT_SYMBOL_GPL(trace_add_output);
+> +
+> +void trace_rm_output(void)
+> +{
+> +	trace_output = NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(trace_rm_output);
+
+These, of course, only work because they are implicitly serialized on
+stm core's link locks.
+
+Regards,
+--
+Alex
