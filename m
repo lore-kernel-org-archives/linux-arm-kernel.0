@@ -1,68 +1,69 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 22 Jun 2016 14:28:25 -0400
-Subject: [PATCH v13 05/10] arm64: Kprobes with single stepping support
-In-Reply-To: <20160614094559.51a7865fa30f3f31f6a70e37@kernel.org>
-References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
- <1464924384-15269-6-git-send-email-dave.long@linaro.org>
- <20160608100714.4abbcebcf356eb72173d0ce3@kernel.org>
- <575E3235.1020904@linaro.org>
- <20160613155017.860097875e8bc86563a065ce@kernel.org>
- <575ECFC7.10207@linaro.org>
- <20160614094559.51a7865fa30f3f31f6a70e37@kernel.org>
-Message-ID: <576AD8C9.7050109@linaro.org>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Wed, 22 Jun 2016 21:34:00 +0300
+Subject: [PATCH 1/2] ARM: OMAP2+: Drop legacy board file for n900
+In-Reply-To: <201606221848.41305@pali>
+References: <1465987689-14812-1-git-send-email-tony@atomide.com>
+ <20160621112944.GV29844@pali> <20160621113215.GP22406@atomide.com>
+ <201606221848.41305@pali>
+Message-ID: <576ADA18.9070000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2016 08:45 PM, Masami Hiramatsu wrote:
-> On Mon, 13 Jun 2016 11:22:47 -0400
-> David Long <dave.long@linaro.org> wrote:
->
->> On 06/13/2016 02:50 AM, Masami Hiramatsu wrote:
->>> On Mon, 13 Jun 2016 00:10:29 -0400
->>> David Long <dave.long@linaro.org> wrote:
->>>
->>>>>> ---
->>>>>>     arch/arm64/Kconfig                      |   1 +
->>>>>>     arch/arm64/include/asm/debug-monitors.h |   5 +
->>>>>>     arch/arm64/include/asm/insn.h           |   4 +-
->>>>>>     arch/arm64/include/asm/kprobes.h        |  60 ++++
->>>>>>     arch/arm64/include/asm/probes.h         |  44 +++
->>>>>>     arch/arm64/kernel/Makefile              |   1 +
->>>>>>     arch/arm64/kernel/debug-monitors.c      |  18 +-
->>>>>>     arch/arm64/kernel/kprobes-arm64.c       | 144 +++++++++
->>>>>>     arch/arm64/kernel/kprobes-arm64.h       |  35 +++
->>>>>>     arch/arm64/kernel/kprobes.c             | 526 ++++++++++++++++++++++++++++++++
+
+
+On 22.06.2016 19:48, Pali Roh?r wrote:
+> On Tuesday 21 June 2016 13:32:16 Tony Lindgren wrote:
+>> * Pali Roh?r <pali.rohar@gmail.com> [160621 04:32]:
+>>> On Tuesday 21 June 2016 04:25:36 Tony Lindgren wrote:
+>>>> * Tony Lindgren <tony@atomide.com> [160615 05:08]:
+>>>>> * Pali Roh?r <pali.rohar@gmail.com> [160615 04:52]:
+>>>>>> On Wednesday 15 June 2016 04:02:02 Tony Lindgren wrote:
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> * Pali Roh?r <pali.rohar@gmail.com> [160615 03:58]:
+>>>>>>>> Hi! I just quickly looked at N900 status matrix
+>>>>>>>> https://elinux.org/N900 and there is still one thing not
+>>>>>>>> finished in DT: It is slot-name for omap_hsmmc driver.
+>>>>>>>> So switch from legacy board code to DT is regression.
+>>>>>>>
+>>>>>>> That's fixed with the following in v4.7-rc series:
+>>>>>>>
+>>>>>>> db863d896681 ("mmc: omap_hsmmc: Check if MMC slot name is
+>>>>>>> passed in pdata") 10c1f7d32bf4 ("ARM: OMAP2+: n900 needs
+>>>>>>> MMC slot names for legacy user space")
+>>>>>>
+>>>>>> Great! Sorry, but now wiki is not fully updated with last
+>>>>>> changes and I do not have in my mind what was
+>>>>>> finished/merged and what not. It is going hard for me to
+>>>>>> track everything.
 >>>>>
->>>>> Not sure why kprobes.c and kprobes-arm64.c are splitted.
->>>>>
->>>>>
+>>>>> OK well maybe take one more look and then ack if no more
+>>>>> issues.
 >>>>
->>>> This comes from the model of the arm32 kprobes code where handling of
->>>> the low-level instruction simulation is implemented in separate files
->>>> for 32-bit vs. thumb instructions.  It should make a little more sense
->>>> in the future when additional instruction simulation code will hopefully
->>>> be added for those instructions we cannot currently single-step
->>>> out-of-line.  It also probably *could* be merged into one file.
+>>>> Pali, any news on this?
 >>>
->>> Hmm, at least the name of arch/arm64/kernel/kprobes-arm64.c is
->>> meaningless. As we've done in x86, I think we can make it
->>> arch/arm64/kernel/kprobes/decode-insn.{c,h}
->>>
+>>> I have not looked at this deeply yet. Please give me some more
+>>> time.
 >>
->> I've changed the name to kprobe-decode-insn.[hc], or do you feel
->> strongly the three kprobes source files in arch/arm64/kernel need their
->> own subdirectory?
+>> OK I'd like to apply this series by Monday if no issues to have
+>> enough time for it in Linux next. Does that sound OK to you?
+>>
+>> Regards,
+>>
+>> Tony
 >
-> Yes, especially when we start working on kprobes-on-ftrace support,
-> it is better to have a separate file for that.
+> Ok, now I looked at it and tested current version from torvalds tree.
+>
+> There is still missing fixed support for IR, but that is waiting in
+> media tree queue for next merge window.
+>
+> So after IR patches land in torvalds tree, I'm fine with dropping legacy
+> board code for n900 and you can add my Acked-by.
 >
 
-I've reorganized the kprobes source files into their own subdirectory 
-and changed some of their names.
+Tony asked me to repost the driver so to be included in 4.7 (or 4.8), 
+but I am too busy lately to do it, will try to find time the next week. 
+In the meanwhile, if somebody has time and will, feel free to repost the 
+series for me.
 
-> Thank you!
->
->
-
-Thanks,
--dl
+Ivo
