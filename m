@@ -1,35 +1,75 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 22 Jun 2016 19:33:30 +0200
-Subject: [PATCH v2 2/3] PCI: host: new PCI host controller driver for
- Aardvark
-In-Reply-To: <20160622161607.GD25485@localhost>
-References: <1465574056-8787-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <201606111501.h2bC6u5a%fengguang.wu@intel.com>
- <20160622161607.GD25485@localhost>
-Message-ID: <20160622193330.490d1bce@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 22 Jun 2016 19:59:08 +0200
+Subject: [PATCH] mmc: pwrseq-simple: Add an optional post-power-on-delay
+Message-ID: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Some devices need a while to boot their firmware after providing clks /
+de-asserting resets before they are ready to receive sdio commands.
 
-On Wed, 22 Jun 2016 11:16:07 -0500, Bjorn Helgaas wrote:
+This commits adds a post-power-on-delay-ms devicetree property to
+mmc-pwrseq-simple for use with such devices.
 
-> > All errors (new ones prefixed by >>):
-> >   
-> > >> drivers/of/Kconfig:4:error: recursive dependency detected!  
-> 
-> Was there a resolution to this?
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+ drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
+ 2 files changed, 11 insertions(+)
 
-Yes, Arnd sent a patch which I believe addresses this:
-
-	[PATCH] arm/arm64/irqchip/pci: fix PCI_MSI dependencies
-
-I'll verify locally that it indeed solves the problem.
-
-Thanks,
-
-Thomas
+diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+index ce0e767..e254368 100644
+--- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
++++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+@@ -16,6 +16,8 @@ Optional properties:
+   See ../clocks/clock-bindings.txt for details.
+ - clock-names : Must include the following entry:
+   "ext_clock" (External clock provided to the card).
++- post-power-on-delay-ms : Delay in ms after powering the card and
++	de-asserting the reset-gpios (if any)
+ 
+ Example:
+ 
+diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+index 450d907..1304160 100644
+--- a/drivers/mmc/core/pwrseq_simple.c
++++ b/drivers/mmc/core/pwrseq_simple.c
+@@ -16,6 +16,8 @@
+ #include <linux/device.h>
+ #include <linux/err.h>
+ #include <linux/gpio/consumer.h>
++#include <linux/delay.h>
++#include <linux/property.h>
+ 
+ #include <linux/mmc/host.h>
+ 
+@@ -24,6 +26,7 @@
+ struct mmc_pwrseq_simple {
+ 	struct mmc_pwrseq pwrseq;
+ 	bool clk_enabled;
++	u32 post_power_on_delay_ms;
+ 	struct clk *ext_clk;
+ 	struct gpio_descs *reset_gpios;
+ };
+@@ -64,6 +67,9 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
+ 	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+ 
+ 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
++
++	if (pwrseq->post_power_on_delay_ms)
++		msleep(pwrseq->post_power_on_delay_ms);
+ }
+ 
+ static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
+@@ -111,6 +117,9 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
+ 		return PTR_ERR(pwrseq->reset_gpios);
+ 	}
+ 
++	device_property_read_u32(dev, "post-power-on-delay-ms",
++				 &pwrseq->post_power_on_delay_ms);
++
+ 	pwrseq->pwrseq.dev = dev;
+ 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
+ 	pwrseq->pwrseq.owner = THIS_MODULE;
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.7.4
