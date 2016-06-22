@@ -1,48 +1,114 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Jun 2016 11:57:50 +0100
-Subject: [PATCH] arm64: Add support ARCH_SUPPORTS_INT128
-In-Reply-To: <1466492123-3356-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1466492123-3356-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20160622105749.GA6521@e104818-lin.cambridge.arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 22 Jun 2016 12:00:22 +0100
+Subject: [RFC PATCH 1/8] PM / Domains: Add new helper functions for
+ device-tree
+In-Reply-To: <1457090634-14785-2-git-send-email-jonathanh@nvidia.com>
+References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
+ <1457090634-14785-2-git-send-email-jonathanh@nvidia.com>
+Message-ID: <576A6FC6.4000307@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 02:55:23PM +0800, Kefeng Wang wrote:
-> The gcc support __SIZEOF_INT128__ and __int128 in arm64, thus,
-> enable ARCH_SUPPORTS_INT128 to make mul_u64_u32_shr() a bit
-> more efficient in scheduler.
+
+On 04/03/16 11:23, Jon Hunter wrote:
+> Ideally, if we are returning a reference to a PM domain via a call to
+> of_genpd_get_from_provider(), then we should keep track of such
+> references via a reference count. The reference count could then be used
+> to determine if a PM domain can be safely removed. Alternatively, it is
+> possible to avoid such external references by providing APIs to access
+> the PM domain and hence, eliminate any calls to
+> of_genpd_get_from_provider().
 > 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> Add new helper functions for adding a device and a subdomain to a PM
+> domain when using device-tree, so that external calls to
+> of_genpd_get_from_provider() can be removed.
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 > ---
->  arch/arm64/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  drivers/base/power/domain.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pm_domain.h   | 16 ++++++++++++++++
+>  2 files changed, 60 insertions(+)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 5a0a691..ab319eb 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -11,6 +11,7 @@ config ARM64
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->  	select ARCH_USE_CMPXCHG_LOCKREF
->  	select ARCH_SUPPORTS_ATOMIC_RMW
-> +	select ARCH_SUPPORTS_INT128
->  	select ARCH_SUPPORTS_NUMA_BALANCING
->  	select ARCH_WANT_OPTIONAL_GPIOLIB
->  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 5bdb42bf40f4..b24893499454 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1706,6 +1706,50 @@ struct generic_pm_domain *of_genpd_get_from_provider(
+>  EXPORT_SYMBOL_GPL(of_genpd_get_from_provider);
+>  
+>  /**
+> + * of_genpd_add_device() - Add a device to an I/O PM domain
+> + * @genpdspec: OF phandle args to use for look-up PM domain
+> + * @dev: Device to be added.
+> + *
+> + * Looks-up an I/O PM domain based upon phandle args provided and adds
+> + * the device to the PM domain. Returns a negative error code on failure.
+> + */
+> +int of_genpd_add_device(struct of_phandle_args *genpdspec, struct device *dev)
+> +{
+> +	struct generic_pm_domain *genpd;
+> +
+> +	genpd = of_genpd_get_from_provider(genpdspec);
+> +	if (IS_ERR(genpd))
+> +		return PTR_ERR(genpd);
+> +
+> +	return pm_genpd_add_device(genpd, dev);
+> +}
+> +
+> +/**
+> + * of_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
+> + * @parent_spec: OF phandle args to use for parent PM domain look-up
+> + * @subdomain_spec: OF phandle args to use for subdomain look-up
+> + *
+> + * Looks-up a parent PM domain and subdomain based upon phandle args
+> + * provided and adds the subdomain to the parent PM domain. Returns a
+> + * negative error code on failure.
+> + */
+> +int of_genpd_add_subdomain(struct of_phandle_args *parent_spec,
+> +			   struct of_phandle_args *subdomain_spec)
+> +{
+> +	struct generic_pm_domain *parent, *subdomain;
+> +
+> +	parent = of_genpd_get_from_provider(parent_spec);
+> +	if (IS_ERR(parent))
+> +		return PTR_ERR(parent);
+> +
+> +	subdomain = of_genpd_get_from_provider(subdomain_spec);
+> +	if (IS_ERR(subdomain))
+> +		return PTR_ERR(subdomain);
+> +
+> +	return pm_genpd_add_subdomain(parent, subdomain);
+> +}
+> +
+> +/**
+>   * genpd_dev_pm_detach - Detach a device from its PM domain.
+>   * @dev: Device to detach.
+>   * @power_off: Currently not used
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 49cd8890b873..2b6ee670b231 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -210,6 +210,10 @@ struct generic_pm_domain *__of_genpd_xlate_simple(
+>  struct generic_pm_domain *__of_genpd_xlate_onecell(
+>  					struct of_phandle_args *genpdspec,
+>  					void *data);
+> +extern int of_genpd_add_device(struct of_phandle_args *args,
+> +			       struct device *dev);
+> +extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
+> +				  struct of_phandle_args *new_subdomain);
+>  
+>  int genpd_dev_pm_attach(struct device *dev);
+>  #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+> @@ -229,6 +233,18 @@ static inline struct generic_pm_domain *of_genpd_get_from_provider(
+>  #define __of_genpd_xlate_simple		NULL
+>  #define __of_genpd_xlate_onecell	NULL
+>  
+> +static inline int of_pm_genpd_add_device(struct of_phandle_args *args,
+> +					 struct device *dev)
 
-With this patch and UBSAN+KASAN enabled, Linux fails to link with:
+This should be of_genpd_add_device. Will fix.
 
-lib/built-in.o: In function `get_signed_val':
-lib/ubsan.c:93: undefined reference to `__ashlti3'
-lib/ubsan.c:93: undefined reference to `__ashrti3'
-
-It succeeds if I revert commit d67703a8a69e ("arm64: kill off the libgcc
-dependency"). We may have to revisit that decision or implement the
-required library functions in the kernel. In general, I'd like to reduce
-the amount of code duplication if the functionality can be found
-elsewhere like in libgcc. There is a risk of not knowing precisely what
-ligbcc relies on (like libc functions), though there are other
-architectures linking against it.
+Jon
 
 -- 
-Catalin
+nvpublic
