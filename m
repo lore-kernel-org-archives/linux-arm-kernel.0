@@ -1,88 +1,54 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 22 Jun 2016 11:15:13 +0100
-Subject: [PATCH] coresight: etm4x: request to retain power to the trace unit
- when active
-Message-ID: <1466590513-22505-1-git-send-email-sudeep.holla@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Jun 2016 12:18:33 +0200
+Subject: [PATCH] ata: ahci_platform: Add ACPI support for APM X-Gene AHCI
+ controller v3 hardware.
+In-Reply-To: <CAOHikRDUH-PK4JfS8pUR+or=XTwDHBejFTGy33V20HKMMTUaPg@mail.gmail.com>
+References: <stripathi@apm.com>
+ <CAOHikRCB4c79okd0q3=Lqwk7LKwZ6EDnWfHRH_oXokrB4PHcyw@mail.gmail.com>
+ <CAOHikRDUH-PK4JfS8pUR+or=XTwDHBejFTGy33V20HKMMTUaPg@mail.gmail.com>
+Message-ID: <5402203.QaZloJIEAM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Coresight ETMv4 architecture provides a way to request to keep the
-power to the trace unit. This might help to collect the traces without
-the need to disable the CPU power management(entering/exiting deeper
-idle states).
+On Tuesday, June 21, 2016 4:31:38 PM CEST Suman Tripathi wrote:
+> On Tue, Jun 21, 2016 at 11:08 AM, Suman Tripathi <stripathi@apm.com> wrote:
+> > On Wed, Jun 15, 2016 at 11:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >>
+> >> On Wednesday, June 15, 2016 5:44:00 PM CEST suman-tripathi wrote:
+> >> > This patch adds ACPI support for APM X-Gene AHCI controller in
+> >> > ahci_platform driver for v3 hardware. APM X-Gene AHCI controller
+> >> > v3 hardware is fully compliant with ahci_platform driver and requires
+> >> > no workaround quirk.
+> >> >
+> >> > Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> >> > ---
+> >> >  drivers/ata/ahci_platform.c |    1 +
+> >> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> >> >
+> >> > diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> >> > index 62a04c8..3395baf 100644
+> >> > --- a/drivers/ata/ahci_platform.c
+> >> > +++ b/drivers/ata/ahci_platform.c
+> >> > @@ -86,6 +86,7 @@ MODULE_DEVICE_TABLE(of, ahci_of_match);
+> >> >
+> >> >  static const struct acpi_device_id ahci_acpi_match[] = {
+> >> >         { ACPI_DEVICE_CLASS(PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff) },
+> >> > +       { "APMC0D33", 0},
+> >> >         {},
+> >> >  };
+> >> >  MODULE_DEVICE_TABLE(acpi, ahci_acpi_match);
+> >> >
+> >>
+> >> Doesn't the ACPI_DEVICE_CLASS entry take care of this? I thought it had been
+> >
+> >
+> > yeah it also works. Just thought that we need something different as
+> > our's is a non-PCI SATA.
+> 
+> Are you suggesting to introduce a new class ACPI_DEVICE_CLASS for
+> non-pci ahci ? or to reuse the existing PCI_CLASS_STORAGE_SATA_AHCI ?
 
-Trace PowerDown Control Register provides powerup request bit which when
-set requests the system to retain power to the trace unit and emulate
-the powerdown request.
+This was specifically introduced for non-PCI devices, so it should
+just work.
 
-Typically, a trace unit drives a signal to the power controller to
-request that the trace unit core power domain is powered up. However,
-if the trace unit and the CPU are in the same power domain then the
-implementation might combine the trace unit power up status with a
-signal from the CPU.
-
-This patch requests to retain power to the trace unit when active and
-to remove when inactive. Note this change will only request but the
-behaviour depends on the implementation. However, it matches the
-exact behaviour expected when the external debugger is connected with
-respect to CPU power states.
-
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 9 +++++++++
- drivers/hwtracing/coresight/coresight-etm4x.h | 3 +++
- 2 files changed, 12 insertions(+)
-
-Hi Mathieu,
-
-This is tested on Juno, and on Juno the trace unit core power domain and
-CPU power domain are shared. So we can manage just with the trace unit
-debug power domain info from the DT as done with my Juno DT patch series.
-
-Regards,
-Sudeep
-
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index d6f1d6d874eb..301ee3232f3d 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -163,6 +163,12 @@ static void etm4_enable_hw(void *info)
- 	writel_relaxed(config->vmid_mask0, drvdata->base + TRCVMIDCCTLR0);
- 	writel_relaxed(config->vmid_mask1, drvdata->base + TRCVMIDCCTLR1);
-
-+	/*
-+	 * Request to keep the trace unit powered and also
-+	 * emulation of powerdown
-+	 */
-+	writel_relaxed(TRCPDCR_PU, drvdata->base + TRCPDCR);
-+
- 	/* Enable the trace unit */
- 	writel_relaxed(1, drvdata->base + TRCPRGCTLR);
-
-@@ -293,6 +299,9 @@ static void etm4_disable_hw(void *info)
-
- 	CS_UNLOCK(drvdata->base);
-
-+	/* power can be removed from the trace unit now */
-+	writel_relaxed(0, drvdata->base + TRCPDCR);
-+
- 	control = readl_relaxed(drvdata->base + TRCPRGCTLR);
-
- 	/* EN, bit[0] Trace unit enable bit */
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-index 5359c5197c1d..2629954429a1 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.h
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-@@ -183,6 +183,9 @@
- #define TRCSTATR_IDLE_BIT		0
- #define ETM_DEFAULT_ADDR_COMP		0
-
-+/* PowerDown Control Register bits */
-+#define TRCPDCR_PU			BIT(3)
-+
- /* secure state access levels */
- #define ETM_EXLEVEL_S_APP		BIT(8)
- #define ETM_EXLEVEL_S_OS		BIT(9)
---
-2.7.4
+	Arnd
