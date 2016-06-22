@@ -1,47 +1,35 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 22 Jun 2016 10:31:26 -0700
-Subject: [PATCH v4 2/3] pwm: iproc: Add support for Broadcom iproc pwm
- controller
-In-Reply-To: <1466594987-26537-3-git-send-email-yendapally.reddy@broadcom.com>
-References: <1466594987-26537-1-git-send-email-yendapally.reddy@broadcom.com>
- <1466594987-26537-3-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <20160622173126.GA74558@google.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 22 Jun 2016 19:33:30 +0200
+Subject: [PATCH v2 2/3] PCI: host: new PCI host controller driver for
+ Aardvark
+In-Reply-To: <20160622161607.GD25485@localhost>
+References: <1465574056-8787-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201606111501.h2bC6u5a%fengguang.wu@intel.com>
+ <20160622161607.GD25485@localhost>
+Message-ID: <20160622193330.490d1bce@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2016 at 07:29:46AM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
-> Add support for the PWM controller present in Broadcom's iProc
-> family of SoCs. This driver is derived from the pwm-bcm-kona
-> driver, with changes to the register offsets and bit positions.
-> It has been tested on the  Northstar+ bcm958625HR board.
+Hello,
+
+On Wed, 22 Jun 2016 11:16:07 -0500, Bjorn Helgaas wrote:
+
+> > All errors (new ones prefixed by >>):
+> >   
+> > >> drivers/of/Kconfig:4:error: recursive dependency detected!  
 > 
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-> ---
->  drivers/pwm/Kconfig         |  10 ++
->  drivers/pwm/Makefile        |   1 +
->  drivers/pwm/pwm-bcm-iproc.c | 327 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 338 insertions(+)
->  create mode 100644 drivers/pwm/pwm-bcm-iproc.c
-> 
-[...]
-> diff --git a/drivers/pwm/pwm-bcm-iproc.c b/drivers/pwm/pwm-bcm-iproc.c
-> new file mode 100644
-> index 0000000..952c457
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-bcm-iproc.c
-> @@ -0,0 +1,327 @@
-[...]
-> +static const struct pwm_ops iproc_pwm_ops = {
-> +	.config = iproc_pwmc_config_check,
-> +	.set_polarity = iproc_pwmc_set_polarity,
-> +	.enable = iproc_pwmc_enable,
-> +	.disable = iproc_pwmc_disable,
-> +	.owner = THIS_MODULE,
-> +};
+> Was there a resolution to this?
 
-Have you considered trying the new apply() callback instead of
-config()/set_polarity()/enable()/disable()?
+Yes, Arnd sent a patch which I believe addresses this:
 
-[...]
+	[PATCH] arm/arm64/irqchip/pci: fix PCI_MSI dependencies
 
-Brian
+I'll verify locally that it indeed solves the problem.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
