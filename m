@@ -1,48 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Jun 2016 16:46:13 +0100
-Subject: [PATCH] xen/arm: register clocks used by the hypervisor
-In-Reply-To: <576AAE36.9070501@arm.com>
-References: <1466504165-9214-1-git-send-email-dirk.behme@de.bosch.com>
- <576AAE36.9070501@arm.com>
-Message-ID: <20160622154613.GC31817@leverpostej>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 22 Jun 2016 09:04:52 -0700
+Subject: [PATCH v2 1/8] arm64: dts: db820c: add basic board support
+In-Reply-To: <576A51BC.5090108@linaro.org>
+References: <1466529769-2674-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1466529769-2674-2-git-send-email-srinivas.kandagatla@linaro.org>
+ <20160622044916.GF1256@tuxbot> <576A51BC.5090108@linaro.org>
+Message-ID: <20160622160452.GN1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2016 at 04:26:46PM +0100, Julien Grall wrote:
-> Hello Dirk,
+On Wed 22 Jun 01:52 PDT 2016, Srinivas Kandagatla wrote:
+
 > 
-> On 21/06/16 11:16, Dirk Behme wrote:
-> >Some clocks might be used by the Xen hypervisor and not by the Linux
-> >kernel. If these are not registered by the Linux kernel, they might be
-> >disabled by clk_disable_unused() as the kernel doesn't know that they
-> >are used. The clock of the serial console handled by Xen is one
-> >example for this. It might be disabled by clk_disable_unused() which
-> >stops the whole serial output, even from Xen, then.
-> >
-> >Up to now, the workaround for this has been to use the Linux kernel
-> >command line parameter 'clk_ignore_unused'. See Xen bug
-> >
-> >http://bugs.xenproject.org/xen/bug/45
-> >
-> >too.
-> >
-> >To fix this, we will add the "unused" clocks in Xen to the hypervisor
-> >node. The Linux kernel has to register the clocks from the hypervisor
-> >node, then.
-> >
-> >Therefore, check if there is a "clocks" entry in the hypervisor node
-> >and if so register the given clocks to the Linux kernel clock
-> >framework and with this mark them as used. This prevents the clocks
-> >from being disabled.
 > 
-> This new property would need to be documented in:
->    - linux/Documentation/devicetree/bindings/arm/xen.txt
->    - xen/docs/misc/arm/device-tree/guest.txt
+> On 22/06/16 05:49, Bjorn Andersson wrote:
+> >On Tue 21 Jun 10:22 PDT 2016, Srinivas Kandagatla wrote:
+> >
+> >[..]
+> >>diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
+> >[..]
+> >>+
+> >>+/ {
+> >>+	model = "Qualcomm Technologies, Inc. DB820c";
+> >>+	compatible = "qcom,apq8096-sbc";
+> >
+> >I'm still not buying the concept of this being the one and only
+> >single-board-computer.
+> >
+> +1
+> 
+> AFAIK, The problem is the dtbTool. dtbTool has predefined all the platform
+> names along with its platform ID's [1] for auto generating board-id, pmic-id
+> and soc-id. dtbTool checks the compatible strings along with soc name with
+> its static list, it would fail if it did not find a matching combination of
+> soc,platform compatible.
+> 
+> Either we have to cope up with this and have a compatbile strings which keep
+> dtbTool happy
+>  or
+> Keep patching dtbtool to be more flexible.
 
-This (series) should also be CC'd to devicetree at vger.kernel.org, and to
-the clock framework maintainers.
+dtbTool is unfortunately broken if it can't handle unknown compatibles.
 
-I have further questions, but I will wait for that posting.
+> 
+> There is another problem with dtbTool, We can not use dtbTool with new
+> boards from other vendors with own board names, like SD600 or IFC6410 and
+> so..
+> 
 
-Thanks,
-Mark.
+Which means that everyone will, just like in Android-land, ship their
+products with the one-and-only-supported qcom,apq8096-sbc.
+
+If at least dtbTool would skip (and potentially warn about) unknown
+entries vendors could add their specific name and then have the sbc
+compatible, allowing for compatibility while dtbTool is updated.
+
+> 
+> IMO, we should patch dtbTool to make it more flexible to cope up with
+> situations like this.
+> 
+> >If this compatible fully and exclusively identifies this particular
+> >board then dtbTool should be updated to follow the product name
+> >"qcom,apq8096-db820c". If on the other hand this identifies a class of
+> >single-board-computers, then the compatible should list both
+> >"qcom,apq8096-dtb820c" and "qcom,apq8096-sbc".
+> 
+> Am not sure this would actually work when we have two boards with same sbc
+> platform ID. Which one would the bootloader pick? and on what basis?
+> 
+
+In Android land you don't have this problem, you know which zImage and
+which set of dtbs you should put into your boot.img. So based on above
+problem (requirement to update dtbTool) and the lack of need companies
+will continue to ship their products as "mtp" or "sbc".
+
+Regards,
+Bjorn
