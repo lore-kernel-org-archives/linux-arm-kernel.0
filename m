@@ -1,78 +1,59 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 22 Jun 2016 09:04:52 -0700
-Subject: [PATCH v2 1/8] arm64: dts: db820c: add basic board support
-In-Reply-To: <576A51BC.5090108@linaro.org>
-References: <1466529769-2674-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1466529769-2674-2-git-send-email-srinivas.kandagatla@linaro.org>
- <20160622044916.GF1256@tuxbot> <576A51BC.5090108@linaro.org>
-Message-ID: <20160622160452.GN1256@tuxbot>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 22 Jun 2016 17:09:53 +0100
+Subject: [PATCH v6 3/5] arm64: cpuidle: drop __init section marker to
+ arm_cpuidle_init
+In-Reply-To: <1465915719-8409-4-git-send-email-sudeep.holla@arm.com>
+References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
+ <1465915719-8409-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20160622160953.GA3976@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 22 Jun 01:52 PDT 2016, Srinivas Kandagatla wrote:
+On Tue, Jun 14, 2016 at 03:48:37PM +0100, Sudeep Holla wrote:
+> Commit ea389daa7fd9 ("arm64: cpuidle: add __init section marker to
+> arm_cpuidle_init") added the __init annotation to arm_cpuidle_init
+> as it was not needed after booting which was correct at that time.
+> 
+> However with the introduction of ACPI LPI support, this will be used
+> from cpuhotplug path in ACPI processor driver.
+> 
+> This patch drops the __init annotation from arm_cpuidle_init to avoid
+> the following warning:
+> 
+> WARNING: vmlinux.o(.text+0x113c8): Section mismatch in reference from the
+> 	function acpi_processor_ffh_lpi_probe() to the function
+> 	.init.text:arm_cpuidle_init()
+> The function acpi_processor_ffh_lpi_probe() references
+> the function __init arm_cpuidle_init().
+> This is often because acpi_processor_ffh_lpi_probe lacks a __init
+> annotation or the annotation of arm_cpuidle_init is wrong.
+> 
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-> 
-> 
-> On 22/06/16 05:49, Bjorn Andersson wrote:
-> >On Tue 21 Jun 10:22 PDT 2016, Srinivas Kandagatla wrote:
-> >
-> >[..]
-> >>diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
-> >[..]
-> >>+
-> >>+/ {
-> >>+	model = "Qualcomm Technologies, Inc. DB820c";
-> >>+	compatible = "qcom,apq8096-sbc";
-> >
-> >I'm still not buying the concept of this being the one and only
-> >single-board-computer.
-> >
-> +1
-> 
-> AFAIK, The problem is the dtbTool. dtbTool has predefined all the platform
-> names along with its platform ID's [1] for auto generating board-id, pmic-id
-> and soc-id. dtbTool checks the compatible strings along with soc name with
-> its static list, it would fail if it did not find a matching combination of
-> soc,platform compatible.
-> 
-> Either we have to cope up with this and have a compatbile strings which keep
-> dtbTool happy
->  or
-> Keep patching dtbtool to be more flexible.
+Depending on acceptance of other patches in this series:
 
-dtbTool is unfortunately broken if it can't handle unknown compatibles.
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
+> ---
+>  arch/arm64/kernel/cpuidle.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> There is another problem with dtbTool, We can not use dtbTool with new
-> boards from other vendors with own board names, like SD600 or IFC6410 and
-> so..
+> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
+> index e11857fce05f..06786fdaadeb 100644
+> --- a/arch/arm64/kernel/cpuidle.c
+> +++ b/arch/arm64/kernel/cpuidle.c
+> @@ -15,7 +15,7 @@
+>  #include <asm/cpuidle.h>
+>  #include <asm/cpu_ops.h>
+>  
+> -int __init arm_cpuidle_init(unsigned int cpu)
+> +int arm_cpuidle_init(unsigned int cpu)
+>  {
+>  	int ret = -EOPNOTSUPP;
+>  
+> -- 
+> 2.7.4
 > 
-
-Which means that everyone will, just like in Android-land, ship their
-products with the one-and-only-supported qcom,apq8096-sbc.
-
-If at least dtbTool would skip (and potentially warn about) unknown
-entries vendors could add their specific name and then have the sbc
-compatible, allowing for compatibility while dtbTool is updated.
-
-> 
-> IMO, we should patch dtbTool to make it more flexible to cope up with
-> situations like this.
-> 
-> >If this compatible fully and exclusively identifies this particular
-> >board then dtbTool should be updated to follow the product name
-> >"qcom,apq8096-db820c". If on the other hand this identifies a class of
-> >single-board-computers, then the compatible should list both
-> >"qcom,apq8096-dtb820c" and "qcom,apq8096-sbc".
-> 
-> Am not sure this would actually work when we have two boards with same sbc
-> platform ID. Which one would the bootloader pick? and on what basis?
-> 
-
-In Android land you don't have this problem, you know which zImage and
-which set of dtbs you should put into your boot.img. So based on above
-problem (requirement to update dtbTool) and the lack of need companies
-will continue to ship their products as "mtp" or "sbc".
-
-Regards,
-Bjorn
