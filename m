@@ -1,66 +1,75 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:42 +0300
-Subject: [PATCHv2 09/27] crypto: omap-aes - Fix enabling clocks
+Date: Wed, 22 Jun 2016 16:23:46 +0300
+Subject: [PATCHv2 13/27] crypto: omap-aes: fix crypto engine initialization
+ order
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-10-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-14-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+The crypto engine must be initialized before registering algorithms,
+otherwise the test manager will crash as it attempts to execute
+tests for the algos while they are being registered.
 
-Enable clocks for all cores before starting session.
-Driver has to pic the aes core dynamically based on the queue length.
-
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Fixes: 0529900a01cb ("crypto: omap-aes - Support crypto engine framework")
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-aes.c | 23 +++++++----------------
- 1 file changed, 7 insertions(+), 16 deletions(-)
+ drivers/crypto/omap-aes.c | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 8178632..cf53d3f 100644
+index 867e56a..2d0978a 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -760,18 +760,13 @@ static int omap_aes_cra_init(struct crypto_tfm *tfm)
- 	struct omap_aes_dev *dd = NULL;
- 	int err;
+@@ -1204,6 +1204,17 @@ static int omap_aes_probe(struct platform_device *pdev)
+ 	list_add_tail(&dd->list, &dev_list);
+ 	spin_unlock(&list_lock);
  
--	/* Find AES device, currently picks the first device */
--	spin_lock_bh(&list_lock);
- 	list_for_each_entry(dd, &dev_list, list) {
--		break;
--	}
--	spin_unlock_bh(&list_lock);
++	/* Initialize crypto engine */
++	dd->engine = crypto_engine_alloc_init(dev, 1);
++	if (!dd->engine)
++		goto err_engine;
++
++	dd->engine->prepare_request = omap_aes_prepare_req;
++	dd->engine->crypt_one_request = omap_aes_crypt_req;
++	err = crypto_engine_start(dd->engine);
++	if (err)
++		goto err_engine;
++
+ 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
+ 		if (!dd->pdata->algs_info[i].registered) {
+ 			for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
+@@ -1221,26 +1232,17 @@ static int omap_aes_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	/* Initialize crypto engine */
+-	dd->engine = crypto_engine_alloc_init(dev, 1);
+-	if (!dd->engine)
+-		goto err_algs;
 -
--	err = pm_runtime_get_sync(dd->dev);
--	if (err < 0) {
--		dev_err(dd->dev, "%s: failed to get_sync(%d)\n",
--			__func__, err);
--		return err;
-+		err = pm_runtime_get_sync(dd->dev);
-+		if (err < 0) {
-+			dev_err(dd->dev, "%s: failed to get_sync(%d)\n",
-+				__func__, err);
-+			return err;
-+		}
- 	}
+-	dd->engine->prepare_request = omap_aes_prepare_req;
+-	dd->engine->crypt_one_request = omap_aes_crypt_req;
+-	err = crypto_engine_start(dd->engine);
+-	if (err)
+-		goto err_engine;
+-
+ 	return 0;
+-err_engine:
+-	crypto_engine_exit(dd->engine);
+ err_algs:
+ 	for (i = dd->pdata->algs_info_size - 1; i >= 0; i--)
+ 		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
+ 			crypto_unregister_alg(
+ 					&dd->pdata->algs_info[i].algs_list[j]);
  
- 	tfm->crt_ablkcipher.reqsize = sizeof(struct omap_aes_reqctx);
-@@ -783,14 +778,10 @@ static void omap_aes_cra_exit(struct crypto_tfm *tfm)
- {
- 	struct omap_aes_dev *dd = NULL;
- 
--	/* Find AES device, currently picks the first device */
--	spin_lock_bh(&list_lock);
- 	list_for_each_entry(dd, &dev_list, list) {
--		break;
-+		pm_runtime_put_sync(dd->dev);
- 	}
--	spin_unlock_bh(&list_lock);
- 
--	pm_runtime_put_sync(dd->dev);
- }
- 
- /* ********************** ALGS ************************************ */
++err_engine:
++	if (dd->engine)
++		crypto_engine_exit(dd->engine);
++
+ 	omap_aes_dma_cleanup(dd);
+ err_irq:
+ 	tasklet_kill(&dd->done_task);
 -- 
 1.9.1
