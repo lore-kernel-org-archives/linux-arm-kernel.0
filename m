@@ -1,417 +1,62 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 22 Jun 2016 15:41:42 +0200
-Subject: [PATCH v2] ARM: sun8i: Add Parrot Board DTS
-Message-ID: <1466602902-4022-1-git-send-email-quentin.schulz@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Jun 2016 14:43:44 +0100
+Subject: [PATCH] arm64: Add support ARCH_SUPPORTS_INT128
+In-Reply-To: <20160622124323.GZ29165@arm.com>
+References: <1466492123-3356-1-git-send-email-wangkefeng.wang@huawei.com>
+ <20160622105749.GA6521@e104818-lin.cambridge.arm.com>
+ <20160622124323.GZ29165@arm.com>
+Message-ID: <20160622134344.GB6521@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Parrot Board is an evaluation board with an Allwinner R16 (assumed
-to be close to an Allwinner A33), 4GB of eMMC, 512MB of RAM, USB host
-and OTG, a WiFi/Bluetooth combo chip, a micro SD Card reader, 2
-controllable buttons, an LVDS port with separated backlight and
-capacitive touch panel ports, an audio/microphone jack, a camera CSI
-port, 2 sets of 22 GPIOs and an accelerometer.
+On Wed, Jun 22, 2016 at 01:43:23PM +0100, Will Deacon wrote:
+> On Wed, Jun 22, 2016 at 11:57:50AM +0100, Catalin Marinas wrote:
+> > On Tue, Jun 21, 2016 at 02:55:23PM +0800, Kefeng Wang wrote:
+> > > The gcc support __SIZEOF_INT128__ and __int128 in arm64, thus,
+> > > enable ARCH_SUPPORTS_INT128 to make mul_u64_u32_shr() a bit
+> > > more efficient in scheduler.
+> > > 
+> > > Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> > > ---
+> > >  arch/arm64/Kconfig | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > > index 5a0a691..ab319eb 100644
+> > > --- a/arch/arm64/Kconfig
+> > > +++ b/arch/arm64/Kconfig
+> > > @@ -11,6 +11,7 @@ config ARM64
+> > >  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+> > >  	select ARCH_USE_CMPXCHG_LOCKREF
+> > >  	select ARCH_SUPPORTS_ATOMIC_RMW
+> > > +	select ARCH_SUPPORTS_INT128
+> > >  	select ARCH_SUPPORTS_NUMA_BALANCING
+> > >  	select ARCH_WANT_OPTIONAL_GPIOLIB
+> > >  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+> > 
+> > With this patch and UBSAN+KASAN enabled, Linux fails to link with:
+> > 
+> > lib/built-in.o: In function `get_signed_val':
+> > lib/ubsan.c:93: undefined reference to `__ashlti3'
+> > lib/ubsan.c:93: undefined reference to `__ashrti3'
+> > 
+> > It succeeds if I revert commit d67703a8a69e ("arm64: kill off the libgcc
+> > dependency"). We may have to revisit that decision or implement the
+> > required library functions in the kernel. In general, I'd like to reduce
+> > the amount of code duplication if the functionality can be found
+> > elsewhere like in libgcc. There is a risk of not knowing precisely what
+> > ligbcc relies on (like libc functions), though there are other
+> > architectures linking against it.
+> 
+> Linking agianst libgcc is pretty scary if we're starting to use plugins
+> for the compiler[1], but IANAL.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
+At a quick grep, there are 9 other architectures linking the kernel
+image against libgcc. I wonder what they do about it.
 
-Patch dependencies:
- - regulator: axp20x: Add support for the (external) drivebus regulator
- - ARM: dts: axp22x.dtsi: Add reg_drivebus node
- - ARM: dts: axp22x.dtsi: Add usb_power_supply node
- - power: axp20x_usb: Add support for usb power-supply on axp22x pmics
- - mfd: axp20x: Extend axp22x_volatile_ranges
- - mfd: axp20x: Add axp20x-usb-power-supply for axp22x pmics
- - phy-sun4i-usb: Add workaround for missing Vbus det interrupts on A31
-or the micro USB port would not be powered.
+For the time being, I'm reverting this patch. It's probably not that
+hard to add the int128 variants of these functions to the kernel (in a
+GPLv2 variant).
 
-v2:
- - correct typos,
- - chose less generic name suffix for nodes (now_parrot_r16),
- - add comment for i2c childless node,
- - add comment for two regulators-powered WiFi chip,
- - add comment to explicit the use of some regulators,
- - add usb_vbus_power-supply property in usbphy node (this adds a
-   dependance to an other patch),
-
- arch/arm/boot/dts/Makefile             |   1 +
- arch/arm/boot/dts/sun8i-r16-parrot.dts | 356 +++++++++++++++++++++++++++++++++
- 2 files changed, 357 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-r16-parrot.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1ff5434..6c7581f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -762,6 +762,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-ippo-q8h-v1.2.dtb \
- 	sun8i-a33-q8-tablet.dtb \
- 	sun8i-a33-sinlinx-sina33.dtb \
-+	sun8i-r16-parrot.dtb \
- 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
- 	sun8i-a83t-cubietruck-plus.dtb \
- 	sun8i-h3-orangepi-2.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-r16-parrot.dts b/arch/arm/boot/dts/sun8i-r16-parrot.dts
-new file mode 100644
-index 0000000..cd68bfa
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-r16-parrot.dts
-@@ -0,0 +1,356 @@
-+/*
-+ * Copyright 2016 Quentin Schulz
-+ *
-+ * Quentin Schulz <quentin.schulz@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-a33.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Allwinner Parrot EVB R16";
-+	compatible = "allwinner,parrot-evb-r16", "allwinner,sun8i-a33";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_parrot_r16>;
-+
-+		led1 {
-+			label = "parrot_r16:led1:usr";
-+			gpio = <&pio 4 17 GPIO_ACTIVE_HIGH>; /* PE17 */
-+		};
-+
-+		led2 {
-+			label = "parrot_r16:led2:usr";
-+			gpio = <&pio 4 16 GPIO_ACTIVE_HIGH>; /* PE16 */
-+		};
-+	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&r_pio 0 6 GPIO_ACTIVE_LOW>; /* PL06 */
-+	};
-+
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+
-+	/* An as-yet-unknown accelerometer is connected to this i2c bus. */
-+};
-+
-+&lradc {
-+	vref-supply = <&reg_aldo3>;
-+	status = "okay";
-+
-+	button at 0 {
-+		label = "V+";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <190000>;
-+	};
-+
-+	button at 1 {
-+		label = "V-";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <390000>;
-+	};
-+
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_parrot_r16>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	cd-gpios = <&pio 3 14 GPIO_ACTIVE_LOW>; /* PD14 */
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+/*
-+ * TODO: WiFi chip needs dldo1 AND dldo2 as vmmc-supply.
-+ * aldo1 is connected to VCC-IO-WIFI and thus should be vqmmc.
-+ * Once two regulators can be in sync for vmmc-supply, modify this node
-+ * accordingly.
-+ */
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>, <&wifi_reset_pin_parrot_r16>;
-+	vmmc-supply = <&reg_aldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_8bit_pins>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&mmc2_8bit_pins {
-+	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
-+	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	mmc0_cd_pin_parrot_r16: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PD14";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	led_pins_parrot_r16: led_pins at 0 {
-+		allwinner,pins = "PE16", "PE17";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb0_id_det: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PD10";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	usb1_vbus_pin_parrot_r16: usb1_vbus_pin at 0 {
-+		allwinner,pins = "PD12";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&r_pio {
-+	wifi_reset_pin_parrot_r16: wifi_reset_pin at 0 {
-+		allwinner,pins = "PL6";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&r_rsb {
-+	status = "okay";
-+
-+	axp22x: pmic at 3a3 {
-+		compatible = "x-powers,axp223";
-+		reg = <0x3a3>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		drivevbus-supply = <&reg_vcc5v0>;
-+		x-powers,drive-vbus-en;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+/* Used for VCC-IO, VCC-PD, VCC-USB, HPVCC, VCC-IO-BB and VCC-IO-WIFI */
-+&reg_aldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "aldo1";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2350000>;
-+	regulator-max-microvolt = <2650000>;
-+	regulator-name = "vdd-dll";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pll-avcc";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_dldo1 {
-+	/*
-+	 * TODO: WiFi chip needs dldo1 AND dldo2 to be on to be powered.
-+	 * Remove next line once it is possible to sync two regulators.
-+	 */
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
-+};
-+
-+&reg_dldo2 {
-+	/*
-+	 * TODO: WiFi chip needs dldo1 AND dldo2 to be on to be powered.
-+	 * Remove next line once it is possible to sync two regulators.
-+	 */
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi1";
-+};
-+
-+&reg_dldo3 {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0-csi";
-+};
-+
-+&reg_drivevbus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
-+&reg_eldo1 {
-+	regulator-min-microvolt = <1200000>;
-+	regulator-max-microvolt = <1200000>;
-+	regulator-name = "vcc-1v2-hsic";
-+};
-+
-+&reg_eldo2 {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "dsp-vcc";
-+};
-+
-+/* Mapped to GPIO 22 in U21 GPIOs set */
-+&reg_eldo3 {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "eldo3";
-+};
-+
-+&reg_usb1_vbus {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb1_vbus_pin_parrot_r16>;
-+	gpio = <&pio 3 12 GPIO_ACTIVE_HIGH>; /* PD12 */
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_b>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_det>;
-+	usb0_vbus-supply = <&reg_drivevbus>;
-+	usb0_id_det-gpios = <&pio 3 10 GPIO_ACTIVE_HIGH>; /* PD10 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb1_vbus-supply = <&reg_usb1_vbus>; /* USB1 VBUS is always on */
-+};
 -- 
-2.5.0
+Catalin
