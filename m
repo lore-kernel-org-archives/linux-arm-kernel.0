@@ -1,27 +1,65 @@
-From: bruherrera@gmail.com (Bruno Herrera)
-Date: Tue, 21 Jun 2016 22:27:06 -0300
-Subject: [PATCH] ARM: dts: stm32f469-disco: Fix memory size from 8Mb to 16Mb
-Message-ID: <1466558826-3078-1-git-send-email-bruherrera@gmail.com>
+From: Yisen.zhuang@huawei.com (Yisen Zhuang)
+Date: Wed, 22 Jun 2016 09:33:24 +0800
+Subject: [PATCH net-next 01/19] net: hns: bug fix of ge reset sequence
+In-Reply-To: <1466505306.30123.203.camel@linux.intel.com>
+References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <1466481399-70080-2-git-send-email-Yisen.Zhuang@huawei.com>
+ <1466505306.30123.203.camel@linux.intel.com>
+Message-ID: <5769EAE4.2010507@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
----
- arch/arm/boot/dts/stm32f469-disco.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
-index e911af8..83ee90d 100644
---- a/arch/arm/boot/dts/stm32f469-disco.dts
-+++ b/arch/arm/boot/dts/stm32f469-disco.dts
-@@ -58,7 +58,7 @@
- 	};
- 
- 	memory {
--		reg = <0x00000000 0x800000>;
-+		reg = <0x00000000 0x1000000>;
- 	};
- 
- 	aliases {
--- 
-2.7.4 (Apple Git-66)
+
+? 2016/6/21 18:35, Andy Shevchenko ??:
+> On Tue, 2016-06-21 at 11:56 +0800, Yisen Zhuang wrote:
+>> From: Qianqian Xie <xieqianqian@huawei.com>
+>>
+>> The bit fileds of PPE reset register are different between HNS v1 and
+>> HNS v2, but the current procedure just only match HNS v1. Here is a
+>> patch to fix it.
+>>
+>> Signed-off-by: Kejian Yan <yankejian@huawei.com>
+>> Signed-off-by: Qianqian Xie <xieqianqian@huawei.com>
+>> Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
+>> ---
+>>  drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 6 +++++-
+>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
+>> b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
+>> index 96cb628..09e60d6 100644
+>> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
+>> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
+>> @@ -271,7 +271,11 @@ static void hns_dsaf_ge_srst_by_port(struct
+>> dsaf_device *dsaf_dev, u32 port,
+>>  		}
+>>  	} else {
+>>  		reg_val_1 = 0x15540 << dsaf_dev->reset_offset;
+>> -		reg_val_2 = 0x100 << dsaf_dev->reset_offset;
+>> +
+>> +		if (AE_IS_VER1(dsaf_dev->dsaf_ver))
+>> +			reg_val_2 = 0x100 << dsaf_dev->reset_offset;
+>> +		else
+>> +			reg_val_2 = 0x40 << dsaf_dev->reset_offset;
+> 
+> reg_val_1 = 0x15540;
+> reg_val_2 = AE_IS_VER1(dsaf_dev->dsaf_ver) ? 0x100 : 0x40;
+> 
+> reg_val_1 <<= dsaf_dev->reset_offset;
+> reg_val_2 <<= dsaf_dev-
+
+I will fix it with a new patch.
+
+Thanks,
+
+Yisen
+
+>> reset_offset;
+> 
+> 
+>>  
+>>  		if (!dereset) {
+>>  			dsaf_write_sub(dsaf_dev,
+>> DSAF_SUB_SC_GE_RESET_REQ1_REG,
+> 
