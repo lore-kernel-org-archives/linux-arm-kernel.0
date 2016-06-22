@@ -1,29 +1,15 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 22 Jun 2016 11:35:00 +0530
-Subject: [PATCH v5] phy-sun4i-usb: Fix irq free conditions to match
- request conditions
-In-Reply-To: <720c35c7-eb9a-2881-cb95-39fa6aa61dee@cogentembedded.com>
-References: <1466242293-22393-1-git-send-email-hdegoede@redhat.com>
- <720c35c7-eb9a-2881-cb95-39fa6aa61dee@cogentembedded.com>
-Message-ID: <576A2A8C.7090403@ti.com>
+From: amit.nagal@samsung.com (AMIT NAGAL)
+Date: Wed, 22 Jun 2016 06:05:03 +0000 (GMT)
+Subject: IPI_CPU_BACKTRACE - disable tracing patch
+Message-ID: <455510402.66471466575502201.JavaMail.weblogic@ep2mlwas09b>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
+As discussed  here :: http://www.spinics.net/lists/arm-kernel/msg484384.html , 
+IPI_CPU_BACKTRACE is special and is not traceable . 
+is the patch enclosed in above discussion finalized and queued up for release on kernel.org ?
+As I see , it has not been released till v4.7-rc4 .
 
-On Saturday 18 June 2016 05:03 PM, Sergei Shtylyov wrote:
-> On 6/18/2016 12:31 PM, Hans de Goede wrote:
-> 
->> commit 5cf700ac9d50("phy: phy-sun4i-usb: Fix optional gpios failing probe")
->> changed the condition under which irqs are requested, but omitted matching
->> changes to sun4i_usb_phy_remove(). This commit fixes this.
->>
->> Fixes: commit 5cf700ac9d50("phy: phy-sun4i-usb: Fix optional gpios failing
->> probe")
-> 
->    "Commit" not needed here, this tag has a standardized format.
-
-Fixed it myself and applied.
-
-Thanks
-Kishon
+Regards
+Amit Nagal
