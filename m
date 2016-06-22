@@ -1,122 +1,126 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 22 Jun 2016 12:41:38 +0300
-Subject: [PATCH net-next 10/19] net: hns: bugfix about pfc pause frame
- statistics
-In-Reply-To: <5769ED55.3000408@huawei.com>
-References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
- <1466481399-70080-11-git-send-email-Yisen.Zhuang@huawei.com>
- <1466505178.30123.201.camel@linux.intel.com>
- <5769ED55.3000408@huawei.com>
-Message-ID: <1466588498.30123.235.camel@linux.intel.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 22 Jun 2016 10:49:29 +0100
+Subject: [PATCH] mailbox: pl320: remove __raw IO
+Message-ID: <1466588969-28051-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-06-22 at 09:43 +0800, Yisen Zhuang wrote:
-> 
-> ? 2016/6/21 18:32, Andy Shevchenko ??:
-> > On Tue, 2016-06-21 at 11:56 +0800, Yisen Zhuang wrote:
-> > > From: Daode Huang <huangdaode@hisilicon.com>
-> > > 
-> > > For SoC hip06, PFC pause handled in dsaf, while hip05 in XGMAC,
-> > > so change the statistics of pfc pause in dsaf and remove the old
-> > > pfc pause frame statistics.
-> > > 
-> >?
-> > 
-> > > +static char *hns_dsaf_get_node_stats_strings(char *data, int
-> > > node,
-> > > +					?????struct dsaf_device
-> > > *dsaf_dev)
-> > > ?{
-> > > ?	char *buff = data;
-> > > +	int i;
-> > > +	bool is_ver1 = AE_IS_VER1(dsaf_dev->dsaf_ver);
-> > > ?
-> > > ?	snprintf(buff, ETH_GSTRING_LEN, "innod%d_pad_drop_pkts",
-> > > node);
-> > > ?	buff = buff + ETH_GSTRING_LEN;
-> > > @@ -2502,6 +2530,18 @@ static char
-> > > *hns_dsaf_get_node_stats_strings(char *data, int node)
-> > > ?	buff = buff + ETH_GSTRING_LEN;
-> > > ?	snprintf(buff, ETH_GSTRING_LEN, "innod%d_stp_drop_pkts",
-> > > node);
-> > > ?	buff = buff + ETH_GSTRING_LEN;
-> > > +	if ((node < DSAF_SERVICE_NW_NUM) && (!is_ver1)) {
-> > 
-> > Redundant parens.
-> > 
-> > > +		for (i = 0; i < DSAF_PRIO_NR; i++) {
-> > > +			snprintf(buff, ETH_GSTRING_LEN,
-> > > +				?"inod%d_pfc_prio%d_pkts", node,
-> > > i);
-> > > +			buff = buff + ETH_GSTRING_LEN;
-> > 
-> > buff += ...
-> > 
-> > > +		}
-> > > +		for (i = 0; i < DSAF_PRIO_NR; i++) {
-> > > +			snprintf(buff, ETH_GSTRING_LEN,
-> > > +				?"onod%d_pfc_prio%d_pkts", node,
-> > > i);
-> > > +			buff = buff + ETH_GSTRING_LEN;
-> > 
-> > Ditto.
-> > 
-> > > ?{
-> > > ?	u64 *p = data;
-> > > +	int i;
-> > > ?	struct dsaf_hw_stats *hw_stats = &ddev-
-> > > >hw_stats[node_num];
-> > > +	bool is_ver1 = AE_IS_VER1(ddev->dsaf_ver);
-> > > ?
-> > > ?	p[0] = hw_stats->pad_drop;
-> > > ?	p[1] = hw_stats->man_pkts;
-> > > @@ -2527,8 +2569,16 @@ static u64 *hns_dsaf_get_node_stats(struct
-> > > dsaf_device *ddev, u64 *data,
-> > > ?	p[10] = hw_stats->local_addr_false;
-> > > ?	p[11] = hw_stats->vlan_drop;
-> > > ?	p[12] = hw_stats->stp_drop;
-> > > -	p[13] = hw_stats->tx_pkts;
-> > > +	if ((node_num < DSAF_SERVICE_NW_NUM) && (!is_ver1)) {
-> > > +		for (i = 0; i < DSAF_PRIO_NR; i++) {
-> > > +			p[13 + i] = hw_stats->rx_pfc[i];
-> > > +			p[13 + i + DSAF_PRIO_NR] = hw_stats-
-> > > > tx_pfc[i];
-> > > +		}
-> > 
-> > Two different approaches how to assign data. Above uses 2 for-loops,
-> > here you put everything to one.
-> 
-> Above cann't be merged to 1 for-loop, because lenght of the string is
-> unknowable.
+The use of __raw IO accesors is not endian safe and should be used
+sparingly. The relaxed variants should be as lightweight and also
+are endian safe.
 
-It doesn't matter since you are incrementing start position by
-constant.?
+Note, this has not been run-time tested.
 
-snprintf(buff, ETH_GSTRING_LEN, "inod%d_pfc_prio%d_pkts", node, i);
-snprintf(buff, ETH_GSTRING_LEN, "onod%d_pfc_prio%d_pkts", node, i);
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jassi Brar <jassisinghbrar@gmail.com>
+Cc: Rob Herring <robh@kernel.org>
+---
+ drivers/mailbox/pl320-ipc.c | 46 ++++++++++++++++++++++-----------------------
+ 1 file changed, 23 insertions(+), 23 deletions(-)
 
-Same approach as below can be used
-
-snprintf(buff + 0 * ETH_GSTRING_LEN * DSAF_PRIO_NR, ETH_GSTRING_LEN, ...
-snprintf(buff + 1 * ETH_GSTRING_LEN * DSAF_PRIO_NR, ETH_GSTRING_LEN, ...
-
-Of course to make it less verbose you may add new definition(s) and/ or
-variable(s).
-
-> 
-> And here we put everything to one to reduce codes.
-> 
-
-I would suggest to use following pattern for such lines
-p[13 + i + 0 * DSAF_PRIO_NR] = hw_stats->rx_pfc[i];
-p[13 + i + 1 * DSAF_PRIO_NR] = hw_stats->tx_pfc[i];
-
-That's allow reader to see what are you doing here.
-
-P.S. This is for the future patches since current is already applied.
-
+diff --git a/drivers/mailbox/pl320-ipc.c b/drivers/mailbox/pl320-ipc.c
+index f80acb3..2dbed87 100644
+--- a/drivers/mailbox/pl320-ipc.c
++++ b/drivers/mailbox/pl320-ipc.c
+@@ -58,29 +58,29 @@ static ATOMIC_NOTIFIER_HEAD(ipc_notifier);
+ 
+ static inline void set_destination(int source, int mbox)
+ {
+-	__raw_writel(CHAN_MASK(source), ipc_base + IPCMxDSET(mbox));
+-	__raw_writel(CHAN_MASK(source), ipc_base + IPCMxMSET(mbox));
++	writel_relaxed(CHAN_MASK(source), ipc_base + IPCMxDSET(mbox));
++	writel_relaxed(CHAN_MASK(source), ipc_base + IPCMxMSET(mbox));
+ }
+ 
+ static inline void clear_destination(int source, int mbox)
+ {
+-	__raw_writel(CHAN_MASK(source), ipc_base + IPCMxDCLEAR(mbox));
+-	__raw_writel(CHAN_MASK(source), ipc_base + IPCMxMCLEAR(mbox));
++	writel_relaxed(CHAN_MASK(source), ipc_base + IPCMxDCLEAR(mbox));
++	writel_relaxed(CHAN_MASK(source), ipc_base + IPCMxMCLEAR(mbox));
+ }
+ 
+ static void __ipc_send(int mbox, u32 *data)
+ {
+ 	int i;
+ 	for (i = 0; i < 7; i++)
+-		__raw_writel(data[i], ipc_base + IPCMxDR(mbox, i));
+-	__raw_writel(0x1, ipc_base + IPCMxSEND(mbox));
++		writel_relaxed(data[i], ipc_base + IPCMxDR(mbox, i));
++	writel_relaxed(0x1, ipc_base + IPCMxSEND(mbox));
+ }
+ 
+ static u32 __ipc_rcv(int mbox, u32 *data)
+ {
+ 	int i;
+ 	for (i = 0; i < 7; i++)
+-		data[i] = __raw_readl(ipc_base + IPCMxDR(mbox, i));
++		data[i] = readl_relaxed(ipc_base + IPCMxDR(mbox, i));
+ 	return data[1];
+ }
+ 
+@@ -112,15 +112,15 @@ static irqreturn_t ipc_handler(int irq, void *dev)
+ 	u32 irq_stat;
+ 	u32 data[7];
+ 
+-	irq_stat = __raw_readl(ipc_base + IPCMMIS(1));
++	irq_stat = readl_relaxed(ipc_base + IPCMMIS(1));
+ 	if (irq_stat & MBOX_MASK(IPC_TX_MBOX)) {
+-		__raw_writel(0, ipc_base + IPCMxSEND(IPC_TX_MBOX));
++		writel_relaxed(0, ipc_base + IPCMxSEND(IPC_TX_MBOX));
+ 		complete(&ipc_completion);
+ 	}
+ 	if (irq_stat & MBOX_MASK(IPC_RX_MBOX)) {
+ 		__ipc_rcv(IPC_RX_MBOX, data);
+ 		atomic_notifier_call_chain(&ipc_notifier, data[0], data + 1);
+-		__raw_writel(2, ipc_base + IPCMxSEND(IPC_RX_MBOX));
++		writel_relaxed(2, ipc_base + IPCMxSEND(IPC_RX_MBOX));
+ 	}
+ 
+ 	return IRQ_HANDLED;
+@@ -146,7 +146,7 @@ static int pl320_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (ipc_base == NULL)
+ 		return -ENOMEM;
+ 
+-	__raw_writel(0, ipc_base + IPCMxSEND(IPC_TX_MBOX));
++	writel_relaxed(0, ipc_base + IPCMxSEND(IPC_TX_MBOX));
+ 
+ 	ipc_irq = adev->irq[0];
+ 	ret = request_irq(ipc_irq, ipc_handler, 0, dev_name(&adev->dev), NULL);
+@@ -154,20 +154,20 @@ static int pl320_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto err;
+ 
+ 	/* Init slow mailbox */
+-	__raw_writel(CHAN_MASK(A9_SOURCE),
+-			ipc_base + IPCMxSOURCE(IPC_TX_MBOX));
+-	__raw_writel(CHAN_MASK(M3_SOURCE),
+-			ipc_base + IPCMxDSET(IPC_TX_MBOX));
+-	__raw_writel(CHAN_MASK(M3_SOURCE) | CHAN_MASK(A9_SOURCE),
+-		     ipc_base + IPCMxMSET(IPC_TX_MBOX));
++	writel_relaxed(CHAN_MASK(A9_SOURCE),
++		       ipc_base + IPCMxSOURCE(IPC_TX_MBOX));
++	writel_relaxed(CHAN_MASK(M3_SOURCE),
++		       ipc_base + IPCMxDSET(IPC_TX_MBOX));
++	writel_relaxed(CHAN_MASK(M3_SOURCE) | CHAN_MASK(A9_SOURCE),
++		       ipc_base + IPCMxMSET(IPC_TX_MBOX));
+ 
+ 	/* Init receive mailbox */
+-	__raw_writel(CHAN_MASK(M3_SOURCE),
+-			ipc_base + IPCMxSOURCE(IPC_RX_MBOX));
+-	__raw_writel(CHAN_MASK(A9_SOURCE),
+-			ipc_base + IPCMxDSET(IPC_RX_MBOX));
+-	__raw_writel(CHAN_MASK(M3_SOURCE) | CHAN_MASK(A9_SOURCE),
+-		     ipc_base + IPCMxMSET(IPC_RX_MBOX));
++	writel_relaxed(CHAN_MASK(M3_SOURCE),
++		       ipc_base + IPCMxSOURCE(IPC_RX_MBOX));
++	writel_relaxed(CHAN_MASK(A9_SOURCE),
++		       ipc_base + IPCMxDSET(IPC_RX_MBOX));
++	writel_relaxed(CHAN_MASK(M3_SOURCE) | CHAN_MASK(A9_SOURCE),
++		       ipc_base + IPCMxMSET(IPC_RX_MBOX));
+ 
+ 	return 0;
+ err:
 -- 
-
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+2.8.1
