@@ -1,63 +1,122 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Jun 2016 00:36:16 -0700
-Subject: [PATCH 2/2] arm: fix kernel image size
-In-Reply-To: <20160621215141.GC5783@n2100.arm.linux.org.uk>
-References: <20160617194405.GN1041@n2100.armlinux.org.uk>
- <E1bDzh4-0006a4-7p@e0050434b2927.dyn.armlinux.org.uk>
- <20160621074319.GH22406@atomide.com>
- <20160621094737.GA5783@n2100.arm.linux.org.uk>
- <20160621103810.GI22406@atomide.com>
- <20160621105720.GK22406@atomide.com>
- <20160621154407.GB5783@n2100.arm.linux.org.uk>
- <20160621165523.GY22406@atomide.com>
- <20160621215141.GC5783@n2100.arm.linux.org.uk>
-Message-ID: <20160622073614.GZ22406@atomide.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Wed, 22 Jun 2016 15:40:19 +0800
+Subject: [PATCH v9 00/10] Add clock support for Mediatek MT2701 
+Message-ID: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [160621 14:54]:
-> So that's 20.7MB, and the zImage was 3.6MB.  You're getting an
-> expansion ratio of 5.7x.
-> 
-> To fix that, we'd need to up it to 7x, but the problem with upping
-> it in this way is that it increases the requirements for the
-> crashdump region too.  We can play with this number, but there will
-> always be cases where it doesn't work - either because the ratio is
-> too big or too small.
+This series is based on v4.7-rc1, add clock and reset controller support
+for Mediatek MT2701.
 
-OK
+This series also refined makefile and Kconfig to support configurable
+multiple SoC clock support.
 
-> By way of illustration, "zImage size + MAX_RODATA_SZ + 4x zImage size"
-> doesn't even work for this case, since you need about 25MB.  Your
-> calculation comes out at 22MB, which is 3MB short.  Not only that, but
-> it introduces (from what I can see) an irrelevant fudge factor of
-> "MAX_RODATA_SZ" which has no basis in what's really going on here, and
-> I'm left wondering what "MAX_RODATA_SZ" is actually referring to.
+changes since v8:
+- Rebase to v4.7-rc1.
+- Include mt2701-resets.h in mt2701.dtsi.
+- Remove an unused property from apmixedsys DT node.
 
-Well I thinking the section alignment split might give us some
-known size for rodata, but looking at it more it's only with
-DEBUG_ALIGN_RODATA. If we can't make any assumptions about the
-size of the rodata, then no point adding it.
+changes since v7:
+- Rebase to clk-next.
+- Implement subsystem clocks in seperated files.
+- Replace critical clock enabling with CLK_IS_CRITICAL flag.
+- Reduce most clock registrations in CLK_OF_DECLARE().
+- Remove __init and __initconst from most init fucntions and data,
+  and replace driver registration with platform_driver_register().
+- Replace some common function or variable names with unique names.
+- Use real clock for UARTs.
 
-> So... I'm of the opinion that we shouldn't play with it - but instead
-> try to come up with a solution which *doesn't* involve teaching kexec
-> a whole load of internals about how the ARM kernel booting happens.
-> 
-> What's more worrying to me at the moment, though, is that the kexec code
-> only tries to find memory for the actual "kernel" size, not the actual
-> space required to decompress the kernel.  It could find a chunk of
-> memory large enough to fit the kernel image to be loaded, but is not big
-> enough to allow its decompression.  kexec is really quite a mess on
-> ARM. :(
+changes since v6:
+- Rebase to v4.6-rc1.
+- Register subsystem clocks in probe() instead of CLK_OF_DECLARE().
+- Add clocks that referred by subsystem clocks.
+- Fix clk_data size of apmixedsys.
+- Add config options for each subsystem clock provider.
 
-How about we check the size of RAM available, and if there is plenty
-of RAM we use a safe compression ratio of 8. If RAM is a problem,
-we could make the compression ratio smaller and warn about it. And
-we could also allow passing the compression ratio to kexec as an
-option.
+changes since v5:
+- Rebase to v4.5-rc1 and [1].
+- Enable critical clocks for MT2701
+- Refine dt-binding documents, add reset controller support for hifsys.
 
-I forgot if we still have some 128MB limits too..
+changes since v4:
+- Rebase to v4.5-rc1.
+- Remove CLK_SET_RATE_PARENT from divider flags.
+- Add img_jpgdec_smi clock.
+- Move clk/mediatek/Kconfig into menu section in clk/Kconfig.
 
-Regards,
+changes since v3:
+- Change the parent of mm_mdp_bls_26m from clk26m to pwm_sel.
 
-Tony
+changes since v2:
+- Fix ethsys definition.
+- Replace read-modify-write with regmap_update_bits() in clock operations.
+- Move mt2701-resets.h to include/dt-bindings/reset/.
+- Add hifsys reset patch from John Crispin.
+
+changes since v1:
+- Document MT2701 compatible strings.
+
+[1] https://patchwork.kernel.org/patch/8147901/
+
+Erin Lo (1):
+  arm: dts: mt2701: Use real clock for UARTs
+
+James Liao (5):
+  clk: fix initial state of critical clock's parents
+  clk: mediatek: remove __init from clk registration functions
+  clk: mediatek: Refine the makefile to support multiple clock drivers
+  dt-bindings: ARM: Mediatek: Document bindings for MT2701
+  arm: dts: mt2701: Add clock controller device nodes
+
+Shunli Wang (4):
+  clk: mediatek: Add dt-bindings for MT2701 clocks
+  clk: mediatek: Add MT2701 clock support
+  reset: mediatek: Add MT2701 reset controller dt-binding file
+  reset: mediatek: Add MT2701 reset driver
+
+ .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    3 +-
+ .../bindings/arm/mediatek/mediatek,bdpsys.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,ethsys.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,hifsys.txt      |   24 +
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      |    3 +-
+ .../bindings/arm/mediatek/mediatek,infracfg.txt    |    3 +-
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |    3 +-
+ .../bindings/arm/mediatek/mediatek,pericfg.txt     |    3 +-
+ .../bindings/arm/mediatek/mediatek,topckgen.txt    |    3 +-
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     |    3 +-
+ arch/arm/boot/dts/mt2701.dtsi                      |   50 +-
+ drivers/clk/Kconfig                                |    1 +
+ drivers/clk/clk.c                                  |    9 +-
+ drivers/clk/mediatek/Kconfig                       |   73 ++
+ drivers/clk/mediatek/Makefile                      |   13 +-
+ drivers/clk/mediatek/clk-gate.c                    |   54 +-
+ drivers/clk/mediatek/clk-gate.h                    |    2 +
+ drivers/clk/mediatek/clk-mt2701-bdp.c              |  140 +++
+ drivers/clk/mediatek/clk-mt2701-eth.c              |   82 ++
+ drivers/clk/mediatek/clk-mt2701-hif.c              |   81 ++
+ drivers/clk/mediatek/clk-mt2701-img.c              |   82 ++
+ drivers/clk/mediatek/clk-mt2701-mm.c               |  125 +++
+ drivers/clk/mediatek/clk-mt2701-vdec.c             |   93 ++
+ drivers/clk/mediatek/clk-mt2701.c                  | 1037 ++++++++++++++++++++
+ drivers/clk/mediatek/clk-mtk.c                     |   52 +-
+ drivers/clk/mediatek/clk-mtk.h                     |   41 +-
+ drivers/clk/mediatek/clk-pll.c                     |    3 +-
+ include/dt-bindings/clock/mt2701-clk.h             |  486 +++++++++
+ include/dt-bindings/reset/mt2701-resets.h          |   83 ++
+ 29 files changed, 2567 insertions(+), 29 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
+ create mode 100644 drivers/clk/mediatek/Kconfig
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-bdp.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-eth.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-hif.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-img.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-mm.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-vdec.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701.c
+ create mode 100644 include/dt-bindings/clock/mt2701-clk.h
+ create mode 100644 include/dt-bindings/reset/mt2701-resets.h
+
+--
+1.7.9.5
