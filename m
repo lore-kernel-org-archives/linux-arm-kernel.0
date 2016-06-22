@@ -1,62 +1,386 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 22 Jun 2016 17:23:12 +0200
-Subject: [PATCH v2] mmc: core: Only change mode if mmc_select_bus_width()
- is successful.
-In-Reply-To: <1465381672-9772-1-git-send-email-peter.griffin@linaro.org>
-References: <1465381672-9772-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <CAPDyKFoJN0a36wJZyUggQVPYycu2NbpR6S=LfX2qSFD4tm6Uwg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Jun 2016 16:23:18 +0100
+Subject: [PATCH v6 08/15] KVM: arm64: introduce new KVM ITS device
+In-Reply-To: <1466165327-32060-9-git-send-email-andre.przywara@arm.com>
+References: <1466165327-32060-1-git-send-email-andre.przywara@arm.com>
+ <1466165327-32060-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <576AAD66.90905@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2016 at 12:27, Peter Griffin <peter.griffin@linaro.org> wrote:
-> mmc_select_bus_width() returns bus width (4 or 8) on success or
-> zero if unsupported. So only change mode if setting the bus width
-> is successful.
->
-> Fixes f741494 mmc: fix mmc mode selection for HS-DDR and higher
-> Fixes: 287980e (remove lots of IS_ERR_VALUE abuses)
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
->
-
-Thanks, applied for next! Updated the changelog to remove the "fixes"
-tags and the Cc, as those shouldn't be relevant.
-
-Kind regards
-Uffe
-
+On 17/06/16 13:08, Andre Przywara wrote:
+> Introduce a new KVM device that represents an ARM Interrupt Translation
+> Service (ITS) controller. Since there can be multiple of this per guest,
+> we can't piggy back on the existing GICv3 distributor device, but create
+> a new type of KVM device.
+> On the KVM_CREATE_DEVICE ioctl we malloc and initialize the ITS data
+> structure and store the pointer in the kvm_device data.
+> Upon an explicit init ioctl from userland (after having setup the MMIO
+> address) we register the handlers with the kvm_io_bus framework.
+> Any reference to an ITS thus has to go via MMIO accesses.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->
-> v2: Rebase on v4.7-rc2 which includes a fix from Chen-Yu and update
->     commit message.
-> ---
->  drivers/mmc/core/mmc.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 5d438ad..aafb73d 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
->          * switch to HS200 mode if bus width is set successfully.
->          */
->         err = mmc_select_bus_width(card);
-> -       if (err >= 0) {
-> +       if (err > 0) {
->                 val = EXT_CSD_TIMING_HS200 |
->                       card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
->                 err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-> @@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->         } else if (mmc_card_hs(card)) {
->                 /* Select the desired bus width optionally */
->                 err = mmc_select_bus_width(card);
-> -               if (err >= 0) {
-> +               if (err > 0) {
->                         err = mmc_select_hs_ddr(card);
->                         if (err)
->                                 goto free_card;
-> --
-> 1.9.1
->
+>  Documentation/virtual/kvm/devices/arm-vgic.txt |  25 +++--
+>  arch/arm/kvm/arm.c                             |   1 +
+>  arch/arm64/include/uapi/asm/kvm.h              |   2 +
+>  include/kvm/vgic/vgic.h                        |   1 +
+>  include/uapi/linux/kvm.h                       |   2 +
+>  virt/kvm/arm/vgic/vgic-its.c                   | 131 ++++++++++++++++++++++++-
+>  virt/kvm/arm/vgic/vgic-kvm-device.c            |   7 +-
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c               |   2 +-
+>  virt/kvm/arm/vgic/vgic.h                       |   8 ++
+>  9 files changed, 168 insertions(+), 11 deletions(-)
+> 
+> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> index 59541d4..89182f8 100644
+> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> @@ -4,16 +4,22 @@ ARM Virtual Generic Interrupt Controller (VGIC)
+>  Device types supported:
+>    KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
+>    KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
+> +  KVM_DEV_TYPE_ARM_VGIC_ITS    ARM Interrupt Translation Service Controller
+>  
+> -Only one VGIC instance may be instantiated through either this API or the
+> -legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
+> -controller, requiring emulated user-space devices to inject interrupts to the
+> -VGIC instead of directly to CPUs.
+> +Only one VGIC instance of the V2/V3 types above may be instantiated through
+> +either this API or the legacy KVM_CREATE_IRQCHIP api.  The created VGIC will
+> +act as the VM interrupt controller, requiring emulated user-space devices to
+> +inject interrupts to the VGIC instead of directly to CPUs.
+>  
+>  Creating a guest GICv3 device requires a host GICv3 as well.
+>  GICv3 implementations with hardware compatibility support allow a guest GICv2
+>  as well.
+>  
+> +Creating a virtual ITS controller requires a host GICv3 (but does not depend
+> +on having physical ITS controllers).
+> +There can be multiple ITS controllers per guest, each of them has to have
+> +a separate, non-overlapping MMIO region.
+> +
+>  Groups:
+>    KVM_DEV_ARM_VGIC_GRP_ADDR
+>    Attributes:
+> @@ -39,6 +45,13 @@ Groups:
+>        Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+>        This address needs to be 64K aligned.
+>  
+> +    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
+> +      Base address in the guest physical address space of the GICv3 ITS
+> +      control register frame. The ITS allows MSI(-X) interrupts to be
+> +      injected into guests. This extension is optional. If the kernel
+> +      does not support the ITS, the call returns -ENODEV.
+> +      Only valid for KVM_DEV_TYPE_ARM_VGIC_ITS.
+> +      This address needs to be 64K aligned and the region covers 128K.
+>  
+>    KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+>    Attributes:
+> @@ -109,8 +122,8 @@ Groups:
+>    KVM_DEV_ARM_VGIC_GRP_CTRL
+>    Attributes:
+>      KVM_DEV_ARM_VGIC_CTRL_INIT
+> -      request the initialization of the VGIC, no additional parameter in
+> -      kvm_device_attr.addr.
+> +      request the initialization of the VGIC or ITS, no additional parameter
+> +      in kvm_device_attr.addr.
+>    Errors:
+>      -ENXIO: VGIC not properly configured as required prior to calling
+>       this attribute
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index a268c85..f4a953e 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/err.h>
+>  #include <linux/kvm_host.h>
+> +#include <linux/list.h>
+>  #include <linux/module.h>
+>  #include <linux/vmalloc.h>
+>  #include <linux/fs.h>
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index f209ea1..f8c257b 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -87,9 +87,11 @@ struct kvm_regs {
+>  /* Supported VGICv3 address types  */
+>  #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+>  #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+> +#define KVM_VGIC_ITS_ADDR_TYPE		4
+>  
+>  #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+>  #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
+> +#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
+>  
+>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index a66ba9a..979d8c3 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -158,6 +158,7 @@ struct vgic_dist {
+>  
+>  	struct vgic_io_device	dist_iodev;
+>  
+> +	bool			has_its;
+>  	/*
+>  	 * Contains the address of the LPI configuration table.
+>  	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 7de96f5..d8c4c32 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -1077,6 +1077,8 @@ enum kvm_device_type {
+>  #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
+>  	KVM_DEV_TYPE_ARM_VGIC_V3,
+>  #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
+> +	KVM_DEV_TYPE_ARM_VGIC_ITS,
+> +#define KVM_DEV_TYPE_ARM_VGIC_ITS	KVM_DEV_TYPE_ARM_VGIC_ITS
+>  	KVM_DEV_TYPE_MAX,
+>  };
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index c02d9df..4ae3c82 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/uaccess.h>
+>  
+>  #include <linux/irqchip/arm-gic-v3.h>
+>  
+> @@ -81,7 +82,7 @@ struct vgic_register_region its_registers[] = {
+>  		VGIC_ACCESS_32bit),
+>  };
+>  
+> -int vits_register(struct kvm *kvm, struct vgic_its *its)
+> +static int vits_register(struct kvm *kvm, struct vgic_its *its)
+>  {
+>  	struct vgic_io_device *iodev = &its->iodev;
+>  	int ret;
+> @@ -100,8 +101,134 @@ int vits_register(struct kvm *kvm, struct vgic_its *its)
+>  	return ret;
+>  }
+>  
+> -void vits_destroy(struct kvm *kvm, struct vgic_its *its)
+> +static void vits_destroy(struct kvm *kvm, struct vgic_its *its)
+
+Maybe move these hunks to the previous patch?
+
+>  {
+>  
+>  	its->enabled = false;
+>  }
+> +
+> +static int vgic_its_create(struct kvm_device *dev, u32 type)
+> +{
+> +	struct vgic_its *its;
+> +
+> +	if (type != KVM_DEV_TYPE_ARM_VGIC_ITS)
+> +		return -ENODEV;
+> +
+> +	its = kzalloc(sizeof(struct vgic_its), GFP_KERNEL);
+> +	if (!its)
+> +		return -ENOMEM;
+> +
+> +	its->vgic_its_base = VGIC_ADDR_UNDEF;
+> +
+> +	dev->kvm->arch.vgic.has_its = true;
+> +	its->enabled = false;
+> +
+> +	dev->private = its;
+> +
+> +	return 0;
+> +}
+> +
+> +static void vgic_its_destroy(struct kvm_device *dev)
+> +{
+> +	struct vgic_its *its = dev->private;
+> +
+> +	vits_destroy(dev->kvm, its);
+
+If that's the only use of vits_destroy (and given that it is not really
+doing much), can we inline it here (or alternatively get rid of it
+altogether)?
+
+> +
+> +	kfree(its);
+> +}
+> +
+> +static int vgic_its_has_attr(struct kvm_device *dev,
+> +			     struct kvm_device_attr *attr)
+> +{
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_ADDR:
+> +		switch (attr->attr) {
+> +		case KVM_VGIC_ITS_ADDR_TYPE:
+> +			return 0;
+> +		}
+> +		break;
+> +	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+> +		switch (attr->attr) {
+> +		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+> +			return 0;
+> +		}
+> +		break;
+> +	}
+> +	return -ENXIO;
+> +}
+> +
+> +static int vgic_its_set_attr(struct kvm_device *dev,
+> +			     struct kvm_device_attr *attr)
+> +{
+> +	struct vgic_its *its = dev->private;
+> +	int ret;
+> +
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
+> +		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+> +		unsigned long type = (unsigned long)attr->attr;
+> +		u64 addr;
+> +
+> +		if (type != KVM_VGIC_ITS_ADDR_TYPE)
+> +			return -ENODEV;
+> +
+> +		if (copy_from_user(&addr, uaddr, sizeof(addr)))
+> +			return -EFAULT;
+> +
+> +		ret = vgic_check_ioaddr(dev->kvm, &its->vgic_its_base,
+> +					addr, SZ_64K);
+> +		if (ret)
+> +			return ret;
+> +
+> +		its->vgic_its_base = addr;
+> +
+> +		return 0;
+> +	}
+> +	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+> +		switch (attr->attr) {
+> +		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+> +			return vits_register(dev->kvm, its);
+> +		}
+> +		break;
+> +	}
+> +	return -ENXIO;
+> +}
+> +
+> +static int vgic_its_get_attr(struct kvm_device *dev,
+> +			     struct kvm_device_attr *attr)
+> +{
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
+> +		struct vgic_its *its = dev->private;
+> +		u64 addr = its->vgic_its_base;
+> +		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+> +		unsigned long type = (unsigned long)attr->attr;
+> +
+> +		if (type != KVM_VGIC_ITS_ADDR_TYPE)
+> +			return -ENODEV;
+> +
+> +		if (copy_to_user(uaddr, &addr, sizeof(addr)))
+> +			return -EFAULT;
+> +		break;
+> +	default:
+> +		return -ENXIO;
+> +	}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +struct kvm_device_ops kvm_arm_vgic_its_ops = {
+> +	.name = "kvm-arm-vgic-its",
+> +	.create = vgic_its_create,
+> +	.destroy = vgic_its_destroy,
+> +	.set_attr = vgic_its_set_attr,
+> +	.get_attr = vgic_its_get_attr,
+> +	.has_attr = vgic_its_has_attr,
+> +};
+> +
+> +int kvm_vgic_register_its_device(void)
+> +{
+> +	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
+> +				       KVM_DEV_TYPE_ARM_VGIC_ITS);
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> index 2f24f13..1813f93 100644
+> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> @@ -21,8 +21,8 @@
+>  
+>  /* common helpers */
+>  
+> -static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
+> -			     phys_addr_t addr, phys_addr_t alignment)
+> +int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
+> +		      phys_addr_t addr, phys_addr_t alignment)
+>  {
+>  	if (addr & ~KVM_PHYS_MASK)
+>  		return -E2BIG;
+> @@ -223,6 +223,9 @@ int kvm_register_vgic_device(unsigned long type)
+>  	case KVM_DEV_TYPE_ARM_VGIC_V3:
+>  		ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
+>  					      KVM_DEV_TYPE_ARM_VGIC_V3);
+> +		if (ret)
+> +			break;
+> +		ret = kvm_vgic_register_its_device();
+>  		break;
+>  #endif
+>  	}
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 4eee0d7..3a72308 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -49,7 +49,7 @@ bool vgic_has_its(struct kvm *kvm)
+>  	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
+>  		return false;
+>  
+> -	return false;
+> +	return dist->has_its;
+>  }
+>  
+>  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index b09590d..24150f7 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -46,6 +46,9 @@ static inline void vgic_put_irq(struct vgic_irq *irq)
+>  bool vgic_queue_irq_put(struct kvm *kvm, struct vgic_irq *irq);
+>  void vgic_kick_vcpus(struct kvm *kvm);
+>  
+> +int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
+> +		      phys_addr_t addr, phys_addr_t alignment);
+> +
+>  void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
+>  void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
+>  void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+> @@ -77,6 +80,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info);
+>  int vgic_v3_map_resources(struct kvm *kvm);
+>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+>  bool vgic_has_its(struct kvm *kvm);
+> +int kvm_vgic_register_its_device(void);
+>  #else
+>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+> @@ -134,6 +138,10 @@ static inline bool vgic_has_its(struct kvm *kvm)
+>  	return false;
+>  }
+>  
+> +static inline int kvm_vgic_register_its_device(void)
+> +{
+> +	return -ENODEV;
+> +}
+>  #endif
+>  
+>  int kvm_register_vgic_device(unsigned long type);
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
