@@ -1,35 +1,84 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 22 Jun 2016 10:53:58 +0800
-Subject: [PATCH v3 0/4] Add the eDP/VOP device node for rk3399
-Message-ID: <1466564038-18021-1-git-send-email-ykk@rock-chips.com>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Wed, 22 Jun 2016 10:54:13 +0800
+Subject: [RFC PATCH v2 0/9] scpi: Add SCPI registry to handle legacy
+ protocol
+In-Reply-To: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
+References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <2a58b7d6-aadc-19fb-dd24-ea6bf51c1857@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This thread is rely on Mark's VOP thread[1] and Yakir's eDP thread[2].
+Hi Neil,
 
-[1]: https://lkml.org/lkml/2016/4/20/36
-[2]: https://patchwork.kernel.org/patch/9175613/
+On 2016/6/21 18:02, Neil Armstrong wrote:
+> This patchset aims to support the legacy SCPI firmware implementation that was
+> delivered as early technology preview for the JUNO platform.
+>
+> Finally a stable, maintained and public implementation for the SCPI protocol
+> has been upstreamed part of the JUNO support and it is the recommended way
+> of implementing SCP communication on ARMv8 platforms.
+>
+> The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
+> platforms. Only the GXBB example is provided here, but it's unclear if other
+> Amlogic ARMv8 based SoCs uses this legacy procotol.
+>
+> In order to support the legacy protocol :
+>   - Move the scpi_get_ops to a thin registry layer
+>   - Change the arm_scpi.c to use the registry layer
+>   - Add a separate config option to build the registry layer
+>   - Add the legacy SCPI driver based on the new implementation
+>   - For example, add the Amlogic GXBB MHU and SCPI DT cpufreq & sensors nodes
 
-Changes in v3:
-- Add this patch in v3, due to another patch[0] need.
-  [0]: https://patchwork.kernel.org/patch/9191737/
+Two comments may be not very associated with this series.
 
-Changes in v2:
-- provide some minimal patch description (Heiko)
-- provide some minimal patch description (Heiko)
-- provide some minimal patch description (Heiko)
+First, do you have any plan to implement the APIs for extended set ID of 
+SCPI? If these APIs do not care commands, just focus on a message 
+transmission access, something like a library role, and extended command 
+can define in consumers driver module, I think it can more help for 
+other consumers like Rockchip to send/receive nonstandard command data 
+conveniently. Can it be?
 
-Mark Yao (1):
-  arm64: dts: rockchip: add VOP and VOP iommu node for rk3399
+Second, As far as I know, some legacy mailbox hardware which like 
+Altera, Rockchip...  need write command and data register sequentially, 
+then it can create a interrupt, however, arm-scpi first use inner 
+scpi_xfer structure to package the message, then data is passed to 
+msg_submit (At mailbox.c), further into the bottom mailbox driver, but 
+the data type is converted void*, so the mailbox driver could not 
+extract the contents of message, if it do cast type, it may become 
+non-general from driver view. Hence, is it possible to add a message 
+header into scpi_xfer which for the bottom mailbox driver or dope out 
+any other methods to solve it?
 
-Yakir Yang (3):
-  arm64: dts: rockchip: add eDP device node for rk3399
-  arm64: dts: rockchip: add backlight support for rk3399 evb board
-  arm64: dtsi: rockchip: introduce pclk_vio_grf in eDP device node
+BR.
+Frank
 
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  40 ++++++++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 110 ++++++++++++++++++++++++++++
- 2 files changed, 150 insertions(+)
-
--- 
-1.9.1
+> Initial RFC discution tread can be found at https://lkml.org/lkml/2016/5/26/111
+>
+> Neil Armstrong (9):
+>    mailbox: Add Amlogic Meson Message-Handling-Unit
+>    dt-bindings: mailbox: Add Amlogic Meson MHU Bindings
+>    ARM64: dts: meson-gxbb: Add Meson MHU Node
+>    firmware: Add a SCPI registry to handle multiple implementations
+>    firmware: scpi: Switch arm_scpi to use new registry
+>    firmware: Add legacy SCPI protocol driver
+>    dt-bindings: arm: Update arm,scpi bindings with Meson GXBB SCPI
+>    ARM64: dts: meson-gxbb: Add SRAM node
+>    ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
+>
+>   Documentation/devicetree/bindings/arm/arm,scpi.txt |   8 +-
+>   .../devicetree/bindings/mailbox/meson-mhu.txt      |  33 ++
+>   arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  53 ++
+>   drivers/firmware/Kconfig                           |  24 +
+>   drivers/firmware/Makefile                          |   2 +
+>   drivers/firmware/arm_scpi.c                        |  14 +-
+>   drivers/firmware/legacy_scpi.c                     | 644 +++++++++++++++++++++
+>   drivers/firmware/scpi.c                            |  94 +++
+>   drivers/mailbox/Makefile                           |   2 +
+>   drivers/mailbox/meson_mhu.c                        | 199 +++++++
+>   include/linux/scpi_protocol.h                      |  15 +-
+>   11 files changed, 1075 insertions(+), 13 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/mailbox/meson-mhu.txt
+>   create mode 100644 drivers/firmware/legacy_scpi.c
+>   create mode 100644 drivers/firmware/scpi.c
+>   create mode 100644 drivers/mailbox/meson_mhu.c
+>
