@@ -1,120 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Jun 2016 13:03:36 +0100
-Subject: [PATCH V7 1/8] ACPI: I/O Remapping Table (IORT) initial support
-In-Reply-To: <576A711D.5080206@semihalf.com>
-References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
- <1466420541-20101-2-git-send-email-tn@semihalf.com>
- <372d3b78-2bc5-94d1-49f6-c9229affa65d@linaro.org> <576A6D7F.6010407@arm.com>
- <576A711D.5080206@semihalf.com>
-Message-ID: <576A7E98.4060502@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 22 Jun 2016 14:04:41 +0200
+Subject: [PATCH 1/2] cpufreq: s5pv210: use relaxed IO accesors
+In-Reply-To: <20160622093820.GE5458@vireshk-i7>
+References: <1466588198-27445-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1466588198-27445-2-git-send-email-ben.dooks@codethink.co.uk>
+ <20160622093820.GE5458@vireshk-i7>
+Message-ID: <CAJKOXPcywVya133jsz5_5mE8j4M3L6+orcWPPrStpNshcj+JsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/16 12:06, Tomasz Nowicki wrote:
-> On 22.06.2016 12:50, Marc Zyngier wrote:
->> On 21/06/16 08:12, Hanjun Guo wrote:
->>> Hi Tomasz,
->>>
->>> Sorry for jumping out late, just one comment below.
->>>
->>> On 2016/6/20 19:02, Tomasz Nowicki wrote:
->>>> IORT shows representation of IO topology for ARM based systems.
->>>> It describes how various components are connected together on
->>>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
->>>>
->>>> Initial support allows to detect IORT table presence and save its
->>>> root pointer obtained through acpi_get_table(). The pointer validity
->>>> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
->>>> is not set while using IORT nodes we would dereference unmapped pointers.
->>>>
->>>> For the aforementioned reason call iort_table_detect() from acpi_init()
->>>> which guarantees acpi_gbl_permanent_mmap to be set at that point.
->>>>
->>>> Add generic helpers which are helpful for scanning and retrieving
->>>> information from IORT table content. List of the most important helpers:
->>>> - iort_find_dev_node() finds IORT node for a given device
->>>> - iort_node_map_rid() maps device RID and returns IORT node which provides
->>>>    final translation
->>>>
->>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>>> ---
->>>>   drivers/acpi/Kconfig  |   3 +
->>>>   drivers/acpi/Makefile |   1 +
->>>>   drivers/acpi/bus.c    |   2 +
->>>>   drivers/acpi/iort.c   | 220 ++++++++++++++++++++++++++++++++++++++++++++++++++
->>>>   include/linux/iort.h  |  30 +++++++
->>>
->>> [...]
->>>
->>>> +static acpi_status
->>>> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
->>>> +{
->>>> +	struct device *dev = context;
->>>> +
->>>> +	switch (node->type) {
->>>> +	case ACPI_IORT_NODE_NAMED_COMPONENT: {
->>>> +		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
->>>
->>> ACPI_ALLOCATE_BUFFER is used here, so ...
->>>
->>>> +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
->>>> +		struct acpi_iort_named_component *ncomp;
->>>> +
->>>> +		if (!adev)
->>>> +			break;
->>>> +
->>>> +		ncomp = (struct acpi_iort_named_component *)node->node_data;
->>>> +
->>>> +		if (ACPI_FAILURE(acpi_get_name(adev->handle,
->>>> +					       ACPI_FULL_PATHNAME, &buffer))) {
->>>> +			dev_warn(dev, "Can't get device full path name\n");
->>>> +			break;
->>>> +		}
->>>> +
->>>> +		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
->>>> +			return AE_OK;
->>>
->>> ... we need to kfree(buffer.pointer) before we return or break.
+On Wed, Jun 22, 2016 at 11:38 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 22-06-16, 10:36, Ben Dooks wrote:
+>> The use of __raw IO accesors is not endian safe and should be used
+>> sparingly. The relaxed variants should be as lightweight and also
+>> are endian safe.
 >>
->> For the record, I've queued this patch on top:
->>
->> diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
->> index 496dcf6..3b9e55b 100644
->> --- a/drivers/acpi/iort.c
->> +++ b/drivers/acpi/iort.c
->> @@ -158,11 +158,15 @@ iort_match_node_callback(struct acpi_iort_node *node, void *context)
->>   		if (ACPI_FAILURE(acpi_get_name(adev->handle,
->>   					       ACPI_FULL_PATHNAME, &buffer))) {
->>   			dev_warn(dev, "Can't get device full path name\n");
->> -			break;
->> -		}
->> +		} else {
->> +			int match;
->>
->> -		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
->> -			return AE_OK;
->> +			match = !strcmp(ncomp->device_name, buffer.pointer);
->> +			acpi_os_free(&buffer);
->> +
->> +			if (match)
->> +				return AE_OK;
->> +		}
->>
->>   		break;
->>   	}
->>
->>
->> assuming that Rafael is OK with the general approach, of course.
->>
-> 
-> Thanks Marc. As Lorenzo pointed out, we need another fix for 
-> iort_node_map_rid(). Do you want me to refresh the whole series or this 
-> patch only?
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>> ---
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>> Cc: linux-pm at vger.kernel.org
+>> Cc: linux-samsung-soc at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>>  drivers/cpufreq/s5pv210-cpufreq.c | 68 +++++++++++++++++++--------------------
+>>  1 file changed, 34 insertions(+), 34 deletions(-)
+>
+> For both patches:
+>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-If the changes are localized enough, just this patch.
+Applied for v4.8, thanks.
 
-Thanks,
+When resending the cpufreq-exynos please CC me as well.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best regards,
+Krzysztof
