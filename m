@@ -1,162 +1,157 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 22 Jun 2016 16:42:00 +0800
-Subject: [PATCH v6 0/5] Thermal: Support for hardware-tracked trip points
-Message-ID: <1466584925-4829-1-git-send-email-wxt@rock-chips.com>
+Date: Wed, 22 Jun 2016 16:42:05 +0800
+Subject: [PATCH v6 5/5] thermal: rockchip: add the set_trips function
+In-Reply-To: <1466584925-4829-1-git-send-email-wxt@rock-chips.com>
+References: <1466584925-4829-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1466584925-4829-6-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you all for providing inputs and comments on previous versions of
-this patchset.
-Especially thanks to the (Mikko,Sascha,Eduardo,Javi,Steve,Rui....).
+Whenever the current temperature is updated, the trip points immediately
+below and above the current temperature are found. A sensor driver
+callback `set_trips' is then called with the temperatures.
+Lastly, The sensor will trigger the hardware high temperature interrupts
+to increase the sampleing rate and throttle frequency to limit the
+temperature rising When performing passive cooling.
 
-The history patches come from Mikko and Sascha.
-    http://thread.gmane.org/gmane.linux.power-management.general/59451
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: linux-pm at vger.kernel.org
+Tested-by: Stephen Barber <smbarber@chromium.org>
 
-Now, I pick them up to continue upstream.
-Nevermind!
-
-This series history patches:
-v5: https://lkml.org/lkml/2016/6/6/353
-v4: https://lkml.org/lkml/2016/5/27/122
-v3: https://lkml.org/lkml/2016/5/24/797
-v2: https://lkml.org/lkml/2016/5/3/220
-v1: https://lkml.org/lkml/2016/4/24/227
-
-This series adds support for hardware trip points. It picks up earlier
-work from Mikko Perttunen. Mikko implemented hardware trip points as part
-of the device tree support. It was suggested back then to move the
-functionality to the thermal core instead of putting more code into the
-device tree support. This series does exactly that.
-
-This series patches rebase the conflicts with the lastest next kernel.
-Note that the hardware-tracked trip points are very well tested currently.
-
-Verified and tested on https://github.com/Caesar-github/rockchip/tree/wip/fixes-thermal-0622
-That's based on the next kernel (4.7-rc4).
-localhost / # cat /proc/version
-Linux version 4.7.0-rc4-next-20160622-06645-g5cba085 (wxt at nb)
----
-There are five pathes in this series.
-thermal: Add support for hardware-tracked trip point
-thermal: of: implement .set_trips for device tree thermal zones
-thermal: streamline get_trend callbacks
-thermal: bang-bang governor: act on lower trip boundary
-thermal: rockchip: add the set_trips function
-
-Note: the hardware-tracked trip points that the similar patches were verified
-on ChromoeOs platform.
-e.g.:
-https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.14
-https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.18
-https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
 ---
 
-Anyway, I take the lastest thermal change to test from next kernel,
-
-Tested on RK3399 SoCs on https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
-And
-Tested on RK3288 SoCs with chromebook on next kernel.
-localhost / # while true; do grep "" /sys/class/thermal/thermal_zone[0-1]/temp; sleep .5; done
-/sys/class/thermal/thermal_zone1/temp:45454
-/sys/class/thermal/thermal_zone2/temp:44090
-/sys/class/thermal/thermal_zone1/temp:44545
-/sys/class/thermal/thermal_zone2/temp:44545
-/sys/class/thermal/thermal_zone1/temp:45454
-/sys/class/thermal/thermal_zone2/temp:44545
-/sys/class/thermal/thermal_zone1/temp:45000
-...
-Then add the loading,
-localhost / # md5sum /dev/zero &
-[3] 8354
-..
-The Set trips trigger the hardware-tracked points.
-
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 68461, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 2 - temp: 64166, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70000, retval: 0
-rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
-rockchip-thermal ff280000.tsadc: sensor 2 - temp: 66153, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69230, retval: 0
-rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 70000
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 68076, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 2 - temp: 65384, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69615, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70000, retval: 0
-rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
-rockchip-thermal ff280000.tsadc: sensor 2 - temp: 65384, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69615, retval: 0
-rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 70000
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69615, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69230, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70833, retval: 0
-rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
-rockchip-thermal ff280000.tsadc: sensor 2 - temp: 66153, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69230, retval: 0
-rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 70000
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70416, retval: 0
-rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70000, retval: 0
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69615, retval: 0
-rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 70000
-rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70000, retval: 0
-rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
-..
----
-Anyway, the series patches are verified on rockchip platform.
-
-Thanks someone are reviewing and testing for it.
-
--Caesar
-
-
-Changes in v6:
-- add Javi's Reviewed-by
-- As Rui's comments on https://patchwork.kernel.org/patch/9157909/,
-  add the "get_trip_hyst" to judge.
-- fixes a check warning from the scripts.
-- as the Keerthy comments on https://patchwork.kernel.org/patch/9157913/,
-  change the get_trend for of_thermal.c.
-
+Changes in v6: None
 Changes in v5:
-- add the lock for thermal_zone_set_trips function.
-- change based on next kernel.
 - add the tested by Steve.
 
-Changes in v4:
-- Missing the lock added in v3.
-- as the Javi comments, %s/implemnets/implements.
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-Changes in v3:
-- as Javi comments on https://patchwork.kernel.org/patch/9001281/.
-- add the lock for preventing the called from multi placce
-- add the note for pre_low/high_trip.
-- as the Javi comments on https://patchwork.kernel.org/patch/9001311/.
-- add the select if they set the option for devicetree.
-- Add the peter's ACK.
+ drivers/thermal/rockchip_thermal.c | 39 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-Changes in v2:
-- update the sysfs-api.txt for set_trips.
-- add the commit in patch[v2 2/5].
-- Update the commit for patch[v2 4/5].
-
-Caesar Wang (1):
-  thermal: rockchip: add the set_trips function
-
-Sascha Hauer (4):
-  thermal: Add support for hardware-tracked trip points
-  thermal: of: implement .set_trips for device tree thermal zones
-  thermal: streamline get_trend callbacks
-  thermal: bang-bang governor: act on lower trip boundary
-
- Documentation/thermal/sysfs-api.txt                |  7 +++
- drivers/thermal/gov_bang_bang.c                    |  2 +-
- drivers/thermal/of-thermal.c                       | 35 ++++++++------
- drivers/thermal/rockchip_thermal.c                 | 39 ++++++++++++++++
- drivers/thermal/thermal_core.c                     | 54 ++++++++++++++++++++++
- drivers/thermal/thermal_sysfs.c                    |  3 ++
- drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 25 ++++------
- include/linux/thermal.h                            | 16 ++++++-
- 8 files changed, 147 insertions(+), 34 deletions(-)
-
+diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+index 5d491f1..8175cdb 100644
+--- a/drivers/thermal/rockchip_thermal.c
++++ b/drivers/thermal/rockchip_thermal.c
+@@ -96,6 +96,7 @@ struct chip_tsadc_table {
+  * @initialize: SoC special initialize tsadc controller method
+  * @irq_ack: clear the interrupt
+  * @get_temp: get the temperature
++ * @set_alarm_temp: set the high temperature interrupt
+  * @set_tshut_temp: set the hardware-controlled shutdown temperature
+  * @set_tshut_mode: set the hardware-controlled shutdown mode
+  * @table: the chip-specific conversion table
+@@ -119,6 +120,8 @@ struct rockchip_tsadc_chip {
+ 	/* Per-sensor methods */
+ 	int (*get_temp)(struct chip_tsadc_table table,
+ 			int chn, void __iomem *reg, int *temp);
++	void (*set_alarm_temp)(struct chip_tsadc_table table,
++			       int chn, void __iomem *reg, int temp);
+ 	void (*set_tshut_temp)(struct chip_tsadc_table table,
+ 			       int chn, void __iomem *reg, int temp);
+ 	void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
+@@ -183,6 +186,7 @@ struct rockchip_thermal_data {
+ #define TSADCV2_INT_EN				0x08
+ #define TSADCV2_INT_PD				0x0c
+ #define TSADCV2_DATA(chn)			(0x20 + (chn) * 0x04)
++#define TSADCV2_COMP_INT(chn)		        (0x30 + (chn) * 0x04)
+ #define TSADCV2_COMP_SHUT(chn)		        (0x40 + (chn) * 0x04)
+ #define TSADCV2_HIGHT_INT_DEBOUNCE		0x60
+ #define TSADCV2_HIGHT_TSHUT_DEBOUNCE		0x64
+@@ -628,6 +632,20 @@ static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
+ 	return rk_tsadcv2_code_to_temp(table, val, temp);
+ }
+ 
++static void rk_tsadcv2_alarm_temp(struct chip_tsadc_table table,
++				  int chn, void __iomem *regs, int temp)
++{
++	u32 alarm_value, int_en;
++
++	alarm_value = rk_tsadcv2_temp_to_code(table, temp);
++	writel_relaxed(alarm_value & table.data_mask,
++		       regs + TSADCV2_COMP_INT(chn));
++
++	int_en = readl_relaxed(regs + TSADCV2_INT_EN);
++	int_en |= TSADCV2_INT_SRC_EN(chn);
++	writel_relaxed(int_en, regs + TSADCV2_INT_EN);
++}
++
+ static void rk_tsadcv2_tshut_temp(struct chip_tsadc_table table,
+ 				  int chn, void __iomem *regs, int temp)
+ {
+@@ -670,6 +688,7 @@ static const struct rockchip_tsadc_chip rk3228_tsadc_data = {
+ 	.irq_ack = rk_tsadcv3_irq_ack,
+ 	.control = rk_tsadcv3_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -694,6 +713,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
+ 	.irq_ack = rk_tsadcv2_irq_ack,
+ 	.control = rk_tsadcv2_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -718,6 +738,7 @@ static const struct rockchip_tsadc_chip rk3366_tsadc_data = {
+ 	.irq_ack = rk_tsadcv3_irq_ack,
+ 	.control = rk_tsadcv3_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -742,6 +763,7 @@ static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
+ 	.irq_ack = rk_tsadcv2_irq_ack,
+ 	.control = rk_tsadcv2_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -766,6 +788,7 @@ static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
+ 	.irq_ack = rk_tsadcv3_irq_ack,
+ 	.control = rk_tsadcv3_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -826,6 +849,21 @@ static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
++static int rockchip_thermal_set_trips(void *_sensor, int low, int high)
++{
++	struct rockchip_thermal_sensor *sensor = _sensor;
++	struct rockchip_thermal_data *thermal = sensor->thermal;
++	const struct rockchip_tsadc_chip *tsadc = thermal->chip;
++
++	dev_dbg(&thermal->pdev->dev, "%s: sensor %d: low: %d, high %d\n",
++		__func__, sensor->id, low, high);
++
++	tsadc->set_alarm_temp(tsadc->table,
++			      sensor->id, thermal->regs, high);
++
++	return 0;
++}
++
+ static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
+ {
+ 	struct rockchip_thermal_sensor *sensor = _sensor;
+@@ -843,6 +881,7 @@ static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
+ 
+ static const struct thermal_zone_of_device_ops rockchip_of_thermal_ops = {
+ 	.get_temp = rockchip_thermal_get_temp,
++	.set_trips = rockchip_thermal_set_trips,
+ };
+ 
+ static int rockchip_configure_from_dt(struct device *dev,
 -- 
 1.9.1
