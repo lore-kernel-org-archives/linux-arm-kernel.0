@@ -1,39 +1,35 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:50 +0300
-Subject: [PATCHv2 17/27] ARM: dts: DRA7: Add support for SHA IP
+Date: Wed, 22 Jun 2016 16:23:51 +0300
+Subject: [PATCHv2 18/27] ARM: dts: DRA7: Add DT node for RNG IP
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-18-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-19-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lokesh Vutla <lokeshvutla@ti.com>
 
-DRA7 SoC has the same SHA IP as OMAP5. Add DT entry for the same.
+Adding dt node for hardware random number generator IP.
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-[t-kristo at ti.com: changed SHA to use EDMA instead of SDMA]
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index da31a72..64759e1 100644
+index 64759e1..16ff083 100644
 --- a/arch/arm/boot/dts/dra7.dtsi
 +++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1776,6 +1776,17 @@
+@@ -1787,6 +1787,15 @@
  			clocks = <&l3_iclk_div>;
  			clock-names = "fck";
  		};
 +
-+		sham: sham at 53100000 {
-+			compatible = "ti,omap5-sham";
-+			ti,hwmods = "sham";
-+			reg = <0x4b101000 0x300>;
-+			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-+			dmas = <&edma_xbar 119 0>;
-+			dma-names = "rx";
++		rng: rng at 48090000 {
++			compatible = "ti,omap4-rng";
++			ti,hwmods = "rng";
++			reg = <0x48090000 0x2000>;
++			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&l3_iclk_div>;
 +			clock-names = "fck";
 +		};
