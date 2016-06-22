@@ -1,33 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Jun 2016 11:52:03 +0200
-Subject: [PATCH 4.7 fix] ARM: dts: sunxi: Add pll3 to simplefb nodes
- clocks lists
-In-Reply-To: <1466456242-22841-1-git-send-email-hdegoede@redhat.com>
-References: <1466456242-22841-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160622095203.GT26668@lukather>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Jun 2016 02:53:05 -0700
+Subject: [PATCH 0/4] Get kexec working on SMP omap variants
+In-Reply-To: <cfc75c15-ab10-22ee-35b8-529e28d2773c@oracle.com>
+References: <1466495565-17480-1-git-send-email-tony@atomide.com>
+ <cfc75c15-ab10-22ee-35b8-529e28d2773c@oracle.com>
+Message-ID: <20160622095303.GF22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 10:57:22PM +0200, Hans de Goede wrote:
-> Now that we've a clock node describing pll3 we must add it to the
-> simplefb nodes clocks lists to avoid it getting turned off when
-> simplefb is used.
+* Santosh Shilimkar <santosh.shilimkar@oracle.com> [160621 09:10]:
 > 
-> This fixes the screen going black when using simplefb.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> I suggest to do bit wider testing including PM. From
+> quick scan, the series looks fine to me.
 
-Applied, thanks!
-Maxime
+Looks like the /sys/kernel/debug/pm_debug/count values for
+both cores for off increse just fine with these patches
+both before and after kexec.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/68cec676/attachment-0001.sig>
+> FWIW, Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+
+Thanks,
+
+Tony
