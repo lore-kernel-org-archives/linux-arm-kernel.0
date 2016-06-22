@@ -1,55 +1,64 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 22 Jun 2016 10:18:18 +0100
-Subject: [PATCH] coresight: document binding acronyms
-In-Reply-To: <1466534486-22422-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1466534486-22422-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <576A57DA.8090309@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 22 Jun 2016 10:20:17 +0100
+Subject: [PATCH RESEND V2] ARM64: config: Enable MAX77620 pinctrl/gpio/rtc
+ for Tegra210 P2180
+In-Reply-To: <1466143556-31849-1-git-send-email-ldewangan@nvidia.com>
+References: <1466143556-31849-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <576A5851.1070106@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
-On 21/06/16 19:41, Mathieu Poirier wrote:
-> It can be hard for people not familiar with the CoreSight IP blocks
-> to make sense of the acronyms found in the current bindings.  As such
-> this patch expands each acronym in the hope of providing a better
-> description of the IP block they represent.
->
-
-Thanks for adding these info so quickly. Just a minor nit below.
-
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+On 17/06/16 07:05, Laxman Dewangan wrote:
+> NVIDIA's Tegra210 Jetson platform (P2180) uses the MAX77620 as PMIC.
+> Enable GPIO, Pincontrol and RTC driver for this device.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 > ---
->   .../devicetree/bindings/arm/coresight.txt          | 32 ++++++++++++++++------
->   1 file changed, 24 insertions(+), 8 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> index 93147c0c8a0e..c73a7f773998 100644
-> --- a/Documentation/devicetree/bindings/arm/coresight.txt
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -12,14 +12,30 @@ its hardware characteristcs.
->
->   	* compatible: These have to be supplemented with "arm,primecell" as
->   	  drivers are using the AMBA bus interface.  Possible values include:
-> -		- "arm,coresight-etb10", "arm,primecell";
-> -		- "arm,coresight-tpiu", "arm,primecell";
-> -		- "arm,coresight-tmc", "arm,primecell";
-> -		- "arm,coresight-funnel", "arm,primecell";
-> -		- "arm,coresight-etm3x", "arm,primecell";
-> -		- "arm,coresight-etm4x", "arm,primecell";
-> -		- "qcom,coresight-replicator1x", "arm,primecell";
-> -		- "arm,coresight-stm", "arm,primecell"; [1]
-> +		- Embedded Trace Buffer (version 1.0):
-> +			"arm,coresight-etb10", "arm,primecell";
-> +
-> +		- Trace Port Interface Unit:
-> +			"arm,coresight-tpiu", "arm,primecell";
-> +
-> +		- Trace Memory Controller (ETB, ETF, ETR):
+> Changes from V1:
+> - MFD and regulator is already enabled, enabling remaining driver.
+> 
+> Resending to linux-tegra group also.
+> 
+> 
+>  arch/arm64/configs/defconfig | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 9af9ba5..90a6705 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -186,6 +186,7 @@ CONFIG_SPI_QUP=y
+>  CONFIG_SPI_SPIDEV=m
+>  CONFIG_SPMI=y
+>  CONFIG_PINCTRL_SINGLE=y
+> +CONFIG_PINCTRL_MAX77620=y
+>  CONFIG_PINCTRL_MSM8916=y
+>  CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+>  CONFIG_GPIO_SYSFS=y
+> @@ -194,6 +195,7 @@ CONFIG_GPIO_PL061=y
+>  CONFIG_GPIO_RCAR=y
+>  CONFIG_GPIO_XGENE=y
+>  CONFIG_GPIO_PCA953X=m
+> +CONFIG_GPIO_MAX77620=y
+>  CONFIG_POWER_RESET_MSM=y
+>  CONFIG_POWER_RESET_XGENE=y
+>  CONFIG_POWER_RESET_SYSCON=y
+> @@ -274,6 +276,7 @@ CONFIG_LEDS_TRIGGERS=y
+>  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_LEDS_TRIGGER_CPU=y
+>  CONFIG_RTC_CLASS=y
+> +CONFIG_RTC_DRV_MAX77686=y
+>  CONFIG_RTC_DRV_S5M=y
+>  CONFIG_RTC_DRV_DS3232=y
+>  CONFIG_RTC_DRV_EFI=y
 
-Only ETB is expanded in the list, does it make sense to expand ETF and
-ETR too ?
+We need this for Tegra210 Smaug as well.
+
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+
+Cheers
+Jon
 
 -- 
-Regards,
-Sudeep
+nvpublic
