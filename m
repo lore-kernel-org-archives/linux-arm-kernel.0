@@ -1,106 +1,115 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Jun 2016 10:35:49 +0100
-Subject: [PATCH 2/2] arm64: dts: Add device-tree for ARM's AEMv8A-AEMv8A
- FVP Base model
-In-Reply-To: <1466532087.2856.66.camel@linaro.org>
-References: <1466424796-13769-1-git-send-email-tixy@linaro.org>
- <1466424796-13769-2-git-send-email-tixy@linaro.org>
- <20160620123906.GC26152@leverpostej>
- <1466433277.2833.33.camel@linaro.org>
- <20160620145535.GC9246@leverpostej>
- <1466532087.2856.66.camel@linaro.org>
-Message-ID: <20160622093549.GA25837@leverpostej>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 22 Jun 2016 10:36:38 +0100
+Subject: [PATCH 2/2] cpufreq: exynos: use relaxed IO accesors
+In-Reply-To: <1466588198-27445-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1466588198-27445-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1466588198-27445-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 07:01:27PM +0100, Jon Medhurst (Tixy) wrote:
-> On Mon, 2016-06-20 at 15:55 +0100, Mark Rutland wrote:
-> > On Mon, Jun 20, 2016 at 03:34:37PM +0100, Jon Medhurst (Tixy) wrote:
-> > > On Mon, 2016-06-20 at 13:39 +0100, Mark Rutland wrote:
-> > > > Hi,
-> > > > 
-> > > > On Mon, Jun 20, 2016 at 01:13:16PM +0100, Jon Medhurst wrote:
-> > > > > Fixed Virtual Platform (FVP) Base models are simulations of systems
-> > > > > that resemble Versatile Express or Juno hardware.
-> > > > > 
-> > > > > This adds a device-tree for the model variant that has two clusters of
-> > > > > Architecture Envelope Model (AEM) v8-A CPUs. The peripheral devices that
-> > > > > are common to all variants of Base models have been placed in a separate
-> > > > > file (fvp-base.dtsi) to facilitate creating device-trees for other
-> > > > > models.
-> > > > > 
-> > > > > It is desirable to use simulations for code testing purposes and so it
-> > > > > is beneficial to include nodes for things that are timing and power
-> > > > > consumption related, even when these don't otherwise have relevance or
-> > > > > accuracy. Where these have been included here (e.g. idle-states) entries
-> > > > > have been copied from real hardware platforms such as Juno.
-> > > > 
-> > > > Which firmware are you using,
-> > > 
-> > > ARM Trusted Firmware
-> > > 
-> > > >  and what precisely does it do w.r.t.
-> > > > those idle states?
-> > > 
-> > > I don't know, will check. Those states are also in the ARM TF
-> > > device-tree for the Base FVP [2] but I admit I didn't verify they were
-> > > correct. (Unlike real 'hardware' dt nodes, for which I methodically went
-> > > through documentation and LISA files to check and fix).
-> > > 
-> > > [2] https://github.com/ARM-software/arm-trusted-firmware/blob/master/fdts/fvp-base-gicv3-psci.dts
-> > > 
-> > > >  Judging by the FVP ATF pm code [1], those state IDs
-> > > > aren't valid (though perhaps the comment is wrong, or I've misunderstood
-> > > > something).
-> > > 
-> > > I'm not sure which comment you are referring to, that link [1] doesn't
-> > > seem to anchor to a particular source line in my web browser, and I
-> > > don't spot anything relevant scanning by eye.
-> > 
-> > Aargh, the web interface appears to have given me a duff URL. Let's try
-> > again [3]. ;)
-> > 
-> > The comments note state-ids 0x01, 0x02, and 0x22, which don't appear to
-> > match the DT. It might be that I've just misunderstood
-> 
-> That function is only compiled when ARM_RECOM_STATE_ID_ENC is true,
-> which it isn't when I build TF using "make PLAT=fvp ...." so I think
-> it's a red herring.
+The use of __raw IO accesors is not endian safe and should be used
+sparingly. The relaxed variants should be as lightweight and also
+are endian safe.
 
-Ah,ok.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-pm at vger.kernel.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/cpufreq/exynos5440-cpufreq.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-> When I boot the FVP with my posted device-tree, the core run state icons
-> on the CLCD window behave as you would expect for CPUs and whole
-> clusters powering off/on as CPU's activity changes. So idle _looks_ like
-> it's working OK.
-> 
-> I also put printfs in ATF's psci_cpu_suspend() function and I can see
-> the values specified in device-tree being passed in and the code
-> behaving sensibly. From how it cracks the power_state value [4] it
-> certainly looks like the numbers have the following meanings:
-> 
-> top byte = 0..3 for the 'level' of the power state
-> top-but-one byte = 0/1 for Standby/Powerdown
-> 
-> For FVP [5], the level appears to be 0=CPU, 1=Cluster.
-> This matches what's in the device-tree I posted, where we have
-> 0x00010000 for CPU sleep, and 0x01010000 for cluster sleep.
-> 
-> All of which is a long way of saying that I believe the values that the
-> firmware guys and Linaro have been using for the past year or two are
-> correct ;-)
-
-Great, thanks for digging into that, and apologies for the noise!
-
-Thanks,
-Mark.
-
-> 
-> > [3] https://github.com/ARM-software/arm-trusted-firmware/blob/6355f2347aec8bf6ad74867c2b0c996e10546ad4/plat/arm/board/fvp/fvp_pm.c#L53
-> 
-> [4] https://github.com/ARM-software/arm-trusted-firmware/blob/6355f2347aec8bf6ad74867c2b0c996e10546ad4/include/bl31/services/psci.h#L100
-> [5] https://github.com/ARM-software/arm-trusted-firmware/blob/6355f2347aec8bf6ad74867c2b0c996e10546ad4/plat/arm/board/fvp/fvp_pm.c#L195
-> 
-> -- 
-> Tixy
-> 
+diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+index c0f3373..7a5707f 100644
+--- a/drivers/cpufreq/exynos5440-cpufreq.c
++++ b/drivers/cpufreq/exynos5440-cpufreq.c
+@@ -155,7 +155,7 @@ static int init_div_table(void)
+ 		tmp = (clk_div | ema_div | (volt_id << P0_7_VDD_SHIFT)
+ 			| ((freq / FREQ_UNIT) << P0_7_FREQ_SHIFT));
+ 
+-		__raw_writel(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 *
++		writel_relaxed(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 *
+ 						(pos - freq_tbl));
+ 	}
+ 
+@@ -169,17 +169,17 @@ static void exynos_enable_dvfs(unsigned int cur_frequency)
+ 	struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
+ 	struct cpufreq_frequency_table *pos;
+ 	/* Disable DVFS */
+-	__raw_writel(0,	dvfs_info->base + XMU_DVFS_CTRL);
++	writel_relaxed(0,	dvfs_info->base + XMU_DVFS_CTRL);
+ 
+ 	/* Enable PSTATE Change Event */
+-	tmp = __raw_readl(dvfs_info->base + XMU_PMUEVTEN);
++	tmp = readl_relaxed(dvfs_info->base + XMU_PMUEVTEN);
+ 	tmp |= (1 << PSTATE_CHANGED_EVTEN_SHIFT);
+-	 __raw_writel(tmp, dvfs_info->base + XMU_PMUEVTEN);
++	 writel_relaxed(tmp, dvfs_info->base + XMU_PMUEVTEN);
+ 
+ 	/* Enable PSTATE Change IRQ */
+-	tmp = __raw_readl(dvfs_info->base + XMU_PMUIRQEN);
++	tmp = readl_relaxed(dvfs_info->base + XMU_PMUIRQEN);
+ 	tmp |= (1 << PSTATE_CHANGED_IRQEN_SHIFT);
+-	 __raw_writel(tmp, dvfs_info->base + XMU_PMUIRQEN);
++	 writel_relaxed(tmp, dvfs_info->base + XMU_PMUIRQEN);
+ 
+ 	/* Set initial performance index */
+ 	cpufreq_for_each_entry(pos, freq_table)
+@@ -197,14 +197,14 @@ static void exynos_enable_dvfs(unsigned int cur_frequency)
+ 						cur_frequency);
+ 
+ 	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+-		tmp = __raw_readl(dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
++		tmp = readl_relaxed(dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
+ 		tmp &= ~(P_VALUE_MASK << C0_3_PSTATE_NEW_SHIFT);
+ 		tmp |= ((pos - freq_table) << C0_3_PSTATE_NEW_SHIFT);
+-		__raw_writel(tmp, dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
++		writel_relaxed(tmp, dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
+ 	}
+ 
+ 	/* Enable DVFS */
+-	__raw_writel(1 << XMU_DVFS_CTRL_EN_SHIFT,
++	writel_relaxed(1 << XMU_DVFS_CTRL_EN_SHIFT,
+ 				dvfs_info->base + XMU_DVFS_CTRL);
+ }
+ 
+@@ -223,11 +223,11 @@ static int exynos_target(struct cpufreq_policy *policy, unsigned int index)
+ 
+ 	/* Set the target frequency in all C0_3_PSTATE register */
+ 	for_each_cpu(i, policy->cpus) {
+-		tmp = __raw_readl(dvfs_info->base + XMU_C0_3_PSTATE + i * 4);
++		tmp = readl_relaxed(dvfs_info->base + XMU_C0_3_PSTATE + i * 4);
+ 		tmp &= ~(P_VALUE_MASK << C0_3_PSTATE_NEW_SHIFT);
+ 		tmp |= (index << C0_3_PSTATE_NEW_SHIFT);
+ 
+-		__raw_writel(tmp, dvfs_info->base + XMU_C0_3_PSTATE + i * 4);
++		writel_relaxed(tmp, dvfs_info->base + XMU_C0_3_PSTATE + i * 4);
+ 	}
+ 	mutex_unlock(&cpufreq_lock);
+ 	return 0;
+@@ -246,7 +246,7 @@ static void exynos_cpufreq_work(struct work_struct *work)
+ 	mutex_lock(&cpufreq_lock);
+ 	freqs.old = policy->cur;
+ 
+-	cur_pstate = __raw_readl(dvfs_info->base + XMU_P_STATUS);
++	cur_pstate = readl_relaxed(dvfs_info->base + XMU_P_STATUS);
+ 	if (cur_pstate >> C0_3_PSTATE_VALID_SHIFT & 0x1)
+ 		index = (cur_pstate >> C0_3_PSTATE_CURR_SHIFT) & P_VALUE_MASK;
+ 	else
+@@ -270,9 +270,9 @@ static irqreturn_t exynos_cpufreq_irq(int irq, void *id)
+ {
+ 	unsigned int tmp;
+ 
+-	tmp = __raw_readl(dvfs_info->base + XMU_PMUIRQ);
++	tmp = readl_relaxed(dvfs_info->base + XMU_PMUIRQ);
+ 	if (tmp >> PSTATE_CHANGED_SHIFT & 0x1) {
+-		__raw_writel(tmp, dvfs_info->base + XMU_PMUIRQ);
++		writel_relaxed(tmp, dvfs_info->base + XMU_PMUIRQ);
+ 		disable_irq_nosync(irq);
+ 		schedule_work(&dvfs_info->irq_work);
+ 	}
+-- 
+2.8.1
