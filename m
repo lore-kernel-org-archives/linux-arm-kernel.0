@@ -1,43 +1,82 @@
 From: erin.lo@mediatek.com (Erin Lo)
-Date: Wed, 22 Jun 2016 15:40:20 +0800
-Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's parents
+Date: Wed, 22 Jun 2016 15:40:22 +0800
+Subject: [PATCH v9 03/10] clk: mediatek: Refine the makefile to support
+ multiple clock drivers
 In-Reply-To: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
 References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1466581229-2342-4-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: James Liao <jamesjj.liao@mediatek.com>
 
-This patch fixed wrong state of parent clocks if they are registered
-after critical clocks.
+Add a Kconfig to define clock configuration for each SoC, and
+modify the Makefile to build drivers that only selected in config.
 
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+Tested-by: John Crispin <blogic@openwrt.org>
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- drivers/clk/clk.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/clk/Kconfig           |  1 +
+ drivers/clk/mediatek/Kconfig  | 23 +++++++++++++++++++++++
+ drivers/clk/mediatek/Makefile |  6 +++---
+ 3 files changed, 27 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/clk/mediatek/Kconfig
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index d584004..e9f5f89 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2388,8 +2388,15 @@ static int __clk_core_init(struct clk_core *core)
- 	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
- 		struct clk_core *parent = __clk_init_parent(orphan);
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 53ddba2..665c03b 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -208,6 +208,7 @@ config COMMON_CLK_OXNAS
  
--		if (parent)
-+		if (parent) {
- 			clk_core_reparent(orphan, parent);
+ source "drivers/clk/bcm/Kconfig"
+ source "drivers/clk/hisilicon/Kconfig"
++source "drivers/clk/mediatek/Kconfig"
+ source "drivers/clk/mvebu/Kconfig"
+ source "drivers/clk/qcom/Kconfig"
+ source "drivers/clk/renesas/Kconfig"
+diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
+new file mode 100644
+index 0000000..dc224e6
+--- /dev/null
++++ b/drivers/clk/mediatek/Kconfig
+@@ -0,0 +1,23 @@
++#
++# MediaTek SoC drivers
++#
++config COMMON_CLK_MEDIATEK
++	bool
++	---help---
++	  Mediatek SoCs' clock support.
 +
-+			if (orphan->prepare_count)
-+				clk_core_prepare(parent);
++config COMMON_CLK_MT8135
++	bool "Clock driver for Mediatek MT8135"
++	depends on COMMON_CLK
++	select COMMON_CLK_MEDIATEK
++	default ARCH_MEDIATEK
++	---help---
++	  This driver supports Mediatek MT8135 clocks.
 +
-+			if (orphan->enable_count)
-+				clk_core_enable(parent);
-+		}
- 	}
- 
- 	/*
++config COMMON_CLK_MT8173
++	bool "Clock driver for Mediatek MT8173"
++	depends on COMMON_CLK
++	select COMMON_CLK_MEDIATEK
++	default ARCH_MEDIATEK
++	---help---
++	  This driver supports Mediatek MT8173 clocks.
+diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+index 95fdfac..32e7222 100644
+--- a/drivers/clk/mediatek/Makefile
++++ b/drivers/clk/mediatek/Makefile
+@@ -1,4 +1,4 @@
+-obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
++obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
+ obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+-obj-y += clk-mt8135.o
+-obj-y += clk-mt8173.o
++obj-$(CONFIG_COMMON_CLK_MT8135) += clk-mt8135.o
++obj-$(CONFIG_COMMON_CLK_MT8173) += clk-mt8173.o
 -- 
 1.9.1
