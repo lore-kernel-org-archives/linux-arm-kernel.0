@@ -1,24 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Jun 2016 02:53:05 -0700
-Subject: [PATCH 0/4] Get kexec working on SMP omap variants
-In-Reply-To: <cfc75c15-ab10-22ee-35b8-529e28d2773c@oracle.com>
-References: <1466495565-17480-1-git-send-email-tony@atomide.com>
- <cfc75c15-ab10-22ee-35b8-529e28d2773c@oracle.com>
-Message-ID: <20160622095303.GF22406@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 22 Jun 2016 11:57:23 +0200
+Subject: [PATCH V3] ARM: dts: sun7i: Add dts file for Bananapi M1 Plus
+ board
+In-Reply-To: <20160617095602.14612-1-luoyi.ly@gmail.com>
+References: <20160617095602.14612-1-luoyi.ly@gmail.com>
+Message-ID: <20160622095723.GU26668@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@oracle.com> [160621 09:10]:
+Hi,
+
+On Fri, Jun 17, 2016 at 05:56:02PM +0800, luoyi.ly at gmail.com wrote:
+> From: Luo Yi <luoyi.ly@gmail.com>
 > 
-> I suggest to do bit wider testing including PM. From
-> quick scan, the series looks fine to me.
+> Add support for the Bananapi M1 Plus A20 development board from
+> sinovoip.com.cn . This board is nearly a clone of the Lemaker's
+> Bananapro, but differ with the wlan chipset connection and i2s pinout.
+> And I also enable the integrated audio codec on default.
 
-Looks like the /sys/kernel/debug/pm_debug/count values for
-both cores for off increse just fine with these patches
-both before and after kexec.
+This patch content is fine, but there's a lot of small issues:
+  - You're not indenting the nodes properly
+  - You're missing your Signed-off-by tag
+  - And probably other stuff
 
-> FWIW, Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+This has all been reported by checkpatch.
 
-Thanks,
+Make sure you run checkpatch, make the modifications needed so that
+you don't have any warnings or errors anymore, and resubmit it.
 
-Tony
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160622/c1e7f4c3/attachment.sig>
