@@ -1,40 +1,48 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Wed, 22 Jun 2016 13:23:39 +0200
-Subject: [PATCH v3 02/10] crypto: marvell: Check engine is not already
- running when enabling a req
-In-Reply-To: <20160622103324.GA30918@gondor.apana.org.au>
-References: <20160622103324.GA30918@gondor.apana.org.au>
-Message-ID: <576A753B.7070507@free-electrons.com>
+From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Wed, 22 Jun 2016 07:29:44 -0400
+Subject: [PATCH v4 0/3] pwm support for Broadcom iProc SoC's
+Message-ID: <1466594987-26537-1-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patchset contains the pwm support for the Broadcom's iProc SoC's.
 
-Le 22/06/2016 12:33, Herbert Xu a ?crit :
-> Romain Perier <romain.perier@free-electrons.com> wrote:
->> Add a BUG_ON() call when the driver tries to launch a crypto request
->> while the engine is still processing the previous one. This replaces
->> a silent system hang by a verbose kernel panic with the associated
->> backtrace to let the user know that something went wrong in the CESA
->> driver.
->
-> Hmm, so how can this happen?
-If it is triggerable then we better
-> try to recover from it more gracefully.  If it is not triggerable
-> then why bother?
->
+The first patch provides the documentation details and the
+second patch contains the controller support details. The third patch
+contains the enable method for Northstar Plus SoC.
 
-Well, It does not happen with the current driver (in mainline). This is 
-bug I had when I added support to chain requests. Take a look at the 
-patch 008/010, it changes the way the requests are "prepared". If you 
-really enable a request while the engine is running, that's very hard to 
-debug. This is more useful to have a backtrace to let the user know that 
-something is wrong instead of having a silent system hang. That's easier 
-to debug and you can detect regressions.
+This patch series has been tested on NSP bcm958625HR board.
+The pwm is not enabled for this board as the pins are open and not used.
 
-Regards,
-Romain
+This patch series is based on v4.7.0-rc1 and is available from github
+repo: https://github.com/Broadcom/cygnus-linux.git
+branch: iproc-pwm-v4
+
+
+Changes since v3
+Addressed comments from Scott to include COMPILE_TEST
+
+Changes since v2
+Rebased on v4.7.0-rc1
+
+Changes since v1
+Addressed the review comments from Thierry
+ 1. Use separate driver for iProc SoC's.
+ 2. Added Robs ack to the Documentation patch
+
+Yendapally Reddy Dhananjaya Reddy (3):
+  Documentation: dt: Add Broadcom iproc pwm controller binding
+  pwm: iproc: Add support for Broadcom iproc pwm controller
+  ARM: dts: NSP: Add PWM Support to DT
+
+ .../devicetree/bindings/pwm/brcm,iproc-pwm.txt     |  21 ++
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |   8 +
+ drivers/pwm/Kconfig                                |  10 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-bcm-iproc.c                        | 327 +++++++++++++++++++++
+ 5 files changed, 367 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/brcm,iproc-pwm.txt
+ create mode 100644 drivers/pwm/pwm-bcm-iproc.c
+
 -- 
-Romain Perier, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.0
