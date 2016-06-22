@@ -1,54 +1,114 @@
-From: wangyijing@huawei.com (wangyijing)
-Date: Wed, 22 Jun 2016 09:07:57 +0800
-Subject: [PATCH v1 00/25] PCI: Request host bridge window resources
-In-Reply-To: <20160621150352.GB31917@localhost>
-References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <20160618180735.GB20504@localhost> <57692BD0.6030609@huawei.com>
- <20160621150352.GB31917@localhost>
-Message-ID: <5769E4ED.4050904@huawei.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 22 Jun 2016 09:14:39 +0800
+Subject: [PATCH 08/12] doc: binding: pwrseq-usb-generic: add binding doc
+ for generic usb power sequence driver
+In-Reply-To: <20160621212653.GA22764@rob-hp-laptop>
+References: <1466158165-9380-1-git-send-email-peter.chen@nxp.com>
+ <1466158165-9380-9-git-send-email-peter.chen@nxp.com>
+ <CAL_JsqLvs0s2TyfqPM5vtmyY81_X84VjCGjsGYbTgT4syOfp9Q@mail.gmail.com>
+ <20160620112651.GA26936@shlinux2>
+ <20160620161607.GA11427@rob-hp-laptop>
+ <20160621021117.GD26936@shlinux2>
+ <20160621212653.GA22764@rob-hp-laptop>
+Message-ID: <20160622011439.GA21361@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2016/6/21 23:03, Bjorn Helgaas ??:
-> On Tue, Jun 21, 2016 at 07:58:08PM +0800, wangyijing wrote:
->> Hi Bjorn, use devm_request_resource() for host bridge resource is cool,
->> what about do the similar change for x86, now we request host bridge resource
->> in pci_acpi_root_add_resources() in x86, and we would release the host bridge
->> resource when host bridge device refcount reach 0. This logic may introduce issue,
->> E.g.
->> If we try to remove a pci host bridge, but there is a child pci device which refcount
->> cannot decrease to 0 after remove the device, in this case, its parent pci_bus and
->> parent device, all their refcount cannot reach to 0, the result is pci host bridge
->> refcount can not reach 0, so its .release_fn() won't be called, and host bridge
->> resouces can not release. If we want to add the pci host bridge again, all pci devices
->> can not work because the resource is conflict with the old.
->>
->> devm resource would be released when the driver detach, this is better than what we do now, I think.
+On Tue, Jun 21, 2016 at 04:26:53PM -0500, Rob Herring wrote:
+> On Tue, Jun 21, 2016 at 10:11:17AM +0800, Peter Chen wrote:
+> > On Mon, Jun 20, 2016 at 11:16:07AM -0500, Rob Herring wrote:
+> > > On Mon, Jun 20, 2016 at 07:26:51PM +0800, Peter Chen wrote:
+> > > > On Fri, Jun 17, 2016 at 12:16:48PM -0500, Rob Herring wrote:
+> > > > > On Fri, Jun 17, 2016 at 5:09 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> > > > > > Add binding doc for generic usb power sequence driver, and update
+> > > > > > generic usb device binding-doc accordingly.
 > 
-> I'm not going to convert pci_root.c to use devm right now.  That might
-> be a good thing, but this current series is mostly trivial.  I think
-> changing pci_root.c would not be trivial, so that looks like a project
-> all by itself.
-
-OK.
-
+> [...]
 > 
-> I don't quite follow the example of removing a host bridge while a
-> child PCI device refcount is non-zero.  That sounds like an invalid
-> scenario regardless of whether the resources are released by a
-> .release_fn() or by devm.
-
-I would send a draft patch to describe and fix the issue, because it's not related to
-this series, so let's discuess it in another thread. :)
-
-Thanks!
-Yijing.
-
-
+> > > > 		clocks = <&clks IMX6SX_CLK_CKO>;
+> > > > 
+> > > > 		#address-cells = <1>;
+> > > > 		#size-cells = <0>;
+> > > > 		ethernet: asix at 1 {
+> > > > 			compatible = "usbb95,1708";
+> > > > 			reg = <1>;
+> > > > 
+> > > > 			power-sequence;
+> > > > 			reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
+> > > > 			reset-duration-us = <15>;
+> > > > 			clocks = <&clks IMX6SX_CLK_IPG>;
+> > > > 		};
+> > > > 	};
+> > > > };
+> > > > 
+> > > > If the node has property "power-sequence", the pwrseq core will create
+> > > > related platform device, and the driver under pwrseq driver will handle
+> > > > power sequence stuffs. 
+> > > 
+> > > This I have issue with. If you are creating a platform device here, you 
+> > > are trying to work-around limitations in the linux driver model.
+> > 
+> > My current solution like below, but it seems you didn't agree with that.
+> > I just double confirm here, if you don't, I give up the solution for
+> > using generic power sequence framework.
+> > 
+> > In drivers/usb/core/hub.c
+> > 
+> > 	for_each_child_of_node(parent->of_node, node) {
+> > 		hdev_pwrseq = pwrseq_alloc(node, "usb_pwrseq_generic");
+> > 		if (!IS_ERR_OR_NULL(hdev_pwrseq)) {
+> > 			pwrseq_node = kzalloc(sizeof(pwrseq_node), GFP_KERNEL);
+> > 			if (!pwrseq_node) {
+> > 				ret = -ENOMEM;
+> > 				goto err1;
+> > 			}
+> > 			/* power on sequence */
+> > 			ret = pwrseq_pre_power_on(hdev_pwrseq);
 > 
-> Bjorn
+> Why does this function need to do anything more than:
 > 
-> .
+> - Check if the child has a "power-sequence" property
+> - Get the "reset-gpios" GPIO
+> - Assert reset for specified/default time
+> - Deassert reset
 > 
+
+Besides gpios, it may exist clock and regulator operation, and the
+operation may be failed. I thought these operations can be easy
+done belongs to a device, but now, let me try this straight-forward
+way, thanks.
+
+Peter
+> Then continue on as normal. That seems straight-forward to me.
+> 
+> There is no reason you need a platform device in the mix. Perhaps trying 
+> to move the MMC pwr-seq code is pointless as it adds needless 
+> complexity.
+> 
+> [...]
+> 
+> > > Either 
+> > > we need some sort of pre-probe hook to the drivers to call or each 
+> > > parent node driver is responsible for checking and calling pwr-seq 
+> > > functions for child nodes. e.g. The host controller calls pwr-seq for 
+> > > the hub, the hub driver calls the power seq for the asix chip. Soon as 
+> > > we have a case too complex for the generic pwr-seq, we're going to need 
+> > > the pre-probe hook as I don't want to see a continual expansion of 
+> > > generic pwr-seq binding for ever more complex cases.
+> > > 
+> > 
+> > How the driver know what it needs to handle (eg, gpio, clock) if there
+> > is no device for it? The most important we need to consider is which
+> > device owns there power sequence properties, then the corresponding
+> > driver can handle it.
+> 
+> What can be handled by is defined by presence of power-sequence 
+> property. There can be 1 driver for the device. That is the USB hub 
+> driver in this example. You should not have 2 "devices".
+> 
+> Rob
+
+-- 
+
+Best Regards,
+Peter Chen
