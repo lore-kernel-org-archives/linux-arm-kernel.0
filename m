@@ -1,87 +1,57 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 22 Jun 2016 17:51:12 +0100
-Subject: [PATCH v5 1/8] Documentation: arm: define DT cpu
- capacity-dmips-mhz bindings
-In-Reply-To: <20160616082042.GI5981@e106622-lin>
-References: <1465985877-18271-1-git-send-email-juri.lelli@arm.com>
- <1465985877-18271-2-git-send-email-juri.lelli@arm.com>
- <CAL_JsqJwQVsn3=6vQus4Q2OhnLUsJVN70j2+f3QoJejcb=p9YA@mail.gmail.com>
- <20160616082042.GI5981@e106622-lin>
-Message-ID: <20160622165112.GD5981@e106622-lin>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Jun 2016 17:56:58 +0100
+Subject: [PATCH] arm64: mm: only initialize swiotlb when necessary
+In-Reply-To: <4203245.3RUrvgiPFd@wuerfel>
+References: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
+ <3518191.m1tVRlZvU1@wuerfel>
+ <20160621160625.GE14542@e104818-lin.cambridge.arm.com>
+ <4203245.3RUrvgiPFd@wuerfel>
+Message-ID: <20160622165658.GE6521@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 16/06/16 09:20, Juri Lelli wrote:
-> Hi,
-> 
-> On 15/06/16 17:11, Rob Herring wrote:
-> > On Wed, Jun 15, 2016 at 5:17 AM, Juri Lelli <juri.lelli@arm.com> wrote:
-> 
-> [...]
-> 
-> > > +==========================================
-> > > +2 - CPU capacity definition
-> > > +==========================================
-> > > +
-> > > +CPU capacity is a number that provides the scheduler information about CPUs
-> > > +heterogeneity. Such heterogeneity can come from micro-architectural differences
-> > > +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
-> > > +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
-> > > +context is about differing performance characteristics; this binding tries to
-> > > +capture a first-order approximation of the relative performance of CPUs.
-> > > +
-> > > +CPU capacities are obtained by running a suitable benchmark. This binding makes
-> > > +no aspersions on the validity or suitability of any particular benchmark, the
-> > > +final capacity should, however, be:
-> > > +
-> > > +* A "single-threaded" or CPU affine benchmark
-> > > +* Divided by the running frequency of the CPU executing the benchmark
-> > > +* Not subject to dynamic frequency scaling of the CPU
-> > > +
-> > > +For the time being we however advise usage of the Dhrystone benchmark. What
-> > > +above thus becomes:
-> > > +
-> > > +CPU capacities are obtained by running the Dhrystone benchmark on each CPU at
-> > > +max frequency. The obtained DMIPS score is then divided by the frequency (in
-> > > +MHz) at which the benchmark has been run, so that DMIPS/MHz are obtained.
-> > > +Such values are then normalized w.r.t. the highest score obtained in the
-> > > +system.
+On Tue, Jun 21, 2016 at 10:13:45PM +0200, Arnd Bergmann wrote:
+> On Tuesday, June 21, 2016 5:06:25 PM CEST Catalin Marinas wrote:
+> > On Wed, Jun 08, 2016 at 05:49:59PM +0200, Arnd Bergmann wrote:
+> > > On Wednesday, June 8, 2016 1:08:29 PM CEST Catalin Marinas wrote:
+> > > > On Wed, Jun 08, 2016 at 03:53:46PM +0800, Jisheng Zhang wrote:
+> > > > >  static int __init arm64_dma_init(void)
+> > > > >  {
+> > > > > +     if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
+> > > > > +             swiotlb = 1;
+> > > > > +
+> > > > >       return atomic_pool_init();
+> > > > >  }
+> > > > 
+> > > > So any platform with RAM larger than 4GB would still initialise swiotlb.
+> > > > I wouldn't say it's an issue, 64MB is not a significant loss on such
+> > > > systems.
+> > > > 
+> > > > An alternative would be to defer the freeing until we are aware of all
+> > > > possible dma masks for the populated devices (e.g. from DT), though I'm
+> > > > not sure that's enough, drivers may try to change such masks when
+> > > > probed.
+> > > 
+> > > Right, this is a hard problem, because you can in theory have odd devices
+> > > that require a DMA mask lower than the limit of ZONE_DMA.
 > > 
-> > So the property says it represents DMIPS/MHz, but we take that and
-> > "normalize" them back to a made up numbers?
+> > I'm not sure what we can do about such devices even with swiotlb. The
+> > bounce buffer is allocated from ZONE_DMA and currently it assumes a
+> > 32-bit mask from the start of RAM, so it is not guaranteed to support a
+> > smaller mask. We may need to come up with some DT memory node attribute
+> > to define the minimum DMA-able memory and restrict ZONE_DMA during early
+> > boot but I would rather wait until we hit a real issue in practice.
 > 
-> The normalization step is required if one wants to prevent
-> cross-platform comparisons (I think that's what vendors generally want).
-> They are not made up, they still come from measured DMIPS/MHz values.
-> 
-> > Perhaps that step should
-> > be optional. Then paranoid Si vendors can put their fake numbers in
-> > and end users can update the dts files with real numbers.
-> > 
-> 
-> But, you can also decide to skip that step and put non normalized
-> numbers in. This documentation is advising people for what seems to be
-> be the most common way of coming up with values that, once in a DT,
-> won't be used to compare perf of different platforms.
-> 
-> Maybe we want to add a paragraph clearly stating this point?
-> 
-> > Is there any point in allowing people to pick their own scale? Why not
-> > just 100 (as in percent)?
-> > 
-> 
-> I think we agreed that not picking any particular scale is more flexible
-> and easier to use. For example, if there is a 2x factor between you cpus
-> you can simply put 1 and 2 there. But, if you need higher "resolution"
-> you can put whatever suits you better and we'll use the max as scale.
-> 
-> Thanks a lot for the review.
-> 
+> The bounce buffer is allocated at early boot time in order to get an address
+> as low as possible, in the hope that it is small enough for those cases.
 
-Do you have any further comments on this point?
+The swiotlb allocation is triggered from mem_init() and that's well
+after the memblock has been initialised. The swiotlb_init() function
+uses memblock_virt_alloc_low_nopanic() which is a top-down allocator
+with an upper bound of ARCH_LOW_ADDRESS_LIMIT. The latter is set by the
+arm64 code to the top 32-bit of RAM (plus some offset), so it's likely
+that the swiotlb bounce buffer will be placed in the upper range of the
+32-bit mask.
 
-Best,
-
-- Juri
+-- 
+Catalin
