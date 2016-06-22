@@ -1,42 +1,57 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 22 Jun 2016 16:23:48 +0300
-Subject: [PATCHv2 15/27] ARM: dts: DRA7: Add DT node for DES IP
+Date: Wed, 22 Jun 2016 16:23:49 +0300
+Subject: [PATCHv2 16/27] ARM: dts: DRA7: Add DT nodes for AES IP
 In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1466601840-18486-16-git-send-email-t-kristo@ti.com>
+Message-ID: <1466601840-18486-17-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Joel Fernandes <joelf@ti.com>
 
-DRA7xx SoCs have a DES3DES IP. Add DT data for the same.
+DRA7 SoC has the same AES IP as OMAP4. Add DT entries for both AES cores.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+[t-kristo at ti.com: squashed in the change to use EDMA, squashed in
+                  support for two AES cores]
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index e007401..959f99b 100644
+index 959f99b..da31a72 100644
 --- a/arch/arm/boot/dts/dra7.dtsi
 +++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1743,6 +1743,17 @@
- 				clock-names = "fck", "sys_clk";
+@@ -1744,6 +1744,28 @@
  			};
  		};
-+
-+		des: des at 480a5000 {
-+			compatible = "ti,omap4-des";
-+			ti,hwmods = "des";
-+			reg = <0x480a5000 0xa0>;
-+			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+			dmas = <&sdma_xbar 117>, <&sdma_xbar 116>;
+ 
++		aes1: aes at 4b500000 {
++			compatible = "ti,omap4-aes";
++			ti,hwmods = "aes1";
++			reg = <0x4b500000 0xa0>;
++			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
++			dmas = <&edma_xbar 111 0>, <&edma_xbar 110 0>;
 +			dma-names = "tx", "rx";
 +			clocks = <&l3_iclk_div>;
 +			clock-names = "fck";
 +		};
- 	};
- 
- 	thermal_zones: thermal-zones {
++
++		aes2: aes at 4b700000 {
++			compatible = "ti,omap4-aes";
++			ti,hwmods = "aes2";
++			reg = <0x4b700000 0xa0>;
++			interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++			dmas = <&edma_xbar 114 0>, <&edma_xbar 113 0>;
++			dma-names = "tx", "rx";
++			clocks = <&l3_iclk_div>;
++			clock-names = "fck";
++		};
++
+ 		des: des at 480a5000 {
+ 			compatible = "ti,omap4-des";
+ 			ti,hwmods = "des";
 -- 
 1.9.1
