@@ -1,67 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Jun 2016 17:16:44 +0100
-Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
- of aliases
-In-Reply-To: <20160619010823.GC26875@pengutronix.de>
-References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
- <20160615072404.GB26768@pengutronix.de>
- <CACRpkdYK1C5px+A_O1sF99KTPTob9qTQpipEaRLHnNx5=AokLg@mail.gmail.com>
- <20160619010823.GC26875@pengutronix.de>
-Message-ID: <20160622161644.GD31817@leverpostej>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 22 Jun 2016 11:16:56 -0500
+Subject: [PATCH v2 1/3] dt-bindings: add DT binding for the Aardvark PCIe
+ controller
+In-Reply-To: <1465574056-8787-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1465574056-8787-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1465574056-8787-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160622161656.GE25485@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 19, 2016 at 03:08:23AM +0200, Uwe Kleine-K?nig wrote:
-> Hello Linus,
+On Fri, Jun 10, 2016 at 05:54:14PM +0200, Thomas Petazzoni wrote:
+> This commit adds the documentation for the Device Tree binding used to
+> describe the Aardvark PCIe controller, found on Marvell Armada 3700
+> ARM64 SoCs.
 > 
-> On Sat, Jun 18, 2016 at 10:25:45AM +0200, Linus Walleij wrote:
-> > On Wed, Jun 15, 2016 at 9:24 AM, Uwe Kleine-K?nig
-> > <u.kleine-koenig@pengutronix.de> wrote:
-> > > On Wed, Jun 15, 2016 at 08:56:58AM +0200, Linus Walleij wrote:
-> > 
-> > >> The GPIO numbering scheme is a matter of Linux internals and
-> > >> not about hardware description IMO.
-> > >
-> > > Not sure if I should agree here or not. It's very usual that the
-> > > "internal" gpio numbers match the hardware reference manual. I know this
-> > > from imx, at91, all pre-dt platforms, I'm sure there are more, and I bet
-> > > I'm not the only one relying on this for omap.
-> > 
-> > I think it will still match nicely against the chip-local offsets of the
-> > primary gpiochip so it'll be fine with a chardev too. The same was/is
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/pci/aardvark-pci.txt       | 56 ++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/aardvark-pci.txt
 > 
-> I cannot follow. What is the primary gpiochip? The first one? What is a
-> "chip-local offset". Just 3 for the fourth gpio of a given gpio bank?
-> I guess the problem is that I didn't follow development of the gpio
-> chardev.
+> diff --git a/Documentation/devicetree/bindings/pci/aardvark-pci.txt b/Documentation/devicetree/bindings/pci/aardvark-pci.txt
+> new file mode 100644
+> index 0000000..683830d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/aardvark-pci.txt
+> @@ -0,0 +1,56 @@
+> +Aardvark PCIe controller
+> +
+> +This PCIe controller is used on the Marvell Armada 3700 ARM64 SoC.
+> +
+> +The Device Tree node describing an Aardvark PCIe controller must
+> +contain the following properties:
+> +
+> + - compatible: Should be "marvell,armada-3700-pcie"
+> + - reg: range of registers for the PCIe controller
+> + - interrupts: the interrupt line of the PCIe controller
+> + - #address-cells: set to <3>
+> + - #size-cells: set to <2>
+> + - device_type: set to "pci"
+> + - ranges: ranges for the PCI memory and I/O regions
+> + - #interrupt-cells: set to <1>
+> + - msi-controller: indicates that the PCIe controller can itself
+> +   handled MSI interrupts
 
-If I've understood correctly, Linus was on about the id space for GPIOs
-under a particular gpiochip. If I've understand correctly, you're trying
-to ensure consistent numbering the the *global* ID space shared by all
-GPIO chips present in a system?
-
-> > the case of the first interrupts on x86 I think, but with the plethora of
-> > irqchips and dependency on probe order etc the assumption is
-> > nowadays to dangerous.
-> > 
-> > > And this is very usual in the dt world, too:
-> > >
-> > > $ git grep -El 'gpio. = \&gpio' arch/arm/boot/dts | wc -l
-> > > 37
-> > 
-> > Aha I didn't even know. Well I guess I could allow it for OMAP too
-> > then, but I want an ACK from one of the DT binding maintainers.
-
-In general, our use of aliases is rather ill-defined. It would be nicer
-if we could address devices in a similar manner to disks or partitions,
-e.g. by path or uuid, but I don't think we have anything sensible we can
-use there.
-
-Given that, I can see the use of an alias to provide a consistent way of
-referring to a particular gpiochip (and maybe we need to expose the
-alises information somehow to userspace), but IMO that's independent of
-any global ID space, probe ordering, etc.
-
-Thanks,
-Mark.
+s/handled/handle/
