@@ -1,67 +1,92 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Jun 2016 17:29:15 +0800
-Subject: [PATCH v2] ARM: dts: sun5i: q8-common: Enable USB-based WiFi
-Message-ID: <1466674155-3365-1-git-send-email-wens@csie.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 23 Jun 2016 11:33:27 +0200
+Subject: [linux-sunxi] Re: [PATCH] mmc: pwrseq-simple: Add an optional
+ post-power-on-delay
+In-Reply-To: <CAL_JsqJ0XVJb=Q9FT8g_OUTbgZWr-E58xQS0iCR4hv-9EHCcPA@mail.gmail.com>
+References: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqJ0XVJb=Q9FT8g_OUTbgZWr-E58xQS0iCR4hv-9EHCcPA@mail.gmail.com>
+Message-ID: <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The early A13 Q8 tablets all use a Realtek WiFi module connected to
-USB1. The module is powered by AXP209's LDO3 at 3.3V.
+Hi,
 
-Move the related settings from sun5i-a13-q8-tablet.dts to
-sun5i-q8-common.dtsi, for all q8-based tablets.
+On 23-06-16 00:25, Rob Herring wrote:
+> On Wed, Jun 22, 2016 at 12:59 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Some devices need a while to boot their firmware after providing clks /
+>> de-asserting resets before they are ready to receive sdio commands.
+>>
+>> This commits adds a post-power-on-delay-ms devicetree property to
+>> mmc-pwrseq-simple for use with such devices.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+>>  drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
+>>  2 files changed, 11 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>> index ce0e767..e254368 100644
+>> --- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>> +++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>> @@ -16,6 +16,8 @@ Optional properties:
+>>    See ../clocks/clock-bindings.txt for details.
+>>  - clock-names : Must include the following entry:
+>>    "ext_clock" (External clock provided to the card).
+>> +- post-power-on-delay-ms : Delay in ms after powering the card and
+>> +       de-asserting the reset-gpios (if any)
+>
+> Presumably you need this delay post any reset, not just after power on
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes since v1:
+mmc-pwrseq is only about doing power-on / off, not about providing
+reset functionality.
 
-  - Move the WiFi module settings from sun5i-a13-q8-tablet.dts
----
- arch/arm/boot/dts/sun5i-a13-q8-tablet.dts | 10 ----------
- arch/arm/boot/dts/sun5i-q8-common.dtsi    |  7 +++++++
- 2 files changed, 7 insertions(+), 10 deletions(-)
+> if you are waiting for firmware to boot. So the name is not all that
+> clear. How about a "reset-timing-ms" property that takes 3 values for
+> pre-assert time (normally 0), assertion time, post assert time. Of
+> course, I can still think of ways that breaks like when in this
+> sequence do clocks need to be turned on.
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-index 72e93acb5a9e..dce77825571d 100644
---- a/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-@@ -48,13 +48,3 @@
- 	model = "Q8 A13 Tablet";
- 	compatible = "allwinner,q8-a13", "allwinner,sun5i-a13";
- };
--
--&reg_ldo3 {
--	regulator-min-microvolt = <3300000>;
--	regulator-max-microvolt = <3300000>;
--	regulator-name = "vcc-wifi";
--};
--
--&usbphy {
--	usb1_vbus-supply = <&reg_ldo3>;
--};
-diff --git a/arch/arm/boot/dts/sun5i-q8-common.dtsi b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-index b6af9a498eda..a5de28d12b16 100644
---- a/arch/arm/boot/dts/sun5i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-@@ -191,6 +191,12 @@
- 	regulator-name = "avcc";
- };
- 
-+&reg_ldo3 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
-+};
-+
- &reg_usb0_vbus {
- 	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
- 	status = "okay";
-@@ -231,5 +237,6 @@
- 	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
- 	usb0_vbus_power-supply = <&usb_power_supply>;
- 	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_ldo3>;
- 	status = "okay";
- };
--- 
-2.8.1
+If you look at bindings/mmc/mmc-pwrseq-simple.txt out side of
+the diff context it contains:
+
+- reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+         at initialization and prior we start the power up procedure of the card.
+         They will be de-asserted right after the power has been provided to the
+         card.
+- clocks : Must contain an entry for the entry in clock-names.
+   See ../clocks/clock-bindings.txt for details.
+- clock-names : Must include the following entry:
+   "ext_clock" (External clock provided to the card).
+
+Notice how the existing docs talk about a power-up procedure (which matches
+the pwrseq name and purpose of these bindings).
+
+I actually started with calling the property "post-reset-delay-ms", but then
+I realized that what we really want is the ability to specify a time to
+wait (for e.g. firmware to boot) after completing the power-up procedure
+(and before starting the probe). The power-up procedure currently can
+also includes enabling external clocks to the sdio device (if any) and
+enabling regulators, so having a "reset-timing-ms" property does not
+seem right, as that would suggest it is ok to do the wait after deasserting
+reset, but before e.g. enabling external clocks. Where what we really
+want is to enable all necessary resources (or iow complete the powerup
+procedure) and then wait.
+
+You're right that in some cases more complicated timings may be necessary,
+but that can get really complicated like e.g.: enable regulator1, wait 10 ms,
+enable regulator2, wait 15ms, enable external clock1, ...
+
+And such complex timings fall outside of the scope of the mmc-pwrseq-simple
+binding, the idea being that for complex cases we do a device specific
+pwrseq binding, and then the smarts are in implementation of that specific
+pwrseq driver. As you've said yourself before we do not want to turn
+devicetree into a scripting language.
+
+However having a single wait after doing a straight forward power-up cycle
+seems to me like something which is appropriate for the mmc-pwrseq-simple
+binding.
+
+Regards,
+
+Hans
