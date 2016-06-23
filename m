@@ -1,34 +1,26 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Jun 2016 21:36:08 -0700
-Subject: [PATCH 1/2] ARM: OMAP2+: Drop legacy board file for n900
-In-Reply-To: <201606221848.41305@pali>
-References: <1465987689-14812-1-git-send-email-tony@atomide.com>
- <20160621112944.GV29844@pali> <20160621113215.GP22406@atomide.com>
- <201606221848.41305@pali>
-Message-ID: <20160623043607.GJ22406@atomide.com>
+Date: Wed, 22 Jun 2016 21:44:36 -0700
+Subject: [RESEND PATCH v2 0/5] ir-rx51 driver fixes
+In-Reply-To: <1466623341-30130-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+References: <1466623341-30130-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <20160623044436.GK22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [160622 09:51]:
-> Ok, now I looked at it and tested current version from torvalds tree.
-> 
-> There is still missing fixed support for IR, but that is waiting in 
-> media tree queue for next merge window.
-> 
-> So after IR patches land in torvalds tree, I'm fine with dropping legacy 
-> board code for n900 and you can add my Acked-by.
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160622 12:25]:
+> ir-rx51 is a driver for Nokia N900 IR transmitter. The current series
+> fixes the remaining problems in the driver:
 
-OK thanks for looking, I'll wait until the IR patches are merged.
+Thanks for updating these.
 
-> Sorry that it look so long time, but Nokia N900 is omap3 device with 
-> most features & drivers.
-> 
-> I need to say that Nokia N900 support has good support in mainline 
-> kernel, probably the best from all mobile phones. It is almost feature 
-> complete, missing parts are: DSP, both cameras, bluetooth and RM radio.
-> 
-> So thanks everybody for this big improvement!
+Trierry, care to ack the PWM patch?
 
-Thank you for fixing up a big chunk of the issues!
+Mauro, do you want me to set up an immutable branch with all
+these against v4.7-rc1 that we can all merge as needed?
+
+If you want to set up the branch instead, please feel free
+to add my ack.
+
+Regards,
 
 Tony
