@@ -1,96 +1,66 @@
-From: amit.pundir@linaro.org (Amit Pundir)
-Date: Thu, 23 Jun 2016 11:44:41 +0530
-Subject: [PATCH] config: Add android config fragments
-In-Reply-To: <CAL_JsqJQsTX8SJY_inC9dFhNsujbzV+5kNdvHEvn-8+7u3XfyA@mail.gmail.com>
-References: <1465403951-32454-1-git-send-email-robh@kernel.org>
- <CAMi1Hd3VDnK+yA6tXLFELCqnnrsPtPHnmov9O9MpJuBpfkcC=w@mail.gmail.com>
- <CAL_JsqJQsTX8SJY_inC9dFhNsujbzV+5kNdvHEvn-8+7u3XfyA@mail.gmail.com>
-Message-ID: <CAMi1Hd3WnVFfxjNZO4N6=X8CEvGt=6D0fA6ybqZPMbMQkn32cQ@mail.gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 23 Jun 2016 12:44:12 +0530
+Subject: [PATCH v19 10/13] arm64: kdump: add VMCOREINFO's for user-space
+ coredump tools
+In-Reply-To: <20160622055940.GY20774@linaro.org>
+References: <cover.1466120418.git.geoff@infradead.org>
+ <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
+ <20160620053222.GB14309@dhcppc9>
+ <20160622055940.GY20774@linaro.org>
+Message-ID: <20160623071412.GA16398@dhcppc9>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 June 2016 at 08:50, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Jun 22, 2016 at 2:53 AM, Amit Pundir <amit.pundir@linaro.org> wrote:
->> On 8 June 2016 at 22:09, Rob Herring <robh@kernel.org> wrote:
->>> Copy the config fragments from the AOSP common kernel tree. It is
->>> becoming possible to run mainline kernels with Android, but the kernel
->>> defconfigs don't work as-is and debugging missing config options is a
->>> pain. Adding the config fragments into the kernel tree, makes
->>> configuring a mainline kernel as simple as:
->>>
->>> make ARCH=arm multi_v7_defconfig android-base.config android-recommended.config
->>>
->>> Cc: Amit Pundir <amit.pundir@linaro.org>
->>> Cc: John Stultz <john.stultz@linaro.org>
->>> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->>> Cc: Rom Lemarchand <romlem@android.com>
->>> Signed-off-by: Rob Herring <robh@kernel.org>
->>> ---
->>>  kernel/configs/android-base.config        | 161 ++++++++++++++++++++++++++++++
->>>  kernel/configs/android-recommended.config | 121 ++++++++++++++++++++++
->
-> [...]
->
->>> +CONFIG_STAGING=y
->>> +CONFIG_SWITCH=y
->>
->> Switch Class support is dropped from kernel/common/android-4.4 sometime back.
->
-> Okay. I'm also removing these options in v2 which don't exist in
-> upstream. Any comments on them?
->
-> IP6_NF_TARGET_REJECT_SKERR
-> IP_NF_TARGET_REJECT_SKERR
-> NETFILTER_XT_MATCH_QTAGUID
-> NETFILTER_XT_MATCH_QUOTA2
-> NETFILTER_XT_MATCH_QUOTA2_LOG
-> PPPOLAC
-> PPPOPNS
-> RESOURCE_COUNTERS
-> SECURITY_PERF_EVENTS_RESTRICT
-> USB_CONFIGFS_F_MTP
-> USB_CONFIGFS_F_PTP
-> USB_CONFIGFS_F_ACC
-> USB_CONFIGFS_F_AUDIO_SRC
-> USB_CONFIGFS_UEVENT
-> USB_OTG_WAKELOCK
-> ANDROID_TIMED_GPIO
-> ARM_KERNMEM_PERMS
-> INPUT_KEYCHORD
-> INPUT_KEYRESET
-> TABLET_USB_WACOM
+Hi Takahiro,
 
-In my opinion we can keep the core configs (usb gadget, netfilter,
-input key et al.). They will not harm the resulting kernel config
-anyway. And we can definitely drop following configs from v2:
+Thanks for your reply.
 
-IP6_NF_TARGET_REJECT_SKERR
-IP_NF_TARGET_REJECT_SKERR
-RESOURCE_COUNTERS
-ANDROID_TIMED_GPIO
-ARM_KERNMEM_PERMS
-TABLET_USB_WACOM
+On 22/06/2016:02:59:41 PM, AKASHI Takahiro wrote:
+> On Mon, Jun 20, 2016 at 11:02:22AM +0530, Pratyush Anand wrote:
+> > +Atsushi
+> > 
+> > Hi Takahiro,
+> > 
+> > On 16/06/2016:11:48:28 PM, Geoff Levand wrote:
+> > > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > 
+> > > For the current crash utility, we need to know, at least,
+> > >   - kimage_voffset
+> > >   - PHYS_OFFSET
+> > > to handle the contents of core dump file (/proc/vmcore) correctly due to
+> > > the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
+> > > This patch puts them as VMCOREINFO's into the file.
+> > > 
+> > >   - VA_BITS
+> > > is also added for makedumpfile command.
+> > 
+> > Thanks for adding them. They are quite helpful for makedumpfile as well.
+> > 
+> > > More VMCOREINFO's may be added later.
+> > 
+> > Yes, we will need to pass VMCOREINFO_SYMBOL(_text) and VMCOREINFO_SYMBOL(_end)
+> > in order to work with makedumpfile.
+> 
+> I know that adding those symbols is the easiest way, but
+> theoretically, if we know the physical address of "swapper_pg_dir",
 
+But, we know only it's virtual address. 
 
-Also please add the following options in v2, which are present in
-android-4.4 configs but missing from v1.
+> instead of its virtual address, we can access all the memory pointed to
+> by any kernel virtual address.
+> How do you rationalize that we need to know "_text" and "_end"?
 
-In android-base.config:
-CONFIG_DM_VERITY_FEC
-CONFIG_INET_DIAG_DESTROY
-CONFIG_IP_MULTICAST
-CONFIG_IP_NF_NAT
-CONFIG_QUOTA
+Well, we need some mechanism so that we can decide if an address can be
+translated using linear mapping of virt_to_phys(). 
 
-In android-recommended.config:
-CONFIG_DRAGONRISE_FF
-CONFIG_TASKSTATS
-CONFIG_TASK_DELAY_ACCT
-CONFIG_TASK_IO_ACCOUNTING
-CONFIG_TASK_XACCT
+Alternatively, probably we can do like this:
+-- Translate all address between "SYMBOL(swapper_pg_dir)"  and "SYMBOL(swapper_pg_dir)
+ + SWAPPER_DIR_SIZE" using virt_to_phys() and now we can read values from
+ dumpfile using that physical address. This way we can get PGD/PMD/PUD values.
+-- PTE values may lie out side this range, however that address should still be
+linearly translatable. We can use virt_to_phys() macro from them as well.
 
-Regards,
-Amit Pundir
+In summary, we can translate address of PGD/PMD/PUD/PTE using virt_to_phys()
+and rest all can be translated using page table entries.
 
->
-> Rob
+~Pratyush
