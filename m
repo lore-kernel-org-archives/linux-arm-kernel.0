@@ -1,10 +1,10 @@
-From: deadcom@gmail.com (deadcom at gmail.com)
-Date: Thu, 23 Jun 2016 04:01:53 -0700 (PDT)
+From: stefan.mavrodiev@gmail.com (stefan.mavrodiev at gmail.com)
+Date: Thu, 23 Jun 2016 04:07:13 -0700 (PDT)
 Subject: [PATCH v3] ARM: dts: sun8i: Add dts file for Olimex A33-OLinuXino
 In-Reply-To: <20160622132222.GX26668@lukather>
 References: <1466418769-8384-1-git-send-email-stefan.mavrodiev@gmail.com>
  <20160622132222.GX26668@lukather>
-Message-ID: <8e5b45fe-f60b-419f-8b00-b816ffe5d98c@googlegroups.com>
+Message-ID: <2618ba96-c3c5-4db6-b860-d212e7045f23@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,6 +24,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Oh? So it ships already? Nice!
 
 Not yet, but very soon will.
+
 > 
 > > Signed-off-by: Stefan Mavrodiev <stefan.mavrodiev@gmail.com>
 > > ---
@@ -280,12 +281,12 @@ Not yet, but very soon will.
 > > +};
 > 
 > It doesn't work as USB OTG ?
+> 
 
 The hardware should work as OTG. In FEL mode it works as device, and in current dt configuration - as host. I've spend some time trying to make it work as otg, but didn't succeed. 
 
 There are some hardware differences between our board and other a33, but if you say that OTG work, I'll spend some additional time working on it.
 
-> 
 > Thanks,
 > Maxime
 > 
@@ -293,7 +294,3 @@ There are some hardware differences between our board and other a33, but if you 
 > Maxime Ripard, Free Electrons
 > Embedded Linux, Kernel and Android engineering
 > http://free-electrons.com
-
-Regards,
-Stefan Mavrodiev
-Olimex LTD.
