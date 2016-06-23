@@ -1,110 +1,407 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 23 Jun 2016 21:16:24 +0530
-Subject: [PATCH v19 10/13] arm64: kdump: add VMCOREINFO's for user-space
- coredump tools
-In-Reply-To: <20160623081545.GA20774@linaro.org>
-References: <cover.1466120418.git.geoff@infradead.org>
- <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
- <20160620053222.GB14309@dhcppc9>
- <20160622055940.GY20774@linaro.org>
- <20160623071412.GA16398@dhcppc9>
- <20160623081545.GA20774@linaro.org>
-Message-ID: <20160623154624.GC16398@dhcppc9>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 23 Jun 2016 17:46:34 +0200
+Subject: [RFC PATCH v2 1/9] mailbox: Add Amlogic Meson
+ Message-Handling-Unit
+In-Reply-To: <CABb+yY3r3_B9wbW6D-do8h8xMKCANQWfz1gFGyre1oWadd7A8Q@mail.gmail.com>
+References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
+ <1466503374-28841-2-git-send-email-narmstrong@baylibre.com>
+ <CABb+yY3r3_B9wbW6D-do8h8xMKCANQWfz1gFGyre1oWadd7A8Q@mail.gmail.com>
+Message-ID: <576C045A.3070701@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/06/2016:05:42:28 PM, AKASHI Takahiro wrote:
-> On Thu, Jun 23, 2016 at 12:44:12PM +0530, Pratyush Anand wrote:
-> > Hi Takahiro,
-> > 
-> > Thanks for your reply.
-> > 
-> > On 22/06/2016:02:59:41 PM, AKASHI Takahiro wrote:
-> > > On Mon, Jun 20, 2016 at 11:02:22AM +0530, Pratyush Anand wrote:
-> > > > +Atsushi
-> > > > 
-> > > > Hi Takahiro,
-> > > > 
-> > > > On 16/06/2016:11:48:28 PM, Geoff Levand wrote:
-> > > > > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > > > 
-> > > > > For the current crash utility, we need to know, at least,
-> > > > >   - kimage_voffset
-> > > > >   - PHYS_OFFSET
-> > > > > to handle the contents of core dump file (/proc/vmcore) correctly due to
-> > > > > the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
-> > > > > This patch puts them as VMCOREINFO's into the file.
-> > > > > 
-> > > > >   - VA_BITS
-> > > > > is also added for makedumpfile command.
-> > > > 
-> > > > Thanks for adding them. They are quite helpful for makedumpfile as well.
-> > > > 
-> > > > > More VMCOREINFO's may be added later.
-> > > > 
-> > > > Yes, we will need to pass VMCOREINFO_SYMBOL(_text) and VMCOREINFO_SYMBOL(_end)
-> > > > in order to work with makedumpfile.
-> > > 
-> > > I know that adding those symbols is the easiest way, but
-> > > theoretically, if we know the physical address of "swapper_pg_dir",
-> > 
-> > But, we know only it's virtual address. 
+On 06/22/2016 06:31 AM, Jassi Brar wrote:
+> On Tue, Jun 21, 2016 at 3:32 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+>> Add Amlogic Meson SoCs Message-Handling-Unit as mailbox controller
+>> with 2 independent channels/links to communicate with a remote processor.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > 
-> What I meant here is that, if we know the physical address of "swapper_pg_dir",
-> we don't have to know neither of "_text", "_end", "kimage_voffset" nor
-> "PHYS_OFFSET".
-> I just wanted to ask you whether you thought of this possibility.
-
-OK, Let me clarify the needs from makedumpfile perspective. Atsushi can correct
-me if I am wrong:
-
-- As a minimal we need some way of reading page table entries. Currently vmcore
-  has only virtual address of swapper_pg_dir, but if you can provide
-  __pa(swapper_pg_dir) in vmcore, then we do not need either "_text", "_end" or
-  "kimage_voffset". 
-- However, "PHYS_OFFSET" might still be needed. makedumpfile core code needs to
-  know phys_base. Currently we find it from the PT_LOAD segments. We treat the
-  lowest start of segment's LMAs as the physical base. I am not sure, if that is
-  still true with latest KASAN changes.
-- Further, if you do not provide "_text" and "_end", then we will have to translate
-  each address with complex page table read process, which would slow
-  makedumpfile execution significantly.
-
-Now, please let us know that what will be the kernel strategy, so that I can
-re-organise makedumpfile accordingly.
-
-> > 
-> > > instead of its virtual address, we can access all the memory pointed to
-> > > by any kernel virtual address.
-> > > How do you rationalize that we need to know "_text" and "_end"?
-> > 
-> > Well, we need some mechanism so that we can decide if an address can be
-> > translated using linear mapping of virt_to_phys(). 
+> .....
 > 
-> All the entries in MMU tables are based on "physical" addresses,
-> and so we don't care whether a given address is in linear mapping or not
-> in walking through MMU.
-> See what I mean?
-
-Yes, yes, I thought, we have only virtual swapper_pg_dir, so I was looking for a
-way to translate *atleast* that into physical.
-
-Thanks for your input. Those are helpful.
-
-~Pratyush
-
+>> +++ b/drivers/mailbox/meson_mhu.c
+>> @@ -0,0 +1,199 @@
+>> +/*
+>> + * Copyright (C) 2016 BayLibre SAS.
+>> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+>> + * Heavily based on meson_mhu.c from :
+>> + * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
+>> + * Copyright (C) 2015 Linaro Ltd.
+>> + * Author: Jassi Brar <jaswinder.singh@linaro.org>
 > 
-> Thanks,
-> -Takahiro AKASHI
+> .........
+>> +
+>> +#define INTR_SET_OFS   0x0
+>> +#define INTR_STAT_OFS  0x4
+>> +#define INTR_CLR_OFS   0x8
+>> +
+>> +#define MHU_LP_OFFSET  0x10
+>> +#define MHU_HP_OFFSET  0x1c
+>> +
+>> +#define TX_REG_OFFSET  0x24
+>> +
+> It seems only some register offsets have changed from arm_mhu. So
+> maybe just adapt the arm_mhu driver to look for IP variant and assign
+> corresponding offsets to set,stat,clr registers.
 > 
-> > Alternatively, probably we can do like this:
-> > -- Translate all address between "SYMBOL(swapper_pg_dir)"  and "SYMBOL(swapper_pg_dir)
-> >  + SWAPPER_DIR_SIZE" using virt_to_phys() and now we can read values from
-> >  dumpfile using that physical address. This way we can get PGD/PMD/PUD values.
-> > -- PTE values may lie out side this range, however that address should still be
-> > linearly translatable. We can use virt_to_phys() macro from them as well.
-> > 
-> > In summary, we can translate address of PGD/PMD/PUD/PTE using virt_to_phys()
-> > and rest all can be translated using page table entries.
-> > 
-> > ~Pratyush
+> Cheers.
+> 
+
+Hi Jassi,
+
+I did a quick & dirty merge with arm_mhu, and I don't it's a good idea...
+
+Please have a look at attached patch.
+
+Regards,
+Neil
+-------------------------------------------------------------------------------------------
+From: Neil Armstrong <narmstrong@baylibre.com>
+Subject: [PATCH] mailbox: arm_mhu: Add support for Amlogic Meson MHU
+
+To achieve this integration, add support for generic probe from amba
+or platform.
+Move all register offsets to a data structure passed in either amba id or
+platform dt id match table.
+
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/mailbox/arm_mhu.c | 217 ++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 181 insertions(+), 36 deletions(-)
+
+diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
+index 99befa7..d7fb843 100644
+--- a/drivers/mailbox/arm_mhu.c
++++ b/drivers/mailbox/arm_mhu.c
+@@ -22,45 +22,68 @@
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/amba/bus.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
+ #include <linux/mailbox_controller.h>
+
+-#define INTR_STAT_OFS	0x0
+-#define INTR_SET_OFS	0x8
+-#define INTR_CLR_OFS	0x10
++#define MHU_INTR_STAT_OFS	0x0
++#define MHU_INTR_SET_OFS	0x8
++#define MHU_INTR_CLR_OFS	0x10
+
+ #define MHU_LP_OFFSET	0x0
+ #define MHU_HP_OFFSET	0x20
+ #define MHU_SEC_OFFSET	0x200
+-#define TX_REG_OFFSET	0x100
++#define MHU_TX_REG_OFFSET	0x100
+
+-#define MHU_CHANS	3
++#define MESON_INTR_SET_OFS	0x0
++#define MESON_INTR_STAT_OFS	0x4
++#define MESON_INTR_CLR_OFS	0x8
++
++#define MESON_MHU_LP_OFFSET	0x10
++#define MESON_MHU_HP_OFFSET	0x1c
++#define MESON_MHU_TX_OFFSET	0x24
++
++#define MAX_MHU_CHANS	3
+
+ struct mhu_link {
+ 	unsigned irq;
+-	void __iomem *tx_reg;
+-	void __iomem *rx_reg;
++	void __iomem *tx_stat_reg;
++	void __iomem *tx_set_reg;
++	void __iomem *tx_clr_reg;
++	void __iomem *rx_stat_reg;
++	void __iomem *rx_set_reg;
++	void __iomem *rx_clr_reg;
+ };
+
+ struct arm_mhu {
+ 	void __iomem *base;
+-	struct mhu_link mlink[MHU_CHANS];
+-	struct mbox_chan chan[MHU_CHANS];
++	struct mhu_link mlink[MAX_MHU_CHANS];
++	struct mbox_chan chan[MAX_MHU_CHANS];
+ 	struct mbox_controller mbox;
+ };
+
++struct arm_mhu_data {
++	unsigned int channels;
++	int rx_offsets[MAX_MHU_CHANS];
++	int tx_offsets[MAX_MHU_CHANS];
++	unsigned int intr_stat_offs;
++	unsigned int intr_set_offs;
++	unsigned int intr_clr_offs;
++};
++
+ static irqreturn_t mhu_rx_interrupt(int irq, void *p)
+ {
+ 	struct mbox_chan *chan = p;
+ 	struct mhu_link *mlink = chan->con_priv;
+ 	u32 val;
+
+-	val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
++	val = readl_relaxed(mlink->rx_stat_reg);
+ 	if (!val)
+ 		return IRQ_NONE;
+
+ 	mbox_chan_received_data(chan, (void *)&val);
+
+-	writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
++	writel_relaxed(val, mlink->rx_clr_reg);
+
+ 	return IRQ_HANDLED;
+ }
+@@ -68,7 +91,7 @@ static irqreturn_t mhu_rx_interrupt(int irq, void *p)
+ static bool mhu_last_tx_done(struct mbox_chan *chan)
+ {
+ 	struct mhu_link *mlink = chan->con_priv;
+-	u32 val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
++	u32 val = readl_relaxed(mlink->tx_stat_reg);
+
+ 	return (val == 0);
+ }
+@@ -78,7 +101,7 @@ static int mhu_send_data(struct mbox_chan *chan, void *data)
+ 	struct mhu_link *mlink = chan->con_priv;
+ 	u32 *arg = data;
+
+-	writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
++	writel_relaxed(*arg, mlink->tx_set_reg);
+
+ 	return 0;
+ }
+@@ -89,8 +112,8 @@ static int mhu_startup(struct mbox_chan *chan)
+ 	u32 val;
+ 	int ret;
+
+-	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
+-	writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
++	val = readl_relaxed(mlink->tx_stat_reg);
++	writel_relaxed(val, mlink->tx_clr_reg);
+
+ 	ret = request_irq(mlink->irq, mhu_rx_interrupt,
+ 			  IRQF_SHARED, "mhu_link", chan);
+@@ -117,52 +140,155 @@ static const struct mbox_chan_ops mhu_ops = {
+ 	.last_tx_done = mhu_last_tx_done,
+ };
+
+-static int mhu_probe(struct amba_device *adev, const struct amba_id *id)
++static struct arm_mhu_data arm_mhu_amba_data = {
++	.channels = 3,
++	.rx_offsets = {MHU_LP_OFFSET, MHU_HP_OFFSET, MHU_SEC_OFFSET},
++	.tx_offsets = {MHU_LP_OFFSET + MHU_TX_REG_OFFSET,
++		       MHU_HP_OFFSET + MHU_TX_REG_OFFSET,
++		       MHU_SEC_OFFSET + MHU_TX_REG_OFFSET},
++	.intr_stat_offs = MHU_INTR_STAT_OFS,
++	.intr_set_offs = MHU_INTR_SET_OFS,
++	.intr_clr_offs = MHU_INTR_CLR_OFS,
++};
++
++static const struct arm_mhu_data meson_mhu_data = {
++	.channels = 2,
++	.rx_offsets = {MESON_MHU_LP_OFFSET, MESON_MHU_HP_OFFSET},
++	.tx_offsets = {MESON_MHU_LP_OFFSET + MESON_MHU_TX_OFFSET,
++		       MESON_MHU_HP_OFFSET + MESON_MHU_TX_OFFSET},
++	.intr_stat_offs = MESON_INTR_STAT_OFS,
++	.intr_set_offs = MESON_INTR_SET_OFS,
++	.intr_clr_offs = MESON_INTR_CLR_OFS,
++};
++
++static struct arm_mhu *mhu_generic_probe(struct device *dev,
++					 struct resource *res,
++					 unsigned int irqs[],
++					 const struct arm_mhu_data *data)
+ {
+ 	int i, err;
+ 	struct arm_mhu *mhu;
+-	struct device *dev = &adev->dev;
+-	int mhu_reg[MHU_CHANS] = {MHU_LP_OFFSET, MHU_HP_OFFSET, MHU_SEC_OFFSET};
+
+ 	/* Allocate memory for device */
+ 	mhu = devm_kzalloc(dev, sizeof(*mhu), GFP_KERNEL);
+ 	if (!mhu)
+-		return -ENOMEM;
++		return ERR_PTR(-ENOMEM);
+
+-	mhu->base = devm_ioremap_resource(dev, &adev->res);
++	mhu->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(mhu->base)) {
+ 		dev_err(dev, "ioremap failed\n");
+-		return PTR_ERR(mhu->base);
++		return ERR_CAST(mhu->base);
+ 	}
+
+-	for (i = 0; i < MHU_CHANS; i++) {
++	for (i = 0; i < data->channels; i++) {
++		void __iomem *reg_base;
+ 		mhu->chan[i].con_priv = &mhu->mlink[i];
+-		mhu->mlink[i].irq = adev->irq[i];
+-		mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
+-		mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + TX_REG_OFFSET;
++		mhu->mlink[i].irq = irqs[i];
++		reg_base = mhu->base + data->rx_offsets[i];
++		mhu->mlink[i].rx_stat_reg = reg_base + data->intr_stat_offs;
++		mhu->mlink[i].rx_set_reg = reg_base + data->intr_set_offs;
++		mhu->mlink[i].rx_clr_reg = reg_base + data->intr_clr_offs;
++		reg_base = mhu->base + data->tx_offsets[i];
++		mhu->mlink[i].rx_stat_reg = reg_base + data->intr_stat_offs;
++		mhu->mlink[i].rx_set_reg = reg_base + data->intr_set_offs;
++		mhu->mlink[i].rx_clr_reg = reg_base + data->intr_clr_offs;
+ 	}
+
+ 	mhu->mbox.dev = dev;
+ 	mhu->mbox.chans = &mhu->chan[0];
+-	mhu->mbox.num_chans = MHU_CHANS;
++	mhu->mbox.num_chans = data->channels;
+ 	mhu->mbox.ops = &mhu_ops;
+ 	mhu->mbox.txdone_irq = false;
+ 	mhu->mbox.txdone_poll = true;
+ 	mhu->mbox.txpoll_period = 1;
+
+-	amba_set_drvdata(adev, mhu);
+-
+ 	err = mbox_controller_register(&mhu->mbox);
+ 	if (err) {
+ 		dev_err(dev, "Failed to register mailboxes %d\n", err);
+-		return err;
++		return ERR_PTR(err);
+ 	}
+
+ 	dev_info(dev, "ARM MHU Mailbox registered\n");
+ 	return 0;
++};
++
++static const struct of_device_id mhu_dt_ids[] = {
++	{ .compatible = "amlogic,meson-gxbb-mhu", .data = &meson_mhu_data},
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, mhu_dt_ids);
++
++static int mhu_platform_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *match;
++	unsigned int irqs[MAX_MHU_CHANS];
++	const struct arm_mhu_data *data;
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	struct arm_mhu *mhu;
++	int i;
++
++	match = of_match_device(mhu_dt_ids, &pdev->dev);
++	if (!match)
++		return -EINVAL;
++
++	data = match->data;
++	if (!data)
++		return -EINVAL;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (WARN_ON(!res))
++		return -EINVAL;
++
++	for (i = 0 ; i < data->channels ; ++i) {
++		irqs[i] = platform_get_irq(pdev, i);
++		if (WARN_ON(irqs[i] < 0))
++			return irqs[i];
++	}
++
++	mhu = mhu_generic_probe(dev, res, irqs, data);
++	if (IS_ERR(mhu))
++		return PTR_ERR(mhu);
++
++	platform_set_drvdata(pdev, mhu);
++
++	return 0;
++}
++
++static int mhu_platform_remove(struct platform_device *pdev)
++{
++	struct arm_mhu *mhu = platform_get_drvdata(pdev);
++
++	mbox_controller_unregister(&mhu->mbox);
++
++	return 0;
++}
++
++static struct platform_driver mhu_platform_driver = {
++	.probe	= mhu_platform_probe,
++	.remove	= mhu_platform_remove,
++	.driver = {
++		.name = "meson-mhu",
++		.of_match_table	= mhu_dt_ids,
++	},
++};
++
++static int mhu_amba_probe(struct amba_device *adev, const struct amba_id *id)
++{
++	const struct arm_mhu_data *data = id->data;
++	struct device *dev = &adev->dev;
++	struct arm_mhu *mhu;
++
++	mhu = mhu_generic_probe(dev, &adev->res, adev->irq, data);
++	if (IS_ERR(mhu))
++		return PTR_ERR(mhu);
++
++	amba_set_drvdata(adev, mhu);
++
++	return 0;
+ }
+
+-static int mhu_remove(struct amba_device *adev)
++static int mhu_amba_remove(struct amba_device *adev)
+ {
+ 	struct arm_mhu *mhu = amba_get_drvdata(adev);
+
+@@ -171,24 +297,43 @@ static int mhu_remove(struct amba_device *adev)
+ 	return 0;
+ }
+
+-static struct amba_id mhu_ids[] = {
++static struct amba_id mhu_amba_ids[] = {
+ 	{
+ 		.id	= 0x1bb098,
+ 		.mask	= 0xffffff,
++		.data	= &arm_mhu_amba_data,
+ 	},
+ 	{ 0, 0 },
+ };
+-MODULE_DEVICE_TABLE(amba, mhu_ids);
++MODULE_DEVICE_TABLE(amba, mhu_amba_ids);
+
+ static struct amba_driver arm_mhu_driver = {
+ 	.drv = {
+ 		.name	= "mhu",
+ 	},
+-	.id_table	= mhu_ids,
+-	.probe		= mhu_probe,
+-	.remove		= mhu_remove,
++	.id_table	= mhu_amba_ids,
++	.probe		= mhu_amba_probe,
++	.remove		= mhu_amba_remove,
+ };
+-module_amba_driver(arm_mhu_driver);
++
++static int __init mhu_module_init(void)
++{
++	int ret;
++
++	ret = platform_driver_register(&mhu_platform_driver);
++	if (ret)
++		return ret;
++
++	return amba_driver_register(&arm_mhu_driver);
++}
++module_init(mhu_module_init);
++
++static void __exit mhu_module_exit(void)
++{
++	platform_driver_unregister(&mhu_platform_driver);
++	amba_driver_unregister(&arm_mhu_driver);
++}
++module_exit(mhu_module_exit);
+
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("ARM MHU Driver");
+-- 
+2.7.0
