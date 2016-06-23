@@ -1,194 +1,476 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Jun 2016 13:49:05 +0200
-Subject: [PATCH] arm64: mm: fix location of _etext
-In-Reply-To: <20160623114006.GB8836@leverpostej>
-References: <1466678792-7971-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160623114006.GB8836@leverpostej>
-Message-ID: <CAKv+Gu9wq+MjV2W0XkEK1xkYNCsJNfdpbKcF08HN-ACMywOtHQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 23 Jun 2016 13:57:44 +0200
+Subject: [PATCH v2] ARM: sun8i: Add Parrot Board DTS
+In-Reply-To: <1466602902-4022-1-git-send-email-quentin.schulz@free-electrons.com>
+References: <1466602902-4022-1-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <20160623115744.GA3785@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 June 2016 at 13:40, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jun 23, 2016 at 12:46:32PM +0200, Ard Biesheuvel wrote:
->> As Kees Cook notes in the ARM counterpart of this patch [0]:
->>
->>   The _etext position is defined to be the end of the kernel text code,
->>   and should not include any part of the data segments. This interferes
->>   with things that might check memory ranges and expect executable code
->>   up to _etext.
->>
->> In particular, Kees is referring to the HARDENED_USERCOPY patch set [1],
->> which rejects attempts to call copy_to_user() on kernel ranges containing
->> executable code, but does allow access to the .rodata segment. Regardless
->> of whether one may or may not agree with the distinction, it makes sense
->> for _etext to have the same meaning across architectures.
->
-> I certainly agree with this.
->
->> So let's put _etext where it belongs, between .text and .rodata, and fix
->> up existing references to use __init_begin instead, which, unlike
->> __end_rodata, includes the exception and notes sections as well.
->>
->> The _etext references in kaslr.c are left untouched, since its references
->> to [_stext, _etext) are meant to capture potential jump instruction targets,
->> and so disregarding .rodata is actually an improvement here.
->>
->> [0] http://article.gmane.org/gmane.linux.kernel/2245084
->> [1] http://thread.gmane.org/gmane.linux.kernel.hardened.devel/2502
->>
->> Reported-by: Kees Cook <keescook@chromium.org>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/setup.c       |  4 ++--
->>  arch/arm64/kernel/vmlinux.lds.S |  7 ++++---
->>  arch/arm64/mm/init.c            |  4 ++--
->>  arch/arm64/mm/mmu.c             | 16 ++++++++--------
->>  4 files changed, 16 insertions(+), 15 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 3279defabaa2..f8b4837d1805 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -202,7 +202,7 @@ static void __init request_standard_resources(void)
->>       struct resource *res;
->>
->>       kernel_code.start   = virt_to_phys(_text);
->> -     kernel_code.end     = virt_to_phys(_etext - 1);
->> +     kernel_code.end     = virt_to_phys(__init_begin - 1);
->>       kernel_data.start   = virt_to_phys(_sdata);
->>       kernel_data.end     = virt_to_phys(_end - 1);
->
-> Given that these resources are coarse to begin with, I guess it doesn't
-> matter that we're capturing rodata friends here, and this retains the
-> existing behaviour.
->
+Hi,
 
-Indeed.
+On Wed, Jun 22, 2016 at 03:41:42PM +0200, Quentin Schulz wrote:
+> The Parrot Board is an evaluation board with an Allwinner R16 (assumed
+> to be close to an Allwinner A33), 4GB of eMMC, 512MB of RAM, USB host
+> and OTG, a WiFi/Bluetooth combo chip, a micro SD Card reader, 2
+> controllable buttons, an LVDS port with separated backlight and
+> capacitive touch panel ports, an audio/microphone jack, a camera CSI
+> port, 2 sets of 22 GPIOs and an accelerometer.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+> 
+> Patch dependencies:
+>  - regulator: axp20x: Add support for the (external) drivebus regulator
+>  - ARM: dts: axp22x.dtsi: Add reg_drivebus node
+>  - ARM: dts: axp22x.dtsi: Add usb_power_supply node
+>  - power: axp20x_usb: Add support for usb power-supply on axp22x pmics
+>  - mfd: axp20x: Extend axp22x_volatile_ranges
+>  - mfd: axp20x: Add axp20x-usb-power-supply for axp22x pmics
 
->> @@ -232,7 +232,7 @@ void __init setup_arch(char **cmdline_p)
->>
->>       sprintf(init_utsname()->machine, ELF_PLATFORM);
->>       init_mm.start_code = (unsigned long) _text;
->> -     init_mm.end_code   = (unsigned long) _etext;
->> +     init_mm.end_code   = (unsigned long) __init_begin;
->
-> Why does this need to be __init_begin?
->
-> We don't have code in .rodata, the exception tables, or notes, so
-> shouldn't this be left pointing at _etext if we're tightening things up?
->
+Those are not dependencies worth mentionning, they've already been
+merged.
 
-You are right, and I am happy to change that in the same patch.
-Strictly speaking, it is a separate change, but that applies equally
-to not updating the _etext references in kaslr.c
+>  - phy-sun4i-usb: Add workaround for missing Vbus det interrupts on A31
+> or the micro USB port would not be powered.
+> 
+> v2:
+>  - correct typos,
+>  - chose less generic name suffix for nodes (now_parrot_r16),
+>  - add comment for i2c childless node,
+>  - add comment for two regulators-powered WiFi chip,
+>  - add comment to explicit the use of some regulators,
+>  - add usb_vbus_power-supply property in usbphy node (this adds a
+>    dependance to an other patch),
+> 
+>  arch/arm/boot/dts/Makefile             |   1 +
+>  arch/arm/boot/dts/sun8i-r16-parrot.dts | 356 +++++++++++++++++++++++++++++++++
+>  2 files changed, 357 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-r16-parrot.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 1ff5434..6c7581f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -762,6 +762,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>  	sun8i-a33-ippo-q8h-v1.2.dtb \
+>  	sun8i-a33-q8-tablet.dtb \
+>  	sun8i-a33-sinlinx-sina33.dtb \
+> +	sun8i-r16-parrot.dtb \
 
->>       init_mm.end_data   = (unsigned long) _edata;
->>       init_mm.brk        = (unsigned long) _end;
->>
->> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> index 435e820e898d..0de7be4f1a9d 100644
->> --- a/arch/arm64/kernel/vmlinux.lds.S
->> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> @@ -131,12 +131,13 @@ SECTIONS
->>       }
->>
->>       . = ALIGN(SEGMENT_ALIGN);
->> -     RO_DATA(PAGE_SIZE)              /* everything from this point to */
->> -     EXCEPTION_TABLE(8)              /* _etext will be marked RO NX   */
->> +     _etext = .;                     /* End of text section */
->> +
->> +     RO_DATA(PAGE_SIZE)              /* everything from this point to     */
->> +     EXCEPTION_TABLE(8)              /* __init_begin will be marked RO NX */
->>       NOTES
->>
->>       . = ALIGN(SEGMENT_ALIGN);
->> -     _etext = .;                     /* End of text and rodata section */
->>       __init_begin = .;
->>
->>       INIT_TEXT_SECTION(8)
->> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->> index d45f8627012c..7bc5bed0220a 100644
->> --- a/arch/arm64/mm/init.c
->> +++ b/arch/arm64/mm/init.c
->> @@ -430,9 +430,9 @@ void __init mem_init(void)
->>       pr_cont("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
->>               MLG(VMALLOC_START, VMALLOC_END));
->>       pr_cont("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> -             MLK_ROUNDUP(_text, __start_rodata));
->> +             MLK_ROUNDUP(_text, _etext));
->>       pr_cont("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> -             MLK_ROUNDUP(__start_rodata, _etext));
->> +             MLK_ROUNDUP(__start_rodata, __init_begin));
->>       pr_cont("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->>               MLK_ROUNDUP(__init_begin, __init_end));
->>       pr_cont("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 0f85a46c3e18..a263a5d19bd9 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -386,7 +386,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
->>  static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
->>  {
->>       unsigned long kernel_start = __pa(_text);
->> -     unsigned long kernel_end = __pa(_etext);
->> +     unsigned long kernel_end = __pa(__init_begin);
->>
->>       /*
->>        * Take care not to create a writable alias for the
->> @@ -417,7 +417,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
->>                                    early_pgtable_alloc);
->>
->>       /*
->> -      * Map the linear alias of the [_text, _etext) interval as
->> +      * Map the linear alias of the [_text, __init_begin) interval as
->>        * read-only/non-executable. This makes the contents of the
->>        * region accessible to subsystems such as hibernate, but
->>        * protects it from inadvertent modification or execution.
->
-> There are a couple of comments regarding overlap that are probably worth
-> updating to say "text + rodata" rather than "text". Strictly speaking
-> they're already slightly wrong, but this is a good opportunity to fix
-> them up.
->
+This is supposed to be ordered alphabetically
 
-OK
+>  	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+>  	sun8i-a83t-cubietruck-plus.dtb \
+>  	sun8i-h3-orangepi-2.dtb \
+> diff --git a/arch/arm/boot/dts/sun8i-r16-parrot.dts b/arch/arm/boot/dts/sun8i-r16-parrot.dts
+> new file mode 100644
+> index 0000000..cd68bfa
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-r16-parrot.dts
+> @@ -0,0 +1,356 @@
+> +/*
+> + * Copyright 2016 Quentin Schulz
+> + *
+> + * Quentin Schulz <quentin.schulz@free-electrons.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun8i-a33.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +
+> +/ {
+> +	model = "Allwinner Parrot EVB R16";
 
->> @@ -449,14 +449,14 @@ void mark_rodata_ro(void)
->>  {
->>       unsigned long section_size;
->>
->> -     section_size = (unsigned long)__start_rodata - (unsigned long)_text;
->> +     section_size = (unsigned long)_etext - (unsigned long)_text;
->>       create_mapping_late(__pa(_text), (unsigned long)_text,
->>                           section_size, PAGE_KERNEL_ROX);
->>       /*
->> -      * mark .rodata as read only. Use _etext rather than __end_rodata to
->> -      * cover NOTES and EXCEPTION_TABLE.
->> +      * mark .rodata as read only. Use __init_begin rather than __end_rodata
->> +      * to cover NOTES and EXCEPTION_TABLE.
->>        */
->> -     section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
->> +     section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
->>       create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
->>                           section_size, PAGE_KERNEL_RO);
->>  }
->> @@ -499,8 +499,8 @@ static void __init map_kernel(pgd_t *pgd)
->>  {
->>       static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
->>
->> -     map_kernel_segment(pgd, _text, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
->> -     map_kernel_segment(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
->> +     map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
->> +     map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
->>       map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
->>                          &vmlinux_init);
->>       map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
->> --
->> 2.7.4
->>
->
-> Other than the above, this looks good to me!
->
+I think something like "Allwinner R16 EVB (Parrot)" would be better.
 
-Thanks,
-Ard.
+> +	compatible = "allwinner,parrot-evb-r16", "allwinner,sun8i-a33";
+
+And we usually put the soc name first, so something like
+"allwinner,r16-evb" or "allwinner,parrot"
+
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pins_parrot_r16>;
+> +
+> +		led1 {
+> +			label = "parrot_r16:led1:usr";
+> +			gpio = <&pio 4 17 GPIO_ACTIVE_HIGH>; /* PE17 */
+> +		};
+> +
+> +		led2 {
+> +			label = "parrot_r16:led2:usr";
+
+parrot_r16 is redundant. Once again, parrot, or r16-evb.
+
+> +			gpio = <&pio 4 16 GPIO_ACTIVE_HIGH>; /* PE16 */
+> +		};
+> +	};
+> +
+> +	wifi_pwrseq: wifi_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		reset-gpios = <&r_pio 0 6 GPIO_ACTIVE_LOW>; /* PL06 */
+> +	};
+> +
+> +};
+> +
+> +&ehci0 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c1_pins_a>;
+> +	status = "okay";
+> +
+> +	/* An as-yet-unknown accelerometer is connected to this i2c bus. */
+
+Maybe add a TODO, or FIXME tag?
+
+> +};
+> +
+> +&lradc {
+> +	vref-supply = <&reg_aldo3>;
+> +	status = "okay";
+> +
+> +	button at 0 {
+> +		label = "V+";
+> +		linux,code = <KEY_VOLUMEUP>;
+> +		channel = <0>;
+> +		voltage = <190000>;
+> +	};
+> +
+> +	button at 1 {
+> +		label = "V-";
+> +		linux,code = <KEY_VOLUMEDOWN>;
+> +		channel = <0>;
+> +		voltage = <390000>;
+> +	};
+> +
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_parrot_r16>;
+> +	vmmc-supply = <&reg_dcdc1>;
+> +	cd-gpios = <&pio 3 14 GPIO_ACTIVE_LOW>; /* PD14 */
+> +	bus-width = <4>;
+> +	status = "okay";
+> +};
+> +
+> +/*
+> + * TODO: WiFi chip needs dldo1 AND dldo2 as vmmc-supply.
+> + * aldo1 is connected to VCC-IO-WIFI and thus should be vqmmc.
+> + * Once two regulators can be in sync for vmmc-supply, modify this node
+> + * accordingly.
+> + */
+
+I would place that comment above the regulator definitions.
+
+> +&mmc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins_a>, <&wifi_reset_pin_parrot_r16>;
+> +	vmmc-supply = <&reg_aldo1>;
+> +	mmc-pwrseq = <&wifi_pwrseq>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+> +&mmc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc2_8bit_pins>;
+> +	vmmc-supply = <&reg_dcdc1>;
+> +	bus-width = <8>;
+> +	non-removable;
+> +	cap-mmc-hw-reset;
+> +	status = "okay";
+> +};
+> +
+> +&mmc2_8bit_pins {
+> +	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
+> +	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +};
+> +
+> +&ohci0 {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	mmc0_cd_pin_parrot_r16: mmc0_cd_pin at 0 {
+> +		allwinner,pins = "PD14";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+> +
+> +	led_pins_parrot_r16: led_pins at 0 {
+> +		allwinner,pins = "PE16", "PE17";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+> +	usb0_id_det: usb0_id_detect_pin at 0 {
+> +		allwinner,pins = "PD10";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+> +
+> +	usb1_vbus_pin_parrot_r16: usb1_vbus_pin at 0 {
+> +		allwinner,pins = "PD12";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
+> +
+> +&r_pio {
+> +	wifi_reset_pin_parrot_r16: wifi_reset_pin at 0 {
+> +		allwinner,pins = "PL6";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
+> +
+> +&r_rsb {
+> +	status = "okay";
+> +
+> +	axp22x: pmic at 3a3 {
+> +		compatible = "x-powers,axp223";
+> +		reg = <0x3a3>;
+> +		interrupt-parent = <&nmi_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +		drivevbus-supply = <&reg_vcc5v0>;
+> +		x-powers,drive-vbus-en;
+> +	};
+> +};
+> +
+> +#include "axp22x.dtsi"
+> +
+> +/* Used for VCC-IO, VCC-PD, VCC-USB, HPVCC, VCC-IO-BB and VCC-IO-WIFI */
+
+Just call it vcc-io then.
+
+> +&reg_aldo1 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "aldo1";
+> +};
+> +
+> +&reg_aldo2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <2350000>;
+> +	regulator-max-microvolt = <2650000>;
+> +	regulator-name = "vdd-dll";
+> +};
+> +
+> +&reg_aldo3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <2700000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-pll-avcc";
+> +};
+> +
+> +&reg_dc5ldo {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <900000>;
+> +	regulator-max-microvolt = <1400000>;
+> +	regulator-name = "vdd-cpus";
+> +};
+> +
+> +&reg_dcdc1 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-3v0";
+> +};
+> +
+> +&reg_dcdc2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <900000>;
+> +	regulator-max-microvolt = <1400000>;
+> +	regulator-name = "vdd-sys";
+> +};
+> +
+> +&reg_dcdc3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <900000>;
+> +	regulator-max-microvolt = <1400000>;
+> +	regulator-name = "vdd-cpu";
+> +};
+> +
+> +&reg_dcdc5 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1500000>;
+> +	regulator-max-microvolt = <1500000>;
+> +	regulator-name = "vcc-dram";
+> +};
+> +
+> +&reg_dldo1 {
+> +	/*
+> +	 * TODO: WiFi chip needs dldo1 AND dldo2 to be on to be powered.
+> +	 * Remove next line once it is possible to sync two regulators.
+> +	 */
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-wifi";
+> +};
+> +
+> +&reg_dldo2 {
+> +	/*
+> +	 * TODO: WiFi chip needs dldo1 AND dldo2 to be on to be powered.
+> +	 * Remove next line once it is possible to sync two regulators.
+> +	 */
+
+Those comments are actually fine, you can just drop the comment on the
+MMC node then :)
+
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-wifi1";
+
+vcc-wifi0 and vcc-wifi1 maybe?
+
+> +};
+> +
+> +&reg_dldo3 {
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-3v0-csi";
+> +};
+> +
+> +&reg_drivevbus {
+> +	regulator-name = "usb0-vbus";
+> +	status = "okay";
+> +};
+> +
+> +&reg_eldo1 {
+> +	regulator-min-microvolt = <1200000>;
+> +	regulator-max-microvolt = <1200000>;
+> +	regulator-name = "vcc-1v2-hsic";
+> +};
+> +
+> +&reg_eldo2 {
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "dsp-vcc";
+
+You have all the other regulators starting with vcc but this one, some
+consistency would be great :)
+
+> +};
+> +
+> +/* Mapped to GPIO 22 in U21 GPIOs set */
+
+So is it a GPIO or a regulator?
+
+> +&reg_eldo3 {
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "eldo3";
+> +};
+> +
+> +&reg_usb1_vbus {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb1_vbus_pin_parrot_r16>;
+> +	gpio = <&pio 3 12 GPIO_ACTIVE_HIGH>; /* PD12 */
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_b>;
+> +	status = "okay";
+> +};
+> +
+> +&usb_otg {
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+> +&usb_power_supply {
+> +	status = "okay";
+> +};
+> +
+> +&usbphy {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb0_id_det>;
+> +	usb0_vbus-supply = <&reg_drivevbus>;
+> +	usb0_id_det-gpios = <&pio 3 10 GPIO_ACTIVE_HIGH>; /* PD10 */
+> +	usb0_vbus_power-supply = <&usb_power_supply>;
+> +	usb1_vbus-supply = <&reg_usb1_vbus>; /* USB1 VBUS is always on */
+
+Like Chen-Yu said, that comment is wrong.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160623/fdb894ae/attachment.sig>
