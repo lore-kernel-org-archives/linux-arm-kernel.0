@@ -1,153 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Jun 2016 12:46:32 +0200
-Subject: [PATCH] arm64: mm: fix location of _etext
-Message-ID: <1466678792-7971-1-git-send-email-ard.biesheuvel@linaro.org>
+From: gxt@mprc.pku.edu.cn (Xuetao Guan)
+Date: Thu, 23 Jun 2016 18:39:03 +0800 (CST)
+Subject: [PATCH v3 4/4] ARM/PCI: remove arch specific
+ pcibios_enable_device()
+In-Reply-To: <20160622230746.GI25485@localhost>
+References: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1465383890-13538-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160622230746.GI25485@localhost>
+Message-ID: <62140.117.114.135.40.1466678343.squirrel@mprc.pku.edu.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As Kees Cook notes in the ARM counterpart of this patch [0]:
+> [+cc Guan]
+>
+> On Wed, Jun 08, 2016 at 12:04:50PM +0100, Lorenzo Pieralisi wrote:
+>> The arm pcibios_enable_device() implementation exists solely
+>> to prevent enabling PCI resources on PCI_PROBE_ONLY systems, since
+>> on those systems the PCI resources are currently not claimed (ie
+>> inserted in the PCI resource tree - which means their parent
+>> pointer is not correctly set-up) therefore they can not be enabled
+>> since this would trigger PCI set-ups failures.
+>>
+>> After removing the pci=firmware command line option in:
+>>
+>> commit 903589ca7165 ("ARM: 8554/1: kernel: pci: remove pci=firmware
+>> command line parameter handling")
+>
+> 903589ca7165 removed "pci=firmware" from ARM and from
+> Documentation/kernel-parameters.txt (where it was documented as
+> ARM-specific).
+>
+> I think unicore32 copied that code from arm, so unicore32 is one of
+> the few remaining arches that can set PCI_PROBE_ONLY.  I suspect this
+> was just copied from arm and may not be necessary on unicore32.
+>
+> Guan, can you confirm that PCI_PROBE_ONLY is necessary on unicore32,
+> or that it can be removed?
+>
 
-  The _etext position is defined to be the end of the kernel text code,
-  and should not include any part of the data segments. This interferes
-  with things that might check memory ranges and expect executable code
-  up to _etext.
+Yes, this code was copied from arm, and it's not necessary.
+It can be removed safely.
 
-In particular, Kees is referring to the HARDENED_USERCOPY patch set [1],
-which rejects attempts to call copy_to_user() on kernel ranges containing
-executable code, but does allow access to the .rodata segment. Regardless
-of whether one may or may not agree with the distinction, it makes sense
-for _etext to have the same meaning across architectures.
-
-So let's put _etext where it belongs, between .text and .rodata, and fix
-up existing references to use __init_begin instead, which, unlike
-__end_rodata, includes the exception and notes sections as well.
-
-The _etext references in kaslr.c are left untouched, since its references
-to [_stext, _etext) are meant to capture potential jump instruction targets,
-and so disregarding .rodata is actually an improvement here.
-
-[0] http://article.gmane.org/gmane.linux.kernel/2245084
-[1] http://thread.gmane.org/gmane.linux.kernel.hardened.devel/2502
-
-Reported-by: Kees Cook <keescook@chromium.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/setup.c       |  4 ++--
- arch/arm64/kernel/vmlinux.lds.S |  7 ++++---
- arch/arm64/mm/init.c            |  4 ++--
- arch/arm64/mm/mmu.c             | 16 ++++++++--------
- 4 files changed, 16 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 3279defabaa2..f8b4837d1805 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -202,7 +202,7 @@ static void __init request_standard_resources(void)
- 	struct resource *res;
- 
- 	kernel_code.start   = virt_to_phys(_text);
--	kernel_code.end     = virt_to_phys(_etext - 1);
-+	kernel_code.end     = virt_to_phys(__init_begin - 1);
- 	kernel_data.start   = virt_to_phys(_sdata);
- 	kernel_data.end     = virt_to_phys(_end - 1);
- 
-@@ -232,7 +232,7 @@ void __init setup_arch(char **cmdline_p)
- 
- 	sprintf(init_utsname()->machine, ELF_PLATFORM);
- 	init_mm.start_code = (unsigned long) _text;
--	init_mm.end_code   = (unsigned long) _etext;
-+	init_mm.end_code   = (unsigned long) __init_begin;
- 	init_mm.end_data   = (unsigned long) _edata;
- 	init_mm.brk	   = (unsigned long) _end;
- 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 435e820e898d..0de7be4f1a9d 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -131,12 +131,13 @@ SECTIONS
- 	}
- 
- 	. = ALIGN(SEGMENT_ALIGN);
--	RO_DATA(PAGE_SIZE)		/* everything from this point to */
--	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
-+	_etext = .;			/* End of text section */
-+
-+	RO_DATA(PAGE_SIZE)		/* everything from this point to     */
-+	EXCEPTION_TABLE(8)		/* __init_begin will be marked RO NX */
- 	NOTES
- 
- 	. = ALIGN(SEGMENT_ALIGN);
--	_etext = .;			/* End of text and rodata section */
- 	__init_begin = .;
- 
- 	INIT_TEXT_SECTION(8)
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index d45f8627012c..7bc5bed0220a 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -430,9 +430,9 @@ void __init mem_init(void)
- 	pr_cont("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
- 		MLG(VMALLOC_START, VMALLOC_END));
- 	pr_cont("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
--		MLK_ROUNDUP(_text, __start_rodata));
-+		MLK_ROUNDUP(_text, _etext));
- 	pr_cont("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
--		MLK_ROUNDUP(__start_rodata, _etext));
-+		MLK_ROUNDUP(__start_rodata, __init_begin));
- 	pr_cont("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
- 		MLK_ROUNDUP(__init_begin, __init_end));
- 	pr_cont("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 0f85a46c3e18..a263a5d19bd9 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -386,7 +386,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
- static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
- {
- 	unsigned long kernel_start = __pa(_text);
--	unsigned long kernel_end = __pa(_etext);
-+	unsigned long kernel_end = __pa(__init_begin);
- 
- 	/*
- 	 * Take care not to create a writable alias for the
-@@ -417,7 +417,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
- 				     early_pgtable_alloc);
- 
- 	/*
--	 * Map the linear alias of the [_text, _etext) interval as
-+	 * Map the linear alias of the [_text, __init_begin) interval as
- 	 * read-only/non-executable. This makes the contents of the
- 	 * region accessible to subsystems such as hibernate, but
- 	 * protects it from inadvertent modification or execution.
-@@ -449,14 +449,14 @@ void mark_rodata_ro(void)
- {
- 	unsigned long section_size;
- 
--	section_size = (unsigned long)__start_rodata - (unsigned long)_text;
-+	section_size = (unsigned long)_etext - (unsigned long)_text;
- 	create_mapping_late(__pa(_text), (unsigned long)_text,
- 			    section_size, PAGE_KERNEL_ROX);
- 	/*
--	 * mark .rodata as read only. Use _etext rather than __end_rodata to
--	 * cover NOTES and EXCEPTION_TABLE.
-+	 * mark .rodata as read only. Use __init_begin rather than __end_rodata
-+	 * to cover NOTES and EXCEPTION_TABLE.
- 	 */
--	section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
-+	section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
- 	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
- 			    section_size, PAGE_KERNEL_RO);
- }
-@@ -499,8 +499,8 @@ static void __init map_kernel(pgd_t *pgd)
- {
- 	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
- 
--	map_kernel_segment(pgd, _text, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
--	map_kernel_segment(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
-+	map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
-+	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
- 	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
- 			   &vmlinux_init);
- 	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
--- 
-2.7.4
+Guan Xuetao
