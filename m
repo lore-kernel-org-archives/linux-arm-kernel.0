@@ -1,25 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Jun 2016 21:44:36 -0700
-Subject: [RESEND PATCH v2 0/5] ir-rx51 driver fixes
-In-Reply-To: <1466623341-30130-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <1466623341-30130-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <20160623044436.GK22406@atomide.com>
+Date: Wed, 22 Jun 2016 21:49:18 -0700
+Subject: [PATCHv2 00/27] crypto: fixes for omap family of devices
+In-Reply-To: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20160623044917.GL22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160622 12:25]:
-> ir-rx51 is a driver for Nokia N900 IR transmitter. The current series
-> fixes the remaining problems in the driver:
+* Tero Kristo <t-kristo@ti.com> [160622 06:27]:
+> Hi,
+> 
+> Changes compared to v1 of the series:
+> 
+> - dropped first patch from the series (crypto: omap-aes: Fix registration of
+>   algorithms) as it was queued by Herbert already
+> - modified the second (now first) patch of the series to use runtime auto-
+>   suspend instead of getting static sync over a cra lifetime
+> - re-ordered the DTS / hwmod changes in the series, the merge order of
+>   these must be maintained to avoid issues
+> 
+> Patches #01 .. #14 should be merged via crypto tree, the rest should be
+> handled by Tony.
 
-Thanks for updating these.
+Next time, please post sets like these split into three separate sets
+with the cover letter listing possible dependencies. Picking patches
+from sets in certain order is a big pain to follow up, and some
+maintainers tend to ignore patchsets with dependencies.
 
-Trierry, care to ack the PWM patch?
+> Merging the omap / dts parts can be done safely separately, assuming
+> you just use omap2plus_defconfig (enabling crypto features will
+> cause some issues without the driver level fixes.)
 
-Mauro, do you want me to set up an immutable branch with all
-these against v4.7-rc1 that we can all merge as needed?
-
-If you want to set up the branch instead, please feel free
-to add my ack.
+I've already applied the dts changes I believe.. So reposting already
+applied patches further confuses things. Now I have to figure out what
+is already applied..
 
 Regards,
 
