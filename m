@@ -1,52 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Jun 2016 11:04:12 +0200
-Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
- of aliases
-In-Reply-To: <20160622161644.GD31817@leverpostej>
-References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
- <20160615072404.GB26768@pengutronix.de>
- <CACRpkdYK1C5px+A_O1sF99KTPTob9qTQpipEaRLHnNx5=AokLg@mail.gmail.com>
- <20160619010823.GC26875@pengutronix.de> <20160622161644.GD31817@leverpostej>
-Message-ID: <CACRpkdazjgZX3cY2Q6AoQRmX14x-YU6SQ=Q38tZHt8xX6St24g@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 23 Jun 2016 11:08:49 +0200
+Subject: [PATCH 1/4] dt-bindings: vendor-prefixes: Add Sierra Wireless
+In-Reply-To: <20160620162822.GA25662@rob-hp-laptop>
+References: <1466160132-24574-1-git-send-email-narmstrong@baylibre.com>
+ <1466160132-24574-2-git-send-email-narmstrong@baylibre.com>
+ <20160620162822.GA25662@rob-hp-laptop>
+Message-ID: <576BA721.8000408@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2016 at 6:16 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+On 06/20/2016 06:28 PM, Rob Herring wrote:
+> On Fri, Jun 17, 2016 at 12:42:09PM +0200, Neil Armstrong wrote:
+>> Add Sierra Wireless as swi vendor prefix.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> index 2c2500d..45bccd2 100644
+>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> @@ -250,6 +250,7 @@ st	STMicroelectronics
+>>  startek	Startek
+>>  ste	ST-Ericsson
+>>  stericsson	ST-Ericsson
+>> +swi	Sierra Wireless
+> 
+> Can we use the stock ticker 'swir' here.
+> 
+>>  syna	Synaptics Inc.
+>>  synology	Synology, Inc.
+>>  SUNW	Sun Microsystems, Inc
 
-> In general, our use of aliases is rather ill-defined. It would be nicer
-> if we could address devices in a similar manner to disks or partitions,
-> e.g. by path or uuid, but I don't think we have anything sensible we can
-> use there.
->
-> Given that, I can see the use of an alias to provide a consistent way of
-> referring to a particular gpiochip (and maybe we need to expose the
-> alises information somehow to userspace), but IMO that's independent of
-> any global ID space, probe ordering, etc.
+Hi Rob,
 
->From the kernel point of view the way forward to identify and refer to
-a particular gpiochip is using /dev/gpiochipN the character device.
+They already use a lot the "swi" prefix for all their open source platform and SDK.
 
-If complete topology of the bus placement etc is needed, userspace
-can traverse /sys/bus/gpio/*
+It would be simpler to stick to "swi".
 
-This solves the big problem with the current global numbering system
-in /sys/class/gpio/*
-
-So what this alias should address would be two things:
-
-- Solve the immediate issue of the global number space for the
-  legacy sysfs ABI, but also:
-
-- Determine which chip is gpiochip0, gpiochip1, .. etc in the
-  new ABI, so the devices get consistent numbering.
-
-The latter is lightly frowned upon by the udev people: they think it
-is more proper to traverse /sys to get topological information about
-the devices.
-
-I would appreciate if a patch to add alias handling would take care
-of both these things if we apply it.
-
-Yours,
-Linus Walleij
+Neil
