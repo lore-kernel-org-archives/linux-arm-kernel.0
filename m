@@ -1,29 +1,41 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 23 Jun 2016 19:40:05 +0900
-Subject: [PATCH] extcon: Check for incorrect connection type in notifier
- register
-In-Reply-To: <20160623075324.21935-1-stephen.boyd@linaro.org>
-References: <CGME20160623075352epcas1p2eb3ffb26777a8aa253eade67b1fed827@epcas1p2.samsung.com>
- <20160623075324.21935-1-stephen.boyd@linaro.org>
-Message-ID: <576BBC85.5070306@samsung.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 23 Jun 2016 18:44:57 +0800
+Subject: [PATCH v3 02/10] crypto: marvell: Check engine is not already
+ running when enabling a req
+In-Reply-To: <576A753B.7070507@free-electrons.com>
+References: <20160622103324.GA30918@gondor.apana.org.au>
+ <576A753B.7070507@free-electrons.com>
+Message-ID: <20160623104457.GC10350@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 2016? 06? 23? 16:53, Stephen Boyd wrote:
-> If we call extcon_register_notifier() with the wrong cable type,
-> it blows up with an oops instead of returning an error code.
-> Let's be nice and fail gracefully given that the consumer might
-> not know if the cable is supported by the extcon provider.
+On Wed, Jun 22, 2016 at 01:23:39PM +0200, Romain Perier wrote:
+> Hello,
 > 
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/extcon/extcon.c | 4 ++++
->  1 file changed, 4 insertions(+)
+> Le 22/06/2016 12:33, Herbert Xu a ?crit :
+> >Romain Perier <romain.perier@free-electrons.com> wrote:
+> >>Add a BUG_ON() call when the driver tries to launch a crypto request
+> >>while the engine is still processing the previous one. This replaces
+> >>a silent system hang by a verbose kernel panic with the associated
+> >>backtrace to let the user know that something went wrong in the CESA
+> >>driver.
+> >
+> >Hmm, so how can this happen?
+> If it is triggerable then we better
+> >try to recover from it more gracefully.  If it is not triggerable
+> >then why bother?
+> >
+> 
+> Well, It does not happen with the current driver (in mainline). This
+> is bug I had when I added support to chain requests. Take a look at
+> the patch 008/010, it changes the way the requests are "prepared".
+> If you really enable a request while the engine is running, that's
+> very hard to debug. This is more useful to have a backtrace to let
+> the user know that something is wrong instead of having a silent
+> system hang. That's easier to debug and you can detect regressions.
 
-This patch has some merge conflict because the base branch is not on linux-next.
-But, Looks good to me. I applied it manually on extcon-next branch.
-
-Thanks,
-Chanwoo Choi
+OK.  All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
