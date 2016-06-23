@@ -1,49 +1,90 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 23 Jun 2016 17:37:12 +0100
-Subject: [PATCH] coresight: add PM runtime calls to coresight_simple_func()
-In-Reply-To: <1466185307-19539-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1466185307-19539-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <576C1038.502@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 23 Jun 2016 11:41:33 -0500
+Subject: [PATCH v3 4/4] ARM/PCI: remove arch specific
+ pcibios_enable_device()
+In-Reply-To: <62140.117.114.135.40.1466678343.squirrel@mprc.pku.edu.cn>
+References: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1465383890-13538-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160622230746.GI25485@localhost>
+ <62140.117.114.135.40.1466678343.squirrel@mprc.pku.edu.cn>
+Message-ID: <20160623164133.GC17987@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 23, 2016 at 06:39:03PM +0800, Xuetao Guan wrote:
+> > [+cc Guan]
+> >
+> > On Wed, Jun 08, 2016 at 12:04:50PM +0100, Lorenzo Pieralisi wrote:
+> >> The arm pcibios_enable_device() implementation exists solely
+> >> to prevent enabling PCI resources on PCI_PROBE_ONLY systems, since
+> >> on those systems the PCI resources are currently not claimed (ie
+> >> inserted in the PCI resource tree - which means their parent
+> >> pointer is not correctly set-up) therefore they can not be enabled
+> >> since this would trigger PCI set-ups failures.
+> >>
+> >> After removing the pci=firmware command line option in:
+> >>
+> >> commit 903589ca7165 ("ARM: 8554/1: kernel: pci: remove pci=firmware
+> >> command line parameter handling")
+> >
+> > 903589ca7165 removed "pci=firmware" from ARM and from
+> > Documentation/kernel-parameters.txt (where it was documented as
+> > ARM-specific).
+> >
+> > I think unicore32 copied that code from arm, so unicore32 is one of
+> > the few remaining arches that can set PCI_PROBE_ONLY.  I suspect this
+> > was just copied from arm and may not be necessary on unicore32.
+> >
+> > Guan, can you confirm that PCI_PROBE_ONLY is necessary on unicore32,
+> > or that it can be removed?
+> >
+> 
+> Yes, this code was copied from arm, and it's not necessary.
+> It can be removed safely.
+
+Great, thank you!  I'll add the patch below to my pci/resource branch for
+v4.8.  Let me know if you see any issues with it.
 
 
-On 17/06/16 18:41, Mathieu Poirier wrote:
-> It is mandatory to enable a coresight block's power domain before
-> trying to access management registers.  Otherwise the transaction
-> simply stalls, leading to a system hang.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->   drivers/hwtracing/coresight/coresight-priv.h | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-> index ad975c58080d..b047241e7496 100644
-> --- a/drivers/hwtracing/coresight/coresight-priv.h
-> +++ b/drivers/hwtracing/coresight/coresight-priv.h
-> @@ -16,6 +16,7 @@
->   #include <linux/bitops.h>
->   #include <linux/io.h>
->   #include <linux/coresight.h>
-> +#include <linux/pm_runtime.h>
->
->   /*
->    * Coresight management registers (0xf00-0xfcc)
-> @@ -42,8 +43,10 @@ static ssize_t name##_show(struct device *_dev,				\
->   			   struct device_attribute *attr, char *buf)	\
->   {									\
->   	type *drvdata = dev_get_drvdata(_dev->parent);			\
-> +	pm_runtime_get_sync(_dev->parent);				\
->   	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
->   			 readl_relaxed(drvdata->base + offset));	\
-> +	pm_runtime_put_sync(_dev->parent);				\
+commit b9b8a53e24649e48c0a8bceb8d9d8fe1cfee018c
+Author: Bjorn Helgaas <bhelgaas@google.com>
+Date:   Thu Jun 23 11:33:24 2016 -0500
 
-This is wrong, I just noticed when I was playing around this.
-Perhaps you meant to do this before returning ? I wonder why compiler
-doesn't throw any error.
+    unicore32/PCI: Remove pci=firmware command line parameter handling
+    
+    Remove support for the "pci=firmware" command line parameter, which was
+    way to keep the kernel from changing any PCI BAR assignments.  This was
+    copied from ARM, but is not actually needed on unicore32.
+    
+    The corresponding ARM support was removed by 903589ca7165 ("ARM: 8554/1:
+    kernel: pci: remove pci=firmware command line parameter handling").
+    
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 
--- 
-Regards,
-Sudeep
+diff --git a/arch/unicore32/kernel/pci.c b/arch/unicore32/kernel/pci.c
+index d45fa5f..62137d1 100644
+--- a/arch/unicore32/kernel/pci.c
++++ b/arch/unicore32/kernel/pci.c
+@@ -265,10 +265,8 @@ static int __init pci_common_init(void)
+ 
+ 	pci_fixup_irqs(pci_common_swizzle, pci_puv3_map_irq);
+ 
+-	if (!pci_has_flag(PCI_PROBE_ONLY)) {
+-		pci_bus_size_bridges(puv3_bus);
+-		pci_bus_assign_resources(puv3_bus);
+-	}
++	pci_bus_size_bridges(puv3_bus);
++	pci_bus_assign_resources(puv3_bus);
+ 	pci_bus_add_devices(puv3_bus);
+ 	return 0;
+ }
+@@ -279,9 +277,6 @@ char * __init pcibios_setup(char *str)
+ 	if (!strcmp(str, "debug")) {
+ 		debug_pci = 1;
+ 		return NULL;
+-	} else if (!strcmp(str, "firmware")) {
+-		pci_add_flags(PCI_PROBE_ONLY);
+-		return NULL;
+ 	}
+ 	return str;
+ }
