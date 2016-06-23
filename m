@@ -1,228 +1,117 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 23 Jun 2016 17:54:48 +0000
-Subject: [PATCH v20 10/14] arm64: kdump: add kdump support
-In-Reply-To: <cover.1466702804.git.geoff@infradead.org>
-References: <cover.1466702804.git.geoff@infradead.org>
-Message-ID: <43a9f5735dff7aceef7611412460d53930ebb8e3.1466702804.git.geoff@infradead.org>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 23 Jun 2016 12:04:51 -0600
+Subject: [PATCH 02/14] dt/bindings: update binding for PM domain idle
+ states
+In-Reply-To: <20160623173312.GA22204@leverpostej>
+References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
+ <1466624209-27432-3-git-send-email-lina.iyer@linaro.org>
+ <20160623173312.GA22204@leverpostej>
+Message-ID: <20160623180451.GD1115@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Hi Mark,
 
-On crash dump kernel, all the information about primary kernel's system
-memory (core image) is available in elf core header.
-The primary kernel will set aside this header with reserve_elfcorehdr()
-at boot time and inform crash dump kernel of its location via a new
-device-tree property, "linux,elfcorehdr".
+On Thu, Jun 23 2016 at 11:35 -0600, Mark Rutland wrote:
+>Hi,
+>
+>On Wed, Jun 22, 2016 at 01:36:37PM -0600, Lina Iyer wrote:
+>> From: Axel Haslam <ahaslam+renesas@baylibre.com>
+>>
+>> Update DT bindings to describe idle states of PM domains.
+>>
+>> Cc: <devicetree@vger.kernel.org>
+>> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> [Lina: Added state properties, removed state names, wakeup-latency,
+>> added of_pm_genpd_init() API, pruned commit text]
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> [Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
+>> ---
+>>  .../devicetree/bindings/power/power_domain.txt     | 70 ++++++++++++++++++++++
+>>  1 file changed, 70 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>> index 025b5e7..41e8dda 100644
+>> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+>> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+>> @@ -29,6 +29,43 @@ Optional properties:
+>>     specified by this binding. More details about power domain specifier are
+>>     available in the next section.
+>>
+>> +- power-states : A phandle of an idle-state that shall be soaked into a
+>> +                generic domain power state.
+>
+>It's somewhat unfortunate that this gives us two possible locations for
+>idle state lists (under the /cpus node and in a pm-domains node),
+>especially as it's not clear what would happen were a DT to have both.
+>
+>I would prefer that we extend the existing bindings such that states can
+>refer to the power domains which they affect.
+>
+I agree. The CPU idle states have become defined to be specific to CPUs.
+PM Domain idle states are generic for any type of domain. I am hoping at
+some point, we could converge and use the same idle state, but that
+would mean changing the CPU idle states to make it generic. At some
+point, during my development, I did use the arm,idle-state for domains
+as well, but the binding definitions were too restrictive for a generic
+PM domain.
 
-Please note that all other architectures use traditional "elfcorehdr="
-kernel parameter for this purpose.
+I would be willing to make the change to CPU idle states to make it
+generic and then we could just reference domain and CPU idle states
+using the same bindings. Are we okay with that, specifically,
+arm,psci-suspend-param? This binding is very restrictive in its
+description. What we pass to the platform driver upon choosing a domain
+state is very platform specific and therefore has to be generic in its
+description.
 
-Then crash dump kernel will access the primary kernel's memory with
-copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-not reside in linear mapping on crash dump kernel.
+Thanks,
+Lina
 
-We also need our own elfcorehdr_read() here since the header is placed
-within crash dump kernel's usable memory.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/Kconfig             | 11 +++++++
- arch/arm64/kernel/Makefile     |  1 +
- arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/init.c           | 54 ++++++++++++++++++++++++++++++++
- 4 files changed, 137 insertions(+)
- create mode 100644 arch/arm64/kernel/crash_dump.c
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 330786d..b5e0eb4 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -674,6 +674,17 @@ config KEXEC
- 	  but it is independent of the system firmware.   And like a reboot
- 	  you can start any kernel with it, not just Linux.
- 
-+config CRASH_DUMP
-+	bool "Build kdump crash kernel"
-+	help
-+	  Generate crash dump after being started by kexec. This should
-+	  be normally only set in special crash dump kernels which are
-+	  loaded in the main kernel with kexec-tools into a specially
-+	  reserved region and then later executed after a crash by
-+	  kdump/kexec.
-+
-+	  For more details see Documentation/kdump/kdump.txt
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7700c0c..c13d3eb 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -48,6 +48,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
- arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
- arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
-+arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-new file mode 100644
-index 0000000..2dc54d1
---- /dev/null
-+++ b/arch/arm64/kernel/crash_dump.c
-@@ -0,0 +1,71 @@
-+/*
-+ * Routines for doing kexec-based kdump
-+ *
-+ * Copyright (C) 2014 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/crash_dump.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+#include <linux/memblock.h>
-+#include <linux/uaccess.h>
-+#include <asm/memory.h>
-+
-+/**
-+ * copy_oldmem_page() - copy one page from old kernel memory
-+ * @pfn: page frame number to be copied
-+ * @buf: buffer where the copied page is placed
-+ * @csize: number of bytes to copy
-+ * @offset: offset in bytes into the page
-+ * @userbuf: if set, @buf is in a user address space
-+ *
-+ * This function copies one page from old kernel memory into buffer pointed by
-+ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-+ * copied or negative error in case of failure.
-+ */
-+ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-+			 size_t csize, unsigned long offset,
-+			 int userbuf)
-+{
-+	void *vaddr;
-+
-+	if (!csize)
-+		return 0;
-+
-+	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-+	if (!vaddr)
-+		return -ENOMEM;
-+
-+	if (userbuf) {
-+		if (copy_to_user(buf, vaddr + offset, csize)) {
-+			iounmap(vaddr);
-+			return -EFAULT;
-+		}
-+	} else {
-+		memcpy(buf, vaddr + offset, csize);
-+	}
-+
-+	iounmap(vaddr);
-+
-+	return csize;
-+}
-+
-+/**
-+ * elfcorehdr_read - read from ELF core header
-+ * @buf: buffer where the data is placed
-+ * @csize: number of bytes to read
-+ * @ppos: address in the memory
-+ *
-+ * This function reads @count bytes from elf core header which exists
-+ * on crash dump kernel's memory.
-+ */
-+ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
-+{
-+	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
-+	return count;
-+}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 22e7bcf..5f8f43c 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -35,6 +35,7 @@
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
- #include <linux/kexec.h>
-+#include <linux/crash_dump.h>
- 
- #include <asm/boot.h>
- #include <asm/fixmap.h>
-@@ -136,6 +137,57 @@ static void __init reserve_crashkernel(void)
- }
- #endif /* CONFIG_KEXEC_CORE */
- 
-+#ifdef CONFIG_CRASH_DUMP
-+static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	const __be32 *reg;
-+	int len;
-+
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
-+
-+	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
-+
-+	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+	return 1;
-+}
-+
-+/*
-+ * reserve_elfcorehdr() - reserves memory for elf core header
-+ *
-+ * This function reserves elf core header given in "elfcorehdr=" kernel
-+ * command line parameter. This region contains all the information about
-+ * primary kernel's core image and is used by a dump capture kernel to
-+ * access the system memory on primary kernel.
-+ */
-+static void __init reserve_elfcorehdr(void)
-+{
-+	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
-+
-+	if (!elfcorehdr_size)
-+		return;
-+
-+	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
-+		pr_warn("elfcorehdr is overlapped\n");
-+		return;
-+	}
-+
-+	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
-+
-+	pr_info("Reserving %lldKB of memory@0x%llx for elfcorehdr\n",
-+		elfcorehdr_size >> 10, elfcorehdr_addr);
-+}
-+#else
-+static void __init reserve_elfcorehdr(void)
-+{
-+	;
-+}
-+#endif /* CONFIG_CRASH_DUMP */
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -391,6 +443,8 @@ void __init arm64_memblock_init(void)
- 
- 	reserve_crashkernel();
- 
-+	reserve_elfcorehdr();
-+
- 	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
--- 
-2.5.0
+>> +==Power state==
+>> +
+>> +A PM domain power state describes an idle state of a domain and must be
+>> +have the following properties -
+>> +
+>> +	- entry-latency-us
+>> +		Usage: Not required if wakeup-latency-us is provided.
+>> +		Value type: <prop-encoded-array>
+>> +		Definition: u32 value representing worst case latency in
+>> +		microseconds required to enter the idle state.
+>> +		The exit-latency-us duration may be guaranteed
+>> +		only after entry-latency-us has passed.
+>> +
+>> +	- exit-latency-us
+>> +		Usage: Not required if wakeup-latency-us is provided.
+>> +		Value type: <prop-encoded-array>
+>> +		Definition: u32 value representing worst case latency
+>> +		in microseconds required to exit the idle state.
+>
+>These are part of the existing idle state binding
+>(Documentation/devicetree/bindings/arm/idle-states.txt), and I would
+>prefer that we did not duplicate this nor come up with an independent
+>set of idle state bindings.
+>
+>> +
+>> +	- residency-us:
+>> +		Usage: Optional
+>> +		Value type: <prop-encoded-array>
+>> +		Definition: A u32 value representing the time for which a
+>> +		domain must be idle in the state to reap power saving benefits
+>> +		of entering the state.
+>
+>This is "min-residency-us" per the existing bindings.
+>
+>> +
+>> +	- state-param:
+>> +		Usage: Optional
+>> +		Value type: <prop-encoded-array>
+>> +		Definition: A u32 value as defined by the state. May be used
+>> +		by the driver to hold state related u32 data. In the case of
+>> +		PSCI, an extended state-id for the domain may be encoded in
+>> +		this value.
+>
+>This is "arm,psci-suspend-param", per the existing bindings.
+>
+>Thanks,
+>Mark.
