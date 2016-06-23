@@ -1,282 +1,168 @@
-From: dave.long@linaro.org (David Long)
-Date: Thu, 23 Jun 2016 09:48:11 -0400
-Subject: [PATCH v13 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
- feature
-In-Reply-To: <57675840.6060909@huawei.com>
-References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
- <1464924384-15269-2-git-send-email-dave.long@linaro.org>
- <57675840.6060909@huawei.com>
-Message-ID: <576BE89B.3060005@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 23 Jun 2016 15:53:17 +0200
+Subject: [PATCH v2] arm64: mm: fix location of _etext
+Message-ID: <1466689997-17890-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2016 10:43 PM, Li Bin wrote:
->
->
-> on 2016/6/3 11:26, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64, including supporting
->> functions and defines.
->>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
->> ---
->>   arch/arm64/Kconfig              |   1 +
->>   arch/arm64/include/asm/ptrace.h |  54 +++++++++++++++++-
->>   arch/arm64/kernel/ptrace.c      | 118 ++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 172 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 76747d9..0f7a624 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -85,6 +85,7 @@ config ARM64
->>   	select HAVE_PERF_EVENTS
->>   	select HAVE_PERF_REGS
->>   	select HAVE_PERF_USER_STACK_DUMP
->> +	select HAVE_REGS_AND_STACK_ACCESS_API
->>   	select HAVE_RCU_TABLE_FREE
->>   	select HAVE_SYSCALL_TRACEPOINTS
->>   	select IOMMU_DMA if IOMMU_SUPPORT
->> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
->> index a307eb6..c130f2b 100644
->> --- a/arch/arm64/include/asm/ptrace.h
->> +++ b/arch/arm64/include/asm/ptrace.h
->> @@ -74,6 +74,7 @@
->>   #define COMPAT_PT_DATA_ADDR		0x10004
->>   #define COMPAT_PT_TEXT_END_ADDR		0x10008
->>   #ifndef __ASSEMBLY__
->> +#include <linux/bug.h>
->>
->>   /* sizeof(struct user) for AArch32 */
->>   #define COMPAT_USER_SZ	296
->> @@ -119,6 +120,8 @@ struct pt_regs {
->>   	u64 syscallno;
->>   };
->>
->> +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
->> +
->>   #define arch_has_single_step()	(1)
->>
->>   #ifdef CONFIG_COMPAT
->> @@ -147,6 +150,55 @@ struct pt_regs {
->>   #define user_stack_pointer(regs) \
->>   	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
->>
->> +extern int regs_query_register_offset(const char *name);
->> +extern const char *regs_query_register_name(unsigned int offset);
->> +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
->> +extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
->> +					       unsigned int n);
->> +
->> +/**
->> + * regs_get_register() - get register value from its offset
->> + * @regs:	   pt_regs from which register value is gotten
->> + * @offset:    offset of the register.
->> + *
->> + * regs_get_register returns the value of a register whose offset from @regs.
->> + * The @offset is the offset of the register in struct pt_regs.
->> + * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
->> + */
->> +static inline u64 regs_get_register(struct pt_regs *regs,
->> +					      unsigned int offset)
->> +{
->> +	u64 val = 0;
->> +
->> +	WARN_ON(offset & 7);
->> +
->> +	offset >>= 3;
->
-> Here, the offset is 3-bits right shifted. So,
->
->> +	switch (offset) {
->> +	case	0 ... 30:
->> +		val = regs->regs[offset];
->> +		break;
->> +	case offsetof(struct pt_regs, sp):
->
-> here should be shifted too, as
->
-> 	case offsetof(struct pt_regs, sp) >> 3:
->
->
->> +		val = regs->sp;
->> +		break;
->> +	case offsetof(struct pt_regs, pc):
->
-> and here,
->
->> +		val = regs->pc;
->> +		break;
->> +	case offsetof(struct pt_regs, pstate):
->
-> and here.
->
-> thanks,
-> Li Bin
->
+As Kees Cook notes in the ARM counterpart of this patch [0]:
 
-Thanks for pointing this out.  It has been fixed now for the v14 patch.
+  The _etext position is defined to be the end of the kernel text code,
+  and should not include any part of the data segments. This interferes
+  with things that might check memory ranges and expect executable code
+  up to _etext.
 
->> +		val = regs->pstate;
->> +		break;
->> +	default:
->> +		val = 0;
->> +	}
->> +
->> +	return val;
->> +}
->> +
->> +/* Valid only for Kernel mode traps. */
->> +static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
->> +{
->> +	return regs->sp;
->> +}
->> +
->>   static inline unsigned long regs_return_value(struct pt_regs *regs)
->>   {
->>   	return regs->regs[0];
->> @@ -156,7 +208,7 @@ static inline unsigned long regs_return_value(struct pt_regs *regs)
->>   struct task_struct;
->>   int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task);
->>
->> -#define instruction_pointer(regs)	((unsigned long)(regs)->pc)
->> +#define instruction_pointer(regs)	((regs)->pc)
->>
->>   extern unsigned long profile_pc(struct pt_regs *regs);
->>
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index 3f6cd5c..2c88c33 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -48,6 +48,124 @@
->>   #define CREATE_TRACE_POINTS
->>   #include <trace/events/syscalls.h>
->>
->> +struct pt_regs_offset {
->> +	const char *name;
->> +	int offset;
->> +};
->> +
->> +#define REG_OFFSET_NAME(r) {.name = #r, .offset = offsetof(struct pt_regs, r)}
->> +#define REG_OFFSET_END {.name = NULL, .offset = 0}
->> +#define	GPR_OFFSET_NAME(r)	\
->> +	{.name = "x" #r, .offset = offsetof(struct pt_regs, regs[r])}
->> +
->> +static const struct pt_regs_offset regoffset_table[] = {
->> +	GPR_OFFSET_NAME(0),
->> +	GPR_OFFSET_NAME(1),
->> +	GPR_OFFSET_NAME(2),
->> +	GPR_OFFSET_NAME(3),
->> +	GPR_OFFSET_NAME(4),
->> +	GPR_OFFSET_NAME(5),
->> +	GPR_OFFSET_NAME(6),
->> +	GPR_OFFSET_NAME(7),
->> +	GPR_OFFSET_NAME(8),
->> +	GPR_OFFSET_NAME(9),
->> +	GPR_OFFSET_NAME(10),
->> +	GPR_OFFSET_NAME(11),
->> +	GPR_OFFSET_NAME(12),
->> +	GPR_OFFSET_NAME(13),
->> +	GPR_OFFSET_NAME(14),
->> +	GPR_OFFSET_NAME(15),
->> +	GPR_OFFSET_NAME(16),
->> +	GPR_OFFSET_NAME(17),
->> +	GPR_OFFSET_NAME(18),
->> +	GPR_OFFSET_NAME(19),
->> +	GPR_OFFSET_NAME(20),
->> +	GPR_OFFSET_NAME(21),
->> +	GPR_OFFSET_NAME(22),
->> +	GPR_OFFSET_NAME(23),
->> +	GPR_OFFSET_NAME(24),
->> +	GPR_OFFSET_NAME(25),
->> +	GPR_OFFSET_NAME(26),
->> +	GPR_OFFSET_NAME(27),
->> +	GPR_OFFSET_NAME(28),
->> +	GPR_OFFSET_NAME(29),
->> +	GPR_OFFSET_NAME(30),
->> +	{.name = "lr", .offset = offsetof(struct pt_regs, regs[30])},
->> +	REG_OFFSET_NAME(sp),
->> +	REG_OFFSET_NAME(pc),
->> +	REG_OFFSET_NAME(pstate),
->> +	REG_OFFSET_END,
->> +};
->> +
->> +/**
->> + * regs_query_register_offset() - query register offset from its name
->> + * @name:	the name of a register
->> + *
->> + * regs_query_register_offset() returns the offset of a register in struct
->> + * pt_regs from its name. If the name is invalid, this returns -EINVAL;
->> + */
->> +int regs_query_register_offset(const char *name)
->> +{
->> +	const struct pt_regs_offset *roff;
->> +
->> +	for (roff = regoffset_table; roff->name != NULL; roff++)
->> +		if (!strcmp(roff->name, name))
->> +			return roff->offset;
->> +	return -EINVAL;
->> +}
->> +
->> +/**
->> + * regs_query_register_name() - query register name from its offset
->> + * @offset:	the offset of a register in struct pt_regs.
->> + *
->> + * regs_query_register_name() returns the name of a register from its
->> + * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
->> + */
->> +const char *regs_query_register_name(unsigned int offset)
->> +{
->> +	const struct pt_regs_offset *roff;
->> +
->> +	for (roff = regoffset_table; roff->name != NULL; roff++)
->> +		if (roff->offset == offset)
->> +			return roff->name;
->> +	return NULL;
->> +}
->> +
->> +/**
->> + * regs_within_kernel_stack() - check the address in the stack
->> + * @regs:      pt_regs which contains kernel stack pointer.
->> + * @addr:      address which is checked.
->> + *
->> + * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
->> + * If @addr is within the kernel stack, it returns true. If not, returns false.
->> + */
->> +bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
->> +{
->> +	return ((addr & ~(THREAD_SIZE - 1))  ==
->> +		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1))) ||
->> +		on_irq_stack(addr, raw_smp_processor_id());
->> +}
->> +
->> +/**
->> + * regs_get_kernel_stack_nth() - get Nth entry of the stack
->> + * @regs:	pt_regs which contains kernel stack pointer.
->> + * @n:		stack entry number.
->> + *
->> + * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
->> + * is specified by @regs. If the @n th entry is NOT in the kernel stack,
->> + * this returns 0.
->> + */
->> +unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n)
->> +{
->> +	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
->> +
->> +	addr += n;
->> +	if (regs_within_kernel_stack(regs, (unsigned long)addr))
->> +		return *addr;
->> +	else
->> +		return 0;
->> +}
->> +
->>   /*
->>    * TODO: does not yet catch signals sent when the child dies.
->>    * in exit.c or in signal.c.
->>
->
+In particular, Kees is referring to the HARDENED_USERCOPY patch set [1],
+which rejects attempts to call copy_to_user() on kernel ranges containing
+executable code, but does allow access to the .rodata segment. Regardless
+of whether one may or may not agree with the distinction, it makes sense
+for _etext to have the same meaning across architectures.
 
+So let's put _etext where it belongs, between .text and .rodata, and fix
+up existing references to use __init_begin instead, which unlike _end_rodata
+includes the exception and notes sections as well.
 
-Thanks,
--dl
+The _etext references in kaslr.c are left untouched, since its references
+to [_stext, _etext) are meant to capture potential jump instruction targets,
+and so disregarding .rodata is actually an improvement here.
+
+[0] http://article.gmane.org/gmane.linux.kernel/2245084
+[1] http://thread.gmane.org/gmane.linux.kernel.hardened.devel/2502
+
+Reported-by: Kees Cook <keescook@chromium.org>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v2: - preserve reference to _etext in init_mm, which redefines the init_mm
+      code region to no longer cover .rodata as well
+    - update comments regarding overlap of text to refer to 'text/rodata'
+      instead
+    - added Mark's R-b
+
+ arch/arm64/kernel/setup.c       |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S |  7 ++++---
+ arch/arm64/mm/init.c            |  4 ++--
+ arch/arm64/mm/mmu.c             | 20 ++++++++++----------
+ 4 files changed, 17 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 3279defabaa2..c1509e654190 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -202,7 +202,7 @@ static void __init request_standard_resources(void)
+ 	struct resource *res;
+ 
+ 	kernel_code.start   = virt_to_phys(_text);
+-	kernel_code.end     = virt_to_phys(_etext - 1);
++	kernel_code.end     = virt_to_phys(__init_begin - 1);
+ 	kernel_data.start   = virt_to_phys(_sdata);
+ 	kernel_data.end     = virt_to_phys(_end - 1);
+ 
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 435e820e898d..0de7be4f1a9d 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -131,12 +131,13 @@ SECTIONS
+ 	}
+ 
+ 	. = ALIGN(SEGMENT_ALIGN);
+-	RO_DATA(PAGE_SIZE)		/* everything from this point to */
+-	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
++	_etext = .;			/* End of text section */
++
++	RO_DATA(PAGE_SIZE)		/* everything from this point to     */
++	EXCEPTION_TABLE(8)		/* __init_begin will be marked RO NX */
+ 	NOTES
+ 
+ 	. = ALIGN(SEGMENT_ALIGN);
+-	_etext = .;			/* End of text and rodata section */
+ 	__init_begin = .;
+ 
+ 	INIT_TEXT_SECTION(8)
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index d45f8627012c..7bc5bed0220a 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -430,9 +430,9 @@ void __init mem_init(void)
+ 	pr_cont("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
+ 		MLG(VMALLOC_START, VMALLOC_END));
+ 	pr_cont("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+-		MLK_ROUNDUP(_text, __start_rodata));
++		MLK_ROUNDUP(_text, _etext));
+ 	pr_cont("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+-		MLK_ROUNDUP(__start_rodata, _etext));
++		MLK_ROUNDUP(__start_rodata, __init_begin));
+ 	pr_cont("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+ 		MLK_ROUNDUP(__init_begin, __init_end));
+ 	pr_cont("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0f85a46c3e18..c356f7b84d4d 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -386,14 +386,14 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+ {
+ 	unsigned long kernel_start = __pa(_text);
+-	unsigned long kernel_end = __pa(_etext);
++	unsigned long kernel_end = __pa(__init_begin);
+ 
+ 	/*
+ 	 * Take care not to create a writable alias for the
+ 	 * read-only text and rodata sections of the kernel image.
+ 	 */
+ 
+-	/* No overlap with the kernel text */
++	/* No overlap with the kernel text/rodata */
+ 	if (end < kernel_start || start >= kernel_end) {
+ 		__create_pgd_mapping(pgd, start, __phys_to_virt(start),
+ 				     end - start, PAGE_KERNEL,
+@@ -402,7 +402,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
+ 	}
+ 
+ 	/*
+-	 * This block overlaps the kernel text mapping.
++	 * This block overlaps the kernel text/rodata mappings.
+ 	 * Map the portion(s) which don't overlap.
+ 	 */
+ 	if (start < kernel_start)
+@@ -417,7 +417,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
+ 				     early_pgtable_alloc);
+ 
+ 	/*
+-	 * Map the linear alias of the [_text, _etext) interval as
++	 * Map the linear alias of the [_text, __init_begin) interval as
+ 	 * read-only/non-executable. This makes the contents of the
+ 	 * region accessible to subsystems such as hibernate, but
+ 	 * protects it from inadvertent modification or execution.
+@@ -449,14 +449,14 @@ void mark_rodata_ro(void)
+ {
+ 	unsigned long section_size;
+ 
+-	section_size = (unsigned long)__start_rodata - (unsigned long)_text;
++	section_size = (unsigned long)_etext - (unsigned long)_text;
+ 	create_mapping_late(__pa(_text), (unsigned long)_text,
+ 			    section_size, PAGE_KERNEL_ROX);
+ 	/*
+-	 * mark .rodata as read only. Use _etext rather than __end_rodata to
+-	 * cover NOTES and EXCEPTION_TABLE.
++	 * mark .rodata as read only. Use __init_begin rather than __end_rodata
++	 * to cover NOTES and EXCEPTION_TABLE.
+ 	 */
+-	section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
++	section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
+ 	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
+ 			    section_size, PAGE_KERNEL_RO);
+ }
+@@ -499,8 +499,8 @@ static void __init map_kernel(pgd_t *pgd)
+ {
+ 	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
+ 
+-	map_kernel_segment(pgd, _text, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
+-	map_kernel_segment(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
++	map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
++	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
+ 	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
+ 			   &vmlinux_init);
+ 	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
+-- 
+2.7.4
