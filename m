@@ -1,41 +1,110 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 23 Jun 2016 23:26:36 +0800
-Subject: [PATCH 1/2] mm: memblock Add some new functions to address the
- mem limit issue
-In-Reply-To: <1466681415-8058-1-git-send-email-dennis.chen@arm.com>
-Message-ID: <201606232319.4gbhuXin%fengguang.wu@intel.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 23 Jun 2016 21:16:24 +0530
+Subject: [PATCH v19 10/13] arm64: kdump: add VMCOREINFO's for user-space
+ coredump tools
+In-Reply-To: <20160623081545.GA20774@linaro.org>
+References: <cover.1466120418.git.geoff@infradead.org>
+ <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
+ <20160620053222.GB14309@dhcppc9>
+ <20160622055940.GY20774@linaro.org>
+ <20160623071412.GA16398@dhcppc9>
+ <20160623081545.GA20774@linaro.org>
+Message-ID: <20160623154624.GC16398@dhcppc9>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 23/06/2016:05:42:28 PM, AKASHI Takahiro wrote:
+> On Thu, Jun 23, 2016 at 12:44:12PM +0530, Pratyush Anand wrote:
+> > Hi Takahiro,
+> > 
+> > Thanks for your reply.
+> > 
+> > On 22/06/2016:02:59:41 PM, AKASHI Takahiro wrote:
+> > > On Mon, Jun 20, 2016 at 11:02:22AM +0530, Pratyush Anand wrote:
+> > > > +Atsushi
+> > > > 
+> > > > Hi Takahiro,
+> > > > 
+> > > > On 16/06/2016:11:48:28 PM, Geoff Levand wrote:
+> > > > > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > > > 
+> > > > > For the current crash utility, we need to know, at least,
+> > > > >   - kimage_voffset
+> > > > >   - PHYS_OFFSET
+> > > > > to handle the contents of core dump file (/proc/vmcore) correctly due to
+> > > > > the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
+> > > > > This patch puts them as VMCOREINFO's into the file.
+> > > > > 
+> > > > >   - VA_BITS
+> > > > > is also added for makedumpfile command.
+> > > > 
+> > > > Thanks for adding them. They are quite helpful for makedumpfile as well.
+> > > > 
+> > > > > More VMCOREINFO's may be added later.
+> > > > 
+> > > > Yes, we will need to pass VMCOREINFO_SYMBOL(_text) and VMCOREINFO_SYMBOL(_end)
+> > > > in order to work with makedumpfile.
+> > > 
+> > > I know that adding those symbols is the easiest way, but
+> > > theoretically, if we know the physical address of "swapper_pg_dir",
+> > 
+> > But, we know only it's virtual address. 
+> 
+> What I meant here is that, if we know the physical address of "swapper_pg_dir",
+> we don't have to know neither of "_text", "_end", "kimage_voffset" nor
+> "PHYS_OFFSET".
+> I just wanted to ask you whether you thought of this possibility.
 
-[auto build test WARNING on arm64/for-next/core]
-[also build test WARNING on v4.7-rc4 next-20160623]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+OK, Let me clarify the needs from makedumpfile perspective. Atsushi can correct
+me if I am wrong:
 
-url:    https://github.com/0day-ci/linux/commits/Dennis-Chen/mm-memblock-Add-some-new-functions-to-address-the-mem-limit-issue/20160623-193344
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/core
-config: x86_64-randconfig-s0-06232144 (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+- As a minimal we need some way of reading page table entries. Currently vmcore
+  has only virtual address of swapper_pg_dir, but if you can provide
+  __pa(swapper_pg_dir) in vmcore, then we do not need either "_text", "_end" or
+  "kimage_voffset". 
+- However, "PHYS_OFFSET" might still be needed. makedumpfile core code needs to
+  know phys_base. Currently we find it from the PT_LOAD segments. We treat the
+  lowest start of segment's LMAs as the physical base. I am not sure, if that is
+  still true with latest KASAN changes.
+- Further, if you do not provide "_text" and "_end", then we will have to translate
+  each address with complex page table read process, which would slow
+  makedumpfile execution significantly.
 
-All warnings (new ones prefixed by >>):
+Now, please let us know that what will be the kernel strategy, so that I can
+re-organise makedumpfile accordingly.
 
->> WARNING: vmlinux.o(.text.unlikely+0x330c): Section mismatch in reference from the function __find_max_addr() to the variable .meminit.data:memblock
-   The function __find_max_addr() references
-   the variable __meminitdata memblock.
-   This is often because __find_max_addr lacks a __meminitdata
-   annotation or the annotation of memblock is wrong.
+> > 
+> > > instead of its virtual address, we can access all the memory pointed to
+> > > by any kernel virtual address.
+> > > How do you rationalize that we need to know "_text" and "_end"?
+> > 
+> > Well, we need some mechanism so that we can decide if an address can be
+> > translated using linear mapping of virt_to_phys(). 
+> 
+> All the entries in MMU tables are based on "physical" addresses,
+> and so we don't care whether a given address is in linear mapping or not
+> in walking through MMU.
+> See what I mean?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 21054 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160623/f10dbdcd/attachment-0001.obj>
+Yes, yes, I thought, we have only virtual swapper_pg_dir, so I was looking for a
+way to translate *atleast* that into physical.
+
+Thanks for your input. Those are helpful.
+
+~Pratyush
+
+> 
+> Thanks,
+> -Takahiro AKASHI
+> 
+> > Alternatively, probably we can do like this:
+> > -- Translate all address between "SYMBOL(swapper_pg_dir)"  and "SYMBOL(swapper_pg_dir)
+> >  + SWAPPER_DIR_SIZE" using virt_to_phys() and now we can read values from
+> >  dumpfile using that physical address. This way we can get PGD/PMD/PUD values.
+> > -- PTE values may lie out side this range, however that address should still be
+> > linearly translatable. We can use virt_to_phys() macro from them as well.
+> > 
+> > In summary, we can translate address of PGD/PMD/PUD/PTE using virt_to_phys()
+> > and rest all can be translated using page table entries.
+> > 
+> > ~Pratyush
