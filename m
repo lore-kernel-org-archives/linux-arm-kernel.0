@@ -1,212 +1,71 @@
 From: megous@megous.com (megous at megous.com)
-Date: Thu, 23 Jun 2016 21:20:57 +0200
-Subject: [PATCH 07/14] regulator: SY8106A regulator driver
+Date: Thu, 23 Jun 2016 21:21:04 +0200
+Subject: [PATCH 14/14] ARM: dts: sun8i: Enable DVFS on Orange Pi One
 In-Reply-To: <20160623192104.18720-1-megous@megous.com>
 References: <20160623192104.18720-1-megous@megous.com>
-Message-ID: <20160623192104.18720-8-megous@megous.com>
+Message-ID: <20160623192104.18720-15-megous@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ondrej Jirman <megous@megous.com>
 
-SY8106A is I2C attached single output voltage regulator
-made by Silergy.
+Use Xulong Orange Pi One GPIO based regulator for
+passive cooling and thermal management.
 
 Signed-off-by: Ondrej Jirman <megous@megous.com>
 ---
- drivers/regulator/Kconfig             |   8 +-
- drivers/regulator/Makefile            |   2 +-
- drivers/regulator/sy8106a-regulator.c | 153 ++++++++++++++++++++++++++++++++++
- 3 files changed, 161 insertions(+), 2 deletions(-)
- create mode 100644 drivers/regulator/sy8106a-regulator.c
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 39 +++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 144cbf5..fc3fae2 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -860,5 +860,11 @@ config REGULATOR_WM8994
- 	  This driver provides support for the voltage regulators on the
- 	  WM8994 CODEC.
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index ce4ba91..6bd4367 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -107,6 +107,45 @@
+ 	};
+ };
  
--endif
-+config REGULATOR_SY8106A
-+	tristate "Silergy SY8106A"
-+	depends on I2C
-+	select REGMAP_I2C
-+	help
-+	  This driver provides support for the voltage regulator SY8106A.
++&cpu0 {
++	clocks = <&cpu>;
++	clock-latency = <244144>; /* 8 32k periods */
++	operating-points = <
++		/* kHz	  uV */
++		1296000	1300000
++		1200000	1300000
++		624000	1100000
++		480000	1100000
++		312000	1100000
++		240000	1100000
++		>;
++	#cooling-cells = <2>;
++	cooling-min-level = <0>;
++	cooling-max-level = <5>;
++	cpu0-supply = <&vdd_soc>;
++};
++
++&cpu_thermal {
++	cooling-maps {
++		map0 {
++			trip = <&cpu_alert0>;
++			cooling-device = <&cpu0 (-1) (-1)>;
++		};
++	};
++
++	trips {
++		cpu_alert0: cpu_alert0 {
++			temperature = <80000>;
++			hysteresis = <2000>;
++			type = "passive";
++		};
++
++		cpu_crit: cpu_crit {
++			temperature = <100000>;
++			hysteresis = <2000>;
++			type = "critical";
++		};
++	};
+ };
  
-+endif
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 85a1d44..f382095 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -110,6 +110,6 @@ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-ldo.o
- obj-$(CONFIG_REGULATOR_WM8350) += wm8350-regulator.o
- obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
- obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
--
-+obj-$(CONFIG_REGULATOR_SY8106A) += sy8106a-regulator.o
- 
- ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
-diff --git a/drivers/regulator/sy8106a-regulator.c b/drivers/regulator/sy8106a-regulator.c
-new file mode 100644
-index 0000000..34bd69c
---- /dev/null
-+++ b/drivers/regulator/sy8106a-regulator.c
-@@ -0,0 +1,153 @@
-+/*
-+ * sy8106a-regulator.c - Regulator device driver for SY8106A
-+ *
-+ * Copyright (C) 2016  Ond?ej Jirman <megous@megous.com>
-+ *
-+ * This library is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU Library General Public
-+ * License as published by the Free Software Foundation; either
-+ * version 2 of the License, or (at your option) any later version.
-+ *
-+ * This library is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * Library General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU Library General Public
-+ * License along with this library; if not, write to the
-+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
-+ * Boston, MA  02110-1301, USA.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/i2c.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/of_regulator.h>
-+#include <linux/regmap.h>
-+
-+#define SY8106A_REG_VOUT1_SEL 		0x01
-+#define SY8106A_REG_VOUT_COM 		0x02
-+#define SY8106A_REG_VOUT1_SEL_MASK 	0x7f
-+#define SY8106A_DISABLE_REG 		0x01
-+
-+struct sy8106a {
-+	struct regulator_dev *rdev;
-+	struct regmap *regmap;
-+};
-+
-+static const struct regmap_config sy8106a_regmap_config = {
-+	.reg_bits = 8,
-+	.val_bits = 8,
-+};
-+
-+static int sy8106a_set_voltage_sel(struct regulator_dev *rdev, unsigned sel)
-+{
-+	return regmap_update_bits(rdev->regmap, rdev->desc->vsel_reg,
-+				  0xff, sel | 0x80);
-+}
-+
-+static const struct regulator_ops sy8106a_ops = {
-+	.is_enabled = regulator_is_enabled_regmap,
-+	.set_voltage_sel = sy8106a_set_voltage_sel,
-+	.set_voltage_time_sel = regulator_set_voltage_time_sel,
-+	.get_voltage_sel = regulator_get_voltage_sel_regmap,
-+	.list_voltage = regulator_list_voltage_linear,
-+};
-+
-+/* Default limits measured in millivolts and milliamps */
-+#define SY8106A_MIN_MV		680
-+#define SY8106A_MAX_MV		1950
-+#define SY8106A_STEP_MV		10
-+
-+static const struct regulator_desc sy8106a_reg = {
-+	.name = "SY8106A",
-+	.id = 0,
-+	.ops = &sy8106a_ops,
-+	.type = REGULATOR_VOLTAGE,
-+	.n_voltages = ((SY8106A_MAX_MV - SY8106A_MIN_MV) / SY8106A_STEP_MV) + 1,
-+	.min_uV = (SY8106A_MIN_MV * 1000),
-+	.uV_step = (SY8106A_STEP_MV * 1000),
-+	.vsel_reg = SY8106A_REG_VOUT1_SEL,
-+	.vsel_mask = SY8106A_REG_VOUT1_SEL_MASK,
-+	.enable_reg = SY8106A_REG_VOUT_COM,
-+	.enable_mask = SY8106A_DISABLE_REG,
-+	.disable_val = SY8106A_DISABLE_REG,
-+	.enable_is_inverted = 1,
-+	.owner = THIS_MODULE,
-+};
-+
-+/*
-+ * I2C driver interface functions
-+ */
-+static int sy8106a_i2c_probe(struct i2c_client *i2c,
-+			    const struct i2c_device_id *id)
-+{
-+	struct sy8106a *chip;
-+	struct device *dev = &i2c->dev;
-+	struct regulator_dev *rdev = NULL;
-+	struct regulator_config config = { };
-+	unsigned int selector;
-+	int error;
-+
-+	chip = devm_kzalloc(&i2c->dev, sizeof(struct sy8106a), GFP_KERNEL);
-+	if (!chip)
-+		return -ENOMEM;
-+
-+	chip->regmap = devm_regmap_init_i2c(i2c, &sy8106a_regmap_config);
-+	if (IS_ERR(chip->regmap)) {
-+		error = PTR_ERR(chip->regmap);
-+		dev_err(&i2c->dev, "Failed to allocate register map: %d\n",
-+			error);
-+		return error;
-+	}
-+
-+	config.dev = &i2c->dev;
-+	config.init_data = of_get_regulator_init_data(dev, dev->of_node, &sy8106a_reg);
-+	config.driver_data = chip;
-+	config.regmap = chip->regmap;
-+	config.of_node = dev->of_node;
-+
-+	/* Probe regulator */
-+	error = regmap_read(chip->regmap, SY8106A_REG_VOUT1_SEL, &selector);
-+	dev_info(&i2c->dev, "SY8106A voltage at boot: %u mV\n", SY8106A_MIN_MV + SY8106A_STEP_MV * (selector & SY8106A_REG_VOUT1_SEL_MASK));
-+	if (error) {
-+		dev_err(&i2c->dev, "Failed to read voltage at probe time: %d\n", error);
-+		return error;
-+	}
-+
-+	rdev = devm_regulator_register(&i2c->dev, &sy8106a_reg, &config);
-+	if (IS_ERR(rdev)) {
-+		dev_err(&i2c->dev, "Failed to register SY8106A regulator\n");
-+		return PTR_ERR(rdev);
-+	}
-+
-+	chip->rdev = rdev;
-+
-+	i2c_set_clientdata(i2c, chip);
-+
-+	return 0;
-+}
-+
-+static const struct i2c_device_id sy8106a_i2c_id[] = {
-+	{"sy8106a", 0},
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(i2c, sy8106a_i2c_id);
-+
-+static struct i2c_driver sy8106a_regulator_driver = {
-+	.driver = {
-+		.name = "sy8106a",
-+	},
-+	.probe = sy8106a_i2c_probe,
-+	.id_table = sy8106a_i2c_id,
-+};
-+
-+module_i2c_driver(sy8106a_regulator_driver);
-+
-+MODULE_AUTHOR("Ond?ej Jirman <megous@megous.com>");
-+MODULE_DESCRIPTION("Regulator device driver for Silergy SY8106A");
-+MODULE_LICENSE("GPL v2");
+ &ehci1 {
 -- 
 2.9.0
