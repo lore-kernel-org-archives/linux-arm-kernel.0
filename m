@@ -1,96 +1,84 @@
-From: hs.liao@mediatek.com (Horng-Shyang Liao)
-Date: Thu, 23 Jun 2016 15:54:40 +0800
-Subject: [PATCH v8 2/3] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1466661829.15112.26.camel@mtksdaap41>
-References: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
- <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
- <1466661829.15112.26.camel@mtksdaap41>
-Message-ID: <1466668480.12124.15.camel@mtksdaap41>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 23 Jun 2016 09:58:38 +0200
+Subject: [PATCH V8 0/9] vfio, platform: add ACPI support
+In-Reply-To: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
+References: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <44afaabd-8393-fa97-ab61-664cd169bd9f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi CK,
+Hi Sinan,
 
-On Thu, 2016-06-23 at 14:03 +0800, CK Hu wrote:
-> Hi, HS:
+On 20/06/2016 17:51, Sinan Kaya wrote:
+> The current code only supports the device tree based platforms.
+> The code checks for the presence of a reset driver and calls the reset
+> function pointer by looking up the reset driver as a module.
 > 
-> On Mon, 2016-05-30 at 11:19 +0800, HS Liao wrote:
-> [...]
+> ACPI defines _RST method to perform device level reset. After the _RST
+> method is executed, the OS can resume using the device.
 > 
-> > +
-> > +/* events for CMDQ and display */
-> > +enum cmdq_event {
-> > +	/* Display start of frame(SOF) events */
-> > +	CMDQ_EVENT_DISP_OVL0_SOF = 11,
-> > +	CMDQ_EVENT_DISP_OVL1_SOF = 12,
-> > +	CMDQ_EVENT_DISP_RDMA0_SOF = 13,
-> > +	CMDQ_EVENT_DISP_RDMA1_SOF = 14,
-> > +	CMDQ_EVENT_DISP_RDMA2_SOF = 15,
-> > +	CMDQ_EVENT_DISP_WDMA0_SOF = 16,
-> > +	CMDQ_EVENT_DISP_WDMA1_SOF = 17,
-> > +	/* Display end of frame(EOF) events */
-> > +	CMDQ_EVENT_DISP_OVL0_EOF = 39,
-> > +	CMDQ_EVENT_DISP_OVL1_EOF = 40,
-> > +	CMDQ_EVENT_DISP_RDMA0_EOF = 41,
-> > +	CMDQ_EVENT_DISP_RDMA1_EOF = 42,
-> > +	CMDQ_EVENT_DISP_RDMA2_EOF = 43,
-> > +	CMDQ_EVENT_DISP_WDMA0_EOF = 44,
-> > +	CMDQ_EVENT_DISP_WDMA1_EOF = 45,
-> > +	/* Mutex end of frame(EOF) events */
-> > +	CMDQ_EVENT_MUTEX0_STREAM_EOF = 53,
-> > +	CMDQ_EVENT_MUTEX1_STREAM_EOF = 54,
-> > +	CMDQ_EVENT_MUTEX2_STREAM_EOF = 55,
-> > +	CMDQ_EVENT_MUTEX3_STREAM_EOF = 56,
-> > +	CMDQ_EVENT_MUTEX4_STREAM_EOF = 57,
-> > +	/* Display underrun events */
-> > +	CMDQ_EVENT_DISP_RDMA0_UNDERRUN = 63,
-> > +	CMDQ_EVENT_DISP_RDMA1_UNDERRUN = 64,
-> > +	CMDQ_EVENT_DISP_RDMA2_UNDERRUN = 65,
-> > +	/* Keep this at the end of HW events */
-> > +	CMDQ_MAX_HW_EVENT_COUNT = 260,
-> > +};
+> The patchset is moving the device tree specific pieces out of the code
+> to common functions so that ACPI support is added without impacting the
+> rest of the code.
 > 
-> The value of these symbol is just the GCE-HW-defined value. I think it's
-> not appropriate to expose HW-defined value to client. For another SoC
-> GCE HW, these definition may change.
+> During probe, the ACPI HID of the object will be saved and will be used to
+> determine if this is an ACPI capable platform or not. If acpihid is NULL
+> then, device tree functions are called.
+> 
+> In addition to plumbing ACPI support, reset functionality is now a
+> requirement by default.
+> 
+> The code was allowing platform devices to be used without a supporting
+> VFIO reset driver. The hardware can be left in some inconsistent state
+> after a guest machine abort.
+> 
+> The reset driver will put the hardware back to safe state and disable
+> interrupts before returning the control back to the host machine.
+> 
+> Adding a new reset_required kernel module option to AMBA and platform
+> VFIO drivers with a default value of true.
+> 
+> New requirements are:
+> 1. A reset function needs to be implemented by the corresponding driver
+> via DT/ACPI.
+> 2. The reset function needs to be discovered via DT/ACPI.
+> 
+> The probe of the driver will fail if any of the above conditions are
+> not satisfied.
+> 
+> Changes from V7:
+> 1. Move the reset function test before IOMMU group set up so that we can
+> clean up properly when reset function is not found.
+> 2. Correct the _RST function call. _RST method does not return any value.
+> We were calling acpi_evaluate_integer. The correct API needs to be
+> acpi_evaluate_object.
+> 
+> Sinan Kaya (9):
+>   vfio: platform: rename reset function
+>   vfio: platform: move reset call to a common function
+>   vfio: platform: determine reset capability
+>   vfio: platform: add support for ACPI probe
+>   vfio: platform: add extra debug info argument to call reset
+>   vfio: platform: call _RST method when using ACPI
+>   vfio, platform: make reset driver a requirement by default
+>   vfio: platform: check reset call return code during open
+>   vfio: platform: check reset call return code during release
+> 
+>  drivers/vfio/platform/vfio_amba.c             |   5 +
+>  drivers/vfio/platform/vfio_platform.c         |   5 +
+>  drivers/vfio/platform/vfio_platform_common.c  | 197 +++++++++++++++++++++-----
+>  drivers/vfio/platform/vfio_platform_private.h |   8 +-
+>  4 files changed, 177 insertions(+), 38 deletions(-)
+> 
+I tested with device tree and I did not find any issue:
+Tested-by: Eric Auger <eric.auger@redhat.com>
 
-Agree.
+For the whole series:
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-> One way to solve this problem is to translate symbol to value
-> internally. But these events looks like interrupt and the value may vary
-> by each SoC, to prevent driver modified frequently, it's better to place
-> the value definition in device tree. It may looks like:
-> 
-> mmsys: clock-controller at 14000000 {
-> 	compatible = "mediatek,mt8173-mmsys";
-> 	mediatek,gce = <&gce>;
-> 	gce-events = <53 54>;
+Please note this will collide with "[PATCH V3] vfio: platform: support
+No-IOMMU mode" (s/iommu_group_put/vfio_iommu_group_put)
 
-However, client still needs to know the HW-defined value by using
-this solution.
+Best Regards
 
-> 	gce-event-names = "MUTEX0_EOF","MUTEX1_EOF";
-> }
-> 
-> For cmdq driver, you just need modify interface from
-> 
-> int cmdq_rec_wfe(struct cmdq_rec *rec, enum cmdq_event event)
-> int cmdq_rec_clear_event(struct cmdq_rec *rec, enum cmdq_event event)
-> 
-> to
-> 
-> int cmdq_rec_wfe(struct cmdq_rec *rec, u32 event)
-> int cmdq_rec_clear_event(struct cmdq_rec *rec, u32 event)
-
-I think an easy way for this issue is just removing HW-defined values
-from include/soc/mediatek/cmdq.h (but keeping enum), and then mapping
-abstract values into real values in driver.
-The benefit of this solution is that we can keep interface and leave SoC
-specific code into driver.
-What do you think?
-
-> Regards,
-> CK
-
-Thanks,
-HS
+Eric
