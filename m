@@ -1,87 +1,126 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 23 Jun 2016 14:45:49 +0200
-Subject: [RFC PATCH v2 0/9] scpi: Add SCPI registry to handle legacy
- protocol
-In-Reply-To: <2a58b7d6-aadc-19fb-dd24-ea6bf51c1857@rock-chips.com>
-References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
- <2a58b7d6-aadc-19fb-dd24-ea6bf51c1857@rock-chips.com>
-Message-ID: <576BD9FD.2030608@baylibre.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 23 Jun 2016 13:50:08 +0100
+Subject: [PATCH] drivers: firmware: psci: Add support for cpu suspend
+ mode as per psci v1.0 spec
+In-Reply-To: <1466684053-26966-1-git-send-email-vikas.cha.sajjan@hpe.com>
+References: <1466684053-26966-1-git-send-email-vikas.cha.sajjan@hpe.com>
+Message-ID: <20160623125008.GE8836@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/2016 04:54 AM, Frank Wang wrote:
-> Hi Neil,
-> 
-> On 2016/6/21 18:02, Neil Armstrong wrote:
->> This patchset aims to support the legacy SCPI firmware implementation that was
->> delivered as early technology preview for the JUNO platform.
->>
->> Finally a stable, maintained and public implementation for the SCPI protocol
->> has been upstreamed part of the JUNO support and it is the recommended way
->> of implementing SCP communication on ARMv8 platforms.
->>
->> The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
->> platforms. Only the GXBB example is provided here, but it's unclear if other
->> Amlogic ARMv8 based SoCs uses this legacy procotol.
->>
->> In order to support the legacy protocol :
->>   - Move the scpi_get_ops to a thin registry layer
->>   - Change the arm_scpi.c to use the registry layer
->>   - Add a separate config option to build the registry layer
->>   - Add the legacy SCPI driver based on the new implementation
->>   - For example, add the Amlogic GXBB MHU and SCPI DT cpufreq & sensors nodes
-> 
-> Two comments may be not very associated with this series.
-> 
-> First, do you have any plan to implement the APIs for extended set ID of SCPI? If these APIs do not care commands, just focus on a message transmission access, something like a library role, and extended command can define in consumers driver module, I think it can more help for other consumers like Rockchip to send/receive nonstandard command data conveniently. Can it be?
+On Thu, Jun 23, 2016 at 05:44:13PM +0530, Vikas C Sajjan wrote:
+> According to section 5.1.16 of PSCI spec,
+> an optional feature called PSCI_SET_SUSPEND_MODE was added in v1.0.
+> This patch adds the support for the same.
 
-Yes, Amlogic only have a single extended command, but supporting Rockchips extended API is necessary.
-I'll need to think about a convenient way to extend vendor API in a separate driver with a set or read/write functions, but
-keeping the compatibility with the official SCPI extension API.
+This alone is not sufficient to use OS Initiated mode.
 
-> Second, As far as I know, some legacy mailbox hardware which like Altera, Rockchip...  need write command and data register sequentially, then it can create a interrupt, however, arm-scpi first use inner scpi_xfer structure to package the message, then data is passed to msg_submit (At mailbox.c), further into the bottom mailbox driver, but the data type is converted void*, so the mailbox driver could not extract the contents of message, if it do cast type, it may become non-general from driver view. Hence, is it possible to add a message header into scpi_xfer which for the bottom mailbox driver or dope out any other methods to solve it?
+Lina Iyer has been looking into more comprehensive support. Please see
+[1,2]
 
-Well, the message type should be considered "known" between the mailbox client and controller, but here Amlogic did copy ARM's MHU so we can simply cast the data into a uint32_t and push the
-word in the status register, but the interface was not designed to handle a "message", only a status.
-In your case, you seem to have used the message capability of the mailbox to transmit a proper message containing the command word and return length.
-Therefore, I must think about implementing a per-vendor transmit layer, because a generic way won't work among the different mailbox controllers.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438625.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438642.html
 
-Would it be possible to actually test the next revision of the legacy SCPI implementation on your platform ? I'll try to implement it for rockchip with what I understood, but I'll need your help for the DT declaration side.
+Thanks,
+Mark.
 
-Regards,
-Neil
-> BR.
-> Frank
 > 
->> Initial RFC discution tread can be found at https://lkml.org/lkml/2016/5/26/111
->>
->> Neil Armstrong (9):
->>    mailbox: Add Amlogic Meson Message-Handling-Unit
->>    dt-bindings: mailbox: Add Amlogic Meson MHU Bindings
->>    ARM64: dts: meson-gxbb: Add Meson MHU Node
->>    firmware: Add a SCPI registry to handle multiple implementations
->>    firmware: scpi: Switch arm_scpi to use new registry
->>    firmware: Add legacy SCPI protocol driver
->>    dt-bindings: arm: Update arm,scpi bindings with Meson GXBB SCPI
->>    ARM64: dts: meson-gxbb: Add SRAM node
->>    ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
->>
->>   Documentation/devicetree/bindings/arm/arm,scpi.txt |   8 +-
->>   .../devicetree/bindings/mailbox/meson-mhu.txt      |  33 ++
->>   arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  53 ++
->>   drivers/firmware/Kconfig                           |  24 +
->>   drivers/firmware/Makefile                          |   2 +
->>   drivers/firmware/arm_scpi.c                        |  14 +-
->>   drivers/firmware/legacy_scpi.c                     | 644 +++++++++++++++++++++
->>   drivers/firmware/scpi.c                            |  94 +++
->>   drivers/mailbox/Makefile                           |   2 +
->>   drivers/mailbox/meson_mhu.c                        | 199 +++++++
->>   include/linux/scpi_protocol.h                      |  15 +-
->>   11 files changed, 1075 insertions(+), 13 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/mailbox/meson-mhu.txt
->>   create mode 100644 drivers/firmware/legacy_scpi.c
->>   create mode 100644 drivers/firmware/scpi.c
->>   create mode 100644 drivers/mailbox/meson_mhu.c
->>
+> Signed-off-by: Vikas C Sajjan <vikas.cha.sajjan@hpe.com>
+> ---
+>  drivers/firmware/psci.c   | 20 +++++++++++++++++++-
+>  include/linux/psci.h      |  1 +
+>  include/uapi/linux/psci.h |  6 +++++-
+>  3 files changed, 25 insertions(+), 2 deletions(-)
 > 
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 03e0458..c318972 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -91,6 +91,12 @@ static inline bool psci_has_ext_power_state(void)
+>  				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
+>  }
+>  
+> +static inline bool psci_has_OS_initiated_mode_support(void)
+> +{
+> +	return psci_cpu_suspend_feature &
+> +			PSCI_1_0_FEATURES_CPU_SUSPEND_OS_INITIATED_MODE_MASK;
+> +}
+> +
+>  static inline bool psci_power_state_loses_context(u32 state)
+>  {
+>  	const u32 mask = psci_has_ext_power_state() ?
+> @@ -145,6 +151,14 @@ static int psci_to_linux_errno(int errno)
+>  
+>  	return -EINVAL;
+>  }
+> +static int psci_set_cpu_suspend_mode(bool suspend_mode)
+> +{
+> +	int err;
+> +
+> +	err = invoke_psci_fn(PSCI_FN_NATIVE(1_0, SUSPEND_MODE),
+> +						suspend_mode, 0, 0);
+> +	return psci_to_linux_errno(err);
+> +}
+>  
+>  static u32 psci_get_version(void)
+>  {
+> @@ -397,8 +411,12 @@ static void __init psci_init_cpu_suspend(void)
+>  {
+>  	int feature = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
+>  
+> -	if (feature != PSCI_RET_NOT_SUPPORTED)
+> +	if (feature != PSCI_RET_NOT_SUPPORTED) {
+>  		psci_cpu_suspend_feature = feature;
+> +		if (psci_has_OS_initiated_mode_support())
+> +			psci_ops.set_cpu_suspend_mode =
+> +						psci_set_cpu_suspend_mode;
+> +	}
+>  }
+>  
+>  /*
+> diff --git a/include/linux/psci.h b/include/linux/psci.h
+> index bdea1cb..c040502 100644
+> --- a/include/linux/psci.h
+> +++ b/include/linux/psci.h
+> @@ -33,6 +33,7 @@ struct psci_operations {
+>  	int (*affinity_info)(unsigned long target_affinity,
+>  			unsigned long lowest_affinity_level);
+>  	int (*migrate_info_type)(void);
+> +	int (*set_cpu_suspend_mode)(bool);
+>  };
+>  
+>  extern struct psci_operations psci_ops;
+> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+> index 3d7a0fc..097c95e 100644
+> --- a/include/uapi/linux/psci.h
+> +++ b/include/uapi/linux/psci.h
+> @@ -50,6 +50,8 @@
+>  #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
+>  
+>  #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
+> +#define PSCI_1_0_FN_SUSPEND_MODE		PSCI_0_2_FN(0xF)
+> +#define PSCI_1_0_FN64_SUSPEND_MODE		PSCI_0_2_FN64(0xF)
+>  
+>  /* PSCI v0.2 power state encoding for CPU_SUSPEND function */
+>  #define PSCI_0_2_POWER_STATE_ID_MASK		0xffff
+> @@ -90,8 +92,10 @@
+>  
+>  /* PSCI features decoding (>=1.0) */
+>  #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT	1
+> +#define PSCI_1_0_FEATURES_CPU_SUSPEND_OS_INITIATED_MODE_MASK 1
+>  #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
+> -			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
+> +			((0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)| \
+> +			PSCI_1_0_FEATURES_CPU_SUSPEND_OS_INITIATED_MODE_MASK)
+>  
+>  /* PSCI return values (inclusive of all PSCI versions) */
+>  #define PSCI_RET_SUCCESS			0
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
