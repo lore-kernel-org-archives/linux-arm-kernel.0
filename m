@@ -1,56 +1,140 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 23 Jun 2016 14:50:55 +0200
-Subject: [RFC PATCH v2 1/9] mailbox: Add Amlogic Meson
- Message-Handling-Unit
-In-Reply-To: <CABb+yY3r3_B9wbW6D-do8h8xMKCANQWfz1gFGyre1oWadd7A8Q@mail.gmail.com>
-References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
- <1466503374-28841-2-git-send-email-narmstrong@baylibre.com>
- <CABb+yY3r3_B9wbW6D-do8h8xMKCANQWfz1gFGyre1oWadd7A8Q@mail.gmail.com>
-Message-ID: <576BDB2F.2070003@baylibre.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Thu, 23 Jun 2016 20:50:59 +0800
+Subject: [v3 PATCH 0/5] Rockchip Type-C and DispplayPort driver
+Message-ID: <1466686264-6744-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/2016 06:31 AM, Jassi Brar wrote:
-> On Tue, Jun 21, 2016 at 3:32 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> Add Amlogic Meson SoCs Message-Handling-Unit as mailbox controller
->> with 2 independent channels/links to communicate with a remote processor.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> .....
-> 
->> +++ b/drivers/mailbox/meson_mhu.c
->> @@ -0,0 +1,199 @@
->> +/*
->> + * Copyright (C) 2016 BayLibre SAS.
->> + * Author: Neil Armstrong <narmstrong@baylibre.com>
->> + * Heavily based on meson_mhu.c from :
->> + * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
->> + * Copyright (C) 2015 Linaro Ltd.
->> + * Author: Jassi Brar <jaswinder.singh@linaro.org>
-> 
-> .........
->> +
->> +#define INTR_SET_OFS   0x0
->> +#define INTR_STAT_OFS  0x4
->> +#define INTR_CLR_OFS   0x8
->> +
->> +#define MHU_LP_OFFSET  0x10
->> +#define MHU_HP_OFFSET  0x1c
->> +
->> +#define TX_REG_OFFSET  0x24
->> +
-> It seems only some register offsets have changed from arm_mhu. So
-> maybe just adapt the arm_mhu driver to look for IP variant and assign
-> corresponding offsets to set,stat,clr registers.
 
-Hi Jassi,
+Hi all
 
-It's a good idea, but adding the platform_driver support along the amba_bus probe will add a lot a code.
-The meson_mhu is a very simple and short driver, I think it'll be simpler to maintain beeing separated.
-And I'm not certain on how it's close of ARM's real IP.
+This series patch is for rockchip Type-C phy and DisplayPort controller
+driver.
 
-Neil
+The USB Type-C PHY is designed to support the USB3 and DP applications.
+The PHY basically has two main components: USB3 and DisplyPort. USB3
+operates in SuperSpeed mode and the DP can operate at RBR, HBR and HBR2
+data rates. The Type-C cable orientation detection and Power Delivery
+(PD) is accomplished using a PD PHY or a exernal PD chip.
 
-> Cheers.
-> 
+The DP controller is compliant with DisplayPort Specification,
+Version 1.3, This IP is compatible with the rockchip type-c PHY IP.
+There is a uCPU in DP controller, it need a firmware to work, please
+put the firmware file to /lib/firmware/cdn/dptx.bin. The uCPU in charge
+of aux communication and link training, the host use mailbox to
+communicate with the ucpu.
+
+The PHY driver has register a notification with extcon API, to get the
+alt mode from PD, the PD driver need call the devm_extcon_dev_allocate
+to create a extcon device and use extcon_set_state to notify PHY and
+DP controller.
+
+About the DP audio, cdn-dp registered 2 DAIs: 0 is I2S, 1 is SPDIF.
+We can reference them in simple-card.
+
+This series is based on Mark Yao's branch:
+https://github.com/markyzq/kernel-drm-rockchip/tree/drm-rockchip-next-2016-05-23
+
+I test this patches on the rk3399-evb board, with a fusb302 driver,
+this branch has no rk3399.dtsi, so the patch about dts is not included
+in this series.
+
+
+Changes in v3:
+- use compatible: rockchip,rk3399-typec-phy
+- use dashes instead of underscores.
+- remove the phy framework(Kishon Vijay Abraham I)
+- add parentheses around the macro
+- use a single space between type and name
+- add spaces after opening and before closing braces.
+- use u16 for register value
+- remove type-c phy header file
+- CodingStyle optimization
+- use some cable extcon to get type-c port information
+- add a extcon to notify Display Port
+- add SoC specific compatible string
+- remove reg = <1>;
+- use EXTCON_DISP_DP and EXTCON_DISP_DP_ALT cable to get dp port state.
+- reset spdif before config it
+- modify the firmware clk to 100Mhz
+- retry load firmware if fw file is requested too early
+
+Changes in v2:
+- add some registers description
+- select RESET_CONTROLLER
+- alphabetic order
+- modify some spelling mistakes
+- make mode cleaner
+- use bool for enable/disable
+- check all of the return value
+- return a better err number
+- use more readx_poll_timeout()
+- clk_disable_unprepare(tcphy->clk_ref);
+- remove unuse functions, rockchip_typec_phy_power_on/off
+- remove unnecessary typecast from void *
+- use dts node to distinguish between phys.
+- Alphabetic order
+- remove excess error message
+- use define clk_rate
+- check all return value
+- remove dev_set_name(dp->dev, "cdn-dp");
+- use schedule_delayed_work
+- remove never-called functions
+- remove some unnecessary ()
+
+Changes in v1:
+- add extcon node description
+- move the registers in phy driver
+- remove the suffix of reset
+- update the licence note
+- init core clock to 50MHz
+- use extcon API
+- remove unused global
+- add some comments for magic num
+- change usleep_range(1000, 2000) tousleep_range(1000, 1050)
+- remove __func__ from dev_err
+- return err number when get clk failed
+- remove ADDR_ADJ define
+- use devm_clk_get(&pdev->dev, "tcpdcore")
+- add extcon node description
+- add #sound-dai-cells description
+- use extcon API
+- use hdmi-codec for the DP Asoc
+- do not initialize the "ret"
+- printk a err log when drm_of_encoder_active_endpoint_id
+- modify the dclk pin_pol to a single line
+
+Chris Zhong (5):
+  extcon: Add Type-C and DP support
+  Documentation: bindings: add dt doc for Rockchip USB Type-C PHY
+  phy: Add USB Type-C PHY driver for rk3399
+  Documentation: bindings: add dt documentation for cdn DP controller
+  drm/rockchip: cdn-dp: add cdn DP support for rk3399
+
+ .../bindings/display/rockchip/cdn-dp-rockchip.txt  |   61 ++
+ .../devicetree/bindings/phy/phy-rockchip-typec.txt |   74 ++
+ drivers/extcon/extcon.c                            |    6 +
+ drivers/gpu/drm/rockchip/Kconfig                   |    9 +
+ drivers/gpu/drm/rockchip/Makefile                  |    1 +
+ drivers/gpu/drm/rockchip/cdn-dp-core.c             |  722 ++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-core.h             |  108 ++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c              |  731 ++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.h              |  404 ++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |    6 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |    2 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        |    2 +
+ drivers/phy/Kconfig                                |    8 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-rockchip-typec.c                   | 1027 ++++++++++++++++++++
+ include/linux/extcon.h                             |    6 +
+ 16 files changed, 3167 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.h
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.h
+ create mode 100644 drivers/phy/phy-rockchip-typec.c
+
+-- 
+2.6.3
