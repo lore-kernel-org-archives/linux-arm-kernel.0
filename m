@@ -1,33 +1,34 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 22 Jun 2016 17:27:01 -0700
-Subject: [PATCH 1/3] Documentation: devicetree: bindings: Add BCM5301x binding
+Date: Wed, 22 Jun 2016 17:27:03 -0700
+Subject: [PATCH 3/3] ARM: dts: BCM5301x: Add RNG Device Tree node
 In-Reply-To: <1466641623-3491-1-git-send-email-f.fainelli@gmail.com>
 References: <1466641623-3491-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1466641623-3491-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1466641623-3491-4-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the binding used by the Broadcom BCM5301x (Northstar) SoC
-random number generator.
+Add the DT node for the random number generator peripheral.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- Documentation/devicetree/bindings/rng/brcm,bcm2835.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm5301x.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt b/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt
-index aa304d412058..26542690b578 100644
---- a/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt
-+++ b/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt
-@@ -2,7 +2,8 @@ BCM2835 Random number generator
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 7d4d29bf0ed3..c67e451435f4 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -260,6 +260,11 @@
+ 				     "sata2";
+ 	};
  
- Required properties:
- 
--- compatible : should be "brcm,bcm2835-rng"  or "brcm,bcm-nsp-rng"
-+- compatible : should be "brcm,bcm2835-rng"  or "brcm,bcm-nsp-rng" or
-+  "brcm,bcm5301x-rng"
- - reg : Specifies base physical address and size of the registers.
- 
- Example:
++	rng: rng at 18004000 {
++		compatible = "brcm,bcm5301x-rng";
++		reg = <0x18004000 0x14>;
++	};
++
+ 	nand: nand at 18028000 {
+ 		compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1", "brcm,brcmnand";
+ 		reg = <0x18028000 0x600>, <0x1811a408 0x600>, <0x18028f00 0x20>;
 -- 
 2.7.4
