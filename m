@@ -1,84 +1,71 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 23 Jun 2016 09:58:38 +0200
-Subject: [PATCH V8 0/9] vfio, platform: add ACPI support
-In-Reply-To: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
-References: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <44afaabd-8393-fa97-ab61-664cd169bd9f@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 23 Jun 2016 10:11:04 +0200
+Subject: [PATCH] ARM: dts: r8a7794: add SMP support
+In-Reply-To: <CAMuHMdWY+hZMFQo7iGaeZkbVnK1cZ9=oyM7RvX_8mhyCuCxD9Q@mail.gmail.com>
+References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
+ <27171008.uuY7altQup@wasted.cogentembedded.com>
+ <CAMuHMdWcVRBxZO85_MhYVvODcbi-GYDNKfQH9LJEcrJRd=p7Vw@mail.gmail.com>
+ <adbc6358-d3fb-c608-15c2-c425332435f3@cogentembedded.com>
+ <CAMuHMdWY+hZMFQo7iGaeZkbVnK1cZ9=oyM7RvX_8mhyCuCxD9Q@mail.gmail.com>
+Message-ID: <CAMuHMdXb8dVPbOv0-cskN+owKJbgjcdFwLRW6J8+=XDO3EfCWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+Hi Sergei,
 
-On 20/06/2016 17:51, Sinan Kaya wrote:
-> The current code only supports the device tree based platforms.
-> The code checks for the presence of a reset driver and calls the reset
-> function pointer by looking up the reset driver as a module.
-> 
-> ACPI defines _RST method to perform device level reset. After the _RST
-> method is executed, the OS can resume using the device.
-> 
-> The patchset is moving the device tree specific pieces out of the code
-> to common functions so that ACPI support is added without impacting the
-> rest of the code.
-> 
-> During probe, the ACPI HID of the object will be saved and will be used to
-> determine if this is an ACPI capable platform or not. If acpihid is NULL
-> then, device tree functions are called.
-> 
-> In addition to plumbing ACPI support, reset functionality is now a
-> requirement by default.
-> 
-> The code was allowing platform devices to be used without a supporting
-> VFIO reset driver. The hardware can be left in some inconsistent state
-> after a guest machine abort.
-> 
-> The reset driver will put the hardware back to safe state and disable
-> interrupts before returning the control back to the host machine.
-> 
-> Adding a new reset_required kernel module option to AMBA and platform
-> VFIO drivers with a default value of true.
-> 
-> New requirements are:
-> 1. A reset function needs to be implemented by the corresponding driver
-> via DT/ACPI.
-> 2. The reset function needs to be discovered via DT/ACPI.
-> 
-> The probe of the driver will fail if any of the above conditions are
-> not satisfied.
-> 
-> Changes from V7:
-> 1. Move the reset function test before IOMMU group set up so that we can
-> clean up properly when reset function is not found.
-> 2. Correct the _RST function call. _RST method does not return any value.
-> We were calling acpi_evaluate_integer. The correct API needs to be
-> acpi_evaluate_object.
-> 
-> Sinan Kaya (9):
->   vfio: platform: rename reset function
->   vfio: platform: move reset call to a common function
->   vfio: platform: determine reset capability
->   vfio: platform: add support for ACPI probe
->   vfio: platform: add extra debug info argument to call reset
->   vfio: platform: call _RST method when using ACPI
->   vfio, platform: make reset driver a requirement by default
->   vfio: platform: check reset call return code during open
->   vfio: platform: check reset call return code during release
-> 
->  drivers/vfio/platform/vfio_amba.c             |   5 +
->  drivers/vfio/platform/vfio_platform.c         |   5 +
->  drivers/vfio/platform/vfio_platform_common.c  | 197 +++++++++++++++++++++-----
->  drivers/vfio/platform/vfio_platform_private.h |   8 +-
->  4 files changed, 177 insertions(+), 38 deletions(-)
-> 
-I tested with device tree and I did not find any issue:
-Tested-by: Eric Auger <eric.auger@redhat.com>
+On Wed, Jun 22, 2016 at 12:20 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Wed, Jun 22, 2016 at 12:08 PM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+>> On 6/22/2016 10:20 AM, Geert Uytterhoeven wrote:
+>>
+>>>> Add the device tree node for the Advanced Power Management Unit (APMU).
+>>>> Use the "enable-method" prop to  point out that the APMU should be used
+>>>> for the SMP support.
+>>>>
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>
+>>>
+>>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>>
+>>>> SMP/PM basically works but you can't offline CPU0 (system hangs)...
+>>>
+>>>
+>>> On #renesas-soc you said it hangs on SILK only, and succeeds on Porter,
+>>> with a WARNING in the clk core (which one?) during suspend?
+>>
+>>    Porter is based on R8A7791 (WARNING seemed to be caused by the CAN
+>> driver). :-)
+>
+> Oh right, mixing up boards.
+>
+> Will try on (remote) ALT when I find some time...
 
-For the whole series:
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+The second CPU boots (irrespective of MD21 setting), but the kernel
+starts spewing:
 
-Please note this will collide with "[PATCH V3] vfio: platform: support
-No-IOMMU mode" (s/iommu_group_put/vfio_iommu_group_put)
+    clocksource: Switched to clocksource arch_sys_counter
+    WARNING: Underflow in clocksource 'arch_sys_counter' observed,
+time update ignored.
+             Please report this, consider using a different
+clocksource, if possible.
+             Your kernel is probably still fine.
+    WARNING: Underflow in clocksource 'arch_sys_counter' observed,
+time update ignored.
+             Please report this, consider using a different
+clocksource, if possible.
+             Your kernel is probably still fine.
 
-Best Regards
+Seems like the secondary CPU also needs CNTVOFF initialization,
+which is done in the BSP in arch/arm/mach-shmobile/headsmp.S.
 
-Eric
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
