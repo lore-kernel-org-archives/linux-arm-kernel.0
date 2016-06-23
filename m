@@ -1,28 +1,59 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 23 Jun 2016 17:54:48 +0000
-Subject: [PATCH v20 05/14] arm64/kexec: Enable kexec in the arm64 defconfig
+Date: Thu, 23 Jun 2016 17:54:49 +0000
+Subject: [PATCH v20 14/14] Documentation: dt: usable-memory and elfcorehdr
+ nodes for arm64 kexec
 In-Reply-To: <cover.1466702804.git.geoff@infradead.org>
 References: <cover.1466702804.git.geoff@infradead.org>
-Message-ID: <833eba2c0b6f6a9318583cb8b13d56706db65ed1.1466702804.git.geoff@infradead.org>
+Message-ID: <e212cd53fdf9d09923408eb906fe0228d22432a9.1466702804.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+From: James Morse <james.morse@arm.com>
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fd2d74d..4ed4756 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -70,6 +70,7 @@ CONFIG_KSM=y
- CONFIG_TRANSPARENT_HUGEPAGE=y
- CONFIG_CMA=y
- CONFIG_XEN=y
-+CONFIG_KEXEC=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_COMPAT=y
- CONFIG_CPU_IDLE=y
+Add documentation for linux,usable-memory and linux,elfcorehdr chosen nodes
+used by arm64 kexec to decribe the kdump reserved area, and the elfcorehdr's
+location within it.
+
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ Documentation/devicetree/bindings/chosen.txt | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+index 6ae9d82..443f88b 100644
+--- a/Documentation/devicetree/bindings/chosen.txt
++++ b/Documentation/devicetree/bindings/chosen.txt
+@@ -52,3 +52,31 @@ This property is set (currently only on PowerPC, and only needed on
+ book3e) by some versions of kexec-tools to tell the new kernel that it
+ is being booted by kexec, as the booting environment may differ (e.g.
+ a different secondary CPU release mechanism)
++
++linux,usable-memory
++-------------------
++
++This property is set on PowerPC and arm64 by kexec-tools during kdump
++to tell the crash kernel the base address of its reserved area of memory, and
++the size. e.g.
++
++/ {
++	chosen {
++		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
++	};
++};
++
++linux,elfcorehdr
++----------------
++
++This property is set (currently only on arm64) by kexec-tools during kdump
++to tell the crash kernel the address and size of the elfcorehdr that describes
++the old kernel's memory as an elf file. This memory must reside within the area
++described by 'linux,usable-memory'. e.g.
++
++/ {
++	chosen {
++		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
++		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
++	};
++};
 -- 
 2.5.0
