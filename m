@@ -1,407 +1,186 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 23 Jun 2016 17:46:34 +0200
-Subject: [RFC PATCH v2 1/9] mailbox: Add Amlogic Meson
- Message-Handling-Unit
-In-Reply-To: <CABb+yY3r3_B9wbW6D-do8h8xMKCANQWfz1gFGyre1oWadd7A8Q@mail.gmail.com>
-References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
- <1466503374-28841-2-git-send-email-narmstrong@baylibre.com>
- <CABb+yY3r3_B9wbW6D-do8h8xMKCANQWfz1gFGyre1oWadd7A8Q@mail.gmail.com>
-Message-ID: <576C045A.3070701@baylibre.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 23 Jun 2016 08:58:42 -0700
+Subject: [PATCH v2] arm64: mm: fix location of _etext
+In-Reply-To: <1466689997-17890-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1466689997-17890-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAGXu5j+8pGwXUUBz_madcCNt_DHZwAC22PFitXKHjiHFAG8_9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/2016 06:31 AM, Jassi Brar wrote:
-> On Tue, Jun 21, 2016 at 3:32 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> Add Amlogic Meson SoCs Message-Handling-Unit as mailbox controller
->> with 2 independent channels/links to communicate with a remote processor.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> .....
-> 
->> +++ b/drivers/mailbox/meson_mhu.c
->> @@ -0,0 +1,199 @@
->> +/*
->> + * Copyright (C) 2016 BayLibre SAS.
->> + * Author: Neil Armstrong <narmstrong@baylibre.com>
->> + * Heavily based on meson_mhu.c from :
->> + * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
->> + * Copyright (C) 2015 Linaro Ltd.
->> + * Author: Jassi Brar <jaswinder.singh@linaro.org>
-> 
-> .........
->> +
->> +#define INTR_SET_OFS   0x0
->> +#define INTR_STAT_OFS  0x4
->> +#define INTR_CLR_OFS   0x8
->> +
->> +#define MHU_LP_OFFSET  0x10
->> +#define MHU_HP_OFFSET  0x1c
->> +
->> +#define TX_REG_OFFSET  0x24
->> +
-> It seems only some register offsets have changed from arm_mhu. So
-> maybe just adapt the arm_mhu driver to look for IP variant and assign
-> corresponding offsets to set,stat,clr registers.
-> 
-> Cheers.
-> 
+On Thu, Jun 23, 2016 at 6:53 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> As Kees Cook notes in the ARM counterpart of this patch [0]:
+>
+>   The _etext position is defined to be the end of the kernel text code,
+>   and should not include any part of the data segments. This interferes
+>   with things that might check memory ranges and expect executable code
+>   up to _etext.
+>
+> In particular, Kees is referring to the HARDENED_USERCOPY patch set [1],
+> which rejects attempts to call copy_to_user() on kernel ranges containing
+> executable code, but does allow access to the .rodata segment. Regardless
+> of whether one may or may not agree with the distinction, it makes sense
+> for _etext to have the same meaning across architectures.
+>
+> So let's put _etext where it belongs, between .text and .rodata, and fix
+> up existing references to use __init_begin instead, which unlike _end_rodata
+> includes the exception and notes sections as well.
+>
+> The _etext references in kaslr.c are left untouched, since its references
+> to [_stext, _etext) are meant to capture potential jump instruction targets,
+> and so disregarding .rodata is actually an improvement here.
+>
+> [0] http://article.gmane.org/gmane.linux.kernel/2245084
+> [1] http://thread.gmane.org/gmane.linux.kernel.hardened.devel/2502
+>
+> Reported-by: Kees Cook <keescook@chromium.org>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> v2: - preserve reference to _etext in init_mm, which redefines the init_mm
+>       code region to no longer cover .rodata as well
+>     - update comments regarding overlap of text to refer to 'text/rodata'
+>       instead
+>     - added Mark's R-b
 
-Hi Jassi,
+Awesome! Thanks for fixing this! :)
 
-I did a quick & dirty merge with arm_mhu, and I don't it's a good idea...
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-Please have a look at attached patch.
+-Kees
 
-Regards,
-Neil
--------------------------------------------------------------------------------------------
-From: Neil Armstrong <narmstrong@baylibre.com>
-Subject: [PATCH] mailbox: arm_mhu: Add support for Amlogic Meson MHU
+>
+>  arch/arm64/kernel/setup.c       |  2 +-
+>  arch/arm64/kernel/vmlinux.lds.S |  7 ++++---
+>  arch/arm64/mm/init.c            |  4 ++--
+>  arch/arm64/mm/mmu.c             | 20 ++++++++++----------
+>  4 files changed, 17 insertions(+), 16 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 3279defabaa2..c1509e654190 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -202,7 +202,7 @@ static void __init request_standard_resources(void)
+>         struct resource *res;
+>
+>         kernel_code.start   = virt_to_phys(_text);
+> -       kernel_code.end     = virt_to_phys(_etext - 1);
+> +       kernel_code.end     = virt_to_phys(__init_begin - 1);
+>         kernel_data.start   = virt_to_phys(_sdata);
+>         kernel_data.end     = virt_to_phys(_end - 1);
+>
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 435e820e898d..0de7be4f1a9d 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -131,12 +131,13 @@ SECTIONS
+>         }
+>
+>         . = ALIGN(SEGMENT_ALIGN);
+> -       RO_DATA(PAGE_SIZE)              /* everything from this point to */
+> -       EXCEPTION_TABLE(8)              /* _etext will be marked RO NX   */
+> +       _etext = .;                     /* End of text section */
+> +
+> +       RO_DATA(PAGE_SIZE)              /* everything from this point to     */
+> +       EXCEPTION_TABLE(8)              /* __init_begin will be marked RO NX */
+>         NOTES
+>
+>         . = ALIGN(SEGMENT_ALIGN);
+> -       _etext = .;                     /* End of text and rodata section */
+>         __init_begin = .;
+>
+>         INIT_TEXT_SECTION(8)
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index d45f8627012c..7bc5bed0220a 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -430,9 +430,9 @@ void __init mem_init(void)
+>         pr_cont("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
+>                 MLG(VMALLOC_START, VMALLOC_END));
+>         pr_cont("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> -               MLK_ROUNDUP(_text, __start_rodata));
+> +               MLK_ROUNDUP(_text, _etext));
+>         pr_cont("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> -               MLK_ROUNDUP(__start_rodata, _etext));
+> +               MLK_ROUNDUP(__start_rodata, __init_begin));
+>         pr_cont("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+>                 MLK_ROUNDUP(__init_begin, __init_end));
+>         pr_cont("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 0f85a46c3e18..c356f7b84d4d 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -386,14 +386,14 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+>  static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+>  {
+>         unsigned long kernel_start = __pa(_text);
+> -       unsigned long kernel_end = __pa(_etext);
+> +       unsigned long kernel_end = __pa(__init_begin);
+>
+>         /*
+>          * Take care not to create a writable alias for the
+>          * read-only text and rodata sections of the kernel image.
+>          */
+>
+> -       /* No overlap with the kernel text */
+> +       /* No overlap with the kernel text/rodata */
+>         if (end < kernel_start || start >= kernel_end) {
+>                 __create_pgd_mapping(pgd, start, __phys_to_virt(start),
+>                                      end - start, PAGE_KERNEL,
+> @@ -402,7 +402,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
+>         }
+>
+>         /*
+> -        * This block overlaps the kernel text mapping.
+> +        * This block overlaps the kernel text/rodata mappings.
+>          * Map the portion(s) which don't overlap.
+>          */
+>         if (start < kernel_start)
+> @@ -417,7 +417,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
+>                                      early_pgtable_alloc);
+>
+>         /*
+> -        * Map the linear alias of the [_text, _etext) interval as
+> +        * Map the linear alias of the [_text, __init_begin) interval as
+>          * read-only/non-executable. This makes the contents of the
+>          * region accessible to subsystems such as hibernate, but
+>          * protects it from inadvertent modification or execution.
+> @@ -449,14 +449,14 @@ void mark_rodata_ro(void)
+>  {
+>         unsigned long section_size;
+>
+> -       section_size = (unsigned long)__start_rodata - (unsigned long)_text;
+> +       section_size = (unsigned long)_etext - (unsigned long)_text;
+>         create_mapping_late(__pa(_text), (unsigned long)_text,
+>                             section_size, PAGE_KERNEL_ROX);
+>         /*
+> -        * mark .rodata as read only. Use _etext rather than __end_rodata to
+> -        * cover NOTES and EXCEPTION_TABLE.
+> +        * mark .rodata as read only. Use __init_begin rather than __end_rodata
+> +        * to cover NOTES and EXCEPTION_TABLE.
+>          */
+> -       section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
+> +       section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
+>         create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
+>                             section_size, PAGE_KERNEL_RO);
+>  }
+> @@ -499,8 +499,8 @@ static void __init map_kernel(pgd_t *pgd)
+>  {
+>         static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
+>
+> -       map_kernel_segment(pgd, _text, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
+> -       map_kernel_segment(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
+> +       map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
+> +       map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
+>         map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
+>                            &vmlinux_init);
+>         map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
+> --
+> 2.7.4
+>
 
-To achieve this integration, add support for generic probe from amba
-or platform.
-Move all register offsets to a data structure passed in either amba id or
-platform dt id match table.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/mailbox/arm_mhu.c | 217 ++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 181 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
-index 99befa7..d7fb843 100644
---- a/drivers/mailbox/arm_mhu.c
-+++ b/drivers/mailbox/arm_mhu.c
-@@ -22,45 +22,68 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/amba/bus.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
- #include <linux/mailbox_controller.h>
-
--#define INTR_STAT_OFS	0x0
--#define INTR_SET_OFS	0x8
--#define INTR_CLR_OFS	0x10
-+#define MHU_INTR_STAT_OFS	0x0
-+#define MHU_INTR_SET_OFS	0x8
-+#define MHU_INTR_CLR_OFS	0x10
-
- #define MHU_LP_OFFSET	0x0
- #define MHU_HP_OFFSET	0x20
- #define MHU_SEC_OFFSET	0x200
--#define TX_REG_OFFSET	0x100
-+#define MHU_TX_REG_OFFSET	0x100
-
--#define MHU_CHANS	3
-+#define MESON_INTR_SET_OFS	0x0
-+#define MESON_INTR_STAT_OFS	0x4
-+#define MESON_INTR_CLR_OFS	0x8
-+
-+#define MESON_MHU_LP_OFFSET	0x10
-+#define MESON_MHU_HP_OFFSET	0x1c
-+#define MESON_MHU_TX_OFFSET	0x24
-+
-+#define MAX_MHU_CHANS	3
-
- struct mhu_link {
- 	unsigned irq;
--	void __iomem *tx_reg;
--	void __iomem *rx_reg;
-+	void __iomem *tx_stat_reg;
-+	void __iomem *tx_set_reg;
-+	void __iomem *tx_clr_reg;
-+	void __iomem *rx_stat_reg;
-+	void __iomem *rx_set_reg;
-+	void __iomem *rx_clr_reg;
- };
-
- struct arm_mhu {
- 	void __iomem *base;
--	struct mhu_link mlink[MHU_CHANS];
--	struct mbox_chan chan[MHU_CHANS];
-+	struct mhu_link mlink[MAX_MHU_CHANS];
-+	struct mbox_chan chan[MAX_MHU_CHANS];
- 	struct mbox_controller mbox;
- };
-
-+struct arm_mhu_data {
-+	unsigned int channels;
-+	int rx_offsets[MAX_MHU_CHANS];
-+	int tx_offsets[MAX_MHU_CHANS];
-+	unsigned int intr_stat_offs;
-+	unsigned int intr_set_offs;
-+	unsigned int intr_clr_offs;
-+};
-+
- static irqreturn_t mhu_rx_interrupt(int irq, void *p)
- {
- 	struct mbox_chan *chan = p;
- 	struct mhu_link *mlink = chan->con_priv;
- 	u32 val;
-
--	val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
-+	val = readl_relaxed(mlink->rx_stat_reg);
- 	if (!val)
- 		return IRQ_NONE;
-
- 	mbox_chan_received_data(chan, (void *)&val);
-
--	writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
-+	writel_relaxed(val, mlink->rx_clr_reg);
-
- 	return IRQ_HANDLED;
- }
-@@ -68,7 +91,7 @@ static irqreturn_t mhu_rx_interrupt(int irq, void *p)
- static bool mhu_last_tx_done(struct mbox_chan *chan)
- {
- 	struct mhu_link *mlink = chan->con_priv;
--	u32 val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
-+	u32 val = readl_relaxed(mlink->tx_stat_reg);
-
- 	return (val == 0);
- }
-@@ -78,7 +101,7 @@ static int mhu_send_data(struct mbox_chan *chan, void *data)
- 	struct mhu_link *mlink = chan->con_priv;
- 	u32 *arg = data;
-
--	writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
-+	writel_relaxed(*arg, mlink->tx_set_reg);
-
- 	return 0;
- }
-@@ -89,8 +112,8 @@ static int mhu_startup(struct mbox_chan *chan)
- 	u32 val;
- 	int ret;
-
--	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
--	writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
-+	val = readl_relaxed(mlink->tx_stat_reg);
-+	writel_relaxed(val, mlink->tx_clr_reg);
-
- 	ret = request_irq(mlink->irq, mhu_rx_interrupt,
- 			  IRQF_SHARED, "mhu_link", chan);
-@@ -117,52 +140,155 @@ static const struct mbox_chan_ops mhu_ops = {
- 	.last_tx_done = mhu_last_tx_done,
- };
-
--static int mhu_probe(struct amba_device *adev, const struct amba_id *id)
-+static struct arm_mhu_data arm_mhu_amba_data = {
-+	.channels = 3,
-+	.rx_offsets = {MHU_LP_OFFSET, MHU_HP_OFFSET, MHU_SEC_OFFSET},
-+	.tx_offsets = {MHU_LP_OFFSET + MHU_TX_REG_OFFSET,
-+		       MHU_HP_OFFSET + MHU_TX_REG_OFFSET,
-+		       MHU_SEC_OFFSET + MHU_TX_REG_OFFSET},
-+	.intr_stat_offs = MHU_INTR_STAT_OFS,
-+	.intr_set_offs = MHU_INTR_SET_OFS,
-+	.intr_clr_offs = MHU_INTR_CLR_OFS,
-+};
-+
-+static const struct arm_mhu_data meson_mhu_data = {
-+	.channels = 2,
-+	.rx_offsets = {MESON_MHU_LP_OFFSET, MESON_MHU_HP_OFFSET},
-+	.tx_offsets = {MESON_MHU_LP_OFFSET + MESON_MHU_TX_OFFSET,
-+		       MESON_MHU_HP_OFFSET + MESON_MHU_TX_OFFSET},
-+	.intr_stat_offs = MESON_INTR_STAT_OFS,
-+	.intr_set_offs = MESON_INTR_SET_OFS,
-+	.intr_clr_offs = MESON_INTR_CLR_OFS,
-+};
-+
-+static struct arm_mhu *mhu_generic_probe(struct device *dev,
-+					 struct resource *res,
-+					 unsigned int irqs[],
-+					 const struct arm_mhu_data *data)
- {
- 	int i, err;
- 	struct arm_mhu *mhu;
--	struct device *dev = &adev->dev;
--	int mhu_reg[MHU_CHANS] = {MHU_LP_OFFSET, MHU_HP_OFFSET, MHU_SEC_OFFSET};
-
- 	/* Allocate memory for device */
- 	mhu = devm_kzalloc(dev, sizeof(*mhu), GFP_KERNEL);
- 	if (!mhu)
--		return -ENOMEM;
-+		return ERR_PTR(-ENOMEM);
-
--	mhu->base = devm_ioremap_resource(dev, &adev->res);
-+	mhu->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(mhu->base)) {
- 		dev_err(dev, "ioremap failed\n");
--		return PTR_ERR(mhu->base);
-+		return ERR_CAST(mhu->base);
- 	}
-
--	for (i = 0; i < MHU_CHANS; i++) {
-+	for (i = 0; i < data->channels; i++) {
-+		void __iomem *reg_base;
- 		mhu->chan[i].con_priv = &mhu->mlink[i];
--		mhu->mlink[i].irq = adev->irq[i];
--		mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
--		mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + TX_REG_OFFSET;
-+		mhu->mlink[i].irq = irqs[i];
-+		reg_base = mhu->base + data->rx_offsets[i];
-+		mhu->mlink[i].rx_stat_reg = reg_base + data->intr_stat_offs;
-+		mhu->mlink[i].rx_set_reg = reg_base + data->intr_set_offs;
-+		mhu->mlink[i].rx_clr_reg = reg_base + data->intr_clr_offs;
-+		reg_base = mhu->base + data->tx_offsets[i];
-+		mhu->mlink[i].rx_stat_reg = reg_base + data->intr_stat_offs;
-+		mhu->mlink[i].rx_set_reg = reg_base + data->intr_set_offs;
-+		mhu->mlink[i].rx_clr_reg = reg_base + data->intr_clr_offs;
- 	}
-
- 	mhu->mbox.dev = dev;
- 	mhu->mbox.chans = &mhu->chan[0];
--	mhu->mbox.num_chans = MHU_CHANS;
-+	mhu->mbox.num_chans = data->channels;
- 	mhu->mbox.ops = &mhu_ops;
- 	mhu->mbox.txdone_irq = false;
- 	mhu->mbox.txdone_poll = true;
- 	mhu->mbox.txpoll_period = 1;
-
--	amba_set_drvdata(adev, mhu);
--
- 	err = mbox_controller_register(&mhu->mbox);
- 	if (err) {
- 		dev_err(dev, "Failed to register mailboxes %d\n", err);
--		return err;
-+		return ERR_PTR(err);
- 	}
-
- 	dev_info(dev, "ARM MHU Mailbox registered\n");
- 	return 0;
-+};
-+
-+static const struct of_device_id mhu_dt_ids[] = {
-+	{ .compatible = "amlogic,meson-gxbb-mhu", .data = &meson_mhu_data},
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, mhu_dt_ids);
-+
-+static int mhu_platform_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *match;
-+	unsigned int irqs[MAX_MHU_CHANS];
-+	const struct arm_mhu_data *data;
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct arm_mhu *mhu;
-+	int i;
-+
-+	match = of_match_device(mhu_dt_ids, &pdev->dev);
-+	if (!match)
-+		return -EINVAL;
-+
-+	data = match->data;
-+	if (!data)
-+		return -EINVAL;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (WARN_ON(!res))
-+		return -EINVAL;
-+
-+	for (i = 0 ; i < data->channels ; ++i) {
-+		irqs[i] = platform_get_irq(pdev, i);
-+		if (WARN_ON(irqs[i] < 0))
-+			return irqs[i];
-+	}
-+
-+	mhu = mhu_generic_probe(dev, res, irqs, data);
-+	if (IS_ERR(mhu))
-+		return PTR_ERR(mhu);
-+
-+	platform_set_drvdata(pdev, mhu);
-+
-+	return 0;
-+}
-+
-+static int mhu_platform_remove(struct platform_device *pdev)
-+{
-+	struct arm_mhu *mhu = platform_get_drvdata(pdev);
-+
-+	mbox_controller_unregister(&mhu->mbox);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver mhu_platform_driver = {
-+	.probe	= mhu_platform_probe,
-+	.remove	= mhu_platform_remove,
-+	.driver = {
-+		.name = "meson-mhu",
-+		.of_match_table	= mhu_dt_ids,
-+	},
-+};
-+
-+static int mhu_amba_probe(struct amba_device *adev, const struct amba_id *id)
-+{
-+	const struct arm_mhu_data *data = id->data;
-+	struct device *dev = &adev->dev;
-+	struct arm_mhu *mhu;
-+
-+	mhu = mhu_generic_probe(dev, &adev->res, adev->irq, data);
-+	if (IS_ERR(mhu))
-+		return PTR_ERR(mhu);
-+
-+	amba_set_drvdata(adev, mhu);
-+
-+	return 0;
- }
-
--static int mhu_remove(struct amba_device *adev)
-+static int mhu_amba_remove(struct amba_device *adev)
- {
- 	struct arm_mhu *mhu = amba_get_drvdata(adev);
-
-@@ -171,24 +297,43 @@ static int mhu_remove(struct amba_device *adev)
- 	return 0;
- }
-
--static struct amba_id mhu_ids[] = {
-+static struct amba_id mhu_amba_ids[] = {
- 	{
- 		.id	= 0x1bb098,
- 		.mask	= 0xffffff,
-+		.data	= &arm_mhu_amba_data,
- 	},
- 	{ 0, 0 },
- };
--MODULE_DEVICE_TABLE(amba, mhu_ids);
-+MODULE_DEVICE_TABLE(amba, mhu_amba_ids);
-
- static struct amba_driver arm_mhu_driver = {
- 	.drv = {
- 		.name	= "mhu",
- 	},
--	.id_table	= mhu_ids,
--	.probe		= mhu_probe,
--	.remove		= mhu_remove,
-+	.id_table	= mhu_amba_ids,
-+	.probe		= mhu_amba_probe,
-+	.remove		= mhu_amba_remove,
- };
--module_amba_driver(arm_mhu_driver);
-+
-+static int __init mhu_module_init(void)
-+{
-+	int ret;
-+
-+	ret = platform_driver_register(&mhu_platform_driver);
-+	if (ret)
-+		return ret;
-+
-+	return amba_driver_register(&arm_mhu_driver);
-+}
-+module_init(mhu_module_init);
-+
-+static void __exit mhu_module_exit(void)
-+{
-+	platform_driver_unregister(&mhu_platform_driver);
-+	amba_driver_unregister(&arm_mhu_driver);
-+}
-+module_exit(mhu_module_exit);
-
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("ARM MHU Driver");
 -- 
-2.7.0
+Kees Cook
+Chrome OS & Brillo Security
