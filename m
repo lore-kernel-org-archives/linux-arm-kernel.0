@@ -1,130 +1,82 @@
-From: Yisen.zhuang@huawei.com (Yisen Zhuang)
-Date: Thu, 23 Jun 2016 13:42:58 +0800
-Subject: [PATCH net-next 10/19] net: hns: bugfix about pfc pause frame
- statistics
-In-Reply-To: <1466588498.30123.235.camel@linux.intel.com>
-References: <1466481399-70080-1-git-send-email-Yisen.Zhuang@huawei.com>
- <1466481399-70080-11-git-send-email-Yisen.Zhuang@huawei.com>
- <1466505178.30123.201.camel@linux.intel.com> <5769ED55.3000408@huawei.com>
- <1466588498.30123.235.camel@linux.intel.com>
-Message-ID: <576B76E2.9040402@huawei.com>
+From: liudongdong3@huawei.com (Dongdong Liu)
+Date: Thu, 23 Jun 2016 13:43:38 +0800
+Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
+In-Reply-To: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+Message-ID: <576B770A.6060508@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2016/6/22 17:41, Andy Shevchenko ??:
-> On Wed, 2016-06-22 at 09:43 +0800, Yisen Zhuang wrote:
->>
->> ? 2016/6/21 18:32, Andy Shevchenko ??:
->>> On Tue, 2016-06-21 at 11:56 +0800, Yisen Zhuang wrote:
->>>> From: Daode Huang <huangdaode@hisilicon.com>
->>>>
->>>> For SoC hip06, PFC pause handled in dsaf, while hip05 in XGMAC,
->>>> so change the statistics of pfc pause in dsaf and remove the old
->>>> pfc pause frame statistics.
->>>>
->>>  
->>>
->>>> +static char *hns_dsaf_get_node_stats_strings(char *data, int
->>>> node,
->>>> +					     struct dsaf_device
->>>> *dsaf_dev)
->>>>  {
->>>>  	char *buff = data;
->>>> +	int i;
->>>> +	bool is_ver1 = AE_IS_VER1(dsaf_dev->dsaf_ver);
->>>>  
->>>>  	snprintf(buff, ETH_GSTRING_LEN, "innod%d_pad_drop_pkts",
->>>> node);
->>>>  	buff = buff + ETH_GSTRING_LEN;
->>>> @@ -2502,6 +2530,18 @@ static char
->>>> *hns_dsaf_get_node_stats_strings(char *data, int node)
->>>>  	buff = buff + ETH_GSTRING_LEN;
->>>>  	snprintf(buff, ETH_GSTRING_LEN, "innod%d_stp_drop_pkts",
->>>> node);
->>>>  	buff = buff + ETH_GSTRING_LEN;
->>>> +	if ((node < DSAF_SERVICE_NW_NUM) && (!is_ver1)) {
->>>
->>> Redundant parens.
->>>
->>>> +		for (i = 0; i < DSAF_PRIO_NR; i++) {
->>>> +			snprintf(buff, ETH_GSTRING_LEN,
->>>> +				 "inod%d_pfc_prio%d_pkts", node,
->>>> i);
->>>> +			buff = buff + ETH_GSTRING_LEN;
->>>
->>> buff += ...
->>>
->>>> +		}
->>>> +		for (i = 0; i < DSAF_PRIO_NR; i++) {
->>>> +			snprintf(buff, ETH_GSTRING_LEN,
->>>> +				 "onod%d_pfc_prio%d_pkts", node,
->>>> i);
->>>> +			buff = buff + ETH_GSTRING_LEN;
->>>
->>> Ditto.
->>>
->>>>  {
->>>>  	u64 *p = data;
->>>> +	int i;
->>>>  	struct dsaf_hw_stats *hw_stats = &ddev-
->>>>> hw_stats[node_num];
->>>> +	bool is_ver1 = AE_IS_VER1(ddev->dsaf_ver);
->>>>  
->>>>  	p[0] = hw_stats->pad_drop;
->>>>  	p[1] = hw_stats->man_pkts;
->>>> @@ -2527,8 +2569,16 @@ static u64 *hns_dsaf_get_node_stats(struct
->>>> dsaf_device *ddev, u64 *data,
->>>>  	p[10] = hw_stats->local_addr_false;
->>>>  	p[11] = hw_stats->vlan_drop;
->>>>  	p[12] = hw_stats->stp_drop;
->>>> -	p[13] = hw_stats->tx_pkts;
->>>> +	if ((node_num < DSAF_SERVICE_NW_NUM) && (!is_ver1)) {
->>>> +		for (i = 0; i < DSAF_PRIO_NR; i++) {
->>>> +			p[13 + i] = hw_stats->rx_pfc[i];
->>>> +			p[13 + i + DSAF_PRIO_NR] = hw_stats-
->>>>> tx_pfc[i];
->>>> +		}
->>>
->>> Two different approaches how to assign data. Above uses 2 for-loops,
->>> here you put everything to one.
->>
->> Above cann't be merged to 1 for-loop, because lenght of the string is
->> unknowable.
-> 
-> It doesn't matter since you are incrementing start position by
-> constant. 
-> 
-> snprintf(buff, ETH_GSTRING_LEN, "inod%d_pfc_prio%d_pkts", node, i);
-> snprintf(buff, ETH_GSTRING_LEN, "onod%d_pfc_prio%d_pkts", node, i);
-> 
-> Same approach as below can be used
-> 
-> snprintf(buff + 0 * ETH_GSTRING_LEN * DSAF_PRIO_NR, ETH_GSTRING_LEN, ...
-> snprintf(buff + 1 * ETH_GSTRING_LEN * DSAF_PRIO_NR, ETH_GSTRING_LEN, ...
-> 
-> Of course to make it less verbose you may add new definition(s) and/ or
-> variable(s).
-> 
->>
->> And here we put everything to one to reduce codes.
->>
-> 
-> I would suggest to use following pattern for such lines
-> p[13 + i + 0 * DSAF_PRIO_NR] = hw_stats->rx_pfc[i];
-> p[13 + i + 1 * DSAF_PRIO_NR] = hw_stats->tx_pfc[i];
-> 
-> That's allow reader to see what are you doing here.
-> 
-> P.S. This is for the future patches since current is already applied.
+? 2016/6/14 16:24, Po Liu ??:
+> On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+> When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
+> maybe there is interrupt line for aer pme etc. Search the interrupt
+> number in the fdt file. Then fixup the dev->irq with it.
+>
+> Signed-off-by: Po Liu <po.liu@nxp.com>
+> ---
+> changes for V3:
+> 	- Move to quirk;
+> 	- Only correct the irq in RC mode;
+>
+>   drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
+>   1 file changed, 29 insertions(+)
+>
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index ee72ebe..8b39cce 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -25,6 +25,7 @@
+>   #include <linux/sched.h>
+>   #include <linux/ktime.h>
+>   #include <linux/mm.h>
+> +#include <linux/of_irq.h>
+>   #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+>   #include "pci.h"
+>
+> @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
+>   	}
+>   }
+>   DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
+> +
+> +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
+> + * but use standalone irq. Read the device tree for the aer
+> + * interrupt number.
+> + */
+> +static void quirk_aer_interrupt(struct pci_dev *dev)
+> +{
+> +	int ret;
+> +	u8 header_type;
+> +	struct device_node *np = NULL;
+> +
+> +	/* Only for the RC mode device */
+> +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
+> +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
+> +		return;
 
-Hi Andy,
+How about that it is changed as below.
 
-Many thanks for you suggestions. I will fix it with a new patch.
+/* Only for the RC mode device */
+if (pci_pcie_type(dev) != PCI_EXP_TYPE_ROOT_PORT)
+	return;
 
-Thanks,
-
-Yisen
-
-> 
+Dongdong
+Thanks
+> +
+> +	if (dev->bus->dev.of_node)
+> +		np = dev->bus->dev.of_node;
+> +
+> +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
+> +		ret = of_irq_get_byname(np, "aer");
+> +		if (ret > 0) {
+> +			dev->no_msi = 1;
+> +			dev->irq = ret;
+> +		}
+> +	}
+> +}
+> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_aer_interrupt);
+>
