@@ -1,36 +1,28 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 Jun 2016 16:10:23 +0200
-Subject: [PATCH v2 1/3] dt-bindings: add DT binding for the Aardvark
- PCIe controller
-In-Reply-To: <20160622161656.GE25485@localhost>
-References: <1465574056-8787-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1465574056-8787-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160622161656.GE25485@localhost>
-Message-ID: <20160623161023.14017043@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 Jun 2016 15:30:34 +0100
+Subject: [PATCH] arm64:swiotlb:Enable only when Input size through
+ command line
+In-Reply-To: <1466684020-5224-1-git-send-email-manjeet.p@samsung.com>
+References: <1466684020-5224-1-git-send-email-manjeet.p@samsung.com>
+Message-ID: <20160623143034.GN6521@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 22 Jun 2016 11:16:56 -0500, Bjorn Helgaas wrote:
-
-> > + - compatible: Should be "marvell,armada-3700-pcie"
-> > + - reg: range of registers for the PCIe controller
-> > + - interrupts: the interrupt line of the PCIe controller
-> > + - #address-cells: set to <3>
-> > + - #size-cells: set to <2>
-> > + - device_type: set to "pci"
-> > + - ranges: ranges for the PCI memory and I/O regions
-> > + - #interrupt-cells: set to <1>
-> > + - msi-controller: indicates that the PCIe controller can itself
-> > +   handled MSI interrupts  
+On Thu, Jun 23, 2016 at 05:43:40PM +0530, Manjeet Pawar wrote:
+> From: Rohit Thapliyal <r.thapliyal@samsung.com>
 > 
-> s/handled/handle/
+> swiotlb default size of 64M is too big as
+> default value therefore it is made configurable
+> through command line through swiotlb_size parameter.
+> swiotlb allocation shall be done only when the
+> swiotlb size is given through command line.
+> Otherwise no swiotlb is allocated.
 
-Thanks. Fixed for v3!
+I already queued this patch:
 
-Thomas
+http://lkml.kernel.org/g/1465372426-4077-1-git-send-email-jszhang at marvell.com
+
+If you have any objections to it, please reply there.
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
