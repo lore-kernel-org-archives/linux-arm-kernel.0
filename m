@@ -1,73 +1,86 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 23 Jun 2016 20:07:13 +0200 (CEST)
-Subject: [PATCH v3 0/2] nvmem: remove regmap dependency
-In-Reply-To: <20160601175542.GA19241@kroah.com>
-References: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
- <7eec3215-b455-6567-28a2-e2a860e1d3ec@i2se.com>
- <20160601175542.GA19241@kroah.com>
-Message-ID: <541115749.18852.dd1915ce-f885-44a4-a743-86ca28f8b9fd.open-xchange@email.1und1.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 23 Jun 2016 19:19:28 +0100
+Subject: [PATCH 02/14] dt/bindings: update binding for PM domain idle
+ states
+In-Reply-To: <20160623180451.GD1115@linaro.org>
+References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
+ <1466624209-27432-3-git-send-email-lina.iyer@linaro.org>
+ <20160623173312.GA22204@leverpostej>
+ <20160623180451.GD1115@linaro.org>
+Message-ID: <20160623181927.GB31170@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Thu, Jun 23, 2016 at 12:04:51PM -0600, Lina Iyer wrote:
+> Hi Mark,
+> 
+> On Thu, Jun 23 2016 at 11:35 -0600, Mark Rutland wrote:
+> >Hi,
+> >
+> >On Wed, Jun 22, 2016 at 01:36:37PM -0600, Lina Iyer wrote:
+> >>From: Axel Haslam <ahaslam+renesas@baylibre.com>
+> >>
+> >>Update DT bindings to describe idle states of PM domains.
+> >>
+> >>Cc: <devicetree@vger.kernel.org>
+> >>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+> >>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> >>[Lina: Added state properties, removed state names, wakeup-latency,
+> >>added of_pm_genpd_init() API, pruned commit text]
+> >>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >>[Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
+> >>---
+> >> .../devicetree/bindings/power/power_domain.txt     | 70 ++++++++++++++++++++++
+> >> 1 file changed, 70 insertions(+)
+> >>
+> >>diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+> >>index 025b5e7..41e8dda 100644
+> >>--- a/Documentation/devicetree/bindings/power/power_domain.txt
+> >>+++ b/Documentation/devicetree/bindings/power/power_domain.txt
+> >>@@ -29,6 +29,43 @@ Optional properties:
+> >>    specified by this binding. More details about power domain specifier are
+> >>    available in the next section.
+> >>
+> >>+- power-states : A phandle of an idle-state that shall be soaked into a
+> >>+                generic domain power state.
+> >
+> >It's somewhat unfortunate that this gives us two possible locations for
+> >idle state lists (under the /cpus node and in a pm-domains node),
+> >especially as it's not clear what would happen were a DT to have both.
+> >
+> >I would prefer that we extend the existing bindings such that states can
+> >refer to the power domains which they affect.
+> >
+> I agree. The CPU idle states have become defined to be specific to CPUs.
+> PM Domain idle states are generic for any type of domain. I am hoping at
+> some point, we could converge and use the same idle state, but that
+> would mean changing the CPU idle states to make it generic.
 
-> Greg Kroah-Hartman <gregkh@linuxfoundation.org> hat am 1. Juni 2016 um 19:55
-> geschrieben:
-> 
-> 
-> On Wed, Jun 01, 2016 at 10:27:49AM +0200, Stefan Wahren wrote:
-> > Hi Greg,
-> > 
-> > Am 02.05.2016 um 20:36 schrieb Srinivas Kandagatla:
-> > > Hi Greg, 
-> > >
-> > > This is v3 patchset for the leftover 2 patches for nvmem regmap
-> > > removal series [1]. These patches are based on char-misc tree.
-> > >
-> > > nvmem uses regmap_raw_read/write apis to read/write data from providers,
-> > > With recent patch 922a9f936e40 ("regmap: mmio: Convert to regmap_bus
-> > > and fix accessor usage") nvmem providers based on regmap-mmio stopped
-> > > working, as nvmem core was using raw accessors.
-> > > This issue can be fixed temporarly by moving to other regmap apis,
-> > > but we might hit same issue in future, and regmap looks like an
-> > > overdo for nvmem. Moving to interfaces based on read/write callbacks
-> > > from providers would be more robust.
-> > >
-> > > This patchset converts the nvmem core and nvmem provider drivers to
-> > > use the new callbacks. Tested this patchset on qfprom and at24 drivers.
-> > > Other driver are only compile tested, any testing on them would be great.
-> > >
-> > > Most of the patches have been applied to char-misc tree, these are the
-> > > two patches which had some outstanding comments on mxs nvmemprovider,
-> > > which are now fixed.
-> > >
-> > > Changes since v2:
-> > >  - Fixed the mxs size and dt data pointer spotted by Stefan and Fabio
-> > >
-> > > Changes since v1:
-> > >  - rebased mtk-efuse on top of char-misc
-> > >  - addressed concerns raised by Stefan Wahren.
-> > >
-> > > [1]
-> > > https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1130026.html
-> > >
-> > > Thanks,
-> > > srini
-> > >
-> > > Srinivas Kandagatla (2):
-> > >   nvmem: mtk-efuse: remove nvmem regmap dependency
-> > >   nvmem: mxs-ocotp: remove nvmem regmap dependency
-> > >
-> > >  drivers/nvmem/Kconfig     |  1 -
-> > >  drivers/nvmem/mtk-efuse.c | 47 ++++++++++++++++++---------
-> > >  drivers/nvmem/mxs-ocotp.c | 83
-> > > +++++++++++++----------------------------------
-> > >  3 files changed, 54 insertions(+), 77 deletions(-)
-> > >
-> > 
-> > any objections about this series or is it still in queue?
-> 
-> still in my queue...
-> 
+Outside of CPU idling, I don't fully understand how this will be used,
+so it's not clear to me what would need to be made generic. Apologies
+for my ignorance there.
 
-gently ping ...
+> At some point, during my development, I did use the arm,idle-state for
+> domains as well, but the binding definitions were too restrictive for
+> a generic PM domain.
+> 
+> I would be willing to make the change to CPU idle states to make it
+> generic and then we could just reference domain and CPU idle states
+> using the same bindings. Are we okay with that, specifically,
+> arm,psci-suspend-param? This binding is very restrictive in its
+> description. What we pass to the platform driver upon choosing a domain
+> state is very platform specific and therefore has to be generic in its
+> description.
+
+I was suggesting that for PSCI we should consistently us
+arm,psci-suspend-param, not that this should be used for all power
+domain state data.
+
+I imagine that mechanisms for powering down power domains will have
+varied requirements on data they require (and may require more than can
+be encoded in a u32), and I don't think it's best to try to force a
+single representation in the DT for that. It would be better to allow
+them to define the properties which they require.
+
+Thanks,
+Mark.
