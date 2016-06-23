@@ -1,200 +1,149 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Thu, 23 Jun 2016 02:46:10 +0000
-Subject: [PATCH 2/4] soc: fsl: add GUTS driver for QorIQ platforms
-In-Reply-To: <1465609853.22191.151.camel@buserror.net>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <5339448.D8rpq4ofAC@wuerfel> <1464832042.22191.23.camel@buserror.net>
- <3435609.s5m1DCsoNb@wuerfel> <1465609853.22191.151.camel@buserror.net>
-Message-ID: <AM2PR04MB0883C91467E26AF0D52DC2C8F82D0@AM2PR04MB0883.eurprd04.prod.outlook.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Wed, 22 Jun 2016 19:47:42 -0700
+Subject: Boot failure on emev2/kzm9d (was: Re: [PATCH v2 11/11] mm/slab:
+ lockless decision to grow cache)
+In-Reply-To: <20160623023756.GA30438@js1304-P5Q-DELUXE>
+References: <CAMuHMdVi-F0n-GjnUqEEd58UcWxw67g8ZJO838fvo31Ttr5E1g@mail.gmail.com>
+ <20160620063942.GA13747@js1304-P5Q-DELUXE>
+ <20160620131254.GO3923@linux.vnet.ibm.com>
+ <20160621064302.GA20635@js1304-P5Q-DELUXE>
+ <20160621125406.GF3923@linux.vnet.ibm.com>
+ <20160622005208.GB25106@js1304-P5Q-DELUXE>
+ <CAMuHMdW-wSxASozhmPh0b+9UJFFVbYHqTqH5e9P1oO7T59YE7g@mail.gmail.com>
+ <20160622190859.GA1473@linux.vnet.ibm.com>
+ <20160623004935.GA20752@linux.vnet.ibm.com>
+ <20160623023756.GA30438@js1304-P5Q-DELUXE>
+Message-ID: <20160623024742.GD1473@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Jun 23, 2016 at 11:37:56AM +0900, Joonsoo Kim wrote:
+> On Wed, Jun 22, 2016 at 05:49:35PM -0700, Paul E. McKenney wrote:
+> > On Wed, Jun 22, 2016 at 12:08:59PM -0700, Paul E. McKenney wrote:
+> > > On Wed, Jun 22, 2016 at 05:01:35PM +0200, Geert Uytterhoeven wrote:
+> > > > On Wed, Jun 22, 2016 at 2:52 AM, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+> > > > > Could you try below patch to check who causes the hang?
+> > > > >
+> > > > > And, if sysalt-t works when hang, could you get sysalt-t output? I haven't
+> > > > > used it before but Paul could find some culprit on it. :)
+> > > > >
+> > > > > Thanks.
+> > > > >
+> > > > >
+> > > > > ----->8-----
+> > > > > diff --git a/mm/slab.c b/mm/slab.c
+> > > > > index 763096a..9652d38 100644
+> > > > > --- a/mm/slab.c
+> > > > > +++ b/mm/slab.c
+> > > > > @@ -964,8 +964,13 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
+> > > > >          * guaranteed to be valid until irq is re-enabled, because it will be
+> > > > >          * freed after synchronize_sched().
+> > > > >          */
+> > > > > -       if (force_change)
+> > > > > +       if (force_change) {
+> > > > > +               if (num_online_cpus() > 1)
+> > > > > +                       dump_stack();
+> > > > >                 synchronize_sched();
+> > > > > +               if (num_online_cpus() > 1)
+> > > > > +                       dump_stack();
+> > > > > +       }
+> > > > 
+> > > > I've only added the first one, as I would never see the second one. All of
+> > > > this happens before the serial console is activated, earlycon is not supported,
+> > > > and I only have remote access.
+> > > > 
+> > > > Brought up 2 CPUs
+> > > > SMP: Total of 2 processors activated (2132.00 BogoMIPS).
+> > > > CPU: All CPU(s) started in SVC mode.
+> > > > CPU: 0 PID: 1 Comm: swapper/0 Not tainted
+> > > > 4.7.0-rc4-kzm9d-00404-g4a235e6dde4404dd-dirty #89
+> > > > Hardware name: Generic Emma Mobile EV2 (Flattened Device Tree)
+> > > > [<c010de68>] (unwind_backtrace) from [<c010a658>] (show_stack+0x10/0x14)
+> > > > [<c010a658>] (show_stack) from [<c02b5cf8>] (dump_stack+0x7c/0x9c)
+> > > > [<c02b5cf8>] (dump_stack) from [<c01cfa4c>] (setup_kmem_cache_node+0x140/0x170)
+> > > > [<c01cfa4c>] (setup_kmem_cache_node) from [<c01cfe3c>]
+> > > > (__do_tune_cpucache+0xf4/0x114)
+> > > > [<c01cfe3c>] (__do_tune_cpucache) from [<c01cff54>] (enable_cpucache+0xf8/0x148)
+> > > > [<c01cff54>] (enable_cpucache) from [<c01d0190>]
+> > > > (__kmem_cache_create+0x1a8/0x1d0)
+> > > > [<c01d0190>] (__kmem_cache_create) from [<c01b32d0>]
+> > > > (kmem_cache_create+0xbc/0x190)
+> > > > [<c01b32d0>] (kmem_cache_create) from [<c070d968>] (shmem_init+0x34/0xb0)
+> > > > [<c070d968>] (shmem_init) from [<c0700cc8>] (kernel_init_freeable+0x98/0x1ec)
+> > > > [<c0700cc8>] (kernel_init_freeable) from [<c049fdbc>] (kernel_init+0x8/0x110)
+> > > > [<c049fdbc>] (kernel_init) from [<c0106cb8>] (ret_from_fork+0x14/0x3c)
+> > > > devtmpfs: initialized
+> > > 
+> > > I don't see anything here that would prevent grace periods from completing.
+> > > 
+> > > The CPUs are using the normal hotplug sequence to come online, correct?
+> > 
+> > And either way, could you please apply the patch below and then
+> > invoke rcu_dump_rcu_sched_tree() just before the offending call to
+> > synchronize_sched()?  That will tell me what CPUs RCU believes exist,
+> > and perhaps also which CPU is holding it up.
+> 
+> I can't find rcu_dump_rcu_sched_tree(). Do you mean
+> rcu_dump_rcu_node_tree()? Anyway, there is no patch below so I attach
+> one which does what Paul want, maybe.
 
-Could you comment on these?
-Thanks.
+One of those days, I guess!  :-/
 
+Your patch is exactly what I intended to send, thank you!
 
-Best regards,
-Yangbo Lu
+							Thanx, Paul
 
-
-> -----Original Message-----
-> From: Scott Wood [mailto:oss at buserror.net]
-> Sent: Saturday, June 11, 2016 9:51 AM
-> To: Arnd Bergmann; linuxppc-dev at lists.ozlabs.org
-> Cc: Mark Rutland; Ulf Hansson; linux-kernel at vger.kernel.org; linux-
-> i2c at vger.kernel.org; linux-clk at vger.kernel.org; Qiang Zhao; Russell King;
-> Bhupesh Sharma; Joerg Roedel; Claudiu Manoil; devicetree at vger.kernel.org;
-> Kumar Gala; Rob Herring; Santosh Shilimkar; linux-arm-
-> kernel at lists.infradead.org; netdev at vger.kernel.org; linux-
-> mmc at vger.kernel.org; Xiaobo Xie; Yang-Leo Li; iommu at lists.linux-
-> foundation.org; Yangbo Lu
-> Subject: Re: [PATCH 2/4] soc: fsl: add GUTS driver for QorIQ platforms
+> Thanks.
 > 
-> On Thu, 2016-06-02 at 10:43 +0200, Arnd Bergmann wrote:
-> > On Wednesday, June 1, 2016 8:47:22 PM CEST Scott Wood wrote:
-> > > On Mon, 2016-05-30 at 15:15 +0200, Arnd Bergmann wrote:
-> > > > diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c new
-> > > > file mode 100644 index 000000000000..2f30698f5bcf
-> > > > --- /dev/null
-> > > > +++ b/drivers/soc/fsl/guts.c
-> > > > @@ -0,0 +1,130 @@
-> > > > +/*
-> > > > + * Freescale QorIQ Platforms GUTS Driver
-> > > > + *
-> > > > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > > > + *
-> > > > + * This program is free software; you can redistribute it and/or
-> > > > +modify
-> > > > + * it under the terms of the GNU General Public License as
-> > > > +published by
-> > > > + * the Free Software Foundation; either version 2 of the License,
-> > > > +or
-> > > > + * (at your option) any later version.
-> > > > + */
-> > > > +
-> > > > +#include <linux/io.h>
-> > > > +#include <linux/platform_device.h> #include <linux/module.h>
-> > > > +#include <linux/slab.h> #include <linux/of_address.h> #include
-> > > > +<linux/of_platform.h> #include <linux/sys_soc.h>
-> > > > +
-> > > > +#define GUTS_PVR	0x0a0
-> > > > +#define GUTS_SVR	0x0a4
-> > > > +
-> > > > +struct guts {
-> > > > +	void __iomem *regs;
-> > >
-> > > We already have a struct to define guts.  Why are you not using it?
-> > > Why do you consider using it to be "abuse"?  What if we want to move
-> > > more guts functionality into this driver?
-> >
-> > This structure was in the original patch, I left it in there, only
-> > removed the inclusion of the powerpc header file, which seemed to be
-> > misplaced.
+> ------->8---------
+> diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
+> index 88d3f95..6b650f0 100644
+> --- a/kernel/rcu/tree.c
+> +++ b/kernel/rcu/tree.c
+> @@ -4171,7 +4171,7 @@ static void __init rcu_init_geometry(void)
+>   * Dump out the structure of the rcu_node combining tree associated
+>   * with the rcu_state structure referenced by rsp.
+>   */
+> -static void __init rcu_dump_rcu_node_tree(struct rcu_state *rsp)
+> +static void rcu_dump_rcu_node_tree(struct rcu_state *rsp)
+>  {
+>         int level = 0;
+>         struct rcu_node *rnp;
+> @@ -4189,6 +4189,11 @@ static void __init rcu_dump_rcu_node_tree(struct rcu_state *rsp)
+>         pr_cont("\n");
+>  }
 > 
-> I'm not refering "struct guts".  I'm referring to changing "struct
-> ccsr_guts __iomem *regs" into "void __iomem *regs".
+> +void rcu_dump_rcu_sched_tree(void)
+> +{
+> +       rcu_dump_rcu_node_tree(&rcu_sched_state);
+> +}
+> +
+>  void __init rcu_init(void)
+>  {
+>         int cpu;
+> diff --git a/mm/slab.c b/mm/slab.c
+> index 763096a..d88976c 100644
+> --- a/mm/slab.c
+> +++ b/mm/slab.c
+> @@ -909,6 +909,8 @@ static int init_cache_node_node(int node)
+>         return 0;
+>  }
 > 
-> And it's not a powerpc header file.
+> +extern void rcu_dump_rcu_sched_tree(void);
+> +
+>  static int setup_kmem_cache_node(struct kmem_cache *cachep,
+>                                 int node, gfp_t gfp, bool force_change)
+>  {
+> @@ -964,8 +966,10 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
+>          * guaranteed to be valid until irq is re-enabled, because it will be
+>          * freed after synchronize_sched().
+>          */
+> -       if (force_change)
+> +       if (force_change) {
+> +               rcu_dump_rcu_sched_tree();
+>                 synchronize_sched();
+> +       }
 > 
-> > > > +/*
-> > > > + * Table for matching compatible strings, for device tree
-> > > > + * guts node, for Freescale QorIQ SOCs.
-> > > > + */
-> > > > +static const struct of_device_id fsl_guts_of_match[] = {
-> > > > +	/* For T4 & B4 Series SOCs */
-> > > > +	{ .compatible = "fsl,qoriq-device-config-1.0", .data = "T4/B4
-> > > > series" },
-> > > [snip]
-> > > > +	{ .compatible = "fsl,qoriq-device-config-2.0", .data = "P
-> > > > series"
-> > >
-> > > As noted in my comment on patch 3/4, these descriptions are reversed.
-> > >
-> > > They're also incomplete.  t2080 has device config 2.0.  t1040 is
-> > > described as
-> > > 2.0 though it should probably be 2.1 (or better, drop the generic
-> > > compatible altogether).
-> >
-> > Ok. Ideally I think we'd even look up the specific SoC names from the
-> > SVC rather than the compatible string. I just didn't have a good list
-> > for those to put in the driver.
+>  fail:
+>         kfree(old_shared);
 > 
-> The list is in arch/powerpc/include/asm/mpc85xx.h but I don't know why we
-> need to convert it to a string in the first place.
-> 
-> >
-> > > > +	/*
-> > > > +	 * syscon devices default to little-endian, but on powerpc we
-> > > > have
-> > > > +	 * existing device trees with big-endian maps and an absent
-> > > > endianess
-> > > > +	 * "big-property"
-> > > > +	 */
-> > > > +	if (!IS_ENABLED(CONFIG_POWERPC) &&
-> > > > +	    !of_property_read_bool(dev->of_node, "big-endian"))
-> > > > +		guts->little_endian = true;
-> > >
-> > > This is not a syscon device (Yangbo's patch to add a guts node on
-> > > ls2080 is the only guts node that says "syscon", and that was a
-> > > leftover from earlier revisions and should probably be removed).
-> > > Even if it were, where is it documented that syscon defaults to
-> > > little-endian?
-> >
-> > Documentation/devicetree/bindings/regmap/regmap.txt
-> >
-> > We had a little screwup here, basically regmap (and by consequence,
-> > syscon) always defaulted to little-endian way before that was
-> > documented, so it's too late to change it,
-> 
-> What causes a device node to fall under the jurisdiction of regmap.txt?
->  Again, these nodes do not claim "syscon" compatibility.
-> 
-> > although I agree it would have made sense to document regmap to
-> > default to big-endian on powerpc.
-> 
-> Please don't.  It's enough of a mess as is; no need to start throwing in
-> architecture ifdefs.
-> 
-> > > Documentation/devicetree/bindings/common-properties.txt says that
-> > > the individual binding specifies the default.  The default for this
-> > > node should be big-endian because that's what existed before there
-> > > was a need to describe the endianness.  And we need an update to the
-> > > guts binding to specify that.
-> >
-> > Good point. This proably means that specifying both the "guts" and
-> "syscon"
-> > compatible strings implies having to also specify the endianess
-> > explicitly both ways, because otherwise we break one of the two
-> bindings.
-> 
-> Yes, but the node should only specify "guts".
-> 
-> >
-> > > > +
-> > > > +	guts->regs = devm_ioremap_resource(dev, 0);
-> > > > +	if (!guts->regs) {
-> > > > +		ret = -ENOMEM;
-> > > > +		kfree(guts);
-> > > > +		goto out;
-> > > > +	}
-> > > > +
-> > > > +	fsl_guts_init(dev, guts);
-> > > > +	ret = 0;
-> > > > +out:
-> > > > +	return ret;
-> > > > +}
-> > > > +
-> > > > +static struct platform_driver fsl_soc_guts = {
-> > > > +	.probe = fsl_guts_probe,
-> > > > +	.driver.of_match_table = fsl_guts_of_match, };
-> > > > +
-> > > > +module_platform_driver(fsl_soc_guts);
-> > >
-> > > Again, this means that the information is not available during early
-> > > boot, such as in the clock driver.  Thus we would not be able to
-> > > convert clk -qoriq's direct mfspr(SPRN_SVR) into an
-> > > soc_device_match() (or anything else that makes use of this file),
-> > > nor would we be able to move its access of the guts RCW registers
-> > > into this driver.
-> >
-> > Correct. Do we have a reason to convert the mfspr() though? I don't
-> > really see an improvement over the current state if we do that,
-> 
-> Then should we drop this patchset and put a similar PPC ifdef in
-> drivers/mmc/host/sdhci-of-esdhc.c?
-> 
-> There's also the RCW access.  You said in the patch 4/4 discussion that
-> you di dn't like any random driver ioremapping the registers...
-> 
-> > and for new devices
-> > that might need the erratum workaround, we could add a DT property
-> > that would be preferred to both.
-> 
-> It's unlikely that we would know the erratum exists at the time the
-> device tree is created.  We also generally don't have separate device
-> trees for each revision of a chip (and if we did, we'd have users that
-> use the wrong one).
-> 
-> -Scott
