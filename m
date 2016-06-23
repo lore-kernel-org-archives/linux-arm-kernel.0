@@ -1,130 +1,299 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 23 Jun 2016 11:55:21 +0100
-Subject: [PATCH v3 4/4] ARM/PCI: remove arch specific
- pcibios_enable_device()
-In-Reply-To: <20160622224358.GG25485@localhost>
-References: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465383890-13538-5-git-send-email-lorenzo.pieralisi@arm.com>
- <20160622224358.GG25485@localhost>
-Message-ID: <20160623105521.GA27719@red-moon>
+From: deadcom@gmail.com (deadcom at gmail.com)
+Date: Thu, 23 Jun 2016 04:01:53 -0700 (PDT)
+Subject: [PATCH v3] ARM: dts: sun8i: Add dts file for Olimex A33-OLinuXino
+In-Reply-To: <20160622132222.GX26668@lukather>
+References: <1466418769-8384-1-git-send-email-stefan.mavrodiev@gmail.com>
+ <20160622132222.GX26668@lukather>
+Message-ID: <8e5b45fe-f60b-419f-8b00-b816ffe5d98c@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2016 at 05:43:58PM -0500, Bjorn Helgaas wrote:
-> On Wed, Jun 08, 2016 at 12:04:50PM +0100, Lorenzo Pieralisi wrote:
-> > The arm pcibios_enable_device() implementation exists solely
-> > to prevent enabling PCI resources on PCI_PROBE_ONLY systems, since
-> > on those systems the PCI resources are currently not claimed (ie
-> > inserted in the PCI resource tree - which means their parent
-> > pointer is not correctly set-up) therefore they can not be enabled
-> > since this would trigger PCI set-ups failures.
+?????, 22 ??? 2016 ?., 16:22:34 UTC+3, Maxime Ripard ??????:
+> Hi,
+> 
+> On Mon, Jun 20, 2016 at 01:32:49PM +0300, Stefan Mavrodiev wrote:
+> > A33-OLinuXino is A33 development board designed by Olimex LTD.
 > > 
-> > After removing the pci=firmware command line option in:
+> > It has AXP233 PMU, 1GB DRAM, a micro SD card, one USB-OTG connector,
+> > headphone and mic jacks, connector for LiPo battery and optional
+> > 4GB NAND Flash.
 > > 
-> > commit 903589ca7165 ("ARM: 8554/1: kernel: pci: remove pci=firmware
-> > command line parameter handling")
-> > 
-> > (that was used to set the PCI_PROBE_ONLY flag through the command line)
-> > and by introducing resources claiming in the PCI host controllers
-> > set-ups that have PCI_PROBE_ONLY as a probe option, there is no need for
-> > arch specific pcibios_enable_device() implementations anymore in that
-> > the kernel can rely on the generic pcibios_enable_device()
-> > implementation without resorting to arch specific code to work around
-> > the missing resources claiming enumeration step.
-> > 
-> > On !PCI_PROBE_ONLY PCI bus set-ups, resources are always assigned
-> > either in pcibios initialization code or PCI host controllers drivers;
-> > since the PCI resource assignment API takes care of inserting the
-> > assigned resources in the resource tree, the resources parent pointers
-> > are correctly set-up, which means that this patch leaves behaviour
-> > unchanged for all arm PCI set-ups that do not set the PCI_PROBE_ONLY
-> > flag.
-> > 
-> > Remove the pcibios_enable_device() function from the arm arch back-end
-> > so that the kernel now uses its generic implementation.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
+> > It has two 40-pin headers. One for LCD panel, and one for
+> > additional modules. Also there is CSI/DSI connector.
+> 
+> Oh? So it ships already? Nice!
+
+Not yet, but very soon will.
+> 
+> > Signed-off-by: Stefan Mavrodiev <stefan.mavrodiev@gmail.com>
 > > ---
-> >  arch/arm/kernel/bios32.c | 12 ------------
-> >  1 file changed, 12 deletions(-)
+> > Changes for v2:
+> > 	- Removed unused power nodes
+> > 	- Removed default-trigger for green led
+> > 	- Removed "always-on" option for LCD power
 > > 
-> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> > index 05e61a2..488545f 100644
-> > --- a/arch/arm/kernel/bios32.c
-> > +++ b/arch/arm/kernel/bios32.c
-> > @@ -590,18 +590,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-> >  	return start;
-> >  }
-> >  
-> > -/**
-> > - * pcibios_enable_device - Enable I/O and memory.
-> > - * @dev: PCI device to be enabled
-> > - */
-> > -int pcibios_enable_device(struct pci_dev *dev, int mask)
-> > -{
-> > -	if (pci_has_flag(PCI_PROBE_ONLY))
-> > -		return 0;
-> > -
-> > -	return pci_enable_resources(dev, mask);
-> > -}
-> 
-> This looks great.
-> 
-> What about the PCI_PROBE_ONLY test in pci_common_init_dev()?  Don't we
-> need to either remove that test (if it's impossible to get there with
-> PCI_PROBE_ONLY set), or add a pci_bus_claim_resources() call as we did
-> in pci_host_common_probe()?
-
-Yes, you are right, I went for the second option given what you
-say below and sent you and Russell an additional patch that
-should be added to this series.
-
-> I think it's unlikely that we'd get to pci_common_init_dev() with
-> PCI_PROBE_ONLY set:
-> 
->   - the only way to set PCI_PROBE_ONLY on ARM is to call
->     of_pci_check_probe_only(),
-> 
->   - the only ARM caller of of_pci_check_probe_only() is
->     pci_host_common_probe(),
-> 
->   - pci_host_common_probe() doesn't call pci_common_init_dev().
-> 
-> But I guess it's possible to imagine a platform with both a generic
-> PCI bridge and a MVEBU, R-Car, or Tegra bridge.  Then
-> pci_host_common_probe() could set PCI_PROBE_ONLY, and we'd claim
-> resources under the generic bridge via the previous patch, but still
-> not claim those under the MVEBU bridge.  Then enabling the MVEBU
-> devices would fail.
-> 
-> I know this is a ridiculous scenario, but the code looks inconsistent
-> as it is.
-
-Well, I do not think that's an *existing* scenario, but this does
-not mean that the code is correct, so you are right and it has to
-be fixed, please let me know if the patch I sent is fine.
-
-I really have to remove PCI_PROBE_ONLY entirely from ARM/ARM64
-kernels.
-
-Thanks !
-Lorenzo
-
-> 
-> >  int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> >  			enum pci_mmap_state mmap_state, int write_combine)
-> >  {
-> > -- 
-> > 2.6.4
+> > Changes for v3:
+> > 	- Nodes are sorted alphabetically
 > > 
+> >  arch/arm/boot/dts/Makefile                |   1 +
+> >  arch/arm/boot/dts/sun8i-a33-olinuxino.dts | 207 ++++++++++++++++++++++++++++++
+> >  2 files changed, 208 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/sun8i-a33-olinuxino.dts
 > > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 970e906..b78f363 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -760,6 +760,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+> >  	sun8i-a33-ippo-q8h-v1.2.dtb \
+> >  	sun8i-a33-q8-tablet.dtb \
+> >  	sun8i-a33-sinlinx-sina33.dtb \
+> > +	sun8i-a33-olinuxino.dtb \
 > 
+> This should be ordered alphabetically.
+> 
+> >  	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+> >  	sun8i-a83t-cubietruck-plus.dtb \
+> >  	sun8i-h3-orangepi-2.dtb \
+> > diff --git a/arch/arm/boot/dts/sun8i-a33-olinuxino.dts b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
+> > new file mode 100644
+> > index 0000000..586ffd3
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
+> > @@ -0,0 +1,207 @@
+> > +/*
+> > + * Copyright 2016 - Stefan Mavrodiev <stefan.mavrodiev@gmail.com>
+> > + *                  Olimex LTD. <support@olimex.com>
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This file is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of the
+> > + *     License, or (at your option) any later version.
+> > + *
+> > + *     This file is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "sun8i-a33.dtsi"
+> > +#include "sunxi-common-regulators.dtsi"
+> > +
+> > +#include <dt-bindings/gpio/gpio.h>
+> > +#include <dt-bindings/input/input.h>
+> > +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> > +
+> > +/ {
+> > +	model = "A33-OLinuXino";
+> 
+> Olimex A33-Olinuxino
+> 
+> > +	compatible = "allwinner,sun8i-a33";
+> 
+> And you should have an extra compatible for your board here.
+> 
+> > +
+> > +	aliases {
+> > +		serial0 = &uart0;
+> > +	};
+> > +
+> > +	chosen {
+> > +		stdout-path = "serial0:115200n8";
+> > +	};
+> > +
+> > +	leds {
+> > +		compatible = "gpio-leds";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&led_pin_olinuxino>;
+> > +
+> > +		green {
+> > +			label = "olinuxino:green:usr";
+> 
+> The first part of the label is usually the board name, a33-olinuxino
+> in that case.
+> 
+> > +			gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* LED2 */
+> > +		};
+> > +	};
+> > +};
+> > +
+> > +&ehci0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&mmc0 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxino>;
+> > +	vmmc-supply = <&reg_dcdc1>;
+> > +	bus-width = <4>;
+> > +	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
+> > +	cd-inverted;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&ohci0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&pio {
+> > +	led_pin_olinuxino: led_pins at 0 {
+> > +		allwinner,pins = "PB7";
+> > +	        allwinner,function = "gpio_out";
+> > +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> > +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> > +    };
+> > +
+> > +	mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
+> > +		allwinner,pins = "PB4";
+> > +		allwinner,function = "gpio_in";
+> > +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> > +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> > +	};
+> > +};
+> > +
+> > +&r_rsb {
+> > +	status = "okay";
+> > +
+> > +	axp22x: pmic at 3a3 {
+> > +		compatible = "x-powers,axp223";
+> > +		reg = <0x3a3>;
+> > +		interrupt-parent = <&nmi_intc>;
+> > +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> > +		eldoin-supply = <&reg_dcdc1>;
+> > +	};
+> > +};
+> > +
+> > +#include "axp22x.dtsi"
+> > +
+> > +&reg_aldo1 {
+> > +	regulator-always-on;
+> > +	regulator-min-microvolt = <3300000>;
+> > +	regulator-max-microvolt = <3300000>;
+> > +	regulator-name = "vcc-io";
+> > +};
+> > +
+> > +&reg_aldo2 {
+> > +	regulator-always-on;
+> > +	regulator-min-microvolt = <2350000>;
+> > +	regulator-max-microvolt = <2650000>;
+> > +	regulator-name = "vdd-dll";
+> > +};
+> > +
+> > +&reg_aldo3 {
+> > +	regulator-always-on;
+> > +	regulator-min-microvolt = <3300000>;
+> > +	regulator-max-microvolt = <3300000>;
+> > +	regulator-name = "vcc-avcc";
+> > +};
+> > +
+> > +&reg_dc1sw {
+> > +	regulator-name = "vcc-lcd";
+> > +};
+> > +
+> > +&reg_dc5ldo {
+> > +	regulator-always-on;
+> > +	regulator-min-microvolt = <900000>;
+> > +	regulator-max-microvolt = <1400000>;
+> > +	regulator-name = "vdd-cpus";
+> > +};
+> > +
+> > +&reg_dcdc1 {
+> > +	regulator-always-on;
+> > +	regulator-min-microvolt = <3300000>;
+> > +	regulator-max-microvolt = <3300000>;
+> > +	regulator-name = "vcc-dsi";
+> > +};
+> > +
+> > +&reg_dcdc2 {
+> > +	regulator-always-on;
+> > +	regulator-min-microvolt = <900000>;
+> > +	regulator-max-microvolt = <1400000>;
+> > +	regulator-name = "vdd-sys";
+> > +};
+> > +
+> > +&reg_dcdc3 {
+> > +	regulator-always-on;
+> > +	regulator-min-microvolt = <900000>;
+> > +	regulator-max-microvolt = <1400000>;
+> > +	regulator-name = "vdd-cpu";
+> > +};
+> > +
+> > +&reg_dcdc5 {
+> > +	regulator-always-on;
+> > +	regulator-min-microvolt = <1500000>;
+> > +	regulator-max-microvolt = <1500000>;
+> > +	regulator-name = "vcc-dram";
+> > +};
+> > +
+> > +&reg_rtc_ldo {
+> > +	regulator-name = "vcc-rtc";
+> > +};
+> > +
+> > +&simplefb_lcd {
+> > +	vcc-lcd-supply = <&reg_dc1sw>;
+> > +};
+> > +
+> > +&uart0 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&uart0_pins_b>;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usb_otg {
+> > +	dr_mode = "host";
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usbphy {
+> > +	usb0_vbus-supply = <&reg_vcc5v0>;
+> > +	status = "okay";
+> > +
+> > +};
+> 
+> It doesn't work as USB OTG ?
+
+The hardware should work as OTG. In FEL mode it works as device, and in current dt configuration - as host. I've spend some time trying to make it work as otg, but didn't succeed. 
+
+There are some hardware differences between our board and other a33, but if you say that OTG work, I'll spend some additional time working on it.
+
+> 
+> Thanks,
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+
+Regards,
+Stefan Mavrodiev
+Olimex LTD.
