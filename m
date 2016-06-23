@@ -1,43 +1,85 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Thu, 23 Jun 2016 10:23:49 -0700
-Subject: [v3 PATCH 3/5] phy: Add USB Type-C PHY driver for rk3399
-In-Reply-To: <1466686264-6744-4-git-send-email-zyw@rock-chips.com>
-References: <1466686264-6744-1-git-send-email-zyw@rock-chips.com>
- <1466686264-6744-4-git-send-email-zyw@rock-chips.com>
-Message-ID: <CABXOdTc11gjrt+_zRs6aJhbgrHXSXnBoG5ZoqwNUKirr_dpX=w@mail.gmail.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Thu, 23 Jun 2016 19:31:34 +0200
+Subject: [PATCH] pci: Add support for unbinding the generic PCI host
+ controller
+In-Reply-To: <20160622060638.GY29165@arm.com>
+References: <57698276.6050606@siemens.com> <20160622060638.GY29165@arm.com>
+Message-ID: <576C1CF6.7020804@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On 2016-06-22 08:06, Will Deacon wrote:
+> Hi Jan,
+> 
+> On Tue, Jun 21, 2016 at 08:07:50PM +0200, Jan Kiszka wrote:
+>> Particularly useful when working in virtual environments where the
+>> controller may come and go, but possibly not only there.
+>>
+>> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+>> ---
+>>  drivers/pci/ecam.h                  |  1 +
+>>  drivers/pci/host/pci-host-common.c  | 13 +++++++++++++
+>>  drivers/pci/host/pci-host-generic.c |  1 +
+>>  3 files changed, 15 insertions(+)
+>>
+>> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
+>> index 9878beb..5a5f607 100644
+>> --- a/drivers/pci/ecam.h
+>> +++ b/drivers/pci/ecam.h
+>> @@ -63,5 +63,6 @@ extern struct pci_ecam_ops pci_generic_ecam_ops;
+>>  /* for DT-based PCI controllers that support ECAM */
+>>  int pci_host_common_probe(struct platform_device *pdev,
+>>  			  struct pci_ecam_ops *ops);
+>> +int pci_host_common_remove(struct platform_device *pdev);
+>>  #endif
+>>  #endif
+>> diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
+>> index 8cba7ab..c0ff4b1 100644
+>> --- a/drivers/pci/host/pci-host-common.c
+>> +++ b/drivers/pci/host/pci-host-common.c
+>> @@ -164,6 +164,19 @@ int pci_host_common_probe(struct platform_device *pdev,
+>>  	}
+>>  
+>>  	pci_bus_add_devices(bus);
+>> +	platform_set_drvdata(pdev, bus);
+>> +	return 0;
+>> +}
+>> +
+>> +int pci_host_common_remove(struct platform_device *pdev)
+>> +{
+>> +	struct pci_bus *bus = platform_get_drvdata(pdev);
+>> +
+>> +	pci_lock_rescan_remove();
+>> +	pci_stop_root_bus(bus);
+>> +	pci_remove_root_bus(bus);
+>> +	pci_unlock_rescan_remove();
+> 
+> A couple of comments/questions about this:
+> 
+>   - The probe path seems to have some stateful operations outside of PCI
+>     resources. For example, kzalloc'ing the bus_range resource in
+>     of_pci_get_host_bridge_resources. Do we need to clean these up
+>     explicitly?
+> 
+>   - Similarly, we don't seem to tear-down the config space mappings and
+>     data structures for that, so we leak VA space afaict.
+> 
 
-[ ... ]
+Good points. But to my understanding, everything is released
+automatically on pci_remove_root_bus because all the resources are
+registered with the bus which takes care of them during destruction. And
+if I trace the release, I find this e.g.
 
-> +       ret = extcon_register_notifier(tcphy->pd_extcon, EXTCON_USB,
-> +                                      &tcphy->event_nb);
-> +       if (ret) {
-> +               dev_err(dev, "regitster EXTCON_USB notifer failed\n");
-> +               return ret;
-> +       }
-> +
-> +       ret = extcon_register_notifier(tcphy->pd_extcon, EXTCON_USB_HOST,
-> +                                      &tcphy->event_nb);
-> +       if (ret) {
-> +               dev_err(dev, "regitster EXTCON_USB_HOST notifer failed\n");
-> +               return ret;
-> +       }
-> +
-> +       ret = extcon_register_notifier(tcphy->pd_extcon, EXTCON_DISP_DP,
-> +                                      &tcphy->event_nb);
-> +       if (ret) {
-> +               dev_err(dev, "regitster EXTCON_DISP_DP notifer failed\n");
-> +               return ret;
-> +       }
-> +
+...
+devres_release_all() {
+  _raw_spin_lock_irqsave();
+  release_nodes() {
+    _raw_spin_unlock_irqrestore();
+    devm_action_release() {
+      gen_pci_unmap_cfg() {
 
-I don't think you can register multiple notifiers with the same
-notifier block. It may work by chance, but at least the 'next' object
-in notifier_clock is set in notifier_chain_register(). Best case it
-may work, but worst case it might cause a loop in the list of
-notifiers.
+Jan
 
-Guenter
+-- 
+Siemens AG, Corporate Technology, CT RDA ITP SES-DE
+Corporate Competence Center Embedded Linux
