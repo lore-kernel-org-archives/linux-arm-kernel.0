@@ -1,66 +1,42 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 23 Jun 2016 12:44:12 +0530
-Subject: [PATCH v19 10/13] arm64: kdump: add VMCOREINFO's for user-space
- coredump tools
-In-Reply-To: <20160622055940.GY20774@linaro.org>
-References: <cover.1466120418.git.geoff@infradead.org>
- <6e96110e85e7b1167043d789e85f9c916fdf281a.1466120418.git.geoff@infradead.org>
- <20160620053222.GB14309@dhcppc9>
- <20160622055940.GY20774@linaro.org>
-Message-ID: <20160623071412.GA16398@dhcppc9>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Thu, 23 Jun 2016 00:53:24 -0700
+Subject: [PATCH] extcon: Check for incorrect connection type in notifier
+ register
+Message-ID: <20160623075324.21935-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Takahiro,
+If we call extcon_register_notifier() with the wrong cable type,
+it blows up with an oops instead of returning an error code.
+Let's be nice and fail gracefully given that the consumer might
+not know if the cable is supported by the extcon provider.
 
-Thanks for your reply.
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
+ drivers/extcon/extcon.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-On 22/06/2016:02:59:41 PM, AKASHI Takahiro wrote:
-> On Mon, Jun 20, 2016 at 11:02:22AM +0530, Pratyush Anand wrote:
-> > +Atsushi
-> > 
-> > Hi Takahiro,
-> > 
-> > On 16/06/2016:11:48:28 PM, Geoff Levand wrote:
-> > > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > 
-> > > For the current crash utility, we need to know, at least,
-> > >   - kimage_voffset
-> > >   - PHYS_OFFSET
-> > > to handle the contents of core dump file (/proc/vmcore) correctly due to
-> > > the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
-> > > This patch puts them as VMCOREINFO's into the file.
-> > > 
-> > >   - VA_BITS
-> > > is also added for makedumpfile command.
-> > 
-> > Thanks for adding them. They are quite helpful for makedumpfile as well.
-> > 
-> > > More VMCOREINFO's may be added later.
-> > 
-> > Yes, we will need to pass VMCOREINFO_SYMBOL(_text) and VMCOREINFO_SYMBOL(_end)
-> > in order to work with makedumpfile.
-> 
-> I know that adding those symbols is the easiest way, but
-> theoretically, if we know the physical address of "swapper_pg_dir",
-
-But, we know only it's virtual address. 
-
-> instead of its virtual address, we can access all the memory pointed to
-> by any kernel virtual address.
-> How do you rationalize that we need to know "_text" and "_end"?
-
-Well, we need some mechanism so that we can decide if an address can be
-translated using linear mapping of virt_to_phys(). 
-
-Alternatively, probably we can do like this:
--- Translate all address between "SYMBOL(swapper_pg_dir)"  and "SYMBOL(swapper_pg_dir)
- + SWAPPER_DIR_SIZE" using virt_to_phys() and now we can read values from
- dumpfile using that physical address. This way we can get PGD/PMD/PUD values.
--- PTE values may lie out side this range, however that address should still be
-linearly translatable. We can use virt_to_phys() macro from them as well.
-
-In summary, we can translate address of PGD/PMD/PUD/PTE using virt_to_phys()
-and rest all can be translated using page table entries.
-
-~Pratyush
+diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
+index 21a123cadf78..161acb826334 100644
+--- a/drivers/extcon/extcon.c
++++ b/drivers/extcon/extcon.c
+@@ -586,6 +586,8 @@ int extcon_register_notifier(struct extcon_dev *edev, unsigned int id,
+ 		return -EINVAL;
+ 
+ 	idx = find_cable_index_by_id(edev, id);
++	if (idx < 0)
++		return idx;
+ 
+ 	spin_lock_irqsave(&edev->lock, flags);
+ 	ret = raw_notifier_chain_register(&edev->nh[idx], nb);
+@@ -611,6 +613,8 @@ int extcon_unregister_notifier(struct extcon_dev *edev, unsigned int id,
+ 		return -EINVAL;
+ 
+ 	idx = find_cable_index_by_id(edev, id);
++	if (idx < 0)
++		return idx;
+ 
+ 	spin_lock_irqsave(&edev->lock, flags);
+ 	ret = raw_notifier_chain_unregister(&edev->nh[idx], nb);
+-- 
+2.9.0.rc2.8.ga28705d
