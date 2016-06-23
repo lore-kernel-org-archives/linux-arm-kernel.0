@@ -1,77 +1,34 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 23 Jun 2016 18:01:08 +0200
-Subject: [PATCH v6 2/2] mtd: nand: sunxi: add reset line support
-In-Reply-To: <20160620044838.56904-2-icenowy@aosc.xyz>
-References: <20160620044838.56904-1-icenowy@aosc.xyz>
- <20160620044838.56904-2-icenowy@aosc.xyz>
-Message-ID: <20160623180108.382bbaae@bbrezillon>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Thu, 23 Jun 2016 12:06:10 -0400
+Subject: [PATCH] arm64:swiotlb:Enable only when Input size through command
+ line
+In-Reply-To: <20160623143034.GN6521@e104818-lin.cambridge.arm.com>
+References: <1466684020-5224-1-git-send-email-manjeet.p@samsung.com>
+ <20160623143034.GN6521@e104818-lin.cambridge.arm.com>
+Message-ID: <9A15F5E5-775E-4079-961F-67FD54B8F2F4@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2016 12:48:38 +0800
-Icenowy Zheng <icenowy@aosc.xyz> wrote:
+On June 23, 2016 10:30:34 AM EDT, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>On Thu, Jun 23, 2016 at 05:43:40PM +0530, Manjeet Pawar wrote:
+>> From: Rohit Thapliyal <r.thapliyal@samsung.com>
+>> 
+>> swiotlb default size of 64M is too big as
+>> default value therefore it is made configurable
+>> through command line through swiotlb_size parameter.
+>> swiotlb allocation shall be done only when the
+>> swiotlb size is given through command line.
+>> Otherwise no swiotlb is allocated.
+>
+>I already queued this patch:
+>
+>http://lkml.kernel.org/g/1465372426-4077-1-git-send-email-jszhang at marvell.com
+>
+>If you have any objections to it, please reply there.
 
-> The NAND controller on some sun8i chips needs its reset line to be
-> deasserted before they can enter working state.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  ?Changes in v2:
->  ???- Corrected the error checking code of reset line.
-> 
->  ?Changes in v3:
->  ???- Corrected a more serious error brought in the "fix" of v2.
-> 
->  ?Changes in v4:
->  ???- Removed unneeded code block after "else".
-> 
->  ?Changes in v5:
->  ???- Added reassertion code in case of initialization error and device
->  ?????remove.
-> 
->   Changes in v6:
->     - Fixed a resource leak by not using goto to exit in case of error.
-> 
->  drivers/mtd/nand/sunxi_nand.c | 28 +++++++++++++++++++++++++---
->  1 file changed, 25 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index a83a690..08d5e88 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-> @@ -39,6 +39,7 @@
->  #include <linux/gpio.h>
->  #include <linux/interrupt.h>
->  #include <linux/iopoll.h>
-> +#include <linux/reset.h>
->  
->  #define NFC_REG_CTL		0x0000
->  #define NFC_REG_ST		0x0004
-> @@ -269,6 +270,7 @@ struct sunxi_nfc {
->  	void __iomem *regs;
->  	struct clk *ahb_clk;
->  	struct clk *mod_clk;
-> +	struct reset_control *reset;
->  	unsigned long assigned_cs;
->  	unsigned long clk_rate;
->  	struct list_head chips;
-> @@ -1871,26 +1873,42 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto out_ahb_clk_unprepare;
->  
-> +	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
-> +
-> +	if (!IS_ERR(nfc->reset)) {
-> +		ret = reset_control_deassert(nfc->reset);
-> +		if (ret) {
-> +			dev_err(dev, "reset err %d\n", ret);
-> +			goto out_mod_clk_unprepare;
-> +		}
-> +	} else if (PTR_ERR(nfc->reset) != -ENOENT) {
-> +		ret = PTR_ERR(nfc->reset);
 
-You should return -EDEFER_PROBE here.
+I do (sorry about duplicate email, the other got rejected by mailing lists).
 
-And can you please rebase this series on top of nand/next [1]?
+Why not expand the swiotlb= parameter instead of introducing a new one?
 
-[1]https://github.com/linux-nand/linux/tree/nand/next
+Also, why not use the swiotlb by itself? That does the job as well?
