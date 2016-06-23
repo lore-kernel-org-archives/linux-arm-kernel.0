@@ -1,97 +1,147 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 22 Jun 2016 18:07:46 -0500
-Subject: [PATCH v3 4/4] ARM/PCI: remove arch specific
- pcibios_enable_device()
-In-Reply-To: <1465383890-13538-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465383890-13538-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160622230746.GI25485@localhost>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 22 Jun 2016 17:00:35 -0700
+Subject: [PATCH] ARM: dts: BCM5301x: Add BCM953012ER board
+Message-ID: <1466640035-29139-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Guan]
+Add support for the Broadcom BCM953012 Enterprise Router reference
+board, enable the following peripherals:
 
-On Wed, Jun 08, 2016 at 12:04:50PM +0100, Lorenzo Pieralisi wrote:
-> The arm pcibios_enable_device() implementation exists solely
-> to prevent enabling PCI resources on PCI_PROBE_ONLY systems, since
-> on those systems the PCI resources are currently not claimed (ie
-> inserted in the PCI resource tree - which means their parent
-> pointer is not correctly set-up) therefore they can not be enabled
-> since this would trigger PCI set-ups failures.
-> 
-> After removing the pci=firmware command line option in:
-> 
-> commit 903589ca7165 ("ARM: 8554/1: kernel: pci: remove pci=firmware
-> command line parameter handling")
+- UART0 (UART1 is not populated)
+- WPS and restart GPIO buttons
+- Ethernet switch w/ only two facing ports
+- NAND flash
+- SPI-NOR flash
 
-903589ca7165 removed "pci=firmware" from ARM and from
-Documentation/kernel-parameters.txt (where it was documented as
-ARM-specific).
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/bcm953012er.dts | 104 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 105 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm953012er.dts
 
-I think unicore32 copied that code from arm, so unicore32 is one of
-the few remaining arches that can set PCI_PROBE_ONLY.  I suspect this
-was just copied from arm and may not be necessary on unicore32.
-
-Guan, can you confirm that PCI_PROBE_ONLY is necessary on unicore32,
-or that it can be removed?
-
-> (that was used to set the PCI_PROBE_ONLY flag through the command line)
-> and by introducing resources claiming in the PCI host controllers
-> set-ups that have PCI_PROBE_ONLY as a probe option, there is no need for
-> arch specific pcibios_enable_device() implementations anymore in that
-> the kernel can rely on the generic pcibios_enable_device()
-> implementation without resorting to arch specific code to work around
-> the missing resources claiming enumeration step.
-> 
-> On !PCI_PROBE_ONLY PCI bus set-ups, resources are always assigned
-> either in pcibios initialization code or PCI host controllers drivers;
-> since the PCI resource assignment API takes care of inserting the
-> assigned resources in the resource tree, the resources parent pointers
-> are correctly set-up, which means that this patch leaves behaviour
-> unchanged for all arm PCI set-ups that do not set the PCI_PROBE_ONLY
-> flag.
-> 
-> Remove the pcibios_enable_device() function from the arm arch back-end
-> so that the kernel now uses its generic implementation.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> ---
->  arch/arm/kernel/bios32.c | 12 ------------
->  1 file changed, 12 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 05e61a2..488545f 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -590,18 +590,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->  	return start;
->  }
->  
-> -/**
-> - * pcibios_enable_device - Enable I/O and memory.
-> - * @dev: PCI device to be enabled
-> - */
-> -int pcibios_enable_device(struct pci_dev *dev, int mask)
-> -{
-> -	if (pci_has_flag(PCI_PROBE_ONLY))
-> -		return 0;
-> -
-> -	return pci_enable_resources(dev, mask);
-> -}
-> -
->  int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
->  			enum pci_mmap_state mmap_state, int write_combine)
->  {
-> -- 
-> 2.6.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 06b6c2d695bf..cbd13ea4b71e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -85,6 +85,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm47094-dlink-dir-885l.dtb \
+ 	bcm94708.dtb \
+ 	bcm94709.dtb \
++	bcm953012er.dtb \
+ 	bcm953012k.dtb
+ dtb-$(CONFIG_ARCH_BCM_63XX) += \
+ 	bcm963138dvt.dtb
+diff --git a/arch/arm/boot/dts/bcm953012er.dts b/arch/arm/boot/dts/bcm953012er.dts
+new file mode 100644
+index 000000000000..0a9abecf9423
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm953012er.dts
+@@ -0,0 +1,104 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2016 Broadcom. All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom Corporation nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++#include "bcm5301x-nand-cs0-bch8.dtsi"
++
++/ {
++	model = "NorthStar Enterprise Router (BCM953012ER)";
++	compatible = "brcm,bcm953012er", "brcm,brcm53012", "brcm,bcm4708";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		reg = <0x00000000 0x8000000>;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&spi_nor {
++	status = "okay";
++};
++
++&srab {
++	status = "okay";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++			label = "port0";
++		};
++
++		port at 1 {
++			reg = <1>;
++			label = "port1";
++		};
++
++		port at 5 {
++			reg = <5>;
++			label = "cpu";
++			ethernet = <&gmac0>;
++		};
++	};
++};
+-- 
+2.7.4
