@@ -1,91 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 23 Jun 2016 18:27:52 +0530
-Subject: [v3 PATCH 3/5] phy: Add USB Type-C PHY driver for rk3399
-In-Reply-To: <1466686264-6744-4-git-send-email-zyw@rock-chips.com>
-References: <1466686264-6744-1-git-send-email-zyw@rock-chips.com>
- <1466686264-6744-4-git-send-email-zyw@rock-chips.com>
-Message-ID: <576BDCD0.5060001@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 23 Jun 2016 14:17:38 +0100
+Subject: [PATCH] arm64/efi: remove spurious WARN_ON for !4K kernels
+In-Reply-To: <20160617211601.GN2658@codeblueprint.co.uk>
+References: <1464189116-30898-1-git-send-email-mark.rutland@arm.com>
+ <20160530211212.GG2984@codeblueprint.co.uk>
+ <20160603100040.GJ9915@arm.com>
+ <20160617211601.GN2658@codeblueprint.co.uk>
+Message-ID: <20160623131738.GH8836@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 17, 2016 at 10:16:01PM +0100, Matt Fleming wrote:
+> On Fri, 03 Jun, at 11:00:40AM, Will Deacon wrote:
+> > 
+> > Mark, Jeremy?
+> > 
+> > I've kept this patch marked as unread, but it's not clear to me (a) how
+> > urgent it is (b) what tree it should go through and (c) whether it's the
+> > right thing to do!
+> 
+> Ping? Anyone got an update here?
 
-On Thursday 23 June 2016 06:21 PM, Chris Zhong wrote:
-> Add a PHY provider driver for the rk3399 SoC Type-c PHY. The USB
-> Type-C PHY is designed to support the USB3 and DP applications. The
-> PHY basically has two main components: USB3 and DisplyPort. USB3
-> operates in SuperSpeed mode and the DP can operate at RBR, HBR and
-> HBR2 data rates.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> 
-> ---
-> 
-> Changes in v3:
-> - remove the phy framework(Kishon Vijay Abraham I)
-> - add parentheses around the macro
-> - use a single space between type and name
-> - add spaces after opening and before closing braces.
-> - use u16 for register value
-> - remove type-c phy header file
-> - CodingStyle optimization
-> - use some cable extcon to get type-c port information
-> - add a extcon to notify Display Port
-> 
-> Changes in v2:
-> - select RESET_CONTROLLER
-> - alphabetic order
-> - modify some spelling mistakes
-> - make mode cleaner
-> - use bool for enable/disable
-> - check all of the return value
-> - return a better err number
-> - use more readx_poll_timeout()
-> - clk_disable_unprepare(tcphy->clk_ref);
-> - remove unuse functions, rockchip_typec_phy_power_on/off
-> - remove unnecessary typecast from void *
-> - use dts node to distinguish between phys.
-> 
-> Changes in v1:
-> - update the licence note
-> - init core clock to 50MHz
-> - use extcon API
-> - remove unused global
-> - add some comments for magic num
-> - change usleep_range(1000, 2000) tousleep_range(1000, 1050)
-> - remove __func__ from dev_err
-> - return err number when get clk failed
-> - remove ADDR_ADJ define
-> - use devm_clk_get(&pdev->dev, "tcpdcore")
-> 
->  drivers/phy/Kconfig              |    8 +
->  drivers/phy/Makefile             |    1 +
->  drivers/phy/phy-rockchip-typec.c | 1027 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1036 insertions(+)
->  create mode 100644 drivers/phy/phy-rockchip-typec.c
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 26566db..ec87b3a 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -351,6 +351,14 @@ config PHY_ROCKCHIP_DP
->  	help
->  	  Enable this to support the Rockchip Display Port PHY.
->  
-> +config PHY_ROCKCHIP_TYPEC
-> +	tristate "Rockchip TYPEC PHY Driver"
-> +	depends on ARCH_ROCKCHIP && OF
-> +	select GENERIC_PHY
+Sorry, I'd been meaning to come back to this.
 
-Why? None of the generic PHY API's are used here. Why do you want select
-generic PHY?
-> +	select RESET_CONTROLLER
+As Ard noted, there are serious cases that this detects which we cannot
+handle, and a WARN_ON for those is appropriate.
 
-The driver also uses extcon. That has to be selected as well.
+For the alignment of regions as required for permissions, I believe we
+need clarification in the spec, and in the mean time I think we should
+keep the WARN_ON.
 
-And since this driver doesn't use phy framework, I feel this should probably
-end up in drivers/extcon and not drivers/phy.
+To accurately report problems with differing attributes within a
+(kernel) page, we need more comprehensive checks on the EFI memory map,
+and potentially in some cases where we handle things dynamically at run
+time. I haven't had the chance to delve into those yet.
 
-Thanks
-Kishon
+So I guess for the timebeing this should stay as a WARN_ON, even if in
+some cases it is spurious.
+
+Thanks,
+Mark.
