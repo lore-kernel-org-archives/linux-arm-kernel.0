@@ -1,71 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 23 Jun 2016 10:11:04 +0200
-Subject: [PATCH] ARM: dts: r8a7794: add SMP support
-In-Reply-To: <CAMuHMdWY+hZMFQo7iGaeZkbVnK1cZ9=oyM7RvX_8mhyCuCxD9Q@mail.gmail.com>
-References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
- <27171008.uuY7altQup@wasted.cogentembedded.com>
- <CAMuHMdWcVRBxZO85_MhYVvODcbi-GYDNKfQH9LJEcrJRd=p7Vw@mail.gmail.com>
- <adbc6358-d3fb-c608-15c2-c425332435f3@cogentembedded.com>
- <CAMuHMdWY+hZMFQo7iGaeZkbVnK1cZ9=oyM7RvX_8mhyCuCxD9Q@mail.gmail.com>
-Message-ID: <CAMuHMdXb8dVPbOv0-cskN+owKJbgjcdFwLRW6J8+=XDO3EfCWw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 23 Jun 2016 10:24:36 +0200
+Subject: [RESEND PATCH v2 2/5] pwm: omap-dmtimer: Allow for setting
+ dmtimer clock source
+In-Reply-To: <1466623341-30130-3-git-send-email-ivo.g.dimitrov.75@gmail.com>
+References: <1466623341-30130-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <1466623341-30130-3-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <20160623082436.GB8136@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Wed, Jun 22, 2016 at 10:22:18PM +0300, Ivaylo Dimitrov wrote:
+> OMAP GP timers can have different input clocks that allow different PWM
+> frequencies. However, there is no other way of setting the clock source but
+> through clocks or clock-names properties of the timer itself. This limits
+> PWM functionality to only the frequencies allowed by the particular clock
+> source. Allowing setting the clock source by PWM rather than by timer
+> allows different PWMs to have different ranges by not hard-wiring the clock
+> source to the timer.
+> 
+> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt |  4 ++++
+>  drivers/pwm/pwm-omap-dmtimer.c                             | 12 +++++++-----
+>  2 files changed, 11 insertions(+), 5 deletions(-)
 
-On Wed, Jun 22, 2016 at 12:20 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Wed, Jun 22, 2016 at 12:08 PM, Sergei Shtylyov
-> <sergei.shtylyov@cogentembedded.com> wrote:
->> On 6/22/2016 10:20 AM, Geert Uytterhoeven wrote:
->>
->>>> Add the device tree node for the Advanced Power Management Unit (APMU).
->>>> Use the "enable-method" prop to  point out that the APMU should be used
->>>> for the SMP support.
->>>>
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>
->>>
->>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>>
->>>> SMP/PM basically works but you can't offline CPU0 (system hangs)...
->>>
->>>
->>> On #renesas-soc you said it hangs on SILK only, and succeeds on Porter,
->>> with a WARNING in the clk core (which one?) during suspend?
->>
->>    Porter is based on R8A7791 (WARNING seemed to be caused by the CAN
->> driver). :-)
->
-> Oh right, mixing up boards.
->
-> Will try on (remote) ALT when I find some time...
-
-The second CPU boots (irrespective of MD21 setting), but the kernel
-starts spewing:
-
-    clocksource: Switched to clocksource arch_sys_counter
-    WARNING: Underflow in clocksource 'arch_sys_counter' observed,
-time update ignored.
-             Please report this, consider using a different
-clocksource, if possible.
-             Your kernel is probably still fine.
-    WARNING: Underflow in clocksource 'arch_sys_counter' observed,
-time update ignored.
-             Please report this, consider using a different
-clocksource, if possible.
-             Your kernel is probably still fine.
-
-Seems like the secondary CPU also needs CNTVOFF initialization,
-which is done in the BSP in arch/arm/mach-shmobile/headsmp.S.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160623/433af8bd/attachment.sig>
