@@ -1,143 +1,104 @@
-From: manjeet.p@samsung.com (Manjeet Pawar)
-Date: Thu, 23 Jun 2016 17:43:40 +0530
-Subject: [PATCH] arm64:swiotlb:Enable only when Input size through command line
-Message-ID: <1466684020-5224-1-git-send-email-manjeet.p@samsung.com>
+From: vikas.cha.sajjan@hpe.com (Vikas C Sajjan)
+Date: Thu, 23 Jun 2016 17:44:13 +0530
+Subject: [PATCH] drivers: firmware: psci: Add support for cpu suspend mode as
+ per psci v1.0 spec
+Message-ID: <1466684053-26966-1-git-send-email-vikas.cha.sajjan@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rohit Thapliyal <r.thapliyal@samsung.com>
+According to section 5.1.16 of PSCI spec,
+an optional feature called PSCI_SET_SUSPEND_MODE was added in v1.0.
+This patch adds the support for the same.
 
-swiotlb default size of 64M is too big as
-default value therefore it is made configurable
-through command line through swiotlb_size parameter.
-swiotlb allocation shall be done only when the
-swiotlb size is given through command line.
-Otherwise no swiotlb is allocated.
-
-Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
-Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
-Reviewed-by: Akhilesh Kumar <akhilesh.k@samsung.com>
-Reviewed-by: Ajeet Kumar Yadav <ajeet.y@samsung.com>
+Signed-off-by: Vikas C Sajjan <vikas.cha.sajjan@hpe.com>
 ---
- Documentation/kernel-parameters.txt |    3 +++
- arch/arm64/mm/init.c                |    3 ++-
- include/linux/swiotlb.h             |    1 +
- lib/swiotlb.c                       |   33 +++++++++++++++++++++++++++++----
- 4 files changed, 35 insertions(+), 5 deletions(-)
+ drivers/firmware/psci.c   | 20 +++++++++++++++++++-
+ include/linux/psci.h      |  1 +
+ include/uapi/linux/psci.h |  6 +++++-
+ 3 files changed, 25 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 82b42c9..12b680f 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -3875,6 +3875,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			force -- force using of bounce buffers even if they
- 			         wouldn't be automatically used by the kernel
- 
-+	swiotlb_sz= [KNL] enter swiotlb size.
-+			Sets the swiotlb size for eg. swiotlb_sz=64M
-+
- 	switches=	[HW,M68k]
- 
- 	sysfs.deprecated=0|1 [KNL]
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index d45f862..89c6b39 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -403,7 +403,8 @@ static void __init free_unused_memmap(void)
-  */
- void __init mem_init(void)
- {
--	swiotlb_init(1);
-+	if (swiotlb_enabled)
-+		swiotlb_init(1);
- 
- 	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
- 
-diff --git a/include/linux/swiotlb.h b/include/linux/swiotlb.h
-index 017fced..c7eb146 100644
---- a/include/linux/swiotlb.h
-+++ b/include/linux/swiotlb.h
-@@ -11,6 +11,7 @@ struct page;
- struct scatterlist;
- 
- extern int swiotlb_force;
-+extern int swiotlb_enabled;
- 
- /*
-  * Maximum allowable number of contiguous slabs to map,
-diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-index 76f29ec..e89296a 100644
---- a/lib/swiotlb.c
-+++ b/lib/swiotlb.c
-@@ -54,6 +54,7 @@
- #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
- 
- int swiotlb_force;
-+int swiotlb_enabled;
- 
- /*
-  * Used to do a quick range check in swiotlb_tbl_unmap_single and
-@@ -96,6 +97,9 @@ static DEFINE_SPINLOCK(io_tlb_lock);
- 
- static int late_alloc;
- 
-+unsigned long swiotlb_sz;
-+unsigned int swiotlb_sz_shift;
-+
- static int __init
- setup_io_tlb_npages(char *str)
- {
-@@ -112,6 +116,24 @@ setup_io_tlb_npages(char *str)
- 	return 0;
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 03e0458..c318972 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -91,6 +91,12 @@ static inline bool psci_has_ext_power_state(void)
+ 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
  }
- early_param("swiotlb", setup_io_tlb_npages);
-+
-+static int __init
-+setup_io_tlb_size(char *str)
+ 
++static inline bool psci_has_OS_initiated_mode_support(void)
 +{
-+	int len = strlen(str);
-+
-+	if (str[len-1] == 'M')
-+		swiotlb_sz_shift = 20;
-+	else if (str[len-1] == 'K')
-+		swiotlb_sz_shift = 10;
-+	str[len-1] = '\0';
-+	if (isdigit(*str))
-+		swiotlb_sz = kstrtoul(str, &str, 0);
-+
-+	swiotlb_enabled = 1;
-+	return 0;
++	return psci_cpu_suspend_feature &
++			PSCI_1_0_FEATURES_CPU_SUSPEND_OS_INITIATED_MODE_MASK;
 +}
-+early_param("swiotlb_sz", setup_io_tlb_size);
- /* make io_tlb_overflow tunable too? */
- 
- unsigned long swiotlb_nr_tbl(void)
-@@ -120,8 +142,9 @@ unsigned long swiotlb_nr_tbl(void)
- }
- EXPORT_SYMBOL_GPL(swiotlb_nr_tbl);
- 
--/* default to 64MB */
--#define IO_TLB_DEFAULT_SIZE (64UL<<20)
-+/* Pass from command line as swiotlb_sz=64M (for eg.)*/
-+#define IO_TLB_DEFAULT_SIZE (swiotlb_sz<<swiotlb_sz_shift)
 +
- unsigned long swiotlb_size_or_default(void)
+ static inline bool psci_power_state_loses_context(u32 state)
  {
- 	unsigned long size;
-@@ -153,10 +176,12 @@ void swiotlb_print_info(void)
- 	vstart = phys_to_virt(io_tlb_start);
- 	vend = phys_to_virt(io_tlb_end);
+ 	const u32 mask = psci_has_ext_power_state() ?
+@@ -145,6 +151,14 @@ static int psci_to_linux_errno(int errno)
  
--	printk(KERN_INFO "software IO TLB [mem %#010llx-%#010llx] (%luMB) mapped at [%p-%p]\n",
-+	pr_info("software IO TLB [mem %#010llx-%#010llx] (%lu%cB) mapped@[%p-%p]\n",
- 	       (unsigned long long)io_tlb_start,
- 	       (unsigned long long)io_tlb_end,
--	       bytes >> 20, vstart, vend - 1);
-+		bytes >> swiotlb_sz_shift,
-+		swiotlb_sz_shift == 20 ? 'M' : 'K',
-+		vstart, vend - 1);
+ 	return -EINVAL;
+ }
++static int psci_set_cpu_suspend_mode(bool suspend_mode)
++{
++	int err;
++
++	err = invoke_psci_fn(PSCI_FN_NATIVE(1_0, SUSPEND_MODE),
++						suspend_mode, 0, 0);
++	return psci_to_linux_errno(err);
++}
+ 
+ static u32 psci_get_version(void)
+ {
+@@ -397,8 +411,12 @@ static void __init psci_init_cpu_suspend(void)
+ {
+ 	int feature = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
+ 
+-	if (feature != PSCI_RET_NOT_SUPPORTED)
++	if (feature != PSCI_RET_NOT_SUPPORTED) {
+ 		psci_cpu_suspend_feature = feature;
++		if (psci_has_OS_initiated_mode_support())
++			psci_ops.set_cpu_suspend_mode =
++						psci_set_cpu_suspend_mode;
++	}
  }
  
- int __init swiotlb_init_with_tbl(char *tlb, unsigned long nslabs, int verbose)
+ /*
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index bdea1cb..c040502 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -33,6 +33,7 @@ struct psci_operations {
+ 	int (*affinity_info)(unsigned long target_affinity,
+ 			unsigned long lowest_affinity_level);
+ 	int (*migrate_info_type)(void);
++	int (*set_cpu_suspend_mode)(bool);
+ };
+ 
+ extern struct psci_operations psci_ops;
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index 3d7a0fc..097c95e 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -50,6 +50,8 @@
+ #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
+ 
+ #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
++#define PSCI_1_0_FN_SUSPEND_MODE		PSCI_0_2_FN(0xF)
++#define PSCI_1_0_FN64_SUSPEND_MODE		PSCI_0_2_FN64(0xF)
+ 
+ /* PSCI v0.2 power state encoding for CPU_SUSPEND function */
+ #define PSCI_0_2_POWER_STATE_ID_MASK		0xffff
+@@ -90,8 +92,10 @@
+ 
+ /* PSCI features decoding (>=1.0) */
+ #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT	1
++#define PSCI_1_0_FEATURES_CPU_SUSPEND_OS_INITIATED_MODE_MASK 1
+ #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
+-			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
++			((0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)| \
++			PSCI_1_0_FEATURES_CPU_SUSPEND_OS_INITIATED_MODE_MASK)
+ 
+ /* PSCI return values (inclusive of all PSCI versions) */
+ #define PSCI_RET_SUCCESS			0
 -- 
-1.7.9.5
+1.9.1
