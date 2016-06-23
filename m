@@ -1,42 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Jun 2016 14:17:38 +0100
-Subject: [PATCH] arm64/efi: remove spurious WARN_ON for !4K kernels
-In-Reply-To: <20160617211601.GN2658@codeblueprint.co.uk>
-References: <1464189116-30898-1-git-send-email-mark.rutland@arm.com>
- <20160530211212.GG2984@codeblueprint.co.uk>
- <20160603100040.GJ9915@arm.com>
- <20160617211601.GN2658@codeblueprint.co.uk>
-Message-ID: <20160623131738.GH8836@leverpostej>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 23 Jun 2016 06:46:51 -0700
+Subject: [v2,1/2] doc/devicetree: Add Aspeed watchdog timer bindings
+In-Reply-To: <1463062631-16432-2-git-send-email-joel@jms.id.au>
+References: <1463062631-16432-2-git-send-email-joel@jms.id.au>
+Message-ID: <20160623134651.GA5523@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 17, 2016 at 10:16:01PM +0100, Matt Fleming wrote:
-> On Fri, 03 Jun, at 11:00:40AM, Will Deacon wrote:
-> > 
-> > Mark, Jeremy?
-> > 
-> > I've kept this patch marked as unread, but it's not clear to me (a) how
-> > urgent it is (b) what tree it should go through and (c) whether it's the
-> > right thing to do!
+On Thu, May 12, 2016 at 11:47:10PM +0930, Joel Stanley wrote:
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
+
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+
+> ---
+>  .../devicetree/bindings/watchdog/aspeed-wdt.txt          | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt
 > 
-> Ping? Anyone got an update here?
-
-Sorry, I'd been meaning to come back to this.
-
-As Ard noted, there are serious cases that this detects which we cannot
-handle, and a WARN_ON for those is appropriate.
-
-For the alignment of regions as required for permissions, I believe we
-need clarification in the spec, and in the mean time I think we should
-keep the WARN_ON.
-
-To accurately report problems with differing attributes within a
-(kernel) page, we need more comprehensive checks on the EFI memory map,
-and potentially in some cases where we handle things dynamically at run
-time. I haven't had the chance to delve into those yet.
-
-So I guess for the timebeing this should stay as a WARN_ON, even if in
-some cases it is spurious.
-
-Thanks,
-Mark.
+> diff --git a/Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt b/Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt
+> new file mode 100644
+> index 000000000000..78ad314eaab9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt
+> @@ -0,0 +1,16 @@
+> +Aspeed Watchdog Timer
+> +
+> +Required properties:
+> + - compatible: must be one of:
+> +	- "aspeed,ast2400-wdt"
+> +	- "aspeed,ast2500-wdt"
+> +
+> + - reg: physical base address of the controller and length of memory mapped
+> +   region
+> +
+> +Example:
+> +
+> +	watchdog1: watchdog at 1e785000 {
+> +		compatible = "aspeed,ast2400-wdt";
+> +		reg = <0x1e785000 0x1c>;
+> +	};
