@@ -1,145 +1,100 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 23 Jun 2016 12:34:10 -0600
-Subject: [PATCH V8 4/9] vfio: platform: add support for ACPI probe
-In-Reply-To: <1466437879-32182-5-git-send-email-okaya@codeaurora.org>
-References: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
- <1466437879-32182-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160623123410.647b3be0@t450s.home>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 23 Jun 2016 12:39:39 -0600
+Subject: [PATCH 02/14] dt/bindings: update binding for PM domain idle
+ states
+In-Reply-To: <20160623181927.GB31170@leverpostej>
+References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
+ <1466624209-27432-3-git-send-email-lina.iyer@linaro.org>
+ <20160623173312.GA22204@leverpostej>
+ <20160623180451.GD1115@linaro.org>
+ <20160623181927.GB31170@leverpostej>
+Message-ID: <20160623183939.GE1115@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2016 11:51:14 -0400
-Sinan Kaya <okaya@codeaurora.org> wrote:
+On Thu, Jun 23 2016 at 12:19 -0600, Mark Rutland wrote:
+>On Thu, Jun 23, 2016 at 12:04:51PM -0600, Lina Iyer wrote:
+>> Hi Mark,
+>>
+>> On Thu, Jun 23 2016 at 11:35 -0600, Mark Rutland wrote:
+>> >Hi,
+>> >
+>> >On Wed, Jun 22, 2016 at 01:36:37PM -0600, Lina Iyer wrote:
+>> >>From: Axel Haslam <ahaslam+renesas@baylibre.com>
+>> >>
+>> >>Update DT bindings to describe idle states of PM domains.
+>> >>
+>> >>Cc: <devicetree@vger.kernel.org>
+>> >>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+>> >>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> >>[Lina: Added state properties, removed state names, wakeup-latency,
+>> >>added of_pm_genpd_init() API, pruned commit text]
+>> >>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> >>[Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
+>> >>---
+>> >> .../devicetree/bindings/power/power_domain.txt     | 70 ++++++++++++++++++++++
+>> >> 1 file changed, 70 insertions(+)
+>> >>
+>> >>diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>> >>index 025b5e7..41e8dda 100644
+>> >>--- a/Documentation/devicetree/bindings/power/power_domain.txt
+>> >>+++ b/Documentation/devicetree/bindings/power/power_domain.txt
+>> >>@@ -29,6 +29,43 @@ Optional properties:
+>> >>    specified by this binding. More details about power domain specifier are
+>> >>    available in the next section.
+>> >>
+>> >>+- power-states : A phandle of an idle-state that shall be soaked into a
+>> >>+                generic domain power state.
+>> >
+>> >It's somewhat unfortunate that this gives us two possible locations for
+>> >idle state lists (under the /cpus node and in a pm-domains node),
+>> >especially as it's not clear what would happen were a DT to have both.
+>> >
+>> >I would prefer that we extend the existing bindings such that states can
+>> >refer to the power domains which they affect.
+>> >
+>> I agree. The CPU idle states have become defined to be specific to CPUs.
+>> PM Domain idle states are generic for any type of domain. I am hoping at
+>> some point, we could converge and use the same idle state, but that
+>> would mean changing the CPU idle states to make it generic.
+>
+>Outside of CPU idling, I don't fully understand how this will be used,
+>so it's not clear to me what would need to be made generic. Apologies
+>for my ignorance there.
+>
+There may be non-PSCI ARM v7 CPU domains that may have domain controller
+drivers in the kernel. They would not hook into the ARM PSCI frameworks.
+It is still cpuidle though.
 
-> The code is using the compatible DT string to associate a reset driver
-> with the actual device itself. The compatible string does not exist on
-> ACPI based systems. HID is the unique identifier for a device driver
-> instead.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> Reviewed-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
-> ---
->  drivers/vfio/platform/vfio_platform_common.c  | 57 ++++++++++++++++++++++++---
->  drivers/vfio/platform/vfio_platform_private.h |  1 +
->  2 files changed, 53 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index 6be92c3..fbf4565 100644
-> --- a/drivers/vfio/platform/vfio_platform_common.c
-> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -13,6 +13,7 @@
->   */
->  
->  #include <linux/device.h>
-> +#include <linux/acpi.h>
->  #include <linux/iommu.h>
->  #include <linux/module.h>
->  #include <linux/mutex.h>
-> @@ -49,6 +50,37 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
->  	return reset_fn;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +static int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
-> +				    struct device *dev)
-> +{
-> +	struct acpi_device *adev = ACPI_COMPANION(dev);
-> +
-> +	if (acpi_disabled)
-> +		return -ENODEV;
-> +
-> +	if (!adev) {
-> +		pr_err("VFIO: ACPI companion device not found for %s\n",
-> +			vdev->name);
-> +		return -ENODEV;
-> +	}
-> +
-> +	vdev->acpihid = acpi_device_hid(adev);
-> +	if (!vdev->acpihid) {
-> +		pr_err("VFIO: cannot find ACPI HID for %s\n",
-> +		       vdev->name);
-> +		return -ENODEV;
-> +	}
+>> At some point, during my development, I did use the arm,idle-state for
+>> domains as well, but the binding definitions were too restrictive for
+>> a generic PM domain.
+>>
+>> I would be willing to make the change to CPU idle states to make it
+>> generic and then we could just reference domain and CPU idle states
+>> using the same bindings. Are we okay with that, specifically,
+>> arm,psci-suspend-param? This binding is very restrictive in its
+>> description. What we pass to the platform driver upon choosing a domain
+>> state is very platform specific and therefore has to be generic in its
+>> description.
+>
+>I was suggesting that for PSCI we should consistently us
+>arm,psci-suspend-param, not that this should be used for all power
+>domain state data.
+>
+>I imagine that mechanisms for powering down power domains will have
+>varied requirements on data they require (and may require more than can
+>be encoded in a u32), and I don't think it's best to try to force a
+>single representation in the DT for that. It would be better to allow
+>them to define the properties which they require.
+>
+The only way to do that is to push the DT parsing to the platform
+drivers. In the case of CPU domains controlled by PSCI, we could use the
+arm,idle-states but any other generic domain, may need to define their
+own bindings and fill up the domain states before initiailizing the domain.
 
-Do you want to try to use different errnos here so you don't rely on
-the pr_err() calls for debugging?  I could imagine -EPERM, -ENODEV,
--EINVAL respectively, but maybe there are better options.
+While this approach pushes the onus on to the platform code, I am fine
+with it. Is that what you were thinking too?
 
-> +	return 0;
-> +}
-> +#else
-> +static inline int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
-> +					   struct device *dev)
-> +{
-> +	return -ENOENT;
-> +}
-> +#endif
-> +
->  static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
->  {
->  	return vdev->of_reset ? true : false;
-> @@ -547,6 +579,20 @@ static const struct vfio_device_ops vfio_platform_ops = {
->  	.mmap		= vfio_platform_mmap,
->  };
->  
-> +int vfio_platform_of_probe(struct vfio_platform_device *vdev,
-> +			   struct device *dev)
-> +{
-> +	int ret;
-> +
-> +	ret = device_property_read_string(dev, "compatible",
-> +					  &vdev->compat);
-> +	if (ret)
-> +		pr_err("VFIO: cannot retrieve compat for %s\n",
-> +			vdev->name);
-
-Previously there was only one probe method and I imagine this pr_err
-was useful.  Now we have multiple methods of probing for the device.
-Do we really want each one generating pr_err messages or just one at
-the end if none of our probes worked?
-
-> +
-> +	return ret;
-> +}
-> +
->  int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->  			       struct device *dev)
->  {
-> @@ -556,11 +602,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->  	if (!vdev)
->  		return -EINVAL;
->  
-> -	ret = device_property_read_string(dev, "compatible", &vdev->compat);
-> -	if (ret) {
-> -		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
-> -		return -EINVAL;
-> -	}
-> +	ret = vfio_platform_acpi_probe(vdev, dev);
-> +	if (ret)
-> +		ret = vfio_platform_of_probe(vdev, dev);
-
-
-The only out way out of vfio_platform_acpi_probe() without hitting a
-pr_err is one of (!CONFIG_ACPI || acpi_disabled || success).  Doesn't
-that make for some unnecessary warning for a DT user?
-
-
-> +
-> +	if (ret)
-> +		return ret;
->  
->  	vdev->device = dev;
->  
-> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-> index 71ed7d1..ba9e4f8 100644
-> --- a/drivers/vfio/platform/vfio_platform_private.h
-> +++ b/drivers/vfio/platform/vfio_platform_private.h
-> @@ -58,6 +58,7 @@ struct vfio_platform_device {
->  	struct mutex			igate;
->  	struct module			*parent_module;
->  	const char			*compat;
-> +	const char			*acpihid;
->  	struct module			*reset_module;
->  	struct device			*device;
->  
+Thanks,
+Lina
