@@ -1,38 +1,36 @@
 From: megous@megous.com (megous at megous.com)
-Date: Thu, 23 Jun 2016 21:20:51 +0200
-Subject: [PATCH 01/14] ARM: dts: sun8i: Add SID node
+Date: Thu, 23 Jun 2016 21:20:59 +0200
+Subject: [PATCH 09/14] ARM: dts: sun8i: Enable r_twi on Orange Pi PC
 In-Reply-To: <20160623192104.18720-1-megous@megous.com>
 References: <20160623192104.18720-1-megous@megous.com>
-Message-ID: <20160623192104.18720-2-megous@megous.com>
+Message-ID: <20160623192104.18720-10-megous@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josef Gajdusek <atx@atx.name>
+From: Ondrej Jirman <megous@megous.com>
 
-Add a node describing the Security ID memory to the Allwinner H3 .dtsi file.
+Enable I2C controller where the SY8106A regulator for
+CPUX voltage is attached on Orange Pi PC SBC.
 
-Signed-off-by: Josef Gajdusek <atx@atx.name>
+Signed-off-by: Ondrej Jirman <megous@megous.com>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 4a4926b..172576d 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -389,6 +389,13 @@
- 			#size-cells = <0>;
- 		};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index daf50b9a6..e5991da 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -90,6 +90,10 @@
+ 	};
+ };
  
-+		sid: eeprom at 01c14000 {
-+			compatible = "allwinner,sun4i-a10-sid";
-+			reg = <0x01c14000 0x400>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+		};
++&r_twi {
++	status = "okay";
++};
 +
- 		usbphy: phy at 01c19400 {
- 			compatible = "allwinner,sun8i-h3-usb-phy";
- 			reg = <0x01c19400 0x2c>,
+ &ehci1 {
+ 	status = "okay";
+ };
 -- 
 2.9.0
