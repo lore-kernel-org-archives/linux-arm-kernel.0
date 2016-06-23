@@ -1,171 +1,140 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Thu, 23 Jun 2016 17:54:48 +0000
-Subject: [PATCH v20 03/14] arm64: Add back cpu reset routines
+Subject: [PATCH v20 07/14] arm64: kdump: reserve memory for crash dump kernel
 In-Reply-To: <cover.1466702804.git.geoff@infradead.org>
 References: <cover.1466702804.git.geoff@infradead.org>
-Message-ID: <9e9cc6f355e353bba1ddcc1f98f9fba41f9dcbf2.1466702804.git.geoff@infradead.org>
+Message-ID: <efbcb33ccbe40404a59487fb0baae61cf7ed0a7a.1466702804.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68234df4ea79 ("arm64: kill flush_cache_all()") removed the global
-arm64 routines cpu_reset() and cpu_soft_restart() needed by the arm64
-kexec and kdump support.  Add back a simplified version of
-cpu_soft_restart() with some changes needed for kexec in the new files
-cpu_reset.S, and cpu_reset.h.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-When a CPU is reset it needs to be put into the exception level it had when
-it entered the kernel. Update cpu_soft_restart() to accept an argument
-which signals if the reset address should be entered at EL1 or EL2, and
-add a new hypercall HVC_SOFT_RESTART which is used for the EL2 switch.
+On the startup of primary kernel, the memory region used by crash dump
+kernel must be specified by "crashkernel=" kernel parameter.
+reserve_crashkernel() will allocate and reserve the region for later use.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
-Reviewed-by: James Morse <james.morse@arm.com>
+User space tools, like kexec-tools, will be able to find that region marked
+as "Crash kernel" in /proc/iomem.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- arch/arm64/include/asm/virt.h |  5 ++++
- arch/arm64/kernel/cpu-reset.S | 54 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu-reset.h | 34 +++++++++++++++++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 10 +++++++-
- 4 files changed, 102 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/cpu-reset.S
- create mode 100644 arch/arm64/kernel/cpu-reset.h
+ arch/arm64/kernel/setup.c |  7 +++++-
+ arch/arm64/mm/init.c      | 62 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 68 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index dcbcf8d..bbc6a8c 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -34,6 +34,11 @@
-  */
- #define HVC_SET_VECTORS 1
- 
-+/*
-+ * HVC_SOFT_RESTART - CPU soft reset, used by the cpu_soft_restart routine.
-+ */
-+#define HVC_SOFT_RESTART 2
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 3279def..e411957 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -31,7 +31,6 @@
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+-#include <linux/crash_dump.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -222,6 +221,12 @@ static void __init request_standard_resources(void)
+ 		    kernel_data.end <= res->end)
+ 			request_resource(res, &kernel_data);
+ 	}
 +
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-new file mode 100644
-index 0000000..65f42d2
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -0,0 +1,54 @@
-+/*
-+ * CPU reset routines
-+ *
-+ * Copyright (C) 2001 Deep Blue Solutions Ltd.
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/sysreg.h>
-+#include <asm/virt.h>
-+
-+.text
-+.pushsection    .idmap.text, "ax"
-+
-+/*
-+ * __cpu_soft_restart(el2_switch, entry, arg0, arg1, arg2) - Helper for
-+ * cpu_soft_restart.
-+ *
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ * @entry: Location to jump to for soft reset.
-+ * arg0: First argument passed to @entry.
-+ * arg1: Second argument passed to @entry.
-+ * arg2: Third argument passed to @entry.
-+ *
-+ * Put the CPU into the same state as it would be if it had been reset, and
-+ * branch to what would be the reset vector. It must be executed with the
-+ * flat identity mapping.
-+ */
-+ENTRY(__cpu_soft_restart)
-+	/* Clear sctlr_el1 flags. */
-+	mrs	x12, sctlr_el1
-+	ldr	x13, =SCTLR_ELx_FLAGS
-+	bic	x12, x12, x13
-+	msr	sctlr_el1, x12
-+	isb
-+
-+	cbz	x0, 1f				// el2_switch?
-+	mov	x0, #HVC_SOFT_RESTART
-+	hvc	#0				// no return
-+
-+1:	mov	x18, x1				// entry
-+	mov	x0, x2				// arg0
-+	mov	x1, x3				// arg1
-+	mov	x2, x4				// arg2
-+	br	x18
-+ENDPROC(__cpu_soft_restart)
-+
-+.popsection
-diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
-new file mode 100644
-index 0000000..d4e9ecb
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.h
-@@ -0,0 +1,34 @@
-+/*
-+ * CPU reset routines
-+ *
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _ARM64_CPU_RESET_H
-+#define _ARM64_CPU_RESET_H
-+
-+#include <asm/virt.h>
-+
-+void __cpu_soft_restart(unsigned long el2_switch, unsigned long entry,
-+	unsigned long arg0, unsigned long arg1, unsigned long arg2);
-+
-+static inline void __noreturn cpu_soft_restart(unsigned long el2_switch,
-+	unsigned long entry, unsigned long arg0, unsigned long arg1,
-+	unsigned long arg2)
-+{
-+	typeof(__cpu_soft_restart) *restart;
-+
-+	el2_switch = el2_switch && !is_kernel_in_hyp_mode() &&
-+		is_hyp_mode_available();
-+	restart = (void *)virt_to_phys(__cpu_soft_restart);
-+
-+	cpu_install_idmap();
-+	restart(el2_switch, entry, arg0, arg1, arg2);
-+	unreachable();
-+}
-+
++#ifdef CONFIG_KEXEC_CORE
++	/* User space tools will find "Crash kernel" region in /proc/iomem. */
++	if (crashk_res.end)
++		insert_resource(&iomem_resource, &crashk_res);
 +#endif
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 8727f44..d3b5f75 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -71,8 +71,16 @@ el1_sync:
- 	msr	vbar_el2, x1
- 	b	9f
+ }
  
-+2:	cmp	x0, #HVC_SOFT_RESTART
-+	b.ne	3f
-+	mov	x0, x2
-+	mov	x2, x4
-+	mov	x4, x1
-+	mov	x1, x3
-+	br	x4				// no return
+ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index d45f862..c948292 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -34,6 +34,7 @@
+ #include <linux/dma-contiguous.h>
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
++#include <linux/kexec.h>
+ 
+ #include <asm/boot.h>
+ #include <asm/fixmap.h>
+@@ -76,6 +77,65 @@ static int __init early_initrd(char *p)
+ early_param("initrd", early_initrd);
+ #endif
+ 
++#ifdef CONFIG_KEXEC_CORE
++/*
++ * reserve_crashkernel() - reserves memory for crash kernel
++ *
++ * This function reserves memory area given in "crashkernel=" kernel command
++ * line parameter. The memory reserved is used by dump capture kernel when
++ * primary kernel is crashing.
++ */
++static void __init reserve_crashkernel(void)
++{
++	unsigned long long crash_size = 0, crash_base = 0;
++	int ret;
 +
- 	/* Someone called kvm_call_hyp() against the hyp-stub... */
--2:	mov     x0, #ARM_EXCEPTION_HYP_GONE
-+3:	mov	x0, #ARM_EXCEPTION_HYP_GONE
++	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
++				&crash_size, &crash_base);
++	/* no crashkernel= or invalid value specified */
++	if (ret || !crash_size)
++		return;
++
++	if (crash_base == 0) {
++		/* Current arm64 boot protocol requires 2MB alignment */
++		crash_base = memblock_find_in_range(0,
++				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
++		if (crash_base == 0) {
++			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
++				crash_size);
++			return;
++		}
++		memblock_reserve(crash_base, crash_size);
++
++	} else {
++		/* User specifies base address explicitly. */
++		if (!memblock_is_region_memory(crash_base, crash_size) ||
++			memblock_is_region_reserved(crash_base, crash_size)) {
++			pr_warn("crashkernel has wrong address or size\n");
++			return;
++		}
++
++		if (!IS_ALIGNED(crash_base, SZ_2M)) {
++			pr_warn("crashkernel base address is not 2MB aligned\n");
++			return;
++		}
++
++		memblock_reserve(crash_base, crash_size);
++	}
++
++	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
++		crash_size >> 20, crash_base >> 20);
++
++	crashk_res.start = crash_base;
++	crashk_res.end = crash_base + crash_size - 1;
++}
++#else
++static void __init reserve_crashkernel(void)
++{
++	;
++}
++#endif /* CONFIG_KEXEC_CORE */
++
+ /*
+  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+  * currently assumes that for memory starting above 4G, 32-bit devices will
+@@ -291,6 +351,8 @@ void __init arm64_memblock_init(void)
+ 	}
+ #endif
  
- 9:	eret
- ENDPROC(el1_sync)
++	reserve_crashkernel();
++
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
 -- 
 2.5.0
