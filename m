@@ -1,96 +1,58 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Thu, 23 Jun 2016 09:42:02 -0700
-Subject: [PATCH 1/3] Documentation: dtb: xgene: Add hwmon dts binding
- documentation
-In-Reply-To: <CAFHUOYwva_mry+gKKEsFaBw-L2ey-HHPetjDGqkr0hwcmw_zEw@mail.gmail.com>
-References: <1463415447-29903-1-git-send-email-hotran@apm.com>
- <1463415447-29903-2-git-send-email-hotran@apm.com>
- <20160523203044.GA17450@rob-hp-laptop>
- <CAFHUOYyYt8pE6sggezCR=TFcsimcjakbYmcWFtpLyQ3Et_gZaA@mail.gmail.com>
- <CABb+yY3uFrknEU65aBCw7G+dfnDdqGTZ_sctktx03GM9b86xaA@mail.gmail.com>
- <CAFHUOYwva_mry+gKKEsFaBw-L2ey-HHPetjDGqkr0hwcmw_zEw@mail.gmail.com>
-Message-ID: <CAFHUOYy7G85O0DiqNds2DJtbg_EZzRE0NjS=7V0gKSEsyQJ8Ow@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 23 Jun 2016 11:10:31 -0600
+Subject: [PATCH] coresight: add PM runtime calls to coresight_simple_func()
+In-Reply-To: <576C1038.502@arm.com>
+References: <1466185307-19539-1-git-send-email-mathieu.poirier@linaro.org>
+ <576C1038.502@arm.com>
+Message-ID: <CANLsYkxTh8TUmOT+-J0cu_cCSYVvXV0zXO_sVepfX8LYgMgEsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 11:05 AM, Hoan Tran <hotran@apm.com> wrote:
-> Hi Jassi,
+On 23 June 2016 at 10:37, Sudeep Holla <sudeep.holla@arm.com> wrote:
 >
-> Thanks for your reply !
 >
-> On Tue, Jun 7, 2016 at 10:20 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Tue, May 24, 2016 at 6:31 AM, Hoan Tran <hotran@apm.com> wrote:
->>> Hi Rob,
->>>
->>> Thanks for your review !
->>>
->>> On Mon, May 23, 2016 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
->>>>
->>>> On Mon, May 16, 2016 at 09:17:25AM -0700, Hoan Tran wrote:
->>>> > This patch adds the APM X-Gene hwmon device tree node documentation.
->>>> >
->>>> > Signed-off-by: Hoan Tran <hotran@apm.com>
->>>> > ---
->>>> >  .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt          | 14 ++++++++++++++
->>>> >  1 file changed, 14 insertions(+)
->>>> >  create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
->>>> >
->>>> > diff --git a/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
->>>> > new file mode 100644
->>>> > index 0000000..49a482e
->>>> > --- /dev/null
->>>> > +++ b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
->>>> > @@ -0,0 +1,14 @@
->>>> > +APM X-Gene hwmon driver
->>>> > +
->>>> > +Hwmon driver accesses sensors over the "SLIMpro" mailbox.
->>>>
->>>> DT bindings describe h/w, not driver data.
->>> How about this description: "APM X-Gene SOC sensors are accessed over
->>> the "SLIMpro" mailbox" ?
->>>> I'm not sure this belongs in
->>>> DT and perhaps the devices for the mailbox should be created by the
->>>> mailbox driver.
->>> I don't think the current mailbox supports it.
->>>>
->>>> > +
->>>> > +Required properties :
->>>> > + - compatible : should be "apm,xgene-slimpro-hwmon"
->>>> > + - mboxes : use the label reference for the mailbox as the first parameter.
->>>> > +         The second parameter is the channel number.
->>>>
->>>> When do you expect this to be different mailbox numbers?
->>> No, this number is not changed. This "mboxes" property is used and
->>> required by mailbox.c when hwmon driver requests a mailbox channel
->>>
->> I think that's inaccurate.
+> On 17/06/16 18:41, Mathieu Poirier wrote:
 >>
->> The h/w and the firmware combined is the "platform" from Linux POV.
->> Channels are physical resources provided by a mailbox controller.
->> Currently the firmware listens on Channel-7 but some future revision
->> might switch to, say, Channel-9.  Or say the same firmware on next
->> revision of h/w may have to switch to Channel-3 because it has only 4
->> channels. So I see the mailbox channel number as a hardware property
->> just like an IRQ (which very often change with SoC iterations).
->
-> Agree about that. I suppose this number is not changed. But as you
-> said, the mailbox channel number can be changed based on SoC or
-> Firmware. It would be better if this channel number is specified
-> inside a DT node.
->
-> Hi Rob, do you have any comments ?
->
-> Thanks
-> Hoan
->
+>> It is mandatory to enable a coresight block's power domain before
+>> trying to access management registers.  Otherwise the transaction
+>> simply stalls, leading to a system hang.
 >>
->> Cheers.
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>   drivers/hwtracing/coresight/coresight-priv.h | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-priv.h
+>> b/drivers/hwtracing/coresight/coresight-priv.h
+>> index ad975c58080d..b047241e7496 100644
+>> --- a/drivers/hwtracing/coresight/coresight-priv.h
+>> +++ b/drivers/hwtracing/coresight/coresight-priv.h
+>> @@ -16,6 +16,7 @@
+>>   #include <linux/bitops.h>
+>>   #include <linux/io.h>
+>>   #include <linux/coresight.h>
+>> +#include <linux/pm_runtime.h>
+>>
+>>   /*
+>>    * Coresight management registers (0xf00-0xfcc)
+>> @@ -42,8 +43,10 @@ static ssize_t name##_show(struct device *_dev,
+>> \
+>>                            struct device_attribute *attr, char *buf)    \
+>>   {                                                                     \
+>>         type *drvdata = dev_get_drvdata(_dev->parent);                  \
+>> +       pm_runtime_get_sync(_dev->parent);                              \
+>>         return scnprintf(buf, PAGE_SIZE, "0x%x\n",                      \
+>>                          readl_relaxed(drvdata->base + offset));        \
+>> +       pm_runtime_put_sync(_dev->parent);                              \
+>
+>
+> This is wrong, I just noticed when I was playing around this.
+> Perhaps you meant to do this before returning ? I wonder why compiler
+> doesn't throw any error.
 
-Hi Rob,
+Yes of course - I'll respin.
 
-Do you have any comments on Jassi's reply ?
-If not, I'll send another version which included the binding document
-and DT node.
-
-Thanks
-Hoan
+>
+> --
+> Regards,
+> Sudeep
