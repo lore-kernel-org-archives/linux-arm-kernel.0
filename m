@@ -1,71 +1,96 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 23 Jun 2016 08:13:30 +0200
-Subject: [RFC PATCH v2 03/15] arm64: mm: change IOMMU notifier action to
- attach DMA ops
-In-Reply-To: <20160621160637.GA31761@red-moon>
-References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
- <5763C27A.9030306@arm.com> <03c537e7-0acf-edca-d0e0-369490c828df@samsung.com>
- <20160621160637.GA31761@red-moon>
-Message-ID: <76c43b76-518c-a2d3-c200-d02aa9125e1d@samsung.com>
+From: amit.pundir@linaro.org (Amit Pundir)
+Date: Thu, 23 Jun 2016 11:44:41 +0530
+Subject: [PATCH] config: Add android config fragments
+In-Reply-To: <CAL_JsqJQsTX8SJY_inC9dFhNsujbzV+5kNdvHEvn-8+7u3XfyA@mail.gmail.com>
+References: <1465403951-32454-1-git-send-email-robh@kernel.org>
+ <CAMi1Hd3VDnK+yA6tXLFELCqnnrsPtPHnmov9O9MpJuBpfkcC=w@mail.gmail.com>
+ <CAL_JsqJQsTX8SJY_inC9dFhNsujbzV+5kNdvHEvn-8+7u3XfyA@mail.gmail.com>
+Message-ID: <CAMi1Hd3WnVFfxjNZO4N6=X8CEvGt=6D0fA6ybqZPMbMQkn32cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-
-On 2016-06-21 18:06, Lorenzo Pieralisi wrote:
-> Hi Marek,
->
-> On Tue, Jun 21, 2016 at 09:53:20AM +0200, Marek Szyprowski wrote:
->> Hi Robin,
->>
->>
->> On 2016-06-17 11:27, Robin Murphy wrote:
->>> Hi Lorenzo,
+On 23 June 2016 at 08:50, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Jun 22, 2016 at 2:53 AM, Amit Pundir <amit.pundir@linaro.org> wrote:
+>> On 8 June 2016 at 22:09, Rob Herring <robh@kernel.org> wrote:
+>>> Copy the config fragments from the AOSP common kernel tree. It is
+>>> becoming possible to run mainline kernels with Android, but the kernel
+>>> defconfigs don't work as-is and debugging missing config options is a
+>>> pain. Adding the config fragments into the kernel tree, makes
+>>> configuring a mainline kernel as simple as:
 >>>
->>> I think this patch makes sense even independent of the rest of the
->>> series, one nit inline notwithstanding.
+>>> make ARCH=arm multi_v7_defconfig android-base.config android-recommended.config
 >>>
->>> Marek; I'm curious as to whether this could make the workaround in
->>> 722ec35f7 obsolete as well, or are all the drivers also bound
->>> super-early in the setup you had there?
->> Yes, this will solve that problem too. I will also hide some possible
->> deferred probe issues, because the moment at which IOMMU is activated
->> will be postponed. The only drawback with this approach is the fact
->> that is drivers won't be allowed to do any dma-mapping operations on
->> devices, which they don't own. This should not be a big issue, but
->> this was the reason to setup IOMMU on device add instead of driver
->> bind.
->>
->> While at it, please make sure that the case of failed client driver
->> probe will be handled properly. IOMMU might do some operations while
->> setting up and if the client driver fails to probe (for whatever
->> reason, might be a deferred probe too), those operation has to be
->> undone. However the current code of the driver core won't call any
->> notifier (like BUS_NOTIFY_UNBOUND_DRIVER or whatever else) in such
->> case.
-> Isn't Andy's commit 14b6257a5f3d enough ? Is that what you had in
-> mind ?
+>>> Cc: Amit Pundir <amit.pundir@linaro.org>
+>>> Cc: John Stultz <john.stultz@linaro.org>
+>>> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>>> Cc: Rom Lemarchand <romlem@android.com>
+>>> Signed-off-by: Rob Herring <robh@kernel.org>
+>>> ---
+>>>  kernel/configs/android-base.config        | 161 ++++++++++++++++++++++++++++++
+>>>  kernel/configs/android-recommended.config | 121 ++++++++++++++++++++++
 >
->> Long time ago I used BUS_NOTIFY_BIND_DRIVER based approach for my
->> Exynos IOMMU patches and had to extend bus core with such patch:
->> https://patchwork.kernel.org/patch/4678181/ to properly cleanup
->> after failed client driver probe and avoid leaking resources. Please
->> read the discussion, because some changes were requested to it.
-> It looks like commit 14b6257a5f3d ("device core: add
-> BUS_NOTIFY_DRIVER_NOT_BOUND notification") does what you
-> are requesting, please let me know if that's enough.
+> [...]
+>
+>>> +CONFIG_STAGING=y
+>>> +CONFIG_SWITCH=y
+>>
+>> Switch Class support is dropped from kernel/common/android-4.4 sometime back.
+>
+> Okay. I'm also removing these options in v2 which don't exist in
+> upstream. Any comments on them?
+>
+> IP6_NF_TARGET_REJECT_SKERR
+> IP_NF_TARGET_REJECT_SKERR
+> NETFILTER_XT_MATCH_QTAGUID
+> NETFILTER_XT_MATCH_QUOTA2
+> NETFILTER_XT_MATCH_QUOTA2_LOG
+> PPPOLAC
+> PPPOPNS
+> RESOURCE_COUNTERS
+> SECURITY_PERF_EVENTS_RESTRICT
+> USB_CONFIGFS_F_MTP
+> USB_CONFIGFS_F_PTP
+> USB_CONFIGFS_F_ACC
+> USB_CONFIGFS_F_AUDIO_SRC
+> USB_CONFIGFS_UEVENT
+> USB_OTG_WAKELOCK
+> ANDROID_TIMED_GPIO
+> ARM_KERNMEM_PERMS
+> INPUT_KEYCHORD
+> INPUT_KEYRESET
+> TABLET_USB_WACOM
 
-Yes, that's exactly the change I needed that time. Nice to see that it
-finally landed in mainline.
+In my opinion we can keep the core configs (usb gadget, netfilter,
+input key et al.). They will not harm the resulting kernel config
+anyway. And we can definitely drop following configs from v2:
 
-> I will revert the changes in 722ec35f7 and fold them in the
-> new version along with Robin's suggestions.
+IP6_NF_TARGET_REJECT_SKERR
+IP_NF_TARGET_REJECT_SKERR
+RESOURCE_COUNTERS
+ANDROID_TIMED_GPIO
+ARM_KERNMEM_PERMS
+TABLET_USB_WACOM
 
-Okay.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Also please add the following options in v2, which are present in
+android-4.4 configs but missing from v1.
+
+In android-base.config:
+CONFIG_DM_VERITY_FEC
+CONFIG_INET_DIAG_DESTROY
+CONFIG_IP_MULTICAST
+CONFIG_IP_NF_NAT
+CONFIG_QUOTA
+
+In android-recommended.config:
+CONFIG_DRAGONRISE_FF
+CONFIG_TASKSTATS
+CONFIG_TASK_DELAY_ACCT
+CONFIG_TASK_IO_ACCOUNTING
+CONFIG_TASK_XACCT
+
+Regards,
+Amit Pundir
+
+>
+> Rob
