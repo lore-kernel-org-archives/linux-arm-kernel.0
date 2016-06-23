@@ -1,104 +1,145 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 23 Jun 2016 18:25:22 +0000
-Subject: [PATCH v2 1/3] irqchip: exynos_combiner: fixup reg access on be
-In-Reply-To: <20160622165703.7775-2-matthew@mattleach.net>
-References: <20160622165703.7775-1-matthew@mattleach.net>
- <20160622165703.7775-2-matthew@mattleach.net>
-Message-ID: <20160623182522.GI9922@io.lakedaemon.net>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 23 Jun 2016 12:34:10 -0600
+Subject: [PATCH V8 4/9] vfio: platform: add support for ACPI probe
+In-Reply-To: <1466437879-32182-5-git-send-email-okaya@codeaurora.org>
+References: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
+ <1466437879-32182-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160623123410.647b3be0@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt, Ben,
+On Mon, 20 Jun 2016 11:51:14 -0400
+Sinan Kaya <okaya@codeaurora.org> wrote:
 
-Both of you submitted similar patches for the same driver, same purpose.
-Since Ben's hit my inbox first, I'll take his.
-
-thx,
-
-Jason.
-
-On Wed, Jun 22, 2016 at 05:57:01PM +0100, Matthew Leach wrote:
-> Use the byte-order aware big endian accessors, allowing for kernels
-> running under big-endian.
+> The code is using the compatible DT string to associate a reset driver
+> with the actual device itself. The compatible string does not exist on
+> ACPI based systems. HID is the unique identifier for a device driver
+> instead.
 > 
-> Signed-off-by: Matthew Leach <matthew@mattleach.net>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Reviewed-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
 > ---
-> CC: Thomas Gleixner <tglx@linutronix.de>
-> CC: Jason Cooper <jason@lakedaemon.net>
-> CC: Marc Zyngier <marc.zyngier@arm.com>
-> CC: Kukjin Kim <kgene@kernel.org>
-> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> CC: linux-kernel at vger.kernel.org
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-samsung-soc at vger.kernel.org
-> ---
->  drivers/irqchip/exynos-combiner.c | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
+>  drivers/vfio/platform/vfio_platform_common.c  | 57 ++++++++++++++++++++++++---
+>  drivers/vfio/platform/vfio_platform_private.h |  1 +
+>  2 files changed, 53 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
-> index ead15be..97ae34c 100644
-> --- a/drivers/irqchip/exynos-combiner.c
-> +++ b/drivers/irqchip/exynos-combiner.c
-> @@ -55,14 +55,14 @@ static void combiner_mask_irq(struct irq_data *data)
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index 6be92c3..fbf4565 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -13,6 +13,7 @@
+>   */
+>  
+>  #include <linux/device.h>
+> +#include <linux/acpi.h>
+>  #include <linux/iommu.h>
+>  #include <linux/module.h>
+>  #include <linux/mutex.h>
+> @@ -49,6 +50,37 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+>  	return reset_fn;
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +static int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+> +				    struct device *dev)
+> +{
+> +	struct acpi_device *adev = ACPI_COMPANION(dev);
+> +
+> +	if (acpi_disabled)
+> +		return -ENODEV;
+> +
+> +	if (!adev) {
+> +		pr_err("VFIO: ACPI companion device not found for %s\n",
+> +			vdev->name);
+> +		return -ENODEV;
+> +	}
+> +
+> +	vdev->acpihid = acpi_device_hid(adev);
+> +	if (!vdev->acpihid) {
+> +		pr_err("VFIO: cannot find ACPI HID for %s\n",
+> +		       vdev->name);
+> +		return -ENODEV;
+> +	}
+
+Do you want to try to use different errnos here so you don't rely on
+the pr_err() calls for debugging?  I could imagine -EPERM, -ENODEV,
+-EINVAL respectively, but maybe there are better options.
+
+> +	return 0;
+> +}
+> +#else
+> +static inline int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+> +					   struct device *dev)
+> +{
+> +	return -ENOENT;
+> +}
+> +#endif
+> +
+>  static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
 >  {
->  	u32 mask = 1 << (data->hwirq % 32);
+>  	return vdev->of_reset ? true : false;
+> @@ -547,6 +579,20 @@ static const struct vfio_device_ops vfio_platform_ops = {
+>  	.mmap		= vfio_platform_mmap,
+>  };
 >  
-> -	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_CLEAR);
-> +	writel_relaxed(mask, combiner_base(data) + COMBINER_ENABLE_CLEAR);
->  }
->  
->  static void combiner_unmask_irq(struct irq_data *data)
+> +int vfio_platform_of_probe(struct vfio_platform_device *vdev,
+> +			   struct device *dev)
+> +{
+> +	int ret;
+> +
+> +	ret = device_property_read_string(dev, "compatible",
+> +					  &vdev->compat);
+> +	if (ret)
+> +		pr_err("VFIO: cannot retrieve compat for %s\n",
+> +			vdev->name);
+
+Previously there was only one probe method and I imagine this pr_err
+was useful.  Now we have multiple methods of probing for the device.
+Do we really want each one generating pr_err messages or just one at
+the end if none of our probes worked?
+
+> +
+> +	return ret;
+> +}
+> +
+>  int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>  			       struct device *dev)
 >  {
->  	u32 mask = 1 << (data->hwirq % 32);
+> @@ -556,11 +602,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>  	if (!vdev)
+>  		return -EINVAL;
 >  
-> -	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_SET);
-> +	writel_relaxed(mask, combiner_base(data) + COMBINER_ENABLE_SET);
->  }
+> -	ret = device_property_read_string(dev, "compatible", &vdev->compat);
+> -	if (ret) {
+> -		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
+> -		return -EINVAL;
+> -	}
+> +	ret = vfio_platform_acpi_probe(vdev, dev);
+> +	if (ret)
+> +		ret = vfio_platform_of_probe(vdev, dev);
+
+
+The only out way out of vfio_platform_acpi_probe() without hitting a
+pr_err is one of (!CONFIG_ACPI || acpi_disabled || success).  Doesn't
+that make for some unnecessary warning for a DT user?
+
+
+> +
+> +	if (ret)
+> +		return ret;
 >  
->  static void combiner_handle_cascade_irq(struct irq_desc *desc)
-> @@ -75,7 +75,7 @@ static void combiner_handle_cascade_irq(struct irq_desc *desc)
->  	chained_irq_enter(chip, desc);
+>  	vdev->device = dev;
 >  
->  	spin_lock(&irq_controller_lock);
-> -	status = __raw_readl(chip_data->base + COMBINER_INT_STATUS);
-> +	status = readl_relaxed(chip_data->base + COMBINER_INT_STATUS);
->  	spin_unlock(&irq_controller_lock);
->  	status &= chip_data->irq_mask;
+> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+> index 71ed7d1..ba9e4f8 100644
+> --- a/drivers/vfio/platform/vfio_platform_private.h
+> +++ b/drivers/vfio/platform/vfio_platform_private.h
+> @@ -58,6 +58,7 @@ struct vfio_platform_device {
+>  	struct mutex			igate;
+>  	struct module			*parent_module;
+>  	const char			*compat;
+> +	const char			*acpihid;
+>  	struct module			*reset_module;
+>  	struct device			*device;
 >  
-> @@ -135,7 +135,7 @@ static void __init combiner_init_one(struct combiner_chip_data *combiner_data,
->  	combiner_data->parent_irq = irq;
->  
->  	/* Disable all interrupts */
-> -	__raw_writel(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
-> +	writel_relaxed(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
->  }
->  
->  static int combiner_irq_domain_xlate(struct irq_domain *d,
-> @@ -218,7 +218,7 @@ static int combiner_suspend(void)
->  
->  	for (i = 0; i < max_nr; i++)
->  		combiner_data[i].pm_save =
-> -			__raw_readl(combiner_data[i].base + COMBINER_ENABLE_SET);
-> +			readl_relaxed(combiner_data[i].base + COMBINER_ENABLE_SET);
->  
->  	return 0;
->  }
-> @@ -235,10 +235,10 @@ static void combiner_resume(void)
->  	int i;
->  
->  	for (i = 0; i < max_nr; i++) {
-> -		__raw_writel(combiner_data[i].irq_mask,
-> -			     combiner_data[i].base + COMBINER_ENABLE_CLEAR);
-> -		__raw_writel(combiner_data[i].pm_save,
-> -			     combiner_data[i].base + COMBINER_ENABLE_SET);
-> +		writel_relaxed(combiner_data[i].irq_mask,
-> +			       combiner_data[i].base + COMBINER_ENABLE_CLEAR);
-> +		writel_relaxed(combiner_data[i].pm_save,
-> +			       combiner_data[i].base + COMBINER_ENABLE_SET);
->  	}
->  }
->  
-> -- 
-> 2.8.3
-> 
