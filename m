@@ -1,58 +1,76 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 23 Jun 2016 11:10:31 -0600
-Subject: [PATCH] coresight: add PM runtime calls to coresight_simple_func()
-In-Reply-To: <576C1038.502@arm.com>
-References: <1466185307-19539-1-git-send-email-mathieu.poirier@linaro.org>
- <576C1038.502@arm.com>
-Message-ID: <CANLsYkxTh8TUmOT+-J0cu_cCSYVvXV0zXO_sVepfX8LYgMgEsw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 Jun 2016 18:17:33 +0100
+Subject: [PATCH 1/6] arm64: alternatives: drop enable parameter from
+ _else and _endif macro
+In-Reply-To: <1462812590-4494-2-git-send-email-andre.przywara@arm.com>
+References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
+ <1462812590-4494-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160623171733.GR6521@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 June 2016 at 10:37, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 17/06/16 18:41, Mathieu Poirier wrote:
->>
->> It is mandatory to enable a coresight block's power domain before
->> trying to access management registers.  Otherwise the transaction
->> simply stalls, leading to a system hang.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>   drivers/hwtracing/coresight/coresight-priv.h | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-priv.h
->> b/drivers/hwtracing/coresight/coresight-priv.h
->> index ad975c58080d..b047241e7496 100644
->> --- a/drivers/hwtracing/coresight/coresight-priv.h
->> +++ b/drivers/hwtracing/coresight/coresight-priv.h
->> @@ -16,6 +16,7 @@
->>   #include <linux/bitops.h>
->>   #include <linux/io.h>
->>   #include <linux/coresight.h>
->> +#include <linux/pm_runtime.h>
->>
->>   /*
->>    * Coresight management registers (0xf00-0xfcc)
->> @@ -42,8 +43,10 @@ static ssize_t name##_show(struct device *_dev,
->> \
->>                            struct device_attribute *attr, char *buf)    \
->>   {                                                                     \
->>         type *drvdata = dev_get_drvdata(_dev->parent);                  \
->> +       pm_runtime_get_sync(_dev->parent);                              \
->>         return scnprintf(buf, PAGE_SIZE, "0x%x\n",                      \
->>                          readl_relaxed(drvdata->base + offset));        \
->> +       pm_runtime_put_sync(_dev->parent);                              \
->
->
-> This is wrong, I just noticed when I was playing around this.
-> Perhaps you meant to do this before returning ? I wonder why compiler
-> doesn't throw any error.
+On Mon, May 09, 2016 at 05:49:45PM +0100, Andre Przywara wrote:
+> Commit 77ee306c0aea9 ("arm64: alternatives: add enable parameter to
+> conditional asm macros") extended the alternative assembly macros.
+> Unfortunately this does not really work as one would expect, as the
+> enable parameter in fact correctly protects the alternative section
+> magic, but not the actual code sequences.
 
-Yes of course - I'll respin.
+I don't remember how we ended up with this code because it's not used
+anywhere.
 
->
-> --
-> Regards,
-> Sudeep
+> So if enable is false, we will have the original instruction(s) _and_
+> the alternative ones in the file, which is just wrong.
+> To make this work one would need to additionally protect the
+> alternative sequence with extra .if directives, which makes
+> the intention of the enable parameter rather pointless.
+> Instead users should directly guard the whole "_else; insn; _endif"
+> sequence with .if directives.
+> Add a comment describing this usage and drop the enable parameter from
+> the alternative_else and alternative_endif macros.
+> 
+> This reverts parts of commit 77ee306c0aea ("arm64: alternatives: add
+> enable parameter to conditional asm macros").
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm64/include/asm/alternative.h | 24 ++++++++++++++++++------
+>  1 file changed, 18 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+> index beccbde..502c9ef 100644
+> --- a/arch/arm64/include/asm/alternative.h
+> +++ b/arch/arm64/include/asm/alternative.h
+> @@ -94,6 +94,8 @@ void apply_alternatives(void *start, size_t length);
+>   *
+>   * The code that follows this macro will be assembled and linked as
+>   * normal. There are no restrictions on this code.
+> + * If you use the enable parameter, see the comments below for _else
+> + * and _endif.
+>   */
+>  .macro alternative_if_not cap, enable = 1
+>  	.if \enable
+> @@ -117,23 +119,33 @@ void apply_alternatives(void *start, size_t length);
+>   * 2. Not contain a branch target that is used outside of the
+>   *    alternative sequence it is defined in (branches into an
+>   *    alternative sequence are not fixed up).
+> + *
+> + * If you used the optional enable parameter in the opening
+> + * alternative_if_not macro above, please protect the whole _else
+> + * branch with an .if directive:
+> + *	alternative_if_not CAP_SOMETHING, condition
+> + *		orig_insn
+> + *	.if condition
+> + *	alternative_else
+> + *		repl_insn
+> + *	alternative_endif
+> + *	.endif
+
+I think the intention was to that in the !condition case, both
+alternatives are dropped. That includes the original code.
+
+I propose we revert the original commit, I don't think it is strictly
+needed for your patches (I'll try to fix them up and see how it goes).
+
+-- 
+Catalin
