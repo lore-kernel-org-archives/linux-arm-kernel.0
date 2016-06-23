@@ -1,32 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 23 Jun 2016 14:01:26 +0200
-Subject: [PATCH v2] ARM: dts: sun5i: q8-common: Enable USB-based WiFi
-In-Reply-To: <1466674155-3365-1-git-send-email-wens@csie.org>
-References: <1466674155-3365-1-git-send-email-wens@csie.org>
-Message-ID: <20160623120126.GB3785@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Jun 2016 14:08:33 +0200
+Subject: [PATCH] gpio: omap: make gpio numbering deterministical by using
+ of aliases
+In-Reply-To: <576BADFF.3000802@ti.com>
+References: <1465898604-16294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdaVRTj4jpGQp9nDKo8RAPDPUaApp4jAdBGRgd45bqo2zQ@mail.gmail.com>
+ <20160615072404.GB26768@pengutronix.de>
+ <CACRpkdYK1C5px+A_O1sF99KTPTob9qTQpipEaRLHnNx5=AokLg@mail.gmail.com>
+ <20160619010823.GC26875@pengutronix.de> <20160622161644.GD31817@leverpostej>
+ <CACRpkdazjgZX3cY2Q6AoQRmX14x-YU6SQ=Q38tZHt8xX6St24g@mail.gmail.com>
+ <576BADFF.3000802@ti.com>
+Message-ID: <CACRpkdaAcsikDgdbchKkx4i0Pk12qp7gTDUQJvj+kmCOtiRiqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 23, 2016 at 05:29:15PM +0800, Chen-Yu Tsai wrote:
-> The early A13 Q8 tablets all use a Realtek WiFi module connected to
-> USB1. The module is powered by AXP209's LDO3 at 3.3V.
-> 
-> Move the related settings from sun5i-a13-q8-tablet.dts to
-> sun5i-q8-common.dtsi, for all q8-based tablets.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Thu, Jun 23, 2016 at 11:38 AM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
 
-Applied, thanks!
-Maxime
+>> This solves the big problem with the current global numbering system
+>> in /sys/class/gpio/*
+>
+> Hm. May be i misunderstood samthing (and sry, if my following question
+> is dummy as I've not followed closely new GPIO ABI development), but..
+>
+> - from above description it seems that  global numbering system is not really
+> solved :( instead it's been moved one level up and now the same happens with
+> gpiocipX devices :(
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160623/810d4e65/attachment.sig>
+Yes that is true, but also the discovery mechanism is changed so it should
+not be a problem: by traversing /sys/bus/gpio/* you know from the topology
+information which GPIO chip is which. This is the same method that e.g. USB,
+IIO or disks use: you have to complement the device name with bus information
+from sysfs.
+
+/sys/class/gpio/* on the other hand has no such information: it is flat.
+
+But as I wrote in the other mail in response to Mark Rutland: if it is desired
+to have predictable numbering of the GPIO chips the exact same alias
+method can be used for that, and a patch utilizing aliases should fix also
+this for the character device usecase.
+
+My own position on these aliases is "eating popcorn", I'm happy with it,
+happy without it, the people who care need to argue for it with the DT
+maintainers.
+
+> Wouldn't it be reasonable to add possibility to create named/labeled
+> gpiocipX devices from the very beginning, like: "/dev/gpiocipX[_name|label], or "/dev/gpiocip[_name|label]", or ..
+>
+> Actually, struct gpio_chip has label field already.
+
+I don't think that would be nice. There is an ioctl() to get that information
+(amongst other stuff) from the device. Check tools/gpio/lsgpio.c
+
+> PS. From my experience, the worst case with dev numbering usually happens after
+> few insmod/rmmod (or sometimes after suspend/resume) iterations - ttyX ;..(.
+
+In the GPIO case I think the numbers will be reused as we're using
+<linux/idr.h> infrastructure (same method as IIO).
+
+Yours,
+Linus Walleij
