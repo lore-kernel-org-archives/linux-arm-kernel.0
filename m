@@ -1,264 +1,228 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 23 Jun 2016 17:54:47 +0000
-Subject: [PATCH v20 00/14] arm64 kexec kernel patches
-Message-ID: <cover.1466702804.git.geoff@infradead.org>
+Date: Thu, 23 Jun 2016 17:54:48 +0000
+Subject: [PATCH v20 10/14] arm64: kdump: add kdump support
+In-Reply-To: <cover.1466702804.git.geoff@infradead.org>
+References: <cover.1466702804.git.geoff@infradead.org>
+Message-ID: <43a9f5735dff7aceef7611412460d53930ebb8e3.1466702804.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the core support for kexec re-boot and kdump on ARM64.  This
-version of the series combines Takahiro's kdump patches with my kexec patches.
-Please consider all patches for inclusion.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Takahiro has done some extensive testing for this version with various
-configurations af endian, image format, memory options and layouts, etc.
+On crash dump kernel, all the information about primary kernel's system
+memory (core image) is available in elf core header.
+The primary kernel will set aside this header with reserve_elfcorehdr()
+at boot time and inform crash dump kernel of its location via a new
+device-tree property, "linux,elfcorehdr".
 
-To load a second stage kernel and execute a kexec re-boot or to work with kdump
-on ARM64 systems a series of patches to kexec-tools [2], which have not yet been
-merged upstream, are needed.  Please update to the latest if you have been using
-an older version.
+Please note that all other architectures use traditional "elfcorehdr="
+kernel parameter for this purpose.
 
-To examine vmcore (/proc/vmcore), you should use
-  - gdb v7.7 or later (only useful for non-KASLR kernel)
-  - crash utility master branch (coming v7.1.6 or later)
-    For crash KASLR/CONFIG_RANDOMIZE_BASE support see [3].
+Then crash dump kernel will access the primary kernel's memory with
+copy_oldmem_page(), which reads one page by ioremap'ing it since it does
+not reside in linear mapping on crash dump kernel.
 
-[1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
-[2]  https://git.kernel.org/cgit/linux/kernel/git/geoff/kexec-tools.git
-[3]  https://www.redhat.com/archives/crash-utility/2016-May/msg00078.html
+We also need our own elfcorehdr_read() here since the header is placed
+within crash dump kernel's usable memory.
 
-Changes for v20 (June 23, 2016, 25m):
-
-  o Rebase to Linux-4.7-rc4.
-  o Add missing break statement in kexec_list_flush.
-  o Add a check for a return value of parse_crashkernel().
-  o Fix a wrong check against misalignment of allocated crash kernel region.
-
-Changes for v19 (June 16, 2016, 25m):
-
-  o Rebase to Linux-4.7-rc3.
-  o Added more VMCOREINFO's (VA_BITS, PHYS_OFFSET).
-  o Remove some unneeded included files.
-  o Remove kmap() usage.
-  o Remove kexec_is_dtb() routine.
-  o Change #ifdef to IS_ENABLED(CONFIG_HOTPLUG_CPU).
-  o Fix kexec_list_flush() to flush all list entries.
-  o Use ENTRY(arm64_relocate_new_kernel).
-  o Remove unused segment start in arm64_relocate_new_kernel.
-
-Changes for v18 (June 9, 2016, 25m):
-
-  o Rebase to Linux-4.7-rc2.
-  o Change ret to br in __cpu_soft_restart().
-  o Add cpu_install_idmap() call and hyp checks to cpu_soft_restart().
-  o Don't return from HVC_SOFT_RESTART.
-
-Changes for v17 (June 9, 2016, 25m):
-
-  o Rebase to Linux-4.7-rc2.
-  o Change ret to br in __cpu_soft_restart().
-  o Add cpu_install_idmap() call to cpu_soft_restart().
-
-Changes for v17 (June 3, 2016, 25m):
-
-  o Rebase to Linux-4.7-rc1.
-  o Added one VMCOREINFO parameter to vmcore for crash utility.
-  o Added a check for CPUs stuck in kernel.
-  o Re-implemented cpu_soft_restart() to be executed only in hyp-stub.
-  o Added some kernel documentation about added device tree properties.
-  o Fixed a returned value of pstate in crash_setup_regs(). Now return
-    a faked pstate since we have no way to get the current pstate.
-
-Changes for v16 (Apr 14, 2016, 23m):
-
-  o Rebase to Linux-4.6-rc3.
-  o Don't try to explicitly enter EL2 at machine_kexec() when VHE in use
-  o Add unreachable() in case of ipi_cpu_crash_stop()
-  o Add more "#ifdef" to eliminate code unused when !CONFIG_KEXEC_CORE
-  o Fix a build error around ipi_cpu_crash_stop() when !CONFIG_HOTPLUG_CPU
-  o Revert "arm64: Add new hcall HVC_CALL_FUNC"
-  o Revert "Convert hcalls to use HVC immediate value"
-    (replaced by James' "hyp/kvm: Extend hyp-stub API to allow function calls
-     at EL2")
-
-  Modified by James:
-  o Add missing icache maintenance + isb to __kvm_hyp_reset()
-  o Rework kvm cpu hotplug for VHE
-
-  Added by James:
-  o arm64: head.S: el2_setup() to accept sctlr_el1 as an argument
-  o arm64: hyp/kvm: Extend hyp-stub API to allow function calls at EL2
-  o arm64: kvm: Move lr save/restore from do_el2_call into EL1
-  o arm64: kvm: Move the do_el2_call macro to a header file
-
-Changes for v15 (Mar 14, 2016, 22m):
-
-  o Rebase to Linux-4.5.
-  o Remove DEBUG conditional in 'Add pr_debug output'.
-
-Changes for v14 (Mar 4, 2016, 22m):
-
-  o Rebase to Linux-4.5-rc6.
-  o Rename setup_mm_for_reboot to cpu_install_idmap.
-  o kdump: leave non-boot cpus online at crash dump
-    As we don't have to make non-boot (crashed) cpus offline at crash dump,
-    this patch adds a variant of smp_send_stop().
-  o kdump: use a new device-tree property, "linux,elfcorehdr", instead of
-    traditional "elfcorehdr=" kernel parameter
-  o limit memory regions based on DT property, "usable-memory", instead of
-    "mem=" kernel parameter
-  o kdump: fix a build error when !CONFIG_KEXEC_CORE
-  o kvm: use generic kvm_call_hyp() interface instead of kvm_cpu_reset()
-  o kvm: initialize only a primary cpu at init_hyp_mode()
-
-Changes for v13 (Jan 15, 2016, 20m):
-
-  o Rebase to Linux-4.4.
-  o Remove align directive from cpu_reset.c.
-  o Use inline C wrapper for cpu_soft_restart.
-  o Revert the new image d-cache flush changes of v10.
-  o Add SCTLR cleanup patch.
-  o Change pr_devel to pr_debug.
-  o Call flush_icache_range() for reboot_code_buffer.
-  o Add .ltorg directive to arm64_relocate_new_kernel.
-  o Make new asm macro copy_page.
-  o Change cache maintenence from inner-shareable to non-shareable.
-  o Rename KEXEC_ARCH_ARM64 to KEXEC_ARCH_AARCH64.
-
-  o arm64: kvm: allows kvm cpu hotplug
-    - remove some garbage code from kvm_host.h
-  o arm64: kdump: reserve memory for crash dump kernel
-    - change CONFIG_KEXEC to CONFIG_KEXEC_CORE
-    - don't panic on crash kernel alloc failure
-      (thanks to Mark Salter, RH)
-  o arm64: kdump: implement machine_crash_shutdown()
-    - change "boot/non-boot cpu" to "crashing/non-crashing cpu"
-    - introduce is_in_crash_kexec() for readability
-    - re-introduce machine_kexec_mask_interrupts(), as arch/arm has,
-      to discard unexpected interrupts
-    - call crash_save_cpu() before making cpus offline to avoid a possible race
-      (thanks to Pratyush Anand/Mark Salter, RH)
-  o arm64: kdump: update a kernel doc
-    - clarify that we support "Image" format as well as vmlinux in kdump.txt
-  o arm64: kdump: relax BUG_ON() if more than one cpus are still active
-    - change a warning message at the failure of shooting down non-crahsing cpus
-
-Changes for v12 (Nov 24, 2015, 18m):
-
-  o No changes, rebase to Linux-4.4-rc2.
-
-Changes for v11 (Nov 6, 2015, 18m):
-
-  o Rebase to Linux-4.3.
-  o Move the new image d-cache flush from arm64_relocate_new_kernel to machine_kexec.
-  o Pass values to arm64_relocate_new_kernel in registers, not in global variables.
-  o Fixups to setting the sctlr_el1 and sctlr_el2 flags.
-
-Changes for v10 (Oct 18, 2015, 17m):
-
-  o Rebase to Linux-4.3-rc6.
-  o Move tcr_set_idmap_t0sz to assembler.h.
-  o Add back simplified cpu_reset routines.
-  o Combine kexec + kdump patches.
-
-Changes for v9 (Apr 7, 2015, 11m):
-
-  o Use new upstream flag IND_FLAGS.
-
-Changes for v8 (Mar 19, 2015, 10m):
-
-  o Rebase to Linux-4.0-rc4.
-  o Re-boot using purgatory only.
-
-Changes for v7 (Jan 16, 2015, 8m):
-
-  o Rebase to Linux-3.19-rc4.
-  o Change from ESR_EL2_ to ESR_ELx_.
-  o Remove work-arounds for EFI systems.
-  
-Changes for v6 (Dec 2, 2014, 7m):
-
-  o Rebase to Linux-3.18-rc2
-
-Changes for v5 (Nov 16, 2014, 6m):
-
-Changes for v4 (Oct 3, 2014, 5m):
-
-Changes for v3 (Sept 23, 2014, 4m):
-
-Changes for v2 (Sep 9, 2014, 4m):
-
-  o Rebase to Linux-3.17-rc4.
-  o Move macros from proc-macros.S to assembler.h.
-  o Convert hcalls to use ISS field.
-  o Add new hcall HVC_CALL_FUNC.
-  o Add EL2 switch to soft_restart.
-
-First submission v1 (May 13, 2014):
-
-  o Based on Linux-3.15-rc4.
-
--Geoff
-
-The following changes since commit 33688abb2802ff3a230bd2441f765477b94cc89e:
-
-  Linux 4.7-rc4 (2016-06-19 21:30:02 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/linux-kexec.git kexec-v20
-
-for you to fetch changes up to e212cd53fdf9d09923408eb906fe0228d22432a9:
-
-  Documentation: dt: usable-memory and elfcorehdr nodes for arm64 kexec (2016-06-23 10:01:38 -0700)
-
-----------------------------------------------------------------
-AKASHI Takahiro (7):
-      arm64: kdump: reserve memory for crash dump kernel
-      arm64: limit memory regions based on DT property, usable-memory
-      arm64: kdump: implement machine_crash_shutdown()
-      arm64: kdump: add kdump support
-      arm64: kdump: add VMCOREINFO's for user-space coredump tools
-      arm64: kdump: enable kdump in the arm64 defconfig
-      arm64: kdump: update a kernel doc
-
-Geoff Levand (4):
-      arm64: Add back cpu reset routines
-      arm64/kexec: Add core kexec support
-      arm64/kexec: Enable kexec in the arm64 defconfig
-      arm64/kexec: Add pr_debug output
-
-James Morse (3):
-      arm64: hibernate: Don't hibernate on systems with stuck CPUs
-      arm64: smp: Add function to determine if cpus are stuck in the kernel
-      Documentation: dt: usable-memory and elfcorehdr nodes for arm64 kexec
-
- Documentation/devicetree/bindings/chosen.txt |  28 +++
- Documentation/kdump/kdump.txt                |  15 +-
- arch/arm64/Kconfig                           |  21 ++
- arch/arm64/configs/defconfig                 |   2 +
- arch/arm64/include/asm/hardirq.h             |   2 +-
- arch/arm64/include/asm/kexec.h               |  87 ++++++++
- arch/arm64/include/asm/smp.h                 |  16 ++
- arch/arm64/include/asm/virt.h                |   5 +
- arch/arm64/kernel/Makefile                   |   3 +
- arch/arm64/kernel/cpu-reset.S                |  54 +++++
- arch/arm64/kernel/cpu-reset.h                |  34 ++++
- arch/arm64/kernel/crash_dump.c               |  71 +++++++
- arch/arm64/kernel/hibernate.c                |   6 +
- arch/arm64/kernel/hyp-stub.S                 |  10 +-
- arch/arm64/kernel/machine_kexec.c            | 288 +++++++++++++++++++++++++++
- arch/arm64/kernel/relocate_kernel.S          | 130 ++++++++++++
- arch/arm64/kernel/setup.c                    |   7 +-
- arch/arm64/kernel/smp.c                      |  79 ++++++++
- arch/arm64/mm/init.c                         | 154 ++++++++++++++
- include/uapi/linux/kexec.h                   |   1 +
- 20 files changed, 1009 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/include/asm/kexec.h
- create mode 100644 arch/arm64/kernel/cpu-reset.S
- create mode 100644 arch/arm64/kernel/cpu-reset.h
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/Kconfig             | 11 +++++++
+ arch/arm64/kernel/Makefile     |  1 +
+ arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/init.c           | 54 ++++++++++++++++++++++++++++++++
+ 4 files changed, 137 insertions(+)
  create mode 100644 arch/arm64/kernel/crash_dump.c
- create mode 100644 arch/arm64/kernel/machine_kexec.c
- create mode 100644 arch/arm64/kernel/relocate_kernel.S
 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 330786d..b5e0eb4 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -674,6 +674,17 @@ config KEXEC
+ 	  but it is independent of the system firmware.   And like a reboot
+ 	  you can start any kernel with it, not just Linux.
+ 
++config CRASH_DUMP
++	bool "Build kdump crash kernel"
++	help
++	  Generate crash dump after being started by kexec. This should
++	  be normally only set in special crash dump kernels which are
++	  loaded in the main kernel with kexec-tools into a specially
++	  reserved region and then later executed after a crash by
++	  kdump/kexec.
++
++	  For more details see Documentation/kdump/kdump.txt
++
+ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 7700c0c..c13d3eb 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -48,6 +48,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+ arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
++arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
+new file mode 100644
+index 0000000..2dc54d1
+--- /dev/null
++++ b/arch/arm64/kernel/crash_dump.c
+@@ -0,0 +1,71 @@
++/*
++ * Routines for doing kexec-based kdump
++ *
++ * Copyright (C) 2014 Linaro Limited
++ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/crash_dump.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <linux/memblock.h>
++#include <linux/uaccess.h>
++#include <asm/memory.h>
++
++/**
++ * copy_oldmem_page() - copy one page from old kernel memory
++ * @pfn: page frame number to be copied
++ * @buf: buffer where the copied page is placed
++ * @csize: number of bytes to copy
++ * @offset: offset in bytes into the page
++ * @userbuf: if set, @buf is in a user address space
++ *
++ * This function copies one page from old kernel memory into buffer pointed by
++ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
++ * copied or negative error in case of failure.
++ */
++ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
++			 size_t csize, unsigned long offset,
++			 int userbuf)
++{
++	void *vaddr;
++
++	if (!csize)
++		return 0;
++
++	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
++	if (!vaddr)
++		return -ENOMEM;
++
++	if (userbuf) {
++		if (copy_to_user(buf, vaddr + offset, csize)) {
++			iounmap(vaddr);
++			return -EFAULT;
++		}
++	} else {
++		memcpy(buf, vaddr + offset, csize);
++	}
++
++	iounmap(vaddr);
++
++	return csize;
++}
++
++/**
++ * elfcorehdr_read - read from ELF core header
++ * @buf: buffer where the data is placed
++ * @csize: number of bytes to read
++ * @ppos: address in the memory
++ *
++ * This function reads @count bytes from elf core header which exists
++ * on crash dump kernel's memory.
++ */
++ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
++{
++	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
++	return count;
++}
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 22e7bcf..5f8f43c 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -35,6 +35,7 @@
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
+ #include <linux/kexec.h>
++#include <linux/crash_dump.h>
+ 
+ #include <asm/boot.h>
+ #include <asm/fixmap.h>
+@@ -136,6 +137,57 @@ static void __init reserve_crashkernel(void)
+ }
+ #endif /* CONFIG_KEXEC_CORE */
+ 
++#ifdef CONFIG_CRASH_DUMP
++static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
++		const char *uname, int depth, void *data)
++{
++	const __be32 *reg;
++	int len;
++
++	if (depth != 1 || strcmp(uname, "chosen") != 0)
++		return 0;
++
++	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
++	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
++		return 1;
++
++	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
++	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
++
++	return 1;
++}
++
++/*
++ * reserve_elfcorehdr() - reserves memory for elf core header
++ *
++ * This function reserves elf core header given in "elfcorehdr=" kernel
++ * command line parameter. This region contains all the information about
++ * primary kernel's core image and is used by a dump capture kernel to
++ * access the system memory on primary kernel.
++ */
++static void __init reserve_elfcorehdr(void)
++{
++	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
++
++	if (!elfcorehdr_size)
++		return;
++
++	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
++		pr_warn("elfcorehdr is overlapped\n");
++		return;
++	}
++
++	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
++
++	pr_info("Reserving %lldKB of memory@0x%llx for elfcorehdr\n",
++		elfcorehdr_size >> 10, elfcorehdr_addr);
++}
++#else
++static void __init reserve_elfcorehdr(void)
++{
++	;
++}
++#endif /* CONFIG_CRASH_DUMP */
+ /*
+  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+  * currently assumes that for memory starting above 4G, 32-bit devices will
+@@ -391,6 +443,8 @@ void __init arm64_memblock_init(void)
+ 
+ 	reserve_crashkernel();
+ 
++	reserve_elfcorehdr();
++
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
 -- 
 2.5.0
