@@ -1,47 +1,79 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 24 Jun 2016 10:41:41 +0800
-Subject: [PATCH 01/14] ARM: dts: sun8i: Add SID node
-In-Reply-To: <20160623192104.18720-2-megous@megous.com>
+Date: Fri, 24 Jun 2016 10:46:11 +0800
+Subject: [PATCH 04/14] dt-bindings: document sun8i_ths
+In-Reply-To: <20160623192104.18720-5-megous@megous.com>
 References: <20160623192104.18720-1-megous@megous.com>
- <20160623192104.18720-2-megous@megous.com>
-Message-ID: <CAGb2v677+abNOEg3iEoiH25Ji9tq0JXkrGUVvLPAbXAPD3Su_g@mail.gmail.com>
+ <20160623192104.18720-5-megous@megous.com>
+Message-ID: <CAGb2v64f6DmagOJMbj9YiLU+umpZ2m8YzpQjA3RhoymjEf+5cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
-> From: Josef Gajdusek <atx@atx.name>
+> From: Ondrej Jirman <megous@megous.com>
 >
-> Add a node describing the Security ID memory to the Allwinner H3 .dtsi file.
+> This patch adds the binding documentation for the sun8i_ths driver
 >
-> Signed-off-by: Josef Gajdusek <atx@atx.name>
+> Signed-off-by: Ond?ej Jirman <megous@megous.com>
 > ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  .../devicetree/bindings/thermal/sun8i-ths.txt      | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/sun8i-ths.txt
 >
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index 4a4926b..172576d 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -389,6 +389,13 @@
->                         #size-cells = <0>;
->                 };
->
-> +               sid: eeprom at 01c14000 {
-> +                       compatible = "allwinner,sun4i-a10-sid";
+> diff --git a/Documentation/devicetree/bindings/thermal/sun8i-ths.txt b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
+> new file mode 100644
+> index 0000000..826cd57
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
+> @@ -0,0 +1,31 @@
+> +* sun8i THS
 
-This has been discussed before. The hardware is not compatible.
-The write control registers are at different offsets.
+An explanation of the acronym would be nice, both in the docs,
+and in the commit message.
 
+> +
+> +Required properties:
+> +- compatible : "allwinner,sun8i-h3-ths"
+> +- reg : Address range of the thermal registers and location of the calibration
+
+                                        *sensor*
+
+Also you only specify one address range in the example. The "location
+of the calibration value" is handled by the nvram-* properties. Please
+remove the description.
+
+> +        value
+> +- resets : Must contain an entry for each entry in reset-names.
+
+This, and clocks below, should probably read "must contain phandles
+to reset/clock controls matching the entries of the names".
+
+Regards
 ChenYu
 
-> +                       reg = <0x01c14000 0x400>;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +               };
+> +           see ../reset/reset.txt for details
+> +- reset-names : Must include the name "ahb"
+> +- clocks : Must contain an entry for each entry in clock-names.
+> +- clock-names : Must contain "ahb" for the bus gate and "ths" for the THS
+> +  clock
 > +
->                 usbphy: phy at 01c19400 {
->                         compatible = "allwinner,sun8i-h3-usb-phy";
->                         reg = <0x01c19400 0x2c>,
+> +Optional properties:
+> +- nvmem-cells : Must contain an entry for each entry in nvmem-cell-names
+> +- nvmem-cell-names : Must contain "calibration" for the cell containing the
+> +  temperature calibration cell, if available
+> +
+> +Example:
+> +ths: ths at 01c25000 {
+> +       #thermal-sensor-cells = <0>;
+> +       compatible = "allwinner,sun8i-h3-ths";
+> +       reg = <0x01c25000 0x400>;
+> +       interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+> +       resets = <&bus_rst 136>;
+> +       reset-names = "ahb";
+> +       clocks = <&bus_gates 72>, <&ths_clk>;
+> +       clock-names = "ahb", "ths";
+> +       nvmem-cells = <&ths_calibration>;
+> +       nvmem-cell-names = "calibration";
+> +};
 > --
 > 2.9.0
 >
