@@ -1,54 +1,37 @@
 From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Fri, 24 Jun 2016 10:13:28 +0800
-Subject: [PATCH v5 3/8] iommu/rockchip: Fix allocation of bases array in
- driver probe
+Date: Fri, 24 Jun 2016 10:13:27 +0800
+Subject: [PATCH v5 2/8] iommu/rockchip: Add map_sg callback for rk_iommu_ops
 In-Reply-To: <1466734413-7453-1-git-send-email-zhengsq@rock-chips.com>
 References: <1466734413-7453-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1466734413-7453-4-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <1466734413-7453-3-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In .probe(), devm_kzalloc() is called with size == 0 and works only
-by luck, due to internal behavior of the allocator and the fact
-that the proper allocation size is small. Let's use proper value for
-calculating the size.
+From: Simon Xue <xxm@rock-chips.com>
 
-Fixes: cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi slaves")
+The iommu_dma_alloc() in iommu/dma-iommu.c calls iommu_map_sg()
+that requires the callback iommu_ops .map_sg(). Adding the
+default_iommu_map_sg() to Rockchip IOMMU accordingly.
 
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Simon Xue <xxm@rock-chips.com>
+Signed-off-by: Shunqian Zheng <xxm@rock-chips.com>
 Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 ---
- drivers/iommu/rockchip-iommu.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/iommu/rockchip-iommu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 53fa0d9..8a5bac7 100644
+index 5a9659a..53fa0d9 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -1034,6 +1034,7 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct rk_iommu *iommu;
- 	struct resource *res;
-+	int num_res = pdev->num_resources;
- 	int i;
- 
- 	iommu = devm_kzalloc(dev, sizeof(*iommu), GFP_KERNEL);
-@@ -1043,12 +1044,13 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, iommu);
- 	iommu->dev = dev;
- 	iommu->num_mmu = 0;
--	iommu->bases = devm_kzalloc(dev, sizeof(*iommu->bases) * iommu->num_mmu,
-+
-+	iommu->bases = devm_kzalloc(dev, sizeof(*iommu->bases) * num_res,
- 				    GFP_KERNEL);
- 	if (!iommu->bases)
- 		return -ENOMEM;
- 
--	for (i = 0; i < pdev->num_resources; i++) {
-+	for (i = 0; i < num_res; i++) {
- 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
- 		if (!res)
- 			continue;
+@@ -1022,6 +1022,7 @@ static const struct iommu_ops rk_iommu_ops = {
+ 	.detach_dev = rk_iommu_detach_device,
+ 	.map = rk_iommu_map,
+ 	.unmap = rk_iommu_unmap,
++	.map_sg = default_iommu_map_sg,
+ 	.add_device = rk_iommu_add_device,
+ 	.remove_device = rk_iommu_remove_device,
+ 	.iova_to_phys = rk_iommu_iova_to_phys,
 -- 
 1.9.1
