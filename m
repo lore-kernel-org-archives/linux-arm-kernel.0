@@ -1,83 +1,136 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 24 Jun 2016 11:50:39 -0500
-Subject: [PATCH V2] hwrng: OMAP: Fix assumption that runtime_get_sync will
- always succeed
-Message-ID: <1466787040-26184-1-git-send-email-nm@ti.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 24 Jun 2016 10:53:29 -0600
+Subject: [PATCH 11/14] drivers: firmware: psci: Allow OS Initiated
+ suspend mode
+In-Reply-To: <CAGm_ybjO+jAN62fqFyVrw_+5LOnUumEfn8kxmDa+s5ap0Bqk9A@mail.gmail.com>
+References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
+ <1466624209-27432-12-git-send-email-lina.iyer@linaro.org>
+ <CAGm_ybjO+jAN62fqFyVrw_+5LOnUumEfn8kxmDa+s5ap0Bqk9A@mail.gmail.com>
+Message-ID: <20160624165329.GA1085@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pm_runtime_get_sync does return a error value that must be checked for
-error conditions, else, due to various reasons, the device maynot be
-enabled and the system will crash due to lack of clock to the hardware
-module.
+On Fri, Jun 24 2016 at 22:25 -0600, Vikas Sajjan wrote:
+>Hi Lina,
+>
+>On Thu, Jun 23, 2016 at 1:06 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> PSCI firmware v1.0 onwards may support 2 different modes for
+>> CPU_SUSPEND. Platform coordinated mode is the default and every firmware
+>> should support it. OS Initiated mode is optional for the firmware to
+>> implement and allow Linux to make an better decision on the state of
+>> the CPU cluster heirarchy.
+>>
+>> With the kernel capable of deciding the state for CPU cluster and
+>> coherency domains, the OS Initiated mode may now be used by the kernel,
+>> provided the firmware supports it. SET_SUSPEND_MODE is a PSCI function
+>> available on v1.0 onwards and can be used to set the mode in the
+>> firmware.
+>>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> [Ulf: Rebased on 4.7 rc1]
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/firmware/psci.c   | 22 +++++++++++++++++++++-
+>>  include/uapi/linux/psci.h |  5 +++++
+>>  2 files changed, 26 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>> index 03e0458..3920aba 100644
+>> --- a/drivers/firmware/psci.c
+>> +++ b/drivers/firmware/psci.c
+>> @@ -52,6 +52,7 @@
+>>   * require cooperation with a Trusted OS driver.
+>>   */
+>>  static int resident_cpu = -1;
+>> +static bool psci_has_osi_pd;
+>>
+>>  bool psci_tos_resident_on(int cpu)
+>>  {
+>> @@ -563,10 +564,29 @@ out_put_node:
+>>         return err;
+>>  }
+>>
+>> +static int __init psci_1_0_init(struct device_node *np)
+>> +{
+>> +       int ret;
+>> +
+>> +       ret = psci_0_2_init(np);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       /* Check if PSCI OSI mode is available */
+>> +       ret = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
+>> +       if (ret & PSCI_1_0_OS_INITIATED) {
+>> +               ret = psci_features(PSCI_1_0_FN_SET_SUSPEND_MODE);
+>> +               if (!ret)
+>> +                       psci_has_osi_pd = true;
+>
+>IMHO, its better to have this done in psci_init_cpu_suspend() itself
+>for 2 reasons
+>
+>a] psci_init_cpu_suspend() already calls
+>psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND])
+>b] by moving this in psci_init_cpu_suspend() we make this support
+>available even for ACPI platforms, since psci_acpi_init() calls
+>psci_probe() and this calls  psci_init_cpu_suspend() for
+>PSCI_VERSION_MAJOR(ver) >= 1
+>
+Hmmm.. I can do that.
 
-Before:
-12.562784] [00000000] *pgd=fe193835
-12.562792] Internal error: : 1406 [#1] SMP ARM
-[...]
-12.562864] CPU: 1 PID: 241 Comm: modprobe Not tainted 4.7.0-rc4-next-20160624 #2
-12.562867] Hardware name: Generic DRA74X (Flattened Device Tree)
-12.562872] task: ed51f140 ti: ed44c000 task.ti: ed44c000
-12.562886] PC is at omap4_rng_init+0x20/0x84 [omap_rng]
-12.562899] LR is at set_current_rng+0xc0/0x154 [rng_core]
-[...]
+Thanks,
+Lina
 
-After the proper checks:
-[   94.366705] omap_rng 48090000.rng: _od_fail_runtime_resume: FIXME:
-missing hwmod/omap_dev info
-[   94.375767] omap_rng 48090000.rng: Failed to runtime_get device -19
-[   94.382351] omap_rng 48090000.rng: initialization failed.
 
-Fixes: 665d92fa85b5 ("hwrng: OMAP: convert to use runtime PM")
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Changes in V2:
-	- Added runtime_put_noidle when get_sync fails to ensure proper refcounting
 
-V1: https://patchwork.kernel.org/patch/9197855/
-
-Patch based on: next-20160624
-Issue seen with next-20160624
-Full crash log: http://pastebin.ubuntu.com/17801376/
-
- drivers/char/hw_random/omap-rng.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
-index 8a1432e8bb80..01d4be2c354b 100644
---- a/drivers/char/hw_random/omap-rng.c
-+++ b/drivers/char/hw_random/omap-rng.c
-@@ -384,7 +384,12 @@ static int omap_rng_probe(struct platform_device *pdev)
- 	}
- 
- 	pm_runtime_enable(&pdev->dev);
--	pm_runtime_get_sync(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to runtime_get device: %d\n", ret);
-+		pm_runtime_put_noidle(&pdev->dev);
-+		goto err_ioremap;
-+	}
- 
- 	ret = (dev->of_node) ? of_get_omap_rng_device_details(priv, pdev) :
- 				get_omap_rng_device_details(priv);
-@@ -435,8 +440,15 @@ static int __maybe_unused omap_rng_suspend(struct device *dev)
- static int __maybe_unused omap_rng_resume(struct device *dev)
- {
- 	struct omap_rng_dev *priv = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret) {
-+		dev_err(dev, "Failed to runtime_get device: %d\n", ret);
-+		pm_runtime_put_noidle(dev);
-+		return ret;
-+	}
- 
--	pm_runtime_get_sync(dev);
- 	priv->pdata->init(priv);
- 
- 	return 0;
--- 
-2.9.0
+>I even posted a patch [1] yesterday, without being aware of your
+>patchset for the same.
+>
+>[1] http://www.spinics.net/lists/arm-kernel/msg513682.html
+>
+>
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>>  static const struct of_device_id psci_of_match[] __initconst = {
+>>         { .compatible = "arm,psci",     .data = psci_0_1_init},
+>>         { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
+>> -       { .compatible = "arm,psci-1.0", .data = psci_0_2_init},
+>> +       { .compatible = "arm,psci-1.0", .data = psci_1_0_init},
+>>         {},
+>>  };
+>>
+>> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+>> index 3d7a0fc..7dd778e 100644
+>> --- a/include/uapi/linux/psci.h
+>> +++ b/include/uapi/linux/psci.h
+>> @@ -48,6 +48,7 @@
+>>
+>>  #define PSCI_1_0_FN_PSCI_FEATURES              PSCI_0_2_FN(10)
+>>  #define PSCI_1_0_FN_SYSTEM_SUSPEND             PSCI_0_2_FN(14)
+>> +#define PSCI_1_0_FN_SET_SUSPEND_MODE           PSCI_0_2_FN(15)
+>>
+>>  #define PSCI_1_0_FN64_SYSTEM_SUSPEND           PSCI_0_2_FN64(14)
+>>
+>> @@ -93,6 +94,10 @@
+>>  #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK  \
+>>                         (0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
+>>
+>> +#define PSCI_1_0_OS_INITIATED                  BIT(0)
+>> +#define PSCI_1_0_SUSPEND_MODE_PC               0
+>> +#define PSCI_1_0_SUSPEND_MODE_OSI              1
+>> +
+>>  /* PSCI return values (inclusive of all PSCI versions) */
+>>  #define PSCI_RET_SUCCESS                       0
+>>  #define PSCI_RET_NOT_SUPPORTED                 -1
+>> --
+>> 2.7.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
