@@ -1,140 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 24 Jun 2016 16:19:34 +0200
-Subject: [PATCH v1 19/25] PCI: rcar Gen2: Request host bridge window
- resources
-In-Reply-To: <20160621164947.GA7603@localhost>
-References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <20160606230706.20936.13086.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <CAMuHMdVgLfTD-BjRZ+gVKgYE8dkDZzQ6DnYtkUs+jVPthJsEdQ@mail.gmail.com>
- <20160621142623.GA29966@localhost> <20160621154100.GA4782@cogentembedded.com>
- <20160621164947.GA7603@localhost>
-Message-ID: <CAMuHMdVuwniXPZszPH8jTd8x0j+f__JjT6yY04RA_gw87sQidg@mail.gmail.com>
+From: chris@chris-wilson.co.uk (Chris Wilson)
+Date: Fri, 24 Jun 2016 15:36:19 +0100
+Subject: [PATCH 2/5] drm/sun4i: Remove redundant call to
+ drm_connector_unregister_all()
+In-Reply-To: <1466778982-6974-1-git-send-email-chris@chris-wilson.co.uk>
+References: <1466778982-6974-1-git-send-email-chris@chris-wilson.co.uk>
+Message-ID: <1466778982-6974-2-git-send-email-chris@chris-wilson.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+drm_connector_unregister_all() is automatically called by
+drm_dev_unregister() and so the manual call can be dropped.
 
-On Tue, Jun 21, 2016 at 6:49 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Tue, Jun 21, 2016 at 06:41:00PM +0300, Valentine Barshak wrote:
->> On Tue, Jun 21, 2016 at 09:26:23AM -0500, Bjorn Helgaas wrote:
->> > On Tue, Jun 21, 2016 at 12:41:31PM +0200, Geert Uytterhoeven wrote:
->> > > On Tue, Jun 7, 2016 at 1:07 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->> > > > Request host bridge window resources so they appear in ioport_resource and
->> > > > iomem_resource and are reflected in /proc/ioports and /proc/iomem.
->> > > >
->> > > > Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
->> > > > ---
->> > > >  drivers/pci/host/pci-rcar-gen2.c |    4 ++++
->> > > >  1 file changed, 4 insertions(+)
->> > > >
->> > > > diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
->> > > > index 9980a4b..617a6b2 100644
->> > > > --- a/drivers/pci/host/pci-rcar-gen2.c
->> > > > +++ b/drivers/pci/host/pci-rcar-gen2.c
->> > > > @@ -194,6 +194,7 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
->> > > >         struct rcar_pci_priv *priv = sys->private_data;
->> > > >         void __iomem *reg = priv->reg;
->> > > >         u32 val;
->> > > > +       int ret;
->> > > >
->> > > >         pm_runtime_enable(priv->dev);
->> > > >         pm_runtime_get_sync(priv->dev);
->> > > > @@ -275,6 +276,9 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
->> > > >         /* Add PCI resources */
->> > > >         pci_add_resource(&sys->resources, &priv->io_res);
->> > > >         pci_add_resource(&sys->resources, &priv->mem_res);
->> > > > +       ret = devm_request_pci_bus_resources(priv->dev, &sys->resources);
->> > > > +       if (ret < 0)
->> > > > +               return ret;
->> > > >
->> > > >         /* Setup bus number based on platform device id / of bus-range */
->> > > >         sys->busnr = priv->busnr;
->> > >
->> > > This patch (commit 1bd019707b7c9249d34c5d348f1ef75eb4d83e89 in pci/next)
->> > > broke PCI on r8a7791/koelsch. Dmesg differences are:
->> > >
->> > >  pci-rcar-gen2 ee090000.pci: PCI: bus0 revision 11
->> > > -pci-rcar-gen2 ee090000.pci: PCI host bridge to bus 0000:00
->> > > -pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
->> > > -pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
->> >
->> > This is probably a result of this code in drivers/pci/host/pci-rcar-gen2.c:
->> >
->> >         /*
->> >          * The controller does not support/use port I/O,
->> >          * so setup a dummy port I/O region here.
->> >          */
->> >         priv->io_res.start = priv->mem_res.start;
->> >         priv->io_res.end = priv->mem_res.end;
->> >         priv->io_res.flags = IORESOURCE_IO;
->> >
->> > We try to avoid adding dummy regions like this, but maybe we missed
->> > this one.  I haven't found any email discussion about it yet, so I
->> > don't know what the reason for this one is.  Valentine, do you
->> > remember?
->>
->> I do not, but I think I've found something in my mailbox.
->> Below is the quote from the original conversation with:
->> (Re: [PATCH] pci: Add R-Car Gen2 internal PCI support)
->>
->> [quote starts]
->>  >>+    priv->mem_res = *mem_res;
->>  >>+    /*
->>  >>+     * The controller does not support/use port I/O,
->>  >>+     * so setup a dummy port I/O region here.
->>  >>+     */
->>  >>+    priv->io_res.start = priv->mem_res.start;
->>  >>+    priv->io_res.end = priv->mem_res.end;
->>  >>+    priv->io_res.flags = IORESOURCE_IO;
->>  >>
->>  > I don't understand this.  There's no requirement (at least as far as the
->>  > PCI core is concerned) to supply an I/O aperture at all, and I think it
->>  > would be better if you didn't.
->>  >
->>  > Oh, I see ... maybe pcibios_init_resources() forces you to have an
->>  > I/O resource to avoid having it give you a default one?  And I
->>  > suppose that since you have several host bridges, these dummy I/O
->>  > regions have to be distinct.  Ugh.  Well, I guess this is something
->>  > you'd have to fix here or in the ARM code, it's up to you what to do.
->>
->>  Exactly. This is to avoid assigning default I/O resources.
->> [quote ends]
->
-> Oh, right, now I remember.  Thanks for digging that out.
->
-> I propose the patches below to remove the requirement for having an
-> I/O space.  Any chance one of you could test them?
+Signed-off-by: Chris Wilson <chris@chris-wilson.co.uk>
+Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: David Airlie <airlied@linux.ie>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Thanks!
-PCI seems to be working again on r8a7791/koelsch using today's pci/next,
-which includes these patches. Lspci shows the USB controllers again.
-
-/proc/iomem gained a few entries:
-
- ec700000-ec70ffff : /dma-controller at ec700000
- ec720000-ec72ffff : /dma-controller at ec720000
- ec740000-ec7401ff : audmapp
-+ee080000-ee0810ff : /pci at ee090000
-+  ee080000-ee080fff : 0000:00:01.0
-+  ee081000-ee0810ff : 0000:00:02.0
- ee090000-ee090bff : /pci at ee090000
-+ee0c0000-ee0c10ff : /pci at ee0d0000
-+  ee0c0000-ee0c0fff : 0001:01:01.0
-+  ee0c1000-ee0c10ff : 0001:01:02.0
- ee0d0000-ee0d0bff : /pci at ee0d0000
- ee300000-ee301fff : /sata at ee300000
- ee700000-ee7003ff : /ethernet at ee700000
-
-Hence
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 5b89940edcb1..b22acc68d3b2 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -185,7 +185,6 @@ static void sun4i_drv_unbind(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+ 
+-	drm_connector_unregister_all(drm);
+ 	drm_dev_unregister(drm);
+ 	drm_kms_helper_poll_fini(drm);
+ 	sun4i_framebuffer_free(drm);
+-- 
+2.8.1
