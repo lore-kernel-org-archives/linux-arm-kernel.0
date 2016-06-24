@@ -1,104 +1,136 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Jun 2016 11:41:30 +0200
-Subject: [PATCH 5/7] ARM: ux500: call ux500_setup_id later
+Date: Fri, 24 Jun 2016 11:41:28 +0200
+Subject: [PATCH 3/7] ARM: ux500: remove cpu_is_u* helpers
 In-Reply-To: <20160624094132.1852086-1-arnd@arndb.de>
 References: <20160624094132.1852086-1-arnd@arndb.de>
-Message-ID: <20160624094132.1852086-6-arnd@arndb.de>
+Message-ID: <20160624094132.1852086-4-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ux500_setup_id is currently called from u8500_map_io(), which is
-really early, but nothing relies on the ID any more, other than
-a printk message that is not really all that important to
-have early during boot.
-
-If we move the call to ux500_setup_id() into ux500_soc_device_init(),
-that file becomes usuable almost entirely standalone, and we can kill
-off the u8500_map_io() callback as it just does the default
-debug_ll_io_init() now.
+These functions are all unused now and can be removed.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |  8 --------
- arch/arm/mach-ux500/id.c         | 23 ++++++++++-------------
- 2 files changed, 10 insertions(+), 21 deletions(-)
+ arch/arm/mach-ux500/id.h | 107 -----------------------------------------------
+ 1 file changed, 107 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index e7eba473d3bd..881cafbc4d97 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -27,13 +27,6 @@
- 
- #include "board-mop500.h"
- #include "db8500-regs.h"
--#include "id.h"
--
--static void __init u8500_map_io(void)
--{
--	debug_ll_io_init();
--	ux500_setup_id();
--}
- 
- /*
-  * The PMU IRQ lines of two cores are wired together into a single interrupt.
-@@ -117,7 +110,6 @@ static const char * stericsson_dt_platform_compat[] = {
- DT_MACHINE_START(U8500_DT, "ST-Ericsson Ux5x0 platform (Device Tree Support)")
- 	.l2c_aux_val    = 0,
- 	.l2c_aux_mask	= ~0,
--	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	.init_machine	= u8500_init_machine,
- 	.dt_compat      = stericsson_dt_platform_compat,
-diff --git a/arch/arm/mach-ux500/id.c b/arch/arm/mach-ux500/id.c
-index 17f80ef44c58..983004d0fef2 100644
---- a/arch/arm/mach-ux500/id.c
-+++ b/arch/arm/mach-ux500/id.c
-@@ -37,21 +37,16 @@ static struct dbx500_asic_id dbx500_id;
- 
- static unsigned int __init ux500_read_asicid(phys_addr_t addr)
- {
--	phys_addr_t base = addr & ~0xfff;
--	struct map_desc desc = {
--		.virtual	= (unsigned long)UX500_VIRT_ROM,
--		.pfn		= __phys_to_pfn(base),
--		.length		= SZ_16K,
--		.type		= MT_DEVICE,
--	};
-+	void __iomem *virt = ioremap(addr, 4);
-+	unsigned int asicid;
- 
--	iotable_init(&desc, 1);
-+	if (!virt)
-+		return 0;
- 
--	/* As in devicemaps_init() */
--	local_flush_tlb_all();
--	flush_cache_all();
-+	asicid = readl(virt);
-+	iounmap(virt);
- 
--	return readl(UX500_VIRT_ROM + (addr & 0xfff));
-+	return asicid;
+diff --git a/arch/arm/mach-ux500/id.h b/arch/arm/mach-ux500/id.h
+index bcc58a8cccbc..929f78ecf3df 100644
+--- a/arch/arm/mach-ux500/id.h
++++ b/arch/arm/mach-ux500/id.h
+@@ -32,113 +32,6 @@ static inline unsigned int __attribute_const__ dbx500_revision(void)
+ 	return dbx500_id.revision;
  }
  
- static void ux500_print_soc_info(unsigned int asicid)
-@@ -86,7 +81,7 @@ static unsigned int partnumber(unsigned int asicid)
-  * DB9540	0x413fc090	0xFFFFDBF4		0x009540xx
-  */
+-/*
+- * SOCs
+- */
+-
+-static inline bool __attribute_const__ cpu_is_u8500(void)
+-{
+-	return dbx500_partnumber() == 0x8500;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8520(void)
+-{
+-	return dbx500_partnumber() == 0x8520;
+-}
+-
+-static inline bool cpu_is_u8500_family(void)
+-{
+-	return cpu_is_u8500() || cpu_is_u8520();
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u9540(void)
+-{
+-	return dbx500_partnumber() == 0x9540;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8540(void)
+-{
+-	return dbx500_partnumber() == 0x8540;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8580(void)
+-{
+-	return dbx500_partnumber() == 0x8580;
+-}
+-
+-static inline bool cpu_is_ux540_family(void)
+-{
+-	return cpu_is_u9540() || cpu_is_u8540() || cpu_is_u8580();
+-}
+-
+-/*
+- * 8500 revisions
+- */
+-
+-static inline bool __attribute_const__ cpu_is_u8500ed(void)
+-{
+-	return cpu_is_u8500() && dbx500_revision() == 0x00;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8500v1(void)
+-{
+-	return cpu_is_u8500() && (dbx500_revision() & 0xf0) == 0xA0;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8500v10(void)
+-{
+-	return cpu_is_u8500() && dbx500_revision() == 0xA0;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8500v11(void)
+-{
+-	return cpu_is_u8500() && dbx500_revision() == 0xA1;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8500v2(void)
+-{
+-	return cpu_is_u8500() && ((dbx500_revision() & 0xf0) == 0xB0);
+-}
+-
+-static inline bool cpu_is_u8500v20(void)
+-{
+-	return cpu_is_u8500() && (dbx500_revision() == 0xB0);
+-}
+-
+-static inline bool cpu_is_u8500v21(void)
+-{
+-	return cpu_is_u8500() && (dbx500_revision() == 0xB1);
+-}
+-
+-static inline bool cpu_is_u8500v22(void)
+-{
+-	return cpu_is_u8500() && (dbx500_revision() == 0xB2);
+-}
+-
+-static inline bool cpu_is_u8500v20_or_later(void)
+-{
+-	return (cpu_is_u8500() && !cpu_is_u8500v10() && !cpu_is_u8500v11());
+-}
+-
+-/*
+- * 8540 revisions
+- */
+-
+-static inline bool __attribute_const__ cpu_is_u8540v10(void)
+-{
+-	return cpu_is_u8540() && dbx500_revision() == 0xA0;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8580v10(void)
+-{
+-	return cpu_is_u8580() && dbx500_revision() == 0xA0;
+-}
+-
+-static inline bool ux500_is_svp(void)
+-{
+-	return false;
+-}
+-
+ #define ux500_unknown_soc()	BUG()
  
--void __init ux500_setup_id(void)
-+static void __init ux500_setup_id(void)
- {
- 	unsigned int cpuid = read_cpuid_id();
- 	unsigned int asicid = 0;
-@@ -197,6 +192,8 @@ struct device * __init ux500_soc_device_init(void)
- 	struct soc_device *soc_dev;
- 	struct soc_device_attribute *soc_dev_attr;
- 
-+	ux500_setup_id();
-+
- 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
- 	if (!soc_dev_attr)
- 		return ERR_PTR(-ENOMEM);
+ #endif
 -- 
 2.9.0
