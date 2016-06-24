@@ -1,82 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 24 Jun 2016 09:44:30 +0200
-Subject: [PATCH v4 07/13] ARM: shmobile: apmu: Add APMU DT support via
- Enable method
-In-Reply-To: <b524c939-d546-65b8-72da-359136c2aebe@cogentembedded.com>
-References: <1466072862-28030-1-git-send-email-geert+renesas@glider.be>
- <1466072862-28030-8-git-send-email-geert+renesas@glider.be>
- <b524c939-d546-65b8-72da-359136c2aebe@cogentembedded.com>
-Message-ID: <CAMuHMdWrwnNxfAh-AHA+Q5AfgYy89nmj-yVSj-E4jMx5cHYi3g@mail.gmail.com>
+From: Thomas.Betker@rohde-schwarz.com (Thomas.Betker at rohde-schwarz.com)
+Date: Fri, 24 Jun 2016 09:58:36 +0200
+Subject: ARM: i.MX6: KSZ9031 fixup questions
+Message-ID: <OFA5811F46.A3BB50D2-ONC1257FDC.0028F664-C1257FDC.002BD17F@rohde-schwarz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hello Sascha,
 
-On Tue, Jun 21, 2016 at 7:49 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 06/16/2016 01:27 PM, Geert Uytterhoeven wrote:
->> From: Magnus Damm <damm+renesas@opensource.se>
->> Allow DT configuration of the APMU hardware in the case when the APMU is
->> pointed out in the DTB via the enable-method. The ability to configure
->> the APMU via C code is still kept intact to prevent DTB breakage for older
->> SoCs that do not rely on the enable-method for SMP support.
->>
->> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
->> [geert: Fix CONFIG_SMP=n build]
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> [...]
->
->> diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c
->> b/arch/arm/mach-shmobile/platsmp-apmu.c
->> index c1558ef0c590dd3e..0c6bb458b7a45128 100644
->> --- a/arch/arm/mach-shmobile/platsmp-apmu.c
->> +++ b/arch/arm/mach-shmobile/platsmp-apmu.c
->
-> [...]
->>
->> +static int shmobile_smp_apmu_boot_secondary_md21(unsigned int cpu,
->> +                                                struct task_struct *idle)
->> +{
->> +       /* Error out when hardware debug mode is enabled */
->> +       if (rcar_gen2_read_mode_pins() & BIT(21)) {
->> +               pr_warn("Unable to boot CPU%u when MD21 is set\n", cpu);
->> +               return -ENOTSUPP;
->> +       }
->> +
->> +       return shmobile_smp_apmu_boot_secondary(cpu, idle);
->> +}
->> +
->> +static struct smp_operations apmu_smp_ops __initdata = {
->> +       .smp_prepare_cpus       = shmobile_smp_apmu_prepare_cpus_dt,
->> +       .smp_boot_secondary     = shmobile_smp_apmu_boot_secondary_md21,
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +       .cpu_can_disable        = shmobile_smp_cpu_can_disable,
->> +       .cpu_die                = shmobile_smp_apmu_cpu_die,
->> +       .cpu_kill               = shmobile_smp_apmu_cpu_kill,
->>  #endif
->
->
->    For the record: it turned out that I tested my non-DT SMP on
-> R8A7792/Blanche with MD21 bit set. And I've just made sure it still works
-> with this implementation (by commenting out the check above.
->    Also, I was going to try the workaround for MD21 I saw in the BSP tree --
+I am trying to understand the ksz9031rn_phy_fixup() function in 
+arch/arm/mach-imx/mach-imx6q.c. My background is that we have a custom 
+board with i.MX6Q and KSZ9031RNX (RGMII).
 
-Which workaround? I only saw the BSP removed the check, but it didn't mention
-why (because E2 and V2H don't need it, or...?).
+The basic idea seems to be that i.MX6Q has to set up the KSZ9031 pad skews 
+because ENET does not have an integrated TX clock delay (TsetupT), and you 
+don't want a trace delay on the PCB; i.e., all the RGMII signal lines are 
+about the same length.
 
-> perhaps it'll help get R8A7791 working w/MD21 set...
+Your register settings add up to the following deltas:
+* TDn to TXC: 0.96 + 0.00 = 0.96 ns
+* TX_CTL to TXC: 0.96 + 0.42 = 1.38 ns
+* RDn, RX_CTL to RXC: 0.96 + 0.42 = 1.38 ns
 
-Does your Porter work with the other MD21 setting (and the check commented
-out, of coutse)?
+(a) Why is there a delay betweem TX_CTL and TDn? I would assume that they 
+should be in sync, same as RDn and RX_CTL. Is this something specific to 
+your boards?
 
-Gr{oetje,eeting}s,
+(b) On the TX side, i.MX6Q has TskewT = -0.1...0.9 ns (according to the 
+i.MX6Q data sheet), so the total data-to-clock delay at the PHY is 
+0.86...1.86 ns. This may violate the RGMII spec, which requires 1...2.6 ns 
+(1.8 ns typ). Is there a reason for this?
 
-                        Geert
+Using a TXDn-to-TXC skew of 1.38 ns would result in a total of 1.28..2.28 
+ns, which is even nicely centered at 1.78 ns.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+(c) On the RX side, KSZ9031 adds an integrated clock delay of 1.2 ns, so 
+the total data-to-clock delay is 2.58 ns. This is just barely within the 
+requirements from the i.MX6Q data sheet (1...2.6 ns, same as RGMII). Is 
+there a reason for this?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+My guess is that the settings were copied from KSZ9021, which does not 
+have an integrated RX clock delay. Actually, we don't need any additional 
+skew with KSZ9031 -- 1.2 ns is fine. If at all, I would use just 0.6 ns, 
+to get a total of 1.8 ns.
+
+Note that the current settings do work, since both sides are fairly 
+tolerant; all that is needed is TXDn-to-TXC skew >= 0.06 ns, RXDn-to-RXC 
+skew >= -1.14 ns (I ran some tests). Still, I would like to understand 
+where the settings came from. Is there something I have overlooked?
+
+Best regards,
+Thomas Betker
