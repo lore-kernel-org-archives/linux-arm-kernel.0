@@ -1,41 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Jun 2016 16:34:24 +0100
-Subject: [PATCH 4/6] arm64: errata: Calling enable functions for CPU
- errata too
-In-Reply-To: <1462812590-4494-5-git-send-email-andre.przywara@arm.com>
-References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
- <1462812590-4494-5-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160624153423.GF22608@e104818-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 24 Jun 2016 10:41:18 -0500
+Subject: [PATCH 3/3] dt-bindings: Document the STM32 USB OTG DWC2 core
+ binding
+In-Reply-To: <1466562349-5043-3-git-send-email-bruherrera@gmail.com>
+References: <1466562349-5043-1-git-send-email-bruherrera@gmail.com>
+ <1466562349-5043-3-git-send-email-bruherrera@gmail.com>
+Message-ID: <20160624154118.GA4598@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2016 at 05:49:48PM +0100, Andre Przywara wrote:
-> Currently we call the (optional) enable function for CPU _features_
-> only. As CPU _errata_ descriptions share the same data structure and
-> having an enable function is useful for errata as well (for instance
-> to set bits in SCTLR), lets call it when enumerating erratas too.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+On Tue, Jun 21, 2016 at 11:25:49PM -0300, Bruno Herrera wrote:
+> Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
 > ---
->  arch/arm64/include/asm/cpufeature.h | 2 ++
->  arch/arm64/kernel/cpu_errata.c      | 5 +++++
->  arch/arm64/kernel/cpufeature.c      | 4 ++--
->  3 files changed, 9 insertions(+), 2 deletions(-)
+>  Documentation/devicetree/bindings/usb/dwc2.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index b9b6494..cb8fb2c 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -174,7 +174,9 @@ void __init setup_cpu_features(void);
->  
->  void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
->  			    const char *info);
-> +void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps);
->  void check_local_cpu_errata(void);
-> +void __init enable_cpu_errata(void);
+> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+> index 20a68bf..79e5370 100644
+> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
+> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+> @@ -11,6 +11,7 @@ Required properties:
+>    - "lantiq,arx100-usb": The DWC2 USB controller instance in Lantiq ARX SoCs;
+>    - "lantiq,xrx200-usb": The DWC2 USB controller instance in Lantiq XRX SoCs;
+>    - snps,dwc2: A generic DWC2 USB controller with default parameters.
+> +  - st,stm32-fsotg: The DWC2 USB controller instance in STM32F4 SoCs in FS mode;
 
-Nitpick: I would rather call this enable_errata_workarounds since errata
-are already enabled by in hardware ;).
+This should go above snps,dwc2.
 
--- 
-Catalin
+What determines FS mode vs. HS?
+
+>  - reg : Should contain 1 register range (address and length)
+>  - interrupts : Should contain 1 interrupt
+>  - clocks: clock provider specifier
+> -- 
+> 2.7.4 (Apple Git-66)
+> 
