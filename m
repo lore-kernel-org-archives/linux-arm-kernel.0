@@ -1,71 +1,78 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Fri, 24 Jun 2016 10:51:26 +0530
-Subject: [PATCH v2 5/5] dmaengine: dma: Use different channel names for each
- dma
+Date: Fri, 24 Jun 2016 10:51:25 +0530
+Subject: [PATCH v2 4/5] dmaengine: dma: Rename driver and config
 In-Reply-To: <1466745686-23898-1-git-send-email-appanad@xilinx.com>
 References: <1466745686-23898-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1466745686-23898-6-git-send-email-appanad@xilinx.com>
+Message-ID: <1466745686-23898-5-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current driver assumes that child node channel name is either
-"xlnx,axi-vdma-mm2s-channel" or "xlnx,axi-vdma-s2mm-channel"
-which is confusing the users of AXI DMA and CDMA.
-This patch fixes this issue by using different channel
-names for the AXI DMA and AXI CDMA child nodes.
+In the existing vdma driver support for
+AXI DMA and CDMA got added so the driver is no
+longer VDMA specific.
+
+This patch renames the driver and DT binding doc to xilinx_dma
+and updates the Kconfig description for all the DMAS.
 
 Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
-Chanes for v2:
----> New patch.
+Changes for v2:
+---> None.
 
- .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |    6 +++++-
- drivers/dma/xilinx/xilinx_dma.c                    |    8 ++++++--
- 2 files changed, 11 insertions(+), 3 deletions(-)
+ .../dma/xilinx/{xilinx_vdma.txt => xilinx_dma.txt} |    0
+ drivers/dma/Kconfig                                |   11 ++++++++---
+ drivers/dma/xilinx/Makefile                        |    2 +-
+ drivers/dma/xilinx/{xilinx_vdma.c => xilinx_dma.c} |    0
+ 4 files changed, 9 insertions(+), 4 deletions(-)
+ rename Documentation/devicetree/bindings/dma/xilinx/{xilinx_vdma.txt => xilinx_dma.txt} (100%)
+ rename drivers/dma/xilinx/{xilinx_vdma.c => xilinx_dma.c} (100%)
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-index 0faa189..a2b8bfa 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-@@ -50,8 +50,12 @@ Optional properties for VDMA:
- 	{3}, flush s2mm channel
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+rename to Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 8c98779..1f39f3e 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -519,19 +519,24 @@ config XGENE_DMA
+ 	help
+ 	  Enable support for the APM X-Gene SoC DMA engine.
  
- Required child node properties:
--- compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
-+- compatible:
-+	For VDMA: It should be either "xlnx,axi-vdma-mm2s-channel" or
- 	"xlnx,axi-vdma-s2mm-channel".
-+	For CDMA: It should be "xlnx,axi-cdma-channel".
-+	For AXIDMA: It should be either "xlnx,axi-dma-mm2s-channel" or
-+	"xlnx,axi-dma-s2mm-channel".
- - interrupts: Should contain per channel VDMA interrupts.
- - xlnx,datawidth: Should contain the stream data width, take values
- 	{32,64...1024}.
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 0768d9f..cf47347 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -2353,7 +2353,9 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
- 	if (!has_dre)
- 		xdev->common.copy_align = fls(width - 1);
+-config XILINX_VDMA
+-	tristate "Xilinx AXI VDMA Engine"
++config XILINX_DMA
++	tristate "Xilinx AXI DMAS Engine"
+ 	depends on (ARCH_ZYNQ || MICROBLAZE || ARM64)
+ 	select DMA_ENGINE
+ 	help
+ 	  Enable support for Xilinx AXI VDMA Soft IP.
  
--	if (of_device_is_compatible(node, "xlnx,axi-vdma-mm2s-channel")) {
-+	if (of_device_is_compatible(node, "xlnx,axi-vdma-mm2s-channel") ||
-+	    of_device_is_compatible(node, "xlnx,axi-dma-mm2s-channel") ||
-+	    of_device_is_compatible(node, "xlnx,axi-cdma-channel")) {
- 		chan->direction = DMA_MEM_TO_DEV;
- 		chan->id = chan_id;
- 		chan->tdest = chan_id;
-@@ -2367,7 +2369,9 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
- 				chan->flush_on_fsync = true;
- 		}
- 	} else if (of_device_is_compatible(node,
--					    "xlnx,axi-vdma-s2mm-channel")) {
-+					   "xlnx,axi-vdma-s2mm-channel") ||
-+		   of_device_is_compatible(node,
-+					   "xlnx,axi-dma-s2mm-channel")) {
- 		chan->direction = DMA_DEV_TO_MEM;
- 		chan->id = chan_id;
- 		chan->tdest = chan_id - xdev->nr_channels;
+-	  This engine provides high-bandwidth direct memory access
++	  AXI VDMA engine provides high-bandwidth direct memory access
+ 	  between memory and AXI4-Stream video type target
+ 	  peripherals including peripherals which support AXI4-
+ 	  Stream Video Protocol.  It has two stream interfaces/
+ 	  channels, Memory Mapped to Stream (MM2S) and Stream to
+ 	  Memory Mapped (S2MM) for the data transfers.
++	  AXI CDMA engine provides high-bandwidth direct memory access
++	  between a memory-mapped source address and a memory-mapped
++	  destination address.
++	  AXI DMA engine provides high-bandwidth one dimensional direct
++	  memory access between memory and AXI4-Stream target peripherals.
+ 
+ config ZX_DMA
+ 	tristate "ZTE ZX296702 DMA support"
+diff --git a/drivers/dma/xilinx/Makefile b/drivers/dma/xilinx/Makefile
+index 3c4e9f2..af9e69a 100644
+--- a/drivers/dma/xilinx/Makefile
++++ b/drivers/dma/xilinx/Makefile
+@@ -1 +1 @@
+-obj-$(CONFIG_XILINX_VDMA) += xilinx_vdma.o
++obj-$(CONFIG_XILINX_DMA) += xilinx_dma.o
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_dma.c
+similarity index 100%
+rename from drivers/dma/xilinx/xilinx_vdma.c
+rename to drivers/dma/xilinx/xilinx_dma.c
 -- 
 1.7.1
