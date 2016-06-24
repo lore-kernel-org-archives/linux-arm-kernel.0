@@ -1,86 +1,41 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 24 Jun 2016 09:35:01 +0200
-Subject: [PATCH v5 2/2] [media] atmel-isc: DT binding for Image Sensor
- Controller driver
-In-Reply-To: <850f10c3-ea9a-11da-4279-7b0ad2c52bb6@atmel.com>
-References: <1466153854-30272-1-git-send-email-songjun.wu@atmel.com>
- <1466153854-30272-3-git-send-email-songjun.wu@atmel.com>
- <20160620132508.GA32585@rob-hp-laptop>
- <850f10c3-ea9a-11da-4279-7b0ad2c52bb6@atmel.com>
-Message-ID: <20160624093501.5dc6d276@bbrezillon>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Fri, 24 Jun 2016 15:25:25 +0800
+Subject: [PATCH] ARM: at91/defconfig: Add ACT8945A driver
+Message-ID: <1466753125-4168-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Jun 2016 13:54:09 +0800
-"Wu, Songjun" <songjun.wu@atmel.com> wrote:
+Include ACT8945A mfd, regulator and power drivers.
 
-> Hi Rob,
-> 
-> Thank you for your comments.
-> 
-> On 6/20/2016 21:25, Rob Herring wrote:
-> > On Fri, Jun 17, 2016 at 04:57:14PM +0800, Songjun Wu wrote:  
-> >> DT binding documentation for ISC driver.
-> >>
-> >> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
-> >> ---
-> >>
-> >> Changes in v5:
-> >> - Add clock names.
-> >>
-> >> Changes in v4:
-> >> - Remove the isc clock nodes.
-> >>
-> >> Changes in v3:
-> >> - Remove the 'atmel,sensor-preferred'.
-> >> - Modify the isc clock node according to the Rob's remarks.
-> >>
-> >> Changes in v2:
-> >> - Remove the unit address of the endpoint.
-> >> - Add the unit address to the clock node.
-> >> - Avoid using underscores in node names.
-> >> - Drop the "0x" in the unit address of the i2c node.
-> >> - Modify the description of 'atmel,sensor-preferred'.
-> >> - Add the description for the ISC internal clock.
-> >>
-> >>  .../devicetree/bindings/media/atmel-isc.txt        | 64 ++++++++++++++++++++++
-> >>  1 file changed, 64 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
-> >> new file mode 100644
-> >> index 0000000..9558a77
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
-> >> @@ -0,0 +1,64 @@
-> >> +Atmel Image Sensor Controller (ISC)
-> >> +----------------------------------------------
-> >> +
-> >> +Required properties for ISC:
-> >> +- compatible
-> >> +	Must be "atmel,sama5d2-isc".
-> >> +- reg
-> >> +	Physical base address and length of the registers set for the device.
-> >> +- interrupts
-> >> +	Should contain IRQ line for the ISC.
-> >> +- clocks
-> >> +	List of clock specifiers, corresponding to entries in
-> >> +	the clock-names property;
-> >> +	Please refer to clock-bindings.txt.
-> >> +- clock-names
-> >> +	Required elements: "hclock".  
-> >
-> > What about the 2 other clocks in the example?
-> >  
-> The other clocks is optional, not required.
-> Do you have any suggestion?
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
 
-Just add a second look at the sama5d2 and iscck gck are not optional.
-What we call optional clocks are clocks that are not necessarily
-required depending on the IP revision or external clocks that are board
-dependent. This is not the case here: iscck and gck are internal to the
-SoC, and are always available. Whether you want to use them or not is a
-different question, and should not be encoded in the clocks/clock-names
-properties.
+ arch/arm/configs/sama5_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-To sum-up, define those 3 clocks as required and document their names.
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index 9cb1a85..aca8625 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -129,16 +129,19 @@ CONFIG_SPI_ATMEL=y
+ CONFIG_SPI_GPIO=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_POWER_SUPPLY=y
++CONFIG_BATTERY_ACT8945A=y
+ CONFIG_POWER_RESET=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_AT91SAM9X_WATCHDOG=y
+ CONFIG_SAMA5D4_WATCHDOG=y
++CONFIG_MFD_ACT8945A=y
+ CONFIG_MFD_ATMEL_FLEXCOM=y
+ CONFIG_MFD_ATMEL_HLCDC=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_ACT8865=y
++CONFIG_REGULATOR_ACT8945A=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+-- 
+2.7.4
