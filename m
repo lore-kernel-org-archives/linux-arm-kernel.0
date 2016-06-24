@@ -1,51 +1,28 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 24 Jun 2016 15:27:18 +0800
-Subject: [GIT PULL] drm/mediatek: MT8173 gamma & dither support
-Message-ID: <1466753238-17216-1-git-send-email-bibby.hsieh@mediatek.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Fri, 24 Jun 2016 15:17:33 +0800
+Subject: [PATCH 0/7] power: act8945a_charger: Improvements
+Message-ID: <1466752660-2922-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+This patch series is used to improve the act8945a-charger, such as
+improve the way to check the status, fix the power supply type
+property, add the status change update, and add more properties:
+capacity level property and max current property.
 
-Please consider merging this tag, which contains the v2 MT8173 gamma & dither function patches I sent on 2016-06-17, rebased onto v4.7-rc1. There have been no further comments.
 
-Thanks
-Bibby
+Wenyou Yang (7):
+  power: act8945a_charger: Remove "battery_temperature"
+  power: act8945a_charger: Improve
+  power: act8945a_charger: Add status change update support
+  power: act8945a_charger: Fix the power supply type
+  power: act8945a_charger: Add capacity level property
+  power: act8945a_charger: Add max current property
+  doc: bindings: act8945a-charger: Update properties
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-
-  Linux 4.7-rc1 (2016-05-29 16:29:24 GMT)
-
-are available in the git repository at:
-
-  git at github.com:BibbyHsieh/linux4.7-rc1.git
-
-for you to fetch changes up to dd0eb773bc125f5e6bca735d19c08500dc3730f9:
-
-  drm/mediatek: Add gamma correction
-
--------------------------------------------------------------------------
-This is MT8173 gamma & dither support PATCH v2, based on 4.7-rc1.
-
-Changes since v1:
- -According to the suggestion from Daniel,
-  we used the new atomic color management.
- -Applied gamma function at GAMMA engine (path 2).
- -Made dithering function support hardware mirroring well.
- -Removed the bpc variable from mtk_drm_crtc struct.
--------------------------------------------------------------------------
-
-Bibby Hsieh (2):
-  drm/mediatek: Add gamma correction
-  drm/mediatek: set mt8173 dithering function
-
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |    3 +-
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |    3 +-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   26 ++++-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |    1 +
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  147 ++++++++++++++++++++++++++-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   16 ++-
- 6 files changed, 184 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/power/act8945a-charger.txt |   6 +-
+ drivers/power/act8945a_charger.c                   | 371 ++++++++++++++++++---
+ 2 files changed, 337 insertions(+), 40 deletions(-)
 
 -- 
-1.7.9.5
+2.7.4
