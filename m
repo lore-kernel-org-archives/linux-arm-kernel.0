@@ -1,164 +1,140 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 24 Jun 2016 16:12:02 +0200
-Subject: [PATCH v2 2/2] arm64:acpi Fix the acpi alignment exeception when
- 'mem=' specified
-In-Reply-To: <20160624120058.GA19972@arm.com>
-References: <1466738027-15066-1-git-send-email-dennis.chen@arm.com>
- <1466738027-15066-2-git-send-email-dennis.chen@arm.com>
- <CAKv+Gu8ZyWG-OZ8=2u9jrdS-0j+qL1sstPQ0uX=j7wyj+ETo-w@mail.gmail.com>
- <20160624120058.GA19972@arm.com>
-Message-ID: <CAKv+Gu9XHYVEoL846WBx6PZqSnbBCjwup0CPkZ1JexJVkvds9A@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 24 Jun 2016 16:19:34 +0200
+Subject: [PATCH v1 19/25] PCI: rcar Gen2: Request host bridge window
+ resources
+In-Reply-To: <20160621164947.GA7603@localhost>
+References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <20160606230706.20936.13086.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <CAMuHMdVgLfTD-BjRZ+gVKgYE8dkDZzQ6DnYtkUs+jVPthJsEdQ@mail.gmail.com>
+ <20160621142623.GA29966@localhost> <20160621154100.GA4782@cogentembedded.com>
+ <20160621164947.GA7603@localhost>
+Message-ID: <CAMuHMdVuwniXPZszPH8jTd8x0j+f__JjT6yY04RA_gw87sQidg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 June 2016 at 14:01, Dennis Chen <dennis.chen@arm.com> wrote:
-> On Fri, Jun 24, 2016 at 12:43:52PM +0200, Ard Biesheuvel wrote:
->> On 24 June 2016 at 05:13, Dennis Chen <dennis.chen@arm.com> wrote:
->> > When booting an ACPI enabled kernel with 'mem=', probably the ACPI data
->> > regions loaded by firmware will beyond the limit of the memory, in this
->> > case we need to nomap the region above the limit while not removing
->> > it from memblock, because once region removed from memblock, the ACPI
->> > will think that region is not a normal memory and map it as device type
->> > memory accordingly. Since the ACPI core will produce non-alignment access
->> > when paring AML data stream, hence result in alignment fault upon the io
->> > mapped memory space.
+Hi Bjorn,
+
+On Tue, Jun 21, 2016 at 6:49 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Tue, Jun 21, 2016 at 06:41:00PM +0300, Valentine Barshak wrote:
+>> On Tue, Jun 21, 2016 at 09:26:23AM -0500, Bjorn Helgaas wrote:
+>> > On Tue, Jun 21, 2016 at 12:41:31PM +0200, Geert Uytterhoeven wrote:
+>> > > On Tue, Jun 7, 2016 at 1:07 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>> > > > Request host bridge window resources so they appear in ioport_resource and
+>> > > > iomem_resource and are reflected in /proc/ioports and /proc/iomem.
+>> > > >
+>> > > > Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>> > > > ---
+>> > > >  drivers/pci/host/pci-rcar-gen2.c |    4 ++++
+>> > > >  1 file changed, 4 insertions(+)
+>> > > >
+>> > > > diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
+>> > > > index 9980a4b..617a6b2 100644
+>> > > > --- a/drivers/pci/host/pci-rcar-gen2.c
+>> > > > +++ b/drivers/pci/host/pci-rcar-gen2.c
+>> > > > @@ -194,6 +194,7 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
+>> > > >         struct rcar_pci_priv *priv = sys->private_data;
+>> > > >         void __iomem *reg = priv->reg;
+>> > > >         u32 val;
+>> > > > +       int ret;
+>> > > >
+>> > > >         pm_runtime_enable(priv->dev);
+>> > > >         pm_runtime_get_sync(priv->dev);
+>> > > > @@ -275,6 +276,9 @@ static int rcar_pci_setup(int nr, struct pci_sys_data *sys)
+>> > > >         /* Add PCI resources */
+>> > > >         pci_add_resource(&sys->resources, &priv->io_res);
+>> > > >         pci_add_resource(&sys->resources, &priv->mem_res);
+>> > > > +       ret = devm_request_pci_bus_resources(priv->dev, &sys->resources);
+>> > > > +       if (ret < 0)
+>> > > > +               return ret;
+>> > > >
+>> > > >         /* Setup bus number based on platform device id / of bus-range */
+>> > > >         sys->busnr = priv->busnr;
+>> > >
+>> > > This patch (commit 1bd019707b7c9249d34c5d348f1ef75eb4d83e89 in pci/next)
+>> > > broke PCI on r8a7791/koelsch. Dmesg differences are:
+>> > >
+>> > >  pci-rcar-gen2 ee090000.pci: PCI: bus0 revision 11
+>> > > -pci-rcar-gen2 ee090000.pci: PCI host bridge to bus 0000:00
+>> > > -pci_bus 0000:00: root bus resource [io  0xee080000-0xee0810ff]
+>> > > -pci_bus 0000:00: root bus resource [mem 0xee080000-0xee0810ff]
 >> >
->> > For example, below is an alignment exception observed on softIron board
->> > when booting the kernel with 'acpi=force mem=8G':
->> > ...
->> > [ 0.542475] Unable to handle kernel paging request at virtual address ffff0000080521e7
->> > [ 0.550457] pgd = ffff000008aa0000
->> > [ 0.553880] [ffff0000080521e7] *pgd=000000801fffe003, *pud=000000801fffd003, *pmd=000000801fffc003, *pte=00e80083ff1c1707
->> > [    0.564939] Internal error: Oops: 96000021 [#1] PREEMPT SMP
->> > [    0.570553] Modules linked in:
->> > [    0.573626] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc3-next-20160616+ #172
->> > [    0.581344] Hardware name: AMD Overdrive/Supercharger/Default string, BIOS ROD1001A 02/09/2016
->> > [    0.590025] task: ffff800001ef0000 ti: ffff800001ef8000 task.ti: ffff800001ef8000
->> > [    0.597571] PC is at acpi_ns_lookup+0x520/0x734
->> > [    0.602134] LR is at acpi_ns_lookup+0x4a4/0x734
->> > [    0.606693] pc : [<ffff0000083b8b10>] lr : [<ffff0000083b8a94>] pstate: 60000045
->> > [    0.614145] sp : ffff800001efb8b0
->> > [    0.617478] x29: ffff800001efb8c0 x28: 000000000000001b
->> > [    0.622829] x27: 0000000000000001 x26: 0000000000000000
->> > [    0.628181] x25: ffff800001efb9e8 x24: ffff000008a10000
->> > [    0.633531] x23: 0000000000000001 x22: 0000000000000001
->> > [    0.638881] x21: ffff000008724000 x20: 000000000000001b
->> > [    0.644230] x19: ffff0000080521e7 x18: 000000000000000d
->> > [    0.649580] x17: 00000000000038ff x16: 0000000000000002
->> > [    0.654929] x15: 0000000000000007 x14: 0000000000007fff
->> > [    0.660278] x13: ffffff0000000000 x12: 0000000000000018
->> > [    0.665627] x11: 000000001fffd200 x10: 00000000ffffff76
->> > [    0.670978] x9 : 000000000000005f x8 : ffff000008725fa8
->> > [    0.676328] x7 : ffff000008a8df70 x6 : ffff000008a8df70
->> > [    0.681679] x5 : ffff000008a8d000 x4 : 0000000000000010
->> > [    0.687027] x3 : 0000000000000010 x2 : 000000000000000c
->> > [    0.692378] x1 : 0000000000000006 x0 : 0000000000000000
->> > ...
->> > [    1.262235] [<ffff0000083b8b10>] acpi_ns_lookup+0x520/0x734
->> > [    1.267845] [<ffff0000083a7160>] acpi_ds_load1_begin_op+0x174/0x4fc
->> > [    1.274156] [<ffff0000083c1f4c>] acpi_ps_build_named_op+0xf8/0x220
->> > [    1.280380] [<ffff0000083c227c>] acpi_ps_create_op+0x208/0x33c
->> > [    1.286254] [<ffff0000083c1820>] acpi_ps_parse_loop+0x204/0x838
->> > [    1.292215] [<ffff0000083c2fd4>] acpi_ps_parse_aml+0x1bc/0x42c
->> > [    1.298090] [<ffff0000083bc6e8>] acpi_ns_one_complete_parse+0x1e8/0x22c
->> > [    1.304753] [<ffff0000083bc7b8>] acpi_ns_parse_table+0x8c/0x128
->> > [    1.310716] [<ffff0000083bb8fc>] acpi_ns_load_table+0xc0/0x1e8
->> > [    1.316591] [<ffff0000083c9068>] acpi_tb_load_namespace+0xf8/0x2e8
->> > [    1.322818] [<ffff000008984128>] acpi_load_tables+0x7c/0x110
->> > [    1.328516] [<ffff000008982ea4>] acpi_init+0x90/0x2c0
->> > [    1.333603] [<ffff0000080819fc>] do_one_initcall+0x38/0x12c
->> > [    1.339215] [<ffff000008960cd4>] kernel_init_freeable+0x148/0x1ec
->> > [    1.345353] [<ffff0000086b7d30>] kernel_init+0x10/0xec
->> > [    1.350529] [<ffff000008084e10>] ret_from_fork+0x10/0x40
->> > [    1.355878] Code: b9009fbc 2a00037b 36380057 3219037b (b9400260)
->> > [    1.362035] ---[ end trace 03381e5eb0a24de4 ]---
->> > [    1.366691] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
->> >
->> > With 'efi=debug', we can see those ACPI regions loaded by firmware on
->> > that board as:
->> > [    0.000000] efi:   0x0083ff1b5000-0x0083ff1c2fff [ACPI Reclaim Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]*
->> > [    0.000000] efi:   0x0083ff223000-0x0083ff224fff [ACPI Memory NVS    |   |  |  |  |  |  |  |   |WB|WT|WC|UC]*
->> >
->> > This patch is trying to address the above issues by nomaping the region
->> > instead of removing it.
->> >
->> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
->> > Cc: Catalin Marinas <catalin.marinas@arm.com>
->> > Cc: Steve Capper <steve.capper@arm.com>
->> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > Cc: Will Deacon <will.deacon@arm.com>
->> > Cc: Mark Rutland <mark.rutland@arm.com>
->> > Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
->> > Cc: linux-mm at kvack.org
->> > Cc: linux-acpi at vger.kernel.org
->> > Cc: linux-efi at vger.kernel.org
->> > ---
->> > Changes in v2:
->> > Update the commit message and remove the memblock_is_map_memory() check
->> > according to the suggestion from Mark Rutland.
->> >
->> >  arch/arm64/mm/init.c | 9 +++++----
->> >  1 file changed, 5 insertions(+), 4 deletions(-)
->> >
->> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->> > index d45f862..6af2456 100644
->> > --- a/arch/arm64/mm/init.c
->> > +++ b/arch/arm64/mm/init.c
->> > @@ -222,12 +222,13 @@ void __init arm64_memblock_init(void)
+>> > This is probably a result of this code in drivers/pci/host/pci-rcar-gen2.c:
 >> >
 >> >         /*
->> >          * Apply the memory limit if it was set. Since the kernel may be loaded
->> > -        * high up in memory, add back the kernel region that must be accessible
->> > -        * via the linear mapping.
->> > +        * in the memory regions above the limit, so we need to clear the
->> > +        * MEMBLOCK_NOMAP flag of this region to make it can be accessible via
->> > +        * the linear mapping.
+>> >          * The controller does not support/use port I/O,
+>> >          * so setup a dummy port I/O region here.
 >> >          */
->> >         if (memory_limit != (phys_addr_t)ULLONG_MAX) {
->> > -               memblock_enforce_memory_limit(memory_limit);
->> > -               memblock_add(__pa(_text), (u64)(_end - _text));
->> > +               memblock_mem_limit_mark_nomap(memory_limit);
->> > +               memblock_clear_nomap(__pa(_text), (u64)(_end - _text));
+>> >         priv->io_res.start = priv->mem_res.start;
+>> >         priv->io_res.end = priv->mem_res.end;
+>> >         priv->io_res.flags = IORESOURCE_IO;
+>> >
+>> > We try to avoid adding dummy regions like this, but maybe we missed
+>> > this one.  I haven't found any email discussion about it yet, so I
+>> > don't know what the reason for this one is.  Valentine, do you
+>> > remember?
 >>
->> Up until now, we have ignored the effect of having NOMAP memblocks on
->> the return values of functions like memblock_phys_mem_size() and
->> memblock_mem_size(), since they could reasonably be expected to cover
->> only a small slice of all available memory. However, after applying
->> this patch, it may well be the case that most of memory is marked
->> NOMAP, and these functions will cease to work as expected.
+>> I do not, but I think I've found something in my mailbox.
+>> Below is the quote from the original conversation with:
+>> (Re: [PATCH] pci: Add R-Car Gen2 internal PCI support)
 >>
-> Hi Ard, I noticed these inconsistences as you mentioned, but seems the
-> available memory is limited correctly. For this case('mem='), will it bring
-> some substantive side effects except that some log messages maybe confusing?
-
-That is exactly the question that needs answering before we can merge
-these patches. I know we consider mem= a development hack, but the
-intent is to make it appear to the kernel as if only a smaller amount
-of memory is available to the kernel, and this is signficantly
-different from having memblock_mem_size() et al return much larger
-values than what is actually available. Perhaps this doesn't matter at
-all, but it is something we must discuss before proceeding with these
-changes.
-
+>> [quote starts]
+>>  >>+    priv->mem_res = *mem_res;
+>>  >>+    /*
+>>  >>+     * The controller does not support/use port I/O,
+>>  >>+     * so setup a dummy port I/O region here.
+>>  >>+     */
+>>  >>+    priv->io_res.start = priv->mem_res.start;
+>>  >>+    priv->io_res.end = priv->mem_res.end;
+>>  >>+    priv->io_res.flags = IORESOURCE_IO;
+>>  >>
+>>  > I don't understand this.  There's no requirement (at least as far as the
+>>  > PCI core is concerned) to supply an I/O aperture at all, and I think it
+>>  > would be better if you didn't.
+>>  >
+>>  > Oh, I see ... maybe pcibios_init_resources() forces you to have an
+>>  > I/O resource to avoid having it give you a default one?  And I
+>>  > suppose that since you have several host bridges, these dummy I/O
+>>  > regions have to be distinct.  Ugh.  Well, I guess this is something
+>>  > you'd have to fix here or in the ARM code, it's up to you what to do.
 >>
->> This means NOMAP is really only suited to punch some holes into the
->> kernel direct mapping, and so implementing the memory limit by marking
->> everything NOMAP is not the way to go. Instead, we should probably
->> reorder the init sequence so that the regions that are reserved in the
->> UEFI memory map are declared and marked NOMAP [again] after applying
->> the memory limit in the old way.
->>
-> Before this patch, I have another one addressing the same issue [1], with
-> that patch we'll not have these inconsistences, but it looks like a little
-> bit complicated, so it becomes current one. Any comments about that?
+>>  Exactly. This is to avoid assigning default I/O resources.
+>> [quote ends]
 >
-> [1]http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438443.html
+> Oh, right, now I remember.  Thanks for digging that out.
 >
+> I propose the patches below to remove the requirement for having an
+> I/O space.  Any chance one of you could test them?
 
-The problem caused by mem= is that it removes regions that are marked
-NOMAP. So instead of marking everything above the limit NOMAP, I would
-much rather see an alternative implementation of
-memblock_enforce_memory_limit() that enforces the mem= limit by only
-removing memblocks that have to NOMAP flag cleared, and leaving the
-NOMAP ones where they are.
+Thanks!
+PCI seems to be working again on r8a7791/koelsch using today's pci/next,
+which includes these patches. Lspci shows the USB controllers again.
+
+/proc/iomem gained a few entries:
+
+ ec700000-ec70ffff : /dma-controller at ec700000
+ ec720000-ec72ffff : /dma-controller at ec720000
+ ec740000-ec7401ff : audmapp
++ee080000-ee0810ff : /pci at ee090000
++  ee080000-ee080fff : 0000:00:01.0
++  ee081000-ee0810ff : 0000:00:02.0
+ ee090000-ee090bff : /pci at ee090000
++ee0c0000-ee0c10ff : /pci at ee0d0000
++  ee0c0000-ee0c0fff : 0001:01:01.0
++  ee0c1000-ee0c10ff : 0001:01:02.0
+ ee0d0000-ee0d0bff : /pci at ee0d0000
+ ee300000-ee301fff : /sata at ee300000
+ ee700000-ee7003ff : /ethernet at ee700000
+
+Hence
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
