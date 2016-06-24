@@ -1,89 +1,47 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Fri, 24 Jun 2016 10:31:48 +0800
-Subject: [PATCH 2/2] arm64:acpi Fix the acpi alignment exeception when
- 'mem=' specified
-In-Reply-To: <20160623124229.GD8836@leverpostej>
-References: <1466681415-8058-1-git-send-email-dennis.chen@arm.com>
- <1466681415-8058-2-git-send-email-dennis.chen@arm.com>
- <20160623124229.GD8836@leverpostej>
-Message-ID: <20160624023147.GB12969@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 24 Jun 2016 10:41:41 +0800
+Subject: [PATCH 01/14] ARM: dts: sun8i: Add SID node
+In-Reply-To: <20160623192104.18720-2-megous@megous.com>
+References: <20160623192104.18720-1-megous@megous.com>
+ <20160623192104.18720-2-megous@megous.com>
+Message-ID: <CAGb2v677+abNOEg3iEoiH25Ji9tq0JXkrGUVvLPAbXAPD3Su_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 23, 2016 at 01:42:30PM +0100, Mark Rutland wrote:
-> On Thu, Jun 23, 2016 at 07:30:15PM +0800, Dennis Chen wrote:
-> > This is a rework patch based on [1]. According to the proposal from
-> > Mark Rutland, when applying the system memory limit through 'mem=x'
-> > kernel command line, don't remove the rest memory regions above the
-> > limit from the memblock, instead marking them as MEMBLOCK_NOMAP region,
-> > which will preserve the ability to identify regions as normal memory
-> > while not using them for allocation and the linear map.
-> > 
-> > Without this patch, the ACPI core will map those acpi data regions(if
-> > they are above the limit) as device type memory, which will result in
-> > the alignment exception when ACPI core parses the AML data stream 
-> > since the parsing will produce some non-alignment accesses.
-> >
-> > [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438443.html
-> 
-> Please rewrite the message to be standalone (i.e. so peopel can read
-> this without having to folow the link).
-> 
-> Explain why using mem= makes ACPI think regions should be mapped as
-> Device memory, the problems this causes for ACPICA, then cover why we
-> want to nomap the region.
-> 
-> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Steve Capper <steve.capper@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> > Cc: linux-mm at kvack.org
-> > Cc: linux-acpi at vger.kernel.org
-> > Cc: linux-efi at vger.kernel.org
-> > ---
-> >  arch/arm64/mm/init.c | 10 ++++++----
-> >  1 file changed, 6 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > index d45f862..e509e24 100644
-> > --- a/arch/arm64/mm/init.c
-> > +++ b/arch/arm64/mm/init.c
-> > @@ -222,12 +222,14 @@ void __init arm64_memblock_init(void)
-> >  
-> >  	/*
-> >  	 * Apply the memory limit if it was set. Since the kernel may be loaded
-> > -	 * high up in memory, add back the kernel region that must be accessible
-> > -	 * via the linear mapping.
-> > +	 * in the memory regions above the limit, so we need to clear the
-> > +	 * MEMBLOCK_NOMAP flag of this region to make it can be accessible via
-> > +	 * the linear mapping.
-> >  	 */
-> >  	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
-> > -		memblock_enforce_memory_limit(memory_limit);
-> > -		memblock_add(__pa(_text), (u64)(_end - _text));
-> > +		memblock_mem_limit_mark_nomap(memory_limit);
-> > +		if (!memblock_is_map_memory(__pa(_text)))
-> > +			memblock_clear_nomap(__pa(_text), (u64)(_end - _text));
-> 
-> I think that the memblock_is_map_memory() check should go. Just because
-> a page of the kernel image is mapped doesn't mean that the rest is. That
-> will make this a 1-1 change.
+On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
+> From: Josef Gajdusek <atx@atx.name>
 >
-Good catch! Will be applied, thanks!
-> 
-> Other than that, this looks right to me.
-> 
-> Thanks,
-> Mark.
-> 
-> >  	}
-> >  
-> >  	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
-> > -- 
-> > 1.8.3.1
-> > 
-> 
+> Add a node describing the Security ID memory to the Allwinner H3 .dtsi file.
+>
+> Signed-off-by: Josef Gajdusek <atx@atx.name>
+> ---
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index 4a4926b..172576d 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -389,6 +389,13 @@
+>                         #size-cells = <0>;
+>                 };
+>
+> +               sid: eeprom at 01c14000 {
+> +                       compatible = "allwinner,sun4i-a10-sid";
+
+This has been discussed before. The hardware is not compatible.
+The write control registers are at different offsets.
+
+ChenYu
+
+> +                       reg = <0x01c14000 0x400>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +               };
+> +
+>                 usbphy: phy at 01c19400 {
+>                         compatible = "allwinner,sun8i-h3-usb-phy";
+>                         reg = <0x01c19400 0x2c>,
+> --
+> 2.9.0
+>
