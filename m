@@ -1,60 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Jun 2016 07:50:28 +0100
-Subject: [PATCH] pci: Add support for unbinding the generic PCI host
- controller
-In-Reply-To: <576CD58C.5020900@siemens.com>
-References: <57698276.6050606@siemens.com> <20160622060638.GY29165@arm.com>
- <576C1CF6.7020804@siemens.com> <20160624061238.GD29165@arm.com>
- <576CD58C.5020900@siemens.com>
-Message-ID: <20160624065028.GG29165@arm.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Fri, 24 Jun 2016 15:27:18 +0800
+Subject: [GIT PULL] drm/mediatek: MT8173 gamma & dither support
+Message-ID: <1466753238-17216-1-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2016 at 08:39:08AM +0200, Jan Kiszka wrote:
-> On 2016-06-24 08:12, Will Deacon wrote:
-> > On Thu, Jun 23, 2016 at 07:31:34PM +0200, Jan Kiszka wrote:
-> >> On 2016-06-22 08:06, Will Deacon wrote:
-> >>>   - The probe path seems to have some stateful operations outside of PCI
-> >>>     resources. For example, kzalloc'ing the bus_range resource in
-> >>>     of_pci_get_host_bridge_resources. Do we need to clean these up
-> >>>     explicitly?
-> >>>
-> >>>   - Similarly, we don't seem to tear-down the config space mappings and
-> >>>     data structures for that, so we leak VA space afaict.
-> >>>
-> >>
-> >> Good points. But to my understanding, everything is released
-> >> automatically on pci_remove_root_bus because all the resources are
-> >> registered with the bus which takes care of them during destruction. And
-> >> if I trace the release, I find this e.g.
-> >>
-> >> ...
-> >> devres_release_all() {
-> >>   _raw_spin_lock_irqsave();
-> >>   release_nodes() {
-> >>     _raw_spin_unlock_irqrestore();
-> >>     devm_action_release() {
-> >>       gen_pci_unmap_cfg() {
-> > 
-> > Ah, thanks for investigating that -- I completely missed the explicit
-> > devm_ callback. That resolves my concern about the config space mappings,
-> > but I still don't understand what happens to the resources allocated
-> > in of_pci_get_host_bridge_resources. It looks like they should actually
-> > be freed within that function, since pci_add_resource{_offset} copy the
-> > resources into their own resource_entries anyway.
-> > 
-> > Am I missing something?
-> 
-> Tracing kmalloc and kfree in addition, it seems you are right. But then
-> we already have leaks in the code in case the setup fails somewhere in
-> the middle, no? gen_pci_init only releases the resource list on errors,
-> but not bus_range. And pci_host_common_probe does non of both if
-> pci_scan_root_bus fails. Anything else?
+Hi Dave,
 
-Yeah, it's a right old mess. of_pci_get_host_bridge_resources even cleans
-up after itself, but gen_pci_init can fail in other ways and then doesn't
-clean up properly.
+Please consider merging this tag, which contains the v2 MT8173 gamma & dither function patches I sent on 2016-06-17, rebased onto v4.7-rc1. There have been no further comments.
 
-I wonder why of_pci_get_host_bridge_resources can't just use devm_kzalloc.
+Thanks
+Bibby
 
-Will
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+
+  Linux 4.7-rc1 (2016-05-29 16:29:24 GMT)
+
+are available in the git repository at:
+
+  git at github.com:BibbyHsieh/linux4.7-rc1.git
+
+for you to fetch changes up to dd0eb773bc125f5e6bca735d19c08500dc3730f9:
+
+  drm/mediatek: Add gamma correction
+
+-------------------------------------------------------------------------
+This is MT8173 gamma & dither support PATCH v2, based on 4.7-rc1.
+
+Changes since v1:
+ -According to the suggestion from Daniel,
+  we used the new atomic color management.
+ -Applied gamma function at GAMMA engine (path 2).
+ -Made dithering function support hardware mirroring well.
+ -Removed the bpc variable from mtk_drm_crtc struct.
+-------------------------------------------------------------------------
+
+Bibby Hsieh (2):
+  drm/mediatek: Add gamma correction
+  drm/mediatek: set mt8173 dithering function
+
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |    3 +-
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |    3 +-
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   26 ++++-
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |    1 +
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  147 ++++++++++++++++++++++++++-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   16 ++-
+ 6 files changed, 184 insertions(+), 12 deletions(-)
+
+-- 
+1.7.9.5
