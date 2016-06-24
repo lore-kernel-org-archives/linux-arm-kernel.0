@@ -1,53 +1,80 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Fri, 24 Jun 2016 06:36:07 +0000
-Subject: [PATCH] usb: renesas_usbhs: make usbhs_write32() static
-In-Reply-To: <1466531574-3096-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1466531574-3096-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <SG2PR06MB091976885A718A8F89EC1AE9D82E0@SG2PR06MB0919.apcprd06.prod.outlook.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Fri, 24 Jun 2016 08:39:08 +0200
+Subject: [PATCH] pci: Add support for unbinding the generic PCI host
+ controller
+In-Reply-To: <20160624061238.GD29165@arm.com>
+References: <57698276.6050606@siemens.com> <20160622060638.GY29165@arm.com>
+ <576C1CF6.7020804@siemens.com> <20160624061238.GD29165@arm.com>
+Message-ID: <576CD58C.5020900@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> From: Ben Dooks
-> Sent: Wednesday, June 22, 2016 2:53 AM
+On 2016-06-24 08:12, Will Deacon wrote:
+> On Thu, Jun 23, 2016 at 07:31:34PM +0200, Jan Kiszka wrote:
+>> On 2016-06-22 08:06, Will Deacon wrote:
+>>> On Tue, Jun 21, 2016 at 08:07:50PM +0200, Jan Kiszka wrote:
+>>>> diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
+>>>> index 8cba7ab..c0ff4b1 100644
+>>>> --- a/drivers/pci/host/pci-host-common.c
+>>>> +++ b/drivers/pci/host/pci-host-common.c
+>>>> @@ -164,6 +164,19 @@ int pci_host_common_probe(struct platform_device *pdev,
+>>>>  	}
+>>>>  
+>>>>  	pci_bus_add_devices(bus);
+>>>> +	platform_set_drvdata(pdev, bus);
+>>>> +	return 0;
+>>>> +}
+>>>> +
+>>>> +int pci_host_common_remove(struct platform_device *pdev)
+>>>> +{
+>>>> +	struct pci_bus *bus = platform_get_drvdata(pdev);
+>>>> +
+>>>> +	pci_lock_rescan_remove();
+>>>> +	pci_stop_root_bus(bus);
+>>>> +	pci_remove_root_bus(bus);
+>>>> +	pci_unlock_rescan_remove();
+>>>
+>>> A couple of comments/questions about this:
+>>>
+>>>   - The probe path seems to have some stateful operations outside of PCI
+>>>     resources. For example, kzalloc'ing the bus_range resource in
+>>>     of_pci_get_host_bridge_resources. Do we need to clean these up
+>>>     explicitly?
+>>>
+>>>   - Similarly, we don't seem to tear-down the config space mappings and
+>>>     data structures for that, so we leak VA space afaict.
+>>>
+>>
+>> Good points. But to my understanding, everything is released
+>> automatically on pci_remove_root_bus because all the resources are
+>> registered with the bus which takes care of them during destruction. And
+>> if I trace the release, I find this e.g.
+>>
+>> ...
+>> devres_release_all() {
+>>   _raw_spin_lock_irqsave();
+>>   release_nodes() {
+>>     _raw_spin_unlock_irqrestore();
+>>     devm_action_release() {
+>>       gen_pci_unmap_cfg() {
 > 
-> The usbhs_write32 function is not used outside of the rcar3.c
-> file, so fix the following sparse warning by making it static:
+> Ah, thanks for investigating that -- I completely missed the explicit
+> devm_ callback. That resolves my concern about the config space mappings,
+> but I still don't understand what happens to the resources allocated
+> in of_pci_get_host_bridge_resources. It looks like they should actually
+> be freed within that function, since pci_add_resource{_offset} copy the
+> resources into their own resource_entries anyway.
 > 
-> drivers/usb/renesas_usbhs/rcar3.c:26:6: warning: symbol 'usbhs_write32' was not declared. Should it be static?
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Am I missing something?
 
-Thank you for the patch.
+Tracing kmalloc and kfree in addition, it seems you are right. But then
+we already have leaks in the code in case the setup fails somewhere in
+the middle, no? gen_pci_init only releases the resource list on errors,
+but not bus_range. And pci_host_common_probe does non of both if
+pci_scan_root_bus fails. Anything else?
 
-Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Jan
 
-Best regards,
-Yoshihiro Shimoda
-
-> ---
-> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/usb/renesas_usbhs/rcar3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/renesas_usbhs/rcar3.c b/drivers/usb/renesas_usbhs/rcar3.c
-> index 38b01f2..1d70add 100644
-> --- a/drivers/usb/renesas_usbhs/rcar3.c
-> +++ b/drivers/usb/renesas_usbhs/rcar3.c
-> @@ -23,7 +23,7 @@
->  #define UGCTRL2_RESERVED_3	0x00000001	/* bit[3:0] should be B'0001 */
->  #define UGCTRL2_USB0SEL_OTG	0x00000030
-> 
-> -void usbhs_write32(struct usbhs_priv *priv, u32 reg, u32 data)
-> +static void usbhs_write32(struct usbhs_priv *priv, u32 reg, u32 data)
->  {
->  	iowrite32(data, priv->base + reg);
->  }
-> --
-> 2.8.1
+-- 
+Siemens AG, Corporate Technology, CT RDA ITP SES-DE
+Corporate Competence Center Embedded Linux
