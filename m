@@ -1,121 +1,256 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Fri, 24 Jun 2016 11:13:47 +0800
-Subject: [PATCH v2 2/2] arm64:acpi Fix the acpi alignment exeception when
- 'mem=' specified
-In-Reply-To: <1466738027-15066-1-git-send-email-dennis.chen@arm.com>
-References: <1466738027-15066-1-git-send-email-dennis.chen@arm.com>
-Message-ID: <1466738027-15066-2-git-send-email-dennis.chen@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 24 Jun 2016 11:41:36 +0800
+Subject: [PATCH 07/14] regulator: SY8106A regulator driver
+In-Reply-To: <20160623192104.18720-8-megous@megous.com>
+References: <20160623192104.18720-1-megous@megous.com>
+ <20160623192104.18720-8-megous@megous.com>
+Message-ID: <CAGb2v64D3Bou62iZgDU9kFHLofQ9tPGdyw6PKTdoTaZqPCn+8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting an ACPI enabled kernel with 'mem=', probably the ACPI data
-regions loaded by firmware will beyond the limit of the memory, in this
-case we need to nomap the region above the limit while not removing
-it from memblock, because once region removed from memblock, the ACPI
-will think that region is not a normal memory and map it as device type
-memory accordingly. Since the ACPI core will produce non-alignment access
-when paring AML data stream, hence result in alignment fault upon the io
-mapped memory space.
+On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
+> From: Ondrej Jirman <megous@megous.com>
+>
+> SY8106A is I2C attached single output voltage regulator
+> made by Silergy.
+>
+> Signed-off-by: Ondrej Jirman <megous@megous.com>
+> ---
+>  drivers/regulator/Kconfig             |   8 +-
+>  drivers/regulator/Makefile            |   2 +-
+>  drivers/regulator/sy8106a-regulator.c | 153 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 161 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/regulator/sy8106a-regulator.c
+>
+> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+> index 144cbf5..fc3fae2 100644
+> --- a/drivers/regulator/Kconfig
+> +++ b/drivers/regulator/Kconfig
+> @@ -860,5 +860,11 @@ config REGULATOR_WM8994
+>           This driver provides support for the voltage regulators on the
+>           WM8994 CODEC.
+>
+> -endif
+> +config REGULATOR_SY8106A
+> +       tristate "Silergy SY8106A"
+> +       depends on I2C
 
-For example, below is an alignment exception observed on softIron board
-when booting the kernel with 'acpi=force mem=8G':
-...
-[    0.542475] Unable to handle kernel paging request at virtual address ffff0000080521e7
-[    0.550457] pgd = ffff000008aa0000
-[    0.553880] [ffff0000080521e7] *pgd=000000801fffe003, *pud=000000801fffd003, *pmd=000000801fffc003, *pte=00e80083ff1c1707
-[    0.564939] Internal error: Oops: 96000021 [#1] PREEMPT SMP
-[    0.570553] Modules linked in:
-[    0.573626] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc3-next-20160616+ #172
-[    0.581344] Hardware name: AMD Overdrive/Supercharger/Default string, BIOS ROD1001A 02/09/2016
-[    0.590025] task: ffff800001ef0000 ti: ffff800001ef8000 task.ti: ffff800001ef8000
-[    0.597571] PC is at acpi_ns_lookup+0x520/0x734
-[    0.602134] LR is at acpi_ns_lookup+0x4a4/0x734
-[    0.606693] pc : [<ffff0000083b8b10>] lr : [<ffff0000083b8a94>] pstate: 60000045
-[    0.614145] sp : ffff800001efb8b0
-[    0.617478] x29: ffff800001efb8c0 x28: 000000000000001b
-[    0.622829] x27: 0000000000000001 x26: 0000000000000000
-[    0.628181] x25: ffff800001efb9e8 x24: ffff000008a10000
-[    0.633531] x23: 0000000000000001 x22: 0000000000000001
-[    0.638881] x21: ffff000008724000 x20: 000000000000001b
-[    0.644230] x19: ffff0000080521e7 x18: 000000000000000d
-[    0.649580] x17: 00000000000038ff x16: 0000000000000002
-[    0.654929] x15: 0000000000000007 x14: 0000000000007fff
-[    0.660278] x13: ffffff0000000000 x12: 0000000000000018
-[    0.665627] x11: 000000001fffd200 x10: 00000000ffffff76
-[    0.670978] x9 : 000000000000005f x8 : ffff000008725fa8
-[    0.676328] x7 : ffff000008a8df70 x6 : ffff000008a8df70
-[    0.681679] x5 : ffff000008a8d000 x4 : 0000000000000010
-[    0.687027] x3 : 0000000000000010 x2 : 000000000000000c
-[    0.692378] x1 : 0000000000000006 x0 : 0000000000000000
-...
-[    1.262235] [<ffff0000083b8b10>] acpi_ns_lookup+0x520/0x734
-[    1.267845] [<ffff0000083a7160>] acpi_ds_load1_begin_op+0x174/0x4fc
-[    1.274156] [<ffff0000083c1f4c>] acpi_ps_build_named_op+0xf8/0x220
-[    1.280380] [<ffff0000083c227c>] acpi_ps_create_op+0x208/0x33c
-[    1.286254] [<ffff0000083c1820>] acpi_ps_parse_loop+0x204/0x838
-[    1.292215] [<ffff0000083c2fd4>] acpi_ps_parse_aml+0x1bc/0x42c
-[    1.298090] [<ffff0000083bc6e8>] acpi_ns_one_complete_parse+0x1e8/0x22c
-[    1.304753] [<ffff0000083bc7b8>] acpi_ns_parse_table+0x8c/0x128
-[    1.310716] [<ffff0000083bb8fc>] acpi_ns_load_table+0xc0/0x1e8
-[    1.316591] [<ffff0000083c9068>] acpi_tb_load_namespace+0xf8/0x2e8
-[    1.322818] [<ffff000008984128>] acpi_load_tables+0x7c/0x110
-[    1.328516] [<ffff000008982ea4>] acpi_init+0x90/0x2c0
-[    1.333603] [<ffff0000080819fc>] do_one_initcall+0x38/0x12c
-[    1.339215] [<ffff000008960cd4>] kernel_init_freeable+0x148/0x1ec
-[    1.345353] [<ffff0000086b7d30>] kernel_init+0x10/0xec
-[    1.350529] [<ffff000008084e10>] ret_from_fork+0x10/0x40
-[    1.355878] Code: b9009fbc 2a00037b 36380057 3219037b (b9400260)
-[    1.362035] ---[ end trace 03381e5eb0a24de4 ]---
-[    1.366691] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+Maybe you should also depend on OF since the driver is going to crippled
+without any constraints set, or (OF || COMPILE_TEST) if you want some
+compile test coverage.
 
-With 'efi=debug', we can see those ACPI regions loaded by firmware on
-that board as:
-[    0.000000] efi:   0x0083ff1b5000-0x0083ff1c2fff [ACPI Reclaim Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0083ff223000-0x0083ff224fff [ACPI Memory NVS    |   |  |  |  |  |  |  |   |WB|WT|WC|UC]*
+> +       select REGMAP_I2C
+> +       help
+> +         This driver provides support for the voltage regulator SY8106A.
+>
+> +endif
+> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+> index 85a1d44..f382095 100644
+> --- a/drivers/regulator/Makefile
+> +++ b/drivers/regulator/Makefile
+> @@ -110,6 +110,6 @@ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-ldo.o
+>  obj-$(CONFIG_REGULATOR_WM8350) += wm8350-regulator.o
+>  obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
+>  obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
+> -
+> +obj-$(CONFIG_REGULATOR_SY8106A) += sy8106a-regulator.o
 
-This patch is trying to address the above issues by nomaping the region
-instead of removing it.
+Follow the existing ordering in the Makefile.
 
-Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Steve Capper <steve.capper@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: linux-mm at kvack.org
-Cc: linux-acpi at vger.kernel.org
-Cc: linux-efi at vger.kernel.org
----
-Changes in v2:
-Update the commit message and remove the memblock_is_map_memory() check
-according to the suggestion from Mark Rutland.
+>
+>  ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
+> diff --git a/drivers/regulator/sy8106a-regulator.c b/drivers/regulator/sy8106a-regulator.c
+> new file mode 100644
+> index 0000000..34bd69c
+> --- /dev/null
+> +++ b/drivers/regulator/sy8106a-regulator.c
+> @@ -0,0 +1,153 @@
+> +/*
+> + * sy8106a-regulator.c - Regulator device driver for SY8106A
+> + *
+> + * Copyright (C) 2016  Ond?ej Jirman <megous@megous.com>
+> + *
+> + * This library is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU Library General Public
+> + * License as published by the Free Software Foundation; either
+> + * version 2 of the License, or (at your option) any later version.
+> + *
+> + * This library is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * Library General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU Library General Public
+> + * License along with this library; if not, write to the
+> + * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+> + * Boston, MA  02110-1301, USA.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/i2c.h>
+> +#include <linux/module.h>
+> +#include <linux/init.h>
 
- arch/arm64/mm/init.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+Do you need this one?
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index d45f862..6af2456 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -222,12 +222,13 @@ void __init arm64_memblock_init(void)
- 
- 	/*
- 	 * Apply the memory limit if it was set. Since the kernel may be loaded
--	 * high up in memory, add back the kernel region that must be accessible
--	 * via the linear mapping.
-+	 * in the memory regions above the limit, so we need to clear the
-+	 * MEMBLOCK_NOMAP flag of this region to make it can be accessible via
-+	 * the linear mapping.
- 	 */
- 	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
--		memblock_enforce_memory_limit(memory_limit);
--		memblock_add(__pa(_text), (u64)(_end - _text));
-+		memblock_mem_limit_mark_nomap(memory_limit);
-+		memblock_clear_nomap(__pa(_text), (u64)(_end - _text));
- 	}
- 
- 	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
--- 
-1.8.3.1
+> +#include <linux/regulator/driver.h>
+> +#include <linux/regulator/machine.h>
+
+And this one?
+
+> +#include <linux/regulator/of_regulator.h>
+> +#include <linux/regmap.h>
+
+Sort alphabetically please.
+
+> +
+> +#define SY8106A_REG_VOUT1_SEL          0x01
+> +#define SY8106A_REG_VOUT_COM           0x02
+> +#define SY8106A_REG_VOUT1_SEL_MASK     0x7f
+> +#define SY8106A_DISABLE_REG            0x01
+
+BIT(0) would be clearer.
+
+> +
+> +struct sy8106a {
+> +       struct regulator_dev *rdev;
+> +       struct regmap *regmap;
+> +};
+> +
+> +static const struct regmap_config sy8106a_regmap_config = {
+> +       .reg_bits = 8,
+> +       .val_bits = 8,
+> +};
+> +
+> +static int sy8106a_set_voltage_sel(struct regulator_dev *rdev, unsigned sel)
+> +{
+> +       return regmap_update_bits(rdev->regmap, rdev->desc->vsel_reg,
+> +                                 0xff, sel | 0x80);
+
+Can you use .apply_bit / .apply_reg with regulator_set_voltage_sel_regmap?
+
+> +}
+> +
+> +static const struct regulator_ops sy8106a_ops = {
+> +       .is_enabled = regulator_is_enabled_regmap,
+> +       .set_voltage_sel = sy8106a_set_voltage_sel,
+> +       .set_voltage_time_sel = regulator_set_voltage_time_sel,
+> +       .get_voltage_sel = regulator_get_voltage_sel_regmap,
+> +       .list_voltage = regulator_list_voltage_linear,
+> +};
+> +
+> +/* Default limits measured in millivolts and milliamps */
+> +#define SY8106A_MIN_MV         680
+> +#define SY8106A_MAX_MV         1950
+> +#define SY8106A_STEP_MV                10
+> +
+> +static const struct regulator_desc sy8106a_reg = {
+> +       .name = "SY8106A",
+> +       .id = 0,
+> +       .ops = &sy8106a_ops,
+> +       .type = REGULATOR_VOLTAGE,
+> +       .n_voltages = ((SY8106A_MAX_MV - SY8106A_MIN_MV) / SY8106A_STEP_MV) + 1,
+> +       .min_uV = (SY8106A_MIN_MV * 1000),
+> +       .uV_step = (SY8106A_STEP_MV * 1000),
+> +       .vsel_reg = SY8106A_REG_VOUT1_SEL,
+> +       .vsel_mask = SY8106A_REG_VOUT1_SEL_MASK,
+> +       .enable_reg = SY8106A_REG_VOUT_COM,
+> +       .enable_mask = SY8106A_DISABLE_REG,
+> +       .disable_val = SY8106A_DISABLE_REG,
+> +       .enable_is_inverted = 1,
+> +       .owner = THIS_MODULE,
+> +};
+> +
+> +/*
+> + * I2C driver interface functions
+> + */
+> +static int sy8106a_i2c_probe(struct i2c_client *i2c,
+> +                           const struct i2c_device_id *id)
+> +{
+> +       struct sy8106a *chip;
+> +       struct device *dev = &i2c->dev;
+> +       struct regulator_dev *rdev = NULL;
+> +       struct regulator_config config = { };
+> +       unsigned int selector;
+> +       int error;
+> +
+> +       chip = devm_kzalloc(&i2c->dev, sizeof(struct sy8106a), GFP_KERNEL);
+> +       if (!chip)
+> +               return -ENOMEM;
+> +
+> +       chip->regmap = devm_regmap_init_i2c(i2c, &sy8106a_regmap_config);
+> +       if (IS_ERR(chip->regmap)) {
+> +               error = PTR_ERR(chip->regmap);
+> +               dev_err(&i2c->dev, "Failed to allocate register map: %d\n",
+> +                       error);
+> +               return error;
+> +       }
+> +
+> +       config.dev = &i2c->dev;
+> +       config.init_data = of_get_regulator_init_data(dev, dev->of_node, &sy8106a_reg);
+
+Check for possible failures?
+
+> +       config.driver_data = chip;
+> +       config.regmap = chip->regmap;
+> +       config.of_node = dev->of_node;
+> +
+> +       /* Probe regulator */
+> +       error = regmap_read(chip->regmap, SY8106A_REG_VOUT1_SEL, &selector);
+> +       dev_info(&i2c->dev, "SY8106A voltage at boot: %u mV\n", SY8106A_MIN_MV + SY8106A_STEP_MV * (selector & SY8106A_REG_VOUT1_SEL_MASK));
+> +       if (error) {
+> +               dev_err(&i2c->dev, "Failed to read voltage at probe time: %d\n", error);
+> +               return error;
+> +       }
+> +
+> +       rdev = devm_regulator_register(&i2c->dev, &sy8106a_reg, &config);
+> +       if (IS_ERR(rdev)) {
+> +               dev_err(&i2c->dev, "Failed to register SY8106A regulator\n");
+> +               return PTR_ERR(rdev);
+> +       }
+> +
+> +       chip->rdev = rdev;
+> +
+> +       i2c_set_clientdata(i2c, chip);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct i2c_device_id sy8106a_i2c_id[] = {
+> +       {"sy8106a", 0},
+> +       {},
+> +};
+> +
+
+Extra line.
+
+> +MODULE_DEVICE_TABLE(i2c, sy8106a_i2c_id);
+
+IMHO probing explicitly through DT (of_device_id) would be better.
+
+
+Regards
+ChenYu
+
+> +
+> +static struct i2c_driver sy8106a_regulator_driver = {
+> +       .driver = {
+> +               .name = "sy8106a",
+> +       },
+> +       .probe = sy8106a_i2c_probe,
+> +       .id_table = sy8106a_i2c_id,
+> +};
+> +
+> +module_i2c_driver(sy8106a_regulator_driver);
+> +
+> +MODULE_AUTHOR("Ond?ej Jirman <megous@megous.com>");
+> +MODULE_DESCRIPTION("Regulator device driver for Silergy SY8106A");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 2.9.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
