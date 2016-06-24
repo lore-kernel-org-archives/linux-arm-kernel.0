@@ -1,82 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 24 Jun 2016 10:55:41 -0500
-Subject: [PATCH 1/5] dt-bindings: Add binding for brcm,bcm2835-sdhost.
-In-Reply-To: <1466595738-2229-2-git-send-email-kraxel@redhat.com>
-References: <1466595738-2229-1-git-send-email-kraxel@redhat.com>
- <1466595738-2229-2-git-send-email-kraxel@redhat.com>
-Message-ID: <20160624155541.GA12266@rob-hp-laptop>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 24 Jun 2016 10:57:47 -0500
+Subject: [PATCH] hwrng: OMAP: Fix assumption that runtime_get_sync will always
+ succeed
+Message-ID: <1466783867-25743-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2016 at 01:42:14PM +0200, Gerd Hoffmann wrote:
-> From: Eric Anholt <eric@anholt.net>
-> 
-> This is the other SD controller on the platform, which can be swapped
-> to the role of SD card host using pin muxing.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  .../devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt |  3 +++
->  .../bindings/mmc/brcm,bcm2835-sdhost.txt           | 24 ++++++++++++++++++++++
->  2 files changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
-> index 59476fb..3cc74e2 100644
-> --- a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
-> @@ -15,4 +15,7 @@ sdhci: sdhci {
->  	interrupts = <2 30>;
->  	clocks = <&clk_mmc>;
->  	bus-width = <4>;
-> +	dmas = <&dma 13>,
-> +	       <&dma 13>;
-> +	dma-names = "tx", "rx";
+pm_runtime_get_sync does return a error value that must be checked for
+error conditions, else, due to various reasons, the device maynot be
+enabled and the system will crash due to lack of clock to the hardware
+module.
 
-This looks like it should be separate patch.
+Before:
+12.562784] [00000000] *pgd=fe193835
+12.562792] Internal error: : 1406 [#1] SMP ARM
+[...]
+12.562864] CPU: 1 PID: 241 Comm: modprobe Not tainted 4.7.0-rc4-next-20160624 #2
+12.562867] Hardware name: Generic DRA74X (Flattened Device Tree)
+12.562872] task: ed51f140 ti: ed44c000 task.ti: ed44c000
+12.562886] PC is at omap4_rng_init+0x20/0x84 [omap_rng]
+12.562899] LR is at set_current_rng+0xc0/0x154 [rng_core]
+[...]
 
->  };
-> diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-> new file mode 100644
-> index 0000000..074992c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-> @@ -0,0 +1,24 @@
-> +Broadcom BCM2835 SDHOST controller
-> +
-> +This file documents differences between the core properties described
-> +by mmc.txt and the properties that represent the BCM2835 controller.
-> +
-> +Required properties:
-> +- compatible: Should be "brcm,bcm2835-sdhci".
+After the proper checks:
+[   94.366705] omap_rng 48090000.rng: _od_fail_runtime_resume: FIXME:
+missing hwmod/omap_dev info
+[   94.375767] omap_rng 48090000.rng: Failed to runtime_get device -19
+[   94.382351] omap_rng 48090000.rng: initialization failed.
 
-Doesn't match the example.
+Fixes: 665d92fa85b5 ("hwrng: OMAP: convert to use runtime PM")
+Cc: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-> +- clocks: The clock feeding the SDHOST controller.
+Patch based on: next-20160624
+Issue seen with next-20160624
+Full crash log: http://pastebin.ubuntu.com/17801376/
 
-reg?
+ drivers/char/hw_random/omap-rng.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-interrupts?
-
-> +
-> +Optional properties:
-> +- dmas: DMA channels for read and write.
-> +          See Documentation/devicetree/bindings/dma/dma.txt for details
-
-dma-names?
-
-> +
-> +Example:
-> +
-> +sdhost: sdhost at 7e202000 {
-> +	compatible = "brcm,bcm2835-sdhost";
-> +	reg = <0x7e202000 0x100>;
-> +	interrupts = <2 24>;
-> +	clocks = <&clocks BCM2835_CLOCK_VPU>;
-> +	dmas = <&dma 13>,
-> +	       <&dma 13>;
-> +	dma-names = "tx", "rx";
-> +};
-> -- 
-> 1.8.3.1
-> 
+diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
+index 8a1432e8bb80..f30a1870cb64 100644
+--- a/drivers/char/hw_random/omap-rng.c
++++ b/drivers/char/hw_random/omap-rng.c
+@@ -384,7 +384,11 @@ static int omap_rng_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	pm_runtime_enable(&pdev->dev);
+-	pm_runtime_get_sync(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to runtime_get device: %d\n", ret);
++		goto err_ioremap;
++	}
+ 
+ 	ret = (dev->of_node) ? of_get_omap_rng_device_details(priv, pdev) :
+ 				get_omap_rng_device_details(priv);
+@@ -435,8 +439,14 @@ static int __maybe_unused omap_rng_suspend(struct device *dev)
+ static int __maybe_unused omap_rng_resume(struct device *dev)
+ {
+ 	struct omap_rng_dev *priv = dev_get_drvdata(dev);
++	int ret;
++
++	ret = pm_runtime_get_sync(dev);
++	if (ret) {
++		dev_err(dev, "Failed to runtime_get device: %d\n", ret);
++		return ret;
++	}
+ 
+-	pm_runtime_get_sync(dev);
+ 	priv->pdata->init(priv);
+ 
+ 	return 0;
+-- 
+2.9.0
