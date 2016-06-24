@@ -1,64 +1,60 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Fri, 24 Jun 2016 12:55:16 +1000
-Subject: [linux-sunxi] [PATCH 13/14] ARM: dts: sun8i: Add gpio-regulator
- used on Orange Pi One
-In-Reply-To: <20160623192104.18720-14-megous@megous.com>
-References: <20160623192104.18720-1-megous@megous.com>
- <20160623192104.18720-14-megous@megous.com>
-Message-ID: <CAGRGNgW4Xk6mEj_Y2gT_Fr+xU47JUhSvmyob14VVwgJrgQfc0Q@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 24 Jun 2016 10:57:29 +0800
+Subject: [PATCH] arm64:swiotlb:Enable only when Input size through
+ command line
+In-Reply-To: <9A15F5E5-775E-4079-961F-67FD54B8F2F4@oracle.com>
+References: <1466684020-5224-1-git-send-email-manjeet.p@samsung.com>
+ <20160623143034.GN6521@e104818-lin.cambridge.arm.com>
+ <9A15F5E5-775E-4079-961F-67FD54B8F2F4@oracle.com>
+Message-ID: <20160624105729.095e7f1f@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ondrej,
+Dear Konrad,
 
-On Fri, Jun 24, 2016 at 5:21 AM,  <megous@megous.com> wrote:
-> From: Ondrej Jirman <megous@megous.com>
->
-> Xulong Orange Pi One uses GPIO based regulator that
-> switches between two voltages: 1.1V and 1.3V. The
-> regulator is controlled from the PL6 pin.
->
-> Signed-off-by: Ondrej Jirman <megous@megous.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> index 0adf932..ce4ba91 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> @@ -88,6 +88,25 @@
->                         gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
->                 };
->         };
-> +
-> +       vdd_soc: gpio-regulator {
-> +               compatible = "regulator-gpio";
-> +
-> +               regulator-name = "soc-vdd-supply";
-> +               regulator-min-microvolt = <1100000>;
-> +               regulator-max-microvolt = <1300000>;
-> +               regulator-boot-on;
-> +               regulator-type = "voltage";
-> +
-> +               gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>;
-> +               states = <1100000 0x0
-> +                         1300000 0x1>;
-> +
-> +               startup-delay-us = <100000>;
-> +               enable-active-high;
-> +       };
-> +};
-> +
+On Thu, 23 Jun 2016 12:06:10 -0400 Konrad Rzeszutek Wilk wrote:
 
-Also, isn't adding another closing bracket here a syntax error?
+> On June 23, 2016 10:30:34 AM EDT, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >On Thu, Jun 23, 2016 at 05:43:40PM +0530, Manjeet Pawar wrote:  
+> >> From: Rohit Thapliyal <r.thapliyal@samsung.com>
+> >> 
+> >> swiotlb default size of 64M is too big as
+> >> default value therefore it is made configurable
+> >> through command line through swiotlb_size parameter.
+> >> swiotlb allocation shall be done only when the
+> >> swiotlb size is given through command line.
+> >> Otherwise no swiotlb is allocated.  
+> >
+> >I already queued this patch:
+> >
+> >http://lkml.kernel.org/g/1465372426-4077-1-git-send-email-jszhang at marvell.com
+> >
+> >If you have any objections to it, please reply there.  
+> 
+> 
+> I do (sorry about duplicate email, the other got rejected by mailing lists).
+> 
+> Why not expand the swiotlb= parameter instead of introducing a new one?
 
->  };
+Do you mean pass "swiotlb=" for those platforms(most probably, arm64 with less
+than 4GB DDR) which don't need swiotlb? I'm afraid this is not convenient, and
+users even don't notice swiotlb parameter. From another side, pass "swiotlb=0"
+will make the swiotlb reserve 64MB instead, so how can we achieve zero reserved
+memory for swiotlb through "swiotlb=" parameter?
+
+PS: my patch didn't introduce new boot parameter.
+
+I'm not sure I got your meaning, so could you please comment my patch
+directly?
 
 Thanks,
+Jisheng
 
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+> 
+> Also, why not use the swiotlb by itself? That does the job as well?
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
