@@ -1,61 +1,40 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 24 Jun 2016 12:05:23 +0900
-Subject: [PATCH v3 0/3] arm64: Add Renesas R8A7796 SoC support
-In-Reply-To: <20160606015201.GA2317@verge.net.au>
-References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
- <20160606013345.GB6258@verge.net.au>
- <20160606015201.GA2317@verge.net.au>
-Message-ID: <20160624030523.GA14973@verge.net.au>
+Date: Fri, 24 Jun 2016 12:05:42 +0900
+Subject: [PATCH 0/2] arm64: dts: r8a7796: Add SYSC PM Domains
+In-Reply-To: <20160606015301.GB2317@verge.net.au>
+References: <1464685726-21611-1-git-send-email-geert+renesas@glider.be>
+ <20160606013359.GE4859@verge.net.au>
+ <20160606015301.GB2317@verge.net.au>
+Message-ID: <20160624030541.GB14973@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2016 at 10:52:01AM +0900, Simon Horman wrote:
-> On Mon, Jun 06, 2016 at 10:33:45AM +0900, Simon Horman wrote:
-> > On Tue, May 24, 2016 at 10:54:37AM +0900, Simon Horman wrote:
-> > > Hi,
+On Mon, Jun 06, 2016 at 10:53:02AM +0900, Simon Horman wrote:
+> On Mon, Jun 06, 2016 at 10:33:59AM +0900, Simon Horman wrote:
+> > On Tue, May 31, 2016 at 11:08:43AM +0200, Geert Uytterhoeven wrote:
+> > > 	Hi Simon, Magnus,
 > > > 
-> > > this short series aims to add basic support for the
-> > > Gen 3 R-Car M3-W (r8a7796) SoC.
+> > > This patch series adds support for the power areas exposed by the System
+> > > Controller on the Renesas R-Car M3-W SoC to the DTS.
 > > > 
-> > > It has few bells and whistles but is sufficient to bring up
-> > > an r8a7795/salvator-x. I have provided a boot-log at the bottom
-> > > of this email in case it is of interest.
+> > > This series is against Simon's "[PATCH v3 0/3] arm64: Add Renesas
+> > > R8A7796 SoC support".  It has a build and runtime dependency on my series
+> > > "[PATCH v2 0/3] soc: renesas: rcar-sysc: Add support for R-Car M3-W power
+> > > areas".
 > > > 
-> > > 
-> > > Dependency:
-> > > 
-> > > "[PATCH 0/4] clk: renesas: cpg-mssr: Add support for R-Car M3-W"
-> > > 
-> > > 
-> > > Availability:
-> > > 
-> > > In order to aid review this series, its dependency (above)
-> > > and the related patch "serial: sh-sci: Document SoC specific bindings for
-> > > r8a7796", which has been posted separately, are available at:
-> > > 
-> > > git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/r8a7796-v3
-> > > 
-> > > To be entirely clear, at the time of writing I have _not_ queued up this
-> > > series for mainline.
+> > > For your convenience, I've pushed this series to the
+> > > topic/r8a7796-sysc-dt-v1 branch of
+> > > https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git.
+> > > This has been tested on r8a7796/salvator-x.
 > > 
-> > I have queued this up for v4.8.
-> > 
-> > 
-> > I acknowledge that there has been some discussion of sharing DT between
-> > the r8a7795 and r8a7796. However it is my considered opinion that the level
-> > of duplication in the approach taken by this patchset is in keeping with
-> > the practice already used in the tree. And that material benefits in terms
-> > of ease of maintenance can only be realised with a solution that goes
-> > beyond breaking common nodes into a shared dtsi file.
-> > 
-> > It is my request that my decision as co-maintainer of the files
-> > in question be respected.
+> > Thanks, I have tentatively queued this up.
 > 
 > Bother, I spoke to soon.
 > 
-> There is a compile-time dependency on 8a7796-cpg-mssr.h
-> so "[PATCH 0/4] clk: renesas: cpg-mssr: Add support for R-Car M3-W"
-> needs to be present. I have deferred these patches pending that.
+> There is a compile-time dependency on 8a7796-cpg-mssr.h in the basic
+> support for r8a7796 which this series depends on.  So "[PATCH 0/4] clk:
+> renesas: cpg-mssr: Add support for R-Car M3-W" needs to be present. I have
+> deferred these patches pending that. 
+> 
 
-I have requeued this on top of
-"clk: renesas: Add r8a7796 CPG Core Clock Definitions"
+I have requeued this.
