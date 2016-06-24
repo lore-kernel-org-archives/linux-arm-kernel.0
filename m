@@ -1,90 +1,127 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 24 Jun 2016 06:16:45 +0200
-Subject: [PATCH v6 2/2] mtd: nand: sunxi: add reset line support
-In-Reply-To: <1284641466724038@web7h.yandex.ru>
-References: <20160620044838.56904-1-icenowy@aosc.xyz>
- <20160620044838.56904-2-icenowy@aosc.xyz>
- <20160623180108.382bbaae@bbrezillon>
- <1284641466724038@web7h.yandex.ru>
-Message-ID: <20160624061645.20af1888@bbrezillon>
+From: sajjan.linux@gmail.com (Vikas Sajjan)
+Date: Fri, 24 Jun 2016 09:55:20 +0530
+Subject: [PATCH 11/14] drivers: firmware: psci: Allow OS Initiated suspend
+ mode
+In-Reply-To: <1466624209-27432-12-git-send-email-lina.iyer@linaro.org>
+References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
+ <1466624209-27432-12-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAGm_ybjO+jAN62fqFyVrw_+5LOnUumEfn8kxmDa+s5ap0Bqk9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Jun 2016 07:20:38 +0800
-Icenowy Zheng <icenowy@aosc.xyz> wrote:
+Hi Lina,
 
-> In my opinion, return directly PTR_ERR(nfc->reset) is OK here.
-> If devm_reset_control_get_optional() return -EPROBE_DEFER, the code here will also return it. However, if we get other error, why should it return -EPROBE_DEFER again?
+On Thu, Jun 23, 2016 at 1:06 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> PSCI firmware v1.0 onwards may support 2 different modes for
+> CPU_SUSPEND. Platform coordinated mode is the default and every firmware
+> should support it. OS Initiated mode is optional for the firmware to
+> implement and allow Linux to make an better decision on the state of
+> the CPU cluster heirarchy.
+>
+> With the kernel capable of deciding the state for CPU cluster and
+> coherency domains, the OS Initiated mode may now be used by the kernel,
+> provided the firmware supports it. SET_SUSPEND_MODE is a PSCI function
+> available on v1.0 onwards and can be used to set the mode in the
+> firmware.
+>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> [Ulf: Rebased on 4.7 rc1]
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/firmware/psci.c   | 22 +++++++++++++++++++++-
+>  include/uapi/linux/psci.h |  5 +++++
+>  2 files changed, 26 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 03e0458..3920aba 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -52,6 +52,7 @@
+>   * require cooperation with a Trusted OS driver.
+>   */
+>  static int resident_cpu = -1;
+> +static bool psci_has_osi_pd;
+>
+>  bool psci_tos_resident_on(int cpu)
+>  {
+> @@ -563,10 +564,29 @@ out_put_node:
+>         return err;
+>  }
+>
+> +static int __init psci_1_0_init(struct device_node *np)
+> +{
+> +       int ret;
+> +
+> +       ret = psci_0_2_init(np);
+> +       if (ret)
+> +               return ret;
+> +
+> +       /* Check if PSCI OSI mode is available */
+> +       ret = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
+> +       if (ret & PSCI_1_0_OS_INITIATED) {
+> +               ret = psci_features(PSCI_1_0_FN_SET_SUSPEND_MODE);
+> +               if (!ret)
+> +                       psci_has_osi_pd = true;
 
-Sorry, I just had a brainfart :-). Your implementation is correct.
-BTW, can you avoid top-posting and reply inline?
+IMHO, its better to have this done in psci_init_cpu_suspend() itself
+for 2 reasons
 
-> 
-> 24.06.2016, 00:01, "Boris Brezillon" <boris.brezillon@free-electrons.com>:
-> > On Mon, 20 Jun 2016 12:48:38 +0800
-> > Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> >  
-> >> ?The NAND controller on some sun8i chips needs its reset line to be
-> >> ?deasserted before they can enter working state.
-> >>
-> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >> ?---
-> >> ???Changes in v2:
-> >> ?????- Corrected the error checking code of reset line.
-> >>
-> >> ???Changes in v3:
-> >> ?????- Corrected a more serious error brought in the "fix" of v2.
-> >>
-> >> ???Changes in v4:
-> >> ?????- Removed unneeded code block after "else".
-> >>
-> >> ???Changes in v5:
-> >> ?????- Added reassertion code in case of initialization error and device
-> >> ???????remove.
-> >>
-> >> ???Changes in v6:
-> >> ?????- Fixed a resource leak by not using goto to exit in case of error.
-> >>
-> >> ??drivers/mtd/nand/sunxi_nand.c | 28 +++++++++++++++++++++++++---
-> >> ??1 file changed, 25 insertions(+), 3 deletions(-)
-> >>
-> >> ?diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> >> ?index a83a690..08d5e88 100644
-> >> ?--- a/drivers/mtd/nand/sunxi_nand.c
-> >> ?+++ b/drivers/mtd/nand/sunxi_nand.c
-> >> ?@@ -39,6 +39,7 @@
-> >> ??#include <linux/gpio.h>
-> >> ??#include <linux/interrupt.h>
-> >> ??#include <linux/iopoll.h>
-> >> ?+#include <linux/reset.h>
-> >>
-> >> ??#define NFC_REG_CTL 0x0000
-> >> ??#define NFC_REG_ST 0x0004
-> >> ?@@ -269,6 +270,7 @@ struct sunxi_nfc {
-> >> ??????????void __iomem *regs;
-> >> ??????????struct clk *ahb_clk;
-> >> ??????????struct clk *mod_clk;
-> >> ?+ struct reset_control *reset;
-> >> ??????????unsigned long assigned_cs;
-> >> ??????????unsigned long clk_rate;
-> >> ??????????struct list_head chips;
-> >> ?@@ -1871,26 +1873,42 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
-> >> ??????????if (ret)
-> >> ??????????????????goto out_ahb_clk_unprepare;
-> >>
-> >> ?+ nfc->reset = devm_reset_control_get_optional(dev, "ahb");
-> >> ?+
-> >> ?+ if (!IS_ERR(nfc->reset)) {
-> >> ?+ ret = reset_control_deassert(nfc->reset);
-> >> ?+ if (ret) {
-> >> ?+ dev_err(dev, "reset err %d\n", ret);
-> >> ?+ goto out_mod_clk_unprepare;
-> >> ?+ }
-> >> ?+ } else if (PTR_ERR(nfc->reset) != -ENOENT) {
-> >> ?+ ret = PTR_ERR(nfc->reset);  
-> >
-> > You should return -EDEFER_PROBE here.
-> >
-> > And can you please rebase this series on top of nand/next [1]?
-> >
-> > [1]https://github.com/linux-nand/linux/tree/nand/next  
+a] psci_init_cpu_suspend() already calls
+psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND])
+b] by moving this in psci_init_cpu_suspend() we make this support
+available even for ACPI platforms, since psci_acpi_init() calls
+psci_probe() and this calls  psci_init_cpu_suspend() for
+PSCI_VERSION_MAJOR(ver) >= 1
+
+I even posted a patch [1] yesterday, without being aware of your
+patchset for the same.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg513682.html
+
+
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  static const struct of_device_id psci_of_match[] __initconst = {
+>         { .compatible = "arm,psci",     .data = psci_0_1_init},
+>         { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
+> -       { .compatible = "arm,psci-1.0", .data = psci_0_2_init},
+> +       { .compatible = "arm,psci-1.0", .data = psci_1_0_init},
+>         {},
+>  };
+>
+> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+> index 3d7a0fc..7dd778e 100644
+> --- a/include/uapi/linux/psci.h
+> +++ b/include/uapi/linux/psci.h
+> @@ -48,6 +48,7 @@
+>
+>  #define PSCI_1_0_FN_PSCI_FEATURES              PSCI_0_2_FN(10)
+>  #define PSCI_1_0_FN_SYSTEM_SUSPEND             PSCI_0_2_FN(14)
+> +#define PSCI_1_0_FN_SET_SUSPEND_MODE           PSCI_0_2_FN(15)
+>
+>  #define PSCI_1_0_FN64_SYSTEM_SUSPEND           PSCI_0_2_FN64(14)
+>
+> @@ -93,6 +94,10 @@
+>  #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK  \
+>                         (0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
+>
+> +#define PSCI_1_0_OS_INITIATED                  BIT(0)
+> +#define PSCI_1_0_SUSPEND_MODE_PC               0
+> +#define PSCI_1_0_SUSPEND_MODE_OSI              1
+> +
+>  /* PSCI return values (inclusive of all PSCI versions) */
+>  #define PSCI_RET_SUCCESS                       0
+>  #define PSCI_RET_NOT_SUPPORTED                 -1
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
