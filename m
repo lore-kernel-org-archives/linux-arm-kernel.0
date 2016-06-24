@@ -1,97 +1,71 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 24 Jun 2016 05:01:44 +0000
-Subject: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
-In-Reply-To: <Pine.LNX.4.44L0.1605121359120.5957-100000@netrider.rowland.org>
-References: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>
- <Pine.LNX.4.44L0.1605121359120.5957-100000@netrider.rowland.org>
-Message-ID: <B256D81BAE5131468A838E5D7A24364101650CC12C@penmbx01>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Fri, 24 Jun 2016 10:51:26 +0530
+Subject: [PATCH v2 5/5] dmaengine: dma: Use different channel names for each
+ dma
+In-Reply-To: <1466745686-23898-1-git-send-email-appanad@xilinx.com>
+References: <1466745686-23898-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1466745686-23898-6-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+Current driver assumes that child node channel name is either
+"xlnx,axi-vdma-mm2s-channel" or "xlnx,axi-vdma-s2mm-channel"
+which is confusing the users of AXI DMA and CDMA.
+This patch fixes this issue by using different channel
+names for the AXI DMA and AXI CDMA child nodes.
 
-Sorry for late answer.
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Chanes for v2:
+---> New patch.
 
-> -----Original Message-----
-> From: Alan Stern [mailto:stern at rowland.harvard.edu]
-> Sent: 2016?5?13? 2:11
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>; Ferre, Nicolas
-> <Nicolas.FERRE@atmel.com>; linux-usb at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
-> 
-> On Thu, 12 May 2016, Wenyou Yang wrote:
-> 
-> > In order to get lower consumption, as a workaround, suspend the USB
-> > PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI Interrupt
-> > Configuration Register while OHCI USB suspending.
-> 
-> What does this mean?  What does suspending a port do?  Is it the same as a
-> normal USB port suspend?
+ .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |    6 +++++-
+ drivers/dma/xilinx/xilinx_dma.c                    |    8 ++++++--
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-The usb controller from Synopsis does not managed correctly the suspend mode for the EHCI. 
-There is no way to have the VDDUTMII (USB device and host UTMI interface) suspend without any device connected to it. 
-
-That's why we added this specific control to fix this issue. Namely, by setting some bits of one of the special function registers to fix this issue outside the usb controller. 
-
-And the suspend mode works in OHCI mode.
-
-It is not same as a normal USB port suspend.
-
-> 
-> If it is the same, why doesn't the USB_PORT_FEAT_SUSPEND subcase of the
-> SetPortFeature case in ohci_hub_control() already take care of this?
-> 
-> > This suspend operation must be done before stopping the USB clock,
-> > resume after the USB clock enabled.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> 
-> > @@ -132,6 +135,17 @@ static void at91_stop_hc(struct platform_device
-> > *pdev)
-> >
-> >
-> > /*--------------------------------------------------------------------
-> > -----*/
-> >
-> > +struct regmap *at91_dt_syscon_sfr(void) {
-> > +	struct regmap *regmap;
-> > +
-> > +	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
-> > +	if (IS_ERR(regmap))
-> > +		return NULL;
-> 
-> If you get an error, the regmap pointer is set to NULL...
-> 
-> > @@ -197,6 +211,8 @@ static int usb_hcd_at91_probe(const struct hc_driver
-> *driver,
-> >  		goto err;
-> >  	}
-> >
-> > +	ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
-> 
-> With no other error checking...
-> 
-> > +
-> >  	board = hcd->self.controller->platform_data;
-> >  	ohci = hcd_to_ohci(hcd);
-> >  	ohci->num_ports = board->ports;
-> 
-> > +static int ohci_at91_port_ctrl(struct regmap *regmap, bool enable) {
-> > +	u32 regval;
-> > +	int ret;
-> > +
-> > +	if (IS_ERR(regmap))
-> > +		return PTR_ERR(regmap);
-> > +
-> > +	ret = regmap_read(regmap, SFR_OHCIICR, &regval);
-> 
-> And now what happens if regmap is NULL?  Hint: It won't be pretty...
-> 
-> Alan Stern
-
-
-Best Regards,
-Wenyou Yang
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+index 0faa189..a2b8bfa 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+@@ -50,8 +50,12 @@ Optional properties for VDMA:
+ 	{3}, flush s2mm channel
+ 
+ Required child node properties:
+-- compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
++- compatible:
++	For VDMA: It should be either "xlnx,axi-vdma-mm2s-channel" or
+ 	"xlnx,axi-vdma-s2mm-channel".
++	For CDMA: It should be "xlnx,axi-cdma-channel".
++	For AXIDMA: It should be either "xlnx,axi-dma-mm2s-channel" or
++	"xlnx,axi-dma-s2mm-channel".
+ - interrupts: Should contain per channel VDMA interrupts.
+ - xlnx,datawidth: Should contain the stream data width, take values
+ 	{32,64...1024}.
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index 0768d9f..cf47347 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -2353,7 +2353,9 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+ 	if (!has_dre)
+ 		xdev->common.copy_align = fls(width - 1);
+ 
+-	if (of_device_is_compatible(node, "xlnx,axi-vdma-mm2s-channel")) {
++	if (of_device_is_compatible(node, "xlnx,axi-vdma-mm2s-channel") ||
++	    of_device_is_compatible(node, "xlnx,axi-dma-mm2s-channel") ||
++	    of_device_is_compatible(node, "xlnx,axi-cdma-channel")) {
+ 		chan->direction = DMA_MEM_TO_DEV;
+ 		chan->id = chan_id;
+ 		chan->tdest = chan_id;
+@@ -2367,7 +2369,9 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+ 				chan->flush_on_fsync = true;
+ 		}
+ 	} else if (of_device_is_compatible(node,
+-					    "xlnx,axi-vdma-s2mm-channel")) {
++					   "xlnx,axi-vdma-s2mm-channel") ||
++		   of_device_is_compatible(node,
++					   "xlnx,axi-dma-s2mm-channel")) {
+ 		chan->direction = DMA_DEV_TO_MEM;
+ 		chan->id = chan_id;
+ 		chan->tdest = chan_id - xdev->nr_channels;
+-- 
+1.7.1
