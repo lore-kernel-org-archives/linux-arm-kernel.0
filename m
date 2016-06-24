@@ -1,38 +1,74 @@
-From: chris@chris-wilson.co.uk (Chris Wilson)
-Date: Fri, 24 Jun 2016 15:36:19 +0100
-Subject: [PATCH 2/5] drm/sun4i: Remove redundant call to
- drm_connector_unregister_all()
-In-Reply-To: <1466778982-6974-1-git-send-email-chris@chris-wilson.co.uk>
-References: <1466778982-6974-1-git-send-email-chris@chris-wilson.co.uk>
-Message-ID: <1466778982-6974-2-git-send-email-chris@chris-wilson.co.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 24 Jun 2016 08:37:03 -0600
+Subject: [PATCH] pci: tegra: actually program REFCLK_CFG* on recent SoCs
+Message-ID: <20160624143703.13231-1-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm_connector_unregister_all() is automatically called by
-drm_dev_unregister() and so the manual call can be dropped.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Chris Wilson <chris@chris-wilson.co.uk>
-Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-arm-kernel at lists.infradead.org
+On recent SoCs, tegra_pcie_phy_enable() isn't called; but instead
+tegra_pcie_enable_controller() calls tegra_xusb_phy_enable(). However,
+part of tegra_pcie_phy_enable() needs to happen in all cases. Move that
+code to tegra_pcie_port_enable() instead.
+
+For reference, NVIDIA's downstream Linux kernel performs this operation
+in tegra_pcie_enable_rp_features(), which is called immediately after
+tegra_pcie_port_enable(). Since that function doesn't exist in the mainline
+driver, we'll just add it to the tail of tegra_pcie_port_enable() instead.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/pci/host/pci-tegra.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 5b89940edcb1..b22acc68d3b2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -185,7 +185,6 @@ static void sun4i_drv_unbind(struct device *dev)
- {
- 	struct drm_device *drm = dev_get_drvdata(dev);
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 74887fedc3d4..2ec64a9e7943 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -541,12 +541,13 @@ static void tegra_pcie_port_reset(struct tegra_pcie_port *port)
  
--	drm_connector_unregister_all(drm);
- 	drm_dev_unregister(drm);
- 	drm_kms_helper_poll_fini(drm);
- 	sun4i_framebuffer_free(drm);
+ static void tegra_pcie_port_enable(struct tegra_pcie_port *port)
+ {
+-	const struct tegra_pcie_soc_data *soc = port->pcie->soc_data;
++	struct tegra_pcie *pcie = port->pcie;
++	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
+ 	unsigned long ctrl = tegra_pcie_port_get_pex_ctrl(port);
+ 	unsigned long value;
+ 
+ 	/* enable reference clock */
+-	value = afi_readl(port->pcie, ctrl);
++	value = afi_readl(pcie, ctrl);
+ 	value |= AFI_PEX_CTRL_REFCLK_EN;
+ 
+ 	if (soc->has_pex_clkreq_en)
+@@ -554,9 +555,14 @@ static void tegra_pcie_port_enable(struct tegra_pcie_port *port)
+ 
+ 	value |= AFI_PEX_CTRL_OVERRIDE_EN;
+ 
+-	afi_writel(port->pcie, value, ctrl);
++	afi_writel(pcie, value, ctrl);
+ 
+ 	tegra_pcie_port_reset(port);
++
++	/* Configure the reference clock driver */
++	pads_writel(pcie, soc->pads_refclk_cfg0, PADS_REFCLK_CFG0);
++	if (soc->num_ports > 2)
++		pads_writel(pcie, soc->pads_refclk_cfg1, PADS_REFCLK_CFG1);
+ }
+ 
+ static void tegra_pcie_port_disable(struct tegra_pcie_port *port)
+@@ -831,11 +837,6 @@ static int tegra_pcie_phy_enable(struct tegra_pcie *pcie)
+ 	value |= PADS_PLL_CTL_RST_B4SM;
+ 	pads_writel(pcie, value, soc->pads_pll_ctl);
+ 
+-	/* Configure the reference clock driver */
+-	pads_writel(pcie, soc->pads_refclk_cfg0, PADS_REFCLK_CFG0);
+-	if (soc->num_ports > 2)
+-		pads_writel(pcie, soc->pads_refclk_cfg1, PADS_REFCLK_CFG1);
+-
+ 	/* wait for the PLL to lock */
+ 	err = tegra_pcie_pll_wait(pcie, 500);
+ 	if (err < 0) {
 -- 
-2.8.1
+2.9.0
