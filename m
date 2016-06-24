@@ -1,315 +1,238 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Jun 2016 11:41:32 +0200
-Subject: [PATCH 7/7] ARM: ux500: consolidate base platform files
+Date: Fri, 24 Jun 2016 11:41:31 +0200
+Subject: [PATCH 6/7] ARM: ux500: move soc_id driver to drivers/soc
 In-Reply-To: <20160624094132.1852086-1-arnd@arndb.de>
 References: <20160624094132.1852086-1-arnd@arndb.de>
-Message-ID: <20160624094132.1852086-8-arnd@arndb.de>
+Message-ID: <20160624094132.1852086-7-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu.c and cache-l2x0.c files hold only two or three simple
-functions each, and they are all called from the machine
-descriptors, so we can just move them all into the same file
-for simplicity and consistency.
+As the ux500 id code is basically a standalone driver, we can move it
+out of the arch code into drivers/soc/ux500.
+
+This is a user-visible change, as it moves all the devices in sysfs
+from /sys/devices/soc0/ to /sys/devices/ and leaves the soc0 node as a
+separate device.
+
+Originally the idea was to put all on-chip devices under the soc node,
+and ux500 was the first platform to have this device, but later platforms
+almost all didn't follow that pattern, so this makes the platform do
+the same thing as everyone else.
+
+Since the platform is really obsolete now, I am optimistic that nothing
+will break after moving the devices around.
+
+As the SoC driver no longer has access to the private header files,
+I'm changing the code to instead look up the address of the backupram
+from devicetree, which is a good idea anyway.
+
+Finally, having a separate Kconfig symbol means the driver is now
+optional and could even be a loadable module rather than always being
+built-in if we allowed that for soc_device.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-ux500/Makefile     |  3 +-
- arch/arm/mach-ux500/cache-l2x0.c | 60 ---------------------------
- arch/arm/mach-ux500/cpu-db8500.c | 87 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-ux500/cpu.c        | 67 -------------------------------
- arch/arm/mach-ux500/setup.h      | 10 -----
- 5 files changed, 88 insertions(+), 139 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/cache-l2x0.c
- delete mode 100644 arch/arm/mach-ux500/cpu.c
+ arch/arm/mach-ux500/Makefile                       |  2 +-
+ arch/arm/mach-ux500/cpu-db8500.c                   |  6 ++--
+ arch/arm/mach-ux500/setup.h                        |  2 --
+ drivers/soc/Kconfig                                |  1 +
+ drivers/soc/Makefile                               |  1 +
+ drivers/soc/ux500/Kconfig                          |  7 ++++
+ .../id.c => drivers/soc/ux500/ux500-soc-id.c       | 39 +++++++++++++---------
+ 7 files changed, 36 insertions(+), 22 deletions(-)
+ create mode 100644 drivers/soc/ux500/Kconfig
+ rename arch/arm/mach-ux500/id.c => drivers/soc/ux500/ux500-soc-id.c (86%)
 
 diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index 753d3eed1985..56d0eb6e254e 100644
+index ea8893fd128f..753d3eed1985 100644
 --- a/arch/arm/mach-ux500/Makefile
 +++ b/arch/arm/mach-ux500/Makefile
-@@ -2,8 +2,7 @@
+@@ -2,7 +2,7 @@
  # Makefile for the linux kernel, U8500 machine.
  #
  
--obj-y				:= cpu.o pm.o
--obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
-+obj-y				:= pm.o
+-obj-y				:= cpu.o id.o pm.o
++obj-y				:= cpu.o pm.o
+ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
  obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o
  obj-$(CONFIG_MACH_MOP500)	+= board-mop500-audio.o
- obj-$(CONFIG_SMP)		+= platsmp.o
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-deleted file mode 100644
-index adec59cc2e1d..000000000000
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ /dev/null
-@@ -1,60 +0,0 @@
--/*
-- * Copyright (C) ST-Ericsson SA 2011
-- *
-- * License terms: GNU General Public License (GPL) version 2
-- */
--
--#include <linux/io.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--
--#include <asm/outercache.h>
--#include <asm/hardware/cache-l2x0.h>
--
--#include "db8500-regs.h"
--
--static int __init ux500_l2x0_unlock(void)
--{
--	int i;
--	struct device_node *np;
--	void __iomem *l2x0_base;
--
--	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
--	l2x0_base = of_iomap(np, 0);
--	of_node_put(np);
--	if (!l2x0_base)
--		return -ENODEV;
--
--	/*
--	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
--	 * apparently locks both caches before jumping to the kernel. The
--	 * l2x0 core will not touch the unlock registers if the l2x0 is
--	 * already enabled, so we do it right here instead. The PL310 has
--	 * 8 sets of registers, one per possible CPU.
--	 */
--	for (i = 0; i < 8; i++) {
--		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE +
--			       i * L2X0_LOCKDOWN_STRIDE);
--		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE +
--			       i * L2X0_LOCKDOWN_STRIDE);
--	}
--	iounmap(l2x0_base);
--	return 0;
--}
--
--static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
--{
--	/*
--	 * We can't write to secure registers as we are in non-secure
--	 * mode, until we have some SMI service available.
--	 */
--}
--
--void __init ux500_l2x0_init(void)
--{
--	/* Unlock before init */
--	ux500_l2x0_unlock();
--	outer_cache.write_sec = ux500_l2c310_write_sec;
--
--	return 0;
--}
 diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index c9c9832f79e9..46b1da1bf5d2 100644
+index 881cafbc4d97..c9c9832f79e9 100644
 --- a/arch/arm/mach-ux500/cpu-db8500.c
 +++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -12,22 +12,109 @@
- #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/amba/bus.h>
-+#include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/mfd/dbx500-prcmu.h>
-+#include <linux/platform_data/arm-ux500-pm.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/perf/arm_pmu.h>
- #include <linux/regulator/machine.h>
+@@ -88,15 +88,13 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
  
-+#include <asm/outercache.h>
-+#include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/map.h>
-+#include <asm/mach/arch.h>
+ static void __init u8500_init_machine(void)
+ {
+-	struct device *parent = ux500_soc_device_init();
+-
+ 	/* automatically probe child nodes of dbx5x0 devices */
+ 	if (of_machine_is_compatible("st-ericsson,u8540"))
+ 		of_platform_populate(NULL, u8500_local_bus_nodes,
+-				     u8540_auxdata_lookup, parent);
++				     u8540_auxdata_lookup, NULL);
+ 	else
+ 		of_platform_populate(NULL, u8500_local_bus_nodes,
+-				     u8500_auxdata_lookup, parent);
++				     u8500_auxdata_lookup, NULL);
+ }
  
- #include "setup.h"
- 
- #include "board-mop500.h"
- #include "db8500-regs.h"
- 
-+static int __init ux500_l2x0_unlock(void)
-+{
-+	int i;
-+	struct device_node *np;
-+	void __iomem *l2x0_base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
-+	l2x0_base = of_iomap(np, 0);
-+	of_node_put(np);
-+	if (!l2x0_base)
-+		return -ENODEV;
-+
-+	/*
-+	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
-+	 * apparently locks both caches before jumping to the kernel. The
-+	 * l2x0 core will not touch the unlock registers if the l2x0 is
-+	 * already enabled, so we do it right here instead. The PL310 has
-+	 * 8 sets of registers, one per possible CPU.
-+	 */
-+	for (i = 0; i < 8; i++) {
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+	}
-+	iounmap(l2x0_base);
-+	return 0;
-+}
-+
-+static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
-+{
-+	/*
-+	 * We can't write to secure registers as we are in non-secure
-+	 * mode, until we have some SMI service available.
-+	 */
-+}
-+
-+/*
-+ * FIXME: Should we set up the GPIO domain here?
-+ *
-+ * The problem is that we cannot put the interrupt resources into the platform
-+ * device until the irqdomain has been added. Right now, we set the GIC interrupt
-+ * domain from init_irq(), then load the gpio driver from
-+ * core_initcall(nmk_gpio_init) and add the platform devices from
-+ * arch_initcall(customize_machine).
-+ *
-+ * This feels fragile because it depends on the gpio device getting probed
-+ * _before_ any device uses the gpio interrupts.
-+*/
-+static void __init ux500_init_irq(void)
-+{
-+	struct device_node *np;
-+	struct resource r;
-+
-+	irqchip_init();
-+	np = of_find_compatible_node(NULL, NULL, "stericsson,db8500-prcmu");
-+	of_address_to_resource(np, 0, &r);
-+	of_node_put(np);
-+	if (!r.start) {
-+		pr_err("could not find PRCMU base resource\n");
-+		return;
-+	}
-+	prcmu_early_init(r.start, r.end-r.start);
-+	ux500_pm_init(r.start, r.end-r.start);
-+
-+	/* Unlock before init */
-+	ux500_l2x0_unlock();
-+	outer_cache.write_sec = ux500_l2c310_write_sec;
-+}
-+
-+static void ux500_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	local_irq_disable();
-+	local_fiq_disable();
-+
-+	prcmu_system_reset(0);
-+}
-+
- /*
-  * The PMU IRQ lines of two cores are wired together into a single interrupt.
-  * Bounce the interrupt to the other core if it's not ours.
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-deleted file mode 100644
-index a34af283ee23..000000000000
---- a/arch/arm/mach-ux500/cpu.c
-+++ /dev/null
-@@ -1,67 +0,0 @@
--/*
-- * Copyright (C) ST-Ericsson SA 2010
-- *
-- * Author: Rabin Vincent <rabin.vincent@stericsson.com> for ST-Ericsson
-- * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson
-- * License terms: GNU General Public License (GPL) version 2
-- */
--
--#include <linux/platform_device.h>
--#include <linux/io.h>
--#include <linux/mfd/dbx500-prcmu.h>
--#include <linux/sys_soc.h>
--#include <linux/err.h>
--#include <linux/slab.h>
--#include <linux/stat.h>
--#include <linux/of.h>
--#include <linux/of_irq.h>
--#include <linux/of_address.h>
--#include <linux/irq.h>
--#include <linux/irqchip.h>
--#include <linux/irqchip/arm-gic.h>
--#include <linux/platform_data/arm-ux500-pm.h>
--
--#include <asm/mach/map.h>
--
--#include "setup.h"
--
--#include "board-mop500.h"
--#include "db8500-regs.h"
--
--void ux500_restart(enum reboot_mode mode, const char *cmd)
--{
--	local_irq_disable();
--	local_fiq_disable();
--
--	prcmu_system_reset(0);
--}
--
--/*
-- * FIXME: Should we set up the GPIO domain here?
-- *
-- * The problem is that we cannot put the interrupt resources into the platform
-- * device until the irqdomain has been added. Right now, we set the GIC interrupt
-- * domain from init_irq(), then load the gpio driver from
-- * core_initcall(nmk_gpio_init) and add the platform devices from
-- * arch_initcall(customize_machine).
-- *
-- * This feels fragile because it depends on the gpio device getting probed
-- * _before_ any device uses the gpio interrupts.
--*/
--void __init ux500_init_irq(void)
--{
--	struct device_node *np;
--	struct resource r;
--
--	irqchip_init();
--	np = of_find_compatible_node(NULL, NULL, "stericsson,db8500-prcmu");
--	of_address_to_resource(np, 0, &r);
--	of_node_put(np);
--	if (!r.start) {
--		pr_err("could not find PRCMU base resource\n");
--		return;
--	}
--	prcmu_early_init(r.start, r.end-r.start);
--	ux500_pm_init(r.start, r.end-r.start);
--	ux500_l2x0_init();
--}
+ static const char * stericsson_dt_platform_compat[] = {
 diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
-index 85b7819a40ab..988e7c77068d 100644
+index 1e9e7c55df75..85b7819a40ab 100644
 --- a/arch/arm/mach-ux500/setup.h
 +++ b/arch/arm/mach-ux500/setup.h
-@@ -11,16 +11,6 @@
- #ifndef __ASM_ARCH_SETUP_H
- #define __ASM_ARCH_SETUP_H
+@@ -21,8 +21,6 @@ void ux500_restart(enum reboot_mode mode, const char *cmd);
  
--#include <asm/mach/arch.h>
--#include <linux/init.h>
--
--
--void ux500_l2x0_init(void);
--
--void ux500_restart(enum reboot_mode mode, const char *cmd);
--
--extern void __init ux500_init_irq(void);
+ extern void __init ux500_init_irq(void);
+ 
+-extern struct device *ux500_soc_device_init(void);
 -
  extern void ux500_cpu_die(unsigned int cpu);
  
  #endif /*  __ASM_ARCH_SETUP_H */
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index 58547f48ebcd..f31bceb69c0d 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -9,6 +9,7 @@ source "drivers/soc/samsung/Kconfig"
+ source "drivers/soc/sunxi/Kconfig"
+ source "drivers/soc/tegra/Kconfig"
+ source "drivers/soc/ti/Kconfig"
++source "drivers/soc/ux500/Kconfig"
+ source "drivers/soc/versatile/Kconfig"
+ 
+ endmenu
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index b75e3bd0a01e..50c23d0bd457 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -14,4 +14,5 @@ obj-$(CONFIG_SOC_SAMSUNG)	+= samsung/
+ obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
+ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+ obj-$(CONFIG_SOC_TI)		+= ti/
++obj-$(CONFIG_ARCH_U8500)	+= ux500/
+ obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
+diff --git a/drivers/soc/ux500/Kconfig b/drivers/soc/ux500/Kconfig
+new file mode 100644
+index 000000000000..025a44aef5db
+--- /dev/null
++++ b/drivers/soc/ux500/Kconfig
+@@ -0,0 +1,7 @@
++config UX500_SOC_ID
++	bool "SoC bus for ST-Ericsson ux500"
++	depends on ARCH_U8500 || COMPILE_TEST
++	default ARCH_U8500
++	help
++	  Include support for the SoC bus on the ARM RealView platforms
++	  providing some sysfs information about the ASIC variant.
+diff --git a/arch/arm/mach-ux500/id.c b/drivers/soc/ux500/ux500-soc-id.c
+similarity index 86%
+rename from arch/arm/mach-ux500/id.c
+rename to drivers/soc/ux500/ux500-soc-id.c
+index 983004d0fef2..49a811edce25 100644
+--- a/arch/arm/mach-ux500/id.c
++++ b/drivers/soc/ux500/ux500-soc-id.c
+@@ -8,8 +8,11 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/module.h>
+ #include <linux/random.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/sys_soc.h>
+ 
+ #include <asm/cputype.h>
+@@ -17,10 +20,6 @@
+ #include <asm/cacheflush.h>
+ #include <asm/mach/map.h>
+ 
+-#include "setup.h"
+-
+-#include "db8500-regs.h"
+-
+ /**
+  * struct dbx500_asic_id - fields of the ASIC ID
+  * @process: the manufacturing process, 0x40 is 40 nm 0x00 is "standard"
+@@ -157,27 +156,31 @@ static ssize_t ux500_get_process(struct device *dev,
+ 	return sprintf(buf, "%02xnm\n", dbx500_id.process);
+ }
+ 
+-static const char *db8500_read_soc_id(void)
++static const char *db8500_read_soc_id(struct device_node *backupram)
+ {
++	void __iomem *base;
+ 	void __iomem *uid;
+ 	const char *retstr;
+ 
+-	uid = ioremap(U8500_BB_UID_BASE, 0x20);
+-	if (!uid)
++	base = of_iomap(backupram, 0);
++	if (!base)
+ 		return NULL;
++	uid = base + 0xfc0;
++
+ 	/* Throw these device-specific numbers into the entropy pool */
+ 	add_device_randomness(uid, 0x14);
+ 	retstr = kasprintf(GFP_KERNEL, "%08x%08x%08x%08x%08x",
+ 			 readl((u32 *)uid+0),
+ 			 readl((u32 *)uid+1), readl((u32 *)uid+2),
+ 			 readl((u32 *)uid+3), readl((u32 *)uid+4));
+-	iounmap(uid);
++	iounmap(base);
+ 	return retstr;
+ }
+ 
+-static void __init soc_info_populate(struct soc_device_attribute *soc_dev_attr)
++static void __init soc_info_populate(struct soc_device_attribute *soc_dev_attr,
++				     struct device_node *backupram)
+ {
+-	soc_dev_attr->soc_id   = db8500_read_soc_id();
++	soc_dev_attr->soc_id   = db8500_read_soc_id(backupram);
+ 	soc_dev_attr->machine  = ux500_get_machine();
+ 	soc_dev_attr->family   = ux500_get_family();
+ 	soc_dev_attr->revision = ux500_get_revision();
+@@ -186,28 +189,34 @@ static void __init soc_info_populate(struct soc_device_attribute *soc_dev_attr)
+ static const struct device_attribute ux500_soc_attr =
+ 	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL);
+ 
+-struct device * __init ux500_soc_device_init(void)
++static int __init ux500_soc_device_init(void)
+ {
+ 	struct device *parent;
+ 	struct soc_device *soc_dev;
+ 	struct soc_device_attribute *soc_dev_attr;
++	struct device_node *backupram;
++
++	backupram = of_find_compatible_node(NULL, NULL, "ste,dbx500-backupram");
++	if (!backupram)
++		return 0;
+ 
+ 	ux500_setup_id();
+ 
+ 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+ 	if (!soc_dev_attr)
+-		return ERR_PTR(-ENOMEM);
++		return -ENOMEM;
+ 
+-	soc_info_populate(soc_dev_attr);
++	soc_info_populate(soc_dev_attr, backupram);
+ 
+ 	soc_dev = soc_device_register(soc_dev_attr);
+ 	if (IS_ERR(soc_dev)) {
+ 	        kfree(soc_dev_attr);
+-		return NULL;
++		return PTR_ERR(soc_dev);
+ 	}
+ 
+ 	parent = soc_device_to_device(soc_dev);
+ 	device_create_file(parent, &ux500_soc_attr);
+ 
+-	return parent;
++	return 0;
+ }
++subsys_initcall(ux500_soc_device_init);
 -- 
 2.9.0
