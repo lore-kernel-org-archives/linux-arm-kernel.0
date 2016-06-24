@@ -1,408 +1,183 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 24 Jun 2016 11:09:00 +0800
-Subject: [PATCH 03/14] thermal: Add support for sun8i THS on Allwinner H3
-In-Reply-To: <20160623192104.18720-4-megous@megous.com>
-References: <20160623192104.18720-1-megous@megous.com>
- <20160623192104.18720-4-megous@megous.com>
-Message-ID: <CAGb2v66sFfbD0rTaeeR9CBZFaXLiCKV4DrqKi4Yhc3+u2q+UMw@mail.gmail.com>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Fri, 24 Jun 2016 11:13:46 +0800
+Subject: [PATCH v2 1/2] mm: memblock Add some new functions to address the mem
+ limit issue
+Message-ID: <1466738027-15066-1-git-send-email-dennis.chen@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In some cases, memblock is queried to determine whether a physical
+address corresponds to memory present in a system even if unused by
+the OS for the linear mapping, highmem, etc. For example, the ACPI
+core needs this information to determine which attributes to use when
+mapping ACPI regions. Use of incorrect memory types can result in
+faults, data corruption, or other issues.
 
-On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
-> From: Ondrej Jirman <megous@megous.com>
->
+Removing memory with memblock_enforce_memory_limit throws away this
+information, and so a kernel booted with 'mem=' may suffer from the
+issues described above. To avoid this, we can mark regions as nomap
+rather than removing them, which preserves the information we need
+while preventing other use of the regions.
 
-The subject could read:
+This patch adds new infrastructure to mark all memblock regions in
+an address range as nomap, to cater for this. Similarly we add
+infrastructure to clear the flag for an address range, which makes
+handling some overlap cases simpler.
 
-  thermal: sun8i_ths: Add support for the thermal sensor on Allwinner H3
+At last, we add 'size' and 'flag' debug output in the memblock debugfs
+for ease of the memblock debug effort.
+The '/sys/kernel/debug/memblock/memory' output looks like before:
+   0: 0x0000008000000000..0x0000008001e7ffff
+   1: 0x0000008001e80000..0x00000083ff184fff
+   2: 0x00000083ff185000..0x00000083ff1c2fff
+   3: 0x00000083ff1c3000..0x00000083ff222fff
+   4: 0x00000083ff223000..0x00000083ffe42fff
+   5: 0x00000083ffe43000..0x00000083ffffffff
 
-> This patch adds support for the sun8i thermal sensor on
-> Allwinner H3 SoC.
->
-> Signed-off-by: Ond?ej Jirman <megous@megous.com>
-> ---
->  drivers/thermal/Kconfig     |   7 ++
->  drivers/thermal/Makefile    |   1 +
->  drivers/thermal/sun8i_ths.c | 295 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 303 insertions(+)
->  create mode 100644 drivers/thermal/sun8i_ths.c
->
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index 2d702ca..3de0f8d 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -351,6 +351,13 @@ config MTK_THERMAL
->           Enable this option if you want to have support for thermal management
->           controller present in Mediatek SoCs
->
-> +config SUN8I_THS
-> +       tristate "sun8i THS driver"
+After applied:
+   0: 0x0000008000000000..0x0000008001e7ffff  0x0000000001e80000  0x4
+   1: 0x0000008001e80000..0x00000083ff184fff  0x00000003fd305000  0x0
+   2: 0x00000083ff185000..0x00000083ff1c2fff  0x000000000003e000  0x4
+   3: 0x00000083ff1c3000..0x00000083ff222fff  0x0000000000060000  0x0
+   4: 0x00000083ff223000..0x00000083ffe42fff  0x0000000000c20000  0x4
+   5: 0x00000083ffe43000..0x00000083ffffffff  0x00000000001bd000  0x0
 
-Explain THS.
+Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Steve Capper <steve.capper@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: linux-mm at kvack.org
+Cc: linux-acpi at vger.kernel.org
+Cc: linux-efi at vger.kernel.org
+---
+Changes in v2:
+Update the commit message and add __init_memblock prefix to __find_max_addr()
+to avoid possible build warnning.
 
-> +       depends on MACH_SUN8I
-> +       depends on OF
-> +       help
-> +         Enable this to support thermal reporting on some newer Allwinner SoCs.
-> +
->  menu "Texas Instruments thermal drivers"
->  depends on ARCH_HAS_BANDGAP || COMPILE_TEST
->  depends on HAS_IOMEM
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index 10b07c1..7261ee8 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -51,3 +51,4 @@ obj-$(CONFIG_TEGRA_SOCTHERM)  += tegra/
->  obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
->  obj-$(CONFIG_MTK_THERMAL)      += mtk_thermal.o
->  obj-$(CONFIG_GENERIC_ADC_THERMAL)      += thermal-generic-adc.o
-> +obj-$(CONFIG_SUN8I_THS)                += sun8i_ths.o
-> diff --git a/drivers/thermal/sun8i_ths.c b/drivers/thermal/sun8i_ths.c
-> new file mode 100644
-> index 0000000..618ccc3
-> --- /dev/null
-> +++ b/drivers/thermal/sun8i_ths.c
-> @@ -0,0 +1,295 @@
-> +/*
-> + * sun8i THS driver
 
-Explain THS.
+ include/linux/memblock.h |  2 ++
+ mm/memblock.c            | 50 ++++++++++++++++++++++++++++++++++++++++--------
+ 2 files changed, 44 insertions(+), 8 deletions(-)
 
-> + *
-> + * Copyright (C) 2016 Ond?ej Jirman
-> + * Based on the work of Josef Gajdusek <atx@atx.name>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/nvmem-consumer.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset.h>
-> +#include <linux/slab.h>
-> +#include <linux/thermal.h>
-> +#include <linux/printk.h>
-> +
-> +#define THS_H3_CTRL0           0x00
-> +#define THS_H3_CTRL2           0x40
-> +#define THS_H3_INT_CTRL                0x44
-> +#define THS_H3_STAT            0x48
-> +#define THS_H3_FILTER          0x70
-> +#define THS_H3_CDATA           0x74
-> +#define THS_H3_DATA            0x80
-> +
-> +#define THS_H3_CTRL0_SENSOR_ACQ0_OFFS   0
-> +#define THS_H3_CTRL0_SENSOR_ACQ0(x) \
-> +        ((x) << THS_H3_CTRL0_SENSOR_ACQ0_OFFS)
-> +#define THS_H3_CTRL2_SENSE_EN_OFFS      0
-> +#define THS_H3_CTRL2_SENSE_EN \
-> +        BIT(THS_H3_CTRL2_SENSE_EN_OFFS)
-> +#define THS_H3_CTRL2_SENSOR_ACQ1_OFFS   16
-> +#define THS_H3_CTRL2_SENSOR_ACQ1(x) \
-> +        ((x) << THS_H3_CTRL2_SENSOR_ACQ1_OFFS)
-> +
-> +#define THS_H3_INT_CTRL_DATA_IRQ_EN_OFFS        8
-> +#define THS_H3_INT_CTRL_DATA_IRQ_EN \
-> +               BIT(THS_H3_INT_CTRL_DATA_IRQ_EN_OFFS)
-> +#define THS_H3_INT_CTRL_THERMAL_PER_OFFS        12
-> +#define THS_H3_INT_CTRL_THERMAL_PER(x) \
-> +               ((x) << THS_H3_INT_CTRL_THERMAL_PER_OFFS)
-> +
-> +#define THS_H3_STAT_DATA_IRQ_STS_OFFS   8
-> +#define THS_H3_STAT_DATA_IRQ_STS \
-> +        BIT(THS_H3_STAT_DATA_IRQ_STS_OFFS)
-> +
-> +#define THS_H3_FILTER_TYPE_OFFS 0
-> +#define THS_H3_FILTER_TYPE(x) \
-> +        ((x) << THS_H3_FILTER_TYPE_OFFS)
-> +#define THS_H3_FILTER_EN_OFFS   2
-> +#define THS_H3_FILTER_EN \
-> +        BIT(THS_H3_FILTER_EN_OFFS)
-
-Is it really necessary to split the lines of all the macros?
-It makes it harder to find and read stuff.
-
-You're also not using any of the *_OFFS macros in the actual code,
-so just drop them.
-
-> +
-> +#define THS_H3_CLK_IN 40000000  /* Hz */
-> +#define THS_H3_DATA_PERIOD 330  /* ms */
-> +
-> +#define THS_H3_FILTER_TYPE_VALUE               2  /* average over 2^(n+1) samples */
-> +#define THS_H3_FILTER_DIV                      (1 << (THS_H3_FILTER_TYPE_VALUE + 1))
-> +#define THS_H3_INT_CTRL_THERMAL_PER_VALUE \
-> +       (THS_H3_DATA_PERIOD * (THS_H3_CLK_IN / 1000) / THS_H3_FILTER_DIV / 4096 - 1)
-> +#define THS_H3_CTRL0_SENSOR_ACQ0_VALUE         0x3f /* 16us */
-> +#define THS_H3_CTRL2_SENSOR_ACQ1_VALUE         0x3f
-> +
-> +struct sun8i_ths_data {
-> +       struct reset_control *reset;
-> +       struct clk *clk;
-> +       struct clk *busclk;
-> +       void __iomem *regs;
-> +       struct nvmem_cell *calcell;
-> +       struct platform_device *pdev;
-> +       struct thermal_zone_device *tzd;
-> +       u32 temp;
-> +};
-> +
-> +static int sun8i_ths_get_temp(void *_data, int *out)
-> +{
-> +       struct sun8i_ths_data *data = _data;
-> +
-> +       if (data->temp == 0)
-> +               return -EINVAL;
-> +
-> +       /* Formula and parameters from the Allwinner 3.4 kernel */
-> +       *out = 217000 - (data->temp * 1000000) / 8253;
-> +       return 0;
-> +}
-> +
-> +static irqreturn_t sun8i_ths_irq_thread(int irq, void *_data)
-> +{
-> +       struct sun8i_ths_data *data = _data;
-> +
-> +       writel(THS_H3_STAT_DATA_IRQ_STS, data->regs + THS_H3_STAT);
-> +
-> +       data->temp = readl(data->regs + THS_H3_DATA);
-> +       if (data->temp)
-> +               thermal_zone_device_update(data->tzd);
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +static int sun8i_ths_h3_init(struct platform_device *pdev,
-> +                            struct sun8i_ths_data *data)
-> +{
-> +       int ret;
-> +       size_t callen;
-> +       s32 *caldata;
-> +
-> +       data->busclk = devm_clk_get(&pdev->dev, "ahb");
-> +       if (IS_ERR(data->busclk)) {
-> +               ret = PTR_ERR(data->busclk);
-> +               dev_err(&pdev->dev, "failed to get ahb clk: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       data->clk = devm_clk_get(&pdev->dev, "ths");
-> +       if (IS_ERR(data->clk)) {
-> +               ret = PTR_ERR(data->clk);
-> +               dev_err(&pdev->dev, "failed to get ths clk: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       data->reset = devm_reset_control_get(&pdev->dev, "ahb");
-
-IIRC with the new shared reset control stuff merged, you are supposed
-to specify whether you want a shared or exclusive one when you ask for
-it.
-
-Also you seem to be requesting some resources here, while others
-directly in the probe function. Could you put them in the same place?
-Maybe requesting all resources in the probe function, and this init
-function turns everything on?
-
-> +       if (IS_ERR(data->reset)) {
-> +               ret = PTR_ERR(data->reset);
-> +               dev_err(&pdev->dev, "failed to get reset: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       if (data->calcell) {
-> +               caldata = nvmem_cell_read(data->calcell, &callen);
-> +               if (IS_ERR(caldata))
-> +                       return PTR_ERR(caldata);
-
-Check the returned length in case of a bogus cell?
-
-> +
-> +               writel(be32_to_cpu(*caldata), data->regs + THS_H3_CDATA);
-> +               kfree(caldata);
-> +       }
-> +
-> +       ret = clk_prepare_enable(data->busclk);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "failed to enable bus clk: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       ret = clk_prepare_enable(data->clk);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "failed to enable ths clk: %d\n", ret);
-> +               goto err_disable_bus;
-> +       }
-> +
-> +       ret = reset_control_deassert(data->reset);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "reset deassert failed: %d\n", ret);
-> +               goto err_disable_ths;
-> +       }
-> +
-> +       ret = clk_set_rate(data->clk, THS_H3_CLK_IN);
-> +       if (ret)
-> +               goto err_disable_ths;
-> +
-> +       writel(THS_H3_CTRL0_SENSOR_ACQ0(THS_H3_CTRL0_SENSOR_ACQ0_VALUE),
-> +               data->regs + THS_H3_CTRL0);
-> +       writel(THS_H3_INT_CTRL_THERMAL_PER(THS_H3_INT_CTRL_THERMAL_PER_VALUE) |
-> +               THS_H3_INT_CTRL_DATA_IRQ_EN,
-> +               data->regs + THS_H3_INT_CTRL);
-
-This enables the interrupts. You already requested IRQs from the kernel, which
-means as soon as this line executes, interrupts will start firing.
-
-You should do this last, after you've finishing all the configuration,
-i.e. move this after the next writel calls.
-
-> +       writel(THS_H3_FILTER_EN | THS_H3_FILTER_TYPE(THS_H3_FILTER_TYPE_VALUE),
-> +               data->regs + THS_H3_FILTER);
-> +       writel(THS_H3_CTRL2_SENSOR_ACQ1(THS_H3_CTRL2_SENSOR_ACQ1_VALUE) |
-> +               THS_H3_CTRL2_SENSE_EN,
-> +               data->regs + THS_H3_CTRL2);
-> +
-> +       return 0;
-> +
-> +err_disable_ths:
-> +       clk_disable_unprepare(data->clk);
-> +err_disable_bus:
-> +       clk_disable_unprepare(data->busclk);
-> +
-> +       return ret;
-> +}
-> +
-> +static void sun8i_ths_h3_deinit(struct sun8i_ths_data *data)
-> +{
-> +       reset_control_assert(data->reset);
-> +       clk_disable_unprepare(data->clk);
-> +       clk_disable_unprepare(data->busclk);
-> +}
-> +
-> +static const struct thermal_zone_of_device_ops sun8i_ths_thermal_ops = {
-> +       .get_temp = sun8i_ths_get_temp,
-> +};
-> +
-> +static const struct of_device_id sun8i_ths_id_table[] = {
-> +       {
-> +               .compatible = "allwinner,sun8i-h3-ths",
-> +       },
-
-Nit. You could fit it in one line.
-
-> +       { /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, sun8i_ths_id_table);
-> +
-> +static int sun8i_ths_probe(struct platform_device *pdev)
-> +{
-> +       struct sun8i_ths_data *data;
-> +       struct resource *res;
-> +       int ret;
-> +       int irq;
-> +
-> +       data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +       if (!data)
-> +               return -ENOMEM;
-> +
-> +       data->pdev = pdev;
-> +
-> +       data->calcell = devm_nvmem_cell_get(&pdev->dev, "calibration");
-> +       if (IS_ERR(data->calcell)) {
-> +               if (PTR_ERR(data->calcell) == -EPROBE_DEFER)
-> +                       return PTR_ERR(data->calcell);
-> +
-> +               data->calcell = NULL; /* No calibration data */
-> +       }
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       data->regs = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(data->regs)) {
-> +               ret = PTR_ERR(data->regs);
-> +               dev_err(&pdev->dev, "failed to ioremap THS registers: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       irq = platform_get_irq(pdev, 0);
-> +       if (irq < 0) {
-> +               dev_err(&pdev->dev, "failed to get IRQ: %d\n", irq);
-> +               return irq;
-> +       }
-> +
-> +       ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-> +                                       sun8i_ths_irq_thread, IRQF_ONESHOT,
-> +                                       dev_name(&pdev->dev), data);
-
-Is a threaded irq required? The thermal core seems to use atomics,
-so this shouldn't be necessary.
-
-> +       if (ret)
-> +               return ret;
-> +
-> +       ret = sun8i_ths_h3_init(pdev, data);
-> +       if (ret)
-> +               return ret;
-> +
-> +       data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
-> +                                                   &sun8i_ths_thermal_ops);
-> +       if (IS_ERR(data->tzd)) {
-> +               ret = PTR_ERR(data->tzd);
-> +               dev_err(&pdev->dev, "failed to register thermal zone: %d\n",
-> +                               ret);
-> +               goto err_deinit;
-> +       }
-> +
-> +       platform_set_drvdata(pdev, data);
-> +       return 0;
-> +
-> +err_deinit:
-> +       sun8i_ths_h3_deinit(data);
-> +       return ret;
-> +}
-> +
-> +static int sun8i_ths_remove(struct platform_device *pdev)
-> +{
-> +       struct sun8i_ths_data *data = platform_get_drvdata(pdev);
-> +
-> +       thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
-> +       sun8i_ths_h3_deinit(data);
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver sun8i_ths_driver = {
-> +       .probe = sun8i_ths_probe,
-> +       .remove = sun8i_ths_remove,
-> +       .driver = {
-> +               .name = "sun8i_ths",
-> +               .of_match_table = sun8i_ths_id_table,
-> +       },
-> +};
-> +
-> +module_platform_driver(sun8i_ths_driver);
-> +
-> +MODULE_AUTHOR("Ond?ej Jirman <megous@megous.com>");
-> +MODULE_DESCRIPTION("sun8i THS driver");
-
-Explain THS.
-
-Regards
-ChenYu
-
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.9.0
->
+diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+index 6c14b61..5e069c8 100644
+--- a/include/linux/memblock.h
++++ b/include/linux/memblock.h
+@@ -92,6 +92,7 @@ int memblock_mark_hotplug(phys_addr_t base, phys_addr_t size);
+ int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
+ int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
+ int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
++int memblock_clear_nomap(phys_addr_t base, phys_addr_t size);
+ ulong choose_memblock_flags(void);
+ 
+ /* Low level functions */
+@@ -332,6 +333,7 @@ phys_addr_t memblock_mem_size(unsigned long limit_pfn);
+ phys_addr_t memblock_start_of_DRAM(void);
+ phys_addr_t memblock_end_of_DRAM(void);
+ void memblock_enforce_memory_limit(phys_addr_t memory_limit);
++void memblock_mem_limit_mark_nomap(phys_addr_t limit);
+ bool memblock_is_memory(phys_addr_t addr);
+ int memblock_is_map_memory(phys_addr_t addr);
+ int memblock_is_region_memory(phys_addr_t base, phys_addr_t size);
+diff --git a/mm/memblock.c b/mm/memblock.c
+index ca09915..795596d 100644
+--- a/mm/memblock.c
++++ b/mm/memblock.c
+@@ -814,6 +814,18 @@ int __init_memblock memblock_mark_nomap(phys_addr_t base, phys_addr_t size)
+ }
+ 
+ /**
++ * memblock_clear_nomap - Clear flag MEMBLOCK_NOMAP for a specified region.
++ * @base: the base phys addr of the region
++ * @size: the size of the region
++ *
++ * Return 0 on success, -errno on failure.
++ */
++int __init_memblock memblock_clear_nomap(phys_addr_t base, phys_addr_t size)
++{
++	return memblock_setclr_flag(base, size, 0, MEMBLOCK_NOMAP);
++}
++
++/**
+  * __next_reserved_mem_region - next function for for_each_reserved_region()
+  * @idx: pointer to u64 loop variable
+  * @out_start: ptr to phys_addr_t for start address of the region, can be %NULL
+@@ -1465,14 +1477,11 @@ phys_addr_t __init_memblock memblock_end_of_DRAM(void)
+ 	return (memblock.memory.regions[idx].base + memblock.memory.regions[idx].size);
+ }
+ 
+-void __init memblock_enforce_memory_limit(phys_addr_t limit)
++static phys_addr_t __init_memblock __find_max_addr(phys_addr_t limit)
+ {
+ 	phys_addr_t max_addr = (phys_addr_t)ULLONG_MAX;
+ 	struct memblock_region *r;
+ 
+-	if (!limit)
+-		return;
+-
+ 	/* find out max address */
+ 	for_each_memblock(memory, r) {
+ 		if (limit <= r->size) {
+@@ -1482,6 +1491,18 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
+ 		limit -= r->size;
+ 	}
+ 
++	return max_addr;
++}
++
++void __init memblock_enforce_memory_limit(phys_addr_t limit)
++{
++	phys_addr_t max_addr;
++
++	if (!limit)
++		return;
++
++	max_addr = __find_max_addr(limit);
++
+ 	/* truncate both memory and reserved regions */
+ 	memblock_remove_range(&memblock.memory, max_addr,
+ 			      (phys_addr_t)ULLONG_MAX);
+@@ -1489,6 +1510,17 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
+ 			      (phys_addr_t)ULLONG_MAX);
+ }
+ 
++void __init memblock_mem_limit_mark_nomap(phys_addr_t limit)
++{
++	phys_addr_t max_addr;
++
++	if (!limit)
++		return;
++
++	max_addr = __find_max_addr(limit);
++	memblock_mark_nomap(max_addr, (phys_addr_t)ULLONG_MAX);
++}
++
+ static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
+ {
+ 	unsigned int left = 0, right = type->cnt;
+@@ -1677,13 +1709,15 @@ static int memblock_debug_show(struct seq_file *m, void *private)
+ 		reg = &type->regions[i];
+ 		seq_printf(m, "%4d: ", i);
+ 		if (sizeof(phys_addr_t) == 4)
+-			seq_printf(m, "0x%08lx..0x%08lx\n",
++			seq_printf(m, "0x%08lx..0x%08lx  0x%08lx  0x%lx\n",
+ 				   (unsigned long)reg->base,
+-				   (unsigned long)(reg->base + reg->size - 1));
++				   (unsigned long)(reg->base + reg->size - 1),
++				   (unsigned long)reg->size, reg->flags);
+ 		else
+-			seq_printf(m, "0x%016llx..0x%016llx\n",
++			seq_printf(m, "0x%016llx..0x%016llx  0x%016llx  0x%lx\n",
+ 				   (unsigned long long)reg->base,
+-				   (unsigned long long)(reg->base + reg->size - 1));
++				   (unsigned long long)(reg->base + reg->size - 1),
++				   (unsigned long long)reg->size, reg->flags);
+ 
+ 	}
+ 	return 0;
+-- 
+1.8.3.1
