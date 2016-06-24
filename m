@@ -1,58 +1,92 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 24 Jun 2016 16:00:00 +0800
-Subject: [PATCH v2 0/4] ASoC: sunxi: Add i2s controller support
-In-Reply-To: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
-References: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64=15sv8GKDKDMA4VOkdE35=TwuX0D0m5JDpVbw6RYn_w@mail.gmail.com>
+From: songjun.wu@atmel.com (Wu, Songjun)
+Date: Fri, 24 Jun 2016 16:56:49 +0800
+Subject: [PATCH v5 2/2] [media] atmel-isc: DT binding for Image Sensor
+ Controller driver
+In-Reply-To: <20160624093501.5dc6d276@bbrezillon>
+References: <1466153854-30272-1-git-send-email-songjun.wu@atmel.com>
+ <1466153854-30272-3-git-send-email-songjun.wu@atmel.com>
+ <20160620132508.GA32585@rob-hp-laptop>
+ <850f10c3-ea9a-11da-4279-7b0ad2c52bb6@atmel.com>
+ <20160624093501.5dc6d276@bbrezillon>
+Message-ID: <03f3bb65-c8c3-e8cc-1311-3a428aff7bc8@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 5:11 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi everyone,
->
-> This is the second version of the I2S support for the controller found
-> in the Allwinner A10 and later SoCs.
->
-> Playback has been tested with an UDA1380 on an A20-Olinuxino. Capture
-> is not implemented yet, but will come eventually.
->
-> Let me know what you think,
-> Maxime
->
-> Changes from v1:
->   - Fixed bogus indentation and spurious whitespaces / newlines
->   - Moved the device initialisation in the probe to the startup function
->   - Disabled the device in shutdown
->   - Removed function to get wss and sr to inline them in hw_params
->   - Changed the way to access the divider array
->   - Checked clk_set_rate return code
->   - Fixed condition for invalid bclk and mclk dividers
->   - Added sound-dai-cells to the bindings documentation required properties
->
-> Emilio L?pez (1):
->   ARM: sun7i: Add mod1 clock nodes
->
-> Maxime Ripard (3):
->   ASoC: sunxi: Add A10 I2S controller binding documentation
->   ASoC: sunxi: Add Allwinner A10 Digital Audio driver
->   ARM: sun7i: Add DAI nodes
->
->  .../devicetree/bindings/sound/sun4i-i2s.txt        |  34 +
->  arch/arm/boot/dts/sun7i-a20.dtsi                   |  87 ++-
->  sound/soc/sunxi/Kconfig                            |   9 +
->  sound/soc/sunxi/Makefile                           |   2 +-
->  sound/soc/sunxi/sun4i-i2s.c                        | 703 +++++++++++++++++++++
->  5 files changed, 832 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/sound/sun4i-i2s.txt
->  create mode 100644 sound/soc/sunxi/sun4i-i2s.c
 
-Tested-by: Chen-Yu Tsai <wens@csie.org>
 
-on a BPI-M1+ with a TI PCM5122-based PiFi DAC+ v2.0, a Raspberry Pi B+
-compatible DAC shield.
-
-I kept getting low but audible pops though. Not sure if it's the
-ad-hoc setup or some other factor.
-
-ChenYu
+On 6/24/2016 15:35, Boris Brezillon wrote:
+> On Fri, 24 Jun 2016 13:54:09 +0800
+> "Wu, Songjun" <songjun.wu@atmel.com> wrote:
+>
+>> Hi Rob,
+>>
+>> Thank you for your comments.
+>>
+>> On 6/20/2016 21:25, Rob Herring wrote:
+>>> On Fri, Jun 17, 2016 at 04:57:14PM +0800, Songjun Wu wrote:
+>>>> DT binding documentation for ISC driver.
+>>>>
+>>>> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+>>>> ---
+>>>>
+>>>> Changes in v5:
+>>>> - Add clock names.
+>>>>
+>>>> Changes in v4:
+>>>> - Remove the isc clock nodes.
+>>>>
+>>>> Changes in v3:
+>>>> - Remove the 'atmel,sensor-preferred'.
+>>>> - Modify the isc clock node according to the Rob's remarks.
+>>>>
+>>>> Changes in v2:
+>>>> - Remove the unit address of the endpoint.
+>>>> - Add the unit address to the clock node.
+>>>> - Avoid using underscores in node names.
+>>>> - Drop the "0x" in the unit address of the i2c node.
+>>>> - Modify the description of 'atmel,sensor-preferred'.
+>>>> - Add the description for the ISC internal clock.
+>>>>
+>>>>  .../devicetree/bindings/media/atmel-isc.txt        | 64 ++++++++++++++++++++++
+>>>>  1 file changed, 64 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
+>>>> new file mode 100644
+>>>> index 0000000..9558a77
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
+>>>> @@ -0,0 +1,64 @@
+>>>> +Atmel Image Sensor Controller (ISC)
+>>>> +----------------------------------------------
+>>>> +
+>>>> +Required properties for ISC:
+>>>> +- compatible
+>>>> +	Must be "atmel,sama5d2-isc".
+>>>> +- reg
+>>>> +	Physical base address and length of the registers set for the device.
+>>>> +- interrupts
+>>>> +	Should contain IRQ line for the ISC.
+>>>> +- clocks
+>>>> +	List of clock specifiers, corresponding to entries in
+>>>> +	the clock-names property;
+>>>> +	Please refer to clock-bindings.txt.
+>>>> +- clock-names
+>>>> +	Required elements: "hclock".
+>>>
+>>> What about the 2 other clocks in the example?
+>>>
+>> The other clocks is optional, not required.
+>> Do you have any suggestion?
+>
+> Just add a second look at the sama5d2 and iscck gck are not optional.
+> What we call optional clocks are clocks that are not necessarily
+> required depending on the IP revision or external clocks that are board
+> dependent. This is not the case here: iscck and gck are internal to the
+> SoC, and are always available. Whether you want to use them or not is a
+> different question, and should not be encoded in the clocks/clock-names
+> properties.
+>
+> To sum-up, define those 3 clocks as required and document their names.
+>
+Thank you for your suggestion.
