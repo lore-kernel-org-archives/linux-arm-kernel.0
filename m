@@ -1,88 +1,25 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 24 Jun 2016 11:53:13 +0100
-Subject: [PATCH] arm64:swiotlb:Enable only when Input size through command
- line
-In-Reply-To: <20160624104619.GA4378@localhost.localdomain>
-References: <1466684020-5224-1-git-send-email-manjeet.p@samsung.com>
- <20160623143034.GN6521@e104818-lin.cambridge.arm.com>
- <9A15F5E5-775E-4079-961F-67FD54B8F2F4@oracle.com>
- <20160624105729.095e7f1f@xhacker>
- <20160624104619.GA4378@localhost.localdomain>
-Message-ID: <576D1119.3000907@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 24 Jun 2016 13:04:01 +0200
+Subject: [PATCH V7 0/8] Introduce ACPI world to ITS irqchip
+In-Reply-To: <1466420541-20101-1-git-send-email-tn@semihalf.com>
+References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
+Message-ID: <576D13A1.7010205@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Konrad,
+On 20.06.2016 13:02, Tomasz Nowicki wrote:
+> The series builds the PCI/MSI domain stack based on initial IORT driver
+> which is added in first place. As a reference please see IORT spec:
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>
+> Tested on Cavium ThunderX server. The patches can be found here:
+> https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v7)
+>
 
-On 24/06/16 11:46, Konrad Rzeszutek Wilk wrote:
-> On Fri, Jun 24, 2016 at 10:57:29AM +0800, Jisheng Zhang wrote:
->> Dear Konrad,
->>
->> On Thu, 23 Jun 2016 12:06:10 -0400 Konrad Rzeszutek Wilk wrote:
->>
->>> On June 23, 2016 10:30:34 AM EDT, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>>> On Thu, Jun 23, 2016 at 05:43:40PM +0530, Manjeet Pawar wrote:  
->>>>> From: Rohit Thapliyal <r.thapliyal@samsung.com>
->>>>>
->>>>> swiotlb default size of 64M is too big as
->>>>> default value therefore it is made configurable
->>>>> through command line through swiotlb_size parameter.
->>>>> swiotlb allocation shall be done only when the
->>>>> swiotlb size is given through command line.
->>>>> Otherwise no swiotlb is allocated.  
->>>>
->>>> I already queued this patch:
->>>>
->>>> http://lkml.kernel.org/g/1465372426-4077-1-git-send-email-jszhang at marvell.com
->>>>
->>>> If you have any objections to it, please reply there.  
->>>
->>>
->>> I do (sorry about duplicate email, the other got rejected by mailing lists).
->>>
->>> Why not expand the swiotlb= parameter instead of introducing a new one?
->>
->> Do you mean pass "swiotlb=" for those platforms(most probably, arm64 with less
->> than 4GB DDR) which don't need swiotlb? I'm afraid this is not convenient, and
-> 
-> Why not just have a function that checks the amount of memory? x86 has
-> that - if it finds that the machine has less than 4GB it will not setup
-> SWIOTLB?
-> 
->> users even don't notice swiotlb parameter. From another side, pass "swiotlb=0"
->> will make the swiotlb reserve 64MB instead, so how can we achieve zero reserved
->> memory for swiotlb through "swiotlb=" parameter?
-> 
-> Obviously make the function understand that 0 is to turn it off.
->>
->> PS: my patch didn't introduce new boot parameter.
-> 
-> swiotlb_sz ?
+Hi Bjorn,
 
-Note that Jisheng's patch is the one Catalin linked to, *not* this one,
-and more or less does exactly what you describe.
+I know it is vacation time :) but would you mind to have a look at 
+respective patches ? Your ACK is major thing for PCI part.
 
-Robin.
-
->>
->> I'm not sure I got your meaning, so could you please comment my patch
->> directly?
->>
->> Thanks,
->> Jisheng
->>
->>>
->>> Also, why not use the swiotlb by itself? That does the job as well?
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thanks,
+Tomasz
