@@ -1,119 +1,82 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 24 Jun 2016 15:32:05 +0800
-Subject: [PATCH] ARM: at91/dt: sama5d2_xplained: Update the pmic node
-Message-ID: <1466753525-4742-1-git-send-email-wenyou.yang@atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 24 Jun 2016 09:44:30 +0200
+Subject: [PATCH v4 07/13] ARM: shmobile: apmu: Add APMU DT support via
+ Enable method
+In-Reply-To: <b524c939-d546-65b8-72da-359136c2aebe@cogentembedded.com>
+References: <1466072862-28030-1-git-send-email-geert+renesas@glider.be>
+ <1466072862-28030-8-git-send-email-geert+renesas@glider.be>
+ <b524c939-d546-65b8-72da-359136c2aebe@cogentembedded.com>
+Message-ID: <CAMuHMdWrwnNxfAh-AHA+Q5AfgYy89nmj-yVSj-E4jMx5cHYi3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to introducing the new driver - ACT8945A MFD drive,
-change the pmic device node to align with the ACT8945A
-regulator and charger drivers.
+Hi Sergei,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+On Tue, Jun 21, 2016 at 7:49 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 06/16/2016 01:27 PM, Geert Uytterhoeven wrote:
+>> From: Magnus Damm <damm+renesas@opensource.se>
+>> Allow DT configuration of the APMU hardware in the case when the APMU is
+>> pointed out in the DTB via the enable-method. The ability to configure
+>> the APMU via C code is still kept intact to prevent DTB breakage for older
+>> SoCs that do not rely on the enable-method for SMP support.
+>>
+>> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+>> [geert: Fix CONFIG_SMP=n build]
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> [...]
+>
+>> diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c
+>> b/arch/arm/mach-shmobile/platsmp-apmu.c
+>> index c1558ef0c590dd3e..0c6bb458b7a45128 100644
+>> --- a/arch/arm/mach-shmobile/platsmp-apmu.c
+>> +++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+>
+> [...]
+>>
+>> +static int shmobile_smp_apmu_boot_secondary_md21(unsigned int cpu,
+>> +                                                struct task_struct *idle)
+>> +{
+>> +       /* Error out when hardware debug mode is enabled */
+>> +       if (rcar_gen2_read_mode_pins() & BIT(21)) {
+>> +               pr_warn("Unable to boot CPU%u when MD21 is set\n", cpu);
+>> +               return -ENOTSUPP;
+>> +       }
+>> +
+>> +       return shmobile_smp_apmu_boot_secondary(cpu, idle);
+>> +}
+>> +
+>> +static struct smp_operations apmu_smp_ops __initdata = {
+>> +       .smp_prepare_cpus       = shmobile_smp_apmu_prepare_cpus_dt,
+>> +       .smp_boot_secondary     = shmobile_smp_apmu_boot_secondary_md21,
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +       .cpu_can_disable        = shmobile_smp_cpu_can_disable,
+>> +       .cpu_die                = shmobile_smp_apmu_cpu_die,
+>> +       .cpu_kill               = shmobile_smp_apmu_cpu_kill,
+>>  #endif
+>
+>
+>    For the record: it turned out that I tested my non-DT SMP on
+> R8A7792/Blanche with MD21 bit set. And I've just made sure it still works
+> with this implementation (by commenting out the check above.
+>    Also, I was going to try the workaround for MD21 I saw in the BSP tree --
 
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 41 ++++++++++++++++++++++-------
- 1 file changed, 32 insertions(+), 9 deletions(-)
+Which workaround? I only saw the BSP removed the check, but it didn't mention
+why (because E2 and V2H don't need it, or...?).
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index eb4f1ac..0b9a59d 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -158,56 +158,64 @@
- 				i2c-sda-hold-time-ns = <350>;
- 				status = "okay";
- 
--				pmic: act8865 at 5b {
--					compatible = "active-semi,act8865";
-+				pmic at 5b {
-+					compatible = "active-semi,act8945a";
- 					reg = <0x5b>;
- 					active-semi,vsel-high;
-+					active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+					active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
-+					active-semi,irq_gpios = <&pioA 45 GPIO_ACTIVE_LOW>;
-+					active-semi,input-voltage-threshold-microvolt = <6600>;
-+					active-semi,precondition-timeout = <40>;
-+					active-semi,total-timeout = <3>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
- 					status = "okay";
- 
- 					regulators {
--						vdd_1v35_reg: DCDC_REG1 {
-+						vdd_1v35_reg: REG_DCDC1 {
- 							regulator-name = "VDD_1V35";
- 							regulator-min-microvolt = <1350000>;
- 							regulator-max-microvolt = <1350000>;
- 							regulator-always-on;
- 						};
- 
--						vdd_1v2_reg: DCDC_REG2 {
-+						vdd_1v2_reg: REG_DCDC2 {
- 							regulator-name = "VDD_1V2";
- 							regulator-min-microvolt = <1100000>;
- 							regulator-max-microvolt = <1300000>;
- 							regulator-always-on;
- 						};
- 
--						vdd_3v3_reg: DCDC_REG3 {
-+						vdd_3v3_reg: REG_DCDC3 {
- 							regulator-name = "VDD_3V3";
- 							regulator-min-microvolt = <3300000>;
- 							regulator-max-microvolt = <3300000>;
- 							regulator-always-on;
- 						};
- 
--						vdd_fuse_reg: LDO_REG1 {
-+						vdd_fuse_reg: REG_LDO1 {
- 							regulator-name = "VDD_FUSE";
- 							regulator-min-microvolt = <2500000>;
- 							regulator-max-microvolt = <2500000>;
- 							regulator-always-on;
- 						};
- 
--						vdd_3v3_lp_reg: LDO_REG2 {
-+						vdd_3v3_lp_reg: REG_LDO2 {
- 							regulator-name = "VDD_3V3_LP";
- 							regulator-min-microvolt = <3300000>;
- 							regulator-max-microvolt = <3300000>;
- 							regulator-always-on;
- 						};
- 
--						vdd_led_reg: LDO_REG3 {
-+						vdd_led_reg: REG_LDO3 {
- 							regulator-name = "VDD_LED";
- 							regulator-min-microvolt = <3300000>;
- 							regulator-max-microvolt = <3300000>;
- 							regulator-always-on;
- 						};
- 
--						vdd_sdhc_1v8_reg: LDO_REG4 {
-+						vdd_sdhc_1v8_reg: REG_LDO4 {
- 							regulator-name = "VDD_SDHC_1V8";
- 							regulator-min-microvolt = <1800000>;
- 							regulator-max-microvolt = <1800000>;
-@@ -309,6 +317,21 @@
- 					bias-disable;
- 				};
- 
-+				pinctrl_charger_chglev: charger_chglev {
-+					pinmux = <PIN_PA12__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_charger_irq: charger_irq {
-+					pinmux = <PIN_PB13__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_charger_lbo: charger_lbo {
-+					pinmux = <PIN_PC8__GPIO>;
-+					bias-pull-up;
-+				};
-+
- 				pinctrl_flx0_default: flx0_default {
- 					pinmux = <PIN_PB28__FLEXCOM0_IO0>,
- 						 <PIN_PB29__FLEXCOM0_IO1>;
--- 
-2.7.4
+> perhaps it'll help get R8A7791 working w/MD21 set...
+
+Does your Porter work with the other MD21 setting (and the check commented
+out, of coutse)?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
