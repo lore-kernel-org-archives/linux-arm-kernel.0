@@ -1,81 +1,88 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Jun 2016 17:25:44 +0100
-Subject: [PATCH 6/6] arm64: trap userspace "dc cvau" cache operation on
- errata-affected core
-In-Reply-To: <1462812590-4494-7-git-send-email-andre.przywara@arm.com>
-References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
- <1462812590-4494-7-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160624162544.GG22608@e104818-lin.cambridge.arm.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 24 Jun 2016 11:35:34 -0500
+Subject: [PATCH] hwrng: OMAP: Fix assumption that runtime_get_sync will
+ always succeed
+In-Reply-To: <1466783867-25743-1-git-send-email-nm@ti.com>
+References: <1466783867-25743-1-git-send-email-nm@ti.com>
+Message-ID: <576D6156.2050508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2016 at 05:49:50PM +0100, Andre Przywara wrote:
-> +#define __user_cache_maint(insn, address, res)			\
-> +	asm volatile (						\
-> +		"1:	" insn ", %1\n"				\
-> +		"	mov	%w0, #0\n"			\
-> +		"2:\n"						\
-> +		"	.pushsection .fixup,\"ax\"\n"		\
-> +		"	.align	2\n"				\
-> +		"3:	mov	%w0, %w2\n"			\
-> +		"	b	2b\n"				\
-> +		"	.popsection\n"				\
-> +		_ASM_EXTABLE(1b, 3b)				\
-> +		: "=r" (res)					\
-> +		: "r" (address), "i" (-EFAULT)			\
-> +		: "memory")
+Hi Nishanth,
 
-I don't think we need the "memory" clobber here. It's not really
-accessing memory that the compiler controls.
+On 06/24/2016 10:57 AM, Menon, Nishanth wrote:
+> pm_runtime_get_sync does return a error value that must be checked for
+> error conditions, else, due to various reasons, the device maynot be
+> enabled and the system will crash due to lack of clock to the hardware
+> module.
+> 
+> Before:
+> 12.562784] [00000000] *pgd=fe193835
+> 12.562792] Internal error: : 1406 [#1] SMP ARM
+> [...]
+> 12.562864] CPU: 1 PID: 241 Comm: modprobe Not tainted 4.7.0-rc4-next-20160624 #2
+> 12.562867] Hardware name: Generic DRA74X (Flattened Device Tree)
+> 12.562872] task: ed51f140 ti: ed44c000 task.ti: ed44c000
+> 12.562886] PC is at omap4_rng_init+0x20/0x84 [omap_rng]
+> 12.562899] LR is at set_current_rng+0xc0/0x154 [rng_core]
+> [...]
+> 
+> After the proper checks:
+> [   94.366705] omap_rng 48090000.rng: _od_fail_runtime_resume: FIXME:
+> missing hwmod/omap_dev info
+> [   94.375767] omap_rng 48090000.rng: Failed to runtime_get device -19
+> [   94.382351] omap_rng 48090000.rng: initialization failed.
+> 
+> Fixes: 665d92fa85b5 ("hwrng: OMAP: convert to use runtime PM")
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> 
+> Patch based on: next-20160624
+> Issue seen with next-20160624
+> Full crash log: http://pastebin.ubuntu.com/17801376/
+> 
+>  drivers/char/hw_random/omap-rng.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
+> index 8a1432e8bb80..f30a1870cb64 100644
+> --- a/drivers/char/hw_random/omap-rng.c
+> +++ b/drivers/char/hw_random/omap-rng.c
+> @@ -384,7 +384,11 @@ static int omap_rng_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	pm_runtime_enable(&pdev->dev);
+> -	pm_runtime_get_sync(&pdev->dev);
+> +	ret = pm_runtime_get_sync(&pdev->dev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Failed to runtime_get device: %d\n", ret);
+> +		goto err_ioremap;
 
-> +asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
-> +{
-> +	unsigned long address;
+You need to also add a pm_runtime_put_noidle() on get_sync failures to
+balance the device's power usage_count.
+
+regards
+Suman
+
+> +	}
+>  
+>  	ret = (dev->of_node) ? of_get_omap_rng_device_details(priv, pdev) :
+>  				get_omap_rng_device_details(priv);
+> @@ -435,8 +439,14 @@ static int __maybe_unused omap_rng_suspend(struct device *dev)
+>  static int __maybe_unused omap_rng_resume(struct device *dev)
+>  {
+>  	struct omap_rng_dev *priv = dev_get_drvdata(dev);
 > +	int ret;
 > +
-> +	/* if this is a write with: Op0=1, Op2=1, Op1=3, CRn=7 */
-> +	if ((esr & 0x01fffc01) == 0x0012dc00) {
-> +		int rt = (esr >> 5) & 0x1f;
-> +		int crm = (esr >> 1) & 0x0f;
-> +
-> +		address = regs->regs[rt];
-> +
-> +		switch (crm) {
-> +		case 11:		/* DC CVAU, gets promoted */
-> +			__user_cache_maint("dc civac", address, ret);
-> +			break;
-> +		case 10:		/* DC CVAC, gets promoted */
-> +			__user_cache_maint("dc civac", address, ret);
-> +			break;
-> +		case 14:		/* DC CIVAC */
-> +			__user_cache_maint("dc civac", address, ret);
-> +			break;
-> +		case 5:			/* IC IVAU */
-> +			__user_cache_maint("ic ivau", address, ret);
-> +			break;
-> +		default:
-> +			force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> +			return;
-> +		}
-> +	} else {
-> +		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> +		return;
-> +	}
-> +
+> +	ret = pm_runtime_get_sync(dev);
 > +	if (ret) {
-> +		int sig_code;
-> +
-> +		down_read(&current->mm->mmap_sem);
-> +		if (find_vma(current->mm, address) == NULL)
-> +			sig_code = SEGV_MAPERR;
-> +		else
-> +			sig_code = SEGV_ACCERR;
-> +		up_read(&current->mm->mmap_sem);
-> +
-> +		force_signal_inject(SIGSEGV, sig_code, regs, address);
-
-BTW, there is some duplication with set_segfault() in
-armv8_deprecated.c, could you make this a common function in trap.c?
-
--- 
-Catalin
+> +		dev_err(dev, "Failed to runtime_get device: %d\n", ret);
+> +		return ret;
+> +	}
+>  
+> -	pm_runtime_get_sync(dev);
+>  	priv->pdata->init(priv);
+>  
+>  	return 0;
+> 
