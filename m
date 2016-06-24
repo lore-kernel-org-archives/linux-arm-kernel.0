@@ -1,127 +1,85 @@
-From: sajjan.linux@gmail.com (Vikas Sajjan)
-Date: Fri, 24 Jun 2016 09:55:20 +0530
-Subject: [PATCH 11/14] drivers: firmware: psci: Allow OS Initiated suspend
- mode
-In-Reply-To: <1466624209-27432-12-git-send-email-lina.iyer@linaro.org>
-References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
- <1466624209-27432-12-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAGm_ybjO+jAN62fqFyVrw_+5LOnUumEfn8kxmDa+s5ap0Bqk9A@mail.gmail.com>
+From: neidhard.kim@lge.com (Jongsung Kim)
+Date: Fri, 24 Jun 2016 13:43:52 +0900
+Subject: [PATCH 1/2] clk: fixed-factor: Allow for a few clocks to change
+ the parent rate
+In-Reply-To: <20160622091555.18415-1-maxime.ripard@free-electrons.com>
+References: <20160622091555.18415-1-maxime.ripard@free-electrons.com>
+Message-ID: <576CBA88.2060502@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
+Hi Maxime,
 
-On Thu, Jun 23, 2016 at 1:06 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> PSCI firmware v1.0 onwards may support 2 different modes for
-> CPU_SUSPEND. Platform coordinated mode is the default and every firmware
-> should support it. OS Initiated mode is optional for the firmware to
-> implement and allow Linux to make an better decision on the state of
-> the CPU cluster heirarchy.
+We need a path to set CLK_SET_RATE_PARENT any other needed flags when a fixed-factor-clock is initialized by DT. It seems your way will work also for my case. However, I suggested some more generic approach:
+
+https://lkml.org/lkml/2016/6/24/3
+
+Please leave any comments.
+
+
+On 2016? 06? 22? 18:15, Maxime Ripard wrote:
+> The only way for a fixed factor clock to change its rate would be to change
+> its parent rate.
 >
-> With the kernel capable of deciding the state for CPU cluster and
-> coherency domains, the OS Initiated mode may now be used by the kernel,
-> provided the firmware supports it. SET_SUSPEND_MODE is a PSCI function
-> available on v1.0 onwards and can be used to set the mode in the
-> firmware.
+> Since passing blindly CLK_SET_RATE_PARENT might break a lot of platforms
+> that were relying on the fact that the parent rate wouldn't change,
+> introduce a compatible-based whitelist that will allow clocks to opt-in
+> that flag.
 >
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> [Ulf: Rebased on 4.7 rc1]
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  drivers/firmware/psci.c   | 22 +++++++++++++++++++++-
->  include/uapi/linux/psci.h |  5 +++++
->  2 files changed, 26 insertions(+), 1 deletion(-)
+>  .../devicetree/bindings/clock/fixed-factor-clock.txt          |  4 ++++
+>  drivers/clk/clk-fixed-factor.c                                | 11 ++++++++++-
+>  2 files changed, 14 insertions(+), 1 deletion(-)
 >
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 03e0458..3920aba 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -52,6 +52,7 @@
->   * require cooperation with a Trusted OS driver.
+> diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+> index 1bae8527eb9b..189467a7188a 100644
+> --- a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+> @@ -14,6 +14,10 @@ Required properties:
+>  Optional properties:
+>  - clock-output-names : From common clock binding.
+>  
+> +Some clocks that require special treatments are also handled by that
+> +driver, with the compatibles:
+> +  - allwinner,sun4i-a10-pll3-2x-clk
+> +
+>  Example:
+>  	clock {
+>  		compatible = "fixed-factor-clock";
+> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> index 75cd6c792cb8..4db3be214077 100644
+> --- a/drivers/clk/clk-fixed-factor.c
+> +++ b/drivers/clk/clk-fixed-factor.c
+> @@ -142,6 +142,11 @@ void clk_hw_unregister_fixed_factor(struct clk_hw *hw)
+>  EXPORT_SYMBOL_GPL(clk_hw_unregister_fixed_factor);
+>  
+>  #ifdef CONFIG_OF
+> +static const struct of_device_id set_rate_parent_matches[] = {
+> +	{ .compatible = "allwinner,sun4i-a10-pll3-2x-clk" },
+> +	{ /* Sentinel */ },
+> +};
+> +
+>  /**
+>   * of_fixed_factor_clk_setup() - Setup function for simple fixed factor clock
 >   */
->  static int resident_cpu = -1;
-> +static bool psci_has_osi_pd;
->
->  bool psci_tos_resident_on(int cpu)
->  {
-> @@ -563,10 +564,29 @@ out_put_node:
->         return err;
->  }
->
-> +static int __init psci_1_0_init(struct device_node *np)
-> +{
-> +       int ret;
+> @@ -150,6 +155,7 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
+>  	struct clk *clk;
+>  	const char *clk_name = node->name;
+>  	const char *parent_name;
+> +	unsigned long flags = 0;
+>  	u32 div, mult;
+>  
+>  	if (of_property_read_u32(node, "clock-div", &div)) {
+> @@ -167,7 +173,10 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
+>  	of_property_read_string(node, "clock-output-names", &clk_name);
+>  	parent_name = of_clk_get_parent_name(node, 0);
+>  
+> -	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
+> +	if (of_match_node(set_rate_parent_matches, node))
+> +		flags |= CLK_SET_RATE_PARENT;
 > +
-> +       ret = psci_0_2_init(np);
-> +       if (ret)
-> +               return ret;
-> +
-> +       /* Check if PSCI OSI mode is available */
-> +       ret = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
-> +       if (ret & PSCI_1_0_OS_INITIATED) {
-> +               ret = psci_features(PSCI_1_0_FN_SET_SUSPEND_MODE);
-> +               if (!ret)
-> +                       psci_has_osi_pd = true;
-
-IMHO, its better to have this done in psci_init_cpu_suspend() itself
-for 2 reasons
-
-a] psci_init_cpu_suspend() already calls
-psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND])
-b] by moving this in psci_init_cpu_suspend() we make this support
-available even for ACPI platforms, since psci_acpi_init() calls
-psci_probe() and this calls  psci_init_cpu_suspend() for
-PSCI_VERSION_MAJOR(ver) >= 1
-
-I even posted a patch [1] yesterday, without being aware of your
-patchset for the same.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg513682.html
-
-
-> +       }
-> +
-> +       return 0;
-> +}
-> +
->  static const struct of_device_id psci_of_match[] __initconst = {
->         { .compatible = "arm,psci",     .data = psci_0_1_init},
->         { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
-> -       { .compatible = "arm,psci-1.0", .data = psci_0_2_init},
-> +       { .compatible = "arm,psci-1.0", .data = psci_1_0_init},
->         {},
->  };
->
-> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-> index 3d7a0fc..7dd778e 100644
-> --- a/include/uapi/linux/psci.h
-> +++ b/include/uapi/linux/psci.h
-> @@ -48,6 +48,7 @@
->
->  #define PSCI_1_0_FN_PSCI_FEATURES              PSCI_0_2_FN(10)
->  #define PSCI_1_0_FN_SYSTEM_SUSPEND             PSCI_0_2_FN(14)
-> +#define PSCI_1_0_FN_SET_SUSPEND_MODE           PSCI_0_2_FN(15)
->
->  #define PSCI_1_0_FN64_SYSTEM_SUSPEND           PSCI_0_2_FN64(14)
->
-> @@ -93,6 +94,10 @@
->  #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK  \
->                         (0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
->
-> +#define PSCI_1_0_OS_INITIATED                  BIT(0)
-> +#define PSCI_1_0_SUSPEND_MODE_PC               0
-> +#define PSCI_1_0_SUSPEND_MODE_OSI              1
-> +
->  /* PSCI return values (inclusive of all PSCI versions) */
->  #define PSCI_RET_SUCCESS                       0
->  #define PSCI_RET_NOT_SUPPORTED                 -1
-> --
-> 2.7.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, flags,
+>  					mult, div);
+>  	if (!IS_ERR(clk))
+>  		of_clk_add_provider(node, of_clk_src_simple_get, clk);
