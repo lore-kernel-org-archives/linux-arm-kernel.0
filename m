@@ -1,110 +1,97 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 24 Jun 2016 13:00:05 +0800
-Subject: [PATCH v7 2/2] mtd: nand: sunxi: add reset line support
-In-Reply-To: <20160624050005.31186-1-icenowy@aosc.xyz>
-References: <20160624050005.31186-1-icenowy@aosc.xyz>
-Message-ID: <20160624050005.31186-2-icenowy@aosc.xyz>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Fri, 24 Jun 2016 05:01:44 +0000
+Subject: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
+In-Reply-To: <Pine.LNX.4.44L0.1605121359120.5957-100000@netrider.rowland.org>
+References: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>
+ <Pine.LNX.4.44L0.1605121359120.5957-100000@netrider.rowland.org>
+Message-ID: <B256D81BAE5131468A838E5D7A24364101650CC12C@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND controller on some sun8i chips needs its reset line to be
-deasserted before they can enter working state.
+Hi Alan,
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes in v2:
-  - Corrected the error checking code of reset line.
+Sorry for late answer.
 
-Changes in v3:
-  - Corrected a more serious error brought in the "fix" of v2.
+> -----Original Message-----
+> From: Alan Stern [mailto:stern at rowland.harvard.edu]
+> Sent: 2016?5?13? 2:11
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>; Ferre, Nicolas
+> <Nicolas.FERRE@atmel.com>; linux-usb at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
+> 
+> On Thu, 12 May 2016, Wenyou Yang wrote:
+> 
+> > In order to get lower consumption, as a workaround, suspend the USB
+> > PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI Interrupt
+> > Configuration Register while OHCI USB suspending.
+> 
+> What does this mean?  What does suspending a port do?  Is it the same as a
+> normal USB port suspend?
 
-Changes in v4:
-  - Removed unneeded code block after "else".
+The usb controller from Synopsis does not managed correctly the suspend mode for the EHCI. 
+There is no way to have the VDDUTMII (USB device and host UTMI interface) suspend without any device connected to it. 
 
-Changes in v5:
-  - Added reassertion code in case of initialization error and device
-    remove.
+That's why we added this specific control to fix this issue. Namely, by setting some bits of one of the special function registers to fix this issue outside the usb controller. 
 
-Changes in v6:
-  - Fixed a resource leak by not using goto to exit in case of error.
+And the suspend mode works in OHCI mode.
 
-Changes in v7:
-  - Rebased for nand/next branch.
+It is not same as a normal USB port suspend.
 
- drivers/mtd/nand/sunxi_nand.c | 26 ++++++++++++++++++++++++--
- 1 file changed, 24 insertions(+), 2 deletions(-)
+> 
+> If it is the same, why doesn't the USB_PORT_FEAT_SUSPEND subcase of the
+> SetPortFeature case in ohci_hub_control() already take care of this?
+> 
+> > This suspend operation must be done before stopping the USB clock,
+> > resume after the USB clock enabled.
+> >
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> 
+> > @@ -132,6 +135,17 @@ static void at91_stop_hc(struct platform_device
+> > *pdev)
+> >
+> >
+> > /*--------------------------------------------------------------------
+> > -----*/
+> >
+> > +struct regmap *at91_dt_syscon_sfr(void) {
+> > +	struct regmap *regmap;
+> > +
+> > +	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
+> > +	if (IS_ERR(regmap))
+> > +		return NULL;
+> 
+> If you get an error, the regmap pointer is set to NULL...
+> 
+> > @@ -197,6 +211,8 @@ static int usb_hcd_at91_probe(const struct hc_driver
+> *driver,
+> >  		goto err;
+> >  	}
+> >
+> > +	ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
+> 
+> With no other error checking...
+> 
+> > +
+> >  	board = hcd->self.controller->platform_data;
+> >  	ohci = hcd_to_ohci(hcd);
+> >  	ohci->num_ports = board->ports;
+> 
+> > +static int ohci_at91_port_ctrl(struct regmap *regmap, bool enable) {
+> > +	u32 regval;
+> > +	int ret;
+> > +
+> > +	if (IS_ERR(regmap))
+> > +		return PTR_ERR(regmap);
+> > +
+> > +	ret = regmap_read(regmap, SFR_OHCIICR, &regval);
+> 
+> And now what happens if regmap is NULL?  Hint: It won't be pretty...
+> 
+> Alan Stern
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index f582fe4..77796da 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -39,6 +39,7 @@
- #include <linux/gpio.h>
- #include <linux/interrupt.h>
- #include <linux/iopoll.h>
-+#include <linux/reset.h>
- 
- #define NFC_REG_CTL		0x0000
- #define NFC_REG_ST		0x0004
-@@ -270,6 +271,7 @@ struct sunxi_nfc {
- 	void __iomem *regs;
- 	struct clk *ahb_clk;
- 	struct clk *mod_clk;
-+	struct reset_control *reset;
- 	unsigned long assigned_cs;
- 	unsigned long clk_rate;
- 	struct list_head chips;
-@@ -2209,15 +2211,28 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out_ahb_clk_unprepare;
- 
-+	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
-+
-+	if (!IS_ERR(nfc->reset)) {
-+		ret = reset_control_deassert(nfc->reset);
-+		if (ret) {
-+			dev_err(dev, "reset err %d\n", ret);
-+			goto out_mod_clk_unprepare;
-+		}
-+	} else if (PTR_ERR(nfc->reset) != -ENOENT) {
-+		ret = PTR_ERR(nfc->reset);
-+		goto out_mod_clk_unprepare;
-+	}
-+
- 	ret = sunxi_nfc_rst(nfc);
- 	if (ret)
--		goto out_mod_clk_unprepare;
-+		goto out_ahb_reset_reassert;
- 
- 	writel(0, nfc->regs + NFC_REG_INT);
- 	ret = devm_request_irq(dev, irq, sunxi_nfc_interrupt,
- 			       0, "sunxi-nand", nfc);
- 	if (ret)
--		goto out_mod_clk_unprepare;
-+		goto out_ahb_reset_reassert;
- 
- 	nfc->dmac = dma_request_slave_channel(dev, "rxtx");
- 	if (nfc->dmac) {
-@@ -2247,6 +2262,9 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- out_release_dmac:
- 	if (nfc->dmac)
- 		dma_release_channel(nfc->dmac);
-+out_ahb_reset_reassert:
-+	if (!IS_ERR(nfc->reset))
-+		reset_control_assert(nfc->reset);
- out_mod_clk_unprepare:
- 	clk_disable_unprepare(nfc->mod_clk);
- out_ahb_clk_unprepare:
-@@ -2262,6 +2280,10 @@ static int sunxi_nfc_remove(struct platform_device *pdev)
- 	sunxi_nand_chips_cleanup(nfc);
- 	if (nfc->dmac)
- 		dma_release_channel(nfc->dmac);
-+
-+	if (!IS_ERR(nfc->reset))
-+		reset_control_assert(nfc->reset);
-+
- 	clk_disable_unprepare(nfc->mod_clk);
- 	clk_disable_unprepare(nfc->ahb_clk);
- 
--- 
-2.9.0
+
+Best Regards,
+Wenyou Yang
