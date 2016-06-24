@@ -1,52 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 24 Jun 2016 12:16:42 +0200
-Subject: [PATCH v3] ARM: dts: sun8i: Add dts file for Olimex A33-OLinuXino
-In-Reply-To: <2618ba96-c3c5-4db6-b860-d212e7045f23@googlegroups.com>
-References: <1466418769-8384-1-git-send-email-stefan.mavrodiev@gmail.com>
- <20160622132222.GX26668@lukather>
- <2618ba96-c3c5-4db6-b860-d212e7045f23@googlegroups.com>
-Message-ID: <20160624101642.GC3785@lukather>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 24 Jun 2016 18:30:42 +0800
+Subject: [PATCHv2 05/27] crypto: omap-sham: avoid executing tasklet where
+ not needed
+In-Reply-To: <1466601840-18486-6-git-send-email-t-kristo@ti.com>
+References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+ <1466601840-18486-6-git-send-email-t-kristo@ti.com>
+Message-ID: <20160624103042.GA19571@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 23, 2016 at 04:07:13AM -0700, stefan.mavrodiev at gmail.com wrote:
-> > > +&usb_otg {
-> > > +	dr_mode = "host";
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&usbphy {
-> > > +	usb0_vbus-supply = <&reg_vcc5v0>;
-> > > +	status = "okay";
-> > > +
-> > > +};
-> > 
-> > It doesn't work as USB OTG ?
-> > 
+On Wed, Jun 22, 2016 at 04:23:38PM +0300, Tero Kristo wrote:
+> Some of the call paths of OMAP SHA driver can avoid executing the next
+> step of the crypto queue under tasklet; instead, execute the next step
+> directly via function call. This avoids a costly round-trip via the
+> scheduler giving a slight performance boost.
 > 
-> The hardware should work as OTG. In FEL mode it works as device, and
-> in current dt configuration - as host. I've spend some time trying
-> to make it work as otg, but didn't succeed.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  drivers/crypto/omap-sham.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
-> There are some hardware differences between our board and other a33,
-> but if you say that OTG work, I'll spend some additional time
-> working on it.
+> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+> index 6247887..84a0027 100644
+> --- a/drivers/crypto/omap-sham.c
+> +++ b/drivers/crypto/omap-sham.c
+> @@ -242,6 +242,8 @@ static struct omap_sham_drv sham = {
+>  	.lock = __SPIN_LOCK_UNLOCKED(sham.lock),
+>  };
+>  
+> +static void omap_sham_done_task(unsigned long data);
+> +
+>  static inline u32 omap_sham_read(struct omap_sham_dev *dd, u32 offset)
+>  {
+>  	return __raw_readl(dd->io_base + offset);
+> @@ -1007,7 +1009,7 @@ static void omap_sham_finish_req(struct ahash_request *req, int err)
+>  		req->base.complete(&req->base, err);
+>  
+>  	/* handle new request */
+> -	tasklet_schedule(&dd->done_task);
+> +	omap_sham_done_task((unsigned long)dd);
+>  }
 
-Yes, I've been testing and got it to work on at least two other A33
-boards (the R16 Parrot and the Sinlinx SinA33). You can look at the
-Parrot DT, you should have everything you need (but you will most
-likely need linux-next).
-
-Maxime
-
+Hmm, what guarnatees that you won't run out of stack doing this?
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160624/aa0e7427/attachment-0001.sig>
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
