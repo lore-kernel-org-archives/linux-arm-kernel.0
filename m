@@ -1,41 +1,48 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 24 Jun 2016 15:25:25 +0800
-Subject: [PATCH] ARM: at91/defconfig: Add ACT8945A driver
-Message-ID: <1466753125-4168-1-git-send-email-wenyou.yang@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Jun 2016 09:40:45 +0200
+Subject: [PATCH 2/4] ARM: OMAP4+: Prevent CPU1 related hang with kexec
+In-Reply-To: <1466495565-17480-3-git-send-email-tony@atomide.com>
+References: <1466495565-17480-1-git-send-email-tony@atomide.com>
+ <1466495565-17480-3-git-send-email-tony@atomide.com>
+Message-ID: <4439074.kx9oBqeAS1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include ACT8945A mfd, regulator and power drivers.
+On Tuesday, June 21, 2016 12:52:43 AM CEST Tony Lindgren wrote:
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 04e276c..cd820f5 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -8,7 +8,7 @@ ccflags-y := -I$(srctree)/$(src)/include \
+>  # Common support
+>  obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o timer.o pm.o \
+>          common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
+> -        omap_device.o sram.o drm.o
+> +        omap_device.o omap-headsmp.o sram.o drm.o
+>  
+>  hwmod-common                           = omap_hwmod.o omap_hwmod_reset.o \
+>                                           omap_hwmod_common_data.o
+> @@ -32,7 +32,7 @@ obj-$(CONFIG_SOC_HAS_OMAP2_SDRC)      += sdrc.o
+>  
+>  # SMP support ONLY available for OMAP4
+>  
+> -smp-$(CONFIG_SMP)                      += omap-smp.o omap-headsmp.o
+> +smp-$(CONFIG_SMP)                      += omap-smp.o
+>  smp-$(CONFIG_HOTPLUG_CPU)              += omap-hotplug.o
+>  omap-4-5-common                                =  omap4-common.o omap-wakeupgen.o
+> 
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+This doesn't work:
 
- arch/arm/configs/sama5_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+arch/arm/mach-omap2/built-in.o: In function `omap5_secondary_startup':
+dss-common.c:(.text+0x4cc4): undefined reference to `secondary_startup'
+arch/arm/mach-omap2/built-in.o: In function `hyp_boot':
+dss-common.c:(.text+0x4cf0): undefined reference to `secondary_startup'
+arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_startup':
+dss-common.c:(.text+0x4d14): undefined reference to `secondary_startup'
+arch/arm/mach-omap2/built-in.o: In function `omap4460_secondary_startup':
+dss-common.c:(.text+0x4d48): undefined reference to `secondary_startup'
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index 9cb1a85..aca8625 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -129,16 +129,19 @@ CONFIG_SPI_ATMEL=y
- CONFIG_SPI_GPIO=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_POWER_SUPPLY=y
-+CONFIG_BATTERY_ACT8945A=y
- CONFIG_POWER_RESET=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_AT91SAM9X_WATCHDOG=y
- CONFIG_SAMA5D4_WATCHDOG=y
-+CONFIG_MFD_ACT8945A=y
- CONFIG_MFD_ATMEL_FLEXCOM=y
- CONFIG_MFD_ATMEL_HLCDC=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ACT8865=y
-+CONFIG_REGULATOR_ACT8945A=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
--- 
-2.7.4
+secondary_startup() is not defined when CONFIG_SMP is disabled.
+
+	Arnd
