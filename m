@@ -1,52 +1,58 @@
-From: Thomas.Betker@rohde-schwarz.com (Thomas.Betker at rohde-schwarz.com)
-Date: Fri, 24 Jun 2016 09:58:36 +0200
-Subject: ARM: i.MX6: KSZ9031 fixup questions
-Message-ID: <OFA5811F46.A3BB50D2-ONC1257FDC.0028F664-C1257FDC.002BD17F@rohde-schwarz.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 24 Jun 2016 16:00:00 +0800
+Subject: [PATCH v2 0/4] ASoC: sunxi: Add i2s controller support
+In-Reply-To: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
+References: <20160615211123.31068-1-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64=15sv8GKDKDMA4VOkdE35=TwuX0D0m5JDpVbw6RYn_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
+On Thu, Jun 16, 2016 at 5:11 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi everyone,
+>
+> This is the second version of the I2S support for the controller found
+> in the Allwinner A10 and later SoCs.
+>
+> Playback has been tested with an UDA1380 on an A20-Olinuxino. Capture
+> is not implemented yet, but will come eventually.
+>
+> Let me know what you think,
+> Maxime
+>
+> Changes from v1:
+>   - Fixed bogus indentation and spurious whitespaces / newlines
+>   - Moved the device initialisation in the probe to the startup function
+>   - Disabled the device in shutdown
+>   - Removed function to get wss and sr to inline them in hw_params
+>   - Changed the way to access the divider array
+>   - Checked clk_set_rate return code
+>   - Fixed condition for invalid bclk and mclk dividers
+>   - Added sound-dai-cells to the bindings documentation required properties
+>
+> Emilio L?pez (1):
+>   ARM: sun7i: Add mod1 clock nodes
+>
+> Maxime Ripard (3):
+>   ASoC: sunxi: Add A10 I2S controller binding documentation
+>   ASoC: sunxi: Add Allwinner A10 Digital Audio driver
+>   ARM: sun7i: Add DAI nodes
+>
+>  .../devicetree/bindings/sound/sun4i-i2s.txt        |  34 +
+>  arch/arm/boot/dts/sun7i-a20.dtsi                   |  87 ++-
+>  sound/soc/sunxi/Kconfig                            |   9 +
+>  sound/soc/sunxi/Makefile                           |   2 +-
+>  sound/soc/sunxi/sun4i-i2s.c                        | 703 +++++++++++++++++++++
+>  5 files changed, 832 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>  create mode 100644 sound/soc/sunxi/sun4i-i2s.c
 
-I am trying to understand the ksz9031rn_phy_fixup() function in 
-arch/arm/mach-imx/mach-imx6q.c. My background is that we have a custom 
-board with i.MX6Q and KSZ9031RNX (RGMII).
+Tested-by: Chen-Yu Tsai <wens@csie.org>
 
-The basic idea seems to be that i.MX6Q has to set up the KSZ9031 pad skews 
-because ENET does not have an integrated TX clock delay (TsetupT), and you 
-don't want a trace delay on the PCB; i.e., all the RGMII signal lines are 
-about the same length.
+on a BPI-M1+ with a TI PCM5122-based PiFi DAC+ v2.0, a Raspberry Pi B+
+compatible DAC shield.
 
-Your register settings add up to the following deltas:
-* TDn to TXC: 0.96 + 0.00 = 0.96 ns
-* TX_CTL to TXC: 0.96 + 0.42 = 1.38 ns
-* RDn, RX_CTL to RXC: 0.96 + 0.42 = 1.38 ns
+I kept getting low but audible pops though. Not sure if it's the
+ad-hoc setup or some other factor.
 
-(a) Why is there a delay betweem TX_CTL and TDn? I would assume that they 
-should be in sync, same as RDn and RX_CTL. Is this something specific to 
-your boards?
-
-(b) On the TX side, i.MX6Q has TskewT = -0.1...0.9 ns (according to the 
-i.MX6Q data sheet), so the total data-to-clock delay at the PHY is 
-0.86...1.86 ns. This may violate the RGMII spec, which requires 1...2.6 ns 
-(1.8 ns typ). Is there a reason for this?
-
-Using a TXDn-to-TXC skew of 1.38 ns would result in a total of 1.28..2.28 
-ns, which is even nicely centered at 1.78 ns.
-
-(c) On the RX side, KSZ9031 adds an integrated clock delay of 1.2 ns, so 
-the total data-to-clock delay is 2.58 ns. This is just barely within the 
-requirements from the i.MX6Q data sheet (1...2.6 ns, same as RGMII). Is 
-there a reason for this?
-
-My guess is that the settings were copied from KSZ9021, which does not 
-have an integrated RX clock delay. Actually, we don't need any additional 
-skew with KSZ9031 -- 1.2 ns is fine. If at all, I would use just 0.6 ns, 
-to get a total of 1.8 ns.
-
-Note that the current settings do work, since both sides are fairly 
-tolerant; all that is needed is TXDn-to-TXC skew >= 0.06 ns, RXDn-to-RXC 
-skew >= -1.14 ns (I ran some tests). Still, I would like to understand 
-where the settings came from. Is there something I have overlooked?
-
-Best regards,
-Thomas Betker
+ChenYu
