@@ -1,77 +1,32 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 24 Jun 2016 10:57:47 -0500
-Subject: [PATCH] hwrng: OMAP: Fix assumption that runtime_get_sync will always
- succeed
-Message-ID: <1466783867-25743-1-git-send-email-nm@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 24 Jun 2016 11:12:30 -0500
+Subject: [PATCH v2 1/2] can: rcar_canfd: Add Classical CAN only mode
+ support
+In-Reply-To: <1466598707-44076-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+References: <1466434007-50873-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <1466598707-44076-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <1466598707-44076-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+Message-ID: <20160624161230.GA21437@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pm_runtime_get_sync does return a error value that must be checked for
-error conditions, else, due to various reasons, the device maynot be
-enabled and the system will crash due to lack of clock to the hardware
-module.
+On Wed, Jun 22, 2016 at 01:31:46PM +0100, Ramesh Shanmugasundaram wrote:
+> The controller can operate in one of the two global modes
+>  - CAN FD only mode (default)
+>  - Classical CAN (CAN2.0) only mode
+> 
+> This patch adds support for Classical CAN only mode. It can be enabled
+> by defining the optional device tree property "renesas,no-can-fd" of this
+> node.
+> 
+> Note: R-Car Gen3 h/w manual v0.51E shows bit6 of RSCFDnCFDGCFG as
+> reserved, which is incorrect. This bit is same as RSCFDnGCFG.
+> 
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> ---
+>  .../devicetree/bindings/net/can/rcar_canfd.txt     |  21 +-
 
-Before:
-12.562784] [00000000] *pgd=fe193835
-12.562792] Internal error: : 1406 [#1] SMP ARM
-[...]
-12.562864] CPU: 1 PID: 241 Comm: modprobe Not tainted 4.7.0-rc4-next-20160624 #2
-12.562867] Hardware name: Generic DRA74X (Flattened Device Tree)
-12.562872] task: ed51f140 ti: ed44c000 task.ti: ed44c000
-12.562886] PC is at omap4_rng_init+0x20/0x84 [omap_rng]
-12.562899] LR is at set_current_rng+0xc0/0x154 [rng_core]
-[...]
+Acked-by: Rob Herring <robh@kernel.org>
 
-After the proper checks:
-[   94.366705] omap_rng 48090000.rng: _od_fail_runtime_resume: FIXME:
-missing hwmod/omap_dev info
-[   94.375767] omap_rng 48090000.rng: Failed to runtime_get device -19
-[   94.382351] omap_rng 48090000.rng: initialization failed.
-
-Fixes: 665d92fa85b5 ("hwrng: OMAP: convert to use runtime PM")
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-
-Patch based on: next-20160624
-Issue seen with next-20160624
-Full crash log: http://pastebin.ubuntu.com/17801376/
-
- drivers/char/hw_random/omap-rng.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
-index 8a1432e8bb80..f30a1870cb64 100644
---- a/drivers/char/hw_random/omap-rng.c
-+++ b/drivers/char/hw_random/omap-rng.c
-@@ -384,7 +384,11 @@ static int omap_rng_probe(struct platform_device *pdev)
- 	}
- 
- 	pm_runtime_enable(&pdev->dev);
--	pm_runtime_get_sync(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to runtime_get device: %d\n", ret);
-+		goto err_ioremap;
-+	}
- 
- 	ret = (dev->of_node) ? of_get_omap_rng_device_details(priv, pdev) :
- 				get_omap_rng_device_details(priv);
-@@ -435,8 +439,14 @@ static int __maybe_unused omap_rng_suspend(struct device *dev)
- static int __maybe_unused omap_rng_resume(struct device *dev)
- {
- 	struct omap_rng_dev *priv = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret) {
-+		dev_err(dev, "Failed to runtime_get device: %d\n", ret);
-+		return ret;
-+	}
- 
--	pm_runtime_get_sync(dev);
- 	priv->pdata->init(priv);
- 
- 	return 0;
--- 
-2.9.0
+>  drivers/net/can/rcar/rcar_canfd.c                  | 355 ++++++++++++++-------
+>  2 files changed, 255 insertions(+), 121 deletions(-)
