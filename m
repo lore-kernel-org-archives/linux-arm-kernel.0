@@ -1,238 +1,209 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Jun 2016 11:41:31 +0200
-Subject: [PATCH 6/7] ARM: ux500: move soc_id driver to drivers/soc
+Date: Fri, 24 Jun 2016 11:41:27 +0200
+Subject: [PATCH 2/7] ARM: ux500: use CLK_OF_DECLARE()
 In-Reply-To: <20160624094132.1852086-1-arnd@arndb.de>
 References: <20160624094132.1852086-1-arnd@arndb.de>
-Message-ID: <20160624094132.1852086-7-arnd@arndb.de>
+Message-ID: <20160624094132.1852086-3-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the ux500 id code is basically a standalone driver, we can move it
-out of the arch code into drivers/soc/ux500.
+The ux500 DT support predates the CLK_OF_DECLARE macro and calls
+directly into the clk driver from platform code.
 
-This is a user-visible change, as it moves all the devices in sysfs
-from /sys/devices/soc0/ to /sys/devices/ and leaves the soc0 node as a
-separate device.
-
-Originally the idea was to put all on-chip devices under the soc node,
-and ux500 was the first platform to have this device, but later platforms
-almost all didn't follow that pattern, so this makes the platform do
-the same thing as everyone else.
-
-Since the platform is really obsolete now, I am optimistic that nothing
-will break after moving the devices around.
-
-As the SoC driver no longer has access to the private header files,
-I'm changing the code to instead look up the address of the backupram
-from devicetree, which is a good idea anyway.
-
-Finally, having a separate Kconfig symbol means the driver is now
-optional and could even be a loadable module rather than always being
-built-in if we allowed that for soc_device.
+Converting this to CLK_OF_DECLARE makes the code much nicer and
+similar to how modern platforms do it today. It also removes the
+last user of cpu_is_u8500_family() etc.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-ux500/Makefile                       |  2 +-
- arch/arm/mach-ux500/cpu-db8500.c                   |  6 ++--
- arch/arm/mach-ux500/setup.h                        |  2 --
- drivers/soc/Kconfig                                |  1 +
- drivers/soc/Makefile                               |  1 +
- drivers/soc/ux500/Kconfig                          |  7 ++++
- .../id.c => drivers/soc/ux500/ux500-soc-id.c       | 39 +++++++++++++---------
- 7 files changed, 36 insertions(+), 22 deletions(-)
- create mode 100644 drivers/soc/ux500/Kconfig
- rename arch/arm/mach-ux500/id.c => drivers/soc/ux500/ux500-soc-id.c (86%)
+ MAINTAINERS                             |  1 -
+ arch/arm/mach-ux500/cpu.c               | 12 ------------
+ drivers/clk/ux500/u8500_of_clk.c        | 16 ++--------------
+ drivers/clk/ux500/u8540_clk.c           | 16 ++--------------
+ drivers/clk/ux500/u9540_clk.c           |  4 ++--
+ include/linux/platform_data/clk-ux500.h | 17 -----------------
+ 6 files changed, 6 insertions(+), 60 deletions(-)
+ delete mode 100644 include/linux/platform_data/clk-ux500.h
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index ea8893fd128f..753d3eed1985 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for the linux kernel, U8500 machine.
- #
+diff --git a/MAINTAINERS b/MAINTAINERS
+index eff103763782..e78251a18255 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1842,7 +1842,6 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://git.linaro.org/people/ulfh/clk.git
+ S:	Maintained
+ F:	drivers/clk/ux500/
+-F:	include/linux/platform_data/clk-ux500.h
  
--obj-y				:= cpu.o id.o pm.o
-+obj-y				:= cpu.o pm.o
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
- obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o
- obj-$(CONFIG_MACH_MOP500)	+= board-mop500-audio.o
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 881cafbc4d97..c9c9832f79e9 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -88,15 +88,13 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
+ ARM/VERSATILE EXPRESS PLATFORM
+ M:	Liviu Dudau <liviu.dudau@arm.com>
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index f8c2d6f2fb7e..63853e76a4e1 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -19,7 +19,6 @@
+ #include <linux/irq.h>
+ #include <linux/irqchip.h>
+ #include <linux/irqchip/arm-gic.h>
+-#include <linux/platform_data/clk-ux500.h>
+ #include <linux/platform_data/arm-ux500-pm.h>
  
- static void __init u8500_init_machine(void)
- {
--	struct device *parent = ux500_soc_device_init();
--
- 	/* automatically probe child nodes of dbx5x0 devices */
- 	if (of_machine_is_compatible("st-ericsson,u8540"))
- 		of_platform_populate(NULL, u8500_local_bus_nodes,
--				     u8540_auxdata_lookup, parent);
-+				     u8540_auxdata_lookup, NULL);
- 	else
- 		of_platform_populate(NULL, u8500_local_bus_nodes,
--				     u8500_auxdata_lookup, parent);
-+				     u8500_auxdata_lookup, NULL);
- }
- 
- static const char * stericsson_dt_platform_compat[] = {
-diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
-index 1e9e7c55df75..85b7819a40ab 100644
---- a/arch/arm/mach-ux500/setup.h
-+++ b/arch/arm/mach-ux500/setup.h
-@@ -21,8 +21,6 @@ void ux500_restart(enum reboot_mode mode, const char *cmd);
- 
- extern void __init ux500_init_irq(void);
- 
--extern struct device *ux500_soc_device_init(void);
--
- extern void ux500_cpu_die(unsigned int cpu);
- 
- #endif /*  __ASM_ARCH_SETUP_H */
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index 58547f48ebcd..f31bceb69c0d 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -9,6 +9,7 @@ source "drivers/soc/samsung/Kconfig"
- source "drivers/soc/sunxi/Kconfig"
- source "drivers/soc/tegra/Kconfig"
- source "drivers/soc/ti/Kconfig"
-+source "drivers/soc/ux500/Kconfig"
- source "drivers/soc/versatile/Kconfig"
- 
- endmenu
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index b75e3bd0a01e..50c23d0bd457 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -14,4 +14,5 @@ obj-$(CONFIG_SOC_SAMSUNG)	+= samsung/
- obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
- obj-$(CONFIG_SOC_TI)		+= ti/
-+obj-$(CONFIG_ARCH_U8500)	+= ux500/
- obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
-diff --git a/drivers/soc/ux500/Kconfig b/drivers/soc/ux500/Kconfig
-new file mode 100644
-index 000000000000..025a44aef5db
---- /dev/null
-+++ b/drivers/soc/ux500/Kconfig
-@@ -0,0 +1,7 @@
-+config UX500_SOC_ID
-+	bool "SoC bus for ST-Ericsson ux500"
-+	depends on ARCH_U8500 || COMPILE_TEST
-+	default ARCH_U8500
-+	help
-+	  Include support for the SoC bus on the ARM RealView platforms
-+	  providing some sysfs information about the ASIC variant.
-diff --git a/arch/arm/mach-ux500/id.c b/drivers/soc/ux500/ux500-soc-id.c
-similarity index 86%
-rename from arch/arm/mach-ux500/id.c
-rename to drivers/soc/ux500/ux500-soc-id.c
-index 983004d0fef2..49a811edce25 100644
---- a/arch/arm/mach-ux500/id.c
-+++ b/drivers/soc/ux500/ux500-soc-id.c
-@@ -8,8 +8,11 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/module.h>
- #include <linux/random.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/sys_soc.h>
- 
- #include <asm/cputype.h>
-@@ -17,10 +20,6 @@
- #include <asm/cacheflush.h>
  #include <asm/mach/map.h>
- 
--#include "setup.h"
+@@ -66,17 +65,6 @@ void __init ux500_init_irq(void)
+ 	prcmu_early_init(r.start, r.end-r.start);
+ 	ux500_pm_init(r.start, r.end-r.start);
+ 	ux500_l2x0_init();
 -
--#include "db8500-regs.h"
--
- /**
-  * struct dbx500_asic_id - fields of the ASIC ID
-  * @process: the manufacturing process, 0x40 is 40 nm 0x00 is "standard"
-@@ -157,27 +156,31 @@ static ssize_t ux500_get_process(struct device *dev,
- 	return sprintf(buf, "%02xnm\n", dbx500_id.process);
+-	/*
+-	 * Init clocks here so that they are available for system timer
+-	 * initialization.
+-	 */
+-	if (cpu_is_u8500_family())
+-		u8500_clk_init();
+-	else if (cpu_is_u9540())
+-		u9540_clk_init();
+-	else if (cpu_is_u8540())
+-		u8540_clk_init();
  }
  
--static const char *db8500_read_soc_id(void)
-+static const char *db8500_read_soc_id(struct device_node *backupram)
- {
-+	void __iomem *base;
- 	void __iomem *uid;
- 	const char *retstr;
+ static const char * __init ux500_get_machine(void)
+diff --git a/drivers/clk/ux500/u8500_of_clk.c b/drivers/clk/ux500/u8500_of_clk.c
+index 9a736d939806..e960d686d9db 100644
+--- a/drivers/clk/ux500/u8500_of_clk.c
++++ b/drivers/clk/ux500/u8500_of_clk.c
+@@ -11,7 +11,6 @@
+ #include <linux/of_address.h>
+ #include <linux/clk-provider.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+-#include <linux/platform_data/clk-ux500.h>
+ #include "clk.h"
  
--	uid = ioremap(U8500_BB_UID_BASE, 0x20);
--	if (!uid)
-+	base = of_iomap(backupram, 0);
-+	if (!base)
- 		return NULL;
-+	uid = base + 0xfc0;
-+
- 	/* Throw these device-specific numbers into the entropy pool */
- 	add_device_randomness(uid, 0x14);
- 	retstr = kasprintf(GFP_KERNEL, "%08x%08x%08x%08x%08x",
- 			 readl((u32 *)uid+0),
- 			 readl((u32 *)uid+1), readl((u32 *)uid+2),
- 			 readl((u32 *)uid+3), readl((u32 *)uid+4));
--	iounmap(uid);
-+	iounmap(base);
- 	return retstr;
+ #define PRCC_NUM_PERIPH_CLUSTERS 6
+@@ -48,11 +47,6 @@ static struct clk *ux500_twocell_get(struct of_phandle_args *clkspec,
+ 	return PRCC_SHOW(clk_data, base, bit);
  }
  
--static void __init soc_info_populate(struct soc_device_attribute *soc_dev_attr)
-+static void __init soc_info_populate(struct soc_device_attribute *soc_dev_attr,
-+				     struct device_node *backupram)
+-static const struct of_device_id u8500_clk_of_match[] = {
+-	{ .compatible = "stericsson,u8500-clks", },
+-	{ },
+-};
+-
+ /* CLKRST4 is missing making it hard to index things */
+ enum clkrst_index {
+ 	CLKRST1_INDEX = 0,
+@@ -63,22 +57,15 @@ enum clkrst_index {
+ 	CLKRST_MAX,
+ };
+ 
+-void u8500_clk_init(void)
++static void u8500_clk_init(struct device_node *np)
  {
--	soc_dev_attr->soc_id   = db8500_read_soc_id();
-+	soc_dev_attr->soc_id   = db8500_read_soc_id(backupram);
- 	soc_dev_attr->machine  = ux500_get_machine();
- 	soc_dev_attr->family   = ux500_get_family();
- 	soc_dev_attr->revision = ux500_get_revision();
-@@ -186,28 +189,34 @@ static void __init soc_info_populate(struct soc_device_attribute *soc_dev_attr)
- static const struct device_attribute ux500_soc_attr =
- 	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL);
+ 	struct prcmu_fw_version *fw_version;
+-	struct device_node *np = NULL;
+ 	struct device_node *child = NULL;
+ 	const char *sgaclk_parent = NULL;
+ 	struct clk *clk, *rtc_clk, *twd_clk;
+ 	u32 bases[CLKRST_MAX];
+ 	int i;
  
--struct device * __init ux500_soc_device_init(void)
-+static int __init ux500_soc_device_init(void)
- {
- 	struct device *parent;
- 	struct soc_device *soc_dev;
- 	struct soc_device_attribute *soc_dev_attr;
-+	struct device_node *backupram;
-+
-+	backupram = of_find_compatible_node(NULL, NULL, "ste,dbx500-backupram");
-+	if (!backupram)
-+		return 0;
+-	if (of_have_populated_dt())
+-		np = of_find_matching_node(NULL, u8500_clk_of_match);
+-	if (!np) {
+-		pr_err("Either DT or U8500 Clock node not found\n");
+-		return;
+-	}
+ 	for (i = 0; i < ARRAY_SIZE(bases); i++) {
+ 		struct resource r;
  
- 	ux500_setup_id();
- 
- 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
- 	if (!soc_dev_attr)
--		return ERR_PTR(-ENOMEM);
-+		return -ENOMEM;
- 
--	soc_info_populate(soc_dev_attr);
-+	soc_info_populate(soc_dev_attr, backupram);
- 
- 	soc_dev = soc_device_register(soc_dev_attr);
- 	if (IS_ERR(soc_dev)) {
- 	        kfree(soc_dev_attr);
--		return NULL;
-+		return PTR_ERR(soc_dev);
+@@ -573,3 +560,4 @@ void u8500_clk_init(void)
+ 			of_clk_add_provider(child, of_clk_src_simple_get, twd_clk);
  	}
- 
- 	parent = soc_device_to_device(soc_dev);
- 	device_create_file(parent, &ux500_soc_attr);
- 
--	return parent;
-+	return 0;
  }
-+subsys_initcall(ux500_soc_device_init);
++CLK_OF_DECLARE(u8500_clks, "stericsson,u8500-clks", u8500_clk_init);
+diff --git a/drivers/clk/ux500/u8540_clk.c b/drivers/clk/ux500/u8540_clk.c
+index 86549e59fb42..133859f0e2bf 100644
+--- a/drivers/clk/ux500/u8540_clk.c
++++ b/drivers/clk/ux500/u8540_clk.c
+@@ -12,14 +12,8 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk-provider.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+-#include <linux/platform_data/clk-ux500.h>
+ #include "clk.h"
+ 
+-static const struct of_device_id u8540_clk_of_match[] = {
+-	{ .compatible = "stericsson,u8540-clks", },
+-	{ }
+-};
+-
+ /* CLKRST4 is missing making it hard to index things */
+ enum clkrst_index {
+ 	CLKRST1_INDEX = 0,
+@@ -30,19 +24,12 @@ enum clkrst_index {
+ 	CLKRST_MAX,
+ };
+ 
+-void u8540_clk_init(void)
++static void u8540_clk_init(struct device_node *np)
+ {
+ 	struct clk *clk;
+-	struct device_node *np = NULL;
+ 	u32 bases[CLKRST_MAX];
+ 	int i;
+ 
+-	if (of_have_populated_dt())
+-		np = of_find_matching_node(NULL, u8540_clk_of_match);
+-	if (!np) {
+-		pr_err("Either DT or U8540 Clock node not found\n");
+-		return;
+-	}
+ 	for (i = 0; i < ARRAY_SIZE(bases); i++) {
+ 		struct resource r;
+ 
+@@ -607,3 +594,4 @@ void u8540_clk_init(void)
+ 			bases[CLKRST6_INDEX], BIT(0), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "rng");
+ }
++CLK_OF_DECLARE(u8540_clks, "stericsson,u8540-clks", u8540_clk_init);
+diff --git a/drivers/clk/ux500/u9540_clk.c b/drivers/clk/ux500/u9540_clk.c
+index 2138a4c8cbca..7b6bca49ce42 100644
+--- a/drivers/clk/ux500/u9540_clk.c
++++ b/drivers/clk/ux500/u9540_clk.c
+@@ -9,10 +9,10 @@
+ 
+ #include <linux/clk-provider.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+-#include <linux/platform_data/clk-ux500.h>
+ #include "clk.h"
+ 
+-void u9540_clk_init(void)
++static void u9540_clk_init(struct device_node *np)
+ {
+ 	/* register clocks here */
+ }
++CLK_OF_DECLARE(u9540_clks, "stericsson,u9540-clks", u9540_clk_init);
+diff --git a/include/linux/platform_data/clk-ux500.h b/include/linux/platform_data/clk-ux500.h
+deleted file mode 100644
+index 3af0da1f3be5..000000000000
+--- a/include/linux/platform_data/clk-ux500.h
++++ /dev/null
+@@ -1,17 +0,0 @@
+-/*
+- * Clock definitions for ux500 platforms
+- *
+- * Copyright (C) 2012 ST-Ericsson SA
+- * Author: Ulf Hansson <ulf.hansson@linaro.org>
+- *
+- * License terms: GNU General Public License (GPL) version 2
+- */
+-
+-#ifndef __CLK_UX500_H
+-#define __CLK_UX500_H
+-
+-void u8500_clk_init(void);
+-void u9540_clk_init(void);
+-void u8540_clk_init(void);
+-
+-#endif /* __CLK_UX500_H */
 -- 
 2.9.0
