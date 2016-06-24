@@ -1,37 +1,40 @@
-From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Fri, 24 Jun 2016 10:13:33 +0800
-Subject: [PATCH v5 8/8] iommu/rockchip: Enable Rockchip IOMMU on ARM64
-In-Reply-To: <1466734413-7453-1-git-send-email-zhengsq@rock-chips.com>
-References: <1466734413-7453-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1466734413-7453-9-git-send-email-zhengsq@rock-chips.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 24 Jun 2016 10:18:35 +0800
+Subject: [PATCH V2 2/4] STM Ftrace: Adding generic buffer interface driver
+In-Reply-To: <1466563613-31578-3-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <201606241004.7obaz2yZ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Xue <xxm@rock-chips.com>
+Hi,
 
-This patch makes it possible to compile the rockchip-iommu driver on
-ARM64, so that it can be used with 64-bit SoCs equipped with this type
-of IOMMU.
+[auto build test ERROR on tip/perf/core]
+[also build test ERROR on v4.7-rc4 next-20160623]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Simon Xue <xxm@rock-chips.com>
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/Integration-of-function-trace-with-System-Trace-IP-blocks/20160622-115305
+config: m68k-allyesconfig (attached as .config)
+compiler: m68k-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=m68k 
+
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `stm_ftrace_unlink':
+>> ftrace.c:(.text+0x12197ac): undefined reference to `trace_rm_output'
+   drivers/built-in.o: In function `stm_ftrace_link':
+>> ftrace.c:(.text+0x12197be): undefined reference to `trace_add_output'
+
 ---
- drivers/iommu/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index ad08603..5572621 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -218,7 +218,7 @@ config OMAP_IOMMU_DEBUG
- 
- config ROCKCHIP_IOMMU
- 	bool "Rockchip IOMMU Support"
--	depends on ARM
-+	depends on ARM || ARM64
- 	depends on ARCH_ROCKCHIP || COMPILE_TEST
- 	select IOMMU_API
- 	select ARM_DMA_USE_IOMMU
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 37199 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160624/e1718706/attachment-0001.obj>
