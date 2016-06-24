@@ -1,52 +1,68 @@
-From: tony.felice@timesys.com (Anthony Felice)
-Date: Fri, 24 Jun 2016 15:44:45 -0400
-Subject: [PATCH 3/4] ARM: dts: vf610-twr: Add crtouch node and pinmux
-In-Reply-To: <1466797486-31558-1-git-send-email-tony.felice@timesys.com>
-References: <1466797486-31558-1-git-send-email-tony.felice@timesys.com>
-Message-ID: <1466797486-31558-4-git-send-email-tony.felice@timesys.com>
+From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
+Date: Fri, 24 Jun 2016 21:58:15 +0200
+Subject: [PATCH 01/14] ARM: dts: sun8i: Add SID node
+In-Reply-To: <CAGb2v677+abNOEg3iEoiH25Ji9tq0JXkrGUVvLPAbXAPD3Su_g@mail.gmail.com>
+References: <20160623192104.18720-1-megous@megous.com>
+ <20160623192104.18720-2-megous@megous.com>
+ <CAGb2v677+abNOEg3iEoiH25Ji9tq0JXkrGUVvLPAbXAPD3Su_g@mail.gmail.com>
+Message-ID: <416577ad-f8d0-d12a-a092-9b22ad2f31f1@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a node for crtouch, the touchscreen controller of the Vybrid
-Tower. Pinmux for the gpio irq used by crtouch is also defined in this
-commit.
+Hello,
 
-Signed-off-by: Anthony Felice <tony.felice@timesys.com>
----
- arch/arm/boot/dts/vf610-twr.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+thank you for the review.
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index ad1aff9..5d5cecf 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -217,6 +217,14 @@
- 	       VDDIO-supply = <&reg_3p3v>;
- 	       clocks = <&clks VF610_CLK_SAI2>;
-        };
-+
-+	touch: crtouch at 49 {
-+		compatible = "fsl,crtouch_ts";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_touchscreen>;
-+		reg = <0x49>;
-+		irq-gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
-+	};
- };
- 
- &iomuxc {
-@@ -365,6 +373,12 @@
- 			>;
- 		};
- 
-+		pinctrl_touchscreen: touchscreengrp {
-+			fsl,pins = <
-+				VF610_PAD_PTA31__GPIO_21	0x219d
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				VF610_PAD_PTB4__UART1_TX		0x21a2
--- 
-2.7.4
+On 24.6.2016 04:41, Chen-Yu Tsai wrote:
+> On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
+>> From: Josef Gajdusek <atx@atx.name>
+>>
+>> Add a node describing the Security ID memory to the Allwinner H3 .dtsi file.
+>>
+>> Signed-off-by: Josef Gajdusek <atx@atx.name>
+>> ---
+>>  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> index 4a4926b..172576d 100644
+>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> @@ -389,6 +389,13 @@
+>>                         #size-cells = <0>;
+>>                 };
+>>
+>> +               sid: eeprom at 01c14000 {
+>> +                       compatible = "allwinner,sun4i-a10-sid";
+> 
+> This has been discussed before. The hardware is not compatible.
+> The write control registers are at different offsets.
+
+I'm not sure what you mean by write control registers. Code in
+sunxi_sid.c implements only read access to the nvram. Can you pelase
+elaborate?
+
+  Ondrej
+
+> 
+> ChenYu
+> 
+>> +                       reg = <0x01c14000 0x400>;
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <1>;
+>> +               };
+>> +
+>>                 usbphy: phy at 01c19400 {
+>>                         compatible = "allwinner,sun8i-h3-usb-phy";
+>>                         reg = <0x01c19400 0x2c>,
+>> --
+>> 2.9.0
+>>
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160624/e121c180/attachment.sig>
