@@ -1,67 +1,48 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Fri, 24 Jun 2016 12:31:43 -0300
-Subject: [PATCH 02/19] exynos4-is: remove some unused vars
-In-Reply-To: <cover.1466782238.git.mchehab@s-opensource.com>
-References: <cover.1466782238.git.mchehab@s-opensource.com>
-Message-ID: <21ed20340a789f893d410bd961c206445a333040.1466782238.git.mchehab@s-opensource.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Jun 2016 16:32:17 +0100
+Subject: [PATCH 3/6] arm64: include alternative handling in
+ dcache_by_line_op
+In-Reply-To: <1462812590-4494-4-git-send-email-andre.przywara@arm.com>
+References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
+ <1462812590-4494-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160624153216.GE22608@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gcc 6.1 warns about some unused vars and functions. Remove them:
+On Mon, May 09, 2016 at 05:49:47PM +0100, Andre Przywara wrote:
+> The newly introduced dcache_by_line_op macro is used at least in
+> one occassion at the moment to issue a "dc cvau" instruction,
+> which is affected by ARM errata 819472, 826319, 827319 and 824069.
+> Change the macro to allow for alternative patching in there to
+> protect affected Cortex-A53 cores.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm64/mm/proc-macros.S | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+> index e6a30e1..5786017 100644
+> --- a/arch/arm64/mm/proc-macros.S
+> +++ b/arch/arm64/mm/proc-macros.S
+> @@ -78,7 +78,14 @@
+>  	add	\size, \kaddr, \size
+>  	sub	\tmp2, \tmp1, #1
+>  	bic	\kaddr, \kaddr, \tmp2
+> -9998:	dc	\op, \kaddr
+> +9998:
+> +	alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE, (\op == cvau || \op == cvac)
+> +	dc	\op, \kaddr
+> +	.if	(\op == cvau || \op == cvac)
+> +	alternative_else
+> +	dc	civac, \kaddr
+> +	alternative_endif
+> +	.endif
 
-drivers/media/platform/exynos4-is/mipi-csis.c:665:46: warning: 's5pcsis_sd_internal_ops' defined but not used [-Wunused-const-variable=]
- static const struct v4l2_subdev_internal_ops s5pcsis_sd_internal_ops = {
-                                              ^~~~~~~~~~~~~~~~~~~~~~~
+We can revert commit 77ee306c0aea ("arm64: alternatives: add enable
+parameter to conditional asm macros"), drop the first patch in this
+series and move the .if outside the alternative block (with a
+duplication of the "dc \op, \kaddr" line.
 
-drivers/media/platform/exynos4-is/mipi-csis.c:652:12: warning: 's5pcsis_open' defined but not used [-Wunused-function]
- static int s5pcsis_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
-            ^~~~~~~~~~~~
-
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
- drivers/media/platform/exynos4-is/mipi-csis.c | 17 -----------------
- drivers/media/radio/radio-aztech.c            |  1 -
- 2 files changed, 18 deletions(-)
-
-diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
-index bf954424e7be..86e681daa89d 100644
---- a/drivers/media/platform/exynos4-is/mipi-csis.c
-+++ b/drivers/media/platform/exynos4-is/mipi-csis.c
-@@ -649,23 +649,6 @@ static int s5pcsis_log_status(struct v4l2_subdev *sd)
- 	return 0;
- }
- 
--static int s5pcsis_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
--{
--	struct v4l2_mbus_framefmt *format = v4l2_subdev_get_try_format(sd, fh->pad, 0);
--
--	format->colorspace = V4L2_COLORSPACE_JPEG;
--	format->code = s5pcsis_formats[0].code;
--	format->width = S5PCSIS_DEF_PIX_WIDTH;
--	format->height = S5PCSIS_DEF_PIX_HEIGHT;
--	format->field = V4L2_FIELD_NONE;
--
--	return 0;
--}
--
--static const struct v4l2_subdev_internal_ops s5pcsis_sd_internal_ops = {
--	.open = s5pcsis_open,
--};
--
- static struct v4l2_subdev_core_ops s5pcsis_core_ops = {
- 	.s_power = s5pcsis_s_power,
- 	.log_status = s5pcsis_log_status,
-diff --git a/drivers/media/radio/radio-aztech.c b/drivers/media/radio/radio-aztech.c
-index 705dd6f9162c..f445327f282d 100644
---- a/drivers/media/radio/radio-aztech.c
-+++ b/drivers/media/radio/radio-aztech.c
-@@ -43,7 +43,6 @@ MODULE_VERSION("1.0.0");
- static int io[AZTECH_MAX] = { [0] = CONFIG_RADIO_AZTECH_PORT,
- 			      [1 ... (AZTECH_MAX - 1)] = -1 };
- static int radio_nr[AZTECH_MAX]	= { [0 ... (AZTECH_MAX - 1)] = -1 };
--static const int radio_wait_time = 1000;
- 
- module_param_array(io, int, NULL, 0444);
- MODULE_PARM_DESC(io, "I/O addresses of the Aztech card (0x350 or 0x358)");
 -- 
-2.7.4
+Catalin
