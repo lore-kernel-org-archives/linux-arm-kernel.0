@@ -1,27 +1,65 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 24 Jun 2016 20:43:05 +0800
-Subject: [PATCH 2/7] power: act8945a_charger: Improve
-In-Reply-To: <1466752660-2922-3-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <201606242015.gipMOaF7%fengguang.wu@intel.com>
+From: amitoj1606@gmail.com (Amitoj Kaur Chawla)
+Date: Fri, 24 Jun 2016 18:36:30 +0530
+Subject: [PATCH] pinctrl: Add missing of_node_put
+Message-ID: <20160624130630.GA11858@amitoj-Inspiron-3542>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+of_find_node_by_name does an of_node_get on its return value, 
+so an of_node_put is needed on this value before the corresponding 
+variable goes out of scope.
 
-[auto build test WARNING on battery/master]
-[also build test WARNING on v4.7-rc4 next-20160624]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+The Coccinelle semantic patch used to make this change is as follows:
+@@
+struct device_node *n;
+struct device_node *n1;
+statement S;
+identifier f;
+expression E;
+constant C;
+@@
 
-url:    https://github.com/0day-ci/linux/commits/Wenyou-Yang/power-act8945a_charger-Improvements/20160624-153641
-base:   git://git.infradead.org/battery-2.6.git master
+n = of_find_node_by_name(...)
+...
+if (!n) S
+... when != of_node_put(n)
+    when != n1 = f(n,...)
+    when != E = n
+    when any
+    when strict
+(
++ of_node_put(n);
+  return -C;
+|
+  of_node_put(n);
+|
+  n1 = f(n,...)
+|
+  E = n
+|
+  return ...;
+)
 
-
-coccinelle warnings: (new ones prefixed by >>)
-
->> drivers/power/act8945a_charger.c:115:2-3: Unneeded semicolon
-
-Please review and possibly fold the followup patch.
-
+Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+ drivers/pinctrl/sirf/pinctrl-atlas7.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+index 3d233fc..7d9c1a3 100644
+--- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
++++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+@@ -5424,8 +5424,10 @@ static int atlas7_pinmux_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 	pmx->sys2pci_base = devm_ioremap_resource(&pdev->dev, &res);
+-	if (IS_ERR(pmx->sys2pci_base))
++	if (IS_ERR(pmx->sys2pci_base)) {
++		of_node_put(sys2pci_np);
+ 		return -ENOMEM;
++	}
+ 
+ 	pmx->dev = &pdev->dev;
+ 
+-- 
+1.9.1
