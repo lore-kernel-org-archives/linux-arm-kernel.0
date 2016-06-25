@@ -1,66 +1,313 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Sat, 25 Jun 2016 08:20:23 +0100
-Subject: [GIT PULL 0/7] EFI changes for v4.8
-Message-ID: <1466839230-12781-1-git-send-email-matt@codeblueprint.co.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 25 Jun 2016 09:47:53 +0200
+Subject: [PATCH V3] ARM: dts: sun7i: Add dts file for Bananapi M1 Plus
+ board
+In-Reply-To: <20160624061134.9500-1-luoyi.ly@gmail.com>
+References: <20160622095723.GU26668@lukather>
+ <20160624061134.9500-1-luoyi.ly@gmail.com>
+Message-ID: <20160625074753.GF4000@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Folks, please pull the v4.8 EFI queue. Included are some cleanups and
-fixes for SGI/UV BIOS calls.
+Hi,
 
-The following changes since commit 5edb56491d4812c42175980759da53388e5d86f5:
+Thanks for sending a new version.
 
-  Linux 4.7-rc3 (2016-06-12 07:20:35 -0700)
+However, it's usually done in a new thread, not as a reply to a
+previous mail. If you're not using it, git send-email does all the
+magic for you.
 
-are available in the git repository at:
+On Fri, Jun 24, 2016 at 02:11:34PM +0800, luoyi.ly at gmail.com wrote:
+> From: Luo Yi <luoyi.ly@gmail.com>
+> 
+> Add support for the Bananapi M1 Plus A20 development board from
+> sinovoip.com.cn . This board is nearly a clone of the Lemaker's
+> Bananapro, but differ with the wlan chipset connection and i2s pinout.
+> And I also enable the integrated audio codec on default.
+> 
+> Signed-off-by: Luo Yi <luoyi.ly@gmail.com>
+> ---
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git tags/efi-next
+Having a changelog of all the changes you made here (right after ---)
+would be great.
 
-for you to fetch changes up to bc6e082f7a4bec4efde100b5b6528f5a2ea82106:
+>  arch/arm/boot/dts/Makefile                       |   1 +
+>  arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 230 +++++++++++++++++++++++
+>  2 files changed, 231 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index e06a5ab..fde407f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -685,6 +685,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+>  	sun6i-a31s-yones-toptech-bs1078-v2.dtb
+>  dtb-$(CONFIG_MACH_SUN7I) += \
+>  	sun7i-a20-bananapi.dtb \
+> +	sun7i-a20-bananapi-m1-plus.dtb \
+>  	sun7i-a20-bananapro.dtb \
+>  	sun7i-a20-cubieboard2.dtb \
+>  	sun7i-a20-cubietruck.dtb \
+> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+> new file mode 100644
+> index 0000000..6efc9aa
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+> @@ -0,0 +1,230 @@
+> +/*
+> + * Copyright 2016 Luo Yi <luoyi.ly@gmail.com>
+> + *
+> + * Thanks to the original work by Hans de Goede <hdegoede@redhat.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *	 modify it under the terms of the GNU General Public License as
+> + *	 published by the Free Software Foundation; either version 2 of the
+> + *	 License, or (at your option) any later version.
+> + *
+> + *	 This file is distributed in the hope that it will be useful,
+> + *	 but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *	 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *	 GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *	 obtaining a copy of this software and associated documentation
+> + *	 files (the "Software"), to deal in the Software without
+> + *	 restriction, including without limitation the rights to use,
+> + *	 copy, modify, merge, publish, distribute, sublicense, and/or
+> + *	 sell copies of the Software, and to permit persons to whom the
+> + *	 Software is furnished to do so, subject to the following
+> + *	 conditions:
+> + *
+> + *	 The above copyright notice and this permission notice shall be
+> + *	 included in all copies or substantial portions of the Software.
+> + *
+> + *	 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *	 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *	 OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *	 NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *	 HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *	 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *	 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *	 OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun7i-a20.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	model = "Banana Pi BPI-M1-Plus";
+> +	compatible = "sinovoip,bpi-m1-plus", "allwinner,sun7i-a20";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pins_bananapi>;
+> +
+> +		green {
+> +			label = "bananapi-m1-plus:green:usr";
+> +			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		red {
+> +			label = "bananapi-m1-plus:red:usr";
+> +			gpios = <&pio 7 25 GPIO_ACTIVE_HIGH>;
+> +			linux,default-trigger = "default-on";
 
-  x86/efi: Remove unused efi_get_time function (2016-06-23 14:32:14 +0100)
+As Chen-Yu already told you, we don't enforce any trigger by default.
 
-----------------------------------------------------------------
- * Improve error messages in the efibc driver by providing more
-   information about why the errors occurred - Jeremy Compostella
+> +		};
+> +
+> +	};
+> +
+> +	mmc3_pwrseq: mmc3_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&mmc3_pwrseq_pin_bananapim1plus>;
+> +		reset-gpios = <&pio 7 22 GPIO_ACTIVE_LOW>; /* PH22 WL-PMU-EN */
+> +	};
+> +
+> +	reg_gmac_3v3: gmac-3v3 {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&gmac_power_pin_bananapi>;
+> +		regulator-name = "gmac-3v3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		startup-delay-us = <100000>;
+> +		enable-active-high;
+> +		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
+> +	};
+> +};
+> +
+> +&ahci {
+> +	status = "okay";
+> +};
+> +
+> +&codec {
+> +	status = "okay";
+> +};
+> +
+> +&ehci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ehci1 {
+> +	status = "okay";
+> +};
+> +
+> +&gmac {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&gmac_pins_rgmii_a>;
+> +	phy = <&phy1>;
+> +	phy-mode = "rgmii";
+> +	phy-supply = <&reg_gmac_3v3>;
+> +	status = "okay";
+> +
+> +	phy1: ethernet-phy at 1 {
+> +		reg = <1>;
+> +	};
+> +};
+> +
+> +&i2c0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c0_pins_a>;
+> +	status = "okay";
+> +
+> +	axp209: pmic at 34 {
+> +		compatible = "x-powers,axp209";
+> +		reg = <0x34>;
+> +		interrupt-parent = <&nmi_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
 
- * Document the formatting of the EFI GUID constants - Peter Jones
+What's the point of adding the PMIC if you're not adding any of its
+drivers?
 
- * Remove an unused variable to fix a clang build warning - Colin King
+> +	};
+> +};
+> +
+> +&ir0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&ir0_rx_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapi>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
+> +	cd-inverted;
+> +	status = "okay";
+> +};
+> +
+> +&mmc3 {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc3_pins_a>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	mmc-pwrseq = <&mmc3_pwrseq>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	enable-sdio-wakeup;
+> +	status = "okay";
+> +
+> +	brcmf: bcrmf at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +		interrupt-parent = <&pio>;
+> +		interrupts = <7 15 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-names = "host-wake";
+> +	};
+> +};
+> +
+> +&mmc3_pins_a {
+> +	/* AP6210 requires pull-up */
+> +	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +};
+> +
+> +&ohci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ohci1 {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	gmac_power_pin_bananapi: gmac_power_pin at 0 {
+> +		allwinner,pins = "PH23";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+> +	led_pins_bananapi: led_pins at 0 {
+> +		allwinner,pins = "PH24", "PG2";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+> +	mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
+> +		allwinner,pins = "PH10";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+> +
+> +	mmc3_pwrseq_pin_bananapim1plus: mmc3_pwrseq_pin at 0 {
+> +		allwinner,pins = "PH22";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
+> +};
+> -- 
+> 2.9.0
+> 
 
- * Refactor the EFI runtime services code so that it can be used for
-   function pointers outside of efi.systab->runtime, e.g. during
-   SGI/UV BIOS and EFI mixed mode calls - Alex Thorlton
+It looks good otherwise.
 
- * Remove the unused efi_get_time() function which also suffers from
-   the 32-bit time_t overflow in 2038 issue - Arnd Bergmann
+Thanks!
+Maxime
 
-----------------------------------------------------------------
-Alex Thorlton (3):
-      efi: Convert efi_call_virt to efi_call_virt_pointer
-      x86/uv: Update uv_bios_call to use efi_call_virt_pointer
-      x86/efi: Update efi_thunk to use the the arch_efi_call_virt* macros
-
-Arnd Bergmann (1):
-      x86/efi: Remove unused efi_get_time function
-
-Colin Ian King (1):
-      x86/efi: Remove unused variable efi
-
-Compostella, Jeremy (1):
-      efibc: Report more information in the error messages
-
-Peter Jones (1):
-      efi: Document #define FOO_PROTOCOL_GUID layout
-
- arch/arm/include/asm/efi.h              |  4 +-
- arch/arm64/include/asm/efi.h            |  4 +-
- arch/x86/boot/compressed/eboot.c        |  2 -
- arch/x86/include/asm/efi.h              |  9 ++---
- arch/x86/platform/efi/efi.c             | 15 -------
- arch/x86/platform/efi/efi_64.c          | 11 ++----
- arch/x86/platform/uv/bios_uv.c          |  3 +-
- drivers/firmware/efi/efibc.c            |  6 ++-
- drivers/firmware/efi/runtime-wrappers.c | 53 +++++--------------------
- include/linux/efi.h                     | 69 ++++++++++++++++++++++++++++++++-
- 10 files changed, 93 insertions(+), 83 deletions(-)
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160625/30c15ac1/attachment.sig>
