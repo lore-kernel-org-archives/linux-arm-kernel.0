@@ -1,73 +1,71 @@
 From: megous@megous.com (megous at megous.com)
-Date: Sat, 25 Jun 2016 05:45:07 +0200
-Subject: [PATCH v2 10/14] ARM: dts: sun8i: Add r_twi I2C controller
+Date: Sat, 25 Jun 2016 05:45:11 +0200
+Subject: [PATCH v2 14/14] ARM: dts: sun8i: Enable DVFS on Orange Pi One
 In-Reply-To: <20160625034511.7966-1-megous@megous.com>
 References: <20160625034511.7966-1-megous@megous.com>
-Message-ID: <20160625034511.7966-11-megous@megous.com>
+Message-ID: <20160625034511.7966-15-megous@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ondrej Jirman <megous@megous.com>
 
-H3 SoC contains I2C controller optionally available
-on the PL0 and PL1 pins. This patch makes this controller
-available.
+Use Xulong Orange Pi One GPIO based regulator for
+passive cooling and thermal management.
 
 Signed-off-by: Ondrej Jirman <megous@megous.com>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 26 ++++++++++++++++++++++++--
- 1 file changed, 24 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 39 +++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 56f211e..e32f211 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -322,8 +322,9 @@
- 			reg = <0x01f01428 0x4>;
- 			#clock-cells = <1>;
- 			clocks = <&apb0>;
--			clock-indices = <0>, <1>;
--			clock-output-names = "apb0_pio", "apb0_ir";
-+			clock-indices = <0>, <1>, <6>;
-+			clock-output-names = "apb0_pio", "apb0_ir", "apb0_i2c";
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index b1bd6b0..a38d871 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -109,6 +109,45 @@
+ 	};
+ };
+ 
++&cpu0 {
++	operating-points = <
++		/* kHz	  uV */
++		1296000	1300000
++		1200000	1300000
++		624000	1100000
++		480000	1100000
++		312000	1100000
++		240000	1100000
++		>;
++	#cooling-cells = <2>;
++	cooling-min-level = <0>;
++	cooling-max-level = <5>;
++	cpu0-supply = <&vdd_soc>;
++};
 +
- 		};
- 
- 		ir_clk: ir_clk at 01f01454 {
-@@ -656,6 +657,20 @@
- 			status = "disabled";
- 		};
- 
-+		r_twi: i2c at 01f02400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01f02400 0x400>;
-+			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&r_twi_pins_a>;
-+			clocks = <&apb0_gates 6>;
-+			clock-frequency = <100000>;
-+			resets = <&apb0_reset 6>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++&cpu_thermal {
++	cooling-maps {
++		map0 {
++			trip = <&cpu_alert0>;
++			cooling-device = <&cpu0 (-1) (-1)>;
++		};
++	};
++
++	trips {
++		cpu_alert0: cpu_alert0 {
++			temperature = <80000>;
++			hysteresis = <2000>;
++			type = "passive";
 +		};
 +
- 		gic: interrupt-controller at 01c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
-@@ -707,6 +722,13 @@
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
++		cpu_crit: cpu_crit {
++			temperature = <100000>;
++			hysteresis = <2000>;
++			type = "critical";
++		};
++	};
++};
 +
-+			r_twi_pins_a: r_twi at 0 {
-+				allwinner,pins = "PL0", "PL1";
-+				allwinner,function = "s_twi";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
- 		};
- 	};
+ &ehci1 {
+ 	status = "okay";
  };
 -- 
 2.9.0
