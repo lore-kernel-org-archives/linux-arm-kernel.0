@@ -1,1295 +1,1303 @@
 From: vw@iommu.org (Wan Zongshun)
-Date: Sat, 25 Jun 2016 18:37:21 +0800
-Subject: [PATCH 5/6] clk: add Clock driver for nuc970
+Date: Sat, 25 Jun 2016 18:37:22 +0800
+Subject: [PATCH 6/6] nuc900: add nuc970 platform defconfig file
 In-Reply-To: <1466851042-22239-1-git-send-email-vw@iommu.org>
 References: <1466851042-22239-1-git-send-email-vw@iommu.org>
-Message-ID: <1466851042-22239-6-git-send-email-vw@iommu.org>
+Message-ID: <1466851042-22239-7-git-send-email-vw@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add nuc970_defconfig file support.
+
 Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
 ---
- drivers/clk/Makefile            |   1 +
- drivers/clk/nuc900/Makefile     |   6 +
- drivers/clk/nuc900/clk-apll.c   | 168 ++++++++
- drivers/clk/nuc900/clk-ccf.h    |  53 +++
- drivers/clk/nuc900/clk-nuc970.c | 920 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/nuc900/clk-upll.c   |  83 ++++
- 6 files changed, 1231 insertions(+)
- create mode 100644 drivers/clk/nuc900/Makefile
- create mode 100644 drivers/clk/nuc900/clk-apll.c
- create mode 100644 drivers/clk/nuc900/clk-ccf.h
- create mode 100644 drivers/clk/nuc900/clk-nuc970.c
- create mode 100644 drivers/clk/nuc900/clk-upll.c
+ arch/arm/configs/nuc970_defconfig | 1278 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 1278 insertions(+)
+ create mode 100644 arch/arm/configs/nuc970_defconfig
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index dcc5e69..042377d 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -88,3 +88,4 @@ obj-$(CONFIG_ARCH_ZX)			+= zte/
- obj-$(CONFIG_ARCH_ZYNQ)			+= zynq/
- obj-$(CONFIG_H8300)		+= h8300/
- obj-$(CONFIG_ARC_PLAT_AXS10X)		+= axs10x/
-+obj-$(CONFIG_ARCH_W90X900)		+= nuc900/
-diff --git a/drivers/clk/nuc900/Makefile b/drivers/clk/nuc900/Makefile
+diff --git a/arch/arm/configs/nuc970_defconfig b/arch/arm/configs/nuc970_defconfig
 new file mode 100644
-index 0000000..a6785ab
+index 0000000..3ee776c
 --- /dev/null
-+++ b/drivers/clk/nuc900/Makefile
-@@ -0,0 +1,6 @@
++++ b/arch/arm/configs/nuc970_defconfig
+@@ -0,0 +1,1278 @@
 +#
-+# Makefile for nuvoton specific clk
++# Automatically generated file; DO NOT EDIT.
++# Linux/arm 4.7.0-rc3 Kernel Configuration
++#
++CONFIG_ARM=y
++CONFIG_SYS_SUPPORTS_APM_EMULATION=y
++CONFIG_HAVE_PROC_CPU=y
++CONFIG_STACKTRACE_SUPPORT=y
++CONFIG_LOCKDEP_SUPPORT=y
++CONFIG_TRACE_IRQFLAGS_SUPPORT=y
++CONFIG_RWSEM_XCHGADD_ALGORITHM=y
++CONFIG_FIX_EARLYCON_MEM=y
++CONFIG_GENERIC_HWEIGHT=y
++CONFIG_GENERIC_CALIBRATE_DELAY=y
++CONFIG_NEED_DMA_MAP_STATE=y
++CONFIG_ARCH_SUPPORTS_UPROBES=y
++CONFIG_VECTORS_BASE=0xffff0000
++CONFIG_ARM_PATCH_PHYS_VIRT=y
++CONFIG_GENERIC_BUG=y
++CONFIG_PGTABLE_LEVELS=2
++CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
++CONFIG_IRQ_WORK=y
++CONFIG_BUILDTIME_EXTABLE_SORT=y
++
++#
++# General setup
++#
++CONFIG_BROKEN_ON_SMP=y
++CONFIG_INIT_ENV_ARG_LIMIT=32
++CONFIG_CROSS_COMPILE=""
++# CONFIG_COMPILE_TEST is not set
++CONFIG_LOCALVERSION=""
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_HAVE_KERNEL_GZIP=y
++CONFIG_HAVE_KERNEL_LZMA=y
++CONFIG_HAVE_KERNEL_XZ=y
++CONFIG_HAVE_KERNEL_LZO=y
++CONFIG_HAVE_KERNEL_LZ4=y
++CONFIG_KERNEL_GZIP=y
++# CONFIG_KERNEL_LZMA is not set
++# CONFIG_KERNEL_XZ is not set
++# CONFIG_KERNEL_LZO is not set
++# CONFIG_KERNEL_LZ4 is not set
++CONFIG_DEFAULT_HOSTNAME="(none)"
++CONFIG_SWAP=y
++CONFIG_SYSVIPC=y
++CONFIG_SYSVIPC_SYSCTL=y
++# CONFIG_CROSS_MEMORY_ATTACH is not set
++CONFIG_FHANDLE=y
++# CONFIG_USELIB is not set
++
++#
++# IRQ subsystem
++#
++CONFIG_GENERIC_IRQ_PROBE=y
++CONFIG_GENERIC_IRQ_SHOW=y
++CONFIG_GENERIC_IRQ_SHOW_LEVEL=y
++CONFIG_HARDIRQS_SW_RESEND=y
++CONFIG_GENERIC_IRQ_CHIP=y
++CONFIG_IRQ_DOMAIN=y
++CONFIG_HANDLE_DOMAIN_IRQ=y
++# CONFIG_IRQ_DOMAIN_DEBUG is not set
++CONFIG_IRQ_FORCED_THREADING=y
++CONFIG_GENERIC_CLOCKEVENTS=y
++
++#
++# Timers subsystem
++#
++CONFIG_TICK_ONESHOT=y
++CONFIG_NO_HZ_COMMON=y
++# CONFIG_HZ_PERIODIC is not set
++CONFIG_NO_HZ_IDLE=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++
++#
++# CPU/Task time and stats accounting
++#
++CONFIG_TICK_CPU_ACCOUNTING=y
++# CONFIG_VIRT_CPU_ACCOUNTING_GEN is not set
++# CONFIG_IRQ_TIME_ACCOUNTING is not set
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BSD_PROCESS_ACCT_V3=y
++
++#
++# RCU Subsystem
++#
++CONFIG_PREEMPT_RCU=y
++# CONFIG_RCU_EXPERT is not set
++CONFIG_SRCU=y
++# CONFIG_TASKS_RCU is not set
++CONFIG_RCU_STALL_COMMON=y
++# CONFIG_TREE_RCU_TRACE is not set
++# CONFIG_RCU_EXPEDITE_BOOT is not set
++# CONFIG_BUILD_BIN2C is not set
++# CONFIG_IKCONFIG is not set
++CONFIG_LOG_BUF_SHIFT=17
++CONFIG_NMI_LOG_BUF_SHIFT=13
++CONFIG_GENERIC_SCHED_CLOCK=y
++CONFIG_CGROUPS=y
++# CONFIG_MEMCG is not set
++# CONFIG_BLK_CGROUP is not set
++CONFIG_CGROUP_SCHED=y
++CONFIG_FAIR_GROUP_SCHED=y
++# CONFIG_CFS_BANDWIDTH is not set
++CONFIG_RT_GROUP_SCHED=y
++# CONFIG_CGROUP_PIDS is not set
++CONFIG_CGROUP_FREEZER=y
++CONFIG_CPUSETS=y
++CONFIG_PROC_PID_CPUSET=y
++CONFIG_CGROUP_DEVICE=y
++CONFIG_CGROUP_CPUACCT=y
++CONFIG_CGROUP_PERF=y
++# CONFIG_CGROUP_DEBUG is not set
++# CONFIG_CHECKPOINT_RESTORE is not set
++CONFIG_NAMESPACES=y
++CONFIG_UTS_NS=y
++CONFIG_IPC_NS=y
++# CONFIG_USER_NS is not set
++CONFIG_PID_NS=y
++# CONFIG_SCHED_AUTOGROUP is not set
++# CONFIG_SYSFS_DEPRECATED is not set
++# CONFIG_RELAY is not set
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE="../rootfs"
++CONFIG_INITRAMFS_ROOT_UID=0
++CONFIG_INITRAMFS_ROOT_GID=0
++CONFIG_RD_GZIP=y
++CONFIG_RD_BZIP2=y
++CONFIG_RD_LZMA=y
++CONFIG_RD_XZ=y
++CONFIG_RD_LZO=y
++CONFIG_RD_LZ4=y
++CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
++# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
++CONFIG_SYSCTL=y
++CONFIG_ANON_INODES=y
++CONFIG_HAVE_UID16=y
++# CONFIG_EXPERT is not set
++CONFIG_UID16=y
++CONFIG_MULTIUSER=y
++# CONFIG_SGETMASK_SYSCALL is not set
++CONFIG_SYSFS_SYSCALL=y
++# CONFIG_SYSCTL_SYSCALL is not set
++CONFIG_KALLSYMS=y
++# CONFIG_KALLSYMS_ABSOLUTE_PERCPU is not set
++CONFIG_KALLSYMS_BASE_RELATIVE=y
++CONFIG_PRINTK=y
++CONFIG_PRINTK_NMI=y
++CONFIG_BUG=y
++CONFIG_ELF_CORE=y
++CONFIG_BASE_FULL=y
++CONFIG_FUTEX=y
++CONFIG_EPOLL=y
++CONFIG_SIGNALFD=y
++CONFIG_TIMERFD=y
++CONFIG_EVENTFD=y
++# CONFIG_BPF_SYSCALL is not set
++CONFIG_SHMEM=y
++CONFIG_AIO=y
++CONFIG_ADVISE_SYSCALLS=y
++# CONFIG_USERFAULTFD is not set
++CONFIG_MEMBARRIER=y
++# CONFIG_EMBEDDED is not set
++CONFIG_HAVE_PERF_EVENTS=y
++CONFIG_PERF_USE_VMALLOC=y
++
++#
++# Kernel Performance Events And Counters
++#
++CONFIG_PERF_EVENTS=y
++CONFIG_VM_EVENT_COUNTERS=y
++CONFIG_SLUB_DEBUG=y
++# CONFIG_COMPAT_BRK is not set
++# CONFIG_SLAB is not set
++CONFIG_SLUB=y
++# CONFIG_SYSTEM_DATA_VERIFICATION is not set
++# CONFIG_PROFILING is not set
++CONFIG_KEXEC_CORE=y
++CONFIG_HAVE_OPROFILE=y
++# CONFIG_KPROBES is not set
++# CONFIG_JUMP_LABEL is not set
++# CONFIG_UPROBES is not set
++# CONFIG_HAVE_64BIT_ALIGNED_ACCESS is not set
++CONFIG_ARCH_USE_BUILTIN_BSWAP=y
++CONFIG_HAVE_KPROBES=y
++CONFIG_HAVE_KRETPROBES=y
++CONFIG_HAVE_OPTPROBES=y
++CONFIG_HAVE_NMI=y
++CONFIG_HAVE_ARCH_TRACEHOOK=y
++CONFIG_HAVE_DMA_CONTIGUOUS=y
++CONFIG_GENERIC_SMP_IDLE_THREAD=y
++CONFIG_GENERIC_IDLE_POLL_SETUP=y
++CONFIG_HAVE_REGS_AND_STACK_ACCESS_API=y
++CONFIG_HAVE_CLK=y
++CONFIG_HAVE_DMA_API_DEBUG=y
++CONFIG_HAVE_PERF_REGS=y
++CONFIG_HAVE_PERF_USER_STACK_DUMP=y
++CONFIG_HAVE_ARCH_JUMP_LABEL=y
++CONFIG_ARCH_WANT_IPC_PARSE_VERSION=y
++CONFIG_HAVE_CC_STACKPROTECTOR=y
++# CONFIG_CC_STACKPROTECTOR is not set
++CONFIG_CC_STACKPROTECTOR_NONE=y
++# CONFIG_CC_STACKPROTECTOR_REGULAR is not set
++# CONFIG_CC_STACKPROTECTOR_STRONG is not set
++CONFIG_HAVE_CONTEXT_TRACKING=y
++CONFIG_HAVE_VIRT_CPU_ACCOUNTING_GEN=y
++CONFIG_HAVE_IRQ_TIME_ACCOUNTING=y
++CONFIG_HAVE_MOD_ARCH_SPECIFIC=y
++CONFIG_MODULES_USE_ELF_REL=y
++CONFIG_ARCH_HAS_ELF_RANDOMIZE=y
++CONFIG_HAVE_ARCH_MMAP_RND_BITS=y
++CONFIG_HAVE_EXIT_THREAD=y
++CONFIG_ARCH_MMAP_RND_BITS_MIN=8
++CONFIG_ARCH_MMAP_RND_BITS_MAX=16
++CONFIG_ARCH_MMAP_RND_BITS=8
++# CONFIG_HAVE_ARCH_HASH is not set
++# CONFIG_ISA_BUS_API is not set
++CONFIG_CLONE_BACKWARDS=y
++CONFIG_OLD_SIGSUSPEND3=y
++CONFIG_OLD_SIGACTION=y
++# CONFIG_CPU_NO_EFFICIENT_FFS is not set
++
++#
++# GCOV-based kernel profiling
++#
++# CONFIG_GCOV_KERNEL is not set
++CONFIG_ARCH_HAS_GCOV_PROFILE_ALL=y
++CONFIG_HAVE_GENERIC_DMA_COHERENT=y
++CONFIG_SLABINFO=y
++CONFIG_RT_MUTEXES=y
++CONFIG_BASE_SMALL=0
++CONFIG_MODULES=y
++# CONFIG_MODULE_FORCE_LOAD is not set
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_MODULE_FORCE_UNLOAD is not set
++# CONFIG_MODVERSIONS is not set
++# CONFIG_MODULE_SRCVERSION_ALL is not set
++# CONFIG_MODULE_SIG is not set
++# CONFIG_MODULE_COMPRESS is not set
++# CONFIG_TRIM_UNUSED_KSYMS is not set
++CONFIG_MODULES_TREE_LOOKUP=y
++CONFIG_BLOCK=y
++CONFIG_LBDAF=y
++CONFIG_BLK_DEV_BSG=y
++# CONFIG_BLK_DEV_BSGLIB is not set
++# CONFIG_BLK_DEV_INTEGRITY is not set
++# CONFIG_BLK_CMDLINE_PARSER is not set
++
++#
++# Partition Types
++#
++# CONFIG_PARTITION_ADVANCED is not set
++CONFIG_MSDOS_PARTITION=y
++CONFIG_EFI_PARTITION=y
++
++#
++# IO Schedulers
++#
++CONFIG_IOSCHED_NOOP=y
++CONFIG_IOSCHED_DEADLINE=y
++CONFIG_IOSCHED_CFQ=y
++# CONFIG_DEFAULT_DEADLINE is not set
++CONFIG_DEFAULT_CFQ=y
++# CONFIG_DEFAULT_NOOP is not set
++CONFIG_DEFAULT_IOSCHED="cfq"
++CONFIG_UNINLINE_SPIN_UNLOCK=y
++CONFIG_ARCH_SUPPORTS_ATOMIC_RMW=y
++CONFIG_FREEZER=y
++
++#
++# System Type
++#
++CONFIG_MMU=y
++# CONFIG_ARCH_MULTIPLATFORM is not set
++# CONFIG_ARCH_CLPS711X is not set
++# CONFIG_ARCH_GEMINI is not set
++# CONFIG_ARCH_EBSA110 is not set
++# CONFIG_ARCH_EP93XX is not set
++# CONFIG_ARCH_FOOTBRIDGE is not set
++# CONFIG_ARCH_NETX is not set
++# CONFIG_ARCH_IOP13XX is not set
++# CONFIG_ARCH_IOP32X is not set
++# CONFIG_ARCH_IOP33X is not set
++# CONFIG_ARCH_IXP4XX is not set
++# CONFIG_ARCH_DOVE is not set
++# CONFIG_ARCH_KS8695 is not set
++CONFIG_ARCH_W90X900=y
++# CONFIG_ARCH_LPC32XX is not set
++# CONFIG_ARCH_PXA is not set
++# CONFIG_ARCH_RPC is not set
++# CONFIG_ARCH_SA1100 is not set
++# CONFIG_ARCH_S3C24XX is not set
++# CONFIG_ARCH_DAVINCI is not set
++# CONFIG_ARCH_OMAP1 is not set
++CONFIG_SOC_NUC970=y
++
++#
++# W90P910 Machines
++#
++# CONFIG_MACH_W90P910EVB is not set
++
++#
++# NUC950 Machines
++#
++# CONFIG_MACH_W90P950EVB is not set
++
++#
++# NUC960 Machines
++#
++# CONFIG_MACH_W90N960EVB is not set
++
++#
++# NUC970 Machines
++#
++CONFIG_MACH_NUC970EVB=y
++
++#
++# Processor Type
++#
++CONFIG_CPU_ARM926T=y
++CONFIG_CPU_32v5=y
++CONFIG_CPU_ABRT_EV5TJ=y
++CONFIG_CPU_PABRT_LEGACY=y
++CONFIG_CPU_CACHE_VIVT=y
++CONFIG_CPU_COPY_V4WB=y
++CONFIG_CPU_TLB_V4WBI=y
++CONFIG_CPU_CP15=y
++CONFIG_CPU_CP15_MMU=y
++CONFIG_CPU_USE_DOMAINS=y
++
++#
++# Processor Features
++#
++# CONFIG_ARCH_PHYS_ADDR_T_64BIT is not set
++CONFIG_ARM_THUMB=y
++# CONFIG_CPU_ICACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
++# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
++CONFIG_NEED_KUSER_HELPERS=y
++CONFIG_KUSER_HELPERS=y
++# CONFIG_CACHE_L2X0 is not set
++CONFIG_ARM_L1_CACHE_SHIFT=5
++# CONFIG_DEBUG_RODATA is not set
++CONFIG_MULTI_IRQ_HANDLER=y
++
++#
++# Bus support
++#
++# CONFIG_PCI_DOMAINS_GENERIC is not set
++# CONFIG_PCI_SYSCALL is not set
++# CONFIG_PCCARD is not set
++
++#
++# Kernel Features
++#
++CONFIG_VMSPLIT_3G=y
++# CONFIG_VMSPLIT_3G_OPT is not set
++# CONFIG_VMSPLIT_2G is not set
++# CONFIG_VMSPLIT_1G is not set
++CONFIG_PAGE_OFFSET=0xC0000000
++CONFIG_ARCH_NR_GPIO=0
++# CONFIG_PREEMPT_NONE is not set
++# CONFIG_PREEMPT_VOLUNTARY is not set
++CONFIG_PREEMPT=y
++CONFIG_PREEMPT_COUNT=y
++CONFIG_HZ_FIXED=0
++CONFIG_HZ_100=y
++# CONFIG_HZ_200 is not set
++# CONFIG_HZ_250 is not set
++# CONFIG_HZ_300 is not set
++# CONFIG_HZ_500 is not set
++# CONFIG_HZ_1000 is not set
++CONFIG_HZ=100
++CONFIG_SCHED_HRTICK=y
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
++# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
++# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
++CONFIG_HAVE_ARCH_PFN_VALID=y
++# CONFIG_HIGHMEM is not set
++CONFIG_CPU_SW_DOMAIN_PAN=y
++CONFIG_HW_PERF_EVENTS=y
++CONFIG_ARCH_WANT_GENERAL_HUGETLB=y
++# CONFIG_ARM_MODULE_PLTS is not set
++CONFIG_FLATMEM=y
++CONFIG_FLAT_NODE_MEM_MAP=y
++CONFIG_HAVE_MEMBLOCK=y
++CONFIG_NO_BOOTMEM=y
++# CONFIG_HAVE_BOOTMEM_INFO_NODE is not set
++CONFIG_SPLIT_PTLOCK_CPUS=999999
++CONFIG_COMPACTION=y
++CONFIG_MIGRATION=y
++# CONFIG_PHYS_ADDR_T_64BIT is not set
++# CONFIG_KSM is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
++CONFIG_NEED_PER_CPU_KM=y
++# CONFIG_CLEANCACHE is not set
++# CONFIG_FRONTSWAP is not set
++# CONFIG_CMA is not set
++# CONFIG_ZPOOL is not set
++# CONFIG_ZBUD is not set
++# CONFIG_ZSMALLOC is not set
++CONFIG_GENERIC_EARLY_IOREMAP=y
++# CONFIG_IDLE_PAGE_TRACKING is not set
++CONFIG_FORCE_MAX_ZONEORDER=11
++CONFIG_ALIGNMENT_TRAP=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
++# CONFIG_SECCOMP is not set
++CONFIG_SWIOTLB=y
++CONFIG_IOMMU_HELPER=y
++# CONFIG_PARAVIRT is not set
++# CONFIG_PARAVIRT_TIME_ACCOUNTING is not set
++
++#
++# Boot options
++#
++CONFIG_USE_OF=y
++CONFIG_ATAGS=y
++# CONFIG_DEPRECATED_PARAM_STRUCT is not set
++CONFIG_ZBOOT_ROM_TEXT=0
++CONFIG_ZBOOT_ROM_BSS=0
++CONFIG_ARM_APPENDED_DTB=y
++# CONFIG_ARM_ATAG_DTB_COMPAT is not set
++CONFIG_CMDLINE="root=/dev/ram0 console=ttyS0,115200n8 rdinit=/sbin/init mem=64M"
++CONFIG_CMDLINE_FROM_BOOTLOADER=y
++# CONFIG_CMDLINE_EXTEND is not set
++# CONFIG_CMDLINE_FORCE is not set
++# CONFIG_XIP_KERNEL is not set
++CONFIG_KEXEC=y
++CONFIG_ATAGS_PROC=y
++# CONFIG_CRASH_DUMP is not set
++# CONFIG_AUTO_ZRELADDR is not set
++
++#
++# CPU Power Management
 +#
 +
-+obj-$(CONFIG_SOC_NUC970) += clk-apll.o clk-upll.o clk-nuc970.o
-+
-diff --git a/drivers/clk/nuc900/clk-apll.c b/drivers/clk/nuc900/clk-apll.c
-new file mode 100644
-index 0000000..4e1c202
---- /dev/null
-+++ b/drivers/clk/nuc900/clk-apll.c
-@@ -0,0 +1,168 @@
-+/*
-+ * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+
-+#include "clk-ccf.h"
-+
-+struct clk_apll {
-+	struct clk_hw	hw;
-+	void __iomem	*base;
-+};
-+
-+#define to_clk_apll(clk) (container_of(clk, struct clk_apll, clk))
-+
-+static int clk_apll_set_rate(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long parent_rate)
-+{
-+	struct clk_apll *pll = to_clk_apll(hw);
-+	unsigned long reg;
-+
-+	reg = readl(pll->base) & ~0x0FFFFFFF;
-+
-+	switch (rate) {
-+	/*usbh*/
-+	case 96000000:
-+		reg |= 0x8027;
-+		break;
-+	/*i2s*/
-+	case 98400000:
-+		reg |= 0x8028;
-+		break;
-+	/*i2s*/
-+	case 169500000:
-+		reg |= 0x21f0;
-+		break;
-+	/*system default, 264MHz*/
-+	case 264000000:
-+		reg |= 0x15;
-+		break;
-+	case 300000000:
-+		reg |= 0x18;
-+		break;
-+	default:
-+		reg |= 0x15;
-+		break;
-+	}
-+
-+	writel(reg, pll->base);
-+
-+	return 0;
-+}
-+
-+static unsigned long clk_apll_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	struct clk_apll *pll = to_clk_apll(hw);
-+	unsigned long reg = readl(pll->base) & 0x0FFFFFFF;
-+	unsigned long rate;
-+
-+	if (parent_rate != 12000000)
-+		return 0;
-+
-+	switch (reg) {
-+	/*system default, 264MHz*/
-+	case 0x15:
-+		rate = 264000000;
-+		break;
-+	case 0x18:
-+		rate = 300000000;
-+		break;
-+	/*usbh*/
-+	case 0x8027:
-+		rate = 96000000;
-+		break;
-+	/*i2s*/
-+	case 0x8028:
-+		rate = 98400000;
-+		break;
-+	/*i2s*/
-+	case 0x21f0:
-+		rate = 169500000;
-+		break;
-+	default:
-+		rate = 264000000;
-+		break;
-+	}
-+
-+	return rate;
-+}
-+
-+static long clk_apll_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate)
-+{
-+	return rate;
-+}
-+
-+static int clk_apll_enable(struct clk_hw *hw)
-+{
-+	struct clk_apll *pll = to_clk_apll(hw);
-+	unsigned long val;
-+
-+	val = __raw_readl(pll->base);
-+	val &= ~0x10000000;
-+	val |= 0x40000000;
-+	__raw_writel(val, pll->base);
-+
-+	return 0;
-+}
-+
-+static void clk_apll_disable(struct clk_hw *hw)
-+{
-+	struct clk_apll *pll = to_clk_apll(hw);
-+	unsigned long val;
-+
-+	val = __raw_readl(pll->base);
-+	val |= 0x10000000;
-+	val &= ~0x40000000;
-+	__raw_writel(val, pll->base);
-+}
-+
-+static struct clk_ops clk_apll_ops = {
-+	.recalc_rate = clk_apll_recalc_rate,
-+	.enable = clk_apll_enable,
-+	.disable = clk_apll_disable,
-+	.set_rate = clk_apll_set_rate,
-+	.round_rate = clk_apll_round_rate,
-+};
-+
-+struct clk *nuc970_clk_apll(const char *name, const char *parent,
-+			    void __iomem *base)
-+{
-+	struct clk_apll *pll;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	pll = kmalloc(sizeof(*pll), GFP_KERNEL);
-+	if (!pll)
-+		return ERR_PTR(-ENOMEM);
-+
-+	pll->base = base;
-+
-+	init.name = name;
-+	init.ops = &clk_apll_ops;
-+	init.flags = 0;
-+	init.parent_names = &parent;
-+	init.num_parents = 1;
-+
-+	pll->hw.init = &init;
-+
-+	clk = clk_register(NULL, &pll->hw);
-+	if (IS_ERR(clk))
-+		kfree(pll);
-+
-+	return clk;
-+}
-diff --git a/drivers/clk/nuc900/clk-ccf.h b/drivers/clk/nuc900/clk-ccf.h
-new file mode 100644
-index 0000000..2808933
---- /dev/null
-+++ b/drivers/clk/nuc900/clk-ccf.h
-@@ -0,0 +1,53 @@
-+#ifndef __MACH_NUC970_CLK_H
-+#define __MACH_NUC970_CLK_H
-+
-+#include <linux/spinlock.h>
-+#include <linux/clk-provider.h>
-+
-+static spinlock_t nuc970_lock;
-+
-+extern struct clk *nuc970_clk_apll(const char *name, const char *parent,
-+				   void __iomem *base);
-+extern struct clk *nuc970_clk_upll(const char *name, const char *parent,
-+				   void __iomem *base);
-+
-+static inline struct clk *nuc970_clk_fixed(const char *name, int rate)
-+{
-+	return clk_register_fixed_rate(NULL, name, NULL, 0, rate);
-+}
-+
-+static inline struct clk *nuc970_clk_mux(const char *name, void __iomem *reg,
-+					 u8 shift, u8 width,
-+					 const char * const *parents,
-+					 int num_parents)
-+{
-+	return clk_register_mux(NULL, name, parents, num_parents, 0, reg, shift,
-+				width, 0, &nuc970_lock);
-+}
-+
-+static inline struct clk *nuc970_clk_divider(const char *name,
-+					     const char *parent,
-+					     void __iomem *reg, u8 shift,
-+					     u8 width)
-+{
-+	return clk_register_divider(NULL, name, parent, 0,
-+				    reg, shift, width, 0, &nuc970_lock);
-+}
-+
-+static inline struct clk *nuc970_clk_fixed_factor(const char *name,
-+						  const char *parent,
-+						  unsigned int mult,
-+						  unsigned int div)
-+{
-+	return clk_register_fixed_factor(NULL, name, parent,
-+					 CLK_SET_RATE_PARENT, mult, div);
-+}
-+
-+static inline struct clk *nuc970_clk_gate(const char *name, const char *parent,
-+					  void __iomem *reg, u8 shift)
-+{
-+	return clk_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+				 shift, 0, &nuc970_lock);
-+}
-+
-+#endif
-diff --git a/drivers/clk/nuc900/clk-nuc970.c b/drivers/clk/nuc900/clk-nuc970.c
-new file mode 100644
-index 0000000..a4faf0d
---- /dev/null
-+++ b/drivers/clk/nuc900/clk-nuc970.c
-@@ -0,0 +1,920 @@
-+/*
-+ * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#include <dt-bindings/clock/nuc970-clock.h>
-+#include "clk-ccf.h"
-+
-+/* Clock Control Registers  */
-+static void __iomem *clkctrl;
-+#define CLK_BA clkctrl
-+
-+#define REG_CLK_PMCON	(CLK_BA + 0x000)
-+#define REG_CLK_HCLKEN	(CLK_BA + 0x010)
-+#define REG_CLK_PCLKEN0	(CLK_BA + 0x018)
-+#define REG_CLK_PCLKEN1	(CLK_BA + 0x01C)
-+#define REG_CLK_DIV0	(CLK_BA + 0x020)
-+#define REG_CLK_DIV1	(CLK_BA + 0x024)
-+#define REG_CLK_DIV2	(CLK_BA + 0x028)
-+#define REG_CLK_DIV3	(CLK_BA + 0x02C)
-+#define REG_CLK_DIV4	(CLK_BA + 0x030)
-+#define REG_CLK_DIV5	(CLK_BA + 0x034)
-+#define REG_CLK_DIV6	(CLK_BA + 0x038)
-+#define REG_CLK_DIV7	(CLK_BA + 0x03C)
-+#define REG_CLK_DIV8	(CLK_BA + 0x040)
-+#define REG_CLK_DIV9	(CLK_BA + 0x044)
-+#define REG_CLK_APLLCON	(CLK_BA + 0x060)
-+#define REG_CLK_UPLLCON	(CLK_BA + 0x064)
-+
-+static const char *const sys_sel_clks[] = { "xin",
-+					    "dummy",
-+					    "apll",
-+					    "upll" };
-+
-+static const char *const lcd_sel_clks[] = { "xin",
-+					    "dummy",
-+					    "lcd_aplldiv",
-+					    "lcd_uplldiv" };
-+
-+static const char *const audio_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "audio_aplldiv",
-+					      "audio_uplldiv" };
-+
-+static const char *const usb_sel_clks[] = { "xin",
-+					    "dummy",
-+					    "usb_aplldiv",
-+					    "usb_uplldiv" };
-+
-+static const char *const adc_sel_clks[] = { "xin",
-+					    "dummy",
-+					    "adc_aplldiv",
-+					    "adc_uplldiv" };
-+
-+static const char *const cap_sel_clks[] = { "xin",
-+					    "dummy",
-+					    "cap_aplldiv",
-+					    "cap_uplldiv" };
-+
-+static const char *const sdh_sel_clks[] = { "xin",
-+					    "dummy",
-+					    "sdh_aplldiv",
-+					    "sdh_uplldiv" };
-+
-+static const char *const emmc_sel_clks[] = { "xin",
-+					     "dummy",
-+					     "emmc_aplldiv",
-+					     "emmc_uplldiv" };
-+
-+static const char *const uart0_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart0_aplldiv",
-+					      "uart0_uplldiv" };
-+
-+static const char *const uart1_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart1_aplldiv",
-+					      "uart1_uplldiv" };
-+
-+static const char *const uart2_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart2_aplldiv",
-+					      "uart2_uplldiv" };
-+
-+static const char *const uart3_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart3_aplldiv",
-+					      "uart3_uplldiv" };
-+
-+static const char *const uart4_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart4_aplldiv",
-+					      "uart4_uplldiv" };
-+
-+static const char *const uart5_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart5_aplldiv",
-+					      "uart5_uplldiv" };
-+
-+static const char *const uart6_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart6_aplldiv",
-+					      "uart6_uplldiv" };
-+
-+static const char *const uart7_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart7_aplldiv",
-+					      "uart7_uplldiv" };
-+
-+static const char *const uart8_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart8_aplldiv",
-+					      "uart8_uplldiv" };
-+
-+static const char *const uart9_sel_clks[] = { "xin",
-+					      "dummy",
-+					      "uart9_aplldiv",
-+					      "uart9_uplldiv" };
-+
-+static const char *const uart10_sel_clks[] = { "xin",
-+					       "dummy",
-+					       "uart10_aplldiv",
-+					       "uart10_uplldiv" };
-+
-+static const char *const system_sel_clks[] = { "xin",
-+					       "dummy",
-+					       "system_aplldiv",
-+					       "system_uplldiv" };
-+
-+static const char *const gpio_sel_clks[] = { "xin", "xin32k"};
-+static const char *const kpi_sel_clks[] = { "xin", "xin32k"};
-+static const char *const etimer_sel_clks[] = { "xin",
-+					       "pclk_div",
-+					      "pclk4096_div",
-+					      "xin32k" };
-+
-+static const char *const wwdt_sel_clks[] = { "xin",
-+					     "xin128_div",
-+					     "pclk4096_div",
-+					     "xin32k" };
-+
-+static struct clk *clk[NUC970_CLK_MAX];
-+static struct clk_onecell_data clk_data;
-+
-+static void __init nuc970_clocks_init(struct device_node *np)
-+{
-+	int i;
-+
-+	clkctrl = of_iomap(np, 0);
-+	WARN_ON(!clkctrl);
-+
-+	/* source */
-+	clk[XIN]	= nuc970_clk_fixed("xin", 12000000);
-+	clk[XIN32K]	= nuc970_clk_fixed("xin32k", 32768);
-+	clk[APLL]	= nuc970_clk_apll("apll", "xin", REG_CLK_APLLCON);
-+	clk[UPLL]	= nuc970_clk_upll("upll", "xin", REG_CLK_UPLLCON);
-+	clk[XIN128_DIV]	= nuc970_clk_fixed_factor("xin128_div", "xin", 1, 128);
-+	clk[SYS_MUX]	= nuc970_clk_mux("sys_mux", REG_CLK_DIV0, 3, 2,
-+					 sys_sel_clks,
-+					 ARRAY_SIZE(sys_sel_clks));
-+	clk[SYS_DIV]	= nuc970_clk_divider("sys_div", "sys_mux",
-+					     REG_CLK_DIV0, 0, 2);
-+	clk[DDR_GATE]	= nuc970_clk_gate("ddr_gate", "sys_div",
-+					  REG_CLK_HCLKEN, 10);
-+	/* CPU */
-+	clk[CPU_DIV]  = nuc970_clk_divider("cpu_div", "sys_div",
-+					   REG_CLK_DIV0, 16, 1);
-+	clk[CPU_GATE] = nuc970_clk_gate("cpu_gate", "cpu_div",
-+					REG_CLK_HCLKEN, 0);
-+	/*HCLK1 & PCLK*/
-+	clk[HCLK1_DIV]	= nuc970_clk_fixed_factor("hclk1_div", "cpu_div", 1, 2);
-+	clk[GDMA_GATE]	= nuc970_clk_gate("gdma_hclk_gate", "hclk1_div",
-+					  REG_CLK_HCLKEN, 12);
-+	clk[EBI_GATE]	= nuc970_clk_gate("ebi_hclk_gate", "hclk1_div",
-+					  REG_CLK_HCLKEN, 9);
-+	clk[TIC_GATE]	= nuc970_clk_gate("tic_hclk_gate", "hclk1_div",
-+					  REG_CLK_HCLKEN, 7);
-+	/* HCLK & HCLK234 */
-+	clk[HCLKN_DIV]		= nuc970_clk_fixed_factor("hclkn_div",
-+							  "sys_div", 1, 2);
-+	clk[DRAM_GATE]		= nuc970_clk_gate("dram_gate", "hclkn_div",
-+						  REG_CLK_HCLKEN, 10);
-+	clk[HCLK_GATE]		= nuc970_clk_gate("hclk_gate", "hclkn_div",
-+						  REG_CLK_HCLKEN, 1);
-+	clk[SRAM_GATE]		= nuc970_clk_gate("sram_gate", "hclk_gate",
-+						  REG_CLK_HCLKEN, 8);
-+	clk[HCLK234_DIV]	= nuc970_clk_divider("hclk234_div", "hclkn_div",
-+						     REG_CLK_DIV0, 20, 4);
-+	/* HCLK3 */
-+	clk[USBH_GATE]		= nuc970_clk_gate("usbh_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 18);
-+	clk[USBD_GATE]		= nuc970_clk_gate("usbd_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 19);
-+	clk[FMI_GATE]		= nuc970_clk_gate("fmi_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 20);
-+	clk[NAND_GATE]		= nuc970_clk_gate("nand_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 21);
-+	clk[EMMC_GATE]		= nuc970_clk_gate("emmc_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 22);
-+	clk[CRYPTO_GATE]	= nuc970_clk_gate("crypto_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 23);
-+	clk[EMAC1_GATE]		= nuc970_clk_gate("emac1_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 17);
-+	clk[EMAC1_ECLK_DIV]	= nuc970_clk_divider("emac1_eclk_div",
-+						     "hclk234_div",
-+						     REG_CLK_DIV8, 0, 8);
-+	clk[EMAC1_ECLK_GATE]	= nuc970_clk_gate("emac1_eclk_gate",
-+						  "emac1_eclk_div",
-+						  REG_CLK_HCLKEN, 17);
-+	clk[JPEG_GATE]		= nuc970_clk_gate("jpeg_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 29);
-+	clk[JPEG_ECLK_DIV]	= nuc970_clk_divider("jpeg_eclk_div",
-+						     "hclk234_div",
-+						     REG_CLK_DIV3, 28, 3);
-+	clk[JPEG_ECLK_GATE]	= nuc970_clk_gate("jpeg_eclk_gate",
-+						  "jpeg_eclk_div",
-+						  REG_CLK_HCLKEN, 29);
-+	clk[GE2D_GATE]		= nuc970_clk_gate("ge2d_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 28);
-+	clk[GE2D_ECLK_DIV]	= nuc970_clk_divider("ge2d_eclk_div",
-+						     "hclk234_div",
-+						     REG_CLK_DIV2, 28, 2);
-+	clk[GE2D_ECLK_GATE]	= nuc970_clk_gate("ge2d_eclk_gate",
-+						  "ge2d_eclk_div",
-+						  REG_CLK_HCLKEN, 28);
-+	/* HCLK4 */
-+	clk[SDH_GATE]		= nuc970_clk_gate("sdh_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 30);
-+	clk[AUDIO_GATE]		= nuc970_clk_gate("audio_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 24);
-+	clk[LCD_GATE]		= nuc970_clk_gate("lcd_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 25);
-+	clk[CAP_GATE]		= nuc970_clk_gate("cap_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 26);
-+	clk[SENSOR_GATE]	= nuc970_clk_gate("sensor_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 27);
-+	clk[EMAC0_GATE]		= nuc970_clk_gate("emac0_hclk_gate",
-+						  "hclk234_div",
-+						  REG_CLK_HCLKEN, 16);
-+	clk[EMAC0_ECLK_DIV]	= nuc970_clk_divider("emac0_eclk_div",
-+						     "hclk234_div",
-+						     REG_CLK_DIV8, 0, 8);
-+	clk[EMAC0_ECLK_GATE]	= nuc970_clk_gate("emac0_eclk_gate",
-+						  "emac0_eclk_div",
-+						  REG_CLK_HCLKEN, 16);
-+	/* ECLK */
-+	/* USB */
-+	clk[USB_APLLDIV]	= nuc970_clk_divider("usb_aplldiv", "apll",
-+						     REG_CLK_DIV2, 0, 3);
-+	clk[USB_UPLLDIV]	= nuc970_clk_divider("usb_uplldiv", "upll",
-+						     REG_CLK_DIV2, 0, 3);
-+	clk[USB_ECLK_MUX]	= nuc970_clk_mux("usb_eclk_mux", REG_CLK_DIV2,
-+						 3, 2, usb_sel_clks,
-+						 ARRAY_SIZE(usb_sel_clks));
-+	clk[USB_ECLK_DIV]	= nuc970_clk_divider("usb_eclk_div",
-+						     "usb_eclk_mux",
-+						     REG_CLK_DIV2, 8, 4);
-+	clk[USB_ECLK_GATE]	= nuc970_clk_gate("usb_eclk_gate",
-+						  "usb_eclk_div",
-+						  REG_CLK_HCLKEN, 18);
-+	/* SDH */
-+	clk[SDH_APLLDIV]	= nuc970_clk_divider("sdh_aplldiv", "apll",
-+						     REG_CLK_DIV9, 0, 3);
-+	clk[SDH_UPLLDIV]	= nuc970_clk_divider("sdh_uplldiv", "upll",
-+						     REG_CLK_DIV9, 0, 3);
-+	clk[SDH_ECLK_MUX]	= nuc970_clk_mux("sdh_eclk_mux", REG_CLK_DIV9,
-+						 3, 2, sdh_sel_clks,
-+						 ARRAY_SIZE(sdh_sel_clks));
-+	clk[SDH_ECLK_DIV]	= nuc970_clk_divider("sdh_eclk_div",
-+						     "sdh_eclk_mux",
-+						     REG_CLK_DIV9, 8, 8);
-+	clk[SDH_ECLK_GATE]	= nuc970_clk_gate("sdh_eclk_gate",
-+						  "sdh_eclk_div",
-+						  REG_CLK_HCLKEN, 30);
-+	/* EMMC */
-+	clk[EMMC_APLLDIV]	= nuc970_clk_divider("emmc_aplldiv", "apll",
-+						     REG_CLK_DIV3, 0, 3);
-+	clk[EMMC_UPLLDIV]	= nuc970_clk_divider("emmc_uplldiv", "upll",
-+						     REG_CLK_DIV3, 0, 3);
-+	clk[EMMC_ECLK_MUX]	= nuc970_clk_mux("emmc_eclk_mux", REG_CLK_DIV3,
-+						 3, 2, emmc_sel_clks,
-+						 ARRAY_SIZE(emmc_sel_clks));
-+	clk[EMMC_ECLK_DIV]	= nuc970_clk_divider("emmc_eclk_div",
-+						     "emmc_eclk_mux",
-+						     REG_CLK_DIV3, 8, 8);
-+	clk[EMMC_ECLK_GATE]	= nuc970_clk_gate("emmc_eclk_gate",
-+						  "emmc_eclk_div",
-+						  REG_CLK_HCLKEN, 22);
-+	/* ADC */
-+	clk[ADC_APLLDIV]	= nuc970_clk_divider("adc_aplldiv", "apll",
-+						     REG_CLK_DIV7, 16, 3);
-+	clk[ADC_UPLLDIV]	= nuc970_clk_divider("adc_uplldiv", "upll",
-+						     REG_CLK_DIV7, 16, 3);
-+	clk[ADC_ECLK_MUX]	= nuc970_clk_mux("adc_eclk_mux", REG_CLK_DIV7,
-+						 19, 2, adc_sel_clks,
-+						 ARRAY_SIZE(adc_sel_clks));
-+	clk[ADC_ECLK_DIV]	= nuc970_clk_divider("adc_eclk_div",
-+						     "adc_eclk_mux",
-+						     REG_CLK_DIV7, 24, 8);
-+	clk[ADC_ECLK_GATE]	= nuc970_clk_gate("adc_eclk_gate",
-+						  "adc_eclk_div",
-+						  REG_CLK_PCLKEN1, 24);
-+	/* LCD */
-+	clk[LCD_APLLDIV]	= nuc970_clk_divider("lcd_aplldiv", "apll",
-+						     REG_CLK_DIV1, 0, 3);
-+	clk[LCD_UPLLDIV]	= nuc970_clk_divider("lcd_uplldiv", "upll",
-+					     REG_CLK_DIV1, 0, 3);
-+	clk[LCD_ECLK_MUX]	= nuc970_clk_mux("lcd_eclk_mux", REG_CLK_DIV1,
-+						 3, 2, lcd_sel_clks,
-+						 ARRAY_SIZE(lcd_sel_clks));
-+	clk[LCD_ECLK_DIV]	= nuc970_clk_divider("lcd_eclk_div",
-+						     "lcd_eclk_mux",
-+						     REG_CLK_DIV1, 8, 8);
-+	clk[LCD_ECLK_GATE]	= nuc970_clk_gate("lcd_eclk_gate",
-+						  "lcd_eclk_div",
-+						  REG_CLK_HCLKEN, 25);
-+	/* AUDIO */
-+	clk[AUDIO_APLLDIV]	= nuc970_clk_divider("audio_aplldiv", "apll",
-+						     REG_CLK_DIV1, 16, 3);
-+	clk[AUDIO_UPLLDIV]	= nuc970_clk_divider("audio_uplldiv", "upll",
-+						     REG_CLK_DIV1, 16, 3);
-+	clk[AUDIO_ECLK_MUX]	= nuc970_clk_mux("audio_eclk_mux", REG_CLK_DIV1,
-+						 19, 2, audio_sel_clks,
-+						 ARRAY_SIZE(audio_sel_clks));
-+	clk[AUDIO_ECLK_DIV]	= nuc970_clk_divider("audio_eclk_div",
-+						     "audio_eclk_mux",
-+						     REG_CLK_DIV1, 24, 8);
-+	clk[AUDIO_ECLK_GATE]	= nuc970_clk_gate("audio_eclk_gate",
-+						  "audio_eclk_div",
-+						  REG_CLK_HCLKEN, 24);
-+	/* CAP */
-+	clk[CAP_APLLDIV]	= nuc970_clk_divider("cap_aplldiv", "apll",
-+						     REG_CLK_DIV3, 16, 3);
-+	clk[CAP_UPLLDIV]	= nuc970_clk_divider("cap_uplldiv", "upll",
-+						     REG_CLK_DIV3, 16, 3);
-+	clk[CAP_ECLK_MUX]	= nuc970_clk_mux("cap_eclk_mux", REG_CLK_DIV3,
-+						 19, 2, cap_sel_clks,
-+						 ARRAY_SIZE(cap_sel_clks));
-+	clk[CAP_ECLK_DIV]	= nuc970_clk_divider("cap_eclk_div",
-+						     "cap_eclk_mux",
-+						     REG_CLK_DIV3, 24, 4);
-+	clk[CAP_ECLK_GATE]	= nuc970_clk_gate("cap_eclk_gate",
-+						  "cap_eclk_div",
-+						  REG_CLK_HCLKEN, 26);
-+	/* UART0 */
-+	clk[UART0_APLLDIV]	= nuc970_clk_divider("uart0_aplldiv",
-+						     "apll", REG_CLK_DIV4,
-+						     0, 3);
-+	clk[UART0_UPLLDIV]	= nuc970_clk_divider("uart0_uplldiv", "upll",
-+						     REG_CLK_DIV4, 0, 3);
-+	clk[UART0_ECLK_MUX]	= nuc970_clk_mux("uart0_eclk_mux", REG_CLK_DIV4,
-+						 3, 2, uart0_sel_clks,
-+						 ARRAY_SIZE(uart0_sel_clks));
-+	clk[UART0_ECLK_DIV]	= nuc970_clk_divider("uart0_eclk_div",
-+						     "uart0_eclk_mux",
-+						     REG_CLK_DIV4, 5, 3);
-+	clk[UART0_ECLK_GATE]	= nuc970_clk_gate("uart0_eclk_gate",
-+						  "uart0_eclk_div",
-+						  REG_CLK_PCLKEN0, 16);
-+	/* UART1 */
-+	clk[UART1_APLLDIV]	= nuc970_clk_divider("uart1_aplldiv", "apll",
-+						     REG_CLK_DIV4, 8, 3);
-+	clk[UART1_UPLLDIV]	= nuc970_clk_divider("uart1_uplldiv", "upll",
-+						     REG_CLK_DIV4, 8, 3);
-+	clk[UART1_ECLK_MUX]	= nuc970_clk_mux("uart1_eclk_mux", REG_CLK_DIV4,
-+						 11, 2, uart1_sel_clks,
-+						 ARRAY_SIZE(uart1_sel_clks));
-+	clk[UART1_ECLK_DIV]	= nuc970_clk_divider("uart1_eclk_div",
-+						     "uart1_eclk_mux",
-+						     REG_CLK_DIV4, 13, 3);
-+	clk[UART1_ECLK_GATE]	= nuc970_clk_gate("uart1_eclk_gate",
-+						  "uart1_eclk_div",
-+						  REG_CLK_PCLKEN0, 17);
-+	/* UART2 */
-+	clk[UART2_APLLDIV]	= nuc970_clk_divider("uart2_aplldiv", "apll",
-+						     REG_CLK_DIV4, 16, 3);
-+	clk[UART2_UPLLDIV]	= nuc970_clk_divider("uart2_uplldiv", "upll",
-+						     REG_CLK_DIV4, 16, 3);
-+	clk[UART2_ECLK_MUX]	= nuc970_clk_mux("uart2_eclk_mux", REG_CLK_DIV4,
-+						 19, 2, uart2_sel_clks,
-+						 ARRAY_SIZE(uart2_sel_clks));
-+	clk[UART2_ECLK_DIV]	= nuc970_clk_divider("uart2_eclk_div",
-+						     "uart2_eclk_mux",
-+						     REG_CLK_DIV4, 21, 3);
-+	clk[UART2_ECLK_GATE]	= nuc970_clk_gate("uart2_eclk_gate",
-+						  "uart2_eclk_div",
-+						  REG_CLK_PCLKEN0, 18);
-+	/* UART3 */
-+	clk[UART3_APLLDIV]	= nuc970_clk_divider("uart3_aplldiv", "apll",
-+						     REG_CLK_DIV4, 24, 3);
-+	clk[UART3_UPLLDIV]	= nuc970_clk_divider("uart3_uplldiv", "upll",
-+						     REG_CLK_DIV4, 24, 3);
-+	clk[UART3_ECLK_MUX]	= nuc970_clk_mux("uart3_eclk_mux", REG_CLK_DIV4,
-+						 27, 2, uart3_sel_clks,
-+						 ARRAY_SIZE(uart3_sel_clks));
-+	clk[UART3_ECLK_DIV]	= nuc970_clk_divider("uart3_eclk_div",
-+						     "uart3_eclk_mux",
-+						     REG_CLK_DIV4, 29, 3);
-+	clk[UART3_ECLK_GATE]	= nuc970_clk_gate("uart3_eclk_gate",
-+						  "uart3_eclk_div",
-+						  REG_CLK_PCLKEN0, 19);
-+	/* UART4 */
-+	clk[UART4_APLLDIV]	= nuc970_clk_divider("uart4_aplldiv", "apll",
-+						     REG_CLK_DIV5, 0, 3);
-+	clk[UART4_UPLLDIV]	= nuc970_clk_divider("uart4_uplldiv", "upll",
-+						     REG_CLK_DIV5, 0, 3);
-+	clk[UART4_ECLK_MUX]	= nuc970_clk_mux("uart4_eclk_mux", REG_CLK_DIV5,
-+						 3, 2, uart4_sel_clks,
-+						 ARRAY_SIZE(uart4_sel_clks));
-+	clk[UART4_ECLK_DIV]	= nuc970_clk_divider("uart4_eclk_div",
-+						     "uart4_eclk_mux",
-+						     REG_CLK_DIV5, 5, 3);
-+	clk[UART4_ECLK_GATE]	= nuc970_clk_gate("uart4_eclk_gate",
-+						  "uart4_eclk_div",
-+						  REG_CLK_PCLKEN0, 20);
-+	/* UART5 */
-+	clk[UART5_APLLDIV]	= nuc970_clk_divider("uart5_aplldiv", "apll",
-+						     REG_CLK_DIV5, 8, 3);
-+	clk[UART5_UPLLDIV]	= nuc970_clk_divider("uart5_uplldiv", "upll",
-+						     REG_CLK_DIV5, 8, 3);
-+	clk[UART5_ECLK_MUX]	= nuc970_clk_mux("uart5_eclk_mux", REG_CLK_DIV5,
-+						 11, 2, uart5_sel_clks,
-+						 ARRAY_SIZE(uart5_sel_clks));
-+	clk[UART5_ECLK_DIV]	= nuc970_clk_divider("uart5_eclk_div",
-+						     "uart5_eclk_mux",
-+						     REG_CLK_DIV5, 13, 3);
-+	clk[UART5_ECLK_GATE]	= nuc970_clk_gate("uart5_eclk_gate",
-+						  "uart5_eclk_div",
-+						  REG_CLK_PCLKEN0, 21);
-+	/* UART6 */
-+	clk[UART6_APLLDIV]	= nuc970_clk_divider("uart6_aplldiv", "apll",
-+						     REG_CLK_DIV5, 16, 3);
-+	clk[UART6_UPLLDIV]	= nuc970_clk_divider("uart6_uplldiv", "upll",
-+						     REG_CLK_DIV5, 16, 3);
-+	clk[UART6_ECLK_MUX]	= nuc970_clk_mux("uart6_eclk_mux", REG_CLK_DIV5,
-+						 19, 2, uart6_sel_clks,
-+						 ARRAY_SIZE(uart6_sel_clks));
-+	clk[UART6_ECLK_DIV]	= nuc970_clk_divider("uart6_eclk_div",
-+						     "uart6_eclk_mux",
-+						     REG_CLK_DIV5, 21, 3);
-+	clk[UART6_ECLK_GATE]	= nuc970_clk_gate("uart6_eclk_gate",
-+						  "uart6_eclk_div",
-+						  REG_CLK_PCLKEN0, 22);
-+	/* UART7 */
-+	clk[UART7_APLLDIV]	= nuc970_clk_divider("uart7_aplldiv", "apll",
-+						     REG_CLK_DIV5, 24, 3);
-+	clk[UART7_UPLLDIV]	= nuc970_clk_divider("uart7_uplldiv", "upll",
-+						     REG_CLK_DIV5, 24, 3);
-+	clk[UART7_ECLK_MUX]	= nuc970_clk_mux("uart7_eclk_mux", REG_CLK_DIV5,
-+						 27, 2, uart7_sel_clks,
-+						 ARRAY_SIZE(uart7_sel_clks));
-+	clk[UART7_ECLK_DIV]	= nuc970_clk_divider("uart7_eclk_div",
-+						     "uart7_eclk_mux",
-+						     REG_CLK_DIV5, 29, 3);
-+	clk[UART7_ECLK_GATE]	= nuc970_clk_gate("uart7_eclk_gate",
-+						  "uart7_eclk_div",
-+						  REG_CLK_PCLKEN0, 23);
-+	/* UART8 */
-+	clk[UART8_APLLDIV]	= nuc970_clk_divider("uart8_aplldiv", "apll",
-+						     REG_CLK_DIV6, 0, 3);
-+	clk[UART8_UPLLDIV]	= nuc970_clk_divider("uart8_uplldiv", "upll",
-+						     REG_CLK_DIV6, 0, 3);
-+	clk[UART8_ECLK_MUX]	= nuc970_clk_mux("uart8_eclk_mux", REG_CLK_DIV6,
-+						 3, 2, uart8_sel_clks,
-+						 ARRAY_SIZE(uart8_sel_clks));
-+	clk[UART8_ECLK_DIV]	= nuc970_clk_divider("uart8_eclk_div",
-+						     "uart8_eclk_mux",
-+						     REG_CLK_DIV6, 5, 3);
-+	clk[UART8_ECLK_GATE]	= nuc970_clk_gate("uart8_eclk_gate",
-+						  "uart8_eclk_div",
-+						  REG_CLK_PCLKEN0, 24);
-+	/* UART9 */
-+	clk[UART9_APLLDIV]	= nuc970_clk_divider("uart9_aplldiv", "apll",
-+						     REG_CLK_DIV6, 8, 3);
-+	clk[UART9_UPLLDIV]	= nuc970_clk_divider("uart9_uplldiv", "upll",
-+						     REG_CLK_DIV6, 8, 3);
-+	clk[UART9_ECLK_MUX]	= nuc970_clk_mux("uart9_eclk_mux", REG_CLK_DIV6,
-+						 11, 2, uart9_sel_clks,
-+						 ARRAY_SIZE(uart9_sel_clks));
-+	clk[UART9_ECLK_DIV]	= nuc970_clk_divider("uart9_eclk_div",
-+						     "uart9_eclk_mux",
-+						     REG_CLK_DIV6, 13, 3);
-+	clk[UART9_ECLK_GATE]	= nuc970_clk_gate("uart9_eclk_gate",
-+						  "uart9_eclk_div",
-+						  REG_CLK_PCLKEN0, 25);
-+	/* UART10 */
-+	clk[UART10_APLLDIV]	 = nuc970_clk_divider("uart10_aplldiv", "apll",
-+						      REG_CLK_DIV6, 16, 3);
-+	clk[UART10_UPLLDIV]	 = nuc970_clk_divider("uart10_uplldiv", "upll",
-+						      REG_CLK_DIV6, 16, 3);
-+	clk[UART10_ECLK_MUX]	= nuc970_clk_mux("uart10_eclk_mux",
-+						 REG_CLK_DIV6, 19, 2,
-+						 uart10_sel_clks,
-+						 ARRAY_SIZE(uart10_sel_clks));
-+	clk[UART10_ECLK_DIV]	= nuc970_clk_divider("uart10_eclk_div",
-+						     "uart10_eclk_mux",
-+						     REG_CLK_DIV6, 21, 3);
-+	clk[UART10_ECLK_GATE]	= nuc970_clk_gate("uart10_eclk_gate",
-+						  "uart10_eclk_div",
-+						  REG_CLK_PCLKEN0, 26);
-+	/* SYSTEM */
-+	clk[SYSTEM_APLLDIV]	= nuc970_clk_divider("system_aplldiv", "apll",
-+						     REG_CLK_DIV0, 0, 3);
-+	clk[SYSTEM_UPLLDIV]	= nuc970_clk_divider("system_uplldiv", "upll",
-+						     REG_CLK_DIV0, 0, 3);
-+	clk[SYSTEM_ECLK_MUX]	= nuc970_clk_mux("system_eclk_mux",
-+						 REG_CLK_DIV0, 3, 2,
-+						 system_sel_clks,
-+						 ARRAY_SIZE(system_sel_clks));
-+	clk[SYSTEM_ECLK_DIV]	= nuc970_clk_divider("system_eclk_div",
-+						     "system_eclk_mux",
-+						     REG_CLK_DIV0, 8, 4);
-+	/* GPIO */
-+	clk[GPIO_ECLK_MUX]	= nuc970_clk_mux("gpio_eclk_mux", REG_CLK_DIV7,
-+						 7, 1, gpio_sel_clks,
-+						 ARRAY_SIZE(gpio_sel_clks));
-+	clk[GPIO_ECLK_DIV]	= nuc970_clk_divider("gpio_eclk_div",
-+						     "gpio_eclk_mux",
-+						     REG_CLK_DIV7, 0, 7);
-+	clk[GPIO_ECLK_GATE]	= nuc970_clk_gate("gpio_eclk_gate",
-+						  "gpio_eclk_div",
-+						  REG_CLK_PCLKEN0, 3);
-+	/* KPI */
-+	clk[KPI_ECLK_MUX]	= nuc970_clk_mux("kpi_eclk_mux", REG_CLK_DIV7,
-+						 15, 1, kpi_sel_clks,
-+						 ARRAY_SIZE(kpi_sel_clks));
-+	clk[KPI_ECLK_DIV]	= nuc970_clk_divider("kpi_eclk_div",
-+						     "kpi_eclk_mux",
-+						     REG_CLK_DIV7, 8, 7);
-+	clk[KPI_ECLK_GATE]	= nuc970_clk_gate("kpi_eclk_gate",
-+						  "kpi_eclk_div",
-+						  REG_CLK_PCLKEN1, 25);
-+	/* ETIMER0 */
-+	clk[ETIMER0_ECLK_MUX]	= nuc970_clk_mux("etimer0_eclk_mux",
-+						 REG_CLK_DIV8, 16, 2,
-+						 etimer_sel_clks,
-+						 ARRAY_SIZE(etimer_sel_clks));
-+	clk[ETIMER0_ECLK_GATE]	= nuc970_clk_gate("etimer0_eclk_gate",
-+						  "etimer0_eclk_mux",
-+						  REG_CLK_PCLKEN0, 4);
-+	/* ETIMER1 */
-+	clk[ETIMER1_ECLK_MUX]	= nuc970_clk_mux("etimer1_eclk_mux",
-+						 REG_CLK_DIV8, 18, 2,
-+						 etimer_sel_clks,
-+						 ARRAY_SIZE(etimer_sel_clks));
-+	clk[ETIMER1_ECLK_GATE]	= nuc970_clk_gate("etimer1_eclk_gate",
-+						  "etimer1_eclk_mux",
-+						  REG_CLK_PCLKEN0, 5);
-+	/* ETIMER2 */
-+	clk[ETIMER2_ECLK_MUX]	= nuc970_clk_mux("etimer2_eclk_mux",
-+						 REG_CLK_DIV8, 20, 2,
-+						 etimer_sel_clks,
-+						 ARRAY_SIZE(etimer_sel_clks));
-+	clk[ETIMER2_ECLK_GATE]	= nuc970_clk_gate("etimer2_eclk_gate",
-+						  "etimer2_eclk_mux",
-+						  REG_CLK_PCLKEN0, 6);
-+	/* ETIMER3 */
-+	clk[ETIMER3_ECLK_MUX]	= nuc970_clk_mux("etimer3_eclk_mux",
-+						 REG_CLK_DIV8, 22, 2,
-+						 etimer_sel_clks,
-+						 ARRAY_SIZE(etimer_sel_clks));
-+	clk[ETIMER3_ECLK_GATE]	= nuc970_clk_gate("etimer3_eclk_gate",
-+						  "etimer3_eclk_mux",
-+						  REG_CLK_PCLKEN0, 7);
-+	/* WWDT */
-+	clk[WWDT_ECLK_MUX]	= nuc970_clk_mux("wwdt_eclk_mux", REG_CLK_DIV8,
-+						 10, 2, wwdt_sel_clks,
-+						 ARRAY_SIZE(wwdt_sel_clks));
-+	clk[WWDT_ECLK_GATE]	= nuc970_clk_gate("wwdt_eclk_gate",
-+						  "wwdt_eclk_mux",
-+						  REG_CLK_PCLKEN0, 1);
-+	/* WDT */
-+	clk[WDT_ECLK_MUX]	= nuc970_clk_mux("wdt_eclk_mux", REG_CLK_DIV8,
-+						 8, 2, wwdt_sel_clks,
-+						 ARRAY_SIZE(wwdt_sel_clks));
-+	clk[WDT_ECLK_GATE]	= nuc970_clk_gate("wdt_eclk_gate",
-+						  "wdt_eclk_mux",
-+						  REG_CLK_PCLKEN0, 0);
-+	/* SMARTCARD */
-+	clk[SMC0_ECLK_DIV]	= nuc970_clk_divider("smc0_eclk_div", "xin",
-+						     REG_CLK_DIV6, 24, 4);
-+	clk[SMC0_ECLK_GATE]	= nuc970_clk_gate("smc0_eclk_gate",
-+						  "smc0_eclk_div",
-+						  REG_CLK_PCLKEN1, 12);
-+	clk[SMC1_ECLK_DIV]	= nuc970_clk_divider("smc1_eclk_div", "xin",
-+						     REG_CLK_DIV6, 28, 4);
-+	clk[SMC1_ECLK_GATE]	= nuc970_clk_gate("smc1_eclk_gate",
-+						  "smc1_eclk_div",
-+						  REG_CLK_PCLKEN1, 13);
-+	/* PCLK */
-+	clk[PCLK_DIV]		= nuc970_clk_divider("pclk_div", "hclk1_div",
-+						     REG_CLK_DIV0, 24, 4);
-+	clk[PCLK4096_DIV]	= nuc970_clk_fixed_factor("pclk4096_div",
-+							  "pclk_div", 1, 4096);
-+	clk[I2C0_GATE]		= nuc970_clk_gate("i2c0_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 0);
-+	clk[I2C1_GATE]		= nuc970_clk_gate("i2c1_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 1);
-+	clk[SPI0_GATE]		= nuc970_clk_gate("spi0_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 4);
-+	clk[SPI1_GATE]		= nuc970_clk_gate("spi1_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 5);
-+	clk[UART0_GATE]		= nuc970_clk_gate("uart0_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 16);
-+	clk[UART1_GATE]		= nuc970_clk_gate("uart1_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 17);
-+	clk[UART2_GATE]		= nuc970_clk_gate("uart2_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 18);
-+	clk[UART3_GATE]		= nuc970_clk_gate("uart3_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 19);
-+	clk[UART4_GATE]		= nuc970_clk_gate("uart4_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 20);
-+	clk[UART5_GATE]		= nuc970_clk_gate("uart5_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 21);
-+	clk[UART6_GATE]		= nuc970_clk_gate("uart6_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 22);
-+	clk[UART7_GATE]		= nuc970_clk_gate("uart7_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 23);
-+	clk[UART8_GATE]		= nuc970_clk_gate("uart8_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 24);
-+	clk[UART9_GATE]		= nuc970_clk_gate("uart9_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 25);
-+	clk[UART10_GATE]	= nuc970_clk_gate("uart10_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 26);
-+	clk[WDT_GATE]		= nuc970_clk_gate("wdt_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 0);
-+	clk[WWDT_GATE]		= nuc970_clk_gate("wwdt_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 1);
-+	clk[RTC_GATE]		= nuc970_clk_gate("rtc_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 2);
-+	clk[GPIO_GATE]		= nuc970_clk_gate("gpio_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 3);
-+	clk[ADC_GATE]		= nuc970_clk_gate("adc_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 24);
-+	clk[KPI_GATE]		= nuc970_clk_gate("kpi_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 25);
-+	clk[MTPC_GATE]		= nuc970_clk_gate("mtpc_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 26);
-+	clk[PWM_GATE]		= nuc970_clk_gate("pwm_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 27);
-+	clk[ETIMER0_GATE]	= nuc970_clk_gate("etimer0_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 4);
-+	clk[ETIMER1_GATE]	= nuc970_clk_gate("etimer1_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 5);
-+	clk[ETIMER2_GATE]	= nuc970_clk_gate("etimer2_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 6);
-+	clk[ETIMER3_GATE]	= nuc970_clk_gate("etimer3_gate", "pclk_div",
-+						  REG_CLK_PCLKEN0, 7);
-+	clk[CAN0_GATE]		= nuc970_clk_gate("can0_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 8);
-+	clk[CAN1_GATE]		= nuc970_clk_gate("can1_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 9);
-+	clk[TIMER0_GATE]	= nuc970_clk_gate("timer0_gate", "xin",
-+						  REG_CLK_PCLKEN0, 8);
-+	clk[TIMER1_GATE]	= nuc970_clk_gate("timer1_gate", "xin",
-+						  REG_CLK_PCLKEN0, 9);
-+	clk[TIMER2_GATE]	= nuc970_clk_gate("timer2_gate", "xin",
-+						  REG_CLK_PCLKEN0, 10);
-+	clk[TIMER3_GATE]	= nuc970_clk_gate("timer3_gate", "xin",
-+						  REG_CLK_PCLKEN0, 11);
-+	clk[TIMER4_GATE]	= nuc970_clk_gate("timer4_gate", "xin",
-+						  REG_CLK_PCLKEN0, 12);
-+	clk[SMC0_GATE]		= nuc970_clk_gate("smc0_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 12);
-+	clk[SMC1_GATE]		= nuc970_clk_gate("smc1_gate", "pclk_div",
-+						  REG_CLK_PCLKEN1, 13);
-+
-+	for (i = 0; i < ARRAY_SIZE(clk); i++)
-+		if (IS_ERR(clk[i]))
-+			pr_err("nuc970 clk %d: register failed with %ld\n",
-+				i, PTR_ERR(clk[i]));
-+
-+	clk_data.clks = clk;
-+	clk_data.clk_num = ARRAY_SIZE(clk);
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+
-+	/* Register clock device */
-+	clk_register_clkdev(clk[TIMER0_GATE], "timer0", NULL);
-+	clk_register_clkdev(clk[TIMER1_GATE], "timer1", NULL);
-+	clk_register_clkdev(clk[PCLK4096_DIV], "pclk4096_div", NULL);
-+	clk_register_clkdev(clk[XIN], "xin", NULL);
-+	clk_register_clkdev(clk[XIN32K], "xin32k", NULL);
-+	clk_register_clkdev(clk[APLL], "apll", NULL);
-+	clk_register_clkdev(clk[UPLL], "upll", NULL);
-+	clk_register_clkdev(clk[SYS_MUX], "sysmux", NULL);
-+	clk_register_clkdev(clk[SYS_DIV], "sysdiv", NULL);
-+	clk_register_clkdev(clk[XIN128_DIV], "xin128div", NULL);
-+	/* CPU */
-+	clk_register_clkdev(clk[CPU_DIV], "cpudiv", NULL);
-+	clk_register_clkdev(clk[CPU_GATE], "cpu", NULL);
-+	/* HCLK1 */
-+	clk_register_clkdev(clk[HCLK_GATE], "hclk", NULL);
-+	clk_register_clkdev(clk[SRAM_GATE], "sram", NULL);
-+	clk_register_clkdev(clk[HCLK1_DIV], "hclk1div", NULL);
-+	clk_register_clkdev(clk[DDR_GATE], "ddr_hclk", NULL);
-+	clk_register_clkdev(clk[GDMA_GATE], "gdma_hclk", NULL);
-+	clk_register_clkdev(clk[EBI_GATE], "ebi_hclk", NULL);
-+	clk_register_clkdev(clk[TIC_GATE], "tic_hclk", NULL);
-+	/* HCLK234 */
-+	clk_register_clkdev(clk[HCLKN_DIV], "hclkndiv", NULL);
-+	clk_register_clkdev(clk[DRAM_GATE], "dram", NULL);
-+	clk_register_clkdev(clk[HCLK234_DIV], "hclk234div", NULL);
-+	/* HCLK3 */
-+	clk_register_clkdev(clk[USBH_GATE], "usbh_hclk", NULL);
-+	clk_register_clkdev(clk[EMAC1_GATE], "emac1_hclk", NULL);
-+	clk_register_clkdev(clk[EMAC1_ECLK_DIV], "emac1_eclk_div", NULL);
-+	clk_register_clkdev(clk[EMAC1_ECLK_GATE], "emac1_eclk", NULL);
-+	clk_register_clkdev(clk[USBD_GATE], "usbd_hclk", NULL);
-+	clk_register_clkdev(clk[FMI_GATE], "fmi_hclk", NULL);
-+	clk_register_clkdev(clk[NAND_GATE], "nand_hclk", NULL);
-+	clk_register_clkdev(clk[EMMC_GATE], "emmc_hclk", NULL);
-+	clk_register_clkdev(clk[CRYPTO_GATE], "crypto_hclk", NULL);
-+	clk_register_clkdev(clk[JPEG_GATE], "jpeg_hclk", NULL);
-+	clk_register_clkdev(clk[JPEG_ECLK_DIV], "jpeg_eclk_div", NULL);
-+	clk_register_clkdev(clk[JPEG_ECLK_GATE], "jpeg_eclk", NULL);
-+	clk_register_clkdev(clk[GE2D_GATE], "ge2d_hclk", NULL);
-+	clk_register_clkdev(clk[GE2D_ECLK_DIV], "ge2d_eclk_div", NULL);
-+	clk_register_clkdev(clk[GE2D_ECLK_GATE], "ge2d_eclk", NULL);
-+	/* HCLK4 */
-+	clk_register_clkdev(clk[EMAC0_GATE], "emac0_hclk", NULL);
-+	clk_register_clkdev(clk[EMAC0_ECLK_DIV], "emac0_eclk_div", NULL);
-+	clk_register_clkdev(clk[EMAC0_ECLK_GATE], "emac0_eclk", NULL);
-+	clk_register_clkdev(clk[SDH_GATE], "sdh_hclk", NULL);
-+	clk_register_clkdev(clk[AUDIO_GATE], "audio_hclk", NULL);
-+	clk_register_clkdev(clk[LCD_GATE], "lcd_hclk", NULL);
-+	clk_register_clkdev(clk[SENSOR_GATE], "sensor_hclk", NULL);
-+	clk_register_clkdev(clk[CAP_GATE], "cap_hclk", NULL);
-+	/* ECLK */
-+	clk_register_clkdev(clk[LCD_APLLDIV], "lcd_aplldiv", NULL);
-+	clk_register_clkdev(clk[LCD_UPLLDIV], "lcd_uplldiv", NULL);
-+	clk_register_clkdev(clk[LCD_ECLK_MUX], "lcd_eclk_mux", NULL);
-+	clk_register_clkdev(clk[LCD_ECLK_DIV], "lcd_eclk_div", NULL);
-+	clk_register_clkdev(clk[LCD_ECLK_GATE], "lcd_eclk", NULL);
-+	clk_register_clkdev(clk[AUDIO_APLLDIV], "audio_aplldiv", NULL);
-+	clk_register_clkdev(clk[AUDIO_UPLLDIV], "audio_uplldiv", NULL);
-+	clk_register_clkdev(clk[AUDIO_ECLK_MUX], "audio_eclk_mux", NULL);
-+	clk_register_clkdev(clk[AUDIO_ECLK_DIV], "audio_eclk_div", NULL);
-+	clk_register_clkdev(clk[AUDIO_ECLK_GATE], "audio_eclk", NULL);
-+	clk_register_clkdev(clk[USB_APLLDIV], "usb_aplldiv", NULL);
-+	clk_register_clkdev(clk[USB_UPLLDIV], "usb_uplldiv", NULL);
-+	clk_register_clkdev(clk[USB_ECLK_MUX], "usb_eclk_mux", NULL);
-+	clk_register_clkdev(clk[USB_ECLK_DIV], "usb_eclk_div", NULL);
-+	clk_register_clkdev(clk[USB_ECLK_GATE], "usb_eclk", NULL);
-+	clk_register_clkdev(clk[SDH_APLLDIV], "sdh_aplldiv", NULL);
-+	clk_register_clkdev(clk[SDH_UPLLDIV], "sdh_uplldiv", NULL);
-+	clk_register_clkdev(clk[SDH_ECLK_MUX], "sdh_eclk_mux", NULL);
-+	clk_register_clkdev(clk[SDH_ECLK_DIV], "sdh_eclk_div", NULL);
-+	clk_register_clkdev(clk[SDH_ECLK_GATE], "sdh_eclk", NULL);
-+	clk_register_clkdev(clk[EMMC_APLLDIV], "emmc_aplldiv", NULL);
-+	clk_register_clkdev(clk[EMMC_UPLLDIV], "emmc_uplldiv", NULL);
-+	clk_register_clkdev(clk[EMMC_ECLK_MUX], "emmc_eclk_mux", NULL);
-+	clk_register_clkdev(clk[EMMC_ECLK_DIV], "emmc_eclk_div", NULL);
-+	clk_register_clkdev(clk[EMMC_ECLK_GATE], "emmc_eclk", NULL);
-+	clk_register_clkdev(clk[ADC_APLLDIV], "adc_aplldiv", NULL);
-+	clk_register_clkdev(clk[ADC_UPLLDIV], "adc_uplldiv", NULL);
-+	clk_register_clkdev(clk[ADC_ECLK_MUX], "adc_eclk_mux", NULL);
-+	clk_register_clkdev(clk[ADC_ECLK_DIV], "adc_eclk_div", NULL);
-+	clk_register_clkdev(clk[ADC_ECLK_GATE], "adc_eclk", NULL);
-+	clk_register_clkdev(clk[CAP_APLLDIV], "cap_aplldiv", NULL);
-+	clk_register_clkdev(clk[CAP_UPLLDIV], "cap_uplldiv", NULL);
-+	clk_register_clkdev(clk[CAP_ECLK_MUX], "cap_eclk_mux", NULL);
-+	clk_register_clkdev(clk[CAP_ECLK_DIV], "cap_eclk_div", NULL);
-+	clk_register_clkdev(clk[CAP_ECLK_GATE], "cap_eclk", NULL);
-+	clk_register_clkdev(clk[UART0_APLLDIV], "uart0_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART0_UPLLDIV], "uart0_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART0_ECLK_MUX], "uart0_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART0_ECLK_DIV], "uart0_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART0_ECLK_GATE], "uart0_eclk", NULL);
-+	clk_register_clkdev(clk[UART1_APLLDIV], "uart1_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART1_UPLLDIV], "uart1_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART1_ECLK_MUX], "uart1_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART1_ECLK_DIV], "uart1_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART1_ECLK_GATE], "uart1_eclk", NULL);
-+	clk_register_clkdev(clk[UART2_APLLDIV], "uart2_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART2_UPLLDIV], "uart2_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART2_ECLK_MUX], "uart2_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART2_ECLK_DIV], "uart2_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART2_ECLK_GATE], "uart2_eclk", NULL);
-+	clk_register_clkdev(clk[UART3_APLLDIV], "uart3_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART3_UPLLDIV], "uart3_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART3_ECLK_MUX], "uart3_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART3_ECLK_DIV], "uart3_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART3_ECLK_GATE], "uart3_eclk", NULL);
-+	clk_register_clkdev(clk[UART4_APLLDIV], "uart4_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART4_UPLLDIV], "uart4_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART4_ECLK_MUX], "uart4_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART4_ECLK_DIV], "uart4_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART4_ECLK_GATE], "uart4_eclk", NULL);
-+	clk_register_clkdev(clk[UART5_APLLDIV], "uart5_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART5_UPLLDIV], "uart5_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART5_ECLK_MUX], "uart5_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART5_ECLK_DIV], "uart5_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART5_ECLK_GATE], "uart5_eclk", NULL);
-+	clk_register_clkdev(clk[UART6_APLLDIV], "uart6_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART6_UPLLDIV], "uart6_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART6_ECLK_MUX], "uart6_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART6_ECLK_DIV], "uart6_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART6_ECLK_GATE], "uart6_eclk", NULL);
-+	clk_register_clkdev(clk[UART7_APLLDIV], "uart7_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART7_UPLLDIV], "uart7_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART7_ECLK_MUX], "uart7_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART7_ECLK_DIV], "uart7_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART7_ECLK_GATE], "uart7_eclk", NULL);
-+	clk_register_clkdev(clk[UART8_APLLDIV], "uart8_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART8_UPLLDIV], "uart8_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART8_ECLK_MUX], "uart8_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART8_ECLK_DIV], "uart8_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART8_ECLK_GATE], "uart8_eclk", NULL);
-+	clk_register_clkdev(clk[UART9_APLLDIV], "uart9_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART9_UPLLDIV], "uart9_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART9_ECLK_MUX], "uart9_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART9_ECLK_DIV], "uart9_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART9_ECLK_GATE], "uart9_eclk", NULL);
-+	clk_register_clkdev(clk[UART10_APLLDIV], "uart10_aplldiv", NULL);
-+	clk_register_clkdev(clk[UART10_UPLLDIV], "uart10_uplldiv", NULL);
-+	clk_register_clkdev(clk[UART10_ECLK_MUX], "uart10_eclk_mux", NULL);
-+	clk_register_clkdev(clk[UART10_ECLK_DIV], "uart10_eclk_div", NULL);
-+	clk_register_clkdev(clk[UART10_ECLK_GATE], "uart10_eclk", NULL);
-+	clk_register_clkdev(clk[SYSTEM_APLLDIV], "system_aplldiv", NULL);
-+	clk_register_clkdev(clk[SYSTEM_UPLLDIV], "system_uplldiv", NULL);
-+	clk_register_clkdev(clk[SYSTEM_ECLK_MUX], "system_eclk_mux", NULL);
-+	clk_register_clkdev(clk[SYSTEM_ECLK_DIV], "system_eclk_div", NULL);
-+	clk_register_clkdev(clk[SYSTEM_ECLK_GATE], "system_eclk", NULL);
-+	clk_register_clkdev(clk[GPIO_ECLK_MUX], "gpio_eclk_mux", NULL);
-+	clk_register_clkdev(clk[GPIO_ECLK_DIV], "gpio_eclk_div", NULL);
-+	clk_register_clkdev(clk[GPIO_ECLK_GATE], "gpio_eclk", NULL);
-+	clk_register_clkdev(clk[KPI_ECLK_MUX], "kpi_eclk_mux", NULL);
-+	clk_register_clkdev(clk[KPI_ECLK_DIV], "kpi_eclk_div", NULL);
-+	clk_register_clkdev(clk[KPI_ECLK_GATE], "kpi_eclk", NULL);
-+	clk_register_clkdev(clk[ETIMER0_ECLK_MUX], "etmr0_eclk_mux", NULL);
-+	clk_register_clkdev(clk[ETIMER0_ECLK_GATE], "etmr0_eclk", NULL);
-+	clk_register_clkdev(clk[ETIMER1_ECLK_MUX], "etmr1_eclk_mux", NULL);
-+	clk_register_clkdev(clk[ETIMER1_ECLK_GATE], "etmr1_eclk", NULL);
-+	clk_register_clkdev(clk[ETIMER2_ECLK_MUX], "etmr2_eclk_mux", NULL);
-+	clk_register_clkdev(clk[ETIMER2_ECLK_GATE], "etmr2_eclk", NULL);
-+	clk_register_clkdev(clk[ETIMER3_ECLK_MUX], "etmr3_eclk_mux", NULL);
-+	clk_register_clkdev(clk[ETIMER3_ECLK_GATE], "etmr3_eclk", NULL);
-+	clk_register_clkdev(clk[WWDT_ECLK_MUX], "wwdt_eclk_mux", NULL);
-+	clk_register_clkdev(clk[WWDT_ECLK_GATE], "wwdt_eclk", NULL);
-+	clk_register_clkdev(clk[WDT_ECLK_MUX], "wdt_eclk_mux", NULL);
-+	clk_register_clkdev(clk[WDT_ECLK_GATE], "wdt_eclk", NULL);
-+	clk_register_clkdev(clk[SMC0_ECLK_DIV], "smc0_eclk_div", NULL);
-+	clk_register_clkdev(clk[SMC0_ECLK_GATE], "smc0_eclk", NULL);
-+	clk_register_clkdev(clk[SMC1_ECLK_DIV], "smc1_eclk_div", NULL);
-+	clk_register_clkdev(clk[SMC1_ECLK_GATE], "smc1_eclk", NULL);
-+	/* PCLK */
-+	clk_register_clkdev(clk[PCLK_DIV], "pclkdiv", NULL);
-+	clk_register_clkdev(clk[RTC_GATE], "rtc", NULL);
-+	clk_register_clkdev(clk[I2C0_GATE], "i2c0", NULL);
-+	clk_register_clkdev(clk[I2C1_GATE], "i2c1", NULL);
-+	clk_register_clkdev(clk[SPI0_GATE], "spi0", NULL);
-+	clk_register_clkdev(clk[SPI1_GATE], "spi1", NULL);
-+	clk_register_clkdev(clk[UART0_GATE], "uart0", NULL);
-+	clk_register_clkdev(clk[UART1_GATE], "uart1", NULL);
-+	clk_register_clkdev(clk[UART2_GATE], "uart2", NULL);
-+	clk_register_clkdev(clk[UART3_GATE], "uart3", NULL);
-+	clk_register_clkdev(clk[UART4_GATE], "uart4", NULL);
-+	clk_register_clkdev(clk[UART5_GATE], "uart5", NULL);
-+	clk_register_clkdev(clk[UART6_GATE], "uart6", NULL);
-+	clk_register_clkdev(clk[UART7_GATE], "uart7", NULL);
-+	clk_register_clkdev(clk[UART8_GATE], "uart8", NULL);
-+	clk_register_clkdev(clk[UART9_GATE], "uart9", NULL);
-+	clk_register_clkdev(clk[UART10_GATE], "uart10", NULL);
-+	clk_register_clkdev(clk[WDT_GATE], "wdt", NULL);
-+	clk_register_clkdev(clk[WWDT_GATE], "wwdt", NULL);
-+	clk_register_clkdev(clk[GPIO_GATE], "gpio", NULL);
-+	clk_register_clkdev(clk[SMC0_GATE], "smc0", NULL);
-+	clk_register_clkdev(clk[SMC1_GATE], "smc1", NULL);
-+	clk_register_clkdev(clk[ADC_GATE], "adc", NULL);
-+	clk_register_clkdev(clk[KPI_GATE], "kpi", NULL);
-+	clk_register_clkdev(clk[MTPC_GATE], "mtpc", NULL);
-+	clk_register_clkdev(clk[PWM_GATE], "pwm", NULL);
-+	clk_register_clkdev(clk[ETIMER0_GATE], "etimer0", NULL);
-+	clk_register_clkdev(clk[ETIMER1_GATE], "etimer1", NULL);
-+	clk_register_clkdev(clk[ETIMER2_GATE], "etimer2", NULL);
-+	clk_register_clkdev(clk[ETIMER3_GATE], "etimer3", NULL);
-+	clk_register_clkdev(clk[TIMER2_GATE], "timer2", NULL);
-+	clk_register_clkdev(clk[TIMER3_GATE], "timer3", NULL);
-+	clk_register_clkdev(clk[TIMER4_GATE], "timer4", NULL);
-+	clk_register_clkdev(clk[CAN0_GATE], "can0", NULL);
-+	clk_register_clkdev(clk[CAN1_GATE], "can1", NULL);
-+
-+	/* enable some important clocks */
-+	clk_prepare_enable(clk_get(NULL, "cpu"));
-+	clk_prepare_enable(clk_get(NULL, "hclk"));
-+	clk_prepare_enable(clk_get(NULL, "sram"));
-+	clk_prepare_enable(clk_get(NULL, "dram"));
-+	clk_prepare_enable(clk_get(NULL, "ddr_hclk"));
-+}
-+
-+CLK_OF_DECLARE(nuc970_clk, "nuvoton,clk", nuc970_clocks_init);
-diff --git a/drivers/clk/nuc900/clk-upll.c b/drivers/clk/nuc900/clk-upll.c
-new file mode 100644
-index 0000000..d0c6fc2
---- /dev/null
-+++ b/drivers/clk/nuc900/clk-upll.c
-@@ -0,0 +1,83 @@
-+/*
-+ * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+
-+#include "clk-ccf.h"
-+
-+struct clk_upll {
-+	struct clk_hw	hw;
-+	void __iomem	*base;
-+};
-+
-+#define to_clk_upll(clk) (container_of(clk, struct clk_upll, clk))
-+
-+static unsigned long clk_upll_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	struct clk_upll *pll = to_clk_upll(hw);
-+	unsigned long rate;
-+	unsigned long reg = readl(pll->base) & 0x0FFFFFFF;
-+
-+	if (parent_rate != 12000000)
-+		return 0;
-+
-+	switch (reg) {
-+	case 0x15:
-+		rate = 264000000;
-+		break;
-+	case 0x18:
-+		rate = 300000000;
-+		break;
-+	default:
-+		rate = 264000000;
-+		break;
-+	}
-+
-+	return rate;
-+}
-+
-+static struct clk_ops clk_upll_ops = {
-+	.recalc_rate = clk_upll_recalc_rate,
-+};
-+
-+struct clk *nuc970_clk_upll(const char *name, const char *parent,
-+			    void __iomem *base)
-+{
-+	struct clk_upll *pll;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	pll = kmalloc(sizeof(*pll), GFP_KERNEL);
-+	if (!pll)
-+		return ERR_PTR(-ENOMEM);
-+
-+	pll->base = base;
-+
-+	init.name = name;
-+	init.ops = &clk_upll_ops;
-+	init.flags = 0;
-+	init.parent_names = &parent;
-+	init.num_parents = 1;
-+
-+	pll->hw.init = &init;
-+
-+	clk = clk_register(NULL, &pll->hw);
-+	if (IS_ERR(clk))
-+		kfree(pll);
-+
-+	return clk;
-+}
++#
++# CPU Frequency scaling
++#
++# CONFIG_CPU_FREQ is not set
++
++#
++# CPU Idle
++#
++# CONFIG_CPU_IDLE is not set
++# CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED is not set
++
++#
++# Floating point emulation
++#
++
++#
++# At least one emulation must be selected
++#
++CONFIG_FPE_NWFPE=y
++# CONFIG_FPE_NWFPE_XP is not set
++# CONFIG_FPE_FASTFPE is not set
++# CONFIG_VFP is not set
++
++#
++# Userspace binary formats
++#
++CONFIG_BINFMT_ELF=y
++CONFIG_ELFCORE=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_BINFMT_SCRIPT=y
++# CONFIG_HAVE_AOUT is not set
++# CONFIG_BINFMT_MISC is not set
++CONFIG_COREDUMP=y
++
++#
++# Power management options
++#
++# CONFIG_SUSPEND is not set
++# CONFIG_HIBERNATION is not set
++# CONFIG_PM is not set
++# CONFIG_APM_EMULATION is not set
++CONFIG_ARCH_SUSPEND_POSSIBLE=y
++# CONFIG_ARM_CPU_SUSPEND is not set
++CONFIG_ARCH_HIBERNATION_POSSIBLE=y
++# CONFIG_NET is not set
++CONFIG_HAVE_CBPF_JIT=y
++
++#
++# Device Drivers
++#
++
++#
++# Generic Driver Options
++#
++CONFIG_UEVENT_HELPER=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++CONFIG_FW_LOADER=y
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_EXTRA_FIRMWARE=""
++# CONFIG_FW_LOADER_USER_HELPER_FALLBACK is not set
++CONFIG_ALLOW_DEV_COREDUMP=y
++# CONFIG_SYS_HYPERVISOR is not set
++# CONFIG_GENERIC_CPU_DEVICES is not set
++CONFIG_SOC_BUS=y
++# CONFIG_DMA_SHARED_BUFFER is not set
++
++#
++# Bus devices
++#
++# CONFIG_ARM_CCN is not set
++# CONFIG_BRCMSTB_GISB_ARB is not set
++# CONFIG_VEXPRESS_CONFIG is not set
++# CONFIG_MTD is not set
++CONFIG_DTC=y
++CONFIG_OF=y
++# CONFIG_OF_UNITTEST is not set
++CONFIG_OF_FLATTREE=y
++CONFIG_OF_EARLY_FLATTREE=y
++CONFIG_OF_ADDRESS=y
++CONFIG_OF_IRQ=y
++CONFIG_OF_RESERVED_MEM=y
++# CONFIG_OF_OVERLAY is not set
++CONFIG_ARCH_MIGHT_HAVE_PC_PARPORT=y
++# CONFIG_PARPORT is not set
++CONFIG_BLK_DEV=y
++# CONFIG_BLK_DEV_NULL_BLK is not set
++# CONFIG_BLK_DEV_COW_COMMON is not set
++# CONFIG_BLK_DEV_LOOP is not set
++
++#
++# DRBD disabled because PROC_FS or INET not selected
++#
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=16
++CONFIG_BLK_DEV_RAM_SIZE=16384
++# CONFIG_CDROM_PKTCDVD is not set
++# CONFIG_MG_DISK is not set
++
++#
++# Misc devices
++#
++# CONFIG_SENSORS_LIS3LV02D is not set
++# CONFIG_DUMMY_IRQ is not set
++# CONFIG_ENCLOSURE_SERVICES is not set
++# CONFIG_SRAM is not set
++# CONFIG_C2PORT is not set
++
++#
++# EEPROM support
++#
++# CONFIG_EEPROM_93CX6 is not set
++
++#
++# Texas Instruments shared transport line discipline
++#
++
++#
++# Altera FPGA firmware download module
++#
++
++#
++# Intel MIC Bus Driver
++#
++
++#
++# SCIF Bus Driver
++#
++
++#
++# VOP Bus Driver
++#
++
++#
++# Intel MIC Host Driver
++#
++
++#
++# Intel MIC Card Driver
++#
++
++#
++# SCIF Driver
++#
++
++#
++# Intel MIC Coprocessor State Management (COSM) Drivers
++#
++
++#
++# VOP Driver
++#
++# CONFIG_ECHO is not set
++# CONFIG_CXL_BASE is not set
++# CONFIG_CXL_KERNEL_API is not set
++# CONFIG_CXL_EEH is not set
++
++#
++# SCSI device support
++#
++CONFIG_SCSI_MOD=y
++# CONFIG_RAID_ATTRS is not set
++CONFIG_SCSI=y
++CONFIG_SCSI_DMA=y
++# CONFIG_SCSI_MQ_DEFAULT is not set
++# CONFIG_SCSI_PROC_FS is not set
++
++#
++# SCSI support type (disk, tape, CD-ROM)
++#
++CONFIG_BLK_DEV_SD=y
++# CONFIG_CHR_DEV_ST is not set
++# CONFIG_CHR_DEV_OSST is not set
++# CONFIG_BLK_DEV_SR is not set
++# CONFIG_CHR_DEV_SG is not set
++# CONFIG_CHR_DEV_SCH is not set
++# CONFIG_SCSI_CONSTANTS is not set
++# CONFIG_SCSI_LOGGING is not set
++# CONFIG_SCSI_SCAN_ASYNC is not set
++
++#
++# SCSI Transports
++#
++# CONFIG_SCSI_SPI_ATTRS is not set
++# CONFIG_SCSI_SAS_ATTRS is not set
++# CONFIG_SCSI_SAS_LIBSAS is not set
++# CONFIG_SCSI_SRP_ATTRS is not set
++# CONFIG_SCSI_LOWLEVEL is not set
++# CONFIG_SCSI_DH is not set
++# CONFIG_SCSI_OSD_INITIATOR is not set
++# CONFIG_ATA is not set
++# CONFIG_MD is not set
++# CONFIG_TARGET_CORE is not set
++# CONFIG_NVM is not set
++
++#
++# Input device support
++#
++CONFIG_INPUT=y
++# CONFIG_INPUT_FF_MEMLESS is not set
++# CONFIG_INPUT_POLLDEV is not set
++# CONFIG_INPUT_SPARSEKMAP is not set
++# CONFIG_INPUT_MATRIXKMAP is not set
++
++#
++# Userland interfaces
++#
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_JOYDEV is not set
++# CONFIG_INPUT_EVDEV is not set
++# CONFIG_INPUT_EVBUG is not set
++
++#
++# Input Device Drivers
++#
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_INPUT_JOYSTICK is not set
++# CONFIG_INPUT_TABLET is not set
++# CONFIG_INPUT_TOUCHSCREEN is not set
++# CONFIG_INPUT_MISC is not set
++# CONFIG_RMI4_CORE is not set
++
++#
++# Hardware I/O ports
++#
++# CONFIG_SERIO is not set
++# CONFIG_GAMEPORT is not set
++
++#
++# Character devices
++#
++CONFIG_TTY=y
++CONFIG_VT=y
++CONFIG_CONSOLE_TRANSLATIONS=y
++CONFIG_VT_CONSOLE=y
++CONFIG_HW_CONSOLE=y
++CONFIG_VT_HW_CONSOLE_BINDING=y
++CONFIG_UNIX98_PTYS=y
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_SERIAL_NONSTANDARD is not set
++# CONFIG_TRACE_SINK is not set
++CONFIG_DEVMEM=y
++CONFIG_DEVKMEM=y
++
++#
++# Serial drivers
++#
++# CONFIG_SERIAL_8250 is not set
++
++#
++# Non-8250 serial port support
++#
++CONFIG_SERIAL_NUC970=y
++CONFIG_SERIAL_NUC970_CONSOLE=y
++# CONFIG_SERIAL_EARLYCON_ARM_SEMIHOST is not set
++# CONFIG_SERIAL_UARTLITE is not set
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++# CONFIG_SERIAL_SCCNXP is not set
++# CONFIG_SERIAL_BCM63XX is not set
++# CONFIG_SERIAL_ALTERA_JTAGUART is not set
++# CONFIG_SERIAL_ALTERA_UART is not set
++# CONFIG_SERIAL_XILINX_PS_UART is not set
++# CONFIG_SERIAL_MPS2_UART is not set
++# CONFIG_SERIAL_ARC is not set
++# CONFIG_SERIAL_FSL_LPUART is not set
++# CONFIG_SERIAL_CONEXANT_DIGICOLOR is not set
++# CONFIG_SERIAL_ST_ASC is not set
++# CONFIG_SERIAL_STM32 is not set
++# CONFIG_HVC_DCC is not set
++# CONFIG_IPMI_HANDLER is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_R3964 is not set
++# CONFIG_RAW_DRIVER is not set
++# CONFIG_TCG_TPM is not set
++# CONFIG_XILLYBUS is not set
++
++#
++# I2C support
++#
++# CONFIG_I2C is not set
++# CONFIG_SPI is not set
++# CONFIG_SPMI is not set
++# CONFIG_HSI is not set
++
++#
++# PPS support
++#
++# CONFIG_PPS is not set
++
++#
++# PPS generators support
++#
++
++#
++# PTP clock support
++#
++
++#
++# Enable PHYLIB and NETWORK_PHY_TIMESTAMPING to see the additional clocks.
++#
++CONFIG_ARCH_HAVE_CUSTOM_GPIO_H=y
++CONFIG_ARCH_REQUIRE_GPIOLIB=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_DEVRES=y
++CONFIG_OF_GPIO=y
++# CONFIG_GPIO_SYSFS is not set
++
++#
++# Memory mapped GPIO drivers
++#
++# CONFIG_GPIO_74XX_MMIO is not set
++# CONFIG_GPIO_ALTERA is not set
++# CONFIG_GPIO_DWAPB is not set
++# CONFIG_GPIO_EM is not set
++# CONFIG_GPIO_GENERIC_PLATFORM is not set
++# CONFIG_GPIO_GRGPIO is not set
++# CONFIG_GPIO_MPC8XXX is not set
++# CONFIG_GPIO_XILINX is not set
++# CONFIG_GPIO_ZEVIO is not set
++# CONFIG_GPIO_ZX is not set
++
++#
++# MFD GPIO expanders
++#
++# CONFIG_W1 is not set
++# CONFIG_POWER_SUPPLY is not set
++# CONFIG_POWER_RESET is not set
++# CONFIG_POWER_AVS is not set
++# CONFIG_HWMON is not set
++# CONFIG_THERMAL is not set
++# CONFIG_WATCHDOG is not set
++CONFIG_SSB_POSSIBLE=y
++
++#
++# Sonics Silicon Backplane
++#
++# CONFIG_SSB is not set
++CONFIG_BCMA_POSSIBLE=y
++
++#
++# Broadcom specific AMBA
++#
++# CONFIG_BCMA is not set
++
++#
++# Multifunction device drivers
++#
++# CONFIG_MFD_CORE is not set
++# CONFIG_MFD_ATMEL_FLEXCOM is not set
++# CONFIG_MFD_ATMEL_HLCDC is not set
++# CONFIG_MFD_CROS_EC is not set
++# CONFIG_MFD_ASIC3 is not set
++# CONFIG_MFD_HI6421_PMIC is not set
++# CONFIG_HTC_EGPIO is not set
++# CONFIG_HTC_PASIC3 is not set
++# CONFIG_MFD_KEMPLD is not set
++# CONFIG_MFD_MT6397 is not set
++# CONFIG_MFD_PM8921_CORE is not set
++# CONFIG_MFD_SM501 is not set
++# CONFIG_ABX500_CORE is not set
++# CONFIG_MFD_SYSCON is not set
++# CONFIG_MFD_TI_AM335X_TSCADC is not set
++# CONFIG_MFD_TMIO is not set
++# CONFIG_MFD_T7L66XB is not set
++# CONFIG_MFD_TC6387XB is not set
++# CONFIG_MFD_TC6393XB is not set
++# CONFIG_REGULATOR is not set
++# CONFIG_MEDIA_SUPPORT is not set
++
++#
++# Graphics support
++#
++# CONFIG_DRM is not set
++
++#
++# ACP (Audio CoProcessor) Configuration
++#
++
++#
++# Frame buffer Devices
++#
++# CONFIG_FB is not set
++# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
++# CONFIG_VGASTATE is not set
++
++#
++# Console display driver support
++#
++CONFIG_DUMMY_CONSOLE=y
++# CONFIG_SOUND is not set
++
++#
++# HID support
++#
++# CONFIG_HID is not set
++CONFIG_USB_OHCI_LITTLE_ENDIAN=y
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_UWB is not set
++# CONFIG_MMC is not set
++# CONFIG_MEMSTICK is not set
++# CONFIG_NEW_LEDS is not set
++# CONFIG_ACCESSIBILITY is not set
++CONFIG_EDAC_ATOMIC_SCRUB=y
++CONFIG_EDAC_SUPPORT=y
++# CONFIG_EDAC is not set
++CONFIG_RTC_LIB=y
++# CONFIG_RTC_CLASS is not set
++# CONFIG_DMADEVICES is not set
++
++#
++# DMABUF options
++#
++# CONFIG_SYNC_FILE is not set
++# CONFIG_AUXDISPLAY is not set
++# CONFIG_UIO is not set
++# CONFIG_VIRT_DRIVERS is not set
++
++#
++# Virtio drivers
++#
++# CONFIG_VIRTIO_MMIO is not set
++
++#
++# Microsoft Hyper-V guest support
++#
++# CONFIG_STAGING is not set
++# CONFIG_GOLDFISH is not set
++# CONFIG_CHROME_PLATFORMS is not set
++CONFIG_CLKDEV_LOOKUP=y
++CONFIG_HAVE_CLK_PREPARE=y
++CONFIG_COMMON_CLK=y
++
++#
++# Common Clock Framework
++#
++# CONFIG_CLK_QORIQ is not set
++# CONFIG_COMMON_CLK_NXP is not set
++# CONFIG_COMMON_CLK_PXA is not set
++# CONFIG_COMMON_CLK_PIC32 is not set
++# CONFIG_COMMON_CLK_OXNAS is not set
++
++#
++# Hardware Spinlock drivers
++#
++
++#
++# Clock Source drivers
++#
++CONFIG_CLKSRC_OF=y
++CONFIG_CLKSRC_PROBE=y
++CONFIG_CLKSRC_MMIO=y
++# CONFIG_ARM_TIMER_SP804 is not set
++# CONFIG_ATMEL_PIT is not set
++# CONFIG_SH_TIMER_CMT is not set
++# CONFIG_SH_TIMER_MTU2 is not set
++# CONFIG_SH_TIMER_TMU is not set
++# CONFIG_EM_TIMER_STI is not set
++CONFIG_NUC900_TIMER=y
++# CONFIG_MAILBOX is not set
++# CONFIG_IOMMU_SUPPORT is not set
++
++#
++# Remoteproc drivers
++#
++# CONFIG_STE_MODEM_RPROC is not set
++
++#
++# Rpmsg drivers
++#
++
++#
++# SOC (System On Chip) specific Drivers
++#
++# CONFIG_SOC_BRCMSTB is not set
++# CONFIG_SUNXI_SRAM is not set
++# CONFIG_SOC_TI is not set
++# CONFIG_PM_DEVFREQ is not set
++# CONFIG_EXTCON is not set
++# CONFIG_MEMORY is not set
++# CONFIG_IIO is not set
++# CONFIG_PWM is not set
++CONFIG_IRQCHIP=y
++CONFIG_ARM_GIC_MAX_NR=1
++# CONFIG_IPACK_BUS is not set
++# CONFIG_RESET_CONTROLLER is not set
++# CONFIG_FMC is not set
++
++#
++# PHY Subsystem
++#
++# CONFIG_GENERIC_PHY is not set
++# CONFIG_PHY_PXA_28NM_HSIC is not set
++# CONFIG_PHY_PXA_28NM_USB2 is not set
++# CONFIG_BCM_KONA_USB2_PHY is not set
++# CONFIG_POWERCAP is not set
++# CONFIG_MCB is not set
++
++#
++# Performance monitor support
++#
++CONFIG_ARM_PMU=y
++# CONFIG_RAS is not set
++
++#
++# Android
++#
++# CONFIG_ANDROID is not set
++# CONFIG_NVMEM is not set
++# CONFIG_STM is not set
++# CONFIG_INTEL_TH is not set
++
++#
++# FPGA Configuration Support
++#
++# CONFIG_FPGA is not set
++
++#
++# Firmware Drivers
++#
++# CONFIG_FIRMWARE_MEMMAP is not set
++# CONFIG_FW_CFG_SYSFS is not set
++
++#
++# File systems
++#
++# CONFIG_EXT2_FS is not set
++# CONFIG_EXT3_FS is not set
++# CONFIG_EXT4_FS is not set
++# CONFIG_REISERFS_FS is not set
++# CONFIG_JFS_FS is not set
++# CONFIG_XFS_FS is not set
++# CONFIG_GFS2_FS is not set
++# CONFIG_BTRFS_FS is not set
++# CONFIG_NILFS2_FS is not set
++# CONFIG_F2FS_FS is not set
++CONFIG_FS_POSIX_ACL=y
++CONFIG_EXPORTFS=y
++CONFIG_FILE_LOCKING=y
++CONFIG_MANDATORY_FILE_LOCKING=y
++# CONFIG_FS_ENCRYPTION is not set
++# CONFIG_FSNOTIFY is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_FANOTIFY is not set
++# CONFIG_QUOTA is not set
++# CONFIG_QUOTACTL is not set
++# CONFIG_AUTOFS4_FS is not set
++# CONFIG_FUSE_FS is not set
++# CONFIG_OVERLAY_FS is not set
++
++#
++# Caches
++#
++# CONFIG_FSCACHE is not set
++
++#
++# CD-ROM/DVD Filesystems
++#
++# CONFIG_ISO9660_FS is not set
++# CONFIG_UDF_FS is not set
++
++#
++# DOS/FAT/NT Filesystems
++#
++CONFIG_FAT_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_FAT_DEFAULT_CODEPAGE=437
++CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
++# CONFIG_FAT_DEFAULT_UTF8 is not set
++# CONFIG_NTFS_FS is not set
++
++#
++# Pseudo filesystems
++#
++CONFIG_PROC_FS=y
++CONFIG_PROC_SYSCTL=y
++CONFIG_PROC_PAGE_MONITOR=y
++# CONFIG_PROC_CHILDREN is not set
++CONFIG_KERNFS=y
++CONFIG_SYSFS=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_TMPFS_XATTR=y
++# CONFIG_HUGETLB_PAGE is not set
++# CONFIG_CONFIGFS_FS is not set
++CONFIG_MISC_FILESYSTEMS=y
++# CONFIG_ORANGEFS_FS is not set
++# CONFIG_ADFS_FS is not set
++# CONFIG_AFFS_FS is not set
++# CONFIG_HFS_FS is not set
++# CONFIG_HFSPLUS_FS is not set
++# CONFIG_BEFS_FS is not set
++# CONFIG_BFS_FS is not set
++# CONFIG_EFS_FS is not set
++# CONFIG_LOGFS is not set
++# CONFIG_CRAMFS is not set
++# CONFIG_SQUASHFS is not set
++# CONFIG_VXFS_FS is not set
++# CONFIG_MINIX_FS is not set
++# CONFIG_OMFS_FS is not set
++# CONFIG_HPFS_FS is not set
++# CONFIG_QNX4FS_FS is not set
++# CONFIG_QNX6FS_FS is not set
++CONFIG_ROMFS_FS=y
++CONFIG_ROMFS_BACKED_BY_BLOCK=y
++CONFIG_ROMFS_ON_BLOCK=y
++# CONFIG_PSTORE is not set
++# CONFIG_SYSV_FS is not set
++# CONFIG_UFS_FS is not set
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="iso8859-1"
++CONFIG_NLS_CODEPAGE_437=y
++# CONFIG_NLS_CODEPAGE_737 is not set
++# CONFIG_NLS_CODEPAGE_775 is not set
++# CONFIG_NLS_CODEPAGE_850 is not set
++# CONFIG_NLS_CODEPAGE_852 is not set
++# CONFIG_NLS_CODEPAGE_855 is not set
++# CONFIG_NLS_CODEPAGE_857 is not set
++# CONFIG_NLS_CODEPAGE_860 is not set
++# CONFIG_NLS_CODEPAGE_861 is not set
++# CONFIG_NLS_CODEPAGE_862 is not set
++# CONFIG_NLS_CODEPAGE_863 is not set
++# CONFIG_NLS_CODEPAGE_864 is not set
++# CONFIG_NLS_CODEPAGE_865 is not set
++# CONFIG_NLS_CODEPAGE_866 is not set
++# CONFIG_NLS_CODEPAGE_869 is not set
++# CONFIG_NLS_CODEPAGE_936 is not set
++# CONFIG_NLS_CODEPAGE_950 is not set
++# CONFIG_NLS_CODEPAGE_932 is not set
++# CONFIG_NLS_CODEPAGE_949 is not set
++# CONFIG_NLS_CODEPAGE_874 is not set
++# CONFIG_NLS_ISO8859_8 is not set
++# CONFIG_NLS_CODEPAGE_1250 is not set
++# CONFIG_NLS_CODEPAGE_1251 is not set
++# CONFIG_NLS_ASCII is not set
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_NLS_ISO8859_2 is not set
++# CONFIG_NLS_ISO8859_3 is not set
++# CONFIG_NLS_ISO8859_4 is not set
++# CONFIG_NLS_ISO8859_5 is not set
++# CONFIG_NLS_ISO8859_6 is not set
++# CONFIG_NLS_ISO8859_7 is not set
++# CONFIG_NLS_ISO8859_9 is not set
++# CONFIG_NLS_ISO8859_13 is not set
++# CONFIG_NLS_ISO8859_14 is not set
++# CONFIG_NLS_ISO8859_15 is not set
++# CONFIG_NLS_KOI8_R is not set
++# CONFIG_NLS_KOI8_U is not set
++# CONFIG_NLS_MAC_ROMAN is not set
++# CONFIG_NLS_MAC_CELTIC is not set
++# CONFIG_NLS_MAC_CENTEURO is not set
++# CONFIG_NLS_MAC_CROATIAN is not set
++# CONFIG_NLS_MAC_CYRILLIC is not set
++# CONFIG_NLS_MAC_GAELIC is not set
++# CONFIG_NLS_MAC_GREEK is not set
++# CONFIG_NLS_MAC_ICELAND is not set
++# CONFIG_NLS_MAC_INUIT is not set
++# CONFIG_NLS_MAC_ROMANIAN is not set
++# CONFIG_NLS_MAC_TURKISH is not set
++# CONFIG_NLS_UTF8 is not set
++
++#
++# Kernel hacking
++#
++
++#
++# printk and dmesg options
++#
++# CONFIG_PRINTK_TIME is not set
++CONFIG_MESSAGE_LOGLEVEL_DEFAULT=7
++# CONFIG_DYNAMIC_DEBUG is not set
++
++#
++# Compile-time checks and compiler options
++#
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_FRAME_WARN=1024
++# CONFIG_STRIP_ASM_SYMS is not set
++# CONFIG_UNUSED_SYMBOLS is not set
++CONFIG_DEBUG_FS=y
++# CONFIG_HEADERS_CHECK is not set
++# CONFIG_DEBUG_SECTION_MISMATCH is not set
++CONFIG_SECTION_MISMATCH_WARN_ONLY=y
++CONFIG_FRAME_POINTER=y
++# CONFIG_MAGIC_SYSRQ is not set
++# CONFIG_DEBUG_KERNEL is not set
++
++#
++# Memory Debugging
++#
++# CONFIG_PAGE_EXTENSION is not set
++# CONFIG_PAGE_POISONING is not set
++# CONFIG_SLUB_DEBUG_ON is not set
++# CONFIG_SLUB_STATS is not set
++CONFIG_HAVE_DEBUG_KMEMLEAK=y
++CONFIG_DEBUG_MEMORY_INIT=y
++
++#
++# Debug Lockups and Hangs
++#
++# CONFIG_PANIC_ON_OOPS is not set
++CONFIG_PANIC_ON_OOPS_VALUE=0
++CONFIG_PANIC_TIMEOUT=0
++# CONFIG_SCHED_INFO is not set
++# CONFIG_DEBUG_TIMEKEEPING is not set
++
++#
++# Lock Debugging (spinlocks, mutexes, etc...)
++#
++# CONFIG_STACKTRACE is not set
++CONFIG_DEBUG_BUGVERBOSE=y
++
++#
++# RCU Debugging
++#
++# CONFIG_PROVE_RCU is not set
++# CONFIG_SPARSE_RCU_POINTER is not set
++# CONFIG_TORTURE_TEST is not set
++CONFIG_RCU_CPU_STALL_TIMEOUT=300
++CONFIG_HAVE_FUNCTION_TRACER=y
++CONFIG_HAVE_FUNCTION_GRAPH_TRACER=y
++CONFIG_HAVE_DYNAMIC_FTRACE=y
++CONFIG_HAVE_FTRACE_MCOUNT_RECORD=y
++CONFIG_HAVE_SYSCALL_TRACEPOINTS=y
++CONFIG_HAVE_C_RECORDMCOUNT=y
++CONFIG_TRACING_SUPPORT=y
++# CONFIG_FTRACE is not set
++
++#
++# Runtime Testing
++#
++# CONFIG_LKDTM is not set
++# CONFIG_ATOMIC64_SELFTEST is not set
++# CONFIG_TEST_HEXDUMP is not set
++# CONFIG_TEST_STRING_HELPERS is not set
++# CONFIG_TEST_KSTRTOX is not set
++# CONFIG_TEST_PRINTF is not set
++# CONFIG_TEST_BITMAP is not set
++# CONFIG_TEST_UUID is not set
++# CONFIG_TEST_RHASHTABLE is not set
++# CONFIG_TEST_HASH is not set
++# CONFIG_DMA_API_DEBUG is not set
++# CONFIG_TEST_LKM is not set
++# CONFIG_TEST_USER_COPY is not set
++# CONFIG_TEST_FIRMWARE is not set
++# CONFIG_TEST_UDELAY is not set
++# CONFIG_MEMTEST is not set
++# CONFIG_TEST_STATIC_KEYS is not set
++# CONFIG_SAMPLES is not set
++CONFIG_HAVE_ARCH_KGDB=y
++# CONFIG_UBSAN is not set
++CONFIG_ARCH_HAS_DEVMEM_IS_ALLOWED=y
++CONFIG_STRICT_DEVMEM=y
++# CONFIG_IO_STRICT_DEVMEM is not set
++# CONFIG_ARM_UNWIND is not set
++# CONFIG_DEBUG_USER is not set
++CONFIG_DEBUG_LL_INCLUDE="mach/debug-macro.S"
++# CONFIG_DEBUG_UART_8250 is not set
++CONFIG_UNCOMPRESS_INCLUDE="mach/uncompress.h"
++# CONFIG_DEBUG_SET_MODULE_RONX is not set
++# CONFIG_CORESIGHT is not set
++
++#
++# Security options
++#
++# CONFIG_KEYS is not set
++# CONFIG_SECURITY_DMESG_RESTRICT is not set
++# CONFIG_SECURITY is not set
++# CONFIG_SECURITYFS is not set
++CONFIG_DEFAULT_SECURITY_DAC=y
++CONFIG_DEFAULT_SECURITY=""
++# CONFIG_CRYPTO is not set
++# CONFIG_BINARY_PRINTF is not set
++
++#
++# Library routines
++#
++CONFIG_BITREVERSE=y
++# CONFIG_HAVE_ARCH_BITREVERSE is not set
++CONFIG_RATIONAL=y
++CONFIG_GENERIC_STRNCPY_FROM_USER=y
++CONFIG_GENERIC_STRNLEN_USER=y
++CONFIG_GENERIC_PCI_IOMAP=y
++CONFIG_GENERIC_IO=y
++CONFIG_ARCH_USE_CMPXCHG_LOCKREF=y
++# CONFIG_CRC_CCITT is not set
++# CONFIG_CRC16 is not set
++# CONFIG_CRC_T10DIF is not set
++# CONFIG_CRC_ITU_T is not set
++CONFIG_CRC32=y
++# CONFIG_CRC32_SELFTEST is not set
++CONFIG_CRC32_SLICEBY8=y
++# CONFIG_CRC32_SLICEBY4 is not set
++# CONFIG_CRC32_SARWATE is not set
++# CONFIG_CRC32_BIT is not set
++# CONFIG_CRC7 is not set
++# CONFIG_LIBCRC32C is not set
++# CONFIG_CRC8 is not set
++# CONFIG_AUDIT_ARCH_COMPAT_GENERIC is not set
++# CONFIG_RANDOM32_SELFTEST is not set
++CONFIG_ZLIB_INFLATE=y
++CONFIG_LZO_DECOMPRESS=y
++CONFIG_LZ4_DECOMPRESS=y
++CONFIG_XZ_DEC=y
++CONFIG_XZ_DEC_X86=y
++CONFIG_XZ_DEC_POWERPC=y
++CONFIG_XZ_DEC_IA64=y
++CONFIG_XZ_DEC_ARM=y
++CONFIG_XZ_DEC_ARMTHUMB=y
++CONFIG_XZ_DEC_SPARC=y
++CONFIG_XZ_DEC_BCJ=y
++# CONFIG_XZ_DEC_TEST is not set
++CONFIG_DECOMPRESS_GZIP=y
++CONFIG_DECOMPRESS_BZIP2=y
++CONFIG_DECOMPRESS_LZMA=y
++CONFIG_DECOMPRESS_XZ=y
++CONFIG_DECOMPRESS_LZO=y
++CONFIG_DECOMPRESS_LZ4=y
++CONFIG_GENERIC_ALLOCATOR=y
++CONFIG_HAS_IOMEM=y
++CONFIG_HAS_IOPORT_MAP=y
++CONFIG_HAS_DMA=y
++CONFIG_GENERIC_ATOMIC64=y
++CONFIG_ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE=y
++# CONFIG_CORDIC is not set
++# CONFIG_DDR is not set
++# CONFIG_IRQ_POLL is not set
++CONFIG_LIBFDT=y
++# CONFIG_SG_SPLIT is not set
++CONFIG_SG_POOL=y
++# CONFIG_ARCH_HAS_SG_CHAIN is not set
++# CONFIG_VIRTUALIZATION is not set
 -- 
 2.7.4
