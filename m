@@ -1,152 +1,247 @@
 From: megous@megous.com (megous at megous.com)
-Date: Sat, 25 Jun 2016 05:44:58 +0200
-Subject: [PATCH v2 01/14] ARM: clk: sunxi: Add driver for the H3 THS clock
+Date: Sat, 25 Jun 2016 05:45:01 +0200
+Subject: [PATCH v2 04/14] regulator: SY8106A regulator driver
 In-Reply-To: <20160625034511.7966-1-megous@megous.com>
 References: <20160625034511.7966-1-megous@megous.com>
-Message-ID: <20160625034511.7966-2-megous@megous.com>
+Message-ID: <20160625034511.7966-5-megous@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josef Gajdusek <atx@atx.name>
+From: Ondrej Jirman <megous@megous.com>
 
-This patch adds a driver for the THS clock which is present on the
-Allwinner H3.
+SY8106A is I2C attached single output voltage regulator
+made by Silergy.
 
-Signed-off-by: Josef Gajdusek <atx@atx.name>
+Signed-off-by: Ondrej Jirman <megous@megous.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/Makefile                        |  1 +
- drivers/clk/sunxi/clk-h3-ths.c                    | 98 +++++++++++++++++++++++
- 3 files changed, 100 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-h3-ths.c
+v2
+- added dt-bindings for the regulator
+- changed to use of_device_id for probing
+- added initialization failure checks
+---
+ drivers/regulator/Kconfig             |   8 +-
+ drivers/regulator/Makefile            |   2 +-
+ drivers/regulator/sy8106a-regulator.c | 171 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 179 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/regulator/sy8106a-regulator.c
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 8f7619d..5faae05 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -87,6 +87,7 @@ Required properties:
- 	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
- 	"allwinner,sun4i-a10-ve-clk" - for the Video Engine clock
- 	"allwinner,sun6i-a31-display-clk" - for the display clocks
-+	"allwinner,sun8i-h3-ths-clk" - for THS on H3
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index 144cbf5..93f3fe4f 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -702,6 +702,13 @@ config REGULATOR_STW481X_VMMC
+ 	  This driver supports the internal VMMC regulator in the STw481x
+ 	  PMIC chips.
  
- Required properties for all clocks:
- - reg : shall be the control register address for the clock.
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 39d2044..8e245e3 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -9,6 +9,7 @@ obj-y += clk-a10-mod1.o
- obj-y += clk-a10-pll2.o
- obj-y += clk-a10-ve.o
- obj-y += clk-a20-gmac.o
-+obj-y += clk-h3-ths.o
- obj-y += clk-mod0.o
- obj-y += clk-simple-gates.o
- obj-y += clk-sun4i-display.o
-diff --git a/drivers/clk/sunxi/clk-h3-ths.c b/drivers/clk/sunxi/clk-h3-ths.c
++config REGULATOR_SY8106A
++	tristate "Silergy SY8106A"
++	depends on I2C && (OF || COMPILE_TEST)
++	select REGMAP_I2C
++	help
++	  This driver provides support for SY8106A voltage regulator.
++
+ config REGULATOR_TPS51632
+ 	tristate "TI TPS51632 Power Regulator"
+ 	depends on I2C
+@@ -861,4 +868,3 @@ config REGULATOR_WM8994
+ 	  WM8994 CODEC.
+ 
+ endif
+-
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 85a1d44..e3f720f 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -88,6 +88,7 @@ obj-$(CONFIG_REGULATOR_S2MPS11) += s2mps11.o
+ obj-$(CONFIG_REGULATOR_S5M8767) += s5m8767.o
+ obj-$(CONFIG_REGULATOR_SKY81452) += sky81452-regulator.o
+ obj-$(CONFIG_REGULATOR_STW481X_VMMC) += stw481x-vmmc.o
++obj-$(CONFIG_REGULATOR_SY8106A) += sy8106a-regulator.o
+ obj-$(CONFIG_REGULATOR_TI_ABB) += ti-abb-regulator.o
+ obj-$(CONFIG_REGULATOR_TPS6105X) += tps6105x-regulator.o
+ obj-$(CONFIG_REGULATOR_TPS62360) += tps62360-regulator.o
+@@ -111,5 +112,4 @@ obj-$(CONFIG_REGULATOR_WM8350) += wm8350-regulator.o
+ obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
+ obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
+ 
+-
+ ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
+diff --git a/drivers/regulator/sy8106a-regulator.c b/drivers/regulator/sy8106a-regulator.c
 new file mode 100644
-index 0000000..c1d6d32
+index 0000000..98626bc
 --- /dev/null
-+++ b/drivers/clk/sunxi/clk-h3-ths.c
-@@ -0,0 +1,98 @@
++++ b/drivers/regulator/sy8106a-regulator.c
+@@ -0,0 +1,171 @@
 +/*
-+ * sun8i THS clock driver
++ * sy8106a-regulator.c - Regulator device driver for SY8106A
 + *
-+ * Copyright (C) 2015 Josef Gajdusek
++ * Copyright (C) 2016  Ond?ej Jirman <megous@megous.com>
 + *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Library General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
 + *
-+ * This program is distributed in the hope that it will be useful,
++ * This library is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Library General Public License for more details.
 + *
++ * You should have received a copy of the GNU Library General Public
++ * License along with this library; if not, write to the
++ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
++ * Boston, MA  02110-1301, USA.
 + */
 +
-+#include <linux/clk-provider.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
++#include <linux/err.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/regmap.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/of_regulator.h>
 +
-+#define SUN8I_H3_THS_CLK_ENABLE				31
-+#define SUN8I_H3_THS_CLK_DIVIDER_SHIFT		0
-+#define SUN8I_H3_THS_CLK_DIVIDER_WIDTH		2
++#define SY8106A_REG_VOUT1_SEL		0x01
++#define SY8106A_REG_VOUT_COM		0x02
++#define SY8106A_REG_VOUT1_SEL_MASK	0x7f
++#define SY8106A_DISABLE_REG		BIT(0)
++#define SY8106A_GO_BIT			BIT(7)
 +
-+static DEFINE_SPINLOCK(sun8i_h3_ths_clk_lock);
-+
-+static const struct clk_div_table sun8i_h3_ths_clk_table[] __initconst = {
-+	{ .val = 0, .div = 1 },
-+	{ .val = 1, .div = 2 },
-+	{ .val = 2, .div = 4 },
-+	{ .val = 3, .div = 6 },
-+	{ } /* sentinel */
++struct sy8106a {
++	struct regulator_dev *rdev;
++	struct regmap *regmap;
 +};
 +
-+static void __init sun8i_h3_ths_clk_setup(struct device_node *node)
++static const struct regmap_config sy8106a_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++};
++
++static int sy8106a_set_voltage_sel(struct regulator_dev *rdev, unsigned sel)
 +{
-+	struct clk *clk;
-+	struct clk_gate *gate;
-+	struct clk_divider *div;
-+	const char *parent;
-+	const char *clk_name = node->name;
-+	void __iomem *reg;
-+	int err;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+
-+	if (IS_ERR(reg))
-+		return;
-+
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		goto err_unmap;
-+
-+	div = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!div)
-+		goto err_gate_free;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+	parent = of_clk_get_parent_name(node, 0);
-+
-+	gate->reg = reg;
-+	gate->bit_idx = SUN8I_H3_THS_CLK_ENABLE;
-+	gate->lock = &sun8i_h3_ths_clk_lock;
-+
-+	div->reg = reg;
-+	div->shift = SUN8I_H3_THS_CLK_DIVIDER_SHIFT;
-+	div->width = SUN8I_H3_THS_CLK_DIVIDER_WIDTH;
-+	div->table = sun8i_h3_ths_clk_table;
-+	div->lock = &sun8i_h3_ths_clk_lock;
-+
-+	clk = clk_register_composite(NULL, clk_name, &parent, 1,
-+								 NULL, NULL,
-+								 &div->hw, &clk_divider_ops,
-+								 &gate->hw, &clk_gate_ops,
-+								 CLK_SET_RATE_PARENT);
-+
-+	if (IS_ERR(clk))
-+		goto err_div_free;
-+
-+	err = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	if (err)
-+		goto err_unregister_clk;
-+
-+	return;
-+
-+err_unregister_clk:
-+	clk_unregister(clk);
-+err_gate_free:
-+	kfree(gate);
-+err_div_free:
-+	kfree(div);
-+err_unmap:
-+	iounmap(reg);
++	/* We use our set_voltage_sel in order to avoid unnecessary I2C chatter,
++	 * because the regulator_get_voltage_sel_regmap using apply_bit
++	 * would perform 4 unnecessary transfers instead of one, increasing the
++	 * chance of error.
++	 */
++	return regmap_write(rdev->regmap, rdev->desc->vsel_reg,
++			    sel | SY8106A_GO_BIT);
 +}
 +
-+CLK_OF_DECLARE(sun8i_h3_ths_clk, "allwinner,sun8i-h3-ths-clk",
-+			   sun8i_h3_ths_clk_setup);
++static const struct regulator_ops sy8106a_ops = {
++	.is_enabled = regulator_is_enabled_regmap,
++	.set_voltage_sel = sy8106a_set_voltage_sel,
++	.set_voltage_time_sel = regulator_set_voltage_time_sel,
++	.get_voltage_sel = regulator_get_voltage_sel_regmap,
++	.list_voltage = regulator_list_voltage_linear,
++};
++
++/* Default limits measured in millivolts and milliamps */
++#define SY8106A_MIN_MV		680
++#define SY8106A_MAX_MV		1950
++#define SY8106A_STEP_MV		10
++
++static const struct regulator_desc sy8106a_reg = {
++	.name = "SY8106A",
++	.id = 0,
++	.ops = &sy8106a_ops,
++	.type = REGULATOR_VOLTAGE,
++	.n_voltages = ((SY8106A_MAX_MV - SY8106A_MIN_MV) / SY8106A_STEP_MV) + 1,
++	.min_uV = (SY8106A_MIN_MV * 1000),
++	.uV_step = (SY8106A_STEP_MV * 1000),
++	.vsel_reg = SY8106A_REG_VOUT1_SEL,
++	.vsel_mask = SY8106A_REG_VOUT1_SEL_MASK,
++	.enable_reg = SY8106A_REG_VOUT_COM,
++	.enable_mask = SY8106A_DISABLE_REG,
++	.disable_val = SY8106A_DISABLE_REG,
++	.enable_is_inverted = 1,
++	.owner = THIS_MODULE,
++};
++
++/*
++ * I2C driver interface functions
++ */
++static int sy8106a_i2c_probe(struct i2c_client *i2c,
++			    const struct i2c_device_id *id)
++{
++	struct sy8106a *chip;
++	struct device *dev = &i2c->dev;
++	struct regulator_dev *rdev = NULL;
++	struct regulator_config config = { };
++	unsigned int selector;
++	int error;
++
++	chip = devm_kzalloc(&i2c->dev, sizeof(struct sy8106a), GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++
++	chip->regmap = devm_regmap_init_i2c(i2c, &sy8106a_regmap_config);
++	if (IS_ERR(chip->regmap)) {
++		error = PTR_ERR(chip->regmap);
++		dev_err(&i2c->dev, "Failed to allocate register map: %d\n",
++			error);
++		return error;
++	}
++
++	config.dev = &i2c->dev;
++	config.regmap = chip->regmap;
++	config.of_node = dev->of_node;
++	config.driver_data = chip;
++	config.init_data = of_get_regulator_init_data(dev, dev->of_node, &sy8106a_reg);
++	if (!config.init_data) {
++		return -EINVAL;
++	}
++
++	/* Probe regulator */
++	error = regmap_read(chip->regmap, SY8106A_REG_VOUT1_SEL, &selector);
++	if (error) {
++		dev_err(&i2c->dev, "Failed to read voltage at probe time: %d\n", error);
++		return error;
++	}
++
++	dev_info(&i2c->dev, "SY8106A voltage at boot: %u mV\n", SY8106A_MIN_MV + 
++		 SY8106A_STEP_MV * (selector & SY8106A_REG_VOUT1_SEL_MASK));
++
++	rdev = devm_regulator_register(&i2c->dev, &sy8106a_reg, &config);
++	if (IS_ERR(rdev)) {
++		error = PTR_ERR(rdev);
++		dev_err(&i2c->dev, "Failed to register SY8106A regulator: %d\n", error);
++		return error;
++	}
++
++	chip->rdev = rdev;
++
++	i2c_set_clientdata(i2c, chip);
++
++	return 0;
++}
++
++static const struct of_device_id sy8106a_i2c_of_match[] = {
++	{ .compatible = "silergy,sy8106a" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, sy8106a_i2c_of_match);
++
++/*
++ * This is useless for OF-enabled devices, but it is needed by I2C subsystem
++ */
++static const struct i2c_device_id sy8106a_i2c_id[] = {
++	{ },
++};
++MODULE_DEVICE_TABLE(i2c, sy8106a_i2c_id);
++
++static struct i2c_driver sy8106a_regulator_driver = {
++	.driver = {
++		.name = "sy8106a",
++		.of_match_table	= of_match_ptr(sy8106a_i2c_of_match),
++	},
++	.probe = sy8106a_i2c_probe,
++	.id_table = sy8106a_i2c_id,
++};
++
++module_i2c_driver(sy8106a_regulator_driver);
++
++MODULE_AUTHOR("Ond?ej Jirman <megous@megous.com>");
++MODULE_DESCRIPTION("Regulator device driver for Silergy SY8106A");
++MODULE_LICENSE("GPL v2");
 -- 
 2.9.0
