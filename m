@@ -1,148 +1,79 @@
-From: bamv2005@gmail.com (Bamvor Zhang)
-Date: Sat, 25 Jun 2016 22:15:40 +0800
-Subject: [PATCH 17/23] arm64: ptrace: handle ptrace_request differently
- for aarch32 and ilp32
-In-Reply-To: <576E509A.7090702@huawei.com>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-18-git-send-email-ynorov@caviumnetworks.com>
- <57577611.9000607@huawei.com> <20160608170048.GA24482@yury-N73SV>
- <576E509A.7090702@huawei.com>
-Message-ID: <CAOijeYKpH-1pumqrQw+kY0gbdVoZ02kUJtJkwX33H403v+Scmw@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 25 Jun 2016 07:43:48 -0700
+Subject: [PATCH v3 0/2] nvmem: remove regmap dependency
+In-Reply-To: <541115749.18852.dd1915ce-f885-44a4-a743-86ca28f8b9fd.open-xchange@email.1und1.de>
+References: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <7eec3215-b455-6567-28a2-e2a860e1d3ec@i2se.com>
+ <20160601175542.GA19241@kroah.com>
+ <541115749.18852.dd1915ce-f885-44a4-a743-86ca28f8b9fd.open-xchange@email.1und1.de>
+Message-ID: <20160625144348.GA19352@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Chengming
+On Thu, Jun 23, 2016 at 08:07:13PM +0200, Stefan Wahren wrote:
+> Hi Greg,
+> 
+> > Greg Kroah-Hartman <gregkh@linuxfoundation.org> hat am 1. Juni 2016 um 19:55
+> > geschrieben:
+> > 
+> > 
+> > On Wed, Jun 01, 2016 at 10:27:49AM +0200, Stefan Wahren wrote:
+> > > Hi Greg,
+> > > 
+> > > Am 02.05.2016 um 20:36 schrieb Srinivas Kandagatla:
+> > > > Hi Greg, 
+> > > >
+> > > > This is v3 patchset for the leftover 2 patches for nvmem regmap
+> > > > removal series [1]. These patches are based on char-misc tree.
+> > > >
+> > > > nvmem uses regmap_raw_read/write apis to read/write data from providers,
+> > > > With recent patch 922a9f936e40 ("regmap: mmio: Convert to regmap_bus
+> > > > and fix accessor usage") nvmem providers based on regmap-mmio stopped
+> > > > working, as nvmem core was using raw accessors.
+> > > > This issue can be fixed temporarly by moving to other regmap apis,
+> > > > but we might hit same issue in future, and regmap looks like an
+> > > > overdo for nvmem. Moving to interfaces based on read/write callbacks
+> > > > from providers would be more robust.
+> > > >
+> > > > This patchset converts the nvmem core and nvmem provider drivers to
+> > > > use the new callbacks. Tested this patchset on qfprom and at24 drivers.
+> > > > Other driver are only compile tested, any testing on them would be great.
+> > > >
+> > > > Most of the patches have been applied to char-misc tree, these are the
+> > > > two patches which had some outstanding comments on mxs nvmemprovider,
+> > > > which are now fixed.
+> > > >
+> > > > Changes since v2:
+> > > >  - Fixed the mxs size and dt data pointer spotted by Stefan and Fabio
+> > > >
+> > > > Changes since v1:
+> > > >  - rebased mtk-efuse on top of char-misc
+> > > >  - addressed concerns raised by Stefan Wahren.
+> > > >
+> > > > [1]
+> > > > https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1130026.html
+> > > >
+> > > > Thanks,
+> > > > srini
+> > > >
+> > > > Srinivas Kandagatla (2):
+> > > >   nvmem: mtk-efuse: remove nvmem regmap dependency
+> > > >   nvmem: mxs-ocotp: remove nvmem regmap dependency
+> > > >
+> > > >  drivers/nvmem/Kconfig     |  1 -
+> > > >  drivers/nvmem/mtk-efuse.c | 47 ++++++++++++++++++---------
+> > > >  drivers/nvmem/mxs-ocotp.c | 83
+> > > > +++++++++++++----------------------------------
+> > > >  3 files changed, 54 insertions(+), 77 deletions(-)
+> > > >
+> > > 
+> > > any objections about this series or is it still in queue?
+> > 
+> > still in my queue...
+> > 
+> 
+> gently ping ...
 
-On Sat, Jun 25, 2016 at 5:36 PM, zhouchengming
-<zhouchengming1@huawei.com> wrote:
-> On 2016/6/9 1:00, Yury Norov wrote:
->>
->> On Wed, Jun 08, 2016 at 09:34:09AM +0800, zhouchengming wrote:
->>>
->>> On 2016/5/24 8:04, Yury Norov wrote:
->>>>
->>>> Here new aarch32 ptrace syscall handler is introsuced to avoid run-time
->>>> detection of the task type.
->>>>
->>>> Signed-off-by: Yury Norov<ynorov@caviumnetworks.com>
->>
->>
->> [...]
->>
->>> Hello, I found ilp32 will use sys_ptrace, not compat_sys_ptrace. So I
->>> write
->>> a little patch to see if can solve the problem correctly.
->>>
->>> Thanks.
->>>
->>>  From f6156236df578bb05c4a17e7f9776ceaf8f7afe6 Mon Sep 17 00:00:00 2001
->>> From: Zhou Chengming<zhouchengming1@huawei.com>
->>> Date: Wed, 8 Jun 2016 09:46:23 +0800
->>> Subject: [PATCH] ilp32: use compat_sys_ptrace instead of sys_ptrace
->>>
->>> When we analyze a testcase of ptrace that failed on ilp32, we found
->>> the syscall that the ilp32 uses is sys_ptrace, not compat_sys_ptrace.
->>> Because in include/uapi/asm-generic/unistd.h it's defined like:
->>> __SYSCALL(__NR_ptrace, sys_ptrace)
->>> So we change it to __SC_COMP(__NR_ptrace, sys_ptrace, compat_sys_ptrace),
->>> let compat tasks use the compat_sys_ptrace.
->>>
->>> Signed-off-by: Zhou Chengming<zhouchengming1@huawei.com>
->>> ---
->>>   include/uapi/asm-generic/unistd.h |    2 +-
->>>   1 files changed, 1 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/include/uapi/asm-generic/unistd.h
->>> b/include/uapi/asm-generic/unistd.h
->>> index 2862d2e..50ee770 100644
->>> --- a/include/uapi/asm-generic/unistd.h
->>> +++ b/include/uapi/asm-generic/unistd.h
->>> @@ -364,7 +364,7 @@ __SC_WRAP(__NR_syslog, sys_syslog)
->>>
->>>   /* kernel/ptrace.c */
->>>   #define __NR_ptrace 117
->>> -__SYSCALL(__NR_ptrace, sys_ptrace)
->>> +__SC_COMP(__NR_ptrace, sys_ptrace, compat_sys_ptrace)
->>>
->>>   /* kernel/sched/core.c */
->>>   #define __NR_sched_setparam 118
->>> --
->>> 1.7.7
->>>
->>
->> Hi Zhou,
->>
->> Thank you for the catch.
->>
->> Could you also show the test that is failed for you. It should
->> probably be sent to LTP maillist.
->>
->> I'm not sure your fix correct as it affects other architectures that
->> use standard unistd.h. I think it's better to redirect the syscall in
->> arch/arm64/kernel/sys_ilp32.c with corresponding definition.
->>
->> Yury
->>
->> .
->>
->
-> Sorry, I missed this mail. Thanks for your reply. :)
-> I attach the testcase file of ptrace that failed on ilp32.
-> I also think it's better to redirect the syscall in ilp32, so I changed
-> the patch.
+Sorry for the delay, now queued up.
 
-Thanks for your patch. But Yury has already sent an new series this week
-which define ptrace to compat one.
-
-It seems that Yury do not take GET/SETSIGMASK into account. You
-could share your test case and patches at this point.
-
-Best wishes
-
-Bamvor
-
-[1] https://www.mail-archive.com/linux-doc at vger.kernel.org/msg03811.html
->
->
-> From 7e692ba1adf02c2a2f125836f5222f455c9ffe56 Mon Sep 17 00:00:00 2001
-> From: Zhou Chengming <zhouchengming1@huawei.com>
-> Date: Sat, 25 Jun 2016 18:02:51 +0800
-> Subject: [PATCH] ilp32 should use compat_sys_ptrace
->
-> The file include/uapi/asm-generic/unistd.h defines this:
-> __SYSCALL(__NR_ptrace, sys_ptrace)
-> It may cause some ptrace tests failed on ilp32. So we redirect the ptrace
-> syscall in arch/arm64/kernel/sys_ilp32.c with corresponding definition.
->
-> Signed-off-by: Zhou Chengming <zhouchengming1@huawei.com>
-> ---
->  arch/arm64/kernel/sys_ilp32.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-> index d85fe94..06d5e1b 100644
-> --- a/arch/arm64/kernel/sys_ilp32.c
-> +++ b/arch/arm64/kernel/sys_ilp32.c
-> @@ -46,6 +46,9 @@
->  asmlinkage long ilp32_sys_rt_sigreturn_wrapper(void);
->  #define compat_sys_rt_sigreturn        ilp32_sys_rt_sigreturn_wrapper
->
-> +/* ilp32 should use compat_sys_ptrace */
-> +#define sys_ptrace                    compat_sys_ptrace
-> +
->  #include <asm/syscall.h>
->
->  #undef __SYSCALL
-> --
-> 1.7.7
->
->
->
-
-
-
--- 
------------------------------------------
-   arm64, kernel. opensuse
-   blog: http://aarch64.me
------------------------------------------
+greg k-h
