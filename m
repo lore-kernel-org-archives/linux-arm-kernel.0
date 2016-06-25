@@ -1,40 +1,85 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 25 Jun 2016 08:26:15 +0300
-Subject: [PATCH] ARM: i.MX: Disable supervisor protect for i.MX51
-Message-ID: <1466832375-32071-1-git-send-email-shc_work@mail.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 25 Jun 2016 09:02:08 +0200
+Subject: [PATCH 06/14] ARM: dts: sun8i: Add cpu0 label to sun8i-h3.dtsi
+In-Reply-To: <CAGb2v665O75vQEfo5WdWtWJSbKEbLi6MBAHbgZC7pyrOCOu+6g@mail.gmail.com>
+References: <20160623192104.18720-1-megous@megous.com>
+ <20160623192104.18720-7-megous@megous.com>
+ <CAGb2v66eskVAxdz8VtjBJBCO7VV9WL4bdFDVrPWrSmxk4RASCw@mail.gmail.com>
+ <adaf7f61-af80-cc02-8c47-af721b86f81e@megous.com>
+ <CAGb2v665O75vQEfo5WdWtWJSbKEbLi6MBAHbgZC7pyrOCOu+6g@mail.gmail.com>
+Message-ID: <20160625070208.GA4000@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most peripherals on the i.MX51 have an Off-Platform Peripheral Access
-Control Register (OPACR) in which the access rights (together with the
-MPROT registers) can be declared.
-However, this does not seem to work for example for SSI1+SDMA, because the
-supervisor bit is not set for the SDMA unit.
-A similar problem was described in the patch for i.MX53 CPU
-(ARM: i.MX53: globally disable supervisor protect), and the same solution
-is applicable for i.MX51 CPU.
-Patch has tested on custom board based on Digi CCMX-51 module (i.MX51).
+On Sat, Jun 25, 2016 at 09:02:48AM +0800, Chen-Yu Tsai wrote:
+> On Sat, Jun 25, 2016 at 6:51 AM, Ond?ej Jirman <megous@megous.com> wrote:
+> > Hello,
+> >
+> > comments below.
+> >
+> > On 24.6.2016 05:48, Chen-Yu Tsai wrote:
+> >> On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
+> >>> From: Ondrej Jirman <megous@megous.com>
+> >>>
+> >>> Add label to the first cpu so that it can be referenced
+> >>> from derived dts files.
+> >>>
+> >>> Signed-off-by: Ondrej Jirman <megous@megous.com>
+> >>> ---
+> >>>  arch/arm/boot/dts/sun8i-h3.dtsi | 2 +-
+> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> >>> index 9938972..82faefc 100644
+> >>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> >>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> >>> @@ -52,7 +52,7 @@
+> >>>                 #address-cells = <1>;
+> >>>                 #size-cells = <0>;
+> >>>
+> >>> -               cpu at 0 {
+> >>> +               cpu0: cpu at 0 {
+> >>>                         compatible = "arm,cortex-a7";
+> >>>                         device_type = "cpu";
+> >>>                         reg = <0>;
+> >>
+> >> Can you also set the cpu clock here? It is part of the SoC
+> >> and does not belong in the board DTS files.
+> >
+> > Do you mean operating-points, or something else? Different SBCs will
+> > probably require different combinations of operating points just for
+> > safety's sake, because they have different regulators and [some have
+> > botched] thermal designs, so it might make sense to customize it for
+> > differnt boards, and I don't feel adventurous enough setting it for all
+> > H3 boards out there.
+> 
+> I meant clocks = <...> and clock-latency = <...>.
+> 
+> These 2 are part of the SoC.
+> 
+> The OPP can stay in the board files. It's a pity there's no standard
+> OPP table for H3 though. :(
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
-DTS-part of this patch, I'll send a bit later.
-Another mention of this problem: https://community.nxp.com/thread/333710
----
- arch/arm/mach-imx/mach-imx51.c | 2 ++
- 1 file changed, 2 insertions(+)
+This has never been the case, and we always had some deviation in the
+FEX files for all the SoCs.
 
-diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
-index 10a82a4..1e91740 100644
---- a/arch/arm/mach-imx/mach-imx51.c
-+++ b/arch/arm/mach-imx/mach-imx51.c
-@@ -54,6 +54,8 @@ static void __init imx51_dt_init(void)
- 	imx_src_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+
-+	imx_aips_allow_unprivileged_access("fsl,imx51-aipstz");
- }
- 
- static void __init imx51_init_late(void)
+If we could come up with standard OPPs that work for every one,
+there's no reason it can't happen here.
+
+I don't really see why the thermal design should change anything. If a
+boards heats faster, it will throttle down to a lower OPP faster, but
+those OPPs are not going to change.
+
+Maxime
+
 -- 
-2.4.9
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160625/71d9e988/attachment.sig>
