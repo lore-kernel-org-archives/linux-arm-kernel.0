@@ -1,285 +1,154 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Sat, 25 Jun 2016 02:11:30 +0200
-Subject: [PATCH 07/14] regulator: SY8106A regulator driver
-In-Reply-To: <CAGb2v64D3Bou62iZgDU9kFHLofQ9tPGdyw6PKTdoTaZqPCn+8w@mail.gmail.com>
-References: <20160623192104.18720-1-megous@megous.com>
- <20160623192104.18720-8-megous@megous.com>
- <CAGb2v64D3Bou62iZgDU9kFHLofQ9tPGdyw6PKTdoTaZqPCn+8w@mail.gmail.com>
-Message-ID: <e297ffd8-12c1-88cd-06d0-6136f0e1ccb0@megous.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Fri, 24 Jun 2016 17:28:37 -0700
+Subject: [PATCH v2 14/15] clk: sunxi-ng: Add H3 clocks
+In-Reply-To: <20160607204154.31967-15-maxime.ripard@free-electrons.com>
+References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
+ <20160607204154.31967-15-maxime.ripard@free-electrons.com>
+Message-ID: <146681451703.35033.17009542256505173233@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-thank you for the review. I've resolved most of the issues. Some more
-comments below.
+Nice series! Looks really great to me. :-)
 
-On 24.6.2016 05:41, Chen-Yu Tsai wrote:
-> On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
->> From: Ondrej Jirman <megous@megous.com>
->>
->> SY8106A is I2C attached single output voltage regulator
->> made by Silergy.
->>
->> Signed-off-by: Ondrej Jirman <megous@megous.com>
->> ---
->>  drivers/regulator/Kconfig             |   8 +-
->>  drivers/regulator/Makefile            |   2 +-
->>  drivers/regulator/sy8106a-regulator.c | 153 ++++++++++++++++++++++++++++++++++
->>  3 files changed, 161 insertions(+), 2 deletions(-)
->>  create mode 100644 drivers/regulator/sy8106a-regulator.c
->>
->> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
->> index 144cbf5..fc3fae2 100644
->> --- a/drivers/regulator/Kconfig
->> +++ b/drivers/regulator/Kconfig
->> @@ -860,5 +860,11 @@ config REGULATOR_WM8994
->>           This driver provides support for the voltage regulators on the
->>           WM8994 CODEC.
->>
->> -endif
->> +config REGULATOR_SY8106A
->> +       tristate "Silergy SY8106A"
->> +       depends on I2C
-> 
-> Maybe you should also depend on OF since the driver is going to crippled
-> without any constraints set, or (OF || COMPILE_TEST) if you want some
-> compile test coverage.
-> 
->> +       select REGMAP_I2C
->> +       help
->> +         This driver provides support for the voltage regulator SY8106A.
->>
->> +endif
->> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
->> index 85a1d44..f382095 100644
->> --- a/drivers/regulator/Makefile
->> +++ b/drivers/regulator/Makefile
->> @@ -110,6 +110,6 @@ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-ldo.o
->>  obj-$(CONFIG_REGULATOR_WM8350) += wm8350-regulator.o
->>  obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
->>  obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
->> -
->> +obj-$(CONFIG_REGULATOR_SY8106A) += sy8106a-regulator.o
-> 
-> Follow the existing ordering in the Makefile.
-> 
->>
->>  ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
->> diff --git a/drivers/regulator/sy8106a-regulator.c b/drivers/regulator/sy8106a-regulator.c
->> new file mode 100644
->> index 0000000..34bd69c
->> --- /dev/null
->> +++ b/drivers/regulator/sy8106a-regulator.c
->> @@ -0,0 +1,153 @@
->> +/*
->> + * sy8106a-regulator.c - Regulator device driver for SY8106A
->> + *
->> + * Copyright (C) 2016  Ond?ej Jirman <megous@megous.com>
->> + *
->> + * This library is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU Library General Public
->> + * License as published by the Free Software Foundation; either
->> + * version 2 of the License, or (at your option) any later version.
->> + *
->> + * This library is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * Library General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU Library General Public
->> + * License along with this library; if not, write to the
->> + * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
->> + * Boston, MA  02110-1301, USA.
->> + */
->> +
->> +#include <linux/err.h>
->> +#include <linux/i2c.h>
->> +#include <linux/module.h>
->> +#include <linux/init.h>
-> 
-> Do you need this one?
-> 
->> +#include <linux/regulator/driver.h>
->> +#include <linux/regulator/machine.h>
-> 
-> And this one?
-> 
->> +#include <linux/regulator/of_regulator.h>
->> +#include <linux/regmap.h>
-> 
-> Sort alphabetically please.
-> 
->> +
->> +#define SY8106A_REG_VOUT1_SEL          0x01
->> +#define SY8106A_REG_VOUT_COM           0x02
->> +#define SY8106A_REG_VOUT1_SEL_MASK     0x7f
->> +#define SY8106A_DISABLE_REG            0x01
-> 
-> BIT(0) would be clearer.
-> 
->> +
->> +struct sy8106a {
->> +       struct regulator_dev *rdev;
->> +       struct regmap *regmap;
->> +};
->> +
->> +static const struct regmap_config sy8106a_regmap_config = {
->> +       .reg_bits = 8,
->> +       .val_bits = 8,
->> +};
->> +
->> +static int sy8106a_set_voltage_sel(struct regulator_dev *rdev, unsigned sel)
->> +{
->> +       return regmap_update_bits(rdev->regmap, rdev->desc->vsel_reg,
->> +                                 0xff, sel | 0x80);
-> 
-> Can you use .apply_bit / .apply_reg with regulator_set_voltage_sel_regmap?
+Quoting Maxime Ripard (2016-06-07 13:41:53)
+> +static SUNXI_CCU_NKMP_WITH_GATE_LOCK(pll_cpux_clk, "pll-cpux",
+> +                                    "osc24M", 0x000,
+> +                                    8, 5,      /* N */
+> +                                    4, 2,      /* K */
+> +                                    0, 2,      /* M */
+> +                                    16, 2,     /* P */
+> +                                    BIT(31),   /* gate */
+> +                                    BIT(28),   /* lock */
+> +                                    0);
 
-I understand the code savings, but I'd rather avoid that, because it
-would involve 2 needless readouts and rewrites of the voltage setting
-register. I'd rather change this to regmap_write, so that the regulator
-only receives writes over I2C, to minimize possibility of bit flip error
-by minimizing the communication over the I2C bus.
+I'm more of a fan of expanding the struct with designated initializers
+versus macro use, but that's only personal preference.
 
->> +}
->> +
->> +static const struct regulator_ops sy8106a_ops = {
->> +       .is_enabled = regulator_is_enabled_regmap,
->> +       .set_voltage_sel = sy8106a_set_voltage_sel,
->> +       .set_voltage_time_sel = regulator_set_voltage_time_sel,
->> +       .get_voltage_sel = regulator_get_voltage_sel_regmap,
->> +       .list_voltage = regulator_list_voltage_linear,
->> +};
->> +
->> +/* Default limits measured in millivolts and milliamps */
->> +#define SY8106A_MIN_MV         680
->> +#define SY8106A_MAX_MV         1950
->> +#define SY8106A_STEP_MV                10
->> +
->> +static const struct regulator_desc sy8106a_reg = {
->> +       .name = "SY8106A",
->> +       .id = 0,
->> +       .ops = &sy8106a_ops,
->> +       .type = REGULATOR_VOLTAGE,
->> +       .n_voltages = ((SY8106A_MAX_MV - SY8106A_MIN_MV) / SY8106A_STEP_MV) + 1,
->> +       .min_uV = (SY8106A_MIN_MV * 1000),
->> +       .uV_step = (SY8106A_STEP_MV * 1000),
->> +       .vsel_reg = SY8106A_REG_VOUT1_SEL,
->> +       .vsel_mask = SY8106A_REG_VOUT1_SEL_MASK,
->> +       .enable_reg = SY8106A_REG_VOUT_COM,
->> +       .enable_mask = SY8106A_DISABLE_REG,
->> +       .disable_val = SY8106A_DISABLE_REG,
->> +       .enable_is_inverted = 1,
->> +       .owner = THIS_MODULE,
->> +};
->> +
->> +/*
->> + * I2C driver interface functions
->> + */
->> +static int sy8106a_i2c_probe(struct i2c_client *i2c,
->> +                           const struct i2c_device_id *id)
->> +{
->> +       struct sy8106a *chip;
->> +       struct device *dev = &i2c->dev;
->> +       struct regulator_dev *rdev = NULL;
->> +       struct regulator_config config = { };
->> +       unsigned int selector;
->> +       int error;
->> +
->> +       chip = devm_kzalloc(&i2c->dev, sizeof(struct sy8106a), GFP_KERNEL);
->> +       if (!chip)
->> +               return -ENOMEM;
->> +
->> +       chip->regmap = devm_regmap_init_i2c(i2c, &sy8106a_regmap_config);
->> +       if (IS_ERR(chip->regmap)) {
->> +               error = PTR_ERR(chip->regmap);
->> +               dev_err(&i2c->dev, "Failed to allocate register map: %d\n",
->> +                       error);
->> +               return error;
->> +       }
->> +
->> +       config.dev = &i2c->dev;
->> +       config.init_data = of_get_regulator_init_data(dev, dev->of_node, &sy8106a_reg);
-> 
-> Check for possible failures?
-> 
->> +       config.driver_data = chip;
->> +       config.regmap = chip->regmap;
->> +       config.of_node = dev->of_node;
->> +
->> +       /* Probe regulator */
->> +       error = regmap_read(chip->regmap, SY8106A_REG_VOUT1_SEL, &selector);
->> +       dev_info(&i2c->dev, "SY8106A voltage at boot: %u mV\n", SY8106A_MIN_MV + SY8106A_STEP_MV * (selector & SY8106A_REG_VOUT1_SEL_MASK));
->> +       if (error) {
->> +               dev_err(&i2c->dev, "Failed to read voltage at probe time: %d\n", error);
->> +               return error;
->> +       }
->> +
->> +       rdev = devm_regulator_register(&i2c->dev, &sy8106a_reg, &config);
->> +       if (IS_ERR(rdev)) {
->> +               dev_err(&i2c->dev, "Failed to register SY8106A regulator\n");
->> +               return PTR_ERR(rdev);
->> +       }
->> +
->> +       chip->rdev = rdev;
->> +
->> +       i2c_set_clientdata(i2c, chip);
->> +
->> +       return 0;
->> +}
->> +
->> +static const struct i2c_device_id sy8106a_i2c_id[] = {
->> +       {"sy8106a", 0},
->> +       {},
->> +};
->> +
-> 
-> Extra line.
-> 
->> +MODULE_DEVICE_TABLE(i2c, sy8106a_i2c_id);
-> 
-> IMHO probing explicitly through DT (of_device_id) would be better.
+> +static const char * const ahb2_parents[] = { "ahb1" , "pll-periph0" };
+> +static struct ccu_mux ahb2_clk = {
+> +       .mux            = {
+> +               .shift  = 0,
+> +               .width  = 1,
+> +
+> +               .fixed_prediv   = {
+> +                       .index  = 1,
+> +                       .div    = 2,
+> +               },
+> +       },
+> +
+> +       .common         = {
+> +               .reg            = 0x05c,
+> +               .features       = CCU_FEATURE_FIXED_PREDIV,
+> +               .hw.init        = SUNXI_HW_INIT_PARENTS("ahb2",
+> +                                                       ahb2_parents,
 
-I checked out a few recently added i2c regulator drivers, and this is
-the way they're written. I'd rather not differ, especially since I'm a
-beginner with this thing, atm. Also, I'm not sure what chanhge in
-particular you're suggesting.
+Note that it's possible to initialize the parent strings here if you
+prefer:
 
-thanks,
-  Ondrej
+	.hw.init = &(struct clk_init_data){
+		   .parent_names = (const char *[]){ "ahb1",
+		   				     "pll-periph0" };
 
-> 
-> Regards
-> ChenYu
-> 
->> +
->> +static struct i2c_driver sy8106a_regulator_driver = {
->> +       .driver = {
->> +               .name = "sy8106a",
->> +       },
->> +       .probe = sy8106a_i2c_probe,
->> +       .id_table = sy8106a_i2c_id,
->> +};
->> +
->> +module_i2c_driver(sy8106a_regulator_driver);
->> +
->> +MODULE_AUTHOR("Ond?ej Jirman <megous@megous.com>");
->> +MODULE_DESCRIPTION("Regulator device driver for Silergy SY8106A");
->> +MODULE_LICENSE("GPL v2");
->> --
->> 2.9.0
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Similar to the above, no big deal, just an observation.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160625/20827ebc/attachment.sig>
+> +static struct ccu_common *sun8i_h3_ccu_clks[] = {
+> +       [CLK_PLL_CPUX]          = &pll_cpux_clk.common,
+> +       [CLK_PLL_AUDIO_BASE]    = &pll_audio_base_clk.common,
+> +       [CLK_PLL_AUDIO]         = &pll_audio_clk.common,
+
+OK, it looks like you followed the qcom clk driver approach here, which
+is a nice way to do things. However, as Stephen alluded to in his
+response to the cover letter, the clk_hw_* api's are an even more
+friendly interface for clock providers. For example, check out the gxbb
+clk driver probe:
+
+	static int gxbb_clkc_probe(struct platform_device *pdev)
+	{
+		void __iomem *clk_base;
+		int ret, clkid, i;
+		struct device *dev = &pdev->dev;
+	
+		/*  Generic clocks and PLLs */
+		clk_base = of_iomap(dev->of_node, 0);
+		if (!clk_base) {
+			pr_err("%s: Unable to map clk base\n", __func__);
+			return -ENXIO;
+		}
+	
+		/* Populate base address for PLLs */
+		for (i = 0; i < ARRAY_SIZE(gxbb_clk_plls); i++)
+			gxbb_clk_plls[i]->base = clk_base;
+	
+		/* Populate base address for MPLLs */
+		for (i = 0; i < ARRAY_SIZE(gxbb_clk_mplls); i++)
+			gxbb_clk_mplls[i]->base = clk_base;
+
+		...
+
+		/*
+		 * register all clks
+		 */
+		for (clkid = 0; clkid < NR_CLKS; clkid++) {
+			ret = devm_clk_hw_register(dev, gxbb_hw_onecell_data.hws[clkid]);
+			if (ret)
+				goto iounmap;
+		}
+
+The nice thing about struct ccu_common is that you don't have to walk
+the list of clocks for each separate clock type like the above probe
+function does. I'm still thinking of the best way to solve this
+generically. Maybe add a .base member struct clk_hw? I dunno, and I've
+resisted the urge to add stuff to struct clk_hw in the past... But I
+really want to minimize this .probe as much as possible, and I do not
+want every clock provider driver to be forced to invent something like
+struct ccu_common every time. Anyways, that is not a blocker for your
+implementation to be merged, but Stephen's question in patch #4 got me
+thinking about this again...
+
+The real nice part is the call to devm_clk_hw_register. That uses the
+new clk_hw_* apis and struct clk_hw_onecell_data, which is initialized
+statically like so:
+
+	static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
+		.hws = {
+			[CLKID_SYS_PLL]	     = &gxbb_sys_pll.hw,
+			[CLKID_CPUCLK]	      = &gxbb_cpu_clk.hw,
+			...
+		},
+		.num = NR_CLKS,
+	};
+
+Unfortunately I believe it impossible to replace NR_CLKS with some
+ARRAY_SIZE stuff because C. As Stephen mentioned, please use this method
+instead.
+
+> diff --git a/include/dt-bindings/clock/sun8i-h3.h b/include/dt-bindings/clock/sun8i-h3.h
+> new file mode 100644
+> index 000000000000..96eced56e7a2
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/sun8i-h3.h
+> @@ -0,0 +1,162 @@
+> +#ifndef _DT_BINDINGS_CLK_SUN8I_H3_H_
+> +#define _DT_BINDINGS_CLK_SUN8I_H3_H_
+> +
+> +#define CLK_PLL_CPUX           0
+> +#define CLK_PLL_AUDIO_BASE     1
+> +#define CLK_PLL_AUDIO          2
+> +#define CLK_PLL_AUDIO_2X       3
+> +#define CLK_PLL_AUDIO_4X       4
+
+Are you sure you want to expose all of these clocks as part of the ABI?
+I exposed the bare minimum clocks for the gxbb driver in the DT shared
+header (we can always add more later) and kept the rest internal to the
+kernel source.
+
+A side benefit of this is that NR_CLKS can live inside the kernel and
+not be part of the binding.
+
+Otherwise this series looks really great. Thanks for tackling such a
+huge task!
+
+Regards,
+Mike
