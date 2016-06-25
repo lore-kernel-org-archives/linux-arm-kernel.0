@@ -1,48 +1,40 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Sat, 25 Jun 2016 17:23:12 +0200
-Subject: [PATCH v2 01/14] ARM: clk: sunxi: Add driver for the H3 THS clock
-In-Reply-To: <20160625071338.GC4000@lukather>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-2-megous@megous.com> <20160625071338.GC4000@lukather>
-Message-ID: <6a37450f-35fe-3296-da4b-10f7d645e2b9@megous.com>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Sat, 25 Jun 2016 09:20:40 -0700
+Subject: orion5x: initrd fails to load due to reserved memory
+Message-ID: <20160625162040.GA15367@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+I ported Debian to the HP Media Vault mv2120 (based on orion5x) many
+years ago.  Debian stable (jessie), based on 3.16 kernel, works fine.
+A user told me a few months ago that the version of Debian currently
+in development (based on 4.6) doesn't boot.
 
-I try to base everything on the torvalds's kernel.
+The boot loader loads the kernel to 0x400000 and the ramdisk 0x200000
+after that location, i.e. at 0x600000:
 
-I did notice the patches. Is there some main git tree/branch where this
-work is tracked in? I'd gladly use it.
+Booting the image (@ 0x400000) with RamDisk (@ 0x600000)...
 
-Also there's a PLL1 rate application patch, that would need to be ported
-to the new CCU code, in the case I would use it as a base for this work.
-Given that the new CCU code is your work and it's fresh in your mind, do
-you have suggestion how to approach it?
+Unfortunately, with 4.x, this leads to:
 
-It is [PATCH v2 06/14] in this series.
+INITRD: 0x00600040+0x00727f12 overlaps in-use memory region - disabling initrd
 
-regards,
-  o.
+Interestingly, when I change the load address to 0x500000/0x700000 it
+boots fine (even though this is spanning 0x600000).
 
-On 25.6.2016 09:13, Maxime Ripard wrote:
-> Hi,
-> 
-> On Sat, Jun 25, 2016 at 05:44:58AM +0200, megous at megous.com wrote:
->> From: Josef Gajdusek <atx@atx.name>
->>
->> This patch adds a driver for the THS clock which is present on the
->> Allwinner H3.
->>
->> Signed-off-by: Josef Gajdusek <atx@atx.name>
-> 
-> You might not have noticed, but we are currently rewriting the whole
-> clock support for the Allwinner SoCs, targetting the H3 as the first
-> SoC to use it.
-> 
-> There's already some support for the H3 THS clock, so please use that
-> instead.
-> 
-> Thanks!
-> Maxime
-> 
+I've no idea how memory management works or how to find out who is
+reserving that memory region, but I'm wondering if there's some
+solution.  For example, would it be possible to express somehow in the
+mv2120 board file that this memory region must be available for the
+boot loader?
+
+FWIW, if someone has serial console access, this can be fixed easily
+because $loadAddr is used from the u-boot environment (0x400000 is
+merely the default).  However, in the past you didn't need serial
+console access too boot Debian so I wonder if there's a possible
+kernel fixed.  (OTOH, I don't know how many users there are left given
+how old this device is.)
+
+-- 
+Martin Michlmayr
+http://www.cyrius.com/
