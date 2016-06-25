@@ -1,551 +1,446 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Sat, 25 Jun 2016 10:54:20 -0700
-Subject: [PATCH v4 3/4] perf: xgene: Add APM X-Gene SoC Performance
- Monitoring Unit driver
-In-Reply-To: <20160623143201.GI8836@leverpostej>
-References: <1466618819-2697-1-git-send-email-ttnguyen@apm.com>
- <1466618819-2697-4-git-send-email-ttnguyen@apm.com>
- <20160623143201.GI8836@leverpostej>
-Message-ID: <CACgAJHyprybnpQuKqvD9rXstQBwoeVG+uGtEBp-pppcfSGMKgQ@mail.gmail.com>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Sat, 25 Jun 2016 12:46:25 -0700
+Subject: orion5x: initrd fails to load due to reserved memory
+In-Reply-To: <20160625171615.GC1041@n2100.armlinux.org.uk>
+References: <20160625162040.GA15367@jirafa.cyrius.com>
+ <20160625171615.GC1041@n2100.armlinux.org.uk>
+Message-ID: <20160625194625.GA16705@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+* Russell King - ARM Linux <linux@armlinux.org.uk> [2016-06-25 18:16]:
+> > The boot loader loads the kernel to 0x400000 and the ramdisk 0x200000
+> > after that location, i.e. at 0x600000:
+> 
+> So you're giving the kernel zImage just 2MB here.  How large is the
+> 4.6 zImage?  Does the zImage have a dtb appended?
 
-On Thu, Jun 23, 2016 at 7:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->
-> Hi,
->
-> On Wed, Jun 22, 2016 at 11:06:58AM -0700, Tai Nguyen wrote:
-> > diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-> > index 04e2653..be597dd 100644
-> > --- a/drivers/perf/Kconfig
-> > +++ b/drivers/perf/Kconfig
-> > @@ -12,4 +12,11 @@ config ARM_PMU
-> >         Say y if you want to use CPU performance monitors on ARM-based
-> >         systems.
-> >
-> > +config XGENE_PMU
-> > +        depends on PERF_EVENTS && ARCH_XGENE
-> > +        bool "APM SoC X-Gene PMU"
->
-> Nit: make this "APM X-Gene SoC PMU"
+This device uses a board file so there's no DTB (but DTB is enabled in
+the kernel because of other devices).
 
-Okay
+We have 64 bytes for the u-boot header, 8 bytes to set the correct
+machine ID and then the zImage.  We ensure everything is < 2 MB.
+The zImage itself is around 2022912 bytes.
 
->
->
-> > +        default n
-> > +        help
-> > +          Say y if you want to use APM X-Gene SOC performance monitors.
->
-> Nit: s/SOC/SoC/ for consistency.
->
+Anyway, I don't think the problem is that the kernel is too large.
+This u-boot always loads the ramdisk 2 MB after the kernel, and
+setting 0x0500000 as loadAddr (therefore 0x0700000 for the initrd)
+works fine.
 
-Okay
+> > Booting the image (@ 0x400000) with RamDisk (@ 0x600000)...
+> > 
+> > Unfortunately, with 4.x, this leads to:
+> > 
+> > INITRD: 0x00600040+0x00727f12 overlaps in-use memory region - disabling initrd
+> 
+> Right, so the kernel worked out that something else overwrote the
+> initramfs.  If you boot with memblock=debug, and memblock should
+> dump out the memory and reserved regions.
 
-> [...]
->
-> > +#include <linux/acpi.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/cpumask.h>
-> > +#include <linux/efi.h>
->
-> Looking at the driver, I don't see any reason you need linux/efi.h, and
-> I can't imagine why this driver would care about EFI. Please drop that
-> include.
->
-> The other includes look fine.
+Thanks.  I've attached logs with loadAddr=0x0400000 (the default,
+which fails) and loadAddr=0x0500000 (which boots fine).
 
-You're right. I'll drop it.
+I don't know how to interpret the log but it seems with 0x0500000 it
+reserves the right memory for the ramdisk whereas with 0x0400000 it
+complains about the initrd space being reserved.
 
->
-> > +#define PMU_MAX_COUNTERS     4
-> > +#define PMU_CNT_MAX_VAL              0x100000000ULL
->
-> I was a little confused by this. Please s/VAL/PERIOD/ (as the maximum
-> *value* will be 0xFFFFFFFF).
+In case it's relevant, a few words about the boot process on this
+device.  There are 2 ways to boot:
 
-Okay, I'll change it
+1) You can send an image to the device via the network.  This image is
+taken by the boot loader and split after 2 MB.  The first 2 MB have to
+consist of the kernel (with u-boot header).  The second part is the
+ramdisk (with u-boot header).  This is not a u-boot multi image.
+These are two images concatenated into one file.  In Debian, we
+prepend the zImage with the magic to set the machine ID, create the
+u-boot image and then pad the image so it's exactly 2 MB.  We then add
+a u-boot header to the ramdisk and append it to the 2MB kernel file to
+create one boot image.
 
->
-> > +#define _GET_CNTR(ev)     (ev->hw.extra_reg.reg)
-> > +#define _GET_EVENTID(ev)  (ev->hw.config & 0xFFULL)
-> > +#define _GET_AGENTID(ev)  (ev->hw.extra_reg.config & 0xFFFFFFFFULL)
-> > +#define _GET_AGENT1ID(ev) ((ev->hw.extra_reg.config >> 32) & 0xFFFFFFFFULL)
->
-> I don't think you need to use the extra_reg fields for this. It's a
-> little bit confusing to use them, as the extra_reg (and branch_reg)
-> fields are for separately allocated PMU state.
->
-> _GET_CNTR can use hw_perf_event::idx,  and _GET_AGENT*_ID can use
-> config_base.
+2) When the device boots from disk, it loads a u-boot multi image.  In
+that case, we don't pad the kernel.  We get:
+   Contents:
+   Image 0:  2023264 Bytes =  1.9 MB
+   Image 1:  3921850 Bytes =  3.7 MB
+Unfortunately, that also doesn't boot:
+INITRD: 0x005edfac+0x003bd7ba overlaps in-use memory region - disabling initrd
 
-I need a 64 bit field for GET_AGENT*ID. The config_base is only 32 bit.
-Can you please suggest another field?
-For _GET_CNTR, yes I'll use hw::idx.
+Again, changing the load address for ext2load works.
 
->
-> > +struct xgene_pmu_dev {
-> > +     struct hw_pmu_info *inf;
-> > +     struct xgene_pmu *parent;
-> > +     struct pmu pmu;
-> > +     u8 max_counters;
-> > +     DECLARE_BITMAP(cntr_assign_mask, PMU_MAX_COUNTERS);
-> > +     raw_spinlock_t lock;
-> > +     u64 max_period;
-> > +     const struct attribute_group **attr_groups;
-> > +     struct perf_event *pmu_counter_event[4];
-> > +};
->
-> I believe that the 4 should be PMU_MAX_COUNTERS, to match the bitmap.
->
-
-Will fix it.
-
-> [...]
->
-> > +#define XGENE_PMU_FORMAT_ATTR(_name, _config) \
-> > +     struct dev_ext_attribute pmu_format_attr_##_name = \
-> > +             { __ATTR(_name, S_IRUGO, xgene_pmu_format_show, NULL), _config }
-> > +
-> > +static XGENE_PMU_FORMAT_ATTR(l3c_eventid, "config:0-7");
-> > +static XGENE_PMU_FORMAT_ATTR(l3c_agentid, "config1:0-9");
-> > +static XGENE_PMU_FORMAT_ATTR(iob_eventid, "config:0-7");
-> > +static XGENE_PMU_FORMAT_ATTR(iob_agentid, "config1:0-63");
-> > +static XGENE_PMU_FORMAT_ATTR(mcb_eventid, "config:0-5");
-> > +static XGENE_PMU_FORMAT_ATTR(mcb_agentid, "config1:0-9");
-> > +static XGENE_PMU_FORMAT_ATTR(mc_eventid, "config:0-28");
-> > +
-> > +static const struct attribute *l3c_pmu_format_attrs[] = {
-> > +     &pmu_format_attr_l3c_eventid.attr.attr,
-> > +     &pmu_format_attr_l3c_agentid.attr.attr,
-> > +     NULL,
-> > +};
-> > +
-> > +static const struct attribute *iob_pmu_format_attrs[] = {
-> > +     &pmu_format_attr_iob_eventid.attr.attr,
-> > +     &pmu_format_attr_iob_agentid.attr.attr,
-> > +     NULL,
-> > +};
-> > +
-> > +static const struct attribute *mcb_pmu_format_attrs[] = {
-> > +     &pmu_format_attr_mcb_eventid.attr.attr,
-> > +     &pmu_format_attr_mcb_agentid.attr.attr,
-> > +     NULL,
-> > +};
-> > +
-> > +static const struct attribute *mc_pmu_format_attrs[] = {
-> > +     &pmu_format_attr_mc_eventid.attr.attr,
-> > +     NULL,
-> > +};
->
-> As mentioned before, you can use compound literals for these and avoid
-> the redundancy. There is a trick to this, which I didn't explain last
-> time. You need to update XGENE_PMU_FORMAT_ATTR to match what we do in
-> the arm-cci driver for CCI_EXT_ATTR_ENTRY, using a single element array
-> to allow the compiler to statically allocate an anonymous struct and
-> generate a pointer to a sub-field at compile time. e.g.
->
-> #define XGENE_PMU_FORMAT_ATTR(_name, _config)                                           \
->         &((struct dev_ext_attribute[]) {                                                \
->                 { __ATTR(_name, S_IRUGO, xgene_pmu_format_show, NULL), _config }        \
->         })[0].attr.attr
->
-> static struct attribute *l3c_pmu_format_attrs[] = {
->         XGENE_PMU_FORMAT_ATTR(l3c_eventid, "config:0-7"),
->         XGENE_PMU_FORMAT_ATTR(l3c_agentid, "config1:0-9"),
->         NULL,
-> };
-
-Thanks, I'll make change as per your suggestion.
-
->
-> > +static const struct attribute_group l3c_pmu_format_attr_group = {
-> > +     .name = "format",
-> > +     .attrs = (struct attribute **) l3c_pmu_format_attrs,
-> > +};
->
-> I see based on that suspicious cast that attribute_group::attrs isn't
-> const, and so we're throwing away the constness of
-> xgene_pmu_cpumask_attrs here. I didn't realise that when I suggested
-> making the structures const; sorry for the bad advice in the last round
-> of review.
->
-> Forcefully casting away const isn't a great idea. For the timebeing,
-> please drop any casts which throw away const, and remove the instances
-> of const that made those necessary.
->
-
-Yes, I agree.
-
-> > +#define XGENE_PMU_EVENT_ATTR(_name) \
-> > +             __ATTR(_name, S_IRUGO, xgene_pmu_event_show, NULL)
-> > +#define XGENE_PMU_EVENT(_name, _config) { \
-> > +             .attr = XGENE_PMU_EVENT_ATTR(_name), \
-> > +             .config = _config, }
-> > +
-> > +static const struct xgene_pmu_event l3c_pmu_events[] = {
-> > +     XGENE_PMU_EVENT(cycle-count,                    0x00),
-> > +     XGENE_PMU_EVENT(cycle-count-div-64,             0x01),
-> > +     XGENE_PMU_EVENT(read-hit,                       0x02),
-> > +     XGENE_PMU_EVENT(read-miss,                      0x03),
-> > +     XGENE_PMU_EVENT(write-need-replacement,         0x06),
-> > +     XGENE_PMU_EVENT(write-not-need-replacement,     0x07),
-> > +     XGENE_PMU_EVENT(tq-full,                        0x08),
-> > +     XGENE_PMU_EVENT(ackq-full,                      0x09),
-> > +     XGENE_PMU_EVENT(wdb-full,                       0x0a),
-> > +     XGENE_PMU_EVENT(bank-fifo-full,                 0x0b),
-> > +     XGENE_PMU_EVENT(odb-full,                       0x0c),
-> > +     XGENE_PMU_EVENT(wbq-full,                       0x0d),
-> > +     XGENE_PMU_EVENT(bank-conflict-fifo-issue,       0x0e),
-> > +     XGENE_PMU_EVENT(bank-fifo-issue,                0x0f),
-> > +};
->
-> [...]
->
-> > +/* Populated in xgene_pmu_probe */
-> > +static struct attribute *l3c_pmu_events_attrs[ARRAY_SIZE(l3c_pmu_events) + 1];
-> > +static struct attribute *iob_pmu_events_attrs[ARRAY_SIZE(iob_pmu_events) + 1];
-> > +static struct attribute *mcb_pmu_events_attrs[ARRAY_SIZE(mcb_pmu_events) + 1];
-> > +static struct attribute *mc_pmu_events_attrs[ARRAY_SIZE(mc_pmu_events) + 1];
->
-> As with the other attributes above, please use the CCI_EXT_ATTR_ENTRY
-> trick to initialise these at compile time, rather than initialising this
-> in xgene_pmu_probe. e.g.
->
-> #define XGENE_PMU_EVENT_ATTR(_name, _config)                                    \
->         &((struct xgene_pmu_event[]) {{                                         \
->                 .attr = __ATTR(_name, S_IRUGO, xgene_pmu_event_show, NULL),     \
->                 .config = _config,                                              \
->         }})[0].attr.attr
->
-> static struct attribute *l3c_pmu_events_attrs[] = {
->         XGENE_PMU_EVENT_ATTR(cycle-count,                       0x00),
->         XGENE_PMU_EVENT_ATTR(cycle-count-div-64,                0x01),
->         XGENE_PMU_EVENT_ATTR(read-hit,                          0x02),
->         XGENE_PMU_EVENT_ATTR(read-miss,                         0x03),
->         XGENE_PMU_EVENT_ATTR(write-need-replacement,            0x06),
->         XGENE_PMU_EVENT_ATTR(write-not-need-replacement,        0x07),
->         XGENE_PMU_EVENT_ATTR(tq-full,                           0x08),
->         XGENE_PMU_EVENT_ATTR(ackq-full,                         0x09),
->         XGENE_PMU_EVENT_ATTR(wdb-full,                          0x0a),
->         XGENE_PMU_EVENT_ATTR(bank-fifo-full,                    0x0b),
->         XGENE_PMU_EVENT_ATTR(odb-full,                          0x0c),
->         XGENE_PMU_EVENT_ATTR(wbq-full,                          0x0d),
->         XGENE_PMU_EVENT_ATTR(bank-conflict-fifo-issue,          0x0e),
->         XGENE_PMU_EVENT_ATTR(bank-fifo-issue,                   0x0f),
->         NULL,
-> };
-
-Got it. I'll do the same as format attribute groups
-
->
-> > +     /*
-> > +      * Each bit of the config1 field represents an agent from which the
-> > +      * request of the event come. The event is counted only if it's caused
-> > +      * by a request of an agent has the bit set.
-> > +      * By default, the event is counted for all agents.
-> > +      */
-> > +     if (config1)
-> > +             hwc->extra_reg.config = config1;
-> > +     else
-> > +             hwc->extra_reg.config = 0xFFFFFFFFFFFFFFFFULL;
->
-> Previously I asked you to invert the meaning of this, such that the
-> default would be to match all masters.
->
-> I understand that in HW, you need to write 0xFFFFFFFFFFFFFFFF to match
-> all masters, as you mentioned in your last reply. The simple way to
-> handle that is to bitwise invert the value when writing it to HW , i.e.
-> write ~(hwc->extra_reg.config). Please do so, updating the documentation
-> appropriately.
->
-
-Okay. I'll do so.
-
-> [...]
->
-> > +static int xgene_perf_add(struct perf_event *event, int flags)
-> > +{
-> > +     struct xgene_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
-> > +     struct hw_perf_event *hw = &event->hw;
-> > +
-> > +     event->hw.state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
->
-> Please either use event->hw.field or hw->field consistently.
-
-Okay, will fix it consistently.
-
->
-> > +
-> > +     /* Allocate an event counter */
-> > +     hw->idx = get_next_avail_cntr(pmu_dev);
-> > +     if (hw->idx < 0)
-> > +             return -EAGAIN;
-> > +
-> > +     event->hw.extra_reg.reg = (u16) hw->idx;
->
-> That cast shouldn't be necessary, given idx will be between 0 and 4, and
-> reg is an unsigned int.
->
-> Given this is already in hw->idx, what is the benefit of duplicating this?
->
-> You can get rid of this line if you change _GET_CNTR to return
-> ev->hw.idx.
-
-Yes, I'll fix it.
-
->
-> > +
-> > +     if (flags & PERF_EF_START)
-> > +             xgene_perf_start(event, PERF_EF_RELOAD);
-> > +
-> > +     /* Update counter event pointer for Interrupt handler */
-> > +     pmu_dev->pmu_counter_event[hw->idx] = event;
->
-> Are interrupts guaranteed to be disabled here, or should these be
-> swapped? Otherwise, what happens if an interrupt comes in before we
-> updated this pointer?
-
-Right. Naturally, this should be updated before starting perf event.
-I'll swap these. Thanks for catching it.
-
->
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static void xgene_perf_del(struct perf_event *event, int flags)
-> > +{
-> > +     struct xgene_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
-> > +
-> > +     xgene_perf_stop(event, PERF_EF_UPDATE);
-> > +
-> > +     /* clear the assigned counter */
-> > +     clear_avail_cntr(pmu_dev, _GET_CNTR(event));
-> > +
-> > +     perf_event_update_userpage(event);
-> > +}
->
-> It would be a good idea to remove the dangling pmu_dev->pmu_counter_event
-> pointer, even if not strictly required.
-
-Sure, I'll reset it to NULL.
-
->
-> > +
-> > +static u64 xgene_perf_event_update(struct perf_event *event)
-> > +{
-> > +     struct xgene_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +     u64 delta, prev_raw_count, new_raw_count;
-> > +
-> > +again:
-> > +     prev_raw_count = local64_read(&hwc->prev_count);
-> > +     new_raw_count = pmu_dev->max_period;
->
-> I don't understand this. Why are we not reading the counter here?
->
-> This means that the irq handler won't be reading the counter, which
-> means we're throwing away events, and I suspect other cases are broken
-> too.
->
-
-When the overflow interrupt occurs, the PMU counter wraps to 0 and
-continues to run.
-This event_update function is called only to handle the The PMU
-counter overflow interrupt occurs.
-I'm assuming that when the overflow happens, the read back counter
-value is the max period.
-Is this assumption incorrect? Do you have any suggestion what I should
-do. Because if I read the counter register,
-it returns the minor wrapped around value.
-Or should it be: new_count = counter read + max period?
-
-> > +
-> > +     if (local64_cmpxchg(&hwc->prev_count, prev_raw_count,
-> > +                         new_raw_count) != prev_raw_count)
-> > +             goto again;
-> > +
-> > +     delta = (new_raw_count - prev_raw_count) & pmu_dev->max_period;
-> > +
-> > +     local64_add(delta, &event->count);
-> > +     local64_sub(delta, &hwc->period_left);
->
-> Given we aren't sampling, does the period left matter? It looks like
-> drivers are inconsistent w.r.t. this, and I'm not immediately sure :(
->
-
-I tried to drop it and  the perf event count still works properly for me.
-I'll remove it.
-
-> > +
-> > +     return new_raw_count;
-> > +}
-> > +
-> > +static int xgene_perf_event_set_period(struct perf_event *event)
-> > +{
-> > +     struct xgene_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +     s64 left = local64_read(&hwc->period_left);
-> > +     s64 period = hwc->sample_period;
-> > +     int ret = 0;
-> > +
-> > +     if (unlikely(left <= -period)) {
-> > +             left = period;
-> > +             local64_set(&hwc->period_left, left);
-> > +             hwc->last_period = period;
-> > +             ret = 1;
-> > +     }
-> > +
-> > +     if (unlikely(left <= 0)) {
-> > +             left += period;
-> > +             local64_set(&hwc->period_left, left);
-> > +             hwc->last_period = period;
-> > +             ret = 1;
-> > +     }
-> > +
-> > +     /*
-> > +      * Limit the maximum period to prevent the counter value
-> > +      * from overtaking the one we are about to program. In
-> > +      * effect we are reducing max_period to account for
-> > +      * interrupt latency (and we are being very conservative).
-> > +      */
-> > +     if (left > (pmu_dev->max_period >> 1))
-> > +             left = pmu_dev->max_period >> 1;
-> > +
-> > +     local64_set(&hwc->prev_count, (u64) -left);
-> > +
-> > +     xgene_pmu_write_counter(pmu_dev, hwc->idx, (u64)(-left) & 0xffffffff);
-> > +
-> > +     perf_event_update_userpage(event);
-> > +
-> > +     return ret;
-> > +}
->
-> Given the lack of sampling, I suspect that you can simply follow what
-> the arm-cci driver does, and always use exactly half a max period.
-
-Okay, I'll refer to the arm-cci driver.
-
->
-> [...]
->
-> > +static irqreturn_t _xgene_pmu_isr(int irq, struct xgene_pmu_dev *pmu_dev)
-> > +{
-> > +     struct xgene_pmu *xgene_pmu = pmu_dev->parent;
-> > +     u32 pmovsr;
-> > +     int idx;
-> > +
-> > +     pmovsr = readl(pmu_dev->inf->csr + PMU_PMOVSR) & PMU_OVERFLOW_MASK;
-> > +     /* Clear interrupt flag */
-> > +     if (xgene_pmu->version == PCP_PMU_V1)
-> > +             writel(0x0, pmu_dev->inf->csr + PMU_PMOVSR);
-> > +     else
-> > +             writel(pmovsr, pmu_dev->inf->csr + PMU_PMOVSR);
-> > +
-> > +     if (!pmovsr)
-> > +             return IRQ_NONE;
-> > +
-> > +     for (idx = 0; idx < PMU_MAX_COUNTERS; idx++) {
-> > +             struct perf_event *event = pmu_dev->pmu_counter_event[idx];
-> > +             int overflowed = pmovsr & BIT(idx);
-> > +
-> > +             /* Ignore if we don't have an event. */
-> > +             if (!event || !overflowed)
-> > +                     continue;
-> > +             xgene_perf_event_update(event);
-> > +             xgene_perf_event_set_period(event);
->
-> As I mentioned earlier, the lack of a counter read in
-> xgene_perf_event_update() means this is broken.
->
-
-Please see above.
-
-> > +     }
-> > +
-> > +     return IRQ_HANDLED;
-> > +}
-> > +
-> > +static irqreturn_t xgene_pmu_isr(int irq, void *dev_id)
-> > +{
-> > +     struct xgene_pmu_dev_ctx *ctx, *temp_ctx;
-> > +     struct xgene_pmu *xgene_pmu = dev_id;
-> > +     u32 val;
-> > +
-> > +     xgene_pmu_mask_int(xgene_pmu);
->
-> Why do you need to mask the IRQ? This handler is called in hard IRQ
-> context.
->
-
-Right. Let me change to use raw_spin_lock_irqsave here.
-
-> > +
-> > +     /* Get Interrupt PMU source */
-> > +     val = readl(xgene_pmu->pcppmu_csr + PCPPMU_INTSTATUS_REG)
-> > +           & PCPPMU_INTMASK;
->
-> I don't think you need the mask here, given you only test masks below.
-> I think that can be removed.
->
-> Otherwise, please leave the '&' dangling on the first line.
-
-Right, this is not necessary. I'll remove it.
-
->
-> > +     if (val & PCPPMU_INT_MCU) {
-> > +             list_for_each_entry_safe(ctx, temp_ctx,
-> > +                             &xgene_pmu->mcpmus, next) {
-> > +                     _xgene_pmu_isr(irq, ctx->pmu_dev);
-> > +             }
-> > +     }
-> > +     if (val & PCPPMU_INT_MCB) {
-> > +             list_for_each_entry_safe(ctx, temp_ctx,
-> > +                             &xgene_pmu->mcbpmus, next) {
-> > +                     _xgene_pmu_isr(irq, ctx->pmu_dev);
-> > +             }
-> > +     }
-> > +     if (val & PCPPMU_INT_L3C) {
-> > +             list_for_each_entry_safe(ctx, temp_ctx,
-> > +                             &xgene_pmu->l3cpmus, next) {
-> > +                     _xgene_pmu_isr(irq, ctx->pmu_dev);
-> > +             }
-> > +     }
-> > +     if (val & PCPPMU_INT_IOB) {
-> > +             list_for_each_entry_safe(ctx, temp_ctx,
-> > +                             &xgene_pmu->iobpmus, next) {
-> > +                     _xgene_pmu_isr(irq, ctx->pmu_dev);
-> > +             }
-> > +     }
-> > +
-> > +     xgene_pmu_unmask_int(xgene_pmu);
-> > +
-> > +     return IRQ_HANDLED;
-> > +}
->
-> [...]
->
-> > +     /* Populate PMU event atrribute arrays */
-> > +     for (i = 0; i < ARRAY_SIZE(l3c_pmu_events); i++)
-> > +             l3c_pmu_events_attrs[i] =
-> > +                     (struct attribute *) &l3c_pmu_events[i].attr.attr;
-> > +     for (i = 0; i < ARRAY_SIZE(iob_pmu_events); i++)
-> > +             iob_pmu_events_attrs[i] =
-> > +                     (struct attribute *) &iob_pmu_events[i].attr.attr;
-> > +     for (i = 0; i < ARRAY_SIZE(mcb_pmu_events); i++)
-> > +             mcb_pmu_events_attrs[i] =
-> > +                     (struct attribute *) &mcb_pmu_events[i].attr.attr;
-> > +     for (i = 0; i < ARRAY_SIZE(mc_pmu_events); i++)
-> > +             mc_pmu_events_attrs[i] =
-> > +                     (struct attribute *) &mc_pmu_events[i].attr.attr;
->
-> As mentioend earlier, you can do this at compile time. Please do.
-
-Yes, I'll do so.
-
-Thanks,
 -- 
-Tai
+Martin Michlmayr
+http://www.cyrius.com/
+-------------- next part --------------
+Recovery Image received (9601362 bytes).
+Booting the image (@ 0x400000) with RamDisk (@ 0x600000)...
+## Booting image at 00400000 ...
+   Image Name:   Debian kernel
+   Created:      2016-06-25  19:21:58 UTC
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    2097088 Bytes =  2 MB
+   Load Address: 01000040
+   Entry Point:  01000040
+   Verifying Checksum ... OK
+OK
+## Loading Ramdisk Image at 00600000 ...
+   Image Name:   Debian installer
+   Created:      2016-06-25   1:11:48 UTC
+   Image Type:   ARM Linux RAMDisk Image (uncompressed)
+   Data Size:    7503634 Bytes =  7.2 MB
+   Load Address: 00000000
+   Entry Point:  00000000
+   Verifying Checksum ... OK
+
+Starting kernel ...
+
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.6.0-1-marvell (debian-kernel at lists.debian.org) (gcc version 5.4.0 20160609 (Debian 5.4.0-4) ) #1 Debian 4.6.2-1 (2016-06-15)
+[    0.000000] CPU: Feroceon [41069260] revision 0 (ARMv5TEJ), cr=a005317f
+[    0.000000] CPU: VIVT data cache, VIVT instruction cache
+[    0.000000] Machine: HP Media Vault mv2120
+[    0.000000] Clearing invalid memory bank 0KB at 0xffffffff
+[    0.000000] Clearing invalid memory bank 0KB at 0xffffffff
+[    0.000000] Clearing invalid memory bank 0KB at 0xffffffff
+[    0.000000] Ignoring unrecognised tag 0x00000000
+[    0.000000] Ignoring unrecognised tag 0x00000000
+[    0.000000] Ignoring unrecognised tag 0x00000000
+[    0.000000] Ignoring unrecognised tag 0x41000403
+[    0.000000] memblock_reserve: [0x00000000008200-0x0000000060646f] flags 0x0 arm_memblock_init+0x20/0x17c
+[    0.000000] INITRD: 0x00600040+0x00727f12 overlaps in-use memory region - disabling initrd
+[    0.000000] memblock_reserve: [0x00000000004000-0x00000000007fff] flags 0x0 arm_memblock_init+0x110/0x17c
+[    0.000000] MEMBLOCK configuration:
+[    0.000000]  memory size = 0x8000000 reserved size = 0x602270
+[    0.000000]  memory.cnt  = 0x1
+[    0.000000]  memory[0x0]	[0x00000000000000-0x00000007ffffff], 0x8000000 bytes flags: 0x0
+[    0.000000]  reserved.cnt  = 0x2
+[    0.000000]  reserved[0x0]	[0x00000000004000-0x00000000007fff], 0x4000 bytes flags: 0x0
+[    0.000000]  reserved[0x1]	[0x00000000008200-0x0000000060646f], 0x5fe270 bytes flags: 0x0
+[    0.000000] Memory policy: Data cache writeback
+[    0.000000] memblock_reserve: [0x00000007ffe000-0x00000007ffffff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffd000-0x00000007ffdfff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffcfb0-0x00000007ffcfff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffcf88-0x00000007ffcfaf] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffcf60-0x00000007ffcf87] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffb000-0x00000007ffbfff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffa000-0x00000007ffafff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ff9000-0x00000007ff9fff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 1048576 bytes align=0x0 nid=0 from=0x0 max_addr=0x0 alloc_node_mem_map.constprop.6+0x68/0xac
+[    0.000000] memblock_reserve: [0x00000007ef9000-0x00000007ff8fff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 16 bytes align=0x0 nid=0 from=0x0 max_addr=0x0 free_area_init_node+0x2cc/0x384
+[    0.000000] memblock_reserve: [0x00000007ffcf40-0x00000007ffcf4f] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 1024 bytes align=0x0 nid=0 from=0x0 max_addr=0x0 zone_wait_table_init+0x78/0xdc
+[    0.000000] memblock_reserve: [0x00000007ffcb40-0x00000007ffcf3f] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 32 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 setup_arch+0x4b8/0x7c0
+[    0.000000] memblock_reserve: [0x00000007ffcb20-0x00000007ffcb3f] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 36 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 start_kernel+0xbc/0x3dc
+[    0.000000] memblock_reserve: [0x00000007ffcae0-0x00000007ffcb03] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 36 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 start_kernel+0xe4/0x3dc
+[    0.000000] memblock_reserve: [0x00000007ffcaa0-0x00000007ffcac3] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 36 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 start_kernel+0x108/0x3dc
+[    0.000000] memblock_reserve: [0x00000007ffca60-0x00000007ffca83] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 4096 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_alloc_alloc_info+0x48/0x84
+[    0.000000] memblock_reserve: [0x00000007ef8000-0x00000007ef8fff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 32768 bytes align=0x1000 nid=-1 from=0x3fffffff max_addr=0x0 setup_per_cpu_areas+0x30/0x98
+[    0.000000] memblock_reserve: [0x00000007ef0000-0x00000007ef7fff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x22c/0x788
+[    0.000000] memblock_reserve: [0x00000007ffca40-0x00000007ffca43] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x24c/0x788
+[    0.000000] memblock_reserve: [0x00000007ffca20-0x00000007ffca23] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x268/0x788
+[    0.000000] memblock_reserve: [0x00000007ffca00-0x00000007ffca03] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x284/0x788
+[    0.000000] memblock_reserve: [0x00000007ffc9e0-0x00000007ffc9e3] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 120 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x4b4/0x788
+[    0.000000] memblock_reserve: [0x00000007ffc960-0x00000007ffc9d7] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 68 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x4f4/0x788
+[    0.000000] memblock_reserve: [0x00000007ffc900-0x00000007ffc943] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
+[    0.000000] Kernel command line: console=ttyS0,115200 memblock=debug
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 2048 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 alloc_large_system_hash+0x15c/0x23c
+[    0.000000] memblock_reserve: [0x00000007ffc100-0x00000007ffc8ff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 65536 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 alloc_large_system_hash+0x15c/0x23c
+[    0.000000] memblock_reserve: [0x00000007ee0000-0x00000007eeffff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 32768 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 alloc_large_system_hash+0x15c/0x23c
+[    0.000000] memblock_reserve: [0x00000007ed8000-0x00000007edffff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+[    0.000000] Memory: 123732K/131072K available (3773K kernel code, 367K rwdata, 1416K rodata, 288K init, 289K bss, 7340K reserved, 0K cma-reserved, 0K highmem)
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+[    0.000000]     vmalloc : 0xc8800000 - 0xff800000   ( 880 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc051993c   (5191 kB)
+[    0.000000]       .init : 0xc051a000 - 0xc0562000   ( 288 kB)
+[    0.000000]       .data : 0xc0562000 - 0xc05bdcb0   ( 368 kB)
+[    0.000000]        .bss : 0xc05bdcb0 - 0xc0606470   ( 290 kB)
+[    0.000000] NR_IRQS:16 nr_irqs:65 65
+[    0.000000] Switching to timer-based delay loop, resolution 6ns
+[    0.000018] sched_clock: 32 bits at 166MHz, resolution 6ns, wraps every 12884901885ns
+[   20.540490] clocksource: orion_clocksource: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 11467562657 ns
+[   20.541178] Console: colour dummy device 80x30
+[   20.541227] Calibrating delay loop (skipped), value calculated using timer frequency.. 333.33 BogoMIPS (lpj=666666)
+[   20.541263] pid_max: default: 32768 minimum: 301
+[   20.541466] Security Framework initialized
+[   20.541492] Yama: disabled by default; enable with sysctl kernel.yama.*
+[   20.541662] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
+[   20.541694] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
+[   20.543656] CPU: Testing write buffer coherency: ok
+[   20.543936] ftrace: allocating 16337 entries in 32 pages
+[   20.605349] Setting up static identity map for 0x8200 - 0x823c
+[   20.610989] devtmpfs: initialized
+[   20.613843] VFP support v0.3: not present
+[   20.614291] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[   20.614923] pinctrl core: initialized pinctrl subsystem
+[   20.618015] NET: Registered protocol family 16
+[   20.619119] DMA: preallocated 256 KiB pool for atomic coherent allocations
+[   20.621134] cpuidle: using governor ladder
+[   20.621176] cpuidle: using governor menu
+[   20.621301] Orion ID: MV88F5182-A2. TCLK=166666667.
+[   20.638236] clocksource: Switched to clocksource orion_clocksource
+[   20.680833] VFS: Disk quotas dquot_6.6.0
+[   20.680996] VFS: Dquot-cache hash table entries: 1024 (order 0, 4096 bytes)
+[   20.705261] NET: Registered protocol family 2
+[   20.707269] TCP established hash table entries: 1024 (order: 0, 4096 bytes)
+[   20.707338] TCP bind hash table entries: 1024 (order: 0, 4096 bytes)
+[   20.707392] TCP: Hash tables configured (established 1024 bind 1024)
+[   20.707562] UDP hash table entries: 256 (order: 0, 4096 bytes)
+[   20.707628] UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
+[   20.708180] NET: Registered protocol family 1
+[   20.710895] futex hash table entries: 256 (order: -1, 3072 bytes)
+[   20.711116] audit: initializing netlink subsys (disabled)
+[   20.711272] audit: type=2000 audit(0.148:1): initialized
+[   20.712421] workingset: timestamp_bits=28 max_order=15 bucket_order=0
+[   20.712799] zbud: loaded
+[   20.718786] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 251)
+[   20.719282] io scheduler noop registered
+[   20.719416] io scheduler cfq registered (default)
+[   20.720902] mv_xor mv_xor.0: Marvell shared XOR driver
+[   20.758312] mv_xor mv_xor.0: Marvell XOR (Registers Mode): ( xor cpy )
+[   20.759197] Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+[   20.761010] console [ttyS0] disabled
+[   20.781269] serial8250.0: ttyS0 at MMIO 0xf1012000 (irq = 4, base_baud = 10416666) is a 16550A
+[   21.767567] console [ttyS0] enabled
+[   21.773125] physmap platform flash device: 00080000 at f4000000
+[   21.779339] physmap-flash.0: Found 1 x16 devices at 0x0 in 8-bit bank. Manufacturer ID 0x0000c2 Chip ID 0x0000b9
+[   21.789587] Amd/Fujitsu Extended Query Table at 0x0040
+[   21.794775]   Amd/Fujitsu Extended Query version 1.0.
+[   21.799860] physmap-flash.0: JEDEC Device ID is 0xB9. Assuming broken CFI table.
+[   21.807282] physmap-flash.0: Swapping erase regions for top-boot CFI table.
+[   21.814272] number of CFI chips: 1
+[   21.818989] Creating 1 MTD partitions on "physmap-flash.0":
+[   21.824680] 0x000000000000-0x000000080000 : "firmware"
+[   21.834549] mousedev: PS/2 mouse device common for all mice
+[   21.841085] i2c /dev entries driver
+[   21.845821] rtc-pcf8563 0-0051: chip found, driver version 0.4.4
+[   21.857713] rtc-pcf8563 0-0051: rtc core: registered rtc-pcf8563 as rtc0
+[   21.868148] ledtrig-cpu: registered to indicate activity on CPUs
+[   21.875382] NET: Registered protocol family 17
+[   21.881696] registered taskstats version 1
+[   21.886179] zswap: loaded using pool lzo/zbud
+[   21.892808] rtc-pcf8563 0-0051: setting system clock to 2016-06-25 19:25:17 UTC (1466882717)
+[   21.903038] List of all partitions:
+[   21.906628] 1f00             512 mtdblock0  (driver?)
+[   21.911726] No filesystem could mount root, tried: 
+[   21.916664] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+[   21.924913] CPU: 0 PID: 1 Comm: swapper Not tainted 4.6.0-1-marvell #1 Debian 4.6.2-1
+[   21.932711] Hardware name: HP Media Vault mv2120
+[   21.937383] [<c0015fec>] (unwind_backtrace) from [<c0013024>] (show_stack+0x18/0x1c)
+[   21.945141] [<c0013024>] (show_stack) from [<c00c8048>] (panic+0xb4/0x244)
+[   21.952027] [<c00c8048>] (panic) from [<c051b298>] (mount_block_root+0x254/0x2dc)
+[   21.959512] [<c051b298>] (mount_block_root) from [<c051b4bc>] (prepare_namespace+0x124/0x184)
+[   21.968031] [<c051b4bc>] (prepare_namespace) from [<c051ae68>] (kernel_init_freeable+0x1c4/0x214)
+[   21.976910] [<c051ae68>] (kernel_init_freeable) from [<c03937ec>] (kernel_init+0x10/0xf8)
+[   21.985099] [<c03937ec>] (kernel_init) from [<c000f770>] (ret_from_fork+0x14/0x24)
+[   21.992655] ---[ end Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+[   53.834304] random: nonblocking pool is initialized
+-------------- next part --------------
+Recovery Image received (9601362 bytes).
+Booting the image (@ 0x500000) with RamDisk (@ 0x700000)...
+## Booting image at 00500000 ...
+   Image Name:   Debian kernel
+   Created:      2016-06-25  19:21:58 UTC
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    2097088 Bytes =  2 MB
+   Load Address: 01000040
+   Entry Point:  01000040
+   Verifying Checksum ... OK
+OK
+## Loading Ramdisk Image at 00700000 ...
+   Image Name:   Debian installer
+   Created:      2016-06-25   1:11:48 UTC
+   Image Type:   ARM Linux RAMDisk Image (uncompressed)
+   Data Size:    7503634 Bytes =  7.2 MB
+   Load Address: 00000000
+   Entry Point:  00000000
+   Verifying Checksum ... OK
+
+Starting kernel ...
+
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.6.0-1-marvell (debian-kernel at lists.debian.org) (gcc version 5.4.0 20160609 (Debian 5.4.0-4) ) #1 Debian 4.6.2-1 (2016-06-15)
+[    0.000000] CPU: Feroceon [41069260] revision 0 (ARMv5TEJ), cr=a005317f
+[    0.000000] CPU: VIVT data cache, VIVT instruction cache
+[    0.000000] Machine: HP Media Vault mv2120
+[    0.000000] Clearing invalid memory bank 0KB at 0xffffffff
+[    0.000000] Clearing invalid memory bank 0KB at 0xffffffff
+[    0.000000] Clearing invalid memory bank 0KB at 0xffffffff
+[    0.000000] Ignoring unrecognised tag 0x00000000
+[    0.000000] Ignoring unrecognised tag 0x00000000
+[    0.000000] Ignoring unrecognised tag 0x00000000
+[    0.000000] Ignoring unrecognised tag 0x41000403
+[    0.000000] memblock_reserve: [0x00000000008200-0x0000000060646f] flags 0x0 arm_memblock_init+0x20/0x17c
+[    0.000000] memblock_reserve: [0x00000000700040-0x00000000e27f51] flags 0x0 arm_memblock_init+0xf4/0x17c
+[    0.000000] memblock_reserve: [0x00000000004000-0x00000000007fff] flags 0x0 arm_memblock_init+0x110/0x17c
+[    0.000000] MEMBLOCK configuration:
+[    0.000000]  memory size = 0x8000000 reserved size = 0xd2a182
+[    0.000000]  memory.cnt  = 0x1
+[    0.000000]  memory[0x0]	[0x00000000000000-0x00000007ffffff], 0x8000000 bytes flags: 0x0
+[    0.000000]  reserved.cnt  = 0x3
+[    0.000000]  reserved[0x0]	[0x00000000004000-0x00000000007fff], 0x4000 bytes flags: 0x0
+[    0.000000]  reserved[0x1]	[0x00000000008200-0x0000000060646f], 0x5fe270 bytes flags: 0x0
+[    0.000000]  reserved[0x2]	[0x00000000700040-0x00000000e27f51], 0x727f12 bytes flags: 0x0
+[    0.000000] Memory policy: Data cache writeback
+[    0.000000] memblock_reserve: [0x00000007ffe000-0x00000007ffffff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffd000-0x00000007ffdfff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffcfb0-0x00000007ffcfff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffcf88-0x00000007ffcfaf] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffcf60-0x00000007ffcf87] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffb000-0x00000007ffbfff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ffa000-0x00000007ffafff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_reserve: [0x00000007ff9000-0x00000007ff9fff] flags 0x0 memblock_alloc_range_nid+0x3c/0x50
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 1048576 bytes align=0x0 nid=0 from=0x0 max_addr=0x0 alloc_node_mem_map.constprop.6+0x68/0xac
+[    0.000000] memblock_reserve: [0x00000007ef9000-0x00000007ff8fff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 16 bytes align=0x0 nid=0 from=0x0 max_addr=0x0 free_area_init_node+0x2cc/0x384
+[    0.000000] memblock_reserve: [0x00000007ffcf40-0x00000007ffcf4f] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 1024 bytes align=0x0 nid=0 from=0x0 max_addr=0x0 zone_wait_table_init+0x78/0xdc
+[    0.000000] memblock_reserve: [0x00000007ffcb40-0x00000007ffcf3f] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 32 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 setup_arch+0x4b8/0x7c0
+[    0.000000] memblock_reserve: [0x00000007ffcb20-0x00000007ffcb3f] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 36 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 start_kernel+0xbc/0x3dc
+[    0.000000] memblock_reserve: [0x00000007ffcae0-0x00000007ffcb03] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 36 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 start_kernel+0xe4/0x3dc
+[    0.000000] memblock_reserve: [0x00000007ffcaa0-0x00000007ffcac3] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 36 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 start_kernel+0x108/0x3dc
+[    0.000000] memblock_reserve: [0x00000007ffca60-0x00000007ffca83] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 4096 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_alloc_alloc_info+0x48/0x84
+[    0.000000] memblock_reserve: [0x00000007ef8000-0x00000007ef8fff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 32768 bytes align=0x1000 nid=-1 from=0x3fffffff max_addr=0x0 setup_per_cpu_areas+0x30/0x98
+[    0.000000] memblock_reserve: [0x00000007ef0000-0x00000007ef7fff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x22c/0x788
+[    0.000000] memblock_reserve: [0x00000007ffca40-0x00000007ffca43] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x24c/0x788
+[    0.000000] memblock_reserve: [0x00000007ffca20-0x00000007ffca23] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x268/0x788
+[    0.000000] memblock_reserve: [0x00000007ffca00-0x00000007ffca03] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x284/0x788
+[    0.000000] memblock_reserve: [0x00000007ffc9e0-0x00000007ffc9e3] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 120 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x4b4/0x788
+[    0.000000] memblock_reserve: [0x00000007ffc960-0x00000007ffc9d7] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] memblock_virt_alloc_try_nid: 68 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x4f4/0x788
+[    0.000000] memblock_reserve: [0x00000007ffc900-0x00000007ffc943] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
+[    0.000000] Kernel command line: console=ttyS0,115200 memblock=debug
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 2048 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 alloc_large_system_hash+0x15c/0x23c
+[    0.000000] memblock_reserve: [0x00000007ffc100-0x00000007ffc8ff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 65536 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 alloc_large_system_hash+0x15c/0x23c
+[    0.000000] memblock_reserve: [0x00000007ee0000-0x00000007eeffff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 32768 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 alloc_large_system_hash+0x15c/0x23c
+[    0.000000] memblock_reserve: [0x00000007ed8000-0x00000007edffff] flags 0x0 memblock_virt_alloc_internal+0x130/0x184
+[    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+[    0.000000] Memory: 116404K/131072K available (3773K kernel code, 367K rwdata, 1416K rodata, 288K init, 289K bss, 14668K reserved, 0K cma-reserved, 0K highmem)
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+[    0.000000]     vmalloc : 0xc8800000 - 0xff800000   ( 880 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc051993c   (5191 kB)
+[    0.000000]       .init : 0xc051a000 - 0xc0562000   ( 288 kB)
+[    0.000000]       .data : 0xc0562000 - 0xc05bdcb0   ( 368 kB)
+[    0.000000]        .bss : 0xc05bdcb0 - 0xc0606470   ( 290 kB)
+[    0.000000] NR_IRQS:16 nr_irqs:65 65
+[    0.000000] Switching to timer-based delay loop, resolution 6ns
+[    0.000018] sched_clock: 32 bits at 166MHz, resolution 6ns, wraps every 12884901885ns
+[   19.620994] clocksource: orion_clocksource: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 11467562657 ns
+[   19.621682] Console: colour dummy device 80x30
+[   19.621732] Calibrating delay loop (skipped), value calculated using timer frequency.. 333.33 BogoMIPS (lpj=666666)
+[   19.621767] pid_max: default: 32768 minimum: 301
+[   19.621970] Security Framework initialized
+[   19.621996] Yama: disabled by default; enable with sysctl kernel.yama.*
+[   19.622166] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
+[   19.622198] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
+[   19.624158] CPU: Testing write buffer coherency: ok
+[   19.624437] ftrace: allocating 16337 entries in 32 pages
+[   19.685850] Setting up static identity map for 0x8200 - 0x823c
+[   19.691490] devtmpfs: initialized
+[   19.694343] VFP support v0.3: not present
+[   19.694791] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[   19.695423] pinctrl core: initialized pinctrl subsystem
+[   19.698518] NET: Registered protocol family 16
+[   19.699622] DMA: preallocated 256 KiB pool for atomic coherent allocations
+[   19.701638] cpuidle: using governor ladder
+[   19.701681] cpuidle: using governor menu
+[   19.701806] Orion ID: MV88F5182-A2. TCLK=166666667.
+[   19.718741] clocksource: Switched to clocksource orion_clocksource
+[   19.761338] VFS: Disk quotas dquot_6.6.0
+[   19.761501] VFS: Dquot-cache hash table entries: 1024 (order 0, 4096 bytes)
+[   19.785765] NET: Registered protocol family 2
+[   19.787773] TCP established hash table entries: 1024 (order: 0, 4096 bytes)
+[   19.787842] TCP bind hash table entries: 1024 (order: 0, 4096 bytes)
+[   19.787897] TCP: Hash tables configured (established 1024 bind 1024)
+[   19.788067] UDP hash table entries: 256 (order: 0, 4096 bytes)
+[   19.788133] UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
+[   19.788684] NET: Registered protocol family 1
+[   19.789435] Unpacking initramfs...
+[   21.586346] Freeing initrd memory: 7328K (c0700000 - c0e28000)
+[   21.588175] futex hash table entries: 256 (order: -1, 3072 bytes)
+[   21.588392] audit: initializing netlink subsys (disabled)
+[   21.588548] audit: type=2000 audit(1.944:1): initialized
+[   21.589702] workingset: timestamp_bits=28 max_order=15 bucket_order=0
+[   21.590091] zbud: loaded
+[   21.596150] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 251)
+[   21.596641] io scheduler noop registered
+[   21.596774] io scheduler cfq registered (default)
+[   21.598258] mv_xor mv_xor.0: Marvell shared XOR driver
+[   21.634123] mv_xor mv_xor.0: Marvell XOR (Registers Mode): ( xor cpy )
+[   21.635113] Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+[   21.636907] console [ttyS0] disabled
+[   21.657164] serial8250.0: ttyS0 at MMIO 0xf1012000 (irq = 4, base_baud = 10416666) is a 16550A
+[   22.662397] console [ttyS0] enabled
+[   22.668030] physmap platform flash device: 00080000 at f4000000
+[   22.674218] physmap-flash.0: Found 1 x16 devices at 0x0 in 8-bit bank. Manufacturer ID 0x0000c2 Chip ID 0x0000b9
+[   22.684470] Amd/Fujitsu Extended Query Table at 0x0040
+[   22.689656]   Amd/Fujitsu Extended Query version 1.0.
+[   22.694762] physmap-flash.0: JEDEC Device ID is 0xB9. Assuming broken CFI table.
+[   22.702179] physmap-flash.0: Swapping erase regions for top-boot CFI table.
+[   22.709170] number of CFI chips: 1
+[   22.738967] Creating 1 MTD partitions on "physmap-flash.0":
+[   22.744650] 0x000000000000-0x000000080000 : "firmware"
+[   22.754470] mousedev: PS/2 mouse device common for all mice
+[   22.761033] i2c /dev entries driver
+[   22.765766] rtc-pcf8563 0-0051: chip found, driver version 0.4.4
+[   22.777681] rtc-pcf8563 0-0051: rtc core: registered rtc-pcf8563 as rtc0
+[   22.788071] ledtrig-cpu: registered to indicate activity on CPUs
+[   22.795347] NET: Registered protocol family 17
+[   22.801611] registered taskstats version 1
+[   22.806096] zswap: loaded using pool lzo/zbud
+[   22.812819] rtc-pcf8563 0-0051: setting system clock to 2016-06-25 19:22:31 UTC (1466882551)
+[   22.825293] Freeing unused kernel memory: 288K (c051a000 - c0562000)
+[   22.831701] This architecture does not have kernel memory protection.
+[   22.968162] random: systemd-udevd urandom read with 12 bits of entropy available
+[   23.281430] input: gpio-keys as /devices/platform/gpio-keys/input/input0
+[   23.373343] mv643xx_eth: MV-643xx 10/100/1000 ethernet driver version 1.4
+[   23.412395] libphy: PHY orion-mdio-mii:08 not found
+[   23.566567] libphy: orion_mdio_bus: probed
+[   23.645585] mv643xx_eth_port mv643xx_eth_port.0 eth0: port 0 with MAC address 00:0a:e4:87:40:ac
+Starting system log daemon: syslogd, klogd.
+...
