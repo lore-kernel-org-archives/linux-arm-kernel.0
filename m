@@ -1,70 +1,75 @@
 From: megous@megous.com (megous at megous.com)
-Date: Sat, 25 Jun 2016 05:45:10 +0200
-Subject: [PATCH v2 13/14] ARM: dts: sun8i: Add gpio-regulator used on Orange
- Pi One
+Date: Sat, 25 Jun 2016 05:45:05 +0200
+Subject: [PATCH v2 08/14] ARM: dts: sun8i: Add thermal sensor node to the
+ sun8i-h3.dtsi
 In-Reply-To: <20160625034511.7966-1-megous@megous.com>
 References: <20160625034511.7966-1-megous@megous.com>
-Message-ID: <20160625034511.7966-14-megous@megous.com>
+Message-ID: <20160625034511.7966-9-megous@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ondrej Jirman <megous@megous.com>
 
-Xulong Orange Pi One uses GPIO based regulator that
-switches between two voltages: 1.1V and 1.3V. The
-regulator is controlled from the PL6 pin.
+This patch adds nodes for the thermal sensor driver and
+the THS clock to the Allwinner sun8i-h3.dtsi file.
 
 Signed-off-by: Ondrej Jirman <megous@megous.com>
 ---
-v2
-- add missing pinctrl-names for gpio-regulator
----
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-index 0adf932..b1bd6b0 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-@@ -88,6 +88,25 @@
- 			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index b3247f4..d3c29cc 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -77,6 +77,14 @@
  		};
  	};
-+
-+	vdd_soc: gpio-regulator {
-+		compatible = "regulator-gpio";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&vdd_reg_r_opc>;
-+
-+		regulator-name = "soc-vdd-supply";
-+		regulator-min-microvolt = <1100000>;
-+		regulator-max-microvolt = <1300000>;
-+		regulator-boot-on;
-+		regulator-type = "voltage";
-+
-+		gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>;
-+		states = <1100000 0x0
-+			  1300000 0x1>;
-+
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+	};
- };
  
- &ehci1 {
-@@ -131,6 +150,13 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
-+
-+	vdd_reg_r_opc: regulator_pins at 0 {
-+		allwinner,pins = "PL6";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	thermal-zones {
++		cpu_thermal: cpu_thermal {
++			polling-delay-passive = <330>;
++			polling-delay = <1000>;
++			thermal-sensors = <&ths 0>;
++		};
 +	};
- };
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+@@ -239,6 +247,14 @@
+ 					     "bus_scr", "bus_ephy", "bus_dbg";
+ 		};
  
- &uart0 {
++		ths_clk: clk at 01c20074 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun8i-h3-ths-clk";
++			reg = <0x01c20074 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "ths";
++		};
++
+ 		mmc0_clk: clk at 01c20088 {
+ 			#clock-cells = <1>;
+ 			compatible = "allwinner,sun4i-a10-mmc-clk";
+@@ -574,6 +590,18 @@
+ 			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
++		ths: ths at 01c25000 {
++			#thermal-sensor-cells = <0>;
++			compatible = "allwinner,sun8i-h3-ths";
++			reg = <0x01c25000 0x400>,
++			      <0x01c14234 0x4>;
++			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&apb1_rst 8>;
++			reset-names = "ahb";
++			clocks = <&bus_gates 72>, <&ths_clk>;
++			clock-names = "ahb", "ths";
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
 -- 
 2.9.0
