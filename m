@@ -1,38 +1,73 @@
 From: megous@megous.com (megous at megous.com)
-Date: Sat, 25 Jun 2016 05:45:04 +0200
-Subject: [PATCH v2 07/14] ARM: dts: sun8i: Use sun8i-h3-pll1-clk for pll1 in H3
+Date: Sat, 25 Jun 2016 05:45:07 +0200
+Subject: [PATCH v2 10/14] ARM: dts: sun8i: Add r_twi I2C controller
 In-Reply-To: <20160625034511.7966-1-megous@megous.com>
 References: <20160625034511.7966-1-megous@megous.com>
-Message-ID: <20160625034511.7966-8-megous@megous.com>
+Message-ID: <20160625034511.7966-11-megous@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ondrej Jirman <megous@megous.com>
 
-PLL1 on H3 requires special factors application algorithm,
-when the rate is changed. This algorithm was extracted
-from the arisc code that handles frequency scaling
-in the BSP kernel.
-
-This algorithm is implemented by sun8i-h3-pll1-clk.
+H3 SoC contains I2C controller optionally available
+on the PL0 and PL1 pins. This patch makes this controller
+available.
 
 Signed-off-by: Ondrej Jirman <megous@megous.com>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 4a4926b..b3247f4 100644
+index 56f211e..e32f211 100644
 --- a/arch/arm/boot/dts/sun8i-h3.dtsi
 +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -106,7 +106,7 @@
+@@ -322,8 +322,9 @@
+ 			reg = <0x01f01428 0x4>;
+ 			#clock-cells = <1>;
+ 			clocks = <&apb0>;
+-			clock-indices = <0>, <1>;
+-			clock-output-names = "apb0_pio", "apb0_ir";
++			clock-indices = <0>, <1>, <6>;
++			clock-output-names = "apb0_pio", "apb0_ir", "apb0_i2c";
++
+ 		};
  
- 		pll1: clk at 01c20000 {
- 			#clock-cells = <0>;
--			compatible = "allwinner,sun8i-a23-pll1-clk";
-+			compatible = "allwinner,sun8i-h3-pll1-clk";
- 			reg = <0x01c20000 0x4>;
- 			clocks = <&osc24M>;
- 			clock-output-names = "pll1";
+ 		ir_clk: ir_clk at 01f01454 {
+@@ -656,6 +657,20 @@
+ 			status = "disabled";
+ 		};
+ 
++		r_twi: i2c at 01f02400 {
++			compatible = "allwinner,sun6i-a31-i2c";
++			reg = <0x01f02400 0x400>;
++			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&r_twi_pins_a>;
++			clocks = <&apb0_gates 6>;
++			clock-frequency = <100000>;
++			resets = <&apb0_reset 6>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		gic: interrupt-controller at 01c81000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c81000 0x1000>,
+@@ -707,6 +722,13 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
++
++			r_twi_pins_a: r_twi at 0 {
++				allwinner,pins = "PL0", "PL1";
++				allwinner,function = "s_twi";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 	};
+ };
 -- 
 2.9.0
