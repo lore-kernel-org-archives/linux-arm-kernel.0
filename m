@@ -1,131 +1,163 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Sun, 26 Jun 2016 00:28:22 -0700
-Subject: [PATCH 05/21] usb: chipidea: Handle extcon events properly
+Date: Sun, 26 Jun 2016 00:28:23 -0700
+Subject: [PATCH 06/21] usb: chipidea: Initialize and reinitialize phy later
 In-Reply-To: <20160626072838.28082-1-stephen.boyd@linaro.org>
 References: <20160626072838.28082-1-stephen.boyd@linaro.org>
-Message-ID: <20160626072838.28082-6-stephen.boyd@linaro.org>
+Message-ID: <20160626072838.28082-7-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're currently emulating the vbus and id interrupts in the OTGSC
-read API, but we also need to make sure that if we're handling
-the events with extcon that we don't enable the interrupts for
-those events in the hardware. Therefore, properly emulate this
-register if we're using extcon, but don't enable the interrupts.
-This allows me to get my cable connect/disconnect working
-properly without getting spurious interrupts on my device that
-uses an extcon for these two events.
+The ULPI phy on qcom platforms needs to be initialized and
+powered on after a USB reset and before we toggle the run/stop
+bit. Otherwise, the phy locks up and doesn't work properly. Move
+the phy initialization to a later point, and shut it down outside
+of driver remove so that the phy state is properly managed across
+role switches.
 
 Cc: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
-Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/otg.c   | 46 +++++++++++++++++++++++++++++++++++++++-----
- include/linux/usb/chipidea.h |  2 ++
- 2 files changed, 43 insertions(+), 5 deletions(-)
+ drivers/usb/chipidea/ci.h   |  3 ++-
+ drivers/usb/chipidea/core.c | 23 ++++++++++-------------
+ drivers/usb/chipidea/host.c |  5 ++---
+ drivers/usb/chipidea/udc.c  |  2 ++
+ 4 files changed, 16 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-index 763a8332b009..b6a88bea4cac 100644
---- a/drivers/usb/chipidea/otg.c
-+++ b/drivers/usb/chipidea/otg.c
-@@ -44,12 +44,15 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
- 		else
- 			val &= ~OTGSC_BSVIS;
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index cd414559040f..f87805235caa 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -431,7 +431,8 @@ u8 hw_port_test_get(struct ci_hdrc *ci);
+ int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
+ 				u32 value, unsigned int timeout_ms);
  
--		cable->changed = false;
--
- 		if (cable->state)
- 			val |= OTGSC_BSV;
- 		else
- 			val &= ~OTGSC_BSV;
+-void ci_platform_configure(struct ci_hdrc *ci);
++void ci_usb_phy_exit(struct ci_hdrc *ci);
++int ci_platform_configure(struct ci_hdrc *ci);
+ 
+ int dbg_create_files(struct ci_hdrc *ci);
+ 
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 01390e02ee53..a01611c7f815 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -359,7 +359,7 @@ static int _ci_usb_phy_init(struct ci_hdrc *ci)
+  * interfaces
+  * @ci: the controller
+  */
+-static void ci_usb_phy_exit(struct ci_hdrc *ci)
++void ci_usb_phy_exit(struct ci_hdrc *ci)
+ {
+ 	if (ci->phy) {
+ 		phy_power_off(ci->phy);
+@@ -412,9 +412,14 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
+  * @ci: the controller
+  *
+  */
+-void ci_platform_configure(struct ci_hdrc *ci)
++int ci_platform_configure(struct ci_hdrc *ci)
+ {
+ 	bool is_device_mode, is_host_mode;
++	int ret;
 +
-+		if (cable->enabled)
-+			val |= OTGSC_BSVIE;
-+		else
-+			val &= ~OTGSC_BSVIE;
++	ret = ci_usb_phy_init(ci);
++	if (ret)
++		return ret;
+ 
+ 	is_device_mode = hw_read(ci, OP_USBMODE, USBMODE_CM) == USBMODE_CM_DC;
+ 	is_host_mode = hw_read(ci, OP_USBMODE, USBMODE_CM) == USBMODE_CM_HC;
+@@ -453,6 +458,8 @@ void ci_platform_configure(struct ci_hdrc *ci)
+ 			hw_write(ci, OP_BURSTSIZE, RX_BURST_MASK,
+ 				ci->platdata->rx_burst_size);
  	}
- 
- 	cable = &ci->platdata->id_extcon;
-@@ -59,15 +62,18 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
- 		else
- 			val &= ~OTGSC_IDIS;
- 
--		cable->changed = false;
--
- 		if (cable->state)
- 			val |= OTGSC_ID;
- 		else
- 			val &= ~OTGSC_ID;
 +
-+		if (cable->enabled)
-+			val |= OTGSC_IDIE;
-+		else
-+			val &= ~OTGSC_IDIE;
- 	}
- 
--	return val;
-+	return val & mask;
++	return 0;
  }
  
  /**
-@@ -77,6 +83,36 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
-  */
- void hw_write_otgsc(struct ci_hdrc *ci, u32 mask, u32 data)
- {
-+	struct ci_hdrc_cable *cable;
-+
-+	cable = &ci->platdata->vbus_extcon;
-+	if (!IS_ERR(cable->edev)) {
-+		if (data & mask & OTGSC_BSVIS)
-+			cable->changed = false;
-+
-+		/* Don't enable vbus interrupt if using external notifier */
-+		if (data & mask & OTGSC_BSVIE) {
-+			cable->enabled = true;
-+			data &= ~OTGSC_BSVIE;
-+		} else if (mask & OTGSC_BSVIE) {
-+			cable->enabled = false;
-+		}
-+	}
-+
-+	cable = &ci->platdata->id_extcon;
-+	if (!IS_ERR(cable->edev)) {
-+		if (data & mask & OTGSC_IDIS)
-+			cable->changed = false;
-+
-+		/* Don't enable id interrupt if using external notifier */
-+		if (data & mask & OTGSC_IDIE) {
-+			cable->enabled = true;
-+			data &= ~OTGSC_IDIE;
-+		} else if (mask & OTGSC_IDIE) {
-+			cable->enabled = false;
-+		}
-+	}
-+
- 	hw_write(ci, OP_OTGSC, mask | OTGSC_INT_STATUS_BITS, data);
+@@ -511,9 +518,7 @@ int hw_device_reset(struct ci_hdrc *ci)
+ 		return -ENODEV;
+ 	}
+ 
+-	ci_platform_configure(ci);
+-
+-	return 0;
++	return ci_platform_configure(ci);
  }
  
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 5dd75fa47dd8..f9be467d6695 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -14,6 +14,7 @@ struct ci_hdrc;
-  * struct ci_hdrc_cable - structure for external connector cable state tracking
-  * @state: current state of the line
-  * @changed: set to true when extcon event happen
-+ * @enabled: set to true if we've enabled the vbus or id interrupt
-  * @edev: device which generate events
-  * @ci: driver state of the chipidea device
-  * @nb: hold event notification callback
-@@ -22,6 +23,7 @@ struct ci_hdrc;
- struct ci_hdrc_cable {
- 	bool				state;
- 	bool				changed;
-+	bool				enabled;
- 	struct extcon_dev		*edev;
- 	struct ci_hdrc			*ci;
- 	struct notifier_block		nb;
+ static irqreturn_t ci_irq(int irq, void *data)
+@@ -917,12 +922,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 			ci->usb_phy = NULL;
+ 	}
+ 
+-	ret = ci_usb_phy_init(ci);
+-	if (ret) {
+-		dev_err(dev, "unable to init phy: %d\n", ret);
+-		return ret;
+-	}
+-
+ 	ci->hw_bank.phys = res->start;
+ 
+ 	ci->irq = platform_get_irq(pdev, 0);
+@@ -1025,7 +1024,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ stop:
+ 	ci_role_destroy(ci);
+ deinit_phy:
+-	ci_usb_phy_exit(ci);
+ 
+ 	return ret;
+ }
+@@ -1044,7 +1042,6 @@ static int ci_hdrc_remove(struct platform_device *pdev)
+ 	ci_extcon_unregister(ci);
+ 	ci_role_destroy(ci);
+ 	ci_hdrc_enter_lpm(ci, true);
+-	ci_usb_phy_exit(ci);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 053bac9d983c..523c155daea8 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -87,9 +87,7 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
+ 	if (ret)
+ 		return ret;
+ 
+-	ci_platform_configure(ci);
+-
+-	return ret;
++	return ci_platform_configure(ci);
+ }
+ 
+ static const struct ehci_driver_overrides ehci_ci_overrides = {
+@@ -186,6 +184,7 @@ static void host_stop(struct ci_hdrc *ci)
+ 	if (hcd) {
+ 		usb_remove_hcd(hcd);
+ 		usb_put_hcd(hcd);
++		ci_usb_phy_exit(ci);
+ 		if (ci->platdata->reg_vbus && !ci_otg_is_fsm_mode(ci) &&
+ 			(ci->platdata->flags & CI_HDRC_TURN_VBUS_EARLY_ON))
+ 				regulator_disable(ci->platdata->reg_vbus);
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 065f5d97aa67..8f44e2d1e0c0 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1534,6 +1534,7 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
+ 			if (ci->driver)
+ 				ci->driver->disconnect(&ci->gadget);
+ 			hw_device_state(ci, 0);
++			ci_usb_phy_exit(ci);
+ 			if (ci->platdata->notify_event)
+ 				ci->platdata->notify_event(ci,
+ 				CI_HDRC_CONTROLLER_STOPPED_EVENT);
+@@ -1794,6 +1795,7 @@ static int ci_udc_stop(struct usb_gadget *gadget)
+ 			ci->platdata->notify_event(ci,
+ 			CI_HDRC_CONTROLLER_STOPPED_EVENT);
+ 		spin_unlock_irqrestore(&ci->lock, flags);
++		ci_usb_phy_exit(ci);
+ 		_gadget_stop_activity(&ci->gadget);
+ 		spin_lock_irqsave(&ci->lock, flags);
+ 		pm_runtime_put(&ci->gadget.dev);
 -- 
 2.9.0.rc2.8.ga28705d
