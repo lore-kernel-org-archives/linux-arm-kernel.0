@@ -1,126 +1,77 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Sun, 26 Jun 2016 00:28:33 -0700
-Subject: [PATCH 16/21] usb: chipidea: msm: Restore wrapper settings after reset
+Date: Sun, 26 Jun 2016 00:28:34 -0700
+Subject: [PATCH 17/21] usb: chipidea: msm: Make platform data driver local
+ instead of global
 In-Reply-To: <20160626072838.28082-1-stephen.boyd@linaro.org>
 References: <20160626072838.28082-1-stephen.boyd@linaro.org>
-Message-ID: <20160626072838.28082-17-stephen.boyd@linaro.org>
+Message-ID: <20160626072838.28082-18-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the RESET bit is set in the USBCMD register it resets quite
-a few of the wrapper's registers to their reset state. This
-includes the GENCONFIG and GENCONFIG2 registers. Currently this
-is done by the usb phy and ehci-msm drivers writing into the
-controller wrapper's MMIO address space. Let's consolidate the
-register writes into the wrapper driver instead so that we
-clearly split the wrapper from the phys.
+If two devices are probed with this same driver, they'll share
+the same platform data structure, while the chipidea core layer
+writes and modifies it. This can lead to interesting results
+especially if one device is an OTG type chipidea controller and
+another is a host. Let's create a copy of this structure per each
+device instance so that odd things don't happen.
 
 Cc: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/ci_hdrc_msm.c | 46 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ drivers/usb/chipidea/ci_hdrc_msm.c | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-index df0f8b31db4f..cc6f9b0df9d5 100644
+index cc6f9b0df9d5..fb4340f02c16 100644
 --- a/drivers/usb/chipidea/ci_hdrc_msm.c
 +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-@@ -14,6 +14,8 @@
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
- #include <linux/io.h>
-+#include <linux/extcon.h>
-+#include <linux/of.h>
- 
- #include "ci.h"
- 
-@@ -21,11 +23,22 @@
- #define HS_PHY_SEC_CTRL			0x0278
- # define HS_PHY_DIG_CLAMP_N		BIT(16)
- 
-+#define HS_PHY_GENCONFIG		0x009c
-+# define HS_PHY_TXFIFO_IDLE_FORCE_DIS	BIT(4)
-+
-+#define HS_PHY_GENCONFIG_2		0x00a0
-+# define HS_PHY_SESS_VLD_CTRL_EN	BIT(7)
-+# define HS_PHY_ULPI_TX_PKT_EN_CLR_FIX	BIT(19)
-+
-+#define HSPHY_SESS_VLD_CTRL		BIT(25)
-+
- struct ci_hdrc_msm {
- 	struct platform_device *ci;
+@@ -37,6 +37,7 @@ struct ci_hdrc_msm {
  	struct clk *core_clk;
  	struct clk *iface_clk;
-+	struct extcon_dev *vbus_edev;
+ 	struct extcon_dev *vbus_edev;
++	struct ci_hdrc_platform_data pdata;
  	bool secondary_phy;
-+	bool hsic;
+ 	bool hsic;
  	void __iomem *base;
- };
+@@ -79,16 +80,6 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+ 	}
+ }
  
-@@ -39,9 +52,26 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
- 		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
- 		/* use AHB transactor, allow posted data writes */
- 		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
-+		/* workaround for rx buffer collision issue */
-+		hw_write_id_reg(ci, HS_PHY_GENCONFIG,
-+				HS_PHY_TXFIFO_IDLE_FORCE_DIS, 0);
-+
- 		if (msm_ci->secondary_phy)
- 			hw_write_id_reg(ci, HS_PHY_SEC_CTRL, HS_PHY_DIG_CLAMP_N,
- 					HS_PHY_DIG_CLAMP_N);
-+
-+		if (!msm_ci->hsic)
-+			hw_write_id_reg(ci, HS_PHY_GENCONFIG_2,
-+					HS_PHY_ULPI_TX_PKT_EN_CLR_FIX, 0);
-+
-+		if (msm_ci->vbus_edev) {
-+			hw_write_id_reg(ci, HS_PHY_GENCONFIG_2,
-+					HS_PHY_SESS_VLD_CTRL_EN,
-+					HS_PHY_SESS_VLD_CTRL_EN);
-+			hw_write(ci, OP_USBCMD, HSPHY_SESS_VLD_CTRL,
-+				 HSPHY_SESS_VLD_CTRL);
-+
-+		}
- 		break;
- 	default:
- 		dev_dbg(dev, "unknown ci_hdrc event\n");
-@@ -112,6 +142,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 	void __iomem *base;
- 	resource_size_t size;
- 	int ret;
-+	struct device_node *ulpi_node, *phy_node;
- 
- 	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
- 
-@@ -141,6 +172,13 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 	if (!base)
+-static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
+-	.name			= "ci_hdrc_msm",
+-	.capoffset		= DEF_CAPOFFSET,
+-	.flags			= CI_HDRC_REGS_SHARED |
+-				  CI_HDRC_DISABLE_STREAMING |
+-				  CI_HDRC_OVERRIDE_AHB_BURST,
+-
+-	.notify_event		= ci_hdrc_msm_notify_event,
+-};
+-
+ static int ci_hdrc_msm_mux_phy(struct ci_hdrc_msm *ci,
+ 			       struct platform_device *pdev)
+ {
+@@ -151,6 +142,12 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
  		return -ENOMEM;
+ 	platform_set_drvdata(pdev, ci);
  
-+	ci->vbus_edev = extcon_get_edev_by_phandle(&pdev->dev, 0);
-+	if (IS_ERR(ci->vbus_edev)) {
-+		if (PTR_ERR(ci->vbus_edev) != -ENODEV)
-+			return PTR_ERR(ci->vbus_edev);
-+		ci->vbus_edev = NULL;
-+	}
++	ci->pdata.name = "ci_hdrc_msm";
++	ci->pdata.capoffset = DEF_CAPOFFSET;
++	ci->pdata.flags	= CI_HDRC_REGS_SHARED | CI_HDRC_DISABLE_STREAMING |
++			  CI_HDRC_OVERRIDE_AHB_BURST;
++	ci->pdata.notify_event = ci_hdrc_msm_notify_event;
 +
- 	reset_control_assert(reset);
- 	usleep_range(10000, 12000);
- 	reset_control_deassert(reset);
-@@ -157,6 +195,14 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_mux;
+ 	reset = devm_reset_control_get(&pdev->dev, "core");
+ 	if (IS_ERR(reset))
+ 		return PTR_ERR(reset);
+@@ -204,7 +201,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+ 	of_node_put(ulpi_node);
  
-+	ulpi_node = of_find_node_by_name(pdev->dev.of_node, "ulpi");
-+	if (ulpi_node) {
-+		phy_node = of_get_next_available_child(ulpi_node, NULL);
-+		ci->hsic = of_device_is_compatible(phy_node, "qcom,usb-hsic-phy");
-+		of_node_put(phy_node);
-+	}
-+	of_node_put(ulpi_node);
-+
  	plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
- 				     pdev->num_resources, &ci_hdrc_msm_platdata);
+-				     pdev->num_resources, &ci_hdrc_msm_platdata);
++				     pdev->num_resources, &ci->pdata);
  	if (IS_ERR(plat_ci)) {
+ 		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+ 		ret = PTR_ERR(plat_ci);
 -- 
 2.9.0.rc2.8.ga28705d
