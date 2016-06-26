@@ -1,41 +1,41 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Sun, 26 Jun 2016 00:28:37 -0700
-Subject: [PATCH 20/21] phy: Add support for Qualcomm's USB HSIC phy
+Date: Sun, 26 Jun 2016 00:28:38 -0700
+Subject: [PATCH 21/21] phy: Add support for Qualcomm's USB HS phy
 In-Reply-To: <20160626072838.28082-1-stephen.boyd@linaro.org>
 References: <20160626072838.28082-1-stephen.boyd@linaro.org>
-Message-ID: <20160626072838.28082-21-stephen.boyd@linaro.org>
+Message-ID: <20160626072838.28082-22-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HSIC USB controller on qcom SoCs has an integrated all
-digital phy controlled via the ULPI viewport.
+The high-speed phy on qcom SoCs is controlled via the ULPI
+viewport.
 
 Cc: Kishon Vijay Abraham I <kishon@ti.com>
 Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  60 ++++++++
- drivers/phy/Kconfig                                |   7 +
+ .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  71 ++++++
+ drivers/phy/Kconfig                                |   8 +
  drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-qcom-usb-hsic.c                    | 161 +++++++++++++++++++++
- 4 files changed, 229 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
- create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
+ drivers/phy/phy-qcom-usb-hs.c                      | 283 +++++++++++++++++++++
+ 4 files changed, 363 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
+ create mode 100644 drivers/phy/phy-qcom-usb-hs.c
 
-diff --git a/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
+diff --git a/Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt b/Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
 new file mode 100644
-index 000000000000..6b1c6aad2962
+index 000000000000..2bd22c53cee0
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
-@@ -0,0 +1,60 @@
-+Qualcomm's USB HSIC PHY
++++ b/Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
+@@ -0,0 +1,71 @@
++Qualcomm's USB HS PHY
 +
 +PROPERTIES
 +
 +- compatible:
 +    Usage: required
 +    Value type: <string>
-+    Definition: Should contain "qcom,usb-hsic-phy"
++    Definition: Should contain "qcom,usb-hs-phy"
 +
 +- #phy-cells:
 +    Usage: required
@@ -45,85 +45,97 @@ index 000000000000..6b1c6aad2962
 +- clocks:
 +    Usage: required
 +    Value type: <prop-encoded-array>
-+    Definition: Should contain clock specifier for phy, calibration and
-+                optionally a calibration sleep clock
++    Definition: Should contain clock specifier for the reference and sleep
++                clocks
 +
 +- clock-names:
 +    Usage: required
 +    Value type: <stringlist>
-+    Definition: Should contain "phy, "cal" and optionally "cal_sleep"
++    Definition: Should contain "ref" and "sleep" for the reference and sleep
++                clocks respectively
 +
-+- pinctrl-names:
++- resets:
++    Usage: required
++    Value type: <prop-encoded-array>
++    Definition: Should contain the phy and POR resets
++
++- reset-names:
 +    Usage: required
 +    Value type: <stringlist>
-+    Definition: Should contain "init" and "default" in that order
++    Definition: Should contain "phy" and "por" for the phy and POR resets
++                respectively
 +
-+- pinctrl-0:
++- v3p3-supply:
 +    Usage: required
-+    Value type: <prop-encoded-array>
-+    Definition: List of pinctrl settings to apply to keep HSIC pins in a glitch
-+                free state
++    Value type: <phandle>
++    Definition: Should contain a reference to the 3.3V supply
 +
-+- pinctrl-1:
++- v1p8-supply:
 +    Usage: required
-+    Value type: <prop-encoded-array>
-+    Definition: List of pinctrl settings to apply to mux out the HSIC pins
++    Value type: <phandle>
++    Definition: Should contain a reference to the 1.8V supply
++
++- qcom,init-seq:
++    Usage: optional
++    Value type: <u8 array>
++    Definition: Should contain a sequence of ULPI register and address pairs to
++                program into the ULPI_EXT_VENDOR_SPECIFIC area. This is related
++                to Device Mode Eye Diagram test.
 +
 +EXAMPLE
 +
-+usb-controller {
++otg: usb-controller {
 +	ulpi {
 +		phy {
-+			compatible = "qcom,usb-hsic-phy";
++			compatible = "qcom,usb-hs-phy";
 +			#phy-cells = <0>;
-+			pinctrl-names = "init", "default";
-+			pinctrl-0 = <&hsic_sleep>;
-+			pinctrl-1 = <&hsic_default>;
-+			clocks = <&gcc GCC_USB_HSIC_CLK>,
-+				 <&gcc GCC_USB_HSIC_IO_CAL_CLK>,
-+				 <&gcc GCC_USB_HSIC_IO_CAL_SLEEP_CLK>;
-+			clock-names = "phy", "cal", "cal_sleep";
-+			assigned-clocks = <&gcc GCC_USB_HSIC_IO_CAL_CLK>;
-+			assigned-clock-rates = <960000>;
++			clocks = <&xo_board>, <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
++			clock-names = "ref", "sleep";
++			resets = <&gcc GCC_USB2A_PHY_BCR>, <&otg 0>;
++			reset-names = "phy", "por";
++			v3p3-supply = <&pm8941_l24>;
++			v1p8-supply = <&pm8941_l6>;
++			qcom,init-seq = /bits/ 8 <0x81 0x63>;
 +		};
 +	};
 +};
 diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index b869b98835f4..a2866949dc97 100644
+index a2866949dc97..cfb3ded0896d 100644
 --- a/drivers/phy/Kconfig
 +++ b/drivers/phy/Kconfig
-@@ -406,6 +406,13 @@ config PHY_QCOM_UFS
+@@ -406,6 +406,14 @@ config PHY_QCOM_UFS
  	help
  	  Support for UFS PHY on QCOM chipsets.
  
-+config PHY_QCOM_USB_HSIC
-+	tristate "Qualcomm USB HSIC ULPI PHY module"
++config PHY_QCOM_USB_HS
++	tristate "Qualcomm USB HS PHY module"
 +	depends on USB_ULPI_BUS
 +	select GENERIC_PHY
 +	help
-+	  Support for the USB HSIC ULPI compliant PHY on QCOM chipsets.
++	  Support for the USB high-speed ULPI compliant phy on Qualcomm
++	  chipsets.
 +
- config PHY_TUSB1210
- 	tristate "TI TUSB1210 ULPI PHY module"
+ config PHY_QCOM_USB_HSIC
+ 	tristate "Qualcomm USB HSIC ULPI PHY module"
  	depends on USB_ULPI_BUS
 diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 9c3e73ccabc4..982e84a290ec 100644
+index 982e84a290ec..21435fc0b656 100644
 --- a/drivers/phy/Makefile
 +++ b/drivers/phy/Makefile
 @@ -49,6 +49,7 @@ obj-$(CONFIG_PHY_STIH41X_USB)		+= phy-stih41x-usb.o
  obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs.o
  obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-20nm.o
  obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-14nm.o
-+obj-$(CONFIG_PHY_QCOM_USB_HSIC) 	+= phy-qcom-usb-hsic.o
++obj-$(CONFIG_PHY_QCOM_USB_HS) 		+= phy-qcom-usb-hs.o
+ obj-$(CONFIG_PHY_QCOM_USB_HSIC) 	+= phy-qcom-usb-hsic.o
  obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
  obj-$(CONFIG_PHY_BRCM_SATA)		+= phy-brcm-sata.o
- obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
-diff --git a/drivers/phy/phy-qcom-usb-hsic.c b/drivers/phy/phy-qcom-usb-hsic.c
+diff --git a/drivers/phy/phy-qcom-usb-hs.c b/drivers/phy/phy-qcom-usb-hs.c
 new file mode 100644
-index 000000000000..a81b2f8bfe37
+index 000000000000..8be83100ecd9
 --- /dev/null
-+++ b/drivers/phy/phy-qcom-usb-hsic.c
-@@ -0,0 +1,161 @@
++++ b/drivers/phy/phy-qcom-usb-hs.c
+@@ -0,0 +1,283 @@
 +/**
 + * Copyright (C) 2016 Linaro Ltd
 + *
@@ -134,156 +146,278 @@ index 000000000000..a81b2f8bfe37
 +#include <linux/module.h>
 +#include <linux/ulpi/driver.h>
 +#include <linux/ulpi/regs.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/pinctrl/pinctrl-state.h>
-+#include <linux/delay.h>
 +#include <linux/clk.h>
++#include <linux/regulator/consumer.h>
++#include <linux/of_device.h>
++#include <linux/reset.h>
++#include <linux/extcon.h>
++#include <linux/notifier.h>
++#include <linux/usb/of.h>
 +
 +#include "ulpi_phy.h"
 +
-+#define ULPI_HSIC_CFG		0x30
-+#define ULPI_HSIC_IO_CAL	0x33
++#define ULPI_PWR_CLK_MNG_REG		0x88
++# define ULPI_PWR_OTG_COMP_DISABLE	BIT(0)
 +
-+struct qcom_usb_hsic_phy {
-+	struct ulpi *ulpi;
-+	struct phy *phy;
-+	struct pinctrl *pctl;
-+	struct clk *phy_clk;
-+	struct clk *cal_clk;
-+	struct clk *cal_sleep_clk;
++#define ULPI_MISC_A			0x96
++# define ULPI_MISC_A_VBUSVLDEXTSEL	BIT(1)
++# define ULPI_MISC_A_VBUSVLDEXT		BIT(0)
++
++
++struct ulpi_seq {
++	u8 addr;
++	u8 val;
 +};
 +
-+static int qcom_usb_hsic_phy_power_on(struct phy *phy)
-+{
-+	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
-+	struct ulpi *ulpi = uphy->ulpi;
-+	struct pinctrl_state *pins_default;
-+	int ret;
++struct qcom_usb_hs_phy {
++	struct ulpi *ulpi;
++	struct phy *phy;
++	struct clk *ref_clk;
++	struct clk *sleep_clk;
++	struct regulator *v1p8;
++	struct regulator *v3p3;
++	struct reset_control *reset;
++	struct ulpi_seq *init_seq;
++	struct notifier_block vbus_notify;
++	struct extcon_dev *vbus_edev;
++	struct extcon_dev *id_edev;
++	enum usb_dr_mode dr_mode;
++};
 +
-+	ret = clk_prepare_enable(uphy->phy_clk);
++static int
++qcom_usb_hs_phy_vbus_notifier(struct notifier_block *nb, unsigned long event,
++			      void *ptr)
++{
++	struct qcom_usb_hs_phy *uphy;
++	int is_host;
++	u8 addr;
++
++	uphy = container_of(nb, struct qcom_usb_hs_phy, vbus_notify);
++	is_host = extcon_get_cable_state_(uphy->id_edev, EXTCON_USB_HOST);
++	if (is_host < 0)
++		is_host = 0; /* No id event means always a peripheral */
++
++	if (event && !is_host)
++		addr = ULPI_SET(ULPI_MISC_A);
++	else
++		addr = ULPI_CLR(ULPI_MISC_A);
++
++	return ulpi_write(uphy->ulpi, addr,
++			  ULPI_MISC_A_VBUSVLDEXTSEL | ULPI_MISC_A_VBUSVLDEXT);
++}
++
++static int qcom_usb_hs_phy_power_on(struct phy *phy)
++{
++	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
++	struct ulpi *ulpi = uphy->ulpi;
++	const struct ulpi_seq *seq;
++	int ret, state;
++
++	ret = clk_prepare_enable(uphy->ref_clk);
 +	if (ret)
 +		return ret;
 +
-+	ret = clk_prepare_enable(uphy->cal_clk);
-+	if (ret)
-+		goto err_cal;
-+
-+	ret = clk_prepare_enable(uphy->cal_sleep_clk);
++	ret = clk_prepare_enable(uphy->sleep_clk);
 +	if (ret)
 +		goto err_sleep;
 +
-+	/* Set periodic calibration interval to ~2.048sec in HSIC_IO_CAL_REG */
-+	ret = ulpi_write(ulpi, ULPI_HSIC_IO_CAL, 0xff);
++	ret = regulator_set_voltage(uphy->v1p8, 1800000, 1800000);
 +	if (ret)
-+		goto err_ulpi;
++		goto err_1p8;
++	ret = regulator_set_load(uphy->v1p8, 50000);
++	if (ret < 0)
++		goto err_1p8;
 +
-+	/* Enable periodic IO calibration in HSIC_CFG register */
-+	ret = ulpi_write(ulpi, ULPI_HSIC_CFG, 0xa8);
++	ret = regulator_enable(uphy->v1p8);
 +	if (ret)
-+		goto err_ulpi;
++		goto err_1p8;
 +
-+	/* Configure pins for HSIC functionality */
-+	pins_default = pinctrl_lookup_state(uphy->pctl, PINCTRL_STATE_DEFAULT);
-+	if (IS_ERR(pins_default))
-+		return PTR_ERR(pins_default);
-+
-+	ret = pinctrl_select_state(uphy->pctl, pins_default);
++	ret = regulator_set_voltage_triplet(uphy->v3p3, 3050000, 3300000,
++					    3300000);
 +	if (ret)
-+		goto err_ulpi;
++		goto err_3p3;
 +
-+	 /* Enable HSIC mode in HSIC_CFG register */
-+	ret = ulpi_write(ulpi, ULPI_SET(ULPI_HSIC_CFG), 0x01);
++	ret = regulator_set_load(uphy->v3p3, 50000);
++	if (ret < 0)
++		goto err_3p3;
++
++	ret = regulator_enable(uphy->v3p3);
 +	if (ret)
-+		goto err_ulpi;
++		goto err_3p3;
 +
-+	/* Disable auto-resume */
-+	ret = ulpi_write(ulpi, ULPI_CLR(ULPI_IFC_CTRL),
-+			 ULPI_IFC_CTRL_AUTORESUME);
-+	if (ret)
-+		goto err_ulpi;
++	for (seq = uphy->init_seq; seq->addr; seq++) {
++		ret = ulpi_write(ulpi, seq->addr, seq->val);
++		if (ret)
++			goto err_ulpi;
++	}
 +
-+	return ret;
++	if (uphy->reset) {
++		ret = reset_control_reset(uphy->reset);
++		if (ret)
++			goto err_ulpi;
++	}
++
++	if (uphy->vbus_edev) {
++		ulpi_write(ulpi, ULPI_SET(ULPI_PWR_CLK_MNG_REG),
++			   ULPI_PWR_OTG_COMP_DISABLE);
++		state = extcon_get_cable_state_(uphy->vbus_edev, EXTCON_USB);
++		/* setup initial state */
++		qcom_usb_hs_phy_vbus_notifier(&uphy->vbus_notify, state,
++					      uphy->vbus_edev);
++	} else {
++		u8 val;
++
++		switch (uphy->dr_mode) {
++		case USB_DR_MODE_OTG:
++			val = ULPI_INT_IDGRD;
++		case USB_DR_MODE_PERIPHERAL:
++			val |= ULPI_INT_SESS_VALID;
++			break;
++		default:
++			val = 0;
++		}
++
++		ret = ulpi_write(ulpi, ULPI_USB_INT_EN_RISE, val);
++		if (ret)
++			goto err_ulpi;
++		ret = ulpi_write(ulpi, ULPI_USB_INT_EN_FALL, val);
++		if (ret)
++			goto err_ulpi;
++	}
++
++	return 0;
 +err_ulpi:
-+	clk_disable_unprepare(uphy->cal_sleep_clk);
++	regulator_disable(uphy->v3p3);
++err_3p3:
++	regulator_disable(uphy->v1p8);
++err_1p8:
++	clk_disable_unprepare(uphy->sleep_clk);
 +err_sleep:
-+	clk_disable_unprepare(uphy->cal_clk);
-+err_cal:
-+	clk_disable_unprepare(uphy->phy_clk);
++	clk_disable_unprepare(uphy->ref_clk);
 +	return ret;
 +}
 +
-+static int qcom_usb_hsic_phy_power_off(struct phy *phy)
++static int qcom_usb_hs_phy_power_off(struct phy *phy)
 +{
-+	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
++	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
 +
-+	clk_disable_unprepare(uphy->cal_sleep_clk);
-+	clk_disable_unprepare(uphy->cal_clk);
-+	clk_disable_unprepare(uphy->phy_clk);
++	regulator_disable(uphy->v3p3);
++	regulator_disable(uphy->v1p8);
++	clk_disable_unprepare(uphy->sleep_clk);
++	clk_disable_unprepare(uphy->ref_clk);
 +
 +	return 0;
 +}
 +
-+static const struct phy_ops qcom_usb_hsic_phy_ops = {
-+	.power_on = qcom_usb_hsic_phy_power_on,
-+	.power_off = qcom_usb_hsic_phy_power_off,
++static const struct phy_ops qcom_usb_hs_phy_ops = {
++	.power_on = qcom_usb_hs_phy_power_on,
++	.power_off = qcom_usb_hs_phy_power_off,
 +	.owner = THIS_MODULE,
 +};
 +
-+static int qcom_usb_hsic_phy_probe(struct ulpi *ulpi)
++static int qcom_usb_hs_phy_probe(struct ulpi *ulpi)
 +{
-+	struct qcom_usb_hsic_phy *uphy;
++	struct qcom_usb_hs_phy *uphy;
 +	struct phy_provider *p;
 +	struct clk *clk;
++	struct regulator *reg;
++	struct reset_control *reset;
++	int size;
++	int ret;
 +
 +	uphy = devm_kzalloc(&ulpi->dev, sizeof(*uphy), GFP_KERNEL);
 +	if (!uphy)
 +		return -ENOMEM;
 +	ulpi_set_drvdata(ulpi, uphy);
-+
 +	uphy->ulpi = ulpi;
-+	uphy->pctl = devm_pinctrl_get(&ulpi->dev);
-+	if (IS_ERR(uphy->pctl))
-+		return PTR_ERR(uphy->pctl);
++	uphy->dr_mode = of_usb_get_dr_mode_by_phy(ulpi->dev.of_node);
 +
-+	uphy->phy_clk = clk = devm_clk_get(&ulpi->dev, "phy");
++	size = of_property_count_u8_elems(ulpi->dev.of_node, "qcom,init-seq");
++	if (size < 0)
++		size = 0;
++	uphy->init_seq = devm_kmalloc_array(&ulpi->dev, (size / 2) + 1,
++					   sizeof(*uphy->init_seq), GFP_KERNEL);
++	if (!uphy->init_seq)
++		return -ENOMEM;
++	ret = of_property_read_u8_array(ulpi->dev.of_node, "qcom,init-seq",
++					(u8 *)uphy->init_seq, size);
++	if (ret && size)
++		return ret;
++	/* NUL terminate */
++	uphy->init_seq[size / 2].addr = uphy->init_seq[size / 2].val = 0;
++
++	uphy->ref_clk = clk = devm_clk_get(&ulpi->dev, "ref");
 +	if (IS_ERR(clk))
 +		return PTR_ERR(clk);
 +
-+	uphy->cal_clk = clk = devm_clk_get(&ulpi->dev, "cal");
++	uphy->sleep_clk = clk = devm_clk_get(&ulpi->dev, "sleep");
 +	if (IS_ERR(clk))
 +		return PTR_ERR(clk);
 +
-+	uphy->cal_sleep_clk = clk = devm_clk_get(&ulpi->dev, "cal_sleep");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
++	uphy->v1p8 = reg = devm_regulator_get(&ulpi->dev, "v1p8");
++	if (IS_ERR(reg))
++		return PTR_ERR(reg);
++
++	uphy->v3p3 = reg = devm_regulator_get(&ulpi->dev, "v3p3");
++	if (IS_ERR(reg))
++		return PTR_ERR(reg);
++
++	uphy->reset = reset = devm_reset_control_get(&ulpi->dev, "por");
++	if (IS_ERR(reset)) {
++		if (PTR_ERR(reset) == -EPROBE_DEFER)
++			return PTR_ERR(reset);
++		uphy->reset = NULL;
++	}
 +
 +	uphy->phy = devm_phy_create(&ulpi->dev, ulpi->dev.of_node,
-+				    &qcom_usb_hsic_phy_ops);
++				    &qcom_usb_hs_phy_ops);
 +	if (IS_ERR(uphy->phy))
 +		return PTR_ERR(uphy->phy);
++
++	uphy->vbus_edev = extcon_get_edev_by_phandle(&ulpi->dev, 0);
++	if (IS_ERR(uphy->vbus_edev)) {
++		if (PTR_ERR(uphy->vbus_edev) != -ENODEV)
++			return PTR_ERR(uphy->vbus_edev);
++		uphy->vbus_edev = NULL;
++	}
++
++	uphy->id_edev = extcon_get_edev_by_phandle(&ulpi->dev, 1);
++	if (IS_ERR(uphy->id_edev)) {
++		if (PTR_ERR(uphy->id_edev) != -ENODEV)
++			return PTR_ERR(uphy->id_edev);
++		uphy->id_edev = NULL;
++	}
++
++	if (uphy->vbus_edev) {
++		uphy->vbus_notify.notifier_call = qcom_usb_hs_phy_vbus_notifier;
++		ret = extcon_register_notifier(uphy->vbus_edev, EXTCON_USB,
++						&uphy->vbus_notify);
++		if (ret)
++			return ret;
++	}
++
 +	phy_set_drvdata(uphy->phy, uphy);
 +
 +	p = devm_of_phy_provider_register(&ulpi->dev, of_phy_simple_xlate);
 +	return PTR_ERR_OR_ZERO(p);
 +}
 +
-+
-+static const struct of_device_id qcom_usb_hsic_phy_match[] = {
-+	{ .compatible = "qcom,usb-hsic-phy", },
++static const struct of_device_id qcom_usb_hs_phy_match[] = {
++	{ .compatible = "qcom,usb-hs-phy", },
 +	{ }
 +};
-+MODULE_DEVICE_TABLE(of, qcom_usb_hsic_phy_match);
++MODULE_DEVICE_TABLE(of, qcom_usb_hs_phy_match);
 +
-+static struct ulpi_driver qcom_usb_hsic_phy_driver = {
-+	.probe = qcom_usb_hsic_phy_probe,
++static struct ulpi_driver qcom_usb_hs_phy_driver = {
++	.probe = qcom_usb_hs_phy_probe,
 +	.driver = {
-+		.name = "qcom_usb_hsic_phy",
-+		.of_match_table = qcom_usb_hsic_phy_match
++		.name = "qcom_usb_hs_phy",
++		.of_match_table = qcom_usb_hs_phy_match
 +	},
 +};
-+module_ulpi_driver(qcom_usb_hsic_phy_driver);
++module_ulpi_driver(qcom_usb_hs_phy_driver);
 +
-+MODULE_DESCRIPTION("Qualcomm USB HSIC phy");
++MODULE_DESCRIPTION("Qualcomm USB HS phy");
 +MODULE_LICENSE("GPL v2");
 -- 
 2.9.0.rc2.8.ga28705d
