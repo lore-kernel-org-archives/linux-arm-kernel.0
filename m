@@ -1,40 +1,36 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 26 Jun 2016 02:45:57 +0200
-Subject: [PATCH v3 5/8] rtc: ac100: Add clk output support
-In-Reply-To: <1466391138-12862-6-git-send-email-wens@csie.org>
+Date: Sun, 26 Jun 2016 03:02:00 +0200
+Subject: [PATCH v3 4/8] rtc: ac100: Add RTC driver for X-Powers AC100
+In-Reply-To: <1466391138-12862-5-git-send-email-wens@csie.org>
 References: <1466391138-12862-1-git-send-email-wens@csie.org>
- <1466391138-12862-6-git-send-email-wens@csie.org>
-Message-ID: <20160626004557.GX5809@piout.net>
+ <1466391138-12862-5-git-send-email-wens@csie.org>
+Message-ID: <20160626010200.GZ5809@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/2016 at 10:52:15 +0800, Chen-Yu Tsai wrote :
-> +struct ac100_clk32k {
-> +	struct clk_hw hw;
-> +	struct regmap *regmap;
-> +	u8 offset;
-> +};
+On 20/06/2016 at 10:52:14 +0800, Chen-Yu Tsai wrote :
+> +static int ac100_rtc_probe(struct platform_device *pdev)
+> +{
+> +	struct ac100_dev *ac100 = dev_get_drvdata(pdev->dev.parent);
+> +	struct ac100_rtc_dev *chip;
+> +	int ret;
 > +
-> +#define to_ac100_clk32k(_hw) container_of(_hw, struct ac100_clk32k, hw)
+> +	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
+> +	platform_set_drvdata(pdev, chip);
+> +	chip->dev = &pdev->dev;
+> +	chip->regmap = ac100->regmap;
+> +	mutex_init(&chip->mutex);
 > +
-> +#define AC100_RTC_32K_NAME	"ac100-rtc-32k"
-> +#define AC100_RTC_32K_RATE	32768
-> +#define AC100_ADDA_4M_NAME	"ac100-adda-4M"
-> +#define AC100_ADDA_4M_RATE	4000000
-> +#define AC100_CLK32K_NUM	3
-> +
-> +static const char * const ac100_clk32k_names[] = {
-> +	"ac100-clk32k-ap",
-> +	"ac100-clk32k-bb",
-> +	"ac100-clk32k-md",
-> +};
-> +
+> +	chip->irq = of_irq_get(pdev->dev.of_node, 0);
 
-Well, naming things is hard but I don't feel ac100_clk32k and
-ac100-clk32k are good prefixes for those clocks as they are actually
-dividing a 32KHz or 4MHz clock (one configuration out of 128 is 32KHz).
+Forgot that one, platform_get_irq() is probably more common but I don't
+care that much. I think you can then avoid including of.h and of_irq.h.
 
-Else, I don't have any objection.
+> +	if (chip->irq < 0) {
+> +		dev_err(&pdev->dev, "No IRQ resource\n");
+> +		return chip->irq;
+> +	}
+> +
 
 -- 
 Alexandre Belloni, Free Electrons
