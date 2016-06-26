@@ -1,26 +1,19 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 26 Jun 2016 19:52:59 +0100
-Subject: [PATCH v2 05/14] dt-bindings: document SY8106A regulator driver
-In-Reply-To: <e8508fa7-bd98-9171-0c9a-59e059573692@megous.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-6-megous@megous.com>
- <20160626112720.GL28202@sirena.org.uk>
- <e8508fa7-bd98-9171-0c9a-59e059573692@megous.com>
-Message-ID: <20160626185259.GS28202@sirena.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 26 Jun 2016 15:45:57 -0400 (EDT)
+Subject: [PATCH v2] net: stmmac: dwmac-rk: add rk3228-specific data
+In-Reply-To: <1466512409-18855-1-git-send-email-zhengxing@rock-chips.com>
+References: <1466512409-18855-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <20160626.154557.2260848143510311898.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2016 at 05:10:06PM +0200, Ond?ej Jirman wrote:
+From: Xing Zheng <zhengxing@rock-chips.com>
+Date: Tue, 21 Jun 2016 20:33:28 +0800
 
-> Hello, I assume that means "regulator: dt-bindings: ..." in this case.
-> I'll keep that in mind in the future. Thank you.
+> Add constants and callback functions for the dwmac on rk3228/rk3229 socs.
+> As can be seen, the base structure is the same, only registers and the
+> bits in them moved slightly.
+> 
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 
-Yes, or "regulator: sy8106a: " - as ever take a look at how other
-commits in the same file/directory are done.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160626/1c336117/attachment-0001.sig>
+Applied, thanks.
