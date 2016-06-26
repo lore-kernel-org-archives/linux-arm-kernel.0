@@ -1,56 +1,26 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 26 Jun 2016 10:26:43 -0700
-Subject: [PATCH] ARM: dts: sun7i: Add BCM53125 Device Tree nodes
-In-Reply-To: <20160626080550.GG4000@lukather>
-References: <1465690459-30751-1-git-send-email-f.fainelli@gmail.com>
- <1465690459-30751-2-git-send-email-f.fainelli@gmail.com>
- <CAGb2v64u74cXG0R-MSMtDBxBpg2tFoifQwqbvWL-+3pG=GLVTQ@mail.gmail.com>
- <576F450B.3080207@gmail.com> <20160626080550.GG4000@lukather>
-Message-ID: <57701053.9090903@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 26 Jun 2016 19:52:59 +0100
+Subject: [PATCH v2 05/14] dt-bindings: document SY8106A regulator driver
+In-Reply-To: <e8508fa7-bd98-9171-0c9a-59e059573692@megous.com>
+References: <20160625034511.7966-1-megous@megous.com>
+ <20160625034511.7966-6-megous@megous.com>
+ <20160626112720.GL28202@sirena.org.uk>
+ <e8508fa7-bd98-9171-0c9a-59e059573692@megous.com>
+Message-ID: <20160626185259.GS28202@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 26/06/2016 01:05, Maxime Ripard a ?crit :
-> Hi Florian,
-> 
-> On Sat, Jun 25, 2016 at 07:59:23PM -0700, Florian Fainelli wrote:
->> Le 23/06/2016 22:48, Chen-Yu Tsai a ?crit :
->>>> diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
->>>> index 5ee43d8bf174..697582397dcf 100644
->>>> --- a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
->>>> +++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
->>>> @@ -110,13 +110,67 @@
->>>>  &gmac {
->>>>         pinctrl-names = "default";
->>>>         pinctrl-0 = <&gmac_pins_rgmii_a>;
->>>> -       phy = <&phy1>;
->>>>         phy-mode = "rgmii";
->>>>         phy-supply = <&reg_gmac_3v3>;
->>>>         status = "okay";
->>>>
->>>> -       phy1: ethernet-phy at 1 {
->>>> -               reg = <1>;
->>>> +       fixed-link {
->>>> +               speed = <1000>;
->>>> +               full-duplex;
->>>> +       };
->>>> +
->>>> +       mdio1 {
->>>
->>> mdio will suffice.
->>
->> There is another label in sun7i-a20.dtsi named mdio which is for the
->> MDIO controller node matching allwinner,sun4i-a10-mdio, which is not the
->> one we want here, we want the MDIO controller associated with the
->> Synopsys GMAC.
-> 
-> Yes, but it's in a different node, and you're not using any labels, so
-> I don't really see how that would conflict.
+On Sun, Jun 26, 2016 at 05:10:06PM +0200, Ond?ej Jirman wrote:
 
-Fair enough, I sent a v2 which uses "mdio-gmac" as a label, should I
-respin a v3 which just uses "mdio"?
+> Hello, I assume that means "regulator: dt-bindings: ..." in this case.
+> I'll keep that in mind in the future. Thank you.
 
-v2 is here;
-http://www.spinics.net/lists/arm-kernel/msg514007.html
--- 
-Florian
+Yes, or "regulator: sy8106a: " - as ever take a look at how other
+commits in the same file/directory are done.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160626/1c336117/attachment-0001.sig>
