@@ -1,56 +1,35 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Sat, 25 Jun 2016 22:52:12 -0700
-Subject: [PATCH 2/3] regulator: qcom_spmi: Update mvs1/mvs2 switches on pm8941
+Date: Sat, 25 Jun 2016 22:52:13 -0700
+Subject: [PATCH 3/3] regulator: qcom_spmi: Add support for get_mode/set_mode
+ on switches
 In-Reply-To: <20160626055213.18071-1-stephen.boyd@linaro.org>
 References: <20160626055213.18071-1-stephen.boyd@linaro.org>
-Message-ID: <20160626055213.18071-3-stephen.boyd@linaro.org>
+Message-ID: <20160626055213.18071-4-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvs1 and mvs2 switches are actually called 5vs1 and 5vs2 on
-some datasheets. Let's rename them to match the datasheets and
-also match the RPM based regulator driver which calls these by
-their 5vs names (see qcom_smd-regulator.c). There aren't any
-users of these regulators so far, so there aren't any concerns of
-DT ABI breakage here. While we're here making updates to the
-switches, also mandate usage of the OCP irq for these switches
-too.
+The voltage switches support mode switching, so add support for
+these ops to those types of regulators.
 
 Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
 Fixes: e92a4047419c ("regulator: Add QCOM SPMI regulator driver")
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt | 2 +-
- drivers/regulator/qcom_spmi-regulator.c                             | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/regulator/qcom_spmi-regulator.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt b/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
-index 3e827bb9a56d..0fa3b0fac129 100644
---- a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
-@@ -115,7 +115,7 @@ pm8916:
- pm8941:
- 	s1, s2, s3, s4, l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13,
- 	l14, l15, l16, l17, l18, l19, l20, l21, l22, l23, l24, lvs1, lvs2, lvs3,
--	mvs1, mvs2
-+	5vs1, 5vs2
- 
- pm8994:
- 	s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, l1, l2, l3, l4, l5,
 diff --git a/drivers/regulator/qcom_spmi-regulator.c b/drivers/regulator/qcom_spmi-regulator.c
-index fe09407b150b..43f8f20b82e9 100644
+index 43f8f20b82e9..16c5f84e06a7 100644
 --- a/drivers/regulator/qcom_spmi-regulator.c
 +++ b/drivers/regulator/qcom_spmi-regulator.c
-@@ -1524,8 +1524,8 @@ static const struct spmi_regulator_data pm8941_regulators[] = {
- 	{ "lvs1", 0x8000, "vdd_l2_lvs_1_2_3", },
- 	{ "lvs2", 0x8100, "vdd_l2_lvs_1_2_3", },
- 	{ "lvs3", 0x8200, "vdd_l2_lvs_1_2_3", },
--	{ "mvs1", 0x8300, "vin_5vs", },
--	{ "mvs2", 0x8400, "vin_5vs", },
-+	{ "5vs1", 0x8300, "vin_5vs", "ocp-5vs1", },
-+	{ "5vs2", 0x8400, "vin_5vs", "ocp-5vs2", },
- 	{ }
+@@ -1085,6 +1085,8 @@ static struct regulator_ops spmi_vs_ops = {
+ 	.set_pull_down		= spmi_regulator_common_set_pull_down,
+ 	.set_soft_start		= spmi_regulator_common_set_soft_start,
+ 	.set_over_current_protection = spmi_regulator_vs_ocp,
++	.set_mode		= spmi_regulator_common_set_mode,
++	.get_mode		= spmi_regulator_common_get_mode,
  };
  
+ static struct regulator_ops spmi_boost_ops = {
 -- 
 2.9.0.rc2.8.ga28705d
