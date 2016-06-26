@@ -1,50 +1,31 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 26 Jun 2016 22:58:07 +0800
-Subject: [PATCH v3 5/8] rtc: ac100: Add clk output support
-In-Reply-To: <20160626004557.GX5809@piout.net>
-References: <1466391138-12862-1-git-send-email-wens@csie.org>
- <1466391138-12862-6-git-send-email-wens@csie.org>
- <20160626004557.GX5809@piout.net>
-Message-ID: <CAGb2v64YnSz5MnnF==ZeeqZw4yBY2R=dNVdyi9BczVR5WCNZ3g@mail.gmail.com>
+From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
+Date: Sun, 26 Jun 2016 17:07:16 +0200
+Subject: [PATCH v2 04/14] regulator: SY8106A regulator driver
+In-Reply-To: <20160626112657.GK28202@sirena.org.uk>
+References: <20160625034511.7966-1-megous@megous.com>
+ <20160625034511.7966-5-megous@megous.com>
+ <20160626112657.GK28202@sirena.org.uk>
+Message-ID: <3d6adff3-7ed3-73de-db0a-5f36c2f67a80@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2016 at 8:45 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On 20/06/2016 at 10:52:15 +0800, Chen-Yu Tsai wrote :
->> +struct ac100_clk32k {
->> +     struct clk_hw hw;
->> +     struct regmap *regmap;
->> +     u8 offset;
->> +};
->> +
->> +#define to_ac100_clk32k(_hw) container_of(_hw, struct ac100_clk32k, hw)
->> +
->> +#define AC100_RTC_32K_NAME   "ac100-rtc-32k"
->> +#define AC100_RTC_32K_RATE   32768
->> +#define AC100_ADDA_4M_NAME   "ac100-adda-4M"
->> +#define AC100_ADDA_4M_RATE   4000000
->> +#define AC100_CLK32K_NUM     3
->> +
->> +static const char * const ac100_clk32k_names[] = {
->> +     "ac100-clk32k-ap",
->> +     "ac100-clk32k-bb",
->> +     "ac100-clk32k-md",
->> +};
->> +
->
-> Well, naming things is hard but I don't feel ac100_clk32k and
-> ac100-clk32k are good prefixes for those clocks as they are actually
-> dividing a 32KHz or 4MHz clock (one configuration out of 128 is 32KHz).
+On 26.6.2016 13:26, Mark Brown wrote:
+> On Sat, Jun 25, 2016 at 05:45:01AM +0200, megous at megous.com wrote:
+>> From: Ondrej Jirman <megous@megous.com>
+>>
+>> SY8106A is I2C attached single output voltage regulator
+>> made by Silergy.
+> 
+> I'm missing almost all of this series, I've just got this and another
+> patch which look like a standalone driver so it's hard to see any
+> dependencies.  What's going on here?
+> 
 
-I agree it's a bit misleading. There are 2 names used throughout the
-datasheet: 1) CKOn_RTC for the pin names, and 2) CLK32Kxx for the
-register names and block diagram.
+Sorry, it's this series:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438981.html
 
-I'll switch to the pin names, since this is probably what is shown on
-board schematics.
+And here's v1 intro letter:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438794.html
 
-> Else, I don't have any objection.
-
-Thanks!
-ChenYu
+regards,
+  Ondrej Jirman
