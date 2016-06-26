@@ -1,35 +1,81 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Sat, 25 Jun 2016 22:52:13 -0700
-Subject: [PATCH 3/3] regulator: qcom_spmi: Add support for get_mode/set_mode
- on switches
-In-Reply-To: <20160626055213.18071-1-stephen.boyd@linaro.org>
-References: <20160626055213.18071-1-stephen.boyd@linaro.org>
-Message-ID: <20160626055213.18071-4-stephen.boyd@linaro.org>
+Date: Sat, 25 Jun 2016 22:54:37 -0700
+Subject: [PATCH] power: qcom_smbb: Make an extcon for usb cable detection
+Message-ID: <20160626055437.18516-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The voltage switches support mode switching, so add support for
-these ops to those types of regulators.
+On these PMICs the usb cable connection/disconnection is
+indicated by the usb-valid interrupt being high or low
+respectively. Let's make an extcon for that, so we can notify usb
+drivers of the cable state.
 
 Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-Fixes: e92a4047419c ("regulator: Add QCOM SPMI regulator driver")
+Cc: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/regulator/qcom_spmi-regulator.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/power/qcom_smbb.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/drivers/regulator/qcom_spmi-regulator.c b/drivers/regulator/qcom_spmi-regulator.c
-index 43f8f20b82e9..16c5f84e06a7 100644
---- a/drivers/regulator/qcom_spmi-regulator.c
-+++ b/drivers/regulator/qcom_spmi-regulator.c
-@@ -1085,6 +1085,8 @@ static struct regulator_ops spmi_vs_ops = {
- 	.set_pull_down		= spmi_regulator_common_set_pull_down,
- 	.set_soft_start		= spmi_regulator_common_set_soft_start,
- 	.set_over_current_protection = spmi_regulator_vs_ocp,
-+	.set_mode		= spmi_regulator_common_set_mode,
-+	.get_mode		= spmi_regulator_common_get_mode,
+diff --git a/drivers/power/qcom_smbb.c b/drivers/power/qcom_smbb.c
+index 5eb1e9e543e2..b5896ba2a602 100644
+--- a/drivers/power/qcom_smbb.c
++++ b/drivers/power/qcom_smbb.c
+@@ -34,6 +34,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
++#include <linux/extcon.h>
+ 
+ #define SMBB_CHG_VMAX		0x040
+ #define SMBB_CHG_VSAFE		0x041
+@@ -111,6 +112,7 @@ struct smbb_charger {
+ 	unsigned int revision;
+ 	unsigned int addr;
+ 	struct device *dev;
++	struct extcon_dev *edev;
+ 
+ 	bool dc_disabled;
+ 	bool jeita_ext_temp;
+@@ -125,6 +127,11 @@ struct smbb_charger {
+ 	struct regmap *regmap;
  };
  
- static struct regulator_ops spmi_boost_ops = {
++static const unsigned int smbb_usb_extcon_cable[] = {
++	EXTCON_USB,
++	EXTCON_NONE,
++};
++
+ static int smbb_vbat_weak_fn(unsigned int index)
+ {
+ 	return 2100000 + index * 100000;
+@@ -371,6 +378,8 @@ static irqreturn_t smbb_usb_valid_handler(int irq, void *_data)
+ 	struct smbb_charger *chg = _data;
+ 
+ 	smbb_set_line_flag(chg, irq, STATUS_USBIN_VALID);
++	extcon_set_cable_state_(chg->edev, EXTCON_USB,
++				chg->status & STATUS_USBIN_VALID);
+ 	power_supply_changed(chg->usb_psy);
+ 
+ 	return IRQ_HANDLED;
+@@ -849,6 +858,18 @@ static int smbb_charger_probe(struct platform_device *pdev)
+ 		return PTR_ERR(chg->usb_psy);
+ 	}
+ 
++	chg->edev = devm_extcon_dev_allocate(&pdev->dev, smbb_usb_extcon_cable);
++	if (IS_ERR(chg->edev)) {
++		dev_err(&pdev->dev, "failed to allocate extcon device\n");
++		return -ENOMEM;
++	}
++
++	rc = devm_extcon_dev_register(&pdev->dev, chg->edev);
++	if (rc < 0) {
++		dev_err(&pdev->dev, "failed to register extcon device\n");
++		return rc;
++	}
++
+ 	if (!chg->dc_disabled) {
+ 		dc_cfg.drv_data = chg;
+ 		dc_cfg.supplied_to = smbb_bif;
 -- 
 2.9.0.rc2.8.ga28705d
