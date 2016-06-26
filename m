@@ -1,98 +1,125 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Sun, 26 Jun 2016 00:28:20 -0700
-Subject: [PATCH 03/21] usb: ulpi: Avoid reading/writing in device creation
- with OF devices
+Date: Sun, 26 Jun 2016 00:28:21 -0700
+Subject: [PATCH 04/21] usb: chipidea: Only read/write OTGSC from one place
 In-Reply-To: <20160626072838.28082-1-stephen.boyd@linaro.org>
 References: <20160626072838.28082-1-stephen.boyd@linaro.org>
-Message-ID: <20160626072838.28082-4-stephen.boyd@linaro.org>
+Message-ID: <20160626072838.28082-5-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ULPI devices are matched up against ULPI drivers by reading the
-vendor id and product id registers in the ULPI address space.
-Before we try to read those registers we'll do a scratch write to
-test the interface. Unfortunately, this doesn't work well if the
-ULPI device is not powered at the time of device creation. In
-that case, the scratch register writes fail and product and
-vendor ids can't be read.
+With the id and vbus detection done via extcon we need to make
+sure we poll the status of OTGSC properly by considering what the
+extcon is saying, and not just what the register is saying. Let's
+move this hw_wait_reg() function to the only place it's used and
+simplify it for polling the OTGSC register. Then we can make
+certain we only use the hw_read_otgsc() API to read OTGSC, which
+will make sure we properly handle extcon events.
 
-If the ULPI spec had some way to describe generic power
-requirements for the scratch, product, and vendor registers we
-could but power sequencing into the ULPI bus layer and power up
-the device before touching the hardware. Unfortunately this
-doesn't exist. Furthermore, the power information is device
-specific, so it varies from device to device and is not standard.
-
-Let's punt on doing the reads/writes here when we're using DT
-backed ULPI devices. This avoids any problems where we need to
-power on the device but haven't figured out which device it is
-yet to know what sort of regulators, clks, etc. that need to be
-turned on for it to work.
-
+Cc: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
+Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/common/ulpi.c | 40 +++++++++++++++++++++-------------------
- 1 file changed, 21 insertions(+), 19 deletions(-)
+ drivers/usb/chipidea/core.c | 32 --------------------------------
+ drivers/usb/chipidea/otg.c  | 35 +++++++++++++++++++++++++++++++----
+ 2 files changed, 31 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/usb/common/ulpi.c b/drivers/usb/common/ulpi.c
-index 980af672bfe3..a6b2a150b176 100644
---- a/drivers/usb/common/ulpi.c
-+++ b/drivers/usb/common/ulpi.c
-@@ -197,25 +197,7 @@ static int ulpi_of_register(struct ulpi *ulpi)
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 69426e644d17..01390e02ee53 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -516,38 +516,6 @@ int hw_device_reset(struct ci_hdrc *ci)
+ 	return 0;
+ }
  
- static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+-/**
+- * hw_wait_reg: wait the register value
+- *
+- * Sometimes, it needs to wait register value before going on.
+- * Eg, when switch to device mode, the vbus value should be lower
+- * than OTGSC_BSV before connects to host.
+- *
+- * @ci: the controller
+- * @reg: register index
+- * @mask: mast bit
+- * @value: the bit value to wait
+- * @timeout_ms: timeout in millisecond
+- *
+- * This function returns an error code if timeout
+- */
+-int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
+-				u32 value, unsigned int timeout_ms)
+-{
+-	unsigned long elapse = jiffies + msecs_to_jiffies(timeout_ms);
+-
+-	while (hw_read(ci, reg, mask) != value) {
+-		if (time_after(jiffies, elapse)) {
+-			dev_err(ci->dev, "timeout waiting for %08x in %d\n",
+-					mask, reg);
+-			return -ETIMEDOUT;
+-		}
+-		msleep(20);
+-	}
+-
+-	return 0;
+-}
+-
+ static irqreturn_t ci_irq(int irq, void *data)
  {
--	int ret;
--
--	/* Test the interface */
--	ret = ulpi_write(ulpi, ULPI_SCRATCH, 0xaa);
--	if (ret < 0)
--		return ret;
--
--	ret = ulpi_read(ulpi, ULPI_SCRATCH);
--	if (ret < 0)
--		return ret;
--
--	if (ret != 0xaa)
--		return -ENODEV;
--
--	ulpi->id.vendor = ulpi_read(ulpi, ULPI_VENDOR_ID_LOW);
--	ulpi->id.vendor |= ulpi_read(ulpi, ULPI_VENDOR_ID_HIGH) << 8;
--
--	ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
--	ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
-+	int ret = -ENODEV;
+ 	struct ci_hdrc *ci = data;
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+index 03b6743461d1..763a8332b009 100644
+--- a/drivers/usb/chipidea/otg.c
++++ b/drivers/usb/chipidea/otg.c
+@@ -104,7 +104,32 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
+ 		usb_gadget_vbus_disconnect(&ci->gadget);
+ }
  
- 	ulpi->dev.parent = dev;
- 	ulpi->dev.bus = &ulpi_bus;
-@@ -230,6 +212,26 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
- 			return ret;
- 	}
- 
-+	if (ret) {
-+		/* Test the interface */
-+		ret = ulpi_write(ulpi, ULPI_SCRATCH, 0xaa);
-+		if (ret < 0)
-+			return ret;
+-#define CI_VBUS_STABLE_TIMEOUT_MS 5000
++/**
++ * Sometimes, it needs to wait register value before going on.
++ * Eg, when switch to device mode, the vbus value should be lower
++ * than OTGSC_BSV before connects to host.
++ *
++ * @ci: the controller
++ *
++ * This function returns an error code if timeout
++ */
++static int hw_wait_otgsc_bsv(struct ci_hdrc *ci)
++{
++	unsigned long elapse = jiffies + msecs_to_jiffies(5000);
++	u32 mask = OTGSC_BSV;
 +
-+		ret = ulpi_read(ulpi, ULPI_SCRATCH);
-+		if (ret < 0)
-+			return ret;
-+
-+		if (ret != 0xaa)
-+			return -ENODEV;
-+
-+		ulpi->id.vendor = ulpi_read(ulpi, ULPI_VENDOR_ID_LOW);
-+		ulpi->id.vendor |= ulpi_read(ulpi, ULPI_VENDOR_ID_HIGH) << 8;
-+
-+		ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
-+		ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
++	while (!hw_read_otgsc(ci, mask)) {
++		if (time_after(jiffies, elapse)) {
++			dev_err(ci->dev, "timeout waiting for %08x in OTGSC\n",
++					mask);
++			return -ETIMEDOUT;
++		}
++		msleep(20);
 +	}
 +
- 	if (of_device_request_module(&ulpi->dev))
- 		request_module("ulpi:v%04xp%04x", ulpi->id.vendor,
- 			       ulpi->id.product);
++	return 0;
++}
++
+ static void ci_handle_id_switch(struct ci_hdrc *ci)
+ {
+ 	enum ci_role role = ci_otg_role(ci);
+@@ -116,9 +141,11 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
+ 		ci_role_stop(ci);
+ 
+ 		if (role == CI_ROLE_GADGET)
+-			/* wait vbus lower than OTGSC_BSV */
+-			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
+-					CI_VBUS_STABLE_TIMEOUT_MS);
++			/*
++			 * wait vbus lower than OTGSC_BSV before connecting
++			 * to host
++			 */
++			hw_wait_otgsc_bsv(ci);
+ 
+ 		ci_role_start(ci, role);
+ 	}
 -- 
 2.9.0.rc2.8.ga28705d
