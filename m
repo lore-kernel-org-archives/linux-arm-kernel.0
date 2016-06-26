@@ -1,120 +1,42 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 25 Jun 2016 18:15:13 -0700
-Subject: [PATCH v3 3/5] regulator: rn5t618: add RN5T567 PMIC support
+Date: Sat, 25 Jun 2016 18:15:14 -0700
+Subject: [PATCH v3 4/5] mfd: rn5t618: register power off callback optionally
 In-Reply-To: <20160626011515.4428-1-stefan@agner.ch>
 References: <20160626011515.4428-1-stefan@agner.ch>
-Message-ID: <20160626011515.4428-4-stefan@agner.ch>
+Message-ID: <20160626011515.4428-5-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the driver to support Ricoh RN5T567. Support the additional
-DCDC and slightly different voltage range of LDORTC1.
+Only register power off if the PMIC is defined as system power
+controller (see Documentation/devicetree/bindings/power/
+power-controller.txt).
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-Acked-by: Mark Brown <broonie@kernel.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/Kconfig             |  5 +++--
- drivers/regulator/rn5t618-regulator.c | 40 +++++++++++++++++++++++++++++++----
- include/linux/mfd/rn5t618.h           |  1 +
- 3 files changed, 40 insertions(+), 6 deletions(-)
+ drivers/mfd/rn5t618.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 144cbf5..5472694 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -636,10 +636,11 @@ config REGULATOR_RK808
- 	  outputs which can be controlled by i2c communication.
- 
- config REGULATOR_RN5T618
--	tristate "Ricoh RN5T618 voltage regulators"
-+	tristate "Ricoh RN5T567/618 voltage regulators"
- 	depends on MFD_RN5T618
- 	help
--	  Say y here to support the regulators found on Ricoh RN5T618 PMIC.
-+	  Say y here to support the regulators found on Ricoh RN5T567 or
-+	  RN5T618 PMIC.
- 
- config REGULATOR_RT5033
- 	tristate "Richtek RT5033 Regulators"
-diff --git a/drivers/regulator/rn5t618-regulator.c b/drivers/regulator/rn5t618-regulator.c
-index b85ceb8..9c930eb 100644
---- a/drivers/regulator/rn5t618-regulator.c
-+++ b/drivers/regulator/rn5t618-regulator.c
-@@ -46,6 +46,23 @@ static struct regulator_ops rn5t618_reg_ops = {
- 		.vsel_mask	= (vmask),				\
+diff --git a/drivers/mfd/rn5t618.c b/drivers/mfd/rn5t618.c
+index c86160d..1831740 100644
+--- a/drivers/mfd/rn5t618.c
++++ b/drivers/mfd/rn5t618.c
+@@ -102,9 +102,13 @@ static int rn5t618_i2c_probe(struct i2c_client *i2c,
+ 		return ret;
  	}
  
-+static struct regulator_desc rn5t567_regulators[] = {
-+	/* DCDC */
-+	REG(DCDC1, DC1CTL, BIT(0), DC1DAC, 0xff, 600000, 3500000, 12500),
-+	REG(DCDC2, DC2CTL, BIT(0), DC2DAC, 0xff, 600000, 3500000, 12500),
-+	REG(DCDC3, DC3CTL, BIT(0), DC3DAC, 0xff, 600000, 3500000, 12500),
-+	REG(DCDC4, DC4CTL, BIT(0), DC4DAC, 0xff, 600000, 3500000, 12500),
-+	/* LDO */
-+	REG(LDO1, LDOEN1, BIT(0), LDO1DAC, 0x7f, 900000, 3500000, 25000),
-+	REG(LDO2, LDOEN1, BIT(1), LDO2DAC, 0x7f, 900000, 3500000, 25000),
-+	REG(LDO3, LDOEN1, BIT(2), LDO3DAC, 0x7f, 600000, 3500000, 25000),
-+	REG(LDO4, LDOEN1, BIT(3), LDO4DAC, 0x7f, 900000, 3500000, 25000),
-+	REG(LDO5, LDOEN1, BIT(4), LDO5DAC, 0x7f, 900000, 3500000, 25000),
-+	/* LDO RTC */
-+	REG(LDORTC1, LDOEN2, BIT(4), LDORTCDAC, 0x7f, 1200000, 3500000, 25000),
-+	REG(LDORTC2, LDOEN2, BIT(5), LDORTC2DAC, 0x7f, 900000, 3500000, 25000),
-+};
-+
- static struct regulator_desc rn5t618_regulators[] = {
- 	/* DCDC */
- 	REG(DCDC1, DC1CTL, BIT(0), DC1DAC, 0xff, 600000, 3500000, 12500),
-@@ -67,18 +84,33 @@ static int rn5t618_regulator_probe(struct platform_device *pdev)
- 	struct rn5t618 *rn5t618 = dev_get_drvdata(pdev->dev.parent);
- 	struct regulator_config config = { };
- 	struct regulator_dev *rdev;
-+	struct regulator_desc *regulators;
- 	int i;
- 
-+	switch (rn5t618->variant) {
-+	case RN5T567:
-+		regulators = rn5t567_regulators;
-+		break;
-+	case RN5T618:
-+		regulators = rn5t618_regulators;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	config.dev = pdev->dev.parent;
-+	config.regmap = rn5t618->regmap;
-+
- 	for (i = 0; i < RN5T618_REG_NUM; i++) {
--		config.dev = pdev->dev.parent;
--		config.regmap = rn5t618->regmap;
-+		if (!regulators[i].name)
-+			continue;
- 
- 		rdev = devm_regulator_register(&pdev->dev,
--					       &rn5t618_regulators[i],
-+					       &regulators[i],
- 					       &config);
- 		if (IS_ERR(rdev)) {
- 			dev_err(&pdev->dev, "failed to register %s regulator\n",
--				rn5t618_regulators[i].name);
-+				regulators[i].name);
- 			return PTR_ERR(rdev);
- 		}
+-	if (!pm_power_off) {
+-		rn5t618_pm_power_off = priv;
+-		pm_power_off = rn5t618_power_off;
++	if (of_device_is_system_power_controller(i2c->dev.of_node)) {
++		if (!pm_power_off) {
++			rn5t618_pm_power_off = priv;
++			pm_power_off = rn5t618_power_off;
++		} else {
++			dev_warn(&i2c->dev, "Poweroff callback already assigned\n");
++		}
  	}
-diff --git a/include/linux/mfd/rn5t618.h b/include/linux/mfd/rn5t618.h
-index 54179c2..cadc654 100644
---- a/include/linux/mfd/rn5t618.h
-+++ b/include/linux/mfd/rn5t618.h
-@@ -217,6 +217,7 @@ enum {
- 	RN5T618_DCDC1,
- 	RN5T618_DCDC2,
- 	RN5T618_DCDC3,
-+	RN5T618_DCDC4,
- 	RN5T618_LDO1,
- 	RN5T618_LDO2,
- 	RN5T618_LDO3,
+ 
+ 	return 0;
 -- 
 2.8.3
