@@ -1,152 +1,264 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Sat, 25 Jun 2016 22:21:32 -0700
-Subject: [PATCH 2/2] pinctrl: qcom: msm8974: Add hsic_ctl pinmux
-In-Reply-To: <20160626052132.7178-1-stephen.boyd@linaro.org>
-References: <20160626052132.7178-1-stephen.boyd@linaro.org>
-Message-ID: <20160626052132.7178-3-stephen.boyd@linaro.org>
+Date: Sat, 25 Jun 2016 22:24:54 -0700
+Subject: [PATCH] usb: misc: Add driver for usb4604
+Message-ID: <20160626052454.7743-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The msm8974 pinctrl variant has a couple USB HSIC "glue"
-registers that let us mux between the pinctrl register settings
-or the HSIC core settings for the HSIC pins (gpio 144 and gpio
-145). Support this method of operation by adding hsic_data and
-hsic_strobe pins that can select between hsic_ctl and gpio
-functions. This allows us to toggle the hsic pin configuration
-over to the HSIC core at runtime.
+This is a minimal driver to support bringing a usb4604 device
+from microchip out of reset and into hub mode. The usb4604 device
+is related to the usb3503 device, but it didn't seem close enough
+to warrant putting both into the same file. This patch borrows
+some of the usb3503 structure and trims it down to just handle
+the optional reset gpio and adds the i2c command to put the
+device into hub mode.
 
-Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/00001716A.pdf
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- .../bindings/pinctrl/qcom,msm8974-pinctrl.txt      |  5 ++-
- drivers/pinctrl/qcom/pinctrl-msm8x74.c             | 43 +++++++++++++++++++++-
- 2 files changed, 46 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/usb/usb4604.txt |  19 +++
+ drivers/usb/misc/Kconfig                          |   6 +
+ drivers/usb/misc/Makefile                         |   1 +
+ drivers/usb/misc/usb4604.c                        | 175 ++++++++++++++++++++++
+ 4 files changed, 201 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/usb4604.txt
+ create mode 100644 drivers/usb/misc/usb4604.c
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-index e4d6a9d20f7d..453bd7c76d6b 100644
---- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-@@ -49,6 +49,9 @@ Valid values for pins are:
-   sdc1_clk, sdc1_cmd, sdc1_data, sdc2_clk, sdc2_cmd, sdc2_data
-     Supports bias and drive-strength
- 
-+  hsic_data, hsic_strobe
-+    Supports only mux
+diff --git a/Documentation/devicetree/bindings/usb/usb4604.txt b/Documentation/devicetree/bindings/usb/usb4604.txt
+new file mode 100644
+index 000000000000..82506d17712c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/usb4604.txt
+@@ -0,0 +1,19 @@
++SMSC USB4604 High-Speed Hub Controller
 +
- Valid values for function are:
-   cci_i2c0, cci_i2c1, uim1, uim2, uim_batt_alarm,
-   blsp_uim1, blsp_uart1, blsp_i2c1, blsp_spi1,
-@@ -70,7 +73,7 @@ Valid values for function are:
-   cam_mckl0, cam_mclk1, cam_mclk2, cam_mclk3, mdp_vsync, hdmi_cec, hdmi_ddc,
-   hdmi_hpd, edp_hpd, gp_pdm0, gp_pdm1, gp_pdm2, gp_pdm3, gp0_clk, gp1_clk,
-   gp_mn, tsif1, tsif2, hsic, grfc, audio_ref_clk, qua_mi2s, pri_mi2s, spkr_mi2s,
--  ter_mi2s, sec_mi2s, bt, fm, wlan, slimbus, gpio
-+  ter_mi2s, sec_mi2s, bt, fm, wlan, slimbus, hsic_ctl, gpio
++Required properties:
++- compatible: Should be "smsc,usb4604"
++
++Optional properties:
++- reg: Specifies the i2c slave address, it is required and should be 0x2d
++       if I2C is used.
++- reset-gpios: Should specify GPIO for reset.
++- initial-mode: Should specify initial mode.
++                (1 for HUB mode, 2 for STANDBY mode)
++
++Examples:
++	usb-hub at 2d {
++		compatible = "smsc,usb4604";
++		reg = <0x2d>;
++		reset-gpios = <&gpx3 5 1>;
++		initial-mode = <1>;
++	};
+diff --git a/drivers/usb/misc/Kconfig b/drivers/usb/misc/Kconfig
+index e9e5ae521fa6..ac9ca570b26d 100644
+--- a/drivers/usb/misc/Kconfig
++++ b/drivers/usb/misc/Kconfig
+@@ -249,6 +249,12 @@ config USB_HSIC_USB3503
+        help
+          This option enables support for SMSC USB3503 HSIC to USB 2.0 Driver.
  
-   (Note that this is not yet the complete list of functions)
++config USB_HSIC_USB4604
++       tristate "USB4604 HSIC to USB20 Driver"
++       depends on I2C
++       help
++         This option enables support for SMSC USB4604 HSIC to USB 2.0 Driver.
++
+ config USB_LINK_LAYER_TEST
+ 	tristate "USB Link Layer Test driver"
+ 	help
+diff --git a/drivers/usb/misc/Makefile b/drivers/usb/misc/Makefile
+index 2769cf6351b4..95e897dff681 100644
+--- a/drivers/usb/misc/Makefile
++++ b/drivers/usb/misc/Makefile
+@@ -25,6 +25,7 @@ obj-$(CONFIG_USB_USS720)		+= uss720.o
+ obj-$(CONFIG_USB_SEVSEG)		+= usbsevseg.o
+ obj-$(CONFIG_USB_YUREX)			+= yurex.o
+ obj-$(CONFIG_USB_HSIC_USB3503)		+= usb3503.o
++obj-$(CONFIG_USB_HSIC_USB4604)		+= usb4604.o
+ obj-$(CONFIG_USB_CHAOSKEY)		+= chaoskey.o
+ obj-$(CONFIG_UCSI)			+= ucsi.o
  
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm8x74.c b/drivers/pinctrl/qcom/pinctrl-msm8x74.c
-index 46fe6ad5f97e..9eb63d3403d4 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm8x74.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm8x74.c
-@@ -172,6 +172,8 @@ static const struct pinctrl_pin_desc msm8x74_pins[] = {
- 	PINCTRL_PIN(149, "SDC2_CLK"),
- 	PINCTRL_PIN(150, "SDC2_CMD"),
- 	PINCTRL_PIN(151, "SDC2_DATA"),
-+	PINCTRL_PIN(152, "HSIC_STROBE"),
-+	PINCTRL_PIN(153, "HSIC_DATA"),
- };
- 
- #define DECLARE_MSM_GPIO_PINS(pin) static const unsigned int gpio##pin##_pins[] = { pin }
-@@ -328,6 +330,8 @@ static const unsigned int sdc1_data_pins[] = { 148 };
- static const unsigned int sdc2_clk_pins[] = { 149 };
- static const unsigned int sdc2_cmd_pins[] = { 150 };
- static const unsigned int sdc2_data_pins[] = { 151 };
-+static const unsigned int hsic_strobe_pins[] = { 152 };
-+static const unsigned int hsic_data_pins[] = { 153 };
- 
- #define FUNCTION(fname)					\
- 	[MSM_MUX_##fname] = {				\
-@@ -399,6 +403,37 @@ static const unsigned int sdc2_data_pins[] = { 151 };
- 		.intr_detection_width = -1,		\
- 	}
- 
-+#define HSIC_PINGROUP(pg_name, ctl)			\
-+	{						\
-+		.name = #pg_name,			\
-+		.pins = pg_name##_pins,			\
-+		.npins = ARRAY_SIZE(pg_name##_pins),	\
-+		.funcs = (int[]){			\
-+			MSM_MUX_gpio,			\
-+			MSM_MUX_hsic_ctl,		\
-+		},					\
-+		.nfuncs = 2,				\
-+		.ctl_reg = ctl,				\
-+		.io_reg = 0,				\
-+		.intr_cfg_reg = 0,			\
-+		.intr_status_reg = 0,			\
-+		.intr_target_reg = 0,			\
-+		.mux_bit = 25,				\
-+		.pull_bit = -1,				\
-+		.drv_bit = -1,				\
-+		.oe_bit = -1,				\
-+		.in_bit = -1,				\
-+		.out_bit = -1,				\
-+		.intr_enable_bit = -1,			\
-+		.intr_status_bit = -1,			\
-+		.intr_target_bit = -1,			\
-+		.intr_target_kpss_val = -1,		\
-+		.intr_raw_status_bit = -1,		\
-+		.intr_polarity_bit = -1,		\
-+		.intr_detection_bit = -1,		\
-+		.intr_detection_width = -1,		\
+diff --git a/drivers/usb/misc/usb4604.c b/drivers/usb/misc/usb4604.c
+new file mode 100644
+index 000000000000..e9f37fb746ac
+--- /dev/null
++++ b/drivers/usb/misc/usb4604.c
+@@ -0,0 +1,175 @@
++/*
++ * Driver for SMSC USB4604 USB HSIC 4-port 2.0 hub controller driver
++ * Based on usb3503 driver
++ *
++ * Copyright (c) 2012-2013 Dongjin Kim (tobetter at gmail.com)
++ * Copyright (c) 2016 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/i2c.h>
++#include <linux/delay.h>
++#include <linux/slab.h>
++#include <linux/module.h>
++#include <linux/gpio/consumer.h>
++
++enum usb4604_mode {
++	USB4604_MODE_UNKNOWN,
++	USB4604_MODE_HUB,
++	USB4604_MODE_STANDBY,
++};
++
++struct usb4604 {
++	enum usb4604_mode	mode;
++	struct device		*dev;
++	struct gpio_desc	*gpio_reset;
++};
++
++static void usb4604_reset(struct usb4604 *hub, int state)
++{
++	gpiod_set_value_cansleep(hub->gpio_reset, state);
++
++	/* Wait for i2c logic to come up */
++	if (state)
++		msleep(250);
++}
++
++static int usb4604_connect(struct usb4604 *hub)
++{
++	struct device *dev = hub->dev;
++	struct i2c_client *client = to_i2c_client(dev);
++	int err;
++	u8 connect_cmd[] = { 0xaa, 0x55, 0x00 };
++
++	usb4604_reset(hub, 1);
++
++	err = i2c_master_send(client, connect_cmd, ARRAY_SIZE(connect_cmd));
++	if (err < 0) {
++		usb4604_reset(hub, 0);
++		return err;
 +	}
 +
- /*
-  * TODO: Add the rest of the possible functions and fill out
-  * the pingroup table below.
-@@ -509,6 +544,7 @@ enum msm8x74_functions {
- 	MSM_MUX_fm,
- 	MSM_MUX_wlan,
- 	MSM_MUX_slimbus,
-+	MSM_MUX_hsic_ctl,
- 	MSM_MUX_NA,
- };
- 
-@@ -534,7 +570,8 @@ static const char * const gpio_groups[] = {
- 	"gpio123", "gpio124", "gpio125", "gpio126", "gpio127", "gpio128",
- 	"gpio129", "gpio130", "gpio131", "gpio132", "gpio133", "gpio134",
- 	"gpio135", "gpio136", "gpio137", "gpio138", "gpio139", "gpio140",
--	"gpio141", "gpio142", "gpio143", "gpio144", "gpio145"
-+	"gpio141", "gpio142", "gpio143", "gpio144", "gpio145", "hsic_data",
-+	"hsic_strobe",
- };
- 
- static const char * const blsp_uart1_groups[] = {
-@@ -754,6 +791,7 @@ static const char * const wlan_groups[] = {
- };
- 
- static const char * const slimbus_groups[] = { "gpio70", "gpio71" };
-+static const char * const hsic_ctl_groups[] = { "hsic_strobe", "hsic_data" };
- 
- static const struct msm_function msm8x74_functions[] = {
- 	FUNCTION(gpio),
-@@ -861,6 +899,7 @@ static const struct msm_function msm8x74_functions[] = {
- 	FUNCTION(fm),
- 	FUNCTION(wlan),
- 	FUNCTION(slimbus),
-+	FUNCTION(hsic_ctl),
- };
- 
- static const struct msm_pingroup msm8x74_groups[] = {
-@@ -1016,6 +1055,8 @@ static const struct msm_pingroup msm8x74_groups[] = {
- 	SDC_PINGROUP(sdc2_clk, 0x2048, 14, 6),
- 	SDC_PINGROUP(sdc2_cmd, 0x2048, 11, 3),
- 	SDC_PINGROUP(sdc2_data, 0x2048, 9, 0),
-+	HSIC_PINGROUP(hsic_strobe, 0x2050),
-+	HSIC_PINGROUP(hsic_data, 0x2054),
- };
- 
- #define NUM_GPIO_PINGROUPS 146
++	hub->mode = USB4604_MODE_HUB;
++	dev_dbg(dev, "switched to HUB mode\n");
++
++	return 0;
++}
++
++static int usb4604_switch_mode(struct usb4604 *hub, enum usb4604_mode mode)
++{
++	struct device *dev = hub->dev;
++	int err = 0;
++
++	switch (mode) {
++	case USB4604_MODE_HUB:
++		err = usb4604_connect(hub);
++		break;
++
++	case USB4604_MODE_STANDBY:
++		usb4604_reset(hub, 0);
++		dev_dbg(dev, "switched to STANDBY mode\n");
++		break;
++
++	default:
++		dev_err(dev, "unknown mode is requested\n");
++		err = -EINVAL;
++		break;
++	}
++
++	return err;
++}
++
++static int usb4604_probe(struct usb4604 *hub)
++{
++	struct device *dev = hub->dev;
++	struct device_node *np = dev->of_node;
++	struct gpio_desc *gpio;
++	u32 mode = USB4604_MODE_HUB;
++
++	gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW);
++	if (IS_ERR(gpio))
++		return PTR_ERR(gpio);
++	hub->gpio_reset = gpio;
++
++	if (of_property_read_u32(np, "initial-mode", &hub->mode))
++		hub->mode = mode;
++
++	return usb4604_switch_mode(hub, hub->mode);
++}
++
++static int usb4604_i2c_probe(struct i2c_client *i2c,
++			     const struct i2c_device_id *id)
++{
++	struct usb4604 *hub;
++
++	hub = devm_kzalloc(&i2c->dev, sizeof(*hub), GFP_KERNEL);
++	if (!hub)
++		return -ENOMEM;
++
++	i2c_set_clientdata(i2c, hub);
++	hub->dev = &i2c->dev;
++
++	return usb4604_probe(hub);
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int usb4604_i2c_suspend(struct device *dev)
++{
++	struct i2c_client *client = to_i2c_client(dev);
++	struct usb4604 *hub = i2c_get_clientdata(client);
++
++	usb4604_switch_mode(hub, USB4604_MODE_STANDBY);
++
++	return 0;
++}
++
++static int usb4604_i2c_resume(struct device *dev)
++{
++	struct i2c_client *client = to_i2c_client(dev);
++	struct usb4604 *hub = i2c_get_clientdata(client);
++
++	usb4604_switch_mode(hub, hub->mode);
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(usb4604_i2c_pm_ops, usb4604_i2c_suspend,
++		usb4604_i2c_resume);
++
++static const struct i2c_device_id usb4604_id[] = {
++	{ "usb4604", 0 },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, usb4604_id);
++
++#ifdef CONFIG_OF
++static const struct of_device_id usb4604_of_match[] = {
++	{ .compatible = "smsc,usb4604" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, usb4604_of_match);
++#endif
++
++static struct i2c_driver usb4604_i2c_driver = {
++	.driver = {
++		.name = "usb4604",
++		.pm = &usb4604_i2c_pm_ops,
++		.of_match_table = of_match_ptr(usb4604_of_match),
++	},
++	.probe		= usb4604_i2c_probe,
++	.id_table	= usb4604_id,
++};
++module_i2c_driver(usb4604_i2c_driver);
++
++MODULE_DESCRIPTION("USB4604 USB HUB driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.9.0.rc2.8.ga28705d
