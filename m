@@ -1,41 +1,43 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Sat, 25 Jun 2016 20:10:18 -0700
-Subject: [PATCH V2 13/63] clocksource/drivers/bcm2835_timer: Convert init
- function to return error
-In-Reply-To: <1466112442-31105-14-git-send-email-daniel.lezcano@linaro.org>
-References: <1466112442-31105-1-git-send-email-daniel.lezcano@linaro.org>
- <1466112442-31105-14-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <87mvm8myqt.fsf@eliezer.anholt.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 25 Jun 2016 21:19:43 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.7 (#1)
+In-Reply-To: <87wpli9abx.fsf@free-electrons.com>
+References: <87wpli9abx.fsf@free-electrons.com>
+Message-ID: <20160626041943.GA15374@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+On Tue, Jun 21, 2016 at 11:10:10AM +0200, Gregory CLEMENT wrote:
+> Hi,
+> 
+> Here is the first pull request for fixes for mvebu for v4.7.
+> 
+> Gregory
+> 
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> 
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.7-1
+> 
+> for you to fetch changes up to 929e604efa3dc0522214e0dc18984be23993e9f0:
+> 
+>   ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on Armada 385 Linksys (2016-06-16 17:01:28 +0200)
+> 
+> ----------------------------------------------------------------
+> mvebu fixes for 4.7 (part 1)
+> 
+> Various I/O memory fix for Cortex A9 based SoCs
+> 
+> ----------------------------------------------------------------
+> Thomas Petazzoni (3):
+>       ARM: mvebu: fix HW I/O coherency related deadlocks
+>       ARM: mvebu: map PCI I/O regions strongly ordered
+>       ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on Armada 385 Linksys
 
-> The init functions do not return any error. They behave as the following:
->
->  - panic, thus leading to a kernel crash while another timer may work and
->    make the system boot up correctly
->
->  or
->
->  - print an error and let the caller unaware if the state of the system
->
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
->
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Merged, thanks.
 
-For the bcm2835 changes here and in 63/63:
 
-Acked-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160625/06972f9a/attachment.sig>
+-Olof
