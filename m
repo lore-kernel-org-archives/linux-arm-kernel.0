@@ -1,65 +1,56 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Sun, 26 Jun 2016 18:39:05 +0200
-Subject: [RFC v4 0/7] extcon: usb-gpio: fixes and improvements
-In-Reply-To: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
-References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <57700529.7090707@math.uni-bielefeld.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 26 Jun 2016 10:26:43 -0700
+Subject: [PATCH] ARM: dts: sun7i: Add BCM53125 Device Tree nodes
+In-Reply-To: <20160626080550.GG4000@lukather>
+References: <1465690459-30751-1-git-send-email-f.fainelli@gmail.com>
+ <1465690459-30751-2-git-send-email-f.fainelli@gmail.com>
+ <CAGb2v64u74cXG0R-MSMtDBxBpg2tFoifQwqbvWL-+3pG=GLVTQ@mail.gmail.com>
+ <576F450B.3080207@gmail.com> <20160626080550.GG4000@lukather>
+Message-ID: <57701053.9090903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Le 26/06/2016 01:05, Maxime Ripard a ?crit :
+> Hi Florian,
+> 
+> On Sat, Jun 25, 2016 at 07:59:23PM -0700, Florian Fainelli wrote:
+>> Le 23/06/2016 22:48, Chen-Yu Tsai a ?crit :
+>>>> diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+>>>> index 5ee43d8bf174..697582397dcf 100644
+>>>> --- a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+>>>> +++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+>>>> @@ -110,13 +110,67 @@
+>>>>  &gmac {
+>>>>         pinctrl-names = "default";
+>>>>         pinctrl-0 = <&gmac_pins_rgmii_a>;
+>>>> -       phy = <&phy1>;
+>>>>         phy-mode = "rgmii";
+>>>>         phy-supply = <&reg_gmac_3v3>;
+>>>>         status = "okay";
+>>>>
+>>>> -       phy1: ethernet-phy at 1 {
+>>>> -               reg = <1>;
+>>>> +       fixed-link {
+>>>> +               speed = <1000>;
+>>>> +               full-duplex;
+>>>> +       };
+>>>> +
+>>>> +       mdio1 {
+>>>
+>>> mdio will suffice.
+>>
+>> There is another label in sun7i-a20.dtsi named mdio which is for the
+>> MDIO controller node matching allwinner,sun4i-a10-mdio, which is not the
+>> one we want here, we want the MDIO controller associated with the
+>> Synopsys GMAC.
+> 
+> Yes, but it's in a different node, and you're not using any labels, so
+> I don't really see how that would conflict.
 
-just wanted to ask on which kernel branch the patchset is based on. At
-least for me the set doesn't apply cleanly to 4.7-rc4.
+Fair enough, I sent a v2 which uses "mdio-gmac" as a label, should I
+respin a v3 which just uses "mdio"?
 
-With best wishes,
-Tobias
-
-
-Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> 
-> Some time ago, Robert tried to add VBUS detection to extcon-usb-gpio
-> driver [1].  There was a discussion about patch #2 ("extcon: usb-gpio:
-> add support for VBUS detection").
-> 
-> The final conclusion was that Chanwoo will add VBUS/ID notifiers [2].
-> That unfortunately never happened so this patchset is a follow up.
-> 
-> 1. Add VBUS/ID cable state notifiers to extcon, so USB controllers
->    could use it.
-> 2. Add VBUS detection to extcon-usb-gpio driver.
-> 
-> Some parts are based on old Robert's work, some are new, some are
-> reworked.
-> 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> [1] http://thread.gmane.org/gmane.linux.kernel/1923192/focus=1923193
-> [2] http://thread.gmane.org/gmane.linux.kernel/1923192/focus=1941152
-> 
-> 
-> Krzysztof Kozlowski (5):
->   Revert "extcon: usb-gpio: switch to use pm wakeirq apis"
->   extcon: Add raw VBUS and ID cable states
->   extcon: usb-gpio: Add support for VBUS detection
->   ARM: exynos_defconfig: Enable EXTCON_USB_GPIO for Odroid XU3 USB OTG
->   ARM: dts: exynos: Add extcon-usb-gpio node for Odroid XU3
-> 
-> Robert Baldyga (2):
->   Documentation: extcon: usb-gpio: update usb-gpio binding description
->   extcon: usb-gpio: make debounce value configurable in devicetree
-> 
->  .../devicetree/bindings/extcon/extcon-usb-gpio.txt |  28 ++++-
->  arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |  21 ++++
->  arch/arm/boot/dts/exynos5422-odroidxu3.dts         |  21 ++++
->  arch/arm/configs/exynos_defconfig                  |   1 +
->  drivers/extcon/extcon-usb-gpio.c                   | 138 +++++++++++++++++----
->  drivers/extcon/extcon.c                            |   3 +
->  include/linux/extcon.h                             |   8 +-
->  7 files changed, 190 insertions(+), 30 deletions(-)
-> 
+v2 is here;
+http://www.spinics.net/lists/arm-kernel/msg514007.html
+-- 
+Florian
