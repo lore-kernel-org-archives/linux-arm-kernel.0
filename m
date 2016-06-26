@@ -1,31 +1,25 @@
 From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Sun, 26 Jun 2016 17:07:16 +0200
-Subject: [PATCH v2 04/14] regulator: SY8106A regulator driver
-In-Reply-To: <20160626112657.GK28202@sirena.org.uk>
+Date: Sun, 26 Jun 2016 17:10:06 +0200
+Subject: [PATCH v2 05/14] dt-bindings: document SY8106A regulator driver
+In-Reply-To: <20160626112720.GL28202@sirena.org.uk>
 References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-5-megous@megous.com>
- <20160626112657.GK28202@sirena.org.uk>
-Message-ID: <3d6adff3-7ed3-73de-db0a-5f36c2f67a80@megous.com>
+ <20160625034511.7966-6-megous@megous.com>
+ <20160626112720.GL28202@sirena.org.uk>
+Message-ID: <e8508fa7-bd98-9171-0c9a-59e059573692@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.6.2016 13:26, Mark Brown wrote:
-> On Sat, Jun 25, 2016 at 05:45:01AM +0200, megous at megous.com wrote:
+On 26.6.2016 13:27, Mark Brown wrote:
+> On Sat, Jun 25, 2016 at 05:45:02AM +0200, megous at megous.com wrote:
 >> From: Ondrej Jirman <megous@megous.com>
 >>
->> SY8106A is I2C attached single output voltage regulator
->> made by Silergy.
+>> This patch adds the binding documentation for the
+>> sy8106a regulator driver.
 > 
-> I'm missing almost all of this series, I've just got this and another
-> patch which look like a standalone driver so it's hard to see any
-> dependencies.  What's going on here?
+> Please submit patches using subject lines reflecting the style for the
+> subsystem.  This makes it easier for people to identify relevant
+> patches.
 > 
 
-Sorry, it's this series:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438981.html
-
-And here's v1 intro letter:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438794.html
-
-regards,
-  Ondrej Jirman
+Hello, I assume that means "regulator: dt-bindings: ..." in this case.
+I'll keep that in mind in the future. Thank you.
