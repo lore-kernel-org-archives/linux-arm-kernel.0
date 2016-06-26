@@ -1,69 +1,68 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 26 Jun 2016 18:00:41 +0200
-Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
-Message-ID: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 26 Jun 2016 18:24:31 +0200
+Subject: [PATCH v2 00/15] clk: sunxi: introduce "modern" clock support
+In-Reply-To: <20160621014816.GT1521@codeaurora.org>
+References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
+ <20160621014816.GT1521@codeaurora.org>
+Message-ID: <20160626162431.GL4000@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Stephen,
 
-I've just spend most of my Sunday debugging a problem
-where Allwinner ARM SoC based boards will not shutdown when
-using a Fedora 24 userland, where as the exact same
-kernel works fine with Fedora 22.
+On Mon, Jun 20, 2016 at 06:48:16PM -0700, Stephen Boyd wrote:
+> On 06/07, Maxime Ripard wrote:
+> > 
+> > The current code has been tested on the H3 and an Orange Pi PC,
+> > including making sure that MMC still works, so the general approach
+> > seems ok.
+> > 
+> > Let me know what you think,
+> 
+> Overall this looks pretty good. Thanks for taking the time to
+> rework the driver.
+> 
+> The macro nesting is sort of concerning, but if you're willing to
+> live with a maze of macros I'm not too worried. Also, I don't see
+> why we have to use the ccu_common structure everywhere even when
+> we're not gaining from it, but it's not a huge problem either
+> way. The non-mmio clks could be split off from the mmio list and
+> then registered in two lists, or there could be mmio list that
+> sets up the base address and then a larger list of clk_hw
+> pointers that we just run through and register.
 
-It turns out that irq-balanced is to blame. In Fedora 24
-it pins the i2c controller, which talks to the pmic
-which is needed for poweroff to cpu-id 1:
+Ok, I'll move the fixed factor clocks out of the ccu_common list.
 
-[root at localhost ~]# cat /proc/irq/49/smp_affinity
-2
+> It would be great if we could squeeze some more code reuse out of
+> the basic types too, but I'm not sure if there's much more that
+> can be done. Sometimes I'm seeing the same code multiple times
+> for handling muxes with parents and dividers or muxes without
+> dividers, etc. But that seems like future work that isn't going
+> to block anything here.
 
-Where as the reboot_cpu is cpu-id 0 and with
-cpu 1 disabled at poweroff time, the i2c transfer
-never gets past its first step leading to an i2c
-driver timeout + kernel panic due to machine_power_off()
-returning.
+I tried my best already to move the common code, but it's not clear at
+this point what can be factorised and what will only be used by a
+single clock driver. Obviously, as we will support more SoCs, that
+will become clearer and we will be able to factor out the code that
+needs to be.
 
-As a workaround I can stop irq-balanced and do:
+> Finally, can you please use the clk_hw_register() APIs that we've
+> recently added. That will save us some time converting a new
+> driver over to use the new style of registering clks.
 
-echo 3 > /proc/irq/49/smp_affinity
+Ack, consider it done.
 
-Before doing poweroff and then everything works as
-expected again.
+Thanks!
+Maxime
 
-Now the question is how to fix this?
-
-IMHO this is a kernel-bug, if we disable CPU-s then we
-should unpin any irqs pinned to them before doing so.
-
-If someone can write a fix for this I will be more then
-happy to test it.
-
-Although I'm mostly unfamiliar with the irq code I'm also
-willing to try and write a fix myself, assuming that
-people agree that this is the right thing to-do, and
-that I can get some hints where to start.
-
-Regards,
-
-Hans
-
-
-
-p.s.
-
-I also noticed the following in the arm reboot code:
-
-void machine_power_off(void)
-{
-         local_irq_disable();
-         smp_send_stop();
-
-         if (pm_power_off)
-                 pm_power_off();
-}
-
-And I cannot help but wonder what re-enables local-irqs ?
-Clearly something does as they are needed for the i2c
-communication done by the m_power_off() call.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160626/ed09bfb9/attachment.sig>
