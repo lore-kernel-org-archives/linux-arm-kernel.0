@@ -1,57 +1,118 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 27 Jun 2016 16:31:40 +0530
-Subject: [PATCH v2 3/8] mfd: tps65218: Use mfd_add_devices instead of
- of_platform_populate
+Date: Mon, 27 Jun 2016 16:31:39 +0530
+Subject: [PATCH v2 2/8] Documentation: regulator: tps65218: Update examples
 In-Reply-To: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
 References: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1467025305-13464-4-git-send-email-j-keerthy@ti.com>
+Message-ID: <1467025305-13464-3-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mfd_add_devices enables parsing device tree nodes without compatibles
-for child nodes. Replace of_platform_populate with mfd_add_devices.
-mfd_cell currently is populated with only regulators.
+This updates the device tree according to the preferred way of parsing
+the nodes using the regulator framework.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
+ .../devicetree/bindings/regulator/tps65218.txt     | 87 ++++++++++++++++++----
+ 1 file changed, 71 insertions(+), 16 deletions(-)
 
-Changes in v2:
-
-  * Updated commit log.
-
-As of now only regulators driver is in kernel. The PMIC contains
-a bunch of GPIOs, Over temperature warning / shutdown unit.
-
- drivers/mfd/tps65218.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-index f20a531..b8b3a58 100644
---- a/drivers/mfd/tps65218.c
-+++ b/drivers/mfd/tps65218.c
-@@ -33,6 +33,10 @@
+diff --git a/Documentation/devicetree/bindings/regulator/tps65218.txt b/Documentation/devicetree/bindings/regulator/tps65218.txt
+index fccc1d2..8d3d919 100644
+--- a/Documentation/devicetree/bindings/regulator/tps65218.txt
++++ b/Documentation/devicetree/bindings/regulator/tps65218.txt
+@@ -1,23 +1,78 @@
+ TPS65218 family of regulators
  
- #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+ Required properties:
+-For tps65218 regulators/LDOs
+-- compatible:
+-  - "ti,tps65218-dcdc1" for DCDC1
+-  - "ti,tps65218-dcdc2" for DCDC2
+-  - "ti,tps65218-dcdc3" for DCDC3
+-  - "ti,tps65218-dcdc4" for DCDC4
+-  - "ti,tps65218-dcdc5" for DCDC5
+-  - "ti,tps65218-dcdc6" for DCDC6
+-  - "ti,tps65218-ldo1" for LDO1
+-
+-Optional properties:
+-- Any optional property defined in bindings/regulator/regulator.txt
++- compatible: "ti,tps65218"
++- reg: I2C slave address
++- list of regulators provided by this controller, must be named
++  after their hardware counterparts: dcdc[1-6] and ldo1
++- This is the list of child nodes that specify the regulator
++  initialization data for defined regulators. Not all regulators for the given
++  device need to be present. The definition for each of these nodes is defined
++  using the standard binding for regulators found at
++  Documentation/devicetree/bindings/regulator/regulator.txt.
++
++  The valid names for regulators are:
++  tps65217: regulator-dcdc1, regulator-dcdc2, regulator-dcdc3, regulator-dcdc4,
++  regulator-dcdc5, regulator-dcdc6, regulator-ldo1, regulator-ls3
++  Each regulator is defined using the standard binding for regulators.
  
-+static const struct mfd_cell tps65218_cells[] = {
-+	{ .name = "tps65218-regulator", },
+ Example:
++tps65218: tps65218 at 24 {
++	reg = <0x24>;
++	compatible = "ti,tps65218";
++	interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* NMIn */
++	interrupt-controller;
++	#interrupt-cells = <2>;
++
++	dcdc1: regulator-dcdc1 {
++		regulator-name = "vdd_core";
++		regulator-min-microvolt = <912000>;
++		regulator-max-microvolt = <1144000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	dcdc2: regulator-dcdc2 {
++		regulator-name = "vdd_mpu";
++		regulator-min-microvolt = <912000>;
++		regulator-max-microvolt = <1378000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	dcdc3: regulator-dcdc3 {
++		regulator-name = "vdcdc3";
++		regulator-min-microvolt = <1500000>;
++		regulator-max-microvolt = <1500000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	dcdc5: regulator-dcdc5 {
++		regulator-name = "v1_0bat";
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1000000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	dcdc6: regulator-dcdc6 {
++		regulator-name = "v1_8bat";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	ldo1: regulator-ldo1 {
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
+ 
+-	xyz: regulator at 0 {
+-		compatible = "ti,tps65218-dcdc1";
+-		regulator-min-microvolt  = <1000000>;
+-		regulator-max-microvolt  = <3000000>;
++	ls3: regulator-ls3 {
++		regulator-min-microvolt = <100000>;
++		regulator-max-microvolt = <1000000>;
+ 	};
 +};
-+
- /**
-  * tps65218_reg_write: Write a single tps65218 register.
-  *
-@@ -236,8 +240,10 @@ static int tps65218_probe(struct i2c_client *client,
- 	if (ret < 0)
- 		return ret;
- 
--	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
--				   &client->dev);
-+	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
-+			      ARRAY_SIZE(tps65218_cells), NULL, 0,
-+			      regmap_irq_get_domain(tps->irq_data));
-+
- 	if (ret < 0)
- 		goto err_irq;
- 
 -- 
 1.9.1
