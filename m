@@ -1,97 +1,48 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 27 Jun 2016 12:18:42 +0100
-Subject: [PATCH v20 04/14] arm64/kexec: Add core kexec support
-In-Reply-To: <018ac873d87fbfc45185cdab91ebc8731f64f94c.1466702804.git.geoff@infradead.org>
-References: <cover.1466702804.git.geoff@infradead.org>
- <018ac873d87fbfc45185cdab91ebc8731f64f94c.1466702804.git.geoff@infradead.org>
-Message-ID: <57710B92.2080603@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 27 Jun 2016 13:26:06 +0200
+Subject: [RFC PATCH 0/4] ARM: remove big.LITTLE switcher support
+Message-ID: <1467026770-5699-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Hi,
 
-On 23/06/16 18:54, Geoff Levand wrote:
-> Add three new files, kexec.h, machine_kexec.c and relocate_kernel.S to the
-> arm64 architecture that add support for the kexec re-boot mechanism
-> (CONFIG_KEXEC) on arm64 platforms.
+It seems that in mainline kernel big.LITTLE switcher support
+may be usable only on ARM Versatile Express TC2 platform
+(but even this platform doesn't enable it in its defconfig).
 
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> new file mode 100644
-> index 0000000..e2904c4
-> --- /dev/null
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> +/**
-> + * machine_kexec_prepare - Prepare for a kexec reboot.
-> + *
-> + * Called from the core kexec code when a kernel image is loaded.
-> + * Forbid loading a kexec kernel if we have no way of hotplugging cpus or cpus
-> + * are stuck in the kernel. This avoids a panic once we hit machine_kexec().
-> + */
-> +int machine_kexec_prepare(struct kimage *kimage)
-> +{
-> +	kimage_start = kimage->start;
-> +
-> +	if (kimage->type != KEXEC_TYPE_CRASH) {
-> +		if (cpus_are_stuck_in_kernel()) {
-> +			pr_err("Can't kexec: failed CPUs are stuck in the kernel.\n");
+The following patchset removes big.LITTLE switcher support
+(from both ARM core and arm_big_little CPUfreq driver) in
+favor of using HMP.
 
-We may want to change the word 'failed' here, the helper function now also
-covers systems that boot secondary processors with spin tables that are stuck in
-the secondary_holding_pen:
-> "Can't kexec: secondary CPUs are stuck in the kernel.\n"
+Since HMP support at scheduler level is not yet merged this
+patchset is probably premature and thus is marked as RFC.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
 
-> +			return -EBUSY;
-> +		}
-> +
+Bartlomiej Zolnierkiewicz (4):
+  ARM: remove big.LITTLE switcher support
+  cpufreq: arm_big_little: remove big.LITTLE switcher support
+  cpufreq: exynos: remove big.LITTLE switcher dependency
+  irqchip/gic: remove big.LITTLE switcher support
 
+ arch/arm/Kconfig                       |  19 +-
+ arch/arm/common/Makefile               |   2 -
+ arch/arm/common/bL_switcher.c          | 802 ---------------------------------
+ arch/arm/common/bL_switcher_dummy_if.c |  71 ---
+ arch/arm/include/asm/bL_switcher.h     |  77 ----
+ drivers/cpufreq/arm_big_little.c       | 379 +---------------
+ drivers/cpufreq/cpufreq-dt-platdev.c   |   2 -
+ drivers/irqchip/irq-gic.c              | 137 ------
+ 8 files changed, 25 insertions(+), 1464 deletions(-)
+ delete mode 100644 arch/arm/common/bL_switcher.c
+ delete mode 100644 arch/arm/common/bL_switcher_dummy_if.c
+ delete mode 100644 arch/arm/include/asm/bL_switcher.h
 
-
-> +		if (num_online_cpus() > 1) {
-> +			if (IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
-> +				/* any_cpu as we don't mind being preempted */
-> +				int any_cpu = raw_smp_processor_id();
-> +
-> +				if (cpu_ops[any_cpu]->cpu_die)
-> +					return 0;
-> +			}
-> +
-> +			pr_err("Can't kexec: no mechanism to offline secondary CPUs.\n");
-> +			return -EBUSY;
-> +		}
-
-This if() {} hunk isn't necessary with the version of cpus_are_stuck_in_kernel()
-you have in patch 2. This logic is the '|| smp_spin_tables' part of that helper
-function. (hibernate needed it too)
-
-
-
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-
-[ ... ]
-
-> +/**
-> + * machine_kexec - Do the kexec reboot.
-> + *
-> + * Called from the core kexec code for a sys_reboot with LINUX_REBOOT_CMD_KEXEC.
-> + */
-> +void machine_kexec(struct kimage *kimage)
-> +{
-> +	phys_addr_t reboot_code_buffer_phys;
-> +	void *reboot_code_buffer;
-> +
-> +	/*
-> +	 * New cpus may have become stuck_in_kernel after we loaded the image.
-> +	 */
-> +	BUG_ON(cpus_are_stuck_in_kernel() && (num_online_cpus() > 1));
-
-BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
-
-
-Thanks,
-
-James
+-- 
+1.9.1
