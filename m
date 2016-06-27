@@ -1,38 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 27 Jun 2016 15:12:55 +0100
-Subject: [PATCH 00/15] arm/arm64: KVM: Merge boot and runtime page tables
-In-Reply-To: <20160627132923.GH26498@cbox>
-References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
- <20160627132923.GH26498@cbox>
-Message-ID: <57713467.4060601@arm.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Mon, 27 Jun 2016 09:14:02 -0500
+Subject: [PATCH] ARM: dts: da850: Add new ECAP and EPWM bindings
+Message-ID: <1467036842-20913-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/16 14:29, Christoffer Dall wrote:
-> On Tue, Jun 07, 2016 at 11:58:20AM +0100, Marc Zyngier wrote:
->> Until now, we've been setting up KVM using two sets of page tables:
->> one for the "boot" where we perform the basic MMU setup, and one for
->> the runtime.
->>
->> Switching between the two was though to be safe, but we've recently
->> realized that it is not: it is not enough to ensure that the VA->PA
->> mapping is consistent when switching TTBR0_EL2, but we also have to
->> ensure that the intermediate translations are the same as well. If the
->> TLB can return two different values for intermediate translations,
->> we're screwed (TLB conflicts).
-> 
-> Just a clarification: Intermediate Translations here means the
-> page table levels of translations for a single stage of translation?
+From: "Cooper Jr., Franklin" <fcooper@ti.com>
 
-It does indeed.
+Switch to a new ECAP and EPWM bindings that doesn't depend on hwmod to
+provide the various required clocks.
 
-> Is there a valid reference to the arhictecture specification for this?
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-D4.7.1 (General TLB maintenance requirements) talks a bit about
-intermediate caching. G4.9.5 (TLB conflicts abort) is also of interest.
+This patch is a da850 specific version of:
+ARM: dts: am437x/am33xx/da850: Add new ECAP and EPWM bindings
+https://patchwork.kernel.org/patch/9005661/
 
-Thanks,
+This patch was created since the da850 portion didn't apply cleanly in
+the original patch.
 
-	M.
+ arch/arm/boot/dts/da850.dtsi | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 25f0f8e..09cf663 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -274,31 +274,36 @@
+ 			status = "disabled";
+ 		};
+ 		ehrpwm0: pwm at 300000 {
+-			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
++			compatible = "ti,da850-ehrpwm", "ti,am3352-ehrpwm",
++				     "ti,am33xx-ehrpwm";
+ 			#pwm-cells = <3>;
+ 			reg = <0x300000 0x2000>;
+ 			status = "disabled";
+ 		};
+ 		ehrpwm1: pwm at 302000 {
+-			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
++			compatible = "ti,da850-ehrpwm", "ti,am3352-ehrpwm",
++				     "ti,am33xx-ehrpwm";
+ 			#pwm-cells = <3>;
+ 			reg = <0x302000 0x2000>;
+ 			status = "disabled";
+ 		};
+ 		ecap0: ecap at 306000 {
+-			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
++			compatible = "ti,da850-ecap", "ti,am3352-ecap",
++				     "ti,am33xx-ecap";
+ 			#pwm-cells = <3>;
+ 			reg = <0x306000 0x80>;
+ 			status = "disabled";
+ 		};
+ 		ecap1: ecap at 307000 {
+-			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
++			compatible = "ti,da850-ecap", "ti,am3352-ecap",
++				     "ti,am33xx-ecap";
+ 			#pwm-cells = <3>;
+ 			reg = <0x307000 0x80>;
+ 			status = "disabled";
+ 		};
+ 		ecap2: ecap at 308000 {
+-			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
++			compatible = "ti,da850-ecap", "ti,am3352-ecap",
++				     "ti,am33xx-ecap";
+ 			#pwm-cells = <3>;
+ 			reg = <0x308000 0x80>;
+ 			status = "disabled";
 -- 
-Jazz is not dead. It just smells funny...
+2.7.0
