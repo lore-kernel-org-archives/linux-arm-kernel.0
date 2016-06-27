@@ -1,403 +1,132 @@
-From: zhouchengming1@huawei.com (zhouchengming)
-Date: Mon, 27 Jun 2016 18:30:51 +0800
-Subject: [PATCH] ilp32: fix {GET,SET}SIGMASK request for ptrace
-In-Reply-To: <20160627053916.GA305@yury-N73SV>
-References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
- <1466207668-10549-13-git-send-email-ynorov@caviumnetworks.com>
- <5770B041.3040509@huawei.com> <20160627053916.GA305@yury-N73SV>
-Message-ID: <5771005B.3060605@huawei.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 27 Jun 2016 12:55:26 +0200
+Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
+In-Reply-To: <20160627094552.GE1041@n2100.armlinux.org.uk>
+References: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
+ <5770EE21.90103@arm.com> <20160627094552.GE1041@n2100.armlinux.org.uk>
+Message-ID: <d3a266d3-2cfc-81c7-25a6-b39c8012bcf0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/27 13:39, Yury Norov wrote:
-> Hi Zhou,
->
-> Thank you for the patch. The idea is ok, but patch format got broken
-> for some reason. Could you re-send it?
->
-> Yury.
+Hi Russel,
 
-Sorry for the broken patch, maybe my mail guest has some problems. So
-I send the patch as an attachment.
+On 27-06-16 11:45, Russell King - ARM Linux wrote:
+> On Mon, Jun 27, 2016 at 10:13:05AM +0100, Marc Zyngier wrote:
+>> I'm wondering if that's not an effect of this patch:
+>>
+>> https://lkml.org/lkml/2015/9/24/138
+>>
+>> missing on the ARM side (the corresponding arm64 patch is 217d453d473c).
+>
+> No, because we don't take the other CPUs offline through CPU hotplug at
+> reboot - we stop them.  That's because CPU hotplug involves scheduling,
+> and a reboot can't be scheduled as it can happen from IRQ contexts.
+>
+> For a long time, we have not supported IRQs on any CPU after the system
+> has gone down for halt/reboot/poweroff etc:
+>
+> ipi_cpu_stop() disables IRQs and FIQs before entering an infinite loop.
+> machine_{halt,power_off,restart}() in arch/arm/kernel/reboot.c disables
+> IRQs on the requesting CPU.
+>
+> So, IRQs get disabled on _all_ CPUs.  Code after this point should not
+> re-enable IRQs to be able to use drivers, which it sounds like what's
+> happening in Hans scenario.  Remember, as I've said above, these paths
+> should not even be scheduling, and should never be reliant on receiving
+> interrupts.  *Especially* as they can themselves be called from IRQ
+> context.
 
-Thanks!
+First of all thanks for your input.
 
->
-> On Mon, Jun 27, 2016 at 12:49:05PM +0800, zhouchengming wrote:
->> atus: RO
->> Content-Length: 4732
->> Lines: 181
->>
->> The function compat_ptrace_request(used by ilp32) don't handle
->> {GET,SET}SIGMASK request, so it will be handled by ptrace_request.
->> But it's wrong because the compat_sigset_t of ilp32 differs from
->> the sigset_t of aarch64. The patch fixes it.
->>
->> Signed-off-by: Zhou Chengming<zhouchengming1@huawei.com>
->> ---
->>   arch/arm64/include/asm/signal_ilp32.h |   22 ++++++++++++
->>   arch/arm64/kernel/ptrace.c            |   62
->> +++++++++++++++++++++++++++++++++
->
-> Here -  unneeded line break
->
->>   arch/arm64/kernel/signal_ilp32.c      |   23 +------------
->>   3 files changed, 85 insertions(+), 22 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/signal_ilp32.h
->> b/arch/arm64/include/asm/signal_ilp32.h
->
-> and here
->
->> index 30eff23..ed52607 100644
->> --- a/arch/arm64/include/asm/signal_ilp32.h
->> +++ b/arch/arm64/include/asm/signal_ilp32.h
->> @@ -21,6 +21,28 @@
->>   int ilp32_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
->>   			  struct pt_regs *regs);
->>
->> +static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
->> +{
->> +	compat_sigset_t cset;
->> +
->> +	cset.sig[0] = set->sig[0]&  0xffffffffull;
->> +	cset.sig[1] = set->sig[0]>>  32;
->> +
->> +	return copy_to_user(uset,&cset, sizeof(*uset));
->> +}
->> +
->> +static inline int get_sigset_t(sigset_t *set,
->> +			       const compat_sigset_t __user *uset)
->> +{
->> +	compat_sigset_t s32;
->> +
->> +	if (copy_from_user(&s32, uset, sizeof(*uset)))
->> +		return -EFAULT;
->> +
->> +	set->sig[0] = s32.sig[0] | (((long)s32.sig[1])<<  32);
->> +	return 0;
->> +}
->> +
->>   #else
->>
->>   static inline int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
->> sigset_t *set,
->
-> and here
->
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index a861105..8d4cad1 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -44,6 +44,7 @@
->>   #include<asm/syscall.h>
->>   #include<asm/traps.h>
->>   #include<asm/system_misc.h>
->> +#include<asm/signal_ilp32.h>
->>
->>   #define CREATE_TRACE_POINTS
->>   #include<trace/events/syscalls.h>
->> @@ -1231,12 +1232,73 @@ COMPAT_SYSCALL_DEFINE4(aarch32_ptrace,
->> compat_long_t, request, compat_long_t, pi
->
-> and later on the patch
->
->>
->>   #endif /* CONFIG_AARCH32_EL0 */
->>
->> +#ifdef CONFIG_ARM64_ILP32
->> +
->> +static int compat_ilp32_ptrace(struct task_struct *child, compat_long_t
->> request,
->> +			compat_ulong_t addr, compat_ulong_t data)
->> +{
->> +	compat_ulong_t __user *datap = compat_ptr(data);
->> +	int ret;
->> +
->> +	switch (request) {
->> +	case PTRACE_GETSIGMASK:
->> +		if (addr != sizeof(compat_sigset_t)) {
->> +			ret = -EINVAL;
->> +			break;
->> +		}
->> +
->> +		if (put_sigset_t((compat_sigset_t __user *)datap,&child->blocked))
->> +			ret = -EFAULT;
->> +		else
->> +			ret = 0;
->> +		break;
->> +
->> +	case PTRACE_SETSIGMASK: {
->> +		sigset_t new_set;
->> +		if (addr != sizeof(compat_sigset_t)) {
->> +			ret = -EINVAL;
->> +			break;
->> +		}
->> +
->> +		if (get_sigset_t(&new_set, (compat_sigset_t __user *)datap)) {
->> +			ret = -EFAULT;
->> +			break;
->> +		}
->> +
->> +		sigdelsetmask(&new_set, sigmask(SIGKILL)|sigmask(SIGSTOP));
->> +
->> +		/*
->> +		 * Every thread does recalc_sigpending() after resume, so
->> +		 * retarget_shared_pending() and recalc_sigpending() are not
->> +		 * called here.
->> +		 */
->> +		spin_lock_irq(&child->sighand->siglock);
->> +		child->blocked = new_set;
->> +		spin_unlock_irq(&child->sighand->siglock);
->> +
->> +		ret = 0;
->> +		break;
->> +	}
->> +
->> +	default:
->> +		ret = compat_ptrace_request(child, request, addr, data);
->> +	}
->> +
->> +	return ret;
->> +}
->> +
->> +#endif /* CONFIG_ARM64_ILP32 */
->> +
->>   #ifdef CONFIG_COMPAT
->>
->>   long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
->>   			compat_ulong_t caddr, compat_ulong_t cdata)
->>   {
->> +#ifdef CONFIG_ARM64_ILP32
->> +	return compat_ilp32_ptrace(child, request, caddr, cdata);
->> +#else
->>   	return compat_ptrace_request(child, request, caddr, cdata);
->> +#endif
->>   }
->>
->>   #endif /* CONFIG_COMPAT */
->> diff --git a/arch/arm64/kernel/signal_ilp32.c
->> b/arch/arm64/kernel/signal_ilp32.c
->> index 8ca64b9..3ef2749 100644
->> --- a/arch/arm64/kernel/signal_ilp32.c
->> +++ b/arch/arm64/kernel/signal_ilp32.c
->> @@ -28,6 +28,7 @@
->>   #include<asm/fpsimd.h>
->>   #include<asm/signal32_common.h>
->>   #include<asm/signal_common.h>
->> +#include<asm/signal_ilp32.h>
->>   #include<asm/uaccess.h>
->>   #include<asm/unistd.h>
->>   #include<asm/ucontext.h>
->> @@ -58,28 +59,6 @@ struct ilp32_rt_sigframe {
->>   	struct ilp32_sigframe sig;
->>   };
->>
->> -static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
->> -{
->> -	compat_sigset_t cset;
->> -
->> -	cset.sig[0] = set->sig[0]&  0xffffffffull;
->> -	cset.sig[1] = set->sig[0]>>  32;
->> -
->> -	return copy_to_user(uset,&cset, sizeof(*uset));
->> -}
->> -
->> -static inline int get_sigset_t(sigset_t *set,
->> -                               const compat_sigset_t __user *uset)
->> -{
->> -	compat_sigset_t s32;
->> -
->> -	if (copy_from_user(&s32, uset, sizeof(*uset)))
->> -		return -EFAULT;
->> -
->> -	set->sig[0] = s32.sig[0] | (((long)s32.sig[1])<<  32);
->> -	return 0;
->> -}
->> -
->>   static int restore_ilp32_sigframe(struct pt_regs *regs,
->>                               struct
->
-> .
->
+Note this is not reboot, this is poweroff. And for poweroff many
+(ARM) boards depend on working i2c, which depends on irqs, for example
+all these mfd drivers:
 
--------------- next part --------------
->From 06f5abeca59069cb41b0b4fdfa06240d3f78910d Mon Sep 17 00:00:00 2001
-From: Zhou Chengming <zhouchengming1@huawei.com>
-Date: Mon, 27 Jun 2016 12:57:02 +0800
-Subject: [PATCH] ilp32: fix {GET,SET}SIGMASK request for ptrace
+drivers/mfd/rn5t618.c
+drivers/mfd/twl4030-power.c
+drivers/mfd/palmas.c
+drivers/mfd/dm355evm_msp.c
+drivers/mfd/tps6586x.c
+drivers/mfd/retu-mfd.c
+drivers/mfd/max8907.c
+drivers/mfd/tps65910.c
+drivers/mfd/tps80031.c
+drivers/mfd/rk808.c
+drivers/mfd/axp20x.c
 
-The function compat_ptrace_request(used by ilp32) don't handle
-{GET,SET}SIGMASK request, so it will be handled by ptrace_request.
-But it's wrong because the compat_sigset_t of ilp32 differs from
-the sigset_t of aarch64. The patch fixes it.
+Define pm_power_off and use i2c.
 
-Signed-off-by: Zhou Chengming <zhouchengming1@huawei.com>
----
- arch/arm64/include/asm/signal_ilp32.h |   22 ++++++++++++
- arch/arm64/kernel/ptrace.c            |   62 +++++++++++++++++++++++++++++++++
- arch/arm64/kernel/signal_ilp32.c      |   23 +------------
- 3 files changed, 85 insertions(+), 22 deletions(-)
+So although you may very well be right that using irqs to implement poweroff
+is not how things should be, in practice we've been using them for this for
+quite a while now and this usually works fine.
 
-diff --git a/arch/arm64/include/asm/signal_ilp32.h b/arch/arm64/include/asm/signal_ilp32.h
-index 30eff23..ed52607 100644
---- a/arch/arm64/include/asm/signal_ilp32.h
-+++ b/arch/arm64/include/asm/signal_ilp32.h
-@@ -21,6 +21,28 @@
- int ilp32_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 			  struct pt_regs *regs);
- 
-+static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
-+{
-+	compat_sigset_t cset;
-+
-+	cset.sig[0] = set->sig[0] & 0xffffffffull;
-+	cset.sig[1] = set->sig[0] >> 32;
-+
-+	return copy_to_user(uset, &cset, sizeof(*uset));
-+}
-+
-+static inline int get_sigset_t(sigset_t *set,
-+			       const compat_sigset_t __user *uset)
-+{
-+	compat_sigset_t s32;
-+
-+	if (copy_from_user(&s32, uset, sizeof(*uset)))
-+		return -EFAULT;
-+
-+	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
-+	return 0;
-+}
-+
- #else
- 
- static inline int ilp32_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index a861105..8d4cad1 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -44,6 +44,7 @@
- #include <asm/syscall.h>
- #include <asm/traps.h>
- #include <asm/system_misc.h>
-+#include <asm/signal_ilp32.h>
- 
- #define CREATE_TRACE_POINTS
- #include <trace/events/syscalls.h>
-@@ -1231,12 +1232,73 @@ COMPAT_SYSCALL_DEFINE4(aarch32_ptrace, compat_long_t, request, compat_long_t, pi
- 
- #endif /* CONFIG_AARCH32_EL0 */
- 
-+#ifdef CONFIG_ARM64_ILP32
-+
-+static int compat_ilp32_ptrace(struct task_struct *child, compat_long_t request,
-+			compat_ulong_t addr, compat_ulong_t data)
-+{
-+	compat_ulong_t __user *datap = compat_ptr(data);
-+	int ret;
-+
-+	switch (request) {
-+	case PTRACE_GETSIGMASK:
-+		if (addr != sizeof(compat_sigset_t)) {
-+			ret = -EINVAL;
-+			break;
-+		}
-+
-+		if (put_sigset_t((compat_sigset_t __user *)datap, &child->blocked))
-+			ret = -EFAULT;
-+		else
-+			ret = 0;
-+		break;
-+
-+	case PTRACE_SETSIGMASK: {
-+		sigset_t new_set;
-+		if (addr != sizeof(compat_sigset_t)) {
-+			ret = -EINVAL;
-+			break;
-+		}
-+
-+		if (get_sigset_t(&new_set, (compat_sigset_t __user *)datap)) {
-+			ret = -EFAULT;
-+			break;
-+		}
-+
-+		sigdelsetmask(&new_set, sigmask(SIGKILL)|sigmask(SIGSTOP));
-+
-+		/*
-+		 * Every thread does recalc_sigpending() after resume, so
-+		 * retarget_shared_pending() and recalc_sigpending() are not
-+		 * called here.
-+		 */
-+		spin_lock_irq(&child->sighand->siglock);
-+		child->blocked = new_set;
-+		spin_unlock_irq(&child->sighand->siglock);
-+
-+		ret = 0;
-+		break;
-+	}
-+
-+	default:
-+		ret = compat_ptrace_request(child, request, addr, data);
-+	}
-+
-+	return ret;
-+}
-+
-+#endif /* CONFIG_ARM64_ILP32 */
-+
- #ifdef CONFIG_COMPAT
- 
- long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
- 			compat_ulong_t caddr, compat_ulong_t cdata)
- {
-+#ifdef CONFIG_ARM64_ILP32
-+	return compat_ilp32_ptrace(child, request, caddr, cdata);
-+#else
- 	return compat_ptrace_request(child, request, caddr, cdata);
-+#endif
- }
- 
- #endif /* CONFIG_COMPAT */
-diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
-index 8ca64b9..3ef2749 100644
---- a/arch/arm64/kernel/signal_ilp32.c
-+++ b/arch/arm64/kernel/signal_ilp32.c
-@@ -28,6 +28,7 @@
- #include <asm/fpsimd.h>
- #include <asm/signal32_common.h>
- #include <asm/signal_common.h>
-+#include <asm/signal_ilp32.h>
- #include <asm/uaccess.h>
- #include <asm/unistd.h>
- #include <asm/ucontext.h>
-@@ -58,28 +59,6 @@ struct ilp32_rt_sigframe {
- 	struct ilp32_sigframe sig;
- };
- 
--static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
--{
--	compat_sigset_t cset;
--
--	cset.sig[0] = set->sig[0] & 0xffffffffull;
--	cset.sig[1] = set->sig[0] >> 32;
--
--	return copy_to_user(uset, &cset, sizeof(*uset));
--}
--
--static inline int get_sigset_t(sigset_t *set,
--                               const compat_sigset_t __user *uset)
--{
--	compat_sigset_t s32;
--
--	if (copy_from_user(&s32, uset, sizeof(*uset)))
--		return -EFAULT;
--
--	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
--	return 0;
--}
--
- static int restore_ilp32_sigframe(struct pt_regs *regs,
-                             struct ilp32_sigframe __user *sf)
- {
--- 
-1.7.7
+So I would prefer to see a fix which does not involve all these drivers /
+their i2c host drivers needing to implement a polling version of the i2c
+transfers just to get poweroff to work.
+
+Looking closer at poweroff being called from irq context, a quick grep gives
+the following files calling machine_power_off or kernel_power_off
+(with non arm relevant drivers and arch hits not under arch/arm / arch/arm64
+filtered out):
+
+arch/arm/mach-ixp4xx/dsmg600-setup.c
+arch/arm/mach-ixp4xx/nas100d-setup.c
+arch/arm/mach-ixp4xx/nslu2-setup.c
+drivers/hwmon/ab8500.c
+drivers/memory/emif.c
+kernel/power/hibernate.c
+kernel/power/poweroff.c
+kernel/reboot.c
+kernel/rcu/rcuperf.c
+kernel/torture.c
+
+mach-ixp4xx/* indeed call power_off from irq context
+ab8500.c      calls kernel_power_off from a workqueue
+emif.c        is used on omap4 / omap5 and indeed calls power_off from irq context
+hibernate.c   I've not checked callers of the hibernate() function, but I'm pretty
+               sure this is a context where sleeping is allowed
+reboot.c      calls machine_power_off from a syscall or a workqueue
+poweroff.c    calls machine_power_off from a workqueue
+rcuperf.c     calls kernel_power_off() in a kernel thread
+torture.c     calls kernel_power_off() in a kernel thread
+
+So it seems that the assumption that machine_power_off may be called
+from irq context is not always true, specifically it is only true on
+certain platforms (mach-ixp4xx, omap4, omap5 and whatever uses
+ab8500.c). I would expect the pm_power_off implementations on these
+platforms to indeed not use irqs themselves, that would indeed be
+bad.
+
+However I do not believe that a few platforms calling power_off directly
+from irq context means that we should forbid the use of sleeping code /
+interrupts in all pm_power_off handlers, that seems counter productive,
+esp. since a lot of pm_power_off handlers actually rely on i2c and
+thus irqs (without some major work) being available.
+
+###
+
+Which brings us back to our original problem, how do we fix
+irq smp_affinity on power off ?
+
+The first solution which comes to mind is to simple not call smp_send_stop()
+in the arm machine_power_off() implementation, AFAICT the purpose of smp_send_stop()
+is to make sure that all the non reboot-cpus are in a clean state for when the
+machine actually boots up again so as to not have them still accessing
+RAM, etc. while the bootloader/rom is running on the reboot-cpu. This does not
+seem necessary for poweroff. Note I'm not very familiar with all the details
+here so likely this is a stupid idea.
+
+Assuming my first solution is a bad idea, then we will likely need to do
+something similar to the hotplug cpu code on shutdown to reset affinities.
+
+I guess that messing with irq affinity while in an interrupt handler
+is a bad idea, so whatever fix we come up with should probably check for
+being in a context where sleeping is allowed and if not then skip this,
+so as to not break the few callers of machine_power_off from irq context;
+or alternatively and perhaps better we can fix those few callers to use
+a workqueue. All core kernel code already ensures this, so I guess this
+is already a requirement on x86?
+
+Regards,
+
+Hans
