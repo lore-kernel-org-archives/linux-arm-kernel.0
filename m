@@ -1,54 +1,38 @@
-From: andi@etezian.org (Andi Shyti)
-Date: Mon, 27 Jun 2016 23:08:27 +0900
-Subject: [PATCH 1/5] spi: do not fail if the CS line is not connected
-In-Reply-To: <20160627130657.GV28202@sirena.org.uk>
-References: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
- <1466150245-2648-2-git-send-email-andi.shyti@samsung.com>
- <20160617104725.GC26099@sirena.org.uk>
- <20160617113622.GA10760@jack.zhora.eu>
- <20160617122803.GN26099@sirena.org.uk>
- <20160619060902.GB424@jack.zhora.eu>
- <CGME20160626124853epcas1p297070a25da8980f1d8d2f025c65cbdab@epcas1p2.samsung.com>
- <20160626124843.GP28202@sirena.org.uk>
- <20160627105716.GA7240@samsunx.samsung>
- <20160627130657.GV28202@sirena.org.uk>
-Message-ID: <20160627140827.GF424@jack.zhora.eu>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Jun 2016 15:12:55 +0100
+Subject: [PATCH 00/15] arm/arm64: KVM: Merge boot and runtime page tables
+In-Reply-To: <20160627132923.GH26498@cbox>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+ <20160627132923.GH26498@cbox>
+Message-ID: <57713467.4060601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 27/06/16 14:29, Christoffer Dall wrote:
+> On Tue, Jun 07, 2016 at 11:58:20AM +0100, Marc Zyngier wrote:
+>> Until now, we've been setting up KVM using two sets of page tables:
+>> one for the "boot" where we perform the basic MMU setup, and one for
+>> the runtime.
+>>
+>> Switching between the two was though to be safe, but we've recently
+>> realized that it is not: it is not enough to ensure that the VA->PA
+>> mapping is consistent when switching TTBR0_EL2, but we also have to
+>> ensure that the intermediate translations are the same as well. If the
+>> TLB can return two different values for intermediate translations,
+>> we're screwed (TLB conflicts).
+> 
+> Just a clarification: Intermediate Translations here means the
+> page table levels of translations for a single stage of translation?
 
-> > What I meant is that if we do not like num-cs = <0>, the
-> > unlinked CS line can be handled only this way (case of the
-> > s3c64xx driver):
-> 
-> > +- broken-cs: the CS line is disconnected, therefore the device should not wait
-> > +  for the CS protocol to be established
-> 
-> So what you're saying here is that you just need a property for the
-> inability to read back the chip select status?  That seems like a
-> totally reasonable thing to have which fits in idiomatically with the
-> rest of the subsystem.  I might call it no-cs-readback or something.
-> 
-> > Which is not something I like, because it means adding a new
-> > flag in the dts.
-> 
-> > What I want to suggest, instead, is to slightly change the logic
-> > behind the num-cs property: i.e. if "num-cs = <0>", doesn't
-> > necessarily mean that we don't have a CS controller, but, while
-> > we can have as many as we wish, non of them is connected.
-> 
-> I disagree, I think from a system integration point of view this is just
-> a chip select which can't be changed and it's less likely that we will
-> run into nasty surprises later on with things assuming that chip selects
-> exist.  AFAICT you only need this property in your case because this
-> controller has some features that rely on readback of the chip select
-> status, that's not very common - normally it'd be write only.  I'd
-> expect most controllers would just say they have one chip select and
-> that'd be that.
+It does indeed.
 
-thanks for your feedback, I will then do as you say, I will use
-the no-cs-readback flag.
+> Is there a valid reference to the arhictecture specification for this?
 
-Thanks again,
-Andi
+D4.7.1 (General TLB maintenance requirements) talks a bit about
+intermediate caching. G4.9.5 (TLB conflicts abort) is also of interest.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
