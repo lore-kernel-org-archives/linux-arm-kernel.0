@@ -1,73 +1,101 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 27 Jun 2016 17:02:38 +0800
-Subject: [PATCH 00/10] arm64: tegra: add BPMP support
-Message-ID: <20160627090248.23621-1-josephl@nvidia.com>
+Date: Mon, 27 Jun 2016 17:02:39 +0800
+Subject: [PATCH 01/10] Documentation: dt-bindings: mailbox: tegra: Add binding
+ for HSP mailbox
+In-Reply-To: <20160627090248.23621-1-josephl@nvidia.com>
+References: <20160627090248.23621-1-josephl@nvidia.com>
+Message-ID: <20160627090248.23621-2-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add DT binding for the Hardware Synchronization Primitives (HSP). The
+HSP is designed for the processors to share resources and communicate
+together. It provides a set of hardware synchronization primitives for
+interprocessor communication. So the interprocessor communication (IPC)
+protocols can use hardware synchronization primitive, when operating
+between two processors not in an SMP relationship.
 
-This series introduce the first announced Boot and Power Management Processor
-(BPMP) for the new generation Tegra SoCs, which is designed for boot
-process handling and offloading the power management tasks from the CPU.
-
-We also add some very initial and basic support for Tegra186 SoC, which
-supports debug console and initrd for initial bring up currently. More drivers
-and functions can be supported based on this later.
-
-Thanks,
-Joseph
-
-Joseph Lo (10):
-  Documentation: dt-bindings: mailbox: tegra: Add binding for HSP
-    mailbox
-  mailbox: tegra-hsp: Add HSP(Hardware Synchronization Primitives)
-    driver
-  Documentation: dt-bindings: firmware: tegra: add bindings of the BPMP
-  firmware: tegra: add IVC library
-  firmware: tegra: add BPMP support
-  soc/tegra: Add Tegra186 support
-  arm64: defconfig: Enable Tegra186 SoC
-  arm64: dts: tegra: Add Tegra186 support
-  arm64: dts: tegra: Add NVIDIA Tegra186 P3310 main board support
-  arm64: dts: tegra: Add NVIDIA P2771 board support
-
- .../bindings/firmware/nvidia,tegra186-bpmp.txt     |   61 +
- .../bindings/mailbox/nvidia,tegra186-hsp.txt       |   42 +
- arch/arm64/boot/dts/nvidia/Makefile                |    1 +
- arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts |    8 +
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi     |   30 +
- arch/arm64/boot/dts/nvidia/tegra186.dtsi           |   77 +
- arch/arm64/configs/defconfig                       |    1 +
- drivers/firmware/Kconfig                           |    1 +
- drivers/firmware/Makefile                          |    1 +
- drivers/firmware/tegra/Kconfig                     |   25 +
- drivers/firmware/tegra/Makefile                    |    2 +
- drivers/firmware/tegra/bpmp.c                      |  713 +++++++++
- drivers/firmware/tegra/ivc.c                       |  659 ++++++++
- drivers/mailbox/Kconfig                            |    9 +
- drivers/mailbox/Makefile                           |    2 +
- drivers/mailbox/tegra-hsp.c                        |  306 ++++
- drivers/soc/tegra/Kconfig                          |   14 +
- include/dt-bindings/mailbox/tegra-hsp.h            |   20 +
- include/soc/tegra/bpmp.h                           |   29 +
- include/soc/tegra/bpmp_abi.h                       | 1601 ++++++++++++++++++++
- include/soc/tegra/ivc.h                            |  102 ++
- 21 files changed, 3704 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ .../bindings/mailbox/nvidia,tegra186-hsp.txt       | 42 ++++++++++++++++++++++
+ include/dt-bindings/mailbox/tegra-hsp.h            | 20 +++++++++++
+ 2 files changed, 62 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186.dtsi
- create mode 100644 drivers/firmware/tegra/Kconfig
- create mode 100644 drivers/firmware/tegra/Makefile
- create mode 100644 drivers/firmware/tegra/bpmp.c
- create mode 100644 drivers/firmware/tegra/ivc.c
- create mode 100644 drivers/mailbox/tegra-hsp.c
  create mode 100644 include/dt-bindings/mailbox/tegra-hsp.h
- create mode 100644 include/soc/tegra/bpmp.h
- create mode 100644 include/soc/tegra/bpmp_abi.h
- create mode 100644 include/soc/tegra/ivc.h
 
+diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+new file mode 100644
+index 000000000000..ca07af2d951e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+@@ -0,0 +1,42 @@
++NVIDIA Tegra Hardware Synchronization Primitives (HSP)
++
++The HSP modules are used for the processors to share resources and communicate
++together. It provides a set of hardware synchronization primitives for
++interprocessor communication. So the interprocessor communication (IPC)
++protocols can use hardware synchronization primitives, when operating between
++two processors not in an SMP relationship.
++
++The features that HSP supported are shared mailboxes, shared semaphores,
++arbitrated semaphores and doorbells.
++
++Required properties:
++- name : Should be hsp
++- compatible : Should be "nvidia,tegra<chip>-hsp"
++- reg : Offset and length of the register set for the device
++- interrupts : Should contain the HSP interrupts
++- interrupt-names: Should contain the names of the HSP interrupts that the
++		   client are using.
++		   "doorbell"
++- nvidia,hsp-function : Specifies one of the HSP functions that the HSP unit
++			will be supported. The function ID can be found in the
++			header file <dt-bindings/mailbox/tegra-hsp.h>.
++- #mbox-cells : Should be 1. Specifies the HSP master that will be enabled of
++		the HSP client. The master ID constants can be found in the
++		header file <dt-bindings/mailbox/tegra-hsp.h>.
++
++Example:
++
++hsp_top: hsp at 3c00000 {
++	compatible = "nvidia,tegra186-hsp";
++	reg = <0x0 0x03c00000 0x0 0xa0000>;
++	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "doorbell";
++	nvidia,hsp-function = <HSP_DOORBELL>;
++	#mbox-cells = <1>;
++};
++
++bpmp at d0000000 {
++	...
++	mboxes = <&hsp_top HSP_DB_MASTER_BPMP>;
++	...
++};
+diff --git a/include/dt-bindings/mailbox/tegra-hsp.h b/include/dt-bindings/mailbox/tegra-hsp.h
+new file mode 100644
+index 000000000000..720c66784b72
+--- /dev/null
++++ b/include/dt-bindings/mailbox/tegra-hsp.h
+@@ -0,0 +1,20 @@
++/*
++ * This header provides constants for binding nvidia,tegra<chip>-hsp.
++ *
++ * The number with HSP_DB_MASTER prefix indicates the bit that is
++ * associated with a master ID in the doorbell registers.
++ */
++
++
++#ifndef _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
++#define _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
++
++#define HSP_SHARED_MAILBOX		0
++#define HSP_SHARED_SEMAPHORE		1
++#define HSP_ARBITRATED_SEMAPHORE	2
++#define HSP_DOORBELL			3
++
++#define HSP_DB_MASTER_CCPLEX 17
++#define HSP_DB_MASTER_BPMP 19
++
++#endif	/* _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H */
 -- 
 2.9.0
