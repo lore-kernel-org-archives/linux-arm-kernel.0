@@ -1,60 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 27 Jun 2016 10:13:05 +0100
-Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
-In-Reply-To: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
-References: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
-Message-ID: <5770EE21.90103@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 Jun 2016 11:22:04 +0200
+Subject: [PATCH v3] ARM: sun8i: Add Parrot Board DTS
+In-Reply-To: <1466763001-24117-1-git-send-email-quentin.schulz@free-electrons.com>
+References: <1466763001-24117-1-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <20160627092204.GU4000@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Thanks Maxime for pointing me to this discussion, +RMK]
-
-Hi Hans,
-
-On 26/06/16 17:00, Hans de Goede wrote:
-> Hi,
+On Fri, Jun 24, 2016 at 12:10:01PM +0200, Quentin Schulz wrote:
+> The Parrot Board is an evaluation board with an Allwinner R16 (assumed
+> to be close to an Allwinner A33), 4GB of eMMC, 512MB of RAM, USB host
+> and OTG, a WiFi/Bluetooth combo chip, a micro SD Card reader, 2
+> controllable buttons, an LVDS port with separated backlight and
+> capacitive touch panel ports, an audio/microphone jack, a camera CSI
+> port, 2 sets of 22 GPIOs and an accelerometer.
 > 
-> I've just spend most of my Sunday debugging a problem
-> where Allwinner ARM SoC based boards will not shutdown when
-> using a Fedora 24 userland, where as the exact same
-> kernel works fine with Fedora 22.
-> 
-> It turns out that irq-balanced is to blame. In Fedora 24
-> it pins the i2c controller, which talks to the pmic
-> which is needed for poweroff to cpu-id 1:
-> 
-> [root at localhost ~]# cat /proc/irq/49/smp_affinity
-> 2
-> 
-> Where as the reboot_cpu is cpu-id 0 and with
-> cpu 1 disabled at poweroff time, the i2c transfer
-> never gets past its first step leading to an i2c
-> driver timeout + kernel panic due to machine_power_off()
-> returning.
-> 
-> As a workaround I can stop irq-balanced and do:
-> 
-> echo 3 > /proc/irq/49/smp_affinity
-> 
-> Before doing poweroff and then everything works as
-> expected again.
-> 
-> Now the question is how to fix this?
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-[...]
+Fixed the longer by 80 chars issue you had, and applied.
 
-I'm wondering if that's not an effect of this patch:
+Thanks!
+Maxime
 
-https://lkml.org/lkml/2015/9/24/138
-
-missing on the ARM side (the corresponding arm64 patch is 217d453d473c).
-
-Otherwise, can you instrument the GIC set_affinity method and find out
-if we're even trying to move this IRQ away from the CPU that is being
-torn down?
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/305ee731/attachment.sig>
