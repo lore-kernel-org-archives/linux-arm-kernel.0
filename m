@@ -1,36 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 Jun 2016 15:54:00 +0100
-Subject: [PATCH v2 04/14] regulator: SY8106A regulator driver
-In-Reply-To: <3d6adff3-7ed3-73de-db0a-5f36c2f67a80@megous.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-5-megous@megous.com>
- <20160626112657.GK28202@sirena.org.uk>
- <3d6adff3-7ed3-73de-db0a-5f36c2f67a80@megous.com>
-Message-ID: <20160627145400.GY28202@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Jun 2016 15:54:46 +0100
+Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
+In-Reply-To: <842a453d-3295-ffbd-f3dd-67baba1692d2@redhat.com>
+References: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
+ <5770EE21.90103@arm.com>
+ <20160627094552.GE1041@n2100.armlinux.org.uk>
+ <d3a266d3-2cfc-81c7-25a6-b39c8012bcf0@redhat.com>
+ <20160627113143.GF1041@n2100.armlinux.org.uk>
+ <842a453d-3295-ffbd-f3dd-67baba1692d2@redhat.com>
+Message-ID: <20160627145445.GA29321@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2016 at 05:07:16PM +0200, Ond?ej Jirman wrote:
-> On 26.6.2016 13:26, Mark Brown wrote:
+On Mon, Jun 27, 2016 at 02:53:16PM +0200, Hans de Goede wrote:
+> Note this does not mean that all pm_power_off implementations
+> are going to be happy with machine_power_off leaving irqs
+> enabled, I would esp. expect the efi and psci implementations
+> to potentially be unhappy about this. See below for a proposal
+> to deal with this.
 
-> > I'm missing almost all of this series, I've just got this and another
-> > patch which look like a standalone driver so it's hard to see any
-> > dependencies.  What's going on here?
+Neither PSCI nor EFI care either way about interrupts.
 
-> Sorry, it's this series:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438981.html
+PSCI makes synchronous HVC/SMC calls to a higher exception level, and
+can be safely called with interrupts enabled or disabled.
 
-> And here's v1 intro letter:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438794.html
+EFI's ResetSystem (which backs pm_power_off) can be called with
+interrupts enabled or disabled, so long as there is not a clashing call
+in progress already (see 7.1 "Runtime Services Rules and Restrictions")
+in the EFI 2.6 spec.
 
-These aren't really enlightening I'm afraid, there's nothing in there
-about why these are a single series and no dependency information.
-Indeed it looks like something is really confused as the thread is
-missing at least patches 2 and 3.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/63382a9b/attachment.sig>
+Thanks,
+Mark.
