@@ -1,54 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 Jun 2016 14:06:57 +0100
-Subject: [PATCH 1/5] spi: do not fail if the CS line is not connected
-In-Reply-To: <20160627105716.GA7240@samsunx.samsung>
-References: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
- <1466150245-2648-2-git-send-email-andi.shyti@samsung.com>
- <20160617104725.GC26099@sirena.org.uk>
- <20160617113622.GA10760@jack.zhora.eu>
- <20160617122803.GN26099@sirena.org.uk>
- <20160619060902.GB424@jack.zhora.eu>
- <CGME20160626124853epcas1p297070a25da8980f1d8d2f025c65cbdab@epcas1p2.samsung.com>
- <20160626124843.GP28202@sirena.org.uk>
- <20160627105716.GA7240@samsunx.samsung>
-Message-ID: <20160627130657.GV28202@sirena.org.uk>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 27 Jun 2016 09:09:54 -0400
+Subject: [PATCH v2 0/3] pwm: lpc32xx: Add support to control PWM_PIN_LEVEL bit
+Message-ID: <1467032997-5340-1-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 07:57:16PM +0900, Andi Shyti wrote:
+From: Sylvain Lemieux <slemieux@tycoint.com>
 
-> What I meant is that if we do not like num-cs = <0>, the
-> unlinked CS line can be handled only this way (case of the
-> s3c64xx driver):
+The PWM_PIN_LEVEL bit is leave unset by the kernel PWM driver.
 
-> +- broken-cs: the CS line is disconnected, therefore the device should not wait
-> +  for the CS protocol to be established
+Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
+the PWM_PIN_LEVEL bit was always clear when the PWM was disable
+and a 0 logic level was apply to the output.
 
-So what you're saying here is that you just need a property for the
-inability to read back the chip select status?  That seems like a
-totally reasonable thing to have which fits in idiomatically with the
-rest of the subsystem.  I might call it no-cs-readback or something.
+According to the LPC32x0 User Manual [1],
+the default value for bit 30 (PWM_PIN_LEVEL) is 0.
 
-> Which is not something I like, because it means adding a new
-> flag in the dts.
+First patch:
+* initialize the pin level to 0 (default value) and update
+  the register value accordingly.
 
-> What I want to suggest, instead, is to slightly change the logic
-> behind the num-cs property: i.e. if "num-cs = <0>", doesn't
-> necessarily mean that we don't have a CS controller, but, while
-> we can have as many as we wish, non of them is connected.
+Second anf third patches:
+*  provide support to configure the pin output (i.e. PWM_PIN_LEVEL bit)
+   when the PWM is disabled.
 
-I disagree, I think from a system integration point of view this is just
-a chip select which can't be changed and it's less likely that we will
-run into nasty surprises later on with things assuming that chip selects
-exist.  AFAICT you only need this property in your case because this
-controller has some features that rely on readback of the chip select
-status, that's not very common - normally it'd be write only.  I'd
-expect most controllers would just say they have one chip select and
-that'd be that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/ce1d3c96/attachment.sig>
+Note:
+* Follow this URL to access the discussion for version 1 of this
+  patch: http://thread.gmane.org/gmane.linux.pwm/3882
+
+[1] http://www.nxp.com/documents/user_manual/UM10326.pdf
+
+Sylvain Lemieux (3):
+  pwm: lpc32xx: Set PWM_PIN_LEVEL bit to default value
+  pwm: lpc32xx: Add support for PWM_PIN_LEVEL bit configuration
+  dt-bindings: pwm: lpc32xx: Add nxp,pwm-disabled-level-high property
+
+ Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt |  3 +++
+ drivers/pwm/pwm-lpc32xx.c                             | 11 +++++++++++
+ 2 files changed, 14 insertions(+)
+
+-- 
+1.8.3.1
