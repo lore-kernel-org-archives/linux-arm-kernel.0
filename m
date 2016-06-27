@@ -1,196 +1,102 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Jun 2016 15:28:19 +0100
-Subject: [PATCH v3 1/2] mm: memblock Add some new functions to address
- the mem limit issue
-In-Reply-To: <1466994431-6214-1-git-send-email-dennis.chen@arm.com>
-References: <1466994431-6214-1-git-send-email-dennis.chen@arm.com>
-Message-ID: <20160627142818.GI1113@leverpostej>
+From: a0393675@ti.com (Keerthy)
+Date: Mon, 27 Jun 2016 20:00:53 +0530
+Subject: [PATCH v2 1/8] mfd: tps65218: Remove redundant read wrapper
+In-Reply-To: <20160627122331.GB24377@dell>
+References: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
+ <1467025305-13464-2-git-send-email-j-keerthy@ti.com>
+ <20160627122331.GB24377@dell>
+Message-ID: <5771389D.5000103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 10:27:10AM +0800, Dennis Chen wrote:
-> In some cases, memblock is queried to determine whether a physical
-> address corresponds to memory present in a system even if unused by
-> the OS for the linear mapping, highmem, etc. For example, the ACPI
-> core needs this information to determine which attributes to use when
-> mapping ACPI regions. Use of incorrect memory types can result in
-> faults, data corruption, or other issues.
-> 
-> Removing memory with memblock_enforce_memory_limit throws away this
-> information, and so a kernel booted with 'mem=' may suffers from the
-> issues described above. To avoid this, we need to keep those NOMAP
-> regions instead of removing all above limit, which preserves the
-> information we need while preventing other use of the regions.
-> 
-> This patch adds new insfrastructure to retain all NOMAP memblock regions
-> while removing others, to cater for this.
-> 
-> At last, we add 'size' and 'flag' debug output in the memblock debugfs
-> for ease of the memblock debug.
-> The '/sys/kernel/debug/memblock/memory' output looks like before:
->    0: 0x0000008000000000..0x0000008001e7ffff
->    1: 0x0000008001e80000..0x00000083ff184fff
->    2: 0x00000083ff185000..0x00000083ff1c2fff
->    3: 0x00000083ff1c3000..0x00000083ff222fff
->    4: 0x00000083ff223000..0x00000083ffe42fff
->    5: 0x00000083ffe43000..0x00000083ffffffff
-> 
-> After applied:
->    0: 0x0000008000000000..0x0000008001e7ffff  0x0000000001e80000  0x4
->    1: 0x0000008001e80000..0x00000083ff184fff  0x00000003fd305000  0x0
->    2: 0x00000083ff185000..0x00000083ff1c2fff  0x000000000003e000  0x4
->    3: 0x00000083ff1c3000..0x00000083ff222fff  0x0000000000060000  0x0
->    4: 0x00000083ff223000..0x00000083ffe42fff  0x0000000000c20000  0x4
->    5: 0x00000083ffe43000..0x00000083ffffffff  0x00000000001bd000  0x0
 
-The debugfs changes should be a separate patch. Even if they're useful
-for debugging this patch, they're logically independent.
 
-> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Steve Capper <steve.capper@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> Cc: linux-mm at kvack.org
-> Cc: linux-acpi at vger.kernel.org
-> Cc: linux-efi at vger.kernel.org
-> ---
->  include/linux/memblock.h |  1 +
->  mm/memblock.c            | 55 +++++++++++++++++++++++++++++++++++++++++-------
->  2 files changed, 48 insertions(+), 8 deletions(-)
-> 
-> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-> index 6c14b61..2925da2 100644
-> --- a/include/linux/memblock.h
-> +++ b/include/linux/memblock.h
-> @@ -332,6 +332,7 @@ phys_addr_t memblock_mem_size(unsigned long limit_pfn);
->  phys_addr_t memblock_start_of_DRAM(void);
->  phys_addr_t memblock_end_of_DRAM(void);
->  void memblock_enforce_memory_limit(phys_addr_t memory_limit);
-> +void memblock_mem_limit_remove_map(phys_addr_t limit);
->  bool memblock_is_memory(phys_addr_t addr);
->  int memblock_is_map_memory(phys_addr_t addr);
->  int memblock_is_region_memory(phys_addr_t base, phys_addr_t size);
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index ca09915..8099f1a 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -1465,14 +1465,11 @@ phys_addr_t __init_memblock memblock_end_of_DRAM(void)
->  	return (memblock.memory.regions[idx].base + memblock.memory.regions[idx].size);
->  }
->  
-> -void __init memblock_enforce_memory_limit(phys_addr_t limit)
-> +static phys_addr_t __init_memblock __find_max_addr(phys_addr_t limit)
->  {
->  	phys_addr_t max_addr = (phys_addr_t)ULLONG_MAX;
->  	struct memblock_region *r;
->  
-> -	if (!limit)
-> -		return;
-> -
->  	/* find out max address */
->  	for_each_memblock(memory, r) {
->  		if (limit <= r->size) {
-> @@ -1482,6 +1479,20 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
->  		limit -= r->size;
->  	}
->  
-> +	return max_addr;
-> +}
-> +
-> +void __init memblock_enforce_memory_limit(phys_addr_t limit)
-> +{
-> +	phys_addr_t max_addr;
-> +
-> +	if (!limit)
-> +		return;
-> +
-> +	max_addr = __find_max_addr(limit);
-> +	if (max_addr == (phys_addr_t)ULLONG_MAX)
-> +		return;
+On Monday 27 June 2016 05:53 PM, Lee Jones wrote:
+> On Mon, 27 Jun 2016, Keerthy wrote:
+>
+>> Currently read directly calls the repmap read function. Hence
+>> remove the redundant wrapper and use regmap read wherever
+>> needed.
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>   drivers/mfd/tps65218.c                 | 16 +---------------
+>>   drivers/regulator/tps65218-regulator.c |  3 ++-
+>>   include/linux/mfd/tps65218.h           |  2 --
+>>   3 files changed, 3 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+>> index 80b9dc3..f20a531 100644
+>> --- a/drivers/mfd/tps65218.c
+>> +++ b/drivers/mfd/tps65218.c
+>> @@ -34,20 +34,6 @@
+>>   #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+>>
+>>   /**
+>> - * tps65218_reg_read: Read a single tps65218 register.
+>> - *
+>> - * @tps: Device to read from.
+>> - * @reg: Register to read.
+>> - * @val: Contians the value
+>> - */
+>> -int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
+>> -			unsigned int *val)
+>> -{
+>> -	return regmap_read(tps->regmap, reg, val);
+>> -}
+>> -EXPORT_SYMBOL_GPL(tps65218_reg_read);
+>> -
+>
+> What about the calls in the GPIO and Misc drivers?
 
-We didn't previously return early, so do we actually need this check?
+Thanks Lee Jones for catching this. I will send an updated v3 of the set.
 
-> +
->  	/* truncate both memory and reserved regions */
->  	memblock_remove_range(&memblock.memory, max_addr,
->  			      (phys_addr_t)ULLONG_MAX);
-> @@ -1489,6 +1500,32 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
->  			      (phys_addr_t)ULLONG_MAX);
->  }
->  
-> +void __init memblock_mem_limit_remove_map(phys_addr_t limit)
-> +{
-> +	struct memblock_type *type = &memblock.memory;
-> +	phys_addr_t max_addr;
-> +	int i, ret, start_rgn, end_rgn;
-> +
-> +	if (!limit)
-> +		return;
-> +
-> +	max_addr = __find_max_addr(limit);
-> +	if (max_addr == (phys_addr_t)ULLONG_MAX)
-> +		return;
-
-Likewise?
-
-> +
-> +	ret = memblock_isolate_range(type, max_addr, (phys_addr_t)ULLONG_MAX,
-> +					&start_rgn, &end_rgn);
-> +	if (ret) {
-> +		WARN_ONCE(1, "Mem limit failed, will not be applied!\n");
-> +		return;
-> +	}
-
-We don't have a similar warning in memblock_enforce_memory_limit, where
-memblock_remove_range() might return an error code from an internal call
-to memblock_isolate_range.
-
-The two should be consistent, either both with a message or both
-without.
-
-> +
-> +	for (i = end_rgn - 1; i >= start_rgn; i--) {
-> +		if (!memblock_is_nomap(&type->regions[i]))
-> +			memblock_remove_region(type, i);
-> +	}
-> +}
-
-This will preserve nomap regions, but it does mean that we may preserve
-less memory that the user asked for, since __find_max_addr counted nomap
-(and reserved) regions. Given we've always counted the latter, maybe
-that's ok.
-
-We should clarify what __find_max_addr is intended to determine, with a
-comment, so as to avoid future ambiguity there.
-
-> +
->  static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
->  {
->  	unsigned int left = 0, right = type->cnt;
-> @@ -1677,13 +1714,15 @@ static int memblock_debug_show(struct seq_file *m, void *private)
->  		reg = &type->regions[i];
->  		seq_printf(m, "%4d: ", i);
->  		if (sizeof(phys_addr_t) == 4)
-> -			seq_printf(m, "0x%08lx..0x%08lx\n",
-> +			seq_printf(m, "0x%08lx..0x%08lx  0x%08lx  0x%lx\n",
->  				   (unsigned long)reg->base,
-> -				   (unsigned long)(reg->base + reg->size - 1));
-> +				   (unsigned long)(reg->base + reg->size - 1),
-> +				   (unsigned long)reg->size, reg->flags);
->  		else
-> -			seq_printf(m, "0x%016llx..0x%016llx\n",
-> +			seq_printf(m, "0x%016llx..0x%016llx  0x%016llx  0x%lx\n",
->  				   (unsigned long long)reg->base,
-> -				   (unsigned long long)(reg->base + reg->size - 1));
-> +				   (unsigned long long)(reg->base + reg->size - 1),
-> +				   (unsigned long long)reg->size, reg->flags);
-
-As mentioned above, this should be a separate patch. I have no strong
-feelings either way about the logic itself.
-
-Thanks,
-Mark.
+>
+>> -/**
+>>    * tps65218_reg_write: Write a single tps65218 register.
+>>    *
+>>    * @tps65218: Device to write to.
+>> @@ -93,7 +79,7 @@ static int tps65218_update_bits(struct tps65218 *tps, unsigned int reg,
+>>   	int ret;
+>>   	unsigned int data;
+>>
+>> -	ret = tps65218_reg_read(tps, reg, &data);
+>> +	ret = regmap_read(tps->regmap, reg, &data);
+>>   	if (ret) {
+>>   		dev_err(tps->dev, "Read from reg 0x%x failed\n", reg);
+>>   		return ret;
+>> diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
+>> index a5e5634..679ab2f 100644
+>> --- a/drivers/regulator/tps65218-regulator.c
+>> +++ b/drivers/regulator/tps65218-regulator.c
+>> @@ -22,6 +22,7 @@
+>>   #include <linux/err.h>
+>>   #include <linux/platform_device.h>
+>>   #include <linux/of_device.h>
+>> +#include <linux/regmap.h>
+>>   #include <linux/regulator/of_regulator.h>
+>>   #include <linux/regulator/driver.h>
+>>   #include <linux/regulator/machine.h>
+>> @@ -224,7 +225,7 @@ static int tps65218_pmic_get_current_limit(struct regulator_dev *dev)
+>>   	unsigned int index;
+>>   	struct tps65218 *tps = rdev_get_drvdata(dev);
+>>
+>> -	retval = tps65218_reg_read(tps, dev->desc->csel_reg, &index);
+>> +	retval = regmap_read(tps->regmap, dev->desc->csel_reg, &index);
+>>   	if (retval < 0)
+>>   		return retval;
+>>
+>> diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
+>> index d58f3b5..7c9241f 100644
+>> --- a/include/linux/mfd/tps65218.h
+>> +++ b/include/linux/mfd/tps65218.h
+>> @@ -276,8 +276,6 @@ struct tps65218 {
+>>   	struct regmap *regmap;
+>>   };
+>>
+>> -int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
+>> -					unsigned int *val);
+>>   int tps65218_reg_write(struct tps65218 *tps, unsigned int reg,
+>>   			unsigned int val, unsigned int level);
+>>   int tps65218_set_bits(struct tps65218 *tps, unsigned int reg,
+>
