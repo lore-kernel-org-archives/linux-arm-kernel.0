@@ -1,76 +1,110 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Mon, 27 Jun 2016 07:49:43 +0100
-Subject: [PATCH 4/5] rtc: m48t86: move m48t86.h to platform_data
-In-Reply-To: <1466978583-13310-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1466978583-13310-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1466978583-13310-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160627064943.GA5125@quatermain.digriz.org.uk>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 27 Jun 2016 12:27:49 +0530
+Subject: [PATCH v14 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <1466996813-23295-5-git-send-email-dave.long@linaro.org>
+References: <1466996813-23295-1-git-send-email-dave.long@linaro.org>
+ <1466996813-23295-5-git-send-email-dave.long@linaro.org>
+Message-ID: <20160627065749.GB29870@dhcppc9>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Alexander Clouter <alex@digriz.org.uk>
+Hi David,
 
-On Mon, Jun 27, 2016 at 12:03:02AM +0200, Alexandre Belloni wrote:
->m48t86.h belongs to include/linux/platform_data/
->
->Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->---
->Cc: Hartley Sweeten <hsweeten@visionengravers.com>
->Cc: Ryan Mallon <rmallon@gmail.com>
->Cc: Alexander Clouter <alex@digriz.org.uk>
->Cc: Jason Cooper <jason@lakedaemon.net>
->Cc: Andrew Lunn <andrew@lunn.ch>
->Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->Cc: Gregory Clement <gregory.clement@free-electrons.com>
->Cc: linux-arm-kernel at lists.infradead.org
->
-> arch/arm/mach-ep93xx/ts72xx.c                          | 2 +-
-> arch/arm/mach-orion5x/ts78xx-setup.c                   | 2 +-
-> drivers/rtc/rtc-m48t86.c                               | 2 +-
-> include/linux/{m48t86.h => platform_data/rtc-m48t86.h} | 0
-> 4 files changed, 3 insertions(+), 3 deletions(-)
-> rename include/linux/{m48t86.h => platform_data/rtc-m48t86.h} (100%)
->
->diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
->index 45b81a2bcd4b..3b39ea353d30 100644
->--- a/arch/arm/mach-ep93xx/ts72xx.c
->+++ b/arch/arm/mach-ep93xx/ts72xx.c
->@@ -16,7 +16,7 @@
-> #include <linux/init.h>
-> #include <linux/platform_device.h>
-> #include <linux/io.h>
->-#include <linux/m48t86.h>
->+#include <linux/platform_data/rtc-m48t86.h>
-> #include <linux/mtd/nand.h>
-> #include <linux/mtd/partitions.h>
->
->diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
->index 3a58a5d4a28a..8d597267d0c4 100644
->--- a/arch/arm/mach-orion5x/ts78xx-setup.c
->+++ b/arch/arm/mach-orion5x/ts78xx-setup.c
->@@ -16,7 +16,7 @@
-> #include <linux/platform_device.h>
-> #include <linux/mv643xx_eth.h>
-> #include <linux/ata_platform.h>
->-#include <linux/m48t86.h>
->+#include <linux/platform_data/rtc-m48t86.h>
-> #include <linux/mtd/nand.h>
-> #include <linux/mtd/partitions.h>
-> #include <linux/timeriomem-rng.h>
->diff --git a/drivers/rtc/rtc-m48t86.c b/drivers/rtc/rtc-m48t86.c
->index f72b91f2501f..0eeb5714c00f 100644
->--- a/drivers/rtc/rtc-m48t86.c
->+++ b/drivers/rtc/rtc-m48t86.c
->@@ -16,7 +16,7 @@
-> #include <linux/module.h>
-> #include <linux/rtc.h>
-> #include <linux/platform_device.h>
->-#include <linux/m48t86.h>
->+#include <linux/platform_data/rtc-m48t86.h>
-> #include <linux/bcd.h>
->
-> #define M48T86_REG_SEC		0x00
->diff --git a/include/linux/m48t86.h b/include/linux/platform_data/rtc-m48t86.h
->similarity index 100%
->rename from include/linux/m48t86.h
->rename to include/linux/platform_data/rtc-m48t86.h
+On 26/06/2016:11:06:47 PM, David Long wrote:
+> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> 
+> Add support for basic kernel probes(kprobes) and jump probes
+> (jprobes) for ARM64.
+> 
+> Kprobes utilizes software breakpoint and single step debug
+> exceptions supported on ARM v8.
+> 
+> A software breakpoint is placed at the probe address to trap the
+> kernel execution into the kprobe handler.
+> 
+> ARM v8 supports enabling single stepping before the break exception
+> return (ERET), with next PC in exception return address (ELR_EL1). The
+> kprobe handler prepares an executable memory slot for out-of-line
+> execution with a copy of the original instruction being probed, and
+> enables single stepping. The PC is set to the out-of-line slot address
+> before the ERET. With this scheme, the instruction is executed with the
+> exact same register context except for the PC (and DAIF) registers.
+> 
+> Debug mask (PSTATE.D) is enabled only when single stepping a recursive
+> kprobe, e.g.: during kprobes reenter so that probed instruction can be
+> single stepped within the kprobe handler -exception- context.
+> The recursion depth of kprobe is always 2, i.e. upon probe re-entry,
+> any further re-entry is prevented by not calling handlers and the case
+> counted as a missed kprobe).
+> 
+> Single stepping from the x-o-l slot has a drawback for PC-relative accesses
+> like branching and symbolic literals access as the offset from the new PC
+> (slot address) may not be ensured to fit in the immediate value of
+> the opcode. Such instructions need simulation, so reject
+> probing them.
+> 
+> Instructions generating exceptions or cpu mode change are rejected
+> for probing.
+> 
+> Exclusive load/store instructions are rejected too.  Additionally, the
+> code is checked to see if it is inside an exclusive load/store sequence
+> (code from Pratyush).
+> 
+> System instructions are mostly enabled for stepping, except MSR/MRS
+> accesses to "DAIF" flags in PSTATE, which are not safe for
+> probing.
+> 
+> Thanks to Steve Capper and Pratyush Anand for several suggested
+> Changes.
+> 
+> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
+> ---
+>  arch/arm64/Kconfig                      |   1 +
+>  arch/arm64/include/asm/debug-monitors.h |   5 +
+>  arch/arm64/include/asm/insn.h           |   2 +
+>  arch/arm64/include/asm/kprobes.h        |  60 ++++
+>  arch/arm64/include/asm/probes.h         |  34 +++
+>  arch/arm64/include/asm/ptrace.h         |   1 +
+>  arch/arm64/kernel/Makefile              |   2 +-
+>  arch/arm64/kernel/debug-monitors.c      |  16 +-
+>  arch/arm64/kernel/kprobes/Makefile      |   1 +
+>  arch/arm64/kernel/kprobes/decode-insn.c | 143 +++++++++
+>  arch/arm64/kernel/kprobes/decode-insn.h |  34 +++
+>  arch/arm64/kernel/kprobes/kprobes.c     | 525 ++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/vmlinux.lds.S         |   1 +
+>  arch/arm64/mm/fault.c                   |  26 ++
+>  14 files changed, 848 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/kprobes.h
+>  create mode 100644 arch/arm64/include/asm/probes.h
+>  create mode 100644 arch/arm64/kernel/kprobes/Makefile
+>  create mode 100644 arch/arm64/kernel/kprobes/decode-insn.c
+>  create mode 100644 arch/arm64/kernel/kprobes/decode-insn.h
+
+Can we rename kernel/kprobes as kernel/probes? uprobes code will use
+decode-insn.c and further simulate-insn.c as well. So, I would like to place my
+uprobes.c in same directory.
+
+>  create mode 100644 arch/arm64/kernel/kprobes/kprobes.c
+> 
+
+[...]
+
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index 6c0c7d3..c7bbeed 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -209,6 +209,7 @@ struct task_struct;
+>  int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task);
+>  
+>  #define instruction_pointer(regs)	((unsigned long)(regs)->pc)
+> +#define instruction_pointer_set(regs, value)	((regs)->pc = ((u64) (value)))
+
+IIRC, Will Daecon had asked to include asm-generic/ptrace.h into asm/ptrace.h when
+I had done similar changes for uprobe needs. May be you can pick patch from
+my uprobe tree.
+
+https://github.com/pratyushanand/linux/commit/bb3e114797c2888ed8ad528cca20e569dd2d818e
+
+~Pratyush
