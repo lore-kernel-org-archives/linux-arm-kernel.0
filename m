@@ -1,39 +1,43 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 27 Jun 2016 12:04:35 +0100
-Subject: [PATCH v20 01/14] arm64: hibernate: Don't hibernate on systems
- with stuck CPUs
-In-Reply-To: <97dcd35763eddf1b4c50a26d16389f313269f0c8.1466702804.git.geoff@infradead.org>
-References: <cover.1466702804.git.geoff@infradead.org>
- <97dcd35763eddf1b4c50a26d16389f313269f0c8.1466702804.git.geoff@infradead.org>
-Message-ID: <57710843.40806@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 27 Jun 2016 13:08:39 +0200
+Subject: [PATCH] KVM: arm/arm64: Stop leaking vcpu pid references
+In-Reply-To: <1465403085-2358-1-git-send-email-james.morse@arm.com>
+References: <1465403085-2358-1-git-send-email-james.morse@arm.com>
+Message-ID: <20160627110839.GD26498@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On 23/06/16 18:54, Geoff Levand wrote:
-> From: James Morse <james.morse@arm.com>
+On Wed, Jun 08, 2016 at 05:24:45PM +0100, James Morse wrote:
+> kvm provides kvm_vcpu_uninit(), which amongst other things, releases the
+> last reference to the struct pid of the task that was last running the vcpu.
 > 
-> Hibernate relies on cpu hotplug to prevent secondary cores executing
-> the kernel text while it is being restored.
+> On arm64 built with CONFIG_DEBUG_KMEMLEAK, starting a guest with kvmtool,
+> then killing it with SIGKILL results (after some considerable time) in:
+> > cat /sys/kernel/debug/kmemleak
+> > unreferenced object 0xffff80007d5ea080 (size 128):
+> >  comm "lkvm", pid 2025, jiffies 4294942645 (age 1107.776s)
+> >  hex dump (first 32 bytes):
+> >    01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> >    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> >  backtrace:
+> >    [<ffff8000001b30ec>] create_object+0xfc/0x278
+> >    [<ffff80000071da34>] kmemleak_alloc+0x34/0x70
+> >    [<ffff80000019fa2c>] kmem_cache_alloc+0x16c/0x1d8
+> >    [<ffff8000000d0474>] alloc_pid+0x34/0x4d0
+> >    [<ffff8000000b5674>] copy_process.isra.6+0x79c/0x1338
+> >    [<ffff8000000b633c>] _do_fork+0x74/0x320
+> >    [<ffff8000000b66b0>] SyS_clone+0x18/0x20
+> >    [<ffff800000085cb0>] el0_svc_naked+0x24/0x28
+> >    [<ffffffffffffffff>] 0xffffffffffffffff
 > 
-> Add a call to cpus_are_stuck_in_kernel() to determine if there are
-> CPUs not counted by 'num_online_cpus()', and prevent hibernate in this
-> case.
+> On x86 kvm_vcpu_uninit() is called on the path from kvm_arch_destroy_vm(),
+> on arm no equivalent call is made. Add the call to kvm_arch_vcpu_free().
 > 
-> Fixes: 82869ac57b5 ("arm64: kernel: Add support for hibernate/suspend-to-disk")
 > Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/kernel/hibernate.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> Fixes: 749cf76c5a36 ("KVM: ARM: Initial skeleton to compile KVM support")
+> Cc: <stable@vger.kernel.org> # 3.10+
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
+Applied, thanks.
 
-... this patch isn't necessary for kexec, it wired up the helper function you
-have in patch 2 for hibernate.
-
-Please drop this in any future posting!
-
-
-Thanks,
-
-James
+-Christoffer
