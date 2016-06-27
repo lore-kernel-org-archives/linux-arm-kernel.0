@@ -1,7 +1,7 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 27 Jun 2016 14:52:03 +0200
-Subject: [PATCH] mmc: s3cmci: Register cpufreq notifier only on S3C24xx
-Message-ID: <1467031923-10415-1-git-send-email-k.kozlowski@samsung.com>
+Date: Mon, 27 Jun 2016 14:52:25 +0200
+Subject: [PATCH] video: s3c2410fb: Register cpufreq notifier only on S3C24xx
+Message-ID: <1467031945-10486-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,35 +15,35 @@ so limit the ifdef to respective cpufreq Kconfig.
 Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/mmc/host/s3cmci.c | 2 +-
- drivers/mmc/host/s3cmci.h | 2 +-
+ drivers/video/fbdev/s3c2410fb.c | 2 +-
+ drivers/video/fbdev/s3c2410fb.h | 2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 39814f3dc96f..c531deef3258 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -1365,7 +1365,7 @@ static struct s3c24xx_mci_pdata s3cmci_def_pdata = {
- 	 .no_detect = 1,
- };
+diff --git a/drivers/video/fbdev/s3c2410fb.c b/drivers/video/fbdev/s3c2410fb.c
+index 0dd86be36afb..a67e4567e656 100644
+--- a/drivers/video/fbdev/s3c2410fb.c
++++ b/drivers/video/fbdev/s3c2410fb.c
+@@ -767,7 +767,7 @@ static irqreturn_t s3c2410fb_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
  
 -#ifdef CONFIG_CPU_FREQ
 +#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
  
- static int s3cmci_cpufreq_transition(struct notifier_block *nb,
- 				     unsigned long val, void *data)
-diff --git a/drivers/mmc/host/s3cmci.h b/drivers/mmc/host/s3cmci.h
-index cc2e46cb5c64..30c2c0dd1bc8 100644
---- a/drivers/mmc/host/s3cmci.h
-+++ b/drivers/mmc/host/s3cmci.h
-@@ -74,7 +74,7 @@ struct s3cmci_host {
- 	struct dentry		*debug_regs;
- #endif
+ static int s3c2410fb_cpufreq_transition(struct notifier_block *nb,
+ 					unsigned long val, void *data)
+diff --git a/drivers/video/fbdev/s3c2410fb.h b/drivers/video/fbdev/s3c2410fb.h
+index 47a17bd23011..cdd11e2f8859 100644
+--- a/drivers/video/fbdev/s3c2410fb.h
++++ b/drivers/video/fbdev/s3c2410fb.h
+@@ -32,7 +32,7 @@ struct s3c2410fb_info {
+ 	unsigned long		clk_rate;
+ 	unsigned int		palette_ready;
  
 -#ifdef CONFIG_CPU_FREQ
 +#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
  	struct notifier_block	freq_transition;
  #endif
- };
+ 
 -- 
 1.9.1
