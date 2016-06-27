@@ -1,66 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 27 Jun 2016 13:23:45 +0100
-Subject: [PATCH v2 3/8] mfd: tps65218: Use mfd_add_devices instead of
- of_platform_populate
-In-Reply-To: <1467025305-13464-4-git-send-email-j-keerthy@ti.com>
-References: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
- <1467025305-13464-4-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160627122345.GC24377@dell>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Mon, 27 Jun 2016 12:47:35 +0000
+Subject: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <20160602225815.GA5508@rob-hp-laptop>
+References: <1464626798-1334-1-git-send-email-navam@xilinx.com>
+ <20160602225815.GA5508@rob-hp-laptop>
+Message-ID: <C89496FEAE474D468F30D558A9468D9F26CF4FCD@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Jun 2016, Keerthy wrote:
+Ping!!
 
-> mfd_add_devices enables parsing device tree nodes without compatibles
-> for child nodes. Replace of_platform_populate with mfd_add_devices.
-> mfd_cell currently is populated with only regulators.
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Friday, June 03, 2016 4:28 AM
+> To: Nava kishore Manne <navam@xilinx.com>
+> Cc: pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
+> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
+> balbi at ti.com; gregkh at linuxfoundation.org; Hyun Kwon
+> <hyunk@xilinx.com>; Nava kishore Manne <navam@xilinx.com>; Radhey
+> Shyam Pandey <radheys@xilinx.com>; devicetree at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
 > 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
+> On Mon, May 30, 2016 at 10:16:38PM +0530, Nava kishore Manne wrote:
+> > This patch updates the driver to support 64-bit DMA addressing.
+> >
+> > Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> > ---
+> > Changes for v4:
+> > 		-Used boolen property insted of addrwith property in the DT
+> > 		 as suggested by Arnd Bergmann.
+> > 		-Adopt the DT relevant changes into the driver.
+> >
+> > Changes for v3:
+> >                 -Added new compatable string for 5.00 IP version as suggested by
+> >                  Arnd Bergmann.
+> >                 -Used write_fn() insted of lo_hi_writeq() as suggested by
+> >                  Arnd Bergmann.
+> >
+> > Changes for v2:
+> >                 -Added dma-ranges property in device tree as suggested by Arnd
+> Bergmann.
+> >                 -Modified the driver code based on the xlnx,addrwidth.
+> >
+> >  .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
 > 
-> Changes in v2:
+> Acked-by: Rob Herring <robh@kernel.org>
 > 
->   * Updated commit log.
-> 
-> As of now only regulators driver is in kernel. The PMIC contains
-> a bunch of GPIOs, Over temperature warning / shutdown unit.
-> 
->  drivers/mfd/tps65218.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-> index f20a531..b8b3a58 100644
-> --- a/drivers/mfd/tps65218.c
-> +++ b/drivers/mfd/tps65218.c
-> @@ -33,6 +33,10 @@
->  
->  #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
->  
-> +static const struct mfd_cell tps65218_cells[] = {
-> +	{ .name = "tps65218-regulator", },
-> +};
-> +
->  /**
->   * tps65218_reg_write: Write a single tps65218 register.
->   *
-> @@ -236,8 +240,10 @@ static int tps65218_probe(struct i2c_client *client,
->  	if (ret < 0)
->  		return ret;
->  
-> -	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
-> -				   &client->dev);
-> +	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
-> +			      ARRAY_SIZE(tps65218_cells), NULL, 0,
-> +			      regmap_irq_get_domain(tps->irq_data));
-> +
->  	if (ret < 0)
->  		goto err_irq;
->  
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> >  drivers/usb/gadget/udc/udc-xilinx.c                | 52
+> +++++++++++++++++++++-
+> >  2 files changed, 54 insertions(+), 3 deletions(-)
