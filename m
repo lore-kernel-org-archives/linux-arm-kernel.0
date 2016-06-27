@@ -1,40 +1,90 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 27 Jun 2016 16:31:37 +0530
-Subject: [PATCH v2 0/8] mfd/regulator: tps65218: Clean ups
-Message-ID: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
+Date: Mon, 27 Jun 2016 16:31:38 +0530
+Subject: [PATCH v2 1/8] mfd: tps65218: Remove redundant read wrapper
+In-Reply-To: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
+References: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1467025305-13464-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series cleans up mainly the regulator driver and implements
-the device tree parsing using the regulator framework. Removes
-all the redundant compatibles for the individual regulators.
+Currently read directly calls the repmap read function. Hence
+remove the redundant wrapper and use regmap read wherever
+needed.
 
-One of the patch removes redundant read wrapper and makes
-use of regmap_read wherever necessary.
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ drivers/mfd/tps65218.c                 | 16 +---------------
+ drivers/regulator/tps65218-regulator.c |  3 ++-
+ include/linux/mfd/tps65218.h           |  2 --
+ 3 files changed, 3 insertions(+), 18 deletions(-)
 
-The series is checked for all the regulator registrations on
-am437x-gp-evm and am437x-sk-evm.
-
-Keerthy (8):
-  mfd: tps65218: Remove redundant read wrapper
-  Documentation: regulator: tps65218: Updates according to changes with
-    parsing
-  mfd: tps65218: Use mfd_add_devices instead of of_platform_populate
-  regulator: tps65218: Remove all the compatibles
-  ARM: dts: AM437X-GP-EVM: Remove redundant regulator compatibles
-  ARM: dts: AM437X-SK-EVM: Remove redundant regulator compatibles
-  ARM: dts: AM437X-CM-T43: Remove redundant regulator compatibles
-  ARM: dts: AM43X-EPOS-EVM: Remove redundant regulator compatibles
-
- .../devicetree/bindings/regulator/tps65218.txt     |  88 +++++++++++---
- arch/arm/boot/dts/am437x-cm-t43.dts                |   6 -
- arch/arm/boot/dts/am437x-gp-evm.dts                |   6 -
- arch/arm/boot/dts/am437x-sk-evm.dts                |   5 -
- arch/arm/boot/dts/am43x-epos-evm.dts               |   7 --
- drivers/mfd/tps65218.c                             |  24 ++--
- drivers/regulator/tps65218-regulator.c             | 134 ++++++++-------------
- include/linux/mfd/tps65218.h                       |   2 -
- 8 files changed, 127 insertions(+), 145 deletions(-)
-
+diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+index 80b9dc3..f20a531 100644
+--- a/drivers/mfd/tps65218.c
++++ b/drivers/mfd/tps65218.c
+@@ -34,20 +34,6 @@
+ #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+ 
+ /**
+- * tps65218_reg_read: Read a single tps65218 register.
+- *
+- * @tps: Device to read from.
+- * @reg: Register to read.
+- * @val: Contians the value
+- */
+-int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
+-			unsigned int *val)
+-{
+-	return regmap_read(tps->regmap, reg, val);
+-}
+-EXPORT_SYMBOL_GPL(tps65218_reg_read);
+-
+-/**
+  * tps65218_reg_write: Write a single tps65218 register.
+  *
+  * @tps65218: Device to write to.
+@@ -93,7 +79,7 @@ static int tps65218_update_bits(struct tps65218 *tps, unsigned int reg,
+ 	int ret;
+ 	unsigned int data;
+ 
+-	ret = tps65218_reg_read(tps, reg, &data);
++	ret = regmap_read(tps->regmap, reg, &data);
+ 	if (ret) {
+ 		dev_err(tps->dev, "Read from reg 0x%x failed\n", reg);
+ 		return ret;
+diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
+index a5e5634..679ab2f 100644
+--- a/drivers/regulator/tps65218-regulator.c
++++ b/drivers/regulator/tps65218-regulator.c
+@@ -22,6 +22,7 @@
+ #include <linux/err.h>
+ #include <linux/platform_device.h>
+ #include <linux/of_device.h>
++#include <linux/regmap.h>
+ #include <linux/regulator/of_regulator.h>
+ #include <linux/regulator/driver.h>
+ #include <linux/regulator/machine.h>
+@@ -224,7 +225,7 @@ static int tps65218_pmic_get_current_limit(struct regulator_dev *dev)
+ 	unsigned int index;
+ 	struct tps65218 *tps = rdev_get_drvdata(dev);
+ 
+-	retval = tps65218_reg_read(tps, dev->desc->csel_reg, &index);
++	retval = regmap_read(tps->regmap, dev->desc->csel_reg, &index);
+ 	if (retval < 0)
+ 		return retval;
+ 
+diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
+index d58f3b5..7c9241f 100644
+--- a/include/linux/mfd/tps65218.h
++++ b/include/linux/mfd/tps65218.h
+@@ -276,8 +276,6 @@ struct tps65218 {
+ 	struct regmap *regmap;
+ };
+ 
+-int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
+-					unsigned int *val);
+ int tps65218_reg_write(struct tps65218 *tps, unsigned int reg,
+ 			unsigned int val, unsigned int level);
+ int tps65218_set_bits(struct tps65218 *tps, unsigned int reg,
 -- 
 1.9.1
