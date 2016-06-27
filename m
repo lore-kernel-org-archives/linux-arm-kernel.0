@@ -1,89 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 27 Jun 2016 10:08:29 -0600
-Subject: [PATCH 03/10] Documentation: dt-bindings: firmware: tegra: add
- bindings of the BPMP
-In-Reply-To: <20160627090248.23621-4-josephl@nvidia.com>
-References: <20160627090248.23621-1-josephl@nvidia.com>
- <20160627090248.23621-4-josephl@nvidia.com>
-Message-ID: <57714F7D.1040301@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 27 Jun 2016 16:12:22 +0000
+Subject: [PATCH 4/5] rtc: m48t86: move m48t86.h to platform_data
+In-Reply-To: <1466978583-13310-4-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1466978583-13310-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1466978583-13310-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160627161222.GY9922@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2016 03:02 AM, Joseph Lo wrote:
-> The BPMP is a specific processor in Tegra chip, which is designed for
-> booting process handling and offloading the power management tasks
-> from the CPU. The binding document defines the resources that would be
-> used by the BPMP firmware driver, which can create the interprocessor
-> communication (IPC) between the CPU and BPMP.
+Hey Alexandre,
 
-> diff --git a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+On Mon, Jun 27, 2016 at 12:03:02AM +0200, Alexandre Belloni wrote:
+> m48t86.h belongs to include/linux/platform_data/
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Alexander Clouter <alex@digriz.org.uk>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> 
+>  arch/arm/mach-ep93xx/ts72xx.c                          | 2 +-
+>  arch/arm/mach-orion5x/ts78xx-setup.c                   | 2 +-
+>  drivers/rtc/rtc-m48t86.c                               | 2 +-
+>  include/linux/{m48t86.h => platform_data/rtc-m48t86.h} | 0
+>  4 files changed, 3 insertions(+), 3 deletions(-)
+>  rename include/linux/{m48t86.h => platform_data/rtc-m48t86.h} (100%)
 
-> +The BPMP is a specific processor in Tegra chip, which is designed for
-> +booting process handling and offloading the power management tasks from
-> +the CPU. The binding document defines the resources that would be used by
-> +the BPMP firmware driver, which can create the interprocessor
-> +communication (IPC) between the CPU and BPMP.
+For the orion5x bit,
 
-s/power management/power management, clock management, and reset control/?
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-> +Required properties:
-> +- name : Should be bpmp
-> +- compatible : Should be "nvidia,tegra<chip>-bpmp"
+thx,
 
-Again, I'd suggest wording this as:
-
-- compatible
-     Array of strings.
-     One of:
-   - "nvidia,tegra186-bpmp"
-
-> +- mboxes : The phandle of mailbox controller and the channel ID
-
-s/channel ID/mailbox specifier/.
-
-> +           See "Documentation/devicetree/bindings/mailbox/
-> +	   nvidia,tegra186-hsp.txt" and "Documentation/devicetree/
-> +	   bindings/mailbox/mailbox.txt" for more details about the generic
-> +	   mailbox controller and mailbox client driver bindings.
-
-I'd rather not split the filenames across lines, since that makes grep 
-fail to match. Perhaps add the following text to the introductory 
-section at the start of the file to avoid having to mention some of the 
-filenames in an indented block of text:
-
-==========
-This node is a mailbox consumer. See the following file for details of 
-the mailbox subsystem, and the specifiers implemented by the relevant 
-provider(s):
-
-- Documentation/devicetree/bindings/mailbox/mailbox.txt
-- Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
-
-This node is a clock and reset provider. See the following files for 
-general documentation of those features, and the specifiers implemented 
-by this node:
-
-- Documentation/devicetree/bindings/clock/clock-bindings.txt
-- include/dt-bindings/clock/tegra186-clock.h
-- Documentation/devicetree/bindings/reset/reset.txt
-- include/dt-bindings/reset/tegra186-reset.h
-==========
-
-Related, I would expect those two header files (tegra186-clock.h and 
-tegra186-reset.h) to be part of this patch, since they form part of the 
-definition of this binding.
-
-> +The shared memory bindings for BPMP
-> +-----------------------------------
-> +
-> +The shared memory area for the IPC TX and RX between CPU and BPMP are
-> +predefined and work on top of sysram, which is a sram inside the chip.
-
-s/a sram/an SRAM/.
-
-> +Example:
-...
-> +bpmp at d0000000 {
-
-There should be no unit address ("@d0000000") in the node name, since 
-there's no reg property.
+Jason.
