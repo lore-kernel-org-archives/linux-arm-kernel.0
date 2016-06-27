@@ -1,104 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 27 Jun 2016 11:44:26 +0200
-Subject: [PATCH v4 01/13] devicetree: bindings: Renesas APMU and SMP
- Enable method
-In-Reply-To: <1466072862-28030-2-git-send-email-geert+renesas@glider.be>
-References: <1466072862-28030-1-git-send-email-geert+renesas@glider.be>
- <1466072862-28030-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdWvbWS=-tjcHo_iKpYMOtTd_e1y_dHjfrKOTh7PuezwhQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jun 2016 10:45:52 +0100
+Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
+In-Reply-To: <5770EE21.90103@arm.com>
+References: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
+ <5770EE21.90103@arm.com>
+Message-ID: <20160627094552.GE1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2016 at 12:27 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> From: Magnus Damm <damm+renesas@opensource.se>
->
-> Add DT binding documentation for the APMU hardware and add "renesas,apmu"
-> to the list of enable methods for the ARM cpus.
->
-> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> ---
-> v4:
->   - s/reigsters/registers/,
->   - Use "renesas,<soctype>-apmu" instead of "renesas,apmu-<soctype>",
->
-> v3:
->   - s/Until/Unit/g,
->
-> v2:
->   - No changes.
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->  .../devicetree/bindings/power/renesas,apmu.txt     | 31 ++++++++++++++++++++++
->  2 files changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/renesas,apmu.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 3f0cbbb8395f84ef..fa7520eb6387edbe 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -204,6 +204,7 @@ nodes to be present and contain the properties described below.
->                             "qcom,gcc-msm8660"
->                             "qcom,kpss-acc-v1"
->                             "qcom,kpss-acc-v2"
-> +                           "renesas,apmu"
+On Mon, Jun 27, 2016 at 10:13:05AM +0100, Marc Zyngier wrote:
+> I'm wondering if that's not an effect of this patch:
+> 
+> https://lkml.org/lkml/2015/9/24/138
+> 
+> missing on the ARM side (the corresponding arm64 patch is 217d453d473c).
 
-Any Acked-by from the ARM people?
-Thanks!
+No, because we don't take the other CPUs offline through CPU hotplug at
+reboot - we stop them.  That's because CPU hotplug involves scheduling,
+and a reboot can't be scheduled as it can happen from IRQ contexts.
 
->                             "rockchip,rk3036-smp"
->                             "rockchip,rk3066-smp"
->                             "ste,dbx500-smp"
-> diff --git a/Documentation/devicetree/bindings/power/renesas,apmu.txt b/Documentation/devicetree/bindings/power/renesas,apmu.txt
-> new file mode 100644
-> index 0000000000000000..84404c9edff73d97
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/renesas,apmu.txt
-> @@ -0,0 +1,31 @@
-> +DT bindings for the Renesas Advanced Power Management Unit
-> +
-> +Renesas R-Car line of SoCs utilize one or more APMU hardware units
-> +for CPU core power domain control including SMP boot and CPU Hotplug.
-> +
-> +Required properties:
-> +
-> +- compatible: Should be "renesas,<soctype>-apmu", "renesas,apmu" as fallback.
-> +             Examples with soctypes are:
-> +               - "renesas,r8a7790-apmu" (R-Car H2)
-> +               - "renesas,r8a7791-apmu" (R-Car M2-W)
-> +               - "renesas,r8a7792-apmu" (R-Car V2H)
-> +               - "renesas,r8a7793-apmu" (R-Car M2-N)
-> +               - "renesas,r8a7794-apmu" (R-Car E2)
-> +
-> +- reg: Base address and length of the I/O registers used by the APMU.
-> +
-> +- cpus: This node contains a list of CPU cores, which should match the order
-> +  of CPU cores used by the WUPCR and PSTR registers in the Advanced Power
-> +  Management Unit section of the device's datasheet.
-> +
-> +
-> +Example:
-> +
-> +This shows the r8a7791 APMU that can control CPU0 and CPU1.
-> +
-> +       apmu at e6152000 {
-> +               compatible = "renesas,r8a7791-apmu", "renesas,apmu";
-> +               reg = <0 0xe6152000 0 0x188>;
-> +               cpus = <&cpu0 &cpu1>;
-> +       };
-> --
-> 1.9.1
+For a long time, we have not supported IRQs on any CPU after the system
+has gone down for halt/reboot/poweroff etc:
 
-Gr{oetje,eeting}s,
+ipi_cpu_stop() disables IRQs and FIQs before entering an infinite loop.
+machine_{halt,power_off,restart}() in arch/arm/kernel/reboot.c disables
+IRQs on the requesting CPU.
 
-                        Geert
+So, IRQs get disabled on _all_ CPUs.  Code after this point should not
+re-enable IRQs to be able to use drivers, which it sounds like what's
+happening in Hans scenario.  Remember, as I've said above, these paths
+should not even be scheduling, and should never be reliant on receiving
+interrupts.  *Especially* as they can themselves be called from IRQ
+context.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
