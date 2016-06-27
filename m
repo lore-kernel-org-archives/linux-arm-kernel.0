@@ -1,39 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Jun 2016 13:02:50 +0200
-Subject: [PATCH] ARM: s3c64xx: avoid warning about 'struct device_node'
-Message-ID: <20160627110303.3391769-1-arnd@arndb.de>
+From: j-keerthy@ti.com (Keerthy)
+Date: Mon, 27 Jun 2016 16:31:37 +0530
+Subject: [PATCH v2 0/8] mfd/regulator: tps65218: Clean ups
+Message-ID: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change to simplify of_platform_populate() had an unintended
-side-effect of introducing a build warning on s3c64xx:
+The series cleans up mainly the regulator driver and implements
+the device tree parsing using the regulator framework. Removes
+all the redundant compatibles for the individual regulators.
 
-In file included from arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c:18:0:
-arch/arm/mach-s3c64xx/common.h:27:30: error: 'struct device_node' declared inside parameter list will not be visible outside of this definition or declaration [-Werror]
+One of the patch removes redundant read wrapper and makes
+use of regmap_read wherever necessary.
 
-This adds a forward-declaration for the structure name in the
-header to avoid the warning.
+The series is checked for all the regulator registrations on
+am437x-gp-evm and am437x-sk-evm.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 850bea2335e4 ("arm: Remove unnecessary of_platform_populate with default match table")
----
-Rob, can you apply this on top of the devicetree git so we don't
-have to coordinate the merges?
----
- arch/arm/mach-s3c64xx/common.h | 1 +
- 1 file changed, 1 insertion(+)
+Keerthy (8):
+  mfd: tps65218: Remove redundant read wrapper
+  Documentation: regulator: tps65218: Updates according to changes with
+    parsing
+  mfd: tps65218: Use mfd_add_devices instead of of_platform_populate
+  regulator: tps65218: Remove all the compatibles
+  ARM: dts: AM437X-GP-EVM: Remove redundant regulator compatibles
+  ARM: dts: AM437X-SK-EVM: Remove redundant regulator compatibles
+  ARM: dts: AM437X-CM-T43: Remove redundant regulator compatibles
+  ARM: dts: AM43X-EPOS-EVM: Remove redundant regulator compatibles
 
-diff --git a/arch/arm/mach-s3c64xx/common.h b/arch/arm/mach-s3c64xx/common.h
-index 9eb864412911..4f204668f00e 100644
---- a/arch/arm/mach-s3c64xx/common.h
-+++ b/arch/arm/mach-s3c64xx/common.h
-@@ -24,6 +24,7 @@ void s3c64xx_init_io(struct map_desc *mach_desc, int size);
- 
- void s3c64xx_restart(enum reboot_mode mode, const char *cmd);
- 
-+struct device_node;
- void s3c64xx_clk_init(struct device_node *np, unsigned long xtal_f,
- 	unsigned long xusbxti_f, bool is_s3c6400, void __iomem *reg_base);
- void s3c64xx_set_xtal_freq(unsigned long freq);
+ .../devicetree/bindings/regulator/tps65218.txt     |  88 +++++++++++---
+ arch/arm/boot/dts/am437x-cm-t43.dts                |   6 -
+ arch/arm/boot/dts/am437x-gp-evm.dts                |   6 -
+ arch/arm/boot/dts/am437x-sk-evm.dts                |   5 -
+ arch/arm/boot/dts/am43x-epos-evm.dts               |   7 --
+ drivers/mfd/tps65218.c                             |  24 ++--
+ drivers/regulator/tps65218-regulator.c             | 134 ++++++++-------------
+ include/linux/mfd/tps65218.h                       |   2 -
+ 8 files changed, 127 insertions(+), 145 deletions(-)
+
 -- 
-2.9.0
+1.9.1
