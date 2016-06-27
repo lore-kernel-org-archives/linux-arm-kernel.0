@@ -1,173 +1,163 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 27 Jun 2016 10:00:07 +0800
-Subject: [PATCH v8 2/3] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1466768371.817.9.camel@mtksdaap41>
-References: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
- <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
- <1466419311.27959.12.camel@mtksdaap41>
- <1466421720.1918.11.camel@mtksdaap41> <1466474580.6214.29.camel@mtksdaap41>
- <1466495171.8045.27.camel@mtksdaap41> <1466768371.817.9.camel@mtksdaap41>
-Message-ID: <1466992807.9692.2.camel@mtksdaap41>
+From: zhouchengming1@huawei.com (zhouchengming)
+Date: Mon, 27 Jun 2016 10:09:32 +0800
+Subject: [PATCH 17/23] arm64: ptrace: handle ptrace_request differently
+ for aarch32 and ilp32
+In-Reply-To: <CAOijeYKpH-1pumqrQw+kY0gbdVoZ02kUJtJkwX33H403v+Scmw@mail.gmail.com>
+References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
+ <1464048292-30136-18-git-send-email-ynorov@caviumnetworks.com>
+ <57577611.9000607@huawei.com> <20160608170048.GA24482@yury-N73SV>
+ <576E509A.7090702@huawei.com>
+ <CAOijeYKpH-1pumqrQw+kY0gbdVoZ02kUJtJkwX33H403v+Scmw@mail.gmail.com>
+Message-ID: <57708ADC.3050002@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-06-24 at 19:39 +0800, Horng-Shyang Liao wrote:
-> On Tue, 2016-06-21 at 15:46 +0800, Horng-Shyang Liao wrote:
-> > On Tue, 2016-06-21 at 10:03 +0800, CK Hu wrote:
-> > > On Mon, 2016-06-20 at 19:22 +0800, Horng-Shyang Liao wrote:
-> > > > On Mon, 2016-06-20 at 18:41 +0800, CK Hu wrote:
-> > > > > [Snip...]
-> > > > > 
-> > > > > > +
-> > > > > > +static int cmdq_eng_get_thread(u64 flag)
-> > > > > > +{
-> > > > > > +	if (flag & BIT_ULL(CMDQ_ENG_DISP_DSI0))
-> > > > > > +		return CMDQ_THR_DISP_MAIN_IDX;
-> > > > > > +	else if (flag & BIT_ULL(CMDQ_ENG_DISP_DPI0))
-> > > > > > +		return CMDQ_THR_DISP_SUB_IDX;
-> > > > > > +	else
-> > > > > > +		return CMDQ_THR_DISP_MISC_IDX;
-> > > > > > +}
-> > > > > 
-> > > > > I think cmdq should not have knowledge of client. These statement show
-> > > > > that cmdq know that DSI0-tasks is different with DPI0-tasks. I propose
-> > > > > the 'session' to replace engine flag. For example, main display create
-> > > > > one cmdq_session and external display create another cmdq_session. For
-> > > > > client driver, every tasks created by main display is bound to main
-> > > > > display session. For cmdq driver, it should dynamically bind a session
-> > > > > to a HW thread, and then dispatch tasks of this session to this HW
-> > > > > thread. After HW thread run out of tasks of this session, detach this
-> > > > > session with this thread.
-> > > > > For the problem of remove wfe cmd, I think a session can have a property
-> > > > > of merge_wfe_cmd. For display session, session->merge_wfe_cmd = true.
-> > > > > For other client, it's false.
-> > > > 
-> > > > Hi CK,
-> > > > 
-> > > > I think your suggestion is similar to CMDQ 'scenarios',
-> > > > which was removed from CMDQ v2.
-> > > > 
-> > > > Daniel suggests to use engine flags instead of scenarios.
-> > > > Quote from https://patchwork.kernel.org/patch/8068311/ .
-> > > > 'Instead of encoding policy (these arbitrary "scenarios"), perhaps the
-> > > >  cmdq driver should just provide these flag bits, and the display
-> > > >  subsystem can use them to build the "flag" parameter itself.
-> > > > 
-> > > >  After all, the exact configuration of mmsys components is somewhat
-> > > >  flexible.'
-> > > > 
-> > > > Therefore, it would be better to discuss with Daniel before we change
-> > > > it.
-> > > > 
-> > > > 
-> > > > Hi Daniel,
-> > > > 
-> > > > Do you think we should use scenarios or sessions instead of flags?
-> > > > 
-> > > > Thanks,
-> > > > HS
-> > > > 
-> > > 
-> > > Hi, HS:
-> > > 
-> > > 'session' is not similar to 'scenarios'.
-> > > 
-> > > In 'scenarios' mechanism, client bind a task with scenarios and send to
-> > > cmdq. Cmdq transfer scenarios to engine flag, and use engine flag to
-> > > dispatch task to HW thread.
-> > > 
-> > > 
-> > > In 'engine flag' mechanism, proposed by Daniel, client bind a task
-> > > directly with engine flag. Cmdq directly use engine flag to dispatch
-> > > task to HW thread without any translation.
-> > > 
-> > > But neither 'scenarios' mechanism nor 'engine flag' mechanism get rid of
-> > > engine flag, which make cmdq have knowledge of client.
-> > > 
-> > > In 'session' mechanism, there is no engine flag any more. Client bind
-> > > time-sequential tasks to the same session and tasks in different session
-> > > can execute parallelly. One thing cmdq need to know is to dispatch tasks
-> > > with the same session to the same HW thread, so cmdq does not have any
-> > > knowledge of client.
-> > > 
-> > > Daniel focus on reduce translating scenarios to engine flag. I think
-> > > 'session' mechanism does not conflict with his opinion because we does
-> > > not translate 'session' to engine flag. Therefore, I think 'session' is
-> > > the best of these three mechanism.
-> > > 
-> > > Regards,
-> > > CK
-> > 
-> > Hi CK,
-> > 
-> > 'Session' looks like a group of options for CMDQ.
-> > CMDQ driver can just follow the options to run its flow,
-> > and doesn't need to know its client(s).
-> > 
-> > We don't have many options now, but it has good flexibility to extend
-> > for future requirements.
-> > 
-> > I will add it in next version.
-> > 
-> > Thanks,
-> > HS
-> 
-> Hi CK,
-> 
-> I think session is very similar to mailbox channel.
-> We can treat session's parameters as channel's arguments in device tree.
-> Linking session to GCE thread is also just like linking channel to GCE
-> thread.
-> Because I will use mailbox framework in CMDQ v9, we can use mailbox
-> channel instead of session.
-> What do you think?
-> 
-> Thanks,
-> HS
-> 
+On 2016/6/25 22:15, Bamvor Zhang wrote:
+> Hi, Chengming
+>
+> On Sat, Jun 25, 2016 at 5:36 PM, zhouchengming
+> <zhouchengming1@huawei.com>  wrote:
+>> On 2016/6/9 1:00, Yury Norov wrote:
+>>>
+>>> On Wed, Jun 08, 2016 at 09:34:09AM +0800, zhouchengming wrote:
+>>>>
+>>>> On 2016/5/24 8:04, Yury Norov wrote:
+>>>>>
+>>>>> Here new aarch32 ptrace syscall handler is introsuced to avoid run-time
+>>>>> detection of the task type.
+>>>>>
+>>>>> Signed-off-by: Yury Norov<ynorov@caviumnetworks.com>
+>>>
+>>>
+>>> [...]
+>>>
+>>>> Hello, I found ilp32 will use sys_ptrace, not compat_sys_ptrace. So I
+>>>> write
+>>>> a little patch to see if can solve the problem correctly.
+>>>>
+>>>> Thanks.
+>>>>
+>>>>   From f6156236df578bb05c4a17e7f9776ceaf8f7afe6 Mon Sep 17 00:00:00 2001
+>>>> From: Zhou Chengming<zhouchengming1@huawei.com>
+>>>> Date: Wed, 8 Jun 2016 09:46:23 +0800
+>>>> Subject: [PATCH] ilp32: use compat_sys_ptrace instead of sys_ptrace
+>>>>
+>>>> When we analyze a testcase of ptrace that failed on ilp32, we found
+>>>> the syscall that the ilp32 uses is sys_ptrace, not compat_sys_ptrace.
+>>>> Because in include/uapi/asm-generic/unistd.h it's defined like:
+>>>> __SYSCALL(__NR_ptrace, sys_ptrace)
+>>>> So we change it to __SC_COMP(__NR_ptrace, sys_ptrace, compat_sys_ptrace),
+>>>> let compat tasks use the compat_sys_ptrace.
+>>>>
+>>>> Signed-off-by: Zhou Chengming<zhouchengming1@huawei.com>
+>>>> ---
+>>>>    include/uapi/asm-generic/unistd.h |    2 +-
+>>>>    1 files changed, 1 insertions(+), 1 deletions(-)
+>>>>
+>>>> diff --git a/include/uapi/asm-generic/unistd.h
+>>>> b/include/uapi/asm-generic/unistd.h
+>>>> index 2862d2e..50ee770 100644
+>>>> --- a/include/uapi/asm-generic/unistd.h
+>>>> +++ b/include/uapi/asm-generic/unistd.h
+>>>> @@ -364,7 +364,7 @@ __SC_WRAP(__NR_syslog, sys_syslog)
+>>>>
+>>>>    /* kernel/ptrace.c */
+>>>>    #define __NR_ptrace 117
+>>>> -__SYSCALL(__NR_ptrace, sys_ptrace)
+>>>> +__SC_COMP(__NR_ptrace, sys_ptrace, compat_sys_ptrace)
+>>>>
+>>>>    /* kernel/sched/core.c */
+>>>>    #define __NR_sched_setparam 118
+>>>> --
+>>>> 1.7.7
+>>>>
+>>>
+>>> Hi Zhou,
+>>>
+>>> Thank you for the catch.
+>>>
+>>> Could you also show the test that is failed for you. It should
+>>> probably be sent to LTP maillist.
+>>>
+>>> I'm not sure your fix correct as it affects other architectures that
+>>> use standard unistd.h. I think it's better to redirect the syscall in
+>>> arch/arm64/kernel/sys_ilp32.c with corresponding definition.
+>>>
+>>> Yury
+>>>
+>>> .
+>>>
+>>
+>> Sorry, I missed this mail. Thanks for your reply. :)
+>> I attach the testcase file of ptrace that failed on ilp32.
+>> I also think it's better to redirect the syscall in ilp32, so I changed
+>> the patch.
+>
+> Thanks for your patch. But Yury has already sent an new series this week
+> which define ptrace to compat one.
+>
+> It seems that Yury do not take GET/SETSIGMASK into account. You
+> could share your test case and patches at this point.
+>
+> Best wishes
+>
+> Bamvor
 
-Hi, HS:
+Ok, I get it. So the new series can handle ptrace correctly. :)
+But as for the GET/SETSIGMASK request, both ilp32 and aarch32 are wrong, 
+because they are handled in ptrace_request(like aarch64). But I don't 
+have a good way to correct it in all architectures.
+The architectures that use compat_ptrace_request are:
+arch/arm64, arch/mips, arch/parisc, arch/powerpc, arch/s390, arch/sparc,
+arch/tile, arch/x86.
+We have to use two architecture dependent functions in 
+compat_ptrace_request to fix the GET/SETSIGMASK request. (as for 
+arch/arm64, the two functions are: put_sigset_t and get_sigset_t)
+So we maybe have to prepare these functions for all these architectures.
+But I don't have much time to work on it. So I just fix it for ilp32 of 
+arch/arm64 (Ah, easier way for me). I will put my patch of this fix 
+under Yury's new series.
 
-I'm not familiar with mailbox, but this sounds good to me.
+Thanks!
 
-Regards,
-CK
-
-> > > > > Here is the sample code to create cmdq_rec with session.
-> > > > > 
-> > > > > merge_wfe_cmd = true;
-> > > > > cmdq_session_create(merge_wfe_cmd, &primary_display_session);
-> > > > > cmdq_rec_create(dev, primary_display_session, &rec);
-> > > > > 
-> > > > > 
-> > > > > Therefore, the below definition can be removed.
-> > > > > 
-> > > > > > +
-> > > > > > +enum cmdq_eng {
-> > > > > > +	CMDQ_ENG_DISP_AAL,
-> > > > > > +	CMDQ_ENG_DISP_COLOR0,
-> > > > > > +	CMDQ_ENG_DISP_COLOR1,
-> > > > > > +	CMDQ_ENG_DISP_DPI0,
-> > > > > > +	CMDQ_ENG_DISP_DSI0,
-> > > > > > +	CMDQ_ENG_DISP_DSI1,
-> > > > > > +	CMDQ_ENG_DISP_GAMMA,
-> > > > > > +	CMDQ_ENG_DISP_OD,
-> > > > > > +	CMDQ_ENG_DISP_OVL0,
-> > > > > > +	CMDQ_ENG_DISP_OVL1,
-> > > > > > +	CMDQ_ENG_DISP_PWM0,
-> > > > > > +	CMDQ_ENG_DISP_PWM1,
-> > > > > > +	CMDQ_ENG_DISP_RDMA0,
-> > > > > > +	CMDQ_ENG_DISP_RDMA1,
-> > > > > > +	CMDQ_ENG_DISP_RDMA2,
-> > > > > > +	CMDQ_ENG_DISP_UFOE,
-> > > > > > +	CMDQ_ENG_DISP_WDMA0,
-> > > > > > +	CMDQ_ENG_DISP_WDMA1,
-> > > > > > +	CMDQ_ENG_MAX,
-> > > > > > +};
-> > > > > > +
-> > > > > 
-> > > > > 
-> > > > > Regards,
-> > > > > CK
-> 
-> 
+>
+> [1] https://www.mail-archive.com/linux-doc at vger.kernel.org/msg03811.html
+>>
+>>
+>>  From 7e692ba1adf02c2a2f125836f5222f455c9ffe56 Mon Sep 17 00:00:00 2001
+>> From: Zhou Chengming<zhouchengming1@huawei.com>
+>> Date: Sat, 25 Jun 2016 18:02:51 +0800
+>> Subject: [PATCH] ilp32 should use compat_sys_ptrace
+>>
+>> The file include/uapi/asm-generic/unistd.h defines this:
+>> __SYSCALL(__NR_ptrace, sys_ptrace)
+>> It may cause some ptrace tests failed on ilp32. So we redirect the ptrace
+>> syscall in arch/arm64/kernel/sys_ilp32.c with corresponding definition.
+>>
+>> Signed-off-by: Zhou Chengming<zhouchengming1@huawei.com>
+>> ---
+>>   arch/arm64/kernel/sys_ilp32.c |    3 +++
+>>   1 files changed, 3 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
+>> index d85fe94..06d5e1b 100644
+>> --- a/arch/arm64/kernel/sys_ilp32.c
+>> +++ b/arch/arm64/kernel/sys_ilp32.c
+>> @@ -46,6 +46,9 @@
+>>   asmlinkage long ilp32_sys_rt_sigreturn_wrapper(void);
+>>   #define compat_sys_rt_sigreturn        ilp32_sys_rt_sigreturn_wrapper
+>>
+>> +/* ilp32 should use compat_sys_ptrace */
+>> +#define sys_ptrace                    compat_sys_ptrace
+>> +
+>>   #include<asm/syscall.h>
+>>
+>>   #undef __SYSCALL
+>> --
+>> 1.7.7
+>>
+>>
+>>
+>
+>
+>
