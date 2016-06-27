@@ -1,36 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Jun 2016 11:22:04 +0200
-Subject: [PATCH v3] ARM: sun8i: Add Parrot Board DTS
-In-Reply-To: <1466763001-24117-1-git-send-email-quentin.schulz@free-electrons.com>
-References: <1466763001-24117-1-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <20160627092204.GU4000@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Jun 2016 11:22:37 +0200
+Subject: [PATCH] drm/mediatek: add ARM_SMCCC dependency
+Message-ID: <20160627092416.1463857-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2016 at 12:10:01PM +0200, Quentin Schulz wrote:
-> The Parrot Board is an evaluation board with an Allwinner R16 (assumed
-> to be close to an Allwinner A33), 4GB of eMMC, 512MB of RAM, USB host
-> and OTG, a WiFi/Bluetooth combo chip, a micro SD Card reader, 2
-> controllable buttons, an LVDS port with separated backlight and
-> capacitive touch panel ports, an audio/microphone jack, a camera CSI
-> port, 2 sets of 22 GPIOs and an accelerometer.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+ARM SMCCC is only set for ARMv7 and ARMv8 CPUs, but we currently
+allow the driver to be build for older architecture levels as
+well, which results in a link failure:
 
-Fixed the longer by 80 chars issue you had, and applied.
+drivers/gpu/built-in.o: In function `mtk_hdmi_hw_make_reg_writable':
+:(.text+0x1e737c): undefined reference to `arm_smccc_smc'
 
-Thanks!
-Maxime
+This adds a Kconfig dependency. The patch applies on my two
+previous fixes that are not yet applied, so please apply all
+three to get randconfig builds to work correctly.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 8f83f26891e1 ("drm/mediatek: Add HDMI support")
+---
+ drivers/gpu/drm/mediatek/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/mediatek/Kconfig b/drivers/gpu/drm/mediatek/Kconfig
+index 96ebf8bb6024..294de4549922 100644
+--- a/drivers/gpu/drm/mediatek/Kconfig
++++ b/drivers/gpu/drm/mediatek/Kconfig
+@@ -3,6 +3,7 @@ config DRM_MEDIATEK
+ 	depends on DRM
+ 	depends on ARCH_MEDIATEK || (ARM && COMPILE_TEST)
+ 	depends on COMMON_CLK
++	depends on HAVE_ARM_SMCCC
+ 	depends on OF
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_KMS_HELPER
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/305ee731/attachment.sig>
+2.9.0
