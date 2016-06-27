@@ -1,77 +1,52 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 27 Jun 2016 12:11:40 -0700
-Subject: [PATCH] extcon: Add support for qcom SPMI PMIC USB id detection
- hardware
-In-Reply-To: <CAGTfZH3ireJWo5-Jd5SEiSy-WMTsw43pweruOqwSesAZqagvtg@mail.gmail.com>
-References: <20160626055647.18898-1-stephen.boyd@linaro.org>
- <CAGTfZH3ireJWo5-Jd5SEiSy-WMTsw43pweruOqwSesAZqagvtg@mail.gmail.com>
-Message-ID: <146705470025.30684.13257433085055355379@sboyd-linaro>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 Jun 2016 21:23:21 +0200
+Subject: [PATCH v3 5/8] rtc: ac100: Add clk output support
+In-Reply-To: <CAGb2v67DVBZbRb2PWLP8WurPaNin=2Fa=HMAEK_PdBeqv1x+8Q@mail.gmail.com>
+References: <1466391138-12862-1-git-send-email-wens@csie.org>
+ <1466391138-12862-6-git-send-email-wens@csie.org>
+ <20160622100206.GV26668@lukather>
+ <CAGb2v67DVBZbRb2PWLP8WurPaNin=2Fa=HMAEK_PdBeqv1x+8Q@mail.gmail.com>
+Message-ID: <20160627192321.GX4000@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chanwoo Choi (2016-06-26 04:20:43)
-> 2016-06-26 14:56 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
-> > +PROPERTIES
-> > +
-> > +- compatible:
-> > +    Usage: required
-> > +    Value type: <string>
-> > +    Definition: Should contain "qcom,pm8941-misc";
-> > +
-> > +- reg:
-> > +    Usage: required
-> > +    Value type: <u32>
-> > +    Definition: Should contain the offset to the misc address space
-> 
-> 'reg' property is used on extcon-qcom-spmi-misc.c?
-> I think that you don't need to include this property.
-
-No it isn't used in the driver right now, but there is a register offset
-for this module and there are registers that can be read/written in this
-module. I'd like to keep it as required so we can easily read the
-registers in the future if needed.
-
-> 
-> > +
-> > +- interrupts:
-> > +    Usage: required
-> > +    Value type: <prop-encoded-array>
-> > +    Definition: Should contain the usb id interrupt
-> > +
-> > +- interrupt-names:
-> > +    Usage: required
-> > +    Value type: <stringlist>
-> > +    Definition: Should contain the string "usb_id" for the usb id interrupt
-> > +
-> > +Example:
-> > +
-> > +       pmic {
-> > +               usb_id: misc at 900 {
-> > +                       compatible = "qcom,pm8941-misc";
-> > +                       reg = <0x900>;
-> > +                       interrupts = <0x0 0x9 0 IRQ_TYPE_EDGE_BOTH>;
-> > +                       interrupt-names = "usb_id";
-> > +               };
-> > +       }
-> > +
-> > +       usb-controller {
-> > +               extcon = <&usb_id>;
-> > +       };
-> > diff --git a/drivers/extcon/Kconfig b/drivers/extcon/Kconfig
-> > index 3d89e60a3e71..b2ee47cb10ca 100644
-> > --- a/drivers/extcon/Kconfig
-> > +++ b/drivers/extcon/Kconfig
-> > @@ -119,6 +119,12 @@ config EXTCON_SM5502
-> >           Silicon Mitus SM5502. The SM5502 is a USB port accessory
-> >           detector and switch.
+On Wed, Jun 22, 2016 at 06:11:55PM +0800, Chen-Yu Tsai wrote:
+> On Wed, Jun 22, 2016 at 6:02 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
 > >
-> > +config EXTCON_QCOM_SPMI_MISC
-> > +       tristate "Qualcomm USB extcon support"
-> > +       help
-> > +         Say Y here to enable SPMI PMIC based USB cable detection
-> > +         support on Qualcomm PMICs such as PM8941.
+> > On Mon, Jun 20, 2016 at 10:52:15AM +0800, Chen-Yu Tsai wrote:
+> >> +     /*
+> >> +      * The ADDA 4 MHz clock is from the codec side of the AC100,
+> >> +      * which is likely a different power domain. However, boards
+> >> +      * always have both sides powered on, so it is impossible to
+> >> +      * test this.
+> >> +      */
+> >
+> > If that ADDA clock is exposed by the codec, why are you putting it in
+> > the RTC?
 > 
-> You need to reorder the entry alphabetically. You better to move
-> it below
+> The thing is it's not entirely clear that it's from the codec side.
+> I'm just inferring this from the name. (I'll make the comment clearer.)
+> The codec parts of the datasheet don't mention this clock at all.
+> 
+> Allwinner's SDK puts all the clocks under the RTC module. And the
+> are always on, so I can't really turn off the codec and see what
+> happens. That and I don't have an oscilloscope or logic analyzer.
 
-Ok.
+Why not just create a separate clock driver then?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/b4bf30da/attachment.sig>
