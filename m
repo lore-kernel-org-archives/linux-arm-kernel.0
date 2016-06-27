@@ -1,45 +1,114 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 27 Jun 2016 10:39:27 -0700
-Subject: [PATCH 3/3] phy: rockchip-emmc: Wait even longer for the DLL to lock
-In-Reply-To: <1467049167-14628-1-git-send-email-dianders@chromium.org>
-References: <1467049167-14628-1-git-send-email-dianders@chromium.org>
-Message-ID: <1467049167-14628-4-git-send-email-dianders@chromium.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Jun 2016 18:43:54 +0100
+Subject: [PATCH v2] arm64: barrier: implement wfe-based smp_cond_load_acquire
+Message-ID: <1467049434-30451-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two times out of 2000 reboots I ran into the error message
-"rockchip_emmc_phy_power: dllrdy timeout".  Presumably there is some
-corner case where the DLL just takes a little longer to timeout.  Let's
-give it even more time to handle these corner cases.
+smp_cond_load_acquire is used to spin on a variable until some
+expression involving that variable becomes true.
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+On arm64, we can build this using WFE and LDXR, since clearing of the
+exclusive monitor as a result of the variable being changed by another
+CPU generates an event, which will wake us up out of WFE.
+
+This patch implements smp_cond_load_acquire using LDXR and WFE, which
+themselves are contained in an internal __cmpwait function.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/phy/phy-rockchip-emmc.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-index a2aa6aca7dec..fd57345ffed2 100644
---- a/drivers/phy/phy-rockchip-emmc.c
-+++ b/drivers/phy/phy-rockchip-emmc.c
-@@ -206,8 +206,18 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
- 	 * per the math: 10.2 us * (50000000 Hz / 100000 Hz) => 5.1 ms
- 	 * Hopefully we won't be running at 100 kHz, but we should still make
- 	 * sure we wait long enough.
-+	 *
-+	 * NOTE: There appear to be corner cases where the DLL seems to take
-+	 * extra long to lock for reasons that aren't understood.  In some
-+	 * extreme cases we've seen it take up to over 10ms (!).  We'll be
-+	 * generous and give it 50ms.  We still busy wait here because:
-+	 * - In most cases it should be super fast.
-+	 * - This is not called lots during normal operation so it shouldn't
-+	 *   be a power or performance problem to busy wait.  We expect it
-+	 *   only at boot / resume.  In both cases, eMMC is probably on the
-+	 *   critical path so busy waiting a little extra time should be OK.
- 	 */
--	timeout = jiffies + msecs_to_jiffies(10);
-+	timeout = jiffies + msecs_to_jiffies(50);
- 	do {
- 		udelay(1);
+Based on Peter's locking/core branch.
+
+v1->v2: Use cmpwait_relaxed
+
+ arch/arm64/include/asm/barrier.h | 13 ++++++++++
+ arch/arm64/include/asm/cmpxchg.h | 51 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 64 insertions(+)
+
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index dae5c49618db..4eea7f618dce 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -91,6 +91,19 @@ do {									\
+ 	__u.__val;							\
+ })
  
++#define smp_cond_load_acquire(ptr, cond_expr)				\
++({									\
++	typeof(ptr) __PTR = (ptr);					\
++	typeof(*ptr) VAL;						\
++	for (;;) {							\
++		VAL = smp_load_acquire(__PTR);				\
++		if (cond_expr)						\
++			break;						\
++		__cmpwait_relaxed(__PTR, VAL);				\
++	}								\
++	VAL;								\
++})
++
+ #include <asm-generic/barrier.h>
+ 
+ #endif	/* __ASSEMBLY__ */
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index 510c7b404454..bd86a79491bc 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -224,4 +224,55 @@ __CMPXCHG_GEN(_mb)
+ 	__ret;								\
+ })
+ 
++#define __CMPWAIT_CASE(w, sz, name)					\
++static inline void __cmpwait_case_##name(volatile void *ptr,		\
++					 unsigned long val)		\
++{									\
++	unsigned long tmp;						\
++									\
++	asm volatile(							\
++	"	ldxr" #sz "\t%" #w "[tmp], %[v]\n"		\
++	"	eor	%" #w "[tmp], %" #w "[tmp], %" #w "[val]\n"	\
++	"	cbnz	%" #w "[tmp], 1f\n"				\
++	"	wfe\n"							\
++	"1:"								\
++	: [tmp] "=&r" (tmp), [v] "+Q" (*(unsigned long *)ptr)		\
++	: [val] "r" (val));						\
++}
++
++__CMPWAIT_CASE(w, b, 1);
++__CMPWAIT_CASE(w, h, 2);
++__CMPWAIT_CASE(w,  , 4);
++__CMPWAIT_CASE( ,  , 8);
++
++#undef __CMPWAIT_CASE
++
++#define __CMPWAIT_GEN(sfx)						\
++static inline void __cmpwait##sfx(volatile void *ptr,			\
++				  unsigned long val,			\
++				  int size)				\
++{									\
++	switch (size) {							\
++	case 1:								\
++		return __cmpwait_case##sfx##_1(ptr, (u8)val);		\
++	case 2:								\
++		return __cmpwait_case##sfx##_2(ptr, (u16)val);		\
++	case 4:								\
++		return __cmpwait_case##sfx##_4(ptr, val);		\
++	case 8:								\
++		return __cmpwait_case##sfx##_8(ptr, val);		\
++	default:							\
++		BUILD_BUG();						\
++	}								\
++									\
++	unreachable();							\
++}
++
++__CMPWAIT_GEN()
++
++#undef __CMPWAIT_GEN
++
++#define __cmpwait_relaxed(ptr, val) \
++	__cmpwait((ptr), (unsigned long)(val), sizeof(*(ptr)))
++
+ #endif	/* __ASM_CMPXCHG_H */
 -- 
-2.8.0.rc3.226.g39d4020
+2.1.4
