@@ -1,62 +1,80 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 27 Jun 2016 16:33:15 +0200
-Subject: [PATCH v6 5/5] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
-In-Reply-To: <1465915719-8409-6-git-send-email-sudeep.holla@arm.com>
-References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
- <1465915719-8409-6-git-send-email-sudeep.holla@arm.com>
-Message-ID: <5771392B.3080002@linaro.org>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Mon, 27 Jun 2016 17:34:22 +0300
+Subject: [PATCH 02/21] usb: ulpi: Support device discovery via DT
+In-Reply-To: <20160626072838.28082-3-stephen.boyd@linaro.org>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-3-stephen.boyd@linaro.org>
+Message-ID: <20160627143422.GB21398@kuha.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2016 04:48 PM, Sudeep Holla wrote:
-> Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
-> enable ACPI_PROCESSOR_IDLE for ARM64 too.
->
-> This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
->
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
+Hi,
 
-Hi Sudeep,
+I'm fine with most of the patch, except..
 
-now that ACPI processor supports ARM64 did you check the 
-CPUIDLE_DRIVER_STATE_START trick in the code and its derivative ?
+On Sun, Jun 26, 2016 at 12:28:19AM -0700, Stephen Boyd wrote:
+> @@ -39,7 +42,10 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
+>  	struct ulpi *ulpi = to_ulpi_dev(dev);
+>  	const struct ulpi_device_id *id;
+>  
+> -	for (id = drv->id_table; id->vendor; id++)
+> +	if (of_driver_match_device(dev, driver))
+> +		return 1;
 
-I deleted the patch 2/5 but there is a place where:
+I don't like this part. We should match separately like that only
+if the bus does not support native enumeration, and of course ULPI
+with its vendor and product IDs does. There really should always be
+IDs to match with here. So exceptions have to be solved before we
+attempt matching.
 
-if (max_cstate=0)
-	max_cstate=1;
+Since we also have to support platforms where the PHY is initially
+powered off and reading the IDs from the registers is not possible
+because of that, I think we should consider getting the product and
+vendor IDs optionally from device properties. Something like this:
 
-Probably this is because the POLL state is inserted, so there is always 
-an idle state. But for ARM, that is not the case.
 
-Also, there are some places where the idle state index begins to 1. I 
-think it should be 0 for ARM.
+diff --git a/drivers/usb/common/ulpi.c b/drivers/usb/common/ulpi.c
+index 01c0c04..6228a85 100644
+--- a/drivers/usb/common/ulpi.c
++++ b/drivers/usb/common/ulpi.c
+@@ -152,7 +152,7 @@ EXPORT_SYMBOL_GPL(ulpi_unregister_driver);
+ 
+ /* -------------------------------------------------------------------------- */
+ 
+-static int ulpi_register(struct device *dev, struct ulpi *ulpi)
++static int ulpi_read_id(struct ulpi *ulpi)
+ {
+        int ret;
+ 
+@@ -174,6 +174,21 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+        ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
+        ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
+ 
++       return 0;
++}
++
++static int ulpi_register(struct device *dev, struct ulpi *ulpi)
++{
++       int ret;
++
++       ret = device_property_read_u16(dev, "ulpi-vendor", &ulpi->id.vendor);
++       ret |= device_property_read_u16(dev, "ulpi-product", &ulpi->id.product);
++       if (ret) {
++               ret = ulpi_read_id(ulpi);
++               if (ret)
++                       return ret;
++       }
++
+        ulpi->dev.parent = dev;
+        ulpi->dev.bus = &ulpi_bus;
+        ulpi->dev.type = &ulpi_dev_type;
 
->   drivers/acpi/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 1358fb7d7a68..d74275c0f374 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
->   config ACPI_PROCESSOR
->   	tristate "Processor"
->   	depends on X86 || IA64 || ARM64
-> -	select ACPI_PROCESSOR_IDLE if X86 || IA64
-> +	select ACPI_PROCESSOR_IDLE
->   	select ACPI_CPU_FREQ_PSS if X86 || IA64
->   	default y
->   	help
->
 
+That should cover both cases. You would just have to create the IDs
+yourself in this case.
+
+
+Thanks,
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+heikki
