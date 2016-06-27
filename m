@@ -1,140 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 27 Jun 2016 15:20:34 +0200
-Subject: [PATCH v4 07/13] ARM: shmobile: apmu: Add APMU DT support via
- Enable method
-In-Reply-To: <ade936c2-230f-031d-498a-82b531ba7ee6@cogentembedded.com>
-References: <1466072862-28030-1-git-send-email-geert+renesas@glider.be>
- <1466072862-28030-8-git-send-email-geert+renesas@glider.be>
- <b524c939-d546-65b8-72da-359136c2aebe@cogentembedded.com>
- <CAMuHMdWrwnNxfAh-AHA+Q5AfgYy89nmj-yVSj-E4jMx5cHYi3g@mail.gmail.com>
- <cf46c1dc-5ccd-fa5f-d2c6-321b284e35eb@cogentembedded.com>
- <CAMuHMdUpfvPKVNOEZ8-x5khEkCEPM8g64pF2XjD+SZow0t-icg@mail.gmail.com>
- <ade936c2-230f-031d-498a-82b531ba7ee6@cogentembedded.com>
-Message-ID: <CAMuHMdWSWpWv7Mg6X64U5Y_HQEdfO+s9MOrkNWwb3PaoKoVUVQ@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Mon, 27 Jun 2016 15:20:44 +0200
+Subject: [PATCH] ARM: STi: Update machine _namestr to be more generic.
+In-Reply-To: <1462984816-705-1-git-send-email-peter.griffin@linaro.org>
+References: <1462984816-705-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <5771282C.2050202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Peter
 
-On Mon, Jun 27, 2016 at 2:59 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 06/27/2016 12:41 PM, Geert Uytterhoeven wrote:
->>>>>> From: Magnus Damm <damm+renesas@opensource.se>
->>>>>> Allow DT configuration of the APMU hardware in the case when the APMU
->>>>>> is
->>>>>> pointed out in the DTB via the enable-method. The ability to configure
->>>>>> the APMU via C code is still kept intact to prevent DTB breakage for
->>>>>> older
->>>>>> SoCs that do not rely on the enable-method for SMP support.
->>>>>>
->>>>>> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
->>>>>> [geert: Fix CONFIG_SMP=n build]
->>>>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>>>>
->>>>> [...]
->>>>>
->>>>>> diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c
->>>>>> b/arch/arm/mach-shmobile/platsmp-apmu.c
->>>>>> index c1558ef0c590dd3e..0c6bb458b7a45128 100644
->>>>>> --- a/arch/arm/mach-shmobile/platsmp-apmu.c
->>>>>> +++ b/arch/arm/mach-shmobile/platsmp-apmu.c
->>>>>
->>>>> [...]
->>>>>>
->>>>>> +static int shmobile_smp_apmu_boot_secondary_md21(unsigned int cpu,
->>>>>> +                                                struct task_struct
->>>>>> *idle)
->>>>>> +{
->>>>>> +       /* Error out when hardware debug mode is enabled */
->>>>>> +       if (rcar_gen2_read_mode_pins() & BIT(21)) {
->>>>>> +               pr_warn("Unable to boot CPU%u when MD21 is set\n",
->>>>>> cpu);
->>>>>> +               return -ENOTSUPP;
->>>>>> +       }
->>>>>> +
->>>>>> +       return shmobile_smp_apmu_boot_secondary(cpu, idle);
->>>>>> +}
->>>>>> +
->>>>>> +static struct smp_operations apmu_smp_ops __initdata = {
->>>>>> +       .smp_prepare_cpus       = shmobile_smp_apmu_prepare_cpus_dt,
->>>>>> +       .smp_boot_secondary     =
->>>>>> shmobile_smp_apmu_boot_secondary_md21,
->>>>>> +#ifdef CONFIG_HOTPLUG_CPU
->>>>>> +       .cpu_can_disable        = shmobile_smp_cpu_can_disable,
->>>>>> +       .cpu_die                = shmobile_smp_apmu_cpu_die,
->>>>>> +       .cpu_kill               = shmobile_smp_apmu_cpu_kill,
->>>>>>  #endif
->>>>>
->>>>>    For the record: it turned out that I tested my non-DT SMP on
->>>>> R8A7792/Blanche with MD21 bit set. And I've just made sure it still
->>>>> works
->>>>> with this implementation (by commenting out the check above.
->>>>>    Also, I was going to try the workaround for MD21 I saw in the BSP
->>>>> tree
->>>>> --
->>>
->>>> Which workaround? I only saw the BSP removed the check, but it didn't
->>>> mention
->>>> why (because E2 and V2H don't need it, or...?).
->>>
->>>    I'm looking at the <soc>_smp_prepare_cpus() in
->>> arch/arm/mach-shmobile/setup-<soc>.c in the
->>
->> .../smp-<soc>.c
+On 05/11/2016 06:40 PM, Peter Griffin wrote:
+> This string is used by dump_stack and as we now support
+> more SoC's than just STiH415/6 it is misleading to have
+> the current string in the stack trace.
 >
->    Yes, sorry. :-)
+> This patch updates it to be more generic for the STi
+> family of SoCs.
 >
->>> 'bsp/v3.10.31-ltsi/rcar-gen2-1.9.6' branch of Simon's
->>> renesas-backport.git.
->>> The all have the code to handle MD21 bit set (by setting some bits in
->>> CA{7,15}DBGRCR.
->>>
->>>>> perhaps it'll help get R8A7791 working w/MD21 set...
-
->>
->> Thanks! I'll give that a try...
->>
->> Note that for SoCs with CA7 cores, it sets undocumented bits (the 0x3330
->> part)?
+> So instead of looking like this
 >
->    Yes, looks like they're undocumented.
+> [  271.672555] Hardware name: STiH415/416 SoC with Flattened Device Tree
+> [  271.678998] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
+> [  271.686746] [<c030bb54>] (show_stack) from [<c058bc4c>] (dump_stack+0x98/0xac)
+> [snip]
 >
->> For now we can keep the check, as the behavior is the same as on H2/M2-W
->> before, so it doesn't introduce a regression.
+> it now looks like this:
 >
->    Wait, H2 SMP code doesn't have this check.
-
-You're right. While Magnus did send out a patch that added the check for both,
-in the end a newer revision touching r8a7791 only was applied.
-Whether r8a7790 is really not affected is not clear to me...
-
->>>> Does your Porter work with the other MD21 setting (and the check
->>>> commented
->>>> out, of coutse)?
->>>
->>>    Yes, I've made sure it works now.
->>
->> With or without the DBGRCR code from the BSP?
+> [    2.669879] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc3-00026-g38a1ce6-dirty #76
+> [    2.677973] Hardware name: STi SoC with Flattened Device Tree
+> [    2.683723] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
+> [    2.691472] [<c030bb54>] (show_stack) from [<c058bc0c>] (dump_stack+0x98/0xac)
+> [snip]
 >
->    Without.
-
-That's interesting. So there may be different firmware/boot loader on Koelsch
-and Porter.
-
-Or perhaps it's just random: on Koelsch, I only had the issue after a Real Cold
-Boot (in the morning). During the day, it used to work with MD21=1, too.
-
-Now, we're getting closer to the moment Simon will close his tree for v4.8.
-Can we apply my series as-is, or do we need the DBGRCR handling first,
-probably postponing all of this to v4.9?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>   arch/arm/mach-sti/board-dt.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+> index ae10fb2..cfee0ef 100644
+> --- a/arch/arm/mach-sti/board-dt.c
+> +++ b/arch/arm/mach-sti/board-dt.c
+> @@ -23,7 +23,7 @@ static const char *const stih41x_dt_match[] __initconst = {
+>   	NULL
+>   };
+>   
+> -DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
+> +DT_MACHINE_START(STM, "STi SoC with Flattened Device Tree")
+>   	.dt_compat	= stih41x_dt_match,
+>   	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE |
+>   			  L310_AUX_CTRL_DATA_PREFETCH |
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
