@@ -1,50 +1,253 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 27 Jun 2016 10:07:30 -0700
-Subject: [PATCH v20 00/14] arm64 kexec kernel patches
-In-Reply-To: <20160627170039.GD6847@e104818-lin.cambridge.arm.com>
-References: <cover.1466702804.git.geoff@infradead.org>
- <20160627170039.GD6847@e104818-lin.cambridge.arm.com>
-Message-ID: <1467047250.7965.40.camel@infradead.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 27 Jun 2016 18:07:59 +0100
+Subject: [PATCH v6 4/5] arm64: add support for ACPI Low Power Idle(LPI)
+In-Reply-To: <57715463.5040305@linaro.org>
+References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
+ <1465915719-8409-5-git-send-email-sudeep.holla@arm.com>
+ <20160622141700.GB2733@red-moon> <57715463.5040305@linaro.org>
+Message-ID: <57715D6F.3060608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
 
-On Mon, 2016-06-27 at 18:00 +0100, Catalin Marinas wrote:
-> On Thu, Jun 23, 2016 at 05:54:47PM +0000, Geoff Levand wrote:
-> > AKASHI Takahiro (7):
-> >       arm64: kdump: reserve memory for crash dump kernel
-> >       arm64: limit memory regions based on DT property, usable-memory
-> >       arm64: kdump: implement machine_crash_shutdown()
-> >       arm64: kdump: add kdump support
-> >       arm64: kdump: add VMCOREINFO's for user-space coredump tools
-> >       arm64: kdump: enable kdump in the arm64 defconfig
-> >       arm64: kdump: update a kernel doc
-> > 
-> > Geoff Levand (4):
-> >       arm64: Add back cpu reset routines
-> >       arm64/kexec: Add core kexec support
-> >       arm64/kexec: Enable kexec in the arm64 defconfig
-> >       arm64/kexec: Add pr_debug output
-> > 
-> > James Morse (3):
-> >       arm64: hibernate: Don't hibernate on systems with stuck CPUs
-> >       arm64: smp: Add function to determine if cpus are stuck in the kernel
-> >       Documentation: dt: usable-memory and elfcorehdr nodes for arm64 kexec
-> 
-> I dropped patch 1 (hibernate), cherry-picked patch 2 from mainline
-> ("cpus stuck in the kernel", already pushed by Will to 4.7-rc5) and
-> merged patches 3-6, with the amendments that James mentioned.
-> 
-> The kdump patches, including the "Documentation" one from James require
-> more review, testing and acks by the corresponding maintainers (kdump,
-> DT). You also don't seem to have added a s-o-b for those patches (since
-> you are submitting them; unless you plan to let Akashi-san submit them
-> in the future).
 
-I'll workout the merge plan for the rest of the patches with
-Takahiro. If they come through me I'll add an SOB.
+On 27/06/16 17:29, Daniel Lezcano wrote:
+> On 06/22/2016 04:17 PM, Lorenzo Pieralisi wrote:
+>> Hi Sudeep,
+>>
+>> On Tue, Jun 14, 2016 at 03:48:38PM +0100, Sudeep Holla wrote:
+>>> This patch adds appropriate callbacks to support ACPI Low Power Idle
+>>> (LPI) on ARM64.
+>>>
+>>> Now that arm_enter_idle_state is exactly same in both generic ARM{32,64}
+>>> CPUIdle driver and ARM64 backend for ACPI processor idle driver, we can
+>>> unify it and move to cpuidle-arm.h header.
+>>>
+>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>> ---
+>>>   arch/arm64/kernel/cpuidle.c   | 17 +++++++++++++
+>>>   drivers/cpuidle/cpuidle-arm.c | 23 ++----------------
+>>>   drivers/firmware/psci.c       | 56
+>>> +++++++++++++++++++++++++++++++++++++++++++
+>>>   include/linux/cpuidle-arm.h   | 30 +++++++++++++++++++++++
+>>>   4 files changed, 105 insertions(+), 21 deletions(-)
+>>>   create mode 100644 include/linux/cpuidle-arm.h
+>>
+>> This patch seems fine by me, it would be good if Daniel can have
+>> a look too.
+>>
+>> Some minor comments below.
+>>
+>> [...]
+>>
+>>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>>> index 03e04582791c..c6caa863d156 100644
+>>> --- a/drivers/firmware/psci.c
+>>> +++ b/drivers/firmware/psci.c
+>>> @@ -13,6 +13,7 @@
+>>>
+>>>   #define pr_fmt(fmt) "psci: " fmt
+>>>
+>>> +#include <linux/acpi.h>
+>>>   #include <linux/arm-smccc.h>
+>>>   #include <linux/cpuidle.h>
+>>>   #include <linux/errno.h>
+>>> @@ -310,11 +311,66 @@ static int psci_dt_cpu_init_idle(struct
+>>> device_node *cpu_node, int cpu)
+>>>       return ret;
+>>>   }
+>>>
+>>> +#ifdef CONFIG_ACPI
+>>> +#include <acpi/processor.h>
+>>> +
+>>> +static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu)
+>>> +{
+>>> +    int i, count;
+>>> +    u32 *psci_states;
+>>> +    struct acpi_processor *pr;
+>>> +    struct acpi_lpi_state *lpi;
+>>> +
+>>> +    pr = per_cpu(processors, cpu);
+>>> +    if (unlikely(!pr || !pr->flags.has_lpi))
+>>> +        return -EINVAL;
+>>> +
+>>> +    /*
+>>> +     * If the PSCI cpu_suspend function hook has not been initialized
+>>> +     * idle states must not be enabled, so bail out
+>>> +     */
+>>> +    if (!psci_ops.cpu_suspend)
+>>> +        return -EOPNOTSUPP;
+>>> +
+>>> +    count = pr->power.count - 1;
+>>> +    if (count <= 0)
+>>> +        return -ENODEV;
+>>> +
+>>> +    psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
+>>> +    if (!psci_states)
+>>> +        return -ENOMEM;
+>>> +
+>>> +    for (i = 0; i < count; i++) {
+>>> +        u32 state;
+>>> +
+>>> +        lpi = &pr->power.lpi_states[i + 1];
+>>> +        state = lpi->address & 0xFFFFFFFF;
+>
+> Why mask 'address' if 'state' is u32 ?
+>
 
-Thanks for the review.
+Agreed, I overlooked it.
 
--Geoff
+>>> +        if (!psci_power_state_is_valid(state)) {
+>>> +            pr_warn("Invalid PSCI power state %#x\n", state);
+>>> +            kfree(psci_states);
+>>> +            return -EINVAL;
+>>> +        }
+>>> +        psci_states[i] = state;
+>>> +    }
+>>> +    /* Idle states parsed correctly, initialize per-cpu pointer */
+>>> +    per_cpu(psci_power_state, cpu) = psci_states;
+>>> +    return 0;
+>
+> The ACPI and the PSCI code are not self contained here.
+>
+> It would be nice to move this function to the ACPI code.
+>
+>>> +}
+>>> +#else
+>>> +static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu)
+>>> +{
+>>> +    return -EINVAL;
+>>> +}
+>>> +#endif
+>>> +
+>>>   int psci_cpu_init_idle(unsigned int cpu)
+>>>   {
+>>>       struct device_node *cpu_node;
+>>>       int ret;
+>>>
+>>> +    if (!acpi_disabled)
+>>> +        return psci_acpi_cpu_init_idle(cpu);
+>>> +
+>
+> acpi_disabled - acpi_disabled - acpi_disabled everywhere :/
+>
+> The enable-method approach is not straightforward and now it is polluted
+> by acpi-disabled.
+>
+> So IIUC,
+>
+> smp_init_cpus (contains acpi_disabled)
+>    smp_cpu_setup
+>      cpu_read_ops
+>        cpu_read_enable_method (contains acpi_disabled)
+>          acpi_get_enable_method (returns 'psci' after checking
+> psci_is_present)
+>
+> Then psci_cpu_init_idle is called... and check again acpi_disabled.
+>
+> IMO, the circumlocution with the psci vs acpi vs acpi_disabled is
+> getting unnecessary too complex, is prone to error and will lead to
+> unmaintainable code very soon.
+>
+> I suggest to sort out encapsulation and self-contained code before
+> adding more feature in this area.
+>
+
+I understand your concern but I have no idea on how to clean up. Lorenzo
+asked to factor our common code between psci_{dt,acpi}_cpu_init_idle and
+I think you might not like the refactoring[1]. I didn't want to change
+cpuidle_ops and hence psci_dt_cpu_init_idle parameters. I will see if
+changing that simplifies things.
+
+>>>       cpu_node = of_get_cpu_node(cpu, NULL);
+>>>       if (!cpu_node)
+>>>           return -ENODEV;
+>>> diff --git a/include/linux/cpuidle-arm.h b/include/linux/cpuidle-arm.h
+>>> new file mode 100644
+>>> index 000000000000..b99bcb3f43dd
+>>> --- /dev/null
+>>> +++ b/include/linux/cpuidle-arm.h
+>>
+>> arm-cpuidle.h for consistency with other (ARM) include/linux files ?
+>>
+>>> @@ -0,0 +1,30 @@
+>>> +#include <linux/cpu_pm.h>
+>>> +
+>>> +#include <asm/cpuidle.h>
+>>> +
+>>> +/*
+>>> + * arm_enter_idle_state - Programs CPU to enter the specified state
+>>> + */
+>>> +static int arm_generic_enter_idle_state(int idx)
+>>> +{
+>>> +    int ret;
+>>> +
+>>> +    if (!idx) {
+>>> +        cpu_do_idle();
+>>> +        return idx;
+>>> +    }
+>>> +
+>>> +    ret = cpu_pm_enter();
+>>> +    if (!ret) {
+>>> +        /*
+>>> +         * Pass idle state index to cpu_suspend which in turn will
+>>> +         * call the CPU ops suspend protocol with idle index as a
+>>> +         * parameter.
+>>> +         */
+>>> +        ret = arm_cpuidle_suspend(idx);
+>>> +
+>>> +        cpu_pm_exit();
+>>> +    }
+>>> +
+>>> +    return ret ? -1 : idx;
+>>> +}
+>>
+>> Either you do this, or we have to add it somehow somewhere in
+>> drivers/cpuidle to avoid duplicating it.
+>>
+>> @Daniel: do you have an opinion on this please ?
+>
+> I don't like the idea to add an ARM arch specific header in
+> include/linux. I thought this directory was supposed to contain as much
+> as possible arch agnostic headers.
+>
+
+While I agree, but what we have is ARM specific code here and calling it
+generic might not make it any usable on other architecture unless they 
+have the same semantics. I am fine if you and Rafael are OK with that.
+
+> May be the name can be changed to something more generic:
+>
+> eg.
+>
+> int cpuidle_generic_enter(int idx);
+>
+> and then add an option:
+>
+> HAVE_CPUIDLE_GENERIC_ENTER
+>
+> , then in the generic header:
+>
+> #ifdef HAVE_CPUIDLE_GENERIC_ENTER
+> int cpuidle_generic_enter(int idx);
+> #endif
+>
+> , change the function name in cpuidle-arm .c
+>
+> and finally add in the ARM and ARM64 Kconfig's option
+> HAVE_CPUIDLE_GENERIC_ENTER.
+>
+>
+>    -- Daniel
+>
+
+[1] 
+http://git.kernel.org/cgit/linux/kernel/git/sudeep.holla/linux.git/commit/?h=for_review/arm64_lpi&id=9b516ad4442b4168e962ba4ca87bd568d605053b
+-- 
+Regards,
+Sudeep
