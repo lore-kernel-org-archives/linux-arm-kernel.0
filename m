@@ -1,47 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 Jun 2016 16:10:08 +0100
-Subject: [PATCH v2 04/14] regulator: SY8106A regulator driver
-In-Reply-To: <20160625034511.7966-5-megous@megous.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-5-megous@megous.com>
-Message-ID: <20160627151008.GZ28202@sirena.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 27 Jun 2016 16:11:54 +0100
+Subject: [PATCH v6 5/5] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+In-Reply-To: <5771416E.1040000@linaro.org>
+References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
+ <1465915719-8409-6-git-send-email-sudeep.holla@arm.com>
+ <5771392B.3080002@linaro.org> <57714043.5020207@arm.com>
+ <577140A7.60904@linaro.org> <57714106.2040200@arm.com>
+ <5771416E.1040000@linaro.org>
+Message-ID: <5771423A.1030708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 25, 2016 at 05:45:01AM +0200, megous at megous.com wrote:
 
-> +	config.init_data = of_get_regulator_init_data(dev, dev->of_node, &sy8106a_reg);
-> +	if (!config.init_data) {
-> +		return -EINVAL;
-> +	}
 
-This is broken, constraints are entirely optional - the driver should
-just instantiate no matter what (if anything) the constraints are.  This
-means people can read the current state even if there is no need for
-runtime configuration.
+On 27/06/16 16:08, Daniel Lezcano wrote:
+> On 06/27/2016 05:06 PM, Sudeep Holla wrote:
 
-> +	dev_info(&i2c->dev, "SY8106A voltage at boot: %u mV\n", SY8106A_MIN_MV + 
-> +		 SY8106A_STEP_MV * (selector & SY8106A_REG_VOUT1_SEL_MASK));
+[...]
 
-This is just noise, remove it - if we want to list the voltage for
-regulators at probe we should be doing it consistently for all
-regulators in the core rather than in individual drivers.
+>> Ah ok, anyways LPI always starts from index 0. IIUC that was your main
+>> concern.
+>
+> Do you have a repo where I can see the code ?
+>
 
-> +/*
-> + * This is useless for OF-enabled devices, but it is needed by I2C subsystem
-> + */
-> +static const struct i2c_device_id sy8106a_i2c_id[] = {
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(i2c, sy8106a_i2c_id);
+Yes, you can get it from [1]
 
-No, this is not the case - supporting DT does not mean that other
-enumeration mechanisms can't be supported and there's no reason not to
-list a sensible ID here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/1d409030/attachment.sig>
+--
+Regards,
+Sudeep
+
+[1] http://git.kernel.org/sudeep.holla/linux/h/for_review/arm64_lpi
