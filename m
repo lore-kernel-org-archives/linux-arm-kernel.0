@@ -1,56 +1,22 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 27 Jun 2016 08:04:24 +0300
-Subject: [PATCHv2 05/27] crypto: omap-sham: avoid executing tasklet where
- not needed
-In-Reply-To: <20160624103042.GA19571@gondor.apana.org.au>
-References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
- <1466601840-18486-6-git-send-email-t-kristo@ti.com>
- <20160624103042.GA19571@gondor.apana.org.au>
-Message-ID: <5770B3D8.9010909@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 27 Jun 2016 07:22:19 +0200
+Subject: [RFC v4 0/7] extcon: usb-gpio: fixes and improvements
+In-Reply-To: <57700529.7090707@math.uni-bielefeld.de>
+References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
+ <57700529.7090707@math.uni-bielefeld.de>
+Message-ID: <5770B80B.3020304@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/06/16 13:30, Herbert Xu wrote:
-> On Wed, Jun 22, 2016 at 04:23:38PM +0300, Tero Kristo wrote:
->> Some of the call paths of OMAP SHA driver can avoid executing the next
->> step of the crypto queue under tasklet; instead, execute the next step
->> directly via function call. This avoids a costly round-trip via the
->> scheduler giving a slight performance boost.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   drivers/crypto/omap-sham.c | 4 +++-
->>   1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
->> index 6247887..84a0027 100644
->> --- a/drivers/crypto/omap-sham.c
->> +++ b/drivers/crypto/omap-sham.c
->> @@ -242,6 +242,8 @@ static struct omap_sham_drv sham = {
->>   	.lock = __SPIN_LOCK_UNLOCKED(sham.lock),
->>   };
->>
->> +static void omap_sham_done_task(unsigned long data);
->> +
->>   static inline u32 omap_sham_read(struct omap_sham_dev *dd, u32 offset)
->>   {
->>   	return __raw_readl(dd->io_base + offset);
->> @@ -1007,7 +1009,7 @@ static void omap_sham_finish_req(struct ahash_request *req, int err)
->>   		req->base.complete(&req->base, err);
->>
->>   	/* handle new request */
->> -	tasklet_schedule(&dd->done_task);
->> +	omap_sham_done_task((unsigned long)dd);
->>   }
->
-> Hmm, what guarnatees that you won't run out of stack doing this?
+On 06/26/2016 06:39 PM, Tobias Jakobi wrote:
+> Hello Krzysztof,
+> 
+> just wanted to ask on which kernel branch the patchset is based on. At
+> least for me the set doesn't apply cleanly to 4.7-rc4.
 
-Good question, I had a deeper look at the driver and it seems you are 
-right... It may result in a recursion loop within the driver. I will dig 
-this further and break the recursion if it indeed can call itself 
-indefinitely.
+Hi,
 
-My knowledge of the crypto stack (+ these drivers unfortunately) is 
-still pretty limited, I appreciate your reviews a lot.
+It was based on next-20160608.
 
--Tero
+Best regards,
+Krzysztof
