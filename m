@@ -1,42 +1,33 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 27 Jun 2016 19:02:40 +0200
-Subject: [PATCH] clocksource: arm_arch_timer: control the evtstrm via the
- cmdline
-In-Reply-To: <1467045013-27211-1-git-send-email-will.deacon@arm.com>
-References: <1467045013-27211-1-git-send-email-will.deacon@arm.com>
-Message-ID: <57715C30.4000202@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 27 Jun 2016 18:06:07 +0100
+Subject: [PATCH] arm64: mm: simplify memblock numa node extraction
+In-Reply-To: <1466594025-27682-1-git-send-email-mark.rutland@arm.com>
+References: <1466594025-27682-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160627170606.GE6847@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2016 06:30 PM, Will Deacon wrote:
-> Disabling the eventstream can be useful for both remotely debugging a
-> deployed production system and development of code using WFE-based
-> polling loops. Whilst this can currently be controlled via a Kconfig
-> option (CONFIG_ARM_ARCH_TIMER_EVTSTREAM), it's often desirable to toggle
-> the feature on the command line, so this patch adds a new command-line
-> option ("clocksource.arm_arch_timer.evtstrm") to do just that. The
-> default behaviour is determined based on CONFIG_ARM_ARCH_TIMER_EVTSTREAM.
->
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
+On Wed, Jun 22, 2016 at 12:13:45PM +0100, Mark Rutland wrote:
+> We currently open-code extracting the NUMA node of a memblock region,
+> which requires an ifdef to cater for !CONFIG_NUMA builds where the
+> memblock_region::nid field does not exist.
+> 
+> The generic memblock_get_region_node helper is intended to cater for
+> this. For CONFIG_HAVE_MEMBLOCK_NODE_MAP, builds this returns reg->nid,
+> and for for !CONFIG_HAVE_MEMBLOCK_NODE_MAP builds this is a static
+> inline that returns 0. Note that for arm64,
+> CONFIG_HAVE_MEMBLOCK_NODE_MAP is selected iff CONFIG_NUMA is.
+> 
+> This patch makes use of memblock_get_region_node to simplify the arm64
+> code. At the same time, we can move the nid variable definition into the
+> loop, as this is the only place it is used.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Steve Capper <steve.capper@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Sounds good for me. I will take it through my tree.
-
-By the way, I would like to do some cleanups in the Kconfig and 
-consistently change the Kconfig options to be silent without the 
-COMPILE_TEST option.
-
-I am wondering if we can just remove the ARM_ARCH_TIMER_EVTSTREAM option 
-with this patch applied and always enable it by default (like what is 
-done today).
-
-   -- Daniel
+Applied. Thanks.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Catalin
