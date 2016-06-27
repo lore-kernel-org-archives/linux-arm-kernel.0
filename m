@@ -1,43 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 27 Jun 2016 17:12:50 +0200
-Subject: [PATCH v6 5/5] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
-In-Reply-To: <5771423A.1030708@arm.com>
-References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
- <1465915719-8409-6-git-send-email-sudeep.holla@arm.com>
- <5771392B.3080002@linaro.org> <57714043.5020207@arm.com>
- <577140A7.60904@linaro.org> <57714106.2040200@arm.com>
- <5771416E.1040000@linaro.org> <5771423A.1030708@arm.com>
-Message-ID: <57714272.7030303@linaro.org>
+From: duwe@lst.de (Torsten Duwe)
+Date: Mon, 27 Jun 2016 17:15:00 +0200 (CEST)
+Subject: [PATCH v2 0/2] arm64 live patching
+Message-ID: <20160627151500.2247A68D20@newverein.lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2016 05:11 PM, Sudeep Holla wrote:
->
->
-> On 27/06/16 16:08, Daniel Lezcano wrote:
->> On 06/27/2016 05:06 PM, Sudeep Holla wrote:
->
-> [...]
->
->>> Ah ok, anyways LPI always starts from index 0. IIUC that was your main
->>> concern.
->>
->> Do you have a repo where I can see the code ?
->>
->
-> Yes, you can get it from [1]
+So here is a slightly updated FTRACE_WITH_REGS plus live patching.
+Reminder: make sure you have a prolog-pad gcc, and this in your
+top level Makefile:
 
-Great. Thanks Sudeep !
+ifdef CONFIG_LIVEPATCH
+KBUILD_CFLAGS	+= $(call cc-option,-fno-ipa-ra)
+endif
 
-> Regards,
-> Sudeep
->
-> [1] http://git.kernel.org/sudeep.holla/linux/h/for_review/arm64_lpi
+Tested with v4.7-rc3 + gcc-6.1
 
+Changes since v1:
+  * instead of a comment "should be CC_USING_PROLOG_PAD":
+    do it. CC_FLAGS_FTRACE holds it now, and the IPA
+    disabler has become a separate issue (see above).
+
+Torsten Duwe (2):
+  arm64: implement FTRACE_WITH_REGS
+  arm64: implement live patching
+
+ arch/arm64/Kconfig                 |   4 ++
+ arch/arm64/Makefile                |   4 ++
+ arch/arm64/include/asm/ftrace.h    |   8 +++
+ arch/arm64/include/asm/livepatch.h |  37 ++++++++++++++
+ arch/arm64/kernel/Makefile         |   6 +--
+ arch/arm64/kernel/entry-ftrace.S   | 102 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/ftrace.c         |  43 ++++++++++++++--
+ include/asm-generic/vmlinux.lds.h  |   2 +-
+ include/linux/compiler.h           |   4 ++
+ 9 files changed, 203 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm64/include/asm/livepatch.h
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.6.6
