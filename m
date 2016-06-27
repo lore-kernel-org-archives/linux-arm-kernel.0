@@ -1,117 +1,45 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 27 Jun 2016 10:39:26 -0700
-Subject: [PATCH 2/3] phy: rockchip-emmc: Be tolerant to card clock of 0 in
- power on
+Date: Mon, 27 Jun 2016 10:39:27 -0700
+Subject: [PATCH 3/3] phy: rockchip-emmc: Wait even longer for the DLL to lock
 In-Reply-To: <1467049167-14628-1-git-send-email-dianders@chromium.org>
 References: <1467049167-14628-1-git-send-email-dianders@chromium.org>
-Message-ID: <1467049167-14628-3-git-send-email-dianders@chromium.org>
+Message-ID: <1467049167-14628-4-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's possible that there are some reasons to turn the PHY on while the
-clock is 0.  In this case we just won't wait for the DLL to lock.
-
-This is a bit of a stopgap until we figure out exactly when we're
-supposed to wait for the DLL to lock and when we're supposed to power
-cycle the PHY.
-
-Note: this patch should help with suspend/resume where the system will
-try to turn the PHY back on when the clock is 0.
+Two times out of 2000 reboots I ran into the error message
+"rockchip_emmc_phy_power: dllrdy timeout".  Presumably there is some
+corner case where the DLL just takes a little longer to timeout.  Let's
+give it even more time to handle these corner cases.
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
- drivers/phy/phy-rockchip-emmc.c | 59 ++++++++++++++++++++++++++---------------
- 1 file changed, 37 insertions(+), 22 deletions(-)
+ drivers/phy/phy-rockchip-emmc.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-index 9dce958233a0..a2aa6aca7dec 100644
+index a2aa6aca7dec..fd57345ffed2 100644
 --- a/drivers/phy/phy-rockchip-emmc.c
 +++ b/drivers/phy/phy-rockchip-emmc.c
-@@ -88,15 +88,36 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
- 	unsigned int caldone;
- 	unsigned int dllrdy;
- 	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
-+	unsigned long rate;
- 	unsigned long timeout;
- 
--	if (rk_phy->emmcclk != NULL) {
--		unsigned long rate = clk_get_rate(rk_phy->emmcclk);
-+	/*
-+	 * Keep phyctrl_pdb and phyctrl_endll low to allow
-+	 * initialization of CALIO state M/C DFFs
-+	 */
-+	regmap_write(rk_phy->reg_base,
-+		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
-+		     HIWORD_UPDATE(PHYCTRL_PDB_PWR_OFF,
-+				   PHYCTRL_PDB_MASK,
-+				   PHYCTRL_PDB_SHIFT));
-+	regmap_write(rk_phy->reg_base,
-+		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
-+		     HIWORD_UPDATE(PHYCTRL_ENDLL_DISABLE,
-+				   PHYCTRL_ENDLL_MASK,
-+				   PHYCTRL_ENDLL_SHIFT));
-+
-+	/* Already finish power_off above */
-+	if (on_off == PHYCTRL_PDB_PWR_OFF)
-+		return 0;
-+
-+	rate = clk_get_rate(rk_phy->emmcclk);
-+
-+	if (rate != 0) {
- 		unsigned long ideal_rate;
- 		unsigned long diff;
- 
- 		switch (rate) {
--		case 0 ... 74999999:
-+		case 1 ... 74999999:
- 			ideal_rate = 50000000;
- 			freqsel = PHYCTRL_FREQSEL_50M;
- 			break;
-@@ -127,25 +148,6 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
- 	}
- 
- 	/*
--	 * Keep phyctrl_pdb and phyctrl_endll low to allow
--	 * initialization of CALIO state M/C DFFs
--	 */
--	regmap_write(rk_phy->reg_base,
--		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
--		     HIWORD_UPDATE(PHYCTRL_PDB_PWR_OFF,
--				   PHYCTRL_PDB_MASK,
--				   PHYCTRL_PDB_SHIFT));
--	regmap_write(rk_phy->reg_base,
--		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
--		     HIWORD_UPDATE(PHYCTRL_ENDLL_DISABLE,
--				   PHYCTRL_ENDLL_MASK,
--				   PHYCTRL_ENDLL_SHIFT));
--
--	/* Already finish power_off above */
--	if (on_off == PHYCTRL_PDB_PWR_OFF)
--		return 0;
--
--	/*
- 	 * According to the user manual, calpad calibration
- 	 * cycle takes more than 2us without the minimal recommended
- 	 * value, so we may need a little margin here
-@@ -183,6 +185,19 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
- 		     HIWORD_UPDATE(PHYCTRL_ENDLL_ENABLE,
- 				   PHYCTRL_ENDLL_MASK,
- 				   PHYCTRL_ENDLL_SHIFT));
-+
-+	/*
-+	 * We turned on the DLL even though the rate was 0 because we the
-+	 * clock might be turned on later.  ...but we can't wait for the DLL
-+	 * to lock when the rate is 0 because it will never lock with no
-+	 * input clock.
+@@ -206,8 +206,18 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+ 	 * per the math: 10.2 us * (50000000 Hz / 100000 Hz) => 5.1 ms
+ 	 * Hopefully we won't be running at 100 kHz, but we should still make
+ 	 * sure we wait long enough.
 +	 *
-+	 * Technically we should be checking the lock later when the clock
-+	 * is turned on, but for now we won't.
-+	 */
-+	if (rate == 0)
-+		return 0;
-+
- 	/*
- 	 * After enabling analog DLL circuits docs say that we need 10.2 us if
- 	 * our source clock is at 50 MHz and that lock time scales linearly
++	 * NOTE: There appear to be corner cases where the DLL seems to take
++	 * extra long to lock for reasons that aren't understood.  In some
++	 * extreme cases we've seen it take up to over 10ms (!).  We'll be
++	 * generous and give it 50ms.  We still busy wait here because:
++	 * - In most cases it should be super fast.
++	 * - This is not called lots during normal operation so it shouldn't
++	 *   be a power or performance problem to busy wait.  We expect it
++	 *   only at boot / resume.  In both cases, eMMC is probably on the
++	 *   critical path so busy waiting a little extra time should be OK.
+ 	 */
+-	timeout = jiffies + msecs_to_jiffies(10);
++	timeout = jiffies + msecs_to_jiffies(50);
+ 	do {
+ 		udelay(1);
+ 
 -- 
 2.8.0.rc3.226.g39d4020
