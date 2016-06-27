@@ -1,87 +1,60 @@
-From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
-Date: Mon, 27 Jun 2016 11:57:41 +0530
-Subject: [PATCH v3 1/3] Documentation: DT: Add iproc-static-adc binding
-In-Reply-To: <4c8870ef-8777-7016-465b-9c03463d01fa@kernel.org>
-References: <1466575913-5027-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1466575913-5027-2-git-send-email-raveendra.padasalagi@broadcom.com>
- <20160624154323.GA6046@rob-hp-laptop>
- <4c8870ef-8777-7016-465b-9c03463d01fa@kernel.org>
-Message-ID: <CAAFb_vqZoACqO6U=bVn3hDmFLQ0kPmZ4KbEMXTfvRv0mDa4VkQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 27 Jun 2016 08:28:20 +0200
+Subject: [v2] media: rc: fix Meson IR decoder
+In-Reply-To: <20160626210622.5257-1-martin.blumenstingl@googlemail.com>
+References: <20160626210622.5257-1-martin.blumenstingl@googlemail.com>
+Message-ID: <5770C784.6040604@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2016 at 3:54 PM, Jonathan Cameron <jic23@kernel.org> wrote:
-> On 24/06/16 16:43, Rob Herring wrote:
->> On Wed, Jun 22, 2016 at 11:41:51AM +0530, Raveendra Padasalagi wrote:
->>> The patch adds devicetree binding document for broadcom's
->>> iproc-static-adc controller driver.
->>>
->>> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
->>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>> ---
->>>  .../bindings/iio/adc/brcm,iproc-static-adc.txt     | 38 ++++++++++++++++++++++
->>>  1 file changed, 38 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt b/Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
->>> new file mode 100644
->>> index 0000000..a82076e
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
->>> @@ -0,0 +1,38 @@
->>> +* Broadcom's IPROC Static ADC controller
->>> +
->>> +Broadcom iProc ADC controller has 8 channels 10bit ADC.
->>> +Allows user to convert analog input voltage values to digital.
->>> +
->>> +Required properties:
->>> +
->>> +- compatible: Must be "brcm,iproc-static-adc"
->>> +
->>> +- adc-syscon: Handler of syscon node defining physical base address of the
->>> +  controller and length of memory mapped region.
->>> +
->>> +- #io-channel-cells = <1>; As ADC has multiple outputs
->>> +  refer to Documentation/devicetree/bindings/iio/iio-bindings.txt for details.
->>> +
->>> +- clocks: Clock used for this block.
->>> +
->>> +- clock-names: Clock name should be given as tsc_clk.
->>> +
->>> +- interrupts: interrupt line number.
->>> +
->>> +For example:
->>> +
->>> +    ts_adc_syscon: ts_adc_syscon at 180a6000 {
->>> +            compatible = "brcm,iproc-ts-adc-syscon","syscon";
->>> +            reg = <0x180a6000 0xc30>;
->>> +    };
->>> +
->>> +    adc: adc at 180a6000 {
->>> +            compatible = "brcm,iproc-static-adc";
->>> +            adc-syscon = <&ts_adc_syscon>;
->>> +            #io-channel-cells = <1>;
->>> +            io-channel-ranges;
->>
->> Not documented.
-> Core iio docs, but obviously a cross reference would be good.
 
-Yes, Will provide the cross reference to core iio docs in the next patch.
-Thanks.
 
->>
->>> +            clocks = <&asiu_clks BCM_CYGNUS_ASIU_ADC_CLK>;
->>> +            clock-names = "tsc_clk";
->>> +            interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
->>> +            status = "disabled";
->>> +    };
->>> --
->>> 1.9.1
->>>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+On 06/26/2016 11:06 PM, Martin Blumenstingl wrote:
+> The meson-ir driver uses the wrong offset (at least according to
+> Amlogic's reference driver as well as the datasheets of the
+> Meson8b/S805 and GXBB/S905).
+> This means that we are getting incorrect durations (REG1_TIME_IV)
+> reported from the hardware.
+
+Hi,
+
+I'm quite sure the registers are good for meson6 actually, and
+it seems reasonable Amlogic made the HW evolve for the Meson8 and GXBB platforms.
+
+>
+> This problem was also noticed by some people trying to use this on an
+> ODROID-C1 and ODROID-C2 - the workaround there (probably because the
+> datasheets were not publicy available yet at that time) was to switch
+> to ir_raw_event_store_edge (which leaves it up to the kernel to measure
+> the duration of a pulse). See [0] and [1] for the corresponding
+> patches.
+
+Since we are using devicetree, the correct way to achieve this fix is not
+to drop support for meson6 (what you do) but add a logic to select the correct
+register for meson8 and gxbb if their compatible string are encountered.
+
+> Please note that I was only able to test this on an GXBB/S905 based
+> device (due to lack of other hardware).
+
+I made this fix already but lacked time to actually test it on HW :
+https://github.com/torvalds/linux/compare/master...superna9999:amlogic/v4.7/ir
+
+My patch is missing the meson8b support, and may need a supplementary compatible check or
+a separate dt match table.
+
+Neil
+
+>
+> [0] https://github.com/erdoukki/linux-amlogic-1/commit/969b2e2242fb14a13cb651f9a1cf771b599c958b
+> [1] http://forum.odroid.com/viewtopic.php?f=135&t=20504
+>
+
+PS: BTW could you format the cover letter using the git format-patch --cover-letter instead and
+add the v2 using the -subject-prefix like :
+# git format-patch --cover-letter --signoff --subject-prefix "PATCH v2" -2
+
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
 >
