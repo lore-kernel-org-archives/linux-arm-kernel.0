@@ -1,40 +1,46 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 27 Jun 2016 10:00:26 -0700
-Subject: [PATCH v20 04/14] arm64/kexec: Add core kexec support
-In-Reply-To: <57715471.7020005@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 27 Jun 2016 18:00:39 +0100
+Subject: [PATCH v20 00/14] arm64 kexec kernel patches
+In-Reply-To: <cover.1466702804.git.geoff@infradead.org>
 References: <cover.1466702804.git.geoff@infradead.org>
- <018ac873d87fbfc45185cdab91ebc8731f64f94c.1466702804.git.geoff@infradead.org>
- <57710B92.2080603@arm.com>
- <20160627143939.GC6847@e104818-lin.cambridge.arm.com>
- <57715471.7020005@arm.com>
-Message-ID: <1467046826.7965.35.camel@infradead.org>
+Message-ID: <20160627170039.GD6847@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Geoff,
 
-On Mon, 2016-06-27 at 17:29 +0100, James Morse wrote:
-> On 27/06/16 15:39, Catalin Marinas wrote:
-> > @@ -163,7 +148,7 @@ void machine_kexec(struct kimage *kimage)
-> >  > > 	> > /*
-> >  > > 	> >  * New cpus may have become stuck_in_kernel after we loaded the image.
-> >  > > 	> >  */
-> > -> > 	> > BUG_ON(cpus_are_stuck_in_kernel() && (num_online_cpus() > 1));
-> > +> > 	> > BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
-> >  
-> >  > > 	> > reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
-> >  > > 	> > reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
-> > 
+On Thu, Jun 23, 2016 at 05:54:47PM +0000, Geoff Levand wrote:
+> AKASHI Takahiro (7):
+>       arm64: kdump: reserve memory for crash dump kernel
+>       arm64: limit memory regions based on DT property, usable-memory
+>       arm64: kdump: implement machine_crash_shutdown()
+>       arm64: kdump: add kdump support
+>       arm64: kdump: add VMCOREINFO's for user-space coredump tools
+>       arm64: kdump: enable kdump in the arm64 defconfig
+>       arm64: kdump: update a kernel doc
 > 
-> Yes, that's what I meant, thanks Catalin.
+> Geoff Levand (4):
+>       arm64: Add back cpu reset routines
+>       arm64/kexec: Add core kexec support
+>       arm64/kexec: Enable kexec in the arm64 defconfig
+>       arm64/kexec: Add pr_debug output
 > 
-> The 'num_online_cpus() > 1' is still needed as disable_nonboot_cpus() called via
-> machine_shutdown() may have failed and this is where we check. (we can't return
-> an error from either path).
-> 
-> Geoff, I assume you agree?
+> James Morse (3):
+>       arm64: hibernate: Don't hibernate on systems with stuck CPUs
+>       arm64: smp: Add function to determine if cpus are stuck in the kernel
+>       Documentation: dt: usable-memory and elfcorehdr nodes for arm64 kexec
 
-Yes, we should do a final check, and abort the reboot if if we have
-more than a single cpu running.
+I dropped patch 1 (hibernate), cherry-picked patch 2 from mainline
+("cpus stuck in the kernel", already pushed by Will to 4.7-rc5) and
+merged patches 3-6, with the amendments that James mentioned.
 
--Geoff
+The kdump patches, including the "Documentation" one from James require
+more review, testing and acks by the corresponding maintainers (kdump,
+DT). You also don't seem to have added a s-o-b for those patches (since
+you are submitting them; unless you plan to let Akashi-san submit them
+in the future).
+
+Thanks.
+
+-- 
+Catalin
