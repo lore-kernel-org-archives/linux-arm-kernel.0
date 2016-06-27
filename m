@@ -1,56 +1,59 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Mon, 27 Jun 2016 17:54:08 +0800
-Subject: [PATCH net-next 2/9] net: hns: fix code style about hns driver
+Date: Mon, 27 Jun 2016 17:54:12 +0800
+Subject: [PATCH net-next 6/9] net: hns: normalize two different loop
 In-Reply-To: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1467021255-95900-3-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1467021255-95900-7-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Daode Huang <huangdaode@hisilicon.com>
 
-This patch fixes code sytle of hns driver to make it
-simple.
+There are two approaches to assign data, one does 2 loops, another
+does 1 loop. This patch normalize the different methods to 1 loop.
 
 Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 16 +++++++---------
- 1 file changed, 7 insertions(+), 9 deletions(-)
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-index 8473287..611b67b 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-@@ -253,10 +253,9 @@ static void hns_dsaf_ge_srst_by_port(struct dsaf_device *dsaf_dev, u32 port,
- 		reg_val_1  = 0x1 << port;
- 		port_rst_off = dsaf_dev->mac_cb[port]->port_rst_off;
- 		/* there is difference between V1 and V2 in register.*/
--		if (AE_IS_VER1(dsaf_dev->dsaf_ver))
--			reg_val_2  = 0x1041041 << port_rst_off;
--		else
--			reg_val_2  = 0x2082082 << port_rst_off;
-+		reg_val_2 = AE_IS_VER1(dsaf_dev->dsaf_ver) ?
-+				0x1041041 : 0x2082082;
-+		reg_val_2 <<= port_rst_off;
- 
- 		if (!dereset) {
- 			dsaf_write_sub(dsaf_dev, DSAF_SUB_SC_GE_RESET_REQ1_REG,
-@@ -272,12 +271,11 @@ static void hns_dsaf_ge_srst_by_port(struct dsaf_device *dsaf_dev, u32 port,
- 				       reg_val_1);
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+index e36ee22..86ce28a 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+@@ -2567,15 +2567,15 @@ static char *hns_dsaf_get_node_stats_strings(char *data, int node,
+ 	buff += ETH_GSTRING_LEN;
+ 	if (node < DSAF_SERVICE_NW_NUM && !is_ver1) {
+ 		for (i = 0; i < DSAF_PRIO_NR; i++) {
+-			snprintf(buff, ETH_GSTRING_LEN,
+-				 "inod%d_pfc_prio%d_pkts", node, i);
+-			buff += ETH_GSTRING_LEN;
+-		}
+-		for (i = 0; i < DSAF_PRIO_NR; i++) {
+-			snprintf(buff, ETH_GSTRING_LEN,
+-				 "onod%d_pfc_prio%d_pkts", node, i);
++			snprintf(buff + 0 * ETH_GSTRING_LEN * DSAF_PRIO_NR,
++				 ETH_GSTRING_LEN, "inod%d_pfc_prio%d_pkts",
++				 node, i);
++			snprintf(buff + 1 * ETH_GSTRING_LEN * DSAF_PRIO_NR,
++				 ETH_GSTRING_LEN, "onod%d_pfc_prio%d_pkts",
++				 node, i);
+ 			buff += ETH_GSTRING_LEN;
  		}
- 	} else {
--		reg_val_1 = 0x15540 << dsaf_dev->reset_offset;
-+		reg_val_1 = 0x15540;
-+		reg_val_2 = AE_IS_VER1(dsaf_dev->dsaf_ver) ? 0x100 : 0x40;
- 
--		if (AE_IS_VER1(dsaf_dev->dsaf_ver))
--			reg_val_2 = 0x100 << dsaf_dev->reset_offset;
--		else
--			reg_val_2 = 0x40 << dsaf_dev->reset_offset;
-+		reg_val_1 <<= dsaf_dev->reset_offset;
-+		reg_val_2 <<= dsaf_dev->reset_offset;
- 
- 		if (!dereset) {
- 			dsaf_write_sub(dsaf_dev, DSAF_SUB_SC_GE_RESET_REQ1_REG,
++		buff += 1 * DSAF_PRIO_NR * ETH_GSTRING_LEN;
+ 	}
+ 	snprintf(buff, ETH_GSTRING_LEN, "onnod%d_tx_pkts", node);
+ 	buff += ETH_GSTRING_LEN;
+@@ -2606,8 +2606,8 @@ static u64 *hns_dsaf_get_node_stats(struct dsaf_device *ddev, u64 *data,
+ 	p[12] = hw_stats->stp_drop;
+ 	if (node_num < DSAF_SERVICE_NW_NUM && !is_ver1) {
+ 		for (i = 0; i < DSAF_PRIO_NR; i++) {
+-			p[13 + i] = hw_stats->rx_pfc[i];
+-			p[13 + i + DSAF_PRIO_NR] = hw_stats->tx_pfc[i];
++			p[13 + i + 0 * DSAF_PRIO_NR] = hw_stats->rx_pfc[i];
++			p[13 + i + 1 * DSAF_PRIO_NR] = hw_stats->tx_pfc[i];
+ 		}
+ 		p[29] = hw_stats->tx_pkts;
+ 		return &p[30];
 -- 
 1.9.1
