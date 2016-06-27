@@ -1,131 +1,125 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jun 2016 14:57:23 +0100
-Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
-In-Reply-To: <842a453d-3295-ffbd-f3dd-67baba1692d2@redhat.com>
-References: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
- <5770EE21.90103@arm.com>
- <20160627094552.GE1041@n2100.armlinux.org.uk>
- <d3a266d3-2cfc-81c7-25a6-b39c8012bcf0@redhat.com>
- <20160627113143.GF1041@n2100.armlinux.org.uk>
- <842a453d-3295-ffbd-f3dd-67baba1692d2@redhat.com>
-Message-ID: <20160627135723.GH1041@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Jun 2016 15:06:11 +0100
+Subject: [PATCH 01/15] arm64: KVM: Merged page tables documentation
+In-Reply-To: <20160627132815.GG26498@cbox>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+ <1465297115-13091-2-git-send-email-marc.zyngier@arm.com>
+ <20160627132815.GG26498@cbox>
+Message-ID: <577132D3.1030700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 02:53:16PM +0200, Hans de Goede wrote:
-> Hi Russell,
+On 27/06/16 14:28, Christoffer Dall wrote:
+> On Tue, Jun 07, 2016 at 11:58:21AM +0100, Marc Zyngier wrote:
+>> Since dealing with VA ranges tends to hurt my brain badly, let's
+>> start with a bit of documentation that will hopefully help
+>> understanding what comes next...
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/kvm_mmu.h | 45 +++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 42 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>> index f05ac27..00bc277 100644
+>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>> @@ -29,10 +29,49 @@
+>>   *
+>>   * Instead, give the HYP mode its own VA region at a fixed offset from
+>>   * the kernel by just masking the top bits (which are all ones for a
+>> - * kernel address).
+>> + * kernel address). We need to find out how many bits to mask.
+>>   *
+>> - * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
+>> - * macros (the entire kernel runs at EL2).
+>> + * We want to build a set of page tables that cover both parts of the
+>> + * idmap (the trampoline page used to initialize EL2), and our normal
+>> + * runtime VA space, at the same time.
+>> + *
+>> + * Given that the kernel uses VA_BITS for its entire address space,
+>> + * and that half of that space (VA_BITS - 1) is used for the linear
+>> + * mapping, we can limit the EL2 space to the same size.
 > 
-> On 27-06-16 13:31, Russell King - ARM Linux wrote:
-> >I think I covered that - all the paths are indentical in the ARM
-> >architecture code, and have been identical in this respect well before
-> >any of the drivers you've pointed out.
+> we can also limit the EL2 space to (VA_BITS - 1).
 > 
-> They may be identical, but there is no _need_ for them to be identical
-> AFAICT.
-
-Well, the need for this comes from the need for drivers to work on any
-architecture, so all architectures need to implement pm_power_off()
-(and the other hooks) so they work the same way.
-
-So, we can't just change it on ARM and be at odds with everything else.
-We need to have consistency here.  If we want to change it on ARM, we
-need all the other architectures to also change with us.
-
-> Maybe if so many drivers need fixing, the conditions set
-> down for poweroff are wrong, and we need to fix those instead ?
-
-The drivers which need fixing are the I2C drivers, not the drivers
-calling into the I2C layer.
-
-> >... and they're all violating the conditions set down for by the
-> >architecture for an orderly poweroff
+>> + *
+>> + * The main question is "Within the VA_BITS space, does EL2 use the
+>> + * top or the bottom half of that space to shadow the kernel's linear
+>> + * mapping?". As we need to idmap the trampoline page, this is
+>> + * determined by the range in which this page lives.
+>> + *
+>> + * If the page is in the bottom half, we have to use the top half. If
+>> + * the page is in the top half, we have to use the bottom half:
+>> + *
+>> + * if (PA(T)[VA_BITS - 1] == 1)
+>> + *	HYP_VA_RANGE = [0 ... (1 << (VA_BITS - 1)) - 1]
+>> + * else
+>> + *	HYP_VA_RANGE = [(1 << (VA_BITS - 1)) ... (1 << VA_BITS) - 1]
 > 
-> This sounds a lot like "we're doing things this way because we always
-> have been doings things this way", which does not really sound like
-> a good argument to me.
+> Is this pseudo code or what am I looking at?  What is T?
 
-It's all to do with providing a _stable_ interface that works the same
-across all architectures.  We can't have one architecture going off and
-doing something different with a cross-arch interface.
+Pseudocode indeed. T is the "trampoline page".
 
-> >Now, we could do as you are suggesting, and route IRQs to the
-> >remaining CPU via all shutdown paths, but that would be papering over
-> >the fundamental bug here: if a function is called with IRQs disabled,
-> >it (or any called function) has no business re-enabling IRQs.
+> I don't understand what this is saying.
+
+This is giving you the range of HYP VAs that can be safely used to map
+kernel ranges.
+
+> Can this be written using known constructs such as hyp_idmap_end,
+> PHYS_OFFSET etc.?
+
+I'm not sure. We're trying to determine the VA range that doesn't
+conflict with a physical range. I don't see how introducing PHYS_OFFSET
+is going to help, because we're only interested in a single page (the
+trampoline page).
+
+> And perhaps the pseudo code should define HYP_VA_SHIFT instead of the
+> range to simplify it, at least I'm confused.
+
+I think HYP_VA_SHIFT is actually contributing to the confusion, because
+it has no practical impact on anything.
+
 > 
-> Which brings us to the fundamental question why are we disabling
-> irqs in machine_poweroff ?
-
-See above.
-
-> Maybe this is necessary on some boards (efi, psci?), but at the
-> same time it breaks things badly on other boards. Thinking about
-> this more I actually believe that on boards with a i2c pmic
-> pm_power_off MUST be called with irqs enabled:
+>> + *
+>> + * In practice, the second case can be simplified to
+>> + *	HYP_VA_RANGE = [0 ... (1 << VA_BITS) - 1]
+>> + * because we'll never get anything in the bottom range.
 > 
-> (from your second reply:)
+> and now I'm more confused, are we not supposed to map the idmap in the
+> bottom range?  Is this part of the comment necessary?
+
+Well, I found it useful when I wrote it. What I meant is that we're
+never going to alias a kernel mapping there.
+
 > 
-> > More to that, the I2C core layer is setup to allow i2c_transfer() to
-> > be called from non-schedulable contexts:
-> >
-> >                 if (in_atomic() || irqs_disabled()) {
-> >                         ret = adap->trylock_bus(adap, I2C_LOCK_SEGMENT);
-> >                         if (!ret)
-> >                                 /* I2C activity is ongoing. */
-> >                                 return -EAGAIN;
-> >
-> > prior to calling into the adapters ->master_xfer() function.  This
-> > acknowledges that, if i2c_transfer() is called in a context which
-> > is not schedulable or IRQs are disabled, the adapters ->master_xfer()
-> > needs to handle this situation.
+>> + *
+>> + * This of course assumes that the trampoline page exists within the
+>> + * VA_BITS range. If it doesn't, then it means we're in the odd case
+>> + * where the kernel idmap (as well as HYP) uses more levels than the
+>> + * kernel runtime page tables (as seen when the kernel is configured
+>> + * for 4k pages, 39bits VA, and yet memory lives just above that
+>> + * limit, forcing the idmap to use 4 levels of page tables while the
+>> + * kernel itself only uses 3). In this particular case, it doesn't
+>> + * matter which side of VA_BITS we use, as we're guaranteed not to
+>> + * conflict with anything.
+>> + *
+>> + * An alternative would be to always use 4 levels of page tables for
+>> + * EL2, no matter what the kernel does. But who wants more levels than
+>> + * strictly necessary?
+>> + *
+>> + * Thankfully, ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't
+>> + * need any of this madness (the entire kernel runs at EL2).
 > 
-> So what happens if we disable irqs as you suggest and machine_power_off
-> gets called when an i2c transfer is ongoing?
+> Not sure how these two last paragraphs helps understanding what this
+> patch set is about to implement, as it seems to raise more questions
+> than answer them, but I will proceed to trying to read the code...
 
-Right... and you also need to ask that very same question again, even
-with IRQs enabled.  Enabling IRQs doesn't fix that problem, because I
-think you'll find that no one bothers checking that (eg) a write to
-the TWL device actually succeeded.  regmap just propagates the error
-code that it received from the I2C layer, twl_i2c_write() prints an
-error message, and also propagates the error code.  twl_i2c_write_u8()
-again propagates the error code, and twl4030_power_off() just prints
-more about a failure.
+As I said, I found this blurb useful when I was trying to reason about
+the problem. I don't mind it being dropped.
 
-Enabling IRQs actually does nothing to solve this underlying problem,
-all it does is paper over the problem and hopes that it goes away.
+Thanks,
 
-In order to solve this, it requires an additional step: _all_ the
-drivers doing this _also_ need to check the return value from the I2C
-write return code and retry if it's EAGAIN.  Retry how many times,
-and after what period?
-
-So, we'd need to fix a load of drivers all over the place.
-
-> Something related to this is that most pmic drivers do:
-> 
->         if (!pm_power_off)
->                 pm_power_off = foo_power_off;
-> 
-> Which seems hardly race free, either we assume there is only one
-> driver per platform implementing pm_power_off and the
-> if() is not necessary, or we need some locking here. Maybe
-> a pm_set_power_off_func() helper would be a good idea ?
-
-pm_power_off started as a hook into the APM/ACPI code, and has ended up
-being re-used by for these drivers.  There's probably saner solutions
-to this (a notifier, like the restart path) than having
-pm_set_power_off_func().  In any case, it's going to need some locking
-to make it truely safe.
-
-It's also a cross-arch issue: various of the drivers using it are also
-used on other architectures as well (eg, TWL drivers.)
-
-So, to summarise, whatever changes we make need to be cross-architecture
-changes, and can't be done in isolation on just ARM.  Moreover, all these
-drivers implementing pm_power_off() also need fixing to check the return
-code from the i2c transaction and do something sensible with it.
-
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
