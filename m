@@ -1,102 +1,62 @@
-From: a0393675@ti.com (Keerthy)
-Date: Mon, 27 Jun 2016 20:00:53 +0530
-Subject: [PATCH v2 1/8] mfd: tps65218: Remove redundant read wrapper
-In-Reply-To: <20160627122331.GB24377@dell>
-References: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
- <1467025305-13464-2-git-send-email-j-keerthy@ti.com>
- <20160627122331.GB24377@dell>
-Message-ID: <5771389D.5000103@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 27 Jun 2016 16:33:15 +0200
+Subject: [PATCH v6 5/5] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+In-Reply-To: <1465915719-8409-6-git-send-email-sudeep.holla@arm.com>
+References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
+ <1465915719-8409-6-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5771392B.3080002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/14/2016 04:48 PM, Sudeep Holla wrote:
+> Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
+> enable ACPI_PROCESSOR_IDLE for ARM64 too.
+>
+> This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
+>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+
+Hi Sudeep,
+
+now that ACPI processor supports ARM64 did you check the 
+CPUIDLE_DRIVER_STATE_START trick in the code and its derivative ?
+
+I deleted the patch 2/5 but there is a place where:
+
+if (max_cstate=0)
+	max_cstate=1;
+
+Probably this is because the POLL state is inserted, so there is always 
+an idle state. But for ARM, that is not the case.
+
+Also, there are some places where the idle state index begins to 1. I 
+think it should be 0 for ARM.
+
+>   drivers/acpi/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 1358fb7d7a68..d74275c0f374 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
+>   config ACPI_PROCESSOR
+>   	tristate "Processor"
+>   	depends on X86 || IA64 || ARM64
+> -	select ACPI_PROCESSOR_IDLE if X86 || IA64
+> +	select ACPI_PROCESSOR_IDLE
+>   	select ACPI_CPU_FREQ_PSS if X86 || IA64
+>   	default y
+>   	help
+>
 
 
-On Monday 27 June 2016 05:53 PM, Lee Jones wrote:
-> On Mon, 27 Jun 2016, Keerthy wrote:
->
->> Currently read directly calls the repmap read function. Hence
->> remove the redundant wrapper and use regmap read wherever
->> needed.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>   drivers/mfd/tps65218.c                 | 16 +---------------
->>   drivers/regulator/tps65218-regulator.c |  3 ++-
->>   include/linux/mfd/tps65218.h           |  2 --
->>   3 files changed, 3 insertions(+), 18 deletions(-)
->>
->> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
->> index 80b9dc3..f20a531 100644
->> --- a/drivers/mfd/tps65218.c
->> +++ b/drivers/mfd/tps65218.c
->> @@ -34,20 +34,6 @@
->>   #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
->>
->>   /**
->> - * tps65218_reg_read: Read a single tps65218 register.
->> - *
->> - * @tps: Device to read from.
->> - * @reg: Register to read.
->> - * @val: Contians the value
->> - */
->> -int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
->> -			unsigned int *val)
->> -{
->> -	return regmap_read(tps->regmap, reg, val);
->> -}
->> -EXPORT_SYMBOL_GPL(tps65218_reg_read);
->> -
->
-> What about the calls in the GPIO and Misc drivers?
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Thanks Lee Jones for catching this. I will send an updated v3 of the set.
-
->
->> -/**
->>    * tps65218_reg_write: Write a single tps65218 register.
->>    *
->>    * @tps65218: Device to write to.
->> @@ -93,7 +79,7 @@ static int tps65218_update_bits(struct tps65218 *tps, unsigned int reg,
->>   	int ret;
->>   	unsigned int data;
->>
->> -	ret = tps65218_reg_read(tps, reg, &data);
->> +	ret = regmap_read(tps->regmap, reg, &data);
->>   	if (ret) {
->>   		dev_err(tps->dev, "Read from reg 0x%x failed\n", reg);
->>   		return ret;
->> diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
->> index a5e5634..679ab2f 100644
->> --- a/drivers/regulator/tps65218-regulator.c
->> +++ b/drivers/regulator/tps65218-regulator.c
->> @@ -22,6 +22,7 @@
->>   #include <linux/err.h>
->>   #include <linux/platform_device.h>
->>   #include <linux/of_device.h>
->> +#include <linux/regmap.h>
->>   #include <linux/regulator/of_regulator.h>
->>   #include <linux/regulator/driver.h>
->>   #include <linux/regulator/machine.h>
->> @@ -224,7 +225,7 @@ static int tps65218_pmic_get_current_limit(struct regulator_dev *dev)
->>   	unsigned int index;
->>   	struct tps65218 *tps = rdev_get_drvdata(dev);
->>
->> -	retval = tps65218_reg_read(tps, dev->desc->csel_reg, &index);
->> +	retval = regmap_read(tps->regmap, dev->desc->csel_reg, &index);
->>   	if (retval < 0)
->>   		return retval;
->>
->> diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
->> index d58f3b5..7c9241f 100644
->> --- a/include/linux/mfd/tps65218.h
->> +++ b/include/linux/mfd/tps65218.h
->> @@ -276,8 +276,6 @@ struct tps65218 {
->>   	struct regmap *regmap;
->>   };
->>
->> -int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
->> -					unsigned int *val);
->>   int tps65218_reg_write(struct tps65218 *tps, unsigned int reg,
->>   			unsigned int val, unsigned int level);
->>   int tps65218_set_bits(struct tps65218 *tps, unsigned int reg,
->
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
