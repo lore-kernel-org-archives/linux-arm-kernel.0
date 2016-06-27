@@ -1,182 +1,138 @@
 From: dave.long@linaro.org (David Long)
-Date: Sun, 26 Jun 2016 23:06:51 -0400
-Subject: [PATCH v14 08/10] arm64: Add trampoline code for kretprobes
+Date: Sun, 26 Jun 2016 23:06:52 -0400
+Subject: [PATCH v14 09/10] arm64: Add kernel return probes support (kretprobes)
 In-Reply-To: <1466996813-23295-1-git-send-email-dave.long@linaro.org>
 References: <1466996813-23295-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1466996813-23295-9-git-send-email-dave.long@linaro.org>
+Message-ID: <1466996813-23295-10-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: William Cohen <wcohen@redhat.com>
+From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 
-The trampoline code is used by kretprobes to capture a return from a probed
-function.  This is done by saving the registers, calling the handler, and
-restoring the registers. The code then returns to the original saved caller
-return address. It is necessary to do this directly instead of using a
-software breakpoint because the code used in processing that breakpoint
-could itself be kprobe'd and cause a problematic reentry into the debug
-exception handler.
+The pre-handler of this special 'trampoline' kprobe executes the return
+probe handler functions and restores original return address in ELR_EL1.
+This way the saved pt_regs still hold the original register context to be
+carried back to the probed kernel function.
 
-Signed-off-by: William Cohen <wcohen@redhat.com>
+Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 Signed-off-by: David A. Long <dave.long@linaro.org>
-Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
 ---
- arch/arm64/include/asm/kprobes.h               |  2 +
- arch/arm64/kernel/asm-offsets.c                | 11 ++++
- arch/arm64/kernel/kprobes/Makefile             |  1 +
- arch/arm64/kernel/kprobes/kprobes.c            |  5 ++
- arch/arm64/kernel/kprobes/kprobes_trampoline.S | 85 ++++++++++++++++++++++++++
- 5 files changed, 104 insertions(+)
- create mode 100644 arch/arm64/kernel/kprobes/kprobes_trampoline.S
+ arch/arm64/Kconfig                  |  1 +
+ arch/arm64/kernel/kprobes/kprobes.c | 90 ++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 90 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
-index 79c9511..61b4915 100644
---- a/arch/arm64/include/asm/kprobes.h
-+++ b/arch/arm64/include/asm/kprobes.h
-@@ -56,5 +56,7 @@ int kprobe_exceptions_notify(struct notifier_block *self,
- 			     unsigned long val, void *data);
- int kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr);
- int kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr);
-+void kretprobe_trampoline(void);
-+void __kprobes *trampoline_probe_handler(struct pt_regs *regs);
- 
- #endif /* _ARM_KPROBES_H */
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index f8e5d47..03dfa27 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -51,6 +51,17 @@ int main(void)
-   DEFINE(S_X5,			offsetof(struct pt_regs, regs[5]));
-   DEFINE(S_X6,			offsetof(struct pt_regs, regs[6]));
-   DEFINE(S_X7,			offsetof(struct pt_regs, regs[7]));
-+  DEFINE(S_X8,			offsetof(struct pt_regs, regs[8]));
-+  DEFINE(S_X10,			offsetof(struct pt_regs, regs[10]));
-+  DEFINE(S_X12,			offsetof(struct pt_regs, regs[12]));
-+  DEFINE(S_X14,			offsetof(struct pt_regs, regs[14]));
-+  DEFINE(S_X16,			offsetof(struct pt_regs, regs[16]));
-+  DEFINE(S_X18,			offsetof(struct pt_regs, regs[18]));
-+  DEFINE(S_X20,			offsetof(struct pt_regs, regs[20]));
-+  DEFINE(S_X22,			offsetof(struct pt_regs, regs[22]));
-+  DEFINE(S_X24,			offsetof(struct pt_regs, regs[24]));
-+  DEFINE(S_X26,			offsetof(struct pt_regs, regs[26]));
-+  DEFINE(S_X28,			offsetof(struct pt_regs, regs[28]));
-   DEFINE(S_LR,			offsetof(struct pt_regs, regs[30]));
-   DEFINE(S_SP,			offsetof(struct pt_regs, sp));
- #ifdef CONFIG_COMPAT
-diff --git a/arch/arm64/kernel/kprobes/Makefile b/arch/arm64/kernel/kprobes/Makefile
-index e184d00..ce06312 100644
---- a/arch/arm64/kernel/kprobes/Makefile
-+++ b/arch/arm64/kernel/kprobes/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_KPROBES)		+= kprobes.o decode-insn.o	\
-+				   kprobes_trampoline.o		\
- 				   simulate-insn.o
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1f7d644..6af0e2e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -89,6 +89,7 @@ config ARM64
+ 	select HAVE_RCU_TABLE_FREE
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_KPROBES
++	select HAVE_KRETPROBES if HAVE_KPROBES
+ 	select IOMMU_DMA if IOMMU_SUPPORT
+ 	select IRQ_DOMAIN
+ 	select IRQ_FORCED_THREADING
 diff --git a/arch/arm64/kernel/kprobes/kprobes.c b/arch/arm64/kernel/kprobes/kprobes.c
-index 4dca25b..89936d2 100644
+index 89936d2..b5d9b9c 100644
 --- a/arch/arm64/kernel/kprobes/kprobes.c
 +++ b/arch/arm64/kernel/kprobes/kprobes.c
-@@ -576,6 +576,11 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
- 	return false;
- }
+@@ -578,7 +578,95 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
  
-+void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
-+{
-+	return NULL;
+ void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
+ {
+-	return NULL;
++	struct kretprobe_instance *ri = NULL;
++	struct hlist_head *head, empty_rp;
++	struct hlist_node *tmp;
++	unsigned long flags, orig_ret_address = 0;
++	unsigned long trampoline_address =
++		(unsigned long)&kretprobe_trampoline;
++	kprobe_opcode_t *correct_ret_addr = NULL;
++
++	INIT_HLIST_HEAD(&empty_rp);
++	kretprobe_hash_lock(current, &head, &flags);
++
++	/*
++	 * It is possible to have multiple instances associated with a given
++	 * task either because multiple functions in the call path have
++	 * return probes installed on them, and/or more than one
++	 * return probe was registered for a target function.
++	 *
++	 * We can handle this because:
++	 *     - instances are always pushed into the head of the list
++	 *     - when multiple return probes are registered for the same
++	 *	 function, the (chronologically) first instance's ret_addr
++	 *	 will be the real return address, and all the rest will
++	 *	 point to kretprobe_trampoline.
++	 */
++	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
++		if (ri->task != current)
++			/* another task is sharing our hash bucket */
++			continue;
++
++		orig_ret_address = (unsigned long)ri->ret_addr;
++
++		if (orig_ret_address != trampoline_address)
++			/*
++			 * This is the real return address. Any other
++			 * instances associated with this task are for
++			 * other calls deeper on the call stack
++			 */
++			break;
++	}
++
++	kretprobe_assert(ri, orig_ret_address, trampoline_address);
++
++	correct_ret_addr = ri->ret_addr;
++	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
++		if (ri->task != current)
++			/* another task is sharing our hash bucket */
++			continue;
++
++		orig_ret_address = (unsigned long)ri->ret_addr;
++		if (ri->rp && ri->rp->handler) {
++			__this_cpu_write(current_kprobe, &ri->rp->kp);
++			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
++			ri->ret_addr = correct_ret_addr;
++			ri->rp->handler(ri, regs);
++			__this_cpu_write(current_kprobe, NULL);
++		}
++
++		recycle_rp_inst(ri, &empty_rp);
++
++		if (orig_ret_address != trampoline_address)
++			/*
++			 * This is the real return address. Any other
++			 * instances associated with this task are for
++			 * other calls deeper on the call stack
++			 */
++			break;
++	}
++
++	kretprobe_hash_unlock(current, &flags);
++
++	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
++		hlist_del(&ri->hlist);
++		kfree(ri);
++	}
++	return (void *)orig_ret_address;
 +}
 +
++void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
++				      struct pt_regs *regs)
++{
++	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
++
++	/* replace return addr (x30) with trampoline */
++	regs->regs[30] = (long)&kretprobe_trampoline;
++}
++
++int __kprobes arch_trampoline_kprobe(struct kprobe *p)
++{
++	return 0;
+ }
+ 
  int __init arch_init_kprobes(void)
- {
- 	return 0;
-diff --git a/arch/arm64/kernel/kprobes/kprobes_trampoline.S b/arch/arm64/kernel/kprobes/kprobes_trampoline.S
-new file mode 100644
-index 0000000..ba37d85
---- /dev/null
-+++ b/arch/arm64/kernel/kprobes/kprobes_trampoline.S
-@@ -0,0 +1,85 @@
-+/*
-+ * trampoline entry and return code for kretprobes.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/assembler.h>
-+
-+	.text
-+
-+.macro save_all_base_regs
-+	stp x0, x1, [sp, #S_X0]
-+	stp x2, x3, [sp, #S_X2]
-+	stp x4, x5, [sp, #S_X4]
-+	stp x6, x7, [sp, #S_X6]
-+	stp x8, x9, [sp, #S_X8]
-+	stp x10, x11, [sp, #S_X10]
-+	stp x12, x13, [sp, #S_X12]
-+	stp x14, x15, [sp, #S_X14]
-+	stp x16, x17, [sp, #S_X16]
-+	stp x18, x19, [sp, #S_X18]
-+	stp x20, x21, [sp, #S_X20]
-+	stp x22, x23, [sp, #S_X22]
-+	stp x24, x25, [sp, #S_X24]
-+	stp x26, x27, [sp, #S_X26]
-+	stp x28, x29, [sp, #S_X28]
-+	add x0, sp, #S_FRAME_SIZE
-+	stp lr, x0, [sp, #S_LR]
-+/*
-+ * Construct a useful saved PSTATE
-+ */
-+	mrs x0, nzcv
-+	and x0, x0, #(PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT)
-+	mrs x1, daif
-+	and x1, x1, #(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
-+	orr x0, x0, x1
-+	mrs x1, CurrentEL
-+	and x1, x1, #(3 << 2)
-+	orr x0, x1, x0
-+	mrs x1, SPSel
-+	and x1, x1, #1
-+	orr x0, x1, x0
-+	str x0, [sp, #S_PSTATE]
-+.endm
-+
-+.macro restore_all_base_regs
-+	ldr x0, [sp, #S_PSTATE]
-+	and x0, x0, #(PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT)
-+	msr nzcv, x0
-+	ldp x0, x1, [sp, #S_X0]
-+	ldp x2, x3, [sp, #S_X2]
-+	ldp x4, x5, [sp, #S_X4]
-+	ldp x6, x7, [sp, #S_X6]
-+	ldp x8, x9, [sp, #S_X8]
-+	ldp x10, x11, [sp, #S_X10]
-+	ldp x12, x13, [sp, #S_X12]
-+	ldp x14, x15, [sp, #S_X14]
-+	ldp x16, x17, [sp, #S_X16]
-+	ldp x18, x19, [sp, #S_X18]
-+	ldp x20, x21, [sp, #S_X20]
-+	ldp x22, x23, [sp, #S_X22]
-+	ldp x24, x25, [sp, #S_X24]
-+	ldp x26, x27, [sp, #S_X26]
-+	ldp x28, x29, [sp, #S_X28]
-+.endm
-+
-+ENTRY(kretprobe_trampoline)
-+
-+	sub sp, sp, #S_FRAME_SIZE
-+
-+	save_all_base_regs
-+
-+	mov x0, sp
-+	bl trampoline_probe_handler
-+	/* Replace trampoline address in lr with actual
-+	   orig_ret_addr return address. */
-+	mov lr, x0
-+
-+	restore_all_base_regs
-+
-+	add sp, sp, #S_FRAME_SIZE
-+
-+	ret
-+
-+ENDPROC(kretprobe_trampoline)
 -- 
 2.5.0
