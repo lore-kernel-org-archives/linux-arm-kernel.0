@@ -1,45 +1,60 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 27 Jun 2016 17:05:37 +0800
-Subject: [PATCH V2] hwrng: OMAP: Fix assumption that runtime_get_sync
- will always succeed
-In-Reply-To: <1466787040-26184-1-git-send-email-nm@ti.com>
-References: <1466787040-26184-1-git-send-email-nm@ti.com>
-Message-ID: <20160627090537.GC7140@gondor.apana.org.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Jun 2016 10:13:05 +0100
+Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
+In-Reply-To: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
+References: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
+Message-ID: <5770EE21.90103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2016 at 11:50:39AM -0500, Nishanth Menon wrote:
-> pm_runtime_get_sync does return a error value that must be checked for
-> error conditions, else, due to various reasons, the device maynot be
-> enabled and the system will crash due to lack of clock to the hardware
-> module.
-> 
-> Before:
-> 12.562784] [00000000] *pgd=fe193835
-> 12.562792] Internal error: : 1406 [#1] SMP ARM
-> [...]
-> 12.562864] CPU: 1 PID: 241 Comm: modprobe Not tainted 4.7.0-rc4-next-20160624 #2
-> 12.562867] Hardware name: Generic DRA74X (Flattened Device Tree)
-> 12.562872] task: ed51f140 ti: ed44c000 task.ti: ed44c000
-> 12.562886] PC is at omap4_rng_init+0x20/0x84 [omap_rng]
-> 12.562899] LR is at set_current_rng+0xc0/0x154 [rng_core]
-> [...]
-> 
-> After the proper checks:
-> [   94.366705] omap_rng 48090000.rng: _od_fail_runtime_resume: FIXME:
-> missing hwmod/omap_dev info
-> [   94.375767] omap_rng 48090000.rng: Failed to runtime_get device -19
-> [   94.382351] omap_rng 48090000.rng: initialization failed.
-> 
-> Fixes: 665d92fa85b5 ("hwrng: OMAP: convert to use runtime PM")
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> Changes in V2:
-> 	- Added runtime_put_noidle when get_sync fails to ensure proper refcounting
+[Thanks Maxime for pointing me to this discussion, +RMK]
 
-Patch applied.  Thanks.
+Hi Hans,
+
+On 26/06/16 17:00, Hans de Goede wrote:
+> Hi,
+> 
+> I've just spend most of my Sunday debugging a problem
+> where Allwinner ARM SoC based boards will not shutdown when
+> using a Fedora 24 userland, where as the exact same
+> kernel works fine with Fedora 22.
+> 
+> It turns out that irq-balanced is to blame. In Fedora 24
+> it pins the i2c controller, which talks to the pmic
+> which is needed for poweroff to cpu-id 1:
+> 
+> [root at localhost ~]# cat /proc/irq/49/smp_affinity
+> 2
+> 
+> Where as the reboot_cpu is cpu-id 0 and with
+> cpu 1 disabled at poweroff time, the i2c transfer
+> never gets past its first step leading to an i2c
+> driver timeout + kernel panic due to machine_power_off()
+> returning.
+> 
+> As a workaround I can stop irq-balanced and do:
+> 
+> echo 3 > /proc/irq/49/smp_affinity
+> 
+> Before doing poweroff and then everything works as
+> expected again.
+> 
+> Now the question is how to fix this?
+
+[...]
+
+I'm wondering if that's not an effect of this patch:
+
+https://lkml.org/lkml/2015/9/24/138
+
+missing on the ARM side (the corresponding arm64 patch is 217d453d473c).
+
+Otherwise, can you instrument the GIC set_affinity method and find out
+if we're even trying to move this IRQ away from the CPU that is being
+torn down?
+
+Thanks,
+
+	M.
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Jazz is not dead. It just smells funny...
