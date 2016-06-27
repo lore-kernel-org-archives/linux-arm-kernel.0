@@ -1,51 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Jun 2016 11:12:31 +0100
-Subject: [PATCH 11/14] drivers: firmware: psci: Allow OS Initiated
- suspend mode
-In-Reply-To: <CAGm_ybjO+jAN62fqFyVrw_+5LOnUumEfn8kxmDa+s5ap0Bqk9A@mail.gmail.com>
-References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
- <1466624209-27432-12-git-send-email-lina.iyer@linaro.org>
- <CAGm_ybjO+jAN62fqFyVrw_+5LOnUumEfn8kxmDa+s5ap0Bqk9A@mail.gmail.com>
-Message-ID: <20160627101231.GB1113@leverpostej>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 27 Jun 2016 12:20:10 +0200
+Subject: [GIT PULL] drm/mediatek: MT8173 gamma & dither support
+In-Reply-To: <1466753238-17216-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1466753238-17216-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <558c9efc-d197-a6c3-cf7e-f9fcac60ca64@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2016 at 09:55:20AM +0530, Vikas Sajjan wrote:
-> On Thu, Jun 23, 2016 at 1:06 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> > +static int __init psci_1_0_init(struct device_node *np)
-> > +{
-> > +       int ret;
-> > +
-> > +       ret = psci_0_2_init(np);
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       /* Check if PSCI OSI mode is available */
-> > +       ret = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
-> > +       if (ret & PSCI_1_0_OS_INITIATED) {
-> > +               ret = psci_features(PSCI_1_0_FN_SET_SUSPEND_MODE);
-> > +               if (!ret)
-> > +                       psci_has_osi_pd = true;
-> 
-> IMHO, its better to have this done in psci_init_cpu_suspend() itself
-> for 2 reasons
-> 
-> a] psci_init_cpu_suspend() already calls
-> psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND])
-> b] by moving this in psci_init_cpu_suspend() we make this support
-> available even for ACPI platforms, since psci_acpi_init() calls
-> psci_probe() and this calls  psci_init_cpu_suspend() for
-> PSCI_VERSION_MAJOR(ver) >= 1
 
-For ACPI platforms it is necessary to go through a handshake to
-determine whether LPI can use OSI (see 6.2.11.2 in the ACPI 6.1 spec).
-So there will have to be some ACPI-specific code to determine whether
-OSI should be used.
 
-We will probably have to an ACPI-specific wrapper for
-psci_init_cpu_suspend to cater for that. I don't think that
-psci_init_cpu_suspend itself should be in charge of deciding whether to
-enable OSI.
+On 06/24/2016 09:27 AM, Bibby Hsieh wrote:
+> Hi Dave,
+>
+> Please consider merging this tag, which contains the v2 MT8173 gamma & dither function patches I sent on 2016-06-17, rebased onto v4.7-rc1. There have been no further comments.
+>
+> Thanks
+> Bibby
+>
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+>
+>   Linux 4.7-rc1 (2016-05-29 16:29:24 GMT)
+>
+> are available in the git repository at:
+>
+>   git at github.com:BibbyHsieh/linux4.7-rc1.git
+>
+> for you to fetch changes up to dd0eb773bc125f5e6bca735d19c08500dc3730f9:
+>
+>   drm/mediatek: Add gamma correction
+>
+> -------------------------------------------------------------------------
 
-Thanks,
-Mark.
+As far as I can see, your branch has 3 patches on top from Eddie. It 
+seems to me as if you didn't send your patches to the mailinglist before?
+Anyway this branch does not fulfill the rules to get merged into the 
+linux kernel.
+
+Why do you send a pull request? The normal process is to send the 
+patches via email and if the maintainer wants you can send a pull 
+request once the patches are ready to be merged.
+
+Regards,
+Matthias
+
+> This is MT8173 gamma & dither support PATCH v2, based on 4.7-rc1.
+>
+> Changes since v1:
+>  -According to the suggestion from Daniel,
+>   we used the new atomic color management.
+>  -Applied gamma function at GAMMA engine (path 2).
+>  -Made dithering function support hardware mirroring well.
+>  -Removed the bpc variable from mtk_drm_crtc struct.
+> -------------------------------------------------------------------------
+>
+> Bibby Hsieh (2):
+>   drm/mediatek: Add gamma correction
+>   drm/mediatek: set mt8173 dithering function
+>
+>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |    3 +-
+>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |    3 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   26 ++++-
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |    1 +
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  147 ++++++++++++++++++++++++++-
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   16 ++-
+>  6 files changed, 184 insertions(+), 12 deletions(-)
+>
