@@ -1,373 +1,91 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 27 Jun 2016 17:02:40 +0800
-Subject: [PATCH 02/10] mailbox: tegra-hsp: Add HSP(Hardware Synchronization
- Primitives) driver
+Date: Mon, 27 Jun 2016 17:02:41 +0800
+Subject: [PATCH 03/10] Documentation: dt-bindings: firmware: tegra: add
+ bindings of the BPMP
 In-Reply-To: <20160627090248.23621-1-josephl@nvidia.com>
 References: <20160627090248.23621-1-josephl@nvidia.com>
-Message-ID: <20160627090248.23621-3-josephl@nvidia.com>
+Message-ID: <20160627090248.23621-4-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra HSP mailbox driver implements the signaling doorbell-based
-interprocessor communication (IPC) for remote processors currently. The
-HSP HW modules support some different features for that, which are
-shared mailboxes, shared semaphores, arbitrated semaphores, and
-doorbells. And there are multiple HSP HW instances on the chip. So the
-driver is extendable to support more features for different IPC
-requirement.
-
-The driver of remote processor can use it as a mailbox client and deal
-with the IPC protocol to synchronize the data communications.
+The BPMP is a specific processor in Tegra chip, which is designed for
+booting process handling and offloading the power management tasks
+from the CPU. The binding document defines the resources that would be
+used by the BPMP firmware driver, which can create the interprocessor
+communication (IPC) between the CPU and BPMP.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- drivers/mailbox/Kconfig     |   9 ++
- drivers/mailbox/Makefile    |   2 +
- drivers/mailbox/tegra-hsp.c | 306 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 317 insertions(+)
- create mode 100644 drivers/mailbox/tegra-hsp.c
+ .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 61 ++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
 
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index 5305923752d2..fe584cb54720 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -114,6 +114,15 @@ config MAILBOX_TEST
- 	  Test client to help with testing new Controller driver
- 	  implementations.
- 
-+config TEGRA_HSP_MBOX
-+	bool "Tegra HSP(Hardware Synchronization Primitives) Driver"
-+	depends on ARCH_TEGRA_186_SOC
-+	help
-+	  The Tegra HSP driver is used for the interprocessor communication
-+	  between different remote processors and host processors on Tegra186
-+	  and later SoCs. Say Y here if you want to have this support.
-+	  If unsure say N.
-+
- config XGENE_SLIMPRO_MBOX
- 	tristate "APM SoC X-Gene SLIMpro Mailbox Controller"
- 	depends on ARCH_XGENE
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index 0be3e742bb7d..26d8f91c7fea 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -25,3 +25,5 @@ obj-$(CONFIG_TI_MESSAGE_MANAGER) += ti-msgmgr.o
- obj-$(CONFIG_XGENE_SLIMPRO_MBOX) += mailbox-xgene-slimpro.o
- 
- obj-$(CONFIG_HI6220_MBOX)	+= hi6220-mailbox.o
-+
-+obj-${CONFIG_TEGRA_HSP_MBOX}	+= tegra-hsp.o
-diff --git a/drivers/mailbox/tegra-hsp.c b/drivers/mailbox/tegra-hsp.c
+diff --git a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
 new file mode 100644
-index 000000000000..85bf5372681d
+index 000000000000..34a252d87e17
 --- /dev/null
-+++ b/drivers/mailbox/tegra-hsp.c
-@@ -0,0 +1,306 @@
-+/*
-+ * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
++++ b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+@@ -0,0 +1,61 @@
++NVIDIA Tegra Boot and Power Management Processor (BPMP)
 +
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/mailbox_controller.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <dt-bindings/mailbox/tegra-hsp.h>
++The BPMP is a specific processor in Tegra chip, which is designed for
++booting process handling and offloading the power management tasks from
++the CPU. The binding document defines the resources that would be used by
++the BPMP firmware driver, which can create the interprocessor
++communication (IPC) between the CPU and BPMP.
 +
-+#define HSP_INT_DIMENSIONING	0x380
-+#define HSP_nSM_OFFSET		0
-+#define HSP_nSS_OFFSET		4
-+#define HSP_nAS_OFFSET		8
-+#define HSP_nDB_OFFSET		12
-+#define HSP_nSI_OFFSET		16
-+#define HSP_nINT_MASK		0xf
++Required properties:
++- name : Should be bpmp
++- compatible : Should be "nvidia,tegra<chip>-bpmp"
++- mboxes : The phandle of mailbox controller and the channel ID
++           See "Documentation/devicetree/bindings/mailbox/
++	   nvidia,tegra186-hsp.txt" and "Documentation/devicetree/
++	   bindings/mailbox/mailbox.txt" for more details about the generic
++	   mailbox controller and mailbox client driver bindings.
++- shmem : List of the phandle of the TX and RX shared memory area that
++	  the IPC between CPU and BPMP is based on.
++- #clock-cells : Should be 1.
++- #reset-cells : Should be 1.
 +
-+#define HSP_DB_REG_TRIGGER	0x0
-+#define HSP_DB_REG_ENABLE	0x4
-+#define HSP_DB_REG_RAW		0x8
-+#define HSP_DB_REG_PENDING	0xc
++The shared memory bindings for BPMP
++-----------------------------------
 +
-+#define HSP_DB_CCPLEX		1
-+#define HSP_DB_BPMP		3
++The shared memory area for the IPC TX and RX between CPU and BPMP are
++predefined and work on top of sysram, which is a sram inside the chip.
 +
-+#define MAX_NUM_HSP_CHAN 32
-+#define MAX_NUM_HSP_DB 7
++See "Documentation/devicetree/bindings/sram/sram.txt" for the bindings.
 +
-+#define hsp_db_offset(i, d) \
-+	(d->base + ((1 + (d->nr_sm >> 1) + d->nr_ss + d->nr_as) << 16) + \
-+	(i) * 0x100)
++Example:
 +
-+struct tegra_hsp_db_chan {
-+	int master_id;
-+	int db_id;
++hsp_top: hsp at 03c00000 {
++	...
++	#mbox-cells = <1>;
 +};
 +
-+struct tegra_hsp_mbox {
-+	struct mbox_controller *db_mbox;
-+	void __iomem *base;
-+	void __iomem *db_base[MAX_NUM_HSP_DB];
-+	int nr_sm;
-+	int nr_as;
-+	int nr_ss;
-+	int nr_db;
-+	int nr_si;
-+	spinlock_t lock;
++bpmp at d0000000 {
++	compatible = "nvidia,tegra186-bpmp";
++	mboxes = <&hsp_mbox HSP_DB_MASTER_BPMP>;
++	shmem = <&cpu_bpmp_tx &cpu_bpmp_rx>;
++	#clock-cells = <1>;
++	#reset-cells = <1>;
 +};
 +
-+static inline u32 hsp_readl(void __iomem *base, int reg)
-+{
-+	return readl(base + reg);
-+}
++sysram at 30000000 {
++	compatible = "nvidia,tegra186-sysram", "mmio-ram";
++	reg = <0x0 0x30000000 0x0 0x50000>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++	ranges = <0 0x0 0x0 0x30000000 0x0 0x50000>;
 +
-+static inline void hsp_writel(void __iomem *base, int reg, u32 val)
-+{
-+	writel(val, base + reg);
-+	readl(base + reg);
-+}
++	cpu_bpmp_tx: bpmp_shmem at 4e000 {
++		compatible = "nvidia,tegra186-bpmp-shmem";
++		reg = <0x0 0x4e000 0x0 0x1000>;
++	};
 +
-+static int hsp_db_can_ring(void __iomem *db_base)
-+{
-+	u32 reg;
-+
-+	reg = hsp_readl(db_base, HSP_DB_REG_ENABLE);
-+
-+	return !!(reg & BIT(HSP_DB_MASTER_CCPLEX));
-+}
-+
-+static irqreturn_t hsp_db_irq(int irq, void *p)
-+{
-+	struct tegra_hsp_mbox *hsp_mbox = p;
-+	ulong val;
-+	int master_id;
-+
-+	val = (ulong)hsp_readl(hsp_mbox->db_base[HSP_DB_CCPLEX],
-+			       HSP_DB_REG_PENDING);
-+	hsp_writel(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_PENDING, val);
-+
-+	spin_lock(&hsp_mbox->lock);
-+	for_each_set_bit(master_id, &val, MAX_NUM_HSP_CHAN) {
-+		struct mbox_chan *chan = &hsp_mbox->db_mbox->chans[master_id];
-+		struct tegra_hsp_db_chan *db_chan = chan->con_priv;
-+
-+		if (master_id == db_chan->master_id)
-+			mbox_chan_received_data(chan, NULL);
-+	}
-+	spin_unlock(&hsp_mbox->lock);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int hsp_db_send_data(struct mbox_chan *chan, void *data)
-+{
-+	struct tegra_hsp_db_chan *db_chan = chan->con_priv;
-+	struct tegra_hsp_mbox *hsp_mbox = dev_get_drvdata(chan->mbox->dev);
-+
-+	hsp_writel(hsp_mbox->db_base[db_chan->db_id], HSP_DB_REG_TRIGGER, 1);
-+
-+	return 0;
-+}
-+
-+static int hsp_db_startup(struct mbox_chan *chan)
-+{
-+	struct tegra_hsp_db_chan *db_chan = chan->con_priv;
-+	struct tegra_hsp_mbox *hsp_mbox = dev_get_drvdata(chan->mbox->dev);
-+	u32 val;
-+	unsigned long flag;
-+
-+	if (db_chan->master_id >= MAX_NUM_HSP_CHAN) {
-+		dev_err(chan->mbox->dev, "invalid HSP chan: master ID: %d\n",
-+			db_chan->master_id);
-+		return -EINVAL;
-+	}
-+
-+	spin_lock_irqsave(&hsp_mbox->lock, flag);
-+	val = hsp_readl(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_ENABLE);
-+	val |= BIT(db_chan->master_id);
-+	hsp_writel(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_ENABLE, val);
-+	spin_unlock_irqrestore(&hsp_mbox->lock, flag);
-+
-+	if (!hsp_db_can_ring(hsp_mbox->db_base[db_chan->db_id]))
-+		return -ENODEV;
-+
-+	return 0;
-+}
-+
-+static void hsp_db_shutdown(struct mbox_chan *chan)
-+{
-+	struct tegra_hsp_db_chan *db_chan = chan->con_priv;
-+	struct tegra_hsp_mbox *hsp_mbox = dev_get_drvdata(chan->mbox->dev);
-+	u32 val;
-+	unsigned long flag;
-+
-+	spin_lock_irqsave(&hsp_mbox->lock, flag);
-+	val = hsp_readl(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_ENABLE);
-+	val &= ~BIT(db_chan->master_id);
-+	hsp_writel(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_ENABLE, val);
-+	spin_unlock_irqrestore(&hsp_mbox->lock, flag);
-+}
-+
-+static bool hsp_db_last_tx_done(struct mbox_chan *chan)
-+{
-+	return true;
-+}
-+
-+static const struct mbox_chan_ops tegra_hsp_db_ops = {
-+	.send_data = hsp_db_send_data,
-+	.startup = hsp_db_startup,
-+	.shutdown = hsp_db_shutdown,
-+	.last_tx_done = hsp_db_last_tx_done,
++	cpu_bpmp_rx: bpmp_shmem at 4f000 {
++		compatible = "nvidia,tegra186-bpmp-shmem";
++		reg = <0x0 0x4f000 0x0 0x1000>;
++	};
 +};
-+
-+static int tegra_hsp_db_init(struct platform_device *pdev,
-+			      struct tegra_hsp_mbox *hsp_mbox)
-+{
-+	int i, irq, ret;
-+
-+	if (hsp_mbox->db_mbox == NULL) {
-+		hsp_mbox->db_mbox = devm_kzalloc(&pdev->dev,
-+						 sizeof(*hsp_mbox->db_mbox),
-+						 GFP_KERNEL);
-+		if (!hsp_mbox->db_mbox)
-+			return -ENOMEM;
-+	}
-+
-+	irq = platform_get_irq_byname(pdev, "doorbell");
-+	ret = devm_request_irq(&pdev->dev, irq, hsp_db_irq,
-+			       IRQF_NO_SUSPEND, dev_name(&pdev->dev), hsp_mbox);
-+	if (ret)
-+		return ret;
-+
-+	hsp_mbox->db_mbox->chans =
-+		devm_kcalloc(&pdev->dev, MAX_NUM_HSP_CHAN,
-+			     sizeof(*hsp_mbox->db_mbox->chans), GFP_KERNEL);
-+	if (!hsp_mbox->db_mbox->chans)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < MAX_NUM_HSP_CHAN; i++) {
-+		struct tegra_hsp_db_chan *db_chan;
-+
-+		db_chan = devm_kzalloc(&pdev->dev,
-+				       sizeof(*db_chan), GFP_KERNEL);
-+		if (!db_chan)
-+			return -ENOMEM;
-+
-+		db_chan->master_id = i;
-+		switch (i) {
-+		case HSP_DB_MASTER_BPMP:
-+			db_chan->db_id = HSP_DB_BPMP;
-+			break;
-+		default:
-+			db_chan->db_id = MAX_NUM_HSP_DB;
-+			break;
-+		}
-+
-+		hsp_mbox->db_mbox->chans[i].con_priv = db_chan;
-+	}
-+
-+	hsp_mbox->db_mbox->num_chans = MAX_NUM_HSP_CHAN;
-+	hsp_mbox->db_mbox->dev = &pdev->dev;
-+	hsp_mbox->db_mbox->txdone_irq = false;
-+	hsp_mbox->db_mbox->txdone_poll = false;
-+	hsp_mbox->db_mbox->ops = &tegra_hsp_db_ops;
-+	platform_set_drvdata(pdev, hsp_mbox);
-+
-+	for (i = 0; i < MAX_NUM_HSP_DB; i++)
-+		hsp_mbox->db_base[i] = hsp_db_offset(i, hsp_mbox);
-+
-+	ret = mbox_controller_register(hsp_mbox->db_mbox);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id tegra_hsp_match[] = {
-+	{ .compatible = "nvidia,tegra186-hsp", },
-+	{ }
-+};
-+
-+static int tegra_hsp_probe(struct platform_device *pdev)
-+{
-+	struct tegra_hsp_mbox *hsp_mbox;
-+	struct device_node *np;
-+	struct resource *res;
-+	int hsp_func_id;
-+	int ret = 0;
-+	u32 reg;
-+
-+	hsp_mbox = devm_kzalloc(&pdev->dev, sizeof(*hsp_mbox), GFP_KERNEL);
-+	if (!hsp_mbox)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	hsp_mbox->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(hsp_mbox->base))
-+		return PTR_ERR(hsp_mbox->base);
-+
-+	reg = hsp_readl(hsp_mbox->base, HSP_INT_DIMENSIONING);
-+	hsp_mbox->nr_sm = (reg >> HSP_nSM_OFFSET) & HSP_nINT_MASK;
-+	hsp_mbox->nr_ss = (reg >> HSP_nSS_OFFSET) & HSP_nINT_MASK;
-+	hsp_mbox->nr_as = (reg >> HSP_nAS_OFFSET) & HSP_nINT_MASK;
-+	hsp_mbox->nr_db = (reg >> HSP_nDB_OFFSET) & HSP_nINT_MASK;
-+	hsp_mbox->nr_si = (reg >> HSP_nSI_OFFSET) & HSP_nINT_MASK;
-+
-+	np = pdev->dev.of_node;
-+	ret = of_property_read_u32(np, "nvidia,hsp-function", &hsp_func_id);
-+	if (ret) {
-+		pr_err("tegra-hsp mbox: fail to parse DT configuration.\n");
-+		return -EINVAL;
-+	}
-+
-+	switch (hsp_func_id) {
-+	case HSP_DOORBELL:
-+		ret = tegra_hsp_db_init(pdev, hsp_mbox);
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	if (ret) {
-+		pr_err("tegra-hsp mbox: fail to register mailbox %d.\n", ret);
-+		return ret;
-+	}
-+
-+	spin_lock_init(&hsp_mbox->lock);
-+
-+	return 0;
-+}
-+
-+static int tegra_hsp_remove(struct platform_device *pdev)
-+{
-+	struct tegra_hsp_mbox *hsp_mbox = platform_get_drvdata(pdev);
-+
-+	if (hsp_mbox->db_mbox)
-+		mbox_controller_unregister(hsp_mbox->db_mbox);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver tegra_hsp_driver = {
-+	.driver = {
-+		.name = "tegra-hsp",
-+		.of_match_table = tegra_hsp_match,
-+	},
-+	.probe = tegra_hsp_probe,
-+	.remove = tegra_hsp_remove,
-+};
-+
-+static int __init tegra_hsp_init(void)
-+{
-+	return platform_driver_register(&tegra_hsp_driver);
-+}
-+core_initcall(tegra_hsp_init);
 -- 
 2.9.0
