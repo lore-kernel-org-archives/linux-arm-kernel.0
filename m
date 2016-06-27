@@ -1,38 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Jun 2016 11:22:37 +0200
-Subject: [PATCH] drm/mediatek: add ARM_SMCCC dependency
-Message-ID: <20160627092416.1463857-1-arnd@arndb.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 27 Jun 2016 10:25:52 +0100
+Subject: [PATCH 2/2] serial: sirf: make uart register info static
+In-Reply-To: <8401626.hVVxvI31N9@wuerfel>
+References: <1465322772-26125-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1465322772-26125-2-git-send-email-ben.dooks@codethink.co.uk>
+ <20160625210150.GA3305@kroah.com> <8401626.hVVxvI31N9@wuerfel>
+Message-ID: <770f927c-1439-2313-e638-51cc85930d48@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM SMCCC is only set for ARMv7 and ARMv8 CPUs, but we currently
-allow the driver to be build for older architecture levels as
-well, which results in a link failure:
+On 25/06/16 22:07, Arnd Bergmann wrote:
+> On Saturday, June 25, 2016 2:01:50 PM CEST Greg Kroah-Hartman wrote:
+>> On Tue, Jun 07, 2016 at 07:06:12PM +0100, Ben Dooks wrote:
+>>> The driver does not export the two structures that
+>>> define the uart register mappings outside of the
+>>> driver, so make them static to avoid the following
+>>> warnings:
+>>>
+>>> drivers/tty/serial/sirfsoc_uart.h:124:30: warning: symbol 'sirfsoc_usp' was not declared. Should it be static?
+>>> drivers/tty/serial/sirfsoc_uart.h:190:30: warning: symbol 'sirfsoc_uart' was not declared. Should it be static?
+>>>
+>>> Note, we don't move these into the driver .c file as this would
+>>> be a larger change. However they really should not belong in the
+>>> header file like this.
+>>
+>> Please do the correct thing here and move them into the .c file.
+> 
+> I guess the entire sirfsoc_uart.h file can just get moved in there,
+> nothing else includes it (obviously, as the symbols above would
+> otherwise clash).
 
-drivers/gpu/built-in.o: In function `mtk_hdmi_hw_make_reg_writable':
-:(.text+0x1e737c): undefined reference to `arm_smccc_smc'
+If no-one else objects then i'll sort a second revision.
 
-This adds a Kconfig dependency. The patch applies on my two
-previous fixes that are not yet applied, so please apply all
-three to get randconfig builds to work correctly.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 8f83f26891e1 ("drm/mediatek: Add HDMI support")
----
- drivers/gpu/drm/mediatek/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/gpu/drm/mediatek/Kconfig b/drivers/gpu/drm/mediatek/Kconfig
-index 96ebf8bb6024..294de4549922 100644
---- a/drivers/gpu/drm/mediatek/Kconfig
-+++ b/drivers/gpu/drm/mediatek/Kconfig
-@@ -3,6 +3,7 @@ config DRM_MEDIATEK
- 	depends on DRM
- 	depends on ARCH_MEDIATEK || (ARM && COMPILE_TEST)
- 	depends on COMMON_CLK
-+	depends on HAVE_ARM_SMCCC
- 	depends on OF
- 	select DRM_GEM_CMA_HELPER
- 	select DRM_KMS_HELPER
 -- 
-2.9.0
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
