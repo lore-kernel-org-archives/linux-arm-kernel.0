@@ -1,53 +1,100 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 27 Jun 2016 15:20:44 +0200
-Subject: [PATCH] ARM: STi: Update machine _namestr to be more generic.
-In-Reply-To: <1462984816-705-1-git-send-email-peter.griffin@linaro.org>
-References: <1462984816-705-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <5771282C.2050202@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Jun 2016 06:26:48 -0700
+Subject: [PATCH 2/4] ARM: OMAP4+: Prevent CPU1 related hang with kexec
+In-Reply-To: <4439074.kx9oBqeAS1@wuerfel>
+References: <1466495565-17480-1-git-send-email-tony@atomide.com>
+ <1466495565-17480-3-git-send-email-tony@atomide.com>
+ <4439074.kx9oBqeAS1@wuerfel>
+Message-ID: <20160627132648.GA28140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter
+* Arnd Bergmann <arnd@arndb.de> [160624 00:41]:
+> This doesn't work:
+> 
+> arch/arm/mach-omap2/built-in.o: In function `omap5_secondary_startup':
+> dss-common.c:(.text+0x4cc4): undefined reference to `secondary_startup'
+> arch/arm/mach-omap2/built-in.o: In function `hyp_boot':
+> dss-common.c:(.text+0x4cf0): undefined reference to `secondary_startup'
+> arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_startup':
+> dss-common.c:(.text+0x4d14): undefined reference to `secondary_startup'
+> arch/arm/mach-omap2/built-in.o: In function `omap4460_secondary_startup':
+> dss-common.c:(.text+0x4d48): undefined reference to `secondary_startup'
+> 
+> secondary_startup() is not defined when CONFIG_SMP is disabled.
 
-On 05/11/2016 06:40 PM, Peter Griffin wrote:
-> This string is used by dump_stack and as we now support
-> more SoC's than just STiH415/6 it is misleading to have
-> the current string in the stack trace.
->
-> This patch updates it to be more generic for the STi
-> family of SoCs.
->
-> So instead of looking like this
->
-> [  271.672555] Hardware name: STiH415/416 SoC with Flattened Device Tree
-> [  271.678998] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
-> [  271.686746] [<c030bb54>] (show_stack) from [<c058bc4c>] (dump_stack+0x98/0xac)
-> [snip]
->
-> it now looks like this:
->
-> [    2.669879] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc3-00026-g38a1ce6-dirty #76
-> [    2.677973] Hardware name: STi SoC with Flattened Device Tree
-> [    2.683723] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
-> [    2.691472] [<c030bb54>] (show_stack) from [<c058bc0c>] (dump_stack+0x98/0xac)
-> [snip]
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->   arch/arm/mach-sti/board-dt.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
-> index ae10fb2..cfee0ef 100644
-> --- a/arch/arm/mach-sti/board-dt.c
-> +++ b/arch/arm/mach-sti/board-dt.c
-> @@ -23,7 +23,7 @@ static const char *const stih41x_dt_match[] __initconst = {
->   	NULL
->   };
->   
-> -DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
-> +DT_MACHINE_START(STM, "STi SoC with Flattened Device Tree")
->   	.dt_compat	= stih41x_dt_match,
->   	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE |
->   			  L310_AUX_CTRL_DATA_PREFETCH |
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Oh sorry. Looks like I did not properly check the compiler output
+while fixing up the randconfig errors I got earlier. Below is a
+fix for this build error.
+
+Regards,
+
+Tony
+
+8< -----------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Sun, 26 Jun 2016 22:47:06 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix build if CONFIG_SMP is not set
+
+Looks like I only partially fixed up things if CONFIG_SMP
+is not set for the recent kexec changes. We don't have
+boot_secondary available without SMP as reported by Arnd.
+
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+index 6d1dffc..fe36ce2 100644
+--- a/arch/arm/mach-omap2/omap-headsmp.S
++++ b/arch/arm/mach-omap2/omap-headsmp.S
+@@ -24,6 +24,16 @@
+ #define AUX_CORE_BOOT0_PA			0x48281800
+ #define API_HYP_ENTRY				0x102
+ 
++ENTRY(omap_secondary_startup)
++#ifdef CONFIG_SMP
++	b	secondary_startup
++#else
++/* Should never get here */
++again:	wfi
++	b	again
++#endif
++#ENDPROC(omap_secondary_startup)
++
+ /*
+  * OMAP5 specific entry point for secondary CPU to jump from ROM
+  * code.  This routine also provides a holding flag into which
+@@ -39,7 +49,7 @@ wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
+ 	and	r4, r4, #0x0f
+ 	cmp	r0, r4
+ 	bne	wait
+-	b	secondary_startup
++	b	omap_secondary_startup
+ ENDPROC(omap5_secondary_startup)
+ /*
+  * Same as omap5_secondary_startup except we call into the ROM to
+@@ -59,7 +69,7 @@ wait_2:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
+ 	adr	r0, hyp_boot
+ 	smc	#0
+ hyp_boot:
+-	b	secondary_startup
++	b	omap_secondary_startup
+ ENDPROC(omap5_secondary_hyp_startup)
+ /*
+  * OMAP4 specific entry point for secondary CPU to jump from ROM
+@@ -82,7 +92,7 @@ hold:	ldr	r12,=0x103
+ 	 * we've been released from the wait loop,secondary_stack
+ 	 * should now contain the SVC stack for this core
+ 	 */
+-	b	secondary_startup
++	b	omap_secondary_startup
+ ENDPROC(omap4_secondary_startup)
+ 
+ ENTRY(omap4460_secondary_startup)
+@@ -119,5 +129,5 @@ hold_2:	ldr	r12,=0x103
+ 	 * we've been released from the wait loop,secondary_stack
+ 	 * should now contain the SVC stack for this core
+ 	 */
+-	b	secondary_startup
++	b	omap_secondary_startup
+ ENDPROC(omap4460_secondary_startup)
