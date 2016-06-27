@@ -1,40 +1,44 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Mon, 27 Jun 2016 17:54:07 +0800
-Subject: [PATCH net-next 1/9] MAINTAINERS: add maintainers for hns driver
-In-Reply-To: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
-References: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1467021255-95900-2-git-send-email-Yisen.Zhuang@huawei.com>
+Date: Mon, 27 Jun 2016 17:54:06 +0800
+Subject: [PATCH net-next 0/9] net: hns: fix the typo of hns
+Message-ID: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daode Huang <huangdaode@hisilicon.com>
+This series includes typo fixes which review by Andy, adding
+the hns maintainer to MAINTAINERS,
 
-This patch adds maintainers for hisilicon network subsystem driver
+ > adds the maintainer for hns driver from Daode;
 
-Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
----
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ > from Daode: fix the typo of hns reviewed by Andy Shevchenko;
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3a171a9..c819659 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5421,6 +5421,15 @@ F:	include/uapi/linux/if_hippi.h
- F:	net/802/hippi.c
- F:	drivers/net/hippi/
- 
-+HISILICON NETWORK SUBSYSTEM DRIVER
-+M:	Yisen Zhuang <yisen.zhuang@huawei.com>
-+M:	Salil Mehta <salil.mehta@huawei.com>
-+L:	netdev at vger.kernel.org
-+W:	http://www.hisilicon.com
-+S:	Maintained
-+F:	drivers/net/ethernet/hisilicon/*
-+F:	Documentation/devicetree/bindings/net/hisilicon*.txt
-+
- HISILICON SAS Controller
- M:	John Garry <john.garry@huawei.com>
- W:	http://www.hisilicon.com
+ > from Kejian: one remove redundant function and two fix to get 
+configuration from DT.
+
+Daode Huang (6):
+  MAINTAINERS: add maintainers for hns driver
+  net: hns: fix code style about hns driver
+  net: hns: change code style from a = a + x to a += x
+  net: hns: delete redundant parens
+  net: hns: add a space before "*/"
+  net: hns: normalize two different loop
+
+Kejian Yan (3):
+  net: hns: remove redundant hns_mac_dev_to_enet_if()
+  net: hns: add media-type property for hns
+  net: hns: get reset registers from DT
+
+ MAINTAINERS                                        |  9 +++
+ drivers/net/ethernet/hisilicon/hns/hnae.h          |  9 +++
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  1 +
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  | 41 +++++++----
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h  |  1 +
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 52 +++++++-------
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 16 ++---
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c      |  4 +-
+ drivers/net/ethernet/hisilicon/hns/hns_ethtool.c   | 14 +++-
+ drivers/net/ethernet/hisilicon/hns_mdio.c          | 80 ++++++++++++++++++----
+ 10 files changed, 158 insertions(+), 69 deletions(-)
+
 -- 
 1.9.1
