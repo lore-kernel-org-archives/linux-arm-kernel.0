@@ -1,100 +1,107 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Jun 2016 06:26:48 -0700
-Subject: [PATCH 2/4] ARM: OMAP4+: Prevent CPU1 related hang with kexec
-In-Reply-To: <4439074.kx9oBqeAS1@wuerfel>
-References: <1466495565-17480-1-git-send-email-tony@atomide.com>
- <1466495565-17480-3-git-send-email-tony@atomide.com>
- <4439074.kx9oBqeAS1@wuerfel>
-Message-ID: <20160627132648.GA28140@atomide.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 27 Jun 2016 15:28:15 +0200
+Subject: [PATCH 01/15] arm64: KVM: Merged page tables documentation
+In-Reply-To: <1465297115-13091-2-git-send-email-marc.zyngier@arm.com>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+ <1465297115-13091-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160627132815.GG26498@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [160624 00:41]:
-> This doesn't work:
+On Tue, Jun 07, 2016 at 11:58:21AM +0100, Marc Zyngier wrote:
+> Since dealing with VA ranges tends to hurt my brain badly, let's
+> start with a bit of documentation that will hopefully help
+> understanding what comes next...
 > 
-> arch/arm/mach-omap2/built-in.o: In function `omap5_secondary_startup':
-> dss-common.c:(.text+0x4cc4): undefined reference to `secondary_startup'
-> arch/arm/mach-omap2/built-in.o: In function `hyp_boot':
-> dss-common.c:(.text+0x4cf0): undefined reference to `secondary_startup'
-> arch/arm/mach-omap2/built-in.o: In function `omap4_secondary_startup':
-> dss-common.c:(.text+0x4d14): undefined reference to `secondary_startup'
-> arch/arm/mach-omap2/built-in.o: In function `omap4460_secondary_startup':
-> dss-common.c:(.text+0x4d48): undefined reference to `secondary_startup'
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_mmu.h | 45 +++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 42 insertions(+), 3 deletions(-)
 > 
-> secondary_startup() is not defined when CONFIG_SMP is disabled.
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index f05ac27..00bc277 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -29,10 +29,49 @@
+>   *
+>   * Instead, give the HYP mode its own VA region at a fixed offset from
+>   * the kernel by just masking the top bits (which are all ones for a
+> - * kernel address).
+> + * kernel address). We need to find out how many bits to mask.
+>   *
+> - * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
+> - * macros (the entire kernel runs at EL2).
+> + * We want to build a set of page tables that cover both parts of the
+> + * idmap (the trampoline page used to initialize EL2), and our normal
+> + * runtime VA space, at the same time.
+> + *
+> + * Given that the kernel uses VA_BITS for its entire address space,
+> + * and that half of that space (VA_BITS - 1) is used for the linear
+> + * mapping, we can limit the EL2 space to the same size.
 
-Oh sorry. Looks like I did not properly check the compiler output
-while fixing up the randconfig errors I got earlier. Below is a
-fix for this build error.
+we can also limit the EL2 space to (VA_BITS - 1).
 
-Regards,
+> + *
+> + * The main question is "Within the VA_BITS space, does EL2 use the
+> + * top or the bottom half of that space to shadow the kernel's linear
+> + * mapping?". As we need to idmap the trampoline page, this is
+> + * determined by the range in which this page lives.
+> + *
+> + * If the page is in the bottom half, we have to use the top half. If
+> + * the page is in the top half, we have to use the bottom half:
+> + *
+> + * if (PA(T)[VA_BITS - 1] == 1)
+> + *	HYP_VA_RANGE = [0 ... (1 << (VA_BITS - 1)) - 1]
+> + * else
+> + *	HYP_VA_RANGE = [(1 << (VA_BITS - 1)) ... (1 << VA_BITS) - 1]
 
-Tony
+Is this pseudo code or what am I looking at?  What is T?
 
-8< -----------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Sun, 26 Jun 2016 22:47:06 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix build if CONFIG_SMP is not set
+I don't understand what this is saying.
 
-Looks like I only partially fixed up things if CONFIG_SMP
-is not set for the recent kexec changes. We don't have
-boot_secondary available without SMP as reported by Arnd.
+Can this be written using known constructs such as hyp_idmap_end,
+PHYS_OFFSET etc.?
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+And perhaps the pseudo code should define HYP_VA_SHIFT instead of the
+range to simplify it,@least I'm confused.
 
-diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
-index 6d1dffc..fe36ce2 100644
---- a/arch/arm/mach-omap2/omap-headsmp.S
-+++ b/arch/arm/mach-omap2/omap-headsmp.S
-@@ -24,6 +24,16 @@
- #define AUX_CORE_BOOT0_PA			0x48281800
- #define API_HYP_ENTRY				0x102
- 
-+ENTRY(omap_secondary_startup)
-+#ifdef CONFIG_SMP
-+	b	secondary_startup
-+#else
-+/* Should never get here */
-+again:	wfi
-+	b	again
-+#endif
-+#ENDPROC(omap_secondary_startup)
-+
- /*
-  * OMAP5 specific entry point for secondary CPU to jump from ROM
-  * code.  This routine also provides a holding flag into which
-@@ -39,7 +49,7 @@ wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
- 	and	r4, r4, #0x0f
- 	cmp	r0, r4
- 	bne	wait
--	b	secondary_startup
-+	b	omap_secondary_startup
- ENDPROC(omap5_secondary_startup)
- /*
-  * Same as omap5_secondary_startup except we call into the ROM to
-@@ -59,7 +69,7 @@ wait_2:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
- 	adr	r0, hyp_boot
- 	smc	#0
- hyp_boot:
--	b	secondary_startup
-+	b	omap_secondary_startup
- ENDPROC(omap5_secondary_hyp_startup)
- /*
-  * OMAP4 specific entry point for secondary CPU to jump from ROM
-@@ -82,7 +92,7 @@ hold:	ldr	r12,=0x103
- 	 * we've been released from the wait loop,secondary_stack
- 	 * should now contain the SVC stack for this core
- 	 */
--	b	secondary_startup
-+	b	omap_secondary_startup
- ENDPROC(omap4_secondary_startup)
- 
- ENTRY(omap4460_secondary_startup)
-@@ -119,5 +129,5 @@ hold_2:	ldr	r12,=0x103
- 	 * we've been released from the wait loop,secondary_stack
- 	 * should now contain the SVC stack for this core
- 	 */
--	b	secondary_startup
-+	b	omap_secondary_startup
- ENDPROC(omap4460_secondary_startup)
+> + *
+> + * In practice, the second case can be simplified to
+> + *	HYP_VA_RANGE = [0 ... (1 << VA_BITS) - 1]
+> + * because we'll never get anything in the bottom range.
+
+and now I'm more confused, are we not supposed to map the idmap in the
+bottom range?  Is this part of the comment necessary?
+
+> + *
+> + * This of course assumes that the trampoline page exists within the
+> + * VA_BITS range. If it doesn't, then it means we're in the odd case
+> + * where the kernel idmap (as well as HYP) uses more levels than the
+> + * kernel runtime page tables (as seen when the kernel is configured
+> + * for 4k pages, 39bits VA, and yet memory lives just above that
+> + * limit, forcing the idmap to use 4 levels of page tables while the
+> + * kernel itself only uses 3). In this particular case, it doesn't
+> + * matter which side of VA_BITS we use, as we're guaranteed not to
+> + * conflict with anything.
+> + *
+> + * An alternative would be to always use 4 levels of page tables for
+> + * EL2, no matter what the kernel does. But who wants more levels than
+> + * strictly necessary?
+> + *
+> + * Thankfully, ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't
+> + * need any of this madness (the entire kernel runs at EL2).
+
+Not sure how these two last paragraphs helps understanding what this
+patch set is about to implement, as it seems to raise more questions
+than answer them, but I will proceed to trying to read the code...
+
+
+Thanks,
+-Christoffer
+
+>   */
+>  #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
+>  #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
+> -- 
+> 2.1.4
+> 
