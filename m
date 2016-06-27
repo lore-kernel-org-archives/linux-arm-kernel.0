@@ -1,42 +1,59 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 27 Jun 2016 04:49:21 -0700
-Subject: [PATCH net-next 6/9] net: hns: normalize two different loop
-In-Reply-To: <1467021255-95900-7-git-send-email-Yisen.Zhuang@huawei.com>
-References: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
- <1467021255-95900-7-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1467028161.1847.101.camel@perches.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 27 Jun 2016 19:51:14 +0800
+Subject: [PATCH v2 1/8] mfd: tps65218: Remove redundant read wrapper
+In-Reply-To: <1467025305-13464-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <201606271916.m2XMilb6%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-06-27 at 17:54 +0800, Yisen Zhuang wrote:
-> From: Daode Huang <huangdaode@hisilicon.com>
-> 
-> There are two approaches to assign data, one does 2 loops, another
-> does 1 loop. This patch normalize the different methods to 1 loop.
-[]
-> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-[]
-> @@ -2567,15 +2567,15 @@ static char *hns_dsaf_get_node_stats_strings(char *data, int node,
-> ?	buff += ETH_GSTRING_LEN;
-> ?	if (node < DSAF_SERVICE_NW_NUM && !is_ver1) {
-> ?		for (i = 0; i < DSAF_PRIO_NR; i++) {
-> -			snprintf(buff, ETH_GSTRING_LEN,
-> -				?"inod%d_pfc_prio%d_pkts", node, i);
-> -			buff += ETH_GSTRING_LEN;
-> -		}
-> -		for (i = 0; i < DSAF_PRIO_NR; i++) {
-> -			snprintf(buff, ETH_GSTRING_LEN,
-> -				?"onod%d_pfc_prio%d_pkts", node, i);
-> +			snprintf(buff + 0 * ETH_GSTRING_LEN * DSAF_PRIO_NR,
-> +				?ETH_GSTRING_LEN, "inod%d_pfc_prio%d_pkts",
-> +				?node, i);
-> +			snprintf(buff + 1 * ETH_GSTRING_LEN * DSAF_PRIO_NR,
-> +				?ETH_GSTRING_LEN, "onod%d_pfc_prio%d_pkts",
-> +				?node, i);
-> ?			buff += ETH_GSTRING_LEN;
+Hi,
 
-This looks odd and likely incorrect.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.7-rc5 next-20160624]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> ?		}
-> +		buff += 1 * DSAF_PRIO_NR * ETH_GSTRING_LEN;
-> ?	}
+url:    https://github.com/0day-ci/linux/commits/Keerthy/mfd-regulator-tps65218-Clean-ups/20160627-191539
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: i386-randconfig-a0-201626 (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   drivers/gpio/gpio-tps65218.c: In function 'tps65218_gpio_get':
+>> drivers/gpio/gpio-tps65218.c:33:8: error: implicit declaration of function 'tps65218_reg_read' [-Werror=implicit-function-declaration]
+     ret = tps65218_reg_read(tps65218, TPS65218_REG_ENABLE2, &val);
+           ^~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+
+vim +/tps65218_reg_read +33 drivers/gpio/gpio-tps65218.c
+
+c366c76a Nicolas Saenz Julienne 2016-01-30  27  {
+c366c76a Nicolas Saenz Julienne 2016-01-30  28  	struct tps65218_gpio *tps65218_gpio = gpiochip_get_data(gc);
+c366c76a Nicolas Saenz Julienne 2016-01-30  29  	struct tps65218 *tps65218 = tps65218_gpio->tps65218;
+c366c76a Nicolas Saenz Julienne 2016-01-30  30  	unsigned int val;
+c366c76a Nicolas Saenz Julienne 2016-01-30  31  	int ret;
+c366c76a Nicolas Saenz Julienne 2016-01-30  32  
+c366c76a Nicolas Saenz Julienne 2016-01-30 @33  	ret = tps65218_reg_read(tps65218, TPS65218_REG_ENABLE2, &val);
+c366c76a Nicolas Saenz Julienne 2016-01-30  34  	if (ret)
+c366c76a Nicolas Saenz Julienne 2016-01-30  35  		return ret;
+c366c76a Nicolas Saenz Julienne 2016-01-30  36  
+
+:::::: The code at line 33 was first introduced by commit
+:::::: c366c76a2c41d0c545e51b53056b21515db32e77 gpio: add tps65218 gpio
+
+:::::: TO: Nicolas Saenz Julienne <nicolassaenzj@gmail.com>
+:::::: CC: Linus Walleij <linus.walleij@linaro.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 21936 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/458b34d5/attachment-0001.obj>
