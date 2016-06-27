@@ -1,39 +1,67 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jun 2016 10:45:52 +0100
-Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
-In-Reply-To: <5770EE21.90103@arm.com>
-References: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
- <5770EE21.90103@arm.com>
-Message-ID: <20160627094552.GE1041@n2100.armlinux.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 27 Jun 2016 10:50:39 +0100
+Subject: [PATCH v6 4/5] arm64: add support for ACPI Low Power Idle(LPI)
+In-Reply-To: <576DA047.7080808@linaro.org>
+References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
+ <1465915719-8409-5-git-send-email-sudeep.holla@arm.com>
+ <20160622141700.GB2733@red-moon> <576DA047.7080808@linaro.org>
+Message-ID: <5770F6EF.3080902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 10:13:05AM +0100, Marc Zyngier wrote:
-> I'm wondering if that's not an effect of this patch:
-> 
-> https://lkml.org/lkml/2015/9/24/138
-> 
-> missing on the ARM side (the corresponding arm64 patch is 217d453d473c).
+Hi, Daniel,
 
-No, because we don't take the other CPUs offline through CPU hotplug at
-reboot - we stop them.  That's because CPU hotplug involves scheduling,
-and a reboot can't be scheduled as it can happen from IRQ contexts.
+On 24/06/16 22:04, Daniel Lezcano wrote:
 
-For a long time, we have not supported IRQs on any CPU after the system
-has gone down for halt/reboot/poweroff etc:
+[...]
 
-ipi_cpu_stop() disables IRQs and FIQs before entering an infinite loop.
-machine_{halt,power_off,restart}() in arch/arm/kernel/reboot.c disables
-IRQs on the requesting CPU.
+>>> +
+>>> +    psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
+>>> +    if (!psci_states)
+>>> +        return -ENOMEM;
+>>> +
+>>> +    for (i = 0; i < count; i++) {
+>>> +        u32 state;
+>>> +
+>>> +        lpi = &pr->power.lpi_states[i + 1];
+>>> +        state = lpi->address & 0xFFFFFFFF;
+>
+> Why is needed to mask 'address' ?
+>
 
-So, IRQs get disabled on _all_ CPUs.  Code after this point should not
-re-enable IRQs to be able to use drivers, which it sounds like what's
-happening in Hans scenario.  Remember, as I've said above, these paths
-should not even be scheduling, and should never be reliant on receiving
-interrupts.  *Especially* as they can themselves be called from IRQ
-context.
+This is as per Section 3.1.1 FFH Usage in LPI state entry methods in [1]
+
+[...]
+
+>>>   int psci_cpu_init_idle(unsigned int cpu)
+>>>   {
+>>>       struct device_node *cpu_node;
+>>>       int ret;
+>>>
+>>> +    if (!acpi_disabled)
+>>> +        return psci_acpi_cpu_init_idle(cpu);
+>
+> Is it possible the case where there is information in both the DT and in
+> ACPI ? So ACPI is enabled without idle information which is in the DT ?
+>
+
+No, as Rafael mentioned aready.
+
+>>
+>> Either you do this, or we have to add it somehow somewhere in
+>> drivers/cpuidle to avoid duplicating it.
+>>
+>> @Daniel: do you have an opinion on this please ?
+>
+> Yes, this function should be added to avoid duplication.
+>
+
+So, I assume you are happy with the way it's handled in this patch ?
+(I will rename the file as suggested by Lorenzo)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Sudeep
+
+[1] 
+http://infocenter.arm.com/help/topic/com.arm.doc.den0048a/DEN0048A_ARM_FFH_Specification.pdf
