@@ -1,59 +1,54 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Mon, 27 Jun 2016 22:03:13 +0900
-Subject: [PATCH v2 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for SPI
- clocks
-Message-ID: <1467032594-7643-1-git-send-email-andi.shyti@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 27 Jun 2016 14:06:57 +0100
+Subject: [PATCH 1/5] spi: do not fail if the CS line is not connected
+In-Reply-To: <20160627105716.GA7240@samsunx.samsung>
+References: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
+ <1466150245-2648-2-git-send-email-andi.shyti@samsung.com>
+ <20160617104725.GC26099@sirena.org.uk>
+ <20160617113622.GA10760@jack.zhora.eu>
+ <20160617122803.GN26099@sirena.org.uk>
+ <20160619060902.GB424@jack.zhora.eu>
+ <CGME20160626124853epcas1p297070a25da8980f1d8d2f025c65cbdab@epcas1p2.samsung.com>
+ <20160626124843.GP28202@sirena.org.uk>
+ <20160627105716.GA7240@samsunx.samsung>
+Message-ID: <20160627130657.GV28202@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLK_IGNORE_UNUSED flag has to be avoided whenever possible.
-Use the CLK_IS_CRITICAL flag instead, which enables the clock line
-during boot time.
+On Mon, Jun 27, 2016 at 07:57:16PM +0900, Andi Shyti wrote:
 
-While none of the SCLK_SPI need to be alive all the time as that
-clock is handled by the SPI driver as a busclk whenever needed.
+> What I meant is that if we do not like num-cs = <0>, the
+> unlinked CS line can be handled only this way (case of the
+> s3c64xx driver):
 
-Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
----
+> +- broken-cs: the CS line is disconnected, therefore the device should not wait
+> +  for the CS protocol to be established
 
-Hi,
+So what you're saying here is that you just need a property for the
+inability to read back the chip select status?  That seems like a
+totally reasonable thing to have which fits in idiomatically with the
+rest of the subsystem.  I might call it no-cs-readback or something.
 
-this patch comes after Tomasz's review where he discouraged from
-using the CLK_IGNORE_UNUSED flag. Therefore I added one more
-patch to the original where I remove that flag for the SPI1
-whenever not necessary while I replace it with the
-CLK_IS_CRITICAL for the ioclk.
+> Which is not something I like, because it means adding a new
+> flag in the dts.
 
-This patch makes this driver the first using the "critical"
-functionality :)
+> What I want to suggest, instead, is to slightly change the logic
+> behind the num-cs property: i.e. if "num-cs = <0>", doesn't
+> necessarily mean that we don't have a CS controller, but, while
+> we can have as many as we wish, non of them is connected.
 
-Andi
-
- drivers/clk/samsung/clk-exynos5433.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-index 128527b..dcb4391 100644
---- a/drivers/clk/samsung/clk-exynos5433.c
-+++ b/drivers/clk/samsung/clk-exynos5433.c
-@@ -1655,7 +1655,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
- 			ENABLE_SCLK_PERIC, 13, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_IOCLK_SPI1, "sclk_ioclk_spi1", "ioclk_spi1_clk_in",
- 			ENABLE_SCLK_PERIC, 12,
--			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-+			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_IOCLK_SPI0, "sclk_ioclk_spi0", "ioclk_spi0_clk_in",
- 			ENABLE_SCLK_PERIC, 11, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_IOCLK_I2S1_BCLK, "sclk_ioclk_i2s1_bclk",
-@@ -1670,7 +1670,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
- 	GATE(CLK_SCLK_SPI2, "sclk_spi2", "sclk_spi2_peric", ENABLE_SCLK_PERIC,
- 			5, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_SPI1, "sclk_spi1", "sclk_spi1_peric", ENABLE_SCLK_PERIC,
--			4, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-+			4, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_SPI0, "sclk_spi0", "sclk_spi0_peric", ENABLE_SCLK_PERIC,
- 			3, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_UART2, "sclk_uart2", "sclk_uart2_peric",
--- 
-2.8.1
+I disagree, I think from a system integration point of view this is just
+a chip select which can't be changed and it's less likely that we will
+run into nasty surprises later on with things assuming that chip selects
+exist.  AFAICT you only need this property in your case because this
+controller has some features that rely on readback of the chip select
+status, that's not very common - normally it'd be write only.  I'd
+expect most controllers would just say they have one chip select and
+that'd be that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/ce1d3c96/attachment.sig>
