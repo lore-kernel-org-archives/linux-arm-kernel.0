@@ -1,55 +1,47 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 27 Jun 2016 17:08:30 +0200
-Subject: [PATCH v6 5/5] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
-In-Reply-To: <57714106.2040200@arm.com>
-References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
- <1465915719-8409-6-git-send-email-sudeep.holla@arm.com>
- <5771392B.3080002@linaro.org> <57714043.5020207@arm.com>
- <577140A7.60904@linaro.org> <57714106.2040200@arm.com>
-Message-ID: <5771416E.1040000@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 27 Jun 2016 16:10:08 +0100
+Subject: [PATCH v2 04/14] regulator: SY8106A regulator driver
+In-Reply-To: <20160625034511.7966-5-megous@megous.com>
+References: <20160625034511.7966-1-megous@megous.com>
+ <20160625034511.7966-5-megous@megous.com>
+Message-ID: <20160627151008.GZ28202@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2016 05:06 PM, Sudeep Holla wrote:
->
->
-> On 27/06/16 16:05, Daniel Lezcano wrote:
->> On 06/27/2016 05:03 PM, Sudeep Holla wrote:
->>> Hi Daniel,
->>>
->>> On 27/06/16 15:33, Daniel Lezcano wrote:
->>>> On 06/14/2016 04:48 PM, Sudeep Holla wrote:
->>>>> Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
->>>>> enable ACPI_PROCESSOR_IDLE for ARM64 too.
->>>>>
->>>>> This patch just removes the IA64 and X86 dependency on
->>>>> ACPI_PROCESSOR_IDLE
->>>>>
->>>>> Cc: linux-arm-kernel at lists.infradead.org
->>>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>>>> ---
->>>>
->>>> Hi Sudeep,
->>>>
->>>> now that ACPI processor supports ARM64 did you check the
->>>> CPUIDLE_DRIVER_STATE_START trick in the code and its derivative ?
->>>>
->>>
->>> No, that is used only for C-State and ARM64 doesn't support it.
->>> Patch 1/5 puts all the C-State code under #ifdef so that it's not
->>> compiled on ARM64.
->>>
->>>> I deleted the patch 2/5 but there is a place where:
->>>>
->>>
->>> Sorry, I don't follow what you mean by that.
->>
->> I meant I just deleted from my mailbox the patch 2/5, so I can't do
->> inline comment.
->>
->
-> Ah ok, anyways LPI always starts from index 0. IIUC that was your main
-> concern.
+On Sat, Jun 25, 2016 at 05:45:01AM +0200, megous at megous.com wrote:
 
-Do you have a repo where I can see the code ?
+> +	config.init_data = of_get_regulator_init_data(dev, dev->of_node, &sy8106a_reg);
+> +	if (!config.init_data) {
+> +		return -EINVAL;
+> +	}
+
+This is broken, constraints are entirely optional - the driver should
+just instantiate no matter what (if anything) the constraints are.  This
+means people can read the current state even if there is no need for
+runtime configuration.
+
+> +	dev_info(&i2c->dev, "SY8106A voltage at boot: %u mV\n", SY8106A_MIN_MV + 
+> +		 SY8106A_STEP_MV * (selector & SY8106A_REG_VOUT1_SEL_MASK));
+
+This is just noise, remove it - if we want to list the voltage for
+regulators at probe we should be doing it consistently for all
+regulators in the core rather than in individual drivers.
+
+> +/*
+> + * This is useless for OF-enabled devices, but it is needed by I2C subsystem
+> + */
+> +static const struct i2c_device_id sy8106a_i2c_id[] = {
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(i2c, sy8106a_i2c_id);
+
+No, this is not the case - supporting DT does not mean that other
+enumeration mechanisms can't be supported and there's no reason not to
+list a sensible ID here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/1d409030/attachment.sig>
