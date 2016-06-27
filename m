@@ -1,30 +1,22 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 27 Jun 2016 17:02:45 +0800
-Subject: [PATCH 07/10] arm64: defconfig: Enable Tegra186 SoC
-In-Reply-To: <20160627090248.23621-1-josephl@nvidia.com>
-References: <20160627090248.23621-1-josephl@nvidia.com>
-Message-ID: <20160627090248.23621-8-josephl@nvidia.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 27 Jun 2016 17:04:33 +0800
+Subject: [PATCH 1/3] Documentation: devicetree: bindings: Add BCM5301x
+ binding
+In-Reply-To: <1466641623-3491-2-git-send-email-f.fainelli@gmail.com>
+References: <1466641623-3491-1-git-send-email-f.fainelli@gmail.com>
+ <1466641623-3491-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20160627090433.GA7088@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Tegra186 SoC.
+On Wed, Jun 22, 2016 at 05:27:01PM -0700, Florian Fainelli wrote:
+> Document the binding used by the Broadcom BCM5301x (Northstar) SoC
+> random number generator.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f267eea101a7..033d9cb1e983 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -312,6 +312,7 @@ CONFIG_QCOM_SMEM=y
- CONFIG_QCOM_SMD=y
- CONFIG_QCOM_SMD_RPM=y
- CONFIG_ARCH_TEGRA_132_SOC=y
-+CONFIG_ARCH_TEGRA_186_SOC=y
- CONFIG_ARCH_TEGRA_210_SOC=y
- CONFIG_EXTCON_USB_GPIO=y
- CONFIG_PWM=y
+Patch applied.  Thanks.
 -- 
-2.9.0
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
