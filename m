@@ -1,48 +1,38 @@
-From: dave.long@linaro.org (David Long)
-Date: Sun, 26 Jun 2016 23:06:53 -0400
-Subject: [PATCH v14 10/10] kprobes: Add arm64 case in kprobe example module
-In-Reply-To: <1466996813-23295-1-git-send-email-dave.long@linaro.org>
-References: <1466996813-23295-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1466996813-23295-11-git-send-email-dave.long@linaro.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 27 Jun 2016 11:41:39 +0800
+Subject: [PATCH 18/21] usb: chipidea: msm: Add reset controller for PHY
+ POR bit
+In-Reply-To: <20160626072838.28082-19-stephen.boyd@linaro.org>
+Message-ID: <201606271118.CClHWAdr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+Hi,
 
-Add info prints in sample kprobe handlers for ARM64
+[auto build test ERROR on peter.chen-usb/ci-for-usb-next]
+[also build test ERROR on v4.7-rc5 next-20160624]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-Signed-off-by: David A. Long <dave.long@linaro.org>
+url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/Support-qcom-s-HSIC-USB-and-rewrite-USB2-HS-phy-support/20160627-102637
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/peter.chen/usb ci-for-usb-next
+config: x86_64-acpi-redef (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `ci_hdrc_msm_remove':
+>> ci_hdrc_msm.c:(.text+0x4fffd2): undefined reference to `reset_controller_unregister'
+
 ---
- samples/kprobes/kprobe_example.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
-index ed0ca0c..f3b61b4 100644
---- a/samples/kprobes/kprobe_example.c
-+++ b/samples/kprobes/kprobe_example.c
-@@ -46,6 +46,11 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
- 			" ex1 = 0x%lx\n",
- 		p->symbol_name, p->addr, regs->pc, regs->ex1);
- #endif
-+#ifdef CONFIG_ARM64
-+	pr_info("<%s> pre_handler: p->addr = 0x%p, pc = 0x%lx,"
-+			" pstate = 0x%lx\n",
-+		p->symbol_name, p->addr, (long)regs->pc, (long)regs->pstate);
-+#endif
- 
- 	/* A dump_stack() here will give a stack backtrace */
- 	return 0;
-@@ -71,6 +76,10 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
- 	printk(KERN_INFO "<%s> post_handler: p->addr = 0x%p, ex1 = 0x%lx\n",
- 		p->symbol_name, p->addr, regs->ex1);
- #endif
-+#ifdef CONFIG_ARM64
-+	pr_info("<%s> post_handler: p->addr = 0x%p, pstate = 0x%lx\n",
-+		p->symbol_name, p->addr, (long)regs->pstate);
-+#endif
- }
- 
- /*
--- 
-2.5.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 28294 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/ad1e2216/attachment-0001.obj>
