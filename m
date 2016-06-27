@@ -1,59 +1,59 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Mon, 27 Jun 2016 17:54:12 +0800
-Subject: [PATCH net-next 6/9] net: hns: normalize two different loop
+Date: Mon, 27 Jun 2016 17:54:13 +0800
+Subject: [PATCH net-next 7/9] net: hns: remove redundant
+ hns_mac_dev_to_enet_if()
 In-Reply-To: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1467021255-95900-7-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1467021255-95900-8-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daode Huang <huangdaode@hisilicon.com>
+From: Kejian Yan <yankejian@huawei.com>
 
-There are two approaches to assign data, one does 2 loops, another
-does 1 loop. This patch normalize the different methods to 1 loop.
+The sequence of hns_mac_dev_to_enet_if() is the same as
+hns_get_enet_interface(), and hns_get_enet_interface() is called
+by initialization to get the mac mode. And the mode is not changed
+anywhere. Thus add hns_mac_dev_to_enet_if() function to get the mac
+mode is obviously redundant.
 
-Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+Reported-by: Jinchuan Tian <tianjinchuan1@huawei.com>
+Signed-off-by: Kejian Yan <yankejian@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c | 15 ---------------
+ 1 file changed, 15 deletions(-)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-index e36ee22..86ce28a 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-@@ -2567,15 +2567,15 @@ static char *hns_dsaf_get_node_stats_strings(char *data, int node,
- 	buff += ETH_GSTRING_LEN;
- 	if (node < DSAF_SERVICE_NW_NUM && !is_ver1) {
- 		for (i = 0; i < DSAF_PRIO_NR; i++) {
--			snprintf(buff, ETH_GSTRING_LEN,
--				 "inod%d_pfc_prio%d_pkts", node, i);
--			buff += ETH_GSTRING_LEN;
--		}
--		for (i = 0; i < DSAF_PRIO_NR; i++) {
--			snprintf(buff, ETH_GSTRING_LEN,
--				 "onod%d_pfc_prio%d_pkts", node, i);
-+			snprintf(buff + 0 * ETH_GSTRING_LEN * DSAF_PRIO_NR,
-+				 ETH_GSTRING_LEN, "inod%d_pfc_prio%d_pkts",
-+				 node, i);
-+			snprintf(buff + 1 * ETH_GSTRING_LEN * DSAF_PRIO_NR,
-+				 ETH_GSTRING_LEN, "onod%d_pfc_prio%d_pkts",
-+				 node, i);
- 			buff += ETH_GSTRING_LEN;
- 		}
-+		buff += 1 * DSAF_PRIO_NR * ETH_GSTRING_LEN;
- 	}
- 	snprintf(buff, ETH_GSTRING_LEN, "onnod%d_tx_pkts", node);
- 	buff += ETH_GSTRING_LEN;
-@@ -2606,8 +2606,8 @@ static u64 *hns_dsaf_get_node_stats(struct dsaf_device *ddev, u64 *data,
- 	p[12] = hw_stats->stp_drop;
- 	if (node_num < DSAF_SERVICE_NW_NUM && !is_ver1) {
- 		for (i = 0; i < DSAF_PRIO_NR; i++) {
--			p[13 + i] = hw_stats->rx_pfc[i];
--			p[13 + i + DSAF_PRIO_NR] = hw_stats->tx_pfc[i];
-+			p[13 + i + 0 * DSAF_PRIO_NR] = hw_stats->rx_pfc[i];
-+			p[13 + i + 1 * DSAF_PRIO_NR] = hw_stats->tx_pfc[i];
- 		}
- 		p[29] = hw_stats->tx_pkts;
- 		return &p[30];
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
+index c526558..d2effcc 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
+@@ -56,20 +56,6 @@ static const enum mac_mode g_mac_mode_1000[] = {
+ 	[PHY_INTERFACE_MODE_RTBI]   = MAC_MODE_RTBI_1000
+ };
+ 
+-static enum mac_mode hns_mac_dev_to_enet_if(const struct hns_mac_cb *mac_cb)
+-{
+-	switch (mac_cb->max_speed) {
+-	case MAC_SPEED_100:
+-		return g_mac_mode_100[mac_cb->phy_if];
+-	case MAC_SPEED_1000:
+-		return g_mac_mode_1000[mac_cb->phy_if];
+-	case MAC_SPEED_10000:
+-		return MAC_MODE_XGMII_10000;
+-	default:
+-		return MAC_MODE_MII_100;
+-	}
+-}
+-
+ static enum mac_mode hns_get_enet_interface(const struct hns_mac_cb *mac_cb)
+ {
+ 	switch (mac_cb->max_speed) {
+@@ -134,7 +120,6 @@ void hns_mac_adjust_link(struct hns_mac_cb *mac_cb, int speed, int duplex)
+ 
+ 	mac_cb->speed = speed;
+ 	mac_cb->half_duplex = !duplex;
+-	mac_ctrl_drv->mac_mode = hns_mac_dev_to_enet_if(mac_cb);
+ 
+ 	if (mac_ctrl_drv->adjust_link) {
+ 		ret = mac_ctrl_drv->adjust_link(mac_ctrl_drv,
 -- 
 1.9.1
