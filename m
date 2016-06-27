@@ -1,132 +1,111 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 27 Jun 2016 12:55:26 +0200
-Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
-In-Reply-To: <20160627094552.GE1041@n2100.armlinux.org.uk>
-References: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
- <5770EE21.90103@arm.com> <20160627094552.GE1041@n2100.armlinux.org.uk>
-Message-ID: <d3a266d3-2cfc-81c7-25a6-b39c8012bcf0@redhat.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Mon, 27 Jun 2016 19:57:16 +0900
+Subject: [PATCH 1/5] spi: do not fail if the CS line is not connected
+In-Reply-To: <20160626124843.GP28202@sirena.org.uk>
+References: <1466150245-2648-1-git-send-email-andi.shyti@samsung.com>
+ <1466150245-2648-2-git-send-email-andi.shyti@samsung.com>
+ <20160617104725.GC26099@sirena.org.uk> <20160617113622.GA10760@jack.zhora.eu>
+ <20160617122803.GN26099@sirena.org.uk> <20160619060902.GB424@jack.zhora.eu>
+ <CGME20160626124853epcas1p297070a25da8980f1d8d2f025c65cbdab@epcas1p2.samsung.com>
+ <20160626124843.GP28202@sirena.org.uk>
+Message-ID: <20160627105716.GA7240@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+Hi Mark,
 
-On 27-06-16 11:45, Russell King - ARM Linux wrote:
-> On Mon, Jun 27, 2016 at 10:13:05AM +0100, Marc Zyngier wrote:
->> I'm wondering if that's not an effect of this patch:
->>
->> https://lkml.org/lkml/2015/9/24/138
->>
->> missing on the ARM side (the corresponding arm64 patch is 217d453d473c).
->
-> No, because we don't take the other CPUs offline through CPU hotplug at
-> reboot - we stop them.  That's because CPU hotplug involves scheduling,
-> and a reboot can't be scheduled as it can happen from IRQ contexts.
->
-> For a long time, we have not supported IRQs on any CPU after the system
-> has gone down for halt/reboot/poweroff etc:
->
-> ipi_cpu_stop() disables IRQs and FIQs before entering an infinite loop.
-> machine_{halt,power_off,restart}() in arch/arm/kernel/reboot.c disables
-> IRQs on the requesting CPU.
->
-> So, IRQs get disabled on _all_ CPUs.  Code after this point should not
-> re-enable IRQs to be able to use drivers, which it sounds like what's
-> happening in Hans scenario.  Remember, as I've said above, these paths
-> should not even be scheduling, and should never be reliant on receiving
-> interrupts.  *Especially* as they can themselves be called from IRQ
-> context.
+> > > > This is true, but there are cases where the CS is not connected
+> > > > and this case needs to be treated separately to allow the device
+> > > > to work.
+> 
+> > > In what way?  It is just as easy for a device with no physical chip
+> > > select to have a logical chip select of 0 that it does nothing with as
+> > > it is for that device to handle any other number.
+> 
+> > That is indeed my case: the s3c64xx doesn't send anything, unless
+> > I manually enable CS (from the next patches I need to write '0'
+> > in the CS register). But I need smoething to tell to the
+> > device that the CS line is not connected, for example a flag in
+> > the DTS.
+> 
+> I'm sorry but I just don't understand what you're saying here.  You are
+> saying that there is no chip select but you need to enable the chip
+> select?
 
-First of all thanks for your input.
+yes, sorry, I have to admit that didn't explain myself properly,
+but code speaks better than words.
 
-Note this is not reboot, this is poweroff. And for poweroff many
-(ARM) boards depend on working i2c, which depends on irqs, for example
-all these mfd drivers:
+What I meant is that if we do not like num-cs = <0>, the
+unlinked CS line can be handled only this way (case of the
+s3c64xx driver):
 
-drivers/mfd/rn5t618.c
-drivers/mfd/twl4030-power.c
-drivers/mfd/palmas.c
-drivers/mfd/dm355evm_msp.c
-drivers/mfd/tps6586x.c
-drivers/mfd/retu-mfd.c
-drivers/mfd/max8907.c
-drivers/mfd/tps65910.c
-drivers/mfd/tps80031.c
-drivers/mfd/rk808.c
-drivers/mfd/axp20x.c
 
-Define pm_power_off and use i2c.
 
-So although you may very well be right that using irqs to implement poweroff
-is not how things should be, in practice we've been using them for this for
-quite a while now and this usually works fine.
+diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+index 6dbdeb3..62f19b6 100644
+--- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
++++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+@@ -40,6 +40,9 @@ Optional Board Specific Properties:
+ 
+ - cs-gpios: should specify GPIOs used for chipselects (see spi-bus.txt)
+ 
++- broken-cs: the CS line is disconnected, therefore the device should not wait
++  for the CS protocol to be established
++
+ SPI Controller specific data in SPI slave nodes:
+ 
+ - The spi slave nodes should provide the following information which is required
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 972367d..5e6ad59 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -315,6 +315,9 @@ static void s3c64xx_spi_set_cs(struct spi_device *spi, bool enable)
+        struct s3c64xx_spi_driver_data *sdd =
+                                        spi_master_get_devdata(spi->master);
+ 
++       if (sdd->cntrlr_info->broken_cs)
++               return;
++
+        if (enable) {
+                if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO)) {
+                        writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
 
-So I would prefer to see a fix which does not involve all these drivers /
-their i2c host drivers needing to implement a polling version of the i2c
-transfers just to get poweroff to work.
+[ ... ]
 
-Looking closer at poweroff being called from irq context, a quick grep gives
-the following files calling machine_power_off or kernel_power_off
-(with non arm relevant drivers and arch hits not under arch/arm / arch/arm64
-filtered out):
+@@ -1015,6 +1020,8 @@ static struct s3c64xx_spi_info *s3c64xx_spi_parse_dt(struct device *dev)
+                sci->num_cs = temp;
+        }
+ 
++       sci->broken_cs = of_property_read_bool(dev->of_node, "broken-cs");
++
+        return sci;
+ }
+ #else
+diff --git a/include/linux/platform_data/spi-s3c64xx.h b/include/linux/platform_data/spi-s3c64xx.h
+index fb5625b..75793b9 100644
+--- a/include/linux/platform_data/spi-s3c64xx.h
++++ b/include/linux/platform_data/spi-s3c64xx.h
+@@ -38,6 +38,7 @@ struct s3c64xx_spi_csinfo {
+ struct s3c64xx_spi_info {
+        int src_clk_nr;
+        int num_cs;
++       bool broken_cs;
+        int (*cfg_gpio)(void);
+        dma_filter_fn filter;
+        void *dma_tx;
 
-arch/arm/mach-ixp4xx/dsmg600-setup.c
-arch/arm/mach-ixp4xx/nas100d-setup.c
-arch/arm/mach-ixp4xx/nslu2-setup.c
-drivers/hwmon/ab8500.c
-drivers/memory/emif.c
-kernel/power/hibernate.c
-kernel/power/poweroff.c
-kernel/reboot.c
-kernel/rcu/rcuperf.c
-kernel/torture.c
 
-mach-ixp4xx/* indeed call power_off from irq context
-ab8500.c      calls kernel_power_off from a workqueue
-emif.c        is used on omap4 / omap5 and indeed calls power_off from irq context
-hibernate.c   I've not checked callers of the hibernate() function, but I'm pretty
-               sure this is a context where sleeping is allowed
-reboot.c      calls machine_power_off from a syscall or a workqueue
-poweroff.c    calls machine_power_off from a workqueue
-rcuperf.c     calls kernel_power_off() in a kernel thread
-torture.c     calls kernel_power_off() in a kernel thread
 
-So it seems that the assumption that machine_power_off may be called
-from irq context is not always true, specifically it is only true on
-certain platforms (mach-ixp4xx, omap4, omap5 and whatever uses
-ab8500.c). I would expect the pm_power_off implementations on these
-platforms to indeed not use irqs themselves, that would indeed be
-bad.
+Which is not something I like, because it means adding a new
+flag in the dts.
 
-However I do not believe that a few platforms calling power_off directly
-from irq context means that we should forbid the use of sleeping code /
-interrupts in all pm_power_off handlers, that seems counter productive,
-esp. since a lot of pm_power_off handlers actually rely on i2c and
-thus irqs (without some major work) being available.
+What I want to suggest, instead, is to slightly change the logic
+behind the num-cs property: i.e. if "num-cs = <0>", doesn't
+necessarily mean that we don't have a CS controller, but, while
+we can have as many as we wish, non of them is connected.
 
-###
+Looking around in the spi drivers, apparently I am not the only
+one who has this need, as I pointed out in my previous mail.
 
-Which brings us back to our original problem, how do we fix
-irq smp_affinity on power off ?
-
-The first solution which comes to mind is to simple not call smp_send_stop()
-in the arm machine_power_off() implementation, AFAICT the purpose of smp_send_stop()
-is to make sure that all the non reboot-cpus are in a clean state for when the
-machine actually boots up again so as to not have them still accessing
-RAM, etc. while the bootloader/rom is running on the reboot-cpu. This does not
-seem necessary for poweroff. Note I'm not very familiar with all the details
-here so likely this is a stupid idea.
-
-Assuming my first solution is a bad idea, then we will likely need to do
-something similar to the hotplug cpu code on shutdown to reset affinities.
-
-I guess that messing with irq affinity while in an interrupt handler
-is a bad idea, so whatever fix we come up with should probably check for
-being in a context where sleeping is allowed and if not then skip this,
-so as to not break the few callers of machine_power_off from irq context;
-or alternatively and perhaps better we can fix those few callers to use
-a workqueue. All core kernel code already ensures this, so I guess this
-is already a requirement on x86?
-
-Regards,
-
-Hans
+Thanks a lot,
+Andi
