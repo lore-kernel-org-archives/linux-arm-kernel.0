@@ -1,53 +1,44 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Mon, 27 Jun 2016 12:47:35 +0000
-Subject: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <20160602225815.GA5508@rob-hp-laptop>
-References: <1464626798-1334-1-git-send-email-navam@xilinx.com>
- <20160602225815.GA5508@rob-hp-laptop>
-Message-ID: <C89496FEAE474D468F30D558A9468D9F26CF4FCD@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 27 Jun 2016 14:51:38 +0200
+Subject: [PATCH] mtd: nand: s3c2410: Register cpufreq notifier only on S3C24xx
+Message-ID: <1467031898-1410-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping!!
+The driver registered for CPU frequency transitions to recalculate its
+clock when ARM clock frequency changes (ratio between frequencies of
+ARM's parent clock (fclk) and clock for peripherals remains fixed).
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Friday, June 03, 2016 4:28 AM
-> To: Nava kishore Manne <navam@xilinx.com>
-> Cc: pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
-> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
-> balbi at ti.com; gregkh at linuxfoundation.org; Hyun Kwon
-> <hyunk@xilinx.com>; Nava kishore Manne <navam@xilinx.com>; Radhey
-> Shyam Pandey <radheys@xilinx.com>; devicetree at vger.kernel.org; linux-
-> arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
-> 
-> On Mon, May 30, 2016 at 10:16:38PM +0530, Nava kishore Manne wrote:
-> > This patch updates the driver to support 64-bit DMA addressing.
-> >
-> > Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> > ---
-> > Changes for v4:
-> > 		-Used boolen property insted of addrwith property in the DT
-> > 		 as suggested by Arnd Bergmann.
-> > 		-Adopt the DT relevant changes into the driver.
-> >
-> > Changes for v3:
-> >                 -Added new compatable string for 5.00 IP version as suggested by
-> >                  Arnd Bergmann.
-> >                 -Used write_fn() insted of lo_hi_writeq() as suggested by
-> >                  Arnd Bergmann.
-> >
-> > Changes for v2:
-> >                 -Added dma-ranges property in device tree as suggested by Arnd
-> Bergmann.
-> >                 -Modified the driver code based on the xlnx,addrwidth.
-> >
-> >  .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-> >  drivers/usb/gadget/udc/udc-xilinx.c                | 52
-> +++++++++++++++++++++-
-> >  2 files changed, 54 insertions(+), 3 deletions(-)
+This is needed only on S3C24xx platform when cpufreq driver is enabled
+so limit the ifdef to respective cpufreq Kconfig.
+
+Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/mtd/nand/s3c2410.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+index d9309cf0ce2e..8d440cc0f002 100644
+--- a/drivers/mtd/nand/s3c2410.c
++++ b/drivers/mtd/nand/s3c2410.c
+@@ -180,7 +180,7 @@ struct s3c2410_nand_info {
+ 
+ 	enum s3c_cpu_type		cpu_type;
+ 
+-#ifdef CONFIG_CPU_FREQ
++#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
+ 	struct notifier_block	freq_transition;
+ #endif
+ };
+@@ -701,7 +701,7 @@ static void s3c2440_nand_write_buf(struct mtd_info *mtd, const u_char *buf,
+ 
+ /* cpufreq driver support */
+ 
+-#ifdef CONFIG_CPU_FREQ
++#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
+ 
+ static int s3c2410_nand_cpufreq_transition(struct notifier_block *nb,
+ 					  unsigned long val, void *data)
+-- 
+1.9.1
