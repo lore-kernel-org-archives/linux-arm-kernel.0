@@ -1,69 +1,36 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 27 Jun 2016 16:44:20 +0200
-Subject: [RFC PATCH] clocksource: arm_arch_timer: disable the evtstrm via
- the cmdline
-In-Reply-To: <20160620133002.GB20071@e104818-lin.cambridge.arm.com>
-References: <1466171011-30468-1-git-send-email-will.deacon@arm.com>
- <5766FBC6.6000405@linaro.org> <20160620082157.GC29165@arm.com>
- <5767E89F.5020809@linaro.org>
- <20160620133002.GB20071@e104818-lin.cambridge.arm.com>
-Message-ID: <57713BC4.5040909@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 27 Jun 2016 15:54:00 +0100
+Subject: [PATCH v2 04/14] regulator: SY8106A regulator driver
+In-Reply-To: <3d6adff3-7ed3-73de-db0a-5f36c2f67a80@megous.com>
+References: <20160625034511.7966-1-megous@megous.com>
+ <20160625034511.7966-5-megous@megous.com>
+ <20160626112657.GK28202@sirena.org.uk>
+ <3d6adff3-7ed3-73de-db0a-5f36c2f67a80@megous.com>
+Message-ID: <20160627145400.GY28202@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2016 03:30 PM, Catalin Marinas wrote:
-> On Mon, Jun 20, 2016 at 02:59:11PM +0200, Daniel Lezcano wrote:
->> On 06/20/2016 10:21 AM, Will Deacon wrote:
->>> On Sun, Jun 19, 2016 at 10:08:38PM +0200, Daniel Lezcano wrote:
->>>> On 06/17/2016 03:43 PM, Will Deacon wrote:
->>>>
->>>> [ Cc'ed tglx ]
->>>>
->>>>> Disabling the eventstream can be useful for debugging and development
->>>>> purposes
->>>>
->>>> If it is for debugging and development, why upstream this change ?
->>>
->>> Mainly because it's desirable to be able to debug systems remotely, on
->>> machines that you don't have direct access to and where recompiling the
->>> kernel isn't necessarily an option. There are plenty of "no*" kernel
->>> parameters already that fall into a similar category.
->>
->> if the kernel is in development and debug, why this option can't be part of
->> debugging code ?
->
-> Because we may actually be debugging the hardware rather than the
-> software. With the event stream enabled, WFE is woken up periodically.
-> This can be a handy feature for user locking primitives or a simple
-> workaround for hardware bugs (and we've seen them before). But the side
-> effect is that it may be potentially hiding hardware issues.
->
-> For hardware testing/validation, you'd want to sometimes disable this
-> feature to check whether your event generation (usually as a result of
-> exclusive monitor clearing) is working as expected. It's much easier to
-> do with a command line option.
->
->> I'm not a big fan of the all the specific driver options for the kernel
->> parameters. If there is a real need to disable some parts of a driver, it
->> would be much more interesting to write a framework for that and then use it
->> from arm_arch_timer, thus giving the other drivers the opportunity to
->> provide the same feature.
->
-> Well, how many non-ARM timer drivers have an exclusive monitor event
-> stream feature to make sense for a framework?
+On Sun, Jun 26, 2016 at 05:07:16PM +0200, Ond?ej Jirman wrote:
+> On 26.6.2016 13:26, Mark Brown wrote:
 
-Ok.
+> > I'm missing almost all of this series, I've just got this and another
+> > patch which look like a standalone driver so it's hard to see any
+> > dependencies.  What's going on here?
 
-What about an option like:
+> Sorry, it's this series:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438981.html
 
-clocksource.arch_arm.evtstream = 0/1
+> And here's v1 intro letter:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438794.html
 
-
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+These aren't really enlightening I'm afraid, there's nothing in there
+about why these are a single series and no dependency information.
+Indeed it looks like something is really confused as the thread is
+missing at least patches 2 and 3.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/63382a9b/attachment.sig>
