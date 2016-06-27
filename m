@@ -1,59 +1,45 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 27 Jun 2016 17:02:47 +0800
-Subject: [PATCH 09/10] arm64: dts: tegra: Add NVIDIA Tegra186 P3310 main board
- support
+Date: Mon, 27 Jun 2016 17:02:48 +0800
+Subject: [PATCH 10/10] arm64: dts: tegra: Add NVIDIA P2771 board support
 In-Reply-To: <20160627090248.23621-1-josephl@nvidia.com>
 References: <20160627090248.23621-1-josephl@nvidia.com>
-Message-ID: <20160627090248.23621-10-josephl@nvidia.com>
+Message-ID: <20160627090248.23621-11-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NVIDIA Tegra186 P3310 main board support, which is a chip module
-with DRAM, nonvolatile storage, WiFi, ethernet and PMIC chips on it. It
-also needs an IO board and hooks on it to represent as an application
-platform.
+Add NVIDIA Tegra186 P2771 board support, which is a reference
+development board with P2597 I/O board and P3310 chip module on it.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 30 ++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+ arch/arm64/boot/dts/nvidia/Makefile                | 1 +
+ arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 8 ++++++++
+ 2 files changed, 9 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+diff --git a/arch/arm64/boot/dts/nvidia/Makefile b/arch/arm64/boot/dts/nvidia/Makefile
+index 0f7cdf3e05c1..67234f3dc795 100644
+--- a/arch/arm64/boot/dts/nvidia/Makefile
++++ b/arch/arm64/boot/dts/nvidia/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_TEGRA_132_SOC) += tegra132-norrin.dtb
++dtb-$(CONFIG_ARCH_TEGRA_186_SOC) += tegra186-p2771-0000.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-0000.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-2180.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2571.dtb
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
 new file mode 100644
-index 000000000000..5258ec0d6eef
+index 000000000000..66b936389fa7
 --- /dev/null
-+++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-@@ -0,0 +1,30 @@
-+#include "tegra186.dtsi"
++++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+@@ -0,0 +1,8 @@
++/dts-v1/;
++
++#include "tegra186-p3310.dtsi"
 +
 +/ {
-+	model = "NVIDIA Tegra186 P3310 main Board";
-+	compatible = "nvidia,p3301", "nvidia,tegra186";
-+
-+	aliases {
-+		serial0 = &uarta;
-+	};
-+
-+	chosen {
-+		bootargs = "earlycon console=ttyS0,115200n8";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x80000000 0x2 0x00000000>;
-+	};
-+
-+	serial at 03100000 {
-+		// HACK: before clk driver ready
-+		clock-frequency = <408000000>;
-+		status = "okay";
-+	};
-+
-+	bpmp at d0000000 {
-+		status = "okay";
-+	};
++	model = "NVIDIA Tegra186 P2771-0000 Board";
++	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
 +};
 -- 
 2.9.0
