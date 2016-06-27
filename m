@@ -1,100 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Jun 2016 17:30:13 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: control the evtstrm via the
- cmdline
-Message-ID: <1467045013-27211-1-git-send-email-will.deacon@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 27 Jun 2016 17:29:37 +0100
+Subject: [PATCH v20 04/14] arm64/kexec: Add core kexec support
+In-Reply-To: <20160627143939.GC6847@e104818-lin.cambridge.arm.com>
+References: <cover.1466702804.git.geoff@infradead.org>
+ <018ac873d87fbfc45185cdab91ebc8731f64f94c.1466702804.git.geoff@infradead.org>
+ <57710B92.2080603@arm.com>
+ <20160627143939.GC6847@e104818-lin.cambridge.arm.com>
+Message-ID: <57715471.7020005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disabling the eventstream can be useful for both remotely debugging a
-deployed production system and development of code using WFE-based
-polling loops. Whilst this can currently be controlled via a Kconfig
-option (CONFIG_ARM_ARCH_TIMER_EVTSTREAM), it's often desirable to toggle
-the feature on the command line, so this patch adds a new command-line
-option ("clocksource.arm_arch_timer.evtstrm") to do just that. The
-default behaviour is determined based on CONFIG_ARM_ARCH_TIMER_EVTSTREAM.
+Hi Catalin,
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- Documentation/kernel-parameters.txt  |  8 ++++++++
- drivers/clocksource/Kconfig          | 12 +++++++-----
- drivers/clocksource/arm_arch_timer.c | 10 +++++++++-
- 3 files changed, 24 insertions(+), 6 deletions(-)
+On 27/06/16 15:39, Catalin Marinas wrote:
+> On Mon, Jun 27, 2016 at 12:18:42PM +0100, James Morse wrote:
+>> This if() {} hunk isn't necessary with the version of cpus_are_stuck_in_kernel()
+>> you have in patch 2. This logic is the '|| smp_spin_tables' part of that helper
+>> function. (hibernate needed it too)
+> 
+> I can make the changes locally but just to be clear I understand what
+> you meant, here's the diff on top of Geoff's patch:
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 82b42c958d1c..2c92f1df7c69 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -687,6 +687,14 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			[SPARC64] tick
- 			[X86-64] hpet,tsc
- 
-+	clocksource.arm_arch_timer.evtstrm=
-+			[ARM,ARM64]
-+			Format: <bool>
-+			Enable/disable the eventstream feature of the ARM
-+			architected timer so that code using WFE-based polling
-+			loops can be debugged more effectively on production
-+			systems.
-+
- 	clearcpuid=BITNUM [X86]
- 			Disable CPUID feature X for the kernel. See
- 			arch/x86/include/asm/cpufeatures.h for the valid bit
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 47352d25c15e..a6b0361c2ada 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -208,14 +208,16 @@ config ARM_ARCH_TIMER
- 	select CLKSRC_ACPI if ACPI
- 
- config ARM_ARCH_TIMER_EVTSTREAM
--	bool "Support for ARM architected timer event stream generation"
-+	bool "Enable ARM architected timer event stream generation by default"
- 	default y if ARM_ARCH_TIMER
- 	depends on ARM_ARCH_TIMER
- 	help
--	  This option enables support for event stream generation based on
--	  the ARM architected timer. It is used for waking up CPUs executing
--	  the wfe instruction at a frequency represented as a power-of-2
--	  divisor of the clock rate.
-+	  This option enables support by default for event stream generation
-+	  based on the ARM architected timer. It is used for waking up CPUs
-+	  executing the wfe instruction at a frequency represented as a
-+	  power-of-2 divisor of the clock rate. The behaviour can also be
-+	  overridden on the command line using the
-+	  clocksource.arm_arch_timer.evtstream parameter.
- 	  The main use of the event stream is wfe-based timeouts of userspace
- 	  locking implementations. It might also be useful for imposing timeout
- 	  on wfe to safeguard against any programming errors in case an expected
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 4814446a0024..48cda6498797 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -79,6 +79,14 @@ static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
- static bool arch_timer_c3stop;
- static bool arch_timer_mem_use_virtual;
- 
-+static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
-+
-+static int __init early_evtstrm_cfg(char *buf)
-+{
-+	return strtobool(buf, &evtstrm_enable);
-+}
-+early_param("clocksource.arm_arch_timer.evtstrm", early_evtstrm_cfg);
-+
- /*
-  * Architected system timer support.
-  */
-@@ -372,7 +380,7 @@ static int arch_timer_setup(struct clock_event_device *clk)
- 		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
- 
- 	arch_counter_set_user_access();
--	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM))
-+	if (evtstrm_enable)
- 		arch_timer_configure_evtstream();
- 
- 	return 0;
--- 
-2.1.4
+Ah, I see my 'if() {}' comment is ambiguous as there are two ...
+
+> 
+> ----8<-------------------------
+> 
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index 945ce326654c..bc96c8a7fc79 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -68,24 +68,9 @@ int machine_kexec_prepare(struct kimage *kimage)
+>  
+>  	kexec_image_info(kimage);
+>  
+> -	if (kimage->type != KEXEC_TYPE_CRASH) {
+> -		if (cpus_are_stuck_in_kernel()) {
+> -			pr_err("Can't kexec: failed CPUs are stuck in the kernel.\n");
+> -			return -EBUSY;
+> -		}
+> -
+> -		if (num_online_cpus() > 1) {
+> -			if (IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
+> -				/* any_cpu as we don't mind being preempted */
+> -				int any_cpu = raw_smp_processor_id();
+> -
+> -				if (cpu_ops[any_cpu]->cpu_die)
+> -					return 0;
+> -			}
+> -
+> -			pr_err("Can't kexec: no mechanism to offline secondary CPUs.\n");
+> -			return -EBUSY;
+> -		}
+> +	if (kimage->type != KEXEC_TYPE_CRASH && cpus_are_stuck_in_kernel()) {
+> +		pr_err("Can't kexec: CPUs are stuck in the kernel.\n");
+> +		return -EBUSY;
+>  	}
+>  
+>  	return 0;
+> @@ -163,7 +148,7 @@ void machine_kexec(struct kimage *kimage)
+>  	/*
+>  	 * New cpus may have become stuck_in_kernel after we loaded the image.
+>  	 */
+> -	BUG_ON(cpus_are_stuck_in_kernel() && (num_online_cpus() > 1));
+> +	BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
+>  
+>  	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+>  	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+> 
+
+Yes, that's what I meant, thanks Catalin.
+
+The 'num_online_cpus() > 1' is still needed as disable_nonboot_cpus() called via
+machine_shutdown() may have failed and this is where we check. (we can't return
+an error from either path).
+
+Geoff, I assume you agree?
+
+
+Thanks,
+
+James
