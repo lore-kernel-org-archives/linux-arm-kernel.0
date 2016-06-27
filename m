@@ -1,73 +1,39 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 27 Jun 2016 16:31:44 +0530
-Subject: [PATCH v2 7/8] ARM: dts: AM437X-CM-T43: Remove redundant regulator
- compatibles
-In-Reply-To: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
-References: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1467025305-13464-8-git-send-email-j-keerthy@ti.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 27 Jun 2016 12:04:35 +0100
+Subject: [PATCH v20 01/14] arm64: hibernate: Don't hibernate on systems
+ with stuck CPUs
+In-Reply-To: <97dcd35763eddf1b4c50a26d16389f313269f0c8.1466702804.git.geoff@infradead.org>
+References: <cover.1466702804.git.geoff@infradead.org>
+ <97dcd35763eddf1b4c50a26d16389f313269f0c8.1466702804.git.geoff@infradead.org>
+Message-ID: <57710843.40806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the device tree parsing using the regulator framework
-there is a no longer a need for separate compatibles for
-individual regulator nodes. Hence removing them all.
+Hi
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
- arch/arm/boot/dts/am437x-cm-t43.dts | 6 ------
- 1 file changed, 6 deletions(-)
+On 23/06/16 18:54, Geoff Levand wrote:
+> From: James Morse <james.morse@arm.com>
+> 
+> Hibernate relies on cpu hotplug to prevent secondary cores executing
+> the kernel text while it is being restored.
+> 
+> Add a call to cpus_are_stuck_in_kernel() to determine if there are
+> CPUs not counted by 'num_online_cpus()', and prevent hibernate in this
+> case.
+> 
+> Fixes: 82869ac57b5 ("arm64: kernel: Add support for hibernate/suspend-to-disk")
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/kernel/hibernate.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am437x-cm-t43.dts b/arch/arm/boot/dts/am437x-cm-t43.dts
-index 9551c47..9e92d48 100644
---- a/arch/arm/boot/dts/am437x-cm-t43.dts
-+++ b/arch/arm/boot/dts/am437x-cm-t43.dts
-@@ -209,7 +209,6 @@
- 		#interrupt-cells = <2>;
- 
- 		dcdc1: regulator-dcdc1 {
--			compatible = "ti,tps65218-dcdc1";
- 			regulator-name = "vdd_core";
- 			regulator-min-microvolt = <912000>;
- 			regulator-max-microvolt = <1144000>;
-@@ -218,7 +217,6 @@
- 		};
- 
- 		dcdc2: regulator-dcdc2 {
--			compatible = "ti,tps65218-dcdc2";
- 			regulator-name = "vdd_mpu";
- 			regulator-min-microvolt = <912000>;
- 			regulator-max-microvolt = <1378000>;
-@@ -227,7 +225,6 @@
- 		};
- 
- 		dcdc3: regulator-dcdc3 {
--			compatible = "ti,tps65218-dcdc3";
- 			regulator-name = "vdcdc3";
- 			regulator-suspend-enable;
- 			regulator-min-microvolt = <1500000>;
-@@ -237,7 +234,6 @@
- 		};
- 
- 		dcdc5: regulator-dcdc5 {
--			compatible = "ti,tps65218-dcdc5";
- 			regulator-name = "v1_0bat";
- 			regulator-min-microvolt = <1000000>;
- 			regulator-max-microvolt = <1000000>;
-@@ -246,7 +242,6 @@
- 		};
- 
- 		dcdc6: regulator-dcdc6 {
--			compatible = "ti,tps65218-dcdc6";
- 			regulator-name = "v1_8bat";
- 			regulator-min-microvolt = <1800000>;
- 			regulator-max-microvolt = <1800000>;
-@@ -255,7 +250,6 @@
- 		};
- 
- 		ldo1: regulator-ldo1 {
--			compatible = "ti,tps65218-ldo1";
- 			regulator-min-microvolt = <1800000>;
- 			regulator-max-microvolt = <1800000>;
- 			regulator-boot-on;
--- 
-1.9.1
+
+... this patch isn't necessary for kexec, it wired up the helper function you
+have in patch 2 for hibernate.
+
+Please drop this in any future posting!
+
+
+Thanks,
+
+James
