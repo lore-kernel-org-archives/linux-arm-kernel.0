@@ -1,59 +1,100 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 27 Jun 2016 20:20:10 +0800
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 27 Jun 2016 13:23:31 +0100
 Subject: [PATCH v2 1/8] mfd: tps65218: Remove redundant read wrapper
 In-Reply-To: <1467025305-13464-2-git-send-email-j-keerthy@ti.com>
-Message-ID: <201606272018.UTkpVQyW%fengguang.wu@intel.com>
+References: <1467025305-13464-1-git-send-email-j-keerthy@ti.com>
+ <1467025305-13464-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <20160627122331.GB24377@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 27 Jun 2016, Keerthy wrote:
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.7-rc5 next-20160624]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> Currently read directly calls the repmap read function. Hence
+> remove the redundant wrapper and use regmap read wherever
+> needed.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+>  drivers/mfd/tps65218.c                 | 16 +---------------
+>  drivers/regulator/tps65218-regulator.c |  3 ++-
+>  include/linux/mfd/tps65218.h           |  2 --
+>  3 files changed, 3 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+> index 80b9dc3..f20a531 100644
+> --- a/drivers/mfd/tps65218.c
+> +++ b/drivers/mfd/tps65218.c
+> @@ -34,20 +34,6 @@
+>  #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+>  
+>  /**
+> - * tps65218_reg_read: Read a single tps65218 register.
+> - *
+> - * @tps: Device to read from.
+> - * @reg: Register to read.
+> - * @val: Contians the value
+> - */
+> -int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
+> -			unsigned int *val)
+> -{
+> -	return regmap_read(tps->regmap, reg, val);
+> -}
+> -EXPORT_SYMBOL_GPL(tps65218_reg_read);
+> -
 
-url:    https://github.com/0day-ci/linux/commits/Keerthy/mfd-regulator-tps65218-Clean-ups/20160627-191539
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: x86_64-randconfig-n0-06271854 (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+What about the calls in the GPIO and Misc drivers?
 
-All errors (new ones prefixed by >>):
+> -/**
+>   * tps65218_reg_write: Write a single tps65218 register.
+>   *
+>   * @tps65218: Device to write to.
+> @@ -93,7 +79,7 @@ static int tps65218_update_bits(struct tps65218 *tps, unsigned int reg,
+>  	int ret;
+>  	unsigned int data;
+>  
+> -	ret = tps65218_reg_read(tps, reg, &data);
+> +	ret = regmap_read(tps->regmap, reg, &data);
+>  	if (ret) {
+>  		dev_err(tps->dev, "Read from reg 0x%x failed\n", reg);
+>  		return ret;
+> diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
+> index a5e5634..679ab2f 100644
+> --- a/drivers/regulator/tps65218-regulator.c
+> +++ b/drivers/regulator/tps65218-regulator.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/err.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of_device.h>
+> +#include <linux/regmap.h>
+>  #include <linux/regulator/of_regulator.h>
+>  #include <linux/regulator/driver.h>
+>  #include <linux/regulator/machine.h>
+> @@ -224,7 +225,7 @@ static int tps65218_pmic_get_current_limit(struct regulator_dev *dev)
+>  	unsigned int index;
+>  	struct tps65218 *tps = rdev_get_drvdata(dev);
+>  
+> -	retval = tps65218_reg_read(tps, dev->desc->csel_reg, &index);
+> +	retval = regmap_read(tps->regmap, dev->desc->csel_reg, &index);
+>  	if (retval < 0)
+>  		return retval;
+>  
+> diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
+> index d58f3b5..7c9241f 100644
+> --- a/include/linux/mfd/tps65218.h
+> +++ b/include/linux/mfd/tps65218.h
+> @@ -276,8 +276,6 @@ struct tps65218 {
+>  	struct regmap *regmap;
+>  };
+>  
+> -int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
+> -					unsigned int *val);
+>  int tps65218_reg_write(struct tps65218 *tps, unsigned int reg,
+>  			unsigned int val, unsigned int level);
+>  int tps65218_set_bits(struct tps65218 *tps, unsigned int reg,
 
-   drivers/input/misc/tps65218-pwrbutton.c: In function 'tps65218_pwr_irq':
->> drivers/input/misc/tps65218-pwrbutton.c:39:10: error: implicit declaration of function 'tps65218_reg_read' [-Werror=implicit-function-declaration]
-     error = tps65218_reg_read(pwr->tps, TPS65218_REG_STATUS, &reg);
-             ^~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
-
-vim +/tps65218_reg_read +39 drivers/input/misc/tps65218-pwrbutton.c
-
-5fafed3e Felipe Balbi 2014-12-27  33  static irqreturn_t tps65218_pwr_irq(int irq, void *_pwr)
-5fafed3e Felipe Balbi 2014-12-27  34  {
-5fafed3e Felipe Balbi 2014-12-27  35  	struct tps65218_pwrbutton *pwr = _pwr;
-5fafed3e Felipe Balbi 2014-12-27  36  	unsigned int reg;
-5fafed3e Felipe Balbi 2014-12-27  37  	int error;
-5fafed3e Felipe Balbi 2014-12-27  38  
-5fafed3e Felipe Balbi 2014-12-27 @39  	error = tps65218_reg_read(pwr->tps, TPS65218_REG_STATUS, &reg);
-5fafed3e Felipe Balbi 2014-12-27  40  	if (error) {
-5fafed3e Felipe Balbi 2014-12-27  41  		dev_err(pwr->dev, "can't read register: %d\n", error);
-5fafed3e Felipe Balbi 2014-12-27  42  		goto out;
-
-:::::: The code at line 39 was first introduced by commit
-:::::: 5fafed3e5612e9f308d20dc94adf5fc3d4a1a2a8 Input: add tps65218 power button driver
-
-:::::: TO: Felipe Balbi <balbi@ti.com>
-:::::: CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 22474 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160627/d843ba3a/attachment-0001.obj>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
