@@ -1,34 +1,29 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 27 Jun 2016 07:58:43 +0300
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 27 Jun 2016 13:00:31 +0800
 Subject: [PATCHv2 06/27] crypto: ahash: increase the maximum allowed
  statesize
-In-Reply-To: <20160624103209.GA19607@gondor.apana.org.au>
+In-Reply-To: <5770B283.8000902@ti.com>
 References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
  <1466601840-18486-7-git-send-email-t-kristo@ti.com>
  <20160624103209.GA19607@gondor.apana.org.au>
-Message-ID: <5770B283.8000902@ti.com>
+ <5770B283.8000902@ti.com>
+Message-ID: <20160627050031.GA5673@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/06/16 13:32, Herbert Xu wrote:
-> On Wed, Jun 22, 2016 at 04:23:39PM +0300, Tero Kristo wrote:
->> The statesize is used to determine the maximum size for saved ahash
->> context. In some cases, this can be much larger than what is currently
->> allocated for it, for example omap-sham driver uses a buffer size of
->> PAGE_SIZE. Increase the statesize to accommodate this.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+On Mon, Jun 27, 2016 at 07:58:43AM +0300, Tero Kristo wrote:
 >
-> Nack.  The exported state is supposed to consist of the actual
-> hash state, plus at most one block worth of unhashed data.  It's
-> limited so that we can store it on the stack.
->
-> So no I'm not taking this patch.
->
+> Ok, I think I need to allocate the storage space locally then within
+> the driver. Would it be ok to call kmalloc / free in the export /
+> import implementation of the driver? The size of the unhashed buffer
+> in omap-sham is unfortunately rather large.
 
-Ok, I think I need to allocate the storage space locally then within the 
-driver. Would it be ok to call kmalloc / free in the export / import 
-implementation of the driver? The size of the unhashed buffer in 
-omap-sham is unfortunately rather large.
+The allocation should usually be done from the request_alloc
+function, i.e., you set the reqsize and the user does the allocation
+for you.
 
--Tero
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
