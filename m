@@ -1,92 +1,109 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Mon, 27 Jun 2016 19:29:30 +0800
-Subject: [GIT PULL] drm/mediatek: MT8173 gamma & dither support
-In-Reply-To: <558c9efc-d197-a6c3-cf7e-f9fcac60ca64@gmail.com>
-References: <1466753238-17216-1-git-send-email-bibby.hsieh@mediatek.com>
- <558c9efc-d197-a6c3-cf7e-f9fcac60ca64@gmail.com>
-Message-ID: <1467026970.23883.16.camel@mtksdaap41>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jun 2016 12:31:43 +0100
+Subject: BUG?: kernel does not (re)set irq smp_affinity to reboot_cpu
+In-Reply-To: <d3a266d3-2cfc-81c7-25a6-b39c8012bcf0@redhat.com>
+References: <4dc8bd4c-8456-9f94-b7eb-c5d227ddc673@redhat.com>
+ <5770EE21.90103@arm.com>
+ <20160627094552.GE1041@n2100.armlinux.org.uk>
+ <d3a266d3-2cfc-81c7-25a6-b39c8012bcf0@redhat.com>
+Message-ID: <20160627113143.GF1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-06-27 at 12:20 +0200, Matthias Brugger wrote:
+On Mon, Jun 27, 2016 at 12:55:26PM +0200, Hans de Goede wrote:
+> Hi Russel,
 > 
-> On 06/24/2016 09:27 AM, Bibby Hsieh wrote:
-> > Hi Dave,
+> On 27-06-16 11:45, Russell King - ARM Linux wrote:
+> >On Mon, Jun 27, 2016 at 10:13:05AM +0100, Marc Zyngier wrote:
+> >>I'm wondering if that's not an effect of this patch:
+> >>
+> >>https://lkml.org/lkml/2015/9/24/138
+> >>
+> >>missing on the ARM side (the corresponding arm64 patch is 217d453d473c).
 > >
-> > Please consider merging this tag, which contains the v2 MT8173 gamma & dither function patches I sent on 2016-06-17, rebased onto v4.7-rc1. There have been no further comments.
+> >No, because we don't take the other CPUs offline through CPU hotplug at
+> >reboot - we stop them.  That's because CPU hotplug involves scheduling,
+> >and a reboot can't be scheduled as it can happen from IRQ contexts.
 > >
-> > Thanks
-> > Bibby
+> >For a long time, we have not supported IRQs on any CPU after the system
+> >has gone down for halt/reboot/poweroff etc:
 > >
-> > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> >ipi_cpu_stop() disables IRQs and FIQs before entering an infinite loop.
+> >machine_{halt,power_off,restart}() in arch/arm/kernel/reboot.c disables
+> >IRQs on the requesting CPU.
 > >
-> >   Linux 4.7-rc1 (2016-05-29 16:29:24 GMT)
-> >
-> > are available in the git repository at:
-> >
-> >   git at github.com:BibbyHsieh/linux4.7-rc1.git
-> >
-> > for you to fetch changes up to dd0eb773bc125f5e6bca735d19c08500dc3730f9:
-> >
-> >   drm/mediatek: Add gamma correction
-> >
-> > -------------------------------------------------------------------------
+> >So, IRQs get disabled on _all_ CPUs.  Code after this point should not
+> >re-enable IRQs to be able to use drivers, which it sounds like what's
+> >happening in Hans scenario.  Remember, as I've said above, these paths
+> >should not even be scheduling, and should never be reliant on receiving
+> >interrupts.  *Especially* as they can themselves be called from IRQ
+> >context.
 > 
-> As far as I can see, your branch has 3 patches on top from Eddie. It 
-> seems to me as if you didn't send your patches to the mailinglist before?
-> Anyway this branch does not fulfill the rules to get merged into the 
-> linux kernel.
+> First of all thanks for your input.
 > 
-> Why do you send a pull request? The normal process is to send the 
-> patches via email and if the maintainer wants you can send a pull 
-> request once the patches are ready to be merged.
-> 
-> Regards,
-> Matthias
-> 
+> Note this is not reboot, this is poweroff.
 
-I sent v1 and v2 on 2016-06-14 and 06-17 respectively [0-8].
-After I made some modifications according to Daniel Vetter's comments,
-there had been no further comments and I sent the pull request as the
-other sub-sys.
+I think I covered that - all the paths are indentical in the ARM
+architecture code, and have been identical in this respect well before
+any of the drivers you've pointed out.
 
-I'm sorry for my mistake, I will re-arrange the tree for upstream.
-Next time, I will check with maintainer by email first, and sent the
-pull request.
+> And for poweroff many (ARM) boards depend on working i2c, which
+> depends on irqs, for example all these mfd drivers:
+> 
+> drivers/mfd/rn5t618.c
+> drivers/mfd/twl4030-power.c
+> drivers/mfd/palmas.c
+> drivers/mfd/dm355evm_msp.c
+> drivers/mfd/tps6586x.c
+> drivers/mfd/retu-mfd.c
+> drivers/mfd/max8907.c
+> drivers/mfd/tps65910.c
+> drivers/mfd/tps80031.c
+> drivers/mfd/rk808.c
+> drivers/mfd/axp20x.c
+> 
+> Define pm_power_off and use i2c.
 
-Thanks.
-Bibby 
- 
-[0]https://patchwork.kernel.org/patch/9174941/
-[1]https://patchwork.kernel.org/patch/9174855/
-[2]https://patchwork.kernel.org/patch/9182361/
-[3]https://patchwork.kernel.org/patch/9182367/
-[4]https://lists.freedesktop.org/archives/dri-devel/2016-June/111178.html
-[5]https://lists.freedesktop.org/archives/dri-devel/2016-June/111177.html
-[6]https://lists.freedesktop.org/archives/dri-devel/2016-June/111176.html
-[7]https://lists.freedesktop.org/archives/dri-devel/2016-June/110781.html
-[8]https://lists.freedesktop.org/archives/dri-devel/2016-June/110782.html
-[9]https://lists.freedesktop.org/archives/dri-devel/2016-June/110784.html
+Right, so these drivers are all buggy, and need fixing.
 
-> > This is MT8173 gamma & dither support PATCH v2, based on 4.7-rc1.
-> >
-> > Changes since v1:
-> >  -According to the suggestion from Daniel,
-> >   we used the new atomic color management.
-> >  -Applied gamma function at GAMMA engine (path 2).
-> >  -Made dithering function support hardware mirroring well.
-> >  -Removed the bpc variable from mtk_drm_crtc struct.
-> > -------------------------------------------------------------------------
-> >
-> > Bibby Hsieh (2):
-> >   drm/mediatek: Add gamma correction
-> >   drm/mediatek: set mt8173 dithering function
-> >
-> >  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |    3 +-
-> >  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |    3 +-
-> >  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   26 ++++-
-> >  drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |    1 +
-> >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  147 ++++++++++++++++++++++++++-
-> >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   16 ++-
-> >  6 files changed, 184 insertions(+), 12 deletions(-)
-> >
+> So although you may very well be right that using irqs to implement poweroff
+> is not how things should be, in practice we've been using them for this for
+> quite a while now and this usually works fine.
+
+... and they're all violating the conditions set down for by the
+architecture for an orderly poweroff - presumably the reason this
+works for !SMP cases is because somewhere along the path, they're
+re-enabling IRQs behind the back of architecture code.
+
+> So it seems that the assumption that machine_power_off may be called
+> from irq context is not always true, specifically it is only true on
+> certain platforms (mach-ixp4xx, omap4, omap5 and whatever uses
+> ab8500.c). I would expect the pm_power_off implementations on these
+> platforms to indeed not use irqs themselves, that would indeed be
+> bad.
+
+Right, but the overriding thing here is that it _may_ be called from
+IRQ context _and_ pm_power_off() is called with IRQs disabled.  That
+second one is the more important point - pm_power_off() handlers are
+called with a non-schedulable context.
+
+> Which brings us back to our original problem, how do we fix
+> irq smp_affinity on power off ?
+
+Only if we accept that pm_power_off() should be called with IRQs
+enabled, which we haven't ascertained yet.
+
+Even on x86, pm_power_off() is generally called with IRQs disabled,
+and more - the APICs are disabled along with the system IOMMU in the
+case of x86_64.  These are only avoided if the reboot mode is set to
+"force" (reboot_force).
+
+Now, we could do as you are suggesting, and route IRQs to the
+remaining CPU via all shutdown paths, but that would be papering over
+the fundamental bug here: if a function is called with IRQs disabled,
+it (or any called function) has no business re-enabling IRQs.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
