@@ -1,102 +1,96 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 27 Jun 2016 11:41:58 +0200
-Subject: [PATCH v4 07/13] ARM: shmobile: apmu: Add APMU DT support via
+Date: Mon, 27 Jun 2016 11:44:26 +0200
+Subject: [PATCH v4 01/13] devicetree: bindings: Renesas APMU and SMP
  Enable method
-In-Reply-To: <cf46c1dc-5ccd-fa5f-d2c6-321b284e35eb@cogentembedded.com>
+In-Reply-To: <1466072862-28030-2-git-send-email-geert+renesas@glider.be>
 References: <1466072862-28030-1-git-send-email-geert+renesas@glider.be>
- <1466072862-28030-8-git-send-email-geert+renesas@glider.be>
- <b524c939-d546-65b8-72da-359136c2aebe@cogentembedded.com>
- <CAMuHMdWrwnNxfAh-AHA+Q5AfgYy89nmj-yVSj-E4jMx5cHYi3g@mail.gmail.com>
- <cf46c1dc-5ccd-fa5f-d2c6-321b284e35eb@cogentembedded.com>
-Message-ID: <CAMuHMdUpfvPKVNOEZ8-x5khEkCEPM8g64pF2XjD+SZow0t-icg@mail.gmail.com>
+ <1466072862-28030-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdWvbWS=-tjcHo_iKpYMOtTd_e1y_dHjfrKOTh7PuezwhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Sun, Jun 26, 2016 at 6:36 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 06/24/2016 10:44 AM, Geert Uytterhoeven wrote:
->>>> From: Magnus Damm <damm+renesas@opensource.se>
->>>> Allow DT configuration of the APMU hardware in the case when the APMU is
->>>> pointed out in the DTB via the enable-method. The ability to configure
->>>> the APMU via C code is still kept intact to prevent DTB breakage for
->>>> older
->>>> SoCs that do not rely on the enable-method for SMP support.
->>>>
->>>> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
->>>> [geert: Fix CONFIG_SMP=n build]
->>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>>
->>> [...]
->>>
->>>> diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c
->>>> b/arch/arm/mach-shmobile/platsmp-apmu.c
->>>> index c1558ef0c590dd3e..0c6bb458b7a45128 100644
->>>> --- a/arch/arm/mach-shmobile/platsmp-apmu.c
->>>> +++ b/arch/arm/mach-shmobile/platsmp-apmu.c
->>>
->>> [...]
->>>>
->>>>
->>>> +static int shmobile_smp_apmu_boot_secondary_md21(unsigned int cpu,
->>>> +                                                struct task_struct
->>>> *idle)
->>>> +{
->>>> +       /* Error out when hardware debug mode is enabled */
->>>> +       if (rcar_gen2_read_mode_pins() & BIT(21)) {
->>>> +               pr_warn("Unable to boot CPU%u when MD21 is set\n", cpu);
->>>> +               return -ENOTSUPP;
->>>> +       }
->>>> +
->>>> +       return shmobile_smp_apmu_boot_secondary(cpu, idle);
->>>> +}
->>>> +
->>>> +static struct smp_operations apmu_smp_ops __initdata = {
->>>> +       .smp_prepare_cpus       = shmobile_smp_apmu_prepare_cpus_dt,
->>>> +       .smp_boot_secondary     = shmobile_smp_apmu_boot_secondary_md21,
->>>> +#ifdef CONFIG_HOTPLUG_CPU
->>>> +       .cpu_can_disable        = shmobile_smp_cpu_can_disable,
->>>> +       .cpu_die                = shmobile_smp_apmu_cpu_die,
->>>> +       .cpu_kill               = shmobile_smp_apmu_cpu_kill,
->>>>  #endif
->>>
->>>    For the record: it turned out that I tested my non-DT SMP on
->>> R8A7792/Blanche with MD21 bit set. And I've just made sure it still works
->>> with this implementation (by commenting out the check above.
->>>    Also, I was going to try the workaround for MD21 I saw in the BSP tree
->>> --
+On Thu, Jun 16, 2016 at 12:27 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
 >
->> Which workaround? I only saw the BSP removed the check, but it didn't
->> mention
->> why (because E2 and V2H don't need it, or...?).
+> Add DT binding documentation for the APMU hardware and add "renesas,apmu"
+> to the list of enable methods for the ARM cpus.
 >
->    I'm looking at the <soc>_smp_prepare_cpus() in
-> arch/arm/mach-shmobile/setup-<soc>.c in the
-
-.../smp-<soc>.c
-
-> 'bsp/v3.10.31-ltsi/rcar-gen2-1.9.6' branch of Simon's renesas-backport.git.
-> The all have the code to handle MD21 bit set (by setting some bits in
-> CA{7,15}DBGRCR.
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> ---
+> v4:
+>   - s/reigsters/registers/,
+>   - Use "renesas,<soctype>-apmu" instead of "renesas,apmu-<soctype>",
 >
->>> perhaps it'll help get R8A7791 working w/MD21 set...
-
-Thanks! I'll give that a try...
-
-Note that for SoCs with CA7 cores, it sets undocumented bits (the 0x3330 part)?
-
-For now we can keep the check, as the behavior is the same as on H2/M2-W
-before, so it doesn't introduce a regression.
-
->> Does your Porter work with the other MD21 setting (and the check commented
->> out, of coutse)?
+> v3:
+>   - s/Until/Unit/g,
 >
->    Yes, I've made sure it works now.
+> v2:
+>   - No changes.
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>  .../devicetree/bindings/power/renesas,apmu.txt     | 31 ++++++++++++++++++++++
+>  2 files changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/renesas,apmu.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 3f0cbbb8395f84ef..fa7520eb6387edbe 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -204,6 +204,7 @@ nodes to be present and contain the properties described below.
+>                             "qcom,gcc-msm8660"
+>                             "qcom,kpss-acc-v1"
+>                             "qcom,kpss-acc-v2"
+> +                           "renesas,apmu"
 
-With or without the DBGRCR code from the BSP?
-
+Any Acked-by from the ARM people?
 Thanks!
+
+>                             "rockchip,rk3036-smp"
+>                             "rockchip,rk3066-smp"
+>                             "ste,dbx500-smp"
+> diff --git a/Documentation/devicetree/bindings/power/renesas,apmu.txt b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+> new file mode 100644
+> index 0000000000000000..84404c9edff73d97
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+> @@ -0,0 +1,31 @@
+> +DT bindings for the Renesas Advanced Power Management Unit
+> +
+> +Renesas R-Car line of SoCs utilize one or more APMU hardware units
+> +for CPU core power domain control including SMP boot and CPU Hotplug.
+> +
+> +Required properties:
+> +
+> +- compatible: Should be "renesas,<soctype>-apmu", "renesas,apmu" as fallback.
+> +             Examples with soctypes are:
+> +               - "renesas,r8a7790-apmu" (R-Car H2)
+> +               - "renesas,r8a7791-apmu" (R-Car M2-W)
+> +               - "renesas,r8a7792-apmu" (R-Car V2H)
+> +               - "renesas,r8a7793-apmu" (R-Car M2-N)
+> +               - "renesas,r8a7794-apmu" (R-Car E2)
+> +
+> +- reg: Base address and length of the I/O registers used by the APMU.
+> +
+> +- cpus: This node contains a list of CPU cores, which should match the order
+> +  of CPU cores used by the WUPCR and PSTR registers in the Advanced Power
+> +  Management Unit section of the device's datasheet.
+> +
+> +
+> +Example:
+> +
+> +This shows the r8a7791 APMU that can control CPU0 and CPU1.
+> +
+> +       apmu at e6152000 {
+> +               compatible = "renesas,r8a7791-apmu", "renesas,apmu";
+> +               reg = <0 0xe6152000 0 0x188>;
+> +               cpus = <&cpu0 &cpu1>;
+> +       };
+> --
+> 1.9.1
 
 Gr{oetje,eeting}s,
 
