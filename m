@@ -1,61 +1,51 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Mon, 27 Jun 2016 15:30:03 +0530
-Subject: [PATCH v2 2/2] net: thunderx: Fix TL4 configuration for secondary
- Qsets
-In-Reply-To: <1467021603-26226-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1467021603-26226-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1467021603-26226-3-git-send-email-sunil.kovvuri@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Jun 2016 11:12:31 +0100
+Subject: [PATCH 11/14] drivers: firmware: psci: Allow OS Initiated
+ suspend mode
+In-Reply-To: <CAGm_ybjO+jAN62fqFyVrw_+5LOnUumEfn8kxmDa+s5ap0Bqk9A@mail.gmail.com>
+References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
+ <1466624209-27432-12-git-send-email-lina.iyer@linaro.org>
+ <CAGm_ybjO+jAN62fqFyVrw_+5LOnUumEfn8kxmDa+s5ap0Bqk9A@mail.gmail.com>
+Message-ID: <20160627101231.GB1113@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On Fri, Jun 24, 2016 at 09:55:20AM +0530, Vikas Sajjan wrote:
+> On Thu, Jun 23, 2016 at 1:06 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> > +static int __init psci_1_0_init(struct device_node *np)
+> > +{
+> > +       int ret;
+> > +
+> > +       ret = psci_0_2_init(np);
+> > +       if (ret)
+> > +               return ret;
+> > +
+> > +       /* Check if PSCI OSI mode is available */
+> > +       ret = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
+> > +       if (ret & PSCI_1_0_OS_INITIATED) {
+> > +               ret = psci_features(PSCI_1_0_FN_SET_SUSPEND_MODE);
+> > +               if (!ret)
+> > +                       psci_has_osi_pd = true;
+> 
+> IMHO, its better to have this done in psci_init_cpu_suspend() itself
+> for 2 reasons
+> 
+> a] psci_init_cpu_suspend() already calls
+> psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND])
+> b] by moving this in psci_init_cpu_suspend() we make this support
+> available even for ACPI platforms, since psci_acpi_init() calls
+> psci_probe() and this calls  psci_init_cpu_suspend() for
+> PSCI_VERSION_MAJOR(ver) >= 1
 
-TL4 calculation for a given SQ of secondary Qsets is incorrect
-and goes out of bounds and also for some SQ's TL4 chosen will
-transmit data via a different BGX interface and not same as
-primary Qset's interface.
+For ACPI platforms it is necessary to go through a handshake to
+determine whether LPI can use OSI (see 6.2.11.2 in the ACPI 6.1 spec).
+So there will have to be some ACPI-specific code to determine whether
+OSI should be used.
 
-This patch fixes this issue.
+We will probably have to an ACPI-specific wrapper for
+psci_init_cpu_suspend to cater for that. I don't think that
+psci_init_cpu_suspend itself should be in charge of deciding whether to
+enable OSI.
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic_main.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 95f17f8..16ed203 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -499,6 +499,7 @@ static void nic_tx_channel_cfg(struct nicpf *nic, u8 vnic,
- 	u32 rr_quantum;
- 	u8 sq_idx = sq->sq_num;
- 	u8 pqs_vnic;
-+	int svf;
- 
- 	if (sq->sqs_mode)
- 		pqs_vnic = nic->pqs_vf[vnic];
-@@ -511,10 +512,19 @@ static void nic_tx_channel_cfg(struct nicpf *nic, u8 vnic,
- 	/* 24 bytes for FCS, IPG and preamble */
- 	rr_quantum = ((NIC_HW_MAX_FRS + 24) / 4);
- 
--	tl4 = (lmac * NIC_TL4_PER_LMAC) + (bgx * NIC_TL4_PER_BGX);
-+	if (!sq->sqs_mode) {
-+		tl4 = (lmac * NIC_TL4_PER_LMAC) + (bgx * NIC_TL4_PER_BGX);
-+	} else {
-+		for (svf = 0; svf < MAX_SQS_PER_VF; svf++) {
-+			if (nic->vf_sqs[pqs_vnic][svf] == vnic)
-+				break;
-+		}
-+		tl4 = (MAX_LMAC_PER_BGX * NIC_TL4_PER_LMAC);
-+		tl4 += (lmac * NIC_TL4_PER_LMAC * MAX_SQS_PER_VF);
-+		tl4 += (svf * NIC_TL4_PER_LMAC);
-+		tl4 += (bgx * NIC_TL4_PER_BGX);
-+	}
- 	tl4 += sq_idx;
--	if (sq->sqs_mode)
--		tl4 += vnic * 8;
- 
- 	tl3 = tl4 / (NIC_MAX_TL4 / NIC_MAX_TL3);
- 	nic_reg_write(nic, NIC_PF_QSET_0_127_SQ_0_7_CFG2 |
--- 
-2.7.4
+Thanks,
+Mark.
