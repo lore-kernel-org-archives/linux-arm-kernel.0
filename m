@@ -1,172 +1,56 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 27 Jun 2016 17:05:01 +0200
-Subject: [PATCH v2] ARM: at91: Document new TCB bindings
-Message-ID: <1467039901-11297-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 27 Jun 2016 16:06:46 +0100
+Subject: [PATCH v6 5/5] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+In-Reply-To: <577140A7.60904@linaro.org>
+References: <1465915719-8409-1-git-send-email-sudeep.holla@arm.com>
+ <1465915719-8409-6-git-send-email-sudeep.holla@arm.com>
+ <5771392B.3080002@linaro.org> <57714043.5020207@arm.com>
+ <577140A7.60904@linaro.org>
+Message-ID: <57714106.2040200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current binding for the TCB is not flexible enough for some use cases
-and prevents proper utilization of all the channels.
-
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: linux-pwm at vger.kernel.org
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
-
-Changes in v2:
- - added slow_clk in the examples
- - removed linuxisms
-
-Rob, does that fit what you wanted? I prefer getting your ack on that one before
-resending a 48 patches series.
 
 
- .../devicetree/bindings/arm/atmel-at91.txt         | 32 -----------
- .../devicetree/bindings/mfd/atmel-tcb.txt          | 62 ++++++++++++++++++++++
- .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
- 3 files changed, 69 insertions(+), 37 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt
+On 27/06/16 16:05, Daniel Lezcano wrote:
+> On 06/27/2016 05:03 PM, Sudeep Holla wrote:
+>> Hi Daniel,
+>>
+>> On 27/06/16 15:33, Daniel Lezcano wrote:
+>>> On 06/14/2016 04:48 PM, Sudeep Holla wrote:
+>>>> Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
+>>>> enable ACPI_PROCESSOR_IDLE for ARM64 too.
+>>>>
+>>>> This patch just removes the IA64 and X86 dependency on
+>>>> ACPI_PROCESSOR_IDLE
+>>>>
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>> ---
+>>>
+>>> Hi Sudeep,
+>>>
+>>> now that ACPI processor supports ARM64 did you check the
+>>> CPUIDLE_DRIVER_STATE_START trick in the code and its derivative ?
+>>>
+>>
+>> No, that is used only for C-State and ARM64 doesn't support it.
+>> Patch 1/5 puts all the C-State code under #ifdef so that it's not
+>> compiled on ARM64.
+>>
+>>> I deleted the patch 2/5 but there is a place where:
+>>>
+>>
+>> Sorry, I don't follow what you mean by that.
+>
+> I meant I just deleted from my mailbox the patch 2/5, so I can't do
+> inline comment.
+>
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index e1f5ad855f14..3dc758403d03 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -60,38 +60,6 @@ System Timer (ST) required properties:
- Its subnodes can be:
- - watchdog: compatible should be "atmel,at91rm9200-wdt"
- 
--TC/TCLIB Timer required properties:
--- compatible: Should be "atmel,<chip>-tcb".
--  <chip> can be "at91rm9200" or "at91sam9x5"
--- reg: Should contain registers location and length
--- interrupts: Should contain all interrupts for the TC block
--  Note that you can specify several interrupt cells if the TC
--  block has one interrupt per channel.
--- clock-names: tuple listing input clock names.
--	Required elements: "t0_clk", "slow_clk"
--	Optional elements: "t1_clk", "t2_clk"
--- clocks: phandles to input clocks.
--
--Examples:
--
--One interrupt per TC block:
--	tcb0: timer at fff7c000 {
--		compatible = "atmel,at91rm9200-tcb";
--		reg = <0xfff7c000 0x100>;
--		interrupts = <18 4>;
--		clocks = <&tcb0_clk>;
--		clock-names = "t0_clk";
--	};
--
--One interrupt per TC channel in a TC block:
--	tcb1: timer at fffdc000 {
--		compatible = "atmel,at91rm9200-tcb";
--		reg = <0xfffdc000 0x100>;
--		interrupts = <26 4 27 4 28 4>;
--		clocks = <&tcb1_clk>;
--		clock-names = "t0_clk";
--	};
--
- RSTC Reset Controller required properties:
- - compatible: Should be "atmel,<chip>-rstc".
-   <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
-diff --git a/Documentation/devicetree/bindings/mfd/atmel-tcb.txt b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-new file mode 100644
-index 000000000000..71c8d83c01a7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-@@ -0,0 +1,62 @@
-+* Device tree bindings for Atmel Timer Counter Blocks
-+- compatible: Should be "atmel,<chip>-tcb", "simple-mfd", "syscon".
-+  <chip> can be "at91rm9200" or "at91sam9x5"
-+- reg: Should contain registers location and length
-+- #address-cells: has to be 1
-+- #size-cells: has to be 0
-+- interrupts: Should contain all interrupts for the TC block
-+  Note that you can specify several interrupt cells if the TC
-+  block has one interrupt per channel.
-+- clock-names: tuple listing input clock names.
-+	Required elements: "t0_clk", "slow_clk"
-+	Optional elements: "t1_clk", "t2_clk"
-+- clocks: phandles to input clocks.
-+
-+The TCB can expose multiple subdevices:
-+ * a clocksource and clockevent device
-+   - compatible: Should be "atmel,tcb-free-running-timer"
-+   - reg: Should contain the TCB channels to be used. If the
-+     counter width is 16 bits (at91rm9200-tcb), two consecutive
-+     channels are needed. Else, only one channel will be used.
-+
-+ * a clockevent device
-+   - compatible: Should be "atmel,tcb-programmable-timer"
-+   - reg: Should contain the TCB channel to be used
-+
-+ * a PWM chip: see ../pwm/atmel-tcb-pwm.txt
-+
-+Examples:
-+
-+One interrupt per TC block:
-+	tcb0: timer at fff7c000 {
-+		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0xfff7c000 0x100>;
-+		interrupts = <18 4>;
-+		clocks = <&tcb0_clk>, <&clk32k>;
-+		clock-names = "t0_clk", "slow_clk";
-+
-+		timer at 0 {
-+			compatible = "atmel,tcb-free-running-timer";
-+			reg = <0>, <1>;
-+		};
-+
-+		timer at 2 {
-+			compatible = "atmel,tcb-programmable-timer";
-+			reg = <2>;
-+		};
-+	};
-+
-+One interrupt per TC channel in a TC block:
-+	tcb1: timer at fffdc000 {
-+		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0xfffdc000 0x100>;
-+		interrupts = <26 4>, <27 4>, <28 4>;
-+		clocks = <&tcb1_clk>, <&clk32k>;
-+		clock-names = "t0_clk", "slow_clk";
-+	};
-+
-+
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-index 8031148bcf85..ab8fbd5ba184 100644
---- a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-@@ -2,15 +2,17 @@ Atmel TCB PWM controller
- 
- Required properties:
- - compatible: should be "atmel,tcb-pwm"
-+- reg: tcb channel to use. Each channel can export 2 PWMs
- - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-   the cells format. The only third cell flag supported by this binding is
-   PWM_POLARITY_INVERTED.
--- tc-block: The Timer Counter block to use as a PWM chip.
- 
- Example:
- 
--pwm {
--	compatible = "atmel,tcb-pwm";
--	#pwm-cells = <3>;
--	tc-block = <1>;
-+tcb0: timer at f800c000 {
-+	pwm at 0 {
-+		compatible = "atmel,tcb-pwm";
-+		reg = <0>;
-+		#pwm-cells = <3>;
-+	};
- };
+Ah ok, anyways LPI always starts from index 0. IIUC that was your main
+concern.
+
 -- 
-2.8.1
+Regards,
+Sudeep
