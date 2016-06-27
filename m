@@ -1,74 +1,87 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Mon, 27 Jun 2016 09:14:02 -0500
-Subject: [PATCH] ARM: dts: da850: Add new ECAP and EPWM bindings
-Message-ID: <1467036842-20913-1-git-send-email-fcooper@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Jun 2016 15:20:23 +0100
+Subject: [PATCH 02/15] arm64: KVM: Kill HYP_PAGE_OFFSET
+In-Reply-To: <20160627134717.GJ26498@cbox>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+ <1465297115-13091-3-git-send-email-marc.zyngier@arm.com>
+ <20160627134717.GJ26498@cbox>
+Message-ID: <57713627.1010800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Cooper Jr., Franklin" <fcooper@ti.com>
+On 27/06/16 14:47, Christoffer Dall wrote:
+> On Tue, Jun 07, 2016 at 11:58:22AM +0100, Marc Zyngier wrote:
+>> HYP_PAGE_OFFSET is not massively useful. And the way we use it
+>> in KERN_HYP_VA is inconsistent with the equivalent operation in
+>> EL2, where we use a mask instead.
+>>
+>> Let's replace the uses of HYP_PAGE_OFFSET with HYP_PAGE_OFFSET_MASK,
+>> and get rid of the pointless macro.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/kvm_hyp.h | 5 ++---
+>>  arch/arm64/include/asm/kvm_mmu.h | 3 +--
+>>  2 files changed, 3 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+>> index 44eaff7..61d01a9 100644
+>> --- a/arch/arm64/include/asm/kvm_hyp.h
+>> +++ b/arch/arm64/include/asm/kvm_hyp.h
+>> @@ -38,11 +38,10 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+>>  
+>>  static inline unsigned long __hyp_kern_va(unsigned long v)
+>>  {
+>> -	u64 offset = PAGE_OFFSET - HYP_PAGE_OFFSET;
+>> -	asm volatile(ALTERNATIVE("add %0, %0, %1",
+>> +	asm volatile(ALTERNATIVE("orr %0, %0, %1",
+>>  				 "nop",
+>>  				 ARM64_HAS_VIRT_HOST_EXTN)
+>> -		     : "+r" (v) : "r" (offset));
+>> +		     : "+r" (v) : "i" (~HYP_PAGE_OFFSET_MASK));
+> 
+> for some reason this is hurting my brain.  I can't easily see that the
+> two implementations are equivalent.
+> 
+> I can see that the kernel-to-hyp masking is trivially correct, but are
+> we always sure that the upper bits that we mask off are always set?
 
-Switch to a new ECAP and EPWM bindings that doesn't depend on hwmod to
-provide the various required clocks.
+A kernel address always has the top bits set. That's a given, and a
+property of the architecture (bits [63:VA_BITS] are set to one. See
+D4.2.1 and the definition of a Virtual Address (top VA subrange).
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+> 
+>>  	return v;
+>>  }
+>>  
+>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>> index 00bc277..d162372 100644
+>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>> @@ -75,7 +75,6 @@
+>>   */
+>>  #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
+>>  #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
+>> -#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
+>>  
+>>  /*
+>>   * Our virtual mapping for the idmap-ed MMU-enable code. Must be
+>> @@ -109,7 +108,7 @@ alternative_endif
+>>  #include <asm/mmu_context.h>
+>>  #include <asm/pgtable.h>
+>>  
+>> -#define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
+>> +#define KERN_TO_HYP(kva)	((unsigned long)kva & HYP_PAGE_OFFSET_MASK)
+>>  
+> 
+> Why do we have both kern_hyp_va() and KERN_TO_HYP and how are they
+> related again?
 
-This patch is a da850 specific version of:
-ARM: dts: am437x/am33xx/da850: Add new ECAP and EPWM bindings
-https://patchwork.kernel.org/patch/9005661/
+That's because kern_hyp_va used to be reserved to the assembly code, and
+KERN_TO_HYP used in C code. We could (and probably should) unify them.
 
-This patch was created since the da850 portion didn't apply cleanly in
-the original patch.
+Thanks,
 
- arch/arm/boot/dts/da850.dtsi | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 25f0f8e..09cf663 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -274,31 +274,36 @@
- 			status = "disabled";
- 		};
- 		ehrpwm0: pwm at 300000 {
--			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-+			compatible = "ti,da850-ehrpwm", "ti,am3352-ehrpwm",
-+				     "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x300000 0x2000>;
- 			status = "disabled";
- 		};
- 		ehrpwm1: pwm at 302000 {
--			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-+			compatible = "ti,da850-ehrpwm", "ti,am3352-ehrpwm",
-+				     "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x302000 0x2000>;
- 			status = "disabled";
- 		};
- 		ecap0: ecap at 306000 {
--			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			compatible = "ti,da850-ecap", "ti,am3352-ecap",
-+				     "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x306000 0x80>;
- 			status = "disabled";
- 		};
- 		ecap1: ecap at 307000 {
--			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			compatible = "ti,da850-ecap", "ti,am3352-ecap",
-+				     "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x307000 0x80>;
- 			status = "disabled";
- 		};
- 		ecap2: ecap at 308000 {
--			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			compatible = "ti,da850-ecap", "ti,am3352-ecap",
-+				     "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x308000 0x80>;
- 			status = "disabled";
+	M.
 -- 
-2.7.0
+Jazz is not dead. It just smells funny...
