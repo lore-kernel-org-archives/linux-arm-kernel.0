@@ -1,163 +1,119 @@
-From: zhouchengming1@huawei.com (zhouchengming)
-Date: Mon, 27 Jun 2016 10:09:32 +0800
-Subject: [PATCH 17/23] arm64: ptrace: handle ptrace_request differently
- for aarch32 and ilp32
-In-Reply-To: <CAOijeYKpH-1pumqrQw+kY0gbdVoZ02kUJtJkwX33H403v+Scmw@mail.gmail.com>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-18-git-send-email-ynorov@caviumnetworks.com>
- <57577611.9000607@huawei.com> <20160608170048.GA24482@yury-N73SV>
- <576E509A.7090702@huawei.com>
- <CAOijeYKpH-1pumqrQw+kY0gbdVoZ02kUJtJkwX33H403v+Scmw@mail.gmail.com>
-Message-ID: <57708ADC.3050002@huawei.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Mon, 27 Jun 2016 10:19:04 +0800
+Subject: [v3 PATCH 3/5] phy: Add USB Type-C PHY driver for rk3399
+In-Reply-To: <1514992.DV7LTB70sc@phil>
+References: <1466686264-6744-1-git-send-email-zyw@rock-chips.com>
+ <1466686264-6744-4-git-send-email-zyw@rock-chips.com>
+ <576BDCD0.5060001@ti.com> <1514992.DV7LTB70sc@phil>
+Message-ID: <57708D18.6050001@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/25 22:15, Bamvor Zhang wrote:
-> Hi, Chengming
->
-> On Sat, Jun 25, 2016 at 5:36 PM, zhouchengming
-> <zhouchengming1@huawei.com>  wrote:
->> On 2016/6/9 1:00, Yury Norov wrote:
->>>
->>> On Wed, Jun 08, 2016 at 09:34:09AM +0800, zhouchengming wrote:
->>>>
->>>> On 2016/5/24 8:04, Yury Norov wrote:
->>>>>
->>>>> Here new aarch32 ptrace syscall handler is introsuced to avoid run-time
->>>>> detection of the task type.
->>>>>
->>>>> Signed-off-by: Yury Norov<ynorov@caviumnetworks.com>
->>>
->>>
->>> [...]
->>>
->>>> Hello, I found ilp32 will use sys_ptrace, not compat_sys_ptrace. So I
->>>> write
->>>> a little patch to see if can solve the problem correctly.
->>>>
->>>> Thanks.
->>>>
->>>>   From f6156236df578bb05c4a17e7f9776ceaf8f7afe6 Mon Sep 17 00:00:00 2001
->>>> From: Zhou Chengming<zhouchengming1@huawei.com>
->>>> Date: Wed, 8 Jun 2016 09:46:23 +0800
->>>> Subject: [PATCH] ilp32: use compat_sys_ptrace instead of sys_ptrace
->>>>
->>>> When we analyze a testcase of ptrace that failed on ilp32, we found
->>>> the syscall that the ilp32 uses is sys_ptrace, not compat_sys_ptrace.
->>>> Because in include/uapi/asm-generic/unistd.h it's defined like:
->>>> __SYSCALL(__NR_ptrace, sys_ptrace)
->>>> So we change it to __SC_COMP(__NR_ptrace, sys_ptrace, compat_sys_ptrace),
->>>> let compat tasks use the compat_sys_ptrace.
->>>>
->>>> Signed-off-by: Zhou Chengming<zhouchengming1@huawei.com>
->>>> ---
->>>>    include/uapi/asm-generic/unistd.h |    2 +-
->>>>    1 files changed, 1 insertions(+), 1 deletions(-)
->>>>
->>>> diff --git a/include/uapi/asm-generic/unistd.h
->>>> b/include/uapi/asm-generic/unistd.h
->>>> index 2862d2e..50ee770 100644
->>>> --- a/include/uapi/asm-generic/unistd.h
->>>> +++ b/include/uapi/asm-generic/unistd.h
->>>> @@ -364,7 +364,7 @@ __SC_WRAP(__NR_syslog, sys_syslog)
->>>>
->>>>    /* kernel/ptrace.c */
->>>>    #define __NR_ptrace 117
->>>> -__SYSCALL(__NR_ptrace, sys_ptrace)
->>>> +__SC_COMP(__NR_ptrace, sys_ptrace, compat_sys_ptrace)
->>>>
->>>>    /* kernel/sched/core.c */
->>>>    #define __NR_sched_setparam 118
->>>> --
->>>> 1.7.7
->>>>
->>>
->>> Hi Zhou,
->>>
->>> Thank you for the catch.
->>>
->>> Could you also show the test that is failed for you. It should
->>> probably be sent to LTP maillist.
->>>
->>> I'm not sure your fix correct as it affects other architectures that
->>> use standard unistd.h. I think it's better to redirect the syscall in
->>> arch/arm64/kernel/sys_ilp32.c with corresponding definition.
->>>
->>> Yury
->>>
->>> .
->>>
->>
->> Sorry, I missed this mail. Thanks for your reply. :)
->> I attach the testcase file of ptrace that failed on ilp32.
->> I also think it's better to redirect the syscall in ilp32, so I changed
->> the patch.
->
-> Thanks for your patch. But Yury has already sent an new series this week
-> which define ptrace to compat one.
->
-> It seems that Yury do not take GET/SETSIGMASK into account. You
-> could share your test case and patches at this point.
->
-> Best wishes
->
-> Bamvor
+Hi Heiko
 
-Ok, I get it. So the new series can handle ptrace correctly. :)
-But as for the GET/SETSIGMASK request, both ilp32 and aarch32 are wrong, 
-because they are handled in ptrace_request(like aarch64). But I don't 
-have a good way to correct it in all architectures.
-The architectures that use compat_ptrace_request are:
-arch/arm64, arch/mips, arch/parisc, arch/powerpc, arch/s390, arch/sparc,
-arch/tile, arch/x86.
-We have to use two architecture dependent functions in 
-compat_ptrace_request to fix the GET/SETSIGMASK request. (as for 
-arch/arm64, the two functions are: put_sigset_t and get_sigset_t)
-So we maybe have to prepare these functions for all these architectures.
-But I don't have much time to work on it. So I just fix it for ilp32 of 
-arch/arm64 (Ah, easier way for me). I will put my patch of this fix 
-under Yury's new series.
+On 06/25/2016 03:39 AM, Heiko Stuebner wrote:
+> Am Donnerstag, 23. Juni 2016, 18:27:52 schrieb Kishon Vijay Abraham I:
+>> Hi,
+>>
+>> On Thursday 23 June 2016 06:21 PM, Chris Zhong wrote:
+>>> Add a PHY provider driver for the rk3399 SoC Type-c PHY. The USB
+>>> Type-C PHY is designed to support the USB3 and DP applications. The
+>>> PHY basically has two main components: USB3 and DisplyPort. USB3
+>>> operates in SuperSpeed mode and the DP can operate at RBR, HBR and
+>>> HBR2 data rates.
+>>>
+>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+>>>
+>>> ---
+>>>
+>>> Changes in v3:
+>>> - remove the phy framework(Kishon Vijay Abraham I)
+>>> - add parentheses around the macro
+>>> - use a single space between type and name
+>>> - add spaces after opening and before closing braces.
+>>> - use u16 for register value
+>>> - remove type-c phy header file
+>>> - CodingStyle optimization
+>>> - use some cable extcon to get type-c port information
+>>> - add a extcon to notify Display Port
+>>>
+>>> Changes in v2:
+>>> - select RESET_CONTROLLER
+>>> - alphabetic order
+>>> - modify some spelling mistakes
+>>> - make mode cleaner
+>>> - use bool for enable/disable
+>>> - check all of the return value
+>>> - return a better err number
+>>> - use more readx_poll_timeout()
+>>> - clk_disable_unprepare(tcphy->clk_ref);
+>>> - remove unuse functions, rockchip_typec_phy_power_on/off
+>>> - remove unnecessary typecast from void *
+>>> - use dts node to distinguish between phys.
+>>>
+>>> Changes in v1:
+>>> - update the licence note
+>>> - init core clock to 50MHz
+>>> - use extcon API
+>>> - remove unused global
+>>> - add some comments for magic num
+>>> - change usleep_range(1000, 2000) tousleep_range(1000, 1050)
+>>> - remove __func__ from dev_err
+>>> - return err number when get clk failed
+>>> - remove ADDR_ADJ define
+>>> - use devm_clk_get(&pdev->dev, "tcpdcore")
+>>>
+>>>   drivers/phy/Kconfig              |    8 +
+>>>   drivers/phy/Makefile             |    1 +
+>>>   drivers/phy/phy-rockchip-typec.c | 1027
+>>>   ++++++++++++++++++++++++++++++++++++++ 3 files changed, 1036
+>>>   insertions(+)
+>>>   create mode 100644 drivers/phy/phy-rockchip-typec.c
+>>>
+>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>> index 26566db..ec87b3a 100644
+>>> --- a/drivers/phy/Kconfig
+>>> +++ b/drivers/phy/Kconfig
+>>> @@ -351,6 +351,14 @@ config PHY_ROCKCHIP_DP
+>>>
+>>>   	help
+>>>   	
+>>>   	  Enable this to support the Rockchip Display Port PHY.
+>>>
+>>> +config PHY_ROCKCHIP_TYPEC
+>>> +	tristate "Rockchip TYPEC PHY Driver"
+>>> +	depends on ARCH_ROCKCHIP && OF
+>>> +	select GENERIC_PHY
+>> Why? None of the generic PHY API's are used here. Why do you want select
+>> generic PHY?
+> I'm actually wondering, why there are no phy ops to start and stop the py.
+> Right now the device seems to be on and handling all the extcon notifies all
+> the time even if no-one is using the phy.
+>
+> There are two users of this phy, the dp-controller as well as some usb
+> component. The phy framework is nicely refcounted, so can handle any number
+> of phy users and somehow I'd expect the phy to do nothing (and try to not
+> consume power) if neither the dp-controller nor the usb-part is actually
+> running.
+>
+> It may very well be my ignorance, but Chris could you explain, if there is a
+> reason for this?
+>
+>
+> Thanks
+> Heiko
+>
+>
+It is good idea, The USB3 and DP controller detect the extcon cable 
+state: USB/USB HOST/DP. If a Type-C device plugged, call phy power on, 
+the phy driver get all the state of extcon: dfp, ufp, dp, flip, pin 
+assignment, and then finish the phy init. So the phy driver need not 
+register extcon notification.
+But this mechanism allows phy driver only focus plug/unplug event, if 
+some other things happen, such as data role change, the phy will not be 
+notified. I'm not sure if this situation exists.
+Hi Guenter,
+Do you have any ohter concerns?
 
-Thanks!
-
->
-> [1] https://www.mail-archive.com/linux-doc at vger.kernel.org/msg03811.html
->>
->>
->>  From 7e692ba1adf02c2a2f125836f5222f455c9ffe56 Mon Sep 17 00:00:00 2001
->> From: Zhou Chengming<zhouchengming1@huawei.com>
->> Date: Sat, 25 Jun 2016 18:02:51 +0800
->> Subject: [PATCH] ilp32 should use compat_sys_ptrace
->>
->> The file include/uapi/asm-generic/unistd.h defines this:
->> __SYSCALL(__NR_ptrace, sys_ptrace)
->> It may cause some ptrace tests failed on ilp32. So we redirect the ptrace
->> syscall in arch/arm64/kernel/sys_ilp32.c with corresponding definition.
->>
->> Signed-off-by: Zhou Chengming<zhouchengming1@huawei.com>
->> ---
->>   arch/arm64/kernel/sys_ilp32.c |    3 +++
->>   1 files changed, 3 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
->> index d85fe94..06d5e1b 100644
->> --- a/arch/arm64/kernel/sys_ilp32.c
->> +++ b/arch/arm64/kernel/sys_ilp32.c
->> @@ -46,6 +46,9 @@
->>   asmlinkage long ilp32_sys_rt_sigreturn_wrapper(void);
->>   #define compat_sys_rt_sigreturn        ilp32_sys_rt_sigreturn_wrapper
->>
->> +/* ilp32 should use compat_sys_ptrace */
->> +#define sys_ptrace                    compat_sys_ptrace
->> +
->>   #include<asm/syscall.h>
->>
->>   #undef __SYSCALL
->> --
->> 1.7.7
->>
->>
->>
->
->
 >
