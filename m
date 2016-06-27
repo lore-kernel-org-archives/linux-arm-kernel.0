@@ -1,41 +1,18 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Mon, 27 Jun 2016 21:19:19 +0300
-Subject: [RESEND PATCH v2 1/5] ir-rx51: Fix build after multiarch changes
- broke it
-In-Reply-To: <201606231948.51640@pali>
-References: <1466623341-30130-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <1466623341-30130-2-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <201606231948.51640@pali>
-Message-ID: <57716E27.2040702@gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 27 Jun 2016 11:21:47 -0700
+Subject: [PATCH 3/3] ARM: dts: BCM5301x: Add RNG Device Tree node
+In-Reply-To: <1466641623-3491-4-git-send-email-f.fainelli@gmail.com>
+References: <1466641623-3491-1-git-send-email-f.fainelli@gmail.com>
+ <1466641623-3491-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <57716EBB.9070803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/22/2016 05:27 PM, Florian Fainelli wrote:
+> Add the DT node for the random number generator peripheral.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-
-On 23.06.2016 20:48, Pali Roh?r wrote:
-> On Wednesday 22 June 2016 21:22:17 Ivaylo Dimitrov wrote:
->> The ir-rx51 driver for n900 has been disabled since the multiarch
->> changes as plat include directory no longer is SoC specific.
->>
->> Let's fix it with minimal changes to pass the dmtimer calls in
->> pdata. Then the following changes can be done while things can
->> be tested to be working for each change:
->>
->> 1. Change the non-pwm dmtimer to use just hrtimer if possible
->>
->> 2. Change the pwm dmtimer to use Linux PWM API with the new
->>     drivers/pwm/pwm-omap-dmtimer.c and remove the direct calls
->>     to dmtimer functions
->>
->> 3. Parse configuration from device tree and drop the pdata
->>
->> Note compilation of this depends on the previous patch
->> "ARM: OMAP2+: Add more functions to pwm pdata for ir-rx51".
->
-> I think that this extensive description is not needed for commit
-> message. Just for email discussion.
->
-
-I guess Tony can strip the description a bit before applying.
-
-Ivo
+Applied
+-- 
+Florian
