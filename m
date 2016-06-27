@@ -1,60 +1,76 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 27 Jun 2016 08:28:20 +0200
-Subject: [v2] media: rc: fix Meson IR decoder
-In-Reply-To: <20160626210622.5257-1-martin.blumenstingl@googlemail.com>
-References: <20160626210622.5257-1-martin.blumenstingl@googlemail.com>
-Message-ID: <5770C784.6040604@baylibre.com>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Mon, 27 Jun 2016 07:49:43 +0100
+Subject: [PATCH 4/5] rtc: m48t86: move m48t86.h to platform_data
+In-Reply-To: <1466978583-13310-4-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1466978583-13310-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1466978583-13310-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160627064943.GA5125@quatermain.digriz.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Acked-by: Alexander Clouter <alex@digriz.org.uk>
 
-
-On 06/26/2016 11:06 PM, Martin Blumenstingl wrote:
-> The meson-ir driver uses the wrong offset (at least according to
-> Amlogic's reference driver as well as the datasheets of the
-> Meson8b/S805 and GXBB/S905).
-> This means that we are getting incorrect durations (REG1_TIME_IV)
-> reported from the hardware.
-
-Hi,
-
-I'm quite sure the registers are good for meson6 actually, and
-it seems reasonable Amlogic made the HW evolve for the Meson8 and GXBB platforms.
-
+On Mon, Jun 27, 2016 at 12:03:02AM +0200, Alexandre Belloni wrote:
+>m48t86.h belongs to include/linux/platform_data/
 >
-> This problem was also noticed by some people trying to use this on an
-> ODROID-C1 and ODROID-C2 - the workaround there (probably because the
-> datasheets were not publicy available yet at that time) was to switch
-> to ir_raw_event_store_edge (which leaves it up to the kernel to measure
-> the duration of a pulse). See [0] and [1] for the corresponding
-> patches.
-
-Since we are using devicetree, the correct way to achieve this fix is not
-to drop support for meson6 (what you do) but add a logic to select the correct
-register for meson8 and gxbb if their compatible string are encountered.
-
-> Please note that I was only able to test this on an GXBB/S905 based
-> device (due to lack of other hardware).
-
-I made this fix already but lacked time to actually test it on HW :
-https://github.com/torvalds/linux/compare/master...superna9999:amlogic/v4.7/ir
-
-My patch is missing the meson8b support, and may need a supplementary compatible check or
-a separate dt match table.
-
-Neil
-
+>Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>---
+>Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+>Cc: Ryan Mallon <rmallon@gmail.com>
+>Cc: Alexander Clouter <alex@digriz.org.uk>
+>Cc: Jason Cooper <jason@lakedaemon.net>
+>Cc: Andrew Lunn <andrew@lunn.ch>
+>Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>Cc: Gregory Clement <gregory.clement@free-electrons.com>
+>Cc: linux-arm-kernel at lists.infradead.org
 >
-> [0] https://github.com/erdoukki/linux-amlogic-1/commit/969b2e2242fb14a13cb651f9a1cf771b599c958b
-> [1] http://forum.odroid.com/viewtopic.php?f=135&t=20504
+> arch/arm/mach-ep93xx/ts72xx.c                          | 2 +-
+> arch/arm/mach-orion5x/ts78xx-setup.c                   | 2 +-
+> drivers/rtc/rtc-m48t86.c                               | 2 +-
+> include/linux/{m48t86.h => platform_data/rtc-m48t86.h} | 0
+> 4 files changed, 3 insertions(+), 3 deletions(-)
+> rename include/linux/{m48t86.h => platform_data/rtc-m48t86.h} (100%)
 >
-
-PS: BTW could you format the cover letter using the git format-patch --cover-letter instead and
-add the v2 using the -subject-prefix like :
-# git format-patch --cover-letter --signoff --subject-prefix "PATCH v2" -2
-
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+>diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+>index 45b81a2bcd4b..3b39ea353d30 100644
+>--- a/arch/arm/mach-ep93xx/ts72xx.c
+>+++ b/arch/arm/mach-ep93xx/ts72xx.c
+>@@ -16,7 +16,7 @@
+> #include <linux/init.h>
+> #include <linux/platform_device.h>
+> #include <linux/io.h>
+>-#include <linux/m48t86.h>
+>+#include <linux/platform_data/rtc-m48t86.h>
+> #include <linux/mtd/nand.h>
+> #include <linux/mtd/partitions.h>
 >
+>diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+>index 3a58a5d4a28a..8d597267d0c4 100644
+>--- a/arch/arm/mach-orion5x/ts78xx-setup.c
+>+++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+>@@ -16,7 +16,7 @@
+> #include <linux/platform_device.h>
+> #include <linux/mv643xx_eth.h>
+> #include <linux/ata_platform.h>
+>-#include <linux/m48t86.h>
+>+#include <linux/platform_data/rtc-m48t86.h>
+> #include <linux/mtd/nand.h>
+> #include <linux/mtd/partitions.h>
+> #include <linux/timeriomem-rng.h>
+>diff --git a/drivers/rtc/rtc-m48t86.c b/drivers/rtc/rtc-m48t86.c
+>index f72b91f2501f..0eeb5714c00f 100644
+>--- a/drivers/rtc/rtc-m48t86.c
+>+++ b/drivers/rtc/rtc-m48t86.c
+>@@ -16,7 +16,7 @@
+> #include <linux/module.h>
+> #include <linux/rtc.h>
+> #include <linux/platform_device.h>
+>-#include <linux/m48t86.h>
+>+#include <linux/platform_data/rtc-m48t86.h>
+> #include <linux/bcd.h>
+>
+> #define M48T86_REG_SEC		0x00
+>diff --git a/include/linux/m48t86.h b/include/linux/platform_data/rtc-m48t86.h
+>similarity index 100%
+>rename from include/linux/m48t86.h
+>rename to include/linux/platform_data/rtc-m48t86.h
