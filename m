@@ -1,82 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 27 Jun 2016 15:39:39 +0100
-Subject: [PATCH v20 04/14] arm64/kexec: Add core kexec support
-In-Reply-To: <57710B92.2080603@arm.com>
-References: <cover.1466702804.git.geoff@infradead.org>
- <018ac873d87fbfc45185cdab91ebc8731f64f94c.1466702804.git.geoff@infradead.org>
- <57710B92.2080603@arm.com>
-Message-ID: <20160627143939.GC6847@e104818-lin.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 27 Jun 2016 16:44:20 +0200
+Subject: [RFC PATCH] clocksource: arm_arch_timer: disable the evtstrm via
+ the cmdline
+In-Reply-To: <20160620133002.GB20071@e104818-lin.cambridge.arm.com>
+References: <1466171011-30468-1-git-send-email-will.deacon@arm.com>
+ <5766FBC6.6000405@linaro.org> <20160620082157.GC29165@arm.com>
+ <5767E89F.5020809@linaro.org>
+ <20160620133002.GB20071@e104818-lin.cambridge.arm.com>
+Message-ID: <57713BC4.5040909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 12:18:42PM +0100, James Morse wrote:
-> On 23/06/16 18:54, Geoff Levand wrote:
-> > "Can't kexec: secondary CPUs are stuck in the kernel.\n"
-> 
-> > +			return -EBUSY;
-> > +		}
-> > +
-> 
-> > +		if (num_online_cpus() > 1) {
-> > +			if (IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
-> > +				/* any_cpu as we don't mind being preempted */
-> > +				int any_cpu = raw_smp_processor_id();
-> > +
-> > +				if (cpu_ops[any_cpu]->cpu_die)
-> > +					return 0;
-> > +			}
-> > +
-> > +			pr_err("Can't kexec: no mechanism to offline secondary CPUs.\n");
-> > +			return -EBUSY;
-> > +		}
-> 
-> This if() {} hunk isn't necessary with the version of cpus_are_stuck_in_kernel()
-> you have in patch 2. This logic is the '|| smp_spin_tables' part of that helper
-> function. (hibernate needed it too)
+On 06/20/2016 03:30 PM, Catalin Marinas wrote:
+> On Mon, Jun 20, 2016 at 02:59:11PM +0200, Daniel Lezcano wrote:
+>> On 06/20/2016 10:21 AM, Will Deacon wrote:
+>>> On Sun, Jun 19, 2016 at 10:08:38PM +0200, Daniel Lezcano wrote:
+>>>> On 06/17/2016 03:43 PM, Will Deacon wrote:
+>>>>
+>>>> [ Cc'ed tglx ]
+>>>>
+>>>>> Disabling the eventstream can be useful for debugging and development
+>>>>> purposes
+>>>>
+>>>> If it is for debugging and development, why upstream this change ?
+>>>
+>>> Mainly because it's desirable to be able to debug systems remotely, on
+>>> machines that you don't have direct access to and where recompiling the
+>>> kernel isn't necessarily an option. There are plenty of "no*" kernel
+>>> parameters already that fall into a similar category.
+>>
+>> if the kernel is in development and debug, why this option can't be part of
+>> debugging code ?
+>
+> Because we may actually be debugging the hardware rather than the
+> software. With the event stream enabled, WFE is woken up periodically.
+> This can be a handy feature for user locking primitives or a simple
+> workaround for hardware bugs (and we've seen them before). But the side
+> effect is that it may be potentially hiding hardware issues.
+>
+> For hardware testing/validation, you'd want to sometimes disable this
+> feature to check whether your event generation (usually as a result of
+> exclusive monitor clearing) is working as expected. It's much easier to
+> do with a command line option.
+>
+>> I'm not a big fan of the all the specific driver options for the kernel
+>> parameters. If there is a real need to disable some parts of a driver, it
+>> would be much more interesting to write a framework for that and then use it
+>> from arm_arch_timer, thus giving the other drivers the opportunity to
+>> provide the same feature.
+>
+> Well, how many non-ARM timer drivers have an exclusive monitor event
+> stream feature to make sense for a framework?
 
-I can make the changes locally but just to be clear I understand what
-you meant, here's the diff on top of Geoff's patch:
+Ok.
 
-----8<-------------------------
+What about an option like:
 
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 945ce326654c..bc96c8a7fc79 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -68,24 +68,9 @@ int machine_kexec_prepare(struct kimage *kimage)
- 
- 	kexec_image_info(kimage);
- 
--	if (kimage->type != KEXEC_TYPE_CRASH) {
--		if (cpus_are_stuck_in_kernel()) {
--			pr_err("Can't kexec: failed CPUs are stuck in the kernel.\n");
--			return -EBUSY;
--		}
--
--		if (num_online_cpus() > 1) {
--			if (IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
--				/* any_cpu as we don't mind being preempted */
--				int any_cpu = raw_smp_processor_id();
--
--				if (cpu_ops[any_cpu]->cpu_die)
--					return 0;
--			}
--
--			pr_err("Can't kexec: no mechanism to offline secondary CPUs.\n");
--			return -EBUSY;
--		}
-+	if (kimage->type != KEXEC_TYPE_CRASH && cpus_are_stuck_in_kernel()) {
-+		pr_err("Can't kexec: CPUs are stuck in the kernel.\n");
-+		return -EBUSY;
- 	}
- 
- 	return 0;
-@@ -163,7 +148,7 @@ void machine_kexec(struct kimage *kimage)
- 	/*
- 	 * New cpus may have become stuck_in_kernel after we loaded the image.
- 	 */
--	BUG_ON(cpus_are_stuck_in_kernel() && (num_online_cpus() > 1));
-+	BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
- 
- 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
- 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+clocksource.arch_arm.evtstream = 0/1
+
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
