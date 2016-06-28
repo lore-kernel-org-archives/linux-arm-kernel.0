@@ -1,19 +1,34 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 28 Jun 2016 10:46:36 +0800
-Subject: [PATCH v2 0/5] ARM: dts: imx7d: add i.MX 7Solo and Colibri
- iMX7S/D dts
-In-Reply-To: <20160626084755.21925-1-stefan@agner.ch>
-References: <20160626084755.21925-1-stefan@agner.ch>
-Message-ID: <20160628024636.GF21328@tiger>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 27 Jun 2016 21:48:34 -0500
+Subject: [GIT PULL] Qualcomm Defconfig Updates for v4.8
+Message-ID: <1467082114-22716-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2016 at 01:47:50AM -0700, Stefan Agner wrote:
-> Stefan Agner (5):
->   ARM: imx: add support for i.MX 7Solo
->   ARM: dts: imx7d: use imx7s.dtsi as base device tree
->   ARM: dts: imx7d: recreate imx7d.dtsi with i.MX 7Dual specifics
->   ARM: dts: imx7d: move input header into base device tree
->   ARM: dts: imx7: add Toradex Colibri iMX7S/iMX7D support
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-Applied all, thanks.
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-defconfig-for-4.8
+
+for you to fetch changes up to 8aa788d3e59a14845c95446ac25a267e75711374:
+
+  ARM: configs: qualcomm: Add MDM9615 missing defconfigs (2016-06-27 16:51:06 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM Based defconfig Updates for v4.8
+
+* Enable MSM9615 board support
+* Enable MSM8660 pinctrl support
+
+----------------------------------------------------------------
+Linus Walleij (1):
+      ARM: defconfig: enable the MSM8660 pin controller
+
+Neil Armstrong (1):
+      ARM: configs: qualcomm: Add MDM9615 missing defconfigs
+
+ arch/arm/configs/qcom_defconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
