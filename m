@@ -1,24 +1,32 @@
 From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 28 Jun 2016 13:55:03 +0200
-Subject: [PATCH v3 0/2] [for arm-soc] mach-tango updates for v4.8
-Message-ID: <57726597.8030501@sigmadesigns.com>
+Date: Tue, 28 Jun 2016 14:01:28 +0200
+Subject: [PATCH v3 2/2] Update ARM/TANGO section
+In-Reply-To: <57726597.8030501@sigmadesigns.com>
+References: <57726597.8030501@sigmadesigns.com>
+Message-ID: <57726718.1080503@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello arm-soc maintainers,
+Use regex pattern to match tango-specific files.
 
-Could you please merge the following patches?
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ MAINTAINERS | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-(Ideally, the MAINTAINERS update would be merged as a fix into
-the next 4.7 release candidate.)
-
-Marc Gonzalez (2):
-  ARM: tango: add HOTPLUG_CPU support
-  Update ARM/TANGO section
-
- MAINTAINERS                   |  3 +--
- arch/arm/mach-tango/platsmp.c | 30 ++++++++++++++++++++++++++++++
- arch/arm/mach-tango/smc.h     |  4 +++-
- 3 files changed, 34 insertions(+), 3 deletions(-)
-
-Regards.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e1b090f86e0d..b8140a3f5764 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1734,8 +1734,7 @@ ARM/TANGO ARCHITECTURE
+ M:	Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+ L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+-F:	arch/arm/mach-tango/
+-F:	arch/arm/boot/dts/tango*
++N:	tango
+ 
+ ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-- 
+2.9.0
