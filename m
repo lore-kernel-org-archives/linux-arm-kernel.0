@@ -1,68 +1,95 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 28 Jun 2016 18:14:31 +0800
-Subject: [PATCH v4 2/3] mm: memblock Add some new functions to address
- the mem limit issue
-In-Reply-To: <1467107137-29631-2-git-send-email-dennis.chen@arm.com>
-Message-ID: <201606281837.baLUZlDs%fengguang.wu@intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Jun 2016 11:23:11 +0100
+Subject: [PATCH 1/8] arm64:perf: Add Devicetree bindings for Hisilicon
+ SoC PMU
+In-Reply-To: <1467107429-55477-2-git-send-email-anurup.m@huawei.com>
+References: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
+ <1467107429-55477-2-git-send-email-anurup.m@huawei.com>
+Message-ID: <20160628102311.GC31744@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-[auto build test WARNING on arm64/for-next/core]
-[also build test WARNING on v4.7-rc5 next-20160627]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On Tue, Jun 28, 2016 at 05:50:22AM -0400, Anurup M wrote:
+> 	1) Device tree bindings for Hisilicon PMU.
+> 	2) Add example for Hisilicon LLC PMU.
+> 
+> Signed-off-by: Anurup M <anurup.m@huawei.com>
+> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> ---
+>  .../devicetree/bindings/arm/hisilicon/pmu.txt      | 32 ++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+> new file mode 100644
+> index 0000000..7584a81
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+> @@ -0,0 +1,32 @@
+> +Hisilicon SoC HIP05 ARMv8 PMU
+> +
+> +Required Properties:
+> +	- compatible : This field contain two values. The first value is
+> +		always "hisilicon" and second value is the PMU type as shown
+> +		in below examples:
+> +		(a) "hisilicon,hip05-llc" for Hisiliocn SoC L3 cache PMU
+> +		(b) "hisilicon,hip05-ddrc" for Hisiliocn SoC DDRC PMU
+> +		(c) "hisilicon,hip05-mn" for Hisiliocn SoC MN PMU
 
-url:    https://github.com/0day-ci/linux/commits/Dennis-Chen/mm-memblock-enhence-the-memblock-debugfs-output/20160628-174951
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: i386-randconfig-i0-201626 (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+That wording is rather confusing. Use:
 
-All warnings (new ones prefixed by >>):
+	- compatible: must contain one of:
+	  * "hisilicon,hip05-llc" for HIP05 L3 cache PMU
+	  * "hisilicon,hip05-ddrc" for HIP05 DDRC PMU
+	  * "hisilicon,hip05-mn" for HIP05 MN PMU
 
-   mm/memblock.c: In function 'memblock_enforce_memory_limit':
->> mm/memblock.c:1489:26: warning: unused variable 'r' [-Wunused-variable]
-     struct memblock_region *r;
-                             ^
+What exactly is an "MN"?
 
-vim +/r +1489 mm/memblock.c
+I assume that these nodes actually describe the whole interface for
+controlling the L3/DDRC/MN, so it's probably worth dropping the "PMU"
+from the description, even if we only support the PMU in Linux.
 
-  1473		 * of those regions, max_addr will keep original value ULLONG_MAX
-  1474		 */
-  1475		for_each_memblock(memory, r) {
-  1476			if (limit <= r->size) {
-  1477				max_addr = r->base + limit;
-  1478				break;
-  1479			}
-  1480			limit -= r->size;
-  1481		}
-  1482	
-  1483		return max_addr;
-  1484	}
-  1485	
-  1486	void __init memblock_enforce_memory_limit(phys_addr_t limit)
-  1487	{
-  1488		phys_addr_t max_addr = (phys_addr_t)ULLONG_MAX;
-> 1489		struct memblock_region *r;
-  1490	
-  1491		if (!limit)
-  1492			return;
-  1493	
-  1494		max_addr = __find_max_addr(limit);
-  1495	
-  1496		/* @limit exceeds the total size of the memory, do nothing */
-  1497		if (max_addr == (phys_addr_t)ULLONG_MAX)
+No reg properties?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 24789 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160628/ba739723/attachment-0001.obj>
+> +
+> +Optional Properties:
+> +
+> +	- djtag	: Some PMU registers are accessed via the Djtag interface
+> +		This field contains two values. The first value is the djtag
+> +		node phandle and second value is the Super CPU Cluster ID.
+
+What is a Djtag node? What is a "Super CPU Cluster ID"?
+
+I think you need additional bindings for these. I cannot understand the
+binding without a description of those.
+
+> +	- interrupt-parent : A phandle indicating which interrupt controller
+> +		this PMU signals interrupts to.
+> +
+> +	- interrupts : Interrupt lines used by this PMU. If the PMU has
+> +		multiple banks, then all IRQ lines are listed in this
+> +		property.
+
+In which order?
+
+> +
+> +Example:
+> +	llc0: llc at 0 {
+
+That unit address (the '@0') shouldn't be there, given the lack of a reg
+property.
+
+> +		compatible = "hisilicon,hip05-llc";
+> +		djtag = <&djtag0 2>; /* DJTAG node for Super CPU Cluster 2
+> +				      * (starts from 1) */
+> +		interrupt-parent = <&mbigen_pc>;
+> +		interrupts = <141 4>,<142 4>,
+> +			 <143 4>,<144 4>; /* IRQ lines for 4 L3 cache banks */
+> +	};
+> -- 
+> 2.1.4
+
+Thanks,
+Mark.
