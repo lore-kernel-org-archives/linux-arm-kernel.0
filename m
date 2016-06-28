@@ -1,22 +1,22 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:30:37 +0200
-Subject: [PATCH 18/92] clocksource/drivers/st_lpc: Convert init function to
+Date: Tue, 28 Jun 2016 12:30:39 +0200
+Subject: [PATCH 20/92] clocksource/drivers/clps711x: Convert init function to
  return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-18-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-20-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The init functions do not return any error. They behave as the following:
 
- - panic, thus leading to a kernel crash while another timer may work and
-   make the system boot up correctly
+  - panic, thus leading to a kernel crash while another timer may work and
+       make the system boot up correctly
 
- or
+  or
 
- - print an error and let the caller unaware if the state of the system
+  - print an error and let the caller unaware if the state of the system
 
 Change that by converting the init functions to return an error conforming
 to the CLOCKSOURCE_OF_RET prototype.
@@ -26,69 +26,41 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- drivers/clocksource/clksrc_st_lpc.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+ drivers/clocksource/clps711x-timer.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clocksource/clksrc_st_lpc.c b/drivers/clocksource/clksrc_st_lpc.c
-index 65ec467..c9022a9 100644
---- a/drivers/clocksource/clksrc_st_lpc.c
-+++ b/drivers/clocksource/clksrc_st_lpc.c
-@@ -92,7 +92,7 @@ static int __init st_clksrc_setup_clk(struct device_node *np)
- 	return 0;
+diff --git a/drivers/clocksource/clps711x-timer.c b/drivers/clocksource/clps711x-timer.c
+index cdd86e3..3b66198 100644
+--- a/drivers/clocksource/clps711x-timer.c
++++ b/drivers/clocksource/clps711x-timer.c
+@@ -104,7 +104,7 @@ void __init clps711x_clksrc_init(void __iomem *tc1_base, void __iomem *tc2_base,
  }
  
--static void __init st_clksrc_of_register(struct device_node *np)
-+static int __init st_clksrc_of_register(struct device_node *np)
+ #ifdef CONFIG_CLKSRC_OF
+-static void __init clps711x_timer_init(struct device_node *np)
++static int __init clps711x_timer_init(struct device_node *np)
  {
- 	int ret;
- 	uint32_t mode;
-@@ -100,32 +100,36 @@ static void __init st_clksrc_of_register(struct device_node *np)
- 	ret = of_property_read_u32(np, "st,lpc-mode", &mode);
- 	if (ret) {
- 		pr_err("clksrc-st-lpc: An LPC mode must be provided\n");
--		return;
-+		return ret;
+ 	unsigned int irq = irq_of_parse_and_map(np, 0);
+ 	struct clk *clock = of_clk_get(np, 0);
+@@ -112,14 +112,12 @@ static void __init clps711x_timer_init(struct device_node *np)
+ 
+ 	switch (of_alias_get_id(np, "timer")) {
+ 	case CLPS711X_CLKSRC_CLOCKSOURCE:
+-		BUG_ON(_clps711x_clksrc_init(clock, base));
+-		break;
++		return _clps711x_clksrc_init(clock, base);
+ 	case CLPS711X_CLKSRC_CLOCKEVENT:
+-		BUG_ON(_clps711x_clkevt_init(clock, base, irq));
+-		break;
++		return _clps711x_clkevt_init(clock, base, irq);
+ 	default:
+-		break;
++		return -EINVAL;
  	}
- 
- 	/* LPC can either run as a Clocksource or in RTC or WDT mode */
- 	if (mode != ST_LPC_MODE_CLKSRC)
--		return;
-+		return 0;
- 
- 	ddata.base = of_iomap(np, 0);
- 	if (!ddata.base) {
- 		pr_err("clksrc-st-lpc: Unable to map iomem\n");
--		return;
-+		return -ENXIO;
- 	}
- 
--	if (st_clksrc_setup_clk(np)) {
-+	ret = st_clksrc_setup_clk(np);
-+	if (ret) {
- 		iounmap(ddata.base);
--		return;
-+		return ret;
- 	}
- 
--	if (st_clksrc_init()) {
-+	ret = st_clksrc_init();
-+	if (ret) {
- 		clk_disable_unprepare(ddata.clk);
- 		clk_put(ddata.clk);
- 		iounmap(ddata.base);
--		return;
-+		return ret;
- 	}
- 
- 	pr_info("clksrc-st-lpc: clocksource initialised - running @ %luHz\n",
- 		clk_get_rate(ddata.clk));
-+
-+	return ret;
  }
--CLOCKSOURCE_OF_DECLARE(ddata, "st,stih407-lpc", st_clksrc_of_register);
-+CLOCKSOURCE_OF_DECLARE_RET(ddata, "st,stih407-lpc", st_clksrc_of_register);
+-CLOCKSOURCE_OF_DECLARE(clps711x, "cirrus,clps711x-timer", clps711x_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(clps711x, "cirrus,clps711x-timer", clps711x_timer_init);
+ #endif
 -- 
 1.9.1
