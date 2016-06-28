@@ -1,47 +1,91 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Jun 2016 23:57:12 -0700
-Subject: [RESEND PATCHv2 04/28] ARM: OMAP2+: hwmod: use new ti_clk_get
- API to search for clock handles
-In-Reply-To: <1465844702-12200-5-git-send-email-t-kristo@ti.com>
-References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
- <1465844702-12200-5-git-send-email-t-kristo@ti.com>
-Message-ID: <20160628065712.GC28140@atomide.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jun 2016 07:59:50 +0100
+Subject: [PATCH v3 02/10] Documentation: regulator: tps65218: Update
+ examples
+In-Reply-To: <1467093980-11458-3-git-send-email-j-keerthy@ti.com>
+References: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
+ <1467093980-11458-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <20160628065950.GE6720@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is a more common format for DT bindings:
 
-* Tero Kristo <t-kristo@ti.com> [160613 12:07]:
-> The new API avoids the need to add clock aliases for most of the clocks,
-> should use of it is preferred. Many of the existing clock aliases are
-> only created because of hwmod data.
+  dt-bindings: regulator: 
+
+On Tue, 28 Jun 2016, Keerthy wrote:
+> This updates the device tree according to the preferred way of parsing
+
+Nit: Device Tree
+
+> the nodes using the regulator framework.
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
 > ---
->  arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  .../devicetree/bindings/regulator/tps65218.txt     | 87 ++++++++++++++++++----
+>  1 file changed, 71 insertions(+), 16 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 83cb527..0ea869c 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -786,7 +786,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
->  	if (!oh->main_clk)
->  		return 0;
+> diff --git a/Documentation/devicetree/bindings/regulator/tps65218.txt b/Documentation/devicetree/bindings/regulator/tps65218.txt
+> index fccc1d2..5e1888f 100644
+> --- a/Documentation/devicetree/bindings/regulator/tps65218.txt
+> +++ b/Documentation/devicetree/bindings/regulator/tps65218.txt
+> @@ -1,23 +1,78 @@
+>  TPS65218 family of regulators
 >  
-> -	oh->_clk = clk_get(NULL, oh->main_clk);
-> +	oh->_clk = ti_clk_get(oh->main_clk);
->  	if (IS_ERR(oh->_clk)) {
->  		pr_warn("omap_hwmod: %s: cannot clk_get main_clk %s\n",
->  			oh->name, oh->main_clk);
+>  Required properties:
+> -For tps65218 regulators/LDOs
+> -- compatible:
+> -  - "ti,tps65218-dcdc1" for DCDC1
+> -  - "ti,tps65218-dcdc2" for DCDC2
+> -  - "ti,tps65218-dcdc3" for DCDC3
+> -  - "ti,tps65218-dcdc4" for DCDC4
+> -  - "ti,tps65218-dcdc5" for DCDC5
+> -  - "ti,tps65218-dcdc6" for DCDC6
+> -  - "ti,tps65218-ldo1" for LDO1
+> -
+> -Optional properties:
+> -- Any optional property defined in bindings/regulator/regulator.txt
+> +- compatible: "ti,tps65218"
+> +- reg: I2C slave address
 
-After thinking about this for a while I think code outside TI specific
-clock implementation should use just clk_get(). Otherwise we create more
-dependencies to move code to live under drivers subdirectory.
+'\n' here for clarity.
 
-Can't we have clk_get() call a SoC specific helper function if clock
-is not found?
+> +- list of regulators provided by this controller, must be named
 
-Regards,
+Sentences start with an uppercase char.
 
-Tony
+> +  after their hardware counterparts: dcdc[1-6] and ldo1
+> +- This is the list of child nodes that specify the regulator
+> +  initialization data for defined regulators. Not all regulators for the given
+> +  device need to be present. The definition for each of these nodes is defined
+> +  using the standard binding for regulators found at
+> +  Documentation/devicetree/bindings/regulator/regulator.txt.
+
+Use relative path names for brevity.
+
+./regulator.txt
+
+> +  The valid names for regulators are:
+> +  tps65217: regulator-dcdc1, regulator-dcdc2, regulator-dcdc3, regulator-dcdc4,
+> +  regulator-dcdc5, regulator-dcdc6, regulator-ldo1, regulator-ls3
+> +  Each regulator is defined using the standard binding for regulators.
+>  
+>  Example:
+> +tps65218: tps65218 at 24 {
+
+Is this label used?
+
+> +	reg = <0x24>;
+> +	compatible = "ti,tps65218";
+> +	interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* NMIn */
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+
+[...]
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
