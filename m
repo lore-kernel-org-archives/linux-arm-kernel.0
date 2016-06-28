@@ -1,53 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Jun 2016 12:06:22 +0100
-Subject: [PATCH v6] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-In-Reply-To: <1466507556-9027-1-git-send-email-suzuki.poulose@arm.com>
-References: <1466507556-9027-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160628110621.GC5425@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Jun 2016 12:13:55 +0100
+Subject: [PATCH v4 3/4] perf: xgene: Add APM X-Gene SoC Performance
+ Monitoring Unit driver
+In-Reply-To: <CACgAJHzM-hzJJDr-HzZyDQ0SUg0PEd5SYKo8YPnRCDCVA9JuJg@mail.gmail.com>
+References: <1466618819-2697-1-git-send-email-ttnguyen@apm.com>
+ <1466618819-2697-4-git-send-email-ttnguyen@apm.com>
+ <20160623143201.GI8836@leverpostej>
+ <CACgAJHyprybnpQuKqvD9rXstQBwoeVG+uGtEBp-pppcfSGMKgQ@mail.gmail.com>
+ <20160627160036.GB29321@leverpostej>
+ <CACgAJHzM-hzJJDr-HzZyDQ0SUg0PEd5SYKo8YPnRCDCVA9JuJg@mail.gmail.com>
+Message-ID: <20160628111355.GI31744@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 12:12:36PM +0100, Suzuki K Poulose wrote:
-> From: Steve Capper <steve.capper@linaro.org>
+On Mon, Jun 27, 2016 at 10:54:07AM -0700, Tai Tri Nguyen wrote:
+> On Mon, Jun 27, 2016 at 9:00 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Sat, Jun 25, 2016 at 10:54:20AM -0700, Tai Tri Nguyen wrote:
+> >> On Thu, Jun 23, 2016 at 7:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Wed, Jun 22, 2016 at 11:06:58AM -0700, Tai Nguyen wrote:
+> >> > > +static irqreturn_t xgene_pmu_isr(int irq, void *dev_id)
+> >> > > +{
+> >> > > +     struct xgene_pmu_dev_ctx *ctx, *temp_ctx;
+> >> > > +     struct xgene_pmu *xgene_pmu = dev_id;
+> >> > > +     u32 val;
+> >> > > +
+> >> > > +     xgene_pmu_mask_int(xgene_pmu);
+> >> >
+> >> > Why do you need to mask the IRQ? This handler is called in hard IRQ
+> >> > context.
+> >>
+> >> Right. Let me change to use raw_spin_lock_irqsave here.
+> >
+> > Interesting; I see we do that in the CCI PMU driver. What are we trying
+> > to protect?
+> >
+> > We don't do that in the CPU PMU drivers, and I'm missng something here.
+> > Hopefully I'm just being thick...
 > 
-> It can be useful for JIT software to be aware of MIDR_EL1 and
-> REVIDR_EL1 to ascertain the presence of any core errata that could
-> affect code generation.
-> 
-> This patch exposes these registers through sysfs:
-> 
-> /sys/devices/system/cpu/cpu$ID/identification/midr
-> /sys/devices/system/cpu/cpu$ID/identification/revidr
-> 
-> where $ID is the cpu number. For big.LITTLE systems, one can have a
-> mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
-> to be enumerated.
-> 
-> If the kernel does not have valid information to populate these entries
-> with, an empty string is returned to userspace.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> [ ABI documentation updates, hotplug notifiers ]
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> For me, we can't guarantee that the interrupt doesn't happen on the other CPUs.
+> The irqbalancer may change the SMP affinity.
 
-Looks good to me, but one minor comment below.
+The perf core requires things to occur on the same CPU for correct
+synchronisation.
 
-> +static struct attribute_group cpuregs_attr_group = {
-> +	.attrs = cpuregs_attrs,
-> +	.name = "identification"
-> +};
+If an IRQ balancer can change the IRQ affinity behind our back, we have
+much bigger problems that affect other uncore PMU drivers.
 
-This makes sense because MIDR/REVIDR belong to the "Identification"
-functional group of registers, however I wonder if we should put this
-under a directory called "regs" or similar, so that we don't have a
-confusing top-level directory where "identification" lives alongside
-things like "hotplug" and "cpuidle".
+Marc, is there a sensible way to prevent irq balancers from changing the
+affinity of an IRQ, e.g. a kernel-side pinning mechanism, or some way we
+can be notified and reject changes?
 
-Either way:
-
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-
-Will
+Thanks,
+Mark.
