@@ -1,90 +1,19 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 28 Jun 2016 11:41:14 +0900
-Subject: [PATCH v2 4/5] spi: s3c64xx: simplify if statement in prepare_transfer
- function
-In-Reply-To: <1467081676-8442-1-git-send-email-andi.shyti@samsung.com>
-References: <1467081676-8442-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1467081676-8442-5-git-send-email-andi.shyti@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jun 2016 10:46:36 +0800
+Subject: [PATCH v2 0/5] ARM: dts: imx7d: add i.MX 7Solo and Colibri
+ iMX7S/D dts
+In-Reply-To: <20160626084755.21925-1-stefan@agner.ch>
+References: <20160626084755.21925-1-stefan@agner.ch>
+Message-ID: <20160628024636.GF21328@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The whole function is inside an 'if' statement
-("!is_polling(sdd)").
+On Sun, Jun 26, 2016 at 01:47:50AM -0700, Stefan Agner wrote:
+> Stefan Agner (5):
+>   ARM: imx: add support for i.MX 7Solo
+>   ARM: dts: imx7d: use imx7s.dtsi as base device tree
+>   ARM: dts: imx7d: recreate imx7d.dtsi with i.MX 7Dual specifics
+>   ARM: dts: imx7d: move input header into base device tree
+>   ARM: dts: imx7: add Toradex Colibri iMX7S/iMX7D support
 
-Check the opposite of that statement at the beginning and exit,
-this way we can have one level less of indentation.
-
-Remove the goto paths as they are redundant.
-
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
----
- drivers/spi/spi-s3c64xx.c | 50 +++++++++++++++++++++--------------------------
- 1 file changed, 22 insertions(+), 28 deletions(-)
-
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index c65a9e6..6d8486f 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -341,38 +341,32 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
- 	dma_filter_fn filter = sdd->cntrlr_info->filter;
- 	struct device *dev = &sdd->pdev->dev;
- 	dma_cap_mask_t mask;
--	int ret;
- 
--	if (!is_polling(sdd)) {
--		dma_cap_zero(mask);
--		dma_cap_set(DMA_SLAVE, mask);
--
--		/* Acquire DMA channels */
--		sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--				   sdd->cntrlr_info->dma_rx, dev, "rx");
--		if (!sdd->rx_dma.ch) {
--			dev_err(dev, "Failed to get RX DMA channel\n");
--			ret = -EBUSY;
--			goto out;
--		}
--		spi->dma_rx = sdd->rx_dma.ch;
--
--		sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--				   sdd->cntrlr_info->dma_tx, dev, "tx");
--		if (!sdd->tx_dma.ch) {
--			dev_err(dev, "Failed to get TX DMA channel\n");
--			ret = -EBUSY;
--			goto out_rx;
--		}
--		spi->dma_tx = sdd->tx_dma.ch;
-+	if (is_polling(sdd))
-+		return 0;
-+
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
-+
-+	/* Acquire DMA channels */
-+	sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
-+			   sdd->cntrlr_info->dma_rx, dev, "rx");
-+	if (!sdd->rx_dma.ch) {
-+		dev_err(dev, "Failed to get RX DMA channel\n");
-+		return -EBUSY;
- 	}
-+	spi->dma_rx = sdd->rx_dma.ch;
- 
--	return 0;
-+	sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
-+			   sdd->cntrlr_info->dma_tx, dev, "tx");
-+	if (!sdd->tx_dma.ch) {
-+		dev_err(dev, "Failed to get TX DMA channel\n");
-+		dma_release_channel(sdd->rx_dma.ch);
-+		return -EBUSY;
-+	}
-+	spi->dma_tx = sdd->tx_dma.ch;
- 
--out_rx:
--	dma_release_channel(sdd->rx_dma.ch);
--out:
--	return ret;
-+	return 0;
- }
- 
- static int s3c64xx_spi_unprepare_transfer(struct spi_master *spi)
--- 
-2.8.1
+Applied all, thanks.
