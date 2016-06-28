@@ -1,45 +1,77 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 28 Jun 2016 16:28:27 +0800
-Subject: [GIT PULL] i.MX clock update for 4.8
-Message-ID: <20160628082827.GG21328@tiger>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 28 Jun 2016 10:30:24 +0200
+Subject: [PATCH 1/3] mfd: add support for Allwinner SoCs ADC
+In-Reply-To: <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
+References: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <20160628083024.GC4472@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+Hello Quentin!
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+A few comments bellow:
 
-are available in the git repository at:
+On Tue, Jun 28, 2016 at 10:18:15AM +0200, Quentin Schulz wrote:
+>
+> diff --git a/drivers/mfd/sunxi-gpadc-mfd.c b/drivers/mfd/sunxi-gpadc-mfd.c
+> new file mode 100644
+> index 0000000..710e297
+> --- /dev/null
+> +++ b/drivers/mfd/sunxi-gpadc-mfd.c
+> @@ -0,0 +1,188 @@
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-4.8
+You should add a license statement here.
 
-for you to fetch changes up to bfa10f7d9ae2a6d1e615bf6841887fd9adb056be:
+> +#include <linux/interrupt.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/sunxi-gpadc-mfd.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
 
-  clk: imx6ul: fix gpt2 clock names (2016-06-16 09:05:55 +0800)
+Headers are usually included in the alphabetical order.
 
-----------------------------------------------------------------
-The i.MX clock updates for 4.8:
- - A few correction and improvements on pllv3 driver around AV pll clock
-   rate calculation, parent setting and power bit handling
- - Correct i.MX6UL GPT2 clock names
- - A couple of minor fixes on i.MX7D clock driver on DRAM clocks
+[...]
 
-----------------------------------------------------------------
-Anson Huang (3):
-      clk: imx: correct AV PLL rate formula
-      clk: imx7d: correct dram root clk parent select
-      clk: imx7d: correct dram pll type
+> diff --git a/include/linux/mfd/sunxi-gpadc-mfd.h b/include/linux/mfd/sunxi-gpadc-mfd.h
+> new file mode 100644
+> index 0000000..341f8c3
+> --- /dev/null
+> +++ b/include/linux/mfd/sunxi-gpadc-mfd.h
+> @@ -0,0 +1,14 @@
 
-Dong Aisheng (4):
-      clk: imx: fix pll clock parents
-      clk: imx: clk-pllv3: fix incorrect handle of enet powerdown bit
-      clk: imx: refine the powerdown bit of clk-pllv3
-      clk: imx6ul: fix gpt2 clock names
+You should also add a license statement here.
 
- drivers/clk/imx/clk-imx6q.c  | 14 +++++++-------
- drivers/clk/imx/clk-imx6sl.c | 14 +++++++-------
- drivers/clk/imx/clk-imx6sx.c | 14 +++++++-------
- drivers/clk/imx/clk-imx6ul.c | 18 +++++++++---------
- drivers/clk/imx/clk-imx7d.c  | 14 +++++++-------
- drivers/clk/imx/clk-pllv3.c  | 28 ++++++++++++++++------------
- 6 files changed, 53 insertions(+), 49 deletions(-)
+> +#ifndef __SUNXI_GPADC_MFD__H__
+> +#define __SUNXI_GPADC_MFD__H__
+> +
+> +#define TP_INT_FIFOC            0x10
+> +#define TP_INT_FIFOS            0x14
+> +
+> +struct sunxi_gpadc_mfd_dev {
+> +	void __iomem			*regs;
+> +	struct device			*dev;
+> +	struct regmap			*regmap;
+> +	struct regmap_irq_chip_data	*regmap_irqc;
+> +};
+> +
+> +#endif
+
+Thanks!
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160628/ba8b4749/attachment.sig>
