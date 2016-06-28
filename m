@@ -1,56 +1,80 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Tue, 28 Jun 2016 11:02:27 +0530
-Subject: [PATCH v2 1/9] tty: serial: fsl_lpuart: consider TX FIFO too in
- tx_empty
-In-Reply-To: <20160628053235.5114-1-bhuvanchandra.dv@toradex.com>
-References: <20160628053235.5114-1-bhuvanchandra.dv@toradex.com>
-Message-ID: <20160628053235.5114-2-bhuvanchandra.dv@toradex.com>
+From: huangdaode@hisilicon.com (Daode Huang)
+Date: Tue, 28 Jun 2016 13:41:35 +0800
+Subject: [PATCH net-next 6/9] net: hns: normalize two different loop
+In-Reply-To: <1467029589.30123.288.camel@linux.intel.com>
+References: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <1467021255-95900-7-git-send-email-Yisen.Zhuang@huawei.com>
+ <1467028161.1847.101.camel@perches.com>
+ <1467028835.30123.287.camel@linux.intel.com>
+ <1467029338.1847.106.camel@perches.com>
+ <1467029589.30123.288.camel@linux.intel.com>
+Message-ID: <57720E0F.8090605@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch>
 
-Currently the tx_empty callback only considers the Transmit Complete Flag (TC).
-The reference manual is not quite clear if the TC flag covers the TX FIFO too.
-Debug prints on real hardware have shown that from time to time the TC flag is
-asserted (indicating Transmitter idle) while there are still data in the
-TX FIFO. Hence, in this case the serial core will call the shutdown callback
-even though there are data remaining in the TX FIFO buffers.
 
-Avoid early shutdowns by considering the TX FIFO empty flag too. Also avoid
-theoretical race conditions between DMA and the driver by checking whether the
-TX DMA is in progress too.
+On 2016/6/27 20:13, Andy Shevchenko wrote:
+> On Mon, 2016-06-27 at 05:08 -0700, Joe Perches wrote:
+>> On Mon, 2016-06-27 at 15:00 +0300, Andy Shevchenko wrote:
+>>> On Mon, 2016-06-27 at 04:49 -0700, Joe Perches wrote:
+>>>> On Mon, 2016-06-27 at 17:54 +0800, Yisen Zhuang wrote:
+>>>>> From: Daode Huang <huangdaode@hisilicon.com>
+>>>>>
+>>>>> There are two approaches to assign data, one does 2 loops,
+>>>>> another
+>>>>> does 1 loop. This patch normalize the different methods to 1
+>>>>> loop.
+>>>> []
+>>>>> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+>>>>> b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+>>>> []
+>>>>> @@ -2567,15 +2567,15 @@ static char
+>>>>> *hns_dsaf_get_node_stats_strings(char *data, int node,
+>>>>>   	buff += ETH_GSTRING_LEN;
+>>>>>   	if (node < DSAF_SERVICE_NW_NUM && !is_ver1) {
+>>>>>   		for (i = 0; i < DSAF_PRIO_NR; i++) {
+>>>>> -			snprintf(buff, ETH_GSTRING_LEN,
+>>>>> -				 "inod%d_pfc_prio%d_pkts",
+>>>>> node,
+>>>>> i);
+>>>>> -			buff += ETH_GSTRING_LEN;
+>>>>> -		}
+>>>>> -		for (i = 0; i < DSAF_PRIO_NR; i++) {
+>>>>> -			snprintf(buff, ETH_GSTRING_LEN,
+>>>>> -				 "onod%d_pfc_prio%d_pkts",
+>>>>> node,
+>>>>> i);
+>>>>> +			snprintf(buff + 0 * ETH_GSTRING_LEN *
+>>>>> DSAF_PRIO_NR,
+>>>>> +				 ETH_GSTRING_LEN,
+>>>>> "inod%d_pfc_prio%d_pkts",
+>>>>> +				 node, i);
+>>>>> +			snprintf(buff + 1 * ETH_GSTRING_LEN *
+>>>>> DSAF_PRIO_NR,
+>>>>> +				 ETH_GSTRING_LEN,
+>>>>> "onod%d_pfc_prio%d_pkts",
+>>>>> +				 node, i);
+>>>>>   			buff += ETH_GSTRING_LEN;
+>>>> This looks odd and likely incorrect.
+>>> Why? the idea is to print stats for Rx and Tx at once.
+>>>
+>>> I hope it was tested.
+>> It changes the order of the strings in buff.
+> I don't see how.
+Hi Andy,
+The patch has been tested when sent out.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
----
- drivers/tty/serial/fsl_lpuart.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+>> Is a bug fix or a style fix?
+>>
+>> If it's a bug fix, then it should likely be added
+>> to the stable trees.
+> I doubt it's a bug fix.
 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 3d79003..fabfa7e 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -810,8 +810,18 @@ static irqreturn_t lpuart32_int(int irq, void *dev_id)
- /* return TIOCSER_TEMT when transmitter is not busy */
- static unsigned int lpuart_tx_empty(struct uart_port *port)
- {
--	return (readb(port->membase + UARTSR1) & UARTSR1_TC) ?
--		TIOCSER_TEMT : 0;
-+	struct lpuart_port *sport = container_of(port,
-+			struct lpuart_port, port);
-+	unsigned char sr1 = readb(port->membase + UARTSR1);
-+	unsigned char sfifo = readb(port->membase + UARTSFIFO);
-+
-+	if (sport->dma_tx_in_progress)
-+		return 0;
-+
-+	if (sr1 & UARTSR1_TC && sfifo & UARTSFIFO_TXEMPT)
-+		return TIOCSER_TEMT;
-+
-+	return 0;
- }
- 
- static unsigned int lpuart32_tx_empty(struct uart_port *port)
--- 
-2.9.0
+Because the previous patch is accepted in net-next, and this set is
+an appendix to the series, in order to avoid merge conflict, we also
+send this bug fix to net-next.
+
+thanks.
+
+>
