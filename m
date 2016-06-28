@@ -1,91 +1,99 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Jun 2016 07:59:50 +0100
-Subject: [PATCH v3 02/10] Documentation: regulator: tps65218: Update
- examples
-In-Reply-To: <1467093980-11458-3-git-send-email-j-keerthy@ti.com>
-References: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
- <1467093980-11458-3-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160628065950.GE6720@dell>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Tue, 28 Jun 2016 14:59:46 +0800
+Subject: [PATCH V2 1/4] trace: Introduce an output interface from ftrace
+ to STM
+In-Reply-To: <87mvmdu5qj.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1466563613-31578-1-git-send-email-zhang.chunyan@linaro.org>
+ <1466563613-31578-2-git-send-email-zhang.chunyan@linaro.org>
+ <87mvmdu5qj.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CAG2=9p_rVX9bWUB2VuTumxkK2BxcLg3=JfWMdZzjBda6BNMqoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a more common format for DT bindings:
+On Wed, Jun 22, 2016 at 1:56 PM, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> [adding Felipe for his sudden interest in the subject matter]
+>
+> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>
+>> +static struct stm_ftrace *trace_output;
+>
+> What you want is a possibility to have different ftrace outputs, not
+> different STM outputs for ftrace (again, STM core already does this).
+> In other words, here, you want to have the notion of "output" be
+> stm-agnostic, but be a generalized output driver object.
 
-  dt-bindings: regulator: 
+Ok, I will make it more generic, i.e. an agnostic of the exact output devices.
 
-On Tue, 28 Jun 2016, Keerthy wrote:
-> This updates the device tree according to the preferred way of parsing
+>
+>> +
+>> +void trace_func_to_stm(unsigned long ip, unsigned long parent_ip)
+>> +{
+>> +     unsigned long ip_array[2] = {ip, parent_ip};
+>> +
+>> +     if (trace_output)
+>> +             trace_output->write(&trace_output->data, (char *)ip_array,
+>> +                                 sizeof(unsigned long) * 2, STM_FTRACE_CHAN);
+>> +}
+>
+> The ip+parent_ip pair is still not a useful output from ftrace
+> data. Moreover, doing this is basically like inventing another binary
+> protocol for ftrace data over stm, where ftrace is in and of itself
+> already a binary protocol, why not just use that? The decoder will
+> basically depend on the kernel binary from whence the traces are
+> coming, but this is a requirement even if we want to decypher the
+> ip+parent_ip data you're proposing.
+>
+> We would need to take some time to think this through. What we might
+> consider is:
+>
+>  * bypassing ftrace ring buffer, sending data directly to an "output",
+>    which has a drawback of ending up in a driver callback, which needs
+>    to serialize on its driver stuff and write registers (I did try to
+>    make stm_write as light as possible when I wrote it, though); the
+>    good part is that data goes into the wire as soon as it is produced
+>    instead of being buffered along the way;
 
-Nit: Device Tree
+I want to try this way, if I remember correctly, Steven Rostedt said
+the similar solution before, use a jump label to switch which "output"
+traces should be sent to.  And yes like you said, the drawback is
+exporting trace data to STM by writing registers is slower than
+writing ring buffer, it would slow down the process.
 
-> the nodes using the regulator framework.
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
->  .../devicetree/bindings/regulator/tps65218.txt     | 87 ++++++++++++++++++----
->  1 file changed, 71 insertions(+), 16 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/regulator/tps65218.txt b/Documentation/devicetree/bindings/regulator/tps65218.txt
-> index fccc1d2..5e1888f 100644
-> --- a/Documentation/devicetree/bindings/regulator/tps65218.txt
-> +++ b/Documentation/devicetree/bindings/regulator/tps65218.txt
-> @@ -1,23 +1,78 @@
->  TPS65218 family of regulators
->  
->  Required properties:
-> -For tps65218 regulators/LDOs
-> -- compatible:
-> -  - "ti,tps65218-dcdc1" for DCDC1
-> -  - "ti,tps65218-dcdc2" for DCDC2
-> -  - "ti,tps65218-dcdc3" for DCDC3
-> -  - "ti,tps65218-dcdc4" for DCDC4
-> -  - "ti,tps65218-dcdc5" for DCDC5
-> -  - "ti,tps65218-dcdc6" for DCDC6
-> -  - "ti,tps65218-ldo1" for LDO1
-> -
-> -Optional properties:
-> -- Any optional property defined in bindings/regulator/regulator.txt
-> +- compatible: "ti,tps65218"
-> +- reg: I2C slave address
+>  * starting a work (or multiple works) that would traverse new data in
+>    ftrace buffer and feed it to an "output", such as stm; this has a
+>    problem of producers being potentially faster than consumers
+>    (consider 'function' tracer, for example) and hogging the cpus by
+>    simply exporting trace data; this also botches the stm timestamps,
 
-'\n' here for clarity.
+With stm timestamps on each trace data, we can sync up every events
+happened on the system, not only on CPU but also on other processors,
+this is useful if only the timestamps are nearly real-time, from this
+view, the second way seems not so more feasible than the first one.
 
-> +- list of regulators provided by this controller, must be named
+Please correct me if I'm missing something.
 
-Sentences start with an uppercase char.
+Thanks for your comments,
+Chunyan
 
-> +  after their hardware counterparts: dcdc[1-6] and ldo1
-> +- This is the list of child nodes that specify the regulator
-> +  initialization data for defined regulators. Not all regulators for the given
-> +  device need to be present. The definition for each of these nodes is defined
-> +  using the standard binding for regulators found at
-> +  Documentation/devicetree/bindings/regulator/regulator.txt.
-
-Use relative path names for brevity.
-
-./regulator.txt
-
-> +  The valid names for regulators are:
-> +  tps65217: regulator-dcdc1, regulator-dcdc2, regulator-dcdc3, regulator-dcdc4,
-> +  regulator-dcdc5, regulator-dcdc6, regulator-ldo1, regulator-ls3
-> +  Each regulator is defined using the standard binding for regulators.
->  
->  Example:
-> +tps65218: tps65218 at 24 {
-
-Is this label used?
-
-> +	reg = <0x24>;
-> +	compatible = "ti,tps65218";
-> +	interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* NMIn */
-> +	interrupt-controller;
-> +	#interrupt-cells = <2>;
-
-[...]
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>    which will then be representative of nothing in particular.
+>
+>> +
+>> +void trace_add_output(struct stm_ftrace *stm)
+>> +{
+>> +     trace_output = stm;
+>> +}
+>> +EXPORT_SYMBOL_GPL(trace_add_output);
+>> +
+>> +void trace_rm_output(void)
+>> +{
+>> +     trace_output = NULL;
+>> +}
+>> +EXPORT_SYMBOL_GPL(trace_rm_output);
+>
+> These, of course, only work because they are implicitly serialized on
+> stm core's link locks.
+>
+> Regards,
+> --
+> Alex
