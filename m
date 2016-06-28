@@ -1,29 +1,62 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 28 Jun 2016 12:56:16 -0400
-Subject: [PATCH] PM / suspend: show workqueues busy name in suspend flow
-In-Reply-To: <1467020645.25092.24.camel@mtksdaap41>
-References: <1466586509-32400-1-git-send-email-roger.lu@mediatek.com>
- <20160622152126.GV3262@mtj.duckdns.org>
- <1467020645.25092.24.camel@mtksdaap41>
-Message-ID: <20160628165616.GD5185@htj.duckdns.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Jun 2016 17:59:41 +0100
+Subject: [PATCH v4 3/4] perf: xgene: Add APM X-Gene SoC Performance
+ Monitoring Unit driver
+In-Reply-To: <CACgAJHzNe68wDxkk5Uc8M8vHsjL5XoppmPys=37LqBWR5m5zxw@mail.gmail.com>
+References: <1466618819-2697-1-git-send-email-ttnguyen@apm.com>
+ <1466618819-2697-4-git-send-email-ttnguyen@apm.com>
+ <20160623143201.GI8836@leverpostej>
+ <CACgAJHyprybnpQuKqvD9rXstQBwoeVG+uGtEBp-pppcfSGMKgQ@mail.gmail.com>
+ <20160627160036.GB29321@leverpostej>
+ <CACgAJHzM-hzJJDr-HzZyDQ0SUg0PEd5SYKo8YPnRCDCVA9JuJg@mail.gmail.com>
+ <20160628111355.GI31744@leverpostej> <577279E2.6070202@arm.com>
+ <20160628141400.GN31744@leverpostej>
+ <CACgAJHzNe68wDxkk5Uc8M8vHsjL5XoppmPys=37LqBWR5m5zxw@mail.gmail.com>
+Message-ID: <20160628165941.GS31744@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Roger.
-
-On Mon, Jun 27, 2016 at 05:44:05PM +0800, Roger Lu wrote:
-> show_workqueue_state() is a better choice to me. However, only freezable
-> workqueue is able to affect suspend flow. So, is there other mailing
-> list discussing about showing freezable workqueue state only?? Maybe we
-> can use that API in this case. Thanks very much.
+On Tue, Jun 28, 2016 at 09:39:36AM -0700, Tai Tri Nguyen wrote:
+> Hi Mark,
 > 
-> freezable workqueue means workqueue is created with flag WQ_FREEZABLE.
+> On Tue, Jun 28, 2016 at 7:14 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Tue, Jun 28, 2016 at 02:21:38PM +0100, Marc Zyngier wrote:
+> >> On 28/06/16 12:13, Mark Rutland wrote:
+> >> > Marc, is there a sensible way to prevent irq balancers from changing the
+> >> > affinity of an IRQ, e.g. a kernel-side pinning mechanism, or some way we
+> >> > can be notified and reject changes?
+> >>
+> >> You can get notified (see irq_set_affinity_notifier), but there no way
+> >> to veto the change.
+> >
+> > :(
+> >
+> >> What should probably be done is to set the affinity hint
+> >> (irq_set_affinity_hint), and use the notifier to migrate the context
+> >> if possible. Note that you'll be called in process context, which will
+> >> race against interrupts being delivered on the new CPU.
+> >
+> > I'll have to go digging into what exactly perf_pmu_migrate_context
+> > requires. Given the race, I'm not sure if that's going to work. It's
+> > certainly not going to be self contained.
+> >
+> > That also won't work for CPU PMUs, where it makes no sense to migrate
+> > context or IRQs.  For those we appear to already be using have
+> > IRQF_NOBALANCING, which sounds like exactly what we want.
+> >
+> > That appears to influence irq_can_set_affinity(), which the procfs
+> > helpers check.
+> >
+> > Tai, can you try requesting the IRQ with the IRQF_NOBALANCING flag?
+> 
+> This seems to work.
+> I also tried to change smp_affinity through procfs and it returns write error.
+> The interrupt seems to be excluded from irq balancing.
+> Should I make the change?
 
-It's for debugging anyway and workqueue dumps usually are pretty
-short.  I don't think it's fine to use the same function.  We can add
-flags in the printouts but I'm not even sure that'd be necessary.
+Yes please. I believe you also need IRQF_NO_THREAD per the CPU PMU
+drivers, so please add both flags. I'll do the same for the CCN and CCI
+PMU drivers.
 
-Thanks.
-
--- 
-tejun
+Thanks,
+Mark.
