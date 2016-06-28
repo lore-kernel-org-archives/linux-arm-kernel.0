@@ -1,32 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 28 Jun 2016 16:33:46 +0100
-Subject: [PATCH v6] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-In-Reply-To: <1466507556-9027-1-git-send-email-suzuki.poulose@arm.com>
-References: <1466507556-9027-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160628153346.GF4585@e104818-lin.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 28 Jun 2016 16:48:19 +0100
+Subject: [PATCH v3 0/9] Generic DT bindings for PCI IOMMUs and ARM SMMUv3
+Message-ID: <cover.1467123945.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 12:12:36PM +0100, Suzuki K. Poulose wrote:
-> +#define CPUINFO_ATTR_RO(_name)							\
-> +	static ssize_t show_##_name(struct device *dev,				\
-> +			struct device_attribute *attr, char *buf)		\
-> +	{									\
-> +		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
-> +										\
-> +		if (info->reg_midr)						\
-> +			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
-> +		else								\
-> +			return 0;						\
-> +	}									\
-> +	static DEVICE_ATTR(_name, 0444, show_##_name, NULL)
-> +
-> +CPUINFO_ATTR_RO(midr);
-> +CPUINFO_ATTR_RO(revidr);
+I didn't want the ongoing SMMUv2 rework delaying getting this out any
+longer, so here's the SMMUv3-flavoured parts of the respin to address
+the last round of comments[1] plus some new bits which fell out of the
+woodwork along the way. This time I've actually fully tested the
+platform device/multiple ID support as well (turns out I was being a
+bit thick and our model does have some suitable peripherals after all).
 
-Since exposing these values is aimed at JIT code (and not human
-readable), wouldn't it make more sense to present the binary value
-instead of the ascii transformation?
+As ever, branch at git://linux-arm.org/linux-rm iommu/generic-v3
+
+Robin.
+
+[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/13936
+
+Lorenzo Pieralisi (1):
+  arm64: mm: change IOMMU notifier action to attach DMA ops
+
+Mark Rutland (1):
+  Docs: dt: add PCI IOMMU map bindings
+
+Robin Murphy (7):
+  iommu/of: Consolidate device creation workarounds
+  of/irq: Break out msi-map lookup (again)
+  iommu/of: Handle iommu-map property for PCI
+  iommu/of: Introduce iommu_fwspec
+  iommu/arm-smmu: Implement of_xlate() for SMMUv3
+  iommu/arm-smmu: Support non-PCI devices with SMMUv3
+  iommu/arm-smmu: Set PRIVCFG in stage 1 STEs
+
+ .../devicetree/bindings/pci/pci-iommu.txt          | 171 ++++++++++++
+ arch/arm64/mm/dma-mapping.c                        |  22 +-
+ drivers/iommu/Kconfig                              |   2 +-
+ drivers/iommu/arm-smmu-v3.c                        | 307 ++++++++++-----------
+ drivers/iommu/exynos-iommu.c                       |  20 +-
+ drivers/iommu/mtk_iommu.c                          |   8 +-
+ drivers/iommu/of_iommu.c                           |  96 ++++++-
+ drivers/of/irq.c                                   |  78 +-----
+ drivers/of/of_pci.c                                | 102 +++++++
+ include/linux/of_iommu.h                           |  18 ++
+ include/linux/of_pci.h                             |  10 +
+ 11 files changed, 554 insertions(+), 280 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-iommu.txt
 
 -- 
-Catalin
+2.8.1.dirty
