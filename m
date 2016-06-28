@@ -1,52 +1,49 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 28 Jun 2016 14:25:36 +0800
-Subject: [PATCH v3 03/10] input: tps65218-pwrbutton: Add
- platform_device_id table
-In-Reply-To: <1467093980-11458-4-git-send-email-j-keerthy@ti.com>
-Message-ID: <201606281427.iovLfzW6%fengguang.wu@intel.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 27 Jun 2016 23:27:52 -0700
+Subject: [PATCH v4 0/5] regulator: add Ricoh RN5T567 PMIC support
+Message-ID: <20160628062757.24490-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset adds RN5T567 PMIC support which is used on the 
+Toradex Colibri iMX7S/iMX7D modules. The existing RN5T618 is from
+the same family, hence this patchset uses the same driver and adds
+variant support.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.7-rc5 next-20160627]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+The Colibris currently do not use the PMIC's power off capabilities,
+as do the current users of that PMIC driver. Therefore this patchset
+also makes the use of the system-power-controller property mandatory
+if the power off capabilties are required.
 
-url:    https://github.com/0day-ci/linux/commits/Keerthy/mfd-tps65218-Clean-ups/20160628-141354
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: tile-allmodconfig (attached as .config)
-compiler: tilegx-linux-gcc (GCC) 4.6.2
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=tile 
+Changes since v3:
+- Use RN5T618_REPCNT_REPWRON macro when writing RN5T618_REPCNT register
 
-All errors (new ones prefixed by >>):
+Changes since v2:
+- Elevate restart priority to 192 to make sure PMIC takes presedence
+  over SoC level restart capabilities (e.g. watchdog)
+- Print a warning if poweroff callback is already assigned
+- Reorder of_id and variant assignment
+- Lower delay to 1ms and justify why it is required
+- Fix DCDC count and a typos in device tree bindings
 
->> drivers/input/misc/tps65218-pwrbutton.c:120:1: error: expected ',' or ';' before 'extern'
+Changes since v1:
+- Removed obsolete include <asm/system_misc.h>
 
-vim +120 drivers/input/misc/tps65218-pwrbutton.c
+Stefan Agner (5):
+  ARM: dts: meson: minix-neo-x8: define PMIC as power controller
+  mfd: add Ricoh RN5T567 PMIC support
+  regulator: rn5t618: add RN5T567 PMIC support
+  mfd: rn5t618: register power off callback optionally
+  mfd: rn5t618: register restart handler
 
-   114	MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
-   115	
-   116	static const struct platform_device_id tps65218_pwrbtn_id_table[] = {
-   117		{ "tps65218-pwrbutton", },
-   118		{ /* sentinel */ }
-   119	}
- > 120	MODULE_DEVICE_TABLE(platform, tps65218_pwrbtn_id_table);
-   121	
-   122	static struct platform_driver tps65218_pwron_driver = {
-   123		.probe	= tps65218_pwron_probe,
+ Documentation/devicetree/bindings/mfd/rn5t618.txt | 19 +++---
+ arch/arm/boot/dts/meson8-minix-neo-x8.dts         |  1 +
+ drivers/mfd/Kconfig                               |  7 ++-
+ drivers/mfd/rn5t618.c                             | 70 +++++++++++++++++++----
+ drivers/regulator/Kconfig                         |  5 +-
+ drivers/regulator/rn5t618-regulator.c             | 40 +++++++++++--
+ include/linux/mfd/rn5t618.h                       | 13 +++++
+ 7 files changed, 126 insertions(+), 29 deletions(-)
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 44836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160628/a3cfe2e9/attachment-0001.obj>
+-- 
+2.8.3
