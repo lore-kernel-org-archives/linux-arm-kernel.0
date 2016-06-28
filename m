@@ -1,554 +1,286 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Jun 2016 11:42:30 +0100
-Subject: [PATCH 4/8] arm64:perf: Add support for Hisilicon SoC event
- counters
-In-Reply-To: <1467107429-55477-5-git-send-email-anurup.m@huawei.com>
-References: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
- <1467107429-55477-5-git-send-email-anurup.m@huawei.com>
-Message-ID: <20160628104230.GE31744@leverpostej>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 28 Jun 2016 16:18:47 +0530
+Subject: [PATCH v5 6/6] regulator: tps65218: Remove all the compatibles
+Message-ID: <1467110927-31145-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 05:50:25AM -0400, Anurup M wrote:
-> 	1. Hisilicon SoC PMU to support different hardware event
-> 	   counters.
-> 	2. Register with Perf PMU as RAW events.
+Remove all the individual compatibles for all the regulators
+and introduce id_table and update the driver accordingly
+to parse device tree nodes using the regulator framework.
 
-NAK to use of PERF_TYPE_RAW. This should be a dynamic, non-ABI id.
-Register with -1 as the type, and have the perf core allocate it.
+Acked-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+Changes in v6:
 
-> 	3. Hisilicon PMU shall use the DJTAG hardware interface
-> 	   to access hardware event counters and configuration
-> 	   register.
+  * Rebased to latest linux-next.
+  * Added dynamic allocation for strobes as part of rebasing.
 
-As mentioend for earlier patches, I cannot find the DJTAG code, so it'sn
-ot possible to review this fully.
+Bootlog on am437x-sk-evm: http://pastebin.ubuntu.com/18019348/
+ 
+ drivers/regulator/tps65218-regulator.c | 152 +++++++++++++--------------------
+ include/linux/mfd/tps65218.h           |   1 +
+ 2 files changed, 58 insertions(+), 95 deletions(-)
 
-> 	4. Routines to initialze and setup PMU.
-
-Nit: initialize.
-
-> 	5. Routines to enable/disable/add/del/start/stop hardware
-> 	   event counting.
-> 
-> Signed-off-by: Anurup M <anurup.m@huawei.com>
-> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-> ---
->  drivers/perf/hisilicon/hisi_uncore_pmu.c | 465 +++++++++++++++++++++++++++++++
->  drivers/perf/hisilicon/hisi_uncore_pmu.h | 125 +++++++++
->  2 files changed, 590 insertions(+)
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
-
->From a quick look at the code, there are a large number of "TBD"
-comments, and the basic functionality required for this driver to
-actually function is not present as of this patch.
-
-This is not helpful for review.
-
-> diff --git a/drivers/perf/hisilicon/hisi_uncore_pmu.c b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> new file mode 100644
-> index 0000000..40bdc23
-> --- /dev/null
-> +++ b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> @@ -0,0 +1,465 @@
-> +/*
-> + * HiSilicon SoC Hardware event counters support
-> + *
-> + * Copyright (C) 2016 Huawei Technologies Limited
-> + * Author: Anurup M <anurup.m@huawei.com>
-> + *
-> + * This code is based heavily on the ARMv7 perf event code.
-
-The CPU PMU code is very different to what's required for uncore/system
-PMUs such as this. The arm-cci and arm-ccn drivers (currently under
-drivers/bus/) are much better examples.
-
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/bitmap.h>
-> +#include <linux/of.h>
-> +#include <linux/perf_event.h>
-
-Minor nit: please sort these alphabetically (the linux/bitmap.h include
-should be first).
-
-> +#include "hisi_uncore_pmu.h"
-> +
-> +/* djtag read interface - Call djtag driver to access SoC registers */
-> +int hisi_djtag_readreg(int module_id, int bank, u32 offset,
-> +				struct device_node *djtag_node, u32 *pvalue)
-> +{
-> +	int ret;
-> +	u32 chain_id = 0;
-> +
-> +	while (bank != 1) {
-> +		bank = (bank >> 0x1);
-> +		chain_id++;
-> +	}
-> +
-> +	ret = djtag_readl(djtag_node, offset, module_id, chain_id, pvalue);
-> +	if (ret)
-> +		pr_warn("Djtag:%s Read failed!\n", djtag_node->full_name);
-> +
-> +	return ret;
-> +}
-> +
-> +/* djtag write interface - Call djtag driver  to access SoC registers */
-> +int hisi_djtag_writereg(int module_id, int bank,
-> +				u32 offset, u32 value,
-> +				struct device_node *djtag_node)
-> +{
-> +	int ret;
-> +
-> +	ret = djtag_writel(djtag_node, offset, module_id, 0, value);
-> +	if (ret)
-> +		pr_warn("Djtag:%s Write failed!\n", djtag_node->full_name);
-> +
-> +	return ret;
-> +}
-> +
-> +void hisi_uncore_pmu_write_evtype(struct hisi_hwmod_unit *punit,
-> +						int idx, u32 val)
-> +{
-> +	/* TBD: Select event based on Hardware counter Module */
-> +}
-> +
-> +int hisi_pmu_get_event_idx(struct hw_perf_event *hwc,
-> +						struct hisi_hwmod_unit *punit)
-> +{
-> +	int event_idx = -1;
-> +
-> +	/* TBD - Get the available hardware event counter index */
-> +
-> +	return event_idx;
-> +}
-> +
-> +void hisi_pmu_clear_event_idx(struct hw_perf_event *hwc,
-> +					struct hisi_hwmod_unit *punit,
-> +								int idx)
-> +{
-> +	/* TBD - Release the hardware event counter index */
-> +}
-
-Please have some version of these implemented when this code is added.
-Having empty stubs like this is not helpful for review.
-
-> +
-> +static int
-> +__hw_perf_event_init(struct perf_event *event)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	int mapping;
-> +
-> +	mapping = pmu_map_event(event);
-> +	if (mapping < 0) {
-> +		pr_debug("event %x:%llx not supported\n", event->attr.type,
-> +							 event->attr.config);
-> +		return mapping;
-> +	}
-> +
-> +	/*
-> +	 * We don't assign an index until we actually place the event onto
-> +	 * hardware. Use -1 to signify that we haven't decided where to put it
-> +	 * yet.
-> +	 */
-> +	hwc->idx		= -1;
-> +	hwc->config_base	= 0;
-> +	hwc->config		= 0;
-> +	hwc->event_base		= 0;
-> +
-> +	/*
-> +	 * For HiSilicon SoC store the event encoding into the config_base
-> +	 * field.
-> +	 */
-> +	hwc->config_base = event->attr.config;
-> +
-> +	/*
-> +	 * Limit the sample_period to half of the counter width. That way, the
-> +	 * new counter value is far less likely to overtake the previous one
-> +	 * unless you have some serious IRQ latency issues.
-> +	 */
-> +	hwc->sample_period  = HISI_MAX_PERIOD >> 1;
-> +	hwc->last_period    = hwc->sample_period;
-> +	local64_set(&hwc->period_left, hwc->sample_period);
-> +
-> +	/* TBD: Initialize event counter variables to support multiple
-> +	 * HiSilicon Soc SCCL and banks
-> +	 */
-> +
-> +	return 0;
-> +}
-> +
-> +void hw_perf_event_destroy(struct perf_event *event)
-> +{
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +	struct hisi_hwmod_unit *punit;
-> +	atomic_t *active_events;
-> +	struct mutex *reserve_mutex;
-> +	u32 unit_idx = GET_UNIT_IDX(event->hw.config_base);
-> +
-> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
-> +	active_events = &punit->active_events;
-> +	reserve_mutex = &punit->reserve_mutex;
-> +
-> +	if (atomic_dec_and_mutex_lock(active_events, reserve_mutex)) {
-> +		/* FIXME: Release IRQ here */
-> +		mutex_unlock(reserve_mutex);
-> +	}
-> +}
-
-Please either implement this, or don't bother dynamically acquiring and
-freeing the IRQ.
-
-It looks like none of the other uncore PMU drivers bothers...
-
-> +
-> +int hisi_uncore_pmu_event_init(struct perf_event *event)
-> +{
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +	struct hisi_hwmod_unit *punit;
-> +	u32 raw_event_code = event->attr.config;
-> +	u32 unit_idx = GET_UNIT_IDX(raw_event_code);
-> +	int err;
-> +
-> +	if (event->attr.type != event->pmu->type)
-> +		return -ENOENT;
-> +
-> +	/* we do not support sampling */
-> +	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
-> +		return -EOPNOTSUPP;
-> +
-> +	/* counters do not have these bits */
-> +	if (event->attr.exclude_user	||
-> +	    event->attr.exclude_kernel	||
-> +	    event->attr.exclude_host	||
-> +	    event->attr.exclude_guest	||
-> +	    event->attr.exclude_hv	||
-> +	    event->attr.exclude_idle)
-> +		return -EINVAL;
-
-All of this crops up so much we should have common code to handle all of
-this. Either a library function or an uncore flag that the core code can
-check.
-
-> +
-> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
-> +
-> +	event->destroy = hw_perf_event_destroy;
-> +
-> +	err = __hw_perf_event_init(event);
-> +	if (err)
-> +		hw_perf_event_destroy(event);
-> +
-> +	return err;
-> +}
-> +
-> +
-> +/* Read hardware counter and update the Perf counter statistics */
-> +u64 hisi_uncore_pmu_event_update(struct perf_event *event,
-> +					struct hw_perf_event *hwc,
-> +							int idx) {
-> +	u64 new_raw_count = 0;
-> +	/*
-> +	 * TBD: Identify Event type and read appropriate hardware
-> +	 * counter and sum the values
-> +	 */
-> +
-> +	return new_raw_count;
-> +}
-> +
-> +void hisi_uncore_pmu_enable(struct pmu *pmu)
-> +{
-> +	/* TBD: Enable all the PMU counters. */
-> +}
-> +
-> +void hisi_uncore_pmu_disable(struct pmu *pmu)
-> +{
-> +	/* TBD: Disable all the PMU counters. */
-> +}
-> +
-> +int hisi_pmu_enable_counter(struct hisi_hwmod_unit *punit,
-> +							int idx)
-> +{
-> +	int ret = 0;
-> +
-> +	/* TBD - Enable the hardware event counting */
-> +
-> +	return ret;
-> +}
-> +
-> +void hisi_pmu_disable_counter(struct hisi_hwmod_unit *punit,
-> +							int idx)
-> +{
-> +	/* TBD - Disable the hardware event counting */
-> +}
-
-Please implement all of these.
-
-> +void hisi_uncore_pmu_enable_event(struct perf_event *event)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +	struct hisi_hwmod_unit *punit;
-> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
-> +	int idx = hwc->idx;
-> +
-> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
-> +
-> +	/*
-> +	 * Enable counter and set the counter to count
-> +	 * the event that we're interested in.
-> +	 */
-> +
-> +	/*
-> +	 * Disable counter
-> +	 */
-> +	hisi_pmu_disable_counter(punit, idx);
-> +
-> +	/*
-> +	 * Set event (if destined for Hisilicon SoC counters).
-> +	 */
-> +	hisi_uncore_pmu_write_evtype(punit, idx, hwc->config_base);
-> +
-> +	/*
-> +	 * Enable counter
-> +	 */
-> +	hisi_pmu_enable_counter(punit, idx);
-> +
-> +}
-> +
-> +int hisi_pmu_write_counter(struct hisi_hwmod_unit *punit,
-> +						int idx,
-> +						u32 value)
-> +{
-> +	int ret = 0;
-> +
-> +	/* TBD - Write to the hardware event counter */
-> +
-> +	return ret;
-> +}
-> +
-> +void hisi_pmu_event_set_period(struct perf_event *event)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +	struct hisi_hwmod_unit *punit;
-> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
-> +	int idx = hwc->idx;
-> +
-> +	/*
-> +	 * The Hisilicon PMU counters have a period of 2^32. To account for the
-> +	 * possiblity of extreme interrupt latency we program for a period of
-> +	 * half that. Hopefully we can handle the interrupt before another 2^31
-> +	 * events occur and the counter overtakes its previous value.
-> +	 */
-> +	u64 val = 1ULL << 31;
-> +
-> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
-> +	local64_set(&hwc->prev_count, val);
-> +	hisi_pmu_write_counter(punit, idx, val);
-> +}
-> +
-> +void hisi_uncore_pmu_start(struct perf_event *event,
-> +						int pmu_flags)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +	struct hisi_hwmod_unit *punit;
-> +	struct hisi_pmu_hw_events *hw_events;
-> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
-> +	unsigned long flags;
-> +
-> +	if (unit_idx >= (HISI_SCCL_MAX - 1)) {
-> +		pr_err("Invalid unitID=%d in event code=%lu!\n",
-> +					unit_idx + 1, hwc->config_base);
-> +		return;
-> +	}
-> +
-> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
-> +	hw_events = &punit->hw_events;
-> +
-> +	/*
-> +	 * To handle interrupt latency, we always reprogram the period
-> +	 * regardlesss of PERF_EF_RELOAD.
-> +	 */
-> +	if (pmu_flags & PERF_EF_RELOAD)
-> +		WARN_ON_ONCE(!(hwc->state & PERF_HES_UPTODATE));
-> +
-> +	hwc->state = 0;
-> +
-> +	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
-> +
-> +	hisi_pmu_event_set_period(event);
-> +	hisi_uncore_pmu_enable_event(event);
-> +
-> +	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
-> +}
-> +
-> +void hisi_uncore_pmu_stop(struct perf_event *event,
-> +						int flags)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +	struct hisi_hwmod_unit *punit = NULL;
-> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
-> +	int idx = hwc->idx;
-> +
-> +	if (hwc->state & PERF_HES_STOPPED)
-> +		return;
-> +
-> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
-> +
-> +	/*
-> +	 * We always reprogram the counter, so ignore PERF_EF_UPDATE. See
-> +	 * hisi_uncore_pmu_start()
-> +	 */
-> +	hisi_pmu_disable_counter(punit, idx);
-> +	hisi_uncore_pmu_event_update(event, hwc, idx);
-> +	hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
-> +
-> +}
-> +
-> +int hisi_uncore_pmu_add(struct perf_event *event, int flags)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisipmu = to_hisi_pmu(event->pmu);
-> +	struct hisi_hwmod_unit *punit;
-> +	struct hisi_pmu_hw_events *hw_events;
-> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
-> +	int idx, err = 0;
-> +
-> +	if (unit_idx >= (HISI_SCCL_MAX - 1)) {
-> +		pr_err("Invalid unitID=%d in event code=%lu\n",
-> +					unit_idx + 1, hwc->config_base);
-> +		return -EINVAL;
-> +	}
-> +
-> +	punit = &phisipmu->hwmod_pmu_unit[unit_idx];
-> +	hw_events = &punit->hw_events;
-> +
-> +	/* If we don't have a free counter then return early. */
-> +	idx = hisi_pmu_get_event_idx(hwc, punit);
-> +	if (idx < 0) {
-> +		err = idx;
-> +		goto out;
-> +	}
-> +
-> +	event->hw.idx = idx;
-> +	hw_events->events[idx] = event;
-> +
-> +	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
-> +	if (flags & PERF_EF_START)
-> +		hisi_uncore_pmu_start(event, PERF_EF_RELOAD);
-> +
-> +	/* Propagate our changes to the userspace mapping. */
-> +	perf_event_update_userpage(event);
-> +
-> +out:
-> +	return err;
-> +}
-> +
-> +void hisi_uncore_pmu_del(struct perf_event *event, int flags)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisipmu = to_hisi_pmu(event->pmu);
-> +	struct hisi_hwmod_unit *punit;
-> +	struct hisi_pmu_hw_events *hw_events;
-> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
-> +	int idx = hwc->idx;
-> +
-> +	punit = &phisipmu->hwmod_pmu_unit[unit_idx];
-> +	hw_events = &punit->hw_events;
-> +
-> +	hisi_uncore_pmu_stop(event, PERF_EF_UPDATE);
-> +	hw_events->events[idx] = NULL;
-> +
-> +	hisi_pmu_clear_event_idx(hwc, punit, idx);
-> +
-> +	perf_event_update_userpage(event);
-> +}
-> +
-> +int pmu_map_event(struct perf_event *event)
-> +{
-> +	return (int)(event->attr.config & HISI_EVTYPE_EVENT);
-> +}
-> +
-> +struct hisi_pmu *hisi_pmu_alloc(struct platform_device *pdev)
-> +{
-> +	struct hisi_pmu *phisipmu;
-> +
-> +	phisipmu = devm_kzalloc(&pdev->dev, sizeof(*phisipmu), GFP_KERNEL);
-> +	if (!phisipmu)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	return phisipmu;
-> +}
-> +
-> +int hisi_pmu_unit_init(struct platform_device *pdev,
-> +				struct hisi_hwmod_unit *punit,
-> +						int unit_id,
-> +						int num_counters)
-> +{
-> +	punit->hw_events.events = devm_kcalloc(&pdev->dev,
-> +				     num_counters,
-> +				     sizeof(*punit->hw_events.events),
-> +							     GFP_KERNEL);
-> +	if (!punit->hw_events.events)
-> +		return -ENOMEM;
-> +
-> +	raw_spin_lock_init(&punit->hw_events.pmu_lock);
-> +	atomic_set(&punit->active_events, 0);
-> +	mutex_init(&punit->reserve_mutex);
-> +
-> +	punit->unit_id = unit_id;
-> +
-> +	return 0;
-> +}
-> +
-> +void hisi_uncore_pmu_read(struct perf_event *event)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	int idx = hwc->idx;
-> +
-> +	hisi_uncore_pmu_event_update(event, hwc, idx);
-> +}
-> +
-> +int hisi_uncore_pmu_setup(struct hisi_pmu *hisipmu,
-> +				struct platform_device *pdev,
-> +						char *pmu_name)
-> +{
-> +	int ret;
-> +
-> +	/* Register the events are RAW events to support RAW events too */
-> +	ret = perf_pmu_register(&hisipmu->pmu, pmu_name, PERF_TYPE_RAW);
-> +	if (ret)
-> +		goto fail;
-> +
-> +	return 0;
-> +
-> +fail:
-> +	return ret;
-> +}
-
-Get rid of the goto and return ret in all cases. If you need the goto in
-subsequent patches, you can introduce it as required.
-
-This is never called currently, so it's unclear to me precisely what is
-being registered...
-
-Thanks,
-Mark.
+diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
+index 03d5657..6c92d97 100644
+--- a/drivers/regulator/tps65218-regulator.c
++++ b/drivers/regulator/tps65218-regulator.c
+@@ -31,10 +31,11 @@
+ enum tps65218_regulators { DCDC1, DCDC2, DCDC3, DCDC4,
+ 			   DCDC5, DCDC6, LDO1, LS3 };
+ 
+-#define TPS65218_REGULATOR(_name, _id, _type, _ops, _n, _vr, _vm, _er, _em, \
+-			   _cr, _cm, _lr, _nlr, _delay, _fuv, _sr, _sm)	\
++#define TPS65218_REGULATOR(_name, _of, _id, _type, _ops, _n, _vr, _vm, _er, \
++			   _em, _cr, _cm, _lr, _nlr, _delay, _fuv, _sr, _sm) \
+ 	{							\
+ 		.name			= _name,		\
++		.of_match		= _of,			\
+ 		.id			= _id,			\
+ 		.ops			= &_ops,		\
+ 		.n_voltages		= _n,			\
+@@ -55,14 +56,6 @@ enum tps65218_regulators { DCDC1, DCDC2, DCDC3, DCDC4,
+ 		.bypass_mask	= _sm,				\
+ 	}							\
+ 
+-#define TPS65218_INFO(_id, _nm, _min, _max)	\
+-	[_id] = {					\
+-		.id		= _id,			\
+-		.name		= _nm,			\
+-		.min_uV		= _min,			\
+-		.max_uV		= _max,			\
+-	}
+-
+ static const struct regulator_linear_range dcdc1_dcdc2_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(850000, 0x0, 0x32, 10000),
+ 	REGULATOR_LINEAR_RANGE(1375000, 0x33, 0x3f, 25000),
+@@ -78,36 +71,6 @@ static const struct regulator_linear_range dcdc4_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(1600000, 0x10, 0x34, 50000),
+ };
+ 
+-static struct tps_info tps65218_pmic_regs[] = {
+-	TPS65218_INFO(DCDC1, "DCDC1", 850000, 1675000),
+-	TPS65218_INFO(DCDC2, "DCDC2", 850000, 1675000),
+-	TPS65218_INFO(DCDC3, "DCDC3", 900000, 3400000),
+-	TPS65218_INFO(DCDC4, "DCDC4", 1175000, 3400000),
+-	TPS65218_INFO(DCDC5, "DCDC5", 1000000, 1000000),
+-	TPS65218_INFO(DCDC6, "DCDC6", 1800000, 1800000),
+-	TPS65218_INFO(LDO1, "LDO1", 900000, 3400000),
+-	TPS65218_INFO(LS3, "LS3", -1, -1),
+-};
+-
+-#define TPS65218_OF_MATCH(comp, label) \
+-	{ \
+-		.compatible = comp, \
+-		.data = &label, \
+-	}
+-
+-static const struct of_device_id tps65218_of_match[] = {
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc1", tps65218_pmic_regs[DCDC1]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc2", tps65218_pmic_regs[DCDC2]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc3", tps65218_pmic_regs[DCDC3]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc4", tps65218_pmic_regs[DCDC4]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc5", tps65218_pmic_regs[DCDC5]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc6", tps65218_pmic_regs[DCDC6]),
+-	TPS65218_OF_MATCH("ti,tps65218-ldo1", tps65218_pmic_regs[LDO1]),
+-	TPS65218_OF_MATCH("ti,tps65218-ls3", tps65218_pmic_regs[LS3]),
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(of, tps65218_of_match);
+-
+ static int tps65218_pmic_set_voltage_sel(struct regulator_dev *dev,
+ 					 unsigned selector)
+ {
+@@ -181,17 +144,16 @@ static int tps65218_pmic_set_suspend_disable(struct regulator_dev *dev)
+ 	if (rid < TPS65218_DCDC_1 || rid > TPS65218_LDO_1)
+ 		return -EINVAL;
+ 
+-	if (!tps->info[rid]->strobe) {
++	if (!tps->strobes[rid]) {
+ 		if (rid == TPS65218_DCDC_3)
+-			tps->info[rid]->strobe = 3;
++			tps->strobes[rid] = 3;
+ 		else
+ 			return -EINVAL;
+ 	}
+ 
+ 	return tps65218_set_bits(tps, dev->desc->bypass_reg,
+ 				 dev->desc->bypass_mask,
+-				 tps->info[rid]->strobe,
+-				 TPS65218_PROTECT_L1);
++				 tps->strobes[rid], TPS65218_PROTECT_L1);
+ }
+ 
+ /* Operations permitted on DCDC1, DCDC2 */
+@@ -293,104 +255,104 @@ static struct regulator_ops tps65218_dcdc56_pmic_ops = {
+ };
+ 
+ static const struct regulator_desc regulators[] = {
+-	TPS65218_REGULATOR("DCDC1", TPS65218_DCDC_1, REGULATOR_VOLTAGE,
+-			   tps65218_dcdc12_ops, 64, TPS65218_REG_CONTROL_DCDC1,
++	TPS65218_REGULATOR("DCDC1", "regulator-dcdc1", TPS65218_DCDC_1,
++			   REGULATOR_VOLTAGE, tps65218_dcdc12_ops, 64,
++			   TPS65218_REG_CONTROL_DCDC1,
+ 			   TPS65218_CONTROL_DCDC1_MASK, TPS65218_REG_ENABLE1,
+ 			   TPS65218_ENABLE1_DC1_EN, 0, 0, dcdc1_dcdc2_ranges,
+ 			   2, 4000, 0, TPS65218_REG_SEQ3,
+ 			   TPS65218_SEQ3_DC1_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC2", TPS65218_DCDC_2, REGULATOR_VOLTAGE,
+-			   tps65218_dcdc12_ops, 64, TPS65218_REG_CONTROL_DCDC2,
++	TPS65218_REGULATOR("DCDC2", "regulator-dcdc2", TPS65218_DCDC_2,
++			   REGULATOR_VOLTAGE, tps65218_dcdc12_ops, 64,
++			   TPS65218_REG_CONTROL_DCDC2,
+ 			   TPS65218_CONTROL_DCDC2_MASK, TPS65218_REG_ENABLE1,
+ 			   TPS65218_ENABLE1_DC2_EN, 0, 0, dcdc1_dcdc2_ranges,
+ 			   2, 4000, 0, TPS65218_REG_SEQ3,
+ 			   TPS65218_SEQ3_DC2_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC3", TPS65218_DCDC_3, REGULATOR_VOLTAGE,
+-			   tps65218_ldo1_dcdc34_ops, 64,
++	TPS65218_REGULATOR("DCDC3", "regulator-dcdc3", TPS65218_DCDC_3,
++			   REGULATOR_VOLTAGE, tps65218_ldo1_dcdc34_ops, 64,
+ 			   TPS65218_REG_CONTROL_DCDC3,
+ 			   TPS65218_CONTROL_DCDC3_MASK, TPS65218_REG_ENABLE1,
+ 			   TPS65218_ENABLE1_DC3_EN, 0, 0, ldo1_dcdc3_ranges, 2,
+ 			   0, 0, TPS65218_REG_SEQ4, TPS65218_SEQ4_DC3_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC4", TPS65218_DCDC_4, REGULATOR_VOLTAGE,
+-			   tps65218_ldo1_dcdc34_ops, 53,
++	TPS65218_REGULATOR("DCDC4", "regulator-dcdc4", TPS65218_DCDC_4,
++			   REGULATOR_VOLTAGE, tps65218_ldo1_dcdc34_ops, 53,
+ 			   TPS65218_REG_CONTROL_DCDC4,
+ 			   TPS65218_CONTROL_DCDC4_MASK, TPS65218_REG_ENABLE1,
+ 			   TPS65218_ENABLE1_DC4_EN, 0, 0, dcdc4_ranges, 2,
+ 			   0, 0, TPS65218_REG_SEQ4, TPS65218_SEQ4_DC4_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC5", TPS65218_DCDC_5, REGULATOR_VOLTAGE,
+-			   tps65218_dcdc56_pmic_ops, 1, -1, -1,
+-			   TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC5_EN, 0, 0,
+-			   NULL, 0, 0, 1000000, TPS65218_REG_SEQ5,
++	TPS65218_REGULATOR("DCDC5", "regulator-dcdc5", TPS65218_DCDC_5,
++			   REGULATOR_VOLTAGE, tps65218_dcdc56_pmic_ops, 1, -1,
++			   -1, TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC5_EN, 0,
++			   0, NULL, 0, 0, 1000000, TPS65218_REG_SEQ5,
+ 			   TPS65218_SEQ5_DC5_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC6", TPS65218_DCDC_6, REGULATOR_VOLTAGE,
+-			   tps65218_dcdc56_pmic_ops, 1, -1, -1,
+-			   TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC6_EN, 0, 0,
+-			   NULL, 0, 0, 1800000, TPS65218_REG_SEQ5,
++	TPS65218_REGULATOR("DCDC6", "regulator-dcdc6", TPS65218_DCDC_6,
++			   REGULATOR_VOLTAGE, tps65218_dcdc56_pmic_ops, 1, -1,
++			   -1, TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC6_EN, 0,
++			   0, NULL, 0, 0, 1800000, TPS65218_REG_SEQ5,
+ 			   TPS65218_SEQ5_DC6_SEQ_MASK),
+-	TPS65218_REGULATOR("LDO1", TPS65218_LDO_1, REGULATOR_VOLTAGE,
+-			   tps65218_ldo1_dcdc34_ops, 64,
++	TPS65218_REGULATOR("LDO1", "regulator-ldo1", TPS65218_LDO_1,
++			   REGULATOR_VOLTAGE, tps65218_ldo1_dcdc34_ops, 64,
+ 			   TPS65218_REG_CONTROL_LDO1,
+ 			   TPS65218_CONTROL_LDO1_MASK, TPS65218_REG_ENABLE2,
+ 			   TPS65218_ENABLE2_LDO1_EN, 0, 0, ldo1_dcdc3_ranges,
+ 			   2, 0, 0, TPS65218_REG_SEQ6,
+ 			   TPS65218_SEQ6_LDO1_SEQ_MASK),
+-	TPS65218_REGULATOR("LS3", TPS65218_LS_3, REGULATOR_CURRENT,
+-			   tps65218_ls3_ops, 0, 0, 0, TPS65218_REG_ENABLE2,
+-			   TPS65218_ENABLE2_LS3_EN, TPS65218_REG_CONFIG2,
+-			   TPS65218_CONFIG2_LS3ILIM_MASK, NULL, 0, 0, 0, 0, 0),
++	TPS65218_REGULATOR("LS3", "regulator-ls3", TPS65218_LS_3,
++			   REGULATOR_CURRENT, tps65218_ls3_ops, 0, 0, 0,
++			   TPS65218_REG_ENABLE2, TPS65218_ENABLE2_LS3_EN,
++			   TPS65218_REG_CONFIG2, TPS65218_CONFIG2_LS3ILIM_MASK,
++			   NULL, 0, 0, 0, 0, 0),
+ };
+ 
+ static int tps65218_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct tps65218 *tps = dev_get_drvdata(pdev->dev.parent);
+-	struct regulator_init_data *init_data;
+-	const struct tps_info	*template;
+ 	struct regulator_dev *rdev;
+-	const struct of_device_id	*match;
+ 	struct regulator_config config = { };
+-	int id, ret;
++	int i, ret;
+ 	unsigned int val;
+ 
+-	match = of_match_device(tps65218_of_match, &pdev->dev);
+-	if (!match)
+-		return -ENODEV;
+-
+-	template = match->data;
+-	id = template->id;
+-	init_data = of_get_regulator_init_data(&pdev->dev, pdev->dev.of_node,
+-					       &regulators[id]);
+-
+-	platform_set_drvdata(pdev, tps);
+-
+-	tps->info[id] = &tps65218_pmic_regs[id];
+ 	config.dev = &pdev->dev;
+-	config.init_data = init_data;
++	config.dev->of_node = tps->dev->of_node;
+ 	config.driver_data = tps;
+ 	config.regmap = tps->regmap;
+-	config.of_node = pdev->dev.of_node;
+ 
+-	rdev = devm_regulator_register(&pdev->dev, &regulators[id], &config);
+-	if (IS_ERR(rdev)) {
+-		dev_err(tps->dev, "failed to register %s regulator\n",
+-			pdev->name);
+-		return PTR_ERR(rdev);
+-	}
++	/* Allocate memory for strobes */
++	tps->strobes = devm_kzalloc(&pdev->dev, sizeof(u8) *
++				    TPS65218_NUM_REGULATOR, GFP_KERNEL);
+ 
+-	ret = tps65218_reg_read(tps, regulators[id].bypass_reg, &val);
+-	if (ret)
+-		return ret;
++	for (i = 0; i < ARRAY_SIZE(regulators); i++) {
++		rdev = devm_regulator_register(&pdev->dev, &regulators[i],
++					       &config);
++		if (IS_ERR(rdev)) {
++			dev_err(tps->dev, "failed to register %s regulator\n",
++				pdev->name);
++			return PTR_ERR(rdev);
++		}
+ 
+-	tps->info[id]->strobe = val & regulators[id].bypass_mask;
++		ret = regmap_read(tps->regmap, regulators[i].bypass_reg, &val);
++		if (ret)
++			return ret;
++
++		tps->strobes[i] = val & regulators[i].bypass_mask;
++	}
+ 
+ 	return 0;
+ }
+ 
++static const struct platform_device_id tps65218_regulator_id_table[] = {
++	{ "tps65218-regulator", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(platform, tps65218_regulator_id_table);
++
+ static struct platform_driver tps65218_regulator_driver = {
+ 	.driver = {
+ 		.name = "tps65218-pmic",
+-		.of_match_table = tps65218_of_match,
+ 	},
+ 	.probe = tps65218_regulator_probe,
++	.id_table = tps65218_regulator_id_table,
+ };
+ 
+ module_platform_driver(tps65218_regulator_driver);
+diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
+index c37ba3e..93160c6b 100644
+--- a/include/linux/mfd/tps65218.h
++++ b/include/linux/mfd/tps65218.h
+@@ -276,6 +276,7 @@ struct tps65218 {
+ 	struct regulator_desc desc[TPS65218_NUM_REGULATOR];
+ 	struct tps_info *info[TPS65218_NUM_REGULATOR];
+ 	struct regmap *regmap;
++	u8 *strobes;
+ };
+ 
+ int tps65218_reg_write(struct tps65218 *tps, unsigned int reg,
+-- 
+1.9.1
