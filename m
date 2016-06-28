@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:31:14 +0200
-Subject: [PATCH 55/92] clocksource/drivers/keystone: Convert init function to
+Date: Tue, 28 Jun 2016 12:31:11 +0200
+Subject: [PATCH 52/92] clocksource/drivers/prima2: Convert init function to
  return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-55-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-52-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,63 +26,85 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 ---
- drivers/clocksource/timer-keystone.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ drivers/clocksource/timer-prima2.c | 43 ++++++++++++++++++++++++++++----------
+ 1 file changed, 32 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
-index 1cea08c..4199823 100644
---- a/drivers/clocksource/timer-keystone.c
-+++ b/drivers/clocksource/timer-keystone.c
-@@ -144,7 +144,7 @@ static int keystone_set_periodic(struct clock_event_device *evt)
- 	return 0;
+diff --git a/drivers/clocksource/timer-prima2.c b/drivers/clocksource/timer-prima2.c
+index 2854c66..7b1084d 100644
+--- a/drivers/clocksource/timer-prima2.c
++++ b/drivers/clocksource/timer-prima2.c
+@@ -189,24 +189,36 @@ static void __init sirfsoc_clockevent_init(void)
  }
  
--static void __init keystone_timer_init(struct device_node *np)
-+static int __init keystone_timer_init(struct device_node *np)
+ /* initialize the kernel jiffy timer source */
+-static void __init sirfsoc_prima2_timer_init(struct device_node *np)
++static int __init sirfsoc_prima2_timer_init(struct device_node *np)
  {
- 	struct clock_event_device *event_dev = &timer.event_dev;
  	unsigned long rate;
-@@ -154,20 +154,20 @@ static void __init keystone_timer_init(struct device_node *np)
- 	irq  = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
- 		pr_err("%s: failed to map interrupts\n", __func__);
--		return;
-+		return -EINVAL;
- 	}
- 
- 	timer.base = of_iomap(np, 0);
- 	if (!timer.base) {
- 		pr_err("%s: failed to map registers\n", __func__);
--		return;
-+		return -ENXIO;
- 	}
+ 	struct clk *clk;
++	int ret;
  
  	clk = of_clk_get(np, 0);
- 	if (IS_ERR(clk)) {
- 		pr_err("%s: failed to get clock\n", __func__);
- 		iounmap(timer.base);
--		return;
+-	BUG_ON(IS_ERR(clk));
++	if (IS_ERR(clk)) {
++		pr_err("Failed to get clock");
 +		return PTR_ERR(clk);
- 	}
++	}
  
- 	error = clk_prepare_enable(clk);
-@@ -219,11 +219,12 @@ static void __init keystone_timer_init(struct device_node *np)
- 	clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
+-	BUG_ON(clk_prepare_enable(clk));
++	ret = clk_prepare_enable(clk);
++	if (ret) {
++		pr_err("Failed to enable clock");
++		return ret;
++	}
  
- 	pr_info("keystone timer clock @%lu Hz\n", rate);
--	return;
+ 	rate = clk_get_rate(clk);
+ 
+-	BUG_ON(rate < PRIMA2_CLOCK_FREQ);
+-	BUG_ON(rate % PRIMA2_CLOCK_FREQ);
++	if (rate < PRIMA2_CLOCK_FREQ || rate % PRIMA2_CLOCK_FREQ) {
++		pr_err("Invalid clock rate");
++		return -EINVAL;
++	}
+ 
+ 	sirfsoc_timer_base = of_iomap(np, 0);
+-	if (!sirfsoc_timer_base)
+-		panic("unable to map timer cpu registers\n");
++	if (!sirfsoc_timer_base) {
++		pr_err("unable to map timer cpu registers\n");
++		return -ENXIO;
++	}
+ 
+ 	sirfsoc_timer_irq.irq = irq_of_parse_and_map(np, 0);
+ 
+@@ -216,14 +228,23 @@ static void __init sirfsoc_prima2_timer_init(struct device_node *np)
+ 	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_HI);
+ 	writel_relaxed(BIT(0), sirfsoc_timer_base + SIRFSOC_TIMER_STATUS);
+ 
+-	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource,
+-				       PRIMA2_CLOCK_FREQ));
++	ret = clocksource_register_hz(&sirfsoc_clocksource, PRIMA2_CLOCK_FREQ);
++	if (ret) {
++		pr_err("Failed to register clocksource");
++		return ret;
++	}
+ 
+ 	sched_clock_register(sirfsoc_read_sched_clock, 64, PRIMA2_CLOCK_FREQ);
+ 
+-	BUG_ON(setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq));
++	ret = setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq);
++	if (ret) {
++		pr_err("Failed to setup irq");
++		return ret;
++	}
+ 
+ 	sirfsoc_clockevent_init();
++
 +	return 0;
- err:
- 	clk_put(clk);
- 	iounmap(timer.base);
-+	return error;
  }
- 
--CLOCKSOURCE_OF_DECLARE(keystone_timer, "ti,keystone-timer",
--					keystone_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(keystone_timer, "ti,keystone-timer",
-+			   keystone_timer_init);
+-CLOCKSOURCE_OF_DECLARE(sirfsoc_prima2_timer,
++CLOCKSOURCE_OF_DECLARE_RET(sirfsoc_prima2_timer,
+ 	"sirf,prima2-tick", sirfsoc_prima2_timer_init);
 -- 
 1.9.1
