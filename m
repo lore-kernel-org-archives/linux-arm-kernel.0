@@ -1,43 +1,81 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Tue, 28 Jun 2016 09:24:00 +0530
-Subject: [PATCH 1/8] tty: serial: fsl_lpuart: consider TX FIFO too in
- tx_empty
-In-Reply-To: <20160625212600.GA28726@kroah.com>
-References: <20160609151039.20817-1-bhuvanchandra.dv@toradex.com>
- <20160609151039.20817-2-bhuvanchandra.dv@toradex.com>
- <20160625212600.GA28726@kroah.com>
-Message-ID: <c8a587d0-814a-e71e-0312-d0b5f71022c4@toradex.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 28 Jun 2016 09:34:02 +0530
+Subject: [PATCH 7/8] dmaengine: tegra20-apb-dma: Only calculate residue
+ if txstate exists.
+In-Reply-To: <57697736.4050008@nvidia.com>
+References: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
+ <1465321121-22238-8-git-send-email-peter.griffin@linaro.org>
+ <5757DCAD.1090106@nvidia.com> <20160621160139.GC16910@localhost>
+ <57697736.4050008@nvidia.com>
+Message-ID: <20160628040402.GP22564@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/16 02:56, Greg KH wrote:
+On Tue, Jun 21, 2016 at 06:19:50PM +0100, Jon Hunter wrote:
+> 
+> On 21/06/16 17:01, Vinod Koul wrote:
+> > On Wed, Jun 08, 2016 at 09:51:57AM +0100, Jon Hunter wrote:
+> >> Hi Peter,
+> >>
+> >> On 07/06/16 18:38, Peter Griffin wrote:
+> >>> There is no point calculating the residue if there is
+> >>> no txstate to store the value.
+> >>>
+> >>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> >>> ---
+> >>>  drivers/dma/tegra20-apb-dma.c | 2 +-
+> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+> >>> index 01e316f..7f4af8c 100644
+> >>> --- a/drivers/dma/tegra20-apb-dma.c
+> >>> +++ b/drivers/dma/tegra20-apb-dma.c
+> >>> @@ -814,7 +814,7 @@ static enum dma_status tegra_dma_tx_status(struct dma_chan *dc,
+> >>>  	unsigned int residual;
+> >>>  
+> >>>  	ret = dma_cookie_status(dc, cookie, txstate);
+> >>> -	if (ret == DMA_COMPLETE)
+> >>> +	if (ret == DMA_COMPLETE || !txstate)
+> >>>  		return ret;
+> >>
+> >> Thanks for reporting this. I agree that we should not do this, however, 
+> >> looking at the code for Tegra, I am wondering if this could change the
+> >> actual state that is returned. Looking at dma_cookie_status() it will
+> >> call dma_async_is_complete() which will return either DMA_COMPLETE or
+> >> DMA_IN_PROGRESS. It could be possible that the actual state for the
+> >> DMA transfer in the tegra driver is DMA_ERROR, so I am wondering if we
+> >> should do something like the following  ...
+> > 
+> > This one is stopping code execution when residue is not valid. Do notice
+> > that it check for DMA_COMPLETE OR txstate. In other cases, wit will return
+> > 'that' state when txstate is NULL.
+> 
+> Sorry what do you mean by "this one"?
 
-> On Thu, Jun 09, 2016 at 08:40:32PM +0530, Bhuvanchandra DV wrote:
->> From: Stefan Agner <stefan@agner.ch>
->>
->> Currently the tx_empty callback only considers the Transmit Complete
->> Flag (TC). The reference manual is not quite clear if the TC flag
->> covers the TX FIFO too. Debug prints on real hardware have shown that
->> from time to time the TC flag is asserted (indicating Transmitter
->> idle) while there are still data in the TX FIFO. Hence, in this case
->> the serial core will call the shutdown callback even though there are
->> data remaining in the TX FIFO buffers.
->>
->> Avoid early shutdowns by considering the TX FIFO empty flag too. Also
->> avoid theoretical race conditions between DMA and the driver by
->> checking whether the TX DMA is in progress too.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>   drivers/tty/serial/fsl_lpuart.c | 14 ++++++++++++--
->>   1 file changed, 12 insertions(+), 2 deletions(-)
-> Why are you not signing off on patches that are flowing through you?
-> Please fix this up and resend the series, after breaking up the clock
-> change as asked.
+the patch
 
-Okay
+> 
+> My point is that if the status is not DMA_COMPLETE, then it is possible
+> that it could be DMA_ERROR (for tegra that is). 
 
->
-> thanks,
->
-> greg k-h
+right it can be any state... and we check for only DMA_COMPLETE as residue
+has no meaning.
+
+> However,
+> dma_cookie_status will only return DMA_IN_PROGRESS or DMA_COMPLETE and
+> so if 'txstate' is NULL we will not see the DMA_ERROR status anymore and
+> just think it is in progress when it is actually an error.
+
+Yes that is an existing issue, if you are reporting DMA_ERROR then you
+should add a check for DMA_ERROR as well and not do residue calculation for
+that case.
+
+> 
+> I do agree that the driver is broken as we are not checking for
+> !txstate, but this also changes the behaviour a bit.
+
+It changes for better and not worse. Btw pls feel free to send a patch
+handling DMA_ERROR :)
+
+-- 
+~Vinod
