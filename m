@@ -1,43 +1,32 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 28 Jun 2016 14:22:19 -0700
-Subject: [PATCH v3 2/2] remoteproc: qcom: Introduce WCNSS peripheral
- image loader
-In-Reply-To: <115043528.GxNIb9dTCg@wuerfel>
-References: <1467147506-753-1-git-send-email-bjorn.andersson@linaro.org>
- <1467147506-753-2-git-send-email-bjorn.andersson@linaro.org>
- <115043528.GxNIb9dTCg@wuerfel>
-Message-ID: <20160628212219.GG1190@tuxbot>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Jun 2016 23:24:36 +0200
+Subject: [PATCH v3] ARM: dts: sun7i: Add BCM53125 switch nodes to the
+ lamobo-r1 board
+In-Reply-To: <1467074756-8402-1-git-send-email-f.fainelli@gmail.com>
+References: <1467074756-8402-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20160628212436.GH5550@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 28 Jun 14:05 PDT 2016, Arnd Bergmann wrote:
+On Mon, Jun 27, 2016 at 05:45:56PM -0700, Florian Fainelli wrote:
+> Now that we have a proper binding for Ethernet switches hanging off
+> different buses, and a driver for the BCM53125 switch, add its Device
+> Tree as a child MDIO node, at MDIO address 30 (Broadcom pseudo-PHY
+> address) and describe the ports layout of the Lamobo R1 board.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-> On Tuesday, June 28, 2016 1:58:26 PM CEST Bjorn Andersson wrote:
-> > 
-> > +config QCOM_WCNSS_PIL
-> > +       tristate "Qualcomm WCNSS Peripheral Image Loader"
-> > +       depends on OF && ARCH_QCOM
-> > +       select QCOM_MDT_LOADER
-> > +       select QCOM_SCM
-> > +       select REMOTEPROC
-> > +       help
-> > +         Say y here to support the Peripherial Image Loader for the Qualcomm
-> > +         Wireless Connectivity Subsystem.
-> > +
-> > 
-> 
-> 	"depends on QCOM_SMEM"
-> 
-> This showed up in Linux-next today and caused a build error:
-> 
-> drivers/remoteproc/built-in.o: In function `q6v5_fatal_interrupt':
-> qcom_q6v5_pil.c:(.text+0x2428): undefined reference to `qcom_smem_get'
-> drivers/remoteproc/built-in.o: In function `q6v5_wdog_interrupt':
-> qcom_q6v5_pil.c:(.text+0x2498): undefined reference to `qcom_smem_get'
-> 
+Applied, thanks!
+Maxime
 
-I was convinced I had stubs for those, sorry for not making sure. I
-amended rproc-next with this.
-
-Thanks,
-Bjorn
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160628/a2b51528/attachment.sig>
