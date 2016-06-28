@@ -1,22 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Jun 2016 15:59:43 -0500
-Subject: [PATCH v1 1/5] dt-bindings: Add support for LG LP079QX1-SP0V
- 1536x2048 panel
-In-Reply-To: <1467089472-18584-1-git-send-email-ykk@rock-chips.com>
-References: <1467089288-18355-1-git-send-email-ykk@rock-chips.com>
- <1467089472-18584-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <20160628205943.GA6556@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Jun 2016 23:05:25 +0200
+Subject: [PATCH v3 2/2] remoteproc: qcom: Introduce WCNSS peripheral image
+ loader
+In-Reply-To: <1467147506-753-2-git-send-email-bjorn.andersson@linaro.org>
+References: <1467147506-753-1-git-send-email-bjorn.andersson@linaro.org>
+ <1467147506-753-2-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <115043528.GxNIb9dTCg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 12:51:12PM +0800, Yakir Yang wrote:
-> The LG LP079QX1-SP0V is an 7.9" QXGA TFT with LED Backlight unit and
-> 32 pins eDP interface. This module supports 1536x2048 mode.
+On Tuesday, June 28, 2016 1:58:26 PM CEST Bjorn Andersson wrote:
 > 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
->  .../devicetree/bindings/display/panel/lg,lp079qx1-sp0v.txt         | 7 +++++++
->  1 file changed, 7 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/lg,lp079qx1-sp0v.txt
+> +config QCOM_WCNSS_PIL
+> +       tristate "Qualcomm WCNSS Peripheral Image Loader"
+> +       depends on OF && ARCH_QCOM
+> +       select QCOM_MDT_LOADER
+> +       select QCOM_SCM
+> +       select REMOTEPROC
+> +       help
+> +         Say y here to support the Peripherial Image Loader for the Qualcomm
+> +         Wireless Connectivity Subsystem.
+> +
+> 
 
-Acked-by: Rob Herring <robh@kernel.org>
+	"depends on QCOM_SMEM"
+
+This showed up in Linux-next today and caused a build error:
+
+drivers/remoteproc/built-in.o: In function `q6v5_fatal_interrupt':
+qcom_q6v5_pil.c:(.text+0x2428): undefined reference to `qcom_smem_get'
+drivers/remoteproc/built-in.o: In function `q6v5_wdog_interrupt':
+qcom_q6v5_pil.c:(.text+0x2498): undefined reference to `qcom_smem_get'
+
+
+	Arnd
