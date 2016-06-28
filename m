@@ -1,79 +1,52 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 28 Jun 2016 11:36:20 +0530
-Subject: [PATCH v3 10/10] ARM: dts: AM43X-EPOS-EVM: Remove redundant regulator
- compatibles
-In-Reply-To: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
-References: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1467093980-11458-11-git-send-email-j-keerthy@ti.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 28 Jun 2016 14:25:36 +0800
+Subject: [PATCH v3 03/10] input: tps65218-pwrbutton: Add
+ platform_device_id table
+In-Reply-To: <1467093980-11458-4-git-send-email-j-keerthy@ti.com>
+Message-ID: <201606281427.iovLfzW6%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the device tree parsing using the regulator framework
-there is a no longer a need for separate compatibles for
-individual regulator nodes. Hence removing them all.
+Hi,
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.7-rc5 next-20160627]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Keerthy/mfd-tps65218-Clean-ups/20160628-141354
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: tile-allmodconfig (attached as .config)
+compiler: tilegx-linux-gcc (GCC) 4.6.2
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=tile 
+
+All errors (new ones prefixed by >>):
+
+>> drivers/input/misc/tps65218-pwrbutton.c:120:1: error: expected ',' or ';' before 'extern'
+
+vim +120 drivers/input/misc/tps65218-pwrbutton.c
+
+   114	MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
+   115	
+   116	static const struct platform_device_id tps65218_pwrbtn_id_table[] = {
+   117		{ "tps65218-pwrbutton", },
+   118		{ /* sentinel */ }
+   119	}
+ > 120	MODULE_DEVICE_TABLE(platform, tps65218_pwrbtn_id_table);
+   121	
+   122	static struct platform_driver tps65218_pwron_driver = {
+   123		.probe	= tps65218_pwron_probe,
+
 ---
- arch/arm/boot/dts/am43x-epos-evm.dts | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-index 3549b8c..6a2eecd 100644
---- a/arch/arm/boot/dts/am43x-epos-evm.dts
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -421,7 +421,6 @@
- 		#interrupt-cells = <2>;
- 
- 		dcdc1: regulator-dcdc1 {
--			compatible = "ti,tps65218-dcdc1";
- 			regulator-name = "vdd_core";
- 			regulator-min-microvolt = <912000>;
- 			regulator-max-microvolt = <1144000>;
-@@ -430,7 +429,6 @@
- 		};
- 
- 		dcdc2: regulator-dcdc2 {
--			compatible = "ti,tps65218-dcdc2";
- 			regulator-name = "vdd_mpu";
- 			regulator-min-microvolt = <912000>;
- 			regulator-max-microvolt = <1378000>;
-@@ -439,7 +437,6 @@
- 		};
- 
- 		dcdc3: regulator-dcdc3 {
--			compatible = "ti,tps65218-dcdc3";
- 			regulator-name = "vdcdc3";
- 			regulator-min-microvolt = <1500000>;
- 			regulator-max-microvolt = <1500000>;
-@@ -448,7 +445,6 @@
- 		};
- 
- 		dcdc4: regulator-dcdc4 {
--			compatible = "ti,tps65218-dcdc4";
- 			regulator-name = "vdcdc4";
- 			regulator-min-microvolt = <3300000>;
- 			regulator-max-microvolt = <3300000>;
-@@ -457,21 +453,18 @@
- 		};
- 
- 		dcdc5: regulator-dcdc5 {
--			compatible = "ti,tps65218-dcdc5";
- 			regulator-name = "v1_0bat";
- 			regulator-min-microvolt = <1000000>;
- 			regulator-max-microvolt = <1000000>;
- 		};
- 
- 		dcdc6: regulator-dcdc6 {
--			compatible = "ti,tps65218-dcdc6";
- 			regulator-name = "v1_8bat";
- 			regulator-min-microvolt = <1800000>;
- 			regulator-max-microvolt = <1800000>;
- 		};
- 
- 		ldo1: regulator-ldo1 {
--			compatible = "ti,tps65218-ldo1";
- 			regulator-min-microvolt = <1800000>;
- 			regulator-max-microvolt = <1800000>;
- 			regulator-boot-on;
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 44836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160628/a3cfe2e9/attachment-0001.obj>
