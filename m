@@ -1,47 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 28 Jun 2016 10:27:42 +0800
-Subject: [PATCH v3 5/8] rtc: ac100: Add clk output support
-In-Reply-To: <20160627192321.GX4000@lukather>
-References: <1466391138-12862-1-git-send-email-wens@csie.org>
- <1466391138-12862-6-git-send-email-wens@csie.org>
- <20160622100206.GV26668@lukather>
- <CAGb2v67DVBZbRb2PWLP8WurPaNin=2Fa=HMAEK_PdBeqv1x+8Q@mail.gmail.com>
- <20160627192321.GX4000@lukather>
-Message-ID: <CAGb2v675+iEnKPH4zdYRA-+aQGUfHgB9K_TH_GrpmXXw4qM50w@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jun 2016 10:27:56 +0800
+Subject: [PATCH 0/6] kill off cpu_is_mx*()
+In-Reply-To: <20160624105001.3166287-1-arnd@arndb.de>
+References: <20160624105001.3166287-1-arnd@arndb.de>
+Message-ID: <20160628022756.GD21328@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 3:23 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Jun 22, 2016 at 06:11:55PM +0800, Chen-Yu Tsai wrote:
->> On Wed, Jun 22, 2016 at 6:02 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi,
->> >
->> > On Mon, Jun 20, 2016 at 10:52:15AM +0800, Chen-Yu Tsai wrote:
->> >> +     /*
->> >> +      * The ADDA 4 MHz clock is from the codec side of the AC100,
->> >> +      * which is likely a different power domain. However, boards
->> >> +      * always have both sides powered on, so it is impossible to
->> >> +      * test this.
->> >> +      */
->> >
->> > If that ADDA clock is exposed by the codec, why are you putting it in
->> > the RTC?
->>
->> The thing is it's not entirely clear that it's from the codec side.
->> I'm just inferring this from the name. (I'll make the comment clearer.)
->> The codec parts of the datasheet don't mention this clock at all.
->>
->> Allwinner's SDK puts all the clocks under the RTC module. And the
->> are always on, so I can't really turn off the codec and see what
->> happens. That and I don't have an oscilloscope or logic analyzer.
->
-> Why not just create a separate clock driver then?
+On Fri, Jun 24, 2016 at 12:49:55PM +0200, Arnd Bergmann wrote:
+> I noticed that i.MX still uses the traditional cpu_is_* functions to
+> tell the difference between various SoC families, but every single
+> user of those can be replaced with a simpler way, so we can just
+> remove it all.
+> 
+> Please review and apply for 4.8 if it looks good to you.
+> 
+> Arnd Bergmann (6):
+>   ARM: imx: remove cpu_is_mx1 check
+>   ARM: imx: deconstruct mxc_rnga initialization
+>   ARM: imx: deconstruct mx3_idle
+>   ARM: imx: rework mx27_pm_init() call
+>   ARM: imx: remove last call to cpu_is_mx5*
+>   ARM: imx: remove cpu_is_mx*()
 
-That would mean a separate device node as well. I'd like to keep
-the bindings close to how the hardware is organized.
+Thanks for cleaning this up.  Applied all.
 
-I can move the ADDA clock over to the codec side.
-
-ChenYu
+Shawn
