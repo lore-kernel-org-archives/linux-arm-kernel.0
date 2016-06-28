@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:30:33 +0200
-Subject: [PATCH 14/92] clocksource/drivers/mtk_timer: Convert init function to
- return error
+Date: Tue, 28 Jun 2016 12:30:32 +0200
+Subject: [PATCH 13/92] clocksource/drivers/rockchip_timer: Convert init
+ function to return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-14-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-13-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,50 +26,112 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/clocksource/mtk_timer.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index 7e583f8..432a2c0 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -181,7 +181,7 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
- 			evt->gpt_base + GPT_IRQ_EN_REG);
+on a rk3399-evb
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clocksource/rockchip_timer.c | 35 +++++++++++++++++++++--------------
+ 1 file changed, 21 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index a3f22b0..85aee69 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -113,38 +113,42 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
  }
  
--static void __init mtk_timer_init(struct device_node *node)
-+static int __init mtk_timer_init(struct device_node *node)
+-static void __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
++static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
  {
- 	struct mtk_clock_event_device *evt;
- 	struct resource res;
-@@ -190,7 +190,7 @@ static void __init mtk_timer_init(struct device_node *node)
+ 	struct clock_event_device *ce = &bc_timer.ce;
+ 	struct clk *timer_clk;
+ 	struct clk *pclk;
+-	int ret, irq;
++	int ret = -EINVAL, irq;
  
- 	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
- 	if (!evt)
+ 	bc_timer.base = of_iomap(np, 0);
+ 	if (!bc_timer.base) {
+ 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
 -		return;
-+		return -ENOMEM;
++		return -ENXIO;
+ 	}
+ 	bc_timer.ctrl = bc_timer.base + ctrl_reg;
  
- 	evt->dev.name = "mtk_tick";
- 	evt->dev.rating = 300;
-@@ -248,7 +248,7 @@ static void __init mtk_timer_init(struct device_node *node)
+ 	pclk = of_clk_get_by_name(np, "pclk");
+ 	if (IS_ERR(pclk)) {
++		ret = PTR_ERR(pclk);
+ 		pr_err("Failed to get pclk for '%s'\n", TIMER_NAME);
+ 		goto out_unmap;
+ 	}
  
- 	mtk_timer_enable_irq(evt, GPT_CLK_EVT);
+-	if (clk_prepare_enable(pclk)) {
++	ret = clk_prepare_enable(pclk);
++	if (ret) {
+ 		pr_err("Failed to enable pclk for '%s'\n", TIMER_NAME);
+ 		goto out_unmap;
+ 	}
+ 
+ 	timer_clk = of_clk_get_by_name(np, "timer");
+ 	if (IS_ERR(timer_clk)) {
++		ret = PTR_ERR(timer_clk);
+ 		pr_err("Failed to get timer clock for '%s'\n", TIMER_NAME);
+ 		goto out_timer_clk;
+ 	}
+ 
+-	if (clk_prepare_enable(timer_clk)) {
++	ret = clk_prepare_enable(timer_clk);
++	if (ret) {
+ 		pr_err("Failed to enable timer clock\n");
+ 		goto out_timer_clk;
+ 	}
+@@ -153,6 +157,7 @@ static void __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+ 
+ 	irq = irq_of_parse_and_map(np, 0);
+ 	if (!irq) {
++		ret = -EINVAL;
+ 		pr_err("Failed to map interrupts for '%s'\n", TIMER_NAME);
+ 		goto out_irq;
+ 	}
+@@ -178,7 +183,7 @@ static void __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+ 
+ 	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
  
 -	return;
 +	return 0;
  
- err_clk_disable:
- 	clk_disable_unprepare(clk);
-@@ -262,5 +262,7 @@ err_mem:
- 	release_mem_region(res.start, resource_size(&res));
- err_kzalloc:
- 	kfree(evt);
+ out_irq:
+ 	clk_disable_unprepare(timer_clk);
+@@ -186,19 +191,21 @@ out_timer_clk:
+ 	clk_disable_unprepare(pclk);
+ out_unmap:
+ 	iounmap(bc_timer.base);
 +
-+	return -EINVAL;
++	return ret;
  }
--CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
+ 
+-static void __init rk3288_timer_init(struct device_node *np)
++static int __init rk3288_timer_init(struct device_node *np)
+ {
+-	rk_timer_init(np, TIMER_CONTROL_REG3288);
++	return rk_timer_init(np, TIMER_CONTROL_REG3288);
+ }
+ 
+-static void __init rk3399_timer_init(struct device_node *np)
++static int __init rk3399_timer_init(struct device_node *np)
+ {
+-	rk_timer_init(np, TIMER_CONTROL_REG3399);
++	return rk_timer_init(np, TIMER_CONTROL_REG3399);
+ }
+ 
+-CLOCKSOURCE_OF_DECLARE(rk3288_timer, "rockchip,rk3288-timer",
+-		       rk3288_timer_init);
+-CLOCKSOURCE_OF_DECLARE(rk3399_timer, "rockchip,rk3399-timer",
+-		       rk3399_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(rk3288_timer, "rockchip,rk3288-timer",
++			   rk3288_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(rk3399_timer, "rockchip,rk3399-timer",
++			   rk3399_timer_init);
 -- 
 1.9.1
