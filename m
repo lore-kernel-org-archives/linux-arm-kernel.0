@@ -1,19 +1,35 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 28 Jun 2016 20:10:13 +0530
-Subject: [PATCH] dmaengine: ti-dma-crossbar: make omap_dmaxbar_init static
-In-Reply-To: <1466529159-10359-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1466529159-10359-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160628144013.GE14945@localhost>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 28 Jun 2016 16:37:48 +0200
+Subject: [PATCH v4 0/4] dmaengine driver for Marvell XOR v2 engine
+In-Reply-To: <20160628143850.GD14945@localhost>
+References: <1466080116-26777-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160628143850.GD14945@localhost>
+Message-ID: <20160628163748.48bc2ad8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 06:12:39PM +0100, Ben Dooks wrote:
-> The omap_dmaxbar_init() function is not exported or declared outside
-> the driver, so make it static to fix the following sparse warning:
+Hello,
+
+On Tue, 28 Jun 2016 20:08:50 +0530, Vinod Koul wrote:
+> On Thu, Jun 16, 2016 at 02:28:32PM +0200, Thomas Petazzoni wrote:
+> > Hello,
+> > 
+> > Here is the fourth version of the mv_xor_v2 driver, which allows to
+> > use the XOR engines available on the Marvell Armada 7K/8K ARM64 SoCs.  
 > 
-> drivers/dma/ti-dma-crossbar.c:455:5: warning: symbol 'omap_dmaxbar_init' was not declared. Should it be static?
+> Looks okay. But need ack on two ARM patches...
 
-Applied, thanks
+Thanks for the review! Please don't take the two ARM patches in your
+tree, let the mvebu platform maintainer take them, to avoid conflicts.
 
+So if you're happy with patches 1 and 2, could you take them? I'll talk
+with the mvebu platform maintainer (who is in Cc) to get patches 3 and
+4 merged.
+
+Thanks a lot!
+
+Thomas
 -- 
-~Vinod
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
