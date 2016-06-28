@@ -1,63 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Jun 2016 09:56:22 +0100
-Subject: [PATCH 4/7] reset: Supply *_shared variant calls when using
- *_optional APIs
-In-Reply-To: <20160606155655.10860-5-lee.jones@linaro.org>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
- <20160606155655.10860-5-lee.jones@linaro.org>
-Message-ID: <20160628085622.GM6720@dell>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 28 Jun 2016 12:13:57 +0300
+Subject: [PATCH] extcon: Add support for qcom SPMI PMIC USB id detection
+ hardware
+In-Reply-To: <146710362771.3879.13924434427129313640@sboyd-linaro>
+References: <20160626055647.18898-1-stephen.boyd@linaro.org>
+ <5770D847.7060901@ti.com>
+ <146705583219.30684.18055040268826215722@sboyd-linaro>
+ <57721AEA.6010509@ti.com>
+ <146710362771.3879.13924434427129313640@sboyd-linaro>
+Message-ID: <57723FD5.8050305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philipp,
-
-I need this to go into the -rcs too.
-
-Can I add it with your Ack please?
-
-> Consumers need to be able to specify whether they are requesting an
-> 'exclusive' or 'shared' reset line no matter which API (of_*, devm_*,
-> etc) they are using.  This change allows users of the optional_* API
-> in particular to specify that their request is for a 'shared' line.
+On 28/06/16 11:47, Stephen Boyd wrote:
+> Quoting Roger Quadros (2016-06-27 23:36:26)
+>> On 27/06/16 22:30, Stephen Boyd wrote:
+>>>
+>>> The VBUS notification is done through another piece of hardware. In this
+>>> case it's done by the charger module. I've sent a patch for that[1].
+>>
+>> Isn't it better if ID event is handled as well in that PMIC driver instead of
+>> creating a separate one here?
+>>
+>> Why do you need ID to be handled outside of the PMIC driver?
+>> You mentioned earlier that some Qualcomm PMICs have ID detection.
+>
+> Sorry I must have confused you. There are two modules in the PMIC that
+> are doing detection here. The charger module is detecting the VBUS event
+> and this misc module is detecting the ID pin. I'm not sure why they're
+> two different blocks, but it is what it is in the hardware.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  include/linux/reset.h | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/include/linux/reset.h b/include/linux/reset.h
-> index fd69240..c358106 100644
-> --- a/include/linux/reset.h
-> +++ b/include/linux/reset.h
-> @@ -141,6 +141,12 @@ static inline struct reset_control *reset_control_get_optional_exclusive(
->  	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 0);
->  }
->  
-> +static inline struct reset_control *reset_control_get_optional_shared(
-> +					struct device *dev, const char *id)
-> +{
-> +	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 1);
-> +}
-> +
->  /**
->   * of_reset_control_get_exclusive - Lookup and obtain an exclusive reference
->   *                                  to a reset controller.
-> @@ -270,6 +276,12 @@ static inline struct reset_control *devm_reset_control_get_optional_exclusive(
->  	return __devm_reset_control_get(dev, id, 0, 0);
->  }
->  
-> +static inline struct reset_control *devm_reset_control_get_optional_shared(
-> +					struct device *dev, const char *id)
-> +{
-> +	return __devm_reset_control_get(dev, id, 0, 1);
-> +}
-> +
->  /**
->   * devm_reset_control_get_exclusive_by_index - resource managed
->   *                                             reset_control_get_exclusive()
+OK. Can the MISC block do anything else other than USB ID?
+Does the USB ID interrupt come on a different line than the charger interrupt?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+It would be more like MISC block interrupt than USB ID interrupt right?
+
+cheers,
+-roger
