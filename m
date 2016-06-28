@@ -1,95 +1,120 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Jun 2016 14:03:42 +0200
-Subject: [PATCH 02/15] arm64: KVM: Kill HYP_PAGE_OFFSET
-In-Reply-To: <57713627.1010800@arm.com>
-References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
- <1465297115-13091-3-git-send-email-marc.zyngier@arm.com>
- <20160627134717.GJ26498@cbox> <57713627.1010800@arm.com>
-Message-ID: <20160628120342.GN26498@cbox>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jun 2016 13:03:56 +0100
+Subject: [PATCH v4 5/5] mfd: rn5t618: register restart handler
+In-Reply-To: <20160628062757.24490-6-stefan@agner.ch>
+References: <20160628062757.24490-1-stefan@agner.ch>
+ <20160628062757.24490-6-stefan@agner.ch>
+Message-ID: <20160628120356.GF24982@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 03:20:23PM +0100, Marc Zyngier wrote:
-> On 27/06/16 14:47, Christoffer Dall wrote:
-> > On Tue, Jun 07, 2016 at 11:58:22AM +0100, Marc Zyngier wrote:
-> >> HYP_PAGE_OFFSET is not massively useful. And the way we use it
-> >> in KERN_HYP_VA is inconsistent with the equivalent operation in
-> >> EL2, where we use a mask instead.
-> >>
-> >> Let's replace the uses of HYP_PAGE_OFFSET with HYP_PAGE_OFFSET_MASK,
-> >> and get rid of the pointless macro.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm64/include/asm/kvm_hyp.h | 5 ++---
-> >>  arch/arm64/include/asm/kvm_mmu.h | 3 +--
-> >>  2 files changed, 3 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> >> index 44eaff7..61d01a9 100644
-> >> --- a/arch/arm64/include/asm/kvm_hyp.h
-> >> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> >> @@ -38,11 +38,10 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
-> >>  
-> >>  static inline unsigned long __hyp_kern_va(unsigned long v)
-> >>  {
-> >> -	u64 offset = PAGE_OFFSET - HYP_PAGE_OFFSET;
-> >> -	asm volatile(ALTERNATIVE("add %0, %0, %1",
-> >> +	asm volatile(ALTERNATIVE("orr %0, %0, %1",
-> >>  				 "nop",
-> >>  				 ARM64_HAS_VIRT_HOST_EXTN)
-> >> -		     : "+r" (v) : "r" (offset));
-> >> +		     : "+r" (v) : "i" (~HYP_PAGE_OFFSET_MASK));
-> > 
-> > for some reason this is hurting my brain.  I can't easily see that the
-> > two implementations are equivalent.
-> > 
-> > I can see that the kernel-to-hyp masking is trivially correct, but are
-> > we always sure that the upper bits that we mask off are always set?
+On Mon, 27 Jun 2016, Stefan Agner wrote:
+
+> Use the PMIC's repower capability for reboots. Register a restart
+> handler and use a slightly elevated priority of 192 since the PMIC
+> has suprior reset capability (causing a system wide reset).
 > 
-> A kernel address always has the top bits set. That's a given, and a
-> property of the architecture (bits [63:VA_BITS] are set to one. See
-> D4.2.1 and the definition of a Virtual Address (top VA subrange).
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> ---
+>  drivers/mfd/rn5t618.c | 43 +++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 37 insertions(+), 6 deletions(-)
 > 
+> diff --git a/drivers/mfd/rn5t618.c b/drivers/mfd/rn5t618.c
+> index 1831740..b3ca6df 100644
+> --- a/drivers/mfd/rn5t618.c
+> +++ b/drivers/mfd/rn5t618.c
+> @@ -12,11 +12,13 @@
+>   * along with this program. If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/delay.h>
+>  #include <linux/i2c.h>
+>  #include <linux/mfd/core.h>
+>  #include <linux/mfd/rn5t618.h>
+>  #include <linux/module.h>
+>  #include <linux/of_device.h>
+> +#include <linux/reboot.h>
+>  #include <linux/regmap.h>
+>  
+>  static const struct mfd_cell rn5t618_cells[] = {
+> @@ -50,17 +52,38 @@ static const struct regmap_config rn5t618_regmap_config = {
+>  };
+>  
+>  static struct rn5t618 *rn5t618_pm_power_off;
+> +static struct notifier_block rn5t618_restart_handler;
+>  
+> -static void rn5t618_power_off(void)
+> +static void rn5t618_trigger_poweroff_sequence(bool repower)
+>  {
+>  	/* disable automatic repower-on */
+>  	regmap_update_bits(rn5t618_pm_power_off->regmap, RN5T618_REPCNT,
+> -			   RN5T618_REPCNT_REPWRON, 0);
+> +			   RN5T618_REPCNT_REPWRON,
+> +			   repower ? RN5T618_REPCNT_REPWRON : 0);
+>  	/* start power-off sequence */
+>  	regmap_update_bits(rn5t618_pm_power_off->regmap, RN5T618_SLPCNT,
+>  			   RN5T618_SLPCNT_SWPWROFF, RN5T618_SLPCNT_SWPWROFF);
+>  }
+>  
+> +static void rn5t618_power_off(void)
+> +{
+> +	rn5t618_trigger_poweroff_sequence(false);
+> +}
+> +
+> +static int rn5t618_restart(struct notifier_block *this,
+> +			    unsigned long mode, void *cmd)
+> +{
+> +	rn5t618_trigger_poweroff_sequence(true);
+> +
+> +	/*
+> +	 * Repower factor detection on PMIC side is not instant. 1ms
+> +	 * proved to be enouth time until reset takes effect.
 
-This part I understood, but I somehow had the impression that
-HYP_PAGE_OFFSET_MASK could mask off more than (63 - VA_BITS + 1) bits,
-but looking at the definition of HYP_PAGE_OFFSET_MASK it clearly cannot.
+Spell check.
 
-What can I say, I probably shouldn't have looked at code yesterday.
+Please fix this, add all the Acks you received and resubmit the set.
 
-> > 
-> >>  	return v;
-> >>  }
-> >>  
-> >> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> >> index 00bc277..d162372 100644
-> >> --- a/arch/arm64/include/asm/kvm_mmu.h
-> >> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> >> @@ -75,7 +75,6 @@
-> >>   */
-> >>  #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
-> >>  #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-> >> -#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
-> >>  
-> >>  /*
-> >>   * Our virtual mapping for the idmap-ed MMU-enable code. Must be
-> >> @@ -109,7 +108,7 @@ alternative_endif
-> >>  #include <asm/mmu_context.h>
-> >>  #include <asm/pgtable.h>
-> >>  
-> >> -#define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
-> >> +#define KERN_TO_HYP(kva)	((unsigned long)kva & HYP_PAGE_OFFSET_MASK)
-> >>  
-> > 
-> > Why do we have both kern_hyp_va() and KERN_TO_HYP and how are they
-> > related again?
-> 
-> That's because kern_hyp_va used to be reserved to the assembly code, and
-> KERN_TO_HYP used in C code. We could (and probably should) unify them.
-> 
-If we can, that would be good.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
+> +	 */
+> +	mdelay(1);
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+>  static const struct of_device_id rn5t618_of_match[] = {
+>  	{ .compatible = "ricoh,rn5t567", .data = (void *)RN5T567 },
+>  	{ .compatible = "ricoh,rn5t618", .data = (void *)RN5T618 },
+> @@ -102,13 +125,21 @@ static int rn5t618_i2c_probe(struct i2c_client *i2c,
+>  		return ret;
+>  	}
+>  
+> +	rn5t618_pm_power_off = priv;
+>  	if (of_device_is_system_power_controller(i2c->dev.of_node)) {
+> -		if (!pm_power_off) {
+> -			rn5t618_pm_power_off = priv;
+> +		if (!pm_power_off)
+>  			pm_power_off = rn5t618_power_off;
+> -		} else {
+> +		else
+>  			dev_warn(&i2c->dev, "Poweroff callback already assigned\n");
+> -		}
+> +	}
+> +
+> +	rn5t618_restart_handler.notifier_call = rn5t618_restart;
+> +	rn5t618_restart_handler.priority = 192;
+> +
+> +	ret = register_restart_handler(&rn5t618_restart_handler);
+> +	if (ret) {
+> +		dev_err(&i2c->dev, "cannot register restart handler, %d\n", ret);
+> +		return ret;
+>  	}
+>  
+>  	return 0;
 
-Thanks,
--Christoffer
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
