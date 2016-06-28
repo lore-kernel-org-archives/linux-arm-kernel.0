@@ -1,209 +1,363 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 28 Jun 2016 13:32:13 +0100
-Subject: [PATCH v7 00/17] KVM: arm64: GICv3 ITS emulation
-Message-ID: <20160628123230.26255-1-andre.przywara@arm.com>
+Date: Tue, 28 Jun 2016 13:32:23 +0100
+Subject: [PATCH v7 10/17] KVM: arm64: introduce new KVM ITS device
+In-Reply-To: <20160628123230.26255-1-andre.przywara@arm.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+Message-ID: <20160628123230.26255-11-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Introduce a new KVM device that represents an ARM Interrupt Translation
+Service (ITS) controller. Since there can be multiple of this per guest,
+we can't piggy back on the existing GICv3 distributor device, but create
+a new type of KVM device.
+On the KVM_CREATE_DEVICE ioctl we allocate and initialize the ITS data
+structure and store the pointer in the kvm_device data.
+Upon an explicit init ioctl from userland (after having setup the MMIO
+address) we register the handlers with the kvm_io_bus framework.
+Any reference to an ITS thus has to go via this interface.
 
-another try on the KVM ITS emulation support.
-It allows those KVM guests that use an emulated GICv3 to use LPIs as
-well, though in the moment this is limited to emulated PCI devices.
-This is based on kvm-arm-for-v4.7-rc2 and relies on the new VGIC
-implementation.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  25 +++--
+ arch/arm/kvm/arm.c                             |   1 +
+ arch/arm64/include/uapi/asm/kvm.h              |   2 +
+ include/kvm/vgic/vgic.h                        |   1 +
+ include/uapi/linux/kvm.h                       |   2 +
+ virt/kvm/arm/vgic/vgic-its.c                   | 127 ++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic-kvm-device.c            |   7 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c               |   2 +-
+ virt/kvm/arm/vgic/vgic.h                       |   8 ++
+ 9 files changed, 165 insertions(+), 10 deletions(-)
 
-Compared to the last drop there have been some changes to the code:
-The reference counting has been rewritten to use the kref infrastructure.
-This has some implications on the rest of the code, for instance the
-locking for the LPI list got changed. There is no RCU usage anymore,
-instead the LPI list is now protected by a spinlock. To overcome the
-problem where we need to access guest memory while holding the lock,
-we create a snapshot of the LPI list, so we can iterate over LPIs with
-the lock dropped.
-Also the base register sanitisation has been reworked completely, which
-includes some changes to the arm-gic-v3.h header file (as a separate
-patch 07/17). I hope I covered all the subtleties of those bits.
-Also the MMIO framework saw some changes, we now tag the different GIC
-regions explicitly and are able to call the different handlers explicitly.
-Also Patch 05/17 extends the kvm-io-bus framework with a small function
-to get the kvm_io_device structure for a given MMIO address. This allows
-us to keep the knowledge of all the ITSes in this framework, but still
-get the respective ITS pointer easily without reverting to "fake" MMIO
-accesses.
-Also all the smaller review comments have been addressed.
-
-You can find all of this code (and the prerequisites) in the
-its-emul/v7 branch of my repository [1].
-This has been briefly tested on the model and on GICv3 hardware.
-If you have GICv3 capable hardware, please test it on your setup.
-Also of course any review comments are very welcome!
-
-Cheers,
-Andre.
-
-Changelog v6..v7:
-- use kref reference counting
-- remove RCU usage from lpi_list, use spinlock instead
-- copy list of LPIs before accessing guest memory
-- introduce kvm_io_bus_get_dev()
-- refactor parts of arm-gic-v3.h header file
-- provide proper initial values for redistributor and ITS base registers
-- rework sanitisation of base registers
-- rework VGIC MMIO dispatching to differentiate between VGIC parts
-- smaller fixes, also comments and commit messages amended
-
-Changelog v5..v6:
-- remove its_list from VGIC code
-- add lpi_list and accessor functions
-- introduce reference counting to struct vgic_irq
-- replace its_lock spinlock with its_cmd and its_lock mutexes
-- simplify guest memory accesses (due to the new mutexes)
-- avoid unnecessary affinity updates
-- refine base register address masking
-- introduce sanity checks for PROPBASER and PENDBASER
-- implement BASER<n> registers
-- pass struct vgic_its directly into the MMIO handlers
-- convert KVM_SIGNAL_MSI ioctl into an MMIO write
-- add explicit INIT ioctl to the ITS KVM device
-- adjusting comments and commit messages
-
-Changelog v4..v5:
-- adapting to final new VGIC (MMIO handlers, etc.)
-- new KVM device to model an ITS, multiple instances allowed
-- move redistributor data into struct vgic_cpu
-- separate distributor and ITS(es)
-- various bug fixes and amended comments after review comments
-
-Changelog v3..v4:
-- adapting to new VGIC (changes in IRQ injection mechanism)
-
-Changelog v2..v3:
-- adapt to 4.3-rc and Christoffer's timer rework
-- adapt spin locks on handling PROPBASER/PENDBASER registers
-- rework locking in ITS command handling (dropping dist where needed)
-- only clear LPI pending bit if LPI could actually be queued
-- simplify GICR_CTLR handling
-- properly free ITTEs (including our pending bitmap)
-- fix corner cases with unmapped collections
-- keep retire_lr() around
-- rename vgic_handle_base_register to vgic_reg64_access()
-- use kcalloc instead of kmalloc
-- minor fixes, renames and added comments
-
-Changelog v1..v2
-- fix issues when using non-ITS GICv3 emulation
-- streamline frame address initialization (new patch 05/15)
-- preallocate buffer memory for reading from guest's memory
-- move locking into the actual command handlers
--   preallocate memory for new structures if needed
-- use non-atomic __set_bit() and __clear_bit() when under the lock
-- add INT command handler to allow LPI injection from the guest
-- rewrite CWRITER handler to align with new locking scheme
-- remove unneeded CONFIG_HAVE_KVM_MSI #ifdefs
-- check memory table size against our LPI limit (65536 interrupts)
-- observe initial gap of 1024 interrupts in pending table
-- use term "configuration table" to be in line with the spec
-- clarify and extend documentation on API extensions
-- introduce new KVM_CAP_MSI_DEVID capability to advertise device ID requirement
-- update, fix and add many comments
-- minor style changes as requested by reviewers
-
----------------
-
-The GICv3 ITS (Interrupt Translation Service) is a part of the
-ARM GICv3 interrupt controller [3] used for implementing MSIs.
-It specifies a new kind of interrupts (LPIs), which are mapped to
-establish a connection between a device, its MSI payload value and
-the target processor the IRQ is eventually delivered to.
-In order to allow using MSIs in an ARM64 KVM guest, we emulate this
-ITS widget in the kernel.
-The ITS works by reading commands written by software (from the guest
-in our case) into a (guest allocated) memory region and establishing
-the mapping between a device, the MSI payload and the target CPU.
-We parse these commands and update our internal data structures to
-reflect those changes. On an MSI injection we iterate those
-structures to learn the LPI number we have to inject.
-For the time being we use simple lists to hold the data, this is
-good enough for the small number of entries each of the components
-currently have. Should this become a performance bottleneck in the
-future, those can be extended to arrays or trees if needed.
-
-Most of the code lives in a separate source file (vgic-its.c), though
-there are some changes necessary in the existing VGIC files.
-
-For the time being this series gives us the ability to use emulated
-PCI devices that can use MSIs in the guest. Those have to be
-triggered by letting the userland device emulation simulate the MSI
-write with the KVM_SIGNAL_MSI ioctl. This will be translated into
-the proper LPI by the ITS emulation and injected into the guest in
-the usual way (just with a higher IRQ number).
-
-This series is based on kvm-arm-for-v4.7-rc2 and can be found at the
-its-emul/v7 branch of this repository [1].
-For this to be used you need a GICv3 host machine (a fast model would
-do), though it does not rely on any host ITS bits (neither in hardware
-or software).
-
-To test this you can use the kvmtool patches available in the "its-v6"
-branch here [2].
-Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
-and see the ITS being used for instance by the virtio devices.
-
-[1]: git://linux-arm.org/linux-ap.git
-     http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-emul/v7
-[2]: git://linux-arm.org/kvmtool.git
-     http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its-v6
-[3]: http://arminfo.emea.arm.com/help/topic/com.arm.doc.ihi0069a/IHI0069A_gic_architecture_specification.pdf
-
-Andre Przywara (17):
-  KVM: arm/arm64: move redistributor kvm_io_devices
-  KVM: arm/arm64: check return value for kvm_register_vgic_device
-  KVM: extend struct kvm_msi to hold a 32-bit device ID
-  KVM: arm/arm64: extend arch CAP checks to allow per-VM capabilities
-  KVM: kvm_io_bus: add kvm_io_bus_get_dev() call
-  KVM: arm/arm64: VGIC: add refcounting for IRQs
-  irqchip: refactor and add GICv3 definitions
-  KVM: arm64: handle ITS related GICv3 redistributor registers
-  KVM: arm64: introduce ITS emulation file with MMIO framework
-  KVM: arm64: introduce new KVM ITS device
-  KVM: arm64: implement basic ITS register handlers
-  KVM: arm64: connect LPIs to the VGIC emulation
-  KVM: arm64: read initial LPI pending table
-  KVM: arm64: allow updates of LPI configuration table
-  KVM: arm64: implement ITS command queue command handlers
-  KVM: arm64: implement MSI injection in ITS emulation
-  KVM: arm64: enable ITS emulation as a virtual MSI controller
-
- Documentation/virtual/kvm/api.txt              |   14 +-
- Documentation/virtual/kvm/devices/arm-vgic.txt |   25 +-
- arch/arm/include/asm/kvm_host.h                |    2 +-
- arch/arm/kvm/arm.c                             |    3 +-
- arch/arm64/include/asm/kvm_host.h              |    2 +-
- arch/arm64/include/uapi/asm/kvm.h              |    2 +
- arch/arm64/kvm/Kconfig                         |    1 +
- arch/arm64/kvm/Makefile                        |    1 +
- arch/arm64/kvm/reset.c                         |   12 +-
- include/kvm/vgic/vgic.h                        |   64 +-
- include/linux/irqchip/arm-gic-v3.h             |  165 ++-
- include/linux/kvm_host.h                       |    2 +
- include/uapi/linux/kvm.h                       |    7 +-
- virt/kvm/arm/vgic-v3.c                         |   11 +-
- virt/kvm/arm/vgic.c                            |    5 +
- virt/kvm/arm/vgic/vgic-init.c                  |    9 +-
- virt/kvm/arm/vgic/vgic-its.c                   | 1408 ++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-kvm-device.c            |   22 +-
- virt/kvm/arm/vgic/vgic-mmio-v2.c               |   48 +-
- virt/kvm/arm/vgic/vgic-mmio-v3.c               |  291 ++++-
- virt/kvm/arm/vgic/vgic-mmio.c                  |   58 +-
- virt/kvm/arm/vgic/vgic-mmio.h                  |   45 +-
- virt/kvm/arm/vgic/vgic-v2.c                    |    8 +-
- virt/kvm/arm/vgic/vgic-v3.c                    |   18 +-
- virt/kvm/arm/vgic/vgic.c                       |  101 +-
- virt/kvm/arm/vgic/vgic.h                       |   37 +-
- virt/kvm/kvm_main.c                            |   24 +
- 27 files changed, 2192 insertions(+), 193 deletions(-)
- create mode 100644 virt/kvm/arm/vgic/vgic-its.c
-
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index 59541d4..89182f8 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -4,16 +4,22 @@ ARM Virtual Generic Interrupt Controller (VGIC)
+ Device types supported:
+   KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
+   KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
++  KVM_DEV_TYPE_ARM_VGIC_ITS    ARM Interrupt Translation Service Controller
+ 
+-Only one VGIC instance may be instantiated through either this API or the
+-legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
+-controller, requiring emulated user-space devices to inject interrupts to the
+-VGIC instead of directly to CPUs.
++Only one VGIC instance of the V2/V3 types above may be instantiated through
++either this API or the legacy KVM_CREATE_IRQCHIP api.  The created VGIC will
++act as the VM interrupt controller, requiring emulated user-space devices to
++inject interrupts to the VGIC instead of directly to CPUs.
+ 
+ Creating a guest GICv3 device requires a host GICv3 as well.
+ GICv3 implementations with hardware compatibility support allow a guest GICv2
+ as well.
+ 
++Creating a virtual ITS controller requires a host GICv3 (but does not depend
++on having physical ITS controllers).
++There can be multiple ITS controllers per guest, each of them has to have
++a separate, non-overlapping MMIO region.
++
+ Groups:
+   KVM_DEV_ARM_VGIC_GRP_ADDR
+   Attributes:
+@@ -39,6 +45,13 @@ Groups:
+       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+       This address needs to be 64K aligned.
+ 
++    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
++      Base address in the guest physical address space of the GICv3 ITS
++      control register frame. The ITS allows MSI(-X) interrupts to be
++      injected into guests. This extension is optional. If the kernel
++      does not support the ITS, the call returns -ENODEV.
++      Only valid for KVM_DEV_TYPE_ARM_VGIC_ITS.
++      This address needs to be 64K aligned and the region covers 128K.
+ 
+   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+   Attributes:
+@@ -109,8 +122,8 @@ Groups:
+   KVM_DEV_ARM_VGIC_GRP_CTRL
+   Attributes:
+     KVM_DEV_ARM_VGIC_CTRL_INIT
+-      request the initialization of the VGIC, no additional parameter in
+-      kvm_device_attr.addr.
++      request the initialization of the VGIC or ITS, no additional parameter
++      in kvm_device_attr.addr.
+   Errors:
+     -ENXIO: VGIC not properly configured as required prior to calling
+      this attribute
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index a268c85..f4a953e 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -20,6 +20,7 @@
+ #include <linux/errno.h>
+ #include <linux/err.h>
+ #include <linux/kvm_host.h>
++#include <linux/list.h>
+ #include <linux/module.h>
+ #include <linux/vmalloc.h>
+ #include <linux/fs.h>
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index f209ea1..f8c257b 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -87,9 +87,11 @@ struct kvm_regs {
+ /* Supported VGICv3 address types  */
+ #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+ #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
++#define KVM_VGIC_ITS_ADDR_TYPE		4
+ 
+ #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+ #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
+ 
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 949a0e1..8cec203 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -159,6 +159,7 @@ struct vgic_dist {
+ 
+ 	struct vgic_io_device	dist_iodev;
+ 
++	bool			has_its;
+ 	/*
+ 	 * Contains the address of the LPI configuration table.
+ 	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 7de96f5..d8c4c32 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -1077,6 +1077,8 @@ enum kvm_device_type {
+ #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
+ 	KVM_DEV_TYPE_ARM_VGIC_V3,
+ #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
++	KVM_DEV_TYPE_ARM_VGIC_ITS,
++#define KVM_DEV_TYPE_ARM_VGIC_ITS	KVM_DEV_TYPE_ARM_VGIC_ITS
+ 	KVM_DEV_TYPE_MAX,
+ };
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index ab8d244..62d7484 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -21,6 +21,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/interrupt.h>
++#include <linux/uaccess.h>
+ 
+ #include <linux/irqchip/arm-gic-v3.h>
+ 
+@@ -80,7 +81,7 @@ static struct vgic_register_region its_registers[] = {
+ 		VGIC_ACCESS_32bit),
+ };
+ 
+-int vits_register(struct kvm *kvm, struct vgic_its *its)
++static int vits_register(struct kvm *kvm, struct vgic_its *its)
+ {
+ 	struct vgic_io_device *iodev = &its->iodev;
+ 	int ret;
+@@ -98,3 +99,127 @@ int vits_register(struct kvm *kvm, struct vgic_its *its)
+ 
+ 	return ret;
+ }
++
++static int vgic_its_create(struct kvm_device *dev, u32 type)
++{
++	struct vgic_its *its;
++
++	if (type != KVM_DEV_TYPE_ARM_VGIC_ITS)
++		return -ENODEV;
++
++	its = kzalloc(sizeof(struct vgic_its), GFP_KERNEL);
++	if (!its)
++		return -ENOMEM;
++
++	its->vgic_its_base = VGIC_ADDR_UNDEF;
++
++	dev->kvm->arch.vgic.has_its = true;
++	its->enabled = false;
++
++	dev->private = its;
++
++	return 0;
++}
++
++static void vgic_its_destroy(struct kvm_device *kvm_dev)
++{
++	struct vgic_its *its = kvm_dev->private;
++
++	kfree(its);
++}
++
++static int vgic_its_has_attr(struct kvm_device *dev,
++			     struct kvm_device_attr *attr)
++{
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR:
++		switch (attr->attr) {
++		case KVM_VGIC_ITS_ADDR_TYPE:
++			return 0;
++		}
++		break;
++	case KVM_DEV_ARM_VGIC_GRP_CTRL:
++		switch (attr->attr) {
++		case KVM_DEV_ARM_VGIC_CTRL_INIT:
++			return 0;
++		}
++		break;
++	}
++	return -ENXIO;
++}
++
++static int vgic_its_set_attr(struct kvm_device *dev,
++			     struct kvm_device_attr *attr)
++{
++	struct vgic_its *its = dev->private;
++	int ret;
++
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		unsigned long type = (unsigned long)attr->attr;
++		u64 addr;
++
++		if (type != KVM_VGIC_ITS_ADDR_TYPE)
++			return -ENODEV;
++
++		if (copy_from_user(&addr, uaddr, sizeof(addr)))
++			return -EFAULT;
++
++		ret = vgic_check_ioaddr(dev->kvm, &its->vgic_its_base,
++					addr, SZ_64K);
++		if (ret)
++			return ret;
++
++		its->vgic_its_base = addr;
++
++		return 0;
++	}
++	case KVM_DEV_ARM_VGIC_GRP_CTRL:
++		switch (attr->attr) {
++		case KVM_DEV_ARM_VGIC_CTRL_INIT:
++			return vits_register(dev->kvm, its);
++		}
++		break;
++	}
++	return -ENXIO;
++}
++
++static int vgic_its_get_attr(struct kvm_device *dev,
++			     struct kvm_device_attr *attr)
++{
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
++		struct vgic_its *its = dev->private;
++		u64 addr = its->vgic_its_base;
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		unsigned long type = (unsigned long)attr->attr;
++
++		if (type != KVM_VGIC_ITS_ADDR_TYPE)
++			return -ENODEV;
++
++		if (copy_to_user(uaddr, &addr, sizeof(addr)))
++			return -EFAULT;
++		break;
++	default:
++		return -ENXIO;
++	}
++	}
++
++	return 0;
++}
++
++struct kvm_device_ops kvm_arm_vgic_its_ops = {
++	.name = "kvm-arm-vgic-its",
++	.create = vgic_its_create,
++	.destroy = vgic_its_destroy,
++	.set_attr = vgic_its_set_attr,
++	.get_attr = vgic_its_get_attr,
++	.has_attr = vgic_its_has_attr,
++};
++
++int kvm_vgic_register_its_device(void)
++{
++	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
++				       KVM_DEV_TYPE_ARM_VGIC_ITS);
++}
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 2f24f13..1813f93 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -21,8 +21,8 @@
+ 
+ /* common helpers */
+ 
+-static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
+-			     phys_addr_t addr, phys_addr_t alignment)
++int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
++		      phys_addr_t addr, phys_addr_t alignment)
+ {
+ 	if (addr & ~KVM_PHYS_MASK)
+ 		return -E2BIG;
+@@ -223,6 +223,9 @@ int kvm_register_vgic_device(unsigned long type)
+ 	case KVM_DEV_TYPE_ARM_VGIC_V3:
+ 		ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
+ 					      KVM_DEV_TYPE_ARM_VGIC_V3);
++		if (ret)
++			break;
++		ret = kvm_vgic_register_its_device();
+ 		break;
+ #endif
+ 	}
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 5fcc33a..9bcffa6 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -49,7 +49,7 @@ bool vgic_has_its(struct kvm *kvm)
+ 	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
+ 		return false;
+ 
+-	return false;
++	return dist->has_its;
+ }
+ 
+ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 31807c1..9dc7207 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -42,6 +42,9 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
+ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
+ void vgic_kick_vcpus(struct kvm *kvm);
+ 
++int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
++		      phys_addr_t addr, phys_addr_t alignment);
++
+ void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
+ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
+ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+@@ -73,6 +76,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info);
+ int vgic_v3_map_resources(struct kvm *kvm);
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+ bool vgic_has_its(struct kvm *kvm);
++int kvm_vgic_register_its_device(void);
+ #else
+ static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+ {
+@@ -130,6 +134,10 @@ static inline bool vgic_has_its(struct kvm *kvm)
+ 	return false;
+ }
+ 
++static inline int kvm_vgic_register_its_device(void)
++{
++	return -ENODEV;
++}
+ #endif
+ 
+ int kvm_register_vgic_device(unsigned long type);
 -- 
 2.9.0
