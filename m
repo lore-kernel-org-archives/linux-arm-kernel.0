@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:30:47 +0200
-Subject: [PATCH 28/92] clocksource/drivers/arm_global_timer: Convert init
+Date: Tue, 28 Jun 2016 12:30:51 +0200
+Subject: [PATCH 32/92] clocksource/drivers/meson6_timer.c: Convert init
  function to return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-28-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-32-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,97 +26,61 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- drivers/clocksource/arm_global_timer.c | 28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
+ drivers/clocksource/meson6_timer.c | 21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index 9df0d16..40104fc 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -238,7 +238,7 @@ static void __init gt_delay_timer_init(void)
- 	register_current_timer_delay(&gt_delay_timer);
- }
- 
--static void __init gt_clocksource_init(void)
-+static int __init gt_clocksource_init(void)
- {
- 	writel(0, gt_base + GT_CONTROL);
- 	writel(0, gt_base + GT_COUNTER0);
-@@ -249,7 +249,7 @@ static void __init gt_clocksource_init(void)
- #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 	sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
- #endif
--	clocksource_register_hz(&gt_clocksource, gt_clk_rate);
-+	return clocksource_register_hz(&gt_clocksource, gt_clk_rate);
- }
- 
- static int gt_cpu_notify(struct notifier_block *self, unsigned long action,
-@@ -270,7 +270,7 @@ static struct notifier_block gt_cpu_nb = {
- 	.notifier_call = gt_cpu_notify,
+diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
+index 1fa22c4..3a6e78f 100644
+--- a/drivers/clocksource/meson6_timer.c
++++ b/drivers/clocksource/meson6_timer.c
+@@ -126,18 +126,22 @@ static struct irqaction meson6_timer_irq = {
+ 	.dev_id		= &meson6_clockevent,
  };
  
--static void __init global_timer_of_register(struct device_node *np)
-+static int __init global_timer_of_register(struct device_node *np)
+-static void __init meson6_timer_init(struct device_node *node)
++static int __init meson6_timer_init(struct device_node *node)
  {
- 	struct clk *gt_clk;
- 	int err = 0;
-@@ -283,19 +283,19 @@ static void __init global_timer_of_register(struct device_node *np)
- 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9
- 	    && (read_cpuid_id() & 0xf0000f) < 0x200000) {
- 		pr_warn("global-timer: non support for this cpu version.\n");
--		return;
-+		return -ENOSYS;
- 	}
+ 	u32 val;
+ 	int ret, irq;
  
- 	gt_ppi = irq_of_parse_and_map(np, 0);
- 	if (!gt_ppi) {
- 		pr_warn("global-timer: unable to parse irq\n");
--		return;
-+		return -EINVAL;
- 	}
- 
- 	gt_base = of_iomap(np, 0);
- 	if (!gt_base) {
- 		pr_warn("global-timer: invalid base address\n");
--		return;
+ 	timer_base = of_io_request_and_map(node, 0, "meson6-timer");
+-	if (IS_ERR(timer_base))
+-		panic("Can't map registers");
++	if (IS_ERR(timer_base)) {
++		pr_err("Can't map registers");
 +		return -ENXIO;
- 	}
++	}
  
- 	gt_clk = of_clk_get(np, 0);
-@@ -332,11 +332,17 @@ static void __init global_timer_of_register(struct device_node *np)
- 	}
+ 	irq = irq_of_parse_and_map(node, 0);
+-	if (irq <= 0)
+-		panic("Can't parse IRQ");
++	if (irq <= 0) {
++		pr_err("Can't parse IRQ");
++		return -EINVAL;
++	}
  
- 	/* Immediately configure the timer on the boot CPU */
--	gt_clocksource_init();
--	gt_clockevents_init(this_cpu_ptr(gt_evt));
-+	err = gt_clocksource_init();
-+	if (err)
-+		goto out_irq;
-+	
-+	err = gt_clockevents_init(this_cpu_ptr(gt_evt));
-+	if (err)
-+		goto out_irq;
-+
- 	gt_delay_timer_init();
+ 	/* Set 1us for timer E */
+ 	val = readl(timer_base + TIMER_ISA_MUX);
+@@ -158,14 +162,17 @@ static void __init meson6_timer_init(struct device_node *node)
+ 	meson6_clkevt_time_stop(CED_ID);
  
--	return;
+ 	ret = setup_irq(irq, &meson6_timer_irq);
+-	if (ret)
++	if (ret) {
+ 		pr_warn("failed to setup irq %d\n", irq);
++		return ret;
++	}
+ 
+ 	meson6_clockevent.cpumask = cpu_possible_mask;
+ 	meson6_clockevent.irq = irq;
+ 
+ 	clockevents_config_and_register(&meson6_clockevent, USEC_PER_SEC,
+ 					1, 0xfffe);
 +	return 0;
- 
- out_irq:
- 	free_percpu_irq(gt_ppi, gt_evt);
-@@ -347,8 +353,10 @@ out_clk:
- out_unmap:
- 	iounmap(gt_base);
- 	WARN(err, "ARM Global timer register failed (%d)\n", err);
-+
-+	return err;
  }
- 
- /* Only tested on r2p2 and r3p0  */
--CLOCKSOURCE_OF_DECLARE(arm_gt, "arm,cortex-a9-global-timer",
-+CLOCKSOURCE_OF_DECLARE_RET(arm_gt, "arm,cortex-a9-global-timer",
- 			global_timer_of_register);
+-CLOCKSOURCE_OF_DECLARE(meson6, "amlogic,meson6-timer",
++CLOCKSOURCE_OF_DECLARE_RET(meson6, "amlogic,meson6-timer",
+ 		       meson6_timer_init);
 -- 
 1.9.1
