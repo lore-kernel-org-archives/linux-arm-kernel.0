@@ -1,50 +1,74 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:51:34 +0200
-Subject: [PATCH 76/92] clocksource/drivers/armv7m_systick: Add the
- COMPILE_TEST option
-In-Reply-To: <577251A4.7030508@linaro.org>
+Date: Tue, 28 Jun 2016 12:51:36 +0200
+Subject: [PATCH 78/92] clocksource/drivers/clps_711x: Add the COMPILE_TEST
+ option
+In-Reply-To: <1467111111-12587-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
-Message-ID: <1467111111-12587-1-git-send-email-daniel.lezcano@linaro.org>
+ <1467111111-12587-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467111111-12587-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to increase the compilation test coverage, add the COMPILE_TEST
-so the driver can be compiled even if it does not belong to the platform
-or the architecture.
+Change the Kconfig option logic to fullfil with the current approach.
 
-The io.h header inclusion is also added as it the driver does not compile
-on UM platform.
+A new Kconfig option is added, CONFIG_CLPS711X_TIMER and is selected by the
+platform. Then the clocksource's Kconfig is changed to make this option
+selectable by the user if the COMPILE_TEST option is set. Otherwise, it is
+up to the platform's Kconfig to select the timer.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/Kconfig          | 2 +-
- drivers/clocksource/armv7m_systick.c | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/Kconfig             | 2 +-
+ drivers/clocksource/Kconfig  | 7 +++++++
+ drivers/clocksource/Makefile | 2 +-
+ 3 files changed, 9 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 90542db..f0636ec9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -358,10 +358,10 @@ config ARCH_CLPS711X
+ 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select AUTO_ZRELADDR
+-	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select CPU_ARM720T
+ 	select GENERIC_CLOCKEVENTS
++	select CLPS711X_TIMER
+ 	select MFD_SYSCON
+ 	select SOC_BUS
+ 	help
 diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 0275b16..01ecd88 100644
+index a3cccf5..f41eef2 100644
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
-@@ -250,7 +250,7 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 	 Use ARM global timer clock source as sched_clock
- 
- config ARMV7M_SYSTICK
--	bool
-+	bool "Support for the ARMv7M system time" if COMPILE_TEST
- 	select CLKSRC_OF if OF
- 	select CLKSRC_MMIO
+@@ -155,6 +155,13 @@ config CLKSRC_DBX500_PRCMU
  	help
-diff --git a/drivers/clocksource/armv7m_systick.c b/drivers/clocksource/armv7m_systick.c
-index e93af1f..a315491 100644
---- a/drivers/clocksource/armv7m_systick.c
-+++ b/drivers/clocksource/armv7m_systick.c
-@@ -7,6 +7,7 @@
- #include <linux/kernel.h>
- #include <linux/clocksource.h>
- #include <linux/clockchips.h>
-+#include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/clk.h>
+ 	  Use the always on PRCMU Timer as clocksource
+ 
++config CLPS711X_TIMER
++	bool "Cirrus logic timer driver" if COMPILE_TEST
++	depends on GENERIC_CLOCKEVENTS
++	select CLKSRC_MMIO
++	help
++	  Enables support for the Cirrus Logic PS711 timer.
++
+ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+ 	bool "Clocksource PRCMU Timer sched_clock"
+ 	depends on (CLKSRC_DBX500_PRCMU && !CLKSRC_NOMADIK_MTU_SCHED_CLOCK)
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index df99c92..25e599c 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -20,7 +20,7 @@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
+ obj-$(CONFIG_BCM2835_TIMER)	+= bcm2835_timer.o
+-obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
++obj-$(CONFIG_CLPS711X_TIMER)	+= clps711x-timer.o
+ obj-$(CONFIG_ARCH_ATLAS7)	+= timer-atlas7.o
+ obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
+ obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
 -- 
 1.9.1
