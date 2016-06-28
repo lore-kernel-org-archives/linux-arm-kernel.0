@@ -1,40 +1,64 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Tue, 28 Jun 2016 18:31:41 +0800
-Subject: [PATCH 1/2] clk: hi6220: Change syspll and media_syspll clk to 1.19GHz
-Message-ID: <1467109902-17625-1-git-send-email-guodong.xu@linaro.org>
+Date: Tue, 28 Jun 2016 18:31:42 +0800
+Subject: [PATCH 2/2] clk: hi6220: initialize UART1 clock to 150MHz
+In-Reply-To: <1467109902-17625-1-git-send-email-guodong.xu@linaro.org>
+References: <1467109902-17625-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1467109902-17625-2-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xinliang Liu <xinliang.liu@linaro.org>
+From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 
-In the bootloader of HiKey/96boards, syspll and media_syspll clk
-was initialized to 1.19GHz. So, here changes it in kernel accordingly.
+Early at boot, during the sys_clk initialization, make sure UART1 uses
+the higher frequency clock.
 
-1.19GHz was chosen over 1.2GHz because at 1.19GHz we get more precise
-HDMI pixel clock (1.19G/16 = 74.4MHz) for 1280x720p at 60Hz HDMI
-(74.25MHz required by standards). Closer pixel clock means better
-compatibility to HDMI monitors.
+This enables support for higher baud rates (up to 3Mbps) required to
+support faster bluetooth transfers.
 
+Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
 ---
- drivers/clk/hisilicon/clk-hi6220.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/hisilicon/clk-hi6220.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
-index f02cb41..a36ffcb 100644
+index a36ffcb..55bd9bb 100644
 --- a/drivers/clk/hisilicon/clk-hi6220.c
 +++ b/drivers/clk/hisilicon/clk-hi6220.c
-@@ -34,8 +34,8 @@ static struct hisi_fixed_rate_clock hi6220_fixed_rate_clks[] __initdata = {
- 	{ HI6220_PLL_BBP,	"bbppll0",	NULL, 0, 245760000, },
- 	{ HI6220_PLL_GPU,	"gpupll",	NULL, 0, 1000000000,},
- 	{ HI6220_PLL1_DDR,	"ddrpll1",	NULL, 0, 1066000000,},
--	{ HI6220_PLL_SYS,	"syspll",	NULL, 0, 1200000000,},
--	{ HI6220_PLL_SYS_MEDIA,	"media_syspll",	NULL, 0, 1200000000,},
-+	{ HI6220_PLL_SYS,	"syspll",	NULL, 0, 1190400000,},
-+	{ HI6220_PLL_SYS_MEDIA,	"media_syspll",	NULL, 0, 1190400000,},
- 	{ HI6220_DDR_SRC,	"ddr_sel_src",  NULL, 0, 1200000000,},
- 	{ HI6220_PLL_MEDIA,	"media_pll",    NULL, 0, 1440000000,},
- 	{ HI6220_PLL_DDR,	"ddrpll0",      NULL, 0, 1600000000,},
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include <linux/kernel.h>
++#include <linux/clk.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/io.h>
+@@ -70,10 +71,10 @@ static struct hisi_gate_clock hi6220_separated_gate_clks_ao[] __initdata = {
+ 	{ HI6220_UART0_PCLK,  "uart0_pclk",  "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 24, 0, },
+ };
+ 
++static struct hisi_clock_data *clk_data_ao;
++
+ static void __init hi6220_clk_ao_init(struct device_node *np)
+ {
+-	struct hisi_clock_data *clk_data_ao;
+-
+ 	clk_data_ao = hisi_clk_init(np, HI6220_AO_NR_CLKS);
+ 	if (!clk_data_ao)
+ 		return;
+@@ -192,6 +193,13 @@ static void __init hi6220_clk_sys_init(struct device_node *np)
+ 
+ 	hi6220_clk_register_divider(hi6220_div_clks_sys,
+ 			ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
++
++	if (!clk_data_ao)
++		return;
++
++	/* enable high speed clock on UART1 mux */
++	clk_set_parent(clk_data->clk_data.clks[HI6220_UART1_SRC],
++			clk_data_ao->clk_data.clks[HI6220_150M]);
+ }
+ CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-sysctrl", hi6220_clk_sys_init);
+ 
 -- 
 1.9.1
