@@ -1,25 +1,49 @@
-From: andrej@inversepath.com (Andrej Rosano)
-Date: Tue, 28 Jun 2016 15:24:41 +0200
-Subject: [PATCH 2/2] ARM: dts: imx53: add support for USB armory board
-In-Reply-To: <20160628015055.GA21328@tiger>
-References: <20160621145053.7742-1-andrej@inversepath.com>
- <20160621145053.7742-3-andrej@inversepath.com>
- <20160628015055.GA21328@tiger>
-Message-ID: <20160628132441.GA17608@core.inversepath.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 28 Jun 2016 16:27:29 +0300
+Subject: [PATCH] ARM: tegra: beaver: allow SD card voltage to be changed
+In-Reply-To: <576CF9F3.7090406@nvidia.com>
+References: <1456779678-20173-1-git-send-email-dev@lynxeye.de>
+ <1463124331.2459.0.camel@lynxeye.de> <20160513172704.GA498@ulmo.ba.sec>
+ <573DCDB3.80202@nvidia.com> <575E897A.5080508@nvidia.com>
+ <575FA21E.80309@intel.com> <575FBEE5.50905@nvidia.com>
+ <575FD6E0.7070201@intel.com> <5760125A.8030102@nvidia.com>
+ <576CF9F3.7090406@nvidia.com>
+Message-ID: <57727B41.1080506@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-06-28, Shawn Guo wrote:
-> Maybe GPL/X11 dual licence to consider non-Linux users.  There are
-> plenty of dual licence examples under arch/arm/boot/dts.
+On 24/06/16 12:14, Jon Hunter wrote:
+> Hi Adrian,
+> 
+> On 14/06/16 15:19, Jon Hunter wrote:
+> 
+> ...
+> 
+>>>> So the controller itself supports UHS-I modes, but a given board may not
+>>>> have the regulator to support them. We need a way to determine if the
+>>>> board can support the UHS-I modes. Now we could check to see if the
+>>>> regulator is present in the Tegra SDHCI driver and if not remove the cap
+>>>> flags. However, I was not sure if this is applicable to other sdhci
+>>>> controllers and so there should be a generic solution for this?
+>>>
+>>> There is SDHCI_QUIRK2_NO_1_8_V but it doesn't cover the eMMC 1.8V DDR52 case
+>>> at present.  Dong Aisheng wanted to plug that gap but I wanted to get rid of
+>>> SDHCI_QUIRK2_NO_1_8_V:
+>>>
+>>> 	http://marc.info/?l=linux-mmc&m=146132847206423&w=2
+>>
+>> Ok, that would require the tegra sdhci driver to set this quirk for a
+>> board, which is do-able, I guess. However, given the above I am not sure
+>> what path you are suggesting we take to resolve this? Does not sound
+>> like we should be looking at using SDHCI_QUIRK2_NO_1_8_V anyway.
+> 
+> Any feedback here? Are you still planning to get rid of
+> SDHCI_QUIRK2_NO_1_8_V or should we use this?
 
-Applied this change along with the others you suggested in the patchset v2.
+Don't use SDHCI_QUIRK2_NO_1_8_V.
 
-Thanks,
-Andrej
+I sent some patches that make it easier for drivers to do whatever they want:
 
---
-Andrej Rosano                                           Inverse Path Srl
-<andrej@inversepath.com>                      http://www.inversepath.com
+	http://marc.info/?l=linux-mmc&m=146712062816835
 
-0x01939B21            5BB8 574E 68E8 D841 E18F  D5E9 CEAD E0CF 0193 9B21
+	
