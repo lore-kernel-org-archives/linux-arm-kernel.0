@@ -1,60 +1,46 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 28 Jun 2016 14:58:16 -0700
-Subject: [PATCH 20/21] phy: Add support for Qualcomm's USB HSIC phy
-In-Reply-To: <57723A21.3060602@baylibre.com>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-21-stephen.boyd@linaro.org>
- <57723A21.3060602@baylibre.com>
-Message-ID: <146715109651.31418.4819151138932336863@sboyd-linaro>
+Date: Tue, 28 Jun 2016 14:59:19 -0700
+Subject: [PATCH] extcon: Add support for qcom SPMI PMIC USB id detection
+ hardware
+In-Reply-To: <CAGTfZH3ZhZ2gQcOSuAByZWD59E3Bro1aayr2JsM2W+mYa2LQTQ@mail.gmail.com>
+References: <20160626055647.18898-1-stephen.boyd@linaro.org>
+ <CAGTfZH3ireJWo5-Jd5SEiSy-WMTsw43pweruOqwSesAZqagvtg@mail.gmail.com>
+ <146705470025.30684.13257433085055355379@sboyd-linaro>
+ <CAGTfZH3ZhZ2gQcOSuAByZWD59E3Bro1aayr2JsM2W+mYa2LQTQ@mail.gmail.com>
+Message-ID: <146715115921.31418.2315766296233007937@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Neil Armstrong (2016-06-28 01:49:37)
-> On 06/26/2016 09:28 AM, Stephen Boyd wrote:
-> > +     uphy->cal_sleep_clk = clk = devm_clk_get(&ulpi->dev, "cal_sleep");
-> > +     if (IS_ERR(clk))
-> > +             return PTR_ERR(clk);
+Quoting Chanwoo Choi (2016-06-28 05:06:48)
+> 2016-06-28 4:11 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
+> > Quoting Chanwoo Choi (2016-06-26 04:20:43)
+> >> 2016-06-26 14:56 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
+> >> > +PROPERTIES
+> >> > +
+> >> > +- compatible:
+> >> > +    Usage: required
+> >> > +    Value type: <string>
+> >> > +    Definition: Should contain "qcom,pm8941-misc";
+> >> > +
+> >> > +- reg:
+> >> > +    Usage: required
+> >> > +    Value type: <u32>
+> >> > +    Definition: Should contain the offset to the misc address space
+> >>
+> >> 'reg' property is used on extcon-qcom-spmi-misc.c?
+> >> I think that you don't need to include this property.
+> >
+> > No it isn't used in the driver right now, but there is a register offset
+> > for this module and there are registers that can be read/written in this
+> > module. I'd like to keep it as required so we can easily read the
+> > registers in the future if needed.
 > 
-> Hi Stephen,
-> 
-> In the bindings the cal_sleep is marked optional, and I think should be since AFAIK
-> it's not present on MDM9615 for example.
-
-The cal_sleep clk is just the sleep clk then (should be a board clk in
-DT). Sometimes there's a gate in GCC to allow us to turn it off, other
-times there isn't. Either way, it's always wired there so I'll update
-the binding to say it isn't optional.
-
-> 
-> Also MDM9615 HSIC requires "core", "alt-core", "phy", "cal" and "iface" clocks.
-> I assume "core" can be attributed to the main chipidea node, but I think "alt-core" and "iface" should be also optionnal.
-
-Looking at the downstream sources I see this:
-
-        "core_clk"     -> usb_hsic_sys_clk
-        "iface_clk"    -> usb_hsic_p_clk
-        "alt_core_clk" -> usb_hsic_xcvr_clk
-
-        "cal_clk"      -> usb_hsic_hsio_cal_clk
-        "phy_clk"      -> usb_hsic_clk
-
-"core_clk" would be the core clk in ci_hdrc_msm. "iface_clk" would be
-the iface clk in ci_hdrc_msm. "cal_clk" would be the cal clk in the hsic
-phy and "phy_clk" would be the phy clk in the hsic phy.
-
-That leaves alt_core_clk which seems to be a clock that needs to be on
-during the reset assert/deassert and possibly for LPM and USB1.1 FS
-modes. Sometimes it's referred to as the "housekeeping" clk. Due to the
-way resets are done on msm8974 and later SoCs it looks like this clk was
-removed. I can make this an optional clk in the ci_hdrc_msm driver, or
-we can have two versions of the ci_hdrc_msm compatible string, one for a
-device that has the housekeeping clk and one for the device that
-doesn't.
-
-> 
-> Finally, it misses an optional reset line AFAIK mandatory on MDM9615.
+> OK.
+> But, If you want to remain the reg property, you should add the code to get
+> the register offset by using OF functions. This patch don't include the OF
+> function to handle it.
 > 
 
->From what I can tell downstream, all those clks point to the same bit 0
-of HSIC_RESET register? So there isn't any phy reset, just the chipidea
-controller wrapper reset bit, which should go into the wrapper node?
+Sorry I don't follow the argument. I've put the reg property here for
+future proofing so that the binding doesn't have to change in backwards
+incompatible ways in the future if we do need to get the property later.
