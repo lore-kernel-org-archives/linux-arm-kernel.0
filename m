@@ -1,176 +1,134 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 28 Jun 2016 15:51:46 +0100
-Subject: [PATCH v3 3/7] arm64: hibernate: Support DEBUG_PAGEALLOC
+Date: Tue, 28 Jun 2016 15:51:47 +0100
+Subject: [PATCH v3 4/7] arm64: hibernate: Detect hibernate image created on
+ non-boot CPU
 In-Reply-To: <1467125510-18758-1-git-send-email-james.morse@arm.com>
 References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
-Message-ID: <1467125510-18758-4-git-send-email-james.morse@arm.com>
+Message-ID: <1467125510-18758-5-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DEBUG_PAGEALLOC removes the valid bit of page table entries to prevent
-any access to unallocated memory. Hibernate uses this as a hint that those
-pages don't need to be saved/restored. This patch adds the
-kernel_page_present() function it uses.
+On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
+user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
+kernel will assign logical id 0 to a different physical CPU.
+This breaks hibernate as hibernate and resume will be attempted on different
+CPUs.
 
-hibernate.c copies the resume kernel's linear map for use during restore.
-Add _copy_pte() to fill-in the holes made by DEBUG_PAGEALLOC in the resume
-kernel, so we can restore data the original kernel had at these addresses.
+Save the MPIDR of the CPU we hibernated on in the hibernate arch-header,
+and fail to resume if it doesn't match CPU0's when we come to read the
+header.
 
-Finally, DEBUG_PAGEALLOC means the linear-map alias of KERNEL_START to
-KERNEL_END may have holes in it, so we can't lazily clean this whole
-area to the PoC. Only clean the new mmuoff regions, and the kernel/kvm
-idmaps.
+This will still lead to data loss (hibernate image is discarded), but
+we at least get the opportunity to print an error message. Later patches
+will allow hibernate to disable all but the CPU we hibernated on.
 
-This reverts commit da24eb1f3f9e2c7b75c5f8c40d8e48e2c4789596.
-
-Reported-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: James Morse <james.morse@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
-Changes since v2:
- * Added cleaning of mmuoff.data section.
- * Added dcache_clean_range() macro, more readable?
+Change since v2:
+ * This patch was split out of v2:patch4. Without any core-code changes,
+   printing an error like this is the best we can do.
 
- arch/arm64/Kconfig            |  1 -
- arch/arm64/kernel/hibernate.c | 45 ++++++++++++++++++++++++++++++++++---------
- arch/arm64/mm/pageattr.c      | 40 +++++++++++++++++++++++++++++++++++++-
- 3 files changed, 75 insertions(+), 11 deletions(-)
+This patch will cause a trivial merge conflict with mainline, due to a fix
+for hibernate which added an include for asm/smp.h. The fix is to keep
+both hunks.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1b196bf99320..79341f6d1b6a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -599,7 +599,6 @@ source kernel/Kconfig.preempt
- source kernel/Kconfig.hz
- 
- config ARCH_SUPPORTS_DEBUG_PAGEALLOC
--	depends on !HIBERNATION
- 	def_bool y
- 
- config ARCH_HAS_HOLES_MEMORYMODEL
+ arch/arm64/kernel/hibernate.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
 diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index 56e548fe0386..1c1278d5ec50 100644
+index 1c1278d5ec50..8c7c6d7d4cd4 100644
 --- a/arch/arm64/kernel/hibernate.c
 +++ b/arch/arm64/kernel/hibernate.c
-@@ -223,6 +223,7 @@ out:
- 	return rc;
- }
+@@ -15,6 +15,7 @@
+  * License terms: GNU General Public License (GPL) version 2
+  */
+ #define pr_fmt(x) "hibernate: " x
++#include <linux/cpu.h>
+ #include <linux/kvm_host.h>
+ #include <linux/mm.h>
+ #include <linux/notifier.h>
+@@ -26,6 +27,7 @@
  
-+#define dcache_clean_range(start, end)	__flush_dcache_area(start, (end - start))
+ #include <asm/barrier.h>
+ #include <asm/cacheflush.h>
++#include <asm/cputype.h>
+ #include <asm/irqflags.h>
+ #include <asm/memory.h>
+ #include <asm/mmu_context.h>
+@@ -33,6 +35,7 @@
+ #include <asm/pgtable.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/sections.h>
++#include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/virt.h>
  
- int swsusp_arch_suspend(void)
- {
-@@ -235,8 +236,14 @@ int swsusp_arch_suspend(void)
- 	if (__cpu_suspend_enter(&state)) {
- 		ret = swsusp_save();
- 	} else {
--		/* Clean kernel to PoC for secondary core startup */
--		__flush_dcache_area(LMADDR(KERNEL_START), KERNEL_END - KERNEL_START);
-+		/* Clean kernel core startup/idle code to PoC*/
-+		dcache_clean_range(__mmuoff_text_start, __mmuoff_text_end);
-+		dcache_clean_range(__mmuoff_data_start, __mmuoff_data_end);
-+		dcache_clean_range(__idmap_text_start, __idmap_text_end);
+@@ -59,6 +62,12 @@ extern char hibernate_el2_vectors[];
+ extern char __hyp_stub_vectors[];
+ 
+ /*
++ * The logical cpu number we should resume on, initialised to a non-cpu
++ * number.
++ */
++static int sleep_cpu = -EINVAL;
 +
-+		/* Clean kvm setup code to PoC? */
-+		if (el2_reset_needed())
-+			dcache_clean_range(__hyp_idmap_text_start, __hyp_idmap_text_end);
- 
- 		/*
- 		 * Tell the hibernation core that we've just restored
-@@ -252,6 +259,32 @@ int swsusp_arch_suspend(void)
- 	return ret;
- }
- 
-+static void _copy_pte(pte_t *dst_pte, pte_t *src_pte, unsigned long addr)
-+{
-+	unsigned long pfn = virt_to_pfn(addr);
++/*
+  * Values that may not change over hibernate/resume. We put the build number
+  * and date in here so that we guarantee not to resume with a different
+  * kernel.
+@@ -80,6 +89,8 @@ static struct arch_hibernate_hdr {
+ 	 * re-configure el2.
+ 	 */
+ 	phys_addr_t	__hyp_stub_vectors;
 +
-+	if (pte_valid(*src_pte)) {
-+		/*
-+		 * Resume will overwrite areas that may be marked
-+		 * read only (code, rodata). Clear the RDONLY bit from
-+		 * the temporary mappings we use during restore.
-+		 */
-+		set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
-+	} else if (debug_pagealloc_enabled()) {
-+		/*
-+		 * debug_pagealloc may have removed the PTE_VALID bit if
-+		 * the page isn't in use by the resume kernel. It may have
-+		 * been in use by the original kernel, in which case we need
-+		 * to put it back in our copy to do the restore.
-+		 *
-+		 * Check for mappable memory that gives us a translation
-+		 * like part of the linear map.
-+		 */
-+		if (pfn_valid(pfn) && pte_pfn(*src_pte) == pfn)
-+			set_pte(dst_pte, __pte((pte_val(*src_pte) & ~PTE_RDONLY) | PTE_VALID));
++	u64		sleep_cpu_mpidr;
+ } resume_hdr;
+ 
+ static inline void arch_hdr_invariants(struct arch_hibernate_hdr_invariants *i)
+@@ -122,6 +133,11 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
+ 	else
+ 		hdr->__hyp_stub_vectors = 0;
+ 
++	/* Save the mpidr of the cpu we called cpu_suspend() on... */
++	hdr->sleep_cpu_mpidr = cpu_logical_map(sleep_cpu);
++	pr_info("Hibernating on CPU %d [mpidr:0x%llx]\n", sleep_cpu,
++		hdr->sleep_cpu_mpidr);
++
+ 	return 0;
+ }
+ EXPORT_SYMBOL(arch_hibernation_header_save);
+@@ -137,6 +153,14 @@ int arch_hibernation_header_restore(void *addr)
+ 		return -EINVAL;
+ 	}
+ 
++	sleep_cpu = get_logical_index(hdr->sleep_cpu_mpidr);
++	pr_info("Hibernated on CPU %d [mpidr:0x%llx]\n", sleep_cpu,
++		hdr->sleep_cpu_mpidr);
++	if (sleep_cpu != 0) {
++		pr_crit("Didn't hibernate on the firmware boot CPU!\n");
++		sleep_cpu = -EINVAL;
++		return -EINVAL;
 +	}
-+}
-+
- static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
- 		    unsigned long end)
- {
-@@ -267,13 +300,7 @@ static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
- 
- 	src_pte = pte_offset_kernel(src_pmd, start);
- 	do {
--		if (!pte_none(*src_pte))
--			/*
--			 * Resume will overwrite areas that may be marked
--			 * read only (code, rodata). Clear the RDONLY bit from
--			 * the temporary mappings we use during restore.
--			 */
--			set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
-+		_copy_pte(dst_pte, src_pte, addr);
- 	} while (dst_pte++, src_pte++, addr += PAGE_SIZE, addr != end);
+ 	resume_hdr = *hdr;
  
  	return 0;
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index ca6d268e3313..b6c0da84258c 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -139,4 +139,42 @@ void __kernel_map_pages(struct page *page, int numpages, int enable)
- 					__pgprot(0),
- 					__pgprot(PTE_VALID));
- }
--#endif
-+#ifdef CONFIG_HIBERNATION
-+/*
-+ * When built with CONFIG_DEBUG_PAGEALLOC and CONFIG_HIBERNATION, this function
-+ * is used to determine if a linear map page has been marked as not-present by
-+ * CONFIG_DEBUG_PAGEALLOC. Walk the page table and check the PTE_VALID bit.
-+ * This is based on kern_addr_valid(), which almost does what we need.
-+ */
-+bool kernel_page_present(struct page *page)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	pte_t *pte;
-+	unsigned long addr = (unsigned long)page_address(page);
-+
-+	pgd = pgd_offset_k(addr);
-+	if (pgd_none(*pgd))
-+		return false;
-+
-+	pud = pud_offset(pgd, addr);
-+	if (pud_none(*pud))
-+		return false;
-+	if (pud_sect(*pud))
-+		return true;
-+
-+	pmd = pmd_offset(pud, addr);
-+	if (pmd_none(*pmd))
-+		return false;
-+	if (pmd_sect(*pmd))
-+		return true;
-+
-+	pte = pte_offset_kernel(pmd, addr);
-+	if (pte_none(*pte))
-+		return false;
-+
-+	return pte_valid(*pte);
-+}
-+#endif /* CONFIG_HIBERNATION */
-+#endif /* CONFIG_DEBUG_PAGEALLOC */
+@@ -234,6 +258,7 @@ int swsusp_arch_suspend(void)
+ 	local_dbg_save(flags);
+ 
+ 	if (__cpu_suspend_enter(&state)) {
++		sleep_cpu = smp_processor_id();
+ 		ret = swsusp_save();
+ 	} else {
+ 		/* Clean kernel core startup/idle code to PoC*/
+@@ -251,6 +276,7 @@ int swsusp_arch_suspend(void)
+ 		 */
+ 		in_suspend = 0;
+ 
++		sleep_cpu = -EINVAL;
+ 		__cpu_suspend_exit();
+ 	}
+ 
 -- 
 2.8.0.rc3
