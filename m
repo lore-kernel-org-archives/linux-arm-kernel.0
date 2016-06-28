@@ -1,188 +1,164 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 28 Jun 2016 18:07:32 +0100
-Subject: [PATCH v2 6/6] arm64: trap userspace "dc cvau" cache operation on
- errata-affected core
+Date: Tue, 28 Jun 2016 18:07:31 +0100
+Subject: [PATCH v2 5/6] arm64: consolidate signal injection on emulation errors
 In-Reply-To: <20160628170732.523-1-andre.przywara@arm.com>
 References: <20160628170732.523-1-andre.przywara@arm.com>
-Message-ID: <20160628170732.523-7-andre.przywara@arm.com>
+Message-ID: <20160628170732.523-6-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM errata 819472, 826319, 827319 and 824069 for affected
-Cortex-A53 cores demand to promote "dc cvau" instructions to
-"dc civac". Since we allow userspace to also emit those instructions,
-we should make sure that "dc cvau" gets promoted there too.
-So lets grasp the nettle here and actually trap every userland cache
-maintenance instruction once we detect at least one affected core in
-the system.
-We then emulate the instruction by executing it on behalf of userland,
-promoting "dc cvau" to "dc civac" on the way and injecting access
-fault back into userspace.
+The code for injecting a signal into userland if a trapped instruction
+fails emulation due to a _userland_ error (like an illegal address)
+will be used more often with the next patch.
+Factor out the core functionality into a separate function and use
+that both for the existing trap handler and for the deprecated
+instructions emulation.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/include/asm/processor.h |  1 +
- arch/arm64/include/asm/sysreg.h    |  2 +-
- arch/arm64/kernel/cpu_errata.c     |  2 ++
- arch/arm64/kernel/entry.S          | 12 +++++++-
- arch/arm64/kernel/traps.c          | 60 ++++++++++++++++++++++++++++++++++++++
- 5 files changed, 75 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/traps.h       |  2 ++
+ arch/arm64/kernel/armv8_deprecated.c | 23 +------------
+ arch/arm64/kernel/traps.c            | 63 ++++++++++++++++++++++++++++--------
+ 3 files changed, 53 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index cef1cf3..ace0a96 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -192,5 +192,6 @@ static inline void spin_lock_prefetch(const void *ptr)
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index 0cc2f29..816b293 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -34,6 +34,8 @@ struct undef_hook {
+ void register_undef_hook(struct undef_hook *hook);
+ void unregister_undef_hook(struct undef_hook *hook);
  
- void cpu_enable_pan(void *__unused);
- void cpu_enable_uao(void *__unused);
-+void cpu_enable_cache_maint_trap(void *__unused);
++void set_segfault(struct pt_regs *regs, unsigned long addr);
++
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ static inline int __in_irqentry_text(unsigned long ptr)
+ {
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index c37202c..b619274 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -316,28 +316,6 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+  */
+ #define TYPE_SWPB (1 << 22)
  
- #endif /* __ASM_PROCESSOR_H */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 751e901..cc06794 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -98,11 +98,11 @@
- 			 SCTLR_ELx_SA | SCTLR_ELx_I)
- 
- /* SCTLR_EL1 specific flags. */
-+#define SCTLR_EL1_UCI		(1 << 26)
- #define SCTLR_EL1_SPAN		(1 << 23)
- #define SCTLR_EL1_SED		(1 << 8)
- #define SCTLR_EL1_CP15BEN	(1 << 5)
- 
+-/*
+- * Set up process info to signal segmentation fault - called on access error.
+- */
+-static void set_segfault(struct pt_regs *regs, unsigned long addr)
+-{
+-	siginfo_t info;
 -
- /* id_aa64isar0 */
- #define ID_AA64ISAR0_RDM_SHIFT		28
- #define ID_AA64ISAR0_ATOMICS_SHIFT	20
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index c2261a7..af647d2 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -46,6 +46,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.desc = "ARM errata 826319, 827319, 824069",
- 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
- 		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x02),
-+		.enable = cpu_enable_cache_maint_trap,
- 	},
- #endif
- #ifdef CONFIG_ARM64_ERRATUM_819472
-@@ -54,6 +55,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.desc = "ARM errata 819472",
- 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
- 		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x01),
-+		.enable = cpu_enable_cache_maint_trap,
- 	},
- #endif
- #ifdef CONFIG_ARM64_ERRATUM_832075
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 12e8d2b..86480b4 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -451,7 +451,7 @@ el0_sync:
- 	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
- 	b.eq	el0_fpsimd_exc
- 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
--	b.eq	el0_undef
-+	b.eq	el0_sys
- 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
- 	b.eq	el0_sp_pc
- 	cmp	x24, #ESR_ELx_EC_PC_ALIGN	// pc alignment exception
-@@ -579,6 +579,16 @@ el0_undef:
- 	mov	x0, sp
- 	bl	do_undefinstr
- 	b	ret_to_user
-+el0_sys:
-+	/*
-+	 * System instructions, for trapped cache maintenance instructions
-+	 */
-+	enable_dbg_and_irq
-+	ct_user_exit
-+	mov	x0, x25
-+	mov	x1, sp
-+	bl	do_sysinstr
-+	b	ret_to_user
- el0_dbg:
- 	/*
- 	 * Debug exception handling
+-	down_read(&current->mm->mmap_sem);
+-	if (find_vma(current->mm, addr) == NULL)
+-		info.si_code = SEGV_MAPERR;
+-	else
+-		info.si_code = SEGV_ACCERR;
+-	up_read(&current->mm->mmap_sem);
+-
+-	info.si_signo = SIGSEGV;
+-	info.si_errno = 0;
+-	info.si_addr  = (void *) instruction_pointer(regs);
+-
+-	pr_debug("SWP{B} emulation: access caused memory abort!\n");
+-	arm64_notify_die("Illegal memory access", regs, &info, 0);
+-}
+-
+ static int emulate_swpX(unsigned int address, unsigned int *data,
+ 			unsigned int type)
+ {
+@@ -430,6 +408,7 @@ ret:
+ 	return 0;
+ 
+ fault:
++	pr_debug("SWP{B} emulation: access caused memory abort!\n");
+ 	set_segfault(regs, address);
+ 
+ 	return 0;
 diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 613b391..dc6a1db 100644
+index 2a43012..613b391 100644
 --- a/arch/arm64/kernel/traps.c
 +++ b/arch/arm64/kernel/traps.c
-@@ -41,6 +41,7 @@
- #include <asm/stacktrace.h>
- #include <asm/exception.h>
- #include <asm/system_misc.h>
-+#include <asm/sysreg.h>
- 
- static const char *handler[]= {
- 	"Synchronous Abort",
-@@ -436,6 +437,65 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+@@ -373,30 +373,67 @@ exit:
+ 	return fn ? fn(regs, instr) : 1;
  }
  
-+void cpu_enable_cache_maint_trap(void *__unused)
-+{
-+	config_sctlr_el1(SCTLR_EL1_UCI, 0);
-+}
-+
-+#define __user_cache_maint(insn, address, res)			\
-+	asm volatile (						\
-+		"1:	" insn ", %1\n"				\
-+		"	mov	%w0, #0\n"			\
-+		"2:\n"						\
-+		"	.pushsection .fixup,\"ax\"\n"		\
-+		"	.align	2\n"				\
-+		"3:	mov	%w0, %w2\n"			\
-+		"	b	2b\n"				\
-+		"	.popsection\n"				\
-+		_ASM_EXTABLE(1b, 3b)				\
-+		: "=r" (res)					\
-+		: "r" (address), "i" (-EFAULT) )
-+
-+asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
-+{
-+	unsigned long address;
-+	int ret;
-+
-+	/* if this is a write with: Op0=1, Op2=1, Op1=3, CRn=7 */
-+	if ((esr & 0x01fffc01) == 0x0012dc00) {
-+		int rt = (esr >> 5) & 0x1f;
-+		int crm = (esr >> 1) & 0x0f;
-+
-+		address = (rt == 31) ? 0 : regs->regs[rt];
-+
-+		switch (crm) {
-+		case 11:		/* DC CVAU, gets promoted */
-+			__user_cache_maint("dc civac", address, ret);
-+			break;
-+		case 10:		/* DC CVAC, gets promoted */
-+			__user_cache_maint("dc civac", address, ret);
-+			break;
-+		case 14:		/* DC CIVAC */
-+			__user_cache_maint("dc civac", address, ret);
-+			break;
-+		case 5:			/* IC IVAU */
-+			__user_cache_maint("ic ivau", address, ret);
-+			break;
-+		default:
-+			force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-+			return;
-+		}
-+	} else {
-+		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-+		return;
-+	}
-+
-+	if (ret)
-+		set_segfault(regs, address);
-+	else
-+		regs->pc += 4;
-+}
-+
- long compat_arm_syscall(struct pt_regs *regs);
+-asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
++static void force_signal_inject(int signal, int code, struct pt_regs *regs,
++				unsigned long address)
+ {
+ 	siginfo_t info;
+ 	void __user *pc = (void __user *)instruction_pointer(regs);
++	const char *desc;
  
- asmlinkage long do_ni_syscall(struct pt_regs *regs)
+-	/* check for AArch32 breakpoint instructions */
+-	if (!aarch32_break_handler(regs))
+-		return;
+-
+-	if (call_undef_hook(regs) == 0)
+-		return;
++	switch (signal) {
++	case SIGILL:
++		desc = "undefined instruction";
++		break;
++	case SIGSEGV:
++		desc = "illegal memory access";
++		break;
++	default:
++		desc = "bad mode";
++		break;
++	}
+ 
+-	if (unhandled_signal(current, SIGILL) && show_unhandled_signals_ratelimited()) {
+-		pr_info("%s[%d]: undefined instruction: pc=%p\n",
+-			current->comm, task_pid_nr(current), pc);
++	if (unhandled_signal(current, signal) &&
++	    show_unhandled_signals_ratelimited()) {
++		pr_info("%s[%d]: %s: pc=%p\n",
++			current->comm, task_pid_nr(current), desc, pc);
+ 		dump_instr(KERN_INFO, regs);
+ 	}
+ 
+-	info.si_signo = SIGILL;
++	info.si_signo = signal;
+ 	info.si_errno = 0;
+-	info.si_code  = ILL_ILLOPC;
++	info.si_code  = code;
+ 	info.si_addr  = pc;
+ 
+-	arm64_notify_die("Oops - undefined instruction", regs, &info, 0);
++	arm64_notify_die(desc, regs, &info, 0);
++}
++
++/*
++ * Set up process info to signal segmentation fault - called on access error.
++ */
++void set_segfault(struct pt_regs *regs, unsigned long addr)
++{
++	int code;
++
++	down_read(&current->mm->mmap_sem);
++	if (find_vma(current->mm, addr) == NULL)
++		code = SEGV_MAPERR;
++	else
++		code = SEGV_ACCERR;
++	up_read(&current->mm->mmap_sem);
++
++	force_signal_inject(SIGSEGV, code, regs, addr);
++}
++
++asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
++{
++	/* check for AArch32 breakpoint instructions */
++	if (!aarch32_break_handler(regs))
++		return;
++
++	if (call_undef_hook(regs) == 0)
++		return;
++
++	force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+ }
+ 
+ long compat_arm_syscall(struct pt_regs *regs);
 -- 
 2.9.0
