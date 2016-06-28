@@ -1,40 +1,78 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 28 Jun 2016 17:14:27 +0100
-Subject: [PATCH v6] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-In-Reply-To: <20160628153346.GF4585@e104818-lin.cambridge.arm.com>
-References: <1466507556-9027-1-git-send-email-suzuki.poulose@arm.com>
- <20160628153346.GF4585@e104818-lin.cambridge.arm.com>
-Message-ID: <5772A263.2050503@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 28 Jun 2016 17:18:58 +0100
+Subject: [RFC 2/2] iommu/dma: Identity-map non-RAM regions
+In-Reply-To: <cover.1467123945.git.robin.murphy@arm.com>
+References: <cover.1467123945.git.robin.murphy@arm.com>
+Message-ID: <98eb098314f4f29532e571fa4ff94ead5ec39a25.1467129314.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/06/16 16:33, Catalin Marinas wrote:
-> On Tue, Jun 21, 2016 at 12:12:36PM +0100, Suzuki K. Poulose wrote:
->> +#define CPUINFO_ATTR_RO(_name)							\
->> +	static ssize_t show_##_name(struct device *dev,				\
->> +			struct device_attribute *attr, char *buf)		\
->> +	{									\
->> +		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
->> +										\
->> +		if (info->reg_midr)						\
->> +			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
->> +		else								\
->> +			return 0;						\
->> +	}									\
->> +	static DEVICE_ATTR(_name, 0444, show_##_name, NULL)
->> +
->> +CPUINFO_ATTR_RO(midr);
->> +CPUINFO_ATTR_RO(revidr);
->
-> Since exposing these values is aimed at JIT code (and not human
-> readable), wouldn't it make more sense to present the binary value
-> instead of the ascii transformation?
+There is a fundamental assumption baked into many drivers and subsystems
+that resources outside of RAM (e.g. MSI controllers, target peripherals
+for DMA engines, etc.) can be accessed directly by physical address.
+Whilst work is ongoing to add the necessary APIs and abstractions to
+make everything more IOMMU-friendly, the time and effort involved is
+proving to be not insignificant, and in the meantime unconditionally
+enabling IOMMU translation for DMA leaves many things unworkably broken.
 
-I am fine with either.
+By swinging the big hammer of identity-mapping every potential I/O
+region, we can at least enable IOMMU remapping for regular DMA to/from
+RAM areas without regressing existing behaviour, and continue developing
+incrementally from there.
 
-Edward,
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-Do you have any preference ?
+And this is even more horrible, but again, there are platforms that want
+32-bit peripherals to be able to access all of (or any of) RAM, but at
+the same time won't appreciate currently-working MSIs and whatever else
+being borked.
 
-Suzuki
-  
+ drivers/iommu/dma-iommu.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 2385fab382d8..3b07a8424ac5 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -92,6 +92,29 @@ static void iova_match_mem(struct iova_domain *iovad)
+ 		reserve_iova(iovad, base, blk);
+ }
+ 
++static void domain_idmap_mmio(struct iommu_domain *domain)
++{
++	struct iova_domain *iovad = domain->iova_cookie;
++	struct rb_node *node;
++	unsigned long shift = iova_shift(iovad);
++
++	spin_lock(&iovad->iova_rbtree_lock);
++	for (node = rb_first(&iovad->rbroot); node; node = rb_next(node)) {
++		struct iova *iova = container_of(node, struct iova, node);
++		phys_addr_t phys = iova->pfn_lo << shift;
++		size_t size = (iova->pfn_hi - iova->pfn_lo) << shift;
++
++		size = min_t(phys_addr_t, size,
++				domain->geometry.aperture_end - phys + 1);
++		if (!size)
++			break;
++
++		iommu_map(domain, phys, phys, size,
++				IOMMU_READ | IOMMU_WRITE | IOMMU_MMIO);
++	}
++	spin_unlock(&iovad->iova_rbtree_lock);
++}
++
+ /**
+  * iommu_dma_init_domain - Initialise a DMA mapping domain
+  * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
+@@ -142,6 +165,8 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size
+ 	} else {
+ 		init_iova_domain(iovad, 1UL << order, base_pfn, end_pfn);
+ 		iova_match_mem(iovad);
++		if (domain->geometry.force_aperture)
++			domain_idmap_mmio(domain);
+ 	}
+ 	return 0;
+ }
+-- 
+2.8.1.dirty
