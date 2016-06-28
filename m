@@ -1,70 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Jun 2016 08:41:10 +0100
-Subject: [PATCH v3 03/10] input: tps65218-pwrbutton: Add
- platform_device_id table
-In-Reply-To: <57721F71.5010700@ti.com>
-References: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
- <1467093980-11458-4-git-send-email-j-keerthy@ti.com>
- <20160628064948.GB6720@dell> <57721F71.5010700@ti.com>
-Message-ID: <20160628074110.GH6720@dell>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Tue, 28 Jun 2016 13:10:34 +0530
+Subject: [PATCH v4 1/3] Documentation: DT: Add iproc-static-adc binding
+In-Reply-To: <1467099636-31855-1-git-send-email-raveendra.padasalagi@broadcom.com>
+References: <1467099636-31855-1-git-send-email-raveendra.padasalagi@broadcom.com>
+Message-ID: <1467099636-31855-2-git-send-email-raveendra.padasalagi@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jun 2016, Keerthy wrote:
+The patch adds devicetree binding document for broadcom's
+iproc-static-adc controller driver.
 
-> 
-> 
-> On Tuesday 28 June 2016 12:19 PM, Lee Jones wrote:
-> >On Tue, 28 Jun 2016, Keerthy wrote:
-> >
-> >>platform_device_id table is needed for adding the tps65218-pwrbutton
-> >>module to the mfd_cell array.
-> >>
-> >>Signed-off-by: Keerthy <j-keerthy@ti.com>
-> >>---
-> >>  drivers/input/misc/tps65218-pwrbutton.c | 7 +++++++
-> >>  1 file changed, 7 insertions(+)
-> >>
-> >>diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
-> >>index 2bba8de..a0cb7d2 100644
-> >>--- a/drivers/input/misc/tps65218-pwrbutton.c
-> >>+++ b/drivers/input/misc/tps65218-pwrbutton.c
-> >>@@ -113,12 +113,19 @@ static const struct of_device_id of_tps65218_pwr_match[] = {
-> >>  };
-> >>  MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
-> >>
-> >>+static const struct platform_device_id tps65218_pwrbtn_id_table[] = {
-> >>+	{ "tps65218-pwrbutton", },
-> >>+	{ /* sentinel */ }
-> >>+}
-> >
-> >Missing ';'.  Did you build test this?
-> 
-> Oops sorry for the mess. Yes i built and booted. While reviewing and just
-> before sending i have accidentally deleted. I will send a v4 in a bit. I
-> will send v4 of this patch.
-> 
-> I just checked now. It somehow compiles silently even with the ';' missing!
-> I will send a v4.
+Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ .../bindings/iio/adc/brcm,iproc-static-adc.txt     | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
 
-Are you sure this driver is enable in the CONFIG?
-
-> >>+MODULE_DEVICE_TABLE(platform, tps65218_pwrbtn_id_table);
-> >>+
-> >>  static struct platform_driver tps65218_pwron_driver = {
-> >>  	.probe	= tps65218_pwron_probe,
-> >>  	.driver	= {
-> >>  		.name	= "tps65218_pwrbutton",
-> >>  		.of_match_table = of_tps65218_pwr_match,
-> >>  	},
-> >>+	.id_table = tps65218_pwrbtn_id_table,
-> >>  };
-> >>  module_platform_driver(tps65218_pwron_driver);
-> >>
-> >
-
+diff --git a/Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt b/Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
+new file mode 100644
+index 0000000..caaaed7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
+@@ -0,0 +1,41 @@
++* Broadcom's IPROC Static ADC controller
++
++Broadcom iProc ADC controller has 8 channels 10bit ADC.
++Allows user to convert analog input voltage values to digital.
++
++Required properties:
++
++- compatible: Must be "brcm,iproc-static-adc"
++
++- adc-syscon: Handler of syscon node defining physical base address of the
++  controller and length of memory mapped region.
++
++- #io-channel-cells = <1>; As ADC has multiple outputs
++  refer to Documentation/devicetree/bindings/iio/iio-bindings.txt for details.
++
++- io-channel-ranges:
++  refer to Documentation/devicetree/bindings/iio/iio-bindings.txt for details.
++
++- clocks: Clock used for this block.
++
++- clock-names: Clock name should be given as tsc_clk.
++
++- interrupts: interrupt line number.
++
++For example:
++
++	ts_adc_syscon: ts_adc_syscon at 180a6000 {
++		compatible = "brcm,iproc-ts-adc-syscon","syscon";
++		reg = <0x180a6000 0xc30>;
++	};
++
++	adc: adc at 180a6000 {
++		compatible = "brcm,iproc-static-adc";
++		adc-syscon = <&ts_adc_syscon>;
++		#io-channel-cells = <1>;
++		io-channel-ranges;
++		clocks = <&asiu_clks BCM_CYGNUS_ASIU_ADC_CLK>;
++		clock-names = "tsc_clk";
++		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
