@@ -1,174 +1,68 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 28 Jun 2016 10:49:37 +0200
-Subject: [PATCH 20/21] phy: Add support for Qualcomm's USB HSIC phy
-In-Reply-To: <20160626072838.28082-21-stephen.boyd@linaro.org>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-21-stephen.boyd@linaro.org>
-Message-ID: <57723A21.3060602@baylibre.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 28 Jun 2016 10:51:54 +0200
+Subject: [PATCH 1/3] mfd: add support for Allwinner SoCs ADC
+In-Reply-To: <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
+References: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <20160628085154.GE4472@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2016 09:28 AM, Stephen Boyd wrote:
-> The HSIC USB controller on qcom SoCs has an integrated all
-> digital phy controlled via the ULPI viewport.
-> 
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  60 ++++++++
->  drivers/phy/Kconfig                                |   7 +
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-qcom-usb-hsic.c                    | 161 +++++++++++++++++++++
->  4 files changed, 229 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
->  create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
+Hello,
+
+On Tue, Jun 28, 2016 at 10:18:15AM +0200, Quentin Schulz wrote:
+> diff --git a/drivers/mfd/sunxi-gpadc-mfd.c b/drivers/mfd/sunxi-gpadc-mfd.c
 > new file mode 100644
-> index 000000000000..6b1c6aad2962
+> index 0000000..710e297
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
-> @@ -0,0 +1,60 @@
-> +Qualcomm's USB HSIC PHY
-> +
-> +PROPERTIES
-> +
-> +- compatible:
-> +    Usage: required
-> +    Value type: <string>
-> +    Definition: Should contain "qcom,usb-hsic-phy"
-> +
-> +- #phy-cells:
-> +    Usage: required
-> +    Value type: <u32>
-> +    Definition: Should contain 0
-> +
-> +- clocks:
-> +    Usage: required
-> +    Value type: <prop-encoded-array>
-> +    Definition: Should contain clock specifier for phy, calibration and
-> +                optionally a calibration sleep clock
-> +
-> +- clock-names:
-> +    Usage: required
-> +    Value type: <stringlist>
-> +    Definition: Should contain "phy, "cal" and optionally "cal_sleep"
-> +
+> +++ b/drivers/mfd/sunxi-gpadc-mfd.c
+> @@ -0,0 +1,188 @@
 
 [...]
 
+> +	if (of_device_is_compatible(pdev->dev.of_node,
+> +				    "allwinner,sun4i-a10-ts"))
+> +		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +				      sun4i_gpadc_mfd_cells,
+> +				      ARRAY_SIZE(sun4i_gpadc_mfd_cells), NULL,
+> +				      0, NULL);
+> +	else if (of_device_is_compatible(pdev->dev.of_node,
+> +					 "allwinner,sun5i-a13-ts"))
+> +		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +				      sun5i_gpadc_mfd_cells,
+> +				      ARRAY_SIZE(sun5i_gpadc_mfd_cells), NULL,
+> +				      0, NULL);
+> +	else if (of_device_is_compatible(pdev->dev.of_node,
+> +					 "allwinner,sun6i-a31-ts"))
+> +		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +				      sun6i_gpadc_mfd_cells,
+> +				      ARRAY_SIZE(sun6i_gpadc_mfd_cells), NULL,
+> +				      0, NULL);
 > +
-> +static int qcom_usb_hsic_phy_power_on(struct phy *phy)
-> +{
-> +	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
-> +	struct ulpi *ulpi = uphy->ulpi;
-> +	struct pinctrl_state *pins_default;
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(uphy->phy_clk);
-> +	if (ret)
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to add MFD devices: %d\n", ret);
+> +		regmap_del_irq_chip(irq, sunxi_gpadc_mfd_dev->regmap_irqc);
+> +		mfd_remove_devices(&pdev->dev);
+
+You don't need to explicitly call mfd_remove_devices() when
+mfd_add_devices() fails. See:
+http://lxr.free-electrons.com/source/drivers/mfd/mfd-core.c#L298
+
 > +		return ret;
-> +
-> +	ret = clk_prepare_enable(uphy->cal_clk);
-> +	if (ret)
-> +		goto err_cal;
-> +
-> +	ret = clk_prepare_enable(uphy->cal_sleep_clk);
-> +	if (ret)
-> +		goto err_sleep;
-> +
+> +	}
 
-[...]
+Thanks,
 
-> +
-> +	return ret;
-> +err_ulpi:
-> +	clk_disable_unprepare(uphy->cal_sleep_clk);
-> +err_sleep:
-> +	clk_disable_unprepare(uphy->cal_clk);
-> +err_cal:
-> +	clk_disable_unprepare(uphy->phy_clk);
-> +	return ret;
-> +}
-> +
-> +static int qcom_usb_hsic_phy_power_off(struct phy *phy)
-> +{
-> +	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
-> +
-> +	clk_disable_unprepare(uphy->cal_sleep_clk);
-> +	clk_disable_unprepare(uphy->cal_clk);
-> +	clk_disable_unprepare(uphy->phy_clk);
+Antoine
 
-[...]
-
-> +static int qcom_usb_hsic_phy_probe(struct ulpi *ulpi)
-> +{
-> +	struct qcom_usb_hsic_phy *uphy;
-> +	struct phy_provider *p;
-> +	struct clk *clk;
-> +
-> +	uphy = devm_kzalloc(&ulpi->dev, sizeof(*uphy), GFP_KERNEL);
-> +	if (!uphy)
-> +		return -ENOMEM;
-> +	ulpi_set_drvdata(ulpi, uphy);
-> +
-> +	uphy->ulpi = ulpi;
-> +	uphy->pctl = devm_pinctrl_get(&ulpi->dev);
-> +	if (IS_ERR(uphy->pctl))
-> +		return PTR_ERR(uphy->pctl);
-> +
-> +	uphy->phy_clk = clk = devm_clk_get(&ulpi->dev, "phy");
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	uphy->cal_clk = clk = devm_clk_get(&ulpi->dev, "cal");
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	uphy->cal_sleep_clk = clk = devm_clk_get(&ulpi->dev, "cal_sleep");
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-
-Hi Stephen,
-
-In the bindings the cal_sleep is marked optional, and I think should be since AFAIK
-it's not present on MDM9615 for example.
-
-Also MDM9615 HSIC requires "core", "alt-core", "phy", "cal" and "iface" clocks.
-I assume "core" can be attributed to the main chipidea node, but I think "alt-core" and "iface" should be also optionnal.
-
-Finally, it misses an optional reset line AFAIK mandatory on MDM9615.
-
-Neil
-
-> +
-> +	uphy->phy = devm_phy_create(&ulpi->dev, ulpi->dev.of_node,
-> +				    &qcom_usb_hsic_phy_ops);
-> +	if (IS_ERR(uphy->phy))
-> +		return PTR_ERR(uphy->phy);
-> +	phy_set_drvdata(uphy->phy, uphy);
-> +
-> +	p = devm_of_phy_provider_register(&ulpi->dev, of_phy_simple_xlate);
-> +	return PTR_ERR_OR_ZERO(p);
-> +}
-> +
-> +
-> +static const struct of_device_id qcom_usb_hsic_phy_match[] = {
-> +	{ .compatible = "qcom,usb-hsic-phy", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, qcom_usb_hsic_phy_match);
-> +
-> +static struct ulpi_driver qcom_usb_hsic_phy_driver = {
-> +	.probe = qcom_usb_hsic_phy_probe,
-> +	.driver = {
-> +		.name = "qcom_usb_hsic_phy",
-> +		.of_match_table = qcom_usb_hsic_phy_match
-> +	},
-> +};
-> +module_ulpi_driver(qcom_usb_hsic_phy_driver);
-> +
-> +MODULE_DESCRIPTION("Qualcomm USB HSIC phy");
-> +MODULE_LICENSE("GPL v2");
-> 
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160628/a0e72c12/attachment.sig>
