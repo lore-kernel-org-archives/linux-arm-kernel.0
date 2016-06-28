@@ -1,7 +1,7 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 28 Jun 2016 18:43:48 +0100
-Subject: [GIT PULL] ARM: hisi: soc changes for v4.8
-Message-ID: <5772B754.2080701@hisilicon.com>
+Date: Tue, 28 Jun 2016 18:46:24 +0100
+Subject: [GIT PULL] ARM: hisi: DT changes for v4.8
+Message-ID: <5772B7F0.6040600@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,25 +21,29 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
 are available in the git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.8
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-dt-for-4.8
 
-for you to fetch changes up to c90047616d4411ff6e7a8a40ed87731dda0753b9:
+for you to fetch changes up to 04f66aa916c141113266646942d449b5781550e3:
 
-  ARM: hisi: add compatible string for Hi3519 soc (2016-06-28 16:24:33 +0100)
-
-----------------------------------------------------------------
-ARM: mach-hisi: Hisilicon SoC updates for 4.8
-
-- Add initial support for the hi3519 SoC based on armv7
-- Avoid the compiling warning by making unexported symbols static
+  ARM: dts: add dts files for Hi3519 and tidy up the makefile entries (2016-06-28 17:27:53 +0100)
 
 ----------------------------------------------------------------
-Ben Dooks (1):
-      ARM: hisi: make unexported symbols static
+ARM: DT: Hisilicon ARMv7 SoC Hi3519 DT updates for 4.8
 
-Jiancheng Xue (1):
-      ARM: hisi: add compatible string for Hi3519 soc
+- Add device tree bindings for hi3519 sysctrl
+- Add dts files for hi3519
+- Tidy up DTB makefile entries to keep the list sorted
 
- arch/arm/mach-hisi/hisilicon.c | 23 ++++-------------------
- arch/arm/mach-hisi/platsmp.c   |  4 ++--
- 2 files changed, 6 insertions(+), 21 deletions(-)
+----------------------------------------------------------------
+Jiancheng Xue (2):
+      ARM: dt-bindings: add device tree bindings for Hi3519 sysctrl
+      ARM: dts: add dts files for Hi3519 and tidy up the makefile entries
+
+ Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt |  14 ++++++++++
+ arch/arm/boot/dts/Makefile |   6 +++--
+ arch/arm/boot/dts/hi3519-demb.dts |  42 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/hi3519.dtsi | 187 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 247 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
+ create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
+ create mode 100644 arch/arm/boot/dts/hi3519.dtsi
