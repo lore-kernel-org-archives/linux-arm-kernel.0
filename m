@@ -1,53 +1,73 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 28 Jun 2016 18:07:29 +0100
-Subject: [PATCH v2 3/6] arm64: include alternative handling in
- dcache_by_line_op
+Date: Tue, 28 Jun 2016 18:07:30 +0100
+Subject: [PATCH v2 4/6] arm64: errata: Calling enable functions for CPU errata
+ too
 In-Reply-To: <20160628170732.523-1-andre.przywara@arm.com>
 References: <20160628170732.523-1-andre.przywara@arm.com>
-Message-ID: <20160628170732.523-4-andre.przywara@arm.com>
+Message-ID: <20160628170732.523-5-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly introduced dcache_by_line_op macro is used at least in
-one occassion at the moment to issue a "dc cvau" instruction,
-which is affected by ARM errata 819472, 826319, 827319 and 824069.
-Change the macro to allow for alternative patching in there to
-protect affected Cortex-A53 cores.
+Currently we call the (optional) enable function for CPU _features_
+only. As CPU _errata_ descriptions share the same data structure and
+having an enable function is useful for errata as well (for instance
+to set bits in SCTLR), lets call it when enumerating erratas too.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/cpufeature.h | 2 ++
+ arch/arm64/kernel/cpu_errata.c      | 5 +++++
+ arch/arm64/kernel/cpufeature.c      | 4 ++--
+ 3 files changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 10b017c..1a021f1 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -24,6 +24,7 @@
- #define __ASM_ASSEMBLER_H
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 224efe7..49dd1bd 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -191,7 +191,9 @@ void __init setup_cpu_features(void);
  
- #include <asm/asm-offsets.h>
-+#include <asm/cpufeature.h>
- #include <asm/page.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptrace.h>
-@@ -261,7 +262,16 @@ lr	.req	x30		// link register
- 	add	\size, \kaddr, \size
- 	sub	\tmp2, \tmp1, #1
- 	bic	\kaddr, \kaddr, \tmp2
--9998:	dc	\op, \kaddr
-+9998:
-+	.if	(\op == cvau || \op == cvac)
-+		alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-+		dc	\op, \kaddr
-+		alternative_else
-+		dc	civac, \kaddr
-+		alternative_endif
-+	.else
-+		dc	\op, \kaddr
-+	.endif
- 	add	\kaddr, \kaddr, \tmp1
- 	cmp	\kaddr, \size
- 	b.lo	9998b
+ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
++void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps);
+ void check_local_cpu_errata(void);
++void __init enable_errata_workarounds(void);
+ 
+ void verify_local_cpu_errata(void);
+ void verify_local_cpu_capabilities(void);
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index d427894..c2261a7 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -127,3 +127,8 @@ void check_local_cpu_errata(void)
+ {
+ 	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+ }
++
++void __init enable_errata_workarounds(void)
++{
++	enable_cpu_capabilities(arm64_errata);
++}
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 811773d..916d27a 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -913,8 +913,7 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+  * Run through the enabled capabilities and enable() it on all active
+  * CPUs
+  */
+-static void __init
+-enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
++void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+ {
+ 	for (; caps->matches; caps++)
+ 		if (caps->enable && cpus_have_cap(caps->capability))
+@@ -1036,6 +1035,7 @@ void __init setup_cpu_features(void)
+ 
+ 	/* Set the CPU feature capabilies */
+ 	setup_feature_capabilities();
++	enable_errata_workarounds();
+ 	setup_elf_hwcaps(arm64_elf_hwcaps);
+ 
+ 	if (system_supports_32bit_el0())
 -- 
 2.9.0
