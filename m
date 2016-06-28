@@ -1,64 +1,97 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 28 Jun 2016 12:51:15 +0800
-Subject: [PATCH v1 2/5] drm/panel: simple: Add support for LG LP079QX1-SP0V
- 1536x2048 panel
+Date: Tue, 28 Jun 2016 12:51:18 +0800
+Subject: [PATCH v1 3/5] ARM: dts: rockchip: add eDP/panel display device nodes
+ for rk3288-evb
 In-Reply-To: <1467089288-18355-1-git-send-email-ykk@rock-chips.com>
 References: <1467089288-18355-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1467089475-18627-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1467089478-18670-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LG LP079QX1-SP0V is an 7.9" QXGA TFT with LED Backlight unit and
-32 pins eDP interface. This module supports 1536x2048 mode.
+The default eDP panel on RK3288 EVB board is LG LP079QX1-SP0V TFT LCD,
+we haven't declared the panel regulator in the 'panel-simple' device
+node here, so the specific board like ACT8846 / RK8080 need to support
+the panel power supply.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
- drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/rk3288-evb.dtsi | 43 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 3a7bdf1..072c994 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -1017,6 +1017,29 @@ static const struct panel_desc lg_lb070wv8 = {
- 	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index 963365d..f293c44 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -48,7 +48,7 @@
+ 		reg = <0x0 0x80000000>;
+ 	};
+ 
+-	backlight {
++	backlight: backlight {
+ 		compatible = "pwm-backlight";
+ 		brightness-levels = <
+ 			  0   1   2   3   4   5   6   7
+@@ -97,6 +97,20 @@
+ 		#clock-cells = <0>;
+ 	};
+ 
++	panel: panel {
++		compatible ="lg,lp079qx1-sp0v", "simple-panel";
++		backlight = <&backlight>;
++		enable-gpios = <&gpio7 4 GPIO_ACTIVE_HIGH>;
++		pinctrl-0 = <&lcd_cs>;
++		ports {
++			panel_in: port {
++				panel_in_edp: endpoint {
++					remote-endpoint = <&edp_out_panel>;
++				};
++			};
++		};
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 		autorepeat;
+@@ -216,6 +230,27 @@
+ 	status = "okay";
  };
  
-+static const struct drm_display_mode lg_lp079qx1_sp0v_mode = {
-+	.clock = 200000,
-+	.hdisplay = 1536,
-+	.hsync_start = 1536 + 12,
-+	.hsync_end = 1536 + 12 + 16,
-+	.htotal = 1536 + 12 + 16 + 48,
-+	.vdisplay = 2048,
-+	.vsync_start = 2048 + 8,
-+	.vsync_end = 2048 + 8 + 4,
-+	.vtotal = 2048 + 8 + 4 + 8,
-+	.vrefresh = 60,
-+	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
++&edp_phy {
++	status = "okay";
 +};
 +
-+static const struct panel_desc lg_lp079qx1_sp0v = {
-+	.modes = &lg_lp079qx1_sp0v_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 129,
-+		.height = 171,
-+	},
++&edp {
++	force-hpd;
++	status = "okay";
++
++	ports {
++		edp_out: port at 1 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			edp_out_panel: endpoint {
++				reg = <0>;
++				remote-endpoint = <&panel_in_edp>;
++			};
++		};
++	};
 +};
 +
- static const struct drm_display_mode lg_lp120up1_mode = {
- 	.clock = 162300,
- 	.hdisplay = 1920,
-@@ -1457,6 +1480,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "lg,lb070wv8",
- 		.data = &lg_lb070wv8,
- 	}, {
-+		.compatible = "lg,lp079qx1-sp0v",
-+		.data = &lg_lp079qx1_sp0v,
-+	}, {
- 		.compatible = "lg,lp120up1",
- 		.data = &lg_lp120up1,
- 	}, {
+ &i2c0 {
+ 	status = "okay";
+ };
+@@ -322,6 +357,12 @@
+ 			rockchip,pins = <0 6 RK_FUNC_GPIO &pcfg_pull_none>;
+ 		};
+ 	};
++
++	lcd {
++		lcd_cs: lcd-cs {
++			rockchip,pins = <7 4 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
+ };
+ 
+ &usbphy {
 -- 
 1.9.1
