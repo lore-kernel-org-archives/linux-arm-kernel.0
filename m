@@ -1,51 +1,70 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 28 Jun 2016 09:55:29 -0600
-Subject: [PATCH] media: s5p-mfc fix memory leak in s5p_mfc_remove()
-In-Reply-To: <57727E2C.9040102@osg.samsung.com>
-References: <1465847114-7427-1-git-send-email-shuahkh@osg.samsung.com>
- <025e01d1d123$7c14e620$743eb260$@samsung.com>
- <57727E2C.9040102@osg.samsung.com>
-Message-ID: <57729DF1.20404@osg.samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 28 Jun 2016 17:05:28 +0100
+Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
+ overlapping regions
+In-Reply-To: <CAKv+Gu_3uKgFtvMryROwTMeGs=uXYU-OPrUC6LaNQiAKP=PZ3Q@mail.gmail.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
+ <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
+ <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
+ <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_3uKgFtvMryROwTMeGs=uXYU-OPrUC6LaNQiAKP=PZ3Q@mail.gmail.com>
+Message-ID: <20160628160528.GG4585@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2016 07:39 AM, Shuah Khan wrote:
-> On 06/28/2016 03:57 AM, Kamil Debski wrote:
->> HI Shuah,
->>
->> Which branch do you base your patches on?
->>
->> I have trouble applying this path
->> (https://patchwork.linuxtv.org/patch/34577/) and 
->> "s5p-mfc fix null pointer deference in clk_core_enable()"
->> (https://patchwork.linuxtv.org/patch/34751/) 
->> onto current linuxtv/master.
->>
->> The top commit of linuxtv/master is :
->> "commit 0db5c79989de2c68d5abb7ba891bfdb3cd3b7e05
->> Author: Mauro Carvalho Chehab <mchehab@s-opensource.com>
->> Date:   Thu Jun 16 08:04:40 2016 -0300
->>
->>     [media] media-devnode.h: Fix documentation"
->>
->> Could you please rebase the two patches mentioned above to the
->> linuxtv/master?
->>
->> Best wishes,
->>
-> 
-> I based them on linux_next. I will rebase both patches on linuxtv/master
-> and resend.
-> 
+(Restarting the thread before I forget the entire discussion)
 
-Hi Kamil,
+On Mon, Jun 06, 2016 at 11:18:14PM +0200, Ard Biesheuvel wrote:
+> >> > On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> >> > > index 78f52488f9ff..0d5753c31c7f 100644
+> >> > > --- a/arch/arm64/kernel/efi.c
+> >> > > +++ b/arch/arm64/kernel/efi.c
+> >> > > @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
+> >> > >  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+> >> > >  {
+> >> > >         pteval_t prot_val = create_mapping_protection(md);
+> >> > > +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
+> >> > > +       efi_memory_desc_t *next = md;
+> >> > >
+> >> > > -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+> >> > > -                          md->num_pages << EFI_PAGE_SHIFT,
+> >> > > -                          __pgprot(prot_val | PTE_NG));
+> >> > > +       /*
+> >> > > +        * Search for the next EFI runtime map and check for any overlap with
+> >> > > +        * the current map when aligned to PAGE_SIZE. In such case, defer
+> >> > > +        * mapping the end of the current range until the next
+> >> > > +        * efi_create_mapping() call.
+> >> > > +        */
+> >> > > +       for_each_efi_memory_desc_continue(next) {
+> >> > > +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
+> >> > > +                       continue;
+> >> > > +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
+> >> > > +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
+[...]
+> Another thing I failed to mention is that the new Memory Attributes
+> table support may map all of the RuntimeServicesCode regions a second
+> time, but with a higher granularity, using RO for .text and .rodata
+> and NX for .data and .bss (and the PE/COFF header).
 
-Do you need me to rebase this one:
+Can this not be done in a single go without multiple passes? That's what
+we did for the core arm64 code, the only one left being EFI run-time
+mappings.
 
-https://patchwork.kernel.org/patch/9166119/
+> Due to the higher
+> granularity, regions that were mapped using the contiguous bit the
+> first time around may be split into smaller regions. Your current code
+> does not address that case.
 
-I will do that anyway and send three patches. I don't see the above
-in linuxtv/master
+If the above doesn't work, the only solution would be to permanently map
+these ranges as individual pages, no large blocks.
 
-thanks,
--- Shuah
+> I wonder how the PT debug code deals with this, and whether there is
+> anything we can reuse to inhibit cont and block mappings
+
+Do you mean DEBUG_PAGEALLOC? When enabled, it defaults to single page
+mappings for the kernel, no sections.
+
+-- 
+Catalin
