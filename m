@@ -1,23 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Jun 2016 16:06:22 -0500
-Subject: [PATCH v4 1/3] Documentation: DT: Add iproc-static-adc binding
-In-Reply-To: <1467099636-31855-2-git-send-email-raveendra.padasalagi@broadcom.com>
-References: <1467099636-31855-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1467099636-31855-2-git-send-email-raveendra.padasalagi@broadcom.com>
-Message-ID: <20160628210622.GA10297@rob-hp-laptop>
+Date: Tue, 28 Jun 2016 16:10:05 -0500
+Subject: [PATCH v2 1/2] devicetree: Add vendor prefix for Inverse Path
+In-Reply-To: <20160628125444.16531-2-andrej@inversepath.com>
+References: <20160628125444.16531-1-andrej@inversepath.com>
+ <20160628125444.16531-2-andrej@inversepath.com>
+Message-ID: <20160628211005.GA11978@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 01:10:34PM +0530, Raveendra Padasalagi wrote:
-> The patch adds devicetree binding document for broadcom's
-> iproc-static-adc controller driver.
+On Tue, Jun 28, 2016 at 02:54:43PM +0200, andrej at inversepath.com wrote:
+> From: Andrej Rosano <andrej@inversepath.com>
 > 
-> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Inverse Path is an information security consulting company:
+> https://inversepath.com
+> 
+> Signed-off-by: Andrej Rosano <andrej@inversepath.com>
 > ---
->  .../bindings/iio/adc/brcm,iproc-static-adc.txt     | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Acked-by: Rob Herring <robh@kernel.org>
+Please add acks when posting new versions.
+
+Rob
