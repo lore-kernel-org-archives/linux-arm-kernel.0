@@ -1,62 +1,57 @@
-From: andi.shyti@gmail.com (andi.shyti at gmail.com)
-Date: Tue, 28 Jun 2016 17:45:37 +0300
-Subject: [PATCH 2/2] clk: rockchip: remove unused
- rockchip_clk_protect_critical function
-In-Reply-To: <1467125137-25999-1-git-send-email-andi@etezian.org>
-References: <1467125137-25999-1-git-send-email-andi@etezian.org>
-Message-ID: <1467125137-25999-3-git-send-email-andi@etezian.org>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 28 Jun 2016 15:51:39 +0100
+Subject: [PATCH v2 4/6] PM / Hibernate: Allow architectures to specify
+ the hibernate/resume CPU
+In-Reply-To: <CAJZ5v0ipRONyMe15k=-FhcKEGM6kMh5Vu35XQexBr0SMYQoktQ@mail.gmail.com>
+References: <1466012148-7674-1-git-send-email-james.morse@arm.com>
+ <1466012148-7674-5-git-send-email-james.morse@arm.com>
+ <CAJZ5v0ipRONyMe15k=-FhcKEGM6kMh5Vu35XQexBr0SMYQoktQ@mail.gmail.com>
+Message-ID: <57728EFB.5050701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andi Shyti <andi@etezian.org>
+Hi Rafael,
 
-because there is no need anymore to enable critical clocks in
-each driver, this function is not necessary anymore.
+On 15/06/16 22:10, Rafael J. Wysocki wrote:
+> On Wed, Jun 15, 2016 at 7:35 PM, James Morse <james.morse@arm.com> wrote:
+>> On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
+>> user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
+>> kernel will assign logical id 0 to a different physical CPU.
+>> This breaks hibernate as hibernate and resume will be attempted on different
+>> CPUs.
+>>
+>> Define a weak symbol arch_hibernation_disable_cpus(), which defaults to
+>> calling disable_nonboot_cpus). Architectures that allow CPU 0 to be
+>> hotplugged can use this to control which CPU is used for hibernate/resume.
+>>
+>> Signed-off-by: James Morse <james.morse@arm.com>
+>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Cc: Pavel Machek <pavel@ucw.cz>
+>> ---
+>> If this approach is acceptable, this patch should go with 4&5 via the arm64
+>> tree.
+> 
+> I'm not entirely happy with this, but if you absolutely need it and if
+> you can't think about any cleaner way to achieve the goal, feel free
+> to add my ACK to this patch if necessary.
 
-The drivers having critical clocks use the CLK_IS_CRITICAL flag.
+I would prefer you to be happy with it.
+On the weak symbol: After staring at this some more I've made the macro approach
+work, so the weak symbol can go. (a new version of this series should arrive soon)
+On the arch-specific odour coming from this, it may also be useful for Chen Yu's
+'Use hlt instead of mwait when resuming from hibernation' series[0]. (I don't
+understand the x86 specifics)
 
-Signed-off-by: Andi Shyti <andi@etezian.org>
----
- drivers/clk/rockchip/clk.c | 14 --------------
- drivers/clk/rockchip/clk.h |  1 -
- 2 files changed, 15 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-index 7ffd134..d9bc61b 100644
---- a/drivers/clk/rockchip/clk.c
-+++ b/drivers/clk/rockchip/clk.c
-@@ -525,20 +525,6 @@ void __init rockchip_clk_register_armclk(struct rockchip_clk_provider *ctx,
- 	rockchip_clk_add_lookup(ctx, clk, lookup_id);
- }
- 
--void __init rockchip_clk_protect_critical(const char *const clocks[],
--					  int nclocks)
--{
--	int i;
--
--	/* Protect the clocks that needs to stay on */
--	for (i = 0; i < nclocks; i++) {
--		struct clk *clk = __clk_lookup(clocks[i]);
--
--		if (clk)
--			clk_prepare_enable(clk);
--	}
--}
--
- static void __iomem *rst_base;
- static unsigned int reg_restart;
- static void (*cb_restart)(void);
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 2194ffa..2fb7acb 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -614,7 +614,6 @@ void rockchip_clk_register_armclk(struct rockchip_clk_provider *ctx,
- 			const struct rockchip_cpuclk_reg_data *reg_data,
- 			const struct rockchip_cpuclk_rate_table *rates,
- 			int nrates);
--void rockchip_clk_protect_critical(const char *const clocks[], int nclocks);
- void rockchip_register_restart_notifier(struct rockchip_clk_provider *ctx,
- 					unsigned int reg, void (*cb)(void));
- 
--- 
-2.8.1
+We need this to allow kexec and hibernate to interact freely. Preventing kexec
+if CPU0 is offline because of hibernate doesn't feel right. Fixing it is
+necessary as the first hint that something is wrong is when we fail to resume
+and the user looses any data they had in memory.
+
+
+Thanks,
+
+James
+
+
+[0] https://lkml.org/lkml/2016/6/25/98
