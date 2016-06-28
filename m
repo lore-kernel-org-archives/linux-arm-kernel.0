@@ -1,70 +1,153 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Tue, 28 Jun 2016 11:05:50 -0700
-Subject: [PATCH v4 3/4] perf: xgene: Add APM X-Gene SoC Performance
- Monitoring Unit driver
-In-Reply-To: <20160628165941.GS31744@leverpostej>
-References: <1466618819-2697-1-git-send-email-ttnguyen@apm.com>
- <1466618819-2697-4-git-send-email-ttnguyen@apm.com>
- <20160623143201.GI8836@leverpostej>
- <CACgAJHyprybnpQuKqvD9rXstQBwoeVG+uGtEBp-pppcfSGMKgQ@mail.gmail.com>
- <20160627160036.GB29321@leverpostej>
- <CACgAJHzM-hzJJDr-HzZyDQ0SUg0PEd5SYKo8YPnRCDCVA9JuJg@mail.gmail.com>
- <20160628111355.GI31744@leverpostej> <577279E2.6070202@arm.com>
- <20160628141400.GN31744@leverpostej>
- <CACgAJHzNe68wDxkk5Uc8M8vHsjL5XoppmPys=37LqBWR5m5zxw@mail.gmail.com>
- <20160628165941.GS31744@leverpostej>
-Message-ID: <CACgAJHy+dcDeq_Zr+7kCKKCpXK2qeyXjxuAOQjULdooT3G6RHw@mail.gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Tue, 28 Jun 2016 14:18:38 -0400
+Subject: [PATCH] ARM: dts: BCM5301x: Add BCM953012ER board
+In-Reply-To: <1466640035-29139-1-git-send-email-f.fainelli@gmail.com>
+References: <1466640035-29139-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <CAC3K-4oez-rQgZY=MVdqSO8_MnusXiKFmvVsP6Xu=Oi7__ME2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Tue, Jun 28, 2016 at 9:59 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Jun 28, 2016 at 09:39:36AM -0700, Tai Tri Nguyen wrote:
->> Hi Mark,
->>
->> On Tue, Jun 28, 2016 at 7:14 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Tue, Jun 28, 2016 at 02:21:38PM +0100, Marc Zyngier wrote:
->> >> On 28/06/16 12:13, Mark Rutland wrote:
->> >> > Marc, is there a sensible way to prevent irq balancers from changing the
->> >> > affinity of an IRQ, e.g. a kernel-side pinning mechanism, or some way we
->> >> > can be notified and reject changes?
->> >>
->> >> You can get notified (see irq_set_affinity_notifier), but there no way
->> >> to veto the change.
->> >
->> > :(
->> >
->> >> What should probably be done is to set the affinity hint
->> >> (irq_set_affinity_hint), and use the notifier to migrate the context
->> >> if possible. Note that you'll be called in process context, which will
->> >> race against interrupts being delivered on the new CPU.
->> >
->> > I'll have to go digging into what exactly perf_pmu_migrate_context
->> > requires. Given the race, I'm not sure if that's going to work. It's
->> > certainly not going to be self contained.
->> >
->> > That also won't work for CPU PMUs, where it makes no sense to migrate
->> > context or IRQs.  For those we appear to already be using have
->> > IRQF_NOBALANCING, which sounds like exactly what we want.
->> >
->> > That appears to influence irq_can_set_affinity(), which the procfs
->> > helpers check.
->> >
->> > Tai, can you try requesting the IRQ with the IRQF_NOBALANCING flag?
->>
->> This seems to work.
->> I also tried to change smp_affinity through procfs and it returns write error.
->> The interrupt seems to be excluded from irq balancing.
->> Should I make the change?
+On Wed, Jun 22, 2016 at 8:00 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Add support for the Broadcom BCM953012 Enterprise Router reference
+> board, enable the following peripherals:
 >
-> Yes please. I believe you also need IRQF_NO_THREAD per the CPU PMU
-> drivers, so please add both flags. I'll do the same for the CCN and CCI
-> PMU drivers.
+> - UART0 (UART1 is not populated)
+> - WPS and restart GPIO buttons
+> - Ethernet switch w/ only two facing ports
+> - NAND flash
+> - SPI-NOR flash
+>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Acked-by: Jon Mason <jon.mason@broadcom.com>
 
-Btw, please skip the v5 I've sent out yesterday. I'll soon send the v6
-with this change.
-
-Thanks,
--- 
-Tai
+> ---
+>  arch/arm/boot/dts/Makefile        |   1 +
+>  arch/arm/boot/dts/bcm953012er.dts | 104 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 105 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/bcm953012er.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 06b6c2d695bf..cbd13ea4b71e 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -85,6 +85,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>         bcm47094-dlink-dir-885l.dtb \
+>         bcm94708.dtb \
+>         bcm94709.dtb \
+> +       bcm953012er.dtb \
+>         bcm953012k.dtb
+>  dtb-$(CONFIG_ARCH_BCM_63XX) += \
+>         bcm963138dvt.dtb
+> diff --git a/arch/arm/boot/dts/bcm953012er.dts b/arch/arm/boot/dts/bcm953012er.dts
+> new file mode 100644
+> index 000000000000..0a9abecf9423
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm953012er.dts
+> @@ -0,0 +1,104 @@
+> +/*
+> + *  BSD LICENSE
+> + *
+> + *  Copyright(c) 2016 Broadcom. All rights reserved.
+> + *
+> + *  Redistribution and use in source and binary forms, with or without
+> + *  modification, are permitted provided that the following conditions
+> + *  are met:
+> + *
+> + *    * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *    * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in
+> + *      the documentation and/or other materials provided with the
+> + *      distribution.
+> + *    * Neither the name of Broadcom Corporation nor the names of its
+> + *      contributors may be used to endorse or promote products derived
+> + *      from this software without specific prior written permission.
+> + *
+> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "bcm4708.dtsi"
+> +#include "bcm5301x-nand-cs0-bch8.dtsi"
+> +
+> +/ {
+> +       model = "NorthStar Enterprise Router (BCM953012ER)";
+> +       compatible = "brcm,bcm953012er", "brcm,brcm53012", "brcm,bcm4708";
+> +
+> +       aliases {
+> +               serial0 = &uart0;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +
+> +       memory {
+> +               reg = <0x00000000 0x8000000>;
+> +       };
+> +
+> +       gpio-keys {
+> +               compatible = "gpio-keys";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               wps {
+> +                       label = "WPS";
+> +                       linux,code = <KEY_WPS_BUTTON>;
+> +                       gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
+> +               };
+> +
+> +               restart {
+> +                       label = "Reset";
+> +                       linux,code = <KEY_RESTART>;
+> +                       gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
+> +               };
+> +       };
+> +};
+> +
+> +&uart0 {
+> +       status = "okay";
+> +};
+> +
+> +&spi_nor {
+> +       status = "okay";
+> +};
+> +
+> +&srab {
+> +       status = "okay";
+> +
+> +       ports {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               port at 0 {
+> +                       reg = <0>;
+> +                       label = "port0";
+> +               };
+> +
+> +               port at 1 {
+> +                       reg = <1>;
+> +                       label = "port1";
+> +               };
+> +
+> +               port at 5 {
+> +                       reg = <5>;
+> +                       label = "cpu";
+> +                       ethernet = <&gmac0>;
+> +               };
+> +       };
+> +};
+> --
+> 2.7.4
+>
