@@ -1,54 +1,52 @@
 From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 28 Jun 2016 11:41:13 +0900
-Subject: [PATCH v2 3/5] spi: s3c64xx: do not configure the device twice
-In-Reply-To: <1467081676-8442-1-git-send-email-andi.shyti@samsung.com>
-References: <1467081676-8442-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1467081676-8442-4-git-send-email-andi.shyti@samsung.com>
+Date: Tue, 28 Jun 2016 11:41:10 +0900
+Subject: [PATCH v2 0/5] s3c64xx: consider the case of a disconnected CS line
+ and some code rework
+Message-ID: <1467081676-8442-1-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the start of the transfer, the spi_config function is called
-twice, the first time when the 3c64xx_spi_prepare_message is
-called and the second time with the s3c64xx_spi_transfer_one,
-both called from the spi framework.
+Hi,
 
-Remove the first call at the prepare message because in that
-point we don't have the imformation about "bit per word" and
-frequency.
+the main goal of the patchset is to support SPI cnnected device
+without CS line link.
 
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
----
- drivers/spi/spi-s3c64xx.c | 11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
+The first two patches make the s3c64xx driver to consider the
+case of a disconnected CS line. This is done by adding a property
+in the DTS ("no-cs-readback") which informs the device driver the
+absence of a chip selection link.
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 14269b0..c65a9e6 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -676,16 +676,6 @@ static int s3c64xx_spi_prepare_message(struct spi_master *master,
- 	struct spi_device *spi = msg->spi;
- 	struct s3c64xx_spi_csinfo *cs = spi->controller_data;
- 
--	/* If Master's(controller) state differs from that needed by Slave */
--	if (sdd->cur_speed != spi->max_speed_hz
--			|| sdd->cur_mode != spi->mode
--			|| sdd->cur_bpw != spi->bits_per_word) {
--		sdd->cur_bpw = spi->bits_per_word;
--		sdd->cur_speed = spi->max_speed_hz;
--		sdd->cur_mode = spi->mode;
--		s3c64xx_spi_config(sdd);
--	}
--
- 	/* Configure feedback delay */
- 	writel(cs->fb_delay & 0x3, sdd->regs + S3C64XX_SPI_FB_CLK);
- 
-@@ -712,6 +702,7 @@ static int s3c64xx_spi_transfer_one(struct spi_master *master,
- 	if (bpw != sdd->cur_bpw || speed != sdd->cur_speed) {
- 		sdd->cur_bpw = bpw;
- 		sdd->cur_speed = speed;
-+		sdd->cur_mode = spi->mode;
- 		s3c64xx_spi_config(sdd);
- 	}
- 
+The last three patches are just some code re-work and
+beautification.
+
+Changelog: V1 -> V2
+
+ - the first version of the patchset was removing an 'if'
+   statement on "!spi->chip_select" which was causing the SPI
+   core to fail. In this case the drivers would have been able to
+   set a chip_select = 0 in absence of a CS link. After a short
+   discussion with Mark, this has been replaced, as described
+   above, by a property in the DTS.
+
+ - one more patch has been added which assigns to some variable
+   the proper type
+
+ - some typos fixed in the commit messages
+
+Thanks,
+Andi
+
+Andi Shyti (5):
+  spi: s3c64xx: group the CS signalling writes in a single function
+  spi: s3c64xx: consider the case when the CS line is not connected
+  spi: s3c64xx: do not configure the device twice
+  spi: s3c64xx: simplify if statement in prepare_transfer function
+  spi: s3c64xx: use unsigned type for fifo handling variables
+
+ .../devicetree/bindings/spi/spi-samsung.txt        |   3 +
+ drivers/spi/spi-s3c64xx.c                          | 114 +++++++++++----------
+ include/linux/platform_data/spi-s3c64xx.h          |   1 +
+ 3 files changed, 65 insertions(+), 53 deletions(-)
+
 -- 
 2.8.1
