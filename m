@@ -1,63 +1,45 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 28 Jun 2016 10:18:17 +0200
-Subject: [RFC PATCH 0/4] ARM: remove big.LITTLE switcher support
-In-Reply-To: <alpine.LFD.2.20.1606271540000.2550@knanqh.ubzr>
-References: <1467026770-5699-1-git-send-email-b.zolnierkie@samsung.com>
- <alpine.LFD.2.20.1606271540000.2550@knanqh.ubzr>
-Message-ID: <8154264.t0CjdgHDuf@amdc1976>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jun 2016 16:28:27 +0800
+Subject: [GIT PULL] i.MX clock update for 4.8
+Message-ID: <20160628082827.GG21328@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-Hi,
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
-On Monday, June 27, 2016 03:49:44 PM Nicolas Pitre wrote:
-> On Mon, 27 Jun 2016, Bartlomiej Zolnierkiewicz wrote:
-> 
-> > Hi,
-> > 
-> > It seems that in mainline kernel big.LITTLE switcher support
-> > may be usable only on ARM Versatile Express TC2 platform
-> > (but even this platform doesn't enable it in its defconfig).
-> 
-> It is also used on some Samsung targets.
+are available in the git repository at:
 
-Could you please explain this more?  AFAIK mainline never
-had working IKS solution (big.LITTLE switcher support +
-arm_big_little CPUfreq driver support) on any Samsung SoC.
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-4.8
 
-> > The following patchset removes big.LITTLE switcher support
-> > (from both ARM core and arm_big_little CPUfreq driver) in
-> > favor of using HMP.
-> > 
-> > Since HMP support at scheduler level is not yet merged this
-> > patchset is probably premature and thus is marked as RFC.
-> 
-> It is premature indeed.
-> 
-> And before this is removed, comparison with power/performance benchmark 
-> numbers will have to be provided as well to justify this removal.  At 
-> the moment there is nothing else in mainline that can achieve what this 
-> code does.
+for you to fetch changes up to bfa10f7d9ae2a6d1e615bf6841887fd9adb056be:
 
-I agree given that this code has real users and according
-to my research on mainline kernel it seems that the IKS
-functionality (bL switcher core code together with
-arm_bit_little CPUfreq driver support) is usable only on
-TC2 and even this platform doesn't enable it by default.
+  clk: imx6ul: fix gpt2 clock names (2016-06-16 09:05:55 +0800)
 
-IOW I would really like to get the confirmation that there
-are platforms that are making use of IKS functionality
-currently with the mainline  kernel.  Otherwise we should
-either consider its removal or enable it on platforms that
-are supposed to use it.
+----------------------------------------------------------------
+The i.MX clock updates for 4.8:
+ - A few correction and improvements on pllv3 driver around AV pll clock
+   rate calculation, parent setting and power bit handling
+ - Correct i.MX6UL GPT2 clock names
+ - A couple of minor fixes on i.MX7D clock driver on DRAM clocks
 
-> We all agree that the scheduler based solution is the best way to do it. 
-> But this has been a couple years already and this is still work in 
-> progress.
+----------------------------------------------------------------
+Anson Huang (3):
+      clk: imx: correct AV PLL rate formula
+      clk: imx7d: correct dram root clk parent select
+      clk: imx7d: correct dram pll type
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Dong Aisheng (4):
+      clk: imx: fix pll clock parents
+      clk: imx: clk-pllv3: fix incorrect handle of enet powerdown bit
+      clk: imx: refine the powerdown bit of clk-pllv3
+      clk: imx6ul: fix gpt2 clock names
+
+ drivers/clk/imx/clk-imx6q.c  | 14 +++++++-------
+ drivers/clk/imx/clk-imx6sl.c | 14 +++++++-------
+ drivers/clk/imx/clk-imx6sx.c | 14 +++++++-------
+ drivers/clk/imx/clk-imx6ul.c | 18 +++++++++---------
+ drivers/clk/imx/clk-imx7d.c  | 14 +++++++-------
+ drivers/clk/imx/clk-pllv3.c  | 28 ++++++++++++++++------------
+ 6 files changed, 53 insertions(+), 49 deletions(-)
