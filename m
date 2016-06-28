@@ -1,71 +1,53 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 28 Jun 2016 18:07:26 +0100
-Subject: [PATCH v2 0/6] arm64: Extend Cortex-A53 errata workaround
-Message-ID: <20160628170732.523-1-andre.przywara@arm.com>
+Date: Tue, 28 Jun 2016 18:07:29 +0100
+Subject: [PATCH v2 3/6] arm64: include alternative handling in
+ dcache_by_line_op
+In-Reply-To: <20160628170732.523-1-andre.przywara@arm.com>
+References: <20160628170732.523-1-andre.przywara@arm.com>
+Message-ID: <20160628170732.523-4-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the errata documentation for the ARM errata 819472, 826319,
-827319 and 824069, in addition to the already covered promotion of
-"dc cvac" cache maintenance instructions to "dc civac"[1], we also need
-to promote "dc cvau" operations.
-Also as cache maintenance instructions on ARMv8 can be issued by EL0 as
-well, we unfortunately have to promote them too, which is only possible
-by means of trap-and-emulate.
+The newly introduced dcache_by_line_op macro is used at least in
+one occassion at the moment to issue a "dc cvau" instruction,
+which is affected by ARM errata 819472, 826319, 827319 and 824069.
+Change the macro to allow for alternative patching in there to
+protect affected Cortex-A53 cores.
 
-These patches cover all in-kernel users of "dc cvau" and make sure
-they are using "dc civac" if run on an affected core.
-In addition if at least one core in the system has one of the above
-mentioned erratas, we set the respective bit in SCTLR to trap cache
-maintenance instructions from EL0 to EL1 on all CPUs, where we "emulate"
-them by executing the potentially fixed instruction on behalf of userspace.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/arm64/include/asm/assembler.h | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-Apart from the actual patches 2/6 and 6/6, which do the main work, the
-other patches are cleanups and do refactoring to make the promotion and
-trapping of EL0 cache maintenance easier.
-
-Tested on a Juno R0 with an userspace tool to issue various cache
-maintenance instructions (including one with triggers a SIGSEGV) and
-verified with some debugfs entries. Also tested on a (non-affected)
-Juno R1 to confirm it does not trap or emulate.
-At least one LTP test also issues around 100 cache maintenance
-instructions, which this code survived happily.
-
-Cheers,
-Andre.
-
-Changelog v1 .. v2:
-- rebase to current upstream kernel
-- revert broken macro patch instead of trying to fix it
-- more refactoring for segfault injection
-- fixing bug when xzr was used as the address register
-- minor nitpicks
-
-[1] commit 301bcfac4289 ("arm64: add Cortex-A53 cache errata workaround")
-
-Andre Przywara (6):
-  Revert "arm64: alternatives: add enable parameter to conditional asm
-    macros"
-  arm64: fix "dc cvau" cache operation on errata-affected core
-  arm64: include alternative handling in dcache_by_line_op
-  arm64: errata: Calling enable functions for CPU errata too
-  arm64: consolidate signal injection on emulation errors
-  arm64: trap userspace "dc cvau" cache operation on errata-affected
-    core
-
- arch/arm64/include/asm/alternative.h |  16 +++--
- arch/arm64/include/asm/assembler.h   |  12 +++-
- arch/arm64/include/asm/cpufeature.h  |   2 +
- arch/arm64/include/asm/processor.h   |   1 +
- arch/arm64/include/asm/sysreg.h      |   2 +-
- arch/arm64/include/asm/traps.h       |   2 +
- arch/arm64/kernel/armv8_deprecated.c |  23 +------
- arch/arm64/kernel/cpu_errata.c       |   7 +++
- arch/arm64/kernel/cpufeature.c       |   4 +-
- arch/arm64/kernel/entry.S            |  12 +++-
- arch/arm64/kernel/traps.c            | 119 +++++++++++++++++++++++++++++++----
- arch/arm64/mm/cache.S                |   2 +-
- 12 files changed, 154 insertions(+), 48 deletions(-)
-
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 10b017c..1a021f1 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -24,6 +24,7 @@
+ #define __ASM_ASSEMBLER_H
+ 
+ #include <asm/asm-offsets.h>
++#include <asm/cpufeature.h>
+ #include <asm/page.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+@@ -261,7 +262,16 @@ lr	.req	x30		// link register
+ 	add	\size, \kaddr, \size
+ 	sub	\tmp2, \tmp1, #1
+ 	bic	\kaddr, \kaddr, \tmp2
+-9998:	dc	\op, \kaddr
++9998:
++	.if	(\op == cvau || \op == cvac)
++		alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
++		dc	\op, \kaddr
++		alternative_else
++		dc	civac, \kaddr
++		alternative_endif
++	.else
++		dc	\op, \kaddr
++	.endif
+ 	add	\kaddr, \kaddr, \tmp1
+ 	cmp	\kaddr, \size
+ 	b.lo	9998b
 -- 
 2.9.0
