@@ -1,109 +1,80 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 28 Jun 2016 19:22:50 +0200
-Subject: [PATCH 3/3] dt: sun8i: Define the clocks of the A83T
-In-Reply-To: <cover.1467135898.git.moinejf@free.fr>
-References: <cover.1467135898.git.moinejf@free.fr>
-Message-ID: <96c1b4e0bb74e3c8a543975f0beb6f057d034323.1467135898.git.moinejf@free.fr>
+From: ttnguyen@apm.com (Tai Nguyen)
+Date: Tue, 28 Jun 2016 11:50:41 -0700
+Subject: [PATCH v6 0/4] perf: Add APM X-Gene SoC Performance Monitoring Unit
+ driver
+Message-ID: <1467139845-29753-1-git-send-email-ttnguyen@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the clock definition using the CCU.
+In addition to the X-Gene ARM CPU performance monitoring unit (PMU), there
+are PMU for the SoC system devices such as L3 cache(s), I/O bridge(s),
+memory controller bridges and memory. These PMU devices are loosely
+architected to follow the same model as the PMU for ARM cores.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  7 ++++---
- arch/arm/boot/dts/sun8i-a83t.dtsi                 | 16 ++++++++++++----
- 2 files changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 8f7619d..8e1f832 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -61,7 +61,6 @@ Required properties:
- 	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
- 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
- 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
--	"allwinner,sun8i-a83t-bus-gates-clk" - for the bus gates on A83T
- 	"allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
- 	"allwinner,sun9i-a80-apbs-gates-clk" - for the APBS gates on A80
- 	"allwinner,sun4i-a10-display-clk" - for the display clocks on the A10
-@@ -87,6 +86,7 @@ Required properties:
- 	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
- 	"allwinner,sun4i-a10-ve-clk" - for the Video Engine clock
- 	"allwinner,sun6i-a31-display-clk" - for the display clocks
-+	"allwinner,sun8i-a83t-ccu" - for the CCU clocks/resets on A83T
- 
- Required properties for all clocks:
- - reg : shall be the control register address for the clock.
-@@ -98,12 +98,13 @@ Required properties for all clocks:
- 	"allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk",
- 	"allwinner,sun4i-pll6-clk", "allwinner,sun6i-a31-pll6-clk",
- 	"allwinner,*-usb-clk", "allwinner,*-mmc-clk",
--	"allwinner,*-mmc-config-clk"
-+	"allwinner,*-mmc-config-clk",
-+	"allwinner,*-ccu"
- - clock-output-names : shall be the corresponding names of the outputs.
- 	If the clock module only has one output, the name shall be the
- 	module name.
- 
--And "allwinner,*-usb-clk" clocks also require:
-+"allwinner,*-usb-clk" and "allwinner,*-ccu" clocks also require:
- - reset-cells : shall be set to 1
- 
- The "allwinner,sun4i-a10-ve-clk" clock also requires:
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index d3473f8..6e0acca 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -45,9 +45,10 @@
- 
- #include "skeleton.dtsi"
- 
-+#include <dt-bindings/clock/sun8i-a83t.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
--
- #include <dt-bindings/pinctrl/sun4i-a10.h>
-+#include <dt-bindings/reset/sun8i-a83t.h>
- 
- / {
- 	interrupt-parent = <&gic>;
-@@ -138,13 +139,13 @@
- 			clock-output-names = "osc16M";
- 		};
- 
--		osc16Md512: osc16Md512_clk {
-+		osc32k: osc32k_clk {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <512>;
- 			clock-mult = <1>;
- 			clocks = <&osc16M>;
--			clock-output-names = "osc16M-d512";
-+			clock-output-names = "osc32k";
- 		};
- 	};
- 
-@@ -154,13 +155,20 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		ccu: clock at 01c20000 {
-+			compatible = "allwinner,sun8i-a83t-ccu";
-+			reg = <0x01c20000 0x400>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun8i-a83t-pinctrl";
- 			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0x01c20800 0x400>;
--			clocks = <&osc24M>;
-+			clocks = <&ccu CLK_BUS_PIO>;
- 			gpio-controller;
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
+v6:
+ * Add IRQF_NOBALANCING and IRQF_NO_THREAD flags to the PMU overflow interrupt
+   Exclude the interrupt from irq balancing and prevent the context from being
+   threaded
+
+v5:
+ * Remove hw_perf_event::extra_reg field use
+   Change GET_CNTR to use hw_perf_event::idx
+   Change GET_AGENTID/GET_AGEN1ID to use hw_perf_event::config_base
+ * Use compound literal structure defines for format and event attribute groups
+   to statically define them at compile time
+ * Bitwise invert the meaning of agent mask in config1 field.
+ * Fix update pmu_counter_event pointer before starting event
+ * Add reset of pmu_dev->pmu_counter_event to NULL in xgene_perf_del
+ * Use exactly half of max period to fix the overflow counter issue and account
+   for the possiblity of extreme interrupt latency
+ * Use spin lock instead of interrupt masking in overflow interrupt handler
+ * Remove unnecessary update of hw_perf_event::period_left
+
+v4:
+ * Alphabetically sorting header files
+ * Remove dynamic allocation for PMU format and event attribute groups
+   Create shared constant attribute groups per each class
+ * Remove perf_sample_data as this perf driver doesn't support sampling
+ * Consistently use the PCP_PMU_V{1,2} defines
+ * Set affinity to make sure the overflow interrupt is handled by the
+   same assigned CPU
+
+v3:
+ * Remove index property use in PMU device sub nodes
+
+v2:
+ * Use bitmask for event asignned counter mask pmu_dev->cntr_assign_mask
+ * Remove unnecessary spinlocks in perf add/del operations
+ * Remove unnecessary condition checks
+ * Enforce CPU assignment to one CPU for perf operarations
+ * Set the task_ctx_nr to perf_invalid_context for perf driver
+ * Remove irrelevant pt_rregs
+ * Change perf sysfs attributes to be fixed instead of dynamic
+ * Fix checking for an ACPI companion device instead of EFI enable
+ * Add documentation for config/config1 fields format and perf tool example
+
+---
+
+Tai Nguyen (4):
+  MAINTAINERS: Add entry for APM X-Gene SoC PMU driver
+  Documentation: Add documentation for APM X-Gene SoC PMU DTS binding
+  perf: xgene: Add APM X-Gene SoC Performance Monitoring Unit driver
+  arm64: dts: apm: Add APM X-Gene SoC PMU DTS entries
+
+ .../devicetree/bindings/perf/apm-xgene-pmu.txt     |  112 ++
+ Documentation/perf/xgene-pmu.txt                   |   48 +
+ MAINTAINERS                                        |    8 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   58 +
+ drivers/perf/Kconfig                               |    7 +
+ drivers/perf/Makefile                              |    1 +
+ drivers/perf/xgene_pmu.c                           | 1360 ++++++++++++++++++++
+ 7 files changed, 1594 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+ create mode 100644 Documentation/perf/xgene-pmu.txt
+ create mode 100644 drivers/perf/xgene_pmu.c
+
 -- 
-2.9.0
+1.9.1
