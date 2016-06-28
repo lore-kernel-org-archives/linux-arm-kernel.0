@@ -1,71 +1,73 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:51:46 +0200
-Subject: [PATCH 88/92] clocksource/drivers/integrator-ap: Add the COMPILE_TEST
- option
-In-Reply-To: <1467111111-12587-1-git-send-email-daniel.lezcano@linaro.org>
-References: <577251A4.7030508@linaro.org>
- <1467111111-12587-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467111111-12587-13-git-send-email-daniel.lezcano@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jun 2016 11:56:58 +0100
+Subject: [PATCH v4 5/6] mfd: tps65218: Use mfd_add_devices instead of
+ of_platform_populate
+In-Reply-To: <1467105729-28249-6-git-send-email-j-keerthy@ti.com>
+References: <1467105729-28249-1-git-send-email-j-keerthy@ti.com>
+ <1467105729-28249-6-git-send-email-j-keerthy@ti.com>
+Message-ID: <20160628105658.GA17585@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the Kconfig option logic to fullfil with the current approach.
+On Tue, 28 Jun 2016, Keerthy wrote:
 
-A new Kconfig option is added, CONFIG_INTEGRATOR_AP_TIMER and is selected
-by the platform. Then the clocksource's Kconfig is changed to make this
-option selectable by the user if the COMPILE_TEST option is set. Otherwise,
-it is up to the platform's Kconfig to select the timer.
+> mfd_add_devices enables parsing device tree nodes without compatibles
+> for regulators and gpio modules. Replace of_platform_populate with
+> mfd_add_devices. mfd_cell currently is populated with regulators,
+> gpio and powerbutton.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+> 
+> Changes in v4:
+> 
+>   * Regrouped the mfd cells better.
+> 
+>  drivers/mfd/tps65218.c | 18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-integrator/Kconfig | 2 +-
- drivers/clocksource/Kconfig      | 7 +++++++
- drivers/clocksource/Makefile     | 2 +-
- 3 files changed, 9 insertions(+), 2 deletions(-)
+For my own reference:
+  Acked-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index b2a85ba..291262e 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -20,7 +20,7 @@ if ARCH_INTEGRATOR
- 
- config ARCH_INTEGRATOR_AP
- 	bool "Support Integrator/AP and Integrator/PP2 platforms"
--	select CLKSRC_MMIO
-+	select INTEGRATOR_AP_TIMER
- 	select MIGHT_HAVE_PCI
- 	select SERIAL_AMBA_PL010 if TTY
- 	select SERIAL_AMBA_PL010_CONSOLE if TTY
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 7e5709a..8055b37 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -214,6 +214,13 @@ config KEYSTONE_TIMER
- 	help
- 	  Enables support for the Keystone timer.
- 
-+config INTEGRATOR_AP_TIMER
-+	bool "Integrator-ap timer driver" if COMPILE_TEST
-+	depends on GENERIC_CLOCKEVENTS
-+	select CLKSRC_MMIO
-+	help
-+	  Enables support for the Integrator-ap timer.
-+
- config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
- 	bool "Clocksource PRCMU Timer sched_clock"
- 	depends on (CLKSRC_DBX500_PRCMU && !CLKSRC_NOMADIK_MTU_SCHED_CLOCK)
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index a818431..fd9d6df 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -57,7 +57,7 @@ obj-$(CONFIG_ARM_TIMER_SP804)		+= timer-sp804.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
- obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
- obj-$(CONFIG_KEYSTONE_TIMER)		+= timer-keystone.o
--obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= timer-integrator-ap.o
-+obj-$(CONFIG_INTEGRATOR_AP_TIMER)	+= timer-integrator-ap.o
- obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
- obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
- obj-$(CONFIG_CLKSRC_TANGO_XTAL)		+= tango_xtal.o
+> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+> index f20a531..f13c8d9 100644
+> --- a/drivers/mfd/tps65218.c
+> +++ b/drivers/mfd/tps65218.c
+> @@ -33,6 +33,18 @@
+>  
+>  #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+>  
+> +static const struct mfd_cell tps65218_cells[] = {
+> +	{
+> +		.name = "tps65218-pwrbutton",
+> +		.of_compatible = "ti,tps65218-pwrbutton",
+> +	},
+> +	{
+> +		.name = "tps65218-gpio",
+> +		.of_compatible = "ti,tps65218-gpio",
+> +	},
+> +	{ .name = "tps65218-regulator", },
+> +};
+> +
+>  /**
+>   * tps65218_reg_write: Write a single tps65218 register.
+>   *
+> @@ -236,8 +248,10 @@ static int tps65218_probe(struct i2c_client *client,
+>  	if (ret < 0)
+>  		return ret;
+>  
+> -	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
+> -				   &client->dev);
+> +	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
+> +			      ARRAY_SIZE(tps65218_cells), NULL, 0,
+> +			      regmap_irq_get_domain(tps->irq_data));
+> +
+>  	if (ret < 0)
+>  		goto err_irq;
+>  
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
