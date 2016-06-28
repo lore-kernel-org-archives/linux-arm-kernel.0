@@ -1,37 +1,36 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 28 Jun 2016 09:54:01 +0200
-Subject: [RFC PATCH v4 4/5] ARM64/PCI: Start using quirks handling for ACPI
- based PCI host controller
-In-Reply-To: <1467100442-28078-1-git-send-email-tn@semihalf.com>
-References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
-Message-ID: <1467100442-28078-5-git-send-email-tn@semihalf.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jun 2016 08:58:37 +0100
+Subject: [PATCH 9/10] usb: host: ehci-st: Inform the reset framework that
+ our reset line may be shared
+In-Reply-To: <Pine.LNX.4.44L0.1606061344011.2049-100000@iolanthe.rowland.org>
+References: <20160606170854.12407-2-lee.jones@linaro.org>
+ <Pine.LNX.4.44L0.1606061344011.2049-100000@iolanthe.rowland.org>
+Message-ID: <20160628075837.GK6720@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since there are platforms which have non-compliant ECAM space we need to
-override these accessors prior to PCI buses enumeration. In order to do
-that we call pci_mcfg_match_quirks() to retrieve custom
-pci_config_window structure. If no correlated quirk on list, use
-fully ECAM compliant generic PCI config accessors.
+On Mon, 06 Jun 2016, Alan Stern wrote:
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- arch/arm64/kernel/pci.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+> On Mon, 6 Jun 2016, Lee Jones wrote:
+> 
+> > On the STiH410 B2120 development board the ST EHCI IP shares its reset
+> > line with the OHCI IP.  New functionality in the reset subsystems forces
+> > consumers to be explicit when requesting shared/exclusive reset lines.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> For this andd the 10/10 patch:
+> 
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index addf00c..ef142b8 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -152,8 +152,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	if (!ri)
- 		return NULL;
- 
--	ri->cfg = pci_acpi_setup_ecam_mapping(root,
--					      &pci_generic_ecam_ops.pci_ops);
-+	ri->cfg = pci_mcfg_match_quirks(root);
- 	if (!ri->cfg) {
- 		kfree(ri);
- 		return NULL;
+Thanks Alan.
+
+I'm going to take this (actually half of this patch -- the other half
+which is due for -next I will resubmit with your Ack) along with the
+other patches due for the -rcs though my MFD -next branch.
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
