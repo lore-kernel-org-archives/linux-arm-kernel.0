@@ -1,78 +1,24 @@
 From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 28 Jun 2016 13:59:41 +0200
-Subject: [PATCH v3 1/2] ARM: tango: add HOTPLUG_CPU support
-In-Reply-To: <57726597.8030501@sigmadesigns.com>
-References: <57726597.8030501@sigmadesigns.com>
-Message-ID: <577266AD.8000006@sigmadesigns.com>
+Date: Tue, 28 Jun 2016 13:55:03 +0200
+Subject: [PATCH v3 0/2] [for arm-soc] mach-tango updates for v4.8
+Message-ID: <57726597.8030501@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpu_die() and cpu_kill() are implemented in firmware.
+Hello arm-soc maintainers,
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
+Could you please merge the following patches?
+
+(Ideally, the MAINTAINERS update would be merged as a fix into
+the next 4.7 release candidate.)
+
+Marc Gonzalez (2):
+  ARM: tango: add HOTPLUG_CPU support
+  Update ARM/TANGO section
+
+ MAINTAINERS                   |  3 +--
  arch/arm/mach-tango/platsmp.c | 30 ++++++++++++++++++++++++++++++
  arch/arm/mach-tango/smc.h     |  4 +++-
- 2 files changed, 33 insertions(+), 1 deletion(-)
+ 3 files changed, 34 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-tango/platsmp.c b/arch/arm/mach-tango/platsmp.c
-index a21f55e000d2..a24b9b1d0b1a 100644
---- a/arch/arm/mach-tango/platsmp.c
-+++ b/arch/arm/mach-tango/platsmp.c
-@@ -1,3 +1,4 @@
-+#include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/smp.h>
- #include "smc.h"
-@@ -9,8 +10,37 @@ static int tango_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return 0;
- }
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+/*
-+ * cpu_kill() and cpu_die() run concurrently on different cores.
-+ * Firmware will only "kill" a core once it has properly "died".
-+ * Keep trying to kill a core until the operation succeeds, but
-+ * sleep between tries to give the core time to die.
-+ */
-+static int tango_cpu_kill(unsigned int cpu)
-+{
-+	do {
-+		msleep(10);
-+	} while (tango_aux_core_kill(cpu) != 0);
-+
-+	return 1;
-+}
-+
-+static void tango_cpu_die(unsigned int cpu)
-+{
-+	do {
-+		cpu_relax();
-+	} while (tango_aux_core_die(cpu) != 0);
-+}
-+#else
-+#define tango_cpu_kill	NULL
-+#define tango_cpu_die	NULL
-+#endif
-+
- static const struct smp_operations tango_smp_ops __initconst = {
- 	.smp_boot_secondary	= tango_boot_secondary,
-+	.cpu_kill		= tango_cpu_kill,
-+	.cpu_die		= tango_cpu_die,
- };
- 
- CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango_smp_ops);
-diff --git a/arch/arm/mach-tango/smc.h b/arch/arm/mach-tango/smc.h
-index 7a4af35cc390..3d31f984f44c 100644
---- a/arch/arm/mach-tango/smc.h
-+++ b/arch/arm/mach-tango/smc.h
-@@ -2,4 +2,6 @@ extern int tango_smc(unsigned int val, unsigned int service);
- 
- #define tango_set_l2_control(val)	tango_smc(val, 0x102)
- #define tango_start_aux_core(val)	tango_smc(val, 0x104)
--#define tango_set_aux_boot_addr(val)	tango_smc((unsigned int)val, 0x105)
-+#define tango_set_aux_boot_addr(val)	tango_smc(val, 0x105)
-+#define tango_aux_core_die(val)		tango_smc(val, 0x121)
-+#define tango_aux_core_kill(val)	tango_smc(val, 0x122)
--- 
-2.9.0
+Regards.
