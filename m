@@ -1,54 +1,71 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 28 Jun 2016 18:07:28 +0100
-Subject: [PATCH v2 2/6] arm64: fix "dc cvau" cache operation on
- errata-affected core
-In-Reply-To: <20160628170732.523-1-andre.przywara@arm.com>
-References: <20160628170732.523-1-andre.przywara@arm.com>
-Message-ID: <20160628170732.523-3-andre.przywara@arm.com>
+Date: Tue, 28 Jun 2016 18:07:26 +0100
+Subject: [PATCH v2 0/6] arm64: Extend Cortex-A53 errata workaround
+Message-ID: <20160628170732.523-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM errata 819472, 826319, 827319 and 824069 for affected
-Cortex-A53 cores demand to promote "dc cvau" instructions to
-"dc civac" as well.
-Attribute the usage of the instruction in __flush_cache_user_range
-to also be covered by our alternative patching efforts.
-For that we introduce an assembly macro which both deals with
-alternatives while still tagging the instructions as USER.
+According to the errata documentation for the ARM errata 819472, 826319,
+827319 and 824069, in addition to the already covered promotion of
+"dc cvac" cache maintenance instructions to "dc civac"[1], we also need
+to promote "dc cvau" operations.
+Also as cache maintenance instructions on ARMv8 can be issued by EL0 as
+well, we unfortunately have to promote them too, which is only possible
+by means of trap-and-emulate.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/include/asm/alternative.h | 4 ++++
- arch/arm64/mm/cache.S                | 2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+These patches cover all in-kernel users of "dc cvau" and make sure
+they are using "dc civac" if run on an affected core.
+In addition if at least one core in the system has one of the above
+mentioned erratas, we set the respective bit in SCTLR to trap cache
+maintenance instructions from EL0 to EL1 on all CPUs, where we "emulate"
+them by executing the potentially fixed instruction on behalf of userspace.
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 7288071..8746ff6 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -133,6 +133,10 @@ void apply_alternatives(void *start, size_t length);
- #define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
- 	alternative_insn insn1, insn2, cap, IS_ENABLED(cfg)
- 
-+.macro user_alt, label, oldinstr, newinstr, cond
-+9999:	alternative_insn "\oldinstr", "\newinstr", \cond
-+	_ASM_EXTABLE 9999b, \label
-+.endm
- 
- /*
-  * Generate the assembly for UAO alternatives with exception table entries.
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 50ff9ba..07d7352 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -52,7 +52,7 @@ ENTRY(__flush_cache_user_range)
- 	sub	x3, x2, #1
- 	bic	x4, x0, x3
- 1:
--USER(9f, dc	cvau, x4	)		// clean D line to PoU
-+user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
- 	add	x4, x4, x2
- 	cmp	x4, x1
- 	b.lo	1b
+Apart from the actual patches 2/6 and 6/6, which do the main work, the
+other patches are cleanups and do refactoring to make the promotion and
+trapping of EL0 cache maintenance easier.
+
+Tested on a Juno R0 with an userspace tool to issue various cache
+maintenance instructions (including one with triggers a SIGSEGV) and
+verified with some debugfs entries. Also tested on a (non-affected)
+Juno R1 to confirm it does not trap or emulate.
+At least one LTP test also issues around 100 cache maintenance
+instructions, which this code survived happily.
+
+Cheers,
+Andre.
+
+Changelog v1 .. v2:
+- rebase to current upstream kernel
+- revert broken macro patch instead of trying to fix it
+- more refactoring for segfault injection
+- fixing bug when xzr was used as the address register
+- minor nitpicks
+
+[1] commit 301bcfac4289 ("arm64: add Cortex-A53 cache errata workaround")
+
+Andre Przywara (6):
+  Revert "arm64: alternatives: add enable parameter to conditional asm
+    macros"
+  arm64: fix "dc cvau" cache operation on errata-affected core
+  arm64: include alternative handling in dcache_by_line_op
+  arm64: errata: Calling enable functions for CPU errata too
+  arm64: consolidate signal injection on emulation errors
+  arm64: trap userspace "dc cvau" cache operation on errata-affected
+    core
+
+ arch/arm64/include/asm/alternative.h |  16 +++--
+ arch/arm64/include/asm/assembler.h   |  12 +++-
+ arch/arm64/include/asm/cpufeature.h  |   2 +
+ arch/arm64/include/asm/processor.h   |   1 +
+ arch/arm64/include/asm/sysreg.h      |   2 +-
+ arch/arm64/include/asm/traps.h       |   2 +
+ arch/arm64/kernel/armv8_deprecated.c |  23 +------
+ arch/arm64/kernel/cpu_errata.c       |   7 +++
+ arch/arm64/kernel/cpufeature.c       |   4 +-
+ arch/arm64/kernel/entry.S            |  12 +++-
+ arch/arm64/kernel/traps.c            | 119 +++++++++++++++++++++++++++++++----
+ arch/arm64/mm/cache.S                |   2 +-
+ 12 files changed, 154 insertions(+), 48 deletions(-)
+
 -- 
 2.9.0
