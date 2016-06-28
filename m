@@ -1,191 +1,105 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 27 Jun 2016 17:53:37 -0700
-Subject: [PATCH v2 14/15] clk: sunxi-ng: Add H3 clocks
-In-Reply-To: <20160626123409.GK4000@lukather>
-References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
- <20160607204154.31967-15-maxime.ripard@free-electrons.com>
- <146681451703.35033.17009542256505173233@resonance>
- <20160626123409.GK4000@lukather>
-Message-ID: <146707521689.89261.8354851392822550901@resonance>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon, 27 Jun 2016 18:18:27 -0700
+Subject: [PATCH] usb: otg-fsm: Cancel HNP polling work when not used
+Message-ID: <20160628011827.1688-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2016-06-26 05:34:09)
-> On Fri, Jun 24, 2016 at 05:28:37PM -0700, Michael Turquette wrote:
-> > Quoting Maxime Ripard (2016-06-07 13:41:53)
-> > > +static struct ccu_common *sun8i_h3_ccu_clks[] = {
-> > > +       [CLK_PLL_CPUX]          = &pll_cpux_clk.common,
-> > > +       [CLK_PLL_AUDIO_BASE]    = &pll_audio_base_clk.common,
-> > > +       [CLK_PLL_AUDIO]         = &pll_audio_clk.common,
-> > 
-> > OK, it looks like you followed the qcom clk driver approach here, which
-> > is a nice way to do things. However, as Stephen alluded to in his
-> > response to the cover letter, the clk_hw_* api's are an even more
-> > friendly interface for clock providers. For example, check out the gxbb
-> > clk driver probe:
-> > 
-> >       static int gxbb_clkc_probe(struct platform_device *pdev)
-> >       {
-> >               void __iomem *clk_base;
-> >               int ret, clkid, i;
-> >               struct device *dev = &pdev->dev;
-> >       
-> >               /*  Generic clocks and PLLs */
-> >               clk_base = of_iomap(dev->of_node, 0);
-> >               if (!clk_base) {
-> >                       pr_err("%s: Unable to map clk base\n", __func__);
-> >                       return -ENXIO;
-> >               }
-> >       
-> >               /* Populate base address for PLLs */
-> >               for (i = 0; i < ARRAY_SIZE(gxbb_clk_plls); i++)
-> >                       gxbb_clk_plls[i]->base = clk_base;
-> >       
-> >               /* Populate base address for MPLLs */
-> >               for (i = 0; i < ARRAY_SIZE(gxbb_clk_mplls); i++)
-> >                       gxbb_clk_mplls[i]->base = clk_base;
-> > 
-> >               ...
-> > 
-> >               /*
-> >                * register all clks
-> >                */
-> >               for (clkid = 0; clkid < NR_CLKS; clkid++) {
-> >                       ret = devm_clk_hw_register(dev, gxbb_hw_onecell_data.hws[clkid]);
-> >                       if (ret)
-> >                               goto iounmap;
-> >               }
-> 
-> Ok, I'll move the fixed factor clocks out of the common list, and
-> initialize the clk_hw_onedata_cell structure to register it.
+We setup the HNP polling worker, but we never stop it. The OTG
+state machine can go round and round and keep reinitializing the
+worker even while it's actively running. That's bad, and debug
+objects catches it. Fix this by canceling the work when we leave
+the A_HOST or B_HOST states.
 
-Cool, thanks! This driver will be one of the early adopters :-)
+[otg_set_state]  Set state: a_wait_bcon
+usb 2-1: USB disconnect, device number 2
+[otg_statemachine]  quit statemachine, changed = 1
+[otg_set_state]  Set state: a_host
+<HNP Polling started>
+[otg_statemachine]  quit statemachine, changed = 1
+usb 2-1: new low-speed USB device number 3 using ci_hdrc
+usb 2-1: New USB device found, idVendor=03f0, idProduct=134a
+usb 2-1: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+usb 2-1: Product: HP USB Optical Mouse
+usb 2-1: Manufacturer: PixArt
+input: PixArt HP USB Optical Mouse as /devices/platform/soc/f9a55000.usb/ci_hdrc.0/usb2/2-1/2-1:1.0/0003:03F0:134A.0002/input/input1
+hid-generic 0003:03F0:134A.0002: input: USB HID v1.11 Mouse [PixArt HP USB Optical Mouse] on usb-ci_hdrc.0-1/input0
+[otg_set_state]  Set state: a_wait_bcon
+usb 2-1: USB disconnect, device number 3
+[otg_statemachine]  quit statemachine, changed = 1
+[otg_set_state]  Set state: a_host
+<HNP Polling started>
+------------[ cut here ]------------
+WARNING: CPU: 2 PID: 95 at lib/debugobjects.c:263 debug_print_object+0x98/0xc0
+ODEBUG: init active (active state 0) object type: timer_list hint: delayed_work_timer_fn+0x0/0x2c
+Modules linked in: phy_qcom_usb_hsic phy_qcom_usb_hs ci_hdrc_msm ci_hdrc
+CPU: 2 PID: 95 Comm: kworker/u8:1 Not tainted 4.7.0-rc1-00043-g1f22f3b65c44-dirty #442
+Hardware name: Qualcomm (Flattened Device Tree)
+Workqueue: ci_otg ci_otg_work [ci_hdrc]
+[<c031067c>] (unwind_backtrace) from [<c030cbf0>] (show_stack+0x20/0x24)
+[<c030cbf0>] (show_stack) from [<c060cec8>] (dump_stack+0x7c/0x9c)
+[<c060cec8>] (dump_stack) from [<c031f8a4>] (__warn+0xe4/0x110)
+[<c031f8a4>] (__warn) from [<c031f9a0>] (warn_slowpath_fmt+0x48/0x50)
+[<c031f9a0>] (warn_slowpath_fmt) from [<c06289c0>] (debug_print_object+0x98/0xc0)
+[<c06289c0>] (debug_print_object) from [<c0628bbc>] (__debug_object_init+0xcc/0x3bc)
+[<c0628bbc>] (__debug_object_init) from [<c0628ed0>] (debug_object_init+0x24/0x2c)
+[<c0628ed0>] (debug_object_init) from [<c037ceb0>] (init_timer_key+0x24/0x120)
+[<c037ceb0>] (init_timer_key) from [<c07b3f1c>] (otg_start_hnp_polling+0x7c/0xbc)
+[<c07b3f1c>] (otg_start_hnp_polling) from [<c074543c>] (otg_set_state+0x740/0xc20)
+[<c074543c>] (otg_set_state) from [<c0745d98>] (otg_statemachine+0x47c/0x4ac)
+[<c0745d98>] (otg_statemachine) from [<bf00c808>] (ci_otg_fsm_work+0x48/0x1a0 [ci_hdrc])
+[<bf00c808>] (ci_otg_fsm_work [ci_hdrc]) from [<bf007428>] (ci_otg_work+0xd4/0x218 [ci_hdrc])
+[<bf007428>] (ci_otg_work [ci_hdrc]) from [<c0338cac>] (process_one_work+0x154/0x4b4)
+[<c0338cac>] (process_one_work) from [<c033908c>] (worker_thread+0x38/0x4d0)
+[<c033908c>] (worker_thread) from [<c033f0a0>] (kthread+0xe8/0x104)
+[<c033f0a0>] (kthread) from [<c0308ed8>] (ret_from_fork+0x14/0x3c)
 
-> 
-> > The nice thing about struct ccu_common is that you don't have to walk
-> > the list of clocks for each separate clock type like the above probe
-> > function does. I'm still thinking of the best way to solve this
-> > generically. Maybe add a .base member struct clk_hw? I dunno, and I've
-> > resisted the urge to add stuff to struct clk_hw in the past... But I
-> > really want to minimize this .probe as much as possible, and I do not
-> > want every clock provider driver to be forced to invent something like
-> > struct ccu_common every time.
-> 
-> We'd need a few more things (in this case) at least: the register
-> offset and a private field to store our flags.
+Cc: Li Jun <jun.li@nxp.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Fixes: ae57e97a9521 ("usb: common: otg-fsm: add HNP polling support")
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
+ drivers/usb/common/usb-otg-fsm.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-A bit of mumbling to myself below:
-
-Hmm, upon further reflection, walking the list of ccu clocks is rather
-identical to walking the list of each clock type, as I do in the gxbb
-driver, where ccu_common is the one and only clock type.
-
-So that in itself is not a big deal and isn't a problem that needs
-solving.
-
-What needs solving is a way to populate base addresses for each clock at
-runtime in a way that does not *force* you to invent something like
-ccu_common if you do not need it.
-
-You would hit this issue if you broke your common gate or divider clocks
-out and did not wrap them in the ccu_common structure. I solved this by
-overloading the ->reg value of each of the common types as static data,
-and then did the following when registering them:
-
-	/* Populate base address for gates */
-	for (i = 0; i < ARRAY_SIZE(gxbb_clk_gates); i++)
-		gxbb_clk_gates[i]->reg = clk_base +
-			(u64)gxbb_clk_gates[i]->reg;
-
-Any thoughts on how to fix this for other common gate types that need
-their base addresses populated from an OF node at runtime?
-
-> 
-> > Anyways, that is not a blocker for your implementation to be merged,
-> > but Stephen's question in patch #4 got me thinking about this
-> > again...
-> > 
-> > The real nice part is the call to devm_clk_hw_register. That uses the
-> > new clk_hw_* apis and struct clk_hw_onecell_data, which is initialized
-> > statically like so:
-> > 
-> >       static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
-> >               .hws = {
-> >                       [CLKID_SYS_PLL]      = &gxbb_sys_pll.hw,
-> >                       [CLKID_CPUCLK]        = &gxbb_cpu_clk.hw,
-> >                       ...
-> >               },
-> >               .num = NR_CLKS,
-> >       };
-> > 
-> > Unfortunately I believe it impossible to replace NR_CLKS with some
-> > ARRAY_SIZE stuff because C. As Stephen mentioned, please use this method
-> > instead.
-> 
-> That's unfortunate :/
-
-But also not a big deal if you hide clocks from your DT ABI. You can
-store NR_CLKS in kernel code, and never expose it to the DT ABI.
-
-> 
-> > > diff --git a/include/dt-bindings/clock/sun8i-h3.h b/include/dt-bindings/clock/sun8i-h3.h
-> > > new file mode 100644
-> > > index 000000000000..96eced56e7a2
-> > > --- /dev/null
-> > > +++ b/include/dt-bindings/clock/sun8i-h3.h
-> > > @@ -0,0 +1,162 @@
-> > > +#ifndef _DT_BINDINGS_CLK_SUN8I_H3_H_
-> > > +#define _DT_BINDINGS_CLK_SUN8I_H3_H_
-> > > +
-> > > +#define CLK_PLL_CPUX           0
-> > > +#define CLK_PLL_AUDIO_BASE     1
-> > > +#define CLK_PLL_AUDIO          2
-> > > +#define CLK_PLL_AUDIO_2X       3
-> > > +#define CLK_PLL_AUDIO_4X       4
-> > 
-> > Are you sure you want to expose all of these clocks as part of the ABI?
-> > I exposed the bare minimum clocks for the gxbb driver in the DT shared
-> > header (we can always add more later) and kept the rest internal to the
-> > kernel source.
-> 
-> I thought about it, but that would require a third array with
-> basically the same clocks:
-> 
->   * the ccu_common array to patch to set the lock and base pointers,
->   * the list of clocks to register
->   * the clk_hw_onecell_data to deal with the dt binding.
-
-"the list of clocks to register" and "the clk_hw_onecell_data to deal
-with the dt binding" are the same array.
-
-You only need two arrays:
-
-1) the ccu_common init data
-2) the clk_hw_onecell_data array of clk_hw pointers that points to
-clk_hw statically defined in the ccu_common array
-
-And then only expose the clocks that you want via the shared header in
-the DT include chroot. See:
-
-https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/diff/drivers/clk/meson/gxbb.h?h=clk-s905&id=738f66d3211d7ae0cd0012ba6457dac9a03bfd6b
-
-https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/diff/include/dt-bindings/clock/gxbb-clkc.h?h=clk-s905&id=738f66d3211d7ae0cd0012ba6457dac9a03bfd6b
-
-In summary, there is only one array of "clocks to be registered", and we
-limit DT exposure via the shared header. Again, your choice to expose
-whatever you want via DT, but I thought I'd explain my approach
-(especially b/c the SoC I'm hacking on has incomplete docs).
-
-Regards,
-Mike
-
-> 
-> That seems a bit overkill.
-> 
-> Thanks!
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+diff --git a/drivers/usb/common/usb-otg-fsm.c b/drivers/usb/common/usb-otg-fsm.c
+index 9059b7dc185e..73eec8c12235 100644
+--- a/drivers/usb/common/usb-otg-fsm.c
++++ b/drivers/usb/common/usb-otg-fsm.c
+@@ -61,6 +61,18 @@ static int otg_set_protocol(struct otg_fsm *fsm, int protocol)
+ 	return 0;
+ }
+ 
++static void otg_stop_hnp_polling(struct otg_fsm *fsm)
++{
++	/*
++	 * The memory of host_req_flag should be allocated by
++	 * controller driver, otherwise, hnp polling is not started.
++	 */
++	if (!fsm->host_req_flag)
++		return;
++
++	cancel_delayed_work_sync(&fsm->hnp_polling_work);
++}
++
+ /* Called when leaving a state.  Do state clean up jobs here */
+ static void otg_leave_state(struct otg_fsm *fsm, enum usb_otg_state old_state)
+ {
+@@ -84,6 +96,7 @@ static void otg_leave_state(struct otg_fsm *fsm, enum usb_otg_state old_state)
+ 		fsm->b_ase0_brst_tmout = 0;
+ 		break;
+ 	case OTG_STATE_B_HOST:
++		otg_stop_hnp_polling(fsm);
+ 		break;
+ 	case OTG_STATE_A_IDLE:
+ 		fsm->adp_prb = 0;
+@@ -97,6 +110,7 @@ static void otg_leave_state(struct otg_fsm *fsm, enum usb_otg_state old_state)
+ 		fsm->a_wait_bcon_tmout = 0;
+ 		break;
+ 	case OTG_STATE_A_HOST:
++		otg_stop_hnp_polling(fsm);
+ 		otg_del_timer(fsm, A_WAIT_ENUM);
+ 		break;
+ 	case OTG_STATE_A_SUSPEND:
+-- 
+2.9.0.rc2.8.ga28705d
