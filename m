@@ -1,46 +1,149 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Tue, 28 Jun 2016 11:40:37 +0200
-Subject: [PATCH] ARM: sti: Implement dummy L2 cache's write_sec
-Message-ID: <1467106837-20996-1-git-send-email-patrice.chotard@st.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 28 Jun 2016 12:42:45 +0300
+Subject: [PATCH] ARM: dts: keystone: specify usb mode explicitly
+Message-ID: <20160628094245.9521-1-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+The USB OTG mode is not supported by Kestone 2 devices, as result, the
+USB devices enumeration and detection will not work properly when
+kernel is built with CONFIG_USB_DWC3_DUAL_ROLE=y (default for multi
+platform build):
+ - it's required to load gadget drivers manually to make host mode
+work and this confuses current Keystone 2 users
+ - device mode is not working, because port can't detect and switch to
+peripheral/host mode dynamically.
 
-This patch implements the write_sec callback that handle PL310
-secure registers writes.
-This callback is just a stub for now, to avoid system crash.
-Later, it could handle SMC calls so that TZ handles the needed writes.
+Hence, specify usb mode explicitly in DT: usb0 = "host" for all KS2
+devices and usb1 = "peripheral" for K2E.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Roger Quadros <rogerq@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- arch/arm/mach-sti/board-dt.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/keystone-k2e-evm.dts  | 12 ++++++++++--
+ arch/arm/boot/dts/keystone-k2e.dtsi     |  4 ++--
+ arch/arm/boot/dts/keystone-k2hk-evm.dts |  6 +++++-
+ arch/arm/boot/dts/keystone-k2l-evm.dts  |  6 +++++-
+ arch/arm/boot/dts/keystone.dtsi         |  4 ++--
+ 5 files changed, 24 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
-index cfee0ef..e04cd1b 100644
---- a/arch/arm/mach-sti/board-dt.c
-+++ b/arch/arm/mach-sti/board-dt.c
-@@ -23,6 +23,14 @@ static const char *const stih41x_dt_match[] __initconst = {
- 	NULL
+diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
+index 4c32ebc..ae1ebe7 100644
+--- a/arch/arm/boot/dts/keystone-k2e-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
+@@ -47,18 +47,26 @@
+ 	status = "okay";
  };
  
-+static void sti_l2_write_sec(unsigned long val, unsigned reg)
-+{
-+	/*
-+	 * We can't write to secure registers as we are in non-secure
-+	 * mode, until we have some SMI service available.
-+	 */
-+}
+-&usb {
++&keystone_usb0 {
+ 	status = "okay";
+ };
+ 
++&usb0 {
++	dr_mode = "host";
++};
 +
- DT_MACHINE_START(STM, "STi SoC with Flattened Device Tree")
- 	.dt_compat	= stih41x_dt_match,
- 	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE |
-@@ -31,4 +39,5 @@ DT_MACHINE_START(STM, "STi SoC with Flattened Device Tree")
- 			  L2C_AUX_CTRL_WAY_SIZE(4),
- 	.l2c_aux_mask	= 0xc0000fff,
- 	.smp		= smp_ops(sti_smp_ops),
-+	.l2c_write_sec	= sti_l2_write_sec,
- MACHINE_END
+ &usb1_phy {
+ 	status = "okay";
+ };
+ 
+-&usb1 {
++&keystone_usb1 {
+ 	status = "okay";
+ };
+ 
++&usb1 {
++	dr_mode = "peripheral";
++};
++
+ &i2c0 {
+ 	dtt at 50 {
+ 		compatible = "at,24c1024";
+diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
+index 96b349f..3540a1d 100644
+--- a/arch/arm/boot/dts/keystone-k2e.dtsi
++++ b/arch/arm/boot/dts/keystone-k2e.dtsi
+@@ -61,7 +61,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		usb1: usb at 25000000 {
++		keystone_usb1: usb at 25000000 {
+ 			compatible = "ti,keystone-dwc3";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+@@ -74,7 +74,7 @@
+ 			dma-ranges;
+ 			status = "disabled";
+ 
+-			dwc3 at 25010000 {
++			usb1: dwc3 at 25010000 {
+ 				compatible = "synopsys,dwc3";
+ 				reg = <0x25010000 0x70000>;
+ 				interrupts = <GIC_SPI 414 IRQ_TYPE_EDGE_RISING>;
+diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+index b38b344..2156ff9 100644
+--- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+@@ -83,10 +83,14 @@
+ 	status = "okay";
+ };
+ 
+-&usb {
++&keystone_usb0 {
+ 	status = "okay";
+ };
+ 
++&usb0 {
++	dr_mode = "host";
++};
++
+ &aemif {
+ 	cs0 {
+ 		#address-cells = <2>;
+diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
+index 7f9c2e9..056b42f 100644
+--- a/arch/arm/boot/dts/keystone-k2l-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
+@@ -32,10 +32,14 @@
+ 	status = "okay";
+ };
+ 
+-&usb {
++&keystone_usb0 {
+ 	status = "okay";
+ };
+ 
++&usb0 {
++	dr_mode = "host";
++};
++
+ &i2c0 {
+ 	dtt at 50 {
+ 		compatible = "at,24c1024";
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index e34b226..96c9943 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -188,7 +188,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		usb: usb at 2680000 {
++		keystone_usb0: usb at 2680000 {
+ 			compatible = "ti,keystone-dwc3";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+@@ -201,7 +201,7 @@
+ 			dma-ranges;
+ 			status = "disabled";
+ 
+-			dwc3 at 2690000 {
++			usb0: dwc3 at 2690000 {
+ 				compatible = "synopsys,dwc3";
+ 				reg = <0x2690000 0x70000>;
+ 				interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
 -- 
-1.9.1
+2.9.0
