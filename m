@@ -1,29 +1,66 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 28 Jun 2016 13:55:36 +0200
-Subject: [PATCH] ARM: sti: Implement dummy L2 cache's write_sec
-In-Reply-To: <20160628094914.GI1041@n2100.armlinux.org.uk>
-References: <1467106837-20996-1-git-send-email-patrice.chotard@st.com>
- <20160628094914.GI1041@n2100.armlinux.org.uk>
-Message-ID: <577265B8.5030009@st.com>
+From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez)
+Date: Tue, 28 Jun 2016 13:56:50 +0200
+Subject: [PATCH 2/2] clk: hi6220: initialize UART1 clock to 150MHz
+In-Reply-To: <1467109902-17625-2-git-send-email-guodong.xu@linaro.org>
+References: <1467109902-17625-1-git-send-email-guodong.xu@linaro.org>
+ <1467109902-17625-2-git-send-email-guodong.xu@linaro.org>
+Message-ID: <57726602.1060505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell
-
-On 06/28/2016 11:49 AM, Russell King - ARM Linux wrote:
-> On Tue, Jun 28, 2016 at 11:40:37AM +0200, patrice.chotard at st.com wrote:
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> This patch implements the write_sec callback that handle PL310
->> secure registers writes.
->> This callback is just a stub for now, to avoid system crash.
->> Later, it could handle SMC calls so that TZ handles the needed writes.
-> Is there much point having the L2 cache DT node enabled if you have
-> no support for the writes, which are required for the hardware to be
-> enabled?
+On 06/28/2016 12:31 PM, Guodong Xu wrote:
+> From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 >
-It's similar to what has been done for ux500 machine, in non secure 
-mode, we
-can't write in L2 cache secure registers.
+> Early at boot, during the sys_clk initialization, make sure UART1 uses
+> the higher frequency clock.
+>
+> This enables support for higher baud rates (up to 3Mbps) required to
+> support faster bluetooth transfers.
+>
+> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
+>   drivers/clk/hisilicon/clk-hi6220.c | 12 ++++++++++--
+>   1 file changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+> index a36ffcb..55bd9bb 100644
+> --- a/drivers/clk/hisilicon/clk-hi6220.c
+> +++ b/drivers/clk/hisilicon/clk-hi6220.c
+> @@ -11,6 +11,7 @@
+>    */
+>   
+>   #include <linux/kernel.h>
+> +#include <linux/clk.h>
+>   #include <linux/clk-provider.h>
+>   #include <linux/clkdev.h>
+>   #include <linux/io.h>
+> @@ -70,10 +71,10 @@ static struct hisi_gate_clock hi6220_separated_gate_clks_ao[] __initdata = {
+>   	{ HI6220_UART0_PCLK,  "uart0_pclk",  "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 24, 0, },
+>   };
+>   
+> +static struct hisi_clock_data *clk_data_ao;
+> +
+>   static void __init hi6220_clk_ao_init(struct device_node *np)
+>   {
+> -	struct hisi_clock_data *clk_data_ao;
+> -
+>   	clk_data_ao = hisi_clk_init(np, HI6220_AO_NR_CLKS);
+>   	if (!clk_data_ao)
+>   		return;
+> @@ -192,6 +193,13 @@ static void __init hi6220_clk_sys_init(struct device_node *np)
+>   
+>   	hi6220_clk_register_divider(hi6220_div_clks_sys,
+>   			ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
+> +
+> +	if (!clk_data_ao)
+> +		return;
+> +
+> +	/* enable high speed clock on UART1 mux */
+> +	clk_set_parent(clk_data->clk_data.clks[HI6220_UART1_SRC],
+> +			clk_data_ao->clk_data.clks[HI6220_150M]);
+>   }
+>   CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-sysctrl", hi6220_clk_sys_init);
+>   
 
-Patrice
+please bear with me on this. it does need rework.
