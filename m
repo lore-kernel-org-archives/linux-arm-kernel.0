@@ -1,50 +1,64 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 28 Jun 2016 18:00:52 +0530
-Subject: [PATCH v6 4/6] gpio: tps65218-gpio: Add platform_device_id table
+Date: Tue, 28 Jun 2016 18:00:53 +0530
+Subject: [PATCH v6 5/6] mfd: tps65218: Use mfd_add_devices instead of
+ of_platform_populate
 In-Reply-To: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
 References: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1467117054-12943-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <1467117054-12943-6-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_device_id table is needed for adding the tps65218-gpio
-module to the mfd_cell array.
+mfd_add_devices enables parsing device tree nodes without compatibles
+for regulators and gpio modules. Replace of_platform_populate with
+mfd_add_devices. mfd_cell currently is populated with regulators,
+gpio and powerbutton.
 
+Acked-by: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
 
 Changes in v4:
 
-  * Retained the compatible strings in order to interrogate the DT in the
-    normal way.
+  * Regrouped the mfd cells better.
 
- drivers/gpio/gpio-tps65218.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/mfd/tps65218.c | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-tps65218.c b/drivers/gpio/gpio-tps65218.c
-index 0f9d9bd..0961f3a 100644
---- a/drivers/gpio/gpio-tps65218.c
-+++ b/drivers/gpio/gpio-tps65218.c
-@@ -231,6 +231,12 @@ static const struct of_device_id tps65218_dt_match[] = {
- };
- MODULE_DEVICE_TABLE(of, tps65218_dt_match);
+diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+index 9bca1b1..13834a0 100644
+--- a/drivers/mfd/tps65218.c
++++ b/drivers/mfd/tps65218.c
+@@ -33,6 +33,18 @@
  
-+static const struct platform_device_id tps65218_gpio_id_table[] = {
-+	{ "tps65218-gpio", },
-+	{ /* sentinel */ }
+ #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+ 
++static const struct mfd_cell tps65218_cells[] = {
++	{
++		.name = "tps65218-pwrbutton",
++		.of_compatible = "ti,tps65218-pwrbutton",
++	},
++	{
++		.name = "tps65218-gpio",
++		.of_compatible = "ti,tps65218-gpio",
++	},
++	{ .name = "tps65218-regulator", },
 +};
-+MODULE_DEVICE_TABLE(platform, tps65218_gpio_id_table);
 +
- static struct platform_driver tps65218_gpio_driver = {
- 	.driver = {
- 		.name = "tps65218-gpio",
-@@ -238,6 +244,7 @@ static struct platform_driver tps65218_gpio_driver = {
- 	},
- 	.probe = tps65218_gpio_probe,
- 	.remove = tps65218_gpio_remove,
-+	.id_table = tps65218_gpio_id_table,
- };
+ /**
+  * tps65218_reg_write: Write a single tps65218 register.
+  *
+@@ -245,8 +257,10 @@ static int tps65218_probe(struct i2c_client *client,
  
- module_platform_driver(tps65218_gpio_driver);
+ 	tps->rev = chipid & TPS65218_CHIPID_REV_MASK;
+ 
+-	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
+-				   &client->dev);
++	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
++			      ARRAY_SIZE(tps65218_cells), NULL, 0,
++			      regmap_irq_get_domain(tps->irq_data));
++
+ 	if (ret < 0)
+ 		goto err_irq;
+ 
 -- 
 1.9.1
