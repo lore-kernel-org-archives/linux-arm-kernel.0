@@ -1,28 +1,20 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 28 Jun 2016 15:17:55 +0100
-Subject: [PATCH v6] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-In-Reply-To: <20160628110621.GC5425@arm.com>
-References: <1466507556-9027-1-git-send-email-suzuki.poulose@arm.com>
- <20160628110621.GC5425@arm.com>
-Message-ID: <20160628141755.GE4585@e104818-lin.cambridge.arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 28 Jun 2016 20:08:50 +0530
+Subject: [PATCH v4 0/4] dmaengine driver for Marvell XOR v2 engine
+In-Reply-To: <1466080116-26777-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1466080116-26777-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160628143850.GD14945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 12:06:22PM +0100, Will Deacon wrote:
-> On Tue, Jun 21, 2016 at 12:12:36PM +0100, Suzuki K Poulose wrote:
-> > +static struct attribute_group cpuregs_attr_group = {
-> > +	.attrs = cpuregs_attrs,
-> > +	.name = "identification"
-> > +};
+On Thu, Jun 16, 2016 at 02:28:32PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> This makes sense because MIDR/REVIDR belong to the "Identification"
-> functional group of registers, however I wonder if we should put this
-> under a directory called "regs" or similar, so that we don't have a
-> confusing top-level directory where "identification" lives alongside
-> things like "hotplug" and "cpuidle".
+> Here is the fourth version of the mv_xor_v2 driver, which allows to
+> use the XOR engines available on the Marvell Armada 7K/8K ARM64 SoCs.
 
-IMO, there are too many subdirectories and I don't think we would expose
-any other registers than the ID ones.
+Looks okay. But need ack on two ARM patches...
+
 
 -- 
-Catalin
+~Vinod
