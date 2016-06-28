@@ -1,164 +1,103 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Tue, 28 Jun 2016 06:49:38 -0700
-Subject: [v4 PATCH 0/5] Rockchip Type-C and DispplayPort driver
-In-Reply-To: <1467116681-9330-1-git-send-email-zyw@rock-chips.com>
-References: <1467116681-9330-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <CABXOdTcGs3JQFFobBjT7u867-uZ0hz7Qw5-gcrndpArqcH5fFA@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 28 Jun 2016 14:55:46 +0100
+Subject: [PATCH v7 0/6] ACPI / processor_idle: Add ACPI v6.0 LPI support
+Message-ID: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 5:24 AM, Chris Zhong <zyw@rock-chips.com> wrote:
->
-> Hi all
->
+ACPI 6.0 introduced LPI(Low Power Idle) states that provides an alternate
+method to describe processor idle states. It extends the specification
+to allow the expression of idle states like C-states selectable by the
+OSPM when a processor goes idle, but may affect more than one processor,
+and may affect other system components.
 
-Hi Chris,
+LPI extensions leverages the processor container device(again introduced
+in ACPI 6.0) allowing to express which parts of the system are affected
+by a given LPI state. It defines the local power states for each node
+in a hierarchical processor topology. The OSPM can use _LPI object to
+select a local power state for each level of processor hierarchy in the
+system. They used to produce a composite power state request that is
+presented to the platform by the OSPM.
 
-I keep forgetting:
+Since multiple processors affect the idle state for any non-leaf hierarchy
+node, coordination of idle state requests between the processors is
+required. ACPI supports two different coordination schemes: Platform
+coordinated and  OS initiated.
 
-Subject line: s/DispplayPort/DisplayPort/
+This series aims at providing basic and initial support for platform
+coordinated LPI states.
 
-Guenter
+v6[6]->v7:
+	- Removed cpuidle-arm.h and introduced HAVE_GENERIC_CPUIDLE_ENTER
+	  and move the common code to cpuidle_generic_enter{,_state}
+	- Factored out common code between psci_{dt,acpi}_cpu_init_idle
 
-> This series patch is for rockchip Type-C phy and DisplayPort controller
-> driver.
->
-> The USB Type-C PHY is designed to support the USB3 and DP applications.
-> The PHY basically has two main components: USB3 and DisplyPort. USB3
-> operates in SuperSpeed mode and the DP can operate at RBR, HBR and HBR2
-> data rates. The Type-C cable orientation detection and Power Delivery
-> (PD) is accomplished using a PD PHY or a exernal PD chip.
->
-> The DP controller is compliant with DisplayPort Specification,
-> Version 1.3, This IP is compatible with the rockchip type-c PHY IP.
-> There is a uCPU in DP controller, it need a firmware to work, please
-> put the firmware file to /lib/firmware/cdn/dptx.bin. The uCPU in charge
-> of aux communication and link training, the host use mailbox to
-> communicate with the ucpu.
->
-> The DP contoller has register a notification with extcon API, to get the
-> alt mode from PD, the PD driver need call the devm_extcon_dev_allocate
-> to create a extcon device and use extcon_set_state to notify DP
-> controller.
->
-> About the DP audio, cdn-dp registered 2 DAIs: 0 is I2S, 1 is SPDIF.
-> We can reference them in simple-card.
->
-> This series is based on Mark Yao's branch:
-> https://github.com/markyzq/kernel-drm-rockchip/tree/drm-rockchip-next-2016-05-23
->
-> I test this patches on the rk3399-evb board, with a fusb302 driver,
-> this branch has no rk3399.dtsi, so the patch about dts is not included
-> in this series.
->
->
-> Changes in v4:
-> - remove DP alt mode
-> - add a #phy-cells node
-> - select EXTCON
-> - use phy framework to control the USB3 and DP function
-> - rename PIN_MAP_ to PIN_ASSIGN_
-> - add a reset node
-> - support 2 phys
-> - use phy framework to control DP phy
-> - support 2 phys
->
-> Changes in v3:
-> - use compatible: rockchip,rk3399-typec-phy
-> - use dashes instead of underscores.
-> - remove the phy framework(Kishon Vijay Abraham I)
-> - add parentheses around the macro
-> - use a single space between type and name
-> - add spaces after opening and before closing braces.
-> - use u16 for register value
-> - remove type-c phy header file
-> - CodingStyle optimization
-> - use some cable extcon to get type-c port information
-> - add a extcon to notify Display Port
-> - add SoC specific compatible string
-> - remove reg = <1>;
-> - use EXTCON_DISP_DP and EXTCON_DISP_DP_ALT cable to get dp port state.
-> - reset spdif before config it
-> - modify the firmware clk to 100Mhz
-> - retry load firmware if fw file is requested too early
->
-> Changes in v2:
-> - add some registers description
-> - select RESET_CONTROLLER
-> - alphabetic order
-> - modify some spelling mistakes
-> - make mode cleaner
-> - use bool for enable/disable
-> - check all of the return value
-> - return a better err number
-> - use more readx_poll_timeout()
-> - clk_disable_unprepare(tcphy->clk_ref);
-> - remove unuse functions, rockchip_typec_phy_power_on/off
-> - remove unnecessary typecast from void *
-> - use dts node to distinguish between phys.
-> - Alphabetic order
-> - remove excess error message
-> - use define clk_rate
-> - check all return value
-> - remove dev_set_name(dp->dev, "cdn-dp");
-> - use schedule_delayed_work
-> - remove never-called functions
-> - remove some unnecessary ()
->
-> Changes in v1:
-> - add extcon node description
-> - move the registers in phy driver
-> - remove the suffix of reset
-> - update the licence note
-> - init core clock to 50MHz
-> - use extcon API
-> - remove unused global
-> - add some comments for magic num
-> - change usleep_range(1000, 2000) tousleep_range(1000, 1050)
-> - remove __func__ from dev_err
-> - return err number when get clk failed
-> - remove ADDR_ADJ define
-> - use devm_clk_get(&pdev->dev, "tcpdcore")
-> - add extcon node description
-> - add #sound-dai-cells description
-> - use extcon API
-> - use hdmi-codec for the DP Asoc
-> - do not initialize the "ret"
-> - printk a err log when drm_of_encoder_active_endpoint_id
-> - modify the dclk pin_pol to a single line
->
-> Chris Zhong (5):
->   extcon: Add Type-C and DP support
->   Documentation: bindings: add dt doc for Rockchip USB Type-C PHY
->   phy: Add USB Type-C PHY driver for rk3399
->   Documentation: bindings: add dt documentation for cdn DP controller
->   drm/rockchip: cdn-dp: add cdn DP support for rk3399
->
->  .../bindings/display/rockchip/cdn-dp-rockchip.txt  |  67 ++
->  .../devicetree/bindings/phy/phy-rockchip-typec.txt |  77 ++
->  drivers/extcon/extcon.c                            |   5 +
->  drivers/gpu/drm/rockchip/Kconfig                   |   9 +
->  drivers/gpu/drm/rockchip/Makefile                  |   1 +
->  drivers/gpu/drm/rockchip/cdn-dp-core.c             | 761 ++++++++++++++++
->  drivers/gpu/drm/rockchip/cdn-dp-core.h             | 113 +++
->  drivers/gpu/drm/rockchip/cdn-dp-reg.c              | 731 ++++++++++++++++
->  drivers/gpu/drm/rockchip/cdn-dp-reg.h              | 404 +++++++++
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |   6 +-
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   2 +
->  drivers/gpu/drm/rockchip/rockchip_vop_reg.c        |   2 +
->  drivers/phy/Kconfig                                |   9 +
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-rockchip-typec.c                   | 963 +++++++++++++++++++++
->  include/linux/extcon.h                             |   5 +
->  16 files changed, 3155 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->  create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.c
->  create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.h
->  create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
->  create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.h
->  create mode 100644 drivers/phy/phy-rockchip-typec.c
->
-> --
-> 2.6.3
->
+v5[5]->v6:
+	- Added support for autopromotable state by not flattening them
+	- Moved arm_enter_idle_state to cpuidle-arm.h as it can be reused
+	  in ARM64 backend for ACPI LPI
+	- Other review comments(mainly for ARM64 from Lorenzo)
+	- Dropped support for skipping PM notifier as it needs to be fixed
+	  in GICv3 code(will be done separately)
+
+v4[4]->v5:
+	- Addressed all the comments from Rafael
+	- Added support for retention mode(Prashant)
+	- Handled acpi_processor_get_power_info return value correctly(Vikas)
+	- Dropped __init from arm_cpuidle_init
+	- Merged psci prepartory patch into arm64 lpi support
+
+v3[3]->v4:
+	- Dropped the preparatory patches that are merged already
+	- Added ARM64 arch specific callback implementations
+	- Addressed most of the review comments from Rafael
+
+v2[2]->v3:
+        - rebased against v4.4-rc3
+        - fixed couple of issues reported by Prashanth and review comments
+          from Ashwin
+
+v1[1]->v2[2]:
+        - Fixed support for ACPI0010 processor container
+        - moved sleep state code out of processor_idle
+
+Code is also available @[7]
+
+Regards,
+Sudeep
+
+[1] http://marc.info/?l=linux-acpi&m=143871041601132&w=2
+[2] http://marc.info/?l=linux-acpi&m=144241209800788&w=2
+[3] http://marc.info/?l=linux-acpi&m=144906557814813&w=2
+[4] http://marc.info/?l=linux-acpi&m=146106902731359&w=2
+[5] http://marc.info/?l=linux-acpi&m=146298107608349&w=2
+[6] http://marc.info/?l=linux-acpi&m=146661754618838&w=2
+[7] git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git for_review/arm64_lpi
+
+Sudeep Holla (6):
+  ACPI / processor_idle: introduce ACPI_PROCESSOR_CSTATE
+  ACPI / processor_idle: Add support for Low Power Idle(LPI) states
+  arm64: cpuidle: drop __init section marker to arm_cpuidle_init
+  cpuidle: introduce HAVE_GENERIC_CPUIDLE_ENTER for ARM{32,64} platforms
+  arm64: add support for ACPI Low Power Idle(LPI)
+  ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+
+ arch/arm/Kconfig                |   1 +
+ arch/arm/kernel/cpuidle.c       |   4 +-
+ arch/arm64/Kconfig              |   1 +
+ arch/arm64/kernel/cpuidle.c     |  24 +-
+ drivers/acpi/Kconfig            |   6 +-
+ drivers/acpi/bus.c              |  14 +-
+ drivers/acpi/processor_driver.c |   2 +-
+ drivers/acpi/processor_idle.c   | 544 ++++++++++++++++++++++++++++++++++------
+ drivers/cpuidle/Kconfig         |   3 +
+ drivers/cpuidle/cpuidle-arm.c   |  21 +-
+ drivers/cpuidle/cpuidle.c       |  35 +++
+ drivers/firmware/psci.c         | 122 +++++++--
+ include/acpi/processor.h        |  26 +-
+ include/linux/acpi.h            |   4 +
+ include/linux/cpuidle.h         |   8 +
+ 15 files changed, 680 insertions(+), 135 deletions(-)
+
+-- 
+2.7.4
