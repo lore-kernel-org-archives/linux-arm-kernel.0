@@ -1,44 +1,55 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 28 Jun 2016 11:36:13 +0530
-Subject: [PATCH v3 03/10] input: tps65218-pwrbutton: Add platform_device_id
- table
+Date: Tue, 28 Jun 2016 11:36:14 +0530
+Subject: [PATCH v3 04/10] mfd: tps65218: Use mfd_add_devices instead of
+ of_platform_populate
 In-Reply-To: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
 References: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1467093980-11458-4-git-send-email-j-keerthy@ti.com>
+Message-ID: <1467093980-11458-5-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_device_id table is needed for adding the tps65218-pwrbutton
-module to the mfd_cell array.
+mfd_add_devices enables parsing device tree nodes without compatibles
+for regulators and gpio modules. Replace of_platform_populate with
+mfd_add_devices. mfd_cell currently is populated with regulators,
+gpio and powerbutton.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- drivers/input/misc/tps65218-pwrbutton.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/mfd/tps65218.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
-index 2bba8de..a0cb7d2 100644
---- a/drivers/input/misc/tps65218-pwrbutton.c
-+++ b/drivers/input/misc/tps65218-pwrbutton.c
-@@ -113,12 +113,19 @@ static const struct of_device_id of_tps65218_pwr_match[] = {
- };
- MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
+diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+index f20a531..107d695 100644
+--- a/drivers/mfd/tps65218.c
++++ b/drivers/mfd/tps65218.c
+@@ -33,6 +33,15 @@
  
-+static const struct platform_device_id tps65218_pwrbtn_id_table[] = {
-+	{ "tps65218-pwrbutton", },
-+	{ /* sentinel */ }
-+}
-+MODULE_DEVICE_TABLE(platform, tps65218_pwrbtn_id_table);
+ #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+ 
++static const struct mfd_cell tps65218_cells[] = {
++	{ .name = "tps65218-regulator", },
++	{
++		.name = "tps65218-pwrbutton",
++		.of_compatible = "ti,tps65218-pwrbutton",
++	},
++	{ .name = "tps65218-gpio", },
++};
 +
- static struct platform_driver tps65218_pwron_driver = {
- 	.probe	= tps65218_pwron_probe,
- 	.driver	= {
- 		.name	= "tps65218_pwrbutton",
- 		.of_match_table = of_tps65218_pwr_match,
- 	},
-+	.id_table = tps65218_pwrbtn_id_table,
- };
- module_platform_driver(tps65218_pwron_driver);
+ /**
+  * tps65218_reg_write: Write a single tps65218 register.
+  *
+@@ -236,8 +245,10 @@ static int tps65218_probe(struct i2c_client *client,
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
+-				   &client->dev);
++	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
++			      ARRAY_SIZE(tps65218_cells), NULL, 0,
++			      regmap_irq_get_domain(tps->irq_data));
++
+ 	if (ret < 0)
+ 		goto err_irq;
  
 -- 
 1.9.1
