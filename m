@@ -1,46 +1,114 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 28 Jun 2016 14:59:19 -0700
-Subject: [PATCH] extcon: Add support for qcom SPMI PMIC USB id detection
- hardware
-In-Reply-To: <CAGTfZH3ZhZ2gQcOSuAByZWD59E3Bro1aayr2JsM2W+mYa2LQTQ@mail.gmail.com>
-References: <20160626055647.18898-1-stephen.boyd@linaro.org>
- <CAGTfZH3ireJWo5-Jd5SEiSy-WMTsw43pweruOqwSesAZqagvtg@mail.gmail.com>
- <146705470025.30684.13257433085055355379@sboyd-linaro>
- <CAGTfZH3ZhZ2gQcOSuAByZWD59E3Bro1aayr2JsM2W+mYa2LQTQ@mail.gmail.com>
-Message-ID: <146715115921.31418.2315766296233007937@sboyd-linaro>
+From: tremyfr@gmail.com (Philippe Reynes)
+Date: Tue, 28 Jun 2016 23:59:44 +0200
+Subject: [PATCH 1/2] net: ethernet: lpc_eth: use phydev from struct net_device
+Message-ID: <1467151185-31403-1-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chanwoo Choi (2016-06-28 05:06:48)
-> 2016-06-28 4:11 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
-> > Quoting Chanwoo Choi (2016-06-26 04:20:43)
-> >> 2016-06-26 14:56 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
-> >> > +PROPERTIES
-> >> > +
-> >> > +- compatible:
-> >> > +    Usage: required
-> >> > +    Value type: <string>
-> >> > +    Definition: Should contain "qcom,pm8941-misc";
-> >> > +
-> >> > +- reg:
-> >> > +    Usage: required
-> >> > +    Value type: <u32>
-> >> > +    Definition: Should contain the offset to the misc address space
-> >>
-> >> 'reg' property is used on extcon-qcom-spmi-misc.c?
-> >> I think that you don't need to include this property.
-> >
-> > No it isn't used in the driver right now, but there is a register offset
-> > for this module and there are registers that can be read/written in this
-> > module. I'd like to keep it as required so we can easily read the
-> > registers in the future if needed.
-> 
-> OK.
-> But, If you want to remain the reg property, you should add the code to get
-> the register offset by using OF functions. This patch don't include the OF
-> function to handle it.
-> 
+The private structure contain a pointer to phydev, but the structure
+net_device already contain such pointer. So we can remove the pointer
+phydev in the private structure, and update the driver to use the
+one contained in struct net_device.
 
-Sorry I don't follow the argument. I've put the reg property here for
-future proofing so that the binding doesn't have to change in backwards
-incompatible ways in the future if we do need to get the property later.
+Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+---
+ drivers/net/ethernet/nxp/lpc_eth.c |   22 +++++++++-------------
+ 1 files changed, 9 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/net/ethernet/nxp/lpc_eth.c b/drivers/net/ethernet/nxp/lpc_eth.c
+index b1ce7aa..b003501 100644
+--- a/drivers/net/ethernet/nxp/lpc_eth.c
++++ b/drivers/net/ethernet/nxp/lpc_eth.c
+@@ -425,7 +425,6 @@ struct netdata_local {
+ 	unsigned int		last_tx_idx;
+ 	unsigned int		num_used_tx_buffs;
+ 	struct mii_bus		*mii_bus;
+-	struct phy_device	*phy_dev;
+ 	struct clk		*clk;
+ 	dma_addr_t		dma_buff_base_p;
+ 	void			*dma_buff_base_v;
+@@ -750,7 +749,7 @@ static int lpc_mdio_reset(struct mii_bus *bus)
+ static void lpc_handle_link_change(struct net_device *ndev)
+ {
+ 	struct netdata_local *pldat = netdev_priv(ndev);
+-	struct phy_device *phydev = pldat->phy_dev;
++	struct phy_device *phydev = ndev->phydev;
+ 	unsigned long flags;
+ 
+ 	bool status_change = false;
+@@ -814,7 +813,6 @@ static int lpc_mii_probe(struct net_device *ndev)
+ 	pldat->link = 0;
+ 	pldat->speed = 0;
+ 	pldat->duplex = -1;
+-	pldat->phy_dev = phydev;
+ 
+ 	phy_attached_info(phydev);
+ 
+@@ -1048,8 +1046,8 @@ static int lpc_eth_close(struct net_device *ndev)
+ 	napi_disable(&pldat->napi);
+ 	netif_stop_queue(ndev);
+ 
+-	if (pldat->phy_dev)
+-		phy_stop(pldat->phy_dev);
++	if (ndev->phydev)
++		phy_stop(ndev->phydev);
+ 
+ 	spin_lock_irqsave(&pldat->lock, flags);
+ 	__lpc_eth_reset(pldat);
+@@ -1186,7 +1184,7 @@ static void lpc_eth_set_multicast_list(struct net_device *ndev)
+ static int lpc_eth_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
+ {
+ 	struct netdata_local *pldat = netdev_priv(ndev);
+-	struct phy_device *phydev = pldat->phy_dev;
++	struct phy_device *phydev = ndev->phydev;
+ 
+ 	if (!netif_running(ndev))
+ 		return -EINVAL;
+@@ -1207,14 +1205,14 @@ static int lpc_eth_open(struct net_device *ndev)
+ 	__lpc_eth_clock_enable(pldat, true);
+ 
+ 	/* Suspended PHY makes LPC ethernet core block, so resume now */
+-	phy_resume(pldat->phy_dev);
++	phy_resume(ndev->phydev);
+ 
+ 	/* Reset and initialize */
+ 	__lpc_eth_reset(pldat);
+ 	__lpc_eth_init(pldat);
+ 
+ 	/* schedule a link state check */
+-	phy_start(pldat->phy_dev);
++	phy_start(ndev->phydev);
+ 	netif_start_queue(ndev);
+ 	napi_enable(&pldat->napi);
+ 
+@@ -1250,8 +1248,7 @@ static void lpc_eth_ethtool_setmsglevel(struct net_device *ndev, u32 level)
+ static int lpc_eth_ethtool_getsettings(struct net_device *ndev,
+ 	struct ethtool_cmd *cmd)
+ {
+-	struct netdata_local *pldat = netdev_priv(ndev);
+-	struct phy_device *phydev = pldat->phy_dev;
++	struct phy_device *phydev = ndev->phydev;
+ 
+ 	if (!phydev)
+ 		return -EOPNOTSUPP;
+@@ -1262,8 +1259,7 @@ static int lpc_eth_ethtool_getsettings(struct net_device *ndev,
+ static int lpc_eth_ethtool_setsettings(struct net_device *ndev,
+ 	struct ethtool_cmd *cmd)
+ {
+-	struct netdata_local *pldat = netdev_priv(ndev);
+-	struct phy_device *phydev = pldat->phy_dev;
++	struct phy_device *phydev = ndev->phydev;
+ 
+ 	if (!phydev)
+ 		return -EOPNOTSUPP;
+@@ -1460,7 +1456,7 @@ static int lpc_eth_drv_probe(struct platform_device *pdev)
+ 	netdev_info(ndev, "LPC mac at 0x%08x irq %d\n",
+ 	       res->start, ndev->irq);
+ 
+-	phydev = pldat->phy_dev;
++	phydev = ndev->phydev;
+ 
+ 	device_init_wakeup(&pdev->dev, 1);
+ 	device_set_wakeup_enable(&pdev->dev, 0);
+-- 
+1.7.4.4
