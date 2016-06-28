@@ -1,105 +1,39 @@
-From: a0393675@ti.com (Keerthy)
-Date: Tue, 28 Jun 2016 13:15:14 +0530
-Subject: [PATCH v3 02/10] Documentation: regulator: tps65218: Update
- examples
-In-Reply-To: <20160628065950.GE6720@dell>
-References: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
- <1467093980-11458-3-git-send-email-j-keerthy@ti.com>
- <20160628065950.GE6720@dell>
-Message-ID: <57722B0A.2070706@ti.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 28 Jun 2016 09:53:57 +0200
+Subject: [RFC PATCH v4 0/5] ECAM quirks handling for ARM64 platforms
+Message-ID: <1467100442-28078-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
+revision (the ones from standard header of MCFG table).
 
+Static array is used to keep quirk entries. Each entry consist of
+metioned MCFG IDs along with custom pci_ops structure and initialization call.
 
-On Tuesday 28 June 2016 12:29 PM, Lee Jones wrote:
-> This is a more common format for DT bindings:
->
->    dt-bindings: regulator:
->
-> On Tue, 28 Jun 2016, Keerthy wrote:
->> This updates the device tree according to the preferred way of parsing
->
-> Nit: Device Tree
+As an example, last patch presents quirk handling mechanism usage for
+ThunderX PEM driver.
 
-Okay.
+Tomasz Nowicki (5):
+  PCI: Embed pci_ecam_ops in pci_config_window structure
+  PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
+  PCI: Check platform specific ECAM quirks
+  ARM64/PCI: Start using quirks handling for ACPI based PCI host
+    controller
+  PCI: thunder: Add ThunderX PEM MCFG quirk to the list
 
->
->> the nodes using the regulator framework.
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>   .../devicetree/bindings/regulator/tps65218.txt     | 87 ++++++++++++++++++----
->>   1 file changed, 71 insertions(+), 16 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/regulator/tps65218.txt b/Documentation/devicetree/bindings/regulator/tps65218.txt
->> index fccc1d2..5e1888f 100644
->> --- a/Documentation/devicetree/bindings/regulator/tps65218.txt
->> +++ b/Documentation/devicetree/bindings/regulator/tps65218.txt
->> @@ -1,23 +1,78 @@
->>   TPS65218 family of regulators
->>
->>   Required properties:
->> -For tps65218 regulators/LDOs
->> -- compatible:
->> -  - "ti,tps65218-dcdc1" for DCDC1
->> -  - "ti,tps65218-dcdc2" for DCDC2
->> -  - "ti,tps65218-dcdc3" for DCDC3
->> -  - "ti,tps65218-dcdc4" for DCDC4
->> -  - "ti,tps65218-dcdc5" for DCDC5
->> -  - "ti,tps65218-dcdc6" for DCDC6
->> -  - "ti,tps65218-ldo1" for LDO1
->> -
->> -Optional properties:
->> -- Any optional property defined in bindings/regulator/regulator.txt
->> +- compatible: "ti,tps65218"
->> +- reg: I2C slave address
->
-> '\n' here for clarity.
+ arch/arm64/kernel/pci.c            | 42 +----------------
+ drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
+ drivers/pci/ecam.c                 |  6 +--
+ drivers/pci/host/Makefile          |  1 +
+ drivers/pci/host/mcfg-quirks.c     | 95 +++++++++++++++++++++++++++++++++++++
+ drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
+ drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
+ include/linux/pci-acpi.h           |  5 ++
+ include/linux/pci-ecam.h           |  2 +-
+ 9 files changed, 254 insertions(+), 57 deletions(-)
+ create mode 100644 drivers/pci/host/mcfg-quirks.c
+ create mode 100644 drivers/pci/host/mcfg-quirks.h
 
-Okay.
-
->
->> +- list of regulators provided by this controller, must be named
->
-> Sentences start with an uppercase char.
-
-Okay.
-
->
->> +  after their hardware counterparts: dcdc[1-6] and ldo1
->> +- This is the list of child nodes that specify the regulator
->> +  initialization data for defined regulators. Not all regulators for the given
->> +  device need to be present. The definition for each of these nodes is defined
->> +  using the standard binding for regulators found at
->> +  Documentation/devicetree/bindings/regulator/regulator.txt.
->
-> Use relative path names for brevity.
-
-Okay.
-
->
-> ./regulator.txt
->
->> +  The valid names for regulators are:
->> +  tps65217: regulator-dcdc1, regulator-dcdc2, regulator-dcdc3, regulator-dcdc4,
->> +  regulator-dcdc5, regulator-dcdc6, regulator-ldo1, regulator-ls3
->> +  Each regulator is defined using the standard binding for regulators.
->>
->>   Example:
->> +tps65218: tps65218 at 24 {
->
-> Is this label used?
-
-Yes. This can be used in the dts files.
-
->
->> +	reg = <0x24>;
->> +	compatible = "ti,tps65218";
->> +	interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* NMIn */
->> +	interrupt-controller;
->> +	#interrupt-cells = <2>;
->
-> [...]
->
+-- 
+1.9.1
