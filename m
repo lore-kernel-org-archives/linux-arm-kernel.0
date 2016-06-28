@@ -1,49 +1,51 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 28 Jun 2016 16:48:28 +0100
-Subject: [PATCH v3 9/9] iommu/arm-smmu: Set PRIVCFG in stage 1 STEs
-In-Reply-To: <cover.1467123945.git.robin.murphy@arm.com>
-References: <cover.1467123945.git.robin.murphy@arm.com>
-Message-ID: <9f731605877ae85aaaac98a614882be7186d0843.1467123945.git.robin.murphy@arm.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Tue, 28 Jun 2016 09:55:29 -0600
+Subject: [PATCH] media: s5p-mfc fix memory leak in s5p_mfc_remove()
+In-Reply-To: <57727E2C.9040102@osg.samsung.com>
+References: <1465847114-7427-1-git-send-email-shuahkh@osg.samsung.com>
+ <025e01d1d123$7c14e620$743eb260$@samsung.com>
+ <57727E2C.9040102@osg.samsung.com>
+Message-ID: <57729DF1.20404@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the SMMUv3 equivalent of d346180e70b9 ("iommu/arm-smmu: Treat
-all device transactions as unprivileged"), so that once again those
-pesky DMA controllers with their privileged instruction fetches don't
-unexpectedly fault in stage 1 domains due to VMSAv8 rules.
+On 06/28/2016 07:39 AM, Shuah Khan wrote:
+> On 06/28/2016 03:57 AM, Kamil Debski wrote:
+>> HI Shuah,
+>>
+>> Which branch do you base your patches on?
+>>
+>> I have trouble applying this path
+>> (https://patchwork.linuxtv.org/patch/34577/) and 
+>> "s5p-mfc fix null pointer deference in clk_core_enable()"
+>> (https://patchwork.linuxtv.org/patch/34751/) 
+>> onto current linuxtv/master.
+>>
+>> The top commit of linuxtv/master is :
+>> "commit 0db5c79989de2c68d5abb7ba891bfdb3cd3b7e05
+>> Author: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+>> Date:   Thu Jun 16 08:04:40 2016 -0300
+>>
+>>     [media] media-devnode.h: Fix documentation"
+>>
+>> Could you please rebase the two patches mentioned above to the
+>> linuxtv/master?
+>>
+>> Best wishes,
+>>
+> 
+> I based them on linux_next. I will rebase both patches on linuxtv/master
+> and resend.
+> 
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Hi Kamil,
 
-v3: New.
+Do you need me to rebase this one:
 
- drivers/iommu/arm-smmu-v3.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+https://patchwork.kernel.org/patch/9166119/
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 735690e03818..e4c3916efba9 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -263,6 +263,9 @@
- #define STRTAB_STE_1_SHCFG_INCOMING	1UL
- #define STRTAB_STE_1_SHCFG_SHIFT	44
- 
-+#define STRTAB_STE_1_PRIVCFG_UNPRIV	2UL
-+#define STRTAB_STE_1_PRIVCFG_SHIFT	48
-+
- #define STRTAB_STE_2_S2VMID_SHIFT	0
- #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
- #define STRTAB_STE_2_VTCR_SHIFT		32
-@@ -1070,7 +1073,9 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- #ifdef CONFIG_PCI_ATS
- 			 STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT |
- #endif
--			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
-+			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT |
-+			 STRTAB_STE_1_PRIVCFG_UNPRIV <<
-+			 STRTAB_STE_1_PRIVCFG_SHIFT);
- 
- 		if (smmu->features & ARM_SMMU_FEAT_STALLS)
- 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
--- 
-2.8.1.dirty
+I will do that anyway and send three patches. I don't see the above
+in linuxtv/master
+
+thanks,
+-- Shuah
