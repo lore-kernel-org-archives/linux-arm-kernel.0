@@ -1,37 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Jun 2016 17:27:56 +0100
-Subject: [PATCH v6] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-In-Reply-To: <20160628153346.GF4585@e104818-lin.cambridge.arm.com>
-References: <1466507556-9027-1-git-send-email-suzuki.poulose@arm.com>
- <20160628153346.GF4585@e104818-lin.cambridge.arm.com>
-Message-ID: <20160628162755.GR31744@leverpostej>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 28 Jun 2016 18:32:30 +0200
+Subject: [PATCH 1/2] clk: clk-rk3*: set CLK_IS_CRITICAL flag to critical
+ clocks
+In-Reply-To: <20160628160922.GN424@jack.zhora.eu>
+References: <1467125137-25999-1-git-send-email-andi@etezian.org>
+ <29356205.Gk5k6xKH6K@phil> <20160628160922.GN424@jack.zhora.eu>
+Message-ID: <2136865.gUkObTo8M5@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 04:33:46PM +0100, Catalin Marinas wrote:
-> On Tue, Jun 21, 2016 at 12:12:36PM +0100, Suzuki K. Poulose wrote:
-> > +#define CPUINFO_ATTR_RO(_name)							\
-> > +	static ssize_t show_##_name(struct device *dev,				\
-> > +			struct device_attribute *attr, char *buf)		\
-> > +	{									\
-> > +		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
-> > +										\
-> > +		if (info->reg_midr)						\
-> > +			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
-> > +		else								\
-> > +			return 0;						\
-> > +	}									\
-> > +	static DEVICE_ATTR(_name, 0444, show_##_name, NULL)
-> > +
-> > +CPUINFO_ATTR_RO(midr);
-> > +CPUINFO_ATTR_RO(revidr);
+Hi Andi,
+
+Am Mittwoch, 29. Juni 2016, 01:09:22 schrieb Andi Shyti:
+> > >  			RK2928_CLKSEL_CON(0), 14, 2, MFLAGS, 8, 5, DFLAGS),
+> > > 
+> > > -	GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_src", CLK_IGNORE_UNUSED,
+> > > +	GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_src",
+> > > +			CLK_IS_CRITICAL | CLK_IGNORE_UNUSED,
+> > 
+> > - you'll never need both critical and ignore_unused
 > 
-> Since exposing these values is aimed at JIT code (and not human
-> readable), wouldn't it make more sense to present the binary value
-> instead of the ascii transformation?
+> Indeed I was unsure whether I should remove the
+> CLK_IGNORE_UNUSED, but then I decided to leave it because that's
+> basically what the driver is currently doing. Thanks!
+> 
+> > Happens in some more cases below, but otherwise looks ok ... as written
+> > in the cover-letter I'm just still trying to make up my mind if it's
+> > worth waiting for the handoff mechanism.
+> 
+> You mean something similar (*)?
 
-Per Documentation/filesystems/sysfs.txt, attributes should be ASCII text
-files, with one value per file. I think they should stay as they are.
+I actually mean 
+https://lkml.org/lkml/2016/2/11/694
 
-Thanks,
-Mark.
+which received additional comments somewhere and Mike said he wanted to 
+repost.
+
+
+Heiko
