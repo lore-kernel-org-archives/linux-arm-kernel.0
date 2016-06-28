@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:30:42 +0200
-Subject: [PATCH 23/92] clocksource/drivers/bcm2835_timer: Convert init
+Date: Tue, 28 Jun 2016 12:30:41 +0200
+Subject: [PATCH 22/92] clocksource/drivers/armv7m_systick: Convert init
  function to return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-23-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-22-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,87 +26,73 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Eric Anholt <eric@anholt.net>
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- drivers/clocksource/bcm2835_timer.c | 40 +++++++++++++++++++++++++------------
- 1 file changed, 27 insertions(+), 13 deletions(-)
+ drivers/clocksource/armv7m_systick.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
-index 6f28229..2dcf896 100644
---- a/drivers/clocksource/bcm2835_timer.c
-+++ b/drivers/clocksource/bcm2835_timer.c
-@@ -80,19 +80,24 @@ static irqreturn_t bcm2835_time_interrupt(int irq, void *dev_id)
- 	}
- }
+diff --git a/drivers/clocksource/armv7m_systick.c b/drivers/clocksource/armv7m_systick.c
+index addfd2c..2b55410 100644
+--- a/drivers/clocksource/armv7m_systick.c
++++ b/drivers/clocksource/armv7m_systick.c
+@@ -21,7 +21,7 @@
  
--static void __init bcm2835_timer_init(struct device_node *node)
-+static int __init bcm2835_timer_init(struct device_node *node)
+ #define SYSTICK_LOAD_RELOAD_MASK 0x00FFFFFF
+ 
+-static void __init system_timer_of_register(struct device_node *np)
++static int __init system_timer_of_register(struct device_node *np)
  {
+ 	struct clk *clk = NULL;
  	void __iomem *base;
- 	u32 freq;
--	int irq;
-+	int irq, ret;
- 	struct bcm2835_timer *timer;
- 
- 	base = of_iomap(node, 0);
--	if (!base)
--		panic("Can't remap registers");
-+	if (!base) {
-+		pr_err("Can't remap registers");
+@@ -31,22 +31,26 @@ static void __init system_timer_of_register(struct device_node *np)
+ 	base = of_iomap(np, 0);
+ 	if (!base) {
+ 		pr_warn("system-timer: invalid base address\n");
+-		return;
 +		return -ENXIO;
-+	}
+ 	}
  
--	if (of_property_read_u32(node, "clock-frequency", &freq))
--		panic("Can't read clock-frequency");
-+	ret = of_property_read_u32(node, "clock-frequency", &freq);
-+	if (ret) {
-+		pr_err("Can't read clock-frequency");
-+		return ret;
-+	}
+ 	ret = of_property_read_u32(np, "clock-frequency", &rate);
+ 	if (ret) {
+ 		clk = of_clk_get(np, 0);
+-		if (IS_ERR(clk))
++		if (IS_ERR(clk)) {
++			ret = PTR_ERR(clk);
+ 			goto out_unmap;
++		}
  
- 	system_clock = base + REG_COUNTER_LO;
- 	sched_clock_register(bcm2835_sched_read, 32, freq);
-@@ -101,12 +106,16 @@ static void __init bcm2835_timer_init(struct device_node *node)
- 		freq, 300, 32, clocksource_mmio_readl_up);
+ 		ret = clk_prepare_enable(clk);
+ 		if (ret)
+ 			goto out_clk_put;
  
- 	irq = irq_of_parse_and_map(node, DEFAULT_TIMER);
--	if (irq <= 0)
--		panic("Can't parse IRQ");
-+	if (irq <= 0) {
-+		pr_err("Can't parse IRQ");
-+		return -EINVAL;
-+	}
+ 		rate = clk_get_rate(clk);
+-		if (!rate)
++		if (!rate) {
++			ret = -EINVAL;
+ 			goto out_clk_disable;
++		}
+ 	}
  
- 	timer = kzalloc(sizeof(*timer), GFP_KERNEL);
--	if (!timer)
--		panic("Can't allocate timer struct\n");
-+	if (!timer) {
-+		pr_err("Can't allocate timer struct\n");
-+		return -ENOMEM;
-+	}
+ 	writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
+@@ -64,7 +68,7 @@ static void __init system_timer_of_register(struct device_node *np)
  
- 	timer->control = base + REG_CONTROL;
- 	timer->compare = base + REG_COMPARE(DEFAULT_TIMER);
-@@ -121,12 +130,17 @@ static void __init bcm2835_timer_init(struct device_node *node)
- 	timer->act.dev_id = timer;
- 	timer->act.handler = bcm2835_time_interrupt;
+ 	pr_info("ARM System timer initialized as clocksource\n");
  
--	if (setup_irq(irq, &timer->act))
--		panic("Can't set up timer IRQ\n");
-+	ret = setup_irq(irq, &timer->act);
-+	if (ret) {
-+		pr_err("Can't set up timer IRQ\n");
-+		return ret;
-+	}
- 
- 	clockevents_config_and_register(&timer->evt, freq, 0xf, 0xffffffff);
- 
- 	pr_info("bcm2835: system timer (irq = %d)\n", irq);
-+
+-	return;
 +	return 0;
+ 
+ out_clk_disable:
+ 	clk_disable_unprepare(clk);
+@@ -73,7 +77,9 @@ out_clk_put:
+ out_unmap:
+ 	iounmap(base);
+ 	pr_warn("ARM System timer register failed (%d)\n", ret);
++
++	return ret;
  }
--CLOCKSOURCE_OF_DECLARE(bcm2835, "brcm,bcm2835-system-timer",
-+CLOCKSOURCE_OF_DECLARE_RET(bcm2835, "brcm,bcm2835-system-timer",
- 			bcm2835_timer_init);
+ 
+-CLOCKSOURCE_OF_DECLARE(arm_systick, "arm,armv7m-systick",
++CLOCKSOURCE_OF_DECLARE_RET(arm_systick, "arm,armv7m-systick",
+ 			system_timer_of_register);
 -- 
 1.9.1
