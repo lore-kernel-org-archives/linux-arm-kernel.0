@@ -1,31 +1,28 @@
 From: dennis.chen@arm.com (Dennis Chen)
-Date: Tue, 28 Jun 2016 17:45:35 +0800
-Subject: [PATCH v4 1/3] mm: memblock enhence the memblock debugfs output
-Message-ID: <1467107137-29631-1-git-send-email-dennis.chen@arm.com>
+Date: Tue, 28 Jun 2016 17:45:36 +0800
+Subject: [PATCH v4 2/3] mm: memblock Add some new functions to address the mem
+ limit issue
+In-Reply-To: <1467107137-29631-1-git-send-email-dennis.chen@arm.com>
+References: <1467107137-29631-1-git-send-email-dennis.chen@arm.com>
+Message-ID: <1467107137-29631-2-git-send-email-dennis.chen@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current memblock debugfs output doesn't make the debug convenient
-enough, for example, lack of the 'flag' of the corresponding memblock
-region result in it's difficult to known whether the region has been
-mapped to the kernel linear map zone or not. This patch is trying to
-ease the dubug effort by adding 'size' and 'flag' output.
+In some cases, memblock is queried to determine whether a physical
+address corresponds to memory present in a system even if unused by
+the OS for the linear mapping, highmem, etc. For example, the ACPI
+core needs this information to determine which attributes to use when
+mapping ACPI regions. Use of incorrect memory types can result in
+faults, data corruption, or other issues.
 
-The '/sys/kernel/debug/memblock/memory' output looks like before:
-   0: 0x0000008000000000..0x0000008001e7ffff
-   1: 0x0000008001e80000..0x00000083ff184fff
-   2: 0x00000083ff185000..0x00000083ff1c2fff
-   3: 0x00000083ff1c3000..0x00000083ff222fff
-   4: 0x00000083ff223000..0x00000083ffe42fff
-   5: 0x00000083ffe43000..0x00000083ffffffff
+Removing memory with memblock_enforce_memory_limit throws away this
+information, and so a kernel booted with 'mem=' may suffers from the
+issues described above. To avoid this, we need to kept those nomap
+regions instead of removing all above limit, which preserves the
+information we need while preventing other use of the regions.
 
-After applied:
-   0: 0x0000008000000000..0x0000008001e7ffff  0x0000000001e80000  0x4
-   1: 0x0000008001e80000..0x00000083ff184fff  0x00000003fd305000  0x0
-   2: 0x00000083ff185000..0x00000083ff1c2fff  0x000000000003e000  0x4
-   3: 0x00000083ff1c3000..0x00000083ff222fff  0x0000000000060000  0x0
-   4: 0x00000083ff223000..0x00000083ffe42fff  0x0000000000c20000  0x4
-   5: 0x00000083ffe43000..0x00000083ffffffff  0x00000000001bd000  0x0
+This patch adds new insfrastructure to kept all nomap memblock regions
+while removing others, to cater for this.
 
 Signed-off-by: Dennis Chen <dennis.chen@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
@@ -39,37 +36,110 @@ Cc: linux-mm at kvack.org
 Cc: linux-acpi at vger.kernel.org
 Cc: linux-efi at vger.kernel.org
 ---
-Change history:
-v3->v4: 
-According to suggestion from Mark Rutland, make the memblock debugfs
-part as an individual patch since logically it's independent from others
+Change history
+v1->v2: Mark all regions above the limit as NOMAP per Mark's suggestion
+v2->v3: Only keep the NOMAP regions above limit while removing all
+ohters according to the proposal from Ard's
+v3->v4: Incorporate some review comments from Mark Rutland.
 
- mm/memblock.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ include/linux/memblock.h |  1 +
+ mm/memblock.c            | 54 +++++++++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 50 insertions(+), 5 deletions(-)
 
+diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+index 6c14b61..2925da2 100644
+--- a/include/linux/memblock.h
++++ b/include/linux/memblock.h
+@@ -332,6 +332,7 @@ phys_addr_t memblock_mem_size(unsigned long limit_pfn);
+ phys_addr_t memblock_start_of_DRAM(void);
+ phys_addr_t memblock_end_of_DRAM(void);
+ void memblock_enforce_memory_limit(phys_addr_t memory_limit);
++void memblock_mem_limit_remove_map(phys_addr_t limit);
+ bool memblock_is_memory(phys_addr_t addr);
+ int memblock_is_map_memory(phys_addr_t addr);
+ int memblock_is_region_memory(phys_addr_t base, phys_addr_t size);
 diff --git a/mm/memblock.c b/mm/memblock.c
-index ca09915..0fc0fa1 100644
+index 0fc0fa1..993f597 100644
 --- a/mm/memblock.c
 +++ b/mm/memblock.c
-@@ -1677,13 +1677,15 @@ static int memblock_debug_show(struct seq_file *m, void *private)
- 		reg = &type->regions[i];
- 		seq_printf(m, "%4d: ", i);
- 		if (sizeof(phys_addr_t) == 4)
--			seq_printf(m, "0x%08lx..0x%08lx\n",
-+			seq_printf(m, "0x%08lx..0x%08lx  0x%08lx  0x%lx\n",
- 				   (unsigned long)reg->base,
--				   (unsigned long)(reg->base + reg->size - 1));
-+				   (unsigned long)(reg->base + reg->size - 1),
-+				   (unsigned long)reg->size, reg->flags);
- 		else
--			seq_printf(m, "0x%016llx..0x%016llx\n",
-+			seq_printf(m, "0x%016llx..0x%016llx  0x%016llx  0x%lx\n",
- 				   (unsigned long long)reg->base,
--				   (unsigned long long)(reg->base + reg->size - 1));
-+				   (unsigned long long)(reg->base + reg->size - 1),
-+				   (unsigned long long)reg->size, reg->flags);
+@@ -1465,15 +1465,16 @@ phys_addr_t __init_memblock memblock_end_of_DRAM(void)
+ 	return (memblock.memory.regions[idx].base + memblock.memory.regions[idx].size);
+ }
  
+-void __init memblock_enforce_memory_limit(phys_addr_t limit)
++static phys_addr_t __init_memblock __find_max_addr(phys_addr_t limit)
+ {
+ 	phys_addr_t max_addr = (phys_addr_t)ULLONG_MAX;
+ 	struct memblock_region *r;
+ 
+-	if (!limit)
+-		return;
+-
+-	/* find out max address */
++	/*
++	 * translate the memory @limit size into the max address within one of
++	 * the memory memblock regions, if the @limit exceeds the total size
++	 * of those regions, max_addr will keep original value ULLONG_MAX
++	 */
+ 	for_each_memblock(memory, r) {
+ 		if (limit <= r->size) {
+ 			max_addr = r->base + limit;
+@@ -1482,6 +1483,23 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
+ 		limit -= r->size;
  	}
- 	return 0;
+ 
++	return max_addr;
++}
++
++void __init memblock_enforce_memory_limit(phys_addr_t limit)
++{
++	phys_addr_t max_addr = (phys_addr_t)ULLONG_MAX;
++	struct memblock_region *r;
++
++	if (!limit)
++		return;
++
++	max_addr = __find_max_addr(limit);
++
++	/* @limit exceeds the total size of the memory, do nothing */
++	if (max_addr == (phys_addr_t)ULLONG_MAX)
++		return;
++
+ 	/* truncate both memory and reserved regions */
+ 	memblock_remove_range(&memblock.memory, max_addr,
+ 			      (phys_addr_t)ULLONG_MAX);
+@@ -1489,6 +1507,32 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
+ 			      (phys_addr_t)ULLONG_MAX);
+ }
+ 
++void __init memblock_mem_limit_remove_map(phys_addr_t limit)
++{
++	struct memblock_type *type = &memblock.memory;
++	phys_addr_t max_addr;
++	int i, ret, start_rgn, end_rgn;
++
++	if (!limit)
++		return;
++
++	max_addr = __find_max_addr(limit);
++
++	/* @limit exceeds the total size of the memory, do nothing */
++	if (max_addr == (phys_addr_t)ULLONG_MAX)
++		return;
++
++	ret = memblock_isolate_range(type, max_addr, (phys_addr_t)ULLONG_MAX,
++				&start_rgn, &end_rgn);
++	if (ret)
++		return;
++
++	for (i = end_rgn - 1; i >= start_rgn; i--) {
++		if (!memblock_is_nomap(&type->regions[i]))
++			memblock_remove_region(type, i);
++	}
++}
++
+ static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
+ {
+ 	unsigned int left = 0, right = type->cnt;
 -- 
 2.7.4
