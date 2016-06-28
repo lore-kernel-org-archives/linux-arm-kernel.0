@@ -1,83 +1,50 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 28 Jun 2016 13:32:16 +0100
-Subject: [PATCH v7 03/17] KVM: extend struct kvm_msi to hold a 32-bit device ID
-In-Reply-To: <20160628123230.26255-1-andre.przywara@arm.com>
-References: <20160628123230.26255-1-andre.przywara@arm.com>
-Message-ID: <20160628123230.26255-4-andre.przywara@arm.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 28 Jun 2016 18:00:52 +0530
+Subject: [PATCH v6 4/6] gpio: tps65218-gpio: Add platform_device_id table
+In-Reply-To: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
+References: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1467117054-12943-5-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM GICv3 ITS MSI controller requires a device ID to be able to
-assign the proper interrupt vector. On real hardware, this ID is
-sampled from the bus. To be able to emulate an ITS controller, extend
-the KVM MSI interface to let userspace provide such a device ID. For
-PCI devices, the device ID is simply the 16-bit bus-device-function
-triplet, which should be easily available to the userland tool.
+platform_device_id table is needed for adding the tps65218-gpio
+module to the mfd_cell array.
 
-Also there is a new KVM capability which advertises whether the
-current VM requires a device ID to be set along with the MSI data.
-This flag is still reported as not available everywhere, later we will
-enable it when ITS emulation is used.
-
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- Documentation/virtual/kvm/api.txt | 12 ++++++++++--
- include/uapi/linux/kvm.h          |  5 ++++-
- 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index a4482cc..bf76639 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2169,10 +2169,18 @@ struct kvm_msi {
- 	__u32 address_hi;
- 	__u32 data;
- 	__u32 flags;
--	__u8  pad[16];
-+	__u32 devid;
-+	__u8  pad[12];
+Changes in v4:
+
+  * Retained the compatible strings in order to interrogate the DT in the
+    normal way.
+
+ drivers/gpio/gpio-tps65218.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/gpio/gpio-tps65218.c b/drivers/gpio/gpio-tps65218.c
+index 0f9d9bd..0961f3a 100644
+--- a/drivers/gpio/gpio-tps65218.c
++++ b/drivers/gpio/gpio-tps65218.c
+@@ -231,6 +231,12 @@ static const struct of_device_id tps65218_dt_match[] = {
  };
+ MODULE_DEVICE_TABLE(of, tps65218_dt_match);
  
--No flags are defined so far. The corresponding field must be 0.
-+flags: KVM_MSI_VALID_DEVID: devid contains a valid value
-+devid: If KVM_MSI_VALID_DEVID is set, contains a unique device identifier
-+       for the device that wrote the MSI message.
-+       For PCI, this is usually a BFD identifier in the lower 16 bits.
++static const struct platform_device_id tps65218_gpio_id_table[] = {
++	{ "tps65218-gpio", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(platform, tps65218_gpio_id_table);
 +
-+The per-VM KVM_CAP_MSI_DEVID capability advertises the need to provide
-+the device ID. If this capability is not set, userland cannot rely on
-+the kernel to allow the KVM_MSI_VALID_DEVID flag being set.
- 
- 
- 4.71 KVM_CREATE_PIT2
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 05ebf47..7de96f5 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -866,6 +866,7 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_ARM_PMU_V3 126
- #define KVM_CAP_VCPU_ATTRIBUTES 127
- #define KVM_CAP_MAX_VCPU_ID 128
-+#define KVM_CAP_MSI_DEVID 129
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
-@@ -1024,12 +1025,14 @@ struct kvm_one_reg {
- 	__u64 addr;
+ static struct platform_driver tps65218_gpio_driver = {
+ 	.driver = {
+ 		.name = "tps65218-gpio",
+@@ -238,6 +244,7 @@ static struct platform_driver tps65218_gpio_driver = {
+ 	},
+ 	.probe = tps65218_gpio_probe,
+ 	.remove = tps65218_gpio_remove,
++	.id_table = tps65218_gpio_id_table,
  };
  
-+#define KVM_MSI_VALID_DEVID	(1U << 0)
- struct kvm_msi {
- 	__u32 address_lo;
- 	__u32 address_hi;
- 	__u32 data;
- 	__u32 flags;
--	__u8  pad[16];
-+	__u32 devid;
-+	__u8  pad[12];
- };
- 
- struct kvm_arm_device_addr {
+ module_platform_driver(tps65218_gpio_driver);
 -- 
-2.9.0
+1.9.1
