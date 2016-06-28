@@ -1,53 +1,78 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Jun 2016 13:01:37 +0100
-Subject: [PATCH v4 4/5] mfd: rn5t618: register power off callback
- optionally
-In-Reply-To: <20160628062757.24490-5-stefan@agner.ch>
-References: <20160628062757.24490-1-stefan@agner.ch>
- <20160628062757.24490-5-stefan@agner.ch>
-Message-ID: <20160628120137.GE24982@dell>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 28 Jun 2016 13:59:41 +0200
+Subject: [PATCH v3 1/2] ARM: tango: add HOTPLUG_CPU support
+In-Reply-To: <57726597.8030501@sigmadesigns.com>
+References: <57726597.8030501@sigmadesigns.com>
+Message-ID: <577266AD.8000006@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Jun 2016, Stefan Agner wrote:
+cpu_die() and cpu_kill() are implemented in firmware.
 
-> Only register power off if the PMIC is defined as system power
-> controller (see Documentation/devicetree/bindings/power/
-> power-controller.txt).
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> ---
->  drivers/mfd/rn5t618.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ arch/arm/mach-tango/platsmp.c | 30 ++++++++++++++++++++++++++++++
+ arch/arm/mach-tango/smc.h     |  4 +++-
+ 2 files changed, 33 insertions(+), 1 deletion(-)
 
-For my own reference:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
-  
-> diff --git a/drivers/mfd/rn5t618.c b/drivers/mfd/rn5t618.c
-> index c86160d..1831740 100644
-> --- a/drivers/mfd/rn5t618.c
-> +++ b/drivers/mfd/rn5t618.c
-> @@ -102,9 +102,13 @@ static int rn5t618_i2c_probe(struct i2c_client *i2c,
->  		return ret;
->  	}
->  
-> -	if (!pm_power_off) {
-> -		rn5t618_pm_power_off = priv;
-> -		pm_power_off = rn5t618_power_off;
-> +	if (of_device_is_system_power_controller(i2c->dev.of_node)) {
-> +		if (!pm_power_off) {
-> +			rn5t618_pm_power_off = priv;
-> +			pm_power_off = rn5t618_power_off;
-> +		} else {
-> +			dev_warn(&i2c->dev, "Poweroff callback already assigned\n");
-> +		}
->  	}
->  
->  	return 0;
-
+diff --git a/arch/arm/mach-tango/platsmp.c b/arch/arm/mach-tango/platsmp.c
+index a21f55e000d2..a24b9b1d0b1a 100644
+--- a/arch/arm/mach-tango/platsmp.c
++++ b/arch/arm/mach-tango/platsmp.c
+@@ -1,3 +1,4 @@
++#include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/smp.h>
+ #include "smc.h"
+@@ -9,8 +10,37 @@ static int tango_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++/*
++ * cpu_kill() and cpu_die() run concurrently on different cores.
++ * Firmware will only "kill" a core once it has properly "died".
++ * Keep trying to kill a core until the operation succeeds, but
++ * sleep between tries to give the core time to die.
++ */
++static int tango_cpu_kill(unsigned int cpu)
++{
++	do {
++		msleep(10);
++	} while (tango_aux_core_kill(cpu) != 0);
++
++	return 1;
++}
++
++static void tango_cpu_die(unsigned int cpu)
++{
++	do {
++		cpu_relax();
++	} while (tango_aux_core_die(cpu) != 0);
++}
++#else
++#define tango_cpu_kill	NULL
++#define tango_cpu_die	NULL
++#endif
++
+ static const struct smp_operations tango_smp_ops __initconst = {
+ 	.smp_boot_secondary	= tango_boot_secondary,
++	.cpu_kill		= tango_cpu_kill,
++	.cpu_die		= tango_cpu_die,
+ };
+ 
+ CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango_smp_ops);
+diff --git a/arch/arm/mach-tango/smc.h b/arch/arm/mach-tango/smc.h
+index 7a4af35cc390..3d31f984f44c 100644
+--- a/arch/arm/mach-tango/smc.h
++++ b/arch/arm/mach-tango/smc.h
+@@ -2,4 +2,6 @@ extern int tango_smc(unsigned int val, unsigned int service);
+ 
+ #define tango_set_l2_control(val)	tango_smc(val, 0x102)
+ #define tango_start_aux_core(val)	tango_smc(val, 0x104)
+-#define tango_set_aux_boot_addr(val)	tango_smc((unsigned int)val, 0x105)
++#define tango_set_aux_boot_addr(val)	tango_smc(val, 0x105)
++#define tango_aux_core_die(val)		tango_smc(val, 0x121)
++#define tango_aux_core_kill(val)	tango_smc(val, 0x122)
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.9.0
