@@ -1,144 +1,56 @@
 From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Tue, 28 Jun 2016 11:02:35 +0530
-Subject: [PATCH v2 9/9] tty: serial: fsl_lpuart: Add support for RS-485
+Date: Tue, 28 Jun 2016 11:02:27 +0530
+Subject: [PATCH v2 1/9] tty: serial: fsl_lpuart: consider TX FIFO too in
+ tx_empty
 In-Reply-To: <20160628053235.5114-1-bhuvanchandra.dv@toradex.com>
 References: <20160628053235.5114-1-bhuvanchandra.dv@toradex.com>
-Message-ID: <20160628053235.5114-10-bhuvanchandra.dv@toradex.com>
+Message-ID: <20160628053235.5114-2-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Vybrid's build-in support for RS-485 auto RTS for controlling line
-direction of RS-485 transceiver driver.
+From: Stefan Agner <stefan@agner.ch>
 
-Enable RS485 feature by either using ioctrl 'TIOCSRS485' or enable it in the
-device tree by setting 'linux,rs485-enabled-at-boot-time' property.
+Currently the tx_empty callback only considers the Transmit Complete Flag (TC).
+The reference manual is not quite clear if the TC flag covers the TX FIFO too.
+Debug prints on real hardware have shown that from time to time the TC flag is
+asserted (indicating Transmitter idle) while there are still data in the
+TX FIFO. Hence, in this case the serial core will call the shutdown callback
+even though there are data remaining in the TX FIFO buffers.
 
+Avoid early shutdowns by considering the TX FIFO empty flag too. Also avoid
+theoretical race conditions between DMA and the driver by checking whether the
+TX DMA is in progress too.
+
+Signed-off-by: Stefan Agner <stefan@agner.ch>
 Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
 ---
- drivers/tty/serial/fsl_lpuart.c | 78 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 72 insertions(+), 6 deletions(-)
+ drivers/tty/serial/fsl_lpuart.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 134090a..4d1fca4 100644
+index 3d79003..fabfa7e 100644
 --- a/drivers/tty/serial/fsl_lpuart.c
 +++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -917,6 +917,52 @@ static void lpuart_dma_rx_free(struct uart_port *port)
- 	sport->dma_rx_cookie = -EINVAL;
- }
- 
-+static int lpuart_config_rs485(struct uart_port *port,
-+			struct serial_rs485 *rs485)
-+{
+@@ -810,8 +810,18 @@ static irqreturn_t lpuart32_int(int irq, void *dev_id)
+ /* return TIOCSER_TEMT when transmitter is not busy */
+ static unsigned int lpuart_tx_empty(struct uart_port *port)
+ {
+-	return (readb(port->membase + UARTSR1) & UARTSR1_TC) ?
+-		TIOCSER_TEMT : 0;
 +	struct lpuart_port *sport = container_of(port,
 +			struct lpuart_port, port);
++	unsigned char sr1 = readb(port->membase + UARTSR1);
++	unsigned char sfifo = readb(port->membase + UARTSFIFO);
 +
-+	u8 modem = readb(sport->port.membase + UARTMODEM) &
-+		~(UARTMODEM_TXRTSPOL | UARTMODEM_TXRTSE);
-+	writeb(modem, sport->port.membase + UARTMODEM);
++	if (sport->dma_tx_in_progress)
++		return 0;
 +
-+	if (rs485->flags & SER_RS485_ENABLED) {
-+		/* Enable auto RS-485 RTS mode */
-+		modem |= UARTMODEM_TXRTSE;
++	if (sr1 & UARTSR1_TC && sfifo & UARTSFIFO_TXEMPT)
++		return TIOCSER_TEMT;
 +
-+		/*
-+		 * RTS needs to be logic HIGH either during transer _or_ after
-+		 * transfer, other variants are not supported by the hardware.
-+		 */
-+
-+		if (!(rs485->flags & (SER_RS485_RTS_ON_SEND |
-+				SER_RS485_RTS_AFTER_SEND)))
-+			rs485->flags |= SER_RS485_RTS_ON_SEND;
-+
-+		if (rs485->flags & SER_RS485_RTS_ON_SEND &&
-+				rs485->flags & SER_RS485_RTS_AFTER_SEND)
-+			rs485->flags &= ~SER_RS485_RTS_AFTER_SEND;
-+
-+		/*
-+		 * The hardware defaults to RTS logic HIGH while transfer.
-+		 * Switch polarity in case RTS shall be logic HIGH
-+		 * after transfer.
-+		 * Note: UART is assumed to be active high.
-+		 */
-+		if (rs485->flags & SER_RS485_RTS_ON_SEND)
-+			modem &= ~UARTMODEM_TXRTSPOL;
-+		else if (rs485->flags & SER_RS485_RTS_AFTER_SEND)
-+			modem |= UARTMODEM_TXRTSPOL;
-+	}
-+
-+	/* Store the new configuration */
-+	sport->port.rs485 = *rs485;
-+
-+	writeb(modem, sport->port.membase + UARTMODEM);
 +	return 0;
-+}
-+
- static unsigned int lpuart_get_mctrl(struct uart_port *port)
- {
- 	unsigned int temp = 0;
-@@ -950,17 +996,22 @@ static unsigned int lpuart32_get_mctrl(struct uart_port *port)
- static void lpuart_set_mctrl(struct uart_port *port, unsigned int mctrl)
- {
- 	unsigned char temp;
-+	struct lpuart_port *sport = container_of(port,
-+				struct lpuart_port, port);
- 
--	temp = readb(port->membase + UARTMODEM) &
-+	/* Make sure RXRTSE bit is not set when RS485 is enabled */
-+	if (!(sport->port.rs485.flags & SER_RS485_ENABLED)) {
-+		temp = readb(sport->port.membase + UARTMODEM) &
- 			~(UARTMODEM_RXRTSE | UARTMODEM_TXCTSE);
- 
--	if (mctrl & TIOCM_RTS)
--		temp |= UARTMODEM_RXRTSE;
-+		if (mctrl & TIOCM_RTS)
-+			temp |= UARTMODEM_RXRTSE;
- 
--	if (mctrl & TIOCM_CTS)
--		temp |= UARTMODEM_TXCTSE;
-+		if (mctrl & TIOCM_CTS)
-+			temp |= UARTMODEM_TXCTSE;
- 
--	writeb(temp, port->membase + UARTMODEM);
-+		writeb(temp, port->membase + UARTMODEM);
-+	}
  }
  
- static void lpuart32_set_mctrl(struct uart_port *port, unsigned int mctrl)
-@@ -1256,6 +1307,13 @@ lpuart_set_termios(struct uart_port *port, struct ktermios *termios,
- 		cr1 |= UARTCR1_M;
- 	}
- 
-+	/*
-+	 * When auto RS-485 RTS mode is enabled,
-+	 * hardware flow control need to be disabled.
-+	 */
-+	if (sport->port.rs485.flags & SER_RS485_ENABLED)
-+		termios->c_cflag &= ~CRTSCTS;
-+
- 	if (termios->c_cflag & CRTSCTS) {
- 		modem |= (UARTMODEM_RXRTSE | UARTMODEM_TXCTSE);
- 	} else {
-@@ -1864,6 +1922,8 @@ static int lpuart_probe(struct platform_device *pdev)
- 		sport->port.ops = &lpuart_pops;
- 	sport->port.flags = UPF_BOOT_AUTOCONF;
- 
-+	sport->port.rs485_config = lpuart_config_rs485;
-+
- 	sport->clk = devm_clk_get(&pdev->dev, "ipg");
- 	if (IS_ERR(sport->clk)) {
- 		ret = PTR_ERR(sport->clk);
-@@ -1904,6 +1964,12 @@ static int lpuart_probe(struct platform_device *pdev)
- 		dev_info(sport->port.dev, "DMA rx channel request failed, "
- 				"operating without rx DMA\n");
- 
-+	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time")) {
-+		sport->port.rs485.flags |= SER_RS485_ENABLED;
-+		sport->port.rs485.flags |= SER_RS485_RTS_ON_SEND;
-+		writeb(UARTMODEM_TXRTSE, sport->port.membase + UARTMODEM);
-+	}
-+
- 	return 0;
- }
- 
+ static unsigned int lpuart32_tx_empty(struct uart_port *port)
 -- 
 2.9.0
