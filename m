@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:31:20 +0200
-Subject: [PATCH 61/92] clocksource/drivers/versatile: Convert init function to
+Date: Tue, 28 Jun 2016 12:31:17 +0200
+Subject: [PATCH 58/92] clocksource/drivers/sun5i: Convert init function to
  return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-61-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-58-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,39 +26,70 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 ---
- drivers/clocksource/versatile.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/clocksource/timer-sun5i.c | 37 +++++++++++++++++++++++--------------
+ 1 file changed, 23 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/clocksource/versatile.c b/drivers/clocksource/versatile.c
-index 0a26d3d..8daeffa 100644
---- a/drivers/clocksource/versatile.c
-+++ b/drivers/clocksource/versatile.c
-@@ -25,18 +25,20 @@ static u64 notrace versatile_sys_24mhz_read(void)
- 	return readl(versatile_sys_24mhz);
+diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+index 24c83f9..f0a3ffb 100644
+--- a/drivers/clocksource/timer-sun5i.c
++++ b/drivers/clocksource/timer-sun5i.c
+@@ -311,33 +311,42 @@ err_free:
+ 	return ret;
  }
  
--static void __init versatile_sched_clock_init(struct device_node *node)
-+static int __init versatile_sched_clock_init(struct device_node *node)
+-static void __init sun5i_timer_init(struct device_node *node)
++static int __init sun5i_timer_init(struct device_node *node)
  {
- 	void __iomem *base = of_iomap(node, 0);
+ 	struct reset_control *rstc;
+ 	void __iomem *timer_base;
+ 	struct clk *clk;
+-	int irq;
++	int irq, ret;
  
- 	if (!base)
--		return;
-+		return -ENXIO;
+ 	timer_base = of_io_request_and_map(node, 0, of_node_full_name(node));
+-	if (IS_ERR(timer_base))
+-		panic("Can't map registers");
++	if (IS_ERR(timer_base)) {
++		pr_err("Can't map registers");
++		return PTR_ERR(timer_base);;
++	}
  
- 	versatile_sys_24mhz = base + SYS_24MHZ;
+ 	irq = irq_of_parse_and_map(node, 0);
+-	if (irq <= 0)
+-		panic("Can't parse IRQ");
++	if (irq <= 0) {
++		pr_err("Can't parse IRQ");
++		return -EINVAL;
++	}
  
- 	sched_clock_register(versatile_sys_24mhz_read, 32, 24000000);
+ 	clk = of_clk_get(node, 0);
+-	if (IS_ERR(clk))
+-		panic("Can't get timer clock");
++	if (IS_ERR(clk)) {
++		pr_err("Can't get timer clock");
++		return PTR_ERR(clk);
++	}
+ 
+ 	rstc = of_reset_control_get(node, NULL);
+ 	if (!IS_ERR(rstc))
+ 		reset_control_deassert(rstc);
+ 
+-	sun5i_setup_clocksource(node, timer_base, clk, irq);
+-	sun5i_setup_clockevent(node, timer_base, clk, irq);
++	ret = sun5i_setup_clocksource(node, timer_base, clk, irq);
++	if (ret)
++		return ret;
 +
-+	return 0;
++	return sun5i_setup_clockevent(node, timer_base, clk, irq);
  }
--CLOCKSOURCE_OF_DECLARE(vexpress, "arm,vexpress-sysreg",
-+CLOCKSOURCE_OF_DECLARE_RET(vexpress, "arm,vexpress-sysreg",
- 		       versatile_sched_clock_init);
--CLOCKSOURCE_OF_DECLARE(versatile, "arm,versatile-sysreg",
-+CLOCKSOURCE_OF_DECLARE_RET(versatile, "arm,versatile-sysreg",
- 		       versatile_sched_clock_init);
+-CLOCKSOURCE_OF_DECLARE(sun5i_a13, "allwinner,sun5i-a13-hstimer",
+-		       sun5i_timer_init);
+-CLOCKSOURCE_OF_DECLARE(sun7i_a20, "allwinner,sun7i-a20-hstimer",
+-		       sun5i_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(sun5i_a13, "allwinner,sun5i-a13-hstimer",
++			   sun5i_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(sun7i_a20, "allwinner,sun7i-a20-hstimer",
++			   sun5i_timer_init);
 -- 
 1.9.1
