@@ -1,41 +1,35 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 28 Jun 2016 21:56:22 +0800
-Subject: [RFC PATCH 3/5] thermal: Add support for the thermal sensor on
- A23/33
-In-Reply-To: <20160628114640.GE5550@lukather>
-References: <20160628101325.2522-1-icenowy@aosc.xyz>
- <20160628101325.2522-3-icenowy@aosc.xyz> <20160628114640.GE5550@lukather>
-Message-ID: <60021467122182@web19j.yandex.ru>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 28 Jun 2016 14:55:52 +0100
+Subject: [PATCH v7 6/6] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+In-Reply-To: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
+References: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1467122152-5604-7-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
+enable ACPI_PROCESSOR_IDLE for ARM64 too.
 
+This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
 
-28.06.2016, 19:46, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> Thanks for working on this.
->
-> On Tue, Jun 28, 2016 at 06:13:23PM +0800, Icenowy Zheng wrote:
->> ?This patch adds support for the sun8iw3 thermal sensor on
->> ?Allwinner A23/33 SoCs.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->
-> The IP is awfully similar to the A31's, which already has a driver
-> (drivers/input/touchscreen/sun4i-ts.c).
->
-> There's no reason to add a new one here.
->
-> Thanks,
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/acpi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The reason for a dedicate driver is:
-1. This IP have only thermal function, so it's not suitable to use a driver at drivers/input/touchscreen/.
-2. Control Register are quite different.
-3. This IP uses AUDIO PLL (PLL2) as its clock!
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 1358fb7d7a68..d74275c0f374 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
+ config ACPI_PROCESSOR
+ 	tristate "Processor"
+ 	depends on X86 || IA64 || ARM64
+-	select ACPI_PROCESSOR_IDLE if X86 || IA64
++	select ACPI_PROCESSOR_IDLE
+ 	select ACPI_CPU_FREQ_PSS if X86 || IA64
+ 	default y
+ 	help
+-- 
+2.7.4
