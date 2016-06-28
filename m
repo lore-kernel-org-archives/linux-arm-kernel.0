@@ -1,84 +1,81 @@
-From: andi@etezian.org (Andi Shyti)
-Date: Wed, 29 Jun 2016 01:09:22 +0900
-Subject: [PATCH 1/2] clk: clk-rk3*: set CLK_IS_CRITICAL flag to critical
- clocks
-In-Reply-To: <29356205.Gk5k6xKH6K@phil>
-References: <1467125137-25999-1-git-send-email-andi@etezian.org>
- <1467125137-25999-2-git-send-email-andi@etezian.org>
- <29356205.Gk5k6xKH6K@phil>
-Message-ID: <20160628160922.GN424@jack.zhora.eu>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Jun 2016 18:12:22 +0200
+Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
+ overlapping regions
+In-Reply-To: <20160628160528.GG4585@e104818-lin.cambridge.arm.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
+ <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
+ <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
+ <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_3uKgFtvMryROwTMeGs=uXYU-OPrUC6LaNQiAKP=PZ3Q@mail.gmail.com>
+ <20160628160528.GG4585@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu8RxZ2xpDC0pudewHu9Z5YTL8XbcjSPvGasRUQbhqm5qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On 28 June 2016 at 18:05, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> (Restarting the thread before I forget the entire discussion)
+>
+> On Mon, Jun 06, 2016 at 11:18:14PM +0200, Ard Biesheuvel wrote:
+>> >> > On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> >> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+>> >> > > index 78f52488f9ff..0d5753c31c7f 100644
+>> >> > > --- a/arch/arm64/kernel/efi.c
+>> >> > > +++ b/arch/arm64/kernel/efi.c
+>> >> > > @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
+>> >> > >  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+>> >> > >  {
+>> >> > >         pteval_t prot_val = create_mapping_protection(md);
+>> >> > > +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
+>> >> > > +       efi_memory_desc_t *next = md;
+>> >> > >
+>> >> > > -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+>> >> > > -                          md->num_pages << EFI_PAGE_SHIFT,
+>> >> > > -                          __pgprot(prot_val | PTE_NG));
+>> >> > > +       /*
+>> >> > > +        * Search for the next EFI runtime map and check for any overlap with
+>> >> > > +        * the current map when aligned to PAGE_SIZE. In such case, defer
+>> >> > > +        * mapping the end of the current range until the next
+>> >> > > +        * efi_create_mapping() call.
+>> >> > > +        */
+>> >> > > +       for_each_efi_memory_desc_continue(next) {
+>> >> > > +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
+>> >> > > +                       continue;
+>> >> > > +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
+>> >> > > +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
+> [...]
+>> Another thing I failed to mention is that the new Memory Attributes
+>> table support may map all of the RuntimeServicesCode regions a second
+>> time, but with a higher granularity, using RO for .text and .rodata
+>> and NX for .data and .bss (and the PE/COFF header).
+>
+> Can this not be done in a single go without multiple passes? That's what
+> we did for the core arm64 code, the only one left being EFI run-time
+> mappings.
+>
 
-> >  			RK2928_CLKSEL_CON(0), 14, 2, MFLAGS, 8, 5, DFLAGS),
-> > -	GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_src", CLK_IGNORE_UNUSED,
-> > +	GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_src",
-> > +			CLK_IS_CRITICAL | CLK_IGNORE_UNUSED,
-> 
-> - you'll never need both critical and ignore_unused
+Well, we probably could, but it is far from trivial.
 
-Indeed I was unsure whether I should remove the
-CLK_IGNORE_UNUSED, but then I decided to leave it because that's
-basically what the driver is currently doing. Thanks!
+>> Due to the higher
+>> granularity, regions that were mapped using the contiguous bit the
+>> first time around may be split into smaller regions. Your current code
+>> does not address that case.
+>
+> If the above doesn't work, the only solution would be to permanently map
+> these ranges as individual pages, no large blocks.
+>
 
-> Happens in some more cases below, but otherwise looks ok ... as written in 
-> the cover-letter I'm just still trying to make up my mind if it's worth 
-> waiting for the handoff mechanism.
+That is not unreasonable, since regions >2MB are unusual.
 
-You mean something similar (*)?
+>> I wonder how the PT debug code deals with this, and whether there is
+>> anything we can reuse to inhibit cont and block mappings
+>
+> Do you mean DEBUG_PAGEALLOC? When enabled, it defaults to single page
+> mappings for the kernel, no sections.
+>
 
-Thanks,
-Andi
-
-(*)
-
-@@ -2403,7 +2407,7 @@ static int __clk_core_init(struct clk_core *core)
-        if (core->ops->init)
-                core->ops->init(core->hw);
- 
--       if (core->flags & CLK_IS_CRITICAL) {
-+       if (core->flags & CLK_IS_CRITICAL || core->flags & CLK_HANDOFF) {
-                unsigned long flags;
- 
-                clk_core_prepare(core);
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 89cc700..5698ef1 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -201,11 +201,19 @@ struct clk *clk_get(struct device *dev, const char *con_id)
- 
-        if (dev) {
-                clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
--               if (!IS_ERR(clk) || PTR_ERR(clk) == -EPROBE_DEFER)
-+               if (!IS_ERR(clk)) {
-+                       clk->clk_core->flags &= ~CLK_HANDOFF;
-+                       return clk;
-+               }
-+               if (PTR_ERR(clk) == -EPROBE_DEFER)
-                        return clk;
-        }
- 
--       return clk_get_sys(dev_id, con_id);
-+       clk = clk_get_sys(dev_id, con_id);
-+       if (!IS_ERR(clk))
-+               clk->clk_core->flags &= ~CLK_HANDOFF;
-+
-+       return clk;
- }
- EXPORT_SYMBOL(clk_get);
-
- 
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index fb39d5a..39684ec 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -33,6 +33,7 @@
- #define CLK_RECALC_NEW_RATES   BIT(9) /* recalc rates after notifications */
- #define CLK_SET_RATE_UNGATE    BIT(10) /* clock needs to run to set rate */
- #define CLK_IS_CRITICAL                BIT(11) /* do not gate, ever */
-+#define CLK_HANDOFF         BIT(12) /* do not gate, ever */
- 
- struct clk;
- struct clk_hw;
+Indeed. So we could reuse the logic that imposes that to prevent
+creating regions that are subject to splitting later on. That way,
+there is no need to worry about the code running twice in case the
+Memory Attributes table is exposed by the firmware.
