@@ -1,66 +1,67 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Tue, 28 Jun 2016 09:12:55 -0700
-Subject: [RFC PATCH v4 3/5] PCI: Check platform specific ECAM quirks
-In-Reply-To: <577275EA.7010002@codeaurora.org>
-References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
- <1467100442-28078-4-git-send-email-tn@semihalf.com>
- <577275EA.7010002@codeaurora.org>
-Message-ID: <CADaLNDkhPZuG7UJ4SK_j5v_nXbd782Q17LAcXduG0uEObaFF=g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 28 Jun 2016 12:13:43 -0400 (EDT)
+Subject: [RFC PATCH 0/4] ARM: remove big.LITTLE switcher support
+In-Reply-To: <8154264.t0CjdgHDuf@amdc1976>
+References: <1467026770-5699-1-git-send-email-b.zolnierkie@samsung.com>
+ <alpine.LFD.2.20.1606271540000.2550@knanqh.ubzr>
+ <8154264.t0CjdgHDuf@amdc1976>
+Message-ID: <alpine.LFD.2.20.1606281157190.24439@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 6:04 AM, Christopher Covington
-<cov@codeaurora.org> wrote:
-> Hi Tomasz,
->
-> On 06/28/2016 03:54 AM, Tomasz Nowicki wrote:
->
->> diff --git a/drivers/pci/host/mcfg-quirks.c b/drivers/pci/host/mcfg-quirks.c
->> new file mode 100644
->> index 0000000..fb2b184
->> --- /dev/null
->> +++ b/drivers/pci/host/mcfg-quirks.c
->> @@ -0,0 +1,88 @@
->
->> +static bool pci_mcfg_fixup_match(struct pci_cfg_fixup *f,
->> +                              struct acpi_table_header *mcfg_header)
->> +{
->> +     int olen = min_t(u8, strlen(f->oem_id), ACPI_OEM_ID_SIZE);
->> +     int tlen = min_t(u8, strlen(f->oem_table_id), ACPI_OEM_TABLE_ID_SIZE);
->> +
->> +     return (!strncmp(f->oem_id, mcfg_header->oem_id, olen) &&
->> +             !strncmp(f->oem_table_id, mcfg_header->oem_table_id, tlen) &&
->> +             f->oem_revision == mcfg_header->oem_revision);
->> +}
->
-> Ard's comments on v3 included:
->
-> "... exact OEM table/rev id matches ..."
-> "... substring match ... out of the question ..."
->
-> I originally advocated the substring match approach because
-> space-padding the input strings was unfamiliar. But given that some
-> vendors have a "PLAT    " then "PLAT2   " naming scheme, where the
-> former needs quirks and the latter (hopefully) doesn't, I agree with Ard
-> and think space-padded inputs is the better way to go. Sorry for the
-> lack of foresight.
+On Tue, 28 Jun 2016, Bartlomiej Zolnierkiewicz wrote:
 
-I think having OEM Table ID as "PLAT   " and then "PLAT2  " (the the
-next version of the SoC)
-is common. So yes, matching full string is better as we can use "PLAT2  "
-in MCFG table and not worry about the "PLAT" sub-string match causes the quirk
-to be applied unintentionally.
+> 
+> Hi,
+> 
+> On Monday, June 27, 2016 03:49:44 PM Nicolas Pitre wrote:
+> > On Mon, 27 Jun 2016, Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > > Hi,
+> > > 
+> > > It seems that in mainline kernel big.LITTLE switcher support
+> > > may be usable only on ARM Versatile Express TC2 platform
+> > > (but even this platform doesn't enable it in its defconfig).
+> > 
+> > It is also used on some Samsung targets.
+> 
+> Could you please explain this more?  AFAIK mainline never
+> had working IKS solution (big.LITTLE switcher support +
+> arm_big_little CPUfreq driver support) on any Samsung SoC.
 
->
-> (I'm happy to rip it out, test, and communicate the delta however you'd
-> prefer--just let me know.)
->
-> Regards,
-> Cov
->
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-Regards,
-Duc Dang.
+You might be right about mainline.  Out-of-tree support for some Samsung 
+targets certainly exists though.
+
+> > > The following patchset removes big.LITTLE switcher support
+> > > (from both ARM core and arm_big_little CPUfreq driver) in
+> > > favor of using HMP.
+> > > 
+> > > Since HMP support at scheduler level is not yet merged this
+> > > patchset is probably premature and thus is marked as RFC.
+> > 
+> > It is premature indeed.
+> > 
+> > And before this is removed, comparison with power/performance benchmark 
+> > numbers will have to be provided as well to justify this removal.  At 
+> > the moment there is nothing else in mainline that can achieve what this 
+> > code does.
+> 
+> I agree given that this code has real users and according
+> to my research on mainline kernel it seems that the IKS
+> functionality (bL switcher core code together with
+> arm_bit_little CPUfreq driver support) is usable only on
+> TC2 and even this platform doesn't enable it by default.
+
+It is not enabled by default because it used to be experimental. And 
+given that it pairs two A15's with two A7's leaving the third A7 
+completely unused, some people didn't consider a good default for 
+showing the complete platform capacity.  
+
+But if you want predictable scheduler results right now with mainline on 
+a b.L system then IKS is the only available solution. It also provides a 
+good reference to do performance/power comparison against any solution 
+meant to replace it. Enabling it by default on TC2 might not be such a 
+bad idea at this point.  I certainly have it enabled in my local config.
+
+
+Nicolas
