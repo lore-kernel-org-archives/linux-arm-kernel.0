@@ -1,64 +1,114 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 28 Jun 2016 18:00:53 +0530
-Subject: [PATCH v6 5/6] mfd: tps65218: Use mfd_add_devices instead of
- of_platform_populate
-In-Reply-To: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
-References: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1467117054-12943-6-git-send-email-j-keerthy@ti.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 28 Jun 2016 13:32:14 +0100
+Subject: [PATCH v7 01/17] KVM: arm/arm64: move redistributor kvm_io_devices
+In-Reply-To: <20160628123230.26255-1-andre.przywara@arm.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+Message-ID: <20160628123230.26255-2-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mfd_add_devices enables parsing device tree nodes without compatibles
-for regulators and gpio modules. Replace of_platform_populate with
-mfd_add_devices. mfd_cell currently is populated with regulators,
-gpio and powerbutton.
+Logically a GICv3 redistributor is assigned to a (v)CPU, so we should
+aim to keep redistributor related variables out of our struct vgic_dist.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Keerthy <j-keerthy@ti.com>
+Let's start by replacing the redistributor related kvm_io_device array
+with two members in our existing struct vgic_cpu, which are naturally
+per-VCPU and thus don't require any allocation / freeing.
+So apart from the better fit with the redistributor design this saves
+some code as well.
+
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
+ include/kvm/vgic/vgic.h          |  8 +++++++-
+ virt/kvm/arm/vgic/vgic-init.c    |  1 -
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 22 ++++++++--------------
+ 3 files changed, 15 insertions(+), 16 deletions(-)
 
-Changes in v4:
-
-  * Regrouped the mfd cells better.
-
- drivers/mfd/tps65218.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-index 9bca1b1..13834a0 100644
---- a/drivers/mfd/tps65218.c
-+++ b/drivers/mfd/tps65218.c
-@@ -33,6 +33,18 @@
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 3fbd175..2f26f37 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -145,7 +145,6 @@ struct vgic_dist {
+ 	struct vgic_irq		*spis;
  
- #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+ 	struct vgic_io_device	dist_iodev;
+-	struct vgic_io_device	*redist_iodevs;
+ };
  
-+static const struct mfd_cell tps65218_cells[] = {
-+	{
-+		.name = "tps65218-pwrbutton",
-+		.of_compatible = "ti,tps65218-pwrbutton",
-+	},
-+	{
-+		.name = "tps65218-gpio",
-+		.of_compatible = "ti,tps65218-gpio",
-+	},
-+	{ .name = "tps65218-regulator", },
-+};
+ struct vgic_v2_cpu_if {
+@@ -193,6 +192,13 @@ struct vgic_cpu {
+ 	struct list_head ap_list_head;
+ 
+ 	u64 live_lrs;
 +
- /**
-  * tps65218_reg_write: Write a single tps65218 register.
-  *
-@@ -245,8 +257,10 @@ static int tps65218_probe(struct i2c_client *client,
++	/*
++	 * Members below are used with GICv3 emulation only and represent
++	 * parts of the redistributor.
++	 */
++	struct vgic_io_device	rd_iodev;
++	struct vgic_io_device	sgi_iodev;
+ };
  
- 	tps->rev = chipid & TPS65218_CHIPID_REV_MASK;
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index a1442f7..90cae48 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -271,7 +271,6 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+ 	dist->initialized = false;
  
--	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
--				   &client->dev);
-+	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
-+			      ARRAY_SIZE(tps65218_cells), NULL, 0,
-+			      regmap_irq_get_domain(tps->irq_data));
+ 	kfree(dist->spis);
+-	kfree(dist->redist_iodevs);
+ 	dist->nr_spis = 0;
+ 
+ 	mutex_unlock(&kvm->lock);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index a0c515a..fc7b6c9 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -285,21 +285,14 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
+ 
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+ {
+-	int nr_vcpus = atomic_read(&kvm->online_vcpus);
+ 	struct kvm_vcpu *vcpu;
+-	struct vgic_io_device *devices;
+ 	int c, ret = 0;
+ 
+-	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
+-			  GFP_KERNEL);
+-	if (!devices)
+-		return -ENOMEM;
+-
+ 	kvm_for_each_vcpu(c, vcpu, kvm) {
+ 		gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
+ 		gpa_t sgi_base = rd_base + SZ_64K;
+-		struct vgic_io_device *rd_dev = &devices[c * 2];
+-		struct vgic_io_device *sgi_dev = &devices[c * 2 + 1];
++		struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
++		struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
+ 
+ 		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
+ 		rd_dev->base_addr = rd_base;
+@@ -335,14 +328,15 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+ 	if (ret) {
+ 		/* The current c failed, so we start with the previous one. */
+ 		for (c--; c >= 0; c--) {
++			struct vgic_cpu *vgic_cpu;
 +
- 	if (ret < 0)
- 		goto err_irq;
++			vcpu = kvm_get_vcpu(kvm, c);
++			vgic_cpu = &vcpu->arch.vgic_cpu;
+ 			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+-						  &devices[c * 2].dev);
++						  &vgic_cpu->rd_iodev.dev);
+ 			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+-						  &devices[c * 2 + 1].dev);
++						  &vgic_cpu->sgi_iodev.dev);
+ 		}
+-		kfree(devices);
+-	} else {
+-		kvm->arch.vgic.redist_iodevs = devices;
+ 	}
  
+ 	return ret;
 -- 
-1.9.1
+2.9.0
