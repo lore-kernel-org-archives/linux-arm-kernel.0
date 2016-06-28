@@ -1,22 +1,16 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:31:00 +0200
-Subject: [PATCH 41/92] clocksource/drivers/sun4i: Convert init function to
- return error
+Date: Tue, 28 Jun 2016 12:31:04 +0200
+Subject: [PATCH 45/92] clocksource/drivers/time-efm32: Convert init function
+ to return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-41-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-45-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The init functions do not return any error. They behave as the following:
-
-  - panic, thus leading to a kernel crash while another timer may work and
-       make the system boot up correctly
-
-  or
-
-  - print an error and let the caller unaware if the state of the system
+The init functions do not return any error and let the caller unaware of
+the state of the system.
 
 Change that by converting the init functions to return an error conforming
 to the CLOCKSOURCE_OF_RET prototype.
@@ -26,93 +20,66 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/clocksource/sun4i_timer.c | 45 ++++++++++++++++++++++++++++-----------
- 1 file changed, 32 insertions(+), 13 deletions(-)
+ drivers/clocksource/time-efm32.c | 21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 6f3719d..4453730 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -146,7 +146,7 @@ static u64 notrace sun4i_timer_sched_read(void)
- 	return ~readl(timer_base + TIMER_CNTVAL_REG(1));
- }
+diff --git a/drivers/clocksource/time-efm32.c b/drivers/clocksource/time-efm32.c
+index b06e4c2..6e2f79f 100644
+--- a/drivers/clocksource/time-efm32.c
++++ b/drivers/clocksource/time-efm32.c
+@@ -233,10 +233,15 @@ static int __init efm32_clockevent_init(struct device_node *np)
+ 					DIV_ROUND_CLOSEST(rate, 1024),
+ 					0xf, 0xffff);
  
--static void __init sun4i_timer_init(struct device_node *node)
-+static int __init sun4i_timer_init(struct device_node *node)
+-	setup_irq(irq, &efm32_clock_event_irq);
++	ret = setup_irq(irq, &efm32_clock_event_irq);
++	if (ret) {
++		pr_err("Failed setup irq");
++		goto err_setup_irq;
++	}
+ 
+ 	return 0;
+ 
++err_setup_irq:
+ err_get_irq:
+ 
+ 	iounmap(base);
+@@ -255,16 +260,16 @@ err_clk_get:
+  * This function asserts that we have exactly one clocksource and one
+  * clock_event_device in the end.
+  */
+-static void __init efm32_timer_init(struct device_node *np)
++static int __init efm32_timer_init(struct device_node *np)
  {
- 	unsigned long rate = 0;
- 	struct clk *clk;
-@@ -154,17 +154,28 @@ static void __init sun4i_timer_init(struct device_node *node)
- 	u32 val;
+ 	static int has_clocksource, has_clockevent;
+-	int ret;
++	int ret = 0;
  
- 	timer_base = of_iomap(node, 0);
--	if (!timer_base)
--		panic("Can't map registers");
-+	if (!timer_base) {
-+		pr_crit("Can't map registers");
-+		return -ENXIO;
-+	}
+ 	if (!has_clocksource) {
+ 		ret = efm32_clocksource_init(np);
+ 		if (!ret) {
+ 			has_clocksource = 1;
+-			return;
++			return 0;
+ 		}
+ 	}
  
- 	irq = irq_of_parse_and_map(node, 0);
--	if (irq <= 0)
--		panic("Can't parse IRQ");
-+	if (irq <= 0) {
-+		pr_crit("Can't parse IRQ");
-+		return -EINVAL;
-+	}
- 
- 	clk = of_clk_get(node, 0);
--	if (IS_ERR(clk))
--		panic("Can't get timer clock");
--	clk_prepare_enable(clk);
-+	if (IS_ERR(clk)) {
-+		pr_crit("Can't get timer clock");
-+		return PTR_ERR(clk);
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("Failed to prepare clock");
-+		return ret;
-+	}
- 
- 	rate = clk_get_rate(clk);
- 
-@@ -182,8 +193,12 @@ static void __init sun4i_timer_init(struct device_node *node)
- 	    of_machine_is_compatible("allwinner,sun5i-a10s"))
- 		sched_clock_register(sun4i_timer_sched_read, 32, rate);
- 
--	clocksource_mmio_init(timer_base + TIMER_CNTVAL_REG(1), node->name,
--			      rate, 350, 32, clocksource_mmio_readl_down);
-+	ret = clocksource_mmio_init(timer_base + TIMER_CNTVAL_REG(1), node->name,
-+				    rate, 350, 32, clocksource_mmio_readl_down);
-+	if (ret) {
-+		pr_err("Failed to register clocksource");
-+		return ret;
-+	}
- 
- 	ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
- 
-@@ -200,12 +215,16 @@ static void __init sun4i_timer_init(struct device_node *node)
- 					TIMER_SYNC_TICKS, 0xffffffff);
- 
- 	ret = setup_irq(irq, &sun4i_timer_irq);
--	if (ret)
--		pr_warn("failed to setup irq %d\n", irq);
-+	if (ret) {
-+		pr_err("failed to setup irq %d\n", irq);
-+		return ret;
-+	}
- 
- 	/* Enable timer0 interrupt */
- 	val = readl(timer_base + TIMER_IRQ_EN_REG);
- 	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
+@@ -272,9 +277,11 @@ static void __init efm32_timer_init(struct device_node *np)
+ 		ret = efm32_clockevent_init(np);
+ 		if (!ret) {
+ 			has_clockevent = 1;
+-			return;
++			return 0;
+ 		}
+ 	}
 +
 +	return ret;
  }
--CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
-+CLOCKSOURCE_OF_DECLARE_RET(sun4i, "allwinner,sun4i-a10-timer",
- 		       sun4i_timer_init);
+-CLOCKSOURCE_OF_DECLARE(efm32compat, "efm32,timer", efm32_timer_init);
+-CLOCKSOURCE_OF_DECLARE(efm32, "energymicro,efm32-timer", efm32_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(efm32compat, "efm32,timer", efm32_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(efm32, "energymicro,efm32-timer", efm32_timer_init);
 -- 
 1.9.1
