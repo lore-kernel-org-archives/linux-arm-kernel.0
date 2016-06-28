@@ -1,83 +1,50 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:30:24 +0200
-Subject: [PATCH 05/92] dt-bindings: Document rk3399 rk-timer bindings
+Date: Tue, 28 Jun 2016 12:30:25 +0200
+Subject: [PATCH 06/92] clocksource/drivers/rockchip: Add the dynamic irq flag
+ to the timer
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-5-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-6-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Huang Tao <huangtao@rock-chips.com>
+From: "Huang, Tao" <huangtao@rock-chips.com>
 
-Add a compatible string for rk3399 SoC because the timer is slightly different
-from the older SoCs. So rename the file name from rockchip,rk3288-timer.txt to
-rockchip,rk-timer.txt and clarify rockchip,rk3288-timer supported SoCs.
+The rockchip timer is a broadcast timer. Add the CLOCK_EVT_FEAT_DYNIRQ flag
+and set the cpumask to all possible cpus to save power by avoiding
+unnecessary wakeups and IPIs.
 
 Signed-off-by: Huang Tao <huangtao@rock-chips.com>
-Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- .../devicetree/bindings/timer/rockchip,rk-timer.txt  | 20 ++++++++++++++++++++
- .../bindings/timer/rockchip,rk3288-timer.txt         | 18 ------------------
- 2 files changed, 20 insertions(+), 18 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
- delete mode 100644 Documentation/devicetree/bindings/timer/rockchip,rk3288-timer.txt
+ drivers/clocksource/rockchip_timer.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-new file mode 100644
-index 0000000..a41b184
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-@@ -0,0 +1,20 @@
-+Rockchip rk timer
-+
-+Required properties:
-+- compatible: shall be one of:
-+  "rockchip,rk3288-timer" - for rk3066, rk3036, rk3188, rk322x, rk3288, rk3368
-+  "rockchip,rk3399-timer" - for rk3399
-+- reg: base address of the timer register starting with TIMERS CONTROL register
-+- interrupts: should contain the interrupts for Timer0
-+- clocks : must contain an entry for each entry in clock-names
-+- clock-names : must include the following entries:
-+  "timer", "pclk"
-+
-+Example:
-+	timer: timer at ff810000 {
-+		compatible = "rockchip,rk3288-timer";
-+		reg = <0xff810000 0x20>;
-+		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&xin24m>, <&cru PCLK_TIMER>;
-+		clock-names = "timer", "pclk";
-+	};
-diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk3288-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk3288-timer.txt
-deleted file mode 100644
-index 87f0b00..0000000
---- a/Documentation/devicetree/bindings/timer/rockchip,rk3288-timer.txt
-+++ /dev/null
-@@ -1,18 +0,0 @@
--Rockchip rk3288 timer
--
--Required properties:
--- compatible: shall be "rockchip,rk3288-timer"
--- reg: base address of the timer register starting with TIMERS CONTROL register
--- interrupts: should contain the interrupts for Timer0
--- clocks : must contain an entry for each entry in clock-names
--- clock-names : must include the following entries:
--  "timer", "pclk"
--
--Example:
--	timer: timer at ff810000 {
--		compatible = "rockchip,rk3288-timer";
--		reg = <0xff810000 0x20>;
--		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&xin24m>, <&cru PCLK_TIMER>;
--		clock-names = "timer", "pclk";
--	};
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index b991b28..b510863 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -150,12 +150,13 @@ static void __init rk_timer_init(struct device_node *np)
+ 	}
+ 
+ 	ce->name = TIMER_NAME;
+-	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
++	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
++		       CLOCK_EVT_FEAT_DYNIRQ;
+ 	ce->set_next_event = rk_timer_set_next_event;
+ 	ce->set_state_shutdown = rk_timer_shutdown;
+ 	ce->set_state_periodic = rk_timer_set_periodic;
+ 	ce->irq = irq;
+-	ce->cpumask = cpumask_of(0);
++	ce->cpumask = cpu_possible_mask;
+ 	ce->rating = 250;
+ 
+ 	rk_timer_interrupt_clear(ce);
 -- 
 1.9.1
