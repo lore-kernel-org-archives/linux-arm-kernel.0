@@ -1,31 +1,58 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 28 Jun 2016 18:03:06 +0100
-Subject: [PATCH 1/3] arm64: dts: juno: add coresight support
-In-Reply-To: <57692488.2030507@arm.com>
-References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
- <1465228765-14038-2-git-send-email-sudeep.holla@arm.com>
- <CAOesGMjQNEOcmYpUAxUxBJLyUYZQuRKK48a31Ys9LuTJFWqMFA@mail.gmail.com>
- <57692488.2030507@arm.com>
-Message-ID: <5772ADCA.2070607@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 28 Jun 2016 10:04:41 -0700
+Subject: [PATCH v6 3/6] input: tps65218-pwrbutton: Add platform_device_id
+ table
+In-Reply-To: <1467117054-12943-4-git-send-email-j-keerthy@ti.com>
+References: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
+ <1467117054-12943-4-git-send-email-j-keerthy@ti.com>
+Message-ID: <20160628170441.GA13114@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Tue, Jun 28, 2016 at 06:00:51PM +0530, Keerthy wrote:
+> platform_device_id table is needed for adding the tps65218-pwrbutton
+> module to the mfd_cell array.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
 
-On 21/06/16 12:27, Sudeep Holla wrote:
->
->
-> On 21/06/16 06:41, Olof Johansson wrote:
->> Hi,
->>
->> Some nits below.
->>
->
-> My bad, I blindly copy-pasted it from vexpress TC2 platform.
->
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Any further comments on the replies so far ?
+> ---
+> 
+> Changes in v4:
+> 
+>   * Added the missing ';' for struct platform_device_id.
+> 
+>  drivers/input/misc/tps65218-pwrbutton.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
+> index 2bba8de..33d141a 100644
+> --- a/drivers/input/misc/tps65218-pwrbutton.c
+> +++ b/drivers/input/misc/tps65218-pwrbutton.c
+> @@ -113,12 +113,19 @@ static const struct of_device_id of_tps65218_pwr_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
+>  
+> +static const struct platform_device_id tps65218_pwrbtn_id_table[] = {
+> +	{ "tps65218-pwrbutton", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(platform, tps65218_pwrbtn_id_table);
+> +
+>  static struct platform_driver tps65218_pwron_driver = {
+>  	.probe	= tps65218_pwron_probe,
+>  	.driver	= {
+>  		.name	= "tps65218_pwrbutton",
+>  		.of_match_table = of_tps65218_pwr_match,
+>  	},
+> +	.id_table = tps65218_pwrbtn_id_table,
+>  };
+>  module_platform_driver(tps65218_pwron_driver);
+>  
+> -- 
+> 1.9.1
+> 
 
 -- 
-Regards,
-Sudeep
+Dmitry
