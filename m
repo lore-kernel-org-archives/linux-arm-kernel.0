@@ -1,67 +1,43 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 28 Jun 2016 15:51:50 +0100
-Subject: [PATCH v3 7/7] Revert "arm64: hibernate: Refuse to hibernate if the
- boot cpu is offline"
-In-Reply-To: <1467125510-18758-1-git-send-email-james.morse@arm.com>
-References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
-Message-ID: <1467125510-18758-8-git-send-email-james.morse@arm.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 28 Jun 2016 17:04:17 +0200
+Subject: [PATCH v3 1/2] ARM: tango: add HOTPLUG_CPU support
+In-Reply-To: <57726DE0.8090308@arm.com>
+References: <57726597.8030501@sigmadesigns.com>
+ <577266AD.8000006@sigmadesigns.com> <57726DE0.8090308@arm.com>
+Message-ID: <577291F1.8060105@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we use the MPIDR to resume on the same CPU that we hibernated on,
-we no longer need to refuse to hibernate if the boot cpu is offline. (Which
-we can't possibly know if kexec causes logical CPUs to be renumbered).
+On 28/06/2016 14:30, Robin Murphy wrote:
 
-This reverts commit 1fe492ce6482b77807b25d29690a48c46456beee.
+> On 28/06/16 12:59, Marc Gonzalez wrote:
+>
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +/*
+>> + * cpu_kill() and cpu_die() run concurrently on different cores.
+>> + * Firmware will only "kill" a core once it has properly "died".
+>> + * Keep trying to kill a core until the operation succeeds, but
+>> + * sleep between tries to give the core time to die.
+>> + */
+>> +static int tango_cpu_kill(unsigned int cpu)
+>> +{
+>> +	do {
+>> +		msleep(10);
+>> +	} while (tango_aux_core_kill(cpu) != 0);
+> 
+> Does the firmware guarantee that this will succeed (or at least report
+> success) in finite time, regardless of how messed up the system might
+> be? I'd imagine this should probably have either a timeout or a comment
+> clarifying why it doesn't need a timeout.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/kernel/hibernate.c | 26 --------------------------
- 1 file changed, 26 deletions(-)
+Good point.
 
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index cbcc8243575e..c1f1b509b177 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -18,7 +18,6 @@
- #include <linux/cpu.h>
- #include <linux/kvm_host.h>
- #include <linux/mm.h>
--#include <linux/notifier.h>
- #include <linux/pm.h>
- #include <linux/sched.h>
- #include <linux/suspend.h>
-@@ -519,31 +518,6 @@ out:
- 	return rc;
- }
- 
--static int check_boot_cpu_online_pm_callback(struct notifier_block *nb,
--					     unsigned long action, void *ptr)
--{
--	if (action == PM_HIBERNATION_PREPARE &&
--	     cpumask_first(cpu_online_mask) != 0) {
--		pr_warn("CPU0 is offline.\n");
--		return notifier_from_errno(-ENODEV);
--	}
--
--	return NOTIFY_OK;
--}
--
--static int __init check_boot_cpu_online_init(void)
--{
--	/*
--	 * Set this pm_notifier callback with a lower priority than
--	 * cpu_hotplug_pm_callback, so that cpu_hotplug_pm_callback will be
--	 * called earlier to disable cpu hotplug before the cpu online check.
--	 */
--	pm_notifier(check_boot_cpu_online_pm_callback, -INT_MAX);
--
--	return 0;
--}
--core_initcall(check_boot_cpu_online_init);
--
- int _arch_hibernation_disable_cpus(bool suspend)
- {
- 	int cpu, ret;
--- 
-2.8.0.rc3
+The FW allows only one thread at a time. If a thread is wedged inside
+the FW, no other thread can use the FW. In that situation, cpu0 would
+remain stuck inside tango_cpu_kill().
+
+Note, that if tango_cpu_kill() starts failing, then secondary cores
+will remain "zombies". So the system is mostly hosed anyway...
+Only cpu0 will be available.
+
+Regards.
