@@ -1,113 +1,75 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:30:26 +0200
-Subject: [PATCH 07/92] clocksource/drivers/rockchip: Add support for the
- rk3399 SoC
+Date: Tue, 28 Jun 2016 12:30:33 +0200
+Subject: [PATCH 14/92] clocksource/drivers/mtk_timer: Convert init function to
+ return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-7-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-14-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Huang, Tao" <huangtao@rock-chips.com>
+The init functions do not return any error. They behave as the following:
 
-The only difference between the rk3399 SoC and the other ones is the control
-register offset which is different.
+ - panic, thus leading to a kernel crash while another timer may work and
+   make the system boot up correctly
 
-Add a new field to store the control register address depending on the SoC
-and use it instead of the <base> + <control offset>.
+ or
 
-Signed-off-by: Huang Tao <huangtao@rock-chips.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+ - print an error and let the caller unaware if the state of the system
+
+Change that by converting the init functions to return an error conforming
+to the CLOCKSOURCE_OF_RET prototype.
+
+Proper error handling (rollback, errno value) will be changed later case
+by case, thus this change just return back an error or success in the init
+function.
+
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- drivers/clocksource/rockchip_timer.c | 31 ++++++++++++++++++++++++++-----
- 1 file changed, 26 insertions(+), 5 deletions(-)
+ drivers/clocksource/mtk_timer.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index b510863..a3f22b0 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -19,7 +19,8 @@
- 
- #define TIMER_LOAD_COUNT0	0x00
- #define TIMER_LOAD_COUNT1	0x04
--#define TIMER_CONTROL_REG	0x10
-+#define TIMER_CONTROL_REG3288	0x10
-+#define TIMER_CONTROL_REG3399	0x1c
- #define TIMER_INT_STATUS	0x18
- 
- #define TIMER_DISABLE		0x0
-@@ -31,6 +32,7 @@
- struct bc_timer {
- 	struct clock_event_device ce;
- 	void __iomem *base;
-+	void __iomem *ctrl;
- 	u32 freq;
- };
- 
-@@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct clock_event_device *ce)
- 	return rk_timer(ce)->base;
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index 7e583f8..432a2c0 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -181,7 +181,7 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
+ 			evt->gpt_base + GPT_IRQ_EN_REG);
  }
  
-+static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
-+{
-+	return rk_timer(ce)->ctrl;
-+}
-+
- static inline void rk_timer_disable(struct clock_event_device *ce)
+-static void __init mtk_timer_init(struct device_node *node)
++static int __init mtk_timer_init(struct device_node *node)
  {
--	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
-+	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
- }
+ 	struct mtk_clock_event_device *evt;
+ 	struct resource res;
+@@ -190,7 +190,7 @@ static void __init mtk_timer_init(struct device_node *node)
  
- static inline void rk_timer_enable(struct clock_event_device *ce, u32 flags)
- {
- 	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
--		       rk_base(ce) + TIMER_CONTROL_REG);
-+		       rk_ctrl(ce));
- }
+ 	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
+ 	if (!evt)
+-		return;
++		return -ENOMEM;
  
- static void rk_timer_update_counter(unsigned long cycles,
-@@ -106,7 +113,7 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
+ 	evt->dev.name = "mtk_tick";
+ 	evt->dev.rating = 300;
+@@ -248,7 +248,7 @@ static void __init mtk_timer_init(struct device_node *node)
  
--static void __init rk_timer_init(struct device_node *np)
-+static void __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- {
- 	struct clock_event_device *ce = &bc_timer.ce;
- 	struct clk *timer_clk;
-@@ -118,6 +125,7 @@ static void __init rk_timer_init(struct device_node *np)
- 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
- 		return;
- 	}
-+	bc_timer.ctrl = bc_timer.base + ctrl_reg;
+ 	mtk_timer_enable_irq(evt, GPT_CLK_EVT);
  
- 	pclk = of_clk_get_by_name(np, "pclk");
- 	if (IS_ERR(pclk)) {
-@@ -180,4 +188,17 @@ out_unmap:
- 	iounmap(bc_timer.base);
- }
+-	return;
++	return 0;
  
--CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
-+static void __init rk3288_timer_init(struct device_node *np)
-+{
-+	rk_timer_init(np, TIMER_CONTROL_REG3288);
-+}
+ err_clk_disable:
+ 	clk_disable_unprepare(clk);
+@@ -262,5 +262,7 @@ err_mem:
+ 	release_mem_region(res.start, resource_size(&res));
+ err_kzalloc:
+ 	kfree(evt);
 +
-+static void __init rk3399_timer_init(struct device_node *np)
-+{
-+	rk_timer_init(np, TIMER_CONTROL_REG3399);
-+}
-+
-+CLOCKSOURCE_OF_DECLARE(rk3288_timer, "rockchip,rk3288-timer",
-+		       rk3288_timer_init);
-+CLOCKSOURCE_OF_DECLARE(rk3399_timer, "rockchip,rk3399-timer",
-+		       rk3399_timer_init);
++	return -EINVAL;
+ }
+-CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
 -- 
 1.9.1
