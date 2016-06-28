@@ -1,135 +1,60 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Jun 2016 23:50:37 +0200
-Subject: [PATCH 12/15] arm: KVM: Simplify HYP init
-In-Reply-To: <1465297115-13091-13-git-send-email-marc.zyngier@arm.com>
-References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
- <1465297115-13091-13-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160628215037.GS26498@cbox>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 28 Jun 2016 14:58:16 -0700
+Subject: [PATCH 20/21] phy: Add support for Qualcomm's USB HSIC phy
+In-Reply-To: <57723A21.3060602@baylibre.com>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-21-stephen.boyd@linaro.org>
+ <57723A21.3060602@baylibre.com>
+Message-ID: <146715109651.31418.4819151138932336863@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 11:58:32AM +0100, Marc Zyngier wrote:
-> Just like for arm64, we can now make the HYP setup a lot simpler,
-> and we can now initialise it in one go (instead of the two
-> phases we currently have).
+Quoting Neil Armstrong (2016-06-28 01:49:37)
+> On 06/26/2016 09:28 AM, Stephen Boyd wrote:
+> > +     uphy->cal_sleep_clk = clk = devm_clk_get(&ulpi->dev, "cal_sleep");
+> > +     if (IS_ERR(clk))
+> > +             return PTR_ERR(clk);
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/kvm_host.h | 15 +++++--------
->  arch/arm/kvm/init.S             | 49 ++++++++---------------------------------
->  2 files changed, 14 insertions(+), 50 deletions(-)
+> Hi Stephen,
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 020f4eb..eafbfd5 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -250,18 +250,13 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
->  	 * code. The init code doesn't need to preserve these
->  	 * registers as r0-r3 are already callee saved according to
->  	 * the AAPCS.
-> -	 * Note that we slightly misuse the prototype by casing the
-> +	 * Note that we slightly misuse the prototype by casting the
->  	 * stack pointer to a void *.
-> -	 *
-> -	 * We don't have enough registers to perform the full init in
-> -	 * one go.  Install the boot PGD first, and then install the
-> -	 * runtime PGD, stack pointer and vectors. The PGDs are always
-> -	 * passed as the third argument, in order to be passed into
-> -	 * r2-r3 to the init code (yes, this is compliant with the
-> -	 * PCS!).
-> -	 */
->  
-> -	kvm_call_hyp(NULL, 0, boot_pgd_ptr);
-> +	 * The PGDs are always passed as the third argument, in order
-> +	 * to be passed into r2-r3 to the init code (yes, this is
-> +	 * compliant with the PCS!).
-> +	 */
->  
->  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
->  }
-> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-> index 1f9ae17..b82a99d 100644
-> --- a/arch/arm/kvm/init.S
-> +++ b/arch/arm/kvm/init.S
-> @@ -32,23 +32,13 @@
->   *       r2,r3 = Hypervisor pgd pointer
->   *
->   * The init scenario is:
-> - * - We jump in HYP with four parameters: boot HYP pgd, runtime HYP pgd,
-> - *   runtime stack, runtime vectors
-> - * - Enable the MMU with the boot pgd
-> - * - Jump to a target into the trampoline page (remember, this is the same
-> - *   physical page!)
-> - * - Now switch to the runtime pgd (same VA, and still the same physical
-> - *   page!)
-> + * - We jump in HYP with 3 parameters: runtime HYP pgd, runtime stack,
-> + *   runtime vectors
+> In the bindings the cal_sleep is marked optional, and I think should be since AFAIK
+> it's not present on MDM9615 for example.
 
-probably just call this HYP pgd, HYP stack, and HYP vectors now
+The cal_sleep clk is just the sleep clk then (should be a board clk in
+DT). Sometimes there's a gate in GCC to allow us to turn it off, other
+times there isn't. Either way, it's always wired there so I'll update
+the binding to say it isn't optional.
 
->   * - Invalidate TLBs
->   * - Set stack and vectors
-> + * - Setup the page tables
-> + * - Enable the MMU
->   * - Profit! (or eret, if you only care about the code).
-> - *
-> - * As we only have four registers available to pass parameters (and we
-> - * need six), we split the init in two phases:
-> - * - Phase 1: r0 = 0, r1 = 0, r2,r3 contain the boot PGD.
-> - *   Provides the basic HYP init, and enable the MMU.
-> - * - Phase 2: r0 = ToS, r1 = vectors, r2,r3 contain the runtime PGD.
-> - *   Switches to the runtime PGD, set stack and vectors.
->   */
->  
->  	.text
-> @@ -68,8 +58,11 @@ __kvm_hyp_init:
->  	W(b)	.
->  
->  __do_hyp_init:
-> -	cmp	r0, #0			@ We have a SP?
-> -	bne	phase2			@ Yes, second stage init
-> +	@ Set stack pointer
-> +	mov	sp, r0
-> +
-> +	@ Set HVBAR to point to the HYP vectors
-> +	mcr	p15, 4, r1, c12, c0, 0	@ HVBAR
->  
->  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
->  	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
-> @@ -114,33 +107,9 @@ __do_hyp_init:
->   THUMB(	ldr	r2, =(HSCTLR_M | HSCTLR_A | HSCTLR_TE)		)
->  	orr	r1, r1, r2
->  	orr	r0, r0, r1
-> -	isb
->  	mcr	p15, 4, r0, c1, c0, 0	@ HSCR
-> -
-> -	@ End of init phase-1
-> -	eret
-> -
-> -phase2:
-> -	@ Set stack pointer
-> -	mov	sp, r0
-> -
-> -	@ Set HVBAR to point to the HYP vectors
-> -	mcr	p15, 4, r1, c12, c0, 0	@ HVBAR
-> -
-> -	@ Jump to the trampoline page
-> -	ldr	r0, =TRAMPOLINE_VA
-> -	adr	r1, target
-> -	bfi	r0, r1, #0, #PAGE_SHIFT
-> -	ret	r0
-> -
-> -target:	@ We're now in the trampoline code, switch page tables
-> -	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
->  	isb
->  
-> -	@ Invalidate the old TLBs
-> -	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
-> -	dsb	ish
+> 
+> Also MDM9615 HSIC requires "core", "alt-core", "phy", "cal" and "iface" clocks.
+> I assume "core" can be attributed to the main chipidea node, but I think "alt-core" and "iface" should be also optionnal.
 
-how are we sure there are no stale entries in the TLB beyond the idmap
-region?  Did we take care of this during kernel boot?  What about
-hotplug/suspend stuff?
+Looking at the downstream sources I see this:
 
-Thanks,
--Christoffer
+        "core_clk"     -> usb_hsic_sys_clk
+        "iface_clk"    -> usb_hsic_p_clk
+        "alt_core_clk" -> usb_hsic_xcvr_clk
+
+        "cal_clk"      -> usb_hsic_hsio_cal_clk
+        "phy_clk"      -> usb_hsic_clk
+
+"core_clk" would be the core clk in ci_hdrc_msm. "iface_clk" would be
+the iface clk in ci_hdrc_msm. "cal_clk" would be the cal clk in the hsic
+phy and "phy_clk" would be the phy clk in the hsic phy.
+
+That leaves alt_core_clk which seems to be a clock that needs to be on
+during the reset assert/deassert and possibly for LPM and USB1.1 FS
+modes. Sometimes it's referred to as the "housekeeping" clk. Due to the
+way resets are done on msm8974 and later SoCs it looks like this clk was
+removed. I can make this an optional clk in the ci_hdrc_msm driver, or
+we can have two versions of the ci_hdrc_msm compatible string, one for a
+device that has the housekeeping clk and one for the device that
+doesn't.
+
+> 
+> Finally, it misses an optional reset line AFAIK mandatory on MDM9615.
+> 
+
+>From what I can tell downstream, all those clks point to the same bit 0
+of HSIC_RESET register? So there isn't any phy reset, just the chipidea
+controller wrapper reset bit, which should go into the wrapper node?
