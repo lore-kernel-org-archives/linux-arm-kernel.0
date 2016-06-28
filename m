@@ -1,44 +1,37 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 27 Jun 2016 21:34:54 -0700
-Subject: [RESEND PATCH 2/2] ARM: cache-l2x0.c: Do not clear bit 23 in prefetch
- control register
-Message-ID: <1467088494-1215-1-git-send-email-andrew.smirnov@gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 28 Jun 2016 12:48:08 +0800
+Subject: [PATCH v1 0/5] Enable graphic support on RK3288 EVB boards
+Message-ID: <1467089288-18355-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per L2C-310 TRM[1]:
 
-"... You can control this feature using bits 30,27 and 23 of the
-Prefetch Control Register. Bit 23 and 27 are only used if you set bit 30
-HIGH..."
+Hi Heiko,
 
-which means there is no need to clear bit 23 if bit 30 is being cleared.
+   This series just want to enable the graphic support on RK3288 EVB
+boards, most of them are DTS changes, but still have one change about
+new eDP panel support.
 
-[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246e/CJAJACBJ.html
+Thanks,
+- Yakir
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- arch/arm/mm/cache-l2x0.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 30e2012..12c1ba7 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -715,11 +715,8 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
- 	if (revision >= L310_CACHE_ID_RTL_R3P0 &&
- 	    revision < L310_CACHE_ID_RTL_R3P2) {
- 		u32 val = l2x0_saved_regs.prefetch_ctrl;
--		/* I don't think bit23 is required here... but iMX6 does so */
--		if (val & (L310_PREFETCH_CTRL_DBL_LINEFILL |
--			   L310_PREFETCH_CTRL_DBL_LINEFILL_INCR)) {
--			val &= ~(L310_PREFETCH_CTRL_DBL_LINEFILL |
--				 L310_PREFETCH_CTRL_DBL_LINEFILL_INCR);
-+		if (val & L310_PREFETCH_CTRL_DBL_LINEFILL) {
-+			val &= ~L310_PREFETCH_CTRL_DBL_LINEFILL;
- 			l2x0_saved_regs.prefetch_ctrl = val;
- 			errata[n++] = "752271";
- 		}
+Yakir Yang (5):
+  dt-bindings: Add support for LG LP079QX1-SP0V 1536x2048 panel
+  drm/panel: simple: Add support for LG LP079QX1-SP0V 1536x2048 panel
+  ARM: dts: rockchip: add eDP/panel display device nodes for rk3288-evb
+  ARM: dts: rockchip: add the panel power supply for rk3288-evb board
+    with act8846 pmu
+  ARM: dts: rockchip: add the panel power supply for rk3288-evb board
+    with rk808 pmu
+
+ .../bindings/display/panel/lg,lp079qx1-sp0v.txt    |  7 ++++
+ arch/arm/boot/dts/rk3288-evb-act8846.dts           |  4 ++
+ arch/arm/boot/dts/rk3288-evb-rk808.dts             |  4 ++
+ arch/arm/boot/dts/rk3288-evb.dtsi                  | 43 +++++++++++++++++++++-
+ drivers/gpu/drm/panel/panel-simple.c               | 26 +++++++++++++
+ 5 files changed, 83 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/lg,lp079qx1-sp0v.txt
+
 -- 
-2.5.5
+1.9.1
