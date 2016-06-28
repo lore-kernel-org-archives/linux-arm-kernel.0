@@ -1,156 +1,76 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Jun 2016 14:42:10 +0200
-Subject: [PATCH 05/15] arm64: KVM: Refactor kern_hyp_va/hyp_kern_va to
- deal with multiple offsets
-In-Reply-To: <1465297115-13091-6-git-send-email-marc.zyngier@arm.com>
-References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
- <1465297115-13091-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160628124210.GP26498@cbox>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jun 2016 20:46:16 +0800
+Subject: [GIT PULL 1/5] i.MX cleanup for 4.8
+Message-ID: <1467117980-20063-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 11:58:25AM +0100, Marc Zyngier wrote:
-> As we move towards a selectable HYP VA range, it is obvious that
-> we don't want to test a variable to find out if we need to use
-> the bottom VA range, the top VA range, or use the address as is
-> (for VHE).
-> 
-> Instead, we can expand our current helpers to generate the right
-> mask or nop with code patching. We default to using the top VA
-> space, with alternatives to switch to the bottom one or to nop
-> out the instructions.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_hyp.h | 27 ++++++++++++--------------
->  arch/arm64/include/asm/kvm_mmu.h | 42 +++++++++++++++++++++++++++++++++++++---
->  2 files changed, 51 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> index 61d01a9..dd4904b 100644
-> --- a/arch/arm64/include/asm/kvm_hyp.h
-> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> @@ -25,24 +25,21 @@
->  
->  #define __hyp_text __section(.hyp.text) notrace
->  
-> -static inline unsigned long __kern_hyp_va(unsigned long v)
-> -{
-> -	asm volatile(ALTERNATIVE("and %0, %0, %1",
-> -				 "nop",
-> -				 ARM64_HAS_VIRT_HOST_EXTN)
-> -		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
-> -	return v;
-> -}
-> -
-> -#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
-> -
->  static inline unsigned long __hyp_kern_va(unsigned long v)
->  {
-> -	asm volatile(ALTERNATIVE("orr %0, %0, %1",
-> -				 "nop",
-> +	u64 mask;
-> +
-> +	asm volatile(ALTERNATIVE("mov %0, %1",
-> +				 "mov %0, %2",
-> +				 ARM64_HYP_OFFSET_LOW)
-> +		     : "=r" (mask)
-> +		     : "i" (~HYP_PAGE_OFFSET_HIGH_MASK),
-> +		       "i" (~HYP_PAGE_OFFSET_LOW_MASK));
-> +	asm volatile(ALTERNATIVE("nop",
-> +				 "mov %0, xzr",
->  				 ARM64_HAS_VIRT_HOST_EXTN)
-> -		     : "+r" (v) : "i" (~HYP_PAGE_OFFSET_MASK));
-> -	return v;
-> +		     : "+r" (mask));
-> +	return v | mask;
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-If mask is ~HYP_PAGE_OFFSET_LOW_MASK how can you be sure that setting
-bit (VA_BITS - 1) is always the right thing to do to generate a kernel
-address?
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
-This is kind of what I asked before only now there's an extra bit not
-guaranteed by the architecture to be set for the kernel range, I
-think.
+are available in the git repository at:
 
->  }
->  
->  #define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index e45df1b..889330b 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -95,13 +95,33 @@
->  /*
->   * Convert a kernel VA into a HYP VA.
->   * reg: VA to be converted.
-> + *
-> + * This generates the following sequences:
-> + * - High mask:
-> + *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-> + *		nop
-> + * - Low mask:
-> + *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-> + *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
-> + * - VHE:
-> + *		nop
-> + *		nop
-> + *
-> + * The "low mask" version works because the mask is a strict subset of
-> + * the "high mask", hence performing the first mask for nothing.
-> + * Should be completely invisible on any viable CPU.
->   */
->  .macro kern_hyp_va	reg
-> -alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
-> -	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
-> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
-> +	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
->  alternative_else
->  	nop
->  alternative_endif
-> +alternative_if_not ARM64_HYP_OFFSET_LOW
-> +	nop
-> +alternative_else
-> +	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
-> +alternative_endif
->  .endm
->  
->  #else
-> @@ -112,7 +132,23 @@ alternative_endif
->  #include <asm/mmu_context.h>
->  #include <asm/pgtable.h>
->  
-> -#define KERN_TO_HYP(kva)	((unsigned long)kva & HYP_PAGE_OFFSET_MASK)
-> +static inline unsigned long __kern_hyp_va(unsigned long v)
-> +{
-> +	asm volatile(ALTERNATIVE("and %0, %0, %1",
-> +				 "nop",
-> +				 ARM64_HAS_VIRT_HOST_EXTN)
-> +		     : "+r" (v)
-> +		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
-> +	asm volatile(ALTERNATIVE("nop",
-> +				 "and %0, %0, %1",
-> +				 ARM64_HYP_OFFSET_LOW)
-> +		     : "+r" (v)
-> +		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-cleanup-4.8
 
-how is the second operation a nop for VHE? Is this because
-ARM64_HYP_OFFSET_LOW will never be set for VHE?
+for you to fetch changes up to 44af782227b3977b98be6967533b0d23add40eb4:
 
-> +	return v;
-> +}
-> +
-> +#define kern_hyp_va(v) 	(typeof(v))(__kern_hyp_va((unsigned long)(v)))
-> +#define KERN_TO_HYP(v)	kern_hyp_va(v)
+  ARM: imx: remove cpu_is_mx*() (2016-06-28 10:26:45 +0800)
 
-looks like there's room for some unification/cleanup here as well.
+----------------------------------------------------------------
+The i.MX cleanup for 4.8:
+ - A series from Arnd to clean up cpu_is_mx*() from i.MX platform
+ - A series from Andrey to clean up i.MX L2-cache code by using
+   core support as much as possible
+ - Remove the orphan header eukrea-baseboards.h from i.MX platform
+ - Remove boilerplate code from TZIC driver by using IRQCHIP_DECLARE
 
->  
->  /*
->   * We currently only support a 40bit IPA.
-> -- 
-> 2.1.4
-> 
+----------------------------------------------------------------
+Alexander Shiyan (2):
+      ARM: imx: Remove orphan header
+      ARM: imx: Use IRQCHIP_DECLARE for TZIC
 
-Thanks,
--Christoffer
+Andrey Smirnov (5):
+      ARM: i.MX: system.c: Convert goto to if statement
+      ARM: i.MX: system.c: Remove redundant errata 752271 code
+      ARM: i.MX: system.c: Replace magic numbers
+      ARM: i.MX: system.c: Tweak prefetch settings for performance
+      ARM: i.MX: Do not explicitly call l2x0_of_init()
+
+Arnd Bergmann (6):
+      ARM: imx: remove cpu_is_mx1 check
+      ARM: imx: deconstruct mxc_rnga initialization
+      ARM: imx: deconstruct mx3_idle
+      ARM: imx: rework mx27_pm_init() call
+      ARM: imx: remove last call to cpu_is_mx5*
+      ARM: imx: remove cpu_is_mx*()
+
+ arch/arm/mach-imx/Kconfig                     |   4 -
+ arch/arm/mach-imx/Makefile                    |   4 +-
+ arch/arm/mach-imx/common.h                    |   3 +-
+ arch/arm/mach-imx/cpu-imx5.c                  |   8 --
+ arch/arm/mach-imx/cpu.c                       |   2 -
+ arch/arm/mach-imx/devices/Kconfig             |   4 -
+ arch/arm/mach-imx/devices/platform-mxc_rnga.c |  53 --------------
+ arch/arm/mach-imx/eukrea-baseboards.h         |  42 -----------
+ arch/arm/mach-imx/imx27-dt.c                  |   1 +
+ arch/arm/mach-imx/imx31-dt.c                  |  12 +++
+ arch/arm/mach-imx/imx35-dt.c                  |  10 +--
+ arch/arm/mach-imx/mach-imx50.c                |   1 -
+ arch/arm/mach-imx/mach-imx51.c                |   1 -
+ arch/arm/mach-imx/mach-imx53.c                |   1 -
+ arch/arm/mach-imx/mach-imx6q.c                |   2 +
+ arch/arm/mach-imx/mach-imx6sl.c               |   2 +
+ arch/arm/mach-imx/mach-imx6sx.c               |   2 +
+ arch/arm/mach-imx/mm-imx1.c                   |   2 +-
+ arch/arm/mach-imx/mm-imx27.c                  |   2 +
+ arch/arm/mach-imx/mm-imx3.c                   |  32 +++++++-
+ arch/arm/mach-imx/mxc.h                       | 101 --------------------------
+ arch/arm/mach-imx/pm-imx27.c                  |   8 +-
+ arch/arm/mach-imx/pm-imx3.c                   |  38 ----------
+ arch/arm/mach-imx/system.c                    |  58 +++++++--------
+ arch/arm/mach-imx/tzic.c                      |  10 +--
+ 25 files changed, 88 insertions(+), 315 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/devices/platform-mxc_rnga.c
+ delete mode 100644 arch/arm/mach-imx/eukrea-baseboards.h
+ delete mode 100644 arch/arm/mach-imx/pm-imx3.c
