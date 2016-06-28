@@ -1,139 +1,120 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Jun 2016 13:39:31 +0200
-Subject: [PATCH v2 02/14] thermal: sun8i_ths: Add support for the thermal
- sensor on Allwinner H3
-In-Reply-To: <4a43f993-6b58-8303-466b-a9115ed26fd6@megous.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-3-megous@megous.com>
- <20160625071044.GB4000@lukather>
- <4a43f993-6b58-8303-466b-a9115ed26fd6@megous.com>
-Message-ID: <20160628113931.GD5550@lukather>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Tue, 28 Jun 2016 14:42:05 +0300
+Subject: [PATCH 02/21] usb: ulpi: Support device discovery via DT
+In-Reply-To: <146706544012.30684.15569003844798199881@sboyd-linaro>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-3-stephen.boyd@linaro.org>
+ <20160627143422.GB21398@kuha.fi.intel.com>
+ <146706544012.30684.15569003844798199881@sboyd-linaro>
+Message-ID: <20160628114205.GA3378@kuha.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 25, 2016 at 05:12:41PM +0200, Ond?ej Jirman wrote:
-> >> +	data->calreg = devm_ioremap_resource(&pdev->dev, res);
-> >> +	if (IS_ERR(data->calreg)) {
-> >> +		ret = PTR_ERR(data->calreg);
-> >> +		dev_err(&pdev->dev, "failed to ioremap THS registers: %d\n", ret);
-> >> +		return ret;
-> >> +	}
+On Mon, Jun 27, 2016 at 03:10:40PM -0700, Stephen Boyd wrote:
+> Quoting Heikki Krogerus (2016-06-27 07:34:22)
+> > Hi,
 > > 
-> > Why did you remove the SID use through the nvmem framework ?!
-> 
-> Because it's overkill for reading a single word from memeory, the sunxi
-> nvmem driver doesn't support H3, the sid is not documented in the
-> datasheet, aside from some registger name/offset dump on the mailing
-> list some time ago.
-> 
-> Aside from that, I've yet to see H3 soc that has anything else than 0 in
-> the calibration data memory location. So this is basically nop.
-> 
-> Proposed solution seems simpler with no drawbacks that I can see,
-> without resorting to dropping the thing entirely from this driver. Which
-> I would be fine with too. Calibration is optional feature in the BSP
-> kernel, so I assume dropping it may not do too much harm either.
-> 
-> If anyone wants to implement sid in the future, it will be easy enough
-> to do with backwards compatibility. The second reg will become optional,
-> and the driver can check for nvmem.
-
-A lot of things in drivers boil down to "reading a single word from
-memory". However, abstractions are here for a reason, and there's none
-to not use it.
-
-If that's not something we can use today, remove it entirely. And if
-that becomes necessary, we will add an optional nvmem property.
-
-> >> +
-> >> +	irq = platform_get_irq(pdev, 0);
-> >> +	if (irq < 0) {
-> >> +		dev_err(&pdev->dev, "failed to get IRQ: %d\n", irq);
-> >> +		return irq;
-> >> +	}
-> >> +
-> >> +	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-> >> +					sun8i_ths_irq_thread, IRQF_ONESHOT,
-> >> +					dev_name(&pdev->dev), data);
-> >> +	if (ret)
-> >> +		return ret;
-> >> +
-> >> +	data->busclk = devm_clk_get(&pdev->dev, "ahb");
-> >> +	if (IS_ERR(data->busclk)) {
-> >> +		ret = PTR_ERR(data->busclk);
-> >> +		dev_err(&pdev->dev, "failed to get ahb clk: %d\n", ret);
-> >> +		return ret;
-> >> +	}
-> >> +
-> >> +	data->clk = devm_clk_get(&pdev->dev, "ths");
-> >> +	if (IS_ERR(data->clk)) {
-> >> +		ret = PTR_ERR(data->clk);
-> >> +		dev_err(&pdev->dev, "failed to get ths clk: %d\n", ret);
-> >> +		return ret;
-> >> +	}
-> >> +
-> >> +	data->reset = devm_reset_control_get(&pdev->dev, "ahb");
-> >> +	if (IS_ERR(data->reset)) {
-> >> +		ret = PTR_ERR(data->reset);
-> >> +		dev_err(&pdev->dev, "failed to get reset: %d\n", ret);
-> >> +		return ret;
-> >> +	}
-> >> +
-> >> +	ret = clk_prepare_enable(data->busclk);
-> >> +	if (ret) {
-> >> +		dev_err(&pdev->dev, "failed to enable bus clk: %d\n", ret);
-> >> +		return ret;
-> >> +	}
-> >> +
-> >> +	ret = clk_prepare_enable(data->clk);
-> >> +	if (ret) {
-> >> +		dev_err(&pdev->dev, "failed to enable ths clk: %d\n", ret);
-> >> +		goto err_disable_bus;
-> >> +	}
-> >> +
-> >> +	ret = clk_set_rate(data->clk, THS_H3_CLK_IN);
-> >> +	if (ret)
-> >> +		goto err_disable_ths;
-> >> +
-> >> +	ret = reset_control_deassert(data->reset);
-> >> +	if (ret) {
-> >> +		dev_err(&pdev->dev, "reset deassert failed: %d\n", ret);
-> >> +		goto err_disable_ths;
-> >> +	}
+> > I'm fine with most of the patch, except..
 > > 
-> > Having runtime_pm support would be great.
-> 
-> Suspend/resume handling? I would have no way of testing it, other than
-> blindly impelementing what BSP kernel does. Other than that, I can add
-> it quite easily. It should be rather simple.
-
-No, I mean runtime_pm, with runtime_suspend and runtime_resume, to
-allow only powering up the device when it's used, and shut it down
-when not used.
-
-> >> +MODULE_AUTHOR("Ond?ej Jirman <megous@megous.com>");
-> >> +MODULE_DESCRIPTION("Thermal sensor driver for Allwinner H3 SoC");
-> >> +MODULE_LICENSE("GPL v2");
+> > On Sun, Jun 26, 2016 at 12:28:19AM -0700, Stephen Boyd wrote:
+> > > @@ -39,7 +42,10 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
+> > >       struct ulpi *ulpi = to_ulpi_dev(dev);
+> > >       const struct ulpi_device_id *id;
+> > >  
+> > > -     for (id = drv->id_table; id->vendor; id++)
+> > > +     if (of_driver_match_device(dev, driver))
+> > > +             return 1;
 > > 
-> > Looks quite good otherwise. It looks very similar to the older
-> > touchscreen driver (without the touchscreen part).
+> > I don't like this part. We should match separately like that only
+> > if the bus does not support native enumeration, and of course ULPI
+> > with its vendor and product IDs does. There really should always be
+> > IDs to match with here. So exceptions have to be solved before we
+> > attempt matching.
 > > 
-> > Have you tried to merge the two?
+> > Since we also have to support platforms where the PHY is initially
+> > powered off and reading the IDs from the registers is not possible
+> > because of that, I think we should consider getting the product and
+> > vendor IDs optionally from device properties. Something like this:
 > 
-> What driver?
+> Ok, I'm a little worried about conflating the powered off problem with
+> this product/vendor ID missing problem. But if you're ok with that I'll
+> combine the two patches into one using your approach below.
+> 
+> > 
+> > 
+> > diff --git a/drivers/usb/common/ulpi.c b/drivers/usb/common/ulpi.c
+> > index 01c0c04..6228a85 100644
+> > --- a/drivers/usb/common/ulpi.c
+> > +++ b/drivers/usb/common/ulpi.c
+> > @@ -152,7 +152,7 @@ EXPORT_SYMBOL_GPL(ulpi_unregister_driver);
+> >  
+> >  /* -------------------------------------------------------------------------- */
+> >  
+> > -static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+> > +static int ulpi_read_id(struct ulpi *ulpi)
+> >  {
+> >         int ret;
+> >  
+> > @@ -174,6 +174,21 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+> >         ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
+> >         ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
+> >  
+> > +       return 0;
+> > +}
+> > +
+> > +static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+> > +{
+> > +       int ret;
+> > +
+> > +       ret = device_property_read_u16(dev, "ulpi-vendor", &ulpi->id.vendor);
+> > +       ret |= device_property_read_u16(dev, "ulpi-product", &ulpi->id.product);
+> > +       if (ret) {
+> > +               ret = ulpi_read_id(ulpi);
+> > +               if (ret)
+> > +                       return ret;
+> > +       }
+> > +
+> >         ulpi->dev.parent = dev;
+> >         ulpi->dev.bus = &ulpi_bus;
+> >         ulpi->dev.type = &ulpi_dev_type;
+> > 
+> > 
+> > That should cover both cases. You would just have to create the IDs
+> > yourself in this case.
+> > 
+> 
+> Right, I would have to make up some IDs in this case. I suppose I can
+> use the qcom vendor ID 0x05c6 and then product ids 0 and 1 for HS phy
+> and HSIC phy? That doesn't make me feel great because it's all made up,
+> but I guess there's no other option. I hope they don't decide to start
+> populating these ids in the future though and then we may have
+> conflicting product ids. If that happens I suppose we can do a
+> workaround based on compatible strings in the DT node. Fun!
+> 
+> Nice side effect of all that is I can drop requesting the module by DT
+> aliases and things become simpler. I'll try this out.
 
-drivers/input/touchscreen/sun4i-ts.c
+I was hoping that we could manage with product id 0 as an exception (I
+failed to consider that you have multiple PHYs to deal with). I don't
+think we can just come up with product id > 0.
 
-Maxime
+I guess we should have the of_driver_match_device() call after all.
+Let's just call it conditionally, only in cases where there is no
+product ID, to make me feel a bit more better. I don't want to make it
+too easy to use.
+
+The properties for the vendor and product ID are still something that
+we need to introduce in any case. We have the powered off problem on
+all kinds of platforms, and not all of them use DT. Please feel free
+to incorporate the diff into the patch you had for the powered off
+case if you are OK with it. So I think in your case you would just
+need to addthe correct ulpi-vendor id 0x05c6 and ulpi-product id 0 to
+the chipidea device node, and I think this would work.
+
+Sorry about the hassle.
+
+
+Thanks,
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160628/59304ceb/attachment-0001.sig>
+heikki
