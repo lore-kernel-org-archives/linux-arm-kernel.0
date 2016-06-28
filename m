@@ -1,109 +1,92 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Jun 2016 12:01:25 +0100
-Subject: [PATCH 8/8] arm64:perf: L3 cache(LLC) event listing in perf
-In-Reply-To: <1467107429-55477-9-git-send-email-anurup.m@huawei.com>
+Date: Tue, 28 Jun 2016 12:05:26 +0100
+Subject: [PATCH 0/8] arm64:perf: Support for Hisilicon SoC Hardware event
+ counters
+In-Reply-To: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
 References: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
- <1467107429-55477-9-git-send-email-anurup.m@huawei.com>
-Message-ID: <20160628110125.GG31744@leverpostej>
+Message-ID: <20160628110526.GH31744@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 05:50:29AM -0400, Anurup M wrote:
-> 	1. Add L3 caches events to /sys/devices/hisi_l3c/events/
-> 	   The events can be selected as shown in perf list
-> 	   e.g.: For LLC_READ_ALLOCATE event for Super CPU cluster 2 the
-> 		 event format is
-> 		 -e "hisi_l3c/l3c_read_allocate,bank=0xf,cluster=0x2/"
+On Tue, Jun 28, 2016 at 05:50:21AM -0400, Anurup M wrote:
+> Provide Support for Hisilicon SoC Hardware event counters.
+> The Hisilicon SoC Hi161x series has many uncore or non-CPU performance
+> events and counters units.
 > 
-> Signed-off-by: Anurup M <anurup.m@huawei.com>
-> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-> ---
->  drivers/perf/hisilicon/hisi_uncore_llc.c | 75 +++++++++++++++++++++++++++++++-
->  drivers/perf/hisilicon/hisi_uncore_pmu.c | 12 +++++
->  drivers/perf/hisilicon/hisi_uncore_pmu.h | 16 +++++++
->  3 files changed, 101 insertions(+), 2 deletions(-)
+> This patch is implemented refering to arm-cci, Intel/AMD uncore and
+> also the cavium thunderX pmu patches.
 > 
-> diff --git a/drivers/perf/hisilicon/hisi_uncore_llc.c b/drivers/perf/hisilicon/hisi_uncore_llc.c
-> index a771e1a..316167a 100644
-> --- a/drivers/perf/hisilicon/hisi_uncore_llc.c
-> +++ b/drivers/perf/hisilicon/hisi_uncore_llc.c
-> @@ -25,11 +25,11 @@
->  #include "hisi_uncore_llc.h"
->  
->  /* Map cfg_en values for LLC Banks */
-> -const int llc_cfgen_map[] = { HISI_LLC_BANK0_CFGEN, HISI_LLC_BANK1_CFGEN,
-> +static const int llc_cfgen_map[] = { HISI_LLC_BANK0_CFGEN, HISI_LLC_BANK1_CFGEN,
->  				HISI_LLC_BANK2_CFGEN, HISI_LLC_BANK3_CFGEN
->  };
->  
-> -struct hisi_pmu *hisi_uncore_llc;
-> +static struct hisi_pmu *hisi_uncore_llc;
->  
->  static inline int hisi_llc_counter_valid(int idx)
->  {
-> @@ -442,6 +442,76 @@ static void hisi_free_llc_data(struct hisi_hwmod_unit *punit)
->  	kfree(punit->hwmod_data);
->  }
->  
-> +PMU_FORMAT_ATTR(event, "config:0-11");
-> +PMU_FORMAT_ATTR(bank, "config:12-15");
-> +PMU_FORMAT_ATTR(module, "config:16-19");
-> +PMU_FORMAT_ATTR(cluster, "config:20-23");
-> +PMU_FORMAT_ATTR(socket, "config:24-25");
-> +
-> +#define HISI_UNCORE_EVENT_DESC(_name, _config)			\
-> +{								\
-> +	.attr   = __ATTR(_name, 0444, uncore_event_show, NULL), \
-> +	.config = _config,					\
-> +}
-> +
-> +static struct attribute *hisi_llc_format_attr[] = {
-> +	&format_attr_event.attr,
-> +	&format_attr_bank.attr,
-> +	&format_attr_module.attr,
-> +	&format_attr_cluster.attr,
-> +	&format_attr_socket.attr,
-> +	NULL,
-> +};
+> Support for Hisilicon L3 cache(LLC) hardware events and counters are added
+> in this implementation.
+> 
+> The Hisilicon PMU datastructures are designed so as to support uncore
+> and also CPU specific events in future.
 
-Pleas use the compound literal trick I describe in [1].
+The uncore and CPU event context are *very* different. These should
+really be handled by separate drivers.
 
-> +
-> +static struct attribute_group hisi_llc_format_group = {
-> +	.name = "format",
-> +	.attrs = hisi_llc_format_attr,
-> +};
-> +
-> +EVENT_ATTR_STR(l3c_read_allocate,
-> +			"event=0x301,bank=?,module=0x4,cluster=?,socket=0x1");
-> +EVENT_ATTR_STR(l3c_write_allocate,
-> +			"event=0x302,bank=?,module=0x4,cluster=?,socket=0x1");
-> +EVENT_ATTR_STR(l3c_read_noallocate,
-> +			"event=0x303,bank=?,module=0x4,cluster=?,socket=0x1");
-> +EVENT_ATTR_STR(l3c_write_noallocate,
-> +			"event=0x304,bank=?,module=0x4,cluster=?,socket=0x1");
-> +EVENT_ATTR_STR(l3c_read_hit,
-> +			"event=0x305,bank=?,module=0x4,cluster=?,socket=0x1");
-> +EVENT_ATTR_STR(l3c_write_hit,
-> +			"event=0x306,bank=?,module=0x4,cluster=?,socket=0x1");
-> +
-> +
-> +static struct attribute *hisi_llc_events_attr[] = {
-> +	EVENT_PTR(l3c_read_allocate),
-> +	EVENT_PTR(l3c_write_allocate),
-> +	EVENT_PTR(l3c_read_noallocate),
-> +	EVENT_PTR(l3c_write_noallocate),
-> +	EVENT_PTR(l3c_read_hit),
-> +	EVENT_PTR(l3c_write_hit),
-> +	NULL,
-> +};
+> 
+> The Hisilicon LLC has four banks for a Super CPU Cluster(consists of
+>  16 CPU cores) and each LLC bank has separate hardware events and counters.
+> In the current implementation, the count from all these banks are summarized
+> and total count is output.
+> 
+> The Hisilicon uncore PMUs can be found under /sys/bus/event_source/devices.
+> The counters are exported via sysfs in the corresponding events files
+> under the PMU directory so the perf tool can list the event names.
+> 
+> Note:
+> This is very initial patchset for Hisilicon SoC PMU support shared for
+> review. Please review and share comments.
+> This patchset depends on the Hisilicon Djtag driver for r/w access to
+> Hisilicon SoC PMU registers, which is not upstreamed yet. The patches for
+> Djtag driver shall be send for review soon.
 
-Again, please use the compound literal trick.
+The Djtag portions are a prerequisite for this patch series, both for
+review and merging.
 
-Regardless of this sysfs data, the format needs documenting, as I
-commented in the last patch.
+> 
+> TODO:
+>         1. Counter overflow interrupt handling support to be added.
+>         2. CPU notifier to migrate to available online CPU's in case
+>            of CPU DOWN. Also mapping CPU cores to the current SCCL.
+>         3. Support for counting of individual LLC banks
+
+I note that bidnings were added for LLC, DDRC, and MN nodes. What's the
+plan for the DDRC and MN nodes? Are they intended to be handled by the
+same driver?
 
 Thanks,
 Mark.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438742.html
+> 
+> Anurup M (8):
+>   arm64:perf: Add Devicetree bindings for Hisilicon SoC PMU
+>   arm64:MAINTAINERS:hisi: Add hisilicon SoC PMU support
+>   arm64:perf: Update Kconfig for Hisilicon PMU support
+>   arm64:perf: Add support for Hisilicon SoC event counters
+>   arm64:perf: L3 cache(LLC) event counting in perf
+>   arm64:perf: Makefile for Hisilicon ARMv8 PMU
+>   arm64:perf: Update Makefile for Hisilicon PMU support
+>   arm64:perf: L3 cache(LLC) event listing in perf
+> 
+>  .../devicetree/bindings/arm/hisilicon/pmu.txt      |  32 ++
+>  MAINTAINERS                                        |   8 +
+>  drivers/perf/Kconfig                               |   9 +
+>  drivers/perf/Makefile                              |   1 +
+>  drivers/perf/hisilicon/Makefile                    |   1 +
+>  drivers/perf/hisilicon/hisi_uncore_llc.c           | 613 +++++++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_llc.h           | 100 ++++
+>  drivers/perf/hisilicon/hisi_uncore_pmu.c           | 521 +++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_pmu.h           | 144 +++++
+>  9 files changed, 1429 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+>  create mode 100644 drivers/perf/hisilicon/Makefile
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_llc.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_llc.h
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+> 
+> -- 
+> 2.1.4
+> 
