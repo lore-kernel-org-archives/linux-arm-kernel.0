@@ -1,28 +1,23 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 28 Jun 2016 10:27:56 +0800
-Subject: [PATCH 0/6] kill off cpu_is_mx*()
-In-Reply-To: <20160624105001.3166287-1-arnd@arndb.de>
-References: <20160624105001.3166287-1-arnd@arndb.de>
-Message-ID: <20160628022756.GD21328@tiger>
+Date: Tue, 28 Jun 2016 10:36:52 +0800
+Subject: [PATCH] ARM: i.MX: Disable supervisor protect for i.MX51
+In-Reply-To: <1466832375-32071-1-git-send-email-shc_work@mail.ru>
+References: <1466832375-32071-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20160628023652.GE21328@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2016 at 12:49:55PM +0200, Arnd Bergmann wrote:
-> I noticed that i.MX still uses the traditional cpu_is_* functions to
-> tell the difference between various SoC families, but every single
-> user of those can be replaced with a simpler way, so we can just
-> remove it all.
+On Sat, Jun 25, 2016 at 08:26:15AM +0300, Alexander Shiyan wrote:
+> Most peripherals on the i.MX51 have an Off-Platform Peripheral Access
+> Control Register (OPACR) in which the access rights (together with the
+> MPROT registers) can be declared.
+> However, this does not seem to work for example for SSI1+SDMA, because the
+> supervisor bit is not set for the SDMA unit.
+> A similar problem was described in the patch for i.MX53 CPU
+> (ARM: i.MX53: globally disable supervisor protect), and the same solution
+> is applicable for i.MX51 CPU.
+> Patch has tested on custom board based on Digi CCMX-51 module (i.MX51).
 > 
-> Please review and apply for 4.8 if it looks good to you.
-> 
-> Arnd Bergmann (6):
->   ARM: imx: remove cpu_is_mx1 check
->   ARM: imx: deconstruct mxc_rnga initialization
->   ARM: imx: deconstruct mx3_idle
->   ARM: imx: rework mx27_pm_init() call
->   ARM: imx: remove last call to cpu_is_mx5*
->   ARM: imx: remove cpu_is_mx*()
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Thanks for cleaning this up.  Applied all.
-
-Shawn
+Applied, thanks.
