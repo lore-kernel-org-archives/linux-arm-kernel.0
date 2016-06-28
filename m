@@ -1,49 +1,165 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Jun 2016 15:57:50 -0500
-Subject: [PATCH v2 7/7] doc: bindings: act8945a-charger: Update properties
-In-Reply-To: <1467076970-12206-8-git-send-email-wenyou.yang@atmel.com>
-References: <1467076970-12206-1-git-send-email-wenyou.yang@atmel.com>
- <1467076970-12206-8-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160628205750.GZ3737@rob-hp-laptop>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 28 Jun 2016 13:58:25 -0700
+Subject: [PATCH v3 1/2] dt-binding: remoteproc: Introduce Qualcomm WCNSS
+ loader binding
+Message-ID: <1467147506-753-1-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 09:22:50AM +0800, Wenyou Yang wrote:
-> Due the driver improvements, update the properties,
->  - Remove "active-semi,check-battery-temperature" property.
->  - Add the properties, "active-semi,irq_gpio"
->    and "active-semi,lbo-gpios".
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-> 
-> Changes in v2: None
-> 
->  Documentation/devicetree/bindings/power/act8945a-charger.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> index bea254c..d7cf05b 100644
-> --- a/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> +++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> @@ -4,10 +4,12 @@ Required properties:
->   - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
->   - active-semi,chglev-gpios: charge current level phandle with args
->     as described in ../gpio/gpio.txt.
-> + - active-semi,irq_gpios: specify the charger interrupt input phanle
-> +   with args as as described in ../gpio/gpio.txt.
+From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-Use "interrupts" property instead.
+The document defines the binding for a component that loads firmware for
+and boots the Qualcomm WCNSS core.
 
-> + - active-semi,lbo-gpios: specify the low battery voltage detect phandle
-> +   with args as as described in ../gpio/gpio.txt.
->  
->  Optional properties:
-> - - active-semi,check-battery-temperature: boolean to check the battery
-> -   temperature or not.
->   - active-semi,input-voltage-threshold-microvolt: unit: mV;
->     Specifies the charger's input over-voltage threshold value;
->     The value can be: 6600, 7000, 7500, 8000; default: 6600
-> -- 
-> 2.7.4
-> 
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+
+Changes since v2:
+- None
+
+ .../bindings/remoteproc/qcom,wcnss-pil.txt         | 132 +++++++++++++++++++++
+ 1 file changed, 132 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/qcom,wcnss-pil.txt
+
+diff --git a/Documentation/devicetree/bindings/remoteproc/qcom,wcnss-pil.txt b/Documentation/devicetree/bindings/remoteproc/qcom,wcnss-pil.txt
+new file mode 100644
+index 000000000000..0d2361ebe3d7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/remoteproc/qcom,wcnss-pil.txt
+@@ -0,0 +1,132 @@
++Qualcomm WCNSS Peripheral Image Loader
++
++This document defines the binding for a component that loads and boots firmware
++on the Qualcomm WCNSS core.
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be one of:
++		    "qcom,riva-pil",
++		    "qcom,pronto-v1-pil",
++		    "qcom,pronto-v2-pil"
++
++- reg:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: must specify the base address and size of the CCU, DXE and
++		    PMU register blocks
++
++- reg-names:
++	Usage: required
++	Value type: <stringlist>
++	Definition: must be "ccu", "dxe", "pmu"
++
++- interrupts-extended:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: must list the watchdog and fatal IRQs and may specify the
++		    ready, handover and stop-ack IRQs
++
++- interrupt-names:
++	Usage: required
++	Value type: <stringlist>
++	Definition: should be "wdog", "fatal", optionally followed by "ready",
++		    "handover", "stop-ack"
++
++- vddmx-supply:
++- vddcx-supply:
++- vddpx-supply:
++	Usage: required
++	Value type: <phandle>
++	Definition: reference to the regulators to be held on behalf of the
++		    booting of the WCNSS core
++
++- qcom,smem-states:
++	Usage: optional
++	Value type: <prop-encoded-array>
++	Definition: reference to the SMEM state used to indicate to WCNSS that
++		    it should shut down
++
++- qcom,smem-state-names:
++	Usage: optional
++	Value type: <stringlist>
++	Definition: should be "stop"
++
++- memory-region:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: reference to reserved-memory node for the remote processor
++		    see ../reserved-memory/reserved-memory.txt
++
++= SUBNODES
++A single subnode of the WCNSS PIL describes the attached rf module and its
++resource dependencies.
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be one of:
++		    "qcom,wcn3620",
++		    "qcom,wcn3660",
++		    "qcom,wcn3680"
++
++- clocks:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: should specify the xo clock and optionally the rf clock
++
++- clock-names:
++	Usage: required
++	Value type: <stringlist>
++	Definition: should be "xo", optionally followed by "rf"
++
++- vddxo-supply:
++- vddrfa-supply:
++- vddpa-supply:
++- vdddig-supply:
++	Usage: required
++	Value type: <phandle>
++	Definition: reference to the regulators to be held on behalf of the
++		    booting of the WCNSS core
++
++= EXAMPLE
++The following example describes the resources needed to boot control the WCNSS,
++with attached WCN3680, as it is commonly found on MSM8974 boards.
++
++pronto at fb204000 {
++	compatible = "qcom,pronto-v2-pil";
++	reg = <0xfb204000 0x2000>, <0xfb202000 0x1000>, <0xfb21b000 0x3000>;
++	reg-names = "ccu", "dxe", "pmu";
++
++	interrupts-extended = <&intc 0 149 1>,
++			      <&wcnss_smp2p_slave 0 0>,
++			      <&wcnss_smp2p_slave 1 0>,
++			      <&wcnss_smp2p_slave 2 0>,
++			      <&wcnss_smp2p_slave 3 0>;
++	interrupt-names = "wdog", "fatal", "ready", "handover", "stop-ack";
++
++	vddmx-supply = <&pm8841_s1>;
++	vddcx-supply = <&pm8841_s2>;
++	vddpx-supply = <&pm8941_s3>;
++
++	qcom,smem-states = <&wcnss_smp2p_out 0>;
++	qcom,smem-state-names = "stop";
++
++	memory-region = <&wcnss_region>;
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&wcnss_pin_a>;
++
++	iris {
++		compatible = "qcom,wcn3680";
++
++		clocks = <&rpmcc RPM_CXO_CLK_SRC>, <&rpmcc RPM_CXO_A2>;
++		clock-names = "xo", "rf";
++
++		vddxo-supply = <&pm8941_l6>;
++		vddrfa-supply = <&pm8941_l11>;
++		vddpa-supply = <&pm8941_l19>;
++		vdddig-supply = <&pm8941_s3>;
++	};
++};
+-- 
+2.5.0
