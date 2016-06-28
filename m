@@ -1,35 +1,237 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 28 Jun 2016 14:55:52 +0100
-Subject: [PATCH v7 6/6] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
-In-Reply-To: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
-References: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1467122152-5604-7-git-send-email-sudeep.holla@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 28 Jun 2016 16:00:57 +0200
+Subject: [RFC PATCH v2 1/9] mailbox: Add Amlogic Meson
+ Message-Handling-Unit
+In-Reply-To: <CABb+yY0Oa7TNHsnt1HRAz1NUQ1QA_gR0-B-ki6qkuT332CnrmQ@mail.gmail.com>
+References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
+ <1466503374-28841-2-git-send-email-narmstrong@baylibre.com>
+ <CABb+yY3r3_B9wbW6D-do8h8xMKCANQWfz1gFGyre1oWadd7A8Q@mail.gmail.com>
+ <576C045A.3070701@baylibre.com>
+ <CABb+yY0Oa7TNHsnt1HRAz1NUQ1QA_gR0-B-ki6qkuT332CnrmQ@mail.gmail.com>
+Message-ID: <57728319.5060701@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
-enable ACPI_PROCESSOR_IDLE for ARM64 too.
+On 06/25/2016 07:50 PM, Jassi Brar wrote:
+> -#define INTR_STAT_OFS  0x0
+> -#define INTR_SET_OFS   0x8
+> -#define INTR_CLR_OFS   0x10
+> -
+> -#define MHU_LP_OFFSET  0x0
+> -#define MHU_HP_OFFSET  0x20
+> -#define MHU_SEC_OFFSET 0x200
+> -#define TX_REG_OFFSET  0x100
+> +#define INTR_SET_OFS   0x0
+> +#define INTR_STAT_OFS  0x4
+> +#define INTR_CLR_OFS   0x8
+> 
+> -#define MHU_CHANS      3
+> +#define MHU_LP_OFFSET  0x10
+> +#define MHU_HP_OFFSET  0x1c
+> +
+> +#define TX_REG_OFFSET  0x24
+> +
+> +#define MHU_CHANS      2
+> 
+> ^^^^^^^^ this is precisely the difference if we ignore cosmetic
+> differences. So the IP is essentially the same.
 
-This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
+Well, no. The overall design is similar. but clearly it's a different IP.
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/acpi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> [snip]
+> 
+>> -------------------------------------------------------------------------------------------
+>> From: Neil Armstrong <narmstrong@baylibre.com>
+>> Subject: [PATCH] mailbox: arm_mhu: Add support for Amlogic Meson MHU
+>>
+> Is there some version of MHU specified anywhere in manuals? It seems
+> weird Amlogic took the IP and only rearranged the registers. Maybe the
+> order is specific to non-Amba version of the IP?  Lets call it that.
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 1358fb7d7a68..d74275c0f374 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
- config ACPI_PROCESSOR
- 	tristate "Processor"
- 	depends on X86 || IA64 || ARM64
--	select ACPI_PROCESSOR_IDLE if X86 || IA64
-+	select ACPI_PROCESSOR_IDLE
- 	select ACPI_CPU_FREQ_PSS if X86 || IA64
- 	default y
- 	help
--- 
-2.7.4
+I think Amlogic took an early Juno platform release and re-implemented the
+MHU using the same concept but following their design rules.
+
+> 
+>> To achieve this integration, add support for generic probe from amba
+>> or platform.
+>> Move all register offsets to a data structure passed in either amba id or
+>> platform dt id match table.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/mailbox/arm_mhu.c | 217 ++++++++++++++++++++++++++++++++++++++--------
+>>  1 file changed, 181 insertions(+), 36 deletions(-)
+>>
+>> diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
+>> index 99befa7..d7fb843 100644
+>> --- a/drivers/mailbox/arm_mhu.c
+>> +++ b/drivers/mailbox/arm_mhu.c
+>> @@ -22,45 +22,68 @@
+>>  #include <linux/io.h>
+>>  #include <linux/module.h>
+>>  #include <linux/amba/bus.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/platform_device.h>
+>>  #include <linux/mailbox_controller.h>
+>>
+>> -#define INTR_STAT_OFS  0x0
+>> -#define INTR_SET_OFS   0x8
+>> -#define INTR_CLR_OFS   0x10
+>> +#define MHU_INTR_STAT_OFS      0x0
+>> +#define MHU_INTR_SET_OFS       0x8
+>> +#define MHU_INTR_CLR_OFS       0x10
+>>
+>>  #define MHU_LP_OFFSET  0x0
+>>  #define MHU_HP_OFFSET  0x20
+>>  #define MHU_SEC_OFFSET 0x200
+>> -#define TX_REG_OFFSET  0x100
+>> +#define MHU_TX_REG_OFFSET      0x100
+>>
+>> -#define MHU_CHANS      3
+>> +#define MESON_INTR_SET_OFS     0x0
+>> +#define MESON_INTR_STAT_OFS    0x4
+>> +#define MESON_INTR_CLR_OFS     0x8
+>> +
+>> +#define MESON_MHU_LP_OFFSET    0x10
+>> +#define MESON_MHU_HP_OFFSET    0x1c
+>> +#define MESON_MHU_TX_OFFSET    0x24
+>> +
+>> +#define MAX_MHU_CHANS  3
+>>
+> MHU_CHANS always 3 doesn't hurt. Lets keep it unchanged.
+> 
+>>  struct mhu_link {
+>>         unsigned irq;
+>> -       void __iomem *tx_reg;
+>> -       void __iomem *rx_reg;
+>> +       void __iomem *tx_stat_reg;
+>> +       void __iomem *tx_set_reg;
+>> +       void __iomem *tx_clr_reg;
+>> +       void __iomem *rx_stat_reg;
+>> +       void __iomem *rx_set_reg;
+>> +       void __iomem *rx_clr_reg;
+>>  };
+> 
+> Yeah, this is OK.
+> 
+> 
+>>
+>>  struct arm_mhu {
+>>         void __iomem *base;
+>> -       struct mhu_link mlink[MHU_CHANS];
+>> -       struct mbox_chan chan[MHU_CHANS];
+>> +       struct mhu_link mlink[MAX_MHU_CHANS];
+>> +       struct mbox_chan chan[MAX_MHU_CHANS];
+>>         struct mbox_controller mbox;
+>>  };
+> just leave it MHU_CHANS
+> 
+>>
+>> +struct arm_mhu_data {
+>> +       unsigned int channels;
+>> +       int rx_offsets[MAX_MHU_CHANS];
+>> +       int tx_offsets[MAX_MHU_CHANS];
+>> +       unsigned int intr_stat_offs;
+>> +       unsigned int intr_set_offs;
+>> +       unsigned int intr_clr_offs;
+>> +};
+> This is unnecessary. Please remove it and code will be simpler -
+> assign rx/tx_regs directly in probe.
+
+I won't assume the platform driver is only for Amlogic, it does not
+make sense.
+
+> 
+>> +
+>>  static irqreturn_t mhu_rx_interrupt(int irq, void *p)
+>>  {
+>>         struct mbox_chan *chan = p;
+>>         struct mhu_link *mlink = chan->con_priv;
+>>         u32 val;
+>>
+>> -       val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
+>> +       val = readl_relaxed(mlink->rx_stat_reg);
+>>         if (!val)
+>>                 return IRQ_NONE;
+>>
+>>         mbox_chan_received_data(chan, (void *)&val);
+>>
+>> -       writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
+>> +       writel_relaxed(val, mlink->rx_clr_reg);
+>>
+>>         return IRQ_HANDLED;
+>>  }
+>> @@ -68,7 +91,7 @@ static irqreturn_t mhu_rx_interrupt(int irq, void *p)
+>>  static bool mhu_last_tx_done(struct mbox_chan *chan)
+>>  {
+>>         struct mhu_link *mlink = chan->con_priv;
+>> -       u32 val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
+>> +       u32 val = readl_relaxed(mlink->tx_stat_reg);
+>>
+>>         return (val == 0);
+>>  }
+>> @@ -78,7 +101,7 @@ static int mhu_send_data(struct mbox_chan *chan, void *data)
+>>         struct mhu_link *mlink = chan->con_priv;
+>>         u32 *arg = data;
+>>
+>> -       writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
+>> +       writel_relaxed(*arg, mlink->tx_set_reg);
+>>
+>>         return 0;
+>>  }
+>> @@ -89,8 +112,8 @@ static int mhu_startup(struct mbox_chan *chan)
+>>         u32 val;
+>>         int ret;
+>>
+>> -       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
+>> -       writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
+>> +       val = readl_relaxed(mlink->tx_stat_reg);
+>> +       writel_relaxed(val, mlink->tx_clr_reg);
+>>
+>>         ret = request_irq(mlink->irq, mhu_rx_interrupt,
+>>                           IRQF_SHARED, "mhu_link", chan);
+>> @@ -117,52 +140,155 @@ static const struct mbox_chan_ops mhu_ops = {
+>>         .last_tx_done = mhu_last_tx_done,
+>>  };
+>>
+>> -static int mhu_probe(struct amba_device *adev, const struct amba_id *id)
+>> +static struct arm_mhu_data arm_mhu_amba_data = {
+>> +       .channels = 3,
+>> +       .rx_offsets = {MHU_LP_OFFSET, MHU_HP_OFFSET, MHU_SEC_OFFSET},
+>> +       .tx_offsets = {MHU_LP_OFFSET + MHU_TX_REG_OFFSET,
+>> +                      MHU_HP_OFFSET + MHU_TX_REG_OFFSET,
+>> +                      MHU_SEC_OFFSET + MHU_TX_REG_OFFSET},
+>> +       .intr_stat_offs = MHU_INTR_STAT_OFS,
+>> +       .intr_set_offs = MHU_INTR_SET_OFS,
+>> +       .intr_clr_offs = MHU_INTR_CLR_OFS,
+>> +};
+>> +
+>> +static const struct arm_mhu_data meson_mhu_data = {
+>> +       .channels = 2,
+>> +       .rx_offsets = {MESON_MHU_LP_OFFSET, MESON_MHU_HP_OFFSET},
+>> +       .tx_offsets = {MESON_MHU_LP_OFFSET + MESON_MHU_TX_OFFSET,
+>> +                      MESON_MHU_HP_OFFSET + MESON_MHU_TX_OFFSET},
+>> +       .intr_stat_offs = MESON_INTR_STAT_OFS,
+>> +       .intr_set_offs = MESON_INTR_SET_OFS,
+>> +       .intr_clr_offs = MESON_INTR_CLR_OFS,
+>> +};
+>> +
+> These could be directly set in amba vs platform probes ?
+
+It does not make sense to assume the platform driver is only for
+amlogic gxbb, it could match other vendors aswell.
+
+The amba could force a single struct, but it's smarter to use the
+same mechanism and associate the struct to an ID.
+
+> Thanks.
+> 
+
+My main question is : do you really want to transform this simple driver into
+a dirty multi-bus generic mailbox driver ?
+The meson_mhu is only 199 lines and this patch adds 181 lines to the arm_mhu driver.
+
+I'll personally push to have two separate drivers here.
+
+Thanks,
+Neil
