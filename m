@@ -1,134 +1,82 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 28 Jun 2016 15:51:47 +0100
-Subject: [PATCH v3 4/7] arm64: hibernate: Detect hibernate image created on
- non-boot CPU
+Date: Tue, 28 Jun 2016 15:51:48 +0100
+Subject: [PATCH v3 5/7] PM / Hibernate: Allow arch code to influence CPU
+ hotplug during hibernate
 In-Reply-To: <1467125510-18758-1-git-send-email-james.morse@arm.com>
 References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
-Message-ID: <1467125510-18758-5-git-send-email-james.morse@arm.com>
+Message-ID: <1467125510-18758-6-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
-user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
-kernel will assign logical id 0 to a different physical CPU.
-This breaks hibernate as hibernate and resume will be attempted on different
-CPUs.
+Architecture code may need to do extra work when secondary CPUs are
+disabled during hibernate and resume. This may include pushing sleeping
+CPUs into a deeper power-saving state, or influencing which CPU resume
+occurs on.
 
-Save the MPIDR of the CPU we hibernated on in the hibernate arch-header,
-and fail to resume if it doesn't match CPU0's when we come to read the
-header.
-
-This will still lead to data loss (hibernate image is discarded), but
-we at least get the opportunity to print an error message. Later patches
-will allow hibernate to disable all but the CPU we hibernated on.
+Define a macro arch_hibernation_disable_cpus(), which defaults to calling
+disable_nonboot_cpus() if undefined. Architectures that need to do extra
+work around these calls can use this to influence disable_nonboot_cpus()
+behaviour. The macro should be defined in asm/suspend.h, and
+ARCH_HIBERNATION_CPUHP should be added to Kconfig.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+Cc: Pavel Machek <pavel@ucw.cz>
 ---
-Change since v2:
- * This patch was split out of v2:patch4. Without any core-code changes,
-   printing an error like this is the best we can do.
+Changes since v2:
+ * Added CONFIG_ARCH_HIBERNATION_CPUHP include guard allowing
+ * Switch to macro approach.
 
-This patch will cause a trivial merge conflict with mainline, due to a fix
-for hibernate which added an include for asm/smp.h. The fix is to keep
-both hunks.
+ kernel/power/hibernate.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
- arch/arm64/kernel/hibernate.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
-
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index 1c1278d5ec50..8c7c6d7d4cd4 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -15,6 +15,7 @@
-  * License terms: GNU General Public License (GPL) version 2
-  */
- #define pr_fmt(x) "hibernate: " x
-+#include <linux/cpu.h>
- #include <linux/kvm_host.h>
- #include <linux/mm.h>
- #include <linux/notifier.h>
-@@ -26,6 +27,7 @@
+diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+index fca9254280ee..338745e78f7e 100644
+--- a/kernel/power/hibernate.c
++++ b/kernel/power/hibernate.c
+@@ -31,8 +31,16 @@
+ #include <linux/ktime.h>
+ #include <trace/events/power.h>
  
- #include <asm/barrier.h>
- #include <asm/cacheflush.h>
-+#include <asm/cputype.h>
- #include <asm/irqflags.h>
- #include <asm/memory.h>
- #include <asm/mmu_context.h>
-@@ -33,6 +35,7 @@
- #include <asm/pgtable.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/sections.h>
-+#include <asm/smp_plat.h>
- #include <asm/suspend.h>
- #include <asm/virt.h>
- 
-@@ -59,6 +62,12 @@ extern char hibernate_el2_vectors[];
- extern char __hyp_stub_vectors[];
- 
- /*
-+ * The logical cpu number we should resume on, initialised to a non-cpu
-+ * number.
-+ */
-+static int sleep_cpu = -EINVAL;
++#ifdef CONFIG_ARCH_HIBERNATION_CPUHP
++/* Arch definition of the arch_hibernation_disable_cpus() macro? */
++#include <asm/suspend.h>
++#endif
 +
-+/*
-  * Values that may not change over hibernate/resume. We put the build number
-  * and date in here so that we guarantee not to resume with a different
-  * kernel.
-@@ -80,6 +89,8 @@ static struct arch_hibernate_hdr {
- 	 * re-configure el2.
- 	 */
- 	phys_addr_t	__hyp_stub_vectors;
-+
-+	u64		sleep_cpu_mpidr;
- } resume_hdr;
+ #include "power.h"
  
- static inline void arch_hdr_invariants(struct arch_hibernate_hdr_invariants *i)
-@@ -122,6 +133,11 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
- 	else
- 		hdr->__hyp_stub_vectors = 0;
++#ifndef arch_hibernation_disable_cpus
++#define arch_hibernation_disable_cpus(x) disable_nonboot_cpus()
++#endif
  
-+	/* Save the mpidr of the cpu we called cpu_suspend() on... */
-+	hdr->sleep_cpu_mpidr = cpu_logical_map(sleep_cpu);
-+	pr_info("Hibernating on CPU %d [mpidr:0x%llx]\n", sleep_cpu,
-+		hdr->sleep_cpu_mpidr);
-+
- 	return 0;
- }
- EXPORT_SYMBOL(arch_hibernation_header_save);
-@@ -137,6 +153,14 @@ int arch_hibernation_header_restore(void *addr)
- 		return -EINVAL;
- 	}
+ static int nocompress;
+ static int noresume;
+@@ -279,7 +287,7 @@ static int create_image(int platform_mode)
+ 	if (error || hibernation_test(TEST_PLATFORM))
+ 		goto Platform_finish;
  
-+	sleep_cpu = get_logical_index(hdr->sleep_cpu_mpidr);
-+	pr_info("Hibernated on CPU %d [mpidr:0x%llx]\n", sleep_cpu,
-+		hdr->sleep_cpu_mpidr);
-+	if (sleep_cpu != 0) {
-+		pr_crit("Didn't hibernate on the firmware boot CPU!\n");
-+		sleep_cpu = -EINVAL;
-+		return -EINVAL;
-+	}
- 	resume_hdr = *hdr;
+-	error = disable_nonboot_cpus();
++	error = arch_hibernation_disable_cpus(true);
+ 	if (error || hibernation_test(TEST_CPUS))
+ 		goto Enable_cpus;
  
- 	return 0;
-@@ -234,6 +258,7 @@ int swsusp_arch_suspend(void)
- 	local_dbg_save(flags);
+@@ -433,7 +441,7 @@ static int resume_target_kernel(bool platform_mode)
+ 	if (error)
+ 		goto Cleanup;
  
- 	if (__cpu_suspend_enter(&state)) {
-+		sleep_cpu = smp_processor_id();
- 		ret = swsusp_save();
- 	} else {
- 		/* Clean kernel core startup/idle code to PoC*/
-@@ -251,6 +276,7 @@ int swsusp_arch_suspend(void)
- 		 */
- 		in_suspend = 0;
+-	error = disable_nonboot_cpus();
++	error = arch_hibernation_disable_cpus(false);
+ 	if (error)
+ 		goto Enable_cpus;
  
-+		sleep_cpu = -EINVAL;
- 		__cpu_suspend_exit();
- 	}
+@@ -551,7 +559,7 @@ int hibernation_platform_enter(void)
+ 	if (error)
+ 		goto Platform_finish;
+ 
+-	error = disable_nonboot_cpus();
++	error = arch_hibernation_disable_cpus(true);
+ 	if (error)
+ 		goto Enable_cpus;
  
 -- 
 2.8.0.rc3
