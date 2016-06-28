@@ -1,9 +1,9 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 28 Jun 2016 20:46:19 +0800
-Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.8
+Date: Tue, 28 Jun 2016 20:46:17 +0800
+Subject: [GIT PULL 2/5] i.MX soc updates for 4.8
 In-Reply-To: <1467117980-20063-1-git-send-email-shawnguo@kernel.org>
 References: <1467117980-20063-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1467117980-20063-4-git-send-email-shawnguo@kernel.org>
+Message-ID: <1467117980-20063-2-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,41 +13,56 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.8
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.8
 
-for you to fetch changes up to 2983e625bf2af422a6f55febb784fe34df834322:
+for you to fetch changes up to 18245c24259acaea4584464bf0215bf413dc7d23:
 
-  arm64: dts: ls2080a: Add cache nodes for cacheinfo support (2016-06-21 14:33:34 +0800)
-
-----------------------------------------------------------------
-The Freescale arm64 device tree updates for 4.8:
- - Update address-cells and reg properties of cpu nodes, considering
-   MPIDR_EL1[63:32] bits are not used for CPUs identification on ls1043a
-   and ls2080a
- - Adds the cache nodes and next-level-cache property for ls1043a and
-   ls2080a to get cacheinfo work on these platforms
- - Add dma-coherent for ls1043a PCI nodes to utilize the hardware
-   capability on data coherency
- - Add dis_rxdet_inp3_quirk property for USB3 device to disable rx
-   detection in P3 PHY mode
+  ARM: imx: add support for i.MX 7Solo (2016-06-28 10:44:44 +0800)
 
 ----------------------------------------------------------------
-Alison Wang (1):
-      arm64: dts: fsl: Update address-cells and reg properties of cpu nodes
+The i.MX SoC changes for 4.8:
+ - A patch series including both cpuidle and FEC driver changes to
+   disable deeper idle states when FEC is active while board level
+   workaround for ERR006687 is not available
+ - A number patches to fix sparse warnings and spell errors
+ - A fix for TZIC FIQ translation from VIRQ to HWIRQ
+ - Support compatible of i.MX7 Solo SoC which has a subset of i.MX7 Dual
 
-Li Yang (2):
-      arm64: dts: ls1043a: Add cache nodes for cacheinfo support
-      arm64: dts: ls2080a: Add cache nodes for cacheinfo support
+----------------------------------------------------------------
+Alexander Shiyan (2):
+      ARM: i.MX: Fix FIQ interrupt handling for TZIC
+      ARM: i.MX: Disable supervisor protect for i.MX51
 
-Liu Gang (2):
-      bindings: PCI: layerscape: Add 'dma-coherent' property
-      arm64: dts: ls1043a: Add 'dma-coherent' for ls1043a PCI nodes
+Ben Dooks (4):
+      ARM: imx: fix missing includes
+      ARM: imx: fix missing include of common.h
+      ARM: imx6: fix static declaration in include/soc/imx/cpuidle.h
+      ARM: imx6: fix missing <soc/imx/cpuidle.h> in cpuidle-imx6q.c
 
-Rajesh Bhagat (2):
-      arm64: dts: ls2080a: Add dis_rxdet_inp3_quirk property to USB3 node
-      arm64: dts: ls1043a: Add dis_rxdet_inp3_quirk property to USB3 node
+Jean Guyomarc'h (1):
+      ARM: mach-imx6q: fix spelling mistake in error message
 
- .../devicetree/bindings/pci/layerscape-pci.txt     |  4 ++
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     | 24 +++++++++---
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     | 44 +++++++++++++++++-----
- 3 files changed, 58 insertions(+), 14 deletions(-)
+Lucas Stach (1):
+      ARM: imx6: disable deeper idle states when FEC is active w/o HW workaround
+
+Shawn Guo (1):
+      ARM: imx6q: export cpuidle functions needed by fec driver
+
+Stefan Agner (1):
+      ARM: imx: add support for i.MX 7Solo
+
+ Documentation/devicetree/bindings/net/fsl-fec.txt |  3 +++
+ arch/arm/mach-imx/avic.c                          | 19 ++++++++---------
+ arch/arm/mach-imx/cpuidle-imx6q.c                 | 20 ++++++++++++++++++
+ arch/arm/mach-imx/devices/devices.c               |  3 +++
+ arch/arm/mach-imx/devices/platform-gpio-mxc.c     |  1 +
+ arch/arm/mach-imx/irq-common.c                    |  6 ++++--
+ arch/arm/mach-imx/mach-imx51.c                    |  2 ++
+ arch/arm/mach-imx/mach-imx6q.c                    |  2 +-
+ arch/arm/mach-imx/mach-imx7d.c                    |  1 +
+ arch/arm/mach-imx/tzic.c                          |  6 +++---
+ drivers/net/ethernet/freescale/fec.h              |  2 ++
+ drivers/net/ethernet/freescale/fec_main.c         | 12 +++++++++++
+ include/soc/imx/cpuidle.h                         | 25 +++++++++++++++++++++++
+ 13 files changed, 85 insertions(+), 17 deletions(-)
+ create mode 100644 include/soc/imx/cpuidle.h
