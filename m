@@ -1,43 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Jun 2016 12:29:02 +0100
-Subject: [PATCH 1/6] firmware: Amlogic: Add secure monitor driver
-In-Reply-To: <20160628081057.GA3171@localhost>
-References: <1466339944-602-1-git-send-email-carlo@caione.org>
- <1466339944-602-2-git-send-email-carlo@caione.org>
- <20160627172805.GA30514@leverpostej>
- <20160628081057.GA3171@localhost>
-Message-ID: <20160628112901.GJ31744@leverpostej>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 28 Jun 2016 13:37:58 +0200
+Subject: [RESEND PATCH v2] thermal: tango: add resume support
+Message-ID: <57726196.5060909@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 
-On Tue, Jun 28, 2016 at 10:10:57AM +0200, Carlo Caione wrote:
-> On 27/06/16 18:28, Mark Rutland wrote:
-> > On Sun, Jun 19, 2016 at 02:38:59PM +0200, Carlo Caione wrote:
-> > > +	np = of_find_matching_node_and_match(NULL, meson_sm_ids, &matched_np);
-> > > +	if (!np) {
-> > > +		pr_err("no matching node\n");
-> > > +		return -EINVAL;
-> > > +	}
-> > > +
-> > 
-> > This is going to be pointlessly noisy on every non-amlogic board out
-> > there.
-> 
-> ouch, right
-> 
-> > Please make this a platform driver, such that this is only called when a
-> > node is present, avoiding some mess there.
-> 
-> Since Rob required this to be under /firmware (and using no "simple-bus"
-> compatible to trigger the automatic creation) making it a platform
-> driver just adds a lot of boilerplate code. If this doesn't mean a NACK
-> on your side, I still would leave the code as is with the
-> device_initcall() calling the init.
+When this platform is suspended, firmware powers the entire SoC down,
+except a few hardware blocks waiting for wakeup events. And there is
+no context to save for this particular block.
 
-Ok. So long as this isn't noisy where the node is not present, that's
-fine by me.
+Therefore, there is nothing useful for the driver to do on suspend;
+so we define a NULL suspend hook. On resume, the driver initializes
+the block exactly as is done in the probe callback.
 
-Thanks,
-Mark.
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+Add Kevin's Reviewed-by tag.
+Eduardo/Zhang, can you pick this patch up for 4.8?
+---
+ drivers/thermal/tango_thermal.c | 27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/thermal/tango_thermal.c b/drivers/thermal/tango_thermal.c
+index 70e0d9f406e9..d571ce2f546d 100644
+--- a/drivers/thermal/tango_thermal.c
++++ b/drivers/thermal/tango_thermal.c
+@@ -64,6 +64,12 @@ static const struct thermal_zone_of_device_ops ops = {
+ 	.get_temp	= tango_get_temp,
+ };
+ 
++static void tango_thermal_init(struct tango_thermal_priv *priv)
++{
++	writel(0, priv->base + TEMPSI_CFG);
++	writel(CMD_ON, priv->base + TEMPSI_CMD);
++}
++
+ static int tango_thermal_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+@@ -79,14 +85,30 @@ static int tango_thermal_probe(struct platform_device *pdev)
+ 	if (IS_ERR(priv->base))
+ 		return PTR_ERR(priv->base);
+ 
++	platform_set_drvdata(pdev, priv);
+ 	priv->thresh_idx = IDX_MIN;
+-	writel(0, priv->base + TEMPSI_CFG);
+-	writel(CMD_ON, priv->base + TEMPSI_CMD);
++	tango_thermal_init(priv);
+ 
+ 	tzdev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &ops);
+ 	return PTR_ERR_OR_ZERO(tzdev);
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int tango_thermal_resume(struct device *dev)
++{
++	struct tango_thermal_priv *priv = dev_get_drvdata(dev);
++	tango_thermal_init(priv);
++
++	return 0;
++}
++
++static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
++
++#define DEV_PM_OPS	&tango_thermal_pm
++#else
++#define DEV_PM_OPS	NULL
++#endif
++
+ static const struct of_device_id tango_sensor_ids[] = {
+ 	{
+ 		.compatible = "sigma,smp8758-thermal",
+@@ -99,6 +121,7 @@ static struct platform_driver tango_thermal_driver = {
+ 	.driver	= {
+ 		.name		= "tango-thermal",
+ 		.of_match_table	= tango_sensor_ids,
++		.pm		= DEV_PM_OPS,
+ 	},
+ };
+ 
+-- 
+2.8.2
