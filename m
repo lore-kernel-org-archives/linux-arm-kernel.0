@@ -1,48 +1,74 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 28 Jun 2016 17:53:06 +0800
-Subject: [RESEND PATCH v2 0/4] Add support i2s/spdif/gmac features for
- RK322x SoCs
-In-Reply-To: <16135166.EFsm9ojsF0@phil>
-References: <1466565413-31027-1-git-send-email-zhengxing@rock-chips.com>
- <16135166.EFsm9ojsF0@phil>
-Message-ID: <57724902.2060802@rock-chips.com>
+From: k.debski@samsung.com (Kamil Debski)
+Date: Tue, 28 Jun 2016 11:57:29 +0200
+Subject: [PATCH] media: s5p-mfc fix memory leak in s5p_mfc_remove()
+In-Reply-To: <1465847114-7427-1-git-send-email-shuahkh@osg.samsung.com>
+References: <1465847114-7427-1-git-send-email-shuahkh@osg.samsung.com>
+Message-ID: <025e01d1d123$7c14e620$743eb260$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Heiko. :-)
+HI Shuah,
 
-On 2016?06?28? 03:43, Heiko Stuebner wrote:
-> Am Mittwoch, 22. Juni 2016, 11:16:49 schrieb Xing Zheng:
->> Hi,
->>    We have the brother chipset product that RK3228 and RK3229,
->> They have many common configuration, but there are a number
->> of different features. In order to develop the future when they
->> are easy to distinguish, we need them to be independent.
->>    And, these patchset add i2s/gmac dts nodes for RK322x SoCs,
->> and add the new dts file of the rk3229 evb board.
-> applied to my dts32 branch for 4.8 with the following changes
->
->> Xing Zheng (4):
->>    ARM: dts: rockchip: rename rk3228.dtsi to rk322x.dtsi
-> we'll refrain from adding empty rk3228.dtsi files until we have actual things
-> to fill it with.
->
->>    ARM: dts: rockchip: add i2s nodes for RK322x SoCs
-> moved i2s node to correct position according to register map
->
->>    ARM: dts: rockchip: add GMAC nodes for RK322x SoCs
-> dropped phy-mode and pinctrl settings, as rgmii <-> rmii is a per-board
-> thing
->
->>    ARM: dts: rockchip: add support rk3229 evb board
-> again dropped the empty rk3229.dtsi, we can add that once there are
-> additions not shared between rk3228/rk3229.
->
->
-> Heiko
->
->
->
+Which branch do you base your patches on?
 
+I have trouble applying this path
+(https://patchwork.linuxtv.org/patch/34577/) and 
+"s5p-mfc fix null pointer deference in clk_core_enable()"
+(https://patchwork.linuxtv.org/patch/34751/) 
+onto current linuxtv/master.
+
+The top commit of linuxtv/master is :
+"commit 0db5c79989de2c68d5abb7ba891bfdb3cd3b7e05
+Author: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+Date:   Thu Jun 16 08:04:40 2016 -0300
+
+    [media] media-devnode.h: Fix documentation"
+
+Could you please rebase the two patches mentioned above to the
+linuxtv/master?
+
+Best wishes,
 -- 
-- Xing Zheng
+Kamil Debski
+Samsung R&D Institute Poland
+
+
+> -----Original Message-----
+> From: Shuah Khan [mailto:shuahkh at osg.samsung.com]
+> Sent: Monday, June 13, 2016 9:45 PM
+> To: kyungmin.park at samsung.com; k.debski at samsung.com;
+> jtp.park at samsung.com; mchehab at osg.samsung.com
+> Cc: Shuah Khan; linux-arm-kernel at lists.infradead.org; linux-
+> media at vger.kernel.org; linux-kernel at vger.kernel.org
+> Subject: [PATCH] media: s5p-mfc fix memory leak in s5p_mfc_remove()
+> 
+> s5p_mfc_remove() fails to release encoder and decoder video devices.
+> 
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+> 
+> Changes since v1:
+> - Addressed comments from Javier Martinez Canillas and added
+>   his reviewed by:
+> 
+>  drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> index 274b4f1..f537b74 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> @@ -1318,6 +1318,8 @@ static int s5p_mfc_remove(struct platform_device
+> *pdev)
+> 
+>  	video_unregister_device(dev->vfd_enc);
+>  	video_unregister_device(dev->vfd_dec);
+> +	video_device_release(dev->vfd_enc);
+> +	video_device_release(dev->vfd_dec);
+>  	v4l2_device_unregister(&dev->v4l2_dev);
+>  	s5p_mfc_release_firmware(dev);
+>  	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[0]);
+> --
+> 2.7.4
