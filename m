@@ -1,110 +1,47 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Tue, 28 Jun 2016 10:20:12 +0800
-Subject: [PATCH v2 2/2] arm64:acpi Fix the acpi alignment exeception when
- 'mem=' specified
-In-Reply-To: <20160627095318.GA1113@leverpostej>
-References: <1466738027-15066-1-git-send-email-dennis.chen@arm.com>
- <1466738027-15066-2-git-send-email-dennis.chen@arm.com>
- <CAKv+Gu8ZyWG-OZ8=2u9jrdS-0j+qL1sstPQ0uX=j7wyj+ETo-w@mail.gmail.com>
- <20160624120058.GA19972@arm.com>
- <CAKv+Gu9XHYVEoL846WBx6PZqSnbBCjwup0CPkZ1JexJVkvds9A@mail.gmail.com>
- <20160627095318.GA1113@leverpostej>
-Message-ID: <20160628022010.GA9594@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 28 Jun 2016 10:27:42 +0800
+Subject: [PATCH v3 5/8] rtc: ac100: Add clk output support
+In-Reply-To: <20160627192321.GX4000@lukather>
+References: <1466391138-12862-1-git-send-email-wens@csie.org>
+ <1466391138-12862-6-git-send-email-wens@csie.org>
+ <20160622100206.GV26668@lukather>
+ <CAGb2v67DVBZbRb2PWLP8WurPaNin=2Fa=HMAEK_PdBeqv1x+8Q@mail.gmail.com>
+ <20160627192321.GX4000@lukather>
+Message-ID: <CAGb2v675+iEnKPH4zdYRA-+aQGUfHgB9K_TH_GrpmXXw4qM50w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 10:53:18AM +0100, Mark Rutland wrote:
-> On Fri, Jun 24, 2016 at 04:12:02PM +0200, Ard Biesheuvel wrote:
-> > On 24 June 2016 at 14:01, Dennis Chen <dennis.chen@arm.com> wrote:
-> > > On Fri, Jun 24, 2016 at 12:43:52PM +0200, Ard Biesheuvel wrote:
-> > >> On 24 June 2016 at 05:13, Dennis Chen <dennis.chen@arm.com> wrote:
-> > >> >         /*
-> > >> >          * Apply the memory limit if it was set. Since the kernel may be loaded
-> > >> > -        * high up in memory, add back the kernel region that must be accessible
-> > >> > -        * via the linear mapping.
-> > >> > +        * in the memory regions above the limit, so we need to clear the
-> > >> > +        * MEMBLOCK_NOMAP flag of this region to make it can be accessible via
-> > >> > +        * the linear mapping.
-> > >> >          */
-> > >> >         if (memory_limit != (phys_addr_t)ULLONG_MAX) {
-> > >> > -               memblock_enforce_memory_limit(memory_limit);
-> > >> > -               memblock_add(__pa(_text), (u64)(_end - _text));
-> > >> > +               memblock_mem_limit_mark_nomap(memory_limit);
-> > >> > +               memblock_clear_nomap(__pa(_text), (u64)(_end - _text));
-> > >>
-> > >> Up until now, we have ignored the effect of having NOMAP memblocks on
-> > >> the return values of functions like memblock_phys_mem_size() and
-> > >> memblock_mem_size(), since they could reasonably be expected to cover
-> > >> only a small slice of all available memory. However, after applying
-> > >> this patch, it may well be the case that most of memory is marked
-> > >> NOMAP, and these functions will cease to work as expected.
-> > >>
-> > > Hi Ard, I noticed these inconsistences as you mentioned, but seems the
-> > > available memory is limited correctly. For this case('mem='), will it bring
-> > > some substantive side effects except that some log messages maybe confusing?
-> > 
-> > That is exactly the question that needs answering before we can merge
-> > these patches. I know we consider mem= a development hack, but the
-> > intent is to make it appear to the kernel as if only a smaller amount
-> > of memory is available to the kernel, and this is signficantly
-> > different from having memblock_mem_size() et al return much larger
-> > values than what is actually available. Perhaps this doesn't matter at
-> > all, but it is something we must discuss before proceeding with these
-> > changes.
-> 
-> Yeah, I think we need to figure out precisely what the expected
-> semantics are.
-> 
-> From taking a look, memblock_mem_size() is only used by arch/x86. In
-> reserve_initrd, it's used to determine the amount of *free* memory, but
-> it counts reserved (and nomap) regions, so that doesn't feel right
-> regardless. For reserve_crashkernel_low it's not immediately clear to me
-> what it should do, as I've not gone digging.
+On Tue, Jun 28, 2016 at 3:23 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Jun 22, 2016 at 06:11:55PM +0800, Chen-Yu Tsai wrote:
+>> On Wed, Jun 22, 2016 at 6:02 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Hi,
+>> >
+>> > On Mon, Jun 20, 2016 at 10:52:15AM +0800, Chen-Yu Tsai wrote:
+>> >> +     /*
+>> >> +      * The ADDA 4 MHz clock is from the codec side of the AC100,
+>> >> +      * which is likely a different power domain. However, boards
+>> >> +      * always have both sides powered on, so it is impossible to
+>> >> +      * test this.
+>> >> +      */
+>> >
+>> > If that ADDA clock is exposed by the codec, why are you putting it in
+>> > the RTC?
+>>
+>> The thing is it's not entirely clear that it's from the codec side.
+>> I'm just inferring this from the name. (I'll make the comment clearer.)
+>> The codec parts of the datasheet don't mention this clock at all.
+>>
+>> Allwinner's SDK puts all the clocks under the RTC module. And the
+>> are always on, so I can't really turn off the codec and see what
+>> happens. That and I don't have an oscilloscope or logic analyzer.
 >
-After rough digging go, memblock_mem_size() used by arch/x86 to calculate
-the size of a segment of direct mapping physical memory, it only counts on 
-memory memblock region regardless of the flag of that region, so from this
-point, if we have a segment of memory marked as NOMAP, memblock_mem_size()
-will still take its size into the total size and have it a direct mapped.
-IMO memblock_mem_size() is not used to determine the amount of *free*, it
-just to determine the amount of mem that can be mapped directly, so it's
-reasonable to count reserved regions.
-    
-> 
-> There are many memblock_end_of_DRAM() users, mostly in arch code. We
-> (arm64) use it to determine the size of the linear map, and effectively
-> need it to be the limit for what should be mapped, which could/should
-> exclude nomap. I've not yet dug into the rest, so I don't know whether
-> that holds.
->
-we will use memblock_end_of_DRAM() to get the top boundary of the linear mapping,
-given some memblock region is NOMAP, so some holes will be punched into the
-linear mapping zone just as you mentioned those NOMAP should be excluded.
-As my understanding, NOMAP regions only have possible potential side effect to count
-the mem size such as memblock_mem_size 
-> 
-> > >> This means NOMAP is really only suited to punch some holes into the
-> > >> kernel direct mapping, and so implementing the memory limit by marking
-> > >> everything NOMAP is not the way to go. Instead, we should probably
-> > >> reorder the init sequence so that the regions that are reserved in the
-> > >> UEFI memory map are declared and marked NOMAP [again] after applying
-> > >> the memory limit in the old way.
-> > >>
-> > > Before this patch, I have another one addressing the same issue [1], with
-> > > that patch we'll not have these inconsistences, but it looks like a little
-> > > bit complicated, so it becomes current one. Any comments about that?
-> > >
-> > > [1]http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438443.html
-> > 
-> > The problem caused by mem= is that it removes regions that are marked
-> > NOMAP. So instead of marking everything above the limit NOMAP, I would
-> > much rather see an alternative implementation of
-> > memblock_enforce_memory_limit() that enforces the mem= limit by only
-> > removing memblocks that have to NOMAP flag cleared, and leaving the
-> > NOMAP ones where they are.
-> 
-> That would work for me.
-> 
-> Thanks,
-> Mark.
-> 
+> Why not just create a separate clock driver then?
+
+That would mean a separate device node as well. I'd like to keep
+the bindings close to how the hardware is organized.
+
+I can move the ADDA clock over to the codec side.
+
+ChenYu
