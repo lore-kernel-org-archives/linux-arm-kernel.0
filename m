@@ -1,55 +1,46 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 28 Jun 2016 12:40:02 +0300
-Subject: [PATCH] ARM: oxnas: Change OX810SE default driver config
-In-Reply-To: <577237F4.8080707@baylibre.com>
-References: <1465987517-24482-1-git-send-email-narmstrong@baylibre.com>
- <577237F4.8080707@baylibre.com>
-Message-ID: <20160628094002.GA2565@tarshish>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Tue, 28 Jun 2016 11:40:37 +0200
+Subject: [PATCH] ARM: sti: Implement dummy L2 cache's write_sec
+Message-ID: <1467106837-20996-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+From: Patrice Chotard <patrice.chotard@st.com>
 
-On Tue, Jun 28, 2016 at 10:40:20AM +0200, Neil Armstrong wrote:
-> On 06/15/2016 12:45 PM, Neil Armstrong wrote:
-> > Since the SP804 timer changes will not been merged upstream, switch the
-> > default OX810SE config to the OXNAS RPS Timer driver configuration.
-> > 
-> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > ---
-> >  arch/arm/mach-oxnas/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > Dear arm-soc maintainers,
-> > 
-> > Daniel just accepted my patchset at :
-> > http://lkml.kernel.org/r/1465985607-21231-1-git-send-email-narmstrong at baylibre.com
-> > 
-> > And now the default config can be switched to OXNAS_RPS_TIMER without any
-> > device tree changes.
-> 
-> Gentle ping about this patch, it would be great to see it in 4.8 !
+This patch implements the write_sec callback that handle PL310
+secure registers writes.
+This callback is just a stub for now, to avoid system crash.
+Later, it could handle SMC calls so that TZ handles the needed writes.
 
-To get the attention of arm-soc maintainers make sure to have arm at kernel.org 
-in your recipients list.
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ arch/arm/mach-sti/board-dt.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-baruch
-
-> > diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
-> > index 4fff3c7..ffcab02 100644
-> > --- a/arch/arm/mach-oxnas/Kconfig
-> > +++ b/arch/arm/mach-oxnas/Kconfig
-> > @@ -11,7 +11,7 @@ if ARCH_OXNAS
-> >  
-> >  config MACH_OX810SE
-> >  	bool "Support OX810SE Based Products"
-> > -	select ARM_TIMER_SP804
-> > +	select OXNAS_RPS_TIMER
-> >  	select COMMON_CLK_OXNAS
-> >  	select CPU_ARM926T
-> >  	select MFD_SYSCON
-
+diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+index cfee0ef..e04cd1b 100644
+--- a/arch/arm/mach-sti/board-dt.c
++++ b/arch/arm/mach-sti/board-dt.c
+@@ -23,6 +23,14 @@ static const char *const stih41x_dt_match[] __initconst = {
+ 	NULL
+ };
+ 
++static void sti_l2_write_sec(unsigned long val, unsigned reg)
++{
++	/*
++	 * We can't write to secure registers as we are in non-secure
++	 * mode, until we have some SMI service available.
++	 */
++}
++
+ DT_MACHINE_START(STM, "STi SoC with Flattened Device Tree")
+ 	.dt_compat	= stih41x_dt_match,
+ 	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE |
+@@ -31,4 +39,5 @@ DT_MACHINE_START(STM, "STi SoC with Flattened Device Tree")
+ 			  L2C_AUX_CTRL_WAY_SIZE(4),
+ 	.l2c_aux_mask	= 0xc0000fff,
+ 	.smp		= smp_ops(sti_smp_ops),
++	.l2c_write_sec	= sti_l2_write_sec,
+ MACHINE_END
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+1.9.1
