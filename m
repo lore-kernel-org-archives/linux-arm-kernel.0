@@ -1,88 +1,52 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 28 Jun 2016 05:55:58 +0000
-Subject: [PATCH 2/4] dmaengine: vdma: Add support for mulit-channel dma
- mode
-In-Reply-To: <20160628043459.GR22564@localhost>
-References: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
- <1465549954-30220-3-git-send-email-appanad@xilinx.com>
- <20160621155502.GB16910@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A5B8248@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160621163340.GE16910@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A5B84A9@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160628043459.GR22564@localhost>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5B9B9E@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 28 Jun 2016 11:36:10 +0530
+Subject: [PATCH v3 00/10] mfd: tps65218: Clean ups
+Message-ID: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+The series cleans up mainly the regulator driver and implements
+the device tree parsing using the regulator framework. Removes
+all the redundant compatibles for the individual regulators.
+Removes compatible for gpio driver as well and adds it to
+the mfd_cell.
 
-	Thanks for the review...
+One of the patch removes redundant read wrapper and makes
+use of regmap_read wherever necessary.
 
-> > > > > >  /**
-> > > > > > + * struct xilinx_mcdma_config - DMA Multi channel
-> > > > > > +configuration structure
-> > > > > > + * @tdest: Channel to operate on
-> > > > > > + * @tid:   Channel configuration
-> > > > > > + * @tuser: Tuser configuration
-> > > > > > + * @ax_user: ax_user value
-> > > > > > + * @ax_cache: ax_cache value
-> > > > > > + */
-> > > > > > +struct xilinx_mcdma_config {
-> > > > > > +	u8 tdest;
-> > > > > > +	u8 tid;
-> > > > > > +	u8 tuser;
-> > > > > > +	u8 ax_user;
-> > > > > > +	u8 ax_cache;
-> > > > >
-> > > > > can you describe these in details, what do these do, what are
-> > > > > the values to be programmed?
-> > > >
-> > > > As said above In Multi-Channel Mode each Stream interface can be
-> > > > Configured up to 16 channels each channel is differentiated based
-> > > > on the tdest
-> > > and tid values.
-> > >
-> > > Then why are you not registering 16 channels for this? That should
-> > > give you channel to operate on!
-> >
-> > The number of channels are configurable.
-> > We are registering number of Channels that h/w configured for.
-> >
-> > Will fix in the next version. Will remove this config.
-> > And based on the channel type will configure the h/w.
-> 
-> Looking at this you should redesign!
-> 
-> The vchan was designed to operate on 'virtual' channels. The hardware channels
-> can be independent of that.
-> 
-> Your IP seems to be a good fit for that approach. Do not link the two and
-> separate them. User can have a virtual channel. In your driver, you can manage
-> hardware channels...
+The series is checked for all the regulator registrations on
+am437x-gp-evm and am437x-sk-evm.
 
-Fixed it in the v2 and posted the v2 series.
-Please go thought it...
+Changes in v3:
 
-> 
-> >
-> > >
-> > > >
-> > > > tdest:
-> > > > TDEST provides routing information for the data stream.
-> > >
-> > > pls elobrate
-> >
-> > Need to configure this with the channel number that We would like to
-> > transfer data.
-> 
-> This should be internal to driver...
+Missed making corresponding changes in the power button and gpio
+drivers. Added couple of patches to fix them to use mfd_cell way
+of parsing.
 
-Fixed it in the v2 and posted the v2 series.
-Please go thought it...
 
-Regards,
-Kedar.
+Keerthy (10):
+  mfd: tps65218: Remove redundant read wrapper
+  Documentation: regulator: tps65218: Update examples
+  input: tps65218-pwrbutton: Add platform_device_id table
+  mfd: tps65218: Use mfd_add_devices instead of of_platform_populate
+  regulator: tps65218: Remove all the compatibles
+  gpio: tps65218: Remove the compatible
+  ARM: dts: AM437X-GP-EVM: Remove redundant regulator compatibles
+  ARM: dts: AM437X-SK-EVM: Remove redundant regulator compatibles
+  ARM: dts: AM437X-CM-T43: Remove redundant regulator compatibles
+  ARM: dts: AM43X-EPOS-EVM: Remove redundant regulator compatibles
 
-> 
-> --
-> ~Vinod
+ .../devicetree/bindings/regulator/tps65218.txt     |  87 ++++++++++---
+ arch/arm/boot/dts/am437x-cm-t43.dts                |   6 -
+ arch/arm/boot/dts/am437x-gp-evm.dts                |   6 -
+ arch/arm/boot/dts/am437x-sk-evm.dts                |   5 -
+ arch/arm/boot/dts/am43x-epos-evm.dts               |   7 --
+ drivers/gpio/gpio-tps65218.c                       |  13 +-
+ drivers/input/misc/tps65218-pwrbutton.c            |  10 +-
+ drivers/mfd/tps65218.c                             |  29 ++---
+ drivers/regulator/tps65218-regulator.c             | 134 ++++++++-------------
+ include/linux/mfd/tps65218.h                       |   2 -
+ 10 files changed, 147 insertions(+), 152 deletions(-)
+
+-- 
+1.9.1
