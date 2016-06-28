@@ -1,99 +1,152 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Tue, 28 Jun 2016 14:59:46 +0800
-Subject: [PATCH V2 1/4] trace: Introduce an output interface from ftrace
- to STM
-In-Reply-To: <87mvmdu5qj.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1466563613-31578-1-git-send-email-zhang.chunyan@linaro.org>
- <1466563613-31578-2-git-send-email-zhang.chunyan@linaro.org>
- <87mvmdu5qj.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CAG2=9p_rVX9bWUB2VuTumxkK2BxcLg3=JfWMdZzjBda6BNMqoQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jun 2016 08:00:55 +0100
+Subject: [PATCH v3 01/10] mfd: tps65218: Remove redundant read wrapper
+In-Reply-To: <1467093980-11458-2-git-send-email-j-keerthy@ti.com>
+References: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
+ <1467093980-11458-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <20160628070055.GF6720@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2016 at 1:56 PM, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> [adding Felipe for his sudden interest in the subject matter]
->
-> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
->
->> +static struct stm_ftrace *trace_output;
->
-> What you want is a possibility to have different ftrace outputs, not
-> different STM outputs for ftrace (again, STM core already does this).
-> In other words, here, you want to have the notion of "output" be
-> stm-agnostic, but be a generalized output driver object.
+On Tue, 28 Jun 2016, Keerthy wrote:
 
-Ok, I will make it more generic, i.e. an agnostic of the exact output devices.
+> Currently read directly calls the repmap read function. Hence
+> remove the redundant wrapper and use regmap read wherever
+> needed.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+> 
+> Changes in v3:
+> 
+>   * Cleaned up tps65218-pwrbutton and gpio drivers to remove
+>     tps65218_reg_read instances.
+> 
+>  drivers/gpio/gpio-tps65218.c            |  3 ++-
+>  drivers/input/misc/tps65218-pwrbutton.c |  3 ++-
+>  drivers/mfd/tps65218.c                  | 16 +---------------
+>  drivers/regulator/tps65218-regulator.c  |  3 ++-
+>  include/linux/mfd/tps65218.h            |  2 --
+>  5 files changed, 7 insertions(+), 20 deletions(-)
 
->
->> +
->> +void trace_func_to_stm(unsigned long ip, unsigned long parent_ip)
->> +{
->> +     unsigned long ip_array[2] = {ip, parent_ip};
->> +
->> +     if (trace_output)
->> +             trace_output->write(&trace_output->data, (char *)ip_array,
->> +                                 sizeof(unsigned long) * 2, STM_FTRACE_CHAN);
->> +}
->
-> The ip+parent_ip pair is still not a useful output from ftrace
-> data. Moreover, doing this is basically like inventing another binary
-> protocol for ftrace data over stm, where ftrace is in and of itself
-> already a binary protocol, why not just use that? The decoder will
-> basically depend on the kernel binary from whence the traces are
-> coming, but this is a requirement even if we want to decypher the
-> ip+parent_ip data you're proposing.
->
-> We would need to take some time to think this through. What we might
-> consider is:
->
->  * bypassing ftrace ring buffer, sending data directly to an "output",
->    which has a drawback of ending up in a driver callback, which needs
->    to serialize on its driver stuff and write registers (I did try to
->    make stm_write as light as possible when I wrote it, though); the
->    good part is that data goes into the wire as soon as it is produced
->    instead of being buffered along the way;
+I like the idea.  So, as long as the patch is properly build tested:
 
-I want to try this way, if I remember correctly, Steven Rostedt said
-the similar solution before, use a jump label to switch which "output"
-traces should be sent to.  And yes like you said, the drawback is
-exporting trace data to STM by writing registers is slower than
-writing ring buffer, it would slow down the process.
+For the MFD part:
+  Acked-by: Lee Jones <lee.jones@linaro.org>
 
->  * starting a work (or multiple works) that would traverse new data in
->    ftrace buffer and feed it to an "output", such as stm; this has a
->    problem of producers being potentially faster than consumers
->    (consider 'function' tracer, for example) and hogging the cpus by
->    simply exporting trace data; this also botches the stm timestamps,
+> diff --git a/drivers/gpio/gpio-tps65218.c b/drivers/gpio/gpio-tps65218.c
+> index 0eaeac8..0f9d9bd 100644
+> --- a/drivers/gpio/gpio-tps65218.c
+> +++ b/drivers/gpio/gpio-tps65218.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/gpio/driver.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+>  #include <linux/mfd/tps65218.h>
+>  
+>  struct tps65218_gpio {
+> @@ -30,7 +31,7 @@ static int tps65218_gpio_get(struct gpio_chip *gc, unsigned offset)
+>  	unsigned int val;
+>  	int ret;
+>  
+> -	ret = tps65218_reg_read(tps65218, TPS65218_REG_ENABLE2, &val);
+> +	ret = regmap_read(tps65218->regmap, TPS65218_REG_ENABLE2, &val);
+>  	if (ret)
+>  		return ret;
+>  
+> diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
+> index a39b626..2bba8de 100644
+> --- a/drivers/input/misc/tps65218-pwrbutton.c
+> +++ b/drivers/input/misc/tps65218-pwrbutton.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+>  #include <linux/slab.h>
+>  
+>  struct tps65218_pwrbutton {
+> @@ -36,7 +37,7 @@ static irqreturn_t tps65218_pwr_irq(int irq, void *_pwr)
+>  	unsigned int reg;
+>  	int error;
+>  
+> -	error = tps65218_reg_read(pwr->tps, TPS65218_REG_STATUS, &reg);
+> +	error = regmap_read(pwr->tps->regmap, TPS65218_REG_STATUS, &reg);
+>  	if (error) {
+>  		dev_err(pwr->dev, "can't read register: %d\n", error);
+>  		goto out;
+> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+> index 80b9dc3..f20a531 100644
+> --- a/drivers/mfd/tps65218.c
+> +++ b/drivers/mfd/tps65218.c
+> @@ -34,20 +34,6 @@
+>  #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+>  
+>  /**
+> - * tps65218_reg_read: Read a single tps65218 register.
+> - *
+> - * @tps: Device to read from.
+> - * @reg: Register to read.
+> - * @val: Contians the value
+> - */
+> -int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
+> -			unsigned int *val)
+> -{
+> -	return regmap_read(tps->regmap, reg, val);
+> -}
+> -EXPORT_SYMBOL_GPL(tps65218_reg_read);
+> -
+> -/**
+>   * tps65218_reg_write: Write a single tps65218 register.
+>   *
+>   * @tps65218: Device to write to.
+> @@ -93,7 +79,7 @@ static int tps65218_update_bits(struct tps65218 *tps, unsigned int reg,
+>  	int ret;
+>  	unsigned int data;
+>  
+> -	ret = tps65218_reg_read(tps, reg, &data);
+> +	ret = regmap_read(tps->regmap, reg, &data);
+>  	if (ret) {
+>  		dev_err(tps->dev, "Read from reg 0x%x failed\n", reg);
+>  		return ret;
+> diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
+> index a5e5634..679ab2f 100644
+> --- a/drivers/regulator/tps65218-regulator.c
+> +++ b/drivers/regulator/tps65218-regulator.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/err.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of_device.h>
+> +#include <linux/regmap.h>
+>  #include <linux/regulator/of_regulator.h>
+>  #include <linux/regulator/driver.h>
+>  #include <linux/regulator/machine.h>
+> @@ -224,7 +225,7 @@ static int tps65218_pmic_get_current_limit(struct regulator_dev *dev)
+>  	unsigned int index;
+>  	struct tps65218 *tps = rdev_get_drvdata(dev);
+>  
+> -	retval = tps65218_reg_read(tps, dev->desc->csel_reg, &index);
+> +	retval = regmap_read(tps->regmap, dev->desc->csel_reg, &index);
+>  	if (retval < 0)
+>  		return retval;
+>  
+> diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
+> index d58f3b5..7c9241f 100644
+> --- a/include/linux/mfd/tps65218.h
+> +++ b/include/linux/mfd/tps65218.h
+> @@ -276,8 +276,6 @@ struct tps65218 {
+>  	struct regmap *regmap;
+>  };
+>  
+> -int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
+> -					unsigned int *val);
+>  int tps65218_reg_write(struct tps65218 *tps, unsigned int reg,
+>  			unsigned int val, unsigned int level);
+>  int tps65218_set_bits(struct tps65218 *tps, unsigned int reg,
 
-With stm timestamps on each trace data, we can sync up every events
-happened on the system, not only on CPU but also on other processors,
-this is useful if only the timestamps are nearly real-time, from this
-view, the second way seems not so more feasible than the first one.
-
-Please correct me if I'm missing something.
-
-Thanks for your comments,
-Chunyan
-
->    which will then be representative of nothing in particular.
->
->> +
->> +void trace_add_output(struct stm_ftrace *stm)
->> +{
->> +     trace_output = stm;
->> +}
->> +EXPORT_SYMBOL_GPL(trace_add_output);
->> +
->> +void trace_rm_output(void)
->> +{
->> +     trace_output = NULL;
->> +}
->> +EXPORT_SYMBOL_GPL(trace_rm_output);
->
-> These, of course, only work because they are implicitly serialized on
-> stm core's link locks.
->
-> Regards,
-> --
-> Alex
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
