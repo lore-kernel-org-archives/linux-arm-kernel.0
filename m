@@ -1,36 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 28 Jun 2016 10:17:59 -0700
-Subject: [PATCH 1/8] arm64: dts: db820c: add basic board support
-In-Reply-To: <5769058D.9020008@linaro.org>
-References: <1466452907-23290-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1466452907-23290-2-git-send-email-srinivas.kandagatla@linaro.org>
- <57687B08.9060900@codeaurora.org> <5769058D.9020008@linaro.org>
-Message-ID: <20160628171759.GZ1521@codeaurora.org>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 28 Jun 2016 18:36:34 +0100
+Subject: [PATCH v11 0/3] ARM: hisi: Add initial support for Hi3519 SOC
+In-Reply-To: <1465957147-32314-1-git-send-email-xuejiancheng@hisilicon.com>
+References: <1465957147-32314-1-git-send-email-xuejiancheng@hisilicon.com>
+Message-ID: <5772B5A2.7030404@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21, Srinivas Kandagatla wrote:
-> I agree, this should match up with the dtbTool. I have been manually
-> patching up dtb to include the board-id, pmic id stuff.
+Hi Jiancheng,
 
-Uh oh :/
-
+On 15/06/2016 03:19, Jiancheng Xue wrote:
+> These three patches are abstracted from the patchset titled
+> "[RESEND PATCH v10 0/6] ARM: hisi: Add initial support including
+> clock driver for Hi3519 soc."(https://lkml.org/lkml/2016/3/31/175).
+> The clock driver part was merged in v4.7-rc1. This patch set
+> is mainly used to enable Hi3519 basic soc and add dts files.
 > 
-> I will fix it in next version,
-> 
-> Did not look at full details but, For some reason dtbTool does not
-> support multiple compatible strings, do you think it makes sense to
-> add this support in dtb tool to cope up with compatible strings
-> like:
-> 
-> compatible = "qcom,apq8096-db820c", "qcom,apq8096-sbc";
+> Jiancheng Xue (3):
+>   ARM: hisi: add compatible string for Hi3519 soc
+>   ARM: dt-bindings: add device tree bindings for Hi3519 sysctrl
+>   ARM: dts: add dts files for Hi3519
 > 
 
-Hmm I suppose we can add support to look for the first compatible
-that matches something that we can generate an id for? That would
-allow us to have the LK compatible and then whatever is more
-specific than that which the bootloader doesn't care about.
+Thanks!
+Applied all the 3 patches to the hisilicon soc tree.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I have modified the dts Makefile in the patch 3 and shuffled
+the ARCH_HIGHBANK, ARCH_HISI and ARCH_HIX5HD2 around to
+keep the list sorted.
+
+Best Regards,
+Wei
