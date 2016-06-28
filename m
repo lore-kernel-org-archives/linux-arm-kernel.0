@@ -1,166 +1,288 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 28 Jun 2016 18:00:49 +0530
-Subject: [PATCH v6 1/6] mfd: tps65218: Remove redundant read wrapper
+Date: Tue, 28 Jun 2016 18:00:54 +0530
+Subject: [PATCH v6 6/6] regulator: tps65218: Remove all the compatibles
 In-Reply-To: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
 References: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1467117054-12943-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <1467117054-12943-7-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently read directly calls the repmap read function. Hence
-remove the redundant wrapper and use regmap read wherever
-needed.
+Remove all the individual compatibles for all the regulators
+and introduce id_table and update the driver accordingly
+to parse device tree nodes using the regulator framework.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Mark Brown <broonie@kernel.org>
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
 Changes in v6:
 
 Rebased against linux-next + https://lkml.org/lkml/2016/6/24/122 series.
 
-Changes in v4:
+Changes in v5:
 
-  * Added Lee Jones's Ack.
+  * Rebased to latest linux-next.
+  * Added dynamic allocation for strobes as part of rebasing.
 
-Changes in v3:
+ drivers/regulator/tps65218-regulator.c | 150 ++++++++++++---------------------
+ include/linux/mfd/tps65218.h           |   1 +
+ 2 files changed, 57 insertions(+), 94 deletions(-)
 
-   * Cleaned up tps65218-pwrbutton and gpio drivers to remove
-     tps65218_reg_read instances.
-
- drivers/gpio/gpio-tps65218.c            |  3 ++-
- drivers/input/misc/tps65218-pwrbutton.c |  3 ++-
- drivers/mfd/tps65218.c                  | 18 ++----------------
- drivers/regulator/tps65218-regulator.c  |  5 +++--
- include/linux/mfd/tps65218.h            |  2 --
- 5 files changed, 9 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/gpio/gpio-tps65218.c b/drivers/gpio/gpio-tps65218.c
-index 0eaeac8..0f9d9bd 100644
---- a/drivers/gpio/gpio-tps65218.c
-+++ b/drivers/gpio/gpio-tps65218.c
-@@ -16,6 +16,7 @@
- #include <linux/errno.h>
- #include <linux/gpio/driver.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
- #include <linux/mfd/tps65218.h>
- 
- struct tps65218_gpio {
-@@ -30,7 +31,7 @@ static int tps65218_gpio_get(struct gpio_chip *gc, unsigned offset)
- 	unsigned int val;
- 	int ret;
- 
--	ret = tps65218_reg_read(tps65218, TPS65218_REG_ENABLE2, &val);
-+	ret = regmap_read(tps65218->regmap, TPS65218_REG_ENABLE2, &val);
- 	if (ret)
- 		return ret;
- 
-diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
-index a39b626..2bba8de 100644
---- a/drivers/input/misc/tps65218-pwrbutton.c
-+++ b/drivers/input/misc/tps65218-pwrbutton.c
-@@ -22,6 +22,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
- #include <linux/slab.h>
- 
- struct tps65218_pwrbutton {
-@@ -36,7 +37,7 @@ static irqreturn_t tps65218_pwr_irq(int irq, void *_pwr)
- 	unsigned int reg;
- 	int error;
- 
--	error = tps65218_reg_read(pwr->tps, TPS65218_REG_STATUS, &reg);
-+	error = regmap_read(pwr->tps->regmap, TPS65218_REG_STATUS, &reg);
- 	if (error) {
- 		dev_err(pwr->dev, "can't read register: %d\n", error);
- 		goto out;
-diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-index ba610ad..9bca1b1 100644
---- a/drivers/mfd/tps65218.c
-+++ b/drivers/mfd/tps65218.c
-@@ -34,20 +34,6 @@
- #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
- 
- /**
-- * tps65218_reg_read: Read a single tps65218 register.
-- *
-- * @tps: Device to read from.
-- * @reg: Register to read.
-- * @val: Contians the value
-- */
--int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
--			unsigned int *val)
--{
--	return regmap_read(tps->regmap, reg, val);
--}
--EXPORT_SYMBOL_GPL(tps65218_reg_read);
--
--/**
-  * tps65218_reg_write: Write a single tps65218 register.
-  *
-  * @tps65218: Device to write to.
-@@ -93,7 +79,7 @@ static int tps65218_update_bits(struct tps65218 *tps, unsigned int reg,
- 	int ret;
- 	unsigned int data;
- 
--	ret = tps65218_reg_read(tps, reg, &data);
-+	ret = regmap_read(tps->regmap, reg, &data);
- 	if (ret) {
- 		dev_err(tps->dev, "Read from reg 0x%x failed\n", reg);
- 		return ret;
-@@ -251,7 +237,7 @@ static int tps65218_probe(struct i2c_client *client,
- 	if (ret < 0)
- 		return ret;
- 
--	ret = tps65218_reg_read(tps, TPS65218_REG_CHIPID, &chipid);
-+	ret = regmap_read(tps->regmap, TPS65218_REG_CHIPID, &chipid);
- 	if (ret) {
- 		dev_err(tps->dev, "Failed to read chipid: %d\n", ret);
- 		return ret;
 diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
-index eb0f5b1..ae16caf 100644
+index ae16caf..9aafbb0 100644
 --- a/drivers/regulator/tps65218-regulator.c
 +++ b/drivers/regulator/tps65218-regulator.c
-@@ -22,6 +22,7 @@
- #include <linux/err.h>
- #include <linux/platform_device.h>
- #include <linux/of_device.h>
-+#include <linux/regmap.h>
- #include <linux/regulator/of_regulator.h>
- #include <linux/regulator/driver.h>
- #include <linux/regulator/machine.h>
-@@ -272,7 +273,7 @@ static int tps65218_pmic_get_current_limit(struct regulator_dev *dev)
- 	unsigned int index;
- 	struct tps65218 *tps = rdev_get_drvdata(dev);
+@@ -31,10 +31,11 @@
+ enum tps65218_regulators { DCDC1, DCDC2, DCDC3, DCDC4,
+ 			   DCDC5, DCDC6, LDO1, LS3 };
  
--	retval = tps65218_reg_read(tps, dev->desc->csel_reg, &index);
-+	retval = regmap_read(tps->regmap, dev->desc->csel_reg, &index);
- 	if (retval < 0)
- 		return retval;
+-#define TPS65218_REGULATOR(_name, _id, _type, _ops, _n, _vr, _vm, _er, _em, \
+-			   _cr, _cm, _lr, _nlr, _delay, _fuv, _sr, _sm)	\
++#define TPS65218_REGULATOR(_name, _of, _id, _type, _ops, _n, _vr, _vm, _er, \
++			   _em, _cr, _cm, _lr, _nlr, _delay, _fuv, _sr, _sm) \
+ 	{							\
+ 		.name			= _name,		\
++		.of_match		= _of,			\
+ 		.id			= _id,			\
+ 		.ops			= &_ops,		\
+ 		.n_voltages		= _n,			\
+@@ -55,14 +56,6 @@ enum tps65218_regulators { DCDC1, DCDC2, DCDC3, DCDC4,
+ 		.bypass_mask	= _sm,				\
+ 	}							\
  
-@@ -383,7 +384,7 @@ static int tps65218_regulator_probe(struct platform_device *pdev)
- 		return PTR_ERR(rdev);
- 	}
- 
--	ret = tps65218_reg_read(tps, regulators[id].bypass_reg, &val);
-+	ret = regmap_read(tps->regmap, regulators[id].bypass_reg, &val);
- 	if (ret)
- 		return ret;
- 
-diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
-index d1db952..51bef53 100644
---- a/include/linux/mfd/tps65218.h
-+++ b/include/linux/mfd/tps65218.h
-@@ -284,8 +284,6 @@ struct tps65218 {
- 	struct regmap *regmap;
+-#define TPS65218_INFO(_id, _nm, _min, _max)	\
+-	[_id] = {					\
+-		.id		= _id,			\
+-		.name		= _nm,			\
+-		.min_uV		= _min,			\
+-		.max_uV		= _max,			\
+-	}
+-
+ static const struct regulator_linear_range dcdc1_dcdc2_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(850000, 0x0, 0x32, 10000),
+ 	REGULATOR_LINEAR_RANGE(1375000, 0x33, 0x3f, 25000),
+@@ -78,36 +71,6 @@ static const struct regulator_linear_range dcdc4_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(1600000, 0x10, 0x34, 50000),
  };
  
--int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
--					unsigned int *val);
+-static struct tps_info tps65218_pmic_regs[] = {
+-	TPS65218_INFO(DCDC1, "DCDC1", 850000, 1675000),
+-	TPS65218_INFO(DCDC2, "DCDC2", 850000, 1675000),
+-	TPS65218_INFO(DCDC3, "DCDC3", 900000, 3400000),
+-	TPS65218_INFO(DCDC4, "DCDC4", 1175000, 3400000),
+-	TPS65218_INFO(DCDC5, "DCDC5", 1000000, 1000000),
+-	TPS65218_INFO(DCDC6, "DCDC6", 1800000, 1800000),
+-	TPS65218_INFO(LDO1, "LDO1", 900000, 3400000),
+-	TPS65218_INFO(LS3, "LS3", -1, -1),
+-};
+-
+-#define TPS65218_OF_MATCH(comp, label) \
+-	{ \
+-		.compatible = comp, \
+-		.data = &label, \
+-	}
+-
+-static const struct of_device_id tps65218_of_match[] = {
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc1", tps65218_pmic_regs[DCDC1]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc2", tps65218_pmic_regs[DCDC2]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc3", tps65218_pmic_regs[DCDC3]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc4", tps65218_pmic_regs[DCDC4]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc5", tps65218_pmic_regs[DCDC5]),
+-	TPS65218_OF_MATCH("ti,tps65218-dcdc6", tps65218_pmic_regs[DCDC6]),
+-	TPS65218_OF_MATCH("ti,tps65218-ldo1", tps65218_pmic_regs[LDO1]),
+-	TPS65218_OF_MATCH("ti,tps65218-ls3", tps65218_pmic_regs[LS3]),
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(of, tps65218_of_match);
+-
+ static int tps65218_pmic_set_voltage_sel(struct regulator_dev *dev,
+ 					 unsigned selector)
+ {
+@@ -189,7 +152,7 @@ static int tps65218_pmic_set_suspend_disable(struct regulator_dev *dev)
+ 	if (rid == TPS65218_DCDC_3 && tps->rev == TPS65218_REV_2_1)
+ 		return 0;
+ 
+-	if (!tps->info[rid]->strobe) {
++	if (!tps->strobes[rid]) {
+ 		if (rid == TPS65218_DCDC_3)
+ 			tps->info[rid]->strobe = 3;
+ 		else
+@@ -198,8 +161,7 @@ static int tps65218_pmic_set_suspend_disable(struct regulator_dev *dev)
+ 
+ 	return tps65218_set_bits(tps, dev->desc->bypass_reg,
+ 				 dev->desc->bypass_mask,
+-				 tps->info[rid]->strobe,
+-				 TPS65218_PROTECT_L1);
++				 tps->strobes[rid], TPS65218_PROTECT_L1);
+ }
+ 
+ /* Operations permitted on DCDC1, DCDC2 */
+@@ -301,104 +263,104 @@ static struct regulator_ops tps65218_dcdc56_pmic_ops = {
+ };
+ 
+ static const struct regulator_desc regulators[] = {
+-	TPS65218_REGULATOR("DCDC1", TPS65218_DCDC_1, REGULATOR_VOLTAGE,
+-			   tps65218_dcdc12_ops, 64, TPS65218_REG_CONTROL_DCDC1,
++	TPS65218_REGULATOR("DCDC1", "regulator-dcdc1", TPS65218_DCDC_1,
++			   REGULATOR_VOLTAGE, tps65218_dcdc12_ops, 64,
++			   TPS65218_REG_CONTROL_DCDC1,
+ 			   TPS65218_CONTROL_DCDC1_MASK, TPS65218_REG_ENABLE1,
+ 			   TPS65218_ENABLE1_DC1_EN, 0, 0, dcdc1_dcdc2_ranges,
+ 			   2, 4000, 0, TPS65218_REG_SEQ3,
+ 			   TPS65218_SEQ3_DC1_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC2", TPS65218_DCDC_2, REGULATOR_VOLTAGE,
+-			   tps65218_dcdc12_ops, 64, TPS65218_REG_CONTROL_DCDC2,
++	TPS65218_REGULATOR("DCDC2", "regulator-dcdc2", TPS65218_DCDC_2,
++			   REGULATOR_VOLTAGE, tps65218_dcdc12_ops, 64,
++			   TPS65218_REG_CONTROL_DCDC2,
+ 			   TPS65218_CONTROL_DCDC2_MASK, TPS65218_REG_ENABLE1,
+ 			   TPS65218_ENABLE1_DC2_EN, 0, 0, dcdc1_dcdc2_ranges,
+ 			   2, 4000, 0, TPS65218_REG_SEQ3,
+ 			   TPS65218_SEQ3_DC2_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC3", TPS65218_DCDC_3, REGULATOR_VOLTAGE,
+-			   tps65218_ldo1_dcdc34_ops, 64,
++	TPS65218_REGULATOR("DCDC3", "regulator-dcdc3", TPS65218_DCDC_3,
++			   REGULATOR_VOLTAGE, tps65218_ldo1_dcdc34_ops, 64,
+ 			   TPS65218_REG_CONTROL_DCDC3,
+ 			   TPS65218_CONTROL_DCDC3_MASK, TPS65218_REG_ENABLE1,
+ 			   TPS65218_ENABLE1_DC3_EN, 0, 0, ldo1_dcdc3_ranges, 2,
+ 			   0, 0, TPS65218_REG_SEQ4, TPS65218_SEQ4_DC3_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC4", TPS65218_DCDC_4, REGULATOR_VOLTAGE,
+-			   tps65218_ldo1_dcdc34_ops, 53,
++	TPS65218_REGULATOR("DCDC4", "regulator-dcdc4", TPS65218_DCDC_4,
++			   REGULATOR_VOLTAGE, tps65218_ldo1_dcdc34_ops, 53,
+ 			   TPS65218_REG_CONTROL_DCDC4,
+ 			   TPS65218_CONTROL_DCDC4_MASK, TPS65218_REG_ENABLE1,
+ 			   TPS65218_ENABLE1_DC4_EN, 0, 0, dcdc4_ranges, 2,
+ 			   0, 0, TPS65218_REG_SEQ4, TPS65218_SEQ4_DC4_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC5", TPS65218_DCDC_5, REGULATOR_VOLTAGE,
+-			   tps65218_dcdc56_pmic_ops, 1, -1, -1,
+-			   TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC5_EN, 0, 0,
+-			   NULL, 0, 0, 1000000, TPS65218_REG_SEQ5,
++	TPS65218_REGULATOR("DCDC5", "regulator-dcdc5", TPS65218_DCDC_5,
++			   REGULATOR_VOLTAGE, tps65218_dcdc56_pmic_ops, 1, -1,
++			   -1, TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC5_EN, 0,
++			   0, NULL, 0, 0, 1000000, TPS65218_REG_SEQ5,
+ 			   TPS65218_SEQ5_DC5_SEQ_MASK),
+-	TPS65218_REGULATOR("DCDC6", TPS65218_DCDC_6, REGULATOR_VOLTAGE,
+-			   tps65218_dcdc56_pmic_ops, 1, -1, -1,
+-			   TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC6_EN, 0, 0,
+-			   NULL, 0, 0, 1800000, TPS65218_REG_SEQ5,
++	TPS65218_REGULATOR("DCDC6", "regulator-dcdc6", TPS65218_DCDC_6,
++			   REGULATOR_VOLTAGE, tps65218_dcdc56_pmic_ops, 1, -1,
++			   -1, TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC6_EN, 0,
++			   0, NULL, 0, 0, 1800000, TPS65218_REG_SEQ5,
+ 			   TPS65218_SEQ5_DC6_SEQ_MASK),
+-	TPS65218_REGULATOR("LDO1", TPS65218_LDO_1, REGULATOR_VOLTAGE,
+-			   tps65218_ldo1_dcdc34_ops, 64,
++	TPS65218_REGULATOR("LDO1", "regulator-ldo1", TPS65218_LDO_1,
++			   REGULATOR_VOLTAGE, tps65218_ldo1_dcdc34_ops, 64,
+ 			   TPS65218_REG_CONTROL_LDO1,
+ 			   TPS65218_CONTROL_LDO1_MASK, TPS65218_REG_ENABLE2,
+ 			   TPS65218_ENABLE2_LDO1_EN, 0, 0, ldo1_dcdc3_ranges,
+ 			   2, 0, 0, TPS65218_REG_SEQ6,
+ 			   TPS65218_SEQ6_LDO1_SEQ_MASK),
+-	TPS65218_REGULATOR("LS3", TPS65218_LS_3, REGULATOR_CURRENT,
+-			   tps65218_ls3_ops, 0, 0, 0, TPS65218_REG_ENABLE2,
+-			   TPS65218_ENABLE2_LS3_EN, TPS65218_REG_CONFIG2,
+-			   TPS65218_CONFIG2_LS3ILIM_MASK, NULL, 0, 0, 0, 0, 0),
++	TPS65218_REGULATOR("LS3", "regulator-ls3", TPS65218_LS_3,
++			   REGULATOR_CURRENT, tps65218_ls3_ops, 0, 0, 0,
++			   TPS65218_REG_ENABLE2, TPS65218_ENABLE2_LS3_EN,
++			   TPS65218_REG_CONFIG2, TPS65218_CONFIG2_LS3ILIM_MASK,
++			   NULL, 0, 0, 0, 0, 0),
+ };
+ 
+ static int tps65218_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct tps65218 *tps = dev_get_drvdata(pdev->dev.parent);
+-	struct regulator_init_data *init_data;
+-	const struct tps_info	*template;
+ 	struct regulator_dev *rdev;
+-	const struct of_device_id	*match;
+ 	struct regulator_config config = { };
+-	int id, ret;
++	int i, ret;
+ 	unsigned int val;
+ 
+-	match = of_match_device(tps65218_of_match, &pdev->dev);
+-	if (!match)
+-		return -ENODEV;
+-
+-	template = match->data;
+-	id = template->id;
+-	init_data = of_get_regulator_init_data(&pdev->dev, pdev->dev.of_node,
+-					       &regulators[id]);
+-
+-	platform_set_drvdata(pdev, tps);
+-
+-	tps->info[id] = &tps65218_pmic_regs[id];
+ 	config.dev = &pdev->dev;
+-	config.init_data = init_data;
++	config.dev->of_node = tps->dev->of_node;
+ 	config.driver_data = tps;
+ 	config.regmap = tps->regmap;
+-	config.of_node = pdev->dev.of_node;
+ 
+-	rdev = devm_regulator_register(&pdev->dev, &regulators[id], &config);
+-	if (IS_ERR(rdev)) {
+-		dev_err(tps->dev, "failed to register %s regulator\n",
+-			pdev->name);
+-		return PTR_ERR(rdev);
+-	}
++	/* Allocate memory for strobes */
++	tps->strobes = devm_kzalloc(&pdev->dev, sizeof(u8) *
++				    TPS65218_NUM_REGULATOR, GFP_KERNEL);
+ 
+-	ret = regmap_read(tps->regmap, regulators[id].bypass_reg, &val);
+-	if (ret)
+-		return ret;
++	for (i = 0; i < ARRAY_SIZE(regulators); i++) {
++		rdev = devm_regulator_register(&pdev->dev, &regulators[i],
++					       &config);
++		if (IS_ERR(rdev)) {
++			dev_err(tps->dev, "failed to register %s regulator\n",
++				pdev->name);
++			return PTR_ERR(rdev);
++		}
+ 
+-	tps->info[id]->strobe = val & regulators[id].bypass_mask;
++		ret = regmap_read(tps->regmap, regulators[i].bypass_reg, &val);
++		if (ret)
++			return ret;
++
++		tps->strobes[i] = val & regulators[i].bypass_mask;
++	}
+ 
+ 	return 0;
+ }
+ 
++static const struct platform_device_id tps65218_regulator_id_table[] = {
++	{ "tps65218-regulator", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(platform, tps65218_regulator_id_table);
++
+ static struct platform_driver tps65218_regulator_driver = {
+ 	.driver = {
+ 		.name = "tps65218-pmic",
+-		.of_match_table = tps65218_of_match,
+ 	},
+ 	.probe = tps65218_regulator_probe,
++	.id_table = tps65218_regulator_id_table,
+ };
+ 
+ module_platform_driver(tps65218_regulator_driver);
+diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
+index 51bef53..bccd2d6 100644
+--- a/include/linux/mfd/tps65218.h
++++ b/include/linux/mfd/tps65218.h
+@@ -282,6 +282,7 @@ struct tps65218 {
+ 	struct regulator_desc desc[TPS65218_NUM_REGULATOR];
+ 	struct tps_info *info[TPS65218_NUM_REGULATOR];
+ 	struct regmap *regmap;
++	u8 *strobes;
+ };
+ 
  int tps65218_reg_write(struct tps65218 *tps, unsigned int reg,
- 			unsigned int val, unsigned int level);
- int tps65218_set_bits(struct tps65218 *tps, unsigned int reg,
 -- 
 1.9.1
