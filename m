@@ -1,118 +1,113 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 28 Jun 2016 13:08:02 -0600
-Subject: [PATCH 01/10] Documentation: dt-bindings: mailbox: tegra: Add
- binding for HSP mailbox
-In-Reply-To: <57724039.7080007@nvidia.com>
-References: <20160627090248.23621-1-josephl@nvidia.com>
- <20160627090248.23621-2-josephl@nvidia.com> <57714C85.50802@wwwdotorg.org>
- <57724039.7080007@nvidia.com>
-Message-ID: <5772CB12.5080408@wwwdotorg.org>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Tue, 28 Jun 2016 13:17:18 -0600
+Subject: [PATCH REBASE 3/3] media: s5p-mfc fix null pointer deference in
+ clk_core_enable()
+In-Reply-To: <cover.1467140929.git.shuahkh@osg.samsung.com>
+References: <cover.1467140929.git.shuahkh@osg.samsung.com>
+Message-ID: <31e7be847d7dad6ed0f8ede41a55b1fdb9bdcb06.1467140929.git.shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2016 03:15 AM, Joseph Lo wrote:
-> On 06/27/2016 11:55 PM, Stephen Warren wrote:
->> On 06/27/2016 03:02 AM, Joseph Lo wrote:
->>> Add DT binding for the Hardware Synchronization Primitives (HSP). The
->>> HSP is designed for the processors to share resources and communicate
->>> together. It provides a set of hardware synchronization primitives for
->>> interprocessor communication. So the interprocessor communication (IPC)
->>> protocols can use hardware synchronization primitive, when operating
->>> between two processors not in an SMP relationship.
->>
->> This binding is quite different to the binding you sent to internal IP
->> review. I wonder why it changed? Specific comments below:
->
-> Due to some enhancements for supporting multiple functions of HSP
-> sub-modules in the same driver, I re-wrote some parts of the bindings
-> and driver.
->
->>> diff --git
->>> a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
->>> b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+Fix null pointer deference in clk_core_enable() when driver unbind is run
+when there is an application has an active pipeline playing.
 
->>> +- reg : Offset and length of the register set for the device
->>> +- interrupts : Should contain the HSP interrupts
->>> +- interrupt-names: Should contain the names of the HSP interrupts
->>> that the
->>> +           client are using.
->>> +           "doorbell"
->>
->> The binding should describe the HW, and not be affected by anything
->> "that the client(s) are using". If there are multiple interrupts, we
->> should list them all here, from the start.
->>
->> When revising this, I would consider the following wording canonical:
->>
->> - interrupt-names
->>      Array of strings.
->>      Contains a list of names for the interrupts described by the
->>      interrupts property. May contain the following entries, in any
->>      order:
->>      - "doorbell"
->>      - "..." (no doubt many more items will be listed here, e.g.
->>        for semaphores, etc.).
- >
-> I think I will just list "doorbell" for now. And adding more later once
-> we add other HSP sub-module support.
+s5p_mfc_release() gets called after s5p_mfc_final_pm() disables and does
+clk_put() and s5p_mfc_release() attempts to enable clock and runs into
+null pointer deference accessing invalid pointer.
 
-That should be OK; adding more entries in interrupt-names is backwards 
-compatible. Still, since the HW is fixed, it would be nice to just get 
-the complete list documented up front if possible.
+[ 4869.434709] Unable to handle kernel NULL pointer dereference at virtual addr0
+[ 4869.441312] pgd = e91ac000
+[ 4869.443996] [00000010] *pgd=ba4f7835
+[ 4869.447552] Internal error: Oops: 17 [#1] PREEMPT SMP ARM
+[ 4869.452921] Modules linked in: cpufreq_userspace cpufreq_powersave cpufreq_ca
+[ 4869.471728] CPU: 4 PID: 2965 Comm: lt-gst-launch-1 Not tainted 4.7.0-rc2-nex0
+[ 4869.481778] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[ 4869.487844] task: e91f1e00 ti: ed650000 task.ti: ed650000
+[ 4869.493227] PC is at clk_core_enable+0x4c/0x98
+[ 4869.497637] LR is at clk_core_enable+0x40/0x98
+[ 4869.502056] pc : [<c0559714>]    lr : [<c0559708>]    psr: 60060093
+[ 4869.502056] sp : ed651f18  ip : 00000000  fp : 002641b4
+[ 4869.513493] r10: e9088c08  r9 : 00000008  r8 : ed676d68
+[ 4869.518692] r7 : ee3ac000  r6 : bf16b3c0  r5 : a0060013  r4 : ee37a8c0
+[ 4869.525191] r3 : 00000000  r2 : 00000001  r1 : 00000004  r0 : 00000000
+[ 4869.531692] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment noe
+[ 4869.538883] Control: 10c5387d  Table: 691ac06a  DAC: 00000051
+[ 4869.544603] Process lt-gst-launch-1 (pid: 2965, stack limit = 0xed650210)
+[ 4869.551361] Stack: (0xed651f18 to 0xed652000)
+[ 4869.555694] 1f00:                                                       ee373
+[ 4869.563841] 1f20: bf16b3c0 c055a0e0 ee3ac004 ed676c10 bf16b3c0 bf1558e0 e9080
+[ 4869.571986] 1f40: 00000000 ee98a510 ee502e40 bf047344 e9088c00 ee986938 00004
+[ 4869.580132] 1f60: 00000000 00000000 e91f2204 00000000 c0b4658c e91f1e00 c0100
+[ 4869.588277] 1f80: 00000000 c0135c58 ed650000 c0107904 ed651fb0 00000006 c0104
+[ 4869.596423] 1fa0: 00229500 b6581000 b6f7b544 c0107794 00000000 00000002 b6f90
+[ 4869.604568] 1fc0: 00229500 b6581000 b6f7b544 00000006 0017b600 0002c038 00264
+[ 4869.612714] 1fe0: 00000000 bee56ef0 00000000 b6d49612 00060030 00000006 00000
+[ 4869.620865] [<c0559714>] (clk_core_enable) from [<c055a0e0>] (clk_enable+0x2)
+[ 4869.628509] [<c055a0e0>] (clk_enable) from [<bf1558e0>] (s5p_mfc_release+0x3)
+[ 4869.637111] [<bf1558e0>] (s5p_mfc_release [s5p_mfc]) from [<bf047344>] (v4l2)
+[ 4869.646706] [<bf047344>] (v4l2_release [videodev]) from [<c01e4274>] (__fput)
+[ 4869.654745] [<c01e4274>] (__fput) from [<c0135c58>] (task_work_run+0x94/0xc8)
+[ 4869.661852] [<c0135c58>] (task_work_run) from [<c010a9d4>] (do_work_pending+)
+[ 4869.669735] [<c010a9d4>] (do_work_pending) from [<c0107794>] (slow_work_pend)
+[ 4869.677878] Code: ebffffef e3500000 18bd8070 e5943004 (e5933010)
 
->>> +- nvidia,hsp-function : Specifies one of the HSP functions that the HSP unit
->>> +            will be supported. The function ID can be found in the
->>> +            header file <dt-bindings/mailbox/tegra-hsp.h>.
->>
->> This property wasn't in the internal patch.
->>
->> This doesn't make sense. The HW feature-set is fixed. This sounds like
->> some kind of software configuration option, or a way to allow different
->> drivers to handle different aspects of the HW? In general, the binding
->> shouldn't be influenced by software structure. Please delete this
->> property.
->>
->> Now, if you're attempting to set up a binding where each function
->> (semaphores, shared mailboxes, doorbells, etc.) has a different DT node,
->> then (a) splitting up HW modules into sub-blocks has usually turned out
->> to be a mistake in the past, and (b) the differences should likely be
->> represented by using a different compatible property for each
->> sub-component, rather than via a custom property.
->
-> Currently the usage of HSP HW in the downstream kernel is something like
-> the model below.
->
-> remote_processor_A-\
-> remote_processor_B--->hsp at 1000 (doorbell func) <-> host CPU
-> remote_processor_C-/
->
-> remote_processor_D -> hsp at 2000 (shared mailbox) <-> CPU
->
-> remote_processor_E -> hsp at 3000 (shared mailbox) <-> CPU
->
-> I am thinking if we can just add the appropriate compatible strings for
-> it to replace "nvidia,tegra186-hsp". e.g. "nvidia,tegra186-hsp-doorbell"
-> and "nvidia,tegra186-hsp-sharedmailbox". So the driver can probe and
-> initialize correctly depend on the compatible property. How do you think
-> about it? Is this the same as the (b) you mentioned above?
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_pm.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-Yes, that would be (b) above.
-
-However, please do note (a): I expect that splitting things up will turn 
-out to be a mistake, as it has for other HW modules in the past. I would 
-far rather see a single hsp node in DT, since there is a single HSP 
-block in HW. Sure that block has multiple sub-functions. However, there 
-is common logic that affects all of those sub-functions and binds 
-everything into a single HW module. If you represent the HW module using 
-multiple different DT nodes, it will be hard to correctly represent that 
-common logic. Conversely, I see no real advantage to splitting up the DT 
-node. I strongly believe we should have a single "hsp" node in DT.
-
-Internally, the SW driver for that node can be structured however you 
-want; it could register with multiple subsystems (mailbox, ...) with 
-just one struct device, or the HSP driver could be an MFD device with 
-sub-drivers for each separate piece of functionality the HW implements. 
-All this can easily be done even while using a single DT node. And 
-furthermore, we can add this SW structure later if/when we actually need 
-it; in other words, there's no need to change your current patches right 
-now, except to remove the nvidia,hsp-function DT property.
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+index 9f75221..930dc2d 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+@@ -77,8 +77,10 @@ int s5p_mfc_init_pm(struct s5p_mfc_dev *dev)
+ 
+ err_s_clk:
+ 	clk_put(pm->clock);
++	pm->clock = NULL;
+ err_p_ip_clk:
+ 	clk_put(pm->clock_gate);
++	pm->clock_gate = NULL;
+ err_g_ip_clk:
+ 	return ret;
+ }
+@@ -89,9 +91,11 @@ void s5p_mfc_final_pm(struct s5p_mfc_dev *dev)
+ 	    pm->clock) {
+ 		clk_disable_unprepare(pm->clock);
+ 		clk_put(pm->clock);
++		pm->clock = NULL;
+ 	}
+ 	clk_unprepare(pm->clock_gate);
+ 	clk_put(pm->clock_gate);
++	pm->clock_gate = NULL;
+ #ifdef CONFIG_PM
+ 	pm_runtime_disable(pm->device);
+ #endif
+@@ -99,12 +103,13 @@ void s5p_mfc_final_pm(struct s5p_mfc_dev *dev)
+ 
+ int s5p_mfc_clock_on(void)
+ {
+-	int ret;
++	int ret = 0;
+ #ifdef CLK_DEBUG
+ 	atomic_inc(&clk_ref);
+ 	mfc_debug(3, "+ %d\n", atomic_read(&clk_ref));
+ #endif
+-	ret = clk_enable(pm->clock_gate);
++	if (!IS_ERR_OR_NULL(pm->clock_gate))
++		ret = clk_enable(pm->clock_gate);
+ 	return ret;
+ }
+ 
+@@ -114,7 +119,8 @@ void s5p_mfc_clock_off(void)
+ 	atomic_dec(&clk_ref);
+ 	mfc_debug(3, "- %d\n", atomic_read(&clk_ref));
+ #endif
+-	clk_disable(pm->clock_gate);
++	if (!IS_ERR_OR_NULL(pm->clock_gate))
++		clk_disable(pm->clock_gate);
+ }
+ 
+ int s5p_mfc_power_on(void)
+-- 
+2.7.4
