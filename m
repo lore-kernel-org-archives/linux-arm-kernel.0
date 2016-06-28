@@ -1,226 +1,63 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 28 Jun 2016 14:52:09 +0530
-Subject: [PATCH v4 6/6] regulator: tps65218: Remove all the compatibles
-In-Reply-To: <1467105729-28249-1-git-send-email-j-keerthy@ti.com>
-References: <1467105729-28249-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1467105729-28249-7-git-send-email-j-keerthy@ti.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 28 Jun 2016 18:25:10 +0900
+Subject: [PATCH] ARM: uniphier: remove empty DT machine descriptor
+Message-ID: <1467105910-5081-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all the individual compatibles for all the regulators
-and introduce id_table and update the driver accordingly
-to parse device tree nodes using the regulator framework.
+Since the initial support of mach-uniphier, this has always been
+just empty.
 
-Acked-by: Mark Brown <broonie@kernel.org>
-Signed-off-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- drivers/regulator/tps65218-regulator.c | 131 +++++++++++----------------------
- 1 file changed, 45 insertions(+), 86 deletions(-)
 
-diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
-index 679ab2f..8106cc4 100644
---- a/drivers/regulator/tps65218-regulator.c
-+++ b/drivers/regulator/tps65218-regulator.c
-@@ -31,10 +31,11 @@
- enum tps65218_regulators { DCDC1, DCDC2, DCDC3, DCDC4,
- 			   DCDC5, DCDC6, LDO1, LS3 };
- 
--#define TPS65218_REGULATOR(_name, _id, _type, _ops, _n, _vr, _vm, _er, _em, \
--			    _cr, _cm, _lr, _nlr, _delay, _fuv)		\
-+#define TPS65218_REGULATOR(_name, _of,  _id, _type, _ops, _n, _vr, _vm, _er,\
-+			   _em,  _cr, _cm, _lr, _nlr, _delay, _fuv)	\
- 	{							\
- 		.name			= _name,		\
-+		.of_match		= _of,			\
- 		.id			= _id,			\
- 		.ops			= &_ops,		\
- 		.n_voltages		= _n,			\
-@@ -53,14 +54,6 @@ enum tps65218_regulators { DCDC1, DCDC2, DCDC3, DCDC4,
- 		.fixed_uV		= _fuv			\
- 	}							\
- 
--#define TPS65218_INFO(_id, _nm, _min, _max)	\
--	[_id] = {					\
--		.id		= _id,			\
--		.name		= _nm,			\
--		.min_uV		= _min,			\
--		.max_uV		= _max,			\
--	}
+ arch/arm/mach-uniphier/Makefile   |  1 -
+ arch/arm/mach-uniphier/uniphier.c | 30 ------------------------------
+ 2 files changed, 31 deletions(-)
+ delete mode 100644 arch/arm/mach-uniphier/uniphier.c
+
+diff --git a/arch/arm/mach-uniphier/Makefile b/arch/arm/mach-uniphier/Makefile
+index 1233f9b..396afe1 100644
+--- a/arch/arm/mach-uniphier/Makefile
++++ b/arch/arm/mach-uniphier/Makefile
+@@ -1,2 +1 @@
+-obj-y			:= uniphier.o
+ obj-$(CONFIG_SMP)	+= platsmp.o headsmp.o
+diff --git a/arch/arm/mach-uniphier/uniphier.c b/arch/arm/mach-uniphier/uniphier.c
+deleted file mode 100644
+index 9be10ef..0000000
+--- a/arch/arm/mach-uniphier/uniphier.c
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
 -
- static const struct regulator_linear_range dcdc1_dcdc2_ranges[] = {
- 	REGULATOR_LINEAR_RANGE(850000, 0x0, 0x32, 10000),
- 	REGULATOR_LINEAR_RANGE(1375000, 0x33, 0x3f, 25000),
-@@ -76,36 +69,6 @@ static const struct regulator_linear_range dcdc4_ranges[] = {
- 	REGULATOR_LINEAR_RANGE(1600000, 0x10, 0x34, 50000),
- };
- 
--static struct tps_info tps65218_pmic_regs[] = {
--	TPS65218_INFO(DCDC1, "DCDC1", 850000, 1675000),
--	TPS65218_INFO(DCDC2, "DCDC2", 850000, 1675000),
--	TPS65218_INFO(DCDC3, "DCDC3", 900000, 3400000),
--	TPS65218_INFO(DCDC4, "DCDC4", 1175000, 3400000),
--	TPS65218_INFO(DCDC5, "DCDC5", 1000000, 1000000),
--	TPS65218_INFO(DCDC6, "DCDC6", 1800000, 1800000),
--	TPS65218_INFO(LDO1, "LDO1", 900000, 3400000),
--	TPS65218_INFO(LS3, "LS3", -1, -1),
+-#include <asm/mach/arch.h>
+-
+-static const char * const uniphier_dt_compat[] __initconst = {
+-	"socionext,ph1-sld3",
+-	"socionext,ph1-ld4",
+-	"socionext,ph1-pro4",
+-	"socionext,ph1-sld8",
+-	"socionext,ph1-pro5",
+-	"socionext,proxstream2",
+-	"socionext,ph1-ld6b",
+-	NULL,
 -};
 -
--#define TPS65218_OF_MATCH(comp, label) \
--	{ \
--		.compatible = comp, \
--		.data = &label, \
--	}
--
--static const struct of_device_id tps65218_of_match[] = {
--	TPS65218_OF_MATCH("ti,tps65218-dcdc1", tps65218_pmic_regs[DCDC1]),
--	TPS65218_OF_MATCH("ti,tps65218-dcdc2", tps65218_pmic_regs[DCDC2]),
--	TPS65218_OF_MATCH("ti,tps65218-dcdc3", tps65218_pmic_regs[DCDC3]),
--	TPS65218_OF_MATCH("ti,tps65218-dcdc4", tps65218_pmic_regs[DCDC4]),
--	TPS65218_OF_MATCH("ti,tps65218-dcdc5", tps65218_pmic_regs[DCDC5]),
--	TPS65218_OF_MATCH("ti,tps65218-dcdc6", tps65218_pmic_regs[DCDC6]),
--	TPS65218_OF_MATCH("ti,tps65218-ldo1", tps65218_pmic_regs[LDO1]),
--	TPS65218_OF_MATCH("ti,tps65218-ls3", tps65218_pmic_regs[LS3]),
--	{ }
--};
--MODULE_DEVICE_TABLE(of, tps65218_of_match);
--
- static int tps65218_pmic_set_voltage_sel(struct regulator_dev *dev,
- 					 unsigned selector)
- {
-@@ -251,92 +214,88 @@ static struct regulator_ops tps65218_dcdc56_pmic_ops = {
- };
- 
- static const struct regulator_desc regulators[] = {
--	TPS65218_REGULATOR("DCDC1", TPS65218_DCDC_1, REGULATOR_VOLTAGE,
--			   tps65218_dcdc12_ops, 64, TPS65218_REG_CONTROL_DCDC1,
-+	TPS65218_REGULATOR("DCDC1", "regulator-dcdc1", TPS65218_DCDC_1,
-+			   REGULATOR_VOLTAGE, tps65218_dcdc12_ops, 64,
-+			   TPS65218_REG_CONTROL_DCDC1,
- 			   TPS65218_CONTROL_DCDC1_MASK, TPS65218_REG_ENABLE1,
- 			   TPS65218_ENABLE1_DC1_EN, 0, 0, dcdc1_dcdc2_ranges,
- 			   2, 4000, 0),
--	TPS65218_REGULATOR("DCDC2", TPS65218_DCDC_2, REGULATOR_VOLTAGE,
--			   tps65218_dcdc12_ops, 64, TPS65218_REG_CONTROL_DCDC2,
-+	TPS65218_REGULATOR("DCDC2", "regulator-dcdc2", TPS65218_DCDC_2,
-+			   REGULATOR_VOLTAGE, tps65218_dcdc12_ops, 64,
-+			   TPS65218_REG_CONTROL_DCDC2,
- 			   TPS65218_CONTROL_DCDC2_MASK, TPS65218_REG_ENABLE1,
- 			   TPS65218_ENABLE1_DC2_EN, 0, 0, dcdc1_dcdc2_ranges,
- 			   2, 4000, 0),
--	TPS65218_REGULATOR("DCDC3", TPS65218_DCDC_3, REGULATOR_VOLTAGE,
--			   tps65218_ldo1_dcdc34_ops, 64,
-+	TPS65218_REGULATOR("DCDC3", "regulator-dcdc3", TPS65218_DCDC_3,
-+			   REGULATOR_VOLTAGE, tps65218_ldo1_dcdc34_ops, 64,
- 			   TPS65218_REG_CONTROL_DCDC3,
- 			   TPS65218_CONTROL_DCDC3_MASK, TPS65218_REG_ENABLE1,
- 			   TPS65218_ENABLE1_DC3_EN, 0, 0, ldo1_dcdc3_ranges, 2,
- 			   0, 0),
--	TPS65218_REGULATOR("DCDC4", TPS65218_DCDC_4, REGULATOR_VOLTAGE,
--			   tps65218_ldo1_dcdc34_ops, 53,
-+	TPS65218_REGULATOR("DCDC4", "regulator-dcdc4", TPS65218_DCDC_4,
-+			   REGULATOR_VOLTAGE, tps65218_ldo1_dcdc34_ops, 53,
- 			   TPS65218_REG_CONTROL_DCDC4,
- 			   TPS65218_CONTROL_DCDC4_MASK, TPS65218_REG_ENABLE1,
- 			   TPS65218_ENABLE1_DC4_EN, 0, 0, dcdc4_ranges, 2,
- 			   0, 0),
--	TPS65218_REGULATOR("DCDC5", TPS65218_DCDC_5, REGULATOR_VOLTAGE,
--			   tps65218_dcdc56_pmic_ops, 1, -1, -1,
--			   TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC5_EN, 0, 0,
--			   NULL, 0, 0, 1000000),
--	TPS65218_REGULATOR("DCDC6", TPS65218_DCDC_6, REGULATOR_VOLTAGE,
--			   tps65218_dcdc56_pmic_ops, 1, -1, -1,
--			   TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC6_EN, 0, 0,
--			   NULL, 0, 0, 1800000),
--	TPS65218_REGULATOR("LDO1", TPS65218_LDO_1, REGULATOR_VOLTAGE,
--			   tps65218_ldo1_dcdc34_ops, 64,
-+	TPS65218_REGULATOR("DCDC5", "regulator-dcdc5", TPS65218_DCDC_5,
-+			   REGULATOR_VOLTAGE, tps65218_dcdc56_pmic_ops, 1, -1,
-+			   -1, TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC5_EN, 0,
-+			   0, NULL, 0, 0, 1000000),
-+	TPS65218_REGULATOR("DCDC6", "regulator-dcdc6", TPS65218_DCDC_6,
-+			   REGULATOR_VOLTAGE, tps65218_dcdc56_pmic_ops, 1, -1,
-+			   -1, TPS65218_REG_ENABLE1, TPS65218_ENABLE1_DC6_EN, 0,
-+			   0, NULL, 0, 0, 1800000),
-+	TPS65218_REGULATOR("LDO1", "regulator-ldo1", TPS65218_LDO_1,
-+			   REGULATOR_VOLTAGE, tps65218_ldo1_dcdc34_ops, 64,
- 			   TPS65218_REG_CONTROL_LDO1,
- 			   TPS65218_CONTROL_LDO1_MASK, TPS65218_REG_ENABLE2,
- 			   TPS65218_ENABLE2_LDO1_EN, 0, 0, ldo1_dcdc3_ranges,
- 			   2, 0, 0),
--	TPS65218_REGULATOR("LS3", TPS65218_LS_3, REGULATOR_CURRENT,
--			   tps65218_ls3_ops, 0, 0, 0, TPS65218_REG_ENABLE2,
--			   TPS65218_ENABLE2_LS3_EN, TPS65218_REG_CONFIG2,
--			   TPS65218_CONFIG2_LS3ILIM_MASK, NULL, 0, 0, 0),
-+	TPS65218_REGULATOR("LS3", "regulator-ls3", TPS65218_LS_3,
-+			   REGULATOR_CURRENT, tps65218_ls3_ops, 0, 0, 0,
-+			   TPS65218_REG_ENABLE2, TPS65218_ENABLE2_LS3_EN,
-+			   TPS65218_REG_CONFIG2, TPS65218_CONFIG2_LS3ILIM_MASK,
-+			   NULL, 0, 0, 0),
- };
- 
- static int tps65218_regulator_probe(struct platform_device *pdev)
- {
- 	struct tps65218 *tps = dev_get_drvdata(pdev->dev.parent);
--	struct regulator_init_data *init_data;
--	const struct tps_info	*template;
- 	struct regulator_dev *rdev;
--	const struct of_device_id	*match;
- 	struct regulator_config config = { };
--	int id;
--
--	match = of_match_device(tps65218_of_match, &pdev->dev);
--	if (!match)
--		return -ENODEV;
--
--	template = match->data;
--	id = template->id;
--	init_data = of_get_regulator_init_data(&pdev->dev, pdev->dev.of_node,
--					       &regulators[id]);
-+	int i;
- 
--	platform_set_drvdata(pdev, tps);
--
--	tps->info[id] = &tps65218_pmic_regs[id];
- 	config.dev = &pdev->dev;
--	config.init_data = init_data;
-+	config.dev->of_node = tps->dev->of_node;
- 	config.driver_data = tps;
- 	config.regmap = tps->regmap;
--	config.of_node = pdev->dev.of_node;
- 
--	rdev = devm_regulator_register(&pdev->dev, &regulators[id], &config);
--	if (IS_ERR(rdev)) {
--		dev_err(tps->dev, "failed to register %s regulator\n",
--			pdev->name);
--		return PTR_ERR(rdev);
-+	for (i = 0; i < ARRAY_SIZE(regulators); i++) {
-+		rdev = devm_regulator_register(&pdev->dev, &regulators[i],
-+					       &config);
-+		if (IS_ERR(rdev)) {
-+			dev_err(tps->dev, "failed to register %s regulator\n",
-+				pdev->name);
-+			return PTR_ERR(rdev);
-+		}
- 	}
- 
- 	return 0;
- }
- 
-+static const struct platform_device_id tps65218_regulator_id_table[] = {
-+	{ "tps65218-regulator", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(platform, tps65218_regulator_id_table);
-+
- static struct platform_driver tps65218_regulator_driver = {
- 	.driver = {
- 		.name = "tps65218-pmic",
--		.of_match_table = tps65218_of_match,
- 	},
- 	.probe = tps65218_regulator_probe,
-+	.id_table = tps65218_regulator_id_table,
- };
- 
- module_platform_driver(tps65218_regulator_driver);
+-DT_MACHINE_START(UNIPHIER, "Socionext UniPhier")
+-	.dt_compat	= uniphier_dt_compat,
+-MACHINE_END
 -- 
 1.9.1
