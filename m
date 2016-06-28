@@ -1,29 +1,42 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Tue, 28 Jun 2016 16:13:44 +0800
-Subject: [PATCH v14 00/10] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <1466996813-23295-1-git-send-email-dave.long@linaro.org>
-References: <1466996813-23295-1-git-send-email-dave.long@linaro.org>
-Message-ID: <20160628081342.GA2053@sha-win-210.asiapac.arm.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 28 Jun 2016 10:18:17 +0200
+Subject: [PATCH 3/3] hwmon: iio_hwmon: defer probe when no channel is found
+In-Reply-To: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
+References: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <1467101897-15946-4-git-send-email-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2016 at 11:06:43PM -0400, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
-> first seen in October 2013. This version attempts to address concerns
-> raised by reviewers and also fixes problems discovered during testing.
-> 
-> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
-> and return probes(kretprobes) support for ARM64.
-> 
-> The kprobes mechanism makes use of software breakpoint and single stepping
-> support available in the ARM v8 kernel.
-> 
-I tested the whole patch set with kprobe/jprobe/kretprobe in my Juno-r1 board,
-it works fine.
+iio_channel_get_all returns -ENODEV when it cannot find either phandles and
+properties in the Device Tree or channels whose consumer_dev_name matches
+iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
+which might be probed after iio_hwmon.
 
-Tested-by: Huang Shijie <shijie.huang@arm.com>
+It is better to defer the probe of iio_hwmon if such error is returned by
+iio_channel_get_all in order to let a chance to iio drivers to expose
+channels in iio_map_list.
 
-thanks
-Huang Shijie
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+ drivers/hwmon/iio_hwmon.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
+index b550ba5..c0da4d9 100644
+--- a/drivers/hwmon/iio_hwmon.c
++++ b/drivers/hwmon/iio_hwmon.c
+@@ -73,8 +73,11 @@ static int iio_hwmon_probe(struct platform_device *pdev)
+ 		name = dev->of_node->name;
+ 
+ 	channels = iio_channel_get_all(dev);
+-	if (IS_ERR(channels))
++	if (IS_ERR(channels)) {
++		if (PTR_ERR(channels) == -ENODEV)
++			return -EPROBE_DEFER;
+ 		return PTR_ERR(channels);
++	}
+ 
+ 	st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
+ 	if (st == NULL) {
+-- 
+2.5.0
