@@ -1,64 +1,25 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 Jun 2016 14:21:38 +0100
-Subject: [PATCH v4 3/4] perf: xgene: Add APM X-Gene SoC Performance
- Monitoring Unit driver
-In-Reply-To: <20160628111355.GI31744@leverpostej>
-References: <1466618819-2697-1-git-send-email-ttnguyen@apm.com>
- <1466618819-2697-4-git-send-email-ttnguyen@apm.com>
- <20160623143201.GI8836@leverpostej>
- <CACgAJHyprybnpQuKqvD9rXstQBwoeVG+uGtEBp-pppcfSGMKgQ@mail.gmail.com>
- <20160627160036.GB29321@leverpostej>
- <CACgAJHzM-hzJJDr-HzZyDQ0SUg0PEd5SYKo8YPnRCDCVA9JuJg@mail.gmail.com>
- <20160628111355.GI31744@leverpostej>
-Message-ID: <577279E2.6070202@arm.com>
+From: andrej@inversepath.com (Andrej Rosano)
+Date: Tue, 28 Jun 2016 15:24:41 +0200
+Subject: [PATCH 2/2] ARM: dts: imx53: add support for USB armory board
+In-Reply-To: <20160628015055.GA21328@tiger>
+References: <20160621145053.7742-1-andrej@inversepath.com>
+ <20160621145053.7742-3-andrej@inversepath.com>
+ <20160628015055.GA21328@tiger>
+Message-ID: <20160628132441.GA17608@core.inversepath.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/06/16 12:13, Mark Rutland wrote:
-> On Mon, Jun 27, 2016 at 10:54:07AM -0700, Tai Tri Nguyen wrote:
->> On Mon, Jun 27, 2016 at 9:00 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Sat, Jun 25, 2016 at 10:54:20AM -0700, Tai Tri Nguyen wrote:
->>>> On Thu, Jun 23, 2016 at 7:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>> On Wed, Jun 22, 2016 at 11:06:58AM -0700, Tai Nguyen wrote:
->>>>>> +static irqreturn_t xgene_pmu_isr(int irq, void *dev_id)
->>>>>> +{
->>>>>> +     struct xgene_pmu_dev_ctx *ctx, *temp_ctx;
->>>>>> +     struct xgene_pmu *xgene_pmu = dev_id;
->>>>>> +     u32 val;
->>>>>> +
->>>>>> +     xgene_pmu_mask_int(xgene_pmu);
->>>>>
->>>>> Why do you need to mask the IRQ? This handler is called in hard IRQ
->>>>> context.
->>>>
->>>> Right. Let me change to use raw_spin_lock_irqsave here.
->>>
->>> Interesting; I see we do that in the CCI PMU driver. What are we trying
->>> to protect?
->>>
->>> We don't do that in the CPU PMU drivers, and I'm missng something here.
->>> Hopefully I'm just being thick...
->>
->> For me, we can't guarantee that the interrupt doesn't happen on the other CPUs.
->> The irqbalancer may change the SMP affinity.
-> 
-> The perf core requires things to occur on the same CPU for correct
-> synchronisation.
-> 
-> If an IRQ balancer can change the IRQ affinity behind our back, we have
-> much bigger problems that affect other uncore PMU drivers.
-> 
-> Marc, is there a sensible way to prevent irq balancers from changing the
-> affinity of an IRQ, e.g. a kernel-side pinning mechanism, or some way we
-> can be notified and reject changes?
+On 2016-06-28, Shawn Guo wrote:
+> Maybe GPL/X11 dual licence to consider non-Linux users.  There are
+> plenty of dual licence examples under arch/arm/boot/dts.
 
-You can get notified (see irq_set_affinity_notifier), but there no way
-to veto the change. What should probably be done is to set the affinity
-hint (irq_set_affinity_hint), and use the notifier to migrate the
-context if possible. Note that you'll be called in process context,
-which will race against interrupts being delivered on the new CPU.
+Applied this change along with the others you suggested in the patchset v2.
 
+Thanks,
+Andrej
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--
+Andrej Rosano                                           Inverse Path Srl
+<andrej@inversepath.com>                      http://www.inversepath.com
+
+0x01939B21            5BB8 574E 68E8 D841 E18F  D5E9 CEAD E0CF 0193 9B21
