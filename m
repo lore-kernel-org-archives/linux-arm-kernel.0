@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:31:17 +0200
-Subject: [PATCH 58/92] clocksource/drivers/sun5i: Convert init function to
+Date: Tue, 28 Jun 2016 12:31:19 +0200
+Subject: [PATCH 60/92] clocksource/drivers/u300: Convert init function to
  return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-58-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-60-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,70 +26,95 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/clocksource/timer-sun5i.c | 37 +++++++++++++++++++++++--------------
- 1 file changed, 23 insertions(+), 14 deletions(-)
+ drivers/clocksource/timer-u300.c | 38 +++++++++++++++++++++++++++-----------
+ 1 file changed, 27 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index 24c83f9..f0a3ffb 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -311,33 +311,42 @@ err_free:
- 	return ret;
- }
- 
--static void __init sun5i_timer_init(struct device_node *node)
-+static int __init sun5i_timer_init(struct device_node *node)
+diff --git a/drivers/clocksource/timer-u300.c b/drivers/clocksource/timer-u300.c
+index 1744b24..a6a0dec 100644
+--- a/drivers/clocksource/timer-u300.c
++++ b/drivers/clocksource/timer-u300.c
+@@ -359,27 +359,37 @@ static struct delay_timer u300_delay_timer;
+ /*
+  * This sets up the system timers, clock source and clock event.
+  */
+-static void __init u300_timer_init_of(struct device_node *np)
++static int __init u300_timer_init_of(struct device_node *np)
  {
- 	struct reset_control *rstc;
- 	void __iomem *timer_base;
+ 	unsigned int irq;
  	struct clk *clk;
--	int irq;
-+	int irq, ret;
+ 	unsigned long rate;
++	int ret;
  
- 	timer_base = of_io_request_and_map(node, 0, of_node_full_name(node));
--	if (IS_ERR(timer_base))
--		panic("Can't map registers");
-+	if (IS_ERR(timer_base)) {
-+		pr_err("Can't map registers");
-+		return PTR_ERR(timer_base);;
+ 	u300_timer_base = of_iomap(np, 0);
+-	if (!u300_timer_base)
+-		panic("could not ioremap system timer\n");
++	if (!u300_timer_base) {
++		pr_err("could not ioremap system timer\n");
++		return -ENXIO;
 +	}
  
- 	irq = irq_of_parse_and_map(node, 0);
--	if (irq <= 0)
--		panic("Can't parse IRQ");
-+	if (irq <= 0) {
-+		pr_err("Can't parse IRQ");
+ 	/* Get the IRQ for the GP1 timer */
+ 	irq = irq_of_parse_and_map(np, 2);
+-	if (!irq)
+-		panic("no IRQ for system timer\n");
++	if (!irq) {
++		pr_err("no IRQ for system timer\n");
 +		return -EINVAL;
 +	}
  
- 	clk = of_clk_get(node, 0);
--	if (IS_ERR(clk))
--		panic("Can't get timer clock");
-+	if (IS_ERR(clk)) {
-+		pr_err("Can't get timer clock");
+ 	pr_info("U300 GP1 timer @ base: %p, IRQ: %u\n", u300_timer_base, irq);
+ 
+ 	/* Clock the interrupt controller */
+ 	clk = of_clk_get(np, 0);
+-	BUG_ON(IS_ERR(clk));
+-	clk_prepare_enable(clk);
++	if (IS_ERR(clk))
 +		return PTR_ERR(clk);
-+	}
- 
- 	rstc = of_reset_control_get(node, NULL);
- 	if (!IS_ERR(rstc))
- 		reset_control_deassert(rstc);
- 
--	sun5i_setup_clocksource(node, timer_base, clk, irq);
--	sun5i_setup_clockevent(node, timer_base, clk, irq);
-+	ret = sun5i_setup_clocksource(node, timer_base, clk, irq);
++
++	ret = clk_prepare_enable(clk);
 +	if (ret)
 +		return ret;
 +
-+	return sun5i_setup_clockevent(node, timer_base, clk, irq);
+ 	rate = clk_get_rate(clk);
+ 
+ 	u300_clockevent_data.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
+@@ -410,7 +420,9 @@ static void __init u300_timer_init_of(struct device_node *np)
+ 		u300_timer_base + U300_TIMER_APP_RGPT1);
+ 
+ 	/* Set up the IRQ handler */
+-	setup_irq(irq, &u300_timer_irq);
++	ret = setup_irq(irq, &u300_timer_irq);
++	if (ret)
++		return ret;
+ 
+ 	/* Reset the General Purpose timer 2 */
+ 	writel(U300_TIMER_APP_RGPT2_TIMER_RESET,
+@@ -428,9 +440,12 @@ static void __init u300_timer_init_of(struct device_node *np)
+ 		u300_timer_base + U300_TIMER_APP_EGPT2);
+ 
+ 	/* Use general purpose timer 2 as clock source */
+-	if (clocksource_mmio_init(u300_timer_base + U300_TIMER_APP_GPT2CC,
+-			"GPT2", rate, 300, 32, clocksource_mmio_readl_up))
++	ret = clocksource_mmio_init(u300_timer_base + U300_TIMER_APP_GPT2CC,
++				    "GPT2", rate, 300, 32, clocksource_mmio_readl_up);
++	if (ret) {
+ 		pr_err("timer: failed to initialize U300 clock source\n");
++		return ret;
++	}
+ 
+ 	/* Configure and register the clockevent */
+ 	clockevents_config_and_register(&u300_clockevent_data.cevd, rate,
+@@ -440,7 +455,8 @@ static void __init u300_timer_init_of(struct device_node *np)
+ 	 * TODO: init and register the rest of the timers too, they can be
+ 	 * used by hrtimers!
+ 	 */
++	return 0;
  }
--CLOCKSOURCE_OF_DECLARE(sun5i_a13, "allwinner,sun5i-a13-hstimer",
--		       sun5i_timer_init);
--CLOCKSOURCE_OF_DECLARE(sun7i_a20, "allwinner,sun7i-a20-hstimer",
--		       sun5i_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(sun5i_a13, "allwinner,sun5i-a13-hstimer",
-+			   sun5i_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(sun7i_a20, "allwinner,sun7i-a20-hstimer",
-+			   sun5i_timer_init);
+ 
+-CLOCKSOURCE_OF_DECLARE(u300_timer, "stericsson,u300-apptimer",
++CLOCKSOURCE_OF_DECLARE_RET(u300_timer, "stericsson,u300-apptimer",
+ 		       u300_timer_init_of);
 -- 
 1.9.1
