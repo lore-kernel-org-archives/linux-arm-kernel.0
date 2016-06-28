@@ -1,1195 +1,1068 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 28 Jun 2016 17:37:35 +0200
-Subject: [PATCH 1/3] clk: sunxi: Add a driver for the CCU
+Date: Tue, 28 Jun 2016 19:20:18 +0200
+Subject: [PATCH 2/3] clk: sunxi: Add the A83T clocks
 In-Reply-To: <cover.1467135898.git.moinejf@free.fr>
 References: <cover.1467135898.git.moinejf@free.fr>
-Message-ID: <a55dc5d1a9f02dc4d71d5c21064bffebe5a7b149.1467135898.git.moinejf@free.fr>
+Message-ID: <96780de5ca755a8eb59729cf9ac8aab4ec664ac6.1467135898.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the clocks in the Allwinner's SoCs are configured in the CCU
-(Clock Configuration Unit).
-
-The PLL clocks are driven from the main clock. Their rates are controlled
-by a set of multiply and divide factors, named from the Allwinner's
-documentation:
-- multipliers: 'n' and 'k'
-- dividers: 'd1', 'd2', 'm' and 'p'
-
-The peripheral clocks may receive their inputs from one or more parents,
-thanks to a mux. Their rates are controlled by a set of divide factors
-only, named 'm' and 'p'.
-
-This driver also handles:
-- fixed clocks,
-- the phase delays for the MMCs,
-- the clock gates,
-- the bus gates,
-- and the resets.
+Define the CCU clocks of the Allwinner's A83T Soc.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/clk/sunxi/Makefile |   2 +
- drivers/clk/sunxi/ccu.c    | 980 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi/ccu.h    | 153 +++++++
- 3 files changed, 1135 insertions(+)
- create mode 100644 drivers/clk/sunxi/ccu.c
- create mode 100644 drivers/clk/sunxi/ccu.h
+ drivers/clk/sunxi/Makefile             |   1 +
+ drivers/clk/sunxi/ccu-sun8i-a83t.c     | 858 +++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/sun8i-a83t.h |  97 ++++
+ include/dt-bindings/reset/sun8i-a83t.h |  62 +++
+ 4 files changed, 1018 insertions(+)
+ create mode 100644 drivers/clk/sunxi/ccu-sun8i-a83t.c
+ create mode 100644 include/dt-bindings/clock/sun8i-a83t.h
+ create mode 100644 include/dt-bindings/reset/sun8i-a83t.h
 
 diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 39d2044..b8ca3e2 100644
+index b8ca3e2..6eae4c2 100644
 --- a/drivers/clk/sunxi/Makefile
 +++ b/drivers/clk/sunxi/Makefile
-@@ -26,3 +26,5 @@ obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
- obj-$(CONFIG_MFD_SUN6I_PRCM) += \
- 	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
+@@ -28,3 +28,4 @@ obj-$(CONFIG_MFD_SUN6I_PRCM) += \
  	clk-sun8i-apb0.o
-+
-+obj-y += ccu.o
-diff --git a/drivers/clk/sunxi/ccu.c b/drivers/clk/sunxi/ccu.c
+ 
+ obj-y += ccu.o
++obj-$(CONFIG_MACH_SUN8I) += ccu-sun8i-a83t.o
+diff --git a/drivers/clk/sunxi/ccu-sun8i-a83t.c b/drivers/clk/sunxi/ccu-sun8i-a83t.c
 new file mode 100644
-index 0000000..5749f9c
+index 0000000..8ee35fd
 --- /dev/null
-+++ b/drivers/clk/sunxi/ccu.c
-@@ -0,0 +1,980 @@
++++ b/drivers/clk/sunxi/ccu-sun8i-a83t.c
+@@ -0,0 +1,858 @@
 +/*
-+ * Allwinner system CCU
++ * Copyright (c) 2016 Jean-Francois Moine <moinejf@free.fr>
 + *
-+ * Copyright (C) 2016 Jean-Francois Moine <moinejf@free.fr>
-+ * Rewrite from 'sunxi-ng':
-+ * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
 +#include <linux/clk-provider.h>
 +#include <linux/reset-controller.h>
-+#include <linux/iopoll.h>
-+#include <linux/slab.h>
-+#include <linux/rational.h>
-+#include <linux/of_address.h>
++
++#include <dt-bindings/clock/sun8i-a83t.h>
++#include <dt-bindings/reset/sun8i-a83t.h>
 +
 +#include "ccu.h"
 +
-+#define CCU_DEBUG 0
++/* 2 * cpux */
++/*	rate = 24MHz * n / p */
++static struct ccu pll_c0cpux_clk = {
++	CCU_REG(0x000),
++	CCU_HW("pll-c0cpux", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 0),
++	CCU_N(8, 8), .n_min = 12,
++/*	CCU_P(16, 1),			* only when rate < 288MHz */
++	.features = CCU_FEATURE_N0,
++};
 +
-+#define CCU_MASK(shift, width) (((1 << width) - 1) << shift)
++static struct ccu pll_c1cpux_clk = {
++	CCU_REG(0x004),
++	CCU_HW("pll-c1cpux", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 1),
++	CCU_N(8, 8), .n_min = 12,
++/*	CCU_P(16, 1),			* only when rate < 288MHz */
++	.features = CCU_FEATURE_N0,
++};
 +
-+/*
-+ * factors:
-+ *	n: multiplier (PLL)
-+ *	d1, d2: boolean dividers by 2 (d2 is p with 1 bit width - PLL)
-+ *	k: multiplier (PLL)
-+ *	m: divider
-+ *	p: divider by power of 2
++/* audio */
++/*	rate = 24MHz * n / (d1 + 1) / (d2 + 1) / (p + 1) */
++static struct ccu pll_audio_clk = {
++	CCU_REG(0x008),
++	CCU_HW("pll-audio", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 2),
++	CCU_N(8, 8), .n_min = 12,
++	CCU_D1(16, 1),
++	CCU_D2(18, 1),
++	CCU_M(0, 6),		/* p = divider */
++	.features = CCU_FEATURE_N0,
++};
++
++/* video 0 */
++/*	rate = 24MHz * n / (d1 + 1) >> p */
++static struct ccu pll_video0_clk = {
++	CCU_REG(0x010),
++	CCU_HW("pll-video0", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 3),
++	CCU_N(8, 8), .n_min = 12,
++	CCU_D1(16, 1),
++	CCU_P(0, 2),
++	.features = CCU_FEATURE_N0,
++};
++
++/* video engine */
++/*	rate = 24MHz * n / (d1 + 1) / (d2 + 1) */
++static struct ccu pll_ve_clk = {
++	CCU_REG(0x018),
++	CCU_HW("pll-ve", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 4),
++	CCU_N(8, 8), .n_min = 12,
++	CCU_D1(16, 1),
++	CCU_D2(18, 1),
++	.features = CCU_FEATURE_N0,
++};
++
++/* ddr */
++/*	rate = 24MHz * (n + 1) / (d1 + 1) / (d2 + 1)
++ *	bit 21: DDR_CLOCK = PLL_DDR / PLL_PERIPH (default DDR)
 + */
-+struct values {
-+	int n, d1, k, m, p;
++static struct ccu pll_ddr_clk = {
++	CCU_REG(0x020),
++	CCU_HW("pll-ddr", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 5),
++	CCU_N(8, 6), .n_min = 12,
++	CCU_D1(16, 1),
++	CCU_D2(18, 1),
++	CCU_UPD(30),
 +};
 +
-+static DEFINE_SPINLOCK(ccu_lock);
-+
-+void ccu_set_clock(struct ccu *ccu, int reg, u32 mask, u32 val)
-+{
-+
-+#if CCU_DEBUG
-+	pr_info("** ccu %s set %03x %08x\n",
-+		clk_hw_get_name(&ccu->hw), reg,
-+		(readl(ccu->base + reg) & ~mask) | val);
-+#endif
-+	spin_lock(&ccu_lock);
-+	writel((readl(ccu->base + reg) & ~mask) | val, ccu->base + reg);
-+	spin_unlock(&ccu_lock);
-+}
-+
-+/* --- prepare / enable --- */
-+int ccu_prepare(struct clk_hw *hw)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+
-+	if (!ccu->reset_reg && !ccu->bus_reg)
-+		return 0;
-+
-+#if CCU_DEBUG
-+	pr_info("** ccu %s prepare\n", clk_hw_get_name(&ccu->hw));
-+#endif
-+	spin_lock(&ccu_lock);
-+	if (ccu->reset_reg)
-+		writel(readl(ccu->base + ccu->reset_reg) |
-+							BIT(ccu->reset_bit),
-+				ccu->base + ccu->reset_reg);
-+	if (ccu->bus_reg)
-+		writel(readl(ccu->base + ccu->bus_reg) | BIT(ccu->bus_bit),
-+				ccu->base + ccu->bus_reg);
-+	spin_unlock(&ccu_lock);
-+
-+	return 0;
-+}
-+
-+void ccu_unprepare(struct clk_hw *hw)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+
-+	if (!ccu->reset_reg && !ccu->bus_reg)
-+		return;
-+
-+#if CCU_DEBUG
-+	pr_info("** ccu %s unprepare\n", clk_hw_get_name(&ccu->hw));
-+#endif
-+	spin_lock(&ccu_lock);
-+	if (ccu->bus_reg)
-+		writel(readl(ccu->base + ccu->bus_reg) & ~BIT(ccu->bus_bit),
-+				ccu->base + ccu->bus_reg);
-+	if (ccu->reset_reg)
-+		writel(readl(ccu->base + ccu->reset_reg) &
-+							~BIT(ccu->reset_bit),
-+				ccu->base + ccu->reset_reg);
-+	spin_unlock(&ccu_lock);
-+}
-+
-+int ccu_enable(struct clk_hw *hw)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+
-+	if (!ccu->has_gate)
-+		return 0;
-+
-+#if CCU_DEBUG
-+	pr_info("** ccu %s enable\n", clk_hw_get_name(&ccu->hw));
-+#endif
-+	spin_lock(&ccu_lock);
-+	writel(readl(ccu->base + ccu->reg) | BIT(ccu->gate_bit),
-+				ccu->base + ccu->reg);
-+	spin_unlock(&ccu_lock);
-+
-+	return 0;
-+}
-+
-+void ccu_disable(struct clk_hw *hw)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+
-+	if (!ccu->has_gate)
-+		return;
-+
-+#if CCU_DEBUG
-+	pr_info("** ccu %s disable\n", clk_hw_get_name(&ccu->hw));
-+#endif
-+	spin_lock(&ccu_lock);
-+	writel(readl(ccu->base + ccu->reg) & ~BIT(ccu->gate_bit),
-+				ccu->base + ccu->reg);
-+	spin_unlock(&ccu_lock);
-+}
-+
-+/* --- PLL --- */
-+static int ccu_pll_find_best(struct ccu *ccu,
-+				unsigned long rate,
-+				unsigned long parent_rate,
-+				struct values *p_v)
-+{
-+	int max_mul, max_div, mul, div, t;
-+	int n = 1, d1 = 1, k = 1, m = 1, p = 0;
-+	int max_n = 1 << ccu->n_width;
-+	int max_d1 = 1 << ccu->d1_width;
-+	int max_k = 1 << ccu->k_width;
-+	int max_m = 1 << ccu->m_width;
-+	int max_p = 1 << ccu->p_width;
-+
-+	if (ccu->features & CCU_FEATURE_N0)
-+		max_n--;
-+
-+	/* compute n */
-+	if (max_n > 1) {
-+		max_mul = max_n * max_k;
-+		if (rate > parent_rate * max_mul) {
-+			pr_err("%s: Clock rate too high %ld > %ld * %d * %d\n",
-+				clk_hw_get_name(&ccu->hw),
-+				rate, parent_rate, max_n, max_k);
-+			return -EINVAL;
-+		}
-+		max_div = max_m * max_d1 << max_p;
-+		if (max_div > 1) {
-+			unsigned long lmul, ldiv;
-+
-+			rational_best_approximation(rate, parent_rate,
-+						max_mul - 1,
-+						max_div - 1,
-+						&lmul, &ldiv);
-+			mul = lmul;
-+			div = ldiv;
-+			if (ccu->n_min && mul < ccu->n_min) {
-+				t = (ccu->n_min + mul - 1) / mul;
-+				mul *= t;
-+				div *= t;
-+			}
-+		} else {
-+			mul = (rate + parent_rate - 1) / parent_rate;
-+			div = 1;
-+		}
-+
-+		/* compute k (present only when 'n' is present) */
-+		if (max_k > 1) {
-+			int k_min, k_opt, delta_opt = 100, delta;
-+
-+			k = (mul + max_n - 1) / max_n;
-+			k_opt = k_min = k;
-+			for (k = max_k; k > k_min; k--) {
-+				n = (mul + k - 1) / k;
-+				t = n * k;
-+				delta = t - mul;
-+				if (delta == 0) {
-+					k_opt = k;
-+					break;
-+				}
-+				if (delta < 0)
-+					delta = -delta;
-+				if (delta < delta_opt) {
-+					delta_opt = delta;
-+					k_opt = k;
-+				}
-+			}
-+			k = k_opt;
-+			n = (mul + k - 1) / k;
-+		} else {
-+			n = mul;
-+		}
-+	} else {
-+		div = (parent_rate + rate - 1) / rate;
-+	}
-+
-+	/* compute d1 (value is only 1 or 2) */
-+	if (max_d1 > 1) {
-+		if (div % 2 == 0) {
-+			d1 = 2;
-+			div /= 2;
-+		}
-+	}
-+
-+	/* compute p */
-+/*	p = 0; */
-+	while (div % 2 == 0 && p <= max_p) {
-+		p++;
-+		div /= 2;
-+	}
-+
-+	/* compute m */
-+	if (max_m > 1) {
-+		if (div <= max_m)
-+			m = div;
-+		else
-+			m = max_m;
-+		div /= m;
-+	}
-+
-+	/* adjust n */
-+	n = DIV_ROUND_CLOSEST((rate << p) * m * d1, parent_rate);
-+	n = DIV_ROUND_CLOSEST(n, k);
-+
-+	p_v->n = n;
-+	p_v->d1 = d1;
-+	p_v->k = k;
-+	p_v->m = m;
-+	p_v->p = p;
-+
-+	return 0;
-+}
-+
-+static unsigned long ccu_pll_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+	const struct ccu_extra *extra = ccu->extra;
-+	unsigned long rate;
-+	int i, n, d1, m, k, p;
-+	u32 reg;
-+
-+	reg = readl(ccu->base + ccu->reg);
-+
-+	if (extra) {
-+		for (i = 0; i < extra->num_frac - 1; i++) {
-+			if ((reg & extra->frac[i].mask) == extra->frac[i].val)
-+				return rate = extra->frac[i].rate;
-+		}
-+	}
-+
-+	rate = parent_rate;
-+
-+	if (ccu->d1_width) {
-+		d1 = reg >> ccu->d1_shift;
-+		d1 &= (1 << ccu->d1_width) - 1;
-+		rate /= (d1 + 1);
-+	}
-+
-+	if (ccu->n_width) {
-+		n = reg >> ccu->n_shift;
-+		n &= (1 << ccu->n_width) - 1;
-+		if (!(ccu->features & CCU_FEATURE_N0))
-+			n++;
-+		rate *= n;
-+	}
-+
-+	if (ccu->m_width) {
-+		m = reg >> ccu->m_shift;
-+		m &= (1 << ccu->m_width) - 1;
-+		rate /= (m + 1);
-+	}
-+
-+	if (ccu->k_width) {
-+		k = reg >> ccu->k_shift;
-+		k &= (1 << ccu->k_width) - 1;
-+		rate *= (k + 1);
-+	}
-+
-+	if (ccu->p_width) {
-+		p = reg >> ccu->p_shift;
-+		p &= (1 << ccu->p_width) - 1;
-+		rate >>= p;
-+	}
-+
-+	if (extra && (ccu->features & CCU_FEATURE_FIXED_POSTDIV))
-+		rate /= extra->fixed_div[0];
-+
-+	return rate;
-+}
-+
-+static long ccu_pll_round_rate(struct clk_hw *hw,
-+				unsigned long rate,
-+				unsigned long *parent_rate)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+	const struct ccu_extra *extra = ccu->extra;
-+	struct values v;
-+	int i, ret;
-+
-+	if (extra) {
-+		for (i = 0; i < extra->num_frac - 1; i++) {
-+			if (extra->frac[i].rate == rate)
-+				return rate;
-+		}
-+
-+		if (ccu->features & CCU_FEATURE_FIXED_POSTDIV)
-+			rate *= extra->fixed_div[0];
-+	}
-+
-+	ret = ccu_pll_find_best(ccu, rate, *parent_rate, &v);
-+	if (ret)
-+		return ret;
-+
-+	rate = *parent_rate / v.d1 * v.n / v.m * v.k >> v.p;
-+
-+	if (extra && (ccu->features & CCU_FEATURE_FIXED_POSTDIV))
-+		rate /= extra->fixed_div[0];
-+
-+	return rate;
-+}
-+
-+static void ccu_pll_set_flat_factors(struct ccu *ccu, u32 mask, u32 val)
-+{
-+	u32 reg, m_val, p_val;
-+	u32 m_mask = (1 << ccu->m_width) - 1;
-+	u32 p_mask = (1 << ccu->p_width) - 1;
-+
-+	reg = readl(ccu->base + ccu->reg);
-+	m_val = reg & m_mask;
-+	p_val = reg & p_mask;
-+
-+	spin_lock(&ccu_lock);
-+
-+	/* increase p, then m */
-+	if (ccu->p_width && p_val < (val & p_mask)) {
-+		reg &= ~p_mask;
-+		reg |= val & p_mask;
-+		writel(reg, ccu->base + ccu->reg);
-+		udelay(10);
-+	}
-+	if (ccu->m_width && m_val < (val & m_mask)) {
-+		reg &= ~m_mask;
-+		reg |= val & m_mask;
-+		writel(reg, ccu->base + ccu->reg);
-+		udelay(10);
-+	}
-+
-+	/* set other factors */
-+	reg &= ~(mask & ~(p_mask | m_mask));
-+	reg |= val & ~(p_mask | m_mask);
-+	writel(reg, ccu->base + ccu->reg);
-+
-+	/* decrease m */
-+	if (ccu->m_width && m_val > (val & m_mask)) {
-+		reg &= ~m_mask;
-+		reg |= val & m_mask;
-+		writel(reg, ccu->base + ccu->reg);
-+		udelay(10);
-+	}
-+
-+	/* wait for PLL stable */
-+	if (ccu->lock_reg) {
-+		u32 lock;
-+
-+		lock = BIT(ccu->lock_bit);
-+		WARN_ON(readl_relaxed_poll_timeout(ccu->base + ccu->lock_reg,
-+							reg, !(reg & lock),
-+							100, 70000));
-+	}
-+
-+	/* decrease p */
-+	if (ccu->p_width && p_val > (val & p_mask)) {
-+		reg &= ~p_mask;
-+		reg |= val & p_mask;
-+		writel(reg, ccu->base + ccu->reg);
-+		udelay(10);
-+	}
-+
-+	spin_unlock(&ccu_lock);
-+}
-+
-+static int ccu_pll_set_rate(struct clk_hw *hw,
-+				unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+	const struct ccu_extra *extra = ccu->extra;
-+	struct values v;
-+	u32 mask, val;
-+	int ret;
-+
-+	mask =  CCU_MASK(ccu->n_shift, ccu->n_width) |
-+		CCU_MASK(ccu->d1_shift, ccu->d1_width) |
-+		CCU_MASK(ccu->k_shift, ccu->k_width) |
-+		CCU_MASK(ccu->m_shift, ccu->m_width) |
-+		CCU_MASK(ccu->p_shift, ccu->p_width);
-+	val = 0;
-+
-+	if (extra && extra->num_frac) {
-+		int i;
-+
-+		for (i = 0; i < extra->num_frac - 1; i++) {
-+			if (extra->frac[i].rate == rate) {
-+				ccu_set_clock(ccu, ccu->reg,
-+						extra->frac[i].mask,
-+						extra->frac[i].val);
-+				return 0;
-+			}
-+		}
-+		mask |= extra->frac[i].mask;
-+		val |= extra->frac[i].val;
-+	}
-+
-+	if (extra && (ccu->features & CCU_FEATURE_FIXED_POSTDIV))
-+		rate *= extra->fixed_div[0];
-+
-+
-+	ret = ccu_pll_find_best(ccu, rate, parent_rate, &v);
-+	if (ret)
-+		return ret;
-+
-+	if (!(ccu->features & CCU_FEATURE_N0))
-+		v.n--;
-+
-+	val |=  (v.n << ccu->n_shift) |
-+		((v.d1 - 1) << ccu->d1_shift) |
-+		((v.k - 1) << ccu->k_shift) |
-+		((v.m - 1) << ccu->m_shift) |
-+		(v.p << ccu->p_shift);
-+
-+	if (ccu->upd_bit)				/* cannot be 0 */
-+		val |= BIT(ccu->upd_bit);
-+
-+	if (!(ccu->features & CCU_FEATURE_FLAT_FACTORS))
-+		ccu_set_clock(ccu, ccu->reg, mask, val);
-+	else
-+		ccu_pll_set_flat_factors(ccu, mask, val);
-+
-+	/* wait for PLL stable */
-+	if (ccu->lock_reg) {
-+		u32 lock, reg;
-+
-+		lock = BIT(ccu->lock_bit);
-+		WARN_ON(readl_relaxed_poll_timeout(ccu->base + ccu->lock_reg,
-+							reg, !(reg & lock),
-+							100, 70000));
-+	}
-+
-+	return 0;
-+}
-+
-+const struct clk_ops ccu_pll_ops = {
-+	.prepare	= ccu_prepare,
-+	.unprepare	= ccu_unprepare,
-+	.enable		= ccu_enable,
-+	.disable	= ccu_disable,
-+/*	.is_enabled	= NULL;	(don't disable the clocks at startup time) */
-+
-+	.recalc_rate	= ccu_pll_recalc_rate,
-+	.round_rate	= ccu_pll_round_rate,
-+	.set_rate	= ccu_pll_set_rate,
++/* periph */
++/*	rate = 24MHz * n / (d1 + 1) / (d2 + 1) */
++static struct ccu pll_periph_clk = {
++	CCU_REG(0x028),
++	CCU_HW("pll-periph", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 6),
++	CCU_N(8, 8), .n_min = 12,
++	CCU_D1(16, 1),
++	CCU_D2(18, 1),
++	.features = CCU_FEATURE_N0,
 +};
 +
-+/* --- mux parent --- */
-+u8 ccu_get_parent(struct clk_hw *hw)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+
-+	if (!ccu->mux_width)
-+		return 0;
-+
-+	return (readl(ccu->base + ccu->reg) >> ccu->mux_shift) &
-+				((1 << ccu->mux_width) - 1);
-+}
-+
-+int ccu_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+	u32 mask;
-+
-+	if (!ccu->mux_width)
-+		return 0;
-+
-+	mask = CCU_MASK(ccu->mux_shift, ccu->mux_width);
-+
-+	ccu_set_clock(ccu, ccu->reg, mask, index << ccu->mux_shift);
-+
-+	return 0;
-+}
-+
-+/* --- mux --- */
-+static void ccu_mux_adjust_parent_for_prediv(struct ccu *ccu,
-+					     int parent_index,
-+					     unsigned long *parent_rate)
-+{
-+	const struct ccu_extra *extra = ccu->extra;
-+	int prediv = 1;
-+	u32 reg;
-+
-+	if (!(extra &&
-+	      (ccu->features & (CCU_FEATURE_MUX_FIXED_PREDIV |
-+				CCU_FEATURE_MUX_VARIABLE_PREDIV))))
-+		return;
-+
-+	reg = readl(ccu->base + ccu->reg);
-+	if (parent_index < 0)
-+		parent_index = (reg >> ccu->mux_shift) &
-+					((1 << ccu->mux_width) - 1);
-+
-+	if (ccu->features & CCU_FEATURE_MUX_FIXED_PREDIV)
-+		prediv = extra->fixed_div[parent_index];
-+
-+	if (ccu->features & CCU_FEATURE_MUX_VARIABLE_PREDIV)
-+		if (parent_index == extra->variable_prediv.index) {
-+			u8 div;
-+
-+			div = reg >> extra->variable_prediv.shift;
-+			div &= (1 << extra->variable_prediv.width) - 1;
-+			prediv = div + 1;
-+		}
-+
-+	*parent_rate /= prediv;
-+}
-+
-+/* --- periph --- */
-+static unsigned long ccu_m_round_rate(struct ccu *ccu,
-+					unsigned long rate,
-+					unsigned long parent_rate)
-+{
-+	int m;
-+
-+	/*
-+	 * We can't use divider_round_rate that assumes that there's
-+	 * several parents, while we might be called to evaluate
-+	 * several different parents.
-+	 */
-+	m = divider_get_val(rate, parent_rate,
-+			ccu->div_table, ccu->m_width, ccu->div_flags);
-+
-+	return divider_recalc_rate(&ccu->hw, parent_rate, m,
-+				   ccu->div_table, ccu->div_flags);
-+}
-+
-+static unsigned long ccu_mp_round_rate(struct ccu *ccu,
-+				unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct values v;
-+	int ret;
-+
-+	ret = ccu_pll_find_best(ccu, rate, parent_rate, &v);
-+	if (ret)
-+		return 0;
-+
-+	return parent_rate / v.m >> v.p;
-+}
-+
-+unsigned long ccu_periph_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+	int m, p;
-+	u32 reg;
-+
-+	ccu_mux_adjust_parent_for_prediv(ccu, -1, &parent_rate);
-+
-+	if (!ccu->m_width && !ccu->p_width)
-+		return parent_rate;
-+
-+	reg = readl(ccu->base + ccu->reg);
-+	m = (reg >> ccu->m_shift) & ((1 << ccu->m_width) - 1);
-+
-+	if (ccu->p_width) {
-+		reg = readl(ccu->base + ccu->reg);
-+		p = (reg >> ccu->p_shift) & ((1 << ccu->p_width) - 1);
-+
-+		return parent_rate / (m + 1) >> p;
-+	}
-+
-+	return divider_recalc_rate(hw, parent_rate, m,
-+				ccu->div_table, ccu->div_flags);
-+}
-+
-+int ccu_periph_determine_rate(struct clk_hw *hw,
-+				struct clk_rate_request *req)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+
-+	unsigned long best_parent_rate = 0, best_rate = 0;
-+	struct clk_hw *best_parent;
-+	unsigned int i;
-+	unsigned long (*round)(struct ccu *,
-+				unsigned long,
-+				unsigned long);
-+
-+	if (ccu->p_width)
-+		round = ccu_mp_round_rate;
-+	else if (ccu->m_width)
-+		round = ccu_m_round_rate;
-+	else
-+		return __clk_mux_determine_rate(hw, req);
-+
-+	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
-+		unsigned long new_rate, parent_rate;
-+		struct clk_hw *parent;
-+
-+		parent = clk_hw_get_parent_by_index(hw, i);
-+		if (!parent)
-+			continue;
-+
-+		parent_rate = clk_hw_get_rate(parent);
-+		ccu_mux_adjust_parent_for_prediv(ccu, i, &parent_rate);
-+		new_rate = round(ccu, req->rate, parent_rate);
-+
-+		if (new_rate == req->rate) {
-+			best_parent = parent;
-+			best_parent_rate = parent_rate;
-+			best_rate = new_rate;
-+			goto out;
-+		}
-+
-+		if ((req->rate - new_rate) < (req->rate - best_rate)) {
-+			best_rate = new_rate;
-+			best_parent_rate = parent_rate;
-+			best_parent = parent;
-+		}
-+	}
-+
-+	if (best_rate == 0)
-+		return -EINVAL;
-+
-+out:
-+	req->best_parent_hw = best_parent;
-+	req->best_parent_rate = best_parent_rate;
-+	req->rate = best_rate;
-+
-+	return 0;
-+}
-+
-+int ccu_periph_set_rate(struct clk_hw *hw, unsigned long rate,
-+			unsigned long parent_rate)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+	const struct ccu_extra *extra = ccu->extra;
-+	struct values v;
-+	u32 mask;
-+	int ret;
-+
-+	if (!ccu->m_width && !ccu->p_width)
-+		return 0;
-+
-+	ccu_mux_adjust_parent_for_prediv(ccu, -1, &parent_rate);
-+
-+	if (extra && (ccu->features & CCU_FEATURE_MODE_SELECT)) {
-+		/* fixme: should use new mode */
-+		if (rate == extra->mode_select.rate)
-+			rate /= 2;
-+	}
-+
-+	if (ccu->p_width) {				/* m and p */
-+		ret = ccu_pll_find_best(ccu, rate, parent_rate, &v);
-+		if (ret)
-+			return ret;
-+	} else {					/* m alone */
-+		v.m = divider_get_val(rate, parent_rate,
-+				ccu->div_table, ccu->m_width, ccu->div_flags);
-+		v.p = 0;
-+		return 0;
-+	}
-+
-+	mask = CCU_MASK(ccu->m_shift, ccu->m_width) |
-+		CCU_MASK(ccu->p_shift, ccu->p_width);
-+
-+	if (ccu->features & CCU_FEATURE_SET_RATE_UNGATE)
-+		ccu_disable(hw);
-+	ccu_set_clock(ccu, ccu->reg, mask, ((v.m - 1) << ccu->m_shift) |
-+					    (v.p << ccu->p_shift));
-+	if (ccu->features & CCU_FEATURE_SET_RATE_UNGATE)
-+		ccu_enable(hw);
-+
-+	return 0;
-+}
-+
-+const struct clk_ops ccu_periph_ops = {
-+	.prepare	= ccu_prepare,
-+	.unprepare	= ccu_unprepare,
-+	.enable		= ccu_enable,
-+	.disable	= ccu_disable,
-+/*	.is_enabled	= NULL;	(don't disable the clocks at startup time) */
-+
-+	.get_parent	= ccu_get_parent,
-+	.set_parent	= ccu_set_parent,
-+
-+	.determine_rate	= ccu_periph_determine_rate,
-+	.recalc_rate	= ccu_periph_recalc_rate,
-+	.set_rate	= ccu_periph_set_rate,
++/* gpu */
++/*	rate = 24MHz * n / (d1 + 1) / (d2 + 1) */
++static struct ccu pll_gpu_clk = {
++	CCU_REG(0x038),
++	CCU_HW("pll-gpu", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 7),
++	CCU_N(8, 8), .n_min = 12,
++	CCU_D1(16, 1),
++	CCU_D2(18, 1),
++	.features = CCU_FEATURE_N0,
 +};
 +
-+/* --- fixed factor --- */
-+/* mul is n_width - div is m_width */
-+unsigned long ccu_fixed_factor_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+
-+	return parent_rate / ccu->m_width * ccu->n_width;
-+}
-+
-+long ccu_fixed_factor_round_rate(struct clk_hw *hw,
-+				unsigned long rate,
-+				unsigned long *parent_rate)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+
-+	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
-+		unsigned long best_parent;
-+
-+		best_parent = (rate / ccu->n_width) * ccu->m_width;
-+		*parent_rate = clk_hw_round_rate(clk_hw_get_parent(hw),
-+						 best_parent);
-+	}
-+
-+	return *parent_rate / ccu->m_width * ccu->n_width;
-+}
-+
-+int ccu_fixed_factor_set_rate(struct clk_hw *hw, unsigned long rate,
-+				     unsigned long parent_rate)
-+{
-+	return 0;
-+}
-+
-+const struct clk_ops ccu_fixed_factor_ops = {
-+	.disable	= ccu_disable,
-+	.enable		= ccu_enable,
-+/*	.is_enabled	= NULL, */
-+
-+	.recalc_rate	= ccu_fixed_factor_recalc_rate,
-+	.round_rate	= ccu_fixed_factor_round_rate,
-+	.set_rate	= ccu_fixed_factor_set_rate,
++/* hsic */
++/*	rate = 24MHz * n / (d1 + 1) / (d2 + 1) */
++static struct ccu pll_hsic_clk = {
++	CCU_REG(0x044),
++	CCU_HW("pll-hsic", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 8),
++	CCU_N(8, 8), .n_min = 12,
++	CCU_D1(16, 1),
++	CCU_D2(18, 1),
++	.features = CCU_FEATURE_N0,
 +};
 +
-+/* --- phase --- */
-+static int ccu_phase_get_phase(struct clk_hw *hw)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+	struct clk_hw *parent, *grandparent;
-+	unsigned int parent_rate, grandparent_rate;
-+	u16 step, parent_div;
-+	u32 reg;
-+	u8 delay;
-+
-+	reg = readl(ccu->base + ccu->reg);
-+	delay = (reg >> ccu->p_shift);
-+	delay &= (1 << ccu->p_width) - 1;
-+
-+	if (!delay)
-+		return 180;
-+
-+	/* Get our parent clock, it's the one that can adjust its rate */
-+	parent = clk_hw_get_parent(hw);
-+	if (!parent)
-+		return -EINVAL;
-+
-+	/* And its rate */
-+	parent_rate = clk_hw_get_rate(parent);
-+	if (!parent_rate)
-+		return -EINVAL;
-+
-+	/* Now, get our parent's parent (most likely some PLL) */
-+	grandparent = clk_hw_get_parent(parent);
-+	if (!grandparent)
-+		return -EINVAL;
-+
-+	/* And its rate */
-+	grandparent_rate = clk_hw_get_rate(grandparent);
-+	if (!grandparent_rate)
-+		return -EINVAL;
-+
-+	/* Get our parent clock divider */
-+	parent_div = grandparent_rate / parent_rate;
-+
-+	step = DIV_ROUND_CLOSEST(360, parent_div);
-+	return delay * step;
-+}
-+
-+static int ccu_phase_set_phase(struct clk_hw *hw, int degrees)
-+{
-+	struct ccu *ccu = hw2ccu(hw);
-+	struct clk_hw *parent, *grandparent;
-+	unsigned int parent_rate, grandparent_rate;
-+	u32 mask;
-+	u8 delay = 0;
-+	u16 step, parent_div;
-+
-+	if (degrees == 180)
-+		goto set_phase;
-+
-+	/* Get our parent clock, it's the one that can adjust its rate */
-+	parent = clk_hw_get_parent(hw);
-+	if (!parent)
-+		return -EINVAL;
-+
-+	/* And its rate */
-+	parent_rate = clk_hw_get_rate(parent);
-+	if (!parent_rate)
-+		return -EINVAL;
-+
-+	/* Now, get our parent's parent (most likely some PLL) */
-+	grandparent = clk_hw_get_parent(parent);
-+	if (!grandparent)
-+		return -EINVAL;
-+
-+	/* And its rate */
-+	grandparent_rate = clk_hw_get_rate(grandparent);
-+	if (!grandparent_rate)
-+		return -EINVAL;
-+
-+	/* Get our parent divider */
-+	parent_div = grandparent_rate / parent_rate;
-+
-+	/*
-+	 * We can only outphase the clocks by multiple of the
-+	 * PLL's period.
-+	 *
-+	 * Since our parent clock is only a divider, and the
-+	 * formula to get the outphasing in degrees is deg =
-+	 * 360 * delta / period
-+	 *
-+	 * If we simplify this formula, we can see that the
-+	 * only thing that we're concerned about is the number
-+	 * of period we want to outphase our clock from, and
-+	 * the divider set by our parent clock.
-+	 */
-+	step = DIV_ROUND_CLOSEST(360, parent_div);
-+	delay = DIV_ROUND_CLOSEST(degrees, step);
-+
-+set_phase:
-+	mask = CCU_MASK(ccu->p_shift, ccu->p_width);
-+	ccu_set_clock(ccu, ccu->reg, mask, delay << ccu->p_shift);
-+
-+	return 0;
-+}
-+
-+const struct clk_ops ccu_phase_ops = {
-+	.get_phase	= ccu_phase_get_phase,
-+	.set_phase	= ccu_phase_set_phase,
++/* display engine */
++/*	rate = 24MHz * n / (d1 + 1) / (d2 + 1) */
++static struct ccu pll_de_clk = {
++	CCU_REG(0x048),
++	CCU_HW("pll-de", "osc24M", &ccu_pll_ops, 0),
++	CCU_RESET(0x2c4, 12),
++	CCU_BUS(0x64, 12),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 9),
++	CCU_N(8, 8), .n_min = 12,
++	CCU_D1(16, 1),
++	CCU_D2(18, 1),
++	.features = CCU_FEATURE_N0,
 +};
 +
-+/* --- reset --- */
-+static inline
-+struct ccu_reset *rcdev_to_ccu_reset(struct reset_controller_dev *rcdev)
-+{
-+	return container_of(rcdev, struct ccu_reset, rcdev);
-+}
-+
-+static void ccu_set_reset_clock(struct ccu_reset *ccu_reset,
-+				int reg, int bit, int enable)
-+{
-+	u32 mask;
-+
-+	if (!reg)			/* compatibility */
-+		return;
-+
-+#if CCU_DEBUG
-+	pr_info("** ccu reset %03x %d %sassert\n",
-+		reg, bit, enable ? "de-" : "");
-+#endif
-+	mask = BIT(bit);
-+
-+	spin_lock(&ccu_lock);
-+	if (enable)
-+		writel(readl(ccu_reset->base + reg) | mask,
-+			ccu_reset->base + reg);
-+	else
-+		writel(readl(ccu_reset->base + reg) & ~mask,
-+			ccu_reset->base + reg);
-+	spin_unlock(&ccu_lock);
-+}
-+
-+static int ccu_reset_assert(struct reset_controller_dev *rcdev,
-+			    unsigned long id)
-+{
-+	struct ccu_reset *ccu_reset = rcdev_to_ccu_reset(rcdev);
-+	const struct ccu_reset_map *map = &ccu_reset->reset_map[id];
-+
-+	ccu_set_reset_clock(ccu_reset, map->reg, map->bit, 0);
-+
-+	return 0;
-+}
-+
-+static int ccu_reset_deassert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct ccu_reset *ccu_reset = rcdev_to_ccu_reset(rcdev);
-+	const struct ccu_reset_map *map = &ccu_reset->reset_map[id];
-+
-+	ccu_set_reset_clock(ccu_reset, map->reg, map->bit, 1);
-+
-+	return 0;
-+}
-+
-+const struct reset_control_ops ccu_reset_ops = {
-+	.assert		= ccu_reset_assert,
-+	.deassert	= ccu_reset_deassert,
++/* video 1 */
++/*	rate = 24MHz * n / (d1 + 1) >> p */
++static struct ccu pll_video1_clk = {
++	CCU_REG(0x04c),
++	CCU_HW("pll-video1", "osc24M", &ccu_pll_ops, 0),
++	CCU_GATE(31),
++	CCU_LOCK(0x20c, 10),
++	CCU_N(8, 8), .n_min = 12,
++	CCU_D1(16, 1),
++	CCU_P(0, 2),
++	.features = CCU_FEATURE_N0,
 +};
 +
-+/* --- init --- */
-+int __init ccu_probe(struct device_node *node,
-+			struct clk_hw_onecell_data *data,
-+			struct ccu_reset *resets)
++static const char * const c0cpux_parents[] = { "osc24M", "pll-c0cpux" };
++static struct ccu c0cpux_clk = {
++	CCU_REG(0x050),
++	CCU_HW_PARENTS("c0cpux", c0cpux_parents, &ccu_periph_ops,
++							CLK_IS_CRITICAL),
++	CCU_MUX(12, 1),
++};
++
++static struct ccu axi0_clk = {
++	CCU_REG(0x050),
++	CCU_HW("axi0", "c0cpux", &ccu_periph_ops, 0),
++	CCU_M(0, 2),
++};
++
++static const char * const c1cpux_parents[] = { "osc24M", "pll-c1cpux" };
++static struct ccu c1cpux_clk = {
++	CCU_REG(0x050),
++	CCU_HW_PARENTS("c1cpux", c1cpux_parents, &ccu_periph_ops,
++							CLK_IS_CRITICAL),
++	CCU_MUX(28, 1),
++};
++
++static struct ccu axi1_clk = {
++	CCU_REG(0x050),
++	CCU_HW("axi1", "c1cpux", &ccu_periph_ops, 0),
++	CCU_M(16, 2),
++};
++
++static const char * const ahb1_parents[] = { "osc32k", "osc24M",
++							"pll-periph" };
++static const struct ccu_extra ahb1_extra = {
++	.variable_prediv = { .index = 2, .shift = 6, .width = 2 },
++};
++static struct ccu ahb1_clk = {
++	CCU_REG(0x054),
++	CCU_HW_PARENTS("ahb1", ahb1_parents, &ccu_periph_ops, 0),
++	CCU_MUX(12, 2),
++	CCU_P(4, 2),
++	.features = CCU_FEATURE_MUX_VARIABLE_PREDIV,
++	.extra = &ahb1_extra,
++};
++
++static struct ccu apb1_clk = {
++	CCU_REG(0x054),
++	CCU_HW("apb1", "ahb1", &ccu_periph_ops, 0),
++	CCU_M(8, 2),
++};
++
++static const char * const apb2_parents[] = { "osc32k", "osc24M",
++						"pll-periph", "pll-periph" };
++static struct ccu apb2_clk = {
++	CCU_REG(0x058),
++	CCU_HW_PARENTS("apb2", apb2_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_M(0, 5),
++	CCU_P(16, 2),
++};
++
++/* from the bpi-m3 legacy driver, pll-periph is the only ahb2 parent */
++static struct ccu ahb2_clk = {
++	CCU_HW("ahb2", "pll-periph", &ccu_fixed_factor_ops, 0),
++	CCU_FIXED(1, 2),
++};
++
++static struct ccu bus_mipi_dsi_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-mipi-dsi", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(1),
++};
++static struct ccu bus_ss_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-ss", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(5),
++};
++static struct ccu bus_dma_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-dma", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(6),
++};
++/* the mmcx bus gates are handled by the mmcx clocks*/
++static struct ccu bus_mmc0_clk = {
++	CCU_HW("bus-mmc0", "ahb1", &ccu_periph_ops, 0),
++};
++static struct ccu bus_mmc1_clk = {
++	CCU_HW("bus-mmc1", "ahb1", &ccu_periph_ops, 0),
++};
++static struct ccu bus_mmc2_clk = {
++	CCU_HW("bus-mmc2", "ahb1", &ccu_periph_ops, 0),
++};
++static struct ccu bus_nand_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-nand", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(13),
++};
++static struct ccu bus_dram_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-dram", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(14),
++};
++static struct ccu bus_emac_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-emac", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(17),
++};
++static struct ccu bus_hstimer_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-hstimer", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(19),
++};
++static struct ccu bus_spi0_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-spi0", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(20),
++};
++static struct ccu bus_spi1_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-spi1", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(21),
++};
++static struct ccu bus_usbdrd_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-usbdrd", "ahb2", &ccu_periph_ops, 0),
++	CCU_GATE(24),
++};
++static struct ccu bus_ehci0_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-ehci0", "ahb2", &ccu_periph_ops, 0),
++	CCU_GATE(26),
++};
++static struct ccu bus_ehci1_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-ehci1", "ahb2", &ccu_periph_ops, 0),
++	CCU_GATE(27),
++};
++static struct ccu bus_ohci0_clk = {
++	CCU_REG(0x060),
++	CCU_HW("bus-ohci0", "ahb2", &ccu_periph_ops, 0),
++	CCU_GATE(29),
++};
++
++static struct ccu bus_ve_clk = {
++	CCU_REG(0x064),
++	CCU_HW("bus-ve", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(0),
++};
++static struct ccu bus_csi_clk = {
++	CCU_REG(0x064),
++	CCU_HW("bus-csi", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(8),
++};
++static struct ccu bus_gpu_clk = {
++	CCU_REG(0x064),
++	CCU_HW("bus-gpu", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(20),
++};
++static struct ccu bus_msgbox_clk = {
++	CCU_REG(0x064),
++	CCU_HW("bus-msgbox", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(21),
++};
++static struct ccu bus_spinlock_clk = {
++	CCU_REG(0x064),
++	CCU_HW("bus-spinlock", "ahb1", &ccu_periph_ops, 0),
++	CCU_GATE(22),
++};
++
++static struct ccu bus_spdif_clk = {
++	CCU_REG(0x068),
++	CCU_HW("bus-spdif", "apb1", &ccu_periph_ops, 0),
++	CCU_GATE(1),
++};
++static struct ccu bus_pio_clk = {
++	CCU_REG(0x068),
++	CCU_HW("bus-pio", "apb1", &ccu_periph_ops, 0),
++	CCU_GATE(5),
++};
++static struct ccu bus_i2c0_clk = {
++	CCU_REG(0x06c),
++	CCU_HW("bus-i2c0", "apb2", &ccu_periph_ops, 0),
++	CCU_GATE(0),
++};
++static struct ccu bus_i2c1_clk = {
++	CCU_REG(0x06c),
++	CCU_HW("bus-i2c1", "apb", &ccu_periph_ops, 0),
++	CCU_GATE(1),
++};
++static struct ccu bus_i2c2_clk = {
++	CCU_REG(0x06c),
++	CCU_HW("bus-i2c2", "apb2", &ccu_periph_ops, 0),
++	CCU_GATE(2),
++};
++static struct ccu bus_uart0_clk = {
++	CCU_REG(0x06c),
++	CCU_HW("bus-uart0", "apb2", &ccu_periph_ops, 0),
++	CCU_GATE(16),
++};
++static struct ccu bus_uart1_clk = {
++	CCU_REG(0x06c),
++	CCU_HW("bus-uart1", "apb2", &ccu_periph_ops, 0),
++	CCU_GATE(17),
++};
++static struct ccu bus_uart2_clk = {
++	CCU_REG(0x06c),
++	CCU_HW("bus-uart2", "apb2", &ccu_periph_ops, 0),
++	CCU_GATE(18),
++};
++static struct ccu bus_uart3_clk = {
++	CCU_REG(0x06c),
++	CCU_HW("bus-uart3", "apb2", &ccu_periph_ops, 0),
++	CCU_GATE(19),
++};
++static struct ccu bus_uart4_clk = {
++	CCU_REG(0x06c),
++	CCU_HW("bus-uart4", "apb2", &ccu_periph_ops, 0),
++	CCU_GATE(20),
++};
++
++static const char * const cci400_parents[] = { "osc24M", "pll-periph",
++						"pll-hsic" };
++static struct ccu cci400_clk = {
++	CCU_REG(0x078),
++	CCU_HW_PARENTS("cci400", cci400_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_M(0, 2),
++};
++
++static const char * const mod0_default_parents[] = { "osc24M", "pll-periph" };
++static struct ccu nand_clk = {
++	CCU_REG(0x080),
++	CCU_HW_PARENTS("nand", mod0_default_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++	CCU_P(16, 2),
++};
++
++static struct ccu mmc0_clk = {
++	CCU_REG(0x088),
++	CCU_HW_PARENTS("mmc0", mod0_default_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_RESET(0x2c0, 8),
++	CCU_BUS(0x060, 8),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++	CCU_P(16, 2),
++	.features = CCU_FEATURE_SET_RATE_UNGATE,
++};
++static struct ccu mmc0_sample_clk = {
++	CCU_REG(0x088),
++	CCU_HW("mmc0_sample", "mmc0", &ccu_phase_ops, 0),
++	CCU_PHASE(20, 3),
++};
++static struct ccu mmc0_output_clk = {
++	CCU_REG(0x088),
++	CCU_HW("mmc0_output", "mmc0", &ccu_phase_ops, 0),
++	CCU_PHASE(8, 3),
++};
++
++static struct ccu mmc1_clk = {
++	CCU_REG(0x08c),
++	CCU_HW_PARENTS("mmc1", mod0_default_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_RESET(0x2c0, 9),
++	CCU_BUS(0x060, 9),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++	CCU_P(16, 2),
++	.features = CCU_FEATURE_SET_RATE_UNGATE,
++};
++static struct ccu mmc1_sample_clk = {
++	CCU_REG(0x08c),
++	CCU_HW("mmc1_sample", "mmc1", &ccu_phase_ops, 0),
++	CCU_PHASE(20, 3),
++};
++static struct ccu mmc1_output_clk = {
++	CCU_REG(0x08c),
++	CCU_HW("mmc1_output", "mmc1", &ccu_phase_ops, 0),
++	CCU_PHASE(8, 3),
++};
++
++/* new mode */
++static const struct ccu_extra mmc_extra = {
++	.mode_select.rate = 100000000,
++	.mode_select.bit = 30,
++};
++static struct ccu mmc2_clk = {
++	CCU_REG(0x090),
++	CCU_HW_PARENTS("mmc2", mod0_default_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_RESET(0x2c0, 10),
++	CCU_BUS(0x060, 10),
++	CCU_M(0, 4),
++	CCU_P(16, 2),
++	CCU_GATE(31),
++	.features = CCU_FEATURE_SET_RATE_UNGATE |
++			CCU_FEATURE_MODE_SELECT,
++	.extra = &mmc_extra,
++};
++static struct ccu mmc2_sample_clk = {
++	CCU_REG(0x090),
++	CCU_HW("mmc2_sample", "mmc2", &ccu_phase_ops, 0),
++	CCU_PHASE(20, 3),
++};
++static struct ccu mmc2_output_clk = {
++	CCU_REG(0x090),
++	CCU_HW("mmc2_output", "mmc2", &ccu_phase_ops, 0),
++	CCU_PHASE(8, 3),
++};
++
++static struct ccu ss_clk = {
++	CCU_REG(0x09c),
++	CCU_HW_PARENTS("ss", mod0_default_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++	CCU_P(16, 2),
++};
++
++static struct ccu spi0_clk = {
++	CCU_REG(0x0a0),
++	CCU_HW_PARENTS("spi0", mod0_default_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++	CCU_P(16, 2),
++};
++
++static struct ccu spi1_clk = {
++	CCU_REG(0x0a4),
++	CCU_HW_PARENTS("spi1", mod0_default_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++	CCU_P(16, 2),
++};
++
++static struct ccu daudio0_clk = {
++	CCU_REG(0x0b0),
++	CCU_HW("daudio0", "pll-audio", &ccu_periph_ops, 0),
++	CCU_BUS(0x068, 12),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++};
++static struct ccu daudio1_clk = {
++	CCU_REG(0x0b4),
++	CCU_HW("daudio1", "pll-audio", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++	CCU_BUS(0x068, 13),
++	CCU_M(0, 4),
++};
++
++static struct ccu daudio2_clk = {
++	CCU_REG(0x0b8),
++	CCU_HW("daudio2", "pll-audio", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++	CCU_BUS(0x068, 14),
++	CCU_M(0, 4),
++};
++
++static struct ccu tdm_clk = {
++	CCU_REG(0x0bc),
++	CCU_HW("tdm", "pll-audio", &ccu_periph_ops, 0),
++	CCU_BUS(0x068, 15),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++};
++
++static struct ccu spdif_clk = {
++	CCU_REG(0x0c0),
++	CCU_HW("spdif", "pll-audio", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++};
++
++static struct ccu usb_phy0_clk = {
++	CCU_REG(0x0cc),
++	CCU_HW("usb-phy0", "osc24M", &ccu_periph_ops, 0),
++	CCU_GATE(8),
++};
++
++static struct ccu usb_phy1_clk = {
++	CCU_REG(0x0cc),
++	CCU_HW("usb-phy1", "osc24M", &ccu_periph_ops, 0),
++	CCU_GATE(9),
++};
++
++static struct ccu usb_hsic_clk = {
++	CCU_REG(0x0cc),
++	CCU_HW("usb-hsic", "osc24M", &ccu_periph_ops, 0),
++	CCU_GATE(10),
++};
++
++static struct ccu osc12m_clk = {
++	CCU_REG(0x0cc),
++	CCU_HW("osc12M", "osc24M", &ccu_fixed_factor_ops, 0),
++	CCU_GATE(11),
++	CCU_FIXED(1, 2),
++};
++
++static struct ccu ohci0_clk = {
++	CCU_REG(0x0cc),
++	CCU_HW("ohci0", "osc24M", &ccu_periph_ops, 0),
++	CCU_GATE(16),
++};
++
++static struct ccu dram_clk = {
++	CCU_REG(0x0f4),
++	CCU_HW("dram", "pll-ddr", &ccu_periph_ops, 0),
++	CCU_M(0, 4),
++	CCU_UPD(16),
++};
++
++/* pll_ddr config not done */
++
++static struct ccu dram_ve_clk = {
++	CCU_REG(0x0100),
++	CCU_HW("dram-ve", "dram", &ccu_periph_ops, 0),
++	CCU_GATE(0),
++};
++
++static struct ccu dram_csi_clk = {
++	CCU_REG(0x0100),
++	CCU_HW("dram-csi", "dram", &ccu_periph_ops, 0),
++	CCU_GATE(1),
++};
++
++static struct ccu tcon0_clk = {
++	CCU_REG(0x118),
++	CCU_HW("tcon0", "pll-video0", &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_RESET(0x2c4, 4),
++	CCU_BUS(0x064, 4),
++	CCU_GATE(31),
++};
++
++static struct ccu tcon1_clk = {
++	CCU_REG(0x11c),
++	CCU_HW("tcon1", "pll-video1", &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_RESET(0x2c4, 5),
++	CCU_BUS(0x064, 5),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++};
++
++static struct ccu csi_misc_clk = {
++	CCU_REG(0x0130),
++	CCU_HW("csi-misc", "osc24M", &ccu_periph_ops, 0),
++	CCU_GATE(16),
++};
++
++static struct ccu mipi_csi_clk = {
++	CCU_REG(0x0130),
++	CCU_HW("mipi-csi", "osc24M", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++};
++
++/* hack: "osc32k" is used for no parent */
++static const char * const csi_sclk_parents[] = { "pll-periph",
++				"osc32k", "osc32k", "osc32k", "osc32k",
++				"pll-ve" };
++static struct ccu csi_sclk_clk = {
++	CCU_REG(0x134),
++	CCU_HW_PARENTS("csi-sclk", csi_sclk_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 3),
++	CCU_GATE(31),
++	CCU_M(16, 4),
++};
++
++/* hack: "osc32k" is used for no parent */
++static const char * const csi_mclk_parents[] = {"osc32k", "osc32k", "osc32k",
++				"pll-periph", "osc32k",
++				"osc24M"};
++static struct ccu csi_mclk_clk = {
++	CCU_REG(0x134),
++	CCU_HW_PARENTS("csi-mclk", csi_mclk_parents, &ccu_periph_ops, 0),
++	CCU_MUX(8, 3),
++	CCU_GATE(15),
++	CCU_M(0, 5),
++};
++
++static struct ccu ve_clk = {
++	CCU_REG(0x13c),
++	CCU_HW("ve", "pll-ve", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++	CCU_M(16, 3),
++};
++
++static struct ccu avs_clk = {
++	CCU_REG(0x0144),
++	CCU_HW("avs", "osc24M", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++};
++
++static struct ccu hdmi_clk = {
++	CCU_REG(0x150),
++	CCU_HW("hdmi", "pll-video1", &ccu_periph_ops, 0),
++	CCU_MUX(24, 2),
++	CCU_BUS(0x064, 11),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++};
++
++static struct ccu hdmi_ddc_clk = {
++	CCU_REG(0x0154),
++	CCU_HW("hdmi-ddc", "osc24M", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++};
++
++static const char * const mbus_parents[] = { "osc24M", "pll-periph",
++						"pll-ddr" };
++static struct ccu mbus_clk = {
++	CCU_REG(0x15c),
++	CCU_HW_PARENTS("mbus", mbus_parents, &ccu_periph_ops, CLK_IS_CRITICAL),
++	CCU_MUX(24, 2),
++	CCU_GATE(31),
++	CCU_M(0, 3),
++};
++
++static struct ccu mipi_dsi0_clk = {
++	CCU_REG(0x168),
++	CCU_HW("mipi-dsi0", "pll-video0", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++};
++
++static const char * const mipi_dsi1_parents[] = { "osc24M",
++/* hack: "osc32k" is used for "no parent" */
++				"osc32k", "osc32k", "osc32k", "osc32k",
++					"osc32k", "osc32k", "osc32k", "osc32k",
++				"pll-video0" };
++static struct ccu mipi_dsi1_clk = {
++	CCU_REG(0x16c),
++	CCU_HW_PARENTS("mipi-dsi1", mipi_dsi1_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 4),
++	CCU_GATE(31),
++	CCU_M(0, 4),
++};
++
++static struct ccu gpu_core_clk = {
++	CCU_REG(0x1a0),
++	CCU_HW("gpu-core", "pll-gpu", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++	CCU_M(0, 3),
++};
++
++static const char * const gpu_mem_parents[] = { "pll-gpu", "pll-periph" };
++static struct ccu gpu_mem_clk = {
++	CCU_REG(0x1a4),
++	CCU_HW_PARENTS("gpu-mem", gpu_mem_parents, &ccu_periph_ops, 0),
++	CCU_MUX(24, 1),
++	CCU_GATE(31),
++	CCU_M(0, 3),
++};
++
++static struct ccu gpu_hyd_clk = {
++	CCU_REG(0x1a8),
++	CCU_HW("gpu-hyd", "pll-gpu", &ccu_periph_ops, 0),
++	CCU_GATE(31),
++	CCU_M(0, 3),
++};
++
++static struct clk_hw_onecell_data sun8i_a83t_ccu_data = {
++	.num = 93,
++	.hws = {
++		[CLK_BUS_DMA]		= &bus_dma_clk.hw,
++		[CLK_BUS_EHCI0]		= &bus_ehci0_clk.hw,
++		[CLK_BUS_EHCI1]		= &bus_ehci1_clk.hw,
++		[CLK_BUS_MMC0]		= &bus_mmc0_clk.hw,
++		[CLK_BUS_MMC1]		= &bus_mmc1_clk.hw,
++		[CLK_BUS_MMC2]		= &bus_mmc2_clk.hw,
++		[CLK_BUS_OHCI0]		= &bus_ohci0_clk.hw,
++		[CLK_BUS_PIO]		= &bus_pio_clk.hw,
++		[CLK_BUS_UART0]		= &bus_uart0_clk.hw,
++		[CLK_BUS_UART1]		= &bus_uart1_clk.hw,
++		[CLK_BUS_UART2]		= &bus_uart2_clk.hw,
++		[CLK_BUS_UART3]		= &bus_uart3_clk.hw,
++		[CLK_BUS_UART4]		= &bus_uart4_clk.hw,
++		[CLK_BUS_USBDRD]	= &bus_usbdrd_clk.hw,
++		[CLK_DAUDIO0]		= &daudio0_clk.hw,
++		[CLK_DAUDIO1]		= &daudio1_clk.hw,
++		[CLK_DAUDIO2]		= &daudio2_clk.hw,
++		[CLK_HDMI]		= &hdmi_clk.hw,
++		[CLK_HDMI_DDC]		= &hdmi_ddc_clk.hw,
++		[CLK_MMC0]		= &mmc0_clk.hw,
++		[CLK_MMC0_SAMPLE]	= &mmc0_sample_clk.hw,
++		[CLK_MMC0_OUTPUT]	= &mmc0_output_clk.hw,
++		[CLK_MMC1]		= &mmc1_clk.hw,
++		[CLK_MMC1_SAMPLE]	= &mmc1_sample_clk.hw,
++		[CLK_MMC1_OUTPUT]	= &mmc1_output_clk.hw,
++		[CLK_MMC2]		= &mmc2_clk.hw,
++		[CLK_MMC2_SAMPLE]	= &mmc2_sample_clk.hw,
++		[CLK_MMC2_OUTPUT]	= &mmc2_output_clk.hw,
++		[CLK_OHCI0]		= &ohci0_clk.hw,
++		[CLK_OSC12M]		= &osc12m_clk.hw,
++		[CLK_PLL_AUDIO]		= &pll_audio_clk.hw,
++		[CLK_PLL_DE]		= &pll_de_clk.hw,
++		[CLK_PLL_GPU]		= &pll_gpu_clk.hw,
++		[CLK_PLL_HSIC]		= &pll_hsic_clk.hw,
++		[CLK_PLL_PERIPH]	= &pll_periph_clk.hw,
++		[CLK_PLL_VE]		= &pll_ve_clk.hw,
++		[CLK_PLL_VIDEO0]	= &pll_video0_clk.hw,
++		[CLK_PLL_VIDEO1]	= &pll_video1_clk.hw,
++		[CLK_SPDIF]		= &spdif_clk.hw,
++		[CLK_SPI0]		= &spi0_clk.hw,
++		[CLK_SPI1]		= &spi1_clk.hw,
++		[CLK_TCON0]		= &tcon0_clk.hw,
++		[CLK_TCON1]		= &tcon1_clk.hw,
++		[CLK_TDM]		= &tdm_clk.hw,
++		[CLK_USB_PHY0]		= &usb_phy0_clk.hw,
++		[CLK_USB_PHY1]		= &usb_phy1_clk.hw,
++		[CLK_USB_HSIC]		= &usb_hsic_clk.hw,
++		[CLK_VE]		= &ve_clk.hw,
++		&pll_c0cpux_clk.hw,
++		&pll_c1cpux_clk.hw,
++		&pll_ddr_clk.hw,			/* 50 */
++		&c0cpux_clk.hw,
++		&axi0_clk.hw,
++		&c1cpux_clk.hw,
++		&axi1_clk.hw,
++		&ahb1_clk.hw,
++		&apb1_clk.hw,
++		&apb2_clk.hw,
++		&ahb2_clk.hw,
++		&bus_mipi_dsi_clk.hw,
++		&bus_ss_clk.hw,				/* 60 */
++		&bus_nand_clk.hw,
++		&bus_dram_clk.hw,
++		&bus_emac_clk.hw,
++		&bus_hstimer_clk.hw,
++		&bus_spi0_clk.hw,
++		&bus_spi1_clk.hw,
++		&bus_ve_clk.hw,
++		&bus_csi_clk.hw,
++		&bus_gpu_clk.hw,
++		&bus_msgbox_clk.hw,			/* 70 */
++		&bus_spinlock_clk.hw,
++		&bus_spdif_clk.hw,
++		&bus_i2c0_clk.hw,
++		&bus_i2c1_clk.hw,
++		&bus_i2c2_clk.hw,
++		&cci400_clk.hw,
++		&nand_clk.hw,
++		&ss_clk.hw,
++		&dram_clk.hw,
++		&dram_ve_clk.hw,			/* 80 */
++		&dram_csi_clk.hw,
++		&csi_misc_clk.hw,
++		&mipi_csi_clk.hw,
++		&csi_sclk_clk.hw,
++		&csi_mclk_clk.hw,
++		&avs_clk.hw,
++		&mbus_clk.hw,
++		&mipi_dsi0_clk.hw,
++		&mipi_dsi1_clk.hw,
++		&gpu_core_clk.hw,			/* 90 */
++		&gpu_mem_clk.hw,
++		&gpu_hyd_clk.hw,
++	},
++};
++
++static struct ccu_reset_map sun8i_a83t_ccu_resets[] = {
++	[RST_USB_PHY0]	=  { 0x0cc, 0 },
++	[RST_USB_PHY1]	=  { 0x0cc, 1 },
++	[RST_USB_HSIC]	=  { 0x0cc, 2 },
++	[RST_DMA]	=  { 0x2c0, 6 },
++	[RST_USBDRD]	=  { 0x2c0, 24 },
++	[RST_EHCI0]	=  { 0x2c0, 26 },
++	[RST_EHCI1]	=  { 0x2c0, 27 },
++	[RST_OHCI0]	=  { 0x2c0, 29 },
++	[RST_HDMI0]	=  { 0x2c4, 10 },
++	[RST_HDMI1]	=  { 0x2c4, 11 },
++	[RST_UART0]	=  { 0x2d8, 16 },
++	[RST_UART1]	=  { 0x2d8, 17 },
++	[RST_UART2]	=  { 0x2d8, 18 },
++	[RST_UART3]	=  { 0x2d8, 19 },
++	[RST_UART4]	=  { 0x2d8, 20 },
++};
++
++static struct ccu_reset sun8i_a83t_resets = {
++	.rcdev.ops = &ccu_reset_ops,
++	.rcdev.owner = THIS_MODULE,
++	.rcdev.nr_resets = ARRAY_SIZE(sun8i_a83t_ccu_resets),
++	.reset_map = sun8i_a83t_ccu_resets,
++};
++
++static void __init sun8i_a83t_ccu_setup(struct device_node *node)
 +{
-+	struct clk_hw *hw;
-+	struct ccu *ccu;
-+	void __iomem *reg;
-+	int i, ret;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg)) {
-+		pr_err("%s: Clock mapping failed %d\n",
-+			of_node_full_name(node), (int) PTR_ERR(reg));
-+		return PTR_ERR(reg);
-+	}
-+
-+	/* register the clocks */
-+	for (i = 0; i < data->num; i++) {
-+		hw = data->hws[i];
-+#if CCU_DEBUG
-+		if (!hw) {
-+			pr_err("%s: Bad number of clocks %d != %d\n",
-+				of_node_full_name(node),
-+				i + 1, data->num);
-+			data->num = i;
-+			break;
-+		}
-+#endif
-+		ccu = hw2ccu(hw);
-+		ccu->base = reg;
-+		ret = clk_hw_register(NULL, hw);
-+		if (ret < 0) {
-+			pr_err("%s: Register clock %s failed %d\n",
-+				of_node_full_name(node),
-+				clk_hw_get_name(hw), ret);
-+			data->num = i;
-+			break;
-+		}
-+	}
-+	ret = of_clk_add_hw_provider(node, of_clk_hw_onecell_get, data);
-+	if (ret < 0)
-+		goto err;
-+
-+	/* register the resets */
-+	resets->rcdev.of_node = node;
-+	resets->base = reg;
-+
-+	ret = reset_controller_register(&resets->rcdev);
-+	if (ret) {
-+		pr_err("%s: Reset register failed %d\n",
-+			of_node_full_name(node), ret);
-+		goto err;
-+	}
-+
-+	return ret;
-+
-+err:
-+	/* don't do anything, otherwise no uart anymore */
-+	return ret;
++	ccu_probe(node, &sun8i_a83t_ccu_data,
++			&sun8i_a83t_resets);
 +}
-diff --git a/drivers/clk/sunxi/ccu.h b/drivers/clk/sunxi/ccu.h
++CLK_OF_DECLARE(sun8i_a83t_ccu, "allwinner,sun8i-a83t-ccu",
++	       sun8i_a83t_ccu_setup);
+diff --git a/include/dt-bindings/clock/sun8i-a83t.h b/include/dt-bindings/clock/sun8i-a83t.h
 new file mode 100644
-index 0000000..5597681
+index 0000000..c063783
 --- /dev/null
-+++ b/drivers/clk/sunxi/ccu.h
-@@ -0,0 +1,153 @@
++++ b/include/dt-bindings/clock/sun8i-a83t.h
+@@ -0,0 +1,97 @@
 +/*
 + * Copyright (C) 2016 Jean-Francois Moine <moinejf@free.fr>
++ * Based on the H3 version from
++ * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#ifndef _CCU_H_
-+#define _CCU_H_
++#ifndef _DT_BINDINGS_CLK_SUN8I_A83T_H_
++#define _DT_BINDINGS_CLK_SUN8I_A83T_H_
 +
-+struct device_node;
++#define CLK_BUS_DMA		0
++#define CLK_BUS_EHCI0		1
++#define CLK_BUS_EHCI1		2
++#define CLK_BUS_MMC0		3
++#define CLK_BUS_MMC1		4
++#define CLK_BUS_MMC2		5
++#define CLK_BUS_OHCI0		6
++#define CLK_BUS_PIO		7
++#define CLK_BUS_UART0		8
++#define CLK_BUS_UART1		9
++#define CLK_BUS_UART2		10
++#define CLK_BUS_UART3		11
++#define CLK_BUS_UART4		12
++#define CLK_BUS_USBDRD		13
++#define CLK_DAUDIO0		14
++#define CLK_DAUDIO1		15
++#define CLK_DAUDIO2		16
++#define CLK_HDMI		17
++#define CLK_HDMI_DDC		18
++#define CLK_MMC0		19
++#define CLK_MMC0_SAMPLE		20
++#define CLK_MMC0_OUTPUT		21
++#define CLK_MMC1		22
++#define CLK_MMC1_SAMPLE		23
++#define CLK_MMC1_OUTPUT		24
++#define CLK_MMC2		25
++#define CLK_MMC2_SAMPLE		26
++#define CLK_MMC2_OUTPUT		27
++#define CLK_OHCI0		28
++#define CLK_OSC12M		29
++#define CLK_PLL_AUDIO		30
++#define CLK_PLL_DE		31
++#define CLK_PLL_GPU		32
++#define CLK_PLL_HSIC		33
++#define CLK_PLL_PERIPH		34
++#define CLK_PLL_VE		35
++#define CLK_PLL_VIDEO0		36
++#define CLK_PLL_VIDEO1		37
++#define CLK_SPDIF		38
++#define CLK_SPI0		39
++#define CLK_SPI1		40
++#define CLK_TCON0		41
++#define CLK_TCON1		42
++#define CLK_TDM			43
++#define CLK_USB_PHY0		44
++#define CLK_USB_PHY1		45
++#define CLK_USB_HSIC		46
++#define CLK_VE			47
 +
-+#define CCU_HW(_name, _parent, _ops, _flags)			\
-+	.hw.init = &(struct clk_init_data) {			\
-+		.flags		= _flags,			\
-+		.name		= _name,			\
-+		.parent_names	= (const char *[]) { _parent },	\
-+		.num_parents	= 1,				\
-+		.ops		= _ops,				\
-+	}
++#endif /* _DT_BINDINGS_CLK_SUN8I_A83T_H_ */
+diff --git a/include/dt-bindings/reset/sun8i-a83t.h b/include/dt-bindings/reset/sun8i-a83t.h
+new file mode 100644
+index 0000000..174382e
+--- /dev/null
++++ b/include/dt-bindings/reset/sun8i-a83t.h
+@@ -0,0 +1,62 @@
++/*
++ * Copyright (c) 2016 Jean-Francois Moine <moinejf@free.fr>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+#define CCU_HW_PARENTS(_name, _parents, _ops, _flags)		\
-+	.hw.init = &(struct clk_init_data) {			\
-+		.flags		= _flags,			\
-+		.name		= _name,			\
-+		.parent_names	= _parents,			\
-+		.num_parents	= ARRAY_SIZE(_parents),		\
-+		.ops		= _ops,				\
-+	}
++#ifndef _DT_BINDINGS_RST_SUN8I_A83T_H_
++#define _DT_BINDINGS_RST_SUN8I_A83T_H_
 +
-+#define CCU_REG(_reg) .reg = _reg
-+#define CCU_RESET(_reg, _bit) .reset_reg = _reg, .reset_bit = _bit
-+#define CCU_BUS(_reg, _bit) .bus_reg = _reg, .bus_bit = _bit
-+#define CCU_GATE(_bit) .has_gate = 1, .gate_bit = _bit
-+#define CCU_LOCK(_reg, _bit) .lock_reg = _reg, .lock_bit = _bit
-+#define CCU_MUX(_shift, _width) .mux_shift = _shift, .mux_width = _width
-+#define CCU_N(_shift, _width) .n_shift = _shift, .n_width = _width
-+#define CCU_D1(_shift, _width) .d1_shift = _shift, .d1_width = _width
-+#define CCU_D2(_shift, _width) .p_shift = _shift, .p_width = _width
-+#define CCU_K(_shift, _width) .k_shift = _shift, .k_width = _width
-+#define CCU_M(_shift, _width) .m_shift = _shift, .m_width = _width
-+#define CCU_P(_shift, _width) .p_shift = _shift, .p_width = _width
-+#define CCU_UPD(_bit) .upd_bit = _bit
-+/* with ccu_fixed_factor_ops */
-+#define CCU_FIXED(_mul, _div) .n_width = _mul, .m_width = _div
-+/* with ccu_phase_ops */
-+#define CCU_PHASE(_shift, _width) .p_shift = _shift, .p_width = _width
++#define RST_DMA		0
++#define RST_EHCI0	1
++#define RST_EHCI1	2
++#define RST_HDMI0	3
++#define RST_HDMI1	4
++#define RST_OHCI0	5
++#define RST_UART0	6
++#define RST_UART1	7
++#define RST_UART2	8
++#define RST_UART3	9
++#define RST_UART4	10
++#define RST_USB_HSIC	11
++#define RST_USB_PHY0	12
++#define RST_USB_PHY1	13
++#define RST_USBDRD	14
 +
-+#define CCU_FEATURE_FRACTIONAL		BIT(0)
-+#define CCU_FEATURE_MUX_VARIABLE_PREDIV	BIT(1)
-+#define CCU_FEATURE_MUX_FIXED_PREDIV	BIT(2)
-+#define CCU_FEATURE_FIXED_POSTDIV	BIT(3)
-+#define CCU_FEATURE_N0			BIT(4)
-+#define CCU_FEATURE_MODE_SELECT		BIT(5)
-+#define CCU_FEATURE_FLAT_FACTORS	BIT(6)
-+#define CCU_FEATURE_SET_RATE_UNGATE	BIT(7)
-+
-+/* extra */
-+#define CCU_EXTRA_FRAC(_frac) .frac = _frac, .num_frac = ARRAY_SIZE(_frac)
-+#define CCU_EXTRA_POST_DIV(_div) .fixed_div[0] = _div
-+
-+/* fractional values */
-+struct frac {
-+	unsigned long rate;
-+	u32 mask;
-+	u32 val;
-+};
-+
-+/* extra features */
-+struct ccu_extra {
-+	const struct frac *frac; /* array - last is the fractional mask/value */
-+	u8 num_frac;
-+
-+	u8 fixed_div[4];
-+
-+	struct {
-+		u8 index;
-+		u8 shift;
-+		u8 width;
-+	} variable_prediv;
-+
-+	struct {
-+		unsigned long rate;
-+		u8 bit;
-+	} mode_select;
-+};
-+
-+struct ccu {
-+	struct clk_hw	hw;
-+
-+	void __iomem *base;
-+	u16 reg;
-+
-+	u16 reset_reg, bus_reg, lock_reg;
-+	u8  reset_bit, bus_bit, lock_bit;
-+	u8 has_gate, gate_bit;
-+
-+	u8 mux_shift, mux_width;
-+	u8 n_shift, n_width, n_min;
-+	u8 d1_shift, d1_width;
-+	u8 k_shift, k_width;
-+	u8 m_shift, m_width;
-+	u8 p_shift, p_width;
-+
-+	u8 upd_bit;
-+
-+	u8 features;
-+
-+	const struct clk_div_table *div_table;
-+	u32 div_flags;
-+
-+	const struct ccu_extra *extra;
-+};
-+
-+struct ccu_reset_map {
-+	u16	reg;
-+	u16	bit;
-+};
-+
-+struct ccu_reset {
-+	void __iomem			*base;
-+	const struct ccu_reset_map	*reset_map;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+extern const struct clk_ops ccu_fixed_factor_ops;
-+extern const struct clk_ops ccu_periph_ops;
-+extern const struct clk_ops ccu_pll_ops;
-+extern const struct clk_ops ccu_phase_ops;
-+extern const struct reset_control_ops ccu_reset_ops;
-+
-+static inline struct ccu *hw2ccu(struct clk_hw *hw)
-+{
-+	return container_of(hw, struct ccu, hw);
-+}
-+
-+int ccu_probe(struct device_node *node,
-+		struct clk_hw_onecell_data *data,
-+		struct ccu_reset *resets);
-+
-+/* functions exported for specific features */
-+void ccu_set_clock(struct ccu *ccu, int reg, u32 mask, u32 val);
-+unsigned long ccu_fixed_factor_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate);
-+long ccu_fixed_factor_round_rate(struct clk_hw *hw,
-+				unsigned long rate,
-+				unsigned long *parent_rate);
-+int ccu_fixed_factor_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate);
-+
-+#endif /* _CCU_H_ */
++#endif /* _DT_BINDINGS_RST_SUN8I_A83T_H_ */
 -- 
 2.9.0
