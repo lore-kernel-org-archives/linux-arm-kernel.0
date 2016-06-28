@@ -1,107 +1,72 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Tue, 28 Jun 2016 17:48:04 +0800
-Subject: [PATCH v4 3/3] arm64:acpi Fix the acpi alignment exeception when
- 'mem=' specified
-Message-ID: <1467107284-29747-1-git-send-email-dennis.chen@arm.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Tue, 28 Jun 2016 05:50:21 -0400
+Subject: [PATCH 0/8] arm64:perf: Support for Hisilicon SoC Hardware event
+ counters
+Message-ID: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting an ACPI enabled kernel with 'mem=x', probably the ACPI data
-regions loaded by firmware will beyond the limit of the memory, in this
-case we need to keep those NOMAP regions above the limit while not removing
-them from memblock, because once a region removed from memblock, the ACPI
-will think that region is not normal memory and map it as device type
-memory accordingly. Since the ACPI core will produce non-alignment access
-when paring AML data stream, hence result in alignment fault upon the IO
-mapped memory space.
+Provide Support for Hisilicon SoC Hardware event counters.
+The Hisilicon SoC Hi161x series has many uncore or non-CPU performance
+events and counters units.
 
-For example, below is an alignment exception observed on ARM platform when
-booting the kernel with 'acpi=on mem=8G':
-...
-[    0.542475] Unable to handle kernel paging request at virtual address ffff0000080521e7
-[    0.550457] pgd = ffff000008aa0000
-[    0.553880] [ffff0000080521e7] *pgd=000000801fffe003, *pud=000000801fffd003, *pmd=000000801fffc003, *pte=00e80083ff1c1707
-[    0.564939] Internal error: Oops: 96000021 [#1] PREEMPT SMP
-[    0.570553] Modules linked in:
-[    0.573626] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc3-next-20160616+ #172
-[    0.581344] Hardware name: AMD Overdrive/Supercharger/Default string, BIOS ROD1001A 02/09/2016
-[    0.590025] task: ffff800001ef0000 ti: ffff800001ef8000 task.ti: ffff800001ef8000
-[    0.597571] PC is at acpi_ns_lookup+0x520/0x734
-[    0.602134] LR is at acpi_ns_lookup+0x4a4/0x734
-[    0.606693] pc : [<ffff0000083b8b10>] lr : [<ffff0000083b8a94>] pstate: 60000045
-[    0.614145] sp : ffff800001efb8b0
-[    0.617478] x29: ffff800001efb8c0 x28: 000000000000001b
-[    0.622829] x27: 0000000000000001 x26: 0000000000000000
-[    0.628181] x25: ffff800001efb9e8 x24: ffff000008a10000
-[    0.633531] x23: 0000000000000001 x22: 0000000000000001
-[    0.638881] x21: ffff000008724000 x20: 000000000000001b
-[    0.644230] x19: ffff0000080521e7 x18: 000000000000000d
-[    0.649580] x17: 00000000000038ff x16: 0000000000000002
-[    0.654929] x15: 0000000000000007 x14: 0000000000007fff
-[    0.660278] x13: ffffff0000000000 x12: 0000000000000018
-[    0.665627] x11: 000000001fffd200 x10: 00000000ffffff76
-[    0.670978] x9 : 000000000000005f x8 : ffff000008725fa8
-[    0.676328] x7 : ffff000008a8df70 x6 : ffff000008a8df70
-[    0.681679] x5 : ffff000008a8d000 x4 : 0000000000000010
-[    0.687027] x3 : 0000000000000010 x2 : 000000000000000c
-[    0.692378] x1 : 0000000000000006 x0 : 0000000000000000
-...
-[    1.262235] [<ffff0000083b8b10>] acpi_ns_lookup+0x520/0x734
-[    1.267845] [<ffff0000083a7160>] acpi_ds_load1_begin_op+0x174/0x4fc
-[    1.274156] [<ffff0000083c1f4c>] acpi_ps_build_named_op+0xf8/0x220
-[    1.280380] [<ffff0000083c227c>] acpi_ps_create_op+0x208/0x33c
-[    1.286254] [<ffff0000083c1820>] acpi_ps_parse_loop+0x204/0x838
-[    1.292215] [<ffff0000083c2fd4>] acpi_ps_parse_aml+0x1bc/0x42c
-[    1.298090] [<ffff0000083bc6e8>] acpi_ns_one_complete_parse+0x1e8/0x22c
-[    1.304753] [<ffff0000083bc7b8>] acpi_ns_parse_table+0x8c/0x128
-[    1.310716] [<ffff0000083bb8fc>] acpi_ns_load_table+0xc0/0x1e8
-[    1.316591] [<ffff0000083c9068>] acpi_tb_load_namespace+0xf8/0x2e8
-[    1.322818] [<ffff000008984128>] acpi_load_tables+0x7c/0x110
-[    1.328516] [<ffff000008982ea4>] acpi_init+0x90/0x2c0
-[    1.333603] [<ffff0000080819fc>] do_one_initcall+0x38/0x12c
-[    1.339215] [<ffff000008960cd4>] kernel_init_freeable+0x148/0x1ec
-[    1.345353] [<ffff0000086b7d30>] kernel_init+0x10/0xec
-[    1.350529] [<ffff000008084e10>] ret_from_fork+0x10/0x40
-[    1.355878] Code: b9009fbc 2a00037b 36380057 3219037b (b9400260)
-[    1.362035] ---[ end trace 03381e5eb0a24de4 ]---
-[    1.366691] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+This patch is implemented refering to arm-cci, Intel/AMD uncore and
+also the cavium thunderX pmu patches.
 
-With 'efi=debug', we can see those ACPI regions loaded by firmware on
-that board as:
-[    0.000000] efi:   0x0083ff185000-0x0083ff1b4fff [Reserved           |   |  |  |  |  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0083ff1b5000-0x0083ff1c2fff [ACPI Reclaim Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0083ff223000-0x0083ff224fff [ACPI Memory NVS    |   |  |  |  |  |  |  |   |WB|WT|WC|UC]*
+Support for Hisilicon L3 cache(LLC) hardware events and counters are added
+in this implementation.
 
-This patch is trying to address the above issue by only keep those
-NOMAP regions instead of removing all above limit from memory memblock.
+The Hisilicon PMU datastructures are designed so as to support uncore
+and also CPU specific events in future.
 
-Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Steve Capper <steve.capper@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: linux-mm at kvack.org
-Cc: linux-acpi at vger.kernel.org
-Cc: linux-efi at vger.kernel.org
----
- arch/arm64/mm/init.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The Hisilicon LLC has four banks for a Super CPU Cluster(consists of
+ 16 CPU cores) and each LLC bank has separate hardware events and counters.
+In the current implementation, the count from all these banks are summarized
+and total count is output.
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 7d25b4d..9482b45 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -226,7 +226,7 @@ void __init arm64_memblock_init(void)
- 	 * via the linear mapping.
- 	 */
- 	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
--		memblock_enforce_memory_limit(memory_limit);
-+		memblock_mem_limit_remove_map(memory_limit);
- 		memblock_add(__pa(_text), (u64)(_end - _text));
- 	}
- 
+The Hisilicon uncore PMUs can be found under /sys/bus/event_source/devices.
+The counters are exported via sysfs in the corresponding events files
+under the PMU directory so the perf tool can list the event names.
+
+Note:
+This is very initial patchset for Hisilicon SoC PMU support shared for
+review. Please review and share comments.
+This patchset depends on the Hisilicon Djtag driver for r/w access to
+Hisilicon SoC PMU registers, which is not upstreamed yet. The patches for
+Djtag driver shall be send for review soon.
+
+TODO:
+        1. Counter overflow interrupt handling support to be added.
+        2. CPU notifier to migrate to available online CPU's in case
+           of CPU DOWN. Also mapping CPU cores to the current SCCL.
+        3. Support for counting of individual LLC banks
+
+Anurup M (8):
+  arm64:perf: Add Devicetree bindings for Hisilicon SoC PMU
+  arm64:MAINTAINERS:hisi: Add hisilicon SoC PMU support
+  arm64:perf: Update Kconfig for Hisilicon PMU support
+  arm64:perf: Add support for Hisilicon SoC event counters
+  arm64:perf: L3 cache(LLC) event counting in perf
+  arm64:perf: Makefile for Hisilicon ARMv8 PMU
+  arm64:perf: Update Makefile for Hisilicon PMU support
+  arm64:perf: L3 cache(LLC) event listing in perf
+
+ .../devicetree/bindings/arm/hisilicon/pmu.txt      |  32 ++
+ MAINTAINERS                                        |   8 +
+ drivers/perf/Kconfig                               |   9 +
+ drivers/perf/Makefile                              |   1 +
+ drivers/perf/hisilicon/Makefile                    |   1 +
+ drivers/perf/hisilicon/hisi_uncore_llc.c           | 613 +++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_llc.h           | 100 ++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.c           | 521 +++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.h           | 144 +++++
+ 9 files changed, 1429 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+ create mode 100644 drivers/perf/hisilicon/Makefile
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_llc.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_llc.h
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+
 -- 
-2.7.4
+2.1.4
