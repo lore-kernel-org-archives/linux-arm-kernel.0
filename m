@@ -1,95 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Jun 2016 11:23:11 +0100
-Subject: [PATCH 1/8] arm64:perf: Add Devicetree bindings for Hisilicon
- SoC PMU
-In-Reply-To: <1467107429-55477-2-git-send-email-anurup.m@huawei.com>
-References: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
- <1467107429-55477-2-git-send-email-anurup.m@huawei.com>
-Message-ID: <20160628102311.GC31744@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Jun 2016 11:24:20 +0100
+Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
+In-Reply-To: <cover.1457539621.git.jglauber@cavium.com>
+References: <cover.1457539621.git.jglauber@cavium.com>
+Message-ID: <20160628102419.GA5425@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jan,
 
-On Tue, Jun 28, 2016 at 05:50:22AM -0400, Anurup M wrote:
-> 	1) Device tree bindings for Hisilicon PMU.
-> 	2) Add example for Hisilicon LLC PMU.
+On Wed, Mar 09, 2016 at 05:21:02PM +0100, Jan Glauber wrote:
+> This patch series provides access to various counters on the ThunderX SOC.
 > 
-> Signed-off-by: Anurup M <anurup.m@huawei.com>
-> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-> ---
->  .../devicetree/bindings/arm/hisilicon/pmu.txt      | 32 ++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+> For details of the uncore implementation see patch #1.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
-> new file mode 100644
-> index 0000000..7584a81
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
-> @@ -0,0 +1,32 @@
-> +Hisilicon SoC HIP05 ARMv8 PMU
-> +
-> +Required Properties:
-> +	- compatible : This field contain two values. The first value is
-> +		always "hisilicon" and second value is the PMU type as shown
-> +		in below examples:
-> +		(a) "hisilicon,hip05-llc" for Hisiliocn SoC L3 cache PMU
-> +		(b) "hisilicon,hip05-ddrc" for Hisiliocn SoC DDRC PMU
-> +		(c) "hisilicon,hip05-mn" for Hisiliocn SoC MN PMU
+> Patches #2-5 add the various ThunderX specific PMUs.
+> 
+> As suggested I've put the files under drivers/perf/uncore. I would
+> prefer this location over drivers/bus because not all of the uncore
+> drivers are bus related.
 
-That wording is rather confusing. Use:
+What's the status of these patches? Were you planning to send a new
+version?
 
-	- compatible: must contain one of:
-	  * "hisilicon,hip05-llc" for HIP05 L3 cache PMU
-	  * "hisilicon,hip05-ddrc" for HIP05 DDRC PMU
-	  * "hisilicon,hip05-mn" for HIP05 MN PMU
-
-What exactly is an "MN"?
-
-I assume that these nodes actually describe the whole interface for
-controlling the L3/DDRC/MN, so it's probably worth dropping the "PMU"
-from the description, even if we only support the PMU in Linux.
-
-No reg properties?
-
-> +
-> +Optional Properties:
-> +
-> +	- djtag	: Some PMU registers are accessed via the Djtag interface
-> +		This field contains two values. The first value is the djtag
-> +		node phandle and second value is the Super CPU Cluster ID.
-
-What is a Djtag node? What is a "Super CPU Cluster ID"?
-
-I think you need additional bindings for these. I cannot understand the
-binding without a description of those.
-
-> +	- interrupt-parent : A phandle indicating which interrupt controller
-> +		this PMU signals interrupts to.
-> +
-> +	- interrupts : Interrupt lines used by this PMU. If the PMU has
-> +		multiple banks, then all IRQ lines are listed in this
-> +		property.
-
-In which order?
-
-> +
-> +Example:
-> +	llc0: llc at 0 {
-
-That unit address (the '@0') shouldn't be there, given the lack of a reg
-property.
-
-> +		compatible = "hisilicon,hip05-llc";
-> +		djtag = <&djtag0 2>; /* DJTAG node for Super CPU Cluster 2
-> +				      * (starts from 1) */
-> +		interrupt-parent = <&mbigen_pc>;
-> +		interrupts = <141 4>,<142 4>,
-> +			 <143 4>,<144 4>; /* IRQ lines for 4 L3 cache banks */
-> +	};
-> -- 
-> 2.1.4
-
-Thanks,
-Mark.
+Will
