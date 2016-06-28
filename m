@@ -1,36 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Jun 2016 23:05:25 +0200
-Subject: [PATCH v3 2/2] remoteproc: qcom: Introduce WCNSS peripheral image
- loader
-In-Reply-To: <1467147506-753-2-git-send-email-bjorn.andersson@linaro.org>
-References: <1467147506-753-1-git-send-email-bjorn.andersson@linaro.org>
- <1467147506-753-2-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <115043528.GxNIb9dTCg@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 28 Jun 2016 16:06:22 -0500
+Subject: [PATCH v4 1/3] Documentation: DT: Add iproc-static-adc binding
+In-Reply-To: <1467099636-31855-2-git-send-email-raveendra.padasalagi@broadcom.com>
+References: <1467099636-31855-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1467099636-31855-2-git-send-email-raveendra.padasalagi@broadcom.com>
+Message-ID: <20160628210622.GA10297@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 28, 2016 1:58:26 PM CEST Bjorn Andersson wrote:
+On Tue, Jun 28, 2016 at 01:10:34PM +0530, Raveendra Padasalagi wrote:
+> The patch adds devicetree binding document for broadcom's
+> iproc-static-adc controller driver.
 > 
-> +config QCOM_WCNSS_PIL
-> +       tristate "Qualcomm WCNSS Peripheral Image Loader"
-> +       depends on OF && ARCH_QCOM
-> +       select QCOM_MDT_LOADER
-> +       select QCOM_SCM
-> +       select REMOTEPROC
-> +       help
-> +         Say y here to support the Peripherial Image Loader for the Qualcomm
-> +         Wireless Connectivity Subsystem.
-> +
-> 
+> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  .../bindings/iio/adc/brcm,iproc-static-adc.txt     | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
 
-	"depends on QCOM_SMEM"
-
-This showed up in Linux-next today and caused a build error:
-
-drivers/remoteproc/built-in.o: In function `q6v5_fatal_interrupt':
-qcom_q6v5_pil.c:(.text+0x2428): undefined reference to `qcom_smem_get'
-drivers/remoteproc/built-in.o: In function `q6v5_wdog_interrupt':
-qcom_q6v5_pil.c:(.text+0x2498): undefined reference to `qcom_smem_get'
-
-
-	Arnd
+Acked-by: Rob Herring <robh@kernel.org>
