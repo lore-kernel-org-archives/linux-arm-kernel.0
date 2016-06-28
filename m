@@ -1,22 +1,22 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Jun 2016 12:30:40 +0200
-Subject: [PATCH 21/92] clocksource/drivers/digicolor: Convert init function to
- return error
+Date: Tue, 28 Jun 2016 12:30:42 +0200
+Subject: [PATCH 23/92] clocksource/drivers/bcm2835_timer: Convert init
+ function to return error
 In-Reply-To: <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577251A4.7030508@linaro.org>
  <1467109911-11060-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467109911-11060-21-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467109911-11060-23-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The init functions do not return any error. They behave as the following:
 
-  - panic, thus leading to a kernel crash while another timer may work and
-       make the system boot up correctly
+ - panic, thus leading to a kernel crash while another timer may work and
+   make the system boot up correctly
 
-  or
+ or
 
-  - print an error and let the caller unaware if the state of the system
+ - print an error and let the caller unaware if the state of the system
 
 Change that by converting the init functions to return an error conforming
 to the CLOCKSOURCE_OF_RET prototype.
@@ -26,66 +26,87 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Baruch Siach <baruch@tkos.co.il>
+Acked-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/clocksource/timer-digicolor.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ drivers/clocksource/bcm2835_timer.c | 40 +++++++++++++++++++++++++------------
+ 1 file changed, 27 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
-index 96bb222..b929061 100644
---- a/drivers/clocksource/timer-digicolor.c
-+++ b/drivers/clocksource/timer-digicolor.c
-@@ -148,7 +148,7 @@ static u64 notrace digicolor_timer_sched_read(void)
- 	return ~readl(dc_timer_dev.base + COUNT(TIMER_B));
+diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
+index 6f28229..2dcf896 100644
+--- a/drivers/clocksource/bcm2835_timer.c
++++ b/drivers/clocksource/bcm2835_timer.c
+@@ -80,19 +80,24 @@ static irqreturn_t bcm2835_time_interrupt(int irq, void *dev_id)
+ 	}
  }
  
--static void __init digicolor_timer_init(struct device_node *node)
-+static int __init digicolor_timer_init(struct device_node *node)
+-static void __init bcm2835_timer_init(struct device_node *node)
++static int __init bcm2835_timer_init(struct device_node *node)
  {
- 	unsigned long rate;
- 	struct clk *clk;
-@@ -161,19 +161,19 @@ static void __init digicolor_timer_init(struct device_node *node)
- 	dc_timer_dev.base = of_iomap(node, 0);
- 	if (!dc_timer_dev.base) {
- 		pr_err("Can't map registers");
--		return;
+ 	void __iomem *base;
+ 	u32 freq;
+-	int irq;
++	int irq, ret;
+ 	struct bcm2835_timer *timer;
+ 
+ 	base = of_iomap(node, 0);
+-	if (!base)
+-		panic("Can't remap registers");
++	if (!base) {
++		pr_err("Can't remap registers");
 +		return -ENXIO;
- 	}
++	}
  
- 	irq = irq_of_parse_and_map(node, dc_timer_dev.timer_id);
- 	if (irq <= 0) {
- 		pr_err("Can't parse IRQ");
--		return;
-+		return -EINVAL;
- 	}
- 
- 	clk = of_clk_get(node, 0);
- 	if (IS_ERR(clk)) {
- 		pr_err("Can't get timer clock");
--		return;
-+		return PTR_ERR(clk);
- 	}
- 	clk_prepare_enable(clk);
- 	rate = clk_get_rate(clk);
-@@ -190,13 +190,17 @@ static void __init digicolor_timer_init(struct device_node *node)
- 	ret = request_irq(irq, digicolor_timer_interrupt,
- 			  IRQF_TIMER | IRQF_IRQPOLL, "digicolor_timerC",
- 			  &dc_timer_dev.ce);
--	if (ret)
+-	if (of_property_read_u32(node, "clock-frequency", &freq))
+-		panic("Can't read clock-frequency");
++	ret = of_property_read_u32(node, "clock-frequency", &freq);
 +	if (ret) {
- 		pr_warn("request of timer irq %d failed (%d)\n", irq, ret);
++		pr_err("Can't read clock-frequency");
 +		return ret;
 +	}
  
- 	dc_timer_dev.ce.cpumask = cpu_possible_mask;
- 	dc_timer_dev.ce.irq = irq;
+ 	system_clock = base + REG_COUNTER_LO;
+ 	sched_clock_register(bcm2835_sched_read, 32, freq);
+@@ -101,12 +106,16 @@ static void __init bcm2835_timer_init(struct device_node *node)
+ 		freq, 300, 32, clocksource_mmio_readl_up);
  
- 	clockevents_config_and_register(&dc_timer_dev.ce, rate, 0, 0xffffffff);
+ 	irq = irq_of_parse_and_map(node, DEFAULT_TIMER);
+-	if (irq <= 0)
+-		panic("Can't parse IRQ");
++	if (irq <= 0) {
++		pr_err("Can't parse IRQ");
++		return -EINVAL;
++	}
+ 
+ 	timer = kzalloc(sizeof(*timer), GFP_KERNEL);
+-	if (!timer)
+-		panic("Can't allocate timer struct\n");
++	if (!timer) {
++		pr_err("Can't allocate timer struct\n");
++		return -ENOMEM;
++	}
+ 
+ 	timer->control = base + REG_CONTROL;
+ 	timer->compare = base + REG_COMPARE(DEFAULT_TIMER);
+@@ -121,12 +130,17 @@ static void __init bcm2835_timer_init(struct device_node *node)
+ 	timer->act.dev_id = timer;
+ 	timer->act.handler = bcm2835_time_interrupt;
+ 
+-	if (setup_irq(irq, &timer->act))
+-		panic("Can't set up timer IRQ\n");
++	ret = setup_irq(irq, &timer->act);
++	if (ret) {
++		pr_err("Can't set up timer IRQ\n");
++		return ret;
++	}
+ 
+ 	clockevents_config_and_register(&timer->evt, freq, 0xf, 0xffffffff);
+ 
+ 	pr_info("bcm2835: system timer (irq = %d)\n", irq);
 +
 +	return 0;
  }
--CLOCKSOURCE_OF_DECLARE(conexant_digicolor, "cnxt,cx92755-timer",
-+CLOCKSOURCE_OF_DECLARE_RET(conexant_digicolor, "cnxt,cx92755-timer",
- 		       digicolor_timer_init);
+-CLOCKSOURCE_OF_DECLARE(bcm2835, "brcm,bcm2835-system-timer",
++CLOCKSOURCE_OF_DECLARE_RET(bcm2835, "brcm,bcm2835-system-timer",
+ 			bcm2835_timer_init);
 -- 
 1.9.1
