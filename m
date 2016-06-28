@@ -1,29 +1,51 @@
 From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Tue, 28 Jun 2016 11:02:26 +0530
-Subject: [PATCH v2 0/9] Improve Rx/Tx DMA implementation
-Message-ID: <20160628053235.5114-1-bhuvanchandra.dv@toradex.com>
+Date: Tue, 28 Jun 2016 11:02:28 +0530
+Subject: [PATCH v2 2/9] clk: imx: vf610: Disable automatic clock gating for
+ lpuart in LPSTOP mode
+In-Reply-To: <20160628053235.5114-1-bhuvanchandra.dv@toradex.com>
+References: <20160628053235.5114-1-bhuvanchandra.dv@toradex.com>
+Message-ID: <20160628053235.5114-3-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
-Split suspend/resume patch.
+From: Stefan Agner <stefan@agner.ch>
 
-Bhuvanchandra DV (5):
-  tty: serial: fsl_lpuart: Fix broken 8m/s1 support
-  tty: serial: fsl-lpuart: Use cyclic DMA for Rx
-  tty: serial: fsl-lpuart: Use scatter/gather DMA for Tx
-  tty: serial: fsl-lpuart: Update suspend/resume for DMA mode
-  tty: serial: fsl_lpuart: Add support for RS-485
+In order to allow wake support in STOP sleep mode, clocks are needed. Use
+imx_clk_gate2_cgr to disable automatic clock gating in low power mode STOP.
+This allows to enable wake by UART using:
+echo enabled > /sys/class/tty/ttyLP0/power/wakeup
 
-Stefan Agner (4):
-  tty: serial: fsl_lpuart: consider TX FIFO too in tx_empty
-  clk: imx: vf610: Disable automatic clock gating for lpuart in LPSTOP mode
-  tty: serial: fsl_lpuart: support suspend/resume
-  tty: serial: fsl_lpuart: fix clearing of receive flag
+However, if wake is not enabled, the driver should disable the clocks explicitly
+to save power.
 
- drivers/clk/imx/clk-vf610.c     |  12 +-
- drivers/tty/serial/fsl_lpuart.c | 810 +++++++++++++++++++++++-----------------
- 2 files changed, 482 insertions(+), 340 deletions(-)
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+---
+ drivers/clk/imx/clk-vf610.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
+index 3a1f244..0476353 100644
+--- a/drivers/clk/imx/clk-vf610.c
++++ b/drivers/clk/imx/clk-vf610.c
+@@ -315,12 +315,12 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 
+ 	clk[VF610_CLK_PIT] = imx_clk_gate2("pit", "ipg_bus", CCM_CCGR1, CCM_CCGRx_CGn(7));
+ 
+-	clk[VF610_CLK_UART0] = imx_clk_gate2("uart0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(7));
+-	clk[VF610_CLK_UART1] = imx_clk_gate2("uart1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(8));
+-	clk[VF610_CLK_UART2] = imx_clk_gate2("uart2", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(9));
+-	clk[VF610_CLK_UART3] = imx_clk_gate2("uart3", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(10));
+-	clk[VF610_CLK_UART4] = imx_clk_gate2("uart4", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(9));
+-	clk[VF610_CLK_UART5] = imx_clk_gate2("uart5", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(10));
++	clk[VF610_CLK_UART0] = imx_clk_gate2_cgr("uart0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(7), 0x2);
++	clk[VF610_CLK_UART1] = imx_clk_gate2_cgr("uart1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(8), 0x2);
++	clk[VF610_CLK_UART2] = imx_clk_gate2_cgr("uart2", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(9), 0x2);
++	clk[VF610_CLK_UART3] = imx_clk_gate2_cgr("uart3", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(10), 0x2);
++	clk[VF610_CLK_UART4] = imx_clk_gate2_cgr("uart4", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(9), 0x2);
++	clk[VF610_CLK_UART5] = imx_clk_gate2_cgr("uart5", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(10), 0x2);
+ 
+ 	clk[VF610_CLK_I2C0] = imx_clk_gate2("i2c0", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(6));
+ 	clk[VF610_CLK_I2C1] = imx_clk_gate2("i2c1", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(7));
 -- 
 2.9.0
