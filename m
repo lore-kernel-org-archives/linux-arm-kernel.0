@@ -1,74 +1,236 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 28 Jun 2016 13:32:18 +0100
-Subject: [PATCH v7 05/17] KVM: kvm_io_bus: add kvm_io_bus_get_dev() call
+Date: Tue, 28 Jun 2016 13:32:20 +0100
+Subject: [PATCH v7 07/17] irqchip: refactor and add GICv3 definitions
 In-Reply-To: <20160628123230.26255-1-andre.przywara@arm.com>
 References: <20160628123230.26255-1-andre.przywara@arm.com>
-Message-ID: <20160628123230.26255-6-andre.przywara@arm.com>
+Message-ID: <20160628123230.26255-8-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kvm_io_bus framework is a nice place of holding information about
-various MMIO regions for kernel emulated devices.
-Add a call to retrieve the kvm_io_device structure which is associated
-with a certain MMIO address. This avoids to duplicate kvm_io_bus'
-knowledge of MMIO regions without having to fake MMIO calls if a user
-needs the device a certain MMIO address belongs to.
-This will be used by the ITS emulation to get the associated ITS device
-when someone triggers an MSI via an ioctl from userspace.
+arm-gic-v3.h contains bit and register definitions for the GICv3 and ITS,
+at least for the bits the we currently care about.
+The ITS emulation needs more definitions, so add them and refactor
+the memory attribute #defines to be more universally usable.
+To avoid changing all users, we still provide some of the old definitons
+defined with the help of the new macros.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/linux/kvm_host.h |  2 ++
- virt/kvm/kvm_main.c      | 24 ++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+ include/linux/irqchip/arm-gic-v3.h | 165 +++++++++++++++++++++++--------------
+ 1 file changed, 105 insertions(+), 60 deletions(-)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 1c9c973..c87fe6f 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -164,6 +164,8 @@ int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
- 			    int len, struct kvm_io_device *dev);
- int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
- 			      struct kvm_io_device *dev);
-+struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
-+					 gpa_t addr);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index bfbd707..2699aa0 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -112,34 +112,53 @@
+ #define GICR_WAKER_ProcessorSleep	(1U << 1)
+ #define GICR_WAKER_ChildrenAsleep	(1U << 2)
  
- #ifdef CONFIG_KVM_ASYNC_PF
- struct kvm_async_pf {
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 37af230..f6b615b9 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -3487,6 +3487,30 @@ int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
- 	return r;
- }
+-#define GICR_PROPBASER_NonShareable	(0U << 10)
+-#define GICR_PROPBASER_InnerShareable	(1U << 10)
+-#define GICR_PROPBASER_OuterShareable	(2U << 10)
+-#define GICR_PROPBASER_SHAREABILITY_MASK (3UL << 10)
+-#define GICR_PROPBASER_nCnB		(0U << 7)
+-#define GICR_PROPBASER_nC		(1U << 7)
+-#define GICR_PROPBASER_RaWt		(2U << 7)
+-#define GICR_PROPBASER_RaWb		(3U << 7)
+-#define GICR_PROPBASER_WaWt		(4U << 7)
+-#define GICR_PROPBASER_WaWb		(5U << 7)
+-#define GICR_PROPBASER_RaWaWt		(6U << 7)
+-#define GICR_PROPBASER_RaWaWb		(7U << 7)
+-#define GICR_PROPBASER_CACHEABILITY_MASK (7U << 7)
+-#define GICR_PROPBASER_IDBITS_MASK	(0x1f)
+-
+-#define GICR_PENDBASER_NonShareable	(0U << 10)
+-#define GICR_PENDBASER_InnerShareable	(1U << 10)
+-#define GICR_PENDBASER_OuterShareable	(2U << 10)
+-#define GICR_PENDBASER_SHAREABILITY_MASK (3UL << 10)
+-#define GICR_PENDBASER_nCnB		(0U << 7)
+-#define GICR_PENDBASER_nC		(1U << 7)
+-#define GICR_PENDBASER_RaWt		(2U << 7)
+-#define GICR_PENDBASER_RaWb		(3U << 7)
+-#define GICR_PENDBASER_WaWt		(4U << 7)
+-#define GICR_PENDBASER_WaWb		(5U << 7)
+-#define GICR_PENDBASER_RaWaWt		(6U << 7)
+-#define GICR_PENDBASER_RaWaWb		(7U << 7)
+-#define GICR_PENDBASER_CACHEABILITY_MASK (7U << 7)
++#define GIC_BASER_CACHE_nCnB		0ULL
++#define GIC_BASER_CACHE_SameAsInner	0ULL
++#define GIC_BASER_CACHE_nC		1ULL
++#define GIC_BASER_CACHE_RaWt		2ULL
++#define GIC_BASER_CACHE_RaWb		3ULL
++#define GIC_BASER_CACHE_WaWt		4ULL
++#define GIC_BASER_CACHE_WaWb		5ULL
++#define GIC_BASER_CACHE_RaWaWt		6ULL
++#define GIC_BASER_CACHE_RaWaWb		7ULL
++#define GIC_BASER_CACHE_MASK		7ULL
++#define GIC_BASER_NonShareable		0ULL
++#define GIC_BASER_InnerShareable	1ULL
++#define GIC_BASER_OuterShareable	2ULL
++#define GIC_BASER_SHAREABILITY_MASK	3ULL
++
++#define GIC_BASER_CACHEABILITY(reg, inner_outer, type)			\
++	(GIC_BASER_CACHE_##type << reg##_##inner_outer##_CACHEABILITY_SHIFT)
++
++#define GIC_BASER_SHAREABILITY(reg, type)				\
++	(GIC_BASER_##type << reg##_SHAREABILITY_SHIFT)
++
++#define GICR_PROPBASER_SHAREABILITY_SHIFT		(10)
++#define GICR_PROPBASER_INNER_CACHEABILITY_SHIFT		(7)
++#define GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT		(56)
++#define GICR_PROPBASER_SHAREABILITY_MASK				\
++	GIC_BASER_SHAREABILITY(GICR_PROPBASER, SHAREABILITY_MASK)
++#define GICR_PROPBASER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, MASK)
++
++#define GICR_PROPBASER_InnerShareable					\
++	GIC_BASER_SHAREABILITY(GICR_PROPBASER, InnerShareable)
++#define GICR_PROPBASER_nC GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, nC)
++#define GICR_PROPBASER_WaWb GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, WaWb)
++#define GICR_PROPBASER_IDBITS_MASK			(0x1f)
++
++#define GICR_PENDBASER_SHAREABILITY_SHIFT		(10)
++#define GICR_PENDBASER_INNER_CACHEABILITY_SHIFT		(7)
++#define GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT		(56)
++#define GICR_PENDBASER_SHAREABILITY_MASK				\
++	GIC_BASER_SHAREABILITY(GICR_PENDBASER, SHAREABILITY_MASK)
++#define GICR_PENDBASER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, MASK)
++
++#define GICR_PENDBASER_InnerShareable					\
++	GIC_BASER_SHAREABILITY(GICR_PENDBASER, InnerShareable)
++#define GICR_PENDBASER_nC GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, nC)
++#define GICR_PENDBASER_WaWb GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, WaWb)
  
-+struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
-+					 gpa_t addr)
-+{
-+	struct kvm_io_bus *bus;
-+	int dev_idx, srcu_idx;
-+	struct kvm_io_device *iodev = NULL;
+ /*
+  * Re-Distributor registers, offsets from SGI_base
+@@ -175,53 +194,62 @@
+ #define GITS_CWRITER			0x0088
+ #define GITS_CREADR			0x0090
+ #define GITS_BASER			0x0100
++#define GITS_IDREGS_BASE		0xffd0
++#define GITS_PIDR0			0xffe0
++#define GITS_PIDR1			0xffe4
+ #define GITS_PIDR2			GICR_PIDR2
++#define GITS_PIDR4			0xffd0
++#define GITS_CIDR0			0xfff0
++#define GITS_CIDR1			0xfff4
++#define GITS_CIDR2			0xfff8
++#define GITS_CIDR3			0xfffc
+ 
+ #define GITS_TRANSLATER			0x10040
+ 
+ #define GITS_CTLR_ENABLE		(1U << 0)
+ #define GITS_CTLR_QUIESCENT		(1U << 31)
+ 
++#define GITS_TYPER_PLPIS		(1UL << 0)
++#define GITS_TYPER_IDBITS_SHIFT		8
+ #define GITS_TYPER_DEVBITS_SHIFT	13
+ #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+ #define GITS_TYPER_PTA			(1UL << 19)
+-
+-#define GITS_CBASER_VALID		(1UL << 63)
+-#define GITS_CBASER_nCnB		(0UL << 59)
+-#define GITS_CBASER_nC			(1UL << 59)
+-#define GITS_CBASER_RaWt		(2UL << 59)
+-#define GITS_CBASER_RaWb		(3UL << 59)
+-#define GITS_CBASER_WaWt		(4UL << 59)
+-#define GITS_CBASER_WaWb		(5UL << 59)
+-#define GITS_CBASER_RaWaWt		(6UL << 59)
+-#define GITS_CBASER_RaWaWb		(7UL << 59)
+-#define GITS_CBASER_CACHEABILITY_MASK	(7UL << 59)
+-#define GITS_CBASER_NonShareable	(0UL << 10)
+-#define GITS_CBASER_InnerShareable	(1UL << 10)
+-#define GITS_CBASER_OuterShareable	(2UL << 10)
+-#define GITS_CBASER_SHAREABILITY_MASK	(3UL << 10)
++#define GITS_TYPER_HWCOLLCNT_SHIFT	24
 +
-+	srcu_idx = srcu_read_lock(&kvm->srcu);
++#define GITS_CBASER_VALID			(1UL << 63)
++#define GITS_CBASER_SHAREABILITY_SHIFT		(10)
++#define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
++#define GITS_CBASER_OUTER_CACHEABILITY_SHIFT	(53)
++#define GITS_CBASER_SHAREABILITY_MASK					\
++	GIC_BASER_SHAREABILITY(GITS_CBASER, SHAREABILITY_MASK)
++#define GITS_CBASER_CACHEABILITY_MASK					\
++	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, MASK)
 +
-+	bus = srcu_dereference(kvm->buses[bus_idx], &kvm->srcu);
++#define GITS_CBASER_InnerShareable					\
++	GIC_BASER_SHAREABILITY(GITS_CBASER, InnerShareable)
++#define GITS_CBASER_nC GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, nC)
++#define GITS_CBASER_WaWb GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, WaWb)
+ 
+ #define GITS_BASER_NR_REGS		8
+ 
+-#define GITS_BASER_VALID		(1UL << 63)
+-#define GITS_BASER_nCnB			(0UL << 59)
+-#define GITS_BASER_nC			(1UL << 59)
+-#define GITS_BASER_RaWt			(2UL << 59)
+-#define GITS_BASER_RaWb			(3UL << 59)
+-#define GITS_BASER_WaWt			(4UL << 59)
+-#define GITS_BASER_WaWb			(5UL << 59)
+-#define GITS_BASER_RaWaWt		(6UL << 59)
+-#define GITS_BASER_RaWaWb		(7UL << 59)
+-#define GITS_BASER_CACHEABILITY_MASK	(7UL << 59)
+-#define GITS_BASER_TYPE_SHIFT		(56)
++#define GITS_BASER_VALID			(1UL << 63)
++#define GITS_BASER_INDIRECT			(1ULL << 62)
++#define GITS_BASER_INNER_CACHEABILITY_SHIFT	(59)
++#define GITS_BASER_OUTER_CACHEABILITY_SHIFT	(53)
++#define GITS_BASER_INNER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GITS_BASER, INNER, MASK)
++#define GITS_BASER_SHAREABILITY_MASK					\
++	GIC_BASER_SHAREABILITY(GITS_BASER, SHAREABILITY_MASK)
 +
-+	dev_idx = kvm_io_bus_get_first_dev(bus, addr, 1);
-+	if (dev_idx < 0)
-+		goto out_unlock;
++#define GITS_BASER_nC GIC_BASER_CACHEABILITY(GITS_BASER, INNER, nC)
++#define GITS_BASER_WaWb GIC_BASER_CACHEABILITY(GITS_BASER, INNER, WaWb)
++#define GITS_BASER_TYPE_SHIFT			(56)
+ #define GITS_BASER_TYPE(r)		(((r) >> GITS_BASER_TYPE_SHIFT) & 7)
+-#define GITS_BASER_ENTRY_SIZE_SHIFT	(48)
++#define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
+ #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0xff) + 1)
+-#define GITS_BASER_NonShareable		(0UL << 10)
+-#define GITS_BASER_InnerShareable	(1UL << 10)
+-#define GITS_BASER_OuterShareable	(2UL << 10)
+ #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+-#define GITS_BASER_SHAREABILITY_MASK	(3UL << GITS_BASER_SHAREABILITY_SHIFT)
++#define GITS_BASER_InnerShareable					\
++	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
+ #define GITS_BASER_PAGE_SIZE_SHIFT	(8)
+ #define GITS_BASER_PAGE_SIZE_4K		(0UL << GITS_BASER_PAGE_SIZE_SHIFT)
+ #define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
+@@ -243,7 +271,10 @@
+  */
+ #define GITS_CMD_MAPD			0x08
+ #define GITS_CMD_MAPC			0x09
+-#define GITS_CMD_MAPVI			0x0a
++#define GITS_CMD_MAPTI			0x0a
++/* older GIC documentation used MAPVI for this command */
++#define GITS_CMD_MAPVI			GITS_CMD_MAPTI
++#define GITS_CMD_MAPI			0x0b
+ #define GITS_CMD_MOVI			0x01
+ #define GITS_CMD_DISCARD		0x0f
+ #define GITS_CMD_INV			0x0c
+@@ -254,6 +285,20 @@
+ #define GITS_CMD_SYNC			0x05
+ 
+ /*
++ * ITS error numbers
++ */
++#define E_ITS_MOVI_UNMAPPED_INTERRUPT           0x010107
++#define E_ITS_MOVI_UNMAPPED_COLLECTION          0x010109
++#define E_ITS_CLEAR_UNMAPPED_INTERRUPT          0x010507
++#define E_ITS_MAPC_PROCNUM_OOR                  0x010902
++#define E_ITS_MAPTI_UNMAPPED_DEVICE             0x010a04
++#define E_ITS_MAPTI_PHYSICALID_OOR              0x010a06
++#define E_ITS_INV_UNMAPPED_INTERRUPT            0x010c07
++#define E_ITS_INVALL_UNMAPPED_COLLECTION        0x010d09
++#define E_ITS_MOVALL_PROCNUM_OOR                0x010e01
++#define E_ITS_DISCARD_UNMAPPED_INTERRUPT        0x010f07
 +
-+	iodev = bus->range[dev_idx].dev;
-+
-+out_unlock:
-+	srcu_read_unlock(&kvm->srcu, srcu_idx);
-+
-+	return iodev;
-+}
-+EXPORT_SYMBOL_GPL(kvm_io_bus_get_dev);
-+
- static struct notifier_block kvm_cpu_notifier = {
- 	.notifier_call = kvm_cpu_hotplug,
- };
++/*
+  * CPU interface registers
+  */
+ #define ICC_CTLR_EL1_EOImode_drop_dir	(0U << 1)
 -- 
 2.9.0
