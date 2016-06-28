@@ -1,74 +1,139 @@
-From: k.debski@samsung.com (Kamil Debski)
-Date: Tue, 28 Jun 2016 11:57:29 +0200
-Subject: [PATCH] media: s5p-mfc fix memory leak in s5p_mfc_remove()
-In-Reply-To: <1465847114-7427-1-git-send-email-shuahkh@osg.samsung.com>
-References: <1465847114-7427-1-git-send-email-shuahkh@osg.samsung.com>
-Message-ID: <025e01d1d123$7c14e620$743eb260$@samsung.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 28 Jun 2016 18:01:21 +0800
+Subject: [PATCH 05/21] usb: chipidea: Handle extcon events properly
+In-Reply-To: <20160626072838.28082-6-stephen.boyd@linaro.org>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-6-stephen.boyd@linaro.org>
+Message-ID: <20160628100120.GB30392@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Shuah,
-
-Which branch do you base your patches on?
-
-I have trouble applying this path
-(https://patchwork.linuxtv.org/patch/34577/) and 
-"s5p-mfc fix null pointer deference in clk_core_enable()"
-(https://patchwork.linuxtv.org/patch/34751/) 
-onto current linuxtv/master.
-
-The top commit of linuxtv/master is :
-"commit 0db5c79989de2c68d5abb7ba891bfdb3cd3b7e05
-Author: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-Date:   Thu Jun 16 08:04:40 2016 -0300
-
-    [media] media-devnode.h: Fix documentation"
-
-Could you please rebase the two patches mentioned above to the
-linuxtv/master?
-
-Best wishes,
--- 
-Kamil Debski
-Samsung R&D Institute Poland
-
-
-> -----Original Message-----
-> From: Shuah Khan [mailto:shuahkh at osg.samsung.com]
-> Sent: Monday, June 13, 2016 9:45 PM
-> To: kyungmin.park at samsung.com; k.debski at samsung.com;
-> jtp.park at samsung.com; mchehab at osg.samsung.com
-> Cc: Shuah Khan; linux-arm-kernel at lists.infradead.org; linux-
-> media at vger.kernel.org; linux-kernel at vger.kernel.org
-> Subject: [PATCH] media: s5p-mfc fix memory leak in s5p_mfc_remove()
+On Sun, Jun 26, 2016 at 12:28:22AM -0700, Stephen Boyd wrote:
+> We're currently emulating the vbus and id interrupts in the OTGSC
+> read API, but we also need to make sure that if we're handling
+> the events with extcon that we don't enable the interrupts for
+> those events in the hardware. Therefore, properly emulate this
+> register if we're using extcon, but don't enable the interrupts.
+> This allows me to get my cable connect/disconnect working
+> properly without getting spurious interrupts on my device that
+> uses an extcon for these two events.
 > 
-> s5p_mfc_remove() fails to release encoder and decoder video devices.
-> 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
+> Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
+>  drivers/usb/chipidea/otg.c   | 46 +++++++++++++++++++++++++++++++++++++++-----
+>  include/linux/usb/chipidea.h |  2 ++
+>  2 files changed, 43 insertions(+), 5 deletions(-)
 > 
-> Changes since v1:
-> - Addressed comments from Javier Martinez Canillas and added
->   his reviewed by:
-> 
->  drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> index 274b4f1..f537b74 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> @@ -1318,6 +1318,8 @@ static int s5p_mfc_remove(struct platform_device
-> *pdev)
-> 
->  	video_unregister_device(dev->vfd_enc);
->  	video_unregister_device(dev->vfd_dec);
-> +	video_device_release(dev->vfd_enc);
-> +	video_device_release(dev->vfd_dec);
->  	v4l2_device_unregister(&dev->v4l2_dev);
->  	s5p_mfc_release_firmware(dev);
->  	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[0]);
-> --
-> 2.7.4
+> diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+> index 763a8332b009..b6a88bea4cac 100644
+> --- a/drivers/usb/chipidea/otg.c
+> +++ b/drivers/usb/chipidea/otg.c
+> @@ -44,12 +44,15 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
+>  		else
+>  			val &= ~OTGSC_BSVIS;
+>  
+> -		cable->changed = false;
+> -
+>  		if (cable->state)
+>  			val |= OTGSC_BSV;
+>  		else
+>  			val &= ~OTGSC_BSV;
+> +
+> +		if (cable->enabled)
+> +			val |= OTGSC_BSVIE;
+> +		else
+> +			val &= ~OTGSC_BSVIE;
+>  	}
+>  
+>  	cable = &ci->platdata->id_extcon;
+> @@ -59,15 +62,18 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
+>  		else
+>  			val &= ~OTGSC_IDIS;
+>  
+> -		cable->changed = false;
+> -
+>  		if (cable->state)
+>  			val |= OTGSC_ID;
+>  		else
+>  			val &= ~OTGSC_ID;
+> +
+> +		if (cable->enabled)
+> +			val |= OTGSC_IDIE;
+> +		else
+> +			val &= ~OTGSC_IDIE;
+>  	}
+>  
+> -	return val;
+> +	return val & mask;
+>  }
+>  
+>  /**
+> @@ -77,6 +83,36 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
+>   */
+>  void hw_write_otgsc(struct ci_hdrc *ci, u32 mask, u32 data)
+>  {
+> +	struct ci_hdrc_cable *cable;
+> +
+> +	cable = &ci->platdata->vbus_extcon;
+> +	if (!IS_ERR(cable->edev)) {
+> +		if (data & mask & OTGSC_BSVIS)
+> +			cable->changed = false;
+> +
+> +		/* Don't enable vbus interrupt if using external notifier */
+> +		if (data & mask & OTGSC_BSVIE) {
+> +			cable->enabled = true;
+> +			data &= ~OTGSC_BSVIE;
+> +		} else if (mask & OTGSC_BSVIE) {
+> +			cable->enabled = false;
+> +		}
+> +	}
+> +
+> +	cable = &ci->platdata->id_extcon;
+> +	if (!IS_ERR(cable->edev)) {
+> +		if (data & mask & OTGSC_IDIS)
+> +			cable->changed = false;
+> +
+> +		/* Don't enable id interrupt if using external notifier */
+> +		if (data & mask & OTGSC_IDIE) {
+> +			cable->enabled = true;
+> +			data &= ~OTGSC_IDIE;
+> +		} else if (mask & OTGSC_IDIE) {
+> +			cable->enabled = false;
+> +		}
+> +	}
+> +
+>  	hw_write(ci, OP_OTGSC, mask | OTGSC_INT_STATUS_BITS, data);
+>  }
+>  
+> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+> index 5dd75fa47dd8..f9be467d6695 100644
+> --- a/include/linux/usb/chipidea.h
+> +++ b/include/linux/usb/chipidea.h
+> @@ -14,6 +14,7 @@ struct ci_hdrc;
+>   * struct ci_hdrc_cable - structure for external connector cable state tracking
+>   * @state: current state of the line
+>   * @changed: set to true when extcon event happen
+> + * @enabled: set to true if we've enabled the vbus or id interrupt
+>   * @edev: device which generate events
+>   * @ci: driver state of the chipidea device
+>   * @nb: hold event notification callback
+> @@ -22,6 +23,7 @@ struct ci_hdrc;
+>  struct ci_hdrc_cable {
+>  	bool				state;
+>  	bool				changed;
+> +	bool				enabled;
+>  	struct extcon_dev		*edev;
+>  	struct ci_hdrc			*ci;
+>  	struct notifier_block		nb;
+> -- 
+
+Acked-by: Peter Chen <peter.chen@nxp.com>
+
+-- 
+
+Best Regards,
+Peter Chen
