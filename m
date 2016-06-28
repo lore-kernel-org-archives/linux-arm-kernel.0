@@ -1,41 +1,32 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 28 Jun 2016 13:51:45 +0800
-Subject: [PATCH 4/4] arm64: defconfig: Enable Hisi SAS and HNS
-In-Reply-To: <1467093105-1568-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1467093105-1568-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1467093105-1568-5-git-send-email-wangkefeng.wang@huawei.com>
+Date: Tue, 28 Jun 2016 13:51:41 +0800
+Subject: [PATCH 0/4] arm64: hisilicon: Hip0x dt/config update
+Message-ID: <1467093105-1568-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Hisi SAS and HNS config for D02/D03 board.
+DT update:
+1) Hip05
+- kill unuesd hip05_hns.dtsi
+2) Hip06
+- Add SAS/HNS node
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/configs/defconfig | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+CONFIG update:
+1) Enable SAS/HNS config
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fd2d74d..3404bbc 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -103,7 +103,8 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_VIRTIO_BLK=y
- # CONFIG_SCSI_PROC_FS is not set
- CONFIG_BLK_DEV_SD=y
--# CONFIG_SCSI_LOWLEVEL is not set
-+CONFIG_SCSI_SAS_ATA=y
-+CONFIG_SCSI_HISI_SAS=y
- CONFIG_ATA=y
- CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
-@@ -120,6 +121,8 @@ CONFIG_TUN=y
- CONFIG_VIRTIO_NET=y
- CONFIG_AMD_XGBE=y
- CONFIG_NET_XGENE=y
-+CONFIG_HNS_DSAF=y
-+CONFIG_HNS_ENET=y
- CONFIG_E1000E=y
- CONFIG_IGB=y
- CONFIG_IGBVF=y
+
+Kefeng Wang (4):
+  arm64: dts: hip05: kill hip05_hns.dtsi
+  arm64: dts: hip06: Append hns node
+  arm64: dts: hip06: Append sas node
+  arm64: defconfig: Enable Hisi SAS and HNS
+
+ arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi | 180 -------------
+ arch/arm64/boot/dts/hisilicon/hip06-d03.dts  |  28 ++
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi     | 365 +++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig                 |   5 +-
+ 4 files changed, 397 insertions(+), 181 deletions(-)
+ delete mode 100644 arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+
 -- 
 1.7.12.4
