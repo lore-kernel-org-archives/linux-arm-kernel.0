@@ -1,296 +1,108 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 28 Jun 2016 18:09:30 +0100
-Subject: [PATCH 2/4] arm64: dts: hip06: Append hns node
-In-Reply-To: <1467093105-1568-3-git-send-email-wangkefeng.wang@huawei.com>
-References: <1467093105-1568-1-git-send-email-wangkefeng.wang@huawei.com>
- <1467093105-1568-3-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <5772AF4A.2030801@hisilicon.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Jun 2016 18:16:10 +0100
+Subject: [PATCH v3 2/7] arm64: vmlinux.ld: Add .mmuoff.{text,data} sections
+In-Reply-To: <1467125510-18758-3-git-send-email-james.morse@arm.com>
+References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
+ <1467125510-18758-3-git-send-email-james.morse@arm.com>
+Message-ID: <20160628171610.GT31744@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kefeng,
+Hi James,
 
-On 28/06/2016 06:51, Kefeng Wang wrote:
-> There are four ports(2 GE, 2 XGE) in D03 board, append
-> relevant nodes for them.
+This looks mostly fine.
+
+On Tue, Jun 28, 2016 at 03:51:45PM +0100, James Morse wrote:
+> Resume from hibernate needs to clean any text executed by the kernel with
+> the MMU off to the PoC. Collect these functions together into a new
+> .mmuoff.text section. __boot_cpu_mode and secondary_holding_pen_release
+> are data that is read or written with the MMU off. Add these to a new
+> .mmuoff.data section.
 > 
-> Cc: Kejian Yan <yankejian@huawei.com>
-> Cc: Yisen Zhuang <yisen.zhuang@huawei.com>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> This covers booting of secondary cores and the cpu_suspend() path used
+> by cpu-idle and suspend-to-ram.
+> 
+> The bulk of head.S is not included, as the primary boot code is only ever
+> executed once, the kernel never needs to ensure it is cleaned to a
+> particular point in the cache.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 > ---
->  arch/arm64/boot/dts/hisilicon/hip06-d03.dts |  16 +++
->  arch/arm64/boot/dts/hisilicon/hip06.dtsi    | 215 ++++++++++++++++++++++++++++
->  2 files changed, 231 insertions(+)
+> Changes since v2:
+>  * mmuoff.data section added
+>  * secondary_holding_pen_release initialisation moved to head.S
+>  * secondary_holding_pen and set_cpu_boot_mode_flag moved into mmuoff.text
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip06-d03.dts b/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
-> index f3e5323..5562cf4 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
-> @@ -25,6 +25,22 @@
->  	chosen { };
->  };
->  
-> +&eth0 {
-> +	status = "ok";
-> +};
-> +
-> +&eth1 {
-> +	status = "ok";
-> +};
-> +
-> +&eth2 {
-> +	status = "ok";
-> +};
-> +
-> +&eth3 {
-> +	status = "ok";
-> +};
-> +
->  &usb_ohci {
->  	status = "ok";
->  };
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-> index 5927bc4..3eca430 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-> @@ -279,6 +279,18 @@
->  		};
->  	};
->  
-> +	mbigen_dsa at c0080000 {
-> +		compatible = "hisilicon,mbigen-v2";
-> +		reg = <0x0 0xc0080000 0x0 0x10000>;
-> +
-> +		mbigen_dsaf0: intc_dsaf0 {
-> +			msi-parent = <&its_dsa 0x40800>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			num-pins = <409>;
-> +		};
-> +	};
-> +
->  	soc {
->  		compatible = "simple-bus";
->  		#address-cells = <2>;
-> @@ -302,6 +314,209 @@
->  			dma-coherent;
->  			status = "disabled";
->  		};
-> +
-> +		peri_c_subctrl: sub_ctrl_c at 60000000 {
-> +			compatible = "hisilicon,peri-c-subctrl","syscon";
-> +			reg = <0 0x60000000 0x0 0x10000>;
-> +		};
-> +
-> +		dsaf_subctrl: dsaf_subctrl at c0000000 {
-> +			compatible = "hisilicon,dsaf-ctrl", "syscon";
-> +			reg = <0x0 0xc0000000 0x0 0x10000>;
-> +		};
-> +
-> +		serdes_ctrl: sds_ctrl at c2200000 {
-> +			compatible = "hisilicon,serdes-syscon","syscon";
-> +			reg = <0 0xc2200000 0x0 0x80000>;
-> +		};
-
-I found peri-c-subctrl, dsaf-ctrl and serdes-syscon are not documented
-in the device tree binding documents.
-I checked the net-next tree and also did not find it.
-Could you check it as well?
-Thanks!
-The others is fine to me.
-
-Best Regards,
-Wei Xu
-
-> +
-> +		mdio at 603c0000 {
-> +			compatible = "hisilicon,hns-mdio";
-> +			reg = <0x0 0x603c0000 0x0 0x1000>;
-> +			subctrl-vbase = <&peri_c_subctrl>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			phy0: ethernet-phy at 0 {
-> +				compatible = "ethernet-phy-ieee802.3-c22";
-> +				reg = <0>;
-> +			};
-> +
-> +			phy1: ethernet-phy at 1 {
-> +				compatible = "ethernet-phy-ieee802.3-c22";
-> +				reg = <1>;
-> +			};
-> +		};
-> +
-> +		dsaf0: dsa at c7000000 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			compatible = "hisilicon,hns-dsaf-v2";
-> +			mode = "6port-16rss";
-> +			reg = <0x0 0xc5000000 0x0 0x890000
-> +			       0x0 0xc7000000 0x0 0x600000>;
-> +			reg-names = "ppe-base", "dsaf-base";
-> +			interrupt-parent = <&mbigen_dsaf0>;
-> +			subctrl-syscon = <&dsaf_subctrl>;
-> +			reset-field-offset = <0>;
-> +			interrupts =
-> +			<576 1>, <577 1>, <578 1>, <579 1>, <580 1>,
-> +			<581 1>, <582 1>, <583 1>, <584 1>, <585 1>,
-> +			<586 1>, <587 1>, <588 1>, <589 1>, <590 1>,
-> +			<591 1>, <592 1>, <593 1>, <594 1>, <595 1>,
-> +			<596 1>, <597 1>, <598 1>, <599 1>, <600 1>,
-> +			<960 1>, <961 1>, <962 1>, <963 1>, <964 1>,
-> +			<965 1>, <966 1>, <967 1>, <968 1>, <969 1>,
-> +			<970 1>, <971 1>, <972 1>, <973 1>, <974 1>,
-> +			<975 1>, <976 1>, <977 1>, <978 1>, <979 1>,
-> +			<980 1>, <981 1>, <982 1>, <983 1>, <984 1>,
-> +			<985 1>, <986 1>, <987 1>, <988 1>, <989 1>,
-> +			<990 1>, <991 1>, <992 1>, <993 1>, <994 1>,
-> +			<995 1>, <996 1>, <997 1>, <998 1>, <999 1>,
-> +			<1000 1>, <1001 1>, <1002 1>, <1003 1>,	<1004 1>,
-> +			<1005 1>, <1006 1>, <1007 1>, <1008 1>, <1009 1>,
-> +			<1010 1>, <1011 1>, <1012 1>, <1013 1>, <1014 1>,
-> +			<1015 1>, <1016 1>, <1017 1>, <1018 1>, <1019 1>,
-> +			<1020 1>, <1021 1>, <1022 1>, <1023 1>, <1024 1>,
-> +			<1025 1>, <1026 1>, <1027 1>, <1028 1>, <1029 1>,
-> +			<1030 1>, <1031 1>, <1032 1>, <1033 1>,	<1034 1>,
-> +			<1035 1>, <1036 1>, <1037 1>, <1038 1>, <1039 1>,
-> +			<1040 1>, <1041 1>, <1042 1>, <1043 1>, <1044 1>,
-> +			<1045 1>, <1046 1>, <1047 1>, <1048 1>, <1049 1>,
-> +			<1050 1>, <1051 1>, <1052 1>, <1053 1>, <1054 1>,
-> +			<1055 1>, <1056 1>, <1057 1>, <1058 1>, <1059 1>,
-> +			<1060 1>, <1061 1>, <1062 1>, <1063 1>,	<1064 1>,
-> +			<1065 1>, <1066 1>, <1067 1>, <1068 1>, <1069 1>,
-> +			<1070 1>, <1071 1>, <1072 1>, <1073 1>, <1074 1>,
-> +			<1075 1>, <1076 1>, <1077 1>, <1078 1>, <1079 1>,
-> +			<1080 1>, <1081 1>, <1082 1>, <1083 1>, <1084 1>,
-> +			<1085 1>, <1086 1>, <1087 1>, <1088 1>, <1089 1>,
-> +			<1090 1>, <1091 1>, <1092 1>, <1093 1>,	<1094 1>,
-> +			<1095 1>, <1096 1>, <1097 1>, <1098 1>, <1099 1>,
-> +			<1100 1>, <1101 1>, <1102 1>, <1103 1>, <1104 1>,
-> +			<1105 1>, <1106 1>, <1107 1>, <1108 1>, <1109 1>,
-> +			<1110 1>, <1111 1>, <1112 1>, <1113 1>, <1114 1>,
-> +			<1115 1>, <1116 1>, <1117 1>, <1118 1>, <1119 1>,
-> +			<1120 1>, <1121 1>, <1122 1>, <1123 1>, <1124 1>,
-> +			<1125 1>, <1126 1>, <1127 1>, <1128 1>, <1129 1>,
-> +			<1130 1>, <1131 1>, <1132 1>, <1133 1>, <1134 1>,
-> +			<1135 1>, <1136 1>, <1137 1>, <1138 1>, <1139 1>,
-> +			<1140 1>, <1141 1>, <1142 1>, <1143 1>, <1144 1>,
-> +			<1145 1>, <1146 1>, <1147 1>, <1148 1>, <1149 1>,
-> +			<1150 1>, <1151 1>, <1152 1>, <1153 1>, <1154 1>,
-> +			<1155 1>, <1156 1>, <1157 1>, <1158 1>, <1159 1>,
-> +			<1160 1>, <1161 1>, <1162 1>, <1163 1>, <1164 1>,
-> +			<1165 1>, <1166 1>, <1167 1>, <1168 1>, <1169 1>,
-> +			<1170 1>, <1171 1>, <1172 1>, <1173 1>, <1174 1>,
-> +			<1175 1>, <1176 1>, <1177 1>, <1178 1>, <1179 1>,
-> +			<1180 1>, <1181 1>, <1182 1>, <1183 1>, <1184 1>,
-> +			<1185 1>, <1186 1>, <1187 1>, <1188 1>, <1189 1>,
-> +			<1190 1>, <1191 1>, <1192 1>, <1193 1>, <1194 1>,
-> +			<1195 1>, <1196 1>, <1197 1>, <1198 1>, <1199 1>,
-> +			<1200 1>, <1201 1>, <1202 1>, <1203 1>, <1204 1>,
-> +			<1205 1>, <1206 1>, <1207 1>, <1208 1>, <1209 1>,
-> +			<1210 1>, <1211 1>, <1212 1>, <1213 1>, <1214 1>,
-> +			<1215 1>, <1216 1>, <1217 1>, <1218 1>, <1219 1>,
-> +			<1220 1>, <1221 1>, <1222 1>, <1223 1>, <1224 1>,
-> +			<1225 1>, <1226 1>, <1227 1>, <1228 1>, <1229 1>,
-> +			<1230 1>, <1231 1>, <1232 1>, <1233 1>, <1234 1>,
-> +			<1235 1>, <1236 1>, <1237 1>, <1238 1>, <1239 1>,
-> +			<1240 1>, <1241 1>, <1242 1>, <1243 1>, <1244 1>,
-> +			<1245 1>, <1246 1>, <1247 1>, <1248 1>, <1249 1>,
-> +			<1250 1>, <1251 1>, <1252 1>, <1253 1>, <1254 1>,
-> +			<1255 1>, <1256 1>, <1257 1>, <1258 1>, <1259 1>,
-> +			<1260 1>, <1261 1>, <1262 1>, <1263 1>, <1264 1>,
-> +			<1265 1>, <1266 1>, <1267 1>, <1268 1>, <1269 1>,
-> +			<1270 1>, <1271 1>, <1272 1>, <1273 1>, <1274 1>,
-> +			<1275 1>, <1276 1>, <1277 1>, <1278 1>, <1279 1>,
-> +			<1280 1>, <1281 1>, <1282 1>, <1283 1>, <1284 1>,
-> +			<1285 1>, <1286 1>, <1287 1>, <1288 1>, <1289 1>,
-> +			<1290 1>, <1291 1>, <1292 1>, <1293 1>, <1294 1>,
-> +			<1295 1>, <1296 1>, <1297 1>, <1298 1>, <1299 1>,
-> +			<1300 1>, <1301 1>, <1302 1>, <1303 1>, <1304 1>,
-> +			<1305 1>, <1306 1>, <1307 1>, <1308 1>, <1309 1>,
-> +			<1310 1>, <1311 1>, <1312 1>, <1313 1>, <1314 1>,
-> +			<1315 1>, <1316 1>, <1317 1>, <1318 1>, <1319 1>,
-> +			<1320 1>, <1321 1>, <1322 1>, <1323 1>, <1324 1>,
-> +			<1325 1>, <1326 1>, <1327 1>, <1328 1>, <1329 1>,
-> +			<1330 1>, <1331 1>, <1332 1>, <1333 1>, <1334 1>,
-> +			<1335 1>, <1336 1>, <1337 1>, <1338 1>, <1339 1>,
-> +			<1340 1>, <1341 1>, <1342 1>, <1343 1>;
-> +
-> +			desc-num = <0x400>;
-> +			buf-size = <0x1000>;
-> +			dma-coherent;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				serdes-syscon = <&serdes_ctrl>;
-> +				port-rst-offset = <0>;
-> +				port-mode-offset = <0>;
-> +				media-type = "fiber";
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				serdes-syscon= <&serdes_ctrl>;
-> +				port-rst-offset = <1>;
-> +				port-mode-offset = <1>;
-> +				media-type = "fiber";
-> +			};
-> +
-> +			port at 4 {
-> +				reg = <4>;
-> +				phy-handle = <&phy0>;
-> +				serdes-syscon= <&serdes_ctrl>;
-> +				port-rst-offset = <4>;
-> +				port-mode-offset = <2>;
-> +				media-type = "copper";
-> +			};
-> +
-> +			port at 5 {
-> +				reg = <5>;
-> +				phy-handle = <&phy1>;
-> +				serdes-syscon= <&serdes_ctrl>;
-> +				port-rst-offset = <5>;
-> +				port-mode-offset = <3>;
-> +				media-type = "copper";
-> +			};
-> +		};
-> +
-> +		eth0: ethernet at 4{
-> +			compatible = "hisilicon,hns-nic-v2";
-> +			ae-handle = <&dsaf0>;
-> +			port-idx-in-ae = <4>;
-> +			local-mac-address = [00 00 00 00 00 00];
-> +			status = "disabled";
-> +			dma-coherent;
-> +		};
-> +
-> +		eth1: ethernet at 5{
-> +			compatible = "hisilicon,hns-nic-v2";
-> +			ae-handle = <&dsaf0>;
-> +			port-idx-in-ae = <5>;
-> +			local-mac-address = [00 00 00 00 00 00];
-> +			status = "disabled";
-> +			dma-coherent;
-> +		};
-> +
-> +		eth2: ethernet at 0{
-> +			compatible = "hisilicon,hns-nic-v2";
-> +			ae-handle = <&dsaf0>;
-> +			port-idx-in-ae = <0>;
-> +			local-mac-address = [00 00 00 00 00 00];
-> +			status = "disabled";
-> +			dma-coherent;
-> +		};
-> +
-> +		eth3: ethernet at 1{
-> +			compatible = "hisilicon,hns-nic-v2";
-> +			ae-handle = <&dsaf0>;
-> +			port-idx-in-ae = <1>;
-> +			local-mac-address = [00 00 00 00 00 00];
-> +			status = "disabled";
-> +			dma-coherent;
-> +		};
->  	};
->  
->  };
+>  arch/arm64/include/asm/sections.h  |  2 ++
+>  arch/arm64/kernel/head.S           | 10 +++++++++-
+>  arch/arm64/kernel/sleep.S          |  2 ++
+>  arch/arm64/kernel/smp_spin_table.c |  2 +-
+>  arch/arm64/kernel/vmlinux.lds.S    |  8 ++++++++
+>  arch/arm64/mm/proc.S               |  4 ++++
+>  6 files changed, 26 insertions(+), 2 deletions(-)
 > 
+> diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
+> index cb68eb348566..7eecfa110330 100644
+> --- a/arch/arm64/include/asm/sections.h
+> +++ b/arch/arm64/include/asm/sections.h
+> @@ -24,5 +24,7 @@ extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
+>  extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+>  extern char __hyp_text_start[], __hyp_text_end[];
+>  extern char __idmap_text_start[], __idmap_text_end[];
+> +extern char __mmuoff_text_start[], __mmuoff_text_end[];
+> +extern char __mmuoff_data_start[], __mmuoff_data_end[];
+>  
+>  #endif /* __ASM_SECTIONS_H */
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 2c6e598a94dc..6e56cd136d27 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -52,6 +52,9 @@
+>  #error TEXT_OFFSET must be less than 2MB
+>  #endif
+>  
+> +/* INVALID_HWID is defined as ULONG_MAX, but we can't include linux/kernel.h */
+> +#define ULONG_MAX ~0
+
+We could avoid the duplication and simplify the change using __section()
+in smp_spin_table.c, e.g.
+
+volatile unsigned long __section(".mmuoff.data) 
+secondary_holding_pen_release = INVALID_HWID
+
+> +
+>  /*
+>   * Kernel startup entry point.
+>   * ---------------------------
+> @@ -477,6 +480,7 @@ ENTRY(kimage_vaddr)
+>   * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
+>   * booted in EL1 or EL2 respectively.
+>   */
+> +	.pushsection ".mmuoff.text", "ax"
+>  ENTRY(el2_setup)
+>  	mrs	x0, CurrentEL
+>  	cmp	x0, #CurrentEL_EL2
+> @@ -627,11 +631,14 @@ ENDPROC(set_cpu_boot_mode_flag)
+>   * This is not in .bss, because we set it sufficiently early that the boot-time
+>   * zeroing of .bss would clobber it.
+>   */
+> -	.pushsection	.data..cacheline_aligned
+> +	.pushsection ".mmuoff.data", "aw"
+>  	.align	L1_CACHE_SHIFT
+>  ENTRY(__boot_cpu_mode)
+>  	.long	BOOT_CPU_MODE_EL2
+>  	.long	BOOT_CPU_MODE_EL1
+
+We might need to pad things in .mmuoff.data to the CWG.
+
+__boot_cpu_mode is written with the MMU off, and read with the MMU on,
+while secondary_holding_pen_release is written with the MMU on and read
+with the MMU off.
+
+Maintenance for either could corrupt one or the other, if they fall in
+the same CWG.
+
+Other than that, this looks good to me.
+
+Thanks,
+Mark.
