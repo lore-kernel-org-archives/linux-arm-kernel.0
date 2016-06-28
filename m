@@ -1,81 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Jun 2016 18:12:22 +0200
-Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
- overlapping regions
-In-Reply-To: <20160628160528.GG4585@e104818-lin.cambridge.arm.com>
-References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
- <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
- <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
- <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
- <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_3uKgFtvMryROwTMeGs=uXYU-OPrUC6LaNQiAKP=PZ3Q@mail.gmail.com>
- <20160628160528.GG4585@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu8RxZ2xpDC0pudewHu9Z5YTL8XbcjSPvGasRUQbhqm5qQ@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 28 Jun 2016 09:12:55 -0700
+Subject: [RFC PATCH v4 3/5] PCI: Check platform specific ECAM quirks
+In-Reply-To: <577275EA.7010002@codeaurora.org>
+References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
+ <1467100442-28078-4-git-send-email-tn@semihalf.com>
+ <577275EA.7010002@codeaurora.org>
+Message-ID: <CADaLNDkhPZuG7UJ4SK_j5v_nXbd782Q17LAcXduG0uEObaFF=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 June 2016 at 18:05, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> (Restarting the thread before I forget the entire discussion)
+On Tue, Jun 28, 2016 at 6:04 AM, Christopher Covington
+<cov@codeaurora.org> wrote:
+> Hi Tomasz,
 >
-> On Mon, Jun 06, 2016 at 11:18:14PM +0200, Ard Biesheuvel wrote:
->> >> > On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> >> > > index 78f52488f9ff..0d5753c31c7f 100644
->> >> > > --- a/arch/arm64/kernel/efi.c
->> >> > > +++ b/arch/arm64/kernel/efi.c
->> >> > > @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
->> >> > >  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
->> >> > >  {
->> >> > >         pteval_t prot_val = create_mapping_protection(md);
->> >> > > +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
->> >> > > +       efi_memory_desc_t *next = md;
->> >> > >
->> >> > > -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
->> >> > > -                          md->num_pages << EFI_PAGE_SHIFT,
->> >> > > -                          __pgprot(prot_val | PTE_NG));
->> >> > > +       /*
->> >> > > +        * Search for the next EFI runtime map and check for any overlap with
->> >> > > +        * the current map when aligned to PAGE_SIZE. In such case, defer
->> >> > > +        * mapping the end of the current range until the next
->> >> > > +        * efi_create_mapping() call.
->> >> > > +        */
->> >> > > +       for_each_efi_memory_desc_continue(next) {
->> >> > > +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
->> >> > > +                       continue;
->> >> > > +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
->> >> > > +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
-> [...]
->> Another thing I failed to mention is that the new Memory Attributes
->> table support may map all of the RuntimeServicesCode regions a second
->> time, but with a higher granularity, using RO for .text and .rodata
->> and NX for .data and .bss (and the PE/COFF header).
+> On 06/28/2016 03:54 AM, Tomasz Nowicki wrote:
 >
-> Can this not be done in a single go without multiple passes? That's what
-> we did for the core arm64 code, the only one left being EFI run-time
-> mappings.
+>> diff --git a/drivers/pci/host/mcfg-quirks.c b/drivers/pci/host/mcfg-quirks.c
+>> new file mode 100644
+>> index 0000000..fb2b184
+>> --- /dev/null
+>> +++ b/drivers/pci/host/mcfg-quirks.c
+>> @@ -0,0 +1,88 @@
 >
+>> +static bool pci_mcfg_fixup_match(struct pci_cfg_fixup *f,
+>> +                              struct acpi_table_header *mcfg_header)
+>> +{
+>> +     int olen = min_t(u8, strlen(f->oem_id), ACPI_OEM_ID_SIZE);
+>> +     int tlen = min_t(u8, strlen(f->oem_table_id), ACPI_OEM_TABLE_ID_SIZE);
+>> +
+>> +     return (!strncmp(f->oem_id, mcfg_header->oem_id, olen) &&
+>> +             !strncmp(f->oem_table_id, mcfg_header->oem_table_id, tlen) &&
+>> +             f->oem_revision == mcfg_header->oem_revision);
+>> +}
+>
+> Ard's comments on v3 included:
+>
+> "... exact OEM table/rev id matches ..."
+> "... substring match ... out of the question ..."
+>
+> I originally advocated the substring match approach because
+> space-padding the input strings was unfamiliar. But given that some
+> vendors have a "PLAT    " then "PLAT2   " naming scheme, where the
+> former needs quirks and the latter (hopefully) doesn't, I agree with Ard
+> and think space-padded inputs is the better way to go. Sorry for the
+> lack of foresight.
 
-Well, we probably could, but it is far from trivial.
+I think having OEM Table ID as "PLAT   " and then "PLAT2  " (the the
+next version of the SoC)
+is common. So yes, matching full string is better as we can use "PLAT2  "
+in MCFG table and not worry about the "PLAT" sub-string match causes the quirk
+to be applied unintentionally.
 
->> Due to the higher
->> granularity, regions that were mapped using the contiguous bit the
->> first time around may be split into smaller regions. Your current code
->> does not address that case.
 >
-> If the above doesn't work, the only solution would be to permanently map
-> these ranges as individual pages, no large blocks.
+> (I'm happy to rip it out, test, and communicate the delta however you'd
+> prefer--just let me know.)
 >
-
-That is not unreasonable, since regions >2MB are unusual.
-
->> I wonder how the PT debug code deals with this, and whether there is
->> anything we can reuse to inhibit cont and block mappings
+> Regards,
+> Cov
 >
-> Do you mean DEBUG_PAGEALLOC? When enabled, it defaults to single page
-> mappings for the kernel, no sections.
->
-
-Indeed. So we could reuse the logic that imposes that to prevent
-creating regions that are subject to splitting later on. That way,
-there is no need to worry about the code running twice in case the
-Memory Attributes table is exposed by the firmware.
+> --
+> Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+Regards,
+Duc Dang.
