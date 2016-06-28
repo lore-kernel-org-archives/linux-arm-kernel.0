@@ -1,72 +1,65 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 28 Jun 2016 17:18:57 +0100
-Subject: [RFC 1/2] iommu/dma: Restrict IOVAs to physical memory layout
-In-Reply-To: <cover.1467123945.git.robin.murphy@arm.com>
-References: <cover.1467123945.git.robin.murphy@arm.com>
-Message-ID: <ac9b11493dfa3500889268488adfa8d4d5c34962.1467129314.git.robin.murphy@arm.com>
+From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
+Date: Tue, 28 Jun 2016 18:27:34 +0200
+Subject: [PATCH v2 04/14] regulator: SY8106A regulator driver
+In-Reply-To: <20160627145400.GY28202@sirena.org.uk>
+References: <20160625034511.7966-1-megous@megous.com>
+ <20160625034511.7966-5-megous@megous.com>
+ <20160626112657.GK28202@sirena.org.uk>
+ <3d6adff3-7ed3-73de-db0a-5f36c2f67a80@megous.com>
+ <20160627145400.GY28202@sirena.org.uk>
+Message-ID: <99d5e0d0-f2d6-d1c7-21fd-9b9c6edb76a2@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain peripherals may be bestowed with knowledge of the physical
-memory map of the system in which they live, and refuse to handle
-addresses that they do not think are memory, which causes issues when
-remapping to arbitrary IOVAs. Sidestep the issue by restricting IOVA
-domains to only allocate addresses within ranges which match the
-physical memory layout.
+On 27.6.2016 16:54, Mark Brown wrote:
+> On Sun, Jun 26, 2016 at 05:07:16PM +0200, Ond?ej Jirman wrote:
+>> On 26.6.2016 13:26, Mark Brown wrote:
+> 
+>>> I'm missing almost all of this series, I've just got this and another
+>>> patch which look like a standalone driver so it's hard to see any
+>>> dependencies.  What's going on here?
+> 
+>> Sorry, it's this series:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438981.html
+> 
+>> And here's v1 intro letter:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438794.html
+> 
+> These aren't really enlightening I'm afraid, there's nothing in there
+> about why these are a single series and no dependency information.
+> Indeed it looks like something is really confused as the thread is
+> missing at least patches 2 and 3.
+> 
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+You're right there's not much about the regulator there. Xulong Orange
+Pi PC is ARM SBC, that uses Allwinner H3 Soc, to which this regulator is
+connected via I2C bus, to regulate the main CPU supply voltage. It is
+used on some other SBC's from Xulong.
 
-Posting this as an RFC because it's something I've been having to use
-on Juno for all the PCI IOMMU development - it's pretty horrible, but I
-can't easily think of a nicer solution...
+It is fairly simple single output, fixed I2C address voltage regulator.
+It has just 3 registers, which allow for: slew rate control (not used in
+this driver), setting and reading out the voltage, switching between
+voltage set via I2C and via external resistor divider and
+enabling/disabling output. It also has status reporting for
+over-tempertature and over-current conditions. That's all the features
+it has.
 
- drivers/iommu/dma-iommu.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+The patch series uses it to provide dynamic vltage scaling of the ARM
+cores in the SoC to be able to achieve higher CPU frequency.
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index ea5a9ebf0f78..2385fab382d8 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -25,6 +25,7 @@
- #include <linux/huge_mm.h>
- #include <linux/iommu.h>
- #include <linux/iova.h>
-+#include <linux/memblock.h>
- #include <linux/mm.h>
- #include <linux/scatterlist.h>
- #include <linux/vmalloc.h>
-@@ -74,6 +75,23 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
- }
- EXPORT_SYMBOL(iommu_put_dma_cookie);
- 
-+static void iova_match_mem(struct iova_domain *iovad)
-+{
-+	struct memblock_region *reg;
-+	unsigned long blk, base = iovad->start_pfn;
-+	unsigned long shift = iova_shift(iovad);
-+
-+	for_each_memblock(memory, reg) {
-+		blk = (reg->base + iova_mask(iovad)) >> shift;
-+		if (blk > base)
-+			reserve_iova(iovad, base, blk - 1);
-+		base = (reg->base + reg->size) >> shift;
-+	}
-+	blk = -1UL >> shift;
-+	if (blk > base)
-+		reserve_iova(iovad, base, blk);
-+}
-+
- /**
-  * iommu_dma_init_domain - Initialise a DMA mapping domain
-  * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
-@@ -123,6 +141,7 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size
- 		iovad->dma_32bit_pfn = end_pfn;
- 	} else {
- 		init_iova_domain(iovad, 1UL << order, base_pfn, end_pfn);
-+		iova_match_mem(iovad);
- 	}
- 	return 0;
- }
--- 
-2.8.1.dirty
+Datasheet is here:
+
+https://01916271185794791722.googlegroups.com/attach/93415fbd5402/SY8106A_datasheet.pdf?part=0.1&vt=ANaJVrHMej8w8XRfd-7A3XoyiryMDDhrHU2SS-tYyHCpOIXRqIaICOIlZTWAUV74vToesmic457zPvODDuvrNnRpomPOPbtV8bMMFV65VX5aYb5NciMkh8E
+
+I'll also include this information in the revised patch.
+
+thank you and regards,
+  Ondrej Jirman
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160628/e4ec00eb/attachment.sig>
