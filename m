@@ -1,26 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Jun 2016 11:24:20 +0100
-Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
-In-Reply-To: <cover.1457539621.git.jglauber@cavium.com>
-References: <cover.1457539621.git.jglauber@cavium.com>
-Message-ID: <20160628102419.GA5425@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Jun 2016 11:24:46 +0100
+Subject: [PATCH 3/8] arm64:perf: Update Kconfig for Hisilicon PMU support
+In-Reply-To: <1467107429-55477-4-git-send-email-anurup.m@huawei.com>
+References: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
+ <1467107429-55477-4-git-send-email-anurup.m@huawei.com>
+Message-ID: <20160628102446.GD31744@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan,
-
-On Wed, Mar 09, 2016 at 05:21:02PM +0100, Jan Glauber wrote:
-> This patch series provides access to various counters on the ThunderX SOC.
+On Tue, Jun 28, 2016 at 05:50:24AM -0400, Anurup M wrote:
+> 	1. Update Kconfig for Hisilicon SoC ARMv8 PMU support.
 > 
-> For details of the uncore implementation see patch #1.
+> Signed-off-by: Anurup M <anurup.m@huawei.com>
+> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> ---
+>  drivers/perf/Kconfig | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> Patches #2-5 add the various ThunderX specific PMUs.
+> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+> index 04e2653..a90b2fc 100644
+> --- a/drivers/perf/Kconfig
+> +++ b/drivers/perf/Kconfig
+> @@ -12,4 +12,13 @@ config ARM_PMU
+>  	  Say y if you want to use CPU performance monitors on ARM-based
+>  	  systems.
+>  
+> +config HISI_PERFCTR
+> +	bool "Enable hardware event counter support for HiSilicon SoC"
+> +	depends on HW_PERF_EVENTS && ARM64
+> +	select HISI_DJTAG
+
+This Kconfig symbol doesn't exist.
+
+You need to post the relevant code, or at the very least refer to it.
+
+This cannot be reviewed or merged in the absence of that code.
+
+Thanks,
+Mark.
+
+> +	default n
+> +	help
+> +	  Enable hardware event counter support for hardware event counters
+> +	  in Hisilicon Hi161x SoC. The hardware modules like LLC, MN1 and
+> +	  DDRC have hardware events and counters.
+>  endmenu
+> -- 
+> 2.1.4
 > 
-> As suggested I've put the files under drivers/perf/uncore. I would
-> prefer this location over drivers/bus because not all of the uncore
-> drivers are bus related.
-
-What's the status of these patches? Were you planning to send a new
-version?
-
-Will
