@@ -1,7 +1,7 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 27 Jun 2016 21:51:35 -0500
-Subject: [GIT PULL] Qualcomm ARM64 DT Updates for v4.8
-Message-ID: <1467082295-22917-1-git-send-email-andy.gross@linaro.org>
+Date: Mon, 27 Jun 2016 21:52:43 -0500
+Subject: [GIT PULL] Qualcomm Driver Updates for v4.8
+Message-ID: <1467082363-22975-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,60 +11,57 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.8
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.8
 
-for you to fetch changes up to a6702798980812c666a5c32e6b12c24f72ef7245:
+for you to fetch changes up to dd4fe5b292226f2459305965c960d8dc39f36e0f:
 
-  arm64: dts: msm8996: add sdc2 support (2016-06-24 22:30:17 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Updates for v4.8
-
-* Enable assorted peripherals on APQ8016 SBC
-* Update reserved memory on MSM8916
-* Add MSM8996 peripheral support
-* Add SCM firmware node on MSM8916
-* Add PMU node on MSM8916
-* Add PSCI cpuidle support on MSM8916
+  firmware: qcom: scm: Expose PAS command 10 as reset-controller (2016-06-24 22:53:52 -0500)
 
 ----------------------------------------------------------------
-Andy Gross (1):
-      arm64: dts: msm8916: Add SCM firmware node
+Qualcomm ARM Based Driver Updates for v4.8
 
-Bjorn Andersson (1):
-      ARM: dts: msm8916: Update reserved-memory
+* Rework of SCM driver
+* Add file patterns for Qualcomm Maintainers entry
+* Add worker for wcnss_ctrl signaling
+* Fixes for smp2p
+* Update smem_state properties to match documentation
+* Add SCM Peripheral Authentication service
+* Expose SCM PAS command 10 as a reset controller
 
-Georgi Djakov (1):
-      arm64: dts: apq8016-sbc: Add DT node for the uSD SDHC interface
+----------------------------------------------------------------
+Andy Gross (4):
+      firmware: qcom: scm: Convert SCM to platform driver
+      firmware: qcom: scm: Use atomic SCM for cold boot
+      firmware: qcom: scm: Generalize shared error map
+      firmware: qcom: scm: Convert to streaming DMA APIS
 
-Lina Iyer (1):
-      ARM64: dts: Add PSCI cpuidle support for MSM8916
+Bjorn Andersson (6):
+      soc: qcom: wcnss_ctrl: Make wcnss_ctrl parent the other components
+      soc: qcom: smp2p: Correct addressing of outgoing value
+      soc: qcom: smp2p: Drop io-accessors
+      soc: qcom: Update properties for smem state referencing
+      firmware: qcom: scm: Peripheral Authentication Service
+      firmware: qcom: scm: Expose PAS command 10 as reset-controller
 
-Srinivas Kandagatla (17):
-      arm64: dts: qcom: apq8016-sbc: enable bam dma node.
-      arm64: dts: msm8996: add msmgpio label
-      arm64: dts: msm8996: add blsp2_uart1 pinctrl
-      arm64: dts: msm8996: add blsp2_uart2 pinctrl nodes.
-      arm64: dts: msm8996: add support blsp2_uart2
-      arm64: dts: msm8996: add blsp1_i2c2 pinctrl nodes.
-      arm64: dts: msm8996: add support to blsp1_i2c2 device
-      arm64: dts: msm8996: add blsp2_i2c1 pinctrl
-      arm64: dts: msm8996: add support to blsp2_i2c1
-      arm64: dts: msm8996: add support to blsp2_i2c0 pinctrl
-      arm64: dts: msm8996: add support to blsp2_i2c0
-      arm64: dts: msm8996: add support to blsp1_spi0 pinctrl
-      arm64: dts: msm8996: add support to blsp1_spi0
-      arm64: dts: msm8996: add support to blsp2_spi5 pinctrl
-      arm64: dts: msm8996: add support to blsp2_spi5
-      arm64: dts: msm8996: add sdc2 pinctrl
-      arm64: dts: msm8996: add sdc2 support
+Geert Uytterhoeven (1):
+      MAINTAINERS: Add file patterns for qcom device tree bindings
 
-Stephen Boyd (1):
-      arm64: dts: qcom: Add msm8916 PMU node
+Kumar Gala (1):
+      firmware: qcom: scm: Add support for ARM64 SoCs
 
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  |  16 ++
- arch/arm64/boot/dts/qcom/msm8916.dtsi      |  78 +++++++-
- arch/arm64/boot/dts/qcom/msm8996-pins.dtsi | 303 +++++++++++++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8996.dtsi      | 103 +++++++++-
- 4 files changed, 496 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
+ .../devicetree/bindings/soc/qcom/qcom,smp2p.txt    |   4 +-
+ .../devicetree/bindings/soc/qcom/qcom,smsm.txt     |   4 +-
+ MAINTAINERS                                        |   1 +
+ drivers/firmware/Kconfig                           |   1 +
+ drivers/firmware/qcom_scm-32.c                     | 327 +++++++++++--------
+ drivers/firmware/qcom_scm-64.c                     | 307 +++++++++++++++++-
+ drivers/firmware/qcom_scm.c                        | 345 ++++++++++++++++++++-
+ drivers/firmware/qcom_scm.h                        |  47 ++-
+ drivers/soc/qcom/smem_state.c                      |  12 +-
+ drivers/soc/qcom/smp2p.c                           |   7 +-
+ drivers/soc/qcom/smsm.c                            |   2 +-
+ drivers/soc/qcom/wcnss_ctrl.c                      | 125 ++++++--
+ include/linux/qcom_scm.h                           |   8 +
+ include/linux/soc/qcom/wcnss_ctrl.h                |   8 +
+ 14 files changed, 1012 insertions(+), 186 deletions(-)
+ create mode 100644 include/linux/soc/qcom/wcnss_ctrl.h
