@@ -1,112 +1,119 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 28 Jun 2016 16:48:20 +0100
-Subject: [PATCH v3 1/9] arm64: mm: change IOMMU notifier action to attach DMA
- ops
+Date: Tue, 28 Jun 2016 16:48:21 +0100
+Subject: [PATCH v3 2/9] iommu/of: Consolidate device creation workarounds
 In-Reply-To: <cover.1467123945.git.robin.murphy@arm.com>
 References: <cover.1467123945.git.robin.murphy@arm.com>
-Message-ID: <06d430a86f5d7f461308a9278bf25f40fb50d93c.1467123945.git.robin.murphy@arm.com>
+Message-ID: <dc8ac0f397ea5c90937fb5c9974e4ab02e264bd8.1467123945.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+So far, all the users of the generic of_xlate configuration mechanism
+are resorting to explicit platform device creation to ensure the IOMMU
+device is ready before anything tries to refer to it. As I'm about to
+convert two more drivers that will need exactly the same thing, let's
+nip that proliferation in the bud and move it to a single place.
 
-Current bus notifier in ARM64 (__iommu_attach_notifier)
-attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
-action notification.
+A neat solution is to make of_get_iommu_ops() ensure an IOMMU device is
+instantiated before giving out its associated ops, since it's a fairly
+safe assumption that the ops aren't going to be much use if the IOMMU
+can't or won't exist to back them up.
 
-This will cause issues on ACPI based systems, where PCI devices
-can be added before the IOMMUs the devices are attached to
-had a chance to be probed, causing failures on attempts to
-attach dma_ops in that the domain for the respective IOMMU
-may not be set-up yet by the time the bus notifier is run.
-
-Devices dma_ops do not require to be set-up till the matching
-device drivers are probed. This means that instead of running
-the notifier attaching dma_ops to devices (__iommu_attach_notifier)
-on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
-device driver is bound to the device in question (on action
-BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
-group and domain are set-up accordingly at the time the
-notifier is triggered.
-
-This patch changes the notifier action upon which dma_ops
-are attached to devices and defer it to driver binding time,
-so that IOMMU devices have a chance to be probed and to register
-their bus notifiers before the dma_ops attach sequence for a
-device is actually carried out.
-
-As a result we also no longer need worry about racing with
-iommu_bus_notifier(), or about retrying the queue in case devices
-were added too early on DT-based systems, so clean up the notifier
-itself plus the additional workaround from 722ec35f7fae ("arm64:
-dma-mapping: fix handling of devices registered before arch_initcall")
-
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-[rm: get rid of other now-redundant bits]
+CC: Marek Szyprowski <m.szyprowski@samsung.com>
+CC: Yong Wu <yong.wu@mediatek.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
-v3: New, co-opted from http://article.gmane.org/gmane.linux.kernel.iommu/13991
+v3: New.
 
- arch/arm64/mm/dma-mapping.c | 22 +++++-----------------
- 1 file changed, 5 insertions(+), 17 deletions(-)
+ drivers/iommu/exynos-iommu.c | 20 +++++++-------------
+ drivers/iommu/mtk_iommu.c    |  8 +-------
+ drivers/iommu/of_iommu.c     |  6 +++++-
+ 3 files changed, 13 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index c566ec83719f..e384b76203cc 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -848,15 +848,16 @@ static int __iommu_attach_notifier(struct notifier_block *nb,
- {
- 	struct iommu_dma_notifier_data *master, *tmp;
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 5ecc86cb74c8..97380ee56d71 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -665,6 +665,13 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
  
--	if (action != BUS_NOTIFY_ADD_DEVICE)
-+	if (action != BUS_NOTIFY_BIND_DRIVER)
- 		return 0;
+ 	pm_runtime_enable(dev);
  
- 	mutex_lock(&iommu_dma_notifier_lock);
- 	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
--		if (do_iommu_attach(master->dev, master->ops,
--				master->dma_base, master->size)) {
-+		if (data == master->dev && do_iommu_attach(master->dev,
-+				master->ops, master->dma_base, master->size)) {
- 			list_del(&master->list);
- 			kfree(master);
-+			break;
- 		}
- 	}
- 	mutex_unlock(&iommu_dma_notifier_lock);
-@@ -870,17 +871,8 @@ static int __init register_iommu_dma_ops_notifier(struct bus_type *bus)
- 
- 	if (!nb)
- 		return -ENOMEM;
--	/*
--	 * The device must be attached to a domain before the driver probe
--	 * routine gets a chance to start allocating DMA buffers. However,
--	 * the IOMMU driver also needs a chance to configure the iommu_group
--	 * via its add_device callback first, so we need to make the attach
--	 * happen between those two points. Since the IOMMU core uses a bus
--	 * notifier with default priority for add_device, do the same but
--	 * with a lower priority to ensure the appropriate ordering.
--	 */
++	/*
++	 * use the first registered sysmmu device for performing
++	 * dma mapping operations on iommu page tables (cpu cache flush)
++	 */
++	if (!dma_dev)
++		dma_dev = dev;
 +
- 	nb->notifier_call = __iommu_attach_notifier;
--	nb->priority = -100;
- 
- 	ret = bus_register_notifier(bus, nb);
- 	if (ret) {
-@@ -904,10 +896,6 @@ static int __init __iommu_dma_init(void)
- 	if (!ret)
- 		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
- #endif
--
--	/* handle devices queued before this arch_initcall */
--	if (!ret)
--		__iommu_attach_notifier(NULL, BUS_NOTIFY_ADD_DEVICE, NULL);
- 	return ret;
+ 	return 0;
  }
- arch_initcall(__iommu_dma_init);
+ 
+@@ -1341,22 +1348,9 @@ err_reg_driver:
+ 
+ static int __init exynos_iommu_of_setup(struct device_node *np)
+ {
+-	struct platform_device *pdev;
+-
+ 	if (!init_done)
+ 		exynos_iommu_init();
+ 
+-	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+-	if (IS_ERR(pdev))
+-		return PTR_ERR(pdev);
+-
+-	/*
+-	 * use the first registered sysmmu device for performing
+-	 * dma mapping operations on iommu page tables (cpu cache flush)
+-	 */
+-	if (!dma_dev)
+-		dma_dev = &pdev->dev;
+-
+ 	of_iommu_set_ops(np, &exynos_iommu_ops);
+ 	return 0;
+ }
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index c3043d8754e3..f7ae87abea99 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -724,14 +724,8 @@ static struct platform_driver mtk_iommu_driver = {
+ 
+ static int mtk_iommu_init_fn(struct device_node *np)
+ {
+-	int ret;
+-	struct platform_device *pdev;
++	int ret = platform_driver_register(&mtk_iommu_driver);
+ 
+-	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+-	if (!pdev)
+-		return -ENOMEM;
+-
+-	ret = platform_driver_register(&mtk_iommu_driver);
+ 	if (ret) {
+ 		pr_err("%s: Failed to register driver\n", __func__);
+ 		return ret;
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index af499aea0a1a..7e6369cffc95 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -22,6 +22,7 @@
+ #include <linux/limits.h>
+ #include <linux/of.h>
+ #include <linux/of_iommu.h>
++#include <linux/of_platform.h>
+ #include <linux/slab.h>
+ 
+ static const struct of_device_id __iommu_of_table_sentinel
+@@ -127,7 +128,10 @@ const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+ 	spin_lock(&of_iommu_lock);
+ 	list_for_each_entry(node, &of_iommu_list, list)
+ 		if (node->np == np) {
+-			ops = node->ops;
++			if (of_node_check_flag(np, OF_POPULATED) ||
++			    of_platform_device_create(np, NULL,
++					    platform_bus_type.dev_root))
++				ops = node->ops;
+ 			break;
+ 		}
+ 	spin_unlock(&of_iommu_lock);
 -- 
 2.8.1.dirty
