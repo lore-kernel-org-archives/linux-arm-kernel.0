@@ -1,38 +1,51 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 28 Jun 2016 22:03:10 +0800
-Subject: [RFC PATCH 3/5] thermal: Add support for the thermal sensor on
- A23/33
-In-Reply-To: <20160628114640.GE5550@lukather>
-References: <20160628101325.2522-1-icenowy@aosc.xyz>
- <20160628101325.2522-3-icenowy@aosc.xyz> <20160628114640.GE5550@lukather>
-Message-ID: <203181467122590@web5g.yandex.ru>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Tue, 28 Jun 2016 16:04:59 +0200
+Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
+In-Reply-To: <20160628102419.GA5425@arm.com>
+References: <cover.1457539621.git.jglauber@cavium.com>
+ <20160628102419.GA5425@arm.com>
+Message-ID: <20160628140459.GA27541@hardcore>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 28, 2016 at 11:24:20AM +0100, Will Deacon wrote:
+> Hi Jan,
+> 
+> On Wed, Mar 09, 2016 at 05:21:02PM +0100, Jan Glauber wrote:
+> > This patch series provides access to various counters on the ThunderX SOC.
+> > 
+> > For details of the uncore implementation see patch #1.
+> > 
+> > Patches #2-5 add the various ThunderX specific PMUs.
+> > 
+> > As suggested I've put the files under drivers/perf/uncore. I would
+> > prefer this location over drivers/bus because not all of the uncore
+> > drivers are bus related.
+> 
+> What's the status of these patches? Were you planning to send a new
+> version?
+> 
+> Will
 
+Hi Will,
 
-28.06.2016, 19:46, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> Thanks for working on this.
->
-> On Tue, Jun 28, 2016 at 06:13:23PM +0800, Icenowy Zheng wrote:
->> ?This patch adds support for the sun8iw3 thermal sensor on
->> ?Allwinner A23/33 SoCs.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->
-> The IP is awfully similar to the A31's, which already has a driver
-> (drivers/input/touchscreen/sun4i-ts.c).
->
-> There's no reason to add a new one here.
->
-> Thanks,
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+I was half-way through with addressing Mark's review comments when
+got side-tracked.
 
-Or... should I split the PLL2 driver into another patch set?
+The principle question these patches raised remains open though in my
+opinion, how to determine the socket a device belongs to.
+
+There is no first-class interface to ask a device or the firmware
+which socket the device lives on.
+
+The options I see are:
+A) Using NUMA node information, depends on CONFIG_NUMA
+B) Decoding the socket bits of the PCI BAR address
+C) Using PCI topology information
+
+A is what I tried, but I agree that depending on CONFIG_NUMA is not a good
+solution. B would be easy but looks not very future-proof. So option C
+is what is left...
+
+thanks,
+Jan
