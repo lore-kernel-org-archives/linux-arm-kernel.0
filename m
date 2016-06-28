@@ -1,68 +1,63 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 28 Jun 2016 10:51:54 +0200
-Subject: [PATCH 1/3] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
-References: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
- <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <20160628085154.GE4472@kwain>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jun 2016 09:56:22 +0100
+Subject: [PATCH 4/7] reset: Supply *_shared variant calls when using
+ *_optional APIs
+In-Reply-To: <20160606155655.10860-5-lee.jones@linaro.org>
+References: <20160606155655.10860-1-lee.jones@linaro.org>
+ <20160606155655.10860-5-lee.jones@linaro.org>
+Message-ID: <20160628085622.GM6720@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Philipp,
 
-On Tue, Jun 28, 2016 at 10:18:15AM +0200, Quentin Schulz wrote:
-> diff --git a/drivers/mfd/sunxi-gpadc-mfd.c b/drivers/mfd/sunxi-gpadc-mfd.c
-> new file mode 100644
-> index 0000000..710e297
-> --- /dev/null
-> +++ b/drivers/mfd/sunxi-gpadc-mfd.c
-> @@ -0,0 +1,188 @@
+I need this to go into the -rcs too.
 
-[...]
+Can I add it with your Ack please?
 
-> +	if (of_device_is_compatible(pdev->dev.of_node,
-> +				    "allwinner,sun4i-a10-ts"))
-> +		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> +				      sun4i_gpadc_mfd_cells,
-> +				      ARRAY_SIZE(sun4i_gpadc_mfd_cells), NULL,
-> +				      0, NULL);
-> +	else if (of_device_is_compatible(pdev->dev.of_node,
-> +					 "allwinner,sun5i-a13-ts"))
-> +		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> +				      sun5i_gpadc_mfd_cells,
-> +				      ARRAY_SIZE(sun5i_gpadc_mfd_cells), NULL,
-> +				      0, NULL);
-> +	else if (of_device_is_compatible(pdev->dev.of_node,
-> +					 "allwinner,sun6i-a31-ts"))
-> +		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> +				      sun6i_gpadc_mfd_cells,
-> +				      ARRAY_SIZE(sun6i_gpadc_mfd_cells), NULL,
-> +				      0, NULL);
+> Consumers need to be able to specify whether they are requesting an
+> 'exclusive' or 'shared' reset line no matter which API (of_*, devm_*,
+> etc) they are using.  This change allows users of the optional_* API
+> in particular to specify that their request is for a 'shared' line.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  include/linux/reset.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/include/linux/reset.h b/include/linux/reset.h
+> index fd69240..c358106 100644
+> --- a/include/linux/reset.h
+> +++ b/include/linux/reset.h
+> @@ -141,6 +141,12 @@ static inline struct reset_control *reset_control_get_optional_exclusive(
+>  	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 0);
+>  }
+>  
+> +static inline struct reset_control *reset_control_get_optional_shared(
+> +					struct device *dev, const char *id)
+> +{
+> +	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 1);
+> +}
 > +
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to add MFD devices: %d\n", ret);
-> +		regmap_del_irq_chip(irq, sunxi_gpadc_mfd_dev->regmap_irqc);
-> +		mfd_remove_devices(&pdev->dev);
-
-You don't need to explicitly call mfd_remove_devices() when
-mfd_add_devices() fails. See:
-http://lxr.free-electrons.com/source/drivers/mfd/mfd-core.c#L298
-
-> +		return ret;
-> +	}
-
-Thanks,
-
-Antoine
+>  /**
+>   * of_reset_control_get_exclusive - Lookup and obtain an exclusive reference
+>   *                                  to a reset controller.
+> @@ -270,6 +276,12 @@ static inline struct reset_control *devm_reset_control_get_optional_exclusive(
+>  	return __devm_reset_control_get(dev, id, 0, 0);
+>  }
+>  
+> +static inline struct reset_control *devm_reset_control_get_optional_shared(
+> +					struct device *dev, const char *id)
+> +{
+> +	return __devm_reset_control_get(dev, id, 0, 1);
+> +}
+> +
+>  /**
+>   * devm_reset_control_get_exclusive_by_index - resource managed
+>   *                                             reset_control_get_exclusive()
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160628/a0e72c12/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
