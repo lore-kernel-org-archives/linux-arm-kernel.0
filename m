@@ -1,58 +1,72 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 28 Jun 2016 10:04:41 -0700
-Subject: [PATCH v6 3/6] input: tps65218-pwrbutton: Add platform_device_id
- table
-In-Reply-To: <1467117054-12943-4-git-send-email-j-keerthy@ti.com>
-References: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
- <1467117054-12943-4-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160628170441.GA13114@dtor-ws>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 28 Jun 2016 18:07:27 +0100
+Subject: [PATCH v2 1/6] Revert "arm64: alternatives: add enable parameter to
+ conditional asm macros"
+In-Reply-To: <20160628170732.523-1-andre.przywara@arm.com>
+References: <20160628170732.523-1-andre.przywara@arm.com>
+Message-ID: <20160628170732.523-2-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 06:00:51PM +0530, Keerthy wrote:
-> platform_device_id table is needed for adding the tps65218-pwrbutton
-> module to the mfd_cell array.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
+Commit 77ee306c0aea9 ("arm64: alternatives: add enable parameter to
+conditional asm macros") extended the alternative assembly macros.
+Unfortunately this does not really work as one would expect, as the
+enable parameter in fact correctly protects the alternative section
+magic, but not the actual code sequences.
+This results in having both the original instruction(s) _and_  the
+alternative ones, if enable if false.
+Since there is no user of this macros anyway, just revert it.
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+This reverts commit 77ee306c0aea9a219daec256ad25982944affef8.
 
-> ---
-> 
-> Changes in v4:
-> 
->   * Added the missing ';' for struct platform_device_id.
-> 
->  drivers/input/misc/tps65218-pwrbutton.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
-> index 2bba8de..33d141a 100644
-> --- a/drivers/input/misc/tps65218-pwrbutton.c
-> +++ b/drivers/input/misc/tps65218-pwrbutton.c
-> @@ -113,12 +113,19 @@ static const struct of_device_id of_tps65218_pwr_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
->  
-> +static const struct platform_device_id tps65218_pwrbtn_id_table[] = {
-> +	{ "tps65218-pwrbutton", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(platform, tps65218_pwrbtn_id_table);
-> +
->  static struct platform_driver tps65218_pwron_driver = {
->  	.probe	= tps65218_pwron_probe,
->  	.driver	= {
->  		.name	= "tps65218_pwrbutton",
->  		.of_match_table = of_tps65218_pwr_match,
->  	},
-> +	.id_table = tps65218_pwrbtn_id_table,
->  };
->  module_platform_driver(tps65218_pwron_driver);
->  
-> -- 
-> 1.9.1
-> 
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/arm64/include/asm/alternative.h | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index beccbde..7288071 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -95,13 +95,11 @@ void apply_alternatives(void *start, size_t length);
+  * The code that follows this macro will be assembled and linked as
+  * normal. There are no restrictions on this code.
+  */
+-.macro alternative_if_not cap, enable = 1
+-	.if \enable
++.macro alternative_if_not cap
+ 	.pushsection .altinstructions, "a"
+ 	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f
+ 	.popsection
+ 661:
+-	.endif
+ .endm
+ 
+ /*
+@@ -118,22 +116,18 @@ void apply_alternatives(void *start, size_t length);
+  *    alternative sequence it is defined in (branches into an
+  *    alternative sequence are not fixed up).
+  */
+-.macro alternative_else, enable = 1
+-	.if \enable
++.macro alternative_else
+ 662:	.pushsection .altinstr_replacement, "ax"
+ 663:
+-	.endif
+ .endm
+ 
+ /*
+  * Complete an alternative code sequence.
+  */
+-.macro alternative_endif, enable = 1
+-	.if \enable
++.macro alternative_endif
+ 664:	.popsection
+ 	.org	. - (664b-663b) + (662b-661b)
+ 	.org	. - (662b-661b) + (664b-663b)
+-	.endif
+ .endm
+ 
+ #define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
 -- 
-Dmitry
+2.9.0
