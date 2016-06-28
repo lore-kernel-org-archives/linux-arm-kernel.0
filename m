@@ -1,102 +1,111 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 27 Jun 2016 21:59:55 -0500
-Subject: [GIT PULL] Qualcomm Device Tree Changes for v4.8
-Message-ID: <1467082795-23207-1-git-send-email-andy.gross@linaro.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 27 Jun 2016 20:09:30 -0700
+Subject: [PATCH 00/21] Support qcom's HSIC USB and rewrite USB2 HS phy
+ support
+In-Reply-To: <20160626072838.28082-1-stephen.boyd@linaro.org>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+Message-ID: <CALAqxLUHfsJBTQS=p5oThnOdiAZwu48puRhREx+2G9+KajDA9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+On Sun, Jun 26, 2016 at 12:28 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> The state of USB ChipIdea support on Qualcomm's platforms is not great.
+> The DT description of these devices requires up to three different nodes
+> for what amounts to be the same hardware block, when there should really
+> only be one. Furthermore, the "phy" driver that is in mainline (phy-msm-usb.c)
+> duplicates the OTG state machine and touches the ci controller wrapper
+> registers when it should really be focused on the phy and the ULPI accesses
+> needed to get the phy working. There's also a slimmed down phy driver for
+> the msm8916 platform, but really the phy hardware is the same as other MSMs,
+> so we have two drivers doing pretty much the same thing. This leads to a
+> situtaion where we have the chipidea core driver, the "phy" driver, and
+> sometimes the ehci-msm.c driver operating the same device all at the same
+> time with very little coordination. This just isn't very safe and is
+> confusing from a driver perspective when trying to figure out who does what.
+> Finally, there isn't any HSIC support on platforms like apq8074 so we
+> should add that.
+>
+> This patch series updates the ChipIdea driver and the MSM wrapper
+> (ci_hdrc_msm.c) to properly handle the PHY and wrapper bits at the right
+> times in the right places. To get there, we update the ChipIdea core to
+> have support for the ULPI phy bus introduced by Heikki. Along the way
+> we fix bugs with the extcon handling for peripheral and OTG mode controllers
+> and move the parts of phy-usb-msm.c that are touching the CI controller
+> wrapper into the wrapper driver (ci_hdrc_msm.c). Finally we add support
+> for the HSIC phy based on the ULPI bus and rewrite the HS phy driver
+> (phy-usb-msm.c) as a standard ULPI phy driver.
+>
+> Once this series is accepted, we should be able to delete the phy-usb-msm.c
+> phy-qcom-8x16-usb.c, and ehci-msm.c drivers from the tree and use the ULPI
+> based phy driver (which also lives in drivers/phy/ instead of drivers/usb/phy/)
+> and the chipidea host core instead.
+>
+> I've also sent seperate patches for other minor pieces to make this
+> all work. The full tree can be found here[3], hacks and all to get
+> things working. I've tested this on the db410c, apq8074 dragonboard,
+> and ifc6410 with configfs gadgets and otg cables.
+...
+> [3] https://git.linaro.org/people/stephen.boyd/linux.git/shortlog/refs/heads/usb-hsic-8074
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+Very excited to see this moving upstream!
 
-are available in the git repository at:
+Just a heads up, trying to build with this branch gives me:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dt-for-4.8
+drivers/usb/Kconfig:39:error: recursive dependency detected!
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/usb/Kconfig:39: symbol USB is selected by MOUSE_APPLETOUCH
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/input/mouse/Kconfig:187:        symbol MOUSE_APPLETOUCH depends on INPUT
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/input/Kconfig:8:        symbol INPUT is selected by VT
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/tty/Kconfig:12: symbol VT is selected by FB_STI
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:674:        symbol FB_STI depends on FB
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/Kconfig:42:     symbol DRM_KMS_FB_HELPER is selected
+by DRM_KMS_CMA_HELPER
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/Kconfig:98:     symbol DRM_KMS_CMA_HELPER is selected by DRM_IMX
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/imx/Kconfig:1:  symbol DRM_IMX depends on IMX_IPUV3_CORE
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/ipu-v3/Kconfig:1:   symbol IMX_IPUV3_CORE depends on
+RESET_CONTROLLER
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/reset/Kconfig:4:        symbol RESET_CONTROLLER is selected by
+USB_CHIPIDEA
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/usb/chipidea/Kconfig:1: symbol USB_CHIPIDEA depends on USB_EHCI_HCD
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/usb/host/Kconfig:84:    symbol USB_EHCI_HCD depends on USB
+drivers/usb/chipidea/otg.c: In function ?hw_write_otgsc?:
+drivers/usb/chipidea/otg.c:120:2: warning: format ?%x? expects
+argument of type ?unsigned int?, but argument 3 has type ?long
+unsigned int? [-Wformat]
+drivers/usb/chipidea/otg.c:120:2: warning: format ?%x? expects
+argument of type ?unsigned int?, but argument 4 has type ?long
+unsigned int? [-Wformat]
 
-for you to fetch changes up to c3d5313001b0c8e9f70807e58438c3dcd30a4817:
+I haven't yet been able to test with this, as I need some other fixes
+it seems too to deal with some of the iommu changes in my flo-WIP tree
+(it can't find of_dma_configure), but will let you know how things
+work once I have all that sorted.
 
-  dts: ipq4019: support ARMv7 PMU (2016-06-27 17:37:00 -0500)
-
-----------------------------------------------------------------
-Qualcomm Device Tree Changes for v4.8
-
-* Reverse BAM dma node reverts
-* Add BAM remote control options for affected platforms
-* Enable peripherals on APQ8074 dragonboard
-* Enable PMA8084 pwrky
-* Fix PMIC reg entries by removing unnecessary size element
-* Add SCM binding and support for all currently supported boards
-* Add Qualcomm WCNSS binding documentation
-* Rename db600c to SD_600eval and add peripheral nodes
-* Remove gpio key entry from Nexus7
-* Add APQ8060 based dragonboard and associated peripherals
-* Add ARMv7 PMU for IPQ4019
-* Update smem state cells to match documentation
-
-----------------------------------------------------------------
-Andy Gross (10):
-      Revert "Revert "dts: msm8974: Add blsp2_bam dma node""
-      Revert "Revert "dts: msm8974: Add dma channels for blsp2_i2c1 node""
-      ARM: dts: qcom: Remove size elements from pmic reg
-      ARM: dts: qcom: pma8084: Add pwrkey entry
-      dt/bindings: firmware: Add Qualcomm SCM binding
-      dts: qcom: apq8084: Add SCM firmware node
-      dts: qcom: msm8974: Add SCM firmware node
-      dts: qcom: apq8064: Add SCM firmware node
-      ARM: dts: qcom: msm8974-honami: Set DMA as remotely controlled
-      arm: dts: qcom: Update smem state cells usage
-
-Bjorn Andersson (1):
-      dt: binding: Add Qualcomm WCNSS control binding
-
-John Stultz (1):
-      device-tree: nexus7: Remove power gpio key entry and use pmic8xxx-pwrkey
-
-Linus Walleij (7):
-      ARM: dts: add GPIO and MPP to MSM8660 PMIC
-      ARM: dts: add SDCC5 to Qualcomm MSM8660
-      ARM: dts: add L2CC and RPM with regulators for MSM8660
-      ARM: dts: add I2C block in GSBI12
-      ARM: dts: fix the MSM8660 RTC base address
-      ARM: dts: move the fixed MMC regulator to SURF board
-      ARM: dts: add Qualcomm APQ8060-based Dragonboard
-
-Parth Pancholi (1):
-      ARM: dts: sd_600eval: Fix eMMC lockup issue
-
-Srinivas Kandagatla (3):
-      ARM: dts: apq8064: move sdcc1 pinctrl nodes to soc file
-      ARM: dts: apq8064: move sdcc3 pinctrls out of baord file
-      ARM: dts: apq8064: rename db600c to SD_600eval
-
-Stephen Boyd (2):
-      ARM: dts: qcom: Enable RPM regulators on apq8074 dragonboard
-      ARM: dts: qcom: Enable sdcard and emmc on apq8074 dragonboard
-
-twp at codeaurora.org (1):
-      dts: ipq4019: support ARMv7 PMU
-
- .../devicetree/bindings/firmware/qcom,scm.txt      |  28 +
- .../devicetree/bindings/soc/qcom/qcom,wcnss.txt    | 116 ++++
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts     | 626 +++++++++++++++++++++
- ...tsi => qcom-apq8064-arrow-sd-600eval-pins.dtsi} |   0
- ...b600c.dts => qcom-apq8064-arrow-sd-600eval.dts} |  10 +-
- arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts |   6 -
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi           |  40 ++
- .../arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts |  44 +-
- arch/arm/boot/dts/qcom-apq8064.dtsi                |  10 +-
- arch/arm/boot/dts/qcom-apq8074-dragonboard.dts     | 247 ++++++++
- arch/arm/boot/dts/qcom-apq8084.dtsi                |   8 +
- arch/arm/boot/dts/qcom-ipq4019.dtsi                |   6 +
- arch/arm/boot/dts/qcom-msm8660-surf.dts            |  11 +
- arch/arm/boot/dts/qcom-msm8660.dtsi                | 166 +++++-
- .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   |   4 +
- arch/arm/boot/dts/qcom-msm8974.dtsi                |  28 +-
- arch/arm/boot/dts/qcom-pma8084.dtsi                |  20 +-
- 18 files changed, 1296 insertions(+), 77 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,wcnss.txt
- create mode 100644 arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
- rename arch/arm/boot/dts/{qcom-apq8064-arrow-db600c-pins.dtsi => qcom-apq8064-arrow-sd-600eval-pins.dtsi} (100%)
- rename arch/arm/boot/dts/{qcom-apq8064-arrow-db600c.dts => qcom-apq8064-arrow-sd-600eval.dts} (96%)
+thanks
+-john
