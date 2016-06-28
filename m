@@ -1,57 +1,70 @@
-From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
-Date: Tue, 28 Jun 2016 13:10:33 +0530
-Subject: [PATCH v4 0/3] Add Broadcom iproc-static-adc controller driver
-Message-ID: <1467099636-31855-1-git-send-email-raveendra.padasalagi@broadcom.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jun 2016 08:41:10 +0100
+Subject: [PATCH v3 03/10] input: tps65218-pwrbutton: Add
+ platform_device_id table
+In-Reply-To: <57721F71.5010700@ti.com>
+References: <1467093980-11458-1-git-send-email-j-keerthy@ti.com>
+ <1467093980-11458-4-git-send-email-j-keerthy@ti.com>
+ <20160628064948.GB6720@dell> <57721F71.5010700@ti.com>
+Message-ID: <20160628074110.GH6720@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains initial driver for Broadcom's
-iproc static adc controller. The patchset is based on v4.7-rc1
-tag and its tested on Broadcom Cygnus SoC.
+On Tue, 28 Jun 2016, Keerthy wrote:
 
-The patches can be fetched from iproc-adc-v4 branch of
-https://github.com/Broadcom/arm64-linux.git
+> 
+> 
+> On Tuesday 28 June 2016 12:19 PM, Lee Jones wrote:
+> >On Tue, 28 Jun 2016, Keerthy wrote:
+> >
+> >>platform_device_id table is needed for adding the tps65218-pwrbutton
+> >>module to the mfd_cell array.
+> >>
+> >>Signed-off-by: Keerthy <j-keerthy@ti.com>
+> >>---
+> >>  drivers/input/misc/tps65218-pwrbutton.c | 7 +++++++
+> >>  1 file changed, 7 insertions(+)
+> >>
+> >>diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
+> >>index 2bba8de..a0cb7d2 100644
+> >>--- a/drivers/input/misc/tps65218-pwrbutton.c
+> >>+++ b/drivers/input/misc/tps65218-pwrbutton.c
+> >>@@ -113,12 +113,19 @@ static const struct of_device_id of_tps65218_pwr_match[] = {
+> >>  };
+> >>  MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
+> >>
+> >>+static const struct platform_device_id tps65218_pwrbtn_id_table[] = {
+> >>+	{ "tps65218-pwrbutton", },
+> >>+	{ /* sentinel */ }
+> >>+}
+> >
+> >Missing ';'.  Did you build test this?
+> 
+> Oops sorry for the mess. Yes i built and booted. While reviewing and just
+> before sending i have accidentally deleted. I will send a v4 in a bit. I
+> will send v4 of this patch.
+> 
+> I just checked now. It somehow compiles silently even with the ';' missing!
+> I will send a v4.
 
+Are you sure this driver is enable in the CONFIG?
 
-Changes since v3:
- - Assigned indio_dev->name to be iproc-static-adc.
- - Modified Module Author to include the name and email address.
- - Modified DT binding document to include reference to IIO core
-   docs for property io-channel-ranges.
-
-Changes since v2:
- - Addressed various comments given by Jonathan Cameron and
-   Peter Meerwald-Stadler on driver source code related to linux
-   coding style and clean-up of code. Lot of source code change
-   happened especially due to redefining the #defines.
- - Added code to support IIO_CHAN_INFO_SCALE mask to return
-   scale value in iproc_adc_read_raw().
- - Removed #address-cells, #size-cells properties in DT binding
-   document and dts file as adc will not have any child nodes as
-   noticed by Rob Herring.
-
-Changes since v1:
- - Modified Kconfig file to add more informative information
-   in Broadcom Adc driver configuration menu.
- - Added Broadcom Adc driver menu config in the alphabetical
-   order in Kconfig
- - Addressed various comments given by Peter Meerwald-Stadler
-   on driver source code, Including issues related to linux
-   coding style and race conditions.
-
-Raveendra Padasalagi (3):
-  Documentation: DT: Add iproc-static-adc binding
-  iio: Add driver for Broadcom iproc-static-adc
-  ARM:dts-Add dt node for Broadcom iproc-static-adc
-
- .../bindings/iio/adc/brcm,iproc-static-adc.txt     |  41 ++
- arch/arm/boot/dts/bcm-cygnus.dtsi                  |  11 +
- drivers/iio/adc/Kconfig                            |  12 +
- drivers/iio/adc/Makefile                           |   1 +
- drivers/iio/adc/bcm_iproc_adc.c                    | 644 +++++++++++++++++++++
- 5 files changed, 709 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/brcm,iproc-static-adc.txt
- create mode 100644 drivers/iio/adc/bcm_iproc_adc.c
+> >>+MODULE_DEVICE_TABLE(platform, tps65218_pwrbtn_id_table);
+> >>+
+> >>  static struct platform_driver tps65218_pwron_driver = {
+> >>  	.probe	= tps65218_pwron_probe,
+> >>  	.driver	= {
+> >>  		.name	= "tps65218_pwrbutton",
+> >>  		.of_match_table = of_tps65218_pwr_match,
+> >>  	},
+> >>+	.id_table = tps65218_pwrbtn_id_table,
+> >>  };
+> >>  module_platform_driver(tps65218_pwron_driver);
+> >>
+> >
 
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
