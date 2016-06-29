@@ -1,44 +1,67 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Wed, 29 Jun 2016 14:34:12 +0200
-Subject: [PATCH v2 2/6] documentation: Add secure monitor bindings
- documentation
+Date: Wed, 29 Jun 2016 14:34:15 +0200
+Subject: [PATCH v2 5/6] documentation: Add nvmem bindings documentation
 In-Reply-To: <1467203656-14381-1-git-send-email-carlo@caione.org>
 References: <1467203656-14381-1-git-send-email-carlo@caione.org>
-Message-ID: <1467203656-14381-3-git-send-email-carlo@caione.org>
+Message-ID: <1467203656-14381-6-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-Add the binding documentation for the Amlogic secure monitor driver.
+This patch add the bindings document of Amlogic eFuse driver.
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/firmware/meson/meson_sm.txt       | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+ .../devicetree/bindings/nvmem/amlogic-efuse.txt    | 39 ++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
 
-diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
 new file mode 100644
-index 0000000..c248cd4
+index 0000000..fafd85b
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
-@@ -0,0 +1,15 @@
-+* Amlogic Secure Monitor
++++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+@@ -0,0 +1,39 @@
++= Amlogic eFuse device tree bindings =
 +
-+In the Amlogic SoCs the Secure Monitor code is used to provide access to the
-+NVMEM, enable JTAG, set USB boot, etc...
++Required properties:
++- compatible: should be "amlogic,meson-gxbb-efuse"
 +
-+Required properties for the secure monitor node:
-+- compatible: Should be "amlogic,meson-gxbb-sm"
++= Data cells =
++Are child nodes of eFuse, bindings of which as described in
++bindings/nvmem/nvmem.txt
 +
 +Example:
 +
-+	firmware {
-+		sm: secure-monitor {
-+			compatible = "amlogic,meson-gxbb-sm";
++	efuse: efuse {
++		compatible = "amlogic,meson-gxbb-efuse";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		sn: sn at 14 {
++			reg = <0x14 0x10>;
 +		};
++
++		eth_mac: eth_mac at 34 {
++			reg = <0x34 0x10>;
++		};
++
++		bid: bid at 46 {
++			reg = <0x46 0x30>;
++		};
++	};
++
++= Data consumers =
++Are device nodes which consume nvmem data cells.
++
++For example:
++
++	eth_mac {
++		...
++		nvmem-cells = <&eth_mac>;
++		nvmem-cell-names = "eth_mac";
 +	};
 -- 
 2.7.4
