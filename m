@@ -1,54 +1,162 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Wed, 29 Jun 2016 13:46:39 -0600
-Subject: [PATCH 3/6] [media] s5p-jpeg: set capablity bus_info as required
- by VIDIOC_QUERYCAP
-In-Reply-To: <1466113235-25909-4-git-send-email-javier@osg.samsung.com>
-References: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
- <1466113235-25909-4-git-send-email-javier@osg.samsung.com>
-Message-ID: <5774259F.10300@osg.samsung.com>
+From: bruherrera@gmail.com (Bruno Herrera)
+Date: Wed, 29 Jun 2016 16:46:39 -0300
+Subject: [PATCH 1/3] usb: dwc2: Add support for STM32F429/439/469 USB OTG
+ in FS mode with internal PHY
+In-Reply-To: <436eef12-6204-d621-8574-92aea2d374fd@synopsys.com>
+References: <1466562349-5043-1-git-send-email-bruherrera@gmail.com>
+ <436eef12-6204-d621-8574-92aea2d374fd@synopsys.com>
+Message-ID: <CAF3+Tqe=6JxiZ=iefKw=2wD5RQt3d-Mb960H4zum1tFoR08Dhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2016 03:40 PM, Javier Martinez Canillas wrote:
-> The driver doesn't set the struct v4l2_capability cap_info field so the
-> v4l2-compliance tool reports the following errors for VIDIOC_QUERYCAP:
-> 
-> Required ioctls:
->                 VIDIOC_QUERYCAP returned 0 (Success)
->                 fail: v4l2-compliance.cpp(304): string empty
->                 fail: v4l2-compliance.cpp(528): check_ustring(vcap.bus_info, sizeof(vcap.bus_info))
->         test VIDIOC_QUERYCAP: FAIL
-> 
-> This patch fixes by setting the field in VIDIOC_QUERYCAP ioctl handler:
-> 
-> Required ioctls:
->                 VIDIOC_QUERYCAP returned 0 (Success)
->         test VIDIOC_QUERYCAP: OK
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
->  drivers/media/platform/s5p-jpeg/jpeg-core.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> index 17bc94092864..e3ff3d4bd72e 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> @@ -1256,7 +1256,8 @@ static int s5p_jpeg_querycap(struct file *file, void *priv,
->  		strlcpy(cap->card, S5P_JPEG_M2M_NAME " decoder",
->  			sizeof(cap->card));
->  	}
-> -	cap->bus_info[0] = 0;
-> +	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
-> +		 dev_name(ctx->jpeg->dev));
->  	cap->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M;
->  	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
->  	return 0;
-> 
+On Mon, Jun 27, 2016 at 7:51 PM, John Youn <John.Youn@synopsys.com> wrote:
+> On 6/21/2016 7:26 PM, Bruno Herrera wrote:
+>> Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
+>
+> Please add a commit message describing the purpose of your changes,
+> some information about the platform you're adding, and the special
+> handling of the GGPIO.
+>
+Ok, no problem.
 
-Looks good.
+>> ---
+>>  drivers/usb/dwc2/core.c     | 18 ++++++++++++++++++
+>>  drivers/usb/dwc2/core.h     |  5 +++++
+>>  drivers/usb/dwc2/hcd.c      | 12 +++++++++++-
+>>  drivers/usb/dwc2/hw.h       |  2 ++
+>>  drivers/usb/dwc2/platform.c | 37 +++++++++++++++++++++++++++++++++++++
+>>  5 files changed, 73 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
+>> index 4135a5f..83fbed6 100644
+>> --- a/drivers/usb/dwc2/core.c
+>> +++ b/drivers/usb/dwc2/core.c
+>> @@ -1276,6 +1276,23 @@ static void dwc2_set_param_hibernation(struct dwc2_hsotg *hsotg,
+>>       hsotg->core_params->hibernation = val;
+>>  }
+>>
+>> +static void dwc2_set_param_stm32_powerdown(struct dwc2_hsotg *hsotg,
+>> +             int val)
+>> +{
+>> +     if (DWC2_OUT_OF_BOUNDS(val, 0, 1)) {
+>> +             if (val >= 0) {
+>> +                     dev_err(hsotg->dev,
+>> +                             "'%d' invalid for parameter power down\n",
+>> +                             val);
+>> +                     dev_err(hsotg->dev, "power down must be 0 or 1\n");
+>> +             }
+>> +             val = 0;
+>> +             dev_dbg(hsotg->dev, "Setting power down to %d\n", val);
+>> +     }
+>> +
+>> +     hsotg->core_params->stm32_powerdown = val;
+>> +}
+>> +
+>>  /*
+>>   * This function is called during module intialization to pass module parameters
+>>   * for the DWC_otg core.
+>> @@ -1323,6 +1340,7 @@ void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
+>>       dwc2_set_param_uframe_sched(hsotg, params->uframe_sched);
+>>       dwc2_set_param_external_id_pin_ctl(hsotg, params->external_id_pin_ctl);
+>>       dwc2_set_param_hibernation(hsotg, params->hibernation);
+>> +     dwc2_set_param_stm32_powerdown(hsotg, params->stm32_powerdown);
+>>  }
+>>
+>>  /*
+>> diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
+>> index 3c58d63..d3e4fcb 100644
+>> --- a/drivers/usb/dwc2/core.h
+>> +++ b/drivers/usb/dwc2/core.h
+>> @@ -386,6 +386,10 @@ enum dwc2_ep0_state {
+>>   *                   needed.
+>>   *                   0 - No (default)
+>>   *                   1 - Yes
+>> + * @stm32_powerdown: Enable STM32 specific USB FS transceiver power down
+>> + *                   control.
+>> + *                   0 = USB FS transceiver disabled (default)
+>> + *                   1 = USB FS transceiver enabled
+>>   *
+>>   * The following parameters may be specified when starting the module. These
+>>   * parameters define how the DWC_otg controller should be configured. A
+>> @@ -426,6 +430,7 @@ struct dwc2_core_params {
+>>       int uframe_sched;
+>>       int external_id_pin_ctl;
+>>       int hibernation;
+>> +     int stm32_powerdown;
+>>  };
+>>
+>>  /**
+>> diff --git a/drivers/usb/dwc2/hcd.c b/drivers/usb/dwc2/hcd.c
+>> index 2df3d04..4f9bb93 100644
+>> --- a/drivers/usb/dwc2/hcd.c
+>> +++ b/drivers/usb/dwc2/hcd.c
+>> @@ -118,7 +118,7 @@ static void dwc2_init_fs_ls_pclk_sel(struct dwc2_hsotg *hsotg)
+>>
+>>  static int dwc2_fs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
+>>  {
+>> -     u32 usbcfg, i2cctl;
+>> +     u32 usbcfg, usbgpio, i2cctl;
+>
+> The convention in this driver would be to just call 'usbgpio' -> 'ggpio'
 
-Reviewed-by: Shuah Khan <shuahkh@osg.samsung.com>
+OK.
+>
+>>       int retval = 0;
+>>
+>>       /*
+>> @@ -142,6 +142,16 @@ static int dwc2_fs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
+>>                               return retval;
+>>                       }
+>>               }
+>> +
+>> +             if (hsotg->core_params->stm32_powerdown > 0) {
+>> +                     dev_dbg(hsotg->dev, "STM32 FS PHY enabling transceiver\n");
+>> +                     /* STM32 uses the GGPIO register as general core
+>> +                      * configuration register.
+>> +                      */
+>> +                     usbgpio = dwc2_readl(hsotg->regs + GGPIO);
+>> +                     usbgpio |= STM32_OTG_GCCFG_PWRDWN;
+>> +                     dwc2_writel(usbgpio, hsotg->regs + GGPIO);
+>> +             }
+>>       }
+>>
+>>       /*
+>> diff --git a/drivers/usb/dwc2/hw.h b/drivers/usb/dwc2/hw.h
+>> index 281b57b..d5f9294 100644
+>> --- a/drivers/usb/dwc2/hw.h
+>> +++ b/drivers/usb/dwc2/hw.h
+>> @@ -224,6 +224,8 @@
+>>
+>>  #define GPVNDCTL                     HSOTG_REG(0x0034)
+>>  #define GGPIO                                HSOTG_REG(0x0038)
+>> +#define STM32_OTG_GCCFG_PWRDWN               (1 << 16)
+>> +
+>
+> Also, bitfields for GGPIO should be named: GGPIO_xxx
 
--- Shuah
+Could it be -> GGPIO_STM32_OTG_GCCFG_PWRDWN
+>From my understand the GGPIO are platform/vendor dependent so in the
+future some other vendor could use the same bit for other purpose.
+Should we keep it defined here or only in the scope it is used?
+
+>
+>
+>>  #define GUID                         HSOTG_REG(0x003c)
+>>  #define GSNPSID                              HSOTG_REG(0x0040)
+>>  #define GHWCFG1                              HSOTG_REG(0x0044)
+>> diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
+>> index fc6f525..d806b94 100644
+>> --- a/drivers/usb/dwc2/platform.c
+>> +++ b/drivers/usb/dwc2/platform.c
+>> @@ -84,6 +84,7 @@ static const struct dwc2_core_params params_hi6220 = {
+>>       .uframe_sched                   = 0,
+>>       .external_id_pin_ctl            = -1,
+>>       .hibernation                    = -1,
+>> +     .stm32_powerdown                = 0,
+>
+> You can probably just leave this out of unrelated configurations since
+> it will default to 0.
+OK.
+>
+> Regards,
+> John
