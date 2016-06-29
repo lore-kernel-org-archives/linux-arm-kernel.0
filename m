@@ -1,97 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Jun 2016 19:40:10 +0200
-Subject: [PATCH 3/5] arm64: efi: avoid block mappings for unaligned UEFI
- memory regions
-In-Reply-To: <CAKv+Gu9CM79pE+dGoJ+Q=j5tUrKaCkaaGH+Yud8AOfxHv2fnvw@mail.gmail.com>
-References: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
- <1467204690-10790-4-git-send-email-ard.biesheuvel@linaro.org>
- <20160629164525.GE2522@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_OUw+WJSNmC8mdAgAK8Nm=UGqtwgt8TBCwhTiBY9+2tg@mail.gmail.com>
- <CAKv+Gu9CxorhWGzx=CaVWnEWZ-AhBt3dh0XU+Vw1gNe=HxkySQ@mail.gmail.com>
- <20160629170053.GY22984@bivouac.eciton.net>
- <CAKv+Gu9CM79pE+dGoJ+Q=j5tUrKaCkaaGH+Yud8AOfxHv2fnvw@mail.gmail.com>
-Message-ID: <CAKv+Gu9f3H5QER+YeTSCoCvDkEvRu6AH6XUkKmkOwTP8mMkDqw@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 29 Jun 2016 19:44:51 +0200
+Subject: [PATCH] dmaengine: at_xdmac: fix debug string
+Message-ID: <1467222291-13045-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 June 2016 at 19:04, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 29 June 2016 at 19:00, Leif Lindholm <leif.lindholm@linaro.org> wrote:
->> On Wed, Jun 29, 2016 at 06:53:18PM +0200, Ard Biesheuvel wrote:
->>> On 29 June 2016 at 18:50, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>> > On 29 June 2016 at 18:45, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>> >> On Wed, Jun 29, 2016 at 02:51:28PM +0200, Ard Biesheuvel wrote:
->>> >>> +     if (!PAGE_ALIGNED(md->phys_addr) ||
->>> >>> +         !PAGE_ALIGNED(md->num_pages << EFI_PAGE_SHIFT)) {
->>> >>> +             /*
->>> >>> +              * If the end address of this region is not aligned to page
->>> >>> +              * size, the mapping is rounded up, and may end up sharing a
->>> >>> +              * page frame with the next UEFI memory region. If we create
->>> >>> +              * a block entry now, we may need to split it again when mapping
->>> >>> +              * the next region, and support for that is going to be removed
->>> >>> +              * from the MMU routines. So avoid block mappings altogether in
->>> >>> +              * that case.
->>> >>> +              */
->>> >>> +             allow_block_mappings = false;
->>> >>> +     }
->>> >>
->>> >> How common is it for large areas to have unaligned start/end? I wonder
->>> >> whether it's worth implementing my approach to look ahead and explicitly
->>> >> check the overlap with the next section instead of disabling block
->>> >> mappings altogether for this region.
->>> >>
->>> >
->>> > Very uncommon. Typically, only MMIO regions that represent NOR flash
->>> > are larger than a couple of pages. Taken from QEMU:
->>>
->>>   RT_Code   :            640 Pages (2,621,440 Bytes)
->>>   RT_Data   :            880 Pages (3,604,480 Bytes)
->>>
->>> so all RT_Code regions *combined* are 2.5 MB in total, and all RT_Data
->>> regions 3.5 MB. Ideally, they are grouped together, but in reality,
->>> there are always a couple of regions of each type, so there is little
->>> to gain here from using block mappings
->>
->> Is this representative for real platforms?
->>
->
-> I think it is a reasonable ballpark figure
->
->> What about efifb and reserved regions?
->>
->
-> Those are not tagged as EFI_MEMORY_RUNTIME so they are not covered by
-> the UEFI runtime mappings, and not relevant to this discussion.
->
->> My (x86) Lenovo workstation has one 64MB and one 16MB Runtime/Uncached
->> MMIO region. As well as a 3MB and a 4MB RT_Data one.
->>
->
-> Are those MMIO regions naturally aligned? And how about the RT_Data ones?
+mbr_ds is an integer, don't use %pad to print it.
 
-Just to be clear: we are talking about regions that
-a) are larger than 2 MB
-b) whose naturally aligned 2 MB subregions are relatively aligned with
-their physical mapping
-c) share a 16 KB or 64 KB page frame at either end with an adjacent region
+Fixes: commit 268914f4e7a0 ("dmaengine: at_xdmac: use %pad format string for dma_addr_t")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/dma/at_xdmac.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-So first of all, the virtual mapping code in the stub does take the 2
-MB alignment into account, but only if the physical base of the region
-is aligned to 2 MB and the size of the region is at least 2 MB. This
-is intended for things like the NOR flash mapping (or the MMIO regions
-that Leif refers to). But a region that happens to exceed 2 MB is not
-mapped with the relative physical alignment in mind, and usually does
-not end up aligned correctly for block mappings to be usable.
-
-On top of that, the v2.6 Memory Attributes table feature (which I
-think should be recommended in all cases, but is optional in the spec)
-breaks RT_Code regions into read-only and non-exec slices, so even if
-a RT_Code region existed whose size and alignment would happen to
-allow a block mapping to be used, it will subsequently be split
-anyway.
-
-The bottom line is that I don't think it makes a huge amount of sense
-to go out of our way to deal with large regions with unaligned
-boundaries until we encounter any in real life.
-
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 8e304b1befc5..e4c5522f9dcd 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -1195,8 +1195,8 @@ static struct at_xdmac_desc *at_xdmac_memset_create_desc(struct dma_chan *chan,
+ 	desc->lld.mbr_cfg = chan_cc;
+ 
+ 	dev_dbg(chan2dev(chan),
+-		"%s: lld: mbr_da=%pad, mbr_ds=%pad, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
+-		__func__, &desc->lld.mbr_da, &desc->lld.mbr_ds, desc->lld.mbr_ubc,
++		"%s: lld: mbr_da=%pad, mbr_ds=0x%08x, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
++		__func__, &desc->lld.mbr_da, desc->lld.mbr_ds, desc->lld.mbr_ubc,
+ 		desc->lld.mbr_cfg);
+ 
+ 	return desc;
 -- 
-Ard.
+2.8.1
