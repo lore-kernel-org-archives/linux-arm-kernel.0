@@ -1,195 +1,74 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 29 Jun 2016 21:59:56 +0800
-Subject: [RESEND PATCH 4/8] clk: core: support clocks which requires
- parents on (part 2)
-In-Reply-To: <146681237910.35033.15404158884510204380@resonance>
-References: <1461144880-8724-1-git-send-email-aisheng.dong@nxp.com>
- <1461144880-8724-5-git-send-email-aisheng.dong@nxp.com>
- <146681237910.35033.15404158884510204380@resonance>
-Message-ID: <20160629135955.GB29919@shlinux2>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 29 Jun 2016 16:07:00 +0200
+Subject: [PATCH 0/2] pinctrl: Enable support for external GPIO interrupts
+In-Reply-To: <CACRpkdZivUN8HKZ7oTDW6C35vSMv6+9G6-8M7=-kJM3B9vmH-A@mail.gmail.com>
+References: <5772301F.3030904@baylibre.com>
+ <CACRpkdZivUN8HKZ7oTDW6C35vSMv6+9G6-8M7=-kJM3B9vmH-A@mail.gmail.com>
+Message-ID: <20160629140700.GA21287@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 29/06/16 10:53, Linus Walleij wrote:
+> On Tue, Jun 28, 2016 at 10:06 AM, Neil Armstrong
+> <narmstrong@baylibre.com> wrote:
+> 
+> > I have another implementation idea about this subject, by using static GPIO-irq
+> > association in DT instead of using a very complex dynamic allocation.
+> >
+> > The idea is to add a simple property :
+> > irqs-gpios = <>
+> >
+> > To map a GPIO to the irqs, then we can either use the DT irq mapping or use the
+> > gpiolib to_irq() if the gpio is in the table.
+> >
+> > The relative drawback is that we will need DT changes to enable routing of a gpio
+> > to an IRQ, but the complete system is based on a DT description anyway.
+> >
+> > In this case, we could use gpiochip_irqchip.
+> >
+> > Do you think this structure would be acceptable ?
 
-On Fri, Jun 24, 2016 at 04:52:59PM -0700, Michael Turquette wrote:
-> Hi Dong,
-> 
-> Quoting Dong Aisheng (2016-04-20 02:34:36)
-> > On Freescale i.MX7D platform, all clocks operations, including
-> > enable/disable, rate change and re-parent, requires its parent clock on.
-> > Current clock core can not support it well.
-> > This patch adding flag CLK_OPS_PARENT_ON to handle this special case in
-> > clock core that enable its parent clock firstly for each operation and
-> > disable it later after operation complete.
-> > 
-> > The patch part 2 fixes set clock rate and set parent while its parent
-> > is off. The most special case is for set_parent() operation which requires
-> > all parents including both old and new one to be enabled at the same time
-> > during the operation.
-> > 
-> > Cc: Michael Turquette <mturquette@baylibre.com>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/clk/clk.c | 45 ++++++++++++++++++++++++++++-----------------
-> >  1 file changed, 28 insertions(+), 17 deletions(-)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 1f054d1a..d6cef61 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -1174,7 +1174,7 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *core,
-> >         struct clk_core *old_parent = core->parent;
-> >  
-> >         /*
-> > -        * Migrate prepare state between parents and prevent race with
-> > +        * 1. Migrate prepare state between parents and prevent race with
-> >          * clk_enable().
-> >          *
-> >          * If the clock is not prepared, then a race with
-> > @@ -1189,13 +1189,16 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *core,
-> >          * hardware and software states.
-> >          *
-> >          * See also: Comment for clk_set_parent() below.
-> > +        *
-> > +        * 2. enable parent clocks for CLK_OPS_PARENT_ON clock
-> >          */
-> > -       if (core->prepare_count) {
-> > -               clk_core_prepare(parent);
-> > -               flags = clk_enable_lock();
-> > -               clk_core_enable(parent);
-> > -               clk_core_enable(core);
-> > -               clk_enable_unlock(flags);
-> > +       if (core->prepare_count || core->flags & CLK_OPS_PARENT_ON) {
-> > +               clk_core_prepare_enable(parent);
-> > +               if (core->prepare_count)
-> > +                       clk_core_enable_lock(core);
-> > +               else
-> > +                       clk_core_prepare_enable(old_parent);
-> 
-> It took me a few seconds to figure out what I was looking at. The
-> set_parent stuff is tricky enough already ... I think we should keep the
-> state machine logic very simple. How about:
-> 
-> 	/* enable old_parent & parent if CLK_OPS_PARENT_ENABLE is set */
-> 	if (core->flags & CLK_OPS_PARENT_ENABLE) {
-> 		clk_core_prepare_enable(old_parent);
-> 		clk_core_prepare_enable(parent);
-> 	}
-> 
-> 	/* migrate prepare count if > 0 */
-> 	if (core->prepare_count) {
-> 		clk_core_prepare_enable(parent);
-> 		clk_core_enable_lock(core);
-> 	}
-> 
+I put some thoughts on this.
 
-Great suggestion! That looks much clearer.
-Will update it in V2.
+Having to statically define the IRQ-GPIO relation in the DT is not the
+most elegant solution but this is a really stupid controller and the
+whole cascade IRQ controller story revealed to be really a PITA with
+this hw when I was trying to write the driver. 
 
-Thanks
+On a side note the driver was working fine but the real problem was on
+some misunderstanding on the gpiolib .to_irq hook. My bad in having lost
+interest in fixing / clarifying that mess, sorry for that.
 
-Regards
-Dong Aisheng
+The latest respin was https://patchwork.kernel.org/patch/7738781/. Neil,
+probably you want also to review that (also privately since after 1 year
+I guess it needs to be updated) before someone starts writing the code
+for the DT-only solution?
 
-> > +
-> >         }
-> >  
-> >         /* update the clk tree topology */
-> > @@ -1210,18 +1213,16 @@ static void __clk_set_parent_after(struct clk_core *core,
-> >                                    struct clk_core *parent,
-> >                                    struct clk_core *old_parent)
-> >  {
-> > -       unsigned long flags;
-> > -
-> >         /*
-> >          * Finish the migration of prepare state and undo the changes done
-> >          * for preventing a race with clk_enable().
-> >          */
-> > -       if (core->prepare_count) {
-> > -               flags = clk_enable_lock();
-> > -               clk_core_disable(core);
-> > -               clk_core_disable(old_parent);
-> > -               clk_enable_unlock(flags);
-> > -               clk_core_unprepare(old_parent);
-> > +       if (core->prepare_count || core->flags & CLK_OPS_PARENT_ON) {
-> > +               clk_core_disable_unprepare(old_parent);
-> > +               if (core->prepare_count)
-> > +                       clk_core_disable_lock(core);
-> > +               else
-> > +                       clk_core_disable_unprepare(parent);
+> That depends on:
 > 
-> Similarly, a more readable solution is:
-> 
-> 	/*
-> 	 * Finish the migration of prepare state and undo the changes done
-> 	 * for preventing a race with clk_enable().
-> 	 */
-> 	if (core->prepare_count) {
-> 		clk_core_disable_lock(core);
-> 		clk_core_disable_unprepare(old_parent);
-> 
-> 	/* re-balance ref counting if CLK_OPS_PARENT_ENABLE is set */
-> 	if (core->flags & CLK_OPS_PARENT_ENABLE) {
-> 		clk_core_disable_unprepare(parent);
-> 		clk_core_disable_unprepare(old_parent);
-> 	}
-> 
-> >         }
-> >  }
-> >  
-> > @@ -1468,13 +1469,17 @@ static void clk_change_rate(struct clk_core *core)
-> >         unsigned long best_parent_rate = 0;
-> >         bool skip_set_rate = false;
-> >         struct clk_core *old_parent;
-> > +       struct clk_core *parent = NULL;
-> >  
-> >         old_rate = core->rate;
-> >  
-> > -       if (core->new_parent)
-> > +       if (core->new_parent) {
-> > +               parent = core->new_parent;
-> >                 best_parent_rate = core->new_parent->rate;
-> > -       else if (core->parent)
-> > +       } else if (core->parent) {
-> > +               parent = core->parent;
-> >                 best_parent_rate = core->parent->rate;
-> > +       }
-> >  
-> >         if (core->flags & CLK_SET_RATE_UNGATE) {
-> >                 unsigned long flags;
-> > @@ -1504,6 +1509,9 @@ static void clk_change_rate(struct clk_core *core)
-> >  
-> >         trace_clk_set_rate(core, core->new_rate);
-> >  
-> > +       if (core->flags & CLK_OPS_PARENT_ON)
-> > +               clk_core_prepare_enable(parent);
-> > +
-> >         if (!skip_set_rate && core->ops->set_rate)
-> >                 core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
-> >  
-> > @@ -1520,6 +1528,9 @@ static void clk_change_rate(struct clk_core *core)
-> >                 clk_core_unprepare(core);
-> >         }
-> >  
-> > +       if (core->flags & CLK_OPS_PARENT_ON)
-> > +               clk_core_disable_unprepare(parent);
-> > +
-> 
-> This part looks good to me.
-> 
-> Regards,
-> Mike
-> 
-> >         if (core->notifier_count && old_rate != core->rate)
-> >                 __clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
-> >  
-> > -- 
-> > 1.9.1
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> - A nod from the DT maintainers that this is acceptable from a HW description
+>   point of view and a simplification that probably all other OS:es
+> will also want
+>   to do.
+
+hardware wise this makes sense at board level and to the best of my
+knowledge we are the only one OS using this DT.
+
+> - Rough consensus from the maintainess of the platform that this makes
+>   sense, do noone appear three months down the road and says "oh wait I
+>   have this usecase that require us to do this dynamically".
+
+this is the real problem I see especially in case someone comes up with
+some homemade driver for some expansion board hooked up on the headers.
+
+> I think the dynamic solution is always more elegant, computers should resolve
+> complex problems, doing it in DT makes a human do a machine's work which
+> is as a rule of thumb not a good idea. But there is also the question
+> of maintenance
+> cost and what makes sense at a human level so I'm not totally
+> inflexible on this.
+
+Totally agree on this.
+
+-- 
+Carlo Caione
