@@ -1,110 +1,175 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Thu, 30 Jun 2016 02:15:47 +0800
-Subject: [PATCH v6 04/10] acpi: Add some basic struct and functions in GTDT
- driver
-In-Reply-To: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1467224153-22873-5-git-send-email-fu.wei@linaro.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 29 Jun 2016 20:16:40 +0200
+Subject: [PATCH v5 resend] usb: musb: sunxi: Simplify dr_mode handling
+In-Reply-To: <1467224200-7565-1-git-send-email-hdegoede@redhat.com>
+References: <1467224200-7565-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1467224200-7565-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+phy-sun4i-usb now has proper dr_mode handling, it always registers an
+extcon, and sends a notify with the mode (even when in peripheral- /
+host-only mode) at least once.
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
+So we can simply the sunxi musb glue by always registering its extcon
+notifier and relying on sunxi_musb_work() to enable vbus when in
+host-only mode.
+
+This also enables host- and peripheral-only mode with vbus monitoring.
+
+Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Bin Liu <b-liu@ti.com>
 ---
- drivers/acpi/acpi_gtdt.c | 85 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
+Changes in v2:
+-No changes
+Changes in v3:
+-No changes
+Changes in v4:
+-Add Maxime's Tested-by
+-Add Bin Liu's Acked-by
+Changes in v5:
+-No changes
+---
+ drivers/usb/musb/sunxi.c | 68 ++++++++++++++++++------------------------------
+ 1 file changed, 25 insertions(+), 43 deletions(-)
 
-diff --git a/drivers/acpi/acpi_gtdt.c b/drivers/acpi/acpi_gtdt.c
-new file mode 100644
-index 0000000..54d7644e
---- /dev/null
-+++ b/drivers/acpi/acpi_gtdt.c
-@@ -0,0 +1,85 @@
-+/*
-+ * ARM Specific GTDT table Support
-+ *
-+ * Copyright (C) 2015, Linaro Ltd.
-+ * Author: Daniel Lezcano <daniel.lezcano@linaro.org>
-+ *         Fu Wei <fu.wei@linaro.org>
-+ *         Hanjun Guo <hanjun.guo@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index 7650051..a17eb2a 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -256,12 +256,10 @@ static int sunxi_musb_init(struct musb *musb)
+ 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
+ 
+ 	/* Register notifier before calling phy_init() */
+-	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE) {
+-		ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
+-					       &glue->host_nb);
+-		if (ret)
+-			goto error_reset_assert;
+-	}
++	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
++				       &glue->host_nb);
++	if (ret)
++		goto error_reset_assert;
+ 
+ 	ret = phy_init(glue->phy);
+ 	if (ret)
+@@ -275,9 +273,8 @@ static int sunxi_musb_init(struct musb *musb)
+ 	return 0;
+ 
+ error_unregister_notifier:
+-	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
+-		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+-					   &glue->host_nb);
++	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
++				   &glue->host_nb);
+ error_reset_assert:
+ 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
+ 		reset_control_assert(glue->rst);
+@@ -301,9 +298,8 @@ static int sunxi_musb_exit(struct musb *musb)
+ 
+ 	phy_exit(glue->phy);
+ 
+-	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
+-		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+-					   &glue->host_nb);
++	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
++				   &glue->host_nb);
+ 
+ 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
+ 		reset_control_assert(glue->rst);
+@@ -315,25 +311,6 @@ static int sunxi_musb_exit(struct musb *musb)
+ 	return 0;
+ }
+ 
+-static int sunxi_set_mode(struct musb *musb, u8 mode)
+-{
+-	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+-	int ret;
+-
+-	if (mode == MUSB_HOST) {
+-		ret = phy_power_on(glue->phy);
+-		if (ret)
+-			return ret;
+-
+-		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
+-		/* Stop musb work from turning vbus off again */
+-		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
+-		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
+-	}
+-
+-	return 0;
+-}
+-
+ static void sunxi_musb_enable(struct musb *musb)
+ {
+ 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+@@ -582,7 +559,6 @@ static const struct musb_platform_ops sunxi_musb_ops = {
+ 	.exit		= sunxi_musb_exit,
+ 	.enable		= sunxi_musb_enable,
+ 	.disable	= sunxi_musb_disable,
+-	.set_mode	= sunxi_set_mode,
+ 	.fifo_offset	= sunxi_musb_fifo_offset,
+ 	.ep_offset	= sunxi_musb_ep_offset,
+ 	.busctl_offset	= sunxi_musb_busctl_offset,
+@@ -638,10 +614,6 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+-	if (!glue)
+-		return -ENOMEM;
+-
+ 	memset(&pdata, 0, sizeof(pdata));
+ 	switch (usb_get_dr_mode(&pdev->dev)) {
+ #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
+@@ -649,15 +621,13 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 		pdata.mode = MUSB_PORT_MODE_HOST;
+ 		break;
+ #endif
++#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
++	case USB_DR_MODE_PERIPHERAL:
++		pdata.mode = MUSB_PORT_MODE_GADGET;
++		break;
++#endif
+ #ifdef CONFIG_USB_MUSB_DUAL_ROLE
+ 	case USB_DR_MODE_OTG:
+-		glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
+-		if (IS_ERR(glue->extcon)) {
+-			if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
+-				return -EPROBE_DEFER;
+-			dev_err(&pdev->dev, "Invalid or missing extcon\n");
+-			return PTR_ERR(glue->extcon);
+-		}
+ 		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
+ 		break;
+ #endif
+@@ -668,6 +638,10 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 	pdata.platform_ops	= &sunxi_musb_ops;
+ 	pdata.config		= &sunxi_musb_hdrc_config;
+ 
++	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
++	if (!glue)
++		return -ENOMEM;
 +
-+#include <linux/acpi.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+
-+#undef pr_fmt
-+#define pr_fmt(fmt) "GTDT: " fmt
-+
-+typedef struct {
-+	struct acpi_table_gtdt *gtdt;
-+	void *platform_timer_start;
-+	void *gtdt_end;
-+} acpi_gtdt_desc_t;
-+
-+static acpi_gtdt_desc_t acpi_gtdt_desc __initdata;
-+
-+static inline void *gtdt_next(void *platform_timer, void *end, int type)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	while ((void *)(gh += gh->length) < end)
-+		if (gh->type == type)
-+			return (void *)gh;
-+	return NULL;
-+}
-+
-+#define for_each_gtdt_type(_g, _t)				\
-+	for (_g = acpi_gtdt_desc.platform_timer_start; _g;	\
-+	     _g = gtdt_next(_g, acpi_gtdt_desc.gtdt_end, _t))
-+
-+#define for_each_gtdt_timer(_g)				\
-+	for_each_gtdt_type(_g, ACPI_GTDT_TYPE_TIMER_BLOCK)
-+
-+#define for_each_gtdt_watchdog(_g)			\
-+	for_each_gtdt_type(_g, ACPI_GTDT_TYPE_WATCHDOG)
-+
-+/*
-+ * Get some basic info from GTDT table, and init the global variables above
-+ * for all timers initialization of Generic Timer.
-+ * This function does some validation on GTDT table.
-+ */
-+static int __init acpi_gtdt_desc_init(struct acpi_table_header *table)
-+{
-+	struct acpi_table_gtdt *gtdt = container_of(table,
-+						    struct acpi_table_gtdt,
-+						    header);
-+
-+	acpi_gtdt_desc.gtdt = gtdt;
-+	acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
-+
-+	if (table->revision < 2) {
-+		pr_info("Revision:%d doesn't support Platform Timers.\n",
-+			table->revision);
-+		return 0;
+ 	glue->dev = &pdev->dev;
+ 	INIT_WORK(&glue->work, sunxi_musb_work);
+ 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
+@@ -701,6 +675,14 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
++	if (IS_ERR(glue->extcon)) {
++		if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		dev_err(&pdev->dev, "Invalid or missing extcon\n");
++		return PTR_ERR(glue->extcon);
 +	}
 +
-+	if (!gtdt->platform_timer_count) {
-+		pr_info("No Platform Timer.\n");
-+		return 0;
-+	}
-+
-+	acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
-+					      gtdt->platform_timer_offset;
-+	if (acpi_gtdt_desc.platform_timer_start <
-+	    (void *)table + sizeof(struct acpi_table_gtdt)) {
-+		pr_err(FW_BUG "Platform Timer pointer error.\n");
-+		acpi_gtdt_desc.platform_timer_start = NULL;
-+		return -EINVAL;
-+	}
-+
-+	return gtdt->platform_timer_count;
-+}
+ 	glue->phy = devm_phy_get(&pdev->dev, "usb");
+ 	if (IS_ERR(glue->phy)) {
+ 		if (PTR_ERR(glue->phy) == -EPROBE_DEFER)
 -- 
-2.5.5
+2.7.4
