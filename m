@@ -1,45 +1,195 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 29 Jun 2016 16:04:34 +0200
-Subject: [PATCH 4/4] ARM: dts: sun5i-a10s-auxtek-t004: Set brcm,
- nvram_file_name
-In-Reply-To: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1467209074-15634-4-git-send-email-hdegoede@redhat.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 29 Jun 2016 21:59:56 +0800
+Subject: [RESEND PATCH 4/8] clk: core: support clocks which requires
+ parents on (part 2)
+In-Reply-To: <146681237910.35033.15404158884510204380@resonance>
+References: <1461144880-8724-1-git-send-email-aisheng.dong@nxp.com>
+ <1461144880-8724-5-git-send-email-aisheng.dong@nxp.com>
+ <146681237910.35033.15404158884510204380@resonance>
+Message-ID: <20160629135955.GB29919@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The auxtek t004 uses a toc9002 sdio wifi module, the android nvram file
-for this is for an older firmware which does not work with the mainline
-kernel driver.
+Hi Mike,
 
-So we set brcm,nvram_file_name to brcmfmac43362-ap6210.txt which
-works fine for this wifi module.
+On Fri, Jun 24, 2016 at 04:52:59PM -0700, Michael Turquette wrote:
+> Hi Dong,
+> 
+> Quoting Dong Aisheng (2016-04-20 02:34:36)
+> > On Freescale i.MX7D platform, all clocks operations, including
+> > enable/disable, rate change and re-parent, requires its parent clock on.
+> > Current clock core can not support it well.
+> > This patch adding flag CLK_OPS_PARENT_ON to handle this special case in
+> > clock core that enable its parent clock firstly for each operation and
+> > disable it later after operation complete.
+> > 
+> > The patch part 2 fixes set clock rate and set parent while its parent
+> > is off. The most special case is for set_parent() operation which requires
+> > all parents including both old and new one to be enabled at the same time
+> > during the operation.
+> > 
+> > Cc: Michael Turquette <mturquette@baylibre.com>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  drivers/clk/clk.c | 45 ++++++++++++++++++++++++++++-----------------
+> >  1 file changed, 28 insertions(+), 17 deletions(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index 1f054d1a..d6cef61 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -1174,7 +1174,7 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *core,
+> >         struct clk_core *old_parent = core->parent;
+> >  
+> >         /*
+> > -        * Migrate prepare state between parents and prevent race with
+> > +        * 1. Migrate prepare state between parents and prevent race with
+> >          * clk_enable().
+> >          *
+> >          * If the clock is not prepared, then a race with
+> > @@ -1189,13 +1189,16 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *core,
+> >          * hardware and software states.
+> >          *
+> >          * See also: Comment for clk_set_parent() below.
+> > +        *
+> > +        * 2. enable parent clocks for CLK_OPS_PARENT_ON clock
+> >          */
+> > -       if (core->prepare_count) {
+> > -               clk_core_prepare(parent);
+> > -               flags = clk_enable_lock();
+> > -               clk_core_enable(parent);
+> > -               clk_core_enable(core);
+> > -               clk_enable_unlock(flags);
+> > +       if (core->prepare_count || core->flags & CLK_OPS_PARENT_ON) {
+> > +               clk_core_prepare_enable(parent);
+> > +               if (core->prepare_count)
+> > +                       clk_core_enable_lock(core);
+> > +               else
+> > +                       clk_core_prepare_enable(old_parent);
+> 
+> It took me a few seconds to figure out what I was looking at. The
+> set_parent stuff is tricky enough already ... I think we should keep the
+> state machine logic very simple. How about:
+> 
+> 	/* enable old_parent & parent if CLK_OPS_PARENT_ENABLE is set */
+> 	if (core->flags & CLK_OPS_PARENT_ENABLE) {
+> 		clk_core_prepare_enable(old_parent);
+> 		clk_core_prepare_enable(parent);
+> 	}
+> 
+> 	/* migrate prepare count if > 0 */
+> 	if (core->prepare_count) {
+> 		clk_core_prepare_enable(parent);
+> 		clk_core_enable_lock(core);
+> 	}
+> 
 
-Setting brcm,nvram_file_name allows us to ship the ap6210 specific nvram
-file in linux-firmware to get the wifi to work out of the box without
-users needing to download and install the nvram file themselves.
+Great suggestion! That looks much clearer.
+Will update it in V2.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+Thanks
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts b/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
-index a790ec8..e15d1ef 100644
---- a/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
-@@ -118,6 +118,12 @@
- 	non-removable;
- 	cap-sdio-irq;
- 	status = "okay";
-+
-+	brcmf: bcrmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		brcm,nvram_file_name = "brcm/brcmfmac43362-ap6210.txt";
-+	};
- };
- 
- &ohci0 {
--- 
-2.7.4
+Regards
+Dong Aisheng
+
+> > +
+> >         }
+> >  
+> >         /* update the clk tree topology */
+> > @@ -1210,18 +1213,16 @@ static void __clk_set_parent_after(struct clk_core *core,
+> >                                    struct clk_core *parent,
+> >                                    struct clk_core *old_parent)
+> >  {
+> > -       unsigned long flags;
+> > -
+> >         /*
+> >          * Finish the migration of prepare state and undo the changes done
+> >          * for preventing a race with clk_enable().
+> >          */
+> > -       if (core->prepare_count) {
+> > -               flags = clk_enable_lock();
+> > -               clk_core_disable(core);
+> > -               clk_core_disable(old_parent);
+> > -               clk_enable_unlock(flags);
+> > -               clk_core_unprepare(old_parent);
+> > +       if (core->prepare_count || core->flags & CLK_OPS_PARENT_ON) {
+> > +               clk_core_disable_unprepare(old_parent);
+> > +               if (core->prepare_count)
+> > +                       clk_core_disable_lock(core);
+> > +               else
+> > +                       clk_core_disable_unprepare(parent);
+> 
+> Similarly, a more readable solution is:
+> 
+> 	/*
+> 	 * Finish the migration of prepare state and undo the changes done
+> 	 * for preventing a race with clk_enable().
+> 	 */
+> 	if (core->prepare_count) {
+> 		clk_core_disable_lock(core);
+> 		clk_core_disable_unprepare(old_parent);
+> 
+> 	/* re-balance ref counting if CLK_OPS_PARENT_ENABLE is set */
+> 	if (core->flags & CLK_OPS_PARENT_ENABLE) {
+> 		clk_core_disable_unprepare(parent);
+> 		clk_core_disable_unprepare(old_parent);
+> 	}
+> 
+> >         }
+> >  }
+> >  
+> > @@ -1468,13 +1469,17 @@ static void clk_change_rate(struct clk_core *core)
+> >         unsigned long best_parent_rate = 0;
+> >         bool skip_set_rate = false;
+> >         struct clk_core *old_parent;
+> > +       struct clk_core *parent = NULL;
+> >  
+> >         old_rate = core->rate;
+> >  
+> > -       if (core->new_parent)
+> > +       if (core->new_parent) {
+> > +               parent = core->new_parent;
+> >                 best_parent_rate = core->new_parent->rate;
+> > -       else if (core->parent)
+> > +       } else if (core->parent) {
+> > +               parent = core->parent;
+> >                 best_parent_rate = core->parent->rate;
+> > +       }
+> >  
+> >         if (core->flags & CLK_SET_RATE_UNGATE) {
+> >                 unsigned long flags;
+> > @@ -1504,6 +1509,9 @@ static void clk_change_rate(struct clk_core *core)
+> >  
+> >         trace_clk_set_rate(core, core->new_rate);
+> >  
+> > +       if (core->flags & CLK_OPS_PARENT_ON)
+> > +               clk_core_prepare_enable(parent);
+> > +
+> >         if (!skip_set_rate && core->ops->set_rate)
+> >                 core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
+> >  
+> > @@ -1520,6 +1528,9 @@ static void clk_change_rate(struct clk_core *core)
+> >                 clk_core_unprepare(core);
+> >         }
+> >  
+> > +       if (core->flags & CLK_OPS_PARENT_ON)
+> > +               clk_core_disable_unprepare(parent);
+> > +
+> 
+> This part looks good to me.
+> 
+> Regards,
+> Mike
+> 
+> >         if (core->notifier_count && old_rate != core->rate)
+> >                 __clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
+> >  
+> > -- 
+> > 1.9.1
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
