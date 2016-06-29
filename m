@@ -1,31 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 29 Jun 2016 09:03:33 +0200
-Subject: [PATCH] ARM: dts: sun7i: Fix pll3x2 and pll7x2 not having a
- parent clock
-In-Reply-To: <1467144674-21322-1-git-send-email-hdegoede@redhat.com>
-References: <1467144674-21322-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160629070333.GA6095@lukather>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 29 Jun 2016 10:08:32 +0300
+Subject: [RESEND PATCHv2 03/28] ARM: OMAP2+: omap_device: create clock
+ alias purely from DT data
+In-Reply-To: <20160628070011.GD28140@atomide.com>
+References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
+ <1465844702-12200-4-git-send-email-t-kristo@ti.com>
+ <20160628070011.GD28140@atomide.com>
+Message-ID: <577373F0.5080700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 10:11:14PM +0200, Hans de Goede wrote:
-> Fix pll3x2 and pll7x2 not having a parent clock, specifically this
-> fixes the kernel turning of pll3 while simplefb is using it when
-> uboot has configured things to use pll3x2 as lcd ch clk parent.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On 28/06/16 10:00, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [160613 12:07]:
+>> This avoids the need to add most of the clock aliases under
+>> drivers/clk/ti/clk-xyz.c files.
+>
+> This is a nice improvment, probably best to queu this along
+> with the rest of the series via the clock tree:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+>
+> Or please let me know if you want me to pick this separately.
+>
+> Regards,
+>
+> Tony
+>
 
-Applied, thanks!
-Maxime
+Patches #3, #6, #7, #8 you can pick up separately (but you will have 
+some conflicts due to missing ti_clk_get implementation.) These patches 
+are required for this series to work properly though.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160629/517e8d41/attachment.sig>
+If we want to re-work the clk_get / ti_clk_get implementation, we should 
+probably postpone it to 4.8, and that would push this series forward 
+also. In that case, you can pick up the above patches for merge 
+yourself, and we would handle the rest separately.
+
+-Tero
