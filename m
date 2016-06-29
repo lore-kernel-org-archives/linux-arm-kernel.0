@@ -1,121 +1,99 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 Jun 2016 19:19:49 +0530
-Subject: [PATCH 2/3] phy: rockchip-emmc: Be tolerant to card clock of 0 in
- power on
-In-Reply-To: <1467049167-14628-3-git-send-email-dianders@chromium.org>
-References: <1467049167-14628-1-git-send-email-dianders@chromium.org>
- <1467049167-14628-3-git-send-email-dianders@chromium.org>
-Message-ID: <5773D1FD.8020601@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 29 Jun 2016 15:50:00 +0200
+Subject: [linux-sunxi] Re: [PATCH] mmc: pwrseq-simple: Add an optional
+ post-power-on-delay
+In-Reply-To: <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
+References: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqJ0XVJb=Q9FT8g_OUTbgZWr-E58xQS0iCR4hv-9EHCcPA@mail.gmail.com>
+ <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
+Message-ID: <15423d66-8127-ef12-743d-29cc8cab2947@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Monday 27 June 2016 11:09 PM, Douglas Anderson wrote:
-> It's possible that there are some reasons to turn the PHY on while the
-> clock is 0.  In this case we just won't wait for the DLL to lock.
-> 
-> This is a bit of a stopgap until we figure out exactly when we're
-> supposed to wait for the DLL to lock and when we're supposed to power
-> cycle the PHY.
-> 
-> Note: this patch should help with suspend/resume where the system will
-> try to turn the PHY back on when the clock is 0.
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> ---
->  drivers/phy/phy-rockchip-emmc.c | 59 ++++++++++++++++++++++++++---------------
->  1 file changed, 37 insertions(+), 22 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-> index 9dce958233a0..a2aa6aca7dec 100644
-> --- a/drivers/phy/phy-rockchip-emmc.c
-> +++ b/drivers/phy/phy-rockchip-emmc.c
-> @@ -88,15 +88,36 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
->  	unsigned int caldone;
->  	unsigned int dllrdy;
->  	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
-> +	unsigned long rate;
->  	unsigned long timeout;
->  
-> -	if (rk_phy->emmcclk != NULL) {
-> -		unsigned long rate = clk_get_rate(rk_phy->emmcclk);
-> +	/*
-> +	 * Keep phyctrl_pdb and phyctrl_endll low to allow
-> +	 * initialization of CALIO state M/C DFFs
-> +	 */
-> +	regmap_write(rk_phy->reg_base,
-> +		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
-> +		     HIWORD_UPDATE(PHYCTRL_PDB_PWR_OFF,
-> +				   PHYCTRL_PDB_MASK,
-> +				   PHYCTRL_PDB_SHIFT));
-> +	regmap_write(rk_phy->reg_base,
-> +		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
-> +		     HIWORD_UPDATE(PHYCTRL_ENDLL_DISABLE,
-> +				   PHYCTRL_ENDLL_MASK,
-> +				   PHYCTRL_ENDLL_SHIFT));
-> +
-> +	/* Already finish power_off above */
-> +	if (on_off == PHYCTRL_PDB_PWR_OFF)
-> +		return 0;
-> +
-> +	rate = clk_get_rate(rk_phy->emmcclk);
-> +
-> +	if (rate != 0) {
->  		unsigned long ideal_rate;
->  		unsigned long diff;
->  
->  		switch (rate) {
-> -		case 0 ... 74999999:
-> +		case 1 ... 74999999:
->  			ideal_rate = 50000000;
->  			freqsel = PHYCTRL_FREQSEL_50M;
->  			break;
-> @@ -127,25 +148,6 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
->  	}
->  
->  	/*
-> -	 * Keep phyctrl_pdb and phyctrl_endll low to allow
-> -	 * initialization of CALIO state M/C DFFs
-> -	 */
-> -	regmap_write(rk_phy->reg_base,
-> -		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
-> -		     HIWORD_UPDATE(PHYCTRL_PDB_PWR_OFF,
-> -				   PHYCTRL_PDB_MASK,
-> -				   PHYCTRL_PDB_SHIFT));
-> -	regmap_write(rk_phy->reg_base,
-> -		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
-> -		     HIWORD_UPDATE(PHYCTRL_ENDLL_DISABLE,
-> -				   PHYCTRL_ENDLL_MASK,
-> -				   PHYCTRL_ENDLL_SHIFT));
-> -
-> -	/* Already finish power_off above */
-> -	if (on_off == PHYCTRL_PDB_PWR_OFF)
-> -		return 0;
-> -
-> -	/*
->  	 * According to the user manual, calpad calibration
->  	 * cycle takes more than 2us without the minimal recommended
->  	 * value, so we may need a little margin here
-> @@ -183,6 +185,19 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
->  		     HIWORD_UPDATE(PHYCTRL_ENDLL_ENABLE,
->  				   PHYCTRL_ENDLL_MASK,
->  				   PHYCTRL_ENDLL_SHIFT));
-> +
-> +	/*
-> +	 * We turned on the DLL even though the rate was 0 because we the
-> +	 * clock might be turned on later.  ...but we can't wait for the DLL
-> +	 * to lock when the rate is 0 because it will never lock with no
-> +	 * input clock.
-> +	 *
-> +	 * Technically we should be checking the lock later when the clock
-> +	 * is turned on, but for now we won't.
-> +	 */
-> +	if (rate == 0)
-> +		return 0;
+On 23-06-16 11:33, Hans de Goede wrote:
+> Hi,
+>
+> On 23-06-16 00:25, Rob Herring wrote:
+>> On Wed, Jun 22, 2016 at 12:59 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> Some devices need a while to boot their firmware after providing clks /
+>>> de-asserting resets before they are ready to receive sdio commands.
+>>>
+>>> This commits adds a post-power-on-delay-ms devicetree property to
+>>> mmc-pwrseq-simple for use with such devices.
+>>>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+>>>  drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
+>>>  2 files changed, 11 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>>> index ce0e767..e254368 100644
+>>> --- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>>> +++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>>> @@ -16,6 +16,8 @@ Optional properties:
+>>>    See ../clocks/clock-bindings.txt for details.
+>>>  - clock-names : Must include the following entry:
+>>>    "ext_clock" (External clock provided to the card).
+>>> +- post-power-on-delay-ms : Delay in ms after powering the card and
+>>> +       de-asserting the reset-gpios (if any)
+>>
+>> Presumably you need this delay post any reset, not just after power on
+>
+> mmc-pwrseq is only about doing power-on / off, not about providing
+> reset functionality.
+>
+>> if you are waiting for firmware to boot. So the name is not all that
+>> clear. How about a "reset-timing-ms" property that takes 3 values for
+>> pre-assert time (normally 0), assertion time, post assert time. Of
+>> course, I can still think of ways that breaks like when in this
+>> sequence do clocks need to be turned on.
+>
+> If you look at bindings/mmc/mmc-pwrseq-simple.txt out side of
+> the diff context it contains:
+>
+> - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+>         at initialization and prior we start the power up procedure of the card.
+>         They will be de-asserted right after the power has been provided to the
+>         card.
+> - clocks : Must contain an entry for the entry in clock-names.
+>   See ../clocks/clock-bindings.txt for details.
+> - clock-names : Must include the following entry:
+>   "ext_clock" (External clock provided to the card).
+>
+> Notice how the existing docs talk about a power-up procedure (which matches
+> the pwrseq name and purpose of these bindings).
+>
+> I actually started with calling the property "post-reset-delay-ms", but then
+> I realized that what we really want is the ability to specify a time to
+> wait (for e.g. firmware to boot) after completing the power-up procedure
+> (and before starting the probe). The power-up procedure currently can
+> also includes enabling external clocks to the sdio device (if any) and
+> enabling regulators, so having a "reset-timing-ms" property does not
+> seem right, as that would suggest it is ok to do the wait after deasserting
+> reset, but before e.g. enabling external clocks. Where what we really
+> want is to enable all necessary resources (or iow complete the powerup
+> procedure) and then wait.
+>
+> You're right that in some cases more complicated timings may be necessary,
+> but that can get really complicated like e.g.: enable regulator1, wait 10 ms,
+> enable regulator2, wait 15ms, enable external clock1, ...
+>
+> And such complex timings fall outside of the scope of the mmc-pwrseq-simple
+> binding, the idea being that for complex cases we do a device specific
+> pwrseq binding, and then the smarts are in implementation of that specific
+> pwrseq driver. As you've said yourself before we do not want to turn
+> devicetree into a scripting language.
+>
+> However having a single wait after doing a straight forward power-up cycle
+> seems to me like something which is appropriate for the mmc-pwrseq-simple
+> binding.
 
-Why not return initially from rockchip_emmc_phy_power if the clock rate is '0'.
-Are there other functions to lock the DLL apart from phy_power?
+Rob, can you please let us know if you're happy with my explanation above
+and if not explain how you would like this binding to look instead ?
 
-Thanks
-Kishon
+Thanks & Regards,
+
+Hans
