@@ -1,72 +1,109 @@
 From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Wed, 29 Jun 2016 22:44:07 +0530
-Subject: [RFC PATCH 1/2] fsl-mc: Added header file to provide fsl-mc bus iommu
- group creation
-Message-ID: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
+Date: Wed, 29 Jun 2016 22:44:08 +0530
+Subject: [RFC PATCH 2/2] iommu/arm-smmu: Add support for the fsl-mc bus
+In-Reply-To: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
+References: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <1467220448-16764-2-git-send-email-nipun.gupta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added a header file fsl_mc_smmu.h to provide basic support of creating
-an IOMMU group for a fsl-mc type device and also provide helper macro
-to get the stream ID of fsl-mc tyoe device.
+Implement bus specific support for the fsl-mc bus including
+registering the arm_smmu_ops and bus specific smmu device init.
 
 Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
 Signed-off-by: Bharat Bhushan <bharat.bhushan@nxp.com>
 ---
- drivers/staging/fsl-mc/include/fsl_mc_smmu.h | 45 ++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+ drivers/iommu/arm-smmu.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/drivers/staging/fsl-mc/include/fsl_mc_smmu.h b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
-new file mode 100644
-index 0000000..9dff5ba
---- /dev/null
-+++ b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Author: Nipun Gupta <nipun.gupta@freescale.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ab365ec..28d5dc8 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -47,6 +47,9 @@
+ 
+ #include <linux/amba/bus.h>
+ 
++/* Include path will be changed once FSL-MC support is out from staging */
++#include <../drivers/staging/fsl-mc/include/fsl_mc_smmu.h>
 +
-+#ifndef _FSL_MC_SMMU_H_
-+#define _FSL_MC_SMMU_H_
-+
-+#include <../drivers/staging/fsl-mc/include/mc.h>
-+
-+/* Macro to get the MC device ICID (Stream ID) */
-+#define fslmc_dev_streamid(_dev) (to_fsl_mc_device(_dev)->icid)
-+
-+/* Macro to get the container device of a MC device */
-+#define fslmc_cont_dev(_dev) ((to_fsl_mc_device(dev)->flags & \
-+	FSL_MC_IS_DPRC) ? (_dev) : (_dev->parent))
-+
-+/* Macro to check if a device is a container device */
-+#define is_cont_dev(_dev) (to_fsl_mc_device(_dev)->flags & FSL_MC_IS_DPRC)
-+
-+static struct iommu_group *fslmc_device_group(struct device *dev)
-+{
-+	struct device *cont_dev = fslmc_cont_dev(dev);
-+	struct iommu_group *group;
-+
-+	/* Container device is responsible for creating the iommu group */
-+	if (is_cont_dev(dev)) {
-+		group = iommu_group_alloc();
-+
-+		if (IS_ERR(group))
-+			return NULL;
-+	} else {
-+		get_device(cont_dev);
-+		group = iommu_group_get(cont_dev);
-+		put_device(cont_dev);
+ #include "io-pgtable.h"
+ 
+ /* Maximum number of stream IDs assigned to a single device */
+@@ -447,6 +450,11 @@ static struct device_node *dev_get_dev_node(struct device *dev)
+ 		return bus->bridge->parent->of_node;
+ 	}
+ 
++	if (dev_is_fsl_mc(dev)) {
++		while (dev_is_fsl_mc(dev))
++			dev = dev->parent;
 +	}
 +
-+	return group;
+ 	return dev->of_node;
+ }
+ 
+@@ -1443,6 +1451,32 @@ static int arm_smmu_init_platform_device(struct device *dev,
+ 	return 0;
+ }
+ 
++static void __arm_smmu_release_fslmc_iommudata(void *data)
++{
++	kfree(data);
 +}
 +
-+#endif /* _FSL_MC_SMMU_H_ */
++static int arm_smmu_init_fslmc_device(struct device *dev,
++				      struct iommu_group *group)
++{
++	struct arm_smmu_master_cfg *cfg;
++
++	cfg = iommu_group_get_iommudata(group);
++	if (!cfg) {
++		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
++		if (!cfg)
++			return -ENOMEM;
++
++		cfg->streamids[0] = fslmc_dev_streamid(dev);
++		cfg->num_streamids = 1;
++
++		iommu_group_set_iommudata(group, cfg,
++					  __arm_smmu_release_fslmc_iommudata);
++	}
++
++	return 0;
++}
++
+ static int arm_smmu_add_device(struct device *dev)
+ {
+ 	struct iommu_group *group;
+@@ -1467,6 +1501,8 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
+ 
+ 	if (dev_is_pci(dev))
+ 		group = pci_device_group(dev);
++	else if (dev_is_fsl_mc(dev))
++		group = fslmc_device_group(dev);
+ 	else
+ 		group = generic_device_group(dev);
+ 
+@@ -1475,6 +1511,8 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
+ 
+ 	if (dev_is_pci(dev))
+ 		ret = arm_smmu_init_pci_device(to_pci_dev(dev), group);
++	else if (dev_is_fsl_mc(dev))
++		ret = arm_smmu_init_fslmc_device(dev, group);
+ 	else
+ 		ret = arm_smmu_init_platform_device(dev, group);
+ 
+@@ -2102,6 +2140,11 @@ static int __init arm_smmu_init(void)
+ 	}
+ #endif
+ 
++#ifdef CONFIG_FSL_MC_BUS
++	if (!iommu_present(&fsl_mc_bus_type))
++		bus_set_iommu(&fsl_mc_bus_type, &arm_smmu_ops);
++#endif
++
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
