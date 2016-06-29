@@ -1,156 +1,89 @@
-From: megi@xff.cz (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Wed, 29 Jun 2016 17:30:51 +0200
-Subject: [linux-sunxi] [PATCH 1/3] clk: sunxi: Add a driver for the CCU
-In-Reply-To: <20160629085116.caf701e214440cdf4b1045c8@free.fr>
-References: <bfb8ceb4-5445-3f43-0a16-bd0e83f2af22@xff.cz>
- <536aa072-d110-1b08-fa25-72c1645e2459@xff.cz>
- <20160629085116.caf701e214440cdf4b1045c8@free.fr>
-Message-ID: <a827aa49-dde3-23fb-7c44-0dc8fd61948b@xff.cz>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Wed, 29 Jun 2016 09:38:50 -0600
+Subject: [RFC PATCH v4 3/5] PCI: Check platform specific ECAM quirks
+In-Reply-To: <5773D284.8060404@semihalf.com>
+References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
+ <1467100442-28078-4-git-send-email-tn@semihalf.com>
+ <577275EA.7010002@codeaurora.org>
+ <CADaLNDkhPZuG7UJ4SK_j5v_nXbd782Q17LAcXduG0uEObaFF=g@mail.gmail.com>
+ <5773A773.8040700@semihalf.com> <5773CE49.1050802@codeaurora.org>
+ <5773D284.8060404@semihalf.com>
+Message-ID: <a083360c-9b75-30f9-fe3c-ba968928fd92@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.6.2016 08:51, Jean-Francois Moine wrote:
-> On Tue, 28 Jun 2016 21:31:06 +0200
-> Ond?ej Jirman <megi@xff.cz> wrote:
-> 
->>
->> On 28.6.2016 17:37, Jean-Francois Moine wrote:
->>> Most of the clocks in the Allwinner's SoCs are configured in the CCU
->>> (Clock Configuration Unit).
->>>
->>> The PLL clocks are driven from the main clock. Their rates are controlled
->>> by a set of multiply and divide factors, named from the Allwinner's
->>> documentation:
->>> - multipliers: 'n' and 'k'
->>> - dividers: 'd1', 'd2', 'm' and 'p'
->>>
->>> The peripheral clocks may receive their inputs from one or more parents,
->>> thanks to a mux. Their rates are controlled by a set of divide factors
->>> only, named 'm' and 'p'.
->>>
->>> This driver also handles:
->>> - fixed clocks,
->>> - the phase delays for the MMCs,
->>> - the clock gates,
->>> - the bus gates,
->>> - and the resets.
->>>
->>> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
->>> ---
->>>  drivers/clk/sunxi/Makefile |   2 +
->>>  drivers/clk/sunxi/ccu.c    | 980 +++++++++++++++++++++++++++++++++++++++++++++
->>>  drivers/clk/sunxi/ccu.h    | 153 +++++++
->>>  3 files changed, 1135 insertions(+)
->>>  create mode 100644 drivers/clk/sunxi/ccu.c
->>>  create mode 100644 drivers/clk/sunxi/ccu.h
-> 	[snip]
->>> diff --git a/drivers/clk/sunxi/ccu.c b/drivers/clk/sunxi/ccu.c
->>> new file mode 100644
->>> index 0000000..5749f9c
->>> --- /dev/null
->>> +++ b/drivers/clk/sunxi/ccu.c
-> 	[snip]
->>> +static void ccu_pll_set_flat_factors(struct ccu *ccu, u32 mask, u32 val)
->>> +{
->>> +	u32 reg, m_val, p_val;
->>> +	u32 m_mask = (1 << ccu->m_width) - 1;
->>> +	u32 p_mask = (1 << ccu->p_width) - 1;
->>
->> I see you have shifted the factor values to be set in the caller of this
->> function, but then you have to shift masks too, to match. It might be
->> clearer to do both shifts in this function.
-> 
-> Oops, yes. Thanks. (I did not test yet your patch about the CPU
-> frequency)
-> 
->>> +	reg = readl(ccu->base + ccu->reg);
->>> +	m_val = reg & m_mask;
->>> +	p_val = reg & p_mask;
->>> +
->>> +	spin_lock(&ccu_lock);
->>> +
->>> +	/* increase p, then m */
->>> +	if (ccu->p_width && p_val < (val & p_mask)) {
->>> +		reg &= ~p_mask;
->>> +		reg |= val & p_mask;
->>> +		writel(reg, ccu->base + ccu->reg);
->>> +		udelay(10);
->>> +	}
->>> +	if (ccu->m_width && m_val < (val & m_mask)) {
->>> +		reg &= ~m_mask;
->>> +		reg |= val & m_mask;
->>> +		writel(reg, ccu->base + ccu->reg);
->>> +		udelay(10);
->>> +	}
->>> +
->>> +	/* set other factors */
->>> +	reg &= ~(mask & ~(p_mask | m_mask));
->>> +	reg |= val & ~(p_mask | m_mask);
->>> +	writel(reg, ccu->base + ccu->reg);
->>> +
->>> +	/* decrease m */
->>> +	if (ccu->m_width && m_val > (val & m_mask)) {
->>> +		reg &= ~m_mask;
->>> +		reg |= val & m_mask;
->>> +		writel(reg, ccu->base + ccu->reg);
->>> +		udelay(10);
->>> +	}
->>> +
->>> +	/* wait for PLL stable */
->>> +	if (ccu->lock_reg) {
->>> +		u32 lock;
->>> +
->>> +		lock = BIT(ccu->lock_bit);
->>> +		WARN_ON(readl_relaxed_poll_timeout(ccu->base + ccu->lock_reg,
->>> +							reg, !(reg & lock),
->>> +							100, 70000));
->>> +	}
-> 	[snip]
->>
->> Any reason why you're waiting for the lock after decreasing m and not
->> before? PLL output may till run too fast before reducing the postdivider
->> potentially causing a crash. But I might be misunderstanding what m is
->> exactly.
-> 
-> I just followed what is done in the function
->  sunxi_clk_factors_set_flat_facotrs() from Allwinnertech:
-> 
-> 	1).try to increase factor p first
-> 	2).try to increase factor m first
-> 	3. write factor n & k
-> 	4. do pair things for 2). decease factor m
-> 	5. wait for PLL state stable
-> 	6.do pair things for 1).  decease factor p
-> 
-> As this is written, it seems m is a pre-divider.
-> 
+On 6/29/2016 7:52 AM, Tomasz Nowicki wrote:
+> On 29.06.2016 15:34, Christopher Covington wrote:
+>> I'm confused by this statement. OEMID is defined as 6 bytes long and OEM
+>> Table ID as 8 bytes long in the ACPI specification. As far as I can
+>> tell, if your string isn't exactly that long, padding up to that length
+>> is required.
+>
+> Well, I cannot find that requirement in ACPI spec. but I might missed
+> something.
 
-Interesting. :) I've reverse engineered their arisc code, and there the
-order for setting up/changing PLL1 is:
+Have a look at table 5-29 in Section 5.2.6 which starts on page 114 of 
+ACPI 6.1
 
-1. try to increase factor p first
-2. try to increase factor m first
-3. write factor n & k
-4. wait for PLL state stable
-5. do pair things for 2). decease factor m
-6. do pair things for 1).  decease factor p
+>
+> I dumped my x86 machine ACPI tables and here is an example of MCFG:
+>
+> $ cat mcfg.dsl
+> /*
+>  * Intel ACPI Component Architecture
+>  * AML/ASL+ Disassembler version 20160108-64
+>  * Copyright (c) 2000 - 2016 Intel Corporation
+>  *
+>  * Disassembly of mcfg.dat, Wed Jun 29 15:48:16 2016
+>  *
+>  * ACPI Data Table [MCFG]
+>  *
+>  * Format: [HexOffset DecimalOffset ByteLength]  FieldName : FieldValue
+>  */
+>
+> [000h 0000   4]                    Signature : "MCFG"    [Memory Mapped
+> Configuration table]
+> [004h 0004   4]                 Table Length : 0000003C
+> [008h 0008   1]                     Revision : 01
+> [009h 0009   1]                     Checksum : A9
+> [00Ah 0010   6]                       Oem ID : "ALASKA"
+> [010h 0016   8]                 Oem Table ID : "A M I"
+> [018h 0024   4]                 Oem Revision : 01072009
+> [01Ch 0028   4]              Asl Compiler ID : "MSFT"
+> [020h 0032   4]        Asl Compiler Revision : 00000097
+>
+> [024h 0036   8]                     Reserved : 0000000000000000
+>
+> [02Ch 0044   8]                 Base Address : 00000000F8000000
+> [034h 0052   2]         Segment Group Number : 0000
+> [036h 0054   1]             Start Bus Number : 00
+> [037h 0055   1]               End Bus Number : 3F
+> [038h 0056   4]                     Reserved : 00000000
+>
+> Raw Table Data: Length 60 (0x3C)
+>
+> 00000000  4d 43 46 47 3c 00 00 00  01 a9 41 4c 41 53 4b 41
+> |MCFG<.....ALASKA|
+> 00000010  41 20 4d 20 49 00 00 00  09 20 07 01 4d 53 46 54  |A M I....
+> ..MSFT|
+> 00000020  97 00 00 00 00 00 00 00  00 00 00 00 00 00 00 f8
+> |................|
+> 00000030  00 00 00 00 00 00 00 3f  00 00 00 00              |.......?....|
+>
+> So in this example I have OEM table ID "A M I" 6 character long and 0
+> padding.
+>
+> Tomasz
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-That's why I asked.
 
-So all this depends on the design of this clock source. It may be
-different for different PLLs.
-
-Hard to know what to believe. Perhaps it would be possible to create a
-PLL stress tester that would try both approaches and see whether one of
-them is more stable/leads to creashes?
-
-regards,
-  Ondrej
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160629/24e0a893/attachment-0001.sig>
+-- 
+Jeffrey Hugo
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
