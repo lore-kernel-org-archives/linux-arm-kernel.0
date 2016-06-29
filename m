@@ -1,61 +1,112 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 29 Jun 2016 15:25:57 +0900
-Subject: [PATCH] extcon: Add support for qcom SPMI PMIC USB id detection
- hardware
-In-Reply-To: <146715115921.31418.2315766296233007937@sboyd-linaro>
-References: <20160626055647.18898-1-stephen.boyd@linaro.org>
- <CAGTfZH3ireJWo5-Jd5SEiSy-WMTsw43pweruOqwSesAZqagvtg@mail.gmail.com>
- <146705470025.30684.13257433085055355379@sboyd-linaro>
- <CAGTfZH3ZhZ2gQcOSuAByZWD59E3Bro1aayr2JsM2W+mYa2LQTQ@mail.gmail.com>
- <CGME20160628215923epcas1p3f7942aca724bf2746c20319750184584@epcas1p3.samsung.com>
- <146715115921.31418.2315766296233007937@sboyd-linaro>
-Message-ID: <577369F5.8040907@samsung.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 29 Jun 2016 14:26:00 +0800
+Subject: [PATCH 09/21] usb: chipidea: Add support for ULPI PHY bus
+In-Reply-To: <20160626072838.28082-10-stephen.boyd@linaro.org>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-10-stephen.boyd@linaro.org>
+Message-ID: <20160629062600.GD25236@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 06? 29? 06:59, Stephen Boyd wrote:
-> Quoting Chanwoo Choi (2016-06-28 05:06:48)
->> 2016-06-28 4:11 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
->>> Quoting Chanwoo Choi (2016-06-26 04:20:43)
->>>> 2016-06-26 14:56 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
->>>>> +PROPERTIES
->>>>> +
->>>>> +- compatible:
->>>>> +    Usage: required
->>>>> +    Value type: <string>
->>>>> +    Definition: Should contain "qcom,pm8941-misc";
->>>>> +
->>>>> +- reg:
->>>>> +    Usage: required
->>>>> +    Value type: <u32>
->>>>> +    Definition: Should contain the offset to the misc address space
->>>>
->>>> 'reg' property is used on extcon-qcom-spmi-misc.c?
->>>> I think that you don't need to include this property.
->>>
->>> No it isn't used in the driver right now, but there is a register offset
->>> for this module and there are registers that can be read/written in this
->>> module. I'd like to keep it as required so we can easily read the
->>> registers in the future if needed.
->>
->> OK.
->> But, If you want to remain the reg property, you should add the code to get
->> the register offset by using OF functions. This patch don't include the OF
->> function to handle it.
->>
+On Sun, Jun 26, 2016 at 12:28:26AM -0700, Stephen Boyd wrote:
+> Some phys for the chipidea controller are controlled via the ULPI
+> viewport. Add support for the ULPI bus so that these sorts of
+> phys can be probed and read/written automatically without having
+> to duplicate the viewport logic in each phy driver.
 > 
-> Sorry I don't follow the argument. I've put the reg property here for
-> future proofing so that the binding doesn't have to change in backwards
-> incompatible ways in the future if we do need to get the property later.
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  drivers/usb/chipidea/Kconfig  |   7 +++
+>  drivers/usb/chipidea/Makefile |   1 +
+>  drivers/usb/chipidea/ci.h     |  20 ++++++++
+>  drivers/usb/chipidea/core.c   |  30 ++++++++---
+>  drivers/usb/chipidea/ulpi.c   | 113 ++++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 165 insertions(+), 6 deletions(-)
+>  create mode 100644 drivers/usb/chipidea/ulpi.c
+> 
+> diff --git a/drivers/usb/chipidea/Kconfig b/drivers/usb/chipidea/Kconfig
+> index 3644a3500b70..4f8c342a8865 100644
+> --- a/drivers/usb/chipidea/Kconfig
+> +++ b/drivers/usb/chipidea/Kconfig
+> @@ -37,4 +37,11 @@ config USB_CHIPIDEA_HOST
+>  	  Say Y here to enable host controller functionality of the
+>  	  ChipIdea driver.
+>  
+> +config USB_CHIPIDEA_ULPI
+> +	bool "ChipIdea ULPI PHY support"
+> +	depends on USB_ULPI_BUS=y || USB_ULPI_BUS=USB_CHIPIDEA
+> +	help
+> +	  Say Y here if you have a ULPI PHY attached to your ChipIdea
+> +	  controller.
+> +
+>  endif
+> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> index 518e445476c3..39fca5715ed3 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -4,6 +4,7 @@ ci_hdrc-y				:= core.o otg.o debug.o
+>  ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+>  ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+>  ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
+> +ci_hdrc-$(CONFIG_USB_CHIPIDEA_ULPI)	+= ulpi.o
+>  
+>  # Glue/Bridge layers go here
+>  
+> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+> index f87805235caa..14aa20525547 100644
+> --- a/drivers/usb/chipidea/ci.h
+> +++ b/drivers/usb/chipidea/ci.h
+> @@ -18,6 +18,8 @@
+>  #include <linux/usb.h>
+>  #include <linux/usb/gadget.h>
+>  #include <linux/usb/otg-fsm.h>
+> +#include <linux/usb/otg.h>
+> +#include <linux/ulpi/interface.h>
+>  
+>  /******************************************************************************
+>   * DEFINE
+> @@ -52,6 +54,7 @@ enum ci_hw_regs {
+>  	OP_ENDPTLISTADDR,
+>  	OP_TTCTRL,
+>  	OP_BURSTSIZE,
+> +	OP_ULPI_VIEWPORT,
+>  	OP_PORTSC,
+>  	OP_DEVLC,
+>  	OP_OTGSC,
+> @@ -187,6 +190,7 @@ struct hw_bank {
+>   * @test_mode: the selected test mode
+>   * @platdata: platform specific information supplied by parent device
+>   * @vbus_active: is VBUS active
+> + * @ulpi: pointer to ULPI device, if any
 
-I don't mention that 'reg' property should be removed.
-Just if you want to remain it, you should add some codes as following:
-For exmaple,
-- of_get_address() to get the address information from device-tree.
+One more kernel-doc
 
-If documentation include the some properties, you should add the handling code
-in device driver. When you add the code to get the offset from device-tree,
-it doesn't influence the some behavior in the future.
+>   * @phy: pointer to PHY, if any
+>   * @usb_phy: pointer to USB PHY, if any and if using the USB PHY framework
+>   * @hcd: pointer to usb_hcd for ehci host driver
+> @@ -236,6 +240,10 @@ struct ci_hdrc {
+>  
+>  	struct ci_hdrc_platform_data	*platdata;
+>  	int				vbus_active;
+> +#ifdef CONFIG_USB_CHIPIDEA_ULPI
+> +	struct ulpi			*ulpi;
+> +	struct ulpi_ops 		ulpi_ops;
+> +#endif
+>  	struct phy			*phy;
+>  	/* old usb_phy interface */
+>  	struct usb_phy			*usb_phy;
+> @@ -418,6 +426,17 @@ static inline bool ci_otg_is_fsm_mode(struct ci_hdrc *ci)
+>  #endif
+>  }
+>  
 
-Thanks,
-Chanwoo Choi
+Others are ok, but I can't accept you change current PHY initialization
+at your previous patch, so you may need to refine this patch a little.
+
+-- 
+
+Best Regards,
+Peter Chen
