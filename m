@@ -1,48 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Jun 2016 21:33:59 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
- <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
-Message-ID: <6402170.5s0abZDqlD@wuerfel>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Wed, 29 Jun 2016 13:43:08 -0600
+Subject: [PATCH 1/6] [media] s5p-mfc: set capablity bus_info as required
+ by VIDIOC_QUERYCAP
+In-Reply-To: <1466113235-25909-2-git-send-email-javier@osg.samsung.com>
+References: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
+ <1466113235-25909-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <577424CC.4080303@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 29, 2016 8:51:44 PM CEST Arend Van Spriel wrote:
-> > Typical wifi devices will have some sort of non volatile storage
-> > on board to not only store the ethernet(mac) address, but also
-> > to contain e.g. info about the antenna gain so that the firmware
-> > and/or the driver can take the antenna gain into account and ensure
-> > that they never exceed the maximum allowed broadcast strength.
-> > 
-> > However on some embedded devices there is no non-volatile storage
-> > for the wifi (for cost reasons) and instead this configuration info
-> > (which is board / pcb specific) is loaded in the form of a
-> > file which contains the contents which would normally be in the
-> > non-volatile storage.
-> > 
-> > Since we are dealing with a per-board config-file here, which is
-> > loaded from the os filesystem we really need to specify a basename
-> > here as the list of possible boards is endless, so we cannot
-> > have a lookup table in the driver.
+On 06/16/2016 03:40 PM, Javier Martinez Canillas wrote:
+> The driver doesn't set the struct v4l2_capability bus_info field so the
+> v4l2-compliance tool reports the following errors for VIDIOC_QUERYCAP:
 > 
-> As Jonas mentioned the general principle of device tree is to be
-> agnostic with regards to OS and/or driver as you undoubtedly know. His
-> proposal seems like a usable solution for your problem while complying
-> to the device tree principle. So instead of overriding the default
-> brcmfmac should modify it when dt specifies the "module" property, ie:
+> Required ioctls:
+>                 VIDIOC_QUERYCAP returned 0 (Success)
+>                 fail: v4l2-compliance.cpp(304): string empty
+>                 fail: v4l2-compliance.cpp(528): check_ustring(vcap.bus_info, sizeof(vcap.bus_info))
+>         test VIDIOC_QUERYCAP: FAIL
 > 
-> no "module" in DT:      nvram filename = brcm/brcmfmac43362-sdio.txt
-> "module=ap6210" in DT:  nvram filename = brcm/brcmfmac43362-ap6210.txt
+> This patch fixes by setting the field in VIDIOC_QUERYCAP ioctl handler:
 > 
-> By the way, the example in the bindings file does not seem to specify a
-> basename, but path+basename+fileext.
+> Required ioctls:
+>                 VIDIOC_QUERYCAP returned 0 (Success)
+>         test VIDIOC_QUERYCAP: OK
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-What is the size of this nvram file? As it's board specific, I wonder
-if we can simply include it inside of the DT verbatim. I remember
-doing that (in the pre-dtb days, on real open firmware) for the "spidernet"
-ethernet driver.
+I started making the very same changes. Looks good.
 
-	Arnd
+Reviewed-by: Shuah Khan <shuahkh@osg.samsung.com>
+
+-- Shuah
+> ---
+> 
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 3 ++-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 3 ++-
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index f2d6376ce618..4a40df22fd63 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -267,7 +267,8 @@ static int vidioc_querycap(struct file *file, void *priv,
+>  
+>  	strncpy(cap->driver, dev->plat_dev->name, sizeof(cap->driver) - 1);
+>  	strncpy(cap->card, dev->plat_dev->name, sizeof(cap->card) - 1);
+> -	cap->bus_info[0] = 0;
+> +	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
+> +		 dev_name(&dev->plat_dev->dev));
+>  	/*
+>  	 * This is only a mem-to-mem video device. The capture and output
+>  	 * device capability flags are left only for backward compatibility
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> index 034b5c1d35a1..dd466ea6429e 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> @@ -945,7 +945,8 @@ static int vidioc_querycap(struct file *file, void *priv,
+>  
+>  	strncpy(cap->driver, dev->plat_dev->name, sizeof(cap->driver) - 1);
+>  	strncpy(cap->card, dev->plat_dev->name, sizeof(cap->card) - 1);
+> -	cap->bus_info[0] = 0;
+> +	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
+> +		 dev_name(&dev->plat_dev->dev));
+>  	/*
+>  	 * This is only a mem-to-mem video device. The capture and output
+>  	 * device capability flags are left only for backward compatibility
+> 
