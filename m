@@ -1,64 +1,96 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Jun 2016 14:51:30 +0200
-Subject: [PATCH 5/5] arm64: mm: fold init_pgd() into __create_pgd_mapping()
+Date: Wed, 29 Jun 2016 14:51:27 +0200
+Subject: [PATCH 2/5] arm64: efi: always map runtime services code and data
+ regions down to pages
 In-Reply-To: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1467204690-10790-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1467204690-10790-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The routine __create_pgd_mapping() does nothing except calling init_pgd(),
-which has no other callers. So fold the latter into the former. Also, drop
-a comment that has gone stale.
+To avoid triggering diagnostics in the MMU code that are finicky about
+splitting block mappings into more granular mappings, ensure that regions
+that are likely to appear in the Memory Attributes table as well as the
+UEFI memory map are always mapped down to pages. This way, we can use
+apply_to_page_range() instead of create_pgd_mapping() for the second pass,
+which cannot split or merge block entries, and operates strictly on PTEs.
+
+Note that this aligns the arm64 Memory Attributes table handling code with
+the ARM code, which already uses apply_to_page_range() to set the strict
+permissions.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/mmu.c | 24 +++++---------------
- 1 file changed, 6 insertions(+), 18 deletions(-)
+ arch/arm64/include/asm/efi.h |  3 +-
+ arch/arm64/kernel/efi.c      | 36 +++++++++++++++++++-
+ 2 files changed, 36 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index f233c885042d..8cf4da36909a 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -240,16 +240,14 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 	pud_clear_fixmap();
- }
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 622db3c6474e..8b13476cdf96 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -14,8 +14,7 @@ extern void efi_init(void);
+ #endif
  
--/*
-- * Create the page directory entries and any necessary page tables for the
-- * mapping specified by 'md'.
-- */
--static void init_pgd(pgd_t *pgd, phys_addr_t phys, unsigned long virt,
--				    phys_addr_t size, pgprot_t prot,
--				    phys_addr_t (*pgtable_alloc)(void),
--				    bool allow_block_mappings)
-+static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
-+				 unsigned long virt, phys_addr_t size,
-+				 pgprot_t prot,
-+				 phys_addr_t (*pgtable_alloc)(void),
-+				 bool allow_block_mappings)
- {
- 	unsigned long addr, length, end, next;
-+	pgd_t *pgd = pgd_offset_raw(pgdir, virt);
- 
- 	/*
- 	 * If the virtual and physical address don't have the same offset
-@@ -281,16 +279,6 @@ static phys_addr_t late_pgtable_alloc(void)
- 	return __pa(ptr);
- }
- 
--static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
--				 unsigned long virt, phys_addr_t size,
--				 pgprot_t prot,
--				 phys_addr_t (*alloc)(void),
--				 bool allow_block_mappings)
--{
--	init_pgd(pgd_offset_raw(pgdir, virt), phys, virt, size, prot, alloc,
--		 allow_block_mappings);
--}
+ int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
 -
- /*
-  * This function can only be used to modify existing table entries,
-  * without allocating new levels of table. Note that this permits the
+-#define efi_set_mapping_permissions	efi_create_mapping
++int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
+ 
+ #define arch_efi_call_virt_setup()					\
+ ({									\
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 981604948521..4aef89f37049 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -62,13 +62,47 @@ struct screen_info screen_info __section(.data);
+ int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+ {
+ 	pteval_t prot_val = create_mapping_protection(md);
++	bool allow_block_mappings = (md->type != EFI_RUNTIME_SERVICES_CODE &&
++				     md->type != EFI_RUNTIME_SERVICES_DATA);
+ 
+ 	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+ 			   md->num_pages << EFI_PAGE_SHIFT,
+-			   __pgprot(prot_val | PTE_NG), true);
++			   __pgprot(prot_val | PTE_NG), allow_block_mappings);
+ 	return 0;
+ }
+ 
++static int __init set_permissions(pte_t *ptep, pgtable_t token,
++				  unsigned long addr, void *data)
++{
++	efi_memory_desc_t *md = data;
++	pte_t pte = *ptep;
++
++	if (md->attribute & EFI_MEMORY_RO)
++		pte = set_pte_bit(pte, __pgprot(PTE_RDONLY));
++	if (md->attribute & EFI_MEMORY_XP)
++		pte = set_pte_bit(pte, __pgprot(PTE_PXN));
++	set_pte(ptep, pte);
++	return 0;
++}
++
++int __init efi_set_mapping_permissions(struct mm_struct *mm,
++				       efi_memory_desc_t *md)
++{
++	BUG_ON(md->type != EFI_RUNTIME_SERVICES_CODE &&
++	       md->type != EFI_RUNTIME_SERVICES_DATA);
++
++	/*
++	 * Calling apply_to_page_range() is only safe on regions that are
++	 * guaranteed to be mapped down to pages. Since we are only called
++	 * for regions that have been mapped using efi_create_mapping() above
++	 * (and this is checked by the generic Memory Attributes table parsing
++	 * routines), there is no need to check that again here.
++	 */
++	return apply_to_page_range(mm, md->virt_addr,
++				   md->num_pages << EFI_PAGE_SHIFT,
++				   set_permissions, md);
++}
++
+ static int __init arm64_dmi_init(void)
+ {
+ 	/*
 -- 
 2.7.4
