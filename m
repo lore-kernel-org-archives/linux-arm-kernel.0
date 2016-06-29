@@ -1,35 +1,38 @@
 From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 29 Jun 2016 23:32:16 +0200
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <CAJZ5v0iD5OYjp7ozmzoQ3zK-3+eMpdwzDxYgD=saLPjNeoq0Qg@mail.gmail.com>
+Date: Wed, 29 Jun 2016 23:40:35 +0200
+Subject: [PATCH V2 4/4] ACPI,PCI,IRQ: correct operator precedence
+In-Reply-To: <96388f6b-f8b1-5720-4725-3f0ec0f5d1c3@codeaurora.org>
+References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
+ <1467188859-28188-5-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0j+CJ3qWTdvm6Sk3DqFYVnkuEmaR1EPZM6DDVMC8rsK+g@mail.gmail.com>
+ <d22fd8f7-7028-b4b7-6677-6903685034aa@codeaurora.org>
+ <CAJZ5v0h1o5C8t+QJuFo93uZt0XuPNwtXFs5XSBkhm-fARWqi2g@mail.gmail.com>
+ <96388f6b-f8b1-5720-4725-3f0ec0f5d1c3@codeaurora.org>
+Message-ID: <CAJZ5v0i67f+zsg_Ui693C3szFskOE3vQ1JsKYZpUkvc=vzXqcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 8:15 PM,  <fu.wei@linaro.org> wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+On Wed, Jun 29, 2016 at 11:19 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 6/29/2016 5:14 PM, Rafael J. Wysocki wrote:
+>> On Wed, Jun 29, 2016 at 8:29 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>>> On 6/29/2016 9:16 AM, Rafael J. Wysocki wrote:
+>>>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>>>> Well, this is a rather obvious one, so I'm wondering why it is the
+>>>> last one in the series?
+>>>>
+>>>
+>>> The first three are more relevant to each other. It makes easy to
+>>> correlate the changes.
+>>
+>> But this one doesn't seem to depend on them and it could be applied
+>> without them, right?
+>>
 >
-> This patchset:
->     (1)Preparation for adding GTDT support in arm_arch_timer
->         1. Move some enums and marcos to header file
->         2. Add a new enum for spi type.
->         3. Improve printk relevant code
->
->     (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
->     Parse all kinds of timer in GTDT table of ACPI:arch timer,
->     memory-mapped timer and SBSA Generic Watchdog timer.
->     This driver can help to simplify all the relevant timer drivers,
->     and separate all the ACPI GTDT knowledge from them.
->
->     (3)Simplify ACPI code for arm_arch_timer
->
->     (4)Add GTDT support for ARM memory-mapped timer
+> Sure. It has no dependency.
 
-GTDT is ARM-specific AFAICS.
+OK
 
-If so, why do we need that code to reside in drivers/acpi/ ?
+I've queued up this one.
 
 Thanks,
 Rafael
