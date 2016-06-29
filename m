@@ -1,288 +1,189 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Wed, 29 Jun 2016 10:15:27 +0200
-Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
- support
-In-Reply-To: <b03c68c9-6949-519d-2c44-c140eac727a4@de.bosch.com>
-References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
- <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
- <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
- <20160525004825.GC7292@verge.net.au>
- <c0fd13d5-c5c4-579b-6fad-c637bda92398@de.bosch.com>
- <20160526022833.GE18393@verge.net.au>
- <59e6225a-6dfa-8bde-dd2e-3428d6fedfe2@de.bosch.com>
- <20160527004256.GD14269@verge.net.au>
- <b03c68c9-6949-519d-2c44-c140eac727a4@de.bosch.com>
-Message-ID: <d0b2edc9-c191-d61c-add0-85f189083931@de.bosch.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 29 Jun 2016 16:08:52 +0800
+Subject: [PATCH 15/21] usb: chipidea: msm: Mux over secondary phy at the
+ right time
+In-Reply-To: <20160626072838.28082-16-stephen.boyd@linaro.org>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-16-stephen.boyd@linaro.org>
+Message-ID: <20160629080852.GJ25236@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Sun, Jun 26, 2016 at 12:28:32AM -0700, Stephen Boyd wrote:
+> We need to pick the correct phy at runtime based on how the SoC
+> has been wired onto the board. If the secondary phy is used, take
+> it out of reset and mux over to it by writing into the TCSR
+> register. Make sure to do this on reset too, because this
+> register is reset to the default value (primary phy) after the
+> RESET bit is set in USBCMD.
+> 
 
-On 27.05.2016 09:32, Dirk Behme wrote:
-> Hi Simon,
->
-> On 27.05.2016 02:42, Simon Horman wrote:
->> On Thu, May 26, 2016 at 09:14:16AM +0200, Dirk Behme wrote:
->>> Hi Simon,
->>>
->>> On 26.05.2016 04:28, Simon Horman wrote:
->>>> Hi Dirk,
->>>>
->>>> On Wed, May 25, 2016 at 07:10:26AM +0200, Dirk Behme wrote:
->>>>> Hi Simon,
->>>>>
->>>>> On 25.05.2016 02:48, Simon Horman wrote:
->>>>>> Hi Dirk,
->>>>>>
->>>>>> On Tue, May 24, 2016 at 07:30:17AM +0200, Dirk Behme wrote:
->>>>>>> Hi Simon,
->>>>>>
->>>>>> [...]
->>>>>>
->>>>>>> With Renesas R-Car3 we will get a whole family of SoCs. I.e.
->>>>>>> different
->>>>>>> computing power (e.g. different number of Cores) with more or
->>>>>>> less similar
->>>>>>> peripherals.
->>>>>>>
->>>>>>> I would think that we want to reflect this in the device tree, too.
->>>>>>> Therefore I think what we want is a hierarchy of device trees.
->>>>>>> Similar
->>>>>>> what's done with other SoC families (compare e.g. i.MX6).
->>>>>>>
->>>>>>> E.g. we want an initial rcar3.dtsi, which contains all common
->>>>>>> parts of all
->>>>>>> R-Car3 SoCs. E.g. one CA57 core, the SCIF where its common etc.
->>>>>>>
->>>>>>> Then you will have the r8a779x.dtsi which includes the rcar3.dtsi
->>>>>>> and
->>>>>>> extends it for SoC specific parts. Which then will be included by
->>>>>>> the board
->>>>>>> device trees, as already done, now.
->>>>>>>
->>>>>>> Or in other words: As soon as you have similar parts in the
->>>>>>> r8a779x.dtsi's,
->>>>>>> it's time to think about moving the parts one hierarchy level up
->>>>>>> into the
->>>>>>> rcar3.dtsi. Else you will end up in a maintenance hell once you
->>>>>>> have to
->>>>>>> change/fix anything.
->>>>>>
->>>>>> Thanks for raising this issue.
->>>>>>
->>>>>> I agree entirely that we should work towards a situation where
->>>>>> maintenance
->>>>>> is as easy as it can be. However, due to the per-SoC binding
->>>>>> scheme that
->>>>>> we are using for IP related to Renesas SoCs I suspect that very
->>>>>> few DT nodes
->>>>>> can be shared between SoCs verbatim.
->>>>>
->>>>>
->>>>> Could you kindly share an example for this? Looking into the H3 and
->>>>> the M3-W
->>>>> manual, it looks to me that ~90% (?) of the peripherals are the same.
->>>>
->>>> The background is that this is a conversation that has been going
->>>> around
->>>> for years. The basic thinking is that at this point we have
->>>> documentation
->>>> that indicates that many hardware blocks on the H3 and M3-W are the
->>>> same.
->>>> But we do not have insight into the internal versioning of the IP
->>>> blocks
->>>> nor if they are really the same. And furthermore even if they are
->>>> currently
->>>> the same we don't really know if that will continue to be the case.
->>>>
->>>> Probably it is. Maybe it isn't. The response has been to take a
->>>> conservative approach to DT bindings to give us the flexibility to
->>>> update
->>>> the driver implementation to reflect any differences that subsequently
->>>> surface. And by providing per-SoC bindings these driver changes can be
->>>> activated on a per-SoC basis without updating DTB files (which may be
->>>> burned into ROMs).
->>>
->>>
->>> Sorry, but I don't think that these are good arguments for this kind of
->>> discussion ;)
->>
->>> From my point of view this is the central point. It is my believe
->>> that we
->> simply do not have enough information to conclude that the IP blocks will
->> be the same in perpetuity.
->>
->>> The discussion has to be based on facts. And not on "maybe" or
->>> "probably".
->>> The fact is that the documentation tells us that the IPs are the
->>> same. And
->>> the documentation tells us where this isn't the case. This is what we
->>> can
->>> reflect in the code and the device trees.
->>>
->>> Or the other way around: I don't ask to not have any SoC specific device
->>> trees (r8a7795.dtsi, r8a7796.dtsi etc). So we *always* have the
->>> option to
->>> move anything to them, once there might be any difference found or
->>> documented. But maintaining x (x > 5?) quite similar device trees just
->>> because there *might* be the possibility that one or two device
->>> *might* be
->>> different doesn't sound like a good argument to me.
->>>
->>> Or again, an other way: If I understood correctly, you are working
->>> already
->>> since some time on R-Car, e.g. R-Car Gen2. How many examples do you have
->>> from the Gen2 family where the IP blocks are different that they need
->>> to be
->>> distinguished in the device tree?
->>
->> I think the question is different. The question is, if a difference comes
->> up, how do we handle it?
->>
->> So far we have a solution. Not an ideal one, but a solution none the
->> less.
->> I do agree entirely that replicated DTs leads to significant maintenance
->> overhead. But lets not throw the baby out with the bath water.
->
->
-> Well, we could continue this kind of discussion infinite ;)
->
-> But I agree to your below point "Lets discuss the change on its merits"
-> and therefore stop here and continue with the technical aspects below ....
->
->
->>>>>> Probably some sort of scheme can be cooked up using preprocessor
->>>>>> macros.
->>>>>> And probably there are other ways to resolve this problem. But I
->>>>>> would
->>>>>> prefer if we worked towards resolving this maintenance problem in
->>>>>> parallel
->>>>>> with rather than as a dependency of merging r8a7796 support into
->>>>>> mainline.
->>>>>
->>>>>
->>>>> I'd propose to do it correct from the beginning.
->>>>>
->>>>> Doing it later would either be more work or forgotten, and never be
->>>>> done,
->>>>> then.
->>>>
->>>> I'm sorry but I don't agree. I think that having r8a7796 support
->>>> in mainline is a higher priority than sorting this out.
->>>
->>>
->>> Looking at the example I gave in
->>>
->>> http://article.gmane.org/gmane.linux.kernel.renesas-soc/4013
->>>
->>> which took me < 1h to create, I'm not sure what would block us from
->>> mainlining the r8a7796 *including* this.
->>
->> Point taken. Lets discuss the change on its merits.
->
->
-> I totally agree, thanks! Let's continue below ...
->
->
->>>>> For a starting point, I'd propose to put the r8a7795.dtsi and
->>>>> r8a7796.dtsi
->>>>> into a graphical diff tool and move all common parts to a
->>>>> rcar3.dtsi (I'd be
->>>>> happy to discuss the name, though)
->>>>
->>>> I'm not opposed to that. But being consistent with my statement above
->>>> I would prefer it to be done as follow-up work.
->>>>
->>>> My suspicion is that right now much of the proposed r8a7796.dtsi can be
->>>> moved into a hypothetical rcar3.dtsi. But that this is because the
->>>> proposed
->>>> r8a7796.dtsi is very small. I would not expect nearly such a large
->>>> proportion of r8a7795.dtsi to be able to be moved into rcar3.dtsi
->>>> because
->>>> it enables more hardware blocks and they typically have (or should
->>>> have in
->>>> keeping with the prevailing policy as described above) per-SoC
->>>> bindings.
->>>
->>>
->>> What doesn't prevent us to use a rcar3.dtsi like given in
->>>
->>> http://article.gmane.org/gmane.linux.kernel.renesas-soc/4013
->>>
->>>
->>> Having a rcar3.dtsi gives us *both* options. It doesn't force us to
->>> use the
->>> one or the other. I.e. we have for each IP block the *option* to
->>> declare it
->>> as common (put it onto rcar3.dtsi) *or* SoC specific (put it into
->>> r8a779x.dtsi).
->>>
->>> Without having a common rcar3.dtsi we don't have this option at all.
->>>
->>> So I think the conclusion is: Let's have all options (by adding a
->>> rcar3.dtsi) and then decide for each IP block individually where to
->>> place it
->>> best. Or move it later from the common dtsi to the individual dtsi once
->>> there is an issue found (what I really doubt that it will happen that
->>> often,
->>> but this is an other topic ;) )
->>
->> I think that most of the nodes you have moved into the common dtsi file
->> make sense. But there are some I am less sure about:
->>
->> * cpus
->>
->>   Probably there are some central aspects of cpus that are shared
->>   between the r8a7795 and r8a7796. And I think that your patch captures
->>   that. But I also think that there will be non-shared aspects and
->>   perhaps the complexity of splitting the cpus node between per-SoC
->>   and common dtsi files isn't worth it.
->>
->>   I don't feel strongly about this at this point.
->>
->>   I am also particularly sensitive about enabling CPU features across
->>   multiple SoCs. But I think that the scheme you propose allows for
->>   per-SoC control of features in per-SoC dtsi files. So I think
->>   I am ok about that at this point.
->>
->>   Lastly, shouldn't the cache-controller go inside the cpu node
->>   in the common dtsi file to reflect the change recently made
->>   upstream to r8a7795.dtsi and the structure of r8a7796.dtsi in
->>   the current patchset (v3).
->
->
-> We already talked about that in an other thread, and I think I missed
-> that change you mentioned. So I'm fine with your proposal. I just saw
-> that it's different between r8a7795 and r8a7796 and wanted to highlight
-> that it should be the same.
->
->
->> * cpg, scif2
->>
->>   This is the compatibility string issue.
->>
->>   Could we at least agree to defer this part of the discussion
->>   and thus omit these nodes from the common dtsi file at this time?
->
->
-> Fine with me :)
->
->
->>   I understand that you are concerned that if we don't handle this
->>   now it will be forgotten. FWIW I strongly doubt this particular
->>   problem will be forgotten.
->
->
-> Ok.
->
-> Thanks!
+I am curious when you need the secondary phy?
+
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  drivers/usb/chipidea/ci_hdrc_msm.c | 78 +++++++++++++++++++++++++++++++++++---
+>  1 file changed, 73 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+> index 40249b0e3e93..df0f8b31db4f 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+> @@ -8,30 +8,40 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+> -#include <linux/usb/gadget.h>
+>  #include <linux/usb/chipidea.h>
+>  #include <linux/clk.h>
+>  #include <linux/reset.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/io.h>
+>  
+>  #include "ci.h"
+>  
+>  #define HS_PHY_AHB_MODE			0x0098
+> +#define HS_PHY_SEC_CTRL			0x0278
+> +# define HS_PHY_DIG_CLAMP_N		BIT(16)
+>  
+
+One space at the beginning, and keep alignment.
+
+>  struct ci_hdrc_msm {
+>  	struct platform_device *ci;
+>  	struct clk *core_clk;
+>  	struct clk *iface_clk;
+> +	bool secondary_phy;
+> +	void __iomem *base;
+>  };
+>  
+>  static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+>  {
+> -	struct device *dev = ci->gadget.dev.parent;
+> +	struct device *dev = ci->dev->parent;
+> +	struct ci_hdrc_msm *msm_ci = dev_get_drvdata(dev);
+>  
+>  	switch (event) {
+>  	case CI_HDRC_CONTROLLER_RESET_EVENT:
+>  		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
+>  		/* use AHB transactor, allow posted data writes */
+>  		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
+> +		if (msm_ci->secondary_phy)
+> +			hw_write_id_reg(ci, HS_PHY_SEC_CTRL, HS_PHY_DIG_CLAMP_N,
+> +					HS_PHY_DIG_CLAMP_N);
+>  		break;
+>  	default:
+>  		dev_dbg(dev, "unknown ci_hdrc event\n");
+> @@ -49,12 +59,58 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
+>  	.notify_event		= ci_hdrc_msm_notify_event,
+>  };
+>  
+> +static int ci_hdrc_msm_mux_phy(struct ci_hdrc_msm *ci,
+> +			       struct platform_device *pdev)
+> +{
+> +	struct regmap *regmap;
+> +	struct device_node *syscon;
+> +	struct device *dev = &pdev->dev;
+> +	u32 off, val;
+> +	int ret;
+> +
+> +	syscon = of_parse_phandle(dev->of_node, "phy-select", 0);
+> +	if (!syscon)
+> +		return 0;
+> +
+> +	regmap = syscon_node_to_regmap(syscon);
+> +	if (IS_ERR(regmap))
+> +		return PTR_ERR(regmap);
+> +
+> +	ret = of_property_read_u32_index(dev->of_node, "phy-select", 1, &off);
+> +	if (ret < 0) {
+> +		dev_err(dev, "no offset in syscon\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = of_property_read_u32_index(dev->of_node, "phy-select", 2, &val);
+> +	if (ret < 0) {
+> +		dev_err(dev, "no value in syscon\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = regmap_write(regmap, off, val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ci->secondary_phy = !!val;
+> +	if (ci->secondary_phy) {
+> +		val = readl_relaxed(ci->base + HS_PHY_SEC_CTRL);
+> +		val |= HS_PHY_DIG_CLAMP_N;
+> +		writel_relaxed(val, ci->base + HS_PHY_SEC_CTRL);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  {
+>  	struct ci_hdrc_msm *ci;
+>  	struct platform_device *plat_ci;
+>  	struct clk *clk;
+>  	struct reset_control *reset;
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	resource_size_t size;
+>  	int ret;
+>  
+>  	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
+> @@ -76,6 +132,15 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  	if (IS_ERR(clk))
+>  		return PTR_ERR(clk);
+>  
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res)
+> +		return -ENODEV;
+> +
+> +	size = resource_size(res);
+> +	ci->base = base = devm_ioremap(&pdev->dev, res->start, size);
+> +	if (!base)
+> +		return -ENOMEM;
+> +
+
+The core will do the ioremap too, you can't remap io address two times.
+The offset larger than 0x200 is vendor specific, you can map it as
+the second io region.
 
 
-Hmm, could you kindly help me to remember what's the recent status of 
-your discussion above regarding a hierarchical structure of the RCar3 
-device trees?
+>  	reset_control_assert(reset);
+>  	usleep_range(10000, 12000);
+>  	reset_control_deassert(reset);
+> @@ -88,9 +153,12 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_iface;
+>  
+> -	plat_ci = ci_hdrc_add_device(&pdev->dev,
+> -				pdev->resource, pdev->num_resources,
+> -				&ci_hdrc_msm_platdata);
+> +	ret = ci_hdrc_msm_mux_phy(ci, pdev);
+> +	if (ret)
+> +		goto err_mux;
+> +
+> +	plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
+> +				     pdev->num_resources, &ci_hdrc_msm_platdata);
+>  	if (IS_ERR(plat_ci)) {
+>  		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+>  		ret = PTR_ERR(plat_ci);
+> -- 
+> 2.9.0.rc2.8.ga28705d
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
+-- 
 
-Best regards
-
-Dirk
+Best Regards,
+Peter Chen
