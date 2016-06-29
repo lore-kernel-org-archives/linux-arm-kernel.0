@@ -1,102 +1,263 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 29 Jun 2016 11:50:38 +0100
-Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
- overlapping regions
-In-Reply-To: <CAKv+Gu-=r=LJ17YKYAOMjaq4QuqN=g-yZmtPzUWDCF5zgezqdw@mail.gmail.com>
-References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
- <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
- <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
- <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
- <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_3uKgFtvMryROwTMeGs=uXYU-OPrUC6LaNQiAKP=PZ3Q@mail.gmail.com>
- <20160628160528.GG4585@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8RxZ2xpDC0pudewHu9Z5YTL8XbcjSPvGasRUQbhqm5qQ@mail.gmail.com>
- <20160629093938.GB2522@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-=r=LJ17YKYAOMjaq4QuqN=g-yZmtPzUWDCF5zgezqdw@mail.gmail.com>
-Message-ID: <20160629105037.GC2522@e104818-lin.cambridge.arm.com>
+From: jun.li@nxp.com (Jun Li)
+Date: Wed, 29 Jun 2016 10:56:42 +0000
+Subject: [PATCH] usb: otg-fsm: Cancel HNP polling work when not used
+In-Reply-To: <20160629094347.GL25236@shlinux2>
+References: <20160628011827.1688-1-stephen.boyd@linaro.org>
+ <20160629094347.GL25236@shlinux2>
+Message-ID: <AM4PR04MB2130070189E9465A354B69D689230@AM4PR04MB2130.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 12:03:16PM +0200, Ard Biesheuvel wrote:
-> On 29 June 2016 at 11:39, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Tue, Jun 28, 2016 at 06:12:22PM +0200, Ard Biesheuvel wrote:
-> >> On 28 June 2016 at 18:05, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > (Restarting the thread before I forget the entire discussion)
-> >> >
-> >> > On Mon, Jun 06, 2016 at 11:18:14PM +0200, Ard Biesheuvel wrote:
-> >> >> >> > On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> >> >> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> >> >> >> > > index 78f52488f9ff..0d5753c31c7f 100644
-> >> >> >> > > --- a/arch/arm64/kernel/efi.c
-> >> >> >> > > +++ b/arch/arm64/kernel/efi.c
-> >> >> >> > > @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
-> >> >> >> > >  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
-> >> >> >> > >  {
-> >> >> >> > >         pteval_t prot_val = create_mapping_protection(md);
-> >> >> >> > > +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
-> >> >> >> > > +       efi_memory_desc_t *next = md;
-> >> >> >> > >
-> >> >> >> > > -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
-> >> >> >> > > -                          md->num_pages << EFI_PAGE_SHIFT,
-> >> >> >> > > -                          __pgprot(prot_val | PTE_NG));
-> >> >> >> > > +       /*
-> >> >> >> > > +        * Search for the next EFI runtime map and check for any overlap with
-> >> >> >> > > +        * the current map when aligned to PAGE_SIZE. In such case, defer
-> >> >> >> > > +        * mapping the end of the current range until the next
-> >> >> >> > > +        * efi_create_mapping() call.
-> >> >> >> > > +        */
-> >> >> >> > > +       for_each_efi_memory_desc_continue(next) {
-> >> >> >> > > +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
-> >> >> >> > > +                       continue;
-> >> >> >> > > +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
-> >> >> >> > > +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
-> >> > [...]
-> >> >> Another thing I failed to mention is that the new Memory Attributes
-> >> >> table support may map all of the RuntimeServicesCode regions a second
-> >> >> time, but with a higher granularity, using RO for .text and .rodata
-> >> >> and NX for .data and .bss (and the PE/COFF header).
-> >> >
-> >> > Can this not be done in a single go without multiple passes? That's what
-> >> > we did for the core arm64 code, the only one left being EFI run-time
-> >> > mappings.
-> >>
-> >> Well, we probably could, but it is far from trivial.
-> >>
-> >> >> Due to the higher
-> >> >> granularity, regions that were mapped using the contiguous bit the
-> >> >> first time around may be split into smaller regions. Your current code
-> >> >> does not address that case.
-> >> >
-> >> > If the above doesn't work, the only solution would be to permanently map
-> >> > these ranges as individual pages, no large blocks.
-> >>
-> >> That is not unreasonable, since regions >2MB are unusual.
-> >
-> > We'll have the contiguous bit supported at some point and we won't be
-> > able to use it for EFI run-time mappings. But I don't think that's
-> > essential, minor improvement on a non-critical path.
-> >
-> > I'll post some patches to always use PAGE_SIZE granularity for EFI
-> > run-time mappings.
+Hi
+
+> -----Original Message-----
+> From: Peter Chen [mailto:hzpeterchen at gmail.com]
+> Sent: Wednesday, June 29, 2016 5:44 PM
+> To: Stephen Boyd <stephen.boyd@linaro.org>
+> Cc: Peter Chen <peter.chen@nxp.com>; Felipe Balbi <balbi@kernel.org>;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> usb at vger.kernel.org; Jun Li <jun.li@nxp.com>; Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org>
+> Subject: Re: [PATCH] usb: otg-fsm: Cancel HNP polling work when not used
 > 
-> Given that contiguous bit mappings only affect the TLB footprint, I'd
-> be more concerned about not using block mappings for EfiMemoryMappedIo
-> regions (since they may cover fairly sizable NOR flashes like the 64
-> MB one QEMU mach-virt exposes).
+> On Mon, Jun 27, 2016 at 06:18:27PM -0700, Stephen Boyd wrote:
+> > We setup the HNP polling worker, but we never stop it. The OTG state
+> > machine can go round and round and keep reinitializing the worker even
+> > while it's actively running. That's bad, and debug objects catches it.
+> > Fix this by canceling the work when we leave the A_HOST or B_HOST
+> > states.
+> >
+> > [otg_set_state]  Set state: a_wait_bcon usb 2-1: USB disconnect,
+> > device number 2 [otg_statemachine]  quit statemachine, changed = 1
+> > [otg_set_state]  Set state: a_host <HNP Polling started>
+> > [otg_statemachine]  quit statemachine, changed = 1 usb 2-1: new
+> > low-speed USB device number 3 using ci_hdrc usb 2-1: New USB device
+> > found, idVendor=03f0, idProduct=134a usb 2-1: New USB device strings:
+> > Mfr=1, Product=2, SerialNumber=0 usb 2-1: Product: HP USB Optical
+> > Mouse usb 2-1: Manufacturer: PixArt
+> > input: PixArt HP USB Optical Mouse as
+> > /devices/platform/soc/f9a55000.usb/ci_hdrc.0/usb2/2-1/2-1:1.0/0003:03F
+> > 0:134A.0002/input/input1 hid-generic 0003:03F0:134A.0002: input: USB
+> > HID v1.11 Mouse [PixArt HP USB Optical Mouse] on
+> > usb-ci_hdrc.0-1/input0 [otg_set_state]  Set state: a_wait_bcon usb
+> > 2-1: USB disconnect, device number 3 [otg_statemachine]  quit
+> > statemachine, changed = 1 [otg_set_state]  Set state: a_host <HNP
+> > Polling started> ------------[ cut here ]------------
+> > WARNING: CPU: 2 PID: 95 at lib/debugobjects.c:263
+> > debug_print_object+0x98/0xc0
+> > ODEBUG: init active (active state 0) object type: timer_list hint:
+> > delayed_work_timer_fn+0x0/0x2c Modules linked in: phy_qcom_usb_hsic
+> > phy_qcom_usb_hs ci_hdrc_msm ci_hdrc
+> > CPU: 2 PID: 95 Comm: kworker/u8:1 Not tainted
+> > 4.7.0-rc1-00043-g1f22f3b65c44-dirty #442 Hardware name: Qualcomm
+> > (Flattened Device Tree)
+> > Workqueue: ci_otg ci_otg_work [ci_hdrc] [<c031067c>]
+> > (unwind_backtrace) from [<c030cbf0>] (show_stack+0x20/0x24)
+> > [<c030cbf0>] (show_stack) from [<c060cec8>] (dump_stack+0x7c/0x9c)
+> > [<c060cec8>] (dump_stack) from [<c031f8a4>] (__warn+0xe4/0x110)
+> > [<c031f8a4>] (__warn) from [<c031f9a0>] (warn_slowpath_fmt+0x48/0x50)
+> > [<c031f9a0>] (warn_slowpath_fmt) from [<c06289c0>]
+> > (debug_print_object+0x98/0xc0) [<c06289c0>] (debug_print_object) from
+> > [<c0628bbc>] (__debug_object_init+0xcc/0x3bc) [<c0628bbc>]
+> > (__debug_object_init) from [<c0628ed0>] (debug_object_init+0x24/0x2c)
+> > [<c0628ed0>] (debug_object_init) from [<c037ceb0>]
+> > (init_timer_key+0x24/0x120) [<c037ceb0>] (init_timer_key) from
+> > [<c07b3f1c>] (otg_start_hnp_polling+0x7c/0xbc) [<c07b3f1c>]
+> > (otg_start_hnp_polling) from [<c074543c>] (otg_set_state+0x740/0xc20)
+> > [<c074543c>] (otg_set_state) from [<c0745d98>]
+> > (otg_statemachine+0x47c/0x4ac) [<c0745d98>] (otg_statemachine) from
+> > [<bf00c808>] (ci_otg_fsm_work+0x48/0x1a0 [ci_hdrc]) [<bf00c808>]
+> > (ci_otg_fsm_work [ci_hdrc]) from [<bf007428>] (ci_otg_work+0xd4/0x218
+> > [ci_hdrc]) [<bf007428>] (ci_otg_work [ci_hdrc]) from [<c0338cac>]
+> > (process_one_work+0x154/0x4b4) [<c0338cac>] (process_one_work) from
+> > [<c033908c>] (worker_thread+0x38/0x4d0) [<c033908c>] (worker_thread)
+> > from [<c033f0a0>] (kthread+0xe8/0x104) [<c033f0a0>] (kthread) from
+> > [<c0308ed8>] (ret_from_fork+0x14/0x3c)
+> >
+> > Cc: Li Jun <jun.li@nxp.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Fixes: ae57e97a9521 ("usb: common: otg-fsm: add HNP polling support")
+> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > ---
+> >  drivers/usb/common/usb-otg-fsm.c | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+)
+> >
+> > diff --git a/drivers/usb/common/usb-otg-fsm.c
+> > b/drivers/usb/common/usb-otg-fsm.c
+> > index 9059b7dc185e..73eec8c12235 100644
+> > --- a/drivers/usb/common/usb-otg-fsm.c
+> > +++ b/drivers/usb/common/usb-otg-fsm.c
+> > @@ -61,6 +61,18 @@ static int otg_set_protocol(struct otg_fsm *fsm, int
+> protocol)
+> >  	return 0;
+> >  }
+> >
+> > +static void otg_stop_hnp_polling(struct otg_fsm *fsm) {
+> > +	/*
+> > +	 * The memory of host_req_flag should be allocated by
+> > +	 * controller driver, otherwise, hnp polling is not started.
+> > +	 */
+> > +	if (!fsm->host_req_flag)
+> > +		return;
+> > +
+> > +	cancel_delayed_work_sync(&fsm->hnp_polling_work);
+> > +}
+> > +
+> >  /* Called when leaving a state.  Do state clean up jobs here */
+> > static void otg_leave_state(struct otg_fsm *fsm, enum usb_otg_state
+> > old_state)  { @@ -84,6 +96,7 @@ static void otg_leave_state(struct
+> > otg_fsm *fsm, enum usb_otg_state old_state)
+> >  		fsm->b_ase0_brst_tmout = 0;
+> >  		break;
+> >  	case OTG_STATE_B_HOST:
+> > +		otg_stop_hnp_polling(fsm);
+> >  		break;
+> >  	case OTG_STATE_A_IDLE:
+> >  		fsm->adp_prb = 0;
+> > @@ -97,6 +110,7 @@ static void otg_leave_state(struct otg_fsm *fsm, enum
+> usb_otg_state old_state)
+> >  		fsm->a_wait_bcon_tmout = 0;
+> >  		break;
+> >  	case OTG_STATE_A_HOST:
+> > +		otg_stop_hnp_polling(fsm);
+> >  		otg_del_timer(fsm, A_WAIT_ENUM);
+> >  		break;
+> >  	case OTG_STATE_A_SUSPEND:
+> > --
+> 
+> It introduces circular locking after applying it, otg_statemachine calls
+> otg_leave_state, and otg_leave_state calls otg_statemachine again due to
+> flush work, see below dump:
 
-Good point.
+How did you trigger this locking issue? I did some simple tests with
+this patch but no problems found.
+ 
+> 
+> I suggest moving initialization/flush hnp polling work to chipidea driver.
+> 
 
-> So I would recommend to only use PAGE_SIZE granularity for
-> EfiRuntimeServicesCode and EfiRuntimeServicesData regions, since those
-> are the only ones that can be expected to appear in the Memory
-> Attributes table, and all other regions will only be mapped a single
-> time.
+Since the HNP polling is done in common driver completely, so I think
+it's not proper to move some of it into controller driver.
 
-Is there a possibility that EfiMemoryMappedIo share the same 64K page
-with EfiRuntimeServicesCode? If it does, it won't help much with
-avoiding splitting. Unless I keep a combination of these series
-(checking the end/start overlap) with a forced page-only mapping for
-EfiRuntimeServicesCode/Data.
+Li Jun
 
--- 
-Catalin
+> [  183.086987] ======================================================
+> [  183.093183] [ INFO: possible circular locking dependency detected ]
+> [  183.099471] 4.7.0-rc4-00012-gf1f333f-dirty #856 Not tainted
+> [  183.105059] -------------------------------------------------------
+> [  183.111341] kworker/0:2/114 is trying to acquire lock:
+> [  183.116492]  (&ci->fsm.lock){+.+.+.}, at: [<806118dc>]
+> otg_statemachine+0x20/0x470
+> [  183.124199]
+> [  183.124199] but task is already holding lock:
+> [  183.130052]  ((&(&fsm->hnp_polling_work)->work)){+.+...}, at:
+> [<80140368>] process_one_work+0x128/0x418 [  183.139568] [  183.139568]
+> which lock already depends on the new lock.
+> [  183.139568]
+> [  183.147765]
+> [  183.147765] the existing dependency chain (in reverse order) is:
+> [  183.155265]
+> -> #1 ((&(&fsm->hnp_polling_work)->work)){+.+...}:
+> [  183.161371]        [<8013e97c>] flush_work+0x44/0x234
+> [  183.166469]        [<801411a8>] __cancel_work_timer+0x98/0x1c8
+> [  183.172347]        [<80141304>] cancel_delayed_work_sync+0x14/0x18
+> [  183.178570]        [<80610ef8>] otg_set_state+0x290/0xc54
+> [  183.184011]        [<806119d0>] otg_statemachine+0x114/0x470
+> [  183.189712]        [<8060a590>] ci_otg_fsm_work+0x40/0x190
+> [  183.195239]        [<806054d0>] ci_otg_work+0xcc/0x1e4
+> [  183.200430]        [<801403d4>] process_one_work+0x194/0x418
+> [  183.206136]        [<8014068c>] worker_thread+0x34/0x4fc
+> [  183.211489]        [<80146d08>] kthread+0xdc/0xf8
+> [  183.216238]        [<80108ab0>] ret_from_fork+0x14/0x24
+> [  183.221514]
+> -> #0 (&ci->fsm.lock){+.+.+.}:
+> [  183.225880]        [<8016ff94>] lock_acquire+0x78/0x98
+> [  183.231062]        [<80947c18>] mutex_lock_nested+0x54/0x3ec
+> [  183.236773]        [<806118dc>] otg_statemachine+0x20/0x470
+> [  183.242388]        [<80611df4>] otg_hnp_polling_work+0xc8/0x1a4
+> [  183.248352]        [<801403d4>] process_one_work+0x194/0x418
+> [  183.254055]        [<8014068c>] worker_thread+0x34/0x4fc
+> [  183.259409]        [<80146d08>] kthread+0xdc/0xf8
+> [  183.264154]        [<80108ab0>] ret_from_fork+0x14/0x24
+> [  183.269424]
+> [  183.269424] other info that might help us debug this:
+> [  183.269424]
+> [  183.277451]  Possible unsafe locking scenario:
+> [  183.277451]
+> [  183.283389]        CPU0                    CPU1
+> [  183.287931]        ----                    ----
+> [  183.292473]   lock((&(&fsm->hnp_polling_work)->work));
+> [  183.297665]                                lock(&ci->fsm.lock);
+> [  183.303639]
+> 	lock((&(&fsm->hnp_polling_work)->work));
+> [  183.311347]   lock(&ci->fsm.lock);
+> [  183.314801]
+> [  183.314801]  *** DEADLOCK ***
+> [  183.314801]
+> [  183.320745] 2 locks held by kworker/0:2/114:
+> [  183.325028]  #0:  ("events"){.+.+.+}, at: [<80140368>]
+> process_one_work+0x128/0x418
+> [  183.332817]  #1:
+> ((&(&fsm->hnp_polling_work)->work)){+.+...}, at: [<80140368>]
+> process_one_work+0x128/0x418
+> [  183.342772]
+> [  183.342772] stack backtrace:
+> [  183.347160] CPU: 0 PID: 114 Comm: kworker/0:2 Not tainted 4.7.0-rc4-
+> 00012-gf1f333f-dirty #856 [  183.355699] Hardware name: Freescale i.MX6
+> SoloX (Device
+> 		Tree)
+> [  183.361561] Workqueue: events otg_hnp_polling_work [  183.366388]
+> Backtrace:
+> [  183.368891] [<8010d014>] (dump_backtrace) from [<8010d208>]
+> (show_stack+0x18/0x1c)
+> [  183.376479]  r6:600001d3 r5:00000000 r4:80f21d3c r3:00000002
+> [  183.382265] [<8010d1f0>] (show_stack) from [<803f158c>]
+> (dump_stack+0xb4/0xe8)
+> [  183.389521] [<803f14d8>] (dump_stack) from [<8016c2b4>]
+> (print_circular_bug+0x1d0/0x314)
+> [  183.397625]  r10:81760be8 r9:00000000 r8:bdb7bc00 r7:bdb7c0e0
+> r6:810c7074 r5:810ea174
+> [  183.405585]  r4:810c7074 r3:00000002
+> [  183.409231] [<8016c0e4>] (print_circular_bug) from [<8016fa8c>]
+> (__lock_acquire+0x196c/0x1ab4) [  183.417857]  r10:80f21e1c r9:00000002
+> r8:00000001 r7:8174e47c
+> r6:00000002 r5:bdb7bc00
+> [  183.425814]  r4:00000026 r3:bdb7c0c0
+> [  183.429459] [<8016e120>] (__lock_acquire) from [<8016ff94>]
+> (lock_acquire+0x78/0x98)
+> [  183.437218]  r10:bdb701cc r9:bdbafeb0 r8:00001388 r7:00000001
+> r6:806118dc r5:60000153 [  183.445175]  r4:00000000 [  183.447758]
+> [<8016ff1c>] (lock_acquire) from [<80947c18>]
+> (mutex_lock_nested+0x54/0x3ec)
+> [  183.455864]  r7:bdb7bc00 r6:8174e47c r5:806118dc r4:00000000
+> [  183.461645] [<80947bc4>] (mutex_lock_nested) from [<806118dc>]
+> (otg_statemachine+0x20/0x470) [  183.470097]  r10:00000001 r9:bdbafeb0
+> r8:00001388 r7:bd3ef000
+> r6:00000009 r5:bdb701cc
+> [  183.478057]  r4:bdb70120
+> [  183.480641] [<806118bc>] (otg_statemachine) from [<80611df4>]
+> (otg_hnp_polling_work+0xc8/0x1a4)
+> [  183.489354]  r5:bdb70214 r4:00000000
+> [  183.493006] [<80611d2c>] (otg_hnp_polling_work) from [<801403d4>]
+> (process_one_work+0x194/0x418) [  183.501805]  r8:00000000 r7:be7c4400
+> r6:be7c0ec0 r5:bdb70214
+> r4:bdb2d600
+> [  183.508650] [<80140240>] (process_one_work) from [<8014068c>]
+> (worker_thread+0x34/0x4fc)
+> [  183.516754]  r10:bdb2d600 r9:be7c0ec0 r8:80f02100 r7:be7c0ef4
+> r6:00000008 r5:bdb2d618
+> [  183.524712]  r4:be7c0ec0
+> [  183.527297] [<80140658>] (worker_thread) from [<80146d08>]
+> (kthread+0xdc/0xf8)
+> [  183.534534]  r10:00000000 r9:00000000 r8:00000000 r7:80140658
+> r6:bdb2d600 r5:bdb51000
+> [  183.542492]  r4:00000000
+> [  183.545081] [<80146c2c>] (kthread) from [<80108ab0>]
+> (ret_from_fork+0x14/0x24)
+> [  183.552317]  r7:00000000 r6:00000000 r5:80146c2c r4:bdb51000
+> 
+> 
+> --
+> 
+> Best Regards,
+> Peter Chen
