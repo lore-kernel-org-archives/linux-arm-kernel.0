@@ -1,103 +1,63 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 29 Jun 2016 02:10:56 +0200
-Subject: [PATCH v3 5/7] PM / Hibernate: Allow arch code to influence CPU
- hotplug during hibernate
-In-Reply-To: <1467125510-18758-6-git-send-email-james.morse@arm.com>
-References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
- <1467125510-18758-6-git-send-email-james.morse@arm.com>
-Message-ID: <7811260.OWJXivZiAP@vostro.rjw.lan>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 29 Jun 2016 09:54:15 +0900
+Subject: [PATCH v20 00/14] arm64 kexec kernel patches
+In-Reply-To: <20160627170039.GD6847@e104818-lin.cambridge.arm.com>
+References: <cover.1466702804.git.geoff@infradead.org>
+ <20160627170039.GD6847@e104818-lin.cambridge.arm.com>
+Message-ID: <20160629005414.GC20774@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 28, 2016 03:51:48 PM James Morse wrote:
-> Architecture code may need to do extra work when secondary CPUs are
-> disabled during hibernate and resume. This may include pushing sleeping
-> CPUs into a deeper power-saving state, or influencing which CPU resume
-> occurs on.
+Hi Catalin,
+
+On Mon, Jun 27, 2016 at 06:00:39PM +0100, Catalin Marinas wrote:
+> Hi Geoff,
 > 
-> Define a macro arch_hibernation_disable_cpus(), which defaults to calling
-> disable_nonboot_cpus() if undefined. Architectures that need to do extra
-> work around these calls can use this to influence disable_nonboot_cpus()
-> behaviour. The macro should be defined in asm/suspend.h, and
-> ARCH_HIBERNATION_CPUHP should be added to Kconfig.
+> On Thu, Jun 23, 2016 at 05:54:47PM +0000, Geoff Levand wrote:
+> > AKASHI Takahiro (7):
+> >       arm64: kdump: reserve memory for crash dump kernel
+> >       arm64: limit memory regions based on DT property, usable-memory
+> >       arm64: kdump: implement machine_crash_shutdown()
+> >       arm64: kdump: add kdump support
+> >       arm64: kdump: add VMCOREINFO's for user-space coredump tools
+> >       arm64: kdump: enable kdump in the arm64 defconfig
+> >       arm64: kdump: update a kernel doc
+> > 
+> > Geoff Levand (4):
+> >       arm64: Add back cpu reset routines
+> >       arm64/kexec: Add core kexec support
+> >       arm64/kexec: Enable kexec in the arm64 defconfig
+> >       arm64/kexec: Add pr_debug output
+> > 
+> > James Morse (3):
+> >       arm64: hibernate: Don't hibernate on systems with stuck CPUs
+> >       arm64: smp: Add function to determine if cpus are stuck in the kernel
+> >       Documentation: dt: usable-memory and elfcorehdr nodes for arm64 kexec
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Pavel Machek <pavel@ucw.cz>
-
-As you noted, this could be used to address the x86 issue that Yu is working on,
-so I'd like it to go in as the first patch in the series and through the PM tree.
-
-A couple of nits below. 
-
-> ---
-> Changes since v2:
->  * Added CONFIG_ARCH_HIBERNATION_CPUHP include guard allowing
-
-What about calling it CONFIG_ARCH_HIBERNATION_CPU_OFFLINE?  It's not
-hotplug really.
-
->  * Switch to macro approach.
+> I dropped patch 1 (hibernate), cherry-picked patch 2 from mainline
+> ("cpus stuck in the kernel", already pushed by Will to 4.7-rc5) and
+> merged patches 3-6, with the amendments that James mentioned.
 > 
->  kernel/power/hibernate.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-> index fca9254280ee..338745e78f7e 100644
-> --- a/kernel/power/hibernate.c
-> +++ b/kernel/power/hibernate.c
-> @@ -31,8 +31,16 @@
->  #include <linux/ktime.h>
->  #include <trace/events/power.h>
->  
-> +#ifdef CONFIG_ARCH_HIBERNATION_CPUHP
-> +/* Arch definition of the arch_hibernation_disable_cpus() macro? */
-> +#include <asm/suspend.h>
-> +#endif
-> +
->  #include "power.h"
->  
-> +#ifndef arch_hibernation_disable_cpus
-> +#define arch_hibernation_disable_cpus(x) disable_nonboot_cpus()
+> The kdump patches, including the "Documentation" one from James require
+> more review, testing and acks by the corresponding maintainers (kdump,
+> DT).
 
-For the x86 case we'll also need the complementary "enable", so why don't
-you add it here and then use it instead of the enable_nonboot_cpus()?
+I see what you mean, but even for Geoff's kexec part, the maintainer
+(Eric) have not given his ack.
 
-> +#endif
->  
->  static int nocompress;
->  static int noresume;
-> @@ -279,7 +287,7 @@ static int create_image(int platform_mode)
->  	if (error || hibernation_test(TEST_PLATFORM))
->  		goto Platform_finish;
->  
-> -	error = disable_nonboot_cpus();
-> +	error = arch_hibernation_disable_cpus(true);
->  	if (error || hibernation_test(TEST_CPUS))
->  		goto Enable_cpus;
->  
-> @@ -433,7 +441,7 @@ static int resume_target_kernel(bool platform_mode)
->  	if (error)
->  		goto Cleanup;
->  
-> -	error = disable_nonboot_cpus();
-> +	error = arch_hibernation_disable_cpus(false);
->  	if (error)
->  		goto Enable_cpus;
->  
-> @@ -551,7 +559,7 @@ int hibernation_platform_enter(void)
->  	if (error)
->  		goto Platform_finish;
->  
-> -	error = disable_nonboot_cpus();
-> +	error = arch_hibernation_disable_cpus(true);
+> You also don't seem to have added a s-o-b for those patches (since
+> you are submitting them; unless you plan to let Akashi-san submit them
+> in the future).
 
-Does this one here actually matter?
-
->  	if (error)
->  		goto Enable_cpus;
->  
-> 
+Basically Geoff has not reviewed nor tested kdump part, and
+so I'm not sure that adding his s-o-b is appropriate.
+Anyhow, I will post my future version of kdump by myself as
+kexec has been queued in for-next/core.
 
 Thanks,
-Rafael
+-Takahiro AKASHI
+
+> Thanks.
+> 
+> -- 
+> Catalin
