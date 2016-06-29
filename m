@@ -1,44 +1,72 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 29 Jun 2016 12:07:32 +0100
-Subject: [PATCH 2/3] dt-bindings: usb: Fix Tegra XUSB example
-In-Reply-To: <1467198453-23406-1-git-send-email-jonathanh@nvidia.com>
-References: <1467198453-23406-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1467198453-23406-3-git-send-email-jonathanh@nvidia.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Wed, 29 Jun 2016 22:44:07 +0530
+Subject: [RFC PATCH 1/2] fsl-mc: Added header file to provide fsl-mc bus iommu
+ group creation
+Message-ID: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The example binding for the Tegra XUSB omits the 'lane' subnode in the
-XUSB pad controller path which is required according to the binding
-documentation for the Tegra XUSB pad controller [0]. In addition to this
-the phy-names with the suffix 'utmi' are also not valid and should have
-the suffix 'usb2'. Correct both the XUSB pad controller pad path and
-phy-names for the XUSB example.
+Added a header file fsl_mc_smmu.h to provide basic support of creating
+an IOMMU group for a fsl-mc type device and also provide helper macro
+to get the stream ID of fsl-mc tyoe device.
 
-[0] Documentation/devicetree/bindings/phy/nvidia,tegra124-xusb-padctl.txt
-
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+Signed-off-by: Bharat Bhushan <bharat.bhushan@nxp.com>
 ---
- Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/staging/fsl-mc/include/fsl_mc_smmu.h | 45 ++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+ create mode 100644 drivers/staging/fsl-mc/include/fsl_mc_smmu.h
 
-diff --git a/Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt
-index d28295a3e55f..3eee9e505400 100644
---- a/Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt
-+++ b/Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt
-@@ -104,10 +104,10 @@ Example:
- 
- 		nvidia,xusb-padctl = <&padctl>;
- 
--		phys = <&{/padctl@0,7009f000/pads/usb2/usb2-1}>, /* mini-PCIe USB */
--		       <&{/padctl@0,7009f000/pads/usb2/usb2-2}>, /* USB A */
--		       <&{/padctl@0,7009f000/pads/pcie/pcie-0}>; /* USB A */
--		phy-names = "utmi-1", "utmi-2", "usb3-0";
-+		phys = <&{/padctl@0,7009f000/pads/usb2/lanes/usb2-1}>, /* mini-PCIe USB */
-+		       <&{/padctl@0,7009f000/pads/usb2/lanes/usb2-2}>, /* USB A */
-+		       <&{/padctl@0,7009f000/pads/pcie/lanes/pcie-0}>; /* USB A */
-+		phy-names = "usb2-1", "usb2-2", "usb3-0";
- 
- 		avddio-pex-supply = <&vdd_1v05_run>;
- 		dvddio-pex-supply = <&vdd_1v05_run>;
+diff --git a/drivers/staging/fsl-mc/include/fsl_mc_smmu.h b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+new file mode 100644
+index 0000000..9dff5ba
+--- /dev/null
++++ b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+@@ -0,0 +1,45 @@
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Author: Nipun Gupta <nipun.gupta@freescale.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef _FSL_MC_SMMU_H_
++#define _FSL_MC_SMMU_H_
++
++#include <../drivers/staging/fsl-mc/include/mc.h>
++
++/* Macro to get the MC device ICID (Stream ID) */
++#define fslmc_dev_streamid(_dev) (to_fsl_mc_device(_dev)->icid)
++
++/* Macro to get the container device of a MC device */
++#define fslmc_cont_dev(_dev) ((to_fsl_mc_device(dev)->flags & \
++	FSL_MC_IS_DPRC) ? (_dev) : (_dev->parent))
++
++/* Macro to check if a device is a container device */
++#define is_cont_dev(_dev) (to_fsl_mc_device(_dev)->flags & FSL_MC_IS_DPRC)
++
++static struct iommu_group *fslmc_device_group(struct device *dev)
++{
++	struct device *cont_dev = fslmc_cont_dev(dev);
++	struct iommu_group *group;
++
++	/* Container device is responsible for creating the iommu group */
++	if (is_cont_dev(dev)) {
++		group = iommu_group_alloc();
++
++		if (IS_ERR(group))
++			return NULL;
++	} else {
++		get_device(cont_dev);
++		group = iommu_group_get(cont_dev);
++		put_device(cont_dev);
++	}
++
++	return group;
++}
++
++#endif /* _FSL_MC_SMMU_H_ */
 -- 
-2.1.4
+1.9.1
