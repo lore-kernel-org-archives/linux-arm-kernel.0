@@ -1,60 +1,41 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Wed, 29 Jun 2016 13:47:17 -0600
-Subject: [PATCH 4/6] [media] s5p-jpeg: only fill driver's name in
- capabilities driver field
-In-Reply-To: <1466113235-25909-5-git-send-email-javier@osg.samsung.com>
-References: <1466113235-25909-1-git-send-email-javier@osg.samsung.com>
- <1466113235-25909-5-git-send-email-javier@osg.samsung.com>
-Message-ID: <577425C5.2000608@osg.samsung.com>
+From: mmayer@broadcom.com (Markus Mayer)
+Date: Wed, 29 Jun 2016 12:49:34 -0700
+Subject: [PATCH] arm64: Add Broadcom Set Top Box Kconfig entry point
+Message-ID: <1467229774-20738-1-git-send-email-mmayer@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2016 03:40 PM, Javier Martinez Canillas wrote:
-> The driver fills in both the struct v4l2_capability driver and card fields
-> the same values, that is the driver's name plus the information if the dev
-> is a decoder or an encoder.
-> 
-> But the driver field has a fixed length of 16 bytes so the filled data is
-> truncated:
-> 
-> Driver Info (not using libv4l2):
->         Driver name   : s5p-jpeg decode
->         Card type     : s5p-jpeg decoder
->         Bus info      : platform:11f50000.jpeg
->         Driver version: 4.7.0
-> 
-> Also, this field should only contain the driver's name so use just that.
-> The information if the device is a decoder or an encoder is in the card
-> type field anyways.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
->  drivers/media/platform/s5p-jpeg/jpeg-core.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> index e3ff3d4bd72e..f9fb52a53e79 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> @@ -1246,12 +1246,12 @@ static int s5p_jpeg_querycap(struct file *file, void *priv,
->  	struct s5p_jpeg_ctx *ctx = fh_to_ctx(priv);
->  
->  	if (ctx->mode == S5P_JPEG_ENCODE) {
-> -		strlcpy(cap->driver, S5P_JPEG_M2M_NAME " encoder",
-> +		strlcpy(cap->driver, S5P_JPEG_M2M_NAME,
->  			sizeof(cap->driver));
->  		strlcpy(cap->card, S5P_JPEG_M2M_NAME " encoder",
->  			sizeof(cap->card));
->  	} else {
-> -		strlcpy(cap->driver, S5P_JPEG_M2M_NAME " decoder",
-> +		strlcpy(cap->driver, S5P_JPEG_M2M_NAME,
->  			sizeof(cap->driver));
->  		strlcpy(cap->card, S5P_JPEG_M2M_NAME " decoder",
->  			sizeof(cap->card));
-> 
+From: Florian Fainelli <f.fainelli@gmail.com>
 
-Looks good.
-Reviewed-by: Shuah Khan <shuahkh@osg.samsung.com>
+Add an ARCH_BRCMSTB Kconfig symbol which allows us not to update the
+dependencies for all STB-related drivers. Select BRCMSTB_L2_IRQ and
+GENERIC_IRQ_CHIP which are required for proper functioning.
 
--- Shuah
+Signed-off-by: Doug Berger <opendmb@gmail.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+---
+
+ arch/arm64/Kconfig.platforms | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 7ef1d05..22b5c7f 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -29,6 +29,13 @@ config ARCH_BERLIN
+ 	help
+ 	  This enables support for Marvell Berlin SoC Family
+ 
++config ARCH_BRCMSTB
++	bool "Broadcom Set-Top-Box SoCs"
++	select BRCMSTB_L2_IRQ
++	select GENERIC_IRQ_CHIP
++	help
++	  This enables support for Broadcom's ARMv8 Set Top Box SoCs
++
+ config ARCH_EXYNOS
+ 	bool "ARMv8 based Samsung Exynos SoC family"
+ 	select COMMON_CLK_SAMSUNG
+-- 
+2.7.4
