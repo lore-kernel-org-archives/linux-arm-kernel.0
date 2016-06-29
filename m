@@ -1,118 +1,36 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 29 Jun 2016 21:57:09 +0800
-Subject: [RESEND PATCH 3/8] clk: core: support clocks which requires
- parents on (part 1)
-In-Reply-To: <146681236249.35033.18209610320711572265@resonance>
-References: <1461144880-8724-1-git-send-email-aisheng.dong@nxp.com>
- <1461144880-8724-4-git-send-email-aisheng.dong@nxp.com>
- <146681236249.35033.18209610320711572265@resonance>
-Message-ID: <20160629135709.GA29919@shlinux2>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 29 Jun 2016 16:04:32 +0200
+Subject: [PATCH 2/4] ARM: dts: sun7i-a20-cubietruck: Set brcm,nvram_file_name
+In-Reply-To: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1467209074-15634-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2016 at 04:52:42PM -0700, Michael Turquette wrote:
-> Quoting Dong Aisheng (2016-04-20 02:34:35)
-> > On Freescale i.MX7D platform, all clocks operations, including
-> > enable/disable, rate change and re-parent, requires its parent
-> > clock on. Current clock core can not support it well.
-> > This patch introduce a new flag CLK_OPS_PARENT_ON to handle this
-> > special case in clock core that enable its parent clock firstly for
-> > each operation and disable it later after operation complete.
-> > 
-> > The patch part 1 fixes the possible disabling clocks while its parent
-> > is off during kernel booting phase in clk_disable_unused_subtree().
-> > 
-> > Before the completion of kernel booting, clock tree is still not built
-> > completely, there may be a case that the child clock is on but its
-> > parent is off which could be caused by either HW initial reset state
-> > or bootloader initialization.
-> > 
-> > Taking bootloader as an example, we may enable all clocks in HW by default.
-> > And during kernel booting time, the parent clock could be disabled in its
-> > driver probe due to calling clk_prepare_enable and clk_disable_unprepare.
-> > Because it's child clock is only enabled in HW while its SW usecount
-> > in clock tree is still 0, so clk_disable of parent clock will gate
-> > the parent clock in both HW and SW usecount ultimately. Then there will
-> > be a child clock is still on in HW but its parent is already off.
-> > 
-> > Later in clk_disable_unused(), this clock disable accessing while its
-> > parent off will cause system hang due to the limitation of HW which
-> > must require its parent on.
-> > 
-> > This patch simply enables the parent clock first before disabling
-> > if flag CLK_OPS_PARENT_ON is set in clk_disable_unused_subtree().
-> > This is a simple solution and only affects booting time.
-> > 
-> > After kernel booting up the clock tree is already created, there will
-> > be no case that child is off but its parent is off.
-> > So no need do this checking for normal clk_disable() later.
-> > 
-> > Cc: Michael Turquette <mturquette@baylibre.com>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/clk/clk.c            | 5 +++++
-> >  include/linux/clk-provider.h | 2 ++
-> >  2 files changed, 7 insertions(+)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 9f944d4..1f054d1a 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -765,6 +765,9 @@ static void clk_disable_unused_subtree(struct clk_core *core)
-> >         hlist_for_each_entry(child, &core->children, child_node)
-> >                 clk_disable_unused_subtree(child);
-> >  
-> > +       if (core->flags & CLK_OPS_PARENT_ON)
-> > +               clk_core_prepare_enable(core->parent);
-> > +
-> >         flags = clk_enable_lock();
-> >  
-> >         if (core->enable_count)
-> > @@ -789,6 +792,8 @@ static void clk_disable_unused_subtree(struct clk_core *core)
-> >  
-> >  unlock_out:
-> >         clk_enable_unlock(flags);
-> > +       if (core->flags & CLK_OPS_PARENT_ON)
-> > +               clk_core_disable_unprepare(core->parent);
-> >  }
-> >  
-> >  static bool clk_ignore_unused;
-> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> > index 15628644..c878f9c 100644
-> > --- a/include/linux/clk-provider.h
-> > +++ b/include/linux/clk-provider.h
-> > @@ -33,6 +33,8 @@
-> >  #define CLK_RECALC_NEW_RATES   BIT(9) /* recalc rates after notifications */
-> >  #define CLK_SET_RATE_UNGATE    BIT(10) /* clock needs to run to set rate */
-> >  #define CLK_IS_CRITICAL                BIT(11) /* do not gate, ever */
-> > +/* parents need on during gate/ungate, set rate and re-parent */
-> > +#define CLK_OPS_PARENT_ON      BIT(12)
-> 
-> Hi Dong,
-> 
-> In the clk framework we use "enabled" instead of "on". How about
-> changing the flag to CLK_OPS_PARENT_ENABLE?
-> 
+The cubietruck uses an ap6210 sdio wifi module, set brcm,nvram_file_name
+to brcmfmac43362-ap6210.txt so that we can ship the ap6210 specific
+nvram file in linunx-firmware to get the wifi to work out of the box
+without users needing to download and install the nvram file themselves.
 
-Yes, of course i'm fine with it.
-I could update the patch title too.
-Thanks for the review.
+Note a downside of this patch is that users who have already manually
+installed the nvram file will need to rename it.
 
-Regards
-Dong Aisheng
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-> Regards,
-> Mike
-> 
-> >  
-> >  struct clk;
-> >  struct clk_hw;
-> > -- 
-> > 1.9.1
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 83f39b0..fda1da4 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -199,6 +199,7 @@
+ 	brcmf: bcrmf at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
++		brcm,nvram_file_name = "brcm/brcmfmac43362-ap6210.txt";
+ 		interrupt-parent = <&pio>;
+ 		interrupts = <7 10 IRQ_TYPE_LEVEL_LOW>; /* PH10 / EINT10 */
+ 		interrupt-names = "host-wake";
+-- 
+2.7.4
