@@ -1,121 +1,114 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 29 Jun 2016 21:52:15 +0800
-Subject: [PATCH RFC 7/7] clk: imx: clk-busy: convert to set_rate_hw and
- set_parent_hw
+Date: Wed, 29 Jun 2016 21:52:12 +0800
+Subject: [PATCH RFC 4/7] PM: add SYSTEM_SUSPEND system_state
 In-Reply-To: <1467208335-29876-1-git-send-email-aisheng.dong@nxp.com>
 References: <1467208335-29876-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1467208335-29876-8-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1467208335-29876-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert to prepare_hw and set_rate_hw and let the clk core
-to handle the polling process automatically.
+From: Thomas Gleixner <tglx@linutronix.de>
 
+During the late system suspend phase, the arch irq is disabled
+and sleeping is not allowed.
+Let's add SYSTEM_SUSPEND to represent this state. The reset of
+the system can then check this flag to do the correct work.
+
+[ Aisheng: back ported from rt tree and did comments change ]
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/imx/clk-busy.c | 52 +++++++++++++++++++++++-----------------------
- 1 file changed, 26 insertions(+), 26 deletions(-)
+ include/linux/kernel.h   | 1 +
+ kernel/power/hibernate.c | 7 +++++++
+ kernel/power/suspend.c   | 4 ++++
+ 3 files changed, 12 insertions(+)
 
-diff --git a/drivers/clk/imx/clk-busy.c b/drivers/clk/imx/clk-busy.c
-index 5cc99590f9a3..5af622fc726b 100644
---- a/drivers/clk/imx/clk-busy.c
-+++ b/drivers/clk/imx/clk-busy.c
-@@ -18,17 +18,6 @@
- #include <linux/err.h>
- #include "clk.h"
+diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+index 94aa10ffe156..92a42312b749 100644
+--- a/include/linux/kernel.h
++++ b/include/linux/kernel.h
+@@ -491,6 +491,7 @@ extern enum system_states {
+ 	SYSTEM_HALT,
+ 	SYSTEM_POWER_OFF,
+ 	SYSTEM_RESTART,
++	SYSTEM_SUSPEND,
+ } system_state;
  
--static int clk_busy_wait(void __iomem *reg, u8 shift)
--{
--	unsigned long timeout = jiffies + msecs_to_jiffies(10);
--
--	while (readl_relaxed(reg) & (1 << shift))
--		if (time_after(jiffies, timeout))
--			return -ETIMEDOUT;
--
--	return 0;
--}
--
- struct clk_busy_divider {
- 	struct clk_divider div;
- 	const struct clk_ops *div_ops;
-@@ -36,6 +25,11 @@ struct clk_busy_divider {
- 	u8 shift;
- };
+ #define TAINT_PROPRIETARY_MODULE	0
+diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+index fca9254280ee..36f420e54848 100644
+--- a/kernel/power/hibernate.c
++++ b/kernel/power/hibernate.c
+@@ -285,6 +285,8 @@ static int create_image(int platform_mode)
  
-+static int clk_is_busy(void __iomem *reg, u8 shift)
-+{
-+	return readl_relaxed(reg) & (1 << shift);
-+}
+ 	local_irq_disable();
+ 
++	system_state = SYSTEM_SUSPEND;
 +
- static inline struct clk_busy_divider *to_clk_busy_divider(struct clk_hw *hw)
- {
- 	struct clk_divider *div = to_clk_divider(hw);
-@@ -59,23 +53,26 @@ static long clk_busy_divider_round_rate(struct clk_hw *hw, unsigned long rate,
- 	return busy->div_ops->round_rate(&busy->div.hw, rate, prate);
- }
+ 	error = syscore_suspend();
+ 	if (error) {
+ 		printk(KERN_ERR "PM: Some system devices failed to power down, "
+@@ -314,6 +316,7 @@ static int create_image(int platform_mode)
+ 	syscore_resume();
  
--static int clk_busy_divider_set_rate(struct clk_hw *hw, unsigned long rate,
--		unsigned long parent_rate)
-+static int clk_busy_divider_set_rate_hw_done(struct clk_hw *hw)
- {
- 	struct clk_busy_divider *busy = to_clk_busy_divider(hw);
--	int ret;
+  Enable_irqs:
++	system_state = SYSTEM_RUNNING;
+ 	local_irq_enable();
  
--	ret = busy->div_ops->set_rate(&busy->div.hw, rate, parent_rate);
--	if (!ret)
--		ret = clk_busy_wait(busy->reg, busy->shift);
-+	return !clk_is_busy(busy->reg, busy->shift);
-+}
+  Enable_cpus:
+@@ -438,6 +441,7 @@ static int resume_target_kernel(bool platform_mode)
+ 		goto Enable_cpus;
+ 
+ 	local_irq_disable();
++	system_state = SYSTEM_SUSPEND;
+ 
+ 	error = syscore_suspend();
+ 	if (error)
+@@ -471,6 +475,7 @@ static int resume_target_kernel(bool platform_mode)
+ 	syscore_resume();
+ 
+  Enable_irqs:
++	system_state = SYSTEM_RUNNING;
+ 	local_irq_enable();
+ 
+  Enable_cpus:
+@@ -556,6 +561,7 @@ int hibernation_platform_enter(void)
+ 		goto Enable_cpus;
+ 
+ 	local_irq_disable();
++	system_state = SYSTEM_SUSPEND;
+ 	syscore_suspend();
+ 	if (pm_wakeup_pending()) {
+ 		error = -EAGAIN;
+@@ -568,6 +574,7 @@ int hibernation_platform_enter(void)
+ 
+  Power_up:
+ 	syscore_resume();
++	system_state = SYSTEM_RUNNING;
+ 	local_irq_enable();
+ 
+  Enable_cpus:
+diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
+index 5b70d64b871e..1258d093ae48 100644
+--- a/kernel/power/suspend.c
++++ b/kernel/power/suspend.c
+@@ -359,6 +359,8 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
+ 	arch_suspend_disable_irqs();
+ 	BUG_ON(!irqs_disabled());
+ 
++	system_state = SYSTEM_SUSPEND;
 +
-+static int clk_busy_divider_set_rate_hw(struct clk_hw *hw, unsigned long rate,
-+		unsigned long parent_rate)
-+{
-+	struct clk_busy_divider *busy = to_clk_busy_divider(hw);
+ 	error = syscore_suspend();
+ 	if (!error) {
+ 		*wakeup = pm_wakeup_pending();
+@@ -375,6 +377,8 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
+ 		syscore_resume();
+ 	}
  
--	return ret;
-+	return busy->div_ops->set_rate(&busy->div.hw, rate, parent_rate);
- }
- 
- static struct clk_ops clk_busy_divider_ops = {
- 	.recalc_rate = clk_busy_divider_recalc_rate,
- 	.round_rate = clk_busy_divider_round_rate,
--	.set_rate = clk_busy_divider_set_rate,
-+	.set_rate_hw = clk_busy_divider_set_rate_hw,
-+	.set_rate_done = clk_busy_divider_set_rate_hw_done,
- };
- 
- struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
-@@ -135,21 +132,24 @@ static u8 clk_busy_mux_get_parent(struct clk_hw *hw)
- 	return busy->mux_ops->get_parent(&busy->mux.hw);
- }
- 
--static int clk_busy_mux_set_parent(struct clk_hw *hw, u8 index)
-+static int clk_busy_mux_set_parent_done(struct clk_hw *hw)
- {
- 	struct clk_busy_mux *busy = to_clk_busy_mux(hw);
--	int ret;
- 
--	ret = busy->mux_ops->set_parent(&busy->mux.hw, index);
--	if (!ret)
--		ret = clk_busy_wait(busy->reg, busy->shift);
-+	return !clk_is_busy(busy->reg, busy->shift);
-+}
++	system_state = SYSTEM_RUNNING;
 +
-+static int clk_busy_mux_set_parent_hw(struct clk_hw *hw, u8 index)
-+{
-+	struct clk_busy_mux *busy = to_clk_busy_mux(hw);
+ 	arch_suspend_enable_irqs();
+ 	BUG_ON(irqs_disabled());
  
--	return ret;
-+	return busy->mux_ops->set_parent(&busy->mux.hw, index);
- }
- 
- static struct clk_ops clk_busy_mux_ops = {
- 	.get_parent = clk_busy_mux_get_parent,
--	.set_parent = clk_busy_mux_set_parent,
-+	.set_parent_hw = clk_busy_mux_set_parent_hw,
-+	.set_parent_done = clk_busy_mux_set_parent_done,
- };
- 
- struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
 -- 
 1.9.1
