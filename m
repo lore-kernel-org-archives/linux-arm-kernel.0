@@ -1,68 +1,65 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 29 Jun 2016 09:33:20 +0300
-Subject: [PATCH 1/1] usb: dwc3: st: Inform the reset framework that our
- reset line may be shared
-In-Reply-To: <20160628092740.GP6720@dell>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
- <20160606155655.10860-8-lee.jones@linaro.org> <20160628092740.GP6720@dell>
-Message-ID: <87mvm4ijwv.fsf@linux.intel.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 29 Jun 2016 14:32:11 +0800
+Subject: [PATCH 10/21] usb: chipidea: msm: Rely on core to override
+ AHBBURST
+In-Reply-To: <20160626072838.28082-11-stephen.boyd@linaro.org>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-11-stephen.boyd@linaro.org>
+Message-ID: <20160629063211.GE25236@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Jun 26, 2016 at 12:28:27AM -0700, Stephen Boyd wrote:
+> The core framework already handles setting this parameter with a
+> platform quirk. Add the appropriate flag so that we always set
+> AHBBURST to 0. Technically DT should be doing this, but we always
+> do it for msm chipidea devices so setting the flag in the driver
+> works just as well.
 
-Hi,
+You still need to set AHB burst value at dts, this flag is just for
+override, see below:
 
-Lee Jones <lee.jones@linaro.org> writes:
-> On the STiH410 B2120 development board the MiPHY28lp shares its reset
-> line with the Synopsys DWC3 SuperSpeed (SS) USB 3.0 Dual-Role-Device
-> (DRD).  New functionality in the reset subsystems forces consumers to
-> be explicit when requesting shared/exclusive reset lines.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+ahb-burst-config = <0x0>;
+
+> 
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
-> Felipe,
->
-> I'd like to send this patch (amonst others) to the -rcs today if possible.
->
-> Would you be kind enough to Ack it, so I can do so please?
-
-okay, back from vacations.
-
-Here you go:
-
-Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
-
->
-> drivers/usb/dwc3/dwc3-st.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/usb/dwc3/dwc3-st.c b/drivers/usb/dwc3/dwc3-st.c
-> index 5c0adb9..b204617 100644
-> --- a/drivers/usb/dwc3/dwc3-st.c
-> +++ b/drivers/usb/dwc3/dwc3-st.c
-> @@ -237,7 +237,8 @@ static int st_dwc3_probe(struct platform_device *pdev)
->  	/* Manage PowerDown */
->  	reset_control_deassert(dwc3_data->rstc_pwrdn);
+>  drivers/usb/chipidea/ci_hdrc_msm.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+> index 3889809fd0c4..37591a4b1346 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+> @@ -24,7 +24,6 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+>  	switch (event) {
+>  	case CI_HDRC_CONTROLLER_RESET_EVENT:
+>  		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
+> -		writel(0, USB_AHBBURST);
+>  		/* use AHB transactor, allow posted data writes */
+>  		writel(0x8, USB_AHBMODE);
+>  		usb_phy_init(ci->usb_phy);
+> @@ -47,7 +46,8 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
+>  	.name			= "ci_hdrc_msm",
+>  	.capoffset		= DEF_CAPOFFSET,
+>  	.flags			= CI_HDRC_REGS_SHARED |
+> -				  CI_HDRC_DISABLE_STREAMING,
+> +				  CI_HDRC_DISABLE_STREAMING |
+> +				  CI_HDRC_OVERRIDE_AHB_BURST,
 >  
-> -	dwc3_data->rstc_rst = devm_reset_control_get(dev, "softreset");
-> +	dwc3_data->rstc_rst =
-> +		devm_reset_control_get_shared(dev, "softreset");
->  	if (IS_ERR(dwc3_data->rstc_rst)) {
->  		dev_err(&pdev->dev, "could not get reset controller\n");
->  		ret = PTR_ERR(dwc3_data->rstc_rst);
+>  	.notify_event		= ci_hdrc_msm_notify_event,
+>  };
 > -- 
-> 2.9.0
+> 2.9.0.rc2.8.ga28705d
+> 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160629/202fec8f/attachment.sig>
+
+Best Regards,
+Peter Chen
