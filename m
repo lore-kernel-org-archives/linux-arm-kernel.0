@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Jun 2016 19:05:31 +0100
-Subject: Applied "ARM: dts: meson: minix-neo-x8: define PMIC as power
- controller" to the regulator tree
-In-Reply-To: <20160605001749.4062-2-stefan@agner.ch>
-Message-ID: <E1bIJrf-0003iU-F2@finisterre>
+Date: Wed, 29 Jun 2016 19:05:14 +0100
+Subject: Applied "mfd: rn5t618: Register restart handler" to the regulator tree
+In-Reply-To: <20160629055322.23038-6-stefan@agner.ch>
+Message-ID: <E1bIJrO-0003dA-CC@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ARM: dts: meson: minix-neo-x8: define PMIC as power controller
+   mfd: rn5t618: Register restart handler
 
 has been applied to the regulator tree at
 
@@ -34,35 +33,106 @@ to this mail.
 Thanks,
 Mark
 
->From 229d641d72d1ecfd21186a52c38d012149097eec Mon Sep 17 00:00:00 2001
+>From a370f60a58ec7bad7045803041524ccdc4d79c75 Mon Sep 17 00:00:00 2001
 From: Stefan Agner <stefan@agner.ch>
-Date: Tue, 28 Jun 2016 22:53:18 -0700
-Subject: [PATCH] ARM: dts: meson: minix-neo-x8: define PMIC as power
- controller
+Date: Tue, 28 Jun 2016 22:53:22 -0700
+Subject: [PATCH] mfd: rn5t618: Register restart handler
 
-The PMIC driver used to register itself as poweroff controller by
-default, hence assuming that this device is using the PMIC as
-system power controller.
+Use the PMIC's repower capability for reboots. Register a restart
+handler and use a slightly elevated priority of 192 since the PMIC
+has suprior reset capability (causing a system wide reset).
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-Acked-by: Carlo Caione <carlo@endlessm.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/meson8-minix-neo-x8.dts | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/mfd/rn5t618.c | 43 +++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 37 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/meson8-minix-neo-x8.dts b/arch/arm/boot/dts/meson8-minix-neo-x8.dts
-index 4f536bb1f002..8bceb8d343f6 100644
---- a/arch/arm/boot/dts/meson8-minix-neo-x8.dts
-+++ b/arch/arm/boot/dts/meson8-minix-neo-x8.dts
-@@ -80,6 +80,7 @@
- 	pmic at 32 {
- 		compatible = "ricoh,rn5t618";
- 		reg = <0x32>;
-+		system-power-controller;
+diff --git a/drivers/mfd/rn5t618.c b/drivers/mfd/rn5t618.c
+index 1831740d9016..ee94080e1cbb 100644
+--- a/drivers/mfd/rn5t618.c
++++ b/drivers/mfd/rn5t618.c
+@@ -12,11 +12,13 @@
+  * along with this program. If not, see <http://www.gnu.org/licenses/>.
+  */
  
- 		regulators {
- 		};
++#include <linux/delay.h>
+ #include <linux/i2c.h>
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/rn5t618.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
++#include <linux/reboot.h>
+ #include <linux/regmap.h>
+ 
+ static const struct mfd_cell rn5t618_cells[] = {
+@@ -50,17 +52,38 @@ static const struct regmap_config rn5t618_regmap_config = {
+ };
+ 
+ static struct rn5t618 *rn5t618_pm_power_off;
++static struct notifier_block rn5t618_restart_handler;
+ 
+-static void rn5t618_power_off(void)
++static void rn5t618_trigger_poweroff_sequence(bool repower)
+ {
+ 	/* disable automatic repower-on */
+ 	regmap_update_bits(rn5t618_pm_power_off->regmap, RN5T618_REPCNT,
+-			   RN5T618_REPCNT_REPWRON, 0);
++			   RN5T618_REPCNT_REPWRON,
++			   repower ? RN5T618_REPCNT_REPWRON : 0);
+ 	/* start power-off sequence */
+ 	regmap_update_bits(rn5t618_pm_power_off->regmap, RN5T618_SLPCNT,
+ 			   RN5T618_SLPCNT_SWPWROFF, RN5T618_SLPCNT_SWPWROFF);
+ }
+ 
++static void rn5t618_power_off(void)
++{
++	rn5t618_trigger_poweroff_sequence(false);
++}
++
++static int rn5t618_restart(struct notifier_block *this,
++			    unsigned long mode, void *cmd)
++{
++	rn5t618_trigger_poweroff_sequence(true);
++
++	/*
++	 * Re-power factor detection on PMIC side is not instant. 1ms
++	 * proved to be enough time until reset takes effect.
++	 */
++	mdelay(1);
++
++	return NOTIFY_DONE;
++}
++
+ static const struct of_device_id rn5t618_of_match[] = {
+ 	{ .compatible = "ricoh,rn5t567", .data = (void *)RN5T567 },
+ 	{ .compatible = "ricoh,rn5t618", .data = (void *)RN5T618 },
+@@ -102,13 +125,21 @@ static int rn5t618_i2c_probe(struct i2c_client *i2c,
+ 		return ret;
+ 	}
+ 
++	rn5t618_pm_power_off = priv;
+ 	if (of_device_is_system_power_controller(i2c->dev.of_node)) {
+-		if (!pm_power_off) {
+-			rn5t618_pm_power_off = priv;
++		if (!pm_power_off)
+ 			pm_power_off = rn5t618_power_off;
+-		} else {
++		else
+ 			dev_warn(&i2c->dev, "Poweroff callback already assigned\n");
+-		}
++	}
++
++	rn5t618_restart_handler.notifier_call = rn5t618_restart;
++	rn5t618_restart_handler.priority = 192;
++
++	ret = register_restart_handler(&rn5t618_restart_handler);
++	if (ret) {
++		dev_err(&i2c->dev, "cannot register restart handler, %d\n", ret);
++		return ret;
+ 	}
+ 
+ 	return 0;
 -- 
 2.8.1
