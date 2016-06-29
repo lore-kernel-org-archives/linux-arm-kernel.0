@@ -1,65 +1,97 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 29 Jun 2016 04:27:35 -0400
-Subject: [PATCH V2 1/4] ACPI,PCI,IRQ: factor in PCI possible
+Date: Wed, 29 Jun 2016 04:27:36 -0400
+Subject: [PATCH V2 2/4] Revert "ACPI, PCI,
+ IRQ: remove redundant code in acpi_irq_penalty_init()"
 In-Reply-To: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
 References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1467188859-28188-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <1467188859-28188-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
-resource requirements") omitted the initially assigned POSSIBLE penalty
-when the IRQ is active.
+Trying to make the ISA and PCI init functionality common turned out to be
+a bad idea. ISA path depends on external functionality. Restoring the
+previous behavior and limiting the refactoring to PCI interrupts only.
 
-The original code would assign the POSSIBLE value divided by the number
-of possible IRQs during initialization.
-
-Later, if the IRQ is chosen as the active IRQ or if the IRQ is in use
-by ISA; additional penalties get added.
+This reverts commit 1fcb6a813c4f ("ACPI,PCI,IRQ: remove redundant code in
+acpi_irq_penalty_init()").
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/acpi/pci_link.c | 21 +++++++++------------
- 1 file changed, 9 insertions(+), 12 deletions(-)
+ arch/x86/pci/acpi.c         |  1 +
+ drivers/acpi/pci_link.c     | 36 ++++++++++++++++++++++++++++++++++++
+ include/acpi/acpi_drivers.h |  1 +
+ 3 files changed, 38 insertions(+)
 
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index b2a4e2a..3cd6983 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -396,6 +396,7 @@ int __init pci_acpi_init(void)
+ 		return -ENODEV;
+ 
+ 	printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
++	acpi_irq_penalty_init();
+ 	pcibios_enable_irq = acpi_pci_irq_enable;
+ 	pcibios_disable_irq = acpi_pci_irq_disable;
+ 	x86_init.pci.init_irq = x86_init_noop;
 diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-index 8fc7323..f2b69e3 100644
+index f2b69e3..714ba4d 100644
 --- a/drivers/acpi/pci_link.c
 +++ b/drivers/acpi/pci_link.c
-@@ -470,6 +470,7 @@ static int acpi_irq_pci_sharing_penalty(int irq)
- {
- 	struct acpi_pci_link *link;
- 	int penalty = 0;
-+	int i;
+@@ -517,6 +517,42 @@ static int acpi_irq_get_penalty(int irq)
+ 	return penalty;
+ }
  
- 	list_for_each_entry(link, &acpi_link_list, list) {
- 		/*
-@@ -478,18 +479,14 @@ static int acpi_irq_pci_sharing_penalty(int irq)
- 		 */
- 		if (link->irq.active && link->irq.active == irq)
- 			penalty += PIRQ_PENALTY_PCI_USING;
--		else {
--			int i;
--
--			/*
--			 * If a link is inactive, penalize the IRQs it
--			 * might use, but not as severely.
--			 */
--			for (i = 0; i < link->irq.possible_count; i++)
--				if (link->irq.possible[i] == irq)
--					penalty += PIRQ_PENALTY_PCI_POSSIBLE /
--						link->irq.possible_count;
--		}
++int __init acpi_irq_penalty_init(void)
++{
++	struct acpi_pci_link *link;
++	int i;
++
++	/*
++	 * Update penalties to facilitate IRQ balancing.
++	 */
++	list_for_each_entry(link, &acpi_link_list, list) {
 +
 +		/*
-+		 * penalize the IRQs PCI might use, but not as severely.
++		 * reflect the possible and active irqs in the penalty table --
++		 * useful for breaking ties.
 +		 */
-+		for (i = 0; i < link->irq.possible_count; i++)
-+			if (link->irq.possible[i] == irq)
-+				penalty += PIRQ_PENALTY_PCI_POSSIBLE /
-+					link->irq.possible_count;
- 	}
++		if (link->irq.possible_count) {
++			int penalty =
++			    PIRQ_PENALTY_PCI_POSSIBLE /
++			    link->irq.possible_count;
++
++			for (i = 0; i < link->irq.possible_count; i++) {
++				if (link->irq.possible[i] < ACPI_MAX_ISA_IRQS)
++					acpi_isa_irq_penalty[link->irq.
++							 possible[i]] +=
++					    penalty;
++			}
++
++		} else if (link->irq.active &&
++				(link->irq.active < ACPI_MAX_ISA_IRQS)) {
++			acpi_isa_irq_penalty[link->irq.active] +=
++			    PIRQ_PENALTY_PCI_POSSIBLE;
++		}
++	}
++
++	return 0;
++}
++
+ static int acpi_irq_balance = -1;	/* 0: static, 1: balance */
  
- 	return penalty;
+ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+diff --git a/include/acpi/acpi_drivers.h b/include/acpi/acpi_drivers.h
+index 797ae2e..29c6912 100644
+--- a/include/acpi/acpi_drivers.h
++++ b/include/acpi/acpi_drivers.h
+@@ -78,6 +78,7 @@
+ 
+ /* ACPI PCI Interrupt Link (pci_link.c) */
+ 
++int acpi_irq_penalty_init(void);
+ int acpi_pci_link_allocate_irq(acpi_handle handle, int index, int *triggering,
+ 			       int *polarity, char **name);
+ int acpi_pci_link_free_irq(acpi_handle handle);
 -- 
 1.8.2.1
