@@ -1,167 +1,36 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Thu, 30 Jun 2016 12:11:48 +0000
-Subject: [RFC PATCH 2/2] iommu/arm-smmu: Add support for the fsl-mc bus
-In-Reply-To: <5775011C.60402@arm.com>
-References: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
- <1467220448-16764-2-git-send-email-nipun.gupta@nxp.com>
- <5775011C.60402@arm.com>
-Message-ID: <HE1PR0401MB18663F18D156196AB570E174E6240@HE1PR0401MB1866.eurprd04.prod.outlook.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 29 Jun 2016 20:13:22 +0100
+Subject: [alsa-devel] [PATCH v5 6/9] ASoC: mediatek: add mt2701 platform
+ driver implementation.
+In-Reply-To: <1466149440-23889-7-git-send-email-garlic.tseng@mediatek.com>
+References: <1466149440-23889-1-git-send-email-garlic.tseng@mediatek.com>
+ <1466149440-23889-7-git-send-email-garlic.tseng@mediatek.com>
+Message-ID: <20160629191322.GT6247@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jun 17, 2016 at 03:43:57PM +0800, Garlic Tseng wrote:
 
+> +static int mt2701_afe_i2s_set_clkdiv(struct snd_soc_dai *dai, int div_id,
+> +				     int div)
+> +{
 
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Thursday, June 30, 2016 16:53
-> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com; Stuart Yoder
-> <stuart.yoder@nxp.com>; iommu at lists.linux-foundation.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: Bharat Bhushan <bharat.bhushan@nxp.com>
-> Subject: Re: [RFC PATCH 2/2] iommu/arm-smmu: Add support for the fsl-mc bus
-> 
-> On 29/06/16 18:14, Nipun Gupta wrote:
-> > Implement bus specific support for the fsl-mc bus including
-> > registering the arm_smmu_ops and bus specific smmu device init.
-> >
-> > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> > Signed-off-by: Bharat Bhushan <bharat.bhushan@nxp.com>
-> > ---
-> >  drivers/iommu/arm-smmu.c | 43
-> > +++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 43 insertions(+)
-> >
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
-> > ab365ec..28d5dc8 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -47,6 +47,9 @@
-> >
-> >  #include <linux/amba/bus.h>
-> >
-> > +/* Include path will be changed once FSL-MC support is out from
-> > +staging */
-> 
-> How about we do that first?
+Why are we adding a set_clkdiv() operation?  I would expect the driver
+to be able to figure things out automatically.
 
-Agree. We are working on that part :)
+> +	case DIV_ID_MCLK_TO_BCK:
+> +		afe_priv->i2s_path[i2s_num].div_mclk_to_bck = div;
+> +		break;
+> +	case DIV_ID_BCK_TO_LRCK:
+> +		afe_priv->i2s_path[i2s_num].div_bck_to_lrck = div;
+> +		break;
 
-> 
-> > +#include <../drivers/staging/fsl-mc/include/fsl_mc_smmu.h>
-> > +
-> >  #include "io-pgtable.h"
-> >
-> >  /* Maximum number of stream IDs assigned to a single device */ @@
-> > -447,6 +450,11 @@ static struct device_node *dev_get_dev_node(struct
-> device *dev)
-> >  		return bus->bridge->parent->of_node;
-> >  	}
-> >
-> > +	if (dev_is_fsl_mc(dev)) {
-> 
-> Where is dev_is_fsl_mc() defined? I don't see it anywhere in mainline, here, or in
-> -next.
-
-My Bad. We have provided a patch on the devel at driverdev.osuosl.org ; linux-kernel at vger.kernel.org to have the macro dev_is_fsl_mc defined. Please see the attached patch.
-
-> 
-> > +		while (dev_is_fsl_mc(dev))
-> > +			dev = dev->parent;
-> > +	}
-> > +
-> >  	return dev->of_node;
-> >  }
-> >
-> > @@ -1443,6 +1451,32 @@ static int arm_smmu_init_platform_device(struct
-> device *dev,
-> >  	return 0;
-> >  }
-> >
-> > +static void __arm_smmu_release_fslmc_iommudata(void *data) {
-> > +	kfree(data);
-> > +}
-> 
-> There's already a suitable callback for this; nobody needs an exact duplicate of
-> it.
-
-I see '__arm_smmu_release_pci_iommudata' similarly defined for PCI bus.
-We will probably need it renaming to '__arm_smmu_release_iommudata' to have a better readable code. Seems okay?
-
-> 
-> > +static int arm_smmu_init_fslmc_device(struct device *dev,
-> > +				      struct iommu_group *group)
-> > +{
-> > +	struct arm_smmu_master_cfg *cfg;
-> > +
-> > +	cfg = iommu_group_get_iommudata(group);
-> > +	if (!cfg) {
-> > +		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-> > +		if (!cfg)
-> > +			return -ENOMEM;
-> > +
-> > +		cfg->streamids[0] = fslmc_dev_streamid(dev);
-> > +		cfg->num_streamids = 1;
-> > +
-> > +		iommu_group_set_iommudata(group, cfg,
-> > +
-> __arm_smmu_release_fslmc_iommudata);
-> > +	}
-> 
-> So the group gets the ID of the container device (assuming that's the first one
-> added), and the subsequent IDs are just ignored and left to go wrong? Or is it
-> inherently guaranteed that all devices in the same container are programmed
-> with the same ID?
-
-Yeah latter one is correct!! Each container is associated with an ID which is common for all the devices. Container device gets added first and is responsible for creating the iommu group and the master CFG.
-
-Thanks,
-Nipun
-
-> 
-> Robin.
-> 
-> > +	return 0;
-> > +}
-> > +
-> >  static int arm_smmu_add_device(struct device *dev)  {
-> >  	struct iommu_group *group;
-> > @@ -1467,6 +1501,8 @@ static struct iommu_group
-> > *arm_smmu_device_group(struct device *dev)
-> >
-> >  	if (dev_is_pci(dev))
-> >  		group = pci_device_group(dev);
-> > +	else if (dev_is_fsl_mc(dev))
-> > +		group = fslmc_device_group(dev);
-> >  	else
-> >  		group = generic_device_group(dev);
-> >
-> > @@ -1475,6 +1511,8 @@ static struct iommu_group
-> > *arm_smmu_device_group(struct device *dev)
-> >
-> >  	if (dev_is_pci(dev))
-> >  		ret = arm_smmu_init_pci_device(to_pci_dev(dev), group);
-> > +	else if (dev_is_fsl_mc(dev))
-> > +		ret = arm_smmu_init_fslmc_device(dev, group);
-> >  	else
-> >  		ret = arm_smmu_init_platform_device(dev, group);
-> >
-> > @@ -2102,6 +2140,11 @@ static int __init arm_smmu_init(void)
-> >  	}
-> >  #endif
-> >
-> > +#ifdef CONFIG_FSL_MC_BUS
-> > +	if (!iommu_present(&fsl_mc_bus_type))
-> > +		bus_set_iommu(&fsl_mc_bus_type, &arm_smmu_ops); #endif
-> > +
-> >  	return 0;
-> >  }
-> >
-> >
-
+Especially in the case where we're configuring LRCLK, that's trivial
+when we know the sample rate which we have to know anyway.
 -------------- next part --------------
-An embedded message was scrubbed...
-From: Nipun Gupta <nipun.gupta@nxp.com>
-Subject: [PATCH v2] fsl-mc: add helper macro to determine if a device is of fsl_mc type
-Date: Wed, 29 Jun 2016 17:14:39 +0000
-Size: 9077
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160630/563688cd/attachment.mht>
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160629/ec6c3bdd/attachment-0001.sig>
