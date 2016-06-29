@@ -1,145 +1,77 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 29 Jun 2016 19:52:06 +0200
-Subject: Boot failure on emev2/kzm9d (was: Re: [PATCH v2 11/11] mm/slab:
- lockless decision to grow cache)
-In-Reply-To: <20160629164415.GG4650@linux.vnet.ibm.com>
-References: <20160621064302.GA20635@js1304-P5Q-DELUXE>
- <20160621125406.GF3923@linux.vnet.ibm.com>
- <20160622005208.GB25106@js1304-P5Q-DELUXE>
- <CAMuHMdW-wSxASozhmPh0b+9UJFFVbYHqTqH5e9P1oO7T59YE7g@mail.gmail.com>
- <20160622190859.GA1473@linux.vnet.ibm.com>
- <20160623004935.GA20752@linux.vnet.ibm.com>
- <20160623023756.GA30438@js1304-P5Q-DELUXE>
- <20160623024742.GD1473@linux.vnet.ibm.com>
- <20160623025329.GA13095@linux.vnet.ibm.com>
- <CAMuHMdVqNV5ZbR3_NV5ZsLxoNQUXXGpfAcaoMJffaJbRPUb6-A@mail.gmail.com>
- <20160629164415.GG4650@linux.vnet.ibm.com>
-Message-ID: <CAMuHMdUfQ-gBqjZGvawf5zxgb-0UnWb+fzD-kcWU+kavwvadgQ@mail.gmail.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 29 Jun 2016 18:54:54 +0100
+Subject: [PATCH 3/5] arm64: efi: avoid block mappings for unaligned UEFI
+ memory regions
+In-Reply-To: <CAKv+Gu9CM79pE+dGoJ+Q=j5tUrKaCkaaGH+Yud8AOfxHv2fnvw@mail.gmail.com>
+References: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1467204690-10790-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20160629164525.GE2522@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_OUw+WJSNmC8mdAgAK8Nm=UGqtwgt8TBCwhTiBY9+2tg@mail.gmail.com>
+ <CAKv+Gu9CxorhWGzx=CaVWnEWZ-AhBt3dh0XU+Vw1gNe=HxkySQ@mail.gmail.com>
+ <20160629170053.GY22984@bivouac.eciton.net>
+ <CAKv+Gu9CM79pE+dGoJ+Q=j5tUrKaCkaaGH+Yud8AOfxHv2fnvw@mail.gmail.com>
+Message-ID: <20160629175454.GZ22984@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Wed, Jun 29, 2016 at 07:04:57PM +0200, Ard Biesheuvel wrote:
+> On 29 June 2016 at 19:00, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> > On Wed, Jun 29, 2016 at 06:53:18PM +0200, Ard Biesheuvel wrote:
+> >> On 29 June 2016 at 18:50, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >> > On 29 June 2016 at 18:45, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> >> On Wed, Jun 29, 2016 at 02:51:28PM +0200, Ard Biesheuvel wrote:
+> >> >>> +     if (!PAGE_ALIGNED(md->phys_addr) ||
+> >> >>> +         !PAGE_ALIGNED(md->num_pages << EFI_PAGE_SHIFT)) {
+> >> >>> +             /*
+> >> >>> +              * If the end address of this region is not aligned to page
+> >> >>> +              * size, the mapping is rounded up, and may end up sharing a
+> >> >>> +              * page frame with the next UEFI memory region. If we create
+> >> >>> +              * a block entry now, we may need to split it again when mapping
+> >> >>> +              * the next region, and support for that is going to be removed
+> >> >>> +              * from the MMU routines. So avoid block mappings altogether in
+> >> >>> +              * that case.
+> >> >>> +              */
+> >> >>> +             allow_block_mappings = false;
+> >> >>> +     }
+> >> >>
+> >> >> How common is it for large areas to have unaligned start/end? I wonder
+> >> >> whether it's worth implementing my approach to look ahead and explicitly
+> >> >> check the overlap with the next section instead of disabling block
+> >> >> mappings altogether for this region.
+> >> >>
+> >> >
+> >> > Very uncommon. Typically, only MMIO regions that represent NOR flash
+> >> > are larger than a couple of pages. Taken from QEMU:
+> >>
+> >>   RT_Code   :            640 Pages (2,621,440 Bytes)
+> >>   RT_Data   :            880 Pages (3,604,480 Bytes)
+> >>
+> >> so all RT_Code regions *combined* are 2.5 MB in total, and all RT_Data
+> >> regions 3.5 MB. Ideally, they are grouped together, but in reality,
+> >> there are always a couple of regions of each type, so there is little
+> >> to gain here from using block mappings
+> >
+> > Is this representative for real platforms?
+> 
+> I think it is a reasonable ballpark figure
+> 
+> > What about efifb and reserved regions?
+> 
+> Those are not tagged as EFI_MEMORY_RUNTIME so they are not covered by
+> the UEFI runtime mappings, and not relevant to this discussion.
 
-On Wed, Jun 29, 2016 at 6:44 PM, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
-> On Wed, Jun 29, 2016 at 04:54:44PM +0200, Geert Uytterhoeven wrote:
->> On Thu, Jun 23, 2016 at 4:53 AM, Paul E. McKenney
->> <paulmck@linux.vnet.ibm.com> wrote:
->> > On Wed, Jun 22, 2016 at 07:47:42PM -0700, Paul E. McKenney wrote:
->
-> [ . . . ]
->
->> > @@ -4720,11 +4720,18 @@ static void __init rcu_dump_rcu_node_tree(struct rcu_state *rsp)
->> >                         pr_info(" ");
->> >                         level = rnp->level;
->> >                 }
->> > -               pr_cont("%d:%d ^%d  ", rnp->grplo, rnp->grphi, rnp->grpnum);
->> > +               pr_cont("%d:%d/%#lx/%#lx ^%d  ", rnp->grplo, rnp->grphi,
->> > +                       rnp->qsmask,
->> > +                       rnp->qsmaskinit | rnp->qsmaskinitnext, rnp->grpnum);
->> >         }
->> >         pr_cont("\n");
->> >  }
->>
->> For me it always crashes during the 37th call of synchronize_sched() in
->> setup_kmem_cache_node(), which is the first call after secondary CPU bring up.
->> With your and my debug code, I get:
->>
->>   CPU: Testing write buffer coherency: ok
->>   CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
->>   Setting up static identity map for 0x40100000 - 0x40100058
->>   cnt = 36, sync
->>   CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
->>   Brought up 2 CPUs
->>   SMP: Total of 2 processors activated (2132.00 BogoMIPS).
->>   CPU: All CPU(s) started in SVC mode.
->>   rcu_node tree layout dump
->>    0:1/0x0/0x3 ^0
->
-> Thank you for running this!
->
-> OK, so RCU knows about both CPUs (the "0x3"), and the previous
-> grace period has seen quiescent states from both of them (the "0x0").
-> That would indicate that your synchronize_sched() showed up when RCU was
-> idle, so it had to start a new grace period.  It also rules out failure
-> modes where RCU thinks that there are more CPUs than really exist.
-> (Don't laugh, such things have really happened.)
->
->>   devtmpfs: initialized
->>   VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 1
->>   clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff,
->> max_idle_ns: 19112604462750000 ns
->>
->> I hope it helps. Thanks!
->
-> I am going to guess that this was the first grace period since the second
-> CPU came online.  When there only on CPU online, synchronize_sched()
-> is a no-op.
->
-> OK, this showed some things that aren't a problem.  What might the
-> problem be?
->
-> o       The grace-period kthread has not yet started.  It -should- start
->         at early_initcall() time, but who knows?  Adding code to print
->         out that kthread's task_struct address.
->
-> o       The grace-period kthread might not be responding to wakeups.
->         Checking this requires that a grace period be in progress,
->         so please put a call_rcu_sched() just before the call to
->         rcu_dump_rcu_node_tree().  (Sample code below.)  Adding code
->         to my patch to print out more GP-kthread state as well.
->
-> o       One of the CPUs might not be responding to RCU.  That -should-
->         result in an RCU CPU stall warning, so I will ignore this
->         possibility for the moment.
->
->         That said, do you have some way to determine whether scheduling
->         clock interrupts are really happening?  Without these interrupts,
->         no RCU CPU stall warnings.
+OK.
 
-I believe there are no clocksources yet. The jiffies clocksource is the first
-clocksource found, and that happens after the first call to
-synchronize_sched(), cfr. my dmesg snippet above.
+> > My (x86) Lenovo workstation has one 64MB and one 16MB Runtime/Uncached
+> > MMIO region. As well as a 3MB and a 4MB RT_Data one.
+> 
+> Are those MMIO regions naturally aligned? And how about the RT_Data ones?
 
-In a working boot:
-# cat /sys/bus/clocksource/devices/clocksource0/available_clocksource
-e0180000.timer jiffies
-# cat /sys/bus/clocksource/devices/clocksource0/current_clocksource
-e0180000.timer
+So, I've now gone home and don't have access to the Lenovo, however I
+have a machine at home also with an AMI UEFI implementation, and
+identical MMIO regions. And they do look naturally aligned.
 
-> OK, that should be enough for the next phase, please see the end for the
-> patch.  This patch applies on top of my previous one.
->
-> Could you please set this up as follows?
->
->         struct rcu_head rh;
->
->         rcu_dump_rcu_node_tree(&rcu_sched_state);  /* Initial state. */
->         call_rcu(&rh, do_nothing_cb);
+The RT_Data ones are not naturally aligned.
 
-I added an empty do_nothing_cb() for this:
-
-    static void do_nothing_cb(struct rcu_head *rcu_head)
-    {
-    }
-
-According to the debugging technique "comment everything out until it boots",
-it now hangs in call_rcu().
-
->         schedule_timeout_uninterruptible(5 * HZ);  /* Or whatever delay. */
->         rcu_dump_rcu_node_tree(&rcu_sched_state);  /* GP state. */
->         synchronize_sched();  /* Probably hangs. */
->         rcu_barrier();  /* Drop RCU's references to rh before return. */
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+/
+    Leif
