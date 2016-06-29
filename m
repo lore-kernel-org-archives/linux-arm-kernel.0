@@ -1,53 +1,79 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 29 Jun 2016 10:37:34 +0100
-Subject: [PATCH 4/7] reset: Supply *_shared variant calls when using
- *_optional APIs
-In-Reply-To: <1467192201.2278.9.camel@pengutronix.de>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
- <20160606155655.10860-5-lee.jones@linaro.org>
- <20160628085622.GM6720@dell>
- <1467186499.2278.7.camel@pengutronix.de>
- <20160629080611.GH29166@dell>
- <1467192201.2278.9.camel@pengutronix.de>
-Message-ID: <20160629093734.GL29166@dell>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 Jun 2016 10:39:38 +0100
+Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
+ overlapping regions
+In-Reply-To: <CAKv+Gu8RxZ2xpDC0pudewHu9Z5YTL8XbcjSPvGasRUQbhqm5qQ@mail.gmail.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
+ <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
+ <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
+ <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_3uKgFtvMryROwTMeGs=uXYU-OPrUC6LaNQiAKP=PZ3Q@mail.gmail.com>
+ <20160628160528.GG4585@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8RxZ2xpDC0pudewHu9Z5YTL8XbcjSPvGasRUQbhqm5qQ@mail.gmail.com>
+Message-ID: <20160629093938.GB2522@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Jun 2016, Philipp Zabel wrote:
-
-> Am Mittwoch, den 29.06.2016, 09:06 +0100 schrieb Lee Jones:
-> > On Wed, 29 Jun 2016, Philipp Zabel wrote:
-> > > Am Dienstag, den 28.06.2016, 09:56 +0100 schrieb Lee Jones:
-> > > > Philipp,
-> > > > 
-> > > > I need this to go into the -rcs too.
-> > > > 
-> > > > Can I add it with your Ack please?
-> > > 
-> > > I have already added your patches to my branch, and I intend to send a
-> > > pull request for it tomorrow. I am afraid applying this patch in another
-> > > branch would create a merge conflict with
-> > > git://git.pengutronix.de/git/pza/linux.git reset/next
-> > > in arm-soc. If that is not the case, go ahead. Otherwise I could provide
-> > > a tag at commit 2485394d9e0b ("reset: TRIVIAL: Add line break at same
-> > > place for similar APIs") for you to merge.
-> > 
-> > Yes please.  If you could tag a branch containing commit:
-> > 
-> >   reset: Supply *_shared variant calls when using *_optional APIs
-> > 
-> > ... that would be perfect.  Would you mind sending me the tag name
-> > ASAP please, since I am ready to send my pull-request to Linus.
+On Tue, Jun 28, 2016 at 06:12:22PM +0200, Ard Biesheuvel wrote:
+> On 28 June 2016 at 18:05, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > (Restarting the thread before I forget the entire discussion)
+> >
+> > On Mon, Jun 06, 2016 at 11:18:14PM +0200, Ard Biesheuvel wrote:
+> >> >> > On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> >> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> >> >> > > index 78f52488f9ff..0d5753c31c7f 100644
+> >> >> > > --- a/arch/arm64/kernel/efi.c
+> >> >> > > +++ b/arch/arm64/kernel/efi.c
+> >> >> > > @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
+> >> >> > >  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+> >> >> > >  {
+> >> >> > >         pteval_t prot_val = create_mapping_protection(md);
+> >> >> > > +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
+> >> >> > > +       efi_memory_desc_t *next = md;
+> >> >> > >
+> >> >> > > -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+> >> >> > > -                          md->num_pages << EFI_PAGE_SHIFT,
+> >> >> > > -                          __pgprot(prot_val | PTE_NG));
+> >> >> > > +       /*
+> >> >> > > +        * Search for the next EFI runtime map and check for any overlap with
+> >> >> > > +        * the current map when aligned to PAGE_SIZE. In such case, defer
+> >> >> > > +        * mapping the end of the current range until the next
+> >> >> > > +        * efi_create_mapping() call.
+> >> >> > > +        */
+> >> >> > > +       for_each_efi_memory_desc_continue(next) {
+> >> >> > > +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
+> >> >> > > +                       continue;
+> >> >> > > +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
+> >> >> > > +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
+> > [...]
+> >> Another thing I failed to mention is that the new Memory Attributes
+> >> table support may map all of the RuntimeServicesCode regions a second
+> >> time, but with a higher granularity, using RO for .text and .rodata
+> >> and NX for .data and .bss (and the PE/COFF header).
+> >
+> > Can this not be done in a single go without multiple passes? That's what
+> > we did for the core arm64 code, the only one left being EFI run-time
+> > mappings.
 > 
-> git://git.pengutronix.de/git/pza/linux.git tags/reset-shared-optional
+> Well, we probably could, but it is far from trivial.
+> 
+> >> Due to the higher
+> >> granularity, regions that were mapped using the contiguous bit the
+> >> first time around may be split into smaller regions. Your current code
+> >> does not address that case.
+> >
+> > If the above doesn't work, the only solution would be to permanently map
+> > these ranges as individual pages, no large blocks.
+> 
+> That is not unreasonable, since regions >2MB are unusual.
 
-Ah!  If I rebase on that tag, I will also take in all of the patches
-between it and v4.7-rc1, which is 14 commits.  Is there any way you
-can place it onto it's own branch, then we both merge it into our
-respective trees?
+We'll have the contiguous bit supported at some point and we won't be
+able to use it for EFI run-time mappings. But I don't think that's
+essential, minor improvement on a non-critical path.
+
+I'll post some patches to always use PAGE_SIZE granularity for EFI
+run-time mappings.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
