@@ -1,38 +1,44 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 29 Jun 2016 23:40:35 +0200
-Subject: [PATCH V2 4/4] ACPI,PCI,IRQ: correct operator precedence
-In-Reply-To: <96388f6b-f8b1-5720-4725-3f0ec0f5d1c3@codeaurora.org>
-References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
- <1467188859-28188-5-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0j+CJ3qWTdvm6Sk3DqFYVnkuEmaR1EPZM6DDVMC8rsK+g@mail.gmail.com>
- <d22fd8f7-7028-b4b7-6677-6903685034aa@codeaurora.org>
- <CAJZ5v0h1o5C8t+QJuFo93uZt0XuPNwtXFs5XSBkhm-fARWqi2g@mail.gmail.com>
- <96388f6b-f8b1-5720-4725-3f0ec0f5d1c3@codeaurora.org>
-Message-ID: <CAJZ5v0i67f+zsg_Ui693C3szFskOE3vQ1JsKYZpUkvc=vzXqcQ@mail.gmail.com>
+From: pza@pengutronix.de (Philipp Zabel)
+Date: Wed, 29 Jun 2016 23:57:04 +0200
+Subject: [PATCH 4/7] reset: Supply *_shared variant calls when using
+ *_optional APIs
+In-Reply-To: <20160629093734.GL29166@dell>
+References: <20160606155655.10860-1-lee.jones@linaro.org>
+ <20160606155655.10860-5-lee.jones@linaro.org>
+ <20160628085622.GM6720@dell>
+ <1467186499.2278.7.camel@pengutronix.de>
+ <20160629080611.GH29166@dell>
+ <1467192201.2278.9.camel@pengutronix.de>
+ <20160629093734.GL29166@dell>
+Message-ID: <20160629215704.GA29796@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 11:19 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> On 6/29/2016 5:14 PM, Rafael J. Wysocki wrote:
->> On Wed, Jun 29, 2016 at 8:29 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->>> On 6/29/2016 9:16 AM, Rafael J. Wysocki wrote:
->>>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->>>> Well, this is a rather obvious one, so I'm wondering why it is the
->>>> last one in the series?
->>>>
->>>
->>> The first three are more relevant to each other. It makes easy to
->>> correlate the changes.
->>
->> But this one doesn't seem to depend on them and it could be applied
->> without them, right?
->>
->
-> Sure. It has no dependency.
+Hi Lee,
 
-OK
+On Wed, Jun 29, 2016 at 10:37:34AM +0100, Lee Jones wrote:
+[...]
+> > > > If that is not the case, go ahead. Otherwise I could provide
+> > > > a tag at commit 2485394d9e0b ("reset: TRIVIAL: Add line break at same
+> > > > place for similar APIs") for you to merge.
+> > > 
+> > > Yes please.  If you could tag a branch containing commit:
+> > > 
+> > >   reset: Supply *_shared variant calls when using *_optional APIs
+> > > 
+> > > ... that would be perfect.  Would you mind sending me the tag name
+> > > ASAP please, since I am ready to send my pull-request to Linus.
+> > 
+> > git://git.pengutronix.de/git/pza/linux.git tags/reset-shared-optional
+> 
+> Ah!  If I rebase on that tag, I will also take in all of the patches
+> between it and v4.7-rc1, which is 14 commits.  Is there any way you
+> can place it onto it's own branch, then we both merge it into our
+> respective trees?
 
-I've queued up this one.
+I have now moved your patches into their own branch at
+git://git.pengutronix.de/git/pza/linux.git tags/reset-explicit-api
+and merged that back in.
 
-Thanks,
-Rafael
+regards
+Philipp
