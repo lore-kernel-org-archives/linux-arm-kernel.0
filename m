@@ -1,97 +1,91 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Jun 2016 15:57:47 +0200
-Subject: [RFC PATCH v4 3/5] PCI: Check platform specific ECAM quirks
-In-Reply-To: <5773D284.8060404@semihalf.com>
-References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
- <1467100442-28078-4-git-send-email-tn@semihalf.com>
- <577275EA.7010002@codeaurora.org>
- <CADaLNDkhPZuG7UJ4SK_j5v_nXbd782Q17LAcXduG0uEObaFF=g@mail.gmail.com>
- <5773A773.8040700@semihalf.com> <5773CE49.1050802@codeaurora.org>
- <5773D284.8060404@semihalf.com>
-Message-ID: <CAKv+Gu8t994-HEJ+Cyiw6a8Bf_Ka=5amOAw44+UgnJZ90WrpnQ@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 29 Jun 2016 15:58:19 +0200
+Subject: [RFC PATCH v1] ARM: tango: add Suspend-to-RAM support
+Message-ID: <5773D3FB.4030101@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 June 2016 at 15:52, Tomasz Nowicki <tn@semihalf.com> wrote:
-> On 29.06.2016 15:34, Christopher Covington wrote:
->>
->> I'm confused by this statement. OEMID is defined as 6 bytes long and OEM
->> Table ID as 8 bytes long in the ACPI specification. As far as I can
->> tell, if your string isn't exactly that long, padding up to that length
->> is required.
->
->
-> Well, I cannot find that requirement in ACPI spec. but I might missed
-> something.
->
+Ask firmware to put RAM in self-refresh mode and power system down.
 
-This has *nothing* to do with the ACPI spec.
+    echo mem > /sys/power/state
 
-There exist a couple of machines that have known quirks. Those
-machines have certain 6 or 8 byte long strings in their MCFG tables
-that we can match against. If any of those fields contains spaces,
-whether you call that padding or not is totally irrelevant. The same
-applies to NUL bytes.
+See Documentation/power/states.txt
 
-So for a 6 byte field, our table contains the six characters that we
-know is in the quirky hardware's table.
-The same for an 8 byte field.
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+This is a RFC because I have a few doubts:
+1) return value when tango_suspend() fails and unexpectedly returns (I used -EIO)
+2) conditionally building pm.c (using CONFIG_SUSPEND? CONFIG_PM_SLEEP? other?)
+3) .valid is required, right?
+---
+ arch/arm/mach-tango/Makefile |  1 +
+ arch/arm/mach-tango/pm.c     | 37 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tango/smc.h    |  1 +
+ 3 files changed, 39 insertions(+)
+ create mode 100644 arch/arm/mach-tango/pm.c
 
-That means there is no need for strnlen, strncmp() with variable size
-etc. Each match can be implemented using memcmp() [since the table
-fields are not NUL terminated] with a constant argument for the length
-parameter.
-
-Regards,
-Ard.
-
-
-> I dumped my x86 machine ACPI tables and here is an example of MCFG:
->
-> $ cat mcfg.dsl
-> /*
->  * Intel ACPI Component Architecture
->  * AML/ASL+ Disassembler version 20160108-64
->  * Copyright (c) 2000 - 2016 Intel Corporation
->  *
->  * Disassembly of mcfg.dat, Wed Jun 29 15:48:16 2016
->  *
->  * ACPI Data Table [MCFG]
->  *
->  * Format: [HexOffset DecimalOffset ByteLength]  FieldName : FieldValue
->  */
->
-> [000h 0000   4]                    Signature : "MCFG"    [Memory Mapped
-> Configuration table]
-> [004h 0004   4]                 Table Length : 0000003C
-> [008h 0008   1]                     Revision : 01
-> [009h 0009   1]                     Checksum : A9
-> [00Ah 0010   6]                       Oem ID : "ALASKA"
-> [010h 0016   8]                 Oem Table ID : "A M I"
-> [018h 0024   4]                 Oem Revision : 01072009
-> [01Ch 0028   4]              Asl Compiler ID : "MSFT"
-> [020h 0032   4]        Asl Compiler Revision : 00000097
->
-> [024h 0036   8]                     Reserved : 0000000000000000
->
-> [02Ch 0044   8]                 Base Address : 00000000F8000000
-> [034h 0052   2]         Segment Group Number : 0000
-> [036h 0054   1]             Start Bus Number : 00
-> [037h 0055   1]               End Bus Number : 3F
-> [038h 0056   4]                     Reserved : 00000000
->
-> Raw Table Data: Length 60 (0x3C)
->
-> 00000000  4d 43 46 47 3c 00 00 00  01 a9 41 4c 41 53 4b 41
-> |MCFG<.....ALASKA|
-> 00000010  41 20 4d 20 49 00 00 00  09 20 07 01 4d 53 46 54  |A M I....
-> ..MSFT|
-> 00000020  97 00 00 00 00 00 00 00  00 00 00 00 00 00 00 f8
-> |................|
-> 00000030  00 00 00 00 00 00 00 3f  00 00 00 00              |.......?....|
->
-> So in this example I have OEM table ID "A M I" 6 character long and 0
-> padding.
->
-> Tomasz
->
+diff --git a/arch/arm/mach-tango/Makefile b/arch/arm/mach-tango/Makefile
+index 7ca753aa9fb6..822b7ca803c6 100644
+--- a/arch/arm/mach-tango/Makefile
++++ b/arch/arm/mach-tango/Makefile
+@@ -3,3 +3,4 @@ AFLAGS_smc.o := -Wa,-march=armv7-a$(plus_sec)
+ 
+ obj-y += setup.o smc.o xenv.o
+ obj-$(CONFIG_SMP) += platsmp.o
++obj-$(CONFIG_SUSPEND) += pm.o
+diff --git a/arch/arm/mach-tango/pm.c b/arch/arm/mach-tango/pm.c
+new file mode 100644
+index 000000000000..08a39beaea09
+--- /dev/null
++++ b/arch/arm/mach-tango/pm.c
+@@ -0,0 +1,37 @@
++#include <linux/init.h>
++#include <linux/suspend.h>
++#include <asm/suspend.h>
++#include "smc.h"
++
++static int tango_pm_powerdown(unsigned long arg)
++{
++	tango_suspend(virt_to_phys(cpu_resume));
++
++	return -EIO; /* tango_suspend has failed */
++}
++
++static int tango_pm_enter(suspend_state_t state)
++{
++	if (state == PM_SUSPEND_MEM)
++		return cpu_suspend(0, tango_pm_powerdown);
++
++	return -EINVAL;
++}
++
++static int tango_pm_valid(suspend_state_t state)
++{
++	return state == PM_SUSPEND_MEM;
++}
++
++static const struct platform_suspend_ops tango_pm_ops = {
++	.enter = tango_pm_enter,
++	.valid = tango_pm_valid,
++};
++
++static int __init tango_pm_init(void)
++{
++	suspend_set_ops(&tango_pm_ops);
++	return 0;
++}
++
++late_initcall(tango_pm_init);
+diff --git a/arch/arm/mach-tango/smc.h b/arch/arm/mach-tango/smc.h
+index 3d31f984f44c..57919539da1b 100644
+--- a/arch/arm/mach-tango/smc.h
++++ b/arch/arm/mach-tango/smc.h
+@@ -3,5 +3,6 @@ extern int tango_smc(unsigned int val, unsigned int service);
+ #define tango_set_l2_control(val)	tango_smc(val, 0x102)
+ #define tango_start_aux_core(val)	tango_smc(val, 0x104)
+ #define tango_set_aux_boot_addr(val)	tango_smc(val, 0x105)
++#define tango_suspend(val)		tango_smc(val, 0x120)
+ #define tango_aux_core_die(val)		tango_smc(val, 0x121)
+ #define tango_aux_core_kill(val)	tango_smc(val, 0x122)
+-- 
+2.9.0
