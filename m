@@ -1,171 +1,110 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Thu, 30 Jun 2016 02:15:46 +0800
-Subject: [PATCH v6 03/10] clocksource/drivers/arm_arch_timer: Improve printk
- relevant code
+Date: Thu, 30 Jun 2016 02:15:47 +0800
+Subject: [PATCH v6 04/10] acpi: Add some basic struct and functions in GTDT
+ driver
 In-Reply-To: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
 References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1467224153-22873-4-git-send-email-fu.wei@linaro.org>
+Message-ID: <1467224153-22873-5-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-This patch defines pr_fmt(fmt) for all pr_* functions,
-then the pr_* don't need to add "arch_timer:" everytime.
-
-Also delete some Blank Spaces in arch_timer_banner,
-according to the suggestion from checkpatch.pl.
-
-No functional change.
-
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
 ---
- drivers/clocksource/arm_arch_timer.c | 52 +++++++++++++++++++-----------------
- 1 file changed, 27 insertions(+), 25 deletions(-)
+ drivers/acpi/acpi_gtdt.c | 85 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 966c574..9540e9d 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -29,6 +29,9 @@
- 
- #include <clocksource/arm_arch_timer.h>
- 
-+#undef pr_fmt
-+#define pr_fmt(fmt) "arch_timer: " fmt
+diff --git a/drivers/acpi/acpi_gtdt.c b/drivers/acpi/acpi_gtdt.c
+new file mode 100644
+index 0000000..54d7644e
+--- /dev/null
++++ b/drivers/acpi/acpi_gtdt.c
+@@ -0,0 +1,85 @@
++/*
++ * ARM Specific GTDT table Support
++ *
++ * Copyright (C) 2015, Linaro Ltd.
++ * Author: Daniel Lezcano <daniel.lezcano@linaro.org>
++ *         Fu Wei <fu.wei@linaro.org>
++ *         Hanjun Guo <hanjun.guo@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- #define CNTTIDR		0x08
- #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
- 
-@@ -388,24 +391,24 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
- 
- 	/* Check the timer frequency. */
- 	if (arch_timer_rate == 0)
--		pr_warn("Architected timer frequency not available\n");
-+		pr_warn("frequency not available\n");
- }
- 
- static void arch_timer_banner(unsigned type)
- {
--	pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
--		     type & ARCH_CP15_TIMER ? "cp15" : "",
--		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
--		     type & ARCH_MEM_TIMER ? "mmio" : "",
--		     (unsigned long)arch_timer_rate / 1000000,
--		     (unsigned long)(arch_timer_rate / 10000) % 100,
--		     type & ARCH_CP15_TIMER ?
--		     (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
--			"",
--		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
--		     type & ARCH_MEM_TIMER ?
--			arch_timer_mem_use_virtual ? "virt" : "phys" :
--			"");
-+	pr_info("%s%s%s timer(s) running@%lu.%02luMHz (%s%s%s).\n",
-+		type & ARCH_CP15_TIMER ? "cp15" : "",
-+		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
-+		type & ARCH_MEM_TIMER ? "mmio" : "",
-+		(unsigned long)arch_timer_rate / 1000000,
-+		(unsigned long)(arch_timer_rate / 10000) % 100,
-+		type & ARCH_CP15_TIMER ?
-+		(arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
-+		"",
-+		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
-+		type & ARCH_MEM_TIMER ?
-+		arch_timer_mem_use_virtual ? "virt" : "phys" :
-+		"");
- }
- 
- u32 arch_timer_get_rate(void)
-@@ -498,7 +501,7 @@ static void __init arch_counter_register(unsigned type)
- 
- static void arch_timer_stop(struct clock_event_device *clk)
- {
--	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
-+	pr_debug("teardown, disable IRQ%d cpu #%d\n",
- 		 clk->irq, smp_processor_id());
- 
- 	disable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi]);
-@@ -597,8 +600,7 @@ static int __init arch_timer_register(void)
- 	}
- 
- 	if (err) {
--		pr_err("arch_timer: can't register interrupt %d (%d)\n",
--		       ppi, err);
-+		pr_err("can't register interrupt %d (%d)\n", ppi, err);
- 		goto out_free;
- 	}
- 
-@@ -650,7 +652,7 @@ static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
- 
- 	ret = request_irq(irq, func, IRQF_TIMER, "arch_mem_timer", &t->evt);
- 	if (ret) {
--		pr_err("arch_timer: Failed to request mem timer irq\n");
-+		pr_err("Failed to request mem timer irq\n");
- 		kfree(t);
- 	}
- 
-@@ -727,7 +729,7 @@ static void __init arch_timer_init(void)
- 		}
- 
- 		if (!has_ppi) {
--			pr_warn("arch_timer: No interrupt available, giving up\n");
-+			pr_warn("No interrupt available, giving up\n");
- 			return;
- 		}
- 	}
-@@ -743,7 +745,7 @@ static void __init arch_timer_of_init(struct device_node *np)
- 	int i;
- 
- 	if (arch_timers_present & ARCH_CP15_TIMER) {
--		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
-+		pr_warn("multiple nodes in dt, skipping\n");
- 		return;
- 	}
- 
-@@ -778,7 +780,7 @@ static void __init arch_timer_mem_init(struct device_node *np)
- 	arch_timers_present |= ARCH_MEM_TIMER;
- 	cntctlbase = of_iomap(np, 0);
- 	if (!cntctlbase) {
--		pr_err("arch_timer: Can't find CNTCTLBase\n");
-+		pr_err("Can't find CNTCTLBase\n");
- 		return;
- 	}
- 
-@@ -793,7 +795,7 @@ static void __init arch_timer_mem_init(struct device_node *np)
- 		u32 cntacr;
- 
- 		if (of_property_read_u32(frame, "frame-number", &n)) {
--			pr_err("arch_timer: Missing frame-number\n");
-+			pr_err("Missing frame-number\n");
- 			of_node_put(frame);
- 			goto out;
- 		}
-@@ -821,7 +823,7 @@ static void __init arch_timer_mem_init(struct device_node *np)
- 
- 	base = arch_counter_base = of_iomap(best_frame, 0);
- 	if (!base) {
--		pr_err("arch_timer: Can't map frame's registers\n");
-+		pr_err("Can't map frame's registers\n");
- 		goto out;
- 	}
- 
-@@ -831,7 +833,7 @@ static void __init arch_timer_mem_init(struct device_node *np)
- 		irq = irq_of_parse_and_map(best_frame, PHYS_SPI);
- 
- 	if (!irq) {
--		pr_err("arch_timer: Frame missing %s irq",
-+		pr_err("Frame missing %s irq",
- 		       arch_timer_mem_use_virtual ? "virt" : "phys");
- 		goto out;
- 	}
-@@ -869,7 +871,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	struct acpi_table_gtdt *gtdt;
- 
- 	if (arch_timers_present & ARCH_CP15_TIMER) {
--		pr_warn("arch_timer: already initialized, skipping\n");
-+		pr_warn("already initialized, skipping\n");
- 		return -EINVAL;
- 	}
- 
++#include <linux/acpi.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++
++#undef pr_fmt
++#define pr_fmt(fmt) "GTDT: " fmt
++
++typedef struct {
++	struct acpi_table_gtdt *gtdt;
++	void *platform_timer_start;
++	void *gtdt_end;
++} acpi_gtdt_desc_t;
++
++static acpi_gtdt_desc_t acpi_gtdt_desc __initdata;
++
++static inline void *gtdt_next(void *platform_timer, void *end, int type)
++{
++	struct acpi_gtdt_header *gh = platform_timer;
++
++	while ((void *)(gh += gh->length) < end)
++		if (gh->type == type)
++			return (void *)gh;
++	return NULL;
++}
++
++#define for_each_gtdt_type(_g, _t)				\
++	for (_g = acpi_gtdt_desc.platform_timer_start; _g;	\
++	     _g = gtdt_next(_g, acpi_gtdt_desc.gtdt_end, _t))
++
++#define for_each_gtdt_timer(_g)				\
++	for_each_gtdt_type(_g, ACPI_GTDT_TYPE_TIMER_BLOCK)
++
++#define for_each_gtdt_watchdog(_g)			\
++	for_each_gtdt_type(_g, ACPI_GTDT_TYPE_WATCHDOG)
++
++/*
++ * Get some basic info from GTDT table, and init the global variables above
++ * for all timers initialization of Generic Timer.
++ * This function does some validation on GTDT table.
++ */
++static int __init acpi_gtdt_desc_init(struct acpi_table_header *table)
++{
++	struct acpi_table_gtdt *gtdt = container_of(table,
++						    struct acpi_table_gtdt,
++						    header);
++
++	acpi_gtdt_desc.gtdt = gtdt;
++	acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
++
++	if (table->revision < 2) {
++		pr_info("Revision:%d doesn't support Platform Timers.\n",
++			table->revision);
++		return 0;
++	}
++
++	if (!gtdt->platform_timer_count) {
++		pr_info("No Platform Timer.\n");
++		return 0;
++	}
++
++	acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
++					      gtdt->platform_timer_offset;
++	if (acpi_gtdt_desc.platform_timer_start <
++	    (void *)table + sizeof(struct acpi_table_gtdt)) {
++		pr_err(FW_BUG "Platform Timer pointer error.\n");
++		acpi_gtdt_desc.platform_timer_start = NULL;
++		return -EINVAL;
++	}
++
++	return gtdt->platform_timer_count;
++}
 -- 
 2.5.5
