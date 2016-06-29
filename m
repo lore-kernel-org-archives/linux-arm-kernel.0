@@ -1,47 +1,30 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 29 Jun 2016 10:02:59 +0100
-Subject: [PATCH] arm64: tegra: Add missing Smaug revision
-In-Reply-To: <20160629085229.31350-1-acourbot@nvidia.com>
-References: <20160629085229.31350-1-acourbot@nvidia.com>
-Message-ID: <57738EC3.3070200@nvidia.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 29 Jun 2016 17:58:42 +0900
+Subject: [PATCH] pinctrl: uniphier: remove pointless SD pin-mux setting
+ for PH1-LD11
+In-Reply-To: <1467189910-14125-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1467189910-14125-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQYi3Na1=HwYiXXHmn6sp+22m-LVLPcGZ9LdvkfK0VyvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2016-06-29 17:45 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> This SoC has no SD card controller.  This pin-muxing has no point.
+>
+> Fixes: 70f2f9c4cf25 ("pinctrl: uniphier: add UniPhier PH1-LD11 pinctrl driver")
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-On 29/06/16 09:52, Alexandre Courbot wrote:
-> The "google,smaug-rev2" string is missing from the compatible list of
-> Smaug's DT. The differences of rev2 are not relevant at our current
-> level of support and it boots just fine, so add it.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
->  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-> index 431266a48e9c..82a96bd27bc8 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-> +++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-> @@ -11,7 +11,8 @@
->  	compatible = "google,smaug-rev8", "google,smaug-rev7",
->  		     "google,smaug-rev6", "google,smaug-rev5",
->  		     "google,smaug-rev4", "google,smaug-rev3",
-> -		     "google,smaug-rev1", "google,smaug", "nvidia,tegra210";
-> +		     "google,smaug-rev2", "google,smaug-rev1",
-> +		     "google,smaug", "nvidia,tegra210";
->  
->  	aliases {
->  		serial0 = &uarta;
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
+I found another mistake in this driver.
 
-Olof, let us know if you have any comments on this? Looks like I missed
-this initially because the rev2 support had been broken out in the
-chrome-os kernel tree to support some specific features for this board.
-However, I think for now it is ok to include rev2 here as well for mainline.
+So, I'd like to replace this patch with the following one:
+http://patchwork.ozlabs.org/patch/641896/
 
-Cheers
-Jon
+
+(Copy-paste work often ends up several mistakes...)
+
+
 
 -- 
-nvpublic
+Best Regards
+Masahiro Yamada
