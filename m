@@ -1,40 +1,53 @@
-From: a0393675@ti.com (Keerthy)
-Date: Wed, 29 Jun 2016 15:02:50 +0530
-Subject: [PATCH v6 4/6] gpio: tps65218-gpio: Add platform_device_id table
-In-Reply-To: <CACRpkdb=jz-=K-itevZtvPtHF05pKdhkSp1USaf5LzQWaxckJw@mail.gmail.com>
-References: <1467117054-12943-1-git-send-email-j-keerthy@ti.com>
- <1467117054-12943-5-git-send-email-j-keerthy@ti.com>
- <CACRpkdb=jz-=K-itevZtvPtHF05pKdhkSp1USaf5LzQWaxckJw@mail.gmail.com>
-Message-ID: <577395C2.5050807@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 29 Jun 2016 10:37:34 +0100
+Subject: [PATCH 4/7] reset: Supply *_shared variant calls when using
+ *_optional APIs
+In-Reply-To: <1467192201.2278.9.camel@pengutronix.de>
+References: <20160606155655.10860-1-lee.jones@linaro.org>
+ <20160606155655.10860-5-lee.jones@linaro.org>
+ <20160628085622.GM6720@dell>
+ <1467186499.2278.7.camel@pengutronix.de>
+ <20160629080611.GH29166@dell>
+ <1467192201.2278.9.camel@pengutronix.de>
+Message-ID: <20160629093734.GL29166@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 29 Jun 2016, Philipp Zabel wrote:
 
+> Am Mittwoch, den 29.06.2016, 09:06 +0100 schrieb Lee Jones:
+> > On Wed, 29 Jun 2016, Philipp Zabel wrote:
+> > > Am Dienstag, den 28.06.2016, 09:56 +0100 schrieb Lee Jones:
+> > > > Philipp,
+> > > > 
+> > > > I need this to go into the -rcs too.
+> > > > 
+> > > > Can I add it with your Ack please?
+> > > 
+> > > I have already added your patches to my branch, and I intend to send a
+> > > pull request for it tomorrow. I am afraid applying this patch in another
+> > > branch would create a merge conflict with
+> > > git://git.pengutronix.de/git/pza/linux.git reset/next
+> > > in arm-soc. If that is not the case, go ahead. Otherwise I could provide
+> > > a tag at commit 2485394d9e0b ("reset: TRIVIAL: Add line break at same
+> > > place for similar APIs") for you to merge.
+> > 
+> > Yes please.  If you could tag a branch containing commit:
+> > 
+> >   reset: Supply *_shared variant calls when using *_optional APIs
+> > 
+> > ... that would be perfect.  Would you mind sending me the tag name
+> > ASAP please, since I am ready to send my pull-request to Linus.
+> 
+> git://git.pengutronix.de/git/pza/linux.git tags/reset-shared-optional
 
-On Wednesday 29 June 2016 02:26 PM, Linus Walleij wrote:
-> On Tue, Jun 28, 2016 at 2:30 PM, Keerthy <j-keerthy@ti.com> wrote:
->
->> platform_device_id table is needed for adding the tps65218-gpio
->> module to the mfd_cell array.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>
->> Changes in v4:
->>
->>    * Retained the compatible strings in order to interrogate the DT in the
->>      normal way.
->
-> So do I just apply this or do you need it applied through another tree?
->
-> It looks standalone, should I just merge it?
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Ah!  If I rebase on that tag, I will also take in all of the patches
+between it and v4.7-rc1, which is 14 commits.  Is there any way you
+can place it onto it's own branch, then we both merge it into our
+respective trees?
 
-Thanks Linus. I guess this can be merged by you. Is that fine Lee Jones?
-
-
->
-> Yours,
-> Linus Walleij
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
