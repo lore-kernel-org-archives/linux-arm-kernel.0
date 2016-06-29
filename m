@@ -1,32 +1,48 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Wed, 29 Jun 2016 17:52:29 +0900
-Subject: [PATCH] arm64: tegra: Add missing Smaug revision
-Message-ID: <20160629085229.31350-1-acourbot@nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Jun 2016 10:53:51 +0200
+Subject: [PATCH 0/2] pinctrl: Enable support for external GPIO interrupts
+In-Reply-To: <5772301F.3030904@baylibre.com>
+References: <5772301F.3030904@baylibre.com>
+Message-ID: <CACRpkdZivUN8HKZ7oTDW6C35vSMv6+9G6-8M7=-kJM3B9vmH-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "google,smaug-rev2" string is missing from the compatible list of
-Smaug's DT. The differences of rev2 are not relevant at our current
-level of support and it boots just fine, so add it.
+On Tue, Jun 28, 2016 at 10:06 AM, Neil Armstrong
+<narmstrong@baylibre.com> wrote:
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> I have another implementation idea about this subject, by using static GPIO-irq
+> association in DT instead of using a very complex dynamic allocation.
+>
+> The idea is to add a simple property :
+> irqs-gpios = <>
+>
+> To map a GPIO to the irqs, then we can either use the DT irq mapping or use the
+> gpiolib to_irq() if the gpio is in the table.
+>
+> The relative drawback is that we will need DT changes to enable routing of a gpio
+> to an IRQ, but the complete system is based on a DT description anyway.
+>
+> In this case, we could use gpiochip_irqchip.
+>
+> Do you think this structure would be acceptable ?
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-index 431266a48e9c..82a96bd27bc8 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-@@ -11,7 +11,8 @@
- 	compatible = "google,smaug-rev8", "google,smaug-rev7",
- 		     "google,smaug-rev6", "google,smaug-rev5",
- 		     "google,smaug-rev4", "google,smaug-rev3",
--		     "google,smaug-rev1", "google,smaug", "nvidia,tegra210";
-+		     "google,smaug-rev2", "google,smaug-rev1",
-+		     "google,smaug", "nvidia,tegra210";
- 
- 	aliases {
- 		serial0 = &uarta;
--- 
-2.9.0
+That depends on:
+
+- A nod from the DT maintainers that this is acceptable from a HW description
+  point of view and a simplification that probably all other OS:es
+will also want
+  to do.
+
+- Rough consensus from the maintainess of the platform that this makes
+  sense, do noone appear three months down the road and says "oh wait I
+  have this usecase that require us to do this dynamically".
+
+I think the dynamic solution is always more elegant, computers should resolve
+complex problems, doing it in DT makes a human do a machine's work which
+is as a rule of thumb not a good idea. But there is also the question
+of maintenance
+cost and what makes sense at a human level so I'm not totally
+inflexible on this.
+
+Yours,
+Linus Walleij
