@@ -1,63 +1,70 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 29 Jun 2016 09:54:15 +0900
-Subject: [PATCH v20 00/14] arm64 kexec kernel patches
-In-Reply-To: <20160627170039.GD6847@e104818-lin.cambridge.arm.com>
-References: <cover.1466702804.git.geoff@infradead.org>
- <20160627170039.GD6847@e104818-lin.cambridge.arm.com>
-Message-ID: <20160629005414.GC20774@linaro.org>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Wed, 29 Jun 2016 08:57:33 +0800
+Subject: [PATCH v5 1/3] mm: memblock enhence the memblock debugfs output
+Message-ID: <1467161855-10010-1-git-send-email-dennis.chen@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Current memblock debugfs output doesn't make the debug convenient
+enough, for example, lack of the 'flag' of the corresponding memblock
+region result in it's difficult to known whether the region has been
+mapped to the kernel linear map zone or not. This patch is trying to
+ease the dubug effort by adding 'size' and 'flag' output.
 
-On Mon, Jun 27, 2016 at 06:00:39PM +0100, Catalin Marinas wrote:
-> Hi Geoff,
-> 
-> On Thu, Jun 23, 2016 at 05:54:47PM +0000, Geoff Levand wrote:
-> > AKASHI Takahiro (7):
-> >       arm64: kdump: reserve memory for crash dump kernel
-> >       arm64: limit memory regions based on DT property, usable-memory
-> >       arm64: kdump: implement machine_crash_shutdown()
-> >       arm64: kdump: add kdump support
-> >       arm64: kdump: add VMCOREINFO's for user-space coredump tools
-> >       arm64: kdump: enable kdump in the arm64 defconfig
-> >       arm64: kdump: update a kernel doc
-> > 
-> > Geoff Levand (4):
-> >       arm64: Add back cpu reset routines
-> >       arm64/kexec: Add core kexec support
-> >       arm64/kexec: Enable kexec in the arm64 defconfig
-> >       arm64/kexec: Add pr_debug output
-> > 
-> > James Morse (3):
-> >       arm64: hibernate: Don't hibernate on systems with stuck CPUs
-> >       arm64: smp: Add function to determine if cpus are stuck in the kernel
-> >       Documentation: dt: usable-memory and elfcorehdr nodes for arm64 kexec
-> 
-> I dropped patch 1 (hibernate), cherry-picked patch 2 from mainline
-> ("cpus stuck in the kernel", already pushed by Will to 4.7-rc5) and
-> merged patches 3-6, with the amendments that James mentioned.
-> 
-> The kdump patches, including the "Documentation" one from James require
-> more review, testing and acks by the corresponding maintainers (kdump,
-> DT).
+The '/sys/kernel/debug/memblock/memory' output looks like before:
+   0: 0x0000008000000000..0x0000008001e7ffff
+   1: 0x0000008001e80000..0x00000083ff184fff
+   2: 0x00000083ff185000..0x00000083ff1c2fff
+   3: 0x00000083ff1c3000..0x00000083ff222fff
+   4: 0x00000083ff223000..0x00000083ffe42fff
+   5: 0x00000083ffe43000..0x00000083ffffffff
 
-I see what you mean, but even for Geoff's kexec part, the maintainer
-(Eric) have not given his ack.
+After applied:
+   0: 0x0000008000000000..0x0000008001e7ffff  0x0000000001e80000  0x4 
+   1: 0x0000008001e80000..0x00000083ff184fff  0x00000003fd305000  0x0 
+   2: 0x00000083ff185000..0x00000083ff1c2fff  0x000000000003e000  0x4 
+   3: 0x00000083ff1c3000..0x00000083ff222fff  0x0000000000060000  0x0 
+   4: 0x00000083ff223000..0x00000083ffe42fff  0x0000000000c20000  0x4 
+   5: 0x00000083ffe43000..0x00000083ffffffff  0x00000000001bd000  0x0 
 
-> You also don't seem to have added a s-o-b for those patches (since
-> you are submitting them; unless you plan to let Akashi-san submit them
-> in the future).
+Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Steve Capper <steve.capper@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: linux-mm at kvack.org
+Cc: linux-acpi at vger.kernel.org
+Cc: linux-efi at vger.kernel.org
+---
+ mm/memblock.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Basically Geoff has not reviewed nor tested kdump part, and
-so I'm not sure that adding his s-o-b is appropriate.
-Anyhow, I will post my future version of kdump by myself as
-kexec has been queued in for-next/core.
-
-Thanks,
--Takahiro AKASHI
-
-> Thanks.
-> 
-> -- 
-> Catalin
+diff --git a/mm/memblock.c b/mm/memblock.c
+index ca09915..0fc0fa1 100644
+--- a/mm/memblock.c
++++ b/mm/memblock.c
+@@ -1677,13 +1677,15 @@ static int memblock_debug_show(struct seq_file *m, void *private)
+ 		reg = &type->regions[i];
+ 		seq_printf(m, "%4d: ", i);
+ 		if (sizeof(phys_addr_t) == 4)
+-			seq_printf(m, "0x%08lx..0x%08lx\n",
++			seq_printf(m, "0x%08lx..0x%08lx  0x%08lx  0x%lx\n",
+ 				   (unsigned long)reg->base,
+-				   (unsigned long)(reg->base + reg->size - 1));
++				   (unsigned long)(reg->base + reg->size - 1),
++				   (unsigned long)reg->size, reg->flags);
+ 		else
+-			seq_printf(m, "0x%016llx..0x%016llx\n",
++			seq_printf(m, "0x%016llx..0x%016llx  0x%016llx  0x%lx\n",
+ 				   (unsigned long long)reg->base,
+-				   (unsigned long long)(reg->base + reg->size - 1));
++				   (unsigned long long)(reg->base + reg->size - 1),
++				   (unsigned long long)reg->size, reg->flags);
+ 
+ 	}
+ 	return 0;
+-- 
+2.7.4
