@@ -1,31 +1,95 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 29 Jun 2016 21:52:39 +0800
-Subject: [RFC PATCH 3/5] thermal: Add support for the thermal sensor on
- A23/33
-In-Reply-To: <20160629134209.GE6095@lukather>
-References: <20160628101325.2522-1-icenowy@aosc.xyz>
- <20160628101325.2522-3-icenowy@aosc.xyz>
- <20160628114640.GE5550@lukather> <60021467122182@web19j.yandex.ru>
- <20160629121021.GD6095@lukather>
- <1112501467207099@web30g.yandex.ru> <20160629134209.GE6095@lukather>
-Message-ID: <1216731467208359@web29g.yandex.ru>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Jun 2016 15:56:50 +0200
+Subject: [RFC PATCH v4 3/5] PCI: Check platform specific ECAM quirks
+In-Reply-To: <5773CE49.1050802@codeaurora.org>
+References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
+ <1467100442-28078-4-git-send-email-tn@semihalf.com>
+ <577275EA.7010002@codeaurora.org>
+ <CADaLNDkhPZuG7UJ4SK_j5v_nXbd782Q17LAcXduG0uEObaFF=g@mail.gmail.com>
+ <5773A773.8040700@semihalf.com> <5773CE49.1050802@codeaurora.org>
+Message-ID: <CAKv+Gu9=0=qw70o1aYNg=tDyv4TguiG2WwXNK8RbWM1-ZcabUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-29.06.2016, 21:42, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Wed, Jun 29, 2016 at 09:31:39PM +0800, Icenowy Zheng wrote:
->> ?However, sun8iw3/5 ths is not even a GPADC... It's a specified IP,
->> ?only used as an ADC suitable for temperature sensor.
+On 29 June 2016 at 15:34, Christopher Covington <cov@codeaurora.org> wrote:
+> Hi Tomasz,
 >
-> It doesn't matter. It's the same IP, labelled differently.
+> On 06/29/2016 06:48 AM, Tomasz Nowicki wrote:
+>> On 28.06.2016 18:12, Duc Dang wrote:
+>>> On Tue, Jun 28, 2016 at 6:04 AM, Christopher Covington
+>>> <cov@codeaurora.org> wrote:
+>>>> Hi Tomasz,
 >
-> Maxime
+>>>> Ard's comments on v3 included:
+>>>>
+>>>> "... exact OEM table/rev id matches ..."
+>>>> "... substring match ... out of the question ..."
+>
+> Digging through the archives I see Jon Master commented earlier to "be
+> careful with substring match".
+>
+>>> I think having OEM Table ID as "PLAT " and then "PLAT2 " (the the
+>>> next version of the SoC) is common. So yes, matching full string is
+>>> better as we can use "PLAT2 " in MCFG table and not worry about the
+>>> "PLAT" sub-string match causes the quirk to be applied
+>>> unintentionally.
+>
+>> Note that platforms already shipped where OEM string has no padding will
+>
+> I'm confused by this statement. OEMID is defined as 6 bytes long and OEM
+> Table ID as 8 bytes long in the ACPI specification. As far as I can
+> tell, if your string isn't exactly that long, padding up to that length
+> is required.
+>
+>> have change the firmware or add 0 padding to our quirk array IDs.
+>
+> The fixed 6 or 8 character string compare, as used v2 of this patchset,
+> will be compatible with existing firmware as best I can tell. Adding
+> padding to the quirk array IDs is exactly what I'm suggesting, although
+> all the strings I've seen are space padded rather than null padded.
+>
+
+I don't think any interpretation of the 6 or 8 byte wide OEM fields is
+necessary to be able to match it against a list of known values as
+used by the quirky platforms. We need an exact match against whatever
+we know is in the table of an affected system, and whether a space
+qualifies as padding or as a character is irrelevant.
+
+> Matches:
+> {"APM   ", "XGENE   ", 1}
+> {"CAVIUM", "THUNDERX", 1}
+> {"HISI  ", "HISI-D02", 1}
+> {"HISI  ", "HISI-D03", 1}
+> {"QCOM  ", "QDF2432 ", 1}
+>
+
+I would not mind listing these as
+
+{ { 'A','P','M',' ',' ',' ',' '}, {'X','G','E','N','E',' ',' ',' '}, 1}
+...
+
+just to stress that we are not dealing with C strings (and to avoid
+having to deal with the implicit NUL terminator).
+That also means memcmp() with a fixed length is the most appropriate
+to perform the comparison
+
+> Given the above tuples, won't accidentally match:
+> (guessing at possible future ids)
+> {"APM   ", "XGENEi  ", 1}
+> {"CAVIUM", "THUNDERX", i} i != 1
+> {"CAVIUM", "THUNDERi", 1}
+> {"CAVIUM", "THUNDRXi", 1}
+> {"HISI  ", "HISI-D0i", 1} i != 2 && i != 3
+> {"QCOM  ", "QDF24ij ", 1} i != 3 && j != 2
+>
+> References for APM, HiSilicon IDs:
+> https://lists.linaro.org/pipermail/linaro-acpi/2016-June/007108.html
+> https://lists.linaro.org/pipermail/linaro-acpi/2016-June/007043.html
+>
+> Thanks,
+> Cov
 >
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-
-OK, now I will send only PLL2 driver.
+> Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
