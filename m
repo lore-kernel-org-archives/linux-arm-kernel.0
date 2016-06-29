@@ -1,114 +1,148 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 29 Jun 2016 22:45:53 +0200
-Subject: [PATCH 06/14] ARM: dts: sun8i: Add cpu0 label to sun8i-h3.dtsi
-In-Reply-To: <380ebf34-fd4a-ea2d-f9cf-68b8ede44757@megous.com>
-References: <20160623192104.18720-1-megous@megous.com>
- <20160623192104.18720-7-megous@megous.com>
- <CAGb2v66eskVAxdz8VtjBJBCO7VV9WL4bdFDVrPWrSmxk4RASCw@mail.gmail.com>
- <adaf7f61-af80-cc02-8c47-af721b86f81e@megous.com>
- <CAGb2v665O75vQEfo5WdWtWJSbKEbLi6MBAHbgZC7pyrOCOu+6g@mail.gmail.com>
- <20160625070208.GA4000@lukather>
- <380ebf34-fd4a-ea2d-f9cf-68b8ede44757@megous.com>
-Message-ID: <20160629204553.GJ6095@lukather>
+From: John.Youn@synopsys.com (John Youn)
+Date: Wed, 29 Jun 2016 13:58:34 -0700
+Subject: [PATCH 1/3] usb: dwc2: Add support for STM32F429/439/469 USB OTG
+ in FS mode with internal PHY
+In-Reply-To: <CAF3+Tqe=6JxiZ=iefKw=2wD5RQt3d-Mb960H4zum1tFoR08Dhg@mail.gmail.com>
+References: <1466562349-5043-1-git-send-email-bruherrera@gmail.com>
+ <436eef12-6204-d621-8574-92aea2d374fd@synopsys.com>
+ <CAF3+Tqe=6JxiZ=iefKw=2wD5RQt3d-Mb960H4zum1tFoR08Dhg@mail.gmail.com>
+Message-ID: <e7a712ee-c064-3393-c9ea-f80aeb3240cd@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, Jun 25, 2016 at 04:50:24PM +0200, Ond?ej Jirman wrote:
-> On 25.6.2016 09:02, Maxime Ripard wrote:
-> > On Sat, Jun 25, 2016 at 09:02:48AM +0800, Chen-Yu Tsai wrote:
-> >> On Sat, Jun 25, 2016 at 6:51 AM, Ond?ej Jirman <megous@megous.com> wrote:
-> >>> Hello,
-> >>>
-> >>> comments below.
-> >>>
-> >>> On 24.6.2016 05:48, Chen-Yu Tsai wrote:
-> >>>> On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
-> >>>>> From: Ondrej Jirman <megous@megous.com>
-> >>>>>
-> >>>>> Add label to the first cpu so that it can be referenced
-> >>>>> from derived dts files.
-> >>>>>
-> >>>>> Signed-off-by: Ondrej Jirman <megous@megous.com>
-> >>>>> ---
-> >>>>>  arch/arm/boot/dts/sun8i-h3.dtsi | 2 +-
-> >>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>>>
-> >>>>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> >>>>> index 9938972..82faefc 100644
-> >>>>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> >>>>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> >>>>> @@ -52,7 +52,7 @@
-> >>>>>                 #address-cells = <1>;
-> >>>>>                 #size-cells = <0>;
-> >>>>>
-> >>>>> -               cpu at 0 {
-> >>>>> +               cpu0: cpu at 0 {
-> >>>>>                         compatible = "arm,cortex-a7";
-> >>>>>                         device_type = "cpu";
-> >>>>>                         reg = <0>;
-> >>>>
-> >>>> Can you also set the cpu clock here? It is part of the SoC
-> >>>> and does not belong in the board DTS files.
-> >>>
-> >>> Do you mean operating-points, or something else? Different SBCs will
-> >>> probably require different combinations of operating points just for
-> >>> safety's sake, because they have different regulators and [some have
-> >>> botched] thermal designs, so it might make sense to customize it for
-> >>> differnt boards, and I don't feel adventurous enough setting it for all
-> >>> H3 boards out there.
-> >>
-> >> I meant clocks = <...> and clock-latency = <...>.
-> >>
-> >> These 2 are part of the SoC.
-> >>
-> >> The OPP can stay in the board files. It's a pity there's no standard
-> >> OPP table for H3 though. :(
-> > 
-> > This has never been the case, and we always had some deviation in the
-> > FEX files for all the SoCs.
-> > 
-> > If we could come up with standard OPPs that work for every one,
-> > there's no reason it can't happen here.
-> > 
-> > I don't really see why the thermal design should change anything. If a
-> > boards heats faster, it will throttle down to a lower OPP faster, but
-> > those OPPs are not going to change.
+On 6/29/2016 12:47 PM, Bruno Herrera wrote:
+> On Mon, Jun 27, 2016 at 7:51 PM, John Youn <John.Youn@synopsys.com> wrote:
+>> On 6/21/2016 7:26 PM, Bruno Herrera wrote:
+>>> Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
+>>
+>> Please add a commit message describing the purpose of your changes,
+>> some information about the platform you're adding, and the special
+>> handling of the GGPIO.
+>>
+> Ok, no problem.
 > 
-> I've no way to test, but I've been told some Sinovoip boards are really
-> bad in this regard (SoC is not even well thermally connected to the
-> PCB/PCB not having copper layer to spread the heat). Thermal sensor
-> readings happen at fixed intervals, so the question is if you can heat
-> up the soc from say 80?C (first trip point) to over 110?C in less than
-> that period (330ms currently).
+>>> ---
+>>>  drivers/usb/dwc2/core.c     | 18 ++++++++++++++++++
+>>>  drivers/usb/dwc2/core.h     |  5 +++++
+>>>  drivers/usb/dwc2/hcd.c      | 12 +++++++++++-
+>>>  drivers/usb/dwc2/hw.h       |  2 ++
+>>>  drivers/usb/dwc2/platform.c | 37 +++++++++++++++++++++++++++++++++++++
+>>>  5 files changed, 73 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
+>>> index 4135a5f..83fbed6 100644
+>>> --- a/drivers/usb/dwc2/core.c
+>>> +++ b/drivers/usb/dwc2/core.c
+>>> @@ -1276,6 +1276,23 @@ static void dwc2_set_param_hibernation(struct dwc2_hsotg *hsotg,
+>>>       hsotg->core_params->hibernation = val;
+>>>  }
+>>>
+>>> +static void dwc2_set_param_stm32_powerdown(struct dwc2_hsotg *hsotg,
+>>> +             int val)
+>>> +{
+>>> +     if (DWC2_OUT_OF_BOUNDS(val, 0, 1)) {
+>>> +             if (val >= 0) {
+>>> +                     dev_err(hsotg->dev,
+>>> +                             "'%d' invalid for parameter power down\n",
+>>> +                             val);
+>>> +                     dev_err(hsotg->dev, "power down must be 0 or 1\n");
+>>> +             }
+>>> +             val = 0;
+>>> +             dev_dbg(hsotg->dev, "Setting power down to %d\n", val);
+>>> +     }
+>>> +
+>>> +     hsotg->core_params->stm32_powerdown = val;
+>>> +}
+>>> +
+>>>  /*
+>>>   * This function is called during module intialization to pass module parameters
+>>>   * for the DWC_otg core.
+>>> @@ -1323,6 +1340,7 @@ void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
+>>>       dwc2_set_param_uframe_sched(hsotg, params->uframe_sched);
+>>>       dwc2_set_param_external_id_pin_ctl(hsotg, params->external_id_pin_ctl);
+>>>       dwc2_set_param_hibernation(hsotg, params->hibernation);
+>>> +     dwc2_set_param_stm32_powerdown(hsotg, params->stm32_powerdown);
+>>>  }
+>>>
+>>>  /*
+>>> diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
+>>> index 3c58d63..d3e4fcb 100644
+>>> --- a/drivers/usb/dwc2/core.h
+>>> +++ b/drivers/usb/dwc2/core.h
+>>> @@ -386,6 +386,10 @@ enum dwc2_ep0_state {
+>>>   *                   needed.
+>>>   *                   0 - No (default)
+>>>   *                   1 - Yes
+>>> + * @stm32_powerdown: Enable STM32 specific USB FS transceiver power down
+>>> + *                   control.
+>>> + *                   0 = USB FS transceiver disabled (default)
+>>> + *                   1 = USB FS transceiver enabled
+>>>   *
+>>>   * The following parameters may be specified when starting the module. These
+>>>   * parameters define how the DWC_otg controller should be configured. A
+>>> @@ -426,6 +430,7 @@ struct dwc2_core_params {
+>>>       int uframe_sched;
+>>>       int external_id_pin_ctl;
+>>>       int hibernation;
+>>> +     int stm32_powerdown;
+>>>  };
+>>>
+>>>  /**
+>>> diff --git a/drivers/usb/dwc2/hcd.c b/drivers/usb/dwc2/hcd.c
+>>> index 2df3d04..4f9bb93 100644
+>>> --- a/drivers/usb/dwc2/hcd.c
+>>> +++ b/drivers/usb/dwc2/hcd.c
+>>> @@ -118,7 +118,7 @@ static void dwc2_init_fs_ls_pclk_sel(struct dwc2_hsotg *hsotg)
+>>>
+>>>  static int dwc2_fs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
+>>>  {
+>>> -     u32 usbcfg, i2cctl;
+>>> +     u32 usbcfg, usbgpio, i2cctl;
+>>
+>> The convention in this driver would be to just call 'usbgpio' -> 'ggpio'
 > 
-> I say it shouldn't be a problem, if that small thing is drawing say 2W
-> at max load. It will burn or trigger a second trip point before the
-> first one has a chance to trigger and the kernel will shut down. I
-> remember tkaiser saying that he has to run that board at 240MHz max. But
-> perhaps I'm misremembering.
+> OK.
+>>
+>>>       int retval = 0;
+>>>
+>>>       /*
+>>> @@ -142,6 +142,16 @@ static int dwc2_fs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
+>>>                               return retval;
+>>>                       }
+>>>               }
+>>> +
+>>> +             if (hsotg->core_params->stm32_powerdown > 0) {
+>>> +                     dev_dbg(hsotg->dev, "STM32 FS PHY enabling transceiver\n");
+>>> +                     /* STM32 uses the GGPIO register as general core
+>>> +                      * configuration register.
+>>> +                      */
+>>> +                     usbgpio = dwc2_readl(hsotg->regs + GGPIO);
+>>> +                     usbgpio |= STM32_OTG_GCCFG_PWRDWN;
+>>> +                     dwc2_writel(usbgpio, hsotg->regs + GGPIO);
+>>> +             }
+>>>       }
+>>>
+>>>       /*
+>>> diff --git a/drivers/usb/dwc2/hw.h b/drivers/usb/dwc2/hw.h
+>>> index 281b57b..d5f9294 100644
+>>> --- a/drivers/usb/dwc2/hw.h
+>>> +++ b/drivers/usb/dwc2/hw.h
+>>> @@ -224,6 +224,8 @@
+>>>
+>>>  #define GPVNDCTL                     HSOTG_REG(0x0034)
+>>>  #define GGPIO                                HSOTG_REG(0x0038)
+>>> +#define STM32_OTG_GCCFG_PWRDWN               (1 << 16)
+>>> +
+>>
+>> Also, bitfields for GGPIO should be named: GGPIO_xxx
 > 
-> I'm just speculating.
+> Could it be -> GGPIO_STM32_OTG_GCCFG_PWRDWN
+> From my understand the GGPIO are platform/vendor dependent so in the
+> future some other vendor could use the same bit for other purpose.
+> Should we keep it defined here or only in the scope it is used?
 
-Yes, but that's just poor thermal design. What I was saying is that
-even if we really need to throttle the SoC to 240 MHz on that board
-because it heats too much, the couple of the frequency and the voltage
-will likely be the same across all boards. It's just the amount of
-time we'll spend using it that will differ.
+Here is fine. We already have overlapping bitfield definitions for
+some registers due to differences in host or device mode.
 
-But that's just my understanding, I might be speaking non-sense :)
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160629/e34112c9/attachment.sig>
+Regards,
+John
