@@ -1,150 +1,118 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Wed, 29 Jun 2016 17:49:08 +0200
-Subject: [PATCH] xen/arm: register clocks used by the hypervisor
-In-Reply-To: <576AAE36.9070501@arm.com>
-References: <1466504165-9214-1-git-send-email-dirk.behme@de.bosch.com>
- <576AAE36.9070501@arm.com>
-Message-ID: <143393c4-739a-6e29-cbfa-128fdfcb1ed0@de.bosch.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 29 Jun 2016 17:58:39 +0200
+Subject: [PATCH v7 01/17] KVM: arm/arm64: move redistributor kvm_io_devices
+In-Reply-To: <20160628123230.26255-2-andre.przywara@arm.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+ <20160628123230.26255-2-andre.przywara@arm.com>
+Message-ID: <a0ff7bc8-deda-87d3-199f-9ff1dcfa49e4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Hi Andre,
 
-On 22.06.2016 17:26, Julien Grall wrote:
-> Hello Dirk,
->
-> On 21/06/16 11:16, Dirk Behme wrote:
->> Some clocks might be used by the Xen hypervisor and not by the Linux
->> kernel. If these are not registered by the Linux kernel, they might be
->> disabled by clk_disable_unused() as the kernel doesn't know that they
->> are used. The clock of the serial console handled by Xen is one
->> example for this. It might be disabled by clk_disable_unused() which
->> stops the whole serial output, even from Xen, then.
->>
->> Up to now, the workaround for this has been to use the Linux kernel
->> command line parameter 'clk_ignore_unused'. See Xen bug
->>
->> http://bugs.xenproject.org/xen/bug/45
->>
->> too.
->>
->> To fix this, we will add the "unused" clocks in Xen to the hypervisor
->> node. The Linux kernel has to register the clocks from the hypervisor
->> node, then.
->>
->> Therefore, check if there is a "clocks" entry in the hypervisor node
->> and if so register the given clocks to the Linux kernel clock
->> framework and with this mark them as used. This prevents the clocks
->> from being disabled.
->
-> This new property would need to be documented in:
->    - linux/Documentation/devicetree/bindings/arm/xen.txt
->    - xen/docs/misc/arm/device-tree/guest.txt
-
-
-Yes, as already discussed, I'll have a look to that.
-
-
->> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
->> ---
->>   arch/arm/xen/enlighten.c | 35 +++++++++++++++++++++++++++++++++++
->>   1 file changed, 35 insertions(+)
->>
->> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->> index 75cd734..ee6e81f 100644
->> --- a/arch/arm/xen/enlighten.c
->> +++ b/arch/arm/xen/enlighten.c
->> @@ -22,6 +22,7 @@
->>   #include <linux/of.h>
->>   #include <linux/of_irq.h>
->>   #include <linux/of_address.h>
->> +#include <linux/clk-provider.h>
->>   #include <linux/cpuidle.h>
->>   #include <linux/cpufreq.h>
->>   #include <linux/cpu.h>
->> @@ -381,6 +382,40 @@ static int __init xen_pm_init(void)
->>   }
->>   late_initcall(xen_pm_init);
->>
->> +/*
->> + * Check if we want to register some clocks, that they
->> + * are not freed because unused by clk_disable_unused().
->> + * E.g. the serial console clock.
->> + */
->> +static int __init xen_arm_register_clks(void)
->> +{
->> +    struct clk *clk;
->> +    unsigned int i, count;
->> +    int ret;
->> +
->> +    count = of_clk_get_parent_count(xen_node);
->
-> The code in this file has changed quite a lot with the support of ACPI.
-> For instance "xen_node" is not anymore a global variable. Can you rebase
-> your rework on top of the branch for-linus-4.8?
->
-> You can find the branch in:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip.git
-
-
-I'll have a look to that, too. Thanks!
-
-Hopefully it won't be too complicated to rebase ;)
-
-
->> +    if (!count)
->> +        return 0;
->> +
->> +    for (i = 0; i < count; i++) {
->> +        clk = of_clk_get(xen_node, i);
->> +        if (IS_ERR(clk)) {
->> +            pr_err("Xen failed to register clock %i. Error: %li\n",
->> +                   i, PTR_ERR(clk));
->> +            return PTR_ERR(clk);
->> +        }
->> +
->> +        ret = clk_prepare_enable(clk);
->
-> I am not sure why we would want Linux to enable the clock. Should not it
-> be already done either by the firmware or Xen?
-
-
-After having a closer look to that, my understanding:
-
-We have to call clk_prepare(clk) and clk_enable(clk) in this order (and 
-clk_prepare_enable() does this in one call) to get the enable count 
-incremented
-
-http://lxr.free-electrons.com/source/drivers/clk/clk.c#L751
-
-to prevent clk_disable_unused() to disable this clock.
-
-That does mean that yes, you are right, the (hw-) clock itself is 
-already enabled by the firmware or Xen. But we are not really interested 
-in enabling the clock, here, but get the Linux kernel's enable_count 
-incremented.
-
-
-> Would it be possible to use the flags CLK_IGNORE_UNUSED instead? So the
-> clock will be ignored by clk_disable_unused_subtree.
-
-
-Yes, using CLK_IGNORE_UNUSED is an option. But ;)
-
-But we can't set it directly in enlighten.c as we can't access the flags 
-part of the clock structs from outside the core clock code.
-
-That would mean that we have to to set the clock flags in the device 
-tree. What would mean that for each clock we don't want to be disabled 
-we have to manipulate the root clock entry of that clock in the device 
-tree. While that would be possible, it doesn't sound that easy and I 
-wonder if that wouldn't be too complicated to be done in Xen (?)
-
-
-You will correct me if I'm wrong ;)
-
-
-Many thanks!
-
-Dirk
+On 28/06/2016 14:32, Andre Przywara wrote:
+> Logically a GICv3 redistributor is assigned to a (v)CPU, so we should
+> aim to keep redistributor related variables out of our struct vgic_dist.
+> 
+> Let's start by replacing the redistributor related kvm_io_device array
+> with two members in our existing struct vgic_cpu, which are naturally
+> per-VCPU and thus don't require any allocation / freeing.
+> So apart from the better fit with the redistributor design this saves
+> some code as well.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/vgic/vgic.h          |  8 +++++++-
+>  virt/kvm/arm/vgic/vgic-init.c    |  1 -
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 22 ++++++++--------------
+>  3 files changed, 15 insertions(+), 16 deletions(-)
+> 
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index 3fbd175..2f26f37 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -145,7 +145,6 @@ struct vgic_dist {
+>  	struct vgic_irq		*spis;
+>  
+>  	struct vgic_io_device	dist_iodev;
+> -	struct vgic_io_device	*redist_iodevs;
+>  };
+>  
+>  struct vgic_v2_cpu_if {
+> @@ -193,6 +192,13 @@ struct vgic_cpu {
+>  	struct list_head ap_list_head;
+>  
+>  	u64 live_lrs;
+> +
+> +	/*
+> +	 * Members below are used with GICv3 emulation only and represent
+> +	 * parts of the redistributor.
+> +	 */
+> +	struct vgic_io_device	rd_iodev;
+> +	struct vgic_io_device	sgi_iodev;
+>  };
+>  
+>  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index a1442f7..90cae48 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -271,7 +271,6 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+>  	dist->initialized = false;
+>  
+>  	kfree(dist->spis);
+> -	kfree(dist->redist_iodevs);
+>  	dist->nr_spis = 0;
+>  
+>  	mutex_unlock(&kvm->lock);
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index a0c515a..fc7b6c9 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -285,21 +285,14 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
+>  
+>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+>  {
+> -	int nr_vcpus = atomic_read(&kvm->online_vcpus);
+>  	struct kvm_vcpu *vcpu;
+> -	struct vgic_io_device *devices;
+>  	int c, ret = 0;
+>  
+> -	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
+> -			  GFP_KERNEL);
+> -	if (!devices)
+> -		return -ENOMEM;
+> -
+>  	kvm_for_each_vcpu(c, vcpu, kvm) {
+>  		gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
+>  		gpa_t sgi_base = rd_base + SZ_64K;
+> -		struct vgic_io_device *rd_dev = &devices[c * 2];
+> -		struct vgic_io_device *sgi_dev = &devices[c * 2 + 1];
+> +		struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
+> +		struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
+>  
+>  		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
+>  		rd_dev->base_addr = rd_base;
+> @@ -335,14 +328,15 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+>  	if (ret) {
+>  		/* The current c failed, so we start with the previous one. */
+>  		for (c--; c >= 0; c--) {
+> +			struct vgic_cpu *vgic_cpu;
+> +
+> +			vcpu = kvm_get_vcpu(kvm, c);
+> +			vgic_cpu = &vcpu->arch.vgic_cpu;
+>  			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> -						  &devices[c * 2].dev);
+> +						  &vgic_cpu->rd_iodev.dev);
+>  			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> -						  &devices[c * 2 + 1].dev);
+> +						  &vgic_cpu->sgi_iodev.dev);
+>  		}
+> -		kfree(devices);
+> -	} else {
+> -		kvm->arch.vgic.redist_iodevs = devices;
+>  	}
+>  
+>  	return ret;
+> 
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
