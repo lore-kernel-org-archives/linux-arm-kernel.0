@@ -1,41 +1,62 @@
-From: mmayer@broadcom.com (Markus Mayer)
-Date: Wed, 29 Jun 2016 12:49:34 -0700
-Subject: [PATCH] arm64: Add Broadcom Set Top Box Kconfig entry point
-Message-ID: <1467229774-20738-1-git-send-email-mmayer@broadcom.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 29 Jun 2016 12:51:37 -0700
+Subject: [PATCH 2/2] arm64: Always provide compat /proc/cpuinfo for
+ 32-bit tasks
+In-Reply-To: <1464706504-25224-3-git-send-email-catalin.marinas@arm.com>
+References: <1464706504-25224-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20160629195137.GA142854@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <f.fainelli@gmail.com>
+Hi all,
 
-Add an ARCH_BRCMSTB Kconfig symbol which allows us not to update the
-dependencies for all STB-related drivers. Select BRCMSTB_L2_IRQ and
-GENERIC_IRQ_CHIP which are required for proper functioning.
+On Tue, May 31, 2016 at 03:55:04PM +0100, Catalin Marinas wrote:
+> Currently, the compat /proc/cpuinfo is provided only if a task has the
+> PER_LINUX32 personality, either by setting it explicitly or by
+> inheriting it from the parent task. This is in line with the "uname -m"
+> behaviour.
+> 
+> However, there are 32-bit user applications making use of the
+> /proc/cpuinfo and unaware of a need to set the personality. This patch
+> changes the arm64 /proc/cpuinfo logic to provide the compat information
+> if the task is 32-bit _or_ the PER_LINUX32 personality is set.
+> 
+> Cc: <stable@vger.kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Signed-off-by: Doug Berger <opendmb@gmail.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
----
+What's the status on this patch? The previous patch (which was accepted
+already) is indeed confusing, because ARM32 processes on an ARM64 system
+are not necessarily setting PER_LINUX32.
 
- arch/arm64/Kconfig.platforms | 7 +++++++
- 1 file changed, 7 insertions(+)
+I'm also curious, why was 'model name' removed from ARM64 in the first
+place? Plenty of other architectures support a similar property, and
+it's useful for some tools that already parse this, such as coreutils
+`uname -p` on Gentoo (and presumably others -- my Ubuntu machine must be
+similarly patched, as it supports `uname -p` on x86_64).
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 7ef1d05..22b5c7f 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -29,6 +29,13 @@ config ARCH_BERLIN
- 	help
- 	  This enables support for Marvell Berlin SoC Family
- 
-+config ARCH_BRCMSTB
-+	bool "Broadcom Set-Top-Box SoCs"
-+	select BRCMSTB_L2_IRQ
-+	select GENERIC_IRQ_CHIP
-+	help
-+	  This enables support for Broadcom's ARMv8 Set Top Box SoCs
-+
- config ARCH_EXYNOS
- 	bool "ARMv8 based Samsung Exynos SoC family"
- 	select COMMON_CLK_SAMSUNG
--- 
-2.7.4
+If we were to just stick 'model name' back in unconditionally, we could
+avoid the objections Will raised entirely :)
+
+Regards,
+Brian
+
+> ---
+>  arch/arm64/kernel/cpuinfo.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index c173d329397f..bd6a122ea856 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -106,7 +106,8 @@ static const char *const compat_hwcap2_str[] = {
+>  static int c_show(struct seq_file *m, void *v)
+>  {
+>  	int i, j;
+> -	bool compat = personality(current->personality) == PER_LINUX32;
+> +	bool compat = is_compat_task() ||
+> +		personality(current->personality) == PER_LINUX32;
+>  
+>  	for_each_online_cpu(i) {
+>  		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
