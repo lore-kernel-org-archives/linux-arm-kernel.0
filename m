@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Jun 2016 19:05:18 +0100
-Subject: Applied "mfd: rn5t618: Register power off callback optionally" to the
- regulator tree
-In-Reply-To: <20160626011515.4428-5-stefan@agner.ch>
-Message-ID: <E1bIJrS-0003eP-5Y@finisterre>
+Date: Wed, 29 Jun 2016 19:05:31 +0100
+Subject: Applied "ARM: dts: meson: minix-neo-x8: define PMIC as power
+ controller" to the regulator tree
+In-Reply-To: <20160605001749.4062-2-stefan@agner.ch>
+Message-ID: <E1bIJrf-0003iU-F2@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   mfd: rn5t618: Register power off callback optionally
+   ARM: dts: meson: minix-neo-x8: define PMIC as power controller
 
 has been applied to the regulator tree at
 
@@ -34,42 +34,35 @@ to this mail.
 Thanks,
 Mark
 
->From fd65ae4cb65a9e41af44e37318afb39045d86bf2 Mon Sep 17 00:00:00 2001
+>From 229d641d72d1ecfd21186a52c38d012149097eec Mon Sep 17 00:00:00 2001
 From: Stefan Agner <stefan@agner.ch>
-Date: Tue, 28 Jun 2016 22:53:21 -0700
-Subject: [PATCH] mfd: rn5t618: Register power off callback optionally
+Date: Tue, 28 Jun 2016 22:53:18 -0700
+Subject: [PATCH] ARM: dts: meson: minix-neo-x8: define PMIC as power
+ controller
 
-Only register power off if the PMIC is defined as system power
-controller (see Documentation/devicetree/bindings/power/
-power-controller.txt).
+The PMIC driver used to register itself as poweroff controller by
+default, hence assuming that this device is using the PMIC as
+system power controller.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Acked-by: Carlo Caione <carlo@endlessm.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/rn5t618.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/meson8-minix-neo-x8.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mfd/rn5t618.c b/drivers/mfd/rn5t618.c
-index c86160d3a773..1831740d9016 100644
---- a/drivers/mfd/rn5t618.c
-+++ b/drivers/mfd/rn5t618.c
-@@ -102,9 +102,13 @@ static int rn5t618_i2c_probe(struct i2c_client *i2c,
- 		return ret;
- 	}
+diff --git a/arch/arm/boot/dts/meson8-minix-neo-x8.dts b/arch/arm/boot/dts/meson8-minix-neo-x8.dts
+index 4f536bb1f002..8bceb8d343f6 100644
+--- a/arch/arm/boot/dts/meson8-minix-neo-x8.dts
++++ b/arch/arm/boot/dts/meson8-minix-neo-x8.dts
+@@ -80,6 +80,7 @@
+ 	pmic at 32 {
+ 		compatible = "ricoh,rn5t618";
+ 		reg = <0x32>;
++		system-power-controller;
  
--	if (!pm_power_off) {
--		rn5t618_pm_power_off = priv;
--		pm_power_off = rn5t618_power_off;
-+	if (of_device_is_system_power_controller(i2c->dev.of_node)) {
-+		if (!pm_power_off) {
-+			rn5t618_pm_power_off = priv;
-+			pm_power_off = rn5t618_power_off;
-+		} else {
-+			dev_warn(&i2c->dev, "Poweroff callback already assigned\n");
-+		}
- 	}
- 
- 	return 0;
+ 		regulators {
+ 		};
 -- 
 2.8.1
