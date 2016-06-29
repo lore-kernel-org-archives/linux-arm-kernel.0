@@ -1,46 +1,47 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 29 Jun 2016 12:00:51 +0300
-Subject: [RESEND PATCHv2 03/28] ARM: OMAP2+: omap_device: create clock
- alias purely from DT data
-In-Reply-To: <20160629075446.GK28140@atomide.com>
-References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
- <1465844702-12200-4-git-send-email-t-kristo@ti.com>
- <20160628070011.GD28140@atomide.com> <577373F0.5080700@ti.com>
- <5773745A.6020307@ti.com> <20160629075446.GK28140@atomide.com>
-Message-ID: <57738E43.6060706@ti.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 29 Jun 2016 10:02:59 +0100
+Subject: [PATCH] arm64: tegra: Add missing Smaug revision
+In-Reply-To: <20160629085229.31350-1-acourbot@nvidia.com>
+References: <20160629085229.31350-1-acourbot@nvidia.com>
+Message-ID: <57738EC3.3070200@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/16 10:54, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [160629 00:13]:
->> On 29/06/16 10:08, Tero Kristo wrote:
->>> On 28/06/16 10:00, Tony Lindgren wrote:
->>>> * Tero Kristo <t-kristo@ti.com> [160613 12:07]:
->>>>> This avoids the need to add most of the clock aliases under
->>>>> drivers/clk/ti/clk-xyz.c files.
->>>>
->>>> This is a nice improvment, probably best to queu this along
->>>> with the rest of the series via the clock tree:
->>>>
->>>> Acked-by: Tony Lindgren <tony@atomide.com>
->>>>
->>>> Or please let me know if you want me to pick this separately.
->>>>
->>>> Regards,
->>>>
->>>> Tony
->>>>
->>>
->>> Patches #3, #6, #7, #8 you can pick up separately (but you will have
->>> some conflicts due to missing ti_clk_get implementation.) These patches
->>> are required for this series to work properly though.
->>
->> And patch #9 you can pick up also obviously...
->
-> OK can you please repost the ones I can pick for v4.8 merge window
-> to get them out of the way? There were some merge conflicts against
-> Linux next when I tried to apply them for testing yesterday.
 
-Yeah, I can repost these separately once I split up the series.
+On 29/06/16 09:52, Alexandre Courbot wrote:
+> The "google,smaug-rev2" string is missing from the compatible list of
+> Smaug's DT. The differences of rev2 are not relevant at our current
+> level of support and it boots just fine, so add it.
+> 
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> index 431266a48e9c..82a96bd27bc8 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> +++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> @@ -11,7 +11,8 @@
+>  	compatible = "google,smaug-rev8", "google,smaug-rev7",
+>  		     "google,smaug-rev6", "google,smaug-rev5",
+>  		     "google,smaug-rev4", "google,smaug-rev3",
+> -		     "google,smaug-rev1", "google,smaug", "nvidia,tegra210";
+> +		     "google,smaug-rev2", "google,smaug-rev1",
+> +		     "google,smaug", "nvidia,tegra210";
+>  
+>  	aliases {
+>  		serial0 = &uarta;
 
--Tero
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+
+Olof, let us know if you have any comments on this? Looks like I missed
+this initially because the rev2 support had been broken out in the
+chrome-os kernel tree to support some specific features for this board.
+However, I think for now it is ok to include rev2 here as well for mainline.
+
+Cheers
+Jon
+
+-- 
+nvpublic
