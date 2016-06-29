@@ -1,33 +1,84 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 29 Jun 2016 19:44:51 +0200
-Subject: [PATCH] dmaengine: at_xdmac: fix debug string
-Message-ID: <1467222291-13045-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 29 Jun 2016 18:48:18 +0100
+Subject: [RFC PATCH v1] ARM: tango: add Suspend-to-RAM support
+In-Reply-To: <5773D3FB.4030101@sigmadesigns.com>
+References: <5773D3FB.4030101@sigmadesigns.com>
+Message-ID: <577409E2.7020106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mbr_ds is an integer, don't use %pad to print it.
 
-Fixes: commit 268914f4e7a0 ("dmaengine: at_xdmac: use %pad format string for dma_addr_t")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/dma/at_xdmac.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index 8e304b1befc5..e4c5522f9dcd 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -1195,8 +1195,8 @@ static struct at_xdmac_desc *at_xdmac_memset_create_desc(struct dma_chan *chan,
- 	desc->lld.mbr_cfg = chan_cc;
- 
- 	dev_dbg(chan2dev(chan),
--		"%s: lld: mbr_da=%pad, mbr_ds=%pad, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
--		__func__, &desc->lld.mbr_da, &desc->lld.mbr_ds, desc->lld.mbr_ubc,
-+		"%s: lld: mbr_da=%pad, mbr_ds=0x%08x, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
-+		__func__, &desc->lld.mbr_da, desc->lld.mbr_ds, desc->lld.mbr_ubc,
- 		desc->lld.mbr_cfg);
- 
- 	return desc;
+On 29/06/16 14:58, Marc Gonzalez wrote:
+> Ask firmware to put RAM in self-refresh mode and power system down.
+>
+>      echo mem > /sys/power/state
+>
+> See Documentation/power/states.txt
+>
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+> This is a RFC because I have a few doubts:
+> 1) return value when tango_suspend() fails and unexpectedly returns (I used -EIO)
+> 2) conditionally building pm.c (using CONFIG_SUSPEND? CONFIG_PM_SLEEP? other?)
+> 3) .valid is required, right?
+> ---
+>   arch/arm/mach-tango/Makefile |  1 +
+>   arch/arm/mach-tango/pm.c     | 37 +++++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-tango/smc.h    |  1 +
+>   3 files changed, 39 insertions(+)
+>   create mode 100644 arch/arm/mach-tango/pm.c
+>
+> diff --git a/arch/arm/mach-tango/Makefile b/arch/arm/mach-tango/Makefile
+> index 7ca753aa9fb6..822b7ca803c6 100644
+> --- a/arch/arm/mach-tango/Makefile
+> +++ b/arch/arm/mach-tango/Makefile
+> @@ -3,3 +3,4 @@ AFLAGS_smc.o := -Wa,-march=armv7-a$(plus_sec)
+>
+>   obj-y += setup.o smc.o xenv.o
+>   obj-$(CONFIG_SMP) += platsmp.o
+> +obj-$(CONFIG_SUSPEND) += pm.o
+> diff --git a/arch/arm/mach-tango/pm.c b/arch/arm/mach-tango/pm.c
+> new file mode 100644
+> index 000000000000..08a39beaea09
+> --- /dev/null
+> +++ b/arch/arm/mach-tango/pm.c
+> @@ -0,0 +1,37 @@
+> +#include <linux/init.h>
+> +#include <linux/suspend.h>
+> +#include <asm/suspend.h>
+> +#include "smc.h"
+> +
+> +static int tango_pm_powerdown(unsigned long arg)
+> +{
+> +	tango_suspend(virt_to_phys(cpu_resume));
+> +
+> +	return -EIO; /* tango_suspend has failed */
+> +}
+> +
+> +static int tango_pm_enter(suspend_state_t state)
+> +{
+> +	if (state == PM_SUSPEND_MEM)
+> +		return cpu_suspend(0, tango_pm_powerdown);
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static int tango_pm_valid(suspend_state_t state)
+> +{
+> +	return state == PM_SUSPEND_MEM;
+> +}
+> +
+> +static const struct platform_suspend_ops tango_pm_ops = {
+> +	.enter = tango_pm_enter,
+> +	.valid = tango_pm_valid,
+
+You can use suspend_valid_only_mem instead which does exactly same thing.
+
 -- 
-2.8.1
+Regards,
+Sudeep
+
+-- 
+Regards,
+Sudeep
