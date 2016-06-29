@@ -1,38 +1,44 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Wed, 29 Jun 2016 14:34:13 +0200
-Subject: [PATCH v2 3/6] ARM64: dts: amlogic: gxbb: Enable secure monitor
+Date: Wed, 29 Jun 2016 14:34:12 +0200
+Subject: [PATCH v2 2/6] documentation: Add secure monitor bindings
+ documentation
 In-Reply-To: <1467203656-14381-1-git-send-email-carlo@caione.org>
 References: <1467203656-14381-1-git-send-email-carlo@caione.org>
-Message-ID: <1467203656-14381-4-git-send-email-carlo@caione.org>
+Message-ID: <1467203656-14381-3-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-Add the secure monitor node in the Amlogic Meson GXBB DTSI file to
-enable it.
+Add the binding documentation for the Amlogic secure monitor driver.
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ .../devicetree/bindings/firmware/meson/meson_sm.txt       | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 832815d..f2a4734 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -97,6 +97,12 @@
- 		method = "smc";
- 	};
- 
+diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+new file mode 100644
+index 0000000..c248cd4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+@@ -0,0 +1,15 @@
++* Amlogic Secure Monitor
++
++In the Amlogic SoCs the Secure Monitor code is used to provide access to the
++NVMEM, enable JTAG, set USB boot, etc...
++
++Required properties for the secure monitor node:
++- compatible: Should be "amlogic,meson-gxbb-sm"
++
++Example:
++
 +	firmware {
 +		sm: secure-monitor {
 +			compatible = "amlogic,meson-gxbb-sm";
 +		};
 +	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
 -- 
 2.7.4
