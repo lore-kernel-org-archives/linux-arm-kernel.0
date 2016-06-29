@@ -1,63 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Jun 2016 00:01:50 -0700
-Subject: [RESEND PATCHv2 04/28] ARM: OMAP2+: hwmod: use new ti_clk_get
- API to search for clock handles
-In-Reply-To: <577367CB.6090703@ti.com>
-References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
- <1465844702-12200-5-git-send-email-t-kristo@ti.com>
- <20160628065712.GC28140@atomide.com> <577367CB.6090703@ti.com>
-Message-ID: <20160629070149.GI28140@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 29 Jun 2016 09:03:33 +0200
+Subject: [PATCH] ARM: dts: sun7i: Fix pll3x2 and pll7x2 not having a
+ parent clock
+In-Reply-To: <1467144674-21322-1-git-send-email-hdegoede@redhat.com>
+References: <1467144674-21322-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160629070333.GA6095@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [160628 23:19]:
-> On 28/06/16 09:57, Tony Lindgren wrote:
-> > Hi,
-> > 
-> > * Tero Kristo <t-kristo@ti.com> [160613 12:07]:
-> > > The new API avoids the need to add clock aliases for most of the clocks,
-> > > should use of it is preferred. Many of the existing clock aliases are
-> > > only created because of hwmod data.
-> > > 
-> > > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > > ---
-> > >   arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
-> > >   1 file changed, 3 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> > > index 83cb527..0ea869c 100644
-> > > --- a/arch/arm/mach-omap2/omap_hwmod.c
-> > > +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> > > @@ -786,7 +786,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
-> > >   	if (!oh->main_clk)
-> > >   		return 0;
-> > > 
-> > > -	oh->_clk = clk_get(NULL, oh->main_clk);
-> > > +	oh->_clk = ti_clk_get(oh->main_clk);
-> > >   	if (IS_ERR(oh->_clk)) {
-> > >   		pr_warn("omap_hwmod: %s: cannot clk_get main_clk %s\n",
-> > >   			oh->name, oh->main_clk);
-> > 
-> > After thinking about this for a while I think code outside TI specific
-> > clock implementation should use just clk_get(). Otherwise we create more
-> > dependencies to move code to live under drivers subdirectory.
-> > 
-> > Can't we have clk_get() call a SoC specific helper function if clock
-> > is not found?
+On Tue, Jun 28, 2016 at 10:11:14PM +0200, Hans de Goede wrote:
+> Fix pll3x2 and pll7x2 not having a parent clock, specifically this
+> fixes the kernel turning of pll3 while simplefb is using it when
+> uboot has configured things to use pll3x2 as lcd ch clk parent.
 > 
-> That is for Mike / Stephen to answer. Implementing something like this
-> sounds trivial, I could just hook up the ti_clk_get being called here.
-> However, any attempted changes to the clkdev implementation have been shot
-> down so far, thus I did this.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Probably best to send a minimal patch for that for review. We want to
-have the clock framework consumers using the standard interface.
+Applied, thanks!
+Maxime
 
-> The problem is still the clocks which are just referred via a name only, not
-> via a DT node.
-
-OK
-
-Regards,
-
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160629/517e8d41/attachment.sig>
