@@ -1,58 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 29 Jun 2016 09:28:00 -0600
-Subject: [PATCH 01/10] Documentation: dt-bindings: mailbox: tegra: Add
- binding for HSP mailbox
-In-Reply-To: <57736311.6020304@nvidia.com>
-References: <20160627090248.23621-1-josephl@nvidia.com>
- <20160627090248.23621-2-josephl@nvidia.com> <57714C85.50802@wwwdotorg.org>
- <57724039.7080007@nvidia.com> <5772CB12.5080408@wwwdotorg.org>
- <57736311.6020304@nvidia.com>
-Message-ID: <5773E900.8060903@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Jun 2016 17:32:47 +0200
+Subject: [PATCH 0/6] ARM: NUC900: Add NUC970 SoC support
+In-Reply-To: <1466851042-22239-1-git-send-email-vw@iommu.org>
+References: <1466851042-22239-1-git-send-email-vw@iommu.org>
+Message-ID: <6119546.EJZ9lH2GPk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2016 11:56 PM, Joseph Lo wrote:
-> On 06/29/2016 03:08 AM, Stephen Warren wrote:
->> On 06/28/2016 03:15 AM, Joseph Lo wrote:
->>> On 06/27/2016 11:55 PM, Stephen Warren wrote:
->>>> On 06/27/2016 03:02 AM, Joseph Lo wrote:
-> snip.
->>>
->>> Currently the usage of HSP HW in the downstream kernel is something like
->>> the model below.
->>>
->>> remote_processor_A-\
->>> remote_processor_B--->hsp at 1000 (doorbell func) <-> host CPU
->>> remote_processor_C-/
->>>
->>> remote_processor_D -> hsp at 2000 (shared mailbox) <-> CPU
->>>
->>> remote_processor_E -> hsp at 3000 (shared mailbox) <-> CPU
->>>
->>> I am thinking if we can just add the appropriate compatible strings for
->>> it to replace "nvidia,tegra186-hsp". e.g. "nvidia,tegra186-hsp-doorbell"
->>> and "nvidia,tegra186-hsp-sharedmailbox". So the driver can probe and
->>> initialize correctly depend on the compatible property. How do you think
->>> about it? Is this the same as the (b) you mentioned above?
->>
->> Yes, that would be (b) above.
->>
->> However, please do note (a): I expect that splitting things up will turn
->> out to be a mistake, as it has for other HW modules in the past. I would
->> far rather see a single hsp node in DT, since there is a single HSP
->> block in HW. Sure that block has multiple sub-functions. However, there
->> is common logic that affects all of those sub-functions and binds
->> everything into a single HW module. If you represent the HW module using
->> multiple different DT nodes, it will be hard to correctly represent that
->> common logic. Conversely, I see no real advantage to splitting up the DT
->> node. I strongly believe we should have a single "hsp" node in DT.
->
-> We have 6 HSP block in HW. FYI.
+On Saturday, June 25, 2016 6:37:16 PM CEST Wan Zongshun wrote:
+> This patch series added Nuvoton new SoC NUC970 development board
+> support, this nuc970 belongs to nuc900 series, but many features are
+> not compatible with old nuc900 SoCs like nuc910, nuc920.
+> 
+> Those patches are basing on old w90x900 codes, and are using standard
+> linux subsystem interface, such as dts, driver/clk, driver/clocksource
+> , driver/irqchip drivers.
+> 
+> The old w90x900 plat such as nuc910,nuc960 codes will also be changed
+> to new style according to nuc970 codes after those patches was accepted.
 
-Yes, we have 6 /instances/ of the overall HSP block. Those should each 
-have their own node, since they're entirely separate modules, all 
-instances of the same configurable IP block.
+Looks good overall. I have a number of comments but they should
+all be easy to address, and the general approach of adding this
+first makes sense to me as well.
 
-Above, I was talking about the sub-blocks within each HSP instance, 
-which should all be represented into a single node per instance, for a 
-total of 6 DT nodes overall.
+The three drivers should be merged through the respective subsystem
+maintainer trees. There is one dependency with the clk header, but
+we can resolve that if we merge the header along with the dts files
+(actually before the dts files) so that it's possible to build the
+.dtb without the clk driver being merged.
+That driver in turn will not be selectable in Kconfig because it
+depends on CONFIG_SOC_NUC970 (or whatever the symbol is called).
+
+	Arnd
