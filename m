@@ -1,187 +1,200 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 29 Jun 2016 18:34:59 +0200
-Subject: [PATCH v7 17/17] KVM: arm64: enable ITS emulation as a virtual
- MSI controller
-In-Reply-To: <20160628123230.26255-18-andre.przywara@arm.com>
-References: <20160628123230.26255-1-andre.przywara@arm.com>
- <20160628123230.26255-18-andre.przywara@arm.com>
-Message-ID: <477014eb-cb07-9339-ef34-5b358d358b77@redhat.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 30 Jun 2016 00:46:09 +0800
+Subject: [PATCH V2 4/8] clk: core: support clocks which requires parents
+ enable (part 2)
+In-Reply-To: <1467212351-16626-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <201606300000.VNGxChoP%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Hi,
 
-On 28/06/2016 14:32, Andre Przywara wrote:
-> Now that all ITS emulation functionality is in place, we advertise
-> MSI functionality to userland and also the ITS device to the guest - if
-> userland has configured that.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  Documentation/virtual/kvm/api.txt |  2 +-
->  arch/arm64/kvm/Kconfig            |  1 +
->  arch/arm64/kvm/reset.c            | 10 ++++++++++
->  include/kvm/vgic/vgic.h           |  5 +++++
->  virt/kvm/arm/vgic.c               |  5 +++++
->  virt/kvm/arm/vgic/vgic-init.c     |  3 +++
->  virt/kvm/arm/vgic/vgic-mmio-v3.c  | 14 ++++++++++----
->  virt/kvm/arm/vgic/vgic.c          |  8 ++++++++
->  8 files changed, 43 insertions(+), 5 deletions(-)
-> 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index bf76639..f60b137 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2156,7 +2156,7 @@ after pausing the vcpu, but before it is resumed.
->  4.71 KVM_SIGNAL_MSI
->  
->  Capability: KVM_CAP_SIGNAL_MSI
-> -Architectures: x86
-> +Architectures: x86 arm64
->  Type: vm ioctl
->  Parameters: struct kvm_msi (in)
->  Returns: >0 on delivery, 0 if guest blocked the MSI, and -1 on error
-> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> index c4f26ef..446686a 100644
-> --- a/arch/arm64/kvm/Kconfig
-> +++ b/arch/arm64/kvm/Kconfig
-> @@ -36,6 +36,7 @@ config KVM
->  	select HAVE_KVM_IRQFD
->  	select KVM_ARM_VGIC_V3-ENODEV
->  	select KVM_ARM_PMU if HW_PERF_EVENTS
-> +	select HAVE_KVM_MSI
-don't you want to enable the modality only with new VGIC? If I am not
-wrong an attempt to inject an msi from userspace with old vgic will
-return  -ENODEV.
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.7-rc5 next-20160629]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Thanks
+url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-core-support-clocks-which-requires-parents-enable/20160629-231445
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: arm-viper_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Eric
->  	---help---
->  	  Support hosting virtualized guest machines.
->  	  We don't support KVM with 16K page tables yet, due to the multiple
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index 6ec9dfe..409d188 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -86,6 +86,16 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_VCPU_ATTRIBUTES:
->  		r = 1;
->  		break;
-> +	case KVM_CAP_MSI_DEVID:
-> +#ifdef CONFIG_KVM_NEW_VGIC
-> +		if (!kvm)
-> +			r = -EINVAL;
-> +		else
-> +			r = kvm->arch.vgic.msis_require_devid;
-> +#else
-> +		r = -EINVAL;
-> +#endif
-> +		break;
->  	default:
->  		r = 0;
->  	}
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 2b00fb3..d7a6da3 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -154,6 +154,9 @@ struct vgic_dist {
->  	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
->  	u32			vgic_model;
->  
-> +	/* Do injected MSIs require an additional device ID? */
-> +	bool			msis_require_devid;
-> +
->  	int			nr_spis;
->  
->  	/* TODO: Consider moving to global state */
-> @@ -298,4 +301,6 @@ static inline int kvm_vgic_get_max_vcpus(void)
->  	return kvm_vgic_global_state.max_gic_vcpus;
->  }
->  
-> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
-> +
->  #endif /* __ASM_ARM_KVM_VGIC_VGIC_H */
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index c3bfbb9..26db30a 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -2438,3 +2438,8 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
->  {
->  	return 0;
->  }
-> +
-> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
-> +{
-> +	return -ENODEV;
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> index 535e713..01a60dc 100644
-> --- a/virt/kvm/arm/vgic/vgic-init.c
-> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> @@ -258,6 +258,9 @@ int vgic_init(struct kvm *kvm)
->  	if (ret)
->  		goto out;
->  
-> +	if (vgic_has_its(kvm))
-> +		dist->msis_require_devid = true;
-> +
->  	kvm_for_each_vcpu(i, vcpu, kvm)
->  		kvm_vgic_vcpu_init(vcpu);
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index dfa79c7..26f4779 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -66,7 +66,12 @@ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
->  	case GICD_TYPER:
->  		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
->  		value = (value >> 5) - 1;
-> -		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-> +		if (vgic_has_its(vcpu->kvm)) {
-> +			value |= (INTERRUPT_ID_BITS_ITS - 1) << 19;
-> +			value |= GICD_TYPER_LPIS;
-> +		} else {
-> +			value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-> +		}
->  		break;
->  	case GICD_IIDR:
->  		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-> @@ -161,9 +166,8 @@ static void vgic_mmio_write_v3r_ctlr(struct kvm_vcpu *vcpu,
->  
->  	vgic_cpu->lpis_enabled = val & GICR_CTLR_ENABLE_LPIS;
->  
-> -	if (!was_enabled && vgic_cpu->lpis_enabled) {
-> -		/* Eventually do something */
-> -	}
-> +	if (!was_enabled && vgic_cpu->lpis_enabled)
-> +		vgic_enable_lpis(vcpu);
->  }
->  
->  static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
-> @@ -177,6 +181,8 @@ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
->  	value |= ((target_vcpu_id & 0xffff) << 8);
->  	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
->  		value |= GICR_TYPER_LAST;
-> +	if (vgic_has_its(vcpu->kvm))
-> +		value |= GICR_TYPER_PLPIS;
->  
->  	return extract_bytes(value, addr & 7, len);
->  }
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index 8111d49..f93f8dd 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -682,3 +682,11 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
->  
->  	return map_is_active;
->  }
-> +
-> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
-> +{
-> +	if (vgic_has_its(kvm))
-> +		return vits_inject_msi(kvm, msi);
-> +	else
-> +		return -ENODEV;
-> +}
-> 
+All errors (new ones prefixed by >>):
+
+   include/linux/export.h:63:39: error: declaration of '__ksymtab_clk_notifier_register' with no linkage follows extern declaration
+     __visible const struct kernel_symbol __ksymtab_##sym \
+                                          ^
+   include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
+    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+                            ^
+   include/linux/export.h:101:2: note: in expansion of macro '__EXPORT_SYMBOL'
+     __EXPORT_SYMBOL(sym, "_gpl")
+     ^
+   drivers/clk/clk.c:2958:1: note: in expansion of macro 'EXPORT_SYMBOL_GPL'
+    EXPORT_SYMBOL_GPL(clk_notifier_register);
+    ^
+   include/linux/export.h:62:36: note: previous declaration of '__ksymtab_clk_notifier_register' was here
+     extern const struct kernel_symbol __ksymtab_##sym; \
+                                       ^
+   include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
+    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+                            ^
+   include/linux/export.h:101:2: note: in expansion of macro '__EXPORT_SYMBOL'
+     __EXPORT_SYMBOL(sym, "_gpl")
+     ^
+   drivers/clk/clk.c:2958:1: note: in expansion of macro 'EXPORT_SYMBOL_GPL'
+    EXPORT_SYMBOL_GPL(clk_notifier_register);
+    ^
+   drivers/clk/clk.c:3005:19: error: non-static declaration of 'clk_notifier_unregister' follows static declaration
+    EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+                      ^
+   include/linux/export.h:57:21: note: in definition of macro '___EXPORT_SYMBOL'
+     extern typeof(sym) sym;     \
+                        ^
+   drivers/clk/clk.c:3005:1: note: in expansion of macro 'EXPORT_SYMBOL_GPL'
+    EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+    ^
+   drivers/clk/clk.c:2971:5: note: previous definition of 'clk_notifier_unregister' was here
+    int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb)
+        ^
+   In file included from include/linux/linkage.h:6:0,
+                    from include/linux/kernel.h:6,
+                    from include/linux/clk.h:16,
+                    from drivers/clk/clk.c:12:
+   include/linux/export.h:63:25: warning: '__used__' attribute ignored [-Wattributes]
+     __visible const struct kernel_symbol __ksymtab_##sym \
+                            ^
+   include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
+    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+                            ^
+   include/linux/export.h:101:2: note: in expansion of macro '__EXPORT_SYMBOL'
+     __EXPORT_SYMBOL(sym, "_gpl")
+     ^
+   drivers/clk/clk.c:3005:1: note: in expansion of macro 'EXPORT_SYMBOL_GPL'
+    EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+    ^
+   include/linux/export.h:63:39: error: section attribute cannot be specified for local variables
+     __visible const struct kernel_symbol __ksymtab_##sym \
+                                          ^
+   include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
+    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+                            ^
+   include/linux/export.h:101:2: note: in expansion of macro '__EXPORT_SYMBOL'
+     __EXPORT_SYMBOL(sym, "_gpl")
+     ^
+   drivers/clk/clk.c:3005:1: note: in expansion of macro 'EXPORT_SYMBOL_GPL'
+    EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+    ^
+   include/linux/export.h:63:25: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+     __visible const struct kernel_symbol __ksymtab_##sym \
+                            ^
+   include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
+    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+                            ^
+   include/linux/export.h:101:2: note: in expansion of macro '__EXPORT_SYMBOL'
+     __EXPORT_SYMBOL(sym, "_gpl")
+     ^
+   drivers/clk/clk.c:3005:1: note: in expansion of macro 'EXPORT_SYMBOL_GPL'
+    EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+    ^
+   include/linux/export.h:63:39: error: declaration of '__ksymtab_clk_notifier_unregister' with no linkage follows extern declaration
+     __visible const struct kernel_symbol __ksymtab_##sym \
+                                          ^
+   include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
+    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+                            ^
+   include/linux/export.h:101:2: note: in expansion of macro '__EXPORT_SYMBOL'
+     __EXPORT_SYMBOL(sym, "_gpl")
+     ^
+   drivers/clk/clk.c:3005:1: note: in expansion of macro 'EXPORT_SYMBOL_GPL'
+    EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+    ^
+   include/linux/export.h:62:36: note: previous declaration of '__ksymtab_clk_notifier_unregister' was here
+     extern const struct kernel_symbol __ksymtab_##sym; \
+                                       ^
+   include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
+    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+                            ^
+   include/linux/export.h:101:2: note: in expansion of macro '__EXPORT_SYMBOL'
+     __EXPORT_SYMBOL(sym, "_gpl")
+     ^
+   drivers/clk/clk.c:3005:1: note: in expansion of macro 'EXPORT_SYMBOL_GPL'
+    EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+    ^
+>> include/linux/export.h:63:25: error: expected declaration or statement at end of input
+     __visible const struct kernel_symbol __ksymtab_##sym \
+                            ^
+   include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
+    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+                            ^
+   include/linux/export.h:101:2: note: in expansion of macro '__EXPORT_SYMBOL'
+     __EXPORT_SYMBOL(sym, "_gpl")
+     ^
+   drivers/clk/clk.c:3005:1: note: in expansion of macro 'EXPORT_SYMBOL_GPL'
+    EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+    ^
+
+vim +63 include/linux/export.h
+
+f5016932 Paul Gortmaker 2011-05-23  57  	extern typeof(sym) sym;					\
+f5016932 Paul Gortmaker 2011-05-23  58  	__CRC_SYMBOL(sym, sec)					\
+f5016932 Paul Gortmaker 2011-05-23  59  	static const char __kstrtab_##sym[]			\
+f5016932 Paul Gortmaker 2011-05-23  60  	__attribute__((section("__ksymtab_strings"), aligned(1))) \
+b92021b0 Rusty Russell  2013-03-15  61  	= VMLINUX_SYMBOL_STR(sym);				\
+7b4ec8dd Johannes Berg  2014-01-16  62  	extern const struct kernel_symbol __ksymtab_##sym;	\
+e0f244c6 Andi Kleen     2013-10-23 @63  	__visible const struct kernel_symbol __ksymtab_##sym	\
+f5016932 Paul Gortmaker 2011-05-23  64  	__used							\
+f5016932 Paul Gortmaker 2011-05-23  65  	__attribute__((section("___ksymtab" sec "+" #sym), unused))	\
+f5016932 Paul Gortmaker 2011-05-23  66  	= { (unsigned long)&sym, __kstrtab_##sym }
+f5016932 Paul Gortmaker 2011-05-23  67  
+c1a95fda Nicolas Pitre  2016-01-22  68  #if defined(__KSYM_DEPS__)
+c1a95fda Nicolas Pitre  2016-01-22  69  
+c1a95fda Nicolas Pitre  2016-01-22  70  /*
+c1a95fda Nicolas Pitre  2016-01-22  71   * For fine grained build dependencies, we want to tell the build system
+c1a95fda Nicolas Pitre  2016-01-22  72   * about each possible exported symbol even if they're not actually exported.
+c1a95fda Nicolas Pitre  2016-01-22  73   * We use a string pattern that is unlikely to be valid code that the build
+c1a95fda Nicolas Pitre  2016-01-22  74   * system filters out from the preprocessor output (see ksym_dep_filter
+c1a95fda Nicolas Pitre  2016-01-22  75   * in scripts/Kbuild.include).
+c1a95fda Nicolas Pitre  2016-01-22  76   */
+c1a95fda Nicolas Pitre  2016-01-22  77  #define __EXPORT_SYMBOL(sym, sec)	=== __KSYM_##sym ===
+c1a95fda Nicolas Pitre  2016-01-22  78  
+c1a95fda Nicolas Pitre  2016-01-22  79  #elif defined(CONFIG_TRIM_UNUSED_KSYMS)
+f2355416 Nicolas Pitre  2016-01-22  80  
+f2355416 Nicolas Pitre  2016-01-22  81  #include <linux/kconfig.h>
+f2355416 Nicolas Pitre  2016-01-22  82  #include <generated/autoksyms.h>
+f2355416 Nicolas Pitre  2016-01-22  83  
+f2355416 Nicolas Pitre  2016-01-22  84  #define __EXPORT_SYMBOL(sym, sec)				\
+f2355416 Nicolas Pitre  2016-01-22  85  	__cond_export_sym(sym, sec, config_enabled(__KSYM_##sym))
+f2355416 Nicolas Pitre  2016-01-22  86  #define __cond_export_sym(sym, sec, conf)			\
+f2355416 Nicolas Pitre  2016-01-22  87  	___cond_export_sym(sym, sec, conf)
+f2355416 Nicolas Pitre  2016-01-22  88  #define ___cond_export_sym(sym, sec, enabled)			\
+f2355416 Nicolas Pitre  2016-01-22  89  	__cond_export_sym_##enabled(sym, sec)
+f2355416 Nicolas Pitre  2016-01-22  90  #define __cond_export_sym_1(sym, sec) ___EXPORT_SYMBOL(sym, sec)
+f2355416 Nicolas Pitre  2016-01-22  91  #define __cond_export_sym_0(sym, sec) /* nothing */
+f2355416 Nicolas Pitre  2016-01-22  92  
+f2355416 Nicolas Pitre  2016-01-22  93  #else
+f2355416 Nicolas Pitre  2016-01-22 @94  #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+f2355416 Nicolas Pitre  2016-01-22  95  #endif
+f2355416 Nicolas Pitre  2016-01-22  96  
+f5016932 Paul Gortmaker 2011-05-23  97  #define EXPORT_SYMBOL(sym)					\
+
+:::::: The code at line 63 was first introduced by commit
+:::::: e0f244c63fc9d192dfd399cc2677bbdca61994b1 asmlinkage, module: Make ksymtab and kcrctab symbols and __this_module __visible
+
+:::::: TO: Andi Kleen <ak@linux.intel.com>
+:::::: CC: Rusty Russell <rusty@rustcorp.com.au>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 18460 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160630/e8d0c526/attachment-0001.obj>
