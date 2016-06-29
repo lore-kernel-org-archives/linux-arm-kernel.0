@@ -1,25 +1,40 @@
 From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 29 Jun 2016 15:13:08 +0200
-Subject: [PATCH V2 1/4] ACPI,PCI,IRQ: factor in PCI possible
-In-Reply-To: <1467188859-28188-2-git-send-email-okaya@codeaurora.org>
+Date: Wed, 29 Jun 2016 15:16:11 +0200
+Subject: [PATCH V2 4/4] ACPI,PCI,IRQ: correct operator precedence
+In-Reply-To: <1467188859-28188-5-git-send-email-okaya@codeaurora.org>
 References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
- <1467188859-28188-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAJZ5v0j1m4oGJfdOC8uerKc-3ksq6k2e9RdjEnk0sWmsq4RHRQ@mail.gmail.com>
+ <1467188859-28188-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAJZ5v0j+CJ3qWTdvm6Sk3DqFYVnkuEmaR1EPZM6DDVMC8rsK+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Jun 29, 2016 at 10:27 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
-> resource requirements") omitted the initially assigned POSSIBLE penalty
-> when the IRQ is active.
-
-It would be good to say what can go wrong with that here.
-
-> The original code would assign the POSSIBLE value divided by the number
-> of possible IRQs during initialization.
+> The omitted parenthesis prevents the addition operation when
+> acpi_penalize_isa_irq function is called.
 >
-> Later, if the IRQ is chosen as the active IRQ or if the IRQ is in use
-> by ISA; additional penalties get added.
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+
+Well, this is a rather obvious one, so I'm wondering why it is the
+last one in the series?
+
+> ---
+>  drivers/acpi/pci_link.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index 8c08971..c983bf7 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -872,7 +872,7 @@ void acpi_penalize_isa_irq(int irq, int active)
+>  {
+>         if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
+>                 acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+> -                       active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING;
+> +                 (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+>  }
+>
+>  bool acpi_isa_irq_available(int irq)
+> --
 
 Thanks,
 Rafael
