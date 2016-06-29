@@ -1,65 +1,42 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Wed, 29 Jun 2016 22:54:38 +0300
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add
- brcm,nvram_file_name dt property
-In-Reply-To: <6402170.5s0abZDqlD@wuerfel>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Jun 2016 22:07:21 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
+ nvram_file_name dt property
+In-Reply-To: <1467230078.2598.2.camel@plaes.org>
 References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
- <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
- <6402170.5s0abZDqlD@wuerfel>
-Message-ID: <1467230078.2598.2.camel@plaes.org>
+ <6402170.5s0abZDqlD@wuerfel> <1467230078.2598.2.camel@plaes.org>
+Message-ID: <6119590.gPKNGsSJ3t@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-06-29 at 21:33 +0200, Arnd Bergmann wrote:
-> On Wednesday, June 29, 2016 8:51:44 PM CEST Arend Van Spriel wrote:
-> > > Typical wifi devices will have some sort of non volatile storage
-> > > on board to not only store the ethernet(mac) address, but also
-> > > to contain e.g. info about the antenna gain so that the firmware
-> > > and/or the driver can take the antenna gain into account and
-> > > ensure
-> > > that they never exceed the maximum allowed broadcast strength.
-> > > 
-> > > However on some embedded devices there is no non-volatile storage
-> > > for the wifi (for cost reasons) and instead this configuration
-> > > info
-> > > (which is board / pcb specific) is loaded in the form of a
-> > > file which contains the contents which would normally be in the
-> > > non-volatile storage.
-> > > 
-> > > Since we are dealing with a per-board config-file here, which is
-> > > loaded from the os filesystem we really need to specify a
-> > > basename
-> > > here as the list of possible boards is endless, so we cannot
-> > > have a lookup table in the driver.
-> > 
-> > As Jonas mentioned the general principle of device tree is to be
-> > agnostic with regards to OS and/or driver as you undoubtedly know.
-> > His
-> > proposal seems like a usable solution for your problem while
-> > complying
-> > to the device tree principle. So instead of overriding the default
-> > brcmfmac should modify it when dt specifies the "module" property,
-> > ie:
-> > 
-> > no "module" in DT:??????nvram filename = brcm/brcmfmac43362-
-> > sdio.txt
-> > "module=ap6210" in DT:??nvram filename = brcm/brcmfmac43362-
-> > ap6210.txt
-> > 
-> > By the way, the example in the bindings file does not seem to
-> > specify a
-> > basename, but path+basename+fileext.
+On Wednesday, June 29, 2016 10:54:38 PM CEST Priit Laes wrote:
+> On Wed, 2016-06-29 at 21:33 +0200, Arnd Bergmann wrote:
+
+> > What is the size of this nvram file? As it's board specific, I wonder
+> > if we can simply include it inside of the DT verbatim. I remember
+> > doing that (in the pre-dtb days, on real open firmware) for the
+> > "spidernet"
+> > ethernet driver.
 > 
-> What is the size of this nvram file? As it's board specific, I wonder
-> if we can simply include it inside of the DT verbatim. I remember
-> doing that (in the pre-dtb days, on real open firmware) for the
-> "spidernet"
-> ethernet driver.
+> It contains a bit too much info:
+> 
+> This is what CubieTruck requires:
+> 
+> http://dl.cubieboard.org/public/Cubieboard/benn/firmware/ap6210/nvram_a
+> p6210.txt
 
-It contains a bit too much info:
+Ah, I had not realized that this is a text based interface rather than
+a small binary blob with fixed offsets.
 
-This is what CubieTruck requires:
+On the other hand, each line in there could be translated easily into
+a separate DT property, and some of them (manfid/prodid, macaddr, ...)
+look like they directly correspond to properties we already have.
 
-http://dl.cubieboard.org/public/Cubieboard/benn/firmware/ap6210/nvram_a
-p6210.txt
+As Arend said there is also the option of having a chip specific
+nvram file (brcmfmac43362-sdio.txt) as a fallback when there is no
+more specific module. How many of the lines in your example would
+actually differ between the two? Does this affect all of them, or
+just a subset that could be turned into a smaller set of DT
+properties?
+
+	Arnd
