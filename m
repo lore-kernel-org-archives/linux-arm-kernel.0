@@ -1,111 +1,65 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 29 Jun 2016 22:59:08 +0800
-Subject: [PATCH V2 5/8] clk: imx: re-order and concentrate the same type of
- clk api
+Date: Wed, 29 Jun 2016 22:59:11 +0800
+Subject: [PATCH V2 8/8] clk: imx7d: only enable minimum required clocks
 In-Reply-To: <1467212351-16626-1-git-send-email-aisheng.dong@nxp.com>
 References: <1467212351-16626-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1467212351-16626-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1467212351-16626-9-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-order and concentrate the same type of clk api for better
-code maintenance.
+Formerly clk core does not support imx7d clock type well that all
+its clock operations requires the parent clock on.
+Therefore we enabled all clocks by default in clock driver
+initialization for other module clocks operate well.
 
+After patch 'clk: imx7d: using api with flag CLK_OPS_PARENT_ENABLE',
+clk core can handle such clock type well, so we don't have to enable
+them all by default anymore. Instead, we only enable a minimum required
+set of clocks.
+
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/imx/clk.h | 58 +++++++++++++++++++++++++--------------------------
- 1 file changed, 29 insertions(+), 29 deletions(-)
+ drivers/clk/imx/clk-imx7d.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 508d0fad84cf..df87d8888d80 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -51,28 +51,6 @@ struct clk * imx_obtain_fixed_clock(
- struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
- 	 void __iomem *reg, u8 shift, u32 exclusive_mask);
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index bb5affae0850..7b46ed0677a5 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -361,6 +361,14 @@ static const char *pll_enet_bypass_sel[] = { "pll_enet_main", "pll_enet_main_src
+ static const char *pll_audio_bypass_sel[] = { "pll_audio_main", "pll_audio_main_src", };
+ static const char *pll_video_bypass_sel[] = { "pll_video_main", "pll_video_main_src", };
  
--static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
--		void __iomem *reg, u8 shift)
--{
--	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
--			shift, 0x3, 0, &imx_ccm_lock, NULL);
--}
--
--static inline struct clk *imx_clk_gate2_shared(const char *name,
--		const char *parent, void __iomem *reg, u8 shift,
--		unsigned int *share_count)
--{
--	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
--			shift, 0x3, 0, &imx_ccm_lock, share_count);
--}
--
--static inline struct clk *imx_clk_gate2_cgr(const char *name, const char *parent,
--		void __iomem *reg, u8 shift, u8 cgr_val)
--{
--	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
--			shift, cgr_val, 0, &imx_ccm_lock, NULL);
--}
--
- struct clk *imx_clk_pfd(const char *name, const char *parent_name,
- 		void __iomem *reg, u8 idx);
- 
-@@ -97,6 +75,13 @@ static inline struct clk *imx_clk_fixed(const char *name, int rate)
- 	return clk_register_fixed_rate(NULL, name, NULL, 0, rate);
- }
- 
-+static inline struct clk *imx_clk_fixed_factor(const char *name,
-+		const char *parent, unsigned int mult, unsigned int div)
-+{
-+	return clk_register_fixed_factor(NULL, name, parent,
-+			CLK_SET_RATE_PARENT, mult, div);
-+}
++static int const clks_init_on[] __initconst = {
++	IMX7D_ARM_A7_ROOT_CLK, IMX7D_MAIN_AXI_ROOT_CLK,
++	IMX7D_PLL_SYS_MAIN_480M_CLK, IMX7D_NAND_USDHC_BUS_ROOT_CLK,
++	IMX7D_DRAM_PHYM_ROOT_CLK, IMX7D_DRAM_ROOT_CLK,
++	IMX7D_DRAM_PHYM_ALT_ROOT_CLK, IMX7D_DRAM_ALT_ROOT_CLK,
++	IMX7D_AHB_CHANNEL_ROOT_CLK,
++};
 +
- static inline struct clk *imx_clk_divider(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift, u8 width)
- {
-@@ -126,6 +111,28 @@ static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
- 			shift, CLK_GATE_SET_TO_DISABLE, &imx_ccm_lock);
- }
+ static struct clk_onecell_data clk_data;
  
-+static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift)
-+{
-+	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+			shift, 0x3, 0, &imx_ccm_lock, NULL);
-+}
-+
-+static inline struct clk *imx_clk_gate2_shared(const char *name,
-+		const char *parent, void __iomem *reg, u8 shift,
-+		unsigned int *share_count)
-+{
-+	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+			shift, 0x3, 0, &imx_ccm_lock, share_count);
-+}
-+
-+static inline struct clk *imx_clk_gate2_cgr(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift, u8 cgr_val)
-+{
-+	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+			shift, cgr_val, 0, &imx_ccm_lock, NULL);
-+}
-+
- static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
- 		u8 shift, u8 width, const char **parents, int num_parents)
- {
-@@ -143,13 +150,6 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
- 			&imx_ccm_lock);
- }
+ static struct clk ** const uart_clks[] __initconst = {
+@@ -846,14 +854,8 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clk_data.clk_num = ARRAY_SIZE(clks);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
  
--static inline struct clk *imx_clk_fixed_factor(const char *name,
--		const char *parent, unsigned int mult, unsigned int div)
--{
--	return clk_register_fixed_factor(NULL, name, parent,
--			CLK_SET_RATE_PARENT, mult, div);
--}
--
- struct clk *imx_clk_cpu(const char *name, const char *parent_name,
- 		struct clk *div, struct clk *mux, struct clk *pll,
- 		struct clk *step);
+-	/* TO BE FIXED LATER
+-	 * Enable all clock to bring up imx7, otherwise system will be halt and block
+-	 * the other part upstream Because imx7d clock design changed, clock framework
+-	 * need do a little modify.
+-	 * Dong Aisheng is working on this. After that, this part need be changed.
+-	 */
+-	for (i = 0; i < IMX7D_CLK_END; i++)
+-		clk_prepare_enable(clks[i]);
++	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
++		clk_prepare_enable(clks[clks_init_on[i]]);
+ 
+ 	/* use old gpt clk setting, gpt1 root clk must be twice as gpt counter freq */
+ 	clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
 -- 
 1.9.1
