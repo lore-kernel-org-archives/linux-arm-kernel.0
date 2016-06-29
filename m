@@ -1,41 +1,158 @@
-From: amitoj1606@gmail.com (Amitoj Kaur Chawla)
-Date: Wed, 29 Jun 2016 20:48:20 +0530
-Subject: [PATCH] PCI: xilinx: Modify error handling
-Message-ID: <20160629151820.GA14282@amitoj-Inspiron-3542>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 29 Jun 2016 08:18:59 -0700
+Subject: [PATCH 2/3] phy: rockchip-emmc: Be tolerant to card clock of 0 in
+ power on
+In-Reply-To: <5773D1FD.8020601@ti.com>
+References: <1467049167-14628-1-git-send-email-dianders@chromium.org>
+ <1467049167-14628-3-git-send-email-dianders@chromium.org>
+ <5773D1FD.8020601@ti.com>
+Message-ID: <CAD=FV=U_-8HJRjWa8ktT=7tmM5RB4OVnDce-Bv2teDibYfbCeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Failure of of_get_next_child returns NULL, not an ERR_PTR. Use
-appropriate error code -ENODEV to be returned on failure instead.
+Kishon,
 
-The Coccinelle semantic patch used to find this issue is as follows:
-@@
-expression E,E1;
-@@
+On Wed, Jun 29, 2016 at 6:49 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Monday 27 June 2016 11:09 PM, Douglas Anderson wrote:
+>> It's possible that there are some reasons to turn the PHY on while the
+>> clock is 0.  In this case we just won't wait for the DLL to lock.
+>>
+>> This is a bit of a stopgap until we figure out exactly when we're
+>> supposed to wait for the DLL to lock and when we're supposed to power
+>> cycle the PHY.
+>>
+>> Note: this patch should help with suspend/resume where the system will
+>> try to turn the PHY back on when the clock is 0.
+>>
+>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>> ---
+>>  drivers/phy/phy-rockchip-emmc.c | 59 ++++++++++++++++++++++++++---------------
+>>  1 file changed, 37 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
+>> index 9dce958233a0..a2aa6aca7dec 100644
+>> --- a/drivers/phy/phy-rockchip-emmc.c
+>> +++ b/drivers/phy/phy-rockchip-emmc.c
+>> @@ -88,15 +88,36 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>>       unsigned int caldone;
+>>       unsigned int dllrdy;
+>>       unsigned int freqsel = PHYCTRL_FREQSEL_200M;
+>> +     unsigned long rate;
+>>       unsigned long timeout;
+>>
+>> -     if (rk_phy->emmcclk != NULL) {
+>> -             unsigned long rate = clk_get_rate(rk_phy->emmcclk);
+>> +     /*
+>> +      * Keep phyctrl_pdb and phyctrl_endll low to allow
+>> +      * initialization of CALIO state M/C DFFs
+>> +      */
+>> +     regmap_write(rk_phy->reg_base,
+>> +                  rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+>> +                  HIWORD_UPDATE(PHYCTRL_PDB_PWR_OFF,
+>> +                                PHYCTRL_PDB_MASK,
+>> +                                PHYCTRL_PDB_SHIFT));
+>> +     regmap_write(rk_phy->reg_base,
+>> +                  rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+>> +                  HIWORD_UPDATE(PHYCTRL_ENDLL_DISABLE,
+>> +                                PHYCTRL_ENDLL_MASK,
+>> +                                PHYCTRL_ENDLL_SHIFT));
+>> +
+>> +     /* Already finish power_off above */
+>> +     if (on_off == PHYCTRL_PDB_PWR_OFF)
+>> +             return 0;
+>> +
+>> +     rate = clk_get_rate(rk_phy->emmcclk);
+>> +
+>> +     if (rate != 0) {
+>>               unsigned long ideal_rate;
+>>               unsigned long diff;
+>>
+>>               switch (rate) {
+>> -             case 0 ... 74999999:
+>> +             case 1 ... 74999999:
+>>                       ideal_rate = 50000000;
+>>                       freqsel = PHYCTRL_FREQSEL_50M;
+>>                       break;
+>> @@ -127,25 +148,6 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>>       }
+>>
+>>       /*
+>> -      * Keep phyctrl_pdb and phyctrl_endll low to allow
+>> -      * initialization of CALIO state M/C DFFs
+>> -      */
+>> -     regmap_write(rk_phy->reg_base,
+>> -                  rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+>> -                  HIWORD_UPDATE(PHYCTRL_PDB_PWR_OFF,
+>> -                                PHYCTRL_PDB_MASK,
+>> -                                PHYCTRL_PDB_SHIFT));
+>> -     regmap_write(rk_phy->reg_base,
+>> -                  rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+>> -                  HIWORD_UPDATE(PHYCTRL_ENDLL_DISABLE,
+>> -                                PHYCTRL_ENDLL_MASK,
+>> -                                PHYCTRL_ENDLL_SHIFT));
+>> -
+>> -     /* Already finish power_off above */
+>> -     if (on_off == PHYCTRL_PDB_PWR_OFF)
+>> -             return 0;
+>> -
+>> -     /*
+>>        * According to the user manual, calpad calibration
+>>        * cycle takes more than 2us without the minimal recommended
+>>        * value, so we may need a little margin here
+>> @@ -183,6 +185,19 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>>                    HIWORD_UPDATE(PHYCTRL_ENDLL_ENABLE,
+>>                                  PHYCTRL_ENDLL_MASK,
+>>                                  PHYCTRL_ENDLL_SHIFT));
+>> +
+>> +     /*
+>> +      * We turned on the DLL even though the rate was 0 because we the
+>> +      * clock might be turned on later.  ...but we can't wait for the DLL
+>> +      * to lock when the rate is 0 because it will never lock with no
+>> +      * input clock.
+>> +      *
+>> +      * Technically we should be checking the lock later when the clock
+>> +      * is turned on, but for now we won't.
+>> +      */
+>> +     if (rate == 0)
+>> +             return 0;
+>
+> Why not return initially from rockchip_emmc_phy_power if the clock rate is '0'.
+> Are there other functions to lock the DLL apart from phy_power?
 
-if (
-*   E == NULL
-   ) { <+... when != E = E1
-        PTR_ERR(E)
-       ...+> }
+Yeah, it's a big ugly right now.  This ugliness is really needed
+because of <https://patchwork.kernel.org/patch/9201035/> because:
 
-Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
----
- drivers/pci/host/pcie-xilinx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+1. We power on the PHY at probe time and the card clock is in an
+unknown state at that time.  It will be reported as 0 right now, but
+it may or may not actually be 0.
 
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index 65f0fe0..d76ea8d 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -550,7 +550,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
- 	pcie_intc_node = of_get_next_child(node, NULL);
- 	if (!pcie_intc_node) {
- 		dev_err(dev, "No PCIe Intc node found\n");
--		return PTR_ERR(pcie_intc_node);
-+		return -ENODEV;
- 	}
- 
- 	port->irq_domain = irq_domain_add_linear(pcie_intc_node, 4,
--- 
-1.9.1
+2. We don't have an easy way to call back into the PHY when we
+actually set the clock to a low rate (like 400kHz) for ID mode.
+Before this series I tried to power the PHY off and on for every clock
+change, but apparently that was causing problems.
+
+
+As talked about in <https://patchwork.kernel.org/patch/9201035/>, I
+think the right answer is to figure out how to get the common clock
+framework notifications to happen for the card clock and then remove
+the wholesale PHY power off / power on for every clock change.  The
+PHY itself can register for the clock change notifications and figure
+out how much or how little to do on every clock change.
+
+Unfortunately, as also discussed in the other patch, it's not trivial
+to do this because I think it requires surgery on the main SDHCI
+driver to change the way it deals with the card clock.  I'm not sure I
+have time for this delicate surgery right now and I'm hoping that
+perhaps Shawn will be able to help figure something out (maybe?) or I
+can try coming back to it later.
+
+
+In any case, I think a wholesale revert of my previous 150 MHz series
+probably puts us in a worse state than we started with, so I was just
+proposing reverting the one patch.  Once we do that, this PHY patch
+helps keep us in a sane state (keeps suspend/resume working).
+
+
+-Doug
