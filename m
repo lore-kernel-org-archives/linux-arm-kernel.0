@@ -1,40 +1,90 @@
-From: yu.c.chen@intel.com (Chen Yu)
-Date: Wed, 29 Jun 2016 18:02:39 +0800
-Subject: [PATCH v3 5/7] PM / Hibernate: Allow arch code to influence CPU
- hotplug during hibernate
-In-Reply-To: <7811260.OWJXivZiAP@vostro.rjw.lan>
-References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
- <1467125510-18758-6-git-send-email-james.morse@arm.com>
- <7811260.OWJXivZiAP@vostro.rjw.lan>
-Message-ID: <57739CBF.2090706@intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Jun 2016 12:03:16 +0200
+Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
+ overlapping regions
+In-Reply-To: <20160629093938.GB2522@e104818-lin.cambridge.arm.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
+ <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
+ <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
+ <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_3uKgFtvMryROwTMeGs=uXYU-OPrUC6LaNQiAKP=PZ3Q@mail.gmail.com>
+ <20160628160528.GG4585@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8RxZ2xpDC0pudewHu9Z5YTL8XbcjSPvGasRUQbhqm5qQ@mail.gmail.com>
+ <20160629093938.GB2522@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu-=r=LJ17YKYAOMjaq4QuqN=g-yZmtPzUWDCF5zgezqdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016?06?29? 08:10, Rafael J. Wysocki wrote:
-> On Tuesday, June 28, 2016 03:51:48 PM James Morse wrote:
->> Architecture code may need to do extra work when secondary CPUs are
->> disabled during hibernate and resume. This may include pushing sleeping
->> CPUs into a deeper power-saving state, or influencing which CPU resume
->> occurs on.
+On 29 June 2016 at 11:39, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Jun 28, 2016 at 06:12:22PM +0200, Ard Biesheuvel wrote:
+>> On 28 June 2016 at 18:05, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > (Restarting the thread before I forget the entire discussion)
+>> >
+>> > On Mon, Jun 06, 2016 at 11:18:14PM +0200, Ard Biesheuvel wrote:
+>> >> >> > On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> >> >> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+>> >> >> > > index 78f52488f9ff..0d5753c31c7f 100644
+>> >> >> > > --- a/arch/arm64/kernel/efi.c
+>> >> >> > > +++ b/arch/arm64/kernel/efi.c
+>> >> >> > > @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
+>> >> >> > >  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+>> >> >> > >  {
+>> >> >> > >         pteval_t prot_val = create_mapping_protection(md);
+>> >> >> > > +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
+>> >> >> > > +       efi_memory_desc_t *next = md;
+>> >> >> > >
+>> >> >> > > -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+>> >> >> > > -                          md->num_pages << EFI_PAGE_SHIFT,
+>> >> >> > > -                          __pgprot(prot_val | PTE_NG));
+>> >> >> > > +       /*
+>> >> >> > > +        * Search for the next EFI runtime map and check for any overlap with
+>> >> >> > > +        * the current map when aligned to PAGE_SIZE. In such case, defer
+>> >> >> > > +        * mapping the end of the current range until the next
+>> >> >> > > +        * efi_create_mapping() call.
+>> >> >> > > +        */
+>> >> >> > > +       for_each_efi_memory_desc_continue(next) {
+>> >> >> > > +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
+>> >> >> > > +                       continue;
+>> >> >> > > +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
+>> >> >> > > +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
+>> > [...]
+>> >> Another thing I failed to mention is that the new Memory Attributes
+>> >> table support may map all of the RuntimeServicesCode regions a second
+>> >> time, but with a higher granularity, using RO for .text and .rodata
+>> >> and NX for .data and .bss (and the PE/COFF header).
+>> >
+>> > Can this not be done in a single go without multiple passes? That's what
+>> > we did for the core arm64 code, the only one left being EFI run-time
+>> > mappings.
 >>
->> Define a macro arch_hibernation_disable_cpus(), which defaults to calling
->> disable_nonboot_cpus() if undefined. Architectures that need to do extra
->> work around these calls can use this to influence disable_nonboot_cpus()
->> behaviour. The macro should be defined in asm/suspend.h, and
->> ARCH_HIBERNATION_CPUHP should be added to Kconfig.
+>> Well, we probably could, but it is far from trivial.
 >>
->> Signed-off-by: James Morse <james.morse@arm.com>
->> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
->> Cc: Pavel Machek <pavel@ucw.cz>
-> As you noted, this could be used to address the x86 issue that Yu is working on,
-> so I'd like it to go in as the first patch in the series and through the PM tree.
+>> >> Due to the higher
+>> >> granularity, regions that were mapped using the contiguous bit the
+>> >> first time around may be split into smaller regions. Your current code
+>> >> does not address that case.
+>> >
+>> > If the above doesn't work, the only solution would be to permanently map
+>> > these ranges as individual pages, no large blocks.
+>>
+>> That is not unreasonable, since regions >2MB are unusual.
 >
-This patch looks friendly for that fix :), thanks.
-> For the x86 case we'll also need the complementary "enable", so why don't
-> you add it here and then use it instead of the enable_nonboot_cpus()?
+> We'll have the contiguous bit supported at some point and we won't be
+> able to use it for EFI run-time mappings. But I don't think that's
+> essential, minor improvement on a non-critical path.
 >
-Agreed.
+> I'll post some patches to always use PAGE_SIZE granularity for EFI
+> run-time mappings.
+>
 
-Yu
+Given that contiguous bit mappings only affect the TLB footprint, I'd
+be more concerned about not using block mappings for EfiMemoryMappedIo
+regions (since they may cover fairly sizable NOR flashes like the 64
+MB one QEMU mach-virt exposes).
+
+So I would recommend to only use PAGE_SIZE granularity for
+EfiRuntimeServicesCode and EfiRuntimeServicesData regions, since those
+are the only ones that can be expected to appear in the Memory
+Attributes table, and all other regions will only be mapped a single
+time.
