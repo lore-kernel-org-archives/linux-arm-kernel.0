@@ -1,63 +1,127 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 29 Jun 2016 14:37:00 +0800
-Subject: [PATCH 11/21] usb: chipidea: msm: Use hw_write_id_reg() instead
- of writel directly
-In-Reply-To: <20160626072838.28082-12-stephen.boyd@linaro.org>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-12-stephen.boyd@linaro.org>
-Message-ID: <20160629063700.GF25236@shlinux2>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 29 Jun 2016 08:51:16 +0200
+Subject: [linux-sunxi] [PATCH 1/3] clk: sunxi: Add a driver for the CCU
+In-Reply-To: <536aa072-d110-1b08-fa25-72c1645e2459@xff.cz>
+References: <bfb8ceb4-5445-3f43-0a16-bd0e83f2af22@xff.cz>
+ <536aa072-d110-1b08-fa25-72c1645e2459@xff.cz>
+Message-ID: <20160629085116.caf701e214440cdf4b1045c8@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2016 at 12:28:28AM -0700, Stephen Boyd wrote:
-> The MSM_USB_BASE macro trick is not very clear, and we're using
-> it for only one register write so let's just move to using
-> hw_write_id_reg() and passing the ci pointer instead. That
-> clearly shows what offset we're using and avoids needing to
-> include the msm_hsusb_hw.h file when we're going to delete that
-> file soon.
-> 
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/usb/chipidea/ci_hdrc_msm.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-> index 37591a4b1346..520c85e701ef 100644
-> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
-> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-> @@ -8,14 +8,12 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
-> -#include <linux/usb/msm_hsusb_hw.h>
-> -#include <linux/usb/ulpi.h>
->  #include <linux/usb/gadget.h>
->  #include <linux/usb/chipidea.h>
->  
->  #include "ci.h"
->  
-> -#define MSM_USB_BASE	(ci->hw_bank.abs)
-> +#define HS_PHY_AHB_MODE			0x0098
->  
->  static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
->  {
-> @@ -25,7 +23,7 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
->  	case CI_HDRC_CONTROLLER_RESET_EVENT:
->  		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
->  		/* use AHB transactor, allow posted data writes */
-> -		writel(0x8, USB_AHBMODE);
-> +		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
->  		usb_phy_init(ci->usb_phy);
->  		break;
->  	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
-> -- 
+On Tue, 28 Jun 2016 21:31:06 +0200
+Ond?ej Jirman <megi@xff.cz> wrote:
 
-Acked-by: Peter Chen <peter.chen@nxp.com>
+> 
+> On 28.6.2016 17:37, Jean-Francois Moine wrote:
+> > Most of the clocks in the Allwinner's SoCs are configured in the CCU
+> > (Clock Configuration Unit).
+> > 
+> > The PLL clocks are driven from the main clock. Their rates are controlled
+> > by a set of multiply and divide factors, named from the Allwinner's
+> > documentation:
+> > - multipliers: 'n' and 'k'
+> > - dividers: 'd1', 'd2', 'm' and 'p'
+> > 
+> > The peripheral clocks may receive their inputs from one or more parents,
+> > thanks to a mux. Their rates are controlled by a set of divide factors
+> > only, named 'm' and 'p'.
+> > 
+> > This driver also handles:
+> > - fixed clocks,
+> > - the phase delays for the MMCs,
+> > - the clock gates,
+> > - the bus gates,
+> > - and the resets.
+> > 
+> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> > ---
+> >  drivers/clk/sunxi/Makefile |   2 +
+> >  drivers/clk/sunxi/ccu.c    | 980 +++++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/sunxi/ccu.h    | 153 +++++++
+> >  3 files changed, 1135 insertions(+)
+> >  create mode 100644 drivers/clk/sunxi/ccu.c
+> >  create mode 100644 drivers/clk/sunxi/ccu.h
+	[snip]
+> > diff --git a/drivers/clk/sunxi/ccu.c b/drivers/clk/sunxi/ccu.c
+> > new file mode 100644
+> > index 0000000..5749f9c
+> > --- /dev/null
+> > +++ b/drivers/clk/sunxi/ccu.c
+	[snip]
+> > +static void ccu_pll_set_flat_factors(struct ccu *ccu, u32 mask, u32 val)
+> > +{
+> > +	u32 reg, m_val, p_val;
+> > +	u32 m_mask = (1 << ccu->m_width) - 1;
+> > +	u32 p_mask = (1 << ccu->p_width) - 1;
+> 
+> I see you have shifted the factor values to be set in the caller of this
+> function, but then you have to shift masks too, to match. It might be
+> clearer to do both shifts in this function.
+
+Oops, yes. Thanks. (I did not test yet your patch about the CPU
+frequency)
+
+> > +	reg = readl(ccu->base + ccu->reg);
+> > +	m_val = reg & m_mask;
+> > +	p_val = reg & p_mask;
+> > +
+> > +	spin_lock(&ccu_lock);
+> > +
+> > +	/* increase p, then m */
+> > +	if (ccu->p_width && p_val < (val & p_mask)) {
+> > +		reg &= ~p_mask;
+> > +		reg |= val & p_mask;
+> > +		writel(reg, ccu->base + ccu->reg);
+> > +		udelay(10);
+> > +	}
+> > +	if (ccu->m_width && m_val < (val & m_mask)) {
+> > +		reg &= ~m_mask;
+> > +		reg |= val & m_mask;
+> > +		writel(reg, ccu->base + ccu->reg);
+> > +		udelay(10);
+> > +	}
+> > +
+> > +	/* set other factors */
+> > +	reg &= ~(mask & ~(p_mask | m_mask));
+> > +	reg |= val & ~(p_mask | m_mask);
+> > +	writel(reg, ccu->base + ccu->reg);
+> > +
+> > +	/* decrease m */
+> > +	if (ccu->m_width && m_val > (val & m_mask)) {
+> > +		reg &= ~m_mask;
+> > +		reg |= val & m_mask;
+> > +		writel(reg, ccu->base + ccu->reg);
+> > +		udelay(10);
+> > +	}
+> > +
+> > +	/* wait for PLL stable */
+> > +	if (ccu->lock_reg) {
+> > +		u32 lock;
+> > +
+> > +		lock = BIT(ccu->lock_bit);
+> > +		WARN_ON(readl_relaxed_poll_timeout(ccu->base + ccu->lock_reg,
+> > +							reg, !(reg & lock),
+> > +							100, 70000));
+> > +	}
+	[snip]
+> 
+> Any reason why you're waiting for the lock after decreasing m and not
+> before? PLL output may till run too fast before reducing the postdivider
+> potentially causing a crash. But I might be misunderstanding what m is
+> exactly.
+
+I just followed what is done in the function
+ sunxi_clk_factors_set_flat_facotrs() from Allwinnertech:
+
+	1).try to increase factor p first
+	2).try to increase factor m first
+	3. write factor n & k
+	4. do pair things for 2). decease factor m
+	5. wait for PLL state stable
+	6.do pair things for 1).  decease factor p
+
+As this is written, it seems m is a pre-divider.
 
 -- 
-
-Best Regards,
-Peter Chen
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
