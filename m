@@ -1,109 +1,183 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Wed, 29 Jun 2016 22:44:08 +0530
-Subject: [RFC PATCH 2/2] iommu/arm-smmu: Add support for the fsl-mc bus
-In-Reply-To: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
-References: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <1467220448-16764-2-git-send-email-nipun.gupta@nxp.com>
+From: sr@denx.de (Stefan Roese)
+Date: Wed, 29 Jun 2016 13:22:03 +0200
+Subject: [RFC PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst
+ areas
+In-Reply-To: <20160603162429.8760-1-sr@denx.de>
+References: <20160603162429.8760-1-sr@denx.de>
+Message-ID: <5773AF5B.1020403@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement bus specific support for the fsl-mc bus including
-registering the arm_smmu_ops and bus specific smmu device init.
+Hi!
 
-Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-Signed-off-by: Bharat Bhushan <bharat.bhushan@nxp.com>
----
- drivers/iommu/arm-smmu.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+On 03.06.2016 18:24, Stefan Roese wrote:
+> To enable the access to a specific area, the MVEBU XOR controllers needs
+> to have this area enabled / mapped via an address window. Right now,
+> only the DRAM memory area is enabled via such memory windows. So
+> using this driver to DMA to / from a e.g. PCIe memory region is
+> currently not supported.
+>
+> This patch now adds support for such PCIe / IO regions by checking
+> if the src / dst address is located in an IO memory area in contrast
+> to being located in DRAM. This is done by using the newly introduced
+> MBus function mvebu_mbus_get_io_win_info(). If the src / dst address
+> is located in such an IO area, a new address window is created in
+> the XOR DMA controller. Enabling the controller to access this area.
+>
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Marcin Wojtas <mw@semihalf.com>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> ---
+>   drivers/dma/mv_xor.c | 107 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+>   1 file changed, 106 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+> index f4c9f98..2671b11 100644
+> --- a/drivers/dma/mv_xor.c
+> +++ b/drivers/dma/mv_xor.c
+> @@ -470,12 +470,107 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+>   	return mv_chan->slots_allocated ? : -ENOMEM;
+>   }
+>
+> +/*
+> + * Check if source or destination is an PCIe/IO address (non-SDRAM) and add
+> + * a new MBus window if necessary
+> + */
+> +static int mv_xor_add_io_win(struct mv_xor_chan *mv_chan, u32 addr)
+> +{
+> +	void __iomem *base = mv_chan->mmr_high_base;
+> +	u32 win_enable;
+> +	u32 size;
+> +	u8 target, attr;
+> +	int ret;
+> +	int i;
+> +
+> +	/* If no IO window is found that addr has to be located in SDRAM */
+> +	ret = mvebu_mbus_get_io_win_info(addr, &size, &target, &attr);
+> +	if (ret < 0)
+> +		return 0;
+> +
+> +	/*
+> +	 * Mask the base addr 'addr' according to 'size' read back from the
+> +	 * MBus window. Otherwise we might end up with an address located
+> +	 * somewhere in the middle of this area here.
+> +	 */
+> +	size -= 1;
+> +	addr &= ~size;
+> +
+> +	/*
+> +	 * Reading one of both enabled register is enough, as they are always
+> +	 * programmed to the identical values
+> +	 */
+> +	win_enable = readl(base + WINDOW_BAR_ENABLE(0));
+> +
+> +	/*
+> +	 * Loop over all windows to find a matching window (area wise). If
+> +	 * one is found it will get disabled and later newly created.
+> +	 */
+> +	for (i = 0; i < 8; i++) {
+> +		u32 wbase;
+> +		u32 wsize;
+> +
+> +		/* Continue if the window is not enabled */
+> +		if (!(win_enable | (1 << i)))
+> +			continue;
+> +
+> +		wbase = readl(base + WINDOW_BASE(i)) & 0xffff0000;
+> +		wsize = readl(base + WINDOW_SIZE(i)) & 0xffff0000;
+> +
+> +		/* Continue if 'addr' is not in this window */
+> +		if (addr < wbase || addr > (wbase + wsize))
+> +			continue;
+> +
+> +		/*
+> +		 * If addr and size match, then this window is already
+> +		 * configured and we are done
+> +		 */
+> +		if (addr == wbase && (size & 0xffff0000) == wsize)
+> +			return 0;
+> +
+> +		/*
+> +		 * The window is already configured, but the size does not
+> +		 * match, so lets disable it
+> +		 */
+> +		writel(0, base + WINDOW_BASE(i));
+> +		writel(0, base + WINDOW_SIZE(i));
+> +		if (i < 4)
+> +			writel(0, base + WINDOW_REMAP_HIGH(i));
+> +		win_enable &= ~(1 << i);
+> +		win_enable &= ~(3 << (16 + (2 * i)));
+> +		writel(win_enable, base + WINDOW_BAR_ENABLE(0));
+> +		writel(win_enable, base + WINDOW_BAR_ENABLE(1));
+> +
+> +		/*
+> +		 * We can stop here since we have found and disabled the window
+> +		 */
+> +		break;
+> +	}
+> +
+> +	/* Set 'i' to the first free window to write the new values to */
+> +	i = ffs(~win_enable) - 1;
+> +	if (i >= 8)
+> +		return -ENOMEM;
+> +
+> +	writel((addr & 0xffff0000) | (attr << 8) | target,
+> +	       base + WINDOW_BASE(i));
+> +	writel(size & 0xffff0000, base + WINDOW_SIZE(i));
+> +
+> +	win_enable |= (1 << i);
+> +	win_enable |= 3 << (16 + (2 * i));
+> +	writel(win_enable, base + WINDOW_BAR_ENABLE(0));
+> +	writel(win_enable, base + WINDOW_BAR_ENABLE(1));
+> +
+> +	return 0;
+> +}
+> +
+>   static struct dma_async_tx_descriptor *
+>   mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+>   		    unsigned int src_cnt, size_t len, unsigned long flags)
+>   {
+>   	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+>   	struct mv_xor_desc_slot *sw_desc;
+> +	int ret;
+>
+>   	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+>   		return NULL;
+> @@ -486,6 +581,11 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+>   		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
+>   		__func__, src_cnt, len, &dest, flags);
+>
+> +	/* Check if a new window needs to get added for 'dest' */
+> +	ret = mv_xor_add_io_win(mv_chan, dest);
+> +	if (ret)
+> +		return NULL;
+> +
+>   	sw_desc = mv_chan_alloc_slot(mv_chan);
+>   	if (sw_desc) {
+>   		sw_desc->type = DMA_XOR;
+> @@ -493,8 +593,13 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+>   		mv_desc_init(sw_desc, dest, len, flags);
+>   		if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+>   			mv_desc_set_mode(sw_desc);
+> -		while (src_cnt--)
+> +		while (src_cnt--) {
+> +			/* Check if a new window needs to get added for 'src' */
+> +			ret = mv_xor_add_io_win(mv_chan, src[src_cnt]);
+> +			if (ret)
+> +				return NULL;
+>   			mv_desc_set_src_addr(sw_desc, src_cnt, src[src_cnt]);
+> +		}
+>   	}
+>
+>   	dev_dbg(mv_chan_to_devp(mv_chan),
+>
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ab365ec..28d5dc8 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -47,6 +47,9 @@
- 
- #include <linux/amba/bus.h>
- 
-+/* Include path will be changed once FSL-MC support is out from staging */
-+#include <../drivers/staging/fsl-mc/include/fsl_mc_smmu.h>
-+
- #include "io-pgtable.h"
- 
- /* Maximum number of stream IDs assigned to a single device */
-@@ -447,6 +450,11 @@ static struct device_node *dev_get_dev_node(struct device *dev)
- 		return bus->bridge->parent->of_node;
- 	}
- 
-+	if (dev_is_fsl_mc(dev)) {
-+		while (dev_is_fsl_mc(dev))
-+			dev = dev->parent;
-+	}
-+
- 	return dev->of_node;
- }
- 
-@@ -1443,6 +1451,32 @@ static int arm_smmu_init_platform_device(struct device *dev,
- 	return 0;
- }
- 
-+static void __arm_smmu_release_fslmc_iommudata(void *data)
-+{
-+	kfree(data);
-+}
-+
-+static int arm_smmu_init_fslmc_device(struct device *dev,
-+				      struct iommu_group *group)
-+{
-+	struct arm_smmu_master_cfg *cfg;
-+
-+	cfg = iommu_group_get_iommudata(group);
-+	if (!cfg) {
-+		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-+		if (!cfg)
-+			return -ENOMEM;
-+
-+		cfg->streamids[0] = fslmc_dev_streamid(dev);
-+		cfg->num_streamids = 1;
-+
-+		iommu_group_set_iommudata(group, cfg,
-+					  __arm_smmu_release_fslmc_iommudata);
-+	}
-+
-+	return 0;
-+}
-+
- static int arm_smmu_add_device(struct device *dev)
- {
- 	struct iommu_group *group;
-@@ -1467,6 +1501,8 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
- 
- 	if (dev_is_pci(dev))
- 		group = pci_device_group(dev);
-+	else if (dev_is_fsl_mc(dev))
-+		group = fslmc_device_group(dev);
- 	else
- 		group = generic_device_group(dev);
- 
-@@ -1475,6 +1511,8 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
- 
- 	if (dev_is_pci(dev))
- 		ret = arm_smmu_init_pci_device(to_pci_dev(dev), group);
-+	else if (dev_is_fsl_mc(dev))
-+		ret = arm_smmu_init_fslmc_device(dev, group);
- 	else
- 		ret = arm_smmu_init_platform_device(dev, group);
- 
-@@ -2102,6 +2140,11 @@ static int __init arm_smmu_init(void)
- 	}
- #endif
- 
-+#ifdef CONFIG_FSL_MC_BUS
-+	if (!iommu_present(&fsl_mc_bus_type))
-+		bus_set_iommu(&fsl_mc_bus_type, &arm_smmu_ops);
-+#endif
-+
- 	return 0;
- }
- 
--- 
-1.9.1
+I didn't receive any comments on this patch so far. How should we
+proceed? Is this approach to enable DMA support to and from regions
+in PCI space acceptable? If yes, do I need to resend this patch as
+a non-RFC patch?
+
+Thanks,
+Stefan
