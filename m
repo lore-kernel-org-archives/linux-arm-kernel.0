@@ -1,30 +1,45 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 29 Jun 2016 09:48:19 +0200
-Subject: [PATCH 4/7] reset: Supply *_shared variant calls when using
- *_optional APIs
-In-Reply-To: <20160628085622.GM6720@dell>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
- <20160606155655.10860-5-lee.jones@linaro.org> <20160628085622.GM6720@dell>
-Message-ID: <1467186499.2278.7.camel@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 Jun 2016 00:54:47 -0700
+Subject: [RESEND PATCHv2 03/28] ARM: OMAP2+: omap_device: create clock
+ alias purely from DT data
+In-Reply-To: <5773745A.6020307@ti.com>
+References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
+ <1465844702-12200-4-git-send-email-t-kristo@ti.com>
+ <20160628070011.GD28140@atomide.com> <577373F0.5080700@ti.com>
+ <5773745A.6020307@ti.com>
+Message-ID: <20160629075446.GK28140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-Am Dienstag, den 28.06.2016, 09:56 +0100 schrieb Lee Jones:
-> Philipp,
+* Tero Kristo <t-kristo@ti.com> [160629 00:13]:
+> On 29/06/16 10:08, Tero Kristo wrote:
+> > On 28/06/16 10:00, Tony Lindgren wrote:
+> > > * Tero Kristo <t-kristo@ti.com> [160613 12:07]:
+> > > > This avoids the need to add most of the clock aliases under
+> > > > drivers/clk/ti/clk-xyz.c files.
+> > > 
+> > > This is a nice improvment, probably best to queu this along
+> > > with the rest of the series via the clock tree:
+> > > 
+> > > Acked-by: Tony Lindgren <tony@atomide.com>
+> > > 
+> > > Or please let me know if you want me to pick this separately.
+> > > 
+> > > Regards,
+> > > 
+> > > Tony
+> > > 
+> > 
+> > Patches #3, #6, #7, #8 you can pick up separately (but you will have
+> > some conflicts due to missing ti_clk_get implementation.) These patches
+> > are required for this series to work properly though.
 > 
-> I need this to go into the -rcs too.
-> 
-> Can I add it with your Ack please?
+> And patch #9 you can pick up also obviously...
 
-I have already added your patches to my branch, and I intend to send a
-pull request for it tomorrow. I am afraid applying this patch in another
-branch would create a merge conflict with
-git://git.pengutronix.de/git/pza/linux.git reset/next
-in arm-soc. If that is not the case, go ahead. Otherwise I could provide
-a tag at commit 2485394d9e0b ("reset: TRIVIAL: Add line break at same
-place for similar APIs") for you to merge.
+OK can you please repost the ones I can pick for v4.8 merge window
+to get them out of the way? There were some merge conflicts against
+Linux next when I tried to apply them for testing yesterday.
 
-regards
-Philipp
+Regards,
+
+Tony
