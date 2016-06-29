@@ -1,95 +1,97 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Jun 2016 15:56:50 +0200
+Date: Wed, 29 Jun 2016 15:57:47 +0200
 Subject: [RFC PATCH v4 3/5] PCI: Check platform specific ECAM quirks
-In-Reply-To: <5773CE49.1050802@codeaurora.org>
+In-Reply-To: <5773D284.8060404@semihalf.com>
 References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
  <1467100442-28078-4-git-send-email-tn@semihalf.com>
  <577275EA.7010002@codeaurora.org>
  <CADaLNDkhPZuG7UJ4SK_j5v_nXbd782Q17LAcXduG0uEObaFF=g@mail.gmail.com>
  <5773A773.8040700@semihalf.com> <5773CE49.1050802@codeaurora.org>
-Message-ID: <CAKv+Gu9=0=qw70o1aYNg=tDyv4TguiG2WwXNK8RbWM1-ZcabUg@mail.gmail.com>
+ <5773D284.8060404@semihalf.com>
+Message-ID: <CAKv+Gu8t994-HEJ+Cyiw6a8Bf_Ka=5amOAw44+UgnJZ90WrpnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 June 2016 at 15:34, Christopher Covington <cov@codeaurora.org> wrote:
-> Hi Tomasz,
+On 29 June 2016 at 15:52, Tomasz Nowicki <tn@semihalf.com> wrote:
+> On 29.06.2016 15:34, Christopher Covington wrote:
+>>
+>> I'm confused by this statement. OEMID is defined as 6 bytes long and OEM
+>> Table ID as 8 bytes long in the ACPI specification. As far as I can
+>> tell, if your string isn't exactly that long, padding up to that length
+>> is required.
 >
-> On 06/29/2016 06:48 AM, Tomasz Nowicki wrote:
->> On 28.06.2016 18:12, Duc Dang wrote:
->>> On Tue, Jun 28, 2016 at 6:04 AM, Christopher Covington
->>> <cov@codeaurora.org> wrote:
->>>> Hi Tomasz,
 >
->>>> Ard's comments on v3 included:
->>>>
->>>> "... exact OEM table/rev id matches ..."
->>>> "... substring match ... out of the question ..."
->
-> Digging through the archives I see Jon Master commented earlier to "be
-> careful with substring match".
->
->>> I think having OEM Table ID as "PLAT " and then "PLAT2 " (the the
->>> next version of the SoC) is common. So yes, matching full string is
->>> better as we can use "PLAT2 " in MCFG table and not worry about the
->>> "PLAT" sub-string match causes the quirk to be applied
->>> unintentionally.
->
->> Note that platforms already shipped where OEM string has no padding will
->
-> I'm confused by this statement. OEMID is defined as 6 bytes long and OEM
-> Table ID as 8 bytes long in the ACPI specification. As far as I can
-> tell, if your string isn't exactly that long, padding up to that length
-> is required.
->
->> have change the firmware or add 0 padding to our quirk array IDs.
->
-> The fixed 6 or 8 character string compare, as used v2 of this patchset,
-> will be compatible with existing firmware as best I can tell. Adding
-> padding to the quirk array IDs is exactly what I'm suggesting, although
-> all the strings I've seen are space padded rather than null padded.
+> Well, I cannot find that requirement in ACPI spec. but I might missed
+> something.
 >
 
-I don't think any interpretation of the 6 or 8 byte wide OEM fields is
-necessary to be able to match it against a list of known values as
-used by the quirky platforms. We need an exact match against whatever
-we know is in the table of an affected system, and whether a space
-qualifies as padding or as a character is irrelevant.
+This has *nothing* to do with the ACPI spec.
 
-> Matches:
-> {"APM   ", "XGENE   ", 1}
-> {"CAVIUM", "THUNDERX", 1}
-> {"HISI  ", "HISI-D02", 1}
-> {"HISI  ", "HISI-D03", 1}
-> {"QCOM  ", "QDF2432 ", 1}
+There exist a couple of machines that have known quirks. Those
+machines have certain 6 or 8 byte long strings in their MCFG tables
+that we can match against. If any of those fields contains spaces,
+whether you call that padding or not is totally irrelevant. The same
+applies to NUL bytes.
+
+So for a 6 byte field, our table contains the six characters that we
+know is in the quirky hardware's table.
+The same for an 8 byte field.
+
+That means there is no need for strnlen, strncmp() with variable size
+etc. Each match can be implemented using memcmp() [since the table
+fields are not NUL terminated] with a constant argument for the length
+parameter.
+
+Regards,
+Ard.
+
+
+> I dumped my x86 machine ACPI tables and here is an example of MCFG:
 >
-
-I would not mind listing these as
-
-{ { 'A','P','M',' ',' ',' ',' '}, {'X','G','E','N','E',' ',' ',' '}, 1}
-...
-
-just to stress that we are not dealing with C strings (and to avoid
-having to deal with the implicit NUL terminator).
-That also means memcmp() with a fixed length is the most appropriate
-to perform the comparison
-
-> Given the above tuples, won't accidentally match:
-> (guessing at possible future ids)
-> {"APM   ", "XGENEi  ", 1}
-> {"CAVIUM", "THUNDERX", i} i != 1
-> {"CAVIUM", "THUNDERi", 1}
-> {"CAVIUM", "THUNDRXi", 1}
-> {"HISI  ", "HISI-D0i", 1} i != 2 && i != 3
-> {"QCOM  ", "QDF24ij ", 1} i != 3 && j != 2
+> $ cat mcfg.dsl
+> /*
+>  * Intel ACPI Component Architecture
+>  * AML/ASL+ Disassembler version 20160108-64
+>  * Copyright (c) 2000 - 2016 Intel Corporation
+>  *
+>  * Disassembly of mcfg.dat, Wed Jun 29 15:48:16 2016
+>  *
+>  * ACPI Data Table [MCFG]
+>  *
+>  * Format: [HexOffset DecimalOffset ByteLength]  FieldName : FieldValue
+>  */
 >
-> References for APM, HiSilicon IDs:
-> https://lists.linaro.org/pipermail/linaro-acpi/2016-June/007108.html
-> https://lists.linaro.org/pipermail/linaro-acpi/2016-June/007043.html
+> [000h 0000   4]                    Signature : "MCFG"    [Memory Mapped
+> Configuration table]
+> [004h 0004   4]                 Table Length : 0000003C
+> [008h 0008   1]                     Revision : 01
+> [009h 0009   1]                     Checksum : A9
+> [00Ah 0010   6]                       Oem ID : "ALASKA"
+> [010h 0016   8]                 Oem Table ID : "A M I"
+> [018h 0024   4]                 Oem Revision : 01072009
+> [01Ch 0028   4]              Asl Compiler ID : "MSFT"
+> [020h 0032   4]        Asl Compiler Revision : 00000097
 >
-> Thanks,
-> Cov
+> [024h 0036   8]                     Reserved : 0000000000000000
 >
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> [02Ch 0044   8]                 Base Address : 00000000F8000000
+> [034h 0052   2]         Segment Group Number : 0000
+> [036h 0054   1]             Start Bus Number : 00
+> [037h 0055   1]               End Bus Number : 3F
+> [038h 0056   4]                     Reserved : 00000000
+>
+> Raw Table Data: Length 60 (0x3C)
+>
+> 00000000  4d 43 46 47 3c 00 00 00  01 a9 41 4c 41 53 4b 41
+> |MCFG<.....ALASKA|
+> 00000010  41 20 4d 20 49 00 00 00  09 20 07 01 4d 53 46 54  |A M I....
+> ..MSFT|
+> 00000020  97 00 00 00 00 00 00 00  00 00 00 00 00 00 00 f8
+> |................|
+> 00000030  00 00 00 00 00 00 00 3f  00 00 00 00              |.......?....|
+>
+> So in this example I have OEM table ID "A M I" 6 character long and 0
+> padding.
+>
+> Tomasz
+>
