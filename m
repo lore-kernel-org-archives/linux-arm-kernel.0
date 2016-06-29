@@ -1,131 +1,190 @@
-From: oss@buserror.net (Scott Wood)
-Date: Tue, 28 Jun 2016 21:05:49 -0500
-Subject: [PATCH v2 1/2] ARM64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <5771267D.7030102@arm.com>
-References: <1463114260-8724-1-git-send-email-oss@buserror.net>
- <20160513112441.200f4349@arm.com> <1466559926.22191.203.camel@buserror.net>
- <5771267D.7030102@arm.com>
-Message-ID: <1467165949.32358.16.camel@buserror.net>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 29 Jun 2016 10:30:52 +0800
+Subject: [PATCH 06/21] usb: chipidea: Initialize and reinitialize phy later
+In-Reply-To: <20160626072838.28082-7-stephen.boyd@linaro.org>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-7-stephen.boyd@linaro.org>
+Message-ID: <20160629023052.GB25236@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-06-27 at 14:13 +0100, Marc Zyngier wrote:
-> On 22/06/16 02:45, Scott Wood wrote:
-> > 
-> > On Fri, 2016-05-13 at 11:24 +0100, Marc Zyngier wrote:
-> > > 
-> > > On Thu, 12 May 2016 23:37:39 -0500
-> > > Scott Wood <oss@buserror.net> wrote:
-> > > 
-> > > > +{
-> > > > +	u64 cval_old, cval_new;
-> > > > +	int timeout = 200;
-> > > Can we have a comment on how this value has been chosen??
-> > It's an arbitrary value well beyond the point at which we've seen it fail.
-> So can we please have a comment *in the code* that explains how this
-> value has been picked?
+On Sun, Jun 26, 2016 at 12:28:23AM -0700, Stephen Boyd wrote:
+> The ULPI phy on qcom platforms needs to be initialized and
+> powered on after a USB reset and before we toggle the run/stop
+> bit. Otherwise, the phy locks up and doesn't work properly.
 
-Sure, if you want. ?I just wasn't sure there was much value in a comment that
-essentially says that there's no special meaning to this particular value.
+This requirement is so strange, try to see if any other initialization
+sequences.
+     
+Since this driver is multi-platforms, I can't accept this change for
+common, if you had to do that, would you please move your changes to
+msm glue layer using CI_HDRC_CONTROLLER_RESET_EVENT and
+CI_HDRC_CONTROLLER_STOPPED_EVENT? Besides, you need to add one flag
+at ci_hdrc_platform_data.flags for your case to avoid normal
+initialization.
 
-> > > > int
-> > > > access, unsigned long evt,
-> > > > ?	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
-> > > > ?}
-> > > > ?
-> > > > +#ifdef CONFIG_ARM64
-> > > > +static __always_inline void rewrite_tval(const int access,
-> > > > +		unsigned long evt, struct clock_event_device *clk)
-> > > > +{
-> > > > +	u64 cval_old, cval_new;
-> > > > +	int timeout = 200;
-> > > > +
-> > > > +	do {
-> > > > +		cval_old = __arch_counter_get_cntvct();
-> > > > +		arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL,
-> > > > evt,
-> > > > clk);
-> > > > +		cval_new = __arch_counter_get_cntvct();
-> > > Don't you need to guarantee the order of accesses here?
-> > I'm not 100% sure.??The erratum workaround sample code doesn't show any
-> > barriers, and adding more barriers could make it harder for the loop to
-> > successfully complete.??There's already a barrier after the write, so the
-> > only
-> > concern should be whether the timer read could be reordered after the
-> > timer
-> > write, which could cause the loop to exit even if the write was bad.??Do
-> > you
-> > know if A53 or A57 will reorder a counter read relative to a tval write?
-> I can't see any absolute guarantee that they wouldn't be reordered (but
-> I have no insight on the micro-architecture either). I'd rather err on
-> the side of caution here.
+Peter
 
-OK, I'll see how well it works with the added barrier.
+> Move
+> the phy initialization to a later point, and shut it down outside
+> of driver remove so that the phy state is properly managed across
+> role switches.
+> 
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  drivers/usb/chipidea/ci.h   |  3 ++-
+>  drivers/usb/chipidea/core.c | 23 ++++++++++-------------
+>  drivers/usb/chipidea/host.c |  5 ++---
+>  drivers/usb/chipidea/udc.c  |  2 ++
+>  4 files changed, 16 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+> index cd414559040f..f87805235caa 100644
+> --- a/drivers/usb/chipidea/ci.h
+> +++ b/drivers/usb/chipidea/ci.h
+> @@ -431,7 +431,8 @@ u8 hw_port_test_get(struct ci_hdrc *ci);
+>  int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
+>  				u32 value, unsigned int timeout_ms);
+>  
+> -void ci_platform_configure(struct ci_hdrc *ci);
+> +void ci_usb_phy_exit(struct ci_hdrc *ci);
+> +int ci_platform_configure(struct ci_hdrc *ci);
+>  
+>  int dbg_create_files(struct ci_hdrc *ci);
+>  
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 01390e02ee53..a01611c7f815 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -359,7 +359,7 @@ static int _ci_usb_phy_init(struct ci_hdrc *ci)
+>   * interfaces
+>   * @ci: the controller
+>   */
+> -static void ci_usb_phy_exit(struct ci_hdrc *ci)
+> +void ci_usb_phy_exit(struct ci_hdrc *ci)
+>  {
+>  	if (ci->phy) {
+>  		phy_power_off(ci->phy);
+> @@ -412,9 +412,14 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
+>   * @ci: the controller
+>   *
+>   */
+> -void ci_platform_configure(struct ci_hdrc *ci)
+> +int ci_platform_configure(struct ci_hdrc *ci)
+>  {
+>  	bool is_device_mode, is_host_mode;
+> +	int ret;
+> +
+> +	ret = ci_usb_phy_init(ci);
+> +	if (ret)
+> +		return ret;
+>  
+>  	is_device_mode = hw_read(ci, OP_USBMODE, USBMODE_CM) == USBMODE_CM_DC;
+>  	is_host_mode = hw_read(ci, OP_USBMODE, USBMODE_CM) == USBMODE_CM_HC;
+> @@ -453,6 +458,8 @@ void ci_platform_configure(struct ci_hdrc *ci)
+>  			hw_write(ci, OP_BURSTSIZE, RX_BURST_MASK,
+>  				ci->platdata->rx_burst_size);
+>  	}
+> +
+> +	return 0;
+>  }
+>  
+>  /**
+> @@ -511,9 +518,7 @@ int hw_device_reset(struct ci_hdrc *ci)
+>  		return -ENODEV;
+>  	}
+>  
+> -	ci_platform_configure(ci);
+> -
+> -	return 0;
+> +	return ci_platform_configure(ci);
+>  }
+>  
+>  static irqreturn_t ci_irq(int irq, void *data)
+> @@ -917,12 +922,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>  			ci->usb_phy = NULL;
+>  	}
+>  
+> -	ret = ci_usb_phy_init(ci);
+> -	if (ret) {
+> -		dev_err(dev, "unable to init phy: %d\n", ret);
+> -		return ret;
+> -	}
+> -
+>  	ci->hw_bank.phys = res->start;
+>  
+>  	ci->irq = platform_get_irq(pdev, 0);
+> @@ -1025,7 +1024,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>  stop:
+>  	ci_role_destroy(ci);
+>  deinit_phy:
+> -	ci_usb_phy_exit(ci);
+>  
+>  	return ret;
+>  }
+> @@ -1044,7 +1042,6 @@ static int ci_hdrc_remove(struct platform_device *pdev)
+>  	ci_extcon_unregister(ci);
+>  	ci_role_destroy(ci);
+>  	ci_hdrc_enter_lpm(ci, true);
+> -	ci_usb_phy_exit(ci);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+> index 053bac9d983c..523c155daea8 100644
+> --- a/drivers/usb/chipidea/host.c
+> +++ b/drivers/usb/chipidea/host.c
+> @@ -87,9 +87,7 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
+>  	if (ret)
+>  		return ret;
+>  
+> -	ci_platform_configure(ci);
+> -
+> -	return ret;
+> +	return ci_platform_configure(ci);
+>  }
+>  
+>  static const struct ehci_driver_overrides ehci_ci_overrides = {
+> @@ -186,6 +184,7 @@ static void host_stop(struct ci_hdrc *ci)
+>  	if (hcd) {
+>  		usb_remove_hcd(hcd);
+>  		usb_put_hcd(hcd);
+> +		ci_usb_phy_exit(ci);
+>  		if (ci->platdata->reg_vbus && !ci_otg_is_fsm_mode(ci) &&
+>  			(ci->platdata->flags & CI_HDRC_TURN_VBUS_EARLY_ON))
+>  				regulator_disable(ci->platdata->reg_vbus);
+> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> index 065f5d97aa67..8f44e2d1e0c0 100644
+> --- a/drivers/usb/chipidea/udc.c
+> +++ b/drivers/usb/chipidea/udc.c
+> @@ -1534,6 +1534,7 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
+>  			if (ci->driver)
+>  				ci->driver->disconnect(&ci->gadget);
+>  			hw_device_state(ci, 0);
+> +			ci_usb_phy_exit(ci);
+>  			if (ci->platdata->notify_event)
+>  				ci->platdata->notify_event(ci,
+>  				CI_HDRC_CONTROLLER_STOPPED_EVENT);
+> @@ -1794,6 +1795,7 @@ static int ci_udc_stop(struct usb_gadget *gadget)
+>  			ci->platdata->notify_event(ci,
+>  			CI_HDRC_CONTROLLER_STOPPED_EVENT);
+>  		spin_unlock_irqrestore(&ci->lock, flags);
+> +		ci_usb_phy_exit(ci);
+>  		_gadget_stop_activity(&ci->gadget);
+>  		spin_lock_irqsave(&ci->lock, flags);
+>  		pm_runtime_put(&ci->gadget.dev);
+> -- 
+> 2.9.0.rc2.8.ga28705d
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-> > > > ?			clk->set_state_shutdown =
-> > > > arch_timer_shutdown_virt;
-> > > > ?			clk->set_state_oneshot_stopped =
-> > > > arch_timer_shutdown_virt;
-> > > > ?			clk->set_next_event =
-> > > > arch_timer_set_next_event_virt;
-> > > > +
-> > > > +#ifdef CONFIG_ARM64
-> > > > +			if
-> > > > (static_branch_unlikely(&arch_timer_read_ool_enabled))
-> > > > +				clk->set_next_event =
-> > > > +					arch_timer_set_next_event_vir
-> > > > t_er
-> > > > rata;
-> > > On the same line, please.
-> > I was trying to avoid going beyond 80 columns.
-> Please ignore what checkpatch says. Readability is more important (and
-> I've given up using a vintage vt100...).
+-- 
 
-I'm not using a vintage vt100 either but I still have (approximately) 80-
-column terminals, because I like having two terminals side-by-side with a
-reasonable font size... and since different people have different terminal
-setups, CodingStyle specifies a standard limit.
-
-I think I can make it moot with the suggestion to have a helper function,
-though.
-
-> > > ?	} else {
-> > > > ?		arch_timer_read_counter =
-> > > > arch_counter_get_cntvct_mem;
-> > > > ?
-> > > > @@ -763,6 +870,9 @@ static void __init arch_timer_of_init(struct
-> > > > device_node *np)
-> > > > ?
-> > > > ?	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
-> > > > ?
-> > > > +	if (of_property_read_bool(np, "fsl,erratum-a008585"))
-> > > > +		static_branch_enable(&arch_timer_read_ool_enabled);
-> > > > +
-> > > > ?	/*
-> > > > ?	?* If we cannot rely on firmware initializing the timer
-> > > > registers
-> > > > then
-> > > > ?	?* we should use the physical timers instead.
-> > > An outstanding question is how we're going to deal with this in KVM,
-> > > because a guest absolutely needs to know about it (I can definitely see
-> > > time jumping in guests running on a LS2080).
-> > The property will need to be in the guest's device tree.??I'm not too
-> > familiar
-> > with how KVM handles device trees on arm...??From looking at the QEMU
-> > source
-> > it seems that the dtb is passed in by the user.??So either that dtb will
-> > need
-> > the erratum property in it, or QEMU (and KVM tool?) would need to patch it
-> > ?into the guest dtb based on seeing the property in /proc/device-tree.
-> There is no guarantee that the host device tree is always accessible to
-> userspace. So we're probably looking at requiring a new KVM device API
-> that would expose the timer properties, one of them being this erratum.
-> That's certainly going to be fun to handle.
-
-KVM on PPC relies on /proc/device-tree -- when would it not be available?
-?Where is the dtb passed to QEMU expected to come from?
-
-In any case, let's get the kernel sorted out first.
-
--Scott
+Best Regards,
+Peter Chen
