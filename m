@@ -1,136 +1,55 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed, 29 Jun 2016 08:12:21 +0200
-Subject: [PATCH v2 2/2] ARM: at91: pm: switch to the PIE infrastructure
-In-Reply-To: <1467153886-21144-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1467153886-21144-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1467153886-21144-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <2349417.jWuiI2GXql@ws-stein>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 29 Jun 2016 09:16:43 +0300
+Subject: [RESEND PATCHv2 04/28] ARM: OMAP2+: hwmod: use new ti_clk_get API
+ to search for clock handles
+In-Reply-To: <20160628065712.GC28140@atomide.com>
+References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
+ <1465844702-12200-5-git-send-email-t-kristo@ti.com>
+ <20160628065712.GC28140@atomide.com>
+Message-ID: <577367CB.6090703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 June 2016 00:44:46, Alexandre Belloni wrote:
-> Using the PIE infrastructure allows to write the whole suspend/resume
-> functions in C instead of assembly.
-> 
-> The only remaining assembly instruction is wfi for armv5
-> It makes the code shorter and clearer.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/mach-at91/Kconfig       |   1 +
->  arch/arm/mach-at91/Makefile      |   2 +-
->  arch/arm/mach-at91/pm.c          |  31 ++--
->  arch/arm/mach-at91/pm/.gitignore |   2 +
->  arch/arm/mach-at91/pm/Makefile   |   3 +
->  arch/arm/mach-at91/pm/atmel_pm.c |  97 +++++++++++
->  arch/arm/mach-at91/pm_suspend.S  | 338
-> [...]
-> --- /dev/null
-> +++ b/arch/arm/mach-at91/pm/atmel_pm.c
-> @@ -0,0 +1,97 @@
-> +#include <linux/io.h>
-> +#include <linux/clk/at91_pmc.h>
-> +#include <linux/mfd/syscon/atmel-mc.h>
-> +#include <linux/pie.h>
-> +#include "../pm.h"
-> +
-> +#define	SRAMC_SELF_FRESH_ACTIVE		0x01
-> +#define	SRAMC_SELF_FRESH_EXIT		0x00
-> +
-> +static void at91_sramc_self_refresh(unsigned int is_active,
-> +				    unsigned int memtype,
-> +				    void __iomem *sdramc_base,
-> +				    void __iomem *sdramc_base1)
-> +{
-> +	static unsigned int lpr, mdr, lpr1, mdr1;
-> +
-> +	switch (memtype) {
-> +	case AT91_MEMCTRL_MC:
-> +	/*
-> +	 * at91rm9200 Memory controller
-> +	 */
-> +		if (is_active)
-> +			__raw_writel(1, sdramc_base + AT91_MC_SDRAMC_SRR);
-> +		break;
-> +
-> +	case AT91_MEMCTRL_DDRSDR:
-> +		if (is_active) {
-> +			mdr = __raw_readl(sdramc_base + AT91_DDRSDRC_MDR);
-> +			lpr = __raw_readl(sdramc_base + AT91_DDRSDRC_LPR);
-> +
-> +			if ((mdr & AT91_DDRSDRC_MD) == AT91_DDRSDRC_MD_LOW_POWER_DDR)
-> +				__raw_writel((mdr & ~AT91_DDRSDRC_MD) |
-> +					     AT91_DDRSDRC_MD_DDR2, sdramc_base +
-> +					     AT91_DDRSDRC_MDR);
-> +			__raw_writel((lpr & ~AT91_DDRSDRC_LPCB) |
-> +				     AT91_DDRSDRC_LPCB_SELF_REFRESH, sdramc_base
-> +				     + AT91_DDRSDRC_LPR);
-> +
-> +			if (sdramc_base1) {
-> +				mdr1 = __raw_readl(sdramc_base1 + AT91_DDRSDRC_MDR);
-> +				lpr1 = __raw_readl(sdramc_base1 + AT91_DDRSDRC_LPR);
-> +				if ((mdr1 & AT91_DDRSDRC_MD) == 
-AT91_DDRSDRC_MD_LOW_POWER_DDR)
-> +					__raw_writel((mdr1 & ~AT91_DDRSDRC_MD) |
-> +						     AT91_DDRSDRC_MD_DDR2,
-> +						     sdramc_base1 +
-> +						     AT91_DDRSDRC_MDR);
-> +				__raw_writel((lpr1 & ~AT91_DDRSDRC_LPCB) |
-> +					     AT91_DDRSDRC_LPCB_SELF_REFRESH,
-> +					     sdramc_base1 + AT91_DDRSDRC_LPR);
-> +			}
-> +		} else {
-> +			__raw_writel(mdr, sdramc_base + AT91_DDRSDRC_MDR);
-> +			__raw_writel(lpr, sdramc_base + AT91_DDRSDRC_LPR);
-> +			if (sdramc_base1) {
-> +				__raw_writel(mdr, sdramc_base1 + AT91_DDRSDRC_MDR);
-> +				__raw_writel(lpr, sdramc_base1 + AT91_DDRSDRC_LPR);
-> +			}
-> +		}
-> +		break;
-> +
-> +	case AT91_MEMCTRL_SDRAMC:
-> +		if (is_active) {
-> +			lpr = __raw_readl(sdramc_base + AT91_SDRAMC_LPR);
-> +
-> +			__raw_writel((lpr & ~AT91_SDRAMC_LPCB) |
-> +				     AT91_SDRAMC_LPCB_SELF_REFRESH, sdramc_base
-> +				     + AT91_SDRAMC_LPR);
-> +		} else {
-> +			__raw_writel(lpr, sdramc_base + AT91_SDRAMC_LPR);
-> +		}
-> +		break;
-> +	}
-> +}
-> +
-> +void atmel_pm_suspend(void __iomem *pmc, void __iomem *ramc0,
-> +		      void __iomem *ramc1, int memctrl)
-> +{
-> +	int memtype, pm_mode;
-> +
-> +	memtype = memctrl & AT91_PM_MEMTYPE_MASK;
-> +	pm_mode = (memctrl >> AT91_PM_MODE_OFFSET) & AT91_PM_MODE_MASK;
-> +
-> +	dsb();
-> +
-> +	at91_sramc_self_refresh(1, memtype, ramc0, ramc1);
-> +
-> +#if defined(CONFIG_CPU_V7)
-> +	dsb();
-> +	wfi();
-> +#else
-> +	asm volatile ("mcr	p15, 0, %0, c7, c0, 4" \
-> +		      : : "r" (0) : "memory");
-> +#endif
+On 28/06/16 09:57, Tony Lindgren wrote:
+> Hi,
+>
+> * Tero Kristo <t-kristo@ti.com> [160613 12:07]:
+>> The new API avoids the need to add clock aliases for most of the clocks,
+>> should use of it is preferred. Many of the existing clock aliases are
+>> only created because of hwmod data.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
+>>   1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>> index 83cb527..0ea869c 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>> @@ -786,7 +786,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
+>>   	if (!oh->main_clk)
+>>   		return 0;
+>>
+>> -	oh->_clk = clk_get(NULL, oh->main_clk);
+>> +	oh->_clk = ti_clk_get(oh->main_clk);
+>>   	if (IS_ERR(oh->_clk)) {
+>>   		pr_warn("omap_hwmod: %s: cannot clk_get main_clk %s\n",
+>>   			oh->name, oh->main_clk);
+>
+> After thinking about this for a while I think code outside TI specific
+> clock implementation should use just clk_get(). Otherwise we create more
+> dependencies to move code to live under drivers subdirectory.
+>
+> Can't we have clk_get() call a SoC specific helper function if clock
+> is not found?
 
-Why not defining wfi() for __LINUX_ARM_ARCH__ < 7 as it is done for dsb() and 
-friends in arch/arm/include/asm/barrier.h? So you can get rid of that #if 
-completly.
+That is for Mike / Stephen to answer. Implementing something like this 
+sounds trivial, I could just hook up the ti_clk_get being called here. 
+However, any attempted changes to the clkdev implementation have been 
+shot down so far, thus I did this.
 
-> +	at91_sramc_self_refresh(0, memtype, ramc0, ramc1);
-> +}
-> +EXPORT_PIE_SYMBOL(atmel_pm_suspend);
+The problem is still the clocks which are just referred via a name only, 
+not via a DT node.
 
-
-Best regards,
-Alexander
+-Tero
