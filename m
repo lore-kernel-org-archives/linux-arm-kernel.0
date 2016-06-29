@@ -1,894 +1,187 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 29 Jun 2016 17:26:52 +0100
-Subject: [PATCH v3 2/2] remoteproc: qcom: Introduce WCNSS peripheral image
- loader
-In-Reply-To: <1467147506-753-2-git-send-email-bjorn.andersson@linaro.org>
-References: <1467147506-753-1-git-send-email-bjorn.andersson@linaro.org>
- <1467147506-753-2-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <5773F6CC.6000605@linaro.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 29 Jun 2016 18:34:59 +0200
+Subject: [PATCH v7 17/17] KVM: arm64: enable ITS emulation as a virtual
+ MSI controller
+In-Reply-To: <20160628123230.26255-18-andre.przywara@arm.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+ <20160628123230.26255-18-andre.przywara@arm.com>
+Message-ID: <477014eb-cb07-9339-ef34-5b358d358b77@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Andre,
 
-Few comments below,
-
-On 28/06/16 21:58, Bjorn Andersson wrote:
-> From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
->
-> This introduces the peripheral image loader, for loading WCNSS firmware
-> and boot the core on e.g. MSM8974. The firmware is verified and booted
-> with the help of the Peripheral Authentication System (PAS) in
-> TrustZone.
->
-> Tested-by: John Stultz <john.stultz@linaro.org>
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+On 28/06/2016 14:32, Andre Przywara wrote:
+> Now that all ITS emulation functionality is in place, we advertise
+> MSI functionality to userland and also the ITS device to the guest - if
+> userland has configured that.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->
-> Changes since v2:
-> - Aligning with changed done to mdt_loader in Hexagon series
-> - Minor cleanups based on comments
-> - Added MODULE_DESCRIPTION and MODULE_LICENSE
->
->   drivers/remoteproc/Kconfig           |  10 +
->   drivers/remoteproc/Makefile          |   1 +
->   drivers/remoteproc/qcom_wcnss.c      | 622 +++++++++++++++++++++++++++++++++++
->   drivers/remoteproc/qcom_wcnss.h      |  23 ++
->   drivers/remoteproc/qcom_wcnss_iris.c | 187 +++++++++++
->   5 files changed, 843 insertions(+)
->   create mode 100644 drivers/remoteproc/qcom_wcnss.c
->   create mode 100644 drivers/remoteproc/qcom_wcnss.h
->   create mode 100644 drivers/remoteproc/qcom_wcnss_iris.c
+>  Documentation/virtual/kvm/api.txt |  2 +-
+>  arch/arm64/kvm/Kconfig            |  1 +
+>  arch/arm64/kvm/reset.c            | 10 ++++++++++
+>  include/kvm/vgic/vgic.h           |  5 +++++
+>  virt/kvm/arm/vgic.c               |  5 +++++
+>  virt/kvm/arm/vgic/vgic-init.c     |  3 +++
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c  | 14 ++++++++++----
+>  virt/kvm/arm/vgic/vgic.c          |  8 ++++++++
+>  8 files changed, 43 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index bf76639..f60b137 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2156,7 +2156,7 @@ after pausing the vcpu, but before it is resumed.
+>  4.71 KVM_SIGNAL_MSI
+>  
+>  Capability: KVM_CAP_SIGNAL_MSI
+> -Architectures: x86
+> +Architectures: x86 arm64
+>  Type: vm ioctl
+>  Parameters: struct kvm_msi (in)
+>  Returns: >0 on delivery, 0 if guest blocked the MSI, and -1 on error
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index c4f26ef..446686a 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -36,6 +36,7 @@ config KVM
+>  	select HAVE_KVM_IRQFD
+>  	select KVM_ARM_VGIC_V3-ENODEV
+>  	select KVM_ARM_PMU if HW_PERF_EVENTS
+> +	select HAVE_KVM_MSI
+don't you want to enable the modality only with new VGIC? If I am not
+wrong an attempt to inject an msi from userspace with old vgic will
+return  -ENODEV.
 
-checkpatch reports:
-total: 0 errors, 16 warnings, 853 lines checked
+Thanks
 
-
->
-> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> index 7c9fa6906f94..898820350cb6 100644
-> --- a/drivers/remoteproc/Kconfig
-> +++ b/drivers/remoteproc/Kconfig
-> @@ -90,6 +90,16 @@ config QCOM_Q6V5_PIL
->   	  Say y here to support the Qualcomm Peripherial Image Loader for the
->   	  Hexagon V5 based remote processors.
->
-> +config QCOM_WCNSS_PIL
-> +	tristate "Qualcomm WCNSS Peripheral Image Loader"
-
-Some of the symbols needs exporting,
-If you build these as modules, you would end up with below errors.
-
-
-ERROR: "qcom_wcnss_assign_iris" [drivers/remoteproc/qcom_wcnss_iris.ko] 
-undefined!
-ERROR: "qcom_iris_disable" [drivers/remoteproc/qcom_wcnss.ko] undefined!
-ERROR: "qcom_iris_enable" [drivers/remoteproc/qcom_wcnss.ko] undefined!
-/workspace/linaro/dev/scripts/Makefile.modpost:91: recipe for target 
-'__modpost' failed
-make[2]: *** [__modpost] Error 1
-
-
-
-> +	depends on OF && ARCH_QCOM
-> +	select QCOM_MDT_LOADER
-> +	select QCOM_SCM
-> +	select REMOTEPROC
-> +	help
-> +	  Say y here to support the Peripherial Image Loader for the Qualcomm
-> +	  Wireless Connectivity Subsystem.
-
-s/Peripherial/Peripheral
-
-> +
->   config ST_REMOTEPROC
->   	tristate "ST remoteproc support"
->   	depends on ARCH_STI
-> diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
-> index 92d3758bd15c..eedcce54667d 100644
-> --- a/drivers/remoteproc/Makefile
-> +++ b/drivers/remoteproc/Makefile
-> @@ -13,4 +13,5 @@ obj-$(CONFIG_WKUP_M3_RPROC)		+= wkup_m3_rproc.o
->   obj-$(CONFIG_DA8XX_REMOTEPROC)		+= da8xx_remoteproc.o
->   obj-$(CONFIG_QCOM_MDT_LOADER)		+= qcom_mdt_loader.o
->   obj-$(CONFIG_QCOM_Q6V5_PIL)		+= qcom_q6v5_pil.o
-> +obj-$(CONFIG_QCOM_WCNSS_PIL)		+= qcom_wcnss.o qcom_wcnss_iris.o
-
-May be we should have two symbols here, one for wcnss and other for 
-wcnss_iris.
-
->   obj-$(CONFIG_ST_REMOTEPROC)		+= st_remoteproc.o
-> diff --git a/drivers/remoteproc/qcom_wcnss.c b/drivers/remoteproc/qcom_wcnss.c
-> new file mode 100644
-> index 000000000000..e624fb255c9e
-> --- /dev/null
-> +++ b/drivers/remoteproc/qcom_wcnss.c
-> @@ -0,0 +1,622 @@
-> +/*
-> + * Qualcomm Peripheral Image Loader
-> + *
-> + * Copyright (C) 2016 Linaro Ltd
-> + * Copyright (C) 2014 Sony Mobile Communications AB
-> + * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/firmware.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/qcom_scm.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/remoteproc.h>
-> +#include <linux/soc/qcom/smem.h>
-> +#include <linux/soc/qcom/smem_state.h>
-> +
-> +#include "qcom_mdt_loader.h"
-> +#include "remoteproc_internal.h"
-> +#include "qcom_wcnss.h"
-> +
-> +#define WCNSS_CRASH_REASON_SMEM		422
-> +#define WCNSS_FIRMWARE_NAME		"wcnss.mdt"
-> +#define WCNSS_PAS_ID			6
-> +
-> +#define WCNSS_SPARE_NVBIN_DLND		BIT(25)
-> +
-> +#define WCNSS_PMU_IRIS_XO_CFG		BIT(3)
-> +#define WCNSS_PMU_IRIS_XO_EN		BIT(4)
-> +#define WCNSS_PMU_GC_BUS_MUX_SEL_TOP	BIT(5)
-> +#define WCNSS_PMU_IRIS_XO_CFG_STS	BIT(6) /* 1: in progress, 0: done */
-> +
-> +#define WCNSS_PMU_IRIS_RESET		BIT(7)
-> +#define WCNSS_PMU_IRIS_RESET_STS	BIT(8) /* 1: in progress, 0: done */
-> +#define WCNSS_PMU_IRIS_XO_READ		BIT(9)
-> +#define WCNSS_PMU_IRIS_XO_READ_STS	BIT(10)
-> +
-> +#define WCNSS_PMU_XO_MODE_MASK		GENMASK(2, 1)
-> +#define WCNSS_PMU_XO_MODE_19p2		0
-> +#define WCNSS_PMU_XO_MODE_48		3
-> +
-> +static const struct rproc_ops wcnss_ops;
-Do you need this here?
-
-> +
-> +struct wcnss_data {
-> +	size_t pmu_offset;
-> +	size_t spare_offset;
-> +
-> +	const struct wcnss_vreg_info *vregs;
-> +	size_t num_vregs;
-> +};
-> +
-> +struct qcom_wcnss {
-> +	struct device *dev;
-> +	struct rproc *rproc;
-> +
-> +	void __iomem *pmu_cfg;
-> +	void __iomem *spare_out;
-> +
-> +	bool use_48mhz_xo;
-> +
-> +	int wdog_irq;
-> +	int fatal_irq;
-> +	int ready_irq;
-> +	int handover_irq;
-> +	int stop_ack_irq;
-> +
-> +	struct qcom_smem_state *state;
-> +	unsigned stop_bit;
-> +
-> +	struct mutex iris_lock;
-> +	struct qcom_iris *iris;
-> +
-> +	struct regulator_bulk_data *vregs;
-> +	size_t num_vregs;
-> +
-> +	struct completion start_done;
-> +	struct completion stop_done;
-> +
-> +	phys_addr_t mem_phys;
-> +	phys_addr_t mem_reloc;
-> +	void *mem_region;
-> +	size_t mem_size;
-> +};
-> +
-...
-> +
-> +static int wcnss_load(struct rproc *rproc, const struct firmware *fw)
-> +{
-> +	struct qcom_wcnss *wcnss = (struct qcom_wcnss *)rproc->priv;
-> +	phys_addr_t fw_addr;
-> +	size_t fw_size;
-> +	bool relocate;
-> +	int ret;
-> +
-> +	ret = qcom_scm_pas_init_image(WCNSS_PAS_ID, fw->data, fw->size);
-> +	if (ret) {
-> +		dev_err(&rproc->dev, "invalid firmware metadata\n");
-> +		return -EINVAL;
-Should we not return the the actual error code here?
-
-> +	}
-> +
-> +	ret = qcom_mdt_parse(fw, &fw_addr, &fw_size, &relocate);
-> +	if (ret) {
-> +		dev_err(&rproc->dev, "failed to parse mdt header\n");
-> +		return ret;
-> +	}
-> +
-> +	if (relocate) {
-> +		wcnss->mem_reloc = fw_addr;
-> +
-> +		ret = qcom_scm_pas_mem_setup(WCNSS_PAS_ID, wcnss->mem_phys, fw_size);
-> +		if (ret) {
-> +			dev_err(&rproc->dev, "unable to setup relocation\n");
-> +			return -EINVAL;
-
-Same as above..
-> +		}
-> +	}
-> +
-> +	return qcom_mdt_load(rproc, fw, rproc->firmware);
-> +}
-> +
-> +static const struct rproc_fw_ops wcnss_fw_ops = {
-> +	.find_rsc_table = qcom_mdt_find_rsc_table,
-> +	.load = wcnss_load,
-> +};
-> +
-> +static void wcnss_indicate_nv_download(struct qcom_wcnss *wcnss)
-> +{
-> +	u32 val;
-> +
-> +	/* Indicate NV download capability */
-> +	val = readl(wcnss->spare_out);
-> +	val |= WCNSS_SPARE_NVBIN_DLND;
-> +	writel(val, wcnss->spare_out);
-> +}
-> +
-> +
-
-...
-
-> +static int wcnss_start(struct rproc *rproc)
-> +{
-> +	struct qcom_wcnss *wcnss = (struct qcom_wcnss *)rproc->priv;
-> +	int ret;
-> +
-> +	mutex_lock(&wcnss->iris_lock);
-> +	if (!wcnss->iris) {
-> +		dev_err(wcnss->dev, "no iris registered\n");
-> +		ret = -EINVAL;
-> +		goto release_iris_lock;
-> +	}
-> +
-> +	ret = regulator_bulk_enable(wcnss->num_vregs, wcnss->vregs);
-> +	if (ret)
-> +		goto release_iris_lock;
-> +
-> +	ret = qcom_iris_enable(wcnss->iris);
-> +	if (ret)
-> +		goto disable_regulators;
-> +
-> +	wcnss_indicate_nv_download(wcnss);
-> +	wcnss_configure_iris(wcnss);
-> +
-> +	ret = qcom_scm_pas_auth_and_reset(WCNSS_PAS_ID);
-> +	if (ret) {
-> +		dev_err(wcnss->dev,
-> +			"failed to authenticate image and release reset\n");
-> +		goto disable_iris;
-> +	}
-> +
-> +	ret = wait_for_completion_timeout(&wcnss->start_done,
-> +					  msecs_to_jiffies(5000));
-> +	if (wcnss->ready_irq > 0 && ret == 0) {
-> +		/* We have a ready_irq, but it didn't fire in time. */
-> +		dev_err(wcnss->dev, "start timed out\n");
-> +		qcom_scm_pas_shutdown(WCNSS_PAS_ID);
-> +		ret = -ETIMEDOUT;
-> +		goto disable_iris;
-> +	}
-> +
-> +	ret = 0;
-> +
-> +disable_iris:
-> +	qcom_iris_disable(wcnss->iris);
-> +disable_regulators:
-> +	regulator_bulk_disable(wcnss->num_vregs, wcnss->vregs);
-> +release_iris_lock:
-> +	mutex_unlock(&wcnss->iris_lock);
-> +
-> +	return ret;
-> +}
-> +
-> +static int wcnss_stop(struct rproc *rproc)
-> +{
-> +	struct qcom_wcnss *wcnss = (struct qcom_wcnss *)rproc->priv;
-> +	int ret;
-> +
-> +	if (wcnss->state) {
-> +		qcom_smem_state_update_bits(wcnss->state,
-> +					    BIT(wcnss->stop_bit),
-> +					    BIT(wcnss->stop_bit));
-> +
-> +		ret = wait_for_completion_timeout(&wcnss->stop_done,
-> +						  msecs_to_jiffies(5000));
-> +		if (ret == 0)
-> +			dev_err(wcnss->dev, "timed out on wait\n");
-> +
-> +		qcom_smem_state_update_bits(wcnss->state,
-> +					    BIT(wcnss->stop_bit),
-> +					    0);
-> +	}
-> +
-> +	ret = qcom_scm_pas_shutdown(WCNSS_PAS_ID);
-> +	if (ret)
-> +		dev_err(wcnss->dev, "failed to shutdown: %d\n", ret);
-> +
-> +	return ret;
-> +}
-> +
-> +static void *wcnss_da_to_va(struct rproc *rproc, u64 da, int len)
-> +{
-> +	struct qcom_wcnss *wcnss = (struct qcom_wcnss *)rproc->priv;
-> +	int offset;
-> +
-> +	offset = da - wcnss->mem_reloc;
-> +	if (offset < 0 || offset + len > wcnss->mem_size)
-> +		return NULL;
-> +
-> +	return wcnss->mem_region + offset;
-> +}
-> +
-> +static const struct rproc_ops wcnss_ops = {
-> +	.start = wcnss_start,
-> +	.stop = wcnss_stop,
-> +	.da_to_va = wcnss_da_to_va,
-> +};
-> +
-> +static irqreturn_t wcnss_wdog_interrupt(int irq, void *dev)
-> +{
-> +	struct qcom_wcnss *wcnss = dev;
-> +
-> +	rproc_report_crash(wcnss->rproc, RPROC_WATCHDOG);
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t wcnss_fatal_interrupt(int irq, void *dev)
-> +{
-> +	struct qcom_wcnss *wcnss = dev;
-> +	size_t len;
-> +	char *msg;
-> +
-> +	msg = qcom_smem_get(QCOM_SMEM_HOST_ANY, WCNSS_CRASH_REASON_SMEM, &len);
-> +	if (!IS_ERR(msg) && len > 0 && msg[0])
-> +		dev_err(wcnss->dev, "fatal error received: %s\n", msg);
-> +
-> +	rproc_report_crash(wcnss->rproc, RPROC_FATAL_ERROR);
-> +
-> +	if (!IS_ERR(msg))
-> +		msg[0] = '\0';
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t wcnss_ready_interrupt(int irq, void *dev)
-> +{
-> +	struct qcom_wcnss *wcnss = dev;
-> +
-> +	complete(&wcnss->start_done);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t wcnss_handover_interrupt(int irq, void *dev)
-> +{
-> +	/*
-> +	 * XXX: At this point we're supposed to release the resources that we
-XXX ???
-
-> +	 * have been holding on behalf of the WCNSS. Unfortunately this
-> +	 * interrupt comes way before the other side seems to be done.
-> +	 *
-> +	 * So we're currently relying on the ready interrupt firing later then
-> +	 * this and we just disable the resources at the end of wcnss_start().
-> +	 */
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t wcnss_stop_ack_interrupt(int irq, void *dev)
-> +{
-> +	struct qcom_wcnss *wcnss = dev;
-> +
-> +	complete(&wcnss->stop_done);
-Adding line before return on all the functions would make code more 
-readable, Or atleast consistency across driver would be nice.
-> +	return IRQ_HANDLED;
-
-> +}
-> +
-> +static int wcnss_init_regulators(struct qcom_wcnss *wcnss,
-> +				 const struct wcnss_vreg_info *info,
-> +				 int num_vregs)
-> +{
-> +	struct regulator_bulk_data *bulk;
-> +	int ret;
-> +	int i;
-> +
-> +	bulk = devm_kcalloc(wcnss->dev,
-> +			    num_vregs, sizeof(struct regulator_bulk_data),
-> +			    GFP_KERNEL);
-> +	if (!bulk)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < num_vregs; i++)
-> +		bulk[i].supply = info[i].name;
-> +
-> +	ret = devm_regulator_bulk_get(wcnss->dev, num_vregs, bulk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	for (i = 0; i < num_vregs; i++) {
-> +		if (info[i].max_voltage)
-> +			regulator_set_voltage(bulk[i].consumer,
-> +					      info[i].min_voltage,
-> +					      info[i].max_voltage);
-
-Error handling seems missing here.
-
-> +
-> +		if (info[i].load_uA)
-> +			regulator_set_load(bulk[i].consumer, info[i].load_uA);
-same..
-
-> +	}
-> +
-> +	wcnss->vregs = bulk;
-> +	wcnss->num_vregs = num_vregs;
-> +
-> +	return 0;
-> +}
-> +
-> +static int wcnss_request_irq(struct qcom_wcnss *wcnss,
-> +			     struct platform_device *pdev,
-> +			     const char *name,
-> +			     bool optional,
-> +			     irq_handler_t thread_fn)
-> +{
-> +	int ret;
-> +
-> +	ret = platform_get_irq_byname(pdev, name);
-> +	if (ret < 0 && optional) {
-> +		dev_dbg(&pdev->dev, "no %s IRQ defined, ignoring\n", name);
-> +		return 0;
-> +	} else if (ret < 0) {
-> +		dev_err(&pdev->dev, "no %s IRQ defined\n", name);
-> +		return ret;
-> +	}
-> +
-> +	ret = devm_request_threaded_irq(&pdev->dev, ret,
-> +					NULL, thread_fn,
-> +					IRQF_TRIGGER_RISING | IRQF_ONESHOT,
-> +					"wcnss", wcnss);
-> +	if (ret)
-> +		dev_err(&pdev->dev, "request %s IRQ failed\n", name);
-> +	return ret;
-> +}
-> +
-> +static int wcnss_alloc_memory_region(struct qcom_wcnss *wcnss)
-> +{
-> +	struct device_node *node;
-> +	struct resource r;
-> +	int ret;
-> +
-> +	node = of_parse_phandle(wcnss->dev->of_node, "memory-region", 0);
-> +	if (!node) {
-> +		dev_err(wcnss->dev, "no memory-region specified\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = of_address_to_resource(node, 0, &r);
-> +	if (ret)
-> +		return ret;
-> +
-> +	wcnss->mem_phys = wcnss->mem_reloc = r.start;
-> +	wcnss->mem_size = resource_size(&r);
-> +	wcnss->mem_region = devm_ioremap_wc(wcnss->dev, wcnss->mem_phys, wcnss->mem_size);
-> +	if (!wcnss->mem_region) {
-> +		dev_err(wcnss->dev, "unable to map memory region: %pa+%zx\n",
-> +			&r.start, wcnss->mem_size);
-> +		return -EBUSY;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int wcnss_probe(struct platform_device *pdev)
-> +{
-> +	const struct wcnss_data *data;
-> +	struct qcom_wcnss *wcnss;
-> +	struct resource *res;
-> +	struct rproc *rproc;
-> +	void __iomem *mmio;
-> +	int ret;
-> +
-> +	data = of_device_get_match_data(&pdev->dev);
-> +
-> +	if (!qcom_scm_is_available())
-> +		return -EPROBE_DEFER;
-
-I cant see this call implemented in mainline yet.
-
-> +
-> +	if (!qcom_scm_pas_supported(WCNSS_PAS_ID)) {
-> +		dev_err(&pdev->dev, "PAS is not available for WCNSS\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	rproc = rproc_alloc(&pdev->dev, pdev->name, &wcnss_ops,
-> +			    WCNSS_FIRMWARE_NAME, sizeof(*wcnss));
-> +	if (!rproc) {
-> +		dev_err(&pdev->dev, "unable to allocate remoteproc\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	rproc->fw_ops = &wcnss_fw_ops;
-> +
-> +	wcnss = (struct qcom_wcnss *)rproc->priv;
-> +	wcnss->dev = &pdev->dev;
-> +	wcnss->rproc = rproc;
-> +	platform_set_drvdata(pdev, wcnss);
-> +
-> +	init_completion(&wcnss->start_done);
-> +	init_completion(&wcnss->stop_done);
-> +
-> +	mutex_init(&wcnss->iris_lock);
-> +
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pmu");
-> +	mmio = devm_ioremap_resource(&pdev->dev, res);
-> +	if (!mmio) {
-> +		ret = -ENOMEM;
-> +		goto free_rproc;
-> +	};
-> +
-> +	ret = wcnss_alloc_memory_region(wcnss);
-> +	if (ret)
-> +		goto free_rproc;
-> +
-> +	wcnss->pmu_cfg = mmio + data->pmu_offset;
-> +	wcnss->spare_out = mmio + data->spare_offset;
-> +
-> +	ret = wcnss_init_regulators(wcnss, data->vregs, data->num_vregs);
-> +	if (ret)
-> +		goto free_rproc;
-> +
-> +	ret = wcnss_request_irq(wcnss, pdev, "wdog", false, wcnss_wdog_interrupt);
-> +	if (ret < 0)
-> +		goto free_rproc;
-> +	wcnss->wdog_irq = ret;
-> +
-> +	ret = wcnss_request_irq(wcnss, pdev, "fatal", false, wcnss_fatal_interrupt);
-> +	if (ret < 0)
-> +		goto free_rproc;
-> +	wcnss->fatal_irq = ret;
-> +
-> +	ret = wcnss_request_irq(wcnss, pdev, "ready", true, wcnss_ready_interrupt);
-> +	if (ret < 0)
-> +		goto free_rproc;
-> +	wcnss->ready_irq = ret;
-> +
-> +	ret = wcnss_request_irq(wcnss, pdev, "handover", true, wcnss_handover_interrupt);
-> +	if (ret < 0)
-> +		goto free_rproc;
-> +	wcnss->handover_irq = ret;
-> +
-> +	ret = wcnss_request_irq(wcnss, pdev, "stop-ack", true, wcnss_stop_ack_interrupt);
-Some of these lines are over 80 chars..
-
-> +	if (ret < 0)
-> +		goto free_rproc;
-
-\n
-
-> +	wcnss->stop_ack_irq = ret;
-> +
-> +	if (wcnss->stop_ack_irq) {
-> +		wcnss->state = qcom_smem_state_get(&pdev->dev, "stop",
-> +						   &wcnss->stop_bit);
-> +		if (IS_ERR(wcnss->state)) {
-> +			ret = PTR_ERR(wcnss->state);
-> +			goto free_rproc;
-> +		}
-> +	}
-> +
-> +	ret = rproc_add(rproc);
-> +	if (ret)
-> +		goto free_rproc;
-> +
-> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-> +
-> +free_rproc:
-> +	rproc_put(rproc);
-> +
-> +	return ret;
-> +}
-> +
-> +static int wcnss_remove(struct platform_device *pdev)
-> +{
-> +	struct qcom_wcnss *wcnss = platform_get_drvdata(pdev);
-> +
-> +	of_platform_depopulate(&pdev->dev);
-> +
-> +	qcom_smem_state_put(wcnss->state);
-> +	rproc_del(wcnss->rproc);
-> +	rproc_put(wcnss->rproc);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id wcnss_of_match[] = {
-> +	{ .compatible = "qcom,riva-pil", &riva_data },
-> +	{ .compatible = "qcom,pronto-v1-pil", &pronto_v1_data },
-> +	{ .compatible = "qcom,pronto-v2-pil", &pronto_v2_data },
-> +	{ },
-> +};
-> +
-> +static struct platform_driver wcnss_driver = {
-> +	.probe = wcnss_probe,
-> +	.remove = wcnss_remove,
-> +	.driver = {
-> +		.name = "qcom-wcnss-pil",
-> +		.of_match_table = wcnss_of_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(wcnss_driver);
-> +MODULE_DESCRIPTION("Qualcomm Peripherial Image Loader for Wireless Subsystem");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/remoteproc/qcom_wcnss.h b/drivers/remoteproc/qcom_wcnss.h
-> new file mode 100644
-> index 000000000000..bb4f042cb5a0
-> --- /dev/null
-> +++ b/drivers/remoteproc/qcom_wcnss.h
-> @@ -0,0 +1,23 @@
-> +#ifndef __QCOM_WNCSS_H__
-> +#define __QCOM_WNCSS_H__
-> +
-> +struct qcom_iris;
-> +struct qcom_wcnss;
-> +
-> +struct wcnss_vreg_info {
-> +	const char * const name;
-> +	int min_voltage;
-> +	int max_voltage;
-> +
-> +	int load_uA;
-> +
-> +	bool super_turbo;
-> +};
-> +
-> +int qcom_iris_enable(struct qcom_iris *iris);
-> +void qcom_iris_disable(struct qcom_iris *iris);
-> +
-> +void qcom_wcnss_assign_iris(struct qcom_wcnss *wcnss, struct qcom_iris *iris,
-> +			    bool use_48mhz_xo);
-
-Dummy functions?
-
-> +
+Eric
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  	  We don't support KVM with 16K page tables yet, due to the multiple
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 6ec9dfe..409d188 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -86,6 +86,16 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_VCPU_ATTRIBUTES:
+>  		r = 1;
+>  		break;
+> +	case KVM_CAP_MSI_DEVID:
+> +#ifdef CONFIG_KVM_NEW_VGIC
+> +		if (!kvm)
+> +			r = -EINVAL;
+> +		else
+> +			r = kvm->arch.vgic.msis_require_devid;
+> +#else
+> +		r = -EINVAL;
 > +#endif
-> diff --git a/drivers/remoteproc/qcom_wcnss_iris.c b/drivers/remoteproc/qcom_wcnss_iris.c
-> new file mode 100644
-> index 000000000000..af48281c1728
-> --- /dev/null
-> +++ b/drivers/remoteproc/qcom_wcnss_iris.c
-> @@ -0,0 +1,187 @@
-> +/*
-> + * Qualcomm Peripheral Image Loader
-> + *
-> + * Copyright (C) 2016 Linaro Ltd
-> + * Copyright (C) 2014 Sony Mobile Communications AB
-> + * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+> +		break;
+>  	default:
+>  		r = 0;
+>  	}
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index 2b00fb3..d7a6da3 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -154,6 +154,9 @@ struct vgic_dist {
+>  	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
+>  	u32			vgic_model;
+>  
+> +	/* Do injected MSIs require an additional device ID? */
+> +	bool			msis_require_devid;
 > +
-> +#include <linux/clk.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/qcom_scm.h>
-??
-
-> +#include <linux/regulator/consumer.h>
+>  	int			nr_spis;
+>  
+>  	/* TODO: Consider moving to global state */
+> @@ -298,4 +301,6 @@ static inline int kvm_vgic_get_max_vcpus(void)
+>  	return kvm_vgic_global_state.max_gic_vcpus;
+>  }
+>  
+> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
 > +
-> +#include "qcom_wcnss.h"
+>  #endif /* __ASM_ARM_KVM_VGIC_VGIC_H */
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index c3bfbb9..26db30a 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -2438,3 +2438,8 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
+>  {
+>  	return 0;
+>  }
 > +
-> +struct qcom_iris {
-> +	struct device *dev;
-> +
-> +	struct clk *xo_clk;
-> +
-> +	struct regulator_bulk_data *vregs;
-> +	size_t num_vregs;
-> +};
-> +
-> +struct iris_data {
-> +	const struct wcnss_vreg_info *vregs;
-> +	size_t num_vregs;
-> +
-> +	bool use_48mhz_xo;
-> +};
-> +
-> +static const struct iris_data wcn3620_data = {
-> +	.vregs = (struct wcnss_vreg_info[]) {
-> +		{ "vddxo",  1800000, 1800000, 10000 },
-> +		{ "vddrfa", 1300000, 1300000, 100000 },
-> +		{ "vddpa",  3300000, 3300000, 515000 },
-> +		{ "vdddig", 1800000, 1800000, 10000 },
-> +	},
-> +	.num_vregs = 4,
-> +	.use_48mhz_xo = false,
-> +};
-> +
-> +static const struct iris_data wcn3660_data = {
-> +	.vregs = (struct wcnss_vreg_info[]) {
-> +		{ "vddxo",  1800000, 1800000, 10000 },
-> +		{ "vddrfa", 1300000, 1300000, 100000 },
-> +		{ "vddpa",  2900000, 3000000, 515000 },
-> +		{ "vdddig", 1200000, 1225000, 10000 },
-> +	},
-> +	.num_vregs = 4,
-> +	.use_48mhz_xo = true,
-> +};
-> +
-> +static const struct iris_data wcn3680_data = {
-> +	.vregs = (struct wcnss_vreg_info[]) {
-> +		{ "vddxo",  1800000, 1800000, 10000 },
-> +		{ "vddrfa", 1300000, 1300000, 100000 },
-> +		{ "vddpa",  3300000, 3300000, 515000 },
-> +		{ "vdddig", 1800000, 1800000, 10000 },
-> +	},
-> +	.num_vregs = 4,
-> +	.use_48mhz_xo = true,
-> +};
-> +
-> +int qcom_iris_enable(struct qcom_iris *iris)
+> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
 > +{
-> +	int ret;
-> +
-> +	ret = regulator_bulk_enable(iris->num_vregs, iris->vregs);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = clk_prepare_enable(iris->xo_clk);
-> +	if (ret) {
-> +		dev_err(iris->dev, "failed to enable xo clk\n");
-> +		goto disable_regulators;
-> +	}
-> +
-> +	return 0;
-> +
-> +disable_regulators:
-> +	regulator_bulk_disable(iris->num_vregs, iris->vregs);
-> +
-> +	return ret;
+> +	return -ENODEV;
 > +}
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 535e713..01a60dc 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -258,6 +258,9 @@ int vgic_init(struct kvm *kvm)
+>  	if (ret)
+>  		goto out;
+>  
+> +	if (vgic_has_its(kvm))
+> +		dist->msis_require_devid = true;
 > +
-EXPORT the symbol??
-> +void qcom_iris_disable(struct qcom_iris *iris)
+>  	kvm_for_each_vcpu(i, vcpu, kvm)
+>  		kvm_vgic_vcpu_init(vcpu);
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index dfa79c7..26f4779 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -66,7 +66,12 @@ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+>  	case GICD_TYPER:
+>  		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
+>  		value = (value >> 5) - 1;
+> -		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
+> +		if (vgic_has_its(vcpu->kvm)) {
+> +			value |= (INTERRUPT_ID_BITS_ITS - 1) << 19;
+> +			value |= GICD_TYPER_LPIS;
+> +		} else {
+> +			value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
+> +		}
+>  		break;
+>  	case GICD_IIDR:
+>  		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+> @@ -161,9 +166,8 @@ static void vgic_mmio_write_v3r_ctlr(struct kvm_vcpu *vcpu,
+>  
+>  	vgic_cpu->lpis_enabled = val & GICR_CTLR_ENABLE_LPIS;
+>  
+> -	if (!was_enabled && vgic_cpu->lpis_enabled) {
+> -		/* Eventually do something */
+> -	}
+> +	if (!was_enabled && vgic_cpu->lpis_enabled)
+> +		vgic_enable_lpis(vcpu);
+>  }
+>  
+>  static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+> @@ -177,6 +181,8 @@ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+>  	value |= ((target_vcpu_id & 0xffff) << 8);
+>  	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
+>  		value |= GICR_TYPER_LAST;
+> +	if (vgic_has_its(vcpu->kvm))
+> +		value |= GICR_TYPER_PLPIS;
+>  
+>  	return extract_bytes(value, addr & 7, len);
+>  }
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index 8111d49..f93f8dd 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -682,3 +682,11 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+>  
+>  	return map_is_active;
+>  }
+> +
+> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
 > +{
-> +	clk_disable_unprepare(iris->xo_clk);
-> +	regulator_bulk_disable(iris->num_vregs, iris->vregs);
+> +	if (vgic_has_its(kvm))
+> +		return vits_inject_msi(kvm, msi);
+> +	else
+> +		return -ENODEV;
 > +}
-EXPORT the symbol??
-> +
-> +static int qcom_iris_probe(struct platform_device *pdev)
-> +{
-> +	const struct iris_data *data;
-> +	struct qcom_wcnss *wcnss;
-> +	struct qcom_iris *iris;
-> +	int ret;
-> +	int i;
-> +
-> +	iris = devm_kzalloc(&pdev->dev, sizeof(struct qcom_iris), GFP_KERNEL);
-> +	if (!iris)
-> +		return -ENOMEM;
-> +
-> +	data = of_device_get_match_data(&pdev->dev);
-> +	wcnss = dev_get_drvdata(pdev->dev.parent);
-> +
-> +	iris->xo_clk = devm_clk_get(&pdev->dev, "xo");
-> +	if (IS_ERR(iris->xo_clk)) {
-> +		if (PTR_ERR(iris->xo_clk) != -EPROBE_DEFER)
-> +			dev_err(&pdev->dev, "failed to acquire xo clk\n");
-> +		return PTR_ERR(iris->xo_clk);
-> +	}
-> +
-> +	iris->num_vregs = data->num_vregs;
-> +	iris->vregs = devm_kcalloc(&pdev->dev,
-> +				   iris->num_vregs,
-> +				   sizeof(struct regulator_bulk_data),
-> +				   GFP_KERNEL);
-> +	if (!iris->vregs)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < iris->num_vregs; i++)
-> +		iris->vregs[i].supply = data->vregs[i].name;
-> +
-> +	ret = devm_regulator_bulk_get(&pdev->dev, iris->num_vregs, iris->vregs);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to get regulators\n");
-> +		return ret;
-> +	}
-> +
-> +	for (i = 0; i < iris->num_vregs; i++) {
-> +		if (data->vregs[i].max_voltage)
-> +			regulator_set_voltage(iris->vregs[i].consumer,
-> +					      data->vregs[i].min_voltage,
-> +					      data->vregs[i].max_voltage);
-> +
-> +		if (data->vregs[i].load_uA)
-> +			regulator_set_load(iris->vregs[i].consumer,
-> +					   data->vregs[i].load_uA);
-> +	}
-> +
-> +	qcom_wcnss_assign_iris(wcnss, iris, data->use_48mhz_xo);
-> +
-> +	return 0;
-> +}
-> +
-> +static int qcom_iris_remove(struct platform_device *pdev)
-> +{
-> +	struct qcom_wcnss *wcnss = dev_get_drvdata(pdev->dev.parent);
-> +
-> +	qcom_wcnss_assign_iris(wcnss, NULL, false);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id iris_of_match[] = {
-> +	{ .compatible = "qcom,wcn3620", .data = &wcn3620_data },
-> +	{ .compatible = "qcom,wcn3660", .data = &wcn3660_data },
-> +	{ .compatible = "qcom,wcn3680", .data = &wcn3680_data },
-> +	{}
-> +};
-> +
-> +static struct platform_driver qcom_iris_driver = {
-> +	.probe = qcom_iris_probe,
-> +	.remove = qcom_iris_remove,
-> +	.driver = {
-> +		.name = "qcom-iris",
-> +		.of_match_table = iris_of_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(qcom_iris_driver);
-> +MODULE_DESCRIPTION("Qualcomm Wireless Subsystem Iris driver");
-> +MODULE_LICENSE("GPL v2");
->
+> 
