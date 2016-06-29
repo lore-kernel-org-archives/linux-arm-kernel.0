@@ -1,47 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 29 Jun 2016 09:19:17 +0100
-Subject: [PATCH v2 1/2] ARM64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <57737F24.5050906@huawei.com>
-References: <1463114260-8724-1-git-send-email-oss@buserror.net>
- <57737F24.5050906@huawei.com>
-Message-ID: <57738485.4010602@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 29 Jun 2016 01:15:36 -0700
+Subject: [PATCH v5 0/5] regulator: add Ricoh RN5T567 PMIC support
+In-Reply-To: <20160629081208.GI29166@dell>
+References: <20160629055322.23038-1-stefan@agner.ch>
+ <20160629081208.GI29166@dell>
+Message-ID: <c82c2ab2fecc805746cb719db5e34723@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/16 08:56, Hanjun Guo wrote:
-> Hello Scott,
+On 2016-06-29 01:12, Lee Jones wrote:
+> On Tue, 28 Jun 2016, Stefan Agner wrote:
 > 
-> On 2016/5/13 12:37, Scott Wood wrote:
-> [...]
->>  
->> +#ifdef CONFIG_ARM64
->> +static __always_inline void rewrite_tval(const int access,
->> +		unsigned long evt, struct clock_event_device *clk)
->> +{
->> +	u64 cval_old, cval_new;
->> +	int timeout = 200;
->> +
->> +	do {
->> +		cval_old = __arch_counter_get_cntvct();
->> +		arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt, clk);
+>> This patchset adds RN5T567 PMIC support which is used on the
+>> Toradex Colibri iMX7S/iMX7D modules. The existing RN5T618 is from
+>> the same family, hence this patchset uses the same driver and adds
+>> variant support.
+>>
+>> The Colibris currently do not use the PMIC's power off capabilities,
+>> as do the current users of that PMIC driver. Therefore this patchset
+>> also makes the use of the system-power-controller property mandatory
+>> if the power off capabilties are required.
+>>
+>> Changes since v4:
+>> - Spell check in patch 5 and added Acks
+>>
+>> Changes since v3:
+>> - Use RN5T618_REPCNT_REPWRON macro when writing RN5T618_REPCNT register
+>>
+>> Changes since v2:
+>> - Elevate restart priority to 192 to make sure PMIC takes presedence
+>>   over SoC level restart capabilities (e.g. watchdog)
+>> - Print a warning if poweroff callback is already assigned
+>> - Reorder of_id and variant assignment
+>> - Lower delay to 1ms and justify why it is required
+>> - Fix DCDC count and a typos in device tree bindings
+>>
+>> Changes since v1:
+>> - Removed obsolete include <asm/system_misc.h>
+>>
+>> Stefan Agner (5):
+>>   ARM: dts: meson: minix-neo-x8: define PMIC as power controller
+>>   mfd: add Ricoh RN5T567 PMIC support
+>>   regulator: rn5t618: add RN5T567 PMIC support
+>>   mfd: rn5t618: register power off callback optionally
+>>   mfd: rn5t618: register restart handler
+>>
+>>  Documentation/devicetree/bindings/mfd/rn5t618.txt | 19 +++---
+>>  arch/arm/boot/dts/meson8-minix-neo-x8.dts         |  1 +
+>>  drivers/mfd/Kconfig                               |  7 ++-
+>>  drivers/mfd/rn5t618.c                             | 70 +++++++++++++++++++----
+>>  drivers/regulator/Kconfig                         |  5 +-
+>>  drivers/regulator/rn5t618-regulator.c             | 40 +++++++++++--
+>>  include/linux/mfd/rn5t618.h                       | 13 +++++
+>>  7 files changed, 126 insertions(+), 29 deletions(-)
 > 
-> For not memory mapped timer, it will call arch_timer_reg_write_cp15() which has
-> isb() at the end of arch_timer_reg_write_cp15()...
-> 
->> +		cval_new = __arch_counter_get_cntvct();
-> 
-> So there is isb() between counter retry read, I think it's likely cval_new will
-> not be equal with cval_old when the cntvct is correct (time lapse is more than
-> one arch timer cycle).
+> Looks like you have all your Acks now.  How do you want to play this?
+> Would you like me to take the set through MFD and provide the other
+> Maintainers with a branch to pull from, or did you have other ideas?
 
-Are you saying that the isb will delay the execution of the read so much
-that your timer will always change? Well, if your timer is in the GHz
-range, maybe. But that also implies that it is out of spec (it should be
-in the 1-50MHz range).
+I did not thought about that really, I guess you have a usual way for
+mixed regulator/mfd patchsets? Taking it through MFD sounds good to
+me...
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--
+Stefan
