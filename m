@@ -1,5 +1,5 @@
 From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 29 Jun 2016 23:25:28 +0200
+Date: Wed, 29 Jun 2016 23:26:36 +0200
 Subject: [PATCH V2 1/4] ACPI,PCI,IRQ: factor in PCI possible
 In-Reply-To: <280859fd-07a0-9cea-c9d4-f956241e8986@codeaurora.org>
 References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
@@ -8,7 +8,7 @@ References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
  <8a40e242-fca4-5681-e480-e29ec05354ac@codeaurora.org>
  <CAJZ5v0hUpxxEjVxMBW6p6q0MSB5nFxnVL0g5dw4HBAsyK4yisg@mail.gmail.com>
  <280859fd-07a0-9cea-c9d4-f956241e8986@codeaurora.org>
-Message-ID: <CAJZ5v0gQeT41e07OuSKtWY_tER8O0-_F3M8h5MhaH+QTvoJzYQ@mail.gmail.com>
+Message-ID: <CAJZ5v0jjopsNJnjZxPZALH5LYamKs4eentUy7HLF38bUVfUEwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -50,22 +50,8 @@ On Wed, Jun 29, 2016 at 11:21 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
 >> It is clear enough.  I can add it to the changelog when applying the patch.
 >
 > OK
->
->>
->>>
->>>>> The original code would assign the POSSIBLE value divided by the number
->>>>> of possible IRQs during initialization.
->>>>>
->>>>> Later, if the IRQ is chosen as the active IRQ or if the IRQ is in use
->>>>> by ISA; additional penalties get added.
->>
->> Does "later" here mean "later in that code path" or "in a later patch"?
->
-> "later in that code path"
 
-OK
-
-I'm hoping we'll hear from the reporter shortly.
+BTW, care to add Fixes: tags to these patches?
 
 Thanks,
 Rafael
