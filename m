@@ -1,79 +1,32 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 29 Jun 2016 16:51:45 +0800
-Subject: [PATCH 2/2] clk: hi6220: initialize UART1 clock to 150MHz
-In-Reply-To: <57726602.1060505@linaro.org>
-References: <1467109902-17625-1-git-send-email-guodong.xu@linaro.org>
- <1467109902-17625-2-git-send-email-guodong.xu@linaro.org>
- <57726602.1060505@linaro.org>
-Message-ID: <CAFGCpxxVmFGphtxZ=wJF2S75OQ5PyMucfOHCWMK51nrCJN0rkw@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Wed, 29 Jun 2016 17:52:29 +0900
+Subject: [PATCH] arm64: tegra: Add missing Smaug revision
+Message-ID: <20160629085229.31350-1-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 June 2016 at 19:56, Jorge Ramirez <jorge.ramirez-ortiz@linaro.org> wrote:
-> On 06/28/2016 12:31 PM, Guodong Xu wrote:
->>
->> From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
->>
->> Early at boot, during the sys_clk initialization, make sure UART1 uses
->> the higher frequency clock.
->>
->> This enables support for higher baud rates (up to 3Mbps) required to
->> support faster bluetooth transfers.
->>
->> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
->> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->> ---
->>   drivers/clk/hisilicon/clk-hi6220.c | 12 ++++++++++--
->>   1 file changed, 10 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/hisilicon/clk-hi6220.c
->> b/drivers/clk/hisilicon/clk-hi6220.c
->> index a36ffcb..55bd9bb 100644
->> --- a/drivers/clk/hisilicon/clk-hi6220.c
->> +++ b/drivers/clk/hisilicon/clk-hi6220.c
->> @@ -11,6 +11,7 @@
->>    */
->>     #include <linux/kernel.h>
->> +#include <linux/clk.h>
->>   #include <linux/clk-provider.h>
->>   #include <linux/clkdev.h>
->>   #include <linux/io.h>
->> @@ -70,10 +71,10 @@ static struct hisi_gate_clock
->> hi6220_separated_gate_clks_ao[] __initdata = {
->>         { HI6220_UART0_PCLK,  "uart0_pclk",  "clk_tcxo",
->> CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 24, 0, },
->>   };
->>   +static struct hisi_clock_data *clk_data_ao;
->> +
->>   static void __init hi6220_clk_ao_init(struct device_node *np)
->>   {
->> -       struct hisi_clock_data *clk_data_ao;
->> -
->>         clk_data_ao = hisi_clk_init(np, HI6220_AO_NR_CLKS);
->>         if (!clk_data_ao)
->>                 return;
->> @@ -192,6 +193,13 @@ static void __init hi6220_clk_sys_init(struct
->> device_node *np)
->>         hi6220_clk_register_divider(hi6220_div_clks_sys,
->>                         ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
->> +
->> +       if (!clk_data_ao)
->> +               return;
->> +
->> +       /* enable high speed clock on UART1 mux */
->> +       clk_set_parent(clk_data->clk_data.clks[HI6220_UART1_SRC],
->> +                       clk_data_ao->clk_data.clks[HI6220_150M]);
->>   }
->>   CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-sysctrl",
->> hi6220_clk_sys_init);
->>
->
->
-> please bear with me on this. it does need rework.
->
+The "google,smaug-rev2" string is missing from the compatible list of
+Smaug's DT. The differences of rev2 are not relevant at our current
+level of support and it boots just fine, so add it.
 
-V2 was sent. Thanks Jorge.
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
--Guodong
-
->
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+index 431266a48e9c..82a96bd27bc8 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+@@ -11,7 +11,8 @@
+ 	compatible = "google,smaug-rev8", "google,smaug-rev7",
+ 		     "google,smaug-rev6", "google,smaug-rev5",
+ 		     "google,smaug-rev4", "google,smaug-rev3",
+-		     "google,smaug-rev1", "google,smaug", "nvidia,tegra210";
++		     "google,smaug-rev2", "google,smaug-rev1",
++		     "google,smaug", "nvidia,tegra210";
+ 
+ 	aliases {
+ 		serial0 = &uarta;
+-- 
+2.9.0
