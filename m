@@ -1,40 +1,27 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 29 Jun 2016 10:29:35 +0200
-Subject: [PATCH v2] ARM: s3c64xx: Add missing head file
-In-Reply-To: <1467187835-25660-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <577379DA.10902@samsung.com>
- <1467187835-25660-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <577386EF.1070400@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Jun 2016 10:30:25 +0200
+Subject: [PATCH 2/2] pinctrl: qcom: msm8974: Add hsic_ctl pinmux
+In-Reply-To: <20160626052132.7178-3-stephen.boyd@linaro.org>
+References: <20160626052132.7178-1-stephen.boyd@linaro.org>
+ <20160626052132.7178-3-stephen.boyd@linaro.org>
+Message-ID: <CACRpkdYfs-8fj8_UqAxJUeRkYt5Y1KQC9dskwaWHmrA3-cD5Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/2016 10:10 AM, Kefeng Wang wrote:
-> The building reports warning after patch "arm: Remove unnecessary
-> of_platform_populate with default match table",
-> 
-> "arch/arm/mach-s3c64xx/common.h:28:2: warning: 'struct device_node' declared inside parameter list"
-> 
-> Add the missing of.h for device_node struct in common.h, and kill common.h
-> from arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c, because no function need it.
-> 
-> Reported-by: kbuild test robot <fengguang.wu@intel.com>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
-> 
-> Hi Krzysztof, 
-> 
-> Thanks for your points, add "Reported-by" tag in v2, and Rob can directly
-> pick it up if necessary.
-> 
-> Thanks,
-> Kefeng
-> 
->  arch/arm/mach-s3c64xx/common.h          | 1 +
->  arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c | 1 -
->  2 files changed, 1 insertion(+), 1 deletion(-)
+On Sun, Jun 26, 2016 at 7:21 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> The msm8974 pinctrl variant has a couple USB HSIC "glue"
+> registers that let us mux between the pinctrl register settings
+> or the HSIC core settings for the HSIC pins (gpio 144 and gpio
+> 145). Support this method of operation by adding hsic_data and
+> hsic_strobe pins that can select between hsic_ctl and gpio
+> functions. This allows us to toggle the hsic pin configuration
+> over to the HSIC core at runtime.
+>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 
-Best regards,
-Krzysztof
+Patch applied.
+
+Yours,
+Linus Walleij
