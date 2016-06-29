@@ -1,48 +1,76 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 29 Jun 2016 21:33:31 +0800
-Subject: [RFC PATCH 3/5] thermal: Add support for the thermal sensor on
- A23/33
-In-Reply-To: <20160629121021.GD6095@lukather>
-References: <20160628101325.2522-1-icenowy@aosc.xyz>
- <20160628101325.2522-3-icenowy@aosc.xyz>
- <20160628114640.GE5550@lukather>
- <60021467122182@web19j.yandex.ru> <20160629121021.GD6095@lukather>
-Message-ID: <1209771467207211@web22j.yandex.ru>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 29 Jun 2016 09:34:01 -0400
+Subject: [RFC PATCH v4 3/5] PCI: Check platform specific ECAM quirks
+In-Reply-To: <5773A773.8040700@semihalf.com>
+References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
+ <1467100442-28078-4-git-send-email-tn@semihalf.com>
+ <577275EA.7010002@codeaurora.org>
+ <CADaLNDkhPZuG7UJ4SK_j5v_nXbd782Q17LAcXduG0uEObaFF=g@mail.gmail.com>
+ <5773A773.8040700@semihalf.com>
+Message-ID: <5773CE49.1050802@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tomasz,
 
+On 06/29/2016 06:48 AM, Tomasz Nowicki wrote:
+> On 28.06.2016 18:12, Duc Dang wrote:
+>> On Tue, Jun 28, 2016 at 6:04 AM, Christopher Covington
+>> <cov@codeaurora.org> wrote:
+>>> Hi Tomasz,
 
-29.06.2016, 20:10, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> On Tue, Jun 28, 2016 at 09:56:22PM +0800, Icenowy Zheng wrote:
->> ?The reason for a dedicate driver is:
->> ?1. This IP have only thermal function, so it's not suitable to use a
->> ?driver at drivers/input/touchscreen/.
->
-> That's not a problem, and it's being worked on [1].
->
->> ?2. Control Register are quite different.
->
-> That's not a problem either, there's just a bit that you don't need to
-> set in the control 1 register, and that's pretty much it. It doesn't
-> justify a whole new driver.
->
->> ?3. This IP uses AUDIO PLL (PLL2) as its clock!
->
-> It's listed as the input, but all the rest of the documentation refers
-> only to 24MHz, which seems to indicate that it's only running on the
-> oscillator, which would make much more sense.
->
-> Thanks,
-> Maxime
->
-> 1: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/439487.html
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+>>> Ard's comments on v3 included:
+>>>
+>>> "... exact OEM table/rev id matches ..."
+>>> "... substring match ... out of the question ..."
 
-I will try to use it without pll2 enabled.
+Digging through the archives I see Jon Master commented earlier to "be
+careful with substring match".
+
+>> I think having OEM Table ID as "PLAT " and then "PLAT2 " (the the 
+>> next version of the SoC) is common. So yes, matching full string is
+>> better as we can use "PLAT2 " in MCFG table and not worry about the
+>> "PLAT" sub-string match causes the quirk to be applied
+>> unintentionally.
+
+> Note that platforms already shipped where OEM string has no padding will
+
+I'm confused by this statement. OEMID is defined as 6 bytes long and OEM
+Table ID as 8 bytes long in the ACPI specification. As far as I can
+tell, if your string isn't exactly that long, padding up to that length
+is required.
+
+> have change the firmware or add 0 padding to our quirk array IDs.
+
+The fixed 6 or 8 character string compare, as used v2 of this patchset,
+will be compatible with existing firmware as best I can tell. Adding
+padding to the quirk array IDs is exactly what I'm suggesting, although
+all the strings I've seen are space padded rather than null padded.
+
+Matches:
+{"APM   ", "XGENE   ", 1}
+{"CAVIUM", "THUNDERX", 1}
+{"HISI  ", "HISI-D02", 1}
+{"HISI  ", "HISI-D03", 1}
+{"QCOM  ", "QDF2432 ", 1}
+
+Given the above tuples, won't accidentally match:
+(guessing at possible future ids)
+{"APM   ", "XGENEi  ", 1}
+{"CAVIUM", "THUNDERX", i} i != 1
+{"CAVIUM", "THUNDERi", 1}
+{"CAVIUM", "THUNDRXi", 1}
+{"HISI  ", "HISI-D0i", 1} i != 2 && i != 3
+{"QCOM  ", "QDF24ij ", 1} i != 3 && j != 2
+
+References for APM, HiSilicon IDs:
+https://lists.linaro.org/pipermail/linaro-acpi/2016-June/007108.html
+https://lists.linaro.org/pipermail/linaro-acpi/2016-June/007043.html
+
+Thanks,
+Cov
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
