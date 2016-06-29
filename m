@@ -1,82 +1,48 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed, 29 Jun 2016 06:38:24 -0700
-Subject: [PATCH] ARM: dts: imx: ventana: add RS485 txen gpio support
-Message-ID: <1467207504-5218-1-git-send-email-tharvey@gateworks.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed, 29 Jun 2016 21:33:31 +0800
+Subject: [RFC PATCH 3/5] thermal: Add support for the thermal sensor on
+ A23/33
+In-Reply-To: <20160629121021.GD6095@lukather>
+References: <20160628101325.2522-1-icenowy@aosc.xyz>
+ <20160628101325.2522-3-icenowy@aosc.xyz>
+ <20160628114640.GE5550@lukather>
+ <60021467122182@web19j.yandex.ru> <20160629121021.GD6095@lukather>
+Message-ID: <1209771467207211@web22j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GW54xx, GW53xx, and GW52xx all have an RS485 transceiver that uses an
-IMX GPIO for the TX enable of the transceiver. Declare this properly.
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 3 +++
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 3 +++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 3 +++
- 3 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 8bf1020..25ed57d 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -315,6 +315,8 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	rts-gpio = <&gpio7 1 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
- 
-@@ -493,6 +495,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
- 			>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index e5f4b6c..69e21b9 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -311,6 +311,8 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	rts-gpio = <&gpio7 1 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
- 
-@@ -481,6 +483,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
- 			>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 5a8dbab..b602e2a 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -414,6 +414,8 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	rts-gpio = <&gpio7 1 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
- 
-@@ -603,6 +605,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
- 			>;
- 		};
- 
--- 
-1.9.1
+29.06.2016, 20:10, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> Hi,
+>
+> On Tue, Jun 28, 2016 at 09:56:22PM +0800, Icenowy Zheng wrote:
+>> ?The reason for a dedicate driver is:
+>> ?1. This IP have only thermal function, so it's not suitable to use a
+>> ?driver at drivers/input/touchscreen/.
+>
+> That's not a problem, and it's being worked on [1].
+>
+>> ?2. Control Register are quite different.
+>
+> That's not a problem either, there's just a bit that you don't need to
+> set in the control 1 register, and that's pretty much it. It doesn't
+> justify a whole new driver.
+>
+>> ?3. This IP uses AUDIO PLL (PLL2) as its clock!
+>
+> It's listed as the input, but all the rest of the documentation refers
+> only to 24MHz, which seems to indicate that it's only running on the
+> oscillator, which would make much more sense.
+>
+> Thanks,
+> Maxime
+>
+> 1: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/439487.html
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+
+I will try to use it without pll2 enabled.
