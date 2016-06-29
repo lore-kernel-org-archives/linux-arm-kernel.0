@@ -1,74 +1,118 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 29 Jun 2016 11:48:06 -0700
-Subject: [PATCH] extcon: Add support for qcom SPMI PMIC USB id detection
- hardware
-In-Reply-To: <577369F5.8040907@samsung.com>
-References: <20160626055647.18898-1-stephen.boyd@linaro.org>
- <CAGTfZH3ireJWo5-Jd5SEiSy-WMTsw43pweruOqwSesAZqagvtg@mail.gmail.com>
- <146705470025.30684.13257433085055355379@sboyd-linaro>
- <CAGTfZH3ZhZ2gQcOSuAByZWD59E3Bro1aayr2JsM2W+mYa2LQTQ@mail.gmail.com>
- <CGME20160628215923epcas1p3f7942aca724bf2746c20319750184584@epcas1p3.samsung.com>
- <146715115921.31418.2315766296233007937@sboyd-linaro>
- <577369F5.8040907@samsung.com>
-Message-ID: <146722608622.16253.4347418438203284037@sboyd-linaro>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 29 Jun 2016 19:48:34 +0100
+Subject: Applied "regmap: Support bulk writes for devices without raw
+ formatting" to the regmap tree
+In-Reply-To: <1465870678-30128-2-git-send-email-wens@csie.org>
+Message-ID: <E1bIKXK-0005rN-JW@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chanwoo Choi (2016-06-28 23:25:57)
-> On 2016? 06? 29? 06:59, Stephen Boyd wrote:
-> > Quoting Chanwoo Choi (2016-06-28 05:06:48)
-> >> 2016-06-28 4:11 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
-> >>> Quoting Chanwoo Choi (2016-06-26 04:20:43)
-> >>>> 2016-06-26 14:56 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
-> >>>>> +PROPERTIES
-> >>>>> +
-> >>>>> +- compatible:
-> >>>>> +    Usage: required
-> >>>>> +    Value type: <string>
-> >>>>> +    Definition: Should contain "qcom,pm8941-misc";
-> >>>>> +
-> >>>>> +- reg:
-> >>>>> +    Usage: required
-> >>>>> +    Value type: <u32>
-> >>>>> +    Definition: Should contain the offset to the misc address space
-> >>>>
-> >>>> 'reg' property is used on extcon-qcom-spmi-misc.c?
-> >>>> I think that you don't need to include this property.
-> >>>
-> >>> No it isn't used in the driver right now, but there is a register offset
-> >>> for this module and there are registers that can be read/written in this
-> >>> module. I'd like to keep it as required so we can easily read the
-> >>> registers in the future if needed.
-> >>
-> >> OK.
-> >> But, If you want to remain the reg property, you should add the code to get
-> >> the register offset by using OF functions. This patch don't include the OF
-> >> function to handle it.
-> >>
-> > 
-> > Sorry I don't follow the argument. I've put the reg property here for
-> > future proofing so that the binding doesn't have to change in backwards
-> > incompatible ways in the future if we do need to get the property later.
-> 
-> I don't mention that 'reg' property should be removed.
+The patch
 
-Ok good. We need to keep reg property as this device is on a bus that
-uses reg property for addressing.
+   regmap: Support bulk writes for devices without raw formatting
 
-> Just if you want to remain it, you should add some codes as following:
-> For exmaple,
-> - of_get_address() to get the address information from device-tree.
-> 
-> If documentation include the some properties, you should add the handling code
-> in device driver. When you add the code to get the offset from device-tree,
-> it doesn't influence the some behavior in the future.
+has been applied to the regmap tree at
 
-Sorry I don't understand that argument. We can put properties into
-bindings and not use them in drivers if there isn't any immediate need
-to use them.
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git 
 
->From what I can tell you're suggesting we call of_get_address() in the
-driver and then do nothing with the value of the property? Is that just
-to check that the node is compliant with the binding and actually has a
-reg property? We don't add code in the kernel to check dts compliance,
-so I'm not inclined to do anything more here.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 5bf75b44972a7edffa9f52cddb291d66bc16a4d6 Mon Sep 17 00:00:00 2001
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Mon, 20 Jun 2016 10:52:11 +0800
+Subject: [PATCH] regmap: Support bulk writes for devices without raw
+ formatting
+
+When doing a bulk writes from a device which lacks raw I/O support we
+fall back to doing register at a time reads but we still use the raw
+formatters in order to render the data into the word size used by the
+device (since bulk reads still operate on the device word size rather
+than unsigned ints).  This means that devices without raw formatting
+such as those that provide reg_read() are not supported.  Provide
+handling for them by copying the values read into native endian values
+of the appropriate size.
+
+This complements commit d5b98eb12420 ("regmap: Support bulk reads for
+devices without raw formatting").
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/base/regmap/regmap.c | 31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index df2d2ef5d6b3..51fa7d66a393 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -1777,8 +1777,6 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
+ 	size_t val_bytes = map->format.val_bytes;
+ 	size_t total_size = val_bytes * val_count;
+ 
+-	if (map->bus && !map->format.parse_inplace)
+-		return -EINVAL;
+ 	if (!IS_ALIGNED(reg, map->reg_stride))
+ 		return -EINVAL;
+ 
+@@ -1789,7 +1787,8 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
+ 	 *
+ 	 * The first if block is used for memory mapped io. It does not allow
+ 	 * val_bytes of 3 for example.
+-	 * The second one is used for busses which do not have this limitation
++	 * The second one is for busses that do not provide raw I/O.
++	 * The third one is used for busses which do not have these limitations
+ 	 * and can write arbitrary value lengths.
+ 	 */
+ 	if (!map->bus) {
+@@ -1825,6 +1824,32 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
+ 		}
+ out:
+ 		map->unlock(map->lock_arg);
++	} else if (map->bus && !map->format.parse_inplace) {
++		const u8 *u8 = val;
++		const u16 *u16 = val;
++		const u32 *u32 = val;
++		unsigned int ival;
++
++		for (i = 0; i < val_count; i++) {
++			switch (map->format.val_bytes) {
++			case 4:
++				ival = u32[i];
++				break;
++			case 2:
++				ival = u16[i];
++				break;
++			case 1:
++				ival = u8[i];
++				break;
++			default:
++				return -EINVAL;
++			}
++
++			ret = regmap_write(map, reg + (i * map->reg_stride),
++					   ival);
++			if (ret)
++				return ret;
++		}
+ 	} else if (map->use_single_write ||
+ 		   (map->max_raw_write && map->max_raw_write < total_size)) {
+ 		int chunk_stride = map->reg_stride;
+-- 
+2.8.1
