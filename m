@@ -1,56 +1,79 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 29 Jun 2016 17:45:10 +0900
-Subject: [PATCH] pinctrl: uniphier: remove pointless SD pin-mux setting for
- PH1-LD11
-Message-ID: <1467189910-14125-1-git-send-email-yamada.masahiro@socionext.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 29 Jun 2016 16:51:45 +0800
+Subject: [PATCH 2/2] clk: hi6220: initialize UART1 clock to 150MHz
+In-Reply-To: <57726602.1060505@linaro.org>
+References: <1467109902-17625-1-git-send-email-guodong.xu@linaro.org>
+ <1467109902-17625-2-git-send-email-guodong.xu@linaro.org>
+ <57726602.1060505@linaro.org>
+Message-ID: <CAFGCpxxVmFGphtxZ=wJF2S75OQ5PyMucfOHCWMK51nrCJN0rkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This SoC has no SD card controller.  This pin-muxing has no point.
+On 28 June 2016 at 19:56, Jorge Ramirez <jorge.ramirez-ortiz@linaro.org> wrote:
+> On 06/28/2016 12:31 PM, Guodong Xu wrote:
+>>
+>> From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>>
+>> Early at boot, during the sys_clk initialization, make sure UART1 uses
+>> the higher frequency clock.
+>>
+>> This enables support for higher baud rates (up to 3Mbps) required to
+>> support faster bluetooth transfers.
+>>
+>> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+>> ---
+>>   drivers/clk/hisilicon/clk-hi6220.c | 12 ++++++++++--
+>>   1 file changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clk/hisilicon/clk-hi6220.c
+>> b/drivers/clk/hisilicon/clk-hi6220.c
+>> index a36ffcb..55bd9bb 100644
+>> --- a/drivers/clk/hisilicon/clk-hi6220.c
+>> +++ b/drivers/clk/hisilicon/clk-hi6220.c
+>> @@ -11,6 +11,7 @@
+>>    */
+>>     #include <linux/kernel.h>
+>> +#include <linux/clk.h>
+>>   #include <linux/clk-provider.h>
+>>   #include <linux/clkdev.h>
+>>   #include <linux/io.h>
+>> @@ -70,10 +71,10 @@ static struct hisi_gate_clock
+>> hi6220_separated_gate_clks_ao[] __initdata = {
+>>         { HI6220_UART0_PCLK,  "uart0_pclk",  "clk_tcxo",
+>> CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 24, 0, },
+>>   };
+>>   +static struct hisi_clock_data *clk_data_ao;
+>> +
+>>   static void __init hi6220_clk_ao_init(struct device_node *np)
+>>   {
+>> -       struct hisi_clock_data *clk_data_ao;
+>> -
+>>         clk_data_ao = hisi_clk_init(np, HI6220_AO_NR_CLKS);
+>>         if (!clk_data_ao)
+>>                 return;
+>> @@ -192,6 +193,13 @@ static void __init hi6220_clk_sys_init(struct
+>> device_node *np)
+>>         hi6220_clk_register_divider(hi6220_div_clks_sys,
+>>                         ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
+>> +
+>> +       if (!clk_data_ao)
+>> +               return;
+>> +
+>> +       /* enable high speed clock on UART1 mux */
+>> +       clk_set_parent(clk_data->clk_data.clks[HI6220_UART1_SRC],
+>> +                       clk_data_ao->clk_data.clks[HI6220_150M]);
+>>   }
+>>   CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-sysctrl",
+>> hi6220_clk_sys_init);
+>>
+>
+>
+> please bear with me on this. it does need rework.
+>
 
-Fixes: 70f2f9c4cf25 ("pinctrl: uniphier: add UniPhier PH1-LD11 pinctrl driver")
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+V2 was sent. Thanks Jorge.
 
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c | 5 -----
- 1 file changed, 5 deletions(-)
+-Guodong
 
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-index 608cd73..2c43576 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-@@ -485,8 +485,6 @@ static const int i2c4_muxvals[] = {1, 1};
- static const unsigned nand_pins[] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
- 				     15, 16, 17};
- static const int nand_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
--static const unsigned sd_pins[] = {10, 11, 12, 13, 14, 15, 16, 17};
--static const int sd_muxvals[] = {3, 3, 3, 3, 3, 3, 3, 3};  /* No SDVOLC */
- static const unsigned system_bus_pins[] = {1, 2, 6, 7, 8, 9, 10, 11, 12, 13,
- 					   14, 15, 16, 17};
- static const int system_bus_muxvals[] = {0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-@@ -598,7 +596,6 @@ static const struct uniphier_pinctrl_group uniphier_ld11_groups[] = {
- 	UNIPHIER_PINCTRL_GROUP(i2c3),
- 	UNIPHIER_PINCTRL_GROUP(i2c4),
- 	UNIPHIER_PINCTRL_GROUP(nand),
--	UNIPHIER_PINCTRL_GROUP(sd),
- 	UNIPHIER_PINCTRL_GROUP(system_bus),
- 	UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
- 	UNIPHIER_PINCTRL_GROUP(uart0),
-@@ -826,7 +823,6 @@ static const char * const i2c1_groups[] = {"i2c1"};
- static const char * const i2c3_groups[] = {"i2c3"};
- static const char * const i2c4_groups[] = {"i2c4"};
- static const char * const nand_groups[] = {"nand"};
--static const char * const sd_groups[] = {"sd"};
- static const char * const system_bus_groups[] = {"system_bus",
- 						 "system_bus_cs1"};
- static const char * const uart0_groups[] = {"uart0"};
-@@ -907,7 +903,6 @@ static const struct uniphier_pinmux_function uniphier_ld11_functions[] = {
- 	UNIPHIER_PINMUX_FUNCTION(i2c3),
- 	UNIPHIER_PINMUX_FUNCTION(i2c4),
- 	UNIPHIER_PINMUX_FUNCTION(nand),
--	UNIPHIER_PINMUX_FUNCTION(sd),
- 	UNIPHIER_PINMUX_FUNCTION(system_bus),
- 	UNIPHIER_PINMUX_FUNCTION(uart0),
- 	UNIPHIER_PINMUX_FUNCTION(uart1),
--- 
-1.9.1
+>
