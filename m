@@ -1,41 +1,58 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Wed, 29 Jun 2016 14:28:23 +0200
-Subject: [PATCH v3 1/2] ARM: tango: add HOTPLUG_CPU support
-In-Reply-To: <577294E2.5030405@arm.com>
-References: <57726597.8030501@sigmadesigns.com>
- <577266AD.8000006@sigmadesigns.com> <57726DE0.8090308@arm.com>
- <577291F1.8060105@sigmadesigns.com> <577294E2.5030405@arm.com>
-Message-ID: <5773BEE7.4080501@sigmadesigns.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 29 Jun 2016 14:34:10 +0200
+Subject: [PATCH v2 0/6] Add Amlogic secure monitor and NVMEM drivers
+Message-ID: <1467203656-14381-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/06/2016 17:16, Robin Murphy wrote:
+From: Carlo Caione <carlo@endlessm.com>
 
-> On 28/06/16 16:04, Marc Gonzalez wrote:
->
->> On 28/06/2016 14:30, Robin Murphy wrote:
->>
->>> Does the firmware guarantee that this will succeed (or at least report
->>> success) in finite time, regardless of how messed up the system might
->>> be? I'd imagine this should probably have either a timeout or a comment
->>> clarifying why it doesn't need a timeout.
->>
->> Good point.
->>
->> The FW allows only one thread at a time. If a thread is wedged inside
->> the FW, no other thread can use the FW. In that situation, cpu0 would
->> remain stuck inside tango_cpu_kill().
->>
->> Note, that if tango_cpu_kill() starts failing, then secondary cores
->> will remain "zombies". So the system is mostly hosed anyway...
->> Only cpu0 will be available.
-> 
-> Indeed; my thought was that if CPU1 somehow ends up wedged such that
-> tango_aux_core_die() never completes, then CPU0 eventually timing out
-> and being able to limp through a clean(ish) reboot is probably
-> preferable to spinning in cpu_kill() forever.
+I decided to respin again the secure monitor driver this time with the NVMEM
+driver in the same patchset to have a clear view on how a generic driver can
+use the monitor.
 
-I have sent an updated patch addressing your comment.
-Thanks for flagging the issue.
+The latest patchset for the secure monitor with the Changelog is here [1].
 
-Regards.
+[1] http://www.spinics.net/lists/arm-kernel/msg510441.html
+
+Changelog:
+v2:
+  - nvmem driver not using regmap anymore
+  - headers list cleanup
+  - disable sm driver for !4K kernels
+  - removed meson_sm_get_fw()
+  - better debug printing
+  - general cleanup  
+
+
+Carlo Caione (6):
+  firmware: Amlogic: Add secure monitor driver
+  documentation: Add secure monitor bindings documentation
+  ARM64: dts: amlogic: gxbb: Enable secure monitor
+  nvmem: amlogic: Add Amlogic Meson EFUSE driver
+  documentation: Add nvmem bindings documentation
+  ARM64: dts: amlogic: gxbb: Enable NVMEM
+
+ .../bindings/firmware/meson/meson_sm.txt           |  15 ++
+ .../devicetree/bindings/nvmem/amlogic-efuse.txt    |  39 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  24 ++
+ drivers/firmware/Kconfig                           |   1 +
+ drivers/firmware/Makefile                          |   1 +
+ drivers/firmware/meson/Kconfig                     |   9 +
+ drivers/firmware/meson/Makefile                    |   1 +
+ drivers/firmware/meson/meson_sm.c                  | 247 +++++++++++++++++++++
+ drivers/nvmem/Kconfig                              |  10 +
+ drivers/nvmem/Makefile                             |   2 +
+ drivers/nvmem/meson-efuse.c                        |  93 ++++++++
+ include/linux/firmware/meson/meson_sm.h            |  31 +++
+ 12 files changed, 473 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+ create mode 100644 drivers/firmware/meson/Kconfig
+ create mode 100644 drivers/firmware/meson/Makefile
+ create mode 100644 drivers/firmware/meson/meson_sm.c
+ create mode 100644 drivers/nvmem/meson-efuse.c
+ create mode 100644 include/linux/firmware/meson/meson_sm.h
+
+-- 
+2.7.4
