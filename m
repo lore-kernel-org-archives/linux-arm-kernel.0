@@ -1,62 +1,65 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 29 Jun 2016 12:51:37 -0700
-Subject: [PATCH 2/2] arm64: Always provide compat /proc/cpuinfo for
- 32-bit tasks
-In-Reply-To: <1464706504-25224-3-git-send-email-catalin.marinas@arm.com>
-References: <1464706504-25224-3-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20160629195137.GA142854@google.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Wed, 29 Jun 2016 22:54:38 +0300
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add
+ brcm,nvram_file_name dt property
+In-Reply-To: <6402170.5s0abZDqlD@wuerfel>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
+ <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
+ <6402170.5s0abZDqlD@wuerfel>
+Message-ID: <1467230078.2598.2.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-On Tue, May 31, 2016 at 03:55:04PM +0100, Catalin Marinas wrote:
-> Currently, the compat /proc/cpuinfo is provided only if a task has the
-> PER_LINUX32 personality, either by setting it explicitly or by
-> inheriting it from the parent task. This is in line with the "uname -m"
-> behaviour.
+On Wed, 2016-06-29 at 21:33 +0200, Arnd Bergmann wrote:
+> On Wednesday, June 29, 2016 8:51:44 PM CEST Arend Van Spriel wrote:
+> > > Typical wifi devices will have some sort of non volatile storage
+> > > on board to not only store the ethernet(mac) address, but also
+> > > to contain e.g. info about the antenna gain so that the firmware
+> > > and/or the driver can take the antenna gain into account and
+> > > ensure
+> > > that they never exceed the maximum allowed broadcast strength.
+> > > 
+> > > However on some embedded devices there is no non-volatile storage
+> > > for the wifi (for cost reasons) and instead this configuration
+> > > info
+> > > (which is board / pcb specific) is loaded in the form of a
+> > > file which contains the contents which would normally be in the
+> > > non-volatile storage.
+> > > 
+> > > Since we are dealing with a per-board config-file here, which is
+> > > loaded from the os filesystem we really need to specify a
+> > > basename
+> > > here as the list of possible boards is endless, so we cannot
+> > > have a lookup table in the driver.
+> > 
+> > As Jonas mentioned the general principle of device tree is to be
+> > agnostic with regards to OS and/or driver as you undoubtedly know.
+> > His
+> > proposal seems like a usable solution for your problem while
+> > complying
+> > to the device tree principle. So instead of overriding the default
+> > brcmfmac should modify it when dt specifies the "module" property,
+> > ie:
+> > 
+> > no "module" in DT:??????nvram filename = brcm/brcmfmac43362-
+> > sdio.txt
+> > "module=ap6210" in DT:??nvram filename = brcm/brcmfmac43362-
+> > ap6210.txt
+> > 
+> > By the way, the example in the bindings file does not seem to
+> > specify a
+> > basename, but path+basename+fileext.
 > 
-> However, there are 32-bit user applications making use of the
-> /proc/cpuinfo and unaware of a need to set the personality. This patch
-> changes the arm64 /proc/cpuinfo logic to provide the compat information
-> if the task is 32-bit _or_ the PER_LINUX32 personality is set.
-> 
-> Cc: <stable@vger.kernel.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> What is the size of this nvram file? As it's board specific, I wonder
+> if we can simply include it inside of the DT verbatim. I remember
+> doing that (in the pre-dtb days, on real open firmware) for the
+> "spidernet"
+> ethernet driver.
 
-What's the status on this patch? The previous patch (which was accepted
-already) is indeed confusing, because ARM32 processes on an ARM64 system
-are not necessarily setting PER_LINUX32.
+It contains a bit too much info:
 
-I'm also curious, why was 'model name' removed from ARM64 in the first
-place? Plenty of other architectures support a similar property, and
-it's useful for some tools that already parse this, such as coreutils
-`uname -p` on Gentoo (and presumably others -- my Ubuntu machine must be
-similarly patched, as it supports `uname -p` on x86_64).
+This is what CubieTruck requires:
 
-If we were to just stick 'model name' back in unconditionally, we could
-avoid the objections Will raised entirely :)
-
-Regards,
-Brian
-
-> ---
->  arch/arm64/kernel/cpuinfo.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index c173d329397f..bd6a122ea856 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -106,7 +106,8 @@ static const char *const compat_hwcap2_str[] = {
->  static int c_show(struct seq_file *m, void *v)
->  {
->  	int i, j;
-> -	bool compat = personality(current->personality) == PER_LINUX32;
-> +	bool compat = is_compat_task() ||
-> +		personality(current->personality) == PER_LINUX32;
->  
->  	for_each_online_cpu(i) {
->  		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
+http://dl.cubieboard.org/public/Cubieboard/benn/firmware/ap6210/nvram_a
+p6210.txt
