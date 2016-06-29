@@ -1,33 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 29 Jun 2016 17:45:25 +0100
-Subject: [PATCH 3/5] arm64: efi: avoid block mappings for unaligned UEFI
- memory regions
-In-Reply-To: <1467204690-10790-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
- <1467204690-10790-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160629164525.GE2522@e104818-lin.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 29 Jun 2016 19:46:33 +0300
+Subject: [PATCH] ARM: dts: r8a7792: add SMP support
+In-Reply-To: <1627631.X1bJtVQHBF@wasted.cogentembedded.com>
+References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
+ <1627631.X1bJtVQHBF@wasted.cogentembedded.com>
+Message-ID: <7c23396f-f880-40ac-654d-cffc82df021e@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 02:51:28PM +0200, Ard Biesheuvel wrote:
-> +	if (!PAGE_ALIGNED(md->phys_addr) ||
-> +	    !PAGE_ALIGNED(md->num_pages << EFI_PAGE_SHIFT)) {
-> +		/*
-> +		 * If the end address of this region is not aligned to page
-> +		 * size, the mapping is rounded up, and may end up sharing a
-> +		 * page frame with the next UEFI memory region. If we create
-> +		 * a block entry now, we may need to split it again when mapping
-> +		 * the next region, and support for that is going to be removed
-> +		 * from the MMU routines. So avoid block mappings altogether in
-> +		 * that case.
-> +		 */
-> +		allow_block_mappings = false;
-> +	}
+Hello.
 
-How common is it for large areas to have unaligned start/end? I wonder
-whether it's worth implementing my approach to look ahead and explicitly
-check the overlap with the next section instead of disabling block
-mappings altogether for this region.
+On 06/21/2016 01:31 AM, Sergei Shtylyov wrote:
 
--- 
-Catalin
+> Add the device tree nodes for the Advanced Power Management Unit (APMU)
+> and the second Cortex-A15 CPU core.
+> Use the "enable-method" prop  to point out that the APMU should be used
+> for the SMP support.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> ---
+> This patch is against the 'renesas-devel-20160620-v4.7-rc4' tag of Simon
+> Horman's 'renesas.git' repo.  It depends on Magnus'/Geert's SMP patchset...
+
+    simon, now that this patchset has been merged (for 4.8?), could you also 
+merge this patch?
+
+MBR, Sergei
