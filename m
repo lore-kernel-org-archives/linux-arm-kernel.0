@@ -1,63 +1,45 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 29 Jun 2016 14:47:02 -0400
-Subject: [PATCH V2 1/4] ACPI,PCI,IRQ: factor in PCI possible
-In-Reply-To: <CAJZ5v0j1m4oGJfdOC8uerKc-3ksq6k2e9RdjEnk0sWmsq4RHRQ@mail.gmail.com>
-References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
- <1467188859-28188-2-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0j1m4oGJfdOC8uerKc-3ksq6k2e9RdjEnk0sWmsq4RHRQ@mail.gmail.com>
-Message-ID: <8a40e242-fca4-5681-e480-e29ec05354ac@codeaurora.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 29 Jun 2016 20:47:01 +0200
+Subject: [PATCH 3/4] ARM: dts: sun5i: Add axp152 pmic node to mk802
+In-Reply-To: <1467226022-10525-1-git-send-email-hdegoede@redhat.com>
+References: <1467226022-10525-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1467226022-10525-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/29/2016 9:13 AM, Rafael J. Wysocki wrote:
-> On Wed, Jun 29, 2016 at 10:27 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
->> resource requirements") omitted the initially assigned POSSIBLE penalty
->> when the IRQ is active.
-> 
-> It would be good to say what can go wrong with that here.
-> 
+Add a node describing the axp152 pmic to the mk802 dts, note there are
+no regulator nodes as we do not yet support the regulators on the
+axp152.
 
-I can add more description. Here is a first attempt.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun5i-a10s-mk802.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Incorrect calculation of penalty leads to ACPI code assigning the wrong
-interrupt number to PCI INTx interrupts.
-
-This would not be as bad as it sounds in theory. You would just cause the
-interrupts to be shared and observe performance penalty.
-
-However, some drivers like parallel port driver doesn't like interrupt
-sharing as in this example and causes all other PCI drivers sharing the interrupt
-to malfunction.
-
-The issue has not been caught because the behavior is platform specific
-and depends on the peripheral drivers sharing the IRQ. 
-
-I can claim that this could be a BIOS bug. if interrupt 7 is not good for PCI,
-it shouldn't have been listed in the possible PCI interrupts to begin with. 
-Given this is an existing platform, I don't think we have the luxury to request
-all BIOS to be updated. This bugfix is needed to support existing platforms.
-
-
-Feel free to request more information if the above description is not clear.
-
-
->> The original code would assign the POSSIBLE value divided by the number
->> of possible IRQs during initialization.
->>
->> Later, if the IRQ is chosen as the active IRQ or if the IRQ is in use
->> by ISA; additional penalties get added.
-> 
-> Thanks,
-> Rafael
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
+diff --git a/arch/arm/boot/dts/sun5i-a10s-mk802.dts b/arch/arm/boot/dts/sun5i-a10s-mk802.dts
+index 0bb5755..04120e1 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-mk802.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-mk802.dts
+@@ -73,6 +73,20 @@
+ 	status = "okay";
+ };
+ 
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp152: pmic at 30 {
++		compatible = "x-powers,axp152";
++		reg = <0x30>;
++		interrupts = <0>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_mk802>;
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+2.7.4
