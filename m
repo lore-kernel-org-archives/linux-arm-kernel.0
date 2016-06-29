@@ -1,45 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Jun 2016 00:54:47 -0700
-Subject: [RESEND PATCHv2 03/28] ARM: OMAP2+: omap_device: create clock
- alias purely from DT data
-In-Reply-To: <5773745A.6020307@ti.com>
-References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
- <1465844702-12200-4-git-send-email-t-kristo@ti.com>
- <20160628070011.GD28140@atomide.com> <577373F0.5080700@ti.com>
- <5773745A.6020307@ti.com>
-Message-ID: <20160629075446.GK28140@atomide.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 29 Jun 2016 09:57:14 +0200
+Subject: [PATCH v2 2/2] ARM: at91: pm: switch to the PIE infrastructure
+In-Reply-To: <2349417.jWuiI2GXql@ws-stein>
+References: <1467153886-21144-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1467153886-21144-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <2349417.jWuiI2GXql@ws-stein>
+Message-ID: <20160629075714.GP29249@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [160629 00:13]:
-> On 29/06/16 10:08, Tero Kristo wrote:
-> > On 28/06/16 10:00, Tony Lindgren wrote:
-> > > * Tero Kristo <t-kristo@ti.com> [160613 12:07]:
-> > > > This avoids the need to add most of the clock aliases under
-> > > > drivers/clk/ti/clk-xyz.c files.
-> > > 
-> > > This is a nice improvment, probably best to queu this along
-> > > with the rest of the series via the clock tree:
-> > > 
-> > > Acked-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > Or please let me know if you want me to pick this separately.
-> > > 
-> > > Regards,
-> > > 
-> > > Tony
-> > > 
-> > 
-> > Patches #3, #6, #7, #8 you can pick up separately (but you will have
-> > some conflicts due to missing ti_clk_get implementation.) These patches
-> > are required for this series to work properly though.
+On 29/06/2016 at 08:12:21 +0200, Alexander Stein wrote :
+> > +#if defined(CONFIG_CPU_V7)
+> > +	dsb();
+> > +	wfi();
+> > +#else
+> > +	asm volatile ("mcr	p15, 0, %0, c7, c0, 4" \
+> > +		      : : "r" (0) : "memory");
+> > +#endif
 > 
-> And patch #9 you can pick up also obviously...
+> Why not defining wfi() for __LINUX_ARM_ARCH__ < 7 as it is done for dsb() and 
+> friends in arch/arm/include/asm/barrier.h? So you can get rid of that #if 
+> completly.
 
-OK can you please repost the ones I can pick for v4.8 merge window
-to get them out of the way? There were some merge conflicts against
-Linux next when I tried to apply them for testing yesterday.
+Well, Russell said it was not useful because "there's no architected WFI
+instruction which doesn't have CPU specific issues (hence why we have
+cpu_do_idle() to abstract that)"
 
-Regards,
-
-Tony
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
