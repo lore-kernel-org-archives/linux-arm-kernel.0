@@ -1,226 +1,284 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 29 Jun 2016 21:05:21 +0200
-Subject: [PATCH v3 00/14] clk: sunxi: introduce "modern" clock support
-Message-ID: <20160629190535.11855-1-maxime.ripard@free-electrons.com>
+Date: Wed, 29 Jun 2016 21:05:32 +0200
+Subject: [PATCH v3 11/14] clk: sunxi-ng: Add N-K-M Factor clock
+In-Reply-To: <20160629190535.11855-1-maxime.ripard@free-electrons.com>
+References: <20160629190535.11855-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160629190535.11855-12-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Introduce support for clocks that multiply and divide using two linear
+multipliers and one linear divider.
 
-This is the third attempt at introducing clock support for the
-Allwinner SoCs following the current model used by pretty much all the
-other SoCs.
-
-Such a conversion has been suggested on a regular basis by Mike and
-Stephen, and here is a first implementation.
-
-This new approach has a good number of advantages, some due to the new
-binding itself, some due to the lessons learned with the current code
-we have.
-
-Beside from having a binding similar to the other SoCs, which helps
-developer hopping from one SoC to the other, it also reduces the
-amount of binding review that needs to be done, something that Rob
-already complained about a few times.
-Now that we are following the DT-as-an-ABI rule, the new binding will
-also make our life way easier, since we reduce the exposed surface
-greatly. The former binding, while making quite easy to mix and match
-clocks when bringing up new SoCs, was also exposing way too much
-implementation details that would hold us back when wanting to
-refactor, consolidate, or fix some shortcomings in the current
-implementation. In the new approach, the only thing that we're
-exposing is the clock index, meaning that we can change the
-implementation as much as we want.
-
-This rewrite is also the occasion to layer things up quite differently
-in our clock core.
-
-The current code had a bunch of shortcomings. Most of the code was
-relying on our clk-factor code, which was factoring away a few things
-like the clock registration, ie boilerplate, but didn't factor the
-logic to compute a clock rate, while the huge majority are computed
-from some variation of a formula, which could actually be shared.
-
-Which meant that every time we had to add new code to help clk-factors
-compute the actual factors used, even though a clock with the same
-formual was probably already supported. This eventually lead to a huge
-number of clocks driver patches, and to review, which is also
-something Stephen complained about.
-
-The new approach takes a different approach by adding a bunch of clock
-drivers based on the formula they use to compute their rate and / or
-the features they have (mux, gate, etc.). The SoC will only have to
-provide the data for the driver to know how many options it has,
-without adding any extra code.
-
-To reduce the amount of code duplication between those drivers, a
-bunch of helpers have also been introduced to deal with the common
-features (pre-dividers, gate, muxes, etc.). This will also be very
-easy to extend to support new features missing for now (mostly the
-fractional stuff as of today).
-
-Since this is a complete rewrite, it probably has a bunch of bugs
-and/or limitations not yet found. My plan would be to start using that
-approach on the A64, A83T and H3 which are in their early support
-stage to be the test-bed for this new framework, before switching the
-older and more featureful SoCs to it eventually.
-
-Because of the DT ABI, the older drivers will remain in-tree
-obviously, otherwise things would break pretty badly.
-
-The current code has been tested on the H3 and an Orange Pi PC,
-including making sure that MMC still works, so the general approach
-seems ok.
-
-Let me know what you think,
-Maxime
-
-Changes from v2:
-  * Switched to Kconfig, and selected the rational lib Kconfig option
-  * Added a better define and comment for the Audio PLL register, and
-    why we need to poke it.
-  * Removed the PLL locks and gate feature flags
-  * Fixed the missing gate define in the CCU divider macro
-  * Switched to clk_hw_register
-  * Removed our implementation of the fixed factor clocks and used the
-    CCF one.
-  * Initialise clk_hw_onecell_data statically
-  * Only expose in the dt-bindings header the clocks that should be
-    use by the devices, and not the internal ones.
-  * Fixed a typo in the DT documentation
-
-Changes from v1:
-  * Common parts:
-      - Moved the register mapping out of the common probe function and
-        into the SoC specific part to be able to do some quirks
-      - Changed the LOCK feature to PLL_LOCK
-      - Fixed a bug in the iteration over the clock array
-      - Changed the clock register offset to an u16
-      - Added fractional support
-      - Added comments to define the formulas of the various clock classes
-      - Fixed an off-by-one issue in the GENMASK calls
-      - Added macros for all the simple clocks
-      - Added the DT documentation
-
-  * H3 part
-      - Only build when MACH_SUN8I is set
-      - Use a static PLL2-1x divider
-      - Used common parents definitions when possible
-      - Fixed the mux width of a bunch of clocks
-      - Fixed the parent of USB OTG bus clocks
-
-  * Dividers
-      - Dropped the various classes of dividers and merged them into a
-        single one
-
-  * Fixed factor
-      - Added support for CLK_SET_RATE_PARENT in fixed factor clocks
-      - Changed the operands order in the rate computation
-
-  * Mux:
-      - Moved the header introduction from the patch adding the common
-        parts to the patch adding the mux
-
-  * N-M:
-      - Fixed the maximum passed to the rational function
-
-  * N-K-M:
-      - Declared the find_best function static
-      - Fixed the set_rate function that was always writing the factors
-        at the same offset
-      - Used a structure for all the find_best arguments
-
-  * N-K-M-P:
-      - Fixed the parent rate computation in the rational_best call
-      - Used a structure for all the find_best arguments
-
-  * Phase:
-      - Renamed some variables as suggested    
-
-Maxime Ripard (14):
-  dt-bindings: sunxi: Add CCU binding documentation
-  clk: sunxi-ng: Add common infrastructure
-  clk: sunxi-ng: Add fractional lib
-  clk: sunxi-ng: Add gate clock support
-  clk: sunxi-ng: Add mux clock support
-  clk: sunxi-ng: Add phase clock support
-  clk: sunxi-ng: Add divider
-  clk: sunxi-ng: Add M-P factor clock support
-  clk: sunxi-ng: Add N-K-factor clock support
-  clk: sunxi-ng: Add N-M-factor clock support
-  clk: sunxi-ng: Add N-K-M Factor clock
-  clk: sunxi-ng: Add N-K-M-P factor clock
-  clk: sunxi-ng: Add H3 clocks
-  ARM: dt: sun8i: switch the H3 to the new CCU driver
-
- .../devicetree/bindings/clock/sunxi-ccu.txt        |  24 +
- arch/arm/boot/dts/sun8i-h3.dtsi                    | 312 ++------
- drivers/clk/Kconfig                                |   1 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/sunxi-ng/Kconfig                       |  65 ++
- drivers/clk/sunxi-ng/Makefile                      |  20 +
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c                | 826 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |  62 ++
- drivers/clk/sunxi-ng/ccu_common.c                  |  90 +++
- drivers/clk/sunxi-ng/ccu_common.h                  |  85 +++
- drivers/clk/sunxi-ng/ccu_div.c                     | 136 ++++
- drivers/clk/sunxi-ng/ccu_div.h                     | 133 ++++
- drivers/clk/sunxi-ng/ccu_frac.c                    | 110 +++
- drivers/clk/sunxi-ng/ccu_frac.h                    |  53 ++
- drivers/clk/sunxi-ng/ccu_gate.c                    |  82 ++
- drivers/clk/sunxi-ng/ccu_gate.h                    |  52 ++
- drivers/clk/sunxi-ng/ccu_mp.c                      | 158 ++++
- drivers/clk/sunxi-ng/ccu_mp.h                      |  77 ++
- drivers/clk/sunxi-ng/ccu_mult.h                    |  15 +
- drivers/clk/sunxi-ng/ccu_mux.c                     | 187 +++++
- drivers/clk/sunxi-ng/ccu_mux.h                     |  91 +++
- drivers/clk/sunxi-ng/ccu_nk.c                      | 147 ++++
- drivers/clk/sunxi-ng/ccu_nk.h                      |  71 ++
- drivers/clk/sunxi-ng/ccu_nkm.c                     | 153 ++++
- drivers/clk/sunxi-ng/ccu_nkm.h                     |  68 ++
- drivers/clk/sunxi-ng/ccu_nkmp.c                    | 167 +++++
- drivers/clk/sunxi-ng/ccu_nkmp.h                    |  71 ++
- drivers/clk/sunxi-ng/ccu_nm.c                      | 114 +++
- drivers/clk/sunxi-ng/ccu_nm.h                      |  91 +++
- drivers/clk/sunxi-ng/ccu_phase.c                   | 126 ++++
- drivers/clk/sunxi-ng/ccu_phase.h                   |  50 ++
- drivers/clk/sunxi-ng/ccu_reset.c                   |  55 ++
- drivers/clk/sunxi-ng/ccu_reset.h                   |  40 +
- include/dt-bindings/clock/sun8i-h3-ccu.h           | 145 ++++
- include/dt-bindings/reset/sun8i-h3-ccu.h           | 103 +++
- 35 files changed, 3729 insertions(+), 252 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/sunxi-ccu.txt
- create mode 100644 drivers/clk/sunxi-ng/Kconfig
- create mode 100644 drivers/clk/sunxi-ng/Makefile
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-h3.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-h3.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_common.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_common.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_div.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_div.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_frac.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_frac.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_gate.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_gate.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_mp.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_mp.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_mult.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_mux.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_mux.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_nk.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_nk.h
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi-ng/Kconfig   |   5 ++
+ drivers/clk/sunxi-ng/Makefile  |   1 +
+ drivers/clk/sunxi-ng/ccu_nkm.c | 153 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_nkm.h |  68 ++++++++++++++++++
+ 4 files changed, 227 insertions(+)
  create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.c
  create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_nkmp.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_nkmp.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_nm.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_nm.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_phase.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_phase.h
- create mode 100644 drivers/clk/sunxi-ng/ccu_reset.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_reset.h
- create mode 100644 include/dt-bindings/clock/sun8i-h3-ccu.h
- create mode 100644 include/dt-bindings/reset/sun8i-h3-ccu.h
 
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index d8a5da270778..4c571b86bfd1 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -28,6 +28,11 @@ config SUNXI_CCU_NK
+ 	bool
+ 	select SUNXI_CCU_GATE
+ 
++config SUNXI_CCU_NKM
++	bool
++	select RATIONAL
++	select SUNXI_CCU_GATE
++
+ config SUNXI_CCU_NM
+ 	bool
+ 	select RATIONAL
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index 7d2cd2a47a39..2d6fdca0d3cc 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -11,5 +11,6 @@ obj-$(CONFIG_SUNXI_CCU_PHASE)	+= ccu_phase.o
+ 
+ # Multi-factor clocks
+ obj-$(CONFIG_SUNXI_CCU_NK)	+= ccu_nk.o
++obj-$(CONFIG_SUNXI_CCU_NKM)	+= ccu_nkm.o
+ obj-$(CONFIG_SUNXI_CCU_NM)	+= ccu_nm.o
+ obj-$(CONFIG_SUNXI_CCU_MP)	+= ccu_mp.o
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+new file mode 100644
+index 000000000000..2071822b1e9c
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -0,0 +1,153 @@
++/*
++ * Copyright (C) 2016 Maxime Ripard
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/rational.h>
++
++#include "ccu_gate.h"
++#include "ccu_nkm.h"
++
++struct _ccu_nkm {
++	unsigned long	n, max_n;
++	unsigned long	k, max_k;
++	unsigned long	m, max_m;
++};
++
++static void ccu_nkm_find_best(unsigned long parent, unsigned long rate,
++			      struct _ccu_nkm *nkm)
++{
++	unsigned long best_rate = 0;
++	unsigned long best_n = 0, best_k = 0, best_m = 0;
++	unsigned long _n, _k, _m;
++
++	for (_k = 1; _k <= nkm->max_k; _k++) {
++		unsigned long tmp_rate;
++
++		rational_best_approximation(rate / _k, parent,
++					    nkm->max_n, nkm->max_m, &_n, &_m);
++
++		tmp_rate = parent * _n * _k / _m;
++
++		if (tmp_rate > rate)
++			continue;
++
++		if ((rate - tmp_rate) < (rate - best_rate)) {
++			best_rate = tmp_rate;
++			best_n = _n;
++			best_k = _k;
++			best_m = _m;
++		}
++	}
++
++	nkm->n = best_n;
++	nkm->k = best_k;
++	nkm->m = best_m;
++}
++
++static void ccu_nkm_disable(struct clk_hw *hw)
++{
++	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
++
++	return ccu_gate_helper_disable(&nkm->common, nkm->enable);
++}
++
++static int ccu_nkm_enable(struct clk_hw *hw)
++{
++	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
++
++	return ccu_gate_helper_enable(&nkm->common, nkm->enable);
++}
++
++static int ccu_nkm_is_enabled(struct clk_hw *hw)
++{
++	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
++
++	return ccu_gate_helper_is_enabled(&nkm->common, nkm->enable);
++}
++
++static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
++					unsigned long parent_rate)
++{
++	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
++	unsigned long n, m, k;
++	u32 reg;
++
++	reg = readl(nkm->common.base + nkm->common.reg);
++
++	n = reg >> nkm->n.shift;
++	n &= (1 << nkm->n.width) - 1;
++
++	k = reg >> nkm->k.shift;
++	k &= (1 << nkm->k.width) - 1;
++
++	m = reg >> nkm->m.shift;
++	m &= (1 << nkm->m.width) - 1;
++
++	return parent_rate * (n + 1) * (k + 1) / (m + 1);
++}
++
++static long ccu_nkm_round_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long *parent_rate)
++{
++	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
++	struct _ccu_nkm _nkm;
++
++	_nkm.max_n = 1 << nkm->n.width;
++	_nkm.max_k = 1 << nkm->k.width;
++	_nkm.max_m = 1 << nkm->m.width;
++
++	ccu_nkm_find_best(*parent_rate, rate, &_nkm);
++
++	return *parent_rate * _nkm.n * _nkm.k / _nkm.m;
++}
++
++static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
++			   unsigned long parent_rate)
++{
++	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
++	struct _ccu_nkm _nkm;
++	unsigned long flags;
++	u32 reg;
++
++	_nkm.max_n = 1 << nkm->n.width;
++	_nkm.max_k = 1 << nkm->k.width;
++	_nkm.max_m = 1 << nkm->m.width;
++
++	ccu_nkm_find_best(parent_rate, rate, &_nkm);
++
++	spin_lock_irqsave(nkm->common.lock, flags);
++
++	reg = readl(nkm->common.base + nkm->common.reg);
++	reg &= ~GENMASK(nkm->n.width + nkm->n.shift - 1, nkm->n.shift);
++	reg &= ~GENMASK(nkm->k.width + nkm->k.shift - 1, nkm->k.shift);
++	reg &= ~GENMASK(nkm->m.width + nkm->m.shift - 1, nkm->m.shift);
++
++	reg |= (_nkm.n - 1) << nkm->n.shift;
++	reg |= (_nkm.k - 1) << nkm->k.shift;
++	reg |= (_nkm.m - 1) << nkm->m.shift;
++
++	writel(reg, nkm->common.base + nkm->common.reg);
++
++	spin_unlock_irqrestore(nkm->common.lock, flags);
++
++	ccu_helper_wait_for_lock(&nkm->common, nkm->lock);
++
++	return 0;
++}
++
++const struct clk_ops ccu_nkm_ops = {
++	.disable	= ccu_nkm_disable,
++	.enable		= ccu_nkm_enable,
++	.is_enabled	= ccu_nkm_is_enabled,
++
++	.recalc_rate	= ccu_nkm_recalc_rate,
++	.round_rate	= ccu_nkm_round_rate,
++	.set_rate	= ccu_nkm_set_rate,
++};
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.h b/drivers/clk/sunxi-ng/ccu_nkm.h
+new file mode 100644
+index 000000000000..1936ac1c6b37
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu_nkm.h
+@@ -0,0 +1,68 @@
++/*
++ * Copyright (c) 2016 Maxime Ripard. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _CCU_NKM_H_
++#define _CCU_NKM_H_
++
++#include <linux/clk-provider.h>
++
++#include "ccu_common.h"
++#include "ccu_div.h"
++#include "ccu_mult.h"
++
++/*
++ * struct ccu_nkm - Definition of an N-K-M clock
++ *
++ * Clocks based on the formula parent * N * K / M
++ */
++struct ccu_nkm {
++	u32			enable;
++	u32			lock;
++
++	struct _ccu_mult	n;
++	struct _ccu_mult	k;
++	struct _ccu_div		m;
++
++	struct ccu_common	common;
++};
++
++#define SUNXI_CCU_NKM_WITH_GATE_LOCK(_struct, _name, _parent, _reg,	\
++				     _nshift, _nwidth,			\
++				     _kshift, _kwidth,			\
++				     _mshift, _mwidth,			\
++				     _gate, _lock, _flags)		\
++	struct ccu_nkm _struct = {					\
++		.enable		= _gate,				\
++		.lock		= _lock,				\
++		.k		= _SUNXI_CCU_MULT(_kshift, _kwidth),	\
++		.n		= _SUNXI_CCU_MULT(_nshift, _nwidth),	\
++		.m		= _SUNXI_CCU_DIV(_mshift, _mwidth),	\
++		.common		= {					\
++			.reg		= _reg,				\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						      _parent,		\
++						      &ccu_nkm_ops,	\
++						      _flags),		\
++		},							\
++	}
++
++static inline struct ccu_nkm *hw_to_ccu_nkm(struct clk_hw *hw)
++{
++	struct ccu_common *common = hw_to_ccu_common(hw);
++
++	return container_of(common, struct ccu_nkm, common);
++}
++
++extern const struct clk_ops ccu_nkm_ops;
++
++#endif /* _CCU_NKM_H_ */
 -- 
 2.9.0
