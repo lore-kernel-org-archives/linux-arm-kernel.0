@@ -1,120 +1,43 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 29 Jun 2016 15:02:12 +0800
-Subject: [PATCH 14/21] usb: chipidea: msm: Add proper clk and reset support
-In-Reply-To: <20160626072838.28082-15-stephen.boyd@linaro.org>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-15-stephen.boyd@linaro.org>
-Message-ID: <20160629070212.GI25236@shlinux2>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 29 Jun 2016 10:10:18 +0300
+Subject: [RESEND PATCHv2 03/28] ARM: OMAP2+: omap_device: create clock
+ alias purely from DT data
+In-Reply-To: <577373F0.5080700@ti.com>
+References: <1465844702-12200-1-git-send-email-t-kristo@ti.com>
+ <1465844702-12200-4-git-send-email-t-kristo@ti.com>
+ <20160628070011.GD28140@atomide.com> <577373F0.5080700@ti.com>
+Message-ID: <5773745A.6020307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2016 at 12:28:31AM -0700, Stephen Boyd wrote:
-> The msm chipidea controller uses two main clks, an AHB clk to
-> read/write the MMIO registers and a core clk called the system
-> clk that drives the controller itself. Add support for these clks
-> as they're required in all designs.
-> 
-> Also add support for an optional third clk that we need to turn
-> on to read/write the ULPI phy registers. Some ULPI phys drive
-> this clk themselves and so it isn't necessary to turn on to probe
-> a ULPI device, but the HSIC phy doesn't provide one itself, so we
-> must turn it on here.
-> 
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/usb/chipidea/ci_hdrc_msm.c | 58 +++++++++++++++++++++++++++++++++++---
->  1 file changed, 54 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-> index 07cccd24a87f..40249b0e3e93 100644
-> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
-> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-> @@ -10,11 +10,19 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/usb/gadget.h>
->  #include <linux/usb/chipidea.h>
-> +#include <linux/clk.h>
-> +#include <linux/reset.h>
->  
->  #include "ci.h"
->  
->  #define HS_PHY_AHB_MODE			0x0098
->  
-> +struct ci_hdrc_msm {
-> +	struct platform_device *ci;
-> +	struct clk *core_clk;
-> +	struct clk *iface_clk;
-> +};
-> +
->  static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
->  {
->  	struct device *dev = ci->gadget.dev.parent;
-> @@ -43,34 +51,76 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
->  
->  static int ci_hdrc_msm_probe(struct platform_device *pdev)
->  {
-> +	struct ci_hdrc_msm *ci;
->  	struct platform_device *plat_ci;
-> +	struct clk *clk;
-> +	struct reset_control *reset;
-> +	int ret;
->  
->  	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
->  
-> +	ci = devm_kzalloc(&pdev->dev, sizeof(*ci), GFP_KERNEL);
-> +	if (!ci)
-> +		return -ENOMEM;
-> +	platform_set_drvdata(pdev, ci);
-> +
-> +	reset = devm_reset_control_get(&pdev->dev, "core");
-> +	if (IS_ERR(reset))
-> +		return PTR_ERR(reset);
-> +
-> +	ci->core_clk = clk = devm_clk_get(&pdev->dev, "core");
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	ci->iface_clk = clk = devm_clk_get(&pdev->dev, "iface");
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
+On 29/06/16 10:08, Tero Kristo wrote:
+> On 28/06/16 10:00, Tony Lindgren wrote:
+>> * Tero Kristo <t-kristo@ti.com> [160613 12:07]:
+>>> This avoids the need to add most of the clock aliases under
+>>> drivers/clk/ti/clk-xyz.c files.
+>>
+>> This is a nice improvment, probably best to queu this along
+>> with the rest of the series via the clock tree:
+>>
+>> Acked-by: Tony Lindgren <tony@atomide.com>
+>>
+>> Or please let me know if you want me to pick this separately.
+>>
+>> Regards,
+>>
+>> Tony
+>>
+>
+> Patches #3, #6, #7, #8 you can pick up separately (but you will have
+> some conflicts due to missing ti_clk_get implementation.) These patches
+> are required for this series to work properly though.
 
-You say it has three clocks in commit log, why it is only two in the code?
-> +
-> +	reset_control_assert(reset);
-> +	usleep_range(10000, 12000);
-> +	reset_control_deassert(reset);
-> +
-> +	ret = clk_prepare_enable(ci->core_clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = clk_prepare_enable(ci->iface_clk);
-> +	if (ret)
-> +		goto err_iface;
-> +
->  	plat_ci = ci_hdrc_add_device(&pdev->dev,
->  				pdev->resource, pdev->num_resources,
->  				&ci_hdrc_msm_platdata);
-ci->plat_ci(or ci) = ...
+And patch #9 you can pick up also obviously...
 
-Delete the local variable plat_ci
-
->  	if (IS_ERR(plat_ci)) {
->  		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
-> -		return PTR_ERR(plat_ci);
-> +		ret = PTR_ERR(plat_ci);
-> +		goto err_mux;
->  	}
->  
-> -	platform_set_drvdata(pdev, plat_ci);
-> +	ci->ci = plat_ci;
-
-[...]
-
-
--- 
-
-Best Regards,
-Peter Chen
+>
+> If we want to re-work the clk_get / ti_clk_get implementation, we should
+> probably postpone it to 4.8, and that would push this series forward
+> also. In that case, you can pick up the above patches for merge
+> yourself, and we would handle the rest separately.
+>
+> -Tero
