@@ -1,48 +1,115 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Thu, 30 Jun 2016 02:15:49 +0800
-Subject: [PATCH v6 06/10] acpi: Add GTDT driver to kernel build system
+Date: Thu, 30 Jun 2016 02:15:50 +0800
+Subject: [PATCH v6 07/10] clocksource/drivers/arm_arch_timer: Simplify ACPI
+ support code.
 In-Reply-To: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
 References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1467224153-22873-7-git-send-email-fu.wei@linaro.org>
+Message-ID: <1467224153-22873-8-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
----
- drivers/acpi/Kconfig  | 9 +++++++++
- drivers/acpi/Makefile | 1 +
- 2 files changed, 10 insertions(+)
+The patch update arm_arch_timer driver to use the function
+provided by the new GTDT driver of ACPI.
+By this way, arm_arch_timer.c can be simplified, and separate
+all the ACPI GTDT knowledge from this timer driver.
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index b7e2e77..27a5cf9 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -521,4 +521,13 @@ config XPOWER_PMIC_OPREGION
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/clocksource/Kconfig          |  1 +
+ drivers/clocksource/arm_arch_timer.c | 49 +++++++++---------------------------
+ 2 files changed, 13 insertions(+), 37 deletions(-)
+
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 47352d2..71d5b30 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -8,6 +8,7 @@ config CLKSRC_OF
+ config CLKSRC_ACPI
+ 	bool
+ 	select CLKSRC_PROBE
++	select ACPI_GTDT if ARM64
  
- endif
+ config CLKSRC_PROBE
+ 	bool
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 9540e9d..1382a49 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -848,60 +848,35 @@ out:
+ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+ 		       arch_timer_mem_init);
  
-+config ACPI_GTDT
-+	bool "ACPI GTDT Support"
-+	depends on ARM64
-+	help
-+	  GTDT (Generic Timer Description Table) provides information
-+	  for per-processor timers and Platform (memory-mapped) timers
-+	  for ARM platforms. Select this option to provide information
-+	  needed for the timers init.
+-#ifdef CONFIG_ACPI
+-static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
+-{
+-	int trigger, polarity;
+-
+-	if (!interrupt)
+-		return 0;
+-
+-	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
+-			: ACPI_LEVEL_SENSITIVE;
+-
+-	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
+-			: ACPI_ACTIVE_HIGH;
+-
+-	return acpi_register_gsi(NULL, interrupt, trigger, polarity);
+-}
+-
++#ifdef CONFIG_ACPI_GTDT
+ /* Initialize per-processor generic timer */
+ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ {
+-	struct acpi_table_gtdt *gtdt;
++	int timer_count;
+ 
+ 	if (arch_timers_present & ARCH_CP15_TIMER) {
+ 		pr_warn("already initialized, skipping\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	gtdt = container_of(table, struct acpi_table_gtdt, header);
+-
+ 	arch_timers_present |= ARCH_CP15_TIMER;
+ 
+-	arch_timer_ppi[PHYS_SECURE_PPI] =
+-		map_generic_timer_interrupt(gtdt->secure_el1_interrupt,
+-		gtdt->secure_el1_flags);
++	timer_count = gtdt_arch_timer_init(table);
+ 
+-	arch_timer_ppi[PHYS_NONSECURE_PPI] =
+-		map_generic_timer_interrupt(gtdt->non_secure_el1_interrupt,
+-		gtdt->non_secure_el1_flags);
+-
+-	arch_timer_ppi[VIRT_PPI] =
+-		map_generic_timer_interrupt(gtdt->virtual_timer_interrupt,
+-		gtdt->virtual_timer_flags);
++	if (timer_count < 0)
++		return -EINVAL;
+ 
+-	arch_timer_ppi[HYP_PPI] =
+-		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
+-		gtdt->non_secure_el2_flags);
++	arch_timer_ppi[PHYS_SECURE_PPI] = acpi_gtdt_map_ppi(PHYS_SECURE_PPI);
++	arch_timer_ppi[PHYS_NONSECURE_PPI] = acpi_gtdt_map_ppi(PHYS_NONSECURE_PPI);
++	arch_timer_ppi[VIRT_PPI] = acpi_gtdt_map_ppi(VIRT_PPI);
++	arch_timer_ppi[HYP_PPI] = acpi_gtdt_map_ppi(HYP_PPI);
++	/* Always-on capability */
++	arch_timer_c3stop = acpi_gtdt_c3stop();
+ 
+ 	/* Get the frequency from CNTFRQ */
+ 	arch_timer_detect_rate(NULL, NULL);
+-
+-	/* Always-on capability */
+-	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
+-
+ 	arch_timer_init();
 +
- endif	# ACPI
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 251ce85..848aa8a 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)	+= acpi_extlog.o
- obj-$(CONFIG_PMIC_OPREGION)	+= pmic/intel_pmic.o
- obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
- obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
-+obj-$(CONFIG_ACPI_GTDT)		+= acpi_gtdt.o
- 
- video-objs			+= acpi_video.o video_detect.o
+ 	return 0;
+ }
+ CLOCKSOURCE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
 -- 
 2.5.5
