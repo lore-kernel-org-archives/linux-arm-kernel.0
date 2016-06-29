@@ -1,53 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Jun 2016 10:08:39 +0200
-Subject: [PATCH] pinctrl: Add missing of_node_put
-In-Reply-To: <20160624130630.GA11858@amitoj-Inspiron-3542>
-References: <20160624130630.GA11858@amitoj-Inspiron-3542>
-Message-ID: <CACRpkdbOBG8g0ifrzF0_Ub2iDS9JpVH_qtEcN+-83dkk4Hz7pQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 29 Jun 2016 09:12:08 +0100
+Subject: [PATCH v5 0/5] regulator: add Ricoh RN5T567 PMIC support
+In-Reply-To: <20160629055322.23038-1-stefan@agner.ch>
+References: <20160629055322.23038-1-stefan@agner.ch>
+Message-ID: <20160629081208.GI29166@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2016 at 3:06 PM, Amitoj Kaur Chawla
-<amitoj1606@gmail.com> wrote:
+On Tue, 28 Jun 2016, Stefan Agner wrote:
 
-> of_find_node_by_name does an of_node_get on its return value,
-> so an of_node_put is needed on this value before the corresponding
-> variable goes out of scope.
->
-> The Coccinelle semantic patch used to make this change is as follows:
-> @@
-> struct device_node *n;
-> struct device_node *n1;
-> statement S;
-> identifier f;
-> expression E;
-> constant C;
-> @@
->
-> n = of_find_node_by_name(...)
-> ...
-> if (!n) S
-> ... when != of_node_put(n)
->     when != n1 = f(n,...)
->     when != E = n
->     when any
->     when strict
-> (
-> + of_node_put(n);
->   return -C;
-> |
->   of_node_put(n);
-> |
->   n1 = f(n,...)
-> |
->   E = n
-> |
->   return ...;
-> )
->
-> Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
+> This patchset adds RN5T567 PMIC support which is used on the 
+> Toradex Colibri iMX7S/iMX7D modules. The existing RN5T618 is from
+> the same family, hence this patchset uses the same driver and adds
+> variant support.
+> 
+> The Colibris currently do not use the PMIC's power off capabilities,
+> as do the current users of that PMIC driver. Therefore this patchset
+> also makes the use of the system-power-controller property mandatory
+> if the power off capabilties are required.
+> 
+> Changes since v4:
+> - Spell check in patch 5 and added Acks
+> 
+> Changes since v3:
+> - Use RN5T618_REPCNT_REPWRON macro when writing RN5T618_REPCNT register
+> 
+> Changes since v2:
+> - Elevate restart priority to 192 to make sure PMIC takes presedence
+>   over SoC level restart capabilities (e.g. watchdog)
+> - Print a warning if poweroff callback is already assigned
+> - Reorder of_id and variant assignment
+> - Lower delay to 1ms and justify why it is required
+> - Fix DCDC count and a typos in device tree bindings
+> 
+> Changes since v1:
+> - Removed obsolete include <asm/system_misc.h>
+> 
+> Stefan Agner (5):
+>   ARM: dts: meson: minix-neo-x8: define PMIC as power controller
+>   mfd: add Ricoh RN5T567 PMIC support
+>   regulator: rn5t618: add RN5T567 PMIC support
+>   mfd: rn5t618: register power off callback optionally
+>   mfd: rn5t618: register restart handler
+> 
+>  Documentation/devicetree/bindings/mfd/rn5t618.txt | 19 +++---
+>  arch/arm/boot/dts/meson8-minix-neo-x8.dts         |  1 +
+>  drivers/mfd/Kconfig                               |  7 ++-
+>  drivers/mfd/rn5t618.c                             | 70 +++++++++++++++++++----
+>  drivers/regulator/Kconfig                         |  5 +-
+>  drivers/regulator/rn5t618-regulator.c             | 40 +++++++++++--
+>  include/linux/mfd/rn5t618.h                       | 13 +++++
+>  7 files changed, 126 insertions(+), 29 deletions(-)
 
-Patch applied.
+Looks like you have all your Acks now.  How do you want to play this?
+Would you like me to take the set through MFD and provide the other
+Maintainers with a branch to pull from, or did you have other ideas?
 
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
