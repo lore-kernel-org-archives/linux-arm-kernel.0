@@ -1,44 +1,53 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 29 Jun 2016 15:56:20 +0800
-Subject: [PATCH v2 1/2] ARM64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <1463114260-8724-1-git-send-email-oss@buserror.net>
-References: <1463114260-8724-1-git-send-email-oss@buserror.net>
-Message-ID: <57737F24.5050906@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Jun 2016 10:08:39 +0200
+Subject: [PATCH] pinctrl: Add missing of_node_put
+In-Reply-To: <20160624130630.GA11858@amitoj-Inspiron-3542>
+References: <20160624130630.GA11858@amitoj-Inspiron-3542>
+Message-ID: <CACRpkdbOBG8g0ifrzF0_Ub2iDS9JpVH_qtEcN+-83dkk4Hz7pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Scott,
+On Fri, Jun 24, 2016 at 3:06 PM, Amitoj Kaur Chawla
+<amitoj1606@gmail.com> wrote:
 
-On 2016/5/13 12:37, Scott Wood wrote:
-[...]
->  
-> +#ifdef CONFIG_ARM64
-> +static __always_inline void rewrite_tval(const int access,
-> +		unsigned long evt, struct clock_event_device *clk)
-> +{
-> +	u64 cval_old, cval_new;
-> +	int timeout = 200;
-> +
-> +	do {
-> +		cval_old = __arch_counter_get_cntvct();
-> +		arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt, clk);
+> of_find_node_by_name does an of_node_get on its return value,
+> so an of_node_put is needed on this value before the corresponding
+> variable goes out of scope.
+>
+> The Coccinelle semantic patch used to make this change is as follows:
+> @@
+> struct device_node *n;
+> struct device_node *n1;
+> statement S;
+> identifier f;
+> expression E;
+> constant C;
+> @@
+>
+> n = of_find_node_by_name(...)
+> ...
+> if (!n) S
+> ... when != of_node_put(n)
+>     when != n1 = f(n,...)
+>     when != E = n
+>     when any
+>     when strict
+> (
+> + of_node_put(n);
+>   return -C;
+> |
+>   of_node_put(n);
+> |
+>   n1 = f(n,...)
+> |
+>   E = n
+> |
+>   return ...;
+> )
+>
+> Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
 
-For not memory mapped timer, it will call arch_timer_reg_write_cp15() which has
-isb() at the end of arch_timer_reg_write_cp15()...
+Patch applied.
 
-> +		cval_new = __arch_counter_get_cntvct();
-
-So there is isb() between counter retry read, I think it's likely cval_new will
-not be equal with cval_old when the cntvct is correct (time lapse is more than
-one arch timer cycle).
-
-> +		timeout--;
-> +	} while (cval_old != cval_new && timeout);
-> +
-> +	WARN_ON_ONCE(!timeout);
-
-Then trigger the warning here, correct me if I miss something else.
-
-Thanks
-Hanjun
+Yours,
+Linus Walleij
