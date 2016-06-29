@@ -1,99 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 29 Jun 2016 15:50:00 +0200
-Subject: [linux-sunxi] Re: [PATCH] mmc: pwrseq-simple: Add an optional
- post-power-on-delay
-In-Reply-To: <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
-References: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
- <CAL_JsqJ0XVJb=Q9FT8g_OUTbgZWr-E58xQS0iCR4hv-9EHCcPA@mail.gmail.com>
- <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
-Message-ID: <15423d66-8127-ef12-743d-29cc8cab2947@redhat.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 29 Jun 2016 19:20:31 +0530
+Subject: [PATCH 3/3] phy: rockchip-emmc: Wait even longer for the DLL to
+ lock
+In-Reply-To: <1467049167-14628-4-git-send-email-dianders@chromium.org>
+References: <1467049167-14628-1-git-send-email-dianders@chromium.org>
+ <1467049167-14628-4-git-send-email-dianders@chromium.org>
+Message-ID: <5773D227.6010502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 23-06-16 11:33, Hans de Goede wrote:
-> Hi,
->
-> On 23-06-16 00:25, Rob Herring wrote:
->> On Wed, Jun 22, 2016 at 12:59 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> Some devices need a while to boot their firmware after providing clks /
->>> de-asserting resets before they are ready to receive sdio commands.
->>>
->>> This commits adds a post-power-on-delay-ms devicetree property to
->>> mmc-pwrseq-simple for use with such devices.
->>>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>> ---
->>>  Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
->>>  drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
->>>  2 files changed, 11 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
->>> index ce0e767..e254368 100644
->>> --- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
->>> +++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
->>> @@ -16,6 +16,8 @@ Optional properties:
->>>    See ../clocks/clock-bindings.txt for details.
->>>  - clock-names : Must include the following entry:
->>>    "ext_clock" (External clock provided to the card).
->>> +- post-power-on-delay-ms : Delay in ms after powering the card and
->>> +       de-asserting the reset-gpios (if any)
->>
->> Presumably you need this delay post any reset, not just after power on
->
-> mmc-pwrseq is only about doing power-on / off, not about providing
-> reset functionality.
->
->> if you are waiting for firmware to boot. So the name is not all that
->> clear. How about a "reset-timing-ms" property that takes 3 values for
->> pre-assert time (normally 0), assertion time, post assert time. Of
->> course, I can still think of ways that breaks like when in this
->> sequence do clocks need to be turned on.
->
-> If you look at bindings/mmc/mmc-pwrseq-simple.txt out side of
-> the diff context it contains:
->
-> - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
->         at initialization and prior we start the power up procedure of the card.
->         They will be de-asserted right after the power has been provided to the
->         card.
-> - clocks : Must contain an entry for the entry in clock-names.
->   See ../clocks/clock-bindings.txt for details.
-> - clock-names : Must include the following entry:
->   "ext_clock" (External clock provided to the card).
->
-> Notice how the existing docs talk about a power-up procedure (which matches
-> the pwrseq name and purpose of these bindings).
->
-> I actually started with calling the property "post-reset-delay-ms", but then
-> I realized that what we really want is the ability to specify a time to
-> wait (for e.g. firmware to boot) after completing the power-up procedure
-> (and before starting the probe). The power-up procedure currently can
-> also includes enabling external clocks to the sdio device (if any) and
-> enabling regulators, so having a "reset-timing-ms" property does not
-> seem right, as that would suggest it is ok to do the wait after deasserting
-> reset, but before e.g. enabling external clocks. Where what we really
-> want is to enable all necessary resources (or iow complete the powerup
-> procedure) and then wait.
->
-> You're right that in some cases more complicated timings may be necessary,
-> but that can get really complicated like e.g.: enable regulator1, wait 10 ms,
-> enable regulator2, wait 15ms, enable external clock1, ...
->
-> And such complex timings fall outside of the scope of the mmc-pwrseq-simple
-> binding, the idea being that for complex cases we do a device specific
-> pwrseq binding, and then the smarts are in implementation of that specific
-> pwrseq driver. As you've said yourself before we do not want to turn
-> devicetree into a scripting language.
->
-> However having a single wait after doing a straight forward power-up cycle
-> seems to me like something which is appropriate for the mmc-pwrseq-simple
-> binding.
 
-Rob, can you please let us know if you're happy with my explanation above
-and if not explain how you would like this binding to look instead ?
+On Monday 27 June 2016 11:09 PM, Douglas Anderson wrote:
+> Two times out of 2000 reboots I ran into the error message
+> "rockchip_emmc_phy_power: dllrdy timeout".  Presumably there is some
+> corner case where the DLL just takes a little longer to timeout.  Let's
+> give it even more time to handle these corner cases.
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
-Thanks & Regards,
-
-Hans
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/phy/phy-rockchip-emmc.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
+> index a2aa6aca7dec..fd57345ffed2 100644
+> --- a/drivers/phy/phy-rockchip-emmc.c
+> +++ b/drivers/phy/phy-rockchip-emmc.c
+> @@ -206,8 +206,18 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>  	 * per the math: 10.2 us * (50000000 Hz / 100000 Hz) => 5.1 ms
+>  	 * Hopefully we won't be running at 100 kHz, but we should still make
+>  	 * sure we wait long enough.
+> +	 *
+> +	 * NOTE: There appear to be corner cases where the DLL seems to take
+> +	 * extra long to lock for reasons that aren't understood.  In some
+> +	 * extreme cases we've seen it take up to over 10ms (!).  We'll be
+> +	 * generous and give it 50ms.  We still busy wait here because:
+> +	 * - In most cases it should be super fast.
+> +	 * - This is not called lots during normal operation so it shouldn't
+> +	 *   be a power or performance problem to busy wait.  We expect it
+> +	 *   only at boot / resume.  In both cases, eMMC is probably on the
+> +	 *   critical path so busy waiting a little extra time should be OK.
+>  	 */
+> -	timeout = jiffies + msecs_to_jiffies(10);
+> +	timeout = jiffies + msecs_to_jiffies(50);
+>  	do {
+>  		udelay(1);
+>  
+> 
