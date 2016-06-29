@@ -1,34 +1,33 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 29 Jun 2016 08:40:56 -0500
-Subject: [PATCH 0/7] APQ8060 Dragonboard support v2
-In-Reply-To: <CACRpkda4Pc9GdDcbm8Wxfn1NJG-m=Jjtu0c5wTpob3Z4CQpfVQ@mail.gmail.com>
-References: <1466195292-28236-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkda4Pc9GdDcbm8Wxfn1NJG-m=Jjtu0c5wTpob3Z4CQpfVQ@mail.gmail.com>
-Message-ID: <20160629134056.GA16832@hector.attlocal.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 29 Jun 2016 15:42:09 +0200
+Subject: [RFC PATCH 3/5] thermal: Add support for the thermal sensor on
+ A23/33
+In-Reply-To: <1112501467207099@web30g.yandex.ru>
+References: <20160628101325.2522-1-icenowy@aosc.xyz>
+ <20160628101325.2522-3-icenowy@aosc.xyz>
+ <20160628114640.GE5550@lukather> <60021467122182@web19j.yandex.ru>
+ <20160629121021.GD6095@lukather>
+ <1112501467207099@web30g.yandex.ru>
+Message-ID: <20160629134209.GE6095@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 11:16:17AM +0200, Linus Walleij wrote:
-> On Fri, Jun 17, 2016 at 10:28 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
-> 
-> > Second attempt at getting a baseline upstream for the APQ8060
-> > Dragonboard, the original.
-> >
-> > I now also add the first I2C block and two sensors to get some
-> > more peripherals running on it.
-> >
-> > Switched to the hierarchical layout of DTS files.
-> >
-> > This would be nice to have merged as a working baseline in the
-> > qcom tree.
-> 
-> Andy what is your take on this? Good enough?
-> 
-> Do you want me to resend as v4 with Stephen's et al's ACKs?
+On Wed, Jun 29, 2016 at 09:31:39PM +0800, Icenowy Zheng wrote:
+> However, sun8iw3/5 ths is not even a GPADC... It's a specified IP,
+> only used as an ADC suitable for temperature sensor.
 
-They are in my pull request for 4.8.  So no need for anything else.
+It doesn't matter. It's the same IP, labelled differently.
 
-Regards,
+Maxime
 
-Andy
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160629/a0191d88/attachment.sig>
