@@ -1,96 +1,50 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Jun 2016 14:51:27 +0200
-Subject: [PATCH 2/5] arm64: efi: always map runtime services code and data
- regions down to pages
+Date: Wed, 29 Jun 2016 14:51:28 +0200
+Subject: [PATCH 3/5] arm64: efi: avoid block mappings for unaligned UEFI
+ memory regions
 In-Reply-To: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1467204690-10790-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1467204690-10790-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid triggering diagnostics in the MMU code that are finicky about
-splitting block mappings into more granular mappings, ensure that regions
-that are likely to appear in the Memory Attributes table as well as the
-UEFI memory map are always mapped down to pages. This way, we can use
-apply_to_page_range() instead of create_pgd_mapping() for the second pass,
-which cannot split or merge block entries, and operates strictly on PTEs.
-
-Note that this aligns the arm64 Memory Attributes table handling code with
-the ARM code, which already uses apply_to_page_range() to set the strict
-permissions.
+When running the OS with a page size > 4 KB, we need to round up mappings
+for regions that are not aligned to the OS's page size. We already avoid
+block mappings for EfiRuntimeServicesCode/Data regions for other reasons,
+but in the unlikely event that other unaliged regions exists that have the
+EFI_MEMORY_RUNTIME attribute set, ensure that unaligned regions are always
+mapped down to pages. This way, the overlapping page is guaranteed not to
+be covered by a block mapping that needs to be split.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/efi.h |  3 +-
- arch/arm64/kernel/efi.c      | 36 +++++++++++++++++++-
- 2 files changed, 36 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/efi.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 622db3c6474e..8b13476cdf96 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -14,8 +14,7 @@ extern void efi_init(void);
- #endif
- 
- int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
--
--#define efi_set_mapping_permissions	efi_create_mapping
-+int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
- 
- #define arch_efi_call_virt_setup()					\
- ({									\
 diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 981604948521..4aef89f37049 100644
+index 4aef89f37049..ba9bee389fd5 100644
 --- a/arch/arm64/kernel/efi.c
 +++ b/arch/arm64/kernel/efi.c
-@@ -62,13 +62,47 @@ struct screen_info screen_info __section(.data);
- int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
- {
- 	pteval_t prot_val = create_mapping_protection(md);
-+	bool allow_block_mappings = (md->type != EFI_RUNTIME_SERVICES_CODE &&
-+				     md->type != EFI_RUNTIME_SERVICES_DATA);
+@@ -65,6 +65,20 @@ int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+ 	bool allow_block_mappings = (md->type != EFI_RUNTIME_SERVICES_CODE &&
+ 				     md->type != EFI_RUNTIME_SERVICES_DATA);
  
++	if (!PAGE_ALIGNED(md->phys_addr) ||
++	    !PAGE_ALIGNED(md->num_pages << EFI_PAGE_SHIFT)) {
++		/*
++		 * If the end address of this region is not aligned to page
++		 * size, the mapping is rounded up, and may end up sharing a
++		 * page frame with the next UEFI memory region. If we create
++		 * a block entry now, we may need to split it again when mapping
++		 * the next region, and support for that is going to be removed
++		 * from the MMU routines. So avoid block mappings altogether in
++		 * that case.
++		 */
++		allow_block_mappings = false;
++	}
++
  	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
  			   md->num_pages << EFI_PAGE_SHIFT,
--			   __pgprot(prot_val | PTE_NG), true);
-+			   __pgprot(prot_val | PTE_NG), allow_block_mappings);
- 	return 0;
- }
- 
-+static int __init set_permissions(pte_t *ptep, pgtable_t token,
-+				  unsigned long addr, void *data)
-+{
-+	efi_memory_desc_t *md = data;
-+	pte_t pte = *ptep;
-+
-+	if (md->attribute & EFI_MEMORY_RO)
-+		pte = set_pte_bit(pte, __pgprot(PTE_RDONLY));
-+	if (md->attribute & EFI_MEMORY_XP)
-+		pte = set_pte_bit(pte, __pgprot(PTE_PXN));
-+	set_pte(ptep, pte);
-+	return 0;
-+}
-+
-+int __init efi_set_mapping_permissions(struct mm_struct *mm,
-+				       efi_memory_desc_t *md)
-+{
-+	BUG_ON(md->type != EFI_RUNTIME_SERVICES_CODE &&
-+	       md->type != EFI_RUNTIME_SERVICES_DATA);
-+
-+	/*
-+	 * Calling apply_to_page_range() is only safe on regions that are
-+	 * guaranteed to be mapped down to pages. Since we are only called
-+	 * for regions that have been mapped using efi_create_mapping() above
-+	 * (and this is checked by the generic Memory Attributes table parsing
-+	 * routines), there is no need to check that again here.
-+	 */
-+	return apply_to_page_range(mm, md->virt_addr,
-+				   md->num_pages << EFI_PAGE_SHIFT,
-+				   set_permissions, md);
-+}
-+
- static int __init arm64_dmi_init(void)
- {
- 	/*
+ 			   __pgprot(prot_val | PTE_NG), allow_block_mappings);
 -- 
 2.7.4
