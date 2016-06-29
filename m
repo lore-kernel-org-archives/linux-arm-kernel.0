@@ -1,95 +1,69 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 29 Jun 2016 11:09:13 +0800
-Subject: [PATCH 08/21] usb: chipidea: Kick OTG state machine for AVVIS
- with vbus extcon
-In-Reply-To: <20160626072838.28082-9-stephen.boyd@linaro.org>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-9-stephen.boyd@linaro.org>
-Message-ID: <20160629030913.GC25236@shlinux2>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 29 Jun 2016 11:28:03 +0800
+Subject: [PATCH 0/3] add support for Allwinner SoCs ADC
+In-Reply-To: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
+References: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v67pK1Gkqxy2LJ0MMVry4P5C0RTqVGPHhqq+4jOFvvEA7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2016 at 12:28:25AM -0700, Stephen Boyd wrote:
-> Force the OTG state machine to go forward when we're using an
-> extcon for vbus detection. In this case, the controller may never
-> raise an interrupt for AVVIS, so we need to simulate the event by
-> toggling the appropriate OTG fsm bits and kicking the state
-> machine again.
-> 
+Hi,
 
-Well, I think you may misunderstand the OTG FSM and dual-role.
->From my and Felipe's point, there are seldom users for USB FSM,
-there are only OTG FSM spec and related OTG certification.
+On Tue, Jun 28, 2016 at 4:45 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> The Allwinner SoCs all have an ADC that can also act as a touchscreen controller
+> and a thermal sensor. The first four channels can be used either for the ADC or
+> the touchscreen and the fifth channel is used for the thermal sensor. We
+> currently have a driver for the two latter functions in
+> drivers/input/touchscreen/sun4i-ts.c but we don't have access to the ADC feature
+> at all.
+>
+> This adds initial support for Allwinner SoCs ADC with all features. Yet, the
+> touchscreen is not implemented but will be added later. To switch between
+> touchscreen and ADC modes, you need to poke few bits in registers and
+> (de)activate an interrupt (pen-up).
+> A MFD is provided to let the input driver activate the pen-up interrupt through
+> virtual interrupt, poke few bits via regmap and read data from the ADC driver
+> while both (and iio_hwmon) are probed by the MFD.
 
-The OTG FSM needs related SoC support, the vbus will be off at
-several states, and the SRP should be supported by SoC.
+I take it that we are going to replace the original sun4i-ts driver
+with this new mfd one, and various sub device drivers?
 
-By default, the dts needs below properties for disabling it if you
-choose otg fsm support at kernel configuration.
+> There exists slight modifications between the different SoCs ADC like the
+> address of some registers and the scale and offset to apply to thermal sensor
+> raw values. These modifications are done by drivers on different
+> platform_device_id passed by the MFD when probing subdrivers.
+>
+> This also modifies iio-hwmon to allow probe deferring when no iio channel is
+> found. Currently when no iio channel is found, the probing of iio-hwmon fails.
+> This is problematic when iio-hwmon probes before the iio driver could register
+> iio channels to share.
 
-&usbotg1 {
-	vbus-supply = <&reg_usb_otg1_vbus>;
-	srp-disable;
-	hnp-disable;
-	adp-disable;
-	status = "okay";
-};
+One thing about iio-hwmon is that it doesn't support hwmon labels.
+Any chance you could improve this, so we see the same names in userspace?
 
-See Documentation/devicetree/bindings/usb/generic.txt.
+Thanks
+ChenYu
 
-Peter
-
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/usb/chipidea/otg_fsm.c | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/drivers/usb/chipidea/otg_fsm.c b/drivers/usb/chipidea/otg_fsm.c
-> index de8e22ec3902..aab076fc4d82 100644
-> --- a/drivers/usb/chipidea/otg_fsm.c
-> +++ b/drivers/usb/chipidea/otg_fsm.c
-> @@ -475,6 +475,14 @@ static void ci_otg_drv_vbus(struct otg_fsm *fsm, int on)
->  				return;
->  			}
->  		}
-> +		/*
-> +		 * Force state machine forward if we use extcon
-> +		 * to detect vbus state (i.e. simulate AVVIS event)
-> +		 */
-> +		if (!IS_ERR(ci->platdata->vbus_extcon.edev)) {
-> +			fsm->a_vbus_vld = 1;
-> +			ci_otg_queue_work(ci);
-> +		}
->  		/* Disable data pulse irq */
->  		hw_write_otgsc(ci, OTGSC_DPIE, 0);
->  
-> @@ -486,6 +494,15 @@ static void ci_otg_drv_vbus(struct otg_fsm *fsm, int on)
->  
->  		fsm->a_bus_drop = 1;
->  		fsm->a_bus_req = 0;
-> +		/*
-> +		 * Force state machine forward if we use extcon
-> +		 * to detect vbus state (i.e. simulate AVVIS event)
-> +		 */
-> +		if (!IS_ERR(ci->platdata->vbus_extcon.edev)) {
-> +			fsm->a_vbus_vld = 0;
-> +			fsm->b_conn = 0;
-> +			ci_otg_queue_work(ci);
-> +		}
->  	}
->  }
->  
-> -- 
-> 2.9.0.rc2.8.ga28705d
-> 
+>
+> Quentin Schulz (3):
+>   mfd: add support for Allwinner SoCs ADC
+>   iio: adc: add support for Allwinner SoCs ADC
+>   hwmon: iio_hwmon: defer probe when no channel is found
+>
+>  drivers/hwmon/iio_hwmon.c           |   5 +-
+>  drivers/iio/adc/Kconfig             |  12 ++
+>  drivers/iio/adc/Makefile            |   1 +
+>  drivers/iio/adc/sunxi-gpadc-iio.c   | 371 ++++++++++++++++++++++++++++++++++++
+>  drivers/mfd/Kconfig                 |  14 ++
+>  drivers/mfd/Makefile                |   2 +
+>  drivers/mfd/sunxi-gpadc-mfd.c       | 188 ++++++++++++++++++
+>  include/linux/mfd/sunxi-gpadc-mfd.h |  14 ++
+>  8 files changed, 606 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/iio/adc/sunxi-gpadc-iio.c
+>  create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
+>  create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-
-Best Regards,
-Peter Chen
+> 2.5.0
+>
