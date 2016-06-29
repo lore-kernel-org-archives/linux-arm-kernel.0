@@ -1,44 +1,90 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 29 Jun 2016 11:51:26 -0700
-Subject: [PATCH] extcon: Add support for qcom SPMI PMIC USB id detection
- hardware
-In-Reply-To: <57736671.6090800@ti.com>
-References: <20160626055647.18898-1-stephen.boyd@linaro.org>
- <5770D847.7060901@ti.com>
- <146705583219.30684.18055040268826215722@sboyd-linaro>
- <57721AEA.6010509@ti.com>
- <146710362771.3879.13924434427129313640@sboyd-linaro>
- <57723FD5.8050305@ti.com>
- <146715129359.31418.3271966598208551482@sboyd-linaro>
- <57736671.6090800@ti.com>
-Message-ID: <146722628645.16253.7225962760627246499@sboyd-linaro>
+From: arend.vanspriel@broadcom.com (Arend Van Spriel)
+Date: Wed, 29 Jun 2016 20:51:44 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
+ dt property
+In-Reply-To: <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <CAOiHx=n6itfmvwYQh+jUSDNguQFkos=MzjkDWP=GsupdgvF6KQ@mail.gmail.com>
+ <b49a9e4b-d591-d978-8005-413f39ebf2bd@redhat.com>
+ <871t3gdj6p.fsf@purkki.adurom.net>
+ <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
+Message-ID: <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Roger Quadros (2016-06-28 23:10:57)
-> On 29/06/16 01:01, Stephen Boyd wrote:
-> > Quoting Roger Quadros (2016-06-28 02:13:57)
-> >> On 28/06/16 11:47, Stephen Boyd wrote:
-> >>>
-> >>> Sorry I must have confused you. There are two modules in the PMIC that
-> >>> are doing detection here. The charger module is detecting the VBUS event
-> >>> and this misc module is detecting the ID pin. I'm not sure why they're
-> >>> two different blocks, but it is what it is in the hardware.
-> >>>
-> >> OK. Can the MISC block do anything else other than USB ID?
-> > 
-> > Yes.
-> > 
-> >> Does the USB ID interrupt come on a different line than the charger interrupt?
-> > 
-> > Yes.
-> > 
+On 29-6-2016 20:01, Hans de Goede wrote:
+> Hi,
 > 
-> OK. Is it better to have this driver somewhere in drivers/mfd or drivers/misc if the
-> other function doesn't need/use extcon?
+> On 29-06-16 19:00, Kalle Valo wrote:
+>> Hans de Goede <hdegoede@redhat.com> writes:
+>>
+>>> Hi,
+>>>
+>>> On 29-06-16 16:42, Jonas Gorski wrote:
+>>>> Hi,
+>>>>
+>>>> On 29 June 2016 at 16:04, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>> Add a brcm,nvram_file_name dt property to allow overruling the default
+>>>>> nvram filename for sdio devices. The idea is that we can specify a
+>>>>> board specific nvram file, e.g. brcmfmac43362-ap6210.txt for boards
+>>>>> with an ap6210 wifi sdio module and ship this in linux-firmware, so
+>>>>> that wifi will work out of the box, without requiring users to find
+>>>>> and then manually install the right nvram file for their board.
+>>>>
+>>>> Directly defining a filename doesn't seem like a good OS-agnostic
+>>>> approach. Maybe an alternative would be to add a model-property to the
+>>>> nodes (this is allowed) and make brcmfmac to request
+>>>> "FWFILENAME-<model>" as firmware if set? That would leave it to the OS
+>>>> on how the filename is set.
+>>>
+>>> It only defines the base-filename, not the entire path, how / where
+>>> this file is searched for / loaded-from is then left up to the os
+>>
+>> It's still a bad idea. The filename, including the path, should be
+>> created in the driver. Can't you provide chipname (or similar) via
+>> device tree and then the driver can choose what image to use?
 > 
+> No, the driver already does that, but this is not ...
+> 
+>> Can you tell more about the naming the firmware image, how does it work
+>> exactly?
+> 
+> About firmware, this is about the nvram file which is board specific,
+> rather then chip specific.
 
-If/when the other functionality is used by the kernel we can consider
-moving this driver somewhere else. As there currently isn't any other
-usage of this device node I implemented it in the extcon directory to be
-explicit about the usage.
+The nvram filename is determined pretty much the same as the firmware
+filename, but indeed the nvram data is board specific. This is main
+reason why we do not submit nvram files to linux-firmware, because we
+simply do not have those files.
+
+> Typical wifi devices will have some sort of non volatile storage
+> on board to not only store the ethernet(mac) address, but also
+> to contain e.g. info about the antenna gain so that the firmware
+> and/or the driver can take the antenna gain into account and ensure
+> that they never exceed the maximum allowed broadcast strength.
+> 
+> However on some embedded devices there is no non-volatile storage
+> for the wifi (for cost reasons) and instead this configuration info
+> (which is board / pcb specific) is loaded in the form of a
+> file which contains the contents which would normally be in the
+> non-volatile storage.
+> 
+> Since we are dealing with a per-board config-file here, which is
+> loaded from the os filesystem we really need to specify a basename
+> here as the list of possible boards is endless, so we cannot
+> have a lookup table in the driver.
+
+As Jonas mentioned the general principle of device tree is to be
+agnostic with regards to OS and/or driver as you undoubtedly know. His
+proposal seems like a usable solution for your problem while complying
+to the device tree principle. So instead of overriding the default
+brcmfmac should modify it when dt specifies the "module" property, ie:
+
+no "module" in DT:	nvram filename = brcm/brcmfmac43362-sdio.txt
+"module=ap6210" in DT:	nvram filename = brcm/brcmfmac43362-ap6210.txt
+
+By the way, the example in the bindings file does not seem to specify a
+basename, but path+basename+fileext.
+
+Regards,
+Arend
