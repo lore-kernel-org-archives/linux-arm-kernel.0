@@ -1,51 +1,70 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 Jun 2016 19:20:31 +0530
-Subject: [PATCH 3/3] phy: rockchip-emmc: Wait even longer for the DLL to
- lock
-In-Reply-To: <1467049167-14628-4-git-send-email-dianders@chromium.org>
-References: <1467049167-14628-1-git-send-email-dianders@chromium.org>
- <1467049167-14628-4-git-send-email-dianders@chromium.org>
-Message-ID: <5773D227.6010502@ti.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 29 Jun 2016 15:52:04 +0200
+Subject: [RFC PATCH v4 3/5] PCI: Check platform specific ECAM quirks
+In-Reply-To: <5773CE49.1050802@codeaurora.org>
+References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
+ <1467100442-28078-4-git-send-email-tn@semihalf.com>
+ <577275EA.7010002@codeaurora.org>
+ <CADaLNDkhPZuG7UJ4SK_j5v_nXbd782Q17LAcXduG0uEObaFF=g@mail.gmail.com>
+ <5773A773.8040700@semihalf.com> <5773CE49.1050802@codeaurora.org>
+Message-ID: <5773D284.8060404@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 29.06.2016 15:34, Christopher Covington wrote:
+> I'm confused by this statement. OEMID is defined as 6 bytes long and OEM
+> Table ID as 8 bytes long in the ACPI specification. As far as I can
+> tell, if your string isn't exactly that long, padding up to that length
+> is required.
 
+Well, I cannot find that requirement in ACPI spec. but I might missed 
+something.
 
-On Monday 27 June 2016 11:09 PM, Douglas Anderson wrote:
-> Two times out of 2000 reboots I ran into the error message
-> "rockchip_emmc_phy_power: dllrdy timeout".  Presumably there is some
-> corner case where the DLL just takes a little longer to timeout.  Let's
-> give it even more time to handle these corner cases.
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+I dumped my x86 machine ACPI tables and here is an example of MCFG:
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/phy/phy-rockchip-emmc.c | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-> index a2aa6aca7dec..fd57345ffed2 100644
-> --- a/drivers/phy/phy-rockchip-emmc.c
-> +++ b/drivers/phy/phy-rockchip-emmc.c
-> @@ -206,8 +206,18 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
->  	 * per the math: 10.2 us * (50000000 Hz / 100000 Hz) => 5.1 ms
->  	 * Hopefully we won't be running at 100 kHz, but we should still make
->  	 * sure we wait long enough.
-> +	 *
-> +	 * NOTE: There appear to be corner cases where the DLL seems to take
-> +	 * extra long to lock for reasons that aren't understood.  In some
-> +	 * extreme cases we've seen it take up to over 10ms (!).  We'll be
-> +	 * generous and give it 50ms.  We still busy wait here because:
-> +	 * - In most cases it should be super fast.
-> +	 * - This is not called lots during normal operation so it shouldn't
-> +	 *   be a power or performance problem to busy wait.  We expect it
-> +	 *   only at boot / resume.  In both cases, eMMC is probably on the
-> +	 *   critical path so busy waiting a little extra time should be OK.
->  	 */
-> -	timeout = jiffies + msecs_to_jiffies(10);
-> +	timeout = jiffies + msecs_to_jiffies(50);
->  	do {
->  		udelay(1);
->  
-> 
+$ cat mcfg.dsl
+/*
+  * Intel ACPI Component Architecture
+  * AML/ASL+ Disassembler version 20160108-64
+  * Copyright (c) 2000 - 2016 Intel Corporation
+  *
+  * Disassembly of mcfg.dat, Wed Jun 29 15:48:16 2016
+  *
+  * ACPI Data Table [MCFG]
+  *
+  * Format: [HexOffset DecimalOffset ByteLength]  FieldName : FieldValue
+  */
+
+[000h 0000   4]                    Signature : "MCFG"    [Memory Mapped 
+Configuration table]
+[004h 0004   4]                 Table Length : 0000003C
+[008h 0008   1]                     Revision : 01
+[009h 0009   1]                     Checksum : A9
+[00Ah 0010   6]                       Oem ID : "ALASKA"
+[010h 0016   8]                 Oem Table ID : "A M I"
+[018h 0024   4]                 Oem Revision : 01072009
+[01Ch 0028   4]              Asl Compiler ID : "MSFT"
+[020h 0032   4]        Asl Compiler Revision : 00000097
+
+[024h 0036   8]                     Reserved : 0000000000000000
+
+[02Ch 0044   8]                 Base Address : 00000000F8000000
+[034h 0052   2]         Segment Group Number : 0000
+[036h 0054   1]             Start Bus Number : 00
+[037h 0055   1]               End Bus Number : 3F
+[038h 0056   4]                     Reserved : 00000000
+
+Raw Table Data: Length 60 (0x3C)
+
+00000000  4d 43 46 47 3c 00 00 00  01 a9 41 4c 41 53 4b 41 
+|MCFG<.....ALASKA|
+00000010  41 20 4d 20 49 00 00 00  09 20 07 01 4d 53 46 54  |A M I.... 
+..MSFT|
+00000020  97 00 00 00 00 00 00 00  00 00 00 00 00 00 00 f8 
+|................|
+00000030  00 00 00 00 00 00 00 3f  00 00 00 00              |.......?....|
+
+So in this example I have OEM table ID "A M I" 6 character long and 0 
+padding.
+
+Tomasz
