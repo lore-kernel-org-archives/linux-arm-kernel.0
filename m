@@ -1,7 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 29 Jun 2016 04:27:34 -0400
-Subject: [PATCH V2 0/4] ACPI,PCI,IRQ: correct ISA penalty calculation
-Message-ID: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
+Date: Wed, 29 Jun 2016 04:27:37 -0400
+Subject: [PATCH V2 3/4] ACPI,PCI,IRQ: separate ISA penalty calculation
+In-Reply-To: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
+References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1467188859-28188-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,17 +16,41 @@ inside the pci_link.c file. This information gets sent externally via
 acpi_penalize_isa_irq function. If active is true, then the IRQ is in use
 by ISA. Otherwise, IRQ is in use by PCI.
 
-Sinan Kaya (4):
-  ACPI,PCI,IRQ: factor in PCI possible
-  Revert "ACPI,PCI,IRQ: remove redundant code in
-    acpi_irq_penalty_init()"
-  ACPI,PCI,IRQ: separate ISA penalty calculation
-  ACPI,PCI,IRQ: correct operator precedence
+Since the current code relies on PCI Link object for determination of
+penalties, we are factoring in the PCI penalty twice after
+acpi_penalize_isa_irq function is called.
 
- arch/x86/pci/acpi.c         |  1 +
- drivers/acpi/pci_link.c     | 65 ++++++++++++++++++++++++++++++++++-----------
- include/acpi/acpi_drivers.h |  1 +
- 3 files changed, 51 insertions(+), 16 deletions(-)
+This change is limiting the newly added functionality to just PCI
+interrupts so that old behavior is still maintained.
 
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/acpi/pci_link.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+index 714ba4d..8c08971 100644
+--- a/drivers/acpi/pci_link.c
++++ b/drivers/acpi/pci_link.c
+@@ -496,9 +496,6 @@ static int acpi_irq_get_penalty(int irq)
+ {
+ 	int penalty = 0;
+ 
+-	if (irq < ACPI_MAX_ISA_IRQS)
+-		penalty += acpi_isa_irq_penalty[irq];
+-
+ 	/*
+ 	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
+ 	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
+@@ -513,6 +510,9 @@ static int acpi_irq_get_penalty(int irq)
+ 			penalty += PIRQ_PENALTY_PCI_USING;
+ 	}
+ 
++	if (irq < ACPI_MAX_ISA_IRQS)
++		return penalty + acpi_isa_irq_penalty[irq];
++
+ 	penalty += acpi_irq_pci_sharing_penalty(irq);
+ 	return penalty;
+ }
 -- 
 1.8.2.1
