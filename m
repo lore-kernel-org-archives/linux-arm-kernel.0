@@ -1,41 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 29 Jun 2016 09:06:11 +0100
-Subject: [PATCH 4/7] reset: Supply *_shared variant calls when using
- *_optional APIs
-In-Reply-To: <1467186499.2278.7.camel@pengutronix.de>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
- <20160606155655.10860-5-lee.jones@linaro.org>
- <20160628085622.GM6720@dell>
- <1467186499.2278.7.camel@pengutronix.de>
-Message-ID: <20160629080611.GH29166@dell>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 29 Jun 2016 15:56:20 +0800
+Subject: [PATCH v2 1/2] ARM64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <1463114260-8724-1-git-send-email-oss@buserror.net>
+References: <1463114260-8724-1-git-send-email-oss@buserror.net>
+Message-ID: <57737F24.5050906@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Jun 2016, Philipp Zabel wrote:
-> Am Dienstag, den 28.06.2016, 09:56 +0100 schrieb Lee Jones:
-> > Philipp,
-> > 
-> > I need this to go into the -rcs too.
-> > 
-> > Can I add it with your Ack please?
-> 
-> I have already added your patches to my branch, and I intend to send a
-> pull request for it tomorrow. I am afraid applying this patch in another
-> branch would create a merge conflict with
-> git://git.pengutronix.de/git/pza/linux.git reset/next
-> in arm-soc. If that is not the case, go ahead. Otherwise I could provide
-> a tag at commit 2485394d9e0b ("reset: TRIVIAL: Add line break at same
-> place for similar APIs") for you to merge.
+Hello Scott,
 
-Yes please.  If you could tag a branch containing commit:
+On 2016/5/13 12:37, Scott Wood wrote:
+[...]
+>  
+> +#ifdef CONFIG_ARM64
+> +static __always_inline void rewrite_tval(const int access,
+> +		unsigned long evt, struct clock_event_device *clk)
+> +{
+> +	u64 cval_old, cval_new;
+> +	int timeout = 200;
+> +
+> +	do {
+> +		cval_old = __arch_counter_get_cntvct();
+> +		arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt, clk);
 
-  reset: Supply *_shared variant calls when using *_optional APIs
+For not memory mapped timer, it will call arch_timer_reg_write_cp15() which has
+isb() at the end of arch_timer_reg_write_cp15()...
 
-... that would be perfect.  Would you mind sending me the tag name
-ASAP please, since I am ready to send my pull-request to Linus.
+> +		cval_new = __arch_counter_get_cntvct();
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+So there is isb() between counter retry read, I think it's likely cval_new will
+not be equal with cval_old when the cntvct is correct (time lapse is more than
+one arch timer cycle).
+
+> +		timeout--;
+> +	} while (cval_old != cval_new && timeout);
+> +
+> +	WARN_ON_ONCE(!timeout);
+
+Then trigger the warning here, correct me if I miss something else.
+
+Thanks
+Hanjun
