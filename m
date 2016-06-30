@@ -1,136 +1,225 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 30 Jun 2016 12:42:09 +0200
-Subject: [PATCH 05/15] arm64: KVM: Refactor kern_hyp_va/hyp_kern_va to
- deal with multiple offsets
-In-Reply-To: <5774F18C.7030603@arm.com>
-References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
- <1465297115-13091-6-git-send-email-marc.zyngier@arm.com>
- <20160628124210.GP26498@cbox>
- <5774E4CE.8020200@arm.com> <5774F18C.7030603@arm.com>
-Message-ID: <CAKv+Gu84EzsO4Sy07ACJ_nsok0Xr2KOkaeKRz0ObHU=0kzEZ-g@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 30 Jun 2016 11:53:09 +0100
+Subject: [RFC PATCH v2 6/9] firmware: Add legacy SCPI protocol driver
+In-Reply-To: <1466503374-28841-7-git-send-email-narmstrong@baylibre.com>
+References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
+ <1466503374-28841-7-git-send-email-narmstrong@baylibre.com>
+Message-ID: <5774FA15.6060302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2016 at 12:16, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 30/06/16 10:22, Marc Zyngier wrote:
->> On 28/06/16 13:42, Christoffer Dall wrote:
->>> On Tue, Jun 07, 2016 at 11:58:25AM +0100, Marc Zyngier wrote:
->>>> As we move towards a selectable HYP VA range, it is obvious that
->>>> we don't want to test a variable to find out if we need to use
->>>> the bottom VA range, the top VA range, or use the address as is
->>>> (for VHE).
->>>>
->>>> Instead, we can expand our current helpers to generate the right
->>>> mask or nop with code patching. We default to using the top VA
->>>> space, with alternatives to switch to the bottom one or to nop
->>>> out the instructions.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm64/include/asm/kvm_hyp.h | 27 ++++++++++++--------------
->>>>  arch/arm64/include/asm/kvm_mmu.h | 42 +++++++++++++++++++++++++++++++++++++---
->>>>  2 files changed, 51 insertions(+), 18 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
->>>> index 61d01a9..dd4904b 100644
->>>> --- a/arch/arm64/include/asm/kvm_hyp.h
->>>> +++ b/arch/arm64/include/asm/kvm_hyp.h
->>>> @@ -25,24 +25,21 @@
->>>>
->>>>  #define __hyp_text __section(.hyp.text) notrace
->>>>
->>>> -static inline unsigned long __kern_hyp_va(unsigned long v)
->>>> -{
->>>> -   asm volatile(ALTERNATIVE("and %0, %0, %1",
->>>> -                            "nop",
->>>> -                            ARM64_HAS_VIRT_HOST_EXTN)
->>>> -                : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
->>>> -   return v;
->>>> -}
->>>> -
->>>> -#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
->>>> -
->>>>  static inline unsigned long __hyp_kern_va(unsigned long v)
->>>>  {
->>>> -   asm volatile(ALTERNATIVE("orr %0, %0, %1",
->>>> -                            "nop",
->>>> +   u64 mask;
->>>> +
->>>> +   asm volatile(ALTERNATIVE("mov %0, %1",
->>>> +                            "mov %0, %2",
->>>> +                            ARM64_HYP_OFFSET_LOW)
->>>> +                : "=r" (mask)
->>>> +                : "i" (~HYP_PAGE_OFFSET_HIGH_MASK),
->>>> +                  "i" (~HYP_PAGE_OFFSET_LOW_MASK));
->>>> +   asm volatile(ALTERNATIVE("nop",
->>>> +                            "mov %0, xzr",
->>>>                              ARM64_HAS_VIRT_HOST_EXTN)
->>>> -                : "+r" (v) : "i" (~HYP_PAGE_OFFSET_MASK));
->>>> -   return v;
->>>> +                : "+r" (mask));
->>>> +   return v | mask;
->>>
->>> If mask is ~HYP_PAGE_OFFSET_LOW_MASK how can you be sure that setting
->>> bit (VA_BITS - 1) is always the right thing to do to generate a kernel
->>> address?
->>
->> It has taken be a while, but I think I finally see what you mean. We
->> have no idea whether that bit was set or not.
->>
->>> This is kind of what I asked before only now there's an extra bit not
->>> guaranteed by the architecture to be set for the kernel range, I
->>> think.
->>
->> Yeah, I finally connected the couple of neurons left up there (that's
->> what remains after the whole brexit braindamage). This doesn't work (or
->> rather it only works sometimes). The good new is that I also realized we
->> don't need any of that crap.
->>
->> The only case we currently use a HVA->KVA transformation is to pass the
->> panic string down to panic(), and we can perfectly prevent
->> __kvm_hyp_teardown from ever be evaluated as a HVA with a bit of
->> asm-foo. This allows us to get rid of this whole function.
+
+
+On 21/06/16 11:02, Neil Armstrong wrote:
+> Add legacy SCPI driver based on the latest SCPI driver but modified to behave
+> like an earlier technology preview SCPI implementation that at least the
+> Amlogic GXBB ARMv8 based platform uses in it's SCP firmware implementation.
 >
-> Here's what I meant by this:
+> The main differences between the mainline, public and recommended SCPI
+> implementation are :
+>   - virtual channels is not implemented
+>   - command word is passed by the MHU instead of the virtual channel ID
+>   - uses "sender id" in the command word for each commands groups
+>   - payload size shift in command word is different
+>   - command word is not in SRAM, so command queuing is not possible
+>   - command indexes are different
+>   - command data structures differs
+>   - commands are redirected to low or high priority channels by their indexes,
+>     so round-robin redirection is not possible
+
+I doubt if that's the case. At-least the original arm scp f/w didn't
+check that. Can you please trying sending any commands on any channel ?
+
 >
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 437cfad..c19754d 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -299,9 +299,16 @@ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%
+> A clear disclaimer is added to make it clear this implementation should not
+> be used for new products and is only here to support already released SoCs.
 >
->  static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
->  {
-> -       unsigned long str_va = (unsigned long)__hyp_panic_string;
-> +       unsigned long str_va;
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>   drivers/firmware/Kconfig       |  20 ++
+>   drivers/firmware/Makefile      |   1 +
+>   drivers/firmware/legacy_scpi.c | 644 +++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 665 insertions(+)
+>   create mode 100644 drivers/firmware/legacy_scpi.c
 >
-> -       __hyp_do_panic(hyp_kern_va(str_va),
-> +       /*
-> +        * Force the panic string to be loaded from the literal pool,
-> +        * making sure it is a kernel address and not a PC-relative
-> +        * reference.
-> +        */
-> +       asm volatile("ldr %0, =__hyp_panic_string" : "=r" (str_va));
+> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+> index 95b01f4..b9c2a33 100644
+> --- a/drivers/firmware/Kconfig
+> +++ b/drivers/firmware/Kconfig
+> @@ -31,6 +31,26 @@ config ARM_SCPI_PROTOCOL
+>   	  This protocol library provides interface for all the client drivers
+>   	  making use of the features offered by the SCP.
+>
+> +config LEGACY_SCPI_PROTOCOL
+> +	bool "Legacy System Control and Power Interface (SCPI) Message Protocol"
+
+Do we really need to add another config ? I thought we could just manage
+with compatibles.
+
+> +	default y if ARCH_MESON
+> +	select ARM_SCPI_FW
+> +	help
+> +	  System Control and Power Interface (SCPI) Message Protocol is
+> +	  defined for the purpose of communication between the Application
+> +	  Cores(AP) and the System Control Processor(SCP). The MHU peripheral
+> +	  provides a mechanism for inter-processor communication between SCP
+> +	  and AP.
+
+[...]
+
+> diff --git a/drivers/firmware/legacy_scpi.c b/drivers/firmware/legacy_scpi.c
+> new file mode 100644
+> index 0000000..4bd3ff7
+> --- /dev/null
+> +++ b/drivers/firmware/legacy_scpi.c
+> @@ -0,0 +1,644 @@
+
+[...]
+
+> +
+> +#define CMD_ID_SHIFT		0
+> +#define CMD_ID_MASK		0x7f
+> +#define CMD_SENDER_ID_SHIFT	8
+> +#define CMD_SENDER_ID_MASK	0xff
+
+Again this is something I introduced in the earlier driver. But from SCP
+f/w perspective, it just sends that as is to the sender. I think we
+retain token concept as is from the latest driver. Could you check
+dropping them and check if f/w makes any assumption about these. It
+should not IMO.
+
+> +#define CMD_DATA_SIZE_SHIFT	20
+> +#define CMD_DATA_SIZE_MASK	0x1ff
+> +#define PACK_SCPI_CMD(cmd_id, sender, tx_sz)				\
+> +	((((cmd_id) & CMD_ID_MASK) << CMD_ID_SHIFT) |			\
+> +	(((sender) & CMD_SENDER_ID_MASK) << CMD_SENDER_ID_SHIFT) |	\
+> +	(((tx_sz) & CMD_DATA_SIZE_MASK) << CMD_DATA_SIZE_SHIFT))
+> +
+> +#define CMD_SIZE(cmd)	(((cmd) >> CMD_DATA_SIZE_SHIFT) & CMD_DATA_SIZE_MASK)
+> +#define CMD_UNIQ_MASK	(CMD_TOKEN_ID_MASK << CMD_TOKEN_ID_SHIFT | CMD_ID_MASK)
+> +#define CMD_XTRACT_UNIQ(cmd)	((cmd) & CMD_UNIQ_MASK)
+> +
+> +#define MAX_DVFS_DOMAINS	3
+> +#define MAX_DVFS_OPPS		16
+> +#define DVFS_LATENCY(hdr)	(le32_to_cpu(hdr) >> 16)
+> +#define DVFS_OPP_COUNT(hdr)	((le32_to_cpu(hdr) >> 8) & 0xff)
+> +
+> +#define MAX_RX_TIMEOUT          (msecs_to_jiffies(30))
+> +
+> +enum legacy_scpi_error_codes {
+
+This along with many other defines are exactly same, not need to
+duplicate them.
+
+> +	SCPI_SUCCESS = 0, /* Success */
+> +	SCPI_ERR_PARAM = 1, /* Invalid parameter(s) */
+> +	SCPI_ERR_ALIGN = 2, /* Invalid alignment */
+> +	SCPI_ERR_SIZE = 3, /* Invalid size */
+> +	SCPI_ERR_HANDLER = 4, /* Invalid handler/callback */
+> +	SCPI_ERR_ACCESS = 5, /* Invalid access/permission denied */
+> +	SCPI_ERR_RANGE = 6, /* Value out of range */
+> +	SCPI_ERR_TIMEOUT = 7, /* Timeout has occurred */
+> +	SCPI_ERR_NOMEM = 8, /* Invalid memory area or pointer */
+> +	SCPI_ERR_PWRSTATE = 9, /* Invalid power state */
+> +	SCPI_ERR_SUPPORT = 10, /* Not supported or disabled */
+> +	SCPI_ERR_DEVICE = 11, /* Device error */
+> +	SCPI_ERR_BUSY = 12, /* Device busy */
+> +	SCPI_ERR_MAX
+> +};
+> +
+> +enum legacy_scpi_client_id {
+
+Could be removed as mentioned above ?
+
+> +	SCPI_CL_NONE,
+> +	SCPI_CL_CLOCKS,
+> +	SCPI_CL_DVFS,
+> +	SCPI_CL_POWER,
+> +	SCPI_CL_THERMAL,
+> +	SCPI_CL_REMOTE,
+> +	SCPI_CL_LED_TIMER,
+> +	SCPI_MAX,
+> +};
+> +
+> +enum legacy_scpi_std_cmd {
+> +	SCPI_CMD_INVALID		= 0x00,
+> +	SCPI_CMD_SCPI_READY		= 0x01,
+> +	SCPI_CMD_SCPI_CAPABILITIES	= 0x02,
+> +	SCPI_CMD_EVENT			= 0x03,
+> +	SCPI_CMD_SET_CSS_PWR_STATE	= 0x04,
+> +	SCPI_CMD_GET_CSS_PWR_STATE	= 0x05,
+> +	SCPI_CMD_CFG_PWR_STATE_STAT	= 0x06,
+> +	SCPI_CMD_GET_PWR_STATE_STAT	= 0x07,
+> +	SCPI_CMD_SYS_PWR_STATE		= 0x08,
+> +	SCPI_CMD_L2_READY		= 0x09,
+> +	SCPI_CMD_SET_AP_TIMER		= 0x0a,
+> +	SCPI_CMD_CANCEL_AP_TIME		= 0x0b,
+> +	SCPI_CMD_DVFS_CAPABILITIES	= 0x0c,
+> +	SCPI_CMD_GET_DVFS_INFO		= 0x0d,
+> +	SCPI_CMD_SET_DVFS		= 0x0e,
+> +	SCPI_CMD_GET_DVFS		= 0x0f,
+> +	SCPI_CMD_GET_DVFS_STAT		= 0x10,
+> +	SCPI_CMD_SET_RTC		= 0x11,
+> +	SCPI_CMD_GET_RTC		= 0x12,
+> +	SCPI_CMD_CLOCK_CAPABILITIES	= 0x13,
+> +	SCPI_CMD_SET_CLOCK_INDEX	= 0x14,
+> +	SCPI_CMD_SET_CLOCK_VALUE	= 0x15,
+> +	SCPI_CMD_GET_CLOCK_VALUE	= 0x16,
+> +	SCPI_CMD_PSU_CAPABILITIES	= 0x17,
+> +	SCPI_CMD_SET_PSU		= 0x18,
+> +	SCPI_CMD_GET_PSU		= 0x19,
+> +	SCPI_CMD_SENSOR_CAPABILITIES	= 0x1a,
+> +	SCPI_CMD_SENSOR_INFO		= 0x1b,
+> +	SCPI_CMD_SENSOR_VALUE		= 0x1c,
+> +	SCPI_CMD_SENSOR_CFG_PERIODIC	= 0x1d,
+> +	SCPI_CMD_SENSOR_CFG_BOUNDS	= 0x1e,
+> +	SCPI_CMD_SENSOR_ASYNC_VALUE	= 0x1f,
+> +	SCPI_CMD_COUNT
+> +};
+> +
+> +struct legacy_scpi_xfer {
+> +	u32 cmd;
+> +	u32 status;
+> +	const void *tx_buf;
+> +	void *rx_buf;
+> +	unsigned int tx_len;
+> +	unsigned int rx_len;
+> +	struct completion done;
+> +};
+> +
+> +struct legacy_scpi_chan {
+> +	struct mbox_client cl;
+> +	struct mbox_chan *chan;
+> +	void __iomem *tx_payload;
+> +	void __iomem *rx_payload;
+> +	spinlock_t rx_lock; /* locking for the rx pending list */
+> +	struct mutex xfers_lock;
+> +	struct legacy_scpi_xfer t;
+> +};
+> +
+> +struct legacy_scpi_drvinfo {
+> +	int num_chans;
+> +	struct legacy_scpi_chan *channels;
+> +	struct scpi_dvfs_info *dvfs[MAX_DVFS_DOMAINS];
+> +};
 > +
 
-Wouldn't it suffice to make  __hyp_panic_string a non-static pointer
-to const char? That way, it will be statically initialized with a
-kernel VA, and the external linkage forces the compiler to evaluate
-its value at runtime.
+Even these data structures could remain, and mended wherever needed or
+an alternate can be added at worse. Complete copy paste seems
+unnecessary to me.
 
+> +	legacy_scpi_info->channels = legacy_scpi_chan;
+> +	legacy_scpi_info->num_chans = count;
+> +	platform_set_drvdata(pdev, legacy_scpi_info);
+> +
+> +	ret = devm_scpi_ops_register(dev, &legacy_scpi_ops);
 
-> +       __hyp_do_panic(str_va,
->                        spsr,  elr,
->                        read_sysreg(esr_el2),   read_sysreg_el2(far),
->                        read_sysreg(hpfar_el2), par,
->
-> With that in place, we can entirely get rid of hyp_kern_va().
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Though the concept of registering scpi ops is really nice, I think we
+may not require that for support this legacy scpi protocol.
+
+In general, I see lot of code duplication, can you try not add another
+file or config and introduce the legacy support into arm_scpi.c itself ?
+
+-- 
+Regards,
+Sudeep
