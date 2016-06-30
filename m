@@ -1,60 +1,87 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 30 Jun 2016 17:13:31 +0300
-Subject: [PATCHv3 0/7] clk: ti add support for hwmod clk type
-Message-ID: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
+Date: Thu, 30 Jun 2016 17:13:33 +0300
+Subject: [PATCHv3 2/7] clk: ti: add clkdev get helper
+In-Reply-To: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
+References: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1467296018-25086-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+TI clocks can be found based on a simple query against the clock name,
+thus add a clkdev helper functionality for this. Using this new helper
+implementation  allows getting rid of most of the DT_CLK() entries under
+drivers/clk/ti.
 
-Changes from v3:
-- moved mach-omap2 related patches to their own sets
-- moved DT_CLK cleanup patches to their own series (which depends on this)
-- added patch #1 to add clkdev helper support, this helps
-  getting rid of some 4...5 patches from v2 of the series, and keeping
-  the clk_get API uniform
-- made ti_clk_get function static, not used outside the file anymore,
-  as this will be providing support via tha API added in patch #1 in
-  this set
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ drivers/clk/ti/clk.c | 38 +++++++++++++++++++++++++++++++++-----
+ 1 file changed, 33 insertions(+), 5 deletions(-)
 
-This series can be applied separately, without any dependencies on the
-other sets. I will be posting the DT_CLK cleanup set separately if this
-series gets approval.
-
-Test results:
-
-  : Board           : Boot WRN version                 
- 1: am335x-evm      : PASS   0 4.7.0-rc1-00007-g958a12a
- 2: am335x-evmsk    : PASS   0 4.7.0-rc1-00007-g958a12a
- 3: am3517-evm      : PASS   1 4.7.0-rc1-00007-g958a12a
- 4: am37x-evm       : PASS   0 4.7.0-rc1-00007-g958a12a
- 5: am437x-sk       : PASS   0 4.7.0-rc1-00007-g958a12a
- 6: am43x-epos-evm  : PASS   0 4.7.0-rc1-00007-g958a12a
- 7: am437x-gp-evm   : PASS   0 4.7.0-rc1-00007-g958a12a
- 8: am57xx-evm      : PASS   3 4.7.0-rc1-00007-g958a12a
- 9: omap3-beagle-xm : PASS   0 4.7.0-rc1-00007-g958a12a
-10: omap3-beagle    : PASS   0 4.7.0-rc1-00007-g958a12a
-11: am335x-boneblack: PASS   0 4.7.0-rc1-00007-g958a12a
-12: am335x-bone     : PASS   0 4.7.0-rc1-00007-g958a12a
-13: craneboard      : PASS   1 4.7.0-rc1-00007-g958a12a
-14: dra72x-evm      : FAIL   3 4.7.0-rc1-00007-g958a12a
-15: dra7xx-evm      : PASS   3 4.7.0-rc1-00007-g958a12a
-16: ldp3430         : FAIL   0                         
-17: omap3-n900      : PASS   0 4.7.0-rc1-00007-g958a12a
-18: omap5-uevm      : PASS   0 4.7.0-rc1-00007-g958a12a
-19: omap4-panda-es  : PASS   0 4.7.0-rc1-00007-g958a12a
-20: omap4-panda     : PASS   0 4.7.0-rc1-00007-g958a12a
-21: omap2430-sdp    : PASS   0 4.7.0-rc1-00007-g958a12a
-22: omap3430-sdp    : PASS   0 4.7.0-rc1-00007-g958a12a
-23: omap4-sdp-es23plus: PASS   0 4.7.0-rc1-00007-g958a12a
-TOTAL = 23 boards, Booted Boards = 21, No Boot boards = 2
-
-The couple of failing boards seem to have hardware issues on the farm, as
-they fail with any kernel.
-
-Patches also available here:
-
-tree: https://github.com/t-kristo/linux-pm.git
-branch: 4.7-rc1-hwmod-clks-v3
-
--Tero
+diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
+index 5fcf247..17554c3 100644
+--- a/drivers/clk/ti/clk.c
++++ b/drivers/clk/ti/clk.c
+@@ -68,6 +68,36 @@ static u32 clk_memmap_readl(void __iomem *reg)
+ }
+ 
+ /**
++ * ti_clk_get - lookup a TI clock handle
++ * @dev_id: device to lookup clock for
++ * @con_id: connection ID to find
++ *
++ * Searches for a TI clock handle based on the DT node name.
++ * Returns the pointer to the clock handle, or ERR_PTR in failure.
++ */
++static struct clk *ti_clk_get(const char *dev_id, const char *con_id)
++{
++	struct of_phandle_args clkspec;
++	struct device_node *node;
++	struct clk *clk;
++
++	/* Only check for cases of type clk_get_sys(NULL, "xyz") */
++	if (dev_id || !con_id)
++		return ERR_PTR(-ENOENT);
++
++	if (of_have_populated_dt()) {
++		node = of_find_node_by_name(NULL, con_id);
++		clkspec.np = node;
++		clk = of_clk_get_from_provider(&clkspec);
++
++		if (!IS_ERR(clk))
++			return clk;
++	}
++
++	return ERR_PTR(-ENOENT);
++}
++
++/**
+  * ti_clk_setup_ll_ops - setup low level clock operations
+  * @ops: low level clock ops descriptor
+  *
+@@ -87,6 +117,8 @@ int ti_clk_setup_ll_ops(struct ti_clk_ll_ops *ops)
+ 	ops->clk_readl = clk_memmap_readl;
+ 	ops->clk_writel = clk_memmap_writel;
+ 
++	clkdev_helper_register(ti_clk_get);
++
+ 	return 0;
+ }
+ 
+@@ -102,14 +134,10 @@ int ti_clk_setup_ll_ops(struct ti_clk_ll_ops *ops)
+ void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
+ {
+ 	struct ti_dt_clk *c;
+-	struct device_node *node;
+ 	struct clk *clk;
+-	struct of_phandle_args clkspec;
+ 
+ 	for (c = oclks; c->node_name != NULL; c++) {
+-		node = of_find_node_by_name(NULL, c->node_name);
+-		clkspec.np = node;
+-		clk = of_clk_get_from_provider(&clkspec);
++		clk = ti_clk_get(NULL, c->node_name);
+ 
+ 		if (!IS_ERR(clk)) {
+ 			c->lk.clk = clk;
+-- 
+1.9.1
