@@ -1,37 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jun 2016 14:25:19 +0200
-Subject: [PATCH] ARM: shmobile: don't call platform_can_secondary_boot on UP
-Message-ID: <20160630122529.4031024-1-arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Jun 2016 05:23:59 -0700
+Subject: Extcon build failure in next
+In-Reply-To: <124460021.HZdfr0AOY2@wuerfel>
+References: <20160630053705.GM28140@atomide.com> <3746939.q8kt0ym6m3@wuerfel>
+ <20160630114911.GO28140@atomide.com> <124460021.HZdfr0AOY2@wuerfel>
+Message-ID: <20160630122359.GP28140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For rcar-gen2, we build the SMP files even for UP configurations,
-and that just broke:
+* Arnd Bergmann <arnd@arndb.de> [160630 05:05]:
+> On Thursday, June 30, 2016 4:49:12 AM CEST Tony Lindgren wrote:
+> > > > Also I'm seeing:
+> > > > 
+> > > > drivers/extcon/extcon.c: In function 'extcon_register_notifier':
+> > > > drivers/extcon/extcon.c:455:6: warning: 'idx' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> > > >    if (idx >= 0) {
+> > > >          ^
+> > > 
+> > > I don't see this one. Which compiler version do you use?
+> > 
+> > Looks like I'm currently using older arm-none-linux-gnueabi-gcc
+> > (Sourcery CodeBench Lite 2014.05-29) 4.8.3 20140320 (prerelease).
+> > I think the Debian compiler was not working few months ago and
+> > I changed to something I had around.
+> > 
+> > Looks like the warning does not appear with arm-linux-gnueabihf-gcc
+> > (Debian 6.1.1-3) 6.1.1 20160511.
+> 
+> You are certainly not the only one using gcc-4.7 or gcc-4.8, but
+> they are known to produce more false postive -Wmaybe-uninitialized
+> warnings and 4.9 or higher. I usually send patches for these warnings
+> when gcc-6 finds them, and I have recently sent patches for all
+> the warnings I got in allmodconfig with 4.9, but have no plans to
+> do that for the older compilers.
 
-arch/arm/mach-shmobile/built-in.o: In function `shmobile_smp_init_fallback_ops':
-pm-rcar-gen2.c:(.init.text+0x40c): undefined reference to `platform_can_secondary_boot'
+OK thanks for the information, I'll change back to something newer
+here again.
 
-This adds an compile-time check before the call to platform_can_secondary_boot,
-turning the function into an empty stub for UP configurations.
+> I wonder whether we should just disable this warning with gcc-4.8
+> by adding $(call cc-ifversion, -eq, 0408, -Wno-maybe-uninitialized)
+> to the command line. However, gcc-4.7 does not let you turn off
+> the warning at all, so the use of that is fairly limited.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: c21af444eace ("ARM: shmobile: smp: Add function to prioritize DT SMP")
----
- arch/arm/mach-shmobile/platsmp.c | 3 +++
- 1 file changed, 3 insertions(+)
+That probably disables warnings also for real warnings too then :)
 
-diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
-index f3dba6f356e2..02e21bceb085 100644
---- a/arch/arm/mach-shmobile/platsmp.c
-+++ b/arch/arm/mach-shmobile/platsmp.c
-@@ -40,5 +40,8 @@ bool shmobile_smp_cpu_can_disable(unsigned int cpu)
- bool __init shmobile_smp_init_fallback_ops(void)
- {
- 	/* fallback on PSCI/smp_ops if no other DT based method is detected */
-+	if (!IS_ENABLED(CONFIG_SMP))
-+		return false;
-+
- 	return platform_can_secondary_boot() ? true : false;
- }
--- 
-2.9.0
+Tony
