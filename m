@@ -1,185 +1,88 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 30 Jun 2016 08:18:38 -0700
-Subject: Boot failure on emev2/kzm9d (was: Re: [PATCH v2 11/11] mm/slab:
- lockless decision to grow cache)
-In-Reply-To: <CAMuHMdVTX3ojMsO5Mv++pA5r+st4yBTTo39QTbV-FxPmJ7fbkQ@mail.gmail.com>
-References: <20160623024742.GD1473@linux.vnet.ibm.com>
- <20160623025329.GA13095@linux.vnet.ibm.com>
- <CAMuHMdVqNV5ZbR3_NV5ZsLxoNQUXXGpfAcaoMJffaJbRPUb6-A@mail.gmail.com>
- <20160629164415.GG4650@linux.vnet.ibm.com>
- <CAMuHMdUfQ-gBqjZGvawf5zxgb-0UnWb+fzD-kcWU+kavwvadgQ@mail.gmail.com>
- <20160629181208.GP4650@linux.vnet.ibm.com>
- <20160630074710.GC30114@js1304-P5Q-DELUXE>
- <CAMuHMdVx4p9=CNCwZuuUyxsYZGN7VPs7F+RbysQjYGSY25TPQA@mail.gmail.com>
- <20160630132401.GT4650@linux.vnet.ibm.com>
- <CAMuHMdVTX3ojMsO5Mv++pA5r+st4yBTTo39QTbV-FxPmJ7fbkQ@mail.gmail.com>
-Message-ID: <20160630151838.GW4650@linux.vnet.ibm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Jun 2016 16:18:49 +0100
+Subject: [Xen-devel] [PATCH v2] xen/arm: register clocks used by the
+ hypervisor
+In-Reply-To: <57753328.9060300@gmail.com>
+References: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
+ <20160630142136.GE20363@leverpostej> <57753328.9060300@gmail.com>
+Message-ID: <20160630151523.GA29700@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 03:31:57PM +0200, Geert Uytterhoeven wrote:
-> Hi Paul,
+Hi,
+
+On Thu, Jun 30, 2016 at 04:56:40PM +0200, Dirk Behme wrote:
+> On 30.06.2016 16:21, Mark Rutland wrote:
+> >On Thu, Jun 30, 2016 at 12:32:32PM +0200, Dirk Behme wrote:
+> >>+- clocks: one or more clocks to be registered.
+> >>+  Xen hypervisor drivers might replace native drivers, resulting in
+> >>+  clocks not registered by these native drivers. To avoid that these
+> >>+  unregistered clocks are disabled, then, e.g. by clk_disable_unused(),
+> >>+  register them in the hypervisor node.
+> >>+  An example for this are the clocks of the serial driver. If the clocks
+> >>+  used by the serial hardware interface are not registered by the serial
+> >>+  driver the serial output might stop once clk_disable_unused() is called.
+> >
+> >This shouldn't be described in terms of the Linux implementation details
+> >like clk_disable_unused. Those can change at any time, and don't define
+> >the contract as such.
 > 
-> On Thu, Jun 30, 2016 at 3:24 PM, Paul E. McKenney
-> <paulmck@linux.vnet.ibm.com> wrote:
-> > On Thu, Jun 30, 2016 at 09:58:51AM +0200, Geert Uytterhoeven wrote:
-> >> On Thu, Jun 30, 2016 at 9:47 AM, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
-> >> > On Wed, Jun 29, 2016 at 11:12:08AM -0700, Paul E. McKenney wrote:
-> >> >> On Wed, Jun 29, 2016 at 07:52:06PM +0200, Geert Uytterhoeven wrote:
-> >> >> > On Wed, Jun 29, 2016 at 6:44 PM, Paul E. McKenney
-> >> >> > <paulmck@linux.vnet.ibm.com> wrote:
-> >> >> > > On Wed, Jun 29, 2016 at 04:54:44PM +0200, Geert Uytterhoeven wrote:
-> >> >> > >> On Thu, Jun 23, 2016 at 4:53 AM, Paul E. McKenney
-> >> >> > >> <paulmck@linux.vnet.ibm.com> wrote:
-> >> >> > >> > On Wed, Jun 22, 2016 at 07:47:42PM -0700, Paul E. McKenney wrote:
-> >> >> > >
-> >> >> > > [ . . . ]
-> >> >> > >
-> >> >> > >> > @@ -4720,11 +4720,18 @@ static void __init rcu_dump_rcu_node_tree(struct rcu_state *rsp)
-> >> >> > >> >                         pr_info(" ");
-> >> >> > >> >                         level = rnp->level;
-> >> >> > >> >                 }
-> >> >> > >> > -               pr_cont("%d:%d ^%d  ", rnp->grplo, rnp->grphi, rnp->grpnum);
-> >> >> > >> > +               pr_cont("%d:%d/%#lx/%#lx ^%d  ", rnp->grplo, rnp->grphi,
-> >> >> > >> > +                       rnp->qsmask,
-> >> >> > >> > +                       rnp->qsmaskinit | rnp->qsmaskinitnext, rnp->grpnum);
-> >> >> > >> >         }
-> >> >> > >> >         pr_cont("\n");
-> >> >> > >> >  }
-> >> >> > >>
-> >> >> > >> For me it always crashes during the 37th call of synchronize_sched() in
-> >> >> > >> setup_kmem_cache_node(), which is the first call after secondary CPU bring up.
-> >> >> > >> With your and my debug code, I get:
-> >> >> > >>
-> >> >> > >>   CPU: Testing write buffer coherency: ok
-> >> >> > >>   CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> >> >> > >>   Setting up static identity map for 0x40100000 - 0x40100058
-> >> >> > >>   cnt = 36, sync
-> >> >> > >>   CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-> >> >> > >>   Brought up 2 CPUs
-> >> >> > >>   SMP: Total of 2 processors activated (2132.00 BogoMIPS).
-> >> >> > >>   CPU: All CPU(s) started in SVC mode.
-> >> >> > >>   rcu_node tree layout dump
-> >> >> > >>    0:1/0x0/0x3 ^0
-> >> >> > >
-> >> >> > > Thank you for running this!
-> >> >> > >
-> >> >> > > OK, so RCU knows about both CPUs (the "0x3"), and the previous
-> >> >> > > grace period has seen quiescent states from both of them (the "0x0").
-> >> >> > > That would indicate that your synchronize_sched() showed up when RCU was
-> >> >> > > idle, so it had to start a new grace period.  It also rules out failure
-> >> >> > > modes where RCU thinks that there are more CPUs than really exist.
-> >> >> > > (Don't laugh, such things have really happened.)
-> >> >> > >
-> >> >> > >>   devtmpfs: initialized
-> >> >> > >>   VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 1
-> >> >> > >>   clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff,
-> >> >> > >> max_idle_ns: 19112604462750000 ns
-> >> >> > >>
-> >> >> > >> I hope it helps. Thanks!
-> >> >> > >
-> >> >> > > I am going to guess that this was the first grace period since the second
-> >> >> > > CPU came online.  When there only on CPU online, synchronize_sched()
-> >> >> > > is a no-op.
-> >> >> > >
-> >> >> > > OK, this showed some things that aren't a problem.  What might the
-> >> >> > > problem be?
-> >> >> > >
-> >> >> > > o       The grace-period kthread has not yet started.  It -should- start
-> >> >> > >         at early_initcall() time, but who knows?  Adding code to print
-> >> >> > >         out that kthread's task_struct address.
-> >> >> > >
-> >> >> > > o       The grace-period kthread might not be responding to wakeups.
-> >> >> > >         Checking this requires that a grace period be in progress,
-> >> >> > >         so please put a call_rcu_sched() just before the call to
-> >> >> > >         rcu_dump_rcu_node_tree().  (Sample code below.)  Adding code
-> >> >> > >         to my patch to print out more GP-kthread state as well.
-> >> >> > >
-> >> >> > > o       One of the CPUs might not be responding to RCU.  That -should-
-> >> >> > >         result in an RCU CPU stall warning, so I will ignore this
-> >> >> > >         possibility for the moment.
-> >> >> > >
-> >> >> > >         That said, do you have some way to determine whether scheduling
-> >> >> > >         clock interrupts are really happening?  Without these interrupts,
-> >> >> > >         no RCU CPU stall warnings.
-> >> >> >
-> >> >> > I believe there are no clocksources yet. The jiffies clocksource is the first
-> >> >> > clocksource found, and that happens after the first call to
-> >> >> > synchronize_sched(), cfr. my dmesg snippet above.
-> >> >> >
-> >> >> > In a working boot:
-> >> >> > # cat /sys/bus/clocksource/devices/clocksource0/available_clocksource
-> >> >> > e0180000.timer jiffies
-> >> >> > # cat /sys/bus/clocksource/devices/clocksource0/current_clocksource
-> >> >> > e0180000.timer
-> >> >>
-> >> >> Ah!  But if there is no jiffies clocksource, then schedule_timeout()
-> >> >> and friends will never return, correct?  If so, I guarantee you that
-> >> >> synchronize_sched() will unconditionally hang.
-> >> >>
-> >> >> So if I understand correctly, the fix is to get the jiffies clocksource
-> >> >> running before the first call to synchronize_sched().
-> >> >
-> >> > If so, following change would be sufficient.
-> >> >
-> >> > Thanks.
-> >> >
-> >> > ------>8-------
-> >> > diff --git a/kernel/time/jiffies.c b/kernel/time/jiffies.c
-> >> > index 555e21f..4f6471f 100644
-> >> > --- a/kernel/time/jiffies.c
-> >> > +++ b/kernel/time/jiffies.c
-> >> > @@ -98,7 +98,7 @@ static int __init init_jiffies_clocksource(void)
-> >> >         return __clocksource_register(&clocksource_jiffies);
-> >> >  }
-> >> >
-> >> > -core_initcall(init_jiffies_clocksource);
-> >> > +early_initcall(init_jiffies_clocksource);
-> >> >
-> >> >  struct clocksource * __init __weak clocksource_default_clock(void)
-> >> >  {
-> >>
-> >> Thanks for your patch!
-> >>
-> >> While this does move jiffies clocksource initialization before secondary CPU
-> >> bringup, it still hangs when calling call_rcu() or synchronize_sched():
-> >>
-> >>   CPU: Testing write buffer coherency: ok
-> >>   CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> >>   Setting up static identity map for 0x40100000 - 0x40100058
-> >>   cnt = 36, sync
-> >>   clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff,
-> >> max_idle_ns: 19112604462750000 ns
-> >>   CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-> >>   Brought up 2 CPUs
-> >>   SMP: Total of 2 processors activated (2132.00 BogoMIPS).
-> >>   CPU: All CPU(s) started in SVC mode.
-> >>   RCU: rcu_sched GP kthread: c784e1c0 state: 1 flags: 0x0 g:-300 c:-300
-> >>        jiffies: 0xffff8ad0  GP start: 0x0 Last GP activity: 0x0
-> >>   rcu_node tree layout dump
-> >>    0:1/0x0/0x3 ^0
-> >
-> > This is in fact the initial state for RCU grace periods.  In other words,
-> > all the earlier calls to synchronize_sched() likely happened while there
-> > was only one CPU online.
-> >
-> >>   devtmpfs: initialized
-> >>   VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 1
-> >
-> > Could you please add the call_rcu() and timed delay as described in my
-> > earlier email?  That would hopefully help me see the state of the stalled
-> > grace period.
+> Ok. I remove that from the description. Thanks!
+
+Great, thanks.
+
+> >What exactly is the contract here? I assume that you don't want the
+> >kernel to alter the state of these clocks in any way,
 > 
-> I already did, cfr. "it still hangs when calling call_rcu() or
-> synchronize_sched()".
+> I don't think so. I think what we want is that the kernel just don't
+> disable the (from kernel's point of view) "unused" clocks. I think
+> we get this from the fact that using 'clk_ignore_unused' is a
+> working workaround for this issue.
 
-Ah, sorry for my inattention.
+What if the clock (or a parent thereof) is shared with another device?
 
-I am a bit surprised that it could hang when calling call_rcu(), given
-that call_rcu() is callable from atomic contexts.  Could you please show
-me the current test code you have?
+Surely you don't want that other driver to change the rate (changing the
+rate of the UART behind Xen's back)?
 
-If the hang is in call_rcu(), could you please try disabling irqs across
-the call to call_rcu()?
+I appreciate that clk_ignore_unused might work on platforms today, but
+that relies on the behaviour of drivers, which might change. It may also
+not work on other platforms in future, in cases like the above.
 
-							Thanx, Paul
+> >e.g. the rate cannot be changed, they must be left always on, parent
+> >clocks cannot be altered if that would result in momentary jitter.
+> >
+> >I suspect it may be necessary to do more to ensure that, but I'm not
+> >familiar enough with the clocks subsystem to say.
+> >
+> >Are we likely to need to care about regulators, GPIOs, resets, etc? I
+> >worry that this may be the tip of hte iceberg
+> 
+> I don't think so. If there is a user in the kernel of the clock,
+> fine. Then hopefully the user in the kernel knows what he is doing
+> with the clock and then he should do what ever he wants.
+
+I'm not sure that's true. A user of the clock may know nothing about
+other users. As far as I can see, nothing prevents it from changing the
+clock rate.
+
+While drivers in the same kernel can co-ordinate to avoid problems such
+as that, we can't do that if we know nothing about the user hidden by
+Xen.
+
+>From looking at the Xen bug tracker, it's not clear which
+platforms/devices this is necessary for, so it's still not clear to me
+if we need to care about regulators, GPIOs, resets, and so on.
+
+Do we know which platforms in particular we need this for?
+
+> As there is a user in the kernel, we don't have to care about
+> 'accidentally' disabling it.
+> 
+> Just let us care about the clocks there is no user.
+
+As above, I don't believe that alone is sufficient in general, though it
+may happen to be for a particular platform. Without information
+regarding the affected platform(s), it's rather difficult to tell.
+
+Thanks,
+Mark.
