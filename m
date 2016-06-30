@@ -1,50 +1,64 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 30 Jun 2016 03:37:18 +0200
-Subject: [PATCH v6 00/10] acpi,
- clocksource: add GTDT driver and GTDT support in arm_arch_timer
-In-Reply-To: <CADyBb7vmS=oJ9EOzs-v-O4_h5Kd_PCMQytjqEHdRNQkqz4WHcQ@mail.gmail.com>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <CAJZ5v0iD5OYjp7ozmzoQ3zK-3+eMpdwzDxYgD=saLPjNeoq0Qg@mail.gmail.com>
- <CADyBb7vmS=oJ9EOzs-v-O4_h5Kd_PCMQytjqEHdRNQkqz4WHcQ@mail.gmail.com>
-Message-ID: <5351858.jEb0qfTvrF@vostro.rjw.lan>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 30 Jun 2016 09:26:52 +0800
+Subject: [PATCH 08/21] usb: chipidea: Kick OTG state machine for AVVIS
+ with vbus extcon
+In-Reply-To: <146724959973.16253.818114721999543873@sboyd-linaro>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-9-stephen.boyd@linaro.org>
+ <20160629030913.GC25236@shlinux2>
+ <146724959973.16253.818114721999543873@sboyd-linaro>
+Message-ID: <20160630012652.GB19928@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 30, 2016 09:29:59 AM Fu Wei wrote:
-> Hi Rafael,
+On Wed, Jun 29, 2016 at 06:19:59PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-06-28 20:09:13)
+> > On Sun, Jun 26, 2016 at 12:28:25AM -0700, Stephen Boyd wrote:
+> > > Force the OTG state machine to go forward when we're using an
+> > > extcon for vbus detection. In this case, the controller may never
+> > > raise an interrupt for AVVIS, so we need to simulate the event by
+> > > toggling the appropriate OTG fsm bits and kicking the state
+> > > machine again.
+> > > 
+> > 
+> > Well, I think you may misunderstand the OTG FSM and dual-role.
+> > From my and Felipe's point, there are seldom users for USB FSM,
+> > there are only OTG FSM spec and related OTG certification.
 > 
-> On 30 June 2016 at 05:32, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > On Wed, Jun 29, 2016 at 8:15 PM,  <fu.wei@linaro.org> wrote:
-> >> From: Fu Wei <fu.wei@linaro.org>
-> >>
-> >> This patchset:
-> >>     (1)Preparation for adding GTDT support in arm_arch_timer
-> >>         1. Move some enums and marcos to header file
-> >>         2. Add a new enum for spi type.
-> >>         3. Improve printk relevant code
-> >>
-> >>     (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
-> >>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
-> >>     memory-mapped timer and SBSA Generic Watchdog timer.
-> >>     This driver can help to simplify all the relevant timer drivers,
-> >>     and separate all the ACPI GTDT knowledge from them.
-> >>
-> >>     (3)Simplify ACPI code for arm_arch_timer
-> >>
-> >>     (4)Add GTDT support for ARM memory-mapped timer
-> >
-> > GTDT is ARM-specific AFAICS.
+> Probably yes.
 > 
-> yes, you are right, it is.
+> > 
+> > The OTG FSM needs related SoC support, the vbus will be off at
+> > several states, and the SRP should be supported by SoC.
+> > 
+> > By default, the dts needs below properties for disabling it if you
+> > choose otg fsm support at kernel configuration.
+> > 
+> > &usbotg1 {
+> >         vbus-supply = <&reg_usb_otg1_vbus>;
+> >         srp-disable;
+> >         hnp-disable;
+> >         adp-disable;
+> >         status = "okay";
+> > };
+> > 
+> > See Documentation/devicetree/bindings/usb/generic.txt.
 > 
-> >
-> > If so, why do we need that code to reside in drivers/acpi/ ?
-> 
-> Although  the GTDT is just for ARM64, but this driver is parsing one
-> of ACPI table,
-> I think that could be treated as ACPI driver.  Do I miss something? :-)
+> Does this mean we should be setting all those properties if we're using
+> an extcon for vbus and id?
 
-Yes, you are.  Nobody except for ARM64 will ever need it.
+It is not related to how we know vbus and id. If your controller is
+otg-capable, and you don't want to enable OTG FSM (just want dual-role),
+you should set them at dts since the zImage is multi-platforms, the
+CONFIG_USB_OTG and CONFIG_USB_OTG_FSM may be chosen.
 
-Thanks,
-Rafael
+> I have noticed that vbus is powered off after
+> some time when no device is connected and we're in A_HOST state because
+> the timeout for a B device connection happens.
+
+I think it is not you want, but it is OTG compliance.
+
+-- 
+
+Best Regards,
+Peter Chen
