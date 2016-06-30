@@ -1,72 +1,335 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Thu, 30 Jun 2016 14:59:06 +0100
-Subject: [3/3] hwmon: iio_hwmon: defer probe when no channel is found
-In-Reply-To: <20160630034725.GA26484@roeck-us.net>
-References: <1467101897-15946-4-git-send-email-quentin.schulz@free-electrons.com>
- <20160630034725.GA26484@roeck-us.net>
-Message-ID: <6FBFD60A-4D68-4B60-AB34-5077BE6BD586@jic23.retrosnub.co.uk>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 30 Jun 2016 15:06:02 +0100
+Subject: [PATCH v7 15/17] KVM: arm64: implement ITS command queue command
+ handlers
+In-Reply-To: <HE1PR04MB13217EC32E3B56C2F0178222FF240@HE1PR04MB1321.eurprd04.prod.outlook.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+ <20160628123230.26255-16-andre.przywara@arm.com>
+ <HE1PR04MB13217EC32E3B56C2F0178222FF240@HE1PR04MB1321.eurprd04.prod.outlook.com>
+Message-ID: <07a2ba5c-b835-a695-b686-94b9886cffc0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Diana,
 
+thanks for having such an elaborate look!
 
-On 30 June 2016 04:47:25 BST, Guenter Roeck <linux@roeck-us.net> wrote:
->On Tue, Jun 28, 2016 at 10:18:17AM +0200, Quentin Schulz wrote:
->> iio_channel_get_all returns -ENODEV when it cannot find either
->phandles and
->> properties in the Device Tree or channels whose consumer_dev_name
->matches
->> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio
->drivers
->> which might be probed after iio_hwmon.
->> 
->> It is better to defer the probe of iio_hwmon if such error is
->returned by
->> iio_channel_get_all in order to let a chance to iio drivers to expose
->> channels in iio_map_list.
->> 
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> ---
->>  drivers/hwmon/iio_hwmon.c | 5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
->> 
->> diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
->> index b550ba5..c0da4d9 100644
->> --- a/drivers/hwmon/iio_hwmon.c
->> +++ b/drivers/hwmon/iio_hwmon.c
->> @@ -73,8 +73,11 @@ static int iio_hwmon_probe(struct platform_device
->*pdev)
->>  		name = dev->of_node->name;
->>  
->>  	channels = iio_channel_get_all(dev);
->> -	if (IS_ERR(channels))
->> +	if (IS_ERR(channels)) {
->> +		if (PTR_ERR(channels) == -ENODEV)
->> +			return -EPROBE_DEFER;
->
->The problem, as I see it, is with iio, which should return
->-EPROBE_DEFER
->in this situation.
-Agreed. New fangled stuff this deferred probing :) 
->
->We can not convert -ENODEV to -EPROBE_DEFER without risking that the
->channels are _really_ not there, which would result in endless
->"deferred"
->messages.
-Hmm not entirely sure how we prevent that happening wherever it is done..
+On 30/06/16 12:22, Diana Madalina Craciun wrote:
+> Hi Andre,
+> 
+> On 06/28/2016 03:32 PM, Andre Przywara wrote:
 
->
->Guenter
->
->>  		return PTR_ERR(channels);
+...
+
+>> +/* The MAPC command maps collection IDs to redistributors. */
+>> +static int vits_cmd_handle_mapc(struct kvm *kvm, struct vgic_its *its,
+>> +				u64 *its_cmd)
+>> +{
+>> +	u16 coll_id;
+>> +	u32 target_addr;
+>> +	struct its_collection *collection;
+>> +	bool valid;
+>> +	int ret = 0;
+>> +
+>> +	valid = its_cmd_get_validbit(its_cmd);
+>> +	coll_id = its_cmd_get_collection(its_cmd);
+>> +	target_addr = its_cmd_get_target_addr(its_cmd);
+>> +
+>> +	if (target_addr >= atomic_read(&kvm->online_vcpus))
+>> +		return E_ITS_MAPC_PROCNUM_OOR;
+>> +
+>> +	mutex_lock(&its->its_lock);
+>> +
+>> +	collection = find_collection(its, coll_id);
+>> +
+>> +	if (!valid) {
+>> +		struct its_device *device;
+>> +		struct its_itte *itte;
+>> +		/*
+>> +		 * Clearing the mapping for that collection ID removes the
+>> +		 * entry from the list. If there wasn't any before, we can
+>> +		 * go home early.
+>> +		 */
+>> +		if (!collection)
+>> +			goto out_unlock;
+>> +
+>> +		for_each_lpi_its(device, itte, its)
+>> +			if (itte->collection &&
+>> +			    itte->collection->collection_id == coll_id)
+>> +				itte->collection = NULL;
+>> +
+>> +		list_del(&collection->coll_list);
+>> +		kfree(collection);
+>> +	} else {
+>> +		if (!collection) {
+>> +			collection = kzalloc(sizeof(struct its_collection),
+>> +					     GFP_KERNEL);
+>> +			if (!collection) {
+>> +				ret = -ENOMEM;
+>> +				goto out_unlock;
+>> +			}
+>> +		}
+>> +
+>> +		vits_init_collection(its, collection, coll_id);
+>> +		collection->target_addr = target_addr;
+> 
+> Why initializing the collection also in the case it was previously
+> found? Can't we end up adding a collection with the same ID twice to the
+> collection list?
+
+Oh right, the vits_init_collection() call has to move inside the if
+clause. Good catch!
+
+>> +		update_affinity_collection(kvm, its, collection);
+> 
+> In case the collection was newly allocated it has no interrupts mapped.
+> So, I guess, it is no use iterating through the ITTE list because we
+> will not find any interrupt.
+
+Yes, though it doesn't hurt to do it anyway. I will try to create an
+else clause and see how that looks like.
+
 >> +	}
->>  
->>  	st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
->>  	if (st == NULL) {
->--
->To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->the body of a message to majordomo at vger.kernel.org
->More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> +
+>> +out_unlock:
+>> +	mutex_unlock(&its->its_lock);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +/* The CLEAR command removes the pending state for a particular LPI. */
+>> +static int vits_cmd_handle_clear(struct kvm *kvm, struct vgic_its *its,
+>> +				 u64 *its_cmd)
+>> +{
+>> +	u32 device_id;
+>> +	u32 event_id;
+>> +	struct its_itte *itte;
+>> +	int ret = 0;
+>> +
+>> +	device_id = its_cmd_get_deviceid(its_cmd);
+>> +	event_id = its_cmd_get_id(its_cmd);
+>> +
+>> +	mutex_lock(&its->its_lock);
+>> +
+>> +	itte = find_itte(its, device_id, event_id);
+>> +	if (!itte) {
+>> +		ret = E_ITS_CLEAR_UNMAPPED_INTERRUPT;
+>> +		goto out_unlock;
+>> +	}
+>> +
+>> +	itte->irq->pending = false;
+>> +
+>> +out_unlock:
+>> +	mutex_unlock(&its->its_lock);
+>> +	return ret;
+>> +}
+>> +
+>> +/* The INV command syncs the configuration bits from the memory table. */
+>> +static int vits_cmd_handle_inv(struct kvm *kvm, struct vgic_its *its,
+>> +			       u64 *its_cmd)
+>> +{
+>> +	u32 device_id;
+>> +	u32 event_id;
+>> +	struct its_itte *itte;
+>> +	int ret;
+>> +
+>> +	device_id = its_cmd_get_deviceid(its_cmd);
+>> +	event_id = its_cmd_get_id(its_cmd);
+>> +
+>> +	mutex_lock(&its->its_lock);
+>> +
+>> +	itte = find_itte(its, device_id, event_id);
+>> +	if (!itte) {
+>> +		ret = E_ITS_INV_UNMAPPED_INTERRUPT;
+>> +		goto out_unlock;
+>> +	}
+>> +
+>> +	ret = update_lpi_config(kvm, itte->irq);
+>> +
+>> +out_unlock:
+>> +	mutex_unlock(&its->its_lock);
+>> +	return ret;
+>> +}
+>> +
+>> +/*
+>> + * The INVALL command requests flushing of all IRQ data in this collection.
+>> + * Find the VCPU mapped to that collection, then iterate over the VM's list
+>> + * of mapped LPIs and update the configuration for each IRQ which targets
+>> + * the specified vcpu. The configuration will be read from the in-memory
+>> + * configuration table.
+>> + */
+>> +static int vits_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
+>> +				  u64 *its_cmd)
+>> +{
+>> +	u32 coll_id = its_cmd_get_collection(its_cmd);
+>> +	struct its_collection *collection;
+>> +	struct kvm_vcpu *vcpu;
+>> +	struct vgic_irq *irq;
+>> +	u32 *intids;
+>> +	int irq_count, i;
+>> +
+>> +	mutex_lock(&its->its_lock);
+>> +
+>> +	collection = find_collection(its, coll_id);
+>> +	if (!its_is_collection_mapped(collection))
+>> +		return E_ITS_INVALL_UNMAPPED_COLLECTION;
+>> +
+>> +	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+>> +
+>> +	irq_count = vits_copy_lpi_list(kvm, &intids);
+>> +	if (irq_count < 0)
+>> +		return irq_count;
+>> +
+>> +	for (i = 0; i < irq_count; i++) {
+>> +		irq = vgic_get_irq(kvm, NULL, intids[i]);
+>> +		if (!irq)
+>> +			continue;
+>> +		update_lpi_config_filtered(kvm, irq, vcpu);
+>> +		vgic_put_irq_locked(kvm, irq);
+>> +	}
+>> +
+>> +	kfree(intids);
+>> +
+>> +	mutex_unlock(&its->its_lock);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/*
+>> + * The MOVALL command moves the pending state of all IRQs targeting one
+>> + * redistributor to another. We don't hold the pending state in the VCPUs,
+>> + * but in the IRQs instead, so there is really not much to do for us here.
+>> + * However the spec says that no IRQ must target the old redistributor
+>> + * afterwards, so we make sure that no LPI is using the associated target_vcpu.
+>> + * This command affects all LPIs in the system.
+> 
+> I am not sure I understand what "This command affects all LPIs in the
+> system" means. Only the LPIs that are targeting redistributor 1 are
+> affected.
 
--- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+Yes, but not only those LPIs that are mapped on _this_ ITS - that's why
+we have to iterate the per-VM LPI list instead of just the ITS data
+structures.
+I think I will refine the comment, thanks for mentioning this.
+
+> 
+>> + */
+>> +static int vits_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
+>> +				  u64 *its_cmd)
+>> +{
+> 
+> I am not sure I understand the spec correctly. So, after the movall
+> instruction the target for all the interrupts targeting redistributor 1
+> changed. However, what happens with the collection the interrupts are
+> mapped to? I see that the target CPU for the collection does not change.
+> The spec says: "In particular, an implementation might choose to remap
+> all affected collections to RDbase2 ." I guess that the user should use
+> mapc - movall combination for mapping the collection to another
+> redistributor. Is my understanding correct?
+
+Yes, movall alone is not sufficient to move LPIs from one redist to
+another, it's just meant to move the _pending state_. The spec is indeed
+not very clear about it, for instance "pending state" is only mentioned
+in the pseudo code (that's why I also got it wrong in v5). And indeed I
+was also reading the sentence you mentioned when implementing v5.
+Frankly I am not sure we actually need this moving in our
+implementation, but as the spec explicitly mentions this I thought it
+would be a good idea to be sure of that.
+
+Thanks again to the review!
+
+Cheers,
+Andre.
+
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	u32 target1_addr = its_cmd_get_target_addr(its_cmd);
+>> +	u32 target2_addr = its_cmd_mask_field(its_cmd, 3, 16, 32);
+>> +	struct kvm_vcpu *vcpu1, *vcpu2;
+>> +	struct vgic_irq *irq;
+>> +
+>> +	if (target1_addr >= atomic_read(&kvm->online_vcpus) ||
+>> +	    target2_addr >= atomic_read(&kvm->online_vcpus))
+>> +		return E_ITS_MOVALL_PROCNUM_OOR;
+>> +
+>> +	if (target1_addr == target2_addr)
+>> +		return 0;
+>> +
+>> +	vcpu1 = kvm_get_vcpu(kvm, target1_addr);
+>> +	vcpu2 = kvm_get_vcpu(kvm, target2_addr);
+>> +
+>> +	spin_lock(&dist->lpi_list_lock);
+>> +
+>> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_entry) {
+>> +		spin_lock(&irq->irq_lock);
+>> +
+>> +		if (irq->target_vcpu == vcpu1)
+>> +			irq->target_vcpu = vcpu2;
+>> +
+>> +		spin_unlock(&irq->irq_lock);
+>> +	}
+>> +
+>> +	spin_unlock(&dist->lpi_list_lock);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/*
+>> + * This function is called with the its_cmd lock held, but the ITS data
+>> + * structure lock dropped. It is within the responsibility of the actual
+>> + * command handlers to take care of proper locking when needed.
+>> + */
+>>  static int vits_handle_command(struct kvm *kvm, struct vgic_its *its,
+>>  			       u64 *its_cmd)
+>>  {
+>> -	return -ENODEV;
+>> +	u8 cmd = its_cmd_get_command(its_cmd);
+>> +	int ret = -ENODEV;
+>> +
+>> +	switch (cmd) {
+>> +	case GITS_CMD_MAPD:
+>> +		ret = vits_cmd_handle_mapd(kvm, its, its_cmd);
+>> +		break;
+>> +	case GITS_CMD_MAPC:
+>> +		ret = vits_cmd_handle_mapc(kvm, its, its_cmd);
+>> +		break;
+>> +	case GITS_CMD_MAPI:
+>> +		ret = vits_cmd_handle_mapi(kvm, its, its_cmd, cmd);
+>> +		break;
+>> +	case GITS_CMD_MAPTI:
+>> +		ret = vits_cmd_handle_mapi(kvm, its, its_cmd, cmd);
+>> +		break;
+>> +	case GITS_CMD_MOVI:
+>> +		ret = vits_cmd_handle_movi(kvm, its, its_cmd);
+>> +		break;
+>> +	case GITS_CMD_DISCARD:
+>> +		ret = vits_cmd_handle_discard(kvm, its, its_cmd);
+>> +		break;
+>> +	case GITS_CMD_CLEAR:
+>> +		ret = vits_cmd_handle_clear(kvm, its, its_cmd);
+>> +		break;
+>> +	case GITS_CMD_MOVALL:
+>> +		ret = vits_cmd_handle_movall(kvm, its, its_cmd);
+>> +		break;
+>> +	case GITS_CMD_INV:
+>> +		ret = vits_cmd_handle_inv(kvm, its, its_cmd);
+>> +		break;
+>> +	case GITS_CMD_INVALL:
+>> +		ret = vits_cmd_handle_invall(kvm, its, its_cmd);
+>> +		break;
+>> +	case GITS_CMD_SYNC:
+>> +		/* we ignore this command: we are in sync all of the time */
+>> +		ret = 0;
+>> +		break;
+>> +	}
+>> +
+>> +	return ret;
+>>  }
+>>  
+>>  static u64 vgic_sanitise_its_baser(u64 reg)
+> 
+> Thanks,
+> 
+> Diana
+> 
+> 
+> 
