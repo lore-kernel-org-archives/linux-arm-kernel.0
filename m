@@ -1,102 +1,61 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 30 Jun 2016 10:22:11 -0600
-Subject: [PATCH 05/13] coresight: Consolidate error handling path for tmc_probe
+Date: Thu, 30 Jun 2016 10:22:14 -0600
+Subject: [PATCH 08/13] coresight: etmv4: Fix ETMv4x peripheral ID table
 In-Reply-To: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1467303739-12543-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1467303739-12543-9-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-This patch cleans up the error handling path for tmc_probe
-as a side effect of the removal of the spurious dma_free_coherent().
+This patch cleans up the peripheral id table for different ETMv4
+implementations.
+
+As per Cortex-A53 TRM, the ETM has following id values:
+
+Peripheral ID0	0x5D	0xFE0
+Peripheral ID1	0xB9	0xFE4
+Peripheral ID2	0x4B	0xFE8
+Peripheral ID3	0x00	0xFEC
+
+where, PID2: has the following format:
+
+[7:4]   Revision
+[3]     JEDEC   0b1     res1. Indicates a JEP106 identity code is used
+[2:0]   DES_1   0b011   ARM Limited. This is bits[6:4] of JEP106 ID code
+
+The existing table entry checks only the bits [1:0], which is not
+sufficient enough. Fix it to match bits [3:0], just like the other
+entries do. While at it, correct the comment for A57 and the A53 entry.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 36 ++++++++++++++---------------
- 1 file changed, 17 insertions(+), 19 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 3978cbb6b038..1b47258e01c9 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -309,22 +309,31 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	if (np) {
- 		pdata = of_get_coresight_platform_data(dev, np);
--		if (IS_ERR(pdata))
--			return PTR_ERR(pdata);
-+		if (IS_ERR(pdata)) {
-+			ret = PTR_ERR(pdata);
-+			goto out;
-+		}
- 		adev->dev.platform_data = pdata;
- 	}
- 
-+	ret = -ENOMEM;
- 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
- 	if (!drvdata)
--		return -ENOMEM;
-+		goto out;
-+
-+	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
-+	if (!desc)
-+		goto out;
- 
- 	drvdata->dev = &adev->dev;
- 	dev_set_drvdata(dev, drvdata);
- 
- 	/* Validity for the resource is already checked by the AMBA core */
- 	base = devm_ioremap_resource(dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	if (IS_ERR(base)) {
-+		ret = PTR_ERR(base);
-+		goto out;
-+	}
- 
- 	drvdata->base = base;
- 
-@@ -347,12 +356,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	pm_runtime_put(&adev->dev);
- 
--	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
--	if (!desc) {
--		ret = -ENOMEM;
--		goto err_devm_kzalloc;
--	}
--
- 	desc->pdata = pdata;
- 	desc->dev = dev;
- 	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
-@@ -373,7 +376,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 	drvdata->csdev = coresight_register(desc);
- 	if (IS_ERR(drvdata->csdev)) {
- 		ret = PTR_ERR(drvdata->csdev);
--		goto err_devm_kzalloc;
-+		goto out;
- 	}
- 
- 	drvdata->miscdev.name = pdata->name;
-@@ -381,13 +384,8 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 	drvdata->miscdev.fops = &tmc_fops;
- 	ret = misc_register(&drvdata->miscdev);
- 	if (ret)
--		goto err_misc_register;
--
--	return 0;
--
--err_misc_register:
--	coresight_unregister(drvdata->csdev);
--err_devm_kzalloc:
-+		coresight_unregister(drvdata->csdev);
-+out:
- 	return ret;
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 4c4f40cbe34e..ee089a7a7e87 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -801,12 +801,12 @@ err_arch_supported:
  }
  
+ static struct amba_id etm4_ids[] = {
+-	{       /* ETM 4.0 - Qualcomm */
+-		.id	= 0x0003b95d,
+-		.mask	= 0x0003ffff,
++	{       /* ETM 4.0 - Cortex-A53  */
++		.id	= 0x000bb95d,
++		.mask	= 0x000fffff,
+ 		.data	= "ETM 4.0",
+ 	},
+-	{       /* ETM 4.0 - Juno board */
++	{       /* ETM 4.0 - Cortex-A57 */
+ 		.id	= 0x000bb95e,
+ 		.mask	= 0x000fffff,
+ 		.data	= "ETM 4.0",
 -- 
 2.7.4
