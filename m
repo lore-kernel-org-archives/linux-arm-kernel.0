@@ -1,55 +1,118 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 30 Jun 2016 16:14:58 +0300
-Subject: [PATCH 0/5] ARM: OMAP2+: hwmod/clk related fixes
-Message-ID: <1467292503-4376-1-git-send-email-t-kristo@ti.com>
+Date: Thu, 30 Jun 2016 16:15:00 +0300
+Subject: [PATCH 2/5] ARM: OMAP2+: hwmod: fetch main_clk based on hwmod name
+In-Reply-To: <1467292503-4376-1-git-send-email-t-kristo@ti.com>
+References: <1467292503-4376-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1467292503-4376-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With the transition to hwmod module clocks, all hwmods will have
+their main clocks named <hwmod_name>_mod_ck. Use this info to
+fetch main_clk, and use it if found.
 
-These patches have been split out of the series here:
+Also, if a main_clk is found based on the hwmod name, disable
+the direct PRCM modulemode access from hwmod.
 
-http://www.spinics.net/lists/arm-kernel/msg510985.html
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c | 49 ++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 44 insertions(+), 5 deletions(-)
 
-Basically a few fixes to the hwmod / clk related functionality
-under mach-omap2.
-
-This split up series has been boot tested on following platforms:
-
-  : Board           : Boot WRN version                 
- 1: am335x-evm      : PASS   0 4.7.0-rc1-00005-g8238af6
- 2: am335x-evmsk    : PASS   0 4.7.0-rc1-00005-g8238af6
- 3: am3517-evm      : PASS   1 4.7.0-rc1-00005-g8238af6
- 4: am37x-evm       : PASS   0 4.7.0-rc1-00005-g8238af6
- 5: am437x-sk       : PASS   0 4.7.0-rc1-00005-g8238af6
- 6: am43x-epos-evm  : PASS   0 4.7.0-rc1-00005-g8238af6
- 7: am437x-gp-evm   : PASS   0 4.7.0-rc1-00005-g8238af6
- 8: am57xx-evm      : PASS   3 4.7.0-rc1-00005-g8238af6
- 9: omap3-beagle-xm : PASS   0 4.7.0-rc1-00005-g8238af6
-10: omap3-beagle    : PASS   0 4.7.0-rc1-00005-g8238af6
-11: am335x-boneblack: PASS   0 4.7.0-rc1-00005-g8238af6
-12: am335x-bone     : PASS   0 4.7.0-rc1-00005-g8238af6
-13: craneboard      : PASS   1 4.7.0-rc1-00005-g8238af6
-14: dra72x-evm      : FAIL   3 4.7.0-rc1-00005-g8238af6
-15: dra7xx-evm      : PASS   3 4.7.0-rc1-00005-g8238af6
-16: ldp3430         : FAIL   0                         
-17: omap3-n900      : PASS   0 4.7.0-rc1-00005-g8238af6
-18: omap5-uevm      : PASS   0 4.7.0-rc1-00005-g8238af6
-19: omap4-panda-es  : PASS   0 4.7.0-rc1-00005-g8238af6
-20: omap4-panda     : PASS   0 4.7.0-rc1-00005-g8238af6
-21: omap2430-sdp    : PASS   0 4.7.0-rc1-00005-g8238af6
-22: omap3430-sdp    : PASS   0 4.7.0-rc1-00005-g8238af6
-23: omap4-sdp-es23plus: PASS   0 4.7.0-rc1-00005-g8238af6
-TOTAL = 23 boards, Booted Boards = 21, No Boot boards = 2
-
-Does not generate any new boot warnings, or other visible side effects.
-
-The two failing boards seem to be broken in the farm in general, as they
-fail with any kernel.
-
-Patches also available here:
-
-tree: https://github.com/t-kristo/linux-pm.git
-branch: 4.7-rc1-hwmod-fixes
-
--Tero
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 83cb527..8adf1c1 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -200,6 +200,7 @@ struct omap_hwmod_soc_ops {
+ 	int (*init_clkdm)(struct omap_hwmod *oh);
+ 	void (*update_context_lost)(struct omap_hwmod *oh);
+ 	int (*get_context_lost)(struct omap_hwmod *oh);
++	int (*disable_direct_prcm)(struct omap_hwmod *oh);
+ };
+ 
+ /* soc_ops: adapts the omap_hwmod code to the currently-booted SoC */
+@@ -776,17 +777,34 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
+  * @oh: struct omap_hwmod *
+  *
+  * Called from _init_clocks().  Populates the @oh _clk (main
+- * functional clock pointer) if a main_clk is present.  Returns 0 on
+- * success or -EINVAL on error.
++ * functional clock pointer) if a clock matching the hwmod name is found,
++ * or a main_clk is present.  Returns 0 on success or -EINVAL on error.
+  */
+ static int _init_main_clk(struct omap_hwmod *oh)
+ {
+ 	int ret = 0;
++	char name[32];
++	static int max_len;
++	struct clk *clk;
+ 
+-	if (!oh->main_clk)
+-		return 0;
++	strcpy(name, oh->name);
++	strcat(name, "_mod_ck");
++
++	if (strlen(name) > max_len)
++		max_len = strlen(name);
++
++	clk = clk_get(NULL, name);
++	if (!IS_ERR(clk)) {
++		oh->_clk = clk;
++		soc_ops.disable_direct_prcm(oh);
++		oh->main_clk = kstrdup(name, GFP_KERNEL);
++	} else {
++		if (!oh->main_clk)
++			return 0;
++
++		oh->_clk = clk_get(NULL, oh->main_clk);
++	}
+ 
+-	oh->_clk = clk_get(NULL, oh->main_clk);
+ 	if (IS_ERR(oh->_clk)) {
+ 		pr_warn("omap_hwmod: %s: cannot clk_get main_clk %s\n",
+ 			oh->name, oh->main_clk);
+@@ -3091,6 +3109,25 @@ static int _omap4_is_hardreset_asserted(struct omap_hwmod *oh,
+ }
+ 
+ /**
++ * _omap4_disable_direct_prcm - disable direct PRCM control for hwmod
++ * @oh: struct omap_hwmod * to disable control for
++ *
++ * Disables direct PRCM clkctrl done by hwmod core. Instead, the hwmod
++ * will be using its main_clk to enable/disable the module. Returns
++ * 0 if successful.
++ */
++static int _omap4_disable_direct_prcm(struct omap_hwmod *oh)
++{
++	if (!oh)
++		return -EINVAL;
++
++	oh->prcm.omap4.clkctrl_offs = 0;
++	oh->prcm.omap4.modulemode = 0;
++
++	return 0;
++}
++
++/**
+  * _am33xx_deassert_hardreset - call AM33XX PRM hardreset fn with hwmod args
+  * @oh: struct omap_hwmod * to deassert hardreset
+  * @ohri: hardreset line data
+@@ -3913,6 +3950,7 @@ void __init omap_hwmod_init(void)
+ 		soc_ops.init_clkdm = _init_clkdm;
+ 		soc_ops.update_context_lost = _omap4_update_context_lost;
+ 		soc_ops.get_context_lost = _omap4_get_context_lost;
++		soc_ops.disable_direct_prcm = _omap4_disable_direct_prcm;
+ 	} else if (cpu_is_ti814x() || cpu_is_ti816x() || soc_is_am33xx() ||
+ 		   soc_is_am43xx()) {
+ 		soc_ops.enable_module = _omap4_enable_module;
+@@ -3922,6 +3960,7 @@ void __init omap_hwmod_init(void)
+ 		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
+ 		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
+ 		soc_ops.init_clkdm = _init_clkdm;
++		soc_ops.disable_direct_prcm = _omap4_disable_direct_prcm;
+ 	} else {
+ 		WARN(1, "omap_hwmod: unknown SoC type\n");
+ 	}
+-- 
+1.9.1
