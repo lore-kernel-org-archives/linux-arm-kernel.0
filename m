@@ -1,39 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:39 +0200
-Subject: [PATCH 19/41] ARM: dts: kzm9g: Name serial port pfc subnode after
- device name
+Date: Thu, 30 Jun 2016 16:15:41 +0200
+Subject: [PATCH 21/41] ARM: dts: r8a7792: add power domain index macros
 In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
 References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <970a62e07e5cfba58a571e4ba671f438065fcb19.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <5258bb5d980024dae22f4256329caec4fe5e98b3.1467294011.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Name the Pin Function Controller subnode for SCIFA4 after its device
-name, instead of after the serial port alias.
+Add macros usable by the device tree sources to reference R8A7792 SYSC power
+domains by index.
 
-This avoids conflicts when adding support for more serial ports later,
-either here or in a DT overlay.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/dt-bindings/power/r8a7792-sysc.h | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 include/dt-bindings/power/r8a7792-sysc.h
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-index 36567cbf2e1c..1df68b167033 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-@@ -352,7 +352,7 @@
- 		};
- 	};
- 
--	scifa4_pins: serial4 {
-+	scifa4_pins: scifa4 {
- 		groups = "scifa4_data", "scifa4_ctrl";
- 		function = "scifa4";
- 	};
+diff --git a/include/dt-bindings/power/r8a7792-sysc.h b/include/dt-bindings/power/r8a7792-sysc.h
+new file mode 100644
+index 000000000000..74f4a78e29aa
+--- /dev/null
++++ b/include/dt-bindings/power/r8a7792-sysc.h
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (C) 2016 Cogent Embedded Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
++#ifndef __DT_BINDINGS_POWER_R8A7792_SYSC_H__
++#define __DT_BINDINGS_POWER_R8A7792_SYSC_H__
++
++/*
++ * These power domain indices match the numbers of the interrupt bits
++ * representing the power areas in the various Interrupt Registers
++ * (e.g. SYSCISR, Interrupt Status Register)
++ */
++
++#define R8A7792_PD_CA15_CPU0		0
++#define R8A7792_PD_CA15_CPU1		1
++#define R8A7792_PD_CA15_SCU		12
++#define R8A7792_PD_SGX			20
++#define R8A7792_PD_IMP			24
++
++/* Always-on power area */
++#define R8A7792_PD_ALWAYS_ON		32
++
++#endif /* __DT_BINDINGS_POWER_R8A7792_SYSC_H__ */
 -- 
 2.7.0.rc3.207.g0ac5344
