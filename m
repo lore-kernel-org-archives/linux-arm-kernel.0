@@ -1,84 +1,106 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 30 Jun 2016 11:32:30 +0200
-Subject: [PATCH v3 1/3] dt-bindings: add DT binding for the Aardvark PCIe
- controller
-In-Reply-To: <1467279152-5717-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1467279152-5717-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1467279152-5717-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 30 Jun 2016 11:32:29 +0200
+Subject: [PATCH v3 0/3] pci: Aardvark PCIe controller driver for Marvell
+ Armada 3700
+Message-ID: <1467279152-5717-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the documentation for the Device Tree binding used to
-describe the Aardvark PCIe controller, found on Marvell Armada 3700
-ARM64 SoCs.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- .../devicetree/bindings/pci/aardvark-pci.txt       | 56 ++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+This is the third iteration of the patch series that adds a PCIe
+controller driver for the Aardvark PCI controller, which is used on
+Marvell Armada 3700.
+
+Changes since v2:
+
+ - Fix typo in the DT binding documentation (handled ->
+   handle). Noticed by Bjorn Helgaas.
+
+ - Make all macro definitions use lower-case letters for hexadecimal
+   numbers. Suggested by Bjorn Helgaas.
+
+ - Remove numerous unused macro definitions. Suggested by Bjorn
+   Helgaas.
+
+ - Remove useless parenthesis in macro definitions. Suggested by Bjorn
+   Helgaas.
+
+ - Read the root bus number from the Device Tree (through the
+   IORESOURCE_BUS resource) instead of hardcoding bus 0. Suggested by
+   Bjorn Helgaas.
+
+ - Rework the "link up" functions in two separate functions:
+   advk_pcie_link_up() and advk_pcie_wait_for_link(), and use
+   usleep_range() with a number of retries. Suggested by Bjorn
+   Helgaas.
+
+ - Fix some comments for consistency.
+
+ - Switch from the AXI disabling logic to a different strategy for
+   accessing the configuration space. This avoids the need for
+   synchronization, and therefore solves some stability problems.
+
+ - Minor improvements to the advk_pcie_wait_pio() function.
+
+ - Make the 'if (where % size)' test earlier in the
+   advk_pcie_wr_conf() function. Suggested by Bjorn Helgaas.
+
+ - Use dev_err() instead of pr_err(). Suggested by Bjorn Helgaas.
+
+ - Split the irq domain initialization (for legacy interrupts and MSI
+   interrupts into two functions). While at it, also fix a device_node
+   reference count leak when initializing the legacy irq
+   domain. Requested by Bjorn Helgaas.
+
+ - Remove the advk_pcie_release_of_pci_ranges() function, and call
+   pci_free_resource_list() directly. Suggested by Bjorn Helgaas.
+
+ - Remove MODULE_DEVICE_TABLE(), as the driver is not compiled as a
+   module. Suggested by Bjorn Helgaas.
+
+ - Change the "select PCI_MSI" to "depends on
+   PCI_MSI_IRQ_DOMAIN". Suggested by Bjorn Helgaas.
+
+Changes since v1:
+
+ - Even if the MSI handling is currently done directly by the PCIe
+   controller, use a msi-parent property to indicate this
+   relationship. This way, if in the future we want to use the MSI
+   capabilities from the GIC interrupt controller rather than the MSI
+   functionality of the PCI controller, it will be possible.
+
+   Suggested by Arnd Bergmann.
+
+ - Replace the number-of-retry based loops by timeout based loops,
+   using time_before().
+
+   Suggested by Arnd Bergmann.
+
+ - Simplify the IRQ handling, which actually also fixes a number of
+   issues with the interrupt handling.
+
+   Suggested by Marcin Wojtas.
+
+Thanks,
+
+Thomas
+
+Thomas Petazzoni (3):
+  dt-bindings: add DT binding for the Aardvark PCIe controller
+  PCI: host: new PCI host controller driver for Aardvark
+  arm64: dts: marvell: Aardvark PCIe support for Armada 3700
+
+ .../devicetree/bindings/pci/aardvark-pci.txt       |   56 ++
+ MAINTAINERS                                        |    7 +
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts     |    5 +
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   25 +
+ drivers/pci/host/Kconfig                           |    9 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pci-aardvark.c                    | 1014 ++++++++++++++++++++
+ 7 files changed, 1117 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pci/aardvark-pci.txt
+ create mode 100644 drivers/pci/host/pci-aardvark.c
 
-diff --git a/Documentation/devicetree/bindings/pci/aardvark-pci.txt b/Documentation/devicetree/bindings/pci/aardvark-pci.txt
-new file mode 100644
-index 0000000..bbcd9f4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/aardvark-pci.txt
-@@ -0,0 +1,56 @@
-+Aardvark PCIe controller
-+
-+This PCIe controller is used on the Marvell Armada 3700 ARM64 SoC.
-+
-+The Device Tree node describing an Aardvark PCIe controller must
-+contain the following properties:
-+
-+ - compatible: Should be "marvell,armada-3700-pcie"
-+ - reg: range of registers for the PCIe controller
-+ - interrupts: the interrupt line of the PCIe controller
-+ - #address-cells: set to <3>
-+ - #size-cells: set to <2>
-+ - device_type: set to "pci"
-+ - ranges: ranges for the PCI memory and I/O regions
-+ - #interrupt-cells: set to <1>
-+ - msi-controller: indicates that the PCIe controller can itself
-+   handle MSI interrupts
-+ - msi-parent: pointer to the MSI controller to be used
-+ - interrupt-map-mask and interrupt-map: standard PCI properties to
-+   define the mapping of the PCIe interface to interrupt numbers.
-+ - bus-range: PCI bus numbers covered
-+
-+In addition, the Device Tree describing an Aardvark PCIe controller
-+must include a sub-node that describes the legacy interrupt controller
-+built into the PCIe controller. This sub-node must have the following
-+properties:
-+
-+ - interrupt-controller
-+ - #interrupt-cells: set to <1>
-+
-+Example:
-+
-+	pcie0: pcie at d0070000 {
-+		compatible = "marvell,armada-3700-pcie";
-+		device_type = "pci";
-+		status = "disabled";
-+		reg = <0 0xd0070000 0 0x20000>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		bus-range = <0x00 0xff>;
-+		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+		#interrupt-cells = <1>;
-+		msi-controller;
-+		msi-parent = <&pcie0>;
-+		ranges = <0x82000000 0 0xe8000000   0 0xe8000000 0 0x1000000 /* Port 0 MEM */
-+			  0x81000000 0 0xe9000000   0 0xe9000000 0 0x10000>; /* Port 0 IO*/
-+		interrupt-map-mask = <0 0 0 7>;
-+		interrupt-map = <0 0 0 1 &pcie_intc 0>,
-+				<0 0 0 2 &pcie_intc 1>,
-+				<0 0 0 3 &pcie_intc 2>,
-+				<0 0 0 4 &pcie_intc 3>;
-+		pcie_intc: interrupt-controller {
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+	};
 -- 
 2.7.4
