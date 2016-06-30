@@ -1,50 +1,93 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Thu, 30 Jun 2016 11:50:41 +0300
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <fa0bf74d-cba3-0853-753c-64fe049105aa@broadcom.com> (Arend Van
- Spriel's message of "Wed, 29 Jun 2016 20:57:35 +0200")
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <CAOiHx=n6itfmvwYQh+jUSDNguQFkos=MzjkDWP=GsupdgvF6KQ@mail.gmail.com>
- <b49a9e4b-d591-d978-8005-413f39ebf2bd@redhat.com>
- <871t3gdj6p.fsf@purkki.adurom.net>
- <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
- <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
- <fa0bf74d-cba3-0853-753c-64fe049105aa@broadcom.com>
-Message-ID: <87inwr6owu.fsf@kamboji.qca.qualcomm.com>
+From: bhe@redhat.com (Baoquan He)
+Date: Thu, 30 Jun 2016 17:00:45 +0800
+Subject: [PATCH v20 13/14] arm64: kdump: update a kernel doc
+In-Reply-To: <ef07d5dafe5c69b621dc4ec01ef1c6f3f9753e60.1466702804.git.geoff@infradead.org>
+References: <cover.1466702804.git.geoff@infradead.org>
+ <ef07d5dafe5c69b621dc4ec01ef1c6f3f9753e60.1466702804.git.geoff@infradead.org>
+Message-ID: <20160630090045.GA16958@x1.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arend Van Spriel <arend.vanspriel@broadcom.com> writes:
+On 06/23/16 at 05:54pm, Geoff Levand wrote:
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> 
+> This patch adds arch specific descriptions about kdump usage on arm64
+> to kdump.txt.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  Documentation/kdump/kdump.txt | 15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+> index 88ff63d..5d6da09 100644
+> --- a/Documentation/kdump/kdump.txt
+> +++ b/Documentation/kdump/kdump.txt
+> @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
+>  a remote system.
+>  
+>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
+> -s390x and arm architectures.
+> +s390x, arm and arm64 architectures.
+>  
+>  When the system kernel boots, it reserves a small section of memory for
+>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
+> @@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
+>  
+>      AUTO_ZRELADDR=y
+>  
+> +Dump-capture kernel config options (Arch Dependent, arm64)
+> +----------------------------------------------------------
+> +
+> +1) Currently, kvm will not be enabled on the dump-capture kernel even
+> +   if it is configured.
+> +
+>  Extended crashkernel syntax
+>  ===========================
+>  
+> @@ -305,6 +311,8 @@ Boot into System Kernel
+>     kernel will automatically locate the crash kernel image within the
+>     first 512MB of RAM if X is not given.
+>  
+> +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
+				  ~ Why square brackets here, is it
+different than other arch?
 
->>> Typical wifi devices will have some sort of non volatile storage
->>> on board to not only store the ethernet(mac) address, but also
->>> to contain e.g. info about the antenna gain so that the firmware
->>> and/or the driver can take the antenna gain into account and ensure
->>> that they never exceed the maximum allowed broadcast strength.
->>>
->>> However on some embedded devices there is no non-volatile storage
->>> for the wifi (for cost reasons) and instead this configuration info
->>> (which is board / pcb specific) is loaded in the form of a
->>> file which contains the contents which would normally be in the
->>> non-volatile storage.
->>>
->>> Since we are dealing with a per-board config-file here, which is
->>> loaded from the os filesystem we really need to specify a basename
->>> here as the list of possible boards is endless, so we cannot
->>> have a lookup table in the driver.
->
-> As a note: For BT Marcel was playing with the idea of having a lookup
-> table on the file system which would be loaded by the driver.
 
-In ath10k we have a similar problem but in our case we can use the
-subsystem id to detect what board file to use, so it's not exactly same
-as yours. In our board-2.bin we have identifiers like this from which
-ath10k selects the correct board file:
+Except for this, it looks good to me.
 
-bus=pci,vendor=168c,device=003e,subsystem-vendor=168c,subsystem-device=334e
-bus=pci,vendor=168c,device=003e,subsystem-vendor=168c,subsystem-device=3360
-bus=pci,vendor=168c,device=003e,subsystem-vendor=168c,subsystem-device=3361
+Thanks
+Baoquan
 
--- 
-Kalle Valo
+> +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
+>  
+>  Load the Dump-capture Kernel
+>  ============================
+> @@ -327,6 +335,8 @@ For s390x:
+>  	- Use image or bzImage
+>  For arm:
+>  	- Use zImage
+> +For arm64:
+> +	- Use vmlinux or Image
+>  
+>  If you are using a uncompressed vmlinux image then use following command
+>  to load dump-capture kernel.
+> @@ -370,6 +380,9 @@ For s390x:
+>  For arm:
+>  	"1 maxcpus=1 reset_devices"
+>  
+> +For arm64:
+> +	"1 maxcpus=1 reset_devices"
+> +
+>  Notes on loading the dump-capture kernel:
+>  
+>  * By default, the ELF headers are stored in ELF64 format to support
+> -- 
+> 2.5.0
+> 
+> 
+> 
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
