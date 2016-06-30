@@ -1,58 +1,37 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 30 Jun 2016 08:38:13 +0200
-Subject: [PATCH] media: s5p-mfc fix vidioc_g_crop() to return crop info.
-In-Reply-To: <1467243236-13395-1-git-send-email-shuahkh@osg.samsung.com>
-References: <1467243236-13395-1-git-send-email-shuahkh@osg.samsung.com>
-Message-ID: <8b6cc61d-836c-26f6-e6b9-269f5cb2be62@xs4all.nl>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 30 Jun 2016 15:04:25 +0800
+Subject: [PATCH V2 4/8] clk: core: support clocks which requires parents
+ enable (part 2)
+In-Reply-To: <201606300015.zJJwBdRV%fengguang.wu@intel.com>
+References: <1467212351-16626-5-git-send-email-aisheng.dong@nxp.com>
+ <201606300015.zJJwBdRV%fengguang.wu@intel.com>
+Message-ID: <20160630070425.GC29919@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2016 01:33 AM, Shuah Khan wrote:
-> Fix vidioc_g_crop() to report crop information irrepective of ctx state.
-> g_crop is expected to return crop information as long as the passed in
-> v4l2_crop type field is vV4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE.
+On Thu, Jun 30, 2016 at 12:42:21AM +0800, kbuild test robot wrote:
+> Hi,
 > 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 9 +++------
->  1 file changed, 3 insertions(+), 6 deletions(-)
+> [auto build test ERROR on clk/clk-next]
+> [also build test ERROR on v4.7-rc5 next-20160629]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 > 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> index a01a373..4ace9e1 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -774,12 +774,9 @@ static int vidioc_g_crop(struct file *file, void *priv,
->  	struct s5p_mfc_dev *dev = ctx->dev;
->  	u32 left, right, top, bottom;
->  
-> -	if (ctx->state != MFCINST_HEAD_PARSED &&
-> -	ctx->state != MFCINST_RUNNING && ctx->state != MFCINST_FINISHING
-> -					&& ctx->state != MFCINST_FINISHED) {
-> -			mfc_err("Cannont set crop\n");
-> -			return -EINVAL;
-> -		}
-
-Well, without this information all you can do is to return a fake rectangle.
-The decoder needs to have parsed the header to know the size.
-
-> +	if (cr->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
-
-Actually, this should be V4L2_BUF_TYPE_VIDEO_OUTPUT. See the spec.
-
-I actually wonder why there is a g_crop at all since without a s_crop it doesn't
-provide any useful information.
-
-And if it is needed, then g_selection is the right callback since g_crop for
-output provides the compose rectangle, not the crop rectangle (one of the
-reasons we introduced g/s_selection).
-
-Regards,
-
-	Hans
-
-> +		return -EINVAL;
-> +
->  	if (ctx->src_fmt->fourcc == V4L2_PIX_FMT_H264) {
->  		left = s5p_mfc_hw_call(dev->mfc_ops, get_crop_info_h, ctx);
->  		right = left >> S5P_FIMV_SHARED_CROP_RIGHT_SHIFT;
+> url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-core-support-clocks-which-requires-parents-enable/20160629-231445
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+> config: x86_64-randconfig-i0-201626 (attached as .config)
+> compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=x86_64 
 > 
+> All error/warnings (new ones prefixed by >>):
+> 
+>    include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
+>     #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
+>                             ^~~~~~~~~~~~~~~~
+
+Sorry, i somehow sent out a wrong re-based version.
+Will send out V3 to fix it.
+
+Regards
+Dong Aisheng
