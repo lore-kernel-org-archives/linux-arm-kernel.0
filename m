@@ -1,240 +1,80 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 30 Jun 2016 17:31:12 +0800
-Subject: [PATCH V3 2/8] clk: move clk_disable_unused after
- clk_core_disable_unprepare function
+Date: Thu, 30 Jun 2016 17:31:16 +0800
+Subject: [PATCH V3 6/8] clk: imx: add clk api for supporting
+ CLK_OPS_PARENT_ENABLE clocks
 In-Reply-To: <1467279078-2330-1-git-send-email-aisheng.dong@nxp.com>
 References: <1467279078-2330-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1467279078-2330-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1467279078-2330-7-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No function level change, just moving code place.
-clk_disable_unused function will need to call clk_core_prepare_enable/
-clk_core_disable_unprepare when adding CLK_OPS_PARENT_ENABLE features.
-So move it after clk_core_disable_unprepare to avoid adding forward
-declared functions later.
+IMX SoCs like i.MX7D requires using CLK_OPS_PARENT_ENABLE flags,
+adding the corresponding clock APIs variants for easily to use.
 
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/clk.c | 196 +++++++++++++++++++++++++++---------------------------
- 1 file changed, 98 insertions(+), 98 deletions(-)
+ drivers/clk/imx/clk.h | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 55e62bac0fb4..e2e8f0c9f20a 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -172,104 +172,6 @@ static bool clk_core_is_enabled(struct clk_core *core)
- 	return core->ops->is_enabled(core->hw);
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index 936e235f7c04..a81c0385ed64 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -97,6 +97,14 @@ static inline struct clk *imx_clk_divider_flags(const char *name,
+ 			reg, shift, width, 0, &imx_ccm_lock);
  }
  
--static void clk_unprepare_unused_subtree(struct clk_core *core)
--{
--	struct clk_core *child;
--
--	lockdep_assert_held(&prepare_lock);
--
--	hlist_for_each_entry(child, &core->children, child_node)
--		clk_unprepare_unused_subtree(child);
--
--	if (core->prepare_count)
--		return;
--
--	if (core->flags & CLK_IGNORE_UNUSED)
--		return;
--
--	if (clk_core_is_prepared(core)) {
--		trace_clk_unprepare(core);
--		if (core->ops->unprepare_unused)
--			core->ops->unprepare_unused(core->hw);
--		else if (core->ops->unprepare)
--			core->ops->unprepare(core->hw);
--		trace_clk_unprepare_complete(core);
--	}
--}
--
--static void clk_disable_unused_subtree(struct clk_core *core)
--{
--	struct clk_core *child;
--	unsigned long flags;
--
--	lockdep_assert_held(&prepare_lock);
--
--	hlist_for_each_entry(child, &core->children, child_node)
--		clk_disable_unused_subtree(child);
--
--	flags = clk_enable_lock();
--
--	if (core->enable_count)
--		goto unlock_out;
--
--	if (core->flags & CLK_IGNORE_UNUSED)
--		goto unlock_out;
--
--	/*
--	 * some gate clocks have special needs during the disable-unused
--	 * sequence.  call .disable_unused if available, otherwise fall
--	 * back to .disable
--	 */
--	if (clk_core_is_enabled(core)) {
--		trace_clk_disable(core);
--		if (core->ops->disable_unused)
--			core->ops->disable_unused(core->hw);
--		else if (core->ops->disable)
--			core->ops->disable(core->hw);
--		trace_clk_disable_complete(core);
--	}
--
--unlock_out:
--	clk_enable_unlock(flags);
--}
--
--static bool clk_ignore_unused;
--static int __init clk_ignore_unused_setup(char *__unused)
--{
--	clk_ignore_unused = true;
--	return 1;
--}
--__setup("clk_ignore_unused", clk_ignore_unused_setup);
--
--static int clk_disable_unused(void)
--{
--	struct clk_core *core;
--
--	if (clk_ignore_unused) {
--		pr_warn("clk: Not disabling unused clocks\n");
--		return 0;
--	}
--
--	clk_prepare_lock();
--
--	hlist_for_each_entry(core, &clk_root_list, child_node)
--		clk_disable_unused_subtree(core);
--
--	hlist_for_each_entry(core, &clk_orphan_list, child_node)
--		clk_disable_unused_subtree(core);
--
--	hlist_for_each_entry(core, &clk_root_list, child_node)
--		clk_unprepare_unused_subtree(core);
--
--	hlist_for_each_entry(core, &clk_orphan_list, child_node)
--		clk_unprepare_unused_subtree(core);
--
--	clk_prepare_unlock();
--
--	return 0;
--}
--late_initcall_sync(clk_disable_unused);
--
- /***    helper functions   ***/
- 
- const char *__clk_get_name(const struct clk *clk)
-@@ -828,6 +730,104 @@ static void clk_core_disable_unprepare(struct clk_core *core)
- 	clk_core_unprepare_lock(core);
- }
- 
-+static void clk_unprepare_unused_subtree(struct clk_core *core)
++static inline struct clk *imx_clk_divider2(const char *name, const char *parent,
++		void __iomem *reg, u8 shift, u8 width)
 +{
-+	struct clk_core *child;
-+
-+	lockdep_assert_held(&prepare_lock);
-+
-+	hlist_for_each_entry(child, &core->children, child_node)
-+		clk_unprepare_unused_subtree(child);
-+
-+	if (core->prepare_count)
-+		return;
-+
-+	if (core->flags & CLK_IGNORE_UNUSED)
-+		return;
-+
-+	if (clk_core_is_prepared(core)) {
-+		trace_clk_unprepare(core);
-+		if (core->ops->unprepare_unused)
-+			core->ops->unprepare_unused(core->hw);
-+		else if (core->ops->unprepare)
-+			core->ops->unprepare(core->hw);
-+		trace_clk_unprepare_complete(core);
-+	}
++	return clk_register_divider(NULL, name, parent,
++			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
++			reg, shift, width, 0, &imx_ccm_lock);
 +}
 +
-+static void clk_disable_unused_subtree(struct clk_core *core)
-+{
-+	struct clk_core *child;
-+	unsigned long flags;
-+
-+	lockdep_assert_held(&prepare_lock);
-+
-+	hlist_for_each_entry(child, &core->children, child_node)
-+		clk_disable_unused_subtree(child);
-+
-+	flags = clk_enable_lock();
-+
-+	if (core->enable_count)
-+		goto unlock_out;
-+
-+	if (core->flags & CLK_IGNORE_UNUSED)
-+		goto unlock_out;
-+
-+	/*
-+	 * some gate clocks have special needs during the disable-unused
-+	 * sequence.  call .disable_unused if available, otherwise fall
-+	 * back to .disable
-+	 */
-+	if (clk_core_is_enabled(core)) {
-+		trace_clk_disable(core);
-+		if (core->ops->disable_unused)
-+			core->ops->disable_unused(core->hw);
-+		else if (core->ops->disable)
-+			core->ops->disable(core->hw);
-+		trace_clk_disable_complete(core);
-+	}
-+
-+unlock_out:
-+	clk_enable_unlock(flags);
-+}
-+
-+static bool clk_ignore_unused;
-+static int __init clk_ignore_unused_setup(char *__unused)
-+{
-+	clk_ignore_unused = true;
-+	return 1;
-+}
-+__setup("clk_ignore_unused", clk_ignore_unused_setup);
-+
-+static int clk_disable_unused(void)
-+{
-+	struct clk_core *core;
-+
-+	if (clk_ignore_unused) {
-+		pr_warn("clk: Not disabling unused clocks\n");
-+		return 0;
-+	}
-+
-+	clk_prepare_lock();
-+
-+	hlist_for_each_entry(core, &clk_root_list, child_node)
-+		clk_disable_unused_subtree(core);
-+
-+	hlist_for_each_entry(core, &clk_orphan_list, child_node)
-+		clk_disable_unused_subtree(core);
-+
-+	hlist_for_each_entry(core, &clk_root_list, child_node)
-+		clk_unprepare_unused_subtree(core);
-+
-+	hlist_for_each_entry(core, &clk_orphan_list, child_node)
-+		clk_unprepare_unused_subtree(core);
-+
-+	clk_prepare_unlock();
-+
-+	return 0;
-+}
-+late_initcall_sync(clk_disable_unused);
-+
- static int clk_core_round_rate_nolock(struct clk_core *core,
- 				      struct clk_rate_request *req)
+ static inline struct clk *imx_clk_gate(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift)
  {
+@@ -133,6 +141,22 @@ static inline struct clk *imx_clk_gate2_cgr(const char *name,
+ 			shift, cgr_val, 0, &imx_ccm_lock, NULL);
+ }
+ 
++static inline struct clk *imx_clk_gate3(const char *name, const char *parent,
++		void __iomem *reg, u8 shift)
++{
++	return clk_register_gate(NULL, name, parent,
++			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
++			reg, shift, 0, &imx_ccm_lock);
++}
++
++static inline struct clk *imx_clk_gate4(const char *name, const char *parent,
++		void __iomem *reg, u8 shift)
++{
++	return clk_register_gate2(NULL, name, parent,
++			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
++			reg, shift, 0x3, 0, &imx_ccm_lock, NULL);
++}
++
+ static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
+ 		u8 shift, u8 width, const char **parents, int num_parents)
+ {
+@@ -141,6 +165,14 @@ static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
+ 			width, 0, &imx_ccm_lock);
+ }
+ 
++static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
++		u8 shift, u8 width, const char **parents, int num_parents)
++{
++	return clk_register_mux(NULL, name, parents, num_parents,
++			CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE,
++			reg, shift, width, 0, &imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_mux_flags(const char *name,
+ 		void __iomem *reg, u8 shift, u8 width, const char **parents,
+ 		int num_parents, unsigned long flags)
 -- 
 1.9.1
