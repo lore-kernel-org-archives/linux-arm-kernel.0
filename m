@@ -1,36 +1,101 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 30 Jun 2016 10:22:15 -0600
-Subject: [PATCH 09/13] coresight: Cleanup TMC status check
+Date: Thu, 30 Jun 2016 10:22:16 -0600
+Subject: [PATCH 10/13] coresight: Add better messages for coresight_timeout
 In-Reply-To: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1467303739-12543-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1467303739-12543-11-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Use the defined symbol rather than hardcoding the value to
-check whether the TMC buffer is full.
+When we encounter a timeout waiting for a status change via
+coresight_timeout, the caller always print the offset which
+was tried. This is pretty much useless as it doesn't specify
+the bit position we wait for. Also, one needs to lookup the
+TRM to figure out, what was wrong. This patch changes all
+such error messages to print something more meaningful.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 6 ++----
+ drivers/hwtracing/coresight/coresight-etm4x.c | 6 ++----
+ drivers/hwtracing/coresight/coresight-tmc.c   | 6 ++----
+ 3 files changed, 6 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 03f36cb8b0c8..6d7de0309e94 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -68,7 +68,7 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
- 	 * Adjust the buffer to point to the beginning of the trace data
- 	 * and update the available trace data.
- 	 */
--	if (val & BIT(0)) {
-+	if (val & TMC_STS_FULL) {
- 		drvdata->buf = drvdata->vaddr + rwp - drvdata->paddr;
- 		drvdata->len = drvdata->size;
- 	} else {
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 4d20b0be0c0b..3b483e3f00ee 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -184,8 +184,7 @@ static void etb_disable_hw(struct etb_drvdata *drvdata)
+ 
+ 	if (coresight_timeout(drvdata->base, ETB_FFCR, ETB_FFCR_BIT, 0)) {
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			ETB_FFCR);
++		"timeout while waiting for completion of Manual Flush\n");
+ 	}
+ 
+ 	/* disable trace capture */
+@@ -193,8 +192,7 @@ static void etb_disable_hw(struct etb_drvdata *drvdata)
+ 
+ 	if (coresight_timeout(drvdata->base, ETB_FFSR, ETB_FFSR_BIT, 1)) {
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			ETB_FFCR);
++			"timeout while waiting for Formatter to Stop\n");
+ 	}
+ 
+ 	CS_LOCK(drvdata->base);
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index ee089a7a7e87..8fc3f33a3273 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -97,8 +97,7 @@ static void etm4_enable_hw(void *info)
+ 	/* wait for TRCSTATR.IDLE to go up */
+ 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 1))
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			TRCSTATR);
++			"timeout while waiting for Idle Trace Status\n");
+ 
+ 	writel_relaxed(config->pe_sel, drvdata->base + TRCPROCSELR);
+ 	writel_relaxed(config->cfg, drvdata->base + TRCCONFIGR);
+@@ -170,8 +169,7 @@ static void etm4_enable_hw(void *info)
+ 	/* wait for TRCSTATR.IDLE to go back down to '0' */
+ 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 0))
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			TRCSTATR);
++			"timeout while waiting for Idle Trace Status\n");
+ 
+ 	CS_LOCK(drvdata->base);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index b3275bb4d035..84052c72462c 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -38,8 +38,7 @@ void tmc_wait_for_tmcready(struct tmc_drvdata *drvdata)
+ 	if (coresight_timeout(drvdata->base,
+ 			      TMC_STS, TMC_STS_TMCREADY_BIT, 1)) {
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			TMC_STS);
++			"timeout while waiting for TMC to be Ready\n");
+ 	}
+ }
+ 
+@@ -56,8 +55,7 @@ void tmc_flush_and_stop(struct tmc_drvdata *drvdata)
+ 	if (coresight_timeout(drvdata->base,
+ 			      TMC_FFCR, TMC_FFCR_FLUSHMAN_BIT, 0)) {
+ 		dev_err(drvdata->dev,
+-			"timeout observed when probing at offset %#x\n",
+-			TMC_FFCR);
++		"timeout while waiting for completion of Manual Flush\n");
+ 	}
+ 
+ 	tmc_wait_for_tmcready(drvdata);
 -- 
 2.7.4
