@@ -1,80 +1,92 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 30 Jun 2016 17:31:16 +0800
-Subject: [PATCH V3 6/8] clk: imx: add clk api for supporting
- CLK_OPS_PARENT_ENABLE clocks
+Date: Thu, 30 Jun 2016 17:31:13 +0800
+Subject: [PATCH V3 3/8] clk: core: support clocks which requires parents
+ enable (part 1)
 In-Reply-To: <1467279078-2330-1-git-send-email-aisheng.dong@nxp.com>
 References: <1467279078-2330-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1467279078-2330-7-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1467279078-2330-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IMX SoCs like i.MX7D requires using CLK_OPS_PARENT_ENABLE flags,
-adding the corresponding clock APIs variants for easily to use.
+On Freescale i.MX7D platform, all clocks operations, including
+enable/disable, rate change and re-parent, requires its parent
+clock enable. Current clock core can not support it well.
+This patch introduce a new flag CLK_OPS_PARENT_ENABLE to handle this
+special case in clock core that enable its parent clock firstly for
+each operation and disable it later after operation complete.
+
+The patch part 1 fixes the possible disabling clocks while its parent
+is off during kernel booting phase in clk_disable_unused_subtree().
+
+Before the completion of kernel booting, clock tree is still not built
+completely, there may be a case that the child clock is on but its
+parent is off which could be caused by either HW initial reset state
+or bootloader initialization.
+
+Taking bootloader as an example, we may enable all clocks in HW by default.
+And during kernel booting time, the parent clock could be disabled in its
+driver probe due to calling clk_prepare_enable and clk_disable_unprepare.
+Because it's child clock is only enabled in HW while its SW usecount
+in clock tree is still 0, so clk_disable of parent clock will gate
+the parent clock in both HW and SW usecount ultimately. Then there will
+be a child clock is still on in HW but its parent is already off.
+
+Later in clk_disable_unused(), this clock disable accessing while its
+parent off will cause system hang due to the limitation of HW which
+must require its parent on.
+
+This patch simply enables the parent clock first before disabling
+if flag CLK_OPS_PARENT_ENABLE is set in clk_disable_unused_subtree().
+This is a simple solution and only affects booting time.
+
+After kernel booting up the clock tree is already created, there will
+be no case that child is off but its parent is off.
+So no need do this checking for normal clk_disable() later.
 
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/imx/clk.h | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ drivers/clk/clk.c            | 5 +++++
+ include/linux/clk-provider.h | 2 ++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 936e235f7c04..a81c0385ed64 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -97,6 +97,14 @@ static inline struct clk *imx_clk_divider_flags(const char *name,
- 			reg, shift, width, 0, &imx_ccm_lock);
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index e2e8f0c9f20a..e3bd28c9ef28 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -765,6 +765,9 @@ static void clk_disable_unused_subtree(struct clk_core *core)
+ 	hlist_for_each_entry(child, &core->children, child_node)
+ 		clk_disable_unused_subtree(child);
+ 
++	if (core->flags & CLK_OPS_PARENT_ENABLE)
++		clk_core_prepare_enable(core->parent);
++
+ 	flags = clk_enable_lock();
+ 
+ 	if (core->enable_count)
+@@ -789,6 +792,8 @@ static void clk_disable_unused_subtree(struct clk_core *core)
+ 
+ unlock_out:
+ 	clk_enable_unlock(flags);
++	if (core->flags & CLK_OPS_PARENT_ENABLE)
++		clk_core_disable_unprepare(core->parent);
  }
  
-+static inline struct clk *imx_clk_divider2(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift, u8 width)
-+{
-+	return clk_register_divider(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
-+			reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_gate(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
-@@ -133,6 +141,22 @@ static inline struct clk *imx_clk_gate2_cgr(const char *name,
- 			shift, cgr_val, 0, &imx_ccm_lock, NULL);
- }
+ static bool clk_ignore_unused;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index fb39d5add173..d87837360254 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -33,6 +33,8 @@
+ #define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after notifications */
+ #define CLK_SET_RATE_UNGATE	BIT(10) /* clock needs to run to set rate */
+ #define CLK_IS_CRITICAL		BIT(11) /* do not gate, ever */
++/* parents need enable during gate/ungate, set rate and re-parent */
++#define CLK_OPS_PARENT_ENABLE	BIT(12)
  
-+static inline struct clk *imx_clk_gate3(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift)
-+{
-+	return clk_register_gate(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
-+			reg, shift, 0, &imx_ccm_lock);
-+}
-+
-+static inline struct clk *imx_clk_gate4(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift)
-+{
-+	return clk_register_gate2(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
-+			reg, shift, 0x3, 0, &imx_ccm_lock, NULL);
-+}
-+
- static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
- 		u8 shift, u8 width, const char **parents, int num_parents)
- {
-@@ -141,6 +165,14 @@ static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
- 			width, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
-+		u8 shift, u8 width, const char **parents, int num_parents)
-+{
-+	return clk_register_mux(NULL, name, parents, num_parents,
-+			CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE,
-+			reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_mux_flags(const char *name,
- 		void __iomem *reg, u8 shift, u8 width, const char **parents,
- 		int num_parents, unsigned long flags)
+ struct clk;
+ struct clk_hw;
 -- 
 1.9.1
