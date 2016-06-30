@@ -1,11 +1,10 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Jun 2016 12:26:03 -0700
-Subject: [PATCH 20/34] clk: nomadik: Migrate to clk_hw based OF and
- registration APIs
-In-Reply-To: <20160601231533.9354-21-stephen.boyd@linaro.org>
+Date: Thu, 30 Jun 2016 12:26:29 -0700
+Subject: [PATCH 32/34] clk: u300: Migrate to clk_hw based registration APIs
+In-Reply-To: <20160601231533.9354-33-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-21-stephen.boyd@linaro.org>
-Message-ID: <20160630192603.GP1521@codeaurora.org>
+ <20160601231533.9354-33-stephen.boyd@linaro.org>
+Message-ID: <20160630192629.GQ1521@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
