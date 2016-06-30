@@ -1,127 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Jun 2016 14:00:17 +0100
-Subject: [PATCH v2] arm64: barrier: implement wfe-based
- smp_cond_load_acquire
-In-Reply-To: <1467049434-30451-1-git-send-email-will.deacon@arm.com>
-References: <1467049434-30451-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20160630130016.GE7962@arm.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 30 Jun 2016 09:00:17 -0400
+Subject: [PATCH v20 13/14] arm64: kdump: update a kernel doc
+In-Reply-To: <ef07d5dafe5c69b621dc4ec01ef1c6f3f9753e60.1466702804.git.geoff@infradead.org>
+References: <cover.1466702804.git.geoff@infradead.org>
+ <ef07d5dafe5c69b621dc4ec01ef1c6f3f9753e60.1466702804.git.geoff@infradead.org>
+Message-ID: <20160630130017.GA2987@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 06:43:54PM +0100, Will Deacon wrote:
-> smp_cond_load_acquire is used to spin on a variable until some
-> expression involving that variable becomes true.
+On 06/23/16 at 05:54pm, Geoff Levand wrote:
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > 
-> On arm64, we can build this using WFE and LDXR, since clearing of the
-> exclusive monitor as a result of the variable being changed by another
-> CPU generates an event, which will wake us up out of WFE.
+> This patch adds arch specific descriptions about kdump usage on arm64
+> to kdump.txt.
 > 
-> This patch implements smp_cond_load_acquire using LDXR and WFE, which
-> themselves are contained in an internal __cmpwait function.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
+>  Documentation/kdump/kdump.txt | 15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
 > 
-> Based on Peter's locking/core branch.
-> 
-> v1->v2: Use cmpwait_relaxed
-> 
->  arch/arm64/include/asm/barrier.h | 13 ++++++++++
->  arch/arm64/include/asm/cmpxchg.h | 51 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 64 insertions(+)
-
-Peter -- could you take this one via locking/core for 4.8, please? I don't
-anticipate any conflicts with the arm64 tree and it relies on your other
-cond-wait patches anyway.
-
-Cheers,
-
-Will
-
-> diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-> index dae5c49618db..4eea7f618dce 100644
-> --- a/arch/arm64/include/asm/barrier.h
-> +++ b/arch/arm64/include/asm/barrier.h
-> @@ -91,6 +91,19 @@ do {									\
->  	__u.__val;							\
->  })
+> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+> index 88ff63d..5d6da09 100644
+> --- a/Documentation/kdump/kdump.txt
+> +++ b/Documentation/kdump/kdump.txt
+> @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
+>  a remote system.
 >  
-> +#define smp_cond_load_acquire(ptr, cond_expr)				\
-> +({									\
-> +	typeof(ptr) __PTR = (ptr);					\
-> +	typeof(*ptr) VAL;						\
-> +	for (;;) {							\
-> +		VAL = smp_load_acquire(__PTR);				\
-> +		if (cond_expr)						\
-> +			break;						\
-> +		__cmpwait_relaxed(__PTR, VAL);				\
-> +	}								\
-> +	VAL;								\
-> +})
-> +
->  #include <asm-generic/barrier.h>
+>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
+> -s390x and arm architectures.
+> +s390x, arm and arm64 architectures.
 >  
->  #endif	/* __ASSEMBLY__ */
-> diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-> index 510c7b404454..bd86a79491bc 100644
-> --- a/arch/arm64/include/asm/cmpxchg.h
-> +++ b/arch/arm64/include/asm/cmpxchg.h
-> @@ -224,4 +224,55 @@ __CMPXCHG_GEN(_mb)
->  	__ret;								\
->  })
+>  When the system kernel boots, it reserves a small section of memory for
+>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
+> @@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
 >  
-> +#define __CMPWAIT_CASE(w, sz, name)					\
-> +static inline void __cmpwait_case_##name(volatile void *ptr,		\
-> +					 unsigned long val)		\
-> +{									\
-> +	unsigned long tmp;						\
-> +									\
-> +	asm volatile(							\
-> +	"	ldxr" #sz "\t%" #w "[tmp], %[v]\n"		\
-> +	"	eor	%" #w "[tmp], %" #w "[tmp], %" #w "[val]\n"	\
-> +	"	cbnz	%" #w "[tmp], 1f\n"				\
-> +	"	wfe\n"							\
-> +	"1:"								\
-> +	: [tmp] "=&r" (tmp), [v] "+Q" (*(unsigned long *)ptr)		\
-> +	: [val] "r" (val));						\
-> +}
+>      AUTO_ZRELADDR=y
+>  
+> +Dump-capture kernel config options (Arch Dependent, arm64)
+> +----------------------------------------------------------
 > +
-> +__CMPWAIT_CASE(w, b, 1);
-> +__CMPWAIT_CASE(w, h, 2);
-> +__CMPWAIT_CASE(w,  , 4);
-> +__CMPWAIT_CASE( ,  , 8);
+> +1) Currently, kvm will not be enabled on the dump-capture kernel even
+> +   if it is configured.
 > +
-> +#undef __CMPWAIT_CASE
+>  Extended crashkernel syntax
+>  ===========================
+>  
+> @@ -305,6 +311,8 @@ Boot into System Kernel
+>     kernel will automatically locate the crash kernel image within the
+>     first 512MB of RAM if X is not given.
+>  
+> +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
+> +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
+>  
+>  Load the Dump-capture Kernel
+>  ============================
+> @@ -327,6 +335,8 @@ For s390x:
+>  	- Use image or bzImage
+>  For arm:
+>  	- Use zImage
+> +For arm64:
+> +	- Use vmlinux or Image
+>  
+>  If you are using a uncompressed vmlinux image then use following command
+>  to load dump-capture kernel.
+> @@ -370,6 +380,9 @@ For s390x:
+>  For arm:
+>  	"1 maxcpus=1 reset_devices"
+>  
+> +For arm64:
+> +	"1 maxcpus=1 reset_devices"
 > +
-> +#define __CMPWAIT_GEN(sfx)						\
-> +static inline void __cmpwait##sfx(volatile void *ptr,			\
-> +				  unsigned long val,			\
-> +				  int size)				\
-> +{									\
-> +	switch (size) {							\
-> +	case 1:								\
-> +		return __cmpwait_case##sfx##_1(ptr, (u8)val);		\
-> +	case 2:								\
-> +		return __cmpwait_case##sfx##_2(ptr, (u16)val);		\
-> +	case 4:								\
-> +		return __cmpwait_case##sfx##_4(ptr, val);		\
-> +	case 8:								\
-> +		return __cmpwait_case##sfx##_8(ptr, val);		\
-> +	default:							\
-> +		BUILD_BUG();						\
-> +	}								\
-> +									\
-> +	unreachable();							\
-> +}
-> +
-> +__CMPWAIT_GEN()
-> +
-> +#undef __CMPWAIT_GEN
-> +
-> +#define __cmpwait_relaxed(ptr, val) \
-> +	__cmpwait((ptr), (unsigned long)(val), sizeof(*(ptr)))
-> +
->  #endif	/* __ASM_CMPXCHG_H */
-> -- 
-> 2.1.4
-> 
+>  Notes on loading the dump-capture kernel:
+>  
+>  * By default, the ELF headers are stored in ELF64 format to support
+
+Looks good to me.
+
+Acked-by: Dave Young <dyoung@redhat.com>
+
+Thanks
+Dave
