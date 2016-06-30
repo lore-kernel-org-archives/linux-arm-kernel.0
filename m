@@ -1,11 +1,11 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Jun 2016 10:25:39 +0200
-Subject: [PATCH v5 12/44] drm/mediatek: dma-mapping: Use unsigned long for
+Date: Thu, 30 Jun 2016 10:25:42 +0200
+Subject: [PATCH v5 15/44] drm/rockship: dma-mapping: Use unsigned long for
  dma_attrs
 In-Reply-To: <1467275171-6298-1-git-send-email-k.kozlowski@samsung.com>
 References: <1467275019-30789-1-git-send-email-k.kozlowski@samsung.com>
  <1467275171-6298-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1467275171-6298-12-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1467275171-6298-15-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,72 +14,90 @@ squashed with main commit.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_gem.c | 13 ++++++-------
- drivers/gpu/drm/mediatek/mtk_drm_gem.h |  2 +-
- 2 files changed, 7 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 17 +++++++----------
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.h |  2 +-
+ 2 files changed, 8 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.c b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-index fa2ec0cd00e8..7abc550ebc00 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-@@ -54,15 +54,14 @@ struct mtk_drm_gem_obj *mtk_drm_gem_create(struct drm_device *dev,
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index 9c2d8a894093..7b1788e2a808 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -17,8 +17,6 @@
+ #include <drm/drm_gem.h>
+ #include <drm/drm_vma_manager.h>
  
- 	obj = &mtk_gem->base;
+-#include <linux/dma-attrs.h>
+-
+ #include "rockchip_drm_drv.h"
+ #include "rockchip_drm_gem.h"
  
--	init_dma_attrs(&mtk_gem->dma_attrs);
--	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &mtk_gem->dma_attrs);
-+	mtk_gem->dma_attrs = DMA_ATTR_WRITE_COMBINE;
+@@ -28,15 +26,14 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
+ 	struct drm_gem_object *obj = &rk_obj->base;
+ 	struct drm_device *drm = obj->dev;
+ 
+-	init_dma_attrs(&rk_obj->dma_attrs);
+-	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &rk_obj->dma_attrs);
++	rk_obj->dma_attrs = DMA_ATTR_WRITE_COMBINE;
  
  	if (!alloc_kmap)
--		dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &mtk_gem->dma_attrs);
-+		mtk_gem->dma_attrs |= DMA_ATTR_NO_KERNEL_MAPPING;
+-		dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &rk_obj->dma_attrs);
++		rk_obj->dma_attrs |= DMA_ATTR_NO_KERNEL_MAPPING;
  
- 	mtk_gem->cookie = dma_alloc_attrs(priv->dma_dev, obj->size,
- 					  &mtk_gem->dma_addr, GFP_KERNEL,
--					  &mtk_gem->dma_attrs);
-+					  mtk_gem->dma_attrs);
- 	if (!mtk_gem->cookie) {
- 		DRM_ERROR("failed to allocate %zx byte dma buffer", obj->size);
- 		ret = -ENOMEM;
-@@ -93,7 +92,7 @@ void mtk_drm_gem_free_object(struct drm_gem_object *obj)
- 		drm_prime_gem_destroy(obj, mtk_gem->sg);
- 	else
- 		dma_free_attrs(priv->dma_dev, obj->size, mtk_gem->cookie,
--			       mtk_gem->dma_addr, &mtk_gem->dma_attrs);
-+			       mtk_gem->dma_addr, mtk_gem->dma_attrs);
+ 	rk_obj->kvaddr = dma_alloc_attrs(drm->dev, obj->size,
+ 					 &rk_obj->dma_addr, GFP_KERNEL,
+-					 &rk_obj->dma_attrs);
++					 rk_obj->dma_attrs);
+ 	if (!rk_obj->kvaddr) {
+ 		DRM_ERROR("failed to allocate %#x byte dma buffer", obj->size);
+ 		return -ENOMEM;
+@@ -51,7 +48,7 @@ static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
+ 	struct drm_device *drm = obj->dev;
  
- 	/* release file pointer to gem object. */
- 	drm_gem_object_release(obj);
-@@ -173,7 +172,7 @@ static int mtk_drm_gem_object_mmap(struct drm_gem_object *obj,
+ 	dma_free_attrs(drm->dev, obj->size, rk_obj->kvaddr, rk_obj->dma_addr,
+-		       &rk_obj->dma_attrs);
++		       rk_obj->dma_attrs);
+ }
+ 
+ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
+@@ -70,7 +67,7 @@ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
  	vma->vm_pgoff = 0;
  
- 	ret = dma_mmap_attrs(priv->dma_dev, vma, mtk_gem->cookie,
--			     mtk_gem->dma_addr, obj->size, &mtk_gem->dma_attrs);
-+			     mtk_gem->dma_addr, obj->size, mtk_gem->dma_attrs);
+ 	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
+-			     obj->size, &rk_obj->dma_attrs);
++			     obj->size, rk_obj->dma_attrs);
  	if (ret)
  		drm_gem_vm_close(vma);
  
-@@ -224,7 +223,7 @@ struct sg_table *mtk_gem_prime_get_sg_table(struct drm_gem_object *obj)
+@@ -262,7 +259,7 @@ struct sg_table *rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj)
  
- 	ret = dma_get_sgtable_attrs(priv->dma_dev, sgt, mtk_gem->cookie,
- 				    mtk_gem->dma_addr, obj->size,
--				    &mtk_gem->dma_attrs);
-+				    mtk_gem->dma_attrs);
+ 	ret = dma_get_sgtable_attrs(drm->dev, sgt, rk_obj->kvaddr,
+ 				    rk_obj->dma_addr, obj->size,
+-				    &rk_obj->dma_attrs);
++				    rk_obj->dma_attrs);
  	if (ret) {
  		DRM_ERROR("failed to allocate sgt, %d\n", ret);
  		kfree(sgt);
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.h b/drivers/gpu/drm/mediatek/mtk_drm_gem.h
-index 3a2a5624a1cb..2752718fa5b2 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_gem.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_gem.h
-@@ -35,7 +35,7 @@ struct mtk_drm_gem_obj {
- 	void			*cookie;
- 	void			*kvaddr;
- 	dma_addr_t		dma_addr;
--	struct dma_attrs	dma_attrs;
-+	unsigned long		dma_attrs;
- 	struct sg_table		*sg;
+@@ -276,7 +273,7 @@ void *rockchip_gem_prime_vmap(struct drm_gem_object *obj)
+ {
+ 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+ 
+-	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, &rk_obj->dma_attrs))
++	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, rk_obj->dma_attrs))
+ 		return NULL;
+ 
+ 	return rk_obj->kvaddr;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
+index ad22618473a4..18b3488db4ec 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
+@@ -23,7 +23,7 @@ struct rockchip_gem_object {
+ 
+ 	void *kvaddr;
+ 	dma_addr_t dma_addr;
+-	struct dma_attrs dma_attrs;
++	unsigned long dma_attrs;
  };
  
+ struct sg_table *rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj);
 -- 
 1.9.1
