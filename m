@@ -1,36 +1,41 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 29 Jun 2016 18:23:50 -0700
-Subject: [PATCH 06/21] usb: chipidea: Initialize and reinitialize phy later
-In-Reply-To: <20160629023052.GB25236@shlinux2>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 30 Jun 2016 09:18:27 +0800
+Subject: [PATCH 10/21] usb: chipidea: msm: Rely on core to override
+ AHBBURST
+In-Reply-To: <146722676163.16253.15476996138920236894@sboyd-linaro>
 References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-7-stephen.boyd@linaro.org>
- <20160629023052.GB25236@shlinux2>
-Message-ID: <146724983020.16253.12640673678669134952@sboyd-linaro>
+ <20160626072838.28082-11-stephen.boyd@linaro.org>
+ <20160629063211.GE25236@shlinux2>
+ <146722676163.16253.15476996138920236894@sboyd-linaro>
+Message-ID: <20160630011827.GA19743@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-06-28 19:30:52)
-> On Sun, Jun 26, 2016 at 12:28:23AM -0700, Stephen Boyd wrote:
-> > The ULPI phy on qcom platforms needs to be initialized and
-> > powered on after a USB reset and before we toggle the run/stop
-> > bit. Otherwise, the phy locks up and doesn't work properly.
+On Wed, Jun 29, 2016 at 11:59:21AM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-06-28 23:32:11)
+> > On Sun, Jun 26, 2016 at 12:28:27AM -0700, Stephen Boyd wrote:
+> > > The core framework already handles setting this parameter with a
+> > > platform quirk. Add the appropriate flag so that we always set
+> > > AHBBURST to 0. Technically DT should be doing this, but we always
+> > > do it for msm chipidea devices so setting the flag in the driver
+> > > works just as well.
+> > 
+> > You still need to set AHB burst value at dts, this flag is just for
+> > override, see below:
+> > 
+> > ahb-burst-config = <0x0>;
 > 
-> This requirement is so strange, try to see if any other initialization
-> sequences.
+> Right, I have added that to dts now, but the CI_HDRC_OVERRIDE_AHB_BURST
+> flag allows us to specify it from the platdata structure in the
+> ci_hdrc_msm.c file. As the value is zero for msm type controllers, I
+> left it out of the static definition of platdata because all the
+> non-initialized members of that structure are going to be zero anyway. I
+> can explicitly set it to zero to make it more clear if you like.
 
-I think the problem is that the reset bit also resets the phy because
-the phy is part of the same clock domain as the controller. Just a guess
-though.
+I suggest setting it explicitly at dts, at current code, it is set
+as zero explicitly too:)
 
->      
-> Since this driver is multi-platforms, I can't accept this change for
-> common, if you had to do that, would you please move your changes to
-> msm glue layer using CI_HDRC_CONTROLLER_RESET_EVENT and
-> CI_HDRC_CONTROLLER_STOPPED_EVENT? Besides, you need to add one flag
-> at ci_hdrc_platform_data.flags for your case to avoid normal
-> initialization.
+-- 
 
-Ok, let me see if I can make this work properly in the glue layer. I
-take it that you want me to add a flag for this specific case so that we
-don't do any phy control in the core and leave it up to the glue layer
-to handle, like CI_HDRC_DISABLE_PHY_CONTROL or something?
+Best Regards,
+Peter Chen
