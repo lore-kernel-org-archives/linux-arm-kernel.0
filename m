@@ -1,66 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:48 +0200
-Subject: [PATCH 28/41] ARM: dts: blanche: add Ethernet support
+Date: Thu, 30 Jun 2016 16:15:50 +0200
+Subject: [PATCH 30/41] ARM: dts: r8a7792: add JPU clocks
 In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
 References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <f80b6dfd5e56f3908832ce89f96ae94352b616c2.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <eebc8e2c5b7a3db19075a02730db8b73be933485.1467294011.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-R8A7792  SoC  doesn't have the EtherMAC core, so SMSC  LAN89218  Ethernet
-chip was used instead on the Blanche board; this chip  is compatible with
-SMSC LAN9115  for  which there's a (device tree aware) driver. Describe
-the  chip in  the  Blanche device tree;  enable DHCP and NFS root in the
-kernel command line for the kernel booting.
+Add JPU clock and its parent, M2 clock to the R8A7792 device tree.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792-blanche.dts | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7792.dtsi            | 16 ++++++++++++++++
+ include/dt-bindings/clock/r8a7792-clock.h |  1 +
+ 2 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7792-blanche.dts b/arch/arm/boot/dts/r8a7792-blanche.dts
-index e277d924441b..e7b40f0e7da6 100644
---- a/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ b/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -22,7 +22,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index 18b4e50521c3..7077c5db2678 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -280,8 +280,24 @@
+ 			clock-div = <48>;
+ 			clock-mult = <1>;
+ 		};
++		m2_clk: m2 {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
++			#clock-cells = <0>;
++			clock-div = <8>;
++			clock-mult = <1>;
++		};
  
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
+ 		/* Gate clocks */
++		mstp1_clks: mstp1_clks at e6150134 {
++			compatible = "renesas,r8a7792-mstp-clocks",
++				     "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150134 0 4>, <0 0xe6150038 0 4>;
++			clocks = <&m2_clk>;
++			#clock-cells = <1>;
++			clock-indices = <R8A7792_CLK_JPU>;
++			clock-output-names = "jpu";
++		};
+ 		mstp2_clks: mstp2_clks at e6150138 {
+ 			compatible = "renesas,r8a7792-mstp-clocks",
+ 				     "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7792-clock.h b/include/dt-bindings/clock/r8a7792-clock.h
+index 949801eb0652..89a5155913f6 100644
+--- a/include/dt-bindings/clock/r8a7792-clock.h
++++ b/include/dt-bindings/clock/r8a7792-clock.h
+@@ -24,6 +24,7 @@
+ #define R8A7792_CLK_MSIOF0		0
  
-@@ -30,6 +30,27 @@
- 		device_type = "memory";
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
-+
-+	d3_3v: regulator-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	ethernet at 18000000 {
-+		compatible = "smsc,lan89218", "smsc,lan9115";
-+		reg = <0 0x18000000 0 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqc>;
-+		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
-+		smsc,irq-push-pull;
-+		reg-io-width = <4>;
-+		vddvario-supply = <&d3_3v>;
-+		vdd33a-supply = <&d3_3v>;
-+	};
- };
- 
- &extal_clk {
+ /* MSTP1 */
++#define R8A7792_CLK_JPU			6
+ #define R8A7792_CLK_TMU1		11
+ #define R8A7792_CLK_TMU3		21
+ #define R8A7792_CLK_TMU2		22
 -- 
 2.7.0.rc3.207.g0ac5344
