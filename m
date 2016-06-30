@@ -1,88 +1,49 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jun 2016 18:40:33 +0100
-Subject: [PATCH v2 00/18] arm/arm64: KVM: Merge boot and runtime page tables
-Message-ID: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 30 Jun 2016 18:40:35 +0100
+Subject: [PATCH v2 02/18] arm64: KVM: Always reference __hyp_panic_string via
+ its kernel VA
+In-Reply-To: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
+References: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1467308451-13365-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, we've been setting up KVM using two sets of page tables:
-one for the "boot" where we perform the basic MMU setup, and one for
-the runtime.
+__hyp_panic_string is passed via the HYP panic code to the panic
+function, and is being "upgraded" to a kernel address, as it is
+referenced by the HYP code (in a PC-relative way).
 
-Switching between the two was though to be safe, but we've recently
-realized that it is not: it is not enough to ensure that the VA->PA
-mapping is consistent when switching TTBR0_EL2, but we also have to
-ensure that the intermediate translations are the same as well. If the
-TLB can return two different values for intermediate translations,
-we're screwed (TLB conflicts).
+This is a bit silly, and we'd be better off obtaining the kernel
+address and not mess with it at all. This patch implements this
+with a tiny bit of asm glue, by forcing the string pointer to be
+read from the literal pool.
 
-At that point, the only safe thing to do is to never change TTBR0_EL2,
-which means that we need to make the idmap page part of the runtime
-page tables.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/hyp/switch.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-The series starts with a bit of brain dumping explaining what we're
-trying to do. This might not be useful as a merge candidate, but it
-was useful for me to put this somewhere. It goes on revamping the
-whole notion of HYP VA range, making it runtime patchable. It then
-always merge idmap and runtime page table into one set, leading to
-quite a lot of simplification in the init/teardown code. In the
-process, 32bit KVM gains the ability to teardown the HYP page-tables
-and vectors, which makes kexec a bit closer.
-
-This has been tested on Seattle, Juno, the FVP model (both v8.0 and
-v8.1), Cubietruck and Midway, and is based on the current
-kvmarm/queue.
-
-Thanks,
-
-	M.
-
-* From v1:
-  - Small changes to documentation patch, thanks to Christoffer
-  - Removed hyp_kern_va altogether
-  - Removed KERN_TO_HYP and used kern_hyp_va everywhere
-  - Rebased on top of kvmarm/queue as of today
-
-Marc Zyngier (18):
-  arm64: KVM: Merged page tables documentation
-  arm64: KVM: Always reference __hyp_panic_string via its kernel VA
-  arm/arm64: KVM: Remove hyp_kern_va helper
-  arm64: KVM: Kill HYP_PAGE_OFFSET
-  arm64: Add ARM64_HYP_OFFSET_LOW capability
-  arm64: KVM: Define HYP offset masks
-  arm64: KVM: Refactor kern_hyp_va to deal with multiple offsets
-  arm/arm64: KVM: Export __hyp_text_start/end symbols
-  arm64: KVM: Runtime detection of lower HYP offset
-  arm/arm64: KVM: Always have merged page tables
-  arm64: KVM: Simplify HYP init/teardown
-  arm/arm64: KVM: Drop boot_pgd
-  arm/arm64: KVM: Kill free_boot_hyp_pgd
-  arm: KVM: Simplify HYP init
-  arm: KVM: Allow hyp teardown
-  arm/arm64: KVM: Prune unused #defines
-  arm/arm64: KVM: Check that IDMAP doesn't intersect with VA range
-  arm/arm64: Get rid of KERN_TO_HYP
-
- arch/arm/include/asm/kvm_asm.h      |   2 +
- arch/arm/include/asm/kvm_host.h     |  25 +++----
- arch/arm/include/asm/kvm_hyp.h      |   3 -
- arch/arm/include/asm/kvm_mmu.h      |  13 +---
- arch/arm/include/asm/virt.h         |   4 ++
- arch/arm/kvm/arm.c                  |  20 ++----
- arch/arm/kvm/init.S                 |  56 ++++++---------
- arch/arm/kvm/mmu.c                  | 137 ++++++++++++++++--------------------
- arch/arm64/include/asm/cpufeature.h |   3 +-
- arch/arm64/include/asm/kvm_host.h   |  17 ++---
- arch/arm64/include/asm/kvm_hyp.h    |  23 ------
- arch/arm64/include/asm/kvm_mmu.h    |  94 ++++++++++++++++++++-----
- arch/arm64/include/asm/virt.h       |   4 ++
- arch/arm64/kernel/cpufeature.c      |  19 +++++
- arch/arm64/kvm/hyp-init.S           |  61 +++-------------
- arch/arm64/kvm/hyp/entry.S          |  19 -----
- arch/arm64/kvm/hyp/hyp-entry.S      |  15 ++++
- arch/arm64/kvm/hyp/switch.c         |  11 ++-
- arch/arm64/kvm/reset.c              |  28 --------
- 19 files changed, 238 insertions(+), 316 deletions(-)
-
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 437cfad..81f21a2 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -299,9 +299,16 @@ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%
+ 
+ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
+ {
+-	unsigned long str_va = (unsigned long)__hyp_panic_string;
++	unsigned long str_va;
+ 
+-	__hyp_do_panic(hyp_kern_va(str_va),
++	/*
++	 * Force the panic string to be loaded from the literal pool,
++	 * making sure it is a kernel address and not a PC-relative
++	 * reference.
++	 */
++	asm volatile("ldr %0, =__hyp_panic_string" : "=r" (str_va));
++
++	__hyp_do_panic(str_va,
+ 		       spsr,  elr,
+ 		       read_sysreg(esr_el2),   read_sysreg_el2(far),
+ 		       read_sysreg(hpfar_el2), par,
 -- 
 2.1.4
