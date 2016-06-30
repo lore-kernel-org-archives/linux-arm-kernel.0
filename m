@@ -1,85 +1,54 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 30 Jun 2016 14:50:44 -0400
-Subject: [PATCH v4 1/2] i2c: qup: add ACPI support
-In-Reply-To: <4043322.Uc6lMkrL43@wuerfel>
-References: <1465409985-17113-1-git-send-email-austinwc@codeaurora.org>
- <4749471.m1cxc4jj96@wuerfel> <577503F2.90204@codeaurora.org>
- <4043322.Uc6lMkrL43@wuerfel>
-Message-ID: <57756A04.3030301@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 30 Jun 2016 12:23:37 -0700
+Subject: [PATCH 0/6] clk: sti: Add support for critical clocks
+In-Reply-To: <20160607111930.10375-1-lee.jones@linaro.org>
+References: <20160607111930.10375-1-lee.jones@linaro.org>
+Message-ID: <20160630192337.GN1521@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 06/30/2016 07:52 AM, Arnd Bergmann wrote:
-> On Thursday, June 30, 2016 7:35:14 AM CEST Christopher Covington wrote:
->> Hi Arnd,
->>
->> On 06/08/2016 05:02 PM, Arnd Bergmann wrote:
->>> On Wednesday, June 8, 2016 12:19:44 PM CEST Austin Christ wrote:
->>>> +               ret = device_property_read_u32(qup->dev,
->>>> +                               "src-clock-hz", &src_clk_freq);
->>>> +               if (ret) {
->>>> +                       dev_warn(qup->dev, "using default src-clock-hz %d",
->>>> +                               DEFAULT_SRC_CLK);
->>>> +                       src_clk_freq = DEFAULT_SRC_CLK;
->>>> +               }
->>>>
->>>
->>> Where is this property documented?
->>
->> We plan on submitting documentation via dsd at acpica.org to
->> https://github.com/ahs3/dsd once it is operational. As I understand it
->> the project is brand new. It may take several months to begin accepting
->> submissions. In the mean time, we could potentially include
->> documentation in a reply to this thread, the cover of the next series, a
->> wiki page on codeaurora.org, a file in Documentation (perhaps to be
->> replaced by ACPICA style imports of the OS-neutral DSD project or a git
->> submodule) or potentially other means. Please let us know what you think
->> is sufficient.
+On 06/07, Lee Jones wrote:
+> Describe the platform's critical clocks in DT, then search for them
+> from the framework.  This set allows us to remove the clk_ignore_unused
+> kernel command line flag which has been required to achieve a successful
+> boot to prompt until this point.
 > 
-> As you are reusing part of the DT binding, it seems appropriate to put
-> the documentation for this into the binding documentation in the kernel.
+> This may not be the definitive list.  There may be other clocks which
+> need to be marked as critical, but we can add those as we go along.
+> 
 
-My understanding is that in the device tree case, the input/source clock
-frequency is assumed to be run-time managed through Global Clock
-Controller (GCC) code and the common clock framework.
+I applied the three clk ones to an immutable branch named
+'clk-st-critical' in the clk tree and merged this into clk-next.
+I'm not comfortable taking the spi patch as I suspect that will
+break something unless the dts patches are applied.
 
-drivers/i2c/busses/i2c-qup.c:1549
+Please use this branch to base your dts and spi patches on so it
+can be merged through arm-soc without introducing some bisection
+hole.
 
-src_clk_freq = clk_get_rate(qup->clk);
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-So a given I2C device tree entry points to the GCC device tree entry,
-but there isn't an explicit, fixed input/source clock frequency value.
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
-arch/arm64/boot/dts/qcom/msm8916.dtsi:310
+are available in the git repository at:
 
-blsp_i2c2: i2c at 78b6000 {
-        compatible = "qcom,i2c-qup-v2.2.1";
-        reg = <0x78b6000 0x1000>;
-        interrupts = <GIC_SPI 96 0>;
-        clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-                <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
-        clock-names = "iface", "core";
-        pinctrl-names = "default", "sleep";
-        pinctrl-0 = <&i2c2_default>;
-        pinctrl-1 = <&i2c2_sleep>;
-        #address-cells = <1>;
-        #size-cells = <0>;
-        status = "disabled";
-};
+  git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-st-critical
 
-On the other hand, when ACPI is in use, the driver assumes a fixed
-input/source clock frequency value, which it tries to look up as a
-device property.
+for you to fetch changes up to 6ca59e6e1fc3a8d7ccbf85ff036bd6ff40847c1a:
 
-(I'm out of my depth here, so somebody please correct me if I've
-described this wrong.)
+  clk: st: clkgen-pll: Detect critical clocks (2016-06-30 12:17:11 -0700)
 
-Thanks,
-Cov
+----------------------------------------------------------------
+Lee Jones (3):
+      clk: st: clk-flexgen: Detect critical clocks
+      clk: st: clkgen-fsyn: Detect critical clocks
+      clk: st: clkgen-pll: Detect critical clocks
+
+ drivers/clk/st/clk-flexgen.c |  4 +++-
+ drivers/clk/st/clkgen-fsyn.c | 10 +++++++---
+ drivers/clk/st/clkgen-pll.c  | 27 +++++++++++++++++----------
+ 3 files changed, 27 insertions(+), 14 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 a Linux Foundation Collaborative Project
