@@ -1,57 +1,44 @@
-From: hs.liao@mediatek.com (HS Liao)
-Date: Thu, 30 Jun 2016 15:14:39 +0800
-Subject: [PATCH v9 0/4] Mediatek MT8173 CMDQ support
-Message-ID: <1467270883-1407-1-git-send-email-hs.liao@mediatek.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Thu, 30 Jun 2016 16:15:09 +0900
+Subject: [PATCH v3 0/2] mark spi clocks as critical and enable spi3 clocks
+Message-ID: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
-to help write registers with critical time limitation, such as
-updating display configuration during the vblank. It controls Global
-Command Engine (GCE) hardware to achieve this requirement.
+This patchset enables spi3 clocks by marking critical clocks as
+CLK_IS_CRITICAL and in the meantime replaces the use of
+CLK_IGNORE_UNUSED for spi1 clocks.
 
-These patches have a build dependency on top of v4.7-rc1.
+The sclk needs to be considered critical as well.
 
-Changes since v8:
- - use mailbox framework, and merge options for GCE thread into
-   mailbox channel
- - use timer to handle timeout case
- - rename cmdq_handle_error_done to cmdq_thread_irq_handler, handle
-   error by cmdq_task_handle_error, and handle timeout by
-   cmdq_thread_handle_timeout
- - use bitops
- - fix bug of treating working task as done task
- - move GCE hardware events' mapping from header to driver
- - remove code about previous tasks since we should keep tasks' order
-   for display, and it is impossible to have previous tasks
- - centralize code to handle executed tasks in cmdq_task_exec_done
- - use u64* instead of u32* for GCE command pointer
- - drop cmdq_thread_readl/writel
- - depends on ARM64
- - refine some code accroding to comments for v8
+The SPI3 in the tm2/tm2e boards will control an irled for remote
+controlling.
 
-Best regards,
-HS Liao
+Changelog:
 
-HS Liao (4):
-  dt-bindings: soc: Add documentation for the MediaTek GCE unit
-  CMDQ: Mediatek CMDQ driver
-  arm64: dts: mt8173: Add GCE node
-  CMDQ: save more energy in idle
+V1 -> V2
+ - the "sclk_spi3" doesn't need to be enabled in boot time as it
+  is handled by the spi driver itself.
 
- .../devicetree/bindings/soc/mediatek/gce.txt       |  44 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
- drivers/soc/mediatek/Kconfig                       |  11 +
- drivers/soc/mediatek/Makefile                      |   1 +
- drivers/soc/mediatek/mtk-cmdq.c                    | 967 +++++++++++++++++++++
- include/soc/mediatek/cmdq.h                        | 192 ++++
- 6 files changed, 1225 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
- create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
- create mode 100644 include/soc/mediatek/cmdq.h
+ - use the CLK_IS_CRITICAL flag for the ioclk
+
+V2 -> V3
+ - some more tests has confirmed taht "sclk_spi1,3" need to be
+   enabled as critical!
+
+ - added Chanwoo's review in the second commit.
+
+Thanks,
+Andi
+
+Andi Shyti (2):
+  clk: exynos5433: do not use CLK_IGNORE_UNUSED for SPI clocks
+  clk: exynos5433: enable sclk_ioclk for SPI3
+
+ drivers/clk/samsung/clk-exynos5433.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
 -- 
-1.9.1
+2.8.1
