@@ -1,49 +1,95 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:59 +0200
-Subject: [PATCH 39/41] ARM: dts: r8a7791: Add APMU node
-In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
-References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <477cbcbd8f089ab72721a90760bc5d7987d3a713.1467294011.git.horms+renesas@verge.net.au>
+Date: Thu, 30 Jun 2016 16:16:18 +0200
+Subject: [PATCH 2/8] ARM: shmobile: rcar-gen2: Obtain extal frequency from DT
+In-Reply-To: <cover.1467293089.git.horms+renesas@verge.net.au>
+References: <cover.1467293089.git.horms+renesas@verge.net.au>
+Message-ID: <9f5ce39ddb8f68b30cd65ae33d32f3b47a58d350.1467293089.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add a DT node for the Advanced Power Management Units (APMU), and use
-the enable-method to point out that the APMU should be used for SMP
-support.
+On some R-Car Gen2 SoCs, the frequency of the ARM architecture timer
+depends on the frequency of the external clock crystal.  Currently the
+latter is determined indirectly from the state of the mode pins, which
+is a relic predating DT.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Obtain the external clock crystal frequency from DT instead, removing
+the dependency on the mode pins.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 42 +++++++++++++++++---------------
+ 1 file changed, 22 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 1985bd0dc32c..8f0086bbd96b 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -43,6 +43,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "renesas,apmu";
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 1c6fd11c2f82..ea092d5dd475 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -46,6 +46,26 @@ u32 rcar_gen2_read_mode_pins(void)
+ 	return mode;
+ }
  
- 		cpu0: cpu at 0 {
- 			device_type = "cpu";
-@@ -101,6 +102,12 @@
- 		};
- 	};
- 
-+	apmu at e6152000 {
-+		compatible = "renesas,r8a7791-apmu", "renesas,apmu";
-+		reg = <0 0xe6152000 0 0x188>;
-+		cpus = <&cpu0 &cpu1>;
-+	};
++static unsigned int __init get_extal_freq(void)
++{
++	struct device_node *cpg, *extal;
++	u32 freq = 20000000;
 +
- 	gic: interrupt-controller at f1001000 {
- 		compatible = "arm,gic-400";
- 		#interrupt-cells = <3>;
++	cpg = of_find_compatible_node(NULL, NULL,
++				      "renesas,rcar-gen2-cpg-clocks");
++	if (!cpg)
++		return freq;
++
++	extal = of_parse_phandle(cpg, "clocks", 0);
++	of_node_put(cpg);
++	if (!extal)
++		return freq;
++
++	of_property_read_u32(extal, "clock-frequency", &freq);
++	of_node_put(extal);
++	return freq;
++}
++
+ #define CNTCR 0
+ #define CNTFID0 0x20
+ 
+@@ -54,7 +74,6 @@ void __init rcar_gen2_timer_init(void)
+ 	u32 mode = rcar_gen2_read_mode_pins();
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ 	void __iomem *base;
+-	int extal_mhz = 0;
+ 	u32 freq;
+ 
+ 	if (of_machine_is_compatible("renesas,r8a7794")) {
+@@ -82,26 +101,9 @@ void __init rcar_gen2_timer_init(void)
+ 		 * with the counter disabled. Moreover, it may also report
+ 		 * a potentially incorrect fixed 13 MHz frequency. To be
+ 		 * correct these registers need to be updated to use the
+-		 * frequency EXTAL / 2 which can be determined by the MD pins.
++		 * frequency EXTAL / 2.
+ 		 */
+-
+-		switch (mode & (MD(14) | MD(13))) {
+-		case 0:
+-			extal_mhz = 15;
+-			break;
+-		case MD(13):
+-			extal_mhz = 20;
+-			break;
+-		case MD(14):
+-			extal_mhz = 26;
+-			break;
+-		case MD(13) | MD(14):
+-			extal_mhz = 30;
+-			break;
+-		}
+-
+-		/* The arch timer frequency equals EXTAL / 2 */
+-		freq = extal_mhz * (1000000 / 2);
++		freq = get_extal_freq() / 2;
+ 	}
+ 
+ 	/* Remap "armgcnt address map" space */
 -- 
 2.7.0.rc3.207.g0ac5344
