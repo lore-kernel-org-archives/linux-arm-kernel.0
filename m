@@ -1,10 +1,11 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Jun 2016 12:26:29 -0700
-Subject: [PATCH 32/34] clk: u300: Migrate to clk_hw based registration APIs
-In-Reply-To: <20160601231533.9354-33-stephen.boyd@linaro.org>
+Date: Thu, 30 Jun 2016 12:27:39 -0700
+Subject: [PATCH 05/34] clk: bcm: iproc: Migrate to clk_hw based
+ registration and OF APIs
+In-Reply-To: <20160601231533.9354-6-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-33-stephen.boyd@linaro.org>
-Message-ID: <20160630192629.GQ1521@codeaurora.org>
+ <20160601231533.9354-6-stephen.boyd@linaro.org>
+Message-ID: <20160630192739.GR1521@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,7 +15,9 @@ On 06/01, Stephen Boyd wrote:
 > these drivers, allowing us to move closer to a clear split of
 > consumer and provider clk APIs.
 > 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Jon Mason <jonmason@broadcom.com>
+> Cc: Simran Rai <ssimran@broadcom.com>
 > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
 
