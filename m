@@ -1,197 +1,91 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 30 Jun 2016 16:17:39 +0100
-Subject: [PATCH v7 06/17] KVM: arm/arm64: VGIC: add refcounting for IRQs
-In-Reply-To: <1b593082-8313-cce5-2a30-38b55a75e894@redhat.com>
-References: <20160628123230.26255-1-andre.przywara@arm.com>
- <20160628123230.26255-7-andre.przywara@arm.com>
- <1b593082-8313-cce5-2a30-38b55a75e894@redhat.com>
-Message-ID: <2da67866-0367-520c-3474-7d7546ecea51@arm.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 30 Jun 2016 17:16:36 +0200
+Subject: [linux-sunxi] [PATCH v2 14/14] ARM: dts: sun8i: Enable DVFS on
+ Orange Pi One
+In-Reply-To: <834b8045-d99f-74a3-0353-aa84b897351d@megous.com>
+References: <20160625034511.7966-1-megous@megous.com>
+ <20160625034511.7966-15-megous@megous.com>
+ <CAOMqctTe==M1SXxbdR8y33yh51fiFGn+oSaKJXhbnpLVTn-New@mail.gmail.com>
+ <834b8045-d99f-74a3-0353-aa84b897351d@megous.com>
+Message-ID: <CAOMqctSbJOB67a=LiCZVUb-wUMCpeJPd81OL5epYkC2p5X1T-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-thanks for going through the mes^Wpatches!
-
-On 29/06/16 16:58, Auger Eric wrote:
-> Hi Andre,
-> 
-> On 28/06/2016 14:32, Andre Przywara wrote:
->> In the moment our struct vgic_irq's are statically allocated at guest
->> creation time. So getting a pointer to an IRQ structure is trivial and
->> safe. LPIs are more dynamic, they can be mapped and unmapped at any time
->> during the guest's _runtime_.
->> In preparation for supporting LPIs we introduce reference counting for
->> those structures using the kernel's kref infrastructure.
->> Since private IRQs and SPIs are statically allocated, the reqcount never
-> s/reqcount/refcount
->> drops to 0 at the moment, but we increase it when an IRQ gets onto a VCPU
->> list and decrease it when it gets removed.
-> may be worth clarifying your incr/decr the refcount on vgic_get/put_irq
-> and each time the irq is added/removed from the ap_list.
-> 
->> This introduces vgic_put_irq(), which wraps kref_put and hides the
->> release function from the callers.
+On 30 June 2016 at 16:19, Ond?ej Jirman <megous@megous.com> wrote:
+> Hello,
+>
+> On 30.6.2016 13:13, Michal Suchanek wrote:
+>> Hello,
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  include/kvm/vgic/vgic.h          |  1 +
->>  virt/kvm/arm/vgic/vgic-init.c    |  2 ++
->>  virt/kvm/arm/vgic/vgic-mmio-v2.c |  8 ++++++++
->>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 10 +++++++---
->>  virt/kvm/arm/vgic/vgic-mmio.c    | 22 +++++++++++++++++++++
->>  virt/kvm/arm/vgic/vgic-v2.c      |  1 +
->>  virt/kvm/arm/vgic/vgic-v3.c      |  1 +
->>  virt/kvm/arm/vgic/vgic.c         | 41 +++++++++++++++++++++++++++++++++-------
->>  virt/kvm/arm/vgic/vgic.h         |  1 +
->>  9 files changed, 77 insertions(+), 10 deletions(-)
+>> On 25 June 2016 at 05:45,  <megous@megous.com> wrote:
+>>> From: Ondrej Jirman <megous@megous.com>
+>>>
+>>> Use Xulong Orange Pi One GPIO based regulator for
+>>> passive cooling and thermal management.
+>>>
+>>> Signed-off-by: Ondrej Jirman <megous@megous.com>
+>>> ---
+>>>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 39 +++++++++++++++++++++++++++++
+>>>  1 file changed, 39 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+>>> index b1bd6b0..a38d871 100644
+>>> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+>>> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+>>> @@ -109,6 +109,45 @@
+>>>         };
+>>>  };
+>>>
+>>> +&cpu0 {
+>>> +       operating-points = <
+>>> +               /* kHz    uV */
+>>> +               1296000 1300000
+>>> +               1200000 1300000
 >>
->> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
->> index 2f26f37..a296d94 100644
->> --- a/include/kvm/vgic/vgic.h
->> +++ b/include/kvm/vgic/vgic.h
->> @@ -96,6 +96,7 @@ struct vgic_irq {
->>  	bool active;			/* not used for LPIs */
->>  	bool enabled;
->>  	bool hw;			/* Tied to HW IRQ */
->> +	struct kref refcount;		/* Used for LPIs */
->>  	u32 hwintid;			/* HW INTID number */
->>  	union {
->>  		u8 targets;			/* GICv2 target VCPUs mask */
->> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
->> index 90cae48..ac3c1a5 100644
->> --- a/virt/kvm/arm/vgic/vgic-init.c
->> +++ b/virt/kvm/arm/vgic/vgic-init.c
->> @@ -177,6 +177,7 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
->>  		spin_lock_init(&irq->irq_lock);
->>  		irq->vcpu = NULL;
->>  		irq->target_vcpu = vcpu0;
->> +		kref_init(&irq->refcount);
->>  		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
->>  			irq->targets = 0;
->>  		else
->> @@ -211,6 +212,7 @@ static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
->>  		irq->vcpu = NULL;
->>  		irq->target_vcpu = vcpu;
->>  		irq->targets = 1U << vcpu->vcpu_id;
->> +		kref_init(&irq->refcount);
->>  		if (vgic_irq_is_sgi(i)) {
->>  			/* SGIs */
->>  			irq->enabled = 1;
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> index a213936..4152348 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> @@ -102,6 +102,7 @@ static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
->>  		irq->source |= 1U << source_vcpu->vcpu_id;
->>  
->>  		vgic_queue_irq_unlock(source_vcpu->kvm, irq);
->> +		vgic_put_irq(source_vcpu->kvm, irq);
->>  	}
->>  }
->>  
->> @@ -116,6 +117,8 @@ static unsigned long vgic_mmio_read_target(struct kvm_vcpu *vcpu,
->>  		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->>  
->>  		val |= (u64)irq->targets << (i * 8);
->> +
->> +		vgic_put_irq(vcpu->kvm, irq);
->>  	}
->>  
->>  	return val;
->> @@ -143,6 +146,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
->>  		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
->>  
->>  		spin_unlock(&irq->irq_lock);
->> +		vgic_put_irq(vcpu->kvm, irq);
->>  	}
->>  }
->>  
->> @@ -157,6 +161,8 @@ static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
->>  		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->>  
->>  		val |= (u64)irq->source << (i * 8);
->> +
->> +		vgic_put_irq(vcpu->kvm, irq);
->>  	}
->>  	return val;
->>  }
->> @@ -178,6 +184,7 @@ static void vgic_mmio_write_sgipendc(struct kvm_vcpu *vcpu,
->>  			irq->pending = false;
->>  
->>  		spin_unlock(&irq->irq_lock);
->> +		vgic_put_irq(vcpu->kvm, irq);
->>  	}
->>  }
->>  
->> @@ -201,6 +208,7 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
->>  		} else {
->>  			spin_unlock(&irq->irq_lock);
->>  		}
->> +		vgic_put_irq(vcpu->kvm, irq);
->>  	}
->>  }
->>  
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> index fc7b6c9..829909e 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> @@ -80,15 +80,17 @@ static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
->>  {
->>  	int intid = VGIC_ADDR_TO_INTID(addr, 64);
->>  	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
->> +	unsigned long ret = 0;
->>  
->>  	if (!irq)
->>  		return 0;
->>  
->>  	/* The upper word is RAZ for us. */
->> -	if (addr & 4)
->> -		return 0;
->> +	if (!(addr & 4))
->> +		ret = extract_bytes(READ_ONCE(irq->mpidr), addr & 7, len);
->>  
->> -	return extract_bytes(READ_ONCE(irq->mpidr), addr & 7, len);
->> +	vgic_put_irq(vcpu->kvm, irq);
->> +	return ret;
->>  }
->>  
->>  static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
->> @@ -112,6 +114,7 @@ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
->>  	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, irq->mpidr);
->>  
->>  	spin_unlock(&irq->irq_lock);
->> +	vgic_put_irq(vcpu->kvm, irq);
-> you need one put in:
-> 
-> 	/* The upper word is WI for us since we don't implement Aff3. */
-> 	if (addr & 4)
-> 		return;
+>> First problem is that the board boots at 1008000 which is not listed
+>> and the kernel complains.
+>>
+>> Second problem is that the board locks up during boot with this enabled.
+>>
+>> Do you have some suggestion for alternate configuration to test?
+>
+> Just to verify, did you test with the entire series applied? (especially
+> the PLL1 clk application changes)
 
-Oh dear, you are right (also about the other places).
-That seems to be a fallout of the migration to kref from v6, where I was
-taking the reference later in some places.
+Yes, I applied the whole series.
 
->>  }
->>  
->>  static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+>
+> You may try dropping the highest operating point, it's probably overly
+> optimistic for Orange Pi One.
+>
+> Is the power supply/cable you're using hard enough?
 
-....
+I use a 7 port hub to power the board. It worked with some other small
+devboards.
 
->> @@ -345,6 +365,8 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
->>  			irq->pending = irq->line_level | irq->soft_pending;
->>  		}
->>  		spin_unlock(&irq->irq_lock);
->> +
->> +		vgic_put_irq(vcpu->kvm, irq);
-> you also need a put at:
-> 		if (intid + i < VGIC_NR_PRIVATE_IRQS)
-> 			continue;
+The cable is some random Chinese USB to power jack adaptor with an
+extra adaptor to fit the Pi socket. It looks ok but I did not test
+this particular combination thoroughly.
 
-That's a nice catch!
-Will also fix all the other cases you mentioned.
+>
+> Where during the boot process does it lock up?
 
-Thanks for having a look!
+Usually sometime around enabling cpufreq  before getty starts.
+Different runs and settings give slightly different results. In
+particular adding the 1008000 point seems to make it go further.
 
-Cheers,
-Andre.
+Removing all traces of the regulator, cpufreq and thermal I can boot
+pretty much 100% to login prompt.
+
+I don't think the difference between 1GHz and 1.3GHz frequency on the
+core would put much additional stress on the supply but I can try with
+35W PSU and some alternative cabling to be sure.
+
+I did some more tests and it seems 1008000 at 1.1V is fine but switching
+to 1.3V crashes the board. Even with only the first 1.3V state. Maybe
+there is need for some delay somewhere for the regulator to get
+stable?
+
+Thanks
+
+Michal
