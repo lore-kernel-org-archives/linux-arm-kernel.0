@@ -1,46 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:25 +0200
-Subject: [PATCH 05/41] ARM: dts: marzen: Name serial port pfc subnodes after
- device names
+Date: Thu, 30 Jun 2016 16:15:22 +0200
+Subject: [PATCH 02/41] ARM: dts: ape6evm: Name mmc pfc subnode after device
+ name
 In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
 References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <46344361f5cdffac3c42b9651595f6e0bd609885.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <8b68d53ec2c1b4106c3d07781c7773ff3e61c0bf.1467294011.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Name the Pin Function Controller subnodes for SCIF2 and SCIF4 after
-their device names, instead of using some arbitrary names that look like
-serial port aliases, but differ from the actual aliases.
+Name the Pin Function Controller subnode for MMC0 after its device name,
+instead of using the generic and indexless "mmc".
 
-This avoids conflicts when enabling support for more serial ports later,
-either here or in a DT overlay.
+This avoids conflicts when enabling support for more MMC interfaces
+later, either here or in a DT overlay.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779-marzen.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index cec79a6347c0..013e6f510b0f 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -195,12 +195,12 @@
- 		};
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index 5bccc7d229d7..ec7c86e06538 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -193,7 +193,7 @@
+ 		function = "scifa0";
  	};
  
--	scif2_pins: serial2 {
-+	scif2_pins: scif2 {
- 		groups = "scif2_data_c";
- 		function = "scif2";
- 	};
- 
--	scif4_pins: serial4 {
-+	scif4_pins: scif4 {
- 		groups = "scif4_data";
- 		function = "scif4";
+-	mmc0_pins: mmc {
++	mmc0_pins: mmc0 {
+ 		groups = "mmc0_data8", "mmc0_ctrl";
+ 		function = "mmc0";
  	};
 -- 
 2.7.0.rc3.207.g0ac5344
