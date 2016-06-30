@@ -1,34 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Jun 2016 22:41:13 -0700
-Subject: Extcon build failure in next
-In-Reply-To: <20160630053705.GM28140@atomide.com>
-References: <20160630053705.GM28140@atomide.com>
-Message-ID: <20160630054112.GN28140@atomide.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 30 Jun 2016 11:17:26 +0530
+Subject: [PATCH v5 resend 0/2] phy-sun4i-usb: peripheral-mode + a31 otg
+ workaround
+In-Reply-To: <1467224050-7480-1-git-send-email-hdegoede@redhat.com>
+References: <1467224050-7480-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <5774B26E.5010609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160629 22:41]:
-> Hi Chanwoo,
+Hi,
+
+On Wednesday 29 June 2016 11:44 PM, Hans de Goede wrote:
+> Hi Kishon,
 > 
-> Looks like current Linux next fails to build with at least
-> omap2plus_defconfig because of:
+> The "USB: Fix of_usb_get_dr_mode_by_phy with a shared phy block"
+> patch on which this series depends is in usb-next now:
 > 
-> ERROR: "extcon_dev_allocate" [drivers/extcon/devres.ko] undefined!
-> scripts/Makefile.modpost:91: recipe for target '__modpost' failed
-> make[1]: *** [__modpost] Error 1
-> Makefile:1163: recipe for target 'modules' failed
-> make: *** [modules] Error 2
-> Kernel build failed
+> https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/?h=usb-next&id=ce15ed4c5dfb3f7757e6611902aed5db253af977
 > 
-> Probably extcon_dev_allocate just needs EXPORT_SYMBOL_GPL?
+> Can you please merge this series?
 
-Also I'm seeing:
+This is not applying cleanly against linux-phy -next. Can you rebase and send?
 
-drivers/extcon/extcon.c: In function 'extcon_register_notifier':
-drivers/extcon/extcon.c:455:6: warning: 'idx' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   if (idx >= 0) {
-         ^
-
-Regards,
-
-Tony
+Thanks
+Kishon
