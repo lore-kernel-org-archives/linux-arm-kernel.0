@@ -1,33 +1,146 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 14:27:18 +0200
-Subject: [PATCH] ARM: dts: r8a7792: add SMP support
-In-Reply-To: <7c23396f-f880-40ac-654d-cffc82df021e@cogentembedded.com>
-References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
- <1627631.X1bJtVQHBF@wasted.cogentembedded.com>
- <7c23396f-f880-40ac-654d-cffc82df021e@cogentembedded.com>
-Message-ID: <20160630122718.GA24035@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 30 Jun 2016 13:31:52 +0100
+Subject: [PATCH 12/15] arm: KVM: Simplify HYP init
+In-Reply-To: <20160628215037.GS26498@cbox>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+ <1465297115-13091-13-git-send-email-marc.zyngier@arm.com>
+ <20160628215037.GS26498@cbox>
+Message-ID: <57751138.5090307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 07:46:33PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On 28/06/16 22:50, Christoffer Dall wrote:
+> On Tue, Jun 07, 2016 at 11:58:32AM +0100, Marc Zyngier wrote:
+>> Just like for arm64, we can now make the HYP setup a lot simpler,
+>> and we can now initialise it in one go (instead of the two
+>> phases we currently have).
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h | 15 +++++--------
+>>  arch/arm/kvm/init.S             | 49 ++++++++---------------------------------
+>>  2 files changed, 14 insertions(+), 50 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 020f4eb..eafbfd5 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -250,18 +250,13 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>>  	 * code. The init code doesn't need to preserve these
+>>  	 * registers as r0-r3 are already callee saved according to
+>>  	 * the AAPCS.
+>> -	 * Note that we slightly misuse the prototype by casing the
+>> +	 * Note that we slightly misuse the prototype by casting the
+>>  	 * stack pointer to a void *.
+>> -	 *
+>> -	 * We don't have enough registers to perform the full init in
+>> -	 * one go.  Install the boot PGD first, and then install the
+>> -	 * runtime PGD, stack pointer and vectors. The PGDs are always
+>> -	 * passed as the third argument, in order to be passed into
+>> -	 * r2-r3 to the init code (yes, this is compliant with the
+>> -	 * PCS!).
+>> -	 */
+>>  
+>> -	kvm_call_hyp(NULL, 0, boot_pgd_ptr);
+>> +	 * The PGDs are always passed as the third argument, in order
+>> +	 * to be passed into r2-r3 to the init code (yes, this is
+>> +	 * compliant with the PCS!).
+>> +	 */
+>>  
+>>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+>>  }
+>> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+>> index 1f9ae17..b82a99d 100644
+>> --- a/arch/arm/kvm/init.S
+>> +++ b/arch/arm/kvm/init.S
+>> @@ -32,23 +32,13 @@
+>>   *       r2,r3 = Hypervisor pgd pointer
+>>   *
+>>   * The init scenario is:
+>> - * - We jump in HYP with four parameters: boot HYP pgd, runtime HYP pgd,
+>> - *   runtime stack, runtime vectors
+>> - * - Enable the MMU with the boot pgd
+>> - * - Jump to a target into the trampoline page (remember, this is the same
+>> - *   physical page!)
+>> - * - Now switch to the runtime pgd (same VA, and still the same physical
+>> - *   page!)
+>> + * - We jump in HYP with 3 parameters: runtime HYP pgd, runtime stack,
+>> + *   runtime vectors
 > 
-> On 06/21/2016 01:31 AM, Sergei Shtylyov wrote:
-> 
-> >Add the device tree nodes for the Advanced Power Management Unit (APMU)
-> >and the second Cortex-A15 CPU core.
-> >Use the "enable-method" prop  to point out that the APMU should be used
-> >for the SMP support.
-> >
-> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >
-> >---
-> >This patch is against the 'renesas-devel-20160620-v4.7-rc4' tag of Simon
-> >Horman's 'renesas.git' repo.  It depends on Magnus'/Geert's SMP patchset...
-> 
->    simon, now that this patchset has been merged (for 4.8?), could you also
-> merge this patch?
+> probably just call this HYP pgd, HYP stack, and HYP vectors now
 
-Sure, as this is for a new board I'll make a last minute exception and take
-this. I am trusting that cpu hotplug and suspend/resume have been adequately
-tested.
+Yup.
+
+>>   * - Invalidate TLBs
+>>   * - Set stack and vectors
+>> + * - Setup the page tables
+>> + * - Enable the MMU
+>>   * - Profit! (or eret, if you only care about the code).
+>> - *
+>> - * As we only have four registers available to pass parameters (and we
+>> - * need six), we split the init in two phases:
+>> - * - Phase 1: r0 = 0, r1 = 0, r2,r3 contain the boot PGD.
+>> - *   Provides the basic HYP init, and enable the MMU.
+>> - * - Phase 2: r0 = ToS, r1 = vectors, r2,r3 contain the runtime PGD.
+>> - *   Switches to the runtime PGD, set stack and vectors.
+>>   */
+>>  
+>>  	.text
+>> @@ -68,8 +58,11 @@ __kvm_hyp_init:
+>>  	W(b)	.
+>>  
+>>  __do_hyp_init:
+>> -	cmp	r0, #0			@ We have a SP?
+>> -	bne	phase2			@ Yes, second stage init
+>> +	@ Set stack pointer
+>> +	mov	sp, r0
+>> +
+>> +	@ Set HVBAR to point to the HYP vectors
+>> +	mcr	p15, 4, r1, c12, c0, 0	@ HVBAR
+>>  
+>>  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
+>>  	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
+>> @@ -114,33 +107,9 @@ __do_hyp_init:
+>>   THUMB(	ldr	r2, =(HSCTLR_M | HSCTLR_A | HSCTLR_TE)		)
+>>  	orr	r1, r1, r2
+>>  	orr	r0, r0, r1
+>> -	isb
+>>  	mcr	p15, 4, r0, c1, c0, 0	@ HSCR
+>> -
+>> -	@ End of init phase-1
+>> -	eret
+>> -
+>> -phase2:
+>> -	@ Set stack pointer
+>> -	mov	sp, r0
+>> -
+>> -	@ Set HVBAR to point to the HYP vectors
+>> -	mcr	p15, 4, r1, c12, c0, 0	@ HVBAR
+>> -
+>> -	@ Jump to the trampoline page
+>> -	ldr	r0, =TRAMPOLINE_VA
+>> -	adr	r1, target
+>> -	bfi	r0, r1, #0, #PAGE_SHIFT
+>> -	ret	r0
+>> -
+>> -target:	@ We're now in the trampoline code, switch page tables
+>> -	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
+>>  	isb
+>>  
+>> -	@ Invalidate the old TLBs
+>> -	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
+>> -	dsb	ish
+> 
+> how are we sure there are no stale entries in the TLB beyond the idmap
+> region?  Did we take care of this during kernel boot?  What about
+> hotplug/suspend stuff?
+
+This is done just before installing the page tables (not visible in this
+patch). Hotplug/suspend goes through the same path as well, so it should
+be all taken care of.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
