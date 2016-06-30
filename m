@@ -1,57 +1,51 @@
-From: roger.lu@mediatek.com (Roger Lu)
-Date: Thu, 30 Jun 2016 11:17:46 +0800
-Subject: [PATCH] PM / suspend: show workqueue state in suspend flow
-Message-ID: <1467256666-27808-1-git-send-email-roger.lu@mediatek.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 29 Jun 2016 20:47:25 -0700
+Subject: [3/3] hwmon: iio_hwmon: defer probe when no channel is found
+In-Reply-To: <1467101897-15946-4-git-send-email-quentin.schulz@free-electrons.com>
+References: <1467101897-15946-4-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <20160630034725.GA26484@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If freezable workqueue aborts suspend flow, show
-workqueue state for debug purpose.
+On Tue, Jun 28, 2016 at 10:18:17AM +0200, Quentin Schulz wrote:
+> iio_channel_get_all returns -ENODEV when it cannot find either phandles and
+> properties in the Device Tree or channels whose consumer_dev_name matches
+> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
+> which might be probed after iio_hwmon.
+> 
+> It is better to defer the probe of iio_hwmon if such error is returned by
+> iio_channel_get_all in order to let a chance to iio drivers to expose
+> channels in iio_map_list.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  drivers/hwmon/iio_hwmon.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
+> index b550ba5..c0da4d9 100644
+> --- a/drivers/hwmon/iio_hwmon.c
+> +++ b/drivers/hwmon/iio_hwmon.c
+> @@ -73,8 +73,11 @@ static int iio_hwmon_probe(struct platform_device *pdev)
+>  		name = dev->of_node->name;
+>  
+>  	channels = iio_channel_get_all(dev);
+> -	if (IS_ERR(channels))
+> +	if (IS_ERR(channels)) {
+> +		if (PTR_ERR(channels) == -ENODEV)
+> +			return -EPROBE_DEFER;
 
-Signed-off-by: Roger Lu <roger.lu@mediatek.com>
----
- kernel/power/process.c | 3 +++
- kernel/workqueue.c     | 7 +++++--
- 2 files changed, 8 insertions(+), 2 deletions(-)
+The problem, as I see it, is with iio, which should return -EPROBE_DEFER
+in this situation.
 
-diff --git a/kernel/power/process.c b/kernel/power/process.c
-index df058be..6eef250 100644
---- a/kernel/power/process.c
-+++ b/kernel/power/process.c
-@@ -89,6 +89,9 @@ static int try_to_freeze_tasks(bool user_only)
- 		       elapsed_msecs / 1000, elapsed_msecs % 1000,
- 		       todo - wq_busy, wq_busy);
- 
-+		if (wq_busy)
-+			show_workqueue_state();
-+
- 		if (!wakeup) {
- 			read_lock(&tasklist_lock);
- 			for_each_process_thread(g, p) {
-diff --git a/kernel/workqueue.c b/kernel/workqueue.c
-index e1c0e99..c945617 100644
---- a/kernel/workqueue.c
-+++ b/kernel/workqueue.c
-@@ -4369,8 +4369,8 @@ static void show_pwq(struct pool_workqueue *pwq)
- /**
-  * show_workqueue_state - dump workqueue state
-  *
-- * Called from a sysrq handler and prints out all busy workqueues and
-- * pools.
-+ * Called from a sysrq handler or try_to_freeze_tasks() and prints out
-+ * all busy workqueues and pools.
-  */
- void show_workqueue_state(void)
- {
-@@ -4396,6 +4396,9 @@ void show_workqueue_state(void)
- 		if (idle)
- 			continue;
- 
-+		if (wq->flags & WQ_FREEZABLE)
-+			pr_info("freezable ");
-+
- 		pr_info("workqueue %s: flags=0x%x\n", wq->name, wq->flags);
- 
- 		for_each_pwq(pwq, wq) {
--- 
-2.6.4
+We can not convert -ENODEV to -EPROBE_DEFER without risking that the
+channels are _really_ not there, which would result in endless "deferred"
+messages.
+
+Guenter
+
+>  		return PTR_ERR(channels);
+> +	}
+>  
+>  	st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
+>  	if (st == NULL) {
