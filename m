@@ -1,57 +1,79 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Thu, 30 Jun 2016 15:03:11 +0530
-Subject: [PATCH 3/8] arm64:perf: Update Kconfig for Hisilicon PMU support
-In-Reply-To: <20160628102446.GD31744@leverpostej>
-References: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
- <1467107429-55477-4-git-send-email-anurup.m@huawei.com>
- <20160628102446.GD31744@leverpostej>
-Message-ID: <5774E757.4050201@gmail.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Thu, 30 Jun 2016 17:31:10 +0800
+Subject: [PATCH V3 0/8] clk: core: support clocks which requires parents enable
+Message-ID: <1467279078-2330-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series adds support in clock framework for clocks which all the
+operations like gate/ungate, set_rate, set_parent must require its parent
+clock on.
 
+This special HW requirement can be found on Freescale i.MX7D platform.
+Besides i.MX7D, it seems lpc18xx clock has a similar requirement.
+(see: http://www.spinics.net/lists/arm-kernel/msg439307.html)
+And there may be other SoCs in the same situation.
 
-On Tuesday 28 June 2016 03:54 PM, Mark Rutland wrote:
-> On Tue, Jun 28, 2016 at 05:50:24AM -0400, Anurup M wrote:
->> 	1. Update Kconfig for Hisilicon SoC ARMv8 PMU support.
->>
->> Signed-off-by: Anurup M <anurup.m@huawei.com>
->> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
->> ---
->>   drivers/perf/Kconfig | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
->> index 04e2653..a90b2fc 100644
->> --- a/drivers/perf/Kconfig
->> +++ b/drivers/perf/Kconfig
->> @@ -12,4 +12,13 @@ config ARM_PMU
->>   	  Say y if you want to use CPU performance monitors on ARM-based
->>   	  systems.
->>   
->> +config HISI_PERFCTR
->> +	bool "Enable hardware event counter support for HiSilicon SoC"
->> +	depends on HW_PERF_EVENTS && ARM64
->> +	select HISI_DJTAG
-> This Kconfig symbol doesn't exist.
->
-> You need to post the relevant code, or at the very least refer to it.
->
-> This cannot be reviewed or merged in the absence of that code.
-Sorry for this. We shall post the djtag driver patch for review next week.
+Current clock core can not support such type of clock well.
 
-Thanks,
-Anurup
->
-> Thanks,
-> Mark.
->
->> +	default n
->> +	help
->> +	  Enable hardware event counter support for hardware event counters
->> +	  in Hisilicon Hi161x SoC. The hardware modules like LLC, MN1 and
->> +	  DDRC have hardware events and counters.
->>   endmenu
->> -- 
->> 2.1.4
->>
+This patch introduce a new flag CLK_SET_PARENT_ENABLE to handle this special
+case in clock core that enable its parent clock firstly for each operation
+and disable it later after operation complete.
+
+There're two special cases for handling this issue:
+
+One is fixing the possible disabling clocks while its parent is already off
+during kernel booting phase in clk_disable_unused_subtree()
+Since this state misalign only happens during booting time,
+so we simply enable the parent clocks before disable it if flag is set.
+For normal clk_disable after kernel booting, there's no such issue
+since the clock tree is already created which makes sure no such issue exist.
+
+Another special case is for set_parent() operation.
+It requires both parent, old one and new one, to be enabled at the same
+time during the operation.
+
+Patch 1~4 does this work.
+
+After clk core supports mx7d type clocks, we don't have to enable all clock
+by default anymore, then we remove the enable of all clocks code and instead
+only enable set of minimum required clocks.
+
+Patch 5~8 does this work.
+
+The whole patch series is based on for-next branch of clock tree:
+git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
+
+Change log:
+v2-> v3:
+ * fix rebase error
+v1-> v2:
+ * Addressed Mike's comments to make code more clearer
+
+V1:
+https://lkml.org/lkml/2016/4/20/199
+
+The original one can be found at here:
+http://www.spinics.net/lists/arm-kernel/msg435136.html
+It has no functional changes but improve the commit message and
+comments a bit.
+
+Dong Aisheng (8):
+  clk: introduce clk_core_enable_lock and clk_core_disable_lock
+    functions
+  clk: move clk_disable_unused after clk_core_disable_unprepare function
+  clk: core: support clocks which requires parents enable (part 1)
+  clk: core: support clocks which requires parents enable (part 2)
+  clk: imx: re-order and concentrate the same type of clk api
+  clk: imx: add clk api for supporting CLK_OPS_PARENT_ENABLE clocks
+  clk: imx7d: using api with flag CLK_OPS_PARENT_ENABLE
+  clk: imx7d: only enable minimum required clocks
+
+ drivers/clk/clk.c            | 332 ++++++++++++--------
+ drivers/clk/imx/clk-imx7d.c  | 732 ++++++++++++++++++++++---------------------
+ drivers/clk/imx/clk.h        |  90 ++++--
+ include/linux/clk-provider.h |   2 +
+ 4 files changed, 628 insertions(+), 528 deletions(-)
+
+-- 
+1.9.1
