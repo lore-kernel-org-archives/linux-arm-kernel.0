@@ -1,100 +1,85 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 30 Jun 2016 08:54:32 -0500
-Subject: [PATCH 3/3] dt-bindings: Document the STM32 USB OTG DWC2 core
- binding
-In-Reply-To: <CAF3+Tqe_83zuaxWfp2sv6pZ70XzkbfZ4V4w+n8wCFAApvRirdg@mail.gmail.com>
-References: <1466562349-5043-1-git-send-email-bruherrera@gmail.com>
- <1466562349-5043-3-git-send-email-bruherrera@gmail.com>
- <20160624154118.GA4598@rob-hp-laptop>
- <CAF3+Tqe05kXExob_62w80BBbXz6p01-WwXM1+R6ecp0JtsgviA@mail.gmail.com>
- <20160628205441.GA3737@rob-hp-laptop>
- <CAF3+Tqe_83zuaxWfp2sv6pZ70XzkbfZ4V4w+n8wCFAApvRirdg@mail.gmail.com>
-Message-ID: <20160630135432.GA13875@rob-hp-laptop>
+From: Per.Hallsmark@windriver.com (Hallsmark, Per)
+Date: Thu, 30 Jun 2016 13:58:08 +0000
+Subject: [PATCH] arm64: ni_syscall should be similar to other archs
+In-Reply-To: <20160418095808.GB18257@e104818-lin.cambridge.arm.com>
+References: <1456325699-25849-1-git-send-email-per.hallsmark@windriver.com>,
+ <20160418095808.GB18257@e104818-lin.cambridge.arm.com>
+Message-ID: <B7B4BB465792624BAF51F33077E990659D7C134D@ALA-MBB.corp.ad.wrs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 03:56:23PM -0300, Bruno Herrera wrote:
-> On Tue, Jun 28, 2016 at 5:54 PM, Rob Herring <robh@kernel.org> wrote:
-> > On Fri, Jun 24, 2016 at 03:51:18PM -0300, Bruno Herrera wrote:
-> >> On Fri, Jun 24, 2016 at 12:41 PM, Rob Herring <robh@kernel.org> wrote:
-> >> > On Tue, Jun 21, 2016 at 11:25:49PM -0300, Bruno Herrera wrote:
-> >> >> Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
-> >> >> ---
-> >> >>  Documentation/devicetree/bindings/usb/dwc2.txt | 1 +
-> >> >>  1 file changed, 1 insertion(+)
-> >> >>
-> >> >> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
-> >> >> index 20a68bf..79e5370 100644
-> >> >> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
-> >> >> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
-> >> >> @@ -11,6 +11,7 @@ Required properties:
-> >> >>    - "lantiq,arx100-usb": The DWC2 USB controller instance in Lantiq ARX SoCs;
-> >> >>    - "lantiq,xrx200-usb": The DWC2 USB controller instance in Lantiq XRX SoCs;
-> >> >>    - snps,dwc2: A generic DWC2 USB controller with default parameters.
-> >> >> +  - st,stm32-fsotg: The DWC2 USB controller instance in STM32F4 SoCs in FS mode;
-> >> >
-> >> > This should go above snps,dwc2.
-> >> >
-> >> Ok, tks!
-> >>
-> >> > What determines FS mode vs. HS?
-> >> >
-> >> Its more HW design decision.
-> >> STM32F429/439/469 has two OTG controllers, one that is FS (internal
-> >> phy) and other that is HS (but can also work in FS mode with
-> >> internal/external phy)
-> >> This bind work with both cores FS and HS working with the internal PHY.
-> >>
-> >> I tested the following configurations:
-> >> 1 - STM32F429I-DISCOv1 board (OTG HS working in FS mode internal PHY)
-> >> 2 - STM32F469I-DISCO board (OTG FS)
-> >>
-> >> I did not tested OTG HS core working in FS mode with external PHY (I2C).
-> >
-> > You shouldn't be setting the compatible string based on which mode you
-> > want. So for the HS block, you need a different compatible string than
-> > the FS block and set the speed in another way (not sure if we have a
-> > standard way). Or perhaps the phy should determine the speed.
-> 
-> I understand but I dont see how to fix it properly unless we add a
-> some specific STM32 properties in the DT or in the dwc2_core_params.
-> In fact there are two cores, and they are different in terms of
-> functionality (despite of the type of the PHY).
-> One core is for FS and other is for HS, so they could/should have
-> different compatible strings because they have different
-> configurations and are different piece of IP/Hardware(The buffer size
-> are different, the number of end points and so one, DMA)
+No problem, I managed to miss this reply with same amount ;-)
 
-Then it is perfectly fine to have 2 compatible strings: one for the FS 
-block and one for the HS block.
+The issue was found on a real case, running lttng that tries to make use
+of sys_brk before falling back to internal variant. On arm64 this generates
+an "ugly" dump on console which dont happen on arm, x86 etc.
 
-> 
-> But the problem is that the HS core can also support the the FS mode
-> and in this case is misleading to have a HS core with an FS compatible
-> string.
+Ok, missed that part with SIGILL, so even more to align then.
 
-But as you said, there are other differences in the 2 blocks, so just 
-changing to the FS compatible string would not work.
+--
+Per Hallsmark                        per.hallsmark at windriver.com
+Senior Member Technical Staff        Wind River AB
+Mobile: +46733249340                 Office: +46859461127
+Torshamnsgatan 27                    164 40 Kista
+________________________________________
+From: Catalin Marinas [catalin.marinas at arm.com]
+Sent: Monday, April 18, 2016 11:58
+To: Hallsmark, Per
+Cc: linux-arm-kernel at lists.infradead.org; Will Deacon
+Subject: Re: [PATCH] arm64: ni_syscall should be similar to other archs
 
-You could just have a high-speed-disable property or something, but look 
-thru existing bindings and see if one exists already. If not, propose a 
-common one.
+(I forgot about this email, some two months ago)
 
-> Something like that (real case for STM32F429I-DISCO):
-> 
-> &usbotg_hs {
-> compatible = "st,stm32-fsotg", "snps,dwc2";
-> dr_mode = "host";
-> pinctrl-0 = <&usbotg_fs_pins_b>;
-> pinctrl-names = "default";
-> status = "okay";
-> };
-> 
-> Even if the decision is phy based it would lead to a STM32 specific
-> logic and we would need to figure out how to represent the internal
-> PHY.
+On Wed, Feb 24, 2016 at 03:54:59PM +0100, per.hallsmark at windriver.com wrote:
+> From: Per Hallsmark <per.hallsmark@windriver.com>
+>
+> Today arm64 have it's own variant when a userspace app is doing a
+> non-implemented syscall in that it dumps on console process name,
+> registers and such. This makes a different behaviour on arm64 than
+> on all other archs.
 
-Most SoCs end up describing the phys at least for USB 2 and 3 as they 
-vary a lot eventhough everyone licenses one of the few IP blocks.
+Are you hitting a real issue with this? Test apps doing random syscalls?
 
-Rob
+> This patch propose to get inline with other archs.
+
+Well, it's not fully in line, for example on arch/arm we generate a
+SIGILL (and I think we should fix the compat path in the arm64
+do_ni_syscall() to do the same).
+
+> If we want to have a note on console, syslog or so when doing a
+> nonimplemented syscall, it would be better to add a variable
+> show_nonimplemented_syscalls and sense on it in the generic
+> kernel/sys_ni.c::sys_ni_syscall() which could dump info (and then
+> it would be generic for all archs). But that is another discussion
+> alltogether, lets first synchronize the archs to behave similar.
+
+Or we could have finer grained show_unhandled_signals variable. The user
+visible /proc/sys/debug/exception-trace doesn't say anything about
+signals.
+
+> Signed-off-by: Per Hallsmark <per.hallsmark@windriver.com>
+> ---
+>  arch/arm64/kernel/traps.c | 8 --------
+>  1 file changed, 8 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index cbedd72..980ff63 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -403,14 +403,6 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
+>       }
+>  #endif
+>
+> -     if (show_unhandled_signals_ratelimited()) {
+> -             pr_info("%s[%d]: syscall %d\n", current->comm,
+> -                     task_pid_nr(current), (int)regs->syscallno);
+> -             dump_instr("", regs);
+> -             if (user_mode(regs))
+> -                     __show_regs(regs);
+> -     }
+> -
+>       return sys_ni_syscall();
+>  }
+
+--
+Catalin
