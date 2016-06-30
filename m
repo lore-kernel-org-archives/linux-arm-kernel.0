@@ -1,51 +1,23 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 29 Jun 2016 20:47:25 -0700
-Subject: [3/3] hwmon: iio_hwmon: defer probe when no channel is found
-In-Reply-To: <1467101897-15946-4-git-send-email-quentin.schulz@free-electrons.com>
-References: <1467101897-15946-4-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <20160630034725.GA26484@roeck-us.net>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 29 Jun 2016 23:13:30 -0500
+Subject: [PATCH v6 04/10] acpi: Add some basic struct and functions in
+ GTDT driver
+In-Reply-To: <3079554.3ECV4uzklN@vostro.rjw.lan>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <CAJZ5v0gw7E6DnGhpACAws2WdF3j=eUkjKBhfo2RKmyKnpoLUbQ@mail.gmail.com>
+ <CADyBb7v70YVL4yM_U335eQfa+NEd+jXDEaMN3iAhgnyL9Dk=WA@mail.gmail.com>
+ <3079554.3ECV4uzklN@vostro.rjw.lan>
+Message-ID: <57749C6A.9070900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 10:18:17AM +0200, Quentin Schulz wrote:
-> iio_channel_get_all returns -ENODEV when it cannot find either phandles and
-> properties in the Device Tree or channels whose consumer_dev_name matches
-> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
-> which might be probed after iio_hwmon.
-> 
-> It is better to defer the probe of iio_hwmon if such error is returned by
-> iio_channel_get_all in order to let a chance to iio drivers to expose
-> channels in iio_map_list.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> ---
->  drivers/hwmon/iio_hwmon.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
-> index b550ba5..c0da4d9 100644
-> --- a/drivers/hwmon/iio_hwmon.c
-> +++ b/drivers/hwmon/iio_hwmon.c
-> @@ -73,8 +73,11 @@ static int iio_hwmon_probe(struct platform_device *pdev)
->  		name = dev->of_node->name;
->  
->  	channels = iio_channel_get_all(dev);
-> -	if (IS_ERR(channels))
-> +	if (IS_ERR(channels)) {
-> +		if (PTR_ERR(channels) == -ENODEV)
-> +			return -EPROBE_DEFER;
+Rafael J. Wysocki wrote:
+> That's not enough.  The [0/10] will not go into the git log, mind you.
 
-The problem, as I see it, is with iio, which should return -EPROBE_DEFER
-in this situation.
+The changelog is placed under the "---", so it wouldn't go into the git 
+log anyway.
 
-We can not convert -ENODEV to -EPROBE_DEFER without risking that the
-channels are _really_ not there, which would result in endless "deferred"
-messages.
-
-Guenter
-
->  		return PTR_ERR(channels);
-> +	}
->  
->  	st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
->  	if (st == NULL) {
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
