@@ -1,40 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:35 +0200
-Subject: [PATCH 15/41] ARM: dts: alt: Name serial port pfc subnode after
+Date: Thu, 30 Jun 2016 16:15:39 +0200
+Subject: [PATCH 19/41] ARM: dts: kzm9g: Name serial port pfc subnode after
  device name
 In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
 References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <d88f5bc4a92f3a7a825b83708e38dd5c390cfbc6.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <970a62e07e5cfba58a571e4ba671f438065fcb19.1467294011.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Name the Pin Function Controller subnode for SCIF2 after its device
-name, instead of using some arbitrary name that looks like a serial port
-alias, but differs from the actual alias.
+Name the Pin Function Controller subnode for SCIFA4 after its device
+name, instead of after the serial port alias.
 
-This avoids conflicts when enabling support for more serial ports later,
+This avoids conflicts when adding support for more serial ports later,
 either here or in a DT overlay.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-alt.dts | 2 +-
+ arch/arm/boot/dts/sh73a0-kzm9g.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index 383ad791f1db..1335664b2f88 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -111,7 +111,7 @@
- 		function = "du";
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+index 36567cbf2e1c..1df68b167033 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+@@ -352,7 +352,7 @@
+ 		};
  	};
  
--	scif2_pins: serial2 {
-+	scif2_pins: scif2 {
- 		groups = "scif2_data";
- 		function = "scif2";
+-	scifa4_pins: serial4 {
++	scifa4_pins: scifa4 {
+ 		groups = "scifa4_data", "scifa4_ctrl";
+ 		function = "scifa4";
  	};
 -- 
 2.7.0.rc3.207.g0ac5344
