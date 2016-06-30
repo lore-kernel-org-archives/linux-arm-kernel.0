@@ -1,40 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jun 2016 13:31:07 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <8d8bd933-717b-48e4-f002-7b834abed6fd@redhat.com>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <CAOiHx==82LHOeQMNVD+dybFifXX690Q6AJTcMBMynjSfUOyGUw@mail.gmail.com>
- <8d8bd933-717b-48e4-f002-7b834abed6fd@redhat.com>
-Message-ID: <3960223.GqB9zXL8s8@wuerfel>
+Date: Thu, 30 Jun 2016 13:37:30 +0200
+Subject: Extcon build failure in next
+In-Reply-To: <20160630054112.GN28140@atomide.com>
+References: <20160630053705.GM28140@atomide.com>
+ <20160630054112.GN28140@atomide.com>
+Message-ID: <3746939.q8kt0ym6m3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 30, 2016 12:25:15 PM CEST Hans de Goede wrote:
-> > So then how about making use of a more specific compatible string?
-> >
-> > e.g.
-> >
-> > brcmf {
-> >         compatible = "foo,ap6210", "brcm,bcm4329-fmac";
-> >         ...
-> > };
-> >
-> > and if the compatible has more than one element you request
-> > FW_NAME_<compatible>.txt as the nvram file. Or try each comptible (and
-> > lastly no suffix) until you get a match. (AFAICT, this is what the
-> > "model" property was originally intended for anyway, but almost nobody
-> > did it right, and everyone put a user readable string into "model" for
-> > boards instead of the ePAPR defined compatible string).
-> 
-> Hmm, interesting idea. Not sure how easy / hard it will be to implement
-> this, but from a dt binding point of view it seems elegant.
-> 
-> Kalle, Arend, what do you think of this ?
+On Wednesday, June 29, 2016 10:41:13 PM CEST Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [160629 22:41]:
+> > Hi Chanwoo,
+> > 
+> > Looks like current Linux next fails to build with at least
+> > omap2plus_defconfig because of:
+> > 
+> > ERROR: "extcon_dev_allocate" [drivers/extcon/devres.ko] undefined!
+> > scripts/Makefile.modpost:91: recipe for target '__modpost' failed
+> > make[1]: *** [__modpost] Error 1
+> > Makefile:1163: recipe for target 'modules' failed
+> > make: *** [modules] Error 2
+> > Kernel build failed
+> > 
+> > Probably extcon_dev_allocate just needs EXPORT_SYMBOL_GPL?
 
-I think that's reasonable. Also, we have precedent for using things like
-the boardid as part of the compatible string, which would help do what
-Kalle suggested earlier with "nvram-<boardtype>-<boardrev>.txt",
-as we get that for free by trying out all the compatible strings.
+I've sent "extcon: link devres into core module" for this
+
+> Also I'm seeing:
+> 
+> drivers/extcon/extcon.c: In function 'extcon_register_notifier':
+> drivers/extcon/extcon.c:455:6: warning: 'idx' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>    if (idx >= 0) {
+>          ^
+
+I don't see this one. Which compiler version do you use?
 
 	Arnd
