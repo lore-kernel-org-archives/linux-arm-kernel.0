@@ -1,50 +1,41 @@
 From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 30 Jun 2016 09:29:59 +0800
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <CAJZ5v0iD5OYjp7ozmzoQ3zK-3+eMpdwzDxYgD=saLPjNeoq0Qg@mail.gmail.com>
+Date: Thu, 30 Jun 2016 09:32:34 +0800
+Subject: [PATCH v6 04/10] acpi: Add some basic struct and functions in
+ GTDT driver
+In-Reply-To: <3079554.3ECV4uzklN@vostro.rjw.lan>
 References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <CAJZ5v0iD5OYjp7ozmzoQ3zK-3+eMpdwzDxYgD=saLPjNeoq0Qg@mail.gmail.com>
-Message-ID: <CADyBb7vmS=oJ9EOzs-v-O4_h5Kd_PCMQytjqEHdRNQkqz4WHcQ@mail.gmail.com>
+ <CAJZ5v0gw7E6DnGhpACAws2WdF3j=eUkjKBhfo2RKmyKnpoLUbQ@mail.gmail.com>
+ <CADyBb7v70YVL4yM_U335eQfa+NEd+jXDEaMN3iAhgnyL9Dk=WA@mail.gmail.com>
+ <3079554.3ECV4uzklN@vostro.rjw.lan>
+Message-ID: <CADyBb7s3=tjSQPwwyzfZBfWoXQXXjD1fPrVtxD4V+jH8fPNwdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Rafael,
 
-On 30 June 2016 at 05:32, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Wed, Jun 29, 2016 at 8:15 PM,  <fu.wei@linaro.org> wrote:
->> From: Fu Wei <fu.wei@linaro.org>
+On 30 June 2016 at 09:26, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Thursday, June 30, 2016 09:17:56 AM Fu Wei wrote:
+>> Hi Rafael,
 >>
->> This patchset:
->>     (1)Preparation for adding GTDT support in arm_arch_timer
->>         1. Move some enums and marcos to header file
->>         2. Add a new enum for spi type.
->>         3. Improve printk relevant code
+>> Great thanks for your review :-)
 >>
->>     (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
->>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
->>     memory-mapped timer and SBSA Generic Watchdog timer.
->>     This driver can help to simplify all the relevant timer drivers,
->>     and separate all the ACPI GTDT knowledge from them.
+>> On 30 June 2016 at 05:24, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>> > On Wed, Jun 29, 2016 at 8:15 PM,  <fu.wei@linaro.org> wrote:
+>> >> From: Fu Wei <fu.wei@linaro.org>
+>> >
+>> > No changelog?
 >>
->>     (3)Simplify ACPI code for arm_arch_timer
->>
->>     (4)Add GTDT support for ARM memory-mapped timer
+>> it's on [0/10]
 >
-> GTDT is ARM-specific AFAICS.
+> That's not enough.  The [0/10] will not go into the git log, mind you.
 
-yes, you are right, it is.
-
->
-> If so, why do we need that code to reside in drivers/acpi/ ?
-
-Although  the GTDT is just for ARM64, but this driver is parsing one
-of ACPI table,
-I think that could be treated as ACPI driver.  Do I miss something? :-)
+OK, thanks for your reminding, will add changelog for this driver in
+this patch[4+5+6].
 
 >
 > Thanks,
 > Rafael
+>
 
 
 
