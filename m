@@ -1,42 +1,44 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Thu, 30 Jun 2016 09:10:52 +0800
-Subject: [PATCH net-next 9/9] net: hns: get reset registers from DT
-In-Reply-To: <20160629.051142.259737654994822294.davem@davemloft.net>
-References: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
- <1467021255-95900-10-git-send-email-Yisen.Zhuang@huawei.com>
- <20160629.051142.259737654994822294.davem@davemloft.net>
-Message-ID: <5774719C.4090409@huawei.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 30 Jun 2016 09:06:28 +0800
+Subject: [PATCH 19/21] usb: chipidea: msm: Be silent on probe defer errors
+In-Reply-To: <20160626072838.28082-20-stephen.boyd@linaro.org>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-20-stephen.boyd@linaro.org>
+Message-ID: <20160630010628.GA19211@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/29 17:11, David Miller wrote:
-> From: Yisen Zhuang <Yisen.Zhuang@huawei.com>
-> Date: Mon, 27 Jun 2016 17:54:15 +0800
->
->> @@ -361,9 +371,10 @@ static int hns_mdio_reset(struct mii_bus *bus)
->>  			return -ENODEV;
->>  		}
->>  
->> +	sc_reg = &mdio_dev->sc_reg;
->>  		/* 1. reset req, and read reset st check */
->> -		ret = mdio_sc_cfg_reg_write(mdio_dev, MDIO_SC_RESET_REQ, 0x1,
->> -					    MDIO_SC_RESET_ST, 0x1,
->> +	ret = mdio_sc_cfg_reg_write(mdio_dev, sc_reg->mdio_reset_req, 0x1,
->> +				    sc_reg->mdio_reset_st, 0x1,
->>  					    MDIO_CHECK_SET_ST);
->>  		if (ret) {
->>  			dev_err(&bus->dev, "MDIO reset fail\n");
-> What in the world are you doing to the indentation here?
->
-> Please read your patches before actually sending them, such things
-> will be quite obvious by simple visual inspection.
->
-> .
->
-Hi David,
-i am sorry for my carelessness. i will pay more attention next time.
-Thanks for pointing it our
+On Sun, Jun 26, 2016 at 12:28:36AM -0700, Stephen Boyd wrote:
+> If something fails in ci_hdrc_add_device() due to probe defer, we
+> shouldn't print an error message. Be silent in this case as we'll
+> try probe again later.
+> 
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  drivers/usb/chipidea/ci_hdrc_msm.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+> index 7d191928e55b..2ed9a181f4b6 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+> @@ -241,7 +241,8 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  	plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
+>  				     pdev->num_resources, &ci->pdata);
+>  	if (IS_ERR(plat_ci)) {
+> -		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+> +		if (PTR_ERR(plat_ci) != -EPROBE_DEFER)
+> +			dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+>  		ret = PTR_ERR(plat_ci);
+>  		goto err_mux;
+>  	}
+
+Why not let ret equals to PTR_ERR(plat_ci) first, and using ret to
+compare?
 
 -- 
-MBR,
-Yankejian (Hackim Yim)
+
+Best Regards,
+Peter Chen
