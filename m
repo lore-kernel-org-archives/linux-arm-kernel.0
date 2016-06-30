@@ -1,70 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Jun 2016 13:48:26 +0200
-Subject: [PATCH] ARM: mvebu: compile pm code conditionally
-In-Reply-To: <20160620160931.2714557-1-arnd@arndb.de> (Arnd Bergmann's message
- of "Mon, 20 Jun 2016 18:08:22 +0200")
-References: <20160620160931.2714557-1-arnd@arndb.de>
-Message-ID: <87lh1mx5h1.fsf@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Jun 2016 04:49:12 -0700
+Subject: Extcon build failure in next
+In-Reply-To: <3746939.q8kt0ym6m3@wuerfel>
+References: <20160630053705.GM28140@atomide.com>
+ <20160630054112.GN28140@atomide.com> <3746939.q8kt0ym6m3@wuerfel>
+Message-ID: <20160630114911.GO28140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On lun., juin 20 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+* Arnd Bergmann <arnd@arndb.de> [160630 04:38]:
+> On Wednesday, June 29, 2016 10:41:13 PM CEST Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [160629 22:41]:
+> > > Hi Chanwoo,
+> > > 
+> > > Looks like current Linux next fails to build with at least
+> > > omap2plus_defconfig because of:
+> > > 
+> > > ERROR: "extcon_dev_allocate" [drivers/extcon/devres.ko] undefined!
+> > > scripts/Makefile.modpost:91: recipe for target '__modpost' failed
+> > > make[1]: *** [__modpost] Error 1
+> > > Makefile:1163: recipe for target 'modules' failed
+> > > make: *** [modules] Error 2
+> > > Kernel build failed
+> > > 
+> > > Probably extcon_dev_allocate just needs EXPORT_SYMBOL_GPL?
+> 
+> I've sent "extcon: link devres into core module" for this
 
-> A cleanup to include the headers correctly caused another build problem:
->
-> arch/arm/mach-mvebu/kirkwood-pm.c:70:13: error: redefinition of 'kirkwood_pm_init'
-> arch/arm/mach-mvebu/kirkwood-pm.h:23:20: note: previous definition of 'kirkwood_pm_init' was here
->
-> The underlying issue is that kirkwood-pm.o is not actually meant to be
-> used when CONFIG_PM is disabled, so we should also leave it out of the
-> Makefile.
->
-> The same seems to be true for the PM code in MACH_MVEBU_V7, and I'm
-> treating it the same way here.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: d705c1a66e15 ("ARM: Kirkwood: fix kirkwood_pm_init() declaration/type")
+OK thanks.
 
-Applied on mvebu/fixes
+> > Also I'm seeing:
+> > 
+> > drivers/extcon/extcon.c: In function 'extcon_register_notifier':
+> > drivers/extcon/extcon.c:455:6: warning: 'idx' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> >    if (idx >= 0) {
+> >          ^
+> 
+> I don't see this one. Which compiler version do you use?
 
-Thanks,
+Looks like I'm currently using older arm-none-linux-gnueabi-gcc
+(Sourcery CodeBench Lite 2014.05-29) 4.8.3 20140320 (prerelease).
+I think the Debian compiler was not working few months ago and
+I changed to something I had around.
 
-Gregory
+Looks like the warning does not appear with arm-linux-gnueabihf-gcc
+(Debian 6.1.1-3) 6.1.1 20160511.
 
-> ---
->  arch/arm/mach-mvebu/Makefile | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-> index 568863e1513c..6c6497e80a7b 100644
-> --- a/arch/arm/mach-mvebu/Makefile
-> +++ b/arch/arm/mach-mvebu/Makefile
-> @@ -6,9 +6,15 @@ CFLAGS_pmsu.o			:= -march=armv7-a
->  obj-$(CONFIG_MACH_MVEBU_ANY)	 += system-controller.o mvebu-soc-id.o
->  
->  ifeq ($(CONFIG_MACH_MVEBU_V7),y)
-> -obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o pm.o pm-board.o
-> +obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
-> +
-> +obj-$(CONFIG_PM)		 += pm.o pm-board.o
->  obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
->  endif
->  
->  obj-$(CONFIG_MACH_DOVE)		 += dove.o
-> -obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
-> +
-> +ifeq ($(CONFIG_MACH_KIRKWOOD),y)
-> +obj-y				 += kirkwood.o
-> +obj-$(CONFIG_PM)		 += kirkwood-pm.o
-> +endif
-> -- 
-> 2.9.0
->
+Regards,
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
