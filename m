@@ -1,51 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Jun 2016 04:49:12 -0700
-Subject: Extcon build failure in next
-In-Reply-To: <3746939.q8kt0ym6m3@wuerfel>
-References: <20160630053705.GM28140@atomide.com>
- <20160630054112.GN28140@atomide.com> <3746939.q8kt0ym6m3@wuerfel>
-Message-ID: <20160630114911.GO28140@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Jun 2016 13:52:56 +0200
+Subject: [PATCH v4 1/2] i2c: qup: add ACPI support
+In-Reply-To: <577503F2.90204@codeaurora.org>
+References: <1465409985-17113-1-git-send-email-austinwc@codeaurora.org>
+ <4749471.m1cxc4jj96@wuerfel> <577503F2.90204@codeaurora.org>
+Message-ID: <4043322.Uc6lMkrL43@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [160630 04:38]:
-> On Wednesday, June 29, 2016 10:41:13 PM CEST Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [160629 22:41]:
-> > > Hi Chanwoo,
-> > > 
-> > > Looks like current Linux next fails to build with at least
-> > > omap2plus_defconfig because of:
-> > > 
-> > > ERROR: "extcon_dev_allocate" [drivers/extcon/devres.ko] undefined!
-> > > scripts/Makefile.modpost:91: recipe for target '__modpost' failed
-> > > make[1]: *** [__modpost] Error 1
-> > > Makefile:1163: recipe for target 'modules' failed
-> > > make: *** [modules] Error 2
-> > > Kernel build failed
-> > > 
-> > > Probably extcon_dev_allocate just needs EXPORT_SYMBOL_GPL?
+On Thursday, June 30, 2016 7:35:14 AM CEST Christopher Covington wrote:
+> Hi Arnd,
 > 
-> I've sent "extcon: link devres into core module" for this
-
-OK thanks.
-
-> > Also I'm seeing:
+> On 06/08/2016 05:02 PM, Arnd Bergmann wrote:
+> > On Wednesday, June 8, 2016 12:19:44 PM CEST Austin Christ wrote:
+> >> +               ret = device_property_read_u32(qup->dev,
+> >> +                               "src-clock-hz", &src_clk_freq);
+> >> +               if (ret) {
+> >> +                       dev_warn(qup->dev, "using default src-clock-hz %d",
+> >> +                               DEFAULT_SRC_CLK);
+> >> +                       src_clk_freq = DEFAULT_SRC_CLK;
+> >> +               }
+> >>
 > > 
-> > drivers/extcon/extcon.c: In function 'extcon_register_notifier':
-> > drivers/extcon/extcon.c:455:6: warning: 'idx' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> >    if (idx >= 0) {
-> >          ^
+> > Where is this property documented?
 > 
-> I don't see this one. Which compiler version do you use?
+> We plan on submitting documentation via dsd at acpica.org to
+> https://github.com/ahs3/dsd once it is operational. As I understand it
+> the project is brand new. It may take several months to begin accepting
+> submissions. In the mean time, we could potentially include
+> documentation in a reply to this thread, the cover of the next series, a
+> wiki page on codeaurora.org, a file in Documentation (perhaps to be
+> replaced by ACPICA style imports of the OS-neutral DSD project or a git
+> submodule) or potentially other means. Please let us know what you think
+> is sufficient.
 
-Looks like I'm currently using older arm-none-linux-gnueabi-gcc
-(Sourcery CodeBench Lite 2014.05-29) 4.8.3 20140320 (prerelease).
-I think the Debian compiler was not working few months ago and
-I changed to something I had around.
+As you are reusing part of the DT binding, it seems appropriate to put
+the documentation for this into the binding documentation in the kernel.
 
-Looks like the warning does not appear with arm-linux-gnueabihf-gcc
-(Debian 6.1.1-3) 6.1.1 20160511.
+Not sure what the devicetree maintainers think about that though.
 
-Regards,
-
-Tony
+	Arnd
