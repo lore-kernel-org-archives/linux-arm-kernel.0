@@ -1,64 +1,104 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:04 +0200
-Subject: [PATCH 6/9] arm64: dts: r8a7796: Add SYSC PM Domains
+Date: Thu, 30 Jun 2016 16:15:01 +0200
+Subject: [PATCH 3/9] clk: renesas: Add r8a7796 CPG Core Clock Definitions
 In-Reply-To: <cover.1467291676.git.horms+renesas@verge.net.au>
 References: <cover.1467291676.git.horms+renesas@verge.net.au>
-Message-ID: <fbb099e4ec724e320bec0126a47dbb683ca3cab0.1467291676.git.horms+renesas@verge.net.au>
+Message-ID: <aba4d56352addfdd8778d9c3ae79f5e4899622fc.1467291676.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add a device node for the System Controller.
-Hook up the Cortex-A57 CPU core and L2 cache/SCU to their respective PM
-Domains.
+Add all R-Car M3-W Clock Pulse Generator Core Clock Outputs, as listed
+in Table 8.2b ("List of Clocks [R-Car M3-W]") of the R-Car Gen3
+datasheet (rev. 0.51 + Errata for Rev051 Mar 31 2016).
+
+Note that internal CPG clocks (S0, S1, S2, S3, SDSRC, and SSPSRC) are
+not included, as they are used as internal clock sources only, and never
+referenced from DT.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ include/dt-bindings/clock/r8a7796-cpg-mssr.h | 69 ++++++++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
+ create mode 100644 include/dt-bindings/clock/r8a7796-cpg-mssr.h
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 178debf68318..85f0843ddd87 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -10,6 +10,7 @@
- 
- #include <dt-bindings/clock/r8a7796-cpg-mssr.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/power/r8a7796-sysc.h>
- 
- / {
- 	compatible = "renesas,r8a7796";
-@@ -30,6 +31,7 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0x0>;
- 			device_type = "cpu";
-+			power-domains = <&sysc R8A7796_PD_CA57_CPU0>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
- 		};
-@@ -37,6 +39,7 @@
- 		L2_CA57: cache-controller at 0 {
- 			compatible = "cache";
- 			reg = <0>;
-+			power-domains = <&sysc R8A7796_PD_CA57_SCU>;
- 			cache-unified;
- 			cache-level = <2>;
- 		};
-@@ -104,6 +107,12 @@
- 			#power-domain-cells = <0>;
- 		};
- 
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a7796-sysc";
-+			reg = <0 0xe6180000 0 0x0400>;
-+			#power-domain-cells = <1>;
-+		};
+diff --git a/include/dt-bindings/clock/r8a7796-cpg-mssr.h b/include/dt-bindings/clock/r8a7796-cpg-mssr.h
+new file mode 100644
+index 000000000000..1e5942695f0d
+--- /dev/null
++++ b/include/dt-bindings/clock/r8a7796-cpg-mssr.h
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (C) 2016 Renesas Electronics Corp.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#ifndef __DT_BINDINGS_CLOCK_R8A7796_CPG_MSSR_H__
++#define __DT_BINDINGS_CLOCK_R8A7796_CPG_MSSR_H__
 +
- 		scif2: serial at e6e88000 {
- 			compatible = "renesas,scif-r8a7796",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
++#include <dt-bindings/clock/renesas-cpg-mssr.h>
++
++/* r8a7796 CPG Core Clocks */
++#define R8A7796_CLK_Z			0
++#define R8A7796_CLK_Z2			1
++#define R8A7796_CLK_ZR			2
++#define R8A7796_CLK_ZG			3
++#define R8A7796_CLK_ZTR			4
++#define R8A7796_CLK_ZTRD2		5
++#define R8A7796_CLK_ZT			6
++#define R8A7796_CLK_ZX			7
++#define R8A7796_CLK_S0D1		8
++#define R8A7796_CLK_S0D2		9
++#define R8A7796_CLK_S0D3		10
++#define R8A7796_CLK_S0D4		11
++#define R8A7796_CLK_S0D6		12
++#define R8A7796_CLK_S0D8		13
++#define R8A7796_CLK_S0D12		14
++#define R8A7796_CLK_S1D1		15
++#define R8A7796_CLK_S1D2		16
++#define R8A7796_CLK_S1D4		17
++#define R8A7796_CLK_S2D1		18
++#define R8A7796_CLK_S2D2		19
++#define R8A7796_CLK_S2D4		20
++#define R8A7796_CLK_S3D1		21
++#define R8A7796_CLK_S3D2		22
++#define R8A7796_CLK_S3D4		23
++#define R8A7796_CLK_LB			24
++#define R8A7796_CLK_CL			25
++#define R8A7796_CLK_ZB3			26
++#define R8A7796_CLK_ZB3D2		27
++#define R8A7796_CLK_ZB3D4		28
++#define R8A7796_CLK_CR			29
++#define R8A7796_CLK_CRD2		30
++#define R8A7796_CLK_SD0H		31
++#define R8A7796_CLK_SD0			32
++#define R8A7796_CLK_SD1H		33
++#define R8A7796_CLK_SD1			34
++#define R8A7796_CLK_SD2H		35
++#define R8A7796_CLK_SD2			36
++#define R8A7796_CLK_SD3H		37
++#define R8A7796_CLK_SD3			38
++#define R8A7796_CLK_SSP2		39
++#define R8A7796_CLK_SSP1		40
++#define R8A7796_CLK_SSPRS		41
++#define R8A7796_CLK_RPC			42
++#define R8A7796_CLK_RPCD2		43
++#define R8A7796_CLK_MSO			44
++#define R8A7796_CLK_CANFD		45
++#define R8A7796_CLK_HDMI		46
++#define R8A7796_CLK_CSI0		47
++#define R8A7796_CLK_CSIREF		48
++#define R8A7796_CLK_CP			49
++#define R8A7796_CLK_CPEX		50
++#define R8A7796_CLK_R			51
++#define R8A7796_CLK_OSC			52
++
++#endif /* __DT_BINDINGS_CLOCK_R8A7796_CPG_MSSR_H__ */
 -- 
 2.7.0.rc3.207.g0ac5344
