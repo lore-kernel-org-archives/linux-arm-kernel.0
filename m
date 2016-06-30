@@ -1,107 +1,37 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Thu, 30 Jun 2016 10:44:14 +0200
-Subject: [RFC PATCH v2] ARM: tango: add Suspend-to-RAM support
-In-Reply-To: <577409E2.7020106@arm.com>
-References: <5773D3FB.4030101@sigmadesigns.com> <577409E2.7020106@arm.com>
-Message-ID: <5774DBDE.1070605@sigmadesigns.com>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Thu, 30 Jun 2016 11:46:10 +0300
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
+ nvram_file_name dt property
+In-Reply-To: <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com> (Arend Van
+ Spriel's message of "Wed, 29 Jun 2016 20:51:44 +0200")
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <CAOiHx=n6itfmvwYQh+jUSDNguQFkos=MzjkDWP=GsupdgvF6KQ@mail.gmail.com>
+ <b49a9e4b-d591-d978-8005-413f39ebf2bd@redhat.com>
+ <871t3gdj6p.fsf@purkki.adurom.net>
+ <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
+ <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
+Message-ID: <87mvm36p4d.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ask firmware to put RAM in self-refresh mode and power system down.
+Arend Van Spriel <arend.vanspriel@broadcom.com> writes:
 
-    echo mem > /sys/power/state
+>> Since we are dealing with a per-board config-file here, which is
+>> loaded from the os filesystem we really need to specify a basename
+>> here as the list of possible boards is endless, so we cannot
+>> have a lookup table in the driver.
+>
+> As Jonas mentioned the general principle of device tree is to be
+> agnostic with regards to OS and/or driver as you undoubtedly know. His
+> proposal seems like a usable solution for your problem while complying
+> to the device tree principle. So instead of overriding the default
+> brcmfmac should modify it when dt specifies the "module" property, ie:
+>
+> no "module" in DT:	nvram filename = brcm/brcmfmac43362-sdio.txt
+> "module=ap6210" in DT:	nvram filename = brcm/brcmfmac43362-ap6210.txt
 
-See Documentation/power/states.txt
+Just out of curiosity, what does "ap6210" exactly mean? I get that 43362
+is the chip id, but not ap6210. Is it just an arbitrary name?
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
-
-This is a RFC because I have a few doubts:
-
-1) return value when tango_suspend() fails and unexpectedly returns (I used -EIO)
-Is there a better error to return?
-
-2) conditionally building pm.c (using CONFIG_SUSPEND? CONFIG_PM_SLEEP? other?)
-Is there a better config knob to use?
-
-3) .valid is required, right?
-AFAICS, the answer is "yes", .valid is indeed required:
-("no valid callback implies that none are valid")
-
-static bool valid_state(suspend_state_t state)
-{
-	/*
-	 * PM_SUSPEND_STANDBY and PM_SUSPEND_MEM states need low level
-	 * support and need to be valid to the low level
-	 * implementation, no valid callback implies that none are valid.
-	 */
-	return suspend_ops && suspend_ops->valid && suspend_ops->valid(state);
-}
-
----
- arch/arm/mach-tango/Makefile |  1 +
- arch/arm/mach-tango/pm.c     | 32 ++++++++++++++++++++++++++++++++
- arch/arm/mach-tango/smc.h    |  1 +
- 3 files changed, 34 insertions(+)
- create mode 100644 arch/arm/mach-tango/pm.c
-
-diff --git a/arch/arm/mach-tango/Makefile b/arch/arm/mach-tango/Makefile
-index 7ca753aa9fb6..822b7ca803c6 100644
---- a/arch/arm/mach-tango/Makefile
-+++ b/arch/arm/mach-tango/Makefile
-@@ -3,3 +3,4 @@ AFLAGS_smc.o := -Wa,-march=armv7-a$(plus_sec)
- 
- obj-y += setup.o smc.o xenv.o
- obj-$(CONFIG_SMP) += platsmp.o
-+obj-$(CONFIG_SUSPEND) += pm.o
-diff --git a/arch/arm/mach-tango/pm.c b/arch/arm/mach-tango/pm.c
-new file mode 100644
-index 000000000000..b05c6d6f99d0
---- /dev/null
-+++ b/arch/arm/mach-tango/pm.c
-@@ -0,0 +1,32 @@
-+#include <linux/init.h>
-+#include <linux/suspend.h>
-+#include <asm/suspend.h>
-+#include "smc.h"
-+
-+static int tango_pm_powerdown(unsigned long arg)
-+{
-+	tango_suspend(virt_to_phys(cpu_resume));
-+
-+	return -EIO; /* tango_suspend has failed */
-+}
-+
-+static int tango_pm_enter(suspend_state_t state)
-+{
-+	if (state == PM_SUSPEND_MEM)
-+		return cpu_suspend(0, tango_pm_powerdown);
-+
-+	return -EINVAL;
-+}
-+
-+static const struct platform_suspend_ops tango_pm_ops = {
-+	.enter = tango_pm_enter,
-+	.valid = suspend_valid_only_mem,
-+};
-+
-+static int __init tango_pm_init(void)
-+{
-+	suspend_set_ops(&tango_pm_ops);
-+	return 0;
-+}
-+
-+late_initcall(tango_pm_init);
-diff --git a/arch/arm/mach-tango/smc.h b/arch/arm/mach-tango/smc.h
-index 3d31f984f44c..57919539da1b 100644
---- a/arch/arm/mach-tango/smc.h
-+++ b/arch/arm/mach-tango/smc.h
-@@ -3,5 +3,6 @@ extern int tango_smc(unsigned int val, unsigned int service);
- #define tango_set_l2_control(val)	tango_smc(val, 0x102)
- #define tango_start_aux_core(val)	tango_smc(val, 0x104)
- #define tango_set_aux_boot_addr(val)	tango_smc(val, 0x105)
-+#define tango_suspend(val)		tango_smc(val, 0x120)
- #define tango_aux_core_die(val)		tango_smc(val, 0x121)
- #define tango_aux_core_kill(val)	tango_smc(val, 0x122)
 -- 
-2.9.0
+Kalle Valo
