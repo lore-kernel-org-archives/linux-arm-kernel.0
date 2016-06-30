@@ -1,35 +1,115 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jun 2016 18:40:38 +0100
-Subject: [PATCH v2 05/18] arm64: Add ARM64_HYP_OFFSET_LOW capability
+Date: Thu, 30 Jun 2016 18:40:40 +0100
+Subject: [PATCH v2 07/18] arm64: KVM: Refactor kern_hyp_va to deal with
+ multiple offsets
 In-Reply-To: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
 References: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1467308451-13365-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1467308451-13365-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we need to indicate to the rest of the kernel which region of
-the HYP VA space is safe to use, add a capability that will
-indicate that KVM should use the [VA_BITS-2:0] range.
+As we move towards a selectable HYP VA range, it is obvious that
+we don't want to test a variable to find out if we need to use
+the bottom VA range, the top VA range, or use the address as is
+(for VHE).
+
+Instead, we can expand our current helper to generate the right
+mask or nop with code patching. We default to using the top VA
+space, with alternatives to switch to the bottom one or to nop
+out the instructions.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_hyp.h | 11 -----------
+ arch/arm64/include/asm/kvm_mmu.h | 42 +++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 39 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 224efe7..d40edbb 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -36,8 +36,9 @@
- #define ARM64_HAS_VIRT_HOST_EXTN		11
- #define ARM64_WORKAROUND_CAVIUM_27456		12
- #define ARM64_HAS_32BIT_EL0			13
-+#define ARM64_HYP_OFFSET_LOW			14
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 1d81f9a..cff5105 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -25,17 +25,6 @@
  
--#define ARM64_NCAPS				14
-+#define ARM64_NCAPS				15
+ #define __hyp_text __section(.hyp.text) notrace
  
- #ifndef __ASSEMBLY__
+-static inline unsigned long __kern_hyp_va(unsigned long v)
+-{
+-	asm volatile(ALTERNATIVE("and %0, %0, %1",
+-				 "nop",
+-				 ARM64_HAS_VIRT_HOST_EXTN)
+-		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
+-	return v;
+-}
+-
+-#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
+-
+ #define read_sysreg_elx(r,nvh,vh)					\
+ 	({								\
+ 		u64 reg;						\
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 5e54323..2970537 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -90,13 +90,33 @@
+ /*
+  * Convert a kernel VA into a HYP VA.
+  * reg: VA to be converted.
++ *
++ * This generates the following sequences:
++ * - High mask:
++ *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
++ *		nop
++ * - Low mask:
++ *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
++ *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
++ * - VHE:
++ *		nop
++ *		nop
++ *
++ * The "low mask" version works because the mask is a strict subset of
++ * the "high mask", hence performing the first mask for nothing.
++ * Should be completely invisible on any viable CPU.
+  */
+ .macro kern_hyp_va	reg
+-alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+-	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
++	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
+ alternative_else
+ 	nop
+ alternative_endif
++alternative_if_not ARM64_HYP_OFFSET_LOW
++	nop
++alternative_else
++	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
++alternative_endif
+ .endm
  
+ #else
+@@ -107,7 +127,23 @@ alternative_endif
+ #include <asm/mmu_context.h>
+ #include <asm/pgtable.h>
+ 
+-#define KERN_TO_HYP(kva)	((unsigned long)kva & HYP_PAGE_OFFSET_MASK)
++static inline unsigned long __kern_hyp_va(unsigned long v)
++{
++	asm volatile(ALTERNATIVE("and %0, %0, %1",
++				 "nop",
++				 ARM64_HAS_VIRT_HOST_EXTN)
++		     : "+r" (v)
++		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
++	asm volatile(ALTERNATIVE("nop",
++				 "and %0, %0, %1",
++				 ARM64_HYP_OFFSET_LOW)
++		     : "+r" (v)
++		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
++	return v;
++}
++
++#define kern_hyp_va(v) 	(typeof(v))(__kern_hyp_va((unsigned long)(v)))
++#define KERN_TO_HYP(v)	kern_hyp_va(v)
+ 
+ /*
+  * We currently only support a 40bit IPA.
 -- 
 2.1.4
