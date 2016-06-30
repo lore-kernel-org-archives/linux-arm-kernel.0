@@ -1,59 +1,52 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 30 Jun 2016 15:39:37 +0200
-Subject: [PULL 2/2] KVM: arm/arm64: Stop leaking vcpu pid references
-In-Reply-To: <20160630133937.2654-1-christoffer.dall@linaro.org>
-References: <20160630133937.2654-1-christoffer.dall@linaro.org>
-Message-ID: <20160630133937.2654-3-christoffer.dall@linaro.org>
+From: garlic.tseng@mediatek.com (Garlic Tseng)
+Date: Thu, 30 Jun 2016 21:39:41 +0800
+Subject: [alsa-devel] [PATCH v5 6/9] ASoC: mediatek: add mt2701 platform
+ driver implementation.
+In-Reply-To: <20160629191322.GT6247@sirena.org.uk>
+References: <1466149440-23889-1-git-send-email-garlic.tseng@mediatek.com>
+ <1466149440-23889-7-git-send-email-garlic.tseng@mediatek.com>
+ <20160629191322.GT6247@sirena.org.uk>
+Message-ID: <1467293981.17087.18.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+On Wed, 2016-06-29 at 20:13 +0100, Mark Brown wrote:
+> On Fri, Jun 17, 2016 at 03:43:57PM +0800, Garlic Tseng wrote:
+> 
+> > +static int mt2701_afe_i2s_set_clkdiv(struct snd_soc_dai *dai, int div_id,
+> > +				     int div)
+> > +{
+> 
+> Why are we adding a set_clkdiv() operation?  I would expect the driver
+> to be able to figure things out automatically.
+> 
+> > +	case DIV_ID_MCLK_TO_BCK:
+> > +		afe_priv->i2s_path[i2s_num].div_mclk_to_bck = div;
+> > +		break;
+> > +	case DIV_ID_BCK_TO_LRCK:
+> > +		afe_priv->i2s_path[i2s_num].div_bck_to_lrck = div;
+> > +		break;
+> 
+> Especially in the case where we're configuring LRCLK, that's trivial
+> when we know the sample rate which we have to know anyway.
 
-kvm provides kvm_vcpu_uninit(), which amongst other things, releases the
-last reference to the struct pid of the task that was last running the vcpu.
+Oh... actually I want to say 'div_mclk_over_bck' and 'div_bck_over_lrck'
+I'll fix the naming if we decide to reserve the set_clkdiv() operation.
 
-On arm64 built with CONFIG_DEBUG_KMEMLEAK, starting a guest with kvmtool,
-then killing it with SIGKILL results (after some considerable time) in:
-> cat /sys/kernel/debug/kmemleak
-> unreferenced object 0xffff80007d5ea080 (size 128):
->  comm "lkvm", pid 2025, jiffies 4294942645 (age 1107.776s)
->  hex dump (first 32 bytes):
->    01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
->    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
->  backtrace:
->    [<ffff8000001b30ec>] create_object+0xfc/0x278
->    [<ffff80000071da34>] kmemleak_alloc+0x34/0x70
->    [<ffff80000019fa2c>] kmem_cache_alloc+0x16c/0x1d8
->    [<ffff8000000d0474>] alloc_pid+0x34/0x4d0
->    [<ffff8000000b5674>] copy_process.isra.6+0x79c/0x1338
->    [<ffff8000000b633c>] _do_fork+0x74/0x320
->    [<ffff8000000b66b0>] SyS_clone+0x18/0x20
->    [<ffff800000085cb0>] el0_svc_naked+0x24/0x28
->    [<ffffffffffffffff>] 0xffffffffffffffff
+For div_bck_over_lrck, yes we only support bck = 64fs now so I'll remove
+it. Maybe in the future we'll allow bck = 32fs for some board and I'll
+send patch on that time.
 
-On x86 kvm_vcpu_uninit() is called on the path from kvm_arch_destroy_vm(),
-on arm no equivalent call is made. Add the call to kvm_arch_vcpu_free().
+For div_mclk_over_bck, mt2635 can offer 128fs and 256fs mclk to codec,
+and it depends on the board so I tend to let machine driver configure
+it. However, maybe changing it to div_mclk_over_lrck will be better.
+I'll do the change.
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Fixes: 749cf76c5a36 ("KVM: ARM: Initial skeleton to compile KVM support")
-Cc: <stable@vger.kernel.org> # 3.10+
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/arm.c | 1 +
- 1 file changed, 1 insertion(+)
+BTW, some patch is applied for the patchset so I need not to send the
+new version but send another patchset, right?
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 893941e..f1bde7c 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -263,6 +263,7 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
- 	kvm_timer_vcpu_terminate(vcpu);
- 	kvm_vgic_vcpu_destroy(vcpu);
- 	kvm_pmu_vcpu_destroy(vcpu);
-+	kvm_vcpu_uninit(vcpu);
- 	kmem_cache_free(kvm_vcpu_cache, vcpu);
- }
- 
--- 
-2.9.0
+
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
