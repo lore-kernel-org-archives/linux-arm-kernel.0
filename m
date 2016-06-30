@@ -1,127 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Jun 2016 12:48:13 -0700
-Subject: [PATCH 08/10] clk: mvebu Add the time base generator clocks for
- Armada 3700
-In-Reply-To: <1465565018-14172-9-git-send-email-gregory.clement@free-electrons.com>
-References: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
- <1465565018-14172-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160630194813.GA1521@codeaurora.org>
+From: rob.rice@broadcom.com (Rob Rice)
+Date: Thu, 30 Jun 2016 15:59:21 -0400
+Subject: [PATCH v2 0/3] Add Broadcom PDC mailbox driver
+Message-ID: <1467316764-19686-1-git-send-email-rob.rice@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10, Gregory CLEMENT wrote:
-> +
-> +struct tbg_def tbg[NUM_TBG] = {
+From: Rob Rice <rrice@broadcom.com>
 
-const?
+Changes in v2:
+- Added COMPILE_TEST depend to PDC Kconfig
+- Renamed pdc.c to bcm-pdc-mailbox.c and moved it from subdirectory
+  to drivers/mailbox
+- Moved code from pdc.h, pdc_debug.h, and pdc_debug.c into
+  bcm-pdc-mailbox.c
+- Removed a few function parameters
 
-> +	{"TBG-A-P", TBG_A_REFDIV, TBG_A_FBDIV, TBG_CTRL8, TBG_A_VCODIV_DIFF},
-> +	{"TBG-B-P", TBG_B_REFDIV, TBG_B_FBDIV, TBG_CTRL8, TBG_B_VCODIV_DIFF},
-> +	{"TBG-A-S", TBG_A_REFDIV, TBG_A_FBDIV, TBG_CTRL1, TBG_A_VCODIV_SE},
-> +	{"TBG-B-S", TBG_B_REFDIV, TBG_B_FBDIV, TBG_CTRL1, TBG_B_VCODIV_SE},
-> +};
-> +
-> +static struct clk_onecell_data clk_tbg_data;
+The Broadcom PDC mailbox driver is a ring manager for the Broadcom
+Secure Processing Unit (SPU) kernel driver and other mailbox clients.
+The PDC driver registers with the Linux mailbox framework a mailbox
+controller, once for each PDC instance. Ring 0 for each PDC is registered as
+a mailbox channel. The PDC driver uses interrupts to determine when ring
+transfers to and from an offload engine are complete. The PDC driver uses
+threaded IRQs so that response messages are handled outside of interrupt
+context.
 
-Please allocate this in the driver probe.
+Rob Rice (3):
+  dt-bindings: add bindings documentation for PDC driver.
+  mailbox: Add Broadcom PDC mailbox driver
+  arm64: dts: Add Broadcom Northstar2 device tree entries for PDC
+    driver.
 
-> +
-> +unsigned int tbg_get_mult(void __iomem *reg, struct tbg_def *ptbg)
-> +{
-> +	u32 val;
-> +
-> +	val = readl(reg + TBG_CTRL0);
-> +
-> +	return ((val >> ptbg->fbdiv_offset) & TBG_DIV_MASK) << 2;
-> +}
-> +
-> +unsigned int tbg_get_div(void __iomem *reg, struct tbg_def *ptbg)
-> +{
-> +	u32 val;
-> +	unsigned int div;
-> +
-> +	val = readl(reg + TBG_CTRL7);
-> +
-> +	div = (val >> ptbg->refdiv_offset) & TBG_DIV_MASK;
-> +	if (div == 0)
-> +		div = 1;
-> +	val = readl(reg + ptbg->vcodiv_reg);
-> +
-> +	div *= 1 << ((val >>  ptbg->vcodiv_offset) & TBG_DIV_MASK);
-> +
-> +	return div;
-> +}
-> +
-> +
-> +static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device *dev = &pdev->dev;
-> +	const char *parent_name;
-> +	struct resource *res;
-> +	struct clk *parent;
-> +	void __iomem *reg;
-> +	int i, ret;
-> +
-> +	parent = of_clk_get(np, 0);
-
-Why not devm_clk_get() instead? Don't make things dependent on DT
-APIs unnecessarily please.
-
-> +	if (IS_ERR(parent)) {
-> +		dev_err(dev, "Could get the clock parent\n");
-> +		return -EINVAL;
-> +	}
-> +	parent_name = __clk_get_name(parent);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	reg = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(reg)) {
-> +		dev_err(dev, "Could not map the tbg clock registers\n");
-
-devm_ioremap_resource() already spits out an error on failure so
-please drop this print.
-
-> +		ret = PTR_ERR(reg);
-> +		goto put_clk;
-> +	}
-> +
-> +	clk_tbg_data.clk_num = NUM_TBG;
-> +	clk_tbg_data.clks = devm_kcalloc(dev, clk_tbg_data.clk_num,
-> +					 sizeof(struct clk *), GFP_KERNEL);
-
-Please move to clk_hw based registration.
-
-> +	if (!clk_tbg_data.clks) {
-> +		ret = -ENOMEM;
-> +		goto put_clk;
-> +	}
-> +
-> +	for (i = 0; i < NUM_TBG; i++) {
-> +		const char *name;
-> +		unsigned int mult, div;
-> +
-> +		name = tbg[i].name;
-> +		mult = tbg_get_mult(reg, &tbg[i]);
-> +		div = tbg_get_div(reg, &tbg[i]);
-> +		clk_tbg_data.clks[i] = clk_register_fixed_factor(NULL, name,
-> +						 parent_name, 0, mult, div);
-> +		if (IS_ERR(clk_tbg_data.clks[i]))
-> +			dev_err(dev, "Can't register TBG clock %s\n", name);
-> +	}
-> +
-> +	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_tbg_data);
-
-What if this fails?
-
-> +
-> +	return 0;
-> +
-> +put_clk:
-> +	clk_put(parent);
-> +	return ret;
-> +}
+ .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       |   23 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |   36 +
+ drivers/mailbox/Kconfig                            |    9 +
+ drivers/mailbox/Makefile                           |    2 +
+ drivers/mailbox/bcm-pdc-mailbox.c                  | 1531 ++++++++++++++++++++
+ include/linux/mailbox/brcm-message.h               |   56 +
+ 6 files changed, 1657 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+ create mode 100644 drivers/mailbox/bcm-pdc-mailbox.c
+ create mode 100644 include/linux/mailbox/brcm-message.h
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.0
