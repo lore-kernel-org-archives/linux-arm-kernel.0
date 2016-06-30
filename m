@@ -1,34 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Thu, 30 Jun 2016 16:15:00 +0200
-Subject: [PATCH] arm64: defconfig: enable Renesas R8A7796 SoC
-In-Reply-To: <cover.1467291186.git.horms+renesas@verge.net.au>
-References: <cover.1467291186.git.horms+renesas@verge.net.au>
-Message-ID: <62bcf9087150f9588456d941d4ee444ead8ed6f2.1467291186.git.horms+renesas@verge.net.au>
+Subject: [PATCH 2/9] arm64: dts: r8a7795: Add CAN FD support
+In-Reply-To: <cover.1467291676.git.horms+renesas@verge.net.au>
+References: <cover.1467291676.git.horms+renesas@verge.net.au>
+Message-ID: <341eb484b14a16fd32086e7dd82a9f7fdea2d040.1467291676.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 
-This patch enables the Renesas R8A7796 SoC in the arm64 defconfig.
+Adds CAN FD controller node for r8a7795.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Note: CAN FD controller register base address specified in R-Car Gen3
+Hardware User Manual v0.5E is incorrect. The correct address is:
+
+CAN FD - 0xe66c0000
+
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fd2d74d0491e..aa473662b3f8 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -45,6 +45,7 @@ CONFIG_ARCH_ROCKCHIP=y
- CONFIG_ARCH_SEATTLE=y
- CONFIG_ARCH_RENESAS=y
- CONFIG_ARCH_R8A7795=y
-+CONFIG_ARCH_R8A7796=y
- CONFIG_ARCH_STRATIX10=y
- CONFIG_ARCH_TEGRA=y
- CONFIG_ARCH_SPRD=y
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index fad6dd8b7771..b902356873c2 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -583,6 +583,30 @@
+ 			status = "disabled";
+ 		};
+ 
++		canfd: can at e66c0000 {
++			compatible = "renesas,r8a7795-canfd",
++				     "renesas,rcar-gen3-canfd";
++			reg = <0 0xe66c0000 0 0x8000>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
++				   <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 914>,
++			       <&cpg CPG_CORE R8A7795_CLK_CANFD>,
++			       <&can_clk>;
++			clock-names = "fck", "canfd", "can_clk";
++			assigned-clocks = <&cpg CPG_CORE R8A7795_CLK_CANFD>;
++			assigned-clock-rates = <40000000>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			status = "disabled";
++
++			channel0 {
++				status = "disabled";
++			};
++
++			channel1 {
++				status = "disabled";
++			};
++		};
++
+ 		hscif0: serial at e6540000 {
+ 			compatible = "renesas,hscif-r8a7795",
+ 				     "renesas,rcar-gen3-hscif",
 -- 
 2.7.0.rc3.207.g0ac5344
