@@ -1,58 +1,37 @@
-From: kieran@bingham.xyz (Kieran Bingham)
-Date: Thu, 30 Jun 2016 14:32:43 +0100
-Subject: [PATCH 2/2] arm64: dts: r8a7795: add FDP1 device nodes
-In-Reply-To: <1467293563-940-1-git-send-email-kieran@bingham.xyz>
-References: <1467293563-940-1-git-send-email-kieran@bingham.xyz>
-Message-ID: <1467293563-940-3-git-send-email-kieran@bingham.xyz>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 30 Jun 2016 15:39:35 +0200
+Subject: [PULL 0/2] KVM/ARM Fixes for v4.7-rc6
+Message-ID: <20160630133937.2654-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Kieran Bingham <kieran@bingham.xyz>
---
-changes for v2
- - channel labels dropped
+Hi Paolo and Radim,
 
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Please pull two small fixes for KVM/ARM for rc6 or as soon as it can make it:
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index a451bd217f05..8bc87e09efd7 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1443,5 +1443,32 @@
- 			clocks = <&cpg CPG_MOD 613>;
- 			power-domains = <&sysc R8A7795_PD_A3VP>;
- 		};
-+
-+		fdp1 at fe940000 {
-+			compatible = "renesas,fdp1";
-+			reg = <0 0xfe940000 0 0x2400>;
-+			interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 119>;
-+			power-domains = <&sysc R8A7795_PD_A3VP>;
-+			renesas,fcp = <&fcpf0>;
-+		};
-+
-+		fdp1 at fe944000 {
-+			compatible = "renesas,fdp1";
-+			reg = <0 0xfe944000 0 0x2400>;
-+			interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 118>;
-+			power-domains = <&sysc R8A7795_PD_A3VP>;
-+			renesas,fcp = <&fcpf1>;
-+		};
-+
-+		fdp1 at fe948000 {
-+			compatible = "renesas,fdp1";
-+			reg = <0 0xfe948000 0 0x2400>;
-+			interrupts = <GIC_SPI 264 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 117>;
-+			power-domains = <&sysc R8A7795_PD_A3VP>;
-+			renesas,fcp = <&fcpf2>;
-+		};
- 	};
- };
--- 
-2.7.4
+They fix a build issue without CONFIG_ARM_PMU and plugs pid leak on arm/arm64.
+
+Thanks,
+-Christoffer
+
+The following changes since commit a0052191624e9bf8a8f9dc41b92ab5f252566c3c:
+
+  kvm: vmx: check apicv is active before using VT-d posted interrupt (2016-06-16 09:38:24 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.7-rc6
+
+for you to fetch changes up to 591d215afcc2f94e8e2c69a63c924c044677eb31:
+
+  KVM: arm/arm64: Stop leaking vcpu pid references (2016-06-27 13:08:10 +0200)
+
+James Morse (1):
+      KVM: arm/arm64: Stop leaking vcpu pid references
+
+Sudeep Holla (1):
+      arm64: KVM: fix build with CONFIG_ARM_PMU disabled
+
+ arch/arm/kvm/arm.c    | 1 +
+ include/kvm/arm_pmu.h | 4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
