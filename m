@@ -1,70 +1,64 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Thu, 30 Jun 2016 17:23:30 +0300
-Subject: [linux-sunxi] [PATCH v2 14/14] ARM: dts: sun8i: Enable DVFS on
- Orange Pi One
-In-Reply-To: <CAOMqctTe==M1SXxbdR8y33yh51fiFGn+oSaKJXhbnpLVTn-New@mail.gmail.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-15-megous@megous.com>
- <CAOMqctTe==M1SXxbdR8y33yh51fiFGn+oSaKJXhbnpLVTn-New@mail.gmail.com>
-Message-ID: <20160630172330.0608178e@i7>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 30 Jun 2016 16:16:00 +0200
+Subject: [PATCH 40/41] ARM: dts: r8a7793: Add APMU node and second CPU core
+In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
+References: <cover.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <65b133cd79cfde9f4e0157deb0e0f88f92811ad3.1467294011.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Jun 2016 13:13:48 +0200
-Michal Suchanek <hramrach@gmail.com> wrote:
+From: Magnus Damm <damm+renesas@opensource.se>
 
-> Hello,
-> 
-> On 25 June 2016 at 05:45,  <megous@megous.com> wrote:
-> > From: Ondrej Jirman <megous@megous.com>
-> >
-> > Use Xulong Orange Pi One GPIO based regulator for
-> > passive cooling and thermal management.
-> >
-> > Signed-off-by: Ondrej Jirman <megous@megous.com>
-> > ---
-> >  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 39 +++++++++++++++++++++++++++++
-> >  1 file changed, 39 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> > index b1bd6b0..a38d871 100644
-> > --- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> > +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> > @@ -109,6 +109,45 @@
-> >         };
-> >  };
-> >
-> > +&cpu0 {
-> > +       operating-points = <
-> > +               /* kHz    uV */
-> > +               1296000 1300000
-> > +               1200000 1300000  
-> 
-> First problem is that the board boots at 1008000 which is not listed
-> and the kernel complains.
-> 
-> Second problem is that the board locks up during boot with this enabled.
-> 
-> Do you have some suggestion for alternate configuration to test?
+Add DT nodes for the Advanced Power Management Unit (APMU) and the
+second CPU core.  Use the enable-method to point out that the APMU
+should be used for SMP support.
 
-Maybe try the Allwinner's original DVFS table instead of these
-undervolted values and see if it helps?
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7793.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-https://linux-sunxi.org/index.php?title=Xunlong_Orange_Pi_PC&oldid=17753#CPU_clock_speed_limit
-
-While undervolting is tempting because it helps to decrease the SoC
-temperature and avoid throttling, different units may have different
-tolerances and one needs to be very careful when picking defaults
-that are intended to work correctly on all boards. Some safety
-headroom exists there for a reason.
-
-If I remember correctly, some people pushed for undervolting experiments
-at least twice in the past (on the Banana Pi and C.H.I.P.). In both
-cases this did not end up well and had to be fixed later to solve
-reliability problems.
-
-In order to allow individual per-unit tuning, a concept of "speed
-grading" may be probably introduced later. So that the board is tested
-for reliability and then the speed grade rating is stored somewhere on
-the non-removable storage (EEPROM, SPI flash, eFUSE, ...). Some SoC
-manufacturers, such as Samsung, are already doing this with their chips.
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 9b55c1c6ee31..8d02aacf2892 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -35,6 +35,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "renesas,apmu";
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -56,6 +57,14 @@
+ 			next-level-cache = <&L2_CA15>;
+ 		};
+ 
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <1>;
++			clock-frequency = <1500000000>;
++			power-domains = <&sysc R8A7793_PD_CA15_CPU1>;
++		};
++
+ 		L2_CA15: cache-controller at 0 {
+ 			compatible = "cache";
+ 			reg = <0>;
+@@ -65,6 +74,12 @@
+ 		};
+ 	};
+ 
++	apmu at e6152000 {
++		compatible = "renesas,r8a7793-apmu", "renesas,apmu";
++		reg = <0 0xe6152000 0 0x188>;
++		cpus = <&cpu0 &cpu1>;
++	};
++
+ 	thermal-zones {
+ 		cpu_thermal: cpu-thermal {
+ 			polling-delay-passive	= <0>;
+-- 
+2.7.0.rc3.207.g0ac5344
