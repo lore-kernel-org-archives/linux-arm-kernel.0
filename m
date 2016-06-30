@@ -1,127 +1,40 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 30 Jun 2016 12:23:08 +0100
-Subject: [RFC PATCH 2/2] iommu/arm-smmu: Add support for the fsl-mc bus
-In-Reply-To: <1467220448-16764-2-git-send-email-nipun.gupta@nxp.com>
-References: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
- <1467220448-16764-2-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <5775011C.60402@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Jun 2016 13:31:07 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
+ nvram_file_name dt property
+In-Reply-To: <8d8bd933-717b-48e4-f002-7b834abed6fd@redhat.com>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <CAOiHx==82LHOeQMNVD+dybFifXX690Q6AJTcMBMynjSfUOyGUw@mail.gmail.com>
+ <8d8bd933-717b-48e4-f002-7b834abed6fd@redhat.com>
+Message-ID: <3960223.GqB9zXL8s8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/16 18:14, Nipun Gupta wrote:
-> Implement bus specific support for the fsl-mc bus including
-> registering the arm_smmu_ops and bus specific smmu device init.
+On Thursday, June 30, 2016 12:25:15 PM CEST Hans de Goede wrote:
+> > So then how about making use of a more specific compatible string?
+> >
+> > e.g.
+> >
+> > brcmf {
+> >         compatible = "foo,ap6210", "brcm,bcm4329-fmac";
+> >         ...
+> > };
+> >
+> > and if the compatible has more than one element you request
+> > FW_NAME_<compatible>.txt as the nvram file. Or try each comptible (and
+> > lastly no suffix) until you get a match. (AFAICT, this is what the
+> > "model" property was originally intended for anyway, but almost nobody
+> > did it right, and everyone put a user readable string into "model" for
+> > boards instead of the ePAPR defined compatible string).
 > 
-> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> Signed-off-by: Bharat Bhushan <bharat.bhushan@nxp.com>
-> ---
->  drivers/iommu/arm-smmu.c | 43 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
+> Hmm, interesting idea. Not sure how easy / hard it will be to implement
+> this, but from a dt binding point of view it seems elegant.
 > 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index ab365ec..28d5dc8 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -47,6 +47,9 @@
->  
->  #include <linux/amba/bus.h>
->  
-> +/* Include path will be changed once FSL-MC support is out from staging */
+> Kalle, Arend, what do you think of this ?
 
-How about we do that first?
+I think that's reasonable. Also, we have precedent for using things like
+the boardid as part of the compatible string, which would help do what
+Kalle suggested earlier with "nvram-<boardtype>-<boardrev>.txt",
+as we get that for free by trying out all the compatible strings.
 
-> +#include <../drivers/staging/fsl-mc/include/fsl_mc_smmu.h>
-> +
->  #include "io-pgtable.h"
->  
->  /* Maximum number of stream IDs assigned to a single device */
-> @@ -447,6 +450,11 @@ static struct device_node *dev_get_dev_node(struct device *dev)
->  		return bus->bridge->parent->of_node;
->  	}
->  
-> +	if (dev_is_fsl_mc(dev)) {
-
-Where is dev_is_fsl_mc() defined? I don't see it anywhere in mainline,
-here, or in -next.
-
-> +		while (dev_is_fsl_mc(dev))
-> +			dev = dev->parent;
-> +	}
-> +
->  	return dev->of_node;
->  }
->  
-> @@ -1443,6 +1451,32 @@ static int arm_smmu_init_platform_device(struct device *dev,
->  	return 0;
->  }
->  
-> +static void __arm_smmu_release_fslmc_iommudata(void *data)
-> +{
-> +	kfree(data);
-> +}
-
-There's already a suitable callback for this; nobody needs an exact
-duplicate of it.
-
-> +static int arm_smmu_init_fslmc_device(struct device *dev,
-> +				      struct iommu_group *group)
-> +{
-> +	struct arm_smmu_master_cfg *cfg;
-> +
-> +	cfg = iommu_group_get_iommudata(group);
-> +	if (!cfg) {
-> +		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-> +		if (!cfg)
-> +			return -ENOMEM;
-> +
-> +		cfg->streamids[0] = fslmc_dev_streamid(dev);
-> +		cfg->num_streamids = 1;
-> +
-> +		iommu_group_set_iommudata(group, cfg,
-> +					  __arm_smmu_release_fslmc_iommudata);
-> +	}
-
-So the group gets the ID of the container device (assuming that's the
-first one added), and the subsequent IDs are just ignored and left to go
-wrong? Or is it inherently guaranteed that all devices in the same
-container are programmed with the same ID?
-
-Robin.
-
-> +	return 0;
-> +}
-> +
->  static int arm_smmu_add_device(struct device *dev)
->  {
->  	struct iommu_group *group;
-> @@ -1467,6 +1501,8 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
->  
->  	if (dev_is_pci(dev))
->  		group = pci_device_group(dev);
-> +	else if (dev_is_fsl_mc(dev))
-> +		group = fslmc_device_group(dev);
->  	else
->  		group = generic_device_group(dev);
->  
-> @@ -1475,6 +1511,8 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
->  
->  	if (dev_is_pci(dev))
->  		ret = arm_smmu_init_pci_device(to_pci_dev(dev), group);
-> +	else if (dev_is_fsl_mc(dev))
-> +		ret = arm_smmu_init_fslmc_device(dev, group);
->  	else
->  		ret = arm_smmu_init_platform_device(dev, group);
->  
-> @@ -2102,6 +2140,11 @@ static int __init arm_smmu_init(void)
->  	}
->  #endif
->  
-> +#ifdef CONFIG_FSL_MC_BUS
-> +	if (!iommu_present(&fsl_mc_bus_type))
-> +		bus_set_iommu(&fsl_mc_bus_type, &arm_smmu_ops);
-> +#endif
-> +
->  	return 0;
->  }
->  
-> 
+	Arnd
