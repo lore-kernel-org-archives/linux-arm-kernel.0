@@ -1,99 +1,276 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 30 Jun 2016 17:25:45 +0800
-Subject: [PATCH 01/10] Documentation: dt-bindings: mailbox: tegra: Add
- binding for HSP mailbox
-In-Reply-To: <5773E900.8060903@wwwdotorg.org>
-References: <20160627090248.23621-1-josephl@nvidia.com>
- <20160627090248.23621-2-josephl@nvidia.com> <57714C85.50802@wwwdotorg.org>
- <57724039.7080007@nvidia.com> <5772CB12.5080408@wwwdotorg.org>
- <57736311.6020304@nvidia.com> <5773E900.8060903@wwwdotorg.org>
-Message-ID: <5774E599.4000204@nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 30 Jun 2016 11:26:11 +0200
+Subject: [PATCH v2 2/3] PCI: host: new PCI host controller driver for
+ Aardvark
+In-Reply-To: <20160622172502.GF25485@localhost>
+References: <1465574056-8787-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1465574056-8787-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160622172502.GF25485@localhost>
+Message-ID: <20160630112611.7503f34c@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/2016 11:28 PM, Stephen Warren wrote:
-> On 06/28/2016 11:56 PM, Joseph Lo wrote:
->> On 06/29/2016 03:08 AM, Stephen Warren wrote:
->>> On 06/28/2016 03:15 AM, Joseph Lo wrote:
->>>> On 06/27/2016 11:55 PM, Stephen Warren wrote:
->>>>> On 06/27/2016 03:02 AM, Joseph Lo wrote:
->> snip.
->>>>
->>>> Currently the usage of HSP HW in the downstream kernel is something
->>>> like
->>>> the model below.
->>>>
->>>> remote_processor_A-\
->>>> remote_processor_B--->hsp at 1000 (doorbell func) <-> host CPU
->>>> remote_processor_C-/
->>>>
->>>> remote_processor_D -> hsp at 2000 (shared mailbox) <-> CPU
->>>>
->>>> remote_processor_E -> hsp at 3000 (shared mailbox) <-> CPU
->>>>
->>>> I am thinking if we can just add the appropriate compatible strings for
->>>> it to replace "nvidia,tegra186-hsp". e.g.
->>>> "nvidia,tegra186-hsp-doorbell"
->>>> and "nvidia,tegra186-hsp-sharedmailbox". So the driver can probe and
->>>> initialize correctly depend on the compatible property. How do you
->>>> think
->>>> about it? Is this the same as the (b) you mentioned above?
->>>
->>> Yes, that would be (b) above.
->>>
->>> However, please do note (a): I expect that splitting things up will turn
->>> out to be a mistake, as it has for other HW modules in the past. I would
->>> far rather see a single hsp node in DT, since there is a single HSP
->>> block in HW. Sure that block has multiple sub-functions. However, there
->>> is common logic that affects all of those sub-functions and binds
->>> everything into a single HW module. If you represent the HW module using
->>> multiple different DT nodes, it will be hard to correctly represent that
->>> common logic. Conversely, I see no real advantage to splitting up the DT
->>> node. I strongly believe we should have a single "hsp" node in DT.
->>
->> We have 6 HSP block in HW. FYI.
->
-> Yes, we have 6 /instances/ of the overall HSP block. Those should each
-> have their own node, since they're entirely separate modules, all
-> instances of the same configurable IP block.
->
-> Above, I was talking about the sub-blocks within each HSP instance,
-> which should all be represented into a single node per instance, for a
-> total of 6 DT nodes overall.
-Yes.
+Bjorn,
 
-So, one thing still concerns me is that the binding and driver still 
-can't work with multiple HSP sub-modules per HSP block. It only supports 
-one HSP module per HSP block right how. Although, I said it matches the 
-model that we are using in the downstream kernel. But I still concern if 
-we need to enable and work with multiple HSP modules per HSP block at 
-sometime in future, then the binding and driver need lots of change to 
-achieve that. And the binding is not back-ward compatible obviously.
+Thanks a lot for your thorough review! I've addressed the comments, but
+I wanted to give some feedback on a few of them. See below.
 
-So I want to revise it again.
+On Wed, 22 Jun 2016 12:25:02 -0500, Bjorn Helgaas wrote:
 
-#mbox-cells: should be 2.
+> > +config PCI_AARDVARK
+> > +	bool "Aardvark PCIe controller"
+> > +	depends on ARCH_MVEBU && ARM64
+> > +	depends on OF
+> > +	select PCI_MSI  
+> 
+> I'm guessing this should be "depends on PCI_MSI_IRQ_DOMAIN" per Arnd's
+> recent patch: http://lkml.kernel.org/r/8531046.3ceRqUA835 at wuerfel
+> 
+> I have merged Arnd's patch, so it will be in v4.8.
 
-The mobxes property in the client node should contain the phandle of the 
-HSP block, HSP sub-module ID and the specifier of the module.
+OK. I've cherry-picked this patch, and changed the dependency, and
+things seems to be alright (I can select my driver, and PCI MSI is
+forced enabled). So sounds good.
 
-Ex.
-hsp_top0: hsp at 1000 {
-     ...
-     #mbox-cells = <2>;
-};
 
-clientA {
-     ....
-     mboxes = <&hsp_top0 HSP_DOORBELL DB_MASTER_XXX>;
-};
+> > +/* PCIe core registers */
+> > +#define PCIE_CORE_CMD_STATUS_REG				0x4
+> > +#define     PCIE_CORE_CMD_IO_ACCESS_EN				BIT(0)
+> > +#define     PCIE_CORE_CMD_MEM_ACCESS_EN				BIT(1)
+> > +#define     PCIE_CORE_CMD_MEM_IO_REQ_EN				BIT(2)
+> > +#define PCIE_CORE_DEV_CTRL_STATS_REG				0xC8  
+> 
+> Please use either upper- or lower-case in hex constants consistently.
+> Most of the ones below are lower-case.
 
-clientB {
-     ...
-     mboxes = <&hsp_top0 HSP_SHARED_MAILBOX SM_MASTER_XXX>;
-};
+Fixed.
 
-Stephen, How do you think of this change?
+> > +#define     OB_PCIE_CONFIG0			0x8
+> > +#define     OB_PCIE_CONFIG1			0x9
+> > +#define     OB_PCIE_MSG				0xc
+> > +#define     OB_PCIE_MSG_VENDOR			0xd  
+> 
+> Some of these definitions (ISR bits above, these window types,
+> probably others) are not actually used.  I usually omit unused ones on
+> the theory that they add bulk and opportunities for transcription
+> errors.  But if they're useful to you, I'm OK with keeping them.
 
-Thanks,
--Joseph
+I've removed a good number of the unused definitions.
+
+> > +#define PIO_TIMEOUT_MS			(1)
+> > +#define PCIE_LINKUP_TIMEOUT_MS		(10)  
+> 
+> Bare numbers do not require parentheses.
+
+Fixed.
+
+> > +static bool advk_pcie_link_up(struct advk_pcie *pcie)
+> > +{
+> > +	unsigned long timeout;
+> > +	u32 ltssm_state;
+> > +	u32 val;
+> > +
+> > +	timeout = jiffies + msecs_to_jiffies(PCIE_LINKUP_TIMEOUT_MS);
+> > +
+> > +	while (time_before(jiffies, timeout)) {
+> > +		val = advk_readl(pcie, CFG_REG);
+> > +		ltssm_state = (val >> LTSSM_SHIFT) & LTSSM_MASK;
+> > +		if (ltssm_state >= LTSSM_L0)
+> > +			return true;
+> > +	}  
+> 
+> To try to improve consistency with other similar drivers, please make
+> advk_pcie_link_up() a simple function that contains one register read
+> and no loop.
+> 
+> Then make a second advk_wait_for_link() function with a loop and
+> timeout.  Please use the same timeout/usleep structure used in
+> dw_pcie_wait_for_link() and nwl_wait_for_link().
+
+I've fixed that. However, notice that the model used by those other
+functions is a number of retries, which I was doing originally, but
+Arnd suggested to change it to a time_before() based loop.
+
+> > +	/* Point PCIe unit MBUS decode windows to DRAM space. */  
+> 
+> Tidy up the comments here by making them all one-line (when they fit) 
+> and consistently omitting (or keeping) the periods.
+
+Fixed.
+
+> > +static int advk_pcie_wait_pio(struct advk_pcie *pcie)
+> > +{
+> > +	unsigned long timeout;
+> > +	u32 reg, is_done;
+> > +
+> > +	timeout = jiffies + msecs_to_jiffies(PIO_TIMEOUT_MS);
+> > +
+> > +	while (time_before(jiffies, timeout)) {
+> > +		reg = advk_readl(pcie, PIO_START);
+> > +		is_done = advk_readl(pcie, PIO_ISR);
+> > +		if ((!reg) && is_done)
+> > +			return 0;
+> > +	}  
+> 
+> This busy-loop could use usleep_range() similar to what
+> dw_pcie_wait_for_link() does.
+
+No, using usleep_range() is not possible here. This function is called
+with the pci_lock held (since it's used when reading/writing the
+configuration space), and usleep_range() schedules.
+
+> > +	dev_err(&pcie->pdev->dev, "config read/write timed out\n");
+> > +	return -ETIME;
+> > +}
+> > +
+> > +static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+> > +			     int where, int size, u32 *val)
+> > +{
+> > +	struct advk_pcie *pcie = bus->sysdata;
+> > +	u32 reg;
+> > +	int ret;
+> > +
+> > +	if (PCI_SLOT(devfn) != 0) {
+> > +		*val = 0xffffffff;
+> > +		return PCIBIOS_DEVICE_NOT_FOUND;
+> > +	}
+> > +
+> > +	advk_pcie_enable_axi_addr_gen(pcie, false);  
+> 
+> This AXI enable/disable requires a mutex to prevent another thread
+> from performing a simulataneous config access, so please add a comment
+> about which mutex you are relying on.  I think there's a PCI global
+> one, but I'd just like to make it explicit that we need it here,
+> because many config accessors don't actually require the mutex.
+> 
+> I assume the AXI enable/disable does not affect MMIO accesses by
+> drivers to areas mapped by PCIe device BARs.  If it did, that would be
+> a pretty serious problem because it would be hard to ensure the mutual
+> exclusion.
+
+The AXI enable/disable was affecting MMIO accesses, so it was in fact
+bogus to do this. We've switched to a different mechanism to access the
+configuration space, which doesn't involve enabling/disabling AXI.
+
+The configuration space read/write themselves are protected by the
+pci_lock spinlock.
+
+> > +	/* Start PIO */
+> > +	advk_writel(pcie, 0, PIO_START);
+> > +	advk_writel(pcie, 1, PIO_ISR);
+> > +
+> > +	/* Program the control register */
+> > +	if (bus->number ==  0)
+> > +		advk_writel(pcie, PCIE_CONFIG_RD_TYPE0, PIO_CTRL);  
+> 
+> Your DT documentation requires the bus range, and
+> of_pci_get_host_bridge_resources() parses it, so you probably should
+> save that bus range from the DT in advk_pcie and use it here instead
+> of assuming zero.
+
+Good point, fixed.
+
+> > +	if (where % size) {
+> > +		advk_pcie_enable_axi_addr_gen(pcie, true);
+> > +		return PCIBIOS_SET_FAILED;  
+> 
+> This could be checked earlier, before fiddling with AXI and touching
+> PIO_START.
+
+Ditto, fixed.
+
+> > +static void advk_pcie_free_msi(struct advk_pcie *pcie, int hwirq)
+> > +{
+> > +	mutex_lock(&pcie->msi_used_lock);
+> > +	if (!test_bit(hwirq, pcie->msi_irq_in_use))
+> > +		pr_err("trying to free unused MSI#%d\n", hwirq);  
+> 
+> Use dev_err().
+
+Indeed, fixed.
+
+> > +	pcie->irq_domain =
+> > +		irq_domain_add_linear(pcie_intc_node, LEGACY_IRQ_NUM,
+> > +				      &advk_pcie_irq_domain_ops, pcie);
+> > +	if (!pcie->irq_domain) {
+> > +		dev_err(dev, "Failed to get a INTx IRQ domain\n");
+> > +		return PTR_ERR(pcie->irq_domain);
+> > +	}  
+> 
+> Can you rename this to advk_pcie_init_irq_domain() and possibly split
+> to advk_pcie_init_msi_irq_domain() so it looks more similar to the
+> other drivers, e.g., nwl_pcie_init_irq_domain() or
+> xilinx_pcie_init_irq_domain()?
+
+I've done two functions:
+
+ advk_pcie_init_irq_domain()
+ advk_pcie_init_msi_irq_domain()
+
+Both are called from probe(). In some other drivers, I've noticed that
+the function initializing the legacy interrupt irq_domain also calls
+the function initializing the MSI irq_domain, but I find this rather
+weird since they are really independent. To me, it makes a lot more
+sense that probe() calls each of them independently.
+
+Also, while doing this, I noticed we were leaking a device_node
+reference count, so I fixed that up as well.
+
+
+> > +static void advk_pcie_release_of_pci_ranges(struct advk_pcie *pcie)
+> > +{
+> > +	pci_free_resource_list(&pcie->resources);  
+> 
+> You can inline this call below; I know other drivers wrap it too, but
+> I don't know why.
+
+Done.
+
+> > +static const struct of_device_id advk_pcie_of_match_table[] = {
+> > +	{ .compatible = "marvell,armada-3700-pcie", },
+> > +	{},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, advk_pcie_of_match_table);  
+> 
+> Since this driver is currently bool in Kconfig, can you omit the
+> MODULE_*() uses?  It would be ideal to make this modular, of course,
+> but if it's not modular, let's make it so it doesn't *look* like a
+> module.
+
+MODULE_DEVICE_TABLE() removed.
+
+> > +static struct platform_driver advk_pcie_driver = {
+> > +	.driver = {
+> > +		.name = "advk-pcie",
+> > +		.of_match_table = advk_pcie_of_match_table,
+> > +		/* Driver unloading/unbinding currently not supported */
+> > +		.suppress_bind_attrs = true,  
+> 
+> I see some other drivers (mvebu, rcar, tegra, altera, xilinx) also use
+> suppress_bind_attrs = true, but I don't know what's special about
+> them.  Do you know?  Do we really need this here?  What would it take
+> to change this driver so we could omit it?
+
+My understanding is that for the unbinding to work, you need a
+->remove() hook. But the PCI infrastructure doesn't provide any
+functionality to "unregister" a PCI controller. It's exactly the same
+reason for which we can't make such drivers modules: because there is
+no way to implement a ->remove() function that unregisters the PCI host
+controller from the PCI core.
+
+Is this a topic that is being worked on in the PCI core?
+
+In any case, I've kept the 'suppress_bind_attrs = true' for now, since
+changing the PCI core to support controller unregistration is well
+beyond the addition of a single controller driver.
+
+I'm going to send the v3 soonish, which takes into account all your
+comments, as mentioned above.
+
+Thanks again for the good review!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
