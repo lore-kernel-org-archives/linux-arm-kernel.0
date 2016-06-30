@@ -1,54 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:16:22 +0200
-Subject: [PATCH 6/8] ARM: shmobile: smp: Add function to prioritize DT SMP
+Date: Thu, 30 Jun 2016 16:16:20 +0200
+Subject: [PATCH 4/8] ARM: shmobile: apmu: Move #ifdef CONFIG_SMP to cover more
+ functions
 In-Reply-To: <cover.1467293089.git.horms+renesas@verge.net.au>
 References: <cover.1467293089.git.horms+renesas@verge.net.au>
-Message-ID: <c21af444eace56619e33df0b1fc67ec2e33481ac.1467293089.git.horms+renesas@verge.net.au>
+Message-ID: <d3f3fb0cfdcf4cbf69af65e8bfdde65cedf4e53a.1467293089.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add a function to check if other DT based method is available, and
-if so return false to not hook up smp_ops from the machine vector.
+shmobile_smp_apmu_prepare_cpus() is used only if CONFIG_SMP=y.
 
-This results in that DT-based SMP support has priority over older
-C-based smp_ops code, and in case DT-based SMP support code does not
-exist in the DTB then the old smp_ops code will still work as-is.
+Hence move the #ifdef to cover shmobile_smp_apmu_prepare_cpus() and all
+functions only called by it (apmu_init_cpu() and apmu_parse_cfg()).
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/common.h  | 1 +
- arch/arm/mach-shmobile/platsmp.c | 6 ++++++
- 2 files changed, 7 insertions(+)
+ arch/arm/mach-shmobile/platsmp-apmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-index 3b562d87826d..1a8f7b3ab449 100644
---- a/arch/arm/mach-shmobile/common.h
-+++ b/arch/arm/mach-shmobile/common.h
-@@ -10,6 +10,7 @@ extern void shmobile_smp_sleep(void);
- extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
- 			      unsigned long arg);
- extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
-+extern bool shmobile_smp_init_fallback_ops(void);
- extern void shmobile_boot_scu(void);
- extern void shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
- 					  unsigned int max_cpus);
-diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
-index b23378f3d7e1..f3dba6f356e2 100644
---- a/arch/arm/mach-shmobile/platsmp.c
-+++ b/arch/arm/mach-shmobile/platsmp.c
-@@ -36,3 +36,9 @@ bool shmobile_smp_cpu_can_disable(unsigned int cpu)
- 	return true; /* Hotplug of any CPU is supported */
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index aba75c89f9c1..c1558ef0c590 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -74,6 +74,7 @@ static int __maybe_unused apmu_wrap(int cpu, int (*fn)(void __iomem *p, int cpu)
+ 	return p ? fn(p, apmu_cpus[cpu].bit) : -EINVAL;
  }
- #endif
-+
-+bool __init shmobile_smp_init_fallback_ops(void)
-+{
-+	/* fallback on PSCI/smp_ops if no other DT based method is detected */
-+	return platform_can_secondary_boot() ? true : false;
-+}
+ 
++#ifdef CONFIG_SMP
+ static void apmu_init_cpu(struct resource *res, int cpu, int bit)
+ {
+ 	if ((cpu >= ARRAY_SIZE(apmu_cpus)) || apmu_cpus[cpu].iomem)
+@@ -128,7 +129,6 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
+ 	apmu_parse_cfg(apmu_init_cpu, apmu_config, num);
+ }
+ 
+-#ifdef CONFIG_SMP
+ int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	/* For this particular CPU register boot vector */
 -- 
 2.7.0.rc3.207.g0ac5344
