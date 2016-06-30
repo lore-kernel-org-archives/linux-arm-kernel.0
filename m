@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:29 +0200
-Subject: [PATCH 09/41] ARM: dts: koelsch: Name serial port pfc subnodes after
+Date: Thu, 30 Jun 2016 16:15:33 +0200
+Subject: [PATCH 13/41] ARM: dts: gose: Name serial port pfc subnodes after
  device names
 In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
 References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <b71b8346e2a4f007721d0e0373240bda9e939a7b.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <167d34af3d8b3b66dc57f60f473a1a1f4ca3cb9d.1467294011.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,14 +19,14 @@ either here or in a DT overlay.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 4 ++--
+ arch/arm/boot/dts/r8a7793-gose.dts | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 20fbc8c36a78..73e5ecf036e1 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -332,12 +332,12 @@
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index f748360ee857..995e1e0fb1ff 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -320,12 +320,12 @@
  		function = "du";
  	};
  
