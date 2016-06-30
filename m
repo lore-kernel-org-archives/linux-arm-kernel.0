@@ -1,129 +1,136 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 30 Jun 2016 12:32:32 +0200
-Subject: [PATCH v2] xen/arm: register clocks used by the hypervisor
-Message-ID: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 30 Jun 2016 12:42:09 +0200
+Subject: [PATCH 05/15] arm64: KVM: Refactor kern_hyp_va/hyp_kern_va to
+ deal with multiple offsets
+In-Reply-To: <5774F18C.7030603@arm.com>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+ <1465297115-13091-6-git-send-email-marc.zyngier@arm.com>
+ <20160628124210.GP26498@cbox>
+ <5774E4CE.8020200@arm.com> <5774F18C.7030603@arm.com>
+Message-ID: <CAKv+Gu84EzsO4Sy07ACJ_nsok0Xr2KOkaeKRz0ObHU=0kzEZ-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks might be used by the Xen hypervisor and not by the Linux
-kernel. If these are not registered by the Linux kernel, they might be
-disabled by clk_disable_unused() as the kernel doesn't know that they
-are used. The clock of the serial console handled by Xen is one
-example for this. It might be disabled by clk_disable_unused() which
-stops the whole serial output, even from Xen, then.
+On 30 June 2016 at 12:16, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 30/06/16 10:22, Marc Zyngier wrote:
+>> On 28/06/16 13:42, Christoffer Dall wrote:
+>>> On Tue, Jun 07, 2016 at 11:58:25AM +0100, Marc Zyngier wrote:
+>>>> As we move towards a selectable HYP VA range, it is obvious that
+>>>> we don't want to test a variable to find out if we need to use
+>>>> the bottom VA range, the top VA range, or use the address as is
+>>>> (for VHE).
+>>>>
+>>>> Instead, we can expand our current helpers to generate the right
+>>>> mask or nop with code patching. We default to using the top VA
+>>>> space, with alternatives to switch to the bottom one or to nop
+>>>> out the instructions.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/kvm_hyp.h | 27 ++++++++++++--------------
+>>>>  arch/arm64/include/asm/kvm_mmu.h | 42 +++++++++++++++++++++++++++++++++++++---
+>>>>  2 files changed, 51 insertions(+), 18 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+>>>> index 61d01a9..dd4904b 100644
+>>>> --- a/arch/arm64/include/asm/kvm_hyp.h
+>>>> +++ b/arch/arm64/include/asm/kvm_hyp.h
+>>>> @@ -25,24 +25,21 @@
+>>>>
+>>>>  #define __hyp_text __section(.hyp.text) notrace
+>>>>
+>>>> -static inline unsigned long __kern_hyp_va(unsigned long v)
+>>>> -{
+>>>> -   asm volatile(ALTERNATIVE("and %0, %0, %1",
+>>>> -                            "nop",
+>>>> -                            ARM64_HAS_VIRT_HOST_EXTN)
+>>>> -                : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
+>>>> -   return v;
+>>>> -}
+>>>> -
+>>>> -#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
+>>>> -
+>>>>  static inline unsigned long __hyp_kern_va(unsigned long v)
+>>>>  {
+>>>> -   asm volatile(ALTERNATIVE("orr %0, %0, %1",
+>>>> -                            "nop",
+>>>> +   u64 mask;
+>>>> +
+>>>> +   asm volatile(ALTERNATIVE("mov %0, %1",
+>>>> +                            "mov %0, %2",
+>>>> +                            ARM64_HYP_OFFSET_LOW)
+>>>> +                : "=r" (mask)
+>>>> +                : "i" (~HYP_PAGE_OFFSET_HIGH_MASK),
+>>>> +                  "i" (~HYP_PAGE_OFFSET_LOW_MASK));
+>>>> +   asm volatile(ALTERNATIVE("nop",
+>>>> +                            "mov %0, xzr",
+>>>>                              ARM64_HAS_VIRT_HOST_EXTN)
+>>>> -                : "+r" (v) : "i" (~HYP_PAGE_OFFSET_MASK));
+>>>> -   return v;
+>>>> +                : "+r" (mask));
+>>>> +   return v | mask;
+>>>
+>>> If mask is ~HYP_PAGE_OFFSET_LOW_MASK how can you be sure that setting
+>>> bit (VA_BITS - 1) is always the right thing to do to generate a kernel
+>>> address?
+>>
+>> It has taken be a while, but I think I finally see what you mean. We
+>> have no idea whether that bit was set or not.
+>>
+>>> This is kind of what I asked before only now there's an extra bit not
+>>> guaranteed by the architecture to be set for the kernel range, I
+>>> think.
+>>
+>> Yeah, I finally connected the couple of neurons left up there (that's
+>> what remains after the whole brexit braindamage). This doesn't work (or
+>> rather it only works sometimes). The good new is that I also realized we
+>> don't need any of that crap.
+>>
+>> The only case we currently use a HVA->KVA transformation is to pass the
+>> panic string down to panic(), and we can perfectly prevent
+>> __kvm_hyp_teardown from ever be evaluated as a HVA with a bit of
+>> asm-foo. This allows us to get rid of this whole function.
+>
+> Here's what I meant by this:
+>
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 437cfad..c19754d 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -299,9 +299,16 @@ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%
+>
+>  static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
+>  {
+> -       unsigned long str_va = (unsigned long)__hyp_panic_string;
+> +       unsigned long str_va;
+>
+> -       __hyp_do_panic(hyp_kern_va(str_va),
+> +       /*
+> +        * Force the panic string to be loaded from the literal pool,
+> +        * making sure it is a kernel address and not a PC-relative
+> +        * reference.
+> +        */
+> +       asm volatile("ldr %0, =__hyp_panic_string" : "=r" (str_va));
+> +
 
-Up to now, the workaround for this has been to use the Linux kernel
-command line parameter 'clk_ignore_unused'. See Xen bug
+Wouldn't it suffice to make  __hyp_panic_string a non-static pointer
+to const char? That way, it will be statically initialized with a
+kernel VA, and the external linkage forces the compiler to evaluate
+its value at runtime.
 
-http://bugs.xenproject.org/xen/bug/45
 
-too.
-
-To fix this, we will add the "unused" clocks in Xen to the hypervisor
-node. The Linux kernel has to register the clocks from the hypervisor
-node, then.
-
-Therefore, check if there is a "clocks" entry in the hypervisor node
-and if so register the given clocks to the Linux kernel clock
-framework and with this mark them as used. This prevents the clocks
-from being disabled.
-
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
----
-Changes in v2:
- - Rebase against git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip.git for-linus-4.8
- - Add changes to Documentation/devicetree/bindings/arm/xen.txt
-
- Documentation/devicetree/bindings/arm/xen.txt | 11 +++++++
- arch/arm/xen/enlighten.c                      | 47 +++++++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-index c9b9321..55dfd3b 100644
---- a/Documentation/devicetree/bindings/arm/xen.txt
-+++ b/Documentation/devicetree/bindings/arm/xen.txt
-@@ -17,6 +17,17 @@ the following properties:
-   A GIC node is also required.
-   This property is unnecessary when booting Dom0 using ACPI.
- 
-+Optional properties:
-+
-+- clocks: one or more clocks to be registered.
-+  Xen hypervisor drivers might replace native drivers, resulting in
-+  clocks not registered by these native drivers. To avoid that these
-+  unregistered clocks are disabled, then, e.g. by clk_disable_unused(),
-+  register them in the hypervisor node.
-+  An example for this are the clocks of the serial driver. If the clocks
-+  used by the serial hardware interface are not registered by the serial
-+  driver the serial output might stop once clk_disable_unused() is called.
-+
- To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
- under /hypervisor with following parameters:
- 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 47acb36..5c546d0 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -24,6 +24,7 @@
- #include <linux/of_fdt.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
-+#include <linux/clk-provider.h>
- #include <linux/cpuidle.h>
- #include <linux/cpufreq.h>
- #include <linux/cpu.h>
-@@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
- }
- late_initcall(xen_pm_init);
- 
-+/*
-+ * Check if we want to register some clocks, that they
-+ * are not freed because unused by clk_disable_unused().
-+ * E.g. the serial console clock.
-+ */
-+static int __init xen_arm_register_clks(void)
-+{
-+	struct clk *clk;
-+	struct device_node *xen_node;
-+	unsigned int i, count;
-+	int ret = 0;
-+
-+	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-+	if (!xen_node) {
-+		pr_err("Xen support was detected before, but it has disappeared\n");
-+		return -EINVAL;
-+	}
-+
-+	count = of_clk_get_parent_count(xen_node);
-+	if (!count)
-+		goto out;
-+
-+	for (i = 0; i < count; i++) {
-+		clk = of_clk_get(xen_node, i);
-+		if (IS_ERR(clk)) {
-+			pr_err("Xen failed to register clock %i. Error: %li\n",
-+			       i, PTR_ERR(clk));
-+			ret = PTR_ERR(clk);
-+			goto out;
-+		}
-+
-+		ret = clk_prepare_enable(clk);
-+		if (ret < 0) {
-+			pr_err("Xen failed to enable clock %i. Error: %i\n",
-+			       i, ret);
-+			goto out;
-+		}
-+	}
-+
-+	ret = 0;
-+
-+out:
-+	of_node_put(xen_node);
-+	return ret;
-+}
-+late_initcall(xen_arm_register_clks);
- 
- /* empty stubs */
- void xen_arch_pre_suspend(void) { }
--- 
-2.8.0
+> +       __hyp_do_panic(str_va,
+>                        spsr,  elr,
+>                        read_sysreg(esr_el2),   read_sysreg_el2(far),
+>                        read_sysreg(hpfar_el2), par,
+>
+> With that in place, we can entirely get rid of hyp_kern_va().
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
