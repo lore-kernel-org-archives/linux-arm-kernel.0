@@ -1,157 +1,31 @@
-From: hs.liao@mediatek.com (HS Liao)
-Date: Thu, 30 Jun 2016 15:14:43 +0800
-Subject: [PATCH v9 4/4] CMDQ: save more energy in idle
-In-Reply-To: <1467270883-1407-1-git-send-email-hs.liao@mediatek.com>
-References: <1467270883-1407-1-git-send-email-hs.liao@mediatek.com>
-Message-ID: <1467270883-1407-5-git-send-email-hs.liao@mediatek.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Thu, 30 Jun 2016 16:18:02 +0900
+Subject: [PATCH v2 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for
+ SPI clocks
+In-Reply-To: <1467032594-7643-1-git-send-email-andi.shyti@samsung.com>
+References: <CGME20160627130341epcas1p23c482f5fb9e637dcda579cb874701589@epcas1p2.samsung.com>
+ <1467032594-7643-1-git-send-email-andi.shyti@samsung.com>
+Message-ID: <20160630071802.GB10787@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_disable_unprepare instead of clk_disable to save more energy
-when CMDQ is idle.
+Hi,
 
-Signed-off-by: HS Liao <hs.liao@mediatek.com>
----
- drivers/soc/mediatek/mtk-cmdq.c | 55 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 47 insertions(+), 8 deletions(-)
+On Mon, Jun 27, 2016 at 10:03:13PM +0900, Andi Shyti wrote:
+> The CLK_IGNORE_UNUSED flag has to be avoided whenever possible.
+> Use the CLK_IS_CRITICAL flag instead, which enables the clock line
+> during boot time.
+> 
+> While none of the SCLK_SPI need to be alive all the time as that
+> clock is handled by the SPI driver as a busclk whenever needed.
+> 
+> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> ---
 
-diff --git a/drivers/soc/mediatek/mtk-cmdq.c b/drivers/soc/mediatek/mtk-cmdq.c
-index 6a6c4c3..549bbdd 100644
---- a/drivers/soc/mediatek/mtk-cmdq.c
-+++ b/drivers/soc/mediatek/mtk-cmdq.c
-@@ -32,6 +32,7 @@
- #include <linux/spinlock.h>
- #include <linux/suspend.h>
- #include <linux/timer.h>
-+#include <linux/workqueue.h>
- #include <soc/mediatek/cmdq.h>
- 
- #define CMDQ_THR_MAX_COUNT		3 /* main, sub, general(misc) */
-@@ -130,10 +131,16 @@ struct cmdq_task {
- 	struct cmdq_task_cb	cb;
- };
- 
-+struct cmdq_clk_release {
-+	struct cmdq		*cmdq;
-+	struct work_struct	release_work;
-+};
-+
- struct cmdq {
- 	struct mbox_controller	mbox;
- 	void __iomem		*base;
- 	u32			irq;
-+	struct workqueue_struct	*clk_release_wq;
- 	struct cmdq_thread	thread[CMDQ_THR_MAX_COUNT];
- 	struct mutex		task_mutex;
- 	struct clk		*clock;
-@@ -282,11 +289,19 @@ static void cmdq_task_remove_wfe(struct cmdq_task *task)
- static void cmdq_task_exec(struct cmdq_task *task, struct cmdq_thread *thread)
- {
- 	struct cmdq *cmdq = task->cmdq;
--	unsigned long curr_pa, end_pa;
-+	unsigned long curr_pa, end_pa, flags;
- 
- 	task->thread = thread;
- 	if (list_empty(&thread->task_busy_list)) {
--		WARN_ON(clk_enable(cmdq->clock) < 0);
-+		/*
-+		 * Unlock for clk prepare (sleeping function).
-+		 * We are safe to do that since we have task_mutex and
-+		 * only flush will add task.
-+		 */
-+		spin_unlock_irqrestore(&thread->chan->lock, flags);
-+		WARN_ON(clk_prepare_enable(cmdq->clock) < 0);
-+		spin_lock_irqsave(&thread->chan->lock, flags);
-+
- 		WARN_ON(cmdq_thread_reset(cmdq, thread) < 0);
- 
- 		writel(task->pa_base, thread->base + CMDQ_THR_CURR_ADDR);
-@@ -356,6 +371,26 @@ static void cmdq_task_handle_error(struct cmdq_task *task)
- 	cmdq_thread_resume(thread);
- }
- 
-+static void cmdq_clk_release_work(struct work_struct *work_item)
-+{
-+	struct cmdq_clk_release *clk_release = container_of(work_item,
-+			struct cmdq_clk_release, release_work);
-+	struct cmdq *cmdq = clk_release->cmdq;
-+
-+	clk_disable_unprepare(cmdq->clock);
-+	kfree(clk_release);
-+}
-+
-+static void cmdq_clk_release_schedule(struct cmdq *cmdq)
-+{
-+	struct cmdq_clk_release *clk_release;
-+
-+	clk_release = kmalloc(sizeof(*clk_release), GFP_ATOMIC);
-+	clk_release->cmdq = cmdq;
-+	INIT_WORK(&clk_release->release_work, cmdq_clk_release_work);
-+	queue_work(cmdq->clk_release_wq, &clk_release->release_work);
-+}
-+
- static void cmdq_thread_irq_handler(struct cmdq *cmdq,
- 				    struct cmdq_thread *thread)
- {
-@@ -405,7 +440,7 @@ static void cmdq_thread_irq_handler(struct cmdq *cmdq,
- 
- 	if (list_empty(&thread->task_busy_list)) {
- 		cmdq_thread_disable(cmdq, thread);
--		clk_disable(cmdq->clock);
-+		cmdq_clk_release_schedule(cmdq);
- 	} else {
- 		mod_timer(&thread->timeout,
- 			  jiffies + msecs_to_jiffies(CMDQ_TIMEOUT_MS));
-@@ -464,7 +499,7 @@ static void cmdq_thread_handle_timeout(unsigned long data)
- 
- 	cmdq_thread_resume(thread);
- 	cmdq_thread_disable(cmdq, thread);
--	clk_disable(cmdq->clock);
-+	cmdq_clk_release_schedule(cmdq);
- 	spin_unlock_irqrestore(&thread->chan->lock, flags);
- }
- 
-@@ -763,7 +798,7 @@ static int cmdq_suspend(struct device *dev)
- 		msleep(20);
- 	}
- 
--	clk_unprepare(cmdq->clock);
-+	flush_workqueue(cmdq->clk_release_wq);
- 	return 0;
- }
- 
-@@ -771,7 +806,6 @@ static int cmdq_resume(struct device *dev)
- {
- 	struct cmdq *cmdq = dev_get_drvdata(dev);
- 
--	WARN_ON(clk_prepare(cmdq->clock) < 0);
- 	cmdq->suspended = false;
- 	return 0;
- }
-@@ -780,8 +814,8 @@ static int cmdq_remove(struct platform_device *pdev)
- {
- 	struct cmdq *cmdq = platform_get_drvdata(pdev);
- 
-+	destroy_workqueue(cmdq->clk_release_wq);
- 	mbox_controller_unregister(&cmdq->mbox);
--	clk_unprepare(cmdq->clock);
- 	return 0;
- }
- 
-@@ -899,8 +933,13 @@ static int cmdq_probe(struct platform_device *pdev)
- 	}
- 
- 	mutex_init(&cmdq->task_mutex);
-+
-+	cmdq->clk_release_wq = alloc_ordered_workqueue(
-+			"%s", WQ_MEM_RECLAIM | WQ_HIGHPRI,
-+			"cmdq_clk_release");
-+
- 	platform_set_drvdata(pdev, cmdq);
--	WARN_ON(clk_prepare(cmdq->clock) < 0);
-+
- 	return 0;
- }
- 
--- 
-1.9.1
+sorry for spamming, please ignore this patch, some more testing
+has shown that if the SCLK_SPI1 is not kept alive, the device not
+always works.
+
+Thanks and sorry again,
+Andi
