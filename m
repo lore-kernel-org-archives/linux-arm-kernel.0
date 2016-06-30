@@ -1,93 +1,93 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Thu, 30 Jun 2016 17:00:45 +0800
-Subject: [PATCH v20 13/14] arm64: kdump: update a kernel doc
-In-Reply-To: <ef07d5dafe5c69b621dc4ec01ef1c6f3f9753e60.1466702804.git.geoff@infradead.org>
-References: <cover.1466702804.git.geoff@infradead.org>
- <ef07d5dafe5c69b621dc4ec01ef1c6f3f9753e60.1466702804.git.geoff@infradead.org>
-Message-ID: <20160630090045.GA16958@x1.redhat.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 30 Jun 2016 16:54:36 +0800
+Subject: [PATCH 16/21] usb: chipidea: msm: Restore wrapper settings after
+ reset
+In-Reply-To: <146722762509.16253.13062209537472705701@sboyd-linaro>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-17-stephen.boyd@linaro.org>
+ <20160629082648.GK25236@shlinux2>
+ <146722762509.16253.13062209537472705701@sboyd-linaro>
+Message-ID: <20160630085436.GA18426@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/16 at 05:54pm, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+On Wed, Jun 29, 2016 at 12:13:45PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-06-29 01:26:48)
+> > On Sun, Jun 26, 2016 at 12:28:33AM -0700, Stephen Boyd wrote:
+> > > When the RESET bit is set in the USBCMD register it resets quite
+> > > @@ -21,11 +23,22 @@
+> > >  #define HS_PHY_SEC_CTRL                      0x0278
+> > >  # define HS_PHY_DIG_CLAMP_N          BIT(16)
+> > >  
+> > > +#define HS_PHY_GENCONFIG             0x009c
+> > > +# define HS_PHY_TXFIFO_IDLE_FORCE_DIS        BIT(4)
+> > > +
+> > > +#define HS_PHY_GENCONFIG_2           0x00a0
+> > > +# define HS_PHY_SESS_VLD_CTRL_EN     BIT(7)
+> > > +# define HS_PHY_ULPI_TX_PKT_EN_CLR_FIX       BIT(19)
+> > > +
+> > > +#define HSPHY_SESS_VLD_CTRL          BIT(25)
+> > > +
+> > 
+> > Keep alignment please.
 > 
-> This patch adds arch specific descriptions about kdump usage on arm64
-> to kdump.txt.
+> I take it this means it should look like:
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  Documentation/kdump/kdump.txt | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
+> #define HS_PHY_GENCONFIG
+> #define HS_PHY_TXFIFO_IDLE_FORCE_DIS
 > 
-> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> index 88ff63d..5d6da09 100644
-> --- a/Documentation/kdump/kdump.txt
-> +++ b/Documentation/kdump/kdump.txt
-> @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
->  a remote system.
->  
->  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> -s390x and arm architectures.
-> +s390x, arm and arm64 architectures.
->  
->  When the system kernel boots, it reserves a small section of memory for
->  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> @@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
->  
->      AUTO_ZRELADDR=y
->  
-> +Dump-capture kernel config options (Arch Dependent, arm64)
-> +----------------------------------------------------------
-> +
-> +1) Currently, kvm will not be enabled on the dump-capture kernel even
-> +   if it is configured.
-> +
->  Extended crashkernel syntax
->  ===========================
->  
-> @@ -305,6 +311,8 @@ Boot into System Kernel
->     kernel will automatically locate the crash kernel image within the
->     first 512MB of RAM if X is not given.
->  
-> +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-				  ~ Why square brackets here, is it
-different than other arch?
+> ?
+> 
 
+Yes
 
-Except for this, it looks good to me.
+> > > @@ -141,6 +172,13 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+> > >       if (!base)
+> > >               return -ENOMEM;
+> > >  
+> > > +     ci->vbus_edev = extcon_get_edev_by_phandle(&pdev->dev, 0);
+> > > +     if (IS_ERR(ci->vbus_edev)) {
+> > > +             if (PTR_ERR(ci->vbus_edev) != -ENODEV)
+> > > +                     return PTR_ERR(ci->vbus_edev);
+> > > +             ci->vbus_edev = NULL;
+> > > +     }
+> > > +
+> > 
+> > Why not using ci->platdata->vbus_extcon directly?
+> 
+> Because ci->platdata->vbus_extcon is assigned after the child platform
+> driver probes, and we have no idea when that will happen from the
+> ci_hdrc_msm driver probe. If we try after ci_hdrc_add_device() we'll
+> race with the driver probe and only get the pointer sometimes.
 
-Thanks
-Baoquan
+ci->platdata->vbus_extcon->edev is assigned at ci_get_platdata which is
+called before ci core device is created.
 
-> +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
->  
->  Load the Dump-capture Kernel
->  ============================
-> @@ -327,6 +335,8 @@ For s390x:
->  	- Use image or bzImage
->  For arm:
->  	- Use zImage
-> +For arm64:
-> +	- Use vmlinux or Image
->  
->  If you are using a uncompressed vmlinux image then use following command
->  to load dump-capture kernel.
-> @@ -370,6 +380,9 @@ For s390x:
->  For arm:
->  	"1 maxcpus=1 reset_devices"
->  
-> +For arm64:
-> +	"1 maxcpus=1 reset_devices"
-> +
->  Notes on loading the dump-capture kernel:
->  
->  * By default, the ELF headers are stored in ELF64 format to support
-> -- 
-> 2.5.0
 > 
+> > 
+> > >       reset_control_assert(reset);
+> > >       usleep_range(10000, 12000);
+> > >       reset_control_deassert(reset);
+> > > @@ -157,6 +195,14 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+> > >       if (ret)
+> > >               goto err_mux;
+> > >  
+> > > +     ulpi_node = of_find_node_by_name(pdev->dev.of_node, "ulpi");
+> > > +     if (ulpi_node) {
+> > > +             phy_node = of_get_next_available_child(ulpi_node, NULL);
+> > > +             ci->hsic = of_device_is_compatible(phy_node, "qcom,usb-hsic-phy");
+> > > +             of_node_put(phy_node);
+> > > +     }
+> > > +     of_node_put(ulpi_node);
+> > > +
+> > 
+> > Just confirm with you that ci->platdata->phy_mode is not enough?
 > 
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
+> Right. The phy_mode is never set to HSIC. It's always ULPI.
+
+Ok
+
+-- 
+
+Best Regards,
+Peter Chen
