@@ -1,45 +1,56 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 30 Jun 2016 09:22:25 +0800
-Subject: [PATCH 06/21] usb: chipidea: Initialize and reinitialize phy later
-In-Reply-To: <146724983020.16253.12640673678669134952@sboyd-linaro>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-7-stephen.boyd@linaro.org>
- <20160629023052.GB25236@shlinux2>
- <146724983020.16253.12640673678669134952@sboyd-linaro>
-Message-ID: <20160630012225.GA19928@shlinux2>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Thu, 30 Jun 2016 09:29:59 +0800
+Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <CAJZ5v0iD5OYjp7ozmzoQ3zK-3+eMpdwzDxYgD=saLPjNeoq0Qg@mail.gmail.com>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <CAJZ5v0iD5OYjp7ozmzoQ3zK-3+eMpdwzDxYgD=saLPjNeoq0Qg@mail.gmail.com>
+Message-ID: <CADyBb7vmS=oJ9EOzs-v-O4_h5Kd_PCMQytjqEHdRNQkqz4WHcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 06:23:50PM -0700, Stephen Boyd wrote:
-> Quoting Peter Chen (2016-06-28 19:30:52)
-> > On Sun, Jun 26, 2016 at 12:28:23AM -0700, Stephen Boyd wrote:
-> > > The ULPI phy on qcom platforms needs to be initialized and
-> > > powered on after a USB reset and before we toggle the run/stop
-> > > bit. Otherwise, the phy locks up and doesn't work properly.
-> > 
-> > This requirement is so strange, try to see if any other initialization
-> > sequences.
-> 
-> I think the problem is that the reset bit also resets the phy because
-> the phy is part of the same clock domain as the controller. Just a guess
-> though.
-> 
-> >      
-> > Since this driver is multi-platforms, I can't accept this change for
-> > common, if you had to do that, would you please move your changes to
-> > msm glue layer using CI_HDRC_CONTROLLER_RESET_EVENT and
-> > CI_HDRC_CONTROLLER_STOPPED_EVENT? Besides, you need to add one flag
-> > at ci_hdrc_platform_data.flags for your case to avoid normal
-> > initialization.
-> 
-> Ok, let me see if I can make this work properly in the glue layer. I
-> take it that you want me to add a flag for this specific case so that we
-> don't do any phy control in the core and leave it up to the glue layer
-> to handle, like CI_HDRC_DISABLE_PHY_CONTROL or something?
+Hi Rafael,
 
-Yes
+On 30 June 2016 at 05:32, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> On Wed, Jun 29, 2016 at 8:15 PM,  <fu.wei@linaro.org> wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This patchset:
+>>     (1)Preparation for adding GTDT support in arm_arch_timer
+>>         1. Move some enums and marcos to header file
+>>         2. Add a new enum for spi type.
+>>         3. Improve printk relevant code
+>>
+>>     (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
+>>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>>     memory-mapped timer and SBSA Generic Watchdog timer.
+>>     This driver can help to simplify all the relevant timer drivers,
+>>     and separate all the ACPI GTDT knowledge from them.
+>>
+>>     (3)Simplify ACPI code for arm_arch_timer
+>>
+>>     (4)Add GTDT support for ARM memory-mapped timer
+>
+> GTDT is ARM-specific AFAICS.
+
+yes, you are right, it is.
+
+>
+> If so, why do we need that code to reside in drivers/acpi/ ?
+
+Although  the GTDT is just for ARM64, but this driver is parsing one
+of ACPI table,
+I think that could be treated as ACPI driver.  Do I miss something? :-)
+
+>
+> Thanks,
+> Rafael
+
+
 
 -- 
+Best regards,
 
-Best Regards,
-Peter Chen
+Fu Wei
+Software Engineer
+Red Hat
