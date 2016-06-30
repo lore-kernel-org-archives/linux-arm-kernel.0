@@ -1,38 +1,30 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:38 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.8
-Message-ID: <cover.1467292079.git.horms+renesas@verge.net.au>
+Date: Thu, 30 Jun 2016 16:15:39 +0200
+Subject: [PATCH 1/2] ARM: shmobile: defconfig: Enable r8a7792 SoC
+In-Reply-To: <cover.1467292079.git.horms+renesas@verge.net.au>
+References: <cover.1467292079.git.horms+renesas@verge.net.au>
+Message-ID: <c39f2947bf063fd6f4e2c02fd3c16c2f2b3d666b.1467292079.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+Enable support for r8a7792 SoC in shmobile_defconfig.
 
-Please consider these Renesas ARM based SoC defconfig updates for v4.8.
-
-
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.8
-
-for you to fetch changes up to a1becf12c6dafd96d77e97c9a7cbc446ba1d1196:
-
-  ARM: multi_v7_defconfig: defconfig: Enable r8a7792 SoC (2016-06-20 17:53:03 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v4.8
-
-* Enable newly added support for r8a7792 SoC in multi_v7 and shmobile
-  defconfigs
-
-----------------------------------------------------------------
-Simon Horman (2):
-      ARM: shmobile: defconfig: Enable r8a7792 SoC
-      ARM: multi_v7_defconfig: defconfig: Enable r8a7792 SoC
-
- arch/arm/configs/multi_v7_defconfig | 1 +
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/configs/shmobile_defconfig | 1 +
- 2 files changed, 2 insertions(+)
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index f2d635566a13..baa07a46a88b 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -17,6 +17,7 @@ CONFIG_ARCH_R8A7778=y
+ CONFIG_ARCH_R8A7779=y
+ CONFIG_ARCH_R8A7790=y
+ CONFIG_ARCH_R8A7791=y
++CONFIG_ARCH_R8A7792=y
+ CONFIG_ARCH_R8A7793=y
+ CONFIG_ARCH_R8A7794=y
+ CONFIG_ARCH_SH73A0=y
+-- 
+2.7.0.rc3.207.g0ac5344
