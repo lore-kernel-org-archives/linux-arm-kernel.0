@@ -1,86 +1,36 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 30 Jun 2016 10:22:12 -0600
-Subject: [PATCH 06/13] coresight: Fix csdev connections initialisation
+Date: Thu, 30 Jun 2016 10:22:15 -0600
+Subject: [PATCH 09/13] coresight: Cleanup TMC status check
 In-Reply-To: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1467303739-12543-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1467303739-12543-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-This is a cleanup patch.
-
-coresight_device->conns holds an array to point to the devices
-connected to the OUT ports of a component. Sinks, e.g ETR, do not
-have an OUT port (nr_outport = 0), as it streams the trace to
-memory via AXI.
-
-At coresight_register() we do :
-
-	conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
-	if (!conns) {
-		ret = -ENOMEM;
-		goto err_kzalloc_conns;
-	}
-
-For ETR, since the total size requested for kcalloc is zero, the return
-value is, ZERO_SIZE_PTR ( != NULL). Hence, csdev->conns = ZERO_SIZE_PTR
-which cannot be verified later to contain a valid pointer. The code which
-accesses the csdev->conns is bounded by the csdev->nr_outport check,
-hence we don't try to dereference the ZERO_SIZE_PTR. This patch cleans
-up the csdev->conns initialisation to make sure we initialise it
-properly(i.e, either NULL or valid conns array).
+Use the defined symbol rather than hardcoding the value to
+check whether the TMC buffer is full.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight.c | 24 ++++++++++++++----------
- 1 file changed, 14 insertions(+), 10 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index ceeaaea41ed6..bb20ee9747e1 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -894,7 +894,7 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
- 	int nr_refcnts = 1;
- 	atomic_t *refcnts = NULL;
- 	struct coresight_device *csdev;
--	struct coresight_connection *conns;
-+	struct coresight_connection *conns = NULL;
- 
- 	csdev = kzalloc(sizeof(*csdev), GFP_KERNEL);
- 	if (!csdev) {
-@@ -922,16 +922,20 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
- 
- 	csdev->nr_inport = desc->pdata->nr_inport;
- 	csdev->nr_outport = desc->pdata->nr_outport;
--	conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
--	if (!conns) {
--		ret = -ENOMEM;
--		goto err_kzalloc_conns;
--	}
- 
--	for (i = 0; i < csdev->nr_outport; i++) {
--		conns[i].outport = desc->pdata->outports[i];
--		conns[i].child_name = desc->pdata->child_names[i];
--		conns[i].child_port = desc->pdata->child_ports[i];
-+	/* Initialise connections if there is at least one outport */
-+	if (csdev->nr_outport) {
-+		conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
-+		if (!conns) {
-+			ret = -ENOMEM;
-+			goto err_kzalloc_conns;
-+		}
-+
-+		for (i = 0; i < csdev->nr_outport; i++) {
-+			conns[i].outport = desc->pdata->outports[i];
-+			conns[i].child_name = desc->pdata->child_names[i];
-+			conns[i].child_port = desc->pdata->child_ports[i];
-+		}
- 	}
- 
- 	csdev->conns = conns;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 03f36cb8b0c8..6d7de0309e94 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -68,7 +68,7 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+ 	 * Adjust the buffer to point to the beginning of the trace data
+ 	 * and update the available trace data.
+ 	 */
+-	if (val & BIT(0)) {
++	if (val & TMC_STS_FULL) {
+ 		drvdata->buf = drvdata->vaddr + rwp - drvdata->paddr;
+ 		drvdata->len = drvdata->size;
+ 	} else {
 -- 
 2.7.4
