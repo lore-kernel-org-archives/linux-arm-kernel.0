@@ -1,58 +1,93 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 30 Jun 2016 10:10:02 +0800
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <5351858.jEb0qfTvrF@vostro.rjw.lan>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <CAJZ5v0iD5OYjp7ozmzoQ3zK-3+eMpdwzDxYgD=saLPjNeoq0Qg@mail.gmail.com>
- <CADyBb7vmS=oJ9EOzs-v-O4_h5Kd_PCMQytjqEHdRNQkqz4WHcQ@mail.gmail.com>
- <5351858.jEb0qfTvrF@vostro.rjw.lan>
-Message-ID: <2f0e60e1-f429-2bd3-5f26-fd6199e64f34@linaro.org>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Thu, 30 Jun 2016 10:01:01 +0800
+Subject: [PATCH 4/4] mmc: mediatek: perfer to use rise edge latching
+In-Reply-To: <1467252061-3791-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1467252061-3791-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1467252061-3791-5-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+in our host design, rise edge latching is more stable than fall edge
+latching. so that if rise edge has enough margin, no need scan fall edge.
 
-On 2016/6/30 9:37, Rafael J. Wysocki wrote:
-> On Thursday, June 30, 2016 09:29:59 AM Fu Wei wrote:
->> Hi Rafael,
->>
->> On 30 June 2016 at 05:32, Rafael J. Wysocki <rafael@kernel.org> wrote:
->>> On Wed, Jun 29, 2016 at 8:15 PM,  <fu.wei@linaro.org> wrote:
->>>> From: Fu Wei <fu.wei@linaro.org>
->>>>
->>>> This patchset:
->>>>     (1)Preparation for adding GTDT support in arm_arch_timer
->>>>         1. Move some enums and marcos to header file
->>>>         2. Add a new enum for spi type.
->>>>         3. Improve printk relevant code
->>>>
->>>>     (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
->>>>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
->>>>     memory-mapped timer and SBSA Generic Watchdog timer.
->>>>     This driver can help to simplify all the relevant timer drivers,
->>>>     and separate all the ACPI GTDT knowledge from them.
->>>>
->>>>     (3)Simplify ACPI code for arm_arch_timer
->>>>
->>>>     (4)Add GTDT support for ARM memory-mapped timer
->>>
->>> GTDT is ARM-specific AFAICS.
->>
->> yes, you are right, it is.
->>
->>>
->>> If so, why do we need that code to reside in drivers/acpi/ ?
->>
->> Although  the GTDT is just for ARM64, but this driver is parsing one
->> of ACPI table,
->> I think that could be treated as ACPI driver.  Do I miss something? :-)
->
-> Yes, you are.  Nobody except for ARM64 will ever need it.
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ drivers/mmc/host/mtk-sd.c | 23 ++++++++++++++---------
+ 1 file changed, 14 insertions(+), 9 deletions(-)
 
-GTDT is part of ACPI spec, drivers/acpi/ is for driver code of
-ACPI spec, I think it can stay in drivers/acpi/ from this point
-of view, am I right?
-
-Thanks
-Hanjun
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index 91277b9..84e9afc 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -1328,7 +1328,7 @@ static int msdc_tune_response(struct mmc_host *mmc, u32 opcode)
+ {
+ 	struct msdc_host *host = mmc_priv(mmc);
+ 	u32 rise_delay = 0, fall_delay = 0;
+-	struct msdc_delay_phase final_rise_delay, final_fall_delay;
++	struct msdc_delay_phase final_rise_delay, final_fall_delay = { 0,};
+ 	u8 final_delay, final_maxlen;
+ 	int cmd_err;
+ 	int i;
+@@ -1341,6 +1341,11 @@ static int msdc_tune_response(struct mmc_host *mmc, u32 opcode)
+ 		if (!cmd_err)
+ 			rise_delay |= (1 << i);
+ 	}
++	final_rise_delay = get_best_delay(host, rise_delay);
++	/* if rising edge has enough margin, then do not scan falling edge */
++	if (final_rise_delay.maxlen >= 10 ||
++	    (final_rise_delay.start == 0 && final_rise_delay.maxlen >= 4))
++		goto skip_fall;
+ 
+ 	sdr_set_bits(host->base + MSDC_IOCON, MSDC_IOCON_RSPL);
+ 	for (i = 0; i < PAD_DELAY_MAX; i++) {
+@@ -1350,10 +1355,9 @@ static int msdc_tune_response(struct mmc_host *mmc, u32 opcode)
+ 		if (!cmd_err)
+ 			fall_delay |= (1 << i);
+ 	}
+-
+-	final_rise_delay = get_best_delay(host, rise_delay);
+ 	final_fall_delay = get_best_delay(host, fall_delay);
+ 
++skip_fall:
+ 	final_maxlen = max(final_rise_delay.maxlen, final_fall_delay.maxlen);
+ 	if (final_maxlen == final_rise_delay.maxlen) {
+ 		sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_RSPL);
+@@ -1374,7 +1378,7 @@ static int msdc_tune_data(struct mmc_host *mmc, u32 opcode)
+ {
+ 	struct msdc_host *host = mmc_priv(mmc);
+ 	u32 rise_delay = 0, fall_delay = 0;
+-	struct msdc_delay_phase final_rise_delay, final_fall_delay;
++	struct msdc_delay_phase final_rise_delay, final_fall_delay = { 0,};
+ 	u8 final_delay, final_maxlen;
+ 	int i, ret;
+ 
+@@ -1387,6 +1391,11 @@ static int msdc_tune_data(struct mmc_host *mmc, u32 opcode)
+ 		if (!ret)
+ 			rise_delay |= (1 << i);
+ 	}
++	final_rise_delay = get_best_delay(host, rise_delay);
++	/* if rising edge has enough margin, then do not scan falling edge */
++	if (final_rise_delay.maxlen >= 10 ||
++	    (final_rise_delay.start == 0 && final_rise_delay.maxlen >= 4))
++		goto skip_fall;
+ 
+ 	sdr_set_bits(host->base + MSDC_IOCON, MSDC_IOCON_DSPL);
+ 	sdr_set_bits(host->base + MSDC_IOCON, MSDC_IOCON_W_DSPL);
+@@ -1397,14 +1406,10 @@ static int msdc_tune_data(struct mmc_host *mmc, u32 opcode)
+ 		if (!ret)
+ 			fall_delay |= (1 << i);
+ 	}
+-
+-	final_rise_delay = get_best_delay(host, rise_delay);
+ 	final_fall_delay = get_best_delay(host, fall_delay);
+ 
++skip_fall:
+ 	final_maxlen = max(final_rise_delay.maxlen, final_fall_delay.maxlen);
+-	/* Rising edge is more stable, prefer to use it */
+-	if (final_rise_delay.maxlen >= 10)
+-		final_maxlen = final_rise_delay.maxlen;
+ 	if (final_maxlen == final_rise_delay.maxlen) {
+ 		sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_DSPL);
+ 		sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_W_DSPL);
+-- 
+1.8.1.1.dirty
