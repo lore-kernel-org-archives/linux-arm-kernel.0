@@ -1,40 +1,48 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 30 Jun 2016 11:47:44 +0200
-Subject: [PATCH] MAINTAINERS: update STM32 maintainers list
-In-Reply-To: <1466603818-7902-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1466603818-7902-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <5774EAC0.4080906@st.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 30 Jun 2016 11:49:01 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
+ dt property
+In-Reply-To: <87mvm36p4d.fsf@kamboji.qca.qualcomm.com>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <CAOiHx=n6itfmvwYQh+jUSDNguQFkos=MzjkDWP=GsupdgvF6KQ@mail.gmail.com>
+ <b49a9e4b-d591-d978-8005-413f39ebf2bd@redhat.com>
+ <871t3gdj6p.fsf@purkki.adurom.net>
+ <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
+ <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
+ <87mvm36p4d.fsf@kamboji.qca.qualcomm.com>
+Message-ID: <4f1a8cce-91e9-f386-cdde-7abcdc43b817@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-On 06/22/2016 03:56 PM, Maxime Coquelin wrote:
-> I will have less time to work on STM32 platform, so I propose
-> Alexandre as co-maintainer.
+On 30-06-16 10:46, Kalle Valo wrote:
+> Arend Van Spriel <arend.vanspriel@broadcom.com> writes:
 >
-> Alex is working in the STMicroelectronics division in charge of STM32
-> family, so he will have access to all technical information and
-> hardware.
+>>> Since we are dealing with a per-board config-file here, which is
+>>> loaded from the os filesystem we really need to specify a basename
+>>> here as the list of possible boards is endless, so we cannot
+>>> have a lookup table in the driver.
+>>
+>> As Jonas mentioned the general principle of device tree is to be
+>> agnostic with regards to OS and/or driver as you undoubtedly know. His
+>> proposal seems like a usable solution for your problem while complying
+>> to the device tree principle. So instead of overriding the default
+>> brcmfmac should modify it when dt specifies the "module" property, ie:
+>>
+>> no "module" in DT:	nvram filename = brcm/brcmfmac43362-sdio.txt
+>> "module=ap6210" in DT:	nvram filename = brcm/brcmfmac43362-ap6210.txt
 >
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> Cc: Alexandre Torgue <alexandre.torgue@st.com>
-> ---
->   MAINTAINERS | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 7304d2e37a98..4504331809ac 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1723,6 +1723,7 @@ F:	drivers/ata/ahci_st.c
->
->   ARM/STM32 ARCHITECTURE
->   M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> +M:	Alexandre Torgue <alexandre.torgue@st.com>
->   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->   S:	Maintained
->   T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
->
+> Just out of curiosity, what does "ap6210" exactly mean? I get that 43362
+> is the chip id, but not ap6210. Is it just an arbitrary name?
 
-Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+It is more or less an arbitrary name, typically these sdio wifi chips
+are used as a pre-assembled module (a tiny pcb) with some things like
+the necessary crystal / resonator and various capacitors and resistors
+on there. The brcm based sdio wifi modules typically come with a metal
+shield cap which has a module type stamped on it, e.g. ap6210,
+ap6476, toc9002.
+
+Regards,
+
+Hans
