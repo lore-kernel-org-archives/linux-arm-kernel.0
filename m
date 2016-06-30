@@ -1,43 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Jun 2016 21:49:59 -0700
-Subject: [RESEND PATCH v2 1/5] ir-rx51: Fix build after multiarch changes
- broke it
-In-Reply-To: <57716E27.2040702@gmail.com>
-References: <1466623341-30130-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <1466623341-30130-2-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <201606231948.51640@pali> <57716E27.2040702@gmail.com>
-Message-ID: <20160630044959.GL28140@atomide.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Thu, 30 Jun 2016 05:23:30 +0000
+Subject: [PATCH v11 2/2] dmaengine: Add Xilinx zynqmp dma engine driver
+ support
+In-Reply-To: <20160630042653.GM14945@localhost>
+References: <1465486667-30737-1-git-send-email-appanad@xilinx.com>
+ <1465486667-30737-2-git-send-email-appanad@xilinx.com>
+ <20160630042653.GM14945@localhost>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5BA435@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160627 11:22]:
-> On 23.06.2016 20:48, Pali Roh?r wrote:
-> > On Wednesday 22 June 2016 21:22:17 Ivaylo Dimitrov wrote:
-> > > The ir-rx51 driver for n900 has been disabled since the multiarch
-> > > changes as plat include directory no longer is SoC specific.
-> > > 
-> > > Let's fix it with minimal changes to pass the dmtimer calls in
-> > > pdata. Then the following changes can be done while things can
-> > > be tested to be working for each change:
-> > > 
-> > > 1. Change the non-pwm dmtimer to use just hrtimer if possible
-> > > 
-> > > 2. Change the pwm dmtimer to use Linux PWM API with the new
-> > >     drivers/pwm/pwm-omap-dmtimer.c and remove the direct calls
-> > >     to dmtimer functions
-> > > 
-> > > 3. Parse configuration from device tree and drop the pdata
-> > > 
-> > > Note compilation of this depends on the previous patch
-> > > "ARM: OMAP2+: Add more functions to pwm pdata for ir-rx51".
-> > 
-> > I think that this extensive description is not needed for commit
-> > message. Just for email discussion.
-> > 
+Hi Vinod,
+
 > 
-> I guess Tony can strip the description a bit before applying.
+> On Thu, Jun 09, 2016 at 09:07:47PM +0530, Kedareswara rao Appana wrote:
+> 
+> > +	dma_set_mask(&pdev->dev, DMA_BIT_MASK(44));
+> > +	dma_cap_set(DMA_SG, zdev->common.cap_mask);
+> > +	dma_cap_set(DMA_MEMCPY, zdev->common.cap_mask);
+> 
+> >  /**
+> > + * struct zynqmp_dma_config - ZYNQMP DMA Configuration structure
+> > + * @ovrfetch: Overfetch status
+> > + * @has_sg: Support scatter gather transfers
+> > + * @ratectrl: Rate control value
+> > + * @src_issue: Out standing transactions on source
+> > + * @src_burst_len: Source burst length
+> > + * @dst_burst_len: Dest burst length
+> > + */
+> 
+> As discussed in other thread as well, this is no-go for memcpy. Please come back
+> after removing this
+> 
+> For slave usages use the dma_slave_config
 
-OK I'll leave out the last paragraph as that already got merged
-earlier.
+Sure will fix in the next version...
 
-Tony
+Regards,
+Kedar.
+
+> 
+> --
+> ~Vinod
