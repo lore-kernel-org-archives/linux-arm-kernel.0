@@ -1,33 +1,98 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Thu, 30 Jun 2016 10:18:59 +0800
-Subject: [PATCH] clk: rockchip: fix the rk3399 spdif incorrect bit for DPTX
-Message-ID: <1467253139-21112-1-git-send-email-zhengxing@rock-chips.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 30 Jun 2016 10:54:32 +0800
+Subject: [PATCH v6 03/10] clocksource/drivers/arm_arch_timer: Improve
+ printk relevant code
+In-Reply-To: <1467224153-22873-4-git-send-email-fu.wei@linaro.org>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <1467224153-22873-4-git-send-email-fu.wei@linaro.org>
+Message-ID: <c347a9d9-82b4-b469-4e64-6446e6282a19@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLKSEL_CON32 bit_0 is controlled for spdif_8ch, not spdif_rec_dptx,
-it should be bit_8, let's fix it.
+On 2016/6/30 2:15, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+>
+> This patch defines pr_fmt(fmt) for all pr_* functions,
+> then the pr_* don't need to add "arch_timer:" everytime.
+>
+> Also delete some Blank Spaces in arch_timer_banner,
+> according to the suggestion from checkpatch.pl.
+>
+> No functional change.
+>
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 52 +++++++++++++++++++-----------------
+>  1 file changed, 27 insertions(+), 25 deletions(-)
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 966c574..9540e9d 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -29,6 +29,9 @@
+>
+>  #include <clocksource/arm_arch_timer.h>
+>
+> +#undef pr_fmt
+> +#define pr_fmt(fmt) "arch_timer: " fmt
+> +
+>  #define CNTTIDR		0x08
+>  #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
+>
+> @@ -388,24 +391,24 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+>
+>  	/* Check the timer frequency. */
+>  	if (arch_timer_rate == 0)
+> -		pr_warn("Architected timer frequency not available\n");
+> +		pr_warn("frequency not available\n");
+>  }
+>
+>  static void arch_timer_banner(unsigned type)
+>  {
+> -	pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
+> -		     type & ARCH_CP15_TIMER ? "cp15" : "",
+> -		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
+> -		     type & ARCH_MEM_TIMER ? "mmio" : "",
+> -		     (unsigned long)arch_timer_rate / 1000000,
+> -		     (unsigned long)(arch_timer_rate / 10000) % 100,
+> -		     type & ARCH_CP15_TIMER ?
+> -		     (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
+> -			"",
+> -		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
+> -		     type & ARCH_MEM_TIMER ?
+> -			arch_timer_mem_use_virtual ? "virt" : "phys" :
+> -			"");
+> +	pr_info("%s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
+> +		type & ARCH_CP15_TIMER ? "cp15" : "",
+> +		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
+> +		type & ARCH_MEM_TIMER ? "mmio" : "",
+> +		(unsigned long)arch_timer_rate / 1000000,
+> +		(unsigned long)(arch_timer_rate / 10000) % 100,
+> +		type & ARCH_CP15_TIMER ?
+> +		(arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
+> +		"",
+> +		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
+> +		type & ARCH_MEM_TIMER ?
+> +		arch_timer_mem_use_virtual ? "virt" : "phys" :
+> +		"");
+>  }
+>
+>  u32 arch_timer_get_rate(void)
+> @@ -498,7 +501,7 @@ static void __init arch_counter_register(unsigned type)
+>
+>  static void arch_timer_stop(struct clock_event_device *clk)
+>  {
+> -	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
+> +	pr_debug("teardown, disable IRQ%d cpu #%d\n",
 
-Reported-by: Chris Zhong <zyw@rock-chips.com>
-Tested-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+Not a problem of this patch, but arch_timer_teardown is a function
+name? I can't find where it's defined...
 
- drivers/clk/rockchip/clk-rk3399.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I think we can leave arch_timer as it but update it to:
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index b6742fa..78e51cb 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -586,7 +586,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 			RK3399_CLKGATE_CON(8), 15, GFLAGS),
- 
- 	COMPOSITE(SCLK_SPDIF_REC_DPTX, "clk_spdif_rec_dptx", mux_pll_src_cpll_gpll_p, 0,
--			RK3399_CLKSEL_CON(32), 15, 1, MFLAGS, 0, 5, DFLAGS,
-+			RK3399_CLKSEL_CON(32), 15, 1, MFLAGS, 8, 5, DFLAGS,
- 			RK3399_CLKGATE_CON(10), 6, GFLAGS),
- 	/* i2s */
- 	COMPOSITE(0, "clk_i2s0_div", mux_pll_src_cpll_gpll_p, 0,
--- 
-1.7.9.5
+pr_debug("arch_timer_stop disable IRQ%d cpu #%d\n",
+
+Others are look good to me.
+
+Thanks
+Hanjun
