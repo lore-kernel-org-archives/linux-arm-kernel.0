@@ -1,49 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jun 2016 18:40:35 +0100
-Subject: [PATCH v2 02/18] arm64: KVM: Always reference __hyp_panic_string via
- its kernel VA
+Date: Thu, 30 Jun 2016 18:40:34 +0100
+Subject: [PATCH v2 01/18] arm64: KVM: Merged page tables documentation
 In-Reply-To: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
 References: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1467308451-13365-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1467308451-13365-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__hyp_panic_string is passed via the HYP panic code to the panic
-function, and is being "upgraded" to a kernel address, as it is
-referenced by the HYP code (in a PC-relative way).
-
-This is a bit silly, and we'd be better off obtaining the kernel
-address and not mess with it at all. This patch implements this
-with a tiny bit of asm glue, by forcing the string pointer to be
-read from the literal pool.
+Since dealing with VA ranges tends to hurt my brain badly, let's
+start with a bit of documentation that will hopefully help
+understanding what comes next...
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h | 40 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 437cfad..81f21a2 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -299,9 +299,16 @@ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%
- 
- static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
- {
--	unsigned long str_va = (unsigned long)__hyp_panic_string;
-+	unsigned long str_va;
- 
--	__hyp_do_panic(hyp_kern_va(str_va),
-+	/*
-+	 * Force the panic string to be loaded from the literal pool,
-+	 * making sure it is a kernel address and not a PC-relative
-+	 * reference.
-+	 */
-+	asm volatile("ldr %0, =__hyp_panic_string" : "=r" (str_va));
-+
-+	__hyp_do_panic(str_va,
- 		       spsr,  elr,
- 		       read_sysreg(esr_el2),   read_sysreg_el2(far),
- 		       read_sysreg(hpfar_el2), par,
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index fdfbddb..6149dfc 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -29,10 +29,44 @@
+  *
+  * Instead, give the HYP mode its own VA region at a fixed offset from
+  * the kernel by just masking the top bits (which are all ones for a
+- * kernel address).
++ * kernel address). We need to find out how many bits to mask.
+  *
+- * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
+- * macros (the entire kernel runs at EL2).
++ * We want to build a set of page tables that cover both parts of the
++ * idmap (the trampoline page used to initialize EL2), and our normal
++ * runtime VA space, at the same time.
++ *
++ * Given that the kernel uses VA_BITS for its entire address space,
++ * and that half of that space (VA_BITS - 1) is used for the linear
++ * mapping, we can also limit the EL2 space to (VA_BITS - 1).
++ *
++ * The main question is "Within the VA_BITS space, does EL2 use the
++ * top or the bottom half of that space to shadow the kernel's linear
++ * mapping?". As we need to idmap the trampoline page, this is
++ * determined by the range in which this page lives.
++ *
++ * If the page is in the bottom half, we have to use the top half. If
++ * the page is in the top half, we have to use the bottom half:
++ *
++ * T = __virt_to_phys(__hyp_idmap_text_start)
++ * if (T & BIT(VA_BITS - 1))
++ *	HYP_VA_MIN = 0  //idmap in upper half
++ * else
++ *	HYP_VA_MIN = 1 << (VA_BITS - 1)
++ * HYP_VA_MAX = HYP_VA_MIN + (1 << (VA_BITS - 1)) - 1
++ *
++ * This of course assumes that the trampoline page exists within the
++ * VA_BITS range. If it doesn't, then it means we're in the odd case
++ * where the kernel idmap (as well as HYP) uses more levels than the
++ * kernel runtime page tables (as seen when the kernel is configured
++ * for 4k pages, 39bits VA, and yet memory lives just above that
++ * limit, forcing the idmap to use 4 levels of page tables while the
++ * kernel itself only uses 3). In this particular case, it doesn't
++ * matter which side of VA_BITS we use, as we're guaranteed not to
++ * conflict with anything.
++ *
++ * When using VHE, there are no separate hyp mappings and all KVM
++ * functionality is already mapped as part of the main kernel
++ * mappings, and none of this applies in that case.
+  */
+ #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
+ #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
 -- 
 2.1.4
