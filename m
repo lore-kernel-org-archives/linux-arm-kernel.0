@@ -1,72 +1,100 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 30 Jun 2016 21:48:02 +0800
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <2435381.sM3CFAEXNR@vostro.rjw.lan>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <5351858.jEb0qfTvrF@vostro.rjw.lan>
- <2f0e60e1-f429-2bd3-5f26-fd6199e64f34@linaro.org>
- <2435381.sM3CFAEXNR@vostro.rjw.lan>
-Message-ID: <57714bed-3f9c-90c2-ac30-2d462d8a06d4@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 30 Jun 2016 08:54:32 -0500
+Subject: [PATCH 3/3] dt-bindings: Document the STM32 USB OTG DWC2 core
+ binding
+In-Reply-To: <CAF3+Tqe_83zuaxWfp2sv6pZ70XzkbfZ4V4w+n8wCFAApvRirdg@mail.gmail.com>
+References: <1466562349-5043-1-git-send-email-bruherrera@gmail.com>
+ <1466562349-5043-3-git-send-email-bruherrera@gmail.com>
+ <20160624154118.GA4598@rob-hp-laptop>
+ <CAF3+Tqe05kXExob_62w80BBbXz6p01-WwXM1+R6ecp0JtsgviA@mail.gmail.com>
+ <20160628205441.GA3737@rob-hp-laptop>
+ <CAF3+Tqe_83zuaxWfp2sv6pZ70XzkbfZ4V4w+n8wCFAApvRirdg@mail.gmail.com>
+Message-ID: <20160630135432.GA13875@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/30 21:27, Rafael J. Wysocki wrote:
-> On Thursday, June 30, 2016 10:10:02 AM Hanjun Guo wrote:
->> Hi Rafael,
->>
->> On 2016/6/30 9:37, Rafael J. Wysocki wrote:
->>> On Thursday, June 30, 2016 09:29:59 AM Fu Wei wrote:
->>>> Hi Rafael,
->>>>
->>>> On 30 June 2016 at 05:32, Rafael J. Wysocki <rafael@kernel.org> wrote:
->>>>> On Wed, Jun 29, 2016 at 8:15 PM,  <fu.wei@linaro.org> wrote:
->>>>>> From: Fu Wei <fu.wei@linaro.org>
->>>>>>
->>>>>> This patchset:
->>>>>>     (1)Preparation for adding GTDT support in arm_arch_timer
->>>>>>         1. Move some enums and marcos to header file
->>>>>>         2. Add a new enum for spi type.
->>>>>>         3. Improve printk relevant code
->>>>>>
->>>>>>     (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
->>>>>>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
->>>>>>     memory-mapped timer and SBSA Generic Watchdog timer.
->>>>>>     This driver can help to simplify all the relevant timer drivers,
->>>>>>     and separate all the ACPI GTDT knowledge from them.
->>>>>>
->>>>>>     (3)Simplify ACPI code for arm_arch_timer
->>>>>>
->>>>>>     (4)Add GTDT support for ARM memory-mapped timer
->>>>>
->>>>> GTDT is ARM-specific AFAICS.
->>>>
->>>> yes, you are right, it is.
->>>>
->>>>>
->>>>> If so, why do we need that code to reside in drivers/acpi/ ?
->>>>
->>>> Although  the GTDT is just for ARM64, but this driver is parsing one
->>>> of ACPI table,
->>>> I think that could be treated as ACPI driver.  Do I miss something? :-)
->>>
->>> Yes, you are.  Nobody except for ARM64 will ever need it.
->>
->> GTDT is part of ACPI spec, drivers/acpi/ is for driver code of
->> ACPI spec, I think it can stay in drivers/acpi/ from this point
->> of view, am I right?
->
-> The question is not "Can it?", but "Does it need to?".
->
-> It is in the spec, but still there's only one architecture needing it.
->
-> There is no way to test it on any other architecture and no reason to build it
-> for any other architecture, so why does it need to be located in drivers/acpi/ ?
+On Wed, Jun 29, 2016 at 03:56:23PM -0300, Bruno Herrera wrote:
+> On Tue, Jun 28, 2016 at 5:54 PM, Rob Herring <robh@kernel.org> wrote:
+> > On Fri, Jun 24, 2016 at 03:51:18PM -0300, Bruno Herrera wrote:
+> >> On Fri, Jun 24, 2016 at 12:41 PM, Rob Herring <robh@kernel.org> wrote:
+> >> > On Tue, Jun 21, 2016 at 11:25:49PM -0300, Bruno Herrera wrote:
+> >> >> Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
+> >> >> ---
+> >> >>  Documentation/devicetree/bindings/usb/dwc2.txt | 1 +
+> >> >>  1 file changed, 1 insertion(+)
+> >> >>
+> >> >> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+> >> >> index 20a68bf..79e5370 100644
+> >> >> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
+> >> >> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+> >> >> @@ -11,6 +11,7 @@ Required properties:
+> >> >>    - "lantiq,arx100-usb": The DWC2 USB controller instance in Lantiq ARX SoCs;
+> >> >>    - "lantiq,xrx200-usb": The DWC2 USB controller instance in Lantiq XRX SoCs;
+> >> >>    - snps,dwc2: A generic DWC2 USB controller with default parameters.
+> >> >> +  - st,stm32-fsotg: The DWC2 USB controller instance in STM32F4 SoCs in FS mode;
+> >> >
+> >> > This should go above snps,dwc2.
+> >> >
+> >> Ok, tks!
+> >>
+> >> > What determines FS mode vs. HS?
+> >> >
+> >> Its more HW design decision.
+> >> STM32F429/439/469 has two OTG controllers, one that is FS (internal
+> >> phy) and other that is HS (but can also work in FS mode with
+> >> internal/external phy)
+> >> This bind work with both cores FS and HS working with the internal PHY.
+> >>
+> >> I tested the following configurations:
+> >> 1 - STM32F429I-DISCOv1 board (OTG HS working in FS mode internal PHY)
+> >> 2 - STM32F469I-DISCO board (OTG FS)
+> >>
+> >> I did not tested OTG HS core working in FS mode with external PHY (I2C).
+> >
+> > You shouldn't be setting the compatible string based on which mode you
+> > want. So for the HS block, you need a different compatible string than
+> > the FS block and set the speed in another way (not sure if we have a
+> > standard way). Or perhaps the phy should determine the speed.
+> 
+> I understand but I dont see how to fix it properly unless we add a
+> some specific STM32 properties in the DT or in the dwc2_core_params.
+> In fact there are two cores, and they are different in terms of
+> functionality (despite of the type of the PHY).
+> One core is for FS and other is for HS, so they could/should have
+> different compatible strings because they have different
+> configurations and are different piece of IP/Hardware(The buffer size
+> are different, the number of end points and so one, DMA)
 
-I'm fine to move it to other places such as arch/arm64/kernel/, but I
-would like to ask ARM64 maintainer's suggestion for this.
+Then it is perfectly fine to have 2 compatible strings: one for the FS 
+block and one for the HS block.
 
-Will, Catalin, what's your opinion on this?
+> 
+> But the problem is that the HS core can also support the the FS mode
+> and in this case is misleading to have a HS core with an FS compatible
+> string.
 
-Thanks
-Hanjun
+But as you said, there are other differences in the 2 blocks, so just 
+changing to the FS compatible string would not work.
+
+You could just have a high-speed-disable property or something, but look 
+thru existing bindings and see if one exists already. If not, propose a 
+common one.
+
+> Something like that (real case for STM32F429I-DISCO):
+> 
+> &usbotg_hs {
+> compatible = "st,stm32-fsotg", "snps,dwc2";
+> dr_mode = "host";
+> pinctrl-0 = <&usbotg_fs_pins_b>;
+> pinctrl-names = "default";
+> status = "okay";
+> };
+> 
+> Even if the decision is phy based it would lead to a STM32 specific
+> logic and we would need to figure out how to represent the internal
+> PHY.
+
+Most SoCs end up describing the phys at least for USB 2 and 3 as they 
+vary a lot eventhough everyone licenses one of the few IP blocks.
+
+Rob
