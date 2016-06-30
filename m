@@ -1,44 +1,44 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Thu, 30 Jun 2016 12:02:17 +0300
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <1467230078.2598.2.camel@plaes.org> (Priit Laes's message of
- "Wed, 29 Jun 2016 22:54:38 +0300")
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
- <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
- <6402170.5s0abZDqlD@wuerfel> <1467230078.2598.2.camel@plaes.org>
-Message-ID: <87eg7f6odi.fsf@kamboji.qca.qualcomm.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 30 Jun 2016 17:08:16 +0800
+Subject: [PATCH 17/21] usb: chipidea: msm: Make platform data driver
+ local instead of global
+In-Reply-To: <146722783258.16253.8246581455698560411@sboyd-linaro>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-18-stephen.boyd@linaro.org>
+ <20160629112925.GN25236@shlinux2>
+ <146722783258.16253.8246581455698560411@sboyd-linaro>
+Message-ID: <20160630090816.GB18426@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Priit Laes <plaes@plaes.org> writes:
+On Wed, Jun 29, 2016 at 12:17:12PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-06-29 04:29:25)
+> > On Sun, Jun 26, 2016 at 12:28:34AM -0700, Stephen Boyd wrote:
+> > > @@ -204,7 +201,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+> > >       of_node_put(ulpi_node);
+> > >  
+> > >       plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
+> > > -                                  pdev->num_resources, &ci_hdrc_msm_platdata);
+> > > +                                  pdev->num_resources, &ci->pdata);
+> > >       if (IS_ERR(plat_ci)) {
+> > >               dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+> > >               ret = PTR_ERR(plat_ci);
+> > 
+> > You can do something like ci_hdrc_usb2.c, it looks simpler. 
+> > 
+> 
+> Do what exactly? I'd rather not do a structure copy because that wastes
+> some memory for a structure that is just a template. We add some more
+> code here to assign values directly, but that is smaller size wise than
+> the large platdata structure that only has a few values set in it.
 
->> What is the size of this nvram file? As it's board specific, I wonder
->> if we can simply include it inside of the DT verbatim. I remember
->> doing that (in the pre-dtb days, on real open firmware) for the
->> "spidernet"
->> ethernet driver.
->
-> It contains a bit too much info:
->
-> This is what CubieTruck requires:
->
-> http://dl.cubieboard.org/public/Cubieboard/benn/firmware/ap6210/nvram_ap6210.txt
+But you add one struct ci_hdrc_platform_data pdata entry at struct
+ci_hdrc_msm which needs to allocate the memory too. Anyway, it is not a 
+big problem.
 
-In the nvram file I see lots of identifiers:
-
-manfid=0x2d0
-prodid=0x492
-vendid=0x14e4
-devid=0x4343
-boardtype=0x0598
-boardrev=0x1307
-boardnum=777
-
-Are any of these (or a combination of them) unique for each board type?
-What if one of these is provided through DT and then the driver could
-choose the nvram file based on the board id? Just another idea...
+Acked-by: Peter Chen <peter.chen@nxp.com>
 
 -- 
-Kalle Valo
+
+Best Regards,
+Peter Chen
