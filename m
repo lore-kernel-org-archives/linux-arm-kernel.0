@@ -1,39 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:22 +0200
-Subject: [PATCH 02/41] ARM: dts: ape6evm: Name mmc pfc subnode after device
- name
+Date: Thu, 30 Jun 2016 16:15:30 +0200
+Subject: [PATCH 10/41] ARM: dts: koelsch: Name spi pfc subnodes after device
+ names
 In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
 References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <8b68d53ec2c1b4106c3d07781c7773ff3e61c0bf.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <a4d98bed5e697333e5dcf74503cdf560229f69bc.1467294011.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Name the Pin Function Controller subnode for MMC0 after its device name,
-instead of using the generic and indexless "mmc".
+Name the Pin Function Controller subnodes for QSPI and MSIOF0 after
+their device names, instead of after the spi interface aliases.
 
-This avoids conflicts when enabling support for more MMC interfaces
+This avoids conflicts when enabling support for more spi interfaces
 later, either here or in a DT overlay.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4-ape6evm.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index 5bccc7d229d7..ec7c86e06538 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -193,7 +193,7 @@
- 		function = "scifa0";
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 73e5ecf036e1..f8a7d090fd01 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -372,12 +372,12 @@
+ 		function = "sdhi2";
  	};
  
--	mmc0_pins: mmc {
-+	mmc0_pins: mmc0 {
- 		groups = "mmc0_data8", "mmc0_ctrl";
- 		function = "mmc0";
+-	qspi_pins: spi0 {
++	qspi_pins: qspi {
+ 		groups = "qspi_ctrl", "qspi_data4";
+ 		function = "qspi";
  	};
+ 
+-	msiof0_pins: spi1 {
++	msiof0_pins: msiof0 {
+ 		groups = "msiof0_clk", "msiof0_sync", "msiof0_rx",
+ 				 "msiof0_tx";
+ 		function = "msiof0";
 -- 
 2.7.0.rc3.207.g0ac5344
