@@ -1,94 +1,70 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Thu, 30 Jun 2016 17:31:00 +0800
-Subject: [PATCH v8 02/10] drm/hisilicon: Add hisilicon kirin drm master
- driver
-In-Reply-To: <CACvgo50dggEbwzEZLUvtErzrxOr3B1gECyyehLQZkoE5oXfNmA@mail.gmail.com>
-References: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
- <1460364943-76135-3-git-send-email-xinliang.liu@linaro.org>
- <CACvgo50dggEbwzEZLUvtErzrxOr3B1gECyyehLQZkoE5oXfNmA@mail.gmail.com>
-Message-ID: <CAGd==05kyhB8kb7nVKrbp5OeNDtROfmfTsczmtQE4A_RZoBdCQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 30 Jun 2016 11:32:32 +0200
+Subject: [PATCH v3 3/3] arm64: dts: marvell: Aardvark PCIe support for Armada
+ 3700
+In-Reply-To: <1467279152-5717-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1467279152-5717-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1467279152-5717-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 April 2016 at 20:15, Emil Velikov <emil.l.velikov@gmail.com> wrote:
-> Hi Xinliang,
->
-> On 11 April 2016 at 09:55, Xinliang Liu <xinliang.liu@linaro.org> wrote:
->
->> +static int kirin_drm_connectors_register(struct drm_device *dev)
->> +{
->> +       struct drm_connector *connector;
->> +       struct drm_connector *failed_connector;
->> +       int ret;
->> +
->> +       mutex_lock(&dev->mode_config.mutex);
->> +       drm_for_each_connector(connector, dev) {
->> +               ret = drm_connector_register(connector);
->> +               if (ret) {
->> +                       failed_connector = connector;
->> +                       goto err;
->> +               }
->> +       }
->> +       mutex_unlock(&dev->mode_config.mutex);
->> +
->> +       return 0;
->> +
->> +err:
->> +       drm_for_each_connector(connector, dev) {
->> +               if (failed_connector == connector)
->> +                       break;
->> +               drm_connector_unregister(connector);
->> +       }
->> +       mutex_unlock(&dev->mode_config.mutex);
->> +
->> +       return ret;
->> +}
->> +
-> Iirc we have new drm_connector_{un,}register_all() helpers.You might
-> want to use it once they are in (i.e. not sure what your base is and
-> if they have landed yet).
->
->
->> +static struct device_node *kirin_get_remote_node(struct device_node *np)
->> +{
->> +       struct device_node *endpoint, *remote;
->> +
->> +       /* get the first endpoint, in our case only one remote node
->> +        * is connected to display controller.
->> +        */
->> +       endpoint = of_graph_get_next_endpoint(np, NULL);
->> +       if (!endpoint) {
->> +               DRM_ERROR("no valid endpoint node\n");
->> +               return ERR_PTR(-ENODEV);
->> +       }
->> +       of_node_put(endpoint);
->> +
->> +       remote = of_graph_get_remote_port_parent(endpoint);
->> +       if (!remote) {
->> +               DRM_ERROR("no valid remote node\n");
->> +               return ERR_PTR(-ENODEV);
->> +       }
->> +       of_node_put(remote);
->> +
->> +       if (!of_device_is_available(remote)) {
->> +               DRM_ERROR("not available for remote node\n");
->> +               return ERR_PTR(-ENODEV);
->> +       }
->> +
-> This seems like a common pattern in many platform DRM drivers. Yet
-> some tend to differ in subtle ways - I'm leaning that they might be
-> bugs, but one cannot be too sure.
->
-> A friendly request:
-> Can you please follow up by adding a helper and removing the
-> duplication thoughout ?
+This commit adds the SoC-level description of the PCIe controller found
+on the Marvell Armada 3700, and also enables this PCIe controller on the
+development board for this SoC.
 
-Hi emil, recently I found that there is already a helper to do such work.
-It is drm_of_component_probe.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts |  5 +++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 25 +++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+)
 
--xinliang
-
-
->
-> Thanks
-> Emil
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 86110a6..1372e9a6 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -76,3 +76,8 @@
+ &usb3 {
+ 	status = "okay";
+ };
++
++/* CON17 (PCIe) / CON12 (mini-PCIe) */
++&pcie0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 9e2efb8..8a9cae9 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -141,5 +141,30 @@
+ 				      <0x1d40000 0x40000>; /* GICR */
+ 			};
+ 		};
++
++		pcie0: pcie at d0070000 {
++			compatible = "marvell,armada-3700-pcie";
++			device_type = "pci";
++			status = "disabled";
++			reg = <0 0xd0070000 0 0x20000>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			bus-range = <0x00 0xff>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <1>;
++			msi-parent = <&pcie0>;
++			msi-controller;
++			ranges = <0x82000000 0 0xe8000000   0 0xe8000000 0 0x1000000 /* Port 0 MEM */
++				  0x81000000 0 0xe9000000   0 0xe9000000 0 0x10000>; /* Port 0 IO*/
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0 0 0 1 &pcie_intc 0>,
++					<0 0 0 2 &pcie_intc 1>,
++					<0 0 0 3 &pcie_intc 2>,
++					<0 0 0 4 &pcie_intc 3>;
++			pcie_intc: interrupt-controller {
++				interrupt-controller;
++				#interrupt-cells = <1>;
++			};
++		};
+ 	};
+ };
+-- 
+2.7.4
