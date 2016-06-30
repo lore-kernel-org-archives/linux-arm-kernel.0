@@ -1,79 +1,54 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 30 Jun 2016 16:25:24 +0800
-Subject: [PATCH V3 0/8] clk: core: support clocks which requires parents enable
-Message-ID: <1467275132-31026-1-git-send-email-aisheng.dong@nxp.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 30 Jun 2016 11:43:16 +0300
+Subject: [PATCH v2 0/3] pwm: lpc32xx: Add support to control PWM_PIN_LEVEL
+ bit
+In-Reply-To: <1467032997-5340-1-git-send-email-slemieux.tyco@gmail.com>
+References: <1467032997-5340-1-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <ce29f743-e481-64b0-8e05-0b610fa33fb3@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support in clock framework for clocks which all the
-operations like gate/ungate, set_rate, set_parent must require its parent
-clock on.
+Hi Sylvain,
 
-This special HW requirement can be found on Freescale i.MX7D platform.
-Besides i.MX7D, it seems lpc18xx clock has a similar requirement.
-(see: http://www.spinics.net/lists/arm-kernel/msg439307.html)
-And there may be other SoCs in the same situation.
+On 27.06.2016 16:09, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
+> 
+> The PWM_PIN_LEVEL bit is leave unset by the kernel PWM driver.
+> 
+> Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
+> the PWM_PIN_LEVEL bit was always clear when the PWM was disable
+> and a 0 logic level was apply to the output.
+> 
+> According to the LPC32x0 User Manual [1],
+> the default value for bit 30 (PWM_PIN_LEVEL) is 0.
+> 
+> First patch:
+> * initialize the pin level to 0 (default value) and update
+>   the register value accordingly.
+> 
+> Second anf third patches:
+> *  provide support to configure the pin output (i.e. PWM_PIN_LEVEL bit)
+>    when the PWM is disabled.
 
-Current clock core can not support such type of clock well.
+a short question, how do you use PWM? Does it serve as a backlight
+or something else?
 
-This patch introduce a new flag CLK_SET_PARENT_ENABLE to handle this special
-case in clock core that enable its parent clock firstly for each operation
-and disable it later after operation complete.
+> Note:
+> * Follow this URL to access the discussion for version 1 of this
+>   patch: http://thread.gmane.org/gmane.linux.pwm/3882
+> 
+> [1] http://www.nxp.com/documents/user_manual/UM10326.pdf
+> 
+> Sylvain Lemieux (3):
+>   pwm: lpc32xx: Set PWM_PIN_LEVEL bit to default value
+>   pwm: lpc32xx: Add support for PWM_PIN_LEVEL bit configuration
+>   dt-bindings: pwm: lpc32xx: Add nxp,pwm-disabled-level-high property
+> 
+>  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt |  3 +++
+>  drivers/pwm/pwm-lpc32xx.c                             | 11 +++++++++++
+>  2 files changed, 14 insertions(+)
+> 
 
-There're two special cases for handling this issue:
-
-One is fixing the possible disabling clocks while its parent is already off
-during kernel booting phase in clk_disable_unused_subtree()
-Since this state misalign only happens during booting time,
-so we simply enable the parent clocks before disable it if flag is set.
-For normal clk_disable after kernel booting, there's no such issue
-since the clock tree is already created which makes sure no such issue exist.
-
-Another special case is for set_parent() operation.
-It requires both parent, old one and new one, to be enabled at the same
-time during the operation.
-
-Patch 1~4 does this work.
-
-After clk core supports mx7d type clocks, we don't have to enable all clock
-by default anymore, then we remove the enable of all clocks code and instead
-only enable set of minimum required clocks.
-
-Patch 5~8 does this work.
-
-The whole patch series is based on for-next branch of clock tree:
-git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
-
-Change log:
-v2-> v3:
- * fix rebase error
-v1-> v2:
- * Addressed Mike's comments to make code more clearer
-
-V1:
-https://lkml.org/lkml/2016/4/20/199
-
-The original one can be found at here:
-http://www.spinics.net/lists/arm-kernel/msg435136.html
-It has no functional changes but improve the commit message and
-comments a bit.
-
-Dong Aisheng (8):
-  clk: introduce clk_core_enable_lock and clk_core_disable_lock
-    functions
-  clk: move clk_disable_unused after clk_core_disable_unprepare function
-  clk: core: support clocks which requires parents enable (part 1)
-  clk: core: support clocks which requires parents enable (part 2)
-  clk: imx: re-order and concentrate the same type of clk api
-  clk: imx: add clk api for supporting CLK_OPS_PARENT_ENABLE clocks
-  clk: imx7d: using api with flag CLK_OPS_PARENT_ENABLE
-  clk: imx7d: only enable minimum required clocks
-
- drivers/clk/clk.c            | 332 ++++++++++++--------
- drivers/clk/imx/clk-imx7d.c  | 732 ++++++++++++++++++++++---------------------
- drivers/clk/imx/clk.h        |  90 ++++--
- include/linux/clk-provider.h |   2 +
- 4 files changed, 628 insertions(+), 528 deletions(-)
-
--- 
-1.9.1
+--
+With best wishes,
+Vladimir
