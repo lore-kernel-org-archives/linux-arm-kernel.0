@@ -1,37 +1,140 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 30 Jun 2016 15:04:25 +0800
-Subject: [PATCH V2 4/8] clk: core: support clocks which requires parents
- enable (part 2)
-In-Reply-To: <201606300015.zJJwBdRV%fengguang.wu@intel.com>
-References: <1467212351-16626-5-git-send-email-aisheng.dong@nxp.com>
- <201606300015.zJJwBdRV%fengguang.wu@intel.com>
-Message-ID: <20160630070425.GC29919@shlinux2>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Jun 2016 00:13:00 -0700
+Subject: [GIT PULL 1/2] omap soc updates for v4.8 merge window
+Message-ID: <pull-1467270686-995259>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 12:42:21AM +0800, kbuild test robot wrote:
-> Hi,
-> 
-> [auto build test ERROR on clk/clk-next]
-> [also build test ERROR on v4.7-rc5 next-20160629]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-core-support-clocks-which-requires-parents-enable/20160629-231445
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-> config: x86_64-randconfig-i0-201626 (attached as .config)
-> compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=x86_64 
-> 
-> All error/warnings (new ones prefixed by >>):
-> 
->    include/linux/export.h:94:25: note: in expansion of macro '___EXPORT_SYMBOL'
->     #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
->                             ^~~~~~~~~~~~~~~~
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-Sorry, i somehow sent out a wrong re-based version.
-Will send out V3 to fix it.
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
-Regards
-Dong Aisheng
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/soc-signed
+
+for you to fetch changes up to 44e7475d40eb26b8d3a6e2b2f7a5f12a5fe0942e:
+
+  ARM: OMAP2+: Fix build if CONFIG_SMP is not set (2016-06-27 23:30:02 -0700)
+
+----------------------------------------------------------------
+SoC related changes for omaps for v4.8 merge window:
+
+- A series of DSS platform_data fixes to prepare for DSS driver changes
+
+- Add tblck clck aliases for PWM
+
+- A series of trivial spelling corrections
+
+- Remove bogus eQEP, ePWM and eCAP hwmod entries
+
+- A series of McBSP sidetone fixes
+
+- Remove QSPI and DSS addresses from hwmod, these come from dts
+
+- Fix RSTST register offset for pruss
+
+- Make ti81xx_rtc_hwmod static
+
+- Remove wrongly defined RSTST offset for PER Domain, note
+  that the subject for this one wrongly has "dts" in the
+  subject
+
+- Add support for omap5 and dra7 workaround for 801819
+
+- A series of patches to make kexec work for SMP omaps
+
+----------------------------------------------------------------
+Andrea Gelmini (7):
+      ARM: OMAP1: Fix typo in fiq.c
+      ARM: OMAP1: Fix typo in mtd-xip.h
+      ARM: OMAP2+: Fix typo in cm3xxx.c
+      ARM: OMAP2+: Fix typo in mux34xx.c
+      ARM: OMAP2+: Fix typo in omap4-common.c
+      ARM: OMAP2+: Fix typo in omap_device.c
+      ARM: OMAP2+: Fix typo in sdrc.h
+
+Ben Dooks (1):
+      ARM: OMAP: make ti81xx_rtc_hwmod static
+
+Franklin S Cooper Jr (2):
+      clk: ti: am335x/am4372: Add tbclk to pwm node
+      ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and eCAP hwmod entries
+
+Keerthy (2):
+      ARM: AM43XX: hwmod: Fix RSTST register offset for pruss
+      ARM: dts: am43xx: Remove wrongly defined RSTST offset for PER Domain
+
+Nishanth Menon (1):
+      ARM: OMAP5 / DRA7: Introduce workaround for 801819
+
+Peter Ujfalusi (10):
+      ARM: OMAP: rx51-video: Do not set TV connector_type
+      ARM/video: omap2: Move omap_display_init declaration to mach-omap2/display.h
+      video/platform_data: omapdss: Create new header file for platform data
+      ARM: OMAP2: Use the platform_data header for omapdss
+      ARM: OMAP3: hwmod data: Fix McBSP2/3 sidetone data
+      ARM: OMAP3: McBSP: New callback for McBSP2/3 ICLK idle configuration
+      ARM: OMAP3: pdata-quirks: Add support for McBSP2/3 sidetone handling
+      ASoC: omap-mcbsp: Rename omap_mcbsp_sysfs_remove() to omap_mcbsp_cleanup()
+      ASoC: omap-mcbsp: sidetone: Use the new callback for iclk handling
+      ARM: OMAP2+: McBSP: Remove the old iclk allow/deny idle code
+
+Tomi Valkeinen (1):
+      ARM: DRA7: hwmod: remove DSS addresses from hwmod
+
+Tony Lindgren (7):
+      Merge branch 'peter/for-4.8_omapdss_part1' of https://github.com/omap-audio/linux-audio into omap-for-v4.8/soc
+      Merge commit 'c0053bd50af5' into omap-for-v4.8/soc
+      ARM: OMAP4+: Initialize SAR RAM base early for proper CPU1 reset for kexec
+      ARM: OMAP4+: Prevent CPU1 related hang with kexec
+      ARM: OMAP4+: Reset CPU1 properly for kexec
+      ARM: OMAP4+: Allow kexec on SMP variants
+      ARM: OMAP2+: Fix build if CONFIG_SMP is not set
+
+Vignesh R (1):
+      ARM: DRA7: hwmod: Remove QSPI address space entry from hwmod
+
+ arch/arm/mach-omap1/ams-delta-fiq.c                |   2 +-
+ arch/arm/mach-omap1/include/mach/mtd-xip.h         |   2 +-
+ arch/arm/mach-omap2/Kconfig                        |   8 ++
+ arch/arm/mach-omap2/Makefile                       |   4 +-
+ arch/arm/mach-omap2/board-ldp.c                    |   3 +-
+ arch/arm/mach-omap2/board-rx51-video.c             |   4 +-
+ arch/arm/mach-omap2/cm3xxx.c                       |   2 +-
+ arch/arm/mach-omap2/common.h                       |   8 +-
+ arch/arm/mach-omap2/display.c                      |   2 +-
+ arch/arm/mach-omap2/display.h                      |   5 +
+ arch/arm/mach-omap2/dss-common.c                   |   2 +-
+ arch/arm/mach-omap2/io.c                           |   3 +
+ arch/arm/mach-omap2/mcbsp.c                        |  31 ++---
+ arch/arm/mach-omap2/mux34xx.c                      |   4 +-
+ arch/arm/mach-omap2/omap-headsmp.S                 |  18 ++-
+ arch/arm/mach-omap2/omap-hotplug.c                 |   6 +
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c          |  29 ++++-
+ arch/arm/mach-omap2/omap-secure.h                  |   1 +
+ arch/arm/mach-omap2/omap-smp.c                     | 140 ++++++++++++++++-----
+ arch/arm/mach-omap2/omap4-common.c                 |  16 ++-
+ arch/arm/mach-omap2/omap_device.c                  |   2 +-
+ .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  18 ---
+ .../omap_hwmod_33xx_43xx_interconnect_data.c       |  64 ----------
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  85 +------------
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |   9 --
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  24 +---
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  54 --------
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  41 ------
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |   2 +-
+ arch/arm/mach-omap2/pdata-quirks.c                 |  18 +++
+ arch/arm/mach-omap2/prcm43xx.h                     |   1 +
+ arch/arm/mach-omap2/prm33xx.h                      |   2 -
+ arch/arm/mach-omap2/sdrc.h                         |   4 +-
+ drivers/clk/ti/clk-33xx.c                          |   3 +
+ drivers/clk/ti/clk-43xx.c                          |   6 +
+ include/linux/platform_data/asoc-ti-mcbsp.h        |   4 +-
+ include/linux/platform_data/omapdss.h              |  42 +++++++
+ include/video/omapdss.h                            |  31 +----
+ sound/soc/omap/mcbsp.c                             |  21 +++-
+ sound/soc/omap/mcbsp.h                             |   3 +-
+ sound/soc/omap/omap-mcbsp.c                        |   5 +-
+ 41 files changed, 320 insertions(+), 409 deletions(-)
+ create mode 100644 include/linux/platform_data/omapdss.h
