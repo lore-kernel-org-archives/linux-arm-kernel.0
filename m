@@ -1,68 +1,42 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 30 Jun 2016 18:59:14 -0400
-Subject: [PATCH 7/7] ARM: dts: NSP: Add bgmac entries
-In-Reply-To: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 30 Jun 2016 16:26:00 -0700
+Subject: [PATCH 5/7] net: ethernet: bgmac: Add platform device support
+In-Reply-To: <1467327554-22074-6-git-send-email-jon.mason@broadcom.com>
 References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1467327554-22074-8-git-send-email-jon.mason@broadcom.com>
+ <1467327554-22074-6-git-send-email-jon.mason@broadcom.com>
+Message-ID: <5775AA88.60800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree entries for the ethernet devices present on the
-Broadcom Northstar Plus SoCs
+[snip]
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi   | 18 ++++++++++++++++++
- arch/arm/boot/dts/bcm958625k.dts |  8 ++++++++
- 2 files changed, 26 insertions(+)
++
+> +	return 0;
+> +
+> +err2:
+> +	devm_iounmap(&pdev->dev, bgmac->plat.idm_base);
+> +err1:
+> +	devm_iounmap(&pdev->dev, bgmac->plat.base);
+> +err:
+> +	devm_kfree(&pdev->dev, bgmac);
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index def9e78..8f4343b 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -192,6 +192,24 @@
- 			status = "disabled";
- 		};
- 
-+		gmac0: ethernet at 22000 {
-+			compatible = "brcm,bgmac-nsp";
-+			reg = <0x022000 0x1000>,
-+			      <0x110000 0x1000>;
-+			reg-names = "gmac_base", "idm_base";
-+			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		gmac1: ethernet at 23000 {
-+			compatible = "brcm,bgmac-nsp";
-+			reg = <0x023000 0x1000>,
-+			      <0x111000 0x1000>;
-+			reg-names = "gmac_base", "idm_base";
-+			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
- 		nand: nand at 26000 {
- 			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
- 			reg = <0x026000 0x600>,
-diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-index e298450..d16ab53 100644
---- a/arch/arm/boot/dts/bcm958625k.dts
-+++ b/arch/arm/boot/dts/bcm958625k.dts
-@@ -56,6 +56,14 @@
- 	status = "okay";
- };
- 
-+&gmac0 {
-+	status = "okay";
-+};
-+
-+&gmac1 {
-+	status = "okay";
-+};
-+
- &pcie0 {
- 	status = "okay";
- };
+
+This is not needed actually, now that you use the device managed helper
+functions.
+
+> +
+> +	return rc;
+> +}
+> +
+> +static int bgmac_remove(struct platform_device *pdev)
+> +{
+> +	struct bgmac *bgmac = platform_get_drvdata(pdev);
+> +
+> +	bgmac_enet_remove(bgmac);
+> +	devm_iounmap(&pdev->dev, bgmac->plat.idm_base);
+> +	devm_iounmap(&pdev->dev, bgmac->plat.base);
+> +	devm_kfree(&pdev->dev, bgmac);
+
+Same here.
 -- 
-1.9.1
+Florian
