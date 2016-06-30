@@ -1,98 +1,125 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Jun 2016 12:43:34 -0700
-Subject: [PATCH 06/10] clk: mvebu: Add the xtal clock for Armada 3700 SoC
-In-Reply-To: <1465565018-14172-7-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu, 30 Jun 2016 12:48:13 -0700
+Subject: [PATCH 08/10] clk: mvebu Add the time base generator clocks for
+ Armada 3700
+In-Reply-To: <1465565018-14172-9-git-send-email-gregory.clement@free-electrons.com>
 References: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
- <1465565018-14172-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160630194334.GZ1521@codeaurora.org>
+ <1465565018-14172-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160630194813.GA1521@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/10, Gregory CLEMENT wrote:
-> diff --git a/drivers/clk/mvebu/armada-37xx-xtal.c b/drivers/clk/mvebu/armada-37xx-xtal.c
-> new file mode 100644
-> index 000000000000..fb051a75b2c2
-> --- /dev/null
-> +++ b/drivers/clk/mvebu/armada-37xx-xtal.c
-> @@ -0,0 +1,93 @@
-> +/*
-> + * Marvell Armada 37xx SoC xtal clocks
-> + *
-> + * Copyright (C) 2016 Marvell
-> + *
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
 > +
-> +#include <linux/clk-provider.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +
-> +#define NB_GPIO1_LATCH	0xC
-> +#define XTAL_MODE	    BIT(31)
-> +
-> +static struct clk *xtal_clk;
+> +struct tbg_def tbg[NUM_TBG] = {
 
-Please allocate this at driver probe time instead, or even just
-assign it to be the platform driver's drvdata.
+const?
+
+> +	{"TBG-A-P", TBG_A_REFDIV, TBG_A_FBDIV, TBG_CTRL8, TBG_A_VCODIV_DIFF},
+> +	{"TBG-B-P", TBG_B_REFDIV, TBG_B_FBDIV, TBG_CTRL8, TBG_B_VCODIV_DIFF},
+> +	{"TBG-A-S", TBG_A_REFDIV, TBG_A_FBDIV, TBG_CTRL1, TBG_A_VCODIV_SE},
+> +	{"TBG-B-S", TBG_B_REFDIV, TBG_B_FBDIV, TBG_CTRL1, TBG_B_VCODIV_SE},
+> +};
+> +
+> +static struct clk_onecell_data clk_tbg_data;
+
+Please allocate this in the driver probe.
 
 > +
-> +static int armada_3700_xtal_clock_probe(struct platform_device *pdev)
+> +unsigned int tbg_get_mult(void __iomem *reg, struct tbg_def *ptbg)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(reg + TBG_CTRL0);
+> +
+> +	return ((val >> ptbg->fbdiv_offset) & TBG_DIV_MASK) << 2;
+> +}
+> +
+> +unsigned int tbg_get_div(void __iomem *reg, struct tbg_def *ptbg)
+> +{
+> +	u32 val;
+> +	unsigned int div;
+> +
+> +	val = readl(reg + TBG_CTRL7);
+> +
+> +	div = (val >> ptbg->refdiv_offset) & TBG_DIV_MASK;
+> +	if (div == 0)
+> +		div = 1;
+> +	val = readl(reg + ptbg->vcodiv_reg);
+> +
+> +	div *= 1 << ((val >>  ptbg->vcodiv_offset) & TBG_DIV_MASK);
+> +
+> +	return div;
+> +}
+> +
+> +
+> +static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
 > +{
 > +	struct device_node *np = pdev->dev.of_node;
-> +	const char *xtal_name = "xtal";
-> +	struct device_node *parent;
-> +	struct regmap *regmap;
-> +	unsigned int rate;
-> +	u32 reg;
-> +	int ret;
+> +	struct device *dev = &pdev->dev;
+> +	const char *parent_name;
+> +	struct resource *res;
+> +	struct clk *parent;
+> +	void __iomem *reg;
+> +	int i, ret;
 > +
-> +	parent = np->parent;
-> +	if (!parent) {
-> +		dev_err(&pdev->dev, "no parrent\n");
+> +	parent = of_clk_get(np, 0);
 
-s/parrent/parent/
+Why not devm_clk_get() instead? Don't make things dependent on DT
+APIs unnecessarily please.
 
-> +		return -ENODEV;
+> +	if (IS_ERR(parent)) {
+> +		dev_err(dev, "Could get the clock parent\n");
+> +		return -EINVAL;
+> +	}
+> +	parent_name = __clk_get_name(parent);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reg = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(reg)) {
+> +		dev_err(dev, "Could not map the tbg clock registers\n");
+
+devm_ioremap_resource() already spits out an error on failure so
+please drop this print.
+
+> +		ret = PTR_ERR(reg);
+> +		goto put_clk;
 > +	}
 > +
-> +	regmap = syscon_node_to_regmap(parent);
-> +	if (IS_ERR(regmap)) {
-> +		dev_err(&pdev->dev, "cannot get regmap\n");
-> +		return PTR_ERR(regmap);
+> +	clk_tbg_data.clk_num = NUM_TBG;
+> +	clk_tbg_data.clks = devm_kcalloc(dev, clk_tbg_data.clk_num,
+> +					 sizeof(struct clk *), GFP_KERNEL);
+
+Please move to clk_hw based registration.
+
+> +	if (!clk_tbg_data.clks) {
+> +		ret = -ENOMEM;
+> +		goto put_clk;
 > +	}
 > +
-> +	ret = regmap_read(regmap, NB_GPIO1_LATCH, &reg);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "cannot read from regmap\n");
-> +		return ret;
+> +	for (i = 0; i < NUM_TBG; i++) {
+> +		const char *name;
+> +		unsigned int mult, div;
+> +
+> +		name = tbg[i].name;
+> +		mult = tbg_get_mult(reg, &tbg[i]);
+> +		div = tbg_get_div(reg, &tbg[i]);
+> +		clk_tbg_data.clks[i] = clk_register_fixed_factor(NULL, name,
+> +						 parent_name, 0, mult, div);
+> +		if (IS_ERR(clk_tbg_data.clks[i]))
+> +			dev_err(dev, "Can't register TBG clock %s\n", name);
 > +	}
 > +
-> +	if (reg & XTAL_MODE)
-> +		rate = 40000000;
-> +	else
-> +		rate = 25000000;
-> +
-> +	of_property_read_string_index(np, "clock-output-names", 0, &xtal_name);
-> +	xtal_clk = clk_register_fixed_rate(NULL, xtal_name, NULL, 0, rate);
-
-Please move this to use the clk_hw_register_fixed_rate() function
-instead and update of_clk_add_provider to register a clk_hw
-instead of clk pointer.
-
-> +	if (IS_ERR(xtal_clk))
-> +		return PTR_ERR(xtal_clk);
-> +	of_clk_add_provider(np, of_clk_src_simple_get, xtal_clk);
+> +	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_tbg_data);
 
 What if this fails?
 
 > +
 > +	return 0;
+> +
+> +put_clk:
+> +	clk_put(parent);
+> +	return ret;
 > +}
 
 -- 
