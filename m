@@ -1,92 +1,114 @@
-From: jun.li@nxp.com (Jun Li)
-Date: Thu, 30 Jun 2016 01:50:03 +0000
-Subject: [PATCH 08/21] usb: chipidea: Kick OTG state machine for AVVIS
- with vbus extcon
-In-Reply-To: <20160630012652.GB19928@shlinux2>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-9-stephen.boyd@linaro.org>
- <20160629030913.GC25236@shlinux2>
- <146724959973.16253.818114721999543873@sboyd-linaro>
- <20160630012652.GB19928@shlinux2>
-Message-ID: <AM4PR04MB2130FC1CB79F303F9A533EC689240@AM4PR04MB2130.eurprd04.prod.outlook.com>
+From: yunhui.cui@nxp.com (Yunhui Cui)
+Date: Thu, 30 Jun 2016 01:54:14 +0000
+Subject: [PATCH v2 1/9] mtd:fsl-quadspi:use the property fields of SPI-NOR
+In-Reply-To: <1461307192-866-1-git-send-email-B56489@freescale.com>
+References: <1461307192-866-1-git-send-email-B56489@freescale.com>
+Message-ID: <DB5PR0401MB191200E18A336E0BE5318D1694240@DB5PR0401MB1912.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Brian and Han,
+Could you please give me some comments about this patch set v2 ?
+
+Thanks
 
 > -----Original Message-----
-> From: linux-usb-owner at vger.kernel.org [mailto:linux-usb-
-> owner at vger.kernel.org] On Behalf Of Peter Chen
-> Sent: Thursday, June 30, 2016 9:27 AM
-> To: Stephen Boyd <stephen.boyd@linaro.org>
-> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; linux-arm-msm at vger.kernel.org; Andy Gross
-> <andy.gross@linaro.org>; Bjorn Andersson <bjorn.andersson@linaro.org>;
-> Neil Armstrong <narmstrong@baylibre.com>; Arnd Bergmann <arnd@arndb.de>;
-> Felipe Balbi <balbi@kernel.org>; Peter Chen <peter.chen@nxp.com>; Greg
-> Kroah-Hartman <gregkh@linuxfoundation.org>
-> Subject: Re: [PATCH 08/21] usb: chipidea: Kick OTG state machine for AVVIS
-> with vbus extcon
+> From: Yunhui Cui [mailto:B56489 at freescale.com]
+> Sent: Friday, April 22, 2016 2:40 PM
+> To: dwmw2 at infradead.org; computersforpeace at gmail.com;
+> han.xu at freescale.com
+> Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-
+> arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
+> Subject: [PATCH v2 1/9] mtd:fsl-quadspi:use the property fields of SPI-
+> NOR
 > 
-> On Wed, Jun 29, 2016 at 06:19:59PM -0700, Stephen Boyd wrote:
-> > Quoting Peter Chen (2016-06-28 20:09:13)
-> > > On Sun, Jun 26, 2016 at 12:28:25AM -0700, Stephen Boyd wrote:
-> > > > Force the OTG state machine to go forward when we're using an
-> > > > extcon for vbus detection. In this case, the controller may never
-> > > > raise an interrupt for AVVIS, so we need to simulate the event by
-> > > > toggling the appropriate OTG fsm bits and kicking the state
-> > > > machine again.
-> > > >
-> > >
-> > > Well, I think you may misunderstand the OTG FSM and dual-role.
-> > > From my and Felipe's point, there are seldom users for USB FSM,
-> > > there are only OTG FSM spec and related OTG certification.
-> >
-> > Probably yes.
-> >
-> > >
-> > > The OTG FSM needs related SoC support, the vbus will be off at
-> > > several states, and the SRP should be supported by SoC.
-> > >
-> > > By default, the dts needs below properties for disabling it if you
-> > > choose otg fsm support at kernel configuration.
-> > >
-> > > &usbotg1 {
-> > >         vbus-supply = <&reg_usb_otg1_vbus>;
-> > >         srp-disable;
-> > >         hnp-disable;
-> > >         adp-disable;
-> > >         status = "okay";
-> > > };
-> > >
-> > > See Documentation/devicetree/bindings/usb/generic.txt.
-> >
-> > Does this mean we should be setting all those properties if we're
-> > using an extcon for vbus and id?
+> We can get the read/write/erase opcode from the spi nor framework
+> directly. This patch uses the information stored in the SPI-NOR to remove
+> the hardcode in the fsl_qspi_init_lut().
 > 
-> It is not related to how we know vbus and id. If your controller is otg-
-> capable, and you don't want to enable OTG FSM (just want dual-role), you
-> should set them at dts since the zImage is multi-platforms, the
-> CONFIG_USB_OTG and CONFIG_USB_OTG_FSM may be chosen.
+> Signed-off-by: Yunhui Cui <B56489@freescale.com>
+> Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+> ---
+>  drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------
+> ------
+>  1 file changed, 12 insertions(+), 28 deletions(-)
 > 
-> > I have noticed that vbus is powered off after some time when no device
-> > is connected and we're in A_HOST state because the timeout for a B
-> > device connection happens.
+> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-
+> quadspi.c
+> index 9ab2b51..517ffe2 100644
+> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
+> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+> @@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	void __iomem *base = q->iobase;
+>  	int rxfifo = q->devtype_data->rxfifo;
+>  	u32 lut_base;
+> -	u8 cmd, addrlen, dummy;
+>  	int i;
 > 
-> I think it is not you want, but it is OTG compliance.
-
-For simple, if you don't want OTG(i.e HNP&SRP) at all, just needs
-dual role, you may disable CONFIG_USB_OTG and CONFIG_USB_OTG_FSM
-in your menuconfig, then you don't need touch all those properties.
-
-Li Jun
-
+> +	struct spi_nor *nor = &q->nor[0];
+> +	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
+> +	u8 read_op = nor->read_opcode;
+> +	u8 read_dm = nor->read_dummy;
+> +
+>  	fsl_qspi_unlock_lut(q);
 > 
+>  	/* Clear all the LUT table */
+> @@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	/* Quad Read */
+>  	lut_base = SEQID_QUAD_READ * 4;
+> 
+> -	if (q->nor_size <= SZ_16M) {
+> -		cmd = SPINOR_OP_READ_1_1_4;
+> -		addrlen = ADDR24BIT;
+> -		dummy = 8;
+> -	} else {
+> -		/* use the 4-byte address */
+> -		cmd = SPINOR_OP_READ_1_1_4;
+> -		addrlen = ADDR32BIT;
+> -		dummy = 8;
+> -	}
+> -
+> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
+> +	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
+>  			base + QUADSPI_LUT(lut_base));
+> -	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4,
+> rxfifo),
+> +	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
+> +		    LUT1(FSL_READ, PAD4, rxfifo),
+>  			base + QUADSPI_LUT(lut_base + 1));
+> 
+>  	/* Write enable */
+> @@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	/* Page Program */
+>  	lut_base = SEQID_PP * 4;
+> 
+> -	if (q->nor_size <= SZ_16M) {
+> -		cmd = SPINOR_OP_PP;
+> -		addrlen = ADDR24BIT;
+> -	} else {
+> -		/* use the 4-byte address */
+> -		cmd = SPINOR_OP_PP;
+> -		addrlen = ADDR32BIT;
+> -	}
+> -
+> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
+> +	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
+> +		    LUT1(ADDR, PAD1, addrlen),
+>  			base + QUADSPI_LUT(lut_base));
+>  	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
+>  			base + QUADSPI_LUT(lut_base + 1));
+> @@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	/* Erase a sector */
+>  	lut_base = SEQID_SE * 4;
+> 
+> -	cmd = q->nor[0].erase_opcode;
+> -	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
+> -
+> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
+> +	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
+> +		    LUT1(ADDR, PAD1, addrlen),
+>  			base + QUADSPI_LUT(lut_base));
+> 
+>  	/* Erase the whole chip */
 > --
-> 
-> Best Regards,
-> Peter Chen
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+> 2.1.0.27.g96db324
