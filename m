@@ -1,47 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jun 2016 14:47:10 +0200
-Subject: [PATCH] dmaengine: bcm2835: fix 64-bit warning
-Message-ID: <20160630124845.184259-1-arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 30 Jun 2016 13:51:00 +0100
+Subject: [PATCH 15/15] arm/arm64: KVM: Check that IDMAP doesn't intersect
+ with VA range
+In-Reply-To: <20160628220101.GT26498@cbox>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+ <1465297115-13091-16-git-send-email-marc.zyngier@arm.com>
+ <20160628220101.GT26498@cbox>
+Message-ID: <577515B4.1080301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building this driver on arm64, we get a harmless type
-mismatch warning:
+On 28/06/16 23:01, Christoffer Dall wrote:
+> On Tue, Jun 07, 2016 at 11:58:35AM +0100, Marc Zyngier wrote:
+>> This is more of a safety measure than anything else: If we end-up
+>> with an idmap page that intersect with the range picked for the
+>> the HYP VA space, abort the KVM setup, as it is unsafe to go
+>> further.
+>>
+>> I cannot imagine it happening on 64bit (we have a mechanism to
+>> work around it), but could potentially occur on a 32bit system with
+>> the kernel loaded high enough in memory so that in conflicts with
+>> the kernel VA.
+> 
+> ah, you had a patch for this...
+> 
+> does this even work for enabling the MMU during kernel boot or how do
+> they deal with it?
 
-drivers/dma/bcm2835-dma.c: In function 'bcm2835_dma_fill_cb_chain_with_sg':
-include/linux/kernel.h:743:17: warning: comparison of distinct pointer types lacks a cast
-  (void) (&_min1 == &_min2);  \
-                 ^
-drivers/dma/bcm2835-dma.c:409:21: note: in expansion of macro 'min'
-    cb->cb->length = min(len, max_len);
+As I said in a reply to an earlier patch, this must already taken care
+of by the bootloader, making sure that the kernel physical memory does
+not alias with the VAs. Pretty scary.
 
-This changes the type of the 'len' variable to size_t, which
-avoids the problem.
+> 
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kvm/mmu.c | 15 +++++++++++++++
+>>  1 file changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 46b8604..819517d 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -1708,6 +1708,21 @@ int kvm_mmu_init(void)
+>>  	 */
+>>  	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
+>>  
+>> +	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
+>> +	kvm_info("HYP VA range: %lx:%lx\n",
+>> +		 KERN_TO_HYP(PAGE_OFFSET), KERN_TO_HYP(~0UL));
+>> +
+>> +	if (hyp_idmap_start >= KERN_TO_HYP(PAGE_OFFSET) &&
+>> +	    hyp_idmap_start <  KERN_TO_HYP(~0UL)) {
+> 
+> why is the second part of this clause necessary?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 388cc7a281c0 ("dmaengine: bcm2835: add slave_sg support to bcm2835-dma")
----
- drivers/dma/bcm2835-dma.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+We want to check that our clash avoiding mechanism works.
 
-diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 9ecb94238aaf..e18dc596cf24 100644
---- a/drivers/dma/bcm2835-dma.c
-+++ b/drivers/dma/bcm2835-dma.c
-@@ -393,11 +393,12 @@ static void bcm2835_dma_fill_cb_chain_with_sg(
- 	unsigned int sg_len)
- {
- 	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
--	size_t max_len = bcm2835_dma_max_frame_length(c);
--	unsigned int i, len;
-+	size_t len, max_len;
-+	unsigned int i;
- 	dma_addr_t addr;
- 	struct scatterlist *sgent;
- 
-+	max_len = bcm2835_dma_max_frame_length(c);
- 	for_each_sg(sgl, sgent, sg_len, i) {
- 		for (addr = sg_dma_address(sgent), len = sg_dma_len(sgent);
- 		     len > 0;
+Since we're translating the kernel VA downwards (by clearing the top
+bits), we can definitely end-up in a situation where the idmap is above
+the translated "top of the kernel" (that's the "low mask" option). So it
+is definitely worth checking that we really don't get any aliasing. This
+has been quite useful when debugging this code.
+
+Thanks,
+
+	M.
 -- 
-2.9.0
+Jazz is not dead. It just smells funny...
