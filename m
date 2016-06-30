@@ -1,114 +1,94 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Thu, 30 Jun 2016 17:32:20 +0200
-Subject: [linux-sunxi] [PATCH v2 14/14] ARM: dts: sun8i: Enable DVFS on
- Orange Pi One
-In-Reply-To: <CAOMqctSbJOB67a=LiCZVUb-wUMCpeJPd81OL5epYkC2p5X1T-g@mail.gmail.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-15-megous@megous.com>
- <CAOMqctTe==M1SXxbdR8y33yh51fiFGn+oSaKJXhbnpLVTn-New@mail.gmail.com>
- <834b8045-d99f-74a3-0353-aa84b897351d@megous.com>
- <CAOMqctSbJOB67a=LiCZVUb-wUMCpeJPd81OL5epYkC2p5X1T-g@mail.gmail.com>
-Message-ID: <870784d7-45e8-558d-28d3-75230fcddd2b@megous.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 30 Jun 2016 16:33:19 +0100
+Subject: [Xen-devel] [PATCH v2] xen/arm: register clocks used by the
+ hypervisor
+In-Reply-To: <20160630151523.GA29700@leverpostej>
+References: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
+ <20160630142136.GE20363@leverpostej> <57753328.9060300@gmail.com>
+ <20160630151523.GA29700@leverpostej>
+Message-ID: <57753BBF.5000004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.6.2016 17:16, Michal Suchanek wrote:
-> On 30 June 2016 at 16:19, Ond?ej Jirman <megous@megous.com> wrote:
->> Hello,
->>
->> On 30.6.2016 13:13, Michal Suchanek wrote:
->>> Hello,
+Hi,
+
+On 30/06/16 16:18, Mark Rutland wrote:
+> On Thu, Jun 30, 2016 at 04:56:40PM +0200, Dirk Behme wrote:
+>> On 30.06.2016 16:21, Mark Rutland wrote:
+>>> On Thu, Jun 30, 2016 at 12:32:32PM +0200, Dirk Behme wrote:
+>>>> +- clocks: one or more clocks to be registered.
+>>>> +  Xen hypervisor drivers might replace native drivers, resulting in
+>>>> +  clocks not registered by these native drivers. To avoid that these
+>>>> +  unregistered clocks are disabled, then, e.g. by clk_disable_unused(),
+>>>> +  register them in the hypervisor node.
+>>>> +  An example for this are the clocks of the serial driver. If the clocks
+>>>> +  used by the serial hardware interface are not registered by the serial
+>>>> +  driver the serial output might stop once clk_disable_unused() is called.
 >>>
->>> On 25 June 2016 at 05:45,  <megous@megous.com> wrote:
->>>> From: Ondrej Jirman <megous@megous.com>
->>>>
->>>> Use Xulong Orange Pi One GPIO based regulator for
->>>> passive cooling and thermal management.
->>>>
->>>> Signed-off-by: Ondrej Jirman <megous@megous.com>
->>>> ---
->>>>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 39 +++++++++++++++++++++++++++++
->>>>  1 file changed, 39 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
->>>> index b1bd6b0..a38d871 100644
->>>> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
->>>> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
->>>> @@ -109,6 +109,45 @@
->>>>         };
->>>>  };
->>>>
->>>> +&cpu0 {
->>>> +       operating-points = <
->>>> +               /* kHz    uV */
->>>> +               1296000 1300000
->>>> +               1200000 1300000
+>>> This shouldn't be described in terms of the Linux implementation details
+>>> like clk_disable_unused. Those can change at any time, and don't define
+>>> the contract as such.
+>>
+>> Ok. I remove that from the description. Thanks!
+>
+> Great, thanks.
+>
+>>> What exactly is the contract here? I assume that you don't want the
+>>> kernel to alter the state of these clocks in any way,
+>>
+>> I don't think so. I think what we want is that the kernel just don't
+>> disable the (from kernel's point of view) "unused" clocks. I think
+>> we get this from the fact that using 'clk_ignore_unused' is a
+>> working workaround for this issue.
+>
+> What if the clock (or a parent thereof) is shared with another device?
+>
+> Surely you don't want that other driver to change the rate (changing the
+> rate of the UART behind Xen's back)?
+>
+> I appreciate that clk_ignore_unused might work on platforms today, but
+> that relies on the behaviour of drivers, which might change. It may also
+> not work on other platforms in future, in cases like the above.
+>
+>>> e.g. the rate cannot be changed, they must be left always on, parent
+>>> clocks cannot be altered if that would result in momentary jitter.
 >>>
->>> First problem is that the board boots at 1008000 which is not listed
->>> and the kernel complains.
+>>> I suspect it may be necessary to do more to ensure that, but I'm not
+>>> familiar enough with the clocks subsystem to say.
 >>>
->>> Second problem is that the board locks up during boot with this enabled.
->>>
->>> Do you have some suggestion for alternate configuration to test?
+>>> Are we likely to need to care about regulators, GPIOs, resets, etc? I
+>>> worry that this may be the tip of hte iceberg
 >>
->> Just to verify, did you test with the entire series applied? (especially
->> the PLL1 clk application changes)
-> 
-> Yes, I applied the whole series.
-> 
->>
->> You may try dropping the highest operating point, it's probably overly
->> optimistic for Orange Pi One.
->>
->> Is the power supply/cable you're using hard enough?
-> 
-> I use a 7 port hub to power the board. It worked with some other small
-> devboards.
-> 
-> The cable is some random Chinese USB to power jack adaptor with an
-> extra adaptor to fit the Pi socket. It looks ok but I did not test
-> this particular combination thoroughly.
-> 
->>
->> Where during the boot process does it lock up?
-> 
-> Usually sometime around enabling cpufreq  before getty starts.
-> Different runs and settings give slightly different results. In
-> particular adding the 1008000 point seems to make it go further.
-> 
-> Removing all traces of the regulator, cpufreq and thermal I can boot
-> pretty much 100% to login prompt.
-> 
-> I don't think the difference between 1GHz and 1.3GHz frequency on the
-> core would put much additional stress on the supply but I can try with
-> 35W PSU and some alternative cabling to be sure.
-> 
-> I did some more tests and it seems 1008000 at 1.1V is fine but switching
-> to 1.3V crashes the board. Even with only the first 1.3V state. Maybe
-> there is need for some delay somewhere for the regulator to get
-> stable?
+>> I don't think so. If there is a user in the kernel of the clock,
+>> fine. Then hopefully the user in the kernel knows what he is doing
+>> with the clock and then he should do what ever he wants.
+>
+> I'm not sure that's true. A user of the clock may know nothing about
+> other users. As far as I can see, nothing prevents it from changing the
+> clock rate.
+>
+> While drivers in the same kernel can co-ordinate to avoid problems such
+> as that, we can't do that if we know nothing about the user hidden by
+> Xen.
+>
+>  From looking at the Xen bug tracker, it's not clear which
+> platforms/devices this is necessary for, so it's still not clear to me
+> if we need to care about regulators, GPIOs, resets, and so on.
+>
+> Do we know which platforms in particular we need this for?
 
-Please try adding:
+I believe this is necessary for all the platforms where the UART has a 
+clock described in the firmware.
 
-  regulator-ramp-delay = <10>
+This workaround was first required on the arndale. Note that UART on 
+Juno r2 has a clock described but 'clk_ignore_unused' is not necessary. 
+I am wondering why it is working.
 
-to the gpio regulator.
+The number of devices used by Xen is very limited (UART, timer and 
+SMMU). However we may also want to consider device passthrough where a 
+clock would be handled by another guest.
 
-which will allow 100ms per 1V change, which should b enough for
-determining, if this is the cause.
+Regards,
 
-regards,
-  Ondrej
-
-> Thanks
-> 
-> Michal
-> 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160630/eb238767/attachment.sig>
+-- 
+Julien Grall
