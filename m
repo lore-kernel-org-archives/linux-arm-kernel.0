@@ -1,60 +1,53 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Thu, 30 Jun 2016 12:58:14 +0300
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <e94f58fe-f709-94bd-21f6-144c4e038d17@redhat.com> (Hans de
- Goede's message of "Thu, 30 Jun 2016 11:50:01 +0200")
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
- <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
- <6402170.5s0abZDqlD@wuerfel> <1467230078.2598.2.camel@plaes.org>
- <87eg7f6odi.fsf@kamboji.qca.qualcomm.com>
- <e94f58fe-f709-94bd-21f6-144c4e038d17@redhat.com>
-Message-ID: <87a8i36ls9.fsf@kamboji.qca.qualcomm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 30 Jun 2016 12:01:46 +0200
+Subject: [PATCH] efi: arm64: add debugfs node to dump UEFI runtime page tables
+Message-ID: <1467280906-31158-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hans de Goede <hdegoede@redhat.com> writes:
+Register the debugfs node 'efi_page_tables' to allow the UEFI runtime
+page tables to be inspected. Note that ARM does not have 'asm/ptdump.h'
+[yet] so for now, this is arm64 only.
 
-> Hi,
->
-> On 30-06-16 11:02, Kalle Valo wrote:
->> Priit Laes <plaes@plaes.org> writes:
->>
->>>> What is the size of this nvram file? As it's board specific, I wonder
->>>> if we can simply include it inside of the DT verbatim. I remember
->>>> doing that (in the pre-dtb days, on real open firmware) for the
->>>> "spidernet"
->>>> ethernet driver.
->>>
->>> It contains a bit too much info:
->>>
->>> This is what CubieTruck requires:
->>>
->>> http://dl.cubieboard.org/public/Cubieboard/benn/firmware/ap6210/nvram_ap6210.txt
->>
->> In the nvram file I see lots of identifiers:
->>
->> manfid=0x2d0
->> prodid=0x492
->> vendid=0x14e4
->> devid=0x4343
->> boardtype=0x0598
->> boardrev=0x1307
->> boardnum=777
->>
->> Are any of these (or a combination of them) unique for each board type?
->> What if one of these is provided through DT and then the driver could
->> choose the nvram file based on the board id? Just another idea...
->
-> That would require updating a table in the driver every time a new
-> board comes out, I do not believe that that is a good solution.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-You don't necessarily need to have a table in the driver if you embed
-the id to the filename, for example something like this:
+This patch could be helpful in assessing the series 'arm64: avoid block
+entries that we need to split later' that I sent out yesterday.
 
-nvram-0598-1307.txt
-nvram-<boardtype>-<boardrev>.txt
+ drivers/firmware/efi/arm-runtime.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
+diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+index 17ccf0a8787a..4197a1da013d 100644
+--- a/drivers/firmware/efi/arm-runtime.c
++++ b/drivers/firmware/efi/arm-runtime.c
+@@ -39,6 +39,26 @@ static struct mm_struct efi_mm = {
+ 	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
+ };
+ 
++#ifdef CONFIG_ARM64
++#include <asm/ptdump.h>
++
++static struct ptdump_info efi_ptdump_info = {
++	.mm		= &efi_mm,
++	.markers	= (struct addr_marker[]){
++		{ 0,		"UEFI runtime start" },
++		{ TASK_SIZE_64,	"UEFI runtime end" }
++	},
++	.base_addr	= 0,
++};
++
++static int __init ptdump_init(void)
++{
++	return ptdump_register(&efi_ptdump_info, "efi_page_tables");
++}
++device_initcall(ptdump_init);
++
++#endif
++
+ static bool __init efi_virtmap_init(void)
+ {
+ 	efi_memory_desc_t *md;
 -- 
-Kalle Valo
+2.7.4
