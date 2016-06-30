@@ -1,107 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:16:11 +0200
-Subject: [PATCH 4/5] soc: renesas: rcar-sysc: Move SYSC interrupt config to
- rcar-sysc driver
-In-Reply-To: <cover.1467292648.git.horms+renesas@verge.net.au>
-References: <cover.1467292648.git.horms+renesas@verge.net.au>
-Message-ID: <053239987f89f9a6299e78610bad010764bccd71.1467292648.git.horms+renesas@verge.net.au>
+Date: Thu, 30 Jun 2016 16:16:22 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.8
+Message-ID: <cover.1467293089.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On R-Car H1 and Gen2, the SYSC interrupt registers are always configured
-using hardcoded values in platform code. For R-Car Gen2, values are
-provided for H2 and M2-W only, other SoCs are not yet supported, and
-never will be.
+Please consider these second round of Renesas ARM based SoC updates for v4.8.
 
-Move this configuration from SoC-specific platform code to the
-rcar_sysc_init() wrapper, so it can be skipped if the SYSC is configured
-from DT. This would be the case not only for H1, H2, and M2-W using a
-modern DTS, but also for other R-Car Gen2 SoCs not supported by the
-platform code, relying purely on DT.
+This pull request is based on a merge of:
 
-There is no longer a need to return the mapped register block, hence
-make the function return void.
+* This pull request is based on the previous round of
+  such requests, tagged as renesas-soc-for-v4.8,
+  which you have already pulled.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/pm-r8a7779.c   |  6 +-----
- arch/arm/mach-shmobile/pm-rcar-gen2.c |  6 +-----
- drivers/soc/renesas/rcar-sysc.c       | 12 ++++++++----
- include/linux/soc/renesas/rcar-sysc.h |  2 +-
- 4 files changed, 11 insertions(+), 15 deletions(-)
+* "Second Round of Renesas ARM Based SoC R-Car SYSC Updates for v4.8",
+  tagged as renesas-rcar-sysc2-for-v4.8,
+  which I have also sent a pull request for.
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
-index 4174cbcbc467..5c9a93f5e650 100644
---- a/arch/arm/mach-shmobile/pm-r8a7779.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7779.c
-@@ -23,11 +23,7 @@
- 
- static void __init r8a7779_sysc_init(void)
- {
--	void __iomem *base = rcar_sysc_init(0xffd85000);
--
--	/* enable all interrupt sources, but do not use interrupt handler */
--	iowrite32(0x0131000e, base + SYSCIER);
--	iowrite32(0, base + SYSCIMR);
-+	rcar_sysc_init(0xffd85000, 0x0131000e);
- }
- 
- #else /* CONFIG_PM || CONFIG_SMP */
-diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-index 691ac166a277..7768fd1bce65 100644
---- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-@@ -37,11 +37,7 @@
- 
- static void __init rcar_gen2_sysc_init(u32 syscier)
- {
--	void __iomem *base = rcar_sysc_init(0xe6180000);
--
--	/* enable all interrupt sources, but do not use interrupt handler */
--	iowrite32(syscier, base + SYSCIER);
--	iowrite32(0, base + SYSCIMR);
-+	rcar_sysc_init(0xe6180000, syscier);
- }
- 
- #else /* CONFIG_SMP */
-diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 68d6856c9d3c..22f0d646225c 100644
---- a/drivers/soc/renesas/rcar-sysc.c
-+++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -400,10 +400,14 @@ out_put:
- }
- early_initcall(rcar_sysc_pd_init);
- 
--void __iomem * __init rcar_sysc_init(phys_addr_t base)
-+void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
- {
--	if (rcar_sysc_pd_init())
--		rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
-+	if (!rcar_sysc_pd_init())
-+		return;
- 
--	return rcar_sysc_base;
-+	rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
-+
-+	/* enable all interrupt sources, but do not use interrupt handler */
-+	iowrite32(syscier, rcar_sysc_base + SYSCIER);
-+	iowrite32(0, rcar_sysc_base + SYSCIMR);
- }
-diff --git a/include/linux/soc/renesas/rcar-sysc.h b/include/linux/soc/renesas/rcar-sysc.h
-index 92fc613ab23d..7b8b280c181b 100644
---- a/include/linux/soc/renesas/rcar-sysc.h
-+++ b/include/linux/soc/renesas/rcar-sysc.h
-@@ -11,6 +11,6 @@ struct rcar_sysc_ch {
- 
- int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
- int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
--void __iomem *rcar_sysc_init(phys_addr_t base);
-+void rcar_sysc_init(phys_addr_t base, u32 syscier);
- 
- #endif /* __LINUX_SOC_RENESAS_RCAR_SYSC_H__ */
--- 
-2.7.0.rc3.207.g0ac5344
+  This provides run-time dependencies for APMU patches in this series
+  and prevents a regression in the absence of complementary DT updates.
+
+
+The following changes since commit f0aa411de83c096e09cf46b9ea0d68a1eeab4863:
+
+  Merge branch 'rcar-sysc-for-v4.8' into HEAD (2016-06-29 14:41:43 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v4.8
+
+for you to fetch changes up to f89a51700d7ae0ef58956a8c8f0e2c68767bcdae:
+
+  ARM: shmobile: r8a7791: Prioritize DT APMU support (2016-06-29 14:43:40 +0200)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v4.8
+
+* Add DT support to the APMU driver and prioritise DT APMU support
+* Obtain extal frequency from DT
+* Add support for r8a7792
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: rcar-gen2: Obtain extal frequency from DT
+      ARM: shmobile: rcar-gen2: Correct arch timer frequency on R-Car V2H
+      ARM: shmobile: apmu: Move #ifdef CONFIG_SMP to cover more functions
+
+Magnus Damm (4):
+      ARM: shmobile: apmu: Add APMU DT support via Enable method
+      ARM: shmobile: smp: Add function to prioritize DT SMP
+      ARM: shmobile: r8a7790: Prioritize DT APMU support
+      ARM: shmobile: r8a7791: Prioritize DT APMU support
+
+Sergei Shtylyov (1):
+      ARM: shmobile: r8a7792: basic SoC support
+
+ arch/arm/mach-shmobile/Kconfig           |  4 ++
+ arch/arm/mach-shmobile/Makefile          |  1 +
+ arch/arm/mach-shmobile/common.h          |  1 +
+ arch/arm/mach-shmobile/platsmp-apmu.c    | 94 ++++++++++++++++++++++++++++++--
+ arch/arm/mach-shmobile/platsmp.c         |  6 ++
+ arch/arm/mach-shmobile/setup-r8a7790.c   |  1 +
+ arch/arm/mach-shmobile/setup-r8a7791.c   |  1 +
+ arch/arm/mach-shmobile/setup-r8a7792.c   | 35 ++++++++++++
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 45 ++++++++-------
+ 9 files changed, 162 insertions(+), 26 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/setup-r8a7792.c
