@@ -1,44 +1,88 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jun 2016 18:40:37 +0100
-Subject: [PATCH v2 04/18] arm64: KVM: Kill HYP_PAGE_OFFSET
-In-Reply-To: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
-References: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1467308451-13365-5-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 30 Jun 2016 18:40:33 +0100
+Subject: [PATCH v2 00/18] arm/arm64: KVM: Merge boot and runtime page tables
+Message-ID: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HYP_PAGE_OFFSET is not massively useful. And the way we use it
-in KERN_HYP_VA is inconsistent with the equivalent operation in
-EL2, where we use a mask instead.
+Until now, we've been setting up KVM using two sets of page tables:
+one for the "boot" where we perform the basic MMU setup, and one for
+the runtime.
 
-Let's replace the uses of HYP_PAGE_OFFSET with HYP_PAGE_OFFSET_MASK,
-and get rid of the pointless macro.
+Switching between the two was though to be safe, but we've recently
+realized that it is not: it is not enough to ensure that the VA->PA
+mapping is consistent when switching TTBR0_EL2, but we also have to
+ensure that the intermediate translations are the same as well. If the
+TLB can return two different values for intermediate translations,
+we're screwed (TLB conflicts).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/kvm_mmu.h | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+At that point, the only safe thing to do is to never change TTBR0_EL2,
+which means that we need to make the idmap page part of the runtime
+page tables.
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 6149dfc..2f1e1ae 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -70,7 +70,6 @@
-  */
- #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
- #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
--#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
- 
- /*
-  * Our virtual mapping for the idmap-ed MMU-enable code. Must be
-@@ -104,7 +103,7 @@ alternative_endif
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- 
--#define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
-+#define KERN_TO_HYP(kva)	((unsigned long)kva & HYP_PAGE_OFFSET_MASK)
- 
- /*
-  * We currently only support a 40bit IPA.
+The series starts with a bit of brain dumping explaining what we're
+trying to do. This might not be useful as a merge candidate, but it
+was useful for me to put this somewhere. It goes on revamping the
+whole notion of HYP VA range, making it runtime patchable. It then
+always merge idmap and runtime page table into one set, leading to
+quite a lot of simplification in the init/teardown code. In the
+process, 32bit KVM gains the ability to teardown the HYP page-tables
+and vectors, which makes kexec a bit closer.
+
+This has been tested on Seattle, Juno, the FVP model (both v8.0 and
+v8.1), Cubietruck and Midway, and is based on the current
+kvmarm/queue.
+
+Thanks,
+
+	M.
+
+* From v1:
+  - Small changes to documentation patch, thanks to Christoffer
+  - Removed hyp_kern_va altogether
+  - Removed KERN_TO_HYP and used kern_hyp_va everywhere
+  - Rebased on top of kvmarm/queue as of today
+
+Marc Zyngier (18):
+  arm64: KVM: Merged page tables documentation
+  arm64: KVM: Always reference __hyp_panic_string via its kernel VA
+  arm/arm64: KVM: Remove hyp_kern_va helper
+  arm64: KVM: Kill HYP_PAGE_OFFSET
+  arm64: Add ARM64_HYP_OFFSET_LOW capability
+  arm64: KVM: Define HYP offset masks
+  arm64: KVM: Refactor kern_hyp_va to deal with multiple offsets
+  arm/arm64: KVM: Export __hyp_text_start/end symbols
+  arm64: KVM: Runtime detection of lower HYP offset
+  arm/arm64: KVM: Always have merged page tables
+  arm64: KVM: Simplify HYP init/teardown
+  arm/arm64: KVM: Drop boot_pgd
+  arm/arm64: KVM: Kill free_boot_hyp_pgd
+  arm: KVM: Simplify HYP init
+  arm: KVM: Allow hyp teardown
+  arm/arm64: KVM: Prune unused #defines
+  arm/arm64: KVM: Check that IDMAP doesn't intersect with VA range
+  arm/arm64: Get rid of KERN_TO_HYP
+
+ arch/arm/include/asm/kvm_asm.h      |   2 +
+ arch/arm/include/asm/kvm_host.h     |  25 +++----
+ arch/arm/include/asm/kvm_hyp.h      |   3 -
+ arch/arm/include/asm/kvm_mmu.h      |  13 +---
+ arch/arm/include/asm/virt.h         |   4 ++
+ arch/arm/kvm/arm.c                  |  20 ++----
+ arch/arm/kvm/init.S                 |  56 ++++++---------
+ arch/arm/kvm/mmu.c                  | 137 ++++++++++++++++--------------------
+ arch/arm64/include/asm/cpufeature.h |   3 +-
+ arch/arm64/include/asm/kvm_host.h   |  17 ++---
+ arch/arm64/include/asm/kvm_hyp.h    |  23 ------
+ arch/arm64/include/asm/kvm_mmu.h    |  94 ++++++++++++++++++++-----
+ arch/arm64/include/asm/virt.h       |   4 ++
+ arch/arm64/kernel/cpufeature.c      |  19 +++++
+ arch/arm64/kvm/hyp-init.S           |  61 +++-------------
+ arch/arm64/kvm/hyp/entry.S          |  19 -----
+ arch/arm64/kvm/hyp/hyp-entry.S      |  15 ++++
+ arch/arm64/kvm/hyp/switch.c         |  11 ++-
+ arch/arm64/kvm/reset.c              |  28 --------
+ 19 files changed, 238 insertions(+), 316 deletions(-)
+
 -- 
 2.1.4
