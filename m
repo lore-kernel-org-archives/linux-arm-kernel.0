@@ -1,45 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:30 +0200
-Subject: [PATCH 10/41] ARM: dts: koelsch: Name spi pfc subnodes after device
- names
+Date: Thu, 30 Jun 2016 16:15:23 +0200
+Subject: [PATCH 03/41] ARM: dts: armadillo800eva: Name serial port pfc subnode
+ after device name
 In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
 References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <a4d98bed5e697333e5dcf74503cdf560229f69bc.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <94667b193c67b3510e644a61243155c234b9f87d.1467294011.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Name the Pin Function Controller subnodes for QSPI and MSIOF0 after
-their device names, instead of after the spi interface aliases.
+Name the Pin Function Controller subnode for SCIFA1 after its device
+name, instead of after the serial port alias.
 
-This avoids conflicts when enabling support for more spi interfaces
-later, either here or in a DT overlay.
+This avoids conflicts when enabling support for more serial ports later,
+either here or in a DT overlay.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 73e5ecf036e1..f8a7d090fd01 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -372,12 +372,12 @@
- 		function = "sdhi2";
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+index 162049516685..6866f61a350c 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+@@ -232,7 +232,7 @@
+ 		function = "gether";
  	};
  
--	qspi_pins: spi0 {
-+	qspi_pins: qspi {
- 		groups = "qspi_ctrl", "qspi_data4";
- 		function = "qspi";
+-	scifa1_pins: serial1 {
++	scifa1_pins: scifa1 {
+ 		groups = "scifa1_data";
+ 		function = "scifa1";
  	};
- 
--	msiof0_pins: spi1 {
-+	msiof0_pins: msiof0 {
- 		groups = "msiof0_clk", "msiof0_sync", "msiof0_rx",
- 				 "msiof0_tx";
- 		function = "msiof0";
 -- 
 2.7.0.rc3.207.g0ac5344
