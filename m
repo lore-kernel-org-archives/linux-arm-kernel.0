@@ -1,104 +1,55 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 30 Jun 2016 11:09:30 +0100
-Subject: [PATCH v7 00/17] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <DB5PR04MB0997B9A41C3C79F45CAC6C989A230@DB5PR04MB0997.eurprd04.prod.outlook.com>
-References: <20160628123230.26255-1-andre.przywara@arm.com>
- <DB5PR04MB0997B9A41C3C79F45CAC6C989A230@DB5PR04MB0997.eurprd04.prod.outlook.com>
-Message-ID: <eab8b632-1a00-9a0c-808d-55d5cc161c22@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 30 Jun 2016 18:14:30 +0800
+Subject: [arm-platforms:irq/irqchip-4.8 16/17]
+ drivers/irqchip/irq-gic.c:101:2: error: implicit declaration of function
+ 'raw_spin_lock_irqrestore'
+Message-ID: <201606301829.16okLsBB%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irqchip-4.8
+head:   f3e9ce36e639f247425f72b4866909367441b4c8
+commit: 7e7426522047645e9b02d9f8eaf4911c3cc1388f [16/17] irqchip: gic: Make locking a BL_SWITCHER only feature
+config: arm-exynos_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 7e7426522047645e9b02d9f8eaf4911c3cc1388f
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-On 29/06/16 05:43, Bharat Bhushan wrote:
-> 
-> 
->> -----Original Message-----
->> From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-
->> bounces at lists.cs.columbia.edu] On Behalf Of Andre Przywara
->> Sent: Tuesday, June 28, 2016 6:02 PM
->> To: Marc Zyngier <marc.zyngier@arm.com>; Christoffer Dall
->> <christoffer.dall@linaro.org>; Eric Auger <eric.auger@redhat.com>
->> Cc: linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
->> kvm at vger.kernel.org
->> Subject: [PATCH v7 00/17] KVM: arm64: GICv3 ITS emulation
->>
->> Hi,
->>
->> another try on the KVM ITS emulation support.
->> It allows those KVM guests that use an emulated GICv3 to use LPIs as well,
->> though in the moment this is limited to emulated PCI devices.
->> This is based on kvm-arm-for-v4.7-rc2 and relies on the new VGIC
->> implementation.
->>
->> Compared to the last drop there have been some changes to the code:
->> The reference counting has been rewritten to use the kref infrastructure.
->> This has some implications on the rest of the code, for instance the locking
->> for the LPI list got changed. There is no RCU usage anymore, instead the LPI
->> list is now protected by a spinlock. To overcome the problem where we need
->> to access guest memory while holding the lock, we create a snapshot of the
->> LPI list, so we can iterate over LPIs with the lock dropped.
->> Also the base register sanitisation has been reworked completely, which
->> includes some changes to the arm-gic-v3.h header file (as a separate patch
->> 07/17). I hope I covered all the subtleties of those bits.
->> Also the MMIO framework saw some changes, we now tag the different GIC
->> regions explicitly and are able to call the different handlers explicitly.
->> Also Patch 05/17 extends the kvm-io-bus framework with a small function to
->> get the kvm_io_device structure for a given MMIO address. This allows us to
->> keep the knowledge of all the ITSes in this framework, but still get the
->> respective ITS pointer easily without reverting to "fake" MMIO accesses.
->> Also all the smaller review comments have been addressed.
->>
->> You can find all of this code (and the prerequisites) in the
->> its-emul/v7 branch of my repository [1].
->> This has been briefly tested on the model and on GICv3 hardware.
->> If you have GICv3 capable hardware, please test it on your setup.
-> 
-> We have GICv3 capable hardware and we can test these on that.
-> How you are testing these changes? QEMU side changes are also required, can you share those changes?
+All error/warnings (new ones prefixed by >>):
 
-I don't have any QEMU patches, that is on Linaro's plate, as far as I
-can tell. I don't know what the status is there. For real patches we
-would need to agree on the userland interface, I guess.
-However hacking something in QEMU shouldn't be too hard, you basically
-have to inject the ITS DT node and reserve some space in the memory map.
-Then tell QEMU to use KVM_SIGNAL_MSI to trigger IRQs.
-You can look at the kvmtool patches to get an idea on what to cover.
+   drivers/irqchip/irq-gic.c: In function 'gic_set_affinity':
+>> drivers/irqchip/irq-gic.c:101:2: error: implicit declaration of function 'raw_spin_lock_irqrestore' [-Werror=implicit-function-declaration]
+     raw_spin_lock_irqrestore(&cpu_map_lock, (f))
+     ^
+>> drivers/irqchip/irq-gic.c:345:2: note: in expansion of macro 'gic_unlock_irqrestore'
+     gic_unlock_irqrestore(flags);
+     ^
+   cc1: some warnings being treated as errors
 
-Further below I gave some hints on testing this series with kvmtool.
+vim +/raw_spin_lock_irqrestore +101 drivers/irqchip/irq-gic.c
 
-....
+    95	
+    96	static DEFINE_RAW_SPINLOCK(cpu_map_lock);
+    97	
+    98	#define gic_lock_irqsave(f)		\
+    99		raw_spin_lock_irqsave(&cpu_map_lock, (f))
+   100	#define gic_unlock_irqrestore(f)	\
+ > 101		raw_spin_lock_irqrestore(&cpu_map_lock, (f))
+   102	
+   103	#define gic_lock()			raw_spin_lock(&cpu_map_lock)
+   104	#define gic_unlock()			raw_spin_unlock(&cpu_map_lock)
 
->>
->> For the time being this series gives us the ability to use emulated PCI devices
->> that can use MSIs in the guest. Those have to be triggered by letting the
->> userland device emulation simulate the MSI write with the
->> KVM_SIGNAL_MSI ioctl. This will be translated into the proper LPI by the ITS
->> emulation and injected into the guest in the usual way (just with a higher IRQ
->> number).
->>
->> This series is based on kvm-arm-for-v4.7-rc2 and can be found at the
->> its-emul/v7 branch of this repository [1].
->> For this to be used you need a GICv3 host machine (a fast model would do),
->> though it does not rely on any host ITS bits (neither in hardware or software).
->>
->> To test this you can use the kvmtool patches available in the "its-v6"
->> branch here [2].
->> Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
->> and see the ITS being used for instance by the virtio devices.
-
-^^^^ here you go.
-
-Cheers,
-Andre.
-
->>
->> [1]: git://linux-arm.org/linux-ap.git
->>      http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-
->> emul/v7
->> [2]: git://linux-arm.org/kvmtool.git
->>      http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its-v6
->> [3]:
->> http://arminfo.emea.arm.com/help/topic/com.arm.doc.ihi0069a/IHI0069A_g
->> ic_architecture_specification.pdf
->>
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 24944 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160630/c534140c/attachment-0001.obj>
