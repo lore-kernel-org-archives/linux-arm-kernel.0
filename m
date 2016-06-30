@@ -1,46 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:45 +0200
-Subject: [PATCH 25/41] ARM: dts: r8a7792: add IRQC support
-In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
-References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <56efdbe56bc674208d01e3afdfb47f6b5b90da3d.1467294011.git.horms+renesas@verge.net.au>
+Date: Thu, 30 Jun 2016 16:16:19 +0200
+Subject: [PATCH 3/8] ARM: shmobile: rcar-gen2: Correct arch timer frequency on
+ R-Car V2H
+In-Reply-To: <cover.1467293089.git.horms+renesas@verge.net.au>
+References: <cover.1467293089.git.horms+renesas@verge.net.au>
+Message-ID: <2477a356dd245bbbde74c81edc5f16a6d8192023.1467293089.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Describe the IRQC interrupt controller in the R8A7792 device tree.
+According to the datasheet, the frequency of the ARM architecture timer
+on R-Car V2H depends on the frequency of the ZS clock, just like on
+R-Car E2.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index b6e34b431a51..18b4e50521c3 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -61,6 +61,19 @@
- 				      IRQ_TYPE_LEVEL_HIGH)>;
- 		};
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index ea092d5dd475..afb9fdcd3d90 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -76,7 +76,8 @@ void __init rcar_gen2_timer_init(void)
+ 	void __iomem *base;
+ 	u32 freq;
  
-+		irqc: interrupt-controller at e61c0000 {
-+			compatible = "renesas,irqc-r8a7792", "renesas,irqc";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			reg = <0 0xe61c0000 0 0x200>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp4_clks R8A7792_CLK_IRQC>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
- 		timer {
- 			compatible = "arm,armv7-timer";
- 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+-	if (of_machine_is_compatible("renesas,r8a7794")) {
++	if (of_machine_is_compatible("renesas,r8a7792") ||
++	    of_machine_is_compatible("renesas,r8a7794")) {
+ 		freq = 260000000 / 8;	/* ZS / 8 */
+ 		/* CNTVOFF has to be initialized either from non-secure
+ 		 * Hypervisor mode or secure Monitor mode with SCR.NS==1.
 -- 
 2.7.0.rc3.207.g0ac5344
