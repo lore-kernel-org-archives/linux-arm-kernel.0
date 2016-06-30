@@ -1,102 +1,58 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 30 Jun 2016 19:52:55 +0200
-Subject: [PATCH v3 1/4] arm64: dts: rockchip: add VOP and VOP iommu node
- for rk3399
-In-Reply-To: <CAD=FV=URVQTvEKQbUVOXyMnO1a-kGs9inX_AZY3vo_YxXD5-5w@mail.gmail.com>
-References: <1466564038-18021-1-git-send-email-ykk@rock-chips.com>
- <1466564069-18220-1-git-send-email-ykk@rock-chips.com>
- <CAD=FV=URVQTvEKQbUVOXyMnO1a-kGs9inX_AZY3vo_YxXD5-5w@mail.gmail.com>
-Message-ID: <2805834.mM1g2PPkiI@phil>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 30 Jun 2016 19:54:56 +0200
+Subject: Boot failure on emev2/kzm9d (was: Re: [PATCH v2 11/11] mm/slab:
+ lockless decision to grow cache)
+In-Reply-To: <20160630165248.GB4650@linux.vnet.ibm.com>
+References: <CAMuHMdVqNV5ZbR3_NV5ZsLxoNQUXXGpfAcaoMJffaJbRPUb6-A@mail.gmail.com>
+ <20160629164415.GG4650@linux.vnet.ibm.com>
+ <CAMuHMdUfQ-gBqjZGvawf5zxgb-0UnWb+fzD-kcWU+kavwvadgQ@mail.gmail.com>
+ <20160629181208.GP4650@linux.vnet.ibm.com>
+ <20160630074710.GC30114@js1304-P5Q-DELUXE>
+ <CAMuHMdVx4p9=CNCwZuuUyxsYZGN7VPs7F+RbysQjYGSY25TPQA@mail.gmail.com>
+ <20160630132401.GT4650@linux.vnet.ibm.com>
+ <CAMuHMdVTX3ojMsO5Mv++pA5r+st4yBTTo39QTbV-FxPmJ7fbkQ@mail.gmail.com>
+ <20160630151838.GW4650@linux.vnet.ibm.com>
+ <alpine.DEB.2.10.1606301752410.6474@ayla.of.borg>
+ <20160630165248.GB4650@linux.vnet.ibm.com>
+Message-ID: <CAMuHMdVRpbVSJmVqqwEiZUJq+q5vt6Me+O72i_8Y2pAPtkLY7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 30. Juni 2016, 10:45:21 schrieb Doug Anderson:
-> Hi
-> 
-> On Tue, Jun 21, 2016 at 7:54 PM, Yakir Yang <ykk@rock-chips.com> wrote:
-> > From: Mark Yao <mark.yao@rock-chips.com>
-> > 
-> > Add the core display-subsystem node and the two display controllers
-> > available on the rk3399.
-> > 
-> > Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> > Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> > ---
-> > Changes in v3: None
-> > Changes in v2:
-> > - provide some minimal patch description (Heiko)
-> > 
-> >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 58
-> >  ++++++++++++++++++++++++++++++++ 1 file changed, 58 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 46f325a..54e5c25
-> > 100644
-> > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > @@ -543,6 +543,64 @@
-> > 
-> >                 status = "disabled";
-> >         
-> >         };
-> > 
-> > +       vopl: vop at ff8f0000 {
-> > +               compatible = "rockchip,rk3399-vop-lit";
-> > +               reg = <0x0 0xff8f0000 0x0 0x3efc>;
-> > +               interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
-> > +               clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru
-> > HCLK_VOP1>; +               clock-names = "aclk_vop", "dclk_vop",
-> > "hclk_vop";
-> Note that if this lands after Elaine / Caesar's patch ("arm64: dts:
-> rockchip: add the power domain node for rk3399")
-> <https://patchwork.kernel.org/patch/9206415/> then you need to respin
-> adding powerdomain references here for correctness.
-> 
-> If this lands before Elaine / Caesar's patch then the other patch
-> needs to be re-spun.  ;)
+Hi Paul,
 
-so far I haven't seen any activity on the drm-driver patches.
-Mark (Yao), what happened to your rk3399 vop patches back from April?
+On Thu, Jun 30, 2016 at 6:52 PM, Paul E. McKenney
+<paulmck@linux.vnet.ibm.com> wrote:
+> On Thu, Jun 30, 2016 at 05:53:42PM +0200, Geert Uytterhoeven wrote:
+>> +void rcu_dump_rcu_sched_tree(void)
+>> +{
+>> +     struct rcu_head rh;
+>> +     unsigned long flags;
+>> +
+>> +     rcu_dump_rcu_node_tree(&rcu_sched_state);  /* Initial state. */
+>> +     local_irq_save(flags);
+>> +     // call_rcu(&rh, do_nothing_cb);
+>> +     local_irq_restore(flags);
+>> +     // schedule_timeout_uninterruptible(5 * HZ);  /* Or whatever delay. */
+>> +     rcu_dump_rcu_node_tree(&rcu_sched_state); /* GP state. */
+>> +     //synchronize_sched();  /* Probably hangs. */
+>> +     //rcu_barrier();  /* Drop RCU's references to rh before return. */
+>> +}
 
-Timing-wise I guess we'll do power-domains first, then display. Especially 
-as neither vop nor edp patches have so far appeared in linux-next.
+>>
+>> When enabling any of the 4 commented-out lines in rcu_dump_rcu_sched_tree(),
+>> it will lock up.
+>
+> OK, but that includes schedule_timeout_uninterruptible(5 * HZ), right?
 
+Yes it does.
 
-Heiko
+Gr{oetje,eeting}s,
 
+                        Geert
 
-> 
-> > +               resets = <&cru SRST_A_VOP1>, <&cru SRST_H_VOP1>, <&cru
-> > SRST_D_VOP1>; +               reset-names = "axi", "ahb", "dclk";
-> > +               iommus = <&vopl_mmu>;
-> > +               status = "disabled";
-> > +
-> > +               vopl_out: port {
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <0>;
-> > +               };
-> > +       };
-> > +
-> > +       vopl_mmu: iommu at ff8f3f00 {
-> > +               compatible = "rockchip,iommu";
-> > +               reg = <0x0 0xff8f3f00 0x0 0x100>;
-> > +               interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
-> > +               interrupt-names = "vopl_mmu";
-> > +               #iommu-cells = <0>;
-> > +               status = "disabled";
-> > +       };
-> > +
-> > +       vopb: vop at ff900000 {
-> > +               compatible = "rockchip,rk3399-vop-big";
-> > +               reg = <0x0 0xff900000 0x0 0x3efc>;
-> > +               interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-> > +               clocks = <&cru ACLK_VOP0>, <&cru DCLK_VOP0>, <&cru
-> > HCLK_VOP0>; +               clock-names = "aclk_vop", "dclk_vop",
-> > "hclk_vop";
-> Here too, obviously.
-> 
-> 
-> See <http://crosreview.com/356623> for reference.
-> 
-> 
-> -Doug
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
