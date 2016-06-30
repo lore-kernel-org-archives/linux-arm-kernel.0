@@ -1,55 +1,122 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 30 Jun 2016 18:14:30 +0800
-Subject: [arm-platforms:irq/irqchip-4.8 16/17]
- drivers/irqchip/irq-gic.c:101:2: error: implicit declaration of function
- 'raw_spin_lock_irqrestore'
-Message-ID: <201606301829.16okLsBB%fengguang.wu@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 30 Jun 2016 11:16:44 +0100
+Subject: [PATCH 05/15] arm64: KVM: Refactor kern_hyp_va/hyp_kern_va to
+ deal with multiple offsets
+In-Reply-To: <5774E4CE.8020200@arm.com>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+ <1465297115-13091-6-git-send-email-marc.zyngier@arm.com>
+ <20160628124210.GP26498@cbox> <5774E4CE.8020200@arm.com>
+Message-ID: <5774F18C.7030603@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irqchip-4.8
-head:   f3e9ce36e639f247425f72b4866909367441b4c8
-commit: 7e7426522047645e9b02d9f8eaf4911c3cc1388f [16/17] irqchip: gic: Make locking a BL_SWITCHER only feature
-config: arm-exynos_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 7e7426522047645e9b02d9f8eaf4911c3cc1388f
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 30/06/16 10:22, Marc Zyngier wrote:
+> On 28/06/16 13:42, Christoffer Dall wrote:
+>> On Tue, Jun 07, 2016 at 11:58:25AM +0100, Marc Zyngier wrote:
+>>> As we move towards a selectable HYP VA range, it is obvious that
+>>> we don't want to test a variable to find out if we need to use
+>>> the bottom VA range, the top VA range, or use the address as is
+>>> (for VHE).
+>>>
+>>> Instead, we can expand our current helpers to generate the right
+>>> mask or nop with code patching. We default to using the top VA
+>>> space, with alternatives to switch to the bottom one or to nop
+>>> out the instructions.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  arch/arm64/include/asm/kvm_hyp.h | 27 ++++++++++++--------------
+>>>  arch/arm64/include/asm/kvm_mmu.h | 42 +++++++++++++++++++++++++++++++++++++---
+>>>  2 files changed, 51 insertions(+), 18 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+>>> index 61d01a9..dd4904b 100644
+>>> --- a/arch/arm64/include/asm/kvm_hyp.h
+>>> +++ b/arch/arm64/include/asm/kvm_hyp.h
+>>> @@ -25,24 +25,21 @@
+>>>  
+>>>  #define __hyp_text __section(.hyp.text) notrace
+>>>  
+>>> -static inline unsigned long __kern_hyp_va(unsigned long v)
+>>> -{
+>>> -	asm volatile(ALTERNATIVE("and %0, %0, %1",
+>>> -				 "nop",
+>>> -				 ARM64_HAS_VIRT_HOST_EXTN)
+>>> -		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
+>>> -	return v;
+>>> -}
+>>> -
+>>> -#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
+>>> -
+>>>  static inline unsigned long __hyp_kern_va(unsigned long v)
+>>>  {
+>>> -	asm volatile(ALTERNATIVE("orr %0, %0, %1",
+>>> -				 "nop",
+>>> +	u64 mask;
+>>> +
+>>> +	asm volatile(ALTERNATIVE("mov %0, %1",
+>>> +				 "mov %0, %2",
+>>> +				 ARM64_HYP_OFFSET_LOW)
+>>> +		     : "=r" (mask)
+>>> +		     : "i" (~HYP_PAGE_OFFSET_HIGH_MASK),
+>>> +		       "i" (~HYP_PAGE_OFFSET_LOW_MASK));
+>>> +	asm volatile(ALTERNATIVE("nop",
+>>> +				 "mov %0, xzr",
+>>>  				 ARM64_HAS_VIRT_HOST_EXTN)
+>>> -		     : "+r" (v) : "i" (~HYP_PAGE_OFFSET_MASK));
+>>> -	return v;
+>>> +		     : "+r" (mask));
+>>> +	return v | mask;
+>>
+>> If mask is ~HYP_PAGE_OFFSET_LOW_MASK how can you be sure that setting
+>> bit (VA_BITS - 1) is always the right thing to do to generate a kernel
+>> address?
+> 
+> It has taken be a while, but I think I finally see what you mean. We
+> have no idea whether that bit was set or not.
+> 
+>> This is kind of what I asked before only now there's an extra bit not
+>> guaranteed by the architecture to be set for the kernel range, I
+>> think.
+> 
+> Yeah, I finally connected the couple of neurons left up there (that's
+> what remains after the whole brexit braindamage). This doesn't work (or
+> rather it only works sometimes). The good new is that I also realized we
+> don't need any of that crap.
+> 
+> The only case we currently use a HVA->KVA transformation is to pass the
+> panic string down to panic(), and we can perfectly prevent
+> __kvm_hyp_teardown from ever be evaluated as a HVA with a bit of
+> asm-foo. This allows us to get rid of this whole function.
 
-All error/warnings (new ones prefixed by >>):
+Here's what I meant by this:
 
-   drivers/irqchip/irq-gic.c: In function 'gic_set_affinity':
->> drivers/irqchip/irq-gic.c:101:2: error: implicit declaration of function 'raw_spin_lock_irqrestore' [-Werror=implicit-function-declaration]
-     raw_spin_lock_irqrestore(&cpu_map_lock, (f))
-     ^
->> drivers/irqchip/irq-gic.c:345:2: note: in expansion of macro 'gic_unlock_irqrestore'
-     gic_unlock_irqrestore(flags);
-     ^
-   cc1: some warnings being treated as errors
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 437cfad..c19754d 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -299,9 +299,16 @@ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%
+ 
+ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
+ {
+-	unsigned long str_va = (unsigned long)__hyp_panic_string;
++	unsigned long str_va;
+ 
+-	__hyp_do_panic(hyp_kern_va(str_va),
++	/*
++	 * Force the panic string to be loaded from the literal pool,
++	 * making sure it is a kernel address and not a PC-relative
++	 * reference.
++	 */
++	asm volatile("ldr %0, =__hyp_panic_string" : "=r" (str_va));
++
++	__hyp_do_panic(str_va,
+ 		       spsr,  elr,
+ 		       read_sysreg(esr_el2),   read_sysreg_el2(far),
+ 		       read_sysreg(hpfar_el2), par,
 
-vim +/raw_spin_lock_irqrestore +101 drivers/irqchip/irq-gic.c
+With that in place, we can entirely get rid of hyp_kern_va().
 
-    95	
-    96	static DEFINE_RAW_SPINLOCK(cpu_map_lock);
-    97	
-    98	#define gic_lock_irqsave(f)		\
-    99		raw_spin_lock_irqsave(&cpu_map_lock, (f))
-   100	#define gic_unlock_irqrestore(f)	\
- > 101		raw_spin_lock_irqrestore(&cpu_map_lock, (f))
-   102	
-   103	#define gic_lock()			raw_spin_lock(&cpu_map_lock)
-   104	#define gic_unlock()			raw_spin_unlock(&cpu_map_lock)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 24944 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160630/c534140c/attachment-0001.obj>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
