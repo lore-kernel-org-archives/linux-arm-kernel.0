@@ -1,87 +1,129 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 30 Jun 2016 17:13:37 +0300
-Subject: [PATCHv3 6/7] dt-bindings: clk: ti: Document module clock type
-In-Reply-To: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
-References: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1467296018-25086-7-git-send-email-t-kristo@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 30 Jun 2016 15:14:17 +0100
+Subject: [RFC PATCH 1/2] fsl-mc: Added header file to provide fsl-mc bus
+ iommu group creation
+In-Reply-To: <HE1PR0401MB1866C1468D3B4733B437C79BE6240@HE1PR0401MB1866.eurprd04.prod.outlook.com>
+References: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
+ <5774FABE.5070707@arm.com>
+ <HE1PR0401MB1866C1468D3B4733B437C79BE6240@HE1PR0401MB1866.eurprd04.prod.outlook.com>
+Message-ID: <57752939.9010504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the new TI module clock type, which is intended to replace the
-internal clock control handling within omap_hwmod. Module clock is
-effectively a gate clock controlling both interface and functional
-clocks for a single hardware IP block.
+On 30/06/16 12:43, Nipun Gupta wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Robin Murphy [mailto:robin.murphy at arm.com]
+>> Sent: Thursday, June 30, 2016 16:26
+>> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com; Stuart Yoder
+>> <stuart.yoder@nxp.com>; iommu at lists.linux-foundation.org; linux-arm-
+>> kernel at lists.infradead.org
+>> Cc: Bharat Bhushan <bharat.bhushan@nxp.com>
+>> Subject: Re: [RFC PATCH 1/2] fsl-mc: Added header file to provide fsl-mc bus
+>> iommu group creation
+>>
+>> On 29/06/16 18:14, Nipun Gupta wrote:
+>>> Added a header file fsl_mc_smmu.h to provide basic support of creating
+>>> an IOMMU group for a fsl-mc type device and also provide helper macro
+>>> to get the stream ID of fsl-mc tyoe device.
+>>>
+>>> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+>>> Signed-off-by: Bharat Bhushan <bharat.bhushan@nxp.com>
+>>> ---
+>>>  drivers/staging/fsl-mc/include/fsl_mc_smmu.h | 45
+>>> ++++++++++++++++++++++++++++
+>>>  1 file changed, 45 insertions(+)
+>>>  create mode 100644 drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+>>>
+>>> diff --git a/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+>>> b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+>>> new file mode 100644
+>>> index 0000000..9dff5ba
+>>> --- /dev/null
+>>> +++ b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+>>> @@ -0,0 +1,45 @@
+>>> +/*
+>>> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+>>> + * Author: Nipun Gupta <nipun.gupta@freescale.com>
+>>> + *
+>>> + * This file is licensed under the terms of the GNU General Public
+>>> + * License version 2. This program is licensed "as is" without any
+>>> + * warranty of any kind, whether express or implied.
+>>> + */
+>>> +
+>>> +#ifndef _FSL_MC_SMMU_H_
+>>> +#define _FSL_MC_SMMU_H_
+>>> +
+>>> +#include <../drivers/staging/fsl-mc/include/mc.h>
+>>> +
+>>> +/* Macro to get the MC device ICID (Stream ID) */ #define
+>>> +fslmc_dev_streamid(_dev) (to_fsl_mc_device(_dev)->icid)
+>>
+>> Is the the full 15-bit ICID from the MC's point of view, just the 7 bits that are
+>> actually routed to the SMMU, or the actual stream ID seen by the SMMU? None
+>> of those three are necessarily the same, and unless it's the third then I don't see
+>> the point of patches adding incomplete code which isn't going to work.
+> 
+> Hi Robin,
+> 
+> It's the second one where just 7 bits are maintained in the 'fsl_mc_device--->icid' which is programmed in SMMU. Right, once the SMR masking support is there then only these patches would make more sense. 
+> We have sent these patches to get some early comments and to have you guys well informed beforehand about the changes which we require in the SMMU driver specific to fsl-mc bus :).
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- .../devicetree/bindings/clock/ti/module.txt        | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/ti/module.txt
+Indeed, it's just kinda hard to review incomplete code, especially when
+it's the parts which don't exist yet which are the most significant ;)
 
-diff --git a/Documentation/devicetree/bindings/clock/ti/module.txt b/Documentation/devicetree/bindings/clock/ti/module.txt
-new file mode 100644
-index 0000000..0329667
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/ti/module.txt
-@@ -0,0 +1,59 @@
-+Binding for Texas Instruments module clock.
-+
-+Binding status: Unstable - ABI compatibility may be broken in the future
-+
-+This binding uses the common clock binding[1]. This clock is
-+quite much similar to the basic gate-clock [2], however, internally
-+it controls an OMAP module clock, which effectively handles
-+both interface and functional clocks for a single module. In some
-+cases, support for mux clock [3] is composited to the same clock node,
-+currently only needed for proper support of timer module clocks.
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+[2] Documentation/devicetree/bindings/clock/ti/gate.txt
-+[3] Documentation/devicetree/bindings/clock/ti/mux.txt
-+
-+Required properties:
-+- compatible : shall be one of:
-+  "ti,omap4-mod-clock" - basic module clock, no gating supported
-+  "ti,omap4-hw-mod-clock" - module clock with hardware gating support
-+  "ti,omap4-sw-mod-clock" - module clock with software forced gating support
-+  "ti,omap4-sw-no-idlest-mod-clock" - module clock with software forced gating
-+				      support, misses idlest
-+  "ti,omap4-mux-mod-clock" - composite clock with mux and module clocks, no
-+			     gating supported
-+  "ti,omap4-hw-mux-mod-clock" - composite clock with mux and module clocks,
-+				with hardware gating
-+  "ti,omap4-sw-mux-mod-clock" - composite clock with mux and module clocks,
-+				with software forced gating
-+
-+- #clock-cells : from common clock binding; shall be set to 0
-+- clocks : link to phandle of parent clock(s)
-+- reg : offset for register controlling adjustable gate and optional mux
-+
-+Optional properties:
-+- ti,bit-shift : bit shift for programming the clock mux, only needed for
-+		 the nodes of the mux variant
-+
-+Examples:
-+	timer6_mod_ck: timer6_mod_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,omap4-sw-mux-mod-clock";
-+		reg = <0x0570>;
-+		clocks = <&syc_clk_div_ck>, <&sys_32k_ck>;
-+		ti,bit-shift = <24>;
-+	};
-+
-+	i2c1_mod_ck: i2c1_mod_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,omap4-sw-mod-clock";
-+		reg = <0x14a0>;
-+		clocks = <&func_96m_fclk>;
-+	};
-+
-+	hsi_mod_ck: hsi_mod_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,omap4-hw-mod-clock";
-+		reg = <0x1338>;
-+		clocks = <&hsi_fck>;
-+	};
--- 
-1.9.1
+Either way, I'm deep in the middle of reworking SMMUv2 generic
+bindings[1] based on the latest iteration of the core code and
+iommu_fwspec[2], which removes the need for nearly all the bus-specific
+business within the driver (it's getting too big to be 4.8 material now,
+but I'll have something to post shortly). In that context, if the fsl-mc
+driver could process an "iommu-map" property on the MC node to plumb the
+ICID-to-stream-ID relationship into of_xlate, and inherit bus->iommu_ops
+from its parent bus, there shouldn't be any need to directly touch the
+SMMU driver at all.
+
+Robin.
+
+[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12454
+[2]:http://thread.gmane.org/gmane.linux.kernel.iommu/14303
+
+> 
+> Thanks,
+> Nipun
+> 
+>>
+>>> +/* Macro to get the container device of a MC device */ #define
+>>> +fslmc_cont_dev(_dev) ((to_fsl_mc_device(dev)->flags & \
+>>> +	FSL_MC_IS_DPRC) ? (_dev) : (_dev->parent))
+>>> +
+>>> +/* Macro to check if a device is a container device */ #define
+>>> +is_cont_dev(_dev) (to_fsl_mc_device(_dev)->flags & FSL_MC_IS_DPRC)
+>>> +
+>>> +static struct iommu_group *fslmc_device_group(struct device *dev) {
+>>> +	struct device *cont_dev = fslmc_cont_dev(dev);
+>>> +	struct iommu_group *group;
+>>> +
+>>> +	/* Container device is responsible for creating the iommu group */
+>>> +	if (is_cont_dev(dev)) {
+>>> +		group = iommu_group_alloc();
+>>> +
+>>> +		if (IS_ERR(group))
+>>> +			return NULL;
+>>> +	} else {
+>>> +		get_device(cont_dev);
+>>> +		group = iommu_group_get(cont_dev);
+>>> +		put_device(cont_dev);
+>>> +	}
+>>> +
+>>> +	return group;
+>>> +}
+>>
+>> In isolation, though, this part seems perfectly reasonable.
+>>
+>> Robin.
+>>
+>>> +
+>>> +#endif /* _FSL_MC_SMMU_H_ */
+>>>
+> 
