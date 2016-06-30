@@ -1,101 +1,69 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 30 Jun 2016 10:22:16 -0600
-Subject: [PATCH 10/13] coresight: Add better messages for coresight_timeout
+Date: Thu, 30 Jun 2016 10:22:18 -0600
+Subject: [PATCH 12/13] coresight: document binding acronyms
 In-Reply-To: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1467303739-12543-11-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1467303739-12543-13-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+It can be hard for people not familiar with the CoreSight IP blocks
+to make sense of the acronyms found in the current bindings.  As such
+this patch expands each acronym in the hope of providing a better
+description of the IP block they represent.
 
-When we encounter a timeout waiting for a status change via
-coresight_timeout, the caller always print the offset which
-was tried. This is pretty much useless as it doesn't specify
-the bit position we wait for. Also, one needs to lookup the
-TRM to figure out, what was wrong. This patch changes all
-such error messages to print something more meaningful.
-
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 6 ++----
- drivers/hwtracing/coresight/coresight-etm4x.c | 6 ++----
- drivers/hwtracing/coresight/coresight-tmc.c   | 6 ++----
- 3 files changed, 6 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/arm/coresight.txt          | 35 +++++++++++++++++-----
+ 1 file changed, 27 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 4d20b0be0c0b..3b483e3f00ee 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -184,8 +184,7 @@ static void etb_disable_hw(struct etb_drvdata *drvdata)
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index 93147c0c8a0e..fcbae6a5e6c1 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -12,14 +12,33 @@ its hardware characteristcs.
  
- 	if (coresight_timeout(drvdata->base, ETB_FFCR, ETB_FFCR_BIT, 0)) {
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			ETB_FFCR);
-+		"timeout while waiting for completion of Manual Flush\n");
- 	}
+ 	* compatible: These have to be supplemented with "arm,primecell" as
+ 	  drivers are using the AMBA bus interface.  Possible values include:
+-		- "arm,coresight-etb10", "arm,primecell";
+-		- "arm,coresight-tpiu", "arm,primecell";
+-		- "arm,coresight-tmc", "arm,primecell";
+-		- "arm,coresight-funnel", "arm,primecell";
+-		- "arm,coresight-etm3x", "arm,primecell";
+-		- "arm,coresight-etm4x", "arm,primecell";
+-		- "qcom,coresight-replicator1x", "arm,primecell";
+-		- "arm,coresight-stm", "arm,primecell"; [1]
++		- Embedded Trace Buffer (version 1.0):
++			"arm,coresight-etb10", "arm,primecell";
++
++		- Trace Port Interface Unit:
++			"arm,coresight-tpiu", "arm,primecell";
++
++		- Trace Memory Controller, used for Embedded Trace Buffer(ETB),
++		  Embedded Trace FIFO(ETF) and Embedded Trace Router(ETR)
++		  configuration.  The configuration mode (ETB, ETF, ETR) is
++		  discovered at boot time when the device is probed.
++			"arm,coresight-tmc", "arm,primecell";
++
++		- Trace Funnel:
++			"arm,coresight-funnel", "arm,primecell";
++
++		- Embedded Trace Macrocell (version 3.x) and
++					Program Flow Trace Macrocell:
++			"arm,coresight-etm3x", "arm,primecell";
++
++		- Embedded Trace Macrocell (version 4.x):
++			"arm,coresight-etm4x", "arm,primecell";
++
++		- Qualcomm Configurable Replicator (version 1.x):
++			"qcom,coresight-replicator1x", "arm,primecell";
++
++		- System Trace Macrocell:
++			"arm,coresight-stm", "arm,primecell"; [1]
  
- 	/* disable trace capture */
-@@ -193,8 +192,7 @@ static void etb_disable_hw(struct etb_drvdata *drvdata)
- 
- 	if (coresight_timeout(drvdata->base, ETB_FFSR, ETB_FFSR_BIT, 1)) {
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			ETB_FFCR);
-+			"timeout while waiting for Formatter to Stop\n");
- 	}
- 
- 	CS_LOCK(drvdata->base);
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index ee089a7a7e87..8fc3f33a3273 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -97,8 +97,7 @@ static void etm4_enable_hw(void *info)
- 	/* wait for TRCSTATR.IDLE to go up */
- 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 1))
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			TRCSTATR);
-+			"timeout while waiting for Idle Trace Status\n");
- 
- 	writel_relaxed(config->pe_sel, drvdata->base + TRCPROCSELR);
- 	writel_relaxed(config->cfg, drvdata->base + TRCCONFIGR);
-@@ -170,8 +169,7 @@ static void etm4_enable_hw(void *info)
- 	/* wait for TRCSTATR.IDLE to go back down to '0' */
- 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 0))
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			TRCSTATR);
-+			"timeout while waiting for Idle Trace Status\n");
- 
- 	CS_LOCK(drvdata->base);
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index b3275bb4d035..84052c72462c 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -38,8 +38,7 @@ void tmc_wait_for_tmcready(struct tmc_drvdata *drvdata)
- 	if (coresight_timeout(drvdata->base,
- 			      TMC_STS, TMC_STS_TMCREADY_BIT, 1)) {
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			TMC_STS);
-+			"timeout while waiting for TMC to be Ready\n");
- 	}
- }
- 
-@@ -56,8 +55,7 @@ void tmc_flush_and_stop(struct tmc_drvdata *drvdata)
- 	if (coresight_timeout(drvdata->base,
- 			      TMC_FFCR, TMC_FFCR_FLUSHMAN_BIT, 0)) {
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			TMC_FFCR);
-+		"timeout while waiting for completion of Manual Flush\n");
- 	}
- 
- 	tmc_wait_for_tmcready(drvdata);
+ 	* reg: physical base address and length of the register
+ 	  set(s) of the component.
 -- 
 2.7.4
