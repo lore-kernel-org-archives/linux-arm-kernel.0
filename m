@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 30 Jun 2016 13:15:42 +0100
-Subject: Applied "spi: s3c64xx: simplify if statement in prepare_transfer
- function" to the spi tree
-In-Reply-To: <1466150245-2648-6-git-send-email-andi.shyti@samsung.com>
-Message-ID: <E1bIasg-0001CB-06@finisterre>
+Date: Thu, 30 Jun 2016 13:15:28 +0100
+Subject: Applied "ASoC: sunxi: Add A10 I2S controller binding documentation"
+ to the asoc tree
+In-Reply-To: <20160615211123.31068-2-maxime.ripard@free-electrons.com>
+Message-ID: <E1bIasS-00012L-EU@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: s3c64xx: simplify if statement in prepare_transfer function
+   ASoC: sunxi: Add A10 I2S controller binding documentation
 
-has been applied to the spi tree at
+has been applied to the asoc tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,90 +34,61 @@ to this mail.
 Thanks,
 Mark
 
->From 730d9d4d11cf48b17d07daaff1f0540642317e09 Mon Sep 17 00:00:00 2001
-From: Andi Shyti <andi.shyti@samsung.com>
-Date: Tue, 28 Jun 2016 11:41:14 +0900
-Subject: [PATCH] spi: s3c64xx: simplify if statement in prepare_transfer
- function
+>From 38c81719b1658fdff7d3509b8a0c6294ce29c3d4 Mon Sep 17 00:00:00 2001
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Date: Wed, 15 Jun 2016 23:11:20 +0200
+Subject: [PATCH] ASoC: sunxi: Add A10 I2S controller binding documentation
 
-The whole function is inside an 'if' statement
-("!is_polling(sdd)").
+Introduce the device tree binding for the I2S controller found in the
+Allwinner A10 and later SoCs.
 
-Check the opposite of that statement at the beginning and exit,
-this way we can have one level less of indentation.
-
-Remove the goto paths as they are redundant.
-
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-s3c64xx.c | 50 +++++++++++++++++++++--------------------------
- 1 file changed, 22 insertions(+), 28 deletions(-)
+ .../devicetree/bindings/sound/sun4i-i2s.txt        | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun4i-i2s.txt
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index c65a9e6baefd..6d8486fc668f 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -341,38 +341,32 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
- 	dma_filter_fn filter = sdd->cntrlr_info->filter;
- 	struct device *dev = &sdd->pdev->dev;
- 	dma_cap_mask_t mask;
--	int ret;
- 
--	if (!is_polling(sdd)) {
--		dma_cap_zero(mask);
--		dma_cap_set(DMA_SLAVE, mask);
--
--		/* Acquire DMA channels */
--		sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--				   sdd->cntrlr_info->dma_rx, dev, "rx");
--		if (!sdd->rx_dma.ch) {
--			dev_err(dev, "Failed to get RX DMA channel\n");
--			ret = -EBUSY;
--			goto out;
--		}
--		spi->dma_rx = sdd->rx_dma.ch;
--
--		sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--				   sdd->cntrlr_info->dma_tx, dev, "tx");
--		if (!sdd->tx_dma.ch) {
--			dev_err(dev, "Failed to get TX DMA channel\n");
--			ret = -EBUSY;
--			goto out_rx;
--		}
--		spi->dma_tx = sdd->tx_dma.ch;
-+	if (is_polling(sdd))
-+		return 0;
+diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+new file mode 100644
+index 000000000000..7b526ec64991
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+@@ -0,0 +1,34 @@
++* Allwinner A10 I2S controller
 +
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
++The I2S bus (Inter-IC sound bus) is a serial link for digital
++audio data transfer between devices in the system.
 +
-+	/* Acquire DMA channels */
-+	sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
-+			   sdd->cntrlr_info->dma_rx, dev, "rx");
-+	if (!sdd->rx_dma.ch) {
-+		dev_err(dev, "Failed to get RX DMA channel\n");
-+		return -EBUSY;
- 	}
-+	spi->dma_rx = sdd->rx_dma.ch;
- 
--	return 0;
-+	sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
-+			   sdd->cntrlr_info->dma_tx, dev, "tx");
-+	if (!sdd->tx_dma.ch) {
-+		dev_err(dev, "Failed to get TX DMA channel\n");
-+		dma_release_channel(sdd->rx_dma.ch);
-+		return -EBUSY;
-+	}
-+	spi->dma_tx = sdd->tx_dma.ch;
- 
--out_rx:
--	dma_release_channel(sdd->rx_dma.ch);
--out:
--	return ret;
-+	return 0;
- }
- 
- static int s3c64xx_spi_unprepare_transfer(struct spi_master *spi)
++Required properties:
++
++- compatible: should be one of the followings
++   - "allwinner,sun4i-a10-i2s"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: should contain the I2S interrupt.
++- dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
++	Documentation/devicetree/bindings/dma/dma.txt
++- dma-names: should include "tx" and "rx".
++- clocks: a list of phandle + clock-specifer pairs, one for each entry in clock-names.
++- clock-names: should contain followings:
++   - "apb" : clock for the I2S bus interface
++   - "mod" : module clock for the I2S controller
++- #sound-dai-cells : Must be equal to 0
++
++Example:
++
++i2s0: i2s at 01c22400 {
++	#sound-dai-cells = <0>;
++	compatible = "allwinner,sun4i-a10-i2s";
++	reg = <0x01c22400 0x400>;
++	interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&apb0_gates 3>, <&i2s0_clk>;
++	clock-names = "apb", "mod";
++	dmas = <&dma SUN4I_DMA_NORMAL 3>,
++	       <&dma SUN4I_DMA_NORMAL 3>;
++	dma-names = "rx", "tx";
++};
 -- 
 2.8.1
