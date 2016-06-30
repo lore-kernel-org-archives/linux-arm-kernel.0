@@ -1,95 +1,42 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 29 Jun 2016 18:04:54 -0700
-Subject: [PATCH] extcon: Add support for qcom SPMI PMIC USB id detection
- hardware
-In-Reply-To: <57746935.4030107@samsung.com>
-References: <20160626055647.18898-1-stephen.boyd@linaro.org>
- <CAGTfZH3ireJWo5-Jd5SEiSy-WMTsw43pweruOqwSesAZqagvtg@mail.gmail.com>
- <146705470025.30684.13257433085055355379@sboyd-linaro>
- <CAGTfZH3ZhZ2gQcOSuAByZWD59E3Bro1aayr2JsM2W+mYa2LQTQ@mail.gmail.com>
- <CGME20160628215923epcas1p3f7942aca724bf2746c20319750184584@epcas1p3.samsung.com>
- <146715115921.31418.2315766296233007937@sboyd-linaro>
- <577369F5.8040907@samsung.com>
- <146722608622.16253.4347418438203284037@sboyd-linaro>
- <57746935.4030107@samsung.com>
-Message-ID: <CAJOFmgwBWUL9wYmzNgXqidGQbEPNYj-qYZGdNjidJ2Utswm3Gw@mail.gmail.com>
+From: yankejian@huawei.com (Yankejian (Hackim Yim))
+Date: Thu, 30 Jun 2016 09:10:52 +0800
+Subject: [PATCH net-next 9/9] net: hns: get reset registers from DT
+In-Reply-To: <20160629.051142.259737654994822294.davem@davemloft.net>
+References: <1467021255-95900-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <1467021255-95900-10-git-send-email-Yisen.Zhuang@huawei.com>
+ <20160629.051142.259737654994822294.davem@davemloft.net>
+Message-ID: <5774719C.4090409@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 June 2016 at 17:35, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> On 2016? 06? 30? 03:48, Stephen Boyd wrote:
->> Quoting Chanwoo Choi (2016-06-28 23:25:57)
->>> On 2016? 06? 29? 06:59, Stephen Boyd wrote:
->>>> Quoting Chanwoo Choi (2016-06-28 05:06:48)
->>>>> 2016-06-28 4:11 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
->>>>>> Quoting Chanwoo Choi (2016-06-26 04:20:43)
->>>>>>> 2016-06-26 14:56 GMT+09:00 Stephen Boyd <stephen.boyd@linaro.org>:
->>>>>>>> +PROPERTIES
->>>>>>>> +
->>>>>>>> +- compatible:
->>>>>>>> +    Usage: required
->>>>>>>> +    Value type: <string>
->>>>>>>> +    Definition: Should contain "qcom,pm8941-misc";
->>>>>>>> +
->>>>>>>> +- reg:
->>>>>>>> +    Usage: required
->>>>>>>> +    Value type: <u32>
->>>>>>>> +    Definition: Should contain the offset to the misc address space
->>>>>>>
->>>>>>> 'reg' property is used on extcon-qcom-spmi-misc.c?
->>>>>>> I think that you don't need to include this property.
->>>>>>
->>>>>> No it isn't used in the driver right now, but there is a register offset
->>>>>> for this module and there are registers that can be read/written in this
->>>>>> module. I'd like to keep it as required so we can easily read the
->>>>>> registers in the future if needed.
->>>>>
->>>>> OK.
->>>>> But, If you want to remain the reg property, you should add the code to get
->>>>> the register offset by using OF functions. This patch don't include the OF
->>>>> function to handle it.
->>>>>
->>>>
->>>> Sorry I don't follow the argument. I've put the reg property here for
->>>> future proofing so that the binding doesn't have to change in backwards
->>>> incompatible ways in the future if we do need to get the property later.
->>>
->>> I don't mention that 'reg' property should be removed.
->>
->> Ok good. We need to keep reg property as this device is on a bus that
->> uses reg property for addressing.
->>
->>> Just if you want to remain it, you should add some codes as following:
->>> For exmaple,
->>> - of_get_address() to get the address information from device-tree.
->>>
->>> If documentation include the some properties, you should add the handling code
->>> in device driver. When you add the code to get the offset from device-tree,
->>> it doesn't influence the some behavior in the future.
->>
->> Sorry I don't understand that argument. We can put properties into
->> bindings and not use them in drivers if there isn't any immediate need
->> to use them.
->>
->> From what I can tell you're suggesting we call of_get_address() in the
->> driver and then do nothing with the value of the property? Is that just
->> to check that the node is compliant with the binding and actually has a
->> reg property? We don't add code in the kernel to check dts compliance,
->> so I'm not inclined to do anything more here.
+On 2016/6/29 17:11, David Miller wrote:
+> From: Yisen Zhuang <Yisen.Zhuang@huawei.com>
+> Date: Mon, 27 Jun 2016 17:54:15 +0800
 >
-> I don't agree.
+>> @@ -361,9 +371,10 @@ static int hns_mdio_reset(struct mii_bus *bus)
+>>  			return -ENODEV;
+>>  		}
+>>  
+>> +	sc_reg = &mdio_dev->sc_reg;
+>>  		/* 1. reset req, and read reset st check */
+>> -		ret = mdio_sc_cfg_reg_write(mdio_dev, MDIO_SC_RESET_REQ, 0x1,
+>> -					    MDIO_SC_RESET_ST, 0x1,
+>> +	ret = mdio_sc_cfg_reg_write(mdio_dev, sc_reg->mdio_reset_req, 0x1,
+>> +				    sc_reg->mdio_reset_st, 0x1,
+>>  					    MDIO_CHECK_SET_ST);
+>>  		if (ret) {
+>>  			dev_err(&bus->dev, "MDIO reset fail\n");
+> What in the world are you doing to the indentation here?
 >
-> When he DT binding document include the 'reg' property.
-> But, the device driver don't include any code to handle the 'reg' property
-> (just to get the offset). It is obviously wrong.
+> Please read your patches before actually sending them, such things
+> will be quite obvious by simple visual inspection.
 >
-> It is just basic principle to write the Device-tree binding document.
+> .
 >
-> Other developer who don' know the history about 'reg' property
-> would be embarrassed. Why don't extcon driver include the code to
-> handle the 'reg' property? There is no method to explain it.
->
+Hi David,
+i am sorry for my carelessness. i will pay more attention next time.
+Thanks for pointing it our
 
-Perhaps Rob can explain why having a reg property is required for a
-bus that has #address-cells=<1> even though the device driver isn't
-using the reg property.
+-- 
+MBR,
+Yankejian (Hackim Yim)
