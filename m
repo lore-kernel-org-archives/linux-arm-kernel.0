@@ -1,114 +1,29 @@
-From: yunhui.cui@nxp.com (Yunhui Cui)
-Date: Thu, 30 Jun 2016 01:54:14 +0000
-Subject: [PATCH v2 1/9] mtd:fsl-quadspi:use the property fields of SPI-NOR
-In-Reply-To: <1461307192-866-1-git-send-email-B56489@freescale.com>
-References: <1461307192-866-1-git-send-email-B56489@freescale.com>
-Message-ID: <DB5PR0401MB191200E18A336E0BE5318D1694240@DB5PR0401MB1912.eurprd04.prod.outlook.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 30 Jun 2016 10:02:04 +0800
+Subject: [PATCH] arm64: mm: remove unnecessary BUG_ON
+Message-ID: <1467252124-19625-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian and Han,
-Could you please give me some comments about this patch set v2 ?
+The memblock_alloc() and memblock_alloc_base() will panic on their own
+if no free memory, remove pointless BUG_ON.
 
-Thanks
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/mm/mmu.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-> -----Original Message-----
-> From: Yunhui Cui [mailto:B56489 at freescale.com]
-> Sent: Friday, April 22, 2016 2:40 PM
-> To: dwmw2 at infradead.org; computersforpeace at gmail.com;
-> han.xu at freescale.com
-> Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-
-> arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
-> Subject: [PATCH v2 1/9] mtd:fsl-quadspi:use the property fields of SPI-
-> NOR
-> 
-> We can get the read/write/erase opcode from the spi nor framework
-> directly. This patch uses the information stored in the SPI-NOR to remove
-> the hardcode in the fsl_qspi_init_lut().
-> 
-> Signed-off-by: Yunhui Cui <B56489@freescale.com>
-> Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
-> ---
->  drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------
-> ------
->  1 file changed, 12 insertions(+), 28 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-
-> quadspi.c
-> index 9ab2b51..517ffe2 100644
-> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> @@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	void __iomem *base = q->iobase;
->  	int rxfifo = q->devtype_data->rxfifo;
->  	u32 lut_base;
-> -	u8 cmd, addrlen, dummy;
->  	int i;
-> 
-> +	struct spi_nor *nor = &q->nor[0];
-> +	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
-> +	u8 read_op = nor->read_opcode;
-> +	u8 read_dm = nor->read_dummy;
-> +
->  	fsl_qspi_unlock_lut(q);
-> 
->  	/* Clear all the LUT table */
-> @@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	/* Quad Read */
->  	lut_base = SEQID_QUAD_READ * 4;
-> 
-> -	if (q->nor_size <= SZ_16M) {
-> -		cmd = SPINOR_OP_READ_1_1_4;
-> -		addrlen = ADDR24BIT;
-> -		dummy = 8;
-> -	} else {
-> -		/* use the 4-byte address */
-> -		cmd = SPINOR_OP_READ_1_1_4;
-> -		addrlen = ADDR32BIT;
-> -		dummy = 8;
-> -	}
-> -
-> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-> +	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
->  			base + QUADSPI_LUT(lut_base));
-> -	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4,
-> rxfifo),
-> +	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> +		    LUT1(FSL_READ, PAD4, rxfifo),
->  			base + QUADSPI_LUT(lut_base + 1));
-> 
->  	/* Write enable */
-> @@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	/* Page Program */
->  	lut_base = SEQID_PP * 4;
-> 
-> -	if (q->nor_size <= SZ_16M) {
-> -		cmd = SPINOR_OP_PP;
-> -		addrlen = ADDR24BIT;
-> -	} else {
-> -		/* use the 4-byte address */
-> -		cmd = SPINOR_OP_PP;
-> -		addrlen = ADDR32BIT;
-> -	}
-> -
-> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-> +	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
-> +		    LUT1(ADDR, PAD1, addrlen),
->  			base + QUADSPI_LUT(lut_base));
->  	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
->  			base + QUADSPI_LUT(lut_base + 1));
-> @@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	/* Erase a sector */
->  	lut_base = SEQID_SE * 4;
-> 
-> -	cmd = q->nor[0].erase_opcode;
-> -	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
-> -
-> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-> +	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
-> +		    LUT1(ADDR, PAD1, addrlen),
->  			base + QUADSPI_LUT(lut_base));
-> 
->  	/* Erase the whole chip */
-> --
-> 2.1.0.27.g96db324
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0f85a46..d120abc 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -77,7 +77,6 @@ static phys_addr_t __init early_pgtable_alloc(void)
+ 	void *ptr;
+ 
+ 	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+-	BUG_ON(!phys);
+ 
+ 	/*
+ 	 * The FIX_{PGD,PUD,PMD} slots may be in active use, but the FIX_PTE
+-- 
+2.6.0.GIT
