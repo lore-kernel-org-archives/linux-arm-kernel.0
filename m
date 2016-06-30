@@ -1,54 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Jun 2016 12:23:37 -0700
-Subject: [PATCH 0/6] clk: sti: Add support for critical clocks
-In-Reply-To: <20160607111930.10375-1-lee.jones@linaro.org>
-References: <20160607111930.10375-1-lee.jones@linaro.org>
-Message-ID: <20160630192337.GN1521@codeaurora.org>
+From: arend.vanspriel@broadcom.com (Arend Van Spriel)
+Date: Thu, 30 Jun 2016 21:23:56 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
+ dt property
+In-Reply-To: <3960223.GqB9zXL8s8@wuerfel>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <CAOiHx==82LHOeQMNVD+dybFifXX690Q6AJTcMBMynjSfUOyGUw@mail.gmail.com>
+ <8d8bd933-717b-48e4-f002-7b834abed6fd@redhat.com>
+ <3960223.GqB9zXL8s8@wuerfel>
+Message-ID: <1f44df41-0111-441b-4671-718eec0c4346@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07, Lee Jones wrote:
-> Describe the platform's critical clocks in DT, then search for them
-> from the framework.  This set allows us to remove the clk_ignore_unused
-> kernel command line flag which has been required to achieve a successful
-> boot to prompt until this point.
-> 
-> This may not be the definitive list.  There may be other clocks which
-> need to be marked as critical, but we can add those as we go along.
-> 
 
-I applied the three clk ones to an immutable branch named
-'clk-st-critical' in the clk tree and merged this into clk-next.
-I'm not comfortable taking the spi patch as I suspect that will
-break something unless the dts patches are applied.
 
-Please use this branch to base your dts and spi patches on so it
-can be merged through arm-soc without introducing some bisection
-hole.
+On 30-6-2016 13:31, Arnd Bergmann wrote:
+> On Thursday, June 30, 2016 12:25:15 PM CEST Hans de Goede wrote:
+>>> So then how about making use of a more specific compatible string?
+>>>
+>>> e.g.
+>>>
+>>> brcmf {
+>>>         compatible = "foo,ap6210", "brcm,bcm4329-fmac";
+>>>         ...
+>>> };
+>>>
+>>> and if the compatible has more than one element you request
+>>> FW_NAME_<compatible>.txt as the nvram file. Or try each comptible (and
+>>> lastly no suffix) until you get a match. (AFAICT, this is what the
+>>> "model" property was originally intended for anyway, but almost nobody
+>>> did it right, and everyone put a user readable string into "model" for
+>>> boards instead of the ePAPR defined compatible string).
+>>
+>> Hmm, interesting idea. Not sure how easy / hard it will be to implement
+>> this, but from a dt binding point of view it seems elegant.
+>>
+>> Kalle, Arend, what do you think of this ?
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+At first glance I like the suggestion, but this would mean updating the
+bindings document for each new wifi module that we want to add. Not a
+big problem, but it makes that I have a slight preference to using a
+property for it, eg. brcm,module = "ap6210";
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> I think that's reasonable. Also, we have precedent for using things like
+> the boardid as part of the compatible string, which would help do what
+> Kalle suggested earlier with "nvram-<boardtype>-<boardrev>.txt",
+> as we get that for free by trying out all the compatible strings.
 
-are available in the git repository at:
+The suggestion from Kalle was to use the field in the nvram file, but
+things are a bit more complicated. The fields are only used if it is not
+stored on the device in OTP or SROM. The 43362 does not have a SROM, but
+it still has a small OTP storage if I am not mistaken. The brcmfmac
+exposes a revinfo file in debugfs containing boardtype and boardrev, but
+that is after starting the firmware. Still worth to check if those
+values match the values in the ap6210 nvram file.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-st-critical
-
-for you to fetch changes up to 6ca59e6e1fc3a8d7ccbf85ff036bd6ff40847c1a:
-
-  clk: st: clkgen-pll: Detect critical clocks (2016-06-30 12:17:11 -0700)
-
-----------------------------------------------------------------
-Lee Jones (3):
-      clk: st: clk-flexgen: Detect critical clocks
-      clk: st: clkgen-fsyn: Detect critical clocks
-      clk: st: clkgen-pll: Detect critical clocks
-
- drivers/clk/st/clk-flexgen.c |  4 +++-
- drivers/clk/st/clkgen-fsyn.c | 10 +++++++---
- drivers/clk/st/clkgen-pll.c  | 27 +++++++++++++++++----------
- 3 files changed, 27 insertions(+), 14 deletions(-)
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Arend
