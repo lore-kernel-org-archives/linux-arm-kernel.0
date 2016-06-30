@@ -1,34 +1,51 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 01 Jul 2016 02:06:58 +0300
-Subject: [PATCH 1/3] ARM: dts: r8a7792: add PFC support
+Date: Fri, 01 Jul 2016 02:08:12 +0300
+Subject: [PATCH 2/3] ARM: dts: blanche: add SCIF0/3 pins
 In-Reply-To: <2144803.0K8qXzjIFq@wasted.cogentembedded.com>
 References: <2144803.0K8qXzjIFq@wasted.cogentembedded.com>
-Message-ID: <7894702.b5qeLxoHdo@wasted.cogentembedded.com>
+Message-ID: <1489490.F0Oqgkmovy@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7792 part of the PFC device node.
+Add the (previously omitted) SCIF0/3 pin data to the Blanche board's
+device tree.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/r8a7792.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/r8a7792-blanche.dts |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
+Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -108,6 +108,12 @@
- 			#power-domain-cells = <1>;
- 		};
+--- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
++++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+@@ -57,10 +57,28 @@
+ 	clock-frequency = <20000000>;
+ };
  
++&pfc {
++	scif0_pins: scif0 {
++		groups = "scif0_data";
++		function = "scif0";
++	};
 +
-+		pfc: pin-controller at e6060000 {
-+			compatible = "renesas,pfc-r8a7792";
-+			reg = <0 0xe6060000 0 0x144>;
-+		};
++	scif3_pins: scif3 {
++		groups = "scif3_data";
++		function = "scif3";
++	};
++};
 +
- 		dmac0: dma-controller at e6700000 {
- 			compatible = "renesas,dmac-r8a7792",
- 				     "renesas,rcar-dmac";
+ &scif0 {
++	pinctrl-0 = <&scif0_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
+ 
+ &scif3 {
++	pinctrl-0 = <&scif3_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
