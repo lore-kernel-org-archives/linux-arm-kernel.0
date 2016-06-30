@@ -1,42 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jun 2016 13:52:56 +0200
-Subject: [PATCH v4 1/2] i2c: qup: add ACPI support
-In-Reply-To: <577503F2.90204@codeaurora.org>
-References: <1465409985-17113-1-git-send-email-austinwc@codeaurora.org>
- <4749471.m1cxc4jj96@wuerfel> <577503F2.90204@codeaurora.org>
-Message-ID: <4043322.Uc6lMkrL43@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 30 Jun 2016 13:50:12 +0200
+Subject: [PATCH v4 3/4] arm64: dts: marvell: adjust to the latest
+ mv-xor-v2 DT binding
+In-Reply-To: <1466080116-26777-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Thu, 16 Jun 2016 14:28:35 +0200")
+References: <1466080116-26777-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1466080116-26777-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87h9cax5e3.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 30, 2016 7:35:14 AM CEST Christopher Covington wrote:
-> Hi Arnd,
-> 
-> On 06/08/2016 05:02 PM, Arnd Bergmann wrote:
-> > On Wednesday, June 8, 2016 12:19:44 PM CEST Austin Christ wrote:
-> >> +               ret = device_property_read_u32(qup->dev,
-> >> +                               "src-clock-hz", &src_clk_freq);
-> >> +               if (ret) {
-> >> +                       dev_warn(qup->dev, "using default src-clock-hz %d",
-> >> +                               DEFAULT_SRC_CLK);
-> >> +                       src_clk_freq = DEFAULT_SRC_CLK;
-> >> +               }
-> >>
-> > 
-> > Where is this property documented?
-> 
-> We plan on submitting documentation via dsd at acpica.org to
-> https://github.com/ahs3/dsd once it is operational. As I understand it
-> the project is brand new. It may take several months to begin accepting
-> submissions. In the mean time, we could potentially include
-> documentation in a reply to this thread, the cover of the next series, a
-> wiki page on codeaurora.org, a file in Documentation (perhaps to be
-> replaced by ACPICA style imports of the OS-neutral DSD project or a git
-> submodule) or potentially other means. Please let us know what you think
-> is sufficient.
+Hi Thomas,
+ 
+ On jeu., juin 16 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-As you are reusing part of the DT binding, it seems appropriate to put
-the documentation for this into the binding documentation in the kernel.
+> As suggested by Rob Herring, we should:
+>
+>  1/ Use a SoC-specific compatible string in addition to the more generic
+>     one.
+>
+>  2/ The generic compatible string has been changed from
+>     "marvell,mv-xor-v2" to "marvell,xor-v2".
+>
+> We simply reflect the changes made to the Device Tree bindings to the
+> relevant Marvell 7K/8K Device Tree files.
 
-Not sure what the devicetree maintainers think about that though.
+Applied on mvebu/dt64
 
-	Arnd
+Thanks,
+
+Gregory
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> index 20d256b..eab1a42 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> @@ -141,7 +141,7 @@
+>  			};
+>  
+>  			xor at 400000 {
+> -				compatible = "marvell,mv-xor-v2";
+> +				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+>  				reg = <0x400000 0x1000>,
+>  				      <0x410000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> @@ -149,7 +149,7 @@
+>  			};
+>  
+>  			xor at 420000 {
+> -				compatible = "marvell,mv-xor-v2";
+> +				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+>  				reg = <0x420000 0x1000>,
+>  				      <0x430000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> @@ -157,7 +157,7 @@
+>  			};
+>  
+>  			xor at 440000 {
+> -				compatible = "marvell,mv-xor-v2";
+> +				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+>  				reg = <0x440000 0x1000>,
+>  				      <0x450000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> @@ -165,7 +165,7 @@
+>  			};
+>  
+>  			xor at 460000 {
+> -				compatible = "marvell,mv-xor-v2";
+> +				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+>  				reg = <0x460000 0x1000>,
+>  				      <0x470000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> -- 
+> 2.7.4
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
