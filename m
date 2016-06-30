@@ -1,67 +1,77 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 30 Jun 2016 17:37:21 +0200
-Subject: [RESEND PATCH v6 0/6] Add Ethernet support on STM32F429
-In-Reply-To: <CALszF6AP52EAN68qH8Pup9uxqTnhoT8wigiKaZzgHns3m+NCgQ@mail.gmail.com>
-References: <1462789899-13153-1-git-send-email-alexandre.torgue@gmail.com>
- <20160517.122527.1937360418899371800.davem@davemloft.net>
- <CALszF6AE7jkRX3sSNm=PCvEmkmZM-Sv5LxFSj7J3vMbvi8M5Cg@mail.gmail.com>
- <2535270.dCFPoM2olB@wuerfel>
- <CALszF6AP52EAN68qH8Pup9uxqTnhoT8wigiKaZzgHns3m+NCgQ@mail.gmail.com>
-Message-ID: <57753CB1.3010800@st.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 30 Jun 2016 09:49:40 -0600
+Subject: [PATCH] pci: tegra: actually program REFCLK_CFG* on recent SoCs
+In-Reply-To: <20160630134728.GE26758@ulmo.ba.sec>
+References: <20160624143703.13231-1-swarren@wwwdotorg.org>
+ <20160630134728.GE26758@ulmo.ba.sec>
+Message-ID: <57753F94.3000301@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On 05/18/2016 11:49 AM, Maxime Coquelin wrote:
-> 2016-05-18 11:31 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->> On Wednesday 18 May 2016 09:48:53 Maxime Coquelin wrote:
->>> 2016-05-17 18:25 GMT+02:00 David Miller <davem@davemloft.net>:
->>>> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>>> Date: Tue, 17 May 2016 11:20:16 +0200
->>>>
->>>>> Hi David,
->>>>>
->>>>> 2016-05-09 21:06 GMT+02:00 David Miller <davem@davemloft.net>:
->>>>>> From: Alexandre TORGUE <alexandre.torgue@gmail.com>
->>>>>> Date: Mon,  9 May 2016 12:31:33 +0200
->>>>>>
->>>>>>> STM32F429 Chip embeds a Synopsys 3.50a MAC IP.
->>>>>>> This series:
->>>>>>>   -enhance current stmmac driver to control it (code already
->>>>>>> available) and adds basic glue for STM32F429 chip.
->>>>>>>   -Enable basic Net config in kernel.
->>>>>>
->>>>>> I assume this will go via the ARM tree, for the networking bits:
->>>>> I would expect patches 1, 2 & 3 to got via your tree, to avoid conflicts.
->>>>
->>>> I don't think putting them all via the ARM tree is going to create much
->>>> in the way of conflicts, and right now during the merge window offloading
->>>> that work from me would really help my backlog a lot.
->>>
->>> Ok, I understand this is not the best time to pick it.
->>>
->>> Arnd, Olof & Kevin, would you accept to pick the series in your tree?
->>>
+On 06/30/2016 07:47 AM, Thierry Reding wrote:
+> On Fri, Jun 24, 2016 at 08:37:03AM -0600, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
 >>
->> It's too late for v4.7 for us too, please pick up the arch/arm patches
->> in your normal stm32 tree and send them to us along with any other changes
->> you may have, and resend the driver by itself to netdev time after the
->> merge window.
+>> On recent SoCs, tegra_pcie_phy_enable() isn't called; but instead
+>> tegra_pcie_enable_controller() calls tegra_xusb_phy_enable(). However,
+>> part of tegra_pcie_phy_enable() needs to happen in all cases. Move that
+>> code to tegra_pcie_port_enable() instead.
 >>
->> The binding document can go either way, with the dts changes or with
->> the driver. I see no dependencies between the patches, so we just need
->> to land them all in v4.8.
+>> For reference, NVIDIA's downstream Linux kernel performs this operation
+>> in tegra_pcie_enable_rp_features(), which is called immediately after
+>> tegra_pcie_port_enable(). Since that function doesn't exist in the mainline
+>> driver, we'll just add it to the tail of tegra_pcie_port_enable() instead.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>>   drivers/pci/host/pci-tegra.c | 17 +++++++++--------
+>>   1 file changed, 9 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+>> index 74887fedc3d4..2ec64a9e7943 100644
+>> --- a/drivers/pci/host/pci-tegra.c
+>> +++ b/drivers/pci/host/pci-tegra.c
+>> @@ -541,12 +541,13 @@ static void tegra_pcie_port_reset(struct tegra_pcie_port *port)
+>>
+>>   static void tegra_pcie_port_enable(struct tegra_pcie_port *port)
+>>   {
+>> -	const struct tegra_pcie_soc_data *soc = port->pcie->soc_data;
+>> +	struct tegra_pcie *pcie = port->pcie;
+>> +	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
+>>   	unsigned long ctrl = tegra_pcie_port_get_pex_ctrl(port);
+>>   	unsigned long value;
+>>
+>>   	/* enable reference clock */
+>> -	value = afi_readl(port->pcie, ctrl);
+>> +	value = afi_readl(pcie, ctrl);
+>>   	value |= AFI_PEX_CTRL_REFCLK_EN;
+>>
+>>   	if (soc->has_pex_clkreq_en)
+>> @@ -554,9 +555,14 @@ static void tegra_pcie_port_enable(struct tegra_pcie_port *port)
+>>
+>>   	value |= AFI_PEX_CTRL_OVERRIDE_EN;
+>>
+>> -	afi_writel(port->pcie, value, ctrl);
+>> +	afi_writel(pcie, value, ctrl);
+>>
+>>   	tegra_pcie_port_reset(port);
+>> +
+>> +	/* Configure the reference clock driver */
+>> +	pads_writel(pcie, soc->pads_refclk_cfg0, PADS_REFCLK_CFG0);
+>> +	if (soc->num_ports > 2)
+>> +		pads_writel(pcie, soc->pads_refclk_cfg1, PADS_REFCLK_CFG1);
+>>   }
 >
-> Ok, this is good for me.
-> No problem to wait for v4.8.
-> I will take the arch/arm patches, and David the drivers/net/ ones once
-> v4.7-rc1 is out.
+> This will actually write these two registers for each enabled port,
+> which, while it shouldn't make a difference, is unnecessary. I've
+> applied a slightly modified version of this patch. Specifically I moved
+> this code to the tail of the tegra_pcie_phy_power_on() function, which
+> is closest to where it was before.
+>
+> I've also applied the patch that changes the values that are written
+> into this register, though I reversed the order because that made more
+> sense to me. I've pushed both patches to the for-4.8/pci branch in the
+> Tegra tree, can you please take a look if that still looks okay to you?
 
-According to this old discussion, could you please take driver patches
-+ bindings one (patch 1/2/3) in your net-next tree ?
-Do you need I resend them separately ?
-
-Thanks in advance
-
-Alex
+I think that will work. It's a pity the code location in the mainline 
+kernel is going to diverge from the downstream kernel and U-Boot though.
