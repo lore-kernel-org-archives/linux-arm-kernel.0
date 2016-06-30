@@ -1,46 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:16:20 +0200
-Subject: [PATCH 4/8] ARM: shmobile: apmu: Move #ifdef CONFIG_SMP to cover more
- functions
+Date: Thu, 30 Jun 2016 16:16:24 +0200
+Subject: [PATCH 8/8] ARM: shmobile: r8a7791: Prioritize DT APMU support
 In-Reply-To: <cover.1467293089.git.horms+renesas@verge.net.au>
 References: <cover.1467293089.git.horms+renesas@verge.net.au>
-Message-ID: <d3f3fb0cfdcf4cbf69af65e8bfdde65cedf4e53a.1467293089.git.horms+renesas@verge.net.au>
+Message-ID: <f89a51700d7ae0ef58956a8c8f0e2c68767bcdae.1467293089.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-shmobile_smp_apmu_prepare_cpus() is used only if CONFIG_SMP=y.
+Adjust the r8a7791 SoC support code to not configure any non-DT SMP code
+in case the DT-based enable-method has been installed already.
 
-Hence move the #ifdef to cover shmobile_smp_apmu_prepare_cpus() and all
-functions only called by it (apmu_init_cpu() and apmu_parse_cfg()).
-
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/platsmp-apmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-r8a7791.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index aba75c89f9c1..c1558ef0c590 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -74,6 +74,7 @@ static int __maybe_unused apmu_wrap(int cpu, int (*fn)(void __iomem *p, int cpu)
- 	return p ? fn(p, apmu_cpus[cpu].bit) : -EINVAL;
- }
+diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
+index 3b8dbaf07777..110e8b588e56 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7791.c
++++ b/arch/arm/mach-shmobile/setup-r8a7791.c
+@@ -29,6 +29,7 @@ static const char *const r8a7791_boards_compat_dt[] __initconst = {
+ };
  
-+#ifdef CONFIG_SMP
- static void apmu_init_cpu(struct resource *res, int cpu, int bit)
- {
- 	if ((cpu >= ARRAY_SIZE(apmu_cpus)) || apmu_cpus[cpu].iomem)
-@@ -128,7 +129,6 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
- 	apmu_parse_cfg(apmu_init_cpu, apmu_config, num);
- }
- 
--#ifdef CONFIG_SMP
- int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	/* For this particular CPU register boot vector */
+ DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
++	.smp_init	= shmobile_smp_init_fallback_ops,
+ 	.smp		= smp_ops(r8a7791_smp_ops),
+ 	.init_early	= shmobile_init_delay,
+ 	.init_time	= rcar_gen2_timer_init,
 -- 
 2.7.0.rc3.207.g0ac5344
