@@ -1,23 +1,34 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 29 Jun 2016 23:13:30 -0500
-Subject: [PATCH v6 04/10] acpi: Add some basic struct and functions in
- GTDT driver
-In-Reply-To: <3079554.3ECV4uzklN@vostro.rjw.lan>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <CAJZ5v0gw7E6DnGhpACAws2WdF3j=eUkjKBhfo2RKmyKnpoLUbQ@mail.gmail.com>
- <CADyBb7v70YVL4yM_U335eQfa+NEd+jXDEaMN3iAhgnyL9Dk=WA@mail.gmail.com>
- <3079554.3ECV4uzklN@vostro.rjw.lan>
-Message-ID: <57749C6A.9070900@codeaurora.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 30 Jun 2016 09:56:53 +0530
+Subject: [PATCH v11 2/2] dmaengine: Add Xilinx zynqmp dma engine driver
+ support
+In-Reply-To: <1465486667-30737-2-git-send-email-appanad@xilinx.com>
+References: <1465486667-30737-1-git-send-email-appanad@xilinx.com>
+ <1465486667-30737-2-git-send-email-appanad@xilinx.com>
+Message-ID: <20160630042653.GM14945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael J. Wysocki wrote:
-> That's not enough.  The [0/10] will not go into the git log, mind you.
+On Thu, Jun 09, 2016 at 09:07:47PM +0530, Kedareswara rao Appana wrote:
 
-The changelog is placed under the "---", so it wouldn't go into the git 
-log anyway.
+> +	dma_set_mask(&pdev->dev, DMA_BIT_MASK(44));
+> +	dma_cap_set(DMA_SG, zdev->common.cap_mask);
+> +	dma_cap_set(DMA_MEMCPY, zdev->common.cap_mask);
+ 
+>  /**
+> + * struct zynqmp_dma_config - ZYNQMP DMA Configuration structure
+> + * @ovrfetch: Overfetch status
+> + * @has_sg: Support scatter gather transfers
+> + * @ratectrl: Rate control value
+> + * @src_issue: Out standing transactions on source
+> + * @src_burst_len: Source burst length
+> + * @dst_burst_len: Dest burst length
+> + */
+
+As discussed in other thread as well, this is no-go for memcpy. Please come
+back after removing this
+
+For slave usages use the dma_slave_config
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+~Vinod
