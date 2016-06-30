@@ -1,39 +1,148 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:16:19 +0200
-Subject: [PATCH 3/8] ARM: shmobile: rcar-gen2: Correct arch timer frequency on
- R-Car V2H
+Date: Thu, 30 Jun 2016 16:16:21 +0200
+Subject: [PATCH 5/8] ARM: shmobile: apmu: Add APMU DT support via Enable method
 In-Reply-To: <cover.1467293089.git.horms+renesas@verge.net.au>
 References: <cover.1467293089.git.horms+renesas@verge.net.au>
-Message-ID: <2477a356dd245bbbde74c81edc5f16a6d8192023.1467293089.git.horms+renesas@verge.net.au>
+Message-ID: <5f3bca0db8ac01a73622361f6062939638bf4730.1467293089.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-According to the datasheet, the frequency of the ARM architecture timer
-on R-Car V2H depends on the frequency of the ZS clock, just like on
-R-Car E2.
+Allow DT configuration of the APMU hardware in the case when the APMU is
+pointed out in the DTB via the enable-method. The ability to configure
+the APMU via C code is still kept intact to prevent DTB breakage for older
+SoCs that do not rely on the enable-method for SMP support.
 
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+[geert: Fix CONFIG_SMP=n build]
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/platsmp-apmu.c | 92 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 88 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index ea092d5dd475..afb9fdcd3d90 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -76,7 +76,8 @@ void __init rcar_gen2_timer_init(void)
- 	void __iomem *base;
- 	u32 freq;
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index c1558ef0c590..0c6bb458b7a4 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -24,6 +24,7 @@
+ #include <asm/suspend.h>
+ #include "common.h"
+ #include "platsmp-apmu.h"
++#include "rcar-gen2.h"
  
--	if (of_machine_is_compatible("renesas,r8a7794")) {
-+	if (of_machine_is_compatible("renesas,r8a7792") ||
-+	    of_machine_is_compatible("renesas,r8a7794")) {
- 		freq = 260000000 / 8;	/* ZS / 8 */
- 		/* CNTVOFF has to be initialized either from non-secure
- 		 * Hypervisor mode or secure Monitor mode with SCR.NS==1.
+ static struct {
+ 	void __iomem *iomem;
+@@ -118,14 +119,66 @@ static void apmu_parse_cfg(void (*fn)(struct resource *res, int cpu, int bit),
+ 	}
+ }
+ 
+-void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
+-					   struct rcar_apmu_config *apmu_config,
+-					   int num)
++static const struct of_device_id apmu_ids[] = {
++	{ .compatible = "renesas,apmu" },
++	{ /*sentinel*/ }
++};
++
++static void apmu_parse_dt(void (*fn)(struct resource *res, int cpu, int bit))
++{
++	struct device_node *np_apmu, *np_cpu;
++	struct resource res;
++	int bit, index;
++	u32 id;
++
++	for_each_matching_node(np_apmu, apmu_ids) {
++		/* only enable the cluster that includes the boot CPU */
++		bool is_allowed = false;
++
++		for (bit = 0; bit < CONFIG_NR_CPUS; bit++) {
++			np_cpu = of_parse_phandle(np_apmu, "cpus", bit);
++			if (np_cpu) {
++				if (!of_property_read_u32(np_cpu, "reg", &id)) {
++					if (id == cpu_logical_map(0)) {
++						is_allowed = true;
++						of_node_put(np_cpu);
++						break;
++					}
++
++				}
++				of_node_put(np_cpu);
++			}
++		}
++		if (!is_allowed)
++			continue;
++
++		for (bit = 0; bit < CONFIG_NR_CPUS; bit++) {
++			np_cpu = of_parse_phandle(np_apmu, "cpus", bit);
++			if (np_cpu) {
++				if (!of_property_read_u32(np_cpu, "reg", &id)) {
++					index = get_logical_index(id);
++					if ((index >= 0) &&
++					    !of_address_to_resource(np_apmu,
++								    0, &res))
++						fn(&res, index, bit);
++				}
++				of_node_put(np_cpu);
++			}
++		}
++	}
++}
++
++static void __init shmobile_smp_apmu_setup_boot(void)
+ {
+ 	/* install boot code shared by all CPUs */
+ 	shmobile_boot_fn = virt_to_phys(shmobile_smp_boot);
++}
+ 
+-	/* perform per-cpu setup */
++void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
++					   struct rcar_apmu_config *apmu_config,
++					   int num)
++{
++	shmobile_smp_apmu_setup_boot();
+ 	apmu_parse_cfg(apmu_init_cpu, apmu_config, num);
+ }
+ 
+@@ -136,7 +189,38 @@ int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ 	return apmu_wrap(cpu, apmu_power_on);
+ }
++
++static void __init shmobile_smp_apmu_prepare_cpus_dt(unsigned int max_cpus)
++{
++	shmobile_smp_apmu_setup_boot();
++	apmu_parse_dt(apmu_init_cpu);
++	rcar_gen2_pm_init();
++}
++
++static int shmobile_smp_apmu_boot_secondary_md21(unsigned int cpu,
++						 struct task_struct *idle)
++{
++	/* Error out when hardware debug mode is enabled */
++	if (rcar_gen2_read_mode_pins() & BIT(21)) {
++		pr_warn("Unable to boot CPU%u when MD21 is set\n", cpu);
++		return -ENOTSUPP;
++	}
++
++	return shmobile_smp_apmu_boot_secondary(cpu, idle);
++}
++
++static struct smp_operations apmu_smp_ops __initdata = {
++	.smp_prepare_cpus	= shmobile_smp_apmu_prepare_cpus_dt,
++	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary_md21,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_can_disable	= shmobile_smp_cpu_can_disable,
++	.cpu_die		= shmobile_smp_apmu_cpu_die,
++	.cpu_kill		= shmobile_smp_apmu_cpu_kill,
+ #endif
++};
++
++CPU_METHOD_OF_DECLARE(shmobile_smp_apmu, "renesas,apmu", &apmu_smp_ops);
++#endif /* CONFIG_SMP */
+ 
+ #if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_SUSPEND)
+ /* nicked from arch/arm/mach-exynos/hotplug.c */
 -- 
 2.7.0.rc3.207.g0ac5344
