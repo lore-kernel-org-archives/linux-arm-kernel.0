@@ -1,138 +1,129 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jun 2016 12:02:04 +0100
-Subject: [PATCH 05/15] arm64: KVM: Refactor kern_hyp_va/hyp_kern_va to
- deal with multiple offsets
-In-Reply-To: <CAKv+Gu84EzsO4Sy07ACJ_nsok0Xr2KOkaeKRz0ObHU=0kzEZ-g@mail.gmail.com>
-References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
- <1465297115-13091-6-git-send-email-marc.zyngier@arm.com>
- <20160628124210.GP26498@cbox> <5774E4CE.8020200@arm.com>
- <5774F18C.7030603@arm.com>
- <CAKv+Gu84EzsO4Sy07ACJ_nsok0Xr2KOkaeKRz0ObHU=0kzEZ-g@mail.gmail.com>
-Message-ID: <5774FC2C.2070607@arm.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 30 Jun 2016 13:04:40 +0200
+Subject: [linux-sunxi] Re: [PATCH 06/14] ARM: dts: sun8i: Add cpu0 label
+ to sun8i-h3.dtsi
+In-Reply-To: <a3cf3531-93a5-de35-b7f4-03d28cfebb3d@megous.com>
+References: <20160623192104.18720-1-megous@megous.com>
+ <20160623192104.18720-7-megous@megous.com>
+ <CAGb2v66eskVAxdz8VtjBJBCO7VV9WL4bdFDVrPWrSmxk4RASCw@mail.gmail.com>
+ <adaf7f61-af80-cc02-8c47-af721b86f81e@megous.com>
+ <CAGb2v665O75vQEfo5WdWtWJSbKEbLi6MBAHbgZC7pyrOCOu+6g@mail.gmail.com>
+ <20160625070208.GA4000@lukather>
+ <380ebf34-fd4a-ea2d-f9cf-68b8ede44757@megous.com>
+ <20160629204553.GJ6095@lukather>
+ <a3cf3531-93a5-de35-b7f4-03d28cfebb3d@megous.com>
+Message-ID: <CAOMqctTocMFztGh7N0y=06XYGKGzx_qknM8v1VdJSuV8L7OdBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/06/16 11:42, Ard Biesheuvel wrote:
-> On 30 June 2016 at 12:16, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 30/06/16 10:22, Marc Zyngier wrote:
->>> On 28/06/16 13:42, Christoffer Dall wrote:
->>>> On Tue, Jun 07, 2016 at 11:58:25AM +0100, Marc Zyngier wrote:
->>>>> As we move towards a selectable HYP VA range, it is obvious that
->>>>> we don't want to test a variable to find out if we need to use
->>>>> the bottom VA range, the top VA range, or use the address as is
->>>>> (for VHE).
+Hello,
+
+On 29 June 2016 at 23:11, Ond?ej Jirman <megous@megous.com> wrote:
+> On 29.6.2016 22:45, Maxime Ripard wrote:
+>> Hi,
+>>
+>> On Sat, Jun 25, 2016 at 04:50:24PM +0200, Ond?ej Jirman wrote:
+>>> On 25.6.2016 09:02, Maxime Ripard wrote:
+>>>> On Sat, Jun 25, 2016 at 09:02:48AM +0800, Chen-Yu Tsai wrote:
+>>>>> On Sat, Jun 25, 2016 at 6:51 AM, Ond?ej Jirman <megous@megous.com> wrote:
+>>>>>> Hello,
+>>>>>>
+>>>>>> comments below.
+>>>>>>
+>>>>>> On 24.6.2016 05:48, Chen-Yu Tsai wrote:
+>>>>>>> On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
+>>>>>>>> From: Ondrej Jirman <megous@megous.com>
+>>>>>>>>
+>>>>>>>> Add label to the first cpu so that it can be referenced
+>>>>>>>> from derived dts files.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Ondrej Jirman <megous@megous.com>
+>>>>>>>> ---
+>>>>>>>>  arch/arm/boot/dts/sun8i-h3.dtsi | 2 +-
+>>>>>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>>>>>
+>>>>>>>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>>>>>> index 9938972..82faefc 100644
+>>>>>>>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>>>>>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>>>>>> @@ -52,7 +52,7 @@
+>>>>>>>>                 #address-cells = <1>;
+>>>>>>>>                 #size-cells = <0>;
+>>>>>>>>
+>>>>>>>> -               cpu at 0 {
+>>>>>>>> +               cpu0: cpu at 0 {
+>>>>>>>>                         compatible = "arm,cortex-a7";
+>>>>>>>>                         device_type = "cpu";
+>>>>>>>>                         reg = <0>;
+>>>>>>>
+>>>>>>> Can you also set the cpu clock here? It is part of the SoC
+>>>>>>> and does not belong in the board DTS files.
+>>>>>>
+>>>>>> Do you mean operating-points, or something else? Different SBCs will
+>>>>>> probably require different combinations of operating points just for
+>>>>>> safety's sake, because they have different regulators and [some have
+>>>>>> botched] thermal designs, so it might make sense to customize it for
+>>>>>> differnt boards, and I don't feel adventurous enough setting it for all
+>>>>>> H3 boards out there.
 >>>>>
->>>>> Instead, we can expand our current helpers to generate the right
->>>>> mask or nop with code patching. We default to using the top VA
->>>>> space, with alternatives to switch to the bottom one or to nop
->>>>> out the instructions.
+>>>>> I meant clocks = <...> and clock-latency = <...>.
 >>>>>
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> ---
->>>>>  arch/arm64/include/asm/kvm_hyp.h | 27 ++++++++++++--------------
->>>>>  arch/arm64/include/asm/kvm_mmu.h | 42 +++++++++++++++++++++++++++++++++++++---
->>>>>  2 files changed, 51 insertions(+), 18 deletions(-)
+>>>>> These 2 are part of the SoC.
 >>>>>
->>>>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
->>>>> index 61d01a9..dd4904b 100644
->>>>> --- a/arch/arm64/include/asm/kvm_hyp.h
->>>>> +++ b/arch/arm64/include/asm/kvm_hyp.h
->>>>> @@ -25,24 +25,21 @@
->>>>>
->>>>>  #define __hyp_text __section(.hyp.text) notrace
->>>>>
->>>>> -static inline unsigned long __kern_hyp_va(unsigned long v)
->>>>> -{
->>>>> -   asm volatile(ALTERNATIVE("and %0, %0, %1",
->>>>> -                            "nop",
->>>>> -                            ARM64_HAS_VIRT_HOST_EXTN)
->>>>> -                : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
->>>>> -   return v;
->>>>> -}
->>>>> -
->>>>> -#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
->>>>> -
->>>>>  static inline unsigned long __hyp_kern_va(unsigned long v)
->>>>>  {
->>>>> -   asm volatile(ALTERNATIVE("orr %0, %0, %1",
->>>>> -                            "nop",
->>>>> +   u64 mask;
->>>>> +
->>>>> +   asm volatile(ALTERNATIVE("mov %0, %1",
->>>>> +                            "mov %0, %2",
->>>>> +                            ARM64_HYP_OFFSET_LOW)
->>>>> +                : "=r" (mask)
->>>>> +                : "i" (~HYP_PAGE_OFFSET_HIGH_MASK),
->>>>> +                  "i" (~HYP_PAGE_OFFSET_LOW_MASK));
->>>>> +   asm volatile(ALTERNATIVE("nop",
->>>>> +                            "mov %0, xzr",
->>>>>                              ARM64_HAS_VIRT_HOST_EXTN)
->>>>> -                : "+r" (v) : "i" (~HYP_PAGE_OFFSET_MASK));
->>>>> -   return v;
->>>>> +                : "+r" (mask));
->>>>> +   return v | mask;
+>>>>> The OPP can stay in the board files. It's a pity there's no standard
+>>>>> OPP table for H3 though. :(
 >>>>
->>>> If mask is ~HYP_PAGE_OFFSET_LOW_MASK how can you be sure that setting
->>>> bit (VA_BITS - 1) is always the right thing to do to generate a kernel
->>>> address?
+>>>> This has never been the case, and we always had some deviation in the
+>>>> FEX files for all the SoCs.
+>>>>
+>>>> If we could come up with standard OPPs that work for every one,
+>>>> there's no reason it can't happen here.
+>>>>
+>>>> I don't really see why the thermal design should change anything. If a
+>>>> boards heats faster, it will throttle down to a lower OPP faster, but
+>>>> those OPPs are not going to change.
 >>>
->>> It has taken be a while, but I think I finally see what you mean. We
->>> have no idea whether that bit was set or not.
+>>> I've no way to test, but I've been told some Sinovoip boards are really
+>>> bad in this regard (SoC is not even well thermally connected to the
+>>> PCB/PCB not having copper layer to spread the heat). Thermal sensor
+>>> readings happen at fixed intervals, so the question is if you can heat
+>>> up the soc from say 80?C (first trip point) to over 110?C in less than
+>>> that period (330ms currently).
 >>>
->>>> This is kind of what I asked before only now there's an extra bit not
->>>> guaranteed by the architecture to be set for the kernel range, I
->>>> think.
+>>> I say it shouldn't be a problem, if that small thing is drawing say 2W
+>>> at max load. It will burn or trigger a second trip point before the
+>>> first one has a chance to trigger and the kernel will shut down. I
+>>> remember tkaiser saying that he has to run that board at 240MHz max. But
+>>> perhaps I'm misremembering.
 >>>
->>> Yeah, I finally connected the couple of neurons left up there (that's
->>> what remains after the whole brexit braindamage). This doesn't work (or
->>> rather it only works sometimes). The good new is that I also realized we
->>> don't need any of that crap.
->>>
->>> The only case we currently use a HVA->KVA transformation is to pass the
->>> panic string down to panic(), and we can perfectly prevent
->>> __kvm_hyp_teardown from ever be evaluated as a HVA with a bit of
->>> asm-foo. This allows us to get rid of this whole function.
+>>> I'm just speculating.
 >>
->> Here's what I meant by this:
+>> Yes, but that's just poor thermal design. What I was saying is that
+>> even if we really need to throttle the SoC to 240 MHz on that board
+>> because it heats too much, the couple of the frequency and the voltage
+>> will likely be the same across all boards. It's just the amount of
+>> time we'll spend using it that will differ.
 >>
->> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> index 437cfad..c19754d 100644
->> --- a/arch/arm64/kvm/hyp/switch.c
->> +++ b/arch/arm64/kvm/hyp/switch.c
->> @@ -299,9 +299,16 @@ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%
+>> But that's just my understanding, I might be speaking non-sense :)
 >>
->>  static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
->>  {
->> -       unsigned long str_va = (unsigned long)__hyp_panic_string;
->> +       unsigned long str_va;
+>> Maxime
 >>
->> -       __hyp_do_panic(hyp_kern_va(str_va),
->> +       /*
->> +        * Force the panic string to be loaded from the literal pool,
->> +        * making sure it is a kernel address and not a PC-relative
->> +        * reference.
->> +        */
->> +       asm volatile("ldr %0, =__hyp_panic_string" : "=r" (str_va));
->> +
-> 
-> Wouldn't it suffice to make  __hyp_panic_string a non-static pointer
-> to const char? That way, it will be statically initialized with a
-> kernel VA, and the external linkage forces the compiler to evaluate
-> its value at runtime.
+>
+> You're probably right. Operating points should be part of h3.dtsi, and
+> if some board is particularly bad, and can't handle being above certain
+> frequency safely, due to thermal design issues, we can override
+> operating points in its dts file.
+>
 
-Yup, that would work as well. The only nit is that the pointer needs to be
-in the __hyp_text section, and my compiler is shouting at me with this:
+Can you override them?
 
-  CC      arch/arm64/kvm/hyp/switch.o
-arch/arm64/kvm/hyp/switch.c: In function '__hyp_call_panic_vhe':
-arch/arm64/kvm/hyp/switch.c:298:13: error: __hyp_panic_string causes a section type conflict with __fpsimd_enabled_nvhe
- const char *__hyp_panic_string __section(.hyp.text) = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
-             ^
-arch/arm64/kvm/hyp/switch.c:22:24: note: '__fpsimd_enabled_nvhe' was declared here
- static bool __hyp_text __fpsimd_enabled_nvhe(void)
+AFAIK you cannot replace a property set in SoC file in a board file.
+If you can keep the operating point list and just add option which
+selects acceptable subset for the board that should work. On some
+boards this subset would be determined by regulator voltage
+constraints but not sure how you would select the subset for the
+boards with thermal problems.
 
-Any clue?
+Thanks
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Michal
