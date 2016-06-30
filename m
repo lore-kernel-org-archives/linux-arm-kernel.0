@@ -1,22 +1,58 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 30 Jun 2016 15:34:05 +0900
-Subject: [PATCH v3] arm: tegra124: remove commas from unit addresses
-In-Reply-To: <1467238897-10028-1-git-send-email-marcel.ziswiler@toradex.com>
-References: <1467238897-10028-1-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <03546b91-7c7d-427a-a583-827f00eda64c@gmail.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Thu, 30 Jun 2016 08:38:13 +0200
+Subject: [PATCH] media: s5p-mfc fix vidioc_g_crop() to return crop info.
+In-Reply-To: <1467243236-13395-1-git-send-email-shuahkh@osg.samsung.com>
+References: <1467243236-13395-1-git-send-email-shuahkh@osg.samsung.com>
+Message-ID: <8b6cc61d-836c-26f6-e6b9-269f5cb2be62@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 30, 2016 7:21:37 AM JST, Marcel Ziswiler wrote:
-> Remove commas from unit addresses as suggested by Rob Herring upon me
-> posting initial Apalis TK1 support:
->
-> http://article.gmane.org/gmane.linux.ports.tegra/26608
->
-> Please keep the remaining 0, notation on the GPU node in place as a
-> former mainline U-Boot version was looking for that particular notation
-> in order to perform required fix-ups on it.
+On 06/30/2016 01:33 AM, Shuah Khan wrote:
+> Fix vidioc_g_crop() to report crop information irrepective of ctx state.
+> g_crop is expected to return crop information as long as the passed in
+> v4l2_crop type field is vV4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE.
+> 
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index a01a373..4ace9e1 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -774,12 +774,9 @@ static int vidioc_g_crop(struct file *file, void *priv,
+>  	struct s5p_mfc_dev *dev = ctx->dev;
+>  	u32 left, right, top, bottom;
+>  
+> -	if (ctx->state != MFCINST_HEAD_PARSED &&
+> -	ctx->state != MFCINST_RUNNING && ctx->state != MFCINST_FINISHING
+> -					&& ctx->state != MFCINST_FINISHED) {
+> -			mfc_err("Cannont set crop\n");
+> -			return -EINVAL;
+> -		}
 
-Tested-by: Alexandre Courbot <acourbot@nvidia.com>
+Well, without this information all you can do is to return a fake rectangle.
+The decoder needs to have parsed the header to know the size.
 
-Confirmed that GPU still probes and is usable after this.
+> +	if (cr->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+
+Actually, this should be V4L2_BUF_TYPE_VIDEO_OUTPUT. See the spec.
+
+I actually wonder why there is a g_crop at all since without a s_crop it doesn't
+provide any useful information.
+
+And if it is needed, then g_selection is the right callback since g_crop for
+output provides the compose rectangle, not the crop rectangle (one of the
+reasons we introduced g/s_selection).
+
+Regards,
+
+	Hans
+
+> +		return -EINVAL;
+> +
+>  	if (ctx->src_fmt->fourcc == V4L2_PIX_FMT_H264) {
+>  		left = s5p_mfc_hw_call(dev->mfc_ops, get_crop_info_h, ctx);
+>  		right = left >> S5P_FIMV_SHARED_CROP_RIGHT_SHIFT;
+> 
