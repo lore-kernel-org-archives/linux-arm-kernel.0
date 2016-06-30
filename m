@@ -1,36 +1,40 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 30 Jun 2016 11:45:00 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] ARM: dts: sun5i: Enable otg on the
- auxtex t004
-In-Reply-To: <20160629203838.GI6095@lukather>
-References: <1467226022-10525-1-git-send-email-hdegoede@redhat.com>
- <20160629203838.GI6095@lukather>
-Message-ID: <dbce3f4a-dbd6-2ee6-292a-6dec71b99d63@redhat.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 30 Jun 2016 11:47:44 +0200
+Subject: [PATCH] MAINTAINERS: update STM32 maintainers list
+In-Reply-To: <1466603818-7902-1-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1466603818-7902-1-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <5774EAC0.4080906@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-On 29-06-16 22:38, Maxime Ripard wrote:
-> Hi,
+On 06/22/2016 03:56 PM, Maxime Coquelin wrote:
+> I will have less time to work on STM32 platform, so I propose
+> Alexandre as co-maintainer.
 >
-> On Wed, Jun 29, 2016 at 08:46:59PM +0200, Hans de Goede wrote:
->> The auxtek t004 has its otg usb vbus hardwired to 5v (likely in case
->> people use it to power the board instead of the dedicated power micro
->> usb connector), it does have an id pin, so it allows full otg
->> functionality.
+> Alex is working in the STMicroelectronics division in charge of STM32
+> family, so he will have access to all technical information and
+> hardware.
 >
-> I don't really get what you're saying here. Is the VBUS hardcoded to
-> 5V, without any way to switch it, or it is not wired at all?
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Alexandre Torgue <alexandre.torgue@st.com>
+> ---
+>   MAINTAINERS | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 7304d2e37a98..4504331809ac 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1723,6 +1723,7 @@ F:	drivers/ata/ahci_st.c
+>
+>   ARM/STM32 ARCHITECTURE
+>   M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> +M:	Alexandre Torgue <alexandre.torgue@st.com>
+>   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>   S:	Maintained
+>   T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
+>
 
-It is hardwired to 5v, quoting from my commit msg
-"has its otg usb vbus hardwired to 5v"
-
-> In the former case, how can one of the PMIC output be related to the
-> board power input?
-
-I believe it is not wired to the pmic output, but to the pmic 5v input.
-
-Regards,
-
-Hans
+Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
