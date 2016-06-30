@@ -1,20 +1,19 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:31 +0200
-Subject: [PATCH 11/41] ARM: dts: porter: Name serial port pfc subnode after
- device name
+Date: Thu, 30 Jun 2016 16:15:32 +0200
+Subject: [PATCH 12/41] ARM: dts: porter: Name spi pfc subnode after device name
 In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
 References: <cover.1467294011.git.horms+renesas@verge.net.au>
-Message-ID: <a1cd3c55d3fcb0003e1dfc5f87131c6689b52944.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <2d3e17013ba58a5f092133794694d2f50a4f0564.1467294011.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Name the Pin Function Controller subnode for SCIF0 after its device
-name, instead of after the serial port alias.
+Name the Pin Function Controller subnode for QSPI after its device name,
+instead of after the spi interface alias.
 
-This avoids conflicts when enabling support for more serial ports later,
-either here or in a DT overlay.
+This avoids conflicts when enabling support for more spi interfaces
+later, either here or in a DT overlay.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
@@ -23,17 +22,17 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index e9151e946da8..85d109a5f43c 100644
+index 85d109a5f43c..6761d11d3f9e 100644
 --- a/arch/arm/boot/dts/r8a7791-porter.dts
 +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -142,7 +142,7 @@
- };
+@@ -167,7 +167,7 @@
+ 		function = "sdhi2";
+ 	};
  
- &pfc {
--	scif0_pins: serial0 {
-+	scif0_pins: scif0 {
- 		groups = "scif0_data_d";
- 		function = "scif0";
+-	qspi_pins: spi0 {
++	qspi_pins: qspi {
+ 		groups = "qspi_ctrl", "qspi_data4";
+ 		function = "qspi";
  	};
 -- 
 2.7.0.rc3.207.g0ac5344
