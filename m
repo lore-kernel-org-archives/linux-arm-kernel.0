@@ -1,56 +1,92 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 30 Jun 2016 09:43:10 +0800
-Subject: [PATCH 13/21] usb: chipidea: msm: Allow core to get usb phy
-In-Reply-To: <146722867837.16253.5338887948471498730@sboyd-linaro>
+From: jun.li@nxp.com (Jun Li)
+Date: Thu, 30 Jun 2016 01:50:03 +0000
+Subject: [PATCH 08/21] usb: chipidea: Kick OTG state machine for AVVIS
+ with vbus extcon
+In-Reply-To: <20160630012652.GB19928@shlinux2>
 References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-14-stephen.boyd@linaro.org>
- <20160629064811.GH25236@shlinux2> <20160629113411.GO25236@shlinux2>
- <146722867837.16253.5338887948471498730@sboyd-linaro>
-Message-ID: <20160630014310.GD19928@shlinux2>
+ <20160626072838.28082-9-stephen.boyd@linaro.org>
+ <20160629030913.GC25236@shlinux2>
+ <146724959973.16253.818114721999543873@sboyd-linaro>
+ <20160630012652.GB19928@shlinux2>
+Message-ID: <AM4PR04MB2130FC1CB79F303F9A533EC689240@AM4PR04MB2130.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 12:31:18PM -0700, Stephen Boyd wrote:
-> Quoting Peter Chen (2016-06-29 04:34:11)
-> > On Wed, Jun 29, 2016 at 02:48:11PM +0800, Peter Chen wrote:
-> > > On Sun, Jun 26, 2016 at 12:28:30AM -0700, Stephen Boyd wrote:
-> > > > @@ -53,21 +44,9 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
-> > > >  static int ci_hdrc_msm_probe(struct platform_device *pdev)
-> > > >  {
-> > > >     struct platform_device *plat_ci;
-> > > > -   struct usb_phy *phy;
-> > > >  
-> > > >     dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
-> > > >  
-> > > > -   /*
-> > > > -    * OTG(PHY) driver takes care of PHY initialization, clock management,
-> > > > -    * powering up VBUS, mapping of registers address space and power
-> > > > -    * management.
-> > > > -    */
-> > > > -   phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
-> > > > -   if (IS_ERR(phy))
-> > > > -           return PTR_ERR(phy);
-> > > > -
-> > > > -   ci_hdrc_msm_platdata.usb_phy = phy;
-> > > > -
-> > > >     plat_ci = ci_hdrc_add_device(&pdev->dev,
-> > > >                             pdev->resource, pdev->num_resources,
-> > > >                             &ci_hdrc_msm_platdata);
-> > > > -- 
-> > > 
-> > 
-> > Wait, how about the UTMI PHY? You don't have a platform which needs
-> > to get PHY through the phandle?
+Hi Stephen,
+
+> -----Original Message-----
+> From: linux-usb-owner at vger.kernel.org [mailto:linux-usb-
+> owner at vger.kernel.org] On Behalf Of Peter Chen
+> Sent: Thursday, June 30, 2016 9:27 AM
+> To: Stephen Boyd <stephen.boyd@linaro.org>
+> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; linux-arm-msm at vger.kernel.org; Andy Gross
+> <andy.gross@linaro.org>; Bjorn Andersson <bjorn.andersson@linaro.org>;
+> Neil Armstrong <narmstrong@baylibre.com>; Arnd Bergmann <arnd@arndb.de>;
+> Felipe Balbi <balbi@kernel.org>; Peter Chen <peter.chen@nxp.com>; Greg
+> Kroah-Hartman <gregkh@linuxfoundation.org>
+> Subject: Re: [PATCH 08/21] usb: chipidea: Kick OTG state machine for AVVIS
+> with vbus extcon
 > 
-> Sorry I don't understand the question. What is the UTMI PHY? We need to
-> get the phy through phandles. The only boards that are using ci_hdrc_msm
-> are DT enabled boards.
+> On Wed, Jun 29, 2016 at 06:19:59PM -0700, Stephen Boyd wrote:
+> > Quoting Peter Chen (2016-06-28 20:09:13)
+> > > On Sun, Jun 26, 2016 at 12:28:25AM -0700, Stephen Boyd wrote:
+> > > > Force the OTG state machine to go forward when we're using an
+> > > > extcon for vbus detection. In this case, the controller may never
+> > > > raise an interrupt for AVVIS, so we need to simulate the event by
+> > > > toggling the appropriate OTG fsm bits and kicking the state
+> > > > machine again.
+> > > >
+> > >
+> > > Well, I think you may misunderstand the OTG FSM and dual-role.
+> > > From my and Felipe's point, there are seldom users for USB FSM,
+> > > there are only OTG FSM spec and related OTG certification.
+> >
+> > Probably yes.
+> >
+> > >
+> > > The OTG FSM needs related SoC support, the vbus will be off at
+> > > several states, and the SRP should be supported by SoC.
+> > >
+> > > By default, the dts needs below properties for disabling it if you
+> > > choose otg fsm support at kernel configuration.
+> > >
+> > > &usbotg1 {
+> > >         vbus-supply = <&reg_usb_otg1_vbus>;
+> > >         srp-disable;
+> > >         hnp-disable;
+> > >         adp-disable;
+> > >         status = "okay";
+> > > };
+> > >
+> > > See Documentation/devicetree/bindings/usb/generic.txt.
+> >
+> > Does this mean we should be setting all those properties if we're
+> > using an extcon for vbus and id?
+> 
+> It is not related to how we know vbus and id. If your controller is otg-
+> capable, and you don't want to enable OTG FSM (just want dual-role), you
+> should set them at dts since the zImage is multi-platforms, the
+> CONFIG_USB_OTG and CONFIG_USB_OTG_FSM may be chosen.
+> 
+> > I have noticed that vbus is powered off after some time when no device
+> > is connected and we're in A_HOST state because the timeout for a B
+> > device connection happens.
+> 
+> I think it is not you want, but it is OTG compliance.
 
-UTMI PHY is the PHY inside the SoC, I just want to confirm all your PHYs
-are at ulpi bus, if they are, you can do that, else, you may need above
-way to get the PHY through PHY node.
+For simple, if you don't want OTG(i.e HNP&SRP) at all, just needs
+dual role, you may disable CONFIG_USB_OTG and CONFIG_USB_OTG_FSM
+in your menuconfig, then you don't need touch all those properties.
 
--- 
+Li Jun
 
-Best Regards,
-Peter Chen
+> 
+> --
+> 
+> Best Regards,
+> Peter Chen
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
