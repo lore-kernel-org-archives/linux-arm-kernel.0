@@ -1,61 +1,59 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 30 Jun 2016 15:39:36 +0200
-Subject: [PULL 1/2] arm64: KVM: fix build with CONFIG_ARM_PMU disabled
+Date: Thu, 30 Jun 2016 15:39:37 +0200
+Subject: [PULL 2/2] KVM: arm/arm64: Stop leaking vcpu pid references
 In-Reply-To: <20160630133937.2654-1-christoffer.dall@linaro.org>
 References: <20160630133937.2654-1-christoffer.dall@linaro.org>
-Message-ID: <20160630133937.2654-2-christoffer.dall@linaro.org>
+Message-ID: <20160630133937.2654-3-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep Holla <sudeep.holla@arm.com>
+From: James Morse <james.morse@arm.com>
 
-When CONFIG_ARM_PMU is disabled, we get the following build error:
+kvm provides kvm_vcpu_uninit(), which amongst other things, releases the
+last reference to the struct pid of the task that was last running the vcpu.
 
-arch/arm64/kvm/sys_regs.c: In function 'pmu_counter_idx_valid':
-arch/arm64/kvm/sys_regs.c:564:27: error: 'ARMV8_PMU_CYCLE_IDX' undeclared (first use in this function)
-  if (idx >= val && idx != ARMV8_PMU_CYCLE_IDX)
-                           ^
-arch/arm64/kvm/sys_regs.c:564:27: note: each undeclared identifier is reported only once for each function it appears in
-arch/arm64/kvm/sys_regs.c: In function 'access_pmu_evcntr':
-arch/arm64/kvm/sys_regs.c:592:10: error: 'ARMV8_PMU_CYCLE_IDX' undeclared (first use in this function)
-    idx = ARMV8_PMU_CYCLE_IDX;
-          ^
-arch/arm64/kvm/sys_regs.c: In function 'access_pmu_evtyper':
-arch/arm64/kvm/sys_regs.c:638:14: error: 'ARMV8_PMU_CYCLE_IDX' undeclared (first use in this function)
-   if (idx == ARMV8_PMU_CYCLE_IDX)
-              ^
-arch/arm64/kvm/hyp/switch.c:86:15: error: 'ARMV8_PMU_USERENR_MASK' undeclared (first use in this function)
-  write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
+On arm64 built with CONFIG_DEBUG_KMEMLEAK, starting a guest with kvmtool,
+then killing it with SIGKILL results (after some considerable time) in:
+> cat /sys/kernel/debug/kmemleak
+> unreferenced object 0xffff80007d5ea080 (size 128):
+>  comm "lkvm", pid 2025, jiffies 4294942645 (age 1107.776s)
+>  hex dump (first 32 bytes):
+>    01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+>    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+>  backtrace:
+>    [<ffff8000001b30ec>] create_object+0xfc/0x278
+>    [<ffff80000071da34>] kmemleak_alloc+0x34/0x70
+>    [<ffff80000019fa2c>] kmem_cache_alloc+0x16c/0x1d8
+>    [<ffff8000000d0474>] alloc_pid+0x34/0x4d0
+>    [<ffff8000000b5674>] copy_process.isra.6+0x79c/0x1338
+>    [<ffff8000000b633c>] _do_fork+0x74/0x320
+>    [<ffff8000000b66b0>] SyS_clone+0x18/0x20
+>    [<ffff800000085cb0>] el0_svc_naked+0x24/0x28
+>    [<ffffffffffffffff>] 0xffffffffffffffff
 
-This patch fixes the build with CONFIG_ARM_PMU disabled.
+On x86 kvm_vcpu_uninit() is called on the path from kvm_arch_destroy_vm(),
+on arm no equivalent call is made. Add the call to kvm_arch_vcpu_free().
 
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+Fixes: 749cf76c5a36 ("KVM: ARM: Initial skeleton to compile KVM support")
+Cc: <stable@vger.kernel.org> # 3.10+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/arm_pmu.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kvm/arm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index fe389ac..92e7e97 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -18,13 +18,13 @@
- #ifndef __ASM_ARM_KVM_PMU_H
- #define __ASM_ARM_KVM_PMU_H
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 893941e..f1bde7c 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -263,6 +263,7 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+ 	kvm_timer_vcpu_terminate(vcpu);
+ 	kvm_vgic_vcpu_destroy(vcpu);
+ 	kvm_pmu_vcpu_destroy(vcpu);
++	kvm_vcpu_uninit(vcpu);
+ 	kmem_cache_free(kvm_vcpu_cache, vcpu);
+ }
  
--#ifdef CONFIG_KVM_ARM_PMU
--
- #include <linux/perf_event.h>
- #include <asm/perf_event.h>
- 
- #define ARMV8_PMU_CYCLE_IDX		(ARMV8_PMU_MAX_COUNTERS - 1)
- 
-+#ifdef CONFIG_KVM_ARM_PMU
-+
- struct kvm_pmc {
- 	u8 idx;	/* index into the pmu->pmc array */
- 	struct perf_event *perf_event;
 -- 
 2.9.0
