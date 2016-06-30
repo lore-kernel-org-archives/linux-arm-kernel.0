@@ -1,37 +1,20 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 01 Jul 2016 00:50:06 +0200
-Subject: [PATCH] arm64: dts: rockchip: add the power domain node for rk3399
-In-Reply-To: <CAD=FV=Uaqp5MyERwBRd1yHLYS3T2mOm-FrMtXUjzjWhCEggG+Q@mail.gmail.com>
-References: <1467251760-14695-1-git-send-email-wxt@rock-chips.com>
- <2709691.LCsUme3dJo@phil>
- <CAD=FV=Uaqp5MyERwBRd1yHLYS3T2mOm-FrMtXUjzjWhCEggG+Q@mail.gmail.com>
-Message-ID: <2164835.qn3FrgoRRc@phil>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 01 Jul 2016 02:05:15 +0300
+Subject: [PATCH 0/3] Add R8A7792/Blanche PFC support
+Message-ID: <2144803.0K8qXzjIFq@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 30. Juni 2016, 15:32:01 schrieb Doug Anderson:
-> Hi,
-> 
-> On Thu, Jun 30, 2016 at 2:57 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> >> It looks like there are also more power domains that you haven't
-> >> listed here (like PD_GMAC, for instance, or PD_CORE_L).  Are you
-> >> planning to add those in a followon patch?
-> > 
-> > that reminds me, nodes with a reg property should have the base address
-> > in the node name as well. Using the constant works nicely, as can be
-> > seen on> 
-> > the rk3288 where we have for example:
-> >         pd_vio at RK3288_PD_VIO
-> 
-> I was wondering about that.  The device tree bindings are similarly
-> missing the reg from the example.
-> 
-> I'm curious: for sorting purposes, are you supposed to know the
-> underlying integer and use that for sorting, or sort by the name of
-> the #define?
+Hello.
 
-requiring the underlying integer sounds very cumbersome, especially as the 
-sorting is only a style-thing. So personally I'd take the constants name as 
-sorting criteria, as everything else would be somewhat counter-intuitive.
+   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160630-v4.7-rc5' tag. We're adding the R8A7792 PFC node and
+the describe the pins for the SCIFs and SMSC LAN89218 Ethernet chip found on
+the Blanche board). These patches depend on the R8A7792 PFC driver patchset
+in order to work properly.
 
-Heiko
+[1/3] ARM: dts: r8a7792: add PFC support
+[2/3] ARM: dts: blanche: add SCIF pins
+[3/3] ARM: dts: blanche: add Ethernet pins
+
+WBR, Sergei
