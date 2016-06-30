@@ -1,42 +1,36 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 30 Jun 2016 07:35:14 -0400
-Subject: [PATCH v4 1/2] i2c: qup: add ACPI support
-In-Reply-To: <4749471.m1cxc4jj96@wuerfel>
-References: <1465409985-17113-1-git-send-email-austinwc@codeaurora.org>
- <4749471.m1cxc4jj96@wuerfel>
-Message-ID: <577503F2.90204@codeaurora.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 30 Jun 2016 12:39:03 +0100
+Subject: [Question] Memory attribute reserved by Device Tree?
+In-Reply-To: <CAK7LNATGoP-Wn-wiK_CgD_v=rQXyt937qRvr8LkUQ06jHB7FAA@mail.gmail.com>
+References: <CAK7LNATGoP-Wn-wiK_CgD_v=rQXyt937qRvr8LkUQ06jHB7FAA@mail.gmail.com>
+Message-ID: <577504D7.7080106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 06/08/2016 05:02 PM, Arnd Bergmann wrote:
-> On Wednesday, June 8, 2016 12:19:44 PM CEST Austin Christ wrote:
->> +               ret = device_property_read_u32(qup->dev,
->> +                               "src-clock-hz", &src_clk_freq);
->> +               if (ret) {
->> +                       dev_warn(qup->dev, "using default src-clock-hz %d",
->> +                               DEFAULT_SRC_CLK);
->> +                       src_clk_freq = DEFAULT_SRC_CLK;
->> +               }
->>
+On 30/06/16 12:10, Masahiro Yamada wrote:
+> Hello.
 > 
-> Where is this property documented?
+> Which memory attribute will ARM/ARM64 Linux
+> set to the memory region reserved by
+> /memreserve/ of Device Tree?
+> 
+> 
+> Normal memory non-cacheable?
+> Or, cacheable?
+> Or, not defined?
+> 
+> Perhaps actual behavior depends on whether the reserved area is
+> located in the low-memory region?
 
-We plan on submitting documentation via dsd at acpica.org to
-https://github.com/ahs3/dsd once it is operational. As I understand it
-the project is brand new. It may take several months to begin accepting
-submissions. In the mean time, we could potentially include
-documentation in a reply to this thread, the cover of the next series, a
-wiki page on codeaurora.org, a file in Documentation (perhaps to be
-replaced by ACPICA style imports of the OS-neutral DSD project or a git
-submodule) or potentially other means. Please let us know what you think
-is sufficient.
+Isn't the point of memreserve that the kernel avoids mapping it at all?
+If a reserved region is later mapped in by a driver using
+dma_declare_coherent_memory(), ioremap(), memremap() or whatever else,
+then the attributes will vary depending on the exact method used.
 
-Thanks,
-Cov
+Robin.
 
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> 
+> 
+> Thanks,
+> 
+> 
