@@ -1,115 +1,129 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 30 Jun 2016 12:25:15 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
- dt property
-In-Reply-To: <CAOiHx==82LHOeQMNVD+dybFifXX690Q6AJTcMBMynjSfUOyGUw@mail.gmail.com>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
- <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
- <6402170.5s0abZDqlD@wuerfel> <1467230078.2598.2.camel@plaes.org>
- <87eg7f6odi.fsf@kamboji.qca.qualcomm.com>
- <e94f58fe-f709-94bd-21f6-144c4e038d17@redhat.com>
- <87a8i36ls9.fsf@kamboji.qca.qualcomm.com>
- <14a3aa66-5851-5537-f6cd-7681fb4cde07@redhat.com>
- <CAOiHx==82LHOeQMNVD+dybFifXX690Q6AJTcMBMynjSfUOyGUw@mail.gmail.com>
-Message-ID: <8d8bd933-717b-48e4-f002-7b834abed6fd@redhat.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 30 Jun 2016 12:32:32 +0200
+Subject: [PATCH v2] xen/arm: register clocks used by the hypervisor
+Message-ID: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some clocks might be used by the Xen hypervisor and not by the Linux
+kernel. If these are not registered by the Linux kernel, they might be
+disabled by clk_disable_unused() as the kernel doesn't know that they
+are used. The clock of the serial console handled by Xen is one
+example for this. It might be disabled by clk_disable_unused() which
+stops the whole serial output, even from Xen, then.
 
-On 30-06-16 12:18, Jonas Gorski wrote:
-> Hi,
->
-> On 30 June 2016 at 12:04, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->>
->> On 30-06-16 11:58, Kalle Valo wrote:
->>>
->>> Hans de Goede <hdegoede@redhat.com> writes:
->>>
->>>> Hi,
->>>>
->>>> On 30-06-16 11:02, Kalle Valo wrote:
->>>>>
->>>>> Priit Laes <plaes@plaes.org> writes:
->>>>>
->>>>>>> What is the size of this nvram file? As it's board specific, I wonder
->>>>>>> if we can simply include it inside of the DT verbatim. I remember
->>>>>>> doing that (in the pre-dtb days, on real open firmware) for the
->>>>>>> "spidernet"
->>>>>>> ethernet driver.
->>>>>>
->>>>>>
->>>>>> It contains a bit too much info:
->>>>>>
->>>>>> This is what CubieTruck requires:
->>>>>>
->>>>>>
->>>>>> http://dl.cubieboard.org/public/Cubieboard/benn/firmware/ap6210/nvram_ap6210.txt
->>>>>
->>>>>
->>>>> In the nvram file I see lots of identifiers:
->>>>>
->>>>> manfid=0x2d0
->>>>> prodid=0x492
->>>>> vendid=0x14e4
->>>>> devid=0x4343
->>>>> boardtype=0x0598
->>>>> boardrev=0x1307
->>>>> boardnum=777
->>>>>
->>>>> Are any of these (or a combination of them) unique for each board type?
->>>>> What if one of these is provided through DT and then the driver could
->>>>> choose the nvram file based on the board id? Just another idea...
->>>>
->>>>
->>>> That would require updating a table in the driver every time a new
->>>> board comes out, I do not believe that that is a good solution.
->>>
->>>
->>> You don't necessarily need to have a table in the driver if you embed
->>> the id to the filename, for example something like this:
->>>
->>> nvram-0598-1307.txt
->>> nvram-<boardtype>-<boardrev>.txt
->>
->>
->> Downside of this is, that as Arend already said, the nvram files are not
->> readily available.
->>
->> Typically the boards we are talking about are shipped with android,
->> and the mainline kernel bringup is done by a user, not the manufacturer.
->>
->> So the nvram file needs to be extracted from e.g. an android image,
->> having ap6210 in the filename allows the user to see that his module
->> (which is clearly labelled ap6210 is already supported, where as the
->> boardtype/boardrev magic numbers are a big unknown.
->>
->> So I believe that using a human readable string is better here.
->
-> So then how about making use of a more specific compatible string?
->
-> e.g.
->
-> brcmf {
->         compatible = "foo,ap6210", "brcm,bcm4329-fmac";
->         ...
-> };
->
-> and if the compatible has more than one element you request
-> FW_NAME_<compatible>.txt as the nvram file. Or try each comptible (and
-> lastly no suffix) until you get a match. (AFAICT, this is what the
-> "model" property was originally intended for anyway, but almost nobody
-> did it right, and everyone put a user readable string into "model" for
-> boards instead of the ePAPR defined compatible string).
+Up to now, the workaround for this has been to use the Linux kernel
+command line parameter 'clk_ignore_unused'. See Xen bug
 
-Hmm, interesting idea. Not sure how easy / hard it will be to implement
-this, but from a dt binding point of view it seems elegant.
+http://bugs.xenproject.org/xen/bug/45
 
-Kalle, Arend, what do you think of this ?
+too.
 
-Regards,
+To fix this, we will add the "unused" clocks in Xen to the hypervisor
+node. The Linux kernel has to register the clocks from the hypervisor
+node, then.
 
-Hans
+Therefore, check if there is a "clocks" entry in the hypervisor node
+and if so register the given clocks to the Linux kernel clock
+framework and with this mark them as used. This prevents the clocks
+from being disabled.
+
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+---
+Changes in v2:
+ - Rebase against git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip.git for-linus-4.8
+ - Add changes to Documentation/devicetree/bindings/arm/xen.txt
+
+ Documentation/devicetree/bindings/arm/xen.txt | 11 +++++++
+ arch/arm/xen/enlighten.c                      | 47 +++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+index c9b9321..55dfd3b 100644
+--- a/Documentation/devicetree/bindings/arm/xen.txt
++++ b/Documentation/devicetree/bindings/arm/xen.txt
+@@ -17,6 +17,17 @@ the following properties:
+   A GIC node is also required.
+   This property is unnecessary when booting Dom0 using ACPI.
+ 
++Optional properties:
++
++- clocks: one or more clocks to be registered.
++  Xen hypervisor drivers might replace native drivers, resulting in
++  clocks not registered by these native drivers. To avoid that these
++  unregistered clocks are disabled, then, e.g. by clk_disable_unused(),
++  register them in the hypervisor node.
++  An example for this are the clocks of the serial driver. If the clocks
++  used by the serial hardware interface are not registered by the serial
++  driver the serial output might stop once clk_disable_unused() is called.
++
+ To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
+ under /hypervisor with following parameters:
+ 
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 47acb36..5c546d0 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -24,6 +24,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
++#include <linux/clk-provider.h>
+ #include <linux/cpuidle.h>
+ #include <linux/cpufreq.h>
+ #include <linux/cpu.h>
+@@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
+ }
+ late_initcall(xen_pm_init);
+ 
++/*
++ * Check if we want to register some clocks, that they
++ * are not freed because unused by clk_disable_unused().
++ * E.g. the serial console clock.
++ */
++static int __init xen_arm_register_clks(void)
++{
++	struct clk *clk;
++	struct device_node *xen_node;
++	unsigned int i, count;
++	int ret = 0;
++
++	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
++	if (!xen_node) {
++		pr_err("Xen support was detected before, but it has disappeared\n");
++		return -EINVAL;
++	}
++
++	count = of_clk_get_parent_count(xen_node);
++	if (!count)
++		goto out;
++
++	for (i = 0; i < count; i++) {
++		clk = of_clk_get(xen_node, i);
++		if (IS_ERR(clk)) {
++			pr_err("Xen failed to register clock %i. Error: %li\n",
++			       i, PTR_ERR(clk));
++			ret = PTR_ERR(clk);
++			goto out;
++		}
++
++		ret = clk_prepare_enable(clk);
++		if (ret < 0) {
++			pr_err("Xen failed to enable clock %i. Error: %i\n",
++			       i, ret);
++			goto out;
++		}
++	}
++
++	ret = 0;
++
++out:
++	of_node_put(xen_node);
++	return ret;
++}
++late_initcall(xen_arm_register_clks);
+ 
+ /* empty stubs */
+ void xen_arch_pre_suspend(void) { }
+-- 
+2.8.0
