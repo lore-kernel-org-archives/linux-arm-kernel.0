@@ -1,86 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:03 +0200
-Subject: [PATCH 5/9] arm64: dts: salvator-x: add Salvator-X board on R8A7796
- SoC
+Date: Thu, 30 Jun 2016 16:15:04 +0200
+Subject: [PATCH 6/9] arm64: dts: r8a7796: Add SYSC PM Domains
 In-Reply-To: <cover.1467291676.git.horms+renesas@verge.net.au>
 References: <cover.1467291676.git.horms+renesas@verge.net.au>
-Message-ID: <d0246960578accf5bd5bed5c61e3553aafc96349.1467291676.git.horms+renesas@verge.net.au>
+Message-ID: <fbb099e4ec724e320bec0126a47dbb683ca3cab0.1467291676.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch adds initial board support for R8A7796 Salvator-X.
+Add a device node for the System Controller.
+Hook up the Cortex-A57 CPU core and L2 cache/SCU to their respective PM
+Domains.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/Makefile               |  1 +
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 45 ++++++++++++++++++++++
- 2 files changed, 46 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
-index 9ce1890a650e..17139f7003a6 100644
---- a/arch/arm64/boot/dts/renesas/Makefile
-+++ b/arch/arm64/boot/dts/renesas/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb
-+dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 178debf68318..85f0843ddd87 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -10,6 +10,7 @@
  
- always		:= $(dtb-y)
- clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-new file mode 100644
-index 000000000000..9c52613fb88c
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Device Tree Source for the Salvator-X board
-+ *
-+ * Copyright (C) 2016 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+ #include <dt-bindings/clock/r8a7796-cpg-mssr.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/power/r8a7796-sysc.h>
+ 
+ / {
+ 	compatible = "renesas,r8a7796";
+@@ -30,6 +31,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0x0>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7796_PD_CA57_CPU0>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
+ 		};
+@@ -37,6 +39,7 @@
+ 		L2_CA57: cache-controller at 0 {
+ 			compatible = "cache";
+ 			reg = <0>;
++			power-domains = <&sysc R8A7796_PD_CA57_SCU>;
+ 			cache-unified;
+ 			cache-level = <2>;
+ 		};
+@@ -104,6 +107,12 @@
+ 			#power-domain-cells = <0>;
+ 		};
+ 
++		sysc: system-controller at e6180000 {
++			compatible = "renesas,r8a7796-sysc";
++			reg = <0 0xe6180000 0 0x0400>;
++			#power-domain-cells = <1>;
++		};
 +
-+/dts-v1/;
-+#include "r8a7796.dtsi"
-+
-+/ {
-+	model = "Renesas Salvator-X board based on r8a7796";
-+	compatible = "renesas,salvator-x", "renesas,r8a7796";
-+
-+	aliases {
-+		serial0 = &scif2;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 48000000 {
-+		device_type = "memory";
-+		/* first 128MB is reserved for secure area. */
-+		reg = <0x0 0x48000000 0x0 0x78000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <16666666>;
-+};
-+
-+&scif2 {
-+	status = "okay";
-+};
-+
-+&scif_clk {
-+	clock-frequency = <14745600>;
-+	status = "okay";
-+};
+ 		scif2: serial at e6e88000 {
+ 			compatible = "renesas,scif-r8a7796",
+ 				     "renesas,rcar-gen3-scif", "renesas,scif";
 -- 
 2.7.0.rc3.207.g0ac5344
