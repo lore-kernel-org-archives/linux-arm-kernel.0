@@ -1,45 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 Jun 2016 22:41:52 +0200
-Subject: [linux-sunxi] Re: [PATCH 06/14] ARM: dts: sun8i: Add cpu0 label
- to sun8i-h3.dtsi
-In-Reply-To: <CAOMqctTocMFztGh7N0y=06XYGKGzx_qknM8v1VdJSuV8L7OdBQ@mail.gmail.com>
-References: <20160623192104.18720-1-megous@megous.com>
- <20160623192104.18720-7-megous@megous.com>
- <CAGb2v66eskVAxdz8VtjBJBCO7VV9WL4bdFDVrPWrSmxk4RASCw@mail.gmail.com>
- <adaf7f61-af80-cc02-8c47-af721b86f81e@megous.com>
- <CAGb2v665O75vQEfo5WdWtWJSbKEbLi6MBAHbgZC7pyrOCOu+6g@mail.gmail.com>
- <20160625070208.GA4000@lukather>
- <380ebf34-fd4a-ea2d-f9cf-68b8ede44757@megous.com>
- <20160629204553.GJ6095@lukather>
- <a3cf3531-93a5-de35-b7f4-03d28cfebb3d@megous.com>
- <CAOMqctTocMFztGh7N0y=06XYGKGzx_qknM8v1VdJSuV8L7OdBQ@mail.gmail.com>
-Message-ID: <20160630204152.GD5485@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 30 Jun 2016 21:52:15 +0100
+Subject: [PATCH 6/6] spi: st-ssc4: Remove 'no clocking' hack
+In-Reply-To: <20160607151712.GA7510@sirena.org.uk>
+References: <20160607111930.10375-1-lee.jones@linaro.org>
+ <20160607111930.10375-7-lee.jones@linaro.org>
+ <20160607151712.GA7510@sirena.org.uk>
+Message-ID: <20160630205215.GF1707@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 01:04:40PM +0200, Michal Suchanek wrote:
-> > You're probably right. Operating points should be part of h3.dtsi, and
-> > if some board is particularly bad, and can't handle being above certain
-> > frequency safely, due to thermal design issues, we can override
-> > operating points in its dts file.
-> >
+On Tue, 07 Jun 2016, Mark Brown wrote:
+> On Tue, Jun 07, 2016 at 12:19:30PM +0100, Lee Jones wrote:
+> > Due to the newly upstreamed 'critical clocks' API we can now
+> > safely handle clocking in the SPI and I2C drivers without fear
+> > of catastrophically crippling the running platform.
 > 
-> Can you override them?
-> 
-> AFAIK you cannot replace a property set in SoC file in a board file.
+> Acked-by: Mark Brown <broonie@kernel.org>
 
-You totally can, we have litterally dozens of examples of that already.
-
-Maxime
+We really need to guarantee that this goes in *after* the other
+patches have landed, and it looks like they're heading in via their
+own respective trees.  Any chance you can hold this back and submit it
+via your v4.8-fixes submission?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160630/bd9715b7/attachment-0001.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
