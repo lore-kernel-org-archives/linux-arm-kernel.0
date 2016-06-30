@@ -1,59 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:16:12 +0200
-Subject: [PATCH 5/5] soc: renesas: rcar-sysc: Improve SYSC interrupt config in
- legacy wrapper
+Date: Thu, 30 Jun 2016 16:16:10 +0200
+Subject: [PATCH 3/5] soc: renesas: rcar-sysc: Make rcar_sysc_init() init the
+ PM domains
 In-Reply-To: <cover.1467292648.git.horms+renesas@verge.net.au>
 References: <cover.1467292648.git.horms+renesas@verge.net.au>
-Message-ID: <ced42730d19dd140a76f86c3761f646b83a35d09.1467292648.git.horms+renesas@verge.net.au>
+Message-ID: <b1e52287a29cf0673e1a60210d55edccc756e44a.1467292648.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Align SYSC interrupt configuration in the legacy wrapper with the DT
-version:
-  - Mask SYSC interrupt sources before enabling them (doesn't matter
-    much as they're disabled at the GIC level anyway),
-  - Make sure not to clear reserved SYSCIMR bits that were set before.
+Let rcar_sysc_init() trigger initialization of the SYSC PM domains from
+DT if called before the early_initcall.
+On failure, it falls back to mapping the passed register block, as
+before.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/soc/renesas/rcar-sysc.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ drivers/soc/renesas/rcar-sysc.c | 20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 22f0d646225c..65c8e1eb90c0 100644
+index 59a8152681a5..68d6856c9d3c 100644
 --- a/drivers/soc/renesas/rcar-sysc.c
 +++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -402,12 +402,25 @@ early_initcall(rcar_sysc_pd_init);
- 
- void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
- {
-+	u32 syscimr;
-+
- 	if (!rcar_sysc_pd_init())
- 		return;
- 
- 	rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
- 
--	/* enable all interrupt sources, but do not use interrupt handler */
-+	/*
-+	 * Mask all interrupt sources to prevent the CPU from receiving them.
-+	 * Make sure not to clear reserved bits that were set before.
-+	 */
-+	syscimr = ioread32(rcar_sysc_base + SYSCIMR);
-+	syscimr |= syscier;
-+	pr_debug("%s: syscimr = 0x%08x\n", __func__, syscimr);
-+	iowrite32(syscimr, rcar_sysc_base + SYSCIMR);
-+
-+	/*
-+	 * SYSC needs all interrupt sources enabled to control power.
-+	 */
-+	pr_debug("%s: syscier = 0x%08x\n", __func__, syscier);
- 	iowrite32(syscier, rcar_sysc_base + SYSCIER);
--	iowrite32(0, rcar_sysc_base + SYSCIMR);
+@@ -164,15 +164,6 @@ static bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
+ 	return false;
  }
+ 
+-void __iomem *rcar_sysc_init(phys_addr_t base)
+-{
+-	rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
+-	if (!rcar_sysc_base)
+-		panic("unable to ioremap R-Car SYSC hardware block\n");
+-
+-	return rcar_sysc_base;
+-}
+-
+ struct rcar_sysc_pd {
+ 	struct generic_pm_domain genpd;
+ 	struct rcar_sysc_ch ch;
+@@ -328,6 +319,9 @@ static int __init rcar_sysc_pd_init(void)
+ 	unsigned int i;
+ 	int error;
+ 
++	if (rcar_sysc_base)
++		return 0;
++
+ 	np = of_find_matching_node_and_match(NULL, rcar_sysc_matches, &match);
+ 	if (!np)
+ 		return -ENODEV;
+@@ -405,3 +399,11 @@ out_put:
+ 	return error;
+ }
+ early_initcall(rcar_sysc_pd_init);
++
++void __iomem * __init rcar_sysc_init(phys_addr_t base)
++{
++	if (rcar_sysc_pd_init())
++		rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
++
++	return rcar_sysc_base;
++}
 -- 
 2.7.0.rc3.207.g0ac5344
