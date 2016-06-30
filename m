@@ -1,61 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jun 2016 16:15:00 +0200
-Subject: [PATCH 2/9] arm64: dts: r8a7795: Add CAN FD support
+Date: Thu, 30 Jun 2016 16:15:07 +0200
+Subject: [PATCH 9/9] arm64: dts: r8a7796/salvator-x: Enable watchdog timer
 In-Reply-To: <cover.1467291676.git.horms+renesas@verge.net.au>
 References: <cover.1467291676.git.horms+renesas@verge.net.au>
-Message-ID: <341eb484b14a16fd32086e7dd82a9f7fdea2d040.1467291676.git.horms+renesas@verge.net.au>
+Message-ID: <2c9616a1fc01c656f04f03feb58fa12d9b30802a.1467291676.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Adds CAN FD controller node for r8a7795.
+Enable the Watchdog Timer (WDT) controller on the Renesas Salvator-X
+board equipped with an R-Car M3-W (r8a7796) SoC.
 
-Note: CAN FD controller register base address specified in R-Car Gen3
-Hardware User Manual v0.5E is incorrect. The correct address is:
-
-CAN FD - 0xe66c0000
-
-Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index fad6dd8b7771..b902356873c2 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -583,6 +583,30 @@
- 			status = "disabled";
- 		};
- 
-+		canfd: can at e66c0000 {
-+			compatible = "renesas,r8a7795-canfd",
-+				     "renesas,rcar-gen3-canfd";
-+			reg = <0 0xe66c0000 0 0x8000>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
-+				   <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 914>,
-+			       <&cpg CPG_CORE R8A7795_CLK_CANFD>,
-+			       <&can_clk>;
-+			clock-names = "fck", "canfd", "can_clk";
-+			assigned-clocks = <&cpg CPG_CORE R8A7795_CLK_CANFD>;
-+			assigned-clock-rates = <40000000>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			status = "disabled";
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+index 9c52613fb88c..e72be3856d79 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+@@ -43,3 +43,8 @@
+ 	clock-frequency = <14745600>;
+ 	status = "okay";
+ };
 +
-+			channel0 {
-+				status = "disabled";
-+			};
-+
-+			channel1 {
-+				status = "disabled";
-+			};
-+		};
-+
- 		hscif0: serial at e6540000 {
- 			compatible = "renesas,hscif-r8a7795",
- 				     "renesas,rcar-gen3-hscif",
++&wdt0 {
++	timeout-sec = <60>;
++	status = "okay";
++};
 -- 
 2.7.0.rc3.207.g0ac5344
