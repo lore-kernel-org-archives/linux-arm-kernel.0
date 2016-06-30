@@ -1,56 +1,41 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 30 Jun 2016 17:13:35 +0300
-Subject: [PATCHv3 4/7] clk: ti: mux: export mux clock APIs locally
+Date: Thu, 30 Jun 2016 17:13:36 +0300
+Subject: [PATCHv3 5/7] clk: ti: am33xx: fix timer3/6 init time setup for
+ module clocks
 In-Reply-To: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
 References: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1467296018-25086-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1467296018-25086-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-get_parent and set_parent are going to be required by the support of
-module clocks, so export these locally.
+timer*_fck are going to be renamed as timer*_mod_ck:s. Fix the init
+time configuration of timer3/timer6 to take this into account, and
+lookup for the module clock in case the lookup for fck fails.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clock.h | 3 +++
- drivers/clk/ti/mux.c   | 4 ++--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ drivers/clk/ti/clk-33xx.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 90f3f47..7eca8a1 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -224,6 +224,9 @@ extern const struct clk_hw_omap_ops clkhwops_am35xx_ipss_wait;
- extern const struct clk_ops ti_clk_divider_ops;
- extern const struct clk_ops ti_clk_mux_ops;
+diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
+index ef2ec64..c69fed5 100644
+--- a/drivers/clk/ti/clk-33xx.c
++++ b/drivers/clk/ti/clk-33xx.c
+@@ -144,9 +144,15 @@ int __init am33xx_dt_clk_init(void)
  
-+u8 ti_clk_mux_get_parent(struct clk_hw *hw);
-+int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index);
+ 	clk1 = clk_get_sys(NULL, "sys_clkin_ck");
+ 	clk2 = clk_get_sys(NULL, "timer3_fck");
++	if (IS_ERR(clk2))
++		clk2 = clk_get_sys(NULL, "timer3_mod_ck");
 +
- int omap2_clkops_enable_clkdm(struct clk_hw *hw);
- void omap2_clkops_disable_clkdm(struct clk_hw *hw);
+ 	clk_set_parent(clk2, clk1);
  
-diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
-index 44777ab..57ff471 100644
---- a/drivers/clk/ti/mux.c
-+++ b/drivers/clk/ti/mux.c
-@@ -26,7 +26,7 @@
- #undef pr_fmt
- #define pr_fmt(fmt) "%s: " fmt, __func__
- 
--static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
-+u8 ti_clk_mux_get_parent(struct clk_hw *hw)
- {
- 	struct clk_mux *mux = to_clk_mux(hw);
- 	int num_parents = clk_hw_get_num_parents(hw);
-@@ -63,7 +63,7 @@ static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
- 	return val;
- }
- 
--static int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index)
-+int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index)
- {
- 	struct clk_mux *mux = to_clk_mux(hw);
- 	u32 val;
+ 	clk2 = clk_get_sys(NULL, "timer6_fck");
++	if (IS_ERR(clk2))
++		clk2 = clk_get_sys(NULL, "timer6_mod_ck");
++
+ 	clk_set_parent(clk2, clk1);
+ 	/*
+ 	 * The On-Chip 32K RC Osc clock is not an accurate clock-source as per
 -- 
 1.9.1
