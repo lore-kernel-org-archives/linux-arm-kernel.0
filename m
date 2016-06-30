@@ -1,32 +1,55 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 30 Jun 2016 15:32:01 -0700
-Subject: [PATCH] arm64: dts: rockchip: add the power domain node for rk3399
-In-Reply-To: <2709691.LCsUme3dJo@phil>
-References: <1467251760-14695-1-git-send-email-wxt@rock-chips.com>
- <CAD=FV=Wg1vuBhcjFRj53t-E0sKoBH577RB7gHZ-rkJV5T7nyZw@mail.gmail.com>
- <2709691.LCsUme3dJo@phil>
-Message-ID: <CAD=FV=Uaqp5MyERwBRd1yHLYS3T2mOm-FrMtXUjzjWhCEggG+Q@mail.gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 30 Jun 2016 18:59:07 -0400
+Subject: [PATCH 0/7] net: ethernet: bgmac: Add platform device support
+Message-ID: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Well, no compilained too loudly at the RFC version of this patch series
+(see https://lkml.org/lkml/2016/6/28/863).  So, I'm officially sending
+this out for inclusion.  All comments from the RFC were addressed in
+this version.
 
-On Thu, Jun 30, 2016 at 2:57 PM, Heiko Stuebner <heiko@sntech.de> wrote:
->> It looks like there are also more power domains that you haven't
->> listed here (like PD_GMAC, for instance, or PD_CORE_L).  Are you
->> planning to add those in a followon patch?
->
-> that reminds me, nodes with a reg property should have the base address in
-> the node name as well. Using the constant works nicely, as can be seen on
-> the rk3288 where we have for example:
->
->         pd_vio at RK3288_PD_VIO
+This patch series adds support for other, non-bcma iProc SoC's to the
+bgmac driver.  This series only adds NSP support, but we are interested
+in adding support for the Cygnus and NS2 families (with more possible
+down the road).
 
-I was wondering about that.  The device tree bindings are similarly
-missing the reg from the example.
+To support non-bcma enabled SoCs, we need to add the standard device
+tree "platform device" support.  Unfortunately, this driver is very
+tighly coupled with the bcma bus and much unwinding is needed.  I tried
+to break this up into a number of patches to make it more obvious what
+was being done to add platform device support.  I was able to verify
+that the bcma code still works using a 53012K board (NS SoC), and that
+the platform code works using a 58625K board (NSP SoC).
 
-I'm curious: for sorting purposes, are you supposed to know the
-underlying integer and use that for sorting, or sort by the name of
-the #define?
+Thanks,
+Jon
 
--Doug
+Jon Mason (7):
+  net: ethernet: bgmac: change bgmac_* prints to dev_* prints
+  net: ethernet: bgmac: add dma_dev pointer
+  net: ethernet: bgmac: move BCMA MDIO Phy code into a separate file
+  net: ethernet: bgmac: convert to feature flags
+  net: ethernet: bgmac: Add platform device support
+  dt-bindings: net: bgmac: add bindings documentation for bgmac
+  ARM: dts: NSP: Add bgmac entries
+
+ .../devicetree/bindings/net/brcm,bgmac-nsp.txt     |  24 +
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |  18 +
+ arch/arm/boot/dts/bcm958625k.dts                   |   8 +
+ drivers/net/ethernet/broadcom/Kconfig              |  23 +-
+ drivers/net/ethernet/broadcom/Makefile             |   2 +
+ drivers/net/ethernet/broadcom/bgmac-bcma-mdio.c    | 266 +++++++++
+ drivers/net/ethernet/broadcom/bgmac-bcma.c         | 315 ++++++++++
+ drivers/net/ethernet/broadcom/bgmac-platform.c     | 210 +++++++
+ drivers/net/ethernet/broadcom/bgmac.c              | 658 +++++----------------
+ drivers/net/ethernet/broadcom/bgmac.h              | 112 +++-
+ 10 files changed, 1120 insertions(+), 516 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
+ create mode 100644 drivers/net/ethernet/broadcom/bgmac-bcma-mdio.c
+ create mode 100644 drivers/net/ethernet/broadcom/bgmac-bcma.c
+ create mode 100644 drivers/net/ethernet/broadcom/bgmac-platform.c
+
+-- 
+1.9.1
