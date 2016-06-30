@@ -1,29 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 30 Jun 2016 17:13:18 +0100
-Subject: [PATCH 0/5] arm64: avoid block entries that we need to split later
-In-Reply-To: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160630161317.GC26679@e104818-lin.cambridge.arm.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Thu, 30 Jun 2016 09:15:46 -0700
+Subject: [PATCH] arm64: tegra: Add missing Smaug revision
+In-Reply-To: <20160629085229.31350-1-acourbot@nvidia.com>
+References: <20160629085229.31350-1-acourbot@nvidia.com>
+Message-ID: <CAL1qeaF+Zck_p_1d-cNMvoJ8oMn7c65wL21E6LjGVVMA3BY2yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 02:51:25PM +0200, Ard Biesheuvel wrote:
-> Ard Biesheuvel (4):
->   arm64: mm: add param to force create_pgd_mapping() to use page
->     mappings
->   arm64: efi: always map runtime services code and data regions down to
->     pages
->   arm64: efi: avoid block mappings for unaligned UEFI memory regions
->   arm64: mm: fold init_pgd() into __create_pgd_mapping()
-> 
-> Catalin Marinas (1):
->   arm64: mm: Remove split_p*d() functions
+On Wed, Jun 29, 2016 at 1:52 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> The "google,smaug-rev2" string is missing from the compatible list of
+> Smaug's DT. The differences of rev2 are not relevant at our current
+> level of support and it boots just fine, so add it.
+>
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 
-I plan to queue these patches for 4.8. Do you have any other patches
-based on these so that I need to create a separate branch? Otherwise,
-I'll just push them on top of arm64 for-next/core branch.
+Acked-by: Andrew Bresticker <abrestic@chromium.org>
 
-Thanks.
-
--- 
-Catalin
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> index 431266a48e9c..82a96bd27bc8 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> +++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> @@ -11,7 +11,8 @@
+>         compatible = "google,smaug-rev8", "google,smaug-rev7",
+>                      "google,smaug-rev6", "google,smaug-rev5",
+>                      "google,smaug-rev4", "google,smaug-rev3",
+> -                    "google,smaug-rev1", "google,smaug", "nvidia,tegra210";
+> +                    "google,smaug-rev2", "google,smaug-rev1",
+> +                    "google,smaug", "nvidia,tegra210";
+>
+>         aliases {
+>                 serial0 = &uarta;
+> --
+> 2.9.0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
