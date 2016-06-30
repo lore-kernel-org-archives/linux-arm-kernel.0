@@ -1,43 +1,94 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 30 Jun 2016 11:30:31 +0200
-Subject: [PATCH 0/3] Fixes for Tegra XUSB
-In-Reply-To: <1467198453-23406-1-git-send-email-jonathanh@nvidia.com>
-References: <1467198453-23406-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20160630093031.GB1776@ulmo.ba.sec>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Thu, 30 Jun 2016 17:31:00 +0800
+Subject: [PATCH v8 02/10] drm/hisilicon: Add hisilicon kirin drm master
+ driver
+In-Reply-To: <CACvgo50dggEbwzEZLUvtErzrxOr3B1gECyyehLQZkoE5oXfNmA@mail.gmail.com>
+References: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
+ <1460364943-76135-3-git-send-email-xinliang.liu@linaro.org>
+ <CACvgo50dggEbwzEZLUvtErzrxOr3B1gECyyehLQZkoE5oXfNmA@mail.gmail.com>
+Message-ID: <CAGd==05kyhB8kb7nVKrbp5OeNDtROfmfTsczmtQE4A_RZoBdCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 12:07:30PM +0100, Jon Hunter wrote:
-> Fixes for Tegra XUSB dt-binding documentation and the XUSB mailbox
-> interrupt.
-> 
-> When testing XUSB on the Tegra210 Smaug, I found that USB connect and
-> disconnect events were not being seen. I have debug this and found that
-> the XUSB mailbox is incorrect and I was never receiving any interrupts
-> from the XUSB mailbox. Interestingly, this behaviour is not seen on the
-> Tegra210 Jetson TX1 despite the fact that there were no mailbox
-> interrupts. The two boards have different USB connectors and so may be
-> the connection is slightly different. After fixing the mailbox interrupt
-> both boards now receive interrupts from the XUSB mailbox as expected.
-> 
-> Jon Hunter (3):
->   dt-bindings: phy: Fix description of Tegra210 PHY nodes
->   dt-bindings: usb: Fix Tegra XUSB example
->   arm64: tegra: Correct Tegra210 XUSB mailbox interrupt
-> 
->  .../devicetree/bindings/phy/nvidia,tegra124-xusb-padctl.txt       | 2 +-
->  Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt    | 8 ++++----
->  arch/arm64/boot/dts/nvidia/tegra210.dtsi                          | 2 +-
->  3 files changed, 6 insertions(+), 6 deletions(-)
+On 13 April 2016 at 20:15, Emil Velikov <emil.l.velikov@gmail.com> wrote:
+> Hi Xinliang,
+>
+> On 11 April 2016 at 09:55, Xinliang Liu <xinliang.liu@linaro.org> wrote:
+>
+>> +static int kirin_drm_connectors_register(struct drm_device *dev)
+>> +{
+>> +       struct drm_connector *connector;
+>> +       struct drm_connector *failed_connector;
+>> +       int ret;
+>> +
+>> +       mutex_lock(&dev->mode_config.mutex);
+>> +       drm_for_each_connector(connector, dev) {
+>> +               ret = drm_connector_register(connector);
+>> +               if (ret) {
+>> +                       failed_connector = connector;
+>> +                       goto err;
+>> +               }
+>> +       }
+>> +       mutex_unlock(&dev->mode_config.mutex);
+>> +
+>> +       return 0;
+>> +
+>> +err:
+>> +       drm_for_each_connector(connector, dev) {
+>> +               if (failed_connector == connector)
+>> +                       break;
+>> +               drm_connector_unregister(connector);
+>> +       }
+>> +       mutex_unlock(&dev->mode_config.mutex);
+>> +
+>> +       return ret;
+>> +}
+>> +
+> Iirc we have new drm_connector_{un,}register_all() helpers.You might
+> want to use it once they are in (i.e. not sure what your base is and
+> if they have landed yet).
+>
+>
+>> +static struct device_node *kirin_get_remote_node(struct device_node *np)
+>> +{
+>> +       struct device_node *endpoint, *remote;
+>> +
+>> +       /* get the first endpoint, in our case only one remote node
+>> +        * is connected to display controller.
+>> +        */
+>> +       endpoint = of_graph_get_next_endpoint(np, NULL);
+>> +       if (!endpoint) {
+>> +               DRM_ERROR("no valid endpoint node\n");
+>> +               return ERR_PTR(-ENODEV);
+>> +       }
+>> +       of_node_put(endpoint);
+>> +
+>> +       remote = of_graph_get_remote_port_parent(endpoint);
+>> +       if (!remote) {
+>> +               DRM_ERROR("no valid remote node\n");
+>> +               return ERR_PTR(-ENODEV);
+>> +       }
+>> +       of_node_put(remote);
+>> +
+>> +       if (!of_device_is_available(remote)) {
+>> +               DRM_ERROR("not available for remote node\n");
+>> +               return ERR_PTR(-ENODEV);
+>> +       }
+>> +
+> This seems like a common pattern in many platform DRM drivers. Yet
+> some tend to differ in subtle ways - I'm leaning that they might be
+> bugs, but one cannot be too sure.
+>
+> A friendly request:
+> Can you please follow up by adding a helper and removing the
+> duplication thoughout ?
 
-All applied to for-4.8/dt-bindings (1 and 2) and for-4.8/arm64 (3).
+Hi emil, recently I found that there is already a helper to do such work.
+It is drm_of_component_probe.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160630/1317ddaf/attachment.sig>
+-xinliang
+
+
+>
+> Thanks
+> Emil
