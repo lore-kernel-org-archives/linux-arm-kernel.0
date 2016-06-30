@@ -1,137 +1,65 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 30 Jun 2016 17:31:14 +0800
-Subject: [PATCH V3 4/8] clk: core: support clocks which requires parents
- enable (part 2)
+Date: Thu, 30 Jun 2016 17:31:18 +0800
+Subject: [PATCH V3 8/8] clk: imx7d: only enable minimum required clocks
 In-Reply-To: <1467279078-2330-1-git-send-email-aisheng.dong@nxp.com>
 References: <1467279078-2330-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1467279078-2330-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1467279078-2330-9-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Freescale i.MX7D platform, all clocks operations, including
-enable/disable, rate change and re-parent, requires its parent clock on.
-Current clock core can not support it well.
-This patch adding flag CLK_OPS_PARENT_ENABLE to handle this special case in
-clock core that enable its parent clock firstly for each operation and
-disable it later after operation complete.
+Formerly clk core does not support imx7d clock type well that all
+its clock operations requires the parent clock on.
+Therefore we enabled all clocks by default in clock driver
+initialization for other module clocks operate well.
 
-The patch part 2 fixes set clock rate and set parent while its parent
-is off. The most special case is for set_parent() operation which requires
-all parents including both old and new one to be enabled at the same time
-during the operation.
+After patch 'clk: imx7d: using api with flag CLK_OPS_PARENT_ENABLE',
+clk core can handle such clock type well, so we don't have to enable
+them all by default anymore. Instead, we only enable a minimum required
+set of clocks.
 
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/clk.c | 48 +++++++++++++++++++++++++++++++++---------------
- 1 file changed, 33 insertions(+), 15 deletions(-)
+ drivers/clk/imx/clk-imx7d.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index e3bd28c9ef28..9bac36a5fdb3 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1172,7 +1172,9 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *core,
- 	struct clk_core *old_parent = core->parent;
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index bb5affae0850..7b46ed0677a5 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -361,6 +361,14 @@ static const char *pll_enet_bypass_sel[] = { "pll_enet_main", "pll_enet_main_src
+ static const char *pll_audio_bypass_sel[] = { "pll_audio_main", "pll_audio_main_src", };
+ static const char *pll_video_bypass_sel[] = { "pll_video_main", "pll_video_main_src", };
  
- 	/*
--	 * Migrate prepare state between parents and prevent race with
-+	 * 1. enable parents for CLK_OPS_PARENT_ENABLE clock
-+	 *
-+	 * 2. Migrate prepare state between parents and prevent race with
- 	 * clk_enable().
- 	 *
- 	 * If the clock is not prepared, then a race with
-@@ -1188,12 +1190,17 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *core,
- 	 *
- 	 * See also: Comment for clk_set_parent() below.
- 	 */
++static int const clks_init_on[] __initconst = {
++	IMX7D_ARM_A7_ROOT_CLK, IMX7D_MAIN_AXI_ROOT_CLK,
++	IMX7D_PLL_SYS_MAIN_480M_CLK, IMX7D_NAND_USDHC_BUS_ROOT_CLK,
++	IMX7D_DRAM_PHYM_ROOT_CLK, IMX7D_DRAM_ROOT_CLK,
++	IMX7D_DRAM_PHYM_ALT_ROOT_CLK, IMX7D_DRAM_ALT_ROOT_CLK,
++	IMX7D_AHB_CHANNEL_ROOT_CLK,
++};
 +
-+	/* enable old_parent & parent if CLK_OPS_PARENT_ENABLE is set */
-+	if (core->flags & CLK_OPS_PARENT_ENABLE) {
-+		clk_core_prepare_enable(old_parent);
-+		clk_core_prepare_enable(parent);
-+	}
-+
-+	/* migrate prepare count if > 0 */
- 	if (core->prepare_count) {
--		clk_core_prepare(parent);
--		flags = clk_enable_lock();
--		clk_core_enable(parent);
--		clk_core_enable(core);
--		clk_enable_unlock(flags);
-+		clk_core_prepare_enable(parent);
-+		clk_core_enable_lock(core);
- 	}
+ static struct clk_onecell_data clk_data;
  
- 	/* update the clk tree topology */
-@@ -1208,18 +1215,19 @@ static void __clk_set_parent_after(struct clk_core *core,
- 				   struct clk_core *parent,
- 				   struct clk_core *old_parent)
- {
--	unsigned long flags;
--
- 	/*
- 	 * Finish the migration of prepare state and undo the changes done
- 	 * for preventing a race with clk_enable().
- 	 */
- 	if (core->prepare_count) {
--		flags = clk_enable_lock();
--		clk_core_disable(core);
--		clk_core_disable(old_parent);
--		clk_enable_unlock(flags);
--		clk_core_unprepare(old_parent);
-+		clk_core_disable_lock(core);
-+		clk_core_disable_unprepare(old_parent);
-+	}
-+
-+	/* re-balance ref counting if CLK_OPS_PARENT_ENABLE is set */
-+	if (core->flags & CLK_OPS_PARENT_ENABLE) {
-+		clk_core_disable_unprepare(parent);
-+		clk_core_disable_unprepare(old_parent);
- 	}
- }
+ static struct clk ** const uart_clks[] __initconst = {
+@@ -846,14 +854,8 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clk_data.clk_num = ARRAY_SIZE(clks);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
  
-@@ -1466,13 +1474,17 @@ static void clk_change_rate(struct clk_core *core)
- 	unsigned long best_parent_rate = 0;
- 	bool skip_set_rate = false;
- 	struct clk_core *old_parent;
-+	struct clk_core *parent = NULL;
+-	/* TO BE FIXED LATER
+-	 * Enable all clock to bring up imx7, otherwise system will be halt and block
+-	 * the other part upstream Because imx7d clock design changed, clock framework
+-	 * need do a little modify.
+-	 * Dong Aisheng is working on this. After that, this part need be changed.
+-	 */
+-	for (i = 0; i < IMX7D_CLK_END; i++)
+-		clk_prepare_enable(clks[i]);
++	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
++		clk_prepare_enable(clks[clks_init_on[i]]);
  
- 	old_rate = core->rate;
- 
--	if (core->new_parent)
-+	if (core->new_parent) {
-+		parent = core->new_parent;
- 		best_parent_rate = core->new_parent->rate;
--	else if (core->parent)
-+	} else if (core->parent) {
-+		parent = core->parent;
- 		best_parent_rate = core->parent->rate;
-+	}
- 
- 	if (core->flags & CLK_SET_RATE_UNGATE) {
- 		unsigned long flags;
-@@ -1502,6 +1514,9 @@ static void clk_change_rate(struct clk_core *core)
- 
- 	trace_clk_set_rate(core, core->new_rate);
- 
-+	if (core->flags & CLK_OPS_PARENT_ENABLE)
-+		clk_core_prepare_enable(parent);
-+
- 	if (!skip_set_rate && core->ops->set_rate)
- 		core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
- 
-@@ -1518,6 +1533,9 @@ static void clk_change_rate(struct clk_core *core)
- 		clk_core_unprepare(core);
- 	}
- 
-+	if (core->flags & CLK_OPS_PARENT_ENABLE)
-+		clk_core_disable_unprepare(parent);
-+
- 	if (core->notifier_count && old_rate != core->rate)
- 		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
- 
+ 	/* use old gpt clk setting, gpt1 root clk must be twice as gpt counter freq */
+ 	clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
 -- 
 1.9.1
