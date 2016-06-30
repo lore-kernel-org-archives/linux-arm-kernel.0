@@ -1,77 +1,108 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 30 Jun 2016 12:04:00 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
- dt property
-In-Reply-To: <87a8i36ls9.fsf@kamboji.qca.qualcomm.com>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <ea10ff70-26e6-e151-5cea-c54bd12a054c@redhat.com>
- <f8995599-115d-87e5-7928-c029b48584f1@broadcom.com>
- <6402170.5s0abZDqlD@wuerfel> <1467230078.2598.2.camel@plaes.org>
- <87eg7f6odi.fsf@kamboji.qca.qualcomm.com>
- <e94f58fe-f709-94bd-21f6-144c4e038d17@redhat.com>
- <87a8i36ls9.fsf@kamboji.qca.qualcomm.com>
-Message-ID: <14a3aa66-5851-5537-f6cd-7681fb4cde07@redhat.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Thu, 30 Jun 2016 15:37:08 +0530
+Subject: [PATCH 1/8] arm64:perf: Add Devicetree bindings for Hisilicon SoC
+ PMU
+In-Reply-To: <20160628102311.GC31744@leverpostej>
+References: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
+ <1467107429-55477-2-git-send-email-anurup.m@huawei.com>
+ <20160628102311.GC31744@leverpostej>
+Message-ID: <5774EF4C.5070106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 30-06-16 11:58, Kalle Valo wrote:
-> Hans de Goede <hdegoede@redhat.com> writes:
+
+On Tuesday 28 June 2016 03:53 PM, Mark Rutland wrote:
+> Hi,
 >
->> Hi,
+> On Tue, Jun 28, 2016 at 05:50:22AM -0400, Anurup M wrote:
+>> 	1) Device tree bindings for Hisilicon PMU.
+>> 	2) Add example for Hisilicon LLC PMU.
 >>
->> On 30-06-16 11:02, Kalle Valo wrote:
->>> Priit Laes <plaes@plaes.org> writes:
->>>
->>>>> What is the size of this nvram file? As it's board specific, I wonder
->>>>> if we can simply include it inside of the DT verbatim. I remember
->>>>> doing that (in the pre-dtb days, on real open firmware) for the
->>>>> "spidernet"
->>>>> ethernet driver.
->>>>
->>>> It contains a bit too much info:
->>>>
->>>> This is what CubieTruck requires:
->>>>
->>>> http://dl.cubieboard.org/public/Cubieboard/benn/firmware/ap6210/nvram_ap6210.txt
->>>
->>> In the nvram file I see lots of identifiers:
->>>
->>> manfid=0x2d0
->>> prodid=0x492
->>> vendid=0x14e4
->>> devid=0x4343
->>> boardtype=0x0598
->>> boardrev=0x1307
->>> boardnum=777
->>>
->>> Are any of these (or a combination of them) unique for each board type?
->>> What if one of these is provided through DT and then the driver could
->>> choose the nvram file based on the board id? Just another idea...
+>> Signed-off-by: Anurup M <anurup.m@huawei.com>
+>> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+>> ---
+>>   .../devicetree/bindings/arm/hisilicon/pmu.txt      | 32 ++++++++++++++++++++++
+>>   1 file changed, 32 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
 >>
->> That would require updating a table in the driver every time a new
->> board comes out, I do not believe that that is a good solution.
+>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+>> new file mode 100644
+>> index 0000000..7584a81
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+>> @@ -0,0 +1,32 @@
+>> +Hisilicon SoC HIP05 ARMv8 PMU
+>> +
+>> +Required Properties:
+>> +	- compatible : This field contain two values. The first value is
+>> +		always "hisilicon" and second value is the PMU type as shown
+>> +		in below examples:
+>> +		(a) "hisilicon,hip05-llc" for Hisiliocn SoC L3 cache PMU
+>> +		(b) "hisilicon,hip05-ddrc" for Hisiliocn SoC DDRC PMU
+>> +		(c) "hisilicon,hip05-mn" for Hisiliocn SoC MN PMU
+> That wording is rather confusing. Use:
 >
-> You don't necessarily need to have a table in the driver if you embed
-> the id to the filename, for example something like this:
+> 	- compatible: must contain one of:
+> 	  * "hisilicon,hip05-llc" for HIP05 L3 cache PMU
+> 	  * "hisilicon,hip05-ddrc" for HIP05 DDRC PMU
+> 	  * "hisilicon,hip05-mn" for HIP05 MN PMU
 >
-> nvram-0598-1307.txt
-> nvram-<boardtype>-<boardrev>.txt
+> What exactly is an "MN"?
+I shall add the description in the bindings.
+>
+> I assume that these nodes actually describe the whole interface for
+> controlling the L3/DDRC/MN, so it's probably worth dropping the "PMU"
+> from the description, even if we only support the PMU in Linux.
+Agreed. I shall remove "PMU".
+>
+> No reg properties?
+These nodes are accessed via djtag interface which again refers to the 
+system-controller node phandle.
+I shall describe them in the bindings along with the djtag driver patch 
+series.
+>
+>> +
+>> +Optional Properties:
+>> +
+>> +	- djtag	: Some PMU registers are accessed via the Djtag interface
+>> +		This field contains two values. The first value is the djtag
+>> +		node phandle and second value is the Super CPU Cluster ID.
+> What is a Djtag node? What is a "Super CPU Cluster ID"?
+>
+> I think you need additional bindings for these. I cannot understand the
+> binding without a description of those.
+I shall add them in the bindings along with the djtag driver patch series.
+>
+>> +	- interrupt-parent : A phandle indicating which interrupt controller
+>> +		this PMU signals interrupts to.
+>> +
+>> +	- interrupts : Interrupt lines used by this PMU. If the PMU has
+>> +		multiple banks, then all IRQ lines are listed in this
+>> +		property.
+> In which order?
+If multiple (N) banks, then the order of IRQ lines to be from bank 0 to 
+bank N.
+I shall mention them more clearly in the description.
+>
+>> +
+>> +Example:
+>> +	llc0: llc at 0 {
+> That unit address (the '@0') shouldn't be there, given the lack of a reg
+> property.
+Ok.
 
-Downside of this is, that as Arend already said, the nvram files are not
-readily available.
-
-Typically the boards we are talking about are shipped with android,
-and the mainline kernel bringup is done by a user, not the manufacturer.
-
-So the nvram file needs to be extracted from e.g. an android image,
-having ap6210 in the filename allows the user to see that his module
-(which is clearly labelled ap6210 is already supported, where as the
-boardtype/boardrev magic numbers are a big unknown.
-
-So I believe that using a human readable string is better here.
-
-Regards,
-
-Hans
+>
+>> +		compatible = "hisilicon,hip05-llc";
+>> +		djtag = <&djtag0 2>; /* DJTAG node for Super CPU Cluster 2
+>> +				      * (starts from 1) */
+>> +		interrupt-parent = <&mbigen_pc>;
+>> +		interrupts = <141 4>,<142 4>,
+>> +			 <143 4>,<144 4>; /* IRQ lines for 4 L3 cache banks */
+>> +	};
+>> -- 
+>> 2.1.4
+> Thanks,
+> Mark.
+Thanks,
+Anurup
