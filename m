@@ -1,64 +1,33 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 30 Jun 2016 09:26:52 +0800
-Subject: [PATCH 08/21] usb: chipidea: Kick OTG state machine for AVVIS
- with vbus extcon
-In-Reply-To: <146724959973.16253.818114721999543873@sboyd-linaro>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Wed, 29 Jun 2016 18:35:32 -0700
+Subject: [PATCH 15/21] usb: chipidea: msm: Mux over secondary phy at the
+ right time
+In-Reply-To: <20160629080852.GJ25236@shlinux2>
 References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-9-stephen.boyd@linaro.org>
- <20160629030913.GC25236@shlinux2>
- <146724959973.16253.818114721999543873@sboyd-linaro>
-Message-ID: <20160630012652.GB19928@shlinux2>
+ <20160626072838.28082-16-stephen.boyd@linaro.org>
+ <20160629080852.GJ25236@shlinux2>
+Message-ID: <146725053250.32568.8634774845930918926@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 06:19:59PM -0700, Stephen Boyd wrote:
-> Quoting Peter Chen (2016-06-28 20:09:13)
-> > On Sun, Jun 26, 2016 at 12:28:25AM -0700, Stephen Boyd wrote:
-> > > Force the OTG state machine to go forward when we're using an
-> > > extcon for vbus detection. In this case, the controller may never
-> > > raise an interrupt for AVVIS, so we need to simulate the event by
-> > > toggling the appropriate OTG fsm bits and kicking the state
-> > > machine again.
-> > > 
+Quoting Peter Chen (2016-06-29 01:08:52)
+> On Sun, Jun 26, 2016 at 12:28:32AM -0700, Stephen Boyd wrote:
+> > We need to pick the correct phy at runtime based on how the SoC
+> > has been wired onto the board. If the secondary phy is used, take
+> > it out of reset and mux over to it by writing into the TCSR
+> > register. Make sure to do this on reset too, because this
+> > register is reset to the default value (primary phy) after the
+> > RESET bit is set in USBCMD.
 > > 
-> > Well, I think you may misunderstand the OTG FSM and dual-role.
-> > From my and Felipe's point, there are seldom users for USB FSM,
-> > there are only OTG FSM spec and related OTG certification.
 > 
-> Probably yes.
-> 
-> > 
-> > The OTG FSM needs related SoC support, the vbus will be off at
-> > several states, and the SRP should be supported by SoC.
-> > 
-> > By default, the dts needs below properties for disabling it if you
-> > choose otg fsm support at kernel configuration.
-> > 
-> > &usbotg1 {
-> >         vbus-supply = <&reg_usb_otg1_vbus>;
-> >         srp-disable;
-> >         hnp-disable;
-> >         adp-disable;
-> >         status = "okay";
-> > };
-> > 
-> > See Documentation/devicetree/bindings/usb/generic.txt.
-> 
-> Does this mean we should be setting all those properties if we're using
-> an extcon for vbus and id?
+> I am curious when you need the secondary phy?
 
-It is not related to how we know vbus and id. If your controller is
-otg-capable, and you don't want to enable OTG FSM (just want dual-role),
-you should set them at dts since the zImage is multi-platforms, the
-CONFIG_USB_OTG and CONFIG_USB_OTG_FSM may be chosen.
-
-> I have noticed that vbus is powered off after
-> some time when no device is connected and we're in A_HOST state because
-> the timeout for a B device connection happens.
-
-I think it is not you want, but it is OTG compliance.
-
--- 
-
-Best Regards,
-Peter Chen
+The msm8974 SoC has two phys that sit behind a mux. The primary phy is
+typically used by the dwc3 instance for usb3, but it can also be used by
+the chipidea controller if this mux is set to zero instead of one. It's
+a board designer decision to use either the primary phy or the secondary
+phy for the chipidea controller, but dwc3 can only use the primary phy
+as it's the only HS phy it's connected to. I suppose if there's a board
+out there that doesn't want to use the dwc3 instance because they don't
+want USB3 they can use the primary phy for the chipidea instance and
+keep the secondary phy powered off.
