@@ -1,82 +1,41 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 30 Jun 2016 09:00:17 -0400
-Subject: [PATCH v20 13/14] arm64: kdump: update a kernel doc
-In-Reply-To: <ef07d5dafe5c69b621dc4ec01ef1c6f3f9753e60.1466702804.git.geoff@infradead.org>
-References: <cover.1466702804.git.geoff@infradead.org>
- <ef07d5dafe5c69b621dc4ec01ef1c6f3f9753e60.1466702804.git.geoff@infradead.org>
-Message-ID: <20160630130017.GA2987@dhcp-128-65.nay.redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 30 Jun 2016 15:09:46 +0200
+Subject: [PATCH] ARM: shmobile: don't call platform_can_secondary_boot on
+ UP
+In-Reply-To: <20160630122529.4031024-1-arnd@arndb.de>
+References: <20160630122529.4031024-1-arnd@arndb.de>
+Message-ID: <CAMuHMdWJOVs_pzDHWVHN8=mguUPETbq2m8LAG_N6mUFk+UA_og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/16 at 05:54pm, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> 
-> This patch adds arch specific descriptions about kdump usage on arm64
-> to kdump.txt.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  Documentation/kdump/kdump.txt | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> index 88ff63d..5d6da09 100644
-> --- a/Documentation/kdump/kdump.txt
-> +++ b/Documentation/kdump/kdump.txt
-> @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
->  a remote system.
->  
->  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> -s390x and arm architectures.
-> +s390x, arm and arm64 architectures.
->  
->  When the system kernel boots, it reserves a small section of memory for
->  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> @@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
->  
->      AUTO_ZRELADDR=y
->  
-> +Dump-capture kernel config options (Arch Dependent, arm64)
-> +----------------------------------------------------------
-> +
-> +1) Currently, kvm will not be enabled on the dump-capture kernel even
-> +   if it is configured.
-> +
->  Extended crashkernel syntax
->  ===========================
->  
-> @@ -305,6 +311,8 @@ Boot into System Kernel
->     kernel will automatically locate the crash kernel image within the
->     first 512MB of RAM if X is not given.
->  
-> +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-> +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
->  
->  Load the Dump-capture Kernel
->  ============================
-> @@ -327,6 +335,8 @@ For s390x:
->  	- Use image or bzImage
->  For arm:
->  	- Use zImage
-> +For arm64:
-> +	- Use vmlinux or Image
->  
->  If you are using a uncompressed vmlinux image then use following command
->  to load dump-capture kernel.
-> @@ -370,6 +380,9 @@ For s390x:
->  For arm:
->  	"1 maxcpus=1 reset_devices"
->  
-> +For arm64:
-> +	"1 maxcpus=1 reset_devices"
-> +
->  Notes on loading the dump-capture kernel:
->  
->  * By default, the ELF headers are stored in ELF64 format to support
+Hi Arnd,
 
-Looks good to me.
+On Thu, Jun 30, 2016 at 2:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> For rcar-gen2, we build the SMP files even for UP configurations,
+> and that just broke:
+>
+> arch/arm/mach-shmobile/built-in.o: In function `shmobile_smp_init_fallback_ops':
+> pm-rcar-gen2.c:(.init.text+0x40c): undefined reference to `platform_can_secondary_boot'
+>
+> This adds an compile-time check before the call to platform_can_secondary_boot,
+> turning the function into an empty stub for UP configurations.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: c21af444eace ("ARM: shmobile: smp: Add function to prioritize DT SMP")
 
-Acked-by: Dave Young <dyoung@redhat.com>
+Crap, I think I took the shortcut of only compile-testing
+arch/arm/mach-shmobile,
+not link-testing the whole kernel, with CONFIG_SMP=n...
 
-Thanks
-Dave
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
