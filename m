@@ -1,72 +1,112 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jun 2016 18:40:34 +0100
-Subject: [PATCH v2 01/18] arm64: KVM: Merged page tables documentation
+Date: Thu, 30 Jun 2016 18:40:46 +0100
+Subject: [PATCH v2 13/18] arm/arm64: KVM: Kill free_boot_hyp_pgd
 In-Reply-To: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
 References: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1467308451-13365-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1467308451-13365-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since dealing with VA ranges tends to hurt my brain badly, let's
-start with a bit of documentation that will hopefully help
-understanding what comes next...
+There is no way to free the boot PGD, because it doesn't exist
+anymore as a standalone entity.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 40 +++++++++++++++++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  1 -
+ arch/arm/kvm/arm.c               |  4 ----
+ arch/arm/kvm/mmu.c               | 30 +++++++-----------------------
+ arch/arm64/include/asm/kvm_mmu.h |  1 -
+ 4 files changed, 7 insertions(+), 29 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 5d161d1..d5fd9fb 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -51,7 +51,6 @@
+ 
+ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+-void free_boot_hyp_pgd(void);
+ void free_hyp_pgds(void);
+ 
+ void stage2_unmap_vm(struct kvm *kvm);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 0887cc1..9b8c537 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1323,10 +1323,6 @@ static int init_hyp_mode(void)
+ 		}
+ 	}
+ 
+-#ifndef CONFIG_HOTPLUG_CPU
+-	free_boot_hyp_pgd();
+-#endif
+-
+ 	/* set size of VMID supported by CPU */
+ 	kvm_vmid_bits = kvm_get_vmid_bits();
+ 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index dd4ccc7..0b36dd52 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -482,27 +482,6 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
+ }
+ 
+ /**
+- * free_boot_hyp_pgd - free HYP boot page tables
+- *
+- * Free the HYP boot page tables. The bounce page is also freed.
+- */
+-void free_boot_hyp_pgd(void)
+-{
+-	mutex_lock(&kvm_hyp_pgd_mutex);
+-
+-	if (boot_hyp_pgd) {
+-		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+-		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
+-		boot_hyp_pgd = NULL;
+-	}
+-
+-	if (hyp_pgd)
+-		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+-
+-	mutex_unlock(&kvm_hyp_pgd_mutex);
+-}
+-
+-/**
+  * free_hyp_pgds - free Hyp-mode page tables
+  *
+  * Assumes hyp_pgd is a page table used strictly in Hyp-mode and
+@@ -516,11 +495,16 @@ void free_hyp_pgds(void)
+ {
+ 	unsigned long addr;
+ 
+-	free_boot_hyp_pgd();
+-
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+ 
++	if (boot_hyp_pgd) {
++		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
++		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
++		boot_hyp_pgd = NULL;
++	}
++
+ 	if (hyp_pgd) {
++		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+ 		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+ 			unmap_hyp_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+ 		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index fdfbddb..6149dfc 100644
+index 390acab..b89122e 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -29,10 +29,44 @@
-  *
-  * Instead, give the HYP mode its own VA region at a fixed offset from
-  * the kernel by just masking the top bits (which are all ones for a
-- * kernel address).
-+ * kernel address). We need to find out how many bits to mask.
-  *
-- * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
-- * macros (the entire kernel runs at EL2).
-+ * We want to build a set of page tables that cover both parts of the
-+ * idmap (the trampoline page used to initialize EL2), and our normal
-+ * runtime VA space, at the same time.
-+ *
-+ * Given that the kernel uses VA_BITS for its entire address space,
-+ * and that half of that space (VA_BITS - 1) is used for the linear
-+ * mapping, we can also limit the EL2 space to (VA_BITS - 1).
-+ *
-+ * The main question is "Within the VA_BITS space, does EL2 use the
-+ * top or the bottom half of that space to shadow the kernel's linear
-+ * mapping?". As we need to idmap the trampoline page, this is
-+ * determined by the range in which this page lives.
-+ *
-+ * If the page is in the bottom half, we have to use the top half. If
-+ * the page is in the top half, we have to use the bottom half:
-+ *
-+ * T = __virt_to_phys(__hyp_idmap_text_start)
-+ * if (T & BIT(VA_BITS - 1))
-+ *	HYP_VA_MIN = 0  //idmap in upper half
-+ * else
-+ *	HYP_VA_MIN = 1 << (VA_BITS - 1)
-+ * HYP_VA_MAX = HYP_VA_MIN + (1 << (VA_BITS - 1)) - 1
-+ *
-+ * This of course assumes that the trampoline page exists within the
-+ * VA_BITS range. If it doesn't, then it means we're in the odd case
-+ * where the kernel idmap (as well as HYP) uses more levels than the
-+ * kernel runtime page tables (as seen when the kernel is configured
-+ * for 4k pages, 39bits VA, and yet memory lives just above that
-+ * limit, forcing the idmap to use 4 levels of page tables while the
-+ * kernel itself only uses 3). In this particular case, it doesn't
-+ * matter which side of VA_BITS we use, as we're guaranteed not to
-+ * conflict with anything.
-+ *
-+ * When using VHE, there are no separate hyp mappings and all KVM
-+ * functionality is already mapped as part of the main kernel
-+ * mappings, and none of this applies in that case.
-  */
- #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
- #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
+@@ -156,7 +156,6 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+ 
+ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+-void free_boot_hyp_pgd(void);
+ void free_hyp_pgds(void);
+ 
+ void stage2_unmap_vm(struct kvm *kvm);
 -- 
 2.1.4
