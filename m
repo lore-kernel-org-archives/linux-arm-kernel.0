@@ -1,44 +1,72 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Thu, 30 Jun 2016 16:15:10 +0900
-Subject: [PATCH v3 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for SPI
- clocks
-In-Reply-To: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
-References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1467270911-10971-2-git-send-email-andi.shyti@samsung.com>
+From: hs.liao@mediatek.com (HS Liao)
+Date: Thu, 30 Jun 2016 15:14:40 +0800
+Subject: [PATCH v9 1/4] dt-bindings: soc: Add documentation for the MediaTek
+ GCE unit
+In-Reply-To: <1467270883-1407-1-git-send-email-hs.liao@mediatek.com>
+References: <1467270883-1407-1-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1467270883-1407-2-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLK_IGNORE_UNUSED flag has to be avoided whenever possible.
-Use the CLK_IS_CRITICAL flag instead for critical SPI1 clocks,
-which enables the clock line during boot time.
+This adds documentation for the MediaTek Global Command Engine (GCE) unit
+found in MT8173 SoCs.
 
-Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Signed-off-by: HS Liao <hs.liao@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/clk/samsung/clk-exynos5433.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/soc/mediatek/gce.txt       | 44 ++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
 
-diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-index c3a5318..1f7c4951 100644
---- a/drivers/clk/samsung/clk-exynos5433.c
-+++ b/drivers/clk/samsung/clk-exynos5433.c
-@@ -1662,7 +1662,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
- 			ENABLE_SCLK_PERIC, 13, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_IOCLK_SPI1, "sclk_ioclk_spi1", "ioclk_spi1_clk_in",
- 			ENABLE_SCLK_PERIC, 12,
--			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-+			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_IOCLK_SPI0, "sclk_ioclk_spi0", "ioclk_spi0_clk_in",
- 			ENABLE_SCLK_PERIC, 11, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_IOCLK_I2S1_BCLK, "sclk_ioclk_i2s1_bclk",
-@@ -1677,7 +1677,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
- 	GATE(CLK_SCLK_SPI2, "sclk_spi2", "sclk_spi2_peric", ENABLE_SCLK_PERIC,
- 			5, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_SPI1, "sclk_spi1", "sclk_spi1_peric", ENABLE_SCLK_PERIC,
--			4, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-+			4, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_SPI0, "sclk_spi0", "sclk_spi0_peric", ENABLE_SCLK_PERIC,
- 			3, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_UART2, "sclk_uart2", "sclk_uart2_peric",
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/gce.txt b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+new file mode 100644
+index 0000000..63c5364
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+@@ -0,0 +1,44 @@
++MediaTek GCE
++===============
++
++The Global Command Engine (GCE) is used to help read/write registers with
++critical time limitation, such as updating display configuration during the
++vblank. The GCE can be used to implement the Command Queue (CMDQ) driver.
++
++CMDQ driver uses mailbox framework for communication. Please refer to
++../../mailbox/mailbox.txt for generic information about mailbox device-tree
++bindings.
++
++Required properties:
++- compatible: Must be "mediatek,mt8173-gce"
++- reg: Address range of the GCE unit
++- interrupts: The interrupt signal from the GCE block
++- clock: Clocks according to the common clock binding
++- clock-names: Must be "gce" to stand for GCE clock
++- #mbox-cells: Should be 1
++
++Required properties for a client device:
++- mediatek,gce: Should point to the respective GCE block
++- mboxes: List of phandle, mailbox channel specifiers, and merging wfe flag.
++
++Example:
++
++	gce: gce at 10212000 {
++		compatible = "mediatek,mt8173-gce";
++		reg = <0 0x10212000 0 0x1000>;
++		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&infracfg CLK_INFRA_GCE>;
++		clock-names = "gce";
++
++		#mbox-cells = <1>;
++	};
++
++Example for a client device:
++
++	mmsys: clock-controller at 14000000 {
++		compatible = "mediatek,mt8173-mmsys";
++		mediatek,gce = <&gce>;
++		mboxes = <&gce 0 1 /* main display with merging wfe */
++			  &gce 1 1>; /* sub display with merging wfe */
++		...
++	};
 -- 
-2.8.1
+1.9.1
