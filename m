@@ -1,107 +1,70 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Thu, 30 Jun 2016 11:43:18 +0000
-Subject: [RFC PATCH 1/2] fsl-mc: Added header file to provide fsl-mc bus
- iommu group creation
-In-Reply-To: <5774FABE.5070707@arm.com>
-References: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
- <5774FABE.5070707@arm.com>
-Message-ID: <HE1PR0401MB1866C1468D3B4733B437C79BE6240@HE1PR0401MB1866.eurprd04.prod.outlook.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 30 Jun 2016 13:48:26 +0200
+Subject: [PATCH] ARM: mvebu: compile pm code conditionally
+In-Reply-To: <20160620160931.2714557-1-arnd@arndb.de> (Arnd Bergmann's message
+ of "Mon, 20 Jun 2016 18:08:22 +0200")
+References: <20160620160931.2714557-1-arnd@arndb.de>
+Message-ID: <87lh1mx5h1.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
+ 
+ On lun., juin 20 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
+> A cleanup to include the headers correctly caused another build problem:
+>
+> arch/arm/mach-mvebu/kirkwood-pm.c:70:13: error: redefinition of 'kirkwood_pm_init'
+> arch/arm/mach-mvebu/kirkwood-pm.h:23:20: note: previous definition of 'kirkwood_pm_init' was here
+>
+> The underlying issue is that kirkwood-pm.o is not actually meant to be
+> used when CONFIG_PM is disabled, so we should also leave it out of the
+> Makefile.
+>
+> The same seems to be true for the PM code in MACH_MVEBU_V7, and I'm
+> treating it the same way here.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: d705c1a66e15 ("ARM: Kirkwood: fix kirkwood_pm_init() declaration/type")
 
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Thursday, June 30, 2016 16:26
-> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com; Stuart Yoder
-> <stuart.yoder@nxp.com>; iommu at lists.linux-foundation.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: Bharat Bhushan <bharat.bhushan@nxp.com>
-> Subject: Re: [RFC PATCH 1/2] fsl-mc: Added header file to provide fsl-mc bus
-> iommu group creation
-> 
-> On 29/06/16 18:14, Nipun Gupta wrote:
-> > Added a header file fsl_mc_smmu.h to provide basic support of creating
-> > an IOMMU group for a fsl-mc type device and also provide helper macro
-> > to get the stream ID of fsl-mc tyoe device.
-> >
-> > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> > Signed-off-by: Bharat Bhushan <bharat.bhushan@nxp.com>
-> > ---
-> >  drivers/staging/fsl-mc/include/fsl_mc_smmu.h | 45
-> > ++++++++++++++++++++++++++++
-> >  1 file changed, 45 insertions(+)
-> >  create mode 100644 drivers/staging/fsl-mc/include/fsl_mc_smmu.h
-> >
-> > diff --git a/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
-> > b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
-> > new file mode 100644
-> > index 0000000..9dff5ba
-> > --- /dev/null
-> > +++ b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
-> > @@ -0,0 +1,45 @@
-> > +/*
-> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > + * Author: Nipun Gupta <nipun.gupta@freescale.com>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2. This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + */
-> > +
-> > +#ifndef _FSL_MC_SMMU_H_
-> > +#define _FSL_MC_SMMU_H_
-> > +
-> > +#include <../drivers/staging/fsl-mc/include/mc.h>
-> > +
-> > +/* Macro to get the MC device ICID (Stream ID) */ #define
-> > +fslmc_dev_streamid(_dev) (to_fsl_mc_device(_dev)->icid)
-> 
-> Is the the full 15-bit ICID from the MC's point of view, just the 7 bits that are
-> actually routed to the SMMU, or the actual stream ID seen by the SMMU? None
-> of those three are necessarily the same, and unless it's the third then I don't see
-> the point of patches adding incomplete code which isn't going to work.
-
-Hi Robin,
-
-It's the second one where just 7 bits are maintained in the 'fsl_mc_device--->icid' which is programmed in SMMU. Right, once the SMR masking support is there then only these patches would make more sense. 
-We have sent these patches to get some early comments and to have you guys well informed beforehand about the changes which we require in the SMMU driver specific to fsl-mc bus :).
+Applied on mvebu/fixes
 
 Thanks,
-Nipun
 
-> 
-> > +/* Macro to get the container device of a MC device */ #define
-> > +fslmc_cont_dev(_dev) ((to_fsl_mc_device(dev)->flags & \
-> > +	FSL_MC_IS_DPRC) ? (_dev) : (_dev->parent))
-> > +
-> > +/* Macro to check if a device is a container device */ #define
-> > +is_cont_dev(_dev) (to_fsl_mc_device(_dev)->flags & FSL_MC_IS_DPRC)
-> > +
-> > +static struct iommu_group *fslmc_device_group(struct device *dev) {
-> > +	struct device *cont_dev = fslmc_cont_dev(dev);
-> > +	struct iommu_group *group;
-> > +
-> > +	/* Container device is responsible for creating the iommu group */
-> > +	if (is_cont_dev(dev)) {
-> > +		group = iommu_group_alloc();
-> > +
-> > +		if (IS_ERR(group))
-> > +			return NULL;
-> > +	} else {
-> > +		get_device(cont_dev);
-> > +		group = iommu_group_get(cont_dev);
-> > +		put_device(cont_dev);
-> > +	}
-> > +
-> > +	return group;
-> > +}
-> 
-> In isolation, though, this part seems perfectly reasonable.
-> 
-> Robin.
-> 
-> > +
-> > +#endif /* _FSL_MC_SMMU_H_ */
-> >
+Gregory
+
+> ---
+>  arch/arm/mach-mvebu/Makefile | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+> index 568863e1513c..6c6497e80a7b 100644
+> --- a/arch/arm/mach-mvebu/Makefile
+> +++ b/arch/arm/mach-mvebu/Makefile
+> @@ -6,9 +6,15 @@ CFLAGS_pmsu.o			:= -march=armv7-a
+>  obj-$(CONFIG_MACH_MVEBU_ANY)	 += system-controller.o mvebu-soc-id.o
+>  
+>  ifeq ($(CONFIG_MACH_MVEBU_V7),y)
+> -obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o pm.o pm-board.o
+> +obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
+> +
+> +obj-$(CONFIG_PM)		 += pm.o pm-board.o
+>  obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
+>  endif
+>  
+>  obj-$(CONFIG_MACH_DOVE)		 += dove.o
+> -obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
+> +
+> +ifeq ($(CONFIG_MACH_KIRKWOOD),y)
+> +obj-y				 += kirkwood.o
+> +obj-$(CONFIG_PM)		 += kirkwood-pm.o
+> +endif
+> -- 
+> 2.9.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
