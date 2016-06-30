@@ -1,42 +1,119 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 30 Jun 2016 10:22:10 -0600
-Subject: [PATCH 04/13] coresight: Remove erroneous dma_free_coherent in
- tmc_probe
+Date: Thu, 30 Jun 2016 10:22:13 -0600
+Subject: [PATCH 07/13] coresight: tmc: Limit the trace to available data
 In-Reply-To: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1467303739-12543-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1467303739-12543-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
-removed the static allocation of buffer for the trace data in ETR mode in
-tmc_probe. However it failed to remove the "devm_free_coherent" in
-tmc_probe when the probe fails due to other reasons. This patch gets
-rid of the incorrect dma_free_coherent() call.
+At present the ETF or ETR gives out the entire device
+buffer, even if there is less or even no trace data
+available. This patch limits the trace data given out to
+the actual trace data collected.
 
-Fixes: commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: mathieu.poirier at linaro.org
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c |  2 ++
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 12 +++++++++---
+ drivers/hwtracing/coresight/coresight-tmc.c     |  6 +++---
+ drivers/hwtracing/coresight/coresight-tmc.h     |  4 +++-
+ 4 files changed, 17 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 9e02ac963cd0..3978cbb6b038 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -388,9 +388,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- err_misc_register:
- 	coresight_unregister(drvdata->csdev);
- err_devm_kzalloc:
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
--		dma_free_coherent(dev, drvdata->size,
--				drvdata->vaddr, drvdata->paddr);
- 	return ret;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index 466af86fd76f..e68289b8c072 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -48,6 +48,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+ 	int i;
+ 
+ 	bufp = drvdata->buf;
++	drvdata->len = 0;
+ 	while (1) {
+ 		for (i = 0; i < drvdata->memwidth; i++) {
+ 			read_data = readl_relaxed(drvdata->base + TMC_RRD);
+@@ -55,6 +56,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+ 				return;
+ 			memcpy(bufp, &read_data, 4);
+ 			bufp += 4;
++			drvdata->len += 4;
+ 		}
+ 	}
+ }
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 688be9e060fc..03f36cb8b0c8 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -64,11 +64,17 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+ 	rwp = readl_relaxed(drvdata->base + TMC_RWP);
+ 	val = readl_relaxed(drvdata->base + TMC_STS);
+ 
+-	/* How much memory do we still have */
+-	if (val & BIT(0))
++	/*
++	 * Adjust the buffer to point to the beginning of the trace data
++	 * and update the available trace data.
++	 */
++	if (val & BIT(0)) {
+ 		drvdata->buf = drvdata->vaddr + rwp - drvdata->paddr;
+-	else
++		drvdata->len = drvdata->size;
++	} else {
+ 		drvdata->buf = drvdata->vaddr;
++		drvdata->len = rwp - drvdata->paddr;
++	}
  }
  
+ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 1b47258e01c9..b3275bb4d035 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -140,8 +140,8 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
+ 						   struct tmc_drvdata, miscdev);
+ 	char *bufp = drvdata->buf + *ppos;
+ 
+-	if (*ppos + len > drvdata->size)
+-		len = drvdata->size - *ppos;
++	if (*ppos + len > drvdata->len)
++		len = drvdata->len - *ppos;
+ 
+ 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+ 		if (bufp == (char *)(drvdata->vaddr + drvdata->size))
+@@ -160,7 +160,7 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
+ 	*ppos += len;
+ 
+ 	dev_dbg(drvdata->dev, "%s: %zu bytes copied, %d bytes left\n",
+-		__func__, len, (int)(drvdata->size - *ppos));
++		__func__, len, (int)(drvdata->len - *ppos));
+ 	return len;
+ }
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index 5c5fe2ad2ca7..44b3ae346118 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -98,7 +98,8 @@ enum tmc_mem_intf_width {
+  * @buf:	area of memory where trace data get sent.
+  * @paddr:	DMA start location in RAM.
+  * @vaddr:	virtual representation of @paddr.
+- * @size:	@buf size.
++ * @size:	trace buffer size.
++ * @len:	size of the available trace.
+  * @mode:	how this TMC is being used.
+  * @config_type: TMC variant, must be of type @tmc_config_type.
+  * @memwidth:	width of the memory interface databus, in bytes.
+@@ -115,6 +116,7 @@ struct tmc_drvdata {
+ 	dma_addr_t		paddr;
+ 	void __iomem		*vaddr;
+ 	u32			size;
++	u32			len;
+ 	local_t			mode;
+ 	enum tmc_config_type	config_type;
+ 	enum tmc_mem_intf_width	memwidth;
 -- 
 2.7.4
