@@ -1,18 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Jun 2016 20:16:13 +0100
-Subject: Applied "ASoC: mediatek: add documents for mt2701" to the asoc tree
-In-Reply-To: <1464929784-5489-5-git-send-email-garlic.tseng@mediatek.com>
-Message-ID: <E1bIKy5-0007Bm-Ix@finisterre>
+Date: Thu, 30 Jun 2016 13:15:58 +0100
+Subject: Applied "spi: s3c64xx: group the CS signalling writes in a single
+ function" to the spi tree
+In-Reply-To: <1466150245-2648-3-git-send-email-andi.shyti@samsung.com>
+Message-ID: <E1bIasw-0001FU-Nj@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: mediatek: add documents for mt2701
+   spi: s3c64xx: group the CS signalling writes in a single function
 
-has been applied to the asoc tree at
+has been applied to the spi tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -33,226 +34,88 @@ to this mail.
 Thanks,
 Mark
 
->From d3986650647d5e5478b4c64c1b01098628577ac1 Mon Sep 17 00:00:00 2001
-From: Garlic Tseng <garlic.tseng@mediatek.com>
-Date: Fri, 17 Jun 2016 15:43:55 +0800
-Subject: [PATCH] ASoC: mediatek: add documents for mt2701
+>From aa4964c4eb3ed38666023bcb805403cb7cf2af63 Mon Sep 17 00:00:00 2001
+From: Andi Shyti <andi.shyti@samsung.com>
+Date: Tue, 28 Jun 2016 11:41:11 +0900
+Subject: [PATCH] spi: s3c64xx: group the CS signalling writes in a single
+ function
 
-add mt2701-afe-pcm.txt and mt2701-cs42448.txt for mt2701
+To enable/disable the CS line, the driver performs a writel in
+the S3C64XX_SPI_SLAVE_SEL registers. Group the register's
+configuration in a single function.
 
-Signed-off-by: Garlic Tseng <garlic.tseng@mediatek.com>
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- .../devicetree/bindings/sound/mt2701-afe-pcm.txt   | 150 +++++++++++++++++++++
- .../devicetree/bindings/sound/mt2701-cs42448.txt   |  43 ++++++
- 2 files changed, 193 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
- create mode 100644 Documentation/devicetree/bindings/sound/mt2701-cs42448.txt
+ drivers/spi/spi-s3c64xx.c | 36 ++++++++++++++++++++++++++----------
+ 1 file changed, 26 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-new file mode 100644
-index 000000000000..3e623a724e55
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-@@ -0,0 +1,150 @@
-+Mediatek AFE PCM controller for mt2701
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 5a76a50063b5..972367d5c7f2 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -310,6 +310,28 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
+ 	dma_async_issue_pending(dma->ch);
+ }
+ 
++static void s3c64xx_spi_set_cs(struct spi_device *spi, bool enable)
++{
++	struct s3c64xx_spi_driver_data *sdd =
++					spi_master_get_devdata(spi->master);
 +
-+Required properties:
-+- compatible = "mediatek,mt2701-audio";
-+- reg: register location and size
-+- interrupts: Should contain AFE interrupt
-+- clock-names: should have these clock names:
-+		"infra_sys_audio_clk",
-+		"top_audio_mux1_sel",
-+		"top_audio_mux2_sel",
-+		"top_audio_mux1_div",
-+		"top_audio_mux2_div",
-+		"top_audio_48k_timing",
-+		"top_audio_44k_timing",
-+		"top_audpll_mux_sel",
-+		"top_apll_sel",
-+		"top_aud1_pll_98M",
-+		"top_aud2_pll_90M",
-+		"top_hadds2_pll_98M",
-+		"top_hadds2_pll_294M",
-+		"top_audpll",
-+		"top_audpll_d4",
-+		"top_audpll_d8",
-+		"top_audpll_d16",
-+		"top_audpll_d24",
-+		"top_audintbus_sel",
-+		"clk_26m",
-+		"top_syspll1_d4",
-+		"top_aud_k1_src_sel",
-+		"top_aud_k2_src_sel",
-+		"top_aud_k3_src_sel",
-+		"top_aud_k4_src_sel",
-+		"top_aud_k5_src_sel",
-+		"top_aud_k6_src_sel",
-+		"top_aud_k1_src_div",
-+		"top_aud_k2_src_div",
-+		"top_aud_k3_src_div",
-+		"top_aud_k4_src_div",
-+		"top_aud_k5_src_div",
-+		"top_aud_k6_src_div",
-+		"top_aud_i2s1_mclk",
-+		"top_aud_i2s2_mclk",
-+		"top_aud_i2s3_mclk",
-+		"top_aud_i2s4_mclk",
-+		"top_aud_i2s5_mclk",
-+		"top_aud_i2s6_mclk",
-+		"top_asm_m_sel",
-+		"top_asm_h_sel",
-+		"top_univpll2_d4",
-+		"top_univpll2_d2",
-+		"top_syspll_d5";
++	if (enable) {
++		if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO)) {
++			writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
++		} else {
++			u32 ssel = readl(sdd->regs + S3C64XX_SPI_SLAVE_SEL);
 +
-+Example:
++			ssel |= (S3C64XX_SPI_SLAVE_AUTO |
++						S3C64XX_SPI_SLAVE_NSC_CNT_2);
++			writel(ssel, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
++		}
++	} else {
++		if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
++		writel(S3C64XX_SPI_SLAVE_SIG_INACT,
++		sdd->regs + S3C64XX_SPI_SLAVE_SEL);
++	}
++}
 +
-+	afe: mt2701-afe-pcm at 11220000 {
-+		compatible = "mediatek,mt2701-audio";
-+		reg = <0 0x11220000 0 0x2000>,
-+		      <0 0x112A0000 0 0x20000>;
-+		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_INFRA_AUDIO>,
-+			 <&topckgen CLK_TOP_AUD_MUX1_SEL>,
-+			 <&topckgen CLK_TOP_AUD_MUX2_SEL>,
-+			 <&topckgen CLK_TOP_AUD_MUX1_DIV>,
-+			 <&topckgen CLK_TOP_AUD_MUX2_DIV>,
-+			 <&topckgen CLK_TOP_AUD_48K_TIMING>,
-+			 <&topckgen CLK_TOP_AUD_44K_TIMING>,
-+			 <&topckgen CLK_TOP_AUDPLL_MUX_SEL>,
-+			 <&topckgen CLK_TOP_APLL_SEL>,
-+			 <&topckgen CLK_TOP_AUD1PLL_98M>,
-+			 <&topckgen CLK_TOP_AUD2PLL_90M>,
-+			 <&topckgen CLK_TOP_HADDS2PLL_98M>,
-+			 <&topckgen CLK_TOP_HADDS2PLL_294M>,
-+			 <&topckgen CLK_TOP_AUDPLL>,
-+			 <&topckgen CLK_TOP_AUDPLL_D4>,
-+			 <&topckgen CLK_TOP_AUDPLL_D8>,
-+			 <&topckgen CLK_TOP_AUDPLL_D16>,
-+			 <&topckgen CLK_TOP_AUDPLL_D24>,
-+			 <&topckgen CLK_TOP_AUDINTBUS_SEL>,
-+			 <&clk26m>,
-+			 <&topckgen CLK_TOP_SYSPLL1_D4>,
-+			 <&topckgen CLK_TOP_AUD_K1_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K2_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K3_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K4_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K5_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K6_SRC_SEL>,
-+			 <&topckgen CLK_TOP_AUD_K1_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K2_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K3_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K4_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K5_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_K6_SRC_DIV>,
-+			 <&topckgen CLK_TOP_AUD_I2S1_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S2_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S3_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S4_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S5_MCLK>,
-+			 <&topckgen CLK_TOP_AUD_I2S6_MCLK>,
-+			 <&topckgen CLK_TOP_ASM_M_SEL>,
-+			 <&topckgen CLK_TOP_ASM_H_SEL>,
-+			 <&topckgen CLK_TOP_UNIVPLL2_D4>,
-+			 <&topckgen CLK_TOP_UNIVPLL2_D2>,
-+			 <&topckgen CLK_TOP_SYSPLL_D5>;
+ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
+ {
+ 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
+@@ -706,12 +728,7 @@ static int s3c64xx_spi_transfer_one(struct spi_master *master,
+ 	enable_datapath(sdd, spi, xfer, use_dma);
+ 
+ 	/* Start the signals */
+-	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
+-		writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+-	else
+-		writel(readl(sdd->regs + S3C64XX_SPI_SLAVE_SEL)
+-			| S3C64XX_SPI_SLAVE_AUTO | S3C64XX_SPI_SLAVE_NSC_CNT_2,
+-			sdd->regs + S3C64XX_SPI_SLAVE_SEL);
++	s3c64xx_spi_set_cs(spi, true);
+ 
+ 	spin_unlock_irqrestore(&sdd->lock, flags);
+ 
+@@ -861,16 +878,15 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 
+ 	pm_runtime_mark_last_busy(&sdd->pdev->dev);
+ 	pm_runtime_put_autosuspend(&sdd->pdev->dev);
+-	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
+-		writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
++	s3c64xx_spi_set_cs(spi, false);
 +
-+		clock-names = "infra_sys_audio_clk",
-+			      "top_audio_mux1_sel",
-+			      "top_audio_mux2_sel",
-+			      "top_audio_mux1_div",
-+			      "top_audio_mux2_div",
-+			      "top_audio_48k_timing",
-+			      "top_audio_44k_timing",
-+			      "top_audpll_mux_sel",
-+			      "top_apll_sel",
-+			      "top_aud1_pll_98M",
-+			      "top_aud2_pll_90M",
-+			      "top_hadds2_pll_98M",
-+			      "top_hadds2_pll_294M",
-+			      "top_audpll",
-+			      "top_audpll_d4",
-+			      "top_audpll_d8",
-+			      "top_audpll_d16",
-+			      "top_audpll_d24",
-+			      "top_audintbus_sel",
-+			      "clk_26m",
-+			      "top_syspll1_d4",
-+			      "top_aud_k1_src_sel",
-+			      "top_aud_k2_src_sel",
-+			      "top_aud_k3_src_sel",
-+			      "top_aud_k4_src_sel",
-+			      "top_aud_k5_src_sel",
-+			      "top_aud_k6_src_sel",
-+			      "top_aud_k1_src_div",
-+			      "top_aud_k2_src_div",
-+			      "top_aud_k3_src_div",
-+			      "top_aud_k4_src_div",
-+			      "top_aud_k5_src_div",
-+			      "top_aud_k6_src_div",
-+			      "top_aud_i2s1_mclk",
-+			      "top_aud_i2s2_mclk",
-+			      "top_aud_i2s3_mclk",
-+			      "top_aud_i2s4_mclk",
-+			      "top_aud_i2s5_mclk",
-+			      "top_aud_i2s6_mclk",
-+			      "top_asm_m_sel",
-+			      "top_asm_h_sel",
-+			      "top_univpll2_d4",
-+			      "top_univpll2_d2",
-+			      "top_syspll_d5";
-+	};
-diff --git a/Documentation/devicetree/bindings/sound/mt2701-cs42448.txt b/Documentation/devicetree/bindings/sound/mt2701-cs42448.txt
-new file mode 100644
-index 000000000000..05574446ceb6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mt2701-cs42448.txt
-@@ -0,0 +1,43 @@
-+MT2701 with CS42448 CODEC
-+
-+Required properties:
-+- compatible: "mediatek,mt2701-cs42448-machine"
-+- mediatek,platform: the phandle of MT2701 ASoC platform
-+- audio-routing: a list of the connections between audio
-+- mediatek,audio-codec: the phandles of cs42448 codec
-+- mediatek,audio-codec-bt-mrg the phandles of bt-sco dummy codec
-+- pinctrl-names: Should contain only one value - "default"
-+- pinctrl-0: Should specify pin control groups used for this controller.
-+- i2s1-in-sel-gpio1, i2s1-in-sel-gpio2: Should specify two gpio pins to
-+					control I2S1-in mux.
-+
-+Example:
-+
-+	sound:sound {
-+		compatible = "mediatek,mt2701-cs42448-machine";
-+		mediatek,platform = <&afe>;
-+		/* CS42448 Machine name */
-+		audio-routing =
-+			"Line Out Jack", "AOUT1L",
-+			"Line Out Jack", "AOUT1R",
-+			"Line Out Jack", "AOUT2L",
-+			"Line Out Jack", "AOUT2R",
-+			"Line Out Jack", "AOUT3L",
-+			"Line Out Jack", "AOUT3R",
-+			"Line Out Jack", "AOUT4L",
-+			"Line Out Jack", "AOUT4R",
-+			"AIN1L", "AMIC",
-+			"AIN1R", "AMIC",
-+			"AIN2L", "Tuner In",
-+			"AIN2R", "Tuner In",
-+			"AIN3L", "Satellite Tuner In",
-+			"AIN3R", "Satellite Tuner In",
-+			"AIN3L", "AUX In",
-+			"AIN3R", "AUX In";
-+		mediatek,audio-codec = <&cs42448>;
-+		mediatek,audio-codec-bt-mrg = <&bt_sco_codec>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&aud_pins_default>;
-+		i2s1-in-sel-gpio1 = <&pio 53 0>;
-+		i2s1-in-sel-gpio2 = <&pio 54 0>;
-+	};
+ 	return 0;
+ 
+ setup_exit:
+ 	pm_runtime_mark_last_busy(&sdd->pdev->dev);
+ 	pm_runtime_put_autosuspend(&sdd->pdev->dev);
+ 	/* setup() returns with device de-selected */
+-	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_CS_AUTO))
+-		writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
++	s3c64xx_spi_set_cs(spi, false);
+ 
+ 	if (gpio_is_valid(spi->cs_gpio))
+ 		gpio_free(spi->cs_gpio);
 -- 
 2.8.1
