@@ -1,47 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Jun 2016 05:23:59 -0700
-Subject: Extcon build failure in next
-In-Reply-To: <124460021.HZdfr0AOY2@wuerfel>
-References: <20160630053705.GM28140@atomide.com> <3746939.q8kt0ym6m3@wuerfel>
- <20160630114911.GO28140@atomide.com> <124460021.HZdfr0AOY2@wuerfel>
-Message-ID: <20160630122359.GP28140@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Jun 2016 13:26:26 +0100
+Subject: [Question] Memory attribute reserved by Device Tree?
+In-Reply-To: <577504D7.7080106@arm.com>
+References: <CAK7LNATGoP-Wn-wiK_CgD_v=rQXyt937qRvr8LkUQ06jHB7FAA@mail.gmail.com>
+ <577504D7.7080106@arm.com>
+Message-ID: <20160630122554.GC20363@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [160630 05:05]:
-> On Thursday, June 30, 2016 4:49:12 AM CEST Tony Lindgren wrote:
-> > > > Also I'm seeing:
-> > > > 
-> > > > drivers/extcon/extcon.c: In function 'extcon_register_notifier':
-> > > > drivers/extcon/extcon.c:455:6: warning: 'idx' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> > > >    if (idx >= 0) {
-> > > >          ^
-> > > 
-> > > I don't see this one. Which compiler version do you use?
+On Thu, Jun 30, 2016 at 12:39:03PM +0100, Robin Murphy wrote:
+> On 30/06/16 12:10, Masahiro Yamada wrote:
+> > Hello.
 > > 
-> > Looks like I'm currently using older arm-none-linux-gnueabi-gcc
-> > (Sourcery CodeBench Lite 2014.05-29) 4.8.3 20140320 (prerelease).
-> > I think the Debian compiler was not working few months ago and
-> > I changed to something I had around.
+> > Which memory attribute will ARM/ARM64 Linux
+> > set to the memory region reserved by
+> > /memreserve/ of Device Tree?
 > > 
-> > Looks like the warning does not appear with arm-linux-gnueabihf-gcc
-> > (Debian 6.1.1-3) 6.1.1 20160511.
+> > 
+> > Normal memory non-cacheable?
+> > Or, cacheable?
+> > Or, not defined?
+> > 
+> > Perhaps actual behavior depends on whether the reserved area is
+> > located in the low-memory region?
 > 
-> You are certainly not the only one using gcc-4.7 or gcc-4.8, but
-> they are known to produce more false postive -Wmaybe-uninitialized
-> warnings and 4.9 or higher. I usually send patches for these warnings
-> when gcc-6 finds them, and I have recently sent patches for all
-> the warnings I got in allmodconfig with 4.9, but have no plans to
-> do that for the older compilers.
+> Isn't the point of memreserve that the kernel avoids mapping it at all?
 
-OK thanks for the information, I'll change back to something newer
-here again.
+Not quite. A /memreserve/ allows the kernel to map a region, so long as
+it doesn't use the region for general allocation.
 
-> I wonder whether we should just disable this warning with gcc-4.8
-> by adding $(call cc-ifversion, -eq, 0408, -Wno-maybe-uninitialized)
-> to the command line. However, gcc-4.7 does not let you turn off
-> the warning at all, so the use of that is fairly limited.
+While not strictly defined for arm64 today, in practice the kernel may
+map a region with Normal Inner-Shareable Inner-WB Outer-WB attributes,
+following similar behaviour for PPC as defined in ePAPR.
 
-That probably disables warnings also for real warnings too then :)
+Generally I would advise against the use of a memreserve, and favour
+carving memory out of memory nodes as required, as that imposes stricter
+requirements.
 
-Tony
+> If a reserved region is later mapped in by a driver using
+> dma_declare_coherent_memory(), ioremap(), memremap() or whatever else,
+> then the attributes will vary depending on the exact method used.
+
+Indeed. This applies even with the above.
+
+Thanks,
+Mark.
