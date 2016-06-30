@@ -1,228 +1,214 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu, 30 Jun 2016 09:56:00 +0800
-Subject: [PATCH] arm64: dts: rockchip: add the power domain node for rk3399
-Message-ID: <1467251760-14695-1-git-send-email-wxt@rock-chips.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 30 Jun 2016 09:52:21 +0800
+Subject: [PATCH 15/21] usb: chipidea: msm: Mux over secondary phy at the
+ right time
+In-Reply-To: <146722853892.16253.6137643683844696922@sboyd-linaro>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-16-stephen.boyd@linaro.org>
+ <20160629080852.GJ25236@shlinux2>
+ <146722853892.16253.6137643683844696922@sboyd-linaro>
+Message-ID: <20160630015221.GE19928@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Elaine Zhang <zhangqing@rock-chips.com>
+On Wed, Jun 29, 2016 at 12:28:58PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-06-29 01:08:52)
+> > On Sun, Jun 26, 2016 at 12:28:32AM -0700, Stephen Boyd wrote:
+> > > We need to pick the correct phy at runtime based on how the SoC
+> > > has been wired onto the board. If the secondary phy is used, take
+> > > it out of reset and mux over to it by writing into the TCSR
+> > > register. Make sure to do this on reset too, because this
+> > > register is reset to the default value (primary phy) after the
+> > > RESET bit is set in USBCMD.
+> > > 
+> > 
+> > I am curious when you need the secondary phy?
+> > 
+> > > Cc: Peter Chen <peter.chen@nxp.com>
+> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > > ---
+> > >  drivers/usb/chipidea/ci_hdrc_msm.c | 78 +++++++++++++++++++++++++++++++++++---
+> > >  1 file changed, 73 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+> > > index 40249b0e3e93..df0f8b31db4f 100644
+> > > --- a/drivers/usb/chipidea/ci_hdrc_msm.c
+> > > +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+> > > @@ -8,30 +8,40 @@
+> > >  #include <linux/module.h>
+> > >  #include <linux/platform_device.h>
+> > >  #include <linux/pm_runtime.h>
+> > > -#include <linux/usb/gadget.h>
+> > >  #include <linux/usb/chipidea.h>
+> > >  #include <linux/clk.h>
+> > >  #include <linux/reset.h>
+> > > +#include <linux/mfd/syscon.h>
+> > > +#include <linux/regmap.h>
+> > > +#include <linux/io.h>
+> > >  
+> > >  #include "ci.h"
+> > >  
+> > >  #define HS_PHY_AHB_MODE                      0x0098
+> > > +#define HS_PHY_SEC_CTRL                      0x0278
+> > > +# define HS_PHY_DIG_CLAMP_N          BIT(16)
+> > >  
+> > 
+> > One space at the beginning, and keep alignment.
+> > 
+> > >  struct ci_hdrc_msm {
+> > >       struct platform_device *ci;
+> > >       struct clk *core_clk;
+> > >       struct clk *iface_clk;
+> > > +     bool secondary_phy;
+> > > +     void __iomem *base;
+> > >  };
+> > >  
+> > >  static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+> > >  {
+> > > -     struct device *dev = ci->gadget.dev.parent;
+> > > +     struct device *dev = ci->dev->parent;
+> > > +     struct ci_hdrc_msm *msm_ci = dev_get_drvdata(dev);
+> > >  
+> > >       switch (event) {
+> > >       case CI_HDRC_CONTROLLER_RESET_EVENT:
+> > >               dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
+> > >               /* use AHB transactor, allow posted data writes */
+> > >               hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
+> > > +             if (msm_ci->secondary_phy)
+> > > +                     hw_write_id_reg(ci, HS_PHY_SEC_CTRL, HS_PHY_DIG_CLAMP_N,
+> > > +                                     HS_PHY_DIG_CLAMP_N);
+> > >               break;
+> > >       default:
+> > >               dev_dbg(dev, "unknown ci_hdrc event\n");
+> > > @@ -49,12 +59,58 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
+> > >       .notify_event           = ci_hdrc_msm_notify_event,
+> > >  };
+> > >  
+> > > +static int ci_hdrc_msm_mux_phy(struct ci_hdrc_msm *ci,
+> > > +                            struct platform_device *pdev)
+> > > +{
+> > > +     struct regmap *regmap;
+> > > +     struct device_node *syscon;
+> > > +     struct device *dev = &pdev->dev;
+> > > +     u32 off, val;
+> > > +     int ret;
+> > > +
+> > > +     syscon = of_parse_phandle(dev->of_node, "phy-select", 0);
+> > > +     if (!syscon)
+> > > +             return 0;
+> > > +
+> > > +     regmap = syscon_node_to_regmap(syscon);
+> > > +     if (IS_ERR(regmap))
+> > > +             return PTR_ERR(regmap);
+> > > +
+> > > +     ret = of_property_read_u32_index(dev->of_node, "phy-select", 1, &off);
+> > > +     if (ret < 0) {
+> > > +             dev_err(dev, "no offset in syscon\n");
+> > > +             return -EINVAL;
+> > > +     }
+> > > +
+> > > +     ret = of_property_read_u32_index(dev->of_node, "phy-select", 2, &val);
+> > > +     if (ret < 0) {
+> > > +             dev_err(dev, "no value in syscon\n");
+> > > +             return -EINVAL;
+> > > +     }
+> > > +
+> > > +     ret = regmap_write(regmap, off, val);
+> > > +     if (ret)
+> > > +             return ret;
+> > > +
+> > > +     ci->secondary_phy = !!val;
+> > > +     if (ci->secondary_phy) {
+> > > +             val = readl_relaxed(ci->base + HS_PHY_SEC_CTRL);
+> > > +             val |= HS_PHY_DIG_CLAMP_N;
+> > > +             writel_relaxed(val, ci->base + HS_PHY_SEC_CTRL);
+> > > +     }
+> > > +
+> > > +     return 0;
+> > > +}
+> > > +
+> > >  static int ci_hdrc_msm_probe(struct platform_device *pdev)
+> > >  {
+> > >       struct ci_hdrc_msm *ci;
+> > >       struct platform_device *plat_ci;
+> > >       struct clk *clk;
+> > >       struct reset_control *reset;
+> > > +     struct resource *res;
+> > > +     void __iomem *base;
+> > > +     resource_size_t size;
+> > >       int ret;
+> > >  
+> > >       dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
+> > > @@ -76,6 +132,15 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+> > >       if (IS_ERR(clk))
+> > >               return PTR_ERR(clk);
+> > >  
+> > > +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > +     if (!res)
+> > > +             return -ENODEV;
+> > > +
+> > > +     size = resource_size(res);
+> > > +     ci->base = base = devm_ioremap(&pdev->dev, res->start, size);
+> > > +     if (!base)
+> > > +             return -ENOMEM;
+> > > +
+> > 
+> > The core will do the ioremap too, you can't remap io address two times.
+> 
+> You can ioremap an address twice, but it's not a great solution. On ARM,
+> at least, we detect the double mapping and return the same virtual
+> address the second time.
+> 
+> > The offset larger than 0x200 is vendor specific, you can map it as
+> > the second io region.
+> 
+> Ok. That would mean we need to adjust the binding then to have to reg
+> properties?
 
-In order to meet low power requirements, a power management unit (PMU) is
-designed for controlling power resources in RK3399. The RK3399 PMU is
-dedicated for managing the power of the whole chip.
+Just using two regs at dts, the second one is dedicated for glue layer.
 
-1. add pd node for RK3399 Soc
-2. create power domain tree
-3. add qos node for domain
+> Or we can limit the size of the resource in the core and the
+> size of the resource here can be bumped up by 0x200. So DT still says
+> one resource for the entire ci address space but we don't map anything
+> more than what we use. Something like this?
+> 
+> ---8<----
+> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+> index 4c70fa6fdc34..1121cf3e3fdc 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+> @@ -190,8 +190,9 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  	if (!res)
+>  		return -ENODEV;
+>  
+> -	size = resource_size(res);
+> -	ci->base = base = devm_ioremap(&pdev->dev, res->start, size);
+> +	res->start += 0x200;
+> +	res->end -= 0x200;
+> +	ci->base = base = devm_ioremap_resource(&pdev->dev, res);
+>  	if (!base)
+>  		return -ENOMEM;
+>  
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 298029a9ffce..8f5782913b11 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -887,6 +887,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (resource_size(res) > 0x200)
+> +		res->end = res->start + 0x200;
+>  	base = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(base))
+>  		return PTR_ERR(base);
+> 
 
->From the DT/binds and driver can get more detail information:
-The driver:
-drivers/soc/rockchip/pm_domains.c
-The document:
-Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+No, don't do it. Keep the core unchanging, and map the second regs at
+glue layer.
 
----
-
-Tested on vop and gpu devices added for next kernel.
-PD:
-localhost / # cat sys/kernel/debug/pm_genpd/pm_genpd_summary
-domain                          status          slaves
-/device                                             runtime status
-----------------------------------------------------------------------
-pd_gpu                          on
-/devices/platform/ff9a0000.gpu                      active
-pd_vopl                         off
-/devices/platform/ff8f0000.vop                      suspended
-pd_vopb                         off
-/devices/platform/ff900000.vop                      suspended
-pd_vo                           off             pd_vopb, pd_vopl
-pd_hdcp                         off
-...
-pd_iep                          off
-pd_vcodec                       off
-pd_vdu                          off
-
-QOS:
-localhost / # cat sys/kernel/debug/pm_qos/
-cpu_dma_latency     network_latency
-memory_bandwidth    network_throughput
-
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 153 +++++++++++++++++++++++++++++++
- 1 file changed, 153 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index a6dd623..cc4035e 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -45,6 +45,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/pinctrl/rockchip.h>
-+#include <dt-bindings/power/rk3399-power.h>
- #include <dt-bindings/thermal/thermal.h>
- 
- / {
-@@ -594,6 +595,158 @@
- 		status = "disabled";
- 	};
- 
-+	qos_gpu: qos_gpu at ffae0000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffae0000 0x0 0x20>;
-+	};
-+	qos_video_m0: qos_video_m0 at ffab8000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffab8000 0x0 0x20>;
-+	};
-+	qos_video_m1_r: qos_video_m1_r at ffac0000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffac0000 0x0 0x20>;
-+	};
-+	qos_video_m1_w: qos_video_m1_w at ffac0080 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffac0080 0x0 0x20>;
-+	};
-+	qos_rga_r: qos_rga_r at ffab0000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffab0000 0x0 0x20>;
-+	};
-+	qos_rga_w: qos_rga_w at ffab0080 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffab0080 0x0 0x20>;
-+	};
-+	qos_iep: qos_iep at ffa98000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa98000 0x0 0x20>;
-+	};
-+	qos_vop_big_r: qos_vop_big_r at ffac8000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffac8000 0x0 0x20>;
-+	};
-+	qos_vop_big_w: qos_vop_big_w at ffac8080 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffac8080 0x0 0x20>;
-+	};
-+	qos_vop_little: qos_vop_little at ffad0000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffad0000 0x0 0x20>;
-+	};
-+	qos_isp0_m0: qos_isp0_m0 at ffaa0000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffaa0000 0x0 0x20>;
-+	};
-+	qos_isp0_m1: qos_isp0_m1 at ffaa0080 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffaa0080 0x0 0x20>;
-+	};
-+	qos_isp1_m0: qos_isp1_m0 at ffaa8000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffaa8000 0x0 0x20>;
-+	};
-+	qos_isp1_m1: qos_isp1_m1 at ffaa8080 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffaa8080 0x0 0x20>;
-+	};
-+	qos_hdcp: qos_hdcp at ffa90000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa90000 0x0 0x20>;
-+	};
-+
-+	pmu: power-management at ff310000 {
-+		compatible = "rockchip,rk3399-pmu", "syscon", "simple-mfd";
-+		reg = <0x0 0xff310000 0x0 0x1000>;
-+
-+		power: power-controller {
-+			status = "okay";
-+			compatible = "rockchip,rk3399-power-controller";
-+			#power-domain-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			pd_vdu {
-+				reg = <RK3399_PD_VDU>;
-+				clocks = <&cru ACLK_VDU>,
-+					 <&cru HCLK_VDU>;
-+				pm_qos = <&qos_video_m1_r>,
-+					 <&qos_video_m1_w>;
-+			};
-+			pd_vcodec {
-+				reg = <RK3399_PD_VCODEC>;
-+				clocks = <&cru ACLK_VCODEC>,
-+					 <&cru HCLK_VCODEC>;
-+				pm_qos = <&qos_video_m0>;
-+			};
-+			pd_iep {
-+				reg = <RK3399_PD_IEP>;
-+				clocks = <&cru ACLK_IEP>,
-+					 <&cru HCLK_IEP>;
-+				pm_qos = <&qos_iep>;
-+			};
-+			pd_rga {
-+				reg = <RK3399_PD_RGA>;
-+				clocks = <&cru ACLK_RGA>,
-+					 <&cru HCLK_RGA>;
-+				pm_qos = <&qos_rga_r>,
-+					 <&qos_rga_w>;
-+			};
-+			pd_vio {
-+				reg = <RK3399_PD_VIO>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				pd_isp0 {
-+					reg = <RK3399_PD_ISP0>;
-+					clocks = <&cru ACLK_ISP0>,
-+						 <&cru HCLK_ISP0>;
-+					pm_qos = <&qos_isp0_m0>,
-+						 <&qos_isp0_m1>;
-+				};
-+				pd_isp1 {
-+					reg = <RK3399_PD_ISP1>;
-+					clocks = <&cru ACLK_ISP1>,
-+						 <&cru HCLK_ISP1>;
-+					pm_qos = <&qos_isp1_m0>,
-+						 <&qos_isp1_m1>;
-+				};
-+				pd_hdcp {
-+					reg = <RK3399_PD_HDCP>;
-+					clocks = <&cru ACLK_HDCP>,
-+						 <&cru HCLK_HDCP>,
-+						 <&cru PCLK_HDCP>;
-+					pm_qos = <&qos_hdcp>;
-+				};
-+				pd_vo {
-+					reg = <RK3399_PD_VO>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					pd_vopb {
-+						reg = <RK3399_PD_VOPB>;
-+						clocks = <&cru ACLK_VOP0>,
-+							 <&cru HCLK_VOP0>;
-+						pm_qos = <&qos_vop_big_r>,
-+							 <&qos_vop_big_w>;
-+					};
-+					pd_vopl {
-+						reg = <RK3399_PD_VOPL>;
-+						clocks = <&cru ACLK_VOP1>,
-+							 <&cru HCLK_VOP1>;
-+						pm_qos = <&qos_vop_little>;
-+					};
-+				};
-+			};
-+			pd_gpu {
-+				reg = <RK3399_PD_GPU>;
-+				clocks = <&cru ACLK_GPU>;
-+				pm_qos = <&qos_gpu>;
-+			};
-+		};
-+	};
-+
- 	pmugrf: syscon at ff320000 {
- 		compatible = "rockchip,rk3399-pmugrf", "syscon", "simple-mfd";
- 		reg = <0x0 0xff320000 0x0 0x1000>;
 -- 
-1.9.1
+
+Best Regards,
+Peter Chen
