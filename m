@@ -1,9 +1,9 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Jun 2016 09:51:13 +0200
-Subject: [GIT PULL 2/4] ARM: exynos: Drivers for v4.8, part 2
+Date: Thu, 30 Jun 2016 09:51:15 +0200
+Subject: [GIT PULL 4/4] ARM: defconfig: exynos: Stuff for v4.8, part 2
 In-Reply-To: <1467273075-13747-1-git-send-email-k.kozlowski@samsung.com>
 References: <1467273075-13747-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1467273075-13747-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1467273075-13747-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,31 +15,28 @@ Best regards,
 Krzysztof
 
 
-The following changes since commit 9479f7cc91879c6ba75e70da41c4c9fe7842b342:
+The following changes since commit 4b388071a2235ed8f05d05d069f5a5a29782a8c5:
 
-  soc: samsung: pm_domains: Enable COMPILE_TEST for build coverage (2016-05-30 09:12:57 +0200)
+  ARM: exynos_defconfig: Save defconfig on current linux-next (2016-06-06 08:36:55 +0200)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.8-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.8-2
 
-for you to fetch changes up to 187364b6fcabb9f4bfefcb62fab4fcda019b5810:
+for you to fetch changes up to 065069248736926d2a89ff99372270fbf38537f6:
 
-  cpufreq: s5pv210: use relaxed IO accesors (2016-06-22 14:00:21 +0200)
-
-----------------------------------------------------------------
-Samsung drivers/soc update for v4.8, part 2:
-1. Endian-friendly fixes.
-2. Make SROMC driver explicitly non-module.
+  ARM: multi_v7_defconfig: Enable vivid driver as a module (2016-06-27 08:19:09 +0200)
 
 ----------------------------------------------------------------
-Ben Dooks (2):
-      memory: samsung: endian fixes for IO
-      cpufreq: s5pv210: use relaxed IO accesors
+Samsung defconfig update for v4.8, part 2:
+1. Enable Virtual Video Test Driver on nulti_v7 and exynos defconfigs.
+   Useful for testing.
 
-Paul Gortmaker (1):
-      memory: samsung: exynos-srom: make it explicitly non-modular
+----------------------------------------------------------------
+Javier Martinez Canillas (2):
+      ARM: exynos_defconfig: Enable vivid driver as a module
+      ARM: multi_v7_defconfig: Enable vivid driver as a module
 
- drivers/cpufreq/s5pv210-cpufreq.c    | 68 ++++++++++++++++++------------------
- drivers/memory/samsung/exynos-srom.c | 39 +++++++--------------
- 2 files changed, 46 insertions(+), 61 deletions(-)
+ arch/arm/configs/exynos_defconfig   | 2 ++
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 2 files changed, 4 insertions(+)
