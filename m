@@ -1,87 +1,56 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 30 Jun 2016 17:13:33 +0300
-Subject: [PATCHv3 2/7] clk: ti: add clkdev get helper
+Date: Thu, 30 Jun 2016 17:13:35 +0300
+Subject: [PATCHv3 4/7] clk: ti: mux: export mux clock APIs locally
 In-Reply-To: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
 References: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1467296018-25086-3-git-send-email-t-kristo@ti.com>
+Message-ID: <1467296018-25086-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TI clocks can be found based on a simple query against the clock name,
-thus add a clkdev helper functionality for this. Using this new helper
-implementation  allows getting rid of most of the DT_CLK() entries under
-drivers/clk/ti.
+get_parent and set_parent are going to be required by the support of
+module clocks, so export these locally.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clk.c | 38 +++++++++++++++++++++++++++++++++-----
- 1 file changed, 33 insertions(+), 5 deletions(-)
+ drivers/clk/ti/clock.h | 3 +++
+ drivers/clk/ti/mux.c   | 4 ++--
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index 5fcf247..17554c3 100644
---- a/drivers/clk/ti/clk.c
-+++ b/drivers/clk/ti/clk.c
-@@ -68,6 +68,36 @@ static u32 clk_memmap_readl(void __iomem *reg)
- }
+diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+index 90f3f47..7eca8a1 100644
+--- a/drivers/clk/ti/clock.h
++++ b/drivers/clk/ti/clock.h
+@@ -224,6 +224,9 @@ extern const struct clk_hw_omap_ops clkhwops_am35xx_ipss_wait;
+ extern const struct clk_ops ti_clk_divider_ops;
+ extern const struct clk_ops ti_clk_mux_ops;
  
- /**
-+ * ti_clk_get - lookup a TI clock handle
-+ * @dev_id: device to lookup clock for
-+ * @con_id: connection ID to find
-+ *
-+ * Searches for a TI clock handle based on the DT node name.
-+ * Returns the pointer to the clock handle, or ERR_PTR in failure.
-+ */
-+static struct clk *ti_clk_get(const char *dev_id, const char *con_id)
-+{
-+	struct of_phandle_args clkspec;
-+	struct device_node *node;
-+	struct clk *clk;
++u8 ti_clk_mux_get_parent(struct clk_hw *hw);
++int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index);
 +
-+	/* Only check for cases of type clk_get_sys(NULL, "xyz") */
-+	if (dev_id || !con_id)
-+		return ERR_PTR(-ENOENT);
-+
-+	if (of_have_populated_dt()) {
-+		node = of_find_node_by_name(NULL, con_id);
-+		clkspec.np = node;
-+		clk = of_clk_get_from_provider(&clkspec);
-+
-+		if (!IS_ERR(clk))
-+			return clk;
-+	}
-+
-+	return ERR_PTR(-ENOENT);
-+}
-+
-+/**
-  * ti_clk_setup_ll_ops - setup low level clock operations
-  * @ops: low level clock ops descriptor
-  *
-@@ -87,6 +117,8 @@ int ti_clk_setup_ll_ops(struct ti_clk_ll_ops *ops)
- 	ops->clk_readl = clk_memmap_readl;
- 	ops->clk_writel = clk_memmap_writel;
+ int omap2_clkops_enable_clkdm(struct clk_hw *hw);
+ void omap2_clkops_disable_clkdm(struct clk_hw *hw);
  
-+	clkdev_helper_register(ti_clk_get);
-+
- 	return 0;
- }
+diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
+index 44777ab..57ff471 100644
+--- a/drivers/clk/ti/mux.c
++++ b/drivers/clk/ti/mux.c
+@@ -26,7 +26,7 @@
+ #undef pr_fmt
+ #define pr_fmt(fmt) "%s: " fmt, __func__
  
-@@ -102,14 +134,10 @@ int ti_clk_setup_ll_ops(struct ti_clk_ll_ops *ops)
- void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
+-static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
++u8 ti_clk_mux_get_parent(struct clk_hw *hw)
  {
- 	struct ti_dt_clk *c;
--	struct device_node *node;
- 	struct clk *clk;
--	struct of_phandle_args clkspec;
+ 	struct clk_mux *mux = to_clk_mux(hw);
+ 	int num_parents = clk_hw_get_num_parents(hw);
+@@ -63,7 +63,7 @@ static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
+ 	return val;
+ }
  
- 	for (c = oclks; c->node_name != NULL; c++) {
--		node = of_find_node_by_name(NULL, c->node_name);
--		clkspec.np = node;
--		clk = of_clk_get_from_provider(&clkspec);
-+		clk = ti_clk_get(NULL, c->node_name);
- 
- 		if (!IS_ERR(clk)) {
- 			c->lk.clk = clk;
+-static int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index)
++int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ {
+ 	struct clk_mux *mux = to_clk_mux(hw);
+ 	u32 val;
 -- 
 1.9.1
