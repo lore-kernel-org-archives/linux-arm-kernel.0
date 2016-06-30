@@ -1,74 +1,71 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Thu, 30 Jun 2016 09:25:19 -0400
-Subject: [PATCH v2 0/3] pwm: lpc32xx: Add support to control
- PWM_PIN_LEVEL bit
-In-Reply-To: <ce29f743-e481-64b0-8e05-0b610fa33fb3@mleia.com>
-References: <1467032997-5340-1-git-send-email-slemieux.tyco@gmail.com>
- <ce29f743-e481-64b0-8e05-0b610fa33fb3@mleia.com>
-Message-ID: <1467293119.32051.9.camel@localhost>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 30 Jun 2016 15:27:59 +0200
+Subject: [PATCH 15/15] arm/arm64: KVM: Check that IDMAP doesn't intersect
+ with VA range
+In-Reply-To: <577515B4.1080301@arm.com>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+ <1465297115-13091-16-git-send-email-marc.zyngier@arm.com>
+ <20160628220101.GT26498@cbox> <577515B4.1080301@arm.com>
+Message-ID: <20160630132759.GX26498@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
-
-On Thu, 2016-06-30 at 11:43 +0300, Vladimir Zapolskiy wrote:
-> Hi Sylvain,
+On Thu, Jun 30, 2016 at 01:51:00PM +0100, Marc Zyngier wrote:
+> On 28/06/16 23:01, Christoffer Dall wrote:
+> > On Tue, Jun 07, 2016 at 11:58:35AM +0100, Marc Zyngier wrote:
+> >> This is more of a safety measure than anything else: If we end-up
+> >> with an idmap page that intersect with the range picked for the
+> >> the HYP VA space, abort the KVM setup, as it is unsafe to go
+> >> further.
+> >>
+> >> I cannot imagine it happening on 64bit (we have a mechanism to
+> >> work around it), but could potentially occur on a 32bit system with
+> >> the kernel loaded high enough in memory so that in conflicts with
+> >> the kernel VA.
+> > 
+> > ah, you had a patch for this...
+> > 
+> > does this even work for enabling the MMU during kernel boot or how do
+> > they deal with it?
 > 
-> On 27.06.2016 16:09, Sylvain Lemieux wrote:
-> > From: Sylvain Lemieux <slemieux@tycoint.com>
-> > 
-> > The PWM_PIN_LEVEL bit is leave unset by the kernel PWM driver.
-> > 
-> > Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
-> > the PWM_PIN_LEVEL bit was always clear when the PWM was disable
-> > and a 0 logic level was apply to the output.
-> > 
-> > According to the LPC32x0 User Manual [1],
-> > the default value for bit 30 (PWM_PIN_LEVEL) is 0.
-> > 
-> > First patch:
-> > * initialize the pin level to 0 (default value) and update
-> >   the register value accordingly.
-> > 
-> > Second anf third patches:
-> > *  provide support to configure the pin output (i.e. PWM_PIN_LEVEL bit)
-> >    when the PWM is disabled.
+> As I said in a reply to an earlier patch, this must already taken care
+> of by the bootloader, making sure that the kernel physical memory does
+> not alias with the VAs. Pretty scary.
 > 
-> a short question, how do you use PWM? Does it serve as a backlight
-> or something else?
+> > 
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/kvm/mmu.c | 15 +++++++++++++++
+> >>  1 file changed, 15 insertions(+)
+> >>
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index 46b8604..819517d 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -1708,6 +1708,21 @@ int kvm_mmu_init(void)
+> >>  	 */
+> >>  	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
+> >>  
+> >> +	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
+> >> +	kvm_info("HYP VA range: %lx:%lx\n",
+> >> +		 KERN_TO_HYP(PAGE_OFFSET), KERN_TO_HYP(~0UL));
+> >> +
+> >> +	if (hyp_idmap_start >= KERN_TO_HYP(PAGE_OFFSET) &&
+> >> +	    hyp_idmap_start <  KERN_TO_HYP(~0UL)) {
+> > 
+> > why is the second part of this clause necessary?
 > 
-The PWM is used to control the LCD backlight intensity.
-
-When we setup the backlight brightness level to 0, 
-it should turn off the LCD display by disabling the PWM.
-
-This is what was added to our board dts for it:
-	backlight {
-		compatible = "pwm-backlight";
-		pwms = <&pwm1 0 1250000>;
-
-		brightness-levels = <0 20 100>;
-		default-brightness-level = <2>;
-	};
-
-> > Note:
-> > * Follow this URL to access the discussion for version 1 of this
-> >   patch: http://thread.gmane.org/gmane.linux.pwm/3882
-> > 
-> > [1] http://www.nxp.com/documents/user_manual/UM10326.pdf
-> > 
-> > Sylvain Lemieux (3):
-> >   pwm: lpc32xx: Set PWM_PIN_LEVEL bit to default value
-> >   pwm: lpc32xx: Add support for PWM_PIN_LEVEL bit configuration
-> >   dt-bindings: pwm: lpc32xx: Add nxp,pwm-disabled-level-high property
-> > 
-> >  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt |  3 +++
-> >  drivers/pwm/pwm-lpc32xx.c                             | 11 +++++++++++
-> >  2 files changed, 14 insertions(+)
-> > 
+> We want to check that our clash avoiding mechanism works.
 > 
-> --
-> With best wishes,
-> Vladimir
+> Since we're translating the kernel VA downwards (by clearing the top
+> bits), we can definitely end-up in a situation where the idmap is above
+> the translated "top of the kernel" (that's the "low mask" option). So it
+> is definitely worth checking that we really don't get any aliasing. This
+> has been quite useful when debugging this code.
+> 
+Right, I thought about this only in the context of 32-bit and got
+confused.
 
-Sylvain
+Thanks,
+-Christoffer
