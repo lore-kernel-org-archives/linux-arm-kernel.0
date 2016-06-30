@@ -1,48 +1,40 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 30 Jun 2016 10:22:19 -0600
-Subject: [PATCH 13/13] coresight: add PM runtime calls to
- coresight_simple_func()
+Date: Thu, 30 Jun 2016 10:22:17 -0600
+Subject: [PATCH 11/13] coresight: delay initialisation when children are
+ missing
 In-Reply-To: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1467303739-12543-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1467303739-12543-14-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1467303739-12543-12-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is mandatory to enable a coresight block's power domain before
-trying to access management registers.  Otherwise the transaction
-simply stalls, leading to a system hang.
+Depending on when CoreSight device are discovered it is possible
+that some IP block may be referencing devices that have not been
+added to the bus yet.  The end result is missing nodes in the
+CoreSight topology even when the devices are present and properly
+initialised.
+
+This patch solves the problem by asking the driver core to
+try initialising the device at a later time when the children
+of a CoreSight node are missing.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-priv.h | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/hwtracing/coresight/of_coresight.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index ad975c58080d..decfd52b5dc3 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -16,6 +16,7 @@
- #include <linux/bitops.h>
- #include <linux/io.h>
- #include <linux/coresight.h>
-+#include <linux/pm_runtime.h>
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index b68da1888fd5..18f1c8c4776b 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -166,7 +166,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
  
- /*
-  * Coresight management registers (0xf00-0xfcc)
-@@ -42,8 +43,11 @@ static ssize_t name##_show(struct device *_dev,				\
- 			   struct device_attribute *attr, char *buf)	\
- {									\
- 	type *drvdata = dev_get_drvdata(_dev->parent);			\
--	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
--			 readl_relaxed(drvdata->base + offset));	\
-+	u32 val;							\
-+	pm_runtime_get_sync(_dev->parent);				\
-+	val = readl_relaxed(drvdata->base + offset);			\
-+	pm_runtime_put_sync(_dev->parent);				\
-+	return scnprintf(buf, PAGE_SIZE, "0x%x\n", val);		\
- }									\
- static DEVICE_ATTR_RO(name)
+ 			rdev = of_coresight_get_endpoint_device(rparent);
+ 			if (!rdev)
+-				continue;
++				return ERR_PTR(-EPROBE_DEFER);
  
+ 			pdata->child_names[i] = dev_name(rdev);
+ 			pdata->child_ports[i] = rendpoint.id;
 -- 
 2.7.4
