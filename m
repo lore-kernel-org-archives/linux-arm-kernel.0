@@ -1,88 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Jun 2016 00:13:01 -0700
-Subject: [GIT PULL 2/2] dtc warning fixes for omaps for v4.8 merge window
-In-Reply-To: <pull-1467270686-995259>
-References: <pull-1467270686-995259>
-Message-ID: <pull-1467270686-995259-2>
+From: hs.liao@mediatek.com (HS Liao)
+Date: Thu, 30 Jun 2016 15:14:39 +0800
+Subject: [PATCH v9 0/4] Mediatek MT8173 CMDQ support
+Message-ID: <1467270883-1407-1-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 52c7c91319e469142628199548852198bcc3150f:
 
-  ARM: dts: AM43xx: Add node for RNG (2016-06-22 00:44:16 -0700)
+Hi,
 
-are available in the git repository at:
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/dt-part2-signed
+These patches have a build dependency on top of v4.7-rc1.
 
-for you to fetch changes up to 480985b06c8e3999940929bf024042e4181bbdce:
+Changes since v8:
+ - use mailbox framework, and merge options for GCE thread into
+   mailbox channel
+ - use timer to handle timeout case
+ - rename cmdq_handle_error_done to cmdq_thread_irq_handler, handle
+   error by cmdq_task_handle_error, and handle timeout by
+   cmdq_thread_handle_timeout
+ - use bitops
+ - fix bug of treating working task as done task
+ - move GCE hardware events' mapping from header to driver
+ - remove code about previous tasks since we should keep tasks' order
+   for display, and it is impossible to have previous tasks
+ - centralize code to handle executed tasks in cmdq_task_exec_done
+ - use u64* instead of u32* for GCE command pointer
+ - drop cmdq_thread_readl/writel
+ - depends on ARM64
+ - refine some code accroding to comments for v8
 
-  ARM: dts: am57xx: sbc-am57x: remove unneded unit name (2016-06-29 00:05:39 -0700)
+Best regards,
+HS Liao
 
-----------------------------------------------------------------
-Second set of device tree updates for omaps for v4.8 merge window.
-This is a series of dtc warning fixes when compiled with make W=2
-from Javier Martinez Canillas <javier@osg.samsung.com>.
+HS Liao (4):
+  dt-bindings: soc: Add documentation for the MediaTek GCE unit
+  CMDQ: Mediatek CMDQ driver
+  arm64: dts: mt8173: Add GCE node
+  CMDQ: save more energy in idle
 
-----------------------------------------------------------------
-Javier Martinez Canillas (27):
-      ARM: dts: omap2: add missing unit name to func_96m_ck
-      ARM: dts: am3517-craneboard: remove unneeded unit name for fixedregulator
-      ARM: dts: dm3730-torpedo-devkit: remove unneeded unit names
-      ARM: dts: n900: remove unneeded unit name for dmtimer-pwm
-      ARM: dts: omap3-beagle: remove unneeded unit names
-      ARM: dts: omap3-beagle-xm: remove unneeded unit names
-      ARM: dts: cm-t3x: remove unneeded unit name in connector
-      ARM: dts: omap3-devkit8000: remove unneeded unit names
-      ARM: dts: omap3-devkit8000-lcd-common: remove unneeded unit names
-      ARM: dts: omap3-gta04: remove unneeded unit names
-      ARM: dts: omap3-ha-lcd: remove unneeded unit name
-      ARM: dts: omap3: overo: remove unneded unit names in display nodes
-      ARM: dts: omap3-igep0020-common: remove unneded unit names
-      ARM: dts: omap3-overo-common-dvi: remove unneded unit names
-      ARM: dts: omap3-pandora-common: remove unneded unit name
-      ARM: dts: sbc-t3x30: remove unneded unit names
-      ARM: dts: omap3-thunder: remove unneded unit name
-      ARM: dts: omap4-duovero-parlor: remove unneded unit name
-      ARM: dts: omap4-panda-common: remove unneded unit names
-      ARM: dts: omap4-sdp: remove unneded unit names
-      ARM: dts: omap4-var-om44customboard: remove unneded unit name
-      ARM: dts: am43xx-epos-evm: remove unneded unit name
-      ARM: dts: am437x-gp-evm: remove unneded unit name
-      ARM: dts: am437x: cm-t43: remove unneded unit names
-      ARM: dts: omap5-cm-t54: remove unneded unit names and add reg properties
-      ARM: dts: omap5-board-common: remove unneded unit names
-      ARM: dts: am57xx: sbc-am57x: remove unneded unit name
+ .../devicetree/bindings/soc/mediatek/gce.txt       |  44 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
+ drivers/soc/mediatek/Kconfig                       |  11 +
+ drivers/soc/mediatek/Makefile                      |   1 +
+ drivers/soc/mediatek/mtk-cmdq.c                    | 967 +++++++++++++++++++++
+ include/soc/mediatek/cmdq.h                        | 192 ++++
+ 6 files changed, 1225 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
+ create mode 100644 include/soc/mediatek/cmdq.h
 
- arch/arm/boot/dts/am3517-craneboard.dts            |  2 +-
- arch/arm/boot/dts/am437x-gp-evm.dts                |  2 +-
- arch/arm/boot/dts/am437x-sbc-t43.dts               |  2 +-
- arch/arm/boot/dts/am43x-epos-evm.dts               |  2 +-
- arch/arm/boot/dts/am57xx-sbc-am57x.dts             |  2 +-
- arch/arm/boot/dts/compulab-sb-som.dtsi             |  2 +-
- arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts  |  4 ++--
- arch/arm/boot/dts/omap24xx-clocks.dtsi             |  2 +-
- arch/arm/boot/dts/omap3-beagle-xm.dts              | 10 +++++-----
- arch/arm/boot/dts/omap3-beagle.dts                 | 10 +++++-----
- arch/arm/boot/dts/omap3-cm-t3x.dtsi                |  2 +-
- arch/arm/boot/dts/omap3-devkit8000-common.dtsi     | 12 ++++++------
- arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi |  4 ++--
- arch/arm/boot/dts/omap3-devkit8000-lcd43.dts       |  2 +-
- arch/arm/boot/dts/omap3-devkit8000-lcd70.dts       |  2 +-
- arch/arm/boot/dts/omap3-gta04.dtsi                 |  8 ++++----
- arch/arm/boot/dts/omap3-ha-lcd.dts                 |  2 +-
- arch/arm/boot/dts/omap3-igep0020-common.dtsi       |  8 ++++----
- arch/arm/boot/dts/omap3-n900.dts                   |  2 +-
- arch/arm/boot/dts/omap3-overo-common-dvi.dtsi      |  8 ++++----
- arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi    |  2 +-
- arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi    |  2 +-
- arch/arm/boot/dts/omap3-pandora-common.dtsi        |  2 +-
- arch/arm/boot/dts/omap3-sb-t35.dtsi                |  8 ++++----
- arch/arm/boot/dts/omap3-thunder.dts                |  2 +-
- arch/arm/boot/dts/omap4-duovero-parlor.dts         |  2 +-
- arch/arm/boot/dts/omap4-panda-common.dtsi          | 16 ++++++++--------
- arch/arm/boot/dts/omap4-sdp.dts                    |  8 ++++----
- arch/arm/boot/dts/omap4-var-om44customboard.dtsi   |  2 +-
- arch/arm/boot/dts/omap5-board-common.dtsi          |  8 ++++----
- arch/arm/boot/dts/omap5-cm-t54.dts                 | 15 ++++++++++-----
- 31 files changed, 80 insertions(+), 75 deletions(-)
+-- 
+1.9.1
