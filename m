@@ -1,58 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Jul 2016 11:33:47 +0100
-Subject: [PATCH 4/7] bus: arm-cci: add missing of_node_put after calling
- of_parse_phandle
-In-Reply-To: <57764626.4060800@arm.com>
-References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
- <1467366121-14120-5-git-send-email-peter.chen@nxp.com>
- <57764626.4060800@arm.com>
-Message-ID: <20160701103346.GF12735@arm.com>
+From: wuchengli@chromium.org (=?UTF-8?B?V3UtQ2hlbmcgTGkgKOadjuWLmeiqoCk=?=)
+Date: Fri, 1 Jul 2016 18:47:40 +0800
+Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
+In-Reply-To: <8a46c1e7-1f27-1e67-8c05-b133598b6a66@xs4all.nl>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+ <20160607112235.475c2e4c@recife.lan> <575746EE.3030706@cisco.com>
+ <1465902488.27938.7.camel@mtksdaap41> <20160616075428.0fde4aaa@recife.lan>
+ <8a46c1e7-1f27-1e67-8c05-b133598b6a66@xs4all.nl>
+Message-ID: <CAOMLVLgsB8mGdTZdn7dNQATFodqFPqmPH_yCn2+PKMYD2B+kYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 11:29:58AM +0100, Suzuki K Poulose wrote:
-> On 01/07/16 10:41, Peter Chen wrote:
-> >of_node_put needs to be called when the device node which is got
-> >from of_parse_phandle has finished using.
-> >
-> >Cc: Will Deacon <will.deacon@arm.com>
-> >Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> 
-> Thanks for the fix.
-> 
-> >---
-> >  drivers/bus/arm-cci.c | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> >
-> >diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> >index a49b283..e7b0b8c 100644
-> >--- a/drivers/bus/arm-cci.c
-> >+++ b/drivers/bus/arm-cci.c
-> >@@ -1912,9 +1912,12 @@ static int __cci_ace_get_port(struct device_node *dn, int type)
-> >  	cci_portn = of_parse_phandle(dn, "cci-control-port", 0);
-> >  	for (i = 0; i < nb_cci_ports; i++) {
-> >  		ace_match = ports[i].type == type;
-> >-		if (ace_match && cci_portn == ports[i].dn)
-> >+		if (ace_match && cci_portn == ports[i].dn) {
-> >+			of_node_put(cci_portn);
-> >  			return i;
-> >+		}
-> >  	}
-> >+	of_node_put(cci_portn);
-> 
-> nit: Could we please do some thing like this ?
-> 		if (ace_match && cci_portn == ports[i].dn)
-> 			break;
-> 	}
-> 
-> 	of_node_put(cci_portn);
-> 	return (i < nb_cci_ports) ? i : -ENODEV ;
-> 
-> Either way,
-> 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
++Andrew. Last I heard the license was ready and Andrew was preparing
+the VPU firmware. Andrew. Is the firmware ready to submit?
 
-Please route this via arm-soc once you've addressed Suzuki's comment.
-
-Will
+On Fri, Jul 1, 2016 at 6:11 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+> On 06/16/2016 12:54 PM, Mauro Carvalho Chehab wrote:
+>> Em Tue, 14 Jun 2016 19:08:08 +0800
+>> tiffany lin <tiffany.lin@mediatek.com> escreveu:
+>>
+>>> Hi Mauro,
+>>>
+>>>
+>>> On Wed, 2016-06-08 at 07:13 +0900, Hans Verkuil wrote:
+>>>>
+>>>> On 06/07/2016 11:22 PM, Mauro Carvalho Chehab wrote:
+>>>>> Em Mon, 30 May 2016 20:29:14 +0800
+>>>>> Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
+>>>>>
+>>>>>> ==============
+>>>>>>   Introduction
+>>>>>> ==============
+>>>>>>
+>>>>>> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
+>>>>>> Mediatek Video Codec is able to handle video decoding of in a range of formats.
+>>>>>>
+>>>>>> This patch series add Mediatek block format V4L2_PIX_FMT_MT21, the decoder driver will decoded bitstream to
+>>>>>> V4L2_PIX_FMT_MT21 format.
+>>>>>>
+>>>>>> This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1]
+>>>>>> and patch "CHROMIUM: v4l: Add V4L2_PIX_FMT_VP9 definition"[2] for VP9 support.
+>>>>>> Mediatek Video Decoder driver rely on VPU driver to load, communicate with VPU.
+>>>>>>
+>>>>>> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
+>>>>>>
+>>>>>> [1]https://patchwork.linuxtv.org/patch/33734/
+>>>>>> [2]https://chromium-review.googlesource.com/#/c/245241/
+>>>>>
+>>>>> Hmm... I'm not seeing the firmware for this driver at the
+>>>>> linux-firmware tree:
+>>>>>    https://git.kernel.org/cgit/linux/kernel/git/firmware/linux-firmware.git/log/
+>>>>>
+>>>>> Nor I'm seeing any pull request for them. Did you send it?
+>>>>> I'll only merge the driver upstream after seeing such pull request.
+>>>>
+>>> Sorry, I am not familiar with how to upstream firmware.
+>>> Do you mean we need to upstream vpu firmware first before merge encoder
+>>> driver upstream?
+>>
+>> Please look at this page:
+>>       https://linuxtv.org/wiki/index.php/Development:_How_to_submit_patches#Firmware_submission
+>>
+>> The information here can also be useful:
+>>       https://www.kernel.org/doc/readme/firmware-README.AddingFirmware
+>>
+>> In summary, you need to provide redistribution rights for the
+>> firmware blob. You can either submit it to me or directly to
+>> linux-firmware. In the latter, please c/c me on such patch.
+>
+> Tiffany, what is the status of the firmware submission?
+>
+> Regards,
+>
+>         Hans
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
