@@ -1,30 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 1 Jul 2016 10:32:11 -0700
-Subject: [PATCH] ARM: brcmstb: Add earlyprintk support using run-time
- checks
-In-Reply-To: <1467333764-2900-1-git-send-email-f.fainelli@gmail.com>
-References: <1467333764-2900-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <5776A91B.1000401@gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 1 Jul 2016 10:35:37 -0700
+Subject: [PATCH] pinctrl: qcom: add support for EBI2
+In-Reply-To: <1467388364-22223-1-git-send-email-linus.walleij@linaro.org>
+References: <1467388364-22223-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160701173537.GL1190@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2016 05:42 PM, Florian Fainelli wrote:
-> SUN_TOP_CTRL_FAMILY_ID is at a fixed absolute address for all of our supported
-> chips, so utilize its value to determine what the UARTA base address should be.
+On Fri 01 Jul 08:52 PDT 2016, Linus Walleij wrote:
+
+> Add support to mux in the second external bus interface as
+> function 1 on pins 123 thru 158. This external bus is used on
+> the APQ8060 Dragonboard to connect an external SMSC9211 ethernet
+> adapter.
 > 
-> Since the code is called both during decompressor when the MMU is off, and
-> after the MMU has been turned on, and we want to do the lookup only
-> once, we use the same technique as tegra.S and have a shared storage
-> location between the decompressor and the kernel.
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/pinctrl/qcom/pinctrl-msm8660.c | 82 +++++++++++++++++++---------------
+>  1 file changed, 46 insertions(+), 36 deletions(-)
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> diff --git a/drivers/pinctrl/qcom/pinctrl-msm8660.c b/drivers/pinctrl/qcom/pinctrl-msm8660.c
+[..]
+> @@ -875,42 +885,42 @@ static const struct msm_pingroup msm8660_groups[] = {
+[..]
+> +	PINGROUP(158, ebi2, _, _, _, _, _, _),
 
-Looks like I missed an update to DEBUG_UNCOMPRESS to make it disbaled if
-DEBUG_BRCMSTB_UART is enabled.
+Looking at the default gpiomux-8x60.c in an old tree (the only one I've
+found that defines ebi2) here seems to indicate that pin 158 is not part
+of ebi2.
 
-Should patches to Kconfig.debug be submitted to RMK's patch system, or
-pulled via arm-soc changes?
+It also denotes pin 40 as "cs2" and skips 131 for some reason.
 
-Thanks
--- 
-Florian
+
+So I suggest dropping 158 and you have my
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
