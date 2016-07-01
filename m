@@ -1,37 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  1 Jul 2016 17:01:31 +0200
-Subject: [PATCH 2/2] arm64: document that pending SErrors are not allowed at
- kernel entry
-In-Reply-To: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1467385291-9880-2-git-send-email-ard.biesheuvel@linaro.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 1 Jul 2016 11:06:35 -0400
+Subject: [PATCH] arm64: defconfig: Enable QDF2432 config options
+In-Reply-To: <57767AC1.3070209@codeaurora.org>
+References: <1467382327-9726-1-git-send-email-cov@codeaurora.org>
+ <57767AC1.3070209@codeaurora.org>
+Message-ID: <577686FB.5040709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our current strategy to deal with pending SErrors at boot is to panic.
-So let's mention in our boot protocol documentation that no SErrors
-should be pending when handing over to the kernel.
+On 07/01/2016 10:14 AM, Timur Tabi wrote:
+> Christopher Covington wrote:
+>>   arch/arm64/configs/defconfig |  4 ++++
+>>   scripts/patch-details.sh     | 21 ++++++++++++++++++---
+> 
+> I don't think these two files should be combined.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- Documentation/arm64/booting.txt | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Oops, sorry. Fixed in v2.
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index 8d0df62c3fe0..75dcfead1a0c 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -154,8 +154,9 @@ Before jumping into the kernel, the following conditions must be met:
-   x3 = 0 (reserved for future use)
- 
- - CPU mode
--  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
--  IRQ and FIQ).
-+  All forms of exceptions must be masked in PSTATE.DAIF (Debug, SError,
-+  IRQ and FIQ), and any pending SError exceptions must be taken by the
-+  boot loader or firmware before handing over to the kernel.
-   The CPU must be in either EL2 (RECOMMENDED in order to have access to
-   the virtualisation extensions) or non-secure EL1.
- 
+>>  CONFIG_PINCTRL_SINGLE=y
+>>  CONFIG_PINCTRL_MSM8916=y
+>> +CONFIG_PINCTRL_QDF2XXX=m
+>>  CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+>>  CONFIG_GPIO_SYSFS=y
+>>  CONFIG_GPIO_DWAPB=y
+>> @@ -245,6 +246,7 @@ CONFIG_MMC=y
+>>  CONFIG_MMC_BLOCK_MINORS=32
+>>  CONFIG_MMC_ARMMMCI=y
+>>  CONFIG_MMC_SDHCI=y
+>> +CONFIG_MMC_SDHCI_ACPI=m
+>>  CONFIG_MMC_SDHCI_PLTFM=y
+> 
+> Why are these =m when all the others are =y?
+
+Due to distribution differences [1][2], I see =y built-in as the default
+on mobile platforms and =m modular as the default on server platforms.
+
+But thinking about it, we could get a poweroff, reset, over-temperature,
+or other interrupt before we get to the initramfs. So the pin controller
+driver should be =y built-in.
+
+One might make rootfs media =y built-in to make testing easier, but I
+prefer to put my rootfs on SATA, as SD/MMC is much slower and smaller by
+comparison.
+
+Thanks,
+Cov
+
+Examples I found to spot check my recollection:
+1.
+https://github.com/CyanogenMod/android_kernel_lge_hammerhead/blob/cm-13.0/arch/arm/configs/cyanogenmod_hammerhead_defconfig
+
+2.
+https://git.centos.org/blob/sig-altarch!kernel.git/c3cb6cc6edb5400321fd9d83413add4cf61d942e/SOURCES!config-arm64
 -- 
-2.7.4
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
