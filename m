@@ -1,21 +1,20 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 01 Jul 2016 02:19:25 +0200
-Subject: [GIT PULL 1/2] Rockchip dts32 changes for 4.8
-Message-ID: <1666093.aVfPg2VmbT@phil>
+Date: Fri, 01 Jul 2016 02:22:19 +0200
+Subject: [GIT PULL 2/2] Rockchip dts64 changes for 4.8
+In-Reply-To: <1666093.aVfPg2VmbT@phil>
+References: <1666093.aVfPg2VmbT@phil>
+Message-ID: <5006101.OhzRdW27q2@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Kevin, Olof,
 
-please find below arm devicetree changes for 4.8. The biggest part is
-probably the support for audio on veyron devices where the renaming was
-coordinated with the alsa side and the overturned name was never part of
-an actual release.
+please find below arm64 devicetree changes for 4.8.
 
-Apart from that Veyron also got a node for its spi flash and we now also
-support the ethernet and i2s controller on the rk3228/rk3229 siblings.
+Some new things for the rk3399 like emmc support as well some
+improvements+fixes for the rk3368 as explained in the tag.
 
-So if it looks ok, please pull
+So if ok, please pull
 
 Thanks
 Heiko
@@ -27,53 +26,47 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.8-rockchip-dts32-1
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.8-rockchip-dts64-1
 
-for you to fetch changes up to 241eff3c198492b2d63e75723b774f2836fee8a3:
+for you to fetch changes up to 5d26ad9cfb2ebe2aba75342813e7542d5a68d644:
 
-  ARM: dts: rockchip: add support rk3229 evb board (2016-06-27 21:38:50 +0200)
-
-----------------------------------------------------------------
-Audio support and spi-flash on rk3288-veyron Chromedevices
-as well as i2s and ethernet support on rk3228/rk3229 devices
-and a dts file for the rk3229 eval board.
+  arm64: dts: rockchip: add ap_pwroff and ddrio_pwroff pins for rk3399 (2016-06-27 01:07:40 +0200)
 
 ----------------------------------------------------------------
-Brian Norris (1):
-      ARM: dts: rockchip: add SPI flash node for rk3288-veyron
+The rk3399 gets support for its emmc controller as well as thermal,
+i2c and core io-domain nodes and some reasonable default rates
+for core clocks. The rk3368 also gets io-domains for its r88 board
+as well as a small fix for the gic's memory regions.
 
-Enric Balletbo i Serra (2):
-      ARM: dts: rockchip: Add shared file for audio on rk3288-veyron boards
-      ARM: dts: rockchip: Enable analog audio on rk3288-veyron chromebooks
+----------------------------------------------------------------
+Brian Norris (3):
+      arm64: dts: rockchip: make rk3399's grf a "simple-mfd"
+      arm64: dts: rockchip: add sdhci/emmc for rk3399
+      arm64: dts: rockchip: enable eMMC for rk3399 EVB
 
-Heiko Stuebner (3):
-      ARM: dts: rockchip: move rk3288 io-domain nodes to the grf
-      ARM: dts: rockchip: rename i2s model for Veyron devices
-      Merge branch 'v4.8-shared/clkids' into v4.8-armsoc/dts32
+Caesar Wang (2):
+      arm64: dts: rockchip: add thermal nodes for rk3399 SoCs
+      arm64: dts: rockchip: fixes the gic400 2nd region size for rk3368
 
-Xing Zheng (6):
-      clk: rockchip: add clock-ids for rk3228 audio clocks
-      clk: rockchip: add clock-ids for rk3228 MAC clocks
-      ARM: dts: rockchip: rename rk3228.dtsi to rk322x.dtsi
-      ARM: dts: rockchip: add i2s nodes for RK322x SoCs
-      ARM: dts: rockchip: add GMAC nodes for RK322x SoCs
-      ARM: dts: rockchip: add support rk3229 evb board
+David Wu (1):
+      arm64: dts: rockchip: add i2c nodes for rk3399
 
- Documentation/devicetree/bindings/arm/rockchip.txt |   3 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3228-evb.dts                   |   2 +-
- arch/arm/boot/dts/rk3229-evb.dts                   |  90 ++++++++++++++++
- arch/arm/boot/dts/{rk3228.dtsi => rk322x.dtsi}     | 118 ++++++++++++++++++++-
- arch/arm/boot/dts/rk3288-firefly.dtsi              |  31 +++---
- arch/arm/boot/dts/rk3288-miqi.dts                  |  26 ++---
- arch/arm/boot/dts/rk3288-popmetal.dts              |  31 +++---
- arch/arm/boot/dts/rk3288-rock2-som.dtsi            |  31 +++---
- arch/arm/boot/dts/rk3288-veyron-analog-audio.dtsi  | 101 ++++++++++++++++++
- arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi    |   1 +
- arch/arm/boot/dts/rk3288-veyron.dtsi               |  31 +++---
- arch/arm/boot/dts/rk3288.dtsi                      |   5 +
- include/dt-bindings/clock/rk3228-cru.h             |  15 +++
- 14 files changed, 409 insertions(+), 77 deletions(-)
- create mode 100644 arch/arm/boot/dts/rk3229-evb.dts
- rename arch/arm/boot/dts/{rk3228.dtsi => rk322x.dtsi} (80%)
- create mode 100644 arch/arm/boot/dts/rk3288-veyron-analog-audio.dtsi
+Douglas Anderson (3):
+      arm64: dts: rockchip: Add soc-ctl-syscon to sdhci for rk3399
+      arm64: dts: rockchip: Provide emmcclk to PHY for rk3399
+      arm64: dts: rockchip: add ap_pwroff and ddrio_pwroff pins for rk3399
+
+Heiko Stuebner (4):
+      arm64: dts: rockchip: make rk3368 grf syscons simple-mfds
+      arm64: dts: rockchip: add rk3368 io-domain core nodes
+      arm64: dts: rockchip: add rk3368-r88 iodomains
+      arm64: dts: rockchip: add rk3399 io-domain core nodes
+
+Xing Zheng (1):
+      arm64: dts: rockchip: assign default rates for core rk3399 clocks
+
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts |  16 ++
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi    |  16 +-
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  12 ++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 313 +++++++++++++++++++++++++++-
+ 4 files changed, 352 insertions(+), 5 deletions(-)
