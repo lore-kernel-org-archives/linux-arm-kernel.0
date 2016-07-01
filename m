@@ -1,206 +1,161 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 1 Jul 2016 14:12:25 +0100
-Subject: [PATCH v7] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-In-Reply-To: <20160701130135.GB14018@e104818-lin.cambridge.arm.com>
-References: <1467308204-23669-1-git-send-email-suzuki.poulose@arm.com>
- <20160701130135.GB14018@e104818-lin.cambridge.arm.com>
-Message-ID: <57766C39.1040305@arm.com>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Fri, 1 Jul 2016 16:17:00 +0300
+Subject: [PATCH v2] arm64: defconfig: add options for virtualization and
+ containers
+In-Reply-To: <20160627111113.GF26498@cbox>
+References: <1465979279-23449-1-git-send-email-riku.voipio@linaro.org>
+ <20160627111113.GF26498@cbox>
+Message-ID: <CAAqcGHmMtSpaB37HYFwpVg51R+DGdDc2T1fogBSxdW7W0A95EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/16 14:01, Catalin Marinas wrote:
-> On Thu, Jun 30, 2016 at 06:36:44PM +0100, Suzuki K. Poulose wrote:
->> From: Steve Capper <steve.capper@linaro.org>
+On 27 June 2016 at 14:11, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Wed, Jun 15, 2016 at 11:27:59AM +0300, Riku Voipio wrote:
+>> Enable options commonly needed by popular virtualization
+>> and container applications. Use modules when possible to
+>> avoid too much overhead for users not interested.
 >>
->> It can be useful for JIT software to be aware of MIDR_EL1 and
->> REVIDR_EL1 to ascertain the presence of any core errata that could
->> affect code generation.
+>> - add namespace and cgroup options needed
+>> - add seccomp - optional, but enhances Qemu etc
+>> - bridge, nat, veth, macvtap and multicast for routing
+>>   guests and containers
+>> - btfrs and overlayfs modules for container COW backends
+>> - while near it, make fuse a module instead of built-in.
 >>
->> This patch exposes these registers through sysfs:
+>> Generated with make saveconfig and dropping unrelated spurious
+>> change hunks while commiting. bloat-o-meter old-vmlinux vmlinux:
 >>
->> /sys/devices/system/cpu/cpu$ID/regs/identification/midr_el1
->> /sys/devices/system/cpu/cpu$ID/regs/identification/revidr_el1
-
-
->> +What:		/sys/devices/system/cpu/cpuX/regs/
->> +		/sys/devices/system/cpu/cpuX/regs/identification/
->> +		/sys/devices/system/cpu/cpuX/regs/identification/midr_el1
->> +		/sys/devices/system/cpu/cpuX/regs/identification/revidr_el1
->> +Date:		June 2016
->> +Contact:	Linux ARM Kernel Mailing list <linux-arm-kernel@lists.infradead.org>
->> +		Linux Kernel mailing list <linux-kernel@vger.kernel.org>
->> +Description:	ARM64 CPU identification registers
+>> add/remove: 905/390 grow/shrink: 767/229 up/down: 183513/-94861 (88652)
+>> ....
+>> Total: Before=10515408, After=10604060, chg +0.84%
+>>
+>> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
 >
-> s/ARM64/AArch64/.
+> I'm unclear what the conclusion on the v1 regarding using modules in
+> defconfig was exactly, but I'm happy to see a defconfig that makes it
+> easier to test virtualization.
 
-Ok.
+I think it was generally agreed that adding modules to defconfig is ok. However
+this patch seems to be a bit stuck in limbo. Anyone going to pick it up?
 
+Riku
+
+> Thanks,
+> -Christoffer
 >
->> +		'identification' directory exposes the CPU ID registers for
->> +		 identifying model and revision of the CPU.
->> +		- midr_el1 : This file gives contents of Main ID Register (MIDR_EL1).
->> +		- revidr_el1 : This file gives contents of the Revision ID register
->> +		 (REVIDR_EL1).
-> [...]
-
-I will remove those superfluous explanation.
-
->> --- a/arch/arm64/kernel/cpuinfo.c
->> +++ b/arch/arm64/kernel/cpuinfo.c
->> @@ -183,6 +183,140 @@ const struct seq_operations cpuinfo_op = {
->>   	.show	= c_show
->>   };
+>> ---
+>> v2: Adapt to v4.7-rc3 where CONFIG_DEVPTS_MULTIPLE_INSTANCES is gone
+>> ---
+>>  arch/arm64/configs/defconfig | 52 +++++++++++++++++++++++++++++++++++++++-----
+>>  1 file changed, 46 insertions(+), 6 deletions(-)
 >>
->> +
->> +static struct kobj_type cpuregs_kobj_type = {
->> +	.sysfs_ops = &kobj_sysfs_ops,
->> +};
->> +
->> +/*
->> + * The ARM ARM uses the phrase "32-bit register" to describe a register
->> + * whose upper 32 bits are RES0 (per C5.1.1, ARM DDI 0487A.i), however
->> + * no statement is made as to whether the upper 32 bits will or will not
->> + * be made use of in future, and between ARM DDI 0487A.c and ARM DDI
->> + * 0487A.d CLIDR_EL1 was expanded from 32-bit to 64-bit.
->> + *
->> + * Thus, while both MIDR_EL1 and REVIDR_EL1 are described as 32-bit
->> + * registers, we expose them both as 64 bit values to cater for possible
->> + * future expansion without an ABI break.
->> + */
->> +#define kobj_to_cpuinfo(kobj)	container_of(kobj, struct cpuinfo_arm64, kobj)
->> +#define CPUREGS_ATTR_RO(_name, _field)						\
->> +	static ssize_t _name##_show(struct kobject *kobj,			\
->> +			struct kobj_attribute *attr, char *buf)			\
->> +	{									\
->> +		struct cpuinfo_arm64 *info = kobj_to_cpuinfo(kobj);		\
->> +										\
->> +		if (info->reg_midr)						\
->> +			return sprintf(buf, "0x%016x\n", info->reg_##_field);	\
->> +		else								\
->> +			return 0;						\
->> +	}									\
->> +	static struct kobj_attribute cpuregs_attr_##_name = __ATTR_RO(_name)
->> +
->> +CPUREGS_ATTR_RO(midr_el1, midr);
->> +CPUREGS_ATTR_RO(revidr_el1, revidr);
->> +
->> +static struct attribute *cpuregs_id_attrs[] = {
->> +	&cpuregs_attr_midr_el1.attr,
->> +	&cpuregs_attr_revidr_el1.attr,
->> +	NULL
->> +};
->> +
->> +static struct attribute_group cpuregs_attr_group = {
->> +	.attrs = cpuregs_id_attrs,
->> +	.name = "identification"
->> +};
->> +
->> +static int cpuid_add_regs(int cpu)
->> +{
->> +	int rc;
->> +	struct device *dev;
->> +	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
->> +
->> +	dev = get_cpu_device(cpu);
->> +	if (dev) {
->> +		rc = kobject_add(&info->kobj, &dev->kobj, "regs");
->> +		if (!rc)
->> +			rc = sysfs_create_group(&info->kobj, &cpuregs_attr_group);
->> +	} else {
->> +		return -ENODEV;
->> +	}
->> +
->> +	return rc;
->> +}
->> +
->> +static int cpuid_remove_regs(int cpu)
->> +{
->> +	int rc = 0;
->> +	struct device *dev;
->> +	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
->> +
->> +	dev = get_cpu_device(cpu);
->> +	if (dev) {
->> +		sysfs_remove_group(&info->kobj, &cpuregs_attr_group);
->> +		kobject_del(&info->kobj);
->> +	} else {
->> +		rc = -ENODEV;
->> +	}
->> +
->> +	return rc;
->> +}
->> +
->> +static int cpuid_callback(struct notifier_block *nb,
->> +			 unsigned long action, void *hcpu)
->> +{
->> +	int rc = 0;
->> +	unsigned long cpu = (unsigned long)hcpu;
->> +
->> +	switch (action & ~CPU_TASKS_FROZEN) {
->> +	case CPU_ONLINE:
->> +		rc = cpuid_add_regs(cpu);
->> +		break;
->> +	case CPU_DEAD:
->> +		rc = cpuid_remove_regs(cpu);
->> +		break;
->> +	}
->> +
->> +	return notifier_from_errno(rc);
->> +}
->> +
->> +static int __init cpuinfo_regs_init(void)
->> +{
->> +	int cpu, finalcpu, ret;
->> +
->> +	cpu_notifier_register_begin();
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
->> +
->> +		kobject_init(&info->kobj, &cpuregs_kobj_type);
->> +		if (cpu_online(cpu)) {
->> +			ret = cpuid_add_regs(cpu);
->> +			if (ret)
->> +				break;
->> +		}
->> +	}
->> +
->> +
->> +	/*
->> +	 * We were unable to put down sysfs groups for all the CPUs, revert
->> +	 * all the groups we have placed down s.t. none are visible.
->> +	 * Otherwise we could give a misleading picture of what's present.
->> +	 */
->> +	if (ret) {
->> +		finalcpu = cpu;
->> +		for_each_online_cpu(cpu) {
->> +			if (cpu == finalcpu)
->> +				break;
->> +			cpuid_remove_regs(cpu);
->> +		}
->> +	} else {
->> +		__hotcpu_notifier(cpuid_callback, 0);
->> +	}
->> +
->> +	cpu_notifier_register_done();
->> +	return ret;
->
-> What is the failure scenario here and do we expect it to fail in the
-> middle of a for_each_possible_cpu()? You don't do any such clean-up if
-> this fails during CPU_ONLINE, so I think we should either ignore this
-
-This was done to decide whether we should report the registers at all at
-init time. i.e, if we failed to setup the sysfs attributes at init time
-for at least one CPU, we don't enable these attributes (and we skip the
-notifiers.) for any.
-
-But you're right. I think we could remove this check altogether.
-It was initially put in place when we didn't have the protection against
-hotplug.
-
-> altogether or have a different clean-up function that handles the
-> CPU_ONLINE cases. I prefer the former.
-
-Thanks
-Suzuki
-  
+>> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+>> index fd2d74d..2d9f845 100644
+>> --- a/arch/arm64/configs/defconfig
+>> +++ b/arch/arm64/configs/defconfig
+>> @@ -15,10 +15,14 @@ CONFIG_IKCONFIG_PROC=y
+>>  CONFIG_LOG_BUF_SHIFT=14
+>>  CONFIG_MEMCG=y
+>>  CONFIG_MEMCG_SWAP=y
+>> +CONFIG_BLK_CGROUP=y
+>> +CONFIG_CGROUP_PIDS=y
+>>  CONFIG_CGROUP_HUGETLB=y
+>> -# CONFIG_UTS_NS is not set
+>> -# CONFIG_IPC_NS is not set
+>> -# CONFIG_NET_NS is not set
+>> +CONFIG_CPUSETS=y
+>> +CONFIG_CGROUP_DEVICE=y
+>> +CONFIG_CGROUP_CPUACCT=y
+>> +CONFIG_CGROUP_PERF=y
+>> +CONFIG_USER_NS=y
+>>  CONFIG_SCHED_AUTOGROUP=y
+>>  CONFIG_BLK_DEV_INITRD=y
+>>  CONFIG_KALLSYMS_ALL=y
+>> @@ -69,6 +73,7 @@ CONFIG_PREEMPT=y
+>>  CONFIG_KSM=y
+>>  CONFIG_TRANSPARENT_HUGEPAGE=y
+>>  CONFIG_CMA=y
+>> +CONFIG_SECCOMP=y
+>>  CONFIG_XEN=y
+>>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+>>  CONFIG_COMPAT=y
+>> @@ -81,10 +86,37 @@ CONFIG_NET=y
+>>  CONFIG_PACKET=y
+>>  CONFIG_UNIX=y
+>>  CONFIG_INET=y
+>> +CONFIG_IP_MULTICAST=y
+>>  CONFIG_IP_PNP=y
+>>  CONFIG_IP_PNP_DHCP=y
+>>  CONFIG_IP_PNP_BOOTP=y
+>> -# CONFIG_IPV6 is not set
+>> +CONFIG_IPV6=m
+>> +CONFIG_NETFILTER=y
+>> +CONFIG_NF_CONNTRACK=m
+>> +CONFIG_NF_CONNTRACK_EVENTS=y
+>> +CONFIG_NETFILTER_XT_TARGET_CHECKSUM=m
+>> +CONFIG_NETFILTER_XT_TARGET_LOG=m
+>> +CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m
+>> +CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m
+>> +CONFIG_NF_CONNTRACK_IPV4=m
+>> +CONFIG_IP_NF_IPTABLES=m
+>> +CONFIG_IP_NF_FILTER=m
+>> +CONFIG_IP_NF_TARGET_REJECT=m
+>> +CONFIG_IP_NF_NAT=m
+>> +CONFIG_IP_NF_TARGET_MASQUERADE=m
+>> +CONFIG_IP_NF_MANGLE=m
+>> +CONFIG_NF_CONNTRACK_IPV6=m
+>> +CONFIG_IP6_NF_IPTABLES=m
+>> +CONFIG_IP6_NF_FILTER=m
+>> +CONFIG_IP6_NF_TARGET_REJECT=m
+>> +CONFIG_IP6_NF_MANGLE=m
+>> +CONFIG_IP6_NF_NAT=m
+>> +CONFIG_IP6_NF_TARGET_MASQUERADE=m
+>> +CONFIG_BRIDGE=m
+>> +CONFIG_BRIDGE_VLAN_FILTERING=y
+>> +CONFIG_VLAN_8021Q=m
+>> +CONFIG_VLAN_8021Q_GVRP=y
+>> +CONFIG_VLAN_8021Q_MVRP=y
+>>  CONFIG_BPF_JIT=y
+>>  CONFIG_CFG80211=m
+>>  CONFIG_MAC80211=m
+>> @@ -100,6 +132,7 @@ CONFIG_MTD=y
+>>  CONFIG_MTD_M25P80=y
+>>  CONFIG_MTD_SPI_NOR=y
+>>  CONFIG_BLK_DEV_LOOP=y
+>> +CONFIG_BLK_DEV_NBD=m
+>>  CONFIG_VIRTIO_BLK=y
+>>  # CONFIG_SCSI_PROC_FS is not set
+>>  CONFIG_BLK_DEV_SD=y
+>> @@ -116,7 +149,10 @@ CONFIG_SATA_SIL24=y
+>>  CONFIG_PATA_PLATFORM=y
+>>  CONFIG_PATA_OF_PLATFORM=y
+>>  CONFIG_NETDEVICES=y
+>> +CONFIG_MACVLAN=m
+>> +CONFIG_MACVTAP=m
+>>  CONFIG_TUN=y
+>> +CONFIG_VETH=m
+>>  CONFIG_VIRTIO_NET=y
+>>  CONFIG_AMD_XGBE=y
+>>  CONFIG_NET_XGENE=y
+>> @@ -304,12 +340,16 @@ CONFIG_ARM_SCPI_PROTOCOL=y
+>>  CONFIG_ACPI=y
+>>  CONFIG_EXT2_FS=y
+>>  CONFIG_EXT3_FS=y
+>> +CONFIG_EXT4_FS_POSIX_ACL=y
+>> +CONFIG_BTRFS_FS=m
+>> +CONFIG_BTRFS_FS_POSIX_ACL=y
+>>  CONFIG_FANOTIFY=y
+>>  CONFIG_FANOTIFY_ACCESS_PERMISSIONS=y
+>>  CONFIG_QUOTA=y
+>>  CONFIG_AUTOFS4_FS=y
+>> -CONFIG_FUSE_FS=y
+>> -CONFIG_CUSE=y
+>> +CONFIG_FUSE_FS=m
+>> +CONFIG_CUSE=m
+>> +CONFIG_OVERLAY_FS=m
+>>  CONFIG_VFAT_FS=y
+>>  CONFIG_TMPFS=y
+>>  CONFIG_HUGETLBFS=y
+>> --
+>> 2.1.4
+>>
