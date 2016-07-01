@@ -1,120 +1,85 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Fri, 1 Jul 2016 12:54:54 +0200
-Subject: [linux-sunxi] [PATCH v2 14/14] ARM: dts: sun8i: Enable DVFS on
- Orange Pi One
-In-Reply-To: <CAOMqctR+SBfo9UZxXuACz858ehXpa2jGHZw_-70dbUFX3Q_0CQ@mail.gmail.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-15-megous@megous.com>
- <CAOMqctTe==M1SXxbdR8y33yh51fiFGn+oSaKJXhbnpLVTn-New@mail.gmail.com>
- <834b8045-d99f-74a3-0353-aa84b897351d@megous.com>
- <CAOMqctSbJOB67a=LiCZVUb-wUMCpeJPd81OL5epYkC2p5X1T-g@mail.gmail.com>
- <CAOMqctR+SBfo9UZxXuACz858ehXpa2jGHZw_-70dbUFX3Q_0CQ@mail.gmail.com>
-Message-ID: <CAOMqctRWBkPdFtJMZmXErpWjK3JABKNyfK=ceFCW4CSYLgwm7A@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 1 Jul 2016 12:19:51 +0100
+Subject: [PATCH v3 2/9] iommu/of: Consolidate device creation workarounds
+In-Reply-To: <611b2a77-e7e8-e1e2-85b5-4f469f3ebdf4@samsung.com>
+References: <cover.1467123945.git.robin.murphy@arm.com>
+ <dc8ac0f397ea5c90937fb5c9974e4ab02e264bd8.1467123945.git.robin.murphy@arm.com>
+ <611b2a77-e7e8-e1e2-85b5-4f469f3ebdf4@samsung.com>
+Message-ID: <577651D7.4030309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2016 at 17:50, Michal Suchanek <hramrach@gmail.com> wrote:
-> On 30 June 2016 at 17:16, Michal Suchanek <hramrach@gmail.com> wrote:
->> On 30 June 2016 at 16:19, Ond?ej Jirman <megous@megous.com> wrote:
->>> Hello,
->>)k, so I tried>
->>> On 30.6.2016 13:13, Michal Suchanek wrote:
->>>> Hello,
->>>>
->>>> On 25 June 2016 at 05:45,  <megous@megous.com> wrote:
->>>>> From: Ondrej Jirman <megous@megous.com>
->>>>>
->>>>> Use Xulong Orange Pi One GPIO based regulator for
->>>>> passive cooling and thermal management.
->>>>>
->>>>> Signed-off-by: Ondrej Jirman <megous@megous.com>
->>>>> ---
->>>>>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 39 +++++++++++++++++++++++++++++
->>>>>  1 file changed, 39 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
->>>>> index b1bd6b0..a38d871 100644
->>>>> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
->>>>> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
->>>>> @@ -109,6 +109,45 @@
->>>>>         };
->>>>>  };
->>>>>
->>>>> +&cpu0 {
->>>>> +       operating-points = <
->>>>> +               /* kHz    uV */
->>>>> +               1296000 1300000
->>>>> +               1200000 1300000
->>>>
->>>> First problem is that the board boots at 1008000 which is not listed
->>>> and the kernel complains.
->>>>
->>>> Second problem is that the board locks up during boot with this enabled.
->>>>
->>>> Do you have some suggestion for alternate configuration to test?
->>>
->>> Just to verify, did you test with the entire series applied? (especially
->>> the PLL1 clk application changes)
->>
->> Yes, I applied the whole series.
->>
->>>
->>> You may try dropping the highest operating point, it's probably overly
->>> optimistic for Orange Pi One.
->>>
->>> Is the power supply/cable you're using hard enough?
->>
->> I use a 7 port hub to power the board. It worked with some other small
->> devboards.
->>
->> The cable is some random Chinese USB to power jack adaptor with an
->> extra adaptor to fit the Pi socket. It looks ok but I did not test
->> this particular combination thoroughly.
->>
->>>
->>> Where during the boot process does it lock up?
->>
->> Usually sometime around enabling cpufreq  before getty starts.
->> Different runs and settings give slightly different results. In
->> particular adding the 1008000 point seems to make it go further.
->>
->> Removing all traces of the regulator, cpufreq and thermal I can boot
->> pretty much 100% to login prompt.
->>
->> I don't think the difference between 1GHz and 1.3GHz frequency on the
->> core would put much additional stress on the supply but I can try with
->> 35W PSU and some alternative cabling to be sure.
->>
->> I did some more tests and it seems 1008000 at 1.1V is fine but switching
->> to 1.3V crashes the board. Even with only the first 1.3V state. Maybe
->> there is need for some delay somewhere for the regulator to get
->> stable?
->>
->
-> Hm, the AW table shows 1008000 at 1.3V as supported state and it indeed
-> works. So the voltage switching works or does nothing. Can I measure
-> the regulator output somewhere? Clocking the chip higher does not
-> work.
->
-> I will try with another PSU later.
->
+Hi Marek,
 
-Ok, so I tried. The result is the same.
+On 01/07/16 11:32, Marek Szyprowski wrote:
+> Hi Robin,
+> 
+> 
+> On 2016-06-28 17:48, Robin Murphy wrote:
+>> So far, all the users of the generic of_xlate configuration mechanism
+>> are resorting to explicit platform device creation to ensure the IOMMU
+>> device is ready before anything tries to refer to it. As I'm about to
+>> convert two more drivers that will need exactly the same thing, let's
+>> nip that proliferation in the bud and move it to a single place.
+>>
+>> A neat solution is to make of_get_iommu_ops() ensure an IOMMU device is
+>> instantiated before giving out its associated ops, since it's a fairly
+>> safe assumption that the ops aren't going to be much use if the IOMMU
+>> can't or won't exist to back them up.
+>>
+>> CC: Marek Szyprowski <m.szyprowski@samsung.com>
+>> CC: Yong Wu <yong.wu@mediatek.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> Frankly, I would avoid moving this workaround to the iommu core. IMHO the
+> best solution would be to let IOMMU controllers to be instantiated as
+> normal
+> devices and implement proper support in the device core for waiting for the
+> iommu controller. Then the workaround can be removed from exynos and mtk
+> iommu drivers. What's the status of IOMMU deferred probe patches?
 
-A Chinese USB power meter shows voltage 5.1V which drops to like 4.95V
-when the board is running. The power draw is around 170mA and
-about 200mA when switch to 1.3V is attempted.
-The voltage drop is not nice and is probably due to excessive cabling used
-to distribute power to multiple boards.
-The USB hub starts at 5.2V and drops to something like 5.1V.
+I think revisiting probe ordering is now second-from-top on my to-do
+list after this lot. This patch was kind of thinking ahead to get the
+"touch all the drivers" aspect out of the way before it grows any
+bigger, and all the development can then happen in the core code alone,
+but I admit it's not a particularly strong argument.
 
-When the top frequency is 1008000 at 1.3V and governor is performance
-the board keeps running 1008000 at 1.1V as set up by u-boot.
+> I've encountered a serious problems with current code (the one which
+> instantiates iommu controller devices from iommu driver) and its
+> integration
+> with power domains, clocks and runtime pm, which were not possible to
+> resolve
+> without iommu deferred probe.
 
-Changing the top point to 1008000 at 1.1V the board locks up as soon as
-governor is changed to conservative. So any attempt at frequency scaling
-crashes even without touching the regulator.
+OK. Do you have any plans to try tweaking the current workaround, or is
+it really not worth it? FWIW I do have an Exynos 5410 (Odroid-XU) on my
+desk which I could theoretically test things on, but I suspect it would
+take a fair amount of work to get the SYSMMUs and relevant media bits up
+and running on top of Krzysztof's basic support.
 
-Thanks
+Will: for the time being, the alternative to this patch would be to
+squash the following change into patch 7/9 (without either, patch 8/9
+doesn't really work).
 
-Michal
+Robin.
+
+-----8<-----
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index e4c3916efba9..c002ff06b625 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -2678,6 +2678,14 @@ module_exit(arm_smmu_exit);
+
+ static int __init arm_smmu_of_init(struct device_node *np)
+ {
++	static bool registered;
++
++	if (!registered)
++		registered = !arm_smmu_init();
++
++	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
++		return -ENODEV;
++
+ 	of_iommu_set_ops(np, &arm_smmu_ops);
+
+ 	return 0;
