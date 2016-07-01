@@ -1,53 +1,59 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 1 Jul 2016 16:00:34 +0200
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <2435381.sM3CFAEXNR@vostro.rjw.lan>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <5351858.jEb0qfTvrF@vostro.rjw.lan>
- <2f0e60e1-f429-2bd3-5f26-fd6199e64f34@linaro.org>
- <2435381.sM3CFAEXNR@vostro.rjw.lan>
-Message-ID: <57767782.6020509@linaro.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 01 Jul 2016 15:00:57 +0100
+Subject: [PATCH 07/11] arm: arm64: pmu: Assign platform PMU CPU affinity
+References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
+ <1466529109-21715-8-git-send-email-jeremy.linton@arm.com>
+Message-ID: <87d1mxe9uu.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2016 03:27 PM, Rafael J. Wysocki wrote:
+Hi Jeremy,
 
-[ ... ]
+One typo below.
 
->> GTDT is part of ACPI spec, drivers/acpi/ is for driver code of
->> ACPI spec, I think it can stay in drivers/acpi/ from this point
->> of view, am I right?
+Jeremy Linton <jeremy.linton@arm.com> writes:
+
+> On systems with multiple PMU types the PMU to CPU affinity
+> needs to be detected and set. The CPU to interrupt affinity
+> should also be set.
 >
-> The question is not "Can it?", but "Does it need to?".
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  drivers/perf/arm_pmu.c | 53 ++++++++++++++++++++++++++++++++++++++++----------
+>  1 file changed, 43 insertions(+), 10 deletions(-)
 >
-> It is in the spec, but still there's only one architecture needing it.
->
-> There is no way to test it on any other architecture and no reason to build it
-> for any other architecture, so why does it need to be located in drivers/acpi/ ?
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 2286cbf..28cac3a 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -11,6 +11,7 @@
+>   */
+>  #define pr_fmt(fmt) "hw perfevents: " fmt
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/bitmap.h>
+>  #include <linux/cpumask.h>
+>  #include <linux/cpu_pm.h>
+> @@ -24,6 +25,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/irqdesc.h>
+>  
+> +#include <asm/cpu.h>
+>  #include <asm/cputype.h>
+>  #include <asm/irq_regs.h>
+>  
+> @@ -872,25 +874,57 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+>  }
+>  
+>  /*
+> - * CPU PMU identification and probing.
+> + * CPU PMU identification and probing. Its possible to have
+> + * multiple CPU types in an ARM machine. Assure that we are
+                                            Assume
 
-Hi Rafael,
-
-what is the problem of having it in drivers/acpi ?
-
-There are cpufreq-dt, speedstep*, tegra124-* in drivers/cpufreq.
-
-clocksource-probe which is DT based with different drivers using it in 
-drivers/clocksource with a pletore of different archs.
-
-Cstate code which is only used by x86 is in drivers/acpi, it is only 
-used by x86/ia64 and it isn't a problem. There is a small chunk in 
-arch/x86/kernel/acpi and it doesn't facilitate the comprehension of the 
-code.
-
-IMHO, having all ACPI code in the same directory will encourage the 
-consolidation.
 
 
+> + * picking the right PMU types based on the CPU in question
+>   */
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+[...]
