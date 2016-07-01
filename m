@@ -1,36 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 1 Jul 2016 18:11:05 +0200
-Subject: [alsa-devel] [PATCH v5 7/9] ASoC: bt-sco: extend rate and add a
- general compatible string
-In-Reply-To: <1467341386.21689.6.camel@mtksdaap41>
-References: <1466149440-23889-1-git-send-email-garlic.tseng@mediatek.com>
- <1466149440-23889-8-git-send-email-garlic.tseng@mediatek.com>
- <20160629191500.GU6247@sirena.org.uk>
- <1467291345.11091.16.camel@mtksdaap41>
- <1467341386.21689.6.camel@mtksdaap41>
-Message-ID: <20160701161105.GY6247@sirena.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 1 Jul 2016 17:15:32 +0100
+Subject: [RFC 1/2] iommu/dma: Restrict IOVAs to physical memory layout
+In-Reply-To: <HE1PR04MB1641583BE6AFF39AF1BFCEFB8D250@HE1PR04MB1641.eurprd04.prod.outlook.com>
+References: <cover.1467123945.git.robin.murphy@arm.com>
+ <ac9b11493dfa3500889268488adfa8d4d5c34962.1467129314.git.robin.murphy@arm.com>
+ <CALRxmdCuxLPogPTwpn2-B=PU=Ry0eNtgs2z+iZBPYtDc3NX-hQ@mail.gmail.com>
+ <HE1PR04MB1641583BE6AFF39AF1BFCEFB8D250@HE1PR04MB1641.eurprd04.prod.outlook.com>
+Message-ID: <57769724.4040801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 10:49:46AM +0800, Garlic Tseng wrote:
-> On Thu, 2016-06-30 at 20:55 +0800, Garlic Tseng wrote:
+On 01/07/16 17:03, Stuart Yoder wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Robin Murphy <robin.murphy@arm.com>
+>> Date: Tue, Jun 28, 2016 at 11:18 AM
+>> Subject: [RFC 1/2] iommu/dma: Restrict IOVAs to physical memory layout
+>> To: iommu at lists.linux-foundation.org, linux-arm-kernel at lists.infradead.org
+>>
+>>
+>> Certain peripherals may be bestowed with knowledge of the physical
+>> memory map of the system in which they live, and refuse to handle
+>> addresses that they do not think are memory, which causes issues when
+>> remapping to arbitrary IOVAs. Sidestep the issue by restricting IOVA
+>> domains to only allocate addresses within ranges which match the
+>> physical memory layout.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> Posting this as an RFC because it's something I've been having to use
+>> on Juno for all the PCI IOMMU development - it's pretty horrible, but I
+>> can't easily think of a nicer solution...
+> 
+> Maybe I'm not getting the implications of this looking at the patch 
+> in isolation, but how will this impact systems that have devices
+> limited to 32-bit addressing?
+> 
+> In our memory map we have physical memory regions at:
+> 0x00_8000_0000
+> 0x80_8000_0000
+> 
+> Will devices with a 32-bit DMA mask still get 32-bit IOVAs?
 
-> > If you worry about some potential risk (I don't see any) maybe we have
-> > to develop another dummy bt-sco codec driver which support both 8k and
-> > 16k?
+Assuming there's some free IOVA space between 0x80000000 and 0xffffffff,
+yes, otherwise it gets nothing ;) This has no effect on the allocation
+behaviour in general, it just makes sure that within that behaviour, we
+avoid allocating any address that doesn't look "real". The primary issue
+is with 64-bit DMA masks - since it's a top-down allocator, you
+typically end up with the poor device issuing its first DMA transaction
+to 0xfffffffffffff000 which on Juno a) gets silently eaten by the root
+complex because it doesn't match any window in the PCI-AXI translation
+table, or b) goes wrong anyway because it's beyond the input address
+range of the SMMU (and there's something not quite right WRT
+truncation/sign-extension which I've not looked into closely and am
+semi-deliberately also sweeping under the rug thanks to the simpler
+hardware issue...)
 
-> Ah! If someone whose bluetooth modules only support 8k use the driver,
-> they might be broken, right? Maybe we can add another snd_soc_dai_driver
-> which can support both 8k and 16k.
-> (Actually I found the issue is discussed before
-> http://mailman.alsa-project.org/pipermail/alsa-devel/2014-November/084687.html )
+As I say, it's hideous, but I can't see what else to do.
 
-Yes, that'd be fine - it could be the same driver and register different
-parameters depending on config/compatible.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160701/c7971a12/attachment.sig>
+Robin.
+
+> 
+> Thanks,
+> Stuart
+> 
