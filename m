@@ -1,254 +1,166 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 1 Jul 2016 14:48:12 +0100
-Subject: [PATCH 2/2] arm64: Add support for CLOCK_MONOTONIC_RAW in
- clock_gettime() vDSO
-In-Reply-To: <1462797421-33103-3-git-send-email-kevin.brodsky@arm.com>
-References: <1462797421-33103-1-git-send-email-kevin.brodsky@arm.com>
- <1462797421-33103-3-git-send-email-kevin.brodsky@arm.com>
-Message-ID: <20160701134811.GB14829@e103592.cambridge.arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 01 Jul 2016 14:57:38 +0100
+Subject: [PATCH 10/11] arm64: pmu: Enable multiple PMUs in an ACPI system
+In-Reply-To: <1466529109-21715-11-git-send-email-jeremy.linton@arm.com>
+ (Jeremy Linton's message of "Tue, 21 Jun 2016 12:11:48 -0500")
+References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
+ <1466529109-21715-11-git-send-email-jeremy.linton@arm.com>
+Message-ID: <87twg9ea0d.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2016 at 01:37:01PM +0100, Kevin Brodsky wrote:
-> So far the arm64 clock_gettime() vDSO implementation only supported
-> the following clocks, falling back to the syscall for the others:
-> - CLOCK_REALTIME{,_COARSE}
-> - CLOCK_MONOTONIC{,_COARSE}
-> 
-> This patch adds support for the CLOCK_MONOTONIC_RAW clock, taking
-> advantage of the recent refactoring of the vDSO time functions. Like
-> the non-_COARSE clocks, this only works when the "arch_sys_counter"
-> clocksource is in use (allowing us to read the current time from the
-> virtual counter register), otherwise we also have to fall back to the
-> syscall.
-> 
-> Most of the data is shared with CLOCK_MONOTONIC, and the algorithm is
-> similar. The reference implementation in kernel/time/timekeeping.c
-> shows that:
-> - CLOCK_MONOTONIC = tk->wall_to_monotonic + tk->xtime_sec +
->   timekeeping_get_ns(&tk->tkr_mono)
-> - CLOCK_MONOTONIC_RAW = tk->raw_time + timekeeping_get_ns(&tk->tkr_raw)
-> - tkr_mono and tkr_raw are identical (in particular, same
->   clocksource), except these members:
->   * mult (only mono's multiplier is NTP-adjusted)
->   * xtime_nsec (always 0 for raw)
-> 
-> Therefore, tk->raw_time and tkr_raw->mult are now also stored in the
-> vDSO data page.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: Ali Saidi <ali.saidi@arm.com>
-> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+Jeremy Linton <jeremy.linton@arm.com> writes:
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
+> Its possible that an ACPI system has multiple CPU types in it
+> with differing PMU counters. Use the newly provided acpi_pmu routines
+> to detect that case, and instantiate more than one set of counters.
+>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 > ---
->  arch/arm64/include/asm/vdso_datapage.h |  8 +++--
->  arch/arm64/kernel/asm-offsets.c        |  6 +++-
->  arch/arm64/kernel/vdso.c               |  8 ++++-
->  arch/arm64/kernel/vdso/gettimeofday.S  | 57 +++++++++++++++++++++++++++-------
->  4 files changed, 64 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/vdso_datapage.h b/arch/arm64/include/asm/vdso_datapage.h
-> index de66199673d7..2b9a63771eda 100644
-> --- a/arch/arm64/include/asm/vdso_datapage.h
-> +++ b/arch/arm64/include/asm/vdso_datapage.h
-> @@ -22,6 +22,8 @@
->  
->  struct vdso_data {
->  	__u64 cs_cycle_last;	/* Timebase at clocksource init */
-> +	__u64 raw_time_sec;	/* Raw time */
-> +	__u64 raw_time_nsec;
->  	__u64 xtime_clock_sec;	/* Kernel time */
->  	__u64 xtime_clock_nsec;
->  	__u64 xtime_coarse_sec;	/* Coarse time */
-> @@ -29,8 +31,10 @@ struct vdso_data {
->  	__u64 wtm_clock_sec;	/* Wall to monotonic time */
->  	__u64 wtm_clock_nsec;
->  	__u32 tb_seq_count;	/* Timebase sequence counter */
-> -	__u32 cs_mult;		/* Clocksource multiplier */
-> -	__u32 cs_shift;		/* Clocksource shift */
-> +	/* cs_* members must be adjacent and in this order (ldp accesses) */
-> +	__u32 cs_mono_mult;	/* NTP-adjusted clocksource multiplier */
-> +	__u32 cs_shift;		/* Clocksource shift (mono = raw) */
-> +	__u32 cs_raw_mult;	/* Raw clocksource multiplier */
->  	__u32 tz_minuteswest;	/* Whacky timezone stuff */
->  	__u32 tz_dsttime;
->  	__u32 use_syscall;
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 3ae6b310ac9b..5ff88560e5ef 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -76,6 +76,7 @@ int main(void)
->    BLANK();
->    DEFINE(CLOCK_REALTIME,	CLOCK_REALTIME);
->    DEFINE(CLOCK_MONOTONIC,	CLOCK_MONOTONIC);
-> +  DEFINE(CLOCK_MONOTONIC_RAW,	CLOCK_MONOTONIC_RAW);
->    DEFINE(CLOCK_REALTIME_RES,	MONOTONIC_RES_NSEC);
->    DEFINE(CLOCK_REALTIME_COARSE,	CLOCK_REALTIME_COARSE);
->    DEFINE(CLOCK_MONOTONIC_COARSE,CLOCK_MONOTONIC_COARSE);
-> @@ -83,6 +84,8 @@ int main(void)
->    DEFINE(NSEC_PER_SEC,		NSEC_PER_SEC);
->    BLANK();
->    DEFINE(VDSO_CS_CYCLE_LAST,	offsetof(struct vdso_data, cs_cycle_last));
-> +  DEFINE(VDSO_RAW_TIME_SEC,	offsetof(struct vdso_data, raw_time_sec));
-> +  DEFINE(VDSO_RAW_TIME_NSEC,	offsetof(struct vdso_data, raw_time_nsec));
->    DEFINE(VDSO_XTIME_CLK_SEC,	offsetof(struct vdso_data, xtime_clock_sec));
->    DEFINE(VDSO_XTIME_CLK_NSEC,	offsetof(struct vdso_data, xtime_clock_nsec));
->    DEFINE(VDSO_XTIME_CRS_SEC,	offsetof(struct vdso_data, xtime_coarse_sec));
-> @@ -90,7 +93,8 @@ int main(void)
->    DEFINE(VDSO_WTM_CLK_SEC,	offsetof(struct vdso_data, wtm_clock_sec));
->    DEFINE(VDSO_WTM_CLK_NSEC,	offsetof(struct vdso_data, wtm_clock_nsec));
->    DEFINE(VDSO_TB_SEQ_COUNT,	offsetof(struct vdso_data, tb_seq_count));
-> -  DEFINE(VDSO_CS_MULT,		offsetof(struct vdso_data, cs_mult));
-> +  DEFINE(VDSO_CS_MONO_MULT,	offsetof(struct vdso_data, cs_mono_mult));
-> +  DEFINE(VDSO_CS_RAW_MULT,	offsetof(struct vdso_data, cs_raw_mult));
->    DEFINE(VDSO_CS_SHIFT,		offsetof(struct vdso_data, cs_shift));
->    DEFINE(VDSO_TZ_MINWEST,	offsetof(struct vdso_data, tz_minuteswest));
->    DEFINE(VDSO_TZ_DSTTIME,	offsetof(struct vdso_data, tz_dsttime));
-> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> index 97bc68f4c689..54f7b327fd18 100644
-> --- a/arch/arm64/kernel/vdso.c
-> +++ b/arch/arm64/kernel/vdso.c
-> @@ -212,10 +212,16 @@ void update_vsyscall(struct timekeeper *tk)
->  	vdso_data->wtm_clock_nsec		= tk->wall_to_monotonic.tv_nsec;
->  
->  	if (!use_syscall) {
-> +		/* tkr_mono.cycle_last == tkr_raw.cycle_last */
->  		vdso_data->cs_cycle_last	= tk->tkr_mono.cycle_last;
-> +		vdso_data->raw_time_sec		= tk->raw_time.tv_sec;
-> +		vdso_data->raw_time_nsec	= tk->raw_time.tv_nsec;
->  		vdso_data->xtime_clock_sec	= tk->xtime_sec;
->  		vdso_data->xtime_clock_nsec	= tk->tkr_mono.xtime_nsec;
-> -		vdso_data->cs_mult		= tk->tkr_mono.mult;
-> +		/* tkr_raw.xtime_nsec == 0 */
-> +		vdso_data->cs_mono_mult		= tk->tkr_mono.mult;
-> +		vdso_data->cs_raw_mult		= tk->tkr_raw.mult;
-> +		/* tkr_mono.shift == tkr_raw.shift */
->  		vdso_data->cs_shift		= tk->tkr_mono.shift;
+>  drivers/perf/arm_pmu.c      |  7 +++-
+>  drivers/perf/arm_pmu_acpi.c | 82 ++++++++++++++++-----------------------------
+>  2 files changed, 35 insertions(+), 54 deletions(-)
+>
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 28cac3a..f94d279 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -1044,7 +1044,12 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+>  		if (!ret)
+>  			ret = init_fn(pmu);
+>  	} else if (probe_table) {
+> -		ret = probe_plat_pmu(pmu, probe_table, read_cpuid_id());
+> +		if (acpi_disabled) {
+> +			/* use the current cpu. */
+> +			ret = probe_plat_pmu(pmu, probe_table,
+> +					     read_cpuid_id());
+> +		} else
+> +			ret = probe_plat_pmu(pmu, probe_table, pdev->id);
 >  	}
 >  
-> diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-> index caff9dd6ba78..f49b6755058a 100644
-> --- a/arch/arm64/kernel/vdso/gettimeofday.S
-> +++ b/arch/arm64/kernel/vdso/gettimeofday.S
-> @@ -87,6 +87,15 @@ x_tmp		.req	x8
->  	msub	\res_nsec, x_tmp, \nsec_to_sec, \res_nsec
->  	.endm
+>  	if (ret) {
+> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+> index 482a54d..6f5df1a 100644
+> --- a/drivers/perf/arm_pmu_acpi.c
+> +++ b/drivers/perf/arm_pmu_acpi.c
+> @@ -50,7 +50,7 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
+>  }
 >  
-> +	/*
-> +	 * Returns in res_{sec,nsec} the timespec based on the clock_raw delta,
-> +	 * used for CLOCK_MONOTONIC_RAW.
-> +	 */
-> +	.macro	get_ts_clock_raw res_sec, res_nsec, clock_nsec, nsec_to_sec
-> +	udiv	\res_sec, \clock_nsec, \nsec_to_sec
-> +	msub	\res_nsec, \res_sec, \nsec_to_sec, \clock_nsec
-> +	.endm
+>  /* Count number and type of CPU cores in the system. */
+> -void __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
+> +static void __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
+>  {
+>  	int i;
+>  
+> @@ -84,7 +84,7 @@ void __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
+>   * Registers the group of PMU interfaces which correspond to the 'last_cpu_id'.
+>   * This group utilizes 'count' resources in the 'res'.
+>   */
+> -int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
+> +static int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
+>  					    int last_cpu_id)
+>  {
+>  	int i;
+> @@ -130,7 +130,7 @@ int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
+>   * them to the resource structure. Return the number of GSI's contained
+>   * in the res structure, and the id of the last CPU/PMU we added.
+>   */
+> -int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
+> +static int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
+>  				       struct resource *res, int *last_cpu_id)
+>  {
+>  	int i, count;
+> @@ -169,63 +169,39 @@ int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
+>  
+>  static int __init pmu_acpi_init(void)
+>  {
+> -	struct platform_device *pdev;
+> -	struct pmu_irq *pirq = pmu_irqs;
+> -	struct resource	*res, *r;
+> +	struct resource	*res;
+>  	int err = -ENOMEM;
+> -	int i, count, irq;
+> +	int count, cpu_id;
+> +	struct pmu_types *pmu, *safe_temp;
+> +	LIST_HEAD(pmus);
+>  
+>  	if (acpi_disabled)
+>  		return 0;
+>  
+> -	/* Must have irq for boot cpu, at least */
+> -	if (pirq->gsi == 0)
+> -		return -EINVAL;
+> -
+> -	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
+> -				ACPI_ACTIVE_HIGH);
+> -
+> -	if (irq_is_percpu(irq))
+> -		count = 1;
+> -	else
+> -		for (i = 1, count = 1; i < NR_CPUS; i++)
+> -			if (pmu_irqs[i].gsi)
+> -				++count;
+> -
+> -	pdev = platform_device_alloc(ARMV8_PMU_PDEV_NAME, -1);
+> -	if (!pdev)
+> -		goto err_free_gsi;
+> -
+> -	res = kcalloc(count, sizeof(*res), GFP_KERNEL);
+> -	if (!res)
+> -		goto err_free_device;
+> -
+> -	for (i = 0, r = res; i < count; i++, pirq++, r++) {
+> -		if (i)
+> -			irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
+> -						ACPI_ACTIVE_HIGH);
+> -		r->start = r->end = irq;
+> -		r->flags = IORESOURCE_IRQ;
+> -		if (pirq->trigger == ACPI_EDGE_SENSITIVE)
+> -			r->flags |= IORESOURCE_IRQ_HIGHEDGE;
+> -		else
+> -			r->flags |= IORESOURCE_IRQ_HIGHLEVEL;
+> +	arm_pmu_acpi_determine_cpu_types(&pmus);
 > +
->  	/* sec and nsec are modified in place. */
->  	.macro add_ts sec, nsec, ts_sec, ts_nsec, nsec_to_sec
->  	/* Add timespec. */
-> @@ -126,7 +135,8 @@ ENTRY(__kernel_gettimeofday)
->  1:	seqcnt_acquire
->  	syscall_check fail=4f
->  	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
-> -	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
-> +	/* w11 = cs_mono_mult, w12 = cs_shift */
-> +	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
->  	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
->  	seqcnt_check fail=1b
->  
-> @@ -163,19 +173,19 @@ ENDPROC(__kernel_gettimeofday)
->  /* int __kernel_clock_gettime(clockid_t clock_id, struct timespec *tp); */
->  ENTRY(__kernel_clock_gettime)
->  	.cfi_startproc
-> -	cmp 	w0, #JUMPSLOT_MAX
-> -	b.hi 	syscall
-> +	cmp	w0, #JUMPSLOT_MAX
-> +	b.hi	syscall
->  	adr	vdso_data, _vdso_data
-> -	adr 	x_tmp, jumptable
-> -	add 	x_tmp, x_tmp, w0, uxtw #2
-> -	br 	x_tmp
-> +	adr	x_tmp, jumptable
-> +	add	x_tmp, x_tmp, w0, uxtw #2
-> +	br	x_tmp
->  
->  jumptable:
->  	jump_slot jumptable, CLOCK_REALTIME, realtime
->  	jump_slot jumptable, CLOCK_MONOTONIC, monotonic
-> -	b 	syscall
-> -	b 	syscall
-> -	b 	syscall
-> +	b	syscall
-> +	b	syscall
-> +	jump_slot jumptable, CLOCK_MONOTONIC_RAW, monotonic_raw
->  	jump_slot jumptable, CLOCK_REALTIME_COARSE, realtime_coarse
->  	jump_slot jumptable, CLOCK_MONOTONIC_COARSE, monotonic_coarse
->  
-> @@ -187,7 +197,8 @@ realtime:
->  	seqcnt_acquire
->  	syscall_check fail=syscall
->  	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
-> -	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
-> +	/* w11 = cs_mono_mult, w12 = cs_shift */
-> +	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
->  	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
->  	seqcnt_check fail=realtime
->  
-> @@ -205,7 +216,8 @@ monotonic:
->  	seqcnt_acquire
->  	syscall_check fail=syscall
->  	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
-> -	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
-> +	/* w11 = cs_mono_mult, w12 = cs_shift */
-> +	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
->  	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
->  	ldp	x3, x4, [vdso_data, #VDSO_WTM_CLK_SEC]
->  	seqcnt_check fail=monotonic
-> @@ -223,6 +235,28 @@ monotonic:
->  
->  	b shift_store
->  
-> +monotonic_raw:
-> +	seqcnt_acquire
-> +	syscall_check fail=syscall
-> +	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
-> +	/* w11 = cs_raw_mult, w12 = cs_shift */
-> +	ldp	w12, w11, [vdso_data, #VDSO_CS_SHIFT]
-> +	ldp	x13, x14, [vdso_data, #VDSO_RAW_TIME_SEC]
-> +	seqcnt_check fail=monotonic_raw
+> +	list_for_each_entry_safe(pmu, safe_temp, &pmus, list) {
+> +		res = kcalloc(pmu->cpu_count,
+> +			      sizeof(struct resource), GFP_KERNEL);
 > +
-> +	/* All computations are done with left-shifted nsecs. */
-> +	lsl	x14, x14, x12
-> +	get_nsec_per_sec res=x9
-> +	lsl	x9, x9, x12
+> +		/* for a given PMU type collect all the GSIs. */
+> +		if (res) {
+> +			count = arm_pmu_acpi_gsi_res(pmu, res,
+> +						     &cpu_id);
+> +			/*
+> +			 * register this set of interrupts
+> +			 * with a new PMU device
+> +			 */
+> +			err = arm_pmu_acpi_register_pmu(count, res, cpu_id);
+> +			kfree(res);
+> +		} else
+> +			pr_warn("PMU unable to allocate interrupt resource space\n");
 > +
-> +	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
-> +	get_ts_clock_raw res_sec=x10, res_nsec=x11, \
-> +		clock_nsec=x15, nsec_to_sec=x9
-> +
-> +	add_ts sec=x10, nsec=x11, ts_sec=x13, ts_nsec=x14, nsec_to_sec=x9
-> +
-> +	b shift_store
-> +
->  realtime_coarse:
->  	seqcnt_acquire
->  	ldp	x10, x11, [vdso_data, #VDSO_XTIME_CRS_SEC]
-> @@ -261,6 +295,7 @@ ENTRY(__kernel_clock_getres)
->  	.cfi_startproc
->  	cmp	w0, #CLOCK_REALTIME
->  	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
-> +	ccmp	w0, #CLOCK_MONOTONIC_RAW, #0x4, ne
->  	b.ne	1f
+> +		list_del(&pmu->list);
+> +		kfree(pmu);
+>  	}
 >  
->  	ldr	x2, 5f
-> -- 
-> 2.8.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> -	err = platform_device_add_resources(pdev, res, count);
+> -	if (!err)
+> -		err = platform_device_add(pdev);
+> -	kfree(res);
+> -	if (!err)
+> -		return 0;
+> -
+> -err_free_device:
+> -	platform_device_put(pdev);
+> -
+> -err_free_gsi:
+> -	for (i = 0; i < count; i++)
+> -		acpi_unregister_gsi(pmu_irqs[i].gsi);
+> -
+>  	return err;
+>  }
+> +
+>  arch_initcall(pmu_acpi_init);
+
+The changes to arm_acpi_pmu.c should be moved to the previous
+patch. It'll help see introduction of functionality and it's use in one
+patch - aiding review.
