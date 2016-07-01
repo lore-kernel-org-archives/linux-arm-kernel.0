@@ -1,150 +1,139 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 1 Jul 2016 09:54:41 -0500
-Subject: [PATCH 09/11] arm64: pmu: Add routines for detecting differing
- PMU types in the system
-In-Reply-To: <87mvm1e9ye.fsf@e105922-lin.cambridge.arm.com>
-References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
- <1466529109-21715-10-git-send-email-jeremy.linton@arm.com>
- <87mvm1e9ye.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <57768431.7080508@arm.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 01 Jul 2016 23:00:39 +0800
+Subject: [PATCH] drivers/perf: arm-pmu: Handle per-interrupt affinity mask
+In-Reply-To: <1467379291-18413-1-git-send-email-marc.zyngier@arm.com>
+References: <1467379291-18413-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <57768597.2070606@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2016 08:58 AM, Punit Agrawal wrote:
-> Jeremy Linton <jeremy.linton@arm.com> writes:
->
->> In preparation for enabling heterogeneous PMUs on ACPI systems
->> add routines that detect this and group the resulting PMUs and
->> interrupts.
->>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> ---
->>   drivers/perf/arm_pmu_acpi.c | 137 +++++++++++++++++++++++++++++++++++++++++++-
->>   1 file changed, 134 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
->> index a24cdd0..482a54d 100644
->> --- a/drivers/perf/arm_pmu_acpi.c
->> +++ b/drivers/perf/arm_pmu_acpi.c
->> @@ -1,23 +1,36 @@
->>   /*
->> - * PMU support
->> + * ARM ACPI PMU support
->>    *
->>    * Copyright (C) 2015 Red Hat Inc.
->> + * Copyright (C) 2016 ARM Ltd.
->>    * Author: Mark Salter <msalter@redhat.com>
->> + *         Jeremy Linton <jeremy.linton@arm.com>
->>    *
->>    * This work is licensed under the terms of the GNU GPL, version 2.  See
->>    * the COPYING file in the top-level directory.
->>    *
->>    */
->>
->> +#define pr_fmt(fmt) "ACPI-PMU: " fmt
->> +
->> +#include <asm/cpu.h>
->>   #include <linux/perf/arm_pmu.h>
->>   #include <linux/platform_device.h>
->>   #include <linux/acpi.h>
->>   #include <linux/irq.h>
->>   #include <linux/irqdesc.h>
->> +#include <linux/list.h>
->>
->>   struct pmu_irq {
->> -	int gsi;
->> -	int trigger;
->> +	int  gsi;
->> +	int  trigger;
->> +	bool registered;
->> +};
->> +
->> +struct pmu_types {
->> +	struct list_head list;
->> +	int		 cpu_type;
->> +	int		 cpu_count;
->>   };
->
-> You can stash the associated resources in the above structure. That
-> should simplify some code below.
+Hi Marc,
 
-	How is that? One structure is per cpu, the other is per pmu type in the 
-system, they are actually completely independent and intertwining them 
-will only server to obfuscate the code.
+On 2016?07?01? 21:21, Marc Zyngier wrote:
+> On a big-little system, PMUs can be wired to CPUs using per CPU
+> interrups (PPI). In this case, it is important to make sure that
+> the enable/disable do happen on the right set of CPUs.
+>
+> So instead of relying on the interrupt-affinity property, we can
+> use the actual percpu affinity that DT exposes as part of the
+> interrupt specifier. The DT binding is also updated to reflect
+> the fact that the interrupt-affinity property shouldn't be used
+> in that case.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Tested-by: Caesar Wang <wxt@rock-chips.com>
+
+I pick this up on my local branch.
+8bc671a FROMLIST: drivers/perf: arm-pmu: Handle per-interrupt affinity mask
+3d723f4 FROMLIST: arm64: dts: rockchip: support the pmu node for rk3399
+1359b92 FIXUP: FROMLIST: arm64: dts: rockchip: change all interrupts 
+cells for 4 on rk3399 SoCs
+...
+
+Tested on rk3399 board.
+localhost / # perf list
+
+List of pre-defined events (to be used in -e):
+cpu-cycles OR cycles [Hardware event]
+instructions [Hardware event]
+cache-references [Hardware event]
+cache-misses [Hardware event]
+branch-instructions OR branches [Hardware event]
+branch-misses [Hardware event]
+bus-cycles [Hardware event]
+...
+
+perf stat --cpu 0/1/2/3..... to minitor
+e.g. cpu0;
+
+localhost / # perf stat --cpu 0
+^C
+Performance counter stats for 'CPU(s) 0':
+
+3374.917571 task-clock (msec) # 1.001 CPUs utilized [100.00%]
+20 context-switches # 0.006 K/sec [100.00%]
+2 cpu-migrations # 0.001 K/sec [100.00%]
+55 page-faults # 0.016 K/sec
+7151843 cycles # 0.002 GHz [100.00%]
+<not supported> stalled-cycles-frontend
+<not supported> stalled-cycles-backend
+4272536 instructions # 0.60 insns per cycle [100.00%]
+568406 branches # 0.168 M/sec [100.00%]
+65652 branch-misses # 11.55% of all branches
+
+Also, 'perf top' to monitor the PMU interrupts from cpus
+---
 
 
->
->>
->>   static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
->> @@ -36,6 +49,124 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
->>   		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
->>   }
->>
->> +/* Count number and type of CPU cores in the system. */
->> +void __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
->> +{
->> +	int i;
->> +
->> +	for_each_possible_cpu(i) {
->> +		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
->> +		u32 partnum = MIDR_PARTNUM(cinfo->reg_midr);
->> +		struct pmu_types *pmu;
->> +
->> +		list_for_each_entry(pmu, pmus, list) {
->> +			if (pmu->cpu_type == partnum) {
->> +				pmu->cpu_count++;
->> +				break;
->> +			}
->> +		}
->> +
->> +		/* we didn't find the CPU type, add an entry to identify it */
->> +		if (&pmu->list == pmus) {
->> +			pmu = kcalloc(1, sizeof(struct pmu_types), GFP_KERNEL);
->
-> Use kzalloc here.
-Ok fair point.
 
+> ---
+>   Documentation/devicetree/bindings/arm/pmu.txt |  4 +++-
+>   drivers/perf/arm_pmu.c                        | 22 +++++++++++++++++-----
+>   2 files changed, 20 insertions(+), 6 deletions(-)
 >
->> +			if (!pmu) {
->> +				pr_warn("Unable to allocate pmu_types\n");
->
-> Bail out with error if the memory can't be allocated. Otherwise, we risk
-> silently failing to register a PMU type.
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 74d5417..61c8b46 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -39,7 +39,9 @@ Optional properties:
+>                          When using a PPI, specifies a list of phandles to CPU
+>   		       nodes corresponding to the set of CPUs which have
+>   		       a PMU of this type signalling the PPI listed in the
+> -		       interrupts property.
+> +		       interrupts property, unless this is already specified
+> +		       by the PPI interrupt specifier itself (in which case
+> +		       the interrupt-affinity property shouldn't be present).
+>   
+>                          This property should be present when there is more than
+>   		       a single SPI.
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 140436a..065ccec 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -603,7 +603,8 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+>   
+>   	irq = platform_get_irq(pmu_device, 0);
+>   	if (irq >= 0 && irq_is_percpu(irq)) {
+> -		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
+> +		on_each_cpu_mask(&cpu_pmu->supported_cpus,
+> +				 cpu_pmu_disable_percpu_irq, &irq, 1);
+>   		free_percpu_irq(irq, &hw_events->percpu_pmu);
+>   	} else {
+>   		for (i = 0; i < irqs; ++i) {
+> @@ -645,7 +646,9 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+>   				irq);
+>   			return err;
+>   		}
+> -		on_each_cpu(cpu_pmu_enable_percpu_irq, &irq, 1);
+> +
+> +		on_each_cpu_mask(&cpu_pmu->supported_cpus,
+> +				 cpu_pmu_enable_percpu_irq, &irq, 1);
+>   	} else {
+>   		for (i = 0; i < irqs; ++i) {
+>   			int cpu = i;
+> @@ -961,9 +964,18 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+>   		i++;
+>   	} while (1);
+>   
+> -	/* If we didn't manage to parse anything, claim to support all CPUs */
+> -	if (cpumask_weight(&pmu->supported_cpus) == 0)
+> -		cpumask_setall(&pmu->supported_cpus);
+> +	/* If we didn't manage to parse anything, try the interrupt affinity */
+> +	if (cpumask_weight(&pmu->supported_cpus) == 0) {
+> +		if (!using_spi) {
+> +			/* If using PPIs, check the affinity of the partition */
+> +			int irq = platform_get_irq(pdev, 0);
+> +			irq_get_percpu_devid_partition(irq,
+> +						       &pmu->supported_cpus);
+> +		} else {
+> +			/* Otherwise default to all CPUs */
+> +			cpumask_setall(&pmu->supported_cpus);
+> +		}
+> +	}
+>   
+>   	/* If we matched up the IRQ affinities, use them to route the SPIs */
+>   	if (using_spi && i == pdev->num_resources)
 
-? Its not silent, it fails to allocate the space complains about it, and 
-therefor this pmu type is not created. In a system with a single CPU 
-this basically cancels the whole operation. If there is more than one 
-pmu, the remaining PMUs continue to have a chance of being created, 
-although if the memory allocation fails (this is pretty early boot code) 
-there is a high probability there is something seriously wrong with the 
-system.
-
-
->
->> +			} else {
->> +				pmu->cpu_type = partnum;
->> +				pmu->cpu_count++;
->> +				list_add_tail(&pmu->list, pmus);
->> +			}
->> +		}
->> +	}
->> +}
->> +
->> +/*
->> + * Registers the group of PMU interfaces which correspond to the 'last_cpu_id'.
->> + * This group utilizes 'count' resources in the 'res'.
->> + */
->> +int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
->> +					    int last_cpu_id)
->> +{
->
-> With the addition of the irq resources to struct pmu_types, you can just pass
-> the pmu structure here.
-
-	Thats a point, but the lifetimes of the structures are different and 
-outside of their shared use in this single function never really 
-interact. I prefer not unnecessarily intertwine independent data 
-structures simply to reduce parameter counts for a single function. 
-Especially since it complicates cleanup because the validity of the 
-resource structure will have to be tracked relative to its successful 
-registration.
+-- 
+caesar wang | software engineer | wxt at rock-chip.com
