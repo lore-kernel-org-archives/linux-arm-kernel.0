@@ -1,91 +1,30 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 1 Jul 2016 18:39:36 +0100
-Subject: [RFC 1/2] iommu/dma: Restrict IOVAs to physical memory layout
-In-Reply-To: <57769724.4040801@arm.com>
-References: <cover.1467123945.git.robin.murphy@arm.com>
- <ac9b11493dfa3500889268488adfa8d4d5c34962.1467129314.git.robin.murphy@arm.com>
- <CALRxmdCuxLPogPTwpn2-B=PU=Ry0eNtgs2z+iZBPYtDc3NX-hQ@mail.gmail.com>
- <HE1PR04MB1641583BE6AFF39AF1BFCEFB8D250@HE1PR04MB1641.eurprd04.prod.outlook.com>
- <57769724.4040801@arm.com>
-Message-ID: <5776AAD8.5030704@arm.com>
+From: john@phrozen.org (John Crispin)
+Date: Fri, 1 Jul 2016 19:46:56 +0200
+Subject: next-20160701 build: 2 failures 5 warnings (next-20160701)
+In-Reply-To: <20160701171557.GB6247@sirena.org.uk>
+References: <E1bIuIz-00085X-RP@optimist> <20160701171557.GB6247@sirena.org.uk>
+Message-ID: <ba71c80f-e01e-8ae0-f99d-6ea32c7c1341@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/16 17:15, Robin Murphy wrote:
-> On 01/07/16 17:03, Stuart Yoder wrote:
->>
->>
->>> -----Original Message-----
->>> From: Robin Murphy <robin.murphy@arm.com>
->>> Date: Tue, Jun 28, 2016 at 11:18 AM
->>> Subject: [RFC 1/2] iommu/dma: Restrict IOVAs to physical memory layout
->>> To: iommu at lists.linux-foundation.org, linux-arm-kernel at lists.infradead.org
->>>
->>>
->>> Certain peripherals may be bestowed with knowledge of the physical
->>> memory map of the system in which they live, and refuse to handle
->>> addresses that they do not think are memory, which causes issues when
->>> remapping to arbitrary IOVAs. Sidestep the issue by restricting IOVA
->>> domains to only allocate addresses within ranges which match the
->>> physical memory layout.
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>>
->>> Posting this as an RFC because it's something I've been having to use
->>> on Juno for all the PCI IOMMU development - it's pretty horrible, but I
->>> can't easily think of a nicer solution...
->>
->> Maybe I'm not getting the implications of this looking at the patch 
->> in isolation, but how will this impact systems that have devices
->> limited to 32-bit addressing?
->>
->> In our memory map we have physical memory regions at:
->> 0x00_8000_0000
->> 0x80_8000_0000
->>
->> Will devices with a 32-bit DMA mask still get 32-bit IOVAs?
+
+
+On 01/07/2016 19:15, Mark Brown wrote:
+> On Fri, Jul 01, 2016 at 10:00:09AM +0100, Build bot for Mark Brown wrote:
 > 
-> Assuming there's some free IOVA space between 0x80000000 and 0xffffffff,
-> yes, otherwise it gets nothing ;) This has no effect on the allocation
-> behaviour in general, it just makes sure that within that behaviour, we
-> avoid allocating any address that doesn't look "real". The primary issue
-> is with 64-bit DMA masks - since it's a top-down allocator, you
-> typically end up with the poor device issuing its first DMA transaction
-> to 0xfffffffffffff000 which on Juno a) gets silently eaten by the root
-> complex because it doesn't match any window in the PCI-AXI translation
-> table, or b) goes wrong anyway because it's beyond the input address
-> range of the SMMU (and there's something not quite right WRT
-> truncation/sign-extension which I've not looked into closely and am
-> semi-deliberately also sweeping under the rug thanks to the simpler
-> hardware issue...)
+> Today's -next fails to build am ARM allmodconfig due to:
 > 
-> As I say, it's hideous, but I can't see what else to do.
-
-Urgh, thinking some more, this is OK on Juno and LS2085 only because
-there *is* some RAM below 4GB to begin with. On something like Seattle
-where it's all high up, 32-bit peripherals will be as screwed as if the
-IOMMU wasn't there :(
-
-How on Earth do we work out which devices can only DMA to arbitrary
-portions of their addressable range, and which are unrestricted? I guess
-the reasonable answer is to use "dma-ranges" on the PCI RC to describe
-the valid regions, but then we have to propagate that to the domain
-somehow, and only after we've taught Linux how to handle multiple
-dma-ranges entries at all (currently we'll just ignore everything other
-than the last one). As for ACPI...
-
-In short; oh dear.
-
-Robin.
-
->>
->> Thanks,
->> Stuart
->>
+>> 	arm-allmodconfig
+>> ../drivers/net/ethernet/mediatek/mtk_eth_soc.c:1300:2: error: implicit declaration of function 'mtk_handle_irq' [-Werror=implicit-function-declaration]
+>> ../drivers/net/ethernet/mediatek/mtk_eth_soc.c:1300:25: error: subscripted value is neither array nor pointer nor vector
 > 
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+> due to the recent changes to the interrupt handling code, the function
+> has been split into rx and tx functions but the NET_POLL_CONTROLLER code
+> hasn't been updated.
 > 
+
+Hi Mark,
+
+i'll look into this first thing in the morning.
+
+	John
