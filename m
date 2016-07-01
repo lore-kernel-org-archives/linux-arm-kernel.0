@@ -1,68 +1,30 @@
-From: kieran@bingham.xyz (Kieran Bingham)
-Date: Fri, 1 Jul 2016 15:37:23 +0100
-Subject: [PATCH 2/2] arm64: dts: r8a7795: add FDP1 device nodes
-In-Reply-To: <1467293563-940-3-git-send-email-kieran@bingham.xyz>
-References: <1467293563-940-1-git-send-email-kieran@bingham.xyz>
- <1467293563-940-3-git-send-email-kieran@bingham.xyz>
-Message-ID: <57768023.8010507@bingham.xyz>
+From: olivier.schonken@gmail.com (Olivier Schonken)
+Date: Fri,  1 Jul 2016 16:37:10 +0200
+Subject: [PATCH 1/2] coresight-etm3x: Add ARM ETM-A5 peripheral ID
+Message-ID: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Signed-off-by: Olivier Schonken <olivier.schonken@gmail.com>
+---
+ drivers/hwtracing/coresight/coresight-etm3x.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-The bindings for this have now been acked by RobH.
-
---
-Cheers
-
-Kieran
-
-On 30/06/16 14:32, Kieran Bingham wrote:
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Kieran Bingham <kieran@bingham.xyz>
-> --
-> changes for v2
->  - channel labels dropped
-> 
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> index a451bd217f05..8bc87e09efd7 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -1443,5 +1443,32 @@
->  			clocks = <&cpg CPG_MOD 613>;
->  			power-domains = <&sysc R8A7795_PD_A3VP>;
->  		};
-> +
-> +		fdp1 at fe940000 {
-> +			compatible = "renesas,fdp1";
-> +			reg = <0 0xfe940000 0 0x2400>;
-> +			interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cpg CPG_MOD 119>;
-> +			power-domains = <&sysc R8A7795_PD_A3VP>;
-> +			renesas,fcp = <&fcpf0>;
-> +		};
-> +
-> +		fdp1 at fe944000 {
-> +			compatible = "renesas,fdp1";
-> +			reg = <0 0xfe944000 0 0x2400>;
-> +			interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cpg CPG_MOD 118>;
-> +			power-domains = <&sysc R8A7795_PD_A3VP>;
-> +			renesas,fcp = <&fcpf1>;
-> +		};
-> +
-> +		fdp1 at fe948000 {
-> +			compatible = "renesas,fdp1";
-> +			reg = <0 0xfe948000 0 0x2400>;
-> +			interrupts = <GIC_SPI 264 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cpg CPG_MOD 117>;
-> +			power-domains = <&sysc R8A7795_PD_A3VP>;
-> +			renesas,fcp = <&fcpf2>;
-> +		};
->  	};
->  };
-> 
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index d83ab82..2c6d4b4 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -885,6 +885,11 @@ static struct amba_id etm_ids[] = {
+ 		.mask	= 0x0003ffff,
+ 		.data	= "ETM 3.3",
+ 	},
++	{	/* ETM-A5 */
++		.id	= 0x0003b955,
++		.mask	= 0x0003ffff,
++		.data	= "ETM-A5",
++	},
+ 	{	/* ETM 3.5 */
+ 		.id	= 0x0003b956,
+ 		.mask	= 0x0003ffff,
+-- 
+1.9.1
