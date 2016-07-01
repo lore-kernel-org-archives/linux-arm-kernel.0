@@ -1,112 +1,92 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri,  1 Jul 2016 17:50:10 +0100
-Subject: [PATCH v4 1/8] arm64: mm: change IOMMU notifier action to attach DMA
- ops
+Date: Fri,  1 Jul 2016 17:50:13 +0100
+Subject: [PATCH v4 4/8] iommu/of: Handle iommu-map property for PCI
 In-Reply-To: <cover.1467388950.git.robin.murphy@arm.com>
 References: <cover.1467388950.git.robin.murphy@arm.com>
-Message-ID: <06d430a86f5d7f461308a9278bf25f40fb50d93c.1467388950.git.robin.murphy@arm.com>
+Message-ID: <3e048b1536c4524c688ea1163623c585df0214f1.1467388950.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Now that we have a way to pick up the RID translation and target IOMMU,
+hook up of_iommu_configure() to bring PCI devices into the of_xlate
+mechanism and allow them IOMMU-backed DMA ops without the need for
+driver-specific handling.
 
-Current bus notifier in ARM64 (__iommu_attach_notifier)
-attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
-action notification.
-
-This will cause issues on ACPI based systems, where PCI devices
-can be added before the IOMMUs the devices are attached to
-had a chance to be probed, causing failures on attempts to
-attach dma_ops in that the domain for the respective IOMMU
-may not be set-up yet by the time the bus notifier is run.
-
-Devices dma_ops do not require to be set-up till the matching
-device drivers are probed. This means that instead of running
-the notifier attaching dma_ops to devices (__iommu_attach_notifier)
-on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
-device driver is bound to the device in question (on action
-BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
-group and domain are set-up accordingly at the time the
-notifier is triggered.
-
-This patch changes the notifier action upon which dma_ops
-are attached to devices and defer it to driver binding time,
-so that IOMMU devices have a chance to be probed and to register
-their bus notifiers before the dma_ops attach sequence for a
-device is actually carried out.
-
-As a result we also no longer need worry about racing with
-iommu_bus_notifier(), or about retrying the queue in case devices
-were added too early on DT-based systems, so clean up the notifier
-itself plus the additional workaround from 722ec35f7fae ("arm64:
-dma-mapping: fix handling of devices registered before arch_initcall")
-
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-[rm: get rid of other now-redundant bits]
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
 v4: No change.
 
- arch/arm64/mm/dma-mapping.c | 22 +++++-----------------
- 1 file changed, 5 insertions(+), 17 deletions(-)
+ drivers/iommu/of_iommu.c | 43 ++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 36 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index c566ec83719f..e384b76203cc 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -848,15 +848,16 @@ static int __iommu_attach_notifier(struct notifier_block *nb,
- {
- 	struct iommu_dma_notifier_data *master, *tmp;
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index af499aea0a1a..1fe1f620f79d 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -22,6 +22,7 @@
+ #include <linux/limits.h>
+ #include <linux/of.h>
+ #include <linux/of_iommu.h>
++#include <linux/of_pci.h>
+ #include <linux/slab.h>
  
--	if (action != BUS_NOTIFY_ADD_DEVICE)
-+	if (action != BUS_NOTIFY_BIND_DRIVER)
- 		return 0;
- 
- 	mutex_lock(&iommu_dma_notifier_lock);
- 	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
--		if (do_iommu_attach(master->dev, master->ops,
--				master->dma_base, master->size)) {
-+		if (data == master->dev && do_iommu_attach(master->dev,
-+				master->ops, master->dma_base, master->size)) {
- 			list_del(&master->list);
- 			kfree(master);
-+			break;
- 		}
- 	}
- 	mutex_unlock(&iommu_dma_notifier_lock);
-@@ -870,17 +871,8 @@ static int __init register_iommu_dma_ops_notifier(struct bus_type *bus)
- 
- 	if (!nb)
- 		return -ENOMEM;
--	/*
--	 * The device must be attached to a domain before the driver probe
--	 * routine gets a chance to start allocating DMA buffers. However,
--	 * the IOMMU driver also needs a chance to configure the iommu_group
--	 * via its add_device callback first, so we need to make the attach
--	 * happen between those two points. Since the IOMMU core uses a bus
--	 * notifier with default priority for add_device, do the same but
--	 * with a lower priority to ensure the appropriate ordering.
--	 */
-+
- 	nb->notifier_call = __iommu_attach_notifier;
--	nb->priority = -100;
- 
- 	ret = bus_register_notifier(bus, nb);
- 	if (ret) {
-@@ -904,10 +896,6 @@ static int __init __iommu_dma_init(void)
- 	if (!ret)
- 		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
- #endif
--
--	/* handle devices queued before this arch_initcall */
--	if (!ret)
--		__iommu_attach_notifier(NULL, BUS_NOTIFY_ADD_DEVICE, NULL);
- 	return ret;
+ static const struct of_device_id __iommu_of_table_sentinel
+@@ -134,20 +135,48 @@ const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+ 	return ops;
  }
- arch_initcall(__iommu_dma_init);
+ 
++static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
++{
++	struct of_phandle_args *iommu_spec = data;
++
++	iommu_spec->args[0] = alias;
++	return iommu_spec->np == pdev->bus->dev.of_node;
++}
++
+ const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 					   struct device_node *master_np)
+ {
+ 	struct of_phandle_args iommu_spec;
+-	struct device_node *np;
++	struct device_node *np = NULL;
+ 	const struct iommu_ops *ops = NULL;
+ 	int idx = 0;
+ 
+-	/*
+-	 * We can't do much for PCI devices without knowing how
+-	 * device IDs are wired up from the PCI bus to the IOMMU.
+-	 */
+-	if (dev_is_pci(dev))
+-		return NULL;
++	if (dev_is_pci(dev)) {
++		/*
++		 * Start by tracing the RID alias down the PCI topology as
++		 * far as the host bridge whose OF node we have...
++		 */
++		iommu_spec.np = master_np;
++		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
++				       &iommu_spec);
++		/*
++		 * ...then find out what that becomes once it escapes the PCI
++		 * bus into the system beyond, and which IOMMU it ends up at.
++		 */
++		if (of_pci_map_rid(master_np, iommu_spec.args[0], "iommu-map",
++				    "iommu-map-mask", &np, iommu_spec.args))
++			return NULL;
++
++		/* We're not attempting to handle multi-alias devices yet */
++		iommu_spec.np = np;
++		iommu_spec.args_count = 1;
++		ops = of_iommu_get_ops(np);
++		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
++			ops = NULL;
++
++		of_node_put(np);
++		return ops;
++	}
+ 
+ 	/*
+ 	 * We don't currently walk up the tree looking for a parent IOMMU.
 -- 
 2.8.1.dirty
