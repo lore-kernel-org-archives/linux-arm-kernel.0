@@ -1,38 +1,37 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  1 Jul 2016 17:01:30 +0200
-Subject: [PATCH 1/2] efi: arm64: abort boot on pending SError
-Message-ID: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Fri,  1 Jul 2016 17:01:31 +0200
+Subject: [PATCH 2/2] arm64: document that pending SErrors are not allowed at
+ kernel entry
+In-Reply-To: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1467385291-9880-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is the firmware's job to clear any pending SErrors before entering
-the kernel. On UEFI, we can fail gracefully rather than panic during
-early boot, so check for this condition in the stub.
+Our current strategy to deal with pending SErrors at boot is to panic.
+So let's mention in our boot protocol documentation that no SErrors
+should be pending when handing over to the kernel.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/arm64-stub.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ Documentation/arm64/booting.txt | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-index eae693eb3e91..c7e7396de876 100644
---- a/drivers/firmware/efi/libstub/arm64-stub.c
-+++ b/drivers/firmware/efi/libstub/arm64-stub.c
-@@ -20,7 +20,14 @@ extern bool __nokaslr;
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 8d0df62c3fe0..75dcfead1a0c 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -154,8 +154,9 @@ Before jumping into the kernel, the following conditions must be met:
+   x3 = 0 (reserved for future use)
  
- efi_status_t check_platform_features(efi_system_table_t *sys_table_arg)
- {
--	u64 tg;
-+	u64 tg, isr;
-+
-+	/* check for a pending SError */
-+	asm ("mrs %0, isr_el1" : "=r"(isr));
-+	if (isr & BIT(8)) {
-+		pr_efi_err(sys_table_arg, "Pending SError detected -- aborting\n");
-+		return EFI_LOAD_ERROR;
-+	}
+ - CPU mode
+-  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
+-  IRQ and FIQ).
++  All forms of exceptions must be masked in PSTATE.DAIF (Debug, SError,
++  IRQ and FIQ), and any pending SError exceptions must be taken by the
++  boot loader or firmware before handing over to the kernel.
+   The CPU must be in either EL2 (RECOMMENDED in order to have access to
+   the virtualisation extensions) or non-secure EL1.
  
- 	/* UEFI mandates support for 4 KB granularity, no need to check */
- 	if (IS_ENABLED(CONFIG_ARM64_4K_PAGES))
 -- 
 2.7.4
