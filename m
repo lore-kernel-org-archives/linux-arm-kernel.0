@@ -1,45 +1,43 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 1 Jul 2016 08:34:02 +0200
-Subject: [PATCH 1/3] clk: sunxi: Add a driver for the CCU
-In-Reply-To: <20160630211635.GE5485@lukather>
-References: <cover.1467135898.git.moinejf@free.fr>
- <a55dc5d1a9f02dc4d71d5c21064bffebe5a7b149.1467135898.git.moinejf@free.fr>
- <20160628204502.GG5550@lukather>
- <20160629101256.93895e6ff9184efa340f69dd@free.fr>
- <20160630211635.GE5485@lukather>
-Message-ID: <20160701083402.4f528ca4ed7fbd4877e4ef7b@free.fr>
+From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
+Date: Fri, 1 Jul 2016 08:34:21 +0200
+Subject: [PATCH v2 06/14] ARM: sun8i: clk: Add clk-factor rate application
+ method
+In-Reply-To: <20160701073710.1a1fc684ae448577bad5b0db@free.fr>
+References: <20160625034511.7966-1-megous@megous.com>
+ <20160625034511.7966-7-megous@megous.com> <20160630204001.GC5485@lukather>
+ <0b71ed7e-98c9-109e-85e6-ceb95131d88a@megous.com>
+ <20160701073710.1a1fc684ae448577bad5b0db@free.fr>
+Message-ID: <643c2648-ddd6-700a-68c0-2981134965c0@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Jun 2016 23:16:35 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> > > I'm sorry, but the whole point of the initial serie was to rework and
-> > > simplify things, precisely because dealing with the clk_factors code
-> > > was just too difficult nowadays. And this doesn't solve anything on
-> > > that aspect.
-> > 
-> > In my code, all the clock factors I know about are handled.
-> > Basically, the requested and the parent rates give a multiplier and a
-> > divider. These ones are dispatched into the specific clock factors
-> > according to their constraints.
+On 1.7.2016 07:37, Jean-Francois Moine wrote:
+> On Fri, 1 Jul 2016 02:50:57 +0200
+> Ond?ej Jirman <megous@megous.com> wrote:
 > 
-> You missed the "simplify" part. The other reason for this serie to
-> exist was to be consistent with what the other architectures are
-> doing, which is not the case here either.
+>>> Since this is really specific, I guess you could simply make the
+>>> clk_ops for the nkmp clocks public, and just re-implement set_rate
+>>> using that logic.
+>>
+>> I would argue that this may be necessary for other PLL clocks too, if
+>> you can get out of bounds output frequency, by changing the dividers too
+>> early or too late. So perhaps this code should be generalized for other
+>> PLL clocks too, instead.
+> 
+> The documentation says that only the CPU and DDR PLLs can be dynamically
+> changed after boot.
 
-The other architectures have not a so complex mechanism as Allwinner's.
-The 'divider'/'fractional-divider'/multiplier'/... "standard" functions
-cannot be used in ou case. Your 'sunxi-ng' just add new structures to
-replace them, and, in fact, you are building an other restricted
-composite clock system. which will be unusable when new SoCs will
-appear.
+The question is what exactly is meant by after boot. :) Anyway, if the
+kernel has no business changing some other PLLs, if there's code for
+changing them, should it be dropped?
 
-Yes, I should not have include the reset/bus gate/factor computation
-stuff in my patch series. Because the only important part is to have a
-flat definition of all the parameters giving this more simplification:
-one structure and one source file.
+regards,
+  Ondrej
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160701/729f1527/attachment.sig>
