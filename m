@@ -1,24 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 Jul 2016 11:53:55 +0100
-Subject: [PATCH v2 0/6] arm64: Extend Cortex-A53 errata workaround
-In-Reply-To: <20160628170732.523-1-andre.przywara@arm.com>
-References: <20160628170732.523-1-andre.przywara@arm.com>
-Message-ID: <20160701105355.GA14018@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 Jul 2016 11:55:06 +0100
+Subject: [PATCH v3 6/9] iommu/of: Introduce iommu_fwspec
+In-Reply-To: <227abd6fb43e4163d94673066b4b736d7efaa635.1467123945.git.robin.murphy@arm.com>
+References: <cover.1467123945.git.robin.murphy@arm.com>
+ <227abd6fb43e4163d94673066b4b736d7efaa635.1467123945.git.robin.murphy@arm.com>
+Message-ID: <20160701105505.GH12735@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 06:07:26PM +0100, Andre Przywara wrote:
-> Andre Przywara (6):
->   Revert "arm64: alternatives: add enable parameter to conditional asm
->     macros"
->   arm64: fix "dc cvau" cache operation on errata-affected core
->   arm64: include alternative handling in dcache_by_line_op
->   arm64: errata: Calling enable functions for CPU errata too
->   arm64: consolidate signal injection on emulation errors
->   arm64: trap userspace "dc cvau" cache operation on errata-affected
->     core
+On Tue, Jun 28, 2016 at 04:48:25PM +0100, Robin Murphy wrote:
+> Introduce a common structure to hold the per-device firmware data that
+> non-architectural IOMMU drivers generally need to keep track of.
+> Initially this is DT-specific to complement the existing of_iommu
+> support code, but will generalise further once other firmware methods
+> (e.g. ACPI IORT) come along.
+> 
+> Ultimately the aim is to promote the fwspec to a first-class member of
+> struct device, and handle the init/free automatically in the firmware
+> code. That way we can have API calls look for dev->fwspec->iommu_ops
+> before falling back to dev->bus->iommu_ops, and thus gracefully handle
+> those troublesome multi-IOMMU systems which we currently cannot. To
+> start with, though, make use of the existing archdata field and delegate
+> the init/free to drivers to allow an incremental conversion rather than
+> the impractical pain of trying to attempt everything in one go.
+> 
+> Suggested-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> v3: New.
+> 
+>  drivers/iommu/of_iommu.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_iommu.h | 18 ++++++++++++++++++
+>  2 files changed, 65 insertions(+)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 25406a8b9d4e..2b90c1f56ff2 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -220,3 +220,50 @@ void __init of_iommu_init(void)
+>  				of_node_full_name(np));
+>  	}
+>  }
+> +
+> +int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np)
 
-Patches queued for 4.8. Thanks.
+These functions might want an of_* prefix to match the rest of the file,
+or do you plan to re-use these later for ACPI?
 
--- 
-Catalin
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index bd02b44902d0..5a4f516cfcfe 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -15,6 +15,14 @@ extern void of_iommu_init(void);
+>  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
+>  					struct device_node *master_np);
+>  
+> +struct iommu_fwspec {
+> +	const struct iommu_ops	*iommu_ops;
+> +	struct device_node	*iommu_np;
+> +	void			*iommu_priv;
+> +	unsigned int		num_ids;
+> +	u32			ids[];
+> +};
+> +
+>  #else
+>  
+>  static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+> @@ -31,8 +39,18 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+>  	return NULL;
+>  }
+>  
+> +struct iommu_fwspec;
+> +
+>  #endif	/* CONFIG_OF_IOMMU */
+>  
+> +int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
+> +void iommu_fwspec_free(struct device *dev);
+> +int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
+> +static inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
+> +{
+> +	return dev->archdata.iommu;
+> +}
+
+I'm a bit nervous about putting this inline in a header file, since not
+all architectures unconditionally provide the iommu field in dev_archdata.
+
+Will
