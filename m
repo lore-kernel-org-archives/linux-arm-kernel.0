@@ -1,86 +1,52 @@
-From: olivier.schonken@gmail.com (Olivier Schonken)
-Date: Fri,  1 Jul 2016 16:37:11 +0200
-Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
-In-Reply-To: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
-References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
-Message-ID: <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Fri, 1 Jul 2016 16:46:26 +0200
+Subject: STi SoC changes for v4.8
+In-Reply-To: <57767EDE.8050708@st.com>
+References: <57767EDE.8050708@st.com>
+Message-ID: <57768242.6090007@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node to support SAMA5D2 Embedded Trace Macrocell and Embedded
-Trace Buffer. Add a dummy clock node needed by drivers/amba/bus.c
-for succesfull probe. The coresight clock is always present, and
-can thus not be enabled/disabled by a register write.
+Sorry, i resend with the correct subject including [GIT PULL] prefix
 
-This patch depends on coresight-etm3x: Add ARM ETM-A5 peripheral ID
-for proper functionality.
-
-Signed-off-by: Olivier Schonken <olivier.schonken@gmail.com>
----
- arch/arm/boot/dts/sama5d2.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 5d63206..4a3a3fb 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -77,6 +77,37 @@
- 		interrupts = <2 IRQ_TYPE_LEVEL_HIGH 0>;
- 	};
- 
-+	etb: etb at 00740000 {
-+		compatible = "arm,coresight-etb10", "arm,primecell";
-+		reg = <0x740000 0x1000>;
-+		status = "okay";
-+
-+		clocks = <&etmck>;
-+		clock-names = "apb_pclk";
-+
-+		port {
-+			etb_in: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&etm_out>;
-+			};
-+		};
-+	};
-+
-+	etm: etm at 0073C000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0x73C000 0x1000>;
-+		status = "okay";
-+
-+		clocks = <&etmck>;
-+		clock-names = "apb_pclk";
-+
-+		port {
-+			etm_out: endpoint {
-+				remote-endpoint = <&etb_in>;
-+			};
-+		};
-+	};
-+
- 	memory {
- 		reg = <0x20000000 0x20000000>;
- 	};
-@@ -474,6 +505,19 @@
- 					};
- 				};
- 
-+				/*
-+				 * This is a dummy clock needed by
-+				 * drivers/amba/bus.c when probing
-+				 * for ETM/ETB. On SAMA5D2 the coresight
-+				 * clock is always supplied.
-+				*/
-+
-+				etmck: etmck {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					clock-frequency = <0>;
-+				};
-+
- 				systemck {
- 					compatible = "atmel,at91rm9200-clk-system";
- 					#address-cells = <1>;
--- 
-1.9.1
+On 07/01/2016 04:31 PM, Patrice Chotard wrote:
+> Hi Olof, Arnd and Kevin,
+>
+> Please consider this first round of STi SoC updates for v4.8:
+>
+> The following changes since commit 
+> 4c2e07c6a29e0129e975727b9f57eede813eea85:
+>
+>   Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+> sti-soc_for_v4.8
+>
+> for you to fetch changes up to 55aa35180c57d82f3db23e5aabce97acb0d36681:
+>
+>   ARM: sti: Implement dummy L2 cache's write_sec (2016-07-01 16:23:44 
+> +0200)
+> ----------------------------------------------------------------
+>
+> Highlights:
+> -----------
+> _ add a dummy L2 cache's write_sec callback as in non secure mode 
+> execution,
+>   we can't get access to L2 cache secure registers
+> _ cosmetics change, in case of dump_stack, update the hardware name 
+> with a
+>   more genericfor the STi SoCs family
+>
+>
+> ----------------------------------------------------------------
+> Patrice Chotard (1):
+>       ARM: sti: Implement dummy L2 cache's write_sec
+>
+> Peter Griffin (1):
+>       ARM: STi: Update machine _namestr to be more generic.
+>
+>  arch/arm/mach-sti/board-dt.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+>
