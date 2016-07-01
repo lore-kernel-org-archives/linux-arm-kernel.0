@@ -1,74 +1,77 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 1 Jul 2016 11:13:01 +0300
-Subject: [PATCH v2 0/3] pwm: lpc32xx: Add support to control PWM_PIN_LEVEL
- bit
-In-Reply-To: <1467293119.32051.9.camel@localhost>
-References: <1467032997-5340-1-git-send-email-slemieux.tyco@gmail.com>
- <ce29f743-e481-64b0-8e05-0b610fa33fb3@mleia.com>
- <1467293119.32051.9.camel@localhost>
-Message-ID: <03725469-ce79-3fe6-3f51-242f4e895c41@mleia.com>
+From: arend.vanspriel@broadcom.com (Arend Van Spriel)
+Date: Fri, 1 Jul 2016 10:17:37 +0200
+Subject: [PATCH 1/4] brcmfmac: Add brcm,nvram_file_name dt property
+In-Reply-To: <20160701020836.GA1722@rob-hp-laptop>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <20160701020836.GA1722@rob-hp-laptop>
+Message-ID: <b18cd232-711a-b617-2f09-09c4bdf2c3c4@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
 
-On 30.06.2016 16:25, Sylvain Lemieux wrote:
-> Hi Vladimir,
+
+On 1-7-2016 4:08, Rob Herring wrote:
+> On Wed, Jun 29, 2016 at 04:04:31PM +0200, Hans de Goede wrote:
+>> Add a brcm,nvram_file_name dt property to allow overruling the default
+>> nvram filename for sdio devices. The idea is that we can specify a
+>> board specific nvram file, e.g. brcmfmac43362-ap6210.txt for boards
+>> with an ap6210 wifi sdio module and ship this in linux-firmware, so
+>> that wifi will work out of the box, without requiring users to find
+>> and then manually install the right nvram file for their board.
 > 
-> On Thu, 2016-06-30 at 11:43 +0300, Vladimir Zapolskiy wrote:
->> Hi Sylvain,
+> What about putting its contents directly into DT? It's just text 
+> key/value pairs so it would match up well.
+
+It would be an option, but I have no clue how to dig up documentation of
+these key,value pairs. The file is typically obtained from a wifi module
+vendor which would need to be converted to DT format, ie. prefix with
+"brcm," etc. From driver perspective this would mean it need to know
+keys. Currently, it just takes the file contents and sends it to the device.
+
+> Also, I have to wonder how all the non-SDIO based cards don't need this 
+> file.
+
+PCIe devices have more on-board storage. Also on some router platforms
+it gets nvram data from flash memory.
+
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  .../devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt          | 2 ++
+>>  drivers/net/wireless/broadcom/brcm80211/brcmfmac/of.c               | 2 ++
+>>  drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c             | 6 ++++++
+>>  include/linux/platform_data/brcmfmac.h                              | 2 ++
+>>  4 files changed, 12 insertions(+)
 >>
->> On 27.06.2016 16:09, Sylvain Lemieux wrote:
->>> From: Sylvain Lemieux <slemieux@tycoint.com>
->>>
->>> The PWM_PIN_LEVEL bit is leave unset by the kernel PWM driver.
->>>
->>> Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
->>> the PWM_PIN_LEVEL bit was always clear when the PWM was disable
->>> and a 0 logic level was apply to the output.
->>>
->>> According to the LPC32x0 User Manual [1],
->>> the default value for bit 30 (PWM_PIN_LEVEL) is 0.
->>>
->>> First patch:
->>> * initialize the pin level to 0 (default value) and update
->>>   the register value accordingly.
->>>
->>> Second anf third patches:
->>> *  provide support to configure the pin output (i.e. PWM_PIN_LEVEL bit)
->>>    when the PWM is disabled.
->>
->> a short question, how do you use PWM? Does it serve as a backlight
->> or something else?
->>
-> The PWM is used to control the LCD backlight intensity.
+>> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>> index 5dbf169..2ba13a6 100644
+>> --- a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>> @@ -11,6 +11,7 @@ Required properties:
+>>  Optional properties:
+>>   - brcm,drive-strength : drive strength used for SDIO pins on device in mA
+>>  	(default = 6).
+>> + - brcm,nvram_file_name : name of the nvram file to load
 > 
-> When we setup the backlight brightness level to 0, 
-> it should turn off the LCD display by disabling the PWM.
-> 
-> This is what was added to our board dts for it:
-> 	backlight {
-> 		compatible = "pwm-backlight";
-> 		pwms = <&pwm1 0 1250000>;
-> 
-> 		brightness-levels = <0 20 100>;
-> 		default-brightness-level = <2>;
-> 	};
-> 
+> The need for firmware file names has come up several times though 
+> nothing merged to yet. There has been at least some level of agreement 
+> to use "firmware-name" here. 
 
-this is good that there is a consumer and we are not talking in
-general, then it might be more visual that the new property probably
-is not needed due to the lack of use cases.
+Do you mean with or without vendor prefix? Actually the device needs two
+files to initialize. The firmware that is needed to have anything
+running on the device and the nvram data that characterizes the device
+for that firmware.
 
-I think that we should start from something as simple as one-time
-setting of PWMx_PIN_LEVEL to default 0 in lpc32xx_pwm_probe() and then
-implement a proper support of boundary values as suggested in discussion
-of v1 series.
+Regards,
+Arend
 
->>> Note:
->>> * Follow this URL to access the discussion for version 1 of this
->>>   patch: http://thread.gmane.org/gmane.linux.pwm/3882
-
---
-With best wishes,
-Vladimir
+>>   - interrupt-parent : the phandle for the interrupt controller to which the
+>>  	device interrupts are connected.
+>>   - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
+>> @@ -34,6 +35,7 @@ mmc3: mmc at 01c12000 {
+>>  	brcmf: bcrmf at 1 {
+>>  		reg = <1>;
+>>  		compatible = "brcm,bcm4329-fmac";
+>> +		brcm,nvram_file_name = "brcm/brcmfmac43362-ap6210.txt";
+>>  		interrupt-parent = <&pio>;
+>>  		interrupts = <10 8>; /* PH10 / EINT10 */
+>>  		interrupt-names = "host-wake";
