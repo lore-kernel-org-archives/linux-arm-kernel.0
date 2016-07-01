@@ -1,32 +1,28 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 1 Jul 2016 09:47:19 +0200
-Subject: [PATCH v2 06/14] ARM: sun8i: clk: Add clk-factor rate
- application method
-In-Reply-To: <643c2648-ddd6-700a-68c0-2981134965c0@megous.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-7-megous@megous.com>
- <20160630204001.GC5485@lukather>
- <0b71ed7e-98c9-109e-85e6-ceb95131d88a@megous.com>
- <20160701073710.1a1fc684ae448577bad5b0db@free.fr>
- <643c2648-ddd6-700a-68c0-2981134965c0@megous.com>
-Message-ID: <20160701094719.9f7e28d93595d9cf7820e7dd@free.fr>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 1 Jul 2016 10:07:17 +0200
+Subject: [PATCH 1/3] ARM: dts: r8a7792: add PFC support
+In-Reply-To: <7894702.b5qeLxoHdo@wasted.cogentembedded.com>
+References: <2144803.0K8qXzjIFq@wasted.cogentembedded.com>
+ <7894702.b5qeLxoHdo@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUeQCX5m2gGj3fj2kybaeVAUq+M8YQfQgrX+NgL8G5vCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Jul 2016 08:34:21 +0200
-Ond?ej Jirman <megous@megous.com> wrote:
+On Fri, Jul 1, 2016 at 1:06 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the generic R8A7792 part of the PFC device node.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> > The documentation says that only the CPU and DDR PLLs can be dynamically
-> > changed after boot.
-> 
-> The question is what exactly is meant by after boot. :) Anyway, if the
-> kernel has no business changing some other PLLs, if there's code for
-> changing them, should it be dropped?
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-No, because all the other PLLs may not be initialized by the U-boot
-(audio, video, gpu...), and also, their rate may be changed safely by
-stopping them (gate).
+Gr{oetje,eeting}s,
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
