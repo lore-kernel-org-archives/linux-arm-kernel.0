@@ -1,42 +1,61 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 1 Jul 2016 13:52:25 -0700
-Subject: [PATCH v6 00/11] qcom: Add support for TSENS driver
-In-Reply-To: <57749F20.4010700@codeaurora.org>
-References: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
- <575A57F8.6060004@codeaurora.org> <576391B3.7090508@codeaurora.org>
- <57749F20.4010700@codeaurora.org>
-Message-ID: <20160701205223.GA7814@localhost.localdomain>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 01 Jul 2016 23:01:57 +0200
+Subject: [PATCH v6 00/10] acpi,
+ clocksource: add GTDT driver and GTDT support in arm_arch_timer
+In-Reply-To: <57767782.6020509@linaro.org>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <2435381.sM3CFAEXNR@vostro.rjw.lan> <57767782.6020509@linaro.org>
+Message-ID: <1643662.QIDsTbCMZg@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 09:55:04AM +0530, Rajendra Nayak wrote:
-> Rui,
+On Friday, July 01, 2016 04:00:34 PM Daniel Lezcano wrote:
+> On 06/30/2016 03:27 PM, Rafael J. Wysocki wrote:
 > 
-> On 06/17/2016 11:29 AM, Nayak, Rajendra wrote:
-> > Hey Eduardo,
-> > 
-> > On 6/10/2016 11:32 AM, Rajendra Nayak wrote:
-> >> Eduardo,
-> >>
-> >> On 05/05/2016 02:21 PM, Rajendra Nayak wrote:
-> >>> Current set of patches apply on 4.6-rc6. Fixes for the nvmem apis
-> >>> are now posted [1] and queued in -next [2]
-> >>> Patches [1-6] will need to be merged via thermal tree/Eduardo.
-> >>
-> >> Any plans to pull these in for 4.8?
-> > 
-> > These patches have been on the list for quite a while, and they
-> > do not have any outstanding dependencies or comments to be
-> > addressed. I would really hope to see these in for 4.8.
-> > Let me know if there is something you want me to address before
-> > you pull them in.
+> [ ... ]
 > 
-> Would you be able to pull this driver in? I haven't heard back
-> anything from Eduardo despite multiple pings.
-> These patches (v6) have been on the list for a couple months now,
-> which address all issues/concerns that were raised by Eduardo
-> in his previous reviews.
+> >> GTDT is part of ACPI spec, drivers/acpi/ is for driver code of
+> >> ACPI spec, I think it can stay in drivers/acpi/ from this point
+> >> of view, am I right?
+> >
+> > The question is not "Can it?", but "Does it need to?".
+> >
+> > It is in the spec, but still there's only one architecture needing it.
+> >
+> > There is no way to test it on any other architecture and no reason to build it
+> > for any other architecture, so why does it need to be located in drivers/acpi/ ?
+> 
+> Hi Rafael,
+> 
+> what is the problem of having it in drivers/acpi ?
 
-Apologize for the late answer. I will take care of queueing them.
+There's no reason for it to be there.
 
-BR,
+> There are cpufreq-dt, speedstep*, tegra124-* in drivers/cpufreq.
+
+Yes, they are, but for a reason.  Having them in there makes it easier to
+rework and clean up the core.
+
+> clocksource-probe which is DT based with different drivers using it in 
+> drivers/clocksource with a pletore of different archs.
+
+So maybe the GTDT code should be there too?
+
+> Cstate code which is only used by x86 is in drivers/acpi, it is only 
+> used by x86/ia64 and it isn't a problem.
+
+It is a problem.  drivers/acpi/ is not the right place for arch-specific code.
+
+> There is a small chunk in arch/x86/kernel/acpi and it doesn't facilitate the
+> comprehension of the code.
+> 
+> IMHO, having all ACPI code in the same directory will encourage the 
+> consolidation.
+
+The consolidation of what exactly?
+
+In particular, how does the GTDT code in drivers/acpi/ help to consolidate
+anything?
+
+Thanks,
+Rafael
