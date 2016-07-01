@@ -1,46 +1,86 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Fri, 1 Jul 2016 16:03:07 +0000
-Subject: [RFC 1/2] iommu/dma: Restrict IOVAs to physical memory layout
-In-Reply-To: <CALRxmdCuxLPogPTwpn2-B=PU=Ry0eNtgs2z+iZBPYtDc3NX-hQ@mail.gmail.com>
-References: <cover.1467123945.git.robin.murphy@arm.com>
- <ac9b11493dfa3500889268488adfa8d4d5c34962.1467129314.git.robin.murphy@arm.com>
- <CALRxmdCuxLPogPTwpn2-B=PU=Ry0eNtgs2z+iZBPYtDc3NX-hQ@mail.gmail.com>
-Message-ID: <HE1PR04MB1641583BE6AFF39AF1BFCEFB8D250@HE1PR04MB1641.eurprd04.prod.outlook.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 1 Jul 2016 17:04:03 +0100
+Subject: [PATCH] arm64: tegra: Enable XUSB controller on Tegra210 Smaug
+Message-ID: <1467389043-959-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable the XUSB controller on Tegra210 Smaug. The Smaug has a USB Type-C
+connector with one of the USB2.0 lanes and one of the USB3.0 lanes
+populated.
 
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
+ arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 57 +++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
 
-> -----Original Message-----
-> From: Robin Murphy <robin.murphy@arm.com>
-> Date: Tue, Jun 28, 2016 at 11:18 AM
-> Subject: [RFC 1/2] iommu/dma: Restrict IOVAs to physical memory layout
-> To: iommu at lists.linux-foundation.org, linux-arm-kernel at lists.infradead.org
-> 
-> 
-> Certain peripherals may be bestowed with knowledge of the physical
-> memory map of the system in which they live, and refuse to handle
-> addresses that they do not think are memory, which causes issues when
-> remapping to arbitrary IOVAs. Sidestep the issue by restricting IOVA
-> domains to only allocate addresses within ranges which match the
-> physical memory layout.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> Posting this as an RFC because it's something I've been having to use
-> on Juno for all the PCI IOMMU development - it's pretty horrible, but I
-> can't easily think of a nicer solution...
-
-Maybe I'm not getting the implications of this looking at the patch 
-in isolation, but how will this impact systems that have devices
-limited to 32-bit addressing?
-
-In our memory map we have physical memory regions at:
-0x00_8000_0000
-0x80_8000_0000
-
-Will devices with a 32-bit DMA mask still get 32-bit IOVAs?
-
-Thanks,
-Stuart
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+index 431266a48e9c..db9763fd945f 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+@@ -1568,6 +1568,63 @@
+ 		status = "okay";
+ 	};
+ 
++	usb at 70090000 {
++		phys = <&{/padctl@7009f000/pads/usb2/lanes/usb2-0}>,
++		       <&{/padctl@7009f000/pads/pcie/lanes/pcie-6}>;
++		phy-names = "usb2-0", "usb3-0";
++
++		dvddio-pex-supply = <&avddio_1v05>;
++		hvddio-pex-supply = <&pp1800>;
++		avdd-usb-supply = <&pp3300>;
++		avdd-pll-utmip-supply = <&pp1800>;
++		avdd-pll-uerefe-supply = <&pp1050_avdd>;
++		dvdd-pex-pll-supply = <&avddio_1v05>;
++		hvdd-pex-pll-e-supply = <&pp1800>;
++
++		status = "okay";
++	};
++
++	padctl at 7009f000 {
++		status = "okay";
++
++		pads {
++			usb2 {
++				status = "okay";
++
++				lanes {
++					usb2-0 {
++						nvidia,function = "xusb";
++						status = "okay";
++					};
++				};
++			};
++
++			pcie {
++				status = "okay";
++
++				lanes {
++					pcie-6 {
++						nvidia,function = "usb3-ss";
++						status = "okay";
++					};
++				};
++			};
++		};
++
++		ports {
++			usb2-0 {
++				status = "okay";
++				vbus-supply = <&usbc_vbus>;
++				mode = "otg";
++			};
++
++			usb3-0 {
++				nvidia,usb2-companion = <0>;
++				status = "okay";
++			};
++		};
++	};
++
+ 	sdhci at 700b0600 {
+ 		bus-width = <8>;
+ 		non-removable;
+-- 
+2.1.4
