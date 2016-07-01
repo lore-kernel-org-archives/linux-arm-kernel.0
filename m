@@ -1,87 +1,57 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 1 Jul 2016 14:05:58 +0100
-Subject: [PATCH v3 8/9] iommu/arm-smmu: Support non-PCI devices with SMMUv3
-In-Reply-To: <20160701124036.GK12735@arm.com>
-References: <cover.1467123945.git.robin.murphy@arm.com>
- <19b0d973e170bebfa57157047bf76499de2a6d33.1467123945.git.robin.murphy@arm.com>
- <20160701124036.GK12735@arm.com>
-Message-ID: <57766AB6.6030706@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 1 Jul 2016 15:07:33 +0200
+Subject: [PATCH v7 2/6] ACPI / processor_idle: Add support for Low Power
+ Idle(LPI) states
+In-Reply-To: <1467122152-5604-3-git-send-email-sudeep.holla@arm.com>
+References: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
+ <1467122152-5604-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <57766B15.4090407@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/16 13:40, Will Deacon wrote:
-> On Tue, Jun 28, 2016 at 04:48:27PM +0100, Robin Murphy wrote:
->> With the device <-> stream ID relationship suitably abstracted and
->> of_xlate() hooked up, the PCI dependency now looks, and is, entirely
->> arbitrary. Any bus using the of_dma_configure() mechanism will work,
->> so extend support to the platform and AMBA buses which do just that.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v3: Now actually tested; improve comment about duplicate IDs.
->>
->>  drivers/iommu/Kconfig       |  2 +-
->>  drivers/iommu/arm-smmu-v3.c | 42 ++++++++++++++++++++++++++++++++++--------
->>  2 files changed, 35 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
->> index ad0860383cb3..d1c66afefeed 100644
->> --- a/drivers/iommu/Kconfig
->> +++ b/drivers/iommu/Kconfig
->> @@ -308,7 +308,7 @@ config ARM_SMMU
->>  
->>  config ARM_SMMU_V3
->>  	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
->> -	depends on ARM64 && PCI
->> +	depends on ARM64
->>  	select IOMMU_API
->>  	select IOMMU_IO_PGTABLE_LPAE
->>  	select GENERIC_MSI_IRQ_DOMAIN
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 8ce2a4f9342b..735690e03818 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -35,6 +35,8 @@
->>  #include <linux/pci.h>
->>  #include <linux/platform_device.h>
->>  
->> +#include <linux/amba/bus.h>
->> +
->>  #include "io-pgtable.h"
->>  
->>  /* MMIO registers */
->> @@ -1822,6 +1824,25 @@ static void arm_smmu_remove_device(struct device *dev)
->>  	iommu_fwspec_free(dev);
->>  }
->>  
->> +static struct iommu_group *arm_smmu_device_group(struct device *dev)
->> +{
->> +	struct iommu_group *group;
->> +
->> +	/*
->> +	 * The difficulty of efficient stream-ID-to-device lookup prevents us
->> +	 * from reasonably detecting aliasing outside of PCI buses, but for the
->> +	 * the same underlying reason (a sparse 32-bit ID space) there's also
-> 
-> extra 'the'
+On 06/28/2016 03:55 PM, Sudeep Holla wrote:
+> ACPI 6.0 introduced an optional object _LPI that provides an alternate
+> method to describe Low Power Idle states. It defines the local power
+> states for each node in a hierarchical processor topology. The OSPM can
+> use _LPI object to select a local power state for each level of processor
+> hierarchy in the system. They used to produce a composite power state
+> request that is presented to the platform by the OSPM.
+>
+> Since multiple processors affect the idle state for any non-leaf hierarchy
+> node, coordination of idle state requests between the processors is
+> required. ACPI supports two different coordination schemes: Platform
+> coordinated and  OS initiated.
+>
+> This patch adds initial support for Platform coordination scheme of LPI.
+>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
 
-Oops, thanks.
+Hi Sudeep,
 
->> +	 * little excuse for systems to be wired up with non-unique IDs in the
->> +	 * first place; consider them unsupported.
->> +	 */
-> 
-> This is a long-winded way of saying "we don't support aliasing SIDs outside
-> of PCI".
+I looked at the acpi processor idle code sometime ago and from my POV, 
+it was awful, unnecessary complex and very difficult to maintain. The 
+usage of flags all over the places is significant of the lack of control 
+of the written code.
 
-It is. Someone said of the original terse 2-line comment "Worse: what if
-a SID in the DT aliases with a PCI master? It might be nice to have some
-basic sanity checking, at least.", so I expanded it to better clarify
-why there isn't. I'll try making it a little less florid.
+Even if you are not responsible of this implementation, the current 
+situation forces you to add more awful code on top of that, which is 
+clearly against "making Linux better".
 
-Robin.
+IMO, the current code deserves a huge cleanup before applying anything 
+new : cstate and lpi should be investigated to be self-contained in 
+their respective file and consolidated, the global variable usage should 
+be killed, redundant flag checking removed by recapturing the code flow, 
+etc ... I believe the usage of acpi probe table could be one entry point 
+to begin this cleanup.
 
-> 
-> Will
-> 
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
