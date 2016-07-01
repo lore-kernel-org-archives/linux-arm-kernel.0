@@ -1,37 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Jul 2016 16:23:40 +0100
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <57714bed-3f9c-90c2-ac30-2d462d8a06d4@linaro.org>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <5351858.jEb0qfTvrF@vostro.rjw.lan>
- <2f0e60e1-f429-2bd3-5f26-fd6199e64f34@linaro.org>
- <2435381.sM3CFAEXNR@vostro.rjw.lan>
- <57714bed-3f9c-90c2-ac30-2d462d8a06d4@linaro.org>
-Message-ID: <20160701152340.GO12735@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Jul 2016 16:25:15 +0100
+Subject: [PATCH 2/2] arm64: document that pending SErrors are not allowed
+ at kernel entry
+In-Reply-To: <1467385291-9880-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1467385291-9880-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160701152515.GB17071@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 09:48:02PM +0800, Hanjun Guo wrote:
-> On 2016/6/30 21:27, Rafael J. Wysocki wrote:
-> >On Thursday, June 30, 2016 10:10:02 AM Hanjun Guo wrote:
-> >>GTDT is part of ACPI spec, drivers/acpi/ is for driver code of
-> >>ACPI spec, I think it can stay in drivers/acpi/ from this point
-> >>of view, am I right?
-> >
-> >The question is not "Can it?", but "Does it need to?".
-> >
-> >It is in the spec, but still there's only one architecture needing it.
-> >
-> >There is no way to test it on any other architecture and no reason to build it
-> >for any other architecture, so why does it need to be located in drivers/acpi/ ?
+On Fri, Jul 01, 2016 at 05:01:31PM +0200, Ard Biesheuvel wrote:
+> Our current strategy to deal with pending SErrors at boot is to panic.
+> So let's mention in our boot protocol documentation that no SErrors
+> should be pending when handing over to the kernel.
 > 
-> I'm fine to move it to other places such as arch/arm64/kernel/, but I
-> would like to ask ARM64 maintainer's suggestion for this.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  Documentation/arm64/booting.txt | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> Will, Catalin, what's your opinion on this?
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index 8d0df62c3fe0..75dcfead1a0c 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -154,8 +154,9 @@ Before jumping into the kernel, the following conditions must be met:
+>    x3 = 0 (reserved for future use)
+>  
+>  - CPU mode
+> -  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
+> -  IRQ and FIQ).
+> +  All forms of exceptions must be masked in PSTATE.DAIF (Debug, SError,
+> +  IRQ and FIQ), and any pending SError exceptions must be taken by the
+> +  boot loader or firmware before handing over to the kernel.
 
-We don't have any device-tree code for the architected timer under
-arch/arm64, so I don't see why we should need anything for ACPI either.
+That can be read to mean that a loader should silently swallow SError,
+which isn't quite what we want (that no SError ever occurs). I don't
+have a better wording to suggest, unfortunately. :/
 
-Will
+As with patch 1, I'm not sure what this means for CPER and friends.
+
+Thanks,
+Mark.
+
+>    The CPU must be in either EL2 (RECOMMENDED in order to have access to
+>    the virtualisation extensions) or non-secure EL1.
+>  
+> -- 
+> 2.7.4
+> 
