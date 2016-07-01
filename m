@@ -1,141 +1,58 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 01 Jul 2016 12:32:42 +0200
-Subject: [PATCH v3 2/9] iommu/of: Consolidate device creation workarounds
-In-Reply-To: <dc8ac0f397ea5c90937fb5c9974e4ab02e264bd8.1467123945.git.robin.murphy@arm.com>
-References: <cover.1467123945.git.robin.murphy@arm.com>
- <dc8ac0f397ea5c90937fb5c9974e4ab02e264bd8.1467123945.git.robin.murphy@arm.com>
-Message-ID: <611b2a77-e7e8-e1e2-85b5-4f469f3ebdf4@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 Jul 2016 11:33:47 +0100
+Subject: [PATCH 4/7] bus: arm-cci: add missing of_node_put after calling
+ of_parse_phandle
+In-Reply-To: <57764626.4060800@arm.com>
+References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
+ <1467366121-14120-5-git-send-email-peter.chen@nxp.com>
+ <57764626.4060800@arm.com>
+Message-ID: <20160701103346.GF12735@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Fri, Jul 01, 2016 at 11:29:58AM +0100, Suzuki K Poulose wrote:
+> On 01/07/16 10:41, Peter Chen wrote:
+> >of_node_put needs to be called when the device node which is got
+> >from of_parse_phandle has finished using.
+> >
+> >Cc: Will Deacon <will.deacon@arm.com>
+> >Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> 
+> Thanks for the fix.
+> 
+> >---
+> >  drivers/bus/arm-cci.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> >diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> >index a49b283..e7b0b8c 100644
+> >--- a/drivers/bus/arm-cci.c
+> >+++ b/drivers/bus/arm-cci.c
+> >@@ -1912,9 +1912,12 @@ static int __cci_ace_get_port(struct device_node *dn, int type)
+> >  	cci_portn = of_parse_phandle(dn, "cci-control-port", 0);
+> >  	for (i = 0; i < nb_cci_ports; i++) {
+> >  		ace_match = ports[i].type == type;
+> >-		if (ace_match && cci_portn == ports[i].dn)
+> >+		if (ace_match && cci_portn == ports[i].dn) {
+> >+			of_node_put(cci_portn);
+> >  			return i;
+> >+		}
+> >  	}
+> >+	of_node_put(cci_portn);
+> 
+> nit: Could we please do some thing like this ?
+> 		if (ace_match && cci_portn == ports[i].dn)
+> 			break;
+> 	}
+> 
+> 	of_node_put(cci_portn);
+> 	return (i < nb_cci_ports) ? i : -ENODEV ;
+> 
+> Either way,
+> 
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
+Please route this via arm-soc once you've addressed Suzuki's comment.
 
-On 2016-06-28 17:48, Robin Murphy wrote:
-> So far, all the users of the generic of_xlate configuration mechanism
-> are resorting to explicit platform device creation to ensure the IOMMU
-> device is ready before anything tries to refer to it. As I'm about to
-> convert two more drivers that will need exactly the same thing, let's
-> nip that proliferation in the bud and move it to a single place.
->
-> A neat solution is to make of_get_iommu_ops() ensure an IOMMU device is
-> instantiated before giving out its associated ops, since it's a fairly
-> safe assumption that the ops aren't going to be much use if the IOMMU
-> can't or won't exist to back them up.
->
-> CC: Marek Szyprowski <m.szyprowski@samsung.com>
-> CC: Yong Wu <yong.wu@mediatek.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-
-Frankly, I would avoid moving this workaround to the iommu core. IMHO the
-best solution would be to let IOMMU controllers to be instantiated as normal
-devices and implement proper support in the device core for waiting for the
-iommu controller. Then the workaround can be removed from exynos and mtk
-iommu drivers. What's the status of IOMMU deferred probe patches?
-
-I've encountered a serious problems with current code (the one which
-instantiates iommu controller devices from iommu driver) and its integration
-with power domains, clocks and runtime pm, which were not possible to 
-resolve
-without iommu deferred probe.
-
-
-> ---
->
-> v3: New.
->
->   drivers/iommu/exynos-iommu.c | 20 +++++++-------------
->   drivers/iommu/mtk_iommu.c    |  8 +-------
->   drivers/iommu/of_iommu.c     |  6 +++++-
->   3 files changed, 13 insertions(+), 21 deletions(-)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 5ecc86cb74c8..97380ee56d71 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -665,6 +665,13 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->   
->   	pm_runtime_enable(dev);
->   
-> +	/*
-> +	 * use the first registered sysmmu device for performing
-> +	 * dma mapping operations on iommu page tables (cpu cache flush)
-> +	 */
-> +	if (!dma_dev)
-> +		dma_dev = dev;
-> +
->   	return 0;
->   }
->   
-> @@ -1341,22 +1348,9 @@ err_reg_driver:
->   
->   static int __init exynos_iommu_of_setup(struct device_node *np)
->   {
-> -	struct platform_device *pdev;
-> -
->   	if (!init_done)
->   		exynos_iommu_init();
->   
-> -	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-> -	if (IS_ERR(pdev))
-> -		return PTR_ERR(pdev);
-> -
-> -	/*
-> -	 * use the first registered sysmmu device for performing
-> -	 * dma mapping operations on iommu page tables (cpu cache flush)
-> -	 */
-> -	if (!dma_dev)
-> -		dma_dev = &pdev->dev;
-> -
->   	of_iommu_set_ops(np, &exynos_iommu_ops);
->   	return 0;
->   }
-> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> index c3043d8754e3..f7ae87abea99 100644
-> --- a/drivers/iommu/mtk_iommu.c
-> +++ b/drivers/iommu/mtk_iommu.c
-> @@ -724,14 +724,8 @@ static struct platform_driver mtk_iommu_driver = {
->   
->   static int mtk_iommu_init_fn(struct device_node *np)
->   {
-> -	int ret;
-> -	struct platform_device *pdev;
-> +	int ret = platform_driver_register(&mtk_iommu_driver);
->   
-> -	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-> -	if (!pdev)
-> -		return -ENOMEM;
-> -
-> -	ret = platform_driver_register(&mtk_iommu_driver);
->   	if (ret) {
->   		pr_err("%s: Failed to register driver\n", __func__);
->   		return ret;
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index af499aea0a1a..7e6369cffc95 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -22,6 +22,7 @@
->   #include <linux/limits.h>
->   #include <linux/of.h>
->   #include <linux/of_iommu.h>
-> +#include <linux/of_platform.h>
->   #include <linux/slab.h>
->   
->   static const struct of_device_id __iommu_of_table_sentinel
-> @@ -127,7 +128,10 @@ const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
->   	spin_lock(&of_iommu_lock);
->   	list_for_each_entry(node, &of_iommu_list, list)
->   		if (node->np == np) {
-> -			ops = node->ops;
-> +			if (of_node_check_flag(np, OF_POPULATED) ||
-> +			    of_platform_device_create(np, NULL,
-> +					    platform_bus_type.dev_root))
-> +				ops = node->ops;
->   			break;
->   		}
->   	spin_unlock(&of_iommu_lock);
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Will
