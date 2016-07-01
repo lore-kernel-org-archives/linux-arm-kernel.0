@@ -1,249 +1,100 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 30 Jun 2016 17:42:39 -0700
-Subject: [PATCH] ARM: brcmstb: Add earlyprintk support using run-time checks
-Message-ID: <1467333764-2900-1-git-send-email-f.fainelli@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 30 Jun 2016 19:47:32 -0500
+Subject: [linux-sunxi] Re: [PATCH] mmc: pwrseq-simple: Add an optional
+ post-power-on-delay
+In-Reply-To: <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
+References: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqJ0XVJb=Q9FT8g_OUTbgZWr-E58xQS0iCR4hv-9EHCcPA@mail.gmail.com>
+ <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
+Message-ID: <20160701004732.GA20831@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SUN_TOP_CTRL_FAMILY_ID is at a fixed absolute address for all of our supported
-chips, so utilize its value to determine what the UARTA base address should be.
+On Thu, Jun 23, 2016 at 11:33:27AM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 23-06-16 00:25, Rob Herring wrote:
+> >On Wed, Jun 22, 2016 at 12:59 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> >>Some devices need a while to boot their firmware after providing clks /
+> >>de-asserting resets before they are ready to receive sdio commands.
+> >>
+> >>This commits adds a post-power-on-delay-ms devicetree property to
+> >>mmc-pwrseq-simple for use with such devices.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >> Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+> >> drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
+> >> 2 files changed, 11 insertions(+)
+> >>
+> >>diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+> >>index ce0e767..e254368 100644
+> >>--- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+> >>+++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+> >>@@ -16,6 +16,8 @@ Optional properties:
+> >>   See ../clocks/clock-bindings.txt for details.
+> >> - clock-names : Must include the following entry:
+> >>   "ext_clock" (External clock provided to the card).
+> >>+- post-power-on-delay-ms : Delay in ms after powering the card and
+> >>+       de-asserting the reset-gpios (if any)
+> >
+> >Presumably you need this delay post any reset, not just after power on
+> 
+> mmc-pwrseq is only about doing power-on / off, not about providing
+> reset functionality.
 
-Since the code is called both during decompressor when the MMU is off, and
-after the MMU has been turned on, and we want to do the lookup only
-once, we use the same technique as tegra.S and have a shared storage
-location between the decompressor and the kernel.
+Yes, but the property (e.g. the delay) is relevant for both and reset is 
+part of the power seq.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/Kconfig.debug           |   7 +-
- arch/arm/include/debug/brcmstb.S | 145 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-bcm/brcmstb.c      |  16 +++++
- 3 files changed, 163 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/include/debug/brcmstb.S
+> >if you are waiting for firmware to boot. So the name is not all that
+> >clear. How about a "reset-timing-ms" property that takes 3 values for
+> >pre-assert time (normally 0), assertion time, post assert time. Of
+> >course, I can still think of ways that breaks like when in this
+> >sequence do clocks need to be turned on.
+> 
+> If you look at bindings/mmc/mmc-pwrseq-simple.txt out side of
+> the diff context it contains:
+> 
+> - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+>         at initialization and prior we start the power up procedure of the card.
+>         They will be de-asserted right after the power has been provided to the
+>         card.
+> - clocks : Must contain an entry for the entry in clock-names.
+>   See ../clocks/clock-bindings.txt for details.
+> - clock-names : Must include the following entry:
+>   "ext_clock" (External clock provided to the card).
+> 
+> Notice how the existing docs talk about a power-up procedure (which matches
+> the pwrseq name and purpose of these bindings).
+> 
+> I actually started with calling the property "post-reset-delay-ms", but then
+> I realized that what we really want is the ability to specify a time to
+> wait (for e.g. firmware to boot) after completing the power-up procedure
+> (and before starting the probe). The power-up procedure currently can
+> also includes enabling external clocks to the sdio device (if any) and
+> enabling regulators, so having a "reset-timing-ms" property does not
+> seem right, as that would suggest it is ok to do the wait after deasserting
+> reset, but before e.g. enabling external clocks. Where what we really
+> want is to enable all necessary resources (or iow complete the powerup
+> procedure) and then wait.
+> 
+> You're right that in some cases more complicated timings may be necessary,
+> but that can get really complicated like e.g.: enable regulator1, wait 10 ms,
+> enable regulator2, wait 15ms, enable external clock1, ...
+> 
+> And such complex timings fall outside of the scope of the mmc-pwrseq-simple
+> binding, the idea being that for complex cases we do a device specific
+> pwrseq binding, and then the smarts are in implementation of that specific
+> pwrseq driver. As you've said yourself before we do not want to turn
+> devicetree into a scripting language.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 19a3dcf5eb2e..260a973ab87d 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -168,7 +168,6 @@ choice
- 	config DEBUG_BRCMSTB_UART
- 		bool "Use BRCMSTB UART for low-level debug"
- 		depends on ARCH_BRCMSTB
--		select DEBUG_UART_8250
- 		help
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to the first serial port on these devices.
-@@ -1408,6 +1407,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
- 	default "debug/bcm63xx.S" if DEBUG_BCM63XX_UART
- 	default "debug/digicolor.S" if DEBUG_DIGICOLOR_UA0
-+	default "debug/brcmstb.S" if DEBUG_BRCMSTB_UART
- 	default "mach/debug-macro.S"
- 
- # Compatibility options for PL01x
-@@ -1498,7 +1498,6 @@ config DEBUG_UART_PHYS
- 	default 0xe6e60000 if DEBUG_RCAR_GEN2_SCIF0
- 	default 0xe8008000 if DEBUG_R7S72100_SCIF2
- 	default 0xf0000be0 if ARCH_EBSA110
--	default 0xf040ab00 if DEBUG_BRCMSTB_UART
- 	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
- 	default 0xf1012100 if DEBUG_MVEBU_UART1_ALTERNATE
- 	default 0xf7fc9000 if DEBUG_BERLIN_UART
-@@ -1574,7 +1573,6 @@ config DEBUG_UART_VIRT
- 	default 0xfb002000 if DEBUG_CNS3XXX
- 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
- 	default 0xfb10c000 if DEBUG_REALVIEW_PB1176_PORT
--	default 0xfc40ab00 if DEBUG_BRCMSTB_UART
- 	default 0xfc705000 if DEBUG_ZTE_ZX
- 	default 0xfcfe8600 if DEBUG_BCM63XX_UART
- 	default 0xfd000000 if DEBUG_SPEAR3XX || DEBUG_SPEAR13XX
-@@ -1646,8 +1644,7 @@ config DEBUG_UART_8250_WORD
- 		DEBUG_ALPINE_UART0 || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
- 		DEBUG_DAVINCI_DA8XX_UART2 || \
--		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
--		DEBUG_BRCMSTB_UART
-+		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
- 
- config DEBUG_UART_8250_PALMCHIP
- 	bool "8250 UART is Palmchip BK-310x"
-diff --git a/arch/arm/include/debug/brcmstb.S b/arch/arm/include/debug/brcmstb.S
-new file mode 100644
-index 000000000000..bb27ef349a04
---- /dev/null
-+++ b/arch/arm/include/debug/brcmstb.S
-@@ -0,0 +1,145 @@
-+/*
-+ * Copyright (C) 2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/serial_reg.h>
-+
-+/* Physical register offset and virtual register offset */
-+#define REG_PHYS_BASE		0xf0000000
-+#define REG_VIRT_BASE		0xfc000000
-+#define REG_PHYS_ADDR(x)	((x) + REG_PHYS_BASE)
-+
-+/* Product id can be read from here */
-+#define SUN_TOP_CTRL_BASE	REG_PHYS_ADDR(0x404000)
-+
-+#define UARTA_3390		REG_PHYS_ADDR(0x40a900)
-+#define UARTA_7250		REG_PHYS_ADDR(0x40b400)
-+#define UARTA_7268		REG_PHYS_ADDR(0x40c000)
-+#define UARTA_7271		UARTA_7268
-+#define UARTA_7364		REG_PHYS_ADDR(0x40b000)
-+#define UARTA_7366		UARTA_7364
-+#define UARTA_74371		REG_PHYS_ADDR(0x406b00)
-+#define UARTA_7439		REG_PHYS_ADDR(0x40a900)
-+#define UARTA_7445		REG_PHYS_ADDR(0x40ab00)
-+
-+#define UART_SHIFT		2
-+
-+#define checkuart(rp, rv, family_id, family) \
-+		/* Load family id */ \
-+		ldr	rp, =family_id ; \
-+		/* Compare SUN_TOP_CTRL value against it */ \
-+		cmp	rp, rv ; \
-+		/* Passed test, load address */ \
-+		ldreq	rp, =UARTA_##family ; \
-+		/* Jump to save UART address */ \
-+		beq	91f
-+
-+		.macro  addruart, rp, rv, tmp
-+		adr	\rp, 99f		@ actual addr of 99f
-+		ldr	\rv, [\rp]		@ linked addr is stored there
-+		sub	\rv, \rv, \rp		@ offset between the two
-+		ldr	\rp, [\rp, #4]		@ linked brcmstb_uart_config
-+		sub	\tmp, \rp, \rv		@ actual brcmstb_uart_config
-+		ldr	\rp, [\tmp]		@ Load brcmstb_uart_config
-+		cmp	\rp, #1			@ needs initialization?
-+		bne	100f			@ no; go load the addresses
-+		mov	\rv, #0			@ yes; record init is done
-+		str	\rv, [\tmp]
-+
-+		/* Check SUN_TOP_CTRL base */
-+		ldr	\rp, =SUN_TOP_CTRL_BASE	@ load SUN_TOP_CTRL PA
-+		ldr	\rv, [\rp, #0]		@ get register contents
-+		and	\rv, \rv, #0xffffff00	@ strip revision bits [7:0]
-+
-+		/* Chip specific detection starts here */
-+20:		checkuart(\rp, \rv, 0x33900000, 3390)
-+21:		checkuart(\rp, \rv, 0x72500000, 7250)
-+22:		checkuart(\rp, \rv, 0x72680000, 7268)
-+23:		checkuart(\rp, \rv, 0x72710000, 7271)
-+24:		checkuart(\rp, \rv, 0x73640000, 7364)
-+25:		checkuart(\rp, \rv, 0x73660000, 7366)
-+26:		checkuart(\rp, \rv, 0x07437100, 74371)
-+27:		checkuart(\rp, \rv, 0x74390000, 7439)
-+28:		checkuart(\rp, \rv, 0x74450000, 7445)
-+
-+		/* No valid UART found */
-+90:		mov	\rp, #0
-+		/* fall through */
-+
-+		/* Record whichever UART we chose */
-+91:		str	\rp, [\tmp, #4]		@ Store in brcmstb_uart_phys
-+		cmp	\rp, #0			@ Valid UART address?
-+		bne	92f			@ Yes, go process it
-+		str	\rp, [\tmp, #8]		@ Store 0 in brcmstb_uart_virt
-+		b	100f			@ Done
-+92:		and	\rv, \rp, #0xffffff	@ offset within 1MB section
-+		add	\rv, \rv, #REG_VIRT_BASE
-+		str	\rv, [\tmp, #8]		@ Store in brcmstb_uart_virt
-+		b	100f
-+
-+		.align
-+99:		.word	.
-+		.word	brcmstb_uart_config
-+		.ltorg
-+
-+		/* Load previously selected UART address */
-+100:		ldr	\rp, [\tmp, #4]		@ Load brcmstb_uart_phys
-+		ldr	\rv, [\tmp, #8]		@ Load brcmstb_uart_virt
-+		.endm
-+
-+		.macro	store, rd, rx:vararg
-+		str	\rd, \rx
-+		.endm
-+
-+		.macro	load, rd, rx:vararg
-+		ldr	\rd, \rx
-+		.endm
-+
-+		.macro	senduart,rd,rx
-+		store	\rd, [\rx, #UART_TX << UART_SHIFT]
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+1002:		load	\rd, [\rx, #UART_LSR << UART_SHIFT]
-+		and	\rd, \rd, #UART_LSR_TEMT | UART_LSR_THRE
-+		teq	\rd, #UART_LSR_TEMT | UART_LSR_THRE
-+		bne	1002b
-+		.endm
-+
-+		.macro	waituart,rd,rx
-+		.endm
-+
-+/*
-+ * Storage for the state maintained by the macros above.
-+ *
-+ * In the kernel proper, this data is located in arch/arm/mach-bcm/brcmstb.c.
-+ * That's because this header is included from multiple files, and we only
-+ * want a single copy of the data. In particular, the UART probing code above
-+ * assumes it's running using physical addresses. This is true when this file
-+ * is included from head.o, but not when included from debug.o. So we need
-+ * to share the probe results between the two copies, rather than having
-+ * to re-run the probing again later.
-+ *
-+ * In the decompressor, we put the symbol/storage right here, since common.c
-+ * isn't included in the decompressor build. This symbol gets put in .text
-+ * even though it's really data, since .data is discarded from the
-+ * decompressor. Luckily, .text is writeable in the decompressor, unless
-+ * CONFIG_ZBOOT_ROM. That dependency is handled in arch/arm/Kconfig.debug.
-+ */
-+#if defined(ZIMAGE)
-+brcmstb_uart_config:
-+	/* Debug UART initialization required */
-+	.word 1
-+	/* Debug UART physical address */
-+	.word 0
-+	/* Debug UART virtual address */
-+	.word 0
-+#endif
-diff --git a/arch/arm/mach-bcm/brcmstb.c b/arch/arm/mach-bcm/brcmstb.c
-index 99a67cfb7c0d..07e3a86c6466 100644
---- a/arch/arm/mach-bcm/brcmstb.c
-+++ b/arch/arm/mach-bcm/brcmstb.c
-@@ -19,6 +19,22 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+/*
-+ * Storage for debug-macro.S's state.
-+ *
-+ * This must be in .data not .bss so that it gets initialized each time the
-+ * kernel is loaded. The data is declared here rather than debug-macro.S so
-+ * that multiple inclusions of debug-macro.S point at the same data.
-+ */
-+u32 brcmstb_uart_config[3] = {
-+	/* Debug UART initialization required */
-+	1,
-+	/* Debug UART physical address */
-+	0,
-+	/* Debug UART virtual address */
-+	0,
-+};
-+
- static void __init brcmstb_init_irq(void)
- {
- 	irqchip_init();
--- 
-2.7.4
+Exactly. The challenge is any single property is hard to push back on 
+that we've crossed that line. I don't want to see this expanded one 
+property at a time without any foresight on additional needs. If we can 
+add a property that is more flexible, but doesn't add to the complexity 
+then that would be better. So this one alone is fine, but the next one 
+I'll be less receptive.
+
+Rob
+
+P.S. I'm on vacation ATM, so I'll be slow responding.
