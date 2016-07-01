@@ -1,61 +1,39 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri, 1 Jul 2016 11:17:25 -0400
-Subject: [PATCH 6/7] dt-bindings: net: bgmac: add bindings documentation
- for bgmac
-In-Reply-To: <29091648.CIZSyGWL7u@wuerfel>
-References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
- <1467327554-22074-7-git-send-email-jon.mason@broadcom.com>
- <29091648.CIZSyGWL7u@wuerfel>
-Message-ID: <CAC3K-4qfb3JQ3i8nEo2AOobb1ExB=d=dSZUrdype+z9eHi1FwQ@mail.gmail.com>
+Date: Fri, 1 Jul 2016 11:21:34 -0400
+Subject: [PATCH] ARM: debug: Enable DEBUG_BCM_5301X for Northstar Plus SoCs
+In-Reply-To: <1467331810-929-1-git-send-email-f.fainelli@gmail.com>
+References: <1467331810-929-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <CAC3K-4p0wwArVUefsC9ku=tBVz8sdLpBkrgagfYKXGCOZayKXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 1, 2016 at 5:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday, June 30, 2016 6:59:13 PM CEST Jon Mason wrote:
->> +
->> +Required properties:
->> + - compatible: "brcm,bgmac-nsp"
->> + - reg:                Address and length of the GMAC registers,
->> +               Address and length of the GMAC IDM registers
->> + - reg-names:  Names of the registers.  Must have both "gmac_base" and
->> +               "idm_base"
->> + - interrupts: Interrupt number
->> +
+On Thu, Jun 30, 2016 at 8:10 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Northstar Plus SoCs (ARCH_BCM_NSP) have the exact same UART location and
+> properties like the register shift of 0, so make it usable.
 >
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+
+Acked-by: Jon Mason <jon.mason@broadcom.com>
+
+> ---
+>  arch/arm/Kconfig.debug | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> "brcm,bgmac-nsp" sounds a bit too general. As I understand, this is a family
-> of SoCs that might not all have the exact same implementation of this
-> ethernet device, as we can see from the long lookup table in bgmac_probe().
-
-The Broadcom iProc family of SoCs contains:
-Northstar
-Northstar Plus
-Cygnus
-Northstar 2
-a few SoCs that are under development
-and a number of ethernet switches (which might never be officially supported)
-
-Each one of these SoCs could have a different revision of the gmac IP
-block, but they should be uniform within each SoC (though there might
-be a A0/B0 change necessary).  The Northstar Plus product family has a
-number of different implementations, but the SoC is unchanged.  So, I
-think this might be too specific, when we really need a general compat
-string.
-
-Broadcom has a history of sharing IP blocks amongst the different
-divisions.  So, this driver might be used on other SoC families (as it
-apparently has been done in the past, based on the code you
-reference).  I do not know of any way to know what legacy, non-iProc
-chips have used this IP block.  I can make this "brcm,iproc-bgmac",
-and add "brcm,iproc-nsp-bgmac" as an alternative compatible string in
-this file (which I believe you are suggesting), but there might be
-non-iProc SoCs that use this driver.  Is this acceptable?
-
-Thanks,
-Jon
-
-> Please document the specific product numbers here that are publically
-> known already. Having the driver match just on "brcm,bgmac-nsp" as a fallback
-> is fine, so you can document that one as required for all users.
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 19a3dcf5eb2e..6912f4fbbe80 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -138,8 +138,8 @@ choice
+>                 select DEBUG_UART_PL01X
 >
->         Arnd
+>         config DEBUG_BCM_5301X
+> -               bool "Kernel low-level debugging on BCM5301X UART1"
+> -               depends on ARCH_BCM_5301X
+> +               bool "Kernel low-level debugging on BCM5301X/NSP UART1"
+> +               depends on ARCH_BCM_5301X || ARCH_BCM_NSP
+>                 select DEBUG_UART_8250
+>
+>         config DEBUG_BCM_KONA_UART
+> --
+> 2.7.4
+>
