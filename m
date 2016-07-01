@@ -1,43 +1,32 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Fri, 1 Jul 2016 16:31:58 +0200
-Subject: STi SoC changes for v4.8
-Message-ID: <57767EDE.8050708@st.com>
+From: olivier.schonken@gmail.com (Olivier Schonken)
+Date: Fri,  1 Jul 2016 16:33:39 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d2: add PMU node
+Message-ID: <1467383619-6805-1-git-send-email-olivier.schonken@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+Add node to support SAMA5D2 Performance Monitor Unit.
 
-Please consider this first round of STi SoC updates for v4.8:
+Signed-off-by: Olivier Schonken <olivier.schonken@gmail.com>
+---
+ arch/arm/boot/dts/sama5d2.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-The following changes since commit 4c2e07c6a29e0129e975727b9f57eede813eea85:
-
-   Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
-sti-soc_for_v4.8
-
-for you to fetch changes up to 55aa35180c57d82f3db23e5aabce97acb0d36681:
-
-   ARM: sti: Implement dummy L2 cache's write_sec (2016-07-01 16:23:44 
-+0200)
-----------------------------------------------------------------
-
-Highlights:
------------
-_ add a dummy L2 cache's write_sec callback as in non secure mode execution,
-   we can't get access to L2 cache secure registers
-_ cosmetics change, in case of dump_stack, update the hardware name with a
-   more genericfor the STi SoCs family
-
-
-----------------------------------------------------------------
-Patrice Chotard (1):
-       ARM: sti: Implement dummy L2 cache's write_sec
-
-Peter Griffin (1):
-       ARM: STi: Update machine _namestr to be more generic.
-
-  arch/arm/mach-sti/board-dt.c | 11 ++++++++++-
-  1 file changed, 10 insertions(+), 1 deletion(-)
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 2827e7a..5d63206 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -72,6 +72,11 @@
+ 		};
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a5-pmu";
++		interrupts = <2 IRQ_TYPE_LEVEL_HIGH 0>;
++	};
++
+ 	memory {
+ 		reg = <0x20000000 0x20000000>;
+ 	};
+-- 
+1.9.1
