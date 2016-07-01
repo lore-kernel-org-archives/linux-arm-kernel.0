@@ -1,94 +1,242 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 1 Jul 2016 11:20:52 +0800
-Subject: [PATCH 12/21] usb: chipidea: msm: Keep device runtime enabled
-In-Reply-To: <146731865461.12823.6532384101517870130@sboyd-linaro>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <20160626072838.28082-13-stephen.boyd@linaro.org>
- <20160629064600.GG25236@shlinux2>
- <146724741028.16253.4741331543289283958@sboyd-linaro>
- <20160630013901.GC19928@shlinux2>
- <146731865461.12823.6532384101517870130@sboyd-linaro>
-Message-ID: <20160701032052.GG18426@shlinux2>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri,  1 Jul 2016 12:32:55 +0800
+Subject: [PATCH v2] arm64: dts: rockchip: add the power domain node for rk3399
+Message-ID: <1467347575-11806-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 01:30:54PM -0700, Stephen Boyd wrote:
-> Quoting Peter Chen (2016-06-29 18:39:01)
-> > On Wed, Jun 29, 2016 at 05:43:30PM -0700, Stephen Boyd wrote:
-> > > Quoting Peter Chen (2016-06-28 23:46:00)
-> > > > On Sun, Jun 26, 2016 at 12:28:29AM -0700, Stephen Boyd wrote:
-> > > > > Sometimes the usb wrapper device is part of a power domain that
-> > > > > needs to stay on as long as the device is active. Let's get and
-> > > > > put the device in driver probe/remove so that we keep the power
-> > > > > domain powered as long as the device is attached. We can fine
-> > > > > tune this later to handle wakeup interrupts, etc. for finer grain
-> > > > > power management later, but this is necessary to make sure we can
-> > > > > keep accessing the device right now.
-> > > > 
-> > > > Since some of the controllers work abnormal if we enables runtime
-> > > > pm unconditionally, so I use one system flag CI_HDRC_SUPPORTS_RUNTIME_PM
-> > > > for it. I can't understand why you can't access device without enable
-> > > > parent's runtime pm, the controller will not enter runtime suspend
-> > > > without that flag.
-> > > 
-> > > Correct, the child device of ci_hdrc_msm will be able to do runtime PM
-> > > and keep the parent enabled if the CI_HDRC_SUPPORTS_RUNTIME_PM flag is
-> > > set. But even if that flag isn't set, the ci_hdrc_msm driver is calling
-> > > pm_runtime_enable() on the same device that it would be called on if the
-> > > CI_HDRC_SUPPORTS_RUNTIME_PM flag was set. That allows runtime PM
-> > > transition of child devices such as the usb ports (usb1-port1 for
-> > > example) to propagate up all the way to the ci_hdrc_msm device and
-> > > disable any attached power domains.
-> > 
-> > Sorry, I can't get you.
-> > 
-> > If the chipidea core's runtime is disabled, the port under the
-> > controller will not be in runtime suspended, only the bus will
-> > be in suspended due to USB core enables runtime PM by default.
-> 
-> Hmm sorry, I was confused too.
-> 
-> From what I can tell, if I don't call pm_runtime_set_active() on the
-> glue device, it will runtime suspend once I call pm_runtime_enable() on
-> it (which we do in ci_hdrc_mms_probe()). When we runtime suspend the
-> glue device, we turn off the power domain associated with it too. The
-> runtime pm enabled state of the core device doesn't seem to matter
-> either way here. So perhaps I should be calling pm_runtime_set_active()
-> before pm_runtime_enable() there instead of doing the get/put? It isn't
-> clear to me when we should be calling pm_runtime_get() vs.
-> pm_runtime_set_active() though.
-> 
-> > 
-> > > 
-> > > Why don't we call runtime PM functions on the ci->dev for all cases of
-> > > ci->supports_runtime_pm? It seems like the glue drivers should be
-> > > managing their own device power states and the ci->dev should be managed
-> > > by core.c code.
-> > > 
-> > 
-> > This is current design. Chipidea core manages portsc.phcd and PHY's PM
-> > (through PHY's API), and glue layer manages its own clocks on the system
-> > bus for register visit (and data transfer if necessary).
-> > 
-> 
-> Sorry, I mean this code in core.c
-> 
-> 	pm_runtime_set_active(&pdev->dev);
-> 	pm_runtime_enable(&pdev->dev);
->        	pm_runtime_set_autosuspend_delay(&pdev->dev, 2000);
->        	pm_runtime_mark_last_busy(ci->dev);
->        	pm_runtime_use_autosuspend(&pdev->dev);
-> 
-> which confused me. I thought pdev->dev was the glue device, but it's the
-> same as ci->dev, the core device. I get it now, but I'd like to change
-> all the calls there to use ci->dev to be clearer.
+From: Elaine Zhang <zhangqing@rock-chips.com>
 
-Yes, please do it.
+In order to meet low power requirements, a power management unit (PMU) is
+designed for controlling power resources in RK3399. The RK3399 PMU is
+dedicated for managing the power of the whole chip.
 
-Glue device is the parent for core device, and at core.c, only ci_hdrc_add_device and
-ci_get_platdata will touch glue device.
+1. add pd node for RK3399 Soc
+2. create power domain tree
+3. add qos node for domain
 
+>From the DT/binds and driver can get more detail information:
+The driver:
+        drivers/soc/rockchip/pm_domains.c
+The document:
+        Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+---
+
+Changes in v2:
+- As Doug/Heiko commnets on https://patchwork.kernel.org/patch/9206415/.
+  drop the debugfs-dump and Add the comments for alphabetical order.
+
+Note: As the TRM lists many voltage domains and power domains, then
+in actual we just need control some domains for driver.
+Due to some domains (e.g. emmc, usb, core)...We can't turn off it on
+bootup.
+
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: Heiko Stuebner <heiko@sntech.de>
+
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 179 +++++++++++++++++++++++++++++++
+ 1 file changed, 179 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index a6dd623..103e185 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -45,6 +45,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
++#include <dt-bindings/power/rk3399-power.h>
+ #include <dt-bindings/thermal/thermal.h>
+ 
+ / {
+@@ -594,6 +595,184 @@
+ 		status = "disabled";
+ 	};
+ 
++	qos_hdcp: qos_hdcp at ffa90000 {
++		compatible = "syscon";
++		reg = <0x0 0xffa90000 0x0 0x20>;
++	};
++
++	qos_iep: qos_iep at ffa98000 {
++		compatible = "syscon";
++		reg = <0x0 0xffa98000 0x0 0x20>;
++	};
++
++	qos_isp0_m0: qos_isp0_m0 at ffaa0000 {
++		compatible = "syscon";
++		reg = <0x0 0xffaa0000 0x0 0x20>;
++	};
++
++	qos_isp0_m1: qos_isp0_m1 at ffaa0080 {
++		compatible = "syscon";
++		reg = <0x0 0xffaa0080 0x0 0x20>;
++	};
++
++	qos_isp1_m0: qos_isp1_m0 at ffaa8000 {
++		compatible = "syscon";
++		reg = <0x0 0xffaa8000 0x0 0x20>;
++	};
++
++	qos_isp1_m1: qos_isp1_m1 at ffaa8080 {
++		compatible = "syscon";
++		reg = <0x0 0xffaa8080 0x0 0x20>;
++	};
++
++	qos_rga_r: qos_rga_r at ffab0000 {
++		compatible = "syscon";
++		reg = <0x0 0xffab0000 0x0 0x20>;
++	};
++
++	qos_rga_w: qos_rga_w at ffab0080 {
++		compatible = "syscon";
++		reg = <0x0 0xffab0080 0x0 0x20>;
++	};
++
++	qos_video_m0: qos_video_m0 at ffab8000 {
++		compatible = "syscon";
++		reg = <0x0 0xffab8000 0x0 0x20>;
++	};
++
++	qos_video_m1_r: qos_video_m1_r at ffac0000 {
++		compatible = "syscon";
++		reg = <0x0 0xffac0000 0x0 0x20>;
++	};
++
++	qos_video_m1_w: qos_video_m1_w at ffac0080 {
++		compatible = "syscon";
++		reg = <0x0 0xffac0080 0x0 0x20>;
++	};
++
++	qos_vop_big_r: qos_vop_big_r at ffac8000 {
++		compatible = "syscon";
++		reg = <0x0 0xffac8000 0x0 0x20>;
++	};
++
++	qos_vop_big_w: qos_vop_big_w at ffac8080 {
++		compatible = "syscon";
++		reg = <0x0 0xffac8080 0x0 0x20>;
++	};
++
++	qos_vop_little: qos_vop_little at ffad0000 {
++		compatible = "syscon";
++		reg = <0x0 0xffad0000 0x0 0x20>;
++	};
++
++	qos_gpu: qos_gpu at ffae0000 {
++		compatible = "syscon";
++		reg = <0x0 0xffae0000 0x0 0x20>;
++	};
++
++	pmu: power-management at ff310000 {
++		compatible = "rockchip,rk3399-pmu", "syscon", "simple-mfd";
++		reg = <0x0 0xff310000 0x0 0x1000>;
++
++		/*
++		 * Note: RK3399 supports 6 voltage domains including VD_CORE_L,
++		 * VD_CORE_B, VD_CENTER, VD_GPU, VD_LOGIC and VD_PMU.
++		 * Some of the power domains are grouped together for every
++		 * voltage domain.
++		 * The detail contents as below.
++		 */
++		power: power-controller {
++			status = "okay";
++			compatible = "rockchip,rk3399-power-controller";
++			#power-domain-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* These power domains are grouped by VD_LOGIC */
++			pd_vio at RK3399_PD_VIO {
++				reg = <RK3399_PD_VIO>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				pd_isp0 at RK3399_PD_ISP0 {
++					reg = <RK3399_PD_ISP0>;
++					clocks = <&cru ACLK_ISP0>,
++						 <&cru HCLK_ISP0>;
++					pm_qos = <&qos_isp0_m0>,
++						 <&qos_isp0_m1>;
++				};
++				pd_isp1 at RK3399_PD_ISP1 {
++					reg = <RK3399_PD_ISP1>;
++					clocks = <&cru ACLK_ISP1>,
++						 <&cru HCLK_ISP1>;
++					pm_qos = <&qos_isp1_m0>,
++						 <&qos_isp1_m1>;
++				};
++				pd_vo at RK3399_PD_VO {
++					reg = <RK3399_PD_VO>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					pd_vopb at RK3399_PD_VOPB {
++						reg = <RK3399_PD_VOPB>;
++						clocks = <&cru ACLK_VOP0>,
++							 <&cru HCLK_VOP0>;
++						pm_qos = <&qos_vop_big_r>,
++							 <&qos_vop_big_w>;
++					};
++					pd_vopl at RK3399_PD_VOP {
++						reg = <RK3399_PD_VOPL>;
++						clocks = <&cru ACLK_VOP1>,
++							 <&cru HCLK_VOP1>;
++						pm_qos = <&qos_vop_little>;
++					};
++				};
++				pd_hdcp at RK3399_PD_HDCP {
++					reg = <RK3399_PD_HDCP>;
++					clocks = <&cru ACLK_HDCP>,
++						 <&cru HCLK_HDCP>,
++						 <&cru PCLK_HDCP>;
++					pm_qos = <&qos_hdcp>;
++				};
++			};
++
++			/* These power domains are grouped by VD_CENTER */
++			pd_vcodec at RK3399_PD_VCODEC {
++				reg = <RK3399_PD_VCODEC>;
++				clocks = <&cru ACLK_VCODEC>,
++					 <&cru HCLK_VCODEC>;
++				pm_qos = <&qos_video_m0>;
++			};
++			pd_vdu at RK3399_PD_VDU {
++				reg = <RK3399_PD_VDU>;
++				clocks = <&cru ACLK_VDU>,
++					 <&cru HCLK_VDU>;
++				pm_qos = <&qos_video_m1_r>,
++					 <&qos_video_m1_w>;
++			};
++			pd_rga at RK3399_PD_RGA {
++				reg = <RK3399_PD_RGA>;
++				clocks = <&cru ACLK_RGA>,
++					 <&cru HCLK_RGA>;
++				pm_qos = <&qos_rga_r>,
++					 <&qos_rga_w>;
++			};
++			pd_iep at RK3399_PD_IE {
++				reg = <RK3399_PD_IEP>;
++				clocks = <&cru ACLK_IEP>,
++					 <&cru HCLK_IEP>;
++				pm_qos = <&qos_iep>;
++			};
++
++			/* These power domains are grouped by VD_GPU */
++			pd_gpu at RK3399_PD_GPU {
++				reg = <RK3399_PD_GPU>;
++				clocks = <&cru ACLK_GPU>;
++				pm_qos = <&qos_gpu>;
++			};
++		};
++	};
++
+ 	pmugrf: syscon at ff320000 {
+ 		compatible = "rockchip,rk3399-pmugrf", "syscon", "simple-mfd";
+ 		reg = <0x0 0xff320000 0x0 0x1000>;
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
