@@ -1,106 +1,52 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 1 Jul 2016 16:37:09 +0900
-Subject: [PATCH v20 13/14] arm64: kdump: update a kernel doc
-In-Reply-To: <20160630090045.GA16958@x1.redhat.com>
-References: <cover.1466702804.git.geoff@infradead.org>
- <ef07d5dafe5c69b621dc4ec01ef1c6f3f9753e60.1466702804.git.geoff@infradead.org>
- <20160630090045.GA16958@x1.redhat.com>
-Message-ID: <20160701073707.GM20774@linaro.org>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri,  1 Jul 2016 15:36:08 +0800
+Subject: [PATCH 0/2] arm64: dts: rockchip: Support PMU for rk3399 SoCs
+Message-ID: <1467358570-24417-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave, Boaquan,
+Hello Heiko, Marc & ARM guys
 
-Thank you for your reviewing.
+When Jay first submitted the rk3399.dtsi upstream
+<https://patchwork.kernel.org/patch/8885821/> he had the PMU node in there,
+but then took it out because the upstream binding wasn't done yet.
+It looks as if the upstream stuff has landed, since in linux/master I see:
+287e9357abcc DT/arm,gic-v3: Documment PPI partition support
+e3825ba1af3a irqchip/gic-v3: Add support for partitioned PPIs
+9e2c986cb460 irqchip: Add per-cpu interrupt partitioning library
+222df54fd8b7 genirq: Allow the affinity of a percpu interrupt to be set/retrieved
+651e8b54abde irqdomain: Allow domain matching on irq_fwspec
 
-On Thu, Jun 30, 2016 at 05:00:45PM +0800, Baoquan He wrote:
-> On 06/23/16 at 05:54pm, Geoff Levand wrote:
-> > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > 
-> > This patch adds arch specific descriptions about kdump usage on arm64
-> > to kdump.txt.
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > ---
-> >  Documentation/kdump/kdump.txt | 15 ++++++++++++++-
-> >  1 file changed, 14 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> > index 88ff63d..5d6da09 100644
-> > --- a/Documentation/kdump/kdump.txt
-> > +++ b/Documentation/kdump/kdump.txt
-> > @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
-> >  a remote system.
-> >  
-> >  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> > -s390x and arm architectures.
-> > +s390x, arm and arm64 architectures.
-> >  
-> >  When the system kernel boots, it reserves a small section of memory for
-> >  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> > @@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
-> >  
-> >      AUTO_ZRELADDR=y
-> >  
-> > +Dump-capture kernel config options (Arch Dependent, arm64)
-> > +----------------------------------------------------------
-> > +
-> > +1) Currently, kvm will not be enabled on the dump-capture kernel even
-> > +   if it is configured.
-> > +
-> >  Extended crashkernel syntax
-> >  ===========================
-> >  
-> > @@ -305,6 +311,8 @@ Boot into System Kernel
-> >     kernel will automatically locate the crash kernel image within the
-> >     first 512MB of RAM if X is not given.
-> >  
-> > +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-> 				  ~ Why square brackets here, is it
-> different than other arch?
+This series patches add to support the rk3399 SoCs PMU.
+As my do some tests with ChromeOs for my rk3399 board.
 
-I want to clearly indicate that "@X" is optional, and that, when you explicitly
-specify it, X must be properly aligned.
-I think that "[..]" notation is quite common.
+TEST=$perf list |grep Hardware
+cpu-cycles OR cycles                               [Hardware event]
+instructions                                       [Hardware event]
+cache-references                                   [Hardware event]
+branch-instructions OR branches                    [Hardware event]
+branch-misses                                      [Hardware event]
+..
+Also,
+localhost / # perf stat sleep 1
+watch the Hardware event.
+e.g.:
+2375647      instructions              #    0.79  insns per cycle
+18482      branch-misses             #    0.00% of all branches
+--
 
-Thanks,
--Takahiro AKASHI
+And perf top/stat to watch the hardware event. That work for me on now.
 
-> 
-> Except for this, it looks good to me.
-> 
-> Thanks
-> Baoquan
-> 
-> > +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
-> >  
-> >  Load the Dump-capture Kernel
-> >  ============================
-> > @@ -327,6 +335,8 @@ For s390x:
-> >  	- Use image or bzImage
-> >  For arm:
-> >  	- Use zImage
-> > +For arm64:
-> > +	- Use vmlinux or Image
-> >  
-> >  If you are using a uncompressed vmlinux image then use following command
-> >  to load dump-capture kernel.
-> > @@ -370,6 +380,9 @@ For s390x:
-> >  For arm:
-> >  	"1 maxcpus=1 reset_devices"
-> >  
-> > +For arm64:
-> > +	"1 maxcpus=1 reset_devices"
-> > +
-> >  Notes on loading the dump-capture kernel:
-> >  
-> >  * By default, the ELF headers are stored in ELF64 format to support
-> > -- 
-> > 2.5.0
-> > 
-> > 
-> > 
-> > _______________________________________________
-> > kexec mailing list
-> > kexec at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/kexec
+-Caesar
+
+
+
+Caesar Wang (2):
+  arm64: dts: rockchip: change all interrupts cells for 4 on rk3399 SoCs
+  arm64: dts: rockchip: support the pmu node for rk3399
+
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 124 +++++++++++++++++++------------
+ 1 file changed, 75 insertions(+), 49 deletions(-)
+
+-- 
+1.9.1
