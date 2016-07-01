@@ -1,167 +1,38 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 1 Jul 2016 11:00:34 +0100
-Subject: [PATCH v2 4/6] nvmem: amlogic: Add Amlogic Meson EFUSE driver
-In-Reply-To: <1467203656-14381-5-git-send-email-carlo@caione.org>
-References: <1467203656-14381-1-git-send-email-carlo@caione.org>
- <1467203656-14381-5-git-send-email-carlo@caione.org>
-Message-ID: <57763F42.3070106@linaro.org>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Fri, 1 Jul 2016 17:41:54 +0800
+Subject: [PATCH 0/7] add missing of_node_put after calling of_parse_phandle
+ (1st)
+Message-ID: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
+of_node_put needs to be called when the device node which is got
+from of_parse_phandle has finished using, but there are many codes
+do not follow that, this patch set fixes some of them.
 
-On 29/06/16 13:34, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
->
-> Add Amlogic EFUSE driver to access hardware data like ethernet address,
-> serial number or IDs.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+Peter Chen (7):
+  extcon: add missing of_node_put after calling of_parse_phandle
+  arm: mach-shmobile: pm-rmobile: add missing of_node_put after calling
+    of_parse_phandle
+  arm: mach-u300: regulator: add missing of_node_put after calling
+    of_parse_phandle
+  bus: arm-cci: add missing of_node_put after calling of_parse_phandle
+  bus: vexpress-config: add missing of_node_put after calling
+    of_parse_phandle
+  devfreq: add missing of_node_put after calling of_parse_phandle
+  devfreq: exynos-bus: add missing of_node_put after calling
+    of_parse_phandle
 
-Patch looks good to me,
+ arch/arm/mach-shmobile/pm-rmobile.c |  1 +
+ arch/arm/mach-u300/regulator.c      | 12 +++++++++---
+ drivers/bus/arm-cci.c               |  5 ++++-
+ drivers/bus/vexpress-config.c       |  1 +
+ drivers/devfreq/devfreq.c           |  2 ++
+ drivers/devfreq/exynos-bus.c        |  9 ++++++---
+ drivers/extcon/extcon.c             |  2 ++
+ 7 files changed, 25 insertions(+), 7 deletions(-)
 
-Looks like there are some dependencies to this patch w.r.t sm_calls, it 
-would be easy to take this series from single tree.
-
-Just incase you want to take this patch via some other tree, here is Ack.
-
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-
-
-
-> ---
->   drivers/nvmem/Kconfig       | 10 +++++
->   drivers/nvmem/Makefile      |  2 +
->   drivers/nvmem/meson-efuse.c | 93 +++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 105 insertions(+)
->   create mode 100644 drivers/nvmem/meson-efuse.c
->
-> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> index 3041d48..87900d3 100644
-> --- a/drivers/nvmem/Kconfig
-> +++ b/drivers/nvmem/Kconfig
-> @@ -101,4 +101,14 @@ config NVMEM_VF610_OCOTP
->   	  This driver can also be build as a module. If so, the module will
->   	  be called nvmem-vf610-ocotp.
->
-> +config MESON_EFUSE
-> +	tristate "Amlogic eFuse Support"
-> +	depends on (ARCH_MESON || COMPILE_TEST) && MESON_SM
-> +	help
-> +	  This is a driver to retrieve specific values from the eFuse found on
-> +	  the Amlogic Meson SoCs.
-> +
-> +	  This driver can also be built as a module. If so, the module
-> +	  will be called nvmem_meson_efuse.
-> +
->   endif
-> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-> index 45ab1ae..8f942a0 100644
-> --- a/drivers/nvmem/Makefile
-> +++ b/drivers/nvmem/Makefile
-> @@ -22,3 +22,5 @@ obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
->   nvmem_sunxi_sid-y		:= sunxi_sid.o
->   obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
->   nvmem-vf610-ocotp-y		:= vf610-ocotp.o
-> +obj-$(CONFIG_MESON_EFUSE)	+= nvmem_meson_efuse.o
-> +nvmem_meson_efuse-y		:= meson-efuse.o
-> diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
-> new file mode 100644
-> index 0000000..f207c3b
-> --- /dev/null
-> +++ b/drivers/nvmem/meson-efuse.c
-> @@ -0,0 +1,93 @@
-> +/*
-> + * Amlogic eFuse Driver
-> + *
-> + * Copyright (c) 2016 Endless Computers, Inc.
-> + * Author: Carlo Caione <carlo@endlessm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of version 2 of the GNU General Public License as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-> + * more details.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/nvmem-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <linux/firmware/meson/meson_sm.h>
-> +
-> +static int meson_efuse_read(void *context, unsigned int offset,
-> +			    void *val, size_t bytes)
-> +{
-> +	u8 *buf = val;
-> +	int ret;
-> +
-> +	ret = meson_sm_call_read(buf, SM_EFUSE_READ, offset,
-> +				 bytes, 0, 0, 0);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct nvmem_config econfig = {
-> +	.name = "meson-efuse",
-> +	.owner = THIS_MODULE,
-> +	.stride = 1,
-> +	.word_size = 1,
-> +	.read_only = true,
-> +};
-> +
-> +static const struct of_device_id meson_efuse_match[] = {
-> +	{ .compatible = "amlogic,meson-gxbb-efuse", },
-> +	{ /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, meson_efuse_match);
-> +
-> +static int meson_efuse_probe(struct platform_device *pdev)
-> +{
-> +	struct nvmem_device *nvmem;
-> +	unsigned int size;
-> +
-> +	if (meson_sm_call(SM_EFUSE_USER_MAX, &size, 0, 0, 0, 0, 0) < 0)
-> +		return -EINVAL;
-> +
-> +	econfig.dev = &pdev->dev;
-> +	econfig.reg_read = meson_efuse_read;
-> +	econfig.size = size;
-> +
-> +	nvmem = nvmem_register(&econfig);
-> +	if (IS_ERR(nvmem))
-> +		return PTR_ERR(nvmem);
-> +
-> +	platform_set_drvdata(pdev, nvmem);
-> +
-> +	return 0;
-> +}
-> +
-> +static int meson_efuse_remove(struct platform_device *pdev)
-> +{
-> +	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-> +
-> +	return nvmem_unregister(nvmem);
-> +}
-> +
-> +static struct platform_driver meson_efuse_driver = {
-> +	.probe = meson_efuse_probe,
-> +	.remove = meson_efuse_remove,
-> +	.driver = {
-> +		.name = "meson-efuse",
-> +		.of_match_table = meson_efuse_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(meson_efuse_driver);
-> +
-> +MODULE_AUTHOR("Carlo Caione <carlo@endlessm.com>");
-> +MODULE_DESCRIPTION("Amlogic Meson NVMEM driver");
-> +MODULE_LICENSE("GPL v2");
->
+-- 
+1.9.1
