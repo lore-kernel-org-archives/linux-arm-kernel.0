@@ -1,116 +1,133 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Fri, 1 Jul 2016 02:53:52 +0200
-Subject: [PATCH v2 06/14] ARM: sun8i: clk: Add clk-factor rate application
- method
-In-Reply-To: <20160630204001.GC5485@lukather>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-7-megous@megous.com> <20160630204001.GC5485@lukather>
-Message-ID: <64d0c1e2-d818-0806-7c92-c10603b4f6f5@megous.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Fri, 1 Jul 2016 11:03:19 +1000
+Subject: [linux-sunxi] Re: [PATCH] mmc: pwrseq-simple: Add an optional
+ post-power-on-delay
+In-Reply-To: <20160701004732.GA20831@rob-hp-laptop>
+References: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqJ0XVJb=Q9FT8g_OUTbgZWr-E58xQS0iCR4hv-9EHCcPA@mail.gmail.com>
+ <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
+ <20160701004732.GA20831@rob-hp-laptop>
+Message-ID: <CAGRGNgW8zdi_vbqtjfG=pTaEmpVw9UEaitVkQjPxWwwe_izsQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.6.2016 22:40, Maxime Ripard wrote:
-> Hi,
-> 
-> On Sat, Jun 25, 2016 at 05:45:03AM +0200, megous at megous.com wrote:
->> From: Ondrej Jirman <megous@megous.com>
->>
->> PLL1 on H3 requires special factors application algorithm,
->> when the rate is changed. This algorithm was extracted
->> from the arisc code that handles frequency scaling
->> in the BSP kernel.
->>
->> This commit adds optional apply function to
->> struct factors_data, that can implement non-trivial
->> factors application method, when necessary.
->>
->> Also struct clk_factors_config is extended with position
->> of the PLL lock flag.
-> 
-> Have you tested the current implementation, and found that it was not
-> working, or did you duplicate the arisc code directly?
+Hi All,
 
-Also of note is that similar code probably doesn't crash in u-boot,
-because there, before changing the PLL1 clock, the cpu is switched to
-24MHz osc, so it is not overclocked, even if factors align in such a way
-that you'd get the behavior I described in the other email.
+On Fri, Jul 1, 2016 at 10:47 AM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Jun 23, 2016 at 11:33:27AM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 23-06-16 00:25, Rob Herring wrote:
+>> >On Wed, Jun 22, 2016 at 12:59 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> >>Some devices need a while to boot their firmware after providing clks /
+>> >>de-asserting resets before they are ready to receive sdio commands.
+>> >>
+>> >>This commits adds a post-power-on-delay-ms devicetree property to
+>> >>mmc-pwrseq-simple for use with such devices.
+>> >>
+>> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> >>---
+>> >> Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+>> >> drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
+>> >> 2 files changed, 11 insertions(+)
+>> >>
+>> >>diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>> >>index ce0e767..e254368 100644
+>> >>--- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>> >>+++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>> >>@@ -16,6 +16,8 @@ Optional properties:
+>> >>   See ../clocks/clock-bindings.txt for details.
+>> >> - clock-names : Must include the following entry:
+>> >>   "ext_clock" (External clock provided to the card).
+>> >>+- post-power-on-delay-ms : Delay in ms after powering the card and
+>> >>+       de-asserting the reset-gpios (if any)
+>> >
+>> >Presumably you need this delay post any reset, not just after power on
+>>
+>> mmc-pwrseq is only about doing power-on / off, not about providing
+>> reset functionality.
+>
+> Yes, but the property (e.g. the delay) is relevant for both and reset is
+> part of the power seq.
+>
+>> >if you are waiting for firmware to boot. So the name is not all that
+>> >clear. How about a "reset-timing-ms" property that takes 3 values for
+>> >pre-assert time (normally 0), assertion time, post assert time. Of
+>> >course, I can still think of ways that breaks like when in this
+>> >sequence do clocks need to be turned on.
+>>
+>> If you look at bindings/mmc/mmc-pwrseq-simple.txt out side of
+>> the diff context it contains:
+>>
+>> - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+>>         at initialization and prior we start the power up procedure of the card.
+>>         They will be de-asserted right after the power has been provided to the
+>>         card.
+>> - clocks : Must contain an entry for the entry in clock-names.
+>>   See ../clocks/clock-bindings.txt for details.
+>> - clock-names : Must include the following entry:
+>>   "ext_clock" (External clock provided to the card).
+>>
+>> Notice how the existing docs talk about a power-up procedure (which matches
+>> the pwrseq name and purpose of these bindings).
+>>
+>> I actually started with calling the property "post-reset-delay-ms", but then
+>> I realized that what we really want is the ability to specify a time to
+>> wait (for e.g. firmware to boot) after completing the power-up procedure
+>> (and before starting the probe). The power-up procedure currently can
+>> also includes enabling external clocks to the sdio device (if any) and
+>> enabling regulators, so having a "reset-timing-ms" property does not
+>> seem right, as that would suggest it is ok to do the wait after deasserting
+>> reset, but before e.g. enabling external clocks. Where what we really
+>> want is to enable all necessary resources (or iow complete the powerup
+>> procedure) and then wait.
+>>
+>> You're right that in some cases more complicated timings may be necessary,
+>> but that can get really complicated like e.g.: enable regulator1, wait 10 ms,
+>> enable regulator2, wait 15ms, enable external clock1, ...
+>>
+>> And such complex timings fall outside of the scope of the mmc-pwrseq-simple
+>> binding, the idea being that for complex cases we do a device specific
+>> pwrseq binding, and then the smarts are in implementation of that specific
+>> pwrseq driver. As you've said yourself before we do not want to turn
+>> devicetree into a scripting language.
+>
+> Exactly. The challenge is any single property is hard to push back on
+> that we've crossed that line. I don't want to see this expanded one
+> property at a time without any foresight on additional needs. If we can
+> add a property that is more flexible, but doesn't add to the complexity
+> then that would be better. So this one alone is fine, but the next one
+> I'll be less receptive.
 
->>  /**
->> + * sun8i_h3_apply_pll1_factors() - applies n, k, m, p factors to the
->> + * register using an algorithm that tries to reserve the PLL lock
->> + */
->> +
->> +static void sun8i_h3_apply_pll1_factors(struct clk_factors *factors, struct factors_request *req)
->> +{
->> +	const struct clk_factors_config *config = factors->config;
->> +	u32 reg;
->> +
->> +	/* Fetch the register value */
->> +	reg = readl(factors->reg);
->> +
->> +	if (FACTOR_GET(config->pshift, config->pwidth, reg) < req->p) {
->> +		reg = FACTOR_SET(config->pshift, config->pwidth, reg, req->p);
->> +
->> +		writel(reg, factors->reg);
->> +		__delay(2000);
->> +	}
-> 
-> So there was some doubts about the fact that P was being used, or at
-> least that it was useful.
-> 
->> +	if (FACTOR_GET(config->mshift, config->mwidth, reg) < req->m) {
->> +		reg = FACTOR_SET(config->mshift, config->mwidth, reg, req->m);
->> +
->> +		writel(reg, factors->reg);
->> +		__delay(2000);
->> +	}
->> +
->> +	reg = FACTOR_SET(config->nshift, config->nwidth, reg, req->n);
->> +	reg = FACTOR_SET(config->kshift, config->kwidth, reg, req->k);
->> +
->> +	writel(reg, factors->reg);
->> +	__delay(20);
->> +
->> +	while (!(readl(factors->reg) & (1 << config->lock)));
-> 
-> So, they are applying the dividers first, and then applying the
-> multipliers, and then wait for the PLL to stabilize.
-> 
->> +
->> +	if (FACTOR_GET(config->mshift, config->mwidth, reg) > req->m) {
->> +		reg = FACTOR_SET(config->mshift, config->mwidth, reg, req->m);
->> +
->> +		writel(reg, factors->reg);
->> +		__delay(2000);
->> +	}
->> +
->> +	if (FACTOR_GET(config->pshift, config->pwidth, reg) > req->p) {
->> +		reg = FACTOR_SET(config->pshift, config->pwidth, reg, req->p);
->> +
->> +		writel(reg, factors->reg);
->> +		__delay(2000);
->> +	}
-> 
-> However, this is kind of weird, why would you need to re-apply the
-> dividers? Nothing really changes. Have you tried without that part?
-> 
-> Since this is really specific, I guess you could simply make the
-> clk_ops for the nkmp clocks public, and just re-implement set_rate
-> using that logic.
-> 
-> You might also need to set an upper limit on P, since the last value
-> (4) is not a valid one.
-> 
-> I guess you could do that by adding a max field in the __ccu_div
-> structure.
-> 
-> Maxime
-> 
+Stupid question:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160701/e95205dd/attachment.sig>
+In the interests of making this more flexible without adding any real
+"scripting", what about adding three optional delays to this binding:
+1. clock delay - time from "boot" to clocks being enabled
+2. reset delay - time from "boot" to resets being de-asserted
+3. boot delay - time from "boot" until the mmc-pwrseq-simple driver
+assumes the card is ready to be probed
+
+Where the "boot" time is when the mmc-pwrseq-simple driver starts
+enabling this card. All three delays default to 0, the boot delay is
+never less than either of the other delays and the time taken to
+enable clocks or de-assert resets is not counted.
+
+IMHO this allows the maximum amount of flexibility (resets and clocks
+can be in either order) without turning this into a scripting
+language. I also feel that it has a nice finality about it. (Of course
+if you wanted to go mad and turn this into a scripting language,
+allowing multiple pwrseq items per card would be the simplest way to
+do that.)
+
+Of course this also makes everything more complicated and I'm
+expecting this proposal to be nak'd for obvious reasons, but I had to
+ask.
+
+Thanks,
+
+-- 
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
