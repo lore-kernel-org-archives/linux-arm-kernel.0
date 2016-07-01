@@ -1,7 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  1 Jul 2016 16:50:21 +0200
-Subject: [GIT PULL 1/6] bus: NVIDIA Tegra ACONNECT support
-Message-ID: <20160701145026.25760-1-thierry.reding@gmail.com>
+Date: Fri,  1 Jul 2016 16:50:22 +0200
+Subject: [GIT PULL 2/6] dt-bindings: tegra: Updates for v4.8-rc1
+In-Reply-To: <20160701145026.25760-1-thierry.reding@gmail.com>
+References: <20160701145026.25760-1-thierry.reding@gmail.com>
+Message-ID: <20160701145026.25760-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,30 +15,32 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.8-bus
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.8-dt-bindings
 
-for you to fetch changes up to 46a88534afb596eb4d9de07ddde778d0e9aa0e3a:
+for you to fetch changes up to 7eb28ee074bcbf0d6507e896be11280a558dbf17:
 
-  bus: Add support for Tegra ACONNECT (2016-07-01 16:35:43 +0200)
+  dt-bindings: tegra: Add Apalis TK1 device tree binding documentation (2016-07-01 16:36:58 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-bus: NVIDIA Tegra ACONNECT support
+dt-bindings: tegra: Updates for v4.8-rc1
 
-Adds support for the Tegra ACONNECT bus that's used to access the APE
-(audio processing engine) on Tegra X1.
+A couple of fixes for the Tegra XUSB controller and Tegra XUSB pad
+controller bindings, as well as the addition of some compatible strings
+for Tegra-based boards.
 
 ----------------------------------------------------------------
 Jon Hunter (2):
-      dt-bindings: bus: Add documentation for Tegra210 ACONNECT
-      bus: Add support for Tegra ACONNECT
+      dt-bindings: phy: Fix description of Tegra210 PHY nodes
+      dt-bindings: usb: Fix Tegra XUSB example
 
- .../bindings/bus/nvidia,tegra210-aconnect.txt      |  45 +++++++++
- drivers/bus/Kconfig                                |  13 +++
- drivers/bus/Makefile                               |   1 +
- drivers/bus/tegra-aconnect.c                       | 112 +++++++++++++++++++++
- 4 files changed, 171 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra210-aconnect.txt
- create mode 100644 drivers/bus/tegra-aconnect.c
+Marcel Ziswiler (2):
+      dt-bindings: tegra: Add Colibri T30 device tree binding documentation
+      dt-bindings: tegra: Add Apalis TK1 device tree binding documentation
+
+ Documentation/devicetree/bindings/arm/tegra.txt                   | 4 ++++
+ .../devicetree/bindings/phy/nvidia,tegra124-xusb-padctl.txt       | 2 +-
+ Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt    | 8 ++++----
+ 3 files changed, 9 insertions(+), 5 deletions(-)
