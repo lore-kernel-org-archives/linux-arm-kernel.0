@@ -1,34 +1,168 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 1 Jul 2016 10:11:00 -0500
-Subject: [PATCH] arm64: defconfig: Enable QDF2432 config options
-In-Reply-To: <577686FB.5040709@codeaurora.org>
-References: <1467382327-9726-1-git-send-email-cov@codeaurora.org>
- <57767AC1.3070209@codeaurora.org> <577686FB.5040709@codeaurora.org>
-Message-ID: <57768804.6050006@codeaurora.org>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Fri, 1 Jul 2016 15:11:26 +0000
+Subject: [RFC PATCH 1/2] fsl-mc: Added header file to provide fsl-mc bus
+ iommu group creation
+In-Reply-To: <57752939.9010504@arm.com>
+References: <1467220448-16764-1-git-send-email-nipun.gupta@nxp.com>
+ <5774FABE.5070707@arm.com>
+ <HE1PR0401MB1866C1468D3B4733B437C79BE6240@HE1PR0401MB1866.eurprd04.prod.outlook.com>
+ <57752939.9010504@arm.com>
+Message-ID: <HE1PR0401MB18665619AD59E13351348558E6250@HE1PR0401MB1866.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christopher Covington wrote:
-> Due to distribution differences [1][2], I see =y built-in as the default
-> on mobile platforms and =m modular as the default on server platforms.
 
-I don't think we should mix "server" defconfing entries with "mobile" 
-defconfig entries.  It's a arm64 defconfig, neither server nor mobile. 
-The other entries are =y, so these should be =y
 
-No one uses this defconfig as-is for any platform.
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Thursday, June 30, 2016 19:44
+> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com; Stuart Yoder
+> <stuart.yoder@nxp.com>; iommu at lists.linux-foundation.org; linux-arm-
+> kernel at lists.infradead.org
+> Cc: Bharat Bhushan <bharat.bhushan@nxp.com>
+> Subject: Re: [RFC PATCH 1/2] fsl-mc: Added header file to provide fsl-mc bus
+> iommu group creation
+> 
+> On 30/06/16 12:43, Nipun Gupta wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> >> Sent: Thursday, June 30, 2016 16:26
+> >> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com; Stuart
+> >> Yoder <stuart.yoder@nxp.com>; iommu at lists.linux-foundation.org;
+> >> linux-arm- kernel at lists.infradead.org
+> >> Cc: Bharat Bhushan <bharat.bhushan@nxp.com>
+> >> Subject: Re: [RFC PATCH 1/2] fsl-mc: Added header file to provide
+> >> fsl-mc bus iommu group creation
+> >>
+> >> On 29/06/16 18:14, Nipun Gupta wrote:
+> >>> Added a header file fsl_mc_smmu.h to provide basic support of
+> >>> creating an IOMMU group for a fsl-mc type device and also provide
+> >>> helper macro to get the stream ID of fsl-mc tyoe device.
+> >>>
+> >>> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> >>> Signed-off-by: Bharat Bhushan <bharat.bhushan@nxp.com>
+> >>> ---
+> >>>  drivers/staging/fsl-mc/include/fsl_mc_smmu.h | 45
+> >>> ++++++++++++++++++++++++++++
+> >>>  1 file changed, 45 insertions(+)
+> >>>  create mode 100644 drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+> >>>
+> >>> diff --git a/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+> >>> b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+> >>> new file mode 100644
+> >>> index 0000000..9dff5ba
+> >>> --- /dev/null
+> >>> +++ b/drivers/staging/fsl-mc/include/fsl_mc_smmu.h
+> >>> @@ -0,0 +1,45 @@
+> >>> +/*
+> >>> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> >>> + * Author: Nipun Gupta <nipun.gupta@freescale.com>
+> >>> + *
+> >>> + * This file is licensed under the terms of the GNU General Public
+> >>> + * License version 2. This program is licensed "as is" without any
+> >>> + * warranty of any kind, whether express or implied.
+> >>> + */
+> >>> +
+> >>> +#ifndef _FSL_MC_SMMU_H_
+> >>> +#define _FSL_MC_SMMU_H_
+> >>> +
+> >>> +#include <../drivers/staging/fsl-mc/include/mc.h>
+> >>> +
+> >>> +/* Macro to get the MC device ICID (Stream ID) */ #define
+> >>> +fslmc_dev_streamid(_dev) (to_fsl_mc_device(_dev)->icid)
+> >>
+> >> Is the the full 15-bit ICID from the MC's point of view, just the 7
+> >> bits that are actually routed to the SMMU, or the actual stream ID
+> >> seen by the SMMU? None of those three are necessarily the same, and
+> >> unless it's the third then I don't see the point of patches adding incomplete
+> code which isn't going to work.
+> >
+> > Hi Robin,
+> >
+> > It's the second one where just 7 bits are maintained in the 'fsl_mc_device---
+> >icid' which is programmed in SMMU. Right, once the SMR masking support is
+> there then only these patches would make more sense.
+> > We have sent these patches to get some early comments and to have you guys
+> well informed beforehand about the changes which we require in the SMMU
+> driver specific to fsl-mc bus :).
+> 
+> Indeed, it's just kinda hard to review incomplete code, especially when it's the
+> parts which don't exist yet which are the most significant ;)
+> 
+> Either way, I'm deep in the middle of reworking SMMUv2 generic bindings[1]
+> based on the latest iteration of the core code and iommu_fwspec[2], which
+> removes the need for nearly all the bus-specific business within the driver (it's
+> getting too big to be 4.8 material now, but I'll have something to post shortly).
+> In that context, if the fsl-mc driver could process an "iommu-map" property on
+> the MC node to plumb the ICID-to-stream-ID relationship into of_xlate, and
+> inherit bus->iommu_ops from its parent bus, there shouldn't be any need to
+> directly touch the SMMU driver at all.
 
-> But thinking about it, we could get a poweroff, reset, over-temperature,
-> or other interrupt before we get to the initramfs. So the pin controller
-> driver should be =y built-in.
->
-> One might make rootfs media =y built-in to make testing easier, but I
-> prefer to put my rootfs on SATA, as SD/MMC is much slower and smaller by
-> comparison.
+Hi Robin,
 
-Let's not overthink things, and just make *everything* =y by default.
+One thing I would like to bring to your notice is that with our SoC the container devices gets dynamically created by MC (using linux command line). Once the container is created, the ICID is provided by MC to the devices.
+Structure is somewhat the following:
+							      		  ---- device 1 (ID 1)
+				  ---- Container device 1 (ID 1)-----------	|---- device 2 (ID 1)
+				|					  ---- device 3 (ID 1) ...
+	MC bus/device------------	|---- Container device 2 (ID 2) ...
+	(has a DT node)  	  ---- Container device 3 (ID 3) ...
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Here the MC device node which is the SMMU master mode is present in the device tree, but the Container devices are created dynamically with ICID's provided to them by the MC (again at run-time).
+A single iommu_group is required to be created per container, which will have the container device and all of its child devices added into that group.
+
+On lines of your suggestion we can call the of_xlate callback of the MC device whenever the devices are created. This shall make API 'arm_smmu_init_fslmc_device' redundant from http://article.gmane.org/gmane.linux.kernel.iommu/14323 (patch 2/2).  Also looking at the your older patch-set for SMMU-v2 if we use of_xlate, I think for fsl-mc bus support there may be few changes required to facilitate addition of all the devices within the container into the single iommu_group & also setting up the 'dev->archdata.iommu' for the fsl-mc non-container devices.
+I need to have a closer look at the iommu_fwspec[2] to see if these other changes required to support fsl-mc bus can also be minimized/removed.
+
+We are eagerly waiting for your patches on SMMU-v2 for the new exciting stuff :).
+
+Thanks,
+Nipun
+ 
+> 
+> Robin.
+> 
+> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12454
+> [2]:http://thread.gmane.org/gmane.linux.kernel.iommu/14303
+> 
+> >
+> > Thanks,
+> > Nipun
+> >
+> >>
+> >>> +/* Macro to get the container device of a MC device */ #define
+> >>> +fslmc_cont_dev(_dev) ((to_fsl_mc_device(dev)->flags & \
+> >>> +	FSL_MC_IS_DPRC) ? (_dev) : (_dev->parent))
+> >>> +
+> >>> +/* Macro to check if a device is a container device */ #define
+> >>> +is_cont_dev(_dev) (to_fsl_mc_device(_dev)->flags & FSL_MC_IS_DPRC)
+> >>> +
+> >>> +static struct iommu_group *fslmc_device_group(struct device *dev) {
+> >>> +	struct device *cont_dev = fslmc_cont_dev(dev);
+> >>> +	struct iommu_group *group;
+> >>> +
+> >>> +	/* Container device is responsible for creating the iommu group */
+> >>> +	if (is_cont_dev(dev)) {
+> >>> +		group = iommu_group_alloc();
+> >>> +
+> >>> +		if (IS_ERR(group))
+> >>> +			return NULL;
+> >>> +	} else {
+> >>> +		get_device(cont_dev);
+> >>> +		group = iommu_group_get(cont_dev);
+> >>> +		put_device(cont_dev);
+> >>> +	}
+> >>> +
+> >>> +	return group;
+> >>> +}
+> >>
+> >> In isolation, though, this part seems perfectly reasonable.
+> >>
+> >> Robin.
+> >>
+> >>> +
+> >>> +#endif /* _FSL_MC_SMMU_H_ */
+> >>>
+> >
