@@ -1,58 +1,34 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 1 Jul 2016 11:06:35 -0400
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 1 Jul 2016 10:11:00 -0500
 Subject: [PATCH] arm64: defconfig: Enable QDF2432 config options
-In-Reply-To: <57767AC1.3070209@codeaurora.org>
+In-Reply-To: <577686FB.5040709@codeaurora.org>
 References: <1467382327-9726-1-git-send-email-cov@codeaurora.org>
- <57767AC1.3070209@codeaurora.org>
-Message-ID: <577686FB.5040709@codeaurora.org>
+ <57767AC1.3070209@codeaurora.org> <577686FB.5040709@codeaurora.org>
+Message-ID: <57768804.6050006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2016 10:14 AM, Timur Tabi wrote:
-> Christopher Covington wrote:
->>   arch/arm64/configs/defconfig |  4 ++++
->>   scripts/patch-details.sh     | 21 ++++++++++++++++++---
-> 
-> I don't think these two files should be combined.
+Christopher Covington wrote:
+> Due to distribution differences [1][2], I see =y built-in as the default
+> on mobile platforms and =m modular as the default on server platforms.
 
-Oops, sorry. Fixed in v2.
+I don't think we should mix "server" defconfing entries with "mobile" 
+defconfig entries.  It's a arm64 defconfig, neither server nor mobile. 
+The other entries are =y, so these should be =y
 
->>  CONFIG_PINCTRL_SINGLE=y
->>  CONFIG_PINCTRL_MSM8916=y
->> +CONFIG_PINCTRL_QDF2XXX=m
->>  CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
->>  CONFIG_GPIO_SYSFS=y
->>  CONFIG_GPIO_DWAPB=y
->> @@ -245,6 +246,7 @@ CONFIG_MMC=y
->>  CONFIG_MMC_BLOCK_MINORS=32
->>  CONFIG_MMC_ARMMMCI=y
->>  CONFIG_MMC_SDHCI=y
->> +CONFIG_MMC_SDHCI_ACPI=m
->>  CONFIG_MMC_SDHCI_PLTFM=y
-> 
-> Why are these =m when all the others are =y?
+No one uses this defconfig as-is for any platform.
 
-Due to distribution differences [1][2], I see =y built-in as the default
-on mobile platforms and =m modular as the default on server platforms.
+> But thinking about it, we could get a poweroff, reset, over-temperature,
+> or other interrupt before we get to the initramfs. So the pin controller
+> driver should be =y built-in.
+>
+> One might make rootfs media =y built-in to make testing easier, but I
+> prefer to put my rootfs on SATA, as SD/MMC is much slower and smaller by
+> comparison.
 
-But thinking about it, we could get a poweroff, reset, over-temperature,
-or other interrupt before we get to the initramfs. So the pin controller
-driver should be =y built-in.
+Let's not overthink things, and just make *everything* =y by default.
 
-One might make rootfs media =y built-in to make testing easier, but I
-prefer to put my rootfs on SATA, as SD/MMC is much slower and smaller by
-comparison.
-
-Thanks,
-Cov
-
-Examples I found to spot check my recollection:
-1.
-https://github.com/CyanogenMod/android_kernel_lge_hammerhead/blob/cm-13.0/arch/arm/configs/cyanogenmod_hammerhead_defconfig
-
-2.
-https://git.centos.org/blob/sig-altarch!kernel.git/c3cb6cc6edb5400321fd9d83413add4cf61d942e/SOURCES!config-arm64
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
