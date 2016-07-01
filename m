@@ -1,43 +1,59 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Fri, 1 Jul 2016 08:34:21 +0200
-Subject: [PATCH v2 06/14] ARM: sun8i: clk: Add clk-factor rate application
- method
-In-Reply-To: <20160701073710.1a1fc684ae448577bad5b0db@free.fr>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-7-megous@megous.com> <20160630204001.GC5485@lukather>
- <0b71ed7e-98c9-109e-85e6-ceb95131d88a@megous.com>
- <20160701073710.1a1fc684ae448577bad5b0db@free.fr>
-Message-ID: <643c2648-ddd6-700a-68c0-2981134965c0@megous.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri,  1 Jul 2016 08:42:13 +0200
+Subject: [PATCH] gpio: document how to order GPIO controllers
+Message-ID: <1467355333-8813-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1.7.2016 07:37, Jean-Francois Moine wrote:
-> On Fri, 1 Jul 2016 02:50:57 +0200
-> Ond?ej Jirman <megous@megous.com> wrote:
-> 
->>> Since this is really specific, I guess you could simply make the
->>> clk_ops for the nkmp clocks public, and just re-implement set_rate
->>> using that logic.
->>
->> I would argue that this may be necessary for other PLL clocks too, if
->> you can get out of bounds output frequency, by changing the dividers too
->> early or too late. So perhaps this code should be generalized for other
->> PLL clocks too, instead.
-> 
-> The documentation says that only the CPU and DDR PLLs can be dynamically
-> changed after boot.
+This uses the same approach that is already used for spi, i2c and
+several other controllers to ensure a consistent numbering independent
+of probe order. This is in use for several gpio drivers that already now
+use of_alias_get_id(np, "gpio").
 
-The question is what exactly is meant by after boot. :) Anyway, if the
-kernel has no business changing some other PLLs, if there's code for
-changing them, should it be dropped?
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-regards,
-  Ondrej
+Linus requested such a patch as part of a change that introduces
+this mechanism to the gpio-omap driver[1]. IMHO this is better done in a
+separate patch, so here it comes.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160701/729f1527/attachment.sig>
+Best regards
+Uwe
+
+[1] http://thread.gmane.org/gmane.linux.kernel.gpio/17399/focus=17629
+
+ Documentation/devicetree/bindings/gpio/gpio.txt | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/gpio/gpio.txt b/Documentation/devicetree/bindings/gpio/gpio.txt
+index 68d28f62a6f4..5dbacc8f094a 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio.txt
+@@ -227,6 +227,24 @@ Example of two SOC GPIO banks defined as gpio-controller nodes:
+ 		#gpio-cells = <2>;
+ 	};
+ 
++Usually the GPIO banks in SoCs are ordered, that is there is a dedicated "first
++gpio bank". To fix this ordering in the device tree use aliases starting at 0
++(even if the first bank is called "GPIO1" in the hardware reference).
++This is necessary/handy to ensure deterministical numbering of GPIOs and GPIO
++controllers.
++
++Example of a machine having 4 GPIO banks.
++
++	/ {
++		aliases {
++			...
++			gpio0 = &gpio1;
++			gpio1 = &gpio2;
++			gpio2 = &gpio3;
++			gpio3 = &gpio4;
++		};
++	};
++
+ 2.1) gpio- and pin-controller interaction
+ -----------------------------------------
+ 
+-- 
+2.8.1
