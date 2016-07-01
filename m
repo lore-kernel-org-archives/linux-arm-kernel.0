@@ -1,23 +1,29 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 30 Jun 2016 21:17:39 -0500
-Subject: [PATCH v3 01/14] dt-bindings: sunxi: Add CCU binding documentation
-In-Reply-To: <20160629190535.11855-2-maxime.ripard@free-electrons.com>
-References: <20160629190535.11855-1-maxime.ripard@free-electrons.com>
- <20160629190535.11855-2-maxime.ripard@free-electrons.com>
-Message-ID: <20160701021739.GA16181@rob-hp-laptop>
+Date: Thu, 30 Jun 2016 21:48:47 -0500
+Subject: [PATCH v4 1/7] mfd: ac100: Add device tree bindings for X-Powers
+ AC100 codec/RTC combo IC
+In-Reply-To: <1467302331-9663-2-git-send-email-wens@csie.org>
+References: <1467302331-9663-1-git-send-email-wens@csie.org>
+ <1467302331-9663-2-git-send-email-wens@csie.org>
+Message-ID: <20160701024847.GA1444@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 09:05:22PM +0200, Maxime Ripard wrote:
-> Introduce a new binding with its documentation for the brand new clock
-> sub-framework.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Thu, Jun 30, 2016 at 11:58:45PM +0800, Chen-Yu Tsai wrote:
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  .../devicetree/bindings/clock/sunxi-ccu.txt        | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-
-Yay!
+> Changes since v3:
+> 
+>   - Fixed device node names and added labels.
+>   - Added clock output from codec and input to rtc.
+> 
+> Changes since v2:
+> 
+>   - Fix interrupt line for ac100_codec in provided example.
+> 
+> ---
+>  Documentation/devicetree/bindings/mfd/ac100.txt | 49 +++++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
