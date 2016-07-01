@@ -1,35 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 1 Jul 2016 13:50:36 +0100
-Subject: [PATCH 2/2] arm64: dts: rockchip: support the pmu node for rk3399
-In-Reply-To: <20160701102612.GB22953@leverpostej>
-References: <1467358570-24417-1-git-send-email-wxt@rock-chips.com>
- <1467358570-24417-3-git-send-email-wxt@rock-chips.com>
- <20160701102612.GB22953@leverpostej>
-Message-ID: <5776671C.7000808@arm.com>
+From: jpoimboe@redhat.com (Josh Poimboeuf)
+Date: Fri, 1 Jul 2016 07:53:44 -0500
+Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
+In-Reply-To: <20160627151717.BD25468D26@newverein.lst.de>
+References: <20160627151500.2247A68D20@newverein.lst.de>
+ <20160627151717.BD25468D26@newverein.lst.de>
+Message-ID: <20160701125344.usuovsvbpilzen4m@treble>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/16 11:26, Mark Rutland wrote:
-> On Fri, Jul 01, 2016 at 03:36:10PM +0800, Caesar Wang wrote:
->> As the Marc posted the patches [0] to support Partitioning per-cpu
->> interrupts. Let's add this patch to match it on rk3399 SoCs.
->>
->> [0]:
->> https://lkml.org/lkml/2016/4/11/182
+On Mon, Jun 27, 2016 at 05:17:17PM +0200, Torsten Duwe wrote:
+> Once gcc is enhanced to optionally generate NOPs at the beginning
+> of each function, like the concept proven in
+> https://gcc.gnu.org/ml/gcc-patches/2016-04/msg01671.html
+> (sans the "fprintf (... pad_size);", which spoils the data structure
+> for kernel use), the generated pads can nicely be used to reroute
+> function calls for tracing/profiling, or live patching.
 > 
-> The core IRQ support is merged, but it's worth noting that the perf code
-> doesn't use it yet. So we still need a patch adding support to the perf
-> code before we can change the dts.
+> The pads look like
+> fffffc00081335f0 <hrtimer_init>:
+> fffffc00081335f0:       d503201f        nop
+> fffffc00081335f4:       d503201f        nop
+> fffffc00081335f8:       a9bd7bfd        stp     x29, x30, [sp,#-48]!
+> fffffc00081335fc:       910003fd        mov     x29, sp
+> [...]
 > 
-> I think Marc had a prototype of that somewhere.
+> This patch gets the pad locations from the compiler-generated
+> __prolog_pads_loc into the _mcount_loc array, and provides the
+> code patching functions to turn the pads at runtime into
 > 
-> Marc?
+> fffffc00081335f0     mov     x9, x30
+> fffffc00081335f4     bl      0xfffffc00080a08c0 <ftrace_caller>
+> fffffc00081335f8     stp     x29, x30, [sp,#-48]!
+> fffffc00081335fc     mov     x29, sp
+> 
+> as well as an ftrace_caller that can handle these call sites.
+> Now ARCH_SUPPORTS_FTRACE_OPS as a benefit, and the graph caller
+> still works, too.
+> 
+> Signed-off-by: Li Bin <huawei.libin@huawei.com>
+> Signed-off-by: Torsten Duwe <duwe@suse.de>
+> ---
+>  arch/arm64/Kconfig                |  1 +
+>  arch/arm64/Makefile               |  4 ++
+>  arch/arm64/include/asm/ftrace.h   |  8 ++++
+>  arch/arm64/kernel/Makefile        |  6 +--
+>  arch/arm64/kernel/entry-ftrace.S  | 89 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/ftrace.c        | 43 +++++++++++++++++--
+>  include/asm-generic/vmlinux.lds.h |  2 +-
+>  include/linux/compiler.h          |  4 ++
+>  8 files changed, 150 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 5a0a691..36a0e26 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -72,6 +72,7 @@ config ARM64
+>  	select HAVE_DMA_API_DEBUG
+>  	select HAVE_DMA_CONTIGUOUS
+>  	select HAVE_DYNAMIC_FTRACE
+> +	select HAVE_DYNAMIC_FTRACE_WITH_REGS
+>  	select HAVE_EFFICIENT_UNALIGNED_ACCESS
+>  	select HAVE_FTRACE_MCOUNT_RECORD
+>  	select HAVE_FUNCTION_TRACER
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 648a32c..e5e335c 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -35,6 +35,10 @@ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+>  KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
+>  KBUILD_AFLAGS	+= $(lseinstr)
+>  
+> +ifeq ($(CONFIG_DYNAMIC_FTRACE_WITH_REGS), y)
+> +CC_FLAGS_FTRACE := -fprolog-pad=2 -DCC_USING_PROLOG_PAD
+> +endif
+> +
 
-I posted something in the original discussion, but need to respin it.
-Stay tuned.
+It would probably be good to print a warning for older gccs which don't
+support this option, so that when the build fails, there's at least a
+warning to indicate why.  Something like:
 
-Thanks,
+  ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+    CC_FLAGS_FTRACE := -fprolog-pad=2 -DCC_USING_PROLOG_PAD
+    ifeq ($(call cc-option,-fprolog-pad=2),)
+      $(warning Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: \
+               -fprolog-pad not supported by compiler)
+    endif
+  endif
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Josh
