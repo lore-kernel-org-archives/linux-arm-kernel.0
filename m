@@ -1,55 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 1 Jul 2016 15:18:37 +0200
-Subject: [PATCH] efi: arm64: add debugfs node to dump UEFI runtime page
- tables
-In-Reply-To: <20160630140930.GD20363@leverpostej>
-References: <1467280906-31158-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160630140930.GD20363@leverpostej>
-Message-ID: <CAKv+Gu8T5=OKQVXzOToCro-XoLvavHGB6B5kAqPtUE+sepwC1A@mail.gmail.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Fri, 1 Jul 2016 15:19:56 +0200
+Subject: [RESEND PATCH] MAINTAINERS: update STi maintainer list
+Message-ID: <1467379196-2484-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2016 at 16:09, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jun 30, 2016 at 12:01:46PM +0200, Ard Biesheuvel wrote:
->> Register the debugfs node 'efi_page_tables' to allow the UEFI runtime
->> page tables to be inspected. Note that ARM does not have 'asm/ptdump.h'
->> [yet] so for now, this is arm64 only.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> This patch could be helpful in assessing the series 'arm64: avoid block
->> entries that we need to split later' that I sent out yesterday.
->
-> It's probably worth noting that this is based on the arm64 for-next/core
-> branch. I don't know if/how we can orgnise branches for merging this.
->
+From: Maxime Coquelin <maxime.coquelin@st.com>
 
-There's no rush, so Matt can take it for v4.9 I suppose?
+Remove myself as STi maintainer as I will no longer have access to
+STi platforms, and remove Srini too, who now works on other
+platforms.
 
->>  drivers/firmware/efi/arm-runtime.c | 20 ++++++++++++++++++++
->>  1 file changed, 20 insertions(+)
->>
->> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
->> index 17ccf0a8787a..4197a1da013d 100644
->> --- a/drivers/firmware/efi/arm-runtime.c
->> +++ b/drivers/firmware/efi/arm-runtime.c
->> @@ -39,6 +39,26 @@ static struct mm_struct efi_mm = {
->>       .mmlist                 = LIST_HEAD_INIT(efi_mm.mmlist),
->>  };
->>
->> +#ifdef CONFIG_ARM64
->
-> If you use CONFIG_ARM64_PTDUMP for the moment, then we won't have some
-> unused structs lying around when the feature is unused.
->
+Patrice will manage the pull requests.
 
-I can change that
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+Cc: Patrice Chotard <patrice.chotard@st.com>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
 
-> Otherwise, I agree that this is a useful debuging feature. FWIW, either
-> way:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
+As Maxime's email address @st.com is no more active, it will bounce.
 
-Thanks.
+ MAINTAINERS | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7304d2e..1ea1456 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1689,8 +1689,6 @@ S:	Maintained
+ F:	drivers/edac/altera_edac.
+ 
+ ARM/STI ARCHITECTURE
+-M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+-M:	Maxime Coquelin <maxime.coquelin@st.com>
+ M:	Patrice Chotard <patrice.chotard@st.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	kernel at stlinux.com
+-- 
+1.9.1
