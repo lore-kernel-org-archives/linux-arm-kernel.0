@@ -1,87 +1,135 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  1 Jul 2016 14:21:31 +0100
-Subject: [PATCH] drivers/perf: arm-pmu: Handle per-interrupt affinity mask
-Message-ID: <1467379291-18413-1-git-send-email-marc.zyngier@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 1 Jul 2016 14:26:08 +0100
+Subject: [PATCH v3 7/9] iommu/arm-smmu: Implement of_xlate() for SMMUv3
+In-Reply-To: <20160701123507.GJ12735@arm.com>
+References: <cover.1467123945.git.robin.murphy@arm.com>
+ <6de0ca7795e1b74627ceb55dcefcfd5537f245ce.1467123945.git.robin.murphy@arm.com>
+ <20160701123507.GJ12735@arm.com>
+Message-ID: <57766F70.6070704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a big-little system, PMUs can be wired to CPUs using per CPU
-interrups (PPI). In this case, it is important to make sure that
-the enable/disable do happen on the right set of CPUs.
+On 01/07/16 13:35, Will Deacon wrote:
+> On Tue, Jun 28, 2016 at 04:48:26PM +0100, Robin Murphy wrote:
+>> Now that we can properly describe the mapping between PCI RIDs and
+>> stream IDs via "iommu-map", and have it fed it to the driver
+>> automatically via of_xlate(), rework the SMMUv3 driver to benefit from
+>> that, and get rid of the current misuse of the "iommus" binding.
+>>
+>> Since having of_xlate wired up means that masters will now be given the
+>> appropriate DMA ops, we also need to make sure that default domains work
+>> properly. This necessitates dispensing with the "whole group at a time"
+>> notion for attaching to a domain, as devices which share a group get
+>> attached to the group's default domain one by one as they are initially
+>> probed.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+> 
+> [...]
+> 
+>>  static int arm_smmu_add_device(struct device *dev)
+>>  {
+>>  	int i, ret;
+>> -	u32 sid, *sids;
+>> -	struct pci_dev *pdev;
+>> -	struct iommu_group *group;
+>> -	struct arm_smmu_group *smmu_group;
+>>  	struct arm_smmu_device *smmu;
+>> +	struct arm_smmu_master_data *master;
+>> +	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
+>> +	struct iommu_group *group;
+>>  
+>> -	/* We only support PCI, for now */
+>> -	if (!dev_is_pci(dev))
+>> +	if (!fwspec || fwspec->iommu_ops != &arm_smmu_ops)
+>>  		return -ENODEV;
+>> -
+>> -	pdev = to_pci_dev(dev);
+>> -	group = iommu_group_get_for_dev(dev);
+>> -	if (IS_ERR(group))
+>> -		return PTR_ERR(group);
+>> -
+>> -	smmu_group = iommu_group_get_iommudata(group);
+>> -	if (!smmu_group) {
+>> -		smmu = arm_smmu_get_for_pci_dev(pdev);
+>> -		if (!smmu) {
+>> -			ret = -ENOENT;
+>> -			goto out_remove_dev;
+>> -		}
+>> -
+>> -		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
+>> -		if (!smmu_group) {
+>> -			ret = -ENOMEM;
+>> -			goto out_remove_dev;
+>> -		}
+>> -
+>> -		smmu_group->ste.valid	= true;
+>> -		smmu_group->smmu	= smmu;
+>> -		iommu_group_set_iommudata(group, smmu_group,
+>> -					  __arm_smmu_release_pci_iommudata);
+>> +	/*
+>> +	 * We _can_ actually withstand dodgy bus code re-calling add_device()
+>> +	 * without an intervening remove_device()/of_xlate() sequence, but
+>> +	 * we're not going to do so quietly...
+>> +	 */
+>> +	if (WARN_ON_ONCE(fwspec->iommu_priv)) {
+>> +		master = fwspec->iommu_priv;
+>> +		smmu = master->smmu;
+>>  	} else {
+>> -		smmu = smmu_group->smmu;
+>> +		smmu = arm_smmu_get_by_node(fwspec->iommu_np);
+>> +		if (!smmu)
+>> +			return -ENODEV;
+>> +		master = kzalloc(sizeof(*master), GFP_KERNEL);
+>> +		if (!master)
+>> +			return -ENOMEM;
+>> +
+>> +		master->smmu = smmu;
+>> +		fwspec->iommu_priv = master;
+>>  	}
+>>  
+>> -	/* Assume SID == RID until firmware tells us otherwise */
+>> -	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
+>> -	for (i = 0; i < smmu_group->num_sids; ++i) {
+>> -		/* If we already know about this SID, then we're done */
+>> -		if (smmu_group->sids[i] == sid)
+>> -			goto out_put_group;
+>> +	/* Check the SIDs are in range of the SMMU and our stream table */
+>> +	for (i = 0; i < fwspec->num_ids; i++) {
+>> +		u32 sid = fwspec->ids[i];
+>> +
+>> +		if (!arm_smmu_sid_in_range(smmu, sid))
+>> +			return -ERANGE;
+>> +
+>> +		/* Ensure l2 strtab is initialised */
+>> +		if (smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
+>> +			ret = arm_smmu_init_l2_strtab(smmu, sid);
+>> +			if (ret)
+>> +				return ret;
+>> +		}
+>>  	}
+> 
+> Do you not need to do some cleanup here, rather than just returning (same
+> for the -ERANGE above)? For example, freeing the master?
 
-So instead of relying on the interrupt-affinity property, we can
-use the actual percpu affinity that DT exposes as part of the
-interrupt specifier. The DT binding is also updated to reflect
-the fact that the interrupt-affinity property shouldn't be used
-in that case.
+The master will be freed in arm_smmu_remove_device() if and when the
+device is removed from the bus. By the time we get this add_device call,
+we're already past the point of it being added to the bus and there's
+nothing we can do (all the return value here actually does is terminate
+the notifier chain). By bailing out before assigning the group, though,
+we prevent the device from being valid for any VFIO/IOMMU API usage.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- Documentation/devicetree/bindings/arm/pmu.txt |  4 +++-
- drivers/perf/arm_pmu.c                        | 22 +++++++++++++++++-----
- 2 files changed, 20 insertions(+), 6 deletions(-)
+That does make me think, however, that it would be worth trying to
+detect in arch_setup_dma_ops() if a device has been rejected by an IOMMU
+it was supposed to be associated with, and in such cases prevent it from
+doing DMA *at all* rather than just leaving it with the default SWIOTLB
+ops. I'll have a think about how feasible that is (with any luck it
+should slot fairly neatly into the probe ordering work touching those
+areas).
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 74d5417..61c8b46 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -39,7 +39,9 @@ Optional properties:
-                        When using a PPI, specifies a list of phandles to CPU
- 		       nodes corresponding to the set of CPUs which have
- 		       a PMU of this type signalling the PPI listed in the
--		       interrupts property.
-+		       interrupts property, unless this is already specified
-+		       by the PPI interrupt specifier itself (in which case
-+		       the interrupt-affinity property shouldn't be present).
- 
-                        This property should be present when there is more than
- 		       a single SPI.
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 140436a..065ccec 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -603,7 +603,8 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
- 
- 	irq = platform_get_irq(pmu_device, 0);
- 	if (irq >= 0 && irq_is_percpu(irq)) {
--		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
-+		on_each_cpu_mask(&cpu_pmu->supported_cpus,
-+				 cpu_pmu_disable_percpu_irq, &irq, 1);
- 		free_percpu_irq(irq, &hw_events->percpu_pmu);
- 	} else {
- 		for (i = 0; i < irqs; ++i) {
-@@ -645,7 +646,9 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 				irq);
- 			return err;
- 		}
--		on_each_cpu(cpu_pmu_enable_percpu_irq, &irq, 1);
-+
-+		on_each_cpu_mask(&cpu_pmu->supported_cpus,
-+				 cpu_pmu_enable_percpu_irq, &irq, 1);
- 	} else {
- 		for (i = 0; i < irqs; ++i) {
- 			int cpu = i;
-@@ -961,9 +964,18 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- 		i++;
- 	} while (1);
- 
--	/* If we didn't manage to parse anything, claim to support all CPUs */
--	if (cpumask_weight(&pmu->supported_cpus) == 0)
--		cpumask_setall(&pmu->supported_cpus);
-+	/* If we didn't manage to parse anything, try the interrupt affinity */
-+	if (cpumask_weight(&pmu->supported_cpus) == 0) {
-+		if (!using_spi) {
-+			/* If using PPIs, check the affinity of the partition */
-+			int irq = platform_get_irq(pdev, 0);
-+			irq_get_percpu_devid_partition(irq,
-+						       &pmu->supported_cpus);
-+		} else {
-+			/* Otherwise default to all CPUs */
-+			cpumask_setall(&pmu->supported_cpus);
-+		}
-+	}
- 
- 	/* If we matched up the IRQ affinities, use them to route the SPIs */
- 	if (using_spi && i == pdev->num_resources)
--- 
-2.1.4
+Robin.
+
+> 
+> Will
+> 
