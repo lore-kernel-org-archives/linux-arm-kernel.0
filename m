@@ -1,272 +1,112 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri,  1 Jul 2016 17:50:12 +0100
-Subject: [PATCH v4 3/8] of/irq: Break out msi-map lookup (again)
+Date: Fri,  1 Jul 2016 17:50:10 +0100
+Subject: [PATCH v4 1/8] arm64: mm: change IOMMU notifier action to attach DMA
+ ops
 In-Reply-To: <cover.1467388950.git.robin.murphy@arm.com>
 References: <cover.1467388950.git.robin.murphy@arm.com>
-Message-ID: <cb0040f52022b049a3515f0b01a81a83381ad7d9.1467388950.git.robin.murphy@arm.com>
+Message-ID: <06d430a86f5d7f461308a9278bf25f40fb50d93c.1467388950.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI msi-map code is already doing double-duty translating IDs and
-retrieving MSI parents, which unsurprisingly is the same functionality
-we need for the identically-formatted PCI iommu-map property. Drag the
-core parsing routine up yet another layer into the general OF-PCI code,
-and further generalise it for either kind of lookup in either flavour
-of map property.
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Frank Rowand <frowand.list@gmail.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Current bus notifier in ARM64 (__iommu_attach_notifier)
+attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
+action notification.
+
+This will cause issues on ACPI based systems, where PCI devices
+can be added before the IOMMUs the devices are attached to
+had a chance to be probed, causing failures on attempts to
+attach dma_ops in that the domain for the respective IOMMU
+may not be set-up yet by the time the bus notifier is run.
+
+Devices dma_ops do not require to be set-up till the matching
+device drivers are probed. This means that instead of running
+the notifier attaching dma_ops to devices (__iommu_attach_notifier)
+on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
+device driver is bound to the device in question (on action
+BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
+group and domain are set-up accordingly at the time the
+notifier is triggered.
+
+This patch changes the notifier action upon which dma_ops
+are attached to devices and defer it to driver binding time,
+so that IOMMU devices have a chance to be probed and to register
+their bus notifiers before the dma_ops attach sequence for a
+device is actually carried out.
+
+As a result we also no longer need worry about racing with
+iommu_bus_notifier(), or about retrying the queue in case devices
+were added too early on DT-based systems, so clean up the notifier
+itself plus the additional workaround from 722ec35f7fae ("arm64:
+dma-mapping: fix handling of devices registered before arch_initcall")
+
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+[rm: get rid of other now-redundant bits]
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
 v4: No change.
 
- drivers/of/irq.c       |  78 ++-----------------------------------
- drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_pci.h |  10 +++++
- 3 files changed, 116 insertions(+), 74 deletions(-)
+ arch/arm64/mm/dma-mapping.c | 22 +++++-----------------
+ 1 file changed, 5 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 6ec743faabe8..091d45e6d61d 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -24,6 +24,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
-+#include <linux/of_pci.h>
- #include <linux/string.h>
- #include <linux/slab.h>
- 
-@@ -587,87 +588,16 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
- 			    u32 rid_in)
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index c566ec83719f..e384b76203cc 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -848,15 +848,16 @@ static int __iommu_attach_notifier(struct notifier_block *nb,
  {
- 	struct device *parent_dev;
--	struct device_node *msi_controller_node;
--	struct device_node *msi_np = *np;
--	u32 map_mask, masked_rid, rid_base, msi_base, rid_len, phandle;
--	int msi_map_len;
--	bool matched;
- 	u32 rid_out = rid_in;
--	const __be32 *msi_map = NULL;
+ 	struct iommu_dma_notifier_data *master, *tmp;
  
- 	/*
- 	 * Walk up the device parent links looking for one with a
- 	 * "msi-map" property.
- 	 */
--	for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
--		if (!parent_dev->of_node)
--			continue;
--
--		msi_map = of_get_property(parent_dev->of_node,
--					  "msi-map", &msi_map_len);
--		if (!msi_map)
--			continue;
--
--		if (msi_map_len % (4 * sizeof(__be32))) {
--			dev_err(parent_dev, "Error: Bad msi-map length: %d\n",
--				msi_map_len);
--			return rid_out;
--		}
--		/* We have a good parent_dev and msi_map, let's use them. */
--		break;
--	}
--	if (!msi_map)
--		return rid_out;
--
--	/* The default is to select all bits. */
--	map_mask = 0xffffffff;
--
+-	if (action != BUS_NOTIFY_ADD_DEVICE)
++	if (action != BUS_NOTIFY_BIND_DRIVER)
+ 		return 0;
+ 
+ 	mutex_lock(&iommu_dma_notifier_lock);
+ 	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
+-		if (do_iommu_attach(master->dev, master->ops,
+-				master->dma_base, master->size)) {
++		if (data == master->dev && do_iommu_attach(master->dev,
++				master->ops, master->dma_base, master->size)) {
+ 			list_del(&master->list);
+ 			kfree(master);
++			break;
+ 		}
+ 	}
+ 	mutex_unlock(&iommu_dma_notifier_lock);
+@@ -870,17 +871,8 @@ static int __init register_iommu_dma_ops_notifier(struct bus_type *bus)
+ 
+ 	if (!nb)
+ 		return -ENOMEM;
 -	/*
--	 * Can be overridden by "msi-map-mask" property.  If
--	 * of_property_read_u32() fails, the default is used.
+-	 * The device must be attached to a domain before the driver probe
+-	 * routine gets a chance to start allocating DMA buffers. However,
+-	 * the IOMMU driver also needs a chance to configure the iommu_group
+-	 * via its add_device callback first, so we need to make the attach
+-	 * happen between those two points. Since the IOMMU core uses a bus
+-	 * notifier with default priority for add_device, do the same but
+-	 * with a lower priority to ensure the appropriate ordering.
 -	 */
--	of_property_read_u32(parent_dev->of_node, "msi-map-mask", &map_mask);
--
--	masked_rid = map_mask & rid_in;
--	matched = false;
--	while (!matched && msi_map_len >= 4 * sizeof(__be32)) {
--		rid_base = be32_to_cpup(msi_map + 0);
--		phandle = be32_to_cpup(msi_map + 1);
--		msi_base = be32_to_cpup(msi_map + 2);
--		rid_len = be32_to_cpup(msi_map + 3);
--
--		if (rid_base & ~map_mask) {
--			dev_err(parent_dev,
--				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-base (0x%x)\n",
--				map_mask, rid_base);
--			return rid_out;
--		}
--
--		msi_controller_node = of_find_node_by_phandle(phandle);
--
--		matched = (masked_rid >= rid_base &&
--			   masked_rid < rid_base + rid_len);
--		if (msi_np)
--			matched &= msi_np == msi_controller_node;
--
--		if (matched && !msi_np) {
--			*np = msi_np = msi_controller_node;
-+	for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent)
-+		if (!of_pci_map_rid(parent_dev->of_node, rid_in, "msi-map",
-+				    "msi-map-mask", np, &rid_out))
- 			break;
--		}
--
--		of_node_put(msi_controller_node);
--		msi_map_len -= 4 * sizeof(__be32);
--		msi_map += 4;
--	}
--	if (!matched)
--		return rid_out;
--
--	rid_out = masked_rid - rid_base + msi_base;
--	dev_dbg(dev,
--		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
--		dev_name(parent_dev), map_mask, rid_base, msi_base,
--		rid_len, rid_in, rid_out);
--
- 	return rid_out;
- }
++
+ 	nb->notifier_call = __iommu_attach_notifier;
+-	nb->priority = -100;
  
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 13f4fed38048..e6465cf7aea9 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -306,3 +306,105 @@ struct msi_controller *of_pci_find_msi_chip_by_node(struct device_node *of_node)
- EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
- 
- #endif /* CONFIG_PCI_MSI */
-+
-+/**
-+ * of_pci_map_rid - Translate a requester ID through a downstream mapping.
-+ * @np: root complex device node.
-+ * @rid: PCI requester ID to map.
-+ * @map_name: property name of the map to use.
-+ * @map_mask_name: optional property name of the mask to use.
-+ * @target: optional pointer to a target device node.
-+ * @id_out: optional pointer to receive the translated ID.
-+ *
-+ * Given a PCI requester ID, look up the appropriate implementation-defined
-+ * platform ID and/or the target device which receives transactions on that
-+ * ID, as per the "iommu-map" and "msi-map" bindings. Either of @target or
-+ * @id_out may be NULL if only the other is required. If @target points to
-+ * a non-NULL device node pointer, only entries targeting that node will be
-+ * matched; if it points to a NULL value, it will receive the device node of
-+ * the first matching target phandle, with a reference held.
-+ *
-+ * Return: 0 on success or a standard error code on failure.
-+ */
-+int of_pci_map_rid(struct device_node *np, u32 rid,
-+		   const char *map_name, const char *map_mask_name,
-+		   struct device_node **target, u32 *id_out)
-+{
-+	u32 map_mask, masked_rid;
-+	int map_len;
-+	const __be32 *map = NULL;
-+
-+	if (!np || !map_name || (!target && !id_out))
-+		return -EINVAL;
-+
-+	map = of_get_property(np, map_name, &map_len);
-+	if (!map) {
-+		if (target)
-+			return -ENODEV;
-+		/* Otherwise, no map implies no translation */
-+		*id_out = rid;
-+		return 0;
-+	}
-+
-+	if (!map_len || map_len % (4 * sizeof(*map))) {
-+		pr_err("%s: Error: Bad %s length: %d\n", np->full_name,
-+			map_name, map_len);
-+		return -EINVAL;
-+	}
-+
-+	/* The default is to select all bits. */
-+	map_mask = 0xffffffff;
-+
-+	/*
-+	 * Can be overridden by "{iommu,msi}-map-mask" property.
-+	 * If of_property_read_u32() fails, the default is used.
-+	 */
-+	if (map_mask_name)
-+		of_property_read_u32(np, map_mask_name, &map_mask);
-+
-+	masked_rid = map_mask & rid;
-+	for ( ; map_len > 0; map_len -= 4 * sizeof(*map), map += 4) {
-+		struct device_node *phandle_node;
-+		u32 rid_base = be32_to_cpup(map + 0);
-+		u32 phandle = be32_to_cpup(map + 1);
-+		u32 out_base = be32_to_cpup(map + 2);
-+		u32 rid_len = be32_to_cpup(map + 3);
-+
-+		if (rid_base & ~map_mask) {
-+			pr_err("%s: Invalid %s translation - %s-mask (0x%x) ignores rid-base (0x%x)\n",
-+				np->full_name, map_name, map_name,
-+				map_mask, rid_base);
-+			return -EFAULT;
-+		}
-+
-+		if (masked_rid < rid_base || masked_rid >= rid_base + rid_len)
-+			continue;
-+
-+		phandle_node = of_find_node_by_phandle(phandle);
-+		if (!phandle_node)
-+			return -ENODEV;
-+
-+		if (target) {
-+			if (*target)
-+				of_node_put(phandle_node);
-+			else
-+				*target = phandle_node;
-+
-+			if (*target != phandle_node)
-+				continue;
-+		}
-+
-+		if (id_out)
-+			*id_out = masked_rid - rid_base + out_base;
-+
-+		pr_debug("%s: %s, using mask %08x, rid-base: %08x, out-base: %08x, length: %08x, rid: %08x -> %08x\n",
-+			np->full_name, map_name, map_mask, rid_base, out_base,
-+			rid_len, rid, *id_out);
-+		return 0;
-+	}
-+
-+	pr_err("%s: Invalid %s translation - no match for rid 0x%x on %s\n",
-+		np->full_name, map_name, rid,
-+		target && *target ? (*target)->full_name : "any target");
-+	return -EFAULT;
-+}
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index b969e9443962..7fd5cfce9140 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -17,6 +17,9 @@ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- int of_get_pci_domain_nr(struct device_node *node);
- void of_pci_check_probe_only(void);
-+int of_pci_map_rid(struct device_node *np, u32 rid,
-+		   const char *map_name, const char *map_mask_name,
-+		   struct device_node **target, u32 *id_out);
- #else
- static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
- {
-@@ -52,6 +55,13 @@ of_get_pci_domain_nr(struct device_node *node)
- 	return -1;
- }
- 
-+static inline int of_pci_map_rid(struct device_node *np, u32 rid,
-+			const char *map_name, const char *map_mask_name,
-+			struct device_node **target, u32 *id_out)
-+{
-+	return -EINVAL;
-+}
-+
- static inline void of_pci_check_probe_only(void) { }
+ 	ret = bus_register_notifier(bus, nb);
+ 	if (ret) {
+@@ -904,10 +896,6 @@ static int __init __iommu_dma_init(void)
+ 	if (!ret)
+ 		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
  #endif
- 
+-
+-	/* handle devices queued before this arch_initcall */
+-	if (!ret)
+-		__iommu_attach_notifier(NULL, BUS_NOTIFY_ADD_DEVICE, NULL);
+ 	return ret;
+ }
+ arch_initcall(__iommu_dma_init);
 -- 
 2.8.1.dirty
