@@ -1,33 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jul 2016 19:05:33 +0200
-Subject: mainline build: 12 warnings 1 failures
- (mainline/v4.7-rc5-284-g6e5c4f1)
-In-Reply-To: <5776a052.8408620a.86fce.1d56@mx.google.com>
-References: <5776a052.8408620a.86fce.1d56@mx.google.com>
-Message-ID: <3687744.RSsK8MoIk0@wuerfel>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 1 Jul 2016 13:09:18 -0400
+Subject: [PATCH v2] arm64: dts: rockchip: add the power domain node for
+ rk3399
+In-Reply-To: <1467347575-11806-1-git-send-email-wxt@rock-chips.com>
+References: <1467347575-11806-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <CABxcv=nJ4jaeBwPOfcKTmBpSHSD1wX-kJ2oi-bFki4=Dae0tEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 1, 2016 9:54:42 AM CEST Olof's autobuilder wrote:
-> 
-> Warnings:
->       1 drivers/block/floppy.c:1777:44: warning: self-comparison always evaluates to true [-Wtautological-compare]
->       1 drivers/block/floppy.c:1779:44: warning: self-comparison always evaluates to true [-Wtautological-compare]
->       1 drivers/block/floppy.c:4487:45: warning: self-comparison always evaluates to true [-Wtautological-compare]
->       1 drivers/block/floppy.c:4495:45: warning: self-comparison always evaluates to true [-Wtautological-compare]
->       1 drivers/block/floppy.c:810:44: warning: self-comparison always evaluates to true [-Wtautological-compare]
->       1 drivers/block/floppy.c:825:43: warning: self-comparison always evaluates to true [-Wtautological-compare]
->       1 drivers/block/floppy.c:826:43: warning: self-comparison always evaluates to true [-Wtautological-compare]
->       1 drivers/infiniband/core/cma.c:1242:12: warning: 'src_addr_storage.sin_addr.s_addr' may be used uninitialized in this function [-Wmaybe-uninitialized]
->       1 fs/reiserfs/ibalance.c:1156:2: warning: 'new_insert_key' may be used uninitialized in this function [-Wmaybe-uninitialized]
->       1 include/sound/control.h:219:9: warning: 'master_vol' may be used uninitialized in this function [-Wmaybe-uninitialized]
->       2 drivers/net/wireless/intel/iwlegacy/3945.c:1022:5: warning: suggest explicit braces to avoid ambiguous 'else' [-Wparentheses]
+Hello Caesar,
 
+On Fri, Jul 1, 2016 at 12:32 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> From: Elaine Zhang <zhangqing@rock-chips.com>
+>
+> In order to meet low power requirements, a power management unit (PMU) is
+> designed for controlling power resources in RK3399. The RK3399 PMU is
+> dedicated for managing the power of the whole chip.
+>
+> 1. add pd node for RK3399 Soc
+> 2. create power domain tree
+> 3. add qos node for domain
+>
+> From the DT/binds and driver can get more detail information:
+> The driver:
+>         drivers/soc/rockchip/pm_domains.c
+> The document:
+>         Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> ---
 
-I've added a patch for the first floppy.c warnings to Russell's patch
-tracker, I had sent it a while ago to the list and then forgotten about it.
+Everything from here to the actual diff will omitted by tools like git-am...
 
-The iwlegacy patch is in linux-next, the other three seem to only show up
-in you ppc64 defconfig build. What compiler version do you use there?
+>
+> Changes in v2:
+> - As Doug/Heiko commnets on https://patchwork.kernel.org/patch/9206415/.
+>   drop the debugfs-dump and Add the comments for alphabetical order.
+>
+> Note: As the TRM lists many voltage domains and power domains, then
+> in actual we just need control some domains for driver.
+> Due to some domains (e.g. emmc, usb, core)...We can't turn off it on
+> bootup.
+>
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+> Cc: Heiko Stuebner <heiko@sntech.de>
+>
 
-	Arnd
+...but you have your S-o-B and collected tags here so these are going
+to be stripped. You should move those before the first '---'
+separator.
+
+Best regards,
+Javier
