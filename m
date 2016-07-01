@@ -1,37 +1,42 @@
 From: oss@buserror.net (Scott Wood)
-Date: Fri,  1 Jul 2016 17:41:35 -0500
-Subject: [PATCH v3 1/3] arm64: arch_timer: Add device tree binding for
- A-008585 erratum
-Message-ID: <1467412897-15220-1-git-send-email-oss@buserror.net>
+Date: Fri,  1 Jul 2016 17:41:36 -0500
+Subject: [PATCH v3 2/3] arm64: dts: Add timer erratum property for LS2080A and
+ LS1043A
+In-Reply-To: <1467412897-15220-1-git-send-email-oss@buserror.net>
+References: <1467412897-15220-1-git-send-email-oss@buserror.net>
+Message-ID: <1467412897-15220-2-git-send-email-oss@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This erratum describes a bug in logic outside the core, so MIDR can't be
-used to identify its presence, and reading an SoC-specific revision
-register from common arch timer code would be awkward.  So, describe it
-in the device tree.
-
 Signed-off-by: Scott Wood <oss@buserror.net>
 ---
- Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-index e774128..ef5fbe9 100644
---- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-@@ -25,6 +25,12 @@ to deliver its interrupts via SPIs.
- - always-on : a boolean property. If present, the timer is powered through an
-   always-on power domain, therefore it never loses context.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index be72bf5..596420c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -115,6 +115,7 @@
+ 			     <1 14 0x1>, /* Physical Non-Secure PPI */
+ 			     <1 11 0x1>, /* Virtual PPI */
+ 			     <1 10 0x1>; /* Hypervisor PPI */
++		fsl,erratum-a008585;
+ 	};
  
-+- fsl,erratum-a008585 : A boolean property. Indicates the presence of
-+  QorIQ erratum A-008585, which says that reading the counter is
-+  unreliable unless the same value is returned by back-to-back reads.
-+  This also affects writes to the tval register, due to the implicit
-+  counter read.
-+
- ** Optional properties:
+ 	pmu {
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 9d746c6..0270ccf 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -171,6 +171,7 @@
+ 			     <1 14 0x8>, /* Physical Non-Secure PPI, active-low */
+ 			     <1 11 0x8>, /* Virtual PPI, active-low */
+ 			     <1 10 0x8>; /* Hypervisor PPI, active-low */
++		fsl,erratum-a008585;
+ 	};
  
- - arm,cpu-registers-not-fw-configured : Firmware does not initialize
+ 	pmu {
 -- 
 2.7.4
