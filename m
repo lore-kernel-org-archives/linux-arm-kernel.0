@@ -1,48 +1,114 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 1 Jul 2016 14:31:58 +0200
-Subject: [PATCH 2/7] arm: mach-shmobile: pm-rmobile: add missing
- of_node_put after calling of_parse_phandle
-In-Reply-To: <1467366121-14120-3-git-send-email-peter.chen@nxp.com>
-References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
- <1467366121-14120-3-git-send-email-peter.chen@nxp.com>
-Message-ID: <CAMuHMdVE8VzPunLzr7WO-kzcg25rKvFkoQcjJ4czwrQxX_obiw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 Jul 2016 13:35:08 +0100
+Subject: [PATCH v3 7/9] iommu/arm-smmu: Implement of_xlate() for SMMUv3
+In-Reply-To: <6de0ca7795e1b74627ceb55dcefcfd5537f245ce.1467123945.git.robin.murphy@arm.com>
+References: <cover.1467123945.git.robin.murphy@arm.com>
+ <6de0ca7795e1b74627ceb55dcefcfd5537f245ce.1467123945.git.robin.murphy@arm.com>
+Message-ID: <20160701123507.GJ12735@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, Jun 28, 2016 at 04:48:26PM +0100, Robin Murphy wrote:
+> Now that we can properly describe the mapping between PCI RIDs and
+> stream IDs via "iommu-map", and have it fed it to the driver
+> automatically via of_xlate(), rework the SMMUv3 driver to benefit from
+> that, and get rid of the current misuse of the "iommus" binding.
+> 
+> Since having of_xlate wired up means that masters will now be given the
+> appropriate DMA ops, we also need to make sure that default domains work
+> properly. This necessitates dispensing with the "whole group at a time"
+> notion for attaching to a domain, as devices which share a group get
+> attached to the group's default domain one by one as they are initially
+> probed.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 
-On Fri, Jul 1, 2016 at 11:41 AM, Peter Chen <peter.chen@nxp.com> wrote:
-> of_node_put needs to be called when the device node which is got
-> from of_parse_phandle has finished using.
->
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+[...]
 
-NAKed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>  static int arm_smmu_add_device(struct device *dev)
+>  {
+>  	int i, ret;
+> -	u32 sid, *sids;
+> -	struct pci_dev *pdev;
+> -	struct iommu_group *group;
+> -	struct arm_smmu_group *smmu_group;
+>  	struct arm_smmu_device *smmu;
+> +	struct arm_smmu_master_data *master;
+> +	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
+> +	struct iommu_group *group;
+>  
+> -	/* We only support PCI, for now */
+> -	if (!dev_is_pci(dev))
+> +	if (!fwspec || fwspec->iommu_ops != &arm_smmu_ops)
+>  		return -ENODEV;
+> -
+> -	pdev = to_pci_dev(dev);
+> -	group = iommu_group_get_for_dev(dev);
+> -	if (IS_ERR(group))
+> -		return PTR_ERR(group);
+> -
+> -	smmu_group = iommu_group_get_iommudata(group);
+> -	if (!smmu_group) {
+> -		smmu = arm_smmu_get_for_pci_dev(pdev);
+> -		if (!smmu) {
+> -			ret = -ENOENT;
+> -			goto out_remove_dev;
+> -		}
+> -
+> -		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
+> -		if (!smmu_group) {
+> -			ret = -ENOMEM;
+> -			goto out_remove_dev;
+> -		}
+> -
+> -		smmu_group->ste.valid	= true;
+> -		smmu_group->smmu	= smmu;
+> -		iommu_group_set_iommudata(group, smmu_group,
+> -					  __arm_smmu_release_pci_iommudata);
+> +	/*
+> +	 * We _can_ actually withstand dodgy bus code re-calling add_device()
+> +	 * without an intervening remove_device()/of_xlate() sequence, but
+> +	 * we're not going to do so quietly...
+> +	 */
+> +	if (WARN_ON_ONCE(fwspec->iommu_priv)) {
+> +		master = fwspec->iommu_priv;
+> +		smmu = master->smmu;
+>  	} else {
+> -		smmu = smmu_group->smmu;
+> +		smmu = arm_smmu_get_by_node(fwspec->iommu_np);
+> +		if (!smmu)
+> +			return -ENODEV;
+> +		master = kzalloc(sizeof(*master), GFP_KERNEL);
+> +		if (!master)
+> +			return -ENOMEM;
+> +
+> +		master->smmu = smmu;
+> +		fwspec->iommu_priv = master;
+>  	}
+>  
+> -	/* Assume SID == RID until firmware tells us otherwise */
+> -	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
+> -	for (i = 0; i < smmu_group->num_sids; ++i) {
+> -		/* If we already know about this SID, then we're done */
+> -		if (smmu_group->sids[i] == sid)
+> -			goto out_put_group;
+> +	/* Check the SIDs are in range of the SMMU and our stream table */
+> +	for (i = 0; i < fwspec->num_ids; i++) {
+> +		u32 sid = fwspec->ids[i];
+> +
+> +		if (!arm_smmu_sid_in_range(smmu, sid))
+> +			return -ERANGE;
+> +
+> +		/* Ensure l2 strtab is initialised */
+> +		if (smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
+> +			ret = arm_smmu_init_l2_strtab(smmu, sid);
+> +			if (ret)
+> +				return ret;
+> +		}
+>  	}
 
-> --- a/arch/arm/mach-shmobile/pm-rmobile.c
-> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
-> @@ -209,6 +209,7 @@ static void __init add_special_pd(struct device_node *np, enum pd_types type)
->         special_pds[num_special_pds].pd = pd;
+Do you not need to do some cleanup here, rather than just returning (same
+for the -ERANGE above)? For example, freeing the master?
 
-The pd pointer is stored in the line above, and released later in
-put_special_pds().
-
->         special_pds[num_special_pds].type = type;
->         num_special_pds++;
-> +       of_node_put(pd);
-
-Hence it must not be released here, as that would cause a double release
-when put_special_pds() is executed.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will
