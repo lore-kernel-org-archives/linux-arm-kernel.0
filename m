@@ -1,45 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 1 Jul 2016 17:34:46 +0200
-Subject: [PATCH 2/2] arm64: document that pending SErrors are not allowed
- at kernel entry
-In-Reply-To: <20160701152515.GB17071@leverpostej>
-References: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
- <1467385291-9880-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160701152515.GB17071@leverpostej>
-Message-ID: <CAKv+Gu_mJzY9YQtibOcvyqMLRNjfxQH5M4eJ=gDU1Uv7hqeGeg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 01 Jul 2016 17:42:39 +0200
+Subject: [PATCH 6/7] dt-bindings: net: bgmac: add bindings documentation
+ for bgmac
+In-Reply-To: <CAC3K-4qfb3JQ3i8nEo2AOobb1ExB=d=dSZUrdype+z9eHi1FwQ@mail.gmail.com>
+References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
+ <29091648.CIZSyGWL7u@wuerfel>
+ <CAC3K-4qfb3JQ3i8nEo2AOobb1ExB=d=dSZUrdype+z9eHi1FwQ@mail.gmail.com>
+Message-ID: <6488341.IDGze89kcW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 July 2016 at 17:25, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Jul 01, 2016 at 05:01:31PM +0200, Ard Biesheuvel wrote:
->> Our current strategy to deal with pending SErrors at boot is to panic.
->> So let's mention in our boot protocol documentation that no SErrors
->> should be pending when handing over to the kernel.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  Documentation/arm64/booting.txt | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
->> index 8d0df62c3fe0..75dcfead1a0c 100644
->> --- a/Documentation/arm64/booting.txt
->> +++ b/Documentation/arm64/booting.txt
->> @@ -154,8 +154,9 @@ Before jumping into the kernel, the following conditions must be met:
->>    x3 = 0 (reserved for future use)
->>
->>  - CPU mode
->> -  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
->> -  IRQ and FIQ).
->> +  All forms of exceptions must be masked in PSTATE.DAIF (Debug, SError,
->> +  IRQ and FIQ), and any pending SError exceptions must be taken by the
->> +  boot loader or firmware before handing over to the kernel.
->
-> That can be read to mean that a loader should silently swallow SError,
-> which isn't quite what we want (that no SError ever occurs). I don't
-> have a better wording to suggest, unfortunately. :/
->
+On Friday, July 1, 2016 11:17:25 AM CEST Jon Mason wrote:
+> On Fri, Jul 1, 2016 at 5:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday, June 30, 2016 6:59:13 PM CEST Jon Mason wrote:
+> >> +
+> >> +Required properties:
+> >> + - compatible: "brcm,bgmac-nsp"
+> >> + - reg:                Address and length of the GMAC registers,
+> >> +               Address and length of the GMAC IDM registers
+> >> + - reg-names:  Names of the registers.  Must have both "gmac_base" and
+> >> +               "idm_base"
+> >> + - interrupts: Interrupt number
+> >> +
+> >
+> >
+> > "brcm,bgmac-nsp" sounds a bit too general. As I understand, this is a family
+> > of SoCs that might not all have the exact same implementation of this
+> > ethernet device, as we can see from the long lookup table in bgmac_probe().
+> 
+> The Broadcom iProc family of SoCs contains:
+> Northstar
+> Northstar Plus
+> Cygnus
+> Northstar 2
+> a few SoCs that are under development
+> and a number of ethernet switches (which might never be officially supported)
+> 
+> Each one of these SoCs could have a different revision of the gmac IP
+> block, but they should be uniform within each SoC (though there might
+> be a A0/B0 change necessary).  The Northstar Plus product family has a
+> number of different implementations, but the SoC is unchanged.  So, I
+> think this might be too specific, when we really need a general compat
+> string.
 
-I don't think it is up to us to mandate how the firmware should be
-dealing with early SErrors, as long as none are pending when we enter
-the kernel.
+Ok, thanks for the clarification, that sounds good enough.
+
+> Broadcom has a history of sharing IP blocks amongst the different
+> divisions.  So, this driver might be used on other SoC families (as it
+> apparently has been done in the past, based on the code you
+> reference).  I do not know of any way to know what legacy, non-iProc
+> chips have used this IP block.  I can make this "brcm,iproc-bgmac",
+> and add "brcm,iproc-nsp-bgmac" as an alternative compatible string in
+> this file (which I believe you are suggesting), but there might be
+> non-iProc SoCs that use this driver.  Is this acceptable?
+
+If it is also used outside of iProc, then I see no need for the
+extra compatible string, although it would not do any harm either.
+
+Ideally we should name it whatever the name for this IP block is
+inside of the company, with "nsp" as the designation for the variant
+in Northstar Plus. A lot of Broadcom IP blocks themselves seem to have
+some four-digit or five-digit number, maybe this one does too?
+
+	Arnd
