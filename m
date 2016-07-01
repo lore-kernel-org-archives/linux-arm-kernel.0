@@ -1,59 +1,43 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri, 1 Jul 2016 10:29:36 -0400
-Subject: [PATCH 6/7] dt-bindings: net: bgmac: add bindings documentation
- for bgmac
-In-Reply-To: <20160701025619.GA4906@rob-hp-laptop>
-References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
- <1467327554-22074-7-git-send-email-jon.mason@broadcom.com>
- <20160701025619.GA4906@rob-hp-laptop>
-Message-ID: <CAC3K-4pu2k8HZ3g-LxbVAFOxPayDT=hK1qgix1Pc81aTEmGQzA@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Fri, 1 Jul 2016 16:31:58 +0200
+Subject: STi SoC changes for v4.8
+Message-ID: <57767EDE.8050708@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 10:56 PM, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Jun 30, 2016 at 06:59:13PM -0400, Jon Mason wrote:
->> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
->> ---
->>  .../devicetree/bindings/net/brcm,bgmac-nsp.txt     | 24 ++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt b/Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
->> new file mode 100644
->> index 0000000..022946c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
->> @@ -0,0 +1,24 @@
->> +Broadcom GMAC Ethernet Controller Device Tree Bindings
->> +-------------------------------------------------------------
->> +
->> +Required properties:
->> + - compatible:       "brcm,bgmac-nsp"
->
-> Usually we do <soc>-<block> order.
+Hi Olof, Arnd and Kevin,
 
-Thanks, I'll make the necessary changes and push out a v2.
+Please consider this first round of STi SoC updates for v4.8:
 
->
->> + - reg:              Address and length of the GMAC registers,
->> +             Address and length of the GMAC IDM registers
->> + - reg-names:        Names of the registers.  Must have both "gmac_base" and
->> +             "idm_base"
->> + - interrupts:       Interrupt number
->> +
->> +Optional properties:
->> +- mac-address:       See ethernet.txt file in the same directory
->> +
->> +Examples:
->> +
->> +gmac0: ethernet at 18022000 {
->> +     compatible = "brcm,bgmac-nsp";
->> +     reg = <0x18022000 0x1000>,
->> +           <0x18110000 0x1000>;
->> +     reg-names = "gmac_base", "idm_base";
->> +     interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
->> +     status = "disabled";
->> +};
->> --
->> 1.9.1
->>
+The following changes since commit 4c2e07c6a29e0129e975727b9f57eede813eea85:
+
+   Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+sti-soc_for_v4.8
+
+for you to fetch changes up to 55aa35180c57d82f3db23e5aabce97acb0d36681:
+
+   ARM: sti: Implement dummy L2 cache's write_sec (2016-07-01 16:23:44 
++0200)
+----------------------------------------------------------------
+
+Highlights:
+-----------
+_ add a dummy L2 cache's write_sec callback as in non secure mode execution,
+   we can't get access to L2 cache secure registers
+_ cosmetics change, in case of dump_stack, update the hardware name with a
+   more genericfor the STi SoCs family
+
+
+----------------------------------------------------------------
+Patrice Chotard (1):
+       ARM: sti: Implement dummy L2 cache's write_sec
+
+Peter Griffin (1):
+       ARM: STi: Update machine _namestr to be more generic.
+
+  arch/arm/mach-sti/board-dt.c | 11 ++++++++++-
+  1 file changed, 10 insertions(+), 1 deletion(-)
