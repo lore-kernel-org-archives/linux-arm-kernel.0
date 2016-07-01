@@ -1,32 +1,68 @@
-From: olivier.schonken@gmail.com (Olivier Schonken)
-Date: Fri,  1 Jul 2016 16:33:39 +0200
-Subject: [PATCH] ARM: dts: at91: sama5d2: add PMU node
-Message-ID: <1467383619-6805-1-git-send-email-olivier.schonken@gmail.com>
+From: kieran@bingham.xyz (Kieran Bingham)
+Date: Fri, 1 Jul 2016 15:37:23 +0100
+Subject: [PATCH 2/2] arm64: dts: r8a7795: add FDP1 device nodes
+In-Reply-To: <1467293563-940-3-git-send-email-kieran@bingham.xyz>
+References: <1467293563-940-1-git-send-email-kieran@bingham.xyz>
+ <1467293563-940-3-git-send-email-kieran@bingham.xyz>
+Message-ID: <57768023.8010507@bingham.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node to support SAMA5D2 Performance Monitor Unit.
+Hi Simon,
 
-Signed-off-by: Olivier Schonken <olivier.schonken@gmail.com>
----
- arch/arm/boot/dts/sama5d2.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+The bindings for this have now been acked by RobH.
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 2827e7a..5d63206 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -72,6 +72,11 @@
- 		};
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a5-pmu";
-+		interrupts = <2 IRQ_TYPE_LEVEL_HIGH 0>;
-+	};
-+
- 	memory {
- 		reg = <0x20000000 0x20000000>;
- 	};
--- 
-1.9.1
+--
+Cheers
+
+Kieran
+
+On 30/06/16 14:32, Kieran Bingham wrote:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Kieran Bingham <kieran@bingham.xyz>
+> --
+> changes for v2
+>  - channel labels dropped
+> 
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> index a451bd217f05..8bc87e09efd7 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> @@ -1443,5 +1443,32 @@
+>  			clocks = <&cpg CPG_MOD 613>;
+>  			power-domains = <&sysc R8A7795_PD_A3VP>;
+>  		};
+> +
+> +		fdp1 at fe940000 {
+> +			compatible = "renesas,fdp1";
+> +			reg = <0 0xfe940000 0 0x2400>;
+> +			interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 119>;
+> +			power-domains = <&sysc R8A7795_PD_A3VP>;
+> +			renesas,fcp = <&fcpf0>;
+> +		};
+> +
+> +		fdp1 at fe944000 {
+> +			compatible = "renesas,fdp1";
+> +			reg = <0 0xfe944000 0 0x2400>;
+> +			interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 118>;
+> +			power-domains = <&sysc R8A7795_PD_A3VP>;
+> +			renesas,fcp = <&fcpf1>;
+> +		};
+> +
+> +		fdp1 at fe948000 {
+> +			compatible = "renesas,fdp1";
+> +			reg = <0 0xfe948000 0 0x2400>;
+> +			interrupts = <GIC_SPI 264 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 117>;
+> +			power-domains = <&sysc R8A7795_PD_A3VP>;
+> +			renesas,fcp = <&fcpf2>;
+> +		};
+>  	};
+>  };
+> 
