@@ -1,159 +1,37 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  1 Jul 2016 23:52:05 +0200
-Subject: [PATCH v3] ARM: at91: Document new TCB bindings
-Message-ID: <1467409925-17761-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: oss@buserror.net (Scott Wood)
+Date: Fri,  1 Jul 2016 17:41:35 -0500
+Subject: [PATCH v3 1/3] arm64: arch_timer: Add device tree binding for
+ A-008585 erratum
+Message-ID: <1467412897-15220-1-git-send-email-oss@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current binding for the TCB is not flexible enough for some use cases
-and prevents proper utilization of all the channels.
+This erratum describes a bug in logic outside the core, so MIDR can't be
+used to identify its presence, and reading an SoC-specific revision
+register from common arch timer code would be awkward.  So, describe it
+in the device tree.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: linux-pwm at vger.kernel.org
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Scott Wood <oss@buserror.net>
 ---
- .../devicetree/bindings/arm/atmel-at91.txt         | 32 ------------
- .../devicetree/bindings/mfd/atmel-tcb.txt          | 58 ++++++++++++++++++++++
- .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
- 3 files changed, 65 insertions(+), 37 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt
+ Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index e1f5ad855f14..3dc758403d03 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -60,38 +60,6 @@ System Timer (ST) required properties:
- Its subnodes can be:
- - watchdog: compatible should be "atmel,at91rm9200-wdt"
+diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+index e774128..ef5fbe9 100644
+--- a/Documentation/devicetree/bindings/arm/arch_timer.txt
++++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+@@ -25,6 +25,12 @@ to deliver its interrupts via SPIs.
+ - always-on : a boolean property. If present, the timer is powered through an
+   always-on power domain, therefore it never loses context.
  
--TC/TCLIB Timer required properties:
--- compatible: Should be "atmel,<chip>-tcb".
--  <chip> can be "at91rm9200" or "at91sam9x5"
--- reg: Should contain registers location and length
--- interrupts: Should contain all interrupts for the TC block
--  Note that you can specify several interrupt cells if the TC
--  block has one interrupt per channel.
--- clock-names: tuple listing input clock names.
--	Required elements: "t0_clk", "slow_clk"
--	Optional elements: "t1_clk", "t2_clk"
--- clocks: phandles to input clocks.
--
--Examples:
--
--One interrupt per TC block:
--	tcb0: timer at fff7c000 {
--		compatible = "atmel,at91rm9200-tcb";
--		reg = <0xfff7c000 0x100>;
--		interrupts = <18 4>;
--		clocks = <&tcb0_clk>;
--		clock-names = "t0_clk";
--	};
--
--One interrupt per TC channel in a TC block:
--	tcb1: timer at fffdc000 {
--		compatible = "atmel,at91rm9200-tcb";
--		reg = <0xfffdc000 0x100>;
--		interrupts = <26 4 27 4 28 4>;
--		clocks = <&tcb1_clk>;
--		clock-names = "t0_clk";
--	};
--
- RSTC Reset Controller required properties:
- - compatible: Should be "atmel,<chip>-rstc".
-   <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
-diff --git a/Documentation/devicetree/bindings/mfd/atmel-tcb.txt b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-new file mode 100644
-index 000000000000..693c7361e1ba
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-@@ -0,0 +1,58 @@
-+* Device tree bindings for Atmel Timer Counter Blocks
-+- compatible: Should be "atmel,<chip>-tcb", "simple-mfd", "syscon".
-+  <chip> can be "at91rm9200" or "at91sam9x5"
-+- reg: Should contain registers location and length
-+- #address-cells: has to be 1
-+- #size-cells: has to be 0
-+- interrupts: Should contain all interrupts for the TC block
-+  Note that you can specify several interrupt cells if the TC
-+  block has one interrupt per channel.
-+- clock-names: tuple listing input clock names.
-+	Required elements: "t0_clk", "slow_clk"
-+	Optional elements: "t1_clk", "t2_clk"
-+- clocks: phandles to input clocks.
++- fsl,erratum-a008585 : A boolean property. Indicates the presence of
++  QorIQ erratum A-008585, which says that reading the counter is
++  unreliable unless the same value is returned by back-to-back reads.
++  This also affects writes to the tval register, due to the implicit
++  counter read.
 +
-+The TCB can expose multiple subdevices:
-+ * a timer
-+   - compatible: Should be "atmel,tcb-timer"
-+   - reg: Should contain the TCB channels to be used. If the
-+     counter width is 16 bits (at91rm9200-tcb), two consecutive
-+     channels are needed. Else, only one channel will be used.
-+
-+ * a PWM chip: see ../pwm/atmel-tcb-pwm.txt
-+
-+Examples:
-+
-+One interrupt per TC block:
-+	tcb0: timer at fff7c000 {
-+		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0xfff7c000 0x100>;
-+		interrupts = <18 4>;
-+		clocks = <&tcb0_clk>, <&clk32k>;
-+		clock-names = "t0_clk", "slow_clk";
-+
-+		timer at 0 {
-+			compatible = "atmel,tcb-timer";
-+			reg = <0>, <1>;
-+		};
-+
-+		timer at 2 {
-+			compatible = "atmel,tcb-timer";
-+			reg = <2>;
-+		};
-+	};
-+
-+One interrupt per TC channel in a TC block:
-+	tcb1: timer at fffdc000 {
-+		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0xfffdc000 0x100>;
-+		interrupts = <26 4>, <27 4>, <28 4>;
-+		clocks = <&tcb1_clk>, <&clk32k>;
-+		clock-names = "t0_clk", "slow_clk";
-+	};
-+
-+
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-index 8031148bcf85..ab8fbd5ba184 100644
---- a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-@@ -2,15 +2,17 @@ Atmel TCB PWM controller
+ ** Optional properties:
  
- Required properties:
- - compatible: should be "atmel,tcb-pwm"
-+- reg: tcb channel to use. Each channel can export 2 PWMs
- - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-   the cells format. The only third cell flag supported by this binding is
-   PWM_POLARITY_INVERTED.
--- tc-block: The Timer Counter block to use as a PWM chip.
- 
- Example:
- 
--pwm {
--	compatible = "atmel,tcb-pwm";
--	#pwm-cells = <3>;
--	tc-block = <1>;
-+tcb0: timer at f800c000 {
-+	pwm at 0 {
-+		compatible = "atmel,tcb-pwm";
-+		reg = <0>;
-+		#pwm-cells = <3>;
-+	};
- };
+ - arm,cpu-registers-not-fw-configured : Firmware does not initialize
 -- 
-2.8.1
+2.7.4
