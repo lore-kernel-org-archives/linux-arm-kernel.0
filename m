@@ -1,91 +1,45 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 1 Jul 2016 17:31:33 +0200
-Subject: [PATCH 1/2] efi: arm64: abort boot on pending SError
-In-Reply-To: <20160701152252.GA17071@leverpostej>
+Date: Fri, 1 Jul 2016 17:34:46 +0200
+Subject: [PATCH 2/2] arm64: document that pending SErrors are not allowed
+ at kernel entry
+In-Reply-To: <20160701152515.GB17071@leverpostej>
 References: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160701152252.GA17071@leverpostej>
-Message-ID: <CAKv+Gu9Pk6xbUUMisAMhd4rpoYHA+wjzrZGkyEUXPdx_TaniVQ@mail.gmail.com>
+ <1467385291-9880-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160701152515.GB17071@leverpostej>
+Message-ID: <CAKv+Gu_mJzY9YQtibOcvyqMLRNjfxQH5M4eJ=gDU1Uv7hqeGeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 July 2016 at 17:22, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Jul 01, 2016 at 05:01:30PM +0200, Ard Biesheuvel wrote:
->> It is the firmware's job to clear any pending SErrors before entering
->> the kernel. On UEFI, we can fail gracefully rather than panic during
->> early boot, so check for this condition in the stub.
+On 1 July 2016 at 17:25, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jul 01, 2016 at 05:01:31PM +0200, Ard Biesheuvel wrote:
+>> Our current strategy to deal with pending SErrors at boot is to panic.
+>> So let's mention in our boot protocol documentation that no SErrors
+>> should be pending when handing over to the kernel.
 >>
 >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> An SError could be triggered either asynchronously by FW, or as a result
-> of our actions at any point after this, e.g. due to the filesystem
-> accesses made to load an initrd.
->
-> So in practice, is checking here useful? Have we seen FW with masked but
-> pending SError at the point we enter the stub rather than that SError
-> being triggered later,?
->
-
-Yes. EDK2 keeps SError masked throughout its execution by default, and
-so any condition that triggered an SError up till this point is likely
-to still be pending, and blow up the kernel as soon as it unmasks it.
-
-> I'm also not sure what this means for CPER, which may use SError to
-> signal to the OS. It's possible that the UEFI implementation polls
-> ISR_EL1 itself, and handles SError appropriately internally, or that the
-> OS can later deal with the SError based on CPER and friends.
->
-
-Currently, the kernel panics on an SError, and so what the kernel
-should do once we start dealing with them in a more sophisticated way
-is hypothetical at the moment. Once that code arrives, it may revert
-this change, but for now, being dropped back into the UEFI shell does
-sound more appealing than panic early imo.
-
 >> ---
->>  drivers/firmware/efi/libstub/arm64-stub.c | 9 ++++++++-
->>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>  Documentation/arm64/booting.txt | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
 >>
->> diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
->> index eae693eb3e91..c7e7396de876 100644
->> --- a/drivers/firmware/efi/libstub/arm64-stub.c
->> +++ b/drivers/firmware/efi/libstub/arm64-stub.c
->> @@ -20,7 +20,14 @@ extern bool __nokaslr;
+>> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+>> index 8d0df62c3fe0..75dcfead1a0c 100644
+>> --- a/Documentation/arm64/booting.txt
+>> +++ b/Documentation/arm64/booting.txt
+>> @@ -154,8 +154,9 @@ Before jumping into the kernel, the following conditions must be met:
+>>    x3 = 0 (reserved for future use)
 >>
->>  efi_status_t check_platform_features(efi_system_table_t *sys_table_arg)
->>  {
->> -     u64 tg;
->> +     u64 tg, isr;
->> +
->> +     /* check for a pending SError */
->> +     asm ("mrs %0, isr_el1" : "=r"(isr));
+>>  - CPU mode
+>> -  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
+>> -  IRQ and FIQ).
+>> +  All forms of exceptions must be masked in PSTATE.DAIF (Debug, SError,
+>> +  IRQ and FIQ), and any pending SError exceptions must be taken by the
+>> +  boot loader or firmware before handing over to the kernel.
 >
-> I think you can use read_sysreg(isr_el1) here, given that the
-> read_sysreg helper is a macro function, and we already include sysreg.h
-> here.
->
-
-OK
-
->> +     if (isr & BIT(8)) {
->
-> Perhaps add:
->
-> #define ISR_EL1_A_BIT   BIT(8)
->
-> to sysreg.h?
+> That can be read to mean that a loader should silently swallow SError,
+> which isn't quite what we want (that no SError ever occurs). I don't
+> have a better wording to suggest, unfortunately. :/
 >
 
-OK
-
->> +             pr_efi_err(sys_table_arg, "Pending SError detected -- aborting\n");
->> +             return EFI_LOAD_ERROR;
->> +     }
->
-> Otherwise, code-wise this looks fine, but as above I'm not sure if this
-> is the right thiing to do. :/
->
-
-Yes, let's clear that up first.
-
--- 
-Ard,
+I don't think it is up to us to mandate how the firmware should be
+dealing with early SErrors, as long as none are pending when we enter
+the kernel.
