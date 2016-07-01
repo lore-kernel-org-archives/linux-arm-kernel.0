@@ -1,59 +1,56 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  1 Jul 2016 08:42:13 +0200
-Subject: [PATCH] gpio: document how to order GPIO controllers
-Message-ID: <1467355333-8813-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: oss@buserror.net (Scott Wood)
+Date: Fri, 01 Jul 2016 01:51:45 -0500
+Subject: [PATCH v2 1/2] ARM64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <5771267D.7030102@arm.com>
+References: <1463114260-8724-1-git-send-email-oss@buserror.net>
+ <20160513112441.200f4349@arm.com> <1466559926.22191.203.camel@buserror.net>
+ <5771267D.7030102@arm.com>
+Message-ID: <1467355905.32358.31.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uses the same approach that is already used for spi, i2c and
-several other controllers to ensure a consistent numbering independent
-of probe order. This is in use for several gpio drivers that already now
-use of_alias_get_id(np, "gpio").
+On Mon, 2016-06-27 at 14:13 +0100, Marc Zyngier wrote:
+> On 22/06/16 02:45, Scott Wood wrote:
+> > 
+> > On Fri, 2016-05-13 at 11:24 +0100, Marc Zyngier wrote:
+> > > 
+> > > On Thu, 12 May 2016 23:37:39 -0500
+> > > Scott Wood <oss@buserror.net> wrote:
+> > > 
+> > > > +#ifdef CONFIG_ARM64
+> > > > +static __always_inline void rewrite_tval(const int access,
+> > > > +		unsigned long evt, struct clock_event_device *clk)
+> > > > +{
+> > > > +	u64 cval_old, cval_new;
+> > > > +	int timeout = 200;
+> > > > +
+> > > > +	do {
+> > > > +		cval_old = __arch_counter_get_cntvct();
+> > > > +		arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL,
+> > > > evt,
+> > > > clk);
+> > > > +		cval_new = __arch_counter_get_cntvct();
+> > > Don't you need to guarantee the order of accesses here?
+> > I'm not 100% sure.??The erratum workaround sample code doesn't show any
+> > barriers, and adding more barriers could make it harder for the loop to
+> > successfully complete.??There's already a barrier after the write, so the
+> > only
+> > concern should be whether the timer read could be reordered after the
+> > timer
+> > write, which could cause the loop to exit even if the write was bad.??Do
+> > you
+> > know if A53 or A57 will reorder a counter read relative to a tval write?
+> I can't see any absolute guarantee that they wouldn't be reordered (but
+> I have no insight on the micro-architecture either). I'd rather err on
+> the side of caution here.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+Adding another isb() before arch_timer_reg_write() causes the loop to not
+complete with any reasonable timeout. ?A testing loop (that repeatedly writes
+to TVAL (using the workaround code), reads it back, and checks that the value
+read back is not greater than the value that was written) shows that the
+workaround without the extra isb() is effective -- lots of assertions without
+the workaround, and none with it -- but I'll go with the cval workaround
+instead.
 
-Linus requested such a patch as part of a change that introduces
-this mechanism to the gpio-omap driver[1]. IMHO this is better done in a
-separate patch, so here it comes.
-
-Best regards
-Uwe
-
-[1] http://thread.gmane.org/gmane.linux.kernel.gpio/17399/focus=17629
-
- Documentation/devicetree/bindings/gpio/gpio.txt | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/gpio/gpio.txt b/Documentation/devicetree/bindings/gpio/gpio.txt
-index 68d28f62a6f4..5dbacc8f094a 100644
---- a/Documentation/devicetree/bindings/gpio/gpio.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio.txt
-@@ -227,6 +227,24 @@ Example of two SOC GPIO banks defined as gpio-controller nodes:
- 		#gpio-cells = <2>;
- 	};
- 
-+Usually the GPIO banks in SoCs are ordered, that is there is a dedicated "first
-+gpio bank". To fix this ordering in the device tree use aliases starting at 0
-+(even if the first bank is called "GPIO1" in the hardware reference).
-+This is necessary/handy to ensure deterministical numbering of GPIOs and GPIO
-+controllers.
-+
-+Example of a machine having 4 GPIO banks.
-+
-+	/ {
-+		aliases {
-+			...
-+			gpio0 = &gpio1;
-+			gpio1 = &gpio2;
-+			gpio2 = &gpio3;
-+			gpio3 = &gpio4;
-+		};
-+	};
-+
- 2.1) gpio- and pin-controller interaction
- -----------------------------------------
- 
--- 
-2.8.1
+-Scott
