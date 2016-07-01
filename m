@@ -1,177 +1,53 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 01 Jul 2016 16:43:02 +0100
-Subject: [PATCH 09/11] arm64: pmu: Add routines for detecting differing
- PMU types in the system
-In-Reply-To: <57768431.7080508@arm.com> (Jeremy Linton's message of "Fri, 1
- Jul 2016 09:54:41 -0500")
-References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
- <1466529109-21715-10-git-send-email-jeremy.linton@arm.com>
- <87mvm1e9ye.fsf@e105922-lin.cambridge.arm.com>
- <57768431.7080508@arm.com>
-Message-ID: <871t3de54p.fsf@e105922-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Jul 2016 16:46:12 +0100
+Subject: [PATCH 1/2] efi: arm64: abort boot on pending SError
+In-Reply-To: <CAKv+Gu9Pk6xbUUMisAMhd4rpoYHA+wjzrZGkyEUXPdx_TaniVQ@mail.gmail.com>
+References: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160701152252.GA17071@leverpostej>
+ <CAKv+Gu9Pk6xbUUMisAMhd4rpoYHA+wjzrZGkyEUXPdx_TaniVQ@mail.gmail.com>
+Message-ID: <20160701154612.GC17071@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeremy Linton <jeremy.linton@arm.com> writes:
+On Fri, Jul 01, 2016 at 05:31:33PM +0200, Ard Biesheuvel wrote:
+> On 1 July 2016 at 17:22, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Jul 01, 2016 at 05:01:30PM +0200, Ard Biesheuvel wrote:
+> >> It is the firmware's job to clear any pending SErrors before entering
+> >> the kernel. On UEFI, we can fail gracefully rather than panic during
+> >> early boot, so check for this condition in the stub.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >
+> > An SError could be triggered either asynchronously by FW, or as a result
+> > of our actions at any point after this, e.g. due to the filesystem
+> > accesses made to load an initrd.
+> >
+> > So in practice, is checking here useful? Have we seen FW with masked but
+> > pending SError at the point we enter the stub rather than that SError
+> > being triggered later,?
+> 
+> Yes. EDK2 keeps SError masked throughout its execution by default, and
+> so any condition that triggered an SError up till this point is likely
+> to still be pending, and blow up the kernel as soon as it unmasks it.
 
-> On 07/01/2016 08:58 AM, Punit Agrawal wrote:
->> Jeremy Linton <jeremy.linton@arm.com> writes:
->>
->>> In preparation for enabling heterogeneous PMUs on ACPI systems
->>> add routines that detect this and group the resulting PMUs and
->>> interrupts.
->>>
->>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>> ---
->>>   drivers/perf/arm_pmu_acpi.c | 137 +++++++++++++++++++++++++++++++++++++++++++-
->>>   1 file changed, 134 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
->>> index a24cdd0..482a54d 100644
->>> --- a/drivers/perf/arm_pmu_acpi.c
->>> +++ b/drivers/perf/arm_pmu_acpi.c
->>> @@ -1,23 +1,36 @@
->>>   /*
->>> - * PMU support
->>> + * ARM ACPI PMU support
->>>    *
->>>    * Copyright (C) 2015 Red Hat Inc.
->>> + * Copyright (C) 2016 ARM Ltd.
->>>    * Author: Mark Salter <msalter@redhat.com>
->>> + *         Jeremy Linton <jeremy.linton@arm.com>
->>>    *
->>>    * This work is licensed under the terms of the GNU GPL, version 2.  See
->>>    * the COPYING file in the top-level directory.
->>>    *
->>>    */
->>>
->>> +#define pr_fmt(fmt) "ACPI-PMU: " fmt
->>> +
->>> +#include <asm/cpu.h>
->>>   #include <linux/perf/arm_pmu.h>
->>>   #include <linux/platform_device.h>
->>>   #include <linux/acpi.h>
->>>   #include <linux/irq.h>
->>>   #include <linux/irqdesc.h>
->>> +#include <linux/list.h>
->>>
->>>   struct pmu_irq {
->>> -	int gsi;
->>> -	int trigger;
->>> +	int  gsi;
->>> +	int  trigger;
->>> +	bool registered;
->>> +};
->>> +
->>> +struct pmu_types {
->>> +	struct list_head list;
->>> +	int		 cpu_type;
->>> +	int		 cpu_count;
->>>   };
->>
->> You can stash the associated resources in the above structure. That
->> should simplify some code below.
->
-> 	How is that? One structure is per cpu, the other is per pmu
-> type in the system, they are actually completely independent and
-> intertwining them will only server to obfuscate the code.
+Ok.
 
-Just to clarify, I am referring to "struct resources" you allocate for
-use with the pmu platform device in the next patch.
+> > I'm also not sure what this means for CPER, which may use SError to
+> > signal to the OS. It's possible that the UEFI implementation polls
+> > ISR_EL1 itself, and handles SError appropriately internally, or that the
+> > OS can later deal with the SError based on CPER and friends.
+> 
+> Currently, the kernel panics on an SError, and so what the kernel
+> should do once we start dealing with them in a more sophisticated way
+> is hypothetical at the moment. Once that code arrives, it may revert
+> this change, but for now, being dropped back into the UEFI shell does
+> sound more appealing than panic early imo.
 
->
->
->>
->>>
->>>   static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
->>> @@ -36,6 +49,124 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
->>>   		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
->>>   }
->>>
->>> +/* Count number and type of CPU cores in the system. */
->>> +void __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
->>> +{
->>> +	int i;
->>> +
->>> +	for_each_possible_cpu(i) {
->>> +		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
->>> +		u32 partnum = MIDR_PARTNUM(cinfo->reg_midr);
->>> +		struct pmu_types *pmu;
->>> +
->>> +		list_for_each_entry(pmu, pmus, list) {
->>> +			if (pmu->cpu_type == partnum) {
->>> +				pmu->cpu_count++;
->>> +				break;
->>> +			}
->>> +		}
->>> +
->>> +		/* we didn't find the CPU type, add an entry to identify it */
->>> +		if (&pmu->list == pmus) {
->>> +			pmu = kcalloc(1, sizeof(struct pmu_types), GFP_KERNEL);
->>
->> Use kzalloc here.
-> Ok fair point.
->
->>
->>> +			if (!pmu) {
->>> +				pr_warn("Unable to allocate pmu_types\n");
->>
->> Bail out with error if the memory can't be allocated. Otherwise, we risk
->> silently failing to register a PMU type.
->
-> ? Its not silent, it fails to allocate the space complains about it,
-> and therefor this pmu type is not created.
+Logging something while the UART is available is certainly appealing.
 
-Sorry for the confusion, I didn't mean PMU type in the above comment. I
-was thinking of the missed cpu in cpu_count.
+As you say, we can change this later if/when we have more advanced
+SError handling. So modulo my prior comments, I guess this is fine for
+now.
 
-If the allocation succeeds in the next iteration (as we don't break out
-of the loop), we'll end up undercounting cpus that have this type of
-pmu. In turn, this will lead to accessing beyond the allocated "struct
-resource" in arm_pmu_acpi_gsi_res.
-
-Punit
-
-> In a system with a single
-> CPU this basically cancels the whole operation. If there is more than
-> one pmu, the remaining PMUs continue to have a chance of being
-> created, although if the memory allocation fails (this is pretty early
-> boot code) there is a high probability there is something seriously
-> wrong with the system.
->
->
->>
->>> +			} else {
->>> +				pmu->cpu_type = partnum;
->>> +				pmu->cpu_count++;
->>> +				list_add_tail(&pmu->list, pmus);
->>> +			}
->>> +		}
->>> +	}
->>> +}
->>> +
->>> +/*
->>> + * Registers the group of PMU interfaces which correspond to the 'last_cpu_id'.
->>> + * This group utilizes 'count' resources in the 'res'.
->>> + */
->>> +int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
->>> +					    int last_cpu_id)
->>> +{
->>
->> With the addition of the irq resources to struct pmu_types, you can just pass
->> the pmu structure here.
->
-> 	Thats a point, but the lifetimes of the structures are
-> different and outside of their shared use in this single function
-> never really interact. I prefer not unnecessarily intertwine
-> independent data structures simply to reduce parameter counts for a
-> single function. Especially since it complicates cleanup because the
-> validity of the resource structure will have to be tracked relative to
-> its successful registration.
->
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+Mark.
