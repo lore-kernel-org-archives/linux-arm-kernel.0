@@ -1,107 +1,83 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 1 Jul 2016 12:33:10 +0100
-Subject: [PATCH v3 5/9] iommu/of: Handle iommu-map property for PCI
-In-Reply-To: <20160701103105.GE12735@arm.com>
-References: <cover.1467123945.git.robin.murphy@arm.com>
- <17617dff6e7998b91d53ed8a1d6283b1c7bc3470.1467123945.git.robin.murphy@arm.com>
- <20160701103105.GE12735@arm.com>
-Message-ID: <577654F6.4040209@arm.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Fri, 1 Jul 2016 17:07:05 +0530
+Subject: [PATCH v12 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma device
+ tree binding documentation
+Message-ID: <1467373026-27768-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/16 11:31, Will Deacon wrote:
-> On Tue, Jun 28, 2016 at 04:48:24PM +0100, Robin Murphy wrote:
->> Now that we have a way to pick up the RID translation and target IOMMU,
->> hook up of_iommu_configure() to bring PCI devices into the of_xlate
->> mechanism and allow them IOMMU-backed DMA ops without the need for
->> driver-specific handling.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v3: Use explicit "iommu-map-mask", drop of_device_is_available() check.
->>
->>  drivers/iommu/of_iommu.c | 43 ++++++++++++++++++++++++++++++++++++-------
->>  1 file changed, 36 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->> index 7e6369cffc95..25406a8b9d4e 100644
->> --- a/drivers/iommu/of_iommu.c
->> +++ b/drivers/iommu/of_iommu.c
->> @@ -22,6 +22,7 @@
->>  #include <linux/limits.h>
->>  #include <linux/of.h>
->>  #include <linux/of_iommu.h>
->> +#include <linux/of_pci.h>
->>  #include <linux/of_platform.h>
->>  #include <linux/slab.h>
->>  
->> @@ -138,20 +139,48 @@ const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
->>  	return ops;
->>  }
->>  
->> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->> +{
->> +	struct of_phandle_args *iommu_spec = data;
->> +
->> +	iommu_spec->args[0] = alias;
->> +	return iommu_spec->np == pdev->bus->dev.of_node;
->> +}
->> +
->>  const struct iommu_ops *of_iommu_configure(struct device *dev,
->>  					   struct device_node *master_np)
->>  {
->>  	struct of_phandle_args iommu_spec;
->> -	struct device_node *np;
->> +	struct device_node *np = NULL;
-> 
-> This sets off some alarm bells...
-> 
->>  	const struct iommu_ops *ops = NULL;
->>  	int idx = 0;
->>  
->> -	/*
->> -	 * We can't do much for PCI devices without knowing how
->> -	 * device IDs are wired up from the PCI bus to the IOMMU.
->> -	 */
->> -	if (dev_is_pci(dev))
->> -		return NULL;
->> +	if (dev_is_pci(dev)) {
->> +		/*
->> +		 * Start by tracing the RID alias down the PCI topology as
->> +		 * far as the host bridge whose OF node we have...
->> +		 */
->> +		iommu_spec.np = master_np;
->> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
->> +				       &iommu_spec);
->> +		/*
->> +		 * ...then find out what that becomes once it escapes the PCI
->> +		 * bus into the system beyond, and which IOMMU it ends up at.
->> +		 */
->> +		if (of_pci_map_rid(master_np, iommu_spec.args[0], "iommu-map",
->> +				    "iommu-map-mask", &np, iommu_spec.args))
->> +			return NULL;
-> 
-> ... because you're assumedly initialising np to NULL in case of_pci_map_rid
-> returns 0, but doesn't set np...
+Device-tree binding documentation for Xilinx zynqmp dma engine
+used in Zynq UltraScale+ MPSoC.
 
-Not quite; we're passing &np as the optional "target" argument to
-of_pci_map_rid - since that argument is provided, it will either find a
-matching translation (and fill in np in the process) or return -EFAULT.
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes in v12:
+- None.
+Changes in v11:
+- None.
+Changes in v10:
+- Added Rob Acked-by in the commit message.
+Changs in v9:
+- Removed include sg runtime configuration parameter
+  from the binding doc as suggested by Lars.
+Changes in v8:
+- Removed all the software runtime configuration parameters
+  from the binding doc as suggested by the Lars.
+Changes in v7:
+- None.
+Changes in v6:
+- Removed desc-axi-cache/dst-axi-cache/src-axi-cache properties
+  from the binding doc as it allow broken combinations when dma-coherent
+  is set as suggested by Rob.
+- Fixed minor comments given by Rob related coding(lower case DT node name).
+Changes in v5:
+- Use dma-coherent flag for coherent transfers as suggested by rob.
+- Removed unnecessary properties from binding doc as suggested by Rob.
+Changes in v4:
+- None
+Changes in v3:
+- None
+Changes in v2:
+- None.
 
->> +
->> +		/* We're not attempting to handle multi-alias devices yet */
->> +		iommu_spec.np = np;
->> +		iommu_spec.args_count = 1;
->> +		ops = of_iommu_get_ops(np);
-> 
-> ... and then we call of_iommu_get_ops(NULL). Does that make any sense?
+ .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  |   27 ++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
 
-It would actually work out, since nobody should have registered any ops
-for a NULL node, but as above won't happen in practice anyway.
-
-Robin.
-
-> 
-> Will
-> 
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+new file mode 100644
+index 0000000..a784cdd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+@@ -0,0 +1,27 @@
++Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
++memory to device and device to memory transfers. It also has flow
++control and rate control support for slave/peripheral dma access.
++
++Required properties:
++- compatible		: Should be "xlnx,zynqmp-dma-1.0"
++- reg			: Memory map for gdma/adma module access.
++- interrupt-parent	: Interrupt controller the interrupt is routed through
++- interrupts		: Should contain DMA channel interrupt.
++- xlnx,bus-width	: Axi buswidth in bits. Should contain 128 or 64
++- clock-names		: List of input clocks "clk_main", "clk_apb"
++			  (see clock bindings for details)
++
++Optional properties:
++- dma-coherent		: Present if dma operations are coherent.
++
++Example:
++++++++++
++fpd_dma_chan1: dma at fd500000 {
++	compatible = "xlnx,zynqmp-dma-1.0";
++	reg = <0x0 0xFD500000 0x1000>;
++	interrupt-parent = <&gic>;
++	interrupts = <0 117 4>;
++	clock-names = "clk_main", "clk_apb";
++	xlnx,bus-width = <128>;
++	dma-coherent;
++};
+-- 
+1.7.1
