@@ -1,42 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 1 Jul 2016 11:59:43 +0200
-Subject: [PATCH 6/6] spi: st-ssc4: Remove 'no clocking' hack
-In-Reply-To: <20160630205215.GF1707@dell>
-References: <20160607111930.10375-1-lee.jones@linaro.org>
- <20160607111930.10375-7-lee.jones@linaro.org>
- <20160607151712.GA7510@sirena.org.uk> <20160630205215.GF1707@dell>
-Message-ID: <20160701095943.GL6247@sirena.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 1 Jul 2016 11:00:28 +0100
+Subject: [PATCH v2 5/6] documentation: Add nvmem bindings documentation
+In-Reply-To: <1467203656-14381-6-git-send-email-carlo@caione.org>
+References: <1467203656-14381-1-git-send-email-carlo@caione.org>
+ <1467203656-14381-6-git-send-email-carlo@caione.org>
+Message-ID: <57763F3C.7090108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 09:52:15PM +0100, Lee Jones wrote:
-> On Tue, 07 Jun 2016, Mark Brown wrote:
-> > On Tue, Jun 07, 2016 at 12:19:30PM +0100, Lee Jones wrote:
-> > > Due to the newly upstreamed 'critical clocks' API we can now
-> > > safely handle clocking in the SPI and I2C drivers without fear
-> > > of catastrophically crippling the running platform.
 
-> > Acked-by: Mark Brown <broonie@kernel.org>
 
-> We really need to guarantee that this goes in *after* the other
-> patches have landed, and it looks like they're heading in via their
-> own respective trees.  Any chance you can hold this back and submit it
-> via your v4.8-fixes submission?
+On 29/06/16 13:34, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> This patch add the bindings document of Amlogic eFuse driver.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-I've not applied this patch and had no intention of applying it, the
-whole point in me acking it was that I was expecting it to get applied
-as part of the series since AFAICT everything needed to go in together.
-Your pattern of acking patches you're expecting to be apply yourself is
-fairly unusual, if it's someone else it's generally safe to assume
-they're expecting the patch to go via another tree.
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-If this still needs sorting after the merge window please resend it, or
-ideally it can go in along with the rest of the series via whatever path
-that's taking.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160701/72565843/attachment.sig>
+> ---
+>   .../devicetree/bindings/nvmem/amlogic-efuse.txt    | 39 ++++++++++++++++++++++
+>   1 file changed, 39 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+>
+> diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+> new file mode 100644
+> index 0000000..fafd85b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+> @@ -0,0 +1,39 @@
+> += Amlogic eFuse device tree bindings =
+> +
+> +Required properties:
+> +- compatible: should be "amlogic,meson-gxbb-efuse"
+> +
+> += Data cells =
+> +Are child nodes of eFuse, bindings of which as described in
+> +bindings/nvmem/nvmem.txt
+> +
+> +Example:
+> +
+> +	efuse: efuse {
+> +		compatible = "amlogic,meson-gxbb-efuse";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		sn: sn at 14 {
+> +			reg = <0x14 0x10>;
+> +		};
+> +
+> +		eth_mac: eth_mac at 34 {
+> +			reg = <0x34 0x10>;
+> +		};
+> +
+> +		bid: bid at 46 {
+> +			reg = <0x46 0x30>;
+> +		};
+> +	};
+> +
+> += Data consumers =
+> +Are device nodes which consume nvmem data cells.
+> +
+> +For example:
+> +
+> +	eth_mac {
+> +		...
+> +		nvmem-cells = <&eth_mac>;
+> +		nvmem-cell-names = "eth_mac";
+> +	};
+>
