@@ -1,100 +1,70 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 30 Jun 2016 19:47:32 -0500
-Subject: [linux-sunxi] Re: [PATCH] mmc: pwrseq-simple: Add an optional
- post-power-on-delay
-In-Reply-To: <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
-References: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
- <CAL_JsqJ0XVJb=Q9FT8g_OUTbgZWr-E58xQS0iCR4hv-9EHCcPA@mail.gmail.com>
- <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
-Message-ID: <20160701004732.GA20831@rob-hp-laptop>
+Date: Thu, 30 Jun 2016 19:59:15 -0500
+Subject: [PATCH 02/21] usb: ulpi: Support device discovery via DT
+In-Reply-To: <146715176149.31418.10938517376423447782@sboyd-linaro>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <20160626072838.28082-3-stephen.boyd@linaro.org>
+ <20160628205642.GP3737@rob-hp-laptop>
+ <146715176149.31418.10938517376423447782@sboyd-linaro>
+Message-ID: <20160701005817.GA31363@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 23, 2016 at 11:33:27AM +0200, Hans de Goede wrote:
-> Hi,
+On Tue, Jun 28, 2016 at 03:09:21PM -0700, Stephen Boyd wrote:
+> Quoting Rob Herring (2016-06-28 13:56:42)
+> > On Sun, Jun 26, 2016 at 12:28:19AM -0700, Stephen Boyd wrote:
+> > > The qcom HSIC ulpi phy doesn't have any bits set in the vendor or
+> > > product id ulpi registers. This makes it impossible to make a
+> > > ulpi driver match against the id registers. Add support to
+> > > discover the ulpi phys via DT to help alleviate this problem.
+> > > We'll look for a ulpi bus node underneath the device registering
+> > > the ulpi viewport (or the parent of that device to support
+> > > chipidea's device layout) and then match up the phy node
+> > > underneath that with the ulpi device that's created.
+> > > 
+> > > The side benefit of this is that we can use standard DT
+> > > properties in the phy node like clks, regulators, gpios, etc.
+> > > because we don't have firmware like ACPI to turn these things on
+> > > for us. And we can use the DT phy binding to point our phy
+> > > consumer to the phy provider.
+> > > 
+> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> > > Cc: <devicetree@vger.kernel.org>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > > ---
+> > >  Documentation/devicetree/bindings/usb/ulpi.txt | 20 +++++++++
+> > >  drivers/usb/common/ulpi.c                      | 56 +++++++++++++++++++++++++-
+> > >  2 files changed, 74 insertions(+), 2 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/usb/ulpi.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/usb/ulpi.txt b/Documentation/devicetree/bindings/usb/ulpi.txt
+> > > new file mode 100644
+> > > index 000000000000..ca179dc4bd50
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/usb/ulpi.txt
+> > > @@ -0,0 +1,20 @@
+> > > +ULPI bus binding
+> > > +----------------
+> > > +
+> > > +Phys that are behind a ULPI connection can be described with the following
+> > > +binding. The host controller shall have a "ulpi" named node as a child, and
+> > > +that node shall have one enabled node underneath it representing the ulpi
+> > > +device on the bus.
+> > 
+> > This needs to co-exist with the USB bus binding which has the controller 
+> > ports for the child nodes. Maybe use the phy binding?
 > 
-> On 23-06-16 00:25, Rob Herring wrote:
-> >On Wed, Jun 22, 2016 at 12:59 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> >>Some devices need a while to boot their firmware after providing clks /
-> >>de-asserting resets before they are ready to receive sdio commands.
-> >>
-> >>This commits adds a post-power-on-delay-ms devicetree property to
-> >>mmc-pwrseq-simple for use with such devices.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>---
-> >> Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
-> >> drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
-> >> 2 files changed, 11 insertions(+)
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-> >>index ce0e767..e254368 100644
-> >>--- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-> >>+++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-> >>@@ -16,6 +16,8 @@ Optional properties:
-> >>   See ../clocks/clock-bindings.txt for details.
-> >> - clock-names : Must include the following entry:
-> >>   "ext_clock" (External clock provided to the card).
-> >>+- post-power-on-delay-ms : Delay in ms after powering the card and
-> >>+       de-asserting the reset-gpios (if any)
-> >
-> >Presumably you need this delay post any reset, not just after power on
-> 
-> mmc-pwrseq is only about doing power-on / off, not about providing
-> reset functionality.
+> Which binding is that? bindings/usb/usb-device.txt? 
 
-Yes, but the property (e.g. the delay) is relevant for both and reset is 
-part of the power seq.
+Yes.
 
-> >if you are waiting for firmware to boot. So the name is not all that
-> >clear. How about a "reset-timing-ms" property that takes 3 values for
-> >pre-assert time (normally 0), assertion time, post assert time. Of
-> >course, I can still think of ways that breaks like when in this
-> >sequence do clocks need to be turned on.
-> 
-> If you look at bindings/mmc/mmc-pwrseq-simple.txt out side of
-> the diff context it contains:
-> 
-> - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
->         at initialization and prior we start the power up procedure of the card.
->         They will be de-asserted right after the power has been provided to the
->         card.
-> - clocks : Must contain an entry for the entry in clock-names.
->   See ../clocks/clock-bindings.txt for details.
-> - clock-names : Must include the following entry:
->   "ext_clock" (External clock provided to the card).
-> 
-> Notice how the existing docs talk about a power-up procedure (which matches
-> the pwrseq name and purpose of these bindings).
-> 
-> I actually started with calling the property "post-reset-delay-ms", but then
-> I realized that what we really want is the ability to specify a time to
-> wait (for e.g. firmware to boot) after completing the power-up procedure
-> (and before starting the probe). The power-up procedure currently can
-> also includes enabling external clocks to the sdio device (if any) and
-> enabling regulators, so having a "reset-timing-ms" property does not
-> seem right, as that would suggest it is ok to do the wait after deasserting
-> reset, but before e.g. enabling external clocks. Where what we really
-> want is to enable all necessary resources (or iow complete the powerup
-> procedure) and then wait.
-> 
-> You're right that in some cases more complicated timings may be necessary,
-> but that can get really complicated like e.g.: enable regulator1, wait 10 ms,
-> enable regulator2, wait 15ms, enable external clock1, ...
-> 
-> And such complex timings fall outside of the scope of the mmc-pwrseq-simple
-> binding, the idea being that for complex cases we do a device specific
-> pwrseq binding, and then the smarts are in implementation of that specific
-> pwrseq driver. As you've said yourself before we do not want to turn
-> devicetree into a scripting language.
+> This ulpi binding is
+> to describe phys that are accessed through the ulpi "viewport" in the
+> usb controller. So controller ports don't come into the picture here.
 
-Exactly. The challenge is any single property is hard to push back on 
-that we've crossed that line. I don't want to see this expanded one 
-property at a time without any foresight on additional needs. If we can 
-add a property that is more flexible, but doesn't add to the complexity 
-then that would be better. So this one alone is fine, but the next one 
-I'll be less receptive.
+You just need to confirm that there's no collision with child nodes like 
+it assumes all children are ports.
 
 Rob
-
-P.S. I'm on vacation ATM, so I'll be slow responding.
