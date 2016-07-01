@@ -1,117 +1,28 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 30 Jun 2016 20:27:43 -0500
-Subject: [PATCH v2] ARM: at91: Document new TCB bindings
-In-Reply-To: <1467039901-11297-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1467039901-11297-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160701012743.GA16698@rob-hp-laptop>
+Date: Thu, 30 Jun 2016 20:41:34 -0500
+Subject: [PATCH 1/3] dt-bindings: phy: Fix description of Tegra210 PHY
+ nodes
+In-Reply-To: <1467198453-23406-2-git-send-email-jonathanh@nvidia.com>
+References: <1467198453-23406-1-git-send-email-jonathanh@nvidia.com>
+ <1467198453-23406-2-git-send-email-jonathanh@nvidia.com>
+Message-ID: <20160701014134.GA26253@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 05:05:01PM +0200, Alexandre Belloni wrote:
-> The current binding for the TCB is not flexible enough for some use cases
-> and prevents proper utilization of all the channels.
+On Wed, Jun 29, 2016 at 12:07:31PM +0100, Jon Hunter wrote:
+> The dt-binding document for the Tegra XUSB pad controller states that
+> 'utmi' is one of the valid choices for the Tegra210 PHY node names and
+> has child lanes named, 'utmi-0', 'utmi-1', 'utmi-2' and 'utmi-3'.
+> However, neither the XUSB pad controller PHY driver or the actual
+> Tegra210 binding for the XUSB pad controller use these names. Instead
+> both the driver and binding use the node name 'usb2' and for the child
+> lanes use the names 'usb2-0', 'usb2-1', 'usb2-2' and 'usb2-3'. Given
+> that the driver and binding are consistent with the naming, up date the
+> dt-binding documentation to match.
 > 
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: linux-pwm at vger.kernel.org
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 > ---
-> 
-> Changes in v2:
->  - added slow_clk in the examples
->  - removed linuxisms
-> 
-> Rob, does that fit what you wanted? I prefer getting your ack on that one before
-> resending a 48 patches series.
-> 
-> 
->  .../devicetree/bindings/arm/atmel-at91.txt         | 32 -----------
->  .../devicetree/bindings/mfd/atmel-tcb.txt          | 62 ++++++++++++++++++++++
->  .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
->  3 files changed, 69 insertions(+), 37 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index e1f5ad855f14..3dc758403d03 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -60,38 +60,6 @@ System Timer (ST) required properties:
->  Its subnodes can be:
->  - watchdog: compatible should be "atmel,at91rm9200-wdt"
->  
-> -TC/TCLIB Timer required properties:
-> -- compatible: Should be "atmel,<chip>-tcb".
-> -  <chip> can be "at91rm9200" or "at91sam9x5"
-> -- reg: Should contain registers location and length
-> -- interrupts: Should contain all interrupts for the TC block
-> -  Note that you can specify several interrupt cells if the TC
-> -  block has one interrupt per channel.
-> -- clock-names: tuple listing input clock names.
-> -	Required elements: "t0_clk", "slow_clk"
-> -	Optional elements: "t1_clk", "t2_clk"
-> -- clocks: phandles to input clocks.
-> -
-> -Examples:
-> -
-> -One interrupt per TC block:
-> -	tcb0: timer at fff7c000 {
-> -		compatible = "atmel,at91rm9200-tcb";
-> -		reg = <0xfff7c000 0x100>;
-> -		interrupts = <18 4>;
-> -		clocks = <&tcb0_clk>;
-> -		clock-names = "t0_clk";
-> -	};
-> -
-> -One interrupt per TC channel in a TC block:
-> -	tcb1: timer at fffdc000 {
-> -		compatible = "atmel,at91rm9200-tcb";
-> -		reg = <0xfffdc000 0x100>;
-> -		interrupts = <26 4 27 4 28 4>;
-> -		clocks = <&tcb1_clk>;
-> -		clock-names = "t0_clk";
-> -	};
-> -
->  RSTC Reset Controller required properties:
->  - compatible: Should be "atmel,<chip>-rstc".
->    <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
-> diff --git a/Documentation/devicetree/bindings/mfd/atmel-tcb.txt b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-> new file mode 100644
-> index 000000000000..71c8d83c01a7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-> @@ -0,0 +1,62 @@
-> +* Device tree bindings for Atmel Timer Counter Blocks
-> +- compatible: Should be "atmel,<chip>-tcb", "simple-mfd", "syscon".
-> +  <chip> can be "at91rm9200" or "at91sam9x5"
-> +- reg: Should contain registers location and length
-> +- #address-cells: has to be 1
-> +- #size-cells: has to be 0
-> +- interrupts: Should contain all interrupts for the TC block
-> +  Note that you can specify several interrupt cells if the TC
-> +  block has one interrupt per channel.
-> +- clock-names: tuple listing input clock names.
-> +	Required elements: "t0_clk", "slow_clk"
-> +	Optional elements: "t1_clk", "t2_clk"
-> +- clocks: phandles to input clocks.
-> +
-> +The TCB can expose multiple subdevices:
-> + * a clocksource and clockevent device
+>  Documentation/devicetree/bindings/phy/nvidia,tegra124-xusb-padctl.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-This still uses Linux terminology.
-
-> +   - compatible: Should be "atmel,tcb-free-running-timer"
-> +   - reg: Should contain the TCB channels to be used. If the
-> +     counter width is 16 bits (at91rm9200-tcb), two consecutive
-> +     channels are needed. Else, only one channel will be used.
-> +
-> + * a clockevent device
-> +   - compatible: Should be "atmel,tcb-programmable-timer"
-
-This still looks like assigning usage in DT. As I'm willing to accept 
-that for PWM, either timer channels should be whatever channels are not 
-assigned to PWM (i.e. not in DT) or they should just be "timer" and let 
-the kernel decide their usage.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
