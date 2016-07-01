@@ -1,53 +1,59 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri,  1 Jul 2016 10:27:17 -0400
-Subject: [PATCH v2] arm64: defconfig: Enable QDF2432 config options
-In-Reply-To: <1467382327-9726-1-git-send-email-cov@codeaurora.org>
-References: <1467382327-9726-1-git-send-email-cov@codeaurora.org>
-Message-ID: <1467383237-11005-1-git-send-email-cov@codeaurora.org>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Fri, 1 Jul 2016 10:29:36 -0400
+Subject: [PATCH 6/7] dt-bindings: net: bgmac: add bindings documentation
+ for bgmac
+In-Reply-To: <20160701025619.GA4906@rob-hp-laptop>
+References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
+ <1467327554-22074-7-git-send-email-jon.mason@broadcom.com>
+ <20160701025619.GA4906@rob-hp-laptop>
+Message-ID: <CAC3K-4pu2k8HZ3g-LxbVAFOxPayDT=hK1qgix1Pc81aTEmGQzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that ACPI is on in the defconfig, the time seems right to enable
-drivers for the SD/MMC, DMA, and pin control hardware described in the ACPI
-tables of the QDF2432 server platform.
+On Thu, Jun 30, 2016 at 10:56 PM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Jun 30, 2016 at 06:59:13PM -0400, Jon Mason wrote:
+>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+>> ---
+>>  .../devicetree/bindings/net/brcm,bgmac-nsp.txt     | 24 ++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt b/Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
+>> new file mode 100644
+>> index 0000000..022946c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
+>> @@ -0,0 +1,24 @@
+>> +Broadcom GMAC Ethernet Controller Device Tree Bindings
+>> +-------------------------------------------------------------
+>> +
+>> +Required properties:
+>> + - compatible:       "brcm,bgmac-nsp"
+>
+> Usually we do <soc>-<block> order.
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
-v2: Remove unrelated script changes.
----
- arch/arm64/configs/defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Thanks, I'll make the necessary changes and push out a v2.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fd2d74d..c138425 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -186,6 +186,7 @@ CONFIG_SPI_SPIDEV=m
- CONFIG_SPMI=y
- CONFIG_PINCTRL_SINGLE=y
- CONFIG_PINCTRL_MSM8916=y
-+CONFIG_PINCTRL_QDF2XXX=m
- CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_DWAPB=y
-@@ -245,6 +246,7 @@ CONFIG_MMC=y
- CONFIG_MMC_BLOCK_MINORS=32
- CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_ACPI=m
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_OF_ESDHC=y
- CONFIG_MMC_SDHCI_TEGRA=y
-@@ -272,6 +274,8 @@ CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_QCOM_BAM_DMA=y
-+CONFIG_QCOM_HIDMA_MGMT=m
-+CONFIG_QCOM_HIDMA=m
- CONFIG_RCAR_DMAC=y
- CONFIG_VFIO=y
- CONFIG_VFIO_PCI=y
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>
+>> + - reg:              Address and length of the GMAC registers,
+>> +             Address and length of the GMAC IDM registers
+>> + - reg-names:        Names of the registers.  Must have both "gmac_base" and
+>> +             "idm_base"
+>> + - interrupts:       Interrupt number
+>> +
+>> +Optional properties:
+>> +- mac-address:       See ethernet.txt file in the same directory
+>> +
+>> +Examples:
+>> +
+>> +gmac0: ethernet at 18022000 {
+>> +     compatible = "brcm,bgmac-nsp";
+>> +     reg = <0x18022000 0x1000>,
+>> +           <0x18110000 0x1000>;
+>> +     reg-names = "gmac_base", "idm_base";
+>> +     interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+>> +     status = "disabled";
+>> +};
+>> --
+>> 1.9.1
+>>
