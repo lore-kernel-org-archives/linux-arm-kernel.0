@@ -1,27 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 1 Jul 2016 19:15:57 +0200
-Subject: next-20160701 build: 2 failures 5 warnings (next-20160701)
-In-Reply-To: <E1bIuIz-00085X-RP@optimist>
-References: <E1bIuIz-00085X-RP@optimist>
-Message-ID: <20160701171557.GB6247@sirena.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 01 Jul 2016 19:19:13 +0200
+Subject: [PATCH v2] arm64: dts: rockchip: add the power domain node for
+ rk3399
+In-Reply-To: <CAD=FV=U0FU5P+seYYmJNZmcV1r-N6_UHtMW5LuVGM-NyPER8BQ@mail.gmail.com>
+References: <1467347575-11806-1-git-send-email-wxt@rock-chips.com>
+ <CAD=FV=U0FU5P+seYYmJNZmcV1r-N6_UHtMW5LuVGM-NyPER8BQ@mail.gmail.com>
+Message-ID: <2235386.KcC75gPTXr@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 10:00:09AM +0100, Build bot for Mark Brown wrote:
+Am Freitag, 1. Juli 2016, 09:56:31 schrieb Doug Anderson:
+> Caesar
+> 
+> On Thu, Jun 30, 2016 at 9:32 PM, Caesar Wang <wxt@rock-chips.com> wrote:
+> > From: Elaine Zhang <zhangqing@rock-chips.com>
+> > 
+> > In order to meet low power requirements, a power management unit (PMU)
+> > is
+> > designed for controlling power resources in RK3399. The RK3399 PMU is
+> > dedicated for managing the power of the whole chip.
+> > 
+> > 1. add pd node for RK3399 Soc
+> > 2. create power domain tree
+> > 3. add qos node for domain
+> > 
+> > From the DT/binds and driver can get more detail information:
+> > 
+> > The driver:
+> >         drivers/soc/rockchip/pm_domains.c
+> > 
+> > The document:
+> >         Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> > 
+> > ---
+> > 
+> > Changes in v2:
+> > - As Doug/Heiko commnets on https://patchwork.kernel.org/patch/9206415/.
+> > 
+> >   drop the debugfs-dump and Add the comments for alphabetical order.
+> > 
+> > Note: As the TRM lists many voltage domains and power domains, then
+> > in actual we just need control some domains for driver.
+> > Due to some domains (e.g. emmc, usb, core)...We can't turn off it on
+> > bootup.
+> 
+> I'm curious: why can't you turn off USB power domains if a board
+> doesn't usb USB?  ...or GMAC on boards that don't use Ethernet?  ...or
+> eDP on boards that don't use EDP?
+> 
+> Maybe the driver for these things isn't ready to handle power domains
+> yet so that's why they are left out for now?
 
-Today's -next fails to build am ARM allmodconfig due to:
+I think core power-domain handling is actually transparent to drivers (aka 
+turning on before probe and turning off after remove), see 
+drivers/base/platform.c:platform_drv_probe() calling dev_pm_domain_attach() 
+with the poweron flag set.
 
-> 	arm-allmodconfig
-> ../drivers/net/ethernet/mediatek/mtk_eth_soc.c:1300:2: error: implicit declaration of function 'mtk_handle_irq' [-Werror=implicit-function-declaration]
-> ../drivers/net/ethernet/mediatek/mtk_eth_soc.c:1300:25: error: subscripted value is neither array nor pointer nor vector
-
-due to the recent changes to the interrupt handling code, the function
-has been split into rx and tx functions but the NET_POLL_CONTROLLER code
-hasn't been updated.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160701/a2744dde/attachment.sig>
+And all the unused domains getting turned off automatically also shouldn't 
+hurt us I'd think. Just that someone need to collect all clocks needed for 
+the synchronuous reset.
