@@ -1,31 +1,32 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri,  1 Jul 2016 17:29:26 +0800
-Subject: [PATCH 4/4] ARM: sun8i: enable axp22x-battery on A23/33 Q8 tablets
-In-Reply-To: <20160701092926.32005-1-icenowy@aosc.xyz>
-References: <20160701092926.32005-1-icenowy@aosc.xyz>
-Message-ID: <20160701092926.32005-4-icenowy@aosc.xyz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 01 Jul 2016 11:46:04 +0200
+Subject: [PATCH 6/7] dt-bindings: net: bgmac: add bindings documentation
+ for bgmac
+In-Reply-To: <1467327554-22074-7-git-send-email-jon.mason@broadcom.com>
+References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
+ <1467327554-22074-7-git-send-email-jon.mason@broadcom.com>
+Message-ID: <29091648.CIZSyGWL7u@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+On Thursday, June 30, 2016 6:59:13 PM CEST Jon Mason wrote:
+> +
+> +Required properties:
+> + - compatible: "brcm,bgmac-nsp"
+> + - reg:                Address and length of the GMAC registers,
+> +               Address and length of the GMAC IDM registers
+> + - reg-names:  Names of the registers.  Must have both "gmac_base" and
+> +               "idm_base"
+> + - interrupts: Interrupt number
+> +
 
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 2e2cbf5..42beec9 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -199,6 +199,10 @@
- 	status = "okay";
- };
- 
-+&battery {
-+	status = "okay";
-+};
-+
- &usbphy {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&usb0_id_detect_pin>;
--- 
-2.9.0
+
+"brcm,bgmac-nsp" sounds a bit too general. As I understand, this is a family
+of SoCs that might not all have the exact same implementation of this
+ethernet device, as we can see from the long lookup table in bgmac_probe().
+
+Please document the specific product numbers here that are publically
+known already. Having the driver match just on "brcm,bgmac-nsp" as a fallback
+is fine, so you can document that one as required for all users.
+
+	Arnd
