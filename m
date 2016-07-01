@@ -1,41 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jul 2016 11:49:52 +0200
-Subject: [PATCH 0/7] net: ethernet: bgmac: Add platform device support
-In-Reply-To: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
-References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <7754885.zcSf8DnDt9@wuerfel>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Fri, 1 Jul 2016 17:41:55 +0800
+Subject: [PATCH 1/7] extcon: add missing of_node_put after calling
+ of_parse_phandle
+In-Reply-To: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
+References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1467366121-14120-2-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 30, 2016 6:59:07 PM CEST Jon Mason wrote:
-> Well, no compilained too loudly at the RFC version of this patch series
-> (see https://lkml.org/lkml/2016/6/28/863).  So, I'm officially sending
-> this out for inclusion.  All comments from the RFC were addressed in
-> this version.
-> 
-> This patch series adds support for other, non-bcma iProc SoC's to the
-> bgmac driver.  This series only adds NSP support, but we are interested
-> in adding support for the Cygnus and NS2 families (with more possible
-> down the road).
-> 
-> To support non-bcma enabled SoCs, we need to add the standard device
-> tree "platform device" support.  Unfortunately, this driver is very
-> tighly coupled with the bcma bus and much unwinding is needed.  I tried
-> to break this up into a number of patches to make it more obvious what
-> was being done to add platform device support.  I was able to verify
-> that the bcma code still works using a 53012K board (NS SoC), and that
-> the platform code works using a 58625K board (NSP SoC).
+of_node_put needs to be called when the device node which is got
+from of_parse_phandle has finished using.
 
-Looks reasonable overall. I have one comment for the binding, but
-we can handle them separately. I think the first five patches
-can just get merged through net-next if there are no other concerns,
-and feel free to add my
+Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+Cc: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+---
+ drivers/extcon/extcon.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-
-For the last two patches, once we have worked out the right
-compatible strings, please send them to Florian for merging through
-the arm-soc next/dt branch.
-
-	Arnd
+diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
+index 21a123c..86ea14d 100644
+--- a/drivers/extcon/extcon.c
++++ b/drivers/extcon/extcon.c
+@@ -1107,10 +1107,12 @@ struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev, int index)
+ 	list_for_each_entry(edev, &extcon_dev_list, entry) {
+ 		if (edev->dev.parent && edev->dev.parent->of_node == node) {
+ 			mutex_unlock(&extcon_dev_list_lock);
++			of_node_put(node);
+ 			return edev;
+ 		}
+ 	}
+ 	mutex_unlock(&extcon_dev_list_lock);
++	of_node_put(node);
+ 
+ 	return ERR_PTR(-EPROBE_DEFER);
+ }
+-- 
+1.9.1
