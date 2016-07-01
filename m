@@ -1,89 +1,120 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Jul 2016 11:55:06 +0100
-Subject: [PATCH v3 6/9] iommu/of: Introduce iommu_fwspec
-In-Reply-To: <227abd6fb43e4163d94673066b4b736d7efaa635.1467123945.git.robin.murphy@arm.com>
-References: <cover.1467123945.git.robin.murphy@arm.com>
- <227abd6fb43e4163d94673066b4b736d7efaa635.1467123945.git.robin.murphy@arm.com>
-Message-ID: <20160701105505.GH12735@arm.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Fri, 1 Jul 2016 12:54:54 +0200
+Subject: [linux-sunxi] [PATCH v2 14/14] ARM: dts: sun8i: Enable DVFS on
+ Orange Pi One
+In-Reply-To: <CAOMqctR+SBfo9UZxXuACz858ehXpa2jGHZw_-70dbUFX3Q_0CQ@mail.gmail.com>
+References: <20160625034511.7966-1-megous@megous.com>
+ <20160625034511.7966-15-megous@megous.com>
+ <CAOMqctTe==M1SXxbdR8y33yh51fiFGn+oSaKJXhbnpLVTn-New@mail.gmail.com>
+ <834b8045-d99f-74a3-0353-aa84b897351d@megous.com>
+ <CAOMqctSbJOB67a=LiCZVUb-wUMCpeJPd81OL5epYkC2p5X1T-g@mail.gmail.com>
+ <CAOMqctR+SBfo9UZxXuACz858ehXpa2jGHZw_-70dbUFX3Q_0CQ@mail.gmail.com>
+Message-ID: <CAOMqctRWBkPdFtJMZmXErpWjK3JABKNyfK=ceFCW4CSYLgwm7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 04:48:25PM +0100, Robin Murphy wrote:
-> Introduce a common structure to hold the per-device firmware data that
-> non-architectural IOMMU drivers generally need to keep track of.
-> Initially this is DT-specific to complement the existing of_iommu
-> support code, but will generalise further once other firmware methods
-> (e.g. ACPI IORT) come along.
-> 
-> Ultimately the aim is to promote the fwspec to a first-class member of
-> struct device, and handle the init/free automatically in the firmware
-> code. That way we can have API calls look for dev->fwspec->iommu_ops
-> before falling back to dev->bus->iommu_ops, and thus gracefully handle
-> those troublesome multi-IOMMU systems which we currently cannot. To
-> start with, though, make use of the existing archdata field and delegate
-> the init/free to drivers to allow an incremental conversion rather than
-> the impractical pain of trying to attempt everything in one go.
-> 
-> Suggested-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v3: New.
-> 
->  drivers/iommu/of_iommu.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_iommu.h | 18 ++++++++++++++++++
->  2 files changed, 65 insertions(+)
-> 
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 25406a8b9d4e..2b90c1f56ff2 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -220,3 +220,50 @@ void __init of_iommu_init(void)
->  				of_node_full_name(np));
->  	}
->  }
-> +
-> +int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np)
+On 30 June 2016 at 17:50, Michal Suchanek <hramrach@gmail.com> wrote:
+> On 30 June 2016 at 17:16, Michal Suchanek <hramrach@gmail.com> wrote:
+>> On 30 June 2016 at 16:19, Ond?ej Jirman <megous@megous.com> wrote:
+>>> Hello,
+>>)k, so I tried>
+>>> On 30.6.2016 13:13, Michal Suchanek wrote:
+>>>> Hello,
+>>>>
+>>>> On 25 June 2016 at 05:45,  <megous@megous.com> wrote:
+>>>>> From: Ondrej Jirman <megous@megous.com>
+>>>>>
+>>>>> Use Xulong Orange Pi One GPIO based regulator for
+>>>>> passive cooling and thermal management.
+>>>>>
+>>>>> Signed-off-by: Ondrej Jirman <megous@megous.com>
+>>>>> ---
+>>>>>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 39 +++++++++++++++++++++++++++++
+>>>>>  1 file changed, 39 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+>>>>> index b1bd6b0..a38d871 100644
+>>>>> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+>>>>> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+>>>>> @@ -109,6 +109,45 @@
+>>>>>         };
+>>>>>  };
+>>>>>
+>>>>> +&cpu0 {
+>>>>> +       operating-points = <
+>>>>> +               /* kHz    uV */
+>>>>> +               1296000 1300000
+>>>>> +               1200000 1300000
+>>>>
+>>>> First problem is that the board boots at 1008000 which is not listed
+>>>> and the kernel complains.
+>>>>
+>>>> Second problem is that the board locks up during boot with this enabled.
+>>>>
+>>>> Do you have some suggestion for alternate configuration to test?
+>>>
+>>> Just to verify, did you test with the entire series applied? (especially
+>>> the PLL1 clk application changes)
+>>
+>> Yes, I applied the whole series.
+>>
+>>>
+>>> You may try dropping the highest operating point, it's probably overly
+>>> optimistic for Orange Pi One.
+>>>
+>>> Is the power supply/cable you're using hard enough?
+>>
+>> I use a 7 port hub to power the board. It worked with some other small
+>> devboards.
+>>
+>> The cable is some random Chinese USB to power jack adaptor with an
+>> extra adaptor to fit the Pi socket. It looks ok but I did not test
+>> this particular combination thoroughly.
+>>
+>>>
+>>> Where during the boot process does it lock up?
+>>
+>> Usually sometime around enabling cpufreq  before getty starts.
+>> Different runs and settings give slightly different results. In
+>> particular adding the 1008000 point seems to make it go further.
+>>
+>> Removing all traces of the regulator, cpufreq and thermal I can boot
+>> pretty much 100% to login prompt.
+>>
+>> I don't think the difference between 1GHz and 1.3GHz frequency on the
+>> core would put much additional stress on the supply but I can try with
+>> 35W PSU and some alternative cabling to be sure.
+>>
+>> I did some more tests and it seems 1008000 at 1.1V is fine but switching
+>> to 1.3V crashes the board. Even with only the first 1.3V state. Maybe
+>> there is need for some delay somewhere for the regulator to get
+>> stable?
+>>
+>
+> Hm, the AW table shows 1008000 at 1.3V as supported state and it indeed
+> works. So the voltage switching works or does nothing. Can I measure
+> the regulator output somewhere? Clocking the chip higher does not
+> work.
+>
+> I will try with another PSU later.
+>
 
-These functions might want an of_* prefix to match the rest of the file,
-or do you plan to re-use these later for ACPI?
+Ok, so I tried. The result is the same.
 
-> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-> index bd02b44902d0..5a4f516cfcfe 100644
-> --- a/include/linux/of_iommu.h
-> +++ b/include/linux/of_iommu.h
-> @@ -15,6 +15,14 @@ extern void of_iommu_init(void);
->  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
->  					struct device_node *master_np);
->  
-> +struct iommu_fwspec {
-> +	const struct iommu_ops	*iommu_ops;
-> +	struct device_node	*iommu_np;
-> +	void			*iommu_priv;
-> +	unsigned int		num_ids;
-> +	u32			ids[];
-> +};
-> +
->  #else
->  
->  static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
-> @@ -31,8 +39,18 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
->  	return NULL;
->  }
->  
-> +struct iommu_fwspec;
-> +
->  #endif	/* CONFIG_OF_IOMMU */
->  
-> +int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
-> +void iommu_fwspec_free(struct device *dev);
-> +int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
-> +static inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
-> +{
-> +	return dev->archdata.iommu;
-> +}
+A Chinese USB power meter shows voltage 5.1V which drops to like 4.95V
+when the board is running. The power draw is around 170mA and
+about 200mA when switch to 1.3V is attempted.
+The voltage drop is not nice and is probably due to excessive cabling used
+to distribute power to multiple boards.
+The USB hub starts at 5.2V and drops to something like 5.1V.
 
-I'm a bit nervous about putting this inline in a header file, since not
-all architectures unconditionally provide the iommu field in dev_archdata.
+When the top frequency is 1008000 at 1.3V and governor is performance
+the board keeps running 1008000 at 1.1V as set up by u-boot.
 
-Will
+Changing the top point to 1008000 at 1.1V the board locks up as soon as
+governor is changed to conservative. So any attempt at frequency scaling
+crashes even without touching the regulator.
+
+Thanks
+
+Michal
