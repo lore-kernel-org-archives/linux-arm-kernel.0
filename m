@@ -1,53 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 1 Jul 2016 16:46:12 +0100
-Subject: [PATCH 1/2] efi: arm64: abort boot on pending SError
-In-Reply-To: <CAKv+Gu9Pk6xbUUMisAMhd4rpoYHA+wjzrZGkyEUXPdx_TaniVQ@mail.gmail.com>
-References: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160701152252.GA17071@leverpostej>
- <CAKv+Gu9Pk6xbUUMisAMhd4rpoYHA+wjzrZGkyEUXPdx_TaniVQ@mail.gmail.com>
-Message-ID: <20160701154612.GC17071@leverpostej>
+From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
+Date: Fri, 01 Jul 2016 12:46:31 -0300
+Subject: [RFC] arm64: kexec_file_load support
+In-Reply-To: <20160701051111.GL20774@linaro.org>
+References: <20160701051111.GL20774@linaro.org>
+Message-ID: <3300473.zhbeG65qgA@hactar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 05:31:33PM +0200, Ard Biesheuvel wrote:
-> On 1 July 2016 at 17:22, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Jul 01, 2016 at 05:01:30PM +0200, Ard Biesheuvel wrote:
-> >> It is the firmware's job to clear any pending SErrors before entering
-> >> the kernel. On UEFI, we can fail gracefully rather than panic during
-> >> early boot, so check for this condition in the stub.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >
-> > An SError could be triggered either asynchronously by FW, or as a result
-> > of our actions at any point after this, e.g. due to the filesystem
-> > accesses made to load an initrd.
-> >
-> > So in practice, is checking here useful? Have we seen FW with masked but
-> > pending SError at the point we enter the stub rather than that SError
-> > being triggered later,?
+Am Freitag, 01 Juli 2016, 14:11:12 schrieb AKASHI Takahiro:
+> I'm not sure whether there is any demand for kexec_file_load
+> support on arm64, but anyhow I'm working on this and now
+> my early prototype code does work fine.
+
+It is necessary if you want to support loading only signed kernels, and also 
+if you want IMA to measure the kernel in its event log.
+
+> There is, however, one essential issue:
+> While arm64 kernel requires a device tree blob to be set up
+> correctly at boot time, the current system call API doesn't
+> have this parameter.
+>     int kexec_file_load(int kernel_fd, int initrd_fd,
+>                         unsigned long cmdline_len, const char
+> *cmdline_ptr, unsigned long flags);
 > 
-> Yes. EDK2 keeps SError masked throughout its execution by default, and
-> so any condition that triggered an SError up till this point is likely
-> to still be pending, and blow up the kernel as soon as it unmasks it.
+> Should we invent a new system call, like kexec_file_load2,
+> and, if so, what kind of interface would be desired?
 
-Ok.
+I'm facing the same issue on powerpc. What I'm doing is taking the device 
+tree that was used to boot the current kernel and modifying it as necessary 
+to pass it to the next kernel.
 
-> > I'm also not sure what this means for CPER, which may use SError to
-> > signal to the OS. It's possible that the UEFI implementation polls
-> > ISR_EL1 itself, and handles SError appropriately internally, or that the
-> > OS can later deal with the SError based on CPER and friends.
-> 
-> Currently, the kernel panics on an SError, and so what the kernel
-> should do once we start dealing with them in a more sophisticated way
-> is hypothetical at the moment. Once that code arrives, it may revert
-> this change, but for now, being dropped back into the UEFI shell does
-> sound more appealing than panic early imo.
+I agree that it would be better if we could have a system call where a 
+custom device tree could be passed. One suggestion is:
 
-Logging something while the UART is available is certainly appealing.
 
-As you say, we can change this later if/when we have more advanced
-SError handling. So modulo my prior comments, I guess this is fine for
-now.
+kexec_file_load2(int fds[], int fd_types[], int nr_fds,
+		 unsigned long cmdline_len, const char *cmdline_ptr,
+		unsigned long flags);
 
-Thanks,
-Mark.
+Where fds is an array with nr_fds file descriptors and fd_types is an array 
+specifying what each fd in fds is. So for example, if fds[i] is the kernel, 
+then fd_types[i] would have the value KEXEC_FILE_KERNEL_FD. If fds[i] is the 
+device tree blob, fd_types[i], would have the value KEXEC_FILE_DTB and so 
+on. That way, the syscall can be extended for an arbitrary number and types 
+of segments that have to be loaded, just like kexec_load.
+
+Another option is to have a struct:
+
+kexec_file_load2(struct kexec_file_params *params, unsigned long params_sz);
+
+Where:
+
+struct kexec_file_params {
+	int version;	/* allows struct to be extended in the future */
+	int fds[];
+	int fd_types[];
+	int nr_fds;
+	unsigned long cmdline_len;
+	const char *cmdline_ptr;
+	unsigned long flags;
+};
+
+This is even more flexible.
+
+[]'s
+Thiago Jung Bauermann
+IBM Linux Technology Center
