@@ -1,38 +1,63 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Fri, 1 Jul 2016 17:41:54 +0800
-Subject: [PATCH 0/7] add missing of_node_put after calling of_parse_phandle
- (1st)
-Message-ID: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
+Date: Fri, 1 Jul 2016 17:41:57 +0800
+Subject: [PATCH 3/7] arm: mach-u300: regulator: add missing of_node_put after
+ calling of_parse_phandle
+In-Reply-To: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
+References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1467366121-14120-4-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
 of_node_put needs to be called when the device node which is got
-from of_parse_phandle has finished using, but there are many codes
-do not follow that, this patch set fixes some of them.
+from of_parse_phandle has finished using.
 
-Peter Chen (7):
-  extcon: add missing of_node_put after calling of_parse_phandle
-  arm: mach-shmobile: pm-rmobile: add missing of_node_put after calling
-    of_parse_phandle
-  arm: mach-u300: regulator: add missing of_node_put after calling
-    of_parse_phandle
-  bus: arm-cci: add missing of_node_put after calling of_parse_phandle
-  bus: vexpress-config: add missing of_node_put after calling
-    of_parse_phandle
-  devfreq: add missing of_node_put after calling of_parse_phandle
-  devfreq: exynos-bus: add missing of_node_put after calling
-    of_parse_phandle
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+---
+ arch/arm/mach-u300/regulator.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
- arch/arm/mach-shmobile/pm-rmobile.c |  1 +
- arch/arm/mach-u300/regulator.c      | 12 +++++++++---
- drivers/bus/arm-cci.c               |  5 ++++-
- drivers/bus/vexpress-config.c       |  1 +
- drivers/devfreq/devfreq.c           |  2 ++
- drivers/devfreq/exynos-bus.c        |  9 ++++++---
- drivers/extcon/extcon.c             |  2 ++
- 7 files changed, 25 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/mach-u300/regulator.c b/arch/arm/mach-u300/regulator.c
+index 595b574..509643e 100644
+--- a/arch/arm/mach-u300/regulator.c
++++ b/arch/arm/mach-u300/regulator.c
+@@ -71,19 +71,21 @@ static int __init __u300_init_boardpower(struct platform_device *pdev)
+ 	regmap = syscon_node_to_regmap(syscon_np);
+ 	if (IS_ERR(regmap)) {
+ 		pr_crit("U300: could not locate syscon regmap\n");
+-		return PTR_ERR(regmap);
++		err = PTR_ERR(regmap);
++		goto error;
+ 	}
+ 
+ 	main_power_15 = regulator_get(&pdev->dev, "vana15");
+ 
+ 	if (IS_ERR(main_power_15)) {
+ 		pr_err("could not get vana15");
+-		return PTR_ERR(main_power_15);
++		err = PTR_ERR(main_power_15);
++		goto error;
+ 	}
+ 	err = regulator_enable(main_power_15);
+ 	if (err) {
+ 		pr_err("could not enable vana15\n");
+-		return err;
++		goto error;
+ 	}
+ 
+ 	/*
+@@ -99,8 +101,12 @@ static int __init __u300_init_boardpower(struct platform_device *pdev)
+ 
+ 	/* Register globally exported PM poweroff hook */
+ 	pm_power_off = u300_pm_poweroff;
++	of_node_put(syscon_np);
+ 
+ 	return 0;
++error:
++	of_node_put(syscon_np);
++	return err;
+ }
+ 
+ static int __init s365_board_probe(struct platform_device *pdev)
 -- 
 1.9.1
