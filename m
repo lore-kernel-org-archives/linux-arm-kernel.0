@@ -1,131 +1,435 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri,  1 Jul 2016 17:50:14 +0100
-Subject: [PATCH v4 5/8] iommu/of: Introduce iommu_fwspec
+Date: Fri,  1 Jul 2016 17:50:15 +0100
+Subject: [PATCH v4 6/8] iommu/arm-smmu: Implement of_xlate() for SMMUv3
 In-Reply-To: <cover.1467388950.git.robin.murphy@arm.com>
 References: <cover.1467388950.git.robin.murphy@arm.com>
-Message-ID: <7947dbaa0e0d4ace8eebe8de1fe5810fe05f7734.1467388950.git.robin.murphy@arm.com>
+Message-ID: <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a common structure to hold the per-device firmware data that
-non-architectural IOMMU drivers generally need to keep track of.
-Initially this is DT-specific to complement the existing of_iommu
-support code, but will generalise further once other firmware methods
-(e.g. ACPI IORT) come along.
+Now that we can properly describe the mapping between PCI RIDs and
+stream IDs via "iommu-map", and have it fed it to the driver
+automatically via of_xlate(), rework the SMMUv3 driver to benefit from
+that, and get rid of the current misuse of the "iommus" binding.
 
-Ultimately the aim is to promote the fwspec to a first-class member of
-struct device, and handle the init/free automatically in the firmware
-code. That way we can have API calls look for dev->fwspec->iommu_ops
-before falling back to dev->bus->iommu_ops, and thus gracefully handle
-those troublesome multi-IOMMU systems which we currently cannot. To
-start with, though, make use of the existing archdata field and delegate
-the init/free to drivers to allow an incremental conversion rather than
-the impractical pain of trying to attempt everything in one go.
+Since having of_xlate wired up means that masters will now be given the
+appropriate DMA ops, we also need to make sure that default domains work
+properly. This necessitates dispensing with the "whole group at a time"
+notion for attaching to a domain, as devices which share a group get
+attached to the group's default domain one by one as they are initially
+probed.
 
-Suggested-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
-v4: Move dev_iommu_fwspec() definition out-of-line.
+v4: Add explicit device probe in of_init callback.
 
- drivers/iommu/of_iommu.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_iommu.h | 15 ++++++++++++++
- 2 files changed, 67 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 278 +++++++++++++++++++-------------------------
+ 1 file changed, 121 insertions(+), 157 deletions(-)
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 1fe1f620f79d..4618e89d6a37 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -216,3 +216,55 @@ void __init of_iommu_init(void)
- 				of_node_full_name(np));
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 94b68213c50d..fb438664b9f0 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -30,6 +30,7 @@
+ #include <linux/msi.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_iommu.h>
+ #include <linux/of_platform.h>
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
+@@ -606,12 +607,9 @@ struct arm_smmu_device {
+ 	struct arm_smmu_strtab_cfg	strtab_cfg;
+ };
+ 
+-/* SMMU private data for an IOMMU group */
+-struct arm_smmu_group {
++/* SMMU private data for each master */
++struct arm_smmu_master_data {
+ 	struct arm_smmu_device		*smmu;
+-	struct arm_smmu_domain		*domain;
+-	int				num_sids;
+-	u32				*sids;
+ 	struct arm_smmu_strtab_ent	ste;
+ };
+ 
+@@ -1575,20 +1573,6 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+ 	return ret;
+ }
+ 
+-static struct arm_smmu_group *arm_smmu_group_get(struct device *dev)
+-{
+-	struct iommu_group *group;
+-	struct arm_smmu_group *smmu_group;
+-
+-	group = iommu_group_get(dev);
+-	if (!group)
+-		return NULL;
+-
+-	smmu_group = iommu_group_get_iommudata(group);
+-	iommu_group_put(group);
+-	return smmu_group;
+-}
+-
+ static __le64 *arm_smmu_get_step_for_sid(struct arm_smmu_device *smmu, u32 sid)
+ {
+ 	__le64 *step;
+@@ -1611,27 +1595,17 @@ static __le64 *arm_smmu_get_step_for_sid(struct arm_smmu_device *smmu, u32 sid)
+ 	return step;
+ }
+ 
+-static int arm_smmu_install_ste_for_group(struct arm_smmu_group *smmu_group)
++static int arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+ {
+ 	int i;
+-	struct arm_smmu_domain *smmu_domain = smmu_group->domain;
+-	struct arm_smmu_strtab_ent *ste = &smmu_group->ste;
+-	struct arm_smmu_device *smmu = smmu_group->smmu;
++	struct arm_smmu_master_data *master = fwspec->iommu_priv;
++	struct arm_smmu_device *smmu = master->smmu;
+ 
+-	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+-		ste->s1_cfg = &smmu_domain->s1_cfg;
+-		ste->s2_cfg = NULL;
+-		arm_smmu_write_ctx_desc(smmu, ste->s1_cfg);
+-	} else {
+-		ste->s1_cfg = NULL;
+-		ste->s2_cfg = &smmu_domain->s2_cfg;
+-	}
+-
+-	for (i = 0; i < smmu_group->num_sids; ++i) {
+-		u32 sid = smmu_group->sids[i];
++	for (i = 0; i < fwspec->num_ids; ++i) {
++		u32 sid = fwspec->ids[i];
+ 		__le64 *step = arm_smmu_get_step_for_sid(smmu, sid);
+ 
+-		arm_smmu_write_strtab_ent(smmu, sid, step, ste);
++		arm_smmu_write_strtab_ent(smmu, sid, step, &master->ste);
  	}
+ 
+ 	return 0;
+@@ -1639,13 +1613,12 @@ static int arm_smmu_install_ste_for_group(struct arm_smmu_group *smmu_group)
+ 
+ static void arm_smmu_detach_dev(struct device *dev)
+ {
+-	struct arm_smmu_group *smmu_group = arm_smmu_group_get(dev);
++	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
++	struct arm_smmu_master_data *master = fwspec->iommu_priv;
+ 
+-	smmu_group->ste.bypass = true;
+-	if (arm_smmu_install_ste_for_group(smmu_group) < 0)
++	master->ste.bypass = true;
++	if (arm_smmu_install_ste_for_dev(fwspec) < 0)
+ 		dev_warn(dev, "failed to install bypass STE\n");
+-
+-	smmu_group->domain = NULL;
  }
-+
-+int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np)
-+{
-+	struct iommu_fwspec *fwspec = dev->archdata.iommu;
-+
-+	if (fwspec)
-+		return 0;
-+
-+	fwspec = kzalloc(sizeof(*fwspec), GFP_KERNEL);
+ 
+ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+@@ -1653,16 +1626,21 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	int ret = 0;
+ 	struct arm_smmu_device *smmu;
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+-	struct arm_smmu_group *smmu_group = arm_smmu_group_get(dev);
++	struct arm_smmu_master_data *master;
++	struct arm_smmu_strtab_ent *ste;
++	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
+ 
+-	if (!smmu_group)
 +	if (!fwspec)
-+		return -ENOMEM;
+ 		return -ENOENT;
+ 
++	master = fwspec->iommu_priv;
++	smmu = master->smmu;
++	ste = &master->ste;
 +
-+	fwspec->iommu_np = of_node_get(iommu_np);
-+	fwspec->iommu_ops = of_iommu_get_ops(iommu_np);
-+	dev->archdata.iommu = fwspec;
-+	return 0;
-+}
-+
-+void iommu_fwspec_free(struct device *dev)
-+{
-+	struct iommu_fwspec *fwspec = dev->archdata.iommu;
-+
-+	if (fwspec) {
-+		of_node_put(fwspec->iommu_np);
-+		kfree(fwspec);
+ 	/* Already attached to a different domain? */
+-	if (smmu_group->domain && smmu_group->domain != smmu_domain)
++	if (!ste->bypass)
+ 		arm_smmu_detach_dev(dev);
+ 
+-	smmu = smmu_group->smmu;
+ 	mutex_lock(&smmu_domain->init_mutex);
+ 
+ 	if (!smmu_domain->smmu) {
+@@ -1681,21 +1659,21 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 		goto out_unlock;
+ 	}
+ 
+-	/* Group already attached to this domain? */
+-	if (smmu_group->domain)
+-		goto out_unlock;
++	ste->bypass = false;
++	ste->valid = true;
+ 
+-	smmu_group->domain	= smmu_domain;
++	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
++		ste->s1_cfg = &smmu_domain->s1_cfg;
++		ste->s2_cfg = NULL;
++		arm_smmu_write_ctx_desc(smmu, ste->s1_cfg);
++	} else {
++		ste->s1_cfg = NULL;
++		ste->s2_cfg = &smmu_domain->s2_cfg;
 +	}
-+}
-+
-+int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
-+{
-+	struct iommu_fwspec *fwspec = dev->archdata.iommu;
-+	size_t size;
-+
-+	if (!fwspec)
-+		return -EINVAL;
-+
-+	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + 1]);
-+	fwspec = krealloc(dev->archdata.iommu, size, GFP_KERNEL);
-+	if (!fwspec)
-+		return -ENOMEM;
-+
-+	while (num_ids--)
-+		fwspec->ids[fwspec->num_ids++] = *ids++;
-+
-+	dev->archdata.iommu = fwspec;
-+	return 0;
-+}
-+
-+inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
-+{
-+	return dev->archdata.iommu;
-+}
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index bd02b44902d0..308791fca32d 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -15,6 +15,14 @@ extern void of_iommu_init(void);
- extern const struct iommu_ops *of_iommu_configure(struct device *dev,
- 					struct device_node *master_np);
  
-+struct iommu_fwspec {
-+	const struct iommu_ops	*iommu_ops;
-+	struct device_node	*iommu_np;
-+	void			*iommu_priv;
-+	unsigned int		num_ids;
-+	u32			ids[];
-+};
-+
- #else
+-	/*
+-	 * FIXME: This should always be "false" once we have IOMMU-backed
+-	 * DMA ops for all devices behind the SMMU.
+-	 */
+-	smmu_group->ste.bypass	= domain->type == IOMMU_DOMAIN_DMA;
+-
+-	ret = arm_smmu_install_ste_for_group(smmu_group);
++	ret = arm_smmu_install_ste_for_dev(fwspec);
+ 	if (ret < 0)
+-		smmu_group->domain = NULL;
++		ste->valid = false;
  
- static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
-@@ -31,8 +39,15 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
- 	return NULL;
+ out_unlock:
+ 	mutex_unlock(&smmu_domain->init_mutex);
+@@ -1754,40 +1732,14 @@ arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
+ 	return ret;
  }
  
-+struct iommu_fwspec;
-+
- #endif	/* CONFIG_OF_IOMMU */
+-static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void *sidp)
++static struct arm_smmu_device *arm_smmu_get_by_node(struct device_node *np)
+ {
+-	*(u32 *)sidp = alias;
+-	return 0; /* Continue walking */
+-}
++	struct platform_device *smmu_pdev = of_find_device_by_node(np);
  
-+int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
-+void iommu_fwspec_free(struct device *dev);
-+int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
-+struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
-+
- void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
- const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+-static void __arm_smmu_release_pci_iommudata(void *data)
+-{
+-	kfree(data);
+-}
+-
+-static struct arm_smmu_device *arm_smmu_get_for_pci_dev(struct pci_dev *pdev)
+-{
+-	struct device_node *of_node;
+-	struct platform_device *smmu_pdev;
+-	struct arm_smmu_device *smmu = NULL;
+-	struct pci_bus *bus = pdev->bus;
+-
+-	/* Walk up to the root bus */
+-	while (!pci_is_root_bus(bus))
+-		bus = bus->parent;
+-
+-	/* Follow the "iommus" phandle from the host controller */
+-	of_node = of_parse_phandle(bus->bridge->parent->of_node, "iommus", 0);
+-	if (!of_node)
++	if (!smmu_pdev)
+ 		return NULL;
  
+-	/* See if we can find an SMMU corresponding to the phandle */
+-	smmu_pdev = of_find_device_by_node(of_node);
+-	if (smmu_pdev)
+-		smmu = platform_get_drvdata(smmu_pdev);
+-
+-	of_node_put(of_node);
+-	return smmu;
++	return platform_get_drvdata(smmu_pdev);
+ }
+ 
+ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
+@@ -1800,94 +1752,74 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
+ 	return sid < limit;
+ }
+ 
++static struct iommu_ops arm_smmu_ops;
++
+ static int arm_smmu_add_device(struct device *dev)
+ {
+ 	int i, ret;
+-	u32 sid, *sids;
+-	struct pci_dev *pdev;
+-	struct iommu_group *group;
+-	struct arm_smmu_group *smmu_group;
+ 	struct arm_smmu_device *smmu;
++	struct arm_smmu_master_data *master;
++	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
++	struct iommu_group *group;
+ 
+-	/* We only support PCI, for now */
+-	if (!dev_is_pci(dev))
++	if (!fwspec || fwspec->iommu_ops != &arm_smmu_ops)
+ 		return -ENODEV;
+-
+-	pdev = to_pci_dev(dev);
+-	group = iommu_group_get_for_dev(dev);
+-	if (IS_ERR(group))
+-		return PTR_ERR(group);
+-
+-	smmu_group = iommu_group_get_iommudata(group);
+-	if (!smmu_group) {
+-		smmu = arm_smmu_get_for_pci_dev(pdev);
+-		if (!smmu) {
+-			ret = -ENOENT;
+-			goto out_remove_dev;
+-		}
+-
+-		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
+-		if (!smmu_group) {
+-			ret = -ENOMEM;
+-			goto out_remove_dev;
+-		}
+-
+-		smmu_group->ste.valid	= true;
+-		smmu_group->smmu	= smmu;
+-		iommu_group_set_iommudata(group, smmu_group,
+-					  __arm_smmu_release_pci_iommudata);
++	/*
++	 * We _can_ actually withstand dodgy bus code re-calling add_device()
++	 * without an intervening remove_device()/of_xlate() sequence, but
++	 * we're not going to do so quietly...
++	 */
++	if (WARN_ON_ONCE(fwspec->iommu_priv)) {
++		master = fwspec->iommu_priv;
++		smmu = master->smmu;
+ 	} else {
+-		smmu = smmu_group->smmu;
++		smmu = arm_smmu_get_by_node(fwspec->iommu_np);
++		if (!smmu)
++			return -ENODEV;
++		master = kzalloc(sizeof(*master), GFP_KERNEL);
++		if (!master)
++			return -ENOMEM;
++
++		master->smmu = smmu;
++		fwspec->iommu_priv = master;
+ 	}
+ 
+-	/* Assume SID == RID until firmware tells us otherwise */
+-	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
+-	for (i = 0; i < smmu_group->num_sids; ++i) {
+-		/* If we already know about this SID, then we're done */
+-		if (smmu_group->sids[i] == sid)
+-			goto out_put_group;
++	/* Check the SIDs are in range of the SMMU and our stream table */
++	for (i = 0; i < fwspec->num_ids; i++) {
++		u32 sid = fwspec->ids[i];
++
++		if (!arm_smmu_sid_in_range(smmu, sid))
++			return -ERANGE;
++
++		/* Ensure l2 strtab is initialised */
++		if (smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
++			ret = arm_smmu_init_l2_strtab(smmu, sid);
++			if (ret)
++				return ret;
++		}
+ 	}
+ 
+-	/* Check the SID is in range of the SMMU and our stream table */
+-	if (!arm_smmu_sid_in_range(smmu, sid)) {
+-		ret = -ERANGE;
+-		goto out_remove_dev;
+-	}
++	group = iommu_group_get_for_dev(dev);
++	if (!IS_ERR(group))
++		iommu_group_put(group);
+ 
+-	/* Ensure l2 strtab is initialised */
+-	if (smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
+-		ret = arm_smmu_init_l2_strtab(smmu, sid);
+-		if (ret)
+-			goto out_remove_dev;
+-	}
+-
+-	/* Resize the SID array for the group */
+-	smmu_group->num_sids++;
+-	sids = krealloc(smmu_group->sids, smmu_group->num_sids * sizeof(*sids),
+-			GFP_KERNEL);
+-	if (!sids) {
+-		smmu_group->num_sids--;
+-		ret = -ENOMEM;
+-		goto out_remove_dev;
+-	}
+-
+-	/* Add the new SID */
+-	sids[smmu_group->num_sids - 1] = sid;
+-	smmu_group->sids = sids;
+-
+-out_put_group:
+-	iommu_group_put(group);
+-	return 0;
+-
+-out_remove_dev:
+-	iommu_group_remove_device(dev);
+-	iommu_group_put(group);
+-	return ret;
++	return PTR_ERR_OR_ZERO(group);
+ }
+ 
+ static void arm_smmu_remove_device(struct device *dev)
+ {
++	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
++	struct arm_smmu_master_data *master;
++
++	if (!fwspec || fwspec->iommu_ops != &arm_smmu_ops)
++		return;
++
++	master = fwspec->iommu_priv;
++	if (master && master->ste.valid)
++		arm_smmu_detach_dev(dev);
+ 	iommu_group_remove_device(dev);
++	kfree(master);
++	iommu_fwspec_free(dev);
+ }
+ 
+ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+@@ -1934,6 +1866,21 @@ out_unlock:
+ 	return ret;
+ }
+ 
++static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
++{
++	int ret;
++
++	/* We only support PCI, for now */
++	if (!dev_is_pci(dev))
++		return -ENODEV;
++
++	ret = iommu_fwspec_init(dev, args->np);
++	if (!ret)
++		ret = iommu_fwspec_add_ids(dev, &args->args[0], 1);
++
++	return ret;
++}
++
+ static struct iommu_ops arm_smmu_ops = {
+ 	.capable		= arm_smmu_capable,
+ 	.domain_alloc		= arm_smmu_domain_alloc,
+@@ -1947,6 +1894,7 @@ static struct iommu_ops arm_smmu_ops = {
+ 	.device_group		= pci_device_group,
+ 	.domain_get_attr	= arm_smmu_domain_get_attr,
+ 	.domain_set_attr	= arm_smmu_domain_set_attr,
++	.of_xlate		= arm_smmu_of_xlate,
+ 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+ };
+ 
+@@ -2697,6 +2645,22 @@ static void __exit arm_smmu_exit(void)
+ subsys_initcall(arm_smmu_init);
+ module_exit(arm_smmu_exit);
+ 
++static int __init arm_smmu_of_init(struct device_node *np)
++{
++	static bool registered;
++
++	if (!registered)
++		registered = !arm_smmu_init();
++
++	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
++		return -ENODEV;
++
++	of_iommu_set_ops(np, &arm_smmu_ops);
++
++	return 0;
++}
++IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
++
+ MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+ MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+ MODULE_LICENSE("GPL v2");
 -- 
 2.8.1.dirty
