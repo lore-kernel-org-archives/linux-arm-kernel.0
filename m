@@ -1,65 +1,177 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jul 2016 17:42:39 +0200
-Subject: [PATCH 6/7] dt-bindings: net: bgmac: add bindings documentation
- for bgmac
-In-Reply-To: <CAC3K-4qfb3JQ3i8nEo2AOobb1ExB=d=dSZUrdype+z9eHi1FwQ@mail.gmail.com>
-References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
- <29091648.CIZSyGWL7u@wuerfel>
- <CAC3K-4qfb3JQ3i8nEo2AOobb1ExB=d=dSZUrdype+z9eHi1FwQ@mail.gmail.com>
-Message-ID: <6488341.IDGze89kcW@wuerfel>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 01 Jul 2016 16:43:02 +0100
+Subject: [PATCH 09/11] arm64: pmu: Add routines for detecting differing
+ PMU types in the system
+In-Reply-To: <57768431.7080508@arm.com> (Jeremy Linton's message of "Fri, 1
+ Jul 2016 09:54:41 -0500")
+References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
+ <1466529109-21715-10-git-send-email-jeremy.linton@arm.com>
+ <87mvm1e9ye.fsf@e105922-lin.cambridge.arm.com>
+ <57768431.7080508@arm.com>
+Message-ID: <871t3de54p.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 1, 2016 11:17:25 AM CEST Jon Mason wrote:
-> On Fri, Jul 1, 2016 at 5:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday, June 30, 2016 6:59:13 PM CEST Jon Mason wrote:
-> >> +
-> >> +Required properties:
-> >> + - compatible: "brcm,bgmac-nsp"
-> >> + - reg:                Address and length of the GMAC registers,
-> >> +               Address and length of the GMAC IDM registers
-> >> + - reg-names:  Names of the registers.  Must have both "gmac_base" and
-> >> +               "idm_base"
-> >> + - interrupts: Interrupt number
-> >> +
-> >
-> >
-> > "brcm,bgmac-nsp" sounds a bit too general. As I understand, this is a family
-> > of SoCs that might not all have the exact same implementation of this
-> > ethernet device, as we can see from the long lookup table in bgmac_probe().
-> 
-> The Broadcom iProc family of SoCs contains:
-> Northstar
-> Northstar Plus
-> Cygnus
-> Northstar 2
-> a few SoCs that are under development
-> and a number of ethernet switches (which might never be officially supported)
-> 
-> Each one of these SoCs could have a different revision of the gmac IP
-> block, but they should be uniform within each SoC (though there might
-> be a A0/B0 change necessary).  The Northstar Plus product family has a
-> number of different implementations, but the SoC is unchanged.  So, I
-> think this might be too specific, when we really need a general compat
-> string.
+Jeremy Linton <jeremy.linton@arm.com> writes:
 
-Ok, thanks for the clarification, that sounds good enough.
+> On 07/01/2016 08:58 AM, Punit Agrawal wrote:
+>> Jeremy Linton <jeremy.linton@arm.com> writes:
+>>
+>>> In preparation for enabling heterogeneous PMUs on ACPI systems
+>>> add routines that detect this and group the resulting PMUs and
+>>> interrupts.
+>>>
+>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>> ---
+>>>   drivers/perf/arm_pmu_acpi.c | 137 +++++++++++++++++++++++++++++++++++++++++++-
+>>>   1 file changed, 134 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+>>> index a24cdd0..482a54d 100644
+>>> --- a/drivers/perf/arm_pmu_acpi.c
+>>> +++ b/drivers/perf/arm_pmu_acpi.c
+>>> @@ -1,23 +1,36 @@
+>>>   /*
+>>> - * PMU support
+>>> + * ARM ACPI PMU support
+>>>    *
+>>>    * Copyright (C) 2015 Red Hat Inc.
+>>> + * Copyright (C) 2016 ARM Ltd.
+>>>    * Author: Mark Salter <msalter@redhat.com>
+>>> + *         Jeremy Linton <jeremy.linton@arm.com>
+>>>    *
+>>>    * This work is licensed under the terms of the GNU GPL, version 2.  See
+>>>    * the COPYING file in the top-level directory.
+>>>    *
+>>>    */
+>>>
+>>> +#define pr_fmt(fmt) "ACPI-PMU: " fmt
+>>> +
+>>> +#include <asm/cpu.h>
+>>>   #include <linux/perf/arm_pmu.h>
+>>>   #include <linux/platform_device.h>
+>>>   #include <linux/acpi.h>
+>>>   #include <linux/irq.h>
+>>>   #include <linux/irqdesc.h>
+>>> +#include <linux/list.h>
+>>>
+>>>   struct pmu_irq {
+>>> -	int gsi;
+>>> -	int trigger;
+>>> +	int  gsi;
+>>> +	int  trigger;
+>>> +	bool registered;
+>>> +};
+>>> +
+>>> +struct pmu_types {
+>>> +	struct list_head list;
+>>> +	int		 cpu_type;
+>>> +	int		 cpu_count;
+>>>   };
+>>
+>> You can stash the associated resources in the above structure. That
+>> should simplify some code below.
+>
+> 	How is that? One structure is per cpu, the other is per pmu
+> type in the system, they are actually completely independent and
+> intertwining them will only server to obfuscate the code.
 
-> Broadcom has a history of sharing IP blocks amongst the different
-> divisions.  So, this driver might be used on other SoC families (as it
-> apparently has been done in the past, based on the code you
-> reference).  I do not know of any way to know what legacy, non-iProc
-> chips have used this IP block.  I can make this "brcm,iproc-bgmac",
-> and add "brcm,iproc-nsp-bgmac" as an alternative compatible string in
-> this file (which I believe you are suggesting), but there might be
-> non-iProc SoCs that use this driver.  Is this acceptable?
+Just to clarify, I am referring to "struct resources" you allocate for
+use with the pmu platform device in the next patch.
 
-If it is also used outside of iProc, then I see no need for the
-extra compatible string, although it would not do any harm either.
+>
+>
+>>
+>>>
+>>>   static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
+>>> @@ -36,6 +49,124 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
+>>>   		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
+>>>   }
+>>>
+>>> +/* Count number and type of CPU cores in the system. */
+>>> +void __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
+>>> +{
+>>> +	int i;
+>>> +
+>>> +	for_each_possible_cpu(i) {
+>>> +		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
+>>> +		u32 partnum = MIDR_PARTNUM(cinfo->reg_midr);
+>>> +		struct pmu_types *pmu;
+>>> +
+>>> +		list_for_each_entry(pmu, pmus, list) {
+>>> +			if (pmu->cpu_type == partnum) {
+>>> +				pmu->cpu_count++;
+>>> +				break;
+>>> +			}
+>>> +		}
+>>> +
+>>> +		/* we didn't find the CPU type, add an entry to identify it */
+>>> +		if (&pmu->list == pmus) {
+>>> +			pmu = kcalloc(1, sizeof(struct pmu_types), GFP_KERNEL);
+>>
+>> Use kzalloc here.
+> Ok fair point.
+>
+>>
+>>> +			if (!pmu) {
+>>> +				pr_warn("Unable to allocate pmu_types\n");
+>>
+>> Bail out with error if the memory can't be allocated. Otherwise, we risk
+>> silently failing to register a PMU type.
+>
+> ? Its not silent, it fails to allocate the space complains about it,
+> and therefor this pmu type is not created.
 
-Ideally we should name it whatever the name for this IP block is
-inside of the company, with "nsp" as the designation for the variant
-in Northstar Plus. A lot of Broadcom IP blocks themselves seem to have
-some four-digit or five-digit number, maybe this one does too?
+Sorry for the confusion, I didn't mean PMU type in the above comment. I
+was thinking of the missed cpu in cpu_count.
 
-	Arnd
+If the allocation succeeds in the next iteration (as we don't break out
+of the loop), we'll end up undercounting cpus that have this type of
+pmu. In turn, this will lead to accessing beyond the allocated "struct
+resource" in arm_pmu_acpi_gsi_res.
+
+Punit
+
+> In a system with a single
+> CPU this basically cancels the whole operation. If there is more than
+> one pmu, the remaining PMUs continue to have a chance of being
+> created, although if the memory allocation fails (this is pretty early
+> boot code) there is a high probability there is something seriously
+> wrong with the system.
+>
+>
+>>
+>>> +			} else {
+>>> +				pmu->cpu_type = partnum;
+>>> +				pmu->cpu_count++;
+>>> +				list_add_tail(&pmu->list, pmus);
+>>> +			}
+>>> +		}
+>>> +	}
+>>> +}
+>>> +
+>>> +/*
+>>> + * Registers the group of PMU interfaces which correspond to the 'last_cpu_id'.
+>>> + * This group utilizes 'count' resources in the 'res'.
+>>> + */
+>>> +int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
+>>> +					    int last_cpu_id)
+>>> +{
+>>
+>> With the addition of the irq resources to struct pmu_types, you can just pass
+>> the pmu structure here.
+>
+> 	Thats a point, but the lifetimes of the structures are
+> different and outside of their shared use in this single function
+> never really interact. I prefer not unnecessarily intertwine
+> independent data structures simply to reduce parameter counts for a
+> single function. Especially since it complicates cleanup because the
+> validity of the resource structure will have to be tracked relative to
+> its successful registration.
+>
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
