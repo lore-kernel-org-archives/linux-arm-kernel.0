@@ -1,43 +1,45 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 01 Jul 2016 23:04:15 +0200
-Subject: [PATCH v6 00/10] acpi,
- clocksource: add GTDT driver and GTDT support in arm_arch_timer
-In-Reply-To: <20160701152340.GO12735@arm.com>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <57714bed-3f9c-90c2-ac30-2d462d8a06d4@linaro.org>
- <20160701152340.GO12735@arm.com>
-Message-ID: <2183745.J7YpvxXQ47@vostro.rjw.lan>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  1 Jul 2016 23:00:54 +0200
+Subject: [PATCH 1/2] iio: sun4i-lradc: Add binding documentation
+Message-ID: <1467406855-9677-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 01, 2016 04:23:40 PM Will Deacon wrote:
-> On Thu, Jun 30, 2016 at 09:48:02PM +0800, Hanjun Guo wrote:
-> > On 2016/6/30 21:27, Rafael J. Wysocki wrote:
-> > >On Thursday, June 30, 2016 10:10:02 AM Hanjun Guo wrote:
-> > >>GTDT is part of ACPI spec, drivers/acpi/ is for driver code of
-> > >>ACPI spec, I think it can stay in drivers/acpi/ from this point
-> > >>of view, am I right?
-> > >
-> > >The question is not "Can it?", but "Does it need to?".
-> > >
-> > >It is in the spec, but still there's only one architecture needing it.
-> > >
-> > >There is no way to test it on any other architecture and no reason to build it
-> > >for any other architecture, so why does it need to be located in drivers/acpi/ ?
-> > 
-> > I'm fine to move it to other places such as arch/arm64/kernel/, but I
-> > would like to ask ARM64 maintainer's suggestion for this.
-> > 
-> > Will, Catalin, what's your opinion on this?
-> 
-> We don't have any device-tree code for the architected timer under
-> arch/arm64, so I don't see why we should need anything for ACPI either.
+Document the bindings for the Allwinner LRADC.
 
-And I don't see a reason for the GTDT code to be there in drivers/acpi/.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: devicetree at vger.kernel.org
 
-What gives?
+ .../devicetree/bindings/iio/adc/sun4i-lradc.txt       | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/sun4i-lradc.txt
 
-Maybe it should go to the same place as the analogus DT code, then?
-
-Thanks,
-Rafael
+diff --git a/Documentation/devicetree/bindings/iio/adc/sun4i-lradc.txt b/Documentation/devicetree/bindings/iio/adc/sun4i-lradc.txt
+new file mode 100644
+index 000000000000..c75a6067b8a5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/sun4i-lradc.txt
+@@ -0,0 +1,19 @@
++Allwinner sun4i Low Resolution ADC
++----------------------------------
++
++Required properties:
++ - compatible: "allwinner,sun4i-a10-lradc"
++ - reg: mmio address range of the chip
++ - interrupts: interrupt to which the chip is connected
++ - vref-supply: powersupply for the lradc reference voltage
++ - #io-channel-cells = <1>; As ADC has multiple outputs
++
++Example:
++
++	lradc: lradc at 01c22800 {
++		compatible = "allwinner,sun4i-a10-lradc";
++		reg = <0x01c22800 0x100>;
++		interrupts = <31>;
++		vref-supply = <&reg_vcc3v0>;
++		#io-channel-cells = <1>;
++	};
+-- 
+2.8.1
