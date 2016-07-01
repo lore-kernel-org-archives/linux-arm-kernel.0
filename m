@@ -1,91 +1,23 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 1 Jul 2016 20:32:49 +0200
-Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
-In-Reply-To: <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
-References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
- <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
-Message-ID: <20160701183248.GC2874@piout.net>
+Date: Fri, 1 Jul 2016 20:47:06 +0200
+Subject: [PATCH 1/2] ARM: dts: at91: Add pinctrl information to ethernet
+ node.
+In-Reply-To: <1466775069-606-1-git-send-email-raashidmuhammed@zilogic.com>
+References: <1466775069-606-1-git-send-email-raashidmuhammed@zilogic.com>
+Message-ID: <20160701184706.GD2874@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2016 at 16:37:11 +0200, Olivier Schonken wrote :
-> Add node to support SAMA5D2 Embedded Trace Macrocell and Embedded
-> Trace Buffer. Add a dummy clock node needed by drivers/amba/bus.c
-> for succesfull probe. The coresight clock is always present, and
-> can thus not be enabled/disabled by a register write.
+On 24/06/2016 at 19:01:08 +0530, Raashid Muhammed wrote :
+> Add missing pinctrl information to ethernet node.
 > 
-> This patch depends on coresight-etm3x: Add ARM ETM-A5 peripheral ID
-> for proper functionality.
-> 
-> Signed-off-by: Olivier Schonken <olivier.schonken@gmail.com>
+> Signed-off-by: Raashid Muhammed <raashidmuhammed@zilogic.com>
+> Reviewed-by: Vijay Kumar B. <vijaykumar@bravegnu.org>
 > ---
->  arch/arm/boot/dts/sama5d2.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
+>  arch/arm/boot/dts/at91-sam9_l9260.dts | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index 5d63206..4a3a3fb 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -77,6 +77,37 @@
->  		interrupts = <2 IRQ_TYPE_LEVEL_HIGH 0>;
->  	};
->  
-> +	etb: etb at 00740000 {
-> +		compatible = "arm,coresight-etb10", "arm,primecell";
-> +		reg = <0x740000 0x1000>;
-> +		status = "okay";
-> +
-> +		clocks = <&etmck>;
-> +		clock-names = "apb_pclk";
-> +
-> +		port {
-> +			etb_in: endpoint {
-> +				slave-mode;
-> +				remote-endpoint = <&etm_out>;
-> +			};
-> +		};
-> +	};
-> +
-> +	etm: etm at 0073C000 {
-> +		compatible = "arm,coresight-etm3x", "arm,primecell";
-> +		reg = <0x73C000 0x1000>;
-> +		status = "okay";
-> +
-> +		clocks = <&etmck>;
-> +		clock-names = "apb_pclk";
-> +
-> +		port {
-> +			etm_out: endpoint {
-> +				remote-endpoint = <&etb_in>;
-> +			};
-> +		};
-> +	};
-> +
->  	memory {
->  		reg = <0x20000000 0x20000000>;
->  	};
-> @@ -474,6 +505,19 @@
->  					};
->  				};
->  
-> +				/*
-> +				 * This is a dummy clock needed by
-> +				 * drivers/amba/bus.c when probing
-> +				 * for ETM/ETB. On SAMA5D2 the coresight
-> +				 * clock is always supplied.
-> +				*/
-> +
-> +				etmck: etmck {
-> +					#clock-cells = <0>;
-> +					compatible = "fixed-clock";
-> +					clock-frequency = <0>;
-> +				};
-> +
-
-Hum, maybe you could take mck instead of adding a dummy clock in the
-PCM.
-
-Boris, do you have a better idea?
+Both applied, thanks.
 
 -- 
 Alexandre Belloni, Free Electrons
