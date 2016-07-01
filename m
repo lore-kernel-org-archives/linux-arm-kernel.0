@@ -1,45 +1,42 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Fri, 1 Jul 2016 16:47:46 +0200
-Subject: [GIT PULL] STi SoC changes for v4.8
-Message-ID: <57768292.8070901@st.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  1 Jul 2016 16:50:21 +0200
+Subject: [GIT PULL 1/6] bus: NVIDIA Tegra ACONNECT support
+Message-ID: <20160701145026.25760-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+Hi ARM SoC maintainers,
 
-Please consider this first round of STi SoC updates for v4.8:
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-The following changes since commit 
-4c2e07c6a29e0129e975727b9f57eede813eea85:
-
-   Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
 are available in the git repository at:
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
-sti-soc_for_v4.8
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.8-bus
 
-for you to fetch changes up to 55aa35180c57d82f3db23e5aabce97acb0d36681:
+for you to fetch changes up to 46a88534afb596eb4d9de07ddde778d0e9aa0e3a:
 
-   ARM: sti: Implement dummy L2 cache's write_sec (2016-07-01 16:23:44 
-+0200)
-----------------------------------------------------------------
+  bus: Add support for Tegra ACONNECT (2016-07-01 16:35:43 +0200)
 
-Highlights:
------------
-_ add a dummy L2 cache's write_sec callback as in non secure mode 
-execution,
-   we can't get access to L2 cache secure registers
-_ cosmetics change, in case of dump_stack, update the hardware name with a
-   more genericfor the STi SoCs family
-
+Thanks,
+Thierry
 
 ----------------------------------------------------------------
-Patrice Chotard (1):
-       ARM: sti: Implement dummy L2 cache's write_sec
+bus: NVIDIA Tegra ACONNECT support
 
-Peter Griffin (1):
-       ARM: STi: Update machine _namestr to be more generic.
+Adds support for the Tegra ACONNECT bus that's used to access the APE
+(audio processing engine) on Tegra X1.
 
-  arch/arm/mach-sti/board-dt.c | 11 ++++++++++-
-  1 file changed, 10 insertions(+), 1 deletion(-)
+----------------------------------------------------------------
+Jon Hunter (2):
+      dt-bindings: bus: Add documentation for Tegra210 ACONNECT
+      bus: Add support for Tegra ACONNECT
+
+ .../bindings/bus/nvidia,tegra210-aconnect.txt      |  45 +++++++++
+ drivers/bus/Kconfig                                |  13 +++
+ drivers/bus/Makefile                               |   1 +
+ drivers/bus/tegra-aconnect.c                       | 112 +++++++++++++++++++++
+ 4 files changed, 171 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra210-aconnect.txt
+ create mode 100644 drivers/bus/tegra-aconnect.c
