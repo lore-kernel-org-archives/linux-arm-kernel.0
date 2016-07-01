@@ -1,18 +1,111 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 01 Jul 2016 10:31:54 +0200
-Subject: [PATCH] clk: rockchip: fix the rk3399 spdif incorrect bit for DPTX
-In-Reply-To: <1467253139-21112-1-git-send-email-zhengxing@rock-chips.com>
-References: <1467253139-21112-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <2167990.nRjYb2NtK4@phil>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 1 Jul 2016 09:40:50 +0100
+Subject: [PATCH v4 1/7] mfd: ac100: Add device tree bindings for X-Powers
+ AC100 codec/RTC combo IC
+In-Reply-To: <1467302331-9663-2-git-send-email-wens@csie.org>
+References: <1467302331-9663-1-git-send-email-wens@csie.org>
+ <1467302331-9663-2-git-send-email-wens@csie.org>
+Message-ID: <20160701084050.GI1707@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 30. Juni 2016, 10:18:59 schrieb Xing Zheng:
-> The CLKSEL_CON32 bit_0 is controlled for spdif_8ch, not spdif_rec_dptx,
-> it should be bit_8, let's fix it.
-> 
-> Reported-by: Chris Zhong <zyw@rock-chips.com>
-> Tested-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+On Thu, 30 Jun 2016, Chen-Yu Tsai wrote:
 
-applied to my clk branch for 4.8
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes since v3:
+> 
+>   - Fixed device node names and added labels.
+>   - Added clock output from codec and input to rtc.
+> 
+> Changes since v2:
+> 
+>   - Fix interrupt line for ac100_codec in provided example.
+> 
+> ---
+>  Documentation/devicetree/bindings/mfd/ac100.txt | 49 +++++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/ac100.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/ac100.txt b/Documentation/devicetree/bindings/mfd/ac100.txt
+> new file mode 100644
+> index 000000000000..31e6f9cc41bc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/ac100.txt
+> @@ -0,0 +1,49 @@
+> +X-Powers AC100 Codec/RTC IC device tree bindings
+
+Nit: Device Tree
+
+> +AC100 is a audio codec and RTC subsystem combo IC. The 2 parts are
+> +separated, including power supplies and interrupt lines, but share
+> +a common register address space and host interface.
+> +
+> +Required properties:
+> +- compatible: "x-powers,ac100"
+> +- reg: The I2C slave address or RSB hardware address for the chip
+> +- sub-nodes:
+> +  - codec
+> +    - compatible: "x-powers,ac100-codec"
+> +    - interrupt-parent: The parent interrupt controller
+> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_AUDIO pin
+> +    - #clock-cells: shall be 0
+
+Nit: Shall
+
+> +    - clock-output-names: "4M_adda"
+> +    - see clock/clock-bindings.txt for common clock bindings
+
+    - compatible:           "x-powers,ac100-codec"
+    - interrupt-parent:	    The parent interrupt controller
+    - interrupts: 	    SoC NMI / GPIO interrupt connected to the IRQ_AUDIO pin
+    - #clock-cells:   	    shall be 0
+    - clock-output-names:   "4M_adda"
+
+    - see clock/clock-bindings.txt for common clock bindings
+
+Don't you think these are easier to read when they're separated?
+
+> +  - rtc
+> +    - compatible: "x-powers,ac100-rtc"
+> +    - interrupt-parent: The parent interrupt controller
+> +    - interrupts: SoC NMI / GPIO interrupt connected to the IRQ_RTC pin
+> +    - clocks: A phandle to the codec's "4M_adda" clock
+> +    - #clock-cells: shall be 1
+
+Nit: Shall
+
+> +    - clock-output-names: "cko1_rtc", "cko2_rtc", "cko3_rtc"
+> +    - see clock/clock-bindings.txt for common clock bindings
+
+Same here.
+
+> +Example:
+> +
+> +ac100: codec at e89 {
+> +	compatible = "x-powers,ac100";
+> +	reg = <0xe89>;
+> +
+> +	ac100_codec: codec {
+> +		compatible = "x-powers,ac100-codec";
+> +		interrupt-parent = <&r_pio>;
+> +		interrupts = <0 9 IRQ_TYPE_LEVEL_LOW>; /* PL9 */
+> +		#clock-cells = <0>;
+> +		clock-output-names = "4M_adda";
+> +	};
+> +
+> +	ac100_rtc: rtc {
+> +		compatible = "x-powers,ac100-rtc";
+> +		interrupt-parent = <&nmi_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&ac100_codec>;
+> +		#clock-cells = <1>;
+> +		clock-output-names = "cko1_rtc", "cko2_rtc", "cko3_rtc";
+> +	};
+> +};
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
