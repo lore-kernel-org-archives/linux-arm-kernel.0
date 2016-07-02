@@ -1,46 +1,78 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 2 Jul 2016 20:07:00 +0300
-Subject: [PATCH 1/3] ARM: dts: r8a7792: add PFC support
-In-Reply-To: <7894702.b5qeLxoHdo@wasted.cogentembedded.com>
-References: <2144803.0K8qXzjIFq@wasted.cogentembedded.com>
- <7894702.b5qeLxoHdo@wasted.cogentembedded.com>
-Message-ID: <c0aad99a-ca5d-4f4a-408b-2d305fa6bab5@cogentembedded.com>
+From: arend.vanspriel@broadcom.com (Arend Van Spriel)
+Date: Sat, 2 Jul 2016 20:20:35 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
+ dt property
+In-Reply-To: <CAOiHx=m8Zf0T4=BTG6BMRjj3kOHzt4YaQa3yzutmrhFSOyZMmA@mail.gmail.com>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <CAOiHx==82LHOeQMNVD+dybFifXX690Q6AJTcMBMynjSfUOyGUw@mail.gmail.com>
+ <8d8bd933-717b-48e4-f002-7b834abed6fd@redhat.com>
+ <3960223.GqB9zXL8s8@wuerfel>
+ <1f44df41-0111-441b-4671-718eec0c4346@broadcom.com>
+ <CAOiHx=m8Zf0T4=BTG6BMRjj3kOHzt4YaQa3yzutmrhFSOyZMmA@mail.gmail.com>
+Message-ID: <ced2a770-2724-bdc9-7e2a-3dc9f76abf29@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 1-7-2016 10:58, Jonas Gorski wrote:
+> Hi,
+> 
+> On 30 June 2016 at 21:23, Arend Van Spriel <arend.vanspriel@broadcom.com> wrote:
+>>
+>>
+>> On 30-6-2016 13:31, Arnd Bergmann wrote:
+>>> On Thursday, June 30, 2016 12:25:15 PM CEST Hans de Goede wrote:
+>>>>> So then how about making use of a more specific compatible string?
+>>>>>
+>>>>> e.g.
+>>>>>
+>>>>> brcmf {
+>>>>>         compatible = "foo,ap6210", "brcm,bcm4329-fmac";
+>>>>>         ...
+>>>>> };
+>>>>>
+>>>>> and if the compatible has more than one element you request
+>>>>> FW_NAME_<compatible>.txt as the nvram file. Or try each comptible (and
+>>>>> lastly no suffix) until you get a match. (AFAICT, this is what the
+>>>>> "model" property was originally intended for anyway, but almost nobody
+>>>>> did it right, and everyone put a user readable string into "model" for
+>>>>> boards instead of the ePAPR defined compatible string).
+>>>>
+>>>> Hmm, interesting idea. Not sure how easy / hard it will be to implement
+>>>> this, but from a dt binding point of view it seems elegant.
+>>>>
+>>>> Kalle, Arend, what do you think of this ?
+>>
+>> At first glance I like the suggestion, but this would mean updating the
+>> bindings document for each new wifi module that we want to add. Not a
+>> big problem, but it makes that I have a slight preference to using a
+>> property for it, eg. brcm,module = "ap6210";
+> 
+> If you want a separate property, then I repeat my very first
+> suggestion, the well defined model property.
+> e.g.
+> 
+> brcmf at 0 {
+>         model = "ampak,ap6210";
+>         compatible = "brcm,bcm4329-fmac";
+>         ...
+> };
+> 
+> All device nodes may have a model property, not just the top "machine" one.
 
-On 07/01/2016 02:06 AM, Sergei Shtylyov wrote:
+I heard you the first time :-p I just was not sure what the implications
+would be to use it. Hence I suggested a vendor specific property.
+However, looking up and reading the definition in ePAPRv1.1 I suppose it
+is fine to use the model property:
 
-> Define the generic R8A7792 part of the PFC device node.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> ---
->  arch/arm/boot/dts/r8a7792.dtsi |    6 ++++++
->  1 file changed, 6 insertions(+)
->
-> Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-> @@ -108,6 +108,12 @@
->  			#power-domain-cells = <1>;
->  		};
->
-> +
+Property: model
+Value type: <string>
+Description:
+The model property value is a <string> that specifies the manufacturer?s
+model number of the device.
 
-    Just noticed this extra empty line... :-/
+The recommended format is: ?manufacturer,model?, where manufacturer is a
+string describing the name of the manufacturer (such as a stock ticker
+symbol), and model specifies the model number.
 
-> +		pfc: pin-controller at e6060000 {
-> +			compatible = "renesas,pfc-r8a7792";
-> +			reg = <0 0xe6060000 0 0x144>;
-> +		};
-> +
->  		dmac0: dma-controller at e6700000 {
->  			compatible = "renesas,dmac-r8a7792",
->  				     "renesas,rcar-dmac";
-
-    Will repost.
-
-MBR, Sergei
+Regards,
+Arend
