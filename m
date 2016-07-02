@@ -1,90 +1,79 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 02 Jul 2016 16:12:07 -0700
-Subject: [PATCH RFC 0/7] support clk setting during kernel early boot
-In-Reply-To: <20160702011216.GR27880@codeaurora.org>
-References: <1467208335-29876-1-git-send-email-aisheng.dong@nxp.com>
- <20160702011216.GR27880@codeaurora.org>
-Message-ID: <bab9b9bacc16a42cf9ca93973ea5de68@agner.ch>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Sat, 2 Jul 2016 19:58:00 -0400
+Subject: [RFC 0/1] ARM: print MHz in /proc/cpuinfo
+In-Reply-To: <20160607221809.GP1041@n2100.armlinux.org.uk>
+References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
+ <20160607221809.GP1041@n2100.armlinux.org.uk>
+Message-ID: <32b30c50-4712-568e-4044-9f533ca497b2@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-07-01 18:12, Stephen Boyd wrote:
-> On 06/29, Dong Aisheng wrote:
->> Recently several people met the kernel complaining
->> "bad: scheduling from the idle thread!" issue which caused by
->> sleeping during kernel early booting phase by calling clk
->> APIs like clk_prepare_enable.
->>
->> See:
->> https://lkml.org/lkml/fancy/2016/1/29/695
->> https://lkml.org/lkml/2016/6/10/779
->> http://www.spinics.net/lists/linux-clk/msg08635.html
-> 
-> That last one was another bug that happened to trigger this
-> problem mistakenly. I doubt critical clks are an issue (more
-> below).
-> 
->>
->> The calling sequence simply could be like:
->> start_kernel
->>   ->time_init
->>     ->of_clk_init
->>       ->clk_core_prepare
->>         ->clk_pllv3_prepare
->>           ->usleep_range
->>             ->dequeue_task_idle
->>
->> This issue is mainly caused during time_init, the irq is still
->> not enabled and scheduler is still not ready, thus there's no way
->> to allow sleep at that time.
->>
->> However, there're many exist platforms calling clk_prepare_enable/
->> clk_get_rate/clk_set_parent at that time in CLK_OF_DECLARE init
->> function.
->> e.g
->> drivers/clk/imx/clk-{soc}.c
->> drivers/clk/rockchip/clk-rk3188.c
->> drivers/clk/ti/clk-44xx.c
->> ...
->>
->> And irqchip and clock source is also initialized before it which
->> may requires to do clk settings.
->>
->> Furthermore, current clk framework also supports critical clocks
->> flagged by CLK_IS_CRITICAL which will be prepared and
->> enabled during clk_register by clk core, that is also happened
->> quite early in of_clk_init usually.
->>
->> And clk framework also supports assign default clk rate and parent for
->> each registered clk provider which also happens early in of_clk_init.
->> (see of_clk_set_defaults())
->>
->> Above are all possible cases which may cause sleeping during kernel
->> early booting.
-> 
-> How many of these cases are really happening and causing problems
-> though?
-> 
->>
->> So it seems we'd like to have the requirement to make kernel support
->> calling clk APIs during kernel early boot without sleep.
-> 
-> I wonder if the problem is more that the framework doesn't know
-> the hardware state of on/off when it initializes? So we call the
-> clk_ops prepare/enable functions when we really shouldn't be
-> doing that at all because the clk is already prepared/enabled.
-> Presumably for critical clks, we shouldn't go and touch any
-> hardware to turn them on, because by definition they're critical
-> and should already be on anyway.
+Hi Russell, Jon,
 
-I found that remark interesting, and agree here with Stephen, critical
-clks should be already on and everything else should be controlled from
-drivers.
+On 06/07/2016 06:18 PM, Russell King - ARM Linux wrote:
+> On Tue, Jun 07, 2016 at 05:08:32PM -0400, Jon Mason wrote:
+>> Many users (and some applications) are expecting the CPU clock speed to
+>> be output in /proc/cpuinfo (as is done in x86, avr32, c6x, tile, parisc,
+>> ia64, and xtensa).
+> 
+> Such as what applications?  This is just another meaningless number,
+> which is just as meaningless as the bogomips number.  It tells you
+> nothing really about the CPU which should remotely be used for
+> anything other than user display.  It certainly can't be used for
+> algorithmic selection.
 
-With that in mind I went on and looked again what is currently (after
-the parents enable patchset) still wrong on i.MX 7. Turned out to be not
-that much, and I think it should be fixable with that:
-https://lkml.org/lkml/2016/7/2/138
+Agreed. HOWEVER...
 
---
-Stefan
+We'll be coming back to add this for servers soon enough. It's on the
+todo, we just need a nice way to extract this information (as has been
+discussed). That's likely to be through DMI data or an ACPI addition
+that will be required and mandatory at some future point.
+
+
+> We have resisted publishing this information for years because not
+> every ARM CPU is capable of providing this information - for many, we
+> don't know what the CPU clock rate even is.  I believe it is a mistake
+> to publish this information.
+
+There are two specific problems on ARM servers:
+
+1). Idiots. I've seen many situations in which benchmarks were run on
+pre-production machines (often explicitly against legal agreements, but
+those never happened within my organization so that's their problem -
+this is carefully prohibited activity within our own walls and I make
+sure our guys never run any numbers on pre-production stuff just so it
+could never get into the "wrong" hands by accident...). What these
+idiots do is then spread rumors that ARM server X "sucks" because they
+ran a prohibited benchmark against a downclocked core and forgot how to
+multiply numbers together. It gets worse. But usually it's because they
+ran "cat /proc/cpuinfo" and it didn't tell them anything useful, so they
+used whatever they thought the frequency was supposed to be.
+
+These idiots include journalists. If you read the press, you'll see the
+Gandhi sequence is playing out already between one of the established
+vendors and an ARM vendor in which said established vendor is at the
+laughing/fighting stage of things. And in a couple of cases recently,
+the press included "we didn't know how fast it ran because /proc/cpuinfo
+didn't tell us anything, so we guessed".
+
+2). Users. Those who use and admin servers get the "speed" from
+/proc/cpuinfo. It's a marketing number. It's useless. It absolutely must
+be provided to the user or administrator exactly like on x86.
+
+> If userspace wants to select an algorithm,
+> that needs to be done according to much more information than just the
+> CPU speed - it needs knowledge of the instruction timings as well, cache
+> behaviour, etc, and you might as well benchmark an implementation and
+> select at run time, caching the result.
+> 
+> Since we've never exported this information, it's not a regression
+> and it's not part of the kernels standard API.
+
+Agreed. But we'll still be coming back to ensure this information is
+presented to users. I pointed out to ARM about 3-4 years ago that this
+was going to bite us. It is now biting us, and we will ensure that
+useless data is provided where it is on x86 for identical experience by
+users. That is unless or until x86 users do something else always. Our
+(separate) case will use DMI or ACPI for the same kind of data.
+
+Jon.
