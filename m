@@ -1,37 +1,68 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 1 Jul 2016 23:03:38 -0700
-Subject: [PATCH 00/21] Support qcom's HSIC USB and rewrite USB2 HS phy
- support
-In-Reply-To: <146710289677.3879.15364764209076318827@sboyd-linaro>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <CALAqxLUHfsJBTQS=p5oThnOdiAZwu48puRhREx+2G9+KajDA9g@mail.gmail.com>
- <146710289677.3879.15364764209076318827@sboyd-linaro>
-Message-ID: <CALAqxLW--yFb2YwX3+x7PB-g_5D0gb6j8CiJwnCC+meb7xqbig@mail.gmail.com>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Sat, 02 Jul 2016 09:59:55 +0300
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
+ nvram_file_name dt property
+In-Reply-To: <CAOiHx=m8Zf0T4=BTG6BMRjj3kOHzt4YaQa3yzutmrhFSOyZMmA@mail.gmail.com>
+ (Jonas Gorski's message of "Fri, 1 Jul 2016 10:58:43 +0200")
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <CAOiHx==82LHOeQMNVD+dybFifXX690Q6AJTcMBMynjSfUOyGUw@mail.gmail.com>
+ <8d8bd933-717b-48e4-f002-7b834abed6fd@redhat.com>
+ <3960223.GqB9zXL8s8@wuerfel>
+ <1f44df41-0111-441b-4671-718eec0c4346@broadcom.com>
+ <CAOiHx=m8Zf0T4=BTG6BMRjj3kOHzt4YaQa3yzutmrhFSOyZMmA@mail.gmail.com>
+Message-ID: <87k2h44j9w.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 1:34 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> Quoting John Stultz (2016-06-27 20:09:30)
->>
->> I haven't yet been able to test with this, as I need some other fixes
->> it seems too to deal with some of the iommu changes in my flo-WIP tree
->> (it can't find of_dma_configure), but will let you know how things
->> work once I have all that sorted.
+Jonas Gorski <jonas.gorski@gmail.com> writes:
+
+> Hi,
 >
-> Cool, thanks for testing.
+> On 30 June 2016 at 21:23, Arend Van Spriel <arend.vanspriel@broadcom.com> wrote:
+>>
+>>
+>> On 30-6-2016 13:31, Arnd Bergmann wrote:
+>>> On Thursday, June 30, 2016 12:25:15 PM CEST Hans de Goede wrote:
+>>>>> So then how about making use of a more specific compatible string?
+>>>>>
+>>>>> e.g.
+>>>>>
+>>>>> brcmf {
+>>>>>         compatible = "foo,ap6210", "brcm,bcm4329-fmac";
+>>>>>         ...
+>>>>> };
+>>>>>
+>>>>> and if the compatible has more than one element you request
+>>>>> FW_NAME_<compatible>.txt as the nvram file. Or try each comptible (and
+>>>>> lastly no suffix) until you get a match. (AFAICT, this is what the
+>>>>> "model" property was originally intended for anyway, but almost nobody
+>>>>> did it right, and everyone put a user readable string into "model" for
+>>>>> boards instead of the ePAPR defined compatible string).
+>>>>
+>>>> Hmm, interesting idea. Not sure how easy / hard it will be to implement
+>>>> this, but from a dt binding point of view it seems elegant.
+>>>>
+>>>> Kalle, Arend, what do you think of this ?
+>>
+>> At first glance I like the suggestion, but this would mean updating the
+>> bindings document for each new wifi module that we want to add. Not a
+>> big problem, but it makes that I have a slight preference to using a
+>> property for it, eg. brcm,module = "ap6210";
+>
+> If you want a separate property, then I repeat my very first
+> suggestion, the well defined model property.
+> e.g.
+>
+> brcmf at 0 {
+>         model = "ampak,ap6210";
+>         compatible = "brcm,bcm4329-fmac";
+>         ...
+> };
+>
+> All device nodes may have a model property, not just the top "machine" one.
 
-So after working out some merge issues w/ my flo-WIP branch for the
-nexus7, I was still having trouble, so I backed out to just your
-(updated) branch.
+I like this model property but I'm no DT expert. What others think about
+it, would it work?
 
-But even there, I'm not able to get the usb gadget up. I see:
-
-[    1.869717] msm_hsusb 12500000.usb: failed to get phandle in
-/soc/usb at 12500000 node
-[    1.882347] 12500000.usb supply vbus not found, using dummy regulator
-
-So I'm not sure if the dts changes were quite right. I've got all the
-ULPI configs enabled. Any ideas?
-
-thanks
--john
+-- 
+Kalle Valo
