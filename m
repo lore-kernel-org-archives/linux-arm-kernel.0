@@ -1,61 +1,37 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sat, 2 Jul 2016 13:53:39 +0900
-Subject: [PATCH 7/7] devfreq: exynos-bus: add missing of_node_put after
- calling of_parse_phandle
-In-Reply-To: <1467366121-14120-8-git-send-email-peter.chen@nxp.com>
-References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
- <1467366121-14120-8-git-send-email-peter.chen@nxp.com>
-Message-ID: <CAGTfZH2HmmEbbmvm9pqMKv_chzPfZvrRvk+g-fkYPQ7pDfGa0Q@mail.gmail.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Fri, 1 Jul 2016 23:03:38 -0700
+Subject: [PATCH 00/21] Support qcom's HSIC USB and rewrite USB2 HS phy
+ support
+In-Reply-To: <146710289677.3879.15364764209076318827@sboyd-linaro>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <CALAqxLUHfsJBTQS=p5oThnOdiAZwu48puRhREx+2G9+KajDA9g@mail.gmail.com>
+ <146710289677.3879.15364764209076318827@sboyd-linaro>
+Message-ID: <CALAqxLW--yFb2YwX3+x7PB-g_5D0gb6j8CiJwnCC+meb7xqbig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, Jun 28, 2016 at 1:34 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> Quoting John Stultz (2016-06-27 20:09:30)
+>>
+>> I haven't yet been able to test with this, as I need some other fixes
+>> it seems too to deal with some of the iommu changes in my flo-WIP tree
+>> (it can't find of_dma_configure), but will let you know how things
+>> work once I have all that sorted.
+>
+> Cool, thanks for testing.
 
-2016-07-01 18:42 GMT+09:00 Peter Chen <peter.chen@nxp.com>:
-> of_node_put needs to be called when the device node which is got
-> from of_parse_phandle has finished using.
->
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> ---
->  drivers/devfreq/exynos-bus.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
-> index 2363d0a..a38b5ec 100644
-> --- a/drivers/devfreq/exynos-bus.c
-> +++ b/drivers/devfreq/exynos-bus.c
-> @@ -383,7 +383,7 @@ err_clk:
->  static int exynos_bus_probe(struct platform_device *pdev)
->  {
->         struct device *dev = &pdev->dev;
-> -       struct device_node *np = dev->of_node;
-> +       struct device_node *np = dev->of_node, node;
->         struct devfreq_dev_profile *profile;
->         struct devfreq_simple_ondemand_data *ondemand_data;
->         struct devfreq_passive_data *passive_data;
-> @@ -415,10 +415,13 @@ static int exynos_bus_probe(struct platform_device *pdev)
->                 goto err;
->         }
->
-> -       if (of_parse_phandle(dev->of_node, "devfreq", 0))
-> +       node = of_parse_phandle(dev->of_node, "devfreq", 0);
-> +       if (node) {
-> +               of_node_put(node);
->                 goto passive;
-> -       else
-> +       } else {
->                 ret = exynos_bus_parent_parse_of(np, bus);
-> +       }
->
->         if (ret < 0)
->                 goto err;
+So after working out some merge issues w/ my flo-WIP branch for the
+nexus7, I was still having trouble, so I backed out to just your
+(updated) branch.
 
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+But even there, I'm not able to get the usb gadget up. I see:
 
-Regards,
-Chanwoo Choi
+[    1.869717] msm_hsusb 12500000.usb: failed to get phandle in
+/soc/usb at 12500000 node
+[    1.882347] 12500000.usb supply vbus not found, using dummy regulator
+
+So I'm not sure if the dts changes were quite right. I've got all the
+ULPI configs enabled. Any ideas?
+
+thanks
+-john
