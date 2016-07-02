@@ -1,58 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 2 Jul 2016 12:14:42 +0200
-Subject: [PATCH 1/2] efi: arm64: abort boot on pending SError
-In-Reply-To: <20160701154612.GC17071@leverpostej>
-References: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160701152252.GA17071@leverpostej>
- <CAKv+Gu9Pk6xbUUMisAMhd4rpoYHA+wjzrZGkyEUXPdx_TaniVQ@mail.gmail.com>
- <20160701154612.GC17071@leverpostej>
-Message-ID: <CAKv+Gu-sAc-PRDqVdi2v9G_crx0dXHpxPhswJHgDRVe6caLjRw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 2 Jul 2016 13:02:27 +0200
+Subject: [PATCH 1/2] iio: sun4i-lradc: Add binding documentation
+In-Reply-To: <777642fd-5e77-206f-a503-23bbf187e6f3@redhat.com>
+References: <1467406855-9677-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <CAGb2v66PzgVqVGxs4FSQkkX=2hX42UmftahOgJmepv4wA-mwnw@mail.gmail.com>
+ <777642fd-5e77-206f-a503-23bbf187e6f3@redhat.com>
+Message-ID: <20160702110227.GB4604@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 July 2016 at 17:46, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Jul 01, 2016 at 05:31:33PM +0200, Ard Biesheuvel wrote:
->> On 1 July 2016 at 17:22, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Fri, Jul 01, 2016 at 05:01:30PM +0200, Ard Biesheuvel wrote:
->> >> It is the firmware's job to clear any pending SErrors before entering
->> >> the kernel. On UEFI, we can fail gracefully rather than panic during
->> >> early boot, so check for this condition in the stub.
->> >>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >
->> > An SError could be triggered either asynchronously by FW, or as a result
->> > of our actions at any point after this, e.g. due to the filesystem
->> > accesses made to load an initrd.
->> >
->> > So in practice, is checking here useful? Have we seen FW with masked but
->> > pending SError at the point we enter the stub rather than that SError
->> > being triggered later,?
->>
->> Yes. EDK2 keeps SError masked throughout its execution by default, and
->> so any condition that triggered an SError up till this point is likely
->> to still be pending, and blow up the kernel as soon as it unmasks it.
->
-> Ok.
->
->> > I'm also not sure what this means for CPER, which may use SError to
->> > signal to the OS. It's possible that the UEFI implementation polls
->> > ISR_EL1 itself, and handles SError appropriately internally, or that the
->> > OS can later deal with the SError based on CPER and friends.
->>
->> Currently, the kernel panics on an SError, and so what the kernel
->> should do once we start dealing with them in a more sophisticated way
->> is hypothetical at the moment. Once that code arrives, it may revert
->> this change, but for now, being dropped back into the UEFI shell does
->> sound more appealing than panic early imo.
->
-> Logging something while the UART is available is certainly appealing.
->
+On Sat, Jul 02, 2016 at 11:32:07AM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 02-07-16 11:12, Chen-Yu Tsai wrote:
+> >Hi,
+> >
+> >On Sat, Jul 2, 2016 at 5:00 AM, Alexandre Belloni
+> ><alexandre.belloni@free-electrons.com> wrote:
+> >>Document the bindings for the Allwinner LRADC.
+> >
+> >We already have Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
+> >and I'm pretty sure Hans (CC-ed) argued that this is not a generic ADC
+> >block.
+> 
+> Right, this block is used on many tablets and some dev boards to
+> provide buttons (as in the hid type) and the block is designed for
+> this purpose, giving an irq when the adc level crosses a certain
+> threshold.
+> 
+> Sure it can be used in a more generic way, but that is not its
+> primary goal.
 
-Not just the UART, the graphical console as well, if the system has one.
+We've always had a different view on this, but it's a detail :)
 
-> As you say, we can change this later if/when we have more advanced
-> SError handling. So modulo my prior comments, I guess this is fine for
-> now.
->
+> So any generic purpose adc driver must not break the current
+> use-case (which is already used in mainline kernel dts files
+> in plenty of cases).
 
-OK, thanks.
+Yep.
+
+> I believe that the best way to deal with this is to add an
+> "allwinner,general-purpose-mode" flag to the existing binding
+> (as well as document general purpose mode in the existing
+> binding rather then in a new binding doc).
+> 
+> That seems to be the right thing to do purely looking at this
+> from a dt binding pov.
+
+There's a way simpler solution: if there's no child nodes, it's meant
+to be used as an ADC, otherwise, as input.
+
+The logic will have to be a bit more complex than that, since there's
+two channels, and you could only require one for the buttons, leaving
+the other one available as an ADC.
+
+But that doesn't require any new property.
+
+> For the implementation of this we can simpy have 2 drivers,
+> then both drivers can check the flag and if present return
+> -ENODEV from the existing input driver and likewise if not
+> present return -ENODEV from the iio driver.
+> 
+> We may actually use a similar solution for the touchscreen
+> controller which can also be alternatively used as a generic
+> purpose adc.
+
+There's no need to keep both drivers as long as we keep the features
+and bindings.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160702/a68408f7/attachment.sig>
