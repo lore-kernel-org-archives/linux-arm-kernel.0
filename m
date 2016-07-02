@@ -1,70 +1,126 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Sat, 02 Jul 2016 08:57:21 +0800
-Subject: [PATCH v2] arm64: dts: rockchip: add the power domain node for
- rk3399
-In-Reply-To: <CABxcv=nJ4jaeBwPOfcKTmBpSHSD1wX-kJ2oi-bFki4=Dae0tEw@mail.gmail.com>
-References: <1467347575-11806-1-git-send-email-wxt@rock-chips.com>
- <CABxcv=nJ4jaeBwPOfcKTmBpSHSD1wX-kJ2oi-bFki4=Dae0tEw@mail.gmail.com>
-Message-ID: <57771171.2030701@rock-chips.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 1 Jul 2016 18:12:16 -0700
+Subject: [PATCH RFC 0/7] support clk setting during kernel early boot
+In-Reply-To: <1467208335-29876-1-git-send-email-aisheng.dong@nxp.com>
+References: <1467208335-29876-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20160702011216.GR27880@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/29, Dong Aisheng wrote:
+> Recently several people met the kernel complaining
+> "bad: scheduling from the idle thread!" issue which caused by
+> sleeping during kernel early booting phase by calling clk
+> APIs like clk_prepare_enable.
+> 
+> See:
+> https://lkml.org/lkml/fancy/2016/1/29/695
+> https://lkml.org/lkml/2016/6/10/779
+> http://www.spinics.net/lists/linux-clk/msg08635.html
 
-On 2016?07?02? 01:09, Javier Martinez Canillas wrote:
-> Hello Caesar,
->
-> On Fri, Jul 1, 2016 at 12:32 AM, Caesar Wang <wxt@rock-chips.com> wrote:
->> From: Elaine Zhang <zhangqing@rock-chips.com>
->>
->> In order to meet low power requirements, a power management unit (PMU) is
->> designed for controlling power resources in RK3399. The RK3399 PMU is
->> dedicated for managing the power of the whole chip.
->>
->> 1. add pd node for RK3399 Soc
->> 2. create power domain tree
->> 3. add qos node for domain
->>
->>  From the DT/binds and driver can get more detail information:
->> The driver:
->>          drivers/soc/rockchip/pm_domains.c
->> The document:
->>          Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
->> ---
-> Everything from here to the actual diff will omitted by tools like git-am...
+That last one was another bug that happened to trigger this
+problem mistakenly. I doubt critical clks are an issue (more
+below).
 
-Hmm....
+> 
+> The calling sequence simply could be like:
+> start_kernel
+>   ->time_init
+>     ->of_clk_init
+>       ->clk_core_prepare
+>         ->clk_pllv3_prepare
+>           ->usleep_range
+>             ->dequeue_task_idle
+> 
+> This issue is mainly caused during time_init, the irq is still
+> not enabled and scheduler is still not ready, thus there's no way
+> to allow sleep at that time.
+> 
+> However, there're many exist platforms calling clk_prepare_enable/
+> clk_get_rate/clk_set_parent at that time in CLK_OF_DECLARE init
+> function.
+> e.g
+> drivers/clk/imx/clk-{soc}.c
+> drivers/clk/rockchip/clk-rk3188.c
+> drivers/clk/ti/clk-44xx.c
+> ...
+> 
+> And irqchip and clock source is also initialized before it which
+> may requires to do clk settings.
+> 
+> Furthermore, current clk framework also supports critical clocks
+> flagged by CLK_IS_CRITICAL which will be prepared and
+> enabled during clk_register by clk core, that is also happened
+> quite early in of_clk_init usually.
+> 
+> And clk framework also supports assign default clk rate and parent for
+> each registered clk provider which also happens early in of_clk_init.
+> (see of_clk_set_defaults())
+> 
+> Above are all possible cases which may cause sleeping during kernel
+> early booting.
 
-I think the '---' cause the broken with patman tool.
+How many of these cases are really happening and causing problems
+though?
 
-Thanks,
-Caesar
->
->> Changes in v2:
->> - As Doug/Heiko commnets on https://patchwork.kernel.org/patch/9206415/.
->>    drop the debugfs-dump and Add the comments for alphabetical order.
->>
->> Note: As the TRM lists many voltage domains and power domains, then
->> in actual we just need control some domains for driver.
->> Due to some domains (e.g. emmc, usb, core)...We can't turn off it on
->> bootup.
->>
->> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-rockchip at lists.infradead.org
->> Cc: Heiko Stuebner <heiko@sntech.de>
->>
-> ...but you have your S-o-B and collected tags here so these are going
-> to be stripped. You should move those before the first '---'
-> separator.
-> Best regards,
-> Javier
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> 
+> So it seems we'd like to have the requirement to make kernel support
+> calling clk APIs during kernel early boot without sleep.
 
+I wonder if the problem is more that the framework doesn't know
+the hardware state of on/off when it initializes? So we call the
+clk_ops prepare/enable functions when we really shouldn't be
+doing that at all because the clk is already prepared/enabled.
+Presumably for critical clks, we shouldn't go and touch any
+hardware to turn them on, because by definition they're critical
+and should already be on anyway.
+
+> 
+> Since many of them is actually mostly implemented unsleepable already,
+> e.g. recalc_rate, recalc_accuracy, get/set_phase
+> but due to the definition allows them sleep, we may still have to add
+> xxx_hw and xxx_done for them.
+> Not sure if any better idea to avoid adding so many new callbacks.
+> 
+> 5) The most important issue may be callbacks (round_rate and determine_rate)
+> which may recursively call its parent.
+> For this case, we may not be able to convert it to xx_hw type.
+> e.g. drivers/clk/clk-divider.c
+> .round_rate
+> -> clk_divider_round_rate
+>    -> clk_hw_round_rate(clk_hw_get_parent(hw), rate) if CLK_SET_RATE_PARENT
+> 
+> clk_hw_round_rate is sleepable in theory.
+> Thus we may not convert .round_rate to .round_rate_hw since we can't
+> predict whether it's parent round_rate is sleepable or not.
+> 
+> This issue may cause us unable to convert the common clk-divider and clk-mux
+> which could be a potential issue since clk_set_rate will indirectly call
+> .round_rate and .determinte_rate which may results in possible sleep.
+> 
+> Any good ideas for this issue?
+> 
+> 6) Not sure your guys's option on calling clk_prepare which acqures a mutex
+> when irq is disalbed.
+> Ideally we probably may should not call mutex_lock with irq disabled.
+> But seems we may can't avoid and during booting, it seems still safe to
+> call it.
+> 
+
+It seems fine to call mutex lock during of_clk_init(). At least
+from what I can tell we're saved here because there's only one
+task during of_clk_init() time so we're not able to be blocked by
+any other task and fall into the mutex slowpath.
+
+The problem seems to be entering the scheduler directly from
+usleep_range() called from clk ops because that effectively
+becomes a scheduler call. Given that of_clk_init() is mostly for
+clk drivers to register clks for their timers and interrupt
+controllers, we should be able to avoid making any clk_ops calls
+besides recalculating rates and checking if clks are enabled or
+not. All other clks should be registered and configured from
+device drivers later on when the scheduler is running.
 
 -- 
-caesar wang | software engineer | wxt at rock-chip.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
