@@ -1,58 +1,75 @@
-From: akurz@blala.de (Alexander Kurz)
-Date: Sat,  2 Jul 2016 14:02:30 +0200
-Subject: [PATCH 1/2] ARM i.MX31 iomux: remove plain duplicates
-Message-ID: <1467460951-9173-1-git-send-email-akurz@blala.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 2 Jul 2016 15:32:43 +0200
+Subject: [PATCH 1/2] iio: sun4i-lradc: Add binding documentation
+In-Reply-To: <9b02394e-b38b-c804-780b-e9707c292486@redhat.com>
+References: <1467406855-9677-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <CAGb2v66PzgVqVGxs4FSQkkX=2hX42UmftahOgJmepv4wA-mwnw@mail.gmail.com>
+ <777642fd-5e77-206f-a503-23bbf187e6f3@redhat.com>
+ <20160702110227.GB4604@lukather>
+ <9b02394e-b38b-c804-780b-e9707c292486@redhat.com>
+Message-ID: <20160702133243.GB20045@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to define some of the iomux twice, remove the duplicates.
+On 02/07/2016 at 13:45:18 +0200, Hans de Goede wrote :
+> Hi,
+> 
+> On 02-07-16 13:02, Maxime Ripard wrote:
+> > On Sat, Jul 02, 2016 at 11:32:07AM +0200, Hans de Goede wrote:
+> > > Hi,
+> > > 
+> > > On 02-07-16 11:12, Chen-Yu Tsai wrote:
+> > > > Hi,
+> > > > 
+> > > > On Sat, Jul 2, 2016 at 5:00 AM, Alexandre Belloni
+> > > > <alexandre.belloni@free-electrons.com> wrote:
+> > > > > Document the bindings for the Allwinner LRADC.
+> > > > 
+> > > > We already have Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
+> > > > and I'm pretty sure Hans (CC-ed) argued that this is not a generic ADC
+> > > > block.
+> > > 
+> > > Right, this block is used on many tablets and some dev boards to
+> > > provide buttons (as in the hid type) and the block is designed for
+> > > this purpose, giving an irq when the adc level crosses a certain
+> > > threshold.
+> > > 
+> > > Sure it can be used in a more generic way, but that is not its
+> > > primary goal.
+> > 
+> > We've always had a different view on this, but it's a detail :)
+> > 
+> > > So any generic purpose adc driver must not break the current
+> > > use-case (which is already used in mainline kernel dts files
+> > > in plenty of cases).
+> > 
+> > Yep.
+> > 
+> > > I believe that the best way to deal with this is to add an
+> > > "allwinner,general-purpose-mode" flag to the existing binding
+> > > (as well as document general purpose mode in the existing
+> > > binding rather then in a new binding doc).
+> > > 
+> > > That seems to be the right thing to do purely looking at this
+> > > from a dt binding pov.
+> > 
+> > There's a way simpler solution: if there's no child nodes, it's meant
+> > to be used as an ADC, otherwise, as input.
+> > 
+> > The logic will have to be a bit more complex than that, since there's
+> > two channels, and you could only require one for the buttons, leaving
+> > the other one available as an ADC.
+> > 
+> > But that doesn't require any new property.
+> 
+> True, if there are no button nodes, then go general-purpose will
+> work too.
+> 
 
-Signed-off-by: Alexander Kurz <akurz@blala.de>
----
- arch/arm/mach-imx/iomux-mx3.h | 31 -------------------------------
- 1 file changed, 31 deletions(-)
+Well, I'd still argue that we need two different compatibles because
+encoding the usage of an IP in its compatible string is less than ideal.
 
-diff --git a/arch/arm/mach-imx/iomux-mx3.h b/arch/arm/mach-imx/iomux-mx3.h
-index 2e4a0dd..a52c051 100644
---- a/arch/arm/mach-imx/iomux-mx3.h
-+++ b/arch/arm/mach-imx/iomux-mx3.h
-@@ -665,37 +665,6 @@ enum iomux_pins {
- #define MX31_PIN_USB_OC__GPIO1_30	IOMUX_MODE(MX31_PIN_USB_OC, IOMUX_CONFIG_GPIO)
- #define MX31_PIN_I2C_DAT__I2C1_SDA	IOMUX_MODE(MX31_PIN_I2C_DAT, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_I2C_CLK__I2C1_SCL	IOMUX_MODE(MX31_PIN_I2C_CLK, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_DCD_DTE1__I2C2_SDA	IOMUX_MODE(MX31_PIN_DCD_DTE1, IOMUX_CONFIG_ALT2)
--#define MX31_PIN_RI_DTE1__I2C2_SCL	IOMUX_MODE(MX31_PIN_RI_DTE1, IOMUX_CONFIG_ALT2)
--#define MX31_PIN_ATA_CS0__GPIO3_26	IOMUX_MODE(MX31_PIN_ATA_CS0, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_ATA_CS1__GPIO3_27	IOMUX_MODE(MX31_PIN_ATA_CS1, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_PC_PWRON__SD2_DATA3	IOMUX_MODE(MX31_PIN_PC_PWRON, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_VS1__SD2_DATA2	IOMUX_MODE(MX31_PIN_PC_VS1, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_READY__SD2_DATA1	IOMUX_MODE(MX31_PIN_PC_READY, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_WAIT_B__SD2_DATA0	IOMUX_MODE(MX31_PIN_PC_WAIT_B, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_CD2_B__SD2_CLK	IOMUX_MODE(MX31_PIN_PC_CD2_B, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_CD1_B__SD2_CMD	IOMUX_MODE(MX31_PIN_PC_CD1_B, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_ATA_DIOR__GPIO3_28	IOMUX_MODE(MX31_PIN_ATA_DIOR, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_ATA_DIOW__GPIO3_29	IOMUX_MODE(MX31_PIN_ATA_DIOW, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_CSI_D4__CSI_D4		IOMUX_MODE(MX31_PIN_CSI_D4, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D5__CSI_D5		IOMUX_MODE(MX31_PIN_CSI_D5, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D6__CSI_D6		IOMUX_MODE(MX31_PIN_CSI_D6, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D7__CSI_D7		IOMUX_MODE(MX31_PIN_CSI_D7, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D8__CSI_D8		IOMUX_MODE(MX31_PIN_CSI_D8, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D9__CSI_D9		IOMUX_MODE(MX31_PIN_CSI_D9, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D10__CSI_D10	IOMUX_MODE(MX31_PIN_CSI_D10, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D11__CSI_D11	IOMUX_MODE(MX31_PIN_CSI_D11, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D12__CSI_D12	IOMUX_MODE(MX31_PIN_CSI_D12, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D13__CSI_D13	IOMUX_MODE(MX31_PIN_CSI_D13, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D14__CSI_D14	IOMUX_MODE(MX31_PIN_CSI_D14, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D15__CSI_D15	IOMUX_MODE(MX31_PIN_CSI_D15, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_HSYNC__CSI_HSYNC	IOMUX_MODE(MX31_PIN_CSI_HSYNC, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_MCLK__CSI_MCLK	IOMUX_MODE(MX31_PIN_CSI_MCLK, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_PIXCLK__CSI_PIXCLK	IOMUX_MODE(MX31_PIN_CSI_PIXCLK, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_VSYNC__CSI_VSYNC	IOMUX_MODE(MX31_PIN_CSI_VSYNC, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_GPIO3_0__GPIO3_0	IOMUX_MODE(MX31_PIN_GPIO3_0, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_GPIO3_1__GPIO3_1	IOMUX_MODE(MX31_PIN_GPIO3_1, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_TXD2__GPIO1_28		IOMUX_MODE(MX31_PIN_TXD2, IOMUX_CONFIG_GPIO)
- #define MX31_PIN_GPIO1_0__GPIO1_0	IOMUX_MODE(MX31_PIN_GPIO1_0, IOMUX_CONFIG_GPIO)
- #define MX31_PIN_SVEN0__GPIO2_0		IOMUX_MODE(MX31_PIN_SVEN0, IOMUX_CONFIG_GPIO)
- #define MX31_PIN_STX0__GPIO2_1		IOMUX_MODE(MX31_PIN_STX0, IOMUX_CONFIG_GPIO)
 -- 
-2.1.4
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
