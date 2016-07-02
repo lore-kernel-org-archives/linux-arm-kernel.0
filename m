@@ -1,46 +1,46 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 2 Jul 2016 21:46:43 +0200
-Subject: [PATCH 1/2] iio: sun4i-lradc: Add binding documentation
-In-Reply-To: <20160702133528.GC20045@piout.net>
-References: <1467406855-9677-1-git-send-email-alexandre.belloni@free-electrons.com>
- <CAGb2v66PzgVqVGxs4FSQkkX=2hX42UmftahOgJmepv4wA-mwnw@mail.gmail.com>
- <20160702133528.GC20045@piout.net>
-Message-ID: <b23bd147-0d68-a6a6-14c0-5047af35e6b7@redhat.com>
+Date: Sat, 2 Jul 2016 22:08:44 +0200
+Subject: [PATCH v5 resend 0/2] phy-sun4i-usb: peripheral-mode + a31 otg
+ workaround
+In-Reply-To: <5774B26E.5010609@ti.com>
+References: <1467224050-7480-1-git-send-email-hdegoede@redhat.com>
+ <5774B26E.5010609@ti.com>
+Message-ID: <5390a35e-e043-6440-9a1c-5e34a41c2992@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 02-07-16 15:35, Alexandre Belloni wrote:
-> On 02/07/2016 at 17:12:55 +0800, Chen-Yu Tsai wrote :
->> Hi,
->>
->> On Sat, Jul 2, 2016 at 5:00 AM, Alexandre Belloni
->> <alexandre.belloni@free-electrons.com> wrote:
->>> Document the bindings for the Allwinner LRADC.
->>
->> We already have Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
->> and I'm pretty sure Hans (CC-ed) argued that this is not a generic ADC
->> block.
->>
->> Any plans to reconcile the different bindings?
->>
+On 30-06-16 07:47, Kishon Vijay Abraham I wrote:
+> Hi,
 >
-> Yes, I already submitted an adc-keys driver that can work with any ADC:
-> https://lkml.org/lkml/2016/7/1/670
+> On Wednesday 29 June 2016 11:44 PM, Hans de Goede wrote:
+>> Hi Kishon,
+>>
+>> The "USB: Fix of_usb_get_dr_mode_by_phy with a shared phy block"
+>> patch on which this series depends is in usb-next now:
+>>
+>> https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/?h=usb-next&id=ce15ed4c5dfb3f7757e6611902aed5db253af977
+>>
+>> Can you please merge this series?
 >
-> I agree that because it is not yet handling interrupts and is polling
-> the ADC, it is not as good as sun4i-lradc-keys yet. My plan is to solve
-> that but it require significant work in iio.
+> This is not applying cleanly against linux-phy -next. Can you rebase and send?
 
-And it also seems to break dt compatibility. Note I'm not against
-making an exception for this and breaking the dt compat, but until
-the polling is fixed we should not replace sun4i-lradc-keys.
+I just tried to rebase, the problem is that your -next branch does not
+contain the fixes from your -fixes branch, specifically it is missing
+this commit:
 
-If I understand you correctly then you want to use a new generic
-"sun4i-lradc" compatible. If you do that then we can just build both
-drivers for now and use the right compatible depending on how the
-board uses the lradc for now.
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/phy?id=5cf700ac9d50353dc5b8194a57c6f40bf1fc4424
+
+Which is causing the conflict you're seeing when trying to merge
+the patches I send. I can send you fixed patches which apply
+cleanly to your linux-phy/next but those then will not merge
+properly with linus' tree.
+
+So it is probably better to at least cherry-pick the commit
+I've linked to above into your -next, to avoid future merge
+problems. If you cherry-pick that commit then the patches
+I've send you should apply cleanly.
 
 Regards,
 
