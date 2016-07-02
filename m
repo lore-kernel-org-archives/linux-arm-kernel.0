@@ -1,36 +1,56 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 2 Jul 2016 15:35:28 +0200
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 2 Jul 2016 15:46:17 +0200
 Subject: [PATCH 1/2] iio: sun4i-lradc: Add binding documentation
-In-Reply-To: <CAGb2v66PzgVqVGxs4FSQkkX=2hX42UmftahOgJmepv4wA-mwnw@mail.gmail.com>
+In-Reply-To: <20160702133243.GB20045@piout.net>
 References: <1467406855-9677-1-git-send-email-alexandre.belloni@free-electrons.com>
  <CAGb2v66PzgVqVGxs4FSQkkX=2hX42UmftahOgJmepv4wA-mwnw@mail.gmail.com>
-Message-ID: <20160702133528.GC20045@piout.net>
+ <777642fd-5e77-206f-a503-23bbf187e6f3@redhat.com>
+ <20160702110227.GB4604@lukather>
+ <9b02394e-b38b-c804-780b-e9707c292486@redhat.com>
+ <20160702133243.GB20045@piout.net>
+Message-ID: <20160702134617.GC4604@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2016 at 17:12:55 +0800, Chen-Yu Tsai wrote :
-> Hi,
+On Sat, Jul 02, 2016 at 03:32:43PM +0200, Alexandre Belloni wrote:
+> > > > I believe that the best way to deal with this is to add an
+> > > > "allwinner,general-purpose-mode" flag to the existing binding
+> > > > (as well as document general purpose mode in the existing
+> > > > binding rather then in a new binding doc).
+> > > > 
+> > > > That seems to be the right thing to do purely looking at this
+> > > > from a dt binding pov.
+> > > 
+> > > There's a way simpler solution: if there's no child nodes, it's meant
+> > > to be used as an ADC, otherwise, as input.
+> > > 
+> > > The logic will have to be a bit more complex than that, since there's
+> > > two channels, and you could only require one for the buttons, leaving
+> > > the other one available as an ADC.
+> > > 
+> > > But that doesn't require any new property.
+> > 
+> > True, if there are no button nodes, then go general-purpose will
+> > work too.
 > 
-> On Sat, Jul 2, 2016 at 5:00 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
-> > Document the bindings for the Allwinner LRADC.
-> 
-> We already have Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-> and I'm pretty sure Hans (CC-ed) argued that this is not a generic ADC
-> block.
-> 
-> Any plans to reconcile the different bindings?
-> 
+> Well, I'd still argue that we need two different compatibles because
+> encoding the usage of an IP in its compatible string is less than ideal.
 
-Yes, I already submitted an adc-keys driver that can work with any ADC:
-https://lkml.org/lkml/2016/7/1/670
+That's true, but it's what we have.
 
-I agree that because it is not yet handling interrupts and is polling
-the ADC, it is not as good as sun4i-lradc-keys yet. My plan is to solve
-that but it require significant work in iio.
+So feel free to add a new compatible if you want, but we'll have to
+support the old one anyway.
 
+Maxime
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160702/a87c13a3/attachment.sig>
