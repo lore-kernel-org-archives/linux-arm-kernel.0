@@ -1,101 +1,58 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 2 Jul 2016 11:32:07 +0200
-Subject: [PATCH 1/2] iio: sun4i-lradc: Add binding documentation
-In-Reply-To: <CAGb2v66PzgVqVGxs4FSQkkX=2hX42UmftahOgJmepv4wA-mwnw@mail.gmail.com>
-References: <1467406855-9677-1-git-send-email-alexandre.belloni@free-electrons.com>
- <CAGb2v66PzgVqVGxs4FSQkkX=2hX42UmftahOgJmepv4wA-mwnw@mail.gmail.com>
-Message-ID: <777642fd-5e77-206f-a503-23bbf187e6f3@redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 2 Jul 2016 12:14:42 +0200
+Subject: [PATCH 1/2] efi: arm64: abort boot on pending SError
+In-Reply-To: <20160701154612.GC17071@leverpostej>
+References: <1467385291-9880-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160701152252.GA17071@leverpostej>
+ <CAKv+Gu9Pk6xbUUMisAMhd4rpoYHA+wjzrZGkyEUXPdx_TaniVQ@mail.gmail.com>
+ <20160701154612.GC17071@leverpostej>
+Message-ID: <CAKv+Gu-sAc-PRDqVdi2v9G_crx0dXHpxPhswJHgDRVe6caLjRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02-07-16 11:12, Chen-Yu Tsai wrote:
-> Hi,
->
-> On Sat, Jul 2, 2016 at 5:00 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
->> Document the bindings for the Allwinner LRADC.
->
-> We already have Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-> and I'm pretty sure Hans (CC-ed) argued that this is not a generic ADC
-> block.
-
-Right, this block is used on many tablets and some dev boards to
-provide buttons (as in the hid type) and the block is designed for
-this purpose, giving an irq when the adc level crosses a certain
-threshold.
-
-Sure it can be used in a more generic way, but that is not its
-primary goal.
-
-So any generic purpose adc driver must not break the current
-use-case (which is already used in mainline kernel dts files
-in plenty of cases).
-
-I believe that the best way to deal with this is to add an
-"allwinner,general-purpose-mode" flag to the existing binding
-(as well as document general purpose mode in the existing
-binding rather then in a new binding doc).
-
-That seems to be the right thing to do purely looking at this
-from a dt binding pov.
-
-For the implementation of this we can simpy have 2 drivers,
-then both drivers can check the flag and if present return
--ENODEV from the existing input driver and likewise if not
-present return -ENODEV from the iio driver.
-
-We may actually use a similar solution for the touchscreen
-controller which can also be alternatively used as a generic
-purpose adc.
-
-Regards,
-
-Hans
-
-
-
-> Any plans to reconcile the different bindings?
->
-> Thanks
-> ChenYu
->
+On 1 July 2016 at 17:46, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jul 01, 2016 at 05:31:33PM +0200, Ard Biesheuvel wrote:
+>> On 1 July 2016 at 17:22, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Fri, Jul 01, 2016 at 05:01:30PM +0200, Ard Biesheuvel wrote:
+>> >> It is the firmware's job to clear any pending SErrors before entering
+>> >> the kernel. On UEFI, we can fail gracefully rather than panic during
+>> >> early boot, so check for this condition in the stub.
+>> >>
+>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >
+>> > An SError could be triggered either asynchronously by FW, or as a result
+>> > of our actions at any point after this, e.g. due to the filesystem
+>> > accesses made to load an initrd.
+>> >
+>> > So in practice, is checking here useful? Have we seen FW with masked but
+>> > pending SError at the point we enter the stub rather than that SError
+>> > being triggered later,?
 >>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> ---
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: devicetree at vger.kernel.org
+>> Yes. EDK2 keeps SError masked throughout its execution by default, and
+>> so any condition that triggered an SError up till this point is likely
+>> to still be pending, and blow up the kernel as soon as it unmasks it.
+>
+> Ok.
+>
+>> > I'm also not sure what this means for CPER, which may use SError to
+>> > signal to the OS. It's possible that the UEFI implementation polls
+>> > ISR_EL1 itself, and handles SError appropriately internally, or that the
+>> > OS can later deal with the SError based on CPER and friends.
 >>
->>  .../devicetree/bindings/iio/adc/sun4i-lradc.txt       | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/iio/adc/sun4i-lradc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/iio/adc/sun4i-lradc.txt b/Documentation/devicetree/bindings/iio/adc/sun4i-lradc.txt
->> new file mode 100644
->> index 000000000000..c75a6067b8a5
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iio/adc/sun4i-lradc.txt
->> @@ -0,0 +1,19 @@
->> +Allwinner sun4i Low Resolution ADC
->> +----------------------------------
->> +
->> +Required properties:
->> + - compatible: "allwinner,sun4i-a10-lradc"
->> + - reg: mmio address range of the chip
->> + - interrupts: interrupt to which the chip is connected
->> + - vref-supply: powersupply for the lradc reference voltage
->> + - #io-channel-cells = <1>; As ADC has multiple outputs
->> +
->> +Example:
->> +
->> +       lradc: lradc at 01c22800 {
->> +               compatible = "allwinner,sun4i-a10-lradc";
->> +               reg = <0x01c22800 0x100>;
->> +               interrupts = <31>;
->> +               vref-supply = <&reg_vcc3v0>;
->> +               #io-channel-cells = <1>;
->> +       };
->> --
->> 2.8.1
->>
+>> Currently, the kernel panics on an SError, and so what the kernel
+>> should do once we start dealing with them in a more sophisticated way
+>> is hypothetical at the moment. Once that code arrives, it may revert
+>> this change, but for now, being dropped back into the UEFI shell does
+>> sound more appealing than panic early imo.
+>
+> Logging something while the UART is available is certainly appealing.
+>
+
+Not just the UART, the graphical console as well, if the system has one.
+
+> As you say, we can change this later if/when we have more advanced
+> SError handling. So modulo my prior comments, I guess this is fine for
+> now.
+>
+
+OK, thanks.
