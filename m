@@ -1,38 +1,107 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 2 Jul 2016 17:05:21 +0800
-Subject: [alsa-devel] [PATCH v5 7/9] ASoC: bt-sco: extend rate and add a
- general compatible string
-In-Reply-To: <20160701161105.GY6247@sirena.org.uk>
-References: <1466149440-23889-1-git-send-email-garlic.tseng@mediatek.com>
- <1466149440-23889-8-git-send-email-garlic.tseng@mediatek.com>
- <20160629191500.GU6247@sirena.org.uk> <1467291345.11091.16.camel@mtksdaap41>
- <1467341386.21689.6.camel@mtksdaap41> <20160701161105.GY6247@sirena.org.uk>
-Message-ID: <CAGb2v67rgj4efyTZpZ-79NnCRM=KLJCJedte594qgSjMMB5xsQ@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 2 Jul 2016 11:11:43 +0200
+Subject: [linux-sunxi] Re: [PATCH] mmc: pwrseq-simple: Add an optional
+ post-power-on-delay
+In-Reply-To: <20160701004732.GA20831@rob-hp-laptop>
+References: <1466618348-32304-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqJ0XVJb=Q9FT8g_OUTbgZWr-E58xQS0iCR4hv-9EHCcPA@mail.gmail.com>
+ <b056f5c8-e77f-ff90-afa5-cd77e446e2dd@redhat.com>
+ <20160701004732.GA20831@rob-hp-laptop>
+Message-ID: <af2b6f24-53c6-9f45-83f6-8967e03d01f9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+HI,
 
-On Sat, Jul 2, 2016 at 12:11 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Jul 01, 2016 at 10:49:46AM +0800, Garlic Tseng wrote:
->> On Thu, 2016-06-30 at 20:55 +0800, Garlic Tseng wrote:
+On 01-07-16 02:47, Rob Herring wrote:
+> On Thu, Jun 23, 2016 at 11:33:27AM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 23-06-16 00:25, Rob Herring wrote:
+>>> On Wed, Jun 22, 2016 at 12:59 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>> Some devices need a while to boot their firmware after providing clks /
+>>>> de-asserting resets before they are ready to receive sdio commands.
+>>>>
+>>>> This commits adds a post-power-on-delay-ms devicetree property to
+>>>> mmc-pwrseq-simple for use with such devices.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>> Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+>>>> drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
+>>>> 2 files changed, 11 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>>>> index ce0e767..e254368 100644
+>>>> --- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>>>> +++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>>>> @@ -16,6 +16,8 @@ Optional properties:
+>>>>   See ../clocks/clock-bindings.txt for details.
+>>>> - clock-names : Must include the following entry:
+>>>>   "ext_clock" (External clock provided to the card).
+>>>> +- post-power-on-delay-ms : Delay in ms after powering the card and
+>>>> +       de-asserting the reset-gpios (if any)
+>>>
+>>> Presumably you need this delay post any reset, not just after power on
+>>
+>> mmc-pwrseq is only about doing power-on / off, not about providing
+>> reset functionality.
 >
->> > If you worry about some potential risk (I don't see any) maybe we have
->> > to develop another dummy bt-sco codec driver which support both 8k and
->> > 16k?
+> Yes, but the property (e.g. the delay) is relevant for both and reset is
+> part of the power seq.
 >
->> Ah! If someone whose bluetooth modules only support 8k use the driver,
->> they might be broken, right? Maybe we can add another snd_soc_dai_driver
->> which can support both 8k and 16k.
->> (Actually I found the issue is discussed before
->> http://mailman.alsa-project.org/pipermail/alsa-devel/2014-November/084687.html )
+>>> if you are waiting for firmware to boot. So the name is not all that
+>>> clear. How about a "reset-timing-ms" property that takes 3 values for
+>>> pre-assert time (normally 0), assertion time, post assert time. Of
+>>> course, I can still think of ways that breaks like when in this
+>>> sequence do clocks need to be turned on.
+>>
+>> If you look at bindings/mmc/mmc-pwrseq-simple.txt out side of
+>> the diff context it contains:
+>>
+>> - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+>>         at initialization and prior we start the power up procedure of the card.
+>>         They will be de-asserted right after the power has been provided to the
+>>         card.
+>> - clocks : Must contain an entry for the entry in clock-names.
+>>   See ../clocks/clock-bindings.txt for details.
+>> - clock-names : Must include the following entry:
+>>   "ext_clock" (External clock provided to the card).
+>>
+>> Notice how the existing docs talk about a power-up procedure (which matches
+>> the pwrseq name and purpose of these bindings).
+>>
+>> I actually started with calling the property "post-reset-delay-ms", but then
+>> I realized that what we really want is the ability to specify a time to
+>> wait (for e.g. firmware to boot) after completing the power-up procedure
+>> (and before starting the probe). The power-up procedure currently can
+>> also includes enabling external clocks to the sdio device (if any) and
+>> enabling regulators, so having a "reset-timing-ms" property does not
+>> seem right, as that would suggest it is ok to do the wait after deasserting
+>> reset, but before e.g. enabling external clocks. Where what we really
+>> want is to enable all necessary resources (or iow complete the powerup
+>> procedure) and then wait.
+>>
+>> You're right that in some cases more complicated timings may be necessary,
+>> but that can get really complicated like e.g.: enable regulator1, wait 10 ms,
+>> enable regulator2, wait 15ms, enable external clock1, ...
+>>
+>> And such complex timings fall outside of the scope of the mmc-pwrseq-simple
+>> binding, the idea being that for complex cases we do a device specific
+>> pwrseq binding, and then the smarts are in implementation of that specific
+>> pwrseq driver. As you've said yourself before we do not want to turn
+>> devicetree into a scripting language.
 >
-> Yes, that'd be fine - it could be the same driver and register different
-> parameters depending on config/compatible.
+> Exactly. The challenge is any single property is hard to push back on
+> that we've crossed that line. I don't want to see this expanded one
+> property at a time without any foresight on additional needs. If we can
+> add a property that is more flexible, but doesn't add to the complexity
+> then that would be better. So this one alone is fine, but the next one
+> I'll be less receptive.
 
-Could we also make this driver directly configurable from Kconfig,
-and not just selected by platforms (currently Samsung) or by building
-all coddecs?
+Understood, so does this mean that you're happy with the patch as
+originally posted, or would you still like to see some changes ?
 
-Thanks
-ChenYu
+Regards,
+
+Hans
