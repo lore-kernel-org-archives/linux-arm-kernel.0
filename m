@@ -1,68 +1,37 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Sat, 02 Jul 2016 09:59:55 +0300
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <CAOiHx=m8Zf0T4=BTG6BMRjj3kOHzt4YaQa3yzutmrhFSOyZMmA@mail.gmail.com>
- (Jonas Gorski's message of "Fri, 1 Jul 2016 10:58:43 +0200")
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <CAOiHx==82LHOeQMNVD+dybFifXX690Q6AJTcMBMynjSfUOyGUw@mail.gmail.com>
- <8d8bd933-717b-48e4-f002-7b834abed6fd@redhat.com>
- <3960223.GqB9zXL8s8@wuerfel>
- <1f44df41-0111-441b-4671-718eec0c4346@broadcom.com>
- <CAOiHx=m8Zf0T4=BTG6BMRjj3kOHzt4YaQa3yzutmrhFSOyZMmA@mail.gmail.com>
-Message-ID: <87k2h44j9w.fsf@kamboji.qca.qualcomm.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 2 Jul 2016 10:27:21 +0200
+Subject: [PATCH v2 4/6] nvmem: amlogic: Add Amlogic Meson EFUSE driver
+In-Reply-To: <57763F42.3070106@linaro.org>
+References: <1467203656-14381-1-git-send-email-carlo@caione.org>
+ <1467203656-14381-5-git-send-email-carlo@caione.org>
+ <57763F42.3070106@linaro.org>
+Message-ID: <20160702082721.GA16826@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jonas Gorski <jonas.gorski@gmail.com> writes:
+On 01/07/16 11:00, Srinivas Kandagatla wrote:
+> 
+> 
+> On 29/06/16 13:34, Carlo Caione wrote:
+> >From: Carlo Caione <carlo@endlessm.com>
+> >
+> >Add Amlogic EFUSE driver to access hardware data like ethernet address,
+> >serial number or IDs.
+> >
+> >Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> 
+> Patch looks good to me,
+> 
+> Looks like there are some dependencies to this patch w.r.t sm_calls, it
+> would be easy to take this series from single tree.
+> 
+> Just incase you want to take this patch via some other tree, here is Ack.
+> 
+> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-> Hi,
->
-> On 30 June 2016 at 21:23, Arend Van Spriel <arend.vanspriel@broadcom.com> wrote:
->>
->>
->> On 30-6-2016 13:31, Arnd Bergmann wrote:
->>> On Thursday, June 30, 2016 12:25:15 PM CEST Hans de Goede wrote:
->>>>> So then how about making use of a more specific compatible string?
->>>>>
->>>>> e.g.
->>>>>
->>>>> brcmf {
->>>>>         compatible = "foo,ap6210", "brcm,bcm4329-fmac";
->>>>>         ...
->>>>> };
->>>>>
->>>>> and if the compatible has more than one element you request
->>>>> FW_NAME_<compatible>.txt as the nvram file. Or try each comptible (and
->>>>> lastly no suffix) until you get a match. (AFAICT, this is what the
->>>>> "model" property was originally intended for anyway, but almost nobody
->>>>> did it right, and everyone put a user readable string into "model" for
->>>>> boards instead of the ePAPR defined compatible string).
->>>>
->>>> Hmm, interesting idea. Not sure how easy / hard it will be to implement
->>>> this, but from a dt binding point of view it seems elegant.
->>>>
->>>> Kalle, Arend, what do you think of this ?
->>
->> At first glance I like the suggestion, but this would mean updating the
->> bindings document for each new wifi module that we want to add. Not a
->> big problem, but it makes that I have a slight preference to using a
->> property for it, eg. brcm,module = "ap6210";
->
-> If you want a separate property, then I repeat my very first
-> suggestion, the well defined model property.
-> e.g.
->
-> brcmf at 0 {
->         model = "ampak,ap6210";
->         compatible = "brcm,bcm4329-fmac";
->         ...
-> };
->
-> All device nodes may have a model property, not just the top "machine" one.
+Thanks, probably it's better to merge everything through the arm-soc tree.
 
-I like this model property but I'm no DT expert. What others think about
-it, would it work?
+Cheers,
 
 -- 
-Kalle Valo
+Carlo Caione
