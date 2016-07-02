@@ -1,61 +1,56 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Jul 2016 18:21:40 -0700
-Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's
- parents
-In-Reply-To: <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
-References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
- <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
-Message-ID: <20160702012140.GB17071@codeaurora.org>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Fri, 1 Jul 2016 18:23:03 -0700
+Subject: [PATCH v6 00/11] qcom: Add support for TSENS driver
+In-Reply-To: <20160701205223.GA7814@localhost.localdomain>
+References: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
+ <575A57F8.6060004@codeaurora.org> <576391B3.7090508@codeaurora.org>
+ <57749F20.4010700@codeaurora.org>
+ <20160701205223.GA7814@localhost.localdomain>
+Message-ID: <20160702012301.GB9035@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Resending to everyone)
-
-On 06/22, Erin Lo wrote:
-> From: James Liao <jamesjj.liao@mediatek.com>
+On Fri, Jul 01, 2016 at 01:52:25PM -0700, Eduardo Valentin wrote:
+> On Thu, Jun 30, 2016 at 09:55:04AM +0530, Rajendra Nayak wrote:
+> > Rui,
+> > 
+> > On 06/17/2016 11:29 AM, Nayak, Rajendra wrote:
+> > > Hey Eduardo,
+> > > 
+> > > On 6/10/2016 11:32 AM, Rajendra Nayak wrote:
+> > >> Eduardo,
+> > >>
+> > >> On 05/05/2016 02:21 PM, Rajendra Nayak wrote:
+> > >>> Current set of patches apply on 4.6-rc6. Fixes for the nvmem apis
+> > >>> are now posted [1] and queued in -next [2]
+> > >>> Patches [1-6] will need to be merged via thermal tree/Eduardo.
+> > >>
+> > >> Any plans to pull these in for 4.8?
+> > > 
+> > > These patches have been on the list for quite a while, and they
+> > > do not have any outstanding dependencies or comments to be
+> > > addressed. I would really hope to see these in for 4.8.
+> > > Let me know if there is something you want me to address before
+> > > you pull them in.
+> > 
+> > Would you be able to pull this driver in? I haven't heard back
+> > anything from Eduardo despite multiple pings.
+> > These patches (v6) have been on the list for a couple months now,
+> > which address all issues/concerns that were raised by Eduardo
+> > in his previous reviews.
 > 
-> This patch fixed wrong state of parent clocks if they are registered
-> after critical clocks.
+> Apologize for the late answer. I will take care of queueing them.
+
+Applied patches 1-6. The DT patches lack the cooling map, on all of
+them. In case you do not have a working cooling device in your
+platform, at least add an empty map with a TODO flag.
+
+After you fix the DT patch, you may add my
+
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
+
+on them.
+
 > 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-
-It would be nice if you included the information about the
-problem from James' previous mail. This says what it does, but
-doesn't explain what the problem is and how it is fixing it.
-
-> ---
->  drivers/clk/clk.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+> BR,
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index d584004..e9f5f89 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2388,8 +2388,15 @@ static int __clk_core_init(struct clk_core *core)
->  	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
->  		struct clk_core *parent = __clk_init_parent(orphan);
->  
-> -		if (parent)
-> +		if (parent) {
->  			clk_core_reparent(orphan, parent);
-> +
-> +			if (orphan->prepare_count)
-> +				clk_core_prepare(parent);
-> +
-> +			if (orphan->enable_count)
-> +				clk_core_enable(parent);
-> +		}
->  	}
-
-I'm pretty sure I pointed this problem out to Mike when the
-critical clk patches were being pushed. I can't recall what the
-plan was though to fix the problem. I'm pretty sure he said that
-clk_core_reparent() would take care of it, but obviously it is
-not doing that. Or perhaps it was that clk handoff should figure
-out that the parents of a critical clk are also on and thus keep
-them on.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
