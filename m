@@ -1,47 +1,37 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 2 Jul 2016 22:08:44 +0200
-Subject: [PATCH v5 resend 0/2] phy-sun4i-usb: peripheral-mode + a31 otg
- workaround
-In-Reply-To: <5774B26E.5010609@ti.com>
-References: <1467224050-7480-1-git-send-email-hdegoede@redhat.com>
- <5774B26E.5010609@ti.com>
-Message-ID: <5390a35e-e043-6440-9a1c-5e34a41c2992@redhat.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 2 Jul 2016 17:30:11 -0300
+Subject: [PATCH RFC 6/7] clk: imx: pllv3: convert to prepare_hw and
+ set_rate_hw
+In-Reply-To: <1467208335-29876-7-git-send-email-aisheng.dong@nxp.com>
+References: <1467208335-29876-1-git-send-email-aisheng.dong@nxp.com>
+ <1467208335-29876-7-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CAOMZO5DnFevNf6tdJ62woC33Mv3cGgTYLkOq6OOz+3RxZJpnMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Dong,
 
-On 30-06-16 07:47, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Wednesday 29 June 2016 11:44 PM, Hans de Goede wrote:
->> Hi Kishon,
->>
->> The "USB: Fix of_usb_get_dr_mode_by_phy with a shared phy block"
->> patch on which this series depends is in usb-next now:
->>
->> https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/?h=usb-next&id=ce15ed4c5dfb3f7757e6611902aed5db253af977
->>
->> Can you please merge this series?
->
-> This is not applying cleanly against linux-phy -next. Can you rebase and send?
+On Wed, Jun 29, 2016 at 10:52 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 
-I just tried to rebase, the problem is that your -next branch does not
-contain the fixes from your -fixes branch, specifically it is missing
-this commit:
+Thanks for working on this series.
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/phy?id=5cf700ac9d50353dc5b8194a57c6f40bf1fc4424
+Tested the whole series on a mx7d-sdb and it does fix the several clk
+warnings that we currently have.
 
-Which is causing the conflict you're seeing when trying to merge
-the patches I send. I can send you fixed patches which apply
-cleanly to your linux-phy/next but those then will not merge
-properly with linus' tree.
+> +static int clk_pllv3_set_rate_done(struct clk_hw *hw)
+> +{
+> +       struct clk_pllv3 *pll = to_clk_pllv3(hw);
+> +       u32 val = readl_relaxed(pll->base) & pll->powerdown;
 
-So it is probably better to at least cherry-pick the commit
-I've linked to above into your -next, to avoid future merge
-problems. If you cherry-pick that commit then the patches
-I've send you should apply cleanly.
+I had to change this to:
 
-Regards,
+--- a/drivers/clk/imx/clk-pllv3.c
++++ b/drivers/clk/imx/clk-pllv3.c
+@@ -108,7 +108,7 @@ static long clk_pllv3_round_rate(struct clk_hw *hw, unsigned
+ static int clk_pllv3_set_rate_done(struct clk_hw *hw)
+ {
+        struct clk_pllv3 *pll = to_clk_pllv3(hw);
+-       u32 val = readl_relaxed(pll->base) & pll->powerdown;
++       u32 val = readl_relaxed(pll->base) & pll->power_bit;
 
-Hans
+,so that it can build against linux-next.
