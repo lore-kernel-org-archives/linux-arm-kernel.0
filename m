@@ -1,53 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 02 Jul 2016 23:30:21 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <ced2a770-2724-bdc9-7e2a-3dc9f76abf29@broadcom.com>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <CAOiHx=m8Zf0T4=BTG6BMRjj3kOHzt4YaQa3yzutmrhFSOyZMmA@mail.gmail.com>
- <ced2a770-2724-bdc9-7e2a-3dc9f76abf29@broadcom.com>
-Message-ID: <7975990.MvNRQ06u39@wuerfel>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 02 Jul 2016 16:12:07 -0700
+Subject: [PATCH RFC 0/7] support clk setting during kernel early boot
+In-Reply-To: <20160702011216.GR27880@codeaurora.org>
+References: <1467208335-29876-1-git-send-email-aisheng.dong@nxp.com>
+ <20160702011216.GR27880@codeaurora.org>
+Message-ID: <bab9b9bacc16a42cf9ca93973ea5de68@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 2, 2016 8:20:35 PM CEST Arend Van Spriel wrote:
-> > If you want a separate property, then I repeat my very first
-> > suggestion, the well defined model property.
-> > e.g.
-> > 
-> > brcmf at 0 {
-> >         model = "ampak,ap6210";
-> >         compatible = "brcm,bcm4329-fmac";
-> >         ...
-> > };
-> > 
-> > All device nodes may have a model property, not just the top "machine" one.
+On 2016-07-01 18:12, Stephen Boyd wrote:
+> On 06/29, Dong Aisheng wrote:
+>> Recently several people met the kernel complaining
+>> "bad: scheduling from the idle thread!" issue which caused by
+>> sleeping during kernel early booting phase by calling clk
+>> APIs like clk_prepare_enable.
+>>
+>> See:
+>> https://lkml.org/lkml/fancy/2016/1/29/695
+>> https://lkml.org/lkml/2016/6/10/779
+>> http://www.spinics.net/lists/linux-clk/msg08635.html
 > 
-> I heard you the first time  I just was not sure what the implications
-> would be to use it. Hence I suggested a vendor specific property.
-> However, looking up and reading the definition in ePAPRv1.1 I suppose it
-> is fine to use the model property:
+> That last one was another bug that happened to trigger this
+> problem mistakenly. I doubt critical clks are an issue (more
+> below).
 > 
-> Property: model
-> Value type: <string>
-> Description:
-> The model property value is a <string> that specifies the manufacturer?s
-> model number of the device.
+>>
+>> The calling sequence simply could be like:
+>> start_kernel
+>>   ->time_init
+>>     ->of_clk_init
+>>       ->clk_core_prepare
+>>         ->clk_pllv3_prepare
+>>           ->usleep_range
+>>             ->dequeue_task_idle
+>>
+>> This issue is mainly caused during time_init, the irq is still
+>> not enabled and scheduler is still not ready, thus there's no way
+>> to allow sleep at that time.
+>>
+>> However, there're many exist platforms calling clk_prepare_enable/
+>> clk_get_rate/clk_set_parent at that time in CLK_OF_DECLARE init
+>> function.
+>> e.g
+>> drivers/clk/imx/clk-{soc}.c
+>> drivers/clk/rockchip/clk-rk3188.c
+>> drivers/clk/ti/clk-44xx.c
+>> ...
+>>
+>> And irqchip and clock source is also initialized before it which
+>> may requires to do clk settings.
+>>
+>> Furthermore, current clk framework also supports critical clocks
+>> flagged by CLK_IS_CRITICAL which will be prepared and
+>> enabled during clk_register by clk core, that is also happened
+>> quite early in of_clk_init usually.
+>>
+>> And clk framework also supports assign default clk rate and parent for
+>> each registered clk provider which also happens early in of_clk_init.
+>> (see of_clk_set_defaults())
+>>
+>> Above are all possible cases which may cause sleeping during kernel
+>> early booting.
 > 
-> The recommended format is: ?manufacturer,model?, where manufacturer is a
-> string describing the name of the manufacturer (such as a stock ticker
-> symbol), and model specifies the model number.
+> How many of these cases are really happening and causing problems
+> though?
+> 
+>>
+>> So it seems we'd like to have the requirement to make kernel support
+>> calling clk APIs during kernel early boot without sleep.
+> 
+> I wonder if the problem is more that the framework doesn't know
+> the hardware state of on/off when it initializes? So we call the
+> clk_ops prepare/enable functions when we really shouldn't be
+> doing that at all because the clk is already prepared/enabled.
+> Presumably for critical clks, we shouldn't go and touch any
+> hardware to turn them on, because by definition they're critical
+> and should already be on anyway.
 
-The model property is very similar to compatible, except that there is
-only one entry rather than a list of entries from most specific to
-most generic.
+I found that remark interesting, and agree here with Stephen, critical
+clks should be already on and everything else should be controlled from
+drivers.
 
-I think by writing the above example as
+With that in mind I went on and looked again what is currently (after
+the parents enable patchset) still wrong on i.MX 7. Turned out to be not
+that much, and I think it should be fixable with that:
+https://lkml.org/lkml/2016/7/2/138
 
-	compatible = "ampak,ap6210", "brcm,bcm4329-fmac";
-
-we can provide the same functionality in a slightly simpler way, the driver
-then just goes on to look for the nvram file for each entry in sequence until
-it finds one.
-
-	Arnd
+--
+Stefan
