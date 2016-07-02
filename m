@@ -1,44 +1,31 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Sat,  2 Jul 2016 15:21:59 -0400
-Subject: [PATCH RESEND] mpt3sas:Fix missing error checks for calls to
- _transport_phy_reset in mpt3sas_transport.c
-Message-ID: <1467487319-30989-1-git-send-email-xerofoify@gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat,  2 Jul 2016 19:23:13 +0000
+Subject: [PATCH 1/2] mmc: sdhci: add define for suspend/resume capability
+In-Reply-To: <1467487394-28682-1-git-send-email-stefan.wahren@i2se.com>
+References: <1467487394-28682-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1467487394-28682-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the missing error checks and paths for functions that
-call _transport_phy_reset and do not correctly check that the
-call to this particular function has succeeded by returning zero
-in the file, mpt3sas_transport.c.
+This patch adds the missing define for the suspend/resume
+capability (according to SD Host Controller spec).
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- drivers/scsi/mpt3sas/mpt3sas_transport.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/mmc/host/sdhci.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/scsi/mpt3sas/mpt3sas_transport.c b/drivers/scsi/mpt3sas/mpt3sas_transport.c
-index ca36d7e..bff5a11 100644
---- a/drivers/scsi/mpt3sas/mpt3sas_transport.c
-+++ b/drivers/scsi/mpt3sas/mpt3sas_transport.c
-@@ -1766,7 +1766,7 @@ _transport_phy_enable(struct sas_phy *phy, int enable)
- 
- 	/* link reset */
- 	if (enable)
--		_transport_phy_reset(phy, 0);
-+		rc = _transport_phy_reset(phy, 0);
- 
-  out:
- 	kfree(sas_iounit_pg1);
-@@ -1870,7 +1870,9 @@ _transport_phy_speed(struct sas_phy *phy, struct sas_phy_linkrates *rates)
- 	}
- 
- 	/* link reset */
--	_transport_phy_reset(phy, 0);
-+	rc = _transport_phy_reset(phy, 0);
-+	if (rc)
-+		goto out;
- 
- 	/* read phy page 0, then update the rates in the sas transport phy */
- 	if (!mpt3sas_config_get_phy_pg0(ioc, &mpi_reply, &phy_pg0,
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 609f87c..42584f0 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -186,6 +186,7 @@
+ #define  SDHCI_CAN_DO_ADMA1	0x00100000
+ #define  SDHCI_CAN_DO_HISPD	0x00200000
+ #define  SDHCI_CAN_DO_SDMA	0x00400000
++#define  SDHCI_CAN_DO_SUSPEND	0x00800000
+ #define  SDHCI_CAN_VDD_330	0x01000000
+ #define  SDHCI_CAN_VDD_300	0x02000000
+ #define  SDHCI_CAN_VDD_180	0x04000000
 -- 
-2.5.0
+1.7.9.5
