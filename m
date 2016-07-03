@@ -1,53 +1,105 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 3 Jul 2016 13:30:37 -0400
-Subject: [PATCH 1/4] bus: brcmstb_gisb: make it explicitly non-modular
+Date: Sun, 3 Jul 2016 13:30:39 -0400
+Subject: [PATCH 3/4] bus: tegra-aconnect: make it explicitly non-modular
 In-Reply-To: <20160703173040.23612-1-paul.gortmaker@windriver.com>
 References: <20160703173040.23612-1-paul.gortmaker@windriver.com>
-Message-ID: <20160703173040.23612-2-paul.gortmaker@windriver.com>
+Message-ID: <20160703173040.23612-4-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig for this driver is currently:
+The Kconfig currently controlling compilation of this code is:
 
-config BRCMSTB_GISB_ARB
-        bool "Broadcom STB GISB bus arbiter"
+drivers/bus/Kconfig:config TEGRA_ACONNECT
+drivers/bus/Kconfig:    bool "Tegra ACONNECT Bus Driver"
 
 ...meaning that it currently is not being built as a module by anyone.
-Lets remove all modular references, so that when reading the driver
-there is no doubt it is builtin-only.
 
-Since module_init translates to device_initcall in the non-modular
-case, the init ordering remains unchanged with this commit.
+Lets remove the modular code that is essentially orphaned, so that
+when reading the driver there is no doubt it is builtin-only.
 
-Cc: Brian Norris <computersforpeace@gmail.com>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
-Cc: Gregory Fong <gregory.0xf0@gmail.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+We explicitly disallow a driver unbind, since that doesn't have a
+sensible use case anyway, and it allows us to drop the ".remove"
+code for non-modular drivers.
+
+Since module_platform_driver() uses the same init level priority as
+builtin_platform_driver() the init ordering remains unchanged with
+this commit.
+
+Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+
+We also delete the MODULE_LICENSE tag etc. since all that information
+was (or is now) contained at the top of the file in the comments.
+
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Jon Hunter <jonathanh@nvidia.com>
+Cc: linux-tegra at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- drivers/bus/brcmstb_gisb.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/bus/tegra-aconnect.c | 22 +++++-----------------
+ 1 file changed, 5 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index 72fe0a5a8bf3..2616d8208777 100644
---- a/drivers/bus/brcmstb_gisb.c
-+++ b/drivers/bus/brcmstb_gisb.c
-@@ -13,7 +13,6 @@
+diff --git a/drivers/bus/tegra-aconnect.c b/drivers/bus/tegra-aconnect.c
+index 7e4104b74fa8..f3982946ab8a 100644
+--- a/drivers/bus/tegra-aconnect.c
++++ b/drivers/bus/tegra-aconnect.c
+@@ -1,6 +1,8 @@
+ /*
+  * Tegra ACONNECT Bus Driver
+  *
++ * Author: Jon Hunter <jonathanh@nvidia.com>
++ *
+  * Copyright (C) 2016, NVIDIA CORPORATION.  All rights reserved.
+  *
+  * This file is subject to the terms and conditions of the GNU General Public
+@@ -9,7 +11,7 @@
+  */
  
- #include <linux/init.h>
- #include <linux/types.h>
+ #include <linux/clk.h>
 -#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/of_platform.h>
  #include <linux/platform_device.h>
- #include <linux/interrupt.h>
- #include <linux/sysfs.h>
-@@ -438,5 +437,4 @@ static int __init brcm_gisb_driver_init(void)
- 	return platform_driver_probe(&brcmstb_gisb_arb_driver,
- 				     brcmstb_gisb_arb_probe);
+ #include <linux/pm_clock.h>
+@@ -66,15 +68,6 @@ clk_destroy:
+ 	return ret;
  }
+ 
+-static int tegra_aconnect_remove(struct platform_device *pdev)
+-{
+-	pm_runtime_disable(&pdev->dev);
 -
--module_init(brcm_gisb_driver_init);
-+device_initcall(brcm_gisb_driver_init);
+-	pm_clk_destroy(&pdev->dev);
+-
+-	return 0;
+-}
+-
+ static int tegra_aconnect_runtime_resume(struct device *dev)
+ {
+ 	return pm_clk_resume(dev);
+@@ -94,19 +87,14 @@ static const struct of_device_id tegra_aconnect_of_match[] = {
+ 	{ .compatible = "nvidia,tegra210-aconnect", },
+ 	{ }
+ };
+-MODULE_DEVICE_TABLE(of, tegra_aconnect_of_match);
+ 
+ static struct platform_driver tegra_aconnect_driver = {
+ 	.probe = tegra_aconnect_probe,
+-	.remove = tegra_aconnect_remove,
+ 	.driver = {
+ 		.name = "tegra-aconnect",
++		.suppress_bind_attrs = true,
+ 		.of_match_table = tegra_aconnect_of_match,
+ 		.pm = &tegra_aconnect_pm_ops,
+ 	},
+ };
+-module_platform_driver(tegra_aconnect_driver);
+-
+-MODULE_DESCRIPTION("NVIDIA Tegra ACONNECT Bus Driver");
+-MODULE_AUTHOR("Jon Hunter <jonathanh@nvidia.com>");
+-MODULE_LICENSE("GPL v2");
++builtin_platform_driver(tegra_aconnect_driver);
 -- 
 2.8.4
