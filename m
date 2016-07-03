@@ -1,13 +1,13 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 3 Jul 2016 08:47:19 +0200
-Subject: ARM: mediatek: dts 64 bit updates for v4.8
-Message-ID: <8e60cf93-062d-368a-f2e0-58c747bb34ca@gmail.com>
+Date: Sun, 3 Jul 2016 08:49:29 +0200
+Subject: ARM: mediatek: dts 32 bits updates for v4.8
+Message-ID: <94a90d0c-f459-296c-4290-739515b4ac5b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
-Please merge the following updates for arm64 device tree branch.
+Please take into account the following dts patch for arm 32 bits.
 
 Thanks,
 Matthias
@@ -20,33 +20,20 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
 are available in the git repository at:
 
-   https://github.com/mbgg/linux-mediatek.git tags/v4.7-next-dts
+   https://github.com/mbgg/linux-mediatek.git tags/v4.7-next-dts32
 
-for you to fetch changes up to aea1c315b6395920bbeb69804e0355e57c67e086:
+for you to fetch changes up to 6f108172f13c311ce2175fab25fbd50940a3622b:
 
-   arm64: dts: mediatek: add mt6755 support (2016-07-03 07:57:21 +0200)
-
-----------------------------------------------------------------
-- Add nodes for the DISP function ports
-- Add dt-bindings for mt6755
-- Add basic support for mt6755 SoC
+   ARM: dts: mt2701: add iommu/smi dtsi node for mt2701 (2016-07-03 
+08:25:08 +0200)
 
 ----------------------------------------------------------------
-CK Hu (1):
-       arm64: dts: mt8173: Add display subsystem related nodes
+- Add dtsi parts for iommu support
 
-Mars Cheng (2):
-       Document: DT: Add bindings for mediatek MT6755 SoC Platform
-       arm64: dts: mediatek: add mt6755 support
+----------------------------------------------------------------
+Honghui Zhang (1):
+       ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
 
-  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
-  .../interrupt-controller/mediatek,sysirq.txt       |   1 +
-  .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
-  arch/arm64/boot/dts/mediatek/Makefile              |   1 +
-  arch/arm64/boot/dts/mediatek/mt6755-evb.dts        |  38 ++++
-  arch/arm64/boot/dts/mediatek/mt6755.dtsi           | 145 ++++++++++++++
-  arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 223 
-+++++++++++++++++++++
-  7 files changed, 413 insertions(+)
-  create mode 100644 arch/arm64/boot/dts/mediatek/mt6755-evb.dts
-  create mode 100644 arch/arm64/boot/dts/mediatek/mt6755.dtsi
+  arch/arm/boot/dts/mt2701.dtsi | 50 
++++++++++++++++++++++++++++++++++++++++++++
+  1 file changed, 50 insertions(+)
