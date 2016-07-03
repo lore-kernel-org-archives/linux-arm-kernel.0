@@ -1,37 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 3 Jul 2016 20:49:45 +0200
-Subject: [RFC 0/1] ARM: print MHz in /proc/cpuinfo
-In-Reply-To: <20160703165431.GL1041@n2100.armlinux.org.uk>
-References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
- <20160607221809.GP1041@n2100.armlinux.org.uk>
- <32b30c50-4712-568e-4044-9f533ca497b2@jonmasters.org>
- <20160703165431.GL1041@n2100.armlinux.org.uk>
-Message-ID: <20160703184945.GB9421@lunn.ch>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 3 Jul 2016 21:08:40 +0200
+Subject: ARM: mediatek: dts 32 bits updates for v4.8
+In-Reply-To: <94a90d0c-f459-296c-4290-739515b4ac5b@gmail.com>
+References: <94a90d0c-f459-296c-4290-739515b4ac5b@gmail.com>
+Message-ID: <98233d90-47ef-88f7-e474-c1fa04a65c04@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 03, 2016 at 05:54:31PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Jul 02, 2016 at 07:58:00PM -0400, Jon Masters wrote:
-> > Agreed. But we'll still be coming back to ensure this information is
-> > presented to users. I pointed out to ARM about 3-4 years ago that this
-> > was going to bite us. It is now biting us, and we will ensure that
-> > useless data is provided where it is on x86 for identical experience by
-> > users. That is unless or until x86 users do something else always. Our
-> > (separate) case will use DMI or ACPI for the same kind of data.
-> 
-> Right, so having read all your email, there's no reason why we couldn't
-> just print:
-> 
-> cpu MHz  : 99999999.999
 
-Since it is a float, how about using the value NaN? I think that
-nicely summaries it is a useless value.
 
-However, i agree, we first need a technical justification for needing
-a value at all.
+On 07/03/2016 08:49 AM, Matthias Brugger wrote:
+> Hi all,
+>
+> Please take into account the following dts patch for arm 32 bits.
+>
 
-Jon: What happened when you posted a patch removing this value from
-x86? That is clearly an alternative to adding it to ARM, especially if
-everybody agrees it is a useless value.
+The patch causes a compilation error, please don't pull this branch.
 
-  Andrew
+Sorry for the noise,
+Matthias
+
+> Thanks,
+> Matthias
+>
+> ---
+>
+> The following changes since commit
+> 1a695a905c18548062509178b98bc91e67510864:
+>
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>
+> are available in the git repository at:
+>
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.7-next-dts32
+>
+> for you to fetch changes up to 6f108172f13c311ce2175fab25fbd50940a3622b:
+>
+>   ARM: dts: mt2701: add iommu/smi dtsi node for mt2701 (2016-07-03
+> 08:25:08 +0200)
+>
+> ----------------------------------------------------------------
+> - Add dtsi parts for iommu support
+>
+> ----------------------------------------------------------------
+> Honghui Zhang (1):
+>       ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
+>
+>  arch/arm/boot/dts/mt2701.dtsi | 50
+> +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
