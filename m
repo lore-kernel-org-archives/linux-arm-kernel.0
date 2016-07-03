@@ -1,46 +1,39 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Sun,  3 Jul 2016 22:01:06 +0100
-Subject: [PATCH] phy: rockhip-usb: use devm_add_action_or_reset()
-Message-ID: <1467579666-9179-1-git-send-email-sudipm.mukherjee@gmail.com>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Sun, 3 Jul 2016 23:08:21 +0200
+Subject: [PATCH] phy: fix error handling
+In-Reply-To: <1467525332-12963-1-git-send-email-christophe.jaillet@wanadoo.fr>
+References: <1467525332-12963-1-git-send-email-christophe.jaillet@wanadoo.fr>
+Message-ID: <00d5243a-0359-1dc7-e9aa-1ad8a9074821@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If devm_add_action() fails we are explicitly calling the cleanup to free
-the resources allocated.  Lets use the helper devm_add_action_or_reset()
-and return directly in case of error, as we know that the cleanup function
-has been already called by the helper if there was any error.
+I will resubmit in the coming days.
 
-Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
----
- drivers/phy/phy-rockchip-usb.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+    return PTR_ERR(phy->clk);
+should also be updated.
 
-diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-index d60b149..dd58f23 100644
---- a/drivers/phy/phy-rockchip-usb.c
-+++ b/drivers/phy/phy-rockchip-usb.c
-@@ -236,9 +236,10 @@ static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
- 			goto err_clk_prov;
- 	}
- 
--	err = devm_add_action(base->dev, rockchip_usb_phy_action, rk_phy);
-+	err = devm_add_action_or_reset(base->dev, rockchip_usb_phy_action,
-+				       rk_phy);
- 	if (err)
--		goto err_devm_action;
-+		return err;
- 
- 	rk_phy->phy = devm_phy_create(base->dev, child, &ops);
- 	if (IS_ERR(rk_phy->phy)) {
-@@ -256,9 +257,6 @@ static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
- 	else
- 		return rockchip_usb_phy_power(rk_phy, 1);
- 
--err_devm_action:
--	if (!rk_phy->uart_enabled)
--		of_clk_del_provider(child);
- err_clk_prov:
- 	if (!rk_phy->uart_enabled)
- 		clk_unregister(rk_phy->clk480m);
--- 
-1.9.1
+Best regards,
+CJ
+
+Le 03/07/2016 ? 07:55, Christophe JAILLET a ?crit :
+> This is likely that checking 'phy->hsic_clk' instead of 'phy->clk' is
+> expected here.
+>
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+>   drivers/phy/phy-sun9i-usb.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/phy/phy-sun9i-usb.c b/drivers/phy/phy-sun9i-usb.c
+> index ac4f31a..ff99eba 100644
+> --- a/drivers/phy/phy-sun9i-usb.c
+> +++ b/drivers/phy/phy-sun9i-usb.c
+> @@ -141,7 +141,7 @@ static int sun9i_usb_phy_probe(struct platform_device *pdev)
+>   		}
+>   
+>   		phy->hsic_clk = devm_clk_get(dev, "hsic_12M");
+> -		if (IS_ERR(phy->clk)) {
+> +		if (IS_ERR(phy->hsic_clk)) {
+>   			dev_err(dev, "failed to get hsic_12M clock\n");
+>   			return PTR_ERR(phy->clk);
+>   		}
