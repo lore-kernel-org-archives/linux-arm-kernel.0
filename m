@@ -1,39 +1,59 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 3 Jul 2016 08:49:29 +0200
-Subject: ARM: mediatek: dts 32 bits updates for v4.8
-Message-ID: <94a90d0c-f459-296c-4290-739515b4ac5b@gmail.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Sun, 3 Jul 2016 11:43:06 +0200
+Subject: [RFC PATCH] media: s5p-mfc - remove vidioc_g_crop
+In-Reply-To: <CAH_td2wtizPpD59h2shZoyuTvSNr=7YjR4mSmTO9FsWaJp8dfA@mail.gmail.com>
+References: <1467322502-11180-1-git-send-email-shuahkh@osg.samsung.com>
+ <CAH_td2wtizPpD59h2shZoyuTvSNr=7YjR4mSmTO9FsWaJp8dfA@mail.gmail.com>
+Message-ID: <772ecbb8-b1d2-b4cf-2be2-110f731b9a2b@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Nicolas,
 
-Please take into account the following dts patch for arm 32 bits.
+On 07/02/2016 10:29 PM, Nicolas Dufresne wrote:
+> 
+> Le 30 juin 2016 5:35 PM, "Shuah Khan" <shuahkh at osg.samsung.com <mailto:shuahkh@osg.samsung.com>> a ?crit :
+>>
+>> Remove vidioc_g_crop() from s5p-mfc decoder. Without its s_crop counterpart
+>> g_crop is not useful. Delete it.
+> 
+> G_CROP tell the userspace which portion of the output is to be displayed. Example,  1920x1080 inside a buffer of 1920x1088. It can be
+> implemented using G_SELECTION too, which emulate G_CROP. removing this without implementing G_SEKECTION will break certain software like
+> GStreamer v4l2 based decoder.
 
-Thanks,
-Matthias
+Sorry, but this is not correct.
 
----
+G_CROP for VIDEO_OUTPUT returns the output *compose* rectangle, not the output
+crop rectangle.
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+Don't blame me, this is how it was defined in V4L2. The problem is that for video
+output (esp. m2m devices) you usually want to set the crop rectangle, and that's
+why the selection API was added so you can unambiguously set the crop and compose
+rectangles for both capture and output.
 
-   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+Unfortunately, the exynos drivers were written before the G/S_SELECTION API was
+created, and the crop ioctls in the video output drivers actually set the output
+crop rectangle instead of the compose rectangle :-(
 
-are available in the git repository at:
+This is a known inconsistency.
 
-   https://github.com/mbgg/linux-mediatek.git tags/v4.7-next-dts32
+You are right though that we can't remove g_crop here, I had forgotten about the
+buffer padding.
 
-for you to fetch changes up to 6f108172f13c311ce2175fab25fbd50940a3622b:
+What should happen here is that g_selection support is added to s5p-mfc, and
+have that return the proper rectangles. The g_crop can be kept, and a comment
+should be added that it returns the wrong thing, but that that is needed for
+backwards compat.
 
-   ARM: dts: mt2701: add iommu/smi dtsi node for mt2701 (2016-07-03 
-08:25:08 +0200)
+The gstreamer code should use g/s_selection if available. It should check how it
+is using g/s_crop for video output devices today and remember that for output
+devices g/s_crop is really g/s_compose, except for the exynos drivers.
 
-----------------------------------------------------------------
-- Add dtsi parts for iommu support
+It's why I recommend the selection API since it doesn't have these problems.
 
-----------------------------------------------------------------
-Honghui Zhang (1):
-       ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
+I think I should do another push towards implementing the selection API in all
+drivers. There aren't many left.
 
-  arch/arm/boot/dts/mt2701.dtsi | 50 
-+++++++++++++++++++++++++++++++++++++++++++
-  1 file changed, 50 insertions(+)
+Regards,
+
+	Hans
