@@ -1,74 +1,104 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 3 Jul 2016 10:38:59 -0700
-Subject: [PATCH 1/3] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <5779422D.9060207@metafoo.de>
-References: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
- <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
- <87ab8638-926b-89ce-26a5-705a321d3066@kernel.org>
- <5779422D.9060207@metafoo.de>
-Message-ID: <57794DB3.2050506@roeck-us.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun,  3 Jul 2016 10:48:13 -0700
+Subject: [PATCH v2] clk: imx7d: do not set parent of ethernet time/ref clocks
+Message-ID: <20160703174813.13970-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2016 09:49 AM, Lars-Peter Clausen wrote:
-> On 07/03/2016 01:17 PM, Jonathan Cameron wrote:
->> On 28/06/16 09:18, Quentin Schulz wrote:
->>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
->>> controller and a thermal sensor. For now, only the ADC and the thermal
->>> sensor drivers are probed by the MFD, the touchscreen controller support
->>> will be added later.
->>>
->>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> The code looks fine to me. The 'controversial' bit of this is listing
->> iio-hwmon as an mfd child to get it to probe as a result of this being
->> present.  My immediately thought is that it should be separately
->> described in the devicetree and hence instantiated outside of this driver.
->
-> The devicetree is a generic description of the hardware. The iio-hwmon
-> bridge is a software component that translates between two Linux specific
-> ABIs. In my opinion putting the later in the former is makes no sense, it is
-> simply not part of the hardware description.
->
-Actually, this is where people get it wrong.
+All device trees currently in mainline specify the time clock parent
+using the assigned-clocks/assigned-clock-parents method, there is no
+need to statically assign the parent in the core clock driver.
+Also all current boards provide an Ethernet reference clock for the
+PHY externally, hence configuring the internal PHY reference clock.
 
-> Its quite terrible that we have the bindings in the first place, but I guess
-> we have to keep them considering they are ABI and there are existing users.
-> But we should definitely strongly discourage the introduction of new users.
->
+Furthermore, and the actual driver of this patch, specify ethernet
+related parents at that early point in boot leads to a warning:
+bad: scheduling from the idle thread!
 
-I do agree that the _bindings_ are bad.
+The reason for the warning is that setting the parent enables the ENET
+PLL since we are using CLK_OPS_PARENT_ENABLE. Enabling the ENET PLL can
+cause clk_pllv3_wait_lock to sleep. See also:
+commit fc8726a2c021 ("clk: core: support clocks which requires parents
+enable (part 2)").
 
-The ultimate problem is to find bindings which do describe the hardware
-in a way that would be acceptable to the devicetree community and is at the
-same time useful for software when trying to determine what to do with that
-hardware. _This_ is the exceptionally hard problem.
+Note that setting the ENET AXI root clock parent also requires ENET
+PLL to be enabled. However, U-Boot typically leaves the ENET PLL on,
+hence when the framework sets the parent of the first clock, it does
+not need to wait for the PLL to come up. But because there is currently
+no user of that clock, the PLL gets disabled after setting the parent.
+Therefore, subsequent reparenting calls of any clock which somehow rely
+on the ENET PLL, need to reenable the ENET PLL which leads to a sleep.
+Removing those subsequent reparenting calls works around this issue.
 
-One example would be an adc channel connected to a board voltage. I would assume
-that it should be permissible to describe this relationship in a way that can
-be _used_ by software to expose that adc channel as voltage, by whatever
-means necessary (it be through hwmon or as a regulator or whatever).
+Also remove comments. The code is really verbose enough.
 
-Similar, some pin on a chip may be connected to a thermal sensor. I would
-assume that it should be permissible to describe that thermal sensor (and its
-location) in a way that can be _used_ by software in a meaningful way, either
-for it to be reported as hardware monitoring attribute or to be used by the
-thermal subsystem as a thermal input channel.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Changes since v1:
+- Also remove PHY REF clock
 
-In addition to that, there are various other properties which _do_ describe
-the hardware, but are commonly seen as "software". Examples for that would
-be voltage or temperature limits (or any other limits, for that matter).
-Such limits _are_ part of the hardware description, but are not commonly
-accepted as such.
+Hi All,
 
-> It is policy whether an application wants to access a device using the IIO
-> or hwmon API. As such it must be managed by userspace, this is not something
-> that can be done using devicetree nor should it be something that is done on
-> a driver by driver basis.
->
+Fabio, thanks for testing v1.
 
-Agreed. However, the connections from one chip to another, and the use of a chip
-on a board, _is_ part of the hardware description. It is determined by the
-schematics as well as the board layout. A well defined hardware description
-needs to provide more than "this is an ADC channel" or "this is a thermal sensor".
+With v2, the warnings should definitly be gone. However, that might
+break some boards...
 
-Guenter
+What is the IMX7D_ENET_PHY_REF_ROOT_SRC clock for anyway? It sounds
+like it should provide a clock for the PHY. However, there is also
+IMX7D_ENET1_REF_ROOT_CLK and IMX7D_ENET2_REF_ROOT_CLK...
+
+Our first design used to use a clock provided by the SoC, by muxing
+a pad to CCM_ENET1_REF_CLK and enabling IMX7D_ENET1_REF_ROOT_CLK
+it seemd to work just fine, there was no need for
+IMX7D_ENET_PHY_REF_ROOT_SRC.
+
+Dong, can you shed some light on this?
+
+Otherwise, in case a board does not work with that change, something
+like this should do the same using device tree. You probably would
+have to add this to all FEC instances since this seems to be a shared
+clock.
+
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_enet1>;
+        assigned-clocks = <&clks IMX7D_ENET1_TIME_ROOT_SRC>,
+-                         <&clks IMX7D_ENET1_TIME_ROOT_CLK>;
+-       assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
++                         <&clks IMX7D_ENET1_TIME_ROOT_CLK>,
++                         <&clks IMX7D_ENET_PHY_REF_ROOT_SRC>;
++       assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>, <0>,
++                                <&clks IMX7D_PLL_ENET_MAIN_25M_CLK>;
+        assigned-clock-rates = <0>, <100000000>;
+        phy-mode = "rgmii";
+        phy-handle = <&ethphy0>;
+
+--
+Stefan
+
+ drivers/clk/imx/clk-imx7d.c | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 79293ed..6ed4f8f 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -860,16 +860,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	/* use old gpt clk setting, gpt1 root clk must be twice as gpt counter freq */
+ 	clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
+ 
+-	/*
+-	 * init enet clock source:
+-	 * 	AXI clock source is 250MHz
+-	 *	Phy refrence clock is 25MHz
+-	 *	1588 time clock source is 100MHz
+-	 */
+ 	clk_set_parent(clks[IMX7D_ENET_AXI_ROOT_SRC], clks[IMX7D_PLL_ENET_MAIN_250M_CLK]);
+-	clk_set_parent(clks[IMX7D_ENET_PHY_REF_ROOT_SRC], clks[IMX7D_PLL_ENET_MAIN_25M_CLK]);
+-	clk_set_parent(clks[IMX7D_ENET1_TIME_ROOT_SRC], clks[IMX7D_PLL_ENET_MAIN_100M_CLK]);
+-	clk_set_parent(clks[IMX7D_ENET2_TIME_ROOT_SRC], clks[IMX7D_PLL_ENET_MAIN_100M_CLK]);
+ 
+ 	/* set uart module clock's parent clock source that must be great then 80MHz */
+ 	clk_set_parent(clks[IMX7D_UART1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
+-- 
+2.9.0
