@@ -1,48 +1,53 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Jul 2016 17:54:31 +0100
-Subject: [RFC 0/1] ARM: print MHz in /proc/cpuinfo
-In-Reply-To: <32b30c50-4712-568e-4044-9f533ca497b2@jonmasters.org>
-References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
- <20160607221809.GP1041@n2100.armlinux.org.uk>
- <32b30c50-4712-568e-4044-9f533ca497b2@jonmasters.org>
-Message-ID: <20160703165431.GL1041@n2100.armlinux.org.uk>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 3 Jul 2016 13:30:37 -0400
+Subject: [PATCH 1/4] bus: brcmstb_gisb: make it explicitly non-modular
+In-Reply-To: <20160703173040.23612-1-paul.gortmaker@windriver.com>
+References: <20160703173040.23612-1-paul.gortmaker@windriver.com>
+Message-ID: <20160703173040.23612-2-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 02, 2016 at 07:58:00PM -0400, Jon Masters wrote:
-> Agreed. But we'll still be coming back to ensure this information is
-> presented to users. I pointed out to ARM about 3-4 years ago that this
-> was going to bite us. It is now biting us, and we will ensure that
-> useless data is provided where it is on x86 for identical experience by
-> users. That is unless or until x86 users do something else always. Our
-> (separate) case will use DMI or ACPI for the same kind of data.
+The Kconfig for this driver is currently:
 
-Right, so having read all your email, there's no reason why we couldn't
-just print:
+config BRCMSTB_GISB_ARB
+        bool "Broadcom STB GISB bus arbiter"
 
-cpu MHz  : 99999999.999
+...meaning that it currently is not being built as a module by anyone.
+Lets remove all modular references, so that when reading the driver
+there is no doubt it is builtin-only.
 
-and be done with it.  Sure, it doesn't reflect the reality, but if people
-are going to be idiots with it, why not play their game with it to show
-how stupid it is.
+Since module_init translates to device_initcall in the non-modular
+case, the init ordering remains unchanged with this commit.
 
-I don't buy "it's biting us" - I see no evidence of it actually "biting"
-anyone.  No one has reported any failures in the last 20 years due to
-this missing - and even so as I've already said, it would _not_ be a
-regression because that information has never been provided on 32-bit
-ARM.
+Cc: Brian Norris <computersforpeace@gmail.com>
+Acked-by: Brian Norris <computersforpeace@gmail.com>
+Cc: Gregory Fong <gregory.0xf0@gmail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+ drivers/bus/brcmstb_gisb.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Moreover, I asked what these applications were that are affected by the
-lack of us providing this number.  I'm still waiting to hear that, and
-I noticed that even you skipped over providing that information which I
-asked for, instead giving a hand-wavey answer based on marketing (spit)
-people doing stupid things.
-
-Please, try to come up with a _technical_ justification.  I really don't
-want to make decisions based on marketing shite which I completely and
-utterly despise.
-
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index 72fe0a5a8bf3..2616d8208777 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -13,7 +13,6 @@
+ 
+ #include <linux/init.h>
+ #include <linux/types.h>
+-#include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/sysfs.h>
+@@ -438,5 +437,4 @@ static int __init brcm_gisb_driver_init(void)
+ 	return platform_driver_probe(&brcmstb_gisb_arb_driver,
+ 				     brcmstb_gisb_arb_probe);
+ }
+-
+-module_init(brcm_gisb_driver_init);
++device_initcall(brcm_gisb_driver_init);
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.8.4
