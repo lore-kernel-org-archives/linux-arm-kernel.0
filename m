@@ -1,72 +1,51 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 3 Jul 2016 13:30:38 -0400
-Subject: [PATCH 2/4] bus: imx-weim: make it explicitly non-modular
+Date: Sun, 3 Jul 2016 13:30:40 -0400
+Subject: [PATCH 4/4] bus: simple-pm-bus: convert bool SIMPLE_PM_BUS to tristate
 In-Reply-To: <20160703173040.23612-1-paul.gortmaker@windriver.com>
 References: <20160703173040.23612-1-paul.gortmaker@windriver.com>
-Message-ID: <20160703173040.23612-3-paul.gortmaker@windriver.com>
+Message-ID: <20160703173040.23612-5-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The Kconfig currently controlling compilation of this code is:
 
-drivers/bus/Kconfig:config IMX_WEIM
-drivers/bus/Kconfig:    bool "Freescale EIM DRIVER
+config SIMPLE_PM_BUS
+        bool "Simple Power-Managed Bus Driver"
 
 ...meaning that it currently is not being built as a module by anyone.
 
-Lets remove the modular code that is essentially orphaned, so that
-when reading the driver there is no doubt it is builtin-only.
+In removing the orphaned modular support in a previous patch set,
+Geert indicated he'd rather see this code converted to tristate.
 
-Since module_platform_driver() uses the same init level priority as
-builtin_platform_driver() the init ordering remains unchanged with
-this commit.
+I normally don't do that because it extends functionality that I
+can't easily run time test or even know if the use case makes sense,
+but since in this case the author has nominated it as such, we do
+the conversion here.
 
-Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+Note that doesn't change the lack of run time testing ; this change
+is only tested for sucessful compile and modpost.
 
-We also delete the MODULE_LICENSE tag etc. since all that information
-is already contained at the top of the file in the comments.
-
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Alison Chaiken <alison_chaiken@mentor.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Simon Horman <horms+renesas@verge.net.au>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- drivers/bus/imx-weim.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ drivers/bus/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index 4bd361d64270..cdc75b1b264d 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -7,7 +7,7 @@
-  * License version 2. This program is licensed "as is" without any
-  * warranty of any kind, whether express or implied.
-  */
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/of_device.h>
-@@ -57,7 +57,6 @@ static const struct of_device_id weim_id_table[] = {
- 	{ .compatible = "fsl,imx51-weim", .data = &imx51_weim_devtype, },
- 	{ }
- };
--MODULE_DEVICE_TABLE(of, weim_id_table);
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 3b205e212337..f4162c76a5f6 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -109,7 +109,7 @@ config OMAP_OCP2SCP
+ 	  OCP2SCP.
  
- static int __init imx_weim_gpr_setup(struct platform_device *pdev)
- {
-@@ -209,8 +208,4 @@ static struct platform_driver weim_driver = {
- 		.of_match_table	= weim_id_table,
- 	},
- };
--module_platform_driver_probe(weim_driver, weim_probe);
--
--MODULE_AUTHOR("Freescale Semiconductor Inc.");
--MODULE_DESCRIPTION("i.MX EIM Controller Driver");
--MODULE_LICENSE("GPL");
-+builtin_platform_driver_probe(weim_driver, weim_probe);
+ config SIMPLE_PM_BUS
+-	bool "Simple Power-Managed Bus Driver"
++	tristate "Simple Power-Managed Bus Driver"
+ 	depends on OF && PM
+ 	depends on ARCH_RENESAS || COMPILE_TEST
+ 	help
 -- 
 2.8.4
