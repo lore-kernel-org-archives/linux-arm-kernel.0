@@ -1,42 +1,39 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 3 Jul 2016 17:57:00 +0200
-Subject: [PATCH] ARM64: dts: amlogic: Add basic support for Amlogic S905X
-In-Reply-To: <1467399478-7183-1-git-send-email-carlo@caione.org>
-References: <1467399478-7183-1-git-send-email-carlo@caione.org>
-Message-ID: <577935CC.80001@suse.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Sun, 3 Jul 2016 18:49:49 +0200
+Subject: [PATCH 1/3] mfd: add support for Allwinner SoCs ADC
+In-Reply-To: <87ab8638-926b-89ce-26a5-705a321d3066@kernel.org>
+References: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
+ <87ab8638-926b-89ce-26a5-705a321d3066@kernel.org>
+Message-ID: <5779422D.9060207@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.07.2016 um 20:57 schrieb Carlo Caione:
-> From: Carlo Caione <carlo@endlessm.com>
-> 
-> This patch introduces the basic support for the Amlogic S905X (Meson
-> GXL) and for the Amlogic evaluation board P212.
-> No documentation has been released yet for this SoC, so for now only the
-> bare minimum has been added in the DT.
-> 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  Documentation/devicetree/bindings/arm/amlogic.txt |   5 +
->  arch/arm64/boot/dts/amlogic/Makefile              |   1 +
->  arch/arm64/boot/dts/amlogic/meson-gxl-p212.dts    |  70 +++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi        | 179 ++++++++++++++++++++++
->  4 files changed, 255 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-p212.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+On 07/03/2016 01:17 PM, Jonathan Cameron wrote:
+> On 28/06/16 09:18, Quentin Schulz wrote:
+>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
+>> controller and a thermal sensor. For now, only the ADC and the thermal
+>> sensor drivers are probed by the MFD, the touchscreen controller support
+>> will be added later.
+>>
+>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> The code looks fine to me. The 'controversial' bit of this is listing
+> iio-hwmon as an mfd child to get it to probe as a result of this being
+> present.  My immediately thought is that it should be separately
+> described in the devicetree and hence instantiated outside of this driver.
 
-I don't have documentation either, but looks sane to me.
+The devicetree is a generic description of the hardware. The iio-hwmon
+bridge is a software component that translates between two Linux specific
+ABIs. In my opinion putting the later in the former is makes no sense, it is
+simply not part of the hardware description.
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Its quite terrible that we have the bindings in the first place, but I guess
+we have to keep them considering they are ABI and there are existing users.
+But we should definitely strongly discourage the introduction of new users.
 
-With the recent driver progress have you checked whether /memory at 0
-actually works or whether U-Boot gives us a /memory node that Linux is
-using instead?
+It is policy whether an application wants to access a device using the IIO
+or hwmon API. As such it must be managed by userspace, this is not something
+that can be done using devicetree nor should it be something that is done on
+a driver by driver basis.
 
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+- Lars
