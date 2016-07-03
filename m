@@ -1,34 +1,37 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 03 Jul 2016 11:25:57 -0700
-Subject: [PATCH v2] clk: imx7d: do not set parent of ethernet time/ref
- clocks
-In-Reply-To: <CAOMZO5AghMZ0iV0=0hBrFhhhAAfPpyxH0oj8UT7TqZr9N0+y9A@mail.gmail.com>
-References: <20160703174813.13970-1-stefan@agner.ch>
- <CAOMZO5AghMZ0iV0=0hBrFhhhAAfPpyxH0oj8UT7TqZr9N0+y9A@mail.gmail.com>
-Message-ID: <d5ff8c157bf6108afe2b14ae887c7b71@agner.ch>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 3 Jul 2016 20:49:45 +0200
+Subject: [RFC 0/1] ARM: print MHz in /proc/cpuinfo
+In-Reply-To: <20160703165431.GL1041@n2100.armlinux.org.uk>
+References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
+ <20160607221809.GP1041@n2100.armlinux.org.uk>
+ <32b30c50-4712-568e-4044-9f533ca497b2@jonmasters.org>
+ <20160703165431.GL1041@n2100.armlinux.org.uk>
+Message-ID: <20160703184945.GB9421@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-07-03 11:23, Fabio Estevam wrote:
-> Hi Stefan,
+On Sun, Jul 03, 2016 at 05:54:31PM +0100, Russell King - ARM Linux wrote:
+> On Sat, Jul 02, 2016 at 07:58:00PM -0400, Jon Masters wrote:
+> > Agreed. But we'll still be coming back to ensure this information is
+> > presented to users. I pointed out to ARM about 3-4 years ago that this
+> > was going to bite us. It is now biting us, and we will ensure that
+> > useless data is provided where it is on x86 for identical experience by
+> > users. That is unless or until x86 users do something else always. Our
+> > (separate) case will use DMI or ACPI for the same kind of data.
 > 
-> On Sun, Jul 3, 2016 at 2:48 PM, Stefan Agner <stefan@agner.ch> wrote:
+> Right, so having read all your email, there's no reason why we couldn't
+> just print:
 > 
->> Fabio, thanks for testing v1.
->>
->> With v2, the warnings should definitly be gone. However, that might
->> break some boards...
-> 
-> Still see the warnings with v2.
+> cpu MHz  : 99999999.999
 
-Hm, just checked again, that is really not the case here. On what base
-do you test? I tested on clk-next. Dong's clock changes are a
-prerequisite for that.
+Since it is a float, how about using the value NaN? I think that
+nicely summaries it is a useless value.
 
-What U-Boot version do you use?
+However, i agree, we first need a technical justification for needing
+a value at all.
 
-I tested on Colibri iMX7 here, but that early during boot there
-shouldn't be a difference.
+Jon: What happened when you posted a patch removing this value from
+x86? That is clearly an alternative to adding it to ARM, especially if
+everybody agrees it is a useless value.
 
---
-Stefan
+  Andrew
