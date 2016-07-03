@@ -1,62 +1,138 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Jul 2016 20:10:51 +0100
-Subject: [RFC 0/1] ARM: print MHz in /proc/cpuinfo
-In-Reply-To: <20160703184945.GB9421@lunn.ch>
-References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
- <20160607221809.GP1041@n2100.armlinux.org.uk>
- <32b30c50-4712-568e-4044-9f533ca497b2@jonmasters.org>
- <20160703165431.GL1041@n2100.armlinux.org.uk>
- <20160703184945.GB9421@lunn.ch>
-Message-ID: <20160703191051.GM1041@n2100.armlinux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 3 Jul 2016 21:12:11 +0200
+Subject: [PATCH v4 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for
+ mt2701
+In-Reply-To: <09eaf7a5-2b18-1ea6-5699-2e968c6b79a4@gmail.com>
+References: <1465379461-14757-1-git-send-email-honghui.zhang@mediatek.com>
+ <1465379461-14757-6-git-send-email-honghui.zhang@mediatek.com>
+ <09eaf7a5-2b18-1ea6-5699-2e968c6b79a4@gmail.com>
+Message-ID: <51441f39-e5b5-2cce-63ab-47bd3cf298b3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 03, 2016 at 08:49:45PM +0200, Andrew Lunn wrote:
-> On Sun, Jul 03, 2016 at 05:54:31PM +0100, Russell King - ARM Linux wrote:
-> > Right, so having read all your email, there's no reason why we couldn't
-> > just print:
-> > 
-> > cpu MHz  : 99999999.999
-> 
-> Since it is a float, how about using the value NaN? I think that
-> nicely summaries it is a useless value.
 
-;)
 
-> However, i agree, we first need a technical justification for needing
-> a value at all.
+On 07/03/2016 08:24 AM, Matthias Brugger wrote:
+>
+>
+> On 06/08/2016 11:51 AM, honghui.zhang at mediatek.com wrote:
+>> From: Honghui Zhang <honghui.zhang@mediatek.com>
+>>
+>> Add the dtsi node of iommu and smi for mt2701.
+>>
+>> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+>> ---
+>>  arch/arm/boot/dts/mt2701.dtsi | 51
+>> +++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 51 insertions(+)
+>>
+>
+> Applied,
 
-The only case where we've had a userspace "failure" is with the Jack
-audio server, which wanted to parse the cpu MHz value to use it in
-this calculation:
+Please resend the patch including the infracfg and mmsys node.
 
-     static jack_time_t jack_get_microseconds_from_cycles (void) {
-      return get_cycles() / __jack_cpu_mhz;
-     }
+Regards,
+Matthias
 
-Now, let's say that we did provide the CPU MHz, so __jack_cpu_mhz
-reflects this value.  Great, Jack can initialise this value, but
-there's two fundamental problems:
-
-1. Jack is not aware of cpufreq, so the CPU MHz value it read at
-   one point in time may not be the current CPU MHz - the CPU
-   frequency can change at any moment depending on the governor's
-   decisions.
-
-2. get_cycles()... we have no userspace accessible CPU cycle counters
-   on 32-bit ARM, which means knowing the CPU MHz for use like this
-   gets you nowhere as get_cycles() can't return the number of CPU
-   cycles.  It certainly can't return a number based on the CPU MHz.
-
-Hence why this change to jack was the only sane thing to do:
-
-https://github.com/jackaudio/jack2/commit/d425d8035b761b4a362c538c41eca874ff4
-
-This wasn't even a kernel regression - the kernel never provided the
-value on ARM, and in many cases the kernel doesn't know the right
-value (as I've said previously in this thread.)
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+> Thanks.
+>
+>> diff --git a/arch/arm/boot/dts/mt2701.dtsi
+>> b/arch/arm/boot/dts/mt2701.dtsi
+>> index 42d5a37..363de0d 100644
+>> --- a/arch/arm/boot/dts/mt2701.dtsi
+>> +++ b/arch/arm/boot/dts/mt2701.dtsi
+>> @@ -16,6 +16,7 @@
+>>  #include <dt-bindings/power/mt2701-power.h>
+>>  #include <dt-bindings/interrupt-controller/irq.h>
+>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +#include <dt-bindings/memory/mt2701-larb-port.h>
+>>  #include "skeleton64.dtsi"
+>>  #include "mt2701-pinfunc.h"
+>>
+>> @@ -160,6 +161,16 @@
+>>          clock-names = "system-clk", "rtc-clk";
+>>      };
+>>
+>> +    smi_common: smi at 1000c000 {
+>> +        compatible = "mediatek,mt2701-smi-common";
+>> +        reg = <0 0x1000c000 0 0x1000>;
+>> +        clocks = <&infracfg CLK_INFRA_SMI>,
+>> +             <&mmsys CLK_MM_SMI_COMMON>,
+>> +             <&infracfg CLK_INFRA_SMI>;
+>> +        clock-names = "apb", "smi", "async";
+>> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+>> +    };
+>> +
+>>      sysirq: interrupt-controller at 10200100 {
+>>          compatible = "mediatek,mt2701-sysirq",
+>>                   "mediatek,mt6577-sysirq";
+>> @@ -169,6 +180,16 @@
+>>          reg = <0 0x10200100 0 0x1c>;
+>>      };
+>>
+>> +    iommu: mmsys_iommu at 10205000 {
+>> +        compatible = "mediatek,mt2701-m4u";
+>> +        reg = <0 0x10205000 0 0x1000>;
+>> +        interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
+>> +        clocks = <&infracfg CLK_INFRA_M4U>;
+>> +        clock-names = "bclk";
+>> +        mediatek,larbs = <&larb0 &larb1 &larb2>;
+>> +        #iommu-cells = <1>;
+>> +    };
+>> +
+>>      apmixedsys: syscon at 10209000 {
+>>          compatible = "mediatek,mt2701-apmixedsys", "syscon";
+>>          reg = <0 0x10209000 0 0x1000>;
+>> @@ -234,6 +255,16 @@
+>>          status = "disabled";
+>>      };
+>>
+>> +    larb0: larb at 14010000 {
+>> +        compatible = "mediatek,mt2701-smi-larb";
+>> +        reg = <0 0x14010000 0 0x1000>;
+>> +        mediatek,smi = <&smi_common>;
+>> +        clocks = <&mmsys CLK_MM_SMI_LARB0>,
+>> +             <&mmsys CLK_MM_SMI_LARB0>;
+>> +        clock-names = "apb", "smi";
+>> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+>> +    };
+>> +
+>>      imgsys: syscon at 15000000 {
+>>          compatible = "mediatek,mt2701-imgsys", "syscon";
+>>          reg = <0 0x15000000 0 0x1000>;
+>> @@ -241,6 +272,16 @@
+>>          status = "disabled";
+>>      };
+>>
+>> +    larb2: larb at 15001000 {
+>> +        compatible = "mediatek,mt2701-smi-larb";
+>> +        reg = <0 0x15001000 0 0x1000>;
+>> +        mediatek,smi = <&smi_common>;
+>> +        clocks = <&imgsys CLK_IMG_SMI_COMM>,
+>> +             <&imgsys CLK_IMG_SMI_COMM>;
+>> +        clock-names = "apb", "smi";
+>> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+>> +    };
+>> +
+>>      vdecsys: syscon at 16000000 {
+>>          compatible = "mediatek,mt2701-vdecsys", "syscon";
+>>          reg = <0 0x16000000 0 0x1000>;
+>> @@ -248,6 +289,16 @@
+>>          status = "disabled";
+>>      };
+>>
+>> +    larb1: larb at 16010000 {
+>> +        compatible = "mediatek,mt2701-smi-larb";
+>> +        reg = <0 0x16010000 0 0x1000>;
+>> +        mediatek,smi = <&smi_common>;
+>> +        clocks = <&vdecsys CLK_VDEC_CKGEN>,
+>> +             <&vdecsys CLK_VDEC_LARB>;
+>> +        clock-names = "apb", "smi";
+>> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
+>> +    };
+>> +
+>>      hifsys: syscon at 1a000000 {
+>>          compatible = "mediatek,mt2701-hifsys", "syscon";
+>>          reg = <0 0x1a000000 0 0x1000>;
+>>
