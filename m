@@ -1,79 +1,44 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Sat, 2 Jul 2016 19:58:00 -0400
-Subject: [RFC 0/1] ARM: print MHz in /proc/cpuinfo
-In-Reply-To: <20160607221809.GP1041@n2100.armlinux.org.uk>
-References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
- <20160607221809.GP1041@n2100.armlinux.org.uk>
-Message-ID: <32b30c50-4712-568e-4044-9f533ca497b2@jonmasters.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 3 Jul 2016 13:17:52 +0800
+Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
+In-Reply-To: <20160627151717.BD25468D26@newverein.lst.de>
+Message-ID: <201607031342.UCz5nZSH%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Jon,
+Hi,
 
-On 06/07/2016 06:18 PM, Russell King - ARM Linux wrote:
-> On Tue, Jun 07, 2016 at 05:08:32PM -0400, Jon Mason wrote:
->> Many users (and some applications) are expecting the CPU clock speed to
->> be output in /proc/cpuinfo (as is done in x86, avr32, c6x, tile, parisc,
->> ia64, and xtensa).
-> 
-> Such as what applications?  This is just another meaningless number,
-> which is just as meaningless as the bogomips number.  It tells you
-> nothing really about the CPU which should remotely be used for
-> anything other than user display.  It certainly can't be used for
-> algorithmic selection.
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.7-rc5 next-20160701]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Agreed. HOWEVER...
+url:    https://github.com/0day-ci/linux/commits/Torsten-Duwe/arm64-live-patching/20160627-232728
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: arm64-allyesconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-We'll be coming back to add this for servers soon enough. It's on the
-todo, we just need a nice way to extract this information (as has been
-discussed). That's likely to be through DMI data or an ACPI addition
-that will be required and mandatory at some future point.
+All errors (new ones prefixed by >>):
 
+   Makefile:687: Cannot use CONFIG_KCOV: -fsanitize-coverage=trace-pc is not supported by compiler
+>> aarch64-linux-gnu-gcc: error: unrecognized command line option '-fprolog-pad=2'
+   make[2]: *** [kernel/bounds.s] Error 1
+   make[2]: Target '__build' not remade because of errors.
+   make[1]: *** [prepare0] Error 2
+   make[1]: Target 'prepare' not remade because of errors.
+   make: *** [sub-make] Error 2
 
-> We have resisted publishing this information for years because not
-> every ARM CPU is capable of providing this information - for many, we
-> don't know what the CPU clock rate even is.  I believe it is a mistake
-> to publish this information.
-
-There are two specific problems on ARM servers:
-
-1). Idiots. I've seen many situations in which benchmarks were run on
-pre-production machines (often explicitly against legal agreements, but
-those never happened within my organization so that's their problem -
-this is carefully prohibited activity within our own walls and I make
-sure our guys never run any numbers on pre-production stuff just so it
-could never get into the "wrong" hands by accident...). What these
-idiots do is then spread rumors that ARM server X "sucks" because they
-ran a prohibited benchmark against a downclocked core and forgot how to
-multiply numbers together. It gets worse. But usually it's because they
-ran "cat /proc/cpuinfo" and it didn't tell them anything useful, so they
-used whatever they thought the frequency was supposed to be.
-
-These idiots include journalists. If you read the press, you'll see the
-Gandhi sequence is playing out already between one of the established
-vendors and an ARM vendor in which said established vendor is at the
-laughing/fighting stage of things. And in a couple of cases recently,
-the press included "we didn't know how fast it ran because /proc/cpuinfo
-didn't tell us anything, so we guessed".
-
-2). Users. Those who use and admin servers get the "speed" from
-/proc/cpuinfo. It's a marketing number. It's useless. It absolutely must
-be provided to the user or administrator exactly like on x86.
-
-> If userspace wants to select an algorithm,
-> that needs to be done according to much more information than just the
-> CPU speed - it needs knowledge of the instruction timings as well, cache
-> behaviour, etc, and you might as well benchmark an implementation and
-> select at run time, caching the result.
-> 
-> Since we've never exported this information, it's not a regression
-> and it's not part of the kernels standard API.
-
-Agreed. But we'll still be coming back to ensure this information is
-presented to users. I pointed out to ARM about 3-4 years ago that this
-was going to bite us. It is now biting us, and we will ensure that
-useless data is provided where it is on x86 for identical experience by
-users. That is unless or until x86 users do something else always. Our
-(separate) case will use DMI or ACPI for the same kind of data.
-
-Jon.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 50257 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160703/45af0b23/attachment-0001.obj>
