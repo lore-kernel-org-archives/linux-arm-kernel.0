@@ -1,45 +1,69 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 3 Jul 2016 23:44:13 +0200
-Subject: [PATCH v2 00/18] arm/arm64: KVM: Merge boot and runtime page
- tables
-In-Reply-To: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
-References: <1467308451-13365-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160703214413.GB12608@cbox>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Sun, 3 Jul 2016 23:43:46 +0100
+Subject: [GIT PULL] drm/mediatek: MT8173 gamma & dither support
+In-Reply-To: <1467026970.23883.16.camel@mtksdaap41>
+References: <1466753238-17216-1-git-send-email-bibby.hsieh@mediatek.com>
+ <558c9efc-d197-a6c3-cf7e-f9fcac60ca64@gmail.com>
+ <1467026970.23883.16.camel@mtksdaap41>
+Message-ID: <CACvgo52YgRat8Uqhd9qh_ppvk0h=krxYLHL6Cjqs9+EzQaogUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 06:40:33PM +0100, Marc Zyngier wrote:
-> Until now, we've been setting up KVM using two sets of page tables:
-> one for the "boot" where we perform the basic MMU setup, and one for
-> the runtime.
-> 
-> Switching between the two was though to be safe, but we've recently
-> realized that it is not: it is not enough to ensure that the VA->PA
-> mapping is consistent when switching TTBR0_EL2, but we also have to
-> ensure that the intermediate translations are the same as well. If the
-> TLB can return two different values for intermediate translations,
-> we're screwed (TLB conflicts).
-> 
-> At that point, the only safe thing to do is to never change TTBR0_EL2,
-> which means that we need to make the idmap page part of the runtime
-> page tables.
-> 
-> The series starts with a bit of brain dumping explaining what we're
-> trying to do. This might not be useful as a merge candidate, but it
-> was useful for me to put this somewhere. It goes on revamping the
-> whole notion of HYP VA range, making it runtime patchable. It then
-> always merge idmap and runtime page table into one set, leading to
-> quite a lot of simplification in the init/teardown code. In the
-> process, 32bit KVM gains the ability to teardown the HYP page-tables
-> and vectors, which makes kexec a bit closer.
-> 
-> This has been tested on Seattle, Juno, the FVP model (both v8.0 and
-> v8.1), Cubietruck and Midway, and is based on the current
-> kvmarm/queue.
-> 
+Hi Bibby,
 
-For the series:
+On 27 June 2016 at 12:29, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
+> On Mon, 2016-06-27 at 12:20 +0200, Matthias Brugger wrote:
+>>
+>> On 06/24/2016 09:27 AM, Bibby Hsieh wrote:
+>> > Hi Dave,
+>> >
+>> > Please consider merging this tag, which contains the v2 MT8173 gamma & dither function patches I sent on 2016-06-17, rebased onto v4.7-rc1. There have been no further comments.
+>> >
+>> > Thanks
+>> > Bibby
+>> >
+>> > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+>> >
+>> >   Linux 4.7-rc1 (2016-05-29 16:29:24 GMT)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   git at github.com:BibbyHsieh/linux4.7-rc1.git
+>> >
+>> > for you to fetch changes up to dd0eb773bc125f5e6bca735d19c08500dc3730f9:
+>> >
+>> >   drm/mediatek: Add gamma correction
+>> >
+>> > -------------------------------------------------------------------------
+>>
+>> As far as I can see, your branch has 3 patches on top from Eddie. It
+>> seems to me as if you didn't send your patches to the mailinglist before?
+>> Anyway this branch does not fulfill the rules to get merged into the
+>> linux kernel.
+>>
+>> Why do you send a pull request? The normal process is to send the
+>> patches via email and if the maintainer wants you can send a pull
+>> request once the patches are ready to be merged.
+>>
+>> Regards,
+>> Matthias
+>>
+>
+> I sent v1 and v2 on 2016-06-14 and 06-17 respectively [0-8].
+> After I made some modifications according to Daniel Vetter's comments,
+> there had been no further comments and I sent the pull request as the
+> other sub-sys.
+>
+> I'm sorry for my mistake, I will re-arrange the tree for upstream.
+> Next time, I will check with maintainer by email first, and sent the
+> pull request.
+>
+It might be a bit hard to find out who's the maintainer considering
+MAINTAINERS has no entry for this driver.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Looking at how things are going Philipp Zabel will be the more likely
+person for the task, yet I would be nice if someone from the Mediatek
+squad is helping him out - CK Hu perhaps ?
 
-Applied to queue, thanks!
+Regards,
+Emil
