@@ -1,105 +1,291 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 3 Jul 2016 11:47:17 +0100
-Subject: [3/3] hwmon: iio_hwmon: defer probe when no channel is found
-In-Reply-To: <577531D4.1090106@roeck-us.net>
-References: <1467101897-15946-4-git-send-email-quentin.schulz@free-electrons.com>
- <20160630034725.GA26484@roeck-us.net>
- <6FBFD60A-4D68-4B60-AB34-5077BE6BD586@jic23.retrosnub.co.uk>
- <577531D4.1090106@roeck-us.net>
-Message-ID: <b1ebf22d-389e-5d2e-93f2-f77728d28f28@kernel.org>
+Date: Sun, 3 Jul 2016 12:17:19 +0100
+Subject: [PATCH 1/3] mfd: add support for Allwinner SoCs ADC
+In-Reply-To: <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
+References: <1467101897-15946-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1467101897-15946-2-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <87ab8638-926b-89ce-26a5-705a321d3066@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/06/16 15:51, Guenter Roeck wrote:
-> On 06/30/2016 06:59 AM, Jonathan Cameron wrote:
->>
->>
->> On 30 June 2016 04:47:25 BST, Guenter Roeck <linux@roeck-us.net> wrote:
->>> On Tue, Jun 28, 2016 at 10:18:17AM +0200, Quentin Schulz wrote:
->>>> iio_channel_get_all returns -ENODEV when it cannot find either
->>> phandles and
->>>> properties in the Device Tree or channels whose consumer_dev_name
->>> matches
->>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio
->>> drivers
->>>> which might be probed after iio_hwmon.
->>>>
->>>> It is better to defer the probe of iio_hwmon if such error is
->>> returned by
->>>> iio_channel_get_all in order to let a chance to iio drivers to expose
->>>> channels in iio_map_list.
->>>>
->>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->>>> ---
->>>>   drivers/hwmon/iio_hwmon.c | 5 ++++-
->>>>   1 file changed, 4 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
->>>> index b550ba5..c0da4d9 100644
->>>> --- a/drivers/hwmon/iio_hwmon.c
->>>> +++ b/drivers/hwmon/iio_hwmon.c
->>>> @@ -73,8 +73,11 @@ static int iio_hwmon_probe(struct platform_device
->>> *pdev)
->>>>           name = dev->of_node->name;
->>>>
->>>>       channels = iio_channel_get_all(dev);
->>>> -    if (IS_ERR(channels))
->>>> +    if (IS_ERR(channels)) {
->>>> +        if (PTR_ERR(channels) == -ENODEV)
->>>> +            return -EPROBE_DEFER;
->>>
->>> The problem, as I see it, is with iio, which should return
->>> -EPROBE_DEFER
->>> in this situation.
->> Agreed. New fangled stuff this deferred probing :)
->>>
->>> We can not convert -ENODEV to -EPROBE_DEFER without risking that the
->>> channels are _really_ not there, which would result in endless
->>> "deferred"
->>> messages.
->> Hmm not entirely sure how we prevent that happening wherever it is done..
->>
+On 28/06/16 09:18, Quentin Schulz wrote:
+> The Allwinner SoCs all have an ADC that can also act as a touchscreen
+> controller and a thermal sensor. For now, only the ADC and the thermal
+> sensor drivers are probed by the MFD, the touchscreen controller support
+> will be added later.
 > 
-> Outch. Better at the source, though. I didn't look at the iio code recently,
-> but can you detect the defer situation at least with devicetree ?
-> 
-> For non-devicetree situations, the only option I can think of would be
-> to replace the module initcall with a later initcall. That should solve
-> the problem if both iio_hwmon and and underlying drivers are built
-> into the kernel. If iio_hwmon is modular, the only real option I can
-> see is to make sure that all drivers it needs are loaded first.
-> 
-> Does this make sense ?
-I think we need to look in a couple of directions.  Firstly, investigate doing
-something similar to gpio and basically move the setup of maps much earlier.
-This will replace drivers presenting their own maps
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+The code looks fine to me. The 'controversial' bit of this is listing
+iio-hwmon as an mfd child to get it to probe as a result of this being
+present.  My immediately thought is that it should be separately
+described in the devicetree and hence instantiated outside of this driver.
 
-The other direction is to get userspace (i.e. configfs) setup of these maps
-working so for cases where it's a bit less hardware defined (i.e. using an
-accelerometer as an input device) we can do once we know all devices relevant
-are present and instantiate new instances on the fly.
+Perhaps you could describe your reasoning for doing it this way?
 
-Anyhow, neither is trivial unfortunately.
+Thanks,
 
-J
+Jonathan
+> ---
+>  drivers/mfd/Kconfig                 |  14 +++
+>  drivers/mfd/Makefile                |   2 +
+>  drivers/mfd/sunxi-gpadc-mfd.c       | 188 ++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/sunxi-gpadc-mfd.h |  14 +++
+>  4 files changed, 218 insertions(+)
+>  create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
+>  create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
 > 
-> Guenter
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index eea61e3..1663db9 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -82,6 +82,20 @@ config MFD_ATMEL_FLEXCOM
+>  	  by the probe function of this MFD driver according to a device tree
+>  	  property.
+>  
+> +config MFD_SUNXI_ADC
+> +	tristate "ADC MFD core driver for sunxi platforms"
+> +	select MFD_CORE
+> +	select REGMAP_MMIO
+> +	help
+> +	  Select this to get support for Allwinner SoCs (A10, A13 and A31) ADC.
+> +	  This driver will only map the hardware interrupt and registers, you
+> +	  have to select individual drivers based on this MFD to be able to use
+> +	  the ADC or the thermal sensor. This will try to probe the ADC driver
+> +	  sunxi-gpadc-iio and the hwmon driver iio_hwmon.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called sunxi-gpadc-mfd.
+> +
+>  config MFD_ATMEL_HLCDC
+>  	tristate "Atmel HLCDC (High-end LCD Controller)"
+>  	select MFD_CORE
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 5eaa6465d..b280d0a 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -199,6 +199,8 @@ obj-$(CONFIG_MFD_DLN2)		+= dln2.o
+>  obj-$(CONFIG_MFD_RT5033)	+= rt5033.o
+>  obj-$(CONFIG_MFD_SKY81452)	+= sky81452.o
+>  
+> +obj-$(CONFIG_MFD_SUNXI_ADC)	+= sunxi-gpadc-mfd.o
+> +
+>  intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
+>  intel-soc-pmic-$(CONFIG_INTEL_PMC_IPC)	+= intel_soc_pmic_bxtwc.o
+>  obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
+> diff --git a/drivers/mfd/sunxi-gpadc-mfd.c b/drivers/mfd/sunxi-gpadc-mfd.c
+> new file mode 100644
+> index 0000000..710e297
+> --- /dev/null
+> +++ b/drivers/mfd/sunxi-gpadc-mfd.c
+> @@ -0,0 +1,188 @@
+> +#include <linux/interrupt.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/sunxi-gpadc-mfd.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#define SUNXI_IRQ_FIFO_DATA	0
+> +#define SUNXI_IRQ_TEMP_DATA	1
+> +
+> +static struct resource adc_resources[] = {
+> +	{
+> +		.name	= "FIFO_DATA_PENDING",
+> +		.start	= SUNXI_IRQ_FIFO_DATA,
+> +		.end	= SUNXI_IRQ_FIFO_DATA,
+> +		.flags	= IORESOURCE_IRQ,
+> +	}, {
+> +		.name	= "TEMP_DATA_PENDING",
+> +		.start	= SUNXI_IRQ_TEMP_DATA,
+> +		.end	= SUNXI_IRQ_TEMP_DATA,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static const struct regmap_irq sunxi_gpadc_mfd_regmap_irq[] = {
+> +	REGMAP_IRQ_REG(SUNXI_IRQ_FIFO_DATA, 0, BIT(16)),
+> +	REGMAP_IRQ_REG(SUNXI_IRQ_TEMP_DATA, 0, BIT(18)),
+> +};
+> +
+> +static const struct regmap_irq_chip sunxi_gpadc_mfd_regmap_irq_chip = {
+> +	.name = "sunxi_gpadc_mfd_irq_chip",
+> +	.status_base = TP_INT_FIFOS,
+> +	.ack_base = TP_INT_FIFOS,
+> +	.mask_base = TP_INT_FIFOC,
+> +	.init_ack_masked = true,
+> +	.mask_invert = true,
+> +	.irqs = sunxi_gpadc_mfd_regmap_irq,
+> +	.num_irqs = ARRAY_SIZE(sunxi_gpadc_mfd_regmap_irq),
+> +	.num_regs = 1,
+> +};
+> +
+> +static struct mfd_cell sun4i_gpadc_mfd_cells[] = {
+> +	{
+> +		.name	= "sun4i-a10-gpadc-iio",
+> +		.resources = adc_resources,
+> +		.num_resources = ARRAY_SIZE(adc_resources),
+> +	}, {
+> +		.name = "iio_hwmon",
+> +	}
+> +};
+> +
+> +static struct mfd_cell sun5i_gpadc_mfd_cells[] = {
+> +	{
+> +		.name	= "sun5i-a13-gpadc-iio",
+> +		.resources = adc_resources,
+> +		.num_resources = ARRAY_SIZE(adc_resources),
+> +	}, {
+> +		.name = "iio_hwmon",
+> +	},
+> +};
+> +
+> +static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
+> +	{
+> +		.name	= "sun6i-a31-gpadc-iio",
+> +		.resources = adc_resources,
+> +		.num_resources = ARRAY_SIZE(adc_resources),
+> +	}, {
+> +		.name = "iio_hwmon",
+Interesting to probe this as part of the mfd as opposed to separately
+describing it in the devicetree.
+> +	},
+> +};
+> +
+> +static const struct regmap_config sunxi_gpadc_mfd_regmap_config = {
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +	.fast_io = true,
+> +};
+> +
+> +static int sunxi_gpadc_mfd_probe(struct platform_device *pdev)
+> +{
+> +	struct sunxi_gpadc_mfd_dev *sunxi_gpadc_mfd_dev = NULL;
+> +	struct resource *mem = NULL;
+> +	unsigned int irq;
+> +	int ret;
+> +
+> +	sunxi_gpadc_mfd_dev = devm_kzalloc(&pdev->dev,
+> +					   sizeof(*sunxi_gpadc_mfd_dev),
+> +					   GFP_KERNEL);
+> +	if (!sunxi_gpadc_mfd_dev)
+> +		return -ENOMEM;
+> +
+> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	sunxi_gpadc_mfd_dev->regs = devm_ioremap_resource(&pdev->dev, mem);
+> +	if (IS_ERR(sunxi_gpadc_mfd_dev->regs))
+> +		return PTR_ERR(sunxi_gpadc_mfd_dev->regs);
+> +
+> +	sunxi_gpadc_mfd_dev->dev = &pdev->dev;
+> +	dev_set_drvdata(sunxi_gpadc_mfd_dev->dev, sunxi_gpadc_mfd_dev);
+> +
+> +	sunxi_gpadc_mfd_dev->regmap =
+> +		devm_regmap_init_mmio(sunxi_gpadc_mfd_dev->dev,
+> +				      sunxi_gpadc_mfd_dev->regs,
+> +				      &sunxi_gpadc_mfd_regmap_config);
+> +	if (IS_ERR(sunxi_gpadc_mfd_dev->regmap)) {
+> +		ret = PTR_ERR(sunxi_gpadc_mfd_dev->regmap);
+> +		dev_err(&pdev->dev, "failed to init regmap: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	ret = regmap_add_irq_chip(sunxi_gpadc_mfd_dev->regmap, irq,
+> +				  IRQF_ONESHOT, 0,
+> +				  &sunxi_gpadc_mfd_regmap_irq_chip,
+> +				  &sunxi_gpadc_mfd_dev->regmap_irqc);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to add irq chip: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	if (of_device_is_compatible(pdev->dev.of_node,
+> +				    "allwinner,sun4i-a10-ts"))
+> +		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +				      sun4i_gpadc_mfd_cells,
+> +				      ARRAY_SIZE(sun4i_gpadc_mfd_cells), NULL,
+> +				      0, NULL);
+> +	else if (of_device_is_compatible(pdev->dev.of_node,
+> +					 "allwinner,sun5i-a13-ts"))
+> +		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +				      sun5i_gpadc_mfd_cells,
+> +				      ARRAY_SIZE(sun5i_gpadc_mfd_cells), NULL,
+> +				      0, NULL);
+> +	else if (of_device_is_compatible(pdev->dev.of_node,
+> +					 "allwinner,sun6i-a31-ts"))
+> +		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +				      sun6i_gpadc_mfd_cells,
+> +				      ARRAY_SIZE(sun6i_gpadc_mfd_cells), NULL,
+> +				      0, NULL);
+> +
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to add MFD devices: %d\n", ret);
+> +		regmap_del_irq_chip(irq, sunxi_gpadc_mfd_dev->regmap_irqc);
+> +		mfd_remove_devices(&pdev->dev);
+> +		return ret;
+> +	}
+> +
+> +	dev_info(&pdev->dev, "successfully loaded\n");
+> +
+> +	return 0;
+> +}
+> +
+> +static int sunxi_gpadc_mfd_remove(struct platform_device *pdev)
+> +{
+> +	struct sunxi_gpadc_mfd_dev *sunxi_gpadc_mfd_dev;
+> +	unsigned int irq;
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	mfd_remove_devices(&pdev->dev);
+> +	sunxi_gpadc_mfd_dev = dev_get_drvdata(&pdev->dev);
+> +	regmap_del_irq_chip(irq, sunxi_gpadc_mfd_dev->regmap_irqc);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id sunxi_gpadc_mfd_of_match[] = {
+> +	{ .compatible = "allwinner,sun4i-a10-ts" },
+> +	{ .compatible = "allwinner,sun5i-a13-ts" },
+> +	{ .compatible = "allwinner,sun6i-a31-ts" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, sunxi_gpadc_mfd_of_match);
+> +
+> +static struct platform_driver sunxi_gpadc_mfd_driver = {
+> +	.driver = {
+> +		.name = "sunxi-adc-mfd",
+> +		.of_match_table = of_match_ptr(sunxi_gpadc_mfd_of_match),
+> +	},
+> +	.probe = sunxi_gpadc_mfd_probe,
+> +	.remove = sunxi_gpadc_mfd_remove,
+> +};
+> +
+> +module_platform_driver(sunxi_gpadc_mfd_driver);
+> +
+> +MODULE_DESCRIPTION("ADC MFD core driver for sunxi platforms");
+> +MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/mfd/sunxi-gpadc-mfd.h b/include/linux/mfd/sunxi-gpadc-mfd.h
+> new file mode 100644
+> index 0000000..341f8c3
+> --- /dev/null
+> +++ b/include/linux/mfd/sunxi-gpadc-mfd.h
+> @@ -0,0 +1,14 @@
+> +#ifndef __SUNXI_GPADC_MFD__H__
+> +#define __SUNXI_GPADC_MFD__H__
+> +
+> +#define TP_INT_FIFOC            0x10
+> +#define TP_INT_FIFOS            0x14
+> +
+> +struct sunxi_gpadc_mfd_dev {
+> +	void __iomem			*regs;
+> +	struct device			*dev;
+> +	struct regmap			*regmap;
+> +	struct regmap_irq_chip_data	*regmap_irqc;
+> +};
+> +
+> +#endif
 > 
->>>
->>> Guenter
->>>
->>>>           return PTR_ERR(channels);
->>>> +    }
->>>>
->>>>       st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
->>>>       if (st == NULL) {
->>> -- 
->>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
