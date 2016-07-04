@@ -1,165 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 4 Jul 2016 12:24:52 +0200
-Subject: [PATCH v3] ARM: at91: Document new TCB bindings
-In-Reply-To: <1467409925-17761-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1467409925-17761-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160704122452.69dcddf0@bbrezillon>
+From: andi@etezian.org (Andi Shyti)
+Date: Mon, 4 Jul 2016 19:26:14 +0900
+Subject: [PATCH v3 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for
+ SPI clocks
+In-Reply-To: <577A2EFF.2010306@samsung.com>
+References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
+ <1467270911-10971-2-git-send-email-andi.shyti@samsung.com>
+ <577A2EFF.2010306@samsung.com>
+Message-ID: <20160704102614.GD1257@jack.zhora.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  1 Jul 2016 23:52:05 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+Hi Sylwester,
 
-> The current binding for the TCB is not flexible enough for some use cases
-> and prevents proper utilization of all the channels.
+> >  	GATE(CLK_SCLK_SPI1, "sclk_spi1", "sclk_spi1_peric", ENABLE_SCLK_PERIC,
+> > -			4, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
+> > +			4, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
 > 
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: linux-pwm at vger.kernel.org
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  .../devicetree/bindings/arm/atmel-at91.txt         | 32 ------------
->  .../devicetree/bindings/mfd/atmel-tcb.txt          | 58 ++++++++++++++++++++++
->  .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
->  3 files changed, 65 insertions(+), 37 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index e1f5ad855f14..3dc758403d03 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -60,38 +60,6 @@ System Timer (ST) required properties:
->  Its subnodes can be:
->  - watchdog: compatible should be "atmel,at91rm9200-wdt"
->  
-> -TC/TCLIB Timer required properties:
-> -- compatible: Should be "atmel,<chip>-tcb".
-> -  <chip> can be "at91rm9200" or "at91sam9x5"
-> -- reg: Should contain registers location and length
-> -- interrupts: Should contain all interrupts for the TC block
-> -  Note that you can specify several interrupt cells if the TC
-> -  block has one interrupt per channel.
-> -- clock-names: tuple listing input clock names.
-> -	Required elements: "t0_clk", "slow_clk"
-> -	Optional elements: "t1_clk", "t2_clk"
-> -- clocks: phandles to input clocks.
-> -
-> -Examples:
-> -
-> -One interrupt per TC block:
-> -	tcb0: timer at fff7c000 {
-> -		compatible = "atmel,at91rm9200-tcb";
-> -		reg = <0xfff7c000 0x100>;
-> -		interrupts = <18 4>;
-> -		clocks = <&tcb0_clk>;
-> -		clock-names = "t0_clk";
-> -	};
-> -
-> -One interrupt per TC channel in a TC block:
-> -	tcb1: timer at fffdc000 {
-> -		compatible = "atmel,at91rm9200-tcb";
-> -		reg = <0xfffdc000 0x100>;
-> -		interrupts = <26 4 27 4 28 4>;
-> -		clocks = <&tcb1_clk>;
-> -		clock-names = "t0_clk";
-> -	};
-> -
->  RSTC Reset Controller required properties:
->  - compatible: Should be "atmel,<chip>-rstc".
->    <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
-> diff --git a/Documentation/devicetree/bindings/mfd/atmel-tcb.txt b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-> new file mode 100644
-> index 000000000000..693c7361e1ba
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-> @@ -0,0 +1,58 @@
-> +* Device tree bindings for Atmel Timer Counter Blocks
-> +- compatible: Should be "atmel,<chip>-tcb", "simple-mfd", "syscon".
-> +  <chip> can be "at91rm9200" or "at91sam9x5"
-> +- reg: Should contain registers location and length
-> +- #address-cells: has to be 1
-> +- #size-cells: has to be 0
-> +- interrupts: Should contain all interrupts for the TC block
-> +  Note that you can specify several interrupt cells if the TC
-> +  block has one interrupt per channel.
-> +- clock-names: tuple listing input clock names.
-> +	Required elements: "t0_clk", "slow_clk"
-> +	Optional elements: "t1_clk", "t2_clk"
-> +- clocks: phandles to input clocks.
-> +
-> +The TCB can expose multiple subdevices:
-> + * a timer
-> +   - compatible: Should be "atmel,tcb-timer"
-> +   - reg: Should contain the TCB channels to be used. If the
-> +     counter width is 16 bits (at91rm9200-tcb), two consecutive
-> +     channels are needed. Else, only one channel will be used.
-> +
-> + * a PWM chip: see ../pwm/atmel-tcb-pwm.txt
-> +
-> +Examples:
-> +
-> +One interrupt per TC block:
-> +	tcb0: timer at fff7c000 {
-> +		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <0xfff7c000 0x100>;
-> +		interrupts = <18 4>;
-> +		clocks = <&tcb0_clk>, <&clk32k>;
-> +		clock-names = "t0_clk", "slow_clk";
-> +
-> +		timer at 0 {
-> +			compatible = "atmel,tcb-timer";
-> +			reg = <0>, <1>;
-> +		};
-> +
-> +		timer at 2 {
-> +			compatible = "atmel,tcb-timer";
-> +			reg = <2>;
-> +		};
+> As Tomasz pointed out, this should be addressed in the driver/dts,
+> we shouldn't be patching board configurations into a per-SoC driver.
+> Other boards may want to keep this clock disabled.
 
-And how can you differentiate the clocksource from the clkevent?
+The single clock lines are not configured in the exynos5433 dts,
+but in the drivers/clk/samsung/clk-exynos5433.c file and it's the
+only place where we can set the flags.
 
-> +	};
-> +
-> +One interrupt per TC channel in a TC block:
-> +	tcb1: timer at fffdc000 {
-> +		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <0xfffdc000 0x100>;
-> +		interrupts = <26 4>, <27 4>, <28 4>;
-> +		clocks = <&tcb1_clk>, <&clk32k>;
-> +		clock-names = "t0_clk", "slow_clk";
-> +	};
-> +
-> +
-> diff --git a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-> index 8031148bcf85..ab8fbd5ba184 100644
-> --- a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-> +++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-> @@ -2,15 +2,17 @@ Atmel TCB PWM controller
->  
->  Required properties:
->  - compatible: should be "atmel,tcb-pwm"
-> +- reg: tcb channel to use. Each channel can export 2 PWMs
->  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
->    the cells format. The only third cell flag supported by this binding is
->    PWM_POLARITY_INVERTED.
-> -- tc-block: The Timer Counter block to use as a PWM chip.
->  
->  Example:
->  
-> -pwm {
-> -	compatible = "atmel,tcb-pwm";
-> -	#pwm-cells = <3>;
-> -	tc-block = <1>;
-> +tcb0: timer at f800c000 {
-> +	pwm at 0 {
-> +		compatible = "atmel,tcb-pwm";
-> +		reg = <0>;
-> +		#pwm-cells = <3>;
-> +	};
->  };
+> What is an exact problem here, are you perhaps testing suspend to RAM?
+> I tested my sound support patches on top of v4.7-rc1 and everything
+> seemed to work well, I didn't notice any issues with the audio codec
+> which was the only slave on the SPI 1 bus.
+
+Yes, because the audio codec is on SPI1 and its bus line
+(spi_busclk0) is CLK_SCLK_SPI1_PERIC while the CLK_SCLK_SPI1 is
+set as CLK_IGNORE_UNUSED.
+
+> Doesn't it help when you specify CLK_SCLK_SPI1 as the second clock
+> ("spi_busclk0") of the spi_1 bus controller instead of
+> CLK_SCLK_SPI0_PERIC? CLK_SCLK_SPI0_PERIC seem to be parent of
+> CLK_SCLK_SPI1 so the enable state would be propagated.
+
+nope! :(
+
+For some reasons, if you set in the DTS as spi_busclk0 the
+CLK_SCLK_SPI1 from cmu_peric you get a synchronus abort in the
+s3c64xx_spi_config (the first read performed on the device).
+
+Andi
