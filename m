@@ -1,21 +1,30 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 4 Jul 2016 14:45:47 +0200
-Subject: [PATCH 2/2] arm64: dts: r8a7795: add FDP1 device nodes
-In-Reply-To: <57768023.8010507@bingham.xyz>
-References: <1467293563-940-1-git-send-email-kieran@bingham.xyz>
- <1467293563-940-3-git-send-email-kieran@bingham.xyz>
- <57768023.8010507@bingham.xyz>
-Message-ID: <20160704124547.GH26270@verge.net.au>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 4 Jul 2016 18:17:12 +0530
+Subject: [PATCH] ARM: dts: da850: Add new ECAP and EPWM bindings
+In-Reply-To: <1467036842-20913-1-git-send-email-fcooper@ti.com>
+References: <1467036842-20913-1-git-send-email-fcooper@ti.com>
+Message-ID: <577A5AD0.7070906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 03:37:23PM +0100, Kieran Bingham wrote:
-> Hi Simon,
+On Monday 27 June 2016 07:44 PM, Franklin S Cooper Jr wrote:
+> From: "Cooper Jr., Franklin" <fcooper@ti.com>
 > 
-> The bindings for this have now been acked by RobH.
+> Switch to a new ECAP and EPWM bindings that doesn't depend on hwmod to
+> provide the various required clocks.
 
-Thanks, I have queued these up for v4.9.
+there is nothing called hwmod on da850, so this need rewording to make
+sense for that platform.
 
-There was a small amount of fuzz when applying the first patch,
-please check to make sure it has been applied correctly once
-it hits the devel branch of the renesas tree.
+> 
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+
+Also, documentation needs update as well since it says:
+
+"
+for da850  - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm"
+"
+
+Thanks,
+Sekhar
