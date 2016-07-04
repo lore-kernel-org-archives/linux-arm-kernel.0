@@ -1,123 +1,85 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 4 Jul 2016 09:41:23 -0400
-Subject: [PATCH 3/4] bus: tegra-aconnect: make it explicitly non-modular
-In-Reply-To: <577A2995.6020504@nvidia.com>
-References: <20160703173040.23612-1-paul.gortmaker@windriver.com>
- <20160703173040.23612-4-paul.gortmaker@windriver.com>
- <577A2995.6020504@nvidia.com>
-Message-ID: <20160704134123.GV26134@windriver.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 4 Jul 2016 14:42:18 +0100
+Subject: [PATCH v7 2/6] ACPI / processor_idle: Add support for Low Power
+ Idle(LPI) states
+In-Reply-To: <6955030.D47pi9uhTn@vostro.rjw.lan>
+References: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
+ <57766B15.4090407@linaro.org> <577A5DD3.4050901@arm.com>
+ <6955030.D47pi9uhTn@vostro.rjw.lan>
+Message-ID: <577A67BA.8060709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH 3/4] bus: tegra-aconnect: make it explicitly non-modular] On 04/07/2016 (Mon 10:17) Jon Hunter wrote:
-
-> Hi Paul,
-> 
-> On 03/07/16 18:30, Paul Gortmaker wrote:
-> > The Kconfig currently controlling compilation of this code is:
-> > 
-> > drivers/bus/Kconfig:config TEGRA_ACONNECT
-> > drivers/bus/Kconfig:    bool "Tegra ACONNECT Bus Driver"
-> > 
-> > ...meaning that it currently is not being built as a module by anyone.
-> > 
-> > Lets remove the modular code that is essentially orphaned, so that
-> > when reading the driver there is no doubt it is builtin-only.
-> > 
-> > We explicitly disallow a driver unbind, since that doesn't have a
-> > sensible use case anyway, and it allows us to drop the ".remove"
-> > code for non-modular drivers.
-> > 
-> > Since module_platform_driver() uses the same init level priority as
-> > builtin_platform_driver() the init ordering remains unchanged with
-> > this commit.
-> > 
-> > Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
-> > 
-> > We also delete the MODULE_LICENSE tag etc. since all that information
-> > was (or is now) contained at the top of the file in the comments.
-> 
-> In version 3 of the aconnect series [0] I had made this a tristate
-> because we allowed it to be removed and you had submitted a patch to
-> export the PM_CLK APIs. However, when discussing with Thierry he said
-> that we were unable to merge with tristate because of the dependency on
-> your patch. So he suggested we merge with bool for now and then change
-> it back to tristate for v4.9.
-
-Oh I see.  The exported clock syms were for the 210 DMA driver and it
-never crossed my mind that this driver needed the same syms in order for
-it to be tristate.  Guess the exports proved useful afterall.  :)
-
-> 
-> I understand that we should not do this, but we do plan to make this
-> modular in the future.
-
-No problem ; I will drop this patch in favor of a one line Kconfig patch
-in my test queue so it doesn't trip the regular audit, just like I have
-for the 210 below -- not yet submitted for the same dependency reason.
-
-P.
----
 
 
- From fe5bdc6348828c157deb14e8d75c732abcc2ad2b Mon Sep 17 00:00:00 2001
-From: Paul Gortmaker <paul.gortmaker@windriver.com>
-Date: Fri, 20 May 2016 14:30:43 -0400
-Subject: [PATCH] dma: tegra210-adma: convert TEGRA210_ADMA from bool to
- tristate
+On 04/07/16 14:17, Rafael J. Wysocki wrote:
+> On Monday, July 04, 2016 02:00:03 PM Sudeep Holla wrote:
+>>
+>> On 01/07/16 14:07, Daniel Lezcano wrote:
+>>> On 06/28/2016 03:55 PM, Sudeep Holla wrote:
+>>>> ACPI 6.0 introduced an optional object _LPI that provides an alternate
+>>>> method to describe Low Power Idle states. It defines the local power
+>>>> states for each node in a hierarchical processor topology. The OSPM can
+>>>> use _LPI object to select a local power state for each level of processor
+>>>> hierarchy in the system. They used to produce a composite power state
+>>>> request that is presented to the platform by the OSPM.
+>>>>
+>>>> Since multiple processors affect the idle state for any non-leaf
+>>>> hierarchy
+>>>> node, coordination of idle state requests between the processors is
+>>>> required. ACPI supports two different coordination schemes: Platform
+>>>> coordinated and  OS initiated.
+>>>>
+>>>> This patch adds initial support for Platform coordination scheme of LPI.
+>>>>
+>>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>> ---
+>>>
+>>> Hi Sudeep,
+>>>
+>>> I looked at the acpi processor idle code sometime ago and from my POV,
+>>> it was awful, unnecessary complex and very difficult to maintain. The
+>>> usage of flags all over the places is significant of the lack of control
+>>> of the written code.
+>>>
+>>
+>> So you have any specific things in mind ? That's too broad and I know
+>> it's not so clean, but it's so for legacy reasons. I would leave that
+>> to Rafael to decide as it takes lots of testing to clean up these code.
+>
+> The cleanup needs to be done at one point.
+>
+> Question is when to do it, before adding LPI support or after doing that
+> (and each option has its pros and cons IMO).
+>
+>>> Even if you are not responsible of this implementation, the current
+>>> situation forces you to add more awful code on top of that, which is
+>>> clearly against "making Linux better".
+>>>
+>>
+>> OK
+>
+> So if there are cases in which you need to make the code more complex
+> because of the legacy stuff in there, I'd say it's better to clean it up
+> first.
+>
 
-This driver currently uses modular infrastructure but is controlled
-by a bool Kconfig.
+I am not sure if Daniel was referring to anything specific. I have
+cleaned up in patch 1/6 for cstate. More cleanups can be done there but
+needs better understanding and reasoning for the current code which I
+don't have as they are mostly x86 related.
 
-There is a general consensus from the DMA reviewers and maintainers
-that "if it can be modular, it should be modular" in order to keep
-the bzImage size under control for multi platform kernels.
+Unless someone points me what they would like to change and how, I don't
+have much in my mind to do here. Yes it may not look as clean as other
+code in the kernel relatively, but without complete understanding of the
+history/reasoning for the current state of code I wouldn't touch
+anything I don't understand.
 
-Build tested only.  Also needs some new pm_clk symbols exported
-before this commit is applied to tree in order to avoid modpost
-errors like:
+I am open to make changes if there's something specific. Sorry I can't
+go ahead making changes the way I think based on some vague idea that
+the current code is not clean.
 
-  ERROR: "pm_clk_add_clk" [drivers/dma/tegra210-adma.ko] undefined!
-  ERROR: "pm_clk_create" [drivers/dma/tegra210-adma.ko] undefined!
-  ERROR: "pm_clk_destroy" [drivers/dma/tegra210-adma.ko] undefined!
-  ERROR: "pm_clk_suspend" [drivers/dma/tegra210-adma.ko] undefined!
-  ERROR: "pm_clk_resume" [drivers/dma/tegra210-adma.ko] undefined!
-
-Cc: Laxman Dewangan <ldewangan@nvidia.com>
-Cc: Jon Hunter <jonathanh@nvidia.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: dmaengine at vger.kernel.org
-Cc: linux-tegra at vger.kernel.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- drivers/dma/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 8c98779a12b1..866068d84ca2 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -468,7 +468,7 @@ config TEGRA20_APB_DMA
- 	  or vice versa. It does not support memory to memory data transfer.
- 
- config TEGRA210_ADMA
--	bool "NVIDIA Tegra210 ADMA support"
-+	tristate "NVIDIA Tegra210 ADMA support"
- 	depends on ARCH_TEGRA_210_SOC
- 	select DMA_ENGINE
- 	select DMA_VIRTUAL_CHANNELS
 -- 
-2.8.0
-
-> 
-> Cheers
-> Jon
-> 
-> [0] http://marc.info/?l=linux-tegra&m=146616753627760&w=2
-> 
-> -- 
-> nvpublic
+Regards,
+Sudeep
