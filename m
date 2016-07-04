@@ -1,35 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Jul 2016 16:44:06 +0200
-Subject: [alsa-devel] [PATCH 3/4] ASoC: mediatek: add BT implementation
-In-Reply-To: <1467629788-14411-4-git-send-email-garlic.tseng@mediatek.com>
-References: <1467629788-14411-1-git-send-email-garlic.tseng@mediatek.com>
- <1467629788-14411-4-git-send-email-garlic.tseng@mediatek.com>
-Message-ID: <20160704144406.GH6247@sirena.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 4 Jul 2016 16:48:08 +0200
+Subject: [PATCH] ARM: defconfig/at91: Add Bosch M_CAN driver
+In-Reply-To: <577A1D8A.8080108@atmel.com>
+References: <1467616514-23589-1-git-send-email-wenyou.yang@atmel.com>
+ <577A1D8A.8080108@atmel.com>
+Message-ID: <20160704144808.GI20045@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2016 at 06:56:27PM +0800, Garlic Tseng wrote:
+On 04/07/2016 at 10:25:46 +0200, Nicolas Ferre wrote :
+> Le 04/07/2016 09:15, Wenyou Yang a ?crit :
+> > Add CONFIG_CAN_M_CAN=y option to enable Bosch M_CAN device driver.
+> > 
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> It seems not present in multi_v7 as well: can you please add it as a module?
+> 
 
-> +static int mt2701_btmrg_startup(struct snd_pcm_substream *substream,
-> +				struct snd_soc_dai *dai)
-> +{
-> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> +	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-> +	struct mt2701_afe_private *afe_priv = afe->platform_priv;
-> +
-> +	regmap_update_bits(afe->regmap, AUDIO_TOP_CON4,
-> +			   AUDIO_TOP_CON4_PDN_MRGIF, 0);
+Can you also explain why this is needed, there isn't any device tree using
+it.
 
-We really shouldn't be writing the registers or other internal data of
-the device.  Instead we should be getting the driver for the relevant
-hardware component to do it.  If we just write to registers that makes
-the interoperation with the real driver for the device more fragile than
-it should be, people might update the main driver without noticing the
-external driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160704/37f4746c/attachment.sig>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
