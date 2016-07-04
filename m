@@ -1,32 +1,82 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Sun, 03 Jul 2016 18:02:32 -0700
-Subject: [PATCH] i2c: bcm2835: Set up the clock stretching timeout at boot.
-In-Reply-To: <20160704003118.GA1381@tetsubishi>
-References: <1464818845-5348-1-git-send-email-eric@anholt.net>
- <20160704003118.GA1381@tetsubishi>
-Message-ID: <87lh1ip653.fsf@eliezer.anholt.net>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 4 Jul 2016 01:04:30 +0000
+Subject: [PATCH] clkdev: add devm_of_clk_get()
+Message-ID: <87y45iz0cs.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang <wsa@the-dreams.de> writes:
 
->> +	/*
->> +	 * SMBUS says "Devices participating in a transfer will
->> +	 * timeout when any clock low exceeds the value of
->> +	 * T_TIMEOUT,MIN of 25 ms."
->> +	 */
->
-> SMBus has that timeout, but I2C doesn't. How about disabling the timeout
-> simply? Or using the max value if you want to keep the timeout
-> detection?
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Disabling the timeout seems fine to me.  We still have a 1-second
-timeout around the entire transfer.  I'll be back on my DSI branch this
-week and test it out then.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160703/83f4c082/attachment.sig>
+This is based on devm_clk_get()
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+---
+ drivers/clk/clkdev.c | 26 ++++++++++++++++++++++++++
+ include/linux/clk.h  |  7 +++++++
+ 2 files changed, 33 insertions(+)
+
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 89cc700..93a613b 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -55,6 +55,32 @@ struct clk *of_clk_get(struct device_node *np, int index)
+ }
+ EXPORT_SYMBOL(of_clk_get);
+ 
++static void devm_of_clk_release(struct device *dev, void *res)
++{
++	clk_put(*(struct clk **)res);
++}
++
++struct clk *devm_of_clk_get(struct device *dev,
++			    struct device_node *np, int index)
++{
++	struct clk **ptr, *clk;
++
++	ptr = devres_alloc(devm_of_clk_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	clk = of_clk_get(np, index);
++	if (!IS_ERR(clk)) {
++		*ptr = clk;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return clk;
++}
++EXPORT_SYMBOL(devm_of_clk_get);
++
+ static struct clk *__of_clk_get_by_name(struct device_node *np,
+ 					const char *dev_id,
+ 					const char *name)
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 834179f..01005e78 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -494,6 +494,8 @@ struct of_phandle_args;
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+ struct clk *of_clk_get(struct device_node *np, int index);
++struct clk *devm_of_clk_get(struct device *dev,
++			    struct device_node *np, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+ #else
+@@ -501,6 +503,11 @@ static inline struct clk *of_clk_get(struct device_node *np, int index)
+ {
+ 	return ERR_PTR(-ENOENT);
+ }
++struct clk *devm_of_clk_get(struct device *dev,
++			    struct device_node *np, int index)
++{
++	return ERR_PTR(-ENOENT);
++}
+ static inline struct clk *of_clk_get_by_name(struct device_node *np,
+ 					     const char *name)
+ {
+-- 
+1.9.1
