@@ -1,66 +1,57 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 4 Jul 2016 02:48:08 +0000
-Subject: [PATCH 4/7] bus: arm-cci: add missing of_node_put after calling
- of_parse_phandle
-In-Reply-To: <20160701103346.GF12735@arm.com>
-References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
- <1467366121-14120-5-git-send-email-peter.chen@nxp.com>
- <57764626.4060800@arm.com> <20160701103346.GF12735@arm.com>
-Message-ID: <HE1PR04MB1450113E1D3A5B0BBF9269C88B380@HE1PR04MB1450.eurprd04.prod.outlook.com>
+Date: Mon, 4 Jul 2016 10:47:46 +0800
+Subject: [PATCH v2 1/1] devfreq: exynos-bus: add missing of_node_put after
+ calling of_parse_phandle
+Message-ID: <1467600466-13667-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+of_node_put needs to be called when the device node which is got
+from of_parse_phandle has finished using.
+
+Cc: Chanwoo Choi <cw00.choi@samsung.com>
+Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+---
+
+Changes at v2:
+- It should define node as pointer, kbuild test robot reports it
+
+
+ drivers/devfreq/exynos-bus.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
+index 2363d0a..4b4c63c 100644
+--- a/drivers/devfreq/exynos-bus.c
++++ b/drivers/devfreq/exynos-bus.c
+@@ -383,7 +383,7 @@ err_clk:
+ static int exynos_bus_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+-	struct device_node *np = dev->of_node;
++	struct device_node *node, *np = dev->of_node;
+ 	struct devfreq_dev_profile *profile;
+ 	struct devfreq_simple_ondemand_data *ondemand_data;
+ 	struct devfreq_passive_data *passive_data;
+@@ -415,10 +415,13 @@ static int exynos_bus_probe(struct platform_device *pdev)
+ 		goto err;
+ 	}
  
->
->On Fri, Jul 01, 2016 at 11:29:58AM +0100, Suzuki K Poulose wrote:
->> On 01/07/16 10:41, Peter Chen wrote:
->> >of_node_put needs to be called when the device node which is got from
->> >of_parse_phandle has finished using.
->> >
->> >Cc: Will Deacon <will.deacon@arm.com>
->> >Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
->> >Signed-off-by: Peter Chen <peter.chen@nxp.com>
->>
->> Thanks for the fix.
->>
->> >---
->> >  drivers/bus/arm-cci.c | 5 ++++-
->> >  1 file changed, 4 insertions(+), 1 deletion(-)
->> >
->> >diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c index
->> >a49b283..e7b0b8c 100644
->> >--- a/drivers/bus/arm-cci.c
->> >+++ b/drivers/bus/arm-cci.c
->> >@@ -1912,9 +1912,12 @@ static int __cci_ace_get_port(struct device_node *dn,
->int type)
->> >  	cci_portn = of_parse_phandle(dn, "cci-control-port", 0);
->> >  	for (i = 0; i < nb_cci_ports; i++) {
->> >  		ace_match = ports[i].type == type;
->> >-		if (ace_match && cci_portn == ports[i].dn)
->> >+		if (ace_match && cci_portn == ports[i].dn) {
->> >+			of_node_put(cci_portn);
->> >  			return i;
->> >+		}
->> >  	}
->> >+	of_node_put(cci_portn);
->>
->> nit: Could we please do some thing like this ?
->> 		if (ace_match && cci_portn == ports[i].dn)
->> 			break;
->> 	}
->>
->> 	of_node_put(cci_portn);
->> 	return (i < nb_cci_ports) ? i : -ENODEV ;
->>
->> Either way,
->>
->> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->
->Please route this via arm-soc once you've addressed Suzuki's comment.
->
-
-Hi Will, how to route patch via arm-soc?
-
-Does it mean sending patch by adding arm at kernel.org at To or Cc list?
-
-Peter
+-	if (of_parse_phandle(dev->of_node, "devfreq", 0))
++	node = of_parse_phandle(dev->of_node, "devfreq", 0);
++	if (node) {
++		of_node_put(node);
+ 		goto passive;
+-	else
++	} else {
+ 		ret = exynos_bus_parent_parse_of(np, bus);
++	}
+ 
+ 	if (ret < 0)
+ 		goto err;
+-- 
+1.9.1
