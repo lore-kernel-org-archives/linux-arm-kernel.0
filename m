@@ -1,44 +1,44 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 4 Jul 2016 02:10:04 +0000
-Subject: [PATCH 2/7] arm: mach-shmobile: pm-rmobile: add missing
- of_node_put after calling of_parse_phandle
-In-Reply-To: <CAMuHMdVE8VzPunLzr7WO-kzcg25rKvFkoQcjJ4czwrQxX_obiw@mail.gmail.com>
-References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
- <1467366121-14120-3-git-send-email-peter.chen@nxp.com>
- <CAMuHMdVE8VzPunLzr7WO-kzcg25rKvFkoQcjJ4czwrQxX_obiw@mail.gmail.com>
-Message-ID: <HE1PR04MB14504D0A5905A777452DC57D8B380@HE1PR04MB1450.eurprd04.prod.outlook.com>
+From: garlic.tseng@mediatek.com (Garlic Tseng)
+Date: Mon, 4 Jul 2016 10:28:52 +0800
+Subject: [alsa-devel] [PATCH v5 6/9] ASoC: mediatek: add mt2701 platform
+ driver implementation.
+In-Reply-To: <1467293981.17087.18.camel@mtksdaap41>
+References: <1466149440-23889-1-git-send-email-garlic.tseng@mediatek.com>
+ <1466149440-23889-7-git-send-email-garlic.tseng@mediatek.com>
+ <20160629191322.GT6247@sirena.org.uk>
+ <1467293981.17087.18.camel@mtksdaap41>
+Message-ID: <1467599332.11819.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
->On Fri, Jul 1, 2016 at 11:41 AM, Peter Chen <peter.chen@nxp.com> wrote:
->> of_node_put needs to be called when the device node which is got from
->> of_parse_phandle has finished using.
->>
->> Cc: Simon Horman <horms@verge.net.au>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Signed-off-by: Peter Chen <peter.chen@nxp.com>
->
->NAKed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
->> --- a/arch/arm/mach-shmobile/pm-rmobile.c
->> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
->> @@ -209,6 +209,7 @@ static void __init add_special_pd(struct device_node *np,
->enum pd_types type)
->>         special_pds[num_special_pds].pd = pd;
->
->The pd pointer is stored in the line above, and released later in put_special_pds().
->
->>         special_pds[num_special_pds].type = type;
->>         num_special_pds++;
->> +       of_node_put(pd);
->
->Hence it must not be released here, as that would cause a double release when
->put_special_pds() is executed.
->
+On Thu, 2016-06-30 at 21:39 +0800, Garlic Tseng wrote:
+> On Wed, 2016-06-29 at 20:13 +0100, Mark Brown wrote:
+> > On Fri, Jun 17, 2016 at 03:43:57PM +0800, Garlic Tseng wrote:
+> > 
+> > > +static int mt2701_afe_i2s_set_clkdiv(struct snd_soc_dai *dai, int div_id,
+> > > +				     int div)
+> > > +{
+> > 
+> > Why are we adding a set_clkdiv() operation?  I would expect the driver
+> > to be able to figure things out automatically.
+> > 
+> > > +	case DIV_ID_MCLK_TO_BCK:
+> > > +		afe_priv->i2s_path[i2s_num].div_mclk_to_bck = div;
+> > > +		break;
+> > > +	case DIV_ID_BCK_TO_LRCK:
+> > > +		afe_priv->i2s_path[i2s_num].div_bck_to_lrck = div;
+> > > +		break;
+> > 
+> > Especially in the case where we're configuring LRCLK, that's trivial
+> > when we know the sample rate which we have to know anyway.
+> 
+> Oh... actually I want to say 'div_mclk_over_bck' and 'div_bck_over_lrck'
+> I'll fix the naming if we decide to reserve the set_clkdiv() operation.
+> (omit some comment)
 
-Thanks, Geert, it is my careless.
+Hi Mark, I recognize that we can set mclk by set_sysclk, fix bck to 64fs
+and let lrck be the same as sample rate so yes we don't need set_clkdiv.
 
-Please forget this patch.
+Thanks for comment, I'll fix that in the next patch.
 
-Peter
+Garlic
