@@ -1,40 +1,69 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 4 Jul 2016 10:58:13 +0200 (CEST)
-Subject: [PATCH] phy: fix error handling
-In-Reply-To: <20160704085102.GF32301@mwanda>
-References: <1467525332-12963-1-git-send-email-christophe.jaillet@wanadoo.fr>
- <00d5243a-0359-1dc7-e9aa-1ad8a9074821@wanadoo.fr> <577A15D2.5010103@ti.com>
- <20160704085102.GF32301@mwanda>
-Message-ID: <alpine.DEB.2.10.1607041057120.3072@hadrien>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Jul 2016 11:17:48 +0200
+Subject: Build regressions/improvements in v4.7-rc6
+In-Reply-To: <CAMuHMdUDO0k86TTVTiCQGS2=H0dEXVW77NNfvt7fvWbwdpS=2g@mail.gmail.com>
+References: <1467619946-424-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdUDO0k86TTVTiCQGS2=H0dEXVW77NNfvt7fvWbwdpS=2g@mail.gmail.com>
+Message-ID: <6183003.0tbSMroAbk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday, July 4, 2016 10:21:45 AM CEST Geert Uytterhoeven wrote:
+> On Mon, Jul 4, 2016 at 10:12 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > JFYI, when comparing v4.7-rc6[1] to v4.7-rc5[3], the summaries are:
+> >   - build errors: +3/-2
+> 
+>   + /home/kisskb/slave/src/drivers/vhost/vhost.c: error: call to
+> '__compiletime_assert_844' declared with attribute error: BUILD_BUG_ON
+> failed: __alignof__ *vq->avail > VRING_AVAIL_ALIGN_SIZE:  => 844:3
+> 
+> arm-randconfig
+> 
+> > [1] http://kisskb.ellerman.id.au/kisskb/head/10562/ (260 out of 263 configs)
+> > [3] http://kisskb.ellerman.id.au/kisskb/head/10532/ (260 out of 263 configs)
+
+I don't see any changes in the code in this time frame, but this is the
+code causing it:
 
 
-On Mon, 4 Jul 2016, Dan Carpenter wrote:
+struct vring_avail {    
+        __virtio16 flags;
+        __virtio16 idx;
+        __virtio16 ring[];
+};      
 
-> On Mon, Jul 04, 2016 at 01:22:50PM +0530, Kishon Vijay Abraham I wrote:
-> > Hi,
-> >
-> > On Monday 04 July 2016 02:38 AM, Christophe JAILLET wrote:
-> > > I will resubmit in the coming days.
-> > >
-> > >    return PTR_ERR(phy->clk);
-> > > should also be updated.
-> >
-> > while at that, also fix your $subject to something like
-> > "phy: sun9i-usb: fix error handling"
-> >
->
-> Yes.  Also the first patch should have used that same prefix.
-> 9c3b44302636 ('phy: Add driver to support individual USB PHYs on sun9i')
->
-> We have this problem quite often, but other subsystems have fixed it
-> because they start using the correct prefix when the driver is added.
-> The second patch for this driver had the same issue:
-> 9c3b44302636 ('phy: Add driver to support individual USB PHYs on sun9i')
+/* The virtqueue structure describes a queue attached to a device. */
+struct vhost_virtqueue {
+        struct vhost_dev *dev;
+                        
+        /* The actual ring of buffers. */
+        struct mutex mutex; 
+        unsigned int num; 
+        struct vring_desc __user *desc;
+        struct vring_avail __user *avail;
+        struct vring_used __user *used;
+        ...
+};
 
-Is there any hope to some day have a deterministic algorithm?  Something
-that get_maintainers could figure out.
+	struct vhost_virtqueue *vq;
+   BUILD_BUG_ON(__alignof__ *vq->avail > VRING_AVAIL_ALIGN_SIZE);
 
-julia
+
+The alignment of the *vq->avail should be '2' on all architectures,
+however an ARM OABI compiler will have a padded structure with alignment '4'.
+
+Looking at the build logs, I find it only in a single randconfig build
+at http://kisskb.ellerman.id.au/kisskb/buildresult/12735927/ which apparently
+enabled the vhost driver in combination with ARM_AEABI=n.
+
+In my own randconfig builds I am forcing ARM_AEABI=y because there are a
+couple of other problems with OABI.
+
+If we want to avoid this one, we could make the inclusion of
+drivers/vhost/Kconfig from arch/arm/kvm/Kconfig depend on CONFIG_AEABI,
+or perhaps go further force-enable CONFIG_AEABI for ARMv6k and higher
+(cmpxchg64() is broken on OABI too), and only include vhost if KVM
+is enabled (KVM in turn requires ARMv7).
+
+	Arnd
