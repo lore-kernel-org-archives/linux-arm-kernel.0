@@ -1,99 +1,130 @@
-From: andrew-ct.chen@mediatek.com (andrew-ct chen)
-Date: Mon, 4 Jul 2016 19:09:15 +0800
-Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
-In-Reply-To: <7ee128a2-f026-5404-bbac-6b5c1bee51e7@xs4all.nl>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <20160607112235.475c2e4c@recife.lan> <575746EE.3030706@cisco.com>
- <1465902488.27938.7.camel@mtksdaap41> <20160616075428.0fde4aaa@recife.lan>
- <8a46c1e7-1f27-1e67-8c05-b133598b6a66@xs4all.nl>
- <1467373995.17297.2.camel@mtksdaap41>
- <7ee128a2-f026-5404-bbac-6b5c1bee51e7@xs4all.nl>
-Message-ID: <1467630555.18007.8.camel@mtksdaap41>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 4 Jul 2016 14:11:48 +0300
+Subject: [PATCHv2 2/5] ARM: OMAP2+: hwmod: fetch main_clk based on hwmod name
+In-Reply-To: <20160704065428.GS28140@atomide.com>
+References: <20160704065428.GS28140@atomide.com>
+Message-ID: <1467630708-28498-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-07-01 at 14:00 +0200, Hans Verkuil wrote:
-> On 07/01/2016 01:53 PM, andrew-ct chen wrote:
-> > On Fri, 2016-07-01 at 12:11 +0200, Hans Verkuil wrote:
-> >> On 06/16/2016 12:54 PM, Mauro Carvalho Chehab wrote:
-> >>> Em Tue, 14 Jun 2016 19:08:08 +0800
-> >>> tiffany lin <tiffany.lin@mediatek.com> escreveu:
-> >>>
-> >>>> Hi Mauro,
-> >>>>
-> >>>>
-> >>>> On Wed, 2016-06-08 at 07:13 +0900, Hans Verkuil wrote:
-> >>>>>
-> >>>>> On 06/07/2016 11:22 PM, Mauro Carvalho Chehab wrote:  
-> >>>>>> Em Mon, 30 May 2016 20:29:14 +0800
-> >>>>>> Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
-> >>>>>>  
-> >>>>>>> ==============
-> >>>>>>>   Introduction
-> >>>>>>> ==============
-> >>>>>>>
-> >>>>>>> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
-> >>>>>>> Mediatek Video Codec is able to handle video decoding of in a range of formats.
-> >>>>>>>
-> >>>>>>> This patch series add Mediatek block format V4L2_PIX_FMT_MT21, the decoder driver will decoded bitstream to
-> >>>>>>> V4L2_PIX_FMT_MT21 format.
-> >>>>>>>
-> >>>>>>> This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1]
-> >>>>>>> and patch "CHROMIUM: v4l: Add V4L2_PIX_FMT_VP9 definition"[2] for VP9 support.
-> >>>>>>> Mediatek Video Decoder driver rely on VPU driver to load, communicate with VPU.
-> >>>>>>>
-> >>>>>>> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
-> >>>>>>>
-> >>>>>>> [1]https://patchwork.linuxtv.org/patch/33734/
-> >>>>>>> [2]https://chromium-review.googlesource.com/#/c/245241/  
-> >>>>>>
-> >>>>>> Hmm... I'm not seeing the firmware for this driver at the
-> >>>>>> linux-firmware tree:
-> >>>>>> 	https://git.kernel.org/cgit/linux/kernel/git/firmware/linux-firmware.git/log/
-> >>>>>>
-> >>>>>> Nor I'm seeing any pull request for them. Did you send it?
-> >>>>>> I'll only merge the driver upstream after seeing such pull request.  
-> >>>>>   
-> >>>> Sorry, I am not familiar with how to upstream firmware.
-> >>>> Do you mean we need to upstream vpu firmware first before merge encoder
-> >>>> driver upstream?
-> >>>
-> >>> Please look at this page:
-> >>> 	https://linuxtv.org/wiki/index.php/Development:_How_to_submit_patches#Firmware_submission
-> >>>
-> >>> The information here can also be useful:
-> >>> 	https://www.kernel.org/doc/readme/firmware-README.AddingFirmware
-> >>>
-> >>> In summary, you need to provide redistribution rights for the
-> >>> firmware blob. You can either submit it to me or directly to
-> >>> linux-firmware. In the latter, please c/c me on such patch.
-> >>
-> >> Tiffany, what is the status of the firmware submission?
-> >>
-> >> Regards,
+With the transition to hwmod module clocks, all hwmods will have
+their main clocks named <hwmod_name>_mod_ck. Use this info to
+fetch main_clk, and use it if found.
 
+Also, if a main_clk is found based on the hwmod name, disable
+the direct PRCM modulemode access from hwmod.
 
-> >>
-> >> 	Hans
-> > 
-> > Hi Hans,
-> > We are working on firmware test to make sure that both decoder and
-> > encoder work well. Hopes it can be ready (firmware submission) on July 4
-> > or July 5.
-> 
-> OK, great! Just wanted to make sure that this work was progressing and not stalled.
-> 
-> Thanks!
-> 
-> 	Hans
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c | 55 ++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 50 insertions(+), 5 deletions(-)
 
-Hi Hans,
-
-We have submitted VPU firmware for encoder as the following link.
-http://lists.infradead.org/pipermail/linux-mediatek/2016-July/006082.html
-If the series of decoder patches apply, we will update the VPU firmware
-for decoder support.
-
-Thanks!.
-	
-	Andrew
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index be77d05..5b70938 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -178,6 +178,11 @@
+  */
+ #define OMAP4_RST_CTRL_ST_OFFSET	4
+ 
++/*
++ * Maximum length for module clock handle names
++ */
++#define MOD_CLK_MAX_NAME_LEN		32
++
+ /**
+  * struct omap_hwmod_soc_ops - fn ptrs for some SoC-specific operations
+  * @enable_module: function to enable a module (via MODULEMODE)
+@@ -200,6 +205,7 @@ struct omap_hwmod_soc_ops {
+ 	int (*init_clkdm)(struct omap_hwmod *oh);
+ 	void (*update_context_lost)(struct omap_hwmod *oh);
+ 	int (*get_context_lost)(struct omap_hwmod *oh);
++	int (*disable_direct_prcm)(struct omap_hwmod *oh);
+ };
+ 
+ /* soc_ops: adapts the omap_hwmod code to the currently-booted SoC */
+@@ -776,17 +782,35 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
+  * @oh: struct omap_hwmod *
+  *
+  * Called from _init_clocks().  Populates the @oh _clk (main
+- * functional clock pointer) if a main_clk is present.  Returns 0 on
+- * success or -EINVAL on error.
++ * functional clock pointer) if a clock matching the hwmod name is found,
++ * or a main_clk is present.  Returns 0 on success or -EINVAL on error.
+  */
+ static int _init_main_clk(struct omap_hwmod *oh)
+ {
+ 	int ret = 0;
++	char name[MOD_CLK_MAX_NAME_LEN];
++	struct clk *clk;
+ 
+-	if (!oh->main_clk)
+-		return 0;
++	/* +7 magic comes from '_mod_ck' suffix */
++	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
++		pr_warn("%s: warning: cropping name for %s\n", __func__,
++			oh->name);
++
++	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
++	strcat(name, "_mod_ck");
++
++	clk = clk_get(NULL, name);
++	if (!IS_ERR(clk)) {
++		oh->_clk = clk;
++		soc_ops.disable_direct_prcm(oh);
++		oh->main_clk = kstrdup(name, GFP_KERNEL);
++	} else {
++		if (!oh->main_clk)
++			return 0;
++
++		oh->_clk = clk_get(NULL, oh->main_clk);
++	}
+ 
+-	oh->_clk = clk_get(NULL, oh->main_clk);
+ 	if (IS_ERR(oh->_clk)) {
+ 		pr_warn("omap_hwmod: %s: cannot clk_get main_clk %s\n",
+ 			oh->name, oh->main_clk);
+@@ -3088,6 +3112,25 @@ static int _omap4_is_hardreset_asserted(struct omap_hwmod *oh,
+ }
+ 
+ /**
++ * _omap4_disable_direct_prcm - disable direct PRCM control for hwmod
++ * @oh: struct omap_hwmod * to disable control for
++ *
++ * Disables direct PRCM clkctrl done by hwmod core. Instead, the hwmod
++ * will be using its main_clk to enable/disable the module. Returns
++ * 0 if successful.
++ */
++static int _omap4_disable_direct_prcm(struct omap_hwmod *oh)
++{
++	if (!oh)
++		return -EINVAL;
++
++	oh->prcm.omap4.clkctrl_offs = 0;
++	oh->prcm.omap4.modulemode = 0;
++
++	return 0;
++}
++
++/**
+  * _am33xx_deassert_hardreset - call AM33XX PRM hardreset fn with hwmod args
+  * @oh: struct omap_hwmod * to deassert hardreset
+  * @ohri: hardreset line data
+@@ -3910,6 +3953,7 @@ void __init omap_hwmod_init(void)
+ 		soc_ops.init_clkdm = _init_clkdm;
+ 		soc_ops.update_context_lost = _omap4_update_context_lost;
+ 		soc_ops.get_context_lost = _omap4_get_context_lost;
++		soc_ops.disable_direct_prcm = _omap4_disable_direct_prcm;
+ 	} else if (cpu_is_ti814x() || cpu_is_ti816x() || soc_is_am33xx() ||
+ 		   soc_is_am43xx()) {
+ 		soc_ops.enable_module = _omap4_enable_module;
+@@ -3919,6 +3963,7 @@ void __init omap_hwmod_init(void)
+ 		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
+ 		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
+ 		soc_ops.init_clkdm = _init_clkdm;
++		soc_ops.disable_direct_prcm = _omap4_disable_direct_prcm;
+ 	} else {
+ 		WARN(1, "omap_hwmod: unknown SoC type\n");
+ 	}
+-- 
+1.9.1
