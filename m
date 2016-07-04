@@ -1,55 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Jul 2016 14:35:25 +0200
-Subject: next-20160704 build: 2 failures 7 warnings (next-20160704)
-In-Reply-To: <E1bK2Ok-0002jU-NX@optimist>
-References: <E1bK2Ok-0002jU-NX@optimist>
-Message-ID: <20160704123525.GA6247@sirena.org.uk>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 4 Jul 2016 12:36:05 +0000
+Subject: [RFC PATCH v2 2/4] net: ethernet: xilinx: Add gmii2rgmii
+ converter support
+In-Reply-To: <577A572F.1050004@atmel.com>
+References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
+ <1467623084-15471-3-git-send-email-appanad@xilinx.com>
+ <577A323A.4080207@atmel.com>
+ <C246CAC1457055469EF09E3A7AC4E11A4A5BB227@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <577A572F.1050004@atmel.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5BB285@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2016 at 12:50:46PM +0100, Build bot for Mark Brown wrote:
+Hi Nicolas,
 
-Today's -next fails to build an ARM allmodconfig due to:
 
-> 	arm-allmodconfig
-> ../drivers/gpu/drm/sti/sti_hdmi.c:1250:15: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-> ../drivers/gpu/drm/sti/sti_hdmi.c:1251:20: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-> ../drivers/gpu/drm/sti/sti_hdmi.c:1252:18: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-> ../drivers/gpu/drm/sti/sti_hdmi.c:1253:13: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+> >
+> > #ifdef CONFIG_NET_VENDOR_XILINX
+> 
+> You may need to have:
+> #if defined(CONFIG_NET_VENDOR_XILINX) &&
+> defined(CONFIG_XILINX_GMII2RGMII)
+> 
+> >  extern int gmii2rgmii_phyprobe(struct gmii2rgmii *xphy); #else extern
+> > void gmii2rgmii_phyprobe(struct gmii2rgmii *xphy);
+> 
+> No need for the line above...
+> 
+> > void gmii2rgmii_phyprobe(struct gmii2rgmii *xphy) { }
+> 
+> On one single line, like:
+> 
+> static inline void gmii2rgmii_phyprobe(struct gmii2rgmii *xphy) { }
+> 
+> > #endif
+> > For me the changes are looking odd...
+> 
+> For me, it's okay...
 
-due to adding new code which doesn't take account of the recent API
-change in the HDMI CODEC.  There's another change already in DRM for
-which the expectation was that the API change and an update Arnd posted
-would be pulled over so I guess the same approach makes sense here:
+Ok will fix as you suggested...
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> 
+> >
+> > Other possible ways
+> > 	1)  Put a config check around phyprobe api in the macb driver.
+> > #ifdef CONFIG_XILINX_GMII2RGMII
+> >                        gmii2rgmii_phyprobe(&bp->converter_phy);
+> > #endif
+> 
+> Nope!
+> 
+> > 	2) Select NET_VENDOR_XILINX in the macb Kconfig @ -22,6 +22,7 @@
+> > config MACB
+> >         tristate "Cadence MACB/GEM support"
+> >         depends on HAS_DMA
+> >         select PHYLIB
+> > +       select NET_VENDOR_XILINX
+> 
+> 
+> 
+> > Please let me know which one you prefer will fix that and will post v3...
+> 
+> First one with my changes is the best. But maybe wait for more feedback...
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+Ok sure will wait and will post next version with your suggestion in case of no comments...
 
-are available in the git repository at:
+Regards,
+Kedar.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git tags/asoc-hdmi-codec-pdata
-
-for you to fetch changes up to efc9194bcff84666832c6493bafa92029ac6634c:
-
-  ASoC: hdmi-codec: callback function will be called with private data (2016-06-27 18:53:15 +0100)
-
-----------------------------------------------------------------
-ASoC: Add private data for HDMI CODEC callbacks
-
-Allow the HDMI CODECs to get private data passed in in callbacks.
-
-----------------------------------------------------------------
-Kuninori Morimoto (1):
-      ASoC: hdmi-codec: callback function will be called with private data
-
- include/sound/hdmi-codec.h    | 13 ++++++++-----
- sound/soc/codecs/hdmi-codec.c | 15 ++++++++-------
- 2 files changed, 16 insertions(+), 12 deletions(-)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160704/e022128a/attachment-0001.sig>
+> 
+> Bye,
+> --
+> Nicolas Ferre
