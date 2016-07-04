@@ -1,196 +1,22 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 05 Jul 2016 00:12:17 +0300
-Subject: [PATCH 2/2] ARM: dts: r8a7792: add GPIO support
-In-Reply-To: <2706182.6XMBucurvj@wasted.cogentembedded.com>
-References: <2706182.6XMBucurvj@wasted.cogentembedded.com>
-Message-ID: <3522881.tHt9KiJA1l@wasted.cogentembedded.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon,  4 Jul 2016 23:17:32 +0200
+Subject: [PATCH v6 0/1] phy-sun4i-usb: Add support for peripheral-only mode
+Message-ID: <1467667053-15122-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe all 12 GPIO controllers in the R8A7792 device tree.
+Hi Kishon,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Thanks for merging one of the 2 pending phy-sun4i-usb patches, I see
+that the other one actually has a conflict after merging in
+linux-phy/fixes. So here is a rebased version of it.
 
----
- arch/arm/boot/dts/r8a7792.dtsi |  168 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 168 insertions(+)
+Note can you please make sure this gets into 4.8? I've a musb patch
+("usb: musb: sunxi: Simplify dr_mode handling") heading into 4.8,
+which depends on the changes in this patch to keep host-only mode
+working (runtime dependency) and we do use host-only mode on a few
+boards.
 
-Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -113,6 +113,174 @@
- 			reg = <0 0xe6060000 0 0x144>;
- 		};
- 
-+		gpio0: gpio at e6050000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6050000 0 0x50>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 0 29>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO0>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio1: gpio at e6051000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6051000 0 0x50>;
-+			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 32 23>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO1>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio2: gpio at e6052000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6052000 0 0x50>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 64 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO2>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio3: gpio at e6053000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6053000 0 0x50>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 96 28>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO3>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio4: gpio at e6054000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6054000 0 0x50>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 128 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO4>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio5: gpio at e6055000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055000 0 0x50>;
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 160 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO5>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio6: gpio at e6055100 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055100 0 0x50>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 192 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO6>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio7: gpio at e6055200 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055200 0 0x50>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 224 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO7>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio8: gpio at e6055300 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055300 0 0x50>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 256 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO8>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio9: gpio at e6055400 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055400 0 0x50>;
-+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 288 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO9>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio10: gpio at e6055500 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055500 0 0x50>;
-+			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 320 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO10>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio11: gpio at e6055600 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055600 0 0x50>;
-+			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 352 30>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO11>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
- 		dmac0: dma-controller at e6700000 {
- 			compatible = "renesas,dmac-r8a7792",
- 				     "renesas,rcar-dmac";
+Thanks & Regards,
+
+Hans
