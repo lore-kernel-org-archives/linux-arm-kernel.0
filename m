@@ -1,69 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Jul 2016 11:17:48 +0200
-Subject: Build regressions/improvements in v4.7-rc6
-In-Reply-To: <CAMuHMdUDO0k86TTVTiCQGS2=H0dEXVW77NNfvt7fvWbwdpS=2g@mail.gmail.com>
-References: <1467619946-424-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdUDO0k86TTVTiCQGS2=H0dEXVW77NNfvt7fvWbwdpS=2g@mail.gmail.com>
-Message-ID: <6183003.0tbSMroAbk@wuerfel>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 4 Jul 2016 12:17:02 +0300
+Subject: [PATCHv2 06/27] crypto: ahash: increase the maximum allowed
+ statesize
+In-Reply-To: <20160627050031.GA5673@gondor.apana.org.au>
+References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+ <1466601840-18486-7-git-send-email-t-kristo@ti.com>
+ <20160624103209.GA19607@gondor.apana.org.au> <5770B283.8000902@ti.com>
+ <20160627050031.GA5673@gondor.apana.org.au>
+Message-ID: <577A298E.4040803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 4, 2016 10:21:45 AM CEST Geert Uytterhoeven wrote:
-> On Mon, Jul 4, 2016 at 10:12 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
-> > JFYI, when comparing v4.7-rc6[1] to v4.7-rc5[3], the summaries are:
-> >   - build errors: +3/-2
-> 
->   + /home/kisskb/slave/src/drivers/vhost/vhost.c: error: call to
-> '__compiletime_assert_844' declared with attribute error: BUILD_BUG_ON
-> failed: __alignof__ *vq->avail > VRING_AVAIL_ALIGN_SIZE:  => 844:3
-> 
-> arm-randconfig
-> 
-> > [1] http://kisskb.ellerman.id.au/kisskb/head/10562/ (260 out of 263 configs)
-> > [3] http://kisskb.ellerman.id.au/kisskb/head/10532/ (260 out of 263 configs)
+On 27/06/16 08:00, Herbert Xu wrote:
+> On Mon, Jun 27, 2016 at 07:58:43AM +0300, Tero Kristo wrote:
+>>
+>> Ok, I think I need to allocate the storage space locally then within
+>> the driver. Would it be ok to call kmalloc / free in the export /
+>> import implementation of the driver? The size of the unhashed buffer
+>> in omap-sham is unfortunately rather large.
+>
+> The allocation should usually be done from the request_alloc
+> function, i.e., you set the reqsize and the user does the allocation
+> for you.
 
-I don't see any changes in the code in this time frame, but this is the
-code causing it:
-
-
-struct vring_avail {    
-        __virtio16 flags;
-        __virtio16 idx;
-        __virtio16 ring[];
-};      
-
-/* The virtqueue structure describes a queue attached to a device. */
-struct vhost_virtqueue {
-        struct vhost_dev *dev;
-                        
-        /* The actual ring of buffers. */
-        struct mutex mutex; 
-        unsigned int num; 
-        struct vring_desc __user *desc;
-        struct vring_avail __user *avail;
-        struct vring_used __user *used;
-        ...
-};
-
-	struct vhost_virtqueue *vq;
-   BUILD_BUG_ON(__alignof__ *vq->avail > VRING_AVAIL_ALIGN_SIZE);
+I need some clarification on this, afaik request_alloc related 
+functionality only works per-request basis. The export / import 
+functionality however is supposed to work across multiple requests. The 
+test code for example does this:
 
 
-The alignment of the *vq->avail should be '2' on all architectures,
-however an ARM OABI compiler will have a padded structure with alignment '4'.
+         ret = crypto_ahash_export(req, state);
+...
+         ahash_request_free(req);
 
-Looking at the build logs, I find it only in a single randconfig build
-at http://kisskb.ellerman.id.au/kisskb/buildresult/12735927/ which apparently
-enabled the vhost driver in combination with ARM_AEABI=n.
+         req = ahash_request_alloc(tfm, GFP_KERNEL);
+...
+         ret = crypto_ahash_import(req, state);
 
-In my own randconfig builds I am forcing ARM_AEABI=y because there are a
-couple of other problems with OABI.
 
-If we want to avoid this one, we could make the inclusion of
-drivers/vhost/Kconfig from arch/arm/kvm/Kconfig depend on CONFIG_AEABI,
-or perhaps go further force-enable CONFIG_AEABI for ARMv6k and higher
-(cmpxchg64() is broken on OABI too), and only include vhost if KVM
-is enabled (KVM in turn requires ARMv7).
+... which means if I attempt to allocate extra space for the export 
+buffer within the first request, it is not available at the import time 
+anymore.
 
-	Arnd
+Is there any limitation how many simultaneous exports can be done from a 
+driver? I was wondering if I can allocate a single export buffer for the 
+whole driver.
+
+-Tero
