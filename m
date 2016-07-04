@@ -1,51 +1,40 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 04 Jul 2016 11:40:15 +0200
-Subject: [PATCH v3 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for
- SPI clocks
-In-Reply-To: <1467270911-10971-2-git-send-email-andi.shyti@samsung.com>
-References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
- <1467270911-10971-2-git-send-email-andi.shyti@samsung.com>
-Message-ID: <577A2EFF.2010306@samsung.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 4 Jul 2016 17:42:14 +0800
+Subject: [PATCHv2 06/27] crypto: ahash: increase the maximum allowed
+ statesize
+In-Reply-To: <577A2BE4.1090202@ti.com>
+References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
+ <1466601840-18486-7-git-send-email-t-kristo@ti.com>
+ <20160624103209.GA19607@gondor.apana.org.au>
+ <5770B283.8000902@ti.com>
+ <20160627050031.GA5673@gondor.apana.org.au>
+ <577A298E.4040803@ti.com>
+ <20160704091925.GA31964@gondor.apana.org.au>
+ <577A2BE4.1090202@ti.com>
+Message-ID: <20160704094214.GA32058@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2016 09:15 AM, Andi Shyti wrote:
-> The CLK_IGNORE_UNUSED flag has to be avoided whenever possible.
-
-In general I would rather disagree.
-
-> Use the CLK_IS_CRITICAL flag instead for critical SPI1 clocks,
-> which enables the clock line during boot time.
+On Mon, Jul 04, 2016 at 12:27:00PM +0300, Tero Kristo wrote:
+>
+> The driver allocates a largish buffer for copying the input data
+> from the sgs into a sequential space. If I don't save the contents
+> of this buffer anywhere, the export/import doesn't work as expected
+> it seems.
 > 
-> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos5433.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-> index c3a5318..1f7c4951 100644
-> --- a/drivers/clk/samsung/clk-exynos5433.c
-> +++ b/drivers/clk/samsung/clk-exynos5433.c
-> @@ -1662,7 +1662,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
+> Actually I am now wondering why the driver allocates this sequential
+> buffer at all, DMA should be possible to use over the sgs just fine,
+> at least some other crypto drivers are doing this.
 
-> @@ -1677,7 +1677,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
->  	GATE(CLK_SCLK_SPI2, "sclk_spi2", "sclk_spi2_peric", ENABLE_SCLK_PERIC,
->  			5, CLK_SET_RATE_PARENT, 0),
->  	GATE(CLK_SCLK_SPI1, "sclk_spi1", "sclk_spi1_peric", ENABLE_SCLK_PERIC,
-> -			4, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-> +			4, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
+Indeed this is totally broken.  No hash driver should be holding
+data without actually hashing it, unless of course if there is less
+than a block of data.
 
-As Tomasz pointed out, this should be addressed in the driver/dts,
-we shouldn't be patching board configurations into a per-SoC driver.
-Other boards may want to keep this clock disabled.
+So either fix the driver to hash the data as they come in, or
+make it use a software fallback for update.
 
-What is an exact problem here, are you perhaps testing suspend to RAM?
-I tested my sound support patches on top of v4.7-rc1 and everything
-seemed to work well, I didn't notice any issues with the audio codec
-which was the only slave on the SPI 1 bus.
-
-Doesn't it help when you specify CLK_SCLK_SPI1 as the second clock
-("spi_busclk0") of the spi_1 bus controller instead of
-CLK_SCLK_SPI0_PERIC? CLK_SCLK_SPI0_PERIC seem to be parent of
-CLK_SCLK_SPI1 so the enable state would be propagated.
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
