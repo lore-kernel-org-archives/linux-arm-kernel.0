@@ -1,82 +1,38 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 4 Jul 2016 01:04:30 +0000
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 4 Jul 2016 09:15:36 +0800
 Subject: [PATCH] clkdev: add devm_of_clk_get()
-Message-ID: <87y45iz0cs.wl%kuninori.morimoto.gx@renesas.com>
+In-Reply-To: <87y45iz0cs.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <201607040929.BqJXQ3tc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.7-rc5 next-20160701]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-This is based on devm_clk_get()
+url:    https://github.com/0day-ci/linux/commits/Kuninori-Morimoto/clkdev-add-devm_of_clk_get/20160704-090653
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: i386-tinyconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+All errors (new ones prefixed by >>):
+
+   arch/x86/kernel/tsc.o: In function `devm_of_clk_get':
+>> tsc.c:(.text+0x3e0): multiple definition of `devm_of_clk_get'
+   arch/x86/kernel/setup.o:setup.c:(.text+0x3): first defined here
+
 ---
- drivers/clk/clkdev.c | 26 ++++++++++++++++++++++++++
- include/linux/clk.h  |  7 +++++++
- 2 files changed, 33 insertions(+)
-
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 89cc700..93a613b 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -55,6 +55,32 @@ struct clk *of_clk_get(struct device_node *np, int index)
- }
- EXPORT_SYMBOL(of_clk_get);
- 
-+static void devm_of_clk_release(struct device *dev, void *res)
-+{
-+	clk_put(*(struct clk **)res);
-+}
-+
-+struct clk *devm_of_clk_get(struct device *dev,
-+			    struct device_node *np, int index)
-+{
-+	struct clk **ptr, *clk;
-+
-+	ptr = devres_alloc(devm_of_clk_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	clk = of_clk_get(np, index);
-+	if (!IS_ERR(clk)) {
-+		*ptr = clk;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL(devm_of_clk_get);
-+
- static struct clk *__of_clk_get_by_name(struct device_node *np,
- 					const char *dev_id,
- 					const char *name)
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 834179f..01005e78 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -494,6 +494,8 @@ struct of_phandle_args;
- 
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
- struct clk *of_clk_get(struct device_node *np, int index);
-+struct clk *devm_of_clk_get(struct device *dev,
-+			    struct device_node *np, int index);
- struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
- #else
-@@ -501,6 +503,11 @@ static inline struct clk *of_clk_get(struct device_node *np, int index)
- {
- 	return ERR_PTR(-ENOENT);
- }
-+struct clk *devm_of_clk_get(struct device *dev,
-+			    struct device_node *np, int index)
-+{
-+	return ERR_PTR(-ENOENT);
-+}
- static inline struct clk *of_clk_get_by_name(struct device_node *np,
- 					     const char *name)
- {
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 6328 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160704/ebb87313/attachment.obj>
