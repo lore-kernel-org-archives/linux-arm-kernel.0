@@ -1,75 +1,42 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 4 Jul 2016 15:43:50 +0200
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <1643662.QIDsTbCMZg@vostro.rjw.lan>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <2435381.sM3CFAEXNR@vostro.rjw.lan> <57767782.6020509@linaro.org>
- <1643662.QIDsTbCMZg@vostro.rjw.lan>
-Message-ID: <577A6816.3050709@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 4 Jul 2016 15:44:27 +0200
+Subject: [GIT PULL] ARM: at91: defconfig for 4.8 #2
+Message-ID: <20160704134427.GA32636@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2016 11:01 PM, Rafael J. Wysocki wrote:
-> On Friday, July 01, 2016 04:00:34 PM Daniel Lezcano wrote:
->> On 06/30/2016 03:27 PM, Rafael J. Wysocki wrote:
->>
+Hi,
 
-[ ... ]
+A late defconfig addition for the sama5d2 Xplained PMIC.
 
->> clocksource-probe which is DT based with different drivers using it in 
->> drivers/clocksource with a pletore of different archs.
-> 
-> So maybe the GTDT code should be there too?
+The following changes since commit 837f27a2c1b4093cda301aead20fcf7d04acc12a:
 
-*maybe*
+  ARM: multi_v5_defconfig: enable Atmel platforms (2016-06-11 00:58:51 +0200)
 
->> Cstate code which is only used by x86 is in drivers/acpi, it is only 
->> used by x86/ia64 and it isn't a problem.
-> 
-> It is a problem.  
+are available in the git repository at:
 
-Can you explain why it is a problem ?
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-defconfig2
 
-> drivers/acpi/ is not the right place for arch-specific code.
+for you to fetch changes up to 526b87fdba9160263c30ad6dfd79034ec0b21631:
 
-I do not understand this assertion regarding what happened during the
-last years with different subsystems where the drivers were moved from
-their arch specific directories to the drivers directory (cpufreq,
-cpuidle, clockevent, clk, etc ...) and resulted at the end to a code
-refactoring and consolidation.
+  ARM: multi_v7_defconfig: add ACT8945A (2016-07-04 10:45:05 +0200)
 
-Why ACPI should follow the opposite rule ?
+----------------------------------------------------------------
+Defconfig changes for 4.8 #2:
+ - Addition of the sama5d2 xplained PMIC: ACT8945A
 
->> There is a small chunk in arch/x86/kernel/acpi and it doesn't facilitate the
->> comprehension of the code.
->>
->> IMHO, having all ACPI code in the same directory will encourage the 
->> consolidation.
-> 
-> The consolidation of what exactly?
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      ARM: multi_v7_defconfig: add ACT8945A
 
-The consolidation of the ACPI code in general which is the
-counter-example of self-contained code.
+Wenyou Yang (1):
+      ARM: at91/defconfig: Add ACT8945A driver
 
-> In particular, how does the GTDT code in drivers/acpi/ help to consolidate
-> anything?
-
-If I imagine we group all ACPI code under a common directory, the first
-example coming in my mind is the sharing of private headers, reducing
-the scope of exported functions and global variables (eg. acpi_disabled).
-
-That say, I can understand grouping all the ACPI into a single directory
-will make it fall under a single umbrella's maintainer and that could be
-a nightmare to maintain as it covers a lot of different features.
-However, I believe that could be solved by clearly identifying who takes
-care of what.
-
-
+ arch/arm/configs/multi_v7_defconfig | 3 +++
+ arch/arm/configs/sama5_defconfig    | 3 +++
+ 2 files changed, 6 insertions(+)
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
