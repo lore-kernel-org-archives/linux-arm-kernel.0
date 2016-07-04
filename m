@@ -1,48 +1,34 @@
-From: olivier.schonken@gmail.com (Olivier Schonken)
-Date: Mon, 4 Jul 2016 10:49:45 +0200
-Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
-In-Reply-To: <20160702204608.257b8bc6@bbrezillon>
-References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
- <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
- <20160701183248.GC2874@piout.net>
- <CALdGsk+KwPMVKXhKtcmoUFqfj6aQRvQSY74F31fSvZhV+QvjAA@mail.gmail.com>
- <20160702204608.257b8bc6@bbrezillon>
-Message-ID: <CALdGskKsq7etC=wnPJoZfEhyzK2Ym8V1bf5MDxPBZ60Ct1b0Ng@mail.gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Mon, 4 Jul 2016 11:51:02 +0300
+Subject: [PATCH] phy: fix error handling
+In-Reply-To: <577A15D2.5010103@ti.com>
+References: <1467525332-12963-1-git-send-email-christophe.jaillet@wanadoo.fr>
+ <00d5243a-0359-1dc7-e9aa-1ad8a9074821@wanadoo.fr>
+ <577A15D2.5010103@ti.com>
+Message-ID: <20160704085102.GF32301@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris
+On Mon, Jul 04, 2016 at 01:22:50PM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Monday 04 July 2016 02:38 AM, Christophe JAILLET wrote:
+> > I will resubmit in the coming days.
+> > 
+> >    return PTR_ERR(phy->clk);
+> > should also be updated.
+> 
+> while at that, also fix your $subject to something like
+> "phy: sun9i-usb: fix error handling"
+> 
 
-The amba bus is probed after the PIT driver.  I have today found pck0
-- pck2 to work as well.  Would this be good enough to use?
+Yes.  Also the first patch should have used that same prefix.
+9c3b44302636 ('phy: Add driver to support individual USB PHYs on sun9i')
 
-Regards
+We have this problem quite often, but other subsystems have fixed it
+because they start using the correct prefix when the driver is added.
+The second patch for this driver had the same issue:
+9c3b44302636 ('phy: Add driver to support individual USB PHYs on sun9i')
 
-On 2 July 2016 at 20:46, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> Hi Olivier,
->
-> On Fri, 1 Jul 2016 22:07:53 +0200
-> Olivier Schonken <olivier.schonken@gmail.com> wrote:
->
->> Hi Alexandre
->>
->> Resending this mail, the previous one was accidentally in html format,
->> thus rejected from the list.  My apologies.
->>
->> I did try a couple of options regarding the clock, mck included, but
->> it would then hang when probing occurs in drivers/amba/bus.c when the
->> clock gets disabled. The dummy clock solved this issue, but I'm open
->> to better suggestions.
->
-> Hm, that's really weird. Is the AMBA bus driver probed before the PIT
-> driver?
-> Anyway, I agree that this dummy clock approach is not ideal. Could we
-> make the apb_pclk clock optional in the AMBA bus driver?
->
-> The other approach would be to have someone claim the mck clock before
-> the AMBA bus driver, and keep it enabled.
->
-> Regards,
->
-> Boris
+regards,
+dan carpenter
