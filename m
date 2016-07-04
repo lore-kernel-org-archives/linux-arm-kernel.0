@@ -1,36 +1,78 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 4 Jul 2016 20:55:50 +0530
-Subject: [RFC PATCH v2 1/9] mailbox: Add Amlogic Meson
- Message-Handling-Unit
-In-Reply-To: <CABb+yY3mD3chLtM02a5NvOO_HF2JAeu-SELkxzTxkkf5i+Bftg@mail.gmail.com>
-References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
- <1466503374-28841-2-git-send-email-narmstrong@baylibre.com>
- <CABb+yY3r3_B9wbW6D-do8h8xMKCANQWfz1gFGyre1oWadd7A8Q@mail.gmail.com>
- <576C045A.3070701@baylibre.com>
- <CABb+yY0Oa7TNHsnt1HRAz1NUQ1QA_gR0-B-ki6qkuT332CnrmQ@mail.gmail.com>
- <57728319.5060701@baylibre.com>
- <CABb+yY3mD3chLtM02a5NvOO_HF2JAeu-SELkxzTxkkf5i+Bftg@mail.gmail.com>
-Message-ID: <CABb+yY0Wnqz9sHq5cq-HM0PnaoQEGZD4h3OFTrxNXFY-v5g_4w@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 04 Jul 2016 17:33:32 +0200
+Subject: [GIT PULL] Reset controller changes for v4.8, part 3
+Message-ID: <1467646412.2224.28.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 8:36 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Tue, Jun 28, 2016 at 7:30 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+Dear arm-soc maintainers,
 
->>
->> My main question is : do you really want to transform this simple driver into
->> a dirty multi-bus generic mailbox driver ?
->> The meson_mhu is only 199 lines and this patch adds 181 lines to the arm_mhu driver.
->>
->> I'll personally push to have two separate drivers here.
->>
-> It is a shame if we need to copy a driver only due to changed register
-> offsets. Let me give it a shot and see how worse off we would be.
->
-OK, so I trimmed the differences further but it still doesn't look any
-better. The best approach seems to be have a separate driver but with
-consideration that its a 3rd party IP and hence likely to be used by
-other platforms. That is, call it something meson-neutral. I will make
-a few comments on the patch post.
+Please consider merging this tag with two new drivers for the Hisilicon
+hi6220 media reset controller and for various TI SYSCON based reset
+controllers. Lee's API changes are already merged into v4.7-rc6 as part
+of commit 4aa34ce3c1ee ("Merge tag 'mfd-fixes-4.7' of
+git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd").
+Let me know if I should drop them here.
 
-Thanks
+regards
+Philipp
+
+The following changes since commit 79795e20a184ebabf4ae743d1506cc39783caa46:
+
+  dt-bindings: reset: Add bindings for the Meson SoC Reset Controller (2016-06-01 08:21:12 +0200)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.8-3
+
+for you to fetch changes up to af3e1629c8d0d26627f3dcc237a6facda8bb1090:
+
+  Merge branch 'reset/explicit-api' into reset/next (2016-06-29 23:39:52 +0200)
+
+----------------------------------------------------------------
+Reset controller changes for v4.8, part 3
+
+- change request API to be more explicit about the difference between
+  exclusive and shared resets (the former guarantee the reset line is
+  asserted immediately when reset_control_assert is called, the latter
+  are refcounted and do not guarantee this).
+- add Hisilicon hi6220 media subsystem reset controller support
+- add TI SYSCON based reset controller support
+
+----------------------------------------------------------------
+Andrew F. Davis (2):
+      Documentation: dt: reset: Add TI syscon reset binding
+      reset: add TI SYSCON based reset driver
+
+Chen Feng (1):
+      reset: hisilicon: Change to syscon register access
+
+Lee Jones (5):
+      reset: Reorder inline reset_control_get*() wrappers
+      reset: Ensure drivers are explicit when requesting reset lines
+      reset: Supply *_shared variant calls when using of_* API
+      reset: Supply *_shared variant calls when using *_optional APIs
+      reset: TRIVIAL: Add line break at same place for similar APIs
+
+Philipp Zabel (1):
+      Merge branch 'reset/explicit-api' into reset/next
+
+Xinliang Liu (3):
+      reset: hisilicon: Add media reset controller binding
+      arm64: dts: hi6220: Add media subsystem reset dts
+      reset: hisilicon: Add hi6220 media subsystem reset support
+
+ .../bindings/reset/hisilicon,hi6220-reset.txt      |   4 +-
+ .../devicetree/bindings/reset/ti-syscon-reset.txt  |  91 ++++++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   2 +
+ drivers/reset/Kconfig                              |  10 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/hisilicon/hi6220_reset.c             | 122 +++++++----
+ drivers/reset/reset-ti-syscon.c                    | 237 +++++++++++++++++++++
+ include/dt-bindings/reset/hisi,hi6220-resets.h     |   8 +
+ include/dt-bindings/reset/ti-syscon.h              |  38 ++++
+ include/linux/reset.h                              | 211 ++++++++++++++----
+ 10 files changed, 643 insertions(+), 81 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+ create mode 100644 drivers/reset/reset-ti-syscon.c
+ create mode 100644 include/dt-bindings/reset/ti-syscon.h
