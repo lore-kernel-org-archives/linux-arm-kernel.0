@@ -1,74 +1,30 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 4 Jul 2016 14:38:09 +0100
-Subject: Tegra baseline test results for v4.7-rc2
-Message-ID: <577A66C1.1010307@nvidia.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 04 Jul 2016 14:39:44 +0100
+Subject: [PATCH 1/2] arm-ccn: ensure perf synchronisation
+In-Reply-To: <1467136218-15789-2-git-send-email-mark.rutland@arm.com>
+References: <1467136218-15789-1-git-send-email-mark.rutland@arm.com>
+ <1467136218-15789-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1467639584.22236.1.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.7-rc2.
-Logs and other details at:
+Dnia 2016-06-28, Tue o godzinie 18:50 +0100, Mark Rutland pisze:
+> Currently the IRQ core is permitted to make the CCN PMU IRQ handler
+> threaded, and will allow userspace to change the CPU affinity of the
+> interrupt behind our back. Both of these could violate our
+> synchronisation requirements with the core perf code, which relies upon
+> strict CPU affinity and disabling of interrupts to guarantee mutual
+> exclusion in some cases.
+> 
+> As with the CPU PMU drivers, we should request the interrupt with
+> IRQF_NOBALANCING and IRQF_NO_THREAD, to avoid these issues.
 
-    https://nvtb.github.io//linux/test_v4.7-rc2/20160605150104/
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-Test summary
-------------
+In principle, because still had no chance to test it...
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+Thanks!
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    FAIL: ( 1/ 5): tegra20-trimslice
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 1/ 5): tegra30-beaver
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice
-
-PM: System suspend: tegra_defconfig:
-    FAIL: ( 1/ 5): tegra30-beaver
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice
-
-vmlinux object size
-(delta in bytes from test_v4.7-rc1 (1a695a905c18548062509178b98bc91e67510864)):
-   text     data      bss    total  kernel
-  +4072        0        0    +4072  defconfig
-  +1128        0        0    +1128  multi_v7_defconfig
-  +1452        0        0    +1452  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.7-rc1 (1a695a905c18548062509178b98bc91e67510864))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
-
---
-nvpublic
+Pawel
