@@ -1,70 +1,44 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 04 Jul 2016 12:16:40 +0100
-Subject: [PATCH 2/2] arm-cci: ensure perf synchronisation
-In-Reply-To: <20160704103130.GA6774@leverpostej> (Mark Rutland's message of
- "Mon, 4 Jul 2016 11:31:31 +0100")
-References: <1467136218-15789-1-git-send-email-mark.rutland@arm.com>
- <1467136218-15789-3-git-send-email-mark.rutland@arm.com>
- <20160704102205.GD1639@arm.com> <20160704103130.GA6774@leverpostej>
-Message-ID: <87bn2dd55z.fsf@e105922-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 4 Jul 2016 13:21:01 +0200
+Subject: [PATCH 0/2] pinctrl: Enable support for external GPIO interrupts
+In-Reply-To: <CAD8Lp44SGNwYmeMPKMxbho8EXv9xZFtgHVGh5PKT7_4svYmiFA@mail.gmail.com>
+References: <5772301F.3030904@baylibre.com>
+ <CACRpkdZivUN8HKZ7oTDW6C35vSMv6+9G6-8M7=-kJM3B9vmH-A@mail.gmail.com>
+ <CAD8Lp44SGNwYmeMPKMxbho8EXv9xZFtgHVGh5PKT7_4svYmiFA@mail.gmail.com>
+Message-ID: <CACRpkdbDJCYYfMdq1yu1L6X6Lf0MPSNGriF_9J=4u4jQsGhkcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Rutland <mark.rutland@arm.com> writes:
+On Wed, Jun 29, 2016 at 4:41 PM, Daniel Drake <drake@endlessm.com> wrote:
 
-> On Mon, Jul 04, 2016 at 11:22:05AM +0100, Will Deacon wrote:
->> On Tue, Jun 28, 2016 at 06:50:18PM +0100, Mark Rutland wrote:
->> > Currently the IRQ core is permitted to make the CCI PMU IRQ handler
->> > threaded, and will allow userspace to change the CPU affinity of the
->> > interrupt behind our back. Both of these could violate our
->> > synchronisation requirements with the core perf code, which relies upon
->> > strict CPU affinity and disabling of interrupts to guarantee mutual
->> > exclusion in some cases.
->> 
->> Minor nit, but I think $subject is particularly unhelpful for these two
->> patches. How about "arm-ccX: fix PMU interrupt flags"?
+> On this hardware we only have 8 GPIO IRQs available, for 100+ GPIOs.
+> If you want to monitor for both rising and falling edge of a GPIO then
+> you have to use 2 GPIO IRQs. 2 are used for the common case of SD card
+> detect. You can quickly lose several more (2 for audio jack detection,
+> power button, etc). So these are a very limited resource.
 >
-> Sure, I'll move over to that wording.
+> If the allocation is done dynamically I see 2 slight advantages:
 >
->> > @@ -881,7 +881,8 @@ static int pmu_request_irq(struct cci_pmu *cci_pmu, irq_handler_t handler)
->> >  	 * This should allow handling of non-unique interrupt for the counters.
->> >  	 */
->> >  	for (i = 0; i < cci_pmu->nr_irqs; i++) {
->> > -		int err = request_irq(cci_pmu->irqs[i], handler, IRQF_SHARED,
->> 
->> Why is this shared and who is the line shared with? We should check that
->> we don't have contradictory IRQ flags in the other irq request path(s).
+>  1. If the number of GPIO-IRQ users is greater than the number
+> available, the distributor can exclude drivers that are not of
+> interest to him and the corresponding GPIO-IRQs will automatically and
+> dynamically become available for the drivers that are of interest.
 >
-> Hmm... I thought that was so the driver could request the same IRQ
-> multiple times in the case of muxing, but I see we've always had the
-> is_duplicate_irq logic.
->
-> The IRQF_SHARED flags has also been there since day one, so I'm not sure
-> if that's needed for some platform or whether that was added out of
-> habit.
->
-> Punit, do you recall if/why IRQF_SHARED was used?
+>  2. If the device tree encodes these assignments then the management
+> could be a bit complex, because some will be defined in the SoC dtsi
+> files and others will be defined in the board dts files (e.g.
+> Endless's CVBS mode selection switch), we'll have to make sure that
+> there are not conflicting assignments. Similarly if we end up sharing
+> dtsi files over different SoC versions then things could get tricky
+> especially in such a small namespace of 8 GPIO-IRQs. In the dynamic
+> case this is not an issue.
 
-AFAIR, there was no platform that needed the flag. The IRQF_SHARED flag
-was included to allow sharing in the eventuality that such a platform
-did show up.
+I think I'm siding with Daniel's analysis.
 
-I worked with the assumption that adding the flag was part of good
-practice for a driver that didn't need exclusive interrupt.
+These IRQs should be dynamically assigned, if practically feasible.
 
-Anyways, I haven't come across any platform that's needed that
-functionality yet. I think it can be safely dropped.
+BTW isn't the hierarchical irqdomain invented for exactly this
+usecase?
 
-Thanks,
-Punit
-
->
-> I'll take a look at dts and see if I can get rid of it.
->
-> Thanks,
-> Mark.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yours,
+Linus Walleij
