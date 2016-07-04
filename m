@@ -1,63 +1,35 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 4 Jul 2016 15:32:37 +0100
-Subject: [PATCH v7 10/17] KVM: arm64: introduce new KVM ITS device
-In-Reply-To: <da2ac9c4-e29b-e74f-a11e-b2736526bf8f@redhat.com>
-References: <20160628123230.26255-1-andre.przywara@arm.com>
- <20160628123230.26255-11-andre.przywara@arm.com>
- <2525bd7b-5df1-54bc-1999-25c8c7fe88a3@redhat.com>
- <173c3704-180e-0385-623c-5dbcced2d762@arm.com>
- <da2ac9c4-e29b-e74f-a11e-b2736526bf8f@redhat.com>
-Message-ID: <CAFEAcA96DGzW=bShwz188O0BaDy34ccEG3921AxQCf3aAFgurg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Jul 2016 16:44:06 +0200
+Subject: [alsa-devel] [PATCH 3/4] ASoC: mediatek: add BT implementation
+In-Reply-To: <1467629788-14411-4-git-send-email-garlic.tseng@mediatek.com>
+References: <1467629788-14411-1-git-send-email-garlic.tseng@mediatek.com>
+ <1467629788-14411-4-git-send-email-garlic.tseng@mediatek.com>
+Message-ID: <20160704144406.GH6247@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 July 2016 at 15:27, Auger Eric <eric.auger@redhat.com> wrote:
-> Andre,
->
-> On 04/07/2016 16:05, Andre Przywara wrote:
->> Hi,
->>
->> On 04/07/16 10:00, Auger Eric wrote:
->>> From a QEMU integration point of view this means the init sequence used
->>> for KVM GIC interrupt controllers cannot be reused for ITS and more
->>> importantly this is not straightforward to have the proper sequence
->>> ordering (hence the previously reported case).
->>
->> I am confused, can you please elaborate what the problem is?
->> Or alternatively sketch what you ideally would the ITS init sequence to
->> look like? I am totally open to any changes, just need to know what
->> you/QEMU needs.
->
-> in QEMU the address setting is done on a so-called qemu
-> "machine_init_done_notifier", ie. a callback that is registered at ITS
-> device init, to be called once the virt machine code has executed. This
-> callback calls  kvm_device_ioctl(kd->dev_fd, KVM_SET_DEVICE_ATTR, attr);
->
-> In case the userspace needs to explicitly "init" the ITS (actually ~
-> map_resources) this must happen after the KVM_SET_DEVICE_ATTR. So you
-> also must register a callback in the same way. However there is a
-> framework existing to register kvm device addresses but this does not
-> exist to set other attributes than device addresses.
->
-> This is feasible I think but this does not fit qemu nicely. So can't the
-> map_resources happen implicitly on the first VCPU run?
+On Mon, Jul 04, 2016 at 06:56:27PM +0800, Garlic Tseng wrote:
 
-I'm not clear what you think the problem here for QEMU is.
-We definitely want the API for the kernel to be:
- create device
- set attributes
- explicitly complete init of the device
- [attribute setting after this is illegal]
- run CPUs
+> +static int mt2701_btmrg_startup(struct snd_pcm_substream *substream,
+> +				struct snd_soc_dai *dai)
+> +{
+> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+> +	struct mt2701_afe_private *afe_priv = afe->platform_priv;
+> +
+> +	regmap_update_bits(afe->regmap, AUDIO_TOP_CON4,
+> +			   AUDIO_TOP_CON4_PDN_MRGIF, 0);
 
-so I'm not sure why QEMU would care if the kernel does things at
-"final init" rather than "run CPUs".
-
-This is how the GICv3 init works and how the ITS should work too;
-we don't want to extend the GICv2 mistake of "no explicit complete
-init" to anything else, because then you end up with ad-hoc
-"do this when we first run the vCPU; oh, but also do it if
-userspace tries to write a register content; and also if...".
-
-thanks
--- PMM
+We really shouldn't be writing the registers or other internal data of
+the device.  Instead we should be getting the driver for the relevant
+hardware component to do it.  If we just write to registers that makes
+the interoperation with the real driver for the device more fragile than
+it should be, people might update the main driver without noticing the
+external driver.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160704/37f4746c/attachment.sig>
