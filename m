@@ -1,26 +1,12 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 4 Jul 2016 09:31:19 +0900
-Subject: [PATCH] i2c: bcm2835: Set up the clock stretching timeout at boot.
-In-Reply-To: <1464818845-5348-1-git-send-email-eric@anholt.net>
-References: <1464818845-5348-1-git-send-email-eric@anholt.net>
-Message-ID: <20160704003118.GA1381@tetsubishi>
+From: eric@anholt.net (Eric Anholt)
+Date: Sun,  3 Jul 2016 17:45:33 -0700
+Subject: [GIT PULL 0/3] BCM2835 pull requests for 4.8
+Message-ID: <1467593136-29524-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	/*
-> +	 * SMBUS says "Devices participating in a transfer will
-> +	 * timeout when any clock low exceeds the value of
-> +	 * T_TIMEOUT,MIN of 25 ms."
-> +	 */
-
-SMBus has that timeout, but I2C doesn't. How about disabling the timeout
-simply? Or using the max value if you want to keep the timeout
-detection?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160704/92d7d6c0/attachment.sig>
+It looks like we didn't get an updated defconfig patch while I was
+gone, so I'm sending my pull requests for Pi3 and ethernet in the DT
+now (the same stuff that's been in -next the whole time).  I think
+it's still worth it to have Pi3 present in 4.8, even if we don't have
+the defconfig in place yet.
