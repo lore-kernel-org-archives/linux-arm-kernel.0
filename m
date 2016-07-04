@@ -1,24 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Jul 2016 07:32:48 -0700
-Subject: [PATCHv2 2/5] ARM: OMAP2+: hwmod: fetch main_clk based on hwmod
- name
-In-Reply-To: <1467630708-28498-1-git-send-email-t-kristo@ti.com>
-References: <20160704065428.GS28140@atomide.com>
- <1467630708-28498-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20160704143248.GU28140@atomide.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 4 Jul 2016 15:32:37 +0100
+Subject: [PATCH v7 10/17] KVM: arm64: introduce new KVM ITS device
+In-Reply-To: <da2ac9c4-e29b-e74f-a11e-b2736526bf8f@redhat.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+ <20160628123230.26255-11-andre.przywara@arm.com>
+ <2525bd7b-5df1-54bc-1999-25c8c7fe88a3@redhat.com>
+ <173c3704-180e-0385-623c-5dbcced2d762@arm.com>
+ <da2ac9c4-e29b-e74f-a11e-b2736526bf8f@redhat.com>
+Message-ID: <CAFEAcA96DGzW=bShwz188O0BaDy34ccEG3921AxQCf3aAFgurg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [160704 04:14]:
-> With the transition to hwmod module clocks, all hwmods will have
-> their main clocks named <hwmod_name>_mod_ck. Use this info to
-> fetch main_clk, and use it if found.
-> 
-> Also, if a main_clk is found based on the hwmod name, disable
-> the direct PRCM modulemode access from hwmod.
+On 4 July 2016 at 15:27, Auger Eric <eric.auger@redhat.com> wrote:
+> Andre,
+>
+> On 04/07/2016 16:05, Andre Przywara wrote:
+>> Hi,
+>>
+>> On 04/07/16 10:00, Auger Eric wrote:
+>>> From a QEMU integration point of view this means the init sequence used
+>>> for KVM GIC interrupt controllers cannot be reused for ITS and more
+>>> importantly this is not straightforward to have the proper sequence
+>>> ordering (hence the previously reported case).
+>>
+>> I am confused, can you please elaborate what the problem is?
+>> Or alternatively sketch what you ideally would the ITS init sequence to
+>> look like? I am totally open to any changes, just need to know what
+>> you/QEMU needs.
+>
+> in QEMU the address setting is done on a so-called qemu
+> "machine_init_done_notifier", ie. a callback that is registered at ITS
+> device init, to be called once the virt machine code has executed. This
+> callback calls  kvm_device_ioctl(kd->dev_fd, KVM_SET_DEVICE_ATTR, attr);
+>
+> In case the userspace needs to explicitly "init" the ITS (actually ~
+> map_resources) this must happen after the KVM_SET_DEVICE_ATTR. So you
+> also must register a callback in the same way. However there is a
+> framework existing to register kvm device addresses but this does not
+> exist to set other attributes than device addresses.
+>
+> This is feasible I think but this does not fit qemu nicely. So can't the
+> map_resources happen implicitly on the first VCPU run?
 
-Thanks for updating this, applying all into omap-for-v4.8/soc.
+I'm not clear what you think the problem here for QEMU is.
+We definitely want the API for the kernel to be:
+ create device
+ set attributes
+ explicitly complete init of the device
+ [attribute setting after this is illegal]
+ run CPUs
 
-Regards,
+so I'm not sure why QEMU would care if the kernel does things at
+"final init" rather than "run CPUs".
 
-Tony
+This is how the GICv3 init works and how the ITS should work too;
+we don't want to extend the GICv2 mistake of "no explicit complete
+init" to anything else, because then you end up with ad-hoc
+"do this when we first run the vCPU; oh, but also do it if
+userspace tries to write a register content; and also if...".
+
+thanks
+-- PMM
