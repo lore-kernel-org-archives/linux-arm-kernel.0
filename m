@@ -1,42 +1,66 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 4 Jul 2016 15:44:27 +0200
-Subject: [GIT PULL] ARM: at91: defconfig for 4.8 #2
-Message-ID: <20160704134427.GA32636@piout.net>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 4 Jul 2016 14:44:42 +0100
+Subject: Tegra baseline test results for v4.7-rc2
+In-Reply-To: <577A66C1.1010307@nvidia.com>
+References: <577A66C1.1010307@nvidia.com>
+Message-ID: <577A684A.9070301@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-A late defconfig addition for the sama5d2 Xplained PMIC.
+On 04/07/16 14:38, Jon Hunter wrote:
+> Here are some basic Tegra test results for Linux v4.7-rc2.
+> Logs and other details at:
+> 
+>     https://nvtb.github.io//linux/test_v4.7-rc2/20160605150104/
+> 
+> 
+> Test summary
+> ------------
+> 
+> Build: zImage:
+>     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+> 
+> Build: Image:
+>     Pass: ( 1/ 1): defconfig
+> 
+> Boot to userspace: defconfig:
+>     Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+> 		   tegra210-p2371-0000, tegra210-smaug
+> 
+> Boot to userspace: multi_v7_defconfig:
+>     FAIL: ( 1/ 5): tegra20-trimslice
+>     Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra30-beaver
 
-The following changes since commit 837f27a2c1b4093cda301aead20fcf7d04acc12a:
+After 4.7-rc1 the tegra20-trimslice start failing to boot occasionally.
+Typically 1 in 10 boots would fail. Seems to be a lock-up around the twd
+frequency change. Interestingly, I don't see this issue any more after
+v4.7-rc3, but bisecting so far has been fruitless. Nevertheless I am
+still trying to track this down.
 
-  ARM: multi_v5_defconfig: enable Atmel platforms (2016-06-11 00:58:51 +0200)
+> Boot to userspace: tegra_defconfig:
+>     Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+> 
+> PM: System suspend: multi_v7_defconfig:
+>     FAIL: ( 1/ 5): tegra30-beaver
+>     Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra20-trimslice
+> 
+> PM: System suspend: tegra_defconfig:
+>     FAIL: ( 1/ 5): tegra30-beaver
+>     Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra20-trimslice
 
-are available in the git repository at:
+These tegra30-beaver suspends issues are related to sdhci and can be
+worked-around by populating the voltage regulator for the sdhci [0].
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-defconfig2
+Sorry this is a bit late, but got very behind!
 
-for you to fetch changes up to 526b87fdba9160263c30ad6dfd79034ec0b21631:
+Jon
 
-  ARM: multi_v7_defconfig: add ACT8945A (2016-07-04 10:45:05 +0200)
-
-----------------------------------------------------------------
-Defconfig changes for 4.8 #2:
- - Addition of the sama5d2 xplained PMIC: ACT8945A
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      ARM: multi_v7_defconfig: add ACT8945A
-
-Wenyou Yang (1):
-      ARM: at91/defconfig: Add ACT8945A driver
-
- arch/arm/configs/multi_v7_defconfig | 3 +++
- arch/arm/configs/sama5_defconfig    | 3 +++
- 2 files changed, 6 insertions(+)
+[0] http://marc.info/?l=linux-tegra&m=146730073503388&w=2
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+nvpublic
