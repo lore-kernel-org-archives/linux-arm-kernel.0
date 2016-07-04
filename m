@@ -1,160 +1,135 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 4 Jul 2016 11:15:22 -0400
-Subject: clk: Per controller locks (prepare & enable)
-In-Reply-To: <577A1D54.9010203@samsung.com>
-References: <57737761.2020708@samsung.com>
- <db64b7f6-2a01-679e-df01-c9545e577e20@osg.samsung.com>
- <577A1D54.9010203@samsung.com>
-Message-ID: <98eb9718-1267-dafe-2e36-323f4976ece0@osg.samsung.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 04 Jul 2016 17:15:25 +0200
+Subject: [PATCH v3 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for
+ SPI clocks
+In-Reply-To: <20160704102614.GD1257@jack.zhora.eu>
+References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
+ <1467270911-10971-2-git-send-email-andi.shyti@samsung.com>
+ <577A2EFF.2010306@samsung.com> <20160704102614.GD1257@jack.zhora.eu>
+Message-ID: <577A7D8D.8070004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On 07/04/2016 12:26 PM, Andi Shyti wrote:
+ 
+> The single clock lines are not configured in the exynos5433 dts,
+> but in the drivers/clk/samsung/clk-exynos5433.c file and it's the
+> only place where we can set the flags.
 
-On 07/04/2016 04:24 AM, Krzysztof Kozlowski wrote:
-> On 06/30/2016 06:22 PM, Javier Martinez Canillas wrote:
->>> Question:
->>> What do you think about it? I know that talk is cheap and code looks
->>> better but before starting the work I would like to hear some
->>> comments/opinions/ideas.
->>>
->>
->> The problem is that the enable and prepare operations are propagated to
->> the parents, so what the locks want to protecting is really a sub-tree
->> of the clock tree. They currently protect the whole clock hierarchy to
->> make sure that the changes in the clock tree are atomically.
+I meant we could amend which clocks are specified at the SPI bus device
+DT nodes and change handling of clocks in the spi-s3c64xx driver to model
+everything properly and get it all working.
+ 
+>> What is an exact problem here, are you perhaps testing suspend to RAM?
+>> I tested my sound support patches on top of v4.7-rc1 and everything
+>> seemed to work well, I didn't notice any issues with the audio codec
+>> which was the only slave on the SPI 1 bus.
 > 
-> Although there is a hierarchy between clocks from different controllers
-> but still these are all clocks controllers coming from one hardware
-> device (like SoC). At least on Exynos, I think there is no real
-> inter-device dependencies. The deadlock you mentioned (and which I want
-> to fix) is between:
+> Yes, because the audio codec is on SPI1 and its bus line
+> (spi_busclk0) is CLK_SCLK_SPI1_PERIC while the CLK_SCLK_SPI1 is
+> set as CLK_IGNORE_UNUSED.
 
-Yes, my point was that this may not be the case in all systems. IOW the
-framework should be generic enough to allow hierarchies where a parent
-clock is a clock provided by a different controller from a different HW.
+That's true, looking at a downstream kernel I see that there is just plain 
+div clock specified for spi_busclk0 (DIVsclk_spi1_b), i.e. SCLK_SPI1_PERIC 
+and SCLK_SPI1 don't get disabled in s3c64xx_spi_config().
+It seems SCLK_SPI1 in CMU_PERIC need to be kept enabled while accessing 
+the SPI controller's registers.
 
-> 1. clock in PMIC (the one needed by s3c_rtc_probe()),
-> 2. clock for I2C in SoC (the one needed by regmap_write()),
-> 3. and regmap lock:
+>> Doesn't it help when you specify CLK_SCLK_SPI1 as the second clock
+>> ("spi_busclk0") of the spi_1 bus controller instead of
+>> CLK_SCLK_SPI0_PERIC? CLK_SCLK_SPI0_PERIC seem to be parent of
+>> CLK_SCLK_SPI1 so the enable state would be propagated.
 > 
-> What I want to say is that the relationship between clocks even when
-> crossing clock controller boundaries is still self-contained. It is
-> simple parent-child relationship so acquiring both
-> clock-controller-level locks is safe.
->
-
-Is safe if the clock controllers are always aquired in the same order but
-I'm not sure if that will always be the case. I.e: you have controllers A
-and B that have clocks A{1,2} and B{1,2} respectively. So you could have
-something like this:
-
-A1 with parent B1
-B2 with parent A2
-
-That can cause a deadlock since in the first case, the controller A will be
-aquired and then the controller B but in the other case, the opposite order
-will be attempted.
-
-> Current dead lock looks like, simplifying your code:
-> A:                            B:
-> lock(regmap)
->                               lock(prepare)
-> lock(prepare) - wait
->                               lock(regmap) - wait
+> nope! :(
 > 
-> 
-> When split locks per clock controller this would be:
-> A:                            B:
-> lock(regmap)
->                               lock(s2mps11)
-> lock(i2c/exynos)
->                               lock(regmap) - wait
-> do the transfer
-> unlock(i2c/exynos)
-> unlock(regmap)
->                               lock(regmap) - acquired
->                               lock(i2c/exynos)
->                               do the transfer
->                               unlock(i2c/exynos)
->                               unlock(regmap)
->                               unlock(s2mps11)
->
+> For some reasons, if you set in the DTS as spi_busclk0 the
+> CLK_SCLK_SPI1 from cmu_peric you get a synchronus abort in the
+> s3c64xx_spi_config (the first read performed on the device).
 
-Yes, splitting the lock per controller will fix the possible deadlock in
-this case but I think we need an approach that is safe for all possible
-scenarios. Otherwise it will work more by coincidence than due a design.
+Indeed, I also observed that, after removing CLK_IGNORE_UNUSED from 
+the CLK_SCLK_SPI1 clock. 
 
-> I still have to figure out how to properly protect the entire tree
-> hierarchy. Maybe the global prepare_lock should be used only for that -
-> for traversing the hierarchy.
->
+After discussion with Krzysztof and Andrzej I came up with a patch as below 
+where there is no aborts, the sound works and clocks are not kept always 
+enabled:
 
-Other thing to figure out is how to determine when a parent belongs to a
-different controller to get its lock in clk_{prepare,enable}(), at least
-part of the hierarchy has to be traversed on prepare/enable to propagate
-the operations to the parents clocks.
+root at localhost:~# cat /sys/kernel/debug/clk/clk_summary | grep spi1
+ ioclk_spi1_clk_in                        0            0    50000000          0 0  
+    sclk_ioclk_spi1                       0            0    50000000          0 0  
+          pclk_isp_spi1                   0            0     6000000          0 0  
+    mout_sclk_isp_spi1_user               0            0    24000000          0 0  
+       sclk_isp_spi1                      0            0    24000000          0 0  
+    mout_sclk_spi1                        0            0    24000000          0 0  
+       div_sclk_spi1_a                    0            0     3000000          0 0  
+          div_sclk_spi1_b                 0            0     3000000          0 0  
+             sclk_spi1_peric              0            0     3000000          0 0  
+                sclk_spi1                 0            0     3000000          0 0  
+    mout_sclk_isp_spi1                    0            0    24000000          0 0  
+       div_sclk_isp_spi1_a                0            0     3000000          0 0  
+          div_sclk_isp_spi1_b             0            0       25000          0 0  
+             sclk_isp_spi1_cam1           0            0       25000          0 0  
+                      pclk_spi1           0            0    66666667          0 0  
 
->>
->> So a clock per controller won't suffice since you can have a parent for
->> a clock provided by a different controller and that won't be protected.
->>
->> Another option is to have a prepare and enable locks per clock. Since
->> the operations are always propagated in the same direction, I think is
->> safe to do it.
->>
->> But even in the case of a more fine-grained locking, I believe the
->> mentioned deadlocks can still happen. For example in 10ff4c5239a1 the
->> issue was that the s2mps11 PMIC has both regulators and clocks that are
->> controlled via I2C so the regulator and clocks drivers shares the same
->> I2C regmap.
->>
->> What happened was something like this:
->>
->>          CPU0                                   CPU1
->>          ----                                   ----
->>   regulator_set_voltage()                s3c_rtc_probe()
->>   regmap_write()                         clk_prepare()
->>   /* regmap->lock was aquired */         /* prepare_lock was aquired */
->>   regmap_i2c_write()                     s2mps11_clk_prepare()
->>   i2c_transfer()                         regmap_write()
->>   exynos5_i2c_xfer()                     /* deadlock due regmap->lock */
->>   clk_prepare_enable()
->>   clk_prepare_lock()
->>   /* prepare_lock was aquired */
->>
->> So if for example a per clock lock is used, the deadlock can still happen
->> if both the I2C clock and S3C RTC source clock share the same parent in a
->> part of the hierarchy. But as you said this is less likely in practice so
->> probably is not an issue.
-> 
-> I think these clocks do not share the parent.
->
+I'm not yet 100% sure if it is a correct approach, the downstream kernel uses
+"global-per-IP" gate clocks (ENABLE_IP_PERIC? registers), that gate all clocks 
+to a given IP block and those clocks are not defined in mainline at all, but 
+it seems we just need to amend the SPI controller driver to not be disabling
+sdd->src_clk clock before accessing registers. 
+Or maybe to pass only DIVsclk_spi?_b as spi_busclk0 in DT nodes and add 
+SCLK_SPI0 from CMU_PERIC as a third SPI device clock for exynos5433.
 
-Yes, I meant the issue of having a shared parent in general and not in this
-particular case that no parent is shared. Sorry for the ambiguous sentence.
-
-> Best regards,
-> Krzysztof
->
-
-So in summary, my point is that we should first define what these locks are
-protecting. The good practice in the kernel is to protect data structures
-instead of code, but the prepare and enable locks are not doing the former.
-
-My understanding is that what the locks are protecting is a sub-tree of the
-hierarchy but there isn't a data structure to represent a sub-tree so global
-locks are used to protect the whole tree instead.
-
-Moving the lock to a per controller/provider seems like an arbitrary thing
-to me since what's important AFAIU is the clock hierarchy and not from where
-these clocks come from.
-
-But I'm very far from being a lock expert so maybe my assumptions are wrong,
-I'll let Stephen and Mike to comment on this.
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+-----------8<------------
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index 8e124fc..f444c66 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -617,8 +617,13 @@
+                        dma-names = "tx", "rx";
+                        #address-cells = <1>;
+                        #size-cells = <0>;
++#if 0
+                        clocks = <&cmu_peric CLK_PCLK_SPI1>,
+                                 <&cmu_top CLK_SCLK_SPI1_PERIC>;
++#else
++                       clocks = <&cmu_peric CLK_PCLK_SPI1>,
++                                <&cmu_peric CLK_SCLK_SPI1>;
++#endif
+                        clock-names = "spi", "spi_busclk0";
+                        samsung,spi-src-clk = <0>;
+                        pinctrl-names = "default";
+diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+index e3cc935..61d5643 100644
+--- a/drivers/clk/samsung/clk-exynos5433.c
++++ b/drivers/clk/samsung/clk-exynos5433.c
+@@ -1675,7 +1675,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
+        GATE(CLK_SCLK_SPI2, "sclk_spi2", "sclk_spi2_peric", ENABLE_SCLK_PERIC,
+                        5, CLK_SET_RATE_PARENT, 0),
+        GATE(CLK_SCLK_SPI1, "sclk_spi1", "sclk_spi1_peric", ENABLE_SCLK_PERIC,
+-                       4, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
++                       4, CLK_SET_RATE_PARENT, 0),
+        GATE(CLK_SCLK_SPI0, "sclk_spi0", "sclk_spi0_peric", ENABLE_SCLK_PERIC,
+                        3, CLK_SET_RATE_PARENT, 0),
+        GATE(CLK_SCLK_UART2, "sclk_uart2", "sclk_uart2_peric",
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 5a76a50..2cb965c 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -578,7 +578,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ 
+        /* Disable Clock */
+        if (sdd->port_conf->clk_from_cmu) {
+-               clk_disable_unprepare(sdd->src_clk);
++               /* clk_disable_unprepare(sdd->src_clk); */
+        } else {
+                val = readl(regs + S3C64XX_SPI_CLK_CFG);
+                val &= ~S3C64XX_SPI_ENCLK_ENABLE;
+@@ -626,7 +626,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+                /* There is half-multiplier before the SPI */
+                clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
+                /* Enable Clock */
+-               clk_prepare_enable(sdd->src_clk);
++               /* clk_prepare_enable(sdd->src_clk); */
+        } else {
+                /* Configure Clock */
+                val = readl(regs + S3C64XX_SPI_CLK_CFG);
+-----------8<------------
