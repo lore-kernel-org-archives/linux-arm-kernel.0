@@ -1,47 +1,48 @@
-From: andi@etezian.org (Andi Shyti)
-Date: Mon, 4 Jul 2016 19:26:14 +0900
-Subject: [PATCH v3 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for
- SPI clocks
-In-Reply-To: <577A2EFF.2010306@samsung.com>
-References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
- <1467270911-10971-2-git-send-email-andi.shyti@samsung.com>
- <577A2EFF.2010306@samsung.com>
-Message-ID: <20160704102614.GD1257@jack.zhora.eu>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 4 Jul 2016 11:31:31 +0100
+Subject: [PATCH 2/2] arm-cci: ensure perf synchronisation
+In-Reply-To: <20160704102205.GD1639@arm.com>
+References: <1467136218-15789-1-git-send-email-mark.rutland@arm.com>
+ <1467136218-15789-3-git-send-email-mark.rutland@arm.com>
+ <20160704102205.GD1639@arm.com>
+Message-ID: <20160704103130.GA6774@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
-
-> >  	GATE(CLK_SCLK_SPI1, "sclk_spi1", "sclk_spi1_peric", ENABLE_SCLK_PERIC,
-> > -			4, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-> > +			4, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
+On Mon, Jul 04, 2016 at 11:22:05AM +0100, Will Deacon wrote:
+> On Tue, Jun 28, 2016 at 06:50:18PM +0100, Mark Rutland wrote:
+> > Currently the IRQ core is permitted to make the CCI PMU IRQ handler
+> > threaded, and will allow userspace to change the CPU affinity of the
+> > interrupt behind our back. Both of these could violate our
+> > synchronisation requirements with the core perf code, which relies upon
+> > strict CPU affinity and disabling of interrupts to guarantee mutual
+> > exclusion in some cases.
 > 
-> As Tomasz pointed out, this should be addressed in the driver/dts,
-> we shouldn't be patching board configurations into a per-SoC driver.
-> Other boards may want to keep this clock disabled.
+> Minor nit, but I think $subject is particularly unhelpful for these two
+> patches. How about "arm-ccX: fix PMU interrupt flags"?
 
-The single clock lines are not configured in the exynos5433 dts,
-but in the drivers/clk/samsung/clk-exynos5433.c file and it's the
-only place where we can set the flags.
+Sure, I'll move over to that wording.
 
-> What is an exact problem here, are you perhaps testing suspend to RAM?
-> I tested my sound support patches on top of v4.7-rc1 and everything
-> seemed to work well, I didn't notice any issues with the audio codec
-> which was the only slave on the SPI 1 bus.
+> > @@ -881,7 +881,8 @@ static int pmu_request_irq(struct cci_pmu *cci_pmu, irq_handler_t handler)
+> >  	 * This should allow handling of non-unique interrupt for the counters.
+> >  	 */
+> >  	for (i = 0; i < cci_pmu->nr_irqs; i++) {
+> > -		int err = request_irq(cci_pmu->irqs[i], handler, IRQF_SHARED,
+> 
+> Why is this shared and who is the line shared with? We should check that
+> we don't have contradictory IRQ flags in the other irq request path(s).
 
-Yes, because the audio codec is on SPI1 and its bus line
-(spi_busclk0) is CLK_SCLK_SPI1_PERIC while the CLK_SCLK_SPI1 is
-set as CLK_IGNORE_UNUSED.
+Hmm... I thought that was so the driver could request the same IRQ
+multiple times in the case of muxing, but I see we've always had the
+is_duplicate_irq logic.
 
-> Doesn't it help when you specify CLK_SCLK_SPI1 as the second clock
-> ("spi_busclk0") of the spi_1 bus controller instead of
-> CLK_SCLK_SPI0_PERIC? CLK_SCLK_SPI0_PERIC seem to be parent of
-> CLK_SCLK_SPI1 so the enable state would be propagated.
+The IRQF_SHARED flags has also been there since day one, so I'm not sure
+if that's needed for some platform or whether that was added out of
+habit.
 
-nope! :(
+Punit, do you recall if/why IRQF_SHARED was used?
 
-For some reasons, if you set in the DTS as spi_busclk0 the
-CLK_SCLK_SPI1 from cmu_peric you get a synchronus abort in the
-s3c64xx_spi_config (the first read performed on the device).
+I'll take a look at dts and see if I can get rid of it.
 
-Andi
+Thanks,
+Mark.
