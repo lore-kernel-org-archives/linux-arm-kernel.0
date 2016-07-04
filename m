@@ -1,70 +1,94 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon,  4 Jul 2016 15:52:30 +0100
-Subject: [PATCH v4 3/3] Revert "arm64: hibernate: Refuse to hibernate if the
- boot cpu is offline"
-In-Reply-To: <1467643950-11034-1-git-send-email-james.morse@arm.com>
-References: <1467643950-11034-1-git-send-email-james.morse@arm.com>
-Message-ID: <1467643950-11034-4-git-send-email-james.morse@arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 4 Jul 2016 17:00:02 +0200
+Subject: [PATCH v7 10/17] KVM: arm64: introduce new KVM ITS device
+In-Reply-To: <CAFEAcA96DGzW=bShwz188O0BaDy34ccEG3921AxQCf3aAFgurg@mail.gmail.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+ <20160628123230.26255-11-andre.przywara@arm.com>
+ <2525bd7b-5df1-54bc-1999-25c8c7fe88a3@redhat.com>
+ <173c3704-180e-0385-623c-5dbcced2d762@arm.com>
+ <da2ac9c4-e29b-e74f-a11e-b2736526bf8f@redhat.com>
+ <CAFEAcA96DGzW=bShwz188O0BaDy34ccEG3921AxQCf3aAFgurg@mail.gmail.com>
+Message-ID: <2b712bbe-1534-0206-34e7-8df433ace7c2@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we use the MPIDR to resume on the same CPU that we hibernated on,
-we no longer need to refuse to hibernate if the boot cpu is offline. (Which
-we can't possibly know if kexec causes logical CPUs to be renumbered).
+Hi Peter,
 
-This reverts commit 1fe492ce6482b77807b25d29690a48c46456beee.
+On 04/07/2016 16:32, Peter Maydell wrote:
+> On 4 July 2016 at 15:27, Auger Eric <eric.auger@redhat.com> wrote:
+>> Andre,
+>>
+>> On 04/07/2016 16:05, Andre Przywara wrote:
+>>> Hi,
+>>>
+>>> On 04/07/16 10:00, Auger Eric wrote:
+>>>> From a QEMU integration point of view this means the init sequence used
+>>>> for KVM GIC interrupt controllers cannot be reused for ITS and more
+>>>> importantly this is not straightforward to have the proper sequence
+>>>> ordering (hence the previously reported case).
+>>>
+>>> I am confused, can you please elaborate what the problem is?
+>>> Or alternatively sketch what you ideally would the ITS init sequence to
+>>> look like? I am totally open to any changes, just need to know what
+>>> you/QEMU needs.
+>>
+>> in QEMU the address setting is done on a so-called qemu
+>> "machine_init_done_notifier", ie. a callback that is registered at ITS
+>> device init, to be called once the virt machine code has executed. This
+>> callback calls  kvm_device_ioctl(kd->dev_fd, KVM_SET_DEVICE_ATTR, attr);
+>>
+>> In case the userspace needs to explicitly "init" the ITS (actually ~
+>> map_resources) this must happen after the KVM_SET_DEVICE_ATTR. So you
+>> also must register a callback in the same way. However there is a
+>> framework existing to register kvm device addresses but this does not
+>> exist to set other attributes than device addresses.
+>>
+>> This is feasible I think but this does not fit qemu nicely. So can't the
+>> map_resources happen implicitly on the first VCPU run?
+> 
+> I'm not clear what you think the problem here for QEMU is.
+> We definitely want the API for the kernel to be:
+>  create device
+>  set attributes
+>  explicitly complete init of the device
+>  [attribute setting after this is illegal]
+>  run CPUs
+> 
+> so I'm not sure why QEMU would care if the kernel does things at
+> "final init" rather than "run CPUs".
+> 
+> This is how the GICv3 init works and how the ITS should work too;
+The GICv3 explicit does not do the same as the ITS init.
+GICv3 init does not map the resources (KVM iodevice registration). This
+is done at 1st VCPU run.
+ITS init does map the resources. If we call the ITS init at the same
+place as we call the GICv3 init, in the realization function, the region
+mapping is not yet done so you will map resources at undefined location.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
-This patch should be merged via the PM tree, (potentially with another user
-of patch one)
+I am definitively not opposed to call the ITS init function explicitly
+from user side but this must happen after the KVM_SET_DEVICE_ATTR. So
+another machine_init_done function must be registered and the notifier
+must be called AFTER the notifier that calls the KVM_SET_DEVICE_ATTR
+ioctl. However you cannot easily master the machine init done notifier
+registration order because in target-arm/kvm.c there is a single
+notifier that calls all the KVM_SET_DEVICE_ATTR for all the KVM devices
+(kvm_arm_machine_init_done). So it is not possible to register the ITS
+init notifier before the "kvm_arm_set_device_addr" notifier.
 
- arch/arm64/kernel/hibernate.c | 26 --------------------------
- 1 file changed, 26 deletions(-)
+So my understanding is one must do things outside of the existing framework?
 
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index bae45abde7a2..ea1acf323b61 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -18,7 +18,6 @@
- #include <linux/cpu.h>
- #include <linux/kvm_host.h>
- #include <linux/mm.h>
--#include <linux/notifier.h>
- #include <linux/pm.h>
- #include <linux/sched.h>
- #include <linux/suspend.h>
-@@ -504,31 +503,6 @@ out:
- 	return rc;
- }
- 
--static int check_boot_cpu_online_pm_callback(struct notifier_block *nb,
--					     unsigned long action, void *ptr)
--{
--	if (action == PM_HIBERNATION_PREPARE &&
--	     cpumask_first(cpu_online_mask) != 0) {
--		pr_warn("CPU0 is offline.\n");
--		return notifier_from_errno(-ENODEV);
--	}
--
--	return NOTIFY_OK;
--}
--
--static int __init check_boot_cpu_online_init(void)
--{
--	/*
--	 * Set this pm_notifier callback with a lower priority than
--	 * cpu_hotplug_pm_callback, so that cpu_hotplug_pm_callback will be
--	 * called earlier to disable cpu hotplug before the cpu online check.
--	 */
--	pm_notifier(check_boot_cpu_online_pm_callback, -INT_MAX);
--
--	return 0;
--}
--core_initcall(check_boot_cpu_online_init);
--
- int _arch_hibernation_disable_cpus(bool suspend)
- {
- 	int cpu, ret;
--- 
-2.8.0.rc3
+Hope this clarifies
+
+Thanks
+
+Eric
+
+
+> we don't want to extend the GICv2 mistake of "no explicit complete
+> init" to anything else, because then you end up with ad-hoc
+> "do this when we first run the vCPU; oh, but also do it if
+> userspace tries to write a register content; and also if...".
+> 
+> thanks
+> -- PMM
+> 
