@@ -1,48 +1,115 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Jul 2016 11:31:31 +0100
-Subject: [PATCH 2/2] arm-cci: ensure perf synchronisation
-In-Reply-To: <20160704102205.GD1639@arm.com>
-References: <1467136218-15789-1-git-send-email-mark.rutland@arm.com>
- <1467136218-15789-3-git-send-email-mark.rutland@arm.com>
- <20160704102205.GD1639@arm.com>
-Message-ID: <20160704103130.GA6774@leverpostej>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 4 Jul 2016 12:33:05 +0200
+Subject: [PATCH] arm64:mm Remove the redundant initrd memblock codes
+In-Reply-To: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
+References: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
+Message-ID: <4ABE8B9C-8027-40AA-A303-A82CF014A287@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2016 at 11:22:05AM +0100, Will Deacon wrote:
-> On Tue, Jun 28, 2016 at 06:50:18PM +0100, Mark Rutland wrote:
-> > Currently the IRQ core is permitted to make the CCI PMU IRQ handler
-> > threaded, and will allow userspace to change the CPU affinity of the
-> > interrupt behind our back. Both of these could violate our
-> > synchronisation requirements with the core perf code, which relies upon
-> > strict CPU affinity and disabling of interrupts to guarantee mutual
-> > exclusion in some cases.
+
+> On 4 jul. 2016, at 06:53, Dennis Chen <dennis.chen@arm.com> wrote:
 > 
-> Minor nit, but I think $subject is particularly unhelpful for these two
-> patches. How about "arm-ccX: fix PMU interrupt flags"?
-
-Sure, I'll move over to that wording.
-
-> > @@ -881,7 +881,8 @@ static int pmu_request_irq(struct cci_pmu *cci_pmu, irq_handler_t handler)
-> >  	 * This should allow handling of non-unique interrupt for the counters.
-> >  	 */
-> >  	for (i = 0; i < cci_pmu->nr_irqs; i++) {
-> > -		int err = request_irq(cci_pmu->irqs[i], handler, IRQF_SHARED,
+> The memory range between initrd_start and initrd_end was added to the memblock
+> twice unnecessarily in the same function before initrd memory range can be freed.
+> This patch merge those codes into one piece of block and add the initrd memory
+> range only once, also it makes the code clean and simple.
 > 
-> Why is this shared and who is the line shared with? We should check that
-> we don't have contradictory IRQ flags in the other irq request path(s).
 
-Hmm... I thought that was so the driver could request the same IRQ
-multiple times in the case of muxing, but I see we've always had the
-is_duplicate_irq logic.
+This is likely to break under KASLR (and I would recommend that you test with kaslr enabled when you propose changes to this code)
 
-The IRQF_SHARED flags has also been there since day one, so I'm not sure
-if that's needed for some platform or whether that was added out of
-habit.
+The randomization of memstart_addr needs to execute /after/ adding back the initrd, otherwise the chosen value of memstart_addr may push the initrd beyond the end of the linear area into the userland range.
 
-Punit, do you recall if/why IRQF_SHARED was used?
 
-I'll take a look at dts and see if I can get rid of it.
-
-Thanks,
-Mark.
+> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Steve Capper <steve.capper@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+> arch/arm64/mm/init.c | 58 +++++++++++++++++++++++-----------------------------
+> 1 file changed, 26 insertions(+), 32 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 2ade7a6..cf26cdb 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -228,6 +228,29 @@ void __init arm64_memblock_init(void)
+>        memblock_add(__pa(_text), (u64)(_end - _text));
+>    }
+> 
+> +    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+> +        extern u16 memstart_offset_seed;
+> +        u64 range = linear_region_size -
+> +                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+> +
+> +        /*
+> +         * If the size of the linear region exceeds, by a sufficient
+> +         * margin, the size of the region that the available physical
+> +         * memory spans, randomize the linear region as well.
+> +         */
+> +        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+> +            range = range / ARM64_MEMSTART_ALIGN + 1;
+> +            memstart_addr -= ARM64_MEMSTART_ALIGN *
+> +                     ((range * memstart_offset_seed) >> 16);
+> +        }
+> +    }
+> +
+> +    /*
+> +     * Register the kernel text, kernel data, initrd, and initial
+> +     * pagetables with memblock.
+> +     */
+> +    memblock_reserve(__pa(_text), _end - _text);
+> +
+>    if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+>        /*
+>         * Add back the memory we just removed if it results in the
+> @@ -254,41 +277,12 @@ void __init arm64_memblock_init(void)
+>            memblock_remove(base, size); /* clear MEMBLOCK_ flags */
+>            memblock_add(base, size);
+>            memblock_reserve(base, size);
+> +            /* the generic initrd code expects virtual addresses */
+> +            initrd_start = __phys_to_virt(initrd_start);
+> +            initrd_end = __phys_to_virt(initrd_end);
+>        }
+>    }
+> 
+> -    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+> -        extern u16 memstart_offset_seed;
+> -        u64 range = linear_region_size -
+> -                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+> -
+> -        /*
+> -         * If the size of the linear region exceeds, by a sufficient
+> -         * margin, the size of the region that the available physical
+> -         * memory spans, randomize the linear region as well.
+> -         */
+> -        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+> -            range = range / ARM64_MEMSTART_ALIGN + 1;
+> -            memstart_addr -= ARM64_MEMSTART_ALIGN *
+> -                     ((range * memstart_offset_seed) >> 16);
+> -        }
+> -    }
+> -
+> -    /*
+> -     * Register the kernel text, kernel data, initrd, and initial
+> -     * pagetables with memblock.
+> -     */
+> -    memblock_reserve(__pa(_text), _end - _text);
+> -#ifdef CONFIG_BLK_DEV_INITRD
+> -    if (initrd_start) {
+> -        memblock_reserve(initrd_start, initrd_end - initrd_start);
+> -
+> -        /* the generic initrd code expects virtual addresses */
+> -        initrd_start = __phys_to_virt(initrd_start);
+> -        initrd_end = __phys_to_virt(initrd_end);
+> -    }
+> -#endif
+> -
+>    early_init_fdt_scan_reserved_mem();
+> 
+>    /* 4GB maximum for 32-bit only capable devices */
+> -- 
+> 1.8.3.1
+> 
