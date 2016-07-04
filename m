@@ -1,49 +1,53 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 4 Jul 2016 12:17:02 +0300
-Subject: [PATCHv2 06/27] crypto: ahash: increase the maximum allowed
- statesize
-In-Reply-To: <20160627050031.GA5673@gondor.apana.org.au>
-References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
- <1466601840-18486-7-git-send-email-t-kristo@ti.com>
- <20160624103209.GA19607@gondor.apana.org.au> <5770B283.8000902@ti.com>
- <20160627050031.GA5673@gondor.apana.org.au>
-Message-ID: <577A298E.4040803@ti.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 4 Jul 2016 10:17:09 +0100
+Subject: [PATCH 3/4] bus: tegra-aconnect: make it explicitly non-modular
+In-Reply-To: <20160703173040.23612-4-paul.gortmaker@windriver.com>
+References: <20160703173040.23612-1-paul.gortmaker@windriver.com>
+ <20160703173040.23612-4-paul.gortmaker@windriver.com>
+Message-ID: <577A2995.6020504@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/16 08:00, Herbert Xu wrote:
-> On Mon, Jun 27, 2016 at 07:58:43AM +0300, Tero Kristo wrote:
->>
->> Ok, I think I need to allocate the storage space locally then within
->> the driver. Would it be ok to call kmalloc / free in the export /
->> import implementation of the driver? The size of the unhashed buffer
->> in omap-sham is unfortunately rather large.
->
-> The allocation should usually be done from the request_alloc
-> function, i.e., you set the reqsize and the user does the allocation
-> for you.
+Hi Paul,
 
-I need some clarification on this, afaik request_alloc related 
-functionality only works per-request basis. The export / import 
-functionality however is supposed to work across multiple requests. The 
-test code for example does this:
+On 03/07/16 18:30, Paul Gortmaker wrote:
+> The Kconfig currently controlling compilation of this code is:
+> 
+> drivers/bus/Kconfig:config TEGRA_ACONNECT
+> drivers/bus/Kconfig:    bool "Tegra ACONNECT Bus Driver"
+> 
+> ...meaning that it currently is not being built as a module by anyone.
+> 
+> Lets remove the modular code that is essentially orphaned, so that
+> when reading the driver there is no doubt it is builtin-only.
+> 
+> We explicitly disallow a driver unbind, since that doesn't have a
+> sensible use case anyway, and it allows us to drop the ".remove"
+> code for non-modular drivers.
+> 
+> Since module_platform_driver() uses the same init level priority as
+> builtin_platform_driver() the init ordering remains unchanged with
+> this commit.
+> 
+> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+> 
+> We also delete the MODULE_LICENSE tag etc. since all that information
+> was (or is now) contained at the top of the file in the comments.
 
+In version 3 of the aconnect series [0] I had made this a tristate
+because we allowed it to be removed and you had submitted a patch to
+export the PM_CLK APIs. However, when discussing with Thierry he said
+that we were unable to merge with tristate because of the dependency on
+your patch. So he suggested we merge with bool for now and then change
+it back to tristate for v4.9.
 
-         ret = crypto_ahash_export(req, state);
-...
-         ahash_request_free(req);
+I understand that we should not do this, but we do plan to make this
+modular in the future.
 
-         req = ahash_request_alloc(tfm, GFP_KERNEL);
-...
-         ret = crypto_ahash_import(req, state);
+Cheers
+Jon
 
+[0] http://marc.info/?l=linux-tegra&m=146616753627760&w=2
 
-... which means if I attempt to allocate extra space for the export 
-buffer within the first request, it is not available at the import time 
-anymore.
-
-Is there any limitation how many simultaneous exports can be done from a 
-driver? I was wondering if I can allocate a single export buffer for the 
-whole driver.
-
--Tero
+-- 
+nvpublic
