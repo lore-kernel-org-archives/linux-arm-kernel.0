@@ -1,54 +1,38 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 4 Jul 2016 22:51:37 +0200
-Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
-In-Reply-To: <20160704204742.GM20045@piout.net>
-References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
- <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
- <20160701183248.GC2874@piout.net>
- <CALdGsk+KwPMVKXhKtcmoUFqfj6aQRvQSY74F31fSvZhV+QvjAA@mail.gmail.com>
- <20160702204608.257b8bc6@bbrezillon>
- <CALdGsk+RO_cxfcTLVyKHP3aVMkSTtzEzQXz2G4ARX7vqxRazSA@mail.gmail.com>
- <20160704110018.76288816@bbrezillon>
- <CALdGsk+rSYukvo6-zqgqNTwJnf8QXu2bCSAdurpg1=BVtENZvw@mail.gmail.com>
- <20160704160203.GJ20045@piout.net>
- <20160704222648.4b74f21e@bbrezillon>
- <20160704204742.GM20045@piout.net>
-Message-ID: <20160704225137.0b7ace06@bbrezillon>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 04 Jul 2016 23:52:59 +0300
+Subject: [PATCH v2 1/3] ARM: dts: r8a7792: add PFC support
+In-Reply-To: <2793535.9X0Tq7I1Mq@wasted.cogentembedded.com>
+References: <2793535.9X0Tq7I1Mq@wasted.cogentembedded.com>
+Message-ID: <2998532.i3jfGt2X0c@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Jul 2016 22:47:42 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+Define the generic R8A7792 part of the PFC device node.
 
-> On 04/07/2016 at 22:26:48 +0200, Boris Brezillon wrote :
-> > On Mon, 4 Jul 2016 18:02:03 +0200
-> > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> >   
-> > > On 04/07/2016 at 11:08:42 +0200, Olivier Schonken wrote :  
-> > > > That is the dilemma I face with the structure.  What is the least
-> > > > invasive option to include the coresight functionality, without
-> > > > breaking the amba probe for other architectures that rely on it having
-> > > > a clock to enable/disable, and not break the processor startup by
-> > > > messing with stable clocks for the sake of giving the ETB/ETM a clock
-> > > > it doesn't need.
-> > > > That is why in the end I decided on a dummy clock driver.  To keep
-> > > > with the convention of having a clock specific to the ETM, and leaving
-> > > > the rest of the clocks as is.
-> > > >     
-> > > 
-> > > Well, the issue is in the pit driver, see the patch I just sent. With
-> > > both of your patches, I got my sama5d2 xplained botting fine.
-> > >   
-> > 
-> > You mean, replacing the reference to the dummy clk by a reference to
-> > mck, right?  
-> 
-> Absolutely!
-> 
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Okay. Olivier, can you send a new version of this patch and use mck
-instead of this dummy etm clk?
+---
+Changes in version 2:
+- killed extra empty line;
+- added Geert's tag.
 
-Thanks,
+ arch/arm/boot/dts/r8a7792.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-Boris
+Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
++++ renesas/arch/arm/boot/dts/r8a7792.dtsi
+@@ -108,6 +108,11 @@
+ 			#power-domain-cells = <1>;
+ 		};
+ 
++		pfc: pin-controller at e6060000 {
++			compatible = "renesas,pfc-r8a7792";
++			reg = <0 0xe6060000 0 0x144>;
++		};
++
+ 		dmac0: dma-controller at e6700000 {
+ 			compatible = "renesas,dmac-r8a7792",
+ 				     "renesas,rcar-dmac";
