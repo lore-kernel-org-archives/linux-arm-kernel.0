@@ -1,49 +1,67 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 4 Jul 2016 16:15:38 +0200
-Subject: [PATCH v7 09/17] KVM: arm64: introduce ITS emulation file with
- MMIO framework
-In-Reply-To: <33ff8f2c-89e0-5778-71a6-9d116e061752@arm.com>
-References: <20160628123230.26255-1-andre.przywara@arm.com>
- <20160628123230.26255-10-andre.przywara@arm.com>
- <3fec9632-ce39-3508-2b71-4049fc959a64@redhat.com>
- <32d54016-731d-e4a9-272d-8b0934ebec31@arm.com>
- <8546ac45-f7cd-31af-a261-bb85ca7305ca@redhat.com>
- <33ff8f2c-89e0-5778-71a6-9d116e061752@arm.com>
-Message-ID: <9fea837a-d45d-ae2b-6442-0a89db124946@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 4 Jul 2016 16:16:54 +0200
+Subject: [GIT PULL] ARM: at91: dt for 4.8 #2 bis
+In-Reply-To: <20160621171108.GA16256@piout.net>
+Message-ID: <20160704141654.GA9355@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+Please disregard the previous DT pull request, it had an issue...
+I'm including the corrected change in this one with two fixes for the
+sam9_l9260 and on fix for the sama5d2 xplained.
+Also, adding the PMU node to the sama5d2 doesn't seem too risky.
 
-On 04/07/2016 16:00, Andre Przywara wrote:
-> Hi,
-> 
-> On 04/07/16 14:54, Auger Eric wrote:
->> Hi Andre,
->>
->> On 04/07/2016 15:38, Andre Przywara wrote:
->>> 2) on KVM_DEV_ARM_VGIC_GRP_ADDR check that "initialized" is false
->>> 3) on KVM_DEV_ARM_VGIC_CTRL_INIT check that "initialized" is false
->>> 4) after KVM_DEV_ARM_VGIC_CTRL_INIT set initialized to true
->>>
->>> I don't want to rely solely on vgic_its_base being ADDR_UNDEF, since I
->>> expect we extend that interface later by supporting more options (for
->>> instance to size the virtual ITS, in terms of devices, number of LPIs,
->>> collections, etc.)
->>>
->>> Does that make sense?
->>> Or do we need more here?
->>
->> So you will accept a call to KVM_DEV_ARM_VGIC_CTRL_INIT with an unset
->> address? I don't think this is relevant.
-> 
-> Ah, good point. Will fix this.
-> 
-> However I think we do the same on GICv2/GICv3 at the moment. CTRL_INIT
-> will succeed, I guess we fail the first KVM_RUN then, right?
-Yes the map_resources will fail with UNDEF addresses
+The following changes since commit 64c0703e269d442f0406b34e64e23744151ea276:
 
-Eric
-> 
-> Cheers,
-> 
+  ARM: dts: at91: calao: remove leftovers clock definition (2016-06-10 16:59:30 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-dt2
+
+for you to fetch changes up to b8bca7eaef9eeda4876b8ded1f49862b0b85181c:
+
+  ARM: dts: at91: sama5d2_xplained: Update the pmic node (2016-07-04 15:59:46 +0200)
+
+----------------------------------------------------------------
+DT Changes for 4.8 #2:
+ - New board: at91sam9260ek
+ - Fixes for the sam9_l9260
+ - Sama5d2 Xplained PMIC fix
+ - Addition of the PMU node for the sama5d2
+
+----------------------------------------------------------------
+Nicolas Ferre (1):
+      ARM: dts: at91: add at91sam9260ek board DT
+
+Olivier Schonken (1):
+      ARM: dts: at91: sama5d2: add PMU node
+
+Raashid Muhammed (2):
+      ARM: dts: at91: sam9_l9260: Add pinctrl information to ethernet node.
+      ARM: dts: at91: sam9_l9260: Modify information in LED nodes.
+
+Wenyou Yang (1):
+      ARM: dts: at91: sama5d2_xplained: Update the pmic node
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/at91-sam9_l9260.dts       |  14 +-
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts |  41 ++++--
+ arch/arm/boot/dts/at91sam9260ek.dts         | 211 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sama5d2.dtsi              |   5 +
+ 5 files changed, 259 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9260ek.dts
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160704/8b0ac4eb/attachment-0001.sig>
