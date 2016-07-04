@@ -1,82 +1,82 @@
-From: olivier.schonken@gmail.com (Olivier Schonken)
-Date: Mon, 4 Jul 2016 11:08:42 +0200
-Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
-In-Reply-To: <20160704110018.76288816@bbrezillon>
-References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
- <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
- <20160701183248.GC2874@piout.net>
- <CALdGsk+KwPMVKXhKtcmoUFqfj6aQRvQSY74F31fSvZhV+QvjAA@mail.gmail.com>
- <20160702204608.257b8bc6@bbrezillon>
- <CALdGsk+RO_cxfcTLVyKHP3aVMkSTtzEzQXz2G4ARX7vqxRazSA@mail.gmail.com>
- <20160704110018.76288816@bbrezillon>
-Message-ID: <CALdGsk+rSYukvo6-zqgqNTwJnf8QXu2bCSAdurpg1=BVtENZvw@mail.gmail.com>
+From: arend.vanspriel@broadcom.com (Arend Van Spriel)
+Date: Mon, 4 Jul 2016 11:08:38 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
+ dt property
+In-Reply-To: <5756670.9hMGo8oEyl@wuerfel>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <7975990.MvNRQ06u39@wuerfel>
+ <ac480a61-5bfd-5d0c-26fe-b85220ee5076@broadcom.com>
+ <5756670.9hMGo8oEyl@wuerfel>
+Message-ID: <6cc6dabf-e6da-d70d-3cce-a7f1804f233e@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That is the dilemma I face with the structure.  What is the least
-invasive option to include the coresight functionality, without
-breaking the amba probe for other architectures that rely on it having
-a clock to enable/disable, and not break the processor startup by
-messing with stable clocks for the sake of giving the ETB/ETM a clock
-it doesn't need.
-That is why in the end I decided on a dummy clock driver.  To keep
-with the convention of having a clock specific to the ETM, and leaving
-the rest of the clocks as is.
 
-Regards
 
-Olivier
+On 4-7-2016 10:55, Arnd Bergmann wrote:
+> On Monday, July 4, 2016 10:41:20 AM CEST Arend Van Spriel wrote:
+>> On 2-7-2016 23:30, Arnd Bergmann wrote:
+>>> On Saturday, July 2, 2016 8:20:35 PM CEST Arend Van Spriel wrote:
+>>>>> If you want a separate property, then I repeat my very first
+>>>>> suggestion, the well defined model property.
+>>>>> e.g.
+>>>>>
+>>>>> brcmf at 0 {
+>>>>>         model = "ampak,ap6210";
+>>>>>         compatible = "brcm,bcm4329-fmac";
+>>>>>         ...
+>>>>> };
+>>>>>
+>>>>> All device nodes may have a model property, not just the top "machine" one.
+>>>>
+>>>> I heard you the first time  I just was not sure what the implications
+>>>> would be to use it. Hence I suggested a vendor specific property.
+>>>> However, looking up and reading the definition in ePAPRv1.1 I suppose it
+>>>> is fine to use the model property:
+>>>>
+>>>> Property: model
+>>>> Value type: <string>
+>>>> Description:
+>>>> The model property value is a <string> that specifies the manufacturer?s
+>>>> model number of the device.
+>>>>
+>>>> The recommended format is: ?manufacturer,model?, where manufacturer is a
+>>>> string describing the name of the manufacturer (such as a stock ticker
+>>>> symbol), and model specifies the model number.
+>>>
+>>> The model property is very similar to compatible, except that there is
+>>> only one entry rather than a list of entries from most specific to
+>>> most generic.
+>>
+>> They seem very similar, but I think there is a conceptual difference.
+>> The compatible property is mainly used to select the appropriate driver
+>> and as such the property is typically ignored by device drivers.
+>> Probably there are exceptions to be found.
+>>
+>>> I think by writing the above example as
+>>>
+>>>       compatible = "ampak,ap6210", "brcm,bcm4329-fmac";
+>>>
+>>> we can provide the same functionality in a slightly simpler way, the driver
+>>> then just goes on to look for the nvram file for each entry in sequence until
+>>> it finds one.
+>>
+>> Not sure why this would be simpler. Why would traversing the compatible
+>> string be simpler than handling the model property if present and
+>> otherwise fallback to the default nvram naming.
+> 
+> Because you have to walk the list anyway to find the other firmware files:
+> when you have a specialization of a device that requires listing both values
+> as compatible, the driver has no idea which of the entries to use, unless
+> you add a lookup table that adds more complexity.
 
-On 4 July 2016 at 11:00, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> On Mon, 4 Jul 2016 10:47:21 +0200
-> Olivier Schonken <olivier.schonken@gmail.com> wrote:
->
->> Hi Boris
->>
->> The amba bus is probed after the PIT driver.
->
-> So we clearly have a problem in there...
->
->> I have today found pck0 -
->> pck2 to work as well.  Would this be good enough to use?
->
-> But why would we reference one of the programmable clock? AFAICT, the
-> coresight-etb10 block does not depend on any of the programmable clock.
->
->>
->> Regards
->>
->> Olivier
->>
->> On 2 July 2016 at 20:46, Boris Brezillon <boris.brezillon@free-electrons.com
->> > wrote:
->>
->> > Hi Olivier,
->> >
->> > On Fri, 1 Jul 2016 22:07:53 +0200
->> > Olivier Schonken <olivier.schonken@gmail.com> wrote:
->> >
->> > > Hi Alexandre
->> > >
->> > > Resending this mail, the previous one was accidentally in html format,
->> > > thus rejected from the list.  My apologies.
->> > >
->> > > I did try a couple of options regarding the clock, mck included, but
->> > > it would then hang when probing occurs in drivers/amba/bus.c when the
->> > > clock gets disabled. The dummy clock solved this issue, but I'm open
->> > > to better suggestions.
->> >
->> > Hm, that's really weird. Is the AMBA bus driver probed before the PIT
->> > driver?
->> > Anyway, I agree that this dummy clock approach is not ideal. Could we
->> > make the apb_pclk clock optional in the AMBA bus driver?
->> >
->> > The other approach would be to have someone claim the mck clock before
->> > the AMBA bus driver, and keep it enabled.
->> >
->> > Regards,
->> >
->> > Boris
->> >
->
+Currently, the brcmfmac bindings describe a single compatible string,
+ie. "brcm,bcm4329-fmac", which selects the driver/programming model. If
+that programming model supports "use model property if present,
+otherwise use default" there is nothing to traverse. The default way in
+the driver to determine firmware and nvram filename already has a lookup
+table which uses the chip id and chip revision as key, which are read
+from the device.
+
+Regards,
+Arend
