@@ -1,28 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Jul 2016 09:54:05 +0200
-Subject: [PATCH] clkdev: add devm_of_clk_get()
-In-Reply-To: <87y45iz0cs.wl%kuninori.morimoto.gx@renesas.com>
-References: <87y45iz0cs.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <7596144.XSxKMDxLKp@wuerfel>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 4 Jul 2016 13:22:50 +0530
+Subject: [PATCH] phy: fix error handling
+In-Reply-To: <00d5243a-0359-1dc7-e9aa-1ad8a9074821@wanadoo.fr>
+References: <1467525332-12963-1-git-send-email-christophe.jaillet@wanadoo.fr>
+ <00d5243a-0359-1dc7-e9aa-1ad8a9074821@wanadoo.fr>
+Message-ID: <577A15D2.5010103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 4, 2016 1:04:30 AM CEST Kuninori Morimoto wrote:
-> @@ -501,6 +503,11 @@ static inline struct clk *of_clk_get(struct device_node *np, int index)
->  {
->         return ERR_PTR(-ENOENT);
->  }
-> +struct clk *devm_of_clk_get(struct device *dev,
-> +                           struct device_node *np, int index)
-> +{
-> +       return ERR_PTR(-ENOENT);
-> +}
->  static inline struct clk *of_clk_get_by_name(struct device_node *np,
->                                              const char *name)
->  {
-> -- 
+Hi,
+
+On Monday 04 July 2016 02:38 AM, Christophe JAILLET wrote:
+> I will resubmit in the coming days.
 > 
+>    return PTR_ERR(phy->clk);
+> should also be updated.
 
-This is missing "static inline" as found by the bot.
+while at that, also fix your $subject to something like
+"phy: sun9i-usb: fix error handling"
 
-	Arnd
+Thanks
+Kishon
+
+> 
+> Best regards,
+> CJ
+> 
+> Le 03/07/2016 ? 07:55, Christophe JAILLET a ?crit :
+>> This is likely that checking 'phy->hsic_clk' instead of 'phy->clk' is
+>> expected here.
+>>
+>> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+>> ---
+>>   drivers/phy/phy-sun9i-usb.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/phy/phy-sun9i-usb.c b/drivers/phy/phy-sun9i-usb.c
+>> index ac4f31a..ff99eba 100644
+>> --- a/drivers/phy/phy-sun9i-usb.c
+>> +++ b/drivers/phy/phy-sun9i-usb.c
+>> @@ -141,7 +141,7 @@ static int sun9i_usb_phy_probe(struct platform_device *pdev)
+>>           }
+>>             phy->hsic_clk = devm_clk_get(dev, "hsic_12M");
+>> -        if (IS_ERR(phy->clk)) {
+>> +        if (IS_ERR(phy->hsic_clk)) {
+>>               dev_err(dev, "failed to get hsic_12M clock\n");
+>>               return PTR_ERR(phy->clk);
+>>           }
+> 
+> 
