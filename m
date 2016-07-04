@@ -1,13 +1,13 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jul 2016 12:25:31 +0100
-Subject: [PATCHv2 1/2] arm-ccn: fix PMU interrupt flags
+Date: Mon,  4 Jul 2016 12:25:32 +0100
+Subject: [PATCHv2 2/2] arm-cci: fix PMU interrupt flags
 In-Reply-To: <1467631532-8122-1-git-send-email-mark.rutland@arm.com>
 References: <1467631532-8122-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1467631532-8122-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1467631532-8122-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the IRQ core is permitted to make the CCN PMU IRQ handler
+Currently the IRQ core is permitted to make the CCI PMU IRQ handler
 threaded, and will allow userspace to change the CPU affinity of the
 interrupt behind our back. Both of these could violate our
 synchronisation requirements with the core perf code, which relies upon
@@ -15,35 +15,36 @@ strict CPU affinity and disabling of interrupts to guarantee mutual
 exclusion in some cases.
 
 As with the CPU PMU drivers, we should request the interrupt with
-IRQF_NOBALANCING and IRQF_NO_THREAD, to avoid these issues.
+IRQF_NOBALANCING and IRQF_NO_THREAD, to avoid these issues. At the same
+time, we drop IRQF_SHARED. The interrupt is not shared in practice, and
+the driver detects and skips duplicate IRQs at probe time, so it is not
+necessary.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Punit Agrawal <punit.agrawal@arm.com>
 Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: <arm@kernel.org>
 ---
- drivers/bus/arm-ccn.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/bus/arm-cci.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index acc3eb5..2c99ab2 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -1479,8 +1479,9 @@ static int arm_ccn_probe(struct platform_device *pdev)
- 		/* Can set 'disable' bits, so can acknowledge interrupts */
- 		writel(CCN_MN_ERRINT_STATUS__PMU_EVENTS__ENABLE,
- 				ccn->base + CCN_MN_ERRINT_STATUS);
--		err = devm_request_irq(ccn->dev, irq, arm_ccn_irq_handler, 0,
--				dev_name(ccn->dev), ccn);
-+		err = devm_request_irq(ccn->dev, irq, arm_ccn_irq_handler,
-+				       IRQF_NOBALANCING | IRQF_NO_THREAD,
-+				       dev_name(ccn->dev), ccn);
- 		if (err)
- 			return err;
- 
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index a49b283..ffce9e3 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -881,7 +881,8 @@ static int pmu_request_irq(struct cci_pmu *cci_pmu, irq_handler_t handler)
+ 	 * This should allow handling of non-unique interrupt for the counters.
+ 	 */
+ 	for (i = 0; i < cci_pmu->nr_irqs; i++) {
+-		int err = request_irq(cci_pmu->irqs[i], handler, IRQF_SHARED,
++		int err = request_irq(cci_pmu->irqs[i], handler,
++				IRQF_NOBALANCING | IRQF_NO_THREAD,
+ 				"arm-cci-pmu", cci_pmu);
+ 		if (err) {
+ 			dev_err(&pmu_device->dev, "unable to request IRQ%d for ARM CCI PMU counters\n",
 -- 
 1.9.1
