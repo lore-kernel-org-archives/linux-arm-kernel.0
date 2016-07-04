@@ -1,34 +1,57 @@
-From: pmeerw@pmeerw.net (Peter Meerwald-Stadler)
-Date: Mon, 4 Jul 2016 21:00:11 +0200 (CEST)
-Subject: atmel_ssc_dai.c, use of dai->id
-Message-ID: <alpine.DEB.2.02.1607041956420.11824@pmeerw.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 4 Jul 2016 21:10:58 +0200
+Subject: [GIT PULL] Allwinner Fixes for 4.7
+Message-ID: <20160704191058.GA29277@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Arnd, Kevin, Olof,
 
-I am trying to use SSC1 (not SSC0 which might work) on a SAMA5D4-Xplained 
-board (4.1 kernel, but close to mainline)
+Please pull the following changes in 4.7.
 
-c706f2e5 ASoC: atmel_ssc_dai: distinguish the different SSC
-fixes an issue with cpu_dai id being always 0, while the ssc id should 
-have been used (or the platform_device id)
+Thanks!
+Maxime
 
-I think there is a remaining issue with DMA parameters in 
-atmel_ssc_startup():
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-line 324:
-dma_params = &ssc_dma_params[dai->id][dir];
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
-I think it should be 
-dma_params = &ssc_dma_params[pdev->id][dir];
+are available in the git repository at:
 
-I am new to this platform, please comment
-I can submit a formal patch later-on of course
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-4.7
 
-thanks, regards, p.
+for you to fetch changes up to eee25ab19de632af1ab4d2ac50bfc5006802e664:
+
+  ARM: dts: sun7i: Fix pll3x2 and pll7x2 not having a parent clock (2016-06-29 09:03:13 +0200)
+
+----------------------------------------------------------------
+Allwinner Fixes for 4.7
+
+Two patches fixing simplefb on the SoCs that had their display clocks
+enabled, and one fix for the CHIP that will enable its sched clock.
+
+----------------------------------------------------------------
+Boris Brezillon (1):
+      ARM: sunxi/dt: make the CHIP inherit from allwinner,sun5i-a13
+
+Hans de Goede (2):
+      ARM: dts: sunxi: Add pll3 to simplefb nodes clocks lists
+      ARM: dts: sun7i: Fix pll3x2 and pll7x2 not having a parent clock
+
+ arch/arm/boot/dts/sun4i-a10.dtsi    | 21 ++++++++++++---------
+ arch/arm/boot/dts/sun5i-a10s.dtsi   | 11 ++++++-----
+ arch/arm/boot/dts/sun5i-r8-chip.dts |  2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi    | 13 ++++++++-----
+ 4 files changed, 27 insertions(+), 20 deletions(-)
 
 -- 
-
-Peter Meerwald-Stadler
-+43-664-2444418 (mobile)
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160704/988d7082/attachment.sig>
