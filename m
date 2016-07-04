@@ -1,95 +1,66 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon,  4 Jul 2016 10:29:31 +0800
-Subject: [PATCH] pinctrl: sunxi: fix nand0 function name for sun8i
-Message-ID: <20160704022931.46223-1-icenowy@aosc.xyz>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Mon, 4 Jul 2016 02:48:08 +0000
+Subject: [PATCH 4/7] bus: arm-cci: add missing of_node_put after calling
+ of_parse_phandle
+In-Reply-To: <20160701103346.GF12735@arm.com>
+References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
+ <1467366121-14120-5-git-send-email-peter.chen@nxp.com>
+ <57764626.4060800@arm.com> <20160701103346.GF12735@arm.com>
+Message-ID: <HE1PR04MB1450113E1D3A5B0BBF9269C88B380@HE1PR04MB1450.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In sun4/5/6/7i, all the pin function related to NAND0 controller is
-named "nand0". However, in sun8i, some of the functions are named as
-"nand". This patch renamed them to "nand0", for the consistency.
+ 
+>
+>On Fri, Jul 01, 2016 at 11:29:58AM +0100, Suzuki K Poulose wrote:
+>> On 01/07/16 10:41, Peter Chen wrote:
+>> >of_node_put needs to be called when the device node which is got from
+>> >of_parse_phandle has finished using.
+>> >
+>> >Cc: Will Deacon <will.deacon@arm.com>
+>> >Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> >Signed-off-by: Peter Chen <peter.chen@nxp.com>
+>>
+>> Thanks for the fix.
+>>
+>> >---
+>> >  drivers/bus/arm-cci.c | 5 ++++-
+>> >  1 file changed, 4 insertions(+), 1 deletion(-)
+>> >
+>> >diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c index
+>> >a49b283..e7b0b8c 100644
+>> >--- a/drivers/bus/arm-cci.c
+>> >+++ b/drivers/bus/arm-cci.c
+>> >@@ -1912,9 +1912,12 @@ static int __cci_ace_get_port(struct device_node *dn,
+>int type)
+>> >  	cci_portn = of_parse_phandle(dn, "cci-control-port", 0);
+>> >  	for (i = 0; i < nb_cci_ports; i++) {
+>> >  		ace_match = ports[i].type == type;
+>> >-		if (ace_match && cci_portn == ports[i].dn)
+>> >+		if (ace_match && cci_portn == ports[i].dn) {
+>> >+			of_node_put(cci_portn);
+>> >  			return i;
+>> >+		}
+>> >  	}
+>> >+	of_node_put(cci_portn);
+>>
+>> nit: Could we please do some thing like this ?
+>> 		if (ace_match && cci_portn == ports[i].dn)
+>> 			break;
+>> 	}
+>>
+>> 	of_node_put(cci_portn);
+>> 	return (i < nb_cci_ports) ? i : -ENODEV ;
+>>
+>> Either way,
+>>
+>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>
+>Please route this via arm-soc once you've addressed Suzuki's comment.
+>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c | 6 +++---
- drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c | 6 +++---
- drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c  | 6 +++---
- 3 files changed, 9 insertions(+), 9 deletions(-)
+Hi Will, how to route patch via arm-soc?
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
-index 55083d2..ce483b0 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
-@@ -180,17 +180,17 @@ static const struct sunxi_desc_pin sun8i_a23_pins[] = {
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ6 */
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ6 */
- 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D6 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ7 */
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ7 */
- 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D7 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 16),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "nand"),		/* DQS */
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQS */
- 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* RST */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 17),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-index 8b381d6..3040abe 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-@@ -140,17 +140,17 @@ static const struct sunxi_desc_pin sun8i_a33_pins[] = {
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ6 */
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ6 */
- 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D6 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ7 */
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ7 */
- 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D7 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 16),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "nand"),		/* DQS */
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQS */
- 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* RST */
- 	/* Hole */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 2),
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-index 11760bb..26a2ad3 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-@@ -219,17 +219,17 @@ static const struct sunxi_desc_pin sun8i_h3_pins[] = {
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ6 */
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ6 */
- 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D6 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ7 */
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ7 */
- 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D7 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 16),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "nand"),		/* DQS */
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQS */
- 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* RST */
- 	/* Hole */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 0),
--- 
-2.9.0
+Does it mean sending patch by adding arm at kernel.org at To or Cc list?
+
+Peter
