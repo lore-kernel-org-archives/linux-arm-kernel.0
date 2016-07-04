@@ -1,84 +1,93 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Mon, 04 Jul 2016 10:08:56 -0400
-Subject: [PATCH v2 0/3] pwm: lpc32xx: Add support to control
- PWM_PIN_LEVEL bit
-In-Reply-To: <03725469-ce79-3fe6-3f51-242f4e895c41@mleia.com>
-References: <1467032997-5340-1-git-send-email-slemieux.tyco@gmail.com>
- <ce29f743-e481-64b0-8e05-0b610fa33fb3@mleia.com>
- <1467293119.32051.9.camel@localhost>
- <03725469-ce79-3fe6-3f51-242f4e895c41@mleia.com>
-Message-ID: <1467641336.9582.22.camel@localhost>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 4 Jul 2016 16:11:50 +0200
+Subject: [PATCH v7 2/6] ACPI / processor_idle: Add support for Low Power
+ Idle(LPI) states
+In-Reply-To: <577A67BA.8060709@arm.com>
+References: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
+ <57766B15.4090407@linaro.org> <577A5DD3.4050901@arm.com>
+ <6955030.D47pi9uhTn@vostro.rjw.lan> <577A67BA.8060709@arm.com>
+Message-ID: <CAJZ5v0iEKnWVwVatpCZOi7CsrZrcEmhEVRaEparfUdKZneP7-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Mon, Jul 4, 2016 at 3:42 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 04/07/16 14:17, Rafael J. Wysocki wrote:
+>>
+>> On Monday, July 04, 2016 02:00:03 PM Sudeep Holla wrote:
+>>>
+>>>
+>>> On 01/07/16 14:07, Daniel Lezcano wrote:
+>>>>
+>>>> On 06/28/2016 03:55 PM, Sudeep Holla wrote:
+>>>>>
+>>>>> ACPI 6.0 introduced an optional object _LPI that provides an alternate
+>>>>> method to describe Low Power Idle states. It defines the local power
+>>>>> states for each node in a hierarchical processor topology. The OSPM can
+>>>>> use _LPI object to select a local power state for each level of
+>>>>> processor
+>>>>> hierarchy in the system. They used to produce a composite power state
+>>>>> request that is presented to the platform by the OSPM.
+>>>>>
+>>>>> Since multiple processors affect the idle state for any non-leaf
+>>>>> hierarchy
+>>>>> node, coordination of idle state requests between the processors is
+>>>>> required. ACPI supports two different coordination schemes: Platform
+>>>>> coordinated and  OS initiated.
+>>>>>
+>>>>> This patch adds initial support for Platform coordination scheme of
+>>>>> LPI.
+>>>>>
+>>>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>>> ---
+>>>>
+>>>>
+>>>> Hi Sudeep,
+>>>>
+>>>> I looked at the acpi processor idle code sometime ago and from my POV,
+>>>> it was awful, unnecessary complex and very difficult to maintain. The
+>>>> usage of flags all over the places is significant of the lack of control
+>>>> of the written code.
+>>>>
+>>>
+>>> So you have any specific things in mind ? That's too broad and I know
+>>> it's not so clean, but it's so for legacy reasons. I would leave that
+>>> to Rafael to decide as it takes lots of testing to clean up these code.
+>>
+>>
+>> The cleanup needs to be done at one point.
+>>
+>> Question is when to do it, before adding LPI support or after doing that
+>> (and each option has its pros and cons IMO).
+>>
+>>>> Even if you are not responsible of this implementation, the current
+>>>> situation forces you to add more awful code on top of that, which is
+>>>> clearly against "making Linux better".
+>>>>
+>>>
+>>> OK
+>>
+>>
+>> So if there are cases in which you need to make the code more complex
+>> because of the legacy stuff in there, I'd say it's better to clean it up
+>> first.
+>>
+>
+> I am not sure if Daniel was referring to anything specific. I have
+> cleaned up in patch 1/6 for cstate. More cleanups can be done there but
+> needs better understanding and reasoning for the current code which I
+> don't have as they are mostly x86 related.
+>
+> Unless someone points me what they would like to change and how, I don't
+> have much in my mind to do here. Yes it may not look as clean as other
+> code in the kernel relatively, but without complete understanding of the
+> history/reasoning for the current state of code I wouldn't touch
+> anything I don't understand.
+>
+> I am open to make changes if there's something specific. Sorry I can't
+> go ahead making changes the way I think based on some vague idea that
+> the current code is not clean.
 
-On Fri, 2016-07-01 at 11:13 +0300, Vladimir Zapolskiy wrote:
-> Hi Sylvain,
-> 
-> On 30.06.2016 16:25, Sylvain Lemieux wrote:
-> > Hi Vladimir,
-> > 
-> > On Thu, 2016-06-30 at 11:43 +0300, Vladimir Zapolskiy wrote:
-> >> Hi Sylvain,
-> >>
-> >> On 27.06.2016 16:09, Sylvain Lemieux wrote:
-> >>> From: Sylvain Lemieux <slemieux@tycoint.com>
-> >>>
-> >>> The PWM_PIN_LEVEL bit is leave unset by the kernel PWM driver.
-> >>>
-> >>> Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
-> >>> the PWM_PIN_LEVEL bit was always clear when the PWM was disable
-> >>> and a 0 logic level was apply to the output.
-> >>>
-> >>> According to the LPC32x0 User Manual [1],
-> >>> the default value for bit 30 (PWM_PIN_LEVEL) is 0.
-> >>>
-> >>> First patch:
-> >>> * initialize the pin level to 0 (default value) and update
-> >>>   the register value accordingly.
-> >>>
-> >>> Second anf third patches:
-> >>> *  provide support to configure the pin output (i.e. PWM_PIN_LEVEL bit)
-> >>>    when the PWM is disabled.
-> >>
-> >> a short question, how do you use PWM? Does it serve as a backlight
-> >> or something else?
-> >>
-> > The PWM is used to control the LCD backlight intensity.
-> > 
-> > When we setup the backlight brightness level to 0, 
-> > it should turn off the LCD display by disabling the PWM.
-> > 
-> > This is what was added to our board dts for it:
-> > 	backlight {
-> > 		compatible = "pwm-backlight";
-> > 		pwms = <&pwm1 0 1250000>;
-> > 
-> > 		brightness-levels = <0 20 100>;
-> > 		default-brightness-level = <2>;
-> > 	};
-> > 
-> 
-> this is good that there is a consumer and we are not talking in
-> general, then it might be more visual that the new property probably
-> is not needed due to the lack of use cases.
-> 
-> I think that we should start from something as simple as one-time
-> setting of PWMx_PIN_LEVEL to default 0 in lpc32xx_pwm_probe() and then
-> implement a proper support of boundary values as suggested in discussion
-> of v1 series.
-> 
-Can you take the patch 1 of this series? This resolved an issue with 
-the LPC32xx PWM when use to control the LCD backlight brightness level.
-
-As suggested, we can later discuss the best way to 
-implement proper support of boundary values.
- 
-> >>> Note:
-> >>> * Follow this URL to access the discussion for version 1 of this
-> >>>   patch: http://thread.gmane.org/gmane.linux.pwm/3882
-> 
-> --
-> With best wishes,
-> Vladimir
+Fair enough.
