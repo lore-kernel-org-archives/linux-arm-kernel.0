@@ -1,88 +1,48 @@
-From: liudongdong3@huawei.com (Dongdong Liu)
-Date: Mon, 4 Jul 2016 16:44:20 +0800
-Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
-In-Reply-To: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-2-git-send-email-po.liu@nxp.com>
-Message-ID: <577A21E4.1030301@huawei.com>
+From: olivier.schonken@gmail.com (Olivier Schonken)
+Date: Mon, 4 Jul 2016 10:49:45 +0200
+Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
+In-Reply-To: <20160702204608.257b8bc6@bbrezillon>
+References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
+ <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
+ <20160701183248.GC2874@piout.net>
+ <CALdGsk+KwPMVKXhKtcmoUFqfj6aQRvQSY74F31fSvZhV+QvjAA@mail.gmail.com>
+ <20160702204608.257b8bc6@bbrezillon>
+Message-ID: <CALdGskKsq7etC=wnPJoZfEhyzK2Ym8V1bf5MDxPBZ60Ct1b0Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Po
+Hi Boris
 
-I found a problem with the similar patch. as the below log.
+The amba bus is probed after the PIT driver.  I have today found pck0
+- pck2 to work as well.  Would this be good enough to use?
 
-[    4.287060] pci 0000:80:00.0: quirk_aer_interrupt dev->irq 416
-[    4.293778] pcieport 0000:80:00.0: pci_device_probe in
-[    4.299605] pcieport 0000:80:00.0: of_irq_parse_pci() failed with rc=-22
-[    4.307209] pcieport 0000:80:00.0: init_service_irqs  dev->irq 0
+Regards
 
-The fucntions are called as below sequence.
-1. quirk_aer_interrupt, get the aer dev->irq 416.
-2. pci_device_probe->of_irq_parse_pci, of_irq_parse_pci() failed, then dev->irq changed to 0.
-
-So this patch could not work with aer.
-
-Thanks
-Dongdong
-? 2016/6/14 16:24, Po Liu ??:
-> On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-> When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-> maybe there is interrupt line for aer pme etc. Search the interrupt
-> number in the fdt file. Then fixup the dev->irq with it.
+On 2 July 2016 at 20:46, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+> Hi Olivier,
 >
-> Signed-off-by: Po Liu <po.liu@nxp.com>
-> ---
-> changes for V3:
-> 	- Move to quirk;
-> 	- Only correct the irq in RC mode;
+> On Fri, 1 Jul 2016 22:07:53 +0200
+> Olivier Schonken <olivier.schonken@gmail.com> wrote:
 >
->   drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
->   1 file changed, 29 insertions(+)
+>> Hi Alexandre
+>>
+>> Resending this mail, the previous one was accidentally in html format,
+>> thus rejected from the list.  My apologies.
+>>
+>> I did try a couple of options regarding the clock, mck included, but
+>> it would then hang when probing occurs in drivers/amba/bus.c when the
+>> clock gets disabled. The dummy clock solved this issue, but I'm open
+>> to better suggestions.
 >
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index ee72ebe..8b39cce 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-> @@ -25,6 +25,7 @@
->   #include <linux/sched.h>
->   #include <linux/ktime.h>
->   #include <linux/mm.h>
-> +#include <linux/of_irq.h>
->   #include <asm/dma.h>	/* isa_dma_bridge_buggy */
->   #include "pci.h"
+> Hm, that's really weird. Is the AMBA bus driver probed before the PIT
+> driver?
+> Anyway, I agree that this dummy clock approach is not ideal. Could we
+> make the apb_pclk clock optional in the AMBA bus driver?
 >
-> @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
->   	}
->   }
->   DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
-> +
-> +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-> + * but use standalone irq. Read the device tree for the aer
-> + * interrupt number.
-> + */
-> +static void quirk_aer_interrupt(struct pci_dev *dev)
-> +{
-> +	int ret;
-> +	u8 header_type;
-> +	struct device_node *np = NULL;
-> +
-> +	/* Only for the RC mode device */
-> +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
-> +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
-> +		return;
-> +
-> +	if (dev->bus->dev.of_node)
-> +		np = dev->bus->dev.of_node;
-> +
-> +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
-> +		ret = of_irq_get_byname(np, "aer");
-> +		if (ret > 0) {
-> +			dev->no_msi = 1;
-> +			dev->irq = ret;
-> +		}
-> +	}
-> +}
-> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_aer_interrupt);
+> The other approach would be to have someone claim the mck clock before
+> the AMBA bus driver, and keep it enabled.
 >
+> Regards,
+>
+> Boris
