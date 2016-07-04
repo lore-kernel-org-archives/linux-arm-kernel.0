@@ -1,50 +1,165 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Jul 2016 11:22:05 +0100
-Subject: [PATCH 2/2] arm-cci: ensure perf synchronisation
-In-Reply-To: <1467136218-15789-3-git-send-email-mark.rutland@arm.com>
-References: <1467136218-15789-1-git-send-email-mark.rutland@arm.com>
- <1467136218-15789-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160704102205.GD1639@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 4 Jul 2016 12:24:52 +0200
+Subject: [PATCH v3] ARM: at91: Document new TCB bindings
+In-Reply-To: <1467409925-17761-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1467409925-17761-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160704122452.69dcddf0@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 06:50:18PM +0100, Mark Rutland wrote:
-> Currently the IRQ core is permitted to make the CCI PMU IRQ handler
-> threaded, and will allow userspace to change the CPU affinity of the
-> interrupt behind our back. Both of these could violate our
-> synchronisation requirements with the core perf code, which relies upon
-> strict CPU affinity and disabling of interrupts to guarantee mutual
-> exclusion in some cases.
+On Fri,  1 Jul 2016 23:52:05 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-Minor nit, but I think $subject is particularly unhelpful for these two
-patches. How about "arm-ccX: fix PMU interrupt flags"?
-
-> As with the CPU PMU drivers, we should request the interrupt with
-> IRQF_NOBALANCING and IRQF_NO_THREAD, to avoid these issues.
+> The current binding for the TCB is not flexible enough for some use cases
+> and prevents proper utilization of all the channels.
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: <arm@kernel.org>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: linux-pwm at vger.kernel.org
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  drivers/bus/arm-cci.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  .../devicetree/bindings/arm/atmel-at91.txt         | 32 ------------
+>  .../devicetree/bindings/mfd/atmel-tcb.txt          | 58 ++++++++++++++++++++++
+>  .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
+>  3 files changed, 65 insertions(+), 37 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt
 > 
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index a49b283..6a8825a 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -881,7 +881,8 @@ static int pmu_request_irq(struct cci_pmu *cci_pmu, irq_handler_t handler)
->  	 * This should allow handling of non-unique interrupt for the counters.
->  	 */
->  	for (i = 0; i < cci_pmu->nr_irqs; i++) {
-> -		int err = request_irq(cci_pmu->irqs[i], handler, IRQF_SHARED,
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index e1f5ad855f14..3dc758403d03 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -60,38 +60,6 @@ System Timer (ST) required properties:
+>  Its subnodes can be:
+>  - watchdog: compatible should be "atmel,at91rm9200-wdt"
+>  
+> -TC/TCLIB Timer required properties:
+> -- compatible: Should be "atmel,<chip>-tcb".
+> -  <chip> can be "at91rm9200" or "at91sam9x5"
+> -- reg: Should contain registers location and length
+> -- interrupts: Should contain all interrupts for the TC block
+> -  Note that you can specify several interrupt cells if the TC
+> -  block has one interrupt per channel.
+> -- clock-names: tuple listing input clock names.
+> -	Required elements: "t0_clk", "slow_clk"
+> -	Optional elements: "t1_clk", "t2_clk"
+> -- clocks: phandles to input clocks.
+> -
+> -Examples:
+> -
+> -One interrupt per TC block:
+> -	tcb0: timer at fff7c000 {
+> -		compatible = "atmel,at91rm9200-tcb";
+> -		reg = <0xfff7c000 0x100>;
+> -		interrupts = <18 4>;
+> -		clocks = <&tcb0_clk>;
+> -		clock-names = "t0_clk";
+> -	};
+> -
+> -One interrupt per TC channel in a TC block:
+> -	tcb1: timer at fffdc000 {
+> -		compatible = "atmel,at91rm9200-tcb";
+> -		reg = <0xfffdc000 0x100>;
+> -		interrupts = <26 4 27 4 28 4>;
+> -		clocks = <&tcb1_clk>;
+> -		clock-names = "t0_clk";
+> -	};
+> -
+>  RSTC Reset Controller required properties:
+>  - compatible: Should be "atmel,<chip>-rstc".
+>    <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-tcb.txt b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
+> new file mode 100644
+> index 000000000000..693c7361e1ba
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
+> @@ -0,0 +1,58 @@
+> +* Device tree bindings for Atmel Timer Counter Blocks
+> +- compatible: Should be "atmel,<chip>-tcb", "simple-mfd", "syscon".
+> +  <chip> can be "at91rm9200" or "at91sam9x5"
+> +- reg: Should contain registers location and length
+> +- #address-cells: has to be 1
+> +- #size-cells: has to be 0
+> +- interrupts: Should contain all interrupts for the TC block
+> +  Note that you can specify several interrupt cells if the TC
+> +  block has one interrupt per channel.
+> +- clock-names: tuple listing input clock names.
+> +	Required elements: "t0_clk", "slow_clk"
+> +	Optional elements: "t1_clk", "t2_clk"
+> +- clocks: phandles to input clocks.
+> +
+> +The TCB can expose multiple subdevices:
+> + * a timer
+> +   - compatible: Should be "atmel,tcb-timer"
+> +   - reg: Should contain the TCB channels to be used. If the
+> +     counter width is 16 bits (at91rm9200-tcb), two consecutive
+> +     channels are needed. Else, only one channel will be used.
+> +
+> + * a PWM chip: see ../pwm/atmel-tcb-pwm.txt
+> +
+> +Examples:
+> +
+> +One interrupt per TC block:
+> +	tcb0: timer at fff7c000 {
+> +		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0xfff7c000 0x100>;
+> +		interrupts = <18 4>;
+> +		clocks = <&tcb0_clk>, <&clk32k>;
+> +		clock-names = "t0_clk", "slow_clk";
+> +
+> +		timer at 0 {
+> +			compatible = "atmel,tcb-timer";
+> +			reg = <0>, <1>;
+> +		};
+> +
+> +		timer at 2 {
+> +			compatible = "atmel,tcb-timer";
+> +			reg = <2>;
+> +		};
 
-Why is this shared and who is the line shared with? We should check that
-we don't have contradictory IRQ flags in the other irq request path(s).
+And how can you differentiate the clocksource from the clkevent?
 
-Will
+> +	};
+> +
+> +One interrupt per TC channel in a TC block:
+> +	tcb1: timer at fffdc000 {
+> +		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0xfffdc000 0x100>;
+> +		interrupts = <26 4>, <27 4>, <28 4>;
+> +		clocks = <&tcb1_clk>, <&clk32k>;
+> +		clock-names = "t0_clk", "slow_clk";
+> +	};
+> +
+> +
+> diff --git a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+> index 8031148bcf85..ab8fbd5ba184 100644
+> --- a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+> +++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+> @@ -2,15 +2,17 @@ Atmel TCB PWM controller
+>  
+>  Required properties:
+>  - compatible: should be "atmel,tcb-pwm"
+> +- reg: tcb channel to use. Each channel can export 2 PWMs
+>  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+>    the cells format. The only third cell flag supported by this binding is
+>    PWM_POLARITY_INVERTED.
+> -- tc-block: The Timer Counter block to use as a PWM chip.
+>  
+>  Example:
+>  
+> -pwm {
+> -	compatible = "atmel,tcb-pwm";
+> -	#pwm-cells = <3>;
+> -	tc-block = <1>;
+> +tcb0: timer at f800c000 {
+> +	pwm at 0 {
+> +		compatible = "atmel,tcb-pwm";
+> +		reg = <0>;
+> +		#pwm-cells = <3>;
+> +	};
+>  };
