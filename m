@@ -1,105 +1,94 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Mon, 4 Jul 2016 14:34:44 +0530
-Subject: [RFC PATCH v2 4/4] net: macb: Add gmii2rgmii phy converter support
-In-Reply-To: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
-References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1467623084-15471-5-git-send-email-appanad@xilinx.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 04 Jul 2016 10:04:26 +0100
+Subject: [PATCH v3 5/7] PM / Hibernate: Allow arch code to influence CPU
+ hotplug during hibernate
+In-Reply-To: <7811260.OWJXivZiAP@vostro.rjw.lan>
+References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
+ <1467125510-18758-6-git-send-email-james.morse@arm.com>
+ <7811260.OWJXivZiAP@vostro.rjw.lan>
+Message-ID: <577A269A.6060307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for gmii2rgmii phy converter in the macb driver.
+Hi Rafael,
 
-The GMII to RGMII IP core provides the Reduced Gigabit Media
-Independent Interface (RGMII) between Ethernet physical media
-Devices and the Gigabit Ethernet controller. This core can
-Switch dynamically between the three different speed modes of
-Operation by configuring the converter register through mdio write.
+On 29/06/16 01:10, Rafael J. Wysocki wrote:
+> On Tuesday, June 28, 2016 03:51:48 PM James Morse wrote:
+>> Architecture code may need to do extra work when secondary CPUs are
+>> disabled during hibernate and resume. This may include pushing sleeping
+>> CPUs into a deeper power-saving state, or influencing which CPU resume
+>> occurs on.
+>>
+>> Define a macro arch_hibernation_disable_cpus(), which defaults to calling
+>> disable_nonboot_cpus() if undefined. Architectures that need to do extra
+>> work around these calls can use this to influence disable_nonboot_cpus()
+>> behaviour. The macro should be defined in asm/suspend.h, and
+>> ARCH_HIBERNATION_CPUHP should be added to Kconfig.
 
-MDIO interface is used to set operating speed of Ethernet MAC.
+> As you noted, this could be used to address the x86 issue that Yu is working on,
+> so I'd like it to go in as the first patch in the series and through the PM tree.
 
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes for v2:
----> Moved header file define xilinx_gmii2rgmii.h to macb.c file
-as suggested by the Nicolas.
----> Updated the commit meassage as suggested by the Nicolas.
----> Fixed minor coding comments as suggested by the Nicolas.
+Sure, I will split the series here, and group the later patches so there are no
+dependencies.
 
- drivers/net/ethernet/cadence/macb.c | 21 +++++++++++++++++++++
- drivers/net/ethernet/cadence/macb.h |  1 +
- 2 files changed, 22 insertions(+)
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index cb07d95..b900eb4 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -32,6 +32,7 @@
- #include <linux/of_gpio.h>
- #include <linux/of_mdio.h>
- #include <linux/of_net.h>
-+#include <linux/xilinx_gmii2rgmii.h>
- 
- #include "macb.h"
- 
-@@ -257,6 +258,14 @@ static int macb_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
- 	return 0;
- }
- 
-+static inline void macb_hw_fix_mac_speed(struct macb *bp,
-+					 struct phy_device *phydev)
-+{
-+	if (bp->converter_phy.fix_mac_speed)
-+		bp->converter_phy.fix_mac_speed(&bp->converter_phy,
-+						phydev->speed);
-+}
-+
- /**
-  * macb_set_tx_clk() - Set a clock to a new frequency
-  * @clk		Pointer to the clock to change
-@@ -329,6 +338,7 @@ static void macb_handle_link_change(struct net_device *dev)
- 				reg |= GEM_BIT(GBE);
- 
- 			macb_or_gem_writel(bp, NCFGR, reg);
-+			macb_hw_fix_mac_speed(bp, phydev);
- 
- 			bp->speed = phydev->speed;
- 			bp->duplex = phydev->duplex;
-@@ -2886,6 +2896,7 @@ static int macb_probe(struct platform_device *pdev)
- 	int (*init)(struct platform_device *) = macb_init;
- 	struct device_node *np = pdev->dev.of_node;
- 	struct device_node *phy_node;
-+	struct device_node *child_node, *np1;
- 	const struct macb_config *macb_config = NULL;
- 	struct clk *pclk, *hclk = NULL, *tx_clk = NULL;
- 	unsigned int queue_mask, num_queues;
-@@ -3011,6 +3022,16 @@ static int macb_probe(struct platform_device *pdev)
- 		goto err_out_free_netdev;
- 
- 	phydev = bp->phy_dev;
-+	child_node = of_get_next_child(np, NULL);
-+	for_each_child_of_node(child_node, np1) {
-+		if (of_device_is_compatible(np1, "xlnx,gmiitorgmii")) {
-+			bp->converter_phy.dev = dev;
-+			bp->converter_phy.mii_bus = bp->mii_bus;
-+			bp->converter_phy.mdio_write = macb_mdio_write;
-+			bp->converter_phy.platform_data = bp->pdev->dev.of_node;
-+			gmii2rgmii_phyprobe(&bp->converter_phy);
-+		}
-+	}
- 
- 	netif_carrier_off(dev);
- 
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index 8a13824..414005c 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -846,6 +846,7 @@ struct macb {
- 	unsigned int		jumbo_max_len;
- 
- 	u32			wol;
-+	struct	gmii2rgmii	converter_phy;
- };
- 
- static inline bool macb_is_gem(struct macb *bp)
--- 
-2.1.2
+> 
+>> ---
+>> Changes since v2:
+>>  * Added CONFIG_ARCH_HIBERNATION_CPUHP include guard allowing
+> 
+> What about calling it CONFIG_ARCH_HIBERNATION_CPU_OFFLINE?  It's not
+> hotplug really.
+
+Even with the enable calls added? CONFIG_ARCH_HIBERNATION_CPU_HOOKS?
+
+
+>> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+>> index fca9254280ee..338745e78f7e 100644
+>> --- a/kernel/power/hibernate.c
+>> +++ b/kernel/power/hibernate.c
+>> @@ -31,8 +31,16 @@
+>>  #include <linux/ktime.h>
+>>  #include <trace/events/power.h>
+>>  
+>> +#ifdef CONFIG_ARCH_HIBERNATION_CPUHP
+>> +/* Arch definition of the arch_hibernation_disable_cpus() macro? */
+>> +#include <asm/suspend.h>
+>> +#endif
+>> +
+>>  #include "power.h"
+>>  
+>> +#ifndef arch_hibernation_disable_cpus
+>> +#define arch_hibernation_disable_cpus(x) disable_nonboot_cpus()
+> 
+> For the x86 case we'll also need the complementary "enable", so why don't
+> you add it here and then use it instead of the enable_nonboot_cpus()?
+
+Done. I've added the 'in_suspend' argument so that it's symmetrical, this may be
+slightly different to the behaviour of your 'in_resume_hibernate' flag.
+
+
+> 
+>> +#endif
+>>  
+>>  static int nocompress;
+>>  static int noresume;
+
+
+>> @@ -551,7 +559,7 @@ int hibernation_platform_enter(void)
+>>  	if (error)
+>>  		goto Platform_finish;
+>>  
+>> -	error = disable_nonboot_cpus();
+>> +	error = arch_hibernation_disable_cpus(true);
+> 
+> Does this one here actually matter?
+
+I added it for completeness/symmetry (but not the enable call because it
+wouldn't have any users). I assume its something to do with acpi...
+
+
+
+Thanks,
+
+James
