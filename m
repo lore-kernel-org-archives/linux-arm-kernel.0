@@ -1,119 +1,53 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 4 Jul 2016 11:01:44 +0200
-Subject: [RFC PATCH v2] ARM: tango: add Suspend-to-RAM support
-In-Reply-To: <5774DBDE.1070605@sigmadesigns.com>
-References: <5773D3FB.4030101@sigmadesigns.com> <577409E2.7020106@arm.com>
- <5774DBDE.1070605@sigmadesigns.com>
-Message-ID: <577A25F8.80702@sigmadesigns.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Mon, 4 Jul 2016 14:34:40 +0530
+Subject: [RFC PATCH v2 0/4] net: ethernet: Add support for gmii2rgmii converter
+Message-ID: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/06/2016 10:44, Marc Gonzalez wrote:
+This patch series does the following
+---> Add support for gmii2rgmii converter.
+---> Add support for gmii2rgmii converter in the macb driver.
 
-> Ask firmware to put RAM in self-refresh mode and power system down.
-> 
->     echo mem > /sys/power/state
-> 
-> See Documentation/power/states.txt
-> 
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
-> 
-> This is a RFC because I have a few doubts:
-> 
-> 1) return value when tango_suspend() fails and unexpectedly returns (I used -EIO)
-> Is there a better error to return?
-> 
-> 2) conditionally building pm.c (using CONFIG_SUSPEND? CONFIG_PM_SLEEP? other?)
-> Is there a better config knob to use?
-> 
-> 3) .valid is required, right?
-> AFAICS, the answer is "yes", .valid is indeed required:
-> ("no valid callback implies that none are valid")
-> 
-> static bool valid_state(suspend_state_t state)
-> {
-> 	/*
-> 	 * PM_SUSPEND_STANDBY and PM_SUSPEND_MEM states need low level
-> 	 * support and need to be valid to the low level
-> 	 * implementation, no valid callback implies that none are valid.
-> 	 */
-> 	return suspend_ops && suspend_ops->valid && suspend_ops->valid(state);
-> }
-> 
-> ---
->  arch/arm/mach-tango/Makefile |  1 +
->  arch/arm/mach-tango/pm.c     | 32 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-tango/smc.h    |  1 +
->  3 files changed, 34 insertions(+)
->  create mode 100644 arch/arm/mach-tango/pm.c
-> 
-> diff --git a/arch/arm/mach-tango/Makefile b/arch/arm/mach-tango/Makefile
-> index 7ca753aa9fb6..822b7ca803c6 100644
-> --- a/arch/arm/mach-tango/Makefile
-> +++ b/arch/arm/mach-tango/Makefile
-> @@ -3,3 +3,4 @@ AFLAGS_smc.o := -Wa,-march=armv7-a$(plus_sec)
->  
->  obj-y += setup.o smc.o xenv.o
->  obj-$(CONFIG_SMP) += platsmp.o
-> +obj-$(CONFIG_SUSPEND) += pm.o
-> diff --git a/arch/arm/mach-tango/pm.c b/arch/arm/mach-tango/pm.c
-> new file mode 100644
-> index 000000000000..b05c6d6f99d0
-> --- /dev/null
-> +++ b/arch/arm/mach-tango/pm.c
-> @@ -0,0 +1,32 @@
-> +#include <linux/init.h>
-> +#include <linux/suspend.h>
-> +#include <asm/suspend.h>
-> +#include "smc.h"
-> +
-> +static int tango_pm_powerdown(unsigned long arg)
-> +{
-> +	tango_suspend(virt_to_phys(cpu_resume));
-> +
-> +	return -EIO; /* tango_suspend has failed */
-> +}
-> +
-> +static int tango_pm_enter(suspend_state_t state)
-> +{
-> +	if (state == PM_SUSPEND_MEM)
-> +		return cpu_suspend(0, tango_pm_powerdown);
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static const struct platform_suspend_ops tango_pm_ops = {
-> +	.enter = tango_pm_enter,
-> +	.valid = suspend_valid_only_mem,
-> +};
-> +
-> +static int __init tango_pm_init(void)
-> +{
-> +	suspend_set_ops(&tango_pm_ops);
-> +	return 0;
-> +}
-> +
-> +late_initcall(tango_pm_init);
-> diff --git a/arch/arm/mach-tango/smc.h b/arch/arm/mach-tango/smc.h
-> index 3d31f984f44c..57919539da1b 100644
-> --- a/arch/arm/mach-tango/smc.h
-> +++ b/arch/arm/mach-tango/smc.h
-> @@ -3,5 +3,6 @@ extern int tango_smc(unsigned int val, unsigned int service);
->  #define tango_set_l2_control(val)	tango_smc(val, 0x102)
->  #define tango_start_aux_core(val)	tango_smc(val, 0x104)
->  #define tango_set_aux_boot_addr(val)	tango_smc(val, 0x105)
-> +#define tango_suspend(val)		tango_smc(val, 0x120)
->  #define tango_aux_core_die(val)		tango_smc(val, 0x121)
->  #define tango_aux_core_kill(val)	tango_smc(val, 0x122)
-> 
+The Gigabit Media Independent Interface (GMII) to Reduced Gigabit Media
+Independent Interface (RGMII) core provides the RGMII between RGMII-compliant
+Ethernet physical media devices (PHY) and the Gigabit Ethernet controller.
+This core can be used in all three modes of operation(10/100/1000 Mb/s).
+The Management Data Input/Output (MDIO) interface is used to configure the
+Speed of operation. This core can switch dynamically between the three
+Different speed modes by configuring the conveter register through mdio write.
 
-Hello everyone,
+The conveter sits b/w the MAC and external phy like below
 
-I'll wait a few more days for comments, then I'll submit the patch
-to arm-soc for inclusion in v4.8 (if no issues are raised).
+MACB <==> GMII2RGMII <==> RGMII_PHY
 
-(I suppose the return value for tango_pm_powerdown() is not that
-big a deal.)
+	MDIO   <========> GMII2RGMII
+MCAB <=======> 
+	       <========> RGMII
 
-Regards.
+Using MAC MDIO bus we can access both the converter and the external PHY.
+We need to program the line speed of the converter during run time based
+On the external phy negotiated speed.
+
+Kedareswara rao Appana (4):
+  Documentation: DT: net: Add Xilinx gmiitorgmii converter device tree
+    binding documentation
+  net: ethernet: xilinx: Add gmii2rgmii converter support
+  Documentation: DT: net: Update binding doc for gmiitorgmii conveter
+  net: macb: Add gmii2rgmii phy converter support
+
+ Documentation/devicetree/bindings/net/macb.txt     |  4 ++
+ .../devicetree/bindings/net/xilinx_gmii2rgmii.txt  | 31 +++++++++
+ drivers/net/ethernet/cadence/macb.c                | 21 ++++++
+ drivers/net/ethernet/cadence/macb.h                |  1 +
+ drivers/net/ethernet/xilinx/Kconfig                |  8 +++
+ drivers/net/ethernet/xilinx/Makefile               |  1 +
+ drivers/net/ethernet/xilinx/xilinx_gmii2rgmii.c    | 79 ++++++++++++++++++++++
+ include/linux/xilinx_gmii2rgmii.h                  | 24 +++++++
+ 8 files changed, 169 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+ create mode 100644 drivers/net/ethernet/xilinx/xilinx_gmii2rgmii.c
+ create mode 100644 include/linux/xilinx_gmii2rgmii.h
+
+-- 
+2.1.2
