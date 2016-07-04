@@ -1,63 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 04 Jul 2016 10:58:40 +0200
-Subject: Applied "ASoC: bt-sco: add config prompt" to the asoc tree
-In-Reply-To: <1467616002-10447-1-git-send-email-garlic.tseng@mediatek.com>
-Message-ID: <E1bJziC-0004QM-4E@finisterre>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 4 Jul 2016 11:00:18 +0200
+Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
+In-Reply-To: <CALdGsk+RO_cxfcTLVyKHP3aVMkSTtzEzQXz2G4ARX7vqxRazSA@mail.gmail.com>
+References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
+ <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
+ <20160701183248.GC2874@piout.net>
+ <CALdGsk+KwPMVKXhKtcmoUFqfj6aQRvQSY74F31fSvZhV+QvjAA@mail.gmail.com>
+ <20160702204608.257b8bc6@bbrezillon>
+ <CALdGsk+RO_cxfcTLVyKHP3aVMkSTtzEzQXz2G4ARX7vqxRazSA@mail.gmail.com>
+Message-ID: <20160704110018.76288816@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Mon, 4 Jul 2016 10:47:21 +0200
+Olivier Schonken <olivier.schonken@gmail.com> wrote:
 
-   ASoC: bt-sco: add config prompt
+> Hi Boris
+> 
+> The amba bus is probed after the PIT driver. 
 
-has been applied to the asoc tree at
+So we clearly have a problem in there...
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+> I have today found pck0 -
+> pck2 to work as well.  Would this be good enough to use?
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+But why would we reference one of the programmable clock? AFAICT, the
+coresight-etb10 block does not depend on any of the programmable clock.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 8b0b50d8a3e3ccfa4632a227102b97994ed95fc0 Mon Sep 17 00:00:00 2001
-From: Garlic Tseng <garlic.tseng@mediatek.com>
-Date: Mon, 4 Jul 2016 15:06:42 +0800
-Subject: [PATCH] ASoC: bt-sco: add config prompt
-
-Add config prompt for bt-sco codec driver
-
-Signed-off-by: Garlic Tseng <garlic.tseng@mediatek.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/codecs/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
-index 4d82a58ff6b0..3ba998a79165 100644
---- a/sound/soc/codecs/Kconfig
-+++ b/sound/soc/codecs/Kconfig
-@@ -371,7 +371,7 @@ config SND_SOC_ALC5632
- 	tristate
- 
- config SND_SOC_BT_SCO
--	tristate
-+	tristate "Dummy BT SCO codec driver"
- 
- config SND_SOC_CQ0093VC
- 	tristate
--- 
-2.8.1
+> 
+> Regards
+> 
+> Olivier
+> 
+> On 2 July 2016 at 20:46, Boris Brezillon <boris.brezillon@free-electrons.com
+> > wrote:  
+> 
+> > Hi Olivier,
+> >
+> > On Fri, 1 Jul 2016 22:07:53 +0200
+> > Olivier Schonken <olivier.schonken@gmail.com> wrote:
+> >  
+> > > Hi Alexandre
+> > >
+> > > Resending this mail, the previous one was accidentally in html format,
+> > > thus rejected from the list.  My apologies.
+> > >
+> > > I did try a couple of options regarding the clock, mck included, but
+> > > it would then hang when probing occurs in drivers/amba/bus.c when the
+> > > clock gets disabled. The dummy clock solved this issue, but I'm open
+> > > to better suggestions.  
+> >
+> > Hm, that's really weird. Is the AMBA bus driver probed before the PIT
+> > driver?
+> > Anyway, I agree that this dummy clock approach is not ideal. Could we
+> > make the apb_pclk clock optional in the AMBA bus driver?
+> >
+> > The other approach would be to have someone claim the mck clock before
+> > the AMBA bus driver, and keep it enabled.
+> >
+> > Regards,
+> >
+> > Boris
+> >  
