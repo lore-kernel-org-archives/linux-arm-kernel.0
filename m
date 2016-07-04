@@ -1,31 +1,41 @@
-From: andrew-ct.chen@mediatek.com (Andrew-CT Chen)
-Date: Mon, 4 Jul 2016 18:48:34 +0800
-Subject: pull request: lunux-firmware: Add Mediatek MT8173 VPU firmware
-Message-ID: <1467629314-31902-1-git-send-email-andrew-ct.chen@mediatek.com>
+From: garlic.tseng@mediatek.com (Garlic Tseng)
+Date: Mon, 4 Jul 2016 18:56:24 +0800
+Subject: [alsa-devel] [PATCH 0/4] ASoC: Mediatek: add MT2701 platform and
+ machine driver
+Message-ID: <1467629788-14411-1-git-send-email-garlic.tseng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi linux-firmware maintainers,
+Some patches of the patchset "ASoC: Mediatek: Add support for MT2701 SOC"
+have been applied to the broonie tree, so I send a new patchset for the 
+remaining patches.
 
-The following changes since commit 3ef7857d511ce6a91c5ce609da76c4702651cfa5:
+The patchset adds mt2701 support based on Mediatek AFE common structure.
 
-  amdgpu: update polaris ucode (2016-06-28 14:31:11 -0400)
+Change since the previous patchset:
+* remove unnecessary set_clkdiv and set_fmt ops in mt2701 platform driver
+* add another snd_soc_dai_driver for bt-sco codec to support 8k and 16k
 
-are available in the git repository at:
 
-  https://github.com/andrewct-chen/vpu-linux-firmware.git vpu_encode
 
-for you to fetch changes up to 40876d7b3c911161ab71bc84a6e90f257a13cdc4:
+Garlic Tseng (4):
+  ASoC: mediatek: add mt2701 platform driver implementation.
+  ASoC: bt-sco: extend rate and add a general compatible string
+  ASoC: mediatek: add BT implementation
+  ASoC: mediatek: Add mt2701-cs42448 driver and config option.
 
-  mediatek: Add mt8173 VPU firmware (2016-07-04 16:26:54 +0800)
+ Documentation/devicetree/bindings/sound/bt-sco.txt |    2 +-
+ sound/soc/codecs/bt-sco.c                          |   52 +-
+ sound/soc/mediatek/Kconfig                         |   21 +
+ sound/soc/mediatek/Makefile                        |    1 +
+ sound/soc/mediatek/mt2701/Makefile                 |   19 +
+ sound/soc/mediatek/mt2701/mt2701-afe-common.h      |    9 -
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c         | 1654 ++++++++++++++++++++
+ sound/soc/mediatek/mt2701/mt2701-cs42448.c         |  412 +++++
+ 8 files changed, 2144 insertions(+), 26 deletions(-)
+ create mode 100644 sound/soc/mediatek/mt2701/Makefile
+ create mode 100644 sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+ create mode 100644 sound/soc/mediatek/mt2701/mt2701-cs42448.c
 
-----------------------------------------------------------------
-Andrew-CT Chen (1):
-      mediatek: Add mt8173 VPU firmware
-
- WHENCE    |   19 +++++++++++++++++++
- vpu_d.bin |  Bin 0 -> 4084848 bytes
- vpu_p.bin |  Bin 0 -> 131036 bytes
- 3 files changed, 19 insertions(+)
- create mode 100644 vpu_d.bin
- create mode 100644 vpu_p.bin
+-- 
+1.9.1
