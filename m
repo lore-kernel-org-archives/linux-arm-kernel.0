@@ -1,133 +1,138 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 4 Jul 2016 15:10:58 +0200
-Subject: [PATCH v2] ARM: at91: Document new TCB bindings
-In-Reply-To: <20160701012743.GA16698@rob-hp-laptop>
-References: <1467039901-11297-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160701012743.GA16698@rob-hp-laptop>
-Message-ID: <20160704151058.44b679bf@bbrezillon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  4 Jul 2016 15:10:57 +0200
+Subject: [PATCH] ARM: dts: Ux500: fix up TVK sensor data
+Message-ID: <1467637857-8205-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Jun 2016 20:27:43 -0500
-Rob Herring <robh@kernel.org> wrote:
+- Fix the I2C address and supply line names for the AK8974
 
-> On Mon, Jun 27, 2016 at 05:05:01PM +0200, Alexandre Belloni wrote:
-> > The current binding for the TCB is not flexible enough for some use cases
-> > and prevents proper utilization of all the channels.
-> > 
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Thierry Reding <thierry.reding@gmail.com>
-> > Cc: linux-pwm at vger.kernel.org
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> > 
-> > Changes in v2:
-> >  - added slow_clk in the examples
-> >  - removed linuxisms
-> > 
-> > Rob, does that fit what you wanted? I prefer getting your ack on that one before
-> > resending a 48 patches series.
-> > 
-> > 
-> >  .../devicetree/bindings/arm/atmel-at91.txt         | 32 -----------
-> >  .../devicetree/bindings/mfd/atmel-tcb.txt          | 62 ++++++++++++++++++++++
-> >  .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
-> >  3 files changed, 69 insertions(+), 37 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> > index e1f5ad855f14..3dc758403d03 100644
-> > --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> > +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> > @@ -60,38 +60,6 @@ System Timer (ST) required properties:
-> >  Its subnodes can be:
-> >  - watchdog: compatible should be "atmel,at91rm9200-wdt"
-> >  
-> > -TC/TCLIB Timer required properties:
-> > -- compatible: Should be "atmel,<chip>-tcb".
-> > -  <chip> can be "at91rm9200" or "at91sam9x5"
-> > -- reg: Should contain registers location and length
-> > -- interrupts: Should contain all interrupts for the TC block
-> > -  Note that you can specify several interrupt cells if the TC
-> > -  block has one interrupt per channel.
-> > -- clock-names: tuple listing input clock names.
-> > -	Required elements: "t0_clk", "slow_clk"
-> > -	Optional elements: "t1_clk", "t2_clk"
-> > -- clocks: phandles to input clocks.
-> > -
-> > -Examples:
-> > -
-> > -One interrupt per TC block:
-> > -	tcb0: timer at fff7c000 {
-> > -		compatible = "atmel,at91rm9200-tcb";
-> > -		reg = <0xfff7c000 0x100>;
-> > -		interrupts = <18 4>;
-> > -		clocks = <&tcb0_clk>;
-> > -		clock-names = "t0_clk";
-> > -	};
-> > -
-> > -One interrupt per TC channel in a TC block:
-> > -	tcb1: timer at fffdc000 {
-> > -		compatible = "atmel,at91rm9200-tcb";
-> > -		reg = <0xfffdc000 0x100>;
-> > -		interrupts = <26 4 27 4 28 4>;
-> > -		clocks = <&tcb1_clk>;
-> > -		clock-names = "t0_clk";
-> > -	};
-> > -
-> >  RSTC Reset Controller required properties:
-> >  - compatible: Should be "atmel,<chip>-rstc".
-> >    <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
-> > diff --git a/Documentation/devicetree/bindings/mfd/atmel-tcb.txt b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-> > new file mode 100644
-> > index 000000000000..71c8d83c01a7
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
-> > @@ -0,0 +1,62 @@
-> > +* Device tree bindings for Atmel Timer Counter Blocks
-> > +- compatible: Should be "atmel,<chip>-tcb", "simple-mfd", "syscon".
-> > +  <chip> can be "at91rm9200" or "at91sam9x5"
-> > +- reg: Should contain registers location and length
-> > +- #address-cells: has to be 1
-> > +- #size-cells: has to be 0
-> > +- interrupts: Should contain all interrupts for the TC block
-> > +  Note that you can specify several interrupt cells if the TC
-> > +  block has one interrupt per channel.
-> > +- clock-names: tuple listing input clock names.
-> > +	Required elements: "t0_clk", "slow_clk"
-> > +	Optional elements: "t1_clk", "t2_clk"
-> > +- clocks: phandles to input clocks.
-> > +
-> > +The TCB can expose multiple subdevices:
-> > + * a clocksource and clockevent device  
-> 
-> This still uses Linux terminology.
-> 
-> > +   - compatible: Should be "atmel,tcb-free-running-timer"
-> > +   - reg: Should contain the TCB channels to be used. If the
-> > +     counter width is 16 bits (at91rm9200-tcb), two consecutive
-> > +     channels are needed. Else, only one channel will be used.
-> > +
-> > + * a clockevent device
-> > +   - compatible: Should be "atmel,tcb-programmable-timer"  
-> 
-> This still looks like assigning usage in DT. As I'm willing to accept 
-> that for PWM, either timer channels should be whatever channels are not 
-> assigned to PWM (i.e. not in DT) or they should just be "timer" and let 
-> the kernel decide their usage.
+- Sets up the interrupt lines to the different components as they
+  actually are connected, I was confused for some time by the fact
+  that several lines were connected with <NM> 0 Ohm resistors, which
+  means NOT MOUNTED and is thus not 0 Ohm at all but infinite ohms,
+  i.e. not connected at all.
 
-I just reviewed Alexandre's new binding, and it makes the whole thing
-a lot more obscure: on older SoCs, we have to chain 2 channels to
-create an acceptable wraparound time (16 bits at 5MHz is generating too
-much interrupts to be acceptable).
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Hi ARM SoC folks:
+please apply this directly to the ARM SoC tree because I don't
+think I will have more DT patches for Ux500 this merge window.
+Your ux500/dt branch would be the best candidate to land this.
+---
+ arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 62 +++++++++++++++++++++---------
+ 1 file changed, 43 insertions(+), 19 deletions(-)
 
-If we don't assign the mode from the DT, how should we know which
-channels should be chained to create the free-running timer? Note that
-not all channels can be chained together: they have to be part of the
-same timer counter block and have to be consecutive (0+1, 1+2 or 3+0).
-
-Honestly, I don't see the difference between assigning the channel to a
-PWM mode and assigning it to a free-running or oneshot timer mode. Why
-is it more acceptable?
+diff --git a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
+index fc5e8ce700c3..3c9f2f068c2f 100644
+--- a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
++++ b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
+@@ -99,46 +99,69 @@
+ 				vddio-supply = <&db8500_vsmps2_reg>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&accel_tvk_mode>;
+-				interrupt-parent = <&gpio2>;
+-				interrupts = <18 IRQ_TYPE_EDGE_FALLING>,
+-					     <19 IRQ_TYPE_EDGE_FALLING>;
+-			};
+-			lsm303dlh at 1e {
+ 				/*
+-				 * This magnetometer is packaged with
+-				 * the accelerometer, and has a DRDY line,
+-				 * however it is not connected on this
+-				 * board so it can not generate interrupts.
++				 * These interrupts cannot be used: the other component
++				 * ST-Micro L3D4200D gyro that is connected to the same lines
++				 * cannot set its DRDY line to open drain, so it cannot be
++				 * shared with other peripherals. The should be defined for
++				 * the falling edge if they could be wired together.
++				 *
++				 * interrupts-extended =
++				 * <&gpio1 0 IRQ_TYPE_EDGE_FALLING>,
++				 * <&gpio2 19 IRQ_TYPE_EDGE_FALLING>;
+ 				 */
++			};
++			lsm303dlh at 1e {
++				/* Magnetometer */
+ 				compatible = "st,lsm303dlh-magn";
+ 				reg = <0x1e>;
+ 				vdd-supply = <&ab8500_ldo_aux1_reg>;
+ 				vddio-supply = <&db8500_vsmps2_reg>;
++				/*
++				 * These interrupts cannot be used: the other component
++				 * ST-Micro L3D4200D gyro that is connected to the same lines
++				 * cannot set its DRDY line to open drain, so it cannot be
++				 * shared with other peripherals. The should be defined for
++				 * the falling edge if they could be wired together.
++				 *
++				 * interrupts-extended =
++				 * <&gpio1 0 IRQ_TYPE_EDGE_FALLING>,
++				 * <&gpio2 19 IRQ_TYPE_EDGE_FALLING>;
++				 */
+ 			};
+ 			lis331dl at 1c {
+ 				/* Accelerometer */
+ 				compatible = "st,lis331dl-accel";
+ 				st,drdy-int-pin = <1>;
+-				drive-open-drain;
+ 				reg = <0x1c>;
+ 				vdd-supply = <&ab8500_ldo_aux1_reg>;
+ 				vddio-supply = <&db8500_vsmps2_reg>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&accel_tvk_mode>;
+ 				interrupt-parent = <&gpio2>;
+-				interrupts = <18 IRQ_TYPE_EDGE_FALLING>,
+-					     <19 IRQ_TYPE_EDGE_FALLING>;
++				/* INT2 would need to be open drain */
++				interrupts = <18 IRQ_TYPE_EDGE_RISING>,
++					     <19 IRQ_TYPE_EDGE_RISING>;
+ 			};
+ 			ak8974 at 0f {
+ 				/* Magnetometer */
+ 				compatible = "asahi-kasei,ak8974";
+ 				reg = <0x0f>;
+-				vdd-supply = <&ab8500_ldo_aux1_reg>;
+-				vddio-supply = <&db8500_vsmps2_reg>;
++				avdd-supply = <&ab8500_ldo_aux1_reg>;
++				dvdd-supply = <&db8500_vsmps2_reg>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&gyro_magn_tvk_mode>;
+-				interrupt-parent = <&gpio1>;
+-				interrupts = <0 IRQ_TYPE_EDGE_RISING>;
++				/*
++				 * These interrupts cannot be used: the other component
++				 * ST-Micro L3D4200D gyro that is connected to the same lines
++				 * cannot set its DRDY line to open drain, so it cannot be
++				 * shared with other peripherals. The should be defined for
++				 * the falling edge if they could be wired together.
++				 *
++				 * interrupts-extended =
++				 * <&gpio1 0 IRQ_TYPE_EDGE_FALLING>,
++				 * <&gpio0 31 IRQ_TYPE_EDGE_FALLING>;
++				 */
+ 			};
+ 			l3g4200d at 68 {
+ 				/* Gyroscope */
+@@ -149,8 +172,9 @@
+ 				vddio-supply = <&db8500_vsmps2_reg>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&gyro_magn_tvk_mode>;
+-				interrupt-parent = <&gpio1>;
+-				interrupts = <0 IRQ_TYPE_EDGE_RISING>;
++				interrupts-extended =
++				<&gpio1 0 IRQ_TYPE_EDGE_RISING>,
++				<&gpio0 31 IRQ_TYPE_EDGE_RISING>;
+ 			};
+ 			lsp001wm at 5c {
+ 				/* Barometer/pressure sensor */
+@@ -218,7 +242,7 @@
+ 					/* Accelerometer interrupt lines 1 & 2 */
+ 					tvk_cfg {
+ 						pins = "GPIO82_C1", "GPIO83_D3";
+-						ste,config = <&gpio_in_pu>;
++						ste,config = <&gpio_in_pd>;
+ 					};
+ 				};
+ 			};
+-- 
+2.4.11
