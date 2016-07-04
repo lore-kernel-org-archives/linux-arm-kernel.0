@@ -1,56 +1,85 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 4 Jul 2016 16:18:57 +0200
-Subject: [PATCH 4/4] bus: simple-pm-bus: convert bool SIMPLE_PM_BUS to
- tristate
-In-Reply-To: <20160703173040.23612-5-paul.gortmaker@windriver.com>
-References: <20160703173040.23612-1-paul.gortmaker@windriver.com>
- <20160703173040.23612-5-paul.gortmaker@windriver.com>
-Message-ID: <CAMuHMdU7W05rPvcmZ7-2L7KU5nwpcLsYt6XSr+EfO2b0kWxC=A@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 4 Jul 2016 16:19:33 +0200
+Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <577A6816.3050709@linaro.org>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <2435381.sM3CFAEXNR@vostro.rjw.lan> <57767782.6020509@linaro.org>
+ <1643662.QIDsTbCMZg@vostro.rjw.lan> <577A6816.3050709@linaro.org>
+Message-ID: <CAJZ5v0idNxDkS2BoOW20dYF1y4nu=R5GLqbn=nO5thLy8NZjLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On Sun, Jul 3, 2016 at 7:30 PM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-> The Kconfig currently controlling compilation of this code is:
+On Mon, Jul 4, 2016 at 3:43 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 07/01/2016 11:01 PM, Rafael J. Wysocki wrote:
+>> On Friday, July 01, 2016 04:00:34 PM Daniel Lezcano wrote:
+>>> On 06/30/2016 03:27 PM, Rafael J. Wysocki wrote:
+>>>
 >
-> config SIMPLE_PM_BUS
->         bool "Simple Power-Managed Bus Driver"
+> [ ... ]
 >
-> ...meaning that it currently is not being built as a module by anyone.
+>>> clocksource-probe which is DT based with different drivers using it in
+>>> drivers/clocksource with a pletore of different archs.
+>>
+>> So maybe the GTDT code should be there too?
 >
-> In removing the orphaned modular support in a previous patch set,
-> Geert indicated he'd rather see this code converted to tristate.
+> *maybe*
 >
-> I normally don't do that because it extends functionality that I
-> can't easily run time test or even know if the use case makes sense,
-> but since in this case the author has nominated it as such, we do
-> the conversion here.
+>>> Cstate code which is only used by x86 is in drivers/acpi, it is only
+>>> used by x86/ia64 and it isn't a problem.
+>>
+>> It is a problem.
 >
-> Note that doesn't change the lack of run time testing ; this change
-> is only tested for sucessful compile and modpost.
+> Can you explain why it is a problem ?
+>
+>> drivers/acpi/ is not the right place for arch-specific code.
+>
+> I do not understand this assertion regarding what happened during the
+> last years with different subsystems where the drivers were moved from
+> their arch specific directories to the drivers directory (cpufreq,
+> cpuidle, clockevent, clk, etc ...) and resulted at the end to a code
+> refactoring and consolidation.
+>
+> Why ACPI should follow the opposite rule ?
 
-Thanks!
+Because drivers/acpi/ is for common and generic ACPI code.  Maybe it
+should not be located under drivers/, but that's a different matter.
 
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+>>> There is a small chunk in arch/x86/kernel/acpi and it doesn't facilitate the
+>>> comprehension of the code.
+>>>
+>>> IMHO, having all ACPI code in the same directory will encourage the
+>>> consolidation.
+>>
+>> The consolidation of what exactly?
+>
+> The consolidation of the ACPI code in general which is the
+> counter-example of self-contained code.
 
-Ethernet is probed successfully on sh73a0/kzm9g after insmodding
-simple-pm-bus.ko.
+Do you actually realize how much ACPI code is there in the kernel and
+that moving it all into one directory would be totally
+counter-productive?
 
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+You seem to be thinking that ACPI is something like cpufreq, where you
+have the core and the drivers and nothing but the drivers uses the
+core, but that's not the case.
 
-Gr{oetje,eeting}s,
+>> In particular, how does the GTDT code in drivers/acpi/ help to consolidate
+>> anything?
+>
+> If I imagine we group all ACPI code under a common directory, the first
+> example coming in my mind is the sharing of private headers, reducing
+> the scope of exported functions and global variables (eg. acpi_disabled).
+>
+> That say, I can understand grouping all the ACPI into a single directory
+> will make it fall under a single umbrella's maintainer and that could be
+> a nightmare to maintain as it covers a lot of different features.
+> However, I believe that could be solved by clearly identifying who takes
+> care of what.
 
-                        Geert
+And one way of doing that is to put things in different places in the
+kernel source tree.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Rafael
