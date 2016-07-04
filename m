@@ -1,115 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 4 Jul 2016 12:33:05 +0200
-Subject: [PATCH] arm64:mm Remove the redundant initrd memblock codes
-In-Reply-To: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
-References: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
-Message-ID: <4ABE8B9C-8027-40AA-A303-A82CF014A287@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 4 Jul 2016 12:36:31 +0200
+Subject: [PATCH v3] ARM: at91: Document new TCB bindings
+In-Reply-To: <20160704122452.69dcddf0@bbrezillon>
+References: <1467409925-17761-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160704122452.69dcddf0@bbrezillon>
+Message-ID: <20160704103631.GE20045@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/07/2016 at 12:24:52 +0200, Boris Brezillon wrote :
+> On Fri,  1 Jul 2016 23:52:05 +0200
+> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> > +One interrupt per TC block:
+> > +	tcb0: timer at fff7c000 {
+> > +		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		reg = <0xfff7c000 0x100>;
+> > +		interrupts = <18 4>;
+> > +		clocks = <&tcb0_clk>, <&clk32k>;
+> > +		clock-names = "t0_clk", "slow_clk";
+> > +
+> > +		timer at 0 {
+> > +			compatible = "atmel,tcb-timer";
+> > +			reg = <0>, <1>;
+> > +		};
+> > +
+> > +		timer at 2 {
+> > +			compatible = "atmel,tcb-timer";
+> > +			reg = <2>;
+> > +		};
+> 
+> And how can you differentiate the clocksource from the clkevent?
+> 
 
-> On 4 jul. 2016, at 06:53, Dennis Chen <dennis.chen@arm.com> wrote:
-> 
-> The memory range between initrd_start and initrd_end was added to the memblock
-> twice unnecessarily in the same function before initrd memory range can be freed.
-> This patch merge those codes into one piece of block and add the initrd memory
-> range only once, also it makes the code clean and simple.
-> 
+It doesn't really matter actually, I'll do the selection in the driver,
+as suggested by Rob.
 
-This is likely to break under KASLR (and I would recommend that you test with kaslr enabled when you propose changes to this code)
-
-The randomization of memstart_addr needs to execute /after/ adding back the initrd, otherwise the chosen value of memstart_addr may push the initrd beyond the end of the linear area into the userland range.
-
-
-> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Steve Capper <steve.capper@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
-> arch/arm64/mm/init.c | 58 +++++++++++++++++++++++-----------------------------
-> 1 file changed, 26 insertions(+), 32 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 2ade7a6..cf26cdb 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -228,6 +228,29 @@ void __init arm64_memblock_init(void)
->        memblock_add(__pa(_text), (u64)(_end - _text));
->    }
-> 
-> +    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-> +        extern u16 memstart_offset_seed;
-> +        u64 range = linear_region_size -
-> +                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
-> +
-> +        /*
-> +         * If the size of the linear region exceeds, by a sufficient
-> +         * margin, the size of the region that the available physical
-> +         * memory spans, randomize the linear region as well.
-> +         */
-> +        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-> +            range = range / ARM64_MEMSTART_ALIGN + 1;
-> +            memstart_addr -= ARM64_MEMSTART_ALIGN *
-> +                     ((range * memstart_offset_seed) >> 16);
-> +        }
-> +    }
-> +
-> +    /*
-> +     * Register the kernel text, kernel data, initrd, and initial
-> +     * pagetables with memblock.
-> +     */
-> +    memblock_reserve(__pa(_text), _end - _text);
-> +
->    if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
->        /*
->         * Add back the memory we just removed if it results in the
-> @@ -254,41 +277,12 @@ void __init arm64_memblock_init(void)
->            memblock_remove(base, size); /* clear MEMBLOCK_ flags */
->            memblock_add(base, size);
->            memblock_reserve(base, size);
-> +            /* the generic initrd code expects virtual addresses */
-> +            initrd_start = __phys_to_virt(initrd_start);
-> +            initrd_end = __phys_to_virt(initrd_end);
->        }
->    }
-> 
-> -    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-> -        extern u16 memstart_offset_seed;
-> -        u64 range = linear_region_size -
-> -                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
-> -
-> -        /*
-> -         * If the size of the linear region exceeds, by a sufficient
-> -         * margin, the size of the region that the available physical
-> -         * memory spans, randomize the linear region as well.
-> -         */
-> -        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-> -            range = range / ARM64_MEMSTART_ALIGN + 1;
-> -            memstart_addr -= ARM64_MEMSTART_ALIGN *
-> -                     ((range * memstart_offset_seed) >> 16);
-> -        }
-> -    }
-> -
-> -    /*
-> -     * Register the kernel text, kernel data, initrd, and initial
-> -     * pagetables with memblock.
-> -     */
-> -    memblock_reserve(__pa(_text), _end - _text);
-> -#ifdef CONFIG_BLK_DEV_INITRD
-> -    if (initrd_start) {
-> -        memblock_reserve(initrd_start, initrd_end - initrd_start);
-> -
-> -        /* the generic initrd code expects virtual addresses */
-> -        initrd_start = __phys_to_virt(initrd_start);
-> -        initrd_end = __phys_to_virt(initrd_end);
-> -    }
-> -#endif
-> -
->    early_init_fdt_scan_reserved_mem();
-> 
->    /* 4GB maximum for 32-bit only capable devices */
-> -- 
-> 1.8.3.1
-> 
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
