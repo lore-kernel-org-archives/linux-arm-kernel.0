@@ -1,33 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 4 Jul 2016 14:41:15 +0200
-Subject: [PATCH 0/6] CLCD support for Nomadik and Versatile series
-In-Reply-To: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
-References: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdY6FDisofanQX9oiXMr2otoBsYKsx+fTs-EkV2F-004Eg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 4 Jul 2016 14:45:47 +0200
+Subject: [PATCH 2/2] arm64: dts: r8a7795: add FDP1 device nodes
+In-Reply-To: <57768023.8010507@bingham.xyz>
+References: <1467293563-940-1-git-send-email-kieran@bingham.xyz>
+ <1467293563-940-3-git-send-email-kieran@bingham.xyz>
+ <57768023.8010507@bingham.xyz>
+Message-ID: <20160704124547.GH26270@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+On Fri, Jul 01, 2016 at 03:37:23PM +0100, Kieran Bingham wrote:
+> Hi Simon,
+> 
+> The bindings for this have now been acked by RobH.
 
-On Thu, Jun 16, 2016 at 11:36 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+Thanks, I have queued these up for v4.9.
 
-> This is a rebase and repost of my earlier "uncontroversial"
-> series of patches to CLCD, which excludes the part where
-> we deal with the Versatile autodetected displays. This makes
-> it possible to handle Nomadik graphics and RealView with just
-> device tree while keeping the Versatile specialties on hold.
->
-> We got an earlier nod from Tomi on this series:
-> http://marc.info/?l=linux-fbdev&m=145733624305361&w=2
-
-Is there any chance that we can progress with this series
-for the v4.8 kernel?
-
-I think Arnd is waiting eagerly to apply my patches removing
-the RealView board files that requires something like this
-series to go in first (the crucial part is the system controller
-set-up).
-
-Yours,
-Linus Walleij
+There was a small amount of fuzz when applying the first patch,
+please check to make sure it has been applied correctly once
+it hits the devel branch of the renesas tree.
