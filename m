@@ -1,40 +1,23 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 4 Jul 2016 17:42:14 +0800
-Subject: [PATCHv2 06/27] crypto: ahash: increase the maximum allowed
- statesize
-In-Reply-To: <577A2BE4.1090202@ti.com>
-References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
- <1466601840-18486-7-git-send-email-t-kristo@ti.com>
- <20160624103209.GA19607@gondor.apana.org.au>
- <5770B283.8000902@ti.com>
- <20160627050031.GA5673@gondor.apana.org.au>
- <577A298E.4040803@ti.com>
- <20160704091925.GA31964@gondor.apana.org.au>
- <577A2BE4.1090202@ti.com>
-Message-ID: <20160704094214.GA32058@gondor.apana.org.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 4 Jul 2016 11:48:22 +0200
+Subject: [PATCH] pinctrl: uniphier: remove pointless pin-mux settings for
+ PH1-LD11
+In-Reply-To: <1467190633-19990-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1467190633-19990-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdYzOwSKFdcVEc2wbFxAec_pHgR_CKvRUHbLN7Pu-mRWKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2016 at 12:27:00PM +0300, Tero Kristo wrote:
+On Wed, Jun 29, 2016 at 10:57 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+
+> This SoC has no SD card controller.  Nor does it have USB port3.
+> These pin-mux settings have no point.
 >
-> The driver allocates a largish buffer for copying the input data
-> from the sgs into a sequential space. If I don't save the contents
-> of this buffer anywhere, the export/import doesn't work as expected
-> it seems.
-> 
-> Actually I am now wondering why the driver allocates this sequential
-> buffer at all, DMA should be possible to use over the sgs just fine,
-> at least some other crypto drivers are doing this.
+> Fixes: 70f2f9c4cf25 ("pinctrl: uniphier: add UniPhier PH1-LD11 pinctrl driver")
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Indeed this is totally broken.  No hash driver should be holding
-data without actually hashing it, unless of course if there is less
-than a block of data.
+Patch applied.
 
-So either fix the driver to hash the data as they come in, or
-make it use a software fallback for update.
-
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Yours,
+Linus Walleij
