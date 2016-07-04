@@ -1,75 +1,47 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 04 Jul 2016 14:04:53 +0200
-Subject: [PATCH v3 5/7] PM / Hibernate: Allow arch code to influence CPU
- hotplug during hibernate
-In-Reply-To: <577A269A.6060307@arm.com>
-References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
- <7811260.OWJXivZiAP@vostro.rjw.lan> <577A269A.6060307@arm.com>
-Message-ID: <5024161.npQD1be5Q1@vostro.rjw.lan>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 4 Jul 2016 14:03:58 +0200
+Subject: [PATCH v3] ARM: at91: Document new TCB bindings
+In-Reply-To: <20160704103631.GE20045@piout.net>
+References: <1467409925-17761-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160704122452.69dcddf0@bbrezillon>
+ <20160704103631.GE20045@piout.net>
+Message-ID: <20160704140358.53ea7ad7@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 04, 2016 10:04:26 AM James Morse wrote:
-> Hi Rafael,
-> 
-> On 29/06/16 01:10, Rafael J. Wysocki wrote:
-> > On Tuesday, June 28, 2016 03:51:48 PM James Morse wrote:
-> >> Architecture code may need to do extra work when secondary CPUs are
-> >> disabled during hibernate and resume. This may include pushing sleeping
-> >> CPUs into a deeper power-saving state, or influencing which CPU resume
-> >> occurs on.
-> >>
-> >> Define a macro arch_hibernation_disable_cpus(), which defaults to calling
-> >> disable_nonboot_cpus() if undefined. Architectures that need to do extra
-> >> work around these calls can use this to influence disable_nonboot_cpus()
-> >> behaviour. The macro should be defined in asm/suspend.h, and
-> >> ARCH_HIBERNATION_CPUHP should be added to Kconfig.
-> 
-> > As you noted, this could be used to address the x86 issue that Yu is working on,
-> > so I'd like it to go in as the first patch in the series and through the PM tree.
-> 
-> Sure, I will split the series here, and group the later patches so there are no
-> dependencies.
-> 
-> 
+On Mon, 4 Jul 2016 12:36:31 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+
+> On 04/07/2016 at 12:24:52 +0200, Boris Brezillon wrote :
+> > On Fri,  1 Jul 2016 23:52:05 +0200
+> > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:  
+> > > +One interrupt per TC block:
+> > > +	tcb0: timer at fff7c000 {
+> > > +		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> > > +		#address-cells = <1>;
+> > > +		#size-cells = <0>;
+> > > +		reg = <0xfff7c000 0x100>;
+> > > +		interrupts = <18 4>;
+> > > +		clocks = <&tcb0_clk>, <&clk32k>;
+> > > +		clock-names = "t0_clk", "slow_clk";
+> > > +
+> > > +		timer at 0 {
+> > > +			compatible = "atmel,tcb-timer";
+> > > +			reg = <0>, <1>;
+> > > +		};
+> > > +
+> > > +		timer at 2 {
+> > > +			compatible = "atmel,tcb-timer";
+> > > +			reg = <2>;
+> > > +		};  
 > > 
-> >> ---
-> >> Changes since v2:
-> >>  * Added CONFIG_ARCH_HIBERNATION_CPUHP include guard allowing
-> > 
-> > What about calling it CONFIG_ARCH_HIBERNATION_CPU_OFFLINE?  It's not
-> > hotplug really.
+> > And how can you differentiate the clocksource from the clkevent?
+> >   
 > 
-> Even with the enable calls added? CONFIG_ARCH_HIBERNATION_CPU_HOOKS?
-
-Fine by me. :-)
-
-> >> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-> >> index fca9254280ee..338745e78f7e 100644
-> >> --- a/kernel/power/hibernate.c
-> >> +++ b/kernel/power/hibernate.c
-> >> @@ -31,8 +31,16 @@
-> >>  #include <linux/ktime.h>
-> >>  #include <trace/events/power.h>
-> >>  
-> >> +#ifdef CONFIG_ARCH_HIBERNATION_CPUHP
-> >> +/* Arch definition of the arch_hibernation_disable_cpus() macro? */
-> >> +#include <asm/suspend.h>
-> >> +#endif
-> >> +
-> >>  #include "power.h"
-> >>  
-> >> +#ifndef arch_hibernation_disable_cpus
-> >> +#define arch_hibernation_disable_cpus(x) disable_nonboot_cpus()
-> > 
-> > For the x86 case we'll also need the complementary "enable", so why don't
-> > you add it here and then use it instead of the enable_nonboot_cpus()?
+> It doesn't really matter actually, I'll do the selection in the driver,
+> as suggested by Rob.
 > 
-> Done. I've added the 'in_suspend' argument so that it's symmetrical, this may be
-> slightly different to the behaviour of your 'in_resume_hibernate' flag.
 
-Well, it turns out that I was wrong, we don't need the "enable" thing, so
-I guess it can stay the way it was.
-
-Thanks,
-Rafael
+Yes, I've read Rob's review, but then what's the point of defining 2
+timer nodes, just do the detection based on the number of channels
+you've reserved for the timer and define a single node.
