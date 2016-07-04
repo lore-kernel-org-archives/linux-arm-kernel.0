@@ -1,127 +1,78 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 4 Jul 2016 14:47:26 +0100
-Subject: [PATCH 3/4] bus: tegra-aconnect: make it explicitly non-modular
-In-Reply-To: <20160704134123.GV26134@windriver.com>
-References: <20160703173040.23612-1-paul.gortmaker@windriver.com>
- <20160703173040.23612-4-paul.gortmaker@windriver.com>
- <577A2995.6020504@nvidia.com> <20160704134123.GV26134@windriver.com>
-Message-ID: <577A68EE.3040402@nvidia.com>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Mon, 4 Jul 2016 15:47:30 +0200
+Subject: [PATCH 2/4] dt-bindings: Document the STM32 reset bindings
+In-Reply-To: <1467640052-6770-1-git-send-email-gabriel.fernandez@st.com>
+References: <1467640052-6770-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1467640052-6770-2-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-On 04/07/16 14:41, Paul Gortmaker wrote:
-> [Re: [PATCH 3/4] bus: tegra-aconnect: make it explicitly non-modular] On 04/07/2016 (Mon 10:17) Jon Hunter wrote:
-> 
->> Hi Paul,
->>
->> On 03/07/16 18:30, Paul Gortmaker wrote:
->>> The Kconfig currently controlling compilation of this code is:
->>>
->>> drivers/bus/Kconfig:config TEGRA_ACONNECT
->>> drivers/bus/Kconfig:    bool "Tegra ACONNECT Bus Driver"
->>>
->>> ...meaning that it currently is not being built as a module by anyone.
->>>
->>> Lets remove the modular code that is essentially orphaned, so that
->>> when reading the driver there is no doubt it is builtin-only.
->>>
->>> We explicitly disallow a driver unbind, since that doesn't have a
->>> sensible use case anyway, and it allows us to drop the ".remove"
->>> code for non-modular drivers.
->>>
->>> Since module_platform_driver() uses the same init level priority as
->>> builtin_platform_driver() the init ordering remains unchanged with
->>> this commit.
->>>
->>> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
->>>
->>> We also delete the MODULE_LICENSE tag etc. since all that information
->>> was (or is now) contained at the top of the file in the comments.
->>
->> In version 3 of the aconnect series [0] I had made this a tristate
->> because we allowed it to be removed and you had submitted a patch to
->> export the PM_CLK APIs. However, when discussing with Thierry he said
->> that we were unable to merge with tristate because of the dependency on
->> your patch. So he suggested we merge with bool for now and then change
->> it back to tristate for v4.9.
-> 
-> Oh I see.  The exported clock syms were for the 210 DMA driver and it
-> never crossed my mind that this driver needed the same syms in order for
-> it to be tristate.  Guess the exports proved useful afterall.  :)
+This adds documentation of device tree bindings for the
+STM32 reset controller.
 
-Yes indeed and I did learn my lesson after your previous catch for the
-ADMA ;-)
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+---
+ .../devicetree/bindings/reset/st,stm32-rcc.txt     | 50 ++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
 
->>
->> I understand that we should not do this, but we do plan to make this
->> modular in the future.
-> 
-> No problem ; I will drop this patch in favor of a one line Kconfig patch
-> in my test queue so it doesn't trip the regular audit, just like I have
-> for the 210 below -- not yet submitted for the same dependency reason.
-> 
-> P.
-> ---
-> 
-> 
->  From fe5bdc6348828c157deb14e8d75c732abcc2ad2b Mon Sep 17 00:00:00 2001
-> From: Paul Gortmaker <paul.gortmaker@windriver.com>
-> Date: Fri, 20 May 2016 14:30:43 -0400
-> Subject: [PATCH] dma: tegra210-adma: convert TEGRA210_ADMA from bool to
->  tristate
-> 
-> This driver currently uses modular infrastructure but is controlled
-> by a bool Kconfig.
-> 
-> There is a general consensus from the DMA reviewers and maintainers
-> that "if it can be modular, it should be modular" in order to keep
-> the bzImage size under control for multi platform kernels.
-> 
-> Build tested only.  Also needs some new pm_clk symbols exported
-> before this commit is applied to tree in order to avoid modpost
-> errors like:
-> 
->   ERROR: "pm_clk_add_clk" [drivers/dma/tegra210-adma.ko] undefined!
->   ERROR: "pm_clk_create" [drivers/dma/tegra210-adma.ko] undefined!
->   ERROR: "pm_clk_destroy" [drivers/dma/tegra210-adma.ko] undefined!
->   ERROR: "pm_clk_suspend" [drivers/dma/tegra210-adma.ko] undefined!
->   ERROR: "pm_clk_resume" [drivers/dma/tegra210-adma.ko] undefined!
-> 
-> Cc: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Jon Hunter <jonathanh@nvidia.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: dmaengine at vger.kernel.org
-> Cc: linux-tegra at vger.kernel.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
->  drivers/dma/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 8c98779a12b1..866068d84ca2 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -468,7 +468,7 @@ config TEGRA20_APB_DMA
->  	  or vice versa. It does not support memory to memory data transfer.
->  
->  config TEGRA210_ADMA
-> -	bool "NVIDIA Tegra210 ADMA support"
-> +	tristate "NVIDIA Tegra210 ADMA support"
->  	depends on ARCH_TEGRA_210_SOC
->  	select DMA_ENGINE
->  	select DMA_VIRTUAL_CHANNELS
-
-Thanks! FWIW ...
-
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
-
+diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+new file mode 100644
+index 0000000..333080c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+@@ -0,0 +1,50 @@
++STMicroelectronics STM32 Peripheral Reset Controller
++====================================================
++
++The RCC IP is both a reset and a clock controller. This documentation only
++documents the reset part.
++
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
++
++Required properties:
++- compatible: Should be "st,stm32-rcc"
++- reg: should be register base and length as documented in the
++  datasheet
++- #reset-cells: 1, see below
++
++example:
++
++rcc: reset at 40023800 {
++	#reset-cells = <1>;
++	compatible = "st,stm32-rcc";
++	reg = <0x40023800 0x400>;
++};
++
++Specifying softreset control of devices
++=======================================
++
++Device nodes should specify the reset channel required in their "resets"
++property, containing a phandle to the reset device node and an index specifying
++which channel to use.
++The index is the bit number within the RCC registers bank, starting from RCC
++base address.
++It is calculated as: index = register_offset / 4 * 32 + bit_offset.
++Where bit_offset is the bit offset within the register.
++For example, for CRC reset:
++  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 + 12 = 140
++
++To simplify the usagen and to share bit definition with the clock driver of
++the RCC IP, macros are available to generate the index in human-readble
++format.
++
++For STM32F4 series, the macro are available here:
++ - include/dt-bindings/mfd/stm32f4-rcc.h
++
++example:
++
++	timer2 {
++		resets			= <&rcc STM32F4_APB1_RESET(TIM2)>;
++	};
++
++
 -- 
-nvpublic
+1.9.1
