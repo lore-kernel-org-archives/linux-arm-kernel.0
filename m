@@ -1,57 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Jul 2016 21:10:58 +0200
-Subject: [GIT PULL] Allwinner Fixes for 4.7
-Message-ID: <20160704191058.GA29277@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 4 Jul 2016 22:24:04 +0200
+Subject: [PATCH] clocksource: timer-atmel-pit: enable mck
+In-Reply-To: <1467648009-24269-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1467648009-24269-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160704222404.5132c3d3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+On Mon,  4 Jul 2016 18:00:09 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-Please pull the following changes in 4.7.
+> mck is needed to get the PIT working. Explicitly prepare_enable it instead
+> of assuming it is enabled.
+> 
+> This solves an issue were the system is freezing when the ETM/ETB drivers
 
-Thanks!
-Maxime
+			^ where
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> are enabled.
+> 
+> Reported-by: Olivier Schonken <olivier.schonken@gmail.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-4.7
-
-for you to fetch changes up to eee25ab19de632af1ab4d2ac50bfc5006802e664:
-
-  ARM: dts: sun7i: Fix pll3x2 and pll7x2 not having a parent clock (2016-06-29 09:03:13 +0200)
-
-----------------------------------------------------------------
-Allwinner Fixes for 4.7
-
-Two patches fixing simplefb on the SoCs that had their display clocks
-enabled, and one fix for the CHIP that will enable its sched clock.
-
-----------------------------------------------------------------
-Boris Brezillon (1):
-      ARM: sunxi/dt: make the CHIP inherit from allwinner,sun5i-a13
-
-Hans de Goede (2):
-      ARM: dts: sunxi: Add pll3 to simplefb nodes clocks lists
-      ARM: dts: sun7i: Fix pll3x2 and pll7x2 not having a parent clock
-
- arch/arm/boot/dts/sun4i-a10.dtsi    | 21 ++++++++++++---------
- arch/arm/boot/dts/sun5i-a10s.dtsi   | 11 ++++++-----
- arch/arm/boot/dts/sun5i-r8-chip.dts |  2 +-
- arch/arm/boot/dts/sun7i-a20.dtsi    | 13 ++++++++-----
- 4 files changed, 27 insertions(+), 20 deletions(-)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160704/988d7082/attachment.sig>
+> ---
+>  drivers/clocksource/timer-atmel-pit.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+> index d911c5dca8f1..fcc97711cd79 100644
+> --- a/drivers/clocksource/timer-atmel-pit.c
+> +++ b/drivers/clocksource/timer-atmel-pit.c
+> @@ -248,6 +248,9 @@ static void __init at91sam926x_pit_dt_init(struct device_node *node)
+>  	if (IS_ERR(data->mck))
+>  		panic(pr_fmt("Unable to get mck clk\n"));
+>  
+> +	if (clk_prepare_enable(data->mck))
+> +		panic(pr_fmt("Unable to enable mck\n"));
+> +
+>  	/* Get the interrupts property */
+>  	data->irq = irq_of_parse_and_map(node, 0);
+>  	if (!data->irq)
