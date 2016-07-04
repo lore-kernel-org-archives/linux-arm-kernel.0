@@ -1,130 +1,70 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 4 Jul 2016 14:11:48 +0300
-Subject: [PATCHv2 2/5] ARM: OMAP2+: hwmod: fetch main_clk based on hwmod name
-In-Reply-To: <20160704065428.GS28140@atomide.com>
-References: <20160704065428.GS28140@atomide.com>
-Message-ID: <1467630708-28498-1-git-send-email-t-kristo@ti.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 04 Jul 2016 12:16:40 +0100
+Subject: [PATCH 2/2] arm-cci: ensure perf synchronisation
+In-Reply-To: <20160704103130.GA6774@leverpostej> (Mark Rutland's message of
+ "Mon, 4 Jul 2016 11:31:31 +0100")
+References: <1467136218-15789-1-git-send-email-mark.rutland@arm.com>
+ <1467136218-15789-3-git-send-email-mark.rutland@arm.com>
+ <20160704102205.GD1639@arm.com> <20160704103130.GA6774@leverpostej>
+Message-ID: <87bn2dd55z.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the transition to hwmod module clocks, all hwmods will have
-their main clocks named <hwmod_name>_mod_ck. Use this info to
-fetch main_clk, and use it if found.
+Mark Rutland <mark.rutland@arm.com> writes:
 
-Also, if a main_clk is found based on the hwmod name, disable
-the direct PRCM modulemode access from hwmod.
+> On Mon, Jul 04, 2016 at 11:22:05AM +0100, Will Deacon wrote:
+>> On Tue, Jun 28, 2016 at 06:50:18PM +0100, Mark Rutland wrote:
+>> > Currently the IRQ core is permitted to make the CCI PMU IRQ handler
+>> > threaded, and will allow userspace to change the CPU affinity of the
+>> > interrupt behind our back. Both of these could violate our
+>> > synchronisation requirements with the core perf code, which relies upon
+>> > strict CPU affinity and disabling of interrupts to guarantee mutual
+>> > exclusion in some cases.
+>> 
+>> Minor nit, but I think $subject is particularly unhelpful for these two
+>> patches. How about "arm-ccX: fix PMU interrupt flags"?
+>
+> Sure, I'll move over to that wording.
+>
+>> > @@ -881,7 +881,8 @@ static int pmu_request_irq(struct cci_pmu *cci_pmu, irq_handler_t handler)
+>> >  	 * This should allow handling of non-unique interrupt for the counters.
+>> >  	 */
+>> >  	for (i = 0; i < cci_pmu->nr_irqs; i++) {
+>> > -		int err = request_irq(cci_pmu->irqs[i], handler, IRQF_SHARED,
+>> 
+>> Why is this shared and who is the line shared with? We should check that
+>> we don't have contradictory IRQ flags in the other irq request path(s).
+>
+> Hmm... I thought that was so the driver could request the same IRQ
+> multiple times in the case of muxing, but I see we've always had the
+> is_duplicate_irq logic.
+>
+> The IRQF_SHARED flags has also been there since day one, so I'm not sure
+> if that's needed for some platform or whether that was added out of
+> habit.
+>
+> Punit, do you recall if/why IRQF_SHARED was used?
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c | 55 ++++++++++++++++++++++++++++++++++++----
- 1 file changed, 50 insertions(+), 5 deletions(-)
+AFAIR, there was no platform that needed the flag. The IRQF_SHARED flag
+was included to allow sharing in the eventuality that such a platform
+did show up.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index be77d05..5b70938 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -178,6 +178,11 @@
-  */
- #define OMAP4_RST_CTRL_ST_OFFSET	4
- 
-+/*
-+ * Maximum length for module clock handle names
-+ */
-+#define MOD_CLK_MAX_NAME_LEN		32
-+
- /**
-  * struct omap_hwmod_soc_ops - fn ptrs for some SoC-specific operations
-  * @enable_module: function to enable a module (via MODULEMODE)
-@@ -200,6 +205,7 @@ struct omap_hwmod_soc_ops {
- 	int (*init_clkdm)(struct omap_hwmod *oh);
- 	void (*update_context_lost)(struct omap_hwmod *oh);
- 	int (*get_context_lost)(struct omap_hwmod *oh);
-+	int (*disable_direct_prcm)(struct omap_hwmod *oh);
- };
- 
- /* soc_ops: adapts the omap_hwmod code to the currently-booted SoC */
-@@ -776,17 +782,35 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
-  * @oh: struct omap_hwmod *
-  *
-  * Called from _init_clocks().  Populates the @oh _clk (main
-- * functional clock pointer) if a main_clk is present.  Returns 0 on
-- * success or -EINVAL on error.
-+ * functional clock pointer) if a clock matching the hwmod name is found,
-+ * or a main_clk is present.  Returns 0 on success or -EINVAL on error.
-  */
- static int _init_main_clk(struct omap_hwmod *oh)
- {
- 	int ret = 0;
-+	char name[MOD_CLK_MAX_NAME_LEN];
-+	struct clk *clk;
- 
--	if (!oh->main_clk)
--		return 0;
-+	/* +7 magic comes from '_mod_ck' suffix */
-+	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
-+		pr_warn("%s: warning: cropping name for %s\n", __func__,
-+			oh->name);
-+
-+	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
-+	strcat(name, "_mod_ck");
-+
-+	clk = clk_get(NULL, name);
-+	if (!IS_ERR(clk)) {
-+		oh->_clk = clk;
-+		soc_ops.disable_direct_prcm(oh);
-+		oh->main_clk = kstrdup(name, GFP_KERNEL);
-+	} else {
-+		if (!oh->main_clk)
-+			return 0;
-+
-+		oh->_clk = clk_get(NULL, oh->main_clk);
-+	}
- 
--	oh->_clk = clk_get(NULL, oh->main_clk);
- 	if (IS_ERR(oh->_clk)) {
- 		pr_warn("omap_hwmod: %s: cannot clk_get main_clk %s\n",
- 			oh->name, oh->main_clk);
-@@ -3088,6 +3112,25 @@ static int _omap4_is_hardreset_asserted(struct omap_hwmod *oh,
- }
- 
- /**
-+ * _omap4_disable_direct_prcm - disable direct PRCM control for hwmod
-+ * @oh: struct omap_hwmod * to disable control for
-+ *
-+ * Disables direct PRCM clkctrl done by hwmod core. Instead, the hwmod
-+ * will be using its main_clk to enable/disable the module. Returns
-+ * 0 if successful.
-+ */
-+static int _omap4_disable_direct_prcm(struct omap_hwmod *oh)
-+{
-+	if (!oh)
-+		return -EINVAL;
-+
-+	oh->prcm.omap4.clkctrl_offs = 0;
-+	oh->prcm.omap4.modulemode = 0;
-+
-+	return 0;
-+}
-+
-+/**
-  * _am33xx_deassert_hardreset - call AM33XX PRM hardreset fn with hwmod args
-  * @oh: struct omap_hwmod * to deassert hardreset
-  * @ohri: hardreset line data
-@@ -3910,6 +3953,7 @@ void __init omap_hwmod_init(void)
- 		soc_ops.init_clkdm = _init_clkdm;
- 		soc_ops.update_context_lost = _omap4_update_context_lost;
- 		soc_ops.get_context_lost = _omap4_get_context_lost;
-+		soc_ops.disable_direct_prcm = _omap4_disable_direct_prcm;
- 	} else if (cpu_is_ti814x() || cpu_is_ti816x() || soc_is_am33xx() ||
- 		   soc_is_am43xx()) {
- 		soc_ops.enable_module = _omap4_enable_module;
-@@ -3919,6 +3963,7 @@ void __init omap_hwmod_init(void)
- 		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
- 		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
- 		soc_ops.init_clkdm = _init_clkdm;
-+		soc_ops.disable_direct_prcm = _omap4_disable_direct_prcm;
- 	} else {
- 		WARN(1, "omap_hwmod: unknown SoC type\n");
- 	}
--- 
-1.9.1
+I worked with the assumption that adding the flag was part of good
+practice for a driver that didn't need exclusive interrupt.
+
+Anyways, I haven't come across any platform that's needed that
+functionality yet. I think it can be safely dropped.
+
+Thanks,
+Punit
+
+>
+> I'll take a look at dts and see if I can get rid of it.
+>
+> Thanks,
+> Mark.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
