@@ -1,36 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Jul 2016 14:50:29 +0100
-Subject: [PATCH 1/2] arm-ccn: ensure perf synchronisation
-In-Reply-To: <1467639584.22236.1.camel@arm.com>
-References: <1467136218-15789-1-git-send-email-mark.rutland@arm.com>
- <1467136218-15789-2-git-send-email-mark.rutland@arm.com>
- <1467639584.22236.1.camel@arm.com>
-Message-ID: <20160704135029.GB9048@leverpostej>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 4 Jul 2016 15:54:17 +0200
+Subject: [PATCH v7 09/17] KVM: arm64: introduce ITS emulation file with
+ MMIO framework
+In-Reply-To: <32d54016-731d-e4a9-272d-8b0934ebec31@arm.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+ <20160628123230.26255-10-andre.przywara@arm.com>
+ <3fec9632-ce39-3508-2b71-4049fc959a64@redhat.com>
+ <32d54016-731d-e4a9-272d-8b0934ebec31@arm.com>
+Message-ID: <8546ac45-f7cd-31af-a261-bb85ca7305ca@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2016 at 02:39:44PM +0100, Pawel Moll wrote:
-> Dnia 2016-06-28, Tue o godzinie 18:50 +0100, Mark Rutland pisze:
-> > Currently the IRQ core is permitted to make the CCN PMU IRQ handler
-> > threaded, and will allow userspace to change the CPU affinity of the
-> > interrupt behind our back. Both of these could violate our
-> > synchronisation requirements with the core perf code, which relies upon
-> > strict CPU affinity and disabling of interrupts to guarantee mutual
-> > exclusion in some cases.
-> > 
-> > As with the CPU PMU drivers, we should request the interrupt with
-> > IRQF_NOBALANCING and IRQF_NO_THREAD, to avoid these issues.
+Hi Andre,
+
+On 04/07/2016 15:38, Andre Przywara wrote:
+> 2) on KVM_DEV_ARM_VGIC_GRP_ADDR check that "initialized" is false
+> 3) on KVM_DEV_ARM_VGIC_CTRL_INIT check that "initialized" is false
+> 4) after KVM_DEV_ARM_VGIC_CTRL_INIT set initialized to true
 > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> I don't want to rely solely on vgic_its_base being ADDR_UNDEF, since I
+> expect we extend that interface later by supporting more options (for
+> instance to size the virtual ITS, in terms of devices, number of LPIs,
+> collections, etc.)
 > 
-> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> Does that make sense?
+> Or do we need more here?
 
-Cheers. I've just sent v2, so I've applied that locally, and it'll
-appear if a v3 is necessary.
+So you will accept a call to KVM_DEV_ARM_VGIC_CTRL_INIT with an unset
+address? I don't think this is relevant.
 
-> In principle, because still had no chance to test it...
+Thanks
 
-Understood.
-
-Thanks,
-Mark.
+Eric
