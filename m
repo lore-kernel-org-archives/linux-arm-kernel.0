@@ -1,69 +1,42 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 4 Jul 2016 11:51:48 +0800
-Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's
- parents
-In-Reply-To: <20160702012140.GB17071@codeaurora.org>
-References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
- <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
- <20160702012140.GB17071@codeaurora.org>
-Message-ID: <1467604308.26485.4.camel@mtksdaap41>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 4 Jul 2016 12:59:54 +0900
+Subject: [PATCH v3 0/2] mark spi clocks as critical and enable spi3 clocks
+In-Reply-To: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
+References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
+Message-ID: <CA+Ln22HuCdDr=g06ynK7mqjDfUVrQgG-NRkfTP_zE6h-wZk6Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-07-01 at 18:21 -0700, Stephen Boyd wrote:
-> (Resending to everyone)
-> 
-> On 06/22, Erin Lo wrote:
-> > From: James Liao <jamesjj.liao@mediatek.com>
-> > 
-> > This patch fixed wrong state of parent clocks if they are registered
-> > after critical clocks.
-> > 
-> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> 
-> It would be nice if you included the information about the
-> problem from James' previous mail. This says what it does, but
-> doesn't explain what the problem is and how it is fixing it.
-> 
-> > ---
-> >  drivers/clk/clk.c | 9 ++++++++-
-> >  1 file changed, 8 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index d584004..e9f5f89 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -2388,8 +2388,15 @@ static int __clk_core_init(struct clk_core *core)
-> >  	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
-> >  		struct clk_core *parent = __clk_init_parent(orphan);
-> >  
-> > -		if (parent)
-> > +		if (parent) {
-> >  			clk_core_reparent(orphan, parent);
-> > +
-> > +			if (orphan->prepare_count)
-> > +				clk_core_prepare(parent);
-> > +
-> > +			if (orphan->enable_count)
-> > +				clk_core_enable(parent);
-> > +		}
-> >  	}
-> 
-> I'm pretty sure I pointed this problem out to Mike when the
-> critical clk patches were being pushed. I can't recall what the
-> plan was though to fix the problem. I'm pretty sure he said that
-> clk_core_reparent() would take care of it, but obviously it is
-> not doing that. Or perhaps it was that clk handoff should figure
-> out that the parents of a critical clk are also on and thus keep
-> them on.
+Hi Andi,
 
-Hi Mike
+2016-06-30 16:15 GMT+09:00 Andi Shyti <andi.shyti@samsung.com>:
+> Hi,
+>
+> This patchset enables spi3 clocks by marking critical clocks as
+> CLK_IS_CRITICAL and in the meantime replaces the use of
+> CLK_IGNORE_UNUSED for spi1 clocks.
+>
+> The sclk needs to be considered critical as well.
+>
+> The SPI3 in the tm2/tm2e boards will control an irled for remote
+> controlling.
+>
+> Changelog:
+>
+> V1 -> V2
+>  - the "sclk_spi3" doesn't need to be enabled in boot time as it
+>   is handled by the spi driver itself.
+>
+>  - use the CLK_IS_CRITICAL flag for the ioclk
+>
+> V2 -> V3
+>  - some more tests has confirmed taht "sclk_spi1,3" need to be
+>    enabled as critical!
 
-Is there any other patch to fix this issue? Or did I misuse critical
-clock flag?
-
+This sounds like a DTS and/or SPI and/or clock driver bug then. I'm
+pretty much convinced that it might also cause other problems and this
+workaround will only mask them making things even more difficult to
+debug in the future. Let's not introduce more technical debt.
 
 Best regards,
-
-James
+Tomasz
