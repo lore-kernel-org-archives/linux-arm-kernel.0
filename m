@@ -1,94 +1,82 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 04 Jul 2016 10:04:26 +0100
-Subject: [PATCH v3 5/7] PM / Hibernate: Allow arch code to influence CPU
- hotplug during hibernate
-In-Reply-To: <7811260.OWJXivZiAP@vostro.rjw.lan>
-References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
- <1467125510-18758-6-git-send-email-james.morse@arm.com>
- <7811260.OWJXivZiAP@vostro.rjw.lan>
-Message-ID: <577A269A.6060307@arm.com>
+From: olivier.schonken@gmail.com (Olivier Schonken)
+Date: Mon, 4 Jul 2016 11:08:42 +0200
+Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
+In-Reply-To: <20160704110018.76288816@bbrezillon>
+References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
+ <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
+ <20160701183248.GC2874@piout.net>
+ <CALdGsk+KwPMVKXhKtcmoUFqfj6aQRvQSY74F31fSvZhV+QvjAA@mail.gmail.com>
+ <20160702204608.257b8bc6@bbrezillon>
+ <CALdGsk+RO_cxfcTLVyKHP3aVMkSTtzEzQXz2G4ARX7vqxRazSA@mail.gmail.com>
+ <20160704110018.76288816@bbrezillon>
+Message-ID: <CALdGsk+rSYukvo6-zqgqNTwJnf8QXu2bCSAdurpg1=BVtENZvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+That is the dilemma I face with the structure.  What is the least
+invasive option to include the coresight functionality, without
+breaking the amba probe for other architectures that rely on it having
+a clock to enable/disable, and not break the processor startup by
+messing with stable clocks for the sake of giving the ETB/ETM a clock
+it doesn't need.
+That is why in the end I decided on a dummy clock driver.  To keep
+with the convention of having a clock specific to the ETM, and leaving
+the rest of the clocks as is.
 
-On 29/06/16 01:10, Rafael J. Wysocki wrote:
-> On Tuesday, June 28, 2016 03:51:48 PM James Morse wrote:
->> Architecture code may need to do extra work when secondary CPUs are
->> disabled during hibernate and resume. This may include pushing sleeping
->> CPUs into a deeper power-saving state, or influencing which CPU resume
->> occurs on.
+Regards
+
+Olivier
+
+On 4 July 2016 at 11:00, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+> On Mon, 4 Jul 2016 10:47:21 +0200
+> Olivier Schonken <olivier.schonken@gmail.com> wrote:
+>
+>> Hi Boris
 >>
->> Define a macro arch_hibernation_disable_cpus(), which defaults to calling
->> disable_nonboot_cpus() if undefined. Architectures that need to do extra
->> work around these calls can use this to influence disable_nonboot_cpus()
->> behaviour. The macro should be defined in asm/suspend.h, and
->> ARCH_HIBERNATION_CPUHP should be added to Kconfig.
-
-> As you noted, this could be used to address the x86 issue that Yu is working on,
-> so I'd like it to go in as the first patch in the series and through the PM tree.
-
-Sure, I will split the series here, and group the later patches so there are no
-dependencies.
-
-
-> 
->> ---
->> Changes since v2:
->>  * Added CONFIG_ARCH_HIBERNATION_CPUHP include guard allowing
-> 
-> What about calling it CONFIG_ARCH_HIBERNATION_CPU_OFFLINE?  It's not
-> hotplug really.
-
-Even with the enable calls added? CONFIG_ARCH_HIBERNATION_CPU_HOOKS?
-
-
->> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
->> index fca9254280ee..338745e78f7e 100644
->> --- a/kernel/power/hibernate.c
->> +++ b/kernel/power/hibernate.c
->> @@ -31,8 +31,16 @@
->>  #include <linux/ktime.h>
->>  #include <trace/events/power.h>
->>  
->> +#ifdef CONFIG_ARCH_HIBERNATION_CPUHP
->> +/* Arch definition of the arch_hibernation_disable_cpus() macro? */
->> +#include <asm/suspend.h>
->> +#endif
->> +
->>  #include "power.h"
->>  
->> +#ifndef arch_hibernation_disable_cpus
->> +#define arch_hibernation_disable_cpus(x) disable_nonboot_cpus()
-> 
-> For the x86 case we'll also need the complementary "enable", so why don't
-> you add it here and then use it instead of the enable_nonboot_cpus()?
-
-Done. I've added the 'in_suspend' argument so that it's symmetrical, this may be
-slightly different to the behaviour of your 'in_resume_hibernate' flag.
-
-
-> 
->> +#endif
->>  
->>  static int nocompress;
->>  static int noresume;
-
-
->> @@ -551,7 +559,7 @@ int hibernation_platform_enter(void)
->>  	if (error)
->>  		goto Platform_finish;
->>  
->> -	error = disable_nonboot_cpus();
->> +	error = arch_hibernation_disable_cpus(true);
-> 
-> Does this one here actually matter?
-
-I added it for completeness/symmetry (but not the enable call because it
-wouldn't have any users). I assume its something to do with acpi...
-
-
-
-Thanks,
-
-James
+>> The amba bus is probed after the PIT driver.
+>
+> So we clearly have a problem in there...
+>
+>> I have today found pck0 -
+>> pck2 to work as well.  Would this be good enough to use?
+>
+> But why would we reference one of the programmable clock? AFAICT, the
+> coresight-etb10 block does not depend on any of the programmable clock.
+>
+>>
+>> Regards
+>>
+>> Olivier
+>>
+>> On 2 July 2016 at 20:46, Boris Brezillon <boris.brezillon@free-electrons.com
+>> > wrote:
+>>
+>> > Hi Olivier,
+>> >
+>> > On Fri, 1 Jul 2016 22:07:53 +0200
+>> > Olivier Schonken <olivier.schonken@gmail.com> wrote:
+>> >
+>> > > Hi Alexandre
+>> > >
+>> > > Resending this mail, the previous one was accidentally in html format,
+>> > > thus rejected from the list.  My apologies.
+>> > >
+>> > > I did try a couple of options regarding the clock, mck included, but
+>> > > it would then hang when probing occurs in drivers/amba/bus.c when the
+>> > > clock gets disabled. The dummy clock solved this issue, but I'm open
+>> > > to better suggestions.
+>> >
+>> > Hm, that's really weird. Is the AMBA bus driver probed before the PIT
+>> > driver?
+>> > Anyway, I agree that this dummy clock approach is not ideal. Could we
+>> > make the apb_pclk clock optional in the AMBA bus driver?
+>> >
+>> > The other approach would be to have someone claim the mck clock before
+>> > the AMBA bus driver, and keep it enabled.
+>> >
+>> > Regards,
+>> >
+>> > Boris
+>> >
+>
