@@ -1,53 +1,93 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Mon, 04 Jul 2016 14:43:06 +0300
-Subject: [BUG] Regression, usb-dwc3 not working, Odroid XU3, usb 3.0
-In-Reply-To: <577A4AFB.9030006@samsung.com>
-References: <577A47D3.7020900@samsung.com> <87shvpljsk.fsf@linux.intel.com>
- <577A4AFB.9030006@samsung.com>
-Message-ID: <87poqtljcl.fsf@linux.intel.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 4 Jul 2016 11:47:50 +0000
+Subject: [RFC PATCH v2 2/4] net: ethernet: xilinx: Add gmii2rgmii
+ converter support
+In-Reply-To: <577A323A.4080207@atmel.com>
+References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
+ <1467623084-15471-3-git-send-email-appanad@xilinx.com>
+ <577A323A.4080207@atmel.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5BB227@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Nicolas,
 
-Hi,
+	Thanks for the review...
 
-Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
->>> Since three recent next releases (first on 20160630), on Odroid XU3 board
->>> the USB 3.0 host port (the only one) stopped working.
->>>
->>> This is a "samsung,exynos5250-dwusb3" (drivers/usb/dwc3/dwc3-exynos.c).
->>>
->>> Two issues here:
->>> 1. The port does not show up as USB 3.0 device.
->>> This one device is missing:
->>> 	Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
->>>
->>> 2. The port does not work even for 2.0 devices (I didn't test 1.0).
->>>
->>>
->>> config: exynos_defconfig (ARM)
->>> DTS: exynos5422-odroidxu3.dts
->> 
->> apply [1] and try again. That commit is already in greg/usb-testing [2]
->> and it should trickle down to usb-next shortly.
->> 
->> [1] https://marc.info/?l=linux-usb&m=146728795330915&w=2
->> [2] https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/?h=usb-testing&id=322832f2f19e04c866a0ce4bdac8cff8e695f2b3
->> 
->
-> Ahhh, indeed, fixed.
->
-> FWIW:
-> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > diff --git a/include/linux/xilinx_gmii2rgmii.h
+> > b/include/linux/xilinx_gmii2rgmii.h
+> > new file mode 100644
+> > index 0000000..b328ee7
+> > --- /dev/null
+> > +++ b/include/linux/xilinx_gmii2rgmii.h
+> > @@ -0,0 +1,24 @@
+> 
+> 
+> Here, header of the file seems needed.
 
-cool, thanks for testing :-)
+Sure will fix in the next version...
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160704/5220a21a/attachment.sig>
+> 
+> > +#ifndef _GMII2RGMII_H
+> > +#define _GMII2RGMII_H
+> > +
+> > +#include <linux/of.h>
+> > +#include <linux/phy.h>
+> > +#include <linux/mii.h>
+> > +
+> > +#define XILINX_GMII2RGMII_FULLDPLX		BMCR_FULLDPLX
+> > +#define XILINX_GMII2RGMII_SPEED1000		BMCR_SPEED1000
+> > +#define XILINX_GMII2RGMII_SPEED100		BMCR_SPEED100
+> > +#define XILINX_GMII2RGMII_REG_NUM			0x10
+> > +
+> > +struct gmii2rgmii {
+> > +	struct net_device	*dev;
+> > +	struct mii_bus		*mii_bus;
+> > +	struct phy_device	*gmii2rgmii_phy_dev;
+> > +	void			*platform_data;
+> > +	int (*mdio_write)(struct mii_bus *bus, int mii_id, int reg,
+> > +			  u16 val);
+> > +	void (*fix_mac_speed)(struct gmii2rgmii *xphy, unsigned int speed);
+> > +};
+> > +
+> > +extern int gmii2rgmii_phyprobe(struct gmii2rgmii *xphy); #endif
+> 
+> I see a compilation issue here:
+> 
+> You should provide a way to have this function even if the NET_VENDOR_XILINX
+> config option is not selected (test to compile with the sama5_defconfig and
+> you'll see).
+
+Ok will fix in the next version...
+
+> 
+> What about making this function void in case of !XILINX?
+
+This is one way to get rid of compilation error. Changes will be look like below
+
+#ifdef CONFIG_NET_VENDOR_XILINX
+ extern int gmii2rgmii_phyprobe(struct gmii2rgmii *xphy);
+#else
+extern void gmii2rgmii_phyprobe(struct gmii2rgmii *xphy);
+void gmii2rgmii_phyprobe(struct gmii2rgmii *xphy)
+{
+}
+#endif
+For me the changes are looking odd...
+
+Other possible ways 
+	1)  Put a config check around phyprobe api in the macb driver.
+#ifdef CONFIG_XILINX_GMII2RGMII
+                       gmii2rgmii_phyprobe(&bp->converter_phy);
+#endif
+	2) Select NET_VENDOR_XILINX in the macb Kconfig 
+@ -22,6 +22,7 @@ config MACB
+        tristate "Cadence MACB/GEM support"
+        depends on HAS_DMA
+        select PHYLIB
++       select NET_VENDOR_XILINX
+
+Please let me know which one you prefer will fix that and will post v3...
+
+Regards,
+Kedar.
