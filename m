@@ -1,34 +1,33 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 4 Jul 2016 15:54:17 +0200
-Subject: [PATCH v7 09/17] KVM: arm64: introduce ITS emulation file with
- MMIO framework
-In-Reply-To: <32d54016-731d-e4a9-272d-8b0934ebec31@arm.com>
-References: <20160628123230.26255-1-andre.przywara@arm.com>
- <20160628123230.26255-10-andre.przywara@arm.com>
- <3fec9632-ce39-3508-2b71-4049fc959a64@redhat.com>
- <32d54016-731d-e4a9-272d-8b0934ebec31@arm.com>
-Message-ID: <8546ac45-f7cd-31af-a261-bb85ca7305ca@redhat.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 04 Jul 2016 14:56:13 +0100
+Subject: [PATCH 2/2] i2c: versatile: Convert to use resource managed
+ devm_* APIs
+In-Reply-To: <CAFRkauAarcYw6tCvM0_1VL-Wpf_OeLY=LEiR33DnQ1Q+2_C_KQ@mail.gmail.com>
+References: <1460644236.6039.2.camel@ingics.com>
+ <1460644306.6039.3.camel@ingics.com>
+ <CAFRkauAarcYw6tCvM0_1VL-Wpf_OeLY=LEiR33DnQ1Q+2_C_KQ@mail.gmail.com>
+Message-ID: <1467640573.23717.3.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-
-On 04/07/2016 15:38, Andre Przywara wrote:
-> 2) on KVM_DEV_ARM_VGIC_GRP_ADDR check that "initialized" is false
-> 3) on KVM_DEV_ARM_VGIC_CTRL_INIT check that "initialized" is false
-> 4) after KVM_DEV_ARM_VGIC_CTRL_INIT set initialized to true
+Dnia 2016-06-25, Sat o godzinie 09:41 +0800, Axel Lin pisze:
+> 2016-04-14 22:31 GMT+08:00 Axel Lin <axel.lin@ingics.com>:
+> > Use devm_* APIs to simplify the code a bit.
+> > This patch also fixes the memory leak when unload the module.
+> > 
+> > Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> > ---
+> > Hi,
+> > I don't have this h/w, I'd appreciate if someone can test this
+> > patch.
 > 
-> I don't want to rely solely on vgic_its_base being ADDR_UNDEF, since I
-> expect we extend that interface later by supporting more options (for
-> instance to size the virtual ITS, in terms of devices, number of LPIs,
-> collections, etc.)
-> 
-> Does that make sense?
-> Or do we need more here?
+> Obviously the module unload path has memory leak.
+> Just wondering if anyone can review/test this patch.
 
-So you will accept a call to KVM_DEV_ARM_VGIC_CTRL_INIT with an unset
-address? I don't think this is relevant.
+Gentlemen? (referring to the VE maintainers here)
 
-Thanks
+Original thread: thread.gmane.org/gmane.linux.drivers.i2c/27277
 
-Eric
+Thanks!
+
+Pawel
