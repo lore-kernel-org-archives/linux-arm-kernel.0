@@ -1,48 +1,75 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Mon, 04 Jul 2016 09:43:35 -0400
-Subject: [PATCH] clk: lpc32xx: allow peripheral clock selection in
- device tree
-In-Reply-To: <1466512531.2114.6.camel@localhost>
-References: <1464982475-24738-1-git-send-email-slemieux.tyco@gmail.com>
- <f8778993-a393-f72a-ba76-76550a9c5bbd@mleia.com>
- <1466512531.2114.6.camel@localhost>
-Message-ID: <1467639815.9582.3.camel@localhost>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 4 Jul 2016 15:43:50 +0200
+Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <1643662.QIDsTbCMZg@vostro.rjw.lan>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <2435381.sM3CFAEXNR@vostro.rjw.lan> <57767782.6020509@linaro.org>
+ <1643662.QIDsTbCMZg@vostro.rjw.lan>
+Message-ID: <577A6816.3050709@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephan,
+On 07/01/2016 11:01 PM, Rafael J. Wysocki wrote:
+> On Friday, July 01, 2016 04:00:34 PM Daniel Lezcano wrote:
+>> On 06/30/2016 03:27 PM, Rafael J. Wysocki wrote:
+>>
 
-On Tue, 2016-06-21 at 08:35 -0400, Sylvain Lemieux wrote:
-> Hi Vladimir,
+[ ... ]
+
+>> clocksource-probe which is DT based with different drivers using it in 
+>> drivers/clocksource with a pletore of different archs.
 > 
-> On Tue, 2016-06-21 at 07:28 +0300, Vladimir Zapolskiy wrote:
-> > Hi Sylvain,
-> > 
-> > On 03.06.2016 22:34, Sylvain Lemieux wrote:
-> > > From: Sylvain Lemieux <slemieux@tycoint.com>
-> > > 
-> > > This patch add the support to select the peripheral clock (PERIPH)
-> > > as a parent clock source using the "assigned-clock-parents"
-> > > parameter in the device tree.
-> > > 
-> > > Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
-> > 
-> > Acked-by: Vladimir Zapolskiy <vz@mleia.com>
-> > 
-> > The change looks good, is it done to support a selection of PWM parent clocks?
+> So maybe the GTDT code should be there too?
+
+*maybe*
+
+>> Cstate code which is only used by x86 is in drivers/acpi, it is only 
+>> used by x86/ia64 and it isn't a problem.
 > 
-> Yes, this is the case.
-> > 
-> > I think it makes sense to set PERIPH clock as a default parent for both
-> > PWM controllers, please consider to send a DTS change.
+> It is a problem.  
+
+Can you explain why it is a problem ?
+
+> drivers/acpi/ is not the right place for arch-specific code.
+
+I do not understand this assertion regarding what happened during the
+last years with different subsystems where the drivers were moved from
+their arch specific directories to the drivers directory (cpufreq,
+cpuidle, clockevent, clk, etc ...) and resulted at the end to a code
+refactoring and consolidation.
+
+Why ACPI should follow the opposite rule ?
+
+>> There is a small chunk in arch/x86/kernel/acpi and it doesn't facilitate the
+>> comprehension of the code.
+>>
+>> IMHO, having all ACPI code in the same directory will encourage the 
+>> consolidation.
 > 
-> I will do.
-> 
-> Thanks for the feedback,
-> Sylvain
-> 
-do you think you can take this change for 4.8?
+> The consolidation of what exactly?
+
+The consolidation of the ACPI code in general which is the
+counter-example of self-contained code.
+
+> In particular, how does the GTDT code in drivers/acpi/ help to consolidate
+> anything?
+
+If I imagine we group all ACPI code under a common directory, the first
+example coming in my mind is the sharing of private headers, reducing
+the scope of exported functions and global variables (eg. acpi_disabled).
+
+That say, I can understand grouping all the ACPI into a single directory
+will make it fall under a single umbrella's maintainer and that could be
+a nightmare to maintain as it covers a lot of different features.
+However, I believe that could be solved by clearly identifying who takes
+care of what.
 
 
-Regards,
-Sylvain
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
