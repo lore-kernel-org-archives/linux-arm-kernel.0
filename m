@@ -1,44 +1,95 @@
-From: garlic.tseng@mediatek.com (Garlic Tseng)
-Date: Mon, 4 Jul 2016 10:28:52 +0800
-Subject: [alsa-devel] [PATCH v5 6/9] ASoC: mediatek: add mt2701 platform
- driver implementation.
-In-Reply-To: <1467293981.17087.18.camel@mtksdaap41>
-References: <1466149440-23889-1-git-send-email-garlic.tseng@mediatek.com>
- <1466149440-23889-7-git-send-email-garlic.tseng@mediatek.com>
- <20160629191322.GT6247@sirena.org.uk>
- <1467293981.17087.18.camel@mtksdaap41>
-Message-ID: <1467599332.11819.11.camel@mtksdaap41>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon,  4 Jul 2016 10:29:31 +0800
+Subject: [PATCH] pinctrl: sunxi: fix nand0 function name for sun8i
+Message-ID: <20160704022931.46223-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-06-30 at 21:39 +0800, Garlic Tseng wrote:
-> On Wed, 2016-06-29 at 20:13 +0100, Mark Brown wrote:
-> > On Fri, Jun 17, 2016 at 03:43:57PM +0800, Garlic Tseng wrote:
-> > 
-> > > +static int mt2701_afe_i2s_set_clkdiv(struct snd_soc_dai *dai, int div_id,
-> > > +				     int div)
-> > > +{
-> > 
-> > Why are we adding a set_clkdiv() operation?  I would expect the driver
-> > to be able to figure things out automatically.
-> > 
-> > > +	case DIV_ID_MCLK_TO_BCK:
-> > > +		afe_priv->i2s_path[i2s_num].div_mclk_to_bck = div;
-> > > +		break;
-> > > +	case DIV_ID_BCK_TO_LRCK:
-> > > +		afe_priv->i2s_path[i2s_num].div_bck_to_lrck = div;
-> > > +		break;
-> > 
-> > Especially in the case where we're configuring LRCLK, that's trivial
-> > when we know the sample rate which we have to know anyway.
-> 
-> Oh... actually I want to say 'div_mclk_over_bck' and 'div_bck_over_lrck'
-> I'll fix the naming if we decide to reserve the set_clkdiv() operation.
-> (omit some comment)
+In sun4/5/6/7i, all the pin function related to NAND0 controller is
+named "nand0". However, in sun8i, some of the functions are named as
+"nand". This patch renamed them to "nand0", for the consistency.
 
-Hi Mark, I recognize that we can set mclk by set_sysclk, fix bck to 64fs
-and let lrck be the same as sample rate so yes we don't need set_clkdiv.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c | 6 +++---
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c | 6 +++---
+ drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c  | 6 +++---
+ 3 files changed, 9 insertions(+), 9 deletions(-)
 
-Thanks for comment, I'll fix that in the next patch.
-
-Garlic
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
+index 55083d2..ce483b0 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
+@@ -180,17 +180,17 @@ static const struct sunxi_desc_pin sun8i_a23_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ6 */
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ6 */
+ 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D6 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ7 */
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ7 */
+ 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D7 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 16),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "nand"),		/* DQS */
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQS */
+ 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* RST */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 17),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+index 8b381d6..3040abe 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+@@ -140,17 +140,17 @@ static const struct sunxi_desc_pin sun8i_a33_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ6 */
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ6 */
+ 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D6 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ7 */
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ7 */
+ 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D7 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 16),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "nand"),		/* DQS */
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQS */
+ 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* RST */
+ 	/* Hole */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 2),
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
+index 11760bb..26a2ad3 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
+@@ -219,17 +219,17 @@ static const struct sunxi_desc_pin sun8i_h3_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ6 */
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ6 */
+ 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D6 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ7 */
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ7 */
+ 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D7 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 16),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "nand"),		/* DQS */
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQS */
+ 		  SUNXI_FUNCTION(0x3, "mmc2")),		/* RST */
+ 	/* Hole */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 0),
+-- 
+2.9.0
