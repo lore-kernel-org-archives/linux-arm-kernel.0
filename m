@@ -1,37 +1,32 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Sun,  3 Jul 2016 17:45:36 -0700
-Subject: [GIT PULL 3/3] bcm2835-arm64-next-2016-07-03
-In-Reply-To: <1467593136-29524-1-git-send-email-eric@anholt.net>
-References: <1467593136-29524-1-git-send-email-eric@anholt.net>
-Message-ID: <1467593136-29524-4-git-send-email-eric@anholt.net>
+Date: Sun, 03 Jul 2016 18:02:32 -0700
+Subject: [PATCH] i2c: bcm2835: Set up the clock stretching timeout at boot.
+In-Reply-To: <20160704003118.GA1381@tetsubishi>
+References: <1464818845-5348-1-git-send-email-eric@anholt.net>
+ <20160704003118.GA1381@tetsubishi>
+Message-ID: <87lh1ip653.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+Wolfram Sang <wsa@the-dreams.de> writes:
 
-are available in the git repository at:
+>> +	/*
+>> +	 * SMBUS says "Devices participating in a transfer will
+>> +	 * timeout when any clock low exceeds the value of
+>> +	 * T_TIMEOUT,MIN of 25 ms."
+>> +	 */
+>
+> SMBus has that timeout, but I2C doesn't. How about disabling the timeout
+> simply? Or using the max value if you want to keep the timeout
+> detection?
 
-  https://github.com/anholt/linux tags/bcm2835-arm64-next-2016-07-03
-
-for you to fetch changes up to 628d30d1ccb897fee54a6f7312561cf2f6f72f09:
-
-  arm64: Add platform selection for BCM2835. (2016-06-15 14:10:30 -0700)
-
-----------------------------------------------------------------
-This pull request brings in the build support for the Raspberry Pi
-arm64 port.
-
-----------------------------------------------------------------
-Alexander Graf (1):
-      arm64: Allow for different DMA and CPU bus offsets
-
-Eric Anholt (3):
-      irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ
-      Merge remote-tracking branch 'irqchip/irqchip/bcm' into bcm2835-arm64-next
-      arm64: Add platform selection for BCM2835.
-
- arch/arm64/Kconfig.platforms         | 13 +++++++++++++
- arch/arm64/include/asm/dma-mapping.h | 17 +++++++++++++++--
- drivers/irqchip/irq-bcm2835.c        |  3 +--
- drivers/irqchip/irq-bcm2836.c        |  2 +-
- 4 files changed, 30 insertions(+), 5 deletions(-)
+Disabling the timeout seems fine to me.  We still have a 1-second
+timeout around the entire transfer.  I'll be back on my DSI branch this
+week and test it out then.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160703/83f4c082/attachment.sig>
