@@ -1,93 +1,49 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 4 Jul 2016 16:11:50 +0200
-Subject: [PATCH v7 2/6] ACPI / processor_idle: Add support for Low Power
- Idle(LPI) states
-In-Reply-To: <577A67BA.8060709@arm.com>
-References: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
- <57766B15.4090407@linaro.org> <577A5DD3.4050901@arm.com>
- <6955030.D47pi9uhTn@vostro.rjw.lan> <577A67BA.8060709@arm.com>
-Message-ID: <CAJZ5v0iEKnWVwVatpCZOi7CsrZrcEmhEVRaEparfUdKZneP7-A@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 4 Jul 2016 16:15:38 +0200
+Subject: [PATCH v7 09/17] KVM: arm64: introduce ITS emulation file with
+ MMIO framework
+In-Reply-To: <33ff8f2c-89e0-5778-71a6-9d116e061752@arm.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+ <20160628123230.26255-10-andre.przywara@arm.com>
+ <3fec9632-ce39-3508-2b71-4049fc959a64@redhat.com>
+ <32d54016-731d-e4a9-272d-8b0934ebec31@arm.com>
+ <8546ac45-f7cd-31af-a261-bb85ca7305ca@redhat.com>
+ <33ff8f2c-89e0-5778-71a6-9d116e061752@arm.com>
+Message-ID: <9fea837a-d45d-ae2b-6442-0a89db124946@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 4, 2016 at 3:42 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 04/07/16 14:17, Rafael J. Wysocki wrote:
->>
->> On Monday, July 04, 2016 02:00:03 PM Sudeep Holla wrote:
->>>
->>>
->>> On 01/07/16 14:07, Daniel Lezcano wrote:
->>>>
->>>> On 06/28/2016 03:55 PM, Sudeep Holla wrote:
->>>>>
->>>>> ACPI 6.0 introduced an optional object _LPI that provides an alternate
->>>>> method to describe Low Power Idle states. It defines the local power
->>>>> states for each node in a hierarchical processor topology. The OSPM can
->>>>> use _LPI object to select a local power state for each level of
->>>>> processor
->>>>> hierarchy in the system. They used to produce a composite power state
->>>>> request that is presented to the platform by the OSPM.
->>>>>
->>>>> Since multiple processors affect the idle state for any non-leaf
->>>>> hierarchy
->>>>> node, coordination of idle state requests between the processors is
->>>>> required. ACPI supports two different coordination schemes: Platform
->>>>> coordinated and  OS initiated.
->>>>>
->>>>> This patch adds initial support for Platform coordination scheme of
->>>>> LPI.
->>>>>
->>>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>>>> ---
->>>>
->>>>
->>>> Hi Sudeep,
->>>>
->>>> I looked at the acpi processor idle code sometime ago and from my POV,
->>>> it was awful, unnecessary complex and very difficult to maintain. The
->>>> usage of flags all over the places is significant of the lack of control
->>>> of the written code.
->>>>
->>>
->>> So you have any specific things in mind ? That's too broad and I know
->>> it's not so clean, but it's so for legacy reasons. I would leave that
->>> to Rafael to decide as it takes lots of testing to clean up these code.
->>
->>
->> The cleanup needs to be done at one point.
->>
->> Question is when to do it, before adding LPI support or after doing that
->> (and each option has its pros and cons IMO).
->>
->>>> Even if you are not responsible of this implementation, the current
->>>> situation forces you to add more awful code on top of that, which is
->>>> clearly against "making Linux better".
->>>>
->>>
->>> OK
->>
->>
->> So if there are cases in which you need to make the code more complex
->> because of the legacy stuff in there, I'd say it's better to clean it up
->> first.
->>
->
-> I am not sure if Daniel was referring to anything specific. I have
-> cleaned up in patch 1/6 for cstate. More cleanups can be done there but
-> needs better understanding and reasoning for the current code which I
-> don't have as they are mostly x86 related.
->
-> Unless someone points me what they would like to change and how, I don't
-> have much in my mind to do here. Yes it may not look as clean as other
-> code in the kernel relatively, but without complete understanding of the
-> history/reasoning for the current state of code I wouldn't touch
-> anything I don't understand.
->
-> I am open to make changes if there's something specific. Sorry I can't
-> go ahead making changes the way I think based on some vague idea that
-> the current code is not clean.
 
-Fair enough.
+
+On 04/07/2016 16:00, Andre Przywara wrote:
+> Hi,
+> 
+> On 04/07/16 14:54, Auger Eric wrote:
+>> Hi Andre,
+>>
+>> On 04/07/2016 15:38, Andre Przywara wrote:
+>>> 2) on KVM_DEV_ARM_VGIC_GRP_ADDR check that "initialized" is false
+>>> 3) on KVM_DEV_ARM_VGIC_CTRL_INIT check that "initialized" is false
+>>> 4) after KVM_DEV_ARM_VGIC_CTRL_INIT set initialized to true
+>>>
+>>> I don't want to rely solely on vgic_its_base being ADDR_UNDEF, since I
+>>> expect we extend that interface later by supporting more options (for
+>>> instance to size the virtual ITS, in terms of devices, number of LPIs,
+>>> collections, etc.)
+>>>
+>>> Does that make sense?
+>>> Or do we need more here?
+>>
+>> So you will accept a call to KVM_DEV_ARM_VGIC_CTRL_INIT with an unset
+>> address? I don't think this is relevant.
+> 
+> Ah, good point. Will fix this.
+> 
+> However I think we do the same on GICv2/GICv3 at the moment. CTRL_INIT
+> will succeed, I guess we fail the first KVM_RUN then, right?
+Yes the map_resources will fail with UNDEF addresses
+
+Eric
+> 
+> Cheers,
+> 
