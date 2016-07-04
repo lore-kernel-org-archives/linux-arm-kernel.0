@@ -1,93 +1,75 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Mon, 4 Jul 2016 11:47:50 +0000
-Subject: [RFC PATCH v2 2/4] net: ethernet: xilinx: Add gmii2rgmii
- converter support
-In-Reply-To: <577A323A.4080207@atmel.com>
-References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
- <1467623084-15471-3-git-send-email-appanad@xilinx.com>
- <577A323A.4080207@atmel.com>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5BB227@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 04 Jul 2016 14:04:53 +0200
+Subject: [PATCH v3 5/7] PM / Hibernate: Allow arch code to influence CPU
+ hotplug during hibernate
+In-Reply-To: <577A269A.6060307@arm.com>
+References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
+ <7811260.OWJXivZiAP@vostro.rjw.lan> <577A269A.6060307@arm.com>
+Message-ID: <5024161.npQD1be5Q1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-	Thanks for the review...
-
-> > diff --git a/include/linux/xilinx_gmii2rgmii.h
-> > b/include/linux/xilinx_gmii2rgmii.h
-> > new file mode 100644
-> > index 0000000..b328ee7
-> > --- /dev/null
-> > +++ b/include/linux/xilinx_gmii2rgmii.h
-> > @@ -0,0 +1,24 @@
+On Monday, July 04, 2016 10:04:26 AM James Morse wrote:
+> Hi Rafael,
+> 
+> On 29/06/16 01:10, Rafael J. Wysocki wrote:
+> > On Tuesday, June 28, 2016 03:51:48 PM James Morse wrote:
+> >> Architecture code may need to do extra work when secondary CPUs are
+> >> disabled during hibernate and resume. This may include pushing sleeping
+> >> CPUs into a deeper power-saving state, or influencing which CPU resume
+> >> occurs on.
+> >>
+> >> Define a macro arch_hibernation_disable_cpus(), which defaults to calling
+> >> disable_nonboot_cpus() if undefined. Architectures that need to do extra
+> >> work around these calls can use this to influence disable_nonboot_cpus()
+> >> behaviour. The macro should be defined in asm/suspend.h, and
+> >> ARCH_HIBERNATION_CPUHP should be added to Kconfig.
+> 
+> > As you noted, this could be used to address the x86 issue that Yu is working on,
+> > so I'd like it to go in as the first patch in the series and through the PM tree.
+> 
+> Sure, I will split the series here, and group the later patches so there are no
+> dependencies.
 > 
 > 
-> Here, header of the file seems needed.
-
-Sure will fix in the next version...
-
+> > 
+> >> ---
+> >> Changes since v2:
+> >>  * Added CONFIG_ARCH_HIBERNATION_CPUHP include guard allowing
+> > 
+> > What about calling it CONFIG_ARCH_HIBERNATION_CPU_OFFLINE?  It's not
+> > hotplug really.
 > 
-> > +#ifndef _GMII2RGMII_H
-> > +#define _GMII2RGMII_H
-> > +
-> > +#include <linux/of.h>
-> > +#include <linux/phy.h>
-> > +#include <linux/mii.h>
-> > +
-> > +#define XILINX_GMII2RGMII_FULLDPLX		BMCR_FULLDPLX
-> > +#define XILINX_GMII2RGMII_SPEED1000		BMCR_SPEED1000
-> > +#define XILINX_GMII2RGMII_SPEED100		BMCR_SPEED100
-> > +#define XILINX_GMII2RGMII_REG_NUM			0x10
-> > +
-> > +struct gmii2rgmii {
-> > +	struct net_device	*dev;
-> > +	struct mii_bus		*mii_bus;
-> > +	struct phy_device	*gmii2rgmii_phy_dev;
-> > +	void			*platform_data;
-> > +	int (*mdio_write)(struct mii_bus *bus, int mii_id, int reg,
-> > +			  u16 val);
-> > +	void (*fix_mac_speed)(struct gmii2rgmii *xphy, unsigned int speed);
-> > +};
-> > +
-> > +extern int gmii2rgmii_phyprobe(struct gmii2rgmii *xphy); #endif
+> Even with the enable calls added? CONFIG_ARCH_HIBERNATION_CPU_HOOKS?
+
+Fine by me. :-)
+
+> >> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+> >> index fca9254280ee..338745e78f7e 100644
+> >> --- a/kernel/power/hibernate.c
+> >> +++ b/kernel/power/hibernate.c
+> >> @@ -31,8 +31,16 @@
+> >>  #include <linux/ktime.h>
+> >>  #include <trace/events/power.h>
+> >>  
+> >> +#ifdef CONFIG_ARCH_HIBERNATION_CPUHP
+> >> +/* Arch definition of the arch_hibernation_disable_cpus() macro? */
+> >> +#include <asm/suspend.h>
+> >> +#endif
+> >> +
+> >>  #include "power.h"
+> >>  
+> >> +#ifndef arch_hibernation_disable_cpus
+> >> +#define arch_hibernation_disable_cpus(x) disable_nonboot_cpus()
+> > 
+> > For the x86 case we'll also need the complementary "enable", so why don't
+> > you add it here and then use it instead of the enable_nonboot_cpus()?
 > 
-> I see a compilation issue here:
-> 
-> You should provide a way to have this function even if the NET_VENDOR_XILINX
-> config option is not selected (test to compile with the sama5_defconfig and
-> you'll see).
+> Done. I've added the 'in_suspend' argument so that it's symmetrical, this may be
+> slightly different to the behaviour of your 'in_resume_hibernate' flag.
 
-Ok will fix in the next version...
+Well, it turns out that I was wrong, we don't need the "enable" thing, so
+I guess it can stay the way it was.
 
-> 
-> What about making this function void in case of !XILINX?
-
-This is one way to get rid of compilation error. Changes will be look like below
-
-#ifdef CONFIG_NET_VENDOR_XILINX
- extern int gmii2rgmii_phyprobe(struct gmii2rgmii *xphy);
-#else
-extern void gmii2rgmii_phyprobe(struct gmii2rgmii *xphy);
-void gmii2rgmii_phyprobe(struct gmii2rgmii *xphy)
-{
-}
-#endif
-For me the changes are looking odd...
-
-Other possible ways 
-	1)  Put a config check around phyprobe api in the macb driver.
-#ifdef CONFIG_XILINX_GMII2RGMII
-                       gmii2rgmii_phyprobe(&bp->converter_phy);
-#endif
-	2) Select NET_VENDOR_XILINX in the macb Kconfig 
-@ -22,6 +22,7 @@ config MACB
-        tristate "Cadence MACB/GEM support"
-        depends on HAS_DMA
-        select PHYLIB
-+       select NET_VENDOR_XILINX
-
-Please let me know which one you prefer will fix that and will post v3...
-
-Regards,
-Kedar.
+Thanks,
+Rafael
