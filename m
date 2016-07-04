@@ -1,100 +1,85 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  5 Jul 2016 00:12:32 +0200
-Subject: [PATCH 1/3] clocksource: timer-atmel-pit: drop
- at91sam926x_pit_common_init
-In-Reply-To: <1467670354-12987-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1467670354-12987-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1467670354-12987-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
+Date: Mon, 04 Jul 2016 19:50:19 -0300
+Subject: [RFC] arm64: kexec_file_load support
+In-Reply-To: <20160704065814.GO20774@linaro.org>
+References: <20160701051111.GL20774@linaro.org> <3300473.zhbeG65qgA@hactar>
+ <20160704065814.GO20774@linaro.org>
+Message-ID: <5766907.oiVi8ABPsz@hactar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merge at91sam926x_pit_common_init in at91sam926x_pit_dt_init as this is the
-only initialization method now.
+Hello,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/clocksource/timer-atmel-pit.c | 59 ++++++++++++++++-------------------
- 1 file changed, 27 insertions(+), 32 deletions(-)
+Am Montag, 04 Juli 2016, 15:58:15 schrieb AKASHI Takahiro:
+> On Fri, Jul 01, 2016 at 12:46:31PM -0300, Thiago Jung Bauermann wrote:
+> > I agree that it would be better if we could have a system call where a
+> 
+> > custom device tree could be passed. One suggestion is:
+> For powerpc, you might be able to use dtbImage instead of Image
+> without changing the kernel interfaces.
 
-diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-index fcc97711cd79..87659b8734d5 100644
---- a/drivers/clocksource/timer-atmel-pit.c
-+++ b/drivers/clocksource/timer-atmel-pit.c
-@@ -177,11 +177,37 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
- /*
-  * Set up both clocksource and clockevent support.
-  */
--static void __init at91sam926x_pit_common_init(struct pit_data *data)
-+static void __init at91sam926x_pit_dt_init(struct device_node *node)
- {
- 	unsigned long	pit_rate;
- 	unsigned	bits;
- 	int		ret;
-+	struct pit_data *data;
-+
-+	data = kzalloc(sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		panic(pr_fmt("Unable to allocate memory\n"));
-+
-+	data->base = of_iomap(node, 0);
-+	if (!data->base)
-+		panic(pr_fmt("Could not map PIT address\n"));
-+
-+	data->mck = of_clk_get(node, 0);
-+	if (IS_ERR(data->mck))
-+		/* Fallback on clkdev for !CCF-based boards */
-+		data->mck = clk_get(NULL, "mck");
-+
-+	if (IS_ERR(data->mck))
-+		panic(pr_fmt("Unable to get mck clk\n"));
-+
-+	if (clk_prepare_enable(data->mck))
-+		panic(pr_fmt("Unable to enable mck\n"));
-+
-+	/* Get the interrupts property */
-+	data->irq = irq_of_parse_and_map(node, 0);
-+	if (!data->irq)
-+		panic(pr_fmt("Unable to get IRQ from DT\n"));
-+
- 
- 	/*
- 	 * Use our actual MCK to figure out how many MCK/16 ticks per
-@@ -227,36 +253,5 @@ static void __init at91sam926x_pit_common_init(struct pit_data *data)
- 	data->clkevt.suspend = at91sam926x_pit_suspend;
- 	clockevents_register_device(&data->clkevt);
- }
--
--static void __init at91sam926x_pit_dt_init(struct device_node *node)
--{
--	struct pit_data *data;
--
--	data = kzalloc(sizeof(*data), GFP_KERNEL);
--	if (!data)
--		panic(pr_fmt("Unable to allocate memory\n"));
--
--	data->base = of_iomap(node, 0);
--	if (!data->base)
--		panic(pr_fmt("Could not map PIT address\n"));
--
--	data->mck = of_clk_get(node, 0);
--	if (IS_ERR(data->mck))
--		/* Fallback on clkdev for !CCF-based boards */
--		data->mck = clk_get(NULL, "mck");
--
--	if (IS_ERR(data->mck))
--		panic(pr_fmt("Unable to get mck clk\n"));
--
--	if (clk_prepare_enable(data->mck))
--		panic(pr_fmt("Unable to enable mck\n"));
--
--	/* Get the interrupts property */
--	data->irq = irq_of_parse_and_map(node, 0);
--	if (!data->irq)
--		panic(pr_fmt("Unable to get IRQ from DT\n"));
--
--	at91sam926x_pit_common_init(data);
--}
- CLOCKSOURCE_OF_DECLARE(at91sam926x_pit, "atmel,at91sam9260-pit",
- 		       at91sam926x_pit_dt_init);
+That works for custom kernels, but for signed kernels from a distro, I 
+believe that's not an option.
+
+> > kexec_file_load2(int fds[], int fd_types[], int nr_fds,
+> > 
+> > 		 unsigned long cmdline_len, const char *cmdline_ptr,
+> > 		
+> > 		unsigned long flags);
+> 
+> You don't want to simply add one more argument, i.e. dtb_fd, don't you.
+
+I'm just trying to avoid having to add another argument later if we find out 
+someone is loading another segment that we didn't know about. :-)
+
+The older kexec_load system call allows passing an arbitrary number of 
+segments (sort of, currently capped at 16) to the kernel, so my suggestions 
+preserve that feature.
+
+If people think that adding another argument for dtb_fd is enough, I won't 
+mind.
+
+> I prefer a slightly-simpler interface:
+>         struct kexec_file_fd {
+>                 enum kexec_file_type;
+>                 int fd;
+>         }
+> 
+>         int kexec_file_load2(struct kexec_file_fd[], int nr_fds, int
+> flags);
+
+I like this one.
+
+> Or if you want to keep the compatibility with the existing system call,
+> 
+>         int kexec_file_load(int kernel_fd, int initrd_fd,
+>                         unsigned long cmdline_len, const char
+> *cmdline_ptr, unsigned long flags,
+>                         int struct kexec_file_fd[], int nr_fds);
+> 
+> Here SYSCALL_DEFINE7() have to be defined, and I'm not sure that we will
+> not have a problem in adding a system call with more than 6 arguments.
+
+That's very clever. We can do what you suggest above or even just add dtb_fd 
+with SYSCALL_DEFINE6. Either option would be good.
+
+> > Where fds is an array with nr_fds file descriptors and fd_types is an
+> > array specifying what each fd in fds is. So for example, if fds[i] is
+> > the kernel, then fd_types[i] would have the value KEXEC_FILE_KERNEL_FD.
+> > If fds[i] is the device tree blob, fd_types[i], would have the value
+> > KEXEC_FILE_DTB and so on. That way, the syscall can be extended for an
+> > arbitrary number and types of segments that have to be loaded, just
+> > like kexec_load.
+> > 
+> > Another option is to have a struct:
+> > 
+> > kexec_file_load2(struct kexec_file_params *params, unsigned long
+> > params_sz);
+> Wow, we can add any number of new parameters with this interface.
+
+Yeah, maybe it's a bit too much.
+
 -- 
-2.8.1
+[]'s
+Thiago Jung Bauermann
+IBM Linux Technology Center
