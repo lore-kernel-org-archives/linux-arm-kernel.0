@@ -1,36 +1,36 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 04 Jul 2016 22:48:39 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.7 (#2)
-Message-ID: <8737npw2mw.fsf@free-electrons.com>
+Date: Mon, 04 Jul 2016 22:49:02 +0200
+Subject: [GIT PULL] ARM: mvebu: arm64 for v4.8 (#1)
+Message-ID: <871t39w2m9.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the second pull request for fixes for mvebu for v4.7.
+Here is the first pull request for arm64 for mvebu for v4.8.
 
 Gregory
 
-The following changes since commit 929e604efa3dc0522214e0dc18984be23993e9f0:
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-  ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on Armada 385 Linksys (2016-06-16 17:01:28 +0200)
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.7-2
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.8-1
 
-for you to fetch changes up to b44439e42912b9dcc510a0ff891809ea2cadc46b:
+for you to fetch changes up to ff60d834d1e0d1b4560b14daab1bc165667af7b4:
 
-  ARM: mvebu: compile pm code conditionally (2016-06-30 13:47:52 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.7 (part 2)
-
-Fix a regression introduced by a cleanup on kirkwood_pm_init
+  arm64: marvell: enable Armada 3700 clock drivers (2016-07-04 22:18:06 +0200)
 
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: mvebu: compile pm code conditionally
+mvebu arm64 for 4.8
 
- arch/arm/mach-mvebu/Makefile | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+enable Armada 3700 clock drivers
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      arm64: marvell: enable Armada 3700 clock drivers
+
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
