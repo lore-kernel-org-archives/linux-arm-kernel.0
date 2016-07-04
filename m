@@ -1,60 +1,103 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Mon, 04 Jul 2016 13:20:03 +0900
-Subject: [PATCH v3 0/2] mark spi clocks as critical and enable spi3 clocks
-In-Reply-To: <CA+Ln22HuCdDr=g06ynK7mqjDfUVrQgG-NRkfTP_zE6h-wZk6Gw@mail.gmail.com>
-References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
- <CGME20160704040000epcas1p3aeb0a1337a7e8e7274090bd932f556e3@epcas1p3.samsung.com>
- <CA+Ln22HuCdDr=g06ynK7mqjDfUVrQgG-NRkfTP_zE6h-wZk6Gw@mail.gmail.com>
-Message-ID: <20160704042003.GB23620@samsunx.samsung>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Mon, 4 Jul 2016 12:53:14 +0800
+Subject: [PATCH] arm64:mm Remove the redundant initrd memblock codes
+Message-ID: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+The memory range between initrd_start and initrd_end was added to the memblock
+twice unnecessarily in the same function before initrd memory range can be freed.
+This patch merge those codes into one piece of block and add the initrd memory
+range only once, also it makes the code clean and simple.
 
-> > This patchset enables spi3 clocks by marking critical clocks as
-> > CLK_IS_CRITICAL and in the meantime replaces the use of
-> > CLK_IGNORE_UNUSED for spi1 clocks.
-> >
-> > The sclk needs to be considered critical as well.
-> >
-> > The SPI3 in the tm2/tm2e boards will control an irled for remote
-> > controlling.
-> >
-> > Changelog:
-> >
-> > V1 -> V2
-> >  - the "sclk_spi3" doesn't need to be enabled in boot time as it
-> >   is handled by the spi driver itself.
-> >
-> >  - use the CLK_IS_CRITICAL flag for the ioclk
-> >
-> > V2 -> V3
-> >  - some more tests has confirmed taht "sclk_spi1,3" need to be
-> >    enabled as critical!
-> 
-> This sounds like a DTS and/or SPI and/or clock driver bug then. I'm
-> pretty much convinced that it might also cause other problems and this
-> workaround will only mask them making things even more difficult to
-> debug in the future. Let's not introduce more technical debt.
+Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Steve Capper <steve.capper@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/init.c | 58 +++++++++++++++++++++++-----------------------------
+ 1 file changed, 26 insertions(+), 32 deletions(-)
 
-In principle I agree, but, the upcoming TM2/TM2e boards will have
-the audio codec connected on SPI1 and the ir remote controller on
-the SPI3 (others SPI slots are used as well, but we don't have
-the drivers ready for them).
-
-I followed for SPI3 the same approach as it was done for SPI1, so
-that I see two choices here:
-
- * reject this patches and cleanup the SPI1 from the "technical
-   debt" and not have anything working on spi.
-
-or
-
- * do for SPI3 the same as it has been done for SPI1 (and as it
-   is now) with its "technical debt".
-
-I did quite an extensive testing on these lines and I don't see
-any other alternative.
-
-Thanks,
-Andi
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 2ade7a6..cf26cdb 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -228,6 +228,29 @@ void __init arm64_memblock_init(void)
+ 		memblock_add(__pa(_text), (u64)(_end - _text));
+ 	}
+ 
++	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
++		extern u16 memstart_offset_seed;
++		u64 range = linear_region_size -
++			    (memblock_end_of_DRAM() - memblock_start_of_DRAM());
++
++		/*
++		 * If the size of the linear region exceeds, by a sufficient
++		 * margin, the size of the region that the available physical
++		 * memory spans, randomize the linear region as well.
++		 */
++		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
++			range = range / ARM64_MEMSTART_ALIGN + 1;
++			memstart_addr -= ARM64_MEMSTART_ALIGN *
++					 ((range * memstart_offset_seed) >> 16);
++		}
++	}
++
++	/*
++	 * Register the kernel text, kernel data, initrd, and initial
++	 * pagetables with memblock.
++	 */
++	memblock_reserve(__pa(_text), _end - _text);
++
+ 	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+ 		/*
+ 		 * Add back the memory we just removed if it results in the
+@@ -254,41 +277,12 @@ void __init arm64_memblock_init(void)
+ 			memblock_remove(base, size); /* clear MEMBLOCK_ flags */
+ 			memblock_add(base, size);
+ 			memblock_reserve(base, size);
++			/* the generic initrd code expects virtual addresses */
++			initrd_start = __phys_to_virt(initrd_start);
++			initrd_end = __phys_to_virt(initrd_end);
+ 		}
+ 	}
+ 
+-	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+-		extern u16 memstart_offset_seed;
+-		u64 range = linear_region_size -
+-			    (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+-
+-		/*
+-		 * If the size of the linear region exceeds, by a sufficient
+-		 * margin, the size of the region that the available physical
+-		 * memory spans, randomize the linear region as well.
+-		 */
+-		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+-			range = range / ARM64_MEMSTART_ALIGN + 1;
+-			memstart_addr -= ARM64_MEMSTART_ALIGN *
+-					 ((range * memstart_offset_seed) >> 16);
+-		}
+-	}
+-
+-	/*
+-	 * Register the kernel text, kernel data, initrd, and initial
+-	 * pagetables with memblock.
+-	 */
+-	memblock_reserve(__pa(_text), _end - _text);
+-#ifdef CONFIG_BLK_DEV_INITRD
+-	if (initrd_start) {
+-		memblock_reserve(initrd_start, initrd_end - initrd_start);
+-
+-		/* the generic initrd code expects virtual addresses */
+-		initrd_start = __phys_to_virt(initrd_start);
+-		initrd_end = __phys_to_virt(initrd_end);
+-	}
+-#endif
+-
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
+-- 
+1.8.3.1
