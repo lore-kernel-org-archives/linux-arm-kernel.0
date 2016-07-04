@@ -1,82 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 04 Jul 2016 22:29:35 +0200
-Subject: [PATCH 00/10] Add clock support for Armada 37xx SoCs
-In-Reply-To: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Fri, 10 Jun 2016 15:23:28 +0200")
-References: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <874m85w3io.fsf@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 4 Jul 2016 22:47:42 +0200
+Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
+In-Reply-To: <20160704222648.4b74f21e@bbrezillon>
+References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
+ <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
+ <20160701183248.GC2874@piout.net>
+ <CALdGsk+KwPMVKXhKtcmoUFqfj6aQRvQSY74F31fSvZhV+QvjAA@mail.gmail.com>
+ <20160702204608.257b8bc6@bbrezillon>
+ <CALdGsk+RO_cxfcTLVyKHP3aVMkSTtzEzQXz2G4ARX7vqxRazSA@mail.gmail.com>
+ <20160704110018.76288816@bbrezillon>
+ <CALdGsk+rSYukvo6-zqgqNTwJnf8QXu2bCSAdurpg1=BVtENZvw@mail.gmail.com>
+ <20160704160203.GJ20045@piout.net>
+ <20160704222648.4b74f21e@bbrezillon>
+Message-ID: <20160704204742.GM20045@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On ven., juin 10 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On 04/07/2016 at 22:26:48 +0200, Boris Brezillon wrote :
+> On Mon, 4 Jul 2016 18:02:03 +0200
+> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> 
+> > On 04/07/2016 at 11:08:42 +0200, Olivier Schonken wrote :
+> > > That is the dilemma I face with the structure.  What is the least
+> > > invasive option to include the coresight functionality, without
+> > > breaking the amba probe for other architectures that rely on it having
+> > > a clock to enable/disable, and not break the processor startup by
+> > > messing with stable clocks for the sake of giving the ETB/ETM a clock
+> > > it doesn't need.
+> > > That is why in the end I decided on a dummy clock driver.  To keep
+> > > with the convention of having a clock specific to the ETM, and leaving
+> > > the rest of the clocks as is.
+> > >   
+> > 
+> > Well, the issue is in the pit driver, see the patch I just sent. With
+> > both of your patches, I got my sama5d2 xplained botting fine.
+> > 
+> 
+> You mean, replacing the reference to the dummy clk by a reference to
+> mck, right?
 
-> Hi,
->
-> this series add clock support for the Armada 37xx SoCs.
->
-> The design of the drivers is as close as possible as the hardware is,
-> with some clocks made of several layers: muxing, divider and gating.
->
-> The device tree binding was written in a way that even if we discover
-> some change inside the clocks, the binding should not be
-> affected. Especially, there are some holes in the clocks, but we
-> should be able to add them seamless.
->
-> I tried to follow the last update made in the clock framework, I hope
-> theses drivers will comply the new guidelines.
-
-I applied the first 4 patches on the mvebu branches, the first one on
-mvebu/arm64 and the 3 other on mvebu/dt64. I did this in order to not
-miss the arm-soc merge window.
-
-The binding was acked by the dt maintainer and the review of the clk
-maintainer was abut the internal of the driver. The only change I did
-was fixing a typo in the address part of the name of the sb-periph-clk
-node as pointed by Victor Gu. I will submit a second version soon
-addressing these concerns.
-
-Gregory
-
->
-> Gregory CLEMENT (10):
->   arm64: marvell: enable Armada 3700 clock drivers
->   arm64: dts: marvell: Add xtal clock support for Armada 3700
->   arm64: dts: marvell: add tbg clocks for Armada 37xx
->   arm64: dts: marvell: add peripherals clocks for Armada 37xx
->   dt-bindings: clock: add DT binding for the Xtal clock on Armada 3700
->   clk: mvebu: Add the xtal clock for Armada 3700 SoC
->   dt-bindings: clock: add DT binding for the TBG clocks on Armada 3700
->   clk: mvebu Add the time base generator clocks for Armada 3700
->   dt-bindings: clock: add DT binding for the peripheral clocks on Armada
->     3700
->   clk: mvebu: Add the peripheral clock driver for Armada 3700
->
->  .../bindings/clock/armada3700-periph-clock.txt     |  70 ++++
->  .../bindings/clock/armada3700-tbg-clock.txt        |  27 ++
->  .../bindings/clock/armada3700-xtal-clock.txt       |  28 ++
->  arch/arm64/Kconfig.platforms                       |   1 +
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  35 ++
->  drivers/clk/mvebu/Kconfig                          |   3 +
->  drivers/clk/mvebu/Makefile                         |   3 +
->  drivers/clk/mvebu/armada-37xx-periph.c             | 462 +++++++++++++++++++++
->  drivers/clk/mvebu/armada-37xx-tbg.c                | 172 ++++++++
->  drivers/clk/mvebu/armada-37xx-xtal.c               |  93 +++++
->  10 files changed, 894 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-periph-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-tbg-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
->  create mode 100644 drivers/clk/mvebu/armada-37xx-periph.c
->  create mode 100644 drivers/clk/mvebu/armada-37xx-tbg.c
->  create mode 100644 drivers/clk/mvebu/armada-37xx-xtal.c
->
-> -- 
-> 2.5.0
->
+Absolutely!
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
