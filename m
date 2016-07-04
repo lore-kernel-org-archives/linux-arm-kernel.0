@@ -1,35 +1,44 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 4 Jul 2016 12:27:00 +0300
-Subject: [PATCHv2 06/27] crypto: ahash: increase the maximum allowed
- statesize
-In-Reply-To: <20160704091925.GA31964@gondor.apana.org.au>
-References: <1466601840-18486-1-git-send-email-t-kristo@ti.com>
- <1466601840-18486-7-git-send-email-t-kristo@ti.com>
- <20160624103209.GA19607@gondor.apana.org.au> <5770B283.8000902@ti.com>
- <20160627050031.GA5673@gondor.apana.org.au> <577A298E.4040803@ti.com>
- <20160704091925.GA31964@gondor.apana.org.au>
-Message-ID: <577A2BE4.1090202@ti.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Mon, 4 Jul 2016 17:27:01 +0800
+Subject: [PATCH v2 1/1] bus: arm-cci: add missing of_node_put after calling
+ of_parse_phandle
+Message-ID: <1467624421-2541-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/16 12:19, Herbert Xu wrote:
-> On Mon, Jul 04, 2016 at 12:17:02PM +0300, Tero Kristo wrote:
->>
->> I need some clarification on this, afaik request_alloc related
->> functionality only works per-request basis. The export / import
->> functionality however is supposed to work across multiple requests.
->> The test code for example does this:
->
-> Why are you trying to allocate memory in export/import at all?
-> The preferred approach is to unconditionally allocate the memory
-> in ahash_request_alloc.
+of_node_put needs to be called when the device node which is got
+from of_parse_phandle has finished using.
 
-The driver allocates a largish buffer for copying the input data from 
-the sgs into a sequential space. If I don't save the contents of this 
-buffer anywhere, the export/import doesn't work as expected it seems.
+Cc: arm at kernel.org
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
 
-Actually I am now wondering why the driver allocates this sequential 
-buffer at all, DMA should be possible to use over the sgs just fine, at 
-least some other crypto drivers are doing this.
+Changes for v2:
+- Address suzuki's comments that calling of_node_put one time
+  for both error and corrent code path.
 
--Tero
+
+ drivers/bus/arm-cci.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index a49b283..648d130 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -1913,9 +1913,10 @@ static int __cci_ace_get_port(struct device_node *dn, int type)
+ 	for (i = 0; i < nb_cci_ports; i++) {
+ 		ace_match = ports[i].type == type;
+ 		if (ace_match && cci_portn == ports[i].dn)
+-			return i;
++			break;
+ 	}
+-	return -ENODEV;
++	of_node_put(cci_portn);
++	return (i < nb_cci_ports) ? i : -ENODEV;
+ }
+ 
+ int cci_ace_get_port(struct device_node *dn)
+-- 
+1.9.1
