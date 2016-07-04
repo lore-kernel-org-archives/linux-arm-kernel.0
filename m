@@ -1,47 +1,36 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 4 Jul 2016 22:47:42 +0200
-Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
-In-Reply-To: <20160704222648.4b74f21e@bbrezillon>
-References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
- <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
- <20160701183248.GC2874@piout.net>
- <CALdGsk+KwPMVKXhKtcmoUFqfj6aQRvQSY74F31fSvZhV+QvjAA@mail.gmail.com>
- <20160702204608.257b8bc6@bbrezillon>
- <CALdGsk+RO_cxfcTLVyKHP3aVMkSTtzEzQXz2G4ARX7vqxRazSA@mail.gmail.com>
- <20160704110018.76288816@bbrezillon>
- <CALdGsk+rSYukvo6-zqgqNTwJnf8QXu2bCSAdurpg1=BVtENZvw@mail.gmail.com>
- <20160704160203.GJ20045@piout.net>
- <20160704222648.4b74f21e@bbrezillon>
-Message-ID: <20160704204742.GM20045@piout.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 04 Jul 2016 22:48:39 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.7 (#2)
+Message-ID: <8737npw2mw.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2016 at 22:26:48 +0200, Boris Brezillon wrote :
-> On Mon, 4 Jul 2016 18:02:03 +0200
-> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> 
-> > On 04/07/2016 at 11:08:42 +0200, Olivier Schonken wrote :
-> > > That is the dilemma I face with the structure.  What is the least
-> > > invasive option to include the coresight functionality, without
-> > > breaking the amba probe for other architectures that rely on it having
-> > > a clock to enable/disable, and not break the processor startup by
-> > > messing with stable clocks for the sake of giving the ETB/ETM a clock
-> > > it doesn't need.
-> > > That is why in the end I decided on a dummy clock driver.  To keep
-> > > with the convention of having a clock specific to the ETM, and leaving
-> > > the rest of the clocks as is.
-> > >   
-> > 
-> > Well, the issue is in the pit driver, see the patch I just sent. With
-> > both of your patches, I got my sama5d2 xplained botting fine.
-> > 
-> 
-> You mean, replacing the reference to the dummy clk by a reference to
-> mck, right?
+Hi,
 
-Absolutely!
+Here is the second pull request for fixes for mvebu for v4.7.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Gregory
+
+The following changes since commit 929e604efa3dc0522214e0dc18984be23993e9f0:
+
+  ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on Armada 385 Linksys (2016-06-16 17:01:28 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.7-2
+
+for you to fetch changes up to b44439e42912b9dcc510a0ff891809ea2cadc46b:
+
+  ARM: mvebu: compile pm code conditionally (2016-06-30 13:47:52 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.7 (part 2)
+
+Fix a regression introduced by a cleanup on kirkwood_pm_init
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: mvebu: compile pm code conditionally
+
+ arch/arm/mach-mvebu/Makefile | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
