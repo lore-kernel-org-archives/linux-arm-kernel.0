@@ -1,65 +1,88 @@
-From: arend.vanspriel@broadcom.com (Arend Van Spriel)
-Date: Mon, 4 Jul 2016 10:41:20 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
- dt property
-In-Reply-To: <7975990.MvNRQ06u39@wuerfel>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <CAOiHx=m8Zf0T4=BTG6BMRjj3kOHzt4YaQa3yzutmrhFSOyZMmA@mail.gmail.com>
- <ced2a770-2724-bdc9-7e2a-3dc9f76abf29@broadcom.com>
- <7975990.MvNRQ06u39@wuerfel>
-Message-ID: <ac480a61-5bfd-5d0c-26fe-b85220ee5076@broadcom.com>
+From: liudongdong3@huawei.com (Dongdong Liu)
+Date: Mon, 4 Jul 2016 16:44:20 +0800
+Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
+In-Reply-To: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+Message-ID: <577A21E4.1030301@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2-7-2016 23:30, Arnd Bergmann wrote:
-> On Saturday, July 2, 2016 8:20:35 PM CEST Arend Van Spriel wrote:
->>> If you want a separate property, then I repeat my very first
->>> suggestion, the well defined model property.
->>> e.g.
->>>
->>> brcmf at 0 {
->>>         model = "ampak,ap6210";
->>>         compatible = "brcm,bcm4329-fmac";
->>>         ...
->>> };
->>>
->>> All device nodes may have a model property, not just the top "machine" one.
->>
->> I heard you the first time  I just was not sure what the implications
->> would be to use it. Hence I suggested a vendor specific property.
->> However, looking up and reading the definition in ePAPRv1.1 I suppose it
->> is fine to use the model property:
->>
->> Property: model
->> Value type: <string>
->> Description:
->> The model property value is a <string> that specifies the manufacturer?s
->> model number of the device.
->>
->> The recommended format is: ?manufacturer,model?, where manufacturer is a
->> string describing the name of the manufacturer (such as a stock ticker
->> symbol), and model specifies the model number.
-> 
-> The model property is very similar to compatible, except that there is
-> only one entry rather than a list of entries from most specific to
-> most generic.
+Hi Po
 
-They seem very similar, but I think there is a conceptual difference.
-The compatible property is mainly used to select the appropriate driver
-and as such the property is typically ignored by device drivers.
-Probably there are exceptions to be found.
+I found a problem with the similar patch. as the below log.
 
-> I think by writing the above example as
-> 
-> 	compatible = "ampak,ap6210", "brcm,bcm4329-fmac";
-> 
-> we can provide the same functionality in a slightly simpler way, the driver
-> then just goes on to look for the nvram file for each entry in sequence until
-> it finds one.
+[    4.287060] pci 0000:80:00.0: quirk_aer_interrupt dev->irq 416
+[    4.293778] pcieport 0000:80:00.0: pci_device_probe in
+[    4.299605] pcieport 0000:80:00.0: of_irq_parse_pci() failed with rc=-22
+[    4.307209] pcieport 0000:80:00.0: init_service_irqs  dev->irq 0
 
-Not sure why this would be simpler. Why would traversing the compatible
-string be simpler than handling the model property if present and
-otherwise fallback to the default nvram naming.
+The fucntions are called as below sequence.
+1. quirk_aer_interrupt, get the aer dev->irq 416.
+2. pci_device_probe->of_irq_parse_pci, of_irq_parse_pci() failed, then dev->irq changed to 0.
 
-Regards,
-Arend
+So this patch could not work with aer.
+
+Thanks
+Dongdong
+? 2016/6/14 16:24, Po Liu ??:
+> On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+> When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
+> maybe there is interrupt line for aer pme etc. Search the interrupt
+> number in the fdt file. Then fixup the dev->irq with it.
+>
+> Signed-off-by: Po Liu <po.liu@nxp.com>
+> ---
+> changes for V3:
+> 	- Move to quirk;
+> 	- Only correct the irq in RC mode;
+>
+>   drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
+>   1 file changed, 29 insertions(+)
+>
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index ee72ebe..8b39cce 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -25,6 +25,7 @@
+>   #include <linux/sched.h>
+>   #include <linux/ktime.h>
+>   #include <linux/mm.h>
+> +#include <linux/of_irq.h>
+>   #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+>   #include "pci.h"
+>
+> @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
+>   	}
+>   }
+>   DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
+> +
+> +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
+> + * but use standalone irq. Read the device tree for the aer
+> + * interrupt number.
+> + */
+> +static void quirk_aer_interrupt(struct pci_dev *dev)
+> +{
+> +	int ret;
+> +	u8 header_type;
+> +	struct device_node *np = NULL;
+> +
+> +	/* Only for the RC mode device */
+> +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
+> +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
+> +		return;
+> +
+> +	if (dev->bus->dev.of_node)
+> +		np = dev->bus->dev.of_node;
+> +
+> +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
+> +		ret = of_irq_get_byname(np, "aer");
+> +		if (ret > 0) {
+> +			dev->no_msi = 1;
+> +			dev->irq = ret;
+> +		}
+> +	}
+> +}
+> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_aer_interrupt);
+>
