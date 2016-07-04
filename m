@@ -1,65 +1,69 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 04 Jul 2016 12:31:29 +0900
-Subject: [PATCH v2 1/1] devfreq: exynos-bus: add missing of_node_put after
- calling of_parse_phandle
-In-Reply-To: <1467600466-13667-1-git-send-email-peter.chen@nxp.com>
-References: <CGME20160704025548epcas1p2869c5b59279f7a997b0dc0425d6a9d88@epcas1p2.samsung.com>
- <1467600466-13667-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <5779D891.30405@samsung.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 4 Jul 2016 11:51:48 +0800
+Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's
+ parents
+In-Reply-To: <20160702012140.GB17071@codeaurora.org>
+References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
+ <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
+ <20160702012140.GB17071@codeaurora.org>
+Message-ID: <1467604308.26485.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 07? 04? 11:47, Peter Chen wrote:
-> of_node_put needs to be called when the device node which is got
-> from of_parse_phandle has finished using.
+On Fri, 2016-07-01 at 18:21 -0700, Stephen Boyd wrote:
+> (Resending to everyone)
 > 
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> ---
+> On 06/22, Erin Lo wrote:
+> > From: James Liao <jamesjj.liao@mediatek.com>
+> > 
+> > This patch fixed wrong state of parent clocks if they are registered
+> > after critical clocks.
+> > 
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 > 
-> Changes at v2:
-> - It should define node as pointer, kbuild test robot reports it
+> It would be nice if you included the information about the
+> problem from James' previous mail. This says what it does, but
+> doesn't explain what the problem is and how it is fixing it.
 > 
+> > ---
+> >  drivers/clk/clk.c | 9 ++++++++-
+> >  1 file changed, 8 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index d584004..e9f5f89 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -2388,8 +2388,15 @@ static int __clk_core_init(struct clk_core *core)
+> >  	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
+> >  		struct clk_core *parent = __clk_init_parent(orphan);
+> >  
+> > -		if (parent)
+> > +		if (parent) {
+> >  			clk_core_reparent(orphan, parent);
+> > +
+> > +			if (orphan->prepare_count)
+> > +				clk_core_prepare(parent);
+> > +
+> > +			if (orphan->enable_count)
+> > +				clk_core_enable(parent);
+> > +		}
+> >  	}
 > 
->  drivers/devfreq/exynos-bus.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
-> index 2363d0a..4b4c63c 100644
-> --- a/drivers/devfreq/exynos-bus.c
-> +++ b/drivers/devfreq/exynos-bus.c
-> @@ -383,7 +383,7 @@ err_clk:
->  static int exynos_bus_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> -	struct device_node *np = dev->of_node;
-> +	struct device_node *node, *np = dev->of_node;
->  	struct devfreq_dev_profile *profile;
->  	struct devfreq_simple_ondemand_data *ondemand_data;
->  	struct devfreq_passive_data *passive_data;
-> @@ -415,10 +415,13 @@ static int exynos_bus_probe(struct platform_device *pdev)
->  		goto err;
->  	}
->  
-> -	if (of_parse_phandle(dev->of_node, "devfreq", 0))
-> +	node = of_parse_phandle(dev->of_node, "devfreq", 0);
-> +	if (node) {
-> +		of_node_put(node);
->  		goto passive;
-> -	else
-> +	} else {
->  		ret = exynos_bus_parent_parse_of(np, bus);
-> +	}
->  
->  	if (ret < 0)
->  		goto err;
-> 
+> I'm pretty sure I pointed this problem out to Mike when the
+> critical clk patches were being pushed. I can't recall what the
+> plan was though to fix the problem. I'm pretty sure he said that
+> clk_core_reparent() would take care of it, but obviously it is
+> not doing that. Or perhaps it was that clk handoff should figure
+> out that the parents of a critical clk are also on and thus keep
+> them on.
 
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+Hi Mike
 
-Thanks,
-Chanwoo Choi
+Is there any other patch to fix this issue? Or did I misuse critical
+clock flag?
+
+
+Best regards,
+
+James
