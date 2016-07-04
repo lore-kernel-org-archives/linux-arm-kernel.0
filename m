@@ -1,92 +1,162 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Jul 2016 16:54:25 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <6cc6dabf-e6da-d70d-3cce-a7f1804f233e@broadcom.com>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <5756670.9hMGo8oEyl@wuerfel>
- <6cc6dabf-e6da-d70d-3cce-a7f1804f233e@broadcom.com>
-Message-ID: <8717879.O1RMZcQt4V@wuerfel>
+From: james.morse@arm.com (James Morse)
+Date: Mon,  4 Jul 2016 15:52:27 +0100
+Subject: [PATCH v4 0/3] PM / Hibernate: Allow arch code to influence CPUs
+ disabled during hibernate
+Message-ID: <1467643950-11034-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 4, 2016 11:08:38 AM CEST Arend Van Spriel wrote:
-> On 4-7-2016 10:55, Arnd Bergmann wrote:
-> > On Monday, July 4, 2016 10:41:20 AM CEST Arend Van Spriel wrote:
-> >> On 2-7-2016 23:30, Arnd Bergmann wrote:
-> >>> On Saturday, July 2, 2016 8:20:35 PM CEST Arend Van Spriel wrote:
-> >>>>> If you want a separate property, then I repeat my very first
-> >>>>> suggestion, the well defined model property.
-> >>>>> e.g.
-> >>>>>
-> >>>>> brcmf at 0 {
-> >>>>>         model = "ampak,ap6210";
-> >>>>>         compatible = "brcm,bcm4329-fmac";
-> >>>>>         ...
-> >>>>> };
-> >>>>>
-> >>>>> All device nodes may have a model property, not just the top "machine" one.
-> >>>>
-> >>>> I heard you the first time  I just was not sure what the implications
-> >>>> would be to use it. Hence I suggested a vendor specific property.
-> >>>> However, looking up and reading the definition in ePAPRv1.1 I suppose it
-> >>>> is fine to use the model property:
-> >>>>
-> >>>> Property: model
-> >>>> Value type: <string>
-> >>>> Description:
-> >>>> The model property value is a <string> that specifies the manufacturer?s
-> >>>> model number of the device.
-> >>>>
-> >>>> The recommended format is: ?manufacturer,model?, where manufacturer is a
-> >>>> string describing the name of the manufacturer (such as a stock ticker
-> >>>> symbol), and model specifies the model number.
-> >>>
-> >>> The model property is very similar to compatible, except that there is
-> >>> only one entry rather than a list of entries from most specific to
-> >>> most generic.
-> >>
-> >> They seem very similar, but I think there is a conceptual difference.
-> >> The compatible property is mainly used to select the appropriate driver
-> >> and as such the property is typically ignored by device drivers.
-> >> Probably there are exceptions to be found.
-> >>
-> >>> I think by writing the above example as
-> >>>
-> >>>       compatible = "ampak,ap6210", "brcm,bcm4329-fmac";
-> >>>
-> >>> we can provide the same functionality in a slightly simpler way, the driver
-> >>> then just goes on to look for the nvram file for each entry in sequence until
-> >>> it finds one.
-> >>
-> >> Not sure why this would be simpler. Why would traversing the compatible
-> >> string be simpler than handling the model property if present and
-> >> otherwise fallback to the default nvram naming.
-> > 
-> > Because you have to walk the list anyway to find the other firmware files:
-> > when you have a specialization of a device that requires listing both values
-> > as compatible, the driver has no idea which of the entries to use, unless
-> > you add a lookup table that adds more complexity.
-> 
-> Currently, the brcmfmac bindings describe a single compatible string,
-> ie. "brcm,bcm4329-fmac", which selects the driver/programming model. If
-> that programming model supports "use model property if present,
-> otherwise use default" there is nothing to traverse. The default way in
-> the driver to determine firmware and nvram filename already has a lookup
-> table which uses the chip id and chip revision as key, which are read
-> from the device.
+Hi all,
 
-In drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c I already see
-over a dozen different chips being supported, bcm4329 is only one of
-them. In particular, there seem to be some that have various modules:
+This series is a break-up/continuation of [v3]. These patches allow arm64 to
+hibernate on any CPU saving the cpu-id in the arch header, then switch to it
+during resume by hooking disable_nonboot_cpus(). Today we forbid
+hibernate if CPU0 has been offlined but this is futile if we booted via
+kexec, as this may have occured with CPU0 offline. The first sign something
+has gone wrong is a hang during resume.
 
-        BRCMF_FW_NVRAM_ENTRY(BRCM_CC_43241_CHIP_ID, 0x0000001F, 43241B0),
-        BRCMF_FW_NVRAM_ENTRY(BRCM_CC_43241_CHIP_ID, 0x00000020, 43241B4),
-        BRCMF_FW_NVRAM_ENTRY(BRCM_CC_43241_CHIP_ID, 0xFFFFFFC0, 43241B5),
+With this series applied I can offline CPU0, kexec, hibernate and then
+resume[3], the implementation is as discussed on the list[2].
 
-So if you have a bcm43241, that compatible string probably should
-include both brcm,bcm43241-b4-fmac and brcm,bcm43241-fmac, possibly also
-brcm,bcm4329-fmac, to show that it is a superset of the programming
-interface of that one.
+Patch one should be usable for Chen Yu's hlt/mwait problem too [1].
 
-	Arnd
+This series is aimed at the PM tree, is based on v4.7-rc6, and can be
+retrieved from:
+git://linux-arm.org/linux-jm.git -b hibernate/cpuN/v4
+
+Changes since v3:
+ * Split series, at the PM/Hibernate patch, merged arm64 patches to remove
+   dependencies.
+ * Changed Kconfig symbol name.
+ * Fixed logic error '<= 0' when testing for an unrecognised CPU.
+
+Changes since v2:
+ * Split wrong-CPU logic into an earlier patch that just returns an error.
+ * Changed core code patch to use macros instead of a weak function.
+   CONFIG_ARCH_HIBERNATION_HEADER now implies an asm/suspend.h header.
+ * Wording in error messages 'hibernate' not 'suspend'.
+
+Changes since v1:
+ * Fixed 'Brining' typo.
+
+
+[v1] http://www.spinics.net/lists/arm-kernel/msg507805.html
+[v2] http://permalink.gmane.org/gmane.linux.power-management.general/77467
+[v3] http://www.spinics.net/lists/arm-kernel/msg514644.html
+
+[0] http://www.spinics.net/lists/arm-kernel/msg499305.html
+[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1176775.html
+[2] http://www.spinics.net/lists/arm-kernel/msg499036.html
+[3] offline cpu0, kexec, hibernate, resume
+-------------------------%<-------------------------
+root@ubuntu:~# echo disk > /sys/power/state
+PM: Syncing filesystems ... done.
+Freezing user space processes ... (elapsed 0.007 seconds) done.
+PM: Preallocating image memory... done (allocated 10112 pages)
+PM: Allocated 647168 kbytes in 2.69 seconds (240.58 MB/s)
+Freezing remaining freezable tasks ... (elapsed 0.005 seconds) done.
+PM: freeze of devices complete after 27.013 msecs
+PM: late freeze of devices complete after 20.624 msecs
+PM: noirq freeze of devices complete after 22.211 msecs
+Disabling non-boot CPUs ...
+PM: Creating hibernation image:
+PM: Need to copy 10103 pages
+PM: Hibernation image created (10103 pages copied)
+PM: noirq thaw of devices complete after 22.350 msecs
+PM: early thaw of devices complete after 23.680 msecs
+PM: thaw of devices complete after 98.331 msecs
+hibernate: Suspending on cpu 0 [mpidr:0x103]
+PM: Using 1 thread(s) for compression.
+PM: Compressing and saving image data (10105 pages)...
+PM: Image saving progress:   0%
+atkbd serio0: keyboard reset failed on 1c060000.kmi
+atkbd serio1: keyboard reset failed on 1c070000.kmi
+PM: Image saving progress:  10%
+PM: Image saving progress:  20%
+PM: Image saving progress:  30%
+PM: Image saving progress:  40%
+PM: Image saving progress:  50%
+PM: Image saving progress:  60%
+PM: Image saving progress:  70%
+PM: Image saving progress:  80%
+PM: Image saving progress:  90%
+PM: Image saving progress: 100%
+PM: Image saving done.
+PM: Wrote 646720 kbytes in 93.08 seconds (6.94 MB/s)
+PM: S|
+reboot: Power down
+
+[ ... ]
+
+Freezing user space processes ... (elapsed 0.000 seconds) done.
+PM: Using 1 thread(s) for decompression.
+PM: Loading and decompressing image data (10105 pages)...
+hibernate: Suspended on cpu 5 [mpidr:0x103]
+hibernate: Suspended on a CPU that is offline! Brining CPU up.
+Detected VIPT I-cache on CPU5
+CPU5: Booted secondary processor [410fd033]
+random: nonblocking pool is initialized
+PM: Image loading progress:   0%
+PM: Image loading progress:  10%
+PM: Image loading progress:  20%
+PM: Image loading progress:  30%
+PM: Image loading progress:  40%
+PM: Image loading progress:  50%
+PM: Image loading progress:  60%
+PM: Image loading progress:  70%
+PM: Image loading progress:  80%
+PM: Image loading progress:  90%
+PM: Image loading progress: 100%
+PM: Image loading done.
+PM: Read 646720 kbytes in 30.47 seconds (21.22 MB/s)
+PM: quiesce of devices complete after 32.958 msecs
+PM: late quiesce of devices complete after 11.574 msecs
+PM: noirq quiesce of devices complete after 24.918 msecs
+hibernate: Disabling secondary CPUs ...
+IRQ1 no longer affine to CPU0
+IRQ6 no longer affine to CPU0
+IRQ28 no longer affine to CPU0
+IRQ29 no longer affine to CPU0
+IRQ32 no longer affine to CPU0
+IRQ34 no longer affine to CPU0
+IRQ35 no longer affine to CPU0
+IRQ37 no longer affine to CPU0
+IRQ41 no longer affine to CPU0
+IRQ48 no longer affine to CPU0
+CPU0: shutdown
+
+psci: CPU0 killed.
+PM: noirq restore of devices complete after 27.419 msecs
+PM: early restore of devices complete after 23.554 msecs
+PM: restore of devices complete after 113.188 msecs
+Restarting tasks ... done.
+root at ubuntu:~# atkbd serio0: keyboard reset failed on 1c060000.kmi
+atkbd serio1: keyboard reset failed on 1c070000.kmi
+root at ubuntu:~# cat /proc/cpuinfo
+processor       : 0
+BogoMIPS        : 100.00
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 3
+
+root at ubuntu:~#
+-------------------------%<-------------------------
+
+James Morse (3):
+  PM / Hibernate: Allow arch code to influence CPUs disabled during
+    hibernate
+  arm64: hibernate: Resume when hibernate image created on non-boot CPU
+  Revert "arm64: hibernate: Refuse to hibernate if the boot cpu is
+    offline"
+
+ arch/arm64/Kconfig               |  4 ++
+ arch/arm64/include/asm/suspend.h |  4 ++
+ arch/arm64/kernel/hibernate.c    | 86 ++++++++++++++++++++++++++++++----------
+ kernel/power/hibernate.c         | 14 +++++--
+ 4 files changed, 84 insertions(+), 24 deletions(-)
+
+-- 
+2.8.0.rc3
