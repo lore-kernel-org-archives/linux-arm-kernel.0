@@ -1,56 +1,32 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 4 Jul 2016 14:53:20 +0200
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <2183745.J7YpvxXQ47@vostro.rjw.lan>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <57714bed-3f9c-90c2-ac30-2d462d8a06d4@linaro.org>
- <20160701152340.GO12735@arm.com>
- <2183745.J7YpvxXQ47@vostro.rjw.lan>
-Message-ID: <CAJZ5v0iFcjxQV9YV2KaXGAPRBM8M2xxPm5e2b4uhwYAZZtndPg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 4 Jul 2016 13:57:40 +0100
+Subject: [PATCHv2 0/2] arm-cc*: fix PMU interrupt flags
+In-Reply-To: <1467631532-8122-1-git-send-email-mark.rutland@arm.com>
+References: <1467631532-8122-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160704125740.GH1639@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 1, 2016 at 11:04 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Friday, July 01, 2016 04:23:40 PM Will Deacon wrote:
->> On Thu, Jun 30, 2016 at 09:48:02PM +0800, Hanjun Guo wrote:
->> > On 2016/6/30 21:27, Rafael J. Wysocki wrote:
->> > >On Thursday, June 30, 2016 10:10:02 AM Hanjun Guo wrote:
->> > >>GTDT is part of ACPI spec, drivers/acpi/ is for driver code of
->> > >>ACPI spec, I think it can stay in drivers/acpi/ from this point
->> > >>of view, am I right?
->> > >
->> > >The question is not "Can it?", but "Does it need to?".
->> > >
->> > >It is in the spec, but still there's only one architecture needing it.
->> > >
->> > >There is no way to test it on any other architecture and no reason to build it
->> > >for any other architecture, so why does it need to be located in drivers/acpi/ ?
->> >
->> > I'm fine to move it to other places such as arch/arm64/kernel/, but I
->> > would like to ask ARM64 maintainer's suggestion for this.
->> >
->> > Will, Catalin, what's your opinion on this?
->>
->> We don't have any device-tree code for the architected timer under
->> arch/arm64, so I don't see why we should need anything for ACPI either.
->
-> And I don't see a reason for the GTDT code to be there in drivers/acpi/.
->
-> What gives?
+On Mon, Jul 04, 2016 at 12:25:30PM +0100, Mark Rutland wrote:
+> As discovered during review of the X-Gene SoC PMU [1], the arm-cc{i,n} drivers
+> don't ensure that IRQ balancers don't migrate interrupts.
+> 
+> This is problematic for the perf core code, which requires mutual exclusion of
+> certain operations (e.g. event rotation, cross-calls, and irq handling) to be
+> provided by disabling IRQs, which only works if all operations occur on the
+> same CPU. This is also required for safe (lockless) manipulation of some data
+> structures.
+> 
+> To avoid this problem, we must request interrupts with IRQF_NOBALANCING, as is
+> already the case for CPU PMU drivers which make use of interrupts.
+> 
+> To ensure synchronisation between IRQ handlers and other manipulation of said
+> data structures or HW state, we must also ensure that the interrupt handlers
+> are not threaded, by requesting them with IRQF_NO_THREAD, as is already the
+> case for CPU PMU drivers.
 
-Well, since there are things like acpi_lpss in there, my position here
-is kind of weak. :-)
+Thanks, looks good now:
 
-That said I'm not particularly happy with having them in
-drivers/acpi/, so I definitely won't object against attempts to moving
-them somewhere else.
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-> Maybe it should go to the same place as the analogus DT code, then?
-
-I'm mostly concerned about how (and by whom) that code is going to be
-maintained going forward, though.  I also think it should be made
-clear that it is ARM64-only.
-
-Thanks,
-Rafael
+Will
