@@ -1,67 +1,44 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 4 Jul 2016 14:00:03 +0100
-Subject: [PATCH v7 2/6] ACPI / processor_idle: Add support for Low Power
- Idle(LPI) states
-In-Reply-To: <57766B15.4090407@linaro.org>
-References: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
- <1467122152-5604-3-git-send-email-sudeep.holla@arm.com>
- <57766B15.4090407@linaro.org>
-Message-ID: <577A5DD3.4050901@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 4 Jul 2016 14:05:45 +0100
+Subject: [PATCHv2 0/2] arm-cc*: fix PMU interrupt flags
+In-Reply-To: <20160704125740.GH1639@arm.com>
+References: <1467631532-8122-1-git-send-email-mark.rutland@arm.com>
+ <20160704125740.GH1639@arm.com>
+Message-ID: <20160704130545.GA9048@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 04, 2016 at 01:57:40PM +0100, Will Deacon wrote:
+> On Mon, Jul 04, 2016 at 12:25:30PM +0100, Mark Rutland wrote:
+> > As discovered during review of the X-Gene SoC PMU [1], the arm-cc{i,n} drivers
+> > don't ensure that IRQ balancers don't migrate interrupts.
+> > 
+> > This is problematic for the perf core code, which requires mutual exclusion of
+> > certain operations (e.g. event rotation, cross-calls, and irq handling) to be
+> > provided by disabling IRQs, which only works if all operations occur on the
+> > same CPU. This is also required for safe (lockless) manipulation of some data
+> > structures.
+> > 
+> > To avoid this problem, we must request interrupts with IRQF_NOBALANCING, as is
+> > already the case for CPU PMU drivers which make use of interrupts.
+> > 
+> > To ensure synchronisation between IRQ handlers and other manipulation of said
+> > data structures or HW state, we must also ensure that the interrupt handlers
+> > are not threaded, by requesting them with IRQF_NO_THREAD, as is already the
+> > case for CPU PMU drivers.
+> 
+> Thanks, looks good now:
+> 
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
 
+Cheers!
 
-On 01/07/16 14:07, Daniel Lezcano wrote:
-> On 06/28/2016 03:55 PM, Sudeep Holla wrote:
->> ACPI 6.0 introduced an optional object _LPI that provides an alternate
->> method to describe Low Power Idle states. It defines the local power
->> states for each node in a hierarchical processor topology. The OSPM can
->> use _LPI object to select a local power state for each level of processor
->> hierarchy in the system. They used to produce a composite power state
->> request that is presented to the platform by the OSPM.
->>
->> Since multiple processors affect the idle state for any non-leaf
->> hierarchy
->> node, coordination of idle state requests between the processors is
->> required. ACPI supports two different coordination schemes: Platform
->> coordinated and  OS initiated.
->>
->> This patch adds initial support for Platform coordination scheme of LPI.
->>
->> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->
-> Hi Sudeep,
->
-> I looked at the acpi processor idle code sometime ago and from my POV,
-> it was awful, unnecessary complex and very difficult to maintain. The
-> usage of flags all over the places is significant of the lack of control
-> of the written code.
->
+I take it that as with the other recent CCI patch [1] you expect the
+patches to go via arm-soc.
 
-So you have any specific things in mind ? That's too broad and I know
-it's not so clean, but it's so for legacy reasons. I would leave that
-to Rafael to decide as it takes lots of testing to clean up these code.
+Arnd, Olof, are you happy to pick these patches?
 
-> Even if you are not responsible of this implementation, the current
-> situation forces you to add more awful code on top of that, which is
-> clearly against "making Linux better".
->
+Thanks,
+Mark.
 
-OK
-
-> IMO, the current code deserves a huge cleanup before applying anything
-> new : cstate and lpi should be investigated to be self-contained in
-> their respective file and consolidated, the global variable usage should
-> be killed, redundant flag checking removed by recapturing the code flow,
-> etc ... I believe the usage of acpi probe table could be one entry point
-> to begin this cleanup.
->
-
-This is not a static table.
-
--- 
-Regards,
-Sudeep
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/440916.html
