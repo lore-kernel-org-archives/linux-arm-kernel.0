@@ -1,89 +1,157 @@
-From: nicolas@ndufresne.ca (Nicolas Dufresne)
-Date: Sun, 03 Jul 2016 21:30:35 -0400
-Subject: [RFC PATCH] media: s5p-mfc - remove vidioc_g_crop
-In-Reply-To: <772ecbb8-b1d2-b4cf-2be2-110f731b9a2b@xs4all.nl>
-References: <1467322502-11180-1-git-send-email-shuahkh@osg.samsung.com>
- <CAH_td2wtizPpD59h2shZoyuTvSNr=7YjR4mSmTO9FsWaJp8dfA@mail.gmail.com>
- <772ecbb8-b1d2-b4cf-2be2-110f731b9a2b@xs4all.nl>
-Message-ID: <1467595835.2577.2.camel@ndufresne.ca>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Mon, 4 Jul 2016 09:32:30 +0800
+Subject: [PATCH v4 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for
+ mt2701
+In-Reply-To: <51441f39-e5b5-2cce-63ab-47bd3cf298b3@gmail.com>
+References: <1465379461-14757-1-git-send-email-honghui.zhang@mediatek.com>
+ <1465379461-14757-6-git-send-email-honghui.zhang@mediatek.com>
+ <09eaf7a5-2b18-1ea6-5699-2e968c6b79a4@gmail.com>
+ <51441f39-e5b5-2cce-63ab-47bd3cf298b3@gmail.com>
+Message-ID: <1467595950.8420.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le dimanche 03 juillet 2016 ? 11:43 +0200, Hans Verkuil a ?crit?:
-> Hi Nicolas,
+On Sun, 2016-07-03 at 21:12 +0200, Matthias Brugger wrote:
 > 
-> On 07/02/2016 10:29 PM, Nicolas Dufresne wrote:
-> > 
-> > Le 30 juin 2016 5:35 PM, "Shuah Khan" <shuahkh@osg.samsung.com
-> > <mailto:shuahkh@osg.samsung.com>> a ?crit :
-> > > 
-> > > Remove vidioc_g_crop() from s5p-mfc decoder. Without its s_crop
-> > > counterpart
-> > > g_crop is not useful. Delete it.
-> > 
-> > G_CROP tell the userspace which portion of the output is to be
-> > displayed. Example,??1920x1080 inside a buffer of 1920x1088. It can
-> > be
-> > implemented using G_SELECTION too, which emulate G_CROP. removing
-> > this without implementing G_SEKECTION will break certain software
-> > like
-> > GStreamer v4l2 based decoder.
+> On 07/03/2016 08:24 AM, Matthias Brugger wrote:
+> >
+> >
+> > On 06/08/2016 11:51 AM, honghui.zhang at mediatek.com wrote:
+> >> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> >>
+> >> Add the dtsi node of iommu and smi for mt2701.
+> >>
+> >> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> >> ---
+> >>  arch/arm/boot/dts/mt2701.dtsi | 51
+> >> +++++++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 51 insertions(+)
+> >>
+> >
+> > Applied,
 > 
-> Sorry, but this is not correct.
+> Please resend the patch including the infracfg and mmsys node.
 > 
-> G_CROP for VIDEO_OUTPUT returns the output *compose* rectangle, not
-> the output
-> crop rectangle.
-> 
-> Don't blame me, this is how it was defined in V4L2. The problem is
-> that for video
-> output (esp. m2m devices) you usually want to set the crop rectangle,
-> and that's
-> why the selection API was added so you can unambiguously set the crop
-> and compose
-> rectangles for both capture and output.
-> 
-> Unfortunately, the exynos drivers were written before the
-> G/S_SELECTION API was
-> created, and the crop ioctls in the video output drivers actually set
-> the output
-> crop rectangle instead of the compose rectangle :-(
-> 
-> This is a known inconsistency.
-> 
-> You are right though that we can't remove g_crop here, I had
-> forgotten about the
-> buffer padding.
-> 
-> What should happen here is that g_selection support is added to s5p-
-> mfc, and
-> have that return the proper rectangles. The g_crop can be kept, and a
-> comment
-> should be added that it returns the wrong thing, but that that is
-> needed for
-> backwards compat.
-> 
-> The gstreamer code should use g/s_selection if available. It should
-> check how it
-> is using g/s_crop for video output devices today and remember that
-> for output
-> devices g/s_crop is really g/s_compose, except for the exynos
-> drivers.
 
-This is already the case. There is other non-mainline driver that do
-like exynos (I have been told).
+Hi, Matthias,
 
-https://cgit.freedesktop.org/gstreamer/gst-plugins-good/commit/sys?id=7
-4f020fd2f1dc645efe35a7ba1f951f9c5ee7c4c
+Please hold this one.
+This one is based on CCF "arm: dts: mt2701: Add clock controller device
+nodes"[1] and power domain patch "Mediatek MT2701 SCPSYS power domain
+support v7"[2],
+But these two patchset are still being reviewed now.
 
-> 
-> It's why I recommend the selection API since it doesn't have these
-> problems.
-> 
-> I think I should do another push towards implementing the selection
-> API in all
-> drivers. There aren't many left.
-> 
+Do you think it's better that I send this one later after ccf and power
+domain patch got merged? I will send this patch later if it's OK with
+you.
+
+Thanks.
+[1] https://patchwork.kernel.org/patch/9109081
+[2]
+http://lists.infradead.org/pipermail/linux-mediatek/2016-May/005429.html
+
 > Regards,
+> Matthias
 > 
-> 	Hans
+> >
+> > Thanks.
+> >
+> >> diff --git a/arch/arm/boot/dts/mt2701.dtsi
+> >> b/arch/arm/boot/dts/mt2701.dtsi
+> >> index 42d5a37..363de0d 100644
+> >> --- a/arch/arm/boot/dts/mt2701.dtsi
+> >> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> >> @@ -16,6 +16,7 @@
+> >>  #include <dt-bindings/power/mt2701-power.h>
+> >>  #include <dt-bindings/interrupt-controller/irq.h>
+> >>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> >> +#include <dt-bindings/memory/mt2701-larb-port.h>
+> >>  #include "skeleton64.dtsi"
+> >>  #include "mt2701-pinfunc.h"
+> >>
+> >> @@ -160,6 +161,16 @@
+> >>          clock-names = "system-clk", "rtc-clk";
+> >>      };
+> >>
+> >> +    smi_common: smi at 1000c000 {
+> >> +        compatible = "mediatek,mt2701-smi-common";
+> >> +        reg = <0 0x1000c000 0 0x1000>;
+> >> +        clocks = <&infracfg CLK_INFRA_SMI>,
+> >> +             <&mmsys CLK_MM_SMI_COMMON>,
+> >> +             <&infracfg CLK_INFRA_SMI>;
+> >> +        clock-names = "apb", "smi", "async";
+> >> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+> >> +    };
+> >> +
+> >>      sysirq: interrupt-controller at 10200100 {
+> >>          compatible = "mediatek,mt2701-sysirq",
+> >>                   "mediatek,mt6577-sysirq";
+> >> @@ -169,6 +180,16 @@
+> >>          reg = <0 0x10200100 0 0x1c>;
+> >>      };
+> >>
+> >> +    iommu: mmsys_iommu at 10205000 {
+> >> +        compatible = "mediatek,mt2701-m4u";
+> >> +        reg = <0 0x10205000 0 0x1000>;
+> >> +        interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
+> >> +        clocks = <&infracfg CLK_INFRA_M4U>;
+> >> +        clock-names = "bclk";
+> >> +        mediatek,larbs = <&larb0 &larb1 &larb2>;
+> >> +        #iommu-cells = <1>;
+> >> +    };
+> >> +
+> >>      apmixedsys: syscon at 10209000 {
+> >>          compatible = "mediatek,mt2701-apmixedsys", "syscon";
+> >>          reg = <0 0x10209000 0 0x1000>;
+> >> @@ -234,6 +255,16 @@
+> >>          status = "disabled";
+> >>      };
+> >>
+> >> +    larb0: larb at 14010000 {
+> >> +        compatible = "mediatek,mt2701-smi-larb";
+> >> +        reg = <0 0x14010000 0 0x1000>;
+> >> +        mediatek,smi = <&smi_common>;
+> >> +        clocks = <&mmsys CLK_MM_SMI_LARB0>,
+> >> +             <&mmsys CLK_MM_SMI_LARB0>;
+> >> +        clock-names = "apb", "smi";
+> >> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+> >> +    };
+> >> +
+> >>      imgsys: syscon at 15000000 {
+> >>          compatible = "mediatek,mt2701-imgsys", "syscon";
+> >>          reg = <0 0x15000000 0 0x1000>;
+> >> @@ -241,6 +272,16 @@
+> >>          status = "disabled";
+> >>      };
+> >>
+> >> +    larb2: larb at 15001000 {
+> >> +        compatible = "mediatek,mt2701-smi-larb";
+> >> +        reg = <0 0x15001000 0 0x1000>;
+> >> +        mediatek,smi = <&smi_common>;
+> >> +        clocks = <&imgsys CLK_IMG_SMI_COMM>,
+> >> +             <&imgsys CLK_IMG_SMI_COMM>;
+> >> +        clock-names = "apb", "smi";
+> >> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+> >> +    };
+> >> +
+> >>      vdecsys: syscon at 16000000 {
+> >>          compatible = "mediatek,mt2701-vdecsys", "syscon";
+> >>          reg = <0 0x16000000 0 0x1000>;
+> >> @@ -248,6 +289,16 @@
+> >>          status = "disabled";
+> >>      };
+> >>
+> >> +    larb1: larb at 16010000 {
+> >> +        compatible = "mediatek,mt2701-smi-larb";
+> >> +        reg = <0 0x16010000 0 0x1000>;
+> >> +        mediatek,smi = <&smi_common>;
+> >> +        clocks = <&vdecsys CLK_VDEC_CKGEN>,
+> >> +             <&vdecsys CLK_VDEC_LARB>;
+> >> +        clock-names = "apb", "smi";
+> >> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
+> >> +    };
+> >> +
+> >>      hifsys: syscon at 1a000000 {
+> >>          compatible = "mediatek,mt2701-hifsys", "syscon";
+> >>          reg = <0 0x1a000000 0 0x1000>;
+> >>
