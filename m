@@ -1,36 +1,45 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 04 Jul 2016 22:49:02 +0200
-Subject: [GIT PULL] ARM: mvebu: arm64 for v4.8 (#1)
-Message-ID: <871t39w2m9.fsf@free-electrons.com>
+Date: Mon, 04 Jul 2016 22:49:27 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.8 (#1)
+Message-ID: <87zipxuo14.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for arm64 for mvebu for v4.8.
+Here is the first pull request for dt64 for mvebu for v4.8.
 
 Gregory
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+The following changes since commit 19b67d5c8b2dbef9a10bc1aeb96a861c57a0bdf8:
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+  arm64: dts: marvell: add XOR node for Armada 3700 SoC (2016-04-29 15:07:42 +0200)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.8-1
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.8-1
 
-for you to fetch changes up to ff60d834d1e0d1b4560b14daab1bc165667af7b4:
+for you to fetch changes up to 5f4beef6db3c158ed99573d74e93dfe0611352e4:
 
-  arm64: marvell: enable Armada 3700 clock drivers (2016-07-04 22:18:06 +0200)
-
-----------------------------------------------------------------
-mvebu arm64 for 4.8
-
-enable Armada 3700 clock drivers
+  arm64: dts: marvell: add peripherals clocks for Armada 37xx (2016-07-04 22:21:13 +0200)
 
 ----------------------------------------------------------------
-Gregory CLEMENT (1):
-      arm64: marvell: enable Armada 3700 clock drivers
+mvebu dt64 for 4.8 (part 1)
 
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+- update dt with mv-xor-v2 found in the Armada 7K/8K SoCs
+- update dt with the clocks found in the Armada 3700 SoCs
+
+----------------------------------------------------------------
+Gregory CLEMENT (3):
+      arm64: dts: marvell: Add xtal clock support for Armada 3700
+      arm64: dts: marvell: add tbg clocks for Armada 37xx
+      arm64: dts: marvell: add peripherals clocks for Armada 37xx
+
+Thomas Petazzoni (2):
+      arm64: dts: marvell: adjust to the latest mv-xor-v2 DT binding
+      arm64: dts: marvell: add XOR engine description for Armada 7K/8K CP
+
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 35 ++++++++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  8 ++---
+ .../boot/dts/marvell/armada-cp110-master.dtsi      | 18 +++++++++++
+ 3 files changed, 57 insertions(+), 4 deletions(-)
