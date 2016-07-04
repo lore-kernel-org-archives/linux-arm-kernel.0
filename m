@@ -1,74 +1,79 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 4 Jul 2016 13:55:37 +0900
-Subject: [PATCH v3 0/2] mark spi clocks as critical and enable spi3 clocks
-In-Reply-To: <20160704042003.GB23620@samsunx.samsung>
-References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
- <CGME20160704040000epcas1p3aeb0a1337a7e8e7274090bd932f556e3@epcas1p3.samsung.com>
- <CA+Ln22HuCdDr=g06ynK7mqjDfUVrQgG-NRkfTP_zE6h-wZk6Gw@mail.gmail.com>
- <20160704042003.GB23620@samsunx.samsung>
-Message-ID: <CA+Ln22HKo2kP8XXdBNve8aX8d9A1rZg7A78x+-S255Xi4k-nxg@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 4 Jul 2016 13:19:33 +0800
+Subject: [GIT PULL] drm/mediatek: MT8173 gamma & dither support
+In-Reply-To: <CACvgo52YgRat8Uqhd9qh_ppvk0h=krxYLHL6Cjqs9+EzQaogUg@mail.gmail.com>
+References: <1466753238-17216-1-git-send-email-bibby.hsieh@mediatek.com>
+ <558c9efc-d197-a6c3-cf7e-f9fcac60ca64@gmail.com>
+ <1467026970.23883.16.camel@mtksdaap41>
+ <CACvgo52YgRat8Uqhd9qh_ppvk0h=krxYLHL6Cjqs9+EzQaogUg@mail.gmail.com>
+Message-ID: <1467609573.31010.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-07-04 13:20 GMT+09:00 Andi Shyti <andi.shyti@samsung.com>:
-> Hi Tomasz,
->
->> > This patchset enables spi3 clocks by marking critical clocks as
->> > CLK_IS_CRITICAL and in the meantime replaces the use of
->> > CLK_IGNORE_UNUSED for spi1 clocks.
->> >
->> > The sclk needs to be considered critical as well.
->> >
->> > The SPI3 in the tm2/tm2e boards will control an irled for remote
->> > controlling.
->> >
->> > Changelog:
->> >
->> > V1 -> V2
->> >  - the "sclk_spi3" doesn't need to be enabled in boot time as it
->> >   is handled by the spi driver itself.
->> >
->> >  - use the CLK_IS_CRITICAL flag for the ioclk
->> >
->> > V2 -> V3
->> >  - some more tests has confirmed taht "sclk_spi1,3" need to be
->> >    enabled as critical!
->>
->> This sounds like a DTS and/or SPI and/or clock driver bug then. I'm
->> pretty much convinced that it might also cause other problems and this
->> workaround will only mask them making things even more difficult to
->> debug in the future. Let's not introduce more technical debt.
->
-> In principle I agree, but, the upcoming TM2/TM2e boards will have
-> the audio codec connected on SPI1 and the ir remote controller on
-> the SPI3 (others SPI slots are used as well, but we don't have
-> the drivers ready for them).
->
-> I followed for SPI3 the same approach as it was done for SPI1, so
-> that I see two choices here:
->
->  * reject this patches and cleanup the SPI1 from the "technical
->    debt" and not have anything working on spi.
+Hi, Emil:
 
->
-> or
->
->  * do for SPI3 the same as it has been done for SPI1 (and as it
->    is now) with its "technical debt".
->
-> I did quite an extensive testing on these lines and I don't see
-> any other alternative.
+On Sun, 2016-07-03 at 23:43 +0100, Emil Velikov wrote:
+> Hi Bibby,
+> 
+> On 27 June 2016 at 12:29, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
+> > On Mon, 2016-06-27 at 12:20 +0200, Matthias Brugger wrote:
+> >>
+> >> On 06/24/2016 09:27 AM, Bibby Hsieh wrote:
+> >> > Hi Dave,
+> >> >
+> >> > Please consider merging this tag, which contains the v2 MT8173 gamma & dither function patches I sent on 2016-06-17, rebased onto v4.7-rc1. There have been no further comments.
+> >> >
+> >> > Thanks
+> >> > Bibby
+> >> >
+> >> > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> >> >
+> >> >   Linux 4.7-rc1 (2016-05-29 16:29:24 GMT)
+> >> >
+> >> > are available in the git repository at:
+> >> >
+> >> >   git at github.com:BibbyHsieh/linux4.7-rc1.git
+> >> >
+> >> > for you to fetch changes up to dd0eb773bc125f5e6bca735d19c08500dc3730f9:
+> >> >
+> >> >   drm/mediatek: Add gamma correction
+> >> >
+> >> > -------------------------------------------------------------------------
+> >>
+> >> As far as I can see, your branch has 3 patches on top from Eddie. It
+> >> seems to me as if you didn't send your patches to the mailinglist before?
+> >> Anyway this branch does not fulfill the rules to get merged into the
+> >> linux kernel.
+> >>
+> >> Why do you send a pull request? The normal process is to send the
+> >> patches via email and if the maintainer wants you can send a pull
+> >> request once the patches are ready to be merged.
+> >>
+> >> Regards,
+> >> Matthias
+> >>
+> >
+> > I sent v1 and v2 on 2016-06-14 and 06-17 respectively [0-8].
+> > After I made some modifications according to Daniel Vetter's comments,
+> > there had been no further comments and I sent the pull request as the
+> > other sub-sys.
+> >
+> > I'm sorry for my mistake, I will re-arrange the tree for upstream.
+> > Next time, I will check with maintainer by email first, and sent the
+> > pull request.
+> >
+> It might be a bit hard to find out who's the maintainer considering
+> MAINTAINERS has no entry for this driver.
+> 
+> Looking at how things are going Philipp Zabel will be the more likely
+> person for the task, yet I would be nice if someone from the Mediatek
+> squad is helping him out - CK Hu perhaps ?
+> 
+> Regards,
+> Emil
 
-The SPI driver is supposed to enable the SPI bus clock whenever
-necessary, if it's given the clock correctly and the clock driver has
-the clock hierarchy correctly defined. So I see third choice here:
+I'm willing to be one of Mediatek DRM driver maintainer. I wish this
+would make things easier.
 
- * Debug why the SPI driver doesn't properly enable the clock, fix the
-cause (fixing both SPI1 and SPI3 sclk at the same time) and then
-remove the CLK_IGNORE_UNUSED flag from sclk_spi1.
-
-Of course the above doesn't apply to sclk_ioclk clocks, as we already
-agreed that they need CLK_IS_CRITICAL due to their nature.
-
-Best regards,
-Tomasz
+Regards,
+CK
