@@ -1,95 +1,22 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 4 Jul 2016 09:38:13 -0600
-Subject: [PATCH 2/2] ARM: dts: at91: sama5d2: add ETM, ETB and ETMCK node
-In-Reply-To: <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
-References: <1467383831-6985-1-git-send-email-olivier.schonken@gmail.com>
- <1467383831-6985-2-git-send-email-olivier.schonken@gmail.com>
-Message-ID: <CANLsYkxzKkpyzb-g9bK8o_sE=meRg9PSzF8j6DX77iZzeL0_1A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Jul 2016 17:43:03 +0200
+Subject: [PATCH] serial: imx: add rx and tx led trigger
+In-Reply-To: <1467646452-21243-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1467646452-21243-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <13559901.NSWqUx1Nl6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 July 2016 at 08:37, Olivier Schonken <olivier.schonken@gmail.com> wrote:
-> Add node to support SAMA5D2 Embedded Trace Macrocell and Embedded
-> Trace Buffer. Add a dummy clock node needed by drivers/amba/bus.c
-> for succesfull probe. The coresight clock is always present, and
-> can thus not be enabled/disabled by a register write.
->
-> This patch depends on coresight-etm3x: Add ARM ETM-A5 peripheral ID
-> for proper functionality.
->
-> Signed-off-by: Olivier Schonken <olivier.schonken@gmail.com>
+On Monday, July 4, 2016 5:34:12 PM CEST Uwe Kleine-K?nig wrote:
+> Add support for two led triggers per UART instance that blink on
+> transmission and reception of data respectively.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > ---
->  arch/arm/boot/dts/sama5d2.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index 5d63206..4a3a3fb 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -77,6 +77,37 @@
->                 interrupts = <2 IRQ_TYPE_LEVEL_HIGH 0>;
->         };
->
-> +       etb: etb at 00740000 {
+>  drivers/tty/serial/imx.c | 57 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
 
-What do you need the label for?
+What is specific to this driver here? Could this be done in the
+core tty code instead?
 
-> +               compatible = "arm,coresight-etb10", "arm,primecell";
-> +               reg = <0x740000 0x1000>;
-> +               status = "okay";
-
-"status" is not part of the CoreSight node properties.
-
-> +
-> +               clocks = <&etmck>;
-> +               clock-names = "apb_pclk";
-> +
-> +               port {
-> +                       etb_in: endpoint {
-> +                               slave-mode;
-> +                               remote-endpoint = <&etm_out>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       etm: etm at 0073C000 {
-> +               compatible = "arm,coresight-etm3x", "arm,primecell";
-> +               reg = <0x73C000 0x1000>;
-> +               status = "okay";
-> +
-> +               clocks = <&etmck>;
-> +               clock-names = "apb_pclk";
-> +
-> +               port {
-> +                       etm_out: endpoint {
-> +                               remote-endpoint = <&etb_in>;
-> +                       };
-> +               };
-> +       };
-> +
->         memory {
->                 reg = <0x20000000 0x20000000>;
->         };
-> @@ -474,6 +505,19 @@
->                                         };
->                                 };
->
-> +                               /*
-> +                                * This is a dummy clock needed by
-> +                                * drivers/amba/bus.c when probing
-> +                                * for ETM/ETB. On SAMA5D2 the coresight
-> +                                * clock is always supplied.
-> +                               */
-> +
-> +                               etmck: etmck {
-> +                                       #clock-cells = <0>;
-> +                                       compatible = "fixed-clock";
-> +                                       clock-frequency = <0>;
-> +                               };
-> +
->                                 systemck {
->                                         compatible = "atmel,at91rm9200-clk-system";
->                                         #address-cells = <1>;
-> --
-> 1.9.1
->
+	Arnd
