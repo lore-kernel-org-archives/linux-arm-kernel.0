@@ -1,49 +1,128 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue,  5 Jul 2016 15:22:52 -0700
-Subject: [PATCHv3] Better kernel instruction abort handling
-Message-ID: <1467757373-31242-1-git-send-email-labbott@redhat.com>
+Date: Tue,  5 Jul 2016 15:22:53 -0700
+Subject: [PATCHv3] arm64: Handle el1 synchronous instruction aborts cleanly
+In-Reply-To: <1467757373-31242-1-git-send-email-labbott@redhat.com>
+References: <1467757373-31242-1-git-send-email-labbott@redhat.com>
+Message-ID: <1467757373-31242-2-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Executing from a non-executable area gives an ugly message:
 
-This is v3 of the patch to make instruction aborts print a nicer more standard\
-error message (i.e. no more bad mode)
+lkdtm: Performing direct entry EXEC_RODATA
+lkdtm: attempting ok execution at ffff0000084c0e08
+lkdtm: attempting bad execution at ffff000008880700
+Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
+CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
+Hardware name: linux,dummy-virt (DT)
+task: ffff800077e35780 ti: ffff800077970000 task.ti: ffff800077970000
+PC is at lkdtm_rodata_do_nothing+0x0/0x8
+LR is at execute_location+0x74/0x88
 
-Mark Rutland pointed out in v2 that we need to audit do_mem_abort paths. Of the
-functions that do_mem_abort can call, do_bad, do_translation_fault, and
-do_alignment_fault all mostly reduce to calling do_bad_area which should call
-__do_kernel_fault directly. This makes do_page_fault and __do_kernel_fault the
-only cases to review.
+The 'IABT (current EL)' indicates the error but it's a bit cryptic
+without knowledge of the ARM ARM. There is also no indication of the
+specific address which triggered the fault. The increase in kernel
+page permissions makes hitting this case more likely as well.
+Handling the case in the vectors gives a much more familiar looking
+error message:
 
-Mark raised the problem of taking an instruction abort with a fixup handler.
-Any fixup handler being run would not exist in the exception table so there
-should be no risk of looping. Another instruction abort would just reduce to
-the case of an instruction abort without a fixup handler. The fixup handlers
-are expecting data aborts, not instruction aborts though so while they could
-run successfully, it wouldn't be for the precise right reason. Practically
-speaking, I don't think it matters but to be on the safe side, the fixup
-handlers are not run in __do_kernel_fault if the abort is an instruction abort.
-This should cover__do_kernel_fault.
+lkdtm: Performing direct entry EXEC_RODATA
+lkdtm: attempting ok execution at ffff0000084c0840
+lkdtm: attempting bad execution at ffff000008880680
+Unable to handle kernel paging request at virtual address ffff000008880680
+pgd = ffff8000089b2000
+[ffff000008880680] *pgd=00000000489b4003, *pud=0000000048904003, *pmd=0000000000000000
+Internal error: Oops: 8400000e [#1] PREEMPT SMP
+Modules linked in:
+CPU: 1 PID: 997 Comm: sh Not tainted 4.7.0-rc1+ #24
+Hardware name: linux,dummy-virt (DT)
+task: ffff800077f9f080 ti: ffff800008a1c000 task.ti: ffff800008a1c000
+PC is at lkdtm_rodata_do_nothing+0x0/0x8
+LR is at execute_location+0x74/0x88
 
-do_page_fault gets a little bit more complicated. A fault on a kernel address
-should just end up in __do_kernel_fault. Extending is_permission_fault to
-cover instruction aborts should be sufficient, mostly because addr == regs->pc
-and there should never be a userspace address in the exception table and there
-should never be a userspace address in the exception table.
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+v3: Fixup permission in do_page_fault to detect the kernel iabort, don't run
+fixup handlers on kernel instruction aborts.
 
-So I think this should cover all cases. The sample LKDTM test cases all work
-now.
-
-Thanks,
-Laura
-
-Laura Abbott (1):
-  arm64: Handle el1 synchronous instruction aborts cleanly
-
+Dropped the Acked-by since the addition of checks is pretty significant.
+---
  arch/arm64/kernel/entry.S | 18 ++++++++++++++++++
  arch/arm64/mm/fault.c     | 11 +++++++++--
  2 files changed, 27 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 12e8d2b..54e93d12 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -336,6 +336,8 @@ el1_sync:
+ 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+ 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+ 	b.eq	el1_da
++	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
++	b.eq	el1_ia
+ 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+ 	b.eq	el1_undef
+ 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+@@ -347,6 +349,22 @@ el1_sync:
+ 	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
+ 	b.ge	el1_dbg
+ 	b	el1_inv
++el1_ia:
++	/*
++	 * Instruction abort handling
++	 */
++	mrs	x0, far_el1
++	enable_dbg
++	// re-enable interrupts if they were enabled in the aborted context
++	tbnz	x23, #7, 1f			// PSR_I_BIT
++	enable_irq
++1:
++	mov	x2, sp				// struct pt_regs
++	bl	do_mem_abort
++
++	// disable interrupts before pulling preserved data off the stack
++	disable_irq
++	kernel_exit 1
+ el1_da:
+ 	/*
+ 	 * Data abort handling
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 013e2cb..e25b0891 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -131,6 +131,11 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ }
+ #endif
+ 
++static bool is_el1_instruction_abort(unsigned int esr)
++{
++	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
++}
++
+ /*
+  * The kernel tried to access some page that wasn't present.
+  */
+@@ -139,8 +144,9 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+ {
+ 	/*
+ 	 * Are we prepared to handle this kernel fault?
++	 * We are almost certainly not prepared to handle instruction faults.
+ 	 */
+-	if (fixup_exception(regs))
++	if (!is_el1_instruction_abort(esr) && fixup_exception(regs))
+ 		return;
+ 
+ 	/*
+@@ -247,7 +253,8 @@ static inline int permission_fault(unsigned int esr)
+ 	unsigned int ec       = (esr & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT;
+ 	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
+ 
+-	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
++	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM) ||
++	       (ec == ESR_ELx_EC_IABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
+ }
+ 
+ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
 -- 
 2.7.4
