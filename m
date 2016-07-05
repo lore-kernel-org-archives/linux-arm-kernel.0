@@ -1,22 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 5 Jul 2016 10:43:04 -0500
-Subject: [PATCH v3 1/3] arm64: arch_timer: Add device tree binding for
- A-008585 erratum
-In-Reply-To: <1467412897-15220-1-git-send-email-oss@buserror.net>
-References: <1467412897-15220-1-git-send-email-oss@buserror.net>
-Message-ID: <20160705154304.GA2979@rob-hp-laptop>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 5 Jul 2016 10:15:35 -0600
+Subject: [PATCH v2 1/2] coresight-etm3x: Add ARM ETM 3.5 Cortex-A5
+ peripheral ID
+In-Reply-To: <1467705950-29482-1-git-send-email-olivier.schonken@gmail.com>
+References: <1467705950-29482-1-git-send-email-olivier.schonken@gmail.com>
+Message-ID: <CANLsYkxdMwsmZWNfBqYjsOaTrG_j3E_VCMM6L-o=xra+dkzSLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 05:41:35PM -0500, Scott Wood wrote:
-> This erratum describes a bug in logic outside the core, so MIDR can't be
-> used to identify its presence, and reading an SoC-specific revision
-> register from common arch timer code would be awkward.  So, describe it
-> in the device tree.
-> 
-> Signed-off-by: Scott Wood <oss@buserror.net>
+On 5 July 2016 at 02:05, Olivier Schonken <olivier.schonken@gmail.com> wrote:
+> Signed-off-by: Olivier Schonken <olivier.schonken@gmail.com>
 > ---
->  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  drivers/hwtracing/coresight/coresight-etm3x.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+> index d83ab82..0f5d400 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+> @@ -885,6 +885,11 @@ static struct amba_id etm_ids[] = {
+>                 .mask   = 0x0003ffff,
+>                 .data   = "ETM 3.3",
+>         },
+> +       {       /* ETM 3.5 - Cortex-A5 */
+> +               .id     = 0x0003b955,
+> +               .mask   = 0x0003ffff,
+> +               .data   = "ETM 3.5",
+> +       },
+>         {       /* ETM 3.5 */
+>                 .id     = 0x0003b956,
+>                 .mask   = 0x0003ffff,
+> --
+> 1.9.1
+>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Applied - thanks.
+Mathieu
