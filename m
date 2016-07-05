@@ -1,48 +1,37 @@
 From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Tue,  5 Jul 2016 02:00:24 -0400
-Subject: [PATCH v5 1/3] Documentation: dt: Add Broadcom iproc pwm controller
- binding
+Date: Tue,  5 Jul 2016 02:00:26 -0400
+Subject: [PATCH v5 3/3] ARM: dts: NSP: Add PWM Support to DT
 In-Reply-To: <1467698426-27600-1-git-send-email-yendapally.reddy@broadcom.com>
 References: <1467698426-27600-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <1467698426-27600-2-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <1467698426-27600-4-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a binding for Broadcom iproc pwm controller
+Add PWM support to the device tree for the Broadcom Northstar Plus SoC.
 
 Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/pwm/brcm,iproc-pwm.txt      | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/brcm,iproc-pwm.txt
+ arch/arm/boot/dts/bcm-nsp.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pwm/brcm,iproc-pwm.txt b/Documentation/devicetree/bindings/pwm/brcm,iproc-pwm.txt
-new file mode 100644
-index 0000000..21f75bb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/brcm,iproc-pwm.txt
-@@ -0,0 +1,21 @@
-+Broadcom iProc PWM controller device tree bindings
+diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+index def9e78..f9c8341 100644
+--- a/arch/arm/boot/dts/bcm-nsp.dtsi
++++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+@@ -206,6 +206,14 @@
+ 			brcm,nand-has-wp;
+ 		};
+ 
++		pwm: pwm at 31000 {
++			compatible = "brcm,iproc-pwm";
++			reg = <0x31000 0x28>;
++			clocks = <&osc>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
 +
-+This controller has 4 channels.
-+
-+Required Properties :
-+- compatible: must be "brcm,iproc-pwm"
-+- reg: physical base address and length of the controller's registers
-+- clocks: phandle + clock specifier pair for the external clock
-+- #pwm-cells: Should be 3. See pwm.txt in this directory for a
-+  description of the cells format.
-+
-+Refer to clocks/clock-bindings.txt for generic clock consumer properties.
-+
-+Example:
-+
-+pwm: pwm at 18031000 {
-+	compatible = "brcm,iproc-pwm";
-+	reg = <0x18031000 0x28>;
-+	clocks = <&osc>;
-+	#pwm-cells = <3>;
-+};
+ 		ccbtimer0: timer at 34000 {
+ 			compatible = "arm,sp804";
+ 			reg = <0x34000 0x1000>;
 -- 
 2.1.0
