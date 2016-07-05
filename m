@@ -1,251 +1,98 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Tue, 05 Jul 2016 04:37:18 -0000
-Subject: [PATCH v3 2/2] arm64: dts: Fix broken architected timer interrupt
- trigger
-In-Reply-To: <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
-References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
- <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CADaLNDn_k2eDoBhmDu9Ub5D0XF7PTN-sW9kNDTuFSUybgT59jQ@mail.gmail.com>
+Date: Tue, 05 Jul 2016 04:37:21 -0000
+Subject: [PATCH v1 00/25] PCI: Request host bridge window resources
+In-Reply-To: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <CADaLNDmnTCnswZLgvsCL=g8rmmCaNjj7ZA-qCaFWSgTjCZko3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 6, 2016 at 10:56 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> The ARM architected timer specification mandates that the interrupt
-> associated with each timer is level triggered (which corresponds to
-> the "counter >= comparator" condition).
+On Mon, Jun 6, 2016 at 4:04 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> Several host bridge drivers (designware and all derivatives, iproc,
+> xgene, xilinx, and xilinx-nwl) don't request the MMIO and I/O port
+> windows they forward downstream to the PCI bus.
 >
-> A number of DTs are being remarkably creative, declaring the interrupt
-> to be edge triggered. A quick look at the TRM for the corresponding ARM
-> CPUs clearly shows that this is wrong, and I've corrected those.
-> For non-ARM designs (and in the absence of a publicly available TRM),
-> I've made them active low as well, which can't be completely wrong
-> as the GIC cannot disinguish between level low and level high.
+> That means the PCI core can't request resources for PCI bridge
+> windows and PCI BARs.
 >
-> The respective maintainers are of course welcome to prove me wrong.
+> Several other drivers (altera, generic, mvebu, rcar, tegra) do request
+> the windows, but use some duplicated code to do it.
 >
-> While I was at it, I took the liberty to fix a couple of related issue,
-> such as some spurious affinity bits on ThunderX, and their complete
-> absence on ls1043a (both of which seem to be related to copy-pasting
-> from other DTs).
+> This adds a new devm_request_pci_bus_resources() interface and changes
+> these drivers to use it.  It also fixes several error paths where we failed
+> to free the resource list allocated by of_pci_get_host_bridge_resources().
 >
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Tegra guys, please take a look at "PCI: tegra: Remove top-level resource
+> from hierarchy" in particular.  Removing the top-level resource definitely
+> makes /proc/iomem look uglier (although it will look more like that of
+> other drivers).  A short-term fix could be to include device information in
+> the resource name.  I think a better long-term fix would be to make the DT
+> or platform device core request all the resources from the DT.
+>
+> Comments welcome.  I expect we'll trip over something here, so I marked
+> this "v1" and I don't plan to put it into -next for a while.
+>
+> This is on my pci/host-request-windows branch, which you can pull or view
+> at https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-request-windows
+>
 > ---
->  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    | 8 ++++----
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 8 ++++----
->  arch/arm64/boot/dts/apm/apm-storm.dtsi               | 8 ++++----
->  arch/arm64/boot/dts/broadcom/ns2.dtsi                | 8 ++++----
->  arch/arm64/boot/dts/cavium/thunder-88xx.dtsi         | 8 ++++----
->  arch/arm64/boot/dts/exynos/exynos7.dtsi              | 8 ++++----
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       | 8 ++++----
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 8 ++++----
->  arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
->  arch/arm64/boot/dts/xilinx/zynqmp.dtsi               | 8 ++++----
->  10 files changed, 40 insertions(+), 40 deletions(-)
 >
-> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> index 445aa67..c2b9bcb 100644
-> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> @@ -255,10 +255,10 @@
->                 /* Local timer */
->                 timer {
->                         compatible = "arm,armv8-timer";
-> -                       interrupts = <1 13 0xf01>,
-> -                                    <1 14 0xf01>,
-> -                                    <1 11 0xf01>,
-> -                                    <1 10 0xf01>;
-> +                       interrupts = <1 13 0xf08>,
-> +                                    <1 14 0xf08>,
-> +                                    <1 11 0xf08>,
-> +                                    <1 10 0xf08>;
->                 };
->
->                 timer0: timer0 at ffc03000 {
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index 832815d..4d9d144 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -100,13 +100,13 @@
->         timer {
->                 compatible = "arm,armv8-timer";
->                 interrupts = <GIC_PPI 13
-> -                       (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_EDGE_RISING)>,
-> +                       (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
->                              <GIC_PPI 14
-> -                       (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_EDGE_RISING)>,
-> +                       (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
->                              <GIC_PPI 11
-> -                       (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_EDGE_RISING)>,
-> +                       (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
->                              <GIC_PPI 10
-> -                       (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_EDGE_RISING)>;
-> +                       (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>;
->         };
->
->         xtal: xtal-clk {
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index 5147d76..1c4193f 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -110,10 +110,10 @@
->
->         timer {
->                 compatible = "arm,armv8-timer";
-> -               interrupts = <1 0 0xff01>,      /* Secure Phys IRQ */
-> -                            <1 13 0xff01>,     /* Non-secure Phys IRQ */
-> -                            <1 14 0xff01>,     /* Virt IRQ */
-> -                            <1 15 0xff01>;     /* Hyp IRQ */
-> +               interrupts = <1 0 0xff08>,      /* Secure Phys IRQ */
-> +                            <1 13 0xff08>,     /* Non-secure Phys IRQ */
-> +                            <1 14 0xff08>,     /* Virt IRQ */
-> +                            <1 15 0xff08>;     /* Hyp IRQ */
->                 clock-frequency = <50000000>;
->         };
+> Bjorn Helgaas (25):
+>       PCI: Add devm_request_pci_bus_resources()
+>       PCI: designware: Free bridge resource list on failure
+>       PCI: designware: Request host bridge window resources
+>       PCI: designware: Simplify host bridge window iteration
+>       PCI: iproc: Request host bridge window resources
+>       PCI: xgene: Free bridge resource list on failure
+>       PCI: xgene: Request host bridge window resources
+>       PCI: xilinx: Free bridge resource list on failure
+>       PCI: xilinx: Request host bridge window resources
+>       PCI: xilinx-nwl: Free bridge resource list on failure
+>       PCI: xilinx-nwl: Request host bridge window resources
+>       PCI: xilinx-nwl: Use dev_printk() when possible
+>       PCI: altera: Request host bridge window resources with core function
+>       PCI: altera: Simplify host bridge window iteration
+>       PCI: generic: Free resource list close to where it's allocated
+>       PCI: generic: Request host bridge window resources with core function
+>       PCI: generic: Simplify host bridge window iteration
+>       PCI: mvebu: Request host bridge window resources with core function
+>       PCI: rcar Gen2: Request host bridge window resources
+>       PCI: rcar: Request host bridge window resources with core function
+>       PCI: rcar: Simplify host bridge window iteration
+>       PCI: tegra: Remove top-level resource from hierarchy
+>       PCI: tegra: Request host bridge window resources with core function
+>       PCI: versatile: Request host bridge window resources with core function
+>       PCI: versatile: Simplify host bridge window iteration
 
-For above changes on apm-storm.dtsi for APM X-Gene 1:
+Thanks, Bjorn.
 
-Acked-by: Duc Dang <dhdang@apm.com>
+For the 2 X-Gene patches:
+     PCI: xgene: Free bridge resource list on failure
+     PCI: xgene: Request host bridge window resources
 
-Thanks,
+Tested-by: Duc Dang <dhdang@apm.com>
+
+Regards,
 Duc Dang.
-
 >
-> diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-> index ec68ec1..9c2d8a7 100644
-> --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-> +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-> @@ -88,13 +88,13 @@
->         timer {
->                 compatible = "arm,armv8-timer";
->                 interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0xff) |
-> -                             IRQ_TYPE_EDGE_RISING)>,
-> +                             IRQ_TYPE_LEVEL_LOW)>,
->                              <GIC_PPI 14 (GIC_CPU_MASK_RAW(0xff) |
-> -                             IRQ_TYPE_EDGE_RISING)>,
-> +                             IRQ_TYPE_LEVEL_LOW)>,
->                              <GIC_PPI 11 (GIC_CPU_MASK_RAW(0xff) |
-> -                             IRQ_TYPE_EDGE_RISING)>,
-> +                             IRQ_TYPE_LEVEL_LOW)>,
->                              <GIC_PPI 10 (GIC_CPU_MASK_RAW(0xff) |
-> -                             IRQ_TYPE_EDGE_RISING)>;
-> +                             IRQ_TYPE_LEVEL_LOW)>;
->         };
 >
->         pmu {
-> diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> index 2eb9b22..382d86f 100644
-> --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> @@ -354,10 +354,10 @@
+>  drivers/pci/bus.c                  |   29 +++++++++++++++++
+>  drivers/pci/host/pci-host-common.c |   61 +++++++++++++++---------------------
+>  drivers/pci/host/pci-mvebu.c       |   17 ++++------
+>  drivers/pci/host/pci-rcar-gen2.c   |    4 ++
+>  drivers/pci/host/pci-tegra.c       |   35 +++------------------
+>  drivers/pci/host/pci-versatile.c   |   29 ++++++-----------
+>  drivers/pci/host/pci-xgene.c       |   16 ++++++++-
+>  drivers/pci/host/pcie-altera.c     |   35 ++++++---------------
+>  drivers/pci/host/pcie-designware.c |   34 +++++++++++++-------
+>  drivers/pci/host/pcie-iproc.c      |    4 ++
+>  drivers/pci/host/pcie-rcar.c       |   33 +++++--------------
+>  drivers/pci/host/pcie-xilinx-nwl.c |   20 +++++++++---
+>  drivers/pci/host/pcie-xilinx.c     |   16 ++++++++-
+>  include/linux/pci.h                |    5 ++-
+>  14 files changed, 170 insertions(+), 168 deletions(-)
 >
->         timer {
->                 compatible = "arm,armv8-timer";
-> -               interrupts = <1 13 0xff01>,
-> -                            <1 14 0xff01>,
-> -                            <1 11 0xff01>,
-> -                            <1 10 0xff01>;
-> +               interrupts = <1 13 8>,
-> +                            <1 14 8>,
-> +                            <1 11 8>,
-> +                            <1 10 8>;
->         };
->
->         pmu {
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> index ca663df..1628315 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> @@ -473,10 +473,10 @@
->
->                 timer {
->                         compatible = "arm,armv8-timer";
-> -                       interrupts = <1 13 0xff01>,
-> -                                    <1 14 0xff01>,
-> -                                    <1 11 0xff01>,
-> -                                    <1 10 0xff01>;
-> +                       interrupts = <1 13 0xff08>,
-> +                                    <1 14 0xff08>,
-> +                                    <1 11 0xff08>,
-> +                                    <1 10 0xff08>;
->                 };
->
->                 pmu_system_controller: system-controller at 105c0000 {
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> index c277ba6..b92543d 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -111,10 +111,10 @@
->
->         timer {
->                 compatible = "arm,armv8-timer";
-> -               interrupts = <1 13 0x1>, /* Physical Secure PPI */
-> -                            <1 14 0x1>, /* Physical Non-Secure PPI */
-> -                            <1 11 0x1>, /* Virtual PPI */
-> -                            <1 10 0x1>; /* Hypervisor PPI */
-> +               interrupts = <1 13 0xf08>, /* Physical Secure PPI */
-> +                            <1 14 0xf08>, /* Physical Non-Secure PPI */
-> +                            <1 11 0xf08>, /* Virtual PPI */
-> +                            <1 10 0xf08>; /* Hypervisor PPI */
->                 fsl,erratum-a008585;
->         };
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> index 20d256b..b1d6bb8 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> @@ -122,10 +122,10 @@
->
->                         timer {
->                                 compatible = "arm,armv8-timer";
-> -                               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>,
-> -                                            <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>,
-> -                                            <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>,
-> -                                            <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
-> +                               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                                            <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                                            <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                                            <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
->                         };
->
->                         odmi: odmi at 300000 {
-> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
-> index 9532880..5a8e0f4 100644
-> --- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
-> +++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
-> @@ -127,10 +127,10 @@
->
->         timer {
->                 compatible = "arm,armv8-timer";
-> -               interrupts = <1 13 0xf01>,
-> -                            <1 14 0xf01>,
-> -                            <1 11 0xf01>,
-> -                            <1 10 0xf01>;
-> +               interrupts = <1 13 0xf08>,
-> +                            <1 14 0xf08>,
-> +                            <1 11 0xf08>,
-> +                            <1 10 0xf08>;
->         };
->
->         soc {
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> index e595f22..3e2e51f 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> @@ -65,10 +65,10 @@
->         timer {
->                 compatible = "arm,armv8-timer";
->                 interrupt-parent = <&gic>;
-> -               interrupts = <1 13 0xf01>,
-> -                            <1 14 0xf01>,
-> -                            <1 11 0xf01>,
-> -                            <1 10 0xf01>;
-> +               interrupts = <1 13 0xf08>,
-> +                            <1 14 0xf08>,
-> +                            <1 11 0xf08>,
-> +                            <1 10 0xf08>;
->         };
->
->         amba_apu {
-> --
-> 2.1.4
->
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
