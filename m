@@ -1,55 +1,39 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 5 Jul 2016 09:17:50 -0700
-Subject: [GIT PULL 2/3] ARM: Keystone config updates for 4.8
-In-Reply-To: <20160705035212.GD1669@localhost>
-References: <1466527923-8689-1-git-send-email-ssantosh@kernel.org>
- <1466527923-8689-2-git-send-email-ssantosh@kernel.org>
- <20160705035212.GD1669@localhost>
-Message-ID: <3b710c8f-d7b5-2d17-82da-22deab94aa17@oracle.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 5 Jul 2016 11:18:13 -0500
+Subject: [PATCH 2/4] dt-bindings: Document the STM32 reset bindings
+In-Reply-To: <1467640052-6770-2-git-send-email-gabriel.fernandez@st.com>
+References: <1467640052-6770-1-git-send-email-gabriel.fernandez@st.com>
+ <1467640052-6770-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20160705161813.GA20477@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/4/2016 8:52 PM, Olof Johansson wrote:
-> On Tue, Jun 21, 2016 at 09:52:02AM -0700, Santosh Shilimkar wrote:
->> The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
->>
->>   Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_config_for_4.8
->>
->> for you to fetch changes up to 229a4bc846e85461252ab7aec3ab2cae4bf22a9c:
->>
->>   ARM: keystone: remove redundant depends on ARM_PATCH_PHYS_VIRT (2016-06-14 17:56:51 -0700)
->
-> Merged into next/defconfig, however note:
+On Mon, Jul 04, 2016 at 03:47:30PM +0200, gabriel.fernandez at st.com wrote:
+> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> 
+> This adds documentation of device tree bindings for the
+> STM32 reset controller.
+> 
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>  .../devicetree/bindings/reset/st,stm32-rcc.txt     | 50 ++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+> new file mode 100644
+> index 0000000..333080c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+> @@ -0,0 +1,50 @@
+> +STMicroelectronics STM32 Peripheral Reset Controller
+> +====================================================
+> +
+> +The RCC IP is both a reset and a clock controller. This documentation only
+> +documents the reset part.
 
-Thanks !!
+The clock part is already documented or will do later? Either way, you 
+are describing an IP block, so please describe all of it now and in one 
+place.
 
->>
->> ----------------------------------------------------------------
->> ARM: Keystone config updates for 4.8
->>
->> 	- Enable PINCTRL support
->> 	- Remove redundant ARM_PATCH_PHYS_VIRT
->>
->> ----------------------------------------------------------------
->> Franklin S Cooper Jr (1):
->>       ARM: keystone: Enable PINCTRL_SINGLE Config
->>
->> Lokesh Vutla (1):
->>       ARM: keystone: Enable PINCTRL config
->>
->> Masahiro Yamada (1):
->>       ARM: keystone: remove redundant depends on ARM_PATCH_PHYS_VIRT
->
-> We normally don't mix in mach* contents here. It's a tiny patch though so it's
-> not a showstopper, but if you sort them in a soc branch if you have more in
-> the future that'd be preferred.
->
-I should have added this in PULL 3/3 tag. Sorry.
-Thanks for taking care this time.
-
-Regards,
-Santosh
+Rob
