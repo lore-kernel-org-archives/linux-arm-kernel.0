@@ -1,23 +1,20 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 5 Jul 2016 08:02:40 -0700
-Subject: [PATCH v4 3/3] ARM:dts-Add dt node for Broadcom iproc-static-adc
-In-Reply-To: <1467099636-31855-4-git-send-email-raveendra.padasalagi@broadcom.com>
-References: <1467099636-31855-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1467099636-31855-4-git-send-email-raveendra.padasalagi@broadcom.com>
-Message-ID: <577BCC10.7000204@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Jul 2016 17:02:52 +0200
+Subject: [PATCH 3/3] Documentation: dt: Add new compatible to STM32
+ pinctrl driver bindings
+In-Reply-To: <1467726017-20041-4-git-send-email-alexandre.torgue@st.com>
+References: <1467726017-20041-1-git-send-email-alexandre.torgue@st.com>
+ <1467726017-20041-4-git-send-email-alexandre.torgue@st.com>
+Message-ID: <CACRpkda-ztJHoWDC+1T=kgjqUUHsN3FNx3a6Ru6knpWRhvOFWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/06/2016 00:40, Raveendra Padasalagi a ?crit :
-> This patch adds DT node for Broadcom's iproc-static-adc
-> controller driver.
-> 
-> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+On Tue, Jul 5, 2016 at 3:40 PM, Alexandre TORGUE
+<alexandre.torgue@st.com> wrote:
 
-Applied, thanks, please prefix your subjects like that in the future:
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-ARM: dts: <soc type>: <subject>
--- 
-Florian
+Patch applied.
+
+Yours,
+Linus Walleij
