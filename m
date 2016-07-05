@@ -1,63 +1,71 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 05 Jul 2016 15:20:38 +0200
-Subject: [PATCH 3/3] reset: socfpga: use readl/writel_relaxed
-In-Reply-To: <3713699.k1gRikAJNK@wuerfel>
-References: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
- <10266400.9nrl73J4sT@wuerfel> <1467718816.2978.41.camel@pengutronix.de>
- <3713699.k1gRikAJNK@wuerfel>
-Message-ID: <1467724838.2978.55.camel@pengutronix.de>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 5 Jul 2016 14:23:31 +0100
+Subject: Tegra baseline test results for v4.7-rc6
+Message-ID: <577BB4D3.7040507@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 05.07.2016, 14:59 +0200 schrieb Arnd Bergmann:
-> On Tuesday, July 5, 2016 1:40:16 PM CEST Philipp Zabel wrote:
-> > Am Dienstag, den 05.07.2016, 13:20 +0200 schrieb Arnd Bergmann:
-> > > On Tuesday, July 5, 2016 12:17:52 PM CEST Philipp Zabel wrote:
-> > > > This just removes the rmb()/wmb() pair between register read and
-> > > > write. Since no relevant reads follow the rmb and no relevant writes
-> > > > precede the wmb, they should be safe to remove.
-> > > > 
-> > > > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > > 
-> > > We should only do this if you are fixing a bug (which you don't mention
-> > > in the changelog), or if you can show a relevant performance
-> > > improvement. Is this code ever used in a fast path? If it is,
-> > > wouldn't that indicate a problem in some driver?
-> > 
-> > It does not fix a bug, and it's not about performance either. I'd like
-> > to align code with the recently posted stm32 driver, to unify them in a
-> > future patch.
-> > Of course we can change the stm32 driver to use readl/writel instead of
-> > the relaxed variants, it just seemed useless to have those barriers
-> > between the read and write.
-> 
-> On stm32, there is no barrier because ARM_DMA_MEM_BUFFERABLE is not set.
-> 
-> I'd really prefer to just have readl/writel everywhere except in the
-> few places that are performance critical and have a comment explaining
-> why it's safe there, mainly to avoid having new developers blindly
-> add the relaxed accessors in drivers because they think it's the
-> normal coding style.
+Here are some basic Tegra test results for Linux v4.7-rc6.
+Logs and other details at:
 
-I get your point. I'll ask the stm32 developers to use non-relaxed
-readl/writel then.
+    https://nvtb.github.io//linux/test_v4.7-rc6/20160703233102/
 
-> > If anything, we'd need to try to make sure that the writel in assert
-> > hits the hardware before the function returns, so that a
-> > assert-delay-deassert doesn't accidentally spend half its delay with the
-> > writel still in the store buffer, and we'd need a full barrier after the
-> > writel in deassert so that there can be no successive reads from still
-> > disabled IP cores.
-> 
-> In general, I think you need a readl() following the writel() to guarantee
-> that it has actually hit the hardware.
->
-> On ARM you often have just the CPU write buffer that needs to be flushed,
-> but if you have a PCI device or a more complex SoC, then a barriers doesn't
-> wait for a write to arrive at the device, it only ensures that a subsequent
-> write cannot arrive any earlier.
 
-Yes, exactly. Until now I have not considered this at all.
+Test summary
+------------
 
-regards
-Philipp
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.7-rc5 (4c2e07c6a29e0129e975727b9f57eede813eea85)):
+   text     data      bss    total  kernel
+  +4100      +32        0    +4132  defconfig
+  +1196        0      +64    +1260  multi_v7_defconfig
+   +144        0        0     +144  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.7-rc5 (4c2e07c6a29e0129e975727b9f57eede813eea85))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
