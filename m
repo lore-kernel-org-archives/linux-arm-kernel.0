@@ -1,76 +1,90 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 6 Jul 2016 02:56:29 +0800
-Subject: [PATCH v3 2/2] clk: samsung: exynos7: Add clocks for atlas block
-In-Reply-To: <1467750561-13957-3-git-send-email-a.kesavan@samsung.com>
-Message-ID: <201607060224.EFZSaMHu%fengguang.wu@intel.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 05 Jul 2016 12:22:19 -0700
+Subject: [PATCH 00/21] Support qcom's HSIC USB and rewrite USB2 HS phy
+ support
+In-Reply-To: <CALAqxLW--yFb2YwX3+x7PB-g_5D0gb6j8CiJwnCC+meb7xqbig@mail.gmail.com>
+References: <20160626072838.28082-1-stephen.boyd@linaro.org>
+ <CALAqxLUHfsJBTQS=p5oThnOdiAZwu48puRhREx+2G9+KajDA9g@mail.gmail.com>
+ <146710289677.3879.15364764209076318827@sboyd-linaro>
+ <CALAqxLW--yFb2YwX3+x7PB-g_5D0gb6j8CiJwnCC+meb7xqbig@mail.gmail.com>
+Message-ID: <146774653916.32648.3323628902201136171@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quoting John Stultz (2016-07-01 23:03:38)
+> On Tue, Jun 28, 2016 at 1:34 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> > Quoting John Stultz (2016-06-27 20:09:30)
+> >>
+> >> I haven't yet been able to test with this, as I need some other fixes
+> >> it seems too to deal with some of the iommu changes in my flo-WIP tree
+> >> (it can't find of_dma_configure), but will let you know how things
+> >> work once I have all that sorted.
+> >
+> > Cool, thanks for testing.
+> 
+> So after working out some merge issues w/ my flo-WIP branch for the
+> nexus7, I was still having trouble, so I backed out to just your
+> (updated) branch.
+> 
+> But even there, I'm not able to get the usb gadget up. I see:
 
-[auto build test WARNING on clk/clk-next]
-[also build test WARNING on next-20160705]
-[cannot apply to v4.7-rc6]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I can get the gadget working on the ifc6410 device I have. I'm using
+this script to test things:
 
-url:    https://github.com/0day-ci/linux/commits/Abhilash-Kesavan/Add-CPU-clock-support-for-Exynos7/20160706-002658
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+modprobe libcomposite
+mkdir config
+mount none config -t configfs
+mkdir config/usb_gadget/g1
+mkdir config/usb_gadget/g1/strings/0x409
+echo 012345678 > config/usb_gadget/g1/strings/0x409/serialnumber
+echo "manufacturer" > config/usb_gadget/g1/strings/0x409/manufacturer
+echo "db8074" > config/usb_gadget/g1/strings/0x409/product
+echo 0x1d6b > config/usb_gadget/g1/idVendor
+echo 0x0104 > config/usb_gadget/g1/idProduct
+mkdir config/usb_gadget/g1/functions/acm.GS0
+mkdir config/usb_gadget/g1/functions/acm.GS1
+mkdir config/usb_gadget/g1/functions/ecm.usb0
+mkdir config/usb_gadget/g1/configs/c.1
+mkdir config/usb_gadget/g1/configs/c.1/strings/0x409/
+echo "CDC 2xACM+ECM" >
+config/usb_gadget/g1/configs/c.1/strings/0x409/configuration
+ln -s config/usb_gadget/g1/functions/acm.GS0
+config/usb_gadget/g1/configs/c.1
+ln -s config/usb_gadget/g1/functions/acm.GS1
+config/usb_gadget/g1/configs/c.1
+ln -s config/usb_gadget/g1/functions/ecm.usb0
+config/usb_gadget/g1/configs/c.1
+echo $(ls /sys/class/udc/) > config/usb_gadget/g1/UDC
 
-All warnings (new ones prefixed by >>):
+> 
+> [    1.869717] msm_hsusb 12500000.usb: failed to get phandle in
+> /soc/usb at 12500000 node
 
->> drivers/clk/samsung/clk-exynos7.c:43:2: warning: this decimal constant is unsigned only in ISO C90
-     PLL_35XX_RATE(2496000000, 208, 2, 0),
-     ^~~~~~~~~~~~~
-   drivers/clk/samsung/clk-exynos7.c:44:2: warning: this decimal constant is unsigned only in ISO C90
-     PLL_35XX_RATE(2400000000, 200, 2, 0),
-     ^~~~~~~~~~~~~
-   drivers/clk/samsung/clk-exynos7.c:45:2: warning: this decimal constant is unsigned only in ISO C90
-     PLL_35XX_RATE(2304000000, 192, 2, 0),
-     ^~~~~~~~~~~~~
-   drivers/clk/samsung/clk-exynos7.c:46:2: warning: this decimal constant is unsigned only in ISO C90
-     PLL_35XX_RATE(2200000000, 275, 3, 0),
-     ^~~~~~~~~~~~~
+This is sort of ok (I've seen it before with the HSIC controller on
+8074). The extcon is optional and so the error message should be
+silenced. I sent a patch to move it to debug level.
 
-vim +43 drivers/clk/samsung/clk-exynos7.c
+I don't see an extcon in mainline for apq8064, but I think it may be
+needed. At the least, I see that we're using a PMIC interrupt in the
+msm-3.4 kernel for the ID pin and the charger is notifying of vbus
+events similar to how smbb is doing it for apq8074.
 
-    27	#define BUS1_DPLL_CON0		0x0120
-    28	#define MFC_PLL_CON0		0x0130
-    29	#define AUD_PLL_CON0		0x0140
-    30	#define MUX_SEL_TOPC0		0x0200
-    31	#define MUX_SEL_TOPC1		0x0204
-    32	#define MUX_SEL_TOPC2		0x0208
-    33	#define MUX_SEL_TOPC3		0x020C
-    34	#define DIV_TOPC0		0x0600
-    35	#define DIV_TOPC1		0x0604
-    36	#define DIV_TOPC3		0x060C
-    37	#define ENABLE_ACLK_TOPC0	0x0800
-    38	#define ENABLE_ACLK_TOPC1	0x0804
-    39	#define ENABLE_SCLK_TOPC1	0x0A04
-    40	
-    41	static const struct samsung_pll_rate_table pll1450x_24mhz_tbl[] = {
-    42		/* rate, m, p, s */
-  > 43		PLL_35XX_RATE(2496000000, 208, 2, 0),
-    44		PLL_35XX_RATE(2400000000, 200, 2, 0),
-    45		PLL_35XX_RATE(2304000000, 192, 2, 0),
-    46		PLL_35XX_RATE(2200000000, 275, 3, 0),
-    47		PLL_35XX_RATE(2100000000, 175, 2, 0),
-    48		PLL_35XX_RATE(2000000000, 250, 3, 0),
-    49		PLL_35XX_RATE(1896000000, 158, 2, 0),
-    50		PLL_35XX_RATE(1800000000, 150, 2, 0),
-    51		PLL_35XX_RATE(1704000000, 142, 2, 0),
+> [    1.882347] 12500000.usb supply vbus not found, using dummy regulator
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 55044 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160706/69d5255f/attachment-0001.obj>
+This is not great. We don't have a regulator specified on apq8064 so we
+can't turn on vbus and really support host mode. This seems to already
+be the case on mainline though, so it's not like we're any worse here.
+To properly support this we need a regulator driver. I suppose if the
+RPM supports it we can just use that, but if it doesn't support this
+regulator then we need to port over the SSBI regulator driver to do
+native regulator control. So far I haven't been able to test host mode
+on apq8064 because of this.
+
+> 
+> So I'm not sure if the dts changes were quite right. I've got all the
+> ULPI configs enabled. Any ideas?
+> 
+
+The phy and controller are both probing? If they're not failing to probe
+then it's probably the phy that isn't working properly. Does gadget work
+without my patches on nexus7?
