@@ -1,132 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 5 Jul 2016 11:41:02 +0800
-Subject: [PATCH] arm64:mm Remove the redundant initrd memblock codes
-In-Reply-To: <20160705022217.GA27637@arm.com>
-References: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
- <4ABE8B9C-8027-40AA-A303-A82CF014A287@linaro.org>
- <20160705022217.GA27637@arm.com>
-Message-ID: <B1CA6829-851E-4E56-BA48-58EE72272B49@linaro.org>
+From: zhiyong.tao@mediatek.com (Zhiyong Tao)
+Date: Tue, 5 Jul 2016 11:50:07 +0800
+Subject: [PATCH v2 0/3] AUXADC: Mediatek auxadc driver 
+Message-ID: <1467690610-20550-1-git-send-email-zhiyong.tao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series includes three patches:
+1.Change the device tree binding documentation.
+2.Add auxadc driver based on linux iio.
+3.Add auxadc nodes in the mediatek MT2701 dtsi file.
 
-> On 5 jul. 2016, at 10:22, Dennis Chen <dennis.chen@arm.com> wrote:
-> 
->> On Mon, Jul 04, 2016 at 12:33:05PM +0200, Ard Biesheuvel wrote:
->> 
->>> On 4 jul. 2016, at 06:53, Dennis Chen <dennis.chen@arm.com> wrote:
->>> 
->>> The memory range between initrd_start and initrd_end was added to the memblock
->>> twice unnecessarily in the same function before initrd memory range can be freed.
->>> This patch merge those codes into one piece of block and add the initrd memory
->>> range only once, also it makes the code clean and simple.
->> 
->> This is likely to break under KASLR (and I would recommend that you test with kaslr enabled when you propose changes to this code)
-> Hello Ard, I've tested it under KASLR on Juno board before proposing the changes,where the firmware provides the RNG protocol, it works well.
+changes in patch 2:
+1).Change the file name mt65xx_auxadc.c to mt6577_auxadc.c.
+2).Add 'depends on ARCH_MEDIATEK || COMPILE_TEST and HAS_IOMEM' for MEDIATEK_MT65XX_AUXADC config.
+3).Add check case for return value of 'readl_poll_timeout'.
+4).Remove returning 1 and 0 for SCALE and OFFSET. use channel type 'IIO_CHAN_INFO_PROCESSED' instead of 'IIO_CHAN_INFO_RAW'.
+5).Remove 'IIO_CHAN_INFO_OFFSET' and 'IIO_CHAN_INFO_SCALE' in 'MT65XX_AUXADC_CHANNEL' channel type.
+6).Add check case when auxadc power on failure. if auxadc power on failure, clk_disable_unprepare should be executed.
+7).Put 'platform_set_drvdata' before 'iio_device_register'.
+8).Fix coding style and spelling error.
 
-Ok, thanks for confirming that (and apologies for assuming you did not test it)
+Zhiyong Tao (3):
+  dt-bindings: auxadc: Add binding document for Mediatek auxadc.
+  auxadc: Add Mediatek auxadc driver for mt2701.
+  arm: dts: auxadc: Add auxadc node.
 
->> 
->> The randomization of memstart_addr needs to execute /after/ adding back the initrd, otherwise the chosen value of memstart_addr may push the initrd beyond the end of the linear area into the userland range.
-> Yes, I know the 'range' is depends on memblock_end_of_DRAM() and memblock_start_of_DRAM(), but I can't see that the order of initrd added to the memblock will affect
-> those two values returned from memblock_ fucntions, IMHO the initrd will be loaded to somewhere within the DRAM by firmware, is that correct?
-
-memblock_add/_remove may affect the return values of memblock_start/_end_of_DRAM, so the reordering will affect the range of the randomized memstart_addr, afaict
-
-> 
-> Thanks,
-> Dennis  
->> 
->> 
->>> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Steve Capper <steve.capper@arm.com>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> ---
->>> arch/arm64/mm/init.c | 58 +++++++++++++++++++++++-----------------------------
->>> 1 file changed, 26 insertions(+), 32 deletions(-)
->>> 
->>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->>> index 2ade7a6..cf26cdb 100644
->>> --- a/arch/arm64/mm/init.c
->>> +++ b/arch/arm64/mm/init.c
->>> @@ -228,6 +228,29 @@ void __init arm64_memblock_init(void)
->>>       memblock_add(__pa(_text), (u64)(_end - _text));
->>>   }
->>> 
->>> +    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
->>> +        extern u16 memstart_offset_seed;
->>> +        u64 range = linear_region_size -
->>> +                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
->>> +
->>> +        /*
->>> +         * If the size of the linear region exceeds, by a sufficient
->>> +         * margin, the size of the region that the available physical
->>> +         * memory spans, randomize the linear region as well.
->>> +         */
->>> +        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
->>> +            range = range / ARM64_MEMSTART_ALIGN + 1;
->>> +            memstart_addr -= ARM64_MEMSTART_ALIGN *
->>> +                     ((range * memstart_offset_seed) >> 16);
->>> +        }
->>> +    }
->>> +
->>> +    /*
->>> +     * Register the kernel text, kernel data, initrd, and initial
->>> +     * pagetables with memblock.
->>> +     */
->>> +    memblock_reserve(__pa(_text), _end - _text);
->>> +
->>>   if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
->>>       /*
->>>        * Add back the memory we just removed if it results in the
->>> @@ -254,41 +277,12 @@ void __init arm64_memblock_init(void)
->>>           memblock_remove(base, size); /* clear MEMBLOCK_ flags */
->>>           memblock_add(base, size);
->>>           memblock_reserve(base, size);
->>> +            /* the generic initrd code expects virtual addresses */
->>> +            initrd_start = __phys_to_virt(initrd_start);
->>> +            initrd_end = __phys_to_virt(initrd_end);
->>>       }
->>>   }
->>> 
->>> -    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
->>> -        extern u16 memstart_offset_seed;
->>> -        u64 range = linear_region_size -
->>> -                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
->>> -
->>> -        /*
->>> -         * If the size of the linear region exceeds, by a sufficient
->>> -         * margin, the size of the region that the available physical
->>> -         * memory spans, randomize the linear region as well.
->>> -         */
->>> -        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
->>> -            range = range / ARM64_MEMSTART_ALIGN + 1;
->>> -            memstart_addr -= ARM64_MEMSTART_ALIGN *
->>> -                     ((range * memstart_offset_seed) >> 16);
->>> -        }
->>> -    }
->>> -
->>> -    /*
->>> -     * Register the kernel text, kernel data, initrd, and initial
->>> -     * pagetables with memblock.
->>> -     */
->>> -    memblock_reserve(__pa(_text), _end - _text);
->>> -#ifdef CONFIG_BLK_DEV_INITRD
->>> -    if (initrd_start) {
->>> -        memblock_reserve(initrd_start, initrd_end - initrd_start);
->>> -
->>> -        /* the generic initrd code expects virtual addresses */
->>> -        initrd_start = __phys_to_virt(initrd_start);
->>> -        initrd_end = __phys_to_virt(initrd_end);
->>> -    }
->>> -#endif
->>> -
->>>   early_init_fdt_scan_reserved_mem();
->>> 
->>>   /* 4GB maximum for 32-bit only capable devices */
->>> -- 
->>> 1.8.3.1
-> 
+ .../devicetree/bindings/iio/adc/mt65xx_auxadc.txt  |   27 ++
+ .../devicetree/bindings/soc/mediatek/auxadc.txt    |   21 --
+ arch/arm/boot/dts/mt2701.dtsi                      |    9 +
+ drivers/iio/adc/Kconfig                            |   13 +
+ drivers/iio/adc/Makefile                           |    1 +
+ drivers/iio/adc/mt6577_auxadc.c                    |  301 ++++++++++++++++++++
+ 6 files changed, 351 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/mt65xx_auxadc.txt
+ delete mode 100644 Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
+ create mode 100644 drivers/iio/adc/mt6577_auxadc.c
