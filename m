@@ -1,81 +1,54 @@
-From: vw@iommu.org (Wan Zongshun)
-Date: Tue, 5 Jul 2016 15:47:25 +0800
-Subject: [PATCH 4/6] irqchip: add irqchip driver for nuc900
-In-Reply-To: <8706947.5rzUDVsB2F@wuerfel>
-References: <1466851042-22239-1-git-send-email-vw@iommu.org>
- <1466851042-22239-5-git-send-email-vw@iommu.org> <8706947.5rzUDVsB2F@wuerfel>
-Message-ID: <577B660D.50908@iommu.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 5 Jul 2016 09:47:43 +0200
+Subject: [PATCH] clocksource: timer-atmel-pit: enable mck
+In-Reply-To: <20160704222404.5132c3d3@bbrezillon>
+References: <1467648009-24269-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160704222404.5132c3d3@bbrezillon>
+Message-ID: <577B661F.5090703@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 04/07/2016 22:24, Boris Brezillon a ?crit :
+> On Mon,  4 Jul 2016 18:00:09 +0200
+> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> 
+>> mck is needed to get the PIT working. Explicitly prepare_enable it instead
+>> of assuming it is enabled.
+>>
+>> This solves an issue were the system is freezing when the ETM/ETB drivers
+> 
+> 			^ where
+> 
+>> are enabled.
+>>
+>> Reported-by: Olivier Schonken <olivier.schonken@gmail.com>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-On 2016?06?29? 23:27, Arnd Bergmann wrote:
-> On Saturday, June 25, 2016 6:37:20 PM CEST Wan Zongshun wrote:
->> +#define IRQ_WDT		W90X900_IRQ(1)
->> +#define IRQ_WWDT	W90X900_IRQ(2)
->> +#define IRQ_LVD		W90X900_IRQ(3)
->> +#define IRQ_EXT0	W90X900_IRQ(4)
->> +#define IRQ_EXT1	W90X900_IRQ(5)
->> +#define IRQ_EXT2	W90X900_IRQ(6)
->> +#define IRQ_EXT3	W90X900_IRQ(7)
->> +#define IRQ_EXT4	W90X900_IRQ(8)
->> +#define IRQ_EXT5	W90X900_IRQ(9)
->> +#define IRQ_EXT6	W90X900_IRQ(10)
->
-> I'd suggest dropping the list, the contents are now in the dts.
-
-Do you think I should put one irqmap header file into this
-/arch/arm/boot/dts/include/dt-bindings folder, or I should removed those 
-irqnumber map anywhere, just hardcode the irqnumber in dts file?
-
->
->> diff --git a/arch/arm/mach-w90x900/include/mach/nuc970-regs-aic.h b/arch/arm/mach-w90x900/include/mach/nuc970-regs-aic.h
->> new file mode 100644
->> index 0000000..7a77016
->> --- /dev/null
->> +++ b/arch/arm/mach-w90x900/include/mach/nuc970-regs-aic.h
->> @@ -0,0 +1,53 @@
->> +#ifndef __ASM_ARCH_REGS_AIC_H
->> +#define __ASM_ARCH_REGS_AIC_H
+>> ---
+>>  drivers/clocksource/timer-atmel-pit.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+>> index d911c5dca8f1..fcc97711cd79 100644
+>> --- a/drivers/clocksource/timer-atmel-pit.c
+>> +++ b/drivers/clocksource/timer-atmel-pit.c
+>> @@ -248,6 +248,9 @@ static void __init at91sam926x_pit_dt_init(struct device_node *node)
+>>  	if (IS_ERR(data->mck))
+>>  		panic(pr_fmt("Unable to get mck clk\n"));
+>>  
+>> +	if (clk_prepare_enable(data->mck))
+>> +		panic(pr_fmt("Unable to enable mck\n"));
 >> +
->> +/*NUC970 AIC regs*/
->> +
->> +#define	REG_AIC_SCR1	0x00
->> +#define	REG_AIC_SCR2	0x04
->> +#define	REG_AIC_SCR3	0x08
->> +#define	REG_AIC_SCR4	0x0C
->> +#define	REG_AIC_SCR5	0x10
->
-> And like the clk driver, these should all be in the irqchip driver instead
-> of a separate header.
+>>  	/* Get the interrupts property */
+>>  	data->irq = irq_of_parse_and_map(node, 0);
+>>  	if (!data->irq)
+> 
+> 
 
-Ok, changed.
->
->> +
->> +static void __iomem *aic_base;
->> +static struct irq_domain *aic_domain;
->> +#define MAKE_HWIRQ(irqnum)	(irqnum)
->
-> The macro appears to be unused.
-removed it.
->
->> +static void nuc970_irq_mask(struct irq_data *d)
->> +{
->> +	if (d->irq < 32)
->> +		__raw_writel(1 << (d->irq), aic_base + REG_AIC_MDCR);
->> +	else
->> +		__raw_writel(1 << (d->irq - 32), aic_base + REG_AIC_MDCRH);
->> +}
->
-> writel()
->
-> 	Arnd
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+
+-- 
+Nicolas Ferre
