@@ -1,99 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 5 Jul 2016 15:43:20 -0500
-Subject: [PATCH v2 1/3] dt-bindings: auxadc: Add binding document for
- Mediatek auxadc.
-In-Reply-To: <1467690610-20550-2-git-send-email-zhiyong.tao@mediatek.com>
-References: <1467690610-20550-1-git-send-email-zhiyong.tao@mediatek.com>
- <1467690610-20550-2-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <20160705204320.GA5064@rob-hp-laptop>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 6 Jul 2016 00:10:04 +0300
+Subject: [PATCH 0/2] Add R8A7792 GPIO support
+In-Reply-To: <2706182.6XMBucurvj@wasted.cogentembedded.com>
+References: <2706182.6XMBucurvj@wasted.cogentembedded.com>
+Message-ID: <66e88d8f-9260-f159-3ea4-b03428675216@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 11:50:08AM +0800, Zhiyong Tao wrote:
-> The commit adds the device tree binding documentation for the mediatek
-> auxadc found on Mediatek MT2701.
-> Thermal gets auxadc sample data by iio device.
-> So the commit changes auxadc device tree binding documentation from
-> /soc/mediatek/auxadc.txt to /iio/adc/mt65xx_auxadc.txt.
-> 
-> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> ---
->  .../devicetree/bindings/iio/adc/mt65xx_auxadc.txt  |   27 ++++++++++++++++++++
->  .../devicetree/bindings/soc/mediatek/auxadc.txt    |   21 ---------------
->  2 files changed, 27 insertions(+), 21 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/mt65xx_auxadc.txt
->  delete mode 100644 Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
+Hello.
 
-Next time, use the git-format-patch -M option to send so only the 
-changes have to be reviewed.
+On 07/05/2016 12:10 AM, Sergei Shtylyov wrote:
 
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/mt65xx_auxadc.txt b/Documentation/devicetree/bindings/iio/adc/mt65xx_auxadc.txt
-> new file mode 100644
-> index 0000000..47fcd1b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/mt65xx_auxadc.txt
-> @@ -0,0 +1,27 @@
-> +* Mediatek AUXADC - Analog to Digital Converter on Mediatek mobile soc (mt65xx/mt81xx/mt27xx)
-> +===============
-> +
-> +The Auxiliary Analog/Digital Converter (AUXADC) is an ADC found
-> +in some Mediatek SoCs which among other things measures the temperatures
-> +in the SoC. It can be used directly with register accesses, but it is also
-> +used by thermal controller which reads the temperatures from the AUXADC
-> +directly via its own bus interface. See
-> +Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> +for the Thermal Controller which holds a phandle to the AUXADC.
-> +
-> +Required properties:
-> +  - compatible: "mediatek,mt2701-auxadc" or "mediatek,mt8173-auxadc"
-> +  - reg: Address range of the AUXADC unit.
-> +  - clocks: Should contain a clock specifier for each entry in clock-names
-> +  - clock-names: Should contain "main".
-> +  - io-channel-cells: Should be 1, see ../iio-bindings.txt
+>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20160704-v4.7-rc6' tag. We're adding the R8A7792 GPIO clocks and
+> device nodes. These patches depend on the R8A7792/Blanche PFC patchset in order
+> to compile and on the R8a7792 PFC driver patchset in order to work properly.
 
-Should be #io-channel-cells
+> [1/2] ARM: dts: r8a7792: add GPIO clocks
+> [2/2] ARM: dts: r8a7792: add GPIO support
 
-> +
-> +Example:
-> +
-> +auxadc: auxadc at 11001000 {
+    Didn't run checkpatch.pl on this one. If I did, it would have found the 
+stray spaces in the 1st patch, and undocumented binding in the 2nd...
+    Will repost RSN!
 
-Should be adc at ...
-
-> +	compatible = "mediatek,mt2701-auxadc";
-> +	reg = <0 0x11001000 0 0x1000>;
-> +	clocks = <&pericfg CLK_PERI_AUXADC>;
-> +	clock-names = "main";
-> +	#io-channel-cells = <1>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt b/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
-> deleted file mode 100644
-> index bdb7829..0000000
-> --- a/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
-> +++ /dev/null
-> @@ -1,21 +0,0 @@
-> -MediaTek AUXADC
-> -===============
-> -
-> -The Auxiliary Analog/Digital Converter (AUXADC) is an ADC found
-> -in some Mediatek SoCs which among other things measures the temperatures
-> -in the SoC. It can be used directly with register accesses, but it is also
-> -used by thermal controller which reads the temperatures from the AUXADC
-> -directly via its own bus interface. See
-> -Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> -for the Thermal Controller which holds a phandle to the AUXADC.
-> -
-> -Required properties:
-> -- compatible: Must be "mediatek,mt8173-auxadc"
-> -- reg: Address range of the AUXADC unit
-> -
-> -Example:
-> -
-> -auxadc: auxadc at 11001000 {
-> -	compatible = "mediatek,mt8173-auxadc";
-> -	reg = <0 0x11001000 0 0x1000>;
-> -};
-> -- 
-> 1.7.9.5
-> 
+WBR, Sergei
