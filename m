@@ -1,69 +1,30 @@
-From: vw@iommu.org (Wan Zongshun)
-Date: Tue, 5 Jul 2016 15:43:03 +0800
-Subject: [PATCH 3/6] Clocksource: add nuc970 clocksource driver
-In-Reply-To: <4184925.Jh1dkPbmzX@wuerfel>
-References: <1466851042-22239-1-git-send-email-vw@iommu.org>
- <1466851042-22239-4-git-send-email-vw@iommu.org> <4184925.Jh1dkPbmzX@wuerfel>
-Message-ID: <577B6507.2040803@iommu.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 5 Jul 2016 09:46:15 +0200
+Subject: [PATCH 2/2] ARM: dts: r8a7792: add EtherAVB support
+In-Reply-To: <3067320.66EgKDGBA3@wasted.cogentembedded.com>
+References: <3308853.O8HBuWdbK9@wasted.cogentembedded.com>
+ <3067320.66EgKDGBA3@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdWSw1M9m2egGgRNw6X0R+krzRHgX04fwQf+OuCzyXCdXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 4, 2016 at 11:23 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the generic R8A7792 part of the EtherAVB device node.
+>
+> Based on the commit 89aac8af1a60 ("ARM: dts: r8a7794: add EtherAVB support").
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-On 2016?06?29? 23:25, Arnd Bergmann wrote:
-> On Saturday, June 25, 2016 6:37:19 PM CEST Wan Zongshun wrote:
->> This patch is to add nuc970 clocksource driver support.
->>
->> Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
->> ---
->>   .../mach-w90x900/include/mach/nuc970-regs-timer.h  |  44 +++++
->>   drivers/clocksource/Kconfig                        |   8 +
->>   drivers/clocksource/Makefile                       |   1 +
->>   drivers/clocksource/timer-nuc900.c                 | 207 +++++++++++++++++++++
->>   4 files changed, 260 insertions(+)
->>   create mode 100644 arch/arm/mach-w90x900/include/mach/nuc970-regs-timer.h
->>   create mode 100644 drivers/clocksource/timer-nuc900.c
->>
->> diff --git a/arch/arm/mach-w90x900/include/mach/nuc970-regs-timer.h b/arch/arm/mach-w90x900/include/mach/nuc970-regs-timer.h
->> new file mode 100644
->> index 0000000..43d7e8b
->> --- /dev/null
->> +++ b/arch/arm/mach-w90x900/include/mach/nuc970-regs-timer.h
->
-> Please move the contents of the header file into the driver. We try to not
-> have any new mach/*.h headers.
+Gr{oetje,eeting}s,
 
-Ok, done.
+                        Geert
 
->
->> +
->> +static unsigned int timer0_load;
->> +static void __iomem *tmr_base;
->> +
->> +static int nuc970_clockevent_set_oneshot(struct clock_event_device *evt)
->> +{
->> +	unsigned int val;
->> +
->> +	val = __raw_readl(tmr_base + REG_TMR_TCSR0);
->> +	val &= ~(0x03 << 27);
->> +
->> +	val |= (ONESHOT | COUNTEN | INTEN | PRESCALE);
->> +
->> +	__raw_writel(val, tmr_base + REG_TMR_TCSR0);
->> +	return 0;
->> +}
->> +
->
-> writel() instead of __raw_writel()
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Ok, so this change will apply to all drivers.
-
->
-> 	Arnd
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
