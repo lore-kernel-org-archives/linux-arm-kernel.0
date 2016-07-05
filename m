@@ -1,311 +1,142 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  5 Jul 2016 22:19:53 +0200
-Subject: [PATCH 3/3] ARM: dts: imx25: substitute NO_PAD_CTL by the respective
- reset value
-In-Reply-To: <1467749993-14533-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1467749993-14533-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1467749993-14533-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Tue,  5 Jul 2016 22:19:50 +0200
+Subject: [PATCH 0/3] ARM: dts: pinctrl-imx: some cleanups and fixes
+Message-ID: <1467749993-14533-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When 0x80000000 (aka NO_PAD_CTL) is used as pad config value, the
-SW_PAD_CTL register isn't modified. Instead be more explicit here and
-specify the reset default value.
+Hello,
 
-If the machines don't depend on bootloader modifications to these
-registers (and my table doesn't have a bug) this commit doesn't
-result in different behaviour of the affected machines.
+when I asked Andreas F?rber to drop the function device nodes in his
+patch that added support for the Udoo Neo boards, he rightfully said:
+"OK, will do. Adopted from imx6sx-sdb.dtsi and imx6sx-sabreauto.dts -
+please update the existing files to be like you expect new ones to be.".
+This is done in patch 1. While the short stat for this patch is
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi       | 18 +++----
- .../imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts  |  2 +-
- .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  | 24 ++++-----
- arch/arm/boot/dts/imx25-karo-tx25.dts              | 50 +++++++++---------
- arch/arm/boot/dts/imx25-pdk.dts                    | 60 +++++++++++-----------
- 5 files changed, 77 insertions(+), 77 deletions(-)
+	87 files changed, 7717 insertions(+), 7899 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
-index f024a84bd37b..5ba6351d55cf 100644
---- a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
-+++ b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
-@@ -43,22 +43,22 @@
- &iomuxc {
- 	pinctrl_fec: fecgrp {
- 		fsl,pins = <
--			MX25_PAD_FEC_MDC__FEC_MDC		0x80000000
-+			MX25_PAD_FEC_MDC__FEC_MDC		0x00000060
- 			MX25_PAD_FEC_MDIO__FEC_MDIO		0x400001e0
--			MX25_PAD_FEC_TDATA0__FEC_TDATA0		0x80000000
--			MX25_PAD_FEC_TDATA1__FEC_TDATA1		0x80000000
--			MX25_PAD_FEC_TX_EN__FEC_TX_EN		0x80000000
--			MX25_PAD_FEC_RDATA0__FEC_RDATA0		0x80000000
--			MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x80000000
--			MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x80000000
-+			MX25_PAD_FEC_TDATA0__FEC_TDATA0		0x00000060
-+			MX25_PAD_FEC_TDATA1__FEC_TDATA1		0x00000060
-+			MX25_PAD_FEC_TX_EN__FEC_TX_EN		0x00000060
-+			MX25_PAD_FEC_RDATA0__FEC_RDATA0		0x000000c1
-+			MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x000000c0
-+			MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x000000c0
- 			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK		0x1c0
- 		>;
- 	};
- 
- 	pinctrl_i2c1: i2c1grp {
- 		fsl,pins = <
--			MX25_PAD_I2C1_CLK__I2C1_CLK		0x80000000
--			MX25_PAD_I2C1_DAT__I2C1_DAT		0x80000000
-+			MX25_PAD_I2C1_CLK__I2C1_CLK		0x000000a8
-+			MX25_PAD_I2C1_DAT__I2C1_DAT		0x000000a8
- 		>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-index 184778f4335f..f773690da909 100644
---- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-@@ -59,7 +59,7 @@
- 
- &iomuxc {
- 	pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
--		fsl,pins = <MX25_PAD_PWM__GPIO_1_26 0x80000000>;
-+		fsl,pins = <MX25_PAD_PWM__GPIO_1_26 0x000000c0>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-index 1a4b08df061c..d6681966ee9c 100644
---- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-@@ -97,11 +97,11 @@
- 	};
- 
- 	pinctrl_gpiokeys: gpiokeysgrp {
--		fsl,pins = <MX25_PAD_VSTBY_ACK__GPIO_3_18 0x80000000>;
-+		fsl,pins = <MX25_PAD_VSTBY_ACK__GPIO_3_18 0x00000080>;
- 	};
- 
- 	pinctrl_gpioled: gpioledgrp {
--		fsl,pins = <MX25_PAD_POWER_FAIL__GPIO_3_19 0x80000000>;
-+		fsl,pins = <MX25_PAD_POWER_FAIL__GPIO_3_19 0x00000080>;
- 	};
- 
- 	pinctrl_lcdc: lcdcgrp {
-@@ -124,11 +124,11 @@
- 			MX25_PAD_LD15__LD15			0x0
- 			MX25_PAD_GPIO_E__LD16			0x0
- 			MX25_PAD_GPIO_F__LD17			0x0
--			MX25_PAD_HSYNC__HSYNC			0x80000000
--			MX25_PAD_VSYNC__VSYNC			0x80000000
--			MX25_PAD_LSCLK__LSCLK			0x80000000
--			MX25_PAD_OE_ACD__OE_ACD			0x80000000
--			MX25_PAD_CONTRAST__CONTRAST		0x80000000
-+			MX25_PAD_HSYNC__HSYNC			0x00000060
-+			MX25_PAD_VSYNC__VSYNC			0x00000060
-+			MX25_PAD_LSCLK__LSCLK			0x00000061
-+			MX25_PAD_OE_ACD__OE_ACD			0x00000060
-+			MX25_PAD_CONTRAST__CONTRAST		0x00000060
- 		>;
- 	};
- 
-@@ -136,17 +136,17 @@
- 		fsl,pins = <
- 			MX25_PAD_UART1_RTS__UART1_RTS		0xe0
- 			MX25_PAD_UART1_CTS__UART1_CTS		0xe0
--			MX25_PAD_UART1_TXD__UART1_TXD		0x80000000
-+			MX25_PAD_UART1_TXD__UART1_TXD		0x00000020
- 			MX25_PAD_UART1_RXD__UART1_RXD		0x00000080
- 		>;
- 	};
- 
- 	pinctrl_uart2: uart2grp {
- 		fsl,pins = <
--			MX25_PAD_UART2_RXD__UART2_RXD		0x80000000
--			MX25_PAD_UART2_TXD__UART2_TXD		0x80000000
--			MX25_PAD_UART2_RTS__UART2_RTS		0x80000000
--			MX25_PAD_UART2_CTS__UART2_CTS		0x80000000
-+			MX25_PAD_UART2_RXD__UART2_RXD		0x000000e0
-+			MX25_PAD_UART2_TXD__UART2_TXD		0x00000060
-+			MX25_PAD_UART2_RTS__UART2_RTS		0x000000e0
-+			MX25_PAD_UART2_CTS__UART2_CTS		0x00000060
- 		>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
-index 9b31faa96377..c622c342efa0 100644
---- a/arch/arm/boot/dts/imx25-karo-tx25.dts
-+++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
-@@ -44,46 +44,46 @@
- &iomuxc {
- 	pinctrl_uart1: uart1grp {
- 		fsl,pins = <
--			MX25_PAD_UART1_TXD__UART1_TXD 0x80000000
--			MX25_PAD_UART1_RXD__UART1_RXD 0x80000000
--			MX25_PAD_UART1_CTS__UART1_CTS 0x80000000
--			MX25_PAD_UART1_RTS__UART1_RTS 0x80000000
-+			MX25_PAD_UART1_TXD__UART1_TXD 0x00000020
-+			MX25_PAD_UART1_RXD__UART1_RXD 0x000000a0
-+			MX25_PAD_UART1_CTS__UART1_CTS 0x00000060
-+			MX25_PAD_UART1_RTS__UART1_RTS 0x000000e0
- 		>;
- 	};
- 
- 	pinctrl_fec: fecgrp {
- 		fsl,pins = <
--			MX25_PAD_D11__GPIO_4_9		0x80000000 /* FEC PHY power on pin */
--			MX25_PAD_D13__GPIO_4_7		0x80000000 /* FEC reset */
--			MX25_PAD_FEC_MDC__FEC_MDC	0x80000000
--			MX25_PAD_FEC_MDIO__FEC_MDIO	0x80000000
--			MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x80000000
--			MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x80000000
--			MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x80000000
--			MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x80000000
--			MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x80000000
--			MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x80000000
--			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x80000000
-+			MX25_PAD_D11__GPIO_4_9		0x00000021 /* FEC PHY power on pin */
-+			MX25_PAD_D13__GPIO_4_7		0x000000a1 /* FEC reset */
-+			MX25_PAD_FEC_MDC__FEC_MDC	0x00000060
-+			MX25_PAD_FEC_MDIO__FEC_MDIO	0x000001f0
-+			MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x00000060
-+			MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x00000060
-+			MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x00000060
-+			MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x000000c1
-+			MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x000000c0
-+			MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x000000c0
-+			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x000000c0
- 		>;
- 	};
- 
- 	pinctrl_nfc: nfcgrp {
- 		fsl,pins = <
--			MX25_PAD_NF_CE0__NF_CE0		0x80000000
-+			MX25_PAD_NF_CE0__NF_CE0		0x00000001
- 			MX25_PAD_NFWE_B__NFWE_B		0x80000000
- 			MX25_PAD_NFRE_B__NFRE_B		0x80000000
- 			MX25_PAD_NFALE__NFALE		0x80000000
- 			MX25_PAD_NFCLE__NFCLE		0x80000000
- 			MX25_PAD_NFWP_B__NFWP_B		0x80000000
--			MX25_PAD_NFRB__NFRB		0x80000000
--			MX25_PAD_D7__D7			0x80000000
--			MX25_PAD_D6__D6			0x80000000
--			MX25_PAD_D5__D5			0x80000000
--			MX25_PAD_D4__D4			0x80000000
--			MX25_PAD_D3__D3			0x80000000
--			MX25_PAD_D2__D2			0x80000000
--			MX25_PAD_D1__D1			0x80000000
--			MX25_PAD_D0__D0			0x80000000
-+			MX25_PAD_NFRB__NFRB		0x00000080
-+			MX25_PAD_D7__D7			0x00000000
-+			MX25_PAD_D6__D6			0x00000000
-+			MX25_PAD_D5__D5			0x00000000
-+			MX25_PAD_D4__D4			0x00000000
-+			MX25_PAD_D3__D3			0x00000000
-+			MX25_PAD_D2__D2			0x00000000
-+			MX25_PAD_D1__D1			0x00000000
-+			MX25_PAD_D0__D0			0x00000000
- 		>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-index c823e45a7a01..643d083951ef 100644
---- a/arch/arm/boot/dts/imx25-pdk.dts
-+++ b/arch/arm/boot/dts/imx25-pdk.dts
-@@ -158,56 +158,56 @@
- 		fsl,pins = <
- 			MX25_PAD_GPIO_A__CAN1_TX		0x0
- 			MX25_PAD_GPIO_B__CAN1_RX		0x0
--			MX25_PAD_D14__GPIO_4_6 			0x80000000
-+			MX25_PAD_D14__GPIO_4_6 			0x000000a1
- 		>;
- 	};
- 
- 	pinctrl_esdhc1: esdhc1grp {
- 		fsl,pins = <
--			MX25_PAD_SD1_CMD__SD1_CMD		0x80000000
--			MX25_PAD_SD1_CLK__SD1_CLK		0x80000000
--			MX25_PAD_SD1_DATA0__SD1_DATA0		0x80000000
--			MX25_PAD_SD1_DATA1__SD1_DATA1		0x80000000
--			MX25_PAD_SD1_DATA2__SD1_DATA2		0x80000000
--			MX25_PAD_SD1_DATA3__SD1_DATA3		0x80000000
--			MX25_PAD_A14__GPIO_2_0			0x80000000
--			MX25_PAD_A15__GPIO_2_1			0x80000000
-+			MX25_PAD_SD1_CMD__SD1_CMD		0x000000d1
-+			MX25_PAD_SD1_CLK__SD1_CLK		0x000000d1
-+			MX25_PAD_SD1_DATA0__SD1_DATA0		0x000000d1
-+			MX25_PAD_SD1_DATA1__SD1_DATA1		0x000000d1
-+			MX25_PAD_SD1_DATA2__SD1_DATA2		0x000000d1
-+			MX25_PAD_SD1_DATA3__SD1_DATA3		0x000000d1
-+			MX25_PAD_A14__GPIO_2_0			0x00000080
-+			MX25_PAD_A15__GPIO_2_1			0x00000080
- 		>;
- 	};
- 
- 	pinctrl_fec: fecgrp {
- 		fsl,pins = <
--			MX25_PAD_FEC_MDC__FEC_MDC		0x80000000
-+			MX25_PAD_FEC_MDC__FEC_MDC		0x00000060
- 			MX25_PAD_FEC_MDIO__FEC_MDIO		0x400001e0
--			MX25_PAD_FEC_TDATA0__FEC_TDATA0		0x80000000
--			MX25_PAD_FEC_TDATA1__FEC_TDATA1		0x80000000
--			MX25_PAD_FEC_TX_EN__FEC_TX_EN		0x80000000
--			MX25_PAD_FEC_RDATA0__FEC_RDATA0		0x80000000
--			MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x80000000
--			MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x80000000
--			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK		0x1c0
--			MX25_PAD_A17__GPIO_2_3			0x80000000
--			MX25_PAD_D12__GPIO_4_8			0x80000000
-+			MX25_PAD_FEC_TDATA0__FEC_TDATA0		0x00000060
-+			MX25_PAD_FEC_TDATA1__FEC_TDATA1		0x00000060
-+			MX25_PAD_FEC_TX_EN__FEC_TX_EN		0x00000060
-+			MX25_PAD_FEC_RDATA0__FEC_RDATA0		0x000000c1
-+			MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x000000c0
-+			MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x000000c0
-+			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK		0x000001c0
-+			MX25_PAD_A17__GPIO_2_3			0x00000000
-+			MX25_PAD_D12__GPIO_4_8			0x000000a1
- 		>;
- 	};
- 
- 	pinctrl_i2c1: i2c1grp {
- 		fsl,pins = <
--			MX25_PAD_I2C1_CLK__I2C1_CLK		0x80000000
--			MX25_PAD_I2C1_DAT__I2C1_DAT		0x80000000
-+			MX25_PAD_I2C1_CLK__I2C1_CLK		0x000000a8
-+			MX25_PAD_I2C1_DAT__I2C1_DAT		0x000000a8
- 		>;
- 	};
- 
- 	pinctrl_kpp: kppgrp {
- 		fsl,pins = <
--			MX25_PAD_KPP_ROW0__KPP_ROW0	0x80000000
--			MX25_PAD_KPP_ROW1__KPP_ROW1	0x80000000
--			MX25_PAD_KPP_ROW2__KPP_ROW2	0x80000000
--			MX25_PAD_KPP_ROW3__KPP_ROW3	0x80000000
--			MX25_PAD_KPP_COL0__KPP_COL0	0x80000000
--			MX25_PAD_KPP_COL1__KPP_COL1	0x80000000
--			MX25_PAD_KPP_COL2__KPP_COL2	0x80000000
--			MX25_PAD_KPP_COL3__KPP_COL3	0x80000000
-+			MX25_PAD_KPP_ROW0__KPP_ROW0		0x000000a0
-+			MX25_PAD_KPP_ROW1__KPP_ROW1		0x000000a0
-+			MX25_PAD_KPP_ROW2__KPP_ROW2		0x000000e0
-+			MX25_PAD_KPP_ROW3__KPP_ROW3		0x000000e0
-+			MX25_PAD_KPP_COL0__KPP_COL0		0x000000a8
-+			MX25_PAD_KPP_COL1__KPP_COL1		0x000000a8
-+			MX25_PAD_KPP_COL2__KPP_COL2		0x000000a8
-+			MX25_PAD_KPP_COL3__KPP_COL3		0x000000a8
- 		>;
- 	};
- 
-@@ -243,7 +243,7 @@
- 		fsl,pins = <
- 			MX25_PAD_UART1_RTS__UART1_RTS		0xe0
- 			MX25_PAD_UART1_CTS__UART1_CTS		0xe0
--			MX25_PAD_UART1_TXD__UART1_TXD		0x80000000
-+			MX25_PAD_UART1_TXD__UART1_TXD		0x00000020
- 			MX25_PAD_UART1_RXD__UART1_RXD		0x80
- 		>;
- 	};
+it was really easier, because most of the changes are indention, and
+with -b I just get:
+
+	87 files changed, 182 deletions(-)
+
+which matches reality much better.
+
+After that I noticed (with a tool I wrote for a customer) that some
+pinctrl settings in the i.MX25 device trees are broken. (That doesn't
+mean all others are ok, my tool just understands i.MX25 pinmuxing. :-)
+These are fixed in patch 2.
+
+Then in the third patch I substituted most occurrences of 0x80000000 in
+the pad config values by the reset default value. (Just pads that don't
+have a pad config register must stay with 0x80000000.)
+
+I admit the patches don't fit together to justify putting them in a
+series, but as they conflict each other I still put them together.
+
+Testing is very welcome as I don't have access to (most of) the affected
+machines.
+
+These patches base on 4.7-rc6. Please advise if I should rebase to a
+different version.
+
+Best regards
+Uwe
+
+Uwe Kleine-K?nig (3):
+  ARM: dts: drop function device nodes for pinctrl-imx nodes
+  ARM: dts: imx25: don't configure reserved pad settings
+  ARM: dts: imx25: substitute NO_PAD_CTL by the respective reset value
+
+ arch/arm/boot/dts/imx1-ads.dts                     | 100 ++--
+ arch/arm/boot/dts/imx1-apf9328.dts                 |  92 ++--
+ arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi       |  38 +-
+ .../imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts  |   6 +-
+ .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  | 134 +++---
+ arch/arm/boot/dts/imx25-karo-tx25.dts              |  50 +-
+ arch/arm/boot/dts/imx25-pdk.dts                    | 190 ++++----
+ arch/arm/boot/dts/imx27-apf27.dts                  |  56 ++-
+ arch/arm/boot/dts/imx27-apf27dev.dts               | 194 ++++----
+ arch/arm/boot/dts/imx27-eukrea-cpuimx27.dtsi       | 228 +++++-----
+ .../boot/dts/imx27-eukrea-mbimxsd27-baseboard.dts  | 194 ++++----
+ arch/arm/boot/dts/imx27-pdk.dts                    | 132 +++---
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts   |  92 ++--
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi  |  78 ++--
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     | 206 +++++----
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi    | 154 ++++---
+ arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi       |  62 ++-
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |  88 ++--
+ arch/arm/boot/dts/imx35-pdk.dts                    |  36 +-
+ arch/arm/boot/dts/imx50-evk.dts                    |  62 ++-
+ arch/arm/boot/dts/imx51-apf51.dts                  |  56 ++-
+ arch/arm/boot/dts/imx51-apf51dev.dts               | 176 ++++---
+ arch/arm/boot/dts/imx51-babbage.dts                | 418 +++++++++--------
+ arch/arm/boot/dts/imx51-digi-connectcore-jsk.dts   |  78 ++--
+ arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi  | 266 ++++++-----
+ arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi       |  68 ++-
+ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  | 192 ++++----
+ arch/arm/boot/dts/imx53-ard.dts                    | 116 +++--
+ arch/arm/boot/dts/imx53-m53.dtsi                   |  64 ++-
+ arch/arm/boot/dts/imx53-m53evk.dts                 | 268 ++++++-----
+ arch/arm/boot/dts/imx53-mba53.dts                  | 114 +++--
+ arch/arm/boot/dts/imx53-qsb-common.dtsi            | 244 +++++-----
+ arch/arm/boot/dts/imx53-qsrb.dts                   |  10 +-
+ arch/arm/boot/dts/imx53-smd.dts                    | 196 ++++----
+ arch/arm/boot/dts/imx53-tqma53.dtsi                | 246 +++++-----
+ arch/arm/boot/dts/imx53-tx53-x03x.dts              | 112 +++--
+ arch/arm/boot/dts/imx53-tx53-x13x.dts              |  74 ++-
+ arch/arm/boot/dts/imx53-tx53.dtsi                  | 436 +++++++++---------
+ arch/arm/boot/dts/imx53-voipac-bsb.dts             | 106 +++--
+ arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi        | 124 +++--
+ arch/arm/boot/dts/imx6dl-riotboard.dts             | 360 ++++++++-------
+ arch/arm/boot/dts/imx6q-arm2.dts                   | 198 ++++----
+ arch/arm/boot/dts/imx6q-cm-fx6.dts                 |  94 ++--
+ arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts            | 232 +++++-----
+ arch/arm/boot/dts/imx6q-gk802.dts                  |  92 ++--
+ arch/arm/boot/dts/imx6q-gw5400-a.dts               | 215 +++++----
+ arch/arm/boot/dts/imx6q-marsboard.dts              |   1 -
+ arch/arm/boot/dts/imx6q-sbc6x.dts                  |  82 ++--
+ arch/arm/boot/dts/imx6qdl-apf6.dtsi                | 112 +++--
+ arch/arm/boot/dts/imx6qdl-apf6dev.dtsi             | 306 +++++++------
+ arch/arm/boot/dts/imx6qdl-aristainetos.dtsi        | 404 ++++++++--------
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi             | 136 +++---
+ arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi       | 176 ++++---
+ arch/arm/boot/dts/imx6qdl-gw51xx.dtsi              | 238 +++++-----
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi              | 348 +++++++-------
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi              | 334 +++++++-------
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              | 356 +++++++--------
+ arch/arm/boot/dts/imx6qdl-gw551x.dtsi              | 162 ++++---
+ arch/arm/boot/dts/imx6qdl-gw552x.dtsi              | 154 ++++---
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi        | 152 +++----
+ arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi     |  84 ++--
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi            |  98 ++--
+ arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi           | 378 ++++++++-------
+ arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi       | 506 ++++++++++-----------
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          | 398 ++++++++--------
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       | 288 ++++++------
+ arch/arm/boot/dts/imx6qdl-rex.dtsi                 | 264 ++++++-----
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           | 412 +++++++++--------
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           | 360 ++++++++-------
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             | 294 ++++++------
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi                | 186 ++++----
+ arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi     |  32 +-
+ arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi     |  32 +-
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi           | 191 ++++----
+ arch/arm/boot/dts/imx6qp-sabreauto.dts             |  40 +-
+ arch/arm/boot/dts/imx6qp-sabresd.dts               |  56 ++-
+ arch/arm/boot/dts/imx6sl-evk.dts                   | 460 ++++++++++---------
+ arch/arm/boot/dts/imx6sl-warp.dts                  | 208 +++++----
+ arch/arm/boot/dts/imx6sx-sabreauto.dts             | 134 +++---
+ arch/arm/boot/dts/imx6sx-sdb.dtsi                  | 482 ++++++++++----------
+ arch/arm/boot/dts/imx7d-sdb.dts                    | 351 +++++++-------
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi          |  10 +-
+ arch/arm/boot/dts/vf-colibri.dtsi                  | 334 +++++++-------
+ arch/arm/boot/dts/vf500-colibri.dtsi               |  44 +-
+ arch/arm/boot/dts/vf610-cosmic.dts                 |  60 ++-
+ arch/arm/boot/dts/vf610-twr.dts                    | 228 +++++-----
+ arch/arm/boot/dts/vf610m4-colibri.dts              |  16 +-
+ arch/arm/boot/dts/vf610m4-cosmic.dts               |  12 +-
+ 88 files changed, 7742 insertions(+), 7924 deletions(-)
+
 -- 
 2.8.1
