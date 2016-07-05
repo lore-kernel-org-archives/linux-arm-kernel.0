@@ -1,37 +1,61 @@
-From: pmeerw@pmeerw.net (Peter Meerwald)
-Date: Tue,  5 Jul 2016 11:46:29 +0200
-Subject: [PATCH] ASoC: atmel_ssc_dai: Fix DMA params for different SSC
-Message-ID: <20160705094629.5326-1-pmeerw@pmeerw.net>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 5 Jul 2016 10:55:56 +0100
+Subject: [PATCH v7 10/17] KVM: arm64: introduce new KVM ITS device
+In-Reply-To: <95a09591-8915-9ebf-1edd-675e83a1a09b@arm.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+ <20160628123230.26255-11-andre.przywara@arm.com>
+ <2525bd7b-5df1-54bc-1999-25c8c7fe88a3@redhat.com>
+ <173c3704-180e-0385-623c-5dbcced2d762@arm.com>
+ <da2ac9c4-e29b-e74f-a11e-b2736526bf8f@redhat.com>
+ <CAFEAcA96DGzW=bShwz188O0BaDy34ccEG3921AxQCf3aAFgurg@mail.gmail.com>
+ <2b712bbe-1534-0206-34e7-8df433ace7c2@redhat.com>
+ <fc201178-cfa4-221d-b36e-f5d959f89f74@arm.com>
+ <081321b4-5bf2-29f7-018e-6d50ee74b95c@redhat.com>
+ <95a09591-8915-9ebf-1edd-675e83a1a09b@arm.com>
+Message-ID: <CAFEAcA8LQPLBtB_H9oN8S8K5ZFZXt3s4trSwowgr-FD9U6DYKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Meerwald <p.meerwald@bct-electronic.com>
+On 5 July 2016 at 09:59, Andre Przywara <andre.przywara@arm.com> wrote:
+> Ah, OK, so you _do_ the address setup _after_ the INIT.
+> My understanding of the KVM API was that this isn't allowed, as with the
+> INIT _everything_ should have been setup. kvmtool works this way.
+>
+> So we obviously can't change this for GICv3, but I wonder if we should
+> make this explicit with the ITS:
+> 1) Create the device
+> 2) setup _all_ parameters (address, number of ...)
+> 3) call INIT, any setup calls from here on are denied
+>
+> That sounds like the proper setup sequence to me.
 
-follow-up patch from c706f2e55f ASoC: atmel_ssc_dai: distinguish the
-different SSC
+So we shouldn't necessarily let QEMU drive the kernel API
+design here, but:
 
-cpu_dai id is always 0, use platform_device id to distinguish DMA
-parameters of SSCs
+(1) consistency with GICv2-with-explicit-init and GICv3
+seems worth preserving
+(2) there is a coherent model here which maps onto QEMU's
+device model:
 
-Signed-off-by: Peter Meerwald-Stadler <p.meerwald@bct-electronic.com>
-Cc: "Wu, Songjun" <songjun.wu@atmel.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- sound/soc/atmel/atmel_ssc_dai.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ (i) create device
+ (ii) configure device
+ (iii) explicitly finish init of device (in QEMU's
+   object model this is called "realize")
+ (iv) wire completed device into the system, by
+   plugging in its IRQs, mapping its memory regions
+   into the address space, etc
+ (v) at this point it is ok to either read/write registers
+   or to start vcpus
 
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index 841d059..c7daea8 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -320,7 +320,7 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
- 		return ret;
- 	}
- 
--	dma_params = &ssc_dma_params[dai->id][dir];
-+	dma_params = &ssc_dma_params[pdev->id][dir];
- 	dma_params->ssc = ssc_p->ssc;
- 	dma_params->substream = substream;
- 
--- 
-2.9.0
+Which I think is why "set register base addresses"
+looks like an odd-one-out from the kernel's point of view.
+
+So I think for the ITS we should continue to do the same
+thing we do for GICv2 and v3 (but not the GICv2
+"explicit completion of init is optional" part).
+
+I'd forgotten exactly how this worked; sorry for any
+confusion in my earlier email.
+
+thanks
+-- PMM
