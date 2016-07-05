@@ -1,523 +1,141 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue,  5 Jul 2016 06:04:09 +0200
-Subject: [PATCH 2/3] ARM: dts: imx6sx: Add UDOO Neo support
-In-Reply-To: <1467691450-22975-1-git-send-email-afaerber@suse.de>
-References: <1467691450-22975-1-git-send-email-afaerber@suse.de>
-Message-ID: <1467691450-22975-3-git-send-email-afaerber@suse.de>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Tue, 5 Jul 2016 12:18:36 +0800
+Subject: [PATCH] arm64:mm Remove the redundant initrd memblock codes
+In-Reply-To: <B1CA6829-851E-4E56-BA48-58EE72272B49@linaro.org>
+References: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
+ <4ABE8B9C-8027-40AA-A303-A82CF014A287@linaro.org>
+ <20160705022217.GA27637@arm.com>
+ <B1CA6829-851E-4E56-BA48-58EE72272B49@linaro.org>
+Message-ID: <20160705041834.GA28823@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial device trees for UDOO Neo Basic, Extended and Full boards.
-Serial console is enabled, other serial ports are prepared.
-Both user LEDs are enabled, with the orange one reserved for the M4.
-I2C based PMIC is enabled. Ethernet is enabled for Basic and Full.
+On Tue, Jul 05, 2016 at 11:41:02AM +0800, Ard Biesheuvel wrote:
+> 
+> > On 5 jul. 2016, at 10:22, Dennis Chen <dennis.chen@arm.com> wrote:
+> > 
+> >> On Mon, Jul 04, 2016 at 12:33:05PM +0200, Ard Biesheuvel wrote:
+> >> 
+> >>> On 4 jul. 2016, at 06:53, Dennis Chen <dennis.chen@arm.com> wrote:
+> >>> 
+> >>> The memory range between initrd_start and initrd_end was added to the memblock
+> >>> twice unnecessarily in the same function before initrd memory range can be freed.
+> >>> This patch merge those codes into one piece of block and add the initrd memory
+> >>> range only once, also it makes the code clean and simple.
+> >> 
+> >> This is likely to break under KASLR (and I would recommend that you test with kaslr enabled when you propose changes to this code)
+> > Hello Ard, I've tested it under KASLR on Juno board before proposing the changes,where the firmware provides the RNG protocol, it works well.
+> 
+> Ok, thanks for confirming that (and apologies for assuming you did not test it)
+> 
+> >> 
+> >> The randomization of memstart_addr needs to execute /after/ adding back the initrd, otherwise the chosen value of memstart_addr may push the initrd beyond the end of the linear area into the userland range.
+> > Yes, I know the 'range' is depends on memblock_end_of_DRAM() and memblock_start_of_DRAM(), but I can't see that the order of initrd added to the memblock will affect
+> > those two values returned from memblock_ fucntions, IMHO the initrd will be loaded to somewhere within the DRAM by firmware, is that correct?
+> 
+> memblock_add/_remove may affect the return values of memblock_start/_end_of_DRAM, so the reordering will affect the range of the randomized memstart_addr, afaict
+>
+Hello Ard, since the efi stub will load the initrd block to the DRAM, and all the memory descriptions passed in by the firmware will be added to the memblock by efi
+stub, so in this case adding the initrd to the memblock will not change the return value of memblock_start/_end_of_DRAM, else it's a bug from efi stub, isn't it?
 
-Cc: Ettore Chimenti <ettore.chimenti@udoo.org>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- arch/arm/boot/dts/Makefile                     |   5 +-
- arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts    |  69 +++++++
- arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts |  54 +++++
- arch/arm/boot/dts/imx6sx-udoo-neo-full.dts     |  69 +++++++
- arch/arm/boot/dts/imx6sx-udoo-neo.dtsi         | 261 +++++++++++++++++++++++++
- 5 files changed, 457 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
- create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
- create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
- create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 8ff3f580d7de..780e17976a14 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -397,7 +397,10 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-sabreauto.dtb \
- 	imx6sx-sdb-reva.dtb \
- 	imx6sx-sdb-sai.dtb \
--	imx6sx-sdb.dtb
-+	imx6sx-sdb.dtb \
-+	imx6sx-udoo-neo-basic.dtb \
-+	imx6sx-udoo-neo-extended.dtb \
-+	imx6sx-udoo-neo-full.dtb
- dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-14x14-evk.dtb \
- 	imx6ul-pico-hobbit.dtb \
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
-new file mode 100644
-index 000000000000..615a1df89c0c
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
-@@ -0,0 +1,69 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6sx-udoo-neo.dtsi"
-+
-+/ {
-+	model = "UDOO Neo Basic";
-+	compatible = "fsl,imx6sx";
-+
-+	memory {
-+		reg = <0x80000000 0x20000000>;
-+	};
-+};
-+
-+&fec1 {
-+	status = "okay";
-+	phy-handle = <&ethphy1>;
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy1: ethernet-phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <0>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
-new file mode 100644
-index 000000000000..d6fdd17cd3ac
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
-@@ -0,0 +1,54 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6sx-udoo-neo.dtsi"
-+
-+/ {
-+	model = "UDOO Neo Extended";
-+	compatible = "fsl,imx6sx";
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
-new file mode 100644
-index 000000000000..d4820c7cd152
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
-@@ -0,0 +1,69 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6sx-udoo-neo.dtsi"
-+
-+/ {
-+	model = "UDOO Neo Full";
-+	compatible = "fsl,imx6sx";
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>;
-+	};
-+};
-+
-+&fec1 {
-+	status = "okay";
-+	phy-handle = <&ethphy1>;
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy1: ethernet-phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <0>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-new file mode 100644
-index 000000000000..e074409644d8
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-@@ -0,0 +1,261 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "imx6sx.dtsi"
-+
-+/ {
-+	compatible = "fsl,imx6sx";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		red {
-+			label = "udoo-neo:red:mmc";
-+			gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		orange {
-+			label = "udoo-neo:orange:user";
-+			gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;
-+			default-state = "keep";
-+		};
-+	};
-+};
-+
-+&cpu0 {
-+	arm-supply = <&sw1a_reg>;
-+	soc-supply = <&sw1c_reg>;
-+};
-+
-+&fec1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet1>;
-+	phy-mode = "rmii";
-+	phy-reset-gpios = <&gpio5 4 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	clock-frequency = <100000>;
-+	status = "okay";
-+
-+	pmic: pmic at 08 {
-+		compatible = "fsl,pfuze3000";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1a {
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1475000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1b {
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1475000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1850000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1650000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vldo1 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen2_reg: vldo2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vccsd {
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen4_reg: v33 {
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vldo3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vldo4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&iomuxc {
-+	imx6sx-udoo-neo {
-+		pinctrl_enet1: enet1grp {
-+			fsl,pins =
-+				<MX6SX_PAD_ENET1_CRS__GPIO2_IO_1	0xa0b1>,
-+				<MX6SX_PAD_ENET1_MDC__ENET1_MDC		0xa0b1>,
-+				<MX6SX_PAD_ENET1_MDIO__ENET1_MDIO	0xa0b1>,
-+				<MX6SX_PAD_RGMII1_TD0__ENET1_TX_DATA_0	0xa0b1>,
-+				<MX6SX_PAD_RGMII1_TD1__ENET1_TX_DATA_1	0xa0b1>,
-+				<MX6SX_PAD_RGMII1_TX_CTL__ENET1_TX_EN	0xa0b1>,
-+
-+				<MX6SX_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x3081>,
-+				<MX6SX_PAD_ENET2_TX_CLK__GPIO2_IO_9	0x3081>,
-+				<MX6SX_PAD_RGMII1_RD0__ENET1_RX_DATA_0	0x3081>,
-+				<MX6SX_PAD_RGMII1_RD1__ENET1_RX_DATA_1	0x3081>,
-+				<MX6SX_PAD_RGMII1_RX_CTL__ENET1_RX_EN	0x3081>,
-+				<MX6SX_PAD_RGMII1_RXC__ENET1_RX_ER	0x3081>,
-+
-+				<MX6SX_PAD_ENET2_RX_CLK__ENET2_REF_CLK_25M	0x91>;
-+		};
-+
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins =
-+				<MX6SX_PAD_GPIO1_IO00__I2C1_SCL		0x4001b8b1>,
-+				<MX6SX_PAD_GPIO1_IO01__I2C1_SDA		0x4001b8b1>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins =
-+				<MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1>,
-+				<MX6SX_PAD_GPIO1_IO05__UART1_RX		0x1b0b1>;
-+		};
-+
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins =
-+				<MX6SX_PAD_GPIO1_IO06__UART2_TX		0x1b0b1>,
-+				<MX6SX_PAD_GPIO1_IO07__UART2_RX		0x1b0b1>;
-+		};
-+
-+		pinctrl_uart5: uart5grp {
-+			fsl,pins =
-+				<MX6SX_PAD_SD4_DATA4__UART5_RX		0x1b0b1>,
-+				<MX6SX_PAD_SD4_DATA5__UART5_TX		0x1b0b1>;
-+		};
-+
-+		pinctrl_uart6: uart6grp {
-+			fsl,pins =
-+				<MX6SX_PAD_CSI_DATA00__UART6_RI_B	0x1b0b1>,
-+				<MX6SX_PAD_CSI_DATA01__UART6_DSR_B	0x1b0b1>,
-+				<MX6SX_PAD_CSI_DATA02__UART6_DTR_B	0x1b0b1>,
-+				<MX6SX_PAD_CSI_DATA03__UART6_DCD_B	0x1b0b1>,
-+				<MX6SX_PAD_CSI_DATA04__UART6_RX		0x1b0b1>,
-+				<MX6SX_PAD_CSI_DATA05__UART6_TX		0x1b0b1>,
-+				<MX6SX_PAD_CSI_DATA06__UART6_RTS_B	0x1b0b1>,
-+				<MX6SX_PAD_CSI_DATA07__UART6_CTS_B	0x1b0b1>;
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+/* Cortex-M4 serial */
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "disabled";
-+};
-+
-+/* Arduino serial */
-+&uart5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+	status = "disabled";
-+};
-+
-+&uart6 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart6>;
-+	uart-has-rtscts;
-+	status = "disabled";
-+};
--- 
-2.6.6
+Thanks,
+Dennis
+> 
+> > 
+> > Thanks,
+> > Dennis  
+> >> 
+> >> 
+> >>> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+> >>> Cc: Mark Rutland <mark.rutland@arm.com>
+> >>> Cc: Steve Capper <steve.capper@arm.com>
+> >>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>> Cc: Will Deacon <will.deacon@arm.com>
+> >>> ---
+> >>> arch/arm64/mm/init.c | 58 +++++++++++++++++++++++-----------------------------
+> >>> 1 file changed, 26 insertions(+), 32 deletions(-)
+> >>> 
+> >>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> >>> index 2ade7a6..cf26cdb 100644
+> >>> --- a/arch/arm64/mm/init.c
+> >>> +++ b/arch/arm64/mm/init.c
+> >>> @@ -228,6 +228,29 @@ void __init arm64_memblock_init(void)
+> >>>       memblock_add(__pa(_text), (u64)(_end - _text));
+> >>>   }
+> >>> 
+> >>> +    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+> >>> +        extern u16 memstart_offset_seed;
+> >>> +        u64 range = linear_region_size -
+> >>> +                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+> >>> +
+> >>> +        /*
+> >>> +         * If the size of the linear region exceeds, by a sufficient
+> >>> +         * margin, the size of the region that the available physical
+> >>> +         * memory spans, randomize the linear region as well.
+> >>> +         */
+> >>> +        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+> >>> +            range = range / ARM64_MEMSTART_ALIGN + 1;
+> >>> +            memstart_addr -= ARM64_MEMSTART_ALIGN *
+> >>> +                     ((range * memstart_offset_seed) >> 16);
+> >>> +        }
+> >>> +    }
+> >>> +
+> >>> +    /*
+> >>> +     * Register the kernel text, kernel data, initrd, and initial
+> >>> +     * pagetables with memblock.
+> >>> +     */
+> >>> +    memblock_reserve(__pa(_text), _end - _text);
+> >>> +
+> >>>   if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+> >>>       /*
+> >>>        * Add back the memory we just removed if it results in the
+> >>> @@ -254,41 +277,12 @@ void __init arm64_memblock_init(void)
+> >>>           memblock_remove(base, size); /* clear MEMBLOCK_ flags */
+> >>>           memblock_add(base, size);
+> >>>           memblock_reserve(base, size);
+> >>> +            /* the generic initrd code expects virtual addresses */
+> >>> +            initrd_start = __phys_to_virt(initrd_start);
+> >>> +            initrd_end = __phys_to_virt(initrd_end);
+> >>>       }
+> >>>   }
+> >>> 
+> >>> -    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+> >>> -        extern u16 memstart_offset_seed;
+> >>> -        u64 range = linear_region_size -
+> >>> -                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+> >>> -
+> >>> -        /*
+> >>> -         * If the size of the linear region exceeds, by a sufficient
+> >>> -         * margin, the size of the region that the available physical
+> >>> -         * memory spans, randomize the linear region as well.
+> >>> -         */
+> >>> -        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+> >>> -            range = range / ARM64_MEMSTART_ALIGN + 1;
+> >>> -            memstart_addr -= ARM64_MEMSTART_ALIGN *
+> >>> -                     ((range * memstart_offset_seed) >> 16);
+> >>> -        }
+> >>> -    }
+> >>> -
+> >>> -    /*
+> >>> -     * Register the kernel text, kernel data, initrd, and initial
+> >>> -     * pagetables with memblock.
+> >>> -     */
+> >>> -    memblock_reserve(__pa(_text), _end - _text);
+> >>> -#ifdef CONFIG_BLK_DEV_INITRD
+> >>> -    if (initrd_start) {
+> >>> -        memblock_reserve(initrd_start, initrd_end - initrd_start);
+> >>> -
+> >>> -        /* the generic initrd code expects virtual addresses */
+> >>> -        initrd_start = __phys_to_virt(initrd_start);
+> >>> -        initrd_end = __phys_to_virt(initrd_end);
+> >>> -    }
+> >>> -#endif
+> >>> -
+> >>>   early_init_fdt_scan_reserved_mem();
+> >>> 
+> >>>   /* 4GB maximum for 32-bit only capable devices */
+> >>> -- 
+> >>> 1.8.3.1
+> > 
+> 
