@@ -1,200 +1,49 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 06 Jul 2016 01:02:20 +0300
-Subject: [PATCH v2 1/2] ARM: dts: r8a7792: add GPIO support
-In-Reply-To: <19087307.ZHtRY0pPL5@wasted.cogentembedded.com>
-References: <19087307.ZHtRY0pPL5@wasted.cogentembedded.com>
-Message-ID: <11674399.J5QsPL1iTr@wasted.cogentembedded.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue,  5 Jul 2016 15:22:52 -0700
+Subject: [PATCHv3] Better kernel instruction abort handling
+Message-ID: <1467757373-31242-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe all 12 GPIO controllers in the R8A7792 device tree.
+Hi,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This is v3 of the patch to make instruction aborts print a nicer more standard\
+error message (i.e. no more bad mode)
 
----
-Changes in version 2:
-- added Geert's tag.
+Mark Rutland pointed out in v2 that we need to audit do_mem_abort paths. Of the
+functions that do_mem_abort can call, do_bad, do_translation_fault, and
+do_alignment_fault all mostly reduce to calling do_bad_area which should call
+__do_kernel_fault directly. This makes do_page_fault and __do_kernel_fault the
+only cases to review.
 
- arch/arm/boot/dts/r8a7792.dtsi |  168 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 168 insertions(+)
+Mark raised the problem of taking an instruction abort with a fixup handler.
+Any fixup handler being run would not exist in the exception table so there
+should be no risk of looping. Another instruction abort would just reduce to
+the case of an instruction abort without a fixup handler. The fixup handlers
+are expecting data aborts, not instruction aborts though so while they could
+run successfully, it wouldn't be for the precise right reason. Practically
+speaking, I don't think it matters but to be on the safe side, the fixup
+handlers are not run in __do_kernel_fault if the abort is an instruction abort.
+This should cover__do_kernel_fault.
 
-Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -113,6 +113,174 @@
- 			reg = <0 0xe6060000 0 0x144>;
- 		};
- 
-+		gpio0: gpio at e6050000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6050000 0 0x50>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 0 29>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO0>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio1: gpio at e6051000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6051000 0 0x50>;
-+			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 32 23>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO1>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio2: gpio at e6052000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6052000 0 0x50>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 64 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO2>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio3: gpio at e6053000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6053000 0 0x50>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 96 28>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO3>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio4: gpio at e6054000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6054000 0 0x50>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 128 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO4>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio5: gpio at e6055000 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055000 0 0x50>;
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 160 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO5>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio6: gpio at e6055100 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055100 0 0x50>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 192 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO6>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio7: gpio at e6055200 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055200 0 0x50>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 224 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO7>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio8: gpio at e6055300 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055300 0 0x50>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 256 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO8>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio9: gpio at e6055400 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055400 0 0x50>;
-+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 288 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO9>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio10: gpio at e6055500 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055500 0 0x50>;
-+			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 320 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO10>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		gpio11: gpio at e6055600 {
-+			compatible = "renesas,gpio-r8a7792",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055600 0 0x50>;
-+			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 352 30>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&mstp9_clks R8A7792_CLK_GPIO11>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
- 		dmac0: dma-controller at e6700000 {
- 			compatible = "renesas,dmac-r8a7792",
- 				     "renesas,rcar-dmac";
+do_page_fault gets a little bit more complicated. A fault on a kernel address
+should just end up in __do_kernel_fault. Extending is_permission_fault to
+cover instruction aborts should be sufficient, mostly because addr == regs->pc
+and there should never be a userspace address in the exception table and there
+should never be a userspace address in the exception table.
+
+So I think this should cover all cases. The sample LKDTM test cases all work
+now.
+
+Thanks,
+Laura
+
+Laura Abbott (1):
+  arm64: Handle el1 synchronous instruction aborts cleanly
+
+ arch/arm64/kernel/entry.S | 18 ++++++++++++++++++
+ arch/arm64/mm/fault.c     | 11 +++++++++--
+ 2 files changed, 27 insertions(+), 2 deletions(-)
+
+-- 
+2.7.4
