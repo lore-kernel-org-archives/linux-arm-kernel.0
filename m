@@ -1,39 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Jul 2016 08:12:11 +0200
-Subject: [RFC PATCH 1/5] clk: sunxi: Add a driver for the PLL2 on A31/23/33
-In-Reply-To: <20160628101325.2522-1-icenowy@aosc.xyz>
-References: <20160628101325.2522-1-icenowy@aosc.xyz>
-Message-ID: <20160705061211.GA7643@lukather>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 5 Jul 2016 08:27:36 +0200
+Subject: [PATCH 2/3] ARM: dts: imx6sx: Add UDOO Neo support
+In-Reply-To: <1467691450-22975-3-git-send-email-afaerber@suse.de>
+References: <1467691450-22975-1-git-send-email-afaerber@suse.de>
+ <1467691450-22975-3-git-send-email-afaerber@suse.de>
+Message-ID: <20160705062736.GL16643@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Tue, Jun 28, 2016 at 06:13:21PM +0800, Icenowy Zheng wrote:
-> This is based on the PLL2 driver for A10/20.
+On Tue, Jul 05, 2016 at 06:04:09AM +0200, Andreas F?rber wrote:
+> +&iomuxc {
+> +	imx6sx-udoo-neo {
 
-Thanks for this patch.
+There is no need for this machine group. Please just put the pinctrl
+groups directly into &iomuxc { }.
 
-However, as you might have seen, we're switching to a new clock code
-base, so it would be great if you could use that instead.
+> +		pinctrl_enet1: enet1grp {
+> +			fsl,pins =
+> +				<MX6SX_PAD_ENET1_CRS__GPIO2_IO_1	0xa0b1>,
+> +				<MX6SX_PAD_ENET1_MDC__ENET1_MDC		0xa0b1>,
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/440077.html
+It's unusual to write pinmuxes this way. The usual form is to write it
+in a single array. (Not sure I'm using the right term here.) Having said
+that I like it your way, but still it should (IMHO) get a more official
+blessing.
 
-While we declared all the clocks for the H3, nothing really mandates
-that for the existing platforms we don't introduce a few clocks as
-they are needed. That will probably even smoothen the transition.
-
-Thanks,
-Maxime
+Best regards
+Uwe
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/01ba6825/attachment.sig>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
