@@ -1,124 +1,89 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Tue, 05 Jul 2016 04:36:26 -0000
-Subject: [PATCH V9 09/11] ARM64/PCI: ACPI support for legacy IRQs parsing
- and consolidation with DT code
-In-Reply-To: <20160613104005.GA26738@red-moon>
-References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
- <1465588519-11334-10-git-send-email-tn@semihalf.com>
- <20160610233612.GB7671@localhost> <20160613104005.GA26738@red-moon>
-Message-ID: <CADaLNDk+pHar2t5Xhv9cvYqcXs3uPyWvTUB2MGKbiRrQWyQ-FA@mail.gmail.com>
+Date: Tue, 05 Jul 2016 04:37:14 -0000
+Subject: [PATCH v3 1/2] clocksource/arm_arch_timer: Force per-CPU
+ interrupt to be level-triggered
+In-Reply-To: <20160610082952.4f20d732@arm.com>
+References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+ <1465235791-7064-2-git-send-email-marc.zyngier@arm.com>
+ <5759DB58.5070906@gmail.com> <20160610082952.4f20d732@arm.com>
+Message-ID: <CADaLND=gft2NEsoAHKBOUkK=ufDf7=xyqgwk-30+0C8Ui6iZRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 3:40 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
+On Fri, Jun 10, 2016 at 12:29 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Thu, 09 Jun 2016 14:10:48 -0700
+> David Daney <ddaney.cavm@gmail.com> wrote:
 >
-> On Fri, Jun 10, 2016 at 06:36:12PM -0500, Bjorn Helgaas wrote:
-> > On Fri, Jun 10, 2016 at 09:55:17PM +0200, Tomasz Nowicki wrote:
-> > > To enable PCI legacy IRQs on platforms booting with ACPI, arch code
-> > > should include ACPI specific callbacks that parse and set-up the
-> > > device IRQ number, equivalent to the DT boot path. Owing to the current
-> > > ACPI core scan handlers implementation, ACPI PCI legacy IRQs bindings
-> > > cannot be parsed at device add time, since that would trigger ACPI scan
-> > > handlers ordering issues depending on how the ACPI tables are defined.
-> >
-> > Uh, OK :)  I can't figure out exactly what the problem is here -- I
-> > don't know where to look if I wanted to fix the scan handler ordering
-> > issues, and I don't know how I could tell if it would ever be safe to
-> > move this from driver probe-time back to device add-time.
+>> On 06/06/2016 10:56 AM, Marc Zyngier wrote:
+>> > The ARM architected timer produces level-triggered interrupts (this
+>> > is mandated by the architecture). Unfortunately, most device-trees
+>> > get this wrong, and expose an edge-triggered interrupt.
+>> >
+>> > Until now, this wasn't too much an issue, as the programming of the
+>> > trigger would fail (the corresponding PPI cannot be reconfigured),
+>> > and the kernel would be happy with this. But we're about to change
+>> > this, and trust DT a lot if the driver doesn't provide its own
+>> > trigger information. In that context, the timer breaks badly.
+>> >
+>> > While we do need to fix the DTs, there is also some userspace out
+>> > there (kvmtool) that generates the same kind of broken DT on the
+>> > fly, and that will completely break with newer kernels.
+>> >
+>> > As a safety measure, and to keep buggy software alive as well as
+>> > buying us some time to fix DTs all over the place, let's check
+>> > what trigger configuration has been given us by the firmware.
+>> > If this is not a level configuration, then we know that the
+>> > DT/ACPI configuration is bust, and we pick some defaults which
+>> > won't be worse than the existing setup.
+>> >
+>> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>>
+>> I tried to test this patch, but there is a problem somewhere that I have
+>> not yet tracked down.  On Cavium Thunder (gic-v3 based) I have tested
+>> with the device tree interrupt type of both 4 and 8 and get the same result:
+>>
+>>
+>> [    0.000000] arm_arch_timer: WARNING: Invalid trigger for IRQ2,
+>> assuming level low
+>> [    0.000000] arm_arch_timer: WARNING: Please fix your firmware
+>> [    0.000000] arm_arch_timer: WARNING: Invalid trigger for IRQ3,
+>> assuming level low
+>> [    0.000000] arm_arch_timer: WARNING: Please fix your firmware
+>> [    0.000000] arm_arch_timer: Architected cp15 timer(s) running at
+>> 100.00MHz (phys).
+>> [    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff
+>> max_cycles: 0x171024e7e0, max_idle_ns: 440795205315 ns
+>> [    0.000002] sched_clock: 56 bits at 100MHz, resolution 10ns, wraps
+>> every 4398046511100ns
+>>
+>> It could be that the gic-v3 irq mapping code is broken.  I will try to
+>> look into it, but there may be other fixes needed before we would
+>> consider this patch to be an improvement.
 >
-> Right, the commit log could have been more informative.
+> That's because the core kernel has other bugs which are going to be
+> addressed in 4.8. So far, we cannot set the trigger of a per-cpu
+> interrupt from the device tree, and we end-up with whatever is the
+> default (edge). You can put whatever you want in the DT, it will be
+> ignored.
 >
-> pcibios_add_device() was added in:
->
-> commit d1e6dc91b532 ("arm64: Add architectural support for PCI")
->
-> whose commit log does not specify why legacy IRQ parsing should
-> be done at pcibios_add_device() either, so honestly we had to
-> do with the information we have at hand.
->
-> > I also notice that x86 and ia64 call acpi_pci_irq_enable() even later,
-> > when the driver *enables* the device.  Is there a reason you didn't do
-> > it at the same time as x86 and ia64?  This is another of those pcibios
-> > hooks that really don't do anything arch-specific, so I can imagine
-> > refactoring this somehow, someday.
->
-> Yes, with [1], that was the goal, that stopped because [1] does not
-> work on x86.
->
-> Only DT platform(s) affected by this change are all platforms relying on
-> drivers/pci/host/pci-xgene.c (others rely on pci_fixup_irqs() that
-> should be removed too), if on those platforms probing IRQs at device
-> enable time works ok I can update this patch (it can be done through [1]
-> once we figure out what to do with it on x86) and move the IRQ set-up at
-> pcibios_enable_device() time.
->
-> @Duc: any feedback on this ?
+> This series in preparation of these fixes landing in 4.8, where we'll
+> be able to do the right thing, and will start noticing stupid things
+> coming from the DT.
+Hi Marc,
 
-Hi Lorenzo,
-
-The changes to add pcibios_alloc_irq works fine on X-Gene PCIe
-
-I also tried to remove pcibios_alloc_irq and move its code into
-pcibios_enable_device
-after pci_enable_resource call and legacy IRQ also works.
-
-Can you also point me to the discussion thread or some info. about the
-issue on x86 with [1]?
-I want to check if there is any more test case I need to verify.
+I also see the same warning that David saw. Can you please cc me when
+the bug fix series
+is available? I will test it out for X-Gene 1 and will need to change
+the interrupt setting for timer
+events on X-Gene 2 as well.
 
 Regards,
 Duc Dang.
 
 >
 > Thanks,
-> Lorenzo
 >
-> [1] http://www.spinics.net/lists/linux-pci/msg45950.html
->
-> > Did we have this conversation before?  It seems vaguely familiar, so I
-> > apologize if you already explained this once.
-> >
-> > > To solve this problem and consolidate FW PCI legacy IRQs parsing in
-> > > one single pcibios callback (pending final removal), this patch moves
-> > > DT PCI IRQ parsing to the pcibios_alloc_irq() callback (called by
-> > > PCI core code at device probe time) and adds ACPI PCI legacy IRQs
-> > > parsing to the same callback too, so that FW PCI legacy IRQs parsing
-> > > is confined in one single arch callback that can be easily removed
-> > > when code parsing PCI legacy IRQs is consolidated and moved to core
-> > > PCI code.
-> > >
-> > > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> > > Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > ---
-> > >  arch/arm64/kernel/pci.c | 11 ++++++++---
-> > >  1 file changed, 8 insertions(+), 3 deletions(-)
-> > >
-> > > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > > index d5d3d26..b3b8a2c 100644
-> > > --- a/arch/arm64/kernel/pci.c
-> > > +++ b/arch/arm64/kernel/pci.c
-> > > @@ -51,11 +51,16 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
-> > >  }
-> > >
-> > >  /*
-> > > - * Try to assign the IRQ number from DT when adding a new device
-> > > + * Try to assign the IRQ number when probing a new device
-> > >   */
-> > > -int pcibios_add_device(struct pci_dev *dev)
-> > > +int pcibios_alloc_irq(struct pci_dev *dev)
-> > >  {
-> > > -   dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > > +   if (acpi_disabled)
-> > > +           dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > > +#ifdef CONFIG_ACPI
-> > > +   else
-> > > +           return acpi_pci_irq_enable(dev);
-> > > +#endif
-> > >
-> > >     return 0;
-> > >  }
-> > > --
-> > > 1.9.1
-> > >
-> >
+>         M.
+> --
+> Jazz is not dead. It just smells funny.
