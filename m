@@ -1,57 +1,122 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Tue,  5 Jul 2016 10:48:06 +0800
-Subject: [PATCH] ASoC: rockchip: implement system suspend/resume for spdif
-Message-ID: <1467686886-53257-1-git-send-email-sugar.zhang@rock-chips.com>
+From: po.liu@nxp.com (Po Liu)
+Date: Tue, 5 Jul 2016 03:03:01 +0000
+Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
+In-Reply-To: <577A21E4.1030301@huawei.com>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+ <577A21E4.1030301@huawei.com>
+Message-ID: <VI1PR0401MB1709D556D0A7F7BB9188221E92390@VI1PR0401MB1709.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-restore hw registers after power loss during a suspend/resume cycle.
+Hi Dongdong,
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
----
+The patch were intend to fixup the NXP layerscape serial SOC and were tested ok.
+I am not clear what platform are you trying to fix. 
+The problem on your board may be as below comments:
 
- sound/soc/rockchip/rockchip_spdif.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
 
-diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
-index 100781e..00ae0e5 100644
---- a/sound/soc/rockchip/rockchip_spdif.c
-+++ b/sound/soc/rockchip/rockchip_spdif.c
-@@ -392,9 +392,35 @@ static int rk_spdif_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int rockchip_spdif_suspend(struct device *dev)
-+{
-+	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
-+
-+	regcache_mark_dirty(spdif->regmap);
-+
-+	return 0;
-+}
-+
-+static int rockchip_spdif_resume(struct device *dev)
-+{
-+	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret < 0)
-+		return ret;
-+	ret = regcache_sync(spdif->regmap);
-+	pm_runtime_put(dev);
-+
-+	return ret;
-+}
-+#endif
-+
- static const struct dev_pm_ops rk_spdif_pm_ops = {
- 	SET_RUNTIME_PM_OPS(rk_spdif_runtime_suspend, rk_spdif_runtime_resume,
- 			   NULL)
-+	SET_SYSTEM_SLEEP_PM_OPS(rockchip_spdif_suspend, rockchip_spdif_resume)
- };
- 
- static struct platform_driver rk_spdif_driver = {
--- 
-1.9.1
+>  -----Original Message-----
+>  From: Dongdong Liu [mailto:liudongdong3 at huawei.com]
+>  Sent: Monday, July 04, 2016 4:44 PM
+>  To: Po Liu; linux-pci at vger.kernel.org; linux-arm-
+>  kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+>  devicetree at vger.kernel.org
+>  Cc: Bjorn Helgaas; Shawn Guo; Marc Zyngier; Rob Herring; Roy Zang;
+>  Mingkai Hu; Stuart Yoder; Yang-Leo Li; Arnd Bergmann; Minghuan Lian;
+>  Murali Karicheri; Linuxarm
+>  Subject: Re: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
+>  
+>  Hi Po
+>  
+>  I found a problem with the similar patch. as the below log.
+>  
+>  [    4.287060] pci 0000:80:00.0: quirk_aer_interrupt dev->irq 416
+>  [    4.293778] pcieport 0000:80:00.0: pci_device_probe in
+>  [    4.299605] pcieport 0000:80:00.0: of_irq_parse_pci() failed with
+>  rc=-22
+>  [    4.307209] pcieport 0000:80:00.0: init_service_irqs  dev->irq 0
+>  
+>  The fucntions are called as below sequence.
+>  1. quirk_aer_interrupt, get the aer dev->irq 416.
+
+This code quirk_aer_interrupt() should be run at pci_fixup_device(pci_fixup_final) which is in the pci_bus_add_devices()
+
+>  2. pci_device_probe->of_irq_parse_pci, of_irq_parse_pci() failed, then
+>  dev->irq changed to 0.
+
+pci_device_probe->of_irq_parse_pci which in the pci_scan_child_bus() run before  pci_bus_add_devices(). See dw_pcie_host_init().
+Apparently , your quirk_aer_interrupt() is running before the dev->irq assignment in the of_irq_parse_pci().
+
+So make sure your configure the quirk_aer_interrupt() run in the FINAL stage in the quirk.c OR check your host driver which you are using.
+
+
+>  
+>  So this patch could not work with aer.
+>  
+>  Thanks
+>  Dongdong
+>  ? 2016/6/14 16:24, Po Liu ??:
+>  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+>  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
+>  > maybe there is interrupt line for aer pme etc. Search the interrupt
+>  > number in the fdt file. Then fixup the dev->irq with it.
+>  >
+>  > Signed-off-by: Po Liu <po.liu@nxp.com>
+>  > ---
+>  > changes for V3:
+>  > 	- Move to quirk;
+>  > 	- Only correct the irq in RC mode;
+>  >
+>  >   drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
+>  >   1 file changed, 29 insertions(+)
+>  >
+>  > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
+>  > ee72ebe..8b39cce 100644
+>  > --- a/drivers/pci/quirks.c
+>  > +++ b/drivers/pci/quirks.c
+>  > @@ -25,6 +25,7 @@
+>  >   #include <linux/sched.h>
+>  >   #include <linux/ktime.h>
+>  >   #include <linux/mm.h>
+>  > +#include <linux/of_irq.h>
+>  >   #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+>  >   #include "pci.h"
+>  >
+>  > @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct
+>  pci_dev *pdev)
+>  >   	}
+>  >   }
+>  >   DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443,
+>  > quirk_intel_qat_vf_cap);
+>  > +
+>  > +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
+>  > + * but use standalone irq. Read the device tree for the aer
+>  > + * interrupt number.
+>  > + */
+>  > +static void quirk_aer_interrupt(struct pci_dev *dev) {
+>  > +	int ret;
+>  > +	u8 header_type;
+>  > +	struct device_node *np = NULL;
+>  > +
+>  > +	/* Only for the RC mode device */
+>  > +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
+>  > +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
+>  > +		return;
+>  > +
+>  > +	if (dev->bus->dev.of_node)
+>  > +		np = dev->bus->dev.of_node;
+>  > +
+>  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
+>  > +		ret = of_irq_get_byname(np, "aer");
+>  > +		if (ret > 0) {
+>  > +			dev->no_msi = 1;
+>  > +			dev->irq = ret;
+>  > +		}
+>  > +	}
+>  > +}
+>  > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,
+>  > +quirk_aer_interrupt);
+>  >
+>  
