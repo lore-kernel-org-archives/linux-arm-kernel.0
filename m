@@ -1,51 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Jul 2016 08:54:31 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] ARM: dts: sun5i: Enable otg on the
- auxtex t004
-In-Reply-To: <dbce3f4a-dbd6-2ee6-292a-6dec71b99d63@redhat.com>
-References: <1467226022-10525-1-git-send-email-hdegoede@redhat.com>
- <20160629203838.GI6095@lukather>
- <dbce3f4a-dbd6-2ee6-292a-6dec71b99d63@redhat.com>
-Message-ID: <20160705065431.GE7643@lukather>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 5 Jul 2016 09:08:04 +0200
+Subject: [PATCH v6 0/1] phy-sun4i-usb: Add support for peripheral-only mode
+In-Reply-To: <577B485C.8010300@ti.com>
+References: <1467667053-15122-1-git-send-email-hdegoede@redhat.com>
+ <577B485C.8010300@ti.com>
+Message-ID: <c3249b24-93e4-8b40-4279-d2ad37aaea99@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 11:45:00AM +0200, Hans de Goede wrote:
+Hi,
+
+On 05-07-16 07:40, Kishon Vijay Abraham I wrote:
 > Hi,
-> 
-> On 29-06-16 22:38, Maxime Ripard wrote:
-> >Hi,
-> >
-> >On Wed, Jun 29, 2016 at 08:46:59PM +0200, Hans de Goede wrote:
-> >>The auxtek t004 has its otg usb vbus hardwired to 5v (likely in case
-> >>people use it to power the board instead of the dedicated power micro
-> >>usb connector), it does have an id pin, so it allows full otg
-> >>functionality.
-> >
-> >I don't really get what you're saying here. Is the VBUS hardcoded to
-> >5V, without any way to switch it, or it is not wired at all?
-> 
-> It is hardwired to 5v, quoting from my commit msg
-> "has its otg usb vbus hardwired to 5v"
-> 
-> >In the former case, how can one of the PMIC output be related to the
-> >board power input?
-> 
-> I believe it is not wired to the pmic output, but to the pmic 5v input.
+>
+> On Tuesday 05 July 2016 02:47 AM, Hans de Goede wrote:
+>> Hi Kishon,
+>>
+>> Thanks for merging one of the 2 pending phy-sun4i-usb patches, I see
+>> that the other one actually has a conflict after merging in
+>> linux-phy/fixes. So here is a rebased version of it.
+>>
+>> Note can you please make sure this gets into 4.8? I've a musb patch
+>> ("usb: musb: sunxi: Simplify dr_mode handling") heading into 4.8,
+>> which depends on the changes in this patch to keep host-only mode
+>> working (runtime dependency) and we do use host-only mode on a few
+>> boards.
+>
+> sure.. but I think this patch can go only in the -rc cycle because of
+> of_usb_get_dr_mode_by_phy() API taking 2 arguments.
 
-Weird. Ok, I just applied it.
+Ok, thanks.
 
-Thanks
-Maxime
+Regards,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/47a7195d/attachment-0001.sig>
+Hans
