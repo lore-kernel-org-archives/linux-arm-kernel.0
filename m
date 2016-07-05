@@ -1,162 +1,311 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Jul 2016 22:12:39 +0200
-Subject: [GIT PULL] Allwinner DT patches for 4.8
-Message-ID: <20160705201239.GA21186@lukather>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  5 Jul 2016 22:19:53 +0200
+Subject: [PATCH 3/3] ARM: dts: imx25: substitute NO_PAD_CTL by the respective
+ reset value
+In-Reply-To: <1467749993-14533-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1467749993-14533-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1467749993-14533-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When 0x80000000 (aka NO_PAD_CTL) is used as pad config value, the
+SW_PAD_CTL register isn't modified. Instead be more explicit here and
+specify the reset default value.
 
-Please pull the following DT changes for the next merge window.
+If the machines don't depend on bootloader modifications to these
+registers (and my table doesn't have a bug) this commit doesn't
+result in different behaviour of the affected machines.
 
-Since it was conflicting on some files with the sunxi-fixes-for-4.7
-tag I sent earlier, this branch is based on that tag.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi       | 18 +++----
+ .../imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts  |  2 +-
+ .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  | 24 ++++-----
+ arch/arm/boot/dts/imx25-karo-tx25.dts              | 50 +++++++++---------
+ arch/arm/boot/dts/imx25-pdk.dts                    | 60 +++++++++++-----------
+ 5 files changed, 77 insertions(+), 77 deletions(-)
 
-Thanks,
-Maxime
-
-The following changes since commit eee25ab19de632af1ab4d2ac50bfc5006802e664:
-
-  ARM: dts: sun7i: Fix pll3x2 and pll7x2 not having a parent clock (2016-06-29 09:03:13 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.8
-
-for you to fetch changes up to d509e205d81f074a9b8d93ac80ab56405dede48b:
-
-  ARM: dts: sun5i: Enable otg on the auxtex t004 (2016-07-05 08:54:33 +0200)
-
-----------------------------------------------------------------
-Allwinner DT changes for 4.8
-
-The usual amount of DT patches, among which:
-  - I2S support
-  - Support for the AXP809 in the relevant boards (A80 based)
-  - New boards: Banapi M1+, Banapi M2+, Allwinner Parrot (R16 EVB),
-  - The other patches to enable various controllers on our boards, most
-    notably USB OTG
-
-----------------------------------------------------------------
-Aleksei Mamlin (2):
-      ARM: dts: sun4i: Re-order pinctrl nodes alphabetically
-      ARM: dts: sun7i: Re-order pinctrl nodes alphabetically
-
-Boris Brezillon (2):
-      ARM: dts: sun4i: Add NFC node to Allwinner A10 SoC
-      ARM: dts: sun7i: Add NFC node to Allwinner A20 SoC
-
-Chen-Yu Tsai (15):
-      ARM: dts: axp209: Disable ldo5 by default
-      ARM: dts: sun5i: q8-common: Enable USB power supply
-      ARM: dts: sun5i: q8-common: Enable audio codec
-      ARM: dts: sun5i: q8-common: Enable display pipeline and LCD display
-      ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
-      ARM: dts: sun9i: a80-optimus: Add AXP809 PMIC device node and regulators
-      ARM: dts: sun9i: cubieboard4: Add AXP809 PMIC device node and regulators
-      ARM: dts: sun8i-h3: move uart0 pins to sort pinmux list in proper order
-      ARM: dts: sun8i-h3: Add uart1 pinmux setting
-      ARM: dts: sun8i-h3: Add dts file for Sinovoip BPI-M2+
-      ARM: dts: sun9i: a80-optimus: Drop sunxi-common-regulators.dtsi
-      ARM: dts: sun9i: cubieboard4: Drop sunxi-common-regulators.dtsi
-      ARM: dts: sun9i: cubieboard4: Order nodes by alphabetical order
-      ARM: dts: sun9i: a80-optimus: Order nodes by alphabetical order
-      ARM: dts: sun5i: q8-common: Enable USB-based WiFi
-
-Emilio L?pez (1):
-      ARM: sun7i: Add mod1 clock nodes
-
-Florian Fainelli (1):
-      ARM: dts: sun7i: Add BCM53125 switch nodes to the lamobo-r1 board
-
-Hans de Goede (20):
-      ARM: dts: sun5i-a10s-wobo-i5: Enable ldo4 too
-      ARM: dts: sunxi: Add a startup delay for fixed regulator enabled phys
-      ARM: dts: sun4i: HDMI and the tv-encoder use tcon ch1 not ch0
-      ARM: dts: sun7i: HDMI and the tv-encoder use tcon ch1 not ch0
-      ARM: dts: axp22x.dtsi: Disable axp22x ldo_io# regulators by default
-      ARM: dts: axp22x.dtsi: Add usb_power_supply node
-      ARM: dts: axp22x.dtsi: Add reg_drivebus node
-      ARM: dts: sun8i-a?3-q8-tablet.dts: Add full otg support
-      ARM: dts: sun8i-a23-polaroid-mid2809pxe04: Add full otg support
-      ARM: dts: sun8i-a23-polaroid-mid2809pxe04: Disable ehci0
-      ARM: dts: sun4i: The blue led on the Mele A1000 is a power led
-      ARM: dts: sun6i: The blue led on the Mele A1000G quad is a power led
-      ARM: dts: sun6i: The blue led on the Mele M9 is a power led
-      ARM: dts: sun6i: Add pmic / regulator nodes to Mele A1000G quad dts
-      ARM: dts: sun6i: Add pmic / regulator nodes to Mele M9 dts
-      ARM: dts: sun8i-q8-common: Add support for USB wifi controllers
-      ARM: dts: sun5i: Enable otg on the mk802
-      ARM: dts: sun5i: Add axp152 pmic node to mk802
-      ARM: dts: sun5i: Add mmc1 / sdio-wifi node to mk802
-      ARM: dts: sun5i: Enable otg on the auxtex t004
-
-Luo Yi (1):
-      ARM: dts: sun7i: Add dts file for Bananapi M1 Plus board
-
-Maxime Ripard (4):
-      ARM: sun5i: a13: Add LCD pins
-      ARM: sun5i: Move display blocks to A13
-      ARM: sun7i: Add DAI nodes
-      ARM: sun5i: Allow PLL3 2x fixed factor clock to change PLL3 rate
-
-Michal Suchanek (2):
-      ARM: dts: sun5i: a10s: add spi2 pins
-      ARM: dts: sun5i: add spi2 on A10s Olinuxino Micro
-
-Priit Laes (2):
-      ARM: sun4i: A10: Add display and TCON clocks
-      ARM: sun7i: A20: Add display and TCON clocks
-
-Quentin Schulz (1):
-      ARM: sun8i: Add Parrot Board DTS
-
- arch/arm/boot/dts/Makefile                         |   5 +-
- arch/arm/boot/dts/axp209.dtsi                      |   1 +
- arch/arm/boot/dts/axp22x.dtsi                      |  12 +
- arch/arm/boot/dts/axp809.dtsi                      |  53 +++
- arch/arm/boot/dts/sun4i-a10-a1000.dts              |   4 +-
- arch/arm/boot/dts/sun4i-a10-hackberry.dts          |   1 +
- arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts         |   1 +
- arch/arm/boot/dts/sun4i-a10.dtsi                   | 227 +++++++---
- arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts       |  19 +
- arch/arm/boot/dts/sun5i-a10s-mk802.dts             |  32 ++
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts   |   7 +
- arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts           |  10 +-
- arch/arm/boot/dts/sun5i-a10s.dtsi                  |  14 +
- arch/arm/boot/dts/sun5i-a13-q8-tablet.dts          |  10 -
- arch/arm/boot/dts/sun5i-a13.dtsi                   | 122 ++++++
- arch/arm/boot/dts/sun5i-q8-common.dtsi             |  62 +++
- arch/arm/boot/dts/sun5i-r8.dtsi                    | 120 +-----
- arch/arm/boot/dts/sun5i.dtsi                       |   2 +-
- arch/arm/boot/dts/sun6i-a31-m9.dts                 |  96 ++++-
- arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts   |  96 ++++-
- arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts   | 230 ++++++++++
- arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts          |  60 ++-
- arch/arm/boot/dts/sun7i-a20.dtsi                   | 474 ++++++++++++++-------
- .../boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts   |  34 +-
- arch/arm/boot/dts/sun8i-a23-q8-tablet.dts          |  15 -
- arch/arm/boot/dts/sun8i-a33-q8-tablet.dts          |  15 -
- .../arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts | 195 +++++++++
- arch/arm/boot/dts/sun8i-h3.dtsi                    |  21 +-
- arch/arm/boot/dts/sun8i-q8-common.dtsi             |  42 ++
- arch/arm/boot/dts/sun8i-r16-parrot.dts             | 351 +++++++++++++++
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 164 ++++++-
- arch/arm/boot/dts/sun9i-a80-optimus.dts            | 195 +++++++--
- 32 files changed, 2235 insertions(+), 455 deletions(-)
- create mode 100644 arch/arm/boot/dts/axp809.dtsi
- create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
- create mode 100644 arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts
- create mode 100644 arch/arm/boot/dts/sun8i-r16-parrot.dts
-
+diff --git a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
+index f024a84bd37b..5ba6351d55cf 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
++++ b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
+@@ -43,22 +43,22 @@
+ &iomuxc {
+ 	pinctrl_fec: fecgrp {
+ 		fsl,pins = <
+-			MX25_PAD_FEC_MDC__FEC_MDC		0x80000000
++			MX25_PAD_FEC_MDC__FEC_MDC		0x00000060
+ 			MX25_PAD_FEC_MDIO__FEC_MDIO		0x400001e0
+-			MX25_PAD_FEC_TDATA0__FEC_TDATA0		0x80000000
+-			MX25_PAD_FEC_TDATA1__FEC_TDATA1		0x80000000
+-			MX25_PAD_FEC_TX_EN__FEC_TX_EN		0x80000000
+-			MX25_PAD_FEC_RDATA0__FEC_RDATA0		0x80000000
+-			MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x80000000
+-			MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x80000000
++			MX25_PAD_FEC_TDATA0__FEC_TDATA0		0x00000060
++			MX25_PAD_FEC_TDATA1__FEC_TDATA1		0x00000060
++			MX25_PAD_FEC_TX_EN__FEC_TX_EN		0x00000060
++			MX25_PAD_FEC_RDATA0__FEC_RDATA0		0x000000c1
++			MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x000000c0
++			MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x000000c0
+ 			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK		0x1c0
+ 		>;
+ 	};
+ 
+ 	pinctrl_i2c1: i2c1grp {
+ 		fsl,pins = <
+-			MX25_PAD_I2C1_CLK__I2C1_CLK		0x80000000
+-			MX25_PAD_I2C1_DAT__I2C1_DAT		0x80000000
++			MX25_PAD_I2C1_CLK__I2C1_CLK		0x000000a8
++			MX25_PAD_I2C1_DAT__I2C1_DAT		0x000000a8
+ 		>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
+index 184778f4335f..f773690da909 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
++++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
+@@ -59,7 +59,7 @@
+ 
+ &iomuxc {
+ 	pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
+-		fsl,pins = <MX25_PAD_PWM__GPIO_1_26 0x80000000>;
++		fsl,pins = <MX25_PAD_PWM__GPIO_1_26 0x000000c0>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+index 1a4b08df061c..d6681966ee9c 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
++++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+@@ -97,11 +97,11 @@
+ 	};
+ 
+ 	pinctrl_gpiokeys: gpiokeysgrp {
+-		fsl,pins = <MX25_PAD_VSTBY_ACK__GPIO_3_18 0x80000000>;
++		fsl,pins = <MX25_PAD_VSTBY_ACK__GPIO_3_18 0x00000080>;
+ 	};
+ 
+ 	pinctrl_gpioled: gpioledgrp {
+-		fsl,pins = <MX25_PAD_POWER_FAIL__GPIO_3_19 0x80000000>;
++		fsl,pins = <MX25_PAD_POWER_FAIL__GPIO_3_19 0x00000080>;
+ 	};
+ 
+ 	pinctrl_lcdc: lcdcgrp {
+@@ -124,11 +124,11 @@
+ 			MX25_PAD_LD15__LD15			0x0
+ 			MX25_PAD_GPIO_E__LD16			0x0
+ 			MX25_PAD_GPIO_F__LD17			0x0
+-			MX25_PAD_HSYNC__HSYNC			0x80000000
+-			MX25_PAD_VSYNC__VSYNC			0x80000000
+-			MX25_PAD_LSCLK__LSCLK			0x80000000
+-			MX25_PAD_OE_ACD__OE_ACD			0x80000000
+-			MX25_PAD_CONTRAST__CONTRAST		0x80000000
++			MX25_PAD_HSYNC__HSYNC			0x00000060
++			MX25_PAD_VSYNC__VSYNC			0x00000060
++			MX25_PAD_LSCLK__LSCLK			0x00000061
++			MX25_PAD_OE_ACD__OE_ACD			0x00000060
++			MX25_PAD_CONTRAST__CONTRAST		0x00000060
+ 		>;
+ 	};
+ 
+@@ -136,17 +136,17 @@
+ 		fsl,pins = <
+ 			MX25_PAD_UART1_RTS__UART1_RTS		0xe0
+ 			MX25_PAD_UART1_CTS__UART1_CTS		0xe0
+-			MX25_PAD_UART1_TXD__UART1_TXD		0x80000000
++			MX25_PAD_UART1_TXD__UART1_TXD		0x00000020
+ 			MX25_PAD_UART1_RXD__UART1_RXD		0x00000080
+ 		>;
+ 	};
+ 
+ 	pinctrl_uart2: uart2grp {
+ 		fsl,pins = <
+-			MX25_PAD_UART2_RXD__UART2_RXD		0x80000000
+-			MX25_PAD_UART2_TXD__UART2_TXD		0x80000000
+-			MX25_PAD_UART2_RTS__UART2_RTS		0x80000000
+-			MX25_PAD_UART2_CTS__UART2_CTS		0x80000000
++			MX25_PAD_UART2_RXD__UART2_RXD		0x000000e0
++			MX25_PAD_UART2_TXD__UART2_TXD		0x00000060
++			MX25_PAD_UART2_RTS__UART2_RTS		0x000000e0
++			MX25_PAD_UART2_CTS__UART2_CTS		0x00000060
+ 		>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
+index 9b31faa96377..c622c342efa0 100644
+--- a/arch/arm/boot/dts/imx25-karo-tx25.dts
++++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
+@@ -44,46 +44,46 @@
+ &iomuxc {
+ 	pinctrl_uart1: uart1grp {
+ 		fsl,pins = <
+-			MX25_PAD_UART1_TXD__UART1_TXD 0x80000000
+-			MX25_PAD_UART1_RXD__UART1_RXD 0x80000000
+-			MX25_PAD_UART1_CTS__UART1_CTS 0x80000000
+-			MX25_PAD_UART1_RTS__UART1_RTS 0x80000000
++			MX25_PAD_UART1_TXD__UART1_TXD 0x00000020
++			MX25_PAD_UART1_RXD__UART1_RXD 0x000000a0
++			MX25_PAD_UART1_CTS__UART1_CTS 0x00000060
++			MX25_PAD_UART1_RTS__UART1_RTS 0x000000e0
+ 		>;
+ 	};
+ 
+ 	pinctrl_fec: fecgrp {
+ 		fsl,pins = <
+-			MX25_PAD_D11__GPIO_4_9		0x80000000 /* FEC PHY power on pin */
+-			MX25_PAD_D13__GPIO_4_7		0x80000000 /* FEC reset */
+-			MX25_PAD_FEC_MDC__FEC_MDC	0x80000000
+-			MX25_PAD_FEC_MDIO__FEC_MDIO	0x80000000
+-			MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x80000000
+-			MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x80000000
+-			MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x80000000
+-			MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x80000000
+-			MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x80000000
+-			MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x80000000
+-			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x80000000
++			MX25_PAD_D11__GPIO_4_9		0x00000021 /* FEC PHY power on pin */
++			MX25_PAD_D13__GPIO_4_7		0x000000a1 /* FEC reset */
++			MX25_PAD_FEC_MDC__FEC_MDC	0x00000060
++			MX25_PAD_FEC_MDIO__FEC_MDIO	0x000001f0
++			MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x00000060
++			MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x00000060
++			MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x00000060
++			MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x000000c1
++			MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x000000c0
++			MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x000000c0
++			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x000000c0
+ 		>;
+ 	};
+ 
+ 	pinctrl_nfc: nfcgrp {
+ 		fsl,pins = <
+-			MX25_PAD_NF_CE0__NF_CE0		0x80000000
++			MX25_PAD_NF_CE0__NF_CE0		0x00000001
+ 			MX25_PAD_NFWE_B__NFWE_B		0x80000000
+ 			MX25_PAD_NFRE_B__NFRE_B		0x80000000
+ 			MX25_PAD_NFALE__NFALE		0x80000000
+ 			MX25_PAD_NFCLE__NFCLE		0x80000000
+ 			MX25_PAD_NFWP_B__NFWP_B		0x80000000
+-			MX25_PAD_NFRB__NFRB		0x80000000
+-			MX25_PAD_D7__D7			0x80000000
+-			MX25_PAD_D6__D6			0x80000000
+-			MX25_PAD_D5__D5			0x80000000
+-			MX25_PAD_D4__D4			0x80000000
+-			MX25_PAD_D3__D3			0x80000000
+-			MX25_PAD_D2__D2			0x80000000
+-			MX25_PAD_D1__D1			0x80000000
+-			MX25_PAD_D0__D0			0x80000000
++			MX25_PAD_NFRB__NFRB		0x00000080
++			MX25_PAD_D7__D7			0x00000000
++			MX25_PAD_D6__D6			0x00000000
++			MX25_PAD_D5__D5			0x00000000
++			MX25_PAD_D4__D4			0x00000000
++			MX25_PAD_D3__D3			0x00000000
++			MX25_PAD_D2__D2			0x00000000
++			MX25_PAD_D1__D1			0x00000000
++			MX25_PAD_D0__D0			0x00000000
+ 		>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+index c823e45a7a01..643d083951ef 100644
+--- a/arch/arm/boot/dts/imx25-pdk.dts
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -158,56 +158,56 @@
+ 		fsl,pins = <
+ 			MX25_PAD_GPIO_A__CAN1_TX		0x0
+ 			MX25_PAD_GPIO_B__CAN1_RX		0x0
+-			MX25_PAD_D14__GPIO_4_6 			0x80000000
++			MX25_PAD_D14__GPIO_4_6 			0x000000a1
+ 		>;
+ 	};
+ 
+ 	pinctrl_esdhc1: esdhc1grp {
+ 		fsl,pins = <
+-			MX25_PAD_SD1_CMD__SD1_CMD		0x80000000
+-			MX25_PAD_SD1_CLK__SD1_CLK		0x80000000
+-			MX25_PAD_SD1_DATA0__SD1_DATA0		0x80000000
+-			MX25_PAD_SD1_DATA1__SD1_DATA1		0x80000000
+-			MX25_PAD_SD1_DATA2__SD1_DATA2		0x80000000
+-			MX25_PAD_SD1_DATA3__SD1_DATA3		0x80000000
+-			MX25_PAD_A14__GPIO_2_0			0x80000000
+-			MX25_PAD_A15__GPIO_2_1			0x80000000
++			MX25_PAD_SD1_CMD__SD1_CMD		0x000000d1
++			MX25_PAD_SD1_CLK__SD1_CLK		0x000000d1
++			MX25_PAD_SD1_DATA0__SD1_DATA0		0x000000d1
++			MX25_PAD_SD1_DATA1__SD1_DATA1		0x000000d1
++			MX25_PAD_SD1_DATA2__SD1_DATA2		0x000000d1
++			MX25_PAD_SD1_DATA3__SD1_DATA3		0x000000d1
++			MX25_PAD_A14__GPIO_2_0			0x00000080
++			MX25_PAD_A15__GPIO_2_1			0x00000080
+ 		>;
+ 	};
+ 
+ 	pinctrl_fec: fecgrp {
+ 		fsl,pins = <
+-			MX25_PAD_FEC_MDC__FEC_MDC		0x80000000
++			MX25_PAD_FEC_MDC__FEC_MDC		0x00000060
+ 			MX25_PAD_FEC_MDIO__FEC_MDIO		0x400001e0
+-			MX25_PAD_FEC_TDATA0__FEC_TDATA0		0x80000000
+-			MX25_PAD_FEC_TDATA1__FEC_TDATA1		0x80000000
+-			MX25_PAD_FEC_TX_EN__FEC_TX_EN		0x80000000
+-			MX25_PAD_FEC_RDATA0__FEC_RDATA0		0x80000000
+-			MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x80000000
+-			MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x80000000
+-			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK		0x1c0
+-			MX25_PAD_A17__GPIO_2_3			0x80000000
+-			MX25_PAD_D12__GPIO_4_8			0x80000000
++			MX25_PAD_FEC_TDATA0__FEC_TDATA0		0x00000060
++			MX25_PAD_FEC_TDATA1__FEC_TDATA1		0x00000060
++			MX25_PAD_FEC_TX_EN__FEC_TX_EN		0x00000060
++			MX25_PAD_FEC_RDATA0__FEC_RDATA0		0x000000c1
++			MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x000000c0
++			MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x000000c0
++			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK		0x000001c0
++			MX25_PAD_A17__GPIO_2_3			0x00000000
++			MX25_PAD_D12__GPIO_4_8			0x000000a1
+ 		>;
+ 	};
+ 
+ 	pinctrl_i2c1: i2c1grp {
+ 		fsl,pins = <
+-			MX25_PAD_I2C1_CLK__I2C1_CLK		0x80000000
+-			MX25_PAD_I2C1_DAT__I2C1_DAT		0x80000000
++			MX25_PAD_I2C1_CLK__I2C1_CLK		0x000000a8
++			MX25_PAD_I2C1_DAT__I2C1_DAT		0x000000a8
+ 		>;
+ 	};
+ 
+ 	pinctrl_kpp: kppgrp {
+ 		fsl,pins = <
+-			MX25_PAD_KPP_ROW0__KPP_ROW0	0x80000000
+-			MX25_PAD_KPP_ROW1__KPP_ROW1	0x80000000
+-			MX25_PAD_KPP_ROW2__KPP_ROW2	0x80000000
+-			MX25_PAD_KPP_ROW3__KPP_ROW3	0x80000000
+-			MX25_PAD_KPP_COL0__KPP_COL0	0x80000000
+-			MX25_PAD_KPP_COL1__KPP_COL1	0x80000000
+-			MX25_PAD_KPP_COL2__KPP_COL2	0x80000000
+-			MX25_PAD_KPP_COL3__KPP_COL3	0x80000000
++			MX25_PAD_KPP_ROW0__KPP_ROW0		0x000000a0
++			MX25_PAD_KPP_ROW1__KPP_ROW1		0x000000a0
++			MX25_PAD_KPP_ROW2__KPP_ROW2		0x000000e0
++			MX25_PAD_KPP_ROW3__KPP_ROW3		0x000000e0
++			MX25_PAD_KPP_COL0__KPP_COL0		0x000000a8
++			MX25_PAD_KPP_COL1__KPP_COL1		0x000000a8
++			MX25_PAD_KPP_COL2__KPP_COL2		0x000000a8
++			MX25_PAD_KPP_COL3__KPP_COL3		0x000000a8
+ 		>;
+ 	};
+ 
+@@ -243,7 +243,7 @@
+ 		fsl,pins = <
+ 			MX25_PAD_UART1_RTS__UART1_RTS		0xe0
+ 			MX25_PAD_UART1_CTS__UART1_CTS		0xe0
+-			MX25_PAD_UART1_TXD__UART1_TXD		0x80000000
++			MX25_PAD_UART1_TXD__UART1_TXD		0x00000020
+ 			MX25_PAD_UART1_RXD__UART1_RXD		0x80
+ 		>;
+ 	};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/f186e6df/attachment.sig>
+2.8.1
