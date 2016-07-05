@@ -1,321 +1,81 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 5 Jul 2016 11:32:22 +0100
-Subject: [PATCH] [RFC] pmem: add pmem support codes on ARM64
-In-Reply-To: <1467703877-12772-1-git-send-email-kwangwoo.lee@sk.com>
-References: <1467703877-12772-1-git-send-email-kwangwoo.lee@sk.com>
-Message-ID: <20160705103222.GB20478@leverpostej>
+Date: Tue, 5 Jul 2016 11:39:17 +0100
+Subject: [PATCH v2] xen/arm: register clocks used by the hypervisor
+In-Reply-To: <1467701423-31138-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1467701423-31138-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <20160705103917.GC20478@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jul 05, 2016 at 04:31:17PM +0900, Kwangwoo Lee wrote:
-> The PMEM driver on top of NVDIMM(Non-Volatile DIMM) has already been
-> supported on X86_64 and there exist several ARM64 platforms which support
-> DIMM type memories.
+On Tue, Jul 05, 2016 at 08:50:23AM +0200, Dirk Behme wrote:
+> Some clocks might be used by the Xen hypervisor and not by the Linux
+> kernel. If these are not registered by the Linux kernel, they might be
+> disabled by clk_disable_unused() as the kernel doesn't know that they
+> are used. The clock of the serial console handled by Xen is one
+> example for this. It might be disabled by clk_disable_unused() which
+> stops the whole serial output, even from Xen, then.
 > 
-> This patch set enables the PMEM driver on ARM64 (AArch64) architecture
-> on top of NVDIMM. While developing this patch set, QEMU 2.6.50 with NVDIMM
-> emulation for ARM64 has also been developed and tested on it.
-
-Just to check, which platforms is this intended to support?
-
-Architectural support for persistent memory (the addition of the
-Point-of-Persistency, along with the new DC CVAP instruction) came in
-ARMv8.2, and prior to this I'm not entirely sure how things are
-expected/likely to work (i.e. I'm not sure whether maintenance to the
-PoC is sufficient).
-
+> Up to now, the workaround for this has been to use the Linux kernel
+> command line parameter 'clk_ignore_unused'. See Xen bug
 > 
-> $ dmesg
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 4.6.0-rc2kw-dirty (kwangwoo at VBox15) (gcc version 5.2.1 20151010 (Ubuntu 5.2.1-22ubuntu1) ) #10 SMP Tue Jul 5 11:30:33 KST 2016
-> [    0.000000] Boot CPU: AArch64 Processor [411fd070]
-> [    0.000000] efi: Getting EFI parameters from FDT:
-> [    0.000000] EFI v2.60 by EDK II
-> [    0.000000] efi:  SMBIOS 3.0=0x58710000  ACPI 2.0=0x589b0000
-> [    0.000000] ACPI: Early table checksum verification disabled
-> [    0.000000] ACPI: RSDP 0x00000000589B0000 000024 (v02 BOCHS )
-> [    0.000000] ACPI: XSDT 0x00000000589A0000 00005C (v01 BOCHS  BXPCFACP 00000001      01000013)
-> [    0.000000] ACPI: FACP 0x0000000058620000 00010C (v05 BOCHS  BXPCFACP 00000001 BXPC 00000001)
-> [    0.000000] ACPI: DSDT 0x0000000058630000 00108F (v02 BOCHS  BXPCDSDT 00000001 BXPC 00000001)
-> [    0.000000] ACPI: APIC 0x0000000058610000 0000A8 (v03 BOCHS  BXPCAPIC 00000001 BXPC 00000001)
-> [    0.000000] ACPI: GTDT 0x0000000058600000 000060 (v02 BOCHS  BXPCGTDT 00000001 BXPC 00000001)
-> [    0.000000] ACPI: MCFG 0x00000000585F0000 00003C (v01 BOCHS  BXPCMCFG 00000001 BXPC 00000001)
-> [    0.000000] ACPI: SPCR 0x00000000585E0000 000050 (v02 BOCHS  BXPCSPCR 00000001 BXPC 00000001)
-> [    0.000000] ACPI: NFIT 0x00000000585D0000 0000E0 (v01 BOCHS  BXPCNFIT 00000001 BXPC 00000001)
-> [    0.000000] ACPI: SSDT 0x00000000585C0000 000131 (v01 BOCHS  NVDIMM 00000001 BXPC 00000001)
-> ...
-> [    5.386743] pmem0: detected capacity change from 0 to 1073741824
-> ...
-> [  531.952466] EXT4-fs (pmem0): DAX enabled. Warning: EXPERIMENTAL, use at your own risk
-> [  531.961073] EXT4-fs (pmem0): mounted filesystem with ordered data mode. Opts: dax
+> http://bugs.xenproject.org/xen/bug/45
 > 
-> $ mount
-> rootfs on / type rootfs (rw,size=206300k,nr_inodes=51575)
-> ...
-> /dev/pmem0 on /mnt/mem type ext4 (rw,relatime,dax,data=ordered)
+> too.
 > 
-> $ df -h
-> Filesystem                Size      Used Available Use% Mounted on
-> ...
-> /dev/pmem0              975.9M      1.3M    907.4M   0% /mnt/mem
+> To fix this, we will add the "unused" clocks in Xen to the hypervisor
+> node. The Linux kernel has to register the clocks from the hypervisor
+> node, then.
 > 
-> Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
+> Therefore, check if there is a "clocks" entry in the hypervisor node
+> and if so register the given clocks to the Linux kernel clock
+> framework and with this mark them as used. This prevents the clocks
+> from being disabled.
+> 
+> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 > ---
->  arch/arm64/Kconfig                  |   2 +
->  arch/arm64/include/asm/cacheflush.h |   2 +
->  arch/arm64/include/asm/pmem.h       | 149 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 153 insertions(+)
->  create mode 100644 arch/arm64/include/asm/pmem.h
+> Changes in v2: Drop the Linux implementation details like clk_disable_unused
+> 	       in xen.txt.
+
+Thanks for doing this.
+
+>  Documentation/devicetree/bindings/arm/xen.txt | 13 ++++++++
+>  arch/arm/xen/enlighten.c                      | 47 +++++++++++++++++++++++++++
+>  2 files changed, 60 insertions(+)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 4f43622..ee1d679 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -15,6 +15,8 @@ config ARM64
->  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
->  	select ARCH_WANT_FRAME_POINTERS
->  	select ARCH_HAS_UBSAN_SANITIZE_ALL
-> +	select ARCH_HAS_PMEM_API
-> +	select ARCH_HAS_MMIO_FLUSH
->  	select ARM_AMBA
->  	select ARM_ARCH_TIMER
->  	select ARM_GIC
-> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> index c64268d..113bd1f 100644
-> --- a/arch/arm64/include/asm/cacheflush.h
-> +++ b/arch/arm64/include/asm/cacheflush.h
-> @@ -133,6 +133,8 @@ static inline void __flush_icache_all(void)
->   */
->  #define flush_icache_page(vma,page)	do { } while (0)
+> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+> index c9b9321..21fd469 100644
+> --- a/Documentation/devicetree/bindings/arm/xen.txt
+> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+> @@ -17,6 +17,19 @@ the following properties:
+>    A GIC node is also required.
+>    This property is unnecessary when booting Dom0 using ACPI.
 >  
-> +#define mmio_flush_range(addr, size)	__flush_dcache_area(addr, size)
-
-What exactly is mmio_flush_range() intended to do? Does it need to
-ensure that data is written back to memory (but not necessarily
-persistently)?
-
-What mappings is this used for?
-
+> +Optional properties:
 > +
->  /*
->   * Not required on AArch64 (PIPT or VIPT non-aliasing D-cache).
->   */
-> diff --git a/arch/arm64/include/asm/pmem.h b/arch/arm64/include/asm/pmem.h
-> new file mode 100644
-> index 0000000..4bdf015
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/pmem.h
-> @@ -0,0 +1,149 @@
-> +/*
-> + * Based on arch/x86/include/asm/pmem.h
-> + *
-> + * Copyright(c) 2016 SK hynix Inc. Kwangwoo Lee <kwangwoo.lee@sk.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of version 2 of the GNU General Public License as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + */
-> +#ifndef __ASM_ARM64_PMEM_H__
-> +#define __ASM_ARM64_PMEM_H__
+> +- clocks: one or more clocks to be registered.
+> +  Xen hypervisor drivers might replace native drivers, resulting in
+> +  clocks not registered by these native drivers. To avoid that these
+> +  unregistered clocks are disabled by the Linux kernel initialization
+> +  register them in the hypervisor node.
+> +  An example for this are the clocks of a serial driver already enabled
+> +  by the firmware. If the clocks used by the serial hardware interface
+> +  are not registered by the serial driver itself the serial output
+> +  might stop once the Linux kernel initialization disables the 'unused'
+> +  clocks.
 
-Nit: make this __ASM_PMEM_H, to match the style of other arm64 headers
+The above describes the set of problems, but doesn't set out the actual
+contract. It also covers a number of Linux implementation details in
+abstract.
 
-> +
-> +#include <linux/uaccess.h>
-> +#include <asm/cacheflush.h>
-> +
-> +#ifdef CONFIG_ARCH_HAS_PMEM_API
+As I commented previously [1], the binding should describe the set of
+guarantees that you rewquire (e.g. that the clocks must be left as-is,
+not gated, and their rates left unchanged).
 
-Can we not put the headers under this guard?
-
-> +/**
-> + * arch_memcpy_to_pmem - copy data to persistent memory
-> + * @dst: destination buffer for the copy
-> + * @src: source buffer for the copy
-> + * @n: length of the copy in bytes
-> + *
-> + * Copy data to persistent memory media via non-temporal stores so that
-> + * a subsequent arch_wmb_pmem() can flush cpu and memory controller
-> + * write buffers to guarantee durability.
-> + */
-
-This comment appears to be a direct copy of the x86 comment, and I don't
-think it's correct. I don't think non-temporal stores come into this at
-all for arm64.
-
-> +static inline void arch_memcpy_to_pmem(void __pmem *dst, const void *src,
-> +		size_t n)
-> +{
-> +	int unwritten;
-> +
-> +	/*
-> +	 * We are copying between two kernel buffers, if
-> +	 * __copy_from_user_inatomic_nocache() returns an error (page
-> +	 * fault) we would have already reported a general protection fault
-> +	 * before the WARN+BUG.
-> +	 */
-> +	unwritten = __copy_from_user_inatomic_nocache((void __force *) dst,
-> +			(void __user *) src, n);
-
-We didn't define ARCH_HAS_NOCACHE_UACCESS, so this is just
-__copy_from_user_inatomic, no?
-
-What is the expectation regarding how persistent memory is mapped?
-
-I'm not sure I follow why we use __copy_from_user_inatomic here, if the
-src is a kernel buffer. Why do we expect faults on kernel addresses?
-
-Do callers set up KERNEL_DS appropriately before calling
-__copy_from_user?
-
-> +	if (WARN(unwritten, "%s: fault copying %p <- %p unwritten: %d\n",
-> +				__func__, dst, src, unwritten))
-> +		BUG();
-> +}
-> +
-> +static inline int arch_memcpy_from_pmem(void *dst, const void __pmem *src,
-> +		size_t n)
-> +{
-> +	memcpy(dst, (void __force *) src, n);
-> +	return 0;
-> +}
-
-We don't need to do any special checks here?
-
-The asymmetry doesn't seem right to me. What am I missing?
-
-> +/**
-> + * arch_wmb_pmem - synchronize writes to persistent memory
-> + *
-> + * After a series of arch_memcpy_to_pmem() operations this drains data
-> + * from cpu write buffers and any platform (memory controller) buffers
-> + * to ensure that written data is durable on persistent memory media.
-> + */
-> +static inline void arch_wmb_pmem(void)
-> +{
-> +	/*
-> +	 * PCOMMIT instruction only exists on x86. So pcommit_sfence() has been
-> +	 * removed after wmb(). Note, that we've already arranged for pmem
-> +	 * writes to avoid the cache via arch_memcpy_to_pmem().
-> +	 */
-> +	wmb();
-> +}
-
-In ARMv8.2, I believe that a DSB following a series of DC CVAP
-instructions is sufficient to ensure that data has made it to the point
-of persistence.
-
-Prior to that, I'm not sure whether a DSB following a series of DC CVAC
-will be sufficient on all platforms.
-
-> +
-> +/**
-> + * arch_wb_cache_pmem - write back a cache range
-> + * @vaddr:	virtual start address
-> + * @size:	number of bytes to write back
-> + *
-> + * Write back a cache range. This function requires explicit ordering with an
-> + * arch_wmb_pmem() call.
-> + */
-> +static inline void arch_wb_cache_pmem(void __pmem *addr, size_t size)
-> +{
-> +	__clean_dcache_area_pou(addr, size);
-> +}
-
-Below (per arch_clear_pmem), it looks like this is required to force
-data to be written back to the Point-of-Persistency.
-
-Cleaning to the PoU is not appropriate, as that only guarantees
-visibility to instruction fetches, and does not guarantee that data was
-written back to memory or to the Point-of-Persistency.
-
-I believe that with ARMv8.2 this needs to consist of DC CVAP (i.e. we
-need a __clean_dache_area_pop).
-
-> +/*
-> + * copy_from_iter_nocache() only uses non-temporal stores for iovec iterators,
-> + * so for other types (bvec & kvec) we must do a cache write-back.
-> + */
-> +static inline bool __iter_needs_pmem_wb(struct iov_iter *i)
-> +{
-> +	return iter_is_iovec(i) == false;
-> +}
-
-As previously, the copy+pasted x86 comment is meaningless here. I don't
-understand what this is intended to achieve.
-
-> +/**
-> + * arch_copy_from_iter_pmem - copy data from an iterator to PMEM
-> + * @addr:	PMEM destination address
-> + * @bytes:	number of bytes to copy
-> + * @i:		iterator with source data
-> + *
-> + * Copy data from the iterator 'i' to the PMEM buffer starting at 'addr'.
-> + * This function requires explicit ordering with an arch_wmb_pmem() call.
-> + */
-> +static inline size_t arch_copy_from_iter_pmem(void __pmem *addr, size_t bytes,
-> +		struct iov_iter *i)
-> +{
-> +	void *vaddr = (void __force *)addr;
-> +	size_t len;
-> +
-> +	/* TODO: skip the write-back by always using non-temporal stores */
-
-Copy+pasted comment again. This is not relevant for arm64.
-
-> +	len = copy_from_iter_nocache(vaddr, bytes, i);
-> +
-> +	if (__iter_needs_pmem_wb(i))
-> +		arch_wb_cache_pmem(addr, bytes);
-> +
-> +	return len;
-> +}
-> +
-> +/**
-> + * arch_clear_pmem - zero a PMEM memory range
-> + * @addr:	virtual start address
-> + * @size:	number of bytes to zero
-> + *
-> + * Write zeros into the memory range starting at 'addr' for 'size' bytes.
-> + * This function requires explicit ordering with an arch_wmb_pmem() call.
-> + */
-> +static inline void arch_clear_pmem(void __pmem *addr, size_t size)
-> +{
-> +	void *vaddr = (void __force *)addr;
-> +
-> +	memset(vaddr, 0, size);
-> +	arch_wb_cache_pmem(addr, size);
-> +}
-> +
-> +static inline void arch_invalidate_pmem(void __pmem *addr, size_t size)
-> +{
-> +	/* barrier before clean and invalidate */
-> +	mb();
-
-That comment is not very helpful.
-
-What exactly are we trying to order before the __flush_dcache_area()
-call?
-
-> +
-> +	__flush_dcache_area(addr, size);
-> +}
-> +
-> +static inline bool __arch_has_wmb_pmem(void)
-> +{
-> +	return true;
-> +}
-
-I'm not sure that we should do this in the absence of the ARMv8.2
-extensions for persistent memory, as I don't know whether we can
-guarantee durability.
+Please describe the specific set of guarantees that you require.
 
 Thanks,
 Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/440434.html
