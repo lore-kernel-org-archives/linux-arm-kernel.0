@@ -1,23 +1,145 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 05 Jul 2016 13:20:29 +0200
-Subject: [PATCH 3/3] reset: socfpga: use readl/writel_relaxed
-In-Reply-To: <1467713872-4051-3-git-send-email-p.zabel@pengutronix.de>
-References: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
- <1467713872-4051-3-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <10266400.9nrl73J4sT@wuerfel>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue,  5 Jul 2016 12:22:54 +0100
+Subject: [PATCH v8 02/17] KVM: arm/arm64: check return value for
+ kvm_register_vgic_device
+In-Reply-To: <20160705112309.28877-1-andre.przywara@arm.com>
+References: <20160705112309.28877-1-andre.przywara@arm.com>
+Message-ID: <20160705112309.28877-3-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 5, 2016 12:17:52 PM CEST Philipp Zabel wrote:
-> This just removes the rmb()/wmb() pair between register read and
-> write. Since no relevant reads follow the rmb and no relevant writes
-> precede the wmb, they should be safe to remove.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+kvm_register_device_ops() can return an error, so lets check its return
+value and propagate this up the call chain.
 
-We should only do this if you are fixing a bug (which you don't mention
-in the changelog), or if you can show a relevant performance
-improvement. Is this code ever used in a fast path? If it is,
-wouldn't that indicate a problem in some driver?
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 15 +++++++++------
+ virt/kvm/arm/vgic/vgic-v2.c         | 11 ++++++++---
+ virt/kvm/arm/vgic/vgic-v3.c         | 15 +++++++++++++--
+ virt/kvm/arm/vgic/vgic.h            |  2 +-
+ 4 files changed, 31 insertions(+), 12 deletions(-)
 
-	Arnd
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 0130c4b..2f24f13 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -210,20 +210,24 @@ static void vgic_destroy(struct kvm_device *dev)
+ 	kfree(dev);
+ }
+ 
+-void kvm_register_vgic_device(unsigned long type)
++int kvm_register_vgic_device(unsigned long type)
+ {
++	int ret = -ENODEV;
++
+ 	switch (type) {
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
+-		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+-					KVM_DEV_TYPE_ARM_VGIC_V2);
++		ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
++					      KVM_DEV_TYPE_ARM_VGIC_V2);
+ 		break;
+ #ifdef CONFIG_KVM_ARM_VGIC_V3
+ 	case KVM_DEV_TYPE_ARM_VGIC_V3:
+-		kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
+-					KVM_DEV_TYPE_ARM_VGIC_V3);
++		ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
++					      KVM_DEV_TYPE_ARM_VGIC_V3);
+ 		break;
+ #endif
+ 	}
++
++	return ret;
+ }
+ 
+ /** vgic_attr_regs_access: allows user space to read/write VGIC registers
+@@ -428,4 +432,3 @@ struct kvm_device_ops kvm_arm_vgic_v3_ops = {
+ };
+ 
+ #endif /* CONFIG_KVM_ARM_VGIC_V3 */
+-
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index e31405e..079bf67 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -332,20 +332,25 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 	vtr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
+ 	kvm_vgic_global_state.nr_lr = (vtr & 0x3f) + 1;
+ 
++	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++	if (ret) {
++		kvm_err("Cannot register GICv2 KVM device\n");
++		iounmap(kvm_vgic_global_state.vctrl_base);
++		return ret;
++	}
++
+ 	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
+ 				     kvm_vgic_global_state.vctrl_base +
+ 					 resource_size(&info->vctrl),
+ 				     info->vctrl.start);
+-
+ 	if (ret) {
+ 		kvm_err("Cannot map VCTRL into hyp\n");
++		kvm_unregister_device_ops(KVM_DEV_TYPE_ARM_VGIC_V2);
+ 		iounmap(kvm_vgic_global_state.vctrl_base);
+ 		return ret;
+ 	}
+ 
+ 	kvm_vgic_global_state.can_emulate_gicv2 = true;
+-	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
+-
+ 	kvm_vgic_global_state.vcpu_base = info->vcpu.start;
+ 	kvm_vgic_global_state.type = VGIC_V2;
+ 	kvm_vgic_global_state.max_gic_vcpus = VGIC_V2_MAX_CPUS;
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 346b4ad..e48a22e 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -296,6 +296,7 @@ out:
+ int vgic_v3_probe(const struct gic_kvm_info *info)
+ {
+ 	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
++	int ret;
+ 
+ 	/*
+ 	 * The ListRegs field is 5 bits, but there is a architectural
+@@ -319,12 +320,22 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	} else {
+ 		kvm_vgic_global_state.vcpu_base = info->vcpu.start;
+ 		kvm_vgic_global_state.can_emulate_gicv2 = true;
+-		kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++		ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++		if (ret) {
++			kvm_err("Cannot register GICv2 KVM device.\n");
++			return ret;
++		}
+ 		kvm_info("vgic-v2@%llx\n", info->vcpu.start);
+ 	}
++	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V3);
++	if (ret) {
++		kvm_err("Cannot register GICv3 KVM device.\n");
++		kvm_unregister_device_ops(KVM_DEV_TYPE_ARM_VGIC_V2);
++		return ret;
++	}
++
+ 	if (kvm_vgic_global_state.vcpu_base == 0)
+ 		kvm_info("disabling GICv2 emulation\n");
+-	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V3);
+ 
+ 	kvm_vgic_global_state.vctrl_base = NULL;
+ 	kvm_vgic_global_state.type = VGIC_V3;
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 7b300ca..c752152 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -124,7 +124,7 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+ }
+ #endif
+ 
+-void kvm_register_vgic_device(unsigned long type);
++int kvm_register_vgic_device(unsigned long type);
+ int vgic_lazy_init(struct kvm *kvm);
+ int vgic_init(struct kvm *kvm);
+ 
+-- 
+2.9.0
