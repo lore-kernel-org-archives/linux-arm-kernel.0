@@ -1,39 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 5 Jul 2016 11:18:13 -0500
-Subject: [PATCH 2/4] dt-bindings: Document the STM32 reset bindings
-In-Reply-To: <1467640052-6770-2-git-send-email-gabriel.fernandez@st.com>
-References: <1467640052-6770-1-git-send-email-gabriel.fernandez@st.com>
- <1467640052-6770-2-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20160705161813.GA20477@rob-hp-laptop>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Wed,  6 Jul 2016 01:58:25 +0530
+Subject: [PATCH 0/2] Add PMU support for Exynos7
+Message-ID: <1467750507-13853-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2016 at 03:47:30PM +0200, gabriel.fernandez at st.com wrote:
-> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> 
-> This adds documentation of device tree bindings for the
-> STM32 reset controller.
-> 
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> ---
->  .../devicetree/bindings/reset/st,stm32-rcc.txt     | 50 ++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-> new file mode 100644
-> index 0000000..333080c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-> @@ -0,0 +1,50 @@
-> +STMicroelectronics STM32 Peripheral Reset Controller
-> +====================================================
-> +
-> +The RCC IP is both a reset and a clock controller. This documentation only
-> +documents the reset part.
+Add support for the Power Management Unit on Exynos7. These patches
+have been tested on an Exynos7 espresso board (next-20160704).
 
-The clock part is already documented or will do later? Either way, you 
-are describing an IP block, so please describe all of it now and in one 
-place.
+Abhilash Kesavan (2):
+  soc: samsung: Change type of PMU configuration register value to u32
+  soc: samsung: Add support for Exynos7 PMU
 
-Rob
+ drivers/soc/samsung/Makefile                |   3 +-
+ drivers/soc/samsung/exynos-pmu.c            |   3 +
+ drivers/soc/samsung/exynos-pmu.h            |   4 +-
+ drivers/soc/samsung/exynos7-pmu.c           | 367 ++++++++++++++++++++++++++++
+ include/linux/soc/samsung/exynos-regs-pmu.h | 259 ++++++++++++++++++++
+ 5 files changed, 634 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/soc/samsung/exynos7-pmu.c
+
+-- 
+1.9.1
