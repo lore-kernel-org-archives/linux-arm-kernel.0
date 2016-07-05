@@ -1,203 +1,337 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 5 Jul 2016 10:52:01 +0530
-Subject: [PATCH v6] phy-sun4i-usb: Add support for peripheral-only mode
-In-Reply-To: <1467667053-15122-2-git-send-email-hdegoede@redhat.com>
-References: <1467667053-15122-1-git-send-email-hdegoede@redhat.com>
- <1467667053-15122-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <577B43F9.10809@ti.com>
+From: michael.haas@mailbox.org (Michael Haas)
+Date: Tue, 5 Jul 2016 07:26:21 +0200
+Subject: [linux-sunxi] [PATCH 2/4] power: add axp20x-battery driver
+In-Reply-To: <20160701092926.32005-2-icenowy@aosc.xyz>
+References: <20160701092926.32005-1-icenowy@aosc.xyz>
+ <20160701092926.32005-2-icenowy@aosc.xyz>
+Message-ID: <577B44FD.6040404@mailbox.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Hi,
 
-On Tuesday 05 July 2016 02:47 AM, Hans de Goede wrote:
-> Use the new of_usb_get_dr_mode_by_phy() function to get the dr_mode
+nice work! Is this in any way related to Bruno Pr?monts driver for the 
+axp20x?
 
-This API in linux-phy -next still takes a single argument. This patch can go
-probably in the next -rc cycle.
+I've got a reworked version of that lying around, but it's not quite 
+ready for submission. Do you know what pieces are missing in your driver 
+for axp20x support - as opposed to axp22x, which is already working?
 
-Thanks
-Kishon
+Michael
 
-> from the musb controller node instead of assuming that having an id_det
-> gpio means otg mode, and not having one means host mode.
-> 
-> Implement peripheral-only mode by adding a sun4i_usb_phy0_get_id_det
-> helper which looks at the dr_mode, always registering our extcon and
-> always monitoring vbus.
-> 
-> If dr_mode is not specified in the dts, do not register phy0 as we then
-> do not know how to treat it. This is actually a good thing as this means
-> we will not be registering phy0 on devices where the otg controller is
-> not enabled in the devicetree.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+On 01.07.2016 11:29, Icenowy Zheng wrote:
+> This driver is the battery power supply driver of axp20x PMIC. Currently
+> it supports only AXP22x variants.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 > ---
-> Changes in v2:
-> -Adjust for of_usb_get_dr_mode_by_phy now taking an args0 parameter
-> Changes in v3:
-> -Only toggle the phy vbus-det bit on id-change on systems without vbus-det
->  when in otg mode
-> Changes in v4:
-> -No changes
-> Changes in v5:
-> -Added Kishon's Acked-by
-> Changes in v6:
-> -Rebase on top of latest linux-phy/next
-> ---
->  drivers/phy/phy-sun4i-usb.c | 68 ++++++++++++++++++++++++++++++---------------
->  1 file changed, 46 insertions(+), 22 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index 0a45bc6..8c7eb33 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -40,6 +40,7 @@
->  #include <linux/power_supply.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/reset.h>
-> +#include <linux/usb/of.h>
->  #include <linux/workqueue.h>
->  
->  #define REG_ISCR			0x00
-> @@ -110,6 +111,7 @@ struct sun4i_usb_phy_cfg {
->  struct sun4i_usb_phy_data {
->  	void __iomem *base;
->  	const struct sun4i_usb_phy_cfg *cfg;
-> +	enum usb_dr_mode dr_mode;
->  	struct mutex mutex;
->  	struct sun4i_usb_phy {
->  		struct phy *phy;
-> @@ -120,6 +122,7 @@ struct sun4i_usb_phy_data {
->  		bool regulator_on;
->  		int index;
->  	} phys[MAX_PHYS];
-> +	int first_phy;
->  	/* phy0 / otg related variables */
->  	struct extcon_dev *extcon;
->  	bool phy0_init;
-> @@ -285,16 +288,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_DPDM_PULLUP_EN);
->  		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_ID_PULLUP_EN);
->  
-> -		if (data->id_det_gpio) {
-> -			/* OTG mode, force ISCR and cable state updates */
-> -			data->id_det = -1;
-> -			data->vbus_det = -1;
-> -			queue_delayed_work(system_wq, &data->detect, 0);
-> -		} else {
-> -			/* Host only mode */
-> -			sun4i_usb_phy0_set_id_detect(_phy, 0);
-> -			sun4i_usb_phy0_set_vbus_detect(_phy, 1);
-> -		}
-> +		/* Force ISCR and cable state updates */
-> +		data->id_det = -1;
-> +		data->vbus_det = -1;
-> +		queue_delayed_work(system_wq, &data->detect, 0);
->  	}
->  
->  	return 0;
-> @@ -319,6 +316,19 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
->  	return 0;
->  }
->  
-> +static int sun4i_usb_phy0_get_id_det(struct sun4i_usb_phy_data *data)
+>   drivers/mfd/axp20x.c           |  14 +++
+>   drivers/power/Makefile         |   1 +
+>   drivers/power/axp20x_battery.c | 254 +++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 269 insertions(+)
+>   create mode 100644 drivers/power/axp20x_battery.c
+>
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index cee5288..064e5015 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -166,6 +166,15 @@ static struct resource axp22x_usb_power_supply_resources[] = {
+>   	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
+>   };
+>   
+> +static struct resource axp22x_battery_resources[] = {
+> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_BATT_PLUGIN, "BATT_PLUGIN"),
+> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_BATT_REMOVAL, "BATT_REMOVAL"),
+> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_BATT_ENT_ACT_MODE, "BATT_ENT_ACT_MODE"),
+> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_BATT_EXIT_ACT_MODE, "BATT_EXIT_ACT_MODE"),
+> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_CHARG, "CHARG"),
+> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_CHARG_DONE, "CHARG_DONE"),
+> +};
+> +
+>   static struct resource axp22x_pek_resources[] = {
+>   	{
+>   		.name   = "PEK_DBR",
+> @@ -538,6 +547,11 @@ static struct mfd_cell axp22x_cells[] = {
+>   		.of_compatible	= "x-powers,axp202-usb-power-supply",
+>   		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+>   		.resources	= axp22x_usb_power_supply_resources,
+> +	}, {
+> +		.name		= "axp20x-battery",
+> +		.of_compatible	= "x-powers,axp202-battery",
+> +		.num_resources	= ARRAY_SIZE(axp22x_battery_resources),
+> +		.resources	= axp22x_battery_resources,
+>   	},
+>   };
+>   
+> diff --git a/drivers/power/Makefile b/drivers/power/Makefile
+> index e46b75d..1452d23 100644
+> --- a/drivers/power/Makefile
+> +++ b/drivers/power/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_GENERIC_ADC_BATTERY)	+= generic-adc-battery.o
+>   obj-$(CONFIG_PDA_POWER)		+= pda_power.o
+>   obj-$(CONFIG_APM_POWER)		+= apm_power.o
+>   obj-$(CONFIG_AXP20X_POWER)	+= axp20x_usb_power.o
+> +obj-$(CONFIG_AXP20X_POWER)	+= axp20x_battery.o
+>   obj-$(CONFIG_MAX8925_POWER)	+= max8925_power.o
+>   obj-$(CONFIG_WM831X_BACKUP)	+= wm831x_backup.o
+>   obj-$(CONFIG_WM831X_POWER)	+= wm831x_power.o
+> diff --git a/drivers/power/axp20x_battery.c b/drivers/power/axp20x_battery.c
+> new file mode 100644
+> index 0000000..8fac2cd
+> --- /dev/null
+> +++ b/drivers/power/axp20x_battery.c
+> @@ -0,0 +1,254 @@
+> +/*
+> + * AXP20x PMIC battery status driver
+> + *
+> + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
+> + * Copyright (C) 2015 Hans de Goede <hdegoede@redhat.com>
+> + * Copyright (C) 2014 Bruno Pr?mont <bonbons@linux-vserver.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under  the terms of the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the License, or (at your
+> + * option) any later version.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/axp20x.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/power_supply.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +
+> +#define DRVNAME "axp20x-battery"
+> +
+> +#define AXP20X_PWR_STATUS_ACIN_USED BIT(6)
+> +#define AXP20X_PWR_STATUS_VBUS_USED BIT(4)
+> +#define AXP20X_PWR_STATUS_BAT_DIRECTION BIT(2)
+> +
+> +#define AXP20X_OP_MODE_CHARGING BIT(6)
+> +#define AXP20X_OP_MODE_BATTERY_PRESENT BIT(5)
+> +#define AXP20X_OP_MODE_BATTERY_ACTIVE BIT(3)
+> +
+> +#define AXP20X_CAPACITY_CORRECT BIT(7)
+> +
+> +struct axp20x_battery {
+> +	struct axp20x_dev *axp20x;
+> +	struct regmap *regmap;
+> +	struct power_supply *supply;
+> +};
+> +
+> +static irqreturn_t axp20x_battery_irq(int irq, void *devid)
 > +{
-> +	switch (data->dr_mode) {
-> +	case USB_DR_MODE_OTG:
-> +		return gpiod_get_value_cansleep(data->id_det_gpio);
-> +	case USB_DR_MODE_HOST:
-> +		return 0;
-> +	case USB_DR_MODE_PERIPHERAL:
-> +	default:
-> +		return 1;
-> +	}
+> +	struct axp20x_battery *power = devid;
+> +
+> +	power_supply_changed(power->supply);
+> +
+> +	return IRQ_HANDLED;
 > +}
 > +
->  static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
->  {
->  	if (data->vbus_det_gpio)
-> @@ -432,7 +442,10 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
->  	struct phy *phy0 = data->phys[0].phy;
->  	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
->  
-> -	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
-> +	if (phy0 == NULL)
-> +		return;
+> +static int axp20x_battery_get_property(struct power_supply *psy,
+> +	enum power_supply_property psp, union power_supply_propval *val)
+> +{
+> +	struct axp20x_battery *power = power_supply_get_drvdata(psy);
+> +	unsigned int input, op_mode, capacity, dh, dl;
+> +	int ret, ext;
 > +
-> +	id_det = sun4i_usb_phy0_get_id_det(data);
->  	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
->  
->  	mutex_lock(&phy0->mutex);
-> @@ -448,7 +461,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
->  		 * without vbus detection report vbus low for long enough for
->  		 * the musb-ip to end the current device session.
->  		 */
-> -		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
-> +		if (data->dr_mode == USB_DR_MODE_OTG &&
-> +		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
->  			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
->  			msleep(200);
->  			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
-> @@ -474,7 +488,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
->  		 * without vbus detection report vbus low for long enough to
->  		 * the musb-ip to end the current host session.
->  		 */
-> -		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
-> +		if (data->dr_mode == USB_DR_MODE_OTG &&
-> +		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
->  			mutex_lock(&phy0->mutex);
->  			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
->  			msleep(1000);
-> @@ -519,7 +534,8 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
->  {
->  	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
->  
-> -	if (args->args[0] >= data->cfg->num_phys)
-> +	if (args->args[0] < data->first_phy ||
-> +	    args->args[0] >= data->cfg->num_phys)
->  		return ERR_PTR(-ENODEV);
->  
->  	return data->phys[args->args[0]].phy;
-> @@ -593,13 +609,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  			return -EPROBE_DEFER;
->  	}
->  
-> -	/* vbus_det without id_det makes no sense, and is not supported */
-> -	if (sun4i_usb_phy0_have_vbus_det(data) && !data->id_det_gpio) {
-> -		dev_err(dev, "usb0_id_det missing or invalid\n");
-> -		return -ENODEV;
-> -	}
-> -
-> -	if (data->id_det_gpio) {
-> +	data->dr_mode = of_usb_get_dr_mode_by_phy(np, 0);
-> +	switch (data->dr_mode) {
-> +	case USB_DR_MODE_OTG:
-> +		/* otg without id_det makes no sense, and is not supported */
-> +		if (!data->id_det_gpio) {
-> +			dev_err(dev, "usb0_id_det missing or invalid\n");
-> +			return -ENODEV;
+> +	/* All the properties below need the input-status reg value */
+> +	ret = regmap_read(power->regmap, AXP20X_PWR_INPUT_STATUS, &input);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = regmap_read(power->regmap, AXP20X_PWR_OP_MODE, &op_mode);
+> +	if (ret)
+> +		return ret;
+> +
+> +	switch (psp) {
+> +	case POWER_SUPPLY_PROP_HEALTH:
+> +		if (!(op_mode & AXP20X_OP_MODE_BATTERY_PRESENT)) {
+> +			val->intval = POWER_SUPPLY_HEALTH_UNKNOWN;
+> +			break;
 > +		}
-> +		/* fall through */
-> +	case USB_DR_MODE_HOST:
-> +	case USB_DR_MODE_PERIPHERAL:
->  		data->extcon = devm_extcon_dev_allocate(dev,
->  							sun4i_usb_phy0_cable);
->  		if (IS_ERR(data->extcon))
-> @@ -610,9 +630,13 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  			dev_err(dev, "failed to register extcon: %d\n", ret);
->  			return ret;
->  		}
+> +
+> +		val->intval = POWER_SUPPLY_HEALTH_GOOD;
+> +
+> +		if (op_mode & AXP20X_OP_MODE_BATTERY_ACTIVE) {
+> +			/* AXP20X is now trying to re-activate the battery */
+> +			val->intval = POWER_SUPPLY_HEALTH_DEAD;
+> +			break;
+> +		}
+> +		break;
+> +	case POWER_SUPPLY_PROP_PRESENT:
+> +		val->intval = !!(op_mode & AXP20X_OP_MODE_BATTERY_PRESENT);
+> +		break;
+> +	case POWER_SUPPLY_PROP_CAPACITY:
+> +		ret = regmap_read(power->regmap, AXP20X_FG_RES, &capacity);
+> +		if (ret)
+> +			return ret;
+> +		if (capacity & AXP20X_CAPACITY_CORRECT)
+> +			val->intval = capacity & (~AXP20X_CAPACITY_CORRECT);
+> +		else
+> +			return -EIO;
+> +		/* from axp_capchange function of Allwinner 3.4 driver */
+> +		if (val->intval == 127)
+> +			val->intval = 100;
+> +		break;
+> +	case POWER_SUPPLY_PROP_STATUS:
+> +		if (!(op_mode & AXP20X_OP_MODE_BATTERY_PRESENT)) {
+> +			val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
+> +			break;
+> +		}
+> +
+> +		ret = regmap_read(power->regmap, AXP20X_FG_RES, &capacity);
+> +		if (ret)
+> +			return ret;
+> +
+> +		ext = (input & AXP20X_PWR_STATUS_ACIN_USED) ||
+> +		      (input & AXP20X_PWR_STATUS_VBUS_USED);
+> +
+> +		if (op_mode & AXP20X_OP_MODE_CHARGING)
+> +			val->intval = POWER_SUPPLY_STATUS_CHARGING;
+> +		else if (!(input & AXP20X_PWR_STATUS_BAT_DIRECTION) && !ext)
+> +			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> +		else if (capacity == (100 | AXP20X_CAPACITY_CORRECT) ||
+> +			 capacity == (127 | AXP20X_CAPACITY_CORRECT))
+> +			val->intval = POWER_SUPPLY_STATUS_FULL;
+> +		else
+> +			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+> +		break;
+> +	case POWER_SUPPLY_PROP_CURRENT_NOW:
+> +		ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_H, &dh);
+> +		if (ret)
+> +			return ret;
+> +		ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_L, &dl);
+> +		if (ret)
+> +			return ret;
+> +		/* it's a 12 bit integer, high 8-bit is stored in dh */
+> +		val->intval = dh << 4 | dl >> 4;
+> +		break;
+> +	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+> +		ret = regmap_read(power->regmap, AXP20X_BATT_V_H, &dh);
+> +		if (ret)
+> +			return ret;
+> +		ret = regmap_read(power->regmap, AXP20X_BATT_V_L, &dl);
+> +		if (ret)
+> +			return ret;
+> +		/* it's a 12 bit integer, high 8-bit is stored in dh */
+> +		val->intval = dh << 4 | dl >> 4;
+> +		/* The formula below is from axp22_vbat_to_mV function
+> +		 * of Allwinner 3.4 kernel.
+> +		 */
+> +		val->intval = val->intval * 1100 / 1000;
 > +		break;
 > +	default:
-> +		dev_info(dev, "dr_mode unknown, not registering usb phy0\n");
-> +		data->first_phy = 1;
->  	}
->  
-> -	for (i = 0; i < data->cfg->num_phys; i++) {
-> +	for (i = data->first_phy; i < data->cfg->num_phys; i++) {
->  		struct sun4i_usb_phy *phy = data->phys + i;
->  		char name[16];
->  
-> 
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static enum power_supply_property axp22x_battery_properties[] = {
+> +	POWER_SUPPLY_PROP_CAPACITY,
+> +	POWER_SUPPLY_PROP_HEALTH,
+> +	POWER_SUPPLY_PROP_PRESENT,
+> +	POWER_SUPPLY_PROP_STATUS,
+> +	POWER_SUPPLY_PROP_CURRENT_NOW,
+> +	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+> +};
+> +
+> +static const struct power_supply_desc axp22x_battery_desc = {
+> +	.name = "axp20x-battery",
+> +	.type = POWER_SUPPLY_TYPE_BATTERY,
+> +	.properties = axp22x_battery_properties,
+> +	.num_properties = ARRAY_SIZE(axp22x_battery_properties),
+> +	.get_property = axp20x_battery_get_property,
+> +};
+> +
+> +static int axp20x_battery_probe(struct platform_device *pdev)
+> +{
+> +	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+> +	struct power_supply_config psy_cfg = {};
+> +	struct axp20x_battery *power;
+> +	static const char * const axp22x_irq_names[] = {
+> +		"BATT_PLUGIN", "BATT_REMOVAL", "BATT_ENT_ACT_MODE",
+> +		"BATT_EXIT_ACT_MODE", "CHARG", "CHARG_DONE", NULL };
+> +	static const char * const *irq_names;
+> +	const struct power_supply_desc *battery_desc;
+> +	int i, irq, ret;
+> +
+> +	if (!of_device_is_available(pdev->dev.of_node))
+> +		return -ENODEV;
+> +
+> +	if (!axp20x) {
+> +		dev_err(&pdev->dev, "Parent drvdata not set\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	power = devm_kzalloc(&pdev->dev, sizeof(*power), GFP_KERNEL);
+> +	if (!power)
+> +		return -ENOMEM;
+> +
+> +	power->axp20x = axp20x;
+> +	power->regmap = axp20x->regmap;
+> +
+> +	switch (power->axp20x->variant) {
+> +	case AXP221_ID:
+> +	case AXP223_ID:
+> +		battery_desc = &axp22x_battery_desc;
+> +		irq_names = axp22x_irq_names;
+> +		break;
+> +	default:
+> +		dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
+> +			axp20x->variant);
+> +		return -EINVAL;
+> +	}
+> +
+> +	psy_cfg.of_node = pdev->dev.of_node;
+> +	psy_cfg.drv_data = power;
+> +
+> +	power->supply = devm_power_supply_register(&pdev->dev, battery_desc,
+> +						   &psy_cfg);
+> +	if (IS_ERR(power->supply))
+> +		return PTR_ERR(power->supply);
+> +
+> +	/* Request irqs after registering, as irqs may trigger immediately */
+> +	for (i = 0; irq_names[i]; i++) {
+> +		irq = platform_get_irq_byname(pdev, irq_names[i]);
+> +		if (irq < 0) {
+> +			dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
+> +				 irq_names[i], irq);
+> +			continue;
+> +		}
+> +		irq = regmap_irq_get_virq(axp20x->regmap_irqc, irq);
+> +		ret = devm_request_any_context_irq(&pdev->dev, irq,
+> +				axp20x_battery_irq, 0, DRVNAME, power);
+> +		if (ret < 0)
+> +			dev_warn(&pdev->dev, "Error requesting %s IRQ: %d\n",
+> +				 irq_names[i], ret);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id axp20x_battery_match[] = {
+> +	{ .compatible = "x-powers,axp202-battery" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, axp20x_battery_match);
+> +
+> +static struct platform_driver axp20x_battery_driver = {
+> +	.probe = axp20x_battery_probe,
+> +	.driver = {
+> +		.name = DRVNAME,
+> +		.of_match_table = axp20x_battery_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(axp20x_battery_driver);
+> +
+> +MODULE_AUTHOR("Icenowy Zheng <icenowy@aosc.xyz>");
+> +MODULE_DESCRIPTION("AXP20x PMIC battery status driver");
+> +MODULE_LICENSE("GPL");
