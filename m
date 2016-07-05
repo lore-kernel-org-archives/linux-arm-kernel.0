@@ -1,27 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 Jul 2016 17:01:52 +0200
-Subject: [PATCH 2/3] pinctrl: Add STM32F746 MCU support
-In-Reply-To: <1467726017-20041-3-git-send-email-alexandre.torgue@st.com>
-References: <1467726017-20041-1-git-send-email-alexandre.torgue@st.com>
- <1467726017-20041-3-git-send-email-alexandre.torgue@st.com>
-Message-ID: <CACRpkdZLa-r8R78P9iAaGbB3u4wmafDYQ9PZ3oP8q2+HL0XYrw@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 5 Jul 2016 08:02:40 -0700
+Subject: [PATCH v4 3/3] ARM:dts-Add dt node for Broadcom iproc-static-adc
+In-Reply-To: <1467099636-31855-4-git-send-email-raveendra.padasalagi@broadcom.com>
+References: <1467099636-31855-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1467099636-31855-4-git-send-email-raveendra.padasalagi@broadcom.com>
+Message-ID: <577BCC10.7000204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2016 at 3:40 PM, Alexandre TORGUE
-<alexandre.torgue@st.com> wrote:
+Le 28/06/2016 00:40, Raveendra Padasalagi a ?crit :
+> This patch adds DT node for Broadcom's iproc-static-adc
+> controller driver.
+> 
+> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 
-> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->
-> This patch which adds STM32F746 pinctrl and GPIO support, relies on the
-> generic STM32 pinctrl driver.
->
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Applied, thanks, please prefix your subjects like that in the future:
 
-Waiting for a new version of this patch addressing Mr. Gortmaker's comments.
-
-I have applied the bindings in patch 1 & 3, you need not resend those.
-
-Yours,
-Linus Walleij
+ARM: dts: <soc type>: <subject>
+-- 
+Florian
