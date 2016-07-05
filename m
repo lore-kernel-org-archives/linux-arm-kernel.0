@@ -1,61 +1,46 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 05 Jul 2016 18:09:17 +0800
-Subject: [linux-sunxi] [PATCH 2/4] power: add axp20x-battery driver
-In-Reply-To: <20160705092510.GL7643@lukather>
-References: <20160701092926.32005-1-icenowy@aosc.xyz>
- <20160701092926.32005-2-icenowy@aosc.xyz>
- <577B44FD.6040404@mailbox.org>
- <4101467707611@web7h.yandex.ru> <20160705092510.GL7643@lukather>
-Message-ID: <2030991467713357@web30j.yandex.ru>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue,  5 Jul 2016 12:17:52 +0200
+Subject: [PATCH 3/3] reset: socfpga: use readl/writel_relaxed
+In-Reply-To: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
+References: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1467713872-4051-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This just removes the rmb()/wmb() pair between register read and
+write. Since no relevant reads follow the rmb and no relevant writes
+precede the wmb, they should be safe to remove.
 
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/reset/reset-socfpga.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-05.07.2016, 17:25, "maxime.ripard at free-electrons.com" <maxime.ripard@free-electrons.com>:
-> On Tue, Jul 05, 2016 at 04:33:31PM +0800, Icenowy Zheng wrote:
->> ?05.07.2016, 13:26, "Michael Haas" <michael.haas@mailbox.org>:
->> ?> Hi,
->> ?>
->> ?> nice work! Is this in any way related to Bruno Pr?monts driver for the
->> ?> axp20x?
->> ?>
->> ?> I've got a reworked version of that lying around, but it's not quite
->> ?> ready for submission. Do you know what pieces are missing in your driver
->> ?> for axp20x support - as opposed to axp22x, which is already working?
->>
->> ?Therotically, it can run on axp20x. However, I have currently no
->> ?test device. (Still waiting for my C.H.I.P.) So I can only promise
->> ?it to run on axp22x.
->
-> Still, it looks like you just took Bruno's driver, stripped out the
-> axp20x parts and added the one to deal with axp22x.
->
-> This makes the driver look weird, by being called axp20x, without
-> actually supporting those PMICs, but having some axp22x variables
-> right in the middle. And that's awfully inconsistent.
->
-> I'd rather have you add the AXP20x driver directly, and then add the
-> needed stuff for the AXP22x.
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-
-I modified axp20x_usb_power.c to suite the battery.
-
-No axp22x-specified register is used in this driver.
-I think this driver may now also work properly on axp20x, however
-I have currently no device with axp20x.
-(I didn't enter linux-sunxi when A10/13/20 is popular... So I'm waiting for
-my CHIP)
-
-This driver didn't implement OCV value tweak.
-
-In fact, OCV value tweaking is even not documented in the datasheet
-of both axp20x and axp22x.
-
-Can you test it with axp20x? (It seems that the shipment of CHIP is so slow)
+diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
+index 78ebf84..4a65128 100644
+--- a/drivers/reset/reset-socfpga.c
++++ b/drivers/reset/reset-socfpga.c
+@@ -44,8 +44,8 @@ static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
+ 
+ 	spin_lock_irqsave(&data->lock, flags);
+ 
+-	reg = readl(data->membase + (bank * NR_BANKS));
+-	writel(reg | BIT(offset), data->membase + (bank * NR_BANKS));
++	reg = readl_relaxed(data->membase + (bank * NR_BANKS));
++	writel_relaxed(reg | BIT(offset), data->membase + (bank * NR_BANKS));
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ 
+ 	return 0;
+@@ -65,8 +65,8 @@ static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
+ 
+ 	spin_lock_irqsave(&data->lock, flags);
+ 
+-	reg = readl(data->membase + (bank * NR_BANKS));
+-	writel(reg & ~BIT(offset), data->membase + (bank * NR_BANKS));
++	reg = readl_relaxed(data->membase + (bank * NR_BANKS));
++	writel_relaxed(reg & ~BIT(offset), data->membase + (bank * NR_BANKS));
+ 
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ 
+-- 
+2.8.1
