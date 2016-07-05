@@ -1,34 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 5 Jul 2016 16:55:56 +0200
-Subject: [PATCH v2 5/5] spi: s3c64xx: use unsigned type for fifo handling
- variables
-In-Reply-To: <1467081676-8442-6-git-send-email-andi.shyti@samsung.com>
-References: <1467081676-8442-1-git-send-email-andi.shyti@samsung.com>
- <1467081676-8442-6-git-send-email-andi.shyti@samsung.com>
-Message-ID: <20160705145556.GD6247@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 5 Jul 2016 15:56:31 +0100
+Subject: [PATCH v8] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
+In-Reply-To: <1467624020-29240-1-git-send-email-suzuki.poulose@arm.com>
+References: <1467624020-29240-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160705145631.GB28482@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 11:41:15AM +0900, Andi Shyti wrote:
-> The 'quirks' variable cannot ever be negative, therefore use u8
-> instead of int. The 8 bit size is given from the fact that
-> currently the quirks variable has very few statuses.
+On Mon, Jul 04, 2016 at 10:20:20AM +0100, Suzuki K Poulose wrote:
+> From: Steve Capper <steve.capper@linaro.org>
 > 
-> The rx_lvl_offset and tx_st_done store shift values, so that u8
-> is a proper size.
+> It can be useful for JIT software to be aware of MIDR_EL1 and
+> REVIDR_EL1 to ascertain the presence of any core errata that could
+> affect code generation.
 > 
-> fifo_lvl_mask stores a series of masks, to be in we will keep the
-> 32 bit size.
+> This patch exposes these registers through sysfs:
+> 
+> /sys/devices/system/cpu/cpu$ID/regs/identification/midr_el1
+> /sys/devices/system/cpu/cpu$ID/regs/identification/revidr_el1
+> 
+> where $ID is the cpu number. For big.LITTLE systems, one can have a
+> mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
+> to be enumerated.
+> 
+> If the kernel does not have valid information to populate these entries
+> with, an empty string is returned to userspace.
 
-What's the advantage of these changes?  This feels like microptimisation
-of something that shouldn't be a big performance issue and it's not
-always the case that the compiler does something more sensible with
-smaller or unsigned types.  I'm not saying don't do it, I'm just saying
-that it's not clear to me what the win is.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/f7e2e514/attachment.sig>
+[...]
+
+> +static int cpuid_add_regs(int cpu)
+> +{
+> +	int rc;
+> +	struct device *dev;
+> +	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
+> +
+> +	dev = get_cpu_device(cpu);
+> +	if (dev) {
+> +		rc = kobject_add(&info->kobj, &dev->kobj, "regs");
+> +		if (!rc)
+> +			rc = sysfs_create_group(&info->kobj, &cpuregs_attr_group);
+
+If this call fails...
+
+> +	} else {
+> +		return -ENODEV;
+> +	}
+> +
+> +	return rc;
+> +}
+> +
+> +static int cpuid_remove_regs(int cpu)
+> +{
+> +	int rc = 0;
+> +	struct device *dev;
+> +	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
+> +
+> +	dev = get_cpu_device(cpu);
+> +	if (dev) {
+> +		sysfs_remove_group(&info->kobj, &cpuregs_attr_group);
+
+... then we still call sysfs_remove_group on the CPU_DEAD path. I think
+that just results in a WARN, but it would be good to double-check this
+(perhaps by forcing the failure path).
+
+Will
