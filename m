@@ -1,34 +1,39 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 5 Jul 2016 09:06:11 +0300
-Subject: [PATCH 0/2] mmc: sdhci-iproc: Use defines instead of magic numbers
-In-Reply-To: <577A968C.3020107@broadcom.com>
-References: <1467487394-28682-1-git-send-email-stefan.wahren@i2se.com>
- <577A968C.3020107@broadcom.com>
-Message-ID: <577B4E53.6030000@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 5 Jul 2016 08:12:11 +0200
+Subject: [RFC PATCH 1/5] clk: sunxi: Add a driver for the PLL2 on A31/23/33
+In-Reply-To: <20160628101325.2522-1-icenowy@aosc.xyz>
+References: <20160628101325.2522-1-icenowy@aosc.xyz>
+Message-ID: <20160705061211.GA7643@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/16 20:02, Scott Branden wrote:
-> Hi Stefan,
-> 
-> On 16-07-02 12:23 PM, Stefan Wahren wrote:
->> Hi,
->>
->> this small patch series should make the sdhci-iproc platform data easier
->> to read. Since i don't have the adequate hardware it's only compile tested.
->>
->> Stefan
->>
->> Stefan Wahren (2):
->>    mmc: sdhci: add define for suspend/resume capability
->>    mmc: sdhci-iproc: Use defines instead of magic numbers
->>
->>   drivers/mmc/host/sdhci-iproc.c |   13 +++++++++++--
->>   drivers/mmc/host/sdhci.h       |    1 +
->>   2 files changed, 12 insertions(+), 2 deletions(-)
->>
-> Patch series looks fine.
-> 
-> Acked-by: Scott Branden <scott.branden@broadcom.com>
+Hi,
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+On Tue, Jun 28, 2016 at 06:13:21PM +0800, Icenowy Zheng wrote:
+> This is based on the PLL2 driver for A10/20.
+
+Thanks for this patch.
+
+However, as you might have seen, we're switching to a new clock code
+base, so it would be great if you could use that instead.
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/440077.html
+
+While we declared all the clocks for the H3, nothing really mandates
+that for the existing platforms we don't introduce a few clocks as
+they are needed. That will probably even smoothen the transition.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/01ba6825/attachment.sig>
