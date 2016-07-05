@@ -1,37 +1,523 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue,  5 Jul 2016 06:04:08 +0200
-Subject: [PATCH 1/3] ARM: dts: imx6sx-sabreauto: Fix misspelled property
+Date: Tue,  5 Jul 2016 06:04:09 +0200
+Subject: [PATCH 2/3] ARM: dts: imx6sx: Add UDOO Neo support
 In-Reply-To: <1467691450-22975-1-git-send-email-afaerber@suse.de>
 References: <1467691450-22975-1-git-send-email-afaerber@suse.de>
-Message-ID: <1467691450-22975-2-git-send-email-afaerber@suse.de>
+Message-ID: <1467691450-22975-3-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 99fc5ba0bfb6 ("ARM: dts: imx6sx: add i.mx6sx sabreauto board
-support") it should've been enable-sdio-wakeup (not -wakup). But that is
-now considered a legacy name for wakeup-source, so directly use the new
-name instead, as done in commit 26cefdd15db1 for the other occurrence.
+Add initial device trees for UDOO Neo Basic, Extended and Full boards.
+Serial console is enabled, other serial ports are prepared.
+Both user LEDs are enabled, with the orange one reserved for the M4.
+I2C based PMIC is enabled. Ethernet is enabled for Basic and Full.
 
-Fixes: 26cefdd15db1 ("ARM: dts: imx: replace legacy wakeup property with 'wakeup-source'")
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Ettore Chimenti <ettore.chimenti@udoo.org>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/imx6sx-sabreauto.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile                     |   5 +-
+ arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts    |  69 +++++++
+ arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts |  54 +++++
+ arch/arm/boot/dts/imx6sx-udoo-neo-full.dts     |  69 +++++++
+ arch/arm/boot/dts/imx6sx-udoo-neo.dtsi         | 261 +++++++++++++++++++++++++
+ 5 files changed, 457 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
+ create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
+ create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
+ create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
 
-diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-index 96ea936eeeb0..240a2864d044 100644
---- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-@@ -64,7 +64,7 @@
- 	cd-gpios = <&gpio7 11 GPIO_ACTIVE_LOW>;
- 	no-1-8-v;
- 	keep-power-in-suspend;
--	enable-sdio-wakup;
-+	wakeup-source;
- 	status = "okay";
- };
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8ff3f580d7de..780e17976a14 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -397,7 +397,10 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
+ 	imx6sx-sabreauto.dtb \
+ 	imx6sx-sdb-reva.dtb \
+ 	imx6sx-sdb-sai.dtb \
+-	imx6sx-sdb.dtb
++	imx6sx-sdb.dtb \
++	imx6sx-udoo-neo-basic.dtb \
++	imx6sx-udoo-neo-extended.dtb \
++	imx6sx-udoo-neo-full.dtb
+ dtb-$(CONFIG_SOC_IMX6UL) += \
+ 	imx6ul-14x14-evk.dtb \
+ 	imx6ul-pico-hobbit.dtb \
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
+new file mode 100644
+index 000000000000..615a1df89c0c
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6sx-udoo-neo.dtsi"
++
++/ {
++	model = "UDOO Neo Basic";
++	compatible = "fsl,imx6sx";
++
++	memory {
++		reg = <0x80000000 0x20000000>;
++	};
++};
++
++&fec1 {
++	status = "okay";
++	phy-handle = <&ethphy1>;
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy1: ethernet-phy at 0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
+new file mode 100644
+index 000000000000..d6fdd17cd3ac
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6sx-udoo-neo.dtsi"
++
++/ {
++	model = "UDOO Neo Extended";
++	compatible = "fsl,imx6sx";
++
++	memory {
++		reg = <0x80000000 0x40000000>;
++	};
++};
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
+new file mode 100644
+index 000000000000..d4820c7cd152
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6sx-udoo-neo.dtsi"
++
++/ {
++	model = "UDOO Neo Full";
++	compatible = "fsl,imx6sx";
++
++	memory {
++		reg = <0x80000000 0x40000000>;
++	};
++};
++
++&fec1 {
++	status = "okay";
++	phy-handle = <&ethphy1>;
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy1: ethernet-phy at 0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+new file mode 100644
+index 000000000000..e074409644d8
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+@@ -0,0 +1,261 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "imx6sx.dtsi"
++
++/ {
++	compatible = "fsl,imx6sx";
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		red {
++			label = "udoo-neo:red:mmc";
++			gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		orange {
++			label = "udoo-neo:orange:user";
++			gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;
++			default-state = "keep";
++		};
++	};
++};
++
++&cpu0 {
++	arm-supply = <&sw1a_reg>;
++	soc-supply = <&sw1c_reg>;
++};
++
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet1>;
++	phy-mode = "rmii";
++	phy-reset-gpios = <&gpio5 4 GPIO_ACTIVE_HIGH>;
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	clock-frequency = <100000>;
++	status = "okay";
++
++	pmic: pmic at 08 {
++		compatible = "fsl,pfuze3000";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1a {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1b {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1850000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3 {
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt = <1650000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vldo1 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen2_reg: vldo2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vccsd {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen4_reg: v33 {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vldo3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vldo4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&iomuxc {
++	imx6sx-udoo-neo {
++		pinctrl_enet1: enet1grp {
++			fsl,pins =
++				<MX6SX_PAD_ENET1_CRS__GPIO2_IO_1	0xa0b1>,
++				<MX6SX_PAD_ENET1_MDC__ENET1_MDC		0xa0b1>,
++				<MX6SX_PAD_ENET1_MDIO__ENET1_MDIO	0xa0b1>,
++				<MX6SX_PAD_RGMII1_TD0__ENET1_TX_DATA_0	0xa0b1>,
++				<MX6SX_PAD_RGMII1_TD1__ENET1_TX_DATA_1	0xa0b1>,
++				<MX6SX_PAD_RGMII1_TX_CTL__ENET1_TX_EN	0xa0b1>,
++
++				<MX6SX_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x3081>,
++				<MX6SX_PAD_ENET2_TX_CLK__GPIO2_IO_9	0x3081>,
++				<MX6SX_PAD_RGMII1_RD0__ENET1_RX_DATA_0	0x3081>,
++				<MX6SX_PAD_RGMII1_RD1__ENET1_RX_DATA_1	0x3081>,
++				<MX6SX_PAD_RGMII1_RX_CTL__ENET1_RX_EN	0x3081>,
++				<MX6SX_PAD_RGMII1_RXC__ENET1_RX_ER	0x3081>,
++
++				<MX6SX_PAD_ENET2_RX_CLK__ENET2_REF_CLK_25M	0x91>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins =
++				<MX6SX_PAD_GPIO1_IO00__I2C1_SCL		0x4001b8b1>,
++				<MX6SX_PAD_GPIO1_IO01__I2C1_SDA		0x4001b8b1>;
++		};
++
++		pinctrl_uart1: uart1grp {
++			fsl,pins =
++				<MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1>,
++				<MX6SX_PAD_GPIO1_IO05__UART1_RX		0x1b0b1>;
++		};
++
++		pinctrl_uart2: uart2grp {
++			fsl,pins =
++				<MX6SX_PAD_GPIO1_IO06__UART2_TX		0x1b0b1>,
++				<MX6SX_PAD_GPIO1_IO07__UART2_RX		0x1b0b1>;
++		};
++
++		pinctrl_uart5: uart5grp {
++			fsl,pins =
++				<MX6SX_PAD_SD4_DATA4__UART5_RX		0x1b0b1>,
++				<MX6SX_PAD_SD4_DATA5__UART5_TX		0x1b0b1>;
++		};
++
++		pinctrl_uart6: uart6grp {
++			fsl,pins =
++				<MX6SX_PAD_CSI_DATA00__UART6_RI_B	0x1b0b1>,
++				<MX6SX_PAD_CSI_DATA01__UART6_DSR_B	0x1b0b1>,
++				<MX6SX_PAD_CSI_DATA02__UART6_DTR_B	0x1b0b1>,
++				<MX6SX_PAD_CSI_DATA03__UART6_DCD_B	0x1b0b1>,
++				<MX6SX_PAD_CSI_DATA04__UART6_RX		0x1b0b1>,
++				<MX6SX_PAD_CSI_DATA05__UART6_TX		0x1b0b1>,
++				<MX6SX_PAD_CSI_DATA06__UART6_RTS_B	0x1b0b1>,
++				<MX6SX_PAD_CSI_DATA07__UART6_CTS_B	0x1b0b1>;
++		};
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++/* Cortex-M4 serial */
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "disabled";
++};
++
++/* Arduino serial */
++&uart5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart5>;
++	status = "disabled";
++};
++
++&uart6 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart6>;
++	uart-has-rtscts;
++	status = "disabled";
++};
 -- 
 2.6.6
