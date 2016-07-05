@@ -1,32 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Jul 2016 20:39:00 -0700
-Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.8 (#1)
-In-Reply-To: <87twgm9a8x.fsf@free-electrons.com>
-References: <87twgm9a8x.fsf@free-electrons.com>
-Message-ID: <20160705033900.GB1669@localhost>
+Date: Mon, 4 Jul 2016 20:52:12 -0700
+Subject: [GIT PULL 2/3] ARM: Keystone config updates for 4.8
+In-Reply-To: <1466527923-8689-2-git-send-email-ssantosh@kernel.org>
+References: <1466527923-8689-1-git-send-email-ssantosh@kernel.org>
+ <1466527923-8689-2-git-send-email-ssantosh@kernel.org>
+Message-ID: <20160705035212.GD1669@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 11:11:58AM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Tue, Jun 21, 2016 at 09:52:02AM -0700, Santosh Shilimkar wrote:
+> The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
 > 
-> Here is the first pull request for defconfig64 for mvebu for v4.8.
-> 
-> Gregory
-> 
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-> 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>   Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig64-4.8-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_config_for_4.8
 > 
-> for you to fetch changes up to 4cf28937cac21f90cacc9477e917d90c2d9ff0b3:
+> for you to fetch changes up to 229a4bc846e85461252ab7aec3ab2cae4bf22a9c:
 > 
->   arm64: configs: enable PCIe driver for Armada 7K/8K (2016-06-16 17:08:50 +0200)
+>   ARM: keystone: remove redundant depends on ARM_PATCH_PHYS_VIRT (2016-06-14 17:56:51 -0700)
 
-Merged, thanks.
+Merged into next/defconfig, however note:
+> 
+> ----------------------------------------------------------------
+> ARM: Keystone config updates for 4.8
+> 
+> 	- Enable PINCTRL support
+> 	- Remove redundant ARM_PATCH_PHYS_VIRT
+> 
+> ----------------------------------------------------------------
+> Franklin S Cooper Jr (1):
+>       ARM: keystone: Enable PINCTRL_SINGLE Config
+> 
+> Lokesh Vutla (1):
+>       ARM: keystone: Enable PINCTRL config
+> 
+> Masahiro Yamada (1):
+>       ARM: keystone: remove redundant depends on ARM_PATCH_PHYS_VIRT
+
+We normally don't mix in mach* contents here. It's a tiny patch though so it's
+not a showstopper, but if you sort them in a soc branch if you have more in
+the future that'd be preferred.
 
 
 -Olof
