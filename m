@@ -1,48 +1,75 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 5 Jul 2016 17:04:31 +0800
-Subject: [PATCH V2 10/10] arm64: dts: tegra: Add NVIDIA P2771 board support
-In-Reply-To: <20160705090431.5852-1-josephl@nvidia.com>
-References: <20160705090431.5852-1-josephl@nvidia.com>
-Message-ID: <20160705090431.5852-11-josephl@nvidia.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Tue, 5 Jul 2016 10:07:47 +0100
+Subject: [PATCH] ata: ahci_platform: Add ACPI support for APM X-Gene AHCI
+ controller v3 hardware.
+In-Reply-To: <CAOHikRDUH-PK4JfS8pUR+or=XTwDHBejFTGy33V20HKMMTUaPg@mail.gmail.com>
+References: <stripathi@apm.com>
+ <1466034240-22694-1-git-send-email-stripathi@apm.com>
+ <6691907.FIx2xYmxSs@wuerfel>
+ <CAOHikRCB4c79okd0q3=Lqwk7LKwZ6EDnWfHRH_oXokrB4PHcyw@mail.gmail.com>
+ <CAOHikRDUH-PK4JfS8pUR+or=XTwDHBejFTGy33V20HKMMTUaPg@mail.gmail.com>
+Message-ID: <20160705090747.GC18338@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NVIDIA Tegra186 P2771 board support, which is a reference
-development board with P2597 I/O board and P3310 chip module on it.
+On Tue, Jun 21, 2016 at 04:31:38PM -0700, Suman Tripathi wrote:
+> Hi Arnd,
+> 
+> On Tue, Jun 21, 2016 at 11:08 AM, Suman Tripathi <stripathi@apm.com> wrote:
+> > On Wed, Jun 15, 2016 at 11:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >>
+> >> On Wednesday, June 15, 2016 5:44:00 PM CEST suman-tripathi wrote:
+> >> > This patch adds ACPI support for APM X-Gene AHCI controller in
+> >> > ahci_platform driver for v3 hardware. APM X-Gene AHCI controller
+> >> > v3 hardware is fully compliant with ahci_platform driver and requires
+> >> > no workaround quirk.
+> >> >
+> >> > Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> >> > ---
+> >> >  drivers/ata/ahci_platform.c |    1 +
+> >> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> >> >
+> >> > diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> >> > index 62a04c8..3395baf 100644
+> >> > --- a/drivers/ata/ahci_platform.c
+> >> > +++ b/drivers/ata/ahci_platform.c
+> >> > @@ -86,6 +86,7 @@ MODULE_DEVICE_TABLE(of, ahci_of_match);
+> >> >
+> >> >  static const struct acpi_device_id ahci_acpi_match[] = {
+> >> >         { ACPI_DEVICE_CLASS(PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff) },
+> >> > +       { "APMC0D33", 0},
+> >> >         {},
+> >> >  };
+> >> >  MODULE_DEVICE_TABLE(acpi, ahci_acpi_match);
+> >> >
+> >>
+> >> Doesn't the ACPI_DEVICE_CLASS entry take care of this? I thought it had been
+> >
+> >
+> > yeah it also works. Just thought that we need something different as
+> > our's is a non-PCI SATA.
+> 
+> Are you suggesting to introduce a new class ACPI_DEVICE_CLASS for
+> non-pci ahci ? or to reuse the existing PCI_CLASS_STORAGE_SATA_AHCI ?
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
-Changes in V2:
-- None
----
- arch/arm64/boot/dts/nvidia/Makefile                | 1 +
- arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 8 ++++++++
- 2 files changed, 9 insertions(+)
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+This was discussed when AMD Seattle SoC had the same issue and it was
+decided in standards body and on LKML that using PCI device classes for
+non PCI devices was fine.
 
-diff --git a/arch/arm64/boot/dts/nvidia/Makefile b/arch/arm64/boot/dts/nvidia/Makefile
-index 0f7cdf3e05c1..67234f3dc795 100644
---- a/arch/arm64/boot/dts/nvidia/Makefile
-+++ b/arch/arm64/boot/dts/nvidia/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_TEGRA_132_SOC) += tegra132-norrin.dtb
-+dtb-$(CONFIG_ARCH_TEGRA_186_SOC) += tegra186-p2771-0000.dtb
- dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-0000.dtb
- dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-2180.dtb
- dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2571.dtb
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-new file mode 100644
-index 000000000000..66b936389fa7
---- /dev/null
-+++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-@@ -0,0 +1,8 @@
-+/dts-v1/;
-+
-+#include "tegra186-p3310.dtsi"
-+
-+/ {
-+	model = "NVIDIA Tegra186 P2771-0000 Board";
-+	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
-+};
--- 
-2.9.0
+Example from Overdrive DSDT
+
+Device (AHC0)
+{
+  Name (_HID, "AMDI0600")  // _HID: Hardware ID
+  Name (_UID, 0x00)  // _UID: Unique ID
+  Name (_CCA, 0x01) // _CCA: Cache Coherency Attribute
+  Name (_CLS,
+    Package (0x03) // _CLS: Class Code
+    {
+      0x01,
+      0x06,
+      0x01
+    })
+  ...
+
+Graeme
