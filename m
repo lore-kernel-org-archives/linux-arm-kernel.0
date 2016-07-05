@@ -1,163 +1,34 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 5 Jul 2016 15:55:30 +0100
-Subject: [PATCH v3 6/7] arm64: hibernate: Resume on the CPU that created
- the hibernate image
-In-Reply-To: <1467125510-18758-7-git-send-email-james.morse@arm.com>
-References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
- <1467125510-18758-7-git-send-email-james.morse@arm.com>
-Message-ID: <20160705145530.GA19925@red-moon>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 5 Jul 2016 16:55:56 +0200
+Subject: [PATCH v2 5/5] spi: s3c64xx: use unsigned type for fifo handling
+ variables
+In-Reply-To: <1467081676-8442-6-git-send-email-andi.shyti@samsung.com>
+References: <1467081676-8442-1-git-send-email-andi.shyti@samsung.com>
+ <1467081676-8442-6-git-send-email-andi.shyti@samsung.com>
+Message-ID: <20160705145556.GD6247@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 03:51:49PM +0100, James Morse wrote:
-> On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
-> user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
-> kernel will assign logical id 0 to a different physical CPU.
-> This breaks hibernate as hibernate and resume will be attempted on different
-> CPUs. A previous patch detects this situation when we come to resume,
-> and returns an error. (data stored in the hibernate image is lost)
+On Tue, Jun 28, 2016 at 11:41:15AM +0900, Andi Shyti wrote:
+> The 'quirks' variable cannot ever be negative, therefore use u8
+> instead of int. The 8 bit size is given from the fact that
+> currently the quirks variable has very few statuses.
 > 
-> We currently forbid hibernate if CPU0 has been hotplugged out to avoid
-> this situation without kexec.
+> The rx_lvl_offset and tx_st_done store shift values, so that u8
+> is a proper size.
 > 
-> Use arch_hibernation_disable_cpus() to direct which CPU we should resume
-> on based on the MPIDR of the CPU we hibernated on. This allows us to
-> hibernate/resume on any CPU, even if the logical numbers have been
-> shuffled by kexec.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
-> Changes since v2:
->  * Storing/reading/checking sleep_cpu moved into an earlier patch
->  * Moved to macro approach.
->  * Added hidden ARCH_HIBERNATION_CPUHP config option.
-> 
->  arch/arm64/Kconfig               |  4 ++++
->  arch/arm64/include/asm/suspend.h |  4 ++++
->  arch/arm64/kernel/hibernate.c    | 48 ++++++++++++++++++++++++++++++++++++++--
->  3 files changed, 54 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 79341f6d1b6a..14ef59a90cfd 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1017,6 +1017,10 @@ config ARCH_HIBERNATION_HEADER
->  	def_bool y
->  	depends on HIBERNATION
->  
-> +config ARCH_HIBERNATION_CPUHP
-> +	def_bool y
-> +	depends on HIBERNATION
-> +
->  config ARCH_SUSPEND_POSSIBLE
->  	def_bool y
->  
-> diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
-> index 024d623f662e..9b3e8d9bfc8c 100644
-> --- a/arch/arm64/include/asm/suspend.h
-> +++ b/arch/arm64/include/asm/suspend.h
-> @@ -47,4 +47,8 @@ int swsusp_arch_resume(void);
->  int arch_hibernation_header_save(void *addr, unsigned int max_size);
->  int arch_hibernation_header_restore(void *addr);
->  
-> +/* Used to resume on the CPU we hibernated on */
-> +int _arch_hibernation_disable_cpus(bool suspend);
-> +#define arch_hibernation_disable_cpus(x) _arch_hibernation_disable_cpus(x)
-> +
->  #endif
-> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> index 8c7c6d7d4cd4..cbcc8243575e 100644
-> --- a/arch/arm64/kernel/hibernate.c
-> +++ b/arch/arm64/kernel/hibernate.c
-> @@ -144,6 +144,7 @@ EXPORT_SYMBOL(arch_hibernation_header_save);
->  
->  int arch_hibernation_header_restore(void *addr)
->  {
-> +	int ret;
->  	struct arch_hibernate_hdr_invariants invariants;
->  	struct arch_hibernate_hdr *hdr = addr;
->  
-> @@ -156,11 +157,21 @@ int arch_hibernation_header_restore(void *addr)
->  	sleep_cpu = get_logical_index(hdr->sleep_cpu_mpidr);
->  	pr_info("Hibernated on CPU %d [mpidr:0x%llx]\n", sleep_cpu,
->  		hdr->sleep_cpu_mpidr);
-> -	if (sleep_cpu != 0) {
-> -		pr_crit("Didn't hibernate on the firmware boot CPU!\n");
-> +	if (sleep_cpu <= 0) {
-> +		pr_crit("Hibernated on a CPU not known to this kernel!\n");
->  		sleep_cpu = -EINVAL;
->  		return -EINVAL;
->  	}
-> +	if (!cpu_online(sleep_cpu)) {
-> +		pr_info("Hibernated on a CPU that is offline! Bringing CPU up.\n");
-> +		ret = cpu_up(sleep_cpu);
-> +		if (ret) {
-> +			pr_err("Failed to bring hibernate-CPU up!\n");
-> +			sleep_cpu = -EINVAL;
-> +			return ret;
-> +		}
-> +	}
-> +
->  	resume_hdr = *hdr;
->  
->  	return 0;
-> @@ -532,3 +543,36 @@ static int __init check_boot_cpu_online_init(void)
->  	return 0;
->  }
->  core_initcall(check_boot_cpu_online_init);
-> +
-> +int _arch_hibernation_disable_cpus(bool suspend)
-> +{
-> +	int cpu, ret;
-> +
-> +	if (suspend) {
-> +		/*
-> +		 * During hibernate we need frozen_cpus to be updated and saved.
-> +		 */
-> +		ret = disable_nonboot_cpus();
-> +	} else {
-> +		/*
-> +		 * Resuming from hibernate. From here, we can't race with
-> +		 * userspace, and don't need to update frozen_cpus.
+> fifo_lvl_mask stores a series of masks, to be in we will keep the
+> 32 bit size.
 
-Yes, but...
-
-> +		 */
-> +		pr_info("Disabling secondary CPUs ...\n");
-> +
-> +		/* sleep_cpu must have been loaded from the arch header */
-> +		BUG_ON(sleep_cpu < 0);
-> +
-> +		for_each_online_cpu(cpu) {
-> +			if (cpu == sleep_cpu)
-> +				continue;
-> +			ret = cpu_down(cpu);
-
-This has a side effect, in that tasks are frozen here but we are now
-calling _cpu_down() through:
-
-	cpu_down() -> do_cpu_down()
-
-and we are telling the kernel that tasks are _not_ frozen, which
-AFAIK changes the cpuhp_tasks_frozen variable and related actions
-(eg __cpu_notify()), I suspect this may confuse some notifiers
-state machines that depend on CPU_TASKS_FROZEN to be set, maybe
-not but it is worth a look.
-
-Thanks,
-Lorenzo
-
-> +			if (ret) {
-> +				pr_err("Secondary CPUs are not disabled\n");
-> +				break;
-> +			}
-> +		}
-> +	}
-> +
-> +	return ret;
-> +}
-> -- 
-> 2.8.0.rc3
-> 
+What's the advantage of these changes?  This feels like microptimisation
+of something that shouldn't be a big performance issue and it's not
+always the case that the compiler does something more sensible with
+smaller or unsigned types.  I'm not saying don't do it, I'm just saying
+that it's not clear to me what the win is.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/f7e2e514/attachment.sig>
