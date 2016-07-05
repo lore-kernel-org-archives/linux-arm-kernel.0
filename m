@@ -1,28 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 5 Jul 2016 09:23:50 -0500
-Subject: [PATCH] drivers/perf: arm-pmu: Handle per-interrupt affinity mask
-In-Reply-To: <1467379291-18413-1-git-send-email-marc.zyngier@arm.com>
-References: <1467379291-18413-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160705142350.GA24441@rob-hp-laptop>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 5 Jul 2016 16:30:40 +0200
+Subject: [PATCH v3 10/14] regulator: pwm: Switch to the atomic PWM API
+In-Reply-To: <1465895602-31008-11-git-send-email-boris.brezillon@free-electrons.com>
+References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1465895602-31008-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160705143040.GX6247@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 02:21:31PM +0100, Marc Zyngier wrote:
-> On a big-little system, PMUs can be wired to CPUs using per CPU
-> interrups (PPI). In this case, it is important to make sure that
-> the enable/disable do happen on the right set of CPUs.
-> 
-> So instead of relying on the interrupt-affinity property, we can
-> use the actual percpu affinity that DT exposes as part of the
-> interrupt specifier. The DT binding is also updated to reflect
-> the fact that the interrupt-affinity property shouldn't be used
-> in that case.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/pmu.txt |  4 +++-
+On Tue, Jun 14, 2016 at 11:13:18AM +0200, Boris Brezillon wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> Use the atomic API wherever appropriate and get rid of pwm_apply_args()
+> call (the reference period and polarity are now explicitly set when
+> calling pwm_apply_state()).
 
->  drivers/perf/arm_pmu.c                        | 22 +++++++++++++++++-----
->  2 files changed, 20 insertions(+), 6 deletions(-)
+Acked-by: Mark Brown <broonie@kernel.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/47249be8/attachment-0001.sig>
