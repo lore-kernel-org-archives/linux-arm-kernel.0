@@ -1,90 +1,50 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Tue, 5 Jul 2016 11:01:21 -0700
-Subject: [PATCH] ata: ahci_platform: Add ACPI support for APM X-Gene AHCI
- controller v3 hardware.
-In-Reply-To: <20160705090747.GC18338@xora-haswell.xora.org.uk>
-References: <stripathi@apm.com>
- <1466034240-22694-1-git-send-email-stripathi@apm.com>
- <6691907.FIx2xYmxSs@wuerfel>
- <CAOHikRCB4c79okd0q3=Lqwk7LKwZ6EDnWfHRH_oXokrB4PHcyw@mail.gmail.com>
- <CAOHikRDUH-PK4JfS8pUR+or=XTwDHBejFTGy33V20HKMMTUaPg@mail.gmail.com>
- <20160705090747.GC18338@xora-haswell.xora.org.uk>
-Message-ID: <CAOHikRCZ=YCH6fy9KObf_Cb5fiNBNcHtW3yW5+6=4pCCVaKA_A@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 5 Jul 2016 18:03:38 +0000
+Subject: [GIT PULL 3/3] bcm2835-arm64-next-2016-07-03
+In-Reply-To: <1467593136-29524-4-git-send-email-eric@anholt.net>
+References: <1467593136-29524-1-git-send-email-eric@anholt.net>
+ <1467593136-29524-4-git-send-email-eric@anholt.net>
+Message-ID: <20160705180338.GI3348@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2016 at 2:07 AM, Graeme Gregory <gg@slimlogic.co.uk> wrote:
->
-> On Tue, Jun 21, 2016 at 04:31:38PM -0700, Suman Tripathi wrote:
-> > Hi Arnd,
-> >
-> > On Tue, Jun 21, 2016 at 11:08 AM, Suman Tripathi <stripathi@apm.com> wrote:
-> > > On Wed, Jun 15, 2016 at 11:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > >>
-> > >> On Wednesday, June 15, 2016 5:44:00 PM CEST suman-tripathi wrote:
-> > >> > This patch adds ACPI support for APM X-Gene AHCI controller in
-> > >> > ahci_platform driver for v3 hardware. APM X-Gene AHCI controller
-> > >> > v3 hardware is fully compliant with ahci_platform driver and requires
-> > >> > no workaround quirk.
-> > >> >
-> > >> > Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> > >> > ---
-> > >> >  drivers/ata/ahci_platform.c |    1 +
-> > >> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > >> >
-> > >> > diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> > >> > index 62a04c8..3395baf 100644
-> > >> > --- a/drivers/ata/ahci_platform.c
-> > >> > +++ b/drivers/ata/ahci_platform.c
-> > >> > @@ -86,6 +86,7 @@ MODULE_DEVICE_TABLE(of, ahci_of_match);
-> > >> >
-> > >> >  static const struct acpi_device_id ahci_acpi_match[] = {
-> > >> >         { ACPI_DEVICE_CLASS(PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff) },
-> > >> > +       { "APMC0D33", 0},
-> > >> >         {},
-> > >> >  };
-> > >> >  MODULE_DEVICE_TABLE(acpi, ahci_acpi_match);
-> > >> >
-> > >>
-> > >> Doesn't the ACPI_DEVICE_CLASS entry take care of this? I thought it had been
-> > >
-> > >
-> > > yeah it also works. Just thought that we need something different as
-> > > our's is a non-PCI SATA.
-> >
-> > Are you suggesting to introduce a new class ACPI_DEVICE_CLASS for
-> > non-pci ahci ? or to reuse the existing PCI_CLASS_STORAGE_SATA_AHCI ?
->
-> This was discussed when AMD Seattle SoC had the same issue and it was
-> decided in standards body and on LKML that using PCI device classes for
-> non PCI devices was fine.
->
-> Example from Overdrive DSDT
->
-> Device (AHC0)
-> {
->   Name (_HID, "AMDI0600")  // _HID: Hardware ID
->   Name (_UID, 0x00)  // _UID: Unique ID
->   Name (_CCA, 0x01) // _CCA: Cache Coherency Attribute
->   Name (_CLS,
->     Package (0x03) // _CLS: Class Code
->     {
->       0x01,
->       0x06,
->       0x01
->     })
+Eric,
 
+On Sun, Jul 03, 2016 at 05:45:36PM -0700, Eric Anholt wrote:
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/anholt/linux tags/bcm2835-arm64-next-2016-07-03
+> 
+> for you to fetch changes up to 628d30d1ccb897fee54a6f7312561cf2f6f72f09:
+> 
+>   arm64: Add platform selection for BCM2835. (2016-06-15 14:10:30 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request brings in the build support for the Raspberry Pi
+> arm64 port.
+> 
+> ----------------------------------------------------------------
+> Alexander Graf (1):
+>       arm64: Allow for different DMA and CPU bus offsets
+> 
+> Eric Anholt (3):
+>       irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ
+>       Merge remote-tracking branch 'irqchip/irqchip/bcm' into bcm2835-arm64-next
 
-Got it. Will do the same. Thanks !!
->
->   ...
->
-> Graeme
->
+You may want to draw attention to the fact that this has an external
+dependency on my irqchip/bcm branch.  Also, that it's stable, been in
+-next for a couple of weeks, and based on v4.7-rc1, etc.
 
+thx,
 
+Jason.
 
--- 
-Thanks,
-with regards,
-Suman Tripathi
+>       arm64: Add platform selection for BCM2835.
+> 
+>  arch/arm64/Kconfig.platforms         | 13 +++++++++++++
+>  arch/arm64/include/asm/dma-mapping.h | 17 +++++++++++++++--
+>  drivers/irqchip/irq-bcm2835.c        |  3 +--
+>  drivers/irqchip/irq-bcm2836.c        |  2 +-
+>  4 files changed, 30 insertions(+), 5 deletions(-)
