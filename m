@@ -1,343 +1,127 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 05 Jul 2016 16:33:31 +0800
-Subject: [linux-sunxi] [PATCH 2/4] power: add axp20x-battery driver
-In-Reply-To: <577B44FD.6040404@mailbox.org>
-References: <20160701092926.32005-1-icenowy@aosc.xyz>
- <20160701092926.32005-2-icenowy@aosc.xyz> <577B44FD.6040404@mailbox.org>
-Message-ID: <4101467707611@web7h.yandex.ru>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 5 Jul 2016 10:34:33 +0200
+Subject: [PATCH v7 10/17] KVM: arm64: introduce new KVM ITS device
+In-Reply-To: <fc201178-cfa4-221d-b36e-f5d959f89f74@arm.com>
+References: <20160628123230.26255-1-andre.przywara@arm.com>
+ <20160628123230.26255-11-andre.przywara@arm.com>
+ <2525bd7b-5df1-54bc-1999-25c8c7fe88a3@redhat.com>
+ <173c3704-180e-0385-623c-5dbcced2d762@arm.com>
+ <da2ac9c4-e29b-e74f-a11e-b2736526bf8f@redhat.com>
+ <CAFEAcA96DGzW=bShwz188O0BaDy34ccEG3921AxQCf3aAFgurg@mail.gmail.com>
+ <2b712bbe-1534-0206-34e7-8df433ace7c2@redhat.com>
+ <fc201178-cfa4-221d-b36e-f5d959f89f74@arm.com>
+Message-ID: <4c7f0de5-a6e6-d637-9ccf-acf81d2c9c5a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andre,
 
+On 04/07/2016 19:40, Andre Przywara wrote:
+> Hi Eric,
+> 
+> On 04/07/16 16:00, Auger Eric wrote:
+>> Hi Peter,
+>>
+>> On 04/07/2016 16:32, Peter Maydell wrote:
+>>> On 4 July 2016 at 15:27, Auger Eric <eric.auger@redhat.com> wrote:
+>>>> Andre,
+>>>>
+>>>> On 04/07/2016 16:05, Andre Przywara wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On 04/07/16 10:00, Auger Eric wrote:
+>>>>>> From a QEMU integration point of view this means the init sequence used
+>>>>>> for KVM GIC interrupt controllers cannot be reused for ITS and more
+>>>>>> importantly this is not straightforward to have the proper sequence
+>>>>>> ordering (hence the previously reported case).
+>>>>>
+>>>>> I am confused, can you please elaborate what the problem is?
+>>>>> Or alternatively sketch what you ideally would the ITS init sequence to
+>>>>> look like? I am totally open to any changes, just need to know what
+>>>>> you/QEMU needs.
+>>>>
+>>>> in QEMU the address setting is done on a so-called qemu
+>>>> "machine_init_done_notifier", ie. a callback that is registered at ITS
+>>>> device init, to be called once the virt machine code has executed. This
+>>>> callback calls  kvm_device_ioctl(kd->dev_fd, KVM_SET_DEVICE_ATTR, attr);
+>>>>
+>>>> In case the userspace needs to explicitly "init" the ITS (actually ~
+>>>> map_resources) this must happen after the KVM_SET_DEVICE_ATTR. So you
+>>>> also must register a callback in the same way. However there is a
+>>>> framework existing to register kvm device addresses but this does not
+>>>> exist to set other attributes than device addresses.
+>>>>
+>>>> This is feasible I think but this does not fit qemu nicely. So can't the
+>>>> map_resources happen implicitly on the first VCPU run?
+>>>
+>>> I'm not clear what you think the problem here for QEMU is.
+>>> We definitely want the API for the kernel to be:
+>>>  create device
+>>>  set attributes
+>>>  explicitly complete init of the device
+>>>  [attribute setting after this is illegal]
+>>>  run CPUs
+>>>
+>>> so I'm not sure why QEMU would care if the kernel does things at
+>>> "final init" rather than "run CPUs".
+>>>
+>>> This is how the GICv3 init works and how the ITS should work too;
+>> The GICv3 explicit does not do the same as the ITS init.
+>> GICv3 init does not map the resources (KVM iodevice registration). This
+>> is done at 1st VCPU run.
+>> ITS init does map the resources. If we call the ITS init at the same
+>> place as we call the GICv3 init, in the realization function, the region
+>> mapping is not yet done so you will map resources at undefined location.
+> 
+> What do you mean with "region mapping"? QEMU's internal mapping?
+> 
+> But you set the GICv3 redist/dist  addresses (or the ITS address, for
+> that matter) before calling CTRL_INIT, right? So are you concerned that
+> the kernel "maps" the region before QEMU connects the memory region? Is
+> that really a problem? This "map_resources" equivalent for the ITS just
+> creates a kvm_io_bus mapping, which would never fire without either a
+> guest running (which we clearly don't at this point) or userland
+> explicitly requesting access (which would require QEMU to have done the
+> mapping?).
+> 
+> Is that about right or do I miss something again?
+> Sorry for my ignorance on the QEMU internals in that matter ;-)
+> 
+>> I am definitively not opposed to call the ITS init function explicitly
+>> from user side but this must happen after the KVM_SET_DEVICE_ATTR. So
+>> another machine_init_done function must be registered and the notifier
+>> must be called AFTER the notifier that calls the KVM_SET_DEVICE_ATTR
+>> ioctl. However you cannot easily master the machine init done notifier
+>> registration order because in target-arm/kvm.c there is a single
+>> notifier that calls all the KVM_SET_DEVICE_ATTR for all the KVM devices
+>> (kvm_arm_machine_init_done). So it is not possible to register the ITS
+>> init notifier before the "kvm_arm_set_device_addr" notifier.
+>>
+>> So my understanding is one must do things outside of the existing framework?
+> 
+> While I am certainly not interested in making QEMU's (or the QEMU patch
+> author's) life harder than needed, I am wondering if we should really
+> model the userland/kernel interface according to QEMU's current
+> framework design.
+> Is the current approach a leftover of the initial vGICv2 code, that was
+> just slightly adjusted to support GICv3?
 
-05.07.2016, 13:26, "Michael Haas" <michael.haas@mailbox.org>:
-> Hi,
->
-> nice work! Is this in any way related to Bruno Pr?monts driver for the
-> axp20x?
->
-> I've got a reworked version of that lying around, but it's not quite
-> ready for submission. Do you know what pieces are missing in your driver
-> for axp20x support - as opposed to axp22x, which is already working?
->
-> Michael
->
-> On 01.07.2016 11:29, Icenowy Zheng wrote:
->> ?This driver is the battery power supply driver of axp20x PMIC. Currently
->> ?it supports only AXP22x variants.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->> ???drivers/mfd/axp20x.c | 14 +++
->> ???drivers/power/Makefile | 1 +
->> ???drivers/power/axp20x_battery.c | 254 +++++++++++++++++++++++++++++++++++++++++
->> ???3 files changed, 269 insertions(+)
->> ???create mode 100644 drivers/power/axp20x_battery.c
->>
->> ?diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
->> ?index cee5288..064e5015 100644
->> ?--- a/drivers/mfd/axp20x.c
->> ?+++ b/drivers/mfd/axp20x.c
->> ?@@ -166,6 +166,15 @@ static struct resource axp22x_usb_power_supply_resources[] = {
->> ???????????DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
->> ???};
->>
->> ?+static struct resource axp22x_battery_resources[] = {
->> ?+ DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_BATT_PLUGIN, "BATT_PLUGIN"),
->> ?+ DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_BATT_REMOVAL, "BATT_REMOVAL"),
->> ?+ DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_BATT_ENT_ACT_MODE, "BATT_ENT_ACT_MODE"),
->> ?+ DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_BATT_EXIT_ACT_MODE, "BATT_EXIT_ACT_MODE"),
->> ?+ DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_CHARG, "CHARG"),
->> ?+ DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_CHARG_DONE, "CHARG_DONE"),
->> ?+};
->> ?+
->> ???static struct resource axp22x_pek_resources[] = {
->> ???????????{
->> ???????????????????.name = "PEK_DBR",
->> ?@@ -538,6 +547,11 @@ static struct mfd_cell axp22x_cells[] = {
->> ???????????????????.of_compatible = "x-powers,axp202-usb-power-supply",
->> ???????????????????.num_resources = ARRAY_SIZE(axp22x_usb_power_supply_resources),
->> ???????????????????.resources = axp22x_usb_power_supply_resources,
->> ?+ }, {
->> ?+ .name = "axp20x-battery",
->> ?+ .of_compatible = "x-powers,axp202-battery",
->> ?+ .num_resources = ARRAY_SIZE(axp22x_battery_resources),
->> ?+ .resources = axp22x_battery_resources,
->> ???????????},
->> ???};
->>
->> ?diff --git a/drivers/power/Makefile b/drivers/power/Makefile
->> ?index e46b75d..1452d23 100644
->> ?--- a/drivers/power/Makefile
->> ?+++ b/drivers/power/Makefile
->> ?@@ -10,6 +10,7 @@ obj-$(CONFIG_GENERIC_ADC_BATTERY) += generic-adc-battery.o
->> ???obj-$(CONFIG_PDA_POWER) += pda_power.o
->> ???obj-$(CONFIG_APM_POWER) += apm_power.o
->> ???obj-$(CONFIG_AXP20X_POWER) += axp20x_usb_power.o
->> ?+obj-$(CONFIG_AXP20X_POWER) += axp20x_battery.o
->> ???obj-$(CONFIG_MAX8925_POWER) += max8925_power.o
->> ???obj-$(CONFIG_WM831X_BACKUP) += wm831x_backup.o
->> ???obj-$(CONFIG_WM831X_POWER) += wm831x_power.o
->> ?diff --git a/drivers/power/axp20x_battery.c b/drivers/power/axp20x_battery.c
->> ?new file mode 100644
->> ?index 0000000..8fac2cd
->> ?--- /dev/null
->> ?+++ b/drivers/power/axp20x_battery.c
->> ?@@ -0,0 +1,254 @@
->> ?+/*
->> ?+ * AXP20x PMIC battery status driver
->> ?+ *
->> ?+ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
->> ?+ * Copyright (C) 2015 Hans de Goede <hdegoede@redhat.com>
->> ?+ * Copyright (C) 2014 Bruno Pr?mont <bonbons@linux-vserver.org>
->> ?+ *
->> ?+ * This program is free software; you can redistribute it and/or modify it
->> ?+ * under the terms of the GNU General Public License as published by the
->> ?+ * Free Software Foundation; either version 2 of the License, or (at your
->> ?+ * option) any later version.
->> ?+ */
->> ?+
->> ?+#include <linux/device.h>
->> ?+#include <linux/init.h>
->> ?+#include <linux/interrupt.h>
->> ?+#include <linux/kernel.h>
->> ?+#include <linux/mfd/axp20x.h>
->> ?+#include <linux/module.h>
->> ?+#include <linux/of.h>
->> ?+#include <linux/platform_device.h>
->> ?+#include <linux/power_supply.h>
->> ?+#include <linux/regmap.h>
->> ?+#include <linux/slab.h>
->> ?+
->> ?+#define DRVNAME "axp20x-battery"
->> ?+
->> ?+#define AXP20X_PWR_STATUS_ACIN_USED BIT(6)
->> ?+#define AXP20X_PWR_STATUS_VBUS_USED BIT(4)
->> ?+#define AXP20X_PWR_STATUS_BAT_DIRECTION BIT(2)
->> ?+
->> ?+#define AXP20X_OP_MODE_CHARGING BIT(6)
->> ?+#define AXP20X_OP_MODE_BATTERY_PRESENT BIT(5)
->> ?+#define AXP20X_OP_MODE_BATTERY_ACTIVE BIT(3)
->> ?+
->> ?+#define AXP20X_CAPACITY_CORRECT BIT(7)
->> ?+
->> ?+struct axp20x_battery {
->> ?+ struct axp20x_dev *axp20x;
->> ?+ struct regmap *regmap;
->> ?+ struct power_supply *supply;
->> ?+};
->> ?+
->> ?+static irqreturn_t axp20x_battery_irq(int irq, void *devid)
->> ?+{
->> ?+ struct axp20x_battery *power = devid;
->> ?+
->> ?+ power_supply_changed(power->supply);
->> ?+
->> ?+ return IRQ_HANDLED;
->> ?+}
->> ?+
->> ?+static int axp20x_battery_get_property(struct power_supply *psy,
->> ?+ enum power_supply_property psp, union power_supply_propval *val)
->> ?+{
->> ?+ struct axp20x_battery *power = power_supply_get_drvdata(psy);
->> ?+ unsigned int input, op_mode, capacity, dh, dl;
->> ?+ int ret, ext;
->> ?+
->> ?+ /* All the properties below need the input-status reg value */
->> ?+ ret = regmap_read(power->regmap, AXP20X_PWR_INPUT_STATUS, &input);
->> ?+ if (ret)
->> ?+ return ret;
->> ?+
->> ?+ ret = regmap_read(power->regmap, AXP20X_PWR_OP_MODE, &op_mode);
->> ?+ if (ret)
->> ?+ return ret;
->> ?+
->> ?+ switch (psp) {
->> ?+ case POWER_SUPPLY_PROP_HEALTH:
->> ?+ if (!(op_mode & AXP20X_OP_MODE_BATTERY_PRESENT)) {
->> ?+ val->intval = POWER_SUPPLY_HEALTH_UNKNOWN;
->> ?+ break;
->> ?+ }
->> ?+
->> ?+ val->intval = POWER_SUPPLY_HEALTH_GOOD;
->> ?+
->> ?+ if (op_mode & AXP20X_OP_MODE_BATTERY_ACTIVE) {
->> ?+ /* AXP20X is now trying to re-activate the battery */
->> ?+ val->intval = POWER_SUPPLY_HEALTH_DEAD;
->> ?+ break;
->> ?+ }
->> ?+ break;
->> ?+ case POWER_SUPPLY_PROP_PRESENT:
->> ?+ val->intval = !!(op_mode & AXP20X_OP_MODE_BATTERY_PRESENT);
->> ?+ break;
->> ?+ case POWER_SUPPLY_PROP_CAPACITY:
->> ?+ ret = regmap_read(power->regmap, AXP20X_FG_RES, &capacity);
->> ?+ if (ret)
->> ?+ return ret;
->> ?+ if (capacity & AXP20X_CAPACITY_CORRECT)
->> ?+ val->intval = capacity & (~AXP20X_CAPACITY_CORRECT);
->> ?+ else
->> ?+ return -EIO;
->> ?+ /* from axp_capchange function of Allwinner 3.4 driver */
->> ?+ if (val->intval == 127)
->> ?+ val->intval = 100;
->> ?+ break;
->> ?+ case POWER_SUPPLY_PROP_STATUS:
->> ?+ if (!(op_mode & AXP20X_OP_MODE_BATTERY_PRESENT)) {
->> ?+ val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
->> ?+ break;
->> ?+ }
->> ?+
->> ?+ ret = regmap_read(power->regmap, AXP20X_FG_RES, &capacity);
->> ?+ if (ret)
->> ?+ return ret;
->> ?+
->> ?+ ext = (input & AXP20X_PWR_STATUS_ACIN_USED) ||
->> ?+ (input & AXP20X_PWR_STATUS_VBUS_USED);
->> ?+
->> ?+ if (op_mode & AXP20X_OP_MODE_CHARGING)
->> ?+ val->intval = POWER_SUPPLY_STATUS_CHARGING;
->> ?+ else if (!(input & AXP20X_PWR_STATUS_BAT_DIRECTION) && !ext)
->> ?+ val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
->> ?+ else if (capacity == (100 | AXP20X_CAPACITY_CORRECT) ||
->> ?+ capacity == (127 | AXP20X_CAPACITY_CORRECT))
->> ?+ val->intval = POWER_SUPPLY_STATUS_FULL;
->> ?+ else
->> ?+ val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
->> ?+ break;
->> ?+ case POWER_SUPPLY_PROP_CURRENT_NOW:
->> ?+ ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_H, &dh);
->> ?+ if (ret)
->> ?+ return ret;
->> ?+ ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_L, &dl);
->> ?+ if (ret)
->> ?+ return ret;
->> ?+ /* it's a 12 bit integer, high 8-bit is stored in dh */
->> ?+ val->intval = dh << 4 | dl >> 4;
->> ?+ break;
->> ?+ case POWER_SUPPLY_PROP_VOLTAGE_NOW:
->> ?+ ret = regmap_read(power->regmap, AXP20X_BATT_V_H, &dh);
->> ?+ if (ret)
->> ?+ return ret;
->> ?+ ret = regmap_read(power->regmap, AXP20X_BATT_V_L, &dl);
->> ?+ if (ret)
->> ?+ return ret;
->> ?+ /* it's a 12 bit integer, high 8-bit is stored in dh */
->> ?+ val->intval = dh << 4 | dl >> 4;
->> ?+ /* The formula below is from axp22_vbat_to_mV function
->> ?+ * of Allwinner 3.4 kernel.
->> ?+ */
->> ?+ val->intval = val->intval * 1100 / 1000;
->> ?+ break;
->> ?+ default:
->> ?+ return -EINVAL;
->> ?+ }
->> ?+
->> ?+ return 0;
->> ?+}
->> ?+
->> ?+static enum power_supply_property axp22x_battery_properties[] = {
->> ?+ POWER_SUPPLY_PROP_CAPACITY,
->> ?+ POWER_SUPPLY_PROP_HEALTH,
->> ?+ POWER_SUPPLY_PROP_PRESENT,
->> ?+ POWER_SUPPLY_PROP_STATUS,
->> ?+ POWER_SUPPLY_PROP_CURRENT_NOW,
->> ?+ POWER_SUPPLY_PROP_VOLTAGE_NOW,
->> ?+};
->> ?+
->> ?+static const struct power_supply_desc axp22x_battery_desc = {
->> ?+ .name = "axp20x-battery",
->> ?+ .type = POWER_SUPPLY_TYPE_BATTERY,
->> ?+ .properties = axp22x_battery_properties,
->> ?+ .num_properties = ARRAY_SIZE(axp22x_battery_properties),
->> ?+ .get_property = axp20x_battery_get_property,
->> ?+};
->> ?+
->> ?+static int axp20x_battery_probe(struct platform_device *pdev)
->> ?+{
->> ?+ struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
->> ?+ struct power_supply_config psy_cfg = {};
->> ?+ struct axp20x_battery *power;
->> ?+ static const char * const axp22x_irq_names[] = {
->> ?+ "BATT_PLUGIN", "BATT_REMOVAL", "BATT_ENT_ACT_MODE",
->> ?+ "BATT_EXIT_ACT_MODE", "CHARG", "CHARG_DONE", NULL };
->> ?+ static const char * const *irq_names;
->> ?+ const struct power_supply_desc *battery_desc;
->> ?+ int i, irq, ret;
->> ?+
->> ?+ if (!of_device_is_available(pdev->dev.of_node))
->> ?+ return -ENODEV;
->> ?+
->> ?+ if (!axp20x) {
->> ?+ dev_err(&pdev->dev, "Parent drvdata not set\n");
->> ?+ return -EINVAL;
->> ?+ }
->> ?+
->> ?+ power = devm_kzalloc(&pdev->dev, sizeof(*power), GFP_KERNEL);
->> ?+ if (!power)
->> ?+ return -ENOMEM;
->> ?+
->> ?+ power->axp20x = axp20x;
->> ?+ power->regmap = axp20x->regmap;
->> ?+
->> ?+ switch (power->axp20x->variant) {
->> ?+ case AXP221_ID:
->> ?+ case AXP223_ID:
->> ?+ battery_desc = &axp22x_battery_desc;
->> ?+ irq_names = axp22x_irq_names;
->> ?+ break;
->> ?+ default:
->> ?+ dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
->> ?+ axp20x->variant);
->> ?+ return -EINVAL;
->> ?+ }
->> ?+
->> ?+ psy_cfg.of_node = pdev->dev.of_node;
->> ?+ psy_cfg.drv_data = power;
->> ?+
->> ?+ power->supply = devm_power_supply_register(&pdev->dev, battery_desc,
->> ?+ &psy_cfg);
->> ?+ if (IS_ERR(power->supply))
->> ?+ return PTR_ERR(power->supply);
->> ?+
->> ?+ /* Request irqs after registering, as irqs may trigger immediately */
->> ?+ for (i = 0; irq_names[i]; i++) {
->> ?+ irq = platform_get_irq_byname(pdev, irq_names[i]);
->> ?+ if (irq < 0) {
->> ?+ dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
->> ?+ irq_names[i], irq);
->> ?+ continue;
->> ?+ }
->> ?+ irq = regmap_irq_get_virq(axp20x->regmap_irqc, irq);
->> ?+ ret = devm_request_any_context_irq(&pdev->dev, irq,
->> ?+ axp20x_battery_irq, 0, DRVNAME, power);
->> ?+ if (ret < 0)
->> ?+ dev_warn(&pdev->dev, "Error requesting %s IRQ: %d\n",
->> ?+ irq_names[i], ret);
->> ?+ }
->> ?+
->> ?+ return 0;
->> ?+}
->> ?+
->> ?+static const struct of_device_id axp20x_battery_match[] = {
->> ?+ { .compatible = "x-powers,axp202-battery" },
->> ?+ { }
->> ?+};
->> ?+MODULE_DEVICE_TABLE(of, axp20x_battery_match);
->> ?+
->> ?+static struct platform_driver axp20x_battery_driver = {
->> ?+ .probe = axp20x_battery_probe,
->> ?+ .driver = {
->> ?+ .name = DRVNAME,
->> ?+ .of_match_table = axp20x_battery_match,
->> ?+ },
->> ?+};
->> ?+
->> ?+module_platform_driver(axp20x_battery_driver);
->> ?+
->> ?+MODULE_AUTHOR("Icenowy Zheng <icenowy@aosc.xyz>");
->> ?+MODULE_DESCRIPTION("AXP20x PMIC battery status driver");
->> ?+MODULE_LICENSE("GPL");
+I have a solution to workaround the issue on qemu side and I can see the
+guest ITS properly initialized now so proceed according to your will &
+consensus.
 
-Therotically, it can run on axp20x. However, I have currently no test device. (Still waiting for my C.H.I.P.)
-So I can only promise it to run on axp22x.
+Eric
+> 
+> Cheers,
+> Andre
+> 
+>>
+>>> we don't want to extend the GICv2 mistake of "no explicit complete
+>>> init" to anything else, because then you end up with ad-hoc
+>>> "do this when we first run the vCPU; oh, but also do it if
+>>> userspace tries to write a register content; and also if...".
+>>>
+>>> thanks
+>>> -- PMM
+>>>
+>>
