@@ -1,96 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 5 Jul 2016 20:04:47 +0200
-Subject: [PATCH] gpio: document how to order GPIO controllers
-In-Reply-To: <20160705140546.GA10601@rob-hp-laptop>
-References: <1467355333-8813-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160705140546.GA10601@rob-hp-laptop>
-Message-ID: <20160705180447.GP16643@pengutronix.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 5 Jul 2016 20:33:17 +0200
+Subject: [PATCH v2] ARM: at91: Document new TCB bindings
+In-Reply-To: <CAL_JsqL2Kjtf-BuCjK8ZHcDdbgVDy-L-_AN+=4HmxVAwy3ucdA@mail.gmail.com>
+References: <1467039901-11297-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160701012743.GA16698@rob-hp-laptop>
+ <20160704151058.44b679bf@bbrezillon>
+ <CAL_JsqL2Kjtf-BuCjK8ZHcDdbgVDy-L-_AN+=4HmxVAwy3ucdA@mail.gmail.com>
+Message-ID: <20160705183317.GB3623@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 09:05:46AM -0500, Rob Herring wrote:
-> On Fri, Jul 01, 2016 at 08:42:13AM +0200, Uwe Kleine-K?nig wrote:
-> > This uses the same approach that is already used for spi, i2c and
-> > several other controllers to ensure a consistent numbering independent
-> > of probe order. This is in use for several gpio drivers that already now
-> > use of_alias_get_id(np, "gpio").
+On 05/07/2016 at 10:40:22 -0500, Rob Herring wrote :
+> >> > +   - compatible: Should be "atmel,tcb-free-running-timer"
+> >> > +   - reg: Should contain the TCB channels to be used. If the
+> >> > +     counter width is 16 bits (at91rm9200-tcb), two consecutive
+> >> > +     channels are needed. Else, only one channel will be used.
+> >> > +
+> >> > + * a clockevent device
+> >> > +   - compatible: Should be "atmel,tcb-programmable-timer"
+> >>
+> >> This still looks like assigning usage in DT. As I'm willing to accept
+> >> that for PWM, either timer channels should be whatever channels are not
+> >> assigned to PWM (i.e. not in DT) or they should just be "timer" and let
+> >> the kernel decide their usage.
+> >
+> > I just reviewed Alexandre's new binding, and it makes the whole thing
+> > a lot more obscure: on older SoCs, we have to chain 2 channels to
+> > create an acceptable wraparound time (16 bits at 5MHz is generating too
+> > much interrupts to be acceptable).
+> >
+> > If we don't assign the mode from the DT, how should we know which
+> > channels should be chained to create the free-running timer? Note that
+> > not all channels can be chained together: they have to be part of the
+> > same timer counter block and have to be consecutive (0+1, 1+2 or 3+0).
 > 
-> Like SPI and I2C, I'm against further abuse of aliases for this purpose 
-> [1].
-
-I considered spi and i2c the good examples here :-|
-
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Hello,
-> > 
-> > Linus requested such a patch as part of a change that introduces
-> > this mechanism to the gpio-omap driver[1]. IMHO this is better done in a
-> > separate patch, so here it comes.
-> > 
-> > Best regards
-> > Uwe
-> > 
-> > [1] http://thread.gmane.org/gmane.linux.kernel.gpio/17399/focus=17629
-> > 
-> >  Documentation/devicetree/bindings/gpio/gpio.txt | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/gpio/gpio.txt b/Documentation/devicetree/bindings/gpio/gpio.txt
-> > index 68d28f62a6f4..5dbacc8f094a 100644
-> > --- a/Documentation/devicetree/bindings/gpio/gpio.txt
-> > +++ b/Documentation/devicetree/bindings/gpio/gpio.txt
-> > @@ -227,6 +227,24 @@ Example of two SOC GPIO banks defined as gpio-controller nodes:
-> >  		#gpio-cells = <2>;
-> >  	};
-> >  
-> > +Usually the GPIO banks in SoCs are ordered, that is there is a dedicated "first
-> > +gpio bank". To fix this ordering in the device tree use aliases starting at 0
-> > +(even if the first bank is called "GPIO1" in the hardware reference).
-> > +This is necessary/handy to ensure deterministical numbering of GPIOs and GPIO
-> > +controllers.
+> The driver can have this knowledge if it is just picking 2 consecutive
+> timers. It should already know it has 16-bit timers based on the
+> compatible string. If it gets more complicated then the features or
+> limitations of the channels should be listed so the driver can make a
+> choice. OMAP is a good example of lots of timers with differing
+> features.
 > 
-> Why is deterministic numbering needed?
+> > Honestly, I don't see the difference between assigning the channel to a
+> > PWM mode and assigning it to a free-running or oneshot timer mode. Why
+> > is it more acceptable?
+> 
+> The difference is that pwm's have clients (e.g. a backlight) in DT and
+> timers do not. We could just make the pwm clients reference the parent
+> node, but then it is hard to figure out which channels are in use for
+> pwm. That could also be solved with a simple "pwm-channels" property
+> listing the channels in use.
+> 
 
-in my case (with a pre 4.8 kernel) it's to control GPIO48 with
-/sys/class/gpio/gpio48. But also when using the gpio chardev device
-(that will hit 4.8-rc1 AFAIK) there is one device file per gpio chip.
+Well, at some point, we will probably have the ADC referring to channels
+used as timers as they can be used to trigger it periodically.
 
-Now consider a user who wants to control/debug direction and value of
-GPIO48 (or GPIO2.16 for the chardev case). The strait forward approach
-is to use /sys/class/gpio/gpio48 (or /dev/dontknowthename2 with offset
-16). I doubt there is a platform where it didn't work like this up to
-now and I'd consider it a userspace breakage to force the user to know
-that the 2nd gpio bank is located at address 0x53fd0000 and so to lookup
-the gpio bank below /sys/bus/platform/devices/53fd0000.gpio/.
+We'll also get frequency measurement that will go in iio, quadrature
+decoders, gray counters and event counters that will probably used by
+different subsystems and will certainly have to be referred to in DT.
 
-On an i.MX25 device I currently see:
-
-root at hostname:/sys/bus/gpio/devices ls -l
-lrwxrwxrwx    1 root     root             0 Jul  5 20:52 gpiochip0 -> ../../../devices/platform/soc/53f00000.aips/53f9c000.gpio/gpiochip0
-lrwxrwxrwx    1 root     root             0 Jul  5 20:52 gpiochip1 -> ../../../devices/platform/soc/53f00000.aips/53fa4000.gpio/gpiochip1
-lrwxrwxrwx    1 root     root             0 Jul  5 20:52 gpiochip2 -> ../../../devices/platform/soc/53f00000.aips/53fcc000.gpio/gpiochip2
-lrwxrwxrwx    1 root     root             0 Jul  5 20:52 gpiochip3 -> ../../../devices/platform/soc/53f00000.aips/53fd0000.gpio/gpiochip3
-
-That is we have:
-
-	Hardware name | software gpiochip
-	    GPIO4     |      gpiochip0
-	    GPIO3     |      gpiochip1
-	    GPIO1     |      gpiochip2
-	    GPIO2     |	     gpiochip3
-
-I bet that's the probe order because when sorted by address (and so
-by order in the device tree) we have exactly this ordering. (Compare
-with $(grep gpio@ arch/arm/boot/dts/imx25.dtsi).)
-
-For a new interface this is OK, still I predict users will complain if
-the numbers used don't match naturally the hardware names. And IMHO they
-are right.
-
-Best regards
-Uwe
+It will definitively feel a bit weird to have all the channels have
+their own nodes but not the timers...
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
