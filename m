@@ -1,68 +1,43 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Tue, 5 Jul 2016 10:13:53 -0700
-Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.8 -
- part1
-In-Reply-To: <20160705044612.GK1669@localhost>
-References: <CADaLNDmLXF3Y7bcabHzzu5eXXqQ8R98QUgO8yKTnCcqCRXPnDg@mail.gmail.com>
- <20160705044612.GK1669@localhost>
-Message-ID: <CADaLNDnnpMCK=_TeXSXzsartu7QTrtFYfwcMbLNBu16FsUy86w@mail.gmail.com>
+From: daniel@0x0f.com (Daniel Palmer)
+Date: Wed, 6 Jul 2016 02:33:52 +0900
+Subject: sh-eth.c writes to non-existent register on RZ/A1
+Message-ID: <CAFr9PXniO=qPUpok1dVHzjrEpKVo6t3koc2n=UCjWrdD_DL+5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 4, 2016 at 9:46 PM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
->
-> On Tue, Jun 21, 2016 at 04:40:49PM -0700, Duc Dang wrote:
->> Hi Arnd, Olof,
->>
->> This is the first part of DTS changes for X-Gene platforms targeted for 4.8
->>
->> The changes includes
->> + 2 clean-up and style fix from Bjorn with Rob's ACK [1]
->> + A timer interrupt polarity fix for X-Gene 2 (refer to Marc's
->> arm/arm64 arch timer fix [2])
->
-> I'd recommend considering switching to symbolic flag definitions, to make it
-> easier for others to interpret the DT (and for downstream users to change
-> where needed). Anyway, not a high-priority thing, just something to keep in
-> mind for some time in the future.
+Not sure if this is the right list or not. Please CC me as I'm not subscribed.
 
-Thanks, Olof.
+I've been working on getting Linux running on the GR Peach board
+(https://developer.mbed.org/platforms/Renesas-GR-PEACH/).
+It has the Renesas RZ/A1H chip and it's ethernet controller is supported by
+drivers/net/ethernet/sh_eth.c.
+There seem to be a few different controllers that are roughly the same
+and used in Renesas chips that are supported by the driver and there
+are a few tables to handle differing locations for the registers.
+There also seem to be controllers that have a "tsu" and some that
+don't.
 
-I will keep this in mind for future clean-up.
+The controller in the RZ/A1 has a tsu but is missing one of the
+registers that is called "TSU_POST1" in the tables for other chips.
+This register doesn't exist according to the hardware manual for the
+RZ/A1.
 
->
->> + Clean up an unused clk node (qmlclk) for X-Gene 1
->>
->> Marc's arch timer series [2] has a change in apm-storm.dtsi file. I
->> verified and the order of applying Marc's apm-storm.dtsi change and
->> the DT changes in xgene-next did not cause any conflict.
->>
->> [1]: (https://lkml.org/lkml/2016/6/14/340
->> [2]: http://www.spinics.net/lists/linux-samsung-soc/msg53533.html
->>
->> Regards,
->> Duc Dang.
->> ------
->>
->> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
->>
->>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
->>
->> are available in the git repository at:
->>
->>   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.8-part1
->>
->> for you to fetch changes up to ddbc71d96012fbcc4b9e42fd1c131f185875f73f:
->>
->>   arm64: dts: apm: Remove unused qmlclk node on X-Gene 1 (2016-06-20
->> 18:41:49 -0700)
->
-> Merged into next/dt64.
->
-> Thanks!
->
-> -Olof
+The problem is that the sh_eth driver doesn't handle that and in
+sh_eth_tsu_enable_cam_entry_post() uses the offset table for the RZ/A1
+which doesn't have an offset to TSU_POST1 to find the register and
+then writes outside of the memory range that has been mapped and
+crashes the kernel.
 
-Regards,
-Duc Dang.
+Commenting out the register write stops the kernel crashing and the
+ethernet seems to work.
+
+There is a function in sh_eth.c called sh_eth_is_rz_fast_ether() that
+seems to be for working around slight differences with this version of
+the controller and I considered submitting a patch with the contents
+of sh_eth_tsu_enable_cam_entry_post() wrapped with if(sh_eth_is...)
+but I have next to no knowledge of how the hardware actually works so
+I'm looking for someone that does to chime in.
+
+Cheers,
+
+Daniel
