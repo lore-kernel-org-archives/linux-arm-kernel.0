@@ -1,29 +1,28 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 5 Jul 2016 17:21:51 +0200
-Subject: [PATCH 1/3] includes: dt-bindings: Add STM32F746 pinctrl DT
- bindings
-In-Reply-To: <CACRpkdbexKR6Z3HQxbrx1C8xcXc_A_1x0oTZ=if_gkRCckoC8g@mail.gmail.com>
-References: <1467726017-20041-1-git-send-email-alexandre.torgue@st.com>
- <1467726017-20041-2-git-send-email-alexandre.torgue@st.com>
- <CACRpkdbexKR6Z3HQxbrx1C8xcXc_A_1x0oTZ=if_gkRCckoC8g@mail.gmail.com>
-Message-ID: <577BD08F.7010803@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Jul 2016 17:22:22 +0200
+Subject: [PATCH 03/11] ASoC: ab8500-codec: remove platform data based probe
+In-Reply-To: <20160705134445.GV6247@sirena.org.uk>
+References: <1467722710-1577-1-git-send-email-linus.walleij@linaro.org>
+ <1467722710-1577-3-git-send-email-linus.walleij@linaro.org>
+ <20160705134445.GV6247@sirena.org.uk>
+Message-ID: <CACRpkdZ7JW7iBzwL_7cY928Fp+CUNwPHQ6D8--CXvoLq7LMZAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On 07/05/2016 04:59 PM, Linus Walleij wrote:
-> On Tue, Jul 5, 2016 at 3:40 PM, Alexandre TORGUE
-> <alexandre.torgue@st.com> wrote:
+On Tue, Jul 5, 2016 at 3:44 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Jul 05, 2016 at 02:45:02PM +0200, Linus Walleij wrote:
 >
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>> Mark: if this makes sense to you, please provide an ACK so Arnd
+>> can merge this cleanup.
 >
-> The patch was a bit liberal with newlines so I cut some whitespace
-> while applying.
+> I'm still not clear what dependency this has on anything elsein the
+> series.
 
-Sorry for that and thanks for modifications.
+None whatsoever if I'm reading it right. The series also compiles
+fine without it.
 
-Regards,
+Do you prefer to apply it to the ASoC tree? I can drop
+it from this series.
 
-Alex
+Yours,
+Linus Walleij
