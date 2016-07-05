@@ -1,45 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Jul 2016 21:55:37 +0200
-Subject: [GIT PULL] Allwinner clock fixes for 4.7
-Message-ID: <20160705195537.GA17805@lukather>
+Date: Tue, 5 Jul 2016 21:59:16 +0200
+Subject: [GIT PULL] Allwinner DRM fixes for 4.7, take 2
+Message-ID: <20160705195916.GA18944@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+Hi David,
 
-Please pull the following fixes for the 4.7 cycle.
+Please pull the following fixes for the 4.7 merge window.
 
 Thanks!
 Maxime
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+The following changes since commit 13fef095bde04228316046f997eb963285d8532e:
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+  drm: sun4i: do cleanup if RGB output init fails (2016-05-30 08:28:33 +0200)
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-fixes-for-4.7
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drm-fixes-for-4.7-2
 
-for you to fetch changes up to 9ca91a65583c73e4be6e9f53323a7ae04e6803ef:
+for you to fetch changes up to 3b8e64f6f8e2d437b15572f445b1932a45f9be6a:
 
-  clk: sunxi: remove unused variable (2016-06-16 09:18:29 +0200)
-
-----------------------------------------------------------------
-Allwinner clock fixes for 4.7
-
-A bunch of changes for the display clocks merged in 4.7
+  gpu: drm: sun4i_drv: add missing of_node_put after calling of_parse_phandle (2016-07-05 09:20:29 +0200)
 
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-      clk: sunxi: remove unused variable
+Allwinner DRM driver fixes for 4.7, take 2
 
+A new set of fixes for the sun4i driver, mostly related to vblank handling,
+and a minor fix to release a reference on the device tree nodes we're
+parsing in the probe logic.
+
+----------------------------------------------------------------
 Maxime Ripard (2):
-      clk: sunxi: tcon-ch1: Do not return a negative error in get_parent
-      clk: sunxi: display: Add per-clock flags
+      drm/sun4i: Report proper vblank
+      drm/sun4i: Send vblank event when the CRTC is disabled
 
- drivers/clk/sunxi/clk-sun4i-display.c  | 5 ++++-
- drivers/clk/sunxi/clk-sun4i-tcon-ch1.c | 4 ----
- 2 files changed, 4 insertions(+), 5 deletions(-)
+Peter Chen (1):
+      gpu: drm: sun4i_drv: add missing of_node_put after calling of_parse_phandle
+
+ drivers/gpu/drm/sun4i/sun4i_crtc.c | 8 ++++++++
+ drivers/gpu/drm/sun4i/sun4i_drv.c  | 3 ++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -51,4 +53,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/9b9588fd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/b9eb6ad5/attachment.sig>
