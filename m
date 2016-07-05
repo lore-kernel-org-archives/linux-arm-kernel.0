@@ -1,43 +1,98 @@
-From: daniel@0x0f.com (Daniel Palmer)
-Date: Wed, 6 Jul 2016 02:33:52 +0900
-Subject: sh-eth.c writes to non-existent register on RZ/A1
-Message-ID: <CAFr9PXniO=qPUpok1dVHzjrEpKVo6t3koc2n=UCjWrdD_DL+5A@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 5 Jul 2016 18:49:01 +0100
+Subject: [PATCH v4 2/3] arm64: hibernate: Resume when hibernate image
+ created on non-boot CPU
+In-Reply-To: <1467643950-11034-3-git-send-email-james.morse@arm.com>
+References: <1467643950-11034-1-git-send-email-james.morse@arm.com>
+ <1467643950-11034-3-git-send-email-james.morse@arm.com>
+Message-ID: <20160705174901.GK3565@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not sure if this is the right list or not. Please CC me as I'm not subscribed.
+On Mon, Jul 04, 2016 at 03:52:29PM +0100, James Morse wrote:
+> diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
+> index 024d623f662e..9b3e8d9bfc8c 100644
+> --- a/arch/arm64/include/asm/suspend.h
+> +++ b/arch/arm64/include/asm/suspend.h
+> @@ -47,4 +47,8 @@ int swsusp_arch_resume(void);
+>  int arch_hibernation_header_save(void *addr, unsigned int max_size);
+>  int arch_hibernation_header_restore(void *addr);
+>  
+> +/* Used to resume on the CPU we hibernated on */
+> +int _arch_hibernation_disable_cpus(bool suspend);
+> +#define arch_hibernation_disable_cpus(x) _arch_hibernation_disable_cpus(x)
 
-I've been working on getting Linux running on the GR Peach board
-(https://developer.mbed.org/platforms/Renesas-GR-PEACH/).
-It has the Renesas RZ/A1H chip and it's ethernet controller is supported by
-drivers/net/ethernet/sh_eth.c.
-There seem to be a few different controllers that are roughly the same
-and used in Renesas chips that are supported by the driver and there
-are a few tables to handle differing locations for the registers.
-There also seem to be controllers that have a "tsu" and some that
-don't.
+Nitpick: we normally tend to use the same name for the function an macro
+but it's fine like this as well:
 
-The controller in the RZ/A1 has a tsu but is missing one of the
-registers that is called "TSU_POST1" in the tables for other chips.
-This register doesn't exist according to the hardware manual for the
-RZ/A1.
++int arch_hibernation_disable_cpus(bool suspend);
++#define arch_hibernation_disable_cpus arch_hibernation_disable_cpus
 
-The problem is that the sh_eth driver doesn't handle that and in
-sh_eth_tsu_enable_cam_entry_post() uses the offset table for the RZ/A1
-which doesn't have an offset to TSU_POST1 to find the register and
-then writes outside of the memory range that has been mapped and
-crashes the kernel.
+BTW, do you expect an architecture to define ARCH_HIBERNATION_CPU_HOOKS
+but not arch_hibernation_disable_cpus? Or you'd expect more hooks in the
+future?
 
-Commenting out the register write stops the kernel crashing and the
-ethernet seems to work.
+> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+> index 21ab5df9fa76..bae45abde7a2 100644
+> --- a/arch/arm64/kernel/hibernate.c
+> +++ b/arch/arm64/kernel/hibernate.c
+> @@ -15,6 +15,7 @@
+>   * License terms: GNU General Public License (GPL) version 2
+>   */
+>  #define pr_fmt(x) "hibernate: " x
+> +#include <linux/cpu.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/mm.h>
+>  #include <linux/notifier.h>
+> @@ -26,6 +27,7 @@
+>  
+>  #include <asm/barrier.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/cputype.h>
+>  #include <asm/irqflags.h>
+>  #include <asm/memory.h>
+>  #include <asm/mmu_context.h>
+> @@ -34,6 +36,7 @@
+>  #include <asm/pgtable-hwdef.h>
+>  #include <asm/sections.h>
+>  #include <asm/smp.h>
+> +#include <asm/smp_plat.h>
+>  #include <asm/suspend.h>
+>  #include <asm/virt.h>
+>  
+> @@ -66,6 +69,12 @@ extern char hibernate_el2_vectors[];
+>  extern char __hyp_stub_vectors[];
+>  
+>  /*
+> + * The logical cpu number we should resume on, initialised to a non-cpu
+> + * number.
+> + */
+> +static int sleep_cpu = -EINVAL;
+> +
+> +/*
+>   * Values that may not change over hibernate/resume. We put the build number
+>   * and date in here so that we guarantee not to resume with a different
+>   * kernel.
+> @@ -87,6 +96,8 @@ static struct arch_hibernate_hdr {
+>  	 * re-configure el2.
+>  	 */
+>  	phys_addr_t	__hyp_stub_vectors;
+> +
+> +	u64		sleep_cpu_mpidr;
+>  } resume_hdr;
+>  
+>  static inline void arch_hdr_invariants(struct arch_hibernate_hdr_invariants *i)
+> @@ -129,12 +140,18 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
+>  	else
+>  		hdr->__hyp_stub_vectors = 0;
+>  
+> +	/* Save the mpidr of the cpu we called cpu_suspend() on... */
+> +	hdr->sleep_cpu_mpidr = cpu_logical_map(sleep_cpu);
+> +	pr_info("Hibernating on CPU %d [mpidr:0x%llx]\n", sleep_cpu,
+> +		hdr->sleep_cpu_mpidr);
 
-There is a function in sh_eth.c called sh_eth_is_rz_fast_ether() that
-seems to be for working around slight differences with this version of
-the controller and I considered submitting a patch with the contents
-of sh_eth_tsu_enable_cam_entry_post() wrapped with if(sh_eth_is...)
-but I have next to no knowledge of how the hardware actually works so
-I'm looking for someone that does to chime in.
+Do we have a guarantee that sleep_cpu != -EINVAL here?
 
-Cheers,
+If the above is fine, feel free to add:
 
-Daniel
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
