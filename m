@@ -1,40 +1,39 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 05 Jul 2016 13:40:16 +0200
-Subject: [PATCH 3/3] reset: socfpga: use readl/writel_relaxed
-In-Reply-To: <10266400.9nrl73J4sT@wuerfel>
-References: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
- <1467713872-4051-3-git-send-email-p.zabel@pengutronix.de>
- <10266400.9nrl73J4sT@wuerfel>
-Message-ID: <1467718816.2978.41.camel@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 5 Jul 2016 09:04:46 -0300
+Subject: [PATCH 2/3] ARM: dts: imx6sx: Add UDOO Neo support
+In-Reply-To: <1467691450-22975-3-git-send-email-afaerber@suse.de>
+References: <1467691450-22975-1-git-send-email-afaerber@suse.de>
+ <1467691450-22975-3-git-send-email-afaerber@suse.de>
+Message-ID: <CAOMZO5CQWz++TVKBKEMSQuyks3C+7Tx5=Frh6R+Qubcab=EbjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 05.07.2016, 13:20 +0200 schrieb Arnd Bergmann:
-> On Tuesday, July 5, 2016 12:17:52 PM CEST Philipp Zabel wrote:
-> > This just removes the rmb()/wmb() pair between register read and
-> > write. Since no relevant reads follow the rmb and no relevant writes
-> > precede the wmb, they should be safe to remove.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> We should only do this if you are fixing a bug (which you don't mention
-> in the changelog), or if you can show a relevant performance
-> improvement. Is this code ever used in a fast path? If it is,
-> wouldn't that indicate a problem in some driver?
+On Tue, Jul 5, 2016 at 1:04 AM, Andreas F?rber <afaerber@suse.de> wrote:
 
-It does not fix a bug, and it's not about performance either. I'd like
-to align code with the recently posted stm32 driver, to unify them in a
-future patch.
-Of course we can change the stm32 driver to use readl/writel instead of
-the relaxed variants, it just seemed useless to have those barriers
-between the read and write.
+> +/dts-v1/;
+> +
+> +#include "imx6sx-udoo-neo.dtsi"
+> +
+> +/ {
+> +       model = "UDOO Neo Basic";
 
-If anything, we'd need to try to make sure that the writel in assert
-hits the hardware before the function returns, so that a
-assert-delay-deassert doesn't accidentally spend half its delay with the
-writel still in the store buffer, and we'd need a full barrier after the
-writel in deassert so that there can be no successive reads from still
-disabled IP cores.
+This should be something like:
 
-regards
-Philipp
+model = "Udoo i.MX6 SoloX UDOO Neo Basic";
+
+> +       compatible = "fsl,imx6sx";
+
+compatible = "udoo,imx6sx-udoo-neo", "fsl,imx6sx";
+
+Then you can also send a separate patch to add udoo to
+Documentation/devicetree/bindings/vendor-prefixes.txt.
+
+Same applies to other places in this patch.
+
+> +&fec1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_enet1>;
+> +       phy-mode = "rmii";
+> +       phy-reset-gpios = <&gpio5 4 GPIO_ACTIVE_HIGH>;
+
+Shouldn't this be GPIO_ACTIVE_LOW instead?
