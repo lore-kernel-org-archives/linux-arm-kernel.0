@@ -1,50 +1,33 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 5 Jul 2016 17:04:27 +0800
-Subject: [PATCH V2 06/10] soc/tegra: Add Tegra186 support
+Date: Tue, 5 Jul 2016 17:04:28 +0800
+Subject: [PATCH V2 07/10] arm64: defconfig: Enable Tegra186 SoC
 In-Reply-To: <20160705090431.5852-1-josephl@nvidia.com>
 References: <20160705090431.5852-1-josephl@nvidia.com>
-Message-ID: <20160705090431.5852-7-josephl@nvidia.com>
+Message-ID: <20160705090431.5852-8-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra186 has a combination of Denver and Cortex-A57 CPU cores and
-GPUs with Pascal architecture on it. It features with ADSP with
-Cortex-A9 CPU for audio processing, hardware video encoder/decoder with
-multi-format support, ISP for image capture processing and BPMP for the
-power managements.
+Enable Tegra186 SoC.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 Changes in V2:
 - None
 ---
- drivers/soc/tegra/Kconfig | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/soc/tegra/Kconfig b/drivers/soc/tegra/Kconfig
-index 03089ad2fc65..88a71dfd466c 100644
---- a/drivers/soc/tegra/Kconfig
-+++ b/drivers/soc/tegra/Kconfig
-@@ -61,6 +61,20 @@ config ARCH_TEGRA_132_SOC
- 	  but contains an NVIDIA Denver CPU complex in place of
- 	  Tegra124's "4+1" Cortex-A15 CPU complex.
- 
-+config ARCH_TEGRA_186_SOC
-+	bool "NVIDIA Tegra186 SoC"
-+	select MAILBOX
-+	select TEGRA_BPMP
-+	select TEGRA_HSP_MBOX
-+	select TEGRA_IVC
-+	help
-+	  Enable support for the NVIDIA Tegar186 SoC. The Tegra186 has a
-+	  combination of Denver and Cortex-A57 CPU cores and GPUs with Pascal
-+	  architecture on it. It features with ADSP with Cortex-A9 CPU for
-+	  audio processing, hardware video encoder/decoder with multi-format
-+	  support, ISP for image capture processing and BPMP for the power
-+	  managements.
-+
- config ARCH_TEGRA_210_SOC
- 	bool "NVIDIA Tegra210 SoC"
- 	select PINCTRL_TEGRA210
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index e69051098435..64d767ec142c 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -326,6 +326,7 @@ CONFIG_QCOM_SMEM=y
+ CONFIG_QCOM_SMD=y
+ CONFIG_QCOM_SMD_RPM=y
+ CONFIG_ARCH_TEGRA_132_SOC=y
++CONFIG_ARCH_TEGRA_186_SOC=y
+ CONFIG_ARCH_TEGRA_210_SOC=y
+ CONFIG_EXTCON_USB_GPIO=y
+ CONFIG_PWM=y
 -- 
 2.9.0
