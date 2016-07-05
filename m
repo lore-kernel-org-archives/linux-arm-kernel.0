@@ -1,36 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Jul 2016 22:19:24 -0700
-Subject: [GIT PULL] DaVinci updates for v4.8
-In-Reply-To: <576D25D6.7090907@ti.com>
-References: <576D25D6.7090907@ti.com>
-Message-ID: <20160705051924.GN1669@localhost>
+Date: Mon, 4 Jul 2016 22:23:03 -0700
+Subject: [GIT PULL] Qualcomm Defconfig Updates for v4.8
+In-Reply-To: <1467082114-22716-1-git-send-email-andy.gross@linaro.org>
+References: <1467082114-22716-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160705052303.GP1669@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2016 at 05:51:42PM +0530, Sekhar Nori wrote:
+On Mon, Jun 27, 2016 at 09:48:34PM -0500, Andy Gross wrote:
 > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
 >   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.8
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-defconfig-for-4.8
 > 
-> for you to fetch changes up to 6bce5efd442488434a317a25c5482fcd5a66bb0f:
+> for you to fetch changes up to 8aa788d3e59a14845c95446ac25a267e75711374:
 > 
->   ARM: davinci: remove unused davinci-i2s pdata (2016-06-24 15:28:30 +0530)
-> 
-> ----------------------------------------------------------------
-> Clean-up unused pdata for DaVinci McBSP
-> audio driver and add McBSP clocks for
-> DaVinci DA850 SoC.
+>   ARM: configs: qualcomm: Add MDM9615 missing defconfigs (2016-06-27 16:51:06 -0500)
 > 
 > ----------------------------------------------------------------
-> Petr Kulhavy (2):
->       ARM: davinci: da850: add clocks for mcbsp0 and 1
->       ARM: davinci: remove unused davinci-i2s pdata
+> Qualcomm ARM Based defconfig Updates for v4.8
+> 
+> * Enable MSM9615 board support
+> * Enable MSM8660 pinctrl support
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (1):
+>       ARM: defconfig: enable the MSM8660 pin controller
+> 
+> Neil Armstrong (1):
+>       ARM: configs: qualcomm: Add MDM9615 missing defconfigs
 
-Merged into next/soc. Thanks.
+Thanks, merged.
 
 
 -Olof
