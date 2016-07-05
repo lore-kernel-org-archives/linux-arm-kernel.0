@@ -1,59 +1,65 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 5 Jul 2016 15:08:41 +0100
-Subject: [PATCH v2] xen/arm: register clocks used by the hypervisor
-In-Reply-To: <alpine.DEB.2.10.1607051456410.2575@sstabellini-ThinkPad-X260>
-References: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
- <alpine.DEB.2.10.1607051449370.2575@sstabellini-ThinkPad-X260>
- <577BBC1A.8020209@arm.com>
- <alpine.DEB.2.10.1607051456410.2575@sstabellini-ThinkPad-X260>
-Message-ID: <577BBF69.8010809@arm.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Tue, 5 Jul 2016 15:18:58 +0100
+Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <CAJZ5v0iFcjxQV9YV2KaXGAPRBM8M2xxPm5e2b4uhwYAZZtndPg@mail.gmail.com>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <57714bed-3f9c-90c2-ac30-2d462d8a06d4@linaro.org>
+ <20160701152340.GO12735@arm.com>
+ <2183745.J7YpvxXQ47@vostro.rjw.lan>
+ <CAJZ5v0iFcjxQV9YV2KaXGAPRBM8M2xxPm5e2b4uhwYAZZtndPg@mail.gmail.com>
+Message-ID: <20160705141858.GD18338@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 04, 2016 at 02:53:20PM +0200, Rafael J. Wysocki wrote:
+> On Fri, Jul 1, 2016 at 11:04 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Friday, July 01, 2016 04:23:40 PM Will Deacon wrote:
+> >> On Thu, Jun 30, 2016 at 09:48:02PM +0800, Hanjun Guo wrote:
+> >> > On 2016/6/30 21:27, Rafael J. Wysocki wrote:
+> >> > >On Thursday, June 30, 2016 10:10:02 AM Hanjun Guo wrote:
+> >> > >>GTDT is part of ACPI spec, drivers/acpi/ is for driver code of
+> >> > >>ACPI spec, I think it can stay in drivers/acpi/ from this point
+> >> > >>of view, am I right?
+> >> > >
+> >> > >The question is not "Can it?", but "Does it need to?".
+> >> > >
+> >> > >It is in the spec, but still there's only one architecture needing it.
+> >> > >
+> >> > >There is no way to test it on any other architecture and no reason to build it
+> >> > >for any other architecture, so why does it need to be located in drivers/acpi/ ?
+> >> >
+> >> > I'm fine to move it to other places such as arch/arm64/kernel/, but I
+> >> > would like to ask ARM64 maintainer's suggestion for this.
+> >> >
+> >> > Will, Catalin, what's your opinion on this?
+> >>
+> >> We don't have any device-tree code for the architected timer under
+> >> arch/arm64, so I don't see why we should need anything for ACPI either.
+> >
+> > And I don't see a reason for the GTDT code to be there in drivers/acpi/.
+> >
+> > What gives?
+> 
+> Well, since there are things like acpi_lpss in there, my position here
+> is kind of weak. :-)
+> 
+> That said I'm not particularly happy with having them in
+> drivers/acpi/, so I definitely won't object against attempts to moving
+> them somewhere else.
+> 
+> > Maybe it should go to the same place as the analogus DT code, then?
+> 
+> I'm mostly concerned about how (and by whom) that code is going to be
+> maintained going forward, though.  I also think it should be made
+> clear that it is ARM64-only.
+> 
 
+So is this a documentation issue in which case Fu Wei can add that to
+the file to explain its limited to ARM64. Or we could even rename the
+file acpi_arm64_gtdt.c
 
-On 05/07/16 15:04, Stefano Stabellini wrote:
-> On Tue, 5 Jul 2016, Julien Grall wrote:
->> On 05/07/16 14:53, Stefano Stabellini wrote:
->>> On Thu, 30 Jun 2016, Dirk Behme wrote:
->>>> +- clocks: one or more clocks to be registered.
->>>> +  Xen hypervisor drivers might replace native drivers, resulting in
->>>> +  clocks not registered by these native drivers. To avoid that these
->>>> +  unregistered clocks are disabled, then, e.g. by clk_disable_unused(),
->>>> +  register them in the hypervisor node.
->>>> +  An example for this are the clocks of the serial driver. If the clocks
->>>> +  used by the serial hardware interface are not registered by the serial
->>>> +  driver the serial output might stop once clk_disable_unused() is
->>>> called.
->>>
->>> What if we use the "status" property of the clocks? Could we set it to
->>> "disabled" in Xen? Would that be enough for Linux to leave them alone?
->>
->> clocks could be shared between multiple devices. So it is not possible to
->> disable the clock.
->
-> To clarify my suggestion: I am not saying we should disable the clock, I
-> am saying we should set the "status" property to "disabled" in Xen for
-> the clock used by the serial or passthrough devices (for which the
-> "status" property is already set to "disabled"). That should work for
-> cases where the clock is not shared among multiple devices.
+It seems a pity as the comment on this series were minors to block
+things on a filename/location.
 
-How would you be able to differentiate in Xen between a clock shared and 
-a non-shared one? The only way I can think it going through all the 
-device tree which sounds really expensive.
-
-> If the clock is shared, then I don't think we would run into the issue
-> described by Dirk because I wouldn't imagine clk_disable_unused would
-> try to disable the clock anymore, because it would actually be in use
-> from Linux POV.
-
-We also want to prevent Linux changing the rate of the clock (see Mark's 
-mail [1]).
-
-Regards,
-
-[1] 
-https://lists.xenproject.org/archives/html/xen-devel/2016-07/msg00335.html
-
--- 
-Julien Grall
+Graeme
