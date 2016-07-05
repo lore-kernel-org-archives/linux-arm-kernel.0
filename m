@@ -1,35 +1,32 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 05 Jul 2016 14:28:50 +0200
-Subject: [PATCH v4 1/3] PM / Hibernate: Allow arch code to influence CPUs
- disabled during hibernate
-In-Reply-To: <1467643950-11034-2-git-send-email-james.morse@arm.com>
-References: <1467643950-11034-1-git-send-email-james.morse@arm.com>
- <1467643950-11034-2-git-send-email-james.morse@arm.com>
-Message-ID: <2602641.slsnqsKrbn@vostro.rjw.lan>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 5 Jul 2016 14:32:31 +0200
+Subject: [PATCH v3 0/2] [for arm-soc] mach-tango updates for v4.8
+In-Reply-To: <57726597.8030501@sigmadesigns.com>
+References: <57726597.8030501@sigmadesigns.com>
+Message-ID: <577BA8DF.9080603@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 04, 2016 03:52:28 PM James Morse wrote:
-> Architecture code may need to do extra work when secondary CPUs are
-> disabled during hibernate and resume. This may include pushing sleeping
-> CPUs into a deeper power-saving state, or influencing which CPU resume
-> occurs on.
+On 28/06/2016 13:55, Marc Gonzalez wrote:
+
+> Hello arm-soc maintainers,
 > 
-> Define a macro arch_hibernation_disable_cpus(), which defaults to
-> calling disable_nonboot_cpus() if undefined. Architectures that
-> need to do extra work around these calls can use this to influence
-> the CPU down calls.
-> The macros should be defined in asm/suspend.h, and
-> ARCH_HIBERNATION_CPU_HOOKS should be added to Kconfig.
+> Could you please merge the following patches?
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Pavel Machek <pavel@ucw.cz>
+> Marc Gonzalez (2):
+>   ARM: tango: add HOTPLUG_CPU support
+>   Update ARM/TANGO section
 
-I'm going to apply this one later today.
+Hello Olof,
 
-If you want me to apply the other two as well, they need to be ACKed by the
-ARM64 maintainers.
+I see you've just merged a large number of patches in the for-next branch.
+https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/log/?h=for-next
 
-Thanks,
-Rafael
+I think you overlooked the two patches in this thread:
+
+[PATCH v4 1/2] ARM: tango: add HOTPLUG_CPU support
+[PATCH v3 2/2] Update ARM/TANGO section
+
+Could you merge these patches as well?
+
+Regards.
