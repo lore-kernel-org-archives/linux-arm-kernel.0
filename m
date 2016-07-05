@@ -1,71 +1,94 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 5 Jul 2016 14:23:31 +0100
-Subject: Tegra baseline test results for v4.7-rc6
-Message-ID: <577BB4D3.7040507@nvidia.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 05 Jul 2016 15:28:29 +0200
+Subject: [PATCH 3/4] drivers: reset: Add STM32 reset driver
+In-Reply-To: <1467640052-6770-3-git-send-email-gabriel.fernandez@st.com>
+References: <1467640052-6770-1-git-send-email-gabriel.fernandez@st.com>
+ <1467640052-6770-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1467725309.2978.63.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.7-rc6.
-Logs and other details at:
+Am Montag, den 04.07.2016, 15:47 +0200 schrieb gabriel.fernandez at st.com:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> 
+> The STM32 MCUs family IPs can be reset by accessing some registers
+> from the RCC block.
+> 
+> The list of available reset lines is documented in the DT bindings.
+> 
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  drivers/reset/Makefile      |   1 +
+>  drivers/reset/reset-stm32.c | 113 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 114 insertions(+)
+>  create mode 100644 drivers/reset/reset-stm32.c
+> 
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 03dc1bb..3776b7b 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+>  obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+>  obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
+>  obj-$(CONFIG_ARCH_MESON) += reset-meson.o
+> +obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+>  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+>  obj-$(CONFIG_ARCH_STI) += sti/
+>  obj-$(CONFIG_ARCH_HISI) += hisilicon/
+> diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
+> new file mode 100644
+> index 0000000..be42bff
+> --- /dev/null
+> +++ b/drivers/reset/reset-stm32.c
+> @@ -0,0 +1,113 @@
+> +/*
+> + * Copyright (C) Maxime Coquelin 2015
+> + * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> + * License terms:  GNU General Public License (GPL), version 2
+> + *
+> + * Heavily based on sunxi driver from Maxime Ripard.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/types.h>
+> +
+> +struct stm32_reset_data {
+> +	spinlock_t			lock;
+> +	void __iomem			*membase;
+> +	struct reset_controller_dev	rcdev;
+> +};
+> +
+> +static int stm32_reset_assert(struct reset_controller_dev *rcdev,
+> +			      unsigned long id)
+> +{
+> +	struct stm32_reset_data *data = container_of(rcdev,
+> +						     struct stm32_reset_data,
+> +						     rcdev);
+> +	int bank = id / BITS_PER_LONG;
+> +	int offset = id % BITS_PER_LONG;
+> +	unsigned long flags;
+> +	u32 reg;
+> +
+> +	spin_lock_irqsave(&data->lock, flags);
+> +
+> +	reg = readl_relaxed(data->membase + (bank * 4));
+> +	writel_relaxed(reg | BIT(offset), data->membase + (bank * 4));
 
-    https://nvtb.github.io//linux/test_v4.7-rc6/20160703233102/
+Please also switch to the non-relaxed variants. It shouldn't make a
+difference here, and as Arnd points out, reduces the risk of new
+developers using readl/writel_relaxed without thinking about the
+consequences.
+Further, this will make the stm32, sunxi, and socfpga accessors look the
+same. I'd like to try and combine them after this is merged.
 
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.7-rc5 (4c2e07c6a29e0129e975727b9f57eede813eea85)):
-   text     data      bss    total  kernel
-  +4100      +32        0    +4132  defconfig
-  +1196        0      +64    +1260  multi_v7_defconfig
-   +144        0        0     +144  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.7-rc5 (4c2e07c6a29e0129e975727b9f57eede813eea85))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
---
-nvpublic
+regards
+Philipp
