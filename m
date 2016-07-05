@@ -1,37 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 5 Jul 2016 09:50:28 +0200
-Subject: [PATCH 0/3] clocksource: timer-atmel-pit: driver cleanup
-In-Reply-To: <1467670354-12987-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1467670354-12987-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <577B66C4.6040101@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue,  5 Jul 2016 00:56:53 -0700
+Subject: [GIT PULL 2/2] omap soc updates for v4.8 merge window, part 2
+In-Reply-To: <pull-1467702709-538742>
+References: <pull-1467702709-538742>
+Message-ID: <pull-1467702709-538742-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/07/2016 00:12, Alexandre Belloni a ?crit :
-> Hi,
-> 
-> Here are a few cleanups I had laying around for a while. I rebased and
-> tested on top of 4.7-rc1.
-> 
-> The series will apply after:
-> "clocksource: timer-atmel-pit: enable mck"
-> 
-> 
-> Alexandre Belloni (3):
->   clocksource: timer-atmel-pit: drop at91sam926x_pit_common_init
->   clocksource: timer-atmel-pit: remove uselesss WARN_ON_ONCE
->   clocksource: timer-atmel-pit: simplify IRQ handler
+The following changes since commit 44e7475d40eb26b8d3a6e2b2f7a5f12a5fe0942e:
 
-To the whole series:
+  ARM: OMAP2+: Fix build if CONFIG_SMP is not set (2016-06-27 23:30:02 -0700)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+are available in the git repository at:
 
-Thanks for having done this cleanup. Bye,
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/soc-pt2-signed
 
->  drivers/clocksource/timer-atmel-pit.c | 76 ++++++++++++++---------------------
->  1 file changed, 30 insertions(+), 46 deletions(-)
-> 
+for you to fetch changes up to 183e2077d007aa4b697efba095ecfea7244a6107:
 
+  ARM: AM33xx: fix module_wait_ready without clkctrl register (2016-07-04 07:15:47 -0700)
 
--- 
-Nicolas Ferre
+----------------------------------------------------------------
+Few more omap SoC changes for v4.8 merge window:
+
+- Fix a make randconfig build error for recent SMP kexec changes
+
+- A series of clock related fixes to prepare things for moving
+  device clkctrl register handling to drivers/clk
+
+----------------------------------------------------------------
+Tero Kristo (5):
+      ARM: OMAP2+: omap_device: create clock alias purely from DT data
+      ARM: OMAP2+: hwmod: fetch main_clk based on hwmod name
+      ARM: OMAP2+: timer: change order of hwmod data handling
+      ARM: OMAP2+: clockdomain: add usecounting support to autoidle APIs
+      ARM: AM33xx: fix module_wait_ready without clkctrl register
+
+Tony Lindgren (1):
+      ARM: OMAP2+: Fix build with CONFIG_SMP and CONFIG_PM is not set
+
+ arch/arm/mach-omap2/Makefile              |  5 +-
+ arch/arm/mach-omap2/clockdomain.c         | 36 +++++++++-----
+ arch/arm/mach-omap2/clockdomain.h         |  2 +
+ arch/arm/mach-omap2/cm33xx.c              |  3 ++
+ arch/arm/mach-omap2/cpuidle44xx.c         |  2 +-
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |  2 +-
+ arch/arm/mach-omap2/omap-smp.c            |  2 +-
+ arch/arm/mach-omap2/omap_device.c         | 17 ++++++-
+ arch/arm/mach-omap2/omap_hwmod.c          | 82 +++++++++++++++++++++++--------
+ arch/arm/mach-omap2/pm.c                  |  8 +--
+ arch/arm/mach-omap2/powerdomain.c         | 20 +++-----
+ arch/arm/mach-omap2/timer.c               |  3 +-
+ 12 files changed, 123 insertions(+), 59 deletions(-)
