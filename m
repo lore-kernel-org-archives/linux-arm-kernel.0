@@ -1,85 +1,90 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Mon, 04 Jul 2016 19:50:19 -0300
-Subject: [RFC] arm64: kexec_file_load support
-In-Reply-To: <20160704065814.GO20774@linaro.org>
-References: <20160701051111.GL20774@linaro.org> <3300473.zhbeG65qgA@hactar>
- <20160704065814.GO20774@linaro.org>
-Message-ID: <5766907.oiVi8ABPsz@hactar>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 05 Jul 2016 02:24:42 +0200
+Subject: [PATCH v3] arm64: dts: rockchip: add the power domain node for
+ rk3399
+In-Reply-To: <1467635644-16798-1-git-send-email-wxt@rock-chips.com>
+References: <1467635644-16798-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1904131.irFlfKsH8m@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Am Montag, 04 Juli 2016, 15:58:15 schrieb AKASHI Takahiro:
-> On Fri, Jul 01, 2016 at 12:46:31PM -0300, Thiago Jung Bauermann wrote:
-> > I agree that it would be better if we could have a system call where a
+Am Montag, 4. Juli 2016, 20:34:04 schrieb Caesar Wang:
+> From: Elaine Zhang <zhangqing@rock-chips.com>
 > 
-> > custom device tree could be passed. One suggestion is:
-> For powerpc, you might be able to use dtbImage instead of Image
-> without changing the kernel interfaces.
-
-That works for custom kernels, but for signed kernels from a distro, I 
-believe that's not an option.
-
-> > kexec_file_load2(int fds[], int fd_types[], int nr_fds,
-> > 
-> > 		 unsigned long cmdline_len, const char *cmdline_ptr,
-> > 		
-> > 		unsigned long flags);
+> In order to meet low power requirements, a power management unit (PMU) is
+> designed for controlling power resources in RK3399. The RK3399 PMU is
+> dedicated for managing the power of the whole chip.
 > 
-> You don't want to simply add one more argument, i.e. dtb_fd, don't you.
-
-I'm just trying to avoid having to add another argument later if we find out 
-someone is loading another segment that we didn't know about. :-)
-
-The older kexec_load system call allows passing an arbitrary number of 
-segments (sort of, currently capped at 16) to the kernel, so my suggestions 
-preserve that feature.
-
-If people think that adding another argument for dtb_fd is enough, I won't 
-mind.
-
-> I prefer a slightly-simpler interface:
->         struct kexec_file_fd {
->                 enum kexec_file_type;
->                 int fd;
->         }
+> 1. add pd node for RK3399 Soc
+> 2. create power domain tree
+> 3. add qos node for domain
 > 
->         int kexec_file_load2(struct kexec_file_fd[], int nr_fds, int
-> flags);
-
-I like this one.
-
-> Or if you want to keep the compatibility with the existing system call,
+> From the DT/binds and driver can get more detail information:
+> The driver:
+>         drivers/soc/rockchip/pm_domains.c
+> The document:
+>         Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
 > 
->         int kexec_file_load(int kernel_fd, int initrd_fd,
->                         unsigned long cmdline_len, const char
-> *cmdline_ptr, unsigned long flags,
->                         int struct kexec_file_fd[], int nr_fds);
+> Note:
+> As the TRM lists many voltage domains and power domains, then this patch
+> adds some domains for driver. Due to some domains
+> (e.g. emmc, usb, core)...We can't turned off it on
+> bootup, or says some device driver can't handle the power domain enough.
+> Maybe We will add more other domains in the future or later.
+
+I talked with Caesar about that today and for example the gmac domain seems 
+to cause problems right now when only using the generic power-domain 
+handling the kernel provides on probe and remove.
+
+So while this gets investigated, I'm probably ok with only using the stable 
+power-domains, but will give the us-people a chance to also respond on 
+wednesday :-) .
+
+
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+> Cc: Heiko Stuebner <heiko@sntech.de>
 > 
-> Here SYSCALL_DEFINE7() have to be defined, and I'm not sure that we will
-> not have a problem in adding a system call with more than 6 arguments.
+> ---
+> 
+> Changes in v3:
+> - As some commnets on https://patchwork.kernel.org/patch/9209205/
+> - according to the alphabetically sort
+> - %s/RK3399_PD_VOP/RK3399_PD_VOPL, %s/RK3399_PD_IE/RK3399_PD_IEP
+> 
+> Changes in v2:
+> - As Doug/Heiko commnets on https://patchwork.kernel.org/patch/9206415/.
+>   drop the debugfs-dump and Add the comments for alphabetical order.
+> 
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 179
+> +++++++++++++++++++++++++++++++ 1 file changed, 179 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index a6dd623..4559c04 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -45,6 +45,7 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/pinctrl/rockchip.h>
+> +#include <dt-bindings/power/rk3399-power.h>
+>  #include <dt-bindings/thermal/thermal.h>
+> 
+>  / {
+> @@ -594,6 +595,184 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	qos_hdcp: qos_hdcp at ffa90000 {
 
-That's very clever. We can do what you suggest above or even just add dtb_fd 
-with SYSCALL_DEFINE6. Either option would be good.
+I guess I'll just rename that to qos_hdcp: qos at ffa90000
+(similar for the other nodes), as the block itself is the same for all qos 
+instances. So if that stays the only comment, there is no need to resend, as 
+I can do the change myself.
 
-> > Where fds is an array with nr_fds file descriptors and fd_types is an
-> > array specifying what each fd in fds is. So for example, if fds[i] is
-> > the kernel, then fd_types[i] would have the value KEXEC_FILE_KERNEL_FD.
-> > If fds[i] is the device tree blob, fd_types[i], would have the value
-> > KEXEC_FILE_DTB and so on. That way, the syscall can be extended for an
-> > arbitrary number and types of segments that have to be loaded, just
-> > like kexec_load.
-> > 
-> > Another option is to have a struct:
-> > 
-> > kexec_file_load2(struct kexec_file_params *params, unsigned long
-> > params_sz);
-> Wow, we can add any number of new parameters with this interface.
 
-Yeah, maybe it's a bit too much.
-
--- 
-[]'s
-Thiago Jung Bauermann
-IBM Linux Technology Center
+> +		compatible = "syscon";
+> +		reg = <0x0 0xffa90000 0x0 0x20>;
+> +	};
