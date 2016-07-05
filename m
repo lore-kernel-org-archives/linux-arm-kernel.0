@@ -1,115 +1,83 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue,  5 Jul 2016 12:22:53 +0100
-Subject: [PATCH v8 01/17] KVM: arm/arm64: move redistributor kvm_io_devices
+Date: Tue,  5 Jul 2016 12:22:55 +0100
+Subject: [PATCH v8 03/17] KVM: extend struct kvm_msi to hold a 32-bit device ID
 In-Reply-To: <20160705112309.28877-1-andre.przywara@arm.com>
 References: <20160705112309.28877-1-andre.przywara@arm.com>
-Message-ID: <20160705112309.28877-2-andre.przywara@arm.com>
+Message-ID: <20160705112309.28877-4-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Logically a GICv3 redistributor is assigned to a (v)CPU, so we should
-aim to keep redistributor related variables out of our struct vgic_dist.
+The ARM GICv3 ITS MSI controller requires a device ID to be able to
+assign the proper interrupt vector. On real hardware, this ID is
+sampled from the bus. To be able to emulate an ITS controller, extend
+the KVM MSI interface to let userspace provide such a device ID. For
+PCI devices, the device ID is simply the 16-bit bus-device-function
+triplet, which should be easily available to the userland tool.
 
-Let's start by replacing the redistributor related kvm_io_device array
-with two members in our existing struct vgic_cpu, which are naturally
-per-VCPU and thus don't require any allocation / freeing.
-So apart from the better fit with the redistributor design this saves
-some code as well.
+Also there is a new KVM capability which advertises whether the
+current VM requires a device ID to be set along with the MSI data.
+This flag is still reported as not available everywhere, later we will
+enable it when ITS emulation is used.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
- include/kvm/arm_vgic.h           |  8 +++++++-
- virt/kvm/arm/vgic/vgic-init.c    |  1 -
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 22 ++++++++--------------
- 3 files changed, 15 insertions(+), 16 deletions(-)
+ Documentation/virtual/kvm/api.txt | 12 ++++++++++--
+ include/uapi/linux/kvm.h          |  5 ++++-
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 1264037..5142e2a 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -145,7 +145,6 @@ struct vgic_dist {
- 	struct vgic_irq		*spis;
- 
- 	struct vgic_io_device	dist_iodev;
--	struct vgic_io_device	*redist_iodevs;
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 09efa9e..6551311 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2175,10 +2175,18 @@ struct kvm_msi {
+ 	__u32 address_hi;
+ 	__u32 data;
+ 	__u32 flags;
+-	__u8  pad[16];
++	__u32 devid;
++	__u8  pad[12];
  };
  
- struct vgic_v2_cpu_if {
-@@ -193,6 +192,13 @@ struct vgic_cpu {
- 	struct list_head ap_list_head;
- 
- 	u64 live_lrs;
+-No flags are defined so far. The corresponding field must be 0.
++flags: KVM_MSI_VALID_DEVID: devid contains a valid value
++devid: If KVM_MSI_VALID_DEVID is set, contains a unique device identifier
++       for the device that wrote the MSI message.
++       For PCI, this is usually a BFD identifier in the lower 16 bits.
 +
-+	/*
-+	 * Members below are used with GICv3 emulation only and represent
-+	 * parts of the redistributor.
-+	 */
-+	struct vgic_io_device	rd_iodev;
-+	struct vgic_io_device	sgi_iodev;
++The per-VM KVM_CAP_MSI_DEVID capability advertises the need to provide
++the device ID. If this capability is not set, userland cannot rely on
++the kernel to allow the KVM_MSI_VALID_DEVID flag being set.
+ 
+ 
+ 4.71 KVM_CREATE_PIT2
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 05ebf47..7de96f5 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -866,6 +866,7 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_ARM_PMU_V3 126
+ #define KVM_CAP_VCPU_ATTRIBUTES 127
+ #define KVM_CAP_MAX_VCPU_ID 128
++#define KVM_CAP_MSI_DEVID 129
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+@@ -1024,12 +1025,14 @@ struct kvm_one_reg {
+ 	__u64 addr;
  };
  
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index a1442f7..90cae48 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -271,7 +271,6 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
- 	dist->initialized = false;
++#define KVM_MSI_VALID_DEVID	(1U << 0)
+ struct kvm_msi {
+ 	__u32 address_lo;
+ 	__u32 address_hi;
+ 	__u32 data;
+ 	__u32 flags;
+-	__u8  pad[16];
++	__u32 devid;
++	__u8  pad[12];
+ };
  
- 	kfree(dist->spis);
--	kfree(dist->redist_iodevs);
- 	dist->nr_spis = 0;
- 
- 	mutex_unlock(&kvm->lock);
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index a0c515a..fc7b6c9 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -285,21 +285,14 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
- 
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
- {
--	int nr_vcpus = atomic_read(&kvm->online_vcpus);
- 	struct kvm_vcpu *vcpu;
--	struct vgic_io_device *devices;
- 	int c, ret = 0;
- 
--	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
--			  GFP_KERNEL);
--	if (!devices)
--		return -ENOMEM;
--
- 	kvm_for_each_vcpu(c, vcpu, kvm) {
- 		gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
- 		gpa_t sgi_base = rd_base + SZ_64K;
--		struct vgic_io_device *rd_dev = &devices[c * 2];
--		struct vgic_io_device *sgi_dev = &devices[c * 2 + 1];
-+		struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
-+		struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
- 
- 		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
- 		rd_dev->base_addr = rd_base;
-@@ -335,14 +328,15 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
- 	if (ret) {
- 		/* The current c failed, so we start with the previous one. */
- 		for (c--; c >= 0; c--) {
-+			struct vgic_cpu *vgic_cpu;
-+
-+			vcpu = kvm_get_vcpu(kvm, c);
-+			vgic_cpu = &vcpu->arch.vgic_cpu;
- 			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
--						  &devices[c * 2].dev);
-+						  &vgic_cpu->rd_iodev.dev);
- 			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
--						  &devices[c * 2 + 1].dev);
-+						  &vgic_cpu->sgi_iodev.dev);
- 		}
--		kfree(devices);
--	} else {
--		kvm->arch.vgic.redist_iodevs = devices;
- 	}
- 
- 	return ret;
+ struct kvm_arm_device_addr {
 -- 
 2.9.0
