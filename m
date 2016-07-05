@@ -1,33 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 05 Jul 2016 10:09:42 +0200
-Subject: [PATCH 4/6] irqchip: add irqchip driver for nuc900
-In-Reply-To: <577B660D.50908@iommu.org>
-References: <1466851042-22239-1-git-send-email-vw@iommu.org>
- <8706947.5rzUDVsB2F@wuerfel> <577B660D.50908@iommu.org>
-Message-ID: <4905263.SDvl9l5FN0@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 5 Jul 2016 10:12:32 +0200
+Subject: [alsa-devel] [PATCH 3/4] ASoC: mediatek: add BT implementation
+In-Reply-To: <1467683533.4212.16.camel@mtksdaap41>
+References: <1467629788-14411-1-git-send-email-garlic.tseng@mediatek.com>
+ <1467629788-14411-4-git-send-email-garlic.tseng@mediatek.com>
+ <20160704144406.GH6247@sirena.org.uk>
+ <1467683533.4212.16.camel@mtksdaap41>
+Message-ID: <20160705081232.GL6247@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 5, 2016 3:47:25 PM CEST Wan Zongshun wrote:
-> On 2016?06?29? 23:27, Arnd Bergmann wrote:
-> > On Saturday, June 25, 2016 6:37:20 PM CEST Wan Zongshun wrote:
-> >> +#define IRQ_WDT             W90X900_IRQ(1)
-> >> +#define IRQ_WWDT    W90X900_IRQ(2)
-> >> +#define IRQ_LVD             W90X900_IRQ(3)
-> >> +#define IRQ_EXT0    W90X900_IRQ(4)
-> >> +#define IRQ_EXT1    W90X900_IRQ(5)
-> >> +#define IRQ_EXT2    W90X900_IRQ(6)
-> >> +#define IRQ_EXT3    W90X900_IRQ(7)
-> >> +#define IRQ_EXT4    W90X900_IRQ(8)
-> >> +#define IRQ_EXT5    W90X900_IRQ(9)
-> >> +#define IRQ_EXT6    W90X900_IRQ(10)
-> >
-> > I'd suggest dropping the list, the contents are now in the dts.
-> 
-> Do you think I should put one irqmap header file into this
-> /arch/arm/boot/dts/include/dt-bindings folder, or I should removed those 
-> irqnumber map anywhere, just hardcode the irqnumber in dts file?
+On Tue, Jul 05, 2016 at 09:52:13AM +0800, Garlic Tseng wrote:
+> On Mon, 2016-07-04 at 16:44 +0200, Mark Brown wrote:
 
-Just hardcode it.
+> > We really shouldn't be writing the registers or other internal data of
+> > the device.  Instead we should be getting the driver for the relevant
+> > hardware component to do it.  If we just write to registers that makes
+> > the interoperation with the real driver for the device more fragile than
+> > it should be, people might update the main driver without noticing the
+> > external driver.
 
-	Arnd
+> The AUDIO_TOP_CON4 is a reg of the ASoC hw module. All the registers
+> which are set in the btmrg operator belong to ASoC hardware. The reg
+> writing you mention above is to power up the MRG interface in the ASoC
+> module.
+
+The problem is that this is the machine driver, not a driver for the
+chip that's being controlled.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/3ec84cf9/attachment.sig>
