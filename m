@@ -1,50 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Jul 2016 22:21:11 -0700
-Subject: [GIT PULL] omap-gpmc changes for v4.8 merge window
-In-Reply-To: <5770E51B.8040206@ti.com>
-References: <5770E51B.8040206@ti.com>
-Message-ID: <20160705052111.GO1669@localhost>
+Date: Mon, 4 Jul 2016 22:19:24 -0700
+Subject: [GIT PULL] DaVinci updates for v4.8
+In-Reply-To: <576D25D6.7090907@ti.com>
+References: <576D25D6.7090907@ti.com>
+Message-ID: <20160705051924.GN1669@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 11:34:35AM +0300, Roger Quadros wrote:
-> Hi Arnd/Olof,
-> 
+On Fri, Jun 24, 2016 at 05:51:42PM +0530, Sekhar Nori wrote:
 > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
 >   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 > 
 > are available in the git repository at:
 > 
->   https://github.com/rogerq/linux.git gpmc-omap-for-v4.8
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.8
 > 
-> for you to fetch changes up to 32dd625a9f3541ee6d390f12f810f28531d016c7:
+> for you to fetch changes up to 6bce5efd442488434a317a25c5482fcd5a66bb0f:
 > 
->   memory: omap-gpmc: Move gpio functions out of #ifdef CONFIG_OF (2016-06-17 10:26:48 +0300)
-> 
-> ----------------------------------------------------------------
-> OMAP-GPMC: driver updates for v4.8
-> 
-> * Make GPMC driver non modular as it is going to
-> be built-in only till arch/arm/mach-omap2 users
-> are removed.
-> 
-> * Fix build if CONFIG_OF is not defined.
-
-Merged into next/drivers.
-
+>   ARM: davinci: remove unused davinci-i2s pdata (2016-06-24 15:28:30 +0530)
 > 
 > ----------------------------------------------------------------
-> Paul Gortmaker (1):
->       memory: omap-gpmc: make it explicitly non-modular
+> Clean-up unused pdata for DaVinci McBSP
+> audio driver and add McBSP clocks for
+> DaVinci DA850 SoC.
 > 
-> Roger Quadros (1):
->       memory: omap-gpmc: Move gpio functions out of #ifdef CONFIG_OF
-> 
->  drivers/memory/omap-gpmc.c | 136 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------------------------------------------
+> ----------------------------------------------------------------
+> Petr Kulhavy (2):
+>       ARM: davinci: da850: add clocks for mcbsp0 and 1
+>       ARM: davinci: remove unused davinci-i2s pdata
 
-Tip for the future: If you redirect the output through cat, you get the
-diffstat at 80 character lines.
+Merged into next/soc. Thanks.
 
 
 -Olof
