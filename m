@@ -1,20 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Jul 2016 21:33:08 -0700
-Subject: [GIT PULL] arm64: defconfig: juno updates for v4.8
-In-Reply-To: <57697F93.4090904@arm.com>
-References: <57697F93.4090904@arm.com>
-Message-ID: <20160705043308.GJ1669@localhost>
+Date: Mon, 4 Jul 2016 21:46:12 -0700
+Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.8 -
+ part1
+In-Reply-To: <CADaLNDmLXF3Y7bcabHzzu5eXXqQ8R98QUgO8yKTnCcqCRXPnDg@mail.gmail.com>
+References: <CADaLNDmLXF3Y7bcabHzzu5eXXqQ8R98QUgO8yKTnCcqCRXPnDg@mail.gmail.com>
+Message-ID: <20160705044612.GK1669@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 06:55:31PM +0100, Sudeep Holla wrote:
-> Hi ARM-SoC team,
+Hi,
+
+On Tue, Jun 21, 2016 at 04:40:49PM -0700, Duc Dang wrote:
+> Hi Arnd, Olof,
 > 
-> Please pull !
+> This is the first part of DTS changes for X-Gene platforms targeted for 4.8
 > 
-> -- 
+> The changes includes
+> + 2 clean-up and style fix from Bjorn with Rob's ACK [1]
+> + A timer interrupt polarity fix for X-Gene 2 (refer to Marc's
+> arm/arm64 arch timer fix [2])
+
+I'd recommend considering switching to symbolic flag definitions, to make it
+easier for others to interpret the DT (and for downstream users to change
+where needed). Anyway, not a high-priority thing, just something to keep in
+mind for some time in the future.
+
+> + Clean up an unused clk node (qmlclk) for X-Gene 1
+> 
+> Marc's arch timer series [2] has a change in apm-storm.dtsi file. I
+> verified and the order of applying Marc's apm-storm.dtsi change and
+> the DT changes in xgene-next did not cause any conflict.
+> 
+> [1]: (https://lkml.org/lkml/2016/6/14/340
+> [2]: http://www.spinics.net/lists/linux-samsung-soc/msg53533.html
+> 
 > Regards,
-> Sudeep
+> Duc Dang.
+> ------
 > 
 > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
@@ -22,23 +44,15 @@ On Tue, Jun 21, 2016 at 06:55:31PM +0100, Sudeep Holla wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-> tags/juno-defconfig-4.8
+>   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.8-part1
 > 
-> for you to fetch changes up to 2a0e527c7ed60f9c85233bfe69a9023798c1d428:
+> for you to fetch changes up to ddbc71d96012fbcc4b9e42fd1c131f185875f73f:
 > 
->   arm64: defconfig: enable SENSORS_ARM_SCPI (2016-06-20 16:45:30 +0100)
-> 
-> ----------------------------------------------------------------
-> ARMv8 Juno/Vexpress defconfig updates for v4.8
-> 
-> 1. Enable support for SCPI based sensors(temperature, voltage,
->    current and power)
-> 
-> 2. Enable the Generic on-chip SRAM driver. SRAM is used for SCPI based
->    communication with SCP on Juno
+>   arm64: dts: apm: Remove unused qmlclk node on X-Gene 1 (2016-06-20
+> 18:41:49 -0700)
 
-Thanks, merged.
+Merged into next/dt64.
 
+Thanks!
 
 -Olof
