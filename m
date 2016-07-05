@@ -1,63 +1,34 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Wed,  6 Jul 2016 01:59:20 +0530
-Subject: [PATCH v3 1/2] clk: samsung: cpu: Prepare for addition for Exynos7
- CPU clocks
-In-Reply-To: <1467750561-13957-1-git-send-email-a.kesavan@samsung.com>
-References: <1467750561-13957-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1467750561-13957-2-git-send-email-a.kesavan@samsung.com>
+Date: Wed,  6 Jul 2016 01:59:19 +0530
+Subject: [PATCH v3 0/2] Add CPU clock support for Exynos7
+Message-ID: <1467750561-13957-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos7 has the same CPU clock registers layout as that present
-in Exynos5433 except for the bits in the MUX_STAT* registers.
-Add a new CLK_CPU_HAS_MODIFIED_MUX_STAT flag to handle this change.
+This patch set adds the atlas clock hierarchy on Exynos7. It also
+modifies the existing cpu clock infrastructure to handle exynos7
+differences. These patches are a pre-requisite for enabling CPUFreq
+on Exynos7. This patchset has been tested on next-20160704. The
+opp device tree changes, cpufreq-dt platform addition and defconfig
+enablement will be sent separately.
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
- drivers/clk/samsung/clk-cpu.c | 10 ++++++++--
- drivers/clk/samsung/clk-cpu.h |  2 ++
- 2 files changed, 10 insertions(+), 2 deletions(-)
+Previous version of this patchset can be found here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/322499.html
 
-diff --git a/drivers/clk/samsung/clk-cpu.c b/drivers/clk/samsung/clk-cpu.c
-index 8bf7e80..d40d740 100644
---- a/drivers/clk/samsung/clk-cpu.c
-+++ b/drivers/clk/samsung/clk-cpu.c
-@@ -322,7 +322,10 @@ static int exynos5433_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
- 	/* select the alternate parent */
- 	mux_reg = readl(base + E5433_MUX_SEL2);
- 	writel(mux_reg | 1, base + E5433_MUX_SEL2);
--	wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 2);
-+	if (cpuclk->flags & CLK_CPU_HAS_MODIFIED_MUX_STAT)
-+		wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 1);
-+	else
-+		wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 2);
- 
- 	/* alternate parent is active now. set the dividers */
- 	writel(div0, base + E5433_DIV_CPU0);
-@@ -348,7 +351,10 @@ static int exynos5433_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
- 	/* select apll as the alternate parent */
- 	mux_reg = readl(base + E5433_MUX_SEL2);
- 	writel(mux_reg & ~1, base + E5433_MUX_SEL2);
--	wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 1);
-+	if (cpuclk->flags & CLK_CPU_HAS_MODIFIED_MUX_STAT)
-+		wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 0);
-+	else
-+		wait_until_mux_stable(base + E5433_MUX_STAT2, 0, 1);
- 
- 	exynos5433_set_safe_div(base, div, div_mask);
- 	spin_unlock_irqrestore(cpuclk->lock, flags);
-diff --git a/drivers/clk/samsung/clk-cpu.h b/drivers/clk/samsung/clk-cpu.h
-index d4b6b51..b4d9a4b 100644
---- a/drivers/clk/samsung/clk-cpu.h
-+++ b/drivers/clk/samsung/clk-cpu.h
-@@ -63,6 +63,8 @@ struct exynos_cpuclk {
- #define CLK_CPU_NEEDS_DEBUG_ALT_DIV	(1 << 1)
- /* The CPU clock registers have Exynos5433-compatible layout */
- #define CLK_CPU_HAS_E5433_REGS_LAYOUT	(1 << 2)
-+/* Exynos5433-compatible layout with different MUX_STAT register bits */
-+#define CLK_CPU_HAS_MODIFIED_MUX_STAT	(1 << 3)
- };
- 
- extern int __init exynos_register_cpu_clock(struct samsung_clk_provider *ctx,
+Changes since v2:
+	- All the dependencies have been merged
+	- Code is now based on exynos5433 cpu clock support
+
+Abhilash Kesavan (2):
+  clk: samsung: cpu: Prepare for addition for Exynos7 CPU clocks
+  clk: samsung: exynos7: Add clocks for atlas block
+
+ .../devicetree/bindings/clock/exynos7-clock.txt    |   6 +
+ drivers/clk/samsung/clk-cpu.c                      |  10 +-
+ drivers/clk/samsung/clk-cpu.h                      |   2 +
+ drivers/clk/samsung/clk-exynos7.c                  | 183 +++++++++++++++++++++
+ include/dt-bindings/clock/exynos7-clk.h            |  21 ++-
+ 5 files changed, 219 insertions(+), 3 deletions(-)
+
 -- 
 1.9.1
