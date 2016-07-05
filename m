@@ -1,142 +1,176 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Tue, 05 Jul 2016 04:36:18 -0000
+Date: Tue, 05 Jul 2016 04:36:25 -0000
 Subject: [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space accessors
  against platfrom specific ECAM quirks
-In-Reply-To: <036882b9-b781-cb56-2bcf-35afb21b2812@codeaurora.org>
+In-Reply-To: <575ED57F.6050503@codeaurora.org>
 References: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
  <1465822923-33599-2-git-send-email-liudongdong3@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F782C86@lhreml507-mbx>
- <575EBD13.8080808@codeaurora.org>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F782E15@lhreml507-mbx>
- <b7202ebbb30f2c715427fbb387129e9c@codeaurora.org>
- <036882b9-b781-cb56-2bcf-35afb21b2812@codeaurora.org>
-Message-ID: <CADaLND=aWkENZVK1Ce9NT4LygGa3LTtG1dCabokDADjEJEgeFQ@mail.gmail.com>
+ <575ED57F.6050503@codeaurora.org>
+Message-ID: <CADaLNDkfKxxXWmG3eAawH1H=B+4ia6ZYh41anjTuOdTWGbhfNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2016 at 8:59 AM, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
-> On 6/13/2016 9:12 AM, okaya at codeaurora.org wrote:
->>
->> On 2016-06-13 10:29, Gabriele Paoloni wrote:
->>>
->>> Hi Sinan
->>>
->>>> -----Original Message-----
->>>> From: Sinan Kaya [mailto:okaya at codeaurora.org]
->>>> Sent: 13 June 2016 15:03
->>>> To: Gabriele Paoloni; liudongdong (C); helgaas at kernel.org;
->>>> arnd at arndb.de; will.deacon at arm.com; catalin.marinas at arm.com;
->>>> rafael at kernel.org; hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com;
->>>> jchandra at broadcom.com; tn at semihalf.com
->>>> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
->>>> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
->>>> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
->>>> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->>>> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
->>>> acpi at lists.linaro.org; jcm at redhat.com; andrea.gallo at linaro.org;
->>>> dhdang at apm.com; jeremy.linton at arm.com; cov at codeaurora.org; Chenxin
->>>> (Charles); Linuxarm
->>>> Subject: Re: [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space
->>>> accessors against platfrom specific ECAM quirks
->>>>
->>>> On 6/13/2016 9:54 AM, Gabriele Paoloni wrote:
->>>> > As you can see here Liudongdong has replaced oem_revision with
->>>> > oem_table_id.
->>>> >
->>>> > Now it seems that there are some platforms that have already shipped
->>>> > using a matching based on the oem_revision (right Jon?)
->>>> >
->>>> > However I guess that if in FW they have defined oem_table_id properly
->>>> > they should be able to use this mechanism without needing to a FW
->>>> update.
->>>> >
->>>> > Can these vendors confirm this?
->>>> >
->>>> > Tomasz do you think this can work for Cavium Thunder?
->>>> >
->>>> > Thanks
->>>> >
->>>> > Gab
->>>>
->>>> Why not have all three of them?
->>>>
->>>> The initial approach was OEM id and revision id.
->>>>
->>>> Jeff Hugo indicated that addition (not removing any other fields) of
->>>> table id
->>>> would make more sense.
->>>
->>>
->>> Mmm from last email of Jeff Hugo on "[RFC PATCH 1/3] pci, acpi: Match
->>> PCI config space accessors against platfrom specific ECAM quirks."
->>>
->>> I quote:
->>>
->>>  "Using the OEM revision
->>>  field does not seem to be appropriate since these are different
->>>  platforms and the revision field appears to be for the purpose of
->>>  tracking differences within a single platform.  Therefore, Cov is
->>>  proposing using the OEM table id as a mechanism to distinguish
->>>  platform A (needs quirk applied) vs platform B (no quirks) from the
->>>  same OEM."
->>>
->>> So it looks to me that he pointed out that using the OEM revision field
->>> is wrong...and this is why I have asked if replacing it with the table
->>> id can work for other vendors....
->>>
->>> Thanks
->>>
->>> Gab
->>>
->>
->> I had an internal discussion with jeff and cov before posting on the
->> maillist.
->>
->> I think there is missing info in the email.
->>
->> Usage of oem id + table id + revision is ok.
->>
->> Usage of oem id + revision is not ok as one oem can build multiple chips
->> with the same oem id and revision id but different table id. Otherwise,
->> we can run out of revisions very quickly.
+On Mon, Jun 13, 2016 at 8:47 AM, Christopher Covington
+<cov@codeaurora.org> wrote:
+> Hi Dongdong,
 >
+> On 06/13/2016 09:02 AM, Dongdong Liu wrote:
+>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+>> index d3c3e85..49612b3 100644
+>> --- a/drivers/acpi/pci_mcfg.c
+>> +++ b/drivers/acpi/pci_mcfg.c
+>> @@ -22,6 +22,10 @@
+>>  #include <linux/kernel.h>
+>>  #include <linux/pci.h>
+>>  #include <linux/pci-acpi.h>
+>> +#include <linux/pci-ecam.h>
+>> +
+>> +/* Root pointer to the mapped MCFG table */
+>> +static struct acpi_table_mcfg *mcfg_table;
+>>
+>>  /* Structure to hold entries from the MCFG table */
+>>  struct mcfg_entry {
+>> @@ -35,6 +39,38 @@ struct mcfg_entry {
+>>  /* List to save mcfg entries */
+>>  static LIST_HEAD(pci_mcfg_list);
+>>
+>> +extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
+>> +extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
+>> +
+>> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
+>> +{
+>> +     int bus_num = root->secondary.start;
+>> +     int domain = root->segment;
+>> +     struct pci_cfg_fixup *f;
+>> +
+>> +     if (!mcfg_table)
+>> +             return &pci_generic_ecam_ops;
+>> +
+>> +     /*
+>> +      * Match against platform specific quirks and return corresponding
+>> +      * CAM ops.
+>> +      *
+>> +      * First match against PCI topology <domain:bus> then use OEM ID and
+>> +      * OEM revision from MCFG table standard header.
+>> +      */
+>> +     for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+>> +             if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+>> +                 (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+>> +                 (!strncmp(f->oem_id, mcfg_table->header.oem_id,
+>> +                           ACPI_OEM_ID_SIZE)) &&
+>> +                 (!strncmp(f->oem_table_id, mcfg_table->header.oem_table_id,
+>> +                           ACPI_OEM_TABLE_ID_SIZE)))
 >
-> Agreed.
+> This would just be a small convenience, but if the character count used here were
 >
-> I'm sorry for the confusion.  My intent was to point out that revision alone
-> appeared insufficient to address all the identified problems, but I believe
-> there is still a case for using revision. Table id is useful for
-> differentiating between platforms/chips.  Revision is useful for
-> differentiation between different versions of a single platform/chip
-> assuming the silicon is respun or some other fix is applied.  Both solve
-> different scenarios, and I'm not aware of a reason why they could not be
-> used together to solve all currently identified cases.
+> min(strlen(f->oem_id), ACPI_OEM_ID_SIZE)
+>
+> then the parameters to DECLARE_ACPI_MCFG_FIXUP macro could be substrings and
+> wouldn't need to be padded out to the full length.
+>
+>> +                     return f->ops;
+>> +     }
+>> +     /* No quirks, use ECAM */
+>> +     return &pci_generic_ecam_ops;
+>> +}
+>
+>> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+>> index 7d63a66..088a1da 100644
+>> --- a/include/linux/pci-acpi.h
+>> +++ b/include/linux/pci-acpi.h
+>> @@ -25,6 +25,7 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
+>>  extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
+>>
+>>  extern phys_addr_t pci_mcfg_lookup(u16 domain, struct resource *bus_res);
+>> +extern struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root);
+>>
+>>  static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev *pdev)
+>>  {
+>> @@ -72,6 +73,25 @@ struct acpi_pci_root_ops {
+>>       int (*prepare_resources)(struct acpi_pci_root_info *info);
+>>  };
+>>
+>> +struct pci_cfg_fixup {
+>> +     struct pci_ecam_ops *ops;
+>> +     char *oem_id;
+>> +     char *oem_table_id;
+>> +     int domain;
+>> +     int bus_num;
+>> +};
+>> +
+>> +#define PCI_MCFG_DOMAIN_ANY  -1
+>> +#define PCI_MCFG_BUS_ANY     -1
+>> +
+>> +/* Designate a routine to fix up buggy MCFG */
+>> +#define DECLARE_ACPI_MCFG_FIXUP(ops, oem_id, oem_table_id, dom, bus) \
+>> +     static const struct pci_cfg_fixup                               \
+>> +     __mcfg_fixup_##oem_id##oem_table_id##dom##bus                   \
+>
+> I'm not entirely sure that this is the right fix--I'm pretty blindly
+> following a GCC documentation suggestion [1]--but removing the first two
+> preprocessor concatenation operators "##" solved the following build error
+> for me.
+>
+> include/linux/pci-acpi.h:90:2: error: pasting "__mcfg_fixup_" and ""QCOM"" does not give a valid preprocessing token
+>   __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
 
-Using OEM ID + Table ID + Revision will work for X-Gene platforms as well.
+I think the problem is gcc is not happy with quoted string when
+processing these tokens
+(""QCOM"", the extra "" are added by gcc). So should we not concat
+string tokens and
+use the fixup definition in v1 of this RFC:
+/* Designate a routine to fix up buggy MCFG */
+#define DECLARE_ACPI_MCFG_FIXUP(ops, oem_id, rev, dom, bus)             \
+        static const struct pci_cfg_fixup __mcfg_fixup_##system##dom##bus\
+         __used __attribute__((__section__(".acpi_fixup_mcfg"),         \
+                                aligned((sizeof(void *))))) =           \
+        { ops, oem_id, rev, dom, bus };
 
 Regards,
 Duc Dang.
+
+
+>   ^
+> arch/arm64/kernel/pci.c:225:1: note: in expansion of macro ?DECLARE_ACPI_MCFG_FIXUP?
+>  DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432", PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
+>  ^
+> arch/arm64/kernel/pci.c:225:44: error: pasting ""QCOM"" and ""QDF2432"" does not give a valid preprocessing token
+>  DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432", PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
+>                                             ^
+> include/linux/pci-acpi.h:90:17: note: in definition of macro ?DECLARE_ACPI_MCFG_FIXUP?
+>   __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
+>                  ^
+> arch/arm64/kernel/pci.c:225:52: error: pasting ""QDF2432"" and "PCI_MCFG_DOMAIN_ANY" does not give a valid preprocessi
+> ng token
+>  DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432", PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
+>                                                     ^
+> include/linux/pci-acpi.h:90:25: note: in definition of macro ?DECLARE_ACPI_MCFG_FIXUP?
+>   __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
+>                          ^
+> arch/arm64/kernel/pci.c:225:44: error: expected ?=?, ?,?, ?;?, ?asm? or ?__attribute__? before string constant
+>  DECLARE_ACPI_MCFG_FIXUP(&pci_32b_ecam_ops, "QCOM", "QDF2432", PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
+>                                             ^
+> include/linux/pci-acpi.h:90:17: note: in definition of macro ?DECLARE_ACPI_MCFG_FIXUP?
+>   __mcfg_fixup_##oem_id##oem_table_id##dom##bus   \
+>                  ^
+> make[1]: *** [arch/arm64/kernel/pci.o] Error 1
+> make: *** [arch/arm64/kernel] Error 2
 >
->>
->>>
->>>>
->>>> --
->>>> Sinan Kaya
->>>> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center,
->>>> Inc.
->>>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
->>>> Linux Foundation Collaborative Project
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 1. https://gcc.gnu.org/onlinedocs/cpp/Concatenation.html#Concatenation
 >
+>> +     __used  __attribute__((__section__(".acpi_fixup_mcfg"),         \
+>> +                             aligned((sizeof(void *))))) =           \
+>> +     { ops, oem_id, oem_table_id, dom, bus };
+>> +
+>>  extern int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info);
+>>  extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>>                                           struct acpi_pci_root_ops *ops,
+>>
 >
+> Thanks,
+> Cov
 >
 > --
-> Jeffrey Hugo
 > Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux
-> Foundation Collaborative Project
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
