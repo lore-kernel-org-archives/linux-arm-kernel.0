@@ -1,29 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 05 Jul 2016 16:02:05 +0200
-Subject: [RESEND PATCH] MAINTAINERS: update STi maintainer list
-In-Reply-To: <1467379196-2484-1-git-send-email-patrice.chotard@st.com>
-References: <1467379196-2484-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <7898014.P0i3S7e15M@wuerfel>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 5 Jul 2016 10:01:27 -0400
+Subject: [PATCH] arm64: defconfig: Enable s2mps11 regulator clk and s3c
+ rtc driver
+In-Reply-To: <1467713211-16014-1-git-send-email-alim.akhtar@samsung.com>
+References: <1467713211-16014-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <20dda870-4196-6160-59cf-ea6f9a5016c8@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 1, 2016 3:19:56 PM CEST patrice.chotard at st.com wrote:
-> From: Maxime Coquelin <maxime.coquelin@st.com>
-> 
-> Remove myself as STi maintainer as I will no longer have access to
-> STi platforms, and remove Srini too, who now works on other
-> platforms.
-> 
-> Patrice will manage the pull requests.
-> 
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> Cc: Patrice Chotard <patrice.chotard@st.com>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Patrice Chotard <patrice.chotard@st.com>
-> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> 
+Hello Alim,
 
-Applied to the fixes branch, thanks!
+On 07/05/2016 06:06 AM, Alim Akhtar wrote:
+> The s3c rtc controller on exynos7 platform uses rtc source clock
+> from s2mps11 pmic. This patch enables the required bits to make
+> rtc work on exynos7-espresso board.
+> 
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
 
-	Arnd
+Looks good to me.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
