@@ -1,22 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 5 Jul 2016 16:36:09 +0200
-Subject: [PATCH v3 14/14] regulator: pwm: Document pwm-dutycycle-unit and
- pwm-dutycycle-range
-In-Reply-To: <1465895602-31008-15-git-send-email-boris.brezillon@free-electrons.com>
-References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
- <1465895602-31008-15-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160705143609.GB6247@sirena.org.uk>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Tue, 5 Jul 2016 15:37:48 +0100 (BST)
+Subject: [PATCH v2] xen/arm: register clocks used by the hypervisor
+In-Reply-To: <577BBF69.8010809@arm.com>
+References: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
+ <alpine.DEB.2.10.1607051449370.2575@sstabellini-ThinkPad-X260>
+ <577BBC1A.8020209@arm.com>
+ <alpine.DEB.2.10.1607051456410.2575@sstabellini-ThinkPad-X260>
+ <577BBF69.8010809@arm.com>
+Message-ID: <alpine.DEB.2.10.1607051534411.2575@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 11:13:22AM +0200, Boris Brezillon wrote:
-> Document the pwm-dutycycle-unit and pwm-dutycycle-range properties.
+On Tue, 5 Jul 2016, Julien Grall wrote:
+> On 05/07/16 15:04, Stefano Stabellini wrote:
+> > On Tue, 5 Jul 2016, Julien Grall wrote:
+> > > On 05/07/16 14:53, Stefano Stabellini wrote:
+> > > > On Thu, 30 Jun 2016, Dirk Behme wrote:
+> > > > > +- clocks: one or more clocks to be registered.
+> > > > > +  Xen hypervisor drivers might replace native drivers, resulting in
+> > > > > +  clocks not registered by these native drivers. To avoid that these
+> > > > > +  unregistered clocks are disabled, then, e.g. by
+> > > > > clk_disable_unused(),
+> > > > > +  register them in the hypervisor node.
+> > > > > +  An example for this are the clocks of the serial driver. If the
+> > > > > clocks
+> > > > > +  used by the serial hardware interface are not registered by the
+> > > > > serial
+> > > > > +  driver the serial output might stop once clk_disable_unused() is
+> > > > > called.
+> > > > 
+> > > > What if we use the "status" property of the clocks? Could we set it to
+> > > > "disabled" in Xen? Would that be enough for Linux to leave them alone?
+> > > 
+> > > clocks could be shared between multiple devices. So it is not possible to
+> > > disable the clock.
+> > 
+> > To clarify my suggestion: I am not saying we should disable the clock, I
+> > am saying we should set the "status" property to "disabled" in Xen for
+> > the clock used by the serial or passthrough devices (for which the
+> > "status" property is already set to "disabled"). That should work for
+> > cases where the clock is not shared among multiple devices.
+> 
+> How would you be able to differentiate in Xen between a clock shared and a
+> non-shared one? The only way I can think it going through all the device tree
+> which sounds really expensive.
 
-Acked-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/043f326e/attachment.sig>
+Yes, but it is only done once and we only need to do the search for
+clocks of "disabled" devices.
+
+
+> > If the clock is shared, then I don't think we would run into the issue
+> > described by Dirk because I wouldn't imagine clk_disable_unused would
+> > try to disable the clock anymore, because it would actually be in use
+> > from Linux POV.
+> 
+> We also want to prevent Linux changing the rate of the clock (see Mark's mail
+> [1]).
+
+I am not sure what's the best way to achieve that for clocks shared
+across multiple devices. Let's see what the clock maintainers suggest.
