@@ -1,47 +1,163 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 5 Jul 2016 15:52:49 +0100
-Subject: [PATCH v2] arm64: defconfig: add options for virtualization and
- containers
-In-Reply-To: <CAAqcGHmMtSpaB37HYFwpVg51R+DGdDc2T1fogBSxdW7W0A95EA@mail.gmail.com>
-References: <1465979279-23449-1-git-send-email-riku.voipio@linaro.org>
- <20160627111113.GF26498@cbox>
- <CAAqcGHmMtSpaB37HYFwpVg51R+DGdDc2T1fogBSxdW7W0A95EA@mail.gmail.com>
-Message-ID: <20160705145248.GJ3565@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 5 Jul 2016 15:55:30 +0100
+Subject: [PATCH v3 6/7] arm64: hibernate: Resume on the CPU that created
+ the hibernate image
+In-Reply-To: <1467125510-18758-7-git-send-email-james.morse@arm.com>
+References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
+ <1467125510-18758-7-git-send-email-james.morse@arm.com>
+Message-ID: <20160705145530.GA19925@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 04:17:00PM +0300, Riku Voipio wrote:
-> On 27 June 2016 at 14:11, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Wed, Jun 15, 2016 at 11:27:59AM +0300, Riku Voipio wrote:
-> >> Enable options commonly needed by popular virtualization
-> >> and container applications. Use modules when possible to
-> >> avoid too much overhead for users not interested.
-> >>
-> >> - add namespace and cgroup options needed
-> >> - add seccomp - optional, but enhances Qemu etc
-> >> - bridge, nat, veth, macvtap and multicast for routing
-> >>   guests and containers
-> >> - btfrs and overlayfs modules for container COW backends
-> >> - while near it, make fuse a module instead of built-in.
-> >>
-> >> Generated with make saveconfig and dropping unrelated spurious
-> >> change hunks while commiting. bloat-o-meter old-vmlinux vmlinux:
-> >>
-> >> add/remove: 905/390 grow/shrink: 767/229 up/down: 183513/-94861 (88652)
-> >> ....
-> >> Total: Before=10515408, After=10604060, chg +0.84%
-> >>
-> >> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
-> >
-> > I'm unclear what the conclusion on the v1 regarding using modules in
-> > defconfig was exactly, but I'm happy to see a defconfig that makes it
-> > easier to test virtualization.
+On Tue, Jun 28, 2016 at 03:51:49PM +0100, James Morse wrote:
+> On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
+> user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
+> kernel will assign logical id 0 to a different physical CPU.
+> This breaks hibernate as hibernate and resume will be attempted on different
+> CPUs. A previous patch detects this situation when we come to resume,
+> and returns an error. (data stored in the hibernate image is lost)
 > 
-> I think it was generally agreed that adding modules to defconfig is ok. However
-> this patch seems to be a bit stuck in limbo. Anyone going to pick it up?
+> We currently forbid hibernate if CPU0 has been hotplugged out to avoid
+> this situation without kexec.
+> 
+> Use arch_hibernation_disable_cpus() to direct which CPU we should resume
+> on based on the MPIDR of the CPU we hibernated on. This allows us to
+> hibernate/resume on any CPU, even if the logical numbers have been
+> shuffled by kexec.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+> Changes since v2:
+>  * Storing/reading/checking sleep_cpu moved into an earlier patch
+>  * Moved to macro approach.
+>  * Added hidden ARCH_HIBERNATION_CPUHP config option.
+> 
+>  arch/arm64/Kconfig               |  4 ++++
+>  arch/arm64/include/asm/suspend.h |  4 ++++
+>  arch/arm64/kernel/hibernate.c    | 48 ++++++++++++++++++++++++++++++++++++++--
+>  3 files changed, 54 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 79341f6d1b6a..14ef59a90cfd 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1017,6 +1017,10 @@ config ARCH_HIBERNATION_HEADER
+>  	def_bool y
+>  	depends on HIBERNATION
+>  
+> +config ARCH_HIBERNATION_CPUHP
+> +	def_bool y
+> +	depends on HIBERNATION
+> +
+>  config ARCH_SUSPEND_POSSIBLE
+>  	def_bool y
+>  
+> diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
+> index 024d623f662e..9b3e8d9bfc8c 100644
+> --- a/arch/arm64/include/asm/suspend.h
+> +++ b/arch/arm64/include/asm/suspend.h
+> @@ -47,4 +47,8 @@ int swsusp_arch_resume(void);
+>  int arch_hibernation_header_save(void *addr, unsigned int max_size);
+>  int arch_hibernation_header_restore(void *addr);
+>  
+> +/* Used to resume on the CPU we hibernated on */
+> +int _arch_hibernation_disable_cpus(bool suspend);
+> +#define arch_hibernation_disable_cpus(x) _arch_hibernation_disable_cpus(x)
+> +
+>  #endif
+> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+> index 8c7c6d7d4cd4..cbcc8243575e 100644
+> --- a/arch/arm64/kernel/hibernate.c
+> +++ b/arch/arm64/kernel/hibernate.c
+> @@ -144,6 +144,7 @@ EXPORT_SYMBOL(arch_hibernation_header_save);
+>  
+>  int arch_hibernation_header_restore(void *addr)
+>  {
+> +	int ret;
+>  	struct arch_hibernate_hdr_invariants invariants;
+>  	struct arch_hibernate_hdr *hdr = addr;
+>  
+> @@ -156,11 +157,21 @@ int arch_hibernation_header_restore(void *addr)
+>  	sleep_cpu = get_logical_index(hdr->sleep_cpu_mpidr);
+>  	pr_info("Hibernated on CPU %d [mpidr:0x%llx]\n", sleep_cpu,
+>  		hdr->sleep_cpu_mpidr);
+> -	if (sleep_cpu != 0) {
+> -		pr_crit("Didn't hibernate on the firmware boot CPU!\n");
+> +	if (sleep_cpu <= 0) {
+> +		pr_crit("Hibernated on a CPU not known to this kernel!\n");
+>  		sleep_cpu = -EINVAL;
+>  		return -EINVAL;
+>  	}
+> +	if (!cpu_online(sleep_cpu)) {
+> +		pr_info("Hibernated on a CPU that is offline! Bringing CPU up.\n");
+> +		ret = cpu_up(sleep_cpu);
+> +		if (ret) {
+> +			pr_err("Failed to bring hibernate-CPU up!\n");
+> +			sleep_cpu = -EINVAL;
+> +			return ret;
+> +		}
+> +	}
+> +
+>  	resume_hdr = *hdr;
+>  
+>  	return 0;
+> @@ -532,3 +543,36 @@ static int __init check_boot_cpu_online_init(void)
+>  	return 0;
+>  }
+>  core_initcall(check_boot_cpu_online_init);
+> +
+> +int _arch_hibernation_disable_cpus(bool suspend)
+> +{
+> +	int cpu, ret;
+> +
+> +	if (suspend) {
+> +		/*
+> +		 * During hibernate we need frozen_cpus to be updated and saved.
+> +		 */
+> +		ret = disable_nonboot_cpus();
+> +	} else {
+> +		/*
+> +		 * Resuming from hibernate. From here, we can't race with
+> +		 * userspace, and don't need to update frozen_cpus.
 
-I can pick it up but usually after -rc1 or close to the end of the
-merging window, just to enable some other features that go in.
+Yes, but...
 
--- 
-Catalin
+> +		 */
+> +		pr_info("Disabling secondary CPUs ...\n");
+> +
+> +		/* sleep_cpu must have been loaded from the arch header */
+> +		BUG_ON(sleep_cpu < 0);
+> +
+> +		for_each_online_cpu(cpu) {
+> +			if (cpu == sleep_cpu)
+> +				continue;
+> +			ret = cpu_down(cpu);
+
+This has a side effect, in that tasks are frozen here but we are now
+calling _cpu_down() through:
+
+	cpu_down() -> do_cpu_down()
+
+and we are telling the kernel that tasks are _not_ frozen, which
+AFAIK changes the cpuhp_tasks_frozen variable and related actions
+(eg __cpu_notify()), I suspect this may confuse some notifiers
+state machines that depend on CPU_TASKS_FROZEN to be set, maybe
+not but it is worth a look.
+
+Thanks,
+Lorenzo
+
+> +			if (ret) {
+> +				pr_err("Secondary CPUs are not disabled\n");
+> +				break;
+> +			}
+> +		}
+> +	}
+> +
+> +	return ret;
+> +}
+> -- 
+> 2.8.0.rc3
+> 
