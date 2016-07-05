@@ -1,55 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 05 Jul 2016 14:59:49 +0200
-Subject: [PATCH 3/3] reset: socfpga: use readl/writel_relaxed
-In-Reply-To: <1467718816.2978.41.camel@pengutronix.de>
-References: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
- <10266400.9nrl73J4sT@wuerfel> <1467718816.2978.41.camel@pengutronix.de>
-Message-ID: <3713699.k1gRikAJNK@wuerfel>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 5 Jul 2016 09:03:02 -0400
+Subject: [PATCH] arm64: dts: Fix rtc by providing rtc_src clock
+In-Reply-To: <1467713107-15932-1-git-send-email-alim.akhtar@samsung.com>
+References: <1467713107-15932-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <caea8f78-be5e-233f-c475-41c2973761ae@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 5, 2016 1:40:16 PM CEST Philipp Zabel wrote:
-> Am Dienstag, den 05.07.2016, 13:20 +0200 schrieb Arnd Bergmann:
-> > On Tuesday, July 5, 2016 12:17:52 PM CEST Philipp Zabel wrote:
-> > > This just removes the rmb()/wmb() pair between register read and
-> > > write. Since no relevant reads follow the rmb and no relevant writes
-> > > precede the wmb, they should be safe to remove.
-> > > 
-> > > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > 
-> > We should only do this if you are fixing a bug (which you don't mention
-> > in the changelog), or if you can show a relevant performance
-> > improvement. Is this code ever used in a fast path? If it is,
-> > wouldn't that indicate a problem in some driver?
+Hello Alim,
+
+On 07/05/2016 06:05 AM, Alim Akhtar wrote:
+> Add rtc source clock as exynos7 needs source (32.768KHz) clock
+> for rtc block. Without this currently rtc driver probe is broken
+> on this SoC, thats because rtc-s3c driver expect rtc_src clock to
+> be provided for _s3c6410-rtc_ type rtc controllers.
 > 
-> It does not fix a bug, and it's not about performance either. I'd like
-> to align code with the recently posted stm32 driver, to unify them in a
-> future patch.
-> Of course we can change the stm32 driver to use readl/writel instead of
-> the relaxed variants, it just seemed useless to have those barriers
-> between the read and write.
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> index 03f9cf6..7f48cf0 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> @@ -12,6 +12,7 @@
+>  /dts-v1/;
+>  #include "exynos7.dtsi"
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/clock/samsung,s2mps11.h>
+>  
+>  / {
+>  	model = "Samsung Exynos7 Espresso board based on EXYNOS7";
+> @@ -44,6 +45,8 @@
+>  
+>  &rtc {
+>  	status = "okay";
+> +	clocks = <&clock_ccore PCLK_RTC>, <&s2mps15_osc S2MPS11_CLK_AP>;
+> +	clock-names = "rtc", "rtc_src";
+>  };
+>  
+>  &watchdog {
+> 
 
-On stm32, there is no barrier because ARM_DMA_MEM_BUFFERABLE is not set.
+Looks good to me.
 
-I'd really prefer to just have readl/writel everywhere except in the
-few places that are performance critical and have a comment explaining
-why it's safe there, mainly to avoid having new developers blindly
-add the relaxed accessors in drivers because they think it's the
-normal coding style.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-> If anything, we'd need to try to make sure that the writel in assert
-> hits the hardware before the function returns, so that a
-> assert-delay-deassert doesn't accidentally spend half its delay with the
-> writel still in the store buffer, and we'd need a full barrier after the
-> writel in deassert so that there can be no successive reads from still
-> disabled IP cores.
-
-In general, I think you need a readl() following the writel() to guarantee
-that it has actually hit the hardware.
-
-On ARM you often have just the CPU write buffer that needs to be flushed,
-but if you have a PCI device or a more complex SoC, then a barriers doesn't
-wait for a write to arrive at the device, it only ensures that a subsequent
-write cannot arrive any earlier.
-
-	Arnd
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
