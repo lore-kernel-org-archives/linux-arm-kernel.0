@@ -1,26 +1,23 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 6 Jul 2016 00:10:04 +0300
-Subject: [PATCH 0/2] Add R8A7792 GPIO support
-In-Reply-To: <2706182.6XMBucurvj@wasted.cogentembedded.com>
-References: <2706182.6XMBucurvj@wasted.cogentembedded.com>
-Message-ID: <66e88d8f-9260-f159-3ea4-b03428675216@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Jul 2016 23:24:31 +0200
+Subject: [PATCH 3/7] arm: mach-u300: regulator: add missing of_node_put
+ after calling of_parse_phandle
+In-Reply-To: <1467366121-14120-4-git-send-email-peter.chen@nxp.com>
+References: <1467366121-14120-1-git-send-email-peter.chen@nxp.com>
+ <1467366121-14120-4-git-send-email-peter.chen@nxp.com>
+Message-ID: <CACRpkdYMn94brCXUzS2b+4GBTx7WVhKririVzmHjjeVb9CC7NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Jul 1, 2016 at 11:41 AM, Peter Chen <peter.chen@nxp.com> wrote:
 
-On 07/05/2016 12:10 AM, Sergei Shtylyov wrote:
+> of_node_put needs to be called when the device node which is got
+> from of_parse_phandle has finished using.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Peter Chen <peter.chen@nxp.com>
 
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-20160704-v4.7-rc6' tag. We're adding the R8A7792 GPIO clocks and
-> device nodes. These patches depend on the R8A7792/Blanche PFC patchset in order
-> to compile and on the R8a7792 PFC driver patchset in order to work properly.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> [1/2] ARM: dts: r8a7792: add GPIO clocks
-> [2/2] ARM: dts: r8a7792: add GPIO support
-
-    Didn't run checkpatch.pl on this one. If I did, it would have found the 
-stray spaces in the 1st patch, and undocumented binding in the 2nd...
-    Will repost RSN!
-
-WBR, Sergei
+Yours,
+Linus Walleij
