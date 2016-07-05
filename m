@@ -1,106 +1,48 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 5 Jul 2016 17:04:29 +0800
-Subject: [PATCH V2 08/10] arm64: dts: tegra: Add Tegra186 support
+Date: Tue, 5 Jul 2016 17:04:31 +0800
+Subject: [PATCH V2 10/10] arm64: dts: tegra: Add NVIDIA P2771 board support
 In-Reply-To: <20160705090431.5852-1-josephl@nvidia.com>
 References: <20160705090431.5852-1-josephl@nvidia.com>
-Message-ID: <20160705090431.5852-9-josephl@nvidia.com>
+Message-ID: <20160705090431.5852-11-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the initial support of Tegra186 SoC, which can help to bring
-up the debug console and initrd for further developing.
+Add NVIDIA Tegra186 P2771 board support, which is a reference
+development board with P2597 I/O board and P3310 chip module on it.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 Changes in V2:
-- update the file according the HSP and BPMP binding fix in V2
+- None
 ---
- arch/arm64/boot/dts/nvidia/tegra186.dtsi | 77 ++++++++++++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186.dtsi
+ arch/arm64/boot/dts/nvidia/Makefile                | 1 +
+ arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 8 ++++++++
+ 2 files changed, 9 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+diff --git a/arch/arm64/boot/dts/nvidia/Makefile b/arch/arm64/boot/dts/nvidia/Makefile
+index 0f7cdf3e05c1..67234f3dc795 100644
+--- a/arch/arm64/boot/dts/nvidia/Makefile
++++ b/arch/arm64/boot/dts/nvidia/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_TEGRA_132_SOC) += tegra132-norrin.dtb
++dtb-$(CONFIG_ARCH_TEGRA_186_SOC) += tegra186-p2771-0000.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-0000.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-2180.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2571.dtb
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
 new file mode 100644
-index 000000000000..57badd5de9b4
+index 000000000000..66b936389fa7
 --- /dev/null
-+++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-@@ -0,0 +1,77 @@
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/mailbox/tegra186-hsp.h>
++++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+@@ -0,0 +1,8 @@
++/dts-v1/;
++
++#include "tegra186-p3310.dtsi"
 +
 +/ {
-+	compatible = "nvidia,tegra186";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	uarta: serial at 03100000 {
-+		compatible = "nvidia,tegra186-uart", "nvidia,tegra20-uart";
-+		reg = <0x0 0x03100000 0x0 0x40>;
-+		reg-shift = <2>;
-+		interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	gic: interrupt-controller at 03881000 {
-+		compatible = "arm,gic-400";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x0 0x03881000 0x0 0x1000>,
-+		      <0x0 0x03882000 0x0 0x2000>;
-+		interrupts = <GIC_PPI 9
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupt-parent = <&gic>;
-+	};
-+
-+	hsp_top0: hsp at 03c00000 {
-+		compatible = "nvidia,tegra186-hsp";
-+		reg = <0x0 0x03c00000 0x0 0xa0000>;
-+		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "doorbell";
-+		#mbox-cells = <1>;
-+		status = "disabled";
-+	};
-+
-+	sysram at 30000000 {
-+		compatible = "nvidia,tegra186-sysram", "mmio-ram";
-+		reg = <0x0 0x30000000 0x0 0x4ffff>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges = <0 0x0 0x0 0x30000000 0x0 0x4ffff>;
-+
-+		cpu_bpmp_tx: bpmp_shmem at 4e000 {
-+			compatible = "nvidia,tegra186-bpmp-shmem";
-+			reg = <0x0 0x4e000 0x0 0x1000>;
-+		};
-+
-+		cpu_bpmp_rx: bpmp_shmem at 4f000 {
-+			compatible = "nvidia,tegra186-bpmp-shmem";
-+			reg = <0x0 0x4f000 0x0 0x1000>;
-+		};
-+	};
-+
-+	bpmp {
-+		compatible = "nvidia,tegra186-bpmp";
-+		mboxes = <&hsp_top0 HSP_MBOX_ID(DB, HSP_DB_MASTER_BPMP)>;
-+		shmem = <&cpu_bpmp_tx &cpu_bpmp_rx>;
-+		#clock-cells = <1>;
-+		#reset-cells = <1>;
-+		status = "disabled";
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupt-parent = <&gic>;
-+	};
++	model = "NVIDIA Tegra186 P2771-0000 Board";
++	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
 +};
 -- 
 2.9.0
