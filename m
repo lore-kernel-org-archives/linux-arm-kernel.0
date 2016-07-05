@@ -1,25 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Jul 2016 20:52:40 -0700
-Subject: [GIT PULL 3/3] ARM: Keystone pm_domain fix for 4.8
-In-Reply-To: <1466527923-8689-3-git-send-email-ssantosh@kernel.org>
-References: <1466527923-8689-1-git-send-email-ssantosh@kernel.org>
- <1466527923-8689-3-git-send-email-ssantosh@kernel.org>
-Message-ID: <20160705035240.GE1669@localhost>
+Date: Mon, 4 Jul 2016 21:03:17 -0700
+Subject: [GIT PULL] ARM: at91: drivers for 4.8 #2
+In-Reply-To: <20160621170306.GA15727@piout.net>
+References: <20160621170306.GA15727@piout.net>
+Message-ID: <20160705040317.GF1669@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2016 at 09:52:03AM -0700, Santosh Shilimkar wrote:
-> The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
+On Tue, Jun 21, 2016 at 07:03:06PM +0200, Alexandre Belloni wrote:
+> Arnd, Olof, Kevin,
 > 
->   Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
+> Here are two simple fixes for our memory drivers.
+> 
+> The following changes since commit 1fdab21d1d52a85c31f932844242fec5fb81daac:
+> 
+>   memory: atmel-ebi: add DT bindings documentation (2016-06-02 08:32:25 +0200)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_for_4.8
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-drivers2
 > 
-> for you to fetch changes up to 39a5cbbc0e24586fc30af9ebfc9957c00f1c9f3b:
+> for you to fetch changes up to 8a86a093ca3b924e6c2d5267cffb809965582a8d:
 > 
->   ARM: keystone: fix missing keystone.h in pm_domain.c (2016-06-21 09:31:15 -0700)
+>   memory: atmel-ebi: make it explicitly non-modular (2016-06-21 17:17:45 +0200)
 
 Merged, thanks.
 
