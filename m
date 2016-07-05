@@ -1,8 +1,10 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 5 Jul 2016 10:11:03 +0800
-Subject: [PATCH 1/2] hwspinlock: qcom_hwspinlock: add missing of_node_put
- after calling of_parse_phandle
-Message-ID: <1467684664-21155-1-git-send-email-peter.chen@nxp.com>
+Date: Tue, 5 Jul 2016 10:11:04 +0800
+Subject: [PATCH 2/2] hwtracing: coresight: of_coresight: add missing
+ of_node_put after calling of_parse_phandle
+In-Reply-To: <1467684664-21155-1-git-send-email-peter.chen@nxp.com>
+References: <1467684664-21155-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1467684664-21155-2-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,23 +12,23 @@ of_node_put needs to be called when the device node which is got
 from of_parse_phandle has finished using.
 
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-arm-msm at vger.kernel.org
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Peter Chen <peter.chen@nxp.com>
 ---
- drivers/hwspinlock/qcom_hwspinlock.c | 1 +
+ drivers/hwtracing/coresight/of_coresight.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/hwspinlock/qcom_hwspinlock.c b/drivers/hwspinlock/qcom_hwspinlock.c
-index c752447..fa6880b 100644
---- a/drivers/hwspinlock/qcom_hwspinlock.c
-+++ b/drivers/hwspinlock/qcom_hwspinlock.c
-@@ -98,6 +98,7 @@ static int qcom_hwspinlock_probe(struct platform_device *pdev)
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index b68da18..b693a4b 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -184,6 +184,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 			break;
+ 		}
  	}
++	of_node_put(dn);
  
- 	regmap = syscon_node_to_regmap(syscon);
-+	of_node_put(syscon);
- 	if (IS_ERR(regmap))
- 		return PTR_ERR(regmap);
- 
+ 	return pdata;
+ }
 -- 
 1.9.1
