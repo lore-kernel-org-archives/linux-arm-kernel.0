@@ -1,94 +1,139 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  5 Jul 2016 14:45:04 +0200
-Subject: [PATCH 05/11] ARM: ux500: move l2x0 init to .init_irq
+Date: Tue,  5 Jul 2016 14:45:06 +0200
+Subject: [PATCH 07/11] ARM: ux500: remove cpu_is_u* helpers
 In-Reply-To: <1467722710-1577-1-git-send-email-linus.walleij@linaro.org>
 References: <1467722710-1577-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1467722710-1577-5-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1467722710-1577-7-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Arnd Bergmann <arnd@arndb.de>
 
-The generic IRQ init function also enables the l2 cache
-implicitly when the machine descriptor sets an .l2c_aux_mask.
-
-Let's use that on ux500 and remove the ux500_l2x0_init()
-along with the cpu_is_u8500_family checks.
+These functions are all unused now and can be removed.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/cache-l2x0.c | 8 +-------
- arch/arm/mach-ux500/cpu-db8500.c | 3 ++-
- arch/arm/mach-ux500/cpu.c        | 1 +
- arch/arm/mach-ux500/setup.h      | 3 +++
- 4 files changed, 7 insertions(+), 8 deletions(-)
+ arch/arm/mach-ux500/id.h | 107 -----------------------------------------------
+ 1 file changed, 107 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index 780bd13cd7e3..d7abc1187769 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -51,17 +51,11 @@ static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
- 	 */
+diff --git a/arch/arm/mach-ux500/id.h b/arch/arm/mach-ux500/id.h
+index bcc58a8cccbc..929f78ecf3df 100644
+--- a/arch/arm/mach-ux500/id.h
++++ b/arch/arm/mach-ux500/id.h
+@@ -32,113 +32,6 @@ static inline unsigned int __attribute_const__ dbx500_revision(void)
+ 	return dbx500_id.revision;
  }
  
--static int __init ux500_l2x0_init(void)
-+void __init ux500_l2x0_init(void)
- {
--	/* Multiplatform guard */
--	if (!((cpu_is_u8500_family() || cpu_is_ux540_family())))
--		return -ENODEV;
+-/*
+- * SOCs
+- */
 -
- 	/* Unlock before init */
- 	ux500_l2x0_unlock();
- 	outer_cache.write_sec = ux500_l2c310_write_sec;
--	l2x0_of_init(0, ~0);
+-static inline bool __attribute_const__ cpu_is_u8500(void)
+-{
+-	return dbx500_partnumber() == 0x8500;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8520(void)
+-{
+-	return dbx500_partnumber() == 0x8520;
+-}
+-
+-static inline bool cpu_is_u8500_family(void)
+-{
+-	return cpu_is_u8500() || cpu_is_u8520();
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u9540(void)
+-{
+-	return dbx500_partnumber() == 0x9540;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8540(void)
+-{
+-	return dbx500_partnumber() == 0x8540;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8580(void)
+-{
+-	return dbx500_partnumber() == 0x8580;
+-}
+-
+-static inline bool cpu_is_ux540_family(void)
+-{
+-	return cpu_is_u9540() || cpu_is_u8540() || cpu_is_u8580();
+-}
+-
+-/*
+- * 8500 revisions
+- */
+-
+-static inline bool __attribute_const__ cpu_is_u8500ed(void)
+-{
+-	return cpu_is_u8500() && dbx500_revision() == 0x00;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8500v1(void)
+-{
+-	return cpu_is_u8500() && (dbx500_revision() & 0xf0) == 0xA0;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8500v10(void)
+-{
+-	return cpu_is_u8500() && dbx500_revision() == 0xA0;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8500v11(void)
+-{
+-	return cpu_is_u8500() && dbx500_revision() == 0xA1;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8500v2(void)
+-{
+-	return cpu_is_u8500() && ((dbx500_revision() & 0xf0) == 0xB0);
+-}
+-
+-static inline bool cpu_is_u8500v20(void)
+-{
+-	return cpu_is_u8500() && (dbx500_revision() == 0xB0);
+-}
+-
+-static inline bool cpu_is_u8500v21(void)
+-{
+-	return cpu_is_u8500() && (dbx500_revision() == 0xB1);
+-}
+-
+-static inline bool cpu_is_u8500v22(void)
+-{
+-	return cpu_is_u8500() && (dbx500_revision() == 0xB2);
+-}
+-
+-static inline bool cpu_is_u8500v20_or_later(void)
+-{
+-	return (cpu_is_u8500() && !cpu_is_u8500v10() && !cpu_is_u8500v11());
+-}
+-
+-/*
+- * 8540 revisions
+- */
+-
+-static inline bool __attribute_const__ cpu_is_u8540v10(void)
+-{
+-	return cpu_is_u8540() && dbx500_revision() == 0xA0;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u8580v10(void)
+-{
+-	return cpu_is_u8580() && dbx500_revision() == 0xA0;
+-}
+-
+-static inline bool ux500_is_svp(void)
+-{
+-	return false;
+-}
+-
+ #define ux500_unknown_soc()	BUG()
  
- 	return 0;
- }
--early_initcall(ux500_l2x0_init);
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index bbd1b4b8d441..3874e9c236e9 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -141,10 +141,11 @@ static const char * stericsson_dt_platform_compat[] = {
- };
- 
- DT_MACHINE_START(U8500_DT, "ST-Ericsson Ux5x0 platform (Device Tree Support)")
-+	.l2c_aux_val    = 0,
-+	.l2c_aux_mask	= ~0,
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	.init_machine	= u8500_init_machine,
--	.init_late	= NULL,
- 	.dt_compat      = stericsson_dt_platform_compat,
- 	.restart        = ux500_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 82156cbc22ce..f8c2d6f2fb7e 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -65,6 +65,7 @@ void __init ux500_init_irq(void)
- 	}
- 	prcmu_early_init(r.start, r.end-r.start);
- 	ux500_pm_init(r.start, r.end-r.start);
-+	ux500_l2x0_init();
- 
- 	/*
- 	 * Init clocks here so that they are available for system timer
-diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
-index e606847c8b58..8b44b646b191 100644
---- a/arch/arm/mach-ux500/setup.h
-+++ b/arch/arm/mach-ux500/setup.h
-@@ -14,6 +14,9 @@
- #include <asm/mach/arch.h>
- #include <linux/init.h>
- 
-+
-+void ux500_l2x0_init(void);
-+
- void ux500_restart(enum reboot_mode mode, const char *cmd);
- 
- void __init ux500_setup_id(void);
+ #endif
 -- 
 2.4.11
