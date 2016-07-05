@@ -1,110 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 5 Jul 2016 20:33:53 +0200
-Subject: [PATCH 2/3] ARM: dts: imx6sx: Add UDOO Neo support
-In-Reply-To: <577BBC4B.5040903@suse.de>
-References: <1467691450-22975-1-git-send-email-afaerber@suse.de>
- <1467691450-22975-3-git-send-email-afaerber@suse.de>
- <CAOMZO5CQWz++TVKBKEMSQuyks3C+7Tx5=Frh6R+Qubcab=EbjA@mail.gmail.com>
- <577BBC4B.5040903@suse.de>
-Message-ID: <20160705183353.GQ16643@pengutronix.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 6 Jul 2016 02:56:29 +0800
+Subject: [PATCH v3 2/2] clk: samsung: exynos7: Add clocks for atlas block
+In-Reply-To: <1467750561-13957-3-git-send-email-a.kesavan@samsung.com>
+Message-ID: <201607060224.EFZSaMHu%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 03:55:23PM +0200, Andreas F?rber wrote:
-> Hi Fabio,
-> 
-> Am 05.07.2016 um 14:04 schrieb Fabio Estevam:
-> > On Tue, Jul 5, 2016 at 1:04 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> > 
-> >> +/dts-v1/;
-> >> +
-> >> +#include "imx6sx-udoo-neo.dtsi"
-> >> +
-> >> +/ {
-> >> +       model = "UDOO Neo Basic";
-> > 
-> > This should be something like:
-> > 
-> > model = "Udoo i.MX6 SoloX UDOO Neo Basic";
-> 
-> Why should anyone use such a weird concatenation of names? If you wanted
-> "UDOO Neo Basic (based on i.MX 6SoloX)" that would be more
-> understandable, but there is no UDOO Neo Basic board with another SoC:
-> 
-> http://www.udoo.org/udoo-neo/
-> 
-> imx6dl-udoo.dts uses "Udoo i.MX6 Dual-lite Board" and
-> imx6q-udoo.dts  uses "Udoo i.MX6 Quad Board".
+Hi,
 
-Ack, I'm OK with "UDOO Neo Basic" et al, too.
+[auto build test WARNING on clk/clk-next]
+[also build test WARNING on next-20160705]
+[cannot apply to v4.7-rc6]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> > [ discussion about what to use for compatible ]
-> However, "udoo,neo-basic", "udoo,neo", "fsl,imx6sx" should be sufficient
-> since unlike the Quad/Dual situation there is no SoC variation here. Or
-> "seco,udoo-neo"? "udoo,udoo-neo" looks duplicate.
+url:    https://github.com/0day-ci/linux/commits/Abhilash-Kesavan/Add-CPU-clock-support-for-Exynos7/20160706-002658
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-I'd use
+All warnings (new ones prefixed by >>):
 
-	"udoo,neo-basic", "fsl,imx6sx";
+>> drivers/clk/samsung/clk-exynos7.c:43:2: warning: this decimal constant is unsigned only in ISO C90
+     PLL_35XX_RATE(2496000000, 208, 2, 0),
+     ^~~~~~~~~~~~~
+   drivers/clk/samsung/clk-exynos7.c:44:2: warning: this decimal constant is unsigned only in ISO C90
+     PLL_35XX_RATE(2400000000, 200, 2, 0),
+     ^~~~~~~~~~~~~
+   drivers/clk/samsung/clk-exynos7.c:45:2: warning: this decimal constant is unsigned only in ISO C90
+     PLL_35XX_RATE(2304000000, 192, 2, 0),
+     ^~~~~~~~~~~~~
+   drivers/clk/samsung/clk-exynos7.c:46:2: warning: this decimal constant is unsigned only in ISO C90
+     PLL_35XX_RATE(2200000000, 275, 3, 0),
+     ^~~~~~~~~~~~~
 
-> >> +&fec1 {
-> >> +       pinctrl-names = "default";
-> >> +       pinctrl-0 = <&pinctrl_enet1>;
-> >> +       phy-mode = "rmii";
-> >> +       phy-reset-gpios = <&gpio5 4 GPIO_ACTIVE_HIGH>;
-> > 
-> > Shouldn't this be GPIO_ACTIVE_LOW instead?
-> 
-> Hm, network worked okay for me like this, how do we verify?
-> 
-> Schematics are here: http://www.udoo.org/other-resources/
+vim +43 drivers/clk/samsung/clk-exynos7.c
 
-The phy's RST# pin is connected to a signal that routes to ENET1_CRS /
-C7. That corresponds to GPIO2_IO01.
+    27	#define BUS1_DPLL_CON0		0x0120
+    28	#define MFC_PLL_CON0		0x0130
+    29	#define AUD_PLL_CON0		0x0140
+    30	#define MUX_SEL_TOPC0		0x0200
+    31	#define MUX_SEL_TOPC1		0x0204
+    32	#define MUX_SEL_TOPC2		0x0208
+    33	#define MUX_SEL_TOPC3		0x020C
+    34	#define DIV_TOPC0		0x0600
+    35	#define DIV_TOPC1		0x0604
+    36	#define DIV_TOPC3		0x060C
+    37	#define ENABLE_ACLK_TOPC0	0x0800
+    38	#define ENABLE_ACLK_TOPC1	0x0804
+    39	#define ENABLE_SCLK_TOPC1	0x0A04
+    40	
+    41	static const struct samsung_pll_rate_table pll1450x_24mhz_tbl[] = {
+    42		/* rate, m, p, s */
+  > 43		PLL_35XX_RATE(2496000000, 208, 2, 0),
+    44		PLL_35XX_RATE(2400000000, 200, 2, 0),
+    45		PLL_35XX_RATE(2304000000, 192, 2, 0),
+    46		PLL_35XX_RATE(2200000000, 275, 3, 0),
+    47		PLL_35XX_RATE(2100000000, 175, 2, 0),
+    48		PLL_35XX_RATE(2000000000, 250, 3, 0),
+    49		PLL_35XX_RATE(1896000000, 158, 2, 0),
+    50		PLL_35XX_RATE(1800000000, 150, 2, 0),
+    51		PLL_35XX_RATE(1704000000, 142, 2, 0),
 
-Also that's what is used in "my" device tree that was created by a
-colleague who probably took udoo's dts as reference.
-
-Regarding the question how to verify that:
-
-	barebox at Freescale i.MX6 SoloX UDOO NEO Board:/ ifup eth0
-	eth0: 100Mbps full duplex link detected
-	T DHCP client bound to address 192.168.24.110
-
-	barebox at Freescale i.MX6 SoloX UDOO NEO Board:/ ping 192.168.23.4
-	host 192.168.23.4 is alive
-
-	barebox at Freescale i.MX6 SoloX UDOO NEO Board:/ gpio_direction_output 33 0
-
-	barebox at Freescale i.MX6 SoloX UDOO NEO Board:/ ping 192.168.23.4
-	eth0: transmission timeout
-	T eth0: transmission timeout
-	T eth0: transmission timeout
-	T eth0: transmission timeout
-	T eth0: transmission timeout
-	T eth0: transmission timeout
-	ping failed: Connection timed out
-
-	barebox at Freescale i.MX6 SoloX UDOO NEO Board:/ gpio_direction_output 33 1
-
-	barebox at Freescale i.MX6 SoloX UDOO NEO Board:/ ping 192.168.23.4
-	host 192.168.23.4 is alive
-
-So I'd say the right thing to do is:
-
-	phy-reset-gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
-
-And as the fec driver ignores the flag (for historic reasons), the only
-other correct possibility is:
-
-	phy-reset-gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
-	phy-reset-active-high;
-
-which is wrong here though.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 55044 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160706/69d5255f/attachment-0001.obj>
