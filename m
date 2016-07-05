@@ -1,122 +1,132 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Tue, 5 Jul 2016 03:03:01 +0000
-Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
-In-Reply-To: <577A21E4.1030301@huawei.com>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-2-git-send-email-po.liu@nxp.com>
- <577A21E4.1030301@huawei.com>
-Message-ID: <VI1PR0401MB1709D556D0A7F7BB9188221E92390@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 5 Jul 2016 11:41:02 +0800
+Subject: [PATCH] arm64:mm Remove the redundant initrd memblock codes
+In-Reply-To: <20160705022217.GA27637@arm.com>
+References: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
+ <4ABE8B9C-8027-40AA-A303-A82CF014A287@linaro.org>
+ <20160705022217.GA27637@arm.com>
+Message-ID: <B1CA6829-851E-4E56-BA48-58EE72272B49@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongdong,
 
-The patch were intend to fixup the NXP layerscape serial SOC and were tested ok.
-I am not clear what platform are you trying to fix. 
-The problem on your board may be as below comments:
+> On 5 jul. 2016, at 10:22, Dennis Chen <dennis.chen@arm.com> wrote:
+> 
+>> On Mon, Jul 04, 2016 at 12:33:05PM +0200, Ard Biesheuvel wrote:
+>> 
+>>> On 4 jul. 2016, at 06:53, Dennis Chen <dennis.chen@arm.com> wrote:
+>>> 
+>>> The memory range between initrd_start and initrd_end was added to the memblock
+>>> twice unnecessarily in the same function before initrd memory range can be freed.
+>>> This patch merge those codes into one piece of block and add the initrd memory
+>>> range only once, also it makes the code clean and simple.
+>> 
+>> This is likely to break under KASLR (and I would recommend that you test with kaslr enabled when you propose changes to this code)
+> Hello Ard, I've tested it under KASLR on Juno board before proposing the changes,where the firmware provides the RNG protocol, it works well.
 
+Ok, thanks for confirming that (and apologies for assuming you did not test it)
 
->  -----Original Message-----
->  From: Dongdong Liu [mailto:liudongdong3 at huawei.com]
->  Sent: Monday, July 04, 2016 4:44 PM
->  To: Po Liu; linux-pci at vger.kernel.org; linux-arm-
->  kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
->  devicetree at vger.kernel.org
->  Cc: Bjorn Helgaas; Shawn Guo; Marc Zyngier; Rob Herring; Roy Zang;
->  Mingkai Hu; Stuart Yoder; Yang-Leo Li; Arnd Bergmann; Minghuan Lian;
->  Murali Karicheri; Linuxarm
->  Subject: Re: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
->  
->  Hi Po
->  
->  I found a problem with the similar patch. as the below log.
->  
->  [    4.287060] pci 0000:80:00.0: quirk_aer_interrupt dev->irq 416
->  [    4.293778] pcieport 0000:80:00.0: pci_device_probe in
->  [    4.299605] pcieport 0000:80:00.0: of_irq_parse_pci() failed with
->  rc=-22
->  [    4.307209] pcieport 0000:80:00.0: init_service_irqs  dev->irq 0
->  
->  The fucntions are called as below sequence.
->  1. quirk_aer_interrupt, get the aer dev->irq 416.
+>> 
+>> The randomization of memstart_addr needs to execute /after/ adding back the initrd, otherwise the chosen value of memstart_addr may push the initrd beyond the end of the linear area into the userland range.
+> Yes, I know the 'range' is depends on memblock_end_of_DRAM() and memblock_start_of_DRAM(), but I can't see that the order of initrd added to the memblock will affect
+> those two values returned from memblock_ fucntions, IMHO the initrd will be loaded to somewhere within the DRAM by firmware, is that correct?
 
-This code quirk_aer_interrupt() should be run at pci_fixup_device(pci_fixup_final) which is in the pci_bus_add_devices()
+memblock_add/_remove may affect the return values of memblock_start/_end_of_DRAM, so the reordering will affect the range of the randomized memstart_addr, afaict
 
->  2. pci_device_probe->of_irq_parse_pci, of_irq_parse_pci() failed, then
->  dev->irq changed to 0.
-
-pci_device_probe->of_irq_parse_pci which in the pci_scan_child_bus() run before  pci_bus_add_devices(). See dw_pcie_host_init().
-Apparently , your quirk_aer_interrupt() is running before the dev->irq assignment in the of_irq_parse_pci().
-
-So make sure your configure the quirk_aer_interrupt() run in the FINAL stage in the quirk.c OR check your host driver which you are using.
-
-
->  
->  So this patch could not work with aer.
->  
->  Thanks
->  Dongdong
->  ? 2016/6/14 16:24, Po Liu ??:
->  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
->  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
->  > maybe there is interrupt line for aer pme etc. Search the interrupt
->  > number in the fdt file. Then fixup the dev->irq with it.
->  >
->  > Signed-off-by: Po Liu <po.liu@nxp.com>
->  > ---
->  > changes for V3:
->  > 	- Move to quirk;
->  > 	- Only correct the irq in RC mode;
->  >
->  >   drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
->  >   1 file changed, 29 insertions(+)
->  >
->  > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
->  > ee72ebe..8b39cce 100644
->  > --- a/drivers/pci/quirks.c
->  > +++ b/drivers/pci/quirks.c
->  > @@ -25,6 +25,7 @@
->  >   #include <linux/sched.h>
->  >   #include <linux/ktime.h>
->  >   #include <linux/mm.h>
->  > +#include <linux/of_irq.h>
->  >   #include <asm/dma.h>	/* isa_dma_bridge_buggy */
->  >   #include "pci.h"
->  >
->  > @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct
->  pci_dev *pdev)
->  >   	}
->  >   }
->  >   DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443,
->  > quirk_intel_qat_vf_cap);
->  > +
->  > +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
->  > + * but use standalone irq. Read the device tree for the aer
->  > + * interrupt number.
->  > + */
->  > +static void quirk_aer_interrupt(struct pci_dev *dev) {
->  > +	int ret;
->  > +	u8 header_type;
->  > +	struct device_node *np = NULL;
->  > +
->  > +	/* Only for the RC mode device */
->  > +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
->  > +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
->  > +		return;
->  > +
->  > +	if (dev->bus->dev.of_node)
->  > +		np = dev->bus->dev.of_node;
->  > +
->  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
->  > +		ret = of_irq_get_byname(np, "aer");
->  > +		if (ret > 0) {
->  > +			dev->no_msi = 1;
->  > +			dev->irq = ret;
->  > +		}
->  > +	}
->  > +}
->  > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,
->  > +quirk_aer_interrupt);
->  >
->  
+> 
+> Thanks,
+> Dennis  
+>> 
+>> 
+>>> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Steve Capper <steve.capper@arm.com>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>> arch/arm64/mm/init.c | 58 +++++++++++++++++++++++-----------------------------
+>>> 1 file changed, 26 insertions(+), 32 deletions(-)
+>>> 
+>>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>>> index 2ade7a6..cf26cdb 100644
+>>> --- a/arch/arm64/mm/init.c
+>>> +++ b/arch/arm64/mm/init.c
+>>> @@ -228,6 +228,29 @@ void __init arm64_memblock_init(void)
+>>>       memblock_add(__pa(_text), (u64)(_end - _text));
+>>>   }
+>>> 
+>>> +    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+>>> +        extern u16 memstart_offset_seed;
+>>> +        u64 range = linear_region_size -
+>>> +                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+>>> +
+>>> +        /*
+>>> +         * If the size of the linear region exceeds, by a sufficient
+>>> +         * margin, the size of the region that the available physical
+>>> +         * memory spans, randomize the linear region as well.
+>>> +         */
+>>> +        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+>>> +            range = range / ARM64_MEMSTART_ALIGN + 1;
+>>> +            memstart_addr -= ARM64_MEMSTART_ALIGN *
+>>> +                     ((range * memstart_offset_seed) >> 16);
+>>> +        }
+>>> +    }
+>>> +
+>>> +    /*
+>>> +     * Register the kernel text, kernel data, initrd, and initial
+>>> +     * pagetables with memblock.
+>>> +     */
+>>> +    memblock_reserve(__pa(_text), _end - _text);
+>>> +
+>>>   if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+>>>       /*
+>>>        * Add back the memory we just removed if it results in the
+>>> @@ -254,41 +277,12 @@ void __init arm64_memblock_init(void)
+>>>           memblock_remove(base, size); /* clear MEMBLOCK_ flags */
+>>>           memblock_add(base, size);
+>>>           memblock_reserve(base, size);
+>>> +            /* the generic initrd code expects virtual addresses */
+>>> +            initrd_start = __phys_to_virt(initrd_start);
+>>> +            initrd_end = __phys_to_virt(initrd_end);
+>>>       }
+>>>   }
+>>> 
+>>> -    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+>>> -        extern u16 memstart_offset_seed;
+>>> -        u64 range = linear_region_size -
+>>> -                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+>>> -
+>>> -        /*
+>>> -         * If the size of the linear region exceeds, by a sufficient
+>>> -         * margin, the size of the region that the available physical
+>>> -         * memory spans, randomize the linear region as well.
+>>> -         */
+>>> -        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+>>> -            range = range / ARM64_MEMSTART_ALIGN + 1;
+>>> -            memstart_addr -= ARM64_MEMSTART_ALIGN *
+>>> -                     ((range * memstart_offset_seed) >> 16);
+>>> -        }
+>>> -    }
+>>> -
+>>> -    /*
+>>> -     * Register the kernel text, kernel data, initrd, and initial
+>>> -     * pagetables with memblock.
+>>> -     */
+>>> -    memblock_reserve(__pa(_text), _end - _text);
+>>> -#ifdef CONFIG_BLK_DEV_INITRD
+>>> -    if (initrd_start) {
+>>> -        memblock_reserve(initrd_start, initrd_end - initrd_start);
+>>> -
+>>> -        /* the generic initrd code expects virtual addresses */
+>>> -        initrd_start = __phys_to_virt(initrd_start);
+>>> -        initrd_end = __phys_to_virt(initrd_end);
+>>> -    }
+>>> -#endif
+>>> -
+>>>   early_init_fdt_scan_reserved_mem();
+>>> 
+>>>   /* 4GB maximum for 32-bit only capable devices */
+>>> -- 
+>>> 1.8.3.1
+> 
