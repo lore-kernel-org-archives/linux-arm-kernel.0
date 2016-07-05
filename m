@@ -1,58 +1,60 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Jul 2016 21:46:12 -0700
-Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.8 -
- part1
-In-Reply-To: <CADaLNDmLXF3Y7bcabHzzu5eXXqQ8R98QUgO8yKTnCcqCRXPnDg@mail.gmail.com>
-References: <CADaLNDmLXF3Y7bcabHzzu5eXXqQ8R98QUgO8yKTnCcqCRXPnDg@mail.gmail.com>
-Message-ID: <20160705044612.GK1669@localhost>
+Date: Mon, 4 Jul 2016 21:47:57 -0700
+Subject: [GIT PULL] device tree updates for omaps for v4.8 merge window
+In-Reply-To: <20160622110640.GD22353@atomide.com>
+References: <20160622110640.GD22353@atomide.com>
+Message-ID: <20160705044757.GL1669@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jun 21, 2016 at 04:40:49PM -0700, Duc Dang wrote:
-> Hi Arnd, Olof,
-> 
-> This is the first part of DTS changes for X-Gene platforms targeted for 4.8
-> 
-> The changes includes
-> + 2 clean-up and style fix from Bjorn with Rob's ACK [1]
-> + A timer interrupt polarity fix for X-Gene 2 (refer to Marc's
-> arm/arm64 arch timer fix [2])
-
-I'd recommend considering switching to symbolic flag definitions, to make it
-easier for others to interpret the DT (and for downstream users to change
-where needed). Anyway, not a high-priority thing, just something to keep in
-mind for some time in the future.
-
-> + Clean up an unused clk node (qmlclk) for X-Gene 1
-> 
-> Marc's arch timer series [2] has a change in apm-storm.dtsi file. I
-> verified and the order of applying Marc's apm-storm.dtsi change and
-> the DT changes in xgene-next did not cause any conflict.
-> 
-> [1]: (https://lkml.org/lkml/2016/6/14/340
-> [2]: http://www.spinics.net/lists/linux-samsung-soc/msg53533.html
-> 
-> Regards,
-> Duc Dang.
-> ------
-> 
+On Wed, Jun 22, 2016 at 04:06:42AM -0700, Tony Lindgren wrote:
 > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
 >   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 > 
 > are available in the git repository at:
 > 
->   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.8-part1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/dt-part1-signed-v2
 > 
-> for you to fetch changes up to ddbc71d96012fbcc4b9e42fd1c131f185875f73f:
+> for you to fetch changes up to 52c7c91319e469142628199548852198bcc3150f:
 > 
->   arm64: dts: apm: Remove unused qmlclk node on X-Gene 1 (2016-06-20
-> 18:41:49 -0700)
+>   ARM: dts: AM43xx: Add node for RNG (2016-06-22 00:44:16 -0700)
+> 
+> ----------------------------------------------------------------
+> Device tree changes for omaps for v4.8 merge window:
+> 
+> - PWM binding updates and related dts changes
+> 
+> - OCM RAM updates for dra7
+> 
+> - Enable n900 lirc-rx51 driver
+> 
+> - omap3-gta04 updates for backlight, bma180, itg3200, hmc5843 and wifi
+> 
+> - am335x, am437x and am57xx operating point updates and additions
+> 
+> - am335x-icev2 pca9536 node
+> 
+> - dra72-evm regulator updates
+> 
+> - edma spelling fixes
+> 
+> - am335x and am437x ethernet phy update
+> 
+> - a series of mcbsp updates
+> 
+> - omap3-gta04 eeprom
+> 
+> - dra7 PCIe unit address fix
+> 
+> - stdout-path for beaglebone variants
+> 
+> - crypto accelerator nodes for am335x, am437x and dra7
 
-Merged into next/dt64.
 
-Thanks!
+Merged, thanks.
+
 
 -Olof
