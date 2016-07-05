@@ -1,141 +1,102 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Tue, 5 Jul 2016 12:18:36 +0800
-Subject: [PATCH] arm64:mm Remove the redundant initrd memblock codes
-In-Reply-To: <B1CA6829-851E-4E56-BA48-58EE72272B49@linaro.org>
-References: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
- <4ABE8B9C-8027-40AA-A303-A82CF014A287@linaro.org>
- <20160705022217.GA27637@arm.com>
- <B1CA6829-851E-4E56-BA48-58EE72272B49@linaro.org>
-Message-ID: <20160705041834.GA28823@arm.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 05 Jul 2016 04:34:17 -0000
+Subject: [Linaro-acpi] [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space
+ accessors against platfrom specific ECAM quirks
+In-Reply-To: <e3174a09-e6f8-126d-d3c5-648d1cfd2b74@redhat.com>
+References: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
+ <1465822923-33599-2-git-send-email-liudongdong3@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F782C86@lhreml507-mbx>
+ <e3174a09-e6f8-126d-d3c5-648d1cfd2b74@redhat.com>
+Message-ID: <CADaLNDnjEuGvWxCMPb=9fiCeVMgF0RRzT2n1SjNw3o57gRUhcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 11:41:02AM +0800, Ard Biesheuvel wrote:
-> 
-> > On 5 jul. 2016, at 10:22, Dennis Chen <dennis.chen@arm.com> wrote:
-> > 
-> >> On Mon, Jul 04, 2016 at 12:33:05PM +0200, Ard Biesheuvel wrote:
-> >> 
-> >>> On 4 jul. 2016, at 06:53, Dennis Chen <dennis.chen@arm.com> wrote:
-> >>> 
-> >>> The memory range between initrd_start and initrd_end was added to the memblock
-> >>> twice unnecessarily in the same function before initrd memory range can be freed.
-> >>> This patch merge those codes into one piece of block and add the initrd memory
-> >>> range only once, also it makes the code clean and simple.
-> >> 
-> >> This is likely to break under KASLR (and I would recommend that you test with kaslr enabled when you propose changes to this code)
-> > Hello Ard, I've tested it under KASLR on Juno board before proposing the changes,where the firmware provides the RNG protocol, it works well.
-> 
-> Ok, thanks for confirming that (and apologies for assuming you did not test it)
-> 
-> >> 
-> >> The randomization of memstart_addr needs to execute /after/ adding back the initrd, otherwise the chosen value of memstart_addr may push the initrd beyond the end of the linear area into the userland range.
-> > Yes, I know the 'range' is depends on memblock_end_of_DRAM() and memblock_start_of_DRAM(), but I can't see that the order of initrd added to the memblock will affect
-> > those two values returned from memblock_ fucntions, IMHO the initrd will be loaded to somewhere within the DRAM by firmware, is that correct?
-> 
-> memblock_add/_remove may affect the return values of memblock_start/_end_of_DRAM, so the reordering will affect the range of the randomized memstart_addr, afaict
+On Wed, Jun 15, 2016 at 11:31 PM, Jon Masters <jcm@redhat.com> wrote:
+> On 06/13/2016 09:54 AM, Gabriele Paoloni wrote:
+>> Hi Tomasz, Jon
 >
-Hello Ard, since the efi stub will load the initrd block to the DRAM, and all the memory descriptions passed in by the firmware will be added to the memblock by efi
-stub, so in this case adding the initrd to the memblock will not change the return value of memblock_start/_end_of_DRAM, else it's a bug from efi stub, isn't it?
+> Hi Gab,
+>
+> Sorry for the lag in following up.
+>
+> <snip>
+>
+>> As you can see here Liudongdong has replaced oem_revision with
+>> oem_table_id.
+>>
+>> Now it seems that there are some platforms that have already shipped
+>> using a matching based on the oem_revision (right Jon?)
+>
+> Actually, it turns out (Cov is correct) that we can just match on OEM
+> Table ID. The revision should not generally be needed and the vendors
+> will just need to make sure that they change OEM Table ID in future
+> silicon. An example from two shipping platforms:
+>
+> 1). AppliedMicro Mustang:
+>
+> [000h 0000   4]                    Signature : "MCFG"    [Memory Mapped
+> Configuration table]
+> [004h 0004   4]                 Table Length : 0000003C
+> [008h 0008   1]                     Revision : 01
+> [009h 0009   1]                     Checksum : 4A
+> [00Ah 0010   6]                       Oem ID : "APM   "
+> [010h 0016   8]                 Oem Table ID : "XGENE   "
+> [018h 0024   4]                 Oem Revision : 00000002
+> [01Ch 0028   4]              Asl Compiler ID : "INTL"
+> [020h 0032   4]        Asl Compiler Revision : 20140724
+>
+> 2). HP(E[0]) Moonshot:
+>
+> [000h 0000   4]                    Signature : "MCFG"    [Memory Mapped
+> Configuration table]
+> [004h 0004   4]                 Table Length : 0000003C
+> [008h 0008   1]                     Revision : 01
+> [009h 0009   1]                     Checksum : 48
+> [00Ah 0010   6]                       Oem ID : "APM   "
+> [010h 0016   8]                 Oem Table ID : "XGENE   "
+> [018h 0024   4]                 Oem Revision : 00000001
+> [01Ch 0028   4]              Asl Compiler ID : "HP  "
+> [020h 0032   4]        Asl Compiler Revision : 00000001
+>
+> I have pinged the semiconductor (Applied) and insisted upon a written
+> plan (which I have now) for handling the first affect generation(s) and
+> future chip roadmap stuff, along with how they plan to upstream this
+> immediately as part of this thread. I have also done similar with each
+> of the other vendors (this is something ARM or Linaro should be doing).
+> But I particularly care about X-Gene because I want it to be loved as
+> shipping silicon in production systems (Moonshot) that are sitting and
+> waiting in the Fedora Phoenix datacenter in large quantity to come
+> online if only an upstream kernel would actually boot on them :)
 
-Thanks,
-Dennis
-> 
-> > 
-> > Thanks,
-> > Dennis  
-> >> 
-> >> 
-> >>> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> >>> Cc: Mark Rutland <mark.rutland@arm.com>
-> >>> Cc: Steve Capper <steve.capper@arm.com>
-> >>> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >>> Cc: Will Deacon <will.deacon@arm.com>
-> >>> ---
-> >>> arch/arm64/mm/init.c | 58 +++++++++++++++++++++++-----------------------------
-> >>> 1 file changed, 26 insertions(+), 32 deletions(-)
-> >>> 
-> >>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> >>> index 2ade7a6..cf26cdb 100644
-> >>> --- a/arch/arm64/mm/init.c
-> >>> +++ b/arch/arm64/mm/init.c
-> >>> @@ -228,6 +228,29 @@ void __init arm64_memblock_init(void)
-> >>>       memblock_add(__pa(_text), (u64)(_end - _text));
-> >>>   }
-> >>> 
-> >>> +    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-> >>> +        extern u16 memstart_offset_seed;
-> >>> +        u64 range = linear_region_size -
-> >>> +                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
-> >>> +
-> >>> +        /*
-> >>> +         * If the size of the linear region exceeds, by a sufficient
-> >>> +         * margin, the size of the region that the available physical
-> >>> +         * memory spans, randomize the linear region as well.
-> >>> +         */
-> >>> +        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-> >>> +            range = range / ARM64_MEMSTART_ALIGN + 1;
-> >>> +            memstart_addr -= ARM64_MEMSTART_ALIGN *
-> >>> +                     ((range * memstart_offset_seed) >> 16);
-> >>> +        }
-> >>> +    }
-> >>> +
-> >>> +    /*
-> >>> +     * Register the kernel text, kernel data, initrd, and initial
-> >>> +     * pagetables with memblock.
-> >>> +     */
-> >>> +    memblock_reserve(__pa(_text), _end - _text);
-> >>> +
-> >>>   if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
-> >>>       /*
-> >>>        * Add back the memory we just removed if it results in the
-> >>> @@ -254,41 +277,12 @@ void __init arm64_memblock_init(void)
-> >>>           memblock_remove(base, size); /* clear MEMBLOCK_ flags */
-> >>>           memblock_add(base, size);
-> >>>           memblock_reserve(base, size);
-> >>> +            /* the generic initrd code expects virtual addresses */
-> >>> +            initrd_start = __phys_to_virt(initrd_start);
-> >>> +            initrd_end = __phys_to_virt(initrd_end);
-> >>>       }
-> >>>   }
-> >>> 
-> >>> -    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-> >>> -        extern u16 memstart_offset_seed;
-> >>> -        u64 range = linear_region_size -
-> >>> -                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
-> >>> -
-> >>> -        /*
-> >>> -         * If the size of the linear region exceeds, by a sufficient
-> >>> -         * margin, the size of the region that the available physical
-> >>> -         * memory spans, randomize the linear region as well.
-> >>> -         */
-> >>> -        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-> >>> -            range = range / ARM64_MEMSTART_ALIGN + 1;
-> >>> -            memstart_addr -= ARM64_MEMSTART_ALIGN *
-> >>> -                     ((range * memstart_offset_seed) >> 16);
-> >>> -        }
-> >>> -    }
-> >>> -
-> >>> -    /*
-> >>> -     * Register the kernel text, kernel data, initrd, and initial
-> >>> -     * pagetables with memblock.
-> >>> -     */
-> >>> -    memblock_reserve(__pa(_text), _end - _text);
-> >>> -#ifdef CONFIG_BLK_DEV_INITRD
-> >>> -    if (initrd_start) {
-> >>> -        memblock_reserve(initrd_start, initrd_end - initrd_start);
-> >>> -
-> >>> -        /* the generic initrd code expects virtual addresses */
-> >>> -        initrd_start = __phys_to_virt(initrd_start);
-> >>> -        initrd_end = __phys_to_virt(initrd_end);
-> >>> -    }
-> >>> -#endif
-> >>> -
-> >>>   early_init_fdt_scan_reserved_mem();
-> >>> 
-> >>>   /* 4GB maximum for 32-bit only capable devices */
-> >>> -- 
-> >>> 1.8.3.1
-> > 
-> 
+Thanks for the MCFG information on Moonshot system, Jon.
+
+I will make sure the posted quirk for X-Gene takes care for HPE
+Moonshot system as well.
+
+Regards,
+Duc Dang.
+
+>
+>> However I guess that if in FW they have defined oem_table_id properly
+>> they should be able to use this mechanism without needing to a FW update.
+>
+> Correct.
+>
+>> Can these vendors confirm this?
+>
+> I've checked all current shipping silicon and prototypes.
+>
+>> Tomasz do you think this can work for Cavium Thunder?
+>
+> Will let the vendors followup directly as well.
+>
+> Jon.
+>
+> [0] Fortunately that name change doesn't factor when using semiconductor
+> matching...hopefully none of the non-complaint IP companies in gen1
+> stuff get bought and change their table names. In the unlikely event
+> that that does happen, I will preemptively beat them up and ensure that
+> something crazy doesn't happen with table contents.
+>
+> --
+> Computer Architect | Sent from my Fedora powered laptop
