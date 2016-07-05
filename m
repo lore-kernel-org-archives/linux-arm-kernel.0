@@ -1,128 +1,92 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue,  5 Jul 2016 15:22:53 -0700
-Subject: [PATCHv3] arm64: Handle el1 synchronous instruction aborts cleanly
-In-Reply-To: <1467757373-31242-1-git-send-email-labbott@redhat.com>
-References: <1467757373-31242-1-git-send-email-labbott@redhat.com>
-Message-ID: <1467757373-31242-2-git-send-email-labbott@redhat.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Tue, 5 Jul 2016 19:18:45 -0400
+Subject: [PATCH 6/7] dt-bindings: net: bgmac: add bindings documentation
+ for bgmac
+In-Reply-To: <3327458.KVBg7y9SeP@wuerfel>
+References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
+ <6488341.IDGze89kcW@wuerfel>
+ <e8ba3130-38ff-3d67-da64-f7c15ec27ded@broadcom.com>
+ <3327458.KVBg7y9SeP@wuerfel>
+Message-ID: <CAC3K-4qZ9tpEAuDBjL-bkjn5F2Xfr4CAmVGc=DpgVh8MrqEDtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Executing from a non-executable area gives an ugly message:
+On Tue, Jul 5, 2016 at 9:37 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday, July 4, 2016 9:34:35 AM CEST Ray Jui wrote:
+>> On 7/1/2016 8:42 AM, Arnd Bergmann wrote:
+>> > On Friday, July 1, 2016 11:17:25 AM CEST Jon Mason wrote:
+>> >> On Fri, Jul 1, 2016 at 5:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >>> On Thursday, June 30, 2016 6:59:13 PM CEST Jon Mason wrote:
+>> >>>> +
+>> >>>> +Required properties:
+>> >>>> + - compatible: "brcm,bgmac-nsp"
+>> >>>> + - reg:                Address and length of the GMAC registers,
+>> >>>> +               Address and length of the GMAC IDM registers
+>> >>>> + - reg-names:  Names of the registers.  Must have both "gmac_base" and
+>> >>>> +               "idm_base"
+>> >>>> + - interrupts: Interrupt number
+>> >>>> +
+>> >>>
+>> >>>
+>> >>> "brcm,bgmac-nsp" sounds a bit too general. As I understand, this is a family
+>> >>> of SoCs that might not all have the exact same implementation of this
+>> >>> ethernet device, as we can see from the long lookup table in bgmac_probe().
+>> >>
+>> >> The Broadcom iProc family of SoCs contains:
+>> >> Northstar
+>> >> Northstar Plus
+>> >> Cygnus
+>> >> Northstar 2
+>> >> a few SoCs that are under development
+>> >> and a number of ethernet switches (which might never be officially supported)
+>> >>
+>> >> Each one of these SoCs could have a different revision of the gmac IP
+>> >> block, but they should be uniform within each SoC (though there might
+>> >> be a A0/B0 change necessary).  The Northstar Plus product family has a
+>> >> number of different implementations, but the SoC is unchanged.  So, I
+>> >> think this might be too specific, when we really need a general compat
+>> >> string.
+>> >
+>> > Ok, thanks for the clarification, that sounds good enough.
+>> >
+>> >> Broadcom has a history of sharing IP blocks amongst the different
+>> >> divisions.  So, this driver might be used on other SoC families (as it
+>> >> apparently has been done in the past, based on the code you
+>> >> reference).  I do not know of any way to know what legacy, non-iProc
+>> >> chips have used this IP block.  I can make this "brcm,iproc-bgmac",
+>> >> and add "brcm,iproc-nsp-bgmac" as an alternative compatible string in
+>> >> this file (which I believe you are suggesting), but there might be
+>> >> non-iProc SoCs that use this driver.  Is this acceptable?
+>> >
+>> > If it is also used outside of iProc, then I see no need for the
+>> > extra compatible string, although it would not do any harm either.
+>> >
+>> > Ideally we should name it whatever the name for this IP block is
+>> > inside of the company, with "nsp" as the designation for the variant
+>> > in Northstar Plus. A lot of Broadcom IP blocks themselves seem to have
+>> > some four-digit or five-digit number, maybe this one does too?
+>> >
+>> >       Arnd
+>> >
+>>
+>> Note this IP block has an official IP controller name of "amac" from the
+>> ASIC team.
+>
+> Ok, then I'd suggest making the compatible string here
+>
+>         compatible = "brcm,nsp-amac", "brcm,amac";
 
-lkdtm: Performing direct entry EXEC_RODATA
-lkdtm: attempting ok execution at ffff0000084c0e08
-lkdtm: attempting bad execution at ffff000008880700
-Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
-CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
-Hardware name: linux,dummy-virt (DT)
-task: ffff800077e35780 ti: ffff800077970000 task.ti: ffff800077970000
-PC is at lkdtm_rodata_do_nothing+0x0/0x8
-LR is at execute_location+0x74/0x88
+It is called GMAC in the NS and NSP documentation, but AMAC is fine
+with me (as it is called this in the NS2 documentation).  I'll make
+the necessary change and repush.
 
-The 'IABT (current EL)' indicates the error but it's a bit cryptic
-without knowledge of the ARM ARM. There is also no indication of the
-specific address which triggered the fault. The increase in kernel
-page permissions makes hitting this case more likely as well.
-Handling the case in the vectors gives a much more familiar looking
-error message:
+Thanks for all of the input.
 
-lkdtm: Performing direct entry EXEC_RODATA
-lkdtm: attempting ok execution at ffff0000084c0840
-lkdtm: attempting bad execution at ffff000008880680
-Unable to handle kernel paging request at virtual address ffff000008880680
-pgd = ffff8000089b2000
-[ffff000008880680] *pgd=00000000489b4003, *pud=0000000048904003, *pmd=0000000000000000
-Internal error: Oops: 8400000e [#1] PREEMPT SMP
-Modules linked in:
-CPU: 1 PID: 997 Comm: sh Not tainted 4.7.0-rc1+ #24
-Hardware name: linux,dummy-virt (DT)
-task: ffff800077f9f080 ti: ffff800008a1c000 task.ti: ffff800008a1c000
-PC is at lkdtm_rodata_do_nothing+0x0/0x8
-LR is at execute_location+0x74/0x88
-
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
-v3: Fixup permission in do_page_fault to detect the kernel iabort, don't run
-fixup handlers on kernel instruction aborts.
-
-Dropped the Acked-by since the addition of checks is pretty significant.
----
- arch/arm64/kernel/entry.S | 18 ++++++++++++++++++
- arch/arm64/mm/fault.c     | 11 +++++++++--
- 2 files changed, 27 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 12e8d2b..54e93d12 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -336,6 +336,8 @@ el1_sync:
- 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
- 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
- 	b.eq	el1_da
-+	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
-+	b.eq	el1_ia
- 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
- 	b.eq	el1_undef
- 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
-@@ -347,6 +349,22 @@ el1_sync:
- 	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
- 	b.ge	el1_dbg
- 	b	el1_inv
-+el1_ia:
-+	/*
-+	 * Instruction abort handling
-+	 */
-+	mrs	x0, far_el1
-+	enable_dbg
-+	// re-enable interrupts if they were enabled in the aborted context
-+	tbnz	x23, #7, 1f			// PSR_I_BIT
-+	enable_irq
-+1:
-+	mov	x2, sp				// struct pt_regs
-+	bl	do_mem_abort
-+
-+	// disable interrupts before pulling preserved data off the stack
-+	disable_irq
-+	kernel_exit 1
- el1_da:
- 	/*
- 	 * Data abort handling
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 013e2cb..e25b0891 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -131,6 +131,11 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
- }
- #endif
- 
-+static bool is_el1_instruction_abort(unsigned int esr)
-+{
-+	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
-+}
-+
- /*
-  * The kernel tried to access some page that wasn't present.
-  */
-@@ -139,8 +144,9 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
- {
- 	/*
- 	 * Are we prepared to handle this kernel fault?
-+	 * We are almost certainly not prepared to handle instruction faults.
- 	 */
--	if (fixup_exception(regs))
-+	if (!is_el1_instruction_abort(esr) && fixup_exception(regs))
- 		return;
- 
- 	/*
-@@ -247,7 +253,8 @@ static inline int permission_fault(unsigned int esr)
- 	unsigned int ec       = (esr & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT;
- 	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
- 
--	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
-+	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM) ||
-+	       (ec == ESR_ELx_EC_IABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
- }
- 
- static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
--- 
-2.7.4
+> or even better if you have a version number associated with it, make that
+>
+>         compatible = "brcm,nsp-amac", "brcm,amac-1.234", "brcm,amac";
+>
+> replacing 1.234 with the actual version of course.
+>
+>         Arnd
+>
