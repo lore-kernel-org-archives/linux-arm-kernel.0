@@ -1,24 +1,21 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 5 Jul 2016 15:44:45 +0200
-Subject: [PATCH 03/11] ASoC: ab8500-codec: remove platform data based probe
-In-Reply-To: <1467722710-1577-3-git-send-email-linus.walleij@linaro.org>
-References: <1467722710-1577-1-git-send-email-linus.walleij@linaro.org>
- <1467722710-1577-3-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160705134445.GV6247@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Jul 2016 15:46:41 +0200
+Subject: [PATCH] pinctrl: sunxi: fix nand0 function name for sun8i
+In-Reply-To: <20160704022931.46223-1-icenowy@aosc.xyz>
+References: <20160704022931.46223-1-icenowy@aosc.xyz>
+Message-ID: <CACRpkdbp3AENFW8ixHmyCdkpTNH8WMdJtYJ0Wuwbh9NLVrhR_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 02:45:02PM +0200, Linus Walleij wrote:
+On Mon, Jul 4, 2016 at 4:29 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
 
-> Mark: if this makes sense to you, please provide an ACK so Arnd
-> can merge this cleanup.
+> In sun4/5/6/7i, all the pin function related to NAND0 controller is
+> named "nand0". However, in sun8i, some of the functions are named as
+> "nand". This patch renamed them to "nand0", for the consistency.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-I'm still not clear what dependency this has on anything elsein the
-series.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/59e11437/attachment.sig>
+Patch applied with Maxime's ACK.
+
+Yours,
+Linus Walleij
