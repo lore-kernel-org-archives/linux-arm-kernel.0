@@ -1,104 +1,99 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 5 Jul 2016 12:33:50 -0700
-Subject: [PATCH 00/21] Support qcom's HSIC USB and rewrite USB2 HS phy
- support
-In-Reply-To: <146774653916.32648.3323628902201136171@sboyd-linaro>
-References: <20160626072838.28082-1-stephen.boyd@linaro.org>
- <CALAqxLUHfsJBTQS=p5oThnOdiAZwu48puRhREx+2G9+KajDA9g@mail.gmail.com>
- <146710289677.3879.15364764209076318827@sboyd-linaro>
- <CALAqxLW--yFb2YwX3+x7PB-g_5D0gb6j8CiJwnCC+meb7xqbig@mail.gmail.com>
- <146774653916.32648.3323628902201136171@sboyd-linaro>
-Message-ID: <CALAqxLUi9_OnqU06Vsa_VxmtYof9+me3p5eTn_fK3O=J1Zhtzg@mail.gmail.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Tue, 5 Jul 2016 13:44:47 -0600
+Subject: [RFC PATCH] media: s5p-mfc - remove vidioc_g_crop
+In-Reply-To: <1467595835.2577.2.camel@ndufresne.ca>
+References: <1467322502-11180-1-git-send-email-shuahkh@osg.samsung.com>
+ <CAH_td2wtizPpD59h2shZoyuTvSNr=7YjR4mSmTO9FsWaJp8dfA@mail.gmail.com>
+ <772ecbb8-b1d2-b4cf-2be2-110f731b9a2b@xs4all.nl>
+ <1467595835.2577.2.camel@ndufresne.ca>
+Message-ID: <577C0E2F.1050804@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2016 at 12:22 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> Quoting John Stultz (2016-07-01 23:03:38)
->> On Tue, Jun 28, 2016 at 1:34 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
->> > Quoting John Stultz (2016-06-27 20:09:30)
->> >>
->> >> I haven't yet been able to test with this, as I need some other fixes
->> >> it seems too to deal with some of the iommu changes in my flo-WIP tree
->> >> (it can't find of_dma_configure), but will let you know how things
->> >> work once I have all that sorted.
->> >
->> > Cool, thanks for testing.
+On 07/03/2016 07:30 PM, Nicolas Dufresne wrote:
+> Le dimanche 03 juillet 2016 ? 11:43 +0200, Hans Verkuil a ?crit :
+>> Hi Nicolas,
 >>
->> So after working out some merge issues w/ my flo-WIP branch for the
->> nexus7, I was still having trouble, so I backed out to just your
->> (updated) branch.
+>> On 07/02/2016 10:29 PM, Nicolas Dufresne wrote:
+>>>
+>>> Le 30 juin 2016 5:35 PM, "Shuah Khan" <shuahkh@osg.samsung.com
+>>> <mailto:shuahkh@osg.samsung.com>> a ?crit :
+>>>>
+>>>> Remove vidioc_g_crop() from s5p-mfc decoder. Without its s_crop
+>>>> counterpart
+>>>> g_crop is not useful. Delete it.
+>>>
+>>> G_CROP tell the userspace which portion of the output is to be
+>>> displayed. Example,  1920x1080 inside a buffer of 1920x1088. It can
+>>> be
+>>> implemented using G_SELECTION too, which emulate G_CROP. removing
+>>> this without implementing G_SEKECTION will break certain software
+>>> like
+>>> GStreamer v4l2 based decoder.
 >>
->> But even there, I'm not able to get the usb gadget up. I see:
->
-> I can get the gadget working on the ifc6410 device I have. I'm using
-> this script to test things:
->
-> modprobe libcomposite
-> mkdir config
-> mount none config -t configfs
-> mkdir config/usb_gadget/g1
-> mkdir config/usb_gadget/g1/strings/0x409
-> echo 012345678 > config/usb_gadget/g1/strings/0x409/serialnumber
-> echo "manufacturer" > config/usb_gadget/g1/strings/0x409/manufacturer
-> echo "db8074" > config/usb_gadget/g1/strings/0x409/product
-> echo 0x1d6b > config/usb_gadget/g1/idVendor
-> echo 0x0104 > config/usb_gadget/g1/idProduct
-> mkdir config/usb_gadget/g1/functions/acm.GS0
-> mkdir config/usb_gadget/g1/functions/acm.GS1
-> mkdir config/usb_gadget/g1/functions/ecm.usb0
-> mkdir config/usb_gadget/g1/configs/c.1
-> mkdir config/usb_gadget/g1/configs/c.1/strings/0x409/
-> echo "CDC 2xACM+ECM" >
-> config/usb_gadget/g1/configs/c.1/strings/0x409/configuration
-> ln -s config/usb_gadget/g1/functions/acm.GS0
-> config/usb_gadget/g1/configs/c.1
-> ln -s config/usb_gadget/g1/functions/acm.GS1
-> config/usb_gadget/g1/configs/c.1
-> ln -s config/usb_gadget/g1/functions/ecm.usb0
-> config/usb_gadget/g1/configs/c.1
-> echo $(ls /sys/class/udc/) > config/usb_gadget/g1/UDC
->
+>> Sorry, but this is not correct.
 >>
->> [    1.869717] msm_hsusb 12500000.usb: failed to get phandle in
->> /soc/usb at 12500000 node
->
-> This is sort of ok (I've seen it before with the HSIC controller on
-> 8074). The extcon is optional and so the error message should be
-> silenced. I sent a patch to move it to debug level.
->
-> I don't see an extcon in mainline for apq8064, but I think it may be
-> needed. At the least, I see that we're using a PMIC interrupt in the
-> msm-3.4 kernel for the ID pin and the charger is notifying of vbus
-> events similar to how smbb is doing it for apq8074.
->
->> [    1.882347] 12500000.usb supply vbus not found, using dummy regulator
->
-> This is not great. We don't have a regulator specified on apq8064 so we
-> can't turn on vbus and really support host mode. This seems to already
-> be the case on mainline though, so it's not like we're any worse here.
-> To properly support this we need a regulator driver. I suppose if the
-> RPM supports it we can just use that, but if it doesn't support this
-> regulator then we need to port over the SSBI regulator driver to do
-> native regulator control. So far I haven't been able to test host mode
-> on apq8064 because of this.
->
+>> G_CROP for VIDEO_OUTPUT returns the output *compose* rectangle, not
+>> the output
+>> crop rectangle.
 >>
->> So I'm not sure if the dts changes were quite right. I've got all the
->> ULPI configs enabled. Any ideas?
+>> Don't blame me, this is how it was defined in V4L2. The problem is
+>> that for video
+>> output (esp. m2m devices) you usually want to set the crop rectangle,
+>> and that's
+>> why the selection API was added so you can unambiguously set the crop
+>> and compose
+>> rectangles for both capture and output.
 >>
->
-> The phy and controller are both probing? If they're not failing to probe
-> then it's probably the phy that isn't working properly. Does gadget work
-> without my patches on nexus7?
+>> Unfortunately, the exynos drivers were written before the
+>> G/S_SELECTION API was
+>> created, and the crop ioctls in the video output drivers actually set
+>> the output
+>> crop rectangle instead of the compose rectangle :-(
+>>
+>> This is a known inconsistency.
+>>
+>> You are right though that we can't remove g_crop here, I had
+>> forgotten about the
+>> buffer padding.
+>>
+>> What should happen here is that g_selection support is added to s5p-
+>> mfc, and
+>> have that return the proper rectangles. The g_crop can be kept, and a
+>> comment
+>> should be added that it returns the wrong thing, but that that is
+>> needed for
+>> backwards compat.
 
-Without your patch, I need one dts tweak on nexus7 (which I sent out
-on friday[1]) to get the default direction set to OTG or gadget. But
-yea, it works with that against mainline.
+Thank you both for the review and comments. I wasn't entirely sure
+about removing g-crop, hence this RFC patch. I will add g_selection
+and the comment to g_crop about returning incorrect info.
 
-I'll dig in some more on your suggestions above and let you know if I
-figure it out.
+thanks,
+-- Shuah
 
-thanks
--john
-
-[1]: http://www.spinics.net/lists/devicetree/msg134274.html
+>>
+>> The gstreamer code should use g/s_selection if available. It should
+>> check how it
+>> is using g/s_crop for video output devices today and remember that
+>> for output
+>> devices g/s_crop is really g/s_compose, except for the exynos
+>> drivers.
+> 
+> This is already the case. There is other non-mainline driver that do
+> like exynos (I have been told).
+> 
+> https://cgit.freedesktop.org/gstreamer/gst-plugins-good/commit/sys?id=7
+> 4f020fd2f1dc645efe35a7ba1f951f9c5ee7c4c
+> 
+>>
+>> It's why I recommend the selection API since it doesn't have these
+>> problems.
+>>
+>> I think I should do another push towards implementing the selection
+>> API in all
+>> drivers. There aren't many left.
+>>
+>> Regards,
+>>
+>> 	Hans
