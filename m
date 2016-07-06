@@ -1,7 +1,7 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 6 Jul 2016 12:41:56 +0100
-Subject: [GIT PULL v2] ARM: hisi: DT changes for v4.8
-Message-ID: <577CEE84.10201@hisilicon.com>
+Date: Wed, 6 Jul 2016 12:44:53 +0100
+Subject: [GIT PULL v2] ARM: hisi: soc changes for v4.8
+Message-ID: <577CEF35.8040906@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,29 +21,26 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
 are available in the git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-dt-for-4.8-v2
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.8-v2
 
-for you to fetch changes up to 747a1af0bb0ed7d1926463d64ee5209206e9e88b:
+for you to fetch changes up to e407b3512dc439b66f735385fdb44d7d0db3f727:
 
-  ARM: dts: add dts files for Hi3519 and tidy up the makefile entries (2016-07-06 09:39:14 +0100)
-
-----------------------------------------------------------------
-ARM: DT: Hisilicon ARMv7 SoC Hi3519 DT updates for 4.8
-
-- Add device tree bindings for hi3519 sysctrl
-- Add dts files for hi3519
-- Tidy up DTB makefile entries to keep the list sorted
+  ARM: hisi: add compatible string for Hi3519 soc (2016-07-06 12:05:42 +0100)
 
 ----------------------------------------------------------------
-Jiancheng Xue (2):
-      ARM: dt-bindings: add device tree bindings for Hi3519 sysctrl
-      ARM: dts: add dts files for Hi3519 and tidy up the makefile entries
+ARM: mach-hisi: Hisilicon SoC updates for 4.8
 
- .../bindings/arm/hisilicon/hi3519-sysctrl.txt      |  14 ++
- arch/arm/boot/dts/Makefile                         |   6 +-
- arch/arm/boot/dts/hi3519-demb.dts                  |  42 +++++
- arch/arm/boot/dts/hi3519.dtsi                      | 187 +++++++++++++++++++++
- 4 files changed, 247 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
- create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
- create mode 100644 arch/arm/boot/dts/hi3519.dtsi
+- Add initial support for the hi3519 SoC based on armv7
+- Consolidate the hisilicon armv7 SoCs machine entries
+- Avoid the compiling warning by making unexported symbols static
+
+----------------------------------------------------------------
+Ben Dooks (1):
+      ARM: hisi: make unexported symbols static
+
+Jiancheng Xue (1):
+      ARM: hisi: add compatible string for Hi3519 soc
+
+ arch/arm/mach-hisi/hisilicon.c | 44 ++++++++++++------------------------------
+ arch/arm/mach-hisi/platsmp.c   |  4 ++--
+ 2 files changed, 14 insertions(+), 34 deletions(-)
