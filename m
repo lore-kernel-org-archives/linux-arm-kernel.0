@@ -1,47 +1,163 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Wed, 06 Jul 2016 16:12:14 +0200
-Subject: Permissions for GPIOs [Was: [PATCH] gpio: document how to order
- GPIO controllers]
-In-Reply-To: <CACRpkdZhx3yTbtuj-ZTP+mtUSr4uxL4bHtu8jVZOoxrUy6=iYw@mail.gmail.com>
-References: <1467355333-8813-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160705140546.GA10601@rob-hp-laptop>
- <20160705180447.GP16643@pengutronix.de>
- <CACRpkdbH+KRXbxFdfyAE44fBNctK4cWV+KRLwQBTzSGLvLMEDg@mail.gmail.com>
- <20160706102750.GH23470@localhost>
- <CACRpkdZhx3yTbtuj-ZTP+mtUSr4uxL4bHtu8jVZOoxrUy6=iYw@mail.gmail.com>
-Message-ID: <1467814334.2472.154.camel@pengutronix.de>
+From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
+Date: Wed, 6 Jul 2016 14:12:21 +0000
+Subject: [RFC PATCH v2 1/4] Documentation: DT: net: Add Xilinx
+ gmiitorgmii converter device tree binding documentation
+In-Reply-To: <20160704140458.GC3282@lunn.ch>
+References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
+ <1467623084-15471-2-git-send-email-appanad@xilinx.com>
+ <20160704140458.GC3282@lunn.ch>
+Message-ID: <03CA77BA8AF6F1469AEDFBDA1322A7B74A193913@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mi, 2016-07-06 at 14:34 +0200, Linus Walleij wrote:
-> On Wed, Jul 6, 2016 at 12:27 PM, Johan Hovold <johan@kernel.org> wrote:
-> > What's wrong with naming the pins in DT and use that for lookups?
-> 
-> That works. It relies on the developers using sane naming conventions
-> though. (This problem is prevalent everywhere I guess, a human problem,
-> not a technical one.) I made this patch:
-> http://marc.info/?l=linux-arm-kernel&m=146672328215354&w=2
-> 
-> There is a standard document for these boards (96board) specifying
-> the names of the GPIO lines to be "GPIO-A" thru "GPIO-L".
-> 
-> So a user can iterate across the gpiochips (as is done in lsgpio)
-> and pick the lines with the right names.
+Hi Andrew,
 
-This discussion caused me remember a concern regarding the chardev
-interface: Is it still be possible to give specific users/groups access
-to individual GPIOs? This is currently possible in the sysfs interface
-with chown/chmod. I don't see how per-GPIO permissions would translate
-to a per-gpiochip device.
+> -----Original Message-----
+> From: Andrew Lunn [mailto:andrew at lunn.ch]
+> Sent: Monday, July 04, 2016 7:35 PM
+> To: Appana Durga Kedareswara Rao <appanad@xilinx.com>
+> Cc: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
+> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>; Punnaiah
+> Choudary Kalluri <punnaia@xilinx.com>; nicolas.ferre at atmel.com;
+> f.fainelli at gmail.com; Anirudha Sarangi <anirudh@xilinx.com>; Harini
+> Katakam <harinik@xilinx.com>; netdev at vger.kernel.org;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Appana Durga Kedareswara Rao
+> <appanad@xilinx.com>
+> Subject: Re: [RFC PATCH v2 1/4] Documentation: DT: net: Add Xilinx
+> gmiitorgmii converter device tree binding documentation
+> 
+> On Mon, Jul 04, 2016 at 02:34:41PM +0530, Kedareswara rao Appana wrote:
+> > Device-tree binding documentation for xilinx gmiitorgmii converter.
+> >
+> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> > ---
+> > Changes for v2:
+> > --> New patch.
+> >
+> >  .../devicetree/bindings/net/xilinx_gmii2rgmii.txt  | 31
+> ++++++++++++++++++++++
+> >  1 file changed, 31 insertions(+)
+> >  create mode 100644
+> Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> > new file mode 100644
+> > index 0000000..d11e259
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> > @@ -0,0 +1,31 @@
+> > +* XILINX GMIITORGMII Converter Driver
+> > +
+> > +The Gigabit Media Independent Interface (GMII) to Reduced Gigabit
+> Media
+> > +Independent Interface (RGMII) core provides the RGMII between RGMII-
+> compliant
+> > +Ethernet physical media devices (PHY) and the Gigabit Ethernet controller.
+> > +This core can be used in all three modes of operation(10/100/1000 Mb/s).
+> > +The Management Data Input/Output (MDIO) interface is used to
+> configure the
+> > +Speed of operation. This core can switch dynamically between the three
+> > +Different speed modes by configuring the conveter register through mdio
+> write.
+> > +
+> > +The MDIO is a bus to which the PHY devices are connected.  For each
+> > +device that exists on this bus, a child node should be created.  See
+> > +the definition of the PHY node in booting-without-of.txt for an example
+> > +of how to define a PHY.
+> > +
+> > +Required properties:
+> > +  - compatible : Should be "xlnx,gmiitorgmii"
+> > +  - reg : The ID number for the phy, usually a small integer
+> > +
+> > +Example:
+> > +	mdio {
+> > +                #address-cells = <1>;
+> > +                #size-cells = <0>;
+> > +		ethernet-phy at 0 {
+> > +			......
+> > +		};
+> > +                gmii_to_rgmii: gmii_to_rgmii at 8 {
+> > +                        compatible = "xlnx,gmiitorgmii";
+> > +                        reg = <8>;
+> > +                };
+> > +        };
+> 
+> Hi Kedareswara
+> 
+> So looking at the device tree, you have the gmiitorgmii as an mdio
+> device. It will get probed as an mdio device, and from that you know
+> the address on the bus. However, your driver does not actually do
+> this. xilinx_gmii2rgmii.c is just a library of two functions, and does
+> not use any of this device tree information. You device tree binding
+> is completely bogus.
+> 
+> What i think is a much more logical structure, and fits the hardware,
+> which is what DT is all about, is to make your driver an mdio driver.
+> Also, have a phy-handle pointing to the PHY in the gmii_to_rgmii node.
+> You then no longer need the exported gmii2rgmii_phyprobe() function.
+> 
+> Next, you want gmiitorgmii driver to register a phy. The MAC driver
+> can then look this up using phy-handle:
+> 
+>        mdio {
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+> 
+>                 phy: ethernet-phy at 0 {
+>                         reg = <0>;
+>                 };
+> 
+>                 gmii_to_rgmii: gmii-to-rgmii at 8 {
+>                         compatible = "xlnx,gmiitorgmii";
+>                         reg = <8>;
+> 			phy-handle = <&phy>;
+>                 };
+>        };
 
-Am I overlooking some better way to give non-root users granular access
-to GPIOs? Or is that intentionally out of scope for the chardev
-interface?
 
-Yours,
-Jan
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks for your inputs initially we too thought the similar implementation
+But the GMII2RGMII converter contains only one register and it is 
+ not compatible to the standard ethernet MII interface. Also it doesn't have
+a standard VID and PID registers So, during the mdio bus scan, this device will 
+not appear. When macb driver calls the gmii2rgmii phy-handle through
+ phy_connect_direct/of_phy_connect, these calls fail for the above reason.
+So, we come up with the current implementation.
+
+Please suggest if you have any other solutions in mind or if our understanding 
+is wrong for the current approach that you suggested.
+
+Regards,
+Punnaiah
+
+> 
+>         macb0: ethernet at fffc4000 {
+>                 compatible = "cdns,at32ap7000-macb";
+>                 reg = <0xfffc4000 0x4000>;
+>                 interrupts = <21>;
+>                 phy-mode = "rmii";
+> 		phy-handle = <&gmii_to_rgmii>
+>                 local-mac-address = [3a 0e 03 04 05 06];
+>                 clock-names = "pclk", "hclk", "tx_clk";
+>                 clocks = <&clkc 30>, <&clkc 30>, <&clkc 13>;
+>                 ethernet-phy at 1 {
+>                         reg = <0x1>;
+>                         reset-gpios = <&pioE 6 1>;
+>                 };
+>         };
+> 
+> This description is the same as the figure in the data sheet. You have
+> the gmii_to_rgmii which passes through to the real PHY.
+> 
+> The phy device that gmiitorgmii registers needs to pass through all
+> its operations to the real PHY. The exception is read_status()
+> function. You want to wrap this, so that after it completes and you
+> know the speed the PHY is using, you set the same speed in your
+> gmiitorgmii device.
+> 
+> Everything then becomes transparent. There is no need to change the
+> MAC driver, and you have a generic solution which will work with any
+> MAC and PHY.
+> 
+>     Andrew
