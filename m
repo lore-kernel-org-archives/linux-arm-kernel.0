@@ -1,30 +1,36 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Thu,  7 Jul 2016 01:34:04 +0800
-Subject: [PATCH 0/3] Re: [PATCH 2/3] ARM: dts: move regulator settings from
- common to specifics
-In-Reply-To: <3015470.z4L7UQJKa9@phil>
+Date: Thu,  7 Jul 2016 01:34:05 +0800
+Subject: [PATCH 1/3] ARM: dts: add label leds for rk3288-firefly.dtsi
+In-Reply-To: <1467826447-24159-1-git-send-email-ayaka@soulik.info>
 References: <3015470.z4L7UQJKa9@phil>
-Message-ID: <1467826447-24159-1-git-send-email-ayaka@soulik.info>
+ <1467826447-24159-1-git-send-email-ayaka@soulik.info>
+Message-ID: <1467826447-24159-2-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am sorry to make this mistake. I have re-sent my patches.
-Thank you for reminding me that.
+From: ayaka <ayaka@soulik.info>
 
-I hope that I make it correct this time.
+The connected leds are different in firefly release version
+and firefly reload.
+Adding this label making it is possible to add more leds.
 
-ayaka (3):
-  ARM: dts: add label leds for rk3288-firefly.dtsi
-  ARM: dts: move regulator settings from common to specifics
-  ARM: dts: add rk3288-firefly-reload
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
+ arch/arm/boot/dts/rk3288-firefly.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/rk3288-firefly-beta.dts   |  30 ++++++++
- arch/arm/boot/dts/rk3288-firefly-reload.dts | 109 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/rk3288-firefly.dts        |  30 ++++++++
- arch/arm/boot/dts/rk3288-firefly.dtsi       |  16 ++--
- 5 files changed, 178 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm/boot/dts/rk3288-firefly-reload.dts
-
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index d6cf9ad..1d7f03c 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -99,7 +99,7 @@
+ 		};
+ 	};
+ 
+-	leds {
++	leds: leds {
+ 		compatible = "gpio-leds";
+ 
+ 		work {
 -- 
 2.7.4
