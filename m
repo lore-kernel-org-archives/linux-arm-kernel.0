@@ -1,58 +1,74 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Jul 2016 11:48:06 +0200
-Subject: [Question] Memory attribute reserved by Device Tree?
-In-Reply-To: <20160706093457.GA14657@leverpostej>
-References: <CAK7LNATGoP-Wn-wiK_CgD_v=rQXyt937qRvr8LkUQ06jHB7FAA@mail.gmail.com>
- <577504D7.7080106@arm.com> <20160630122554.GC20363@leverpostej>
- <CAK7LNAQJNYVFjZyMH=kU+VJLfUCr2EwKc51HB4knZ=XM7s+MQg@mail.gmail.com>
- <CAKv+Gu_iF31mBbg1pMawq+7fPDo4iXdGWJT_nWV4Oy+AqDpFOg@mail.gmail.com>
- <20160706093457.GA14657@leverpostej>
-Message-ID: <CAKv+Gu-OyRMOcNzkW2fU0dO1phtwZV1tnu8S=yYF+=7NXQ0Dog@mail.gmail.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 6 Jul 2016 11:50:28 +0200
+Subject: SPI: performance regression when using the common message queuing
+ infrastructure
+Message-ID: <577CD464.6050506@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 July 2016 at 11:34, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jul 06, 2016 at 07:34:58AM +0200, Ard Biesheuvel wrote:
->> On 6 July 2016 at 06:10, Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
->> > My motivation is to try my own implementation of PSCI for my ARMv7 SoC.
->> >
->> > I put my PSCI firmware somewhere in the DRAM region and
->> > protected it with /memreserve/, but I was not sure what kind of memory attribute
->> > is used for the area.
->>
->> As Mark implies, /memreserve/ entries are not suitable for this, and
->> you should create an entry under /reserved-memory instead (please
->> check the bindings under Documentation/ for details).
->
-> I'd strongly recommend that the memory in question was carved out of the
-> memory node, rather than using a reserved-memory node. The OS has
-> absolutely no reason to know about this memory in the first place.
->
-> This is more robust as other agents will similarly not poke the memory.
->
+Hi Mark,
 
-Right, so I misunderstood your suggestion. You'd prefer the memory in
-question not to be covered at all by any memory nodes. I agree this
-makes the most sense.
+recently Heiko reported to us a performance regression with Atmel SPI
+controllers. He noticed the issue on a sam9g15ek board and I was also able to
+reproduce it on a sama5d36ek board.
 
->> This not only allows you to add a no-map attribute to prevent the
->> kernel from mapping it (which allows you to map it any way you like),
->> it also guarantees that the reservation is honoured even when booting
->> via UEFI, as /memreserve/s are ignored in this case.
->
-> You'll still need to teach your UEFI implementation to reserve the
-> region (and to not give it cacheable attributes), to enable this,
+We found out that the performance regression was introduced in 3.14 by commit:
+8090d6d1a415d3ae1a7208995decfab8f60f4f36
+spi: atmel: Refactor spi-atmel to use SPI framework queue
 
-You'd need this in any case if you are using UEFI, unless you're
-seeding its view of the memory map from the DT. So I think this is a
-separate issue.
+For the test, I connected a Spansion S25FL512 memory on the SPI1 controller of
+a sama5d36ek board. Then with an oscilloscope I monitored the chip-select, clock
+and MOSI signals on the SPI bus.
 
-> so similarly I'd recommend that it is completely removed from the memory
-> map -- no agent other than the PSCI implementation has any reason to map
-> this memory.
->
 
-Indeed. Since you are invoking PSCI via hvc or smc calls, neither the
-OS nor anything else that executes at the same exception level (or
-whatever we call it for ARMv7) has any business accessing it directly,
-and so it does not need to know of its existence.
+1 - Reading 512 bytes from the memory
+
+# dd if=/dev/mtd6 bs=512 count=1 of=/dev/null
+
+With the oscilloscope, I measured the time between the chip-select fell before
+the Read Status command (05h) and the chip-select rose after all data had been
+read by the 4-byte address Fast Read 1-1-1 command (13h).
+
+3.14 vanilla                      : 305 ?s
+3.14 commit 8090d6d1a415 reverted : 242 ?s   -21%
+
+2 - Reading 1000 x 1024 bytes from the memory
+
+# dd if=/dev/mtd6 bs=1024 count=1000 of=/dev/null
+
+Still with the scope, I measured the time to read all data.
+
+3.14 vanilla                      : 435 ms
+3.14 commit 8090d6d1a415 reverted : 361 ms   -17%
+
+
+Indeed the oscilloscope shows that more time is spent between messages and
+transfers.
+
+commit 8090d6d1a415 replaced the tasklet used to manage a SPI message/transfer
+queue by a workqueue provided by the SPI framework.
+
+The support of this (optional) workqueue was introduced by commit:
+ffbbdd21329f3e15eeca6df2d4bc11c04d9d91c0
+spi: create a message queuing infrastructure
+
+Though the commit message claims that is common infrastructure is optional,
+the patch also claims the .transfer() hook is deprecated, suggesting drivers
+should implement the new .transfer_one_message() hook instead.
+
+This is the reason why commit 8090d6d1a415 was submitted. However we lost
+quite amount of performances moving from our tasklet to the generic workqueue.
+
+So do you recommend us to keep our current generic implementation relying on
+the SPI framework workqueue or to go back to a custom implementation using
+tasklet?
+If we keep the current implementation, is there a way to improve the
+performances so we go back to something close to what he had before?
+
+We saw in commit ffbbdd21329f that we can change the workqueue thread
+scheduling policy to SCHED_FIFO by setting master->rt.
+
+
+Best regards,
+
+Cyrille
