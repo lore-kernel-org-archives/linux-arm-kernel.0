@@ -1,38 +1,25 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Wed,  6 Jul 2016 08:00:06 +0200
-Subject: [PATCH] phy: sun9i-usb: fix error handling
-Message-ID: <1467784806-17091-1-git-send-email-christophe.jaillet@wanadoo.fr>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 06 Jul 2016 08:03:24 +0200
+Subject: [PATCH] arm64: defconfig: Enable s2mps11 regulator clk and s3c rtc
+ driver
+In-Reply-To: <1467713211-16014-1-git-send-email-alim.akhtar@samsung.com>
+References: <1467713211-16014-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <577C9F2C.4040509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is likely that checking 'phy->hsic_clk' instead of 'phy->clk' is
-expected here.
+On 07/05/2016 12:06 PM, Alim Akhtar wrote:
+> The s3c rtc controller on exynos7 platform uses rtc source clock
+> from s2mps11 pmic. This patch enables the required bits to make
+> rtc work on exynos7-espresso board.
+> 
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  arch/arm64/configs/defconfig |    2 ++
+>  1 file changed, 2 insertions(+)
 
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Thanks, applied, with changed commit title and message. Any more arm64
+defconfig changes coming soon?
 
----
-
-v2: Also fix the variable name used by PTR_ERR
-    Update $subject
----
- drivers/phy/phy-sun9i-usb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/phy/phy-sun9i-usb.c b/drivers/phy/phy-sun9i-usb.c
-index ac4f31a..28fce4b 100644
---- a/drivers/phy/phy-sun9i-usb.c
-+++ b/drivers/phy/phy-sun9i-usb.c
-@@ -141,9 +141,9 @@ static int sun9i_usb_phy_probe(struct platform_device *pdev)
- 		}
- 
- 		phy->hsic_clk = devm_clk_get(dev, "hsic_12M");
--		if (IS_ERR(phy->clk)) {
-+		if (IS_ERR(phy->hsic_clk)) {
- 			dev_err(dev, "failed to get hsic_12M clock\n");
--			return PTR_ERR(phy->clk);
-+			return PTR_ERR(phy->hsic_clk);
- 		}
- 
- 		phy->reset = devm_reset_control_get(dev, "hsic");
--- 
-2.7.4
+Best regards,
+Krzysztof
