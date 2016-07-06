@@ -1,69 +1,84 @@
-From: myy@miouyouyou.fr (Myy)
-Date: Wed, 06 Jul 2016 17:04:27 +0000
-Subject: RK3188 : Kernel installation madness
-Message-ID: <2fc5082b15eac774f6947c782f03de8f@miouyouyou.fr>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 06 Jul 2016 10:28:57 -0700
+Subject: [PATCH v21 3/8] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <20160706075226.27609-4-takahiro.akashi@linaro.org>
+References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
+ <20160706075226.27609-4-takahiro.akashi@linaro.org>
+Message-ID: <1467826137.8880.35.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+On Wed, 2016-07-06 at 16:52 +0900, AKASHI Takahiro wrote:
+> --- a/arch/arm64/include/asm/smp.h
+> +++ b/arch/arm64/include/asm/smp.h
+> @@ -136,6 +136,10 @@ static inline void cpu_panic_kernel(void)
+>   */
+>  bool cpus_are_stuck_in_kernel(void);
+>  
+> +#ifdef CONFIG_KEXEC_CORE
+> +extern void smp_send_crash_stop(void);
+> +#endif
 
-I asked on the ARM Community Forum how to compile and flash a new kernel 
-on a RK3188 device ( https://community.arm.com/thread/10159 ) and I was 
-told that the ARM LKML would be the best place for that kind of 
-questions. I sent a mail to the arm-lkml but, in the same ARM Community 
-Forum thread, I was again told that arm-linux-kernel would be best 
-suited for that kind of questions. So here I am.
+It seems this could be simplified by removing these
+conditionals, then move the conditionals that are
+around the smp_send_crash_stop definition to inside
+that definition.
 
-I currently own a Cube GT2 tablet, which uses a RK3188 chip.
-My goal is to install a new (4.7.x) kernel on this device. However, 
-between the facts that the NAND driver still requires some reverse 
-engineering and the fact that I do not know how kernels are booted on 
-that kind of hardware, I'm stuck.
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 62ff3c0..51e0b73 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -800,6 +803,28 @@ static void ipi_cpu_stop(unsigned int cpu)
+>  > 	> 	> cpu_relax();
+>  }
+>  
+> +#ifdef CONFIG_KEXEC_CORE
+> +static atomic_t waiting_for_crash_ipi;
+> +
+> +static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+> +{
+> +> 	> crash_save_cpu(regs, cpu);
+> +
+> +> 	> atomic_dec(&waiting_for_crash_ipi);
+> +
+> +> 	> local_irq_disable();
+> +
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +> 	> if (cpu_ops[cpu]->cpu_die)
+> +> 	> 	> cpu_ops[cpu]->cpu_die(cpu);
+> +#endif
+> +
+> +> 	> /* just in case */
+> +> 	> while (1)
+> +> 	> 	> wfi();
+> +}
+> +#endif
 
-So my current objectives are :
-- Load a modified initrd image.
-- Load a modified initrd containing the graphic driver (if possible), 
-the Wifi driver, wpa_supplicant and sshd, with the currently installed 
-kernel.
-- Replace the kernel with a new stock kernel, using the same initrd.
+ /*
+>   * Main handler for inter-processor interrupts
+>   */
+> @@ -830,6 +855,14 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>  > 	> 	> irq_exit();
+>  > 	> 	> break;
+>  
+> +#ifdef CONFIG_KEXEC_CORE
+> +> 	> case IPI_CPU_CRASH_STOP:
+> +> 	> 	> irq_enter();
+> +> 	> 	> ipi_cpu_crash_stop(cpu, regs);
+> +
+> +> 	> 	> unreachable();
+> +#endif
 
-So my current questions are :
-- Where does the system loads the initrd images from ?
-    I extracted the android boot image stored in the boot partition, 
-using rkflashkit, replaced the initrd, repacked the image and reflahsed 
-it but, STILL, when returning on Android, it clearly seems that a 
-different initrd file was used. Same thing when flashing the modified 
-image to the "kernel" partition too.
-- How to pack kernels and initrd ?
-    There's a ton of rk3188 3.0.36+ kernels available on Github that do 
-NOT compile. The only kernel I was able to compile is the official one. 
-Of course, when trying to boot from my new kernel, the systems started a 
-reboot loop, with no informations about what went wrong... I do not 
-understand what rkcrc do and the kernel inside the Android boot Image do 
-not have any standard Linux Kernel header. So, what is the official 
-procedure for packing AND unpacking kernels and initrd images ?
+It seems like you could simplifiy with something like:
 
-The param file of my tablet is as follows :
+	case IPI_CPU_CRASH_STOP:
+		if (IS_ENABLED(CONFIG_KEXEC_CORE) {
+			irq_enter();
+			ipi_cpu_crash_stop(cpu, regs);
+			unreachable();
+		}
 
-FIRMWARE_VER:4.1.1
-MACHINE_MODEL:U30GT 2
-MACHINE_ID:007
-MANUFACTURER:RK30SDK
-MAGIC: 0x5041524B
-ATAG: 0x60000800
-MACHINE: 3066
-CHECK_MASK: 0x80
-KERNEL_IMG: 0x60408000
-#RECOVER_KEY: 1,1,0,20,0
-CMDLINE:console=ttyFIQ0 androidboot.console=ttyFIQ0 init=/init 
-initrd=0x62000000,0x00800000 
-mtdparts=rk29xxnand:0x00002000 at 0x00002000(misc),0x00006000 at 0x00004000(kernel),0x00006000 at 0x0000A000(boot),0x00010000 at 0x00010000(recovery),0x00020000 at 0x00020000(backup),0x00040000 at 0x00040000(cache),0x00400000 at 0x00080000(userdata),0x00002000 at 0x00480000(kpanic),0x00100000 at 0x00482000(system),- at 0x00582000(user)
+Then move the CONFIG_KEXEC_CORE conditional around
+ipi_cpu_crash_stop to just around crash_save_cpu().
 
-There seems to be some fragments of documentation about how to load some 
-LiveSD system, but I don't know if it's possible with this tablet. And 
-quite frankly, half of the documentation is badly put together.
-
-Best regards,
-
--- 
-Myy
+ -Geoff
