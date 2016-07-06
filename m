@@ -1,70 +1,64 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 6 Jul 2016 18:22:10 +0800
-Subject: [PATCH v6 01/18] remoteproc: st_slim_rproc: add a slimcore rproc
- driver
-In-Reply-To: <1467795276-21725-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <201607061839.LWqagDPP%fengguang.wu@intel.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 6 Jul 2016 12:27:50 +0200
+Subject: [PATCH] gpio: document how to order GPIO controllers
+In-Reply-To: <CACRpkdbH+KRXbxFdfyAE44fBNctK4cWV+KRLwQBTzSGLvLMEDg@mail.gmail.com>
+References: <1467355333-8813-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160705140546.GA10601@rob-hp-laptop>
+ <20160705180447.GP16643@pengutronix.de>
+ <CACRpkdbH+KRXbxFdfyAE44fBNctK4cWV+KRLwQBTzSGLvLMEDg@mail.gmail.com>
+Message-ID: <20160706102750.GH23470@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 06, 2016 at 11:34:37AM +0200, Linus Walleij wrote:
+> On Tue, Jul 5, 2016 at 8:04 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
 
-[auto build test WARNING on robh/for-next]
-[also build test WARNING on v4.7-rc6 next-20160706]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> > root at hostname:/sys/bus/gpio/devices ls -l
+> > lrwxrwxrwx    1 root     root             0 Jul  5 20:52 gpiochip0 -> ../../../devices/platform/soc/53f00000.aips/53f9c000.gpio/gpiochip0
+> > lrwxrwxrwx    1 root     root             0 Jul  5 20:52 gpiochip1 -> ../../../devices/platform/soc/53f00000.aips/53fa4000.gpio/gpiochip1
+> > lrwxrwxrwx    1 root     root             0 Jul  5 20:52 gpiochip2 -> ../../../devices/platform/soc/53f00000.aips/53fcc000.gpio/gpiochip2
+> > lrwxrwxrwx    1 root     root             0 Jul  5 20:52 gpiochip3 -> ../../../devices/platform/soc/53f00000.aips/53fd0000.gpio/gpiochip3
+> >
+> > That is we have:
+> >
+> >         Hardware name | software gpiochip
+> >             GPIO4     |      gpiochip0
+> >             GPIO3     |      gpiochip1
+> >             GPIO1     |      gpiochip2
+> >             GPIO2     |      gpiochip3
+> >
+> > I bet that's the probe order because when sorted by address (and so
+> > by order in the device tree) we have exactly this ordering. (Compare
+> > with $(grep gpio@ arch/arm/boot/dts/imx25.dtsi).)
+> 
+> That is super-unintuitive for a human user, I agree 100%.
+> 
+> > For a new interface this is OK, still I predict users will complain if
+> > the numbers used don't match naturally the hardware names. And IMHO they
+> > are right.
+> 
+> I agree, and I think that if aliases can alleviate the situation we should
+> allow them and encourage them. They are the best duct-tape we can
+> find for the DT systems.
+> 
+> Unfortunately it is not my call, because DT bindings and alias use
+> is not under my jurisdiction.
+> 
+> I *THINK* the view of the device core maintainers is that udev
+> and sysfs hierarchies should be used to uniquely identify a certain
+> device, and that relying on device numbering is too fragile.
 
-url:    https://github.com/0day-ci/linux/commits/Peter-Griffin/Add-support-for-FDMA-DMA-controller-and-slim-core-rproc-found-on-STi-chipsets/20160706-170304
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: m68k-allyesconfig (attached as .config)
-compiler: m68k-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=m68k 
+I thought the whole idea (or at least a large part of) the new
+user-space interface was to allow lookups by line names precisely in
+order not to have to rely on gpio numbers, which may not only change
+between boots, but also between hardware revisions, etc.
 
-All warnings (new ones prefixed by >>):
+What's wrong with naming the pins in DT and use that for lookups?
 
-   drivers/remoteproc/st_slim_rproc.c: In function 'slim_rproc_alloc':
->> drivers/remoteproc/st_slim_rproc.c:288:10: warning: assignment discards 'const' qualifier from pointer target type
-     elf_ops = rproc->fw_ops;
-             ^
+I've been too busy with other stuff this spring to follow the new
+user-space interface development, but I assume that this had been taken
+into account in the design?
 
-vim +/const +288 drivers/remoteproc/st_slim_rproc.c
-
-   272		if (WARN_ON(!np || !fw_name))
-   273			return ERR_PTR(-EINVAL);
-   274	
-   275		if (!of_device_is_compatible(np, "st,slim-rproc"))
-   276			return ERR_PTR(-EINVAL);
-   277	
-   278		rproc = rproc_alloc(dev, np->name, &slim_rproc_ops,
-   279				fw_name, sizeof(*slim_rproc));
-   280		if (!rproc)
-   281			return ERR_PTR(-ENOMEM);
-   282	
-   283		rproc->has_iommu = false;
-   284	
-   285		slim_rproc = rproc->priv;
-   286		slim_rproc->rproc = rproc;
-   287	
- > 288		elf_ops = rproc->fw_ops;
-   289		/* Use some generic elf ops */
-   290		slim_rproc_fw_ops.load = elf_ops->load;
-   291		slim_rproc_fw_ops.sanity_check = elf_ops->sanity_check;
-   292	
-   293		rproc->fw_ops = &slim_rproc_fw_ops;
-   294	
-   295		/* get imem and dmem */
-   296		for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 37201 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160706/0d1cf197/attachment-0001.obj>
+Thanks,
+Johan
