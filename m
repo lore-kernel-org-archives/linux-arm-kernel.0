@@ -1,30 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 Jul 2016 09:34:14 +0200
-Subject: [PATCH 6/7] dt-bindings: net: bgmac: add bindings documentation
- for bgmac
-In-Reply-To: <CAC3K-4qZ9tpEAuDBjL-bkjn5F2Xfr4CAmVGc=DpgVh8MrqEDtQ@mail.gmail.com>
-References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
- <3327458.KVBg7y9SeP@wuerfel>
- <CAC3K-4qZ9tpEAuDBjL-bkjn5F2Xfr4CAmVGc=DpgVh8MrqEDtQ@mail.gmail.com>
-Message-ID: <13160704.EGDxD1URaF@wuerfel>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Wed, 6 Jul 2016 09:39:10 +0200
+Subject: [PATCH 2/4] dt-bindings: Document the STM32 reset bindings
+In-Reply-To: <20160705161813.GA20477@rob-hp-laptop>
+References: <1467640052-6770-1-git-send-email-gabriel.fernandez@st.com>
+ <1467640052-6770-2-git-send-email-gabriel.fernandez@st.com>
+ <20160705161813.GA20477@rob-hp-laptop>
+Message-ID: <577CB59E.1080508@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 5, 2016 7:18:45 PM CEST Jon Mason wrote:
-> >
-> > Ok, then I'd suggest making the compatible string here
-> >
-> >         compatible = "brcm,nsp-amac", "brcm,amac";
-> 
-> It is called GMAC in the NS and NSP documentation, but AMAC is fine
-> with me (as it is called this in the NS2 documentation).  I'll make
-> the necessary change and repush.
+Hi Rob,
 
-Ok, then we can use
+Thanks for reviewing
 
-	compatible = "brcm,nsp-gmac", "brcm,amac";
+On 07/05/2016 06:18 PM, Rob Herring wrote:
+> On Mon, Jul 04, 2016 at 03:47:30PM +0200, gabriel.fernandez at st.com wrote:
+>> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>
+>> This adds documentation of device tree bindings for the
+>> STM32 reset controller.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>   .../devicetree/bindings/reset/st,stm32-rcc.txt     | 50 ++++++++++++++++++++++
+>>   1 file changed, 50 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>> new file mode 100644
+>> index 0000000..333080c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>> @@ -0,0 +1,50 @@
+>> +STMicroelectronics STM32 Peripheral Reset Controller
+>> +====================================================
+>> +
+>> +The RCC IP is both a reset and a clock controller. This documentation only
+>> +documents the reset part.
+> The clock part is already documented or will do later? Either way, you
+> are describing an IP block, so please describe all of it now and in one
+> place.
+>
+> Rob
+The clock part is already documented.
 
-to be consistent with that documentation and have the generic name as the
-fallback.
+Okay to put this in one place, but in which directory ?
+what do you prefer ?
+- create a rcc directory
+- put the file on top, in Documentation/devicetree/bindings
 
-	Arnd
+Best regards
+
+Gabriel
