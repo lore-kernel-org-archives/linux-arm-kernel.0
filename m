@@ -1,31 +1,55 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  6 Jul 2016 09:54:26 +0100
-Subject: [PATCH v6 08/18] ARM: multi_v7_defconfig: Enable STi FDMA driver
+Date: Wed,  6 Jul 2016 09:54:29 +0100
+Subject: [PATCH v6 11/18] ARM: DT: STiH407: Add i2s_in pinctrl configuration
 In-Reply-To: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
 References: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1467795276-21725-9-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1467795276-21725-12-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This DMA controller is found on all STi chipsets.
+This patch adds the pinctrl config for the i2s_in pins
+used by the uniperif reader IP.
 
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 3ac30f0..541c914 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -747,6 +747,7 @@ CONFIG_DMA_OMAP=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_XILINX_VDMA=y
- CONFIG_DMA_SUN6I=y
-+CONFIG_ST_FDMA=m
- CONFIG_STAGING=y
- CONFIG_SENSORS_ISL29018=y
- CONFIG_SENSORS_ISL29028=y
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index 0fb5c8a..537db7e 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -1090,6 +1090,30 @@
+ 				};
+ 			};
+ 
++			i2s_in {
++				pinctrl_i2s_8ch_in: i2s_8ch_in{
++					st,pins {
++						mclk = <&pio32 5 ALT1 IN>;
++						lrclk = <&pio32 7 ALT1 IN>;
++						sclk = <&pio32 6 ALT1 IN>;
++						data0 = <&pio32 4 ALT1 IN>;
++						data1 = <&pio33 0 ALT1 IN>;
++						data2 = <&pio33 1 ALT1 IN>;
++						data3 = <&pio33 2 ALT1 IN>;
++						data4 = <&pio33 3 ALT1 IN>;
++					};
++				};
++
++				pinctrl_i2s_2ch_in: i2s_2ch_in{
++					st,pins {
++						mclk = <&pio32 5 ALT1 IN>;
++						lrclk = <&pio32 7 ALT1 IN>;
++						sclk = <&pio32 6 ALT1 IN>;
++						data0 = <&pio32 4 ALT1 IN>;
++					};
++				};
++			};
++
+ 			serial3 {
+ 				pinctrl_serial3: serial3-0 {
+ 					st,pins {
 -- 
 1.9.1
