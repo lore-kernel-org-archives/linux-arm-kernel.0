@@ -1,25 +1,37 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 06 Jul 2016 08:03:24 +0200
-Subject: [PATCH] arm64: defconfig: Enable s2mps11 regulator clk and s3c rtc
- driver
-In-Reply-To: <1467713211-16014-1-git-send-email-alim.akhtar@samsung.com>
-References: <1467713211-16014-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <577C9F2C.4040509@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 5 Jul 2016 20:57:30 -0700
+Subject: [PATCH v3 0/2] [for arm-soc] mach-tango updates for v4.8
+In-Reply-To: <577BA8DF.9080603@free.fr>
+References: <57726597.8030501@sigmadesigns.com>
+ <577BA8DF.9080603@free.fr>
+Message-ID: <20160706035730.GA23212@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2016 12:06 PM, Alim Akhtar wrote:
-> The s3c rtc controller on exynos7 platform uses rtc source clock
-> from s2mps11 pmic. This patch enables the required bits to make
-> rtc work on exynos7-espresso board.
+On Tue, Jul 05, 2016 at 02:32:31PM +0200, Mason wrote:
+> On 28/06/2016 13:55, Marc Gonzalez wrote:
 > 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->  arch/arm64/configs/defconfig |    2 ++
->  1 file changed, 2 insertions(+)
+> > Hello arm-soc maintainers,
+> > 
+> > Could you please merge the following patches?
+> > 
+> > Marc Gonzalez (2):
+> >   ARM: tango: add HOTPLUG_CPU support
+> >   Update ARM/TANGO section
+> 
+> Hello Olof,
+> 
+> I see you've just merged a large number of patches in the for-next branch.
+> https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/log/?h=for-next
+> 
+> I think you overlooked the two patches in this thread:
+> 
+> [PATCH v4 1/2] ARM: tango: add HOTPLUG_CPU support
+> [PATCH v3 2/2] Update ARM/TANGO section
+> 
+> Could you merge these patches as well?
 
-Thanks, applied, with changed commit title and message. Any more arm64
-defconfig changes coming soon?
+Yes, applied now. Thanks!
 
-Best regards,
-Krzysztof
+
+-Olof
