@@ -1,63 +1,78 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 6 Jul 2016 15:19:50 +0200
-Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
-In-Reply-To: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <577D0576.2050706@xs4all.nl>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 6 Jul 2016 14:26:32 +0100
+Subject: [PATCH v2] xen/arm: register clocks used by the hypervisor
+In-Reply-To: <alpine.DEB.2.10.1607061412370.26575@sstabellini-ThinkPad-X260>
+References: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
+ <146776885213.35356.11565744417822933094@resonance>
+ <577D035C.7090504@arm.com>
+ <alpine.DEB.2.10.1607061412370.26575@sstabellini-ThinkPad-X260>
+Message-ID: <577D0708.9000207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tiffany,
 
-I plan to review this patch series on Friday, but one obvious question is
-what the reason for these failures is:
 
-> Input/Output configuration ioctls:
->         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
->         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
->         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
->         test VIDIOC_G/S_EDID: OK (Not Supported)
-> 
->         Control ioctls:
->                 test VIDIOC_QUERYCTRL/MENU: OK
->                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(357): g_ctrl returned an error (11)
->                 test VIDIOC_G/S_CTRL: FAIL
->                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(579): g_ext_ctrls returned an error (11)
->                 test VIDIOC_G/S/TRY_EXT_CTRLS: FAIL
->                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(721): subscribe event for control 'User Controls' failed
->                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
->                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
->                 Standard Controls: 2 Private Controls: 0
-> 
->         Format ioctls:
->                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
->                 test VIDIOC_G/S_PARM: OK (Not Supported)
->                 test VIDIOC_G_FBUF: OK (Not Supported)
->                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-formats.cpp(405): expected EINVAL, but got 11 when getting format for buftype 9
->                 test VIDIOC_G_FMT: FAIL
->                 test VIDIOC_TRY_FMT: OK (Not Supported)
->                 test VIDIOC_S_FMT: OK (Not Supported)
->                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-> 
->         Codec ioctls:
->                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
->                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
->                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-> 
->         Buffer ioctls:
->                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
->                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(500): q.has_expbuf(node)
->                 test VIDIOC_EXPBUF: FAIL
-> 
-> 
-> Total: 38, Succeeded: 33, Failed: 5, Warnings: 0
+On 06/07/16 14:16, Stefano Stabellini wrote:
+> On Wed, 6 Jul 2016, Julien Grall wrote:
+>> On 06/07/16 02:34, Michael Turquette wrote:
+>>> Hi!
+>>
+>> Hello Michael,
+>>
+>>> Quoting Dirk Behme (2016-06-30 03:32:32)
+>>>> Some clocks might be used by the Xen hypervisor and not by the Linux
+>>>> kernel. If these are not registered by the Linux kernel, they might be
+>>>> disabled by clk_disable_unused() as the kernel doesn't know that they
+>>>> are used. The clock of the serial console handled by Xen is one
+>>>> example for this. It might be disabled by clk_disable_unused() which
+>>>> stops the whole serial output, even from Xen, then.
+>>>
+>>> This whole thread had me confused until I realized that it all boiled
+>>> down to some nomenclature issues (for me).
+>>>
+>>> This code does not _register_ any clocks. It simply gets them and
+>>> enables them, which is what every other clk consumer in the Linux kernel
+>>> does. More details below.
+>>>
+>>>>
+>>>> Up to now, the workaround for this has been to use the Linux kernel
+>>>> command line parameter 'clk_ignore_unused'. See Xen bug
+>>>>
+>>>> http://bugs.xenproject.org/xen/bug/45
+>>>
+>>> clk_ignore_unused is a band-aid, not a proper medical solution. Setting
+>>> that flag will not turn clocks on for you, nor will it guarantee that
+>>> those clocks are never turned off in the future. It looks like you
+>>> figured this out correctly in the patch below but it is worth repeating.
+>>>
+>>> Also the new CLK_IS_CRITICAL flag might be of interest to you, but that
+>>> flag only exists as a way to enable clocks that must be enabled for the
+>>> system to function (hence, "critical") AND when those same clocks do not
+>>> have an accompanying Linux driver to consume them and enable them.
+>>
+>> I don't think we want the kernel to enable the clock for the hypervisor. We
+>> want to tell the kernel "don't touch at all to this clock, it does not belong
+>> to you".
+>
+> Right, and that's why I was suggesting that another way to do this would
+> be to set the "status" to "disabled" in Xen: so that Linux would leave
+> the clock alone. But in that case Linux would not be happy to see
+> disabled clocks which are actually supposed to be used by some devices.
+> Is that correct?
 
-If it is due to a bug in v4l2-compliance, then let me know and I'll fix it. If not,
-then it should be fixed in the driver.
+The problem is not "whether Linux would be happy or not", but the 
+meaning of this property.
 
-Frankly, it was the presence of these failures that made me think this patch series
-wasn't final. Before a v4l2 driver can be accepted in the kernel, v4l2-compliance must pass.
+Based on the ePAPR, "status = disabled" indicates that the device is not 
+presently operational, but it might become operational later (for 
+example, something is not plugged in, or switched off).
+
+An operating system which read this property should interpret as "the 
+clock should not be used". However, with your suggestion the OS would 
+need to differentiate between "the clock may be used by the hypervisor" 
+and "the clock is not wired up/present/...".
 
 Regards,
 
-	Hans
+-- 
+Julien Grall
