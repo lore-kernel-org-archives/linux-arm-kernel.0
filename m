@@ -1,54 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 Jul 2016 15:21:40 +0200
-Subject: [PATCH] oxnas: select reset controller framework
-In-Reply-To: <CAA3gFWsg7E3tczzroQfNLayiUQhdoWxa-rYJys83Z5saJ6kMaw@mail.gmail.com>
-References: <20160706124826.1563413-1-arnd@arndb.de>
- <CAA3gFWsg7E3tczzroQfNLayiUQhdoWxa-rYJys83Z5saJ6kMaw@mail.gmail.com>
-Message-ID: <3635781.NJKnVkuV7s@wuerfel>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 6 Jul 2016 15:19:50 +0200
+Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
+In-Reply-To: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <577D0576.2050706@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 6, 2016 3:04:25 PM CEST Neil Armstrong wrote:
-> 2016-07-06 14:48 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> > For unknown reasons, we have to enable three symbols for a platform
-> > to use a reset controller driver, otherwise we get a Kconfig
-> > warning:
-> >
-> > warning: (MACH_OX810SE) selects RESET_OXNAS which has unmet direct dependencies (RESET_CONTROLLER)
-> >
-> > This selects the other two symbols for oxnas.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  arch/arm/mach-oxnas/Kconfig | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
-> > index 2dde0acf01fd..b6a36d660e6f 100644
-> > --- a/arch/arm/mach-oxnas/Kconfig
-> > +++ b/arch/arm/mach-oxnas/Kconfig
-> > @@ -11,11 +11,13 @@ if ARCH_OXNAS
-> >
-> >  config MACH_OX810SE
-> >         bool "Support OX810SE Based Products"
-> > +       select ARCH_HAS_RESET_CONTROLLER
+Hi Tiffany,
+
+I plan to review this patch series on Friday, but one obvious question is
+what the reason for these failures is:
+
+> Input/Output configuration ioctls:
+>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+>         test VIDIOC_G/S_EDID: OK (Not Supported)
 > 
-> This is strange since this is selected by CONFIG_ARCH_OXNAS !
+>         Control ioctls:
+>                 test VIDIOC_QUERYCTRL/MENU: OK
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(357): g_ctrl returned an error (11)
+>                 test VIDIOC_G/S_CTRL: FAIL
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(579): g_ext_ctrls returned an error (11)
+>                 test VIDIOC_G/S/TRY_EXT_CTRLS: FAIL
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(721): subscribe event for control 'User Controls' failed
+>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
+>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+>                 Standard Controls: 2 Private Controls: 0
 > 
-
-You are right, this one is not needed.
-
-> >         select ARM_TIMER_SP8
-> >         select COMMON_CLK_OXNAS
-> >         select CPU_ARM926T
-> >         select MFD_SYSCON
-> >         select PINCTRL_OXNAS
-> > +       select RESET_CONTROLLER
+>         Format ioctls:
+>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+>                 test VIDIOC_G/S_PARM: OK (Not Supported)
+>                 test VIDIOC_G_FBUF: OK (Not Supported)
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-formats.cpp(405): expected EINVAL, but got 11 when getting format for buftype 9
+>                 test VIDIOC_G_FMT: FAIL
+>                 test VIDIOC_TRY_FMT: OK (Not Supported)
+>                 test VIDIOC_S_FMT: OK (Not Supported)
+>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
 > 
-> Same here, it should be selected by ARCH_HAS_RESET_CONTROLLER
+>         Codec ioctls:
+>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+> 
+>         Buffer ioctls:
+>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(500): q.has_expbuf(node)
+>                 test VIDIOC_EXPBUF: FAIL
+> 
+> 
+> Total: 38, Succeeded: 33, Failed: 5, Warnings: 0
 
-I actually did a patch at one point to kill off ARCH_HAS_RESET_CONTROLLER
-completely, it's not really needed at all, but that is a larger rework
-so (I think) I never submitted it.
+If it is due to a bug in v4l2-compliance, then let me know and I'll fix it. If not,
+then it should be fixed in the driver.
 
-	Arnd
+Frankly, it was the presence of these failures that made me think this patch series
+wasn't final. Before a v4l2 driver can be accepted in the kernel, v4l2-compliance must pass.
+
+Regards,
+
+	Hans
