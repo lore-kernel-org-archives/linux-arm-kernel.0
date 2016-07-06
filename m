@@ -1,76 +1,61 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  6 Jul 2016 16:52:25 +0900
-Subject: [PATCH v21 7/8] arm64: kdump: update a kernel doc
+Date: Wed,  6 Jul 2016 16:52:26 +0900
+Subject: [PATCH v21 8/8] Documentation: dt: usable-memory and elfcorehdr nodes
+ for arm64 kexec
 In-Reply-To: <20160706075226.27609-1-takahiro.akashi@linaro.org>
 References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
-Message-ID: <20160706075226.27609-8-takahiro.akashi@linaro.org>
+Message-ID: <20160706075226.27609-9-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds arch specific descriptions about kdump usage on arm64
-to kdump.txt.
+From: James Morse <james.morse@arm.com>
 
+Add documentation for linux,usable-memory and linux,elfcorehdr chosen
+nodes used by arm64 kexec to decribe the kdump reserved area, and the
+elfcorehdr's location within it.
+
+Signed-off-by: James Morse <james.morse@arm.com>
+[akashi: wrap the commit description to avoid a checkpatch warning]
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: Baoquan He <bhe@redhat.com>
-Acked-by: Dave Young <dyoung@redhat.com>
 ---
- Documentation/kdump/kdump.txt | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/chosen.txt | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-index 88ff63d..8bf91fd 100644
---- a/Documentation/kdump/kdump.txt
-+++ b/Documentation/kdump/kdump.txt
-@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
- a remote system.
- 
- Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
--s390x and arm architectures.
-+s390x, arm and arm64 architectures.
- 
- When the system kernel boots, it reserves a small section of memory for
- the dump-capture kernel. This ensures that ongoing Direct Memory Access
-@@ -249,6 +249,13 @@ Dump-capture kernel config options (Arch Dependent, arm)
- 
-     AUTO_ZRELADDR=y
- 
-+Dump-capture kernel config options (Arch Dependent, arm64)
-+----------------------------------------------------------
+diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+index 6ae9d82..443f88b 100644
+--- a/Documentation/devicetree/bindings/chosen.txt
++++ b/Documentation/devicetree/bindings/chosen.txt
+@@ -52,3 +52,31 @@ This property is set (currently only on PowerPC, and only needed on
+ book3e) by some versions of kexec-tools to tell the new kernel that it
+ is being booted by kexec, as the booting environment may differ (e.g.
+ a different secondary CPU release mechanism)
 +
-+- Please note that kvm at the dump-capture kernel will not be enabled
-+  on non-VHE system even if it is configured. This is because we have
-+  no chance to reset CPU state to EL2 on panic.
++linux,usable-memory
++-------------------
 +
- Extended crashkernel syntax
- ===========================
- 
-@@ -305,6 +312,8 @@ Boot into System Kernel
-    kernel will automatically locate the crash kernel image within the
-    first 512MB of RAM if X is not given.
- 
-+   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-+   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
- 
- Load the Dump-capture Kernel
- ============================
-@@ -327,6 +336,8 @@ For s390x:
- 	- Use image or bzImage
- For arm:
- 	- Use zImage
-+For arm64:
-+	- Use vmlinux or Image
- 
- If you are using a uncompressed vmlinux image then use following command
- to load dump-capture kernel.
-@@ -370,6 +381,9 @@ For s390x:
- For arm:
- 	"1 maxcpus=1 reset_devices"
- 
-+For arm64:
-+	"1 maxcpus=1 reset_devices"
++This property is set on PowerPC and arm64 by kexec-tools during kdump
++to tell the crash kernel the base address of its reserved area of memory, and
++the size. e.g.
 +
- Notes on loading the dump-capture kernel:
- 
- * By default, the ELF headers are stored in ELF64 format to support
++/ {
++	chosen {
++		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
++	};
++};
++
++linux,elfcorehdr
++----------------
++
++This property is set (currently only on arm64) by kexec-tools during kdump
++to tell the crash kernel the address and size of the elfcorehdr that describes
++the old kernel's memory as an elf file. This memory must reside within the area
++described by 'linux,usable-memory'. e.g.
++
++/ {
++	chosen {
++		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
++		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
++	};
++};
 -- 
 2.9.0
