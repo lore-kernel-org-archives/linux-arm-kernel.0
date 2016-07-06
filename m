@@ -1,51 +1,54 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 06 Jul 2016 15:09:42 +0200
-Subject: [PATCH -next] iommu/exynos: Fix return value check in
- exynos_iommu_of_setup()
-In-Reply-To: <1467807354-26503-1-git-send-email-weiyj_lk@163.com>
-References: <1467807354-26503-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <577D0316.1050502@samsung.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 6 Jul 2016 14:10:52 +0100
+Subject: [PATCH v2] xen/arm: register clocks used by the hypervisor
+In-Reply-To: <146776885213.35356.11565744417822933094@resonance>
+References: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
+ <146776885213.35356.11565744417822933094@resonance>
+Message-ID: <577D035C.7090504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2016 02:15 PM, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function of_platform_device_create() returns
-> NULL pointer not ERR_PTR(). The IS_ERR() test in the return value
-> check should be replaced with NULL test.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
->  drivers/iommu/exynos-iommu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 33dcc29..9b23059 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -1345,8 +1345,8 @@ static int __init exynos_iommu_of_setup(struct device_node *np)
->  		exynos_iommu_init();
->  
->  	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-> -	if (IS_ERR(pdev))
-> -		return PTR_ERR(pdev);
-> +	if (!pdev)
-> +		return -ENOMEM;
->  
->  	/*
->  	 * use the first registered sysmmu device for performing
-> 
+On 06/07/16 02:34, Michael Turquette wrote:
+> Hi!
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Hello Michael,
 
+> Quoting Dirk Behme (2016-06-30 03:32:32)
+>> Some clocks might be used by the Xen hypervisor and not by the Linux
+>> kernel. If these are not registered by the Linux kernel, they might be
+>> disabled by clk_disable_unused() as the kernel doesn't know that they
+>> are used. The clock of the serial console handled by Xen is one
+>> example for this. It might be disabled by clk_disable_unused() which
+>> stops the whole serial output, even from Xen, then.
+>
+> This whole thread had me confused until I realized that it all boiled
+> down to some nomenclature issues (for me).
+>
+> This code does not _register_ any clocks. It simply gets them and
+> enables them, which is what every other clk consumer in the Linux kernel
+> does. More details below.
+>
+>>
+>> Up to now, the workaround for this has been to use the Linux kernel
+>> command line parameter 'clk_ignore_unused'. See Xen bug
+>>
+>> http://bugs.xenproject.org/xen/bug/45
+>
+> clk_ignore_unused is a band-aid, not a proper medical solution. Setting
+> that flag will not turn clocks on for you, nor will it guarantee that
+> those clocks are never turned off in the future. It looks like you
+> figured this out correctly in the patch below but it is worth repeating.
+>
+> Also the new CLK_IS_CRITICAL flag might be of interest to you, but that
+> flag only exists as a way to enable clocks that must be enabled for the
+> system to function (hence, "critical") AND when those same clocks do not
+> have an accompanying Linux driver to consume them and enable them.
 
-Which in case of first sysmmu device and of_platform_device_create()
-failure will lead to NULL pointer exception, so I think it is
-appropriate to:
-Fixes: 8ed55c812fa8 ("iommu/exynos: Init from dt-specific callback
-instead of initcall")
-Cc: <stable@vger.kernel.org>
+I don't think we want the kernel to enable the clock for the hypervisor. 
+We want to tell the kernel "don't touch at all to this clock, it does 
+not belong to you".
 
-Best regards,
-Krzysztof
+Regards,
+
+-- 
+Julien Grall
