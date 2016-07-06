@@ -1,68 +1,109 @@
-From: arend.vanspriel@broadcom.com (Arend Van Spriel)
-Date: Wed, 6 Jul 2016 10:08:55 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
- dt property
-In-Reply-To: <26659199.PqqRaoPEho@wuerfel>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <8717879.O1RMZcQt4V@wuerfel> <577AAC95.7040800@broadcom.com>
- <26659199.PqqRaoPEho@wuerfel>
-Message-ID: <CAF7Mx6qcwtwYQhrkNk8o+D6UQBLEQkL-ti7aMQyLVuRo+JMUfw@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed,  6 Jul 2016 16:20:54 +0800
+Subject: [PATCH] arm64: dts: rockchip: Add idle-states to device tree for
+ rk3399
+Message-ID: <1467793254-10808-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2016 at 3:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday, July 4, 2016 8:36:05 PM CEST Arend van Spriel wrote:
->> On 04-07-16 16:54, Arnd Bergmann wrote:
->> > On Monday, July 4, 2016 11:08:38 AM CEST Arend Van Spriel wrote:
->> >
->> > In drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c I already see
->> > over a dozen different chips being supported, bcm4329 is only one of
->> > them. In particular, there seem to be some that have various modules:
->> >
->> >         BRCMF_FW_NVRAM_ENTRY(BRCM_CC_43241_CHIP_ID, 0x0000001F, 43241B0),
->> >         BRCMF_FW_NVRAM_ENTRY(BRCM_CC_43241_CHIP_ID, 0x00000020, 43241B4),
->> >         BRCMF_FW_NVRAM_ENTRY(BRCM_CC_43241_CHIP_ID, 0xFFFFFFC0, 43241B5),
->> >
->> > So if you have a bcm43241, that compatible string probably should
->> > include both brcm,bcm43241-b4-fmac and brcm,bcm43241-fmac, possibly also
->> > brcm,bcm4329-fmac, to show that it is a superset of the programming
->> > interface of that one.
->>
->> Hi Arnd,
->>
->> I have to disagree here. The compatible string "brcm,bcm4329-fmac" is
->> chosen as the bcm4329 chip was the first supported and we never added
->> others as there is no other programming required. For all supported
->> devices the same device tree properties apply and are handled the same.
->> As such there is no need to come up with a new compatible string.
->
-> Generally speaking, the way that the compatible strings work is that you
-> add a new one whenever you get a new piece of hardware, and you can leave
-> the first one as a fallback so you don't have to change the driver.
->
-> Adding the new string for the actual device is important though,
-> since you might only discover later that they are not 100% compatible
-> and that you in fact need to know the difference.
->
-> For discoverable buses like sdio or usb, it may actually be better
-> to not identify the device through the compatible property at all,
-> and instead use a string that is generated from the actual identifier
-> as the primary key, as e.g. documented in
-> Documentation/devicetree/bindings/usb/usb-device.txt
+As the rk3399 ATF had been supported on ARM github [0], so we can add
+idle-states for rk3399.
+This patch adds idle-states bindings data collected through tests
+experiments (latency and energy consumption) on rk3399 evb2 board.
 
-Well, that is my point. We do not need to identify the device here. We
-can obtain that info, ie. chip id and revision, from the device itself
-as our wifi chips have a discoverable AXI backplane. What is missing
-is that we have no way to tell what board/module this device is
-integrated on, which makes it impossible to select the correct nvram
-file. The model property can fill that gap just nicely.
+You can see detail idle-states definitions on document [1].
 
-Regards,
-Arend
+* arm,psci-suspend-param: power_state parameter to pass to the PSCI
+  suspend call.
+* entry-latency: Worst case latency required to enter the idle state. The
+  exit-latency may be guaranteed only after entry-latency has passed.
+* min-residency: Minimum period, including preparation and entry, for a
+  given idle state to be worthwhile energywise
+* min-residency: Minimum period, including preparation and entry, for a
+  given idle state to be worthwhile energywise.
 
-> The mmc binding is less clear about that, and we may want to correct
-> that. In fact, the example in
-> Documentation/devicetree/bindings/mmc/mmc.txt even lists an invalid
-> compatible string, so that is even worse.
->
->         Arnd
+[0]:
+https://github.com/ARM-software/arm-trusted-firmware
+[1]:
+Documentation/devicetree/bindings/arm/psci.txt
+Documentation/devicetree/bindings/arm/idle-states.txt
+
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
+
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index a6dd623..12ce265 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -101,6 +101,18 @@
+ 			};
+ 		};
+ 
++		idle-states {
++			entry-method = "psci";
++			cpu_sleep: cpu-sleep-0 {
++				compatible = "arm,idle-state";
++				local-timer-stop;
++				arm,psci-suspend-param = <0x0010000>;
++				entry-latency-us = <350>;
++				exit-latency-us = <600>;
++				min-residency-us = <1150>;
++			};
++		};
++
+ 		cpu_l0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+@@ -108,6 +120,7 @@
+ 			enable-method = "psci";
+ 			#cooling-cells = <2>; /* min followed by max */
+ 			clocks = <&cru ARMCLKL>;
++			cpu-idle-states = <&cpu_sleep>;
+ 		};
+ 
+ 		cpu_l1: cpu at 1 {
+@@ -116,6 +129,7 @@
+ 			reg = <0x0 0x1>;
+ 			enable-method = "psci";
+ 			clocks = <&cru ARMCLKL>;
++			cpu-idle-states = <&cpu_sleep>;
+ 		};
+ 
+ 		cpu_l2: cpu at 2 {
+@@ -124,6 +138,7 @@
+ 			reg = <0x0 0x2>;
+ 			enable-method = "psci";
+ 			clocks = <&cru ARMCLKL>;
++			cpu-idle-states = <&cpu_sleep>;
+ 		};
+ 
+ 		cpu_l3: cpu at 3 {
+@@ -132,6 +147,7 @@
+ 			reg = <0x0 0x3>;
+ 			enable-method = "psci";
+ 			clocks = <&cru ARMCLKL>;
++			cpu-idle-states = <&cpu_sleep>;
+ 		};
+ 
+ 		cpu_b0: cpu at 100 {
+@@ -141,6 +157,7 @@
+ 			enable-method = "psci";
+ 			#cooling-cells = <2>; /* min followed by max */
+ 			clocks = <&cru ARMCLKB>;
++			cpu-idle-states = <&cpu_sleep>;
+ 		};
+ 
+ 		cpu_b1: cpu at 101 {
+@@ -149,6 +166,7 @@
+ 			reg = <0x0 0x101>;
+ 			enable-method = "psci";
+ 			clocks = <&cru ARMCLKB>;
++			cpu-idle-states = <&cpu_sleep>;
+ 		};
+ 	};
+ 
+-- 
+1.9.1
