@@ -1,22 +1,36 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 06 Jul 2016 08:17:12 +0200
-Subject: [PATCH] memory: samsung: exynos-srom: fix wrong count of registers
-In-Reply-To: <1467718817-19239-1-git-send-email-sw0312.kim@samsung.com>
-References: <1467718817-19239-1-git-send-email-sw0312.kim@samsung.com>
-Message-ID: <577CA268.5020606@samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 6 Jul 2016 14:15:53 +0800
+Subject: [PATCH v4 0/2] make arm_cpuidle_suspend() a bit more efficient
+Message-ID: <1467785755-3488-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2016 01:40 PM, Seung-Woo Kim wrote:
-> This patch fixes wrong count of array for srom registers from probe
-> function.
-> 
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> ---
->  drivers/memory/samsung/exynos-srom.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+There's one corner case need to be fixed: !cpuidle_ops[cpu].init.
+patch1 tries to address this corner case.
 
-Thanks, applied.
+patch2 tries to improve arm_cpuidle_suspend() a bit by moving .suspend
+check into arm_cpuidle_read_ops().
 
-Best regards,
-Krzysztof
+Since v3:
+ - rebased on 4.7-rc1
+
+Since v2:
+ - add back patch1.
+
+Since v1:
+ - drop patch1, I.E "ARM: cpuidle: fix !cpuidle_ops[cpu].init case
+   during init", because there may be platforms which doesn't need the
+   init member at all.
+ - adopt Daniel's suggestion to move the cpuidle_ops.suspend check to
+   arm_cpuidle_read_ops().
+
+
+Jisheng Zhang (2):
+  ARM: cpuidle: fix !cpuidle_ops[cpu].init case during init
+  ARM: cpuidle: make arm_cpuidle_suspend() a bit more efficient
+
+ arch/arm/kernel/cpuidle.c | 23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
+
+-- 
+2.8.1
