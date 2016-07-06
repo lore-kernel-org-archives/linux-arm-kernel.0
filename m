@@ -1,51 +1,98 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 6 Jul 2016 14:04:42 -0700
-Subject: [PATCH v3] arm64: dts: rockchip: add the power domain node for
- rk3399
-In-Reply-To: <4362000.pLfftZqEvu@phil>
-References: <1467635644-16798-1-git-send-email-wxt@rock-chips.com>
- <4362000.pLfftZqEvu@phil>
-Message-ID: <CAD=FV=WrSVL=eYn=0rY=yc8pPfuBrZ44kAa-D6AW=2V8CdoR5g@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 6 Jul 2016 23:06:48 +0200
+Subject: [PATCH v8 03/17] KVM: extend struct kvm_msi to hold a 32-bit
+ device ID
+In-Reply-To: <20160705112309.28877-4-andre.przywara@arm.com>
+References: <20160705112309.28877-1-andre.przywara@arm.com>
+ <20160705112309.28877-4-andre.przywara@arm.com>
+Message-ID: <20160706210648.GD12608@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+On Tue, Jul 05, 2016 at 12:22:55PM +0100, Andre Przywara wrote:
+> The ARM GICv3 ITS MSI controller requires a device ID to be able to
+> assign the proper interrupt vector. On real hardware, this ID is
+> sampled from the bus. To be able to emulate an ITS controller, extend
+> the KVM MSI interface to let userspace provide such a device ID. For
+> PCI devices, the device ID is simply the 16-bit bus-device-function
+> triplet, which should be easily available to the userland tool.
+> 
+> Also there is a new KVM capability which advertises whether the
+> current VM requires a device ID to be set along with the MSI data.
+> This flag is still reported as not available everywhere, later we will
+> enable it when ITS emulation is used.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>  Documentation/virtual/kvm/api.txt | 12 ++++++++++--
+>  include/uapi/linux/kvm.h          |  5 ++++-
+>  2 files changed, 14 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 09efa9e..6551311 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2175,10 +2175,18 @@ struct kvm_msi {
+>  	__u32 address_hi;
+>  	__u32 data;
+>  	__u32 flags;
+> -	__u8  pad[16];
+> +	__u32 devid;
+> +	__u8  pad[12];
+>  };
+>  
+> -No flags are defined so far. The corresponding field must be 0.
+> +flags: KVM_MSI_VALID_DEVID: devid contains a valid value
+> +devid: If KVM_MSI_VALID_DEVID is set, contains a unique device identifier
+> +       for the device that wrote the MSI message.
+> +       For PCI, this is usually a BFD identifier in the lower 16 bits.
+> +
+> +The per-VM KVM_CAP_MSI_DEVID capability advertises the need to provide
+> +the device ID. If this capability is not set, userland cannot rely on
+> +the kernel to allow the KVM_MSI_VALID_DEVID flag being set.
 
-On Wed, Jul 6, 2016 at 1:56 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Am Montag, 4. Juli 2016, 20:34:04 schrieb Caesar Wang:
->> From: Elaine Zhang <zhangqing@rock-chips.com>
->>
->> In order to meet low power requirements, a power management unit (PMU) is
->> designed for controlling power resources in RK3399. The RK3399 PMU is
->> dedicated for managing the power of the whole chip.
->>
->> 1. add pd node for RK3399 Soc
->> 2. create power domain tree
->> 3. add qos node for domain
->>
->> From the DT/binds and driver can get more detail information:
->> The driver:
->>         drivers/soc/rockchip/pm_domains.c
->> The document:
->>         Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
->>
->> Note:
->> As the TRM lists many voltage domains and power domains, then this patch
->> adds some domains for driver. Due to some domains
->> (e.g. emmc, usb, core)...We can't turned off it on
->> bootup, or says some device driver can't handle the power domain enough.
->> Maybe We will add more other domains in the future or later.
->>
->> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-rockchip at lists.infradead.org
->> Cc: Heiko Stuebner <heiko@sntech.de>
->
-> applied to my dts64 branch after renaming the qos nodes, removing the status
-> property and moving the rga domain up a bit. Please double check:
-> https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=6d3cdbf1c219f9817290903e9d1e8de7462a7b54
+If KVM_CAP_MSI_DEVID is set, is it an error to provide a struct kvm_msi
+without the KVM_MSI_VALID_DEVID flag set, or not necessarily?
 
-This looks like the same as my attempt to do these fixes too.  ;)
+>  
+>  
+>  4.71 KVM_CREATE_PIT2
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 05ebf47..7de96f5 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -866,6 +866,7 @@ struct kvm_ppc_smmu_info {
+>  #define KVM_CAP_ARM_PMU_V3 126
+>  #define KVM_CAP_VCPU_ATTRIBUTES 127
+>  #define KVM_CAP_MAX_VCPU_ID 128
+> +#define KVM_CAP_MSI_DEVID 129
+>  
+>  #ifdef KVM_CAP_IRQ_ROUTING
+>  
+> @@ -1024,12 +1025,14 @@ struct kvm_one_reg {
+>  	__u64 addr;
+>  };
+>  
+> +#define KVM_MSI_VALID_DEVID	(1U << 0)
+>  struct kvm_msi {
+>  	__u32 address_lo;
+>  	__u32 address_hi;
+>  	__u32 data;
+>  	__u32 flags;
+> -	__u8  pad[16];
+> +	__u32 devid;
+> +	__u8  pad[12];
+>  };
+>  
+>  struct kvm_arm_device_addr {
+> -- 
+> 2.9.0
+> 
 
--Doug
+Looks good to me, but you probably need an ack from Paolo or Radim
+before we can queue this.
+
+FWIW: Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+-Christoffer
