@@ -1,45 +1,65 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 5 Jul 2016 20:50:58 -0700
-Subject: [GIT PULL 3/3] bcm2835-arm64-next-2016-07-03
-In-Reply-To: <20160705180338.GI3348@io.lakedaemon.net>
-References: <1467593136-29524-1-git-send-email-eric@anholt.net>
- <1467593136-29524-4-git-send-email-eric@anholt.net>
- <20160705180338.GI3348@io.lakedaemon.net>
-Message-ID: <577C8022.9000600@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 6 Jul 2016 13:10:24 +0900
+Subject: [Question] Memory attribute reserved by Device Tree?
+In-Reply-To: <20160630122554.GC20363@leverpostej>
+References: <CAK7LNATGoP-Wn-wiK_CgD_v=rQXyt937qRvr8LkUQ06jHB7FAA@mail.gmail.com>
+ <577504D7.7080106@arm.com> <20160630122554.GC20363@leverpostej>
+Message-ID: <CAK7LNAQJNYVFjZyMH=kU+VJLfUCr2EwKc51HB4knZ=XM7s+MQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/07/2016 11:03, Jason Cooper a ?crit :
-> Eric,
-> 
-> On Sun, Jul 03, 2016 at 05:45:36PM -0700, Eric Anholt wrote:
->>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+2016-06-30 21:26 GMT+09:00 Mark Rutland <mark.rutland@arm.com>:
+> On Thu, Jun 30, 2016 at 12:39:03PM +0100, Robin Murphy wrote:
+>> On 30/06/16 12:10, Masahiro Yamada wrote:
+>> > Hello.
+>> >
+>> > Which memory attribute will ARM/ARM64 Linux
+>> > set to the memory region reserved by
+>> > /memreserve/ of Device Tree?
+>> >
+>> >
+>> > Normal memory non-cacheable?
+>> > Or, cacheable?
+>> > Or, not defined?
+>> >
+>> > Perhaps actual behavior depends on whether the reserved area is
+>> > located in the low-memory region?
 >>
->> are available in the git repository at:
->>
->>   https://github.com/anholt/linux tags/bcm2835-arm64-next-2016-07-03
->>
->> for you to fetch changes up to 628d30d1ccb897fee54a6f7312561cf2f6f72f09:
->>
->>   arm64: Add platform selection for BCM2835. (2016-06-15 14:10:30 -0700)
->>
->> ----------------------------------------------------------------
->> This pull request brings in the build support for the Raspberry Pi
->> arm64 port.
->>
->> ----------------------------------------------------------------
->> Alexander Graf (1):
->>       arm64: Allow for different DMA and CPU bus offsets
->>
->> Eric Anholt (3):
->>       irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ
->>       Merge remote-tracking branch 'irqchip/irqchip/bcm' into bcm2835-arm64-next
-> 
-> You may want to draw attention to the fact that this has an external
-> dependency on my irqchip/bcm branch.  Also, that it's stable, been in
-> -next for a couple of weeks, and based on v4.7-rc1, etc.
+>> Isn't the point of memreserve that the kernel avoids mapping it at all?
+>
+> Not quite. A /memreserve/ allows the kernel to map a region, so long as
+> it doesn't use the region for general allocation.
+>
+> While not strictly defined for arm64 today, in practice the kernel may
+> map a region with Normal Inner-Shareable Inner-WB Outer-WB attributes,
+> following similar behaviour for PPC as defined in ePAPR.
+>
+> Generally I would advise against the use of a memreserve, and favour
+> carving memory out of memory nodes as required, as that imposes stricter
+> requirements.
+>
+>> If a reserved region is later mapped in by a driver using
+>> dma_declare_coherent_memory(), ioremap(), memremap() or whatever else,
+>> then the attributes will vary depending on the exact method used.
+>
+> Indeed. This applies even with the above.
 
-Thanks for the heads-up, merged and updated the merge commit to make
-this clear, thanks everyone.
+
+Hi Robin, Mark,
+
+
+Thanks for clarification!
+
+
+My motivation is to try my own implementation of PSCI for my ARMv7 SoC.
+
+I put my PSCI firmware somewhere in the DRAM region and
+protected it with /memreserve/, but I was not sure what kind of memory attribute
+is used for the area.
+
+
+
+
 -- 
-Florian
+Best Regards
+Masahiro Yamada
