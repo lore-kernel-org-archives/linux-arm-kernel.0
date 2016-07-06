@@ -1,13 +1,14 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Jul 2016 21:46:00 -0700
-Subject: [GIT PULL] ARM: hisi: DT changes for v4.8
-In-Reply-To: <5772B7F0.6040600@hisilicon.com>
-References: <5772B7F0.6040600@hisilicon.com>
-Message-ID: <20160706044600.GH23212@localhost>
+Date: Tue, 5 Jul 2016 21:49:19 -0700
+Subject: [GIT PULL] arm64: dts: hisilicon: hi6220 hikey board updates for
+ 4.8
+In-Reply-To: <5772B8AF.4040608@hisilicon.com>
+References: <5772B8AF.4040608@hisilicon.com>
+Message-ID: <20160706044919.GI23212@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2016 at 06:46:24PM +0100, Wei Xu wrote:
+On Tue, Jun 28, 2016 at 06:49:35PM +0100, Wei Xu wrote:
 > Hi Arnd, Hi Olof, Hi Kevin,
 > 
 > Please help to pull the following changes.
@@ -24,34 +25,29 @@ On Tue, Jun 28, 2016 at 06:46:24PM +0100, Wei Xu wrote:
 > 
 > are available in the git repository at:
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-dt-for-4.8
+>   git://github.com/hisilicon/linux-hisi.git tags/hi6220-dt-for-4.8
 > 
-> for you to fetch changes up to 04f66aa916c141113266646942d449b5781550e3:
+> for you to fetch changes up to bbaf867e2d3796bca465d07ffcd800a3bd570861:
 > 
->   ARM: dts: add dts files for Hi3519 and tidy up the makefile entries (2016-06-28 17:27:53 +0100)
+>   arm64: dts: hikey: name the GPIO lines (2016-06-28 17:36:04 +0100)
 > 
 > ----------------------------------------------------------------
-> ARM: DT: Hisilicon ARMv7 SoC Hi3519 DT updates for 4.8
+> ARM64: DT: Hisilicon Hi6220 hikey board updates for 4.8
 > 
-> - Add device tree bindings for hi3519 sysctrl
-> - Add dts files for hi3519
-> - Tidy up DTB makefile entries to keep the list sorted
+> - name the GPIO lines
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (1):
+>       arm64: dts: hikey: name the GPIO lines
+> 
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 143 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 143 insertions(+)
 
-This isn't tidying up the makefile, the list isn't sorted:
+Merged into next/dt64. Thanks.
 
- dtb-$(CONFIG_ARCH_HIGHBANK) += \                                                                                                                   
-        highbank.dtb \                                                                                                                              
-        ecx-2000.dtb                                                                                                                                
-+dtb-$(CONFIG_ARCH_HISI) += \                                                                                                                       
-+       hi3519-demb.dtb                                                                                                                             
-+dtb-$(CONFIG_ARCH_HIX5HD2) += \                                                                                                                    
-+       hisi-x5hd2-dkb.dtb                                                                                                                          
- dtb-$(CONFIG_ARCH_HIP01) += \                                                                                                                      
-        hip01-ca9x2.dtb          
-
-Last time I checked, both S and X came after P.
-
-Not merging this.
+Also, as I've told others: If you redirect your git request-pull to a file, or
+pipe it through cat, it'll produce a diffstat that is more reasonable for email
+(80 columns).
 
 
 -Olof
