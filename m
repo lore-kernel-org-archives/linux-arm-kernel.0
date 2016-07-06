@@ -1,32 +1,36 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Wed, 06 Jul 2016 15:11:45 -0300
-Subject: [PATCH v21 1/8] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20160706075226.27609-2-takahiro.akashi@linaro.org>
-References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
- <20160706075226.27609-2-takahiro.akashi@linaro.org>
-Message-ID: <2543175.KeBui093Sr@hactar>
+From: ayaka@soulik.info (Randy Li)
+Date: Thu,  7 Jul 2016 02:22:57 +0800
+Subject: [PATCH 0/3] ARM: dts: the dts support for rk3288 firefly reload
+In-Reply-To: <3015470.z4L7UQJKa9@phil>
+References: <3015470.z4L7UQJKa9@phil>
+Message-ID: <1467829380-16242-1-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 06 Juli 2016, 16:52:19 schrieb AKASHI Takahiro:
-> On the startup of primary kernel, the memory region used by crash dump
-> kernel must be specified by "crashkernel=" kernel parameter.
-> reserve_crashkernel() will allocate and reserve the region for later use.
-> 
-> User space tools, like kexec-tools, will be able to find that region
-> marked as "Crash kernel" in /proc/iomem.
+The rk3288 firefly reload  is a Rockchip RK3288 based board be found by
+core board and main board. The regulators are connected in a different
+way to the previous version of firefly boards, it is necessary to
+move some common code to uncommon place.
 
-On powerpc, userspace tools get everything from the device tree (exposed to 
-userspace in /proc/device-tree/), not /proc/iomem.
+I only tested the ethernet and confirmed that works.
+The usb in this board won't caused by the bugs in the driver.
 
-In the case of the crashkernel reserved region, that information is in 
-/chosen/linux,crashkernel-base and /chosen/linux,crashkernel-size.
+This version follow the suggests from Heiko Stuebner,
+except the duplicated supply name problem, I don't think
+it could be fixed in that way.
 
-Either way is fine I think. I'm just mentioning this for reference in case 
-you want the ARM implementation to be closer to another arch which is also 
-based on the device tree.
+Randy Li (3):
+  ARM: dts: add label leds for rk3288-firefly.dtsi
+  ARM: dts: move regulator settings from common to specifics
+  ARM: dts: add rk3288-firefly-reload
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/rk3288-firefly-beta.dts   |  30 ++++++++
+ arch/arm/boot/dts/rk3288-firefly-reload.dts | 109 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3288-firefly.dts        |  30 ++++++++
+ arch/arm/boot/dts/rk3288-firefly.dtsi       |  16 ++--
+ 5 files changed, 178 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly-reload.dts
 
 -- 
-[]'s
-Thiago Jung Bauermann
-IBM Linux Technology Center
+2.7.4
