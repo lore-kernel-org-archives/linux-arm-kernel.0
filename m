@@ -1,150 +1,88 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Thu,  7 Jul 2016 01:34:07 +0800
-Subject: [PATCH 3/3] ARM: dts: add rk3288-firefly-reload
-In-Reply-To: <1467826447-24159-1-git-send-email-ayaka@soulik.info>
-References: <3015470.z4L7UQJKa9@phil>
- <1467826447-24159-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1467826447-24159-4-git-send-email-ayaka@soulik.info>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 06 Jul 2016 10:38:09 -0700
+Subject: [PATCH v21 4/8] arm64: kdump: add kdump support
+In-Reply-To: <20160706075226.27609-5-takahiro.akashi@linaro.org>
+References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
+ <20160706075226.27609-5-takahiro.akashi@linaro.org>
+Message-ID: <1467826689.8880.39.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ayaka <ayaka@soulik.info>
+On Wed, 2016-07-06 at 16:52 +0900, AKASHI Takahiro wrote:
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -136,6 +137,57 @@ static void __init reserve_crashkernel(void)
+>  }
+>  #endif /* CONFIG_KEXEC_CORE */
+>  
+> +#ifdef CONFIG_CRASH_DUMP
+> +static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
+> +> 	> 	> const char *uname, int depth, void *data)
+> +{
+> +> 	> const __be32 *reg;
+> +> 	> int len;
+> +
+> +> 	> if (depth != 1 || strcmp(uname, "chosen") != 0)
+> +> 	> 	> return 0;
+> +
+> +> 	> reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
+> +> 	> if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
+> +> 	> 	> return 1;
+> +
+> +> 	> elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, ?);
+> +> 	> elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, ?);
+> +
+> +> 	> return 1;
+> +}
+> +
+> +/*
+> + * reserve_elfcorehdr() - reserves memory for elf core header
+> + *
+> + * This function reserves elf core header given in "elfcorehdr=" kernel
+> + * command line parameter. This region contains all the information about
+> + * primary kernel's core image and is used by a dump capture kernel to
+> + * access the system memory on primary kernel.
+> + */
+> +static void __init reserve_elfcorehdr(void)
+> +{
 
-The firefly rk3288 reload is a Rockchip rk3288 based develop board.
+It seems like you could get rid of all these conditionals by
+just putting this here:
 
-Signed-off-by: Randy Li <ayaka@soulik.info>
----
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/rk3288-firefly-reload.dts | 109 ++++++++++++++++++++++++++++
- 2 files changed, 110 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-firefly-reload.dts
+	if (!IS_ENABLED(CONFIG_CRASH_DUMP))
+		return;
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 06b6c2d..19a6049 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -606,6 +606,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3288-evb-rk808.dtb \
- 	rk3288-firefly-beta.dtb \
- 	rk3288-firefly.dtb \
-+	rk3288-firefly-reload.dtb \
- 	rk3288-miqi.dtb \
- 	rk3288-popmetal.dtb \
- 	rk3288-r89.dtb \
-diff --git a/arch/arm/boot/dts/rk3288-firefly-reload.dts b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-new file mode 100644
-index 0000000..9805cf2
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-@@ -0,0 +1,109 @@
-+/*
-+ * Copyright (c) 2016 Randy Li <ayaka@soulik.info>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3288-firefly.dtsi"
-+
-+/ {
-+	model = "Firefly-RK3288-reload";
-+	compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
-+
-+};
-+
-+&leds {
-+	power {
-+		gpios = <&gpio8 2 GPIO_ACTIVE_LOW>;
-+		label = "firefly:blue:power";
-+		linux,default-trigger = "default-on";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&power_led>;
-+	};
-+};
-+
-+&gmac {
-+	phy-supply = <&vcc_lan>;
-+};
-+
-+&pinctrl {
-+	act8846 {
-+		pmic_vsel: pmic-vsel {
-+			rockchip,pins = <7 14 RK_FUNC_GPIO &pcfg_output_low>;
-+		};
-+	};
-+
-+	ir {
-+		ir_int: ir-int {
-+			rockchip,pins = <7 0 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
-+};
-+
-+&pwm1 {
-+	status = "disabled";
-+};
-+
-+&io_domains {
-+		audio-supply = <&vcca_33>;
-+		flash1-supply = <&vcc_lan>;
-+};
-+
-+&regulators {
-+	vcca_33: REG7 {
-+		regulator-name = "vcca_33";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vcc_lan: REG8 {
-+		regulator-name = "vcc_lan";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vccio_pmu: REG9 {
-+		regulator-name = "vccio_pmu";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+};
--- 
-2.7.4
+
+> +> 	> of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
+> +
+> +> 	> if (!elfcorehdr_size)
+> +> 	> 	> return;
+> +
+> +> 	> if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
+> +> 	> 	> pr_warn("elfcorehdr is overlapped\n");
+> +> 	> 	> return;
+> +> 	> }
+> +
+> +> 	> memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
+> +
+> +> 	> pr_info("Reserving %lldKB of memory at 0x%llx for elfcorehdr\n",
+> +> 	> 	> elfcorehdr_size >> 10, elfcorehdr_addr);
+> +}
+> +#else
+> +static void __init reserve_elfcorehdr(void)
+> +{
+> +> 	> ;
+> +}
+> +#endif /* CONFIG_CRASH_DUMP */
+>  /*
+>   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+>   * currently assumes that for memory starting above 4G, 32-bit devices will
+> @@ -389,6 +441,8 @@ void __init arm64_memblock_init(void)
+>  
+>  > 	> reserve_crashkernel();
+>  
+> +> 	> reserve_elfcorehdr();
+> +
+>  > 	> early_init_fdt_scan_reserved_mem();
+>  
+>  > 	> /* 4GB maximum for 32-bit only capable devices */
