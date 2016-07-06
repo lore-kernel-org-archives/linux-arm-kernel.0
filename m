@@ -1,51 +1,49 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 6 Jul 2016 12:35:12 -0700
-Subject: [PATCH 1/2] hwspinlock: qcom_hwspinlock: add missing of_node_put
- after calling of_parse_phandle
-In-Reply-To: <1467684664-21155-1-git-send-email-peter.chen@nxp.com>
-References: <1467684664-21155-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <20160706193512.GB23833@tuxbot>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 6 Jul 2016 12:47:44 -0700
+Subject: [PATCH v3] arm64: dts: rockchip: add the power domain node for
+ rk3399
+In-Reply-To: <1904131.irFlfKsH8m@phil>
+References: <1467635644-16798-1-git-send-email-wxt@rock-chips.com>
+ <1904131.irFlfKsH8m@phil>
+Message-ID: <CAD=FV=W8-48ODWJN=4M54nYBAzH_Bproc13kKakStL_-aLUHcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 04 Jul 19:11 PDT 2016, Peter Chen wrote:
+Hi,
 
-> of_node_put needs to be called when the device node which is got
-> from of_parse_phandle has finished using.
-> 
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-arm-msm at vger.kernel.org
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+On Mon, Jul 4, 2016 at 5:24 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Montag, 4. Juli 2016, 20:34:04 schrieb Caesar Wang:
+>> From: Elaine Zhang <zhangqing@rock-chips.com>
+>>
+>> In order to meet low power requirements, a power management unit (PMU) is
+>> designed for controlling power resources in RK3399. The RK3399 PMU is
+>> dedicated for managing the power of the whole chip.
+>>
+>> 1. add pd node for RK3399 Soc
+>> 2. create power domain tree
+>> 3. add qos node for domain
+>>
+>> From the DT/binds and driver can get more detail information:
+>> The driver:
+>>         drivers/soc/rockchip/pm_domains.c
+>> The document:
+>>         Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+>>
+>> Note:
+>> As the TRM lists many voltage domains and power domains, then this patch
+>> adds some domains for driver. Due to some domains
+>> (e.g. emmc, usb, core)...We can't turned off it on
+>> bootup, or says some device driver can't handle the power domain enough.
+>> Maybe We will add more other domains in the future or later.
+>
+> I talked with Caesar about that today and for example the gmac domain seems
+> to cause problems right now when only using the generic power-domain
+> handling the kernel provides on probe and remove.
+>
+> So while this gets investigated, I'm probably ok with only using the stable
+> power-domains, but will give the us-people a chance to also respond on
+> wednesday :-) .
 
-Applied.
+Sure, that's fine with me.  Walk before we run.  ;)
 
-Please use get_maintainer.pl to find out whom to send patches to, I
-only stumbled upon this while looking for something else.
-
-Thanks,
-Bjorn
-
-> ---
->  drivers/hwspinlock/qcom_hwspinlock.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/hwspinlock/qcom_hwspinlock.c b/drivers/hwspinlock/qcom_hwspinlock.c
-> index c752447..fa6880b 100644
-> --- a/drivers/hwspinlock/qcom_hwspinlock.c
-> +++ b/drivers/hwspinlock/qcom_hwspinlock.c
-> @@ -98,6 +98,7 @@ static int qcom_hwspinlock_probe(struct platform_device *pdev)
->  	}
->  
->  	regmap = syscon_node_to_regmap(syscon);
-> +	of_node_put(syscon);
->  	if (IS_ERR(regmap))
->  		return PTR_ERR(regmap);
->  
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-Doug
