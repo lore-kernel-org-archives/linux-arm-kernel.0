@@ -1,56 +1,98 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 05 Jul 2016 17:18:40 -0700
-Subject: [GIT PULL] Allwinner clock fixes for 4.7
-In-Reply-To: <20160705195537.GA17805@lukather>
-References: <20160705195537.GA17805@lukather>
-Message-ID: <146776432067.35356.1674013489826255803@resonance>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 06 Jul 2016 02:38:51 +0200
+Subject: [PATCH v4 1/3] PM / Hibernate: Allow arch code to influence CPUs
+ disabled during hibernate
+In-Reply-To: <1467643950-11034-2-git-send-email-james.morse@arm.com>
+References: <1467643950-11034-1-git-send-email-james.morse@arm.com>
+ <1467643950-11034-2-git-send-email-james.morse@arm.com>
+Message-ID: <54369969.i5TPzUzNII@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2016-07-05 12:55:37)
-> Hi Mike, Stephen,
+On Monday, July 04, 2016 03:52:28 PM James Morse wrote:
+> Architecture code may need to do extra work when secondary CPUs are
+> disabled during hibernate and resume. This may include pushing sleeping
+> CPUs into a deeper power-saving state, or influencing which CPU resume
+> occurs on.
 > 
-> Please pull the following fixes for the 4.7 cycle.
+> Define a macro arch_hibernation_disable_cpus(), which defaults to
+> calling disable_nonboot_cpus() if undefined. Architectures that
+> need to do extra work around these calls can use this to influence
+> the CPU down calls.
+> The macros should be defined in asm/suspend.h, and
+> ARCH_HIBERNATION_CPU_HOOKS should be added to Kconfig.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Pavel Machek <pavel@ucw.cz>
+> ---
+> Changes since v3:
+>  * Changed kconfig name to CONFIG_ARCH_HIBERNATION_CPU_HOOKS
+> 
+> Changes since v2:
+>  * Added CONFIG_ARCH_HIBERNATION_CPUHP include guard allowing
+>  * Switch to macro approach.
+> 
+>  kernel/power/hibernate.c | 14 +++++++++++---
+>  1 file changed, 11 insertions(+), 3 deletions(-)
+> 
+> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+> index fca9254280ee..855a3a2374c8 100644
+> --- a/kernel/power/hibernate.c
+> +++ b/kernel/power/hibernate.c
+> @@ -31,8 +31,16 @@
+>  #include <linux/ktime.h>
+>  #include <trace/events/power.h>
+>  
+> +#ifdef CONFIG_ARCH_HIBERNATION_CPU_HOOKS
+> +/* Arch definition of the arch_hibernation_disable_cpus() macros? */
+> +#include <asm/suspend.h>
+> +#endif
+> +
+>  #include "power.h"
+>  
+> +#ifndef arch_hibernation_disable_cpus
+> +#define arch_hibernation_disable_cpus(x) disable_nonboot_cpus()
+> +#endif
+>  
+>  static int nocompress;
+>  static int noresume;
+> @@ -279,7 +287,7 @@ static int create_image(int platform_mode)
+>  	if (error || hibernation_test(TEST_PLATFORM))
+>  		goto Platform_finish;
+>  
+> -	error = disable_nonboot_cpus();
+> +	error = arch_hibernation_disable_cpus(true);
+>  	if (error || hibernation_test(TEST_CPUS))
+>  		goto Enable_cpus;
+>  
+> @@ -433,7 +441,7 @@ static int resume_target_kernel(bool platform_mode)
+>  	if (error)
+>  		goto Cleanup;
+>  
+> -	error = disable_nonboot_cpus();
+> +	error = arch_hibernation_disable_cpus(false);
 
-Pulled.
+Why "false"?
 
-Regards,
-Mike
+>  	if (error)
+>  		goto Enable_cpus;
+>  
+> @@ -551,7 +559,7 @@ int hibernation_platform_enter(void)
+>  	if (error)
+>  		goto Platform_finish;
+>  
+> -	error = disable_nonboot_cpus();
+> +	error = arch_hibernation_disable_cpus(true);
 
-> 
-> Thanks!
-> Maxime
-> 
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-> 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-fixes-for-4.7
-> 
-> for you to fetch changes up to 9ca91a65583c73e4be6e9f53323a7ae04e6803ef:
-> 
->   clk: sunxi: remove unused variable (2016-06-16 09:18:29 +0200)
-> 
-> ----------------------------------------------------------------
-> Allwinner clock fixes for 4.7
-> 
-> A bunch of changes for the display clocks merged in 4.7
-> 
-> ----------------------------------------------------------------
-> Arnd Bergmann (1):
->       clk: sunxi: remove unused variable
-> 
-> Maxime Ripard (2):
->       clk: sunxi: tcon-ch1: Do not return a negative error in get_parent
->       clk: sunxi: display: Add per-clock flags
-> 
->  drivers/clk/sunxi/clk-sun4i-display.c  | 5 ++++-
->  drivers/clk/sunxi/clk-sun4i-tcon-ch1.c | 4 ----
->  2 files changed, 4 insertions(+), 5 deletions(-)
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+I have the same question about this hunk I had before.
+
+Is it really necessary to do the arch thing here?
+
+It shouldn't really matter AFAICS.
+
+>  	if (error)
+>  		goto Enable_cpus;
+
+Thanks,
+Rafael
