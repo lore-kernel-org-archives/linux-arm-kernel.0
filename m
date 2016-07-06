@@ -1,38 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Jul 2016 14:43:12 +0200
-Subject: [PATCH v2] pinctrl: Add STM32F746 MCU support
-In-Reply-To: <1467798418-12124-2-git-send-email-alexandre.torgue@st.com>
-References: <1467798418-12124-1-git-send-email-alexandre.torgue@st.com>
- <1467798418-12124-2-git-send-email-alexandre.torgue@st.com>
-Message-ID: <CACRpkdaQ+SY5x_wjZUK4d4UHmrfnTrKghTJ96WEWqkzhphq-ng@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  6 Jul 2016 14:48:09 +0200
+Subject: [PATCH] oxnas: select reset controller framework
+Message-ID: <20160706124826.1563413-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 6, 2016 at 11:46 AM, Alexandre TORGUE
-<alexandre.torgue@st.com> wrote:
+For unknown reasons, we have to enable three symbols for a platform
+to use a reset controller driver, otherwise we get a Kconfig
+warning:
 
-> This patch which adds STM32F746 pinctrl and GPIO support, relies on the
-> generic STM32 pinctrl driver.
->
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+warning: (MACH_OX810SE) selects RESET_OXNAS which has unmet direct dependencies (RESET_CONTROLLER)
 
-(...)
-> +static struct platform_driver stm32f746_pinctrl_driver = {
-> +       .probe = stm32_pctl_probe,
-> +       .driver = {
-> +               .name = "stm32f746-pinctrl",
-> +               .of_match_table = stm32f746_pctrl_match,
-> +       },
-> +};
-> +
-> +static int __init stm32f746_pinctrl_init(void)
-> +{
-> +       return platform_driver_register(&stm32f746_pinctrl_driver);
-> +}
-> +device_initcall(stm32f746_pinctrl_init);
+This selects the other two symbols for oxnas.
 
-Please use builtin_platform_driver() for this.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-oxnas/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
+index 2dde0acf01fd..b6a36d660e6f 100644
+--- a/arch/arm/mach-oxnas/Kconfig
++++ b/arch/arm/mach-oxnas/Kconfig
+@@ -11,11 +11,13 @@ if ARCH_OXNAS
+ 
+ config MACH_OX810SE
+ 	bool "Support OX810SE Based Products"
++	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARM_TIMER_SP804
+ 	select COMMON_CLK_OXNAS
+ 	select CPU_ARM926T
+ 	select MFD_SYSCON
+ 	select PINCTRL_OXNAS
++	select RESET_CONTROLLER
+ 	select RESET_OXNAS
+ 	select VERSATILE_FPGA_IRQ
+ 	help
+-- 
+2.9.0
