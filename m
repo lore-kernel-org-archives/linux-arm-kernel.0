@@ -1,47 +1,75 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed, 06 Jul 2016 09:54:03 +0200
-Subject: [PATCH] gpio: document how to order GPIO controllers
-In-Reply-To: <20160705180447.GP16643@pengutronix.de>
-References: <1467355333-8813-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160705140546.GA10601@rob-hp-laptop>
- <20160705180447.GP16643@pengutronix.de>
-Message-ID: <7356797.MVQep4sf2D@ws-stein>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed,  6 Jul 2016 16:05:55 +0800
+Subject: [PATCH v2 0/2] arm64: dts: rockchip: Support PMU for rk3399 SoCs
+Message-ID: <1467792357-9749-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 July 2016 20:04:47, Uwe Kleine-K?nig wrote:
-> That is we have:
-> 
-> 	Hardware name | software gpiochip
-> 	    GPIO4     |      gpiochip0
-> 	    GPIO3     |      gpiochip1
-> 	    GPIO1     |      gpiochip2
-> 	    GPIO2     |	     gpiochip3
-> 
-> I bet that's the probe order because when sorted by address (and so
-> by order in the device tree) we have exactly this ordering. (Compare
-> with $(grep gpio@ arch/arm/boot/dts/imx25.dtsi).)
+Hello Heiko, Marc & ARM guys
 
-This is rather straight forward and rather simple for controller internal GPIO 
-controllers but when using GPIO expanders both on SPI and I2C thing will get 
-much more volatile especially on SMP systems. What would be the correct 
-"order" here? Unless they are cascaded they are independent and there is no 
-such thing as an order. Probe order _is_ unpredictable so they will vary on 
-different boots. Having 4 internal GPIO controllers which creates 4 gpiochips 
-with more or less fixed names is rather a special case. Dunno if they might 
-change on a SMP system. Can a driver probe be called multiple times 
-simultaneously? Well, when drivers are used as modules I think things are even 
-more unpredictable.
+When Jay first submitted the rk3399.dtsi upstream
+<https://patchwork.kernel.org/patch/8885821/> he had the PMU node in there,
+but then took it out because the upstream binding wasn't done yet.
+It looks as if the upstream stuff has landed, since in linux/master I see:
+287e9357abcc DT/arm,gic-v3: Documment PPI partition support
+e3825ba1af3a irqchip/gic-v3: Add support for partitioned PPIs
+9e2c986cb460 irqchip: Add per-cpu interrupt partitioning library
+222df54fd8b7 genirq: Allow the affinity of a percpu interrupt to be set/retrieved
+651e8b54abde irqdomain: Allow domain matching on irq_fwspec
 
-> For a new interface this is OK, still I predict users will complain if
-> the numbers used don't match naturally the hardware names. And IMHO they
-> are right.
+This series patches add to support the rk3399 SoCs PMU.
+I pick up the https://patchwork.kernel.org/patch/9209369/.
 
-Given the fact that hardware names and gpiochip number relation is not fixed 
-IMHO the simplest way to identify them is using the DT label. You need them 
-anyway to identify them in DT itself at other places why not using this on 
-Linux userspace too? So gpiochip[0-9]* should still be created but using udev 
-you can create appropriate symlinks with more recognizable names.
+As do some tests with ChromeOs for my rk3399 board.
+Tested with linus master 4.7-rc6 kernel on rk3399 board.
+https://github.com/Caesar-github/rockchip/tree/rk3399/pmu-upstream
 
-Best regards,
-Alexander
+localhost / # perf list
+
+List of pre-defined events (to be used in -e):
+cpu-cycles OR cycles [Hardware event]
+instructions [Hardware event]
+cache-references [Hardware event]
+cache-misses [Hardware event]
+branch-instructions OR branches [Hardware event]
+branch-misses [Hardware event]
+bus-cycles [Hardware event]
+...
+
+perf stat --cpu 0/1/2/3..... to minitor
+e.g. cpu0;
+
+localhost / # perf stat --cpu 0
+
+Performance counter stats for 'CPU(s) 0':
+
+3374.917571 task-clock (msec) # 1.001 CPUs utilized [100.00%]
+20 context-switches # 0.006 K/sec [100.00%]
+2 cpu-migrations # 0.001 K/sec [100.00%]
+55 page-faults # 0.016 K/sec
+7151843 cycles # 0.002 GHz [100.00%]
+<not supported> stalled-cycles-frontend
+<not supported> stalled-cycles-backend
+4272536 instructions # 0.60 insns per cycle [100.00%]
+568406 branches # 0.168 M/sec [100.00%]
+65652 branch-misses # 11.55% of all branches
+
+Also, 'perf top' to monitor the PMU interrupts from cpus
+
+-Caesar
+
+
+Changes in v2:
+- AS Mark comments on https://patchwork.kernel.org/patch/9209369/
+  remove the interrupt-affinity property, we need depend on Marc' perf
+  code on https://patchwork.kernel.org/patch/9209369/.
+
+Caesar Wang (2):
+  arm64: dts: rockchip: change all interrupts cells for 4 on rk3399 SoCs
+  arm64: dts: rockchip: support the pmu node for rk3399
+
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 118 ++++++++++++++++++-------------
+ 1 file changed, 69 insertions(+), 49 deletions(-)
+
+-- 
+1.9.1
