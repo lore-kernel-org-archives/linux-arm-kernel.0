@@ -1,46 +1,97 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 6 Jul 2016 12:44:53 +0100
-Subject: [GIT PULL v2] ARM: hisi: soc changes for v4.8
-Message-ID: <577CEF35.8040906@hisilicon.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 6 Jul 2016 13:03:18 +0100
+Subject: [RESEND PATCH v4] KVM: arm/arm64: Add VGICv3 save/restore API
+ documentation
+In-Reply-To: <20160706113725.32437-1-christoffer.dall@linaro.org>
+References: <20160706113725.32437-1-christoffer.dall@linaro.org>
+Message-ID: <CAFEAcA_OJh+sS-adVP9Z7TDZmPQfsNwfmS1Gxm5EzdVi2FjAwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+On 6 July 2016 at 12:37, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> Factor out the GICv3-specific documentation into a separate
+> documentation file.  Add description for how to access distributor,
+> redistributor, and CPU interface registers for GICv3 in this new file,
+> and add a group for accessing level triggered IRQ information for GICv3
+> as well.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Please help to pull the following changes.
-Thanks!
+> +    Accesses (reads and writes) to the GICD_ISPENDR register region and
+> +    GICR_ISPENDR0 registers get/set the value of the latched pending state for
+> +    the interrupts.
+> +
+> +    This is identical to the value read from ISPENDR for an edge triggered
+> +    interrupt, but may differ for level triggered interrupts. For edge triggered
+> +    interrupts, once an interrupt becomes pending (whether because of an edge
+> +    detected on the input line or because of a guest write to ISPENDR) this
+> +    state is "latched", and only cleared when either the interrupt is activated
+> +    or when the guest writes to ICPENDR. A level triggered interrupt may be
+> +    pending either because the level input is held high by a device, or because
+> +    of a guest write to the ISPENDR register. Only ISPENDR writes are latched;
+> +    if the device lowers the line level then the interrupt is no longer pending
+> +    unless the guest also wrote to ISPENDR, and conversely writes to ICPENDR or
+> +    activations of the interrupt do not clear the pending status if the line
+> +    level is still being held high.  (These rules are documented in the GICv3
+> +    specification descriptions of the ICPENDR and ISPENDR registers.)
+> +    For a level triggered interrupt the value accessed here
+> +    is that of the latch which is set by ISPENDR and cleared by ICPENDR or
+> +    interrupt activation, whereas the value read from ISPENDR is the logical OR
+> +    of the latch value and the input line level.
 
-Best Regards,
-Wei
+Rereading these paragraphs I think
+ "This is identical to the value returned by a guest read from ISPENDR..."
+(in the first line) and
+ "the value returned by a guest read from the ISPENDR register is the
+logical OR..."
+(at the end) would be clearer, just to make sure we're clear between
+when we're describing the behaviour of the hardware register as seen
+by the guest, and when we're describing the behaviour of a read/write
+through this API. I misread the intention the first time around
+even though  I wrote this text :-)
 
----
+> +  KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
+> +  Attributes:
+> +    The attr field of kvm_device_attr encodes the following values:
+> +    bits:     | 63      ....       32 | 31   ....    10 | 9  ....  0 |
+> +    values:   |         mpidr         |      info       |   vINTID   |
+> +
+> +    The vINTID specifies which set of IRQs is reported on.
+> +
+> +    The info field specifies which information userspace wants to get or set
+> +    using this interface.  Currently we support two different pieces of
+> +    information:
+> +
+> +      VGIC_LEVEL_INFO_LINE_LEVEL:
+> +       Get/Set the input level of the IRQ line for a set of 32 contiguously
+> +       numbered interrupts.
+> +       vINTID must be a multiple of 32.
+> +
+> +        kvm_device_attr.addr points to a __u32 value which will contain a
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+stray extra space at start of line?
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> +       bitmap where a set bit means the interrupt level is asserted.
+> +
+> +       Bit[n] indicates the status for interrupt vINTID + n.
+> +
+> +    SGIs and any interrupt with a higher ID than the number of interrupts
+> +    supported, will be RAZ/WI.  LPIs are always edge-triggered and are
+> +    therefore not supported by this interface.
+> +
+> +    PPIs are reported per VCPU as specified in the mpidr field, and SPIs are
+> +    reported with the same value regardless of the mpidr specified.
+> +
+> +    The mpidr field encodes the CPU ID based on the affinity information in the
+> +    architecture defined MPIDR, and the field is encoded as follows:
+> +      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
+> +      |    Aff3    |    Aff2    |    Aff1    |    Aff0   |
 
-are available in the git repository at:
+Missing space -- ASCII art doesn't quite line up.
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.8-v2
+Otherwise
+Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
 
-for you to fetch changes up to e407b3512dc439b66f735385fdb44d7d0db3f727:
 
-  ARM: hisi: add compatible string for Hi3519 soc (2016-07-06 12:05:42 +0100)
-
-----------------------------------------------------------------
-ARM: mach-hisi: Hisilicon SoC updates for 4.8
-
-- Add initial support for the hi3519 SoC based on armv7
-- Consolidate the hisilicon armv7 SoCs machine entries
-- Avoid the compiling warning by making unexported symbols static
-
-----------------------------------------------------------------
-Ben Dooks (1):
-      ARM: hisi: make unexported symbols static
-
-Jiancheng Xue (1):
-      ARM: hisi: add compatible string for Hi3519 soc
-
- arch/arm/mach-hisi/hisilicon.c | 44 ++++++++++++------------------------------
- arch/arm/mach-hisi/platsmp.c   |  4 ++--
- 2 files changed, 14 insertions(+), 34 deletions(-)
+thanks
+-- PMM
