@@ -1,39 +1,243 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 6 Jul 2016 07:04:31 +0200
-Subject: [PATCH net] net: mvneta: set real interrupt per packet for tx_done
-In-Reply-To: <1467771538-31811-1-git-send-email-mw@semihalf.com>
-References: <1467771538-31811-1-git-send-email-mw@semihalf.com>
-Message-ID: <20160706050431.GA26348@1wt.eu>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 6 Jul 2016 13:17:02 +0800
+Subject: [PATCH v7 4/4] soc: mediatek: Add MT2701 scpsys driver
+In-Reply-To: <0ed4df8f-334a-e32d-e378-2ebdd80038e7@gmail.com>
+References: <1463390894-32062-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1463390894-32062-5-git-send-email-jamesjj.liao@mediatek.com>
+ <0ed4df8f-334a-e32d-e378-2ebdd80038e7@gmail.com>
+Message-ID: <1467782222.26485.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jul 06, 2016 at 04:18:58AM +0200, Marcin Wojtas wrote:
-> From: Dmitri Epshtein <dima@marvell.com>
+On Sat, 2016-07-02 at 18:41 +0200, Matthias Brugger wrote:
 > 
-> Commit aebea2ba0f74 ("net: mvneta: fix Tx interrupt delay") intended to
-> set coalescing threshold to a value guaranteeing interrupt generation
-> per each sent packet, so that buffers can be released with no delay.
+> On 05/16/2016 11:28 AM, James Liao wrote:
+> > From: Shunli Wang <shunli.wang@mediatek.com>
+> >
+> > Add scpsys driver for MT2701.
+> >
+> > mtk-scpsys now supports MT8173 (arm64) and MT2701 (arm). So it should
+> > be enabled on both arm64 and arm platforms.
+> >
+> > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> > ---
+> >  drivers/soc/mediatek/Kconfig      |   2 +-
+> >  drivers/soc/mediatek/mtk-scpsys.c | 117 +++++++++++++++++++++++++++++++++++++-
+> >  2 files changed, 116 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> > index 0a4ea80..609bb34 100644
+> > --- a/drivers/soc/mediatek/Kconfig
+> > +++ b/drivers/soc/mediatek/Kconfig
+> > @@ -23,7 +23,7 @@ config MTK_PMIC_WRAP
+> >  config MTK_SCPSYS
+> >  	bool "MediaTek SCPSYS Support"
+> >  	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > -	default ARM64 && ARCH_MEDIATEK
+> > +	default ARCH_MEDIATEK
+> >  	select REGMAP
+> >  	select MTK_INFRACFG
+> >  	select PM_GENERIC_DOMAINS if PM
+> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> > index 00c0adb..f4d1230 100644
+> > --- a/drivers/soc/mediatek/mtk-scpsys.c
+> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> > @@ -20,6 +20,7 @@
+> >  #include <linux/regulator/consumer.h>
+> >  #include <linux/soc/mediatek/infracfg.h>
+> >
+> > +#include <dt-bindings/power/mt2701-power.h>
+> >  #include <dt-bindings/power/mt8173-power.h>
+> >
+> >  #define SPM_VDE_PWR_CON			0x0210
+> > @@ -27,8 +28,13 @@
+> >  #define SPM_VEN_PWR_CON			0x0230
+> >  #define SPM_ISP_PWR_CON			0x0238
+> >  #define SPM_DIS_PWR_CON			0x023c
+> > +#define SPM_CONN_PWR_CON		0x0280
+> >  #define SPM_VEN2_PWR_CON		0x0298
+> > -#define SPM_AUDIO_PWR_CON		0x029c
+> > +#define SPM_AUDIO_PWR_CON		0x029c	/* MT8173 */
+> > +#define SPM_BDP_PWR_CON			0x029c	/* MT2701 */
+> > +#define SPM_ETH_PWR_CON			0x02a0
+> > +#define SPM_HIF_PWR_CON			0x02a4
+> > +#define SPM_IFR_MSC_PWR_CON		0x02a8
+> >  #define SPM_MFG_2D_PWR_CON		0x02c0
+> >  #define SPM_MFG_ASYNC_PWR_CON		0x02c4
+> >  #define SPM_USB_PWR_CON			0x02cc
+> > @@ -42,10 +48,15 @@
+> >  #define PWR_ON_2ND_BIT			BIT(3)
+> >  #define PWR_CLK_DIS_BIT			BIT(4)
+> >
+> > +#define PWR_STATUS_CONN			BIT(1)
+> >  #define PWR_STATUS_DISP			BIT(3)
+> >  #define PWR_STATUS_MFG			BIT(4)
+> >  #define PWR_STATUS_ISP			BIT(5)
+> >  #define PWR_STATUS_VDEC			BIT(7)
+> > +#define PWR_STATUS_BDP			BIT(14)
+> > +#define PWR_STATUS_ETH			BIT(15)
+> > +#define PWR_STATUS_HIF			BIT(16)
+> > +#define PWR_STATUS_IFR_MSC		BIT(17)
+> >  #define PWR_STATUS_VENC_LT		BIT(20)
+> >  #define PWR_STATUS_VENC			BIT(21)
+> >  #define PWR_STATUS_MFG_2D		BIT(22)
+> > @@ -59,6 +70,7 @@ enum clk_id {
+> >  	CLK_MFG,
+> >  	CLK_VENC,
+> >  	CLK_VENC_LT,
+> > +	CLK_ETHIF,
+> >  	CLK_MAX,
+> >  };
+> >
+> > @@ -321,7 +333,8 @@ static void init_clks(struct platform_device *pdev, struct clk *clk[CLK_MAX])
+> >  		CLK_MM,
+> >  		CLK_MFG,
+> >  		CLK_VENC,
+> > -		CLK_VENC_LT
+> > +		CLK_VENC_LT,
+> > +		CLK_ETHIF
+> >  	};
+> >
+> >  	static const char * const clk_names[] = {
+> > @@ -329,6 +342,7 @@ static void init_clks(struct platform_device *pdev, struct clk *clk[CLK_MAX])
+> >  		"mfg",
+> >  		"venc",
+> >  		"venc_lt",
+> > +		"ethif",
+> >  	};
+> >
+> >  	int i;
+> > @@ -459,6 +473,102 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+> >  }
+> >
+> >  /*
+> > + * MT2701 power domain support
+> > + */
+> > +
+> > +static const struct scp_domain_data scp_domain_data_mt2701[] = {
+> > +	[MT2701_POWER_DOMAIN_CONN] = {
+> > +		.name = "conn",
+> > +		.sta_mask = PWR_STATUS_CONN,
+> > +		.ctl_offs = SPM_CONN_PWR_CON,
+> > +		.bus_prot_mask = 0x0104,
+> > +		.active_wakeup = true,
 > 
-> In fact setting threshold to '1' was wrong, because it causes interrupt
-> every two packets. According to the documentation a reason behind it is
-> following - interrupt occurs once sent buffers counter reaches a value,
-> which is higher than one specified in MVNETA_TXQ_SIZE_REG(q). This
-> behavior was confirmed during tests. Also when testing the SoC working
-> as a NAS device, better performance was observed with int-per-packet,
-> as it strongly depends on the fact that all transmitted packets are
-> released immediately.
+> .clk_id = {CLK_NONE},
 > 
-> This commit enables NETA controller work in interrupt per sent packet mode
-> by setting coalescing threshold to 0.
+> > +	},
+> > +	[MT2701_POWER_DOMAIN_DISP] = {
+> > +		.name = "disp",
+> > +		.sta_mask = PWR_STATUS_DISP,
+> > +		.ctl_offs = SPM_DIS_PWR_CON,
+> > +		.sram_pdn_bits = GENMASK(11, 8),
+> > +		.clk_id = {CLK_MM},
+> > +		.bus_prot_mask = 0x0002,
+> > +		.active_wakeup = true,
+> > +	},
+> > +	[MT2701_POWER_DOMAIN_MFG] = {
+> > +		.name = "mfg",
+> > +		.sta_mask = PWR_STATUS_MFG,
+> > +		.ctl_offs = SPM_MFG_PWR_CON,
+> > +		.sram_pdn_bits = GENMASK(11, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(12, 12),
+> > +		.clk_id = {CLK_MFG},
+> > +		.active_wakeup = true,
+> > +	},
+> > +	[MT2701_POWER_DOMAIN_VDEC] = {
+> > +		.name = "vdec",
+> > +		.sta_mask = PWR_STATUS_VDEC,
+> > +		.ctl_offs = SPM_VDE_PWR_CON,
+> > +		.sram_pdn_bits = GENMASK(11, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(12, 12),
+> > +		.clk_id = {CLK_MM},
+> > +		.active_wakeup = true,
+> > +	},
+> > +	[MT2701_POWER_DOMAIN_ISP] = {
+> > +		.name = "isp",
+> > +		.sta_mask = PWR_STATUS_ISP,
+> > +		.ctl_offs = SPM_ISP_PWR_CON,
+> > +		.sram_pdn_bits = GENMASK(11, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(13, 12),
+> > +		.clk_id = {CLK_MM},
+> > +		.active_wakeup = true,
+> > +	},
+> > +	[MT2701_POWER_DOMAIN_BDP] = {
+> > +		.name = "bdp",
+> > +		.sta_mask = PWR_STATUS_BDP,
+> > +		.ctl_offs = SPM_BDP_PWR_CON,
+> > +		.sram_pdn_bits = GENMASK(11, 8),
+> > +		.active_wakeup = true,
+> 
+> same here.
+> 
+> > +	},
+> > +	[MT2701_POWER_DOMAIN_ETH] = {
+> > +		.name = "eth",
+> > +		.sta_mask = PWR_STATUS_ETH,
+> > +		.ctl_offs = SPM_ETH_PWR_CON,
+> > +		.sram_pdn_bits = GENMASK(11, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> > +		.clk_id = {CLK_ETHIF},
+> > +		.active_wakeup = true,
+> > +	},
+> > +	[MT2701_POWER_DOMAIN_HIF] = {
+> > +		.name = "hif",
+> > +		.sta_mask = PWR_STATUS_HIF,
+> > +		.ctl_offs = SPM_HIF_PWR_CON,
+> > +		.sram_pdn_bits = GENMASK(11, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> > +		.clk_id = {CLK_ETHIF},
+> > +		.active_wakeup = true,
+> > +	},
+> > +	[MT2701_POWER_DOMAIN_IFR_MSC] = {
+> > +		.name = "ifr_msc",
+> > +		.sta_mask = PWR_STATUS_IFR_MSC,
+> > +		.ctl_offs = SPM_IFR_MSC_PWR_CON,
+> > +		.active_wakeup = true,
+> 
+> same here.
 
-We had a discussion about this in January 2015 and I thought I sent a patch
-to change it but I can't find it, so I think it was only proposed to some
-users for testing. I also remember that on more recent kernels by then
-(>=3.13) we observed a slightly better performance with this value set to
-zero.
+Hi Matthias,
 
-Acked-by: Willy Tarreau <w@1wt.eu>
+I'll add them in next patch.
 
-Willy
+
+Best regards,
+
+James
+
+> > +	},
+> > +};
+> > +
+> > +#define NUM_DOMAINS_MT2701	ARRAY_SIZE(scp_domain_data_mt2701)
+> > +
+> > +static int __init scpsys_probe_mt2701(struct platform_device *pdev)
+> > +{
+> > +	struct scp *scp;
+> > +
+> > +	scp = init_scp(pdev, scp_domain_data_mt2701, NUM_DOMAINS_MT2701);
+> > +	if (IS_ERR(scp))
+> > +		return PTR_ERR(scp);
+> > +
+> > +	mtk_register_power_domains(pdev, scp, NUM_DOMAINS_MT2701);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +/*
+> >   * MT8173 power domain support
+> >   */
+> >
+> > @@ -587,6 +697,9 @@ static int __init scpsys_probe_mt8173(struct platform_device *pdev)
+> >
+> >  static const struct of_device_id of_scpsys_match_tbl[] = {
+> >  	{
+> > +		.compatible = "mediatek,mt2701-scpsys",
+> > +		.data = scpsys_probe_mt2701,
+> > +	}, {
+> >  		.compatible = "mediatek,mt8173-scpsys",
+> >  		.data = scpsys_probe_mt8173,
+> >  	}, {
+> >
