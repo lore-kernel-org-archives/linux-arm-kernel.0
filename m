@@ -1,53 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Jul 2016 22:32:55 -0700
-Subject: [GIT PULL 1/2] omap soc updates for v4.8 merge window
-In-Reply-To: <5774c688.0137620a.4e207.ffffb69fSMTPIN_ADDED_BROKEN@mx.google.com>
-References: <5774c688.0137620a.4e207.ffffb69fSMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20160706053255.GL23212@localhost>
+Date: Tue, 5 Jul 2016 22:48:42 -0700
+Subject: [GIT PULL 3/4] ARM: dts: exynos: MFC driver topic branch for
+ v4.8, part 2
+In-Reply-To: <1467273075-13747-4-git-send-email-k.kozlowski@samsung.com>
+References: <1467273075-13747-1-git-send-email-k.kozlowski@samsung.com>
+ <1467273075-13747-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160706054842.GO23212@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 12:13:00AM -0700, Tony Lindgren wrote:
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+On Thu, Jun 30, 2016 at 09:51:14AM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> Continuation of previous topic branch (tag tags/samsung-drivers-exynos-mfc-4.8).
+> DTS changes only but this depends on previous work.
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit 96167bd37dd604cbba0aed341765dda8556405b2:
+> 
+>   ARM: dts: exynos: Enable MFC device on Exynos4412 Odroid boards (2016-06-06 09:30:43 +0200)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/soc-signed
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-exynos-mfc-4.8-2
 > 
-> for you to fetch changes up to 44e7475d40eb26b8d3a6e2b2f7a5f12a5fe0942e:
+> for you to fetch changes up to 9f7d27fa1b0b3685471a1a34223a3475943f53e4:
 > 
->   ARM: OMAP2+: Fix build if CONFIG_SMP is not set (2016-06-27 23:30:02 -0700)
+>   ARM: dts: exynos: enable MFC device for all boards (2016-06-08 09:46:00 +0200)
 > 
 > ----------------------------------------------------------------
-> SoC related changes for omaps for v4.8 merge window:
+> Topic branch for Exynos MFC changes for v4.8, part 2:
 > 
-> - A series of DSS platform_data fixes to prepare for DSS driver changes
-> 
-> - Add tblck clck aliases for PWM
-> 
-> - A series of trivial spelling corrections
-> 
-> - Remove bogus eQEP, ePWM and eCAP hwmod entries
-> 
-> - A series of McBSP sidetone fixes
-> 
-> - Remove QSPI and DSS addresses from hwmod, these come from dts
-> 
-> - Fix RSTST register offset for pruss
-> 
-> - Make ti81xx_rtc_hwmod static
-> 
-> - Remove wrongly defined RSTST offset for PER Domain, note
->   that the subject for this one wrongly has "dts" in the
->   subject
-> 
-> - Add support for omap5 and dra7 workaround for 801819
-> 
-> - A series of patches to make kexec work for SMP omaps
+> Replace hardcoded reserved memory ranges with auto-allocated ones
+> and enable MFC for all boards.
 
-Merged, thanks.
+Merged, thanks. Had a minor context conflict with previous DT contents.
 
 
 -Olof
