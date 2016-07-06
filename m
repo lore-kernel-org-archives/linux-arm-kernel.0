@@ -1,41 +1,51 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Wed, 06 Jul 2016 16:29:18 -0300
-Subject: [PATCH v21 8/8] Documentation: dt: usable-memory and elfcorehdr
- nodes for arm64 kexec
-In-Reply-To: <20160706075226.27609-9-takahiro.akashi@linaro.org>
-References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
- <20160706075226.27609-9-takahiro.akashi@linaro.org>
-Message-ID: <6483018.WWW2TSJB10@hactar>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 6 Jul 2016 12:35:12 -0700
+Subject: [PATCH 1/2] hwspinlock: qcom_hwspinlock: add missing of_node_put
+ after calling of_parse_phandle
+In-Reply-To: <1467684664-21155-1-git-send-email-peter.chen@nxp.com>
+References: <1467684664-21155-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <20160706193512.GB23833@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon 04 Jul 19:11 PDT 2016, Peter Chen wrote:
 
-Am Mittwoch, 06 Juli 2016, 16:52:26 schrieb AKASHI Takahiro:
-> +linux,usable-memory
-> +-------------------
-> +
-> +This property is set on PowerPC and arm64 by kexec-tools during kdump
-> +to tell the crash kernel the base address of its reserved area of memory,
-> and +the size. e.g.
-> +
-> +/ {
-> +	chosen {
-> +		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
-> +	};
-> +};
+> of_node_put needs to be called when the device node which is got
+> from of_parse_phandle has finished using.
+> 
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Signed-off-by: Peter Chen <peter.chen@nxp.com>
 
-Again, this description is wrong for PowerPC. See messages from myself and 
-Michael Ellerman:
+Applied.
 
-https://lists.infradead.org/pipermail/kexec/2016-June/016250.html
+Please use get_maintainer.pl to find out whom to send patches to, I
+only stumbled upon this while looking for something else.
 
-https://lists.infradead.org/pipermail/kexec/2016-June/016253.html
+Thanks,
+Bjorn
 
-IMHO, it would be simpler if ARM used linux,usable-memory in the same way 
-that PowerPC does, for consistency.
-
--- 
-[]'s
-Thiago Jung Bauermann
-IBM Linux Technology Center
+> ---
+>  drivers/hwspinlock/qcom_hwspinlock.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/hwspinlock/qcom_hwspinlock.c b/drivers/hwspinlock/qcom_hwspinlock.c
+> index c752447..fa6880b 100644
+> --- a/drivers/hwspinlock/qcom_hwspinlock.c
+> +++ b/drivers/hwspinlock/qcom_hwspinlock.c
+> @@ -98,6 +98,7 @@ static int qcom_hwspinlock_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	regmap = syscon_node_to_regmap(syscon);
+> +	of_node_put(syscon);
+>  	if (IS_ERR(regmap))
+>  		return PTR_ERR(regmap);
+>  
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
