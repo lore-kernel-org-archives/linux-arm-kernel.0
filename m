@@ -1,56 +1,45 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Wed,  6 Jul 2016 16:51:35 -0700
-Subject: [PATCH 2/3] iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
+Date: Wed,  6 Jul 2016 16:51:36 -0700
+Subject: [PATCH 3/3] Revert "iommu/arm-smmu: Treat all device transactions as
+ unprivileged"
 In-Reply-To: <20160706235136.27854-1-mitchelh@codeaurora.org>
 References: <20160706235136.27854-1-mitchelh@codeaurora.org>
-Message-ID: <20160706235136.27854-3-mitchelh@codeaurora.org>
+Message-ID: <20160706235136.27854-4-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Gebben <jgebben@codeaurora.org>
+This reverts commit (d346180e70b91b3d: "iommu/arm-smmu: Treat all device
+transactions as unprivileged") since some platforms actually make use of
+privileged transactions.
 
-Allow the creation of privileged mode mappings, for stage 1 only.
-
-Signed-off-by: Jeremy Gebben <jgebben@codeaurora.org>
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
 ---
- drivers/iommu/io-pgtable-arm.c | 16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
+ drivers/iommu/arm-smmu.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index a1ed1b73fed4..e9e7dd179708 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -101,8 +101,10 @@
- 					 ARM_LPAE_PTE_ATTR_HI_MASK)
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 9345a3fcb706..d0627ef26b05 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -178,9 +178,6 @@
+ #define S2CR_TYPE_BYPASS		(1 << S2CR_TYPE_SHIFT)
+ #define S2CR_TYPE_FAULT			(2 << S2CR_TYPE_SHIFT)
  
- /* Stage-1 PTE */
--#define ARM_LPAE_PTE_AP_UNPRIV		(((arm_lpae_iopte)1) << 6)
--#define ARM_LPAE_PTE_AP_RDONLY		(((arm_lpae_iopte)2) << 6)
-+#define ARM_LPAE_PTE_AP_PRIV_RW		(((arm_lpae_iopte)0) << 6)
-+#define ARM_LPAE_PTE_AP_RW		(((arm_lpae_iopte)1) << 6)
-+#define ARM_LPAE_PTE_AP_PRIV_RO		(((arm_lpae_iopte)2) << 6)
-+#define ARM_LPAE_PTE_AP_RO		(((arm_lpae_iopte)3) << 6)
- #define ARM_LPAE_PTE_ATTRINDX_SHIFT	2
- #define ARM_LPAE_PTE_nG			(((arm_lpae_iopte)1) << 11)
+-#define S2CR_PRIVCFG_SHIFT		24
+-#define S2CR_PRIVCFG_UNPRIV		(2 << S2CR_PRIVCFG_SHIFT)
+-
+ /* Context bank attribute registers */
+ #define ARM_SMMU_GR1_CBAR(n)		(0x0 + ((n) << 2))
+ #define CBAR_VMID_SHIFT			0
+@@ -1175,7 +1172,7 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
+ 		u32 idx, s2cr;
  
-@@ -350,10 +352,14 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
- 
- 	if (data->iop.fmt == ARM_64_LPAE_S1 ||
- 	    data->iop.fmt == ARM_32_LPAE_S1) {
--		pte = ARM_LPAE_PTE_AP_UNPRIV | ARM_LPAE_PTE_nG;
-+		pte = ARM_LPAE_PTE_nG;
- 
--		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
--			pte |= ARM_LPAE_PTE_AP_RDONLY;
-+		if (prot & IOMMU_WRITE)
-+			pte |= (prot & IOMMU_PRIV) ? ARM_LPAE_PTE_AP_PRIV_RW
-+					: ARM_LPAE_PTE_AP_RW;
-+		else
-+			pte |= (prot & IOMMU_PRIV) ? ARM_LPAE_PTE_AP_PRIV_RO
-+					: ARM_LPAE_PTE_AP_RO;
- 
- 		if (prot & IOMMU_MMIO)
- 			pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
+ 		idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
+-		s2cr = S2CR_TYPE_TRANS | S2CR_PRIVCFG_UNPRIV |
++		s2cr = S2CR_TYPE_TRANS |
+ 		       (smmu_domain->cfg.cbndx << S2CR_CBNDX_SHIFT);
+ 		writel_relaxed(s2cr, gr0_base + ARM_SMMU_GR0_S2CR(idx));
+ 	}
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
