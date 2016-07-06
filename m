@@ -1,98 +1,57 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 06 Jul 2016 02:38:51 +0200
-Subject: [PATCH v4 1/3] PM / Hibernate: Allow arch code to influence CPUs
- disabled during hibernate
-In-Reply-To: <1467643950-11034-2-git-send-email-james.morse@arm.com>
-References: <1467643950-11034-1-git-send-email-james.morse@arm.com>
- <1467643950-11034-2-git-send-email-james.morse@arm.com>
-Message-ID: <54369969.i5TPzUzNII@vostro.rjw.lan>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed,  6 Jul 2016 08:33:52 +0800
+Subject: [PATCH -next] ARM: dts: sun8i: Add NFC node to Allwinner A23/A33 SoC
+Message-ID: <20160706003352.28194-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 04, 2016 03:52:28 PM James Morse wrote:
-> Architecture code may need to do extra work when secondary CPUs are
-> disabled during hibernate and resume. This may include pushing sleeping
-> CPUs into a deeper power-saving state, or influencing which CPU resume
-> occurs on.
-> 
-> Define a macro arch_hibernation_disable_cpus(), which defaults to
-> calling disable_nonboot_cpus() if undefined. Architectures that
-> need to do extra work around these calls can use this to influence
-> the CPU down calls.
-> The macros should be defined in asm/suspend.h, and
-> ARCH_HIBERNATION_CPU_HOOKS should be added to Kconfig.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> ---
-> Changes since v3:
->  * Changed kconfig name to CONFIG_ARCH_HIBERNATION_CPU_HOOKS
-> 
-> Changes since v2:
->  * Added CONFIG_ARCH_HIBERNATION_CPUHP include guard allowing
->  * Switch to macro approach.
-> 
->  kernel/power/hibernate.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-> index fca9254280ee..855a3a2374c8 100644
-> --- a/kernel/power/hibernate.c
-> +++ b/kernel/power/hibernate.c
-> @@ -31,8 +31,16 @@
->  #include <linux/ktime.h>
->  #include <trace/events/power.h>
->  
-> +#ifdef CONFIG_ARCH_HIBERNATION_CPU_HOOKS
-> +/* Arch definition of the arch_hibernation_disable_cpus() macros? */
-> +#include <asm/suspend.h>
-> +#endif
-> +
->  #include "power.h"
->  
-> +#ifndef arch_hibernation_disable_cpus
-> +#define arch_hibernation_disable_cpus(x) disable_nonboot_cpus()
-> +#endif
->  
->  static int nocompress;
->  static int noresume;
-> @@ -279,7 +287,7 @@ static int create_image(int platform_mode)
->  	if (error || hibernation_test(TEST_PLATFORM))
->  		goto Platform_finish;
->  
-> -	error = disable_nonboot_cpus();
-> +	error = arch_hibernation_disable_cpus(true);
->  	if (error || hibernation_test(TEST_CPUS))
->  		goto Enable_cpus;
->  
-> @@ -433,7 +441,7 @@ static int resume_target_kernel(bool platform_mode)
->  	if (error)
->  		goto Cleanup;
->  
-> -	error = disable_nonboot_cpus();
-> +	error = arch_hibernation_disable_cpus(false);
+Add NAND Flash controller node definition to the A23/A33 SoC.
 
-Why "false"?
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
->  	if (error)
->  		goto Enable_cpus;
->  
-> @@ -551,7 +559,7 @@ int hibernation_platform_enter(void)
->  	if (error)
->  		goto Platform_finish;
->  
-> -	error = disable_nonboot_cpus();
-> +	error = arch_hibernation_disable_cpus(true);
-
-I have the same question about this hunk I had before.
-
-Is it really necessary to do the arch thing here?
-
-It shouldn't really matter AFAICS.
-
->  	if (error)
->  		goto Enable_cpus;
-
-Thanks,
-Rafael
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 7e05e09..270c38a 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -209,6 +209,14 @@
+ 					"apb2_uart3", "apb2_uart4";
+ 		};
+ 
++		nand_clk: clk at 01c20080 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20080 0x4>;
++			clocks = <&osc24M>, <&pll6 1>;
++			clock-output-names = "nand";
++		};
++
+ 		mmc0_clk: clk at 01c20088 {
+ 			#clock-cells = <1>;
+ 			compatible = "allwinner,sun4i-a10-mmc-clk";
+@@ -265,6 +273,21 @@
+ 			#dma-cells = <1>;
+ 		};
+ 
++		nfc: nand at 01c03000 {
++			compatible = "allwinner,sun4i-a10-nand";
++			reg = <0x01c03000 0x1000>;
++			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ahb1_gates 13>, <&nand_clk>;
++			clock-names = "ahb", "mod";
++			dmas = <&dma 5>;
++			dma-names = "rxtx";
++			resets = <&ahb1_rst 13>;
++			reset-names = "ahb";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		mmc0: mmc at 01c0f000 {
+ 			compatible = "allwinner,sun5i-a13-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+-- 
+2.9.0
