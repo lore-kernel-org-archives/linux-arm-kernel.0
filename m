@@ -1,61 +1,95 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  6 Jul 2016 16:52:26 +0900
-Subject: [PATCH v21 8/8] Documentation: dt: usable-memory and elfcorehdr nodes
- for arm64 kexec
-In-Reply-To: <20160706075226.27609-1-takahiro.akashi@linaro.org>
-References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
-Message-ID: <20160706075226.27609-9-takahiro.akashi@linaro.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 6 Jul 2016 09:49:53 +0200
+Subject: [PATCH 2/3] pinctrl: Add STM32F746 MCU support
+In-Reply-To: <20160705140218.GD26134@windriver.com>
+References: <1467726017-20041-1-git-send-email-alexandre.torgue@st.com>
+ <1467726017-20041-3-git-send-email-alexandre.torgue@st.com>
+ <20160705140218.GD26134@windriver.com>
+Message-ID: <577CB821.7000206@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+Hi Paul,
 
-Add documentation for linux,usable-memory and linux,elfcorehdr chosen
-nodes used by arm64 kexec to decribe the kdump reserved area, and the
-elfcorehdr's location within it.
+On 07/05/2016 04:02 PM, Paul Gortmaker wrote:
+> [[PATCH 2/3] pinctrl: Add STM32F746 MCU support] On 05/07/2016 (Tue 15:40) Alexandre TORGUE wrote:
+>
+>> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>
+>> This patch which adds STM32F746 pinctrl and GPIO support, relies on the
+>> generic STM32 pinctrl driver.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>>
+>> diff --git a/drivers/pinctrl/stm32/Kconfig b/drivers/pinctrl/stm32/Kconfig
+>> index 0f28841..4c40dae 100644
+>> --- a/drivers/pinctrl/stm32/Kconfig
+>> +++ b/drivers/pinctrl/stm32/Kconfig
+>> @@ -13,4 +13,10 @@ config PINCTRL_STM32F429
+>>   	default MACH_STM32F429
+>>   	select PINCTRL_STM32
+>>
+>> +config PINCTRL_STM32F746
+>> +	bool "STMicroelectronics STM32F746 pin control" if COMPILE_TEST && !MACH_STM32F746
+>          ^^^^
+>
+>> +	depends on OF
+>> +	default MACH_STM32F746
+>> +	select PINCTRL_STM32
+>> +
+>> +	),
+>> +};
+>> +
+>
+> [...]
+>
+>> +static const struct of_device_id stm32f746_pctrl_match[] = {
+>> +	{
+>> +		.compatible = "st,stm32f746-pinctrl",
+>> +		.data = &stm32f746_match_data,
+>> +	},
+>> +	{ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, stm32f746_pctrl_match);
+>    ^^^^^^^^^^^^^^^^^^^^
+>
+>> +
+>> +static struct platform_driver stm32f746_pinctrl_driver = {
+>> +	.probe = stm32_pctl_probe,
+>> +	.driver = {
+>> +		.name = "stm32f746-pinctrl",
+>> +		.of_match_table = stm32f746_pctrl_match,
+>> +	},
+>> +};
+>> +
+>> +static int __init stm32f746_pinctrl_init(void)
+>> +{
+>> +	return platform_driver_register(&stm32f746_pinctrl_driver);
+>> +}
+>> +
+>> +module_init(stm32f746_pinctrl_init);
+>> +
+>> +MODULE_LICENSE("GPL");
+>> +MODULE_DESCRIPTION("STM32F746 Pinctrl Driver");
+>> +MODULE_AUTHOR("Maxime Coquelin <mcoquelin.stm32@gmail.com>");
+>
+> ...and here as well.  Please don't use modular support functions and
+> infrastructure for code that is only built-in.  Either make sure it can
+> be modular and use a tristate Kconfig, or delete all the MODULE_<tags>
+> and use device_initcall() to register the driver.
 
-Signed-off-by: James Morse <james.morse@arm.com>
-[akashi: wrap the commit description to avoid a checkpatch warning]
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- Documentation/devicetree/bindings/chosen.txt | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Thanks for remark. I will send a v2 removing modular stuff.
 
-diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
-index 6ae9d82..443f88b 100644
---- a/Documentation/devicetree/bindings/chosen.txt
-+++ b/Documentation/devicetree/bindings/chosen.txt
-@@ -52,3 +52,31 @@ This property is set (currently only on PowerPC, and only needed on
- book3e) by some versions of kexec-tools to tell the new kernel that it
- is being booted by kexec, as the booting environment may differ (e.g.
- a different secondary CPU release mechanism)
-+
-+linux,usable-memory
-+-------------------
-+
-+This property is set on PowerPC and arm64 by kexec-tools during kdump
-+to tell the crash kernel the base address of its reserved area of memory, and
-+the size. e.g.
-+
-+/ {
-+	chosen {
-+		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
-+	};
-+};
-+
-+linux,elfcorehdr
-+----------------
-+
-+This property is set (currently only on arm64) by kexec-tools during kdump
-+to tell the crash kernel the address and size of the elfcorehdr that describes
-+the old kernel's memory as an elf file. This memory must reside within the area
-+described by 'linux,usable-memory'. e.g.
-+
-+/ {
-+	chosen {
-+		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
-+		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
-+	};
-+};
--- 
-2.9.0
+Regards
+
+Alex
+
+>
+> Thanks,
+> Paul.
+> --
+>
+>> --
+>> 1.9.1
+>>
