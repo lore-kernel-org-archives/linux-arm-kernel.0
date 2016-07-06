@@ -1,69 +1,24 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 6 Jul 2016 14:15:55 +0800
-Subject: [PATCH v4 2/2] ARM: cpuidle: make arm_cpuidle_suspend() a bit more
- efficient
-In-Reply-To: <1467785755-3488-1-git-send-email-jszhang@marvell.com>
-References: <1467785755-3488-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1467785755-3488-3-git-send-email-jszhang@marvell.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 06 Jul 2016 08:21:40 +0200
+Subject: [PATCH] arm64: dts: Fix rtc by providing rtc_src clock
+In-Reply-To: <1467713107-15932-1-git-send-email-alim.akhtar@samsung.com>
+References: <1467713107-15932-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <577CA374.4000900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we check cpuidle_ops.suspend every time when entering a
-low-power idle state. But this check could be avoided in this hot path
-by moving it into arm_cpuidle_read_ops() to reduce arm_cpuidle_suspend
-overhead a bit.
+On 07/05/2016 12:05 PM, Alim Akhtar wrote:
+> Add rtc source clock as exynos7 needs source (32.768KHz) clock
+> for rtc block. Without this currently rtc driver probe is broken
+> on this SoC, thats because rtc-s3c driver expect rtc_src clock to
+> be provided for _s3c6410-rtc_ type rtc controllers.
+> 
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts |    3 +++
+>  1 file changed, 3 insertions(+)
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/kernel/cpuidle.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+Thanks, applied with adjusted message. I'll send it as a fix for v4.7.
 
-diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 2129b29..7dccc96 100644
---- a/arch/arm/kernel/cpuidle.c
-+++ b/arch/arm/kernel/cpuidle.c
-@@ -47,18 +47,13 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
-  * This function calls the underlying arch specific low level PM code as
-  * registered at the init time.
-  *
-- * Returns -EOPNOTSUPP if no suspend callback is defined, the result of the
-- * callback otherwise.
-+ * Returns the result of the suspend callback.
-  */
- int arm_cpuidle_suspend(int index)
- {
--	int ret = -EOPNOTSUPP;
- 	int cpu = smp_processor_id();
- 
--	if (cpuidle_ops[cpu].suspend)
--		ret = cpuidle_ops[cpu].suspend(index);
--
--	return ret;
-+	return cpuidle_ops[cpu].suspend(index);
- }
- 
- /**
-@@ -92,8 +87,8 @@ static const struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
-  * process.
-  *
-  * Return 0 on sucess, -ENOENT if no 'enable-method' is defined, -EOPNOTSUPP if
-- * no cpuidle_ops is registered for the 'enable-method', or if no init callback
-- * is defined.
-+ * no cpuidle_ops is registered for the 'enable-method', or if either init or
-+ * suspend callback isn't defined.
-  */
- static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
- {
-@@ -111,8 +106,8 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
- 		return -EOPNOTSUPP;
- 	}
- 
--	if (!ops->init) {
--		pr_warn("cpuidle_ops '%s': no init callback\n",
-+	if (!ops->init || !ops->suspend) {
-+		pr_warn("cpuidle_ops '%s': no init or suspend callback\n",
- 			enable_method);
- 		return -EOPNOTSUPP;
- 	}
--- 
-2.8.1
+Best regards,
+Krzysztof
