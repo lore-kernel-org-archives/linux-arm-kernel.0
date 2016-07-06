@@ -1,148 +1,144 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Thu,  7 Jul 2016 02:23:00 +0800
-Subject: [PATCH 3/3] ARM: dts: add rk3288-firefly-reload
-In-Reply-To: <1467829380-16242-1-git-send-email-ayaka@soulik.info>
-References: <3015470.z4L7UQJKa9@phil>
- <1467829380-16242-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1467829380-16242-4-git-send-email-ayaka@soulik.info>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Wed, 06 Jul 2016 20:10:49 +0100
+Subject: [PATCH] ARM: save and reset the address limit when entering an
+ exception
+Message-ID: <E1bKsDh-0001l5-Lk@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The firefly rk3288 reload is a Rockchip rk3288 based develop board.
+When we enter an exception, the current address limit should not apply
+to the exception context: if the exception context wishes to access
+kernel space via the user accessors (eg, perf code), it must explicitly
+request such access.  Doing otherwise allows the parent context settings
+to leak into the exception handler, which may inadvertently take
+advantage of raised privileges of the parent context.
 
-Signed-off-by: Randy Li <ayaka@soulik.info>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/rk3288-firefly-reload.dts | 109 ++++++++++++++++++++++++++++
- 2 files changed, 110 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-firefly-reload.dts
+This patch relies on cleanups previously posted which are currently in
+linux-next.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 06b6c2d..19a6049 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -606,6 +606,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3288-evb-rk808.dtb \
- 	rk3288-firefly-beta.dtb \
- 	rk3288-firefly.dtb \
-+	rk3288-firefly-reload.dtb \
- 	rk3288-miqi.dtb \
- 	rk3288-popmetal.dtb \
- 	rk3288-r89.dtb \
-diff --git a/arch/arm/boot/dts/rk3288-firefly-reload.dts b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-new file mode 100644
-index 0000000..9d02509
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-@@ -0,0 +1,109 @@
-+/*
-+ * Copyright (c) 2016 Randy Li <ayaka@soulik.info>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+ arch/arm/include/asm/ptrace.h  |  2 +-
+ arch/arm/kernel/asm-offsets.c  |  1 +
+ arch/arm/kernel/entry-armv.S   |  7 ++++++-
+ arch/arm/kernel/entry-header.S |  4 ++++
+ arch/arm/kernel/process.c      | 12 ++++++++----
+ 5 files changed, 20 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
+index 0ef0093800f2..e9c9a117bd25 100644
+--- a/arch/arm/include/asm/ptrace.h
++++ b/arch/arm/include/asm/ptrace.h
+@@ -22,7 +22,7 @@ struct pt_regs {
+ struct svc_pt_regs {
+ 	struct pt_regs regs;
+ 	u32 dacr;
+-	u32 unused;
++	u32 addr_limit;
+ };
+ 
+ #define to_svc_pt_regs(r) container_of(r, struct svc_pt_regs, regs)
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 9a8ce342cd82..608008229c7d 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -109,6 +109,7 @@ int main(void)
+   DEFINE(S_OLD_R0,		offsetof(struct pt_regs, ARM_ORIG_r0));
+   DEFINE(PT_REGS_SIZE,		sizeof(struct pt_regs));
+   DEFINE(SVC_DACR,		offsetof(struct svc_pt_regs, dacr));
++  DEFINE(SVC_ADDR_LIMIT,	offsetof(struct svc_pt_regs, addr_limit));
+   DEFINE(SVC_REGS_SIZE,		sizeof(struct svc_pt_regs));
+   BLANK();
+ #ifdef CONFIG_CACHE_L2X0
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 0d6f5413be18..bc5f50799d75 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -185,6 +185,12 @@ ENDPROC(__und_invalid)
+ 	@
+ 	stmia	r7, {r2 - r6}
+ 
++	get_thread_info tsk
++	ldr	r0, [tsk, #TI_ADDR_LIMIT]
++	mov	r1, #TASK_SIZE
++	str	r1, [tsk, #TI_ADDR_LIMIT]
++	str	r0, [sp, #SVC_ADDR_LIMIT]
 +
-+/dts-v1/;
-+#include "rk3288-firefly.dtsi"
-+
-+/ {
-+	model = "Firefly-RK3288-reload";
-+	compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
-+
-+};
-+
-+&leds {
-+	power {
-+		gpios = <&gpio8 2 GPIO_ACTIVE_LOW>;
-+		label = "firefly:blue:power";
-+		linux,default-trigger = "default-on";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&power_led>;
-+	};
-+};
-+
-+&gmac {
-+	phy-supply = <&vcc_lan>;
-+};
-+
-+&pinctrl {
-+	act8846 {
-+		pmic_vsel: pmic-vsel {
-+			rockchip,pins = <7 14 RK_FUNC_GPIO &pcfg_output_low>;
-+		};
-+	};
-+
-+	ir {
-+		ir_int: ir-int {
-+			rockchip,pins = <7 0 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
-+};
-+
-+&pwm1 {
-+	status = "disabled";
-+};
-+
-+&io_domains {
-+		audio-supply = <&vcca_33>;
-+		flash1-supply = <&vcc_lan>;
-+};
-+
-+&act8846_regs {
-+	vcca_33: REG7 {
-+		regulator-name = "vcca_33";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vcc_lan: REG8 {
-+		regulator-name = "vcc_lan";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vccio_pmu: REG9 {
-+		regulator-name = "vccio_pmu";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+};
+ 	uaccess_save r0
+ 	.if \uaccess
+ 	uaccess_disable r0
+@@ -213,7 +219,6 @@ __irq_svc:
+ 	irq_handler
+ 
+ #ifdef CONFIG_PREEMPT
+-	get_thread_info tsk
+ 	ldr	r8, [tsk, #TI_PREEMPT]		@ get preempt count
+ 	ldr	r0, [tsk, #TI_FLAGS]		@ get flags
+ 	teq	r8, #0				@ if preempt count != 0
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index 5e1d029147cb..6391728c8f03 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -215,7 +215,9 @@
+ 	blne	trace_hardirqs_off
+ #endif
+ 	.endif
++	ldr	r1, [sp, #SVC_ADDR_LIMIT]
+ 	uaccess_restore
++	str	r1, [tsk, #TI_ADDR_LIMIT]
+ 
+ #ifndef CONFIG_THUMB2_KERNEL
+ 	@ ARM mode SVC restore
+@@ -259,7 +261,9 @@
+ 	@ on the stack remains correct).
+ 	@
+ 	.macro  svc_exit_via_fiq
++	ldr	r1, [sp, #SVC_ADDR_LIMIT]
+ 	uaccess_restore
++	str	r1, [tsk, #TI_ADDR_LIMIT]
+ #ifndef CONFIG_THUMB2_KERNEL
+ 	@ ARM mode restore
+ 	mov	r0, sp
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index f1c720c0d568..612eb530f33f 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -96,19 +96,23 @@ void __show_regs(struct pt_regs *regs)
+ 	unsigned long flags;
+ 	char buf[64];
+ #ifndef CONFIG_CPU_V7M
+-	unsigned int domain;
++	unsigned int domain, fs;
+ #ifdef CONFIG_CPU_SW_DOMAIN_PAN
+ 	/*
+ 	 * Get the domain register for the parent context. In user
+ 	 * mode, we don't save the DACR, so lets use what it should
+ 	 * be. For other modes, we place it after the pt_regs struct.
+ 	 */
+-	if (user_mode(regs))
++	if (user_mode(regs)) {
+ 		domain = DACR_UACCESS_ENABLE;
+-	else
++		fs = get_fs();
++	} else {
+ 		domain = to_svc_pt_regs(regs)->dacr;
++		fs = to_svc_pt_regs(regs)->addr_limit;
++	}
+ #else
+ 	domain = get_domain();
++	fs = get_fs();
+ #endif
+ #endif
+ 
+@@ -144,7 +148,7 @@ void __show_regs(struct pt_regs *regs)
+ 		if ((domain & domain_mask(DOMAIN_USER)) ==
+ 		    domain_val(DOMAIN_USER, DOMAIN_NOACCESS))
+ 			segment = "none";
+-		else if (get_fs() == get_ds())
++		else if (fs == get_ds())
+ 			segment = "kernel";
+ 		else
+ 			segment = "user";
 -- 
-2.7.4
+2.1.0
