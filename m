@@ -1,100 +1,83 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 Jul 2016 21:59:48 +0200
-Subject: [PATCH 00/22] ARM: clps711x: Switch to DT and Multiplatform
-In-Reply-To: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-Message-ID: <3364202.xZFayybK9O@wuerfel>
+Date: Wed, 06 Jul 2016 22:04:42 +0200
+Subject: [PATCH v3 0/2] [for arm-soc] mach-tango updates for v4.8
+In-Reply-To: <20160706035730.GA23212@localhost>
+References: <57726597.8030501@sigmadesigns.com> <577BA8DF.9080603@free.fr>
+ <20160706035730.GA23212@localhost>
+Message-ID: <12902449.rg2TfjcyfJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, June 4, 2016 10:09:52 AM CEST Alexander Shiyan wrote:
-> The Cirrus Logic company announced EOL on May 20 this year for the
-> ARMv4 processors, so the company where I work ceases the use of the CPU
-> for our devices and switches our boards to use with another type of CPU.
-> I can not continue develop for this platform, so I gathered all the
-> existing patches/solutions for the final series. Of course, we keep
-> support our existing products with this CPU, so I remain able to check
-> any third-party patches.
-> This series of patches switches CLPS711X platform for use with device
-> tree and adds multiplatform support.
-> The series contain various subsystem changes but designed for applying
-> directly in the ARM-SOC tree.
+On Tuesday, July 5, 2016 8:57:30 PM CEST Olof Johansson wrote:
+> On Tue, Jul 05, 2016 at 02:32:31PM +0200, Mason wrote:
+> > On 28/06/2016 13:55, Marc Gonzalez wrote:
+> > 
+> > > Hello arm-soc maintainers,
+> > > 
+> > > Could you please merge the following patches?
+> > > 
+> > > Marc Gonzalez (2):
+> > >   ARM: tango: add HOTPLUG_CPU support
+> > >   Update ARM/TANGO section
+> > 
+> > Hello Olof,
+> > 
+> > I see you've just merged a large number of patches in the for-next branch.
+> > https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/log/?h=for-next
+> > 
+> > I think you overlooked the two patches in this thread:
+> > 
+> > [PATCH v4 1/2] ARM: tango: add HOTPLUG_CPU support
+> > [PATCH v3 2/2] Update ARM/TANGO section
+> > 
+> > Could you merge these patches as well?
 > 
+> Yes, applied now. Thanks!
 
-I've applied the majority of these into arm-soc now. I did not
-care much about ordering for bisection except for build coverage,
-as we already broke bisection when the gpio changes got applied.
-
-I'm sure nobody cares about it too much.
-
-> Alexander Shiyan (22):
->   ARM: clps711x: Reduce static map size
-
-next/soc
-
->   clk: clps711x: Changing the compatibility string to match with the
->     smallest supported chip
->   clocksource: clps711x: Changing the compatibility string to match with
->     the smallest supported chip
->   irqchip: clps711x: Changing the compatibility string to match with the
->     smallest supported chip
->   serial: clps711x: Changing the compatibility string to match with the
->     smallest supported chip
->   pwm: clps711x: Changing the compatibility string to match with the
->     smallest supported chip
-
-next/drivers
-
->   gpio: clps711x: Changing the compatibility string to match with the
->     smallest supported chip
->   gpio: syscon: Changing the compatibility string to match with the
->     smallest supported chip
-
-already merged in gpio tree
-
->   input: clps711x-keypad: Changing the compatibility string to match
->     with the smallest supported chip
->   video: clps711x-fb: Changing the compatibility string to match with
->     the smallest supported chip
-
-next/drivers
-
->   ARM: clps711x: Add basic DT support
-
-next/soc
-
->   ARM: dts: clps711x: Add DT Cirrus Logic EDB7211 Development board
-
-next/dt
-
->   spi: clps711x: Driver refactor
-
-I've sent this to Mark Brown along with the missing binding description.
-I'll either add this one here, or he can pick it up into the spi tree.
-
->   ARM: clps711x: Remove board support
-
-next/soc
-
->   video: clps711x: Remove old driver
->   clk: clps711x: Remove board support
->   clocksource: clps711x: Remove board support
->   irqchip: clps711x: Remove board support
->   serial: clps711x: Remove board support
->   gpio: clps711x: Remove board support
-
-I've skipped these for now, I think I'll just resend them after the
-merge window.
-
->   ARM: clps711x: Switch to MULTIPLATFORM
-
-next/soc
-
->   ARM: config: Add a multi_v4t_defconfig
-
-next/defconfig
-
-Sorry for the delay. I hope this works out and I didn't miss any additional
-compile-time dependencies.
+I ran into a build regression during randconfig testing, I think
+we should apply the patch below on top of next/soc:
 
 	Arnd
+
+>From 3ea8aba06a2a99e40e145b90865e0635a56209c8 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 6 Jul 2016 21:59:55 +0200
+Subject: [PATCH] ARM: tango: fix CONFIG_HOTPLUG_CPU=n build
+
+Building with CONFIG_HOTPLUG_CPU disabled fails for mach-tango:
+
+include/linux/stddef.h:7:14: error: excess elements in struct initializer [-Werror]
+ #define NULL ((void *)0)
+arch/arm/mach-tango/platsmp.c:48:15: note: in expansion of macro 'tango_cpu_kill'
+  .cpu_kill  = tango_cpu_kill,
+
+the problem as that the .cpu_kill and .cpu_die struct members are
+unavailable and we must not try to assign them in this configuration.
+
+Hiding the two (as all other platforms do too) lets us get rid of
+the #else clause as well.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-tango/platsmp.c b/arch/arm/mach-tango/platsmp.c
+index 8380699..98c62a4 100644
+--- a/arch/arm/mach-tango/platsmp.c
++++ b/arch/arm/mach-tango/platsmp.c
+@@ -38,15 +38,14 @@ static void tango_cpu_die(unsigned int cpu)
+ 
+ 	panic("cpu %d failed to die\n", cpu);
+ }
+-#else
+-#define tango_cpu_kill	NULL
+-#define tango_cpu_die	NULL
+ #endif
+ 
+ static const struct smp_operations tango_smp_ops __initconst = {
+ 	.smp_boot_secondary	= tango_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= tango_cpu_kill,
+ 	.cpu_die		= tango_cpu_die,
++#endif
+ };
+ 
+ CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango_smp_ops);
