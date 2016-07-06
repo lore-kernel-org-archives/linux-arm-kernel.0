@@ -1,25 +1,30 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 6 Jul 2016 18:21:35 +0200
-Subject: fix some host driver defect
-In-Reply-To: <1467252061-3791-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1467252061-3791-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFoZVoZpKh90hG-QoSdwWSgAdV0b6oup-w-dOQ8atRZ+2w@mail.gmail.com>
+Date: Wed, 6 Jul 2016 18:21:44 +0200
+Subject: [PATCH 0/2] mmc: sdhci-iproc: Use defines instead of magic numbers
+In-Reply-To: <1467487394-28682-1-git-send-email-stefan.wahren@i2se.com>
+References: <1467487394-28682-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CAPDyKFrTRwwQr0UkjiRVp4_kt1Zv8=LKj0gfBSTzVHdxLTm_WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2016 at 04:00, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+On 2 July 2016 at 21:23, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Hi,
 >
-> Chaotian Jing (4):
->   mmc: mediatek: do not tune data for HS400 mode
->   mmc: mediatek: fix CRC error when calling mmc_select_hs400()
->   mmc: mediatek: fix CMD21/CMD19 timeout issue
->   mmc: mediatek: perfer to use rise edge latching
+> this small patch series should make the sdhci-iproc platform data easier
+> to read. Since i don't have the adequate hardware it's only compile tested.
 >
->  drivers/mmc/host/mtk-sd.c | 70 +++++++++++++++++++++++++++++++++++++----------
->  1 file changed, 56 insertions(+), 14 deletions(-)
+> Stefan
+>
+> Stefan Wahren (2):
+>   mmc: sdhci: add define for suspend/resume capability
+>   mmc: sdhci-iproc: Use defines instead of magic numbers
+>
+>  drivers/mmc/host/sdhci-iproc.c |   13 +++++++++++--
+>  drivers/mmc/host/sdhci.h       |    1 +
+>  2 files changed, 12 insertions(+), 2 deletions(-)
 >
 > --
-> 1.8.1.1.dirty
+> 1.7.9.5
 >
 
 Thanks, applied for next!
