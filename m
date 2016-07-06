@@ -1,83 +1,39 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Wed, 06 Jul 2016 13:51:09 +0900
-Subject: [PATCH v3 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for
- SPI clocks
-In-Reply-To: <577A7D8D.8070004@samsung.com>
-References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
- <1467270911-10971-2-git-send-email-andi.shyti@samsung.com>
- <577A2EFF.2010306@samsung.com> <20160704102614.GD1257@jack.zhora.eu>
- <CGME20160704151537epcas1p42a74c53ebb4227da9a30c25e250f0c5a@epcas1p4.samsung.com>
- <577A7D8D.8070004@samsung.com>
-Message-ID: <20160706045108.GD23620@samsunx.samsung>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 6 Jul 2016 07:04:31 +0200
+Subject: [PATCH net] net: mvneta: set real interrupt per packet for tx_done
+In-Reply-To: <1467771538-31811-1-git-send-email-mw@semihalf.com>
+References: <1467771538-31811-1-git-send-email-mw@semihalf.com>
+Message-ID: <20160706050431.GA26348@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Hi,
 
-> +#if 0
->                         clocks = <&cmu_peric CLK_PCLK_SPI1>,
->                                  <&cmu_top CLK_SCLK_SPI1_PERIC>;
-> +#else
-> +                       clocks = <&cmu_peric CLK_PCLK_SPI1>,
-> +                                <&cmu_peric CLK_SCLK_SPI1>;
-> +#endif
+On Wed, Jul 06, 2016 at 04:18:58AM +0200, Marcin Wojtas wrote:
+> From: Dmitri Epshtein <dima@marvell.com>
+> 
+> Commit aebea2ba0f74 ("net: mvneta: fix Tx interrupt delay") intended to
+> set coalescing threshold to a value guaranteeing interrupt generation
+> per each sent packet, so that buffers can be released with no delay.
+> 
+> In fact setting threshold to '1' was wrong, because it causes interrupt
+> every two packets. According to the documentation a reason behind it is
+> following - interrupt occurs once sent buffers counter reaches a value,
+> which is higher than one specified in MVNETA_TXQ_SIZE_REG(q). This
+> behavior was confirmed during tests. Also when testing the SoC working
+> as a NAS device, better performance was observed with int-per-packet,
+> as it strongly depends on the fact that all transmitted packets are
+> released immediately.
+> 
+> This commit enables NETA controller work in interrupt per sent packet mode
+> by setting coalescing threshold to 0.
 
-Yes, that's how it should be, indeed.
+We had a discussion about this in January 2015 and I thought I sent a patch
+to change it but I can't find it, so I think it was only proposed to some
+users for testing. I also remember that on more recent kernels by then
+(>=3.13) we observed a slightly better performance with this value set to
+zero.
 
->         /* Disable Clock */
->         if (sdd->port_conf->clk_from_cmu) {
-> -               clk_disable_unprepare(sdd->src_clk);
-> +               /* clk_disable_unprepare(sdd->src_clk); */
->         } else {
->                 val = readl(regs + S3C64XX_SPI_CLK_CFG);
->                 val &= ~S3C64XX_SPI_ENCLK_ENABLE;
-> @@ -626,7 +626,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
->                 /* There is half-multiplier before the SPI */
->                 clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
->                 /* Enable Clock */
-> -               clk_prepare_enable(sdd->src_clk);
-> +               /* clk_prepare_enable(sdd->src_clk); */
->         } else {
->                 /* Configure Clock */
->                 val = readl(regs + S3C64XX_SPI_CLK_CFG);
+Acked-by: Willy Tarreau <w@1wt.eu>
 
-I don't see anything wrong on the above. We could make it as:
-
-@@ -596,9 +597,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
-        u32 val;
- 
-        /* Disable Clock */
--       if (sdd->port_conf->clk_from_cmu) {
--               clk_disable_unprepare(sdd->src_clk);
--       } else {
-+       if (!sdd->port_conf->clk_from_cmu) {
-                val = readl(regs + S3C64XX_SPI_CLK_CFG);
-                val &= ~S3C64XX_SPI_ENCLK_ENABLE;
-                writel(val, regs + S3C64XX_SPI_CLK_CFG);
-@@ -640,13 +639,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
- 
-        writel(val, regs + S3C64XX_SPI_MODE_CFG);
- 
--       if (sdd->port_conf->clk_from_cmu) {
--               /* Configure Clock */
--               /* There is half-multiplier before the SPI */
--               clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
--               /* Enable Clock */
--               clk_prepare_enable(sdd->src_clk);
--       } else {
-+       if (!sdd->port_conf->clk_from_cmu) {
-                /* Configure Clock */
-                val = readl(regs + S3C64XX_SPI_CLK_CFG);
-                val &= ~S3C64XX_SPI_PSR_MASK;
-
-> I meant we could amend which clocks are specified at the SPI bus device
-> DT nodes and change handling of clocks in the spi-s3c64xx driver to model
-> everything properly and get it all working.
-
-I think that if the clock comes from the cmu it's not necessary
-to disable it. I would like to avoid adding DTS properties
-because we have the clock disabling inherited from old code which
-it might not be required at all (in our tests, indeed it works).
-
-Thanks,
-Andi
+Willy
