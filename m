@@ -1,33 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Jul 2016 22:11:29 -0700
-Subject: [RESEND PATCH] ARM: oxnas: Change OX810SE default driver config
-In-Reply-To: <577392EF.7030609@baylibre.com>
-References: <577392EF.7030609@baylibre.com>
-Message-ID: <20160706051129.GJ23212@localhost>
+Date: Tue, 5 Jul 2016 22:33:33 -0700
+Subject: [GIT PULL 2/2] dtc warning fixes for omaps for v4.8 merge window
+In-Reply-To: <5774c68b.4130620a.bf46e.ffffe39dSMTPIN_ADDED_BROKEN@mx.google.com>
+References: <pull-1467270686-995259>
+ <5774c68b.4130620a.bf46e.ffffe39dSMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20160706053333.GM23212@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 11:20:47AM +0200, Neil Armstrong wrote:
-> Since the SP804 timer changes will not been merged upstream, switch the
-> default OX810SE config to the OXNAS RPS Timer driver configuration.
+On Thu, Jun 30, 2016 at 12:13:01AM -0700, Tony Lindgren wrote:
+> The following changes since commit 52c7c91319e469142628199548852198bcc3150f:
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  arch/arm/mach-oxnas/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>   ARM: dts: AM43xx: Add node for RNG (2016-06-22 00:44:16 -0700)
 > 
-> Dear arm-soc maintainers,
+> are available in the git repository at:
 > 
-> Gentle ping/resend about this patch, it would be great to see it in 4.8 !
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/dt-part2-signed
 > 
-> Daniel just accepted my patchset at :
-> http://lkml.kernel.org/r/1465985607-21231-1-git-send-email-narmstrong at baylibre.com
+> for you to fetch changes up to 480985b06c8e3999940929bf024042e4181bbdce:
 > 
-> And now the default config can be switched to OXNAS_RPS_TIMER without any
-> device tree changes.
+>   ARM: dts: am57xx: sbc-am57x: remove unneded unit name (2016-06-29 00:05:39 -0700)
+> 
+> ----------------------------------------------------------------
+> Second set of device tree updates for omaps for v4.8 merge window.
+> This is a series of dtc warning fixes when compiled with make W=2
+> from Javier Martinez Canillas <javier@osg.samsung.com>.
 
-Applied manually, and inserted the new option where it belongs alphabetically
-in the list.
+Merged, thanks!
 
 
 -Olof
