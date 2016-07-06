@@ -1,36 +1,34 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Thu,  7 Jul 2016 02:22:57 +0800
-Subject: [PATCH 0/3] ARM: dts: the dts support for rk3288 firefly reload
-In-Reply-To: <3015470.z4L7UQJKa9@phil>
+Date: Thu,  7 Jul 2016 02:22:58 +0800
+Subject: [PATCH 1/3] ARM: dts: add label leds for rk3288-firefly.dtsi
+In-Reply-To: <1467829380-16242-1-git-send-email-ayaka@soulik.info>
 References: <3015470.z4L7UQJKa9@phil>
-Message-ID: <1467829380-16242-1-git-send-email-ayaka@soulik.info>
+ <1467829380-16242-1-git-send-email-ayaka@soulik.info>
+Message-ID: <1467829380-16242-2-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3288 firefly reload  is a Rockchip RK3288 based board be found by
-core board and main board. The regulators are connected in a different
-way to the previous version of firefly boards, it is necessary to
-move some common code to uncommon place.
+The connected leds are different in firefly release version
+and firefly reload.
+Adding this label making it is possible to add more leds.
 
-I only tested the ethernet and confirmed that works.
-The usb in this board won't caused by the bugs in the driver.
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
+ arch/arm/boot/dts/rk3288-firefly.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This version follow the suggests from Heiko Stuebner,
-except the duplicated supply name problem, I don't think
-it could be fixed in that way.
-
-Randy Li (3):
-  ARM: dts: add label leds for rk3288-firefly.dtsi
-  ARM: dts: move regulator settings from common to specifics
-  ARM: dts: add rk3288-firefly-reload
-
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/rk3288-firefly-beta.dts   |  30 ++++++++
- arch/arm/boot/dts/rk3288-firefly-reload.dts | 109 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/rk3288-firefly.dts        |  30 ++++++++
- arch/arm/boot/dts/rk3288-firefly.dtsi       |  16 ++--
- 5 files changed, 178 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm/boot/dts/rk3288-firefly-reload.dts
-
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index d6cf9ad..1d7f03c 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -99,7 +99,7 @@
+ 		};
+ 	};
+ 
+-	leds {
++	leds: leds {
+ 		compatible = "gpio-leds";
+ 
+ 		work {
 -- 
 2.7.4
