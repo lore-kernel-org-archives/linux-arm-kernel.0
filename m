@@ -1,20 +1,20 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 6 Jul 2016 11:02:46 -0600
-Subject: [PATCH V2 01/10] Documentation: dt-bindings: mailbox: tegra: Add
- binding for HSP mailbox
-In-Reply-To: <20160705090431.5852-2-josephl@nvidia.com>
+Date: Wed, 6 Jul 2016 11:03:27 -0600
+Subject: [PATCH V2 03/10] Documentation: dt-bindings: firmware: tegra: add
+ bindings of the BPMP
+In-Reply-To: <20160705090431.5852-4-josephl@nvidia.com>
 References: <20160705090431.5852-1-josephl@nvidia.com>
- <20160705090431.5852-2-josephl@nvidia.com>
-Message-ID: <577D39B6.701@wwwdotorg.org>
+ <20160705090431.5852-4-josephl@nvidia.com>
+Message-ID: <577D39DF.600@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/05/2016 03:04 AM, Joseph Lo wrote:
-> Add DT binding for the Hardware Synchronization Primitives (HSP). The
-> HSP is designed for the processors to share resources and communicate
-> together. It provides a set of hardware synchronization primitives for
-> interprocessor communication. So the interprocessor communication (IPC)
-> protocols can use hardware synchronization primitive, when operating
-> between two processors not in an SMP relationship.
+> The BPMP is a specific processor in Tegra chip, which is designed for
+> booting process handling and offloading the power management, clock
+> management, and reset control tasks from the CPU. The binding document
+> defines the resources that would be used by the BPMP firmware driver,
+> which can create the interprocessor communication (IPC) between the CPU
+> and BPMP.
 
 Acked-by: Stephen Warren <swarren@nvidia.com>
