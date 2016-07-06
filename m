@@ -1,75 +1,44 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed, 6 Jul 2016 10:05:47 -0400
-Subject: [PATCH] MAINTAINERS: Change L to M for Broadcom ARM SoC entries
-In-Reply-To: <1467761520-23796-1-git-send-email-f.fainelli@gmail.com>
-References: <1467761520-23796-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <CAC3K-4quLJOCxp3i2naJWDrbMu3AywO4+4NWdizVAPD4-44SgA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 6 Jul 2016 15:11:17 +0100
+Subject: [PATCH] drivers/perf: arm-pmu: Handle per-interrupt affinity mask
+In-Reply-To: <20160706103951.GC17925@arm.com>
+References: <1467379291-18413-1-git-send-email-marc.zyngier@arm.com>
+ <20160706103951.GC17925@arm.com>
+Message-ID: <577D1185.4090801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2016 at 7:32 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> bcm-kernel-feedback-list at broadcom.com is a Broadcom internaly
-> mailing-list for which no external subscribers are allowed for now, so
-> update the different entries from L to M to reflect that.
->
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Suggested-by: Olof Johansson <olof@lixom.net>
-> Suggested-by: Scott Branden <scott.branden@broadcom.com>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
-> I am going to send this as a pull request since we have other
-> changes to the MAINTAINERS file, just posting it publicly before
-> the actual pull request.
->
->  MAINTAINERS | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index b673a000e715..a5130c5f9f75 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2478,7 +2478,7 @@ BROADCOM BCM281XX/BCM11XXX/BCM216XX ARM ARCHITECTURE
->  M:     Florian Fainelli <f.fainelli@gmail.com>
->  M:     Ray Jui <rjui@broadcom.com>
->  M:     Scott Branden <sbranden@broadcom.com>
-> -L:     bcm-kernel-feedback-list at broadcom.com
-> +M:     bcm-kernel-feedback-list at broadcom.com
->  T:     git git://github.com/broadcom/mach-bcm
->  S:     Maintained
->  F:     arch/arm/mach-bcm/
-> @@ -2522,7 +2522,7 @@ F:        arch/arm/boot/dts/bcm470*
->  BROADCOM BCM63XX ARM ARCHITECTURE
->  M:     Florian Fainelli <f.fainelli@gmail.com>
->  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -L:     bcm-kernel-feedback-list at broadcom.com
-> +M:     bcm-kernel-feedback-list at broadcom.com
->  T:     git git://github.com/broadcom/stblinux.git
->  S:     Maintained
->  F:     arch/arm/mach-bcm/bcm63xx.c
-> @@ -2539,7 +2539,7 @@ M:        Brian Norris <computersforpeace@gmail.com>
->  M:     Gregory Fong <gregory.0xf0@gmail.com>
->  M:     Florian Fainelli <f.fainelli@gmail.com>
->  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -L:     bcm-kernel-feedback-list at broadcom.com
-> +M:     bcm-kernel-feedback-list at broadcom.com
->  T:     git git://github.com/broadcom/stblinux.git
->  S:     Maintained
->  F:     arch/arm/mach-bcm/*brcmstb*
-> @@ -2598,7 +2598,7 @@ M:        Ray Jui <rjui@broadcom.com>
->  M:     Scott Branden <sbranden@broadcom.com>
->  M:     Jon Mason <jonmason@broadcom.com>
->  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -L:     bcm-kernel-feedback-list at broadcom.com
-> +M:     bcm-kernel-feedback-list at broadcom.com
+On 06/07/16 11:39, Will Deacon wrote:
+> On Fri, Jul 01, 2016 at 02:21:31PM +0100, Marc Zyngier wrote:
+>> On a big-little system, PMUs can be wired to CPUs using per CPU
+>> interrups (PPI). In this case, it is important to make sure that
+>> the enable/disable do happen on the right set of CPUs.
+>>
+>> So instead of relying on the interrupt-affinity property, we can
+>> use the actual percpu affinity that DT exposes as part of the
+>> interrupt specifier. The DT binding is also updated to reflect
+>> the fact that the interrupt-affinity property shouldn't be used
+>> in that case.
+> 
+> [...]
+> 
+>> -	/* If we didn't manage to parse anything, claim to support all CPUs */
+>> -	if (cpumask_weight(&pmu->supported_cpus) == 0)
+>> -		cpumask_setall(&pmu->supported_cpus);
+>> +	/* If we didn't manage to parse anything, try the interrupt affinity */
+>> +	if (cpumask_weight(&pmu->supported_cpus) == 0) {
+>> +		if (!using_spi) {
+>> +			/* If using PPIs, check the affinity of the partition */
+>> +			int irq = platform_get_irq(pdev, 0);
+>> +			irq_get_percpu_devid_partition(irq,
+>> +						       &pmu->supported_cpus);
+> 
+> Should we not at least propagate the failure if this returns -EINVAL?
 
-Nit, shouldn't the "M"s be together?  If so, this should be moved up 1 line.
+Good point. I'll fix that and resend it.
 
 Thanks,
-Jon
 
->  T:     git git://github.com/broadcom/cygnus-linux.git
->  S:     Maintained
->  N:     iproc
-> --
-> 2.7.4
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
