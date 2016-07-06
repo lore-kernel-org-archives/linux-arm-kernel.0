@@ -1,41 +1,56 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 06 Jul 2016 09:12:18 +0900
-Subject: [PATCH] memory: samsung: exynos-srom: fix wrong count of registers
-In-Reply-To: <1467718817-19239-1-git-send-email-sw0312.kim@samsung.com>
-References: <CGME20160705114058epcas1p103f3f6d7cd39bf6d99f36f0fea2493f0@epcas1p1.samsung.com>
- <1467718817-19239-1-git-send-email-sw0312.kim@samsung.com>
-Message-ID: <577C4CE2.2090103@samsung.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 05 Jul 2016 17:18:40 -0700
+Subject: [GIT PULL] Allwinner clock fixes for 4.7
+In-Reply-To: <20160705195537.GA17805@lukather>
+References: <20160705195537.GA17805@lukather>
+Message-ID: <146776432067.35356.1674013489826255803@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 07? 05? 20:40, Seung-Woo Kim wrote:
-> This patch fixes wrong count of array for srom registers from probe
-> function.
+Quoting Maxime Ripard (2016-07-05 12:55:37)
+> Hi Mike, Stephen,
 > 
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> ---
->  drivers/memory/samsung/exynos-srom.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Please pull the following fixes for the 4.7 cycle.
+
+Pulled.
+
+Regards,
+Mike
+
 > 
-> diff --git a/drivers/memory/samsung/exynos-srom.c b/drivers/memory/samsung/exynos-srom.c
-> index 96756fb..c66d2bd 100644
-> --- a/drivers/memory/samsung/exynos-srom.c
-> +++ b/drivers/memory/samsung/exynos-srom.c
-> @@ -134,7 +134,7 @@ static int exynos_srom_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, srom);
->  
->  	srom->reg_offset = exynos_srom_alloc_reg_dump(exynos_srom_offsets,
-> -			sizeof(exynos_srom_offsets));
-> +			ARRAY_SIZE(exynos_srom_offsets));
->  	if (!srom->reg_offset) {
->  		iounmap(srom->reg_base);
->  		return -ENOMEM;
+> Thanks!
+> Maxime
 > 
-
-On the exynos-srom.c, use the ARRAY_SIZE to get the number of array entry.
-Looks good to me.
-
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-Thanks,
-Chanwoo Choi
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> 
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-fixes-for-4.7
+> 
+> for you to fetch changes up to 9ca91a65583c73e4be6e9f53323a7ae04e6803ef:
+> 
+>   clk: sunxi: remove unused variable (2016-06-16 09:18:29 +0200)
+> 
+> ----------------------------------------------------------------
+> Allwinner clock fixes for 4.7
+> 
+> A bunch of changes for the display clocks merged in 4.7
+> 
+> ----------------------------------------------------------------
+> Arnd Bergmann (1):
+>       clk: sunxi: remove unused variable
+> 
+> Maxime Ripard (2):
+>       clk: sunxi: tcon-ch1: Do not return a negative error in get_parent
+>       clk: sunxi: display: Add per-clock flags
+> 
+>  drivers/clk/sunxi/clk-sun4i-display.c  | 5 ++++-
+>  drivers/clk/sunxi/clk-sun4i-tcon-ch1.c | 4 ----
+>  2 files changed, 4 insertions(+), 5 deletions(-)
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
