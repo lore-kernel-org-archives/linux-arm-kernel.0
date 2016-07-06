@@ -1,39 +1,37 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  6 Jul 2016 09:54:30 +0100
-Subject: [PATCH v6 12/18] ARM: DT: STiH407: Add spdif_out pinctrl config
+Date: Wed,  6 Jul 2016 09:54:31 +0100
+Subject: [PATCH v6 13/18] ARM: STi: DT: STiH407: Add sti-sasg-codec dt node
 In-Reply-To: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
 References: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1467795276-21725-13-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1467795276-21725-14-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the pinctrl config for the spidf out
-pins used by the sasg codec IP.
+This patch adds the dt node for the internal audio
+codec IP.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/stih407-family.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index 537db7e..598dbab 100644
---- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -1114,6 +1114,14 @@
- 				};
- 			};
- 
-+			spdif_out {
-+				pinctrl_spdif_out: spdif_out{
-+					st,pins {
-+						spdif_out = <&pio34 7 ALT1 OUT>;
-+					};
-+				};
-+			};
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 45cab30..d1258d5 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -873,5 +873,12 @@
+ 				<&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
+ 				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
+ 		};
 +
- 			serial3 {
- 				pinctrl_serial3: serial3-0 {
- 					st,pins {
++		sti_sasg_codec: sti-sasg-codec {
++			compatible = "st,stih407-sas-codec";
++			#sound-dai-cells = <1>;
++			status = "disabled";
++			st,syscfg = <&syscfg_core>;
++		};
+ 	};
+ };
 -- 
 1.9.1
