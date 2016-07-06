@@ -1,226 +1,102 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  6 Jul 2016 16:52:22 +0900
-Subject: [PATCH v21 4/8] arm64: kdump: add kdump support
-In-Reply-To: <20160706075226.27609-1-takahiro.akashi@linaro.org>
-References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
-Message-ID: <20160706075226.27609-5-takahiro.akashi@linaro.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed, 06 Jul 2016 15:48:27 +0800
+Subject: [linux-sunxi] [PATCH 2/4] power: add axp20x-battery driver
+In-Reply-To: <577C8A6D.8000409@computerlinguist.org>
+References: <20160701092926.32005-1-icenowy@aosc.xyz>
+ <20160701092926.32005-2-icenowy@aosc.xyz> <577B44FD.6040404@mailbox.org>
+ <4101467707611@web7h.yandex.ru> <577C8A6D.8000409@computerlinguist.org>
+Message-ID: <1108451467791307@web8g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On crash dump kernel, all the information about primary kernel's system
-memory (core image) is available in elf core header.
-The primary kernel will set aside this header with reserve_elfcorehdr()
-at boot time and inform crash dump kernel of its location via a new
-device-tree property, "linux,elfcorehdr".
 
-Please note that all other architectures use traditional "elfcorehdr="
-kernel parameter for this purpose.
 
-Then crash dump kernel will access the primary kernel's memory with
-copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-not reside in linear mapping on crash dump kernel.
+06.07.2016, 12:35, "Michael Haas" <haas@computerlinguist.org>:
+> Hi There,
+>
+> On 05.07.2016 10:33, Icenowy Zheng wrote:
+>> ?On 01.07.2016 11:29, Icenowy Zheng wrote:
+>
+>>>> ???+
+>>>> ???+static enum power_supply_property axp22x_battery_properties[] = {
+>>>> ???+ POWER_SUPPLY_PROP_CAPACITY,
+>>>> ???+ POWER_SUPPLY_PROP_HEALTH,
+>>>> ???+ POWER_SUPPLY_PROP_PRESENT,
+>>>> ???+ POWER_SUPPLY_PROP_STATUS,
+>>>> ???+ POWER_SUPPLY_PROP_CURRENT_NOW,
+>>>> ???+ POWER_SUPPLY_PROP_VOLTAGE_NOW,
+>>>> ???+};
+>
+> Here's what Bruno's driver supports:
+>
+> static enum power_supply_property axp20x_battery_power_properties[] = {
+> ?????POWER_SUPPLY_PROP_PRESENT,
+> ?????POWER_SUPPLY_PROP_ONLINE,
+> ?????POWER_SUPPLY_PROP_STATUS,
+> ?????POWER_SUPPLY_PROP_VOLTAGE_NOW,
+> ?????POWER_SUPPLY_PROP_CURRENT_NOW,
+> ?????POWER_SUPPLY_PROP_CURRENT_MAX,
+> ?????POWER_SUPPLY_PROP_HEALTH,
+> ?????POWER_SUPPLY_PROP_TECHNOLOGY,
+> ?????POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
+> ?????POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
+> ?????/* POWER_SUPPLY_PROP_POWER_NOW, */
+> ?????POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
+> ?????/* POWER_SUPPLY_PROP_CHARGE_NOW, */
+> ?????POWER_SUPPLY_PROP_CAPACITY,
+> ?????POWER_SUPPLY_PROP_TEMP,
+> ?????POWER_SUPPLY_PROP_TEMP_ALERT_MIN,
+> ?????POWER_SUPPLY_PROP_TEMP_ALERT_MAX,
+> };
+>
+>>>> ???+
+>>>> ???+static int axp20x_battery_probe(struct platform_device *pdev)
+>>>> ???+{
+>>>> ???+ struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+>>>> ???+ struct power_supply_config psy_cfg = {};
+>>>> ???+ struct axp20x_battery *power;
+>>>> ???+ static const char * const axp22x_irq_names[] = {
+>>>> ???+ "BATT_PLUGIN", "BATT_REMOVAL", "BATT_ENT_ACT_MODE",
+>>>> ???+ "BATT_EXIT_ACT_MODE", "CHARG", "CHARG_DONE", NULL };
+>
+> And here are the interrupts handled:
+>
+> static const char * const irq_names[] = { "BATT_HOT", "BATT_COLD",
+> ?????????"BATT_PLUGIN", "BATT_REMOVAL", "BATT_ACTIVATE",
+> ?????????"BATT_ACTIVATED", "BATT_CHARGING", "BATT_CHARGED",
+> ?????????"BATT_CHG_CURR_LOW", "BATT_POWER_LOW_WARN",
+> ?????????"BATT_POWER_LOW_CRIT" };
+>
+> There are a couple of issues with the version of Bruno's driver that I have:
+>
+> * power management is disabled (in the driver, not in the charger) -
+> think suspend/resume
+> * the temperature sensor data is not turned into a temperature value
+> correctly
+> * the IRQ handlers need to be cleaned up (remove logging)
+> * device tree binding documentation is missing
+>
+> Other than that, it's basically working and I have been using it at
+> least for some testing.
+>
+> The device tree bindings support:
+> * OCV curve support
+> * battery resistance
+> * battery capacity
+> * temp sensor settings
+>
+> You can find my copy of Bruno's driver here:
+> https://github.com/mhaas/linux-sunxi/blob/axp209-charger/drivers/power/axp20x_fuel_gauge.c
+>
+> Thanks,
+>
+> Michael
 
-We also need our own elfcorehdr_read() here since the header is placed
-within crash dump kernel's usable memory.
+Michael Haas:
+I'm grateful for you providing your axp20x_fuel_gauge.c copy.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/Kconfig             | 11 +++++++
- arch/arm64/kernel/Makefile     |  1 +
- arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/init.c           | 54 ++++++++++++++++++++++++++++++++
- 4 files changed, 137 insertions(+)
- create mode 100644 arch/arm64/kernel/crash_dump.c
+I will try to tidy it up and add support for axp22x.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1b196bf..ad2c53e 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -675,6 +675,17 @@ config KEXEC
- 	  but it is independent of the system firmware.   And like a reboot
- 	  you can start any kernel with it, not just Linux.
- 
-+config CRASH_DUMP
-+	bool "Build kdump crash kernel"
-+	help
-+	  Generate crash dump after being started by kexec. This should
-+	  be normally only set in special crash dump kernels which are
-+	  loaded in the main kernel with kexec-tools into a specially
-+	  reserved region and then later executed after a crash by
-+	  kdump/kexec.
-+
-+	  For more details see Documentation/kdump/kdump.txt
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7700c0c..c13d3eb 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -48,6 +48,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
- arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
- arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
-+arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-new file mode 100644
-index 0000000..2dc54d1
---- /dev/null
-+++ b/arch/arm64/kernel/crash_dump.c
-@@ -0,0 +1,71 @@
-+/*
-+ * Routines for doing kexec-based kdump
-+ *
-+ * Copyright (C) 2014 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/crash_dump.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+#include <linux/memblock.h>
-+#include <linux/uaccess.h>
-+#include <asm/memory.h>
-+
-+/**
-+ * copy_oldmem_page() - copy one page from old kernel memory
-+ * @pfn: page frame number to be copied
-+ * @buf: buffer where the copied page is placed
-+ * @csize: number of bytes to copy
-+ * @offset: offset in bytes into the page
-+ * @userbuf: if set, @buf is in a user address space
-+ *
-+ * This function copies one page from old kernel memory into buffer pointed by
-+ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-+ * copied or negative error in case of failure.
-+ */
-+ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-+			 size_t csize, unsigned long offset,
-+			 int userbuf)
-+{
-+	void *vaddr;
-+
-+	if (!csize)
-+		return 0;
-+
-+	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-+	if (!vaddr)
-+		return -ENOMEM;
-+
-+	if (userbuf) {
-+		if (copy_to_user(buf, vaddr + offset, csize)) {
-+			iounmap(vaddr);
-+			return -EFAULT;
-+		}
-+	} else {
-+		memcpy(buf, vaddr + offset, csize);
-+	}
-+
-+	iounmap(vaddr);
-+
-+	return csize;
-+}
-+
-+/**
-+ * elfcorehdr_read - read from ELF core header
-+ * @buf: buffer where the data is placed
-+ * @csize: number of bytes to read
-+ * @ppos: address in the memory
-+ *
-+ * This function reads @count bytes from elf core header which exists
-+ * on crash dump kernel's memory.
-+ */
-+ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
-+{
-+	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
-+	return count;
-+}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 88fd99a..7e5844d 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -35,6 +35,7 @@
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
- #include <linux/kexec.h>
-+#include <linux/crash_dump.h>
- 
- #include <asm/boot.h>
- #include <asm/fixmap.h>
-@@ -136,6 +137,57 @@ static void __init reserve_crashkernel(void)
- }
- #endif /* CONFIG_KEXEC_CORE */
- 
-+#ifdef CONFIG_CRASH_DUMP
-+static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	const __be32 *reg;
-+	int len;
-+
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
-+
-+	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
-+
-+	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+	return 1;
-+}
-+
-+/*
-+ * reserve_elfcorehdr() - reserves memory for elf core header
-+ *
-+ * This function reserves elf core header given in "elfcorehdr=" kernel
-+ * command line parameter. This region contains all the information about
-+ * primary kernel's core image and is used by a dump capture kernel to
-+ * access the system memory on primary kernel.
-+ */
-+static void __init reserve_elfcorehdr(void)
-+{
-+	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
-+
-+	if (!elfcorehdr_size)
-+		return;
-+
-+	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
-+		pr_warn("elfcorehdr is overlapped\n");
-+		return;
-+	}
-+
-+	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
-+
-+	pr_info("Reserving %lldKB of memory@0x%llx for elfcorehdr\n",
-+		elfcorehdr_size >> 10, elfcorehdr_addr);
-+}
-+#else
-+static void __init reserve_elfcorehdr(void)
-+{
-+	;
-+}
-+#endif /* CONFIG_CRASH_DUMP */
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -389,6 +441,8 @@ void __init arm64_memblock_init(void)
- 
- 	reserve_crashkernel();
- 
-+	reserve_elfcorehdr();
-+
- 	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
--- 
-2.9.0
+Thanks,
+
+Icenowy
