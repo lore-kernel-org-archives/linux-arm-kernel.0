@@ -1,37 +1,73 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 6 Jul 2016 15:23:53 +0300
-Subject: [PATCH 2/3] arm64: dts: rockchip: add GMAC dt nodes for rk3399 SoC
-In-Reply-To: <1467802291-6487-3-git-send-email-roger.chen@rock-chips.com>
-References: <1467802291-6487-1-git-send-email-roger.chen@rock-chips.com>
- <1467802291-6487-3-git-send-email-roger.chen@rock-chips.com>
-Message-ID: <f1e3270b-4908-2d81-9784-21c1cb77e2d9@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Jul 2016 14:34:39 +0200
+Subject: [PATCH] gpio: document how to order GPIO controllers
+In-Reply-To: <20160706102750.GH23470@localhost>
+References: <1467355333-8813-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160705140546.GA10601@rob-hp-laptop> <20160705180447.GP16643@pengutronix.de>
+ <CACRpkdbH+KRXbxFdfyAE44fBNctK4cWV+KRLwQBTzSGLvLMEDg@mail.gmail.com>
+ <20160706102750.GH23470@localhost>
+Message-ID: <CACRpkdZhx3yTbtuj-ZTP+mtUSr4uxL4bHtu8jVZOoxrUy6=iYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Jul 6, 2016 at 12:27 PM, Johan Hovold <johan@kernel.org> wrote:
+> On Wed, Jul 06, 2016 at 11:34:37AM +0200, Linus Walleij wrote:
 
-On 7/6/2016 1:51 PM, Roger Chen wrote:
-
-> This patch adds ethernet GMAC dt notes for Rockchip RK3399 SoC.
+>> I *THINK* the view of the device core maintainers is that udev
+>> and sysfs hierarchies should be used to uniquely identify a certain
+>> device, and that relying on device numbering is too fragile.
 >
-> Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 79 ++++++++++++++++++++++++++++++++
->  1 file changed, 79 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> index d7f8e06..cb0b17d 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -189,6 +189,25 @@
->  		};
->  	};
->
-> +	gmac: eth at fe300000 {
+> I thought the whole idea (or at least a large part of) the new
+> user-space interface was to allow lookups by line names precisely in
+> order not to have to rely on gpio numbers, which may not only change
+> between boots, but also between hardware revisions, etc.
 
-    The node should be named "ethernet at fe300000" to comply with the ePAPR 
-standard.
+That is true for the individual pins, but not the device names.
+Devices are just names gpiochipN where N is the instance
+number. Topological info on the device can be found in sysfs.
 
-[...]
+The discussion here pertaining to the new chardev is just about
+the intuitiveness of the number N, whether it should be
+"whatever" or something predictable.
 
-MBR, Sergei
+For the purpose of picking a certain named GPIO line (see below)
+knowing this number is unnecessary. To that mechanism all gpio
+chips are equal and the instance number does not matter.
+
+> What's wrong with naming the pins in DT and use that for lookups?
+
+That works. It relies on the developers using sane naming conventions
+though. (This problem is prevalent everywhere I guess, a human problem,
+not a technical one.) I made this patch:
+http://marc.info/?l=linux-arm-kernel&m=146672328215354&w=2
+
+There is a standard document for these boards (96board) specifying
+the names of the GPIO lines to be "GPIO-A" thru "GPIO-L".
+
+So a user can iterate across the gpiochips (as is done in lsgpio)
+and pick the lines with the right names.
+
+This works fine, given you have such conventions or equal.
+
+I.e. the person writing the DTS file naming the lines must not
+be a complete lunatic.
+
+I can think of scenarios where bad use can make things problematic:
+i.e. name two lines the same thing, albeit on different GPIO chips.
+That is currently allowed, and if that happens, the user must
+use topological information about the gpiochip (from sysfs) to
+uniquely identify the GPIO line.
+
+I wouldn't recommend that since it is essentially inventing a
+problem for oneself to solve, but I don't know what reasons
+people may have to do something like that. There is no technical
+problem with it.
+
+> I've been too busy with other stuff this spring to follow the new
+> user-space interface development, but I assume that this had been taken
+> into account in the design?
+
+I think so...
+
+Yours,
+Linus Walleij
