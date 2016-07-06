@@ -1,39 +1,44 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 6 Jul 2016 08:47:21 +0200
-Subject: [PATCH 1/2] soc: samsung: Change type of PMU configuration
- register value to u32
-In-Reply-To: <1467750507-13853-2-git-send-email-a.kesavan@samsung.com>
-References: <1467750507-13853-1-git-send-email-a.kesavan@samsung.com>
- <1467750507-13853-2-git-send-email-a.kesavan@samsung.com>
-Message-ID: <CAJKOXPdPa7vCqetd5EUb3ebz7rB741ua=9wbdx-MkFh+G-=CJA@mail.gmail.com>
+Date: Wed, 06 Jul 2016 09:03:46 +0200
+Subject: [PATCH] soc: samsung: pmu: Constify arrays with PMU data
+Message-ID: <1467788626-6591-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2016 at 10:28 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> Exynos7 has certain PMU registers that needs to be configured with
-> u32 values.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  drivers/soc/samsung/exynos-pmu.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
-> index a469e36..1bdc506 100644
-> --- a/drivers/soc/samsung/exynos-pmu.h
-> +++ b/drivers/soc/samsung/exynos-pmu.h
-> @@ -18,7 +18,7 @@
->
->  struct exynos_pmu_conf {
->         unsigned int offset;
-> -       u8 val[NUM_SYS_POWERDOWN];
-> +       unsigned int val[NUM_SYS_POWERDOWN];
+Arrays storing values for Power Management Unit for given sleep mode can
+be made const.
 
-You mentioned u32 but I see unsigned int here. This should be u32.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/soc/samsung/exynos3250-pmu.c | 2 +-
+ drivers/soc/samsung/exynos5420-pmu.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-BTW, none of your emails reached my samsung inbox. I got them only
-from the lists. Please investigate why this couldn't be delivered to
-samsung.com address.
-
-Best regards,
-Krzysztof
+diff --git a/drivers/soc/samsung/exynos3250-pmu.c b/drivers/soc/samsung/exynos3250-pmu.c
+index 20b3ab8aa790..af2f54e14b83 100644
+--- a/drivers/soc/samsung/exynos3250-pmu.c
++++ b/drivers/soc/samsung/exynos3250-pmu.c
+@@ -14,7 +14,7 @@
+ 
+ #include "exynos-pmu.h"
+ 
+-static struct exynos_pmu_conf exynos3250_pmu_config[] = {
++static const struct exynos_pmu_conf exynos3250_pmu_config[] = {
+ 	/* { .offset = offset, .val = { AFTR, W-AFTR, SLEEP } */
+ 	{ EXYNOS3_ARM_CORE0_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
+ 	{ EXYNOS3_DIS_IRQ_ARM_CORE0_LOCAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
+diff --git a/drivers/soc/samsung/exynos5420-pmu.c b/drivers/soc/samsung/exynos5420-pmu.c
+index b962fb6a5d22..3f2c64180ef8 100644
+--- a/drivers/soc/samsung/exynos5420-pmu.c
++++ b/drivers/soc/samsung/exynos5420-pmu.c
+@@ -17,7 +17,7 @@
+ 
+ #include "exynos-pmu.h"
+ 
+-static struct exynos_pmu_conf exynos5420_pmu_config[] = {
++static const struct exynos_pmu_conf exynos5420_pmu_config[] = {
+ 	/* { .offset = offset, .val = { AFTR, LPA, SLEEP } */
+ 	{ EXYNOS5_ARM_CORE0_SYS_PWR_REG,		{ 0x0, 0x0, 0x0} },
+ 	{ EXYNOS5_DIS_IRQ_ARM_CORE0_LOCAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
+-- 
+1.9.1
