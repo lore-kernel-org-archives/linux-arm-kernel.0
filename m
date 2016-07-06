@@ -1,144 +1,51 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Wed, 06 Jul 2016 20:10:49 +0100
-Subject: [PATCH] ARM: save and reset the address limit when entering an
- exception
-Message-ID: <E1bKsDh-0001l5-Lk@rmk-PC.armlinux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 6 Jul 2016 22:12:20 +0300
+Subject: [PATCH v2 3/3] ARM: dts: blanche: add Ethernet pins
+In-Reply-To: <3279336.lifIduxqUW@wasted.cogentembedded.com>
+References: <2793535.9X0Tq7I1Mq@wasted.cogentembedded.com>
+ <3279336.lifIduxqUW@wasted.cogentembedded.com>
+Message-ID: <106a5c67-94d2-07ff-723d-4cf8cb4978a5@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we enter an exception, the current address limit should not apply
-to the exception context: if the exception context wishes to access
-kernel space via the user accessors (eg, perf code), it must explicitly
-request such access.  Doing otherwise allows the parent context settings
-to leak into the exception handler, which may inadvertently take
-advantage of raised privileges of the parent context.
+On 07/04/2016 11:55 PM, Sergei Shtylyov wrote:
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
-This patch relies on cleanups previously posted which are currently in
-linux-next.
+> Add the (previously omitted) pin data for the SMSC LAN89218 Ethernet chip
+> to the Blanche board's device tree: the chip's IRQ output is connected to
+> the SoC's IRQ0 pin and its nCS input is connected to the SoC's EX_CS0# pin.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> ---
+>  arch/arm/boot/dts/r8a7792-blanche.dts |   15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
+> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+[...]
+> @@ -67,6 +70,18 @@
+>  		groups = "scif3_data";
+>  		function = "scif3";
+>  	};
+> +
+> +	lan89218_pins: lan89218 {
+> +		intc {
+> +			groups = "intc_irq0";
+> +			function = "intc";
+> +		};
+> +		lbsc {
+> +			groups = "lbsc_ex_cs0";
+> +			function = "lbsc";
+> +		};
+> +	};
+> +
 
- arch/arm/include/asm/ptrace.h  |  2 +-
- arch/arm/kernel/asm-offsets.c  |  1 +
- arch/arm/kernel/entry-armv.S   |  7 ++++++-
- arch/arm/kernel/entry-header.S |  4 ++++
- arch/arm/kernel/process.c      | 12 ++++++++----
- 5 files changed, 20 insertions(+), 6 deletions(-)
+    Oops, stray newline... will fix!
 
-diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
-index 0ef0093800f2..e9c9a117bd25 100644
---- a/arch/arm/include/asm/ptrace.h
-+++ b/arch/arm/include/asm/ptrace.h
-@@ -22,7 +22,7 @@ struct pt_regs {
- struct svc_pt_regs {
- 	struct pt_regs regs;
- 	u32 dacr;
--	u32 unused;
-+	u32 addr_limit;
- };
- 
- #define to_svc_pt_regs(r) container_of(r, struct svc_pt_regs, regs)
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 9a8ce342cd82..608008229c7d 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -109,6 +109,7 @@ int main(void)
-   DEFINE(S_OLD_R0,		offsetof(struct pt_regs, ARM_ORIG_r0));
-   DEFINE(PT_REGS_SIZE,		sizeof(struct pt_regs));
-   DEFINE(SVC_DACR,		offsetof(struct svc_pt_regs, dacr));
-+  DEFINE(SVC_ADDR_LIMIT,	offsetof(struct svc_pt_regs, addr_limit));
-   DEFINE(SVC_REGS_SIZE,		sizeof(struct svc_pt_regs));
-   BLANK();
- #ifdef CONFIG_CACHE_L2X0
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 0d6f5413be18..bc5f50799d75 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -185,6 +185,12 @@ ENDPROC(__und_invalid)
- 	@
- 	stmia	r7, {r2 - r6}
- 
-+	get_thread_info tsk
-+	ldr	r0, [tsk, #TI_ADDR_LIMIT]
-+	mov	r1, #TASK_SIZE
-+	str	r1, [tsk, #TI_ADDR_LIMIT]
-+	str	r0, [sp, #SVC_ADDR_LIMIT]
-+
- 	uaccess_save r0
- 	.if \uaccess
- 	uaccess_disable r0
-@@ -213,7 +219,6 @@ __irq_svc:
- 	irq_handler
- 
- #ifdef CONFIG_PREEMPT
--	get_thread_info tsk
- 	ldr	r8, [tsk, #TI_PREEMPT]		@ get preempt count
- 	ldr	r0, [tsk, #TI_FLAGS]		@ get flags
- 	teq	r8, #0				@ if preempt count != 0
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 5e1d029147cb..6391728c8f03 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -215,7 +215,9 @@
- 	blne	trace_hardirqs_off
- #endif
- 	.endif
-+	ldr	r1, [sp, #SVC_ADDR_LIMIT]
- 	uaccess_restore
-+	str	r1, [tsk, #TI_ADDR_LIMIT]
- 
- #ifndef CONFIG_THUMB2_KERNEL
- 	@ ARM mode SVC restore
-@@ -259,7 +261,9 @@
- 	@ on the stack remains correct).
- 	@
- 	.macro  svc_exit_via_fiq
-+	ldr	r1, [sp, #SVC_ADDR_LIMIT]
- 	uaccess_restore
-+	str	r1, [tsk, #TI_ADDR_LIMIT]
- #ifndef CONFIG_THUMB2_KERNEL
- 	@ ARM mode restore
- 	mov	r0, sp
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index f1c720c0d568..612eb530f33f 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -96,19 +96,23 @@ void __show_regs(struct pt_regs *regs)
- 	unsigned long flags;
- 	char buf[64];
- #ifndef CONFIG_CPU_V7M
--	unsigned int domain;
-+	unsigned int domain, fs;
- #ifdef CONFIG_CPU_SW_DOMAIN_PAN
- 	/*
- 	 * Get the domain register for the parent context. In user
- 	 * mode, we don't save the DACR, so lets use what it should
- 	 * be. For other modes, we place it after the pt_regs struct.
- 	 */
--	if (user_mode(regs))
-+	if (user_mode(regs)) {
- 		domain = DACR_UACCESS_ENABLE;
--	else
-+		fs = get_fs();
-+	} else {
- 		domain = to_svc_pt_regs(regs)->dacr;
-+		fs = to_svc_pt_regs(regs)->addr_limit;
-+	}
- #else
- 	domain = get_domain();
-+	fs = get_fs();
- #endif
- #endif
- 
-@@ -144,7 +148,7 @@ void __show_regs(struct pt_regs *regs)
- 		if ((domain & domain_mask(DOMAIN_USER)) ==
- 		    domain_val(DOMAIN_USER, DOMAIN_NOACCESS))
- 			segment = "none";
--		else if (get_fs() == get_ds())
-+		else if (fs == get_ds())
- 			segment = "kernel";
- 		else
- 			segment = "user";
--- 
-2.1.0
+>  };
+>
+>  &scif0 {
+
+MBR, Sergei
