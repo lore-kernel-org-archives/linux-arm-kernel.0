@@ -1,41 +1,39 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 6 Jul 2016 14:41:41 +0800
-Subject: [PATCH 3/3] arm64: dts: berlin4ct: enable all wdt nodes
- unconditionally
-In-Reply-To: <1467787301-3728-1-git-send-email-jszhang@marvell.com>
-References: <1467787301-3728-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1467787301-3728-4-git-send-email-jszhang@marvell.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 6 Jul 2016 08:47:21 +0200
+Subject: [PATCH 1/2] soc: samsung: Change type of PMU configuration
+ register value to u32
+In-Reply-To: <1467750507-13853-2-git-send-email-a.kesavan@samsung.com>
+References: <1467750507-13853-1-git-send-email-a.kesavan@samsung.com>
+ <1467750507-13853-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <CAJKOXPdPa7vCqetd5EUb3ebz7rB741ua=9wbdx-MkFh+G-=CJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit f29a72c24ad4 ("watchdog: dw_wdt: Convert to use watchdog
-infrastructure"), the dw_wdt driver can support multiple variants, so
-unconditionally enable all dw_wdt nodes now.
+On Tue, Jul 5, 2016 at 10:28 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+> Exynos7 has certain PMU registers that needs to be configured with
+> u32 values.
+>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>  drivers/soc/samsung/exynos-pmu.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
+> index a469e36..1bdc506 100644
+> --- a/drivers/soc/samsung/exynos-pmu.h
+> +++ b/drivers/soc/samsung/exynos-pmu.h
+> @@ -18,7 +18,7 @@
+>
+>  struct exynos_pmu_conf {
+>         unsigned int offset;
+> -       u8 val[NUM_SYS_POWERDOWN];
+> +       unsigned int val[NUM_SYS_POWERDOWN];
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+You mentioned u32 but I see unsigned int here. This should be u32.
 
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-index 099ad93..c8e07e0 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-@@ -279,7 +279,6 @@
- 				reg = <0x4000 0x100>;
- 				clocks = <&osc>;
- 				interrupts = <1>;
--				status = "disabled";
- 			};
- 
- 			wdt2: watchdog at 5000 {
-@@ -287,7 +286,6 @@
- 				reg = <0x5000 0x100>;
- 				clocks = <&osc>;
- 				interrupts = <2>;
--				status = "disabled";
- 			};
- 
- 			sm_gpio0: gpio at 8000 {
--- 
-2.8.1
+BTW, none of your emails reached my samsung inbox. I got them only
+from the lists. Please investigate why this couldn't be delivered to
+samsung.com address.
+
+Best regards,
+Krzysztof
