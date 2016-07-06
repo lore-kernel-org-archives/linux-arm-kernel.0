@@ -1,170 +1,68 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  6 Jul 2016 16:53:12 +0200
-Subject: [PATCH 1/2] spi: clps711x: Driver refactor
-Message-ID: <20160706145326.2658600-1-arnd@arndb.de>
+Date: Wed,  6 Jul 2016 16:53:13 +0200
+Subject: [PATCH 2/2] dt-bindings: spi: add binding for clps711x SPI
+In-Reply-To: <20160706145326.2658600-1-arnd@arndb.de>
+References: <20160706145326.2658600-1-arnd@arndb.de>
+Message-ID: <20160706145326.2658600-2-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Shiyan <shc_work@mail.ru>
+This documents the binding used by Alexander Shiyan's DT support for
+the clps711x SPI controller.
 
-This is a complex patch for refactoring CLPS711X SPI driver.
-This change adds devicetree support and removes board support.
+I've left the file name to match the ARM platform port name "clps711x"
+for consistency with the other bindings, even though the compatible
+string refers to the later ep7309 chip.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Linux no longer supports the old clps711x and ep72xx product lines,
+but we still use the name. The entire family is now discontinued
+by the manufacturer.
+
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Alexander Shiyan <shc_work@mail.ru>
 ---
- drivers/spi/spi-clps711x.c | 69 +++++++++++++++++-----------------------------
- 1 file changed, 26 insertions(+), 43 deletions(-)
+ .../devicetree/bindings/spi/spi-clps711x.txt       | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-clps711x.txt
 
-diff --git a/drivers/spi/spi-clps711x.c b/drivers/spi/spi-clps711x.c
-index 8c30de0315e7..18193df2eba8 100644
---- a/drivers/spi/spi-clps711x.c
-+++ b/drivers/spi/spi-clps711x.c
-@@ -1,7 +1,7 @@
- /*
-  *  CLPS711X SPI bus driver
-  *
-- *  Copyright (C) 2012-2014 Alexander Shiyan <shc_work@mail.ru>
-+ *  Copyright (C) 2012-2016 Alexander Shiyan <shc_work@mail.ru>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -12,7 +12,6 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/gpio.h>
--#include <linux/delay.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-@@ -20,9 +19,8 @@
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/clps711x.h>
- #include <linux/spi/spi.h>
--#include <linux/platform_data/spi-clps711x.h>
- 
--#define DRIVER_NAME	"spi-clps711x"
-+#define DRIVER_NAME		"clps711x-spi"
- 
- #define SYNCIO_FRMLEN(x)	((x) << 8)
- #define SYNCIO_TXFRMEN		(1 << 14)
-@@ -40,6 +38,17 @@ struct spi_clps711x_data {
- 
- static int spi_clps711x_setup(struct spi_device *spi)
- {
-+	if (!spi->controller_state) {
-+		int ret;
+diff --git a/Documentation/devicetree/bindings/spi/spi-clps711x.txt b/Documentation/devicetree/bindings/spi/spi-clps711x.txt
+new file mode 100644
+index 000000000000..4c3ec13f423f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi-clps711x.txt
+@@ -0,0 +1,33 @@
++Serial Peripheral Interface on Cirrus Logic CL-PS71xx, EP72xx, EP73xx
 +
-+		ret = devm_gpio_request(&spi->master->dev, spi->cs_gpio,
-+					dev_name(&spi->master->dev));
-+		if (ret)
-+			return ret;
++Required properties
++- #address-cells: must be <1>
++- #size-cells: must be <0>
++- compatible: should include "cirrus,ep7209-spi"
++- reg: Address and length of one register range
++- interrupts: one interrupt line
++- clocks: One entry, refers to the SPI bus clock
++- cs-gpios: Specifies the gpio pins to be used for chipselects.
++	    See: Documentation/devicetree/bindings/spi/spi-bus.txt
 +
-+		spi->controller_state = spi;
-+	}
++An additional register is present in the system controller,
++which is assumed to be in the same device tree, with and marked
++as compatible with "cirrus,ep7209-syscon3".
 +
- 	/* We are expect that SPI-device is not selected */
- 	gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
- 
-@@ -104,20 +113,9 @@ static irqreturn_t spi_clps711x_isr(int irq, void *dev_id)
- static int spi_clps711x_probe(struct platform_device *pdev)
- {
- 	struct spi_clps711x_data *hw;
--	struct spi_clps711x_pdata *pdata = dev_get_platdata(&pdev->dev);
- 	struct spi_master *master;
- 	struct resource *res;
--	int i, irq, ret;
--
--	if (!pdata) {
--		dev_err(&pdev->dev, "No platform data supplied\n");
--		return -EINVAL;
--	}
--
--	if (pdata->num_chipselect < 1) {
--		dev_err(&pdev->dev, "At least one CS must be defined\n");
--		return -EINVAL;
--	}
-+	int irq, ret;
- 
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0)
-@@ -127,40 +125,24 @@ static int spi_clps711x_probe(struct platform_device *pdev)
- 	if (!master)
- 		return -ENOMEM;
- 
--	master->cs_gpios = devm_kzalloc(&pdev->dev, sizeof(int) *
--					pdata->num_chipselect, GFP_KERNEL);
--	if (!master->cs_gpios) {
--		ret = -ENOMEM;
--		goto err_out;
--	}
--
--	master->bus_num = pdev->id;
-+	master->bus_num = -1;
- 	master->mode_bits = SPI_CPHA | SPI_CS_HIGH;
- 	master->bits_per_word_mask =  SPI_BPW_RANGE_MASK(1, 8);
--	master->num_chipselect = pdata->num_chipselect;
-+	master->dev.of_node = pdev->dev.of_node;
- 	master->setup = spi_clps711x_setup;
- 	master->prepare_message = spi_clps711x_prepare_message;
- 	master->transfer_one = spi_clps711x_transfer_one;
- 
- 	hw = spi_master_get_devdata(master);
- 
--	for (i = 0; i < master->num_chipselect; i++) {
--		master->cs_gpios[i] = pdata->chipselect[i];
--		ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
--					DRIVER_NAME);
--		if (ret) {
--			dev_err(&pdev->dev, "Can't get CS GPIO %i\n", i);
--			goto err_out;
--		}
--	}
--
- 	hw->spi_clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(hw->spi_clk)) {
- 		ret = PTR_ERR(hw->spi_clk);
- 		goto err_out;
- 	}
- 
--	hw->syscon = syscon_regmap_lookup_by_pdevname("syscon.3");
-+	hw->syscon =
-+		syscon_regmap_lookup_by_compatible("cirrus,ep7209-syscon3");
- 	if (IS_ERR(hw->syscon)) {
- 		ret = PTR_ERR(hw->syscon);
- 		goto err_out;
-@@ -185,14 +167,8 @@ static int spi_clps711x_probe(struct platform_device *pdev)
- 		goto err_out;
- 
- 	ret = devm_spi_register_master(&pdev->dev, master);
--	if (!ret) {
--		dev_info(&pdev->dev,
--			 "SPI bus driver initialized. Master clock %u Hz\n",
--			 master->max_speed_hz);
-+	if (!ret)
- 		return 0;
--	}
--
--	dev_err(&pdev->dev, "Failed to register master\n");
- 
- err_out:
- 	spi_master_put(master);
-@@ -200,9 +176,16 @@ err_out:
- 	return ret;
- }
- 
-+static const struct of_device_id clps711x_spi_dt_ids[] = {
-+	{ .compatible = "cirrus,ep7209-spi", },
-+	{ }
++Example:
++
++spi at 80000500 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	compatible = "cirrus,ep7209-spi";
++	reg = <0x80000500 0x4>;
++	interrupts = <15>;
++	clocks = <&clks CLPS711X_CLK_SPI>;
++	status = "disabled";
 +};
-+MODULE_DEVICE_TABLE(of, clps711x_spi_dt_ids);
 +
- static struct platform_driver clps711x_spi_driver = {
- 	.driver	= {
- 		.name	= DRIVER_NAME,
-+		.of_match_table = clps711x_spi_dt_ids,
- 	},
- 	.probe	= spi_clps711x_probe,
- };
++syscon3: syscon at 80002200 {
++	compatible = "cirrus,ep7209-syscon3", "syscon";
++	reg = <0x80002200 0x40>;
++};
++
 -- 
 2.9.0
