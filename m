@@ -1,15 +1,13 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Jul 2016 21:33:20 -0700
-Subject: [GIT PULL] ARM: hisi: soc changes for v4.8
-In-Reply-To: <5772B754.2080701@hisilicon.com>
-References: <5772B754.2080701@hisilicon.com>
-Message-ID: <20160706043320.GG23212@localhost>
+Date: Tue, 5 Jul 2016 21:46:00 -0700
+Subject: [GIT PULL] ARM: hisi: DT changes for v4.8
+In-Reply-To: <5772B7F0.6040600@hisilicon.com>
+References: <5772B7F0.6040600@hisilicon.com>
+Message-ID: <20160706044600.GH23212@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jun 28, 2016 at 06:43:48PM +0100, Wei Xu wrote:
+On Tue, Jun 28, 2016 at 06:46:24PM +0100, Wei Xu wrote:
 > Hi Arnd, Hi Olof, Hi Kevin,
 > 
 > Please help to pull the following changes.
@@ -26,36 +24,34 @@ On Tue, Jun 28, 2016 at 06:43:48PM +0100, Wei Xu wrote:
 > 
 > are available in the git repository at:
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.8
+>   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-dt-for-4.8
 > 
-> for you to fetch changes up to c90047616d4411ff6e7a8a40ed87731dda0753b9:
+> for you to fetch changes up to 04f66aa916c141113266646942d449b5781550e3:
 > 
->   ARM: hisi: add compatible string for Hi3519 soc (2016-06-28 16:24:33 +0100)
-> 
-> ----------------------------------------------------------------
-> ARM: mach-hisi: Hisilicon SoC updates for 4.8
-> 
-> - Add initial support for the hi3519 SoC based on armv7
-> - Avoid the compiling warning by making unexported symbols static
+>   ARM: dts: add dts files for Hi3519 and tidy up the makefile entries (2016-06-28 17:27:53 +0100)
 > 
 > ----------------------------------------------------------------
-> Ben Dooks (1):
->       ARM: hisi: make unexported symbols static
+> ARM: DT: Hisilicon ARMv7 SoC Hi3519 DT updates for 4.8
 > 
-> Jiancheng Xue (1):
->       ARM: hisi: add compatible string for Hi3519 soc
+> - Add device tree bindings for hi3519 sysctrl
+> - Add dts files for hi3519
+> - Tidy up DTB makefile entries to keep the list sorted
 
-This patch does more than this, it consolidates a bunch of machine entries.
+This isn't tidying up the makefile, the list isn't sorted:
 
-Since none of them are needed (the generic machine will match instead), just
-remove all of them instead, please.
+ dtb-$(CONFIG_ARCH_HIGHBANK) += \                                                                                                                   
+        highbank.dtb \                                                                                                                              
+        ecx-2000.dtb                                                                                                                                
++dtb-$(CONFIG_ARCH_HISI) += \                                                                                                                       
++       hi3519-demb.dtb                                                                                                                             
++dtb-$(CONFIG_ARCH_HIX5HD2) += \                                                                                                                    
++       hisi-x5hd2-dkb.dtb                                                                                                                          
+ dtb-$(CONFIG_ARCH_HIP01) += \                                                                                                                      
+        hip01-ca9x2.dtb          
 
-I'd recommend a future cleanup to do this instead, as I did for Qualcomm, but
-since you're already churning this code it's better to do it now.
+Last time I checked, both S and X came after P.
 
-So, please respin this pull request with the above addressed.
-
-Thanks,
+Not merging this.
 
 
 -Olof
