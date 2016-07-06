@@ -1,98 +1,49 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 6 Jul 2016 20:42:41 +0900
-Subject: [PATCH V2 03/10] Documentation: dt-bindings: firmware: tegra: add
- bindings of the BPMP
-In-Reply-To: <20160705090431.5852-4-josephl@nvidia.com>
-References: <20160705090431.5852-1-josephl@nvidia.com>
- <20160705090431.5852-4-josephl@nvidia.com>
-Message-ID: <CAAVeFuJwhQ=L803W7K+e5_VUKrfB2NyCz+WMR91QuvKgmv1ofw@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 6 Jul 2016 12:41:56 +0100
+Subject: [GIT PULL v2] ARM: hisi: DT changes for v4.8
+Message-ID: <577CEE84.10201@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2016 at 6:04 PM, Joseph Lo <josephl@nvidia.com> wrote:
-> The BPMP is a specific processor in Tegra chip, which is designed for
-> booting process handling and offloading the power management, clock
-> management, and reset control tasks from the CPU. The binding document
-> defines the resources that would be used by the BPMP firmware driver,
-> which can create the interprocessor communication (IPC) between the CPU
-> and BPMP.
->
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
-> Changes in V2:
-> - update the message that the BPMP is clock and reset control provider
-> - add tegra186-clock.h and tegra186-reset.h header files
-> - revise the description of the required properties
-> ---
->  .../bindings/firmware/nvidia,tegra186-bpmp.txt     |  77 ++
->  include/dt-bindings/clock/tegra186-clock.h         | 940 +++++++++++++++++++++
->  include/dt-bindings/reset/tegra186-reset.h         | 217 +++++
->  3 files changed, 1234 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
->  create mode 100644 include/dt-bindings/clock/tegra186-clock.h
->  create mode 100644 include/dt-bindings/reset/tegra186-reset.h
->
-> diff --git a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> new file mode 100644
-> index 000000000000..4d0b6eba56c5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> @@ -0,0 +1,77 @@
-> +NVIDIA Tegra Boot and Power Management Processor (BPMP)
-> +
-> +The BPMP is a specific processor in Tegra chip, which is designed for
-> +booting process handling and offloading the power management, clock
-> +management, and reset control tasks from the CPU. The binding document
-> +defines the resources that would be used by the BPMP firmware driver,
-> +which can create the interprocessor communication (IPC) between the CPU
-> +and BPMP.
-> +
-> +Required properties:
-> +- name : Should be bpmp
-> +- compatible
-> +    Array of strings
-> +    One of:
-> +    - "nvidia,tegra186-bpmp"
-> +- mboxes : The phandle of mailbox controller and the mailbox specifier.
-> +- shmem : List of the phandle of the TX and RX shared memory area that
-> +         the IPC between CPU and BPMP is based on.
-> +- #clock-cells : Should be 1.
-> +- #reset-cells : Should be 1.
-> +
-> +This node is a mailbox consumer. See the following files for details of
-> +the mailbox subsystem, and the specifiers implemented by the relevant
-> +provider(s):
-> +
-> +- Documentation/devicetree/bindings/mailbox/mailbox.txt
-> +- Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
-> +
-> +This node is a clock and reset provider. See the following files for
-> +general documentation of those features, and the specifiers implemented
-> +by this node:
-> +
-> +- Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +- include/dt-bindings/clock/tegra186-clock.h
-> +- Documentation/devicetree/bindings/reset/reset.txt
-> +- include/dt-bindings/reset/tegra186-reset.h
-> +
-> +The shared memory bindings for BPMP
-> +-----------------------------------
-> +
-> +The shared memory area for the IPC TX and RX between CPU and BPMP are
-> +predefined and work on top of sysram, which is an SRAM inside the chip.
-> +
-> +See "Documentation/devicetree/bindings/sram/sram.txt" for the bindings.
-> +
-> +Example:
-> +
-> +hsp_top0: hsp at 03c00000 {
-> +       ...
-> +       #mbox-cells = <1>;
-> +};
-> +
-> +sysram at 30000000 {
-> +       compatible = "nvidia,tegra186-sysram", "mmio-ram";
+Hi Arnd, Hi Olof, Hi Kevin,
 
-Shouldn't the second compatible be "mmio-sram"?
+Please help to pull the following changes.
+Thanks!
 
-If so, then you have the same typo in tegra186.dtsi as well.
+Best Regards,
+Wei
+
+---
+
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-dt-for-4.8-v2
+
+for you to fetch changes up to 747a1af0bb0ed7d1926463d64ee5209206e9e88b:
+
+  ARM: dts: add dts files for Hi3519 and tidy up the makefile entries (2016-07-06 09:39:14 +0100)
+
+----------------------------------------------------------------
+ARM: DT: Hisilicon ARMv7 SoC Hi3519 DT updates for 4.8
+
+- Add device tree bindings for hi3519 sysctrl
+- Add dts files for hi3519
+- Tidy up DTB makefile entries to keep the list sorted
+
+----------------------------------------------------------------
+Jiancheng Xue (2):
+      ARM: dt-bindings: add device tree bindings for Hi3519 sysctrl
+      ARM: dts: add dts files for Hi3519 and tidy up the makefile entries
+
+ .../bindings/arm/hisilicon/hi3519-sysctrl.txt      |  14 ++
+ arch/arm/boot/dts/Makefile                         |   6 +-
+ arch/arm/boot/dts/hi3519-demb.dts                  |  42 +++++
+ arch/arm/boot/dts/hi3519.dtsi                      | 187 +++++++++++++++++++++
+ 4 files changed, 247 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
+ create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
+ create mode 100644 arch/arm/boot/dts/hi3519.dtsi
