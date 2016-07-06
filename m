@@ -1,59 +1,36 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 06 Jul 2016 14:43:11 -0700
-Subject: [PATCH v2 2/2] clk: hi6220: initialize UART1 clock to 150MHz
-In-Reply-To: <1467189955-21694-2-git-send-email-guodong.xu@linaro.org>
-References: <1467189955-21694-1-git-send-email-guodong.xu@linaro.org>
- <1467189955-21694-2-git-send-email-guodong.xu@linaro.org>
-Message-ID: <146784139106.73491.6417383579004254897@resonance>
+From: jbaron@akamai.com (Jason Baron)
+Date: Wed,  6 Jul 2016 17:42:34 -0400
+Subject: [PATCH v3 5/7] arm: jump label may reference text in __exit
+In-Reply-To: <cover.1467837322.git.jbaron@akamai.com>
+References: <cover.1467837322.git.jbaron@akamai.com>
+Message-ID: <60284113bb759121e8ae3e99af1535647e52123f.1467837322.git.jbaron@akamai.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Guodong Xu (2016-06-29 01:45:55)
-> From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-> 
-> Early at boot, during the sys_clk initialization, make sure UART1 uses
-> the higher frequency clock, 150MHz.
-> 
-> This enables support for higher baud rates (up to 3Mbps) in UART1, which
-> is required by faster bluetooth transfers.
-> 
-> v2: use clk_set_rate() to propergate clock settings.
-> 
-> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> ---
->  drivers/clk/hisilicon/clk-hi6220.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
-> index a36ffcb..631c56f 100644
-> --- a/drivers/clk/hisilicon/clk-hi6220.c
-> +++ b/drivers/clk/hisilicon/clk-hi6220.c
-> @@ -12,6 +12,7 @@
->  
->  #include <linux/kernel.h>
->  #include <linux/clk-provider.h>
-> +#include <linux/clk.h>
->  #include <linux/clkdev.h>
->  #include <linux/io.h>
->  #include <linux/of.h>
-> @@ -192,6 +193,9 @@ static void __init hi6220_clk_sys_init(struct device_node *np)
->  
->         hi6220_clk_register_divider(hi6220_div_clks_sys,
->                         ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
-> +
-> +       if (clk_set_rate(clk_data->clk_data.clks[HI6220_UART1_SRC], 150000000))
-> +               pr_err("failed to set uart1 clock rate\n");
+The jump table can reference text found in an __exit section. Thus,
+instead of discarding it at build time, include EXIT_TEXT as part
+of __init and it will be released when the system boots.
 
-Why doesn't the UART driver call clk_get and then clk_set_rate on this
-clock? Why do it in the clk provider driver?
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux at armlinux.org.uk
+Signed-off-by: Jason Baron <jbaron@akamai.com>
+---
+ arch/arm/kernel/vmlinux.lds.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Mike
-
->  }
->  CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-sysctrl", hi6220_clk_sys_init);
->  
-> -- 
-> 1.9.1
-> 
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index e2c6da096cef..d4be685bc1eb 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -44,7 +44,7 @@
+ #endif
+ 
+ #if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
+-	defined(CONFIG_GENERIC_BUG)
++	defined(CONFIG_GENERIC_BUG) || defined(CONFIG_JUMP_LABEL)
+ #define ARM_EXIT_KEEP(x)	x
+ #define ARM_EXIT_DISCARD(x)
+ #else
+-- 
+2.6.1
