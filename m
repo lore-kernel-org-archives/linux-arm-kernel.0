@@ -1,204 +1,25 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 06 Jul 2016 18:13:06 +0200
-Subject: [PATCH 2/3] ARM: dts: move regulator settings from common to
- specifics
-In-Reply-To: <1467818724-21500-3-git-send-email-ayaka@soulik.info>
-References: <1467818724-21500-1-git-send-email-ayaka@soulik.info>
- <1467818724-21500-3-git-send-email-ayaka@soulik.info>
-Message-ID: <3015470.z4L7UQJKa9@phil>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 6 Jul 2016 11:06:18 -0500
+Subject: [PATCH 1/3] reset: socfpga: no need to store modrst_offset
+In-Reply-To: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
+References: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <577D2C7A.2030204@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Mittwoch, 6. Juli 2016, 23:25:23 schrieb ayaka:
-> The regulator settings are the same in the firefly beta and
-> firefly. But the firefly reload is different. I remove
-> the difference part from the common header dtsi, but remained those
-> common one to keep references.
+On 07/05/2016 05:17 AM, Philipp Zabel wrote:
+> Since we can just add it to membase once, there is no need to store
+> modrst_offset separately, and to repeat the addition with every access.
 > 
-> Signed-off-by: ayaka <ayaka@soulik.info>
-
-applies to all 3 patches: we require real names both in the patch/mail from 
-as well as the Signed-off-by line, see [0] at number 11. To my untrained eye 
-the name given doesn't look like a real name, please correct me if I'm 
-wrong.
-
-
-[0] https://www.kernel.org/doc/Documentation/SubmittingPatches
-
-
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 > ---
->  arch/arm/boot/dts/rk3288-firefly-beta.dts | 30
-> ++++++++++++++++++++++++++++++ arch/arm/boot/dts/rk3288-firefly.dts     
-> | 30 ++++++++++++++++++++++++++++++ arch/arm/boot/dts/rk3288-firefly.dtsi
->     | 14 +++++++-------
->  3 files changed, 67 insertions(+), 7 deletions(-)
+>  drivers/reset/reset-socfpga.c | 19 +++++++++----------
+>  1 file changed, 9 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/rk3288-firefly-beta.dts
-> b/arch/arm/boot/dts/rk3288-firefly-beta.dts index 75d77e3..6c08dae2
-> 100644
-> --- a/arch/arm/boot/dts/rk3288-firefly-beta.dts
-> +++ b/arch/arm/boot/dts/rk3288-firefly-beta.dts
-> @@ -69,3 +69,33 @@
->  &pwm0 {
->  	status = "okay";
->  };
-> +
-> +&gmac {
-> +	phy-supply = <&vcc_lan>;
-> +};
 
-Not 100% sure, but I guess this does not need to be duplicated.
-The supply is named vcc_lan in all board revisions only the supplying 
-regulator seems different, so it should be enough to point the vcc_lan 
-phandle to the correct regulator in the relevant file, but the gmac 
-assignment could stay in the main file?
+In case you want it:
 
-> +
-> +&io_domains {
-> +		audio-supply = <&vcca_33>;
-> +		flash1-supply = <&vcc_lan>;
-> +};
+Tested-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-same here
-
-> +
-> +&regulators {
-> +	vcca_18: REG7  {
-> +		regulator-name = "vcca_18";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +	};
-> +
-> +	vcca_33: REG8 {
-> +		regulator-name = "vcca_33";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	vcc_lan: REG9 {
-> +		regulator-name = "vcc_lan";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/rk3288-firefly.dts
-> b/arch/arm/boot/dts/rk3288-firefly.dts index c07fe92..1964b6f 100644
-> --- a/arch/arm/boot/dts/rk3288-firefly.dts
-> +++ b/arch/arm/boot/dts/rk3288-firefly.dts
-> @@ -69,3 +69,33 @@
->  &pwm1 {
->  	status = "okay";
->  };
-> +
-> +&gmac {
-> +	phy-supply = <&vcc_lan>;
-> +};
-> +
-> +&io_domains {
-> +		audio-supply = <&vcca_33>;
-> +		flash1-supply = <&vcc_lan>;
-> +};
-> +
-> +&regulators {
-> +	vcca_18: REG7  {
-> +		regulator-name = "vcca_18";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +	};
-> +
-> +	vcca_33: REG8 {
-> +		regulator-name = "vcca_33";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	vcc_lan: REG9 {
-> +		regulator-name = "vcc_lan";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi
-> b/arch/arm/boot/dts/rk3288-firefly.dtsi index 1d7f03c..205348f 100644
-> --- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-> @@ -68,11 +68,9 @@
->  		compatible = "rockchip,rk3288-io-voltage-domain";
->  		rockchip,grf = <&grf>;
-> 
-> -		audio-supply = <&vcca_33>;
->  		bb-supply = <&vcc_io>;
->  		dvp-supply = <&dovdd_1v8>;
->  		flash0-supply = <&vcc_flash>;
-> -		flash1-supply = <&vcc_lan>;
->  		gpio30-supply = <&vcc_io>;
->  		gpio1830-supply = <&vcc_io>;
->  		lcdc-supply = <&vcc_io>;
-> @@ -225,7 +223,6 @@
->  	clock_in_out = "input";
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&rgmii_pins>, <&phy_rst>, <&phy_pmeb>, <&phy_int>;
-> -	phy-supply = <&vcc_lan>;
->  	phy-mode = "rgmii";
->  	snps,reset-active-low;
->  	snps,reset-delays-us = <0 10000 1000000>;
-> @@ -296,7 +293,7 @@
->  		inl2-supply = <&vcc_sys>;
->  		inl3-supply = <&vcc_20>;
-> 
-> -		regulators {
-> +		regulators: regulators {
-
-the phandle name is to generic, as this is part of the act8846 and not 
-something generic. So please name the phandle act8846_regulators / 
-act8846_regs or so.
-
->  			vcc_ddr: REG1 {
->  				regulator-name = "vcc_ddr";
->  				regulator-min-microvolt = <1200000>;
-> @@ -339,24 +336,27 @@
->  				regulator-always-on;
->  			};
-> 
-> -			vcca_18: REG7 {
-> +			REG7  {
->  				regulator-name = "vcca_18";
->  				regulator-min-microvolt = <1800000>;
->  				regulator-max-microvolt = <1800000>;
->  			};
-> 
-> -			vcca_33: REG8 {
-> +
-
-unecessary new empty line
-
-> +			REG8 {
->  				regulator-name = "vcca_33";
->  				regulator-min-microvolt = <3300000>;
->  				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
->  			};
-> 
-> -			vcc_lan: REG9 {
-> +			REG9 {
->  				regulator-name = "vcc_lan";
->  				regulator-min-microvolt = <3300000>;
->  				regulator-max-microvolt = <3300000>;
->  			};
-> 
-> +
-
-unecessary new empty line
-
->  			vdd_10: REG10 {
->  				regulator-name = "vdd_10";
->  				regulator-min-microvolt = <1000000>;
-> --
-> 2.7.4
-
-
-Heiko
+Thanks,
+Dinh
