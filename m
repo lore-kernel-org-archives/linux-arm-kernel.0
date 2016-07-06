@@ -1,37 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Jul 2016 20:57:30 -0700
-Subject: [PATCH v3 0/2] [for arm-soc] mach-tango updates for v4.8
-In-Reply-To: <577BA8DF.9080603@free.fr>
-References: <57726597.8030501@sigmadesigns.com>
- <577BA8DF.9080603@free.fr>
-Message-ID: <20160706035730.GA23212@localhost>
+Date: Tue, 5 Jul 2016 20:58:28 -0700
+Subject: [GIT PULL 1/5] i.MX cleanup for 4.8
+In-Reply-To: <1467117980-20063-1-git-send-email-shawnguo@kernel.org>
+References: <1467117980-20063-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20160706035828.GB23212@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 02:32:31PM +0200, Mason wrote:
-> On 28/06/2016 13:55, Marc Gonzalez wrote:
+On Tue, Jun 28, 2016 at 08:46:16PM +0800, Shawn Guo wrote:
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
-> > Hello arm-soc maintainers,
-> > 
-> > Could you please merge the following patches?
-> > 
-> > Marc Gonzalez (2):
-> >   ARM: tango: add HOTPLUG_CPU support
-> >   Update ARM/TANGO section
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 > 
-> Hello Olof,
+> are available in the git repository at:
 > 
-> I see you've just merged a large number of patches in the for-next branch.
-> https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/log/?h=for-next
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-cleanup-4.8
 > 
-> I think you overlooked the two patches in this thread:
+> for you to fetch changes up to 44af782227b3977b98be6967533b0d23add40eb4:
 > 
-> [PATCH v4 1/2] ARM: tango: add HOTPLUG_CPU support
-> [PATCH v3 2/2] Update ARM/TANGO section
+>   ARM: imx: remove cpu_is_mx*() (2016-06-28 10:26:45 +0800)
 > 
-> Could you merge these patches as well?
+> ----------------------------------------------------------------
+> The i.MX cleanup for 4.8:
+>  - A series from Arnd to clean up cpu_is_mx*() from i.MX platform
+>  - A series from Andrey to clean up i.MX L2-cache code by using
+>    core support as much as possible
+>  - Remove the orphan header eukrea-baseboards.h from i.MX platform
+>  - Remove boilerplate code from TZIC driver by using IRQCHIP_DECLARE
 
-Yes, applied now. Thanks!
+Applied, thanks.
 
 
 -Olof
