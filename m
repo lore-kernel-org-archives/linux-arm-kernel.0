@@ -1,41 +1,45 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 5 Jul 2016 20:48:23 -0700
-Subject: [GIT PULL 2/3] bcm2835-dt-64-next-2016-07-03
-In-Reply-To: <1467593136-29524-3-git-send-email-eric@anholt.net>
+Date: Tue, 5 Jul 2016 20:50:58 -0700
+Subject: [GIT PULL 3/3] bcm2835-arm64-next-2016-07-03
+In-Reply-To: <20160705180338.GI3348@io.lakedaemon.net>
 References: <1467593136-29524-1-git-send-email-eric@anholt.net>
- <1467593136-29524-3-git-send-email-eric@anholt.net>
-Message-ID: <577C7F87.8050503@gmail.com>
+ <1467593136-29524-4-git-send-email-eric@anholt.net>
+ <20160705180338.GI3348@io.lakedaemon.net>
+Message-ID: <577C8022.9000600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/07/2016 17:45, Eric Anholt a ?crit :
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+Le 05/07/2016 11:03, Jason Cooper a ?crit :
+> Eric,
 > 
-> are available in the git repository at:
+> On Sun, Jul 03, 2016 at 05:45:36PM -0700, Eric Anholt wrote:
+>>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/anholt/linux tags/bcm2835-arm64-next-2016-07-03
+>>
+>> for you to fetch changes up to 628d30d1ccb897fee54a6f7312561cf2f6f72f09:
+>>
+>>   arm64: Add platform selection for BCM2835. (2016-06-15 14:10:30 -0700)
+>>
+>> ----------------------------------------------------------------
+>> This pull request brings in the build support for the Raspberry Pi
+>> arm64 port.
+>>
+>> ----------------------------------------------------------------
+>> Alexander Graf (1):
+>>       arm64: Allow for different DMA and CPU bus offsets
+>>
+>> Eric Anholt (3):
+>>       irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ
+>>       Merge remote-tracking branch 'irqchip/irqchip/bcm' into bcm2835-arm64-next
 > 
->   https://github.com/anholt/linux tags/bcm2835-dt-64-next-2016-07-03
-> 
-> for you to fetch changes up to 02d08603649816a941246c18252e5c41fd07625a:
-> 
->   ARM: bcm2837: dt: Add the ethernet to the device trees (2016-06-07 15:23:08 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request brings in the Raspberry Pi 3 DT for its arm64
-> support.  Note that it also merges in the ethernet DT changes so that
-> the Pi3's ethernet can also get the MAC address.
-> 
-> ----------------------------------------------------------------
-> Eric Anholt (3):
->       dt-bindings: Add root properties for Raspberry Pi 3
->       ARM: bcm2835: Add devicetree for the Raspberry Pi 3.
->       Merge tag 'bcm2835-dt-ethernet' into HEAD
-> 
-> Gerd Hoffmann (1):
->       ARM: bcm2837: dt: Add the ethernet to the device trees
-> 
-> Lubomir Rintel (1):
->       ARM: bcm2835: dt: Add the ethernet to the device trees
+> You may want to draw attention to the fact that this has an external
+> dependency on my irqchip/bcm branch.  Also, that it's stable, been in
+> -next for a couple of weeks, and based on v4.7-rc1, etc.
 
-Merged, thanks Eric!
+Thanks for the heads-up, merged and updated the merge commit to make
+this clear, thanks everyone.
 -- 
 Florian
