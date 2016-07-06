@@ -1,99 +1,84 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  6 Jul 2016 17:10:49 +0800
-Subject: [PATCH 8/9] ARM: dts: sun7i: bananapi-m1-plus: Add PMIC regulators
- and OPPs for cpufreq
+Date: Wed,  6 Jul 2016 17:10:50 +0800
+Subject: [PATCH 9/9] ARM: dts: sun7i: bananapi-m1-plus: Enable USB OTG
 In-Reply-To: <1467796250-22010-1-git-send-email-wens@csie.org>
 References: <1467796250-22010-1-git-send-email-wens@csie.org>
-Message-ID: <1467796250-22010-9-git-send-email-wens@csie.org>
+Message-ID: <1467796250-22010-10-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Bananapi M1+, like other Allwinner A20 based boards, uses the AXP209
-PMIC to supply its power. The vendor FEX file's DVFS table suggests the
-board's CPU power rail has a voltage drop of 25 ~ 50 mV.
+The Bananapi M1+ supports USB OTG, with the PMIC doing VBUS sensing.
 
-Add the PMIC regulator nodes and copy the DVFS table from the FEX file.
+Enable the USB OTG related functions. This also enables the previously
+missing USB PHY node, which also handles some initial setup for the
+normal USB hosts.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 48 ++++++++++++++++++++++--
- 1 file changed, 44 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 35 ++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-index ba5bca0fe997..7bb418bd1b6e 100644
+index 7bb418bd1b6e..5182989757ca 100644
 --- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
 +++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-@@ -105,6 +105,22 @@
+@@ -204,6 +204,10 @@
  	status = "okay";
  };
  
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+
-+	/* The custom DVFS table suggests a voltage drop of 25 ~ 50 mV */
-+	operating-points = <
-+		/* kHz    uV */
-+		1080000	1450000
-+		912000	1425000
-+		864000	1350000
-+		720000	1250000
-+		528000	1150000
-+		312000	1100000
-+		144000	1050000
-+		>;
++&otg_sram {
++	status = "okay";
 +};
 +
- &ehci0 {
- 	status = "okay";
- };
-@@ -132,13 +148,9 @@
- 	status = "okay";
- 
- 	axp209: pmic at 34 {
--		compatible = "x-powers,axp209";
- 		reg = <0x34>;
- 		interrupt-parent = <&nmi_intc>;
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--
--		interrupt-controller;
--		#interrupt-cells = <1>;
+ &pio {
+ 	gmac_power_pin_bpi_m1p: gmac_power_pin at 0 {
+ 		allwinner,pins = "PH23";
+@@ -232,6 +236,13 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
  	};
++
++	usb0_id_detect_pin_bpi_m1p: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
  };
  
-@@ -222,6 +234,34 @@
- 	};
+ #include "axp209.dtsi"
+@@ -262,8 +273,32 @@
+ 	regulator-name = "avcc";
  };
  
-+#include "axp209.dtsi"
-+
-+&reg_dcdc2 {
-+	/* The custom DVFS table suggests a voltage drop of 25 ~ 50 mV */
-+	regulator-always-on;
-+	regulator-min-microvolt = <1050000>;
-+	regulator-max-microvolt = <1450000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
++&reg_usb0_vbus {
++	/* defaults from sunxi-common-regulators.dtsi */
++	status = "okay";
 +};
 +
  &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pins_a>;
+ 	status = "okay";
+ };
++
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usb_power_supply {
++	status = "okay";
++};
++
++&usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin_bpi_m1p>;
++	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 USB0-IDDET */
++	usb0_vbus_power-supply = <&usb_power_supply>;
++	usb0_vbus-supply = <&reg_usb0_vbus>;
++	/* USB host VBUS is always on */
++	status = "okay";
++};
 -- 
 2.8.1
