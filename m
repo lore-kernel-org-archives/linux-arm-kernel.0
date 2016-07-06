@@ -1,95 +1,47 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 6 Jul 2016 09:49:53 +0200
-Subject: [PATCH 2/3] pinctrl: Add STM32F746 MCU support
-In-Reply-To: <20160705140218.GD26134@windriver.com>
-References: <1467726017-20041-1-git-send-email-alexandre.torgue@st.com>
- <1467726017-20041-3-git-send-email-alexandre.torgue@st.com>
- <20160705140218.GD26134@windriver.com>
-Message-ID: <577CB821.7000206@st.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Wed, 06 Jul 2016 09:54:03 +0200
+Subject: [PATCH] gpio: document how to order GPIO controllers
+In-Reply-To: <20160705180447.GP16643@pengutronix.de>
+References: <1467355333-8813-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160705140546.GA10601@rob-hp-laptop>
+ <20160705180447.GP16643@pengutronix.de>
+Message-ID: <7356797.MVQep4sf2D@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Tuesday 05 July 2016 20:04:47, Uwe Kleine-K?nig wrote:
+> That is we have:
+> 
+> 	Hardware name | software gpiochip
+> 	    GPIO4     |      gpiochip0
+> 	    GPIO3     |      gpiochip1
+> 	    GPIO1     |      gpiochip2
+> 	    GPIO2     |	     gpiochip3
+> 
+> I bet that's the probe order because when sorted by address (and so
+> by order in the device tree) we have exactly this ordering. (Compare
+> with $(grep gpio@ arch/arm/boot/dts/imx25.dtsi).)
 
-On 07/05/2016 04:02 PM, Paul Gortmaker wrote:
-> [[PATCH 2/3] pinctrl: Add STM32F746 MCU support] On 05/07/2016 (Tue 15:40) Alexandre TORGUE wrote:
->
->> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>
->> This patch which adds STM32F746 pinctrl and GPIO support, relies on the
->> generic STM32 pinctrl driver.
->>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>
->> diff --git a/drivers/pinctrl/stm32/Kconfig b/drivers/pinctrl/stm32/Kconfig
->> index 0f28841..4c40dae 100644
->> --- a/drivers/pinctrl/stm32/Kconfig
->> +++ b/drivers/pinctrl/stm32/Kconfig
->> @@ -13,4 +13,10 @@ config PINCTRL_STM32F429
->>   	default MACH_STM32F429
->>   	select PINCTRL_STM32
->>
->> +config PINCTRL_STM32F746
->> +	bool "STMicroelectronics STM32F746 pin control" if COMPILE_TEST && !MACH_STM32F746
->          ^^^^
->
->> +	depends on OF
->> +	default MACH_STM32F746
->> +	select PINCTRL_STM32
->> +
->> +	),
->> +};
->> +
->
-> [...]
->
->> +static const struct of_device_id stm32f746_pctrl_match[] = {
->> +	{
->> +		.compatible = "st,stm32f746-pinctrl",
->> +		.data = &stm32f746_match_data,
->> +	},
->> +	{ }
->> +};
->> +MODULE_DEVICE_TABLE(of, stm32f746_pctrl_match);
->    ^^^^^^^^^^^^^^^^^^^^
->
->> +
->> +static struct platform_driver stm32f746_pinctrl_driver = {
->> +	.probe = stm32_pctl_probe,
->> +	.driver = {
->> +		.name = "stm32f746-pinctrl",
->> +		.of_match_table = stm32f746_pctrl_match,
->> +	},
->> +};
->> +
->> +static int __init stm32f746_pinctrl_init(void)
->> +{
->> +	return platform_driver_register(&stm32f746_pinctrl_driver);
->> +}
->> +
->> +module_init(stm32f746_pinctrl_init);
->> +
->> +MODULE_LICENSE("GPL");
->> +MODULE_DESCRIPTION("STM32F746 Pinctrl Driver");
->> +MODULE_AUTHOR("Maxime Coquelin <mcoquelin.stm32@gmail.com>");
->
-> ...and here as well.  Please don't use modular support functions and
-> infrastructure for code that is only built-in.  Either make sure it can
-> be modular and use a tristate Kconfig, or delete all the MODULE_<tags>
-> and use device_initcall() to register the driver.
+This is rather straight forward and rather simple for controller internal GPIO 
+controllers but when using GPIO expanders both on SPI and I2C thing will get 
+much more volatile especially on SMP systems. What would be the correct 
+"order" here? Unless they are cascaded they are independent and there is no 
+such thing as an order. Probe order _is_ unpredictable so they will vary on 
+different boots. Having 4 internal GPIO controllers which creates 4 gpiochips 
+with more or less fixed names is rather a special case. Dunno if they might 
+change on a SMP system. Can a driver probe be called multiple times 
+simultaneously? Well, when drivers are used as modules I think things are even 
+more unpredictable.
 
-Thanks for remark. I will send a v2 removing modular stuff.
+> For a new interface this is OK, still I predict users will complain if
+> the numbers used don't match naturally the hardware names. And IMHO they
+> are right.
 
-Regards
+Given the fact that hardware names and gpiochip number relation is not fixed 
+IMHO the simplest way to identify them is using the DT label. You need them 
+anyway to identify them in DT itself at other places why not using this on 
+Linux userspace too? So gpiochip[0-9]* should still be created but using udev 
+you can create appropriate symlinks with more recognizable names.
 
-Alex
-
->
-> Thanks,
-> Paul.
-> --
->
->> --
->> 1.9.1
->>
+Best regards,
+Alexander
