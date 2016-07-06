@@ -1,32 +1,29 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 06 Jul 2016 17:43:58 +0200
-Subject: [PATCH 3/4] drivers: reset: Add STM32 reset driver
-In-Reply-To: <577D264A.4050709@st.com>
-References: <1467640052-6770-1-git-send-email-gabriel.fernandez@st.com>
- <1467640052-6770-3-git-send-email-gabriel.fernandez@st.com>
- <1467653810.2224.77.camel@pengutronix.de> <577B61EA.5080703@st.com>
- <1467725370.2978.64.camel@pengutronix.de> <577D264A.4050709@st.com>
-Message-ID: <1467819838.2914.6.camel@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Jul 2016 17:05:25 +0100
+Subject: [PATCH v2] drivers/perf: arm-pmu: Handle per-interrupt affinity
+ mask
+In-Reply-To: <1467815627-4061-1-git-send-email-marc.zyngier@arm.com>
+References: <1467815627-4061-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160706160525.GA31910@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 06.07.2016, 17:39 +0200 schrieb Gabriel Fernandez:
-> Hi Philipp
+On Wed, Jul 06, 2016 at 03:33:47PM +0100, Marc Zyngier wrote:
+> On a big-little system, PMUs can be wired to CPUs using per CPU
+> interrups (PPI). In this case, it is important to make sure that
+> the enable/disable do happen on the right set of CPUs.
 > 
-> On 07/05/2016 03:29 PM, Philipp Zabel wrote:
-> > Am Dienstag, den 05.07.2016, 09:29 +0200 schrieb Gabriel Fernandez:
-> > [...]
-> >>>> +static const struct reset_control_ops stm32_reset_ops = {
-> >>>> +	.assert		= stm32_reset_assert,
-> >>>> +	.deassert	= stm32_reset_deassert,
-> >>> Are the registers not readable, or did you choose not to
-> >>> implement .status on purpose?
-> >> We choose to not implement.
-> > Ok. Because of size issues or just because you don't need them in any of
-> > your drivers?
-> Because i don't need them.
+> So instead of relying on the interrupt-affinity property, we can
+> use the actual percpu affinity that DT exposes as part of the
+> interrupt specifier. The DT binding is also updated to reflect
+> the fact that the interrupt-affinity property shouldn't be used
+> in that case.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> * From v1:
+>   - propagate the error if irq_get_percpu_devid_partition fails
 
-Ok, thanks for clarifying.
+Thanks, I'll queue this.
 
-regards
-Philipp
+Will
