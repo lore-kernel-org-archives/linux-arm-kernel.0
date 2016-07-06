@@ -1,34 +1,27 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Wed,  6 Jul 2016 15:59:17 -0700
-Subject: [REPOST v3 2/2] drm/panel: simple: Add Documentation for Sharp
- LQ101K1LY04
-In-Reply-To: <1467845957-29036-1-git-send-email-stillcompiling@gmail.com>
-References: <1467845957-29036-1-git-send-email-stillcompiling@gmail.com>
-Message-ID: <1467845957-29036-2-git-send-email-stillcompiling@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed,  6 Jul 2016 16:07:49 -0700
+Subject: [PATCH] clk: gxbb: expose CLKID_MMC_PCLK
+Message-ID: <20160706230749.9620-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document basic simple-panel support for Sharp LQ101K1LY04
+The MMC_PCLK is needed for the SD/eMMC driver.
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- .../devicetree/bindings/display/panel/sharp,lq101k1ly04.txt        | 7 +++++++
- 1 file changed, 7 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/sharp,lq101k1ly04.txt
+ include/dt-bindings/clock/gxbb-clkc.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/sharp,lq101k1ly04.txt b/Documentation/devicetree/bindings/display/panel/sharp,lq101k1ly04.txt
-new file mode 100644
-index 0000000..4aff25b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/sharp,lq101k1ly04.txt
-@@ -0,0 +1,7 @@
-+Sharp Display Corp. LQ101K1LY04 10.07" WXGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "sharp,lq101k1ly04"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
+diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+index f889d80246cb..5eb69ec74f6b 100644
+--- a/include/dt-bindings/clock/gxbb-clkc.h
++++ b/include/dt-bindings/clock/gxbb-clkc.h
+@@ -8,5 +8,6 @@
+ #define CLKID_CPUCLK		1
+ #define CLKID_CLK81		12
+ #define CLKID_ETH		36
++#define CLKID_MMC_PCLK		66
+ 
+ #endif /* __GXBB_CLKC_H */
 -- 
-2.7.4
+2.9.0
