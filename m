@@ -1,445 +1,77 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed,  6 Jul 2016 11:15:36 +0100
-Subject: [PATCH v2 1/2] arm64: dts: juno: add coresight support
-In-Reply-To: <1467800137-17533-1-git-send-email-sudeep.holla@arm.com>
-References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
- <1467800137-17533-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1467800137-17533-2-git-send-email-sudeep.holla@arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 6 Jul 2016 11:15:24 +0100
+Subject: [GIT PULL] ARM: hisi: soc changes for v4.8
+In-Reply-To: <20160706043320.GG23212@localhost>
+References: <5772B754.2080701@hisilicon.com> <20160706043320.GG23212@localhost>
+Message-ID: <577CDA3C.5060706@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the debug-related components on Juno are located in the coreSight
-subsystem while others are located in the Cortex-Axx clusters, the SCP
-subsystem, and in the main system.
+Hi Olof,
 
-Each core in the two processor clusters contain an Embedded Trace
-Macrocell(ETM) which generates real-time trace information that trace
-tools can use and an ATB trace output that is sent to a funnel before
-going to the CoreSight subsystem.
+On 06/07/2016 05:33, Olof Johansson wrote:
+> Hi,
+> 
+> On Tue, Jun 28, 2016 at 06:43:48PM +0100, Wei Xu wrote:
+>> Hi Arnd, Hi Olof, Hi Kevin,
+>>
+>> Please help to pull the following changes.
+>> Thanks!
+>>
+>> Best Regards,
+>> Wei
+>>
+>> ---
+>>
+>> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+>>
+>>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.8
+>>
+>> for you to fetch changes up to c90047616d4411ff6e7a8a40ed87731dda0753b9:
+>>
+>>   ARM: hisi: add compatible string for Hi3519 soc (2016-06-28 16:24:33 +0100)
+>>
+>> ----------------------------------------------------------------
+>> ARM: mach-hisi: Hisilicon SoC updates for 4.8
+>>
+>> - Add initial support for the hi3519 SoC based on armv7
+>> - Avoid the compiling warning by making unexported symbols static
+>>
+>> ----------------------------------------------------------------
+>> Ben Dooks (1):
+>>       ARM: hisi: make unexported symbols static
+>>
+>> Jiancheng Xue (1):
+>>       ARM: hisi: add compatible string for Hi3519 soc
+> 
+> This patch does more than this, it consolidates a bunch of machine entries.
+> 
+> Since none of them are needed (the generic machine will match instead), just
+> remove all of them instead, please.
+> 
+> I'd recommend a future cleanup to do this instead, as I did for Qualcomm, but
+> since you're already churning this code it's better to do it now.
+>
+> So, please respin this pull request with the above addressed.
 
-The trace output signals combine with two trace expansions using another
-funnel and fed into the Embedded Trace FIFO(ETF0).
+There is a specific "map_io" for hi3620 so that we kept 2 machine entries.
+Do you mean we need to merge all of them in one machine entry?
+In that case, I will add a new "hisilicon_map_io" function to invoke
+"debug_ll_io_init" and check the board compatible string.
+Is it OK?
+Thanks!
 
-The output trace data stream of the funnel is then replicated before it
-is sent to either the:
-- Trace Port Interface Unit(TPIU), that sends it out using the trace port.
-- ETR that can write the trace data to memory located in the application
-  memory space
-
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Liviu Dudau <liviu.dudau@arm.com>
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/boot/dts/arm/juno-base.dtsi | 297 +++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-r1.dts    |  24 +++
- arch/arm64/boot/dts/arm/juno-r2.dts    |  24 +++
- arch/arm64/boot/dts/arm/juno.dts       |  24 +++
- 4 files changed, 369 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index dee2386d3b9b..4ea40a476906 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -56,6 +56,303 @@
- 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
-+	/*
-+	 * Juno TRMs specify the size for these coresight components as 64K.
-+	 * The actual size is just 4K though 64K is reserved. Access to the
-+	 * unmapped reserved region results in a DECERR response.
-+	 */
-+	etf at 20010000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20010000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* input port */
-+			port at 0 {
-+				reg = <0>;
-+				etf_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&main_funnel_out_port>;
-+				};
-+			};
-+
-+			/* output port */
-+			port at 1 {
-+				reg = <0>;
-+				etf_out_port: endpoint {
-+					remote-endpoint = <&replicator_in_port0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	tpiu at 20030000 {
-+		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		reg = <0 0x20030000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			tpiu_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port0>;
-+			};
-+		};
-+	};
-+
-+	main-funnel at 20040000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x20040000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				main_funnel_out_port: endpoint {
-+					remote-endpoint = <&etf_in_port>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <0>;
-+				main_funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster0_funnel_out_port>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <1>;
-+				main_funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster1_funnel_out_port>;
-+				};
-+			};
-+
-+		};
-+	};
-+
-+	etr at 20070000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20070000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			etr_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port1>;
-+			};
-+		};
-+	};
-+
-+	etm0: etm at 22040000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0 0x22040000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			cluster0_etm0_out_port: endpoint {
-+				remote-endpoint = <&cluster0_funnel_in_port0>;
-+			};
-+		};
-+	};
-+
-+	cluster0-funnel at 220c0000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x220c0000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				cluster0_funnel_out_port: endpoint {
-+					remote-endpoint = <&main_funnel_in_port0>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <0>;
-+				cluster0_funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster0_etm0_out_port>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <1>;
-+				cluster0_funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster0_etm1_out_port>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etm1: etm at 22140000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0 0x22140000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			cluster0_etm1_out_port: endpoint {
-+				remote-endpoint = <&cluster0_funnel_in_port1>;
-+			};
-+		};
-+	};
-+
-+	etm2: etm at 23040000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0 0x23040000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			cluster1_etm0_out_port: endpoint {
-+				remote-endpoint = <&cluster1_funnel_in_port0>;
-+			};
-+		};
-+	};
-+
-+	cluster1-funnel at 230c0000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x230c0000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				cluster1_funnel_out_port: endpoint {
-+					remote-endpoint = <&main_funnel_in_port1>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <0>;
-+				cluster1_funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster1_etm0_out_port>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <1>;
-+				cluster1_funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster1_etm1_out_port>;
-+				};
-+			};
-+			port at 3 {
-+				reg = <2>;
-+				cluster1_funnel_in_port2: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster1_etm2_out_port>;
-+				};
-+			};
-+			port at 4 {
-+				reg = <3>;
-+				cluster1_funnel_in_port3: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster1_etm3_out_port>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etm3: etm at 23140000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0 0x23140000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			cluster1_etm1_out_port: endpoint {
-+				remote-endpoint = <&cluster1_funnel_in_port1>;
-+			};
-+		};
-+	};
-+
-+	etm4: etm at 23240000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0 0x23240000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			cluster1_etm2_out_port: endpoint {
-+				remote-endpoint = <&cluster1_funnel_in_port2>;
-+			};
-+		};
-+	};
-+
-+	etm5: etm at 23340000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0 0x23340000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			cluster1_etm3_out_port: endpoint {
-+				remote-endpoint = <&cluster1_funnel_in_port3>;
-+			};
-+		};
-+	};
-+
-+	coresight-replicator {
-+		/*
-+		 * Non-configurable replicators don't show up on the
-+		 * AMBA bus.  As such no need to add "arm,primecell".
-+		 */
-+		compatible = "arm,coresight-replicator";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* replicator output ports */
-+			port at 0 {
-+				reg = <0>;
-+				replicator_out_port0: endpoint {
-+					remote-endpoint = <&tpiu_in_port>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				replicator_out_port1: endpoint {
-+					remote-endpoint = <&etr_in_port>;
-+				};
-+			};
-+
-+			/* replicator input port */
-+			port at 2 {
-+				reg = <0>;
-+				replicator_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etf_out_port>;
-+				};
-+			};
-+		};
-+	};
-+
- 	sram: sram at 2e000000 {
- 		compatible = "arm,juno-sram-ns", "mmio-sram";
- 		reg = <0x0 0x2e000000 0x0 0x8000>;
-diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-index d95d9e7e2dc0..f4f8f54f8b85 100644
---- a/arch/arm64/boot/dts/arm/juno-r1.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-@@ -181,3 +181,27 @@
- &pcie_ctlr {
- 	status = "okay";
- };
-+
-+&etm0 {
-+	cpu = <&A57_0>;
-+};
-+
-+&etm1 {
-+	cpu = <&A57_1>;
-+};
-+
-+&etm2 {
-+	cpu = <&A53_0>;
-+};
-+
-+&etm3 {
-+	cpu = <&A53_1>;
-+};
-+
-+&etm4 {
-+	cpu = <&A53_2>;
-+};
-+
-+&etm5 {
-+	cpu = <&A53_3>;
-+};
-diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
-index 88ecd6182b67..d903e545b64c 100644
---- a/arch/arm64/boot/dts/arm/juno-r2.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r2.dts
-@@ -181,3 +181,27 @@
- &pcie_ctlr {
- 	status = "okay";
- };
-+
-+&etm0 {
-+	cpu = <&A72_0>;
-+};
-+
-+&etm1 {
-+	cpu = <&A72_1>;
-+};
-+
-+&etm2 {
-+	cpu = <&A53_0>;
-+};
-+
-+&etm3 {
-+	cpu = <&A53_1>;
-+};
-+
-+&etm4 {
-+	cpu = <&A53_2>;
-+};
-+
-+&etm5 {
-+	cpu = <&A53_3>;
-+};
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index dcfcf15a17f5..a7270eff6939 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -173,3 +173,27 @@
- 
- 	#include "juno-base.dtsi"
- };
-+
-+&etm0 {
-+	cpu = <&A57_0>;
-+};
-+
-+&etm1 {
-+	cpu = <&A57_1>;
-+};
-+
-+&etm2 {
-+	cpu = <&A53_0>;
-+};
-+
-+&etm3 {
-+	cpu = <&A53_1>;
-+};
-+
-+&etm4 {
-+	cpu = <&A53_2>;
-+};
-+
-+&etm5 {
-+	cpu = <&A53_3>;
-+};
--- 
-2.7.4
+Best Regards,
+Wei
+> 
+> Thanks,
+> 
+> 
+> -Olof
+> 
+> .
+> 
