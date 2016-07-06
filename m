@@ -1,105 +1,59 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Wed, 6 Jul 2016 22:36:36 +0100
-Subject: [PATCH v8 05/17] KVM: kvm_io_bus: add kvm_io_bus_get_dev() call
-In-Reply-To: <20160706211518.GE12608@cbox>
-References: <20160705112309.28877-1-andre.przywara@arm.com>
- <20160705112309.28877-6-andre.przywara@arm.com> <20160706211518.GE12608@cbox>
-Message-ID: <4e0ad82e-b052-ed0c-4bae-f50d2eae47a0@arm.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 06 Jul 2016 14:43:11 -0700
+Subject: [PATCH v2 2/2] clk: hi6220: initialize UART1 clock to 150MHz
+In-Reply-To: <1467189955-21694-2-git-send-email-guodong.xu@linaro.org>
+References: <1467189955-21694-1-git-send-email-guodong.xu@linaro.org>
+ <1467189955-21694-2-git-send-email-guodong.xu@linaro.org>
+Message-ID: <146784139106.73491.6417383579004254897@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 06/07/16 22:15, Christoffer Dall wrote:
-> On Tue, Jul 05, 2016 at 12:22:57PM +0100, Andre Przywara wrote:
->> The kvm_io_bus framework is a nice place of holding information about
->> various MMIO regions for kernel emulated devices.
->> Add a call to retrieve the kvm_io_device structure which is associated
->> with a certain MMIO address. This avoids to duplicate kvm_io_bus'
->> knowledge of MMIO regions without having to fake MMIO calls if a user
->> needs the device a certain MMIO address belongs to.
->> This will be used by the ITS emulation to get the associated ITS device
->> when someone triggers an MSI via an ioctl from userspace.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> Reviewed-by: Eric Auger <eric.auger@redhat.com>
->> ---
->>  include/linux/kvm_host.h |  2 ++
->>  virt/kvm/kvm_main.c      | 24 ++++++++++++++++++++++++
->>  2 files changed, 26 insertions(+)
->>
->> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
->> index 0640ee9..614a981 100644
->> --- a/include/linux/kvm_host.h
->> +++ b/include/linux/kvm_host.h
->> @@ -164,6 +164,8 @@ int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
->>  			    int len, struct kvm_io_device *dev);
->>  int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
->>  			      struct kvm_io_device *dev);
->> +struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
->> +					 gpa_t addr);
->>  
->>  #ifdef CONFIG_KVM_ASYNC_PF
->>  struct kvm_async_pf {
->> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
->> index ef54b4c..bd2eb92 100644
->> --- a/virt/kvm/kvm_main.c
->> +++ b/virt/kvm/kvm_main.c
->> @@ -3496,6 +3496,30 @@ int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
->>  	return r;
->>  }
->>  
+Quoting Guodong Xu (2016-06-29 01:45:55)
+> From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 > 
-> do you need to hold kvm->slots_lock here like the other functions
-> touching the io_bus framework here, which have comments specifying that?
-
-AFAICT this comment is outdated, the slots_lock needs only to be taken
-if one changes the kvm_io_bus (adding or removing devices).
-Readers (looking up a device) use RCU. I looked at the other readers,
-also in other architectures, none of them takes the lock AFAICS when
-they just get an entry.
-
-Paolo, Radim, can you confirm this?
-Shall I send a patch that remove the misleading comments
-at virt/kvm/kvm_main.c, lines 3347, 3365 and 3414?
-
-Cheers,
-Andre.
-
->> +struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
->> +					 gpa_t addr)
->> +{
->> +	struct kvm_io_bus *bus;
->> +	int dev_idx, srcu_idx;
->> +	struct kvm_io_device *iodev = NULL;
->> +
->> +	srcu_idx = srcu_read_lock(&kvm->srcu);
->> +
->> +	bus = srcu_dereference(kvm->buses[bus_idx], &kvm->srcu);
->> +
->> +	dev_idx = kvm_io_bus_get_first_dev(bus, addr, 1);
->> +	if (dev_idx < 0)
->> +		goto out_unlock;
->> +
->> +	iodev = bus->range[dev_idx].dev;
->> +
->> +out_unlock:
->> +	srcu_read_unlock(&kvm->srcu, srcu_idx);
->> +
->> +	return iodev;
->> +}
->> +EXPORT_SYMBOL_GPL(kvm_io_bus_get_dev);
->> +
->>  static struct notifier_block kvm_cpu_notifier = {
->>  	.notifier_call = kvm_cpu_hotplug,
->>  };
->> -- 
->> 2.9.0
->>
+> Early at boot, during the sys_clk initialization, make sure UART1 uses
+> the higher frequency clock, 150MHz.
 > 
-> You also need an ack here, but my comment-comment above notwithstanding:
+> This enables support for higher baud rates (up to 3Mbps) in UART1, which
+> is required by faster bluetooth transfers.
 > 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> v2: use clk_set_rate() to propergate clock settings.
 > 
-> -Christoffer
+> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
+>  drivers/clk/hisilicon/clk-hi6220.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+> index a36ffcb..631c56f 100644
+> --- a/drivers/clk/hisilicon/clk-hi6220.c
+> +++ b/drivers/clk/hisilicon/clk-hi6220.c
+> @@ -12,6 +12,7 @@
+>  
+>  #include <linux/kernel.h>
+>  #include <linux/clk-provider.h>
+> +#include <linux/clk.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> @@ -192,6 +193,9 @@ static void __init hi6220_clk_sys_init(struct device_node *np)
+>  
+>         hi6220_clk_register_divider(hi6220_div_clks_sys,
+>                         ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
+> +
+> +       if (clk_set_rate(clk_data->clk_data.clks[HI6220_UART1_SRC], 150000000))
+> +               pr_err("failed to set uart1 clock rate\n");
+
+Why doesn't the UART driver call clk_get and then clk_set_rate on this
+clock? Why do it in the clk provider driver?
+
+Thanks,
+Mike
+
+>  }
+>  CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-sysctrl", hi6220_clk_sys_init);
+>  
+> -- 
+> 1.9.1
 > 
