@@ -1,22 +1,32 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 06 Jul 2016 09:40:49 -0700
-Subject: [PATCH v6 00/18] Add support for FDMA DMA controller and slim
- core rproc found on STi chipsets
-In-Reply-To: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
-References: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1467823249.8360.28.camel@perches.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Jul 2016 17:45:09 +0100
+Subject: [PATCH 05/11] arm64: pmu: Add support for probing with ACPI
+In-Reply-To: <1466529109-21715-6-git-send-email-jeremy.linton@arm.com>
+References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
+ <1466529109-21715-6-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20160706164509.GD31910@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-07-06 at 09:54 +0100, Peter Griffin wrote:
-> This patchset adds support for the Flexible Direct Memory Access (FDMA) core
-> found on STi chipsets from STMicroelectronics. The FDMA is a slim core CPU
-> with a dedicated firmware. It is a general purpose DMA controller supporting
-> 16 independent channels and data can be moved from memory to memory or between
-> memory and paced latency critical real time targets.
-[]
-> ?include/linux/remoteproc/st_slim_rproc.h??????????|??53 ++
+On Tue, Jun 21, 2016 at 12:11:43PM -0500, Jeremy Linton wrote:
+> From: Mark Salter <msalter@redhat.com>
+> 
+> In the case of ACPI, the PMU IRQ information is contained in the
+> MADT table. Also, since the PMU does not exist as a device in the
+> ACPI DSDT table, it is necessary to create a platform device so
+> that the appropriate driver probing is triggered.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+> 
+> NOTE: Much of the code in pmu_acpi_init() is replaced in patches 0009 and
+>       0010 this set. The later version of the patch cleans up most of the
+>       possible style/error handling issues that have been pointed out with
+>       this version.
 
-Is this directory really necessary?
+I agree with Punit that it would be a lot easier to review this series
+if you could fold in the changes to pmu_acpi_init so the sum of the
+changes can be viewed in one patch.
 
-Why shouldn't this file be local to drivers/remoteproc/?
+Will
