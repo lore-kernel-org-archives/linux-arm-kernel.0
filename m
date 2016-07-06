@@ -1,25 +1,59 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 6 Jul 2016 11:06:18 -0500
-Subject: [PATCH 1/3] reset: socfpga: no need to store modrst_offset
-In-Reply-To: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
-References: <1467713872-4051-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <577D2C7A.2030204@opensource.altera.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 6 Jul 2016 18:21:01 +0200
+Subject: [PATCH] mmc: s3cmci: Register cpufreq notifier only on S3C24xx
+In-Reply-To: <1467031923-10415-1-git-send-email-k.kozlowski@samsung.com>
+References: <1467031923-10415-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CAPDyKFpO0xdLxC5u3G4gYa0uVMdXRj0-aOpC+wEZ9UP=tkO=qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2016 05:17 AM, Philipp Zabel wrote:
-> Since we can just add it to membase once, there is no need to store
-> modrst_offset separately, and to repeat the addition with every access.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+On 27 June 2016 at 14:52, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> The driver registered for CPU frequency transitions to recalculate its
+> clock when ARM clock frequency changes (ratio between frequencies of
+> ARM's parent clock (fclk) and clock for peripherals remains fixed).
+>
+> This is needed only on S3C24xx platform when cpufreq driver is enabled
+> so limit the ifdef to respective cpufreq Kconfig.
+>
+> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Thanks, applied for next!
+
+Kind regards
+Uffe
+
 > ---
->  drivers/reset/reset-socfpga.c | 19 +++++++++----------
->  1 file changed, 9 insertions(+), 10 deletions(-)
-> 
-
-In case you want it:
-
-Tested-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-
-Thanks,
-Dinh
+>  drivers/mmc/host/s3cmci.c | 2 +-
+>  drivers/mmc/host/s3cmci.h | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+> index 39814f3dc96f..c531deef3258 100644
+> --- a/drivers/mmc/host/s3cmci.c
+> +++ b/drivers/mmc/host/s3cmci.c
+> @@ -1365,7 +1365,7 @@ static struct s3c24xx_mci_pdata s3cmci_def_pdata = {
+>          .no_detect = 1,
+>  };
+>
+> -#ifdef CONFIG_CPU_FREQ
+> +#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
+>
+>  static int s3cmci_cpufreq_transition(struct notifier_block *nb,
+>                                      unsigned long val, void *data)
+> diff --git a/drivers/mmc/host/s3cmci.h b/drivers/mmc/host/s3cmci.h
+> index cc2e46cb5c64..30c2c0dd1bc8 100644
+> --- a/drivers/mmc/host/s3cmci.h
+> +++ b/drivers/mmc/host/s3cmci.h
+> @@ -74,7 +74,7 @@ struct s3cmci_host {
+>         struct dentry           *debug_regs;
+>  #endif
+>
+> -#ifdef CONFIG_CPU_FREQ
+> +#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
+>         struct notifier_block   freq_transition;
+>  #endif
+>  };
+> --
+> 1.9.1
+>
