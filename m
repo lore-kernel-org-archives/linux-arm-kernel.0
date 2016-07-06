@@ -1,53 +1,33 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 6 Jul 2016 16:44:44 -0700
-Subject: [PATCH v2 3/5] drivers: net: phy: Add MDIO driver
-In-Reply-To: <20160705134950.GC5230@lunn.ch>
-References: <1464739840-21971-1-git-send-email-isubramanian@apm.com>
- <1464739840-21971-4-git-send-email-isubramanian@apm.com>
- <20160601011148.GD31982@lunn.ch>
- <CAKh23FmaQy8J=f-eyfBeNndz0oT5R0icvwJ3vrw1DMJnj9uv_g@mail.gmail.com>
- <20160705134950.GC5230@lunn.ch>
-Message-ID: <CAKh23FnvgWRMo=M35Mj4=a_KeUpvOoHa8stU=bSk9Y3VSRtyzQ@mail.gmail.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed,  6 Jul 2016 16:51:34 -0700
+Subject: [PATCH 1/3] iommu: add IOMMU_PRIV attribute
+In-Reply-To: <20160706235136.27854-1-mitchelh@codeaurora.org>
+References: <20160706235136.27854-1-mitchelh@codeaurora.org>
+Message-ID: <20160706235136.27854-2-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Add the IOMMU_PRIV attribute, which is used to indicate privileged
+mappings.
 
-On Tue, Jul 5, 2016 at 6:49 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Mon, Jun 06, 2016 at 10:12:35AM -0700, Iyappan Subramanian wrote:
->> Hi Andrew,
->>
->> Thanks for the review.
->>
->> On Tue, May 31, 2016 at 6:11 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> > On Tue, May 31, 2016 at 05:10:38PM -0700, Iyappan Subramanian wrote:
->> >> +static int xgene_mdio_reset(struct xgene_mdio_pdata *pdata)
->> >> +{
->> >> +     int ret;
->> >> +
->> >> +     if (pdata->mdio_id == XGENE_MDIO_RGMII) {
->> >> +             if (pdata->dev->of_node) {
->> >> +                     clk_prepare_enable(pdata->clk);
->> >> +                     clk_disable_unprepare(pdata->clk);
->> >> +                     clk_prepare_enable(pdata->clk);
->> >
->> > Hi Iyappan
->> >
->> > Is that a workaround for a hardware problem? If so, i would suggest
->> > adding a comment, to stop people submitting a patch simplifying it.
->>
->> Hardware expects this clock sequence.  I'll add comment as you suggested.
->
-> What exactly does the hardware require? Is this a workaround for a bug
-> in the clock generator? Or a workaround for a bug in the MDIO device?
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+ include/linux/iommu.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Hardware requires a clock pulse.  There is no bug.
-
->
-> If it is a clock generator bug, i think the fix should be in the clock
-> driver. If this is bug in the MDIO device, do you need a sleep in
-> there, so you actually have the clock ticking/not ticking for a time?
-> Since these calls can all sleep, you have no idea how long/sort the
-> clock will be enabled/disabled.
->
->       Andrew
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 664683aedcce..01c9f2667f2b 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -31,6 +31,7 @@
+ #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+ #define IOMMU_NOEXEC	(1 << 3)
+ #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
++#define IOMMU_PRIV	(1 << 5)
+ 
+ struct iommu_ops;
+ struct iommu_group;
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
