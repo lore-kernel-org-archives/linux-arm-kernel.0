@@ -1,51 +1,80 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 06 Jul 2016 15:23:20 -0700
-Subject: [PATCH v2 1/2] clk: hi6220: Change syspll and media_syspll clk to
- 1.19GHz
-In-Reply-To: <1467189955-21694-1-git-send-email-guodong.xu@linaro.org>
-References: <1467189955-21694-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <146784380027.73491.17727471600536823074@resonance>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed,  6 Jul 2016 15:25:19 -0700
+Subject: [PATCH 0/9] mm: Hardened usercopy
+Message-ID: <1467843928-29351-1-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Guodong Xu (2016-06-29 01:45:54)
-> From: Xinliang Liu <xinliang.liu@linaro.org>
-> 
-> In the bootloader of HiKey/96boards, syspll and media_syspll clk
-> was initialized to 1.19GHz. So, here changes it in kernel accordingly.
-> 
-> 1.19GHz was chosen over 1.2GHz because at 1.19GHz we get more precise
-> HDMI pixel clock (1.19G/16 = 74.4MHz) for 1280x720p at 60Hz HDMI
-> (74.25MHz required by standards). Closer pixel clock means better
-> compatibility to HDMI monitors.
-> 
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+Hi,
 
-Applied.
+This is a start of the mainline port of PAX_USERCOPY[1]. After I started
+writing tests (now in lkdtm in -next) for Casey's earlier port[2], I
+kept tweaking things further and further until I ended up with a whole
+new patch series. To that end, I took Rik's feedback and made a number
+of other changes and clean-ups as well.
 
-Regards,
-Mike
+Based on my understanding, PAX_USERCOPY was designed to catch a few
+classes of flaws around the use of copy_to_user()/copy_from_user(). These
+changes don't touch get_user() and put_user(), since these operate on
+constant sized lengths, and tend to be much less vulnerable. There
+are effectively three distinct protections in the whole series,
+each of which I've given a separate CONFIG, though this patch set is
+only the first of the three intended protections. (Generally speaking,
+PAX_USERCOPY covers what I'm calling CONFIG_HARDENED_USERCOPY (this) and
+CONFIG_HARDENED_USERCOPY_WHITELIST (future), and PAX_USERCOPY_SLABS covers
+CONFIG_HARDENED_USERCOPY_SPLIT_KMALLOC (future).)
 
-> ---
->  drivers/clk/hisilicon/clk-hi6220.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
-> index f02cb41..a36ffcb 100644
-> --- a/drivers/clk/hisilicon/clk-hi6220.c
-> +++ b/drivers/clk/hisilicon/clk-hi6220.c
-> @@ -34,8 +34,8 @@ static struct hisi_fixed_rate_clock hi6220_fixed_rate_clks[] __initdata = {
->         { HI6220_PLL_BBP,       "bbppll0",      NULL, 0, 245760000, },
->         { HI6220_PLL_GPU,       "gpupll",       NULL, 0, 1000000000,},
->         { HI6220_PLL1_DDR,      "ddrpll1",      NULL, 0, 1066000000,},
-> -       { HI6220_PLL_SYS,       "syspll",       NULL, 0, 1200000000,},
-> -       { HI6220_PLL_SYS_MEDIA, "media_syspll", NULL, 0, 1200000000,},
-> +       { HI6220_PLL_SYS,       "syspll",       NULL, 0, 1190400000,},
-> +       { HI6220_PLL_SYS_MEDIA, "media_syspll", NULL, 0, 1190400000,},
->         { HI6220_DDR_SRC,       "ddr_sel_src",  NULL, 0, 1200000000,},
->         { HI6220_PLL_MEDIA,     "media_pll",    NULL, 0, 1440000000,},
->         { HI6220_PLL_DDR,       "ddrpll0",      NULL, 0, 1600000000,},
-> -- 
-> 1.9.1
-> 
+This series, which adds CONFIG_HARDENED_USERCOPY, checks that objects
+being copied to/from userspace meet certain criteria:
+- if address is a heap object, the size must not exceed the object's
+  allocated size. (This will catch all kinds of heap overflow flaws.)
+- if address range is in the current process stack, it must be within the
+  current stack frame (if such checking is possible) or at least entirely
+  within the current process's stack. (This could catch large lengths that
+  would have extended beyond the current process stack, or overflows if
+  their length extends back into the original stack.)
+- if the address range is part of kernel data, rodata, or bss, allow it.
+- if address range is page-allocated, that it doesn't span multiple
+  allocations.
+- if address is within the kernel text, reject it.
+- everything else is accepted
+
+The patches in the series are:
+- The core copy_to/from_user() checks, without the slab object checks:
+	1- mm: Hardened usercopy
+- Per-arch enablement of the protection:
+	2- x86/uaccess: Enable hardened usercopy
+	3- ARM: uaccess: Enable hardened usercopy
+	4- arm64/uaccess: Enable hardened usercopy
+	5- ia64/uaccess: Enable hardened usercopy
+	6- powerpc/uaccess: Enable hardened usercopy
+	7- sparc/uaccess: Enable hardened usercopy
+- The heap allocator implementation of object size checking:
+	8- mm: SLAB hardened usercopy support
+	9- mm: SLUB hardened usercopy support
+
+Some notes:
+
+- This is expected to apply on top of -next which contains fixes for the
+  position of _etext on both arm and arm64.
+
+- I couldn't detect a measurable performance change with these features
+  enabled. Kernel build times were unchanged, hackbench was unchanged,
+  etc. I think we could flip this to "on by default" at some point.
+
+- The SLOB support extracted from grsecurity seems entirely broken. I
+  have no idea what's going on there, I spent my time testing SLAB and
+  SLUB. Having someone else look at SLOB would be nice, but this series
+  doesn't depend on it.
+
+Additional features that would be nice, but aren't blocking this series:
+
+- Needs more architecture support for stack frame checking (only x86 now).
+
+
+Thanks!
+
+-Kees
+
+[1] https://grsecurity.net/download.php "grsecurity - test kernel patch"
+[2] http://www.openwall.com/lists/kernel-hardening/2016/05/19/5
