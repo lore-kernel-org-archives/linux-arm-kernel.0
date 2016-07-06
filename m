@@ -1,19 +1,35 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 6 Jul 2016 08:33:32 -0700
-Subject: [PATCH] clocksource: cadence_ttc: fix a return value in case of
- error
-In-Reply-To: <1467783323-16632-1-git-send-email-christophe.jaillet@wanadoo.fr>
-References: <1467783323-16632-1-git-send-email-christophe.jaillet@wanadoo.fr>
-Message-ID: <20160706153332.GN19175@xsjsorenbubuntu>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Wed, 6 Jul 2016 17:39:54 +0200
+Subject: [PATCH 3/4] drivers: reset: Add STM32 reset driver
+In-Reply-To: <1467725370.2978.64.camel@pengutronix.de>
+References: <1467640052-6770-1-git-send-email-gabriel.fernandez@st.com>
+ <1467640052-6770-3-git-send-email-gabriel.fernandez@st.com>
+ <1467653810.2224.77.camel@pengutronix.de> <577B61EA.5080703@st.com>
+ <1467725370.2978.64.camel@pengutronix.de>
+Message-ID: <577D264A.4050709@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-07-06 at 07:35:23 +0200, Christophe JAILLET wrote:
-> IS_ERR and PTR_ERR should use the same variable, clk_ce in this case.
-> 
-> Fixes: 4de1eb07c47f (Convert init function to return error)
-> 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Hi Philipp
 
-	S?ren
+On 07/05/2016 03:29 PM, Philipp Zabel wrote:
+> Am Dienstag, den 05.07.2016, 09:29 +0200 schrieb Gabriel Fernandez:
+> [...]
+>>>> +static const struct reset_control_ops stm32_reset_ops = {
+>>>> +	.assert		= stm32_reset_assert,
+>>>> +	.deassert	= stm32_reset_deassert,
+>>> Are the registers not readable, or did you choose not to
+>>> implement .status on purpose?
+>> We choose to not implement.
+> Ok. Because of size issues or just because you don't need them in any of
+> your drivers?
+Because i don't need them.
+
+BR
+
+Gabriel
+
+>
+> regards
+> Philipp
+>
