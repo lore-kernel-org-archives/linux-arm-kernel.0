@@ -1,82 +1,197 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 6 Jul 2016 13:03:19 +0300
-Subject: SPI: performance regression when using the common message queuing
- infrastructure
-In-Reply-To: <577CD464.6050506@atmel.com>
-References: <577CD464.6050506@atmel.com>
-Message-ID: <577CD767.2080309@ti.com>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Wed, 6 Jul 2016 18:07:27 +0800
+Subject: [PATCH] arm64:mm Remove the redundant initrd memblock codes
+In-Reply-To: <CAKv+Gu8Zygx8jiYvDN69NuAEHWFOg2eCh+xM7m6FveBw2Qo7-Q@mail.gmail.com>
+References: <1467607994-14368-1-git-send-email-dennis.chen@arm.com>
+ <4ABE8B9C-8027-40AA-A303-A82CF014A287@linaro.org>
+ <20160705022217.GA27637@arm.com>
+ <B1CA6829-851E-4E56-BA48-58EE72272B49@linaro.org>
+ <20160705041834.GA28823@arm.com>
+ <CAKv+Gu8Zygx8jiYvDN69NuAEHWFOg2eCh+xM7m6FveBw2Qo7-Q@mail.gmail.com>
+Message-ID: <20160706100725.GA14647@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2016 12:50 PM, Cyrille Pitchen wrote:
-> Hi Mark,
+On Wed, Jul 06, 2016 at 10:47:57AM +0200, Ard Biesheuvel wrote:
+> On 5 July 2016 at 06:18, Dennis Chen <dennis.chen@arm.com> wrote:
+> > On Tue, Jul 05, 2016 at 11:41:02AM +0800, Ard Biesheuvel wrote:
+> >>
+> >> > On 5 jul. 2016, at 10:22, Dennis Chen <dennis.chen@arm.com> wrote:
+> >> >
+> >> >> On Mon, Jul 04, 2016 at 12:33:05PM +0200, Ard Biesheuvel wrote:
+> >> >>
+> >> >>> On 4 jul. 2016, at 06:53, Dennis Chen <dennis.chen@arm.com> wrote:
+> >> >>>
+> >> >>> The memory range between initrd_start and initrd_end was added to the memblock
+> >> >>> twice unnecessarily in the same function before initrd memory range can be freed.
+> >> >>> This patch merge those codes into one piece of block and add the initrd memory
+> >> >>> range only once, also it makes the code clean and simple.
+> >> >>
+> >> >> This is likely to break under KASLR (and I would recommend that you test with kaslr enabled when you propose changes to this code)
+> >> > Hello Ard, I've tested it under KASLR on Juno board before proposing the changes,where the firmware provides the RNG protocol, it works well.
+> >>
+> >> Ok, thanks for confirming that (and apologies for assuming you did not test it)
+> >>
+> >> >>
+> >> >> The randomization of memstart_addr needs to execute /after/ adding back the initrd, otherwise the chosen value of memstart_addr may push the initrd beyond the end of the linear area into the userland range.
+> >> > Yes, I know the 'range' is depends on memblock_end_of_DRAM() and memblock_start_of_DRAM(), but I can't see that the order of initrd added to the memblock will affect
+> >> > those two values returned from memblock_ fucntions, IMHO the initrd will be loaded to somewhere within the DRAM by firmware, is that correct?
+> >>
+> >> memblock_add/_remove may affect the return values of memblock_start/_end_of_DRAM, so the reordering will affect the range of the randomized memstart_addr, afaict
+> >>
+> > Hello Ard, since the efi stub will load the initrd block to the DRAM, and all the memory descriptions passed in by the firmware will be added to the memblock by efi
+> > stub, so in this case adding the initrd to the memblock will not change the return value of memblock_start/_end_of_DRAM, else it's a bug from efi stub, isn't it?
+> >
+> 
+> First of all, every memblock_add/_remove call is likely to affect
+> either memblock_start_of_DRAM or memblock_end_of_DRAM. The EFI stub
+> does not manipulate the memblock table, it simply retrieves the UEFI
+> memory map from the firmware and hands the address to the kernel
+> proper.
+> 
+> But more importantly, the initrd could be loaded not only by the EFI
+> stub, but also by GRUB, and so we should be able to gracefully handle
+> the case where the initrd ends up in a place where it is outside of
+> the linear mapping, either due to a mem= kernel command line argument,
+> or due to an insufficient VA size (e.g., the Freescale platform that
+> puts 2 GB at 0x8000_0000 and the remaining memory at 0x80_0000_0000
+> cannot run an ordinary 39-bit VA kernel without losing access to a
+> substantial chunk of its memory)
 >
-> recently Heiko reported to us a performance regression with Atmel SPI
-> controllers. He noticed the issue on a sam9g15ek board and I was also able to
-> reproduce it on a sama5d36ek board.
->
-> We found out that the performance regression was introduced in 3.14 by commit:
-> 8090d6d1a415d3ae1a7208995decfab8f60f4f36
-> spi: atmel: Refactor spi-atmel to use SPI framework queue
->
-> For the test, I connected a Spansion S25FL512 memory on the SPI1 controller of
-> a sama5d36ek board. Then with an oscilloscope I monitored the chip-select, clock
-> and MOSI signals on the SPI bus.
->
->
-> 1 - Reading 512 bytes from the memory
->
-> # dd if=/dev/mtd6 bs=512 count=1 of=/dev/null
->
-> With the oscilloscope, I measured the time between the chip-select fell before
-> the Read Status command (05h) and the chip-select rose after all data had been
-> read by the 4-byte address Fast Read 1-1-1 command (13h).
->
-> 3.14 vanilla                      : 305 ?s
-> 3.14 commit 8090d6d1a415 reverted : 242 ?s   -21%
->
-> 2 - Reading 1000 x 1024 bytes from the memory
->
-> # dd if=/dev/mtd6 bs=1024 count=1000 of=/dev/null
->
-> Still with the scope, I measured the time to read all data.
->
-> 3.14 vanilla                      : 435 ms
-> 3.14 commit 8090d6d1a415 reverted : 361 ms   -17%
->
->
-> Indeed the oscilloscope shows that more time is spent between messages and
-> transfers.
->
-> commit 8090d6d1a415 replaced the tasklet used to manage a SPI message/transfer
-> queue by a workqueue provided by the SPI framework.
->
-> The support of this (optional) workqueue was introduced by commit:
-> ffbbdd21329f3e15eeca6df2d4bc11c04d9d91c0
-> spi: create a message queuing infrastructure
->
-> Though the commit message claims that is common infrastructure is optional,
-> the patch also claims the .transfer() hook is deprecated, suggesting drivers
-> should implement the new .transfer_one_message() hook instead.
->
-> This is the reason why commit 8090d6d1a415 was submitted. However we lost
-> quite amount of performances moving from our tasklet to the generic workqueue.
->
-> So do you recommend us to keep our current generic implementation relying on
-> the SPI framework workqueue or to go back to a custom implementation using
-> tasklet?
-> If we keep the current implementation, is there a way to improve the
-> performances so we go back to something close to what he had before?
->
-> We saw in commit ffbbdd21329f that we can change the workqueue thread
-> scheduling policy to SCHED_FIFO by setting master->rt.
->
+Hello Ard, Freescale platform is a good example. In this case, with 39-bit
+VA, the linear map area is only 256GB, while the upper memory block on that
+platform is 0x80_0000_0000 exceeding the linear size, so current code will not
+put the [0x80_0000_0000, size] into the memblock, if kernel is loaded into the
+lower address memblock [0x8000_0000, size] while initrd block is loaded into
+the higher memblock, so the memblock_end_of_DRAM() will be changed after adding
+back the initrd. 
+OK, so please modulo my prior comments/questions. Maybe we can have:
 
-master->rt is not a good choice as i know and
-you may find thread [1] useful for you.
+-------->8--------
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 2ade7a6..2dede3b 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -279,15 +279,11 @@ void __init arm64_memblock_init(void)
+         * pagetables with memblock.
+         */
+        memblock_reserve(__pa(_text), _end - _text);
+-#ifdef CONFIG_BLK_DEV_INITRD
+-       if (initrd_start) {
+-               memblock_reserve(initrd_start, initrd_end - initrd_start);
+-
++       if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+                /* the generic initrd code expects virtual addresses */
+                initrd_start = __phys_to_virt(initrd_start);
+                initrd_end = __phys_to_virt(initrd_end);
+        }
+-#endif
+-------->8--------
 
-[1] http://www.spinics.net/lists/linux-rt-users/msg14347.html
+But I really have no keen on this kind of cleanup. So let's ignore this changes,
+and thanks for the clarification!
 
--- 
-regards,
--grygorii
+Thanks,
+Dennis
+> 
+> So this means that we cannot randomize the linear mapping until we
+> have added [back] the pieces we expect to be covered by it, which are
+> the [_text, _end) kernel range, and the initrd.
+> 
+> 
+> 
+> >> >>> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+> >> >>> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> >>> Cc: Steve Capper <steve.capper@arm.com>
+> >> >>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> >>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> >>> Cc: Will Deacon <will.deacon@arm.com>
+> >> >>> ---
+> >> >>> arch/arm64/mm/init.c | 58 +++++++++++++++++++++++-----------------------------
+> >> >>> 1 file changed, 26 insertions(+), 32 deletions(-)
+> >> >>>
+> >> >>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> >> >>> index 2ade7a6..cf26cdb 100644
+> >> >>> --- a/arch/arm64/mm/init.c
+> >> >>> +++ b/arch/arm64/mm/init.c
+> >> >>> @@ -228,6 +228,29 @@ void __init arm64_memblock_init(void)
+> >> >>>       memblock_add(__pa(_text), (u64)(_end - _text));
+> >> >>>   }
+> >> >>>
+> >> >>> +    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+> >> >>> +        extern u16 memstart_offset_seed;
+> >> >>> +        u64 range = linear_region_size -
+> >> >>> +                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+> >> >>> +
+> >> >>> +        /*
+> >> >>> +         * If the size of the linear region exceeds, by a sufficient
+> >> >>> +         * margin, the size of the region that the available physical
+> >> >>> +         * memory spans, randomize the linear region as well.
+> >> >>> +         */
+> >> >>> +        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+> >> >>> +            range = range / ARM64_MEMSTART_ALIGN + 1;
+> >> >>> +            memstart_addr -= ARM64_MEMSTART_ALIGN *
+> >> >>> +                     ((range * memstart_offset_seed) >> 16);
+> >> >>> +        }
+> >> >>> +    }
+> >> >>> +
+> >> >>> +    /*
+> >> >>> +     * Register the kernel text, kernel data, initrd, and initial
+> >> >>> +     * pagetables with memblock.
+> >> >>> +     */
+> >> >>> +    memblock_reserve(__pa(_text), _end - _text);
+> >> >>> +
+> >> >>>   if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+> >> >>>       /*
+> >> >>>        * Add back the memory we just removed if it results in the
+> >> >>> @@ -254,41 +277,12 @@ void __init arm64_memblock_init(void)
+> >> >>>           memblock_remove(base, size); /* clear MEMBLOCK_ flags */
+> >> >>>           memblock_add(base, size);
+> >> >>>           memblock_reserve(base, size);
+> >> >>> +            /* the generic initrd code expects virtual addresses */
+> >> >>> +            initrd_start = __phys_to_virt(initrd_start);
+> >> >>> +            initrd_end = __phys_to_virt(initrd_end);
+> >> >>>       }
+> >> >>>   }
+> >> >>>
+> >> >>> -    if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+> >> >>> -        extern u16 memstart_offset_seed;
+> >> >>> -        u64 range = linear_region_size -
+> >> >>> -                (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+> >> >>> -
+> >> >>> -        /*
+> >> >>> -         * If the size of the linear region exceeds, by a sufficient
+> >> >>> -         * margin, the size of the region that the available physical
+> >> >>> -         * memory spans, randomize the linear region as well.
+> >> >>> -         */
+> >> >>> -        if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+> >> >>> -            range = range / ARM64_MEMSTART_ALIGN + 1;
+> >> >>> -            memstart_addr -= ARM64_MEMSTART_ALIGN *
+> >> >>> -                     ((range * memstart_offset_seed) >> 16);
+> >> >>> -        }
+> >> >>> -    }
+> >> >>> -
+> >> >>> -    /*
+> >> >>> -     * Register the kernel text, kernel data, initrd, and initial
+> >> >>> -     * pagetables with memblock.
+> >> >>> -     */
+> >> >>> -    memblock_reserve(__pa(_text), _end - _text);
+> >> >>> -#ifdef CONFIG_BLK_DEV_INITRD
+> >> >>> -    if (initrd_start) {
+> >> >>> -        memblock_reserve(initrd_start, initrd_end - initrd_start);
+> >> >>> -
+> >> >>> -        /* the generic initrd code expects virtual addresses */
+> >> >>> -        initrd_start = __phys_to_virt(initrd_start);
+> >> >>> -        initrd_end = __phys_to_virt(initrd_end);
+> >> >>> -    }
+> >> >>> -#endif
+> >> >>> -
+> >> >>>   early_init_fdt_scan_reserved_mem();
+> >> >>>
+> >> >>>   /* 4GB maximum for 32-bit only capable devices */
+> >> >>> --
+> >> >>> 1.8.3.1
+> >> >
+> >>
+> >
+> 
