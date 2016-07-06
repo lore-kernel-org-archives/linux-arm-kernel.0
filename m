@@ -1,102 +1,36 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed,  6 Jul 2016 15:25:26 -0700
-Subject: [PATCH 7/9] sparc/uaccess: Enable hardened usercopy
-In-Reply-To: <1467843928-29351-1-git-send-email-keescook@chromium.org>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
-Message-ID: <1467843928-29351-8-git-send-email-keescook@chromium.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 06 Jul 2016 15:48:24 -0700
+Subject: [GIT PULL] Amlogic SoC updates for v4.8 (#2)
+Message-ID: <m28txeqt6v.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables CONFIG_HARDENED_USERCOPY checks on sparc.
+This is the 2nd round of SoC changes for Amlogic.
 
-Based on code from PaX and grsecurity.
+Kevin
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/sparc/Kconfig                  |  1 +
- arch/sparc/include/asm/uaccess_32.h | 14 ++++++++++----
- arch/sparc/include/asm/uaccess_64.h | 11 +++++++++--
- 3 files changed, 20 insertions(+), 6 deletions(-)
 
-diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-index 546293d9e6c5..59b09600dd32 100644
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -43,6 +43,7 @@ config SPARC
- 	select OLD_SIGSUSPEND
- 	select ARCH_HAS_SG_CHAIN
- 	select CPU_NO_EFFICIENT_FFS
-+	select HAVE_ARCH_HARDENED_USERCOPY
- 
- config SPARC32
- 	def_bool !64BIT
-diff --git a/arch/sparc/include/asm/uaccess_32.h b/arch/sparc/include/asm/uaccess_32.h
-index 57aca2792d29..341a5a133f48 100644
---- a/arch/sparc/include/asm/uaccess_32.h
-+++ b/arch/sparc/include/asm/uaccess_32.h
-@@ -248,22 +248,28 @@ unsigned long __copy_user(void __user *to, const void __user *from, unsigned lon
- 
- static inline unsigned long copy_to_user(void __user *to, const void *from, unsigned long n)
- {
--	if (n && __access_ok((unsigned long) to, n))
-+	if (n && __access_ok((unsigned long) to, n)) {
-+		if (!__builtin_constant_p(n))
-+			check_object_size(from, n, true);
- 		return __copy_user(to, (__force void __user *) from, n);
--	else
-+	} else
- 		return n;
- }
- 
- static inline unsigned long __copy_to_user(void __user *to, const void *from, unsigned long n)
- {
-+	if (!__builtin_constant_p(n))
-+		check_object_size(from, n, true);
- 	return __copy_user(to, (__force void __user *) from, n);
- }
- 
- static inline unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
- {
--	if (n && __access_ok((unsigned long) from, n))
-+	if (n && __access_ok((unsigned long) from, n)) {
-+		if (!__builtin_constant_p(n))
-+			check_object_size(to, n, false);
- 		return __copy_user((__force void __user *) to, from, n);
--	else
-+	} else
- 		return n;
- }
- 
-diff --git a/arch/sparc/include/asm/uaccess_64.h b/arch/sparc/include/asm/uaccess_64.h
-index e9a51d64974d..8bda94fab8e8 100644
---- a/arch/sparc/include/asm/uaccess_64.h
-+++ b/arch/sparc/include/asm/uaccess_64.h
-@@ -210,8 +210,12 @@ unsigned long copy_from_user_fixup(void *to, const void __user *from,
- static inline unsigned long __must_check
- copy_from_user(void *to, const void __user *from, unsigned long size)
- {
--	unsigned long ret = ___copy_from_user(to, from, size);
-+	unsigned long ret;
- 
-+	if (!__builtin_constant_p(size))
-+		check_object_size(to, size, false);
-+
-+	ret = ___copy_from_user(to, from, size);
- 	if (unlikely(ret))
- 		ret = copy_from_user_fixup(to, from, size);
- 
-@@ -227,8 +231,11 @@ unsigned long copy_to_user_fixup(void __user *to, const void *from,
- static inline unsigned long __must_check
- copy_to_user(void __user *to, const void *from, unsigned long size)
- {
--	unsigned long ret = ___copy_to_user(to, from, size);
-+	unsigned long ret;
- 
-+	if (!__builtin_constant_p(size))
-+		check_object_size(from, size, true);
-+	ret = ___copy_to_user(to, from, size);
- 	if (unlikely(ret))
- 		ret = copy_to_user_fixup(to, from, size);
- 	return ret;
--- 
-2.7.4
+The following changes since commit bf56c7762df2ef60512eb58c5f4525d173a4da22:
+
+  ARM64: Kconfig: Select the Amlogic Meson pin controller driver (2016-06-01 10:55:05 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-soc-2
+
+for you to fetch changes up to 59f910d8fbd9d7c2957ad4df642dc262fbfdcd59:
+
+  arm64: amlogic: select gxbb clk driver (2016-06-23 15:22:37 -0700)
+
+----------------------------------------------------------------
+Amlogic SoC updates:
+- Kconfig updates for new GXBB clock driver
+
+----------------------------------------------------------------
+Michael Turquette (2):
+      arm: meson: explicitly select clk drivers
+      arm64: amlogic: select gxbb clk driver
+
+ arch/arm/mach-meson/Kconfig  | 3 +++
+ arch/arm64/Kconfig.platforms | 2 ++
+ 2 files changed, 5 insertions(+)
