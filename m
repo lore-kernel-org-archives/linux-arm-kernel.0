@@ -1,93 +1,83 @@
-From: haas@computerlinguist.org (Michael Haas)
-Date: Wed, 6 Jul 2016 06:34:53 +0200
-Subject: [linux-sunxi] [PATCH 2/4] power: add axp20x-battery driver
-In-Reply-To: <4101467707611@web7h.yandex.ru>
-References: <20160701092926.32005-1-icenowy@aosc.xyz>
- <20160701092926.32005-2-icenowy@aosc.xyz> <577B44FD.6040404@mailbox.org>
- <4101467707611@web7h.yandex.ru>
-Message-ID: <577C8A6D.8000409@computerlinguist.org>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Wed, 06 Jul 2016 13:51:09 +0900
+Subject: [PATCH v3 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for
+ SPI clocks
+In-Reply-To: <577A7D8D.8070004@samsung.com>
+References: <1467270911-10971-1-git-send-email-andi.shyti@samsung.com>
+ <1467270911-10971-2-git-send-email-andi.shyti@samsung.com>
+ <577A2EFF.2010306@samsung.com> <20160704102614.GD1257@jack.zhora.eu>
+ <CGME20160704151537epcas1p42a74c53ebb4227da9a30c25e250f0c5a@epcas1p4.samsung.com>
+ <577A7D8D.8070004@samsung.com>
+Message-ID: <20160706045108.GD23620@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi There,
+Hi Sylwester,
 
-On 05.07.2016 10:33, Icenowy Zheng wrote:
-> On 01.07.2016 11:29, Icenowy Zheng wrote:
+> +#if 0
+>                         clocks = <&cmu_peric CLK_PCLK_SPI1>,
+>                                  <&cmu_top CLK_SCLK_SPI1_PERIC>;
+> +#else
+> +                       clocks = <&cmu_peric CLK_PCLK_SPI1>,
+> +                                <&cmu_peric CLK_SCLK_SPI1>;
+> +#endif
 
->>>   +
->>>   +static enum power_supply_property axp22x_battery_properties[] = {
->>>   + POWER_SUPPLY_PROP_CAPACITY,
->>>   + POWER_SUPPLY_PROP_HEALTH,
->>>   + POWER_SUPPLY_PROP_PRESENT,
->>>   + POWER_SUPPLY_PROP_STATUS,
->>>   + POWER_SUPPLY_PROP_CURRENT_NOW,
->>>   + POWER_SUPPLY_PROP_VOLTAGE_NOW,
->>>   +};
+Yes, that's how it should be, indeed.
 
-Here's what Bruno's driver supports:
+>         /* Disable Clock */
+>         if (sdd->port_conf->clk_from_cmu) {
+> -               clk_disable_unprepare(sdd->src_clk);
+> +               /* clk_disable_unprepare(sdd->src_clk); */
+>         } else {
+>                 val = readl(regs + S3C64XX_SPI_CLK_CFG);
+>                 val &= ~S3C64XX_SPI_ENCLK_ENABLE;
+> @@ -626,7 +626,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+>                 /* There is half-multiplier before the SPI */
+>                 clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
+>                 /* Enable Clock */
+> -               clk_prepare_enable(sdd->src_clk);
+> +               /* clk_prepare_enable(sdd->src_clk); */
+>         } else {
+>                 /* Configure Clock */
+>                 val = readl(regs + S3C64XX_SPI_CLK_CFG);
 
-static enum power_supply_property axp20x_battery_power_properties[] = {
-     POWER_SUPPLY_PROP_PRESENT,
-     POWER_SUPPLY_PROP_ONLINE,
-     POWER_SUPPLY_PROP_STATUS,
-     POWER_SUPPLY_PROP_VOLTAGE_NOW,
-     POWER_SUPPLY_PROP_CURRENT_NOW,
-     POWER_SUPPLY_PROP_CURRENT_MAX,
-     POWER_SUPPLY_PROP_HEALTH,
-     POWER_SUPPLY_PROP_TECHNOLOGY,
-     POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
-     POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
-     /* POWER_SUPPLY_PROP_POWER_NOW, */
-     POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
-     /* POWER_SUPPLY_PROP_CHARGE_NOW, */
-     POWER_SUPPLY_PROP_CAPACITY,
-     POWER_SUPPLY_PROP_TEMP,
-     POWER_SUPPLY_PROP_TEMP_ALERT_MIN,
-     POWER_SUPPLY_PROP_TEMP_ALERT_MAX,
-};
+I don't see anything wrong on the above. We could make it as:
 
->>>   +
->>>   +static int axp20x_battery_probe(struct platform_device *pdev)
->>>   +{
->>>   + struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
->>>   + struct power_supply_config psy_cfg = {};
->>>   + struct axp20x_battery *power;
->>>   + static const char * const axp22x_irq_names[] = {
->>>   + "BATT_PLUGIN", "BATT_REMOVAL", "BATT_ENT_ACT_MODE",
->>>   + "BATT_EXIT_ACT_MODE", "CHARG", "CHARG_DONE", NULL };
+@@ -596,9 +597,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+        u32 val;
+ 
+        /* Disable Clock */
+-       if (sdd->port_conf->clk_from_cmu) {
+-               clk_disable_unprepare(sdd->src_clk);
+-       } else {
++       if (!sdd->port_conf->clk_from_cmu) {
+                val = readl(regs + S3C64XX_SPI_CLK_CFG);
+                val &= ~S3C64XX_SPI_ENCLK_ENABLE;
+                writel(val, regs + S3C64XX_SPI_CLK_CFG);
+@@ -640,13 +639,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ 
+        writel(val, regs + S3C64XX_SPI_MODE_CFG);
+ 
+-       if (sdd->port_conf->clk_from_cmu) {
+-               /* Configure Clock */
+-               /* There is half-multiplier before the SPI */
+-               clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
+-               /* Enable Clock */
+-               clk_prepare_enable(sdd->src_clk);
+-       } else {
++       if (!sdd->port_conf->clk_from_cmu) {
+                /* Configure Clock */
+                val = readl(regs + S3C64XX_SPI_CLK_CFG);
+                val &= ~S3C64XX_SPI_PSR_MASK;
 
+> I meant we could amend which clocks are specified at the SPI bus device
+> DT nodes and change handling of clocks in the spi-s3c64xx driver to model
+> everything properly and get it all working.
 
-And here are the interrupts handled:
-
-static const char * const irq_names[] = { "BATT_HOT", "BATT_COLD",
-         "BATT_PLUGIN", "BATT_REMOVAL", "BATT_ACTIVATE",
-         "BATT_ACTIVATED", "BATT_CHARGING", "BATT_CHARGED",
-         "BATT_CHG_CURR_LOW", "BATT_POWER_LOW_WARN",
-         "BATT_POWER_LOW_CRIT" };
-
-
-
-There are a couple of issues with the version of Bruno's driver that I have:
-
-* power management is disabled (in the driver, not in the charger) - 
-think suspend/resume
-* the temperature sensor data is not turned into a temperature value 
-correctly
-* the IRQ handlers need to be cleaned up (remove logging)
-* device tree binding documentation is missing
-
-Other than that, it's basically working and I have been using it at 
-least for some testing.
-
-The device tree bindings support:
-* OCV curve support
-* battery resistance
-* battery capacity
-* temp sensor settings
-
-You can find my copy of Bruno's driver here:
-https://github.com/mhaas/linux-sunxi/blob/axp209-charger/drivers/power/axp20x_fuel_gauge.c
+I think that if the clock comes from the cmu it's not necessary
+to disable it. I would like to avoid adding DTS properties
+because we have the clock disabling inherited from old code which
+it might not be required at all (in our tests, indeed it works).
 
 Thanks,
-
-Michael
+Andi
