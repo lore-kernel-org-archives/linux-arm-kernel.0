@@ -1,47 +1,88 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 06 Jul 2016 23:11:12 +0200
-Subject: [PATCH v4 1/3] PM / Hibernate: Allow arch code to influence CPUs
- disabled during hibernate
-In-Reply-To: <577CCC5F.2060409@arm.com>
-References: <1467643950-11034-1-git-send-email-james.morse@arm.com>
- <2602641.slsnqsKrbn@vostro.rjw.lan> <577CCC5F.2060409@arm.com>
-Message-ID: <3861939.zr3zvCQ85S@vostro.rjw.lan>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 6 Jul 2016 23:15:18 +0200
+Subject: [PATCH v8 05/17] KVM: kvm_io_bus: add kvm_io_bus_get_dev() call
+In-Reply-To: <20160705112309.28877-6-andre.przywara@arm.com>
+References: <20160705112309.28877-1-andre.przywara@arm.com>
+ <20160705112309.28877-6-andre.przywara@arm.com>
+Message-ID: <20160706211518.GE12608@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 06, 2016 10:16:15 AM James Morse wrote:
-> Hi Rafael,
+On Tue, Jul 05, 2016 at 12:22:57PM +0100, Andre Przywara wrote:
+> The kvm_io_bus framework is a nice place of holding information about
+> various MMIO regions for kernel emulated devices.
+> Add a call to retrieve the kvm_io_device structure which is associated
+> with a certain MMIO address. This avoids to duplicate kvm_io_bus'
+> knowledge of MMIO regions without having to fake MMIO calls if a user
+> needs the device a certain MMIO address belongs to.
+> This will be used by the ITS emulation to get the associated ITS device
+> when someone triggers an MSI via an ioctl from userspace.
 > 
-> On 05/07/16 13:28, Rafael J. Wysocki wrote:
-> > On Monday, July 04, 2016 03:52:28 PM James Morse wrote:
-> >> Architecture code may need to do extra work when secondary CPUs are
-> >> disabled during hibernate and resume. This may include pushing sleeping
-> >> CPUs into a deeper power-saving state, or influencing which CPU resume
-> >> occurs on.
-> >>
-> >> Define a macro arch_hibernation_disable_cpus(), which defaults to
-> >> calling disable_nonboot_cpus() if undefined. Architectures that
-> >> need to do extra work around these calls can use this to influence
-> >> the CPU down calls.
-> >> The macros should be defined in asm/suspend.h, and
-> >> ARCH_HIBERNATION_CPU_HOOKS should be added to Kconfig.
-> >>
-> >> Signed-off-by: James Morse <james.morse@arm.com>
-> >> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> >> Cc: Pavel Machek <pavel@ucw.cz>
-> > 
-> > I'm going to apply this one later today.
-> > 
-> > If you want me to apply the other two as well, they need to be ACKed by the
-> > ARM64 maintainers.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  include/linux/kvm_host.h |  2 ++
+>  virt/kvm/kvm_main.c      | 24 ++++++++++++++++++++++++
+>  2 files changed, 26 insertions(+)
 > 
-> Thanks. I'd like to get to the bottom of Lorenzo's comments[0] before the arm64
-> patches go any further though!
+> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> index 0640ee9..614a981 100644
+> --- a/include/linux/kvm_host.h
+> +++ b/include/linux/kvm_host.h
+> @@ -164,6 +164,8 @@ int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
+>  			    int len, struct kvm_io_device *dev);
+>  int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+>  			      struct kvm_io_device *dev);
+> +struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+> +					 gpa_t addr);
+>  
+>  #ifdef CONFIG_KVM_ASYNC_PF
+>  struct kvm_async_pf {
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index ef54b4c..bd2eb92 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -3496,6 +3496,30 @@ int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+>  	return r;
+>  }
+>  
 
-OK
+do you need to hold kvm->slots_lock here like the other functions
+touching the io_bus framework here, which have comments specifying that?
 
-Can you please answer my questions regarding patch [1/3] in the
-meantime (posted separately)?
+> +struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+> +					 gpa_t addr)
+> +{
+> +	struct kvm_io_bus *bus;
+> +	int dev_idx, srcu_idx;
+> +	struct kvm_io_device *iodev = NULL;
+> +
+> +	srcu_idx = srcu_read_lock(&kvm->srcu);
+> +
+> +	bus = srcu_dereference(kvm->buses[bus_idx], &kvm->srcu);
+> +
+> +	dev_idx = kvm_io_bus_get_first_dev(bus, addr, 1);
+> +	if (dev_idx < 0)
+> +		goto out_unlock;
+> +
+> +	iodev = bus->range[dev_idx].dev;
+> +
+> +out_unlock:
+> +	srcu_read_unlock(&kvm->srcu, srcu_idx);
+> +
+> +	return iodev;
+> +}
+> +EXPORT_SYMBOL_GPL(kvm_io_bus_get_dev);
+> +
+>  static struct notifier_block kvm_cpu_notifier = {
+>  	.notifier_call = kvm_cpu_hotplug,
+>  };
+> -- 
+> 2.9.0
+> 
 
-Thanks,
-Rafael
+You also need an ack here, but my comment-comment above notwithstanding:
+
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+-Christoffer
