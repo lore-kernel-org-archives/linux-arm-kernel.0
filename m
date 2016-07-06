@@ -1,106 +1,47 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  6 Jul 2016 09:54:32 +0100
-Subject: [PATCH v6 14/18] ARM: STi: DT: STiH407: Add uniperif player dt nodes
-In-Reply-To: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
-References: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1467795276-21725-15-git-send-email-peter.griffin@linaro.org>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 06 Jul 2016 10:16:15 +0100
+Subject: [PATCH v4 1/3] PM / Hibernate: Allow arch code to influence CPUs
+ disabled during hibernate
+In-Reply-To: <2602641.slsnqsKrbn@vostro.rjw.lan>
+References: <1467643950-11034-1-git-send-email-james.morse@arm.com>
+ <1467643950-11034-2-git-send-email-james.morse@arm.com>
+ <2602641.slsnqsKrbn@vostro.rjw.lan>
+Message-ID: <577CCC5F.2060409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DT nodes for the uniperif player
-IP blocks found on STiH407 family silicon.
+Hi Rafael,
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 76 +++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+On 05/07/16 13:28, Rafael J. Wysocki wrote:
+> On Monday, July 04, 2016 03:52:28 PM James Morse wrote:
+>> Architecture code may need to do extra work when secondary CPUs are
+>> disabled during hibernate and resume. This may include pushing sleeping
+>> CPUs into a deeper power-saving state, or influencing which CPU resume
+>> occurs on.
+>>
+>> Define a macro arch_hibernation_disable_cpus(), which defaults to
+>> calling disable_nonboot_cpus() if undefined. Architectures that
+>> need to do extra work around these calls can use this to influence
+>> the CPU down calls.
+>> The macros should be defined in asm/suspend.h, and
+>> ARCH_HIBERNATION_CPU_HOOKS should be added to Kconfig.
+>>
+>> Signed-off-by: James Morse <james.morse@arm.com>
+>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Cc: Pavel Machek <pavel@ucw.cz>
+> 
+> I'm going to apply this one later today.
+> 
+> If you want me to apply the other two as well, they need to be ACKed by the
+> ARM64 maintainers.
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index d1258d5..d263c96 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -880,5 +880,81 @@
- 			status = "disabled";
- 			st,syscfg = <&syscfg_core>;
- 		};
-+
-+		sti_uni_player0: sti-uni-player at 0 {
-+			compatible = "st,sti-uni-player";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			clocks = <&clk_s_d0_flexgen CLK_PCM_0>;
-+			assigned-clocks = <&clk_s_d0_quadfs 0>, <&clk_s_d0_flexgen CLK_PCM_0>;
-+			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 0>;
-+			assigned-clock-rates = <50000000>;
-+			reg = <0x8D80000 0x158>;
-+			interrupts = <GIC_SPI 84 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 2 0 1>;
-+			dai-name = "Uni Player #0 (HDMI)";
-+			dma-names = "tx";
-+			st,uniperiph-id = <0>;
-+			st,version = <5>;
-+			st,mode = "HDMI";
-+		};
-+
-+		sti_uni_player1: sti-uni-player at 1 {
-+			compatible = "st,sti-uni-player";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			clocks = <&clk_s_d0_flexgen CLK_PCM_1>;
-+			assigned-clocks = <&clk_s_d0_quadfs 1>, <&clk_s_d0_flexgen CLK_PCM_1>;
-+			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 1>;
-+			assigned-clock-rates = <50000000>;
-+			reg = <0x8D81000 0x158>;
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 3 0 1>;
-+			dai-name = "Uni Player #1 (PIO)";
-+			dma-names = "tx";
-+			st,uniperiph-id = <1>;
-+			st,version = <5>;
-+			st,mode = "PCM";
-+		};
-+
-+		sti_uni_player2: sti-uni-player at 2 {
-+			compatible = "st,sti-uni-player";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
-+			assigned-clocks = <&clk_s_d0_quadfs 2>, <&clk_s_d0_flexgen CLK_PCM_2>;
-+			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 2>;
-+			assigned-clock-rates = <50000000>;
-+			reg = <0x8D82000 0x158>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 4 0 1>;
-+			dai-name = "Uni Player #1 (DAC)";
-+			dma-names = "tx";
-+			st,uniperiph-id = <2>;
-+			st,version = <5>;
-+			st,mode = "PCM";
-+		};
-+
-+		sti_uni_player3: sti-uni-player at 3 {
-+			compatible = "st,sti-uni-player";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			clocks = <&clk_s_d0_flexgen CLK_SPDIFF>;
-+			assigned-clocks = <&clk_s_d0_quadfs 3>, <&clk_s_d0_flexgen CLK_SPDIFF>;
-+			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 3>;
-+			assigned-clock-rates = <50000000>;
-+			reg = <0x8D85000 0x158>;
-+			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 7 0 1>;
-+			dma-names = "tx";
-+			dai-name = "Uni Player #1 (PIO)";
-+			st,uniperiph-id = <3>;
-+			st,version = <5>;
-+			st,mode = "SPDIF";
-+		};
- 	};
- };
--- 
-1.9.1
+Thanks. I'd like to get to the bottom of Lorenzo's comments[0] before the arm64
+patches go any further though!
+
+Thanks,
+
+
+James
+
+
+[0] http://www.spinics.net/lists/arm-kernel/msg516244.html
