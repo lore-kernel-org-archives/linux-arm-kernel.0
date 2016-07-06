@@ -1,50 +1,77 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  6 Jul 2016 09:54:35 +0100
-Subject: [PATCH v6 17/18] dmaengine: st_fdma: Change to late_initcall_sync
+Date: Wed,  6 Jul 2016 09:54:34 +0100
+Subject: [PATCH v6 16/18] ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi
+ audio card
 In-Reply-To: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
 References: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1467795276-21725-18-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1467795276-21725-17-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This avoids unnecessary rounds of -EPROBE_DEFER, which
-in turn avoids lots of console noise from remoteproc when
-all drivers are built-in.
+This patch enables the uniperif players 2 & 3 for b2120 boards
+and also adds the "simple-audio-card" device node to interconnect
+the SoC sound device and the codec.
 
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/dma/st_fdma.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/stihxxx-b2120.dtsi | 45 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-diff --git a/drivers/dma/st_fdma.c b/drivers/dma/st_fdma.c
-index f28026e..df7af95 100644
---- a/drivers/dma/st_fdma.c
-+++ b/drivers/dma/st_fdma.c
-@@ -869,10 +869,22 @@ static struct platform_driver st_fdma_platform_driver = {
- 		.name = "st-fdma",
- 		.of_match_table = st_fdma_match,
- 	},
--	.probe = st_fdma_probe,
--	.remove = st_fdma_remove,
+diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+index 722c63f..1f64bb6 100644
+--- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
++++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+@@ -131,5 +131,50 @@
+ 				dvb-card	= <STV0367_TDA18212_NIMA_1>;
+ 			};
+ 		};
++
++		sti_uni_player2: sti-uni-player at 2 {
++			status = "okay";
++		};
++
++		sti_uni_player3: sti-uni-player at 3 {
++			status = "okay";
++		};
++
++		sti_sasg_codec: sti-sasg-codec {
++			status = "okay";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spdif_out>;
++		};
++
++		sound {
++			compatible = "simple-audio-card";
++			simple-audio-card,name = "sti audio card";
++			status = "okay";
++
++			simple-audio-card,dai-link at 0 {
++				/* DAC */
++				format = "i2s";
++				mclk-fs = <256>;
++				cpu {
++					sound-dai = <&sti_uni_player2>;
++				};
++
++				codec {
++					sound-dai = <&sti_sasg_codec 1>;
++				};
++			};
++			simple-audio-card,dai-link at 1 {
++				/* SPDIF */
++				format = "left_j";
++				mclk-fs = <128>;
++				cpu {
++					sound-dai = <&sti_uni_player3>;
++				};
++
++				codec {
++					sound-dai = <&sti_sasg_codec 0>;
++				};
++			};
++		};
+ 	};
  };
--module_platform_driver(st_fdma_platform_driver);
-+
-+static int __init fdma_init(void)
-+{
-+	return platform_driver_probe(&st_fdma_platform_driver, st_fdma_probe);
-+}
-+
-+static void __exit fdma_exit(void)
-+{
-+	platform_driver_unregister(&st_fdma_platform_driver);
-+}
-+
-+/* attempt to load late, helps when built-in */
-+
-+late_initcall_sync(fdma_init);
-+module_exit(fdma_exit);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("STMicroelectronics FDMA engine driver");
 -- 
 1.9.1
