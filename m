@@ -1,31 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jul 2016 15:53:54 +0200
-Subject: [GIT PULL 4/4] Broadcom MAINTAINERS file updates for 4.8 (resend)
-In-Reply-To: <1467862574-6522-4-git-send-email-f.fainelli@gmail.com>
-References: <1467862574-6522-1-git-send-email-f.fainelli@gmail.com>
- <1467862574-6522-4-git-send-email-f.fainelli@gmail.com>
-Message-ID: <3260731.EF1kpWq91U@wuerfel>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 7 Jul 2016 14:51:44 +0100
+Subject: [GIT PULL]arm64: dts: hisilicon: hi6220 updates for 4.8(#2)
+Message-ID: <577E5E70.1050304@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 6, 2016 8:36:13 PM CEST Florian Fainelli wrote:
-> This pull request contains MAINTAINERS file changes for Broadcom entries:
-> 
-> - Rafal updates the BCM5301x entry to include the internal Broadcom
->   mailing-list so it's easy for engineers there to keep track of patches
-> 
-> - Jon updates the NSP regexp, updates the NS2, BCM63xx and Broadcom Mobile SoCs
->   entry
-> 
-> - Florian changes L to M in all Broadcom ARM/ARM64 entries per feeedback
-> 
+Hi Arnd, Hi Olof, Hi Kevin,
 
-I've pulled it into next/soc since I couldn't come up with a better branch
-to put this into. I've added some other MAINTAINERS changes to the 4.7
-fixes branch, but this one doesn't seem as urgent, but it also didn't
-feel right to put it into cleanups.
+I know the walkaround for this kind of patch is still under discussion.
+Could you please consider to pull the following changes?
 
-Anyway, not your problem, sending it as a separate branch was the
-right thing to do on your side ;-)
+This depends on the change in clk tree (clk-hi6220-rtc)
+which is already in the clk-next.
 
-	Arnd
+And for easier grepping through history, below is the pull request
+for the dts specific change (no clk commits):
+
+Thanks!
+
+Best Regards,
+Wei
+
+---
+
+The following changes since commit 6fb924dc9c482557ebd41f6c6a5fde34210a2e08:
+
+  clk: hi6220: Add RTC clock for pl031 (2016-06-30 12:11:49 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hi6220-dt-for-4.8-2
+
+for you to fetch changes up to 810bd15fe0f049233ce6b89e1fbfaaff124be8c2:
+
+  arm64: dts: hi6220: Add pl031 RTC support (2016-07-07 14:05:34 +0100)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon Hi6220 updates for 4.8
+
+- Add pl031 rtc0 and rtc1 support for hi6220 SoC
+
+----------------------------------------------------------------
+Zhangfei Gao (1):
+      arm64: dts: hi6220: Add pl031 RTC support
+
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
