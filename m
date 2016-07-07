@@ -1,42 +1,42 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jul 2016 11:20:04 +0100
-Subject: kexec failures with DEBUG_RODATA
-In-Reply-To: <20160615224228.GK1041@n2100.armlinux.org.uk>
-References: <20160614175920.GD1041@n2100.armlinux.org.uk>
- <CAGXu5j+5j32HO0rQtF2hcqMUBaa8cyxgLT4JvaZ6LL2WPj_zjw@mail.gmail.com>
- <20160615211359.GJ1041@n2100.armlinux.org.uk>
- <CAGXu5jKRBA9b6gos+FG7iV2ppxtAERstNPschxA0z=aDL_y1YA@mail.gmail.com>
- <20160615224228.GK1041@n2100.armlinux.org.uk>
-Message-ID: <20160707102003.GO1041@n2100.armlinux.org.uk>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 7 Jul 2016 11:20:29 +0100
+Subject: [PATCH v6 18/18] remoteproc: core: Retry
+ rproc_fw_config_virtio() if !rproc->table_ptr
+In-Reply-To: <201607070935.iuu6KqiK%fengguang.wu@intel.com>
+References: <1467795276-21725-19-git-send-email-peter.griffin@linaro.org>
+ <201607070935.iuu6KqiK%fengguang.wu@intel.com>
+Message-ID: <20160707102029.GA8755@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2016 at 11:42:28PM +0100, Russell King - ARM Linux wrote:
-> The boot environment must be setup such that there is room for the
-> uncompressed image (aligned currently to 256 bytes) followed by the
-> size of the compressed image, with any appended DTBs included.
-> Anything which is located below that is likely to get trampled by
-> the decompressor.
+Hi,
 
-There's a question that's been lingering, which hasn't been brought up
-by anyone yet: should we even support zImage files with an appended
-DTB for kexec?
+On Thu, 07 Jul 2016, kbuild test robot wrote:
 
-When kexec is operating in DTB mode, it will provide the DTB to the
-kernel from the host environment, possibly with some modifications (eg,
-to change the command line arguments.)  Since an appended DTB would
-override the kexec-provided DTB, this would wipe out those changes,
-some of which are necessary for things like crashdump to work.
+> Hi,
+> 
+> [auto build test WARNING on robh/for-next]
+> [also build test WARNING on v4.7-rc6 next-20160706]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Peter-Griffin/Add-support-for-FDMA-DMA-controller-and-slim-core-rproc-found-on-STi-chipsets/20160706-170304
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+> config: openrisc-allyesconfig (attached as .config)
+> compiler: or32-linux-gcc (GCC) 4.5.1-or32-1.0rc1
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=openrisc 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+> >> drivers/remoteproc/remoteproc_internal.h:52:13: warning: 'rproc_fw_config_virtio_cb' declared 'static' but never defined
+> >> drivers/remoteproc/remoteproc_internal.h:53:13: warning:
+> >> 'rproc_fw_config_virtio' declared 'static' but never defined
 
-So, I'm thinking that kexec should not support a zImage with appended
-DTB - in fact, I think it should truncate the zImage to be loaded, and
-ensure that the word following the zImage does not contain a DTB magic
-number, in case the zImage has been built with CONFIG_ARM_APPENDED_DTB
-enabled.
+Will fix this in next version.
 
-Thoughts?
+regards,
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Peter.
