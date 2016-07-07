@@ -1,67 +1,126 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Thu,  7 Jul 2016 16:02:56 -0700
-Subject: [PATCH v5 08/11] drivers: net: xgene: ethtool: Use phy_ethtool_gset
- and sset
+Date: Thu,  7 Jul 2016 16:02:57 -0700
+Subject: [PATCH v5 09/11] dtb: xgene: Add MDIO node
 In-Reply-To: <1467932579-14320-1-git-send-email-isubramanian@apm.com>
 References: <1467932579-14320-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1467932579-14320-9-git-send-email-isubramanian@apm.com>
+Message-ID: <1467932579-14320-10-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changed SGMII 1G get_settings to use phy_ethtool_gset.
-Changed SGMII 1G set_settings to use phy_ethtool_sset.
+Added mdio node for mdio driver.  Also added phy-handle
+reference to the ethernet nodes.
+
+Removed unused mdio subnode within storm menet ethernet node.
+Removed unused clock node from storm sgenet1.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Tested-by: Fushen Chen <fchen@apm.com>
 Tested-by: Toan Le <toanle@apm.com>
+Tested-by: Matthias Brugger <mbrugger@suse.com>
 ---
- .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/apm/apm-mustang.dts | 12 +++++++++++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi  | 36 ++++++++++++---------------------
+ 2 files changed, 25 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c b/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
-index 416d6eb..22a7b26 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
-@@ -65,8 +65,15 @@ static int xgene_get_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
- 
- 		return phy_ethtool_gset(phydev, cmd);
- 	} else if (pdata->phy_mode == PHY_INTERFACE_MODE_SGMII) {
--		cmd->supported = SUPPORTED_1000baseT_Full |
--				 SUPPORTED_Autoneg | SUPPORTED_MII;
-+		if (pdata->mdio_driver) {
-+			if (!phydev)
-+				return -ENODEV;
+diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
+index 44db32e..b7fb5d9 100644
+--- a/arch/arm64/boot/dts/apm/apm-mustang.dts
++++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
+@@ -79,3 +79,15 @@
+ &mmc0 {
+ 	status = "ok";
+ };
 +
-+			return phy_ethtool_gset(phydev, cmd);
-+		}
++&mdio {
++	menet0phy: phy at 3 {
++		reg = <0x3>;
++	};
++	sgenet0phy: phy at 4 {
++		reg = <0x4>;
++	};
++	sgenet1phy: phy at 5 {
++		reg = <0x5>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index 5147d76..a415b3a 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -237,20 +237,11 @@
+ 				clocks = <&socplldiv2 0>;
+ 				reg = <0x0 0x1f21c000 0x0 0x1000>;
+ 				reg-names = "csr-reg";
+-				csr-mask = <0x3>;
++				csr-mask = <0xa>;
++				enable-mask = <0xf>;
+ 				clock-output-names = "sge0clk";
+ 			};
+ 
+-			sge1clk: sge1clk at 1f21c000 {
+-				compatible = "apm,xgene-device-clock";
+-				#clock-cells = <1>;
+-				clocks = <&socplldiv2 0>;
+-				reg = <0x0 0x1f21c000 0x0 0x1000>;
+-				reg-names = "csr-reg";
+-				csr-mask = <0xc>;
+-				clock-output-names = "sge1clk";
+-			};
+-
+ 			xge0clk: xge0clk at 1f61c000 {
+ 				compatible = "apm,xgene-device-clock";
+ 				#clock-cells = <1>;
+@@ -921,6 +912,14 @@
+ 			clocks = <&rtcclk 0>;
+ 		};
+ 
++		mdio: mdio at 0x17020000 {
++			compatible = "apm,xgene-mdio-rgmii";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0x17020000 0x0 0xd100>;
++			clocks = <&menetclk 0>;
++		};
 +
-+		cmd->supported = SUPPORTED_1000baseT_Full | SUPPORTED_Autoneg |
-+				 SUPPORTED_MII;
- 		cmd->advertising = cmd->supported;
- 		ethtool_cmd_speed_set(cmd, SPEED_1000);
- 		cmd->duplex = DUPLEX_FULL;
-@@ -92,12 +99,21 @@ static int xgene_set_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
- 	struct phy_device *phydev = pdata->phy_dev;
+ 		menet: ethernet at 17020000 {
+ 			compatible = "apm,xgene-enet";
+ 			status = "disabled";
+@@ -934,17 +933,7 @@
+ 			/* mac address will be overwritten by the bootloader */
+ 			local-mac-address = [00 00 00 00 00 00];
+ 			phy-connection-type = "rgmii";
+-			phy-handle = <&menetphy>;
+-			mdio {
+-				compatible = "apm,xgene-mdio";
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-				menetphy: menetphy at 3 {
+-					compatible = "ethernet-phy-id001c.c915";
+-					reg = <0x3>;
+-				};
+-
+-			};
++			phy-handle = <&menet0phy>;
+ 		};
  
- 	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII) {
--		if (phydev == NULL)
-+		if (!phydev)
- 			return -ENODEV;
+ 		sgenet0: ethernet at 1f210000 {
+@@ -960,6 +949,7 @@
+ 			clocks = <&sge0clk 0>;
+ 			local-mac-address = [00 00 00 00 00 00];
+ 			phy-connection-type = "sgmii";
++			phy-handle = <&sgenet0phy>;
+ 		};
  
- 		return phy_ethtool_sset(phydev, cmd);
- 	}
+ 		sgenet1: ethernet at 1f210030 {
+@@ -973,9 +963,9 @@
+ 				     <0x0 0xAD 0x4>;
+ 			port-id = <1>;
+ 			dma-coherent;
+-			clocks = <&sge1clk 0>;
+ 			local-mac-address = [00 00 00 00 00 00];
+ 			phy-connection-type = "sgmii";
++			phy-handle = <&sgenet1phy>;
+ 		};
  
-+	if (pdata->phy_mode == PHY_INTERFACE_MODE_SGMII) {
-+		if (pdata->mdio_driver) {
-+			if (!phydev)
-+				return -ENODEV;
-+
-+			return phy_ethtool_sset(phydev, cmd);
-+		}
-+	}
-+
- 	return -EINVAL;
- }
- 
+ 		xgenet: ethernet at 1f610000 {
 -- 
 1.9.1
