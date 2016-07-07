@@ -1,72 +1,44 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 7 Jul 2016 10:19:34 -0700
-Subject: [PATCH] MAINTAINERS: Change L to M for Broadcom ARM SoC entries
-In-Reply-To: <CAC3K-4quLJOCxp3i2naJWDrbMu3AywO4+4NWdizVAPD4-44SgA@mail.gmail.com>
-References: <1467761520-23796-1-git-send-email-f.fainelli@gmail.com>
- <CAC3K-4quLJOCxp3i2naJWDrbMu3AywO4+4NWdizVAPD4-44SgA@mail.gmail.com>
-Message-ID: <577E8F26.4070403@gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 7 Jul 2016 13:25:21 -0400
+Subject: [PATCH 1/9] mm: Hardened usercopy
+In-Reply-To: <20160707053710.GH2118@tarshish>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <1467843928-29351-2-git-send-email-keescook@chromium.org>
+ <20160707053710.GH2118@tarshish>
+Message-ID: <CAGXu5jJV4ZQp4VQ44SPQ49RxXpFXzx6d233A3+_Ka7txYHmuMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2016 07:05 AM, Jon Mason wrote:
-> On Tue, Jul 5, 2016 at 7:32 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> bcm-kernel-feedback-list at broadcom.com is a Broadcom internaly
->> mailing-list for which no external subscribers are allowed for now, so
->> update the different entries from L to M to reflect that.
->>
->> Suggested-by: Arnd Bergmann <arnd@arndb.de>
->> Suggested-by: Olof Johansson <olof@lixom.net>
->> Suggested-by: Scott Branden <scott.branden@broadcom.com>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->> I am going to send this as a pull request since we have other
->> changes to the MAINTAINERS file, just posting it publicly before
->> the actual pull request.
->>
->>  MAINTAINERS | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index b673a000e715..a5130c5f9f75 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -2478,7 +2478,7 @@ BROADCOM BCM281XX/BCM11XXX/BCM216XX ARM ARCHITECTURE
->>  M:     Florian Fainelli <f.fainelli@gmail.com>
->>  M:     Ray Jui <rjui@broadcom.com>
->>  M:     Scott Branden <sbranden@broadcom.com>
->> -L:     bcm-kernel-feedback-list at broadcom.com
->> +M:     bcm-kernel-feedback-list at broadcom.com
->>  T:     git git://github.com/broadcom/mach-bcm
->>  S:     Maintained
->>  F:     arch/arm/mach-bcm/
->> @@ -2522,7 +2522,7 @@ F:        arch/arm/boot/dts/bcm470*
->>  BROADCOM BCM63XX ARM ARCHITECTURE
->>  M:     Florian Fainelli <f.fainelli@gmail.com>
->>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> -L:     bcm-kernel-feedback-list at broadcom.com
->> +M:     bcm-kernel-feedback-list at broadcom.com
->>  T:     git git://github.com/broadcom/stblinux.git
->>  S:     Maintained
->>  F:     arch/arm/mach-bcm/bcm63xx.c
->> @@ -2539,7 +2539,7 @@ M:        Brian Norris <computersforpeace@gmail.com>
->>  M:     Gregory Fong <gregory.0xf0@gmail.com>
->>  M:     Florian Fainelli <f.fainelli@gmail.com>
->>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> -L:     bcm-kernel-feedback-list at broadcom.com
->> +M:     bcm-kernel-feedback-list at broadcom.com
->>  T:     git git://github.com/broadcom/stblinux.git
->>  S:     Maintained
->>  F:     arch/arm/mach-bcm/*brcmstb*
->> @@ -2598,7 +2598,7 @@ M:        Ray Jui <rjui@broadcom.com>
->>  M:     Scott Branden <sbranden@broadcom.com>
->>  M:     Jon Mason <jonmason@broadcom.com>
->>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> -L:     bcm-kernel-feedback-list at broadcom.com
->> +M:     bcm-kernel-feedback-list at broadcom.com
-> 
-> Nit, shouldn't the "M"s be together?  If so, this should be moved up 1 line.
+On Thu, Jul 7, 2016 at 1:37 AM, Baruch Siach <baruch@tkos.co.il> wrote:
+> Hi Kees,
+>
+> On Wed, Jul 06, 2016 at 03:25:20PM -0700, Kees Cook wrote:
+>> +#ifdef CONFIG_HAVE_HARDENED_USERCOPY_ALLOCATOR
+>
+> Should be CONFIG_HARDENED_USERCOPY to match the slab/slub implementation
+> condition.
+>
+>> +const char *__check_heap_object(const void *ptr, unsigned long n,
+>> +                             struct page *page);
+>> +#else
+>> +static inline const char *__check_heap_object(const void *ptr,
+>> +                                           unsigned long n,
+>> +                                           struct page *page)
+>> +{
+>> +     return NULL;
+>> +}
+>> +#endif
 
-Thanks, the version I submitted had that fixed and also updated the
-Vulcan entry.
+Hmm, I think what I have is correct: if the allocator supports the
+heap object checking, it defines __check_heap_object as existing via
+CONFIG_HAVE_HARDENED_USERCOPY_ALLOCATOR. If usercopy checking is done
+at all is controlled by CONFIG_HARDENED_USERCOPY.
+
+I.e. you can have the other usercopy checks even if your allocator
+doesn't support object size checking.
+
+-Kees
+
 -- 
-Florian
+Kees Cook
+Chrome OS & Brillo Security
