@@ -1,78 +1,53 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 7 Jul 2016 20:09:04 +0800
-Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is dirty
- when munmap
-Message-ID: <1467893344-8352-1-git-send-email-thunder.leizhen@huawei.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Thu, 07 Jul 2016 21:13:55 +0900
+Subject: [PATCH v4 0/2] mark spi clocks as critical and enable spi3 clocks
+Message-ID: <1467893637-12573-1-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At present, PG_dcache_clean is only cleared when the related huge page
-is about to be freed. But sometimes, there maybe a process is in charge
-to copy binary codes into a shared memory, and notifies other processes
-to execute base on that. For the first time, there is no problem, because
-the default value of page->flags is PG_dcache_clean cleared. So the cache
-will be maintained at the time of set_pte_at for other processes. But if
-the content of the shared memory have been updated again, there is no
-cache operations, because the PG_dcache_clean is still set.
+Hi,
 
-For example:
-Process A
-	open a hugetlbfs file
-	mmap it as a shared memory
-	copy some binary codes into it
-	munmap
+I managed to bring some confusion on these two patches, but
+finally I managed to find the right solution (which is similar to
+the patch version 2).
 
-Process B
-	open the hugetlbfs file
-	mmap it as a shared memory, executable
-	invoke the functions in the shared memory
-	munmap
+The real issue was hidden in the spi bus as reported in the
+following patch:
 
-repeat the above steps.
+  https://lkml.org/lkml/2016/7/7/81
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- arch/arm64/mm/hugetlbpage.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+This patch in principle replaces the clock_ignore_unused flags in
+for the spi and enables the spi3 that in the tm2(e) board will be
+connected to the IR remote controller.
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 2e49bd2..547b158 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -201,6 +201,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 			      unsigned long addr, pte_t *ptep)
- {
- 	pte_t pte;
-+	struct page *page;
+Changelog:
 
- 	if (pte_cont(*ptep)) {
- 		int ncontig, i;
-@@ -222,12 +223,21 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 			if (pte_dirty(ptep_get_and_clear(mm, addr, cpte)))
- 				is_dirty = true;
- 		}
--		if (is_dirty)
--			return pte_mkdirty(pte);
--		else
--			return pte;
-+		if (is_dirty) {
-+			pte = pte_mkdirty(pte);
-+			page = pte_page(pte);
-+			clear_bit(PG_dcache_clean, &page->flags);
-+		}
-+
-+		return pte;
- 	} else {
--		return ptep_get_and_clear(mm, addr, ptep);
-+		pte = ptep_get_and_clear(mm, addr, ptep);
-+		if (huge_pte_dirty(pte)) {
-+			page = pte_page(pte);
-+			clear_bit(PG_dcache_clean, &page->flags);
-+		}
-+
-+		return pte;
- 	}
- }
+V1 -> V2
+ - the "sclk_spi3" doesn't need to be enabled in boot time as it
+  is handled by the spi driver itself.
 
---
-2.5.0
+ - use the CLK_IS_CRITICAL flag for the ioclk
+
+V2 -> V3
+ - some more tests has confirmed taht "sclk_spi1,3" need to be
+   enabled as critical!
+
+ - added Chanwoo's review in the second commit.
+
+V3 -> V4
+ - patch V3 was wrong, back to patch v2.
+
+ - reworded the commit of patch no. 1
+
+Thanks,
+Andi
+
+Andi Shyti (2):
+  clk: exynos5433: do not use CLK_IGNORE_UNUSED for SPI clocks
+  clk: exynos5433: enable sclk_ioclk for SPI3
+
+ drivers/clk/samsung/clk-exynos5433.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+-- 
+2.8.1
