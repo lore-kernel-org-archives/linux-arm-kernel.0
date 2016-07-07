@@ -1,30 +1,27 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 7 Jul 2016 11:50:34 +0200
-Subject: SPI: performance regression when using the common message
- queuing infrastructure
-In-Reply-To: <577CD464.6050506@atmel.com>
-References: <577CD464.6050506@atmel.com>
-Message-ID: <20160707095034.GL6247@sirena.org.uk>
+Date: Thu, 7 Jul 2016 14:24:41 +0200
+Subject: [PATCH] spi: s3c64xx: do not disable the clock while configuring
+ the spi
+In-Reply-To: <20160707095840.GH23620@samsunx.samsung>
+References: <CGME20160707072419epcas1p3ba881fb9b3270eb8cde87380aea7bcf9@epcas1p3.samsung.com>
+ <1467876237-12183-1-git-send-email-andi.shyti@samsung.com>
+ <20160707095840.GH23620@samsunx.samsung>
+Message-ID: <20160707122441.GP6247@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2016 at 11:50:28AM +0200, Cyrille Pitchen wrote:
+On Thu, Jul 07, 2016 at 06:58:41PM +0900, Andi Shyti wrote:
 
-> So do you recommend us to keep our current generic implementation relying on
-> the SPI framework workqueue or to go back to a custom implementation using
-> tasklet?
-> If we keep the current implementation, is there a way to improve the
-> performances so we go back to something close to what he had before?
+> sorry, I will re-send it because I should not remove the comments
+> above.... in the future someone might wonder why it's multiplied
+> by 2.
 
-I'd suggest trying to implement whatever it is that your customm
-implementation was doing in the core, having individual drivers trying
-to open code the message pump is obviously not sensible.  If what you're
-doing makes your controllers run faster it'll probably make everyone
-else's run faster too.
+I already applied and published this, can you please send an incremental
+patch fixing the issue?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/e453244b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/749cc072/attachment-0001.sig>
