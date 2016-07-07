@@ -1,38 +1,37 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Thu, 07 Jul 2016 21:13:57 +0900
-Subject: [PATCH v4 2/2] clk: exynos5433: enable sclk_ioclk for SPI3
-In-Reply-To: <1467893637-12573-1-git-send-email-andi.shyti@samsung.com>
-References: <1467893637-12573-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1467893637-12573-3-git-send-email-andi.shyti@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 Jul 2016 14:18:57 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.8 (#1)
+In-Reply-To: <87zipxuo14.fsf@free-electrons.com>
+References: <87zipxuo14.fsf@free-electrons.com>
+Message-ID: <3561749.CFSYsPZb04@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable SPI3 critical clocks by using the CLK_IS_CRITICAL flag.
-There is no device which is supposed to enable this clock when
-needed, therefore, the only way to use the SPI bus is to enable
-it in boot time.
+On Monday, July 4, 2016 10:49:27 PM CEST Gregory CLEMENT wrote:
+> Hi,
+> 
+> Here is the first pull request for dt64 for mvebu for v4.8.
+> 
+> Gregory
+> 
+> The following changes since commit 19b67d5c8b2dbef9a10bc1aeb96a861c57a0bdf8:
+> 
+>   arm64: dts: marvell: add XOR node for Armada 3700 SoC (2016-04-29 15:07:42 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.8-1
+> 
+> for you to fetch changes up to 5f4beef6db3c158ed99573d74e93dfe0611352e4:
+> 
+>   arm64: dts: marvell: add peripherals clocks for Armada 37xx (2016-07-04 22:21:13 +0200)
+> 
+> ----------------------------------------------------------------
+> mvebu dt64 for 4.8 (part 1)
+> 
+> - update dt with mv-xor-v2 found in the Armada 7K/8K SoCs
+> - update dt with the clocks found in the Armada 3700 SoCs
 
-Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- drivers/clk/samsung/clk-exynos5433.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Pulled into next/dt64, thanks!
 
-diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-index 337387b..fb8d330 100644
---- a/drivers/clk/samsung/clk-exynos5433.c
-+++ b/drivers/clk/samsung/clk-exynos5433.c
-@@ -1648,7 +1648,8 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
- 	GATE(CLK_SCLK_IOCLK_SPI4, "sclk_ioclk_spi4", "ioclk_spi4_clk_in",
- 			ENABLE_SCLK_PERIC, 21, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_IOCLK_SPI3, "sclk_ioclk_spi3", "ioclk_spi3_clk_in",
--			ENABLE_SCLK_PERIC, 20, CLK_SET_RATE_PARENT, 0),
-+			ENABLE_SCLK_PERIC, 20,
-+			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_SPI4, "sclk_spi4", "sclk_spi4_peric", ENABLE_SCLK_PERIC,
- 			19, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_SPI3, "sclk_spi3", "sclk_spi3_peric", ENABLE_SCLK_PERIC,
--- 
-2.8.1
+	Arnd
