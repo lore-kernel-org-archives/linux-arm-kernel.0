@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  7 Jul 2016 10:01:36 +0200
-Subject: [PATCH 63/93] clocksource/drivers/vt8500: Convert init function to
+Date: Thu,  7 Jul 2016 10:01:41 +0200
+Subject: [PATCH 68/93] clocksource/drivers/smp_twd: Convert init function to
  return error
 In-Reply-To: <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577E0BED.3020608@linaro.org>
  <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467878526-1238-63-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467878526-1238-68-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,69 +27,34 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/vt8500_timer.c | 26 ++++++++++++++++++--------
- 1 file changed, 18 insertions(+), 8 deletions(-)
+ arch/arm/kernel/smp_twd.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
-index ddb4092..1bc8707 100644
---- a/drivers/clocksource/vt8500_timer.c
-+++ b/drivers/clocksource/vt8500_timer.c
-@@ -121,38 +121,48 @@ static struct irqaction irq = {
- 	.dev_id  = &clockevent,
- };
- 
--static void __init vt8500_timer_init(struct device_node *np)
-+static int __init vt8500_timer_init(struct device_node *np)
- {
--	int timer_irq;
-+	int timer_irq, ret;
- 
- 	regbase = of_iomap(np, 0);
- 	if (!regbase) {
- 		pr_err("%s: Missing iobase description in Device Tree\n",
- 								__func__);
--		return;
-+		return -ENXIO;
- 	}
-+
- 	timer_irq = irq_of_parse_and_map(np, 0);
- 	if (!timer_irq) {
- 		pr_err("%s: Missing irq description in Device Tree\n",
- 								__func__);
--		return;
-+		return -EINVAL;
- 	}
- 
- 	writel(1, regbase + TIMER_CTRL_VAL);
- 	writel(0xf, regbase + TIMER_STATUS_VAL);
- 	writel(~0, regbase + TIMER_MATCH_VAL);
- 
--	if (clocksource_register_hz(&clocksource, VT8500_TIMER_HZ))
-+	ret = clocksource_register_hz(&clocksource, VT8500_TIMER_HZ);
-+	if (ret) {
- 		pr_err("%s: vt8500_timer_init: clocksource_register failed for %s\n",
--					__func__, clocksource.name);
-+		       __func__, clocksource.name);
-+		return ret;
-+	}
- 
- 	clockevent.cpumask = cpumask_of(0);
- 
--	if (setup_irq(timer_irq, &irq))
-+	ret = setup_irq(timer_irq, &irq);
-+	if (ret) {
- 		pr_err("%s: setup_irq failed for %s\n", __func__,
- 							clockevent.name);
-+		return ret;
-+	}
-+
- 	clockevents_config_and_register(&clockevent, VT8500_TIMER_HZ,
- 					MIN_OSCR_DELTA * 2, 0xf0000000);
-+
-+	return 0;
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 1bfa7a7..2b24be4 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -390,7 +390,7 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
  }
  
--CLOCKSOURCE_OF_DECLARE(vt8500, "via,vt8500-timer", vt8500_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(vt8500, "via,vt8500-timer", vt8500_timer_init);
+ #ifdef CONFIG_OF
+-static void __init twd_local_timer_of_register(struct device_node *np)
++static int __init twd_local_timer_of_register(struct device_node *np)
+ {
+ 	int err;
+ 
+@@ -410,8 +410,9 @@ static void __init twd_local_timer_of_register(struct device_node *np)
+ 
+ out:
+ 	WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
++	return err;
+ }
+-CLOCKSOURCE_OF_DECLARE(arm_twd_a9, "arm,cortex-a9-twd-timer", twd_local_timer_of_register);
+-CLOCKSOURCE_OF_DECLARE(arm_twd_a5, "arm,cortex-a5-twd-timer", twd_local_timer_of_register);
+-CLOCKSOURCE_OF_DECLARE(arm_twd_11mp, "arm,arm11mp-twd-timer", twd_local_timer_of_register);
++CLOCKSOURCE_OF_DECLARE_RET(arm_twd_a9, "arm,cortex-a9-twd-timer", twd_local_timer_of_register);
++CLOCKSOURCE_OF_DECLARE_RET(arm_twd_a5, "arm,cortex-a5-twd-timer", twd_local_timer_of_register);
++CLOCKSOURCE_OF_DECLARE_RET(arm_twd_11mp, "arm,arm11mp-twd-timer", twd_local_timer_of_register);
+ #endif
 -- 
 1.9.1
