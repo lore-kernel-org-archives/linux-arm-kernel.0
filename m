@@ -1,51 +1,65 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu,  7 Jul 2016 15:20:59 -0700
-Subject: [PATCH v2 08/22] usb: chipidea: Remove locking in ci_udc_start()
+Date: Thu,  7 Jul 2016 15:21:00 -0700
+Subject: [PATCH v2 09/22] usb: chipidea: Kick OTG state machine for AVVIS with
+ vbus extcon
 In-Reply-To: <20160707222114.1673-1-stephen.boyd@linaro.org>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
-Message-ID: <20160707222114.1673-9-stephen.boyd@linaro.org>
+Message-ID: <20160707222114.1673-10-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't call hw_device_reset() with the ci->lock held, so it
-doesn't seem like this lock here is protecting anything. Let's
-just remove it. This allows us to call sleeping functions like
-phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
+Force the OTG state machine to go forward when we're using an
+extcon for vbus detection. In this case, the controller may never
+raise an interrupt for AVVIS, so we need to simulate the event by
+toggling the appropriate OTG fsm bits and kicking the state
+machine again.
 
 Cc: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/udc.c | 3 ---
- 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 065f5d97aa67..f16be4710cdb 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1719,7 +1719,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
- 			 struct usb_gadget_driver *driver)
- {
- 	struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
--	unsigned long flags;
- 	int retval = -ENOMEM;
+I think this was rejected last time around but I've kept it in the
+series to continue discussion on how we're supposed to be emulating
+vbus an id pin interrupts and the otgsc register.
+
+ drivers/usb/chipidea/otg_fsm.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/drivers/usb/chipidea/otg_fsm.c b/drivers/usb/chipidea/otg_fsm.c
+index de8e22ec3902..aab076fc4d82 100644
+--- a/drivers/usb/chipidea/otg_fsm.c
++++ b/drivers/usb/chipidea/otg_fsm.c
+@@ -475,6 +475,14 @@ static void ci_otg_drv_vbus(struct otg_fsm *fsm, int on)
+ 				return;
+ 			}
+ 		}
++		/*
++		 * Force state machine forward if we use extcon
++		 * to detect vbus state (i.e. simulate AVVIS event)
++		 */
++		if (!IS_ERR(ci->platdata->vbus_extcon.edev)) {
++			fsm->a_vbus_vld = 1;
++			ci_otg_queue_work(ci);
++		}
+ 		/* Disable data pulse irq */
+ 		hw_write_otgsc(ci, OTGSC_DPIE, 0);
  
- 	if (driver->disconnect == NULL)
-@@ -1746,7 +1745,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+@@ -486,6 +494,15 @@ static void ci_otg_drv_vbus(struct otg_fsm *fsm, int on)
  
- 	pm_runtime_get_sync(&ci->gadget.dev);
- 	if (ci->vbus_active) {
--		spin_lock_irqsave(&ci->lock, flags);
- 		hw_device_reset(ci);
- 	} else {
- 		usb_udc_vbus_handler(&ci->gadget, false);
-@@ -1755,7 +1753,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+ 		fsm->a_bus_drop = 1;
+ 		fsm->a_bus_req = 0;
++		/*
++		 * Force state machine forward if we use extcon
++		 * to detect vbus state (i.e. simulate AVVIS event)
++		 */
++		if (!IS_ERR(ci->platdata->vbus_extcon.edev)) {
++			fsm->a_vbus_vld = 0;
++			fsm->b_conn = 0;
++			ci_otg_queue_work(ci);
++		}
  	}
- 
- 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
--	spin_unlock_irqrestore(&ci->lock, flags);
- 	if (retval)
- 		pm_runtime_put_sync(&ci->gadget.dev);
+ }
  
 -- 
 2.9.0.rc2.8.ga28705d
