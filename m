@@ -1,27 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jul 2016 15:58:34 +0200
-Subject: [GIT PULL 5/4] Broadcom soc-arm64 changes for 4.8 part 2
-In-Reply-To: <1467867851-11298-1-git-send-email-f.fainelli@gmail.com>
-References: <1467862574-6522-1-git-send-email-f.fainelli@gmail.com>
- <1467867851-11298-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <3314738.osW38YoyUP@wuerfel>
+Date: Thu, 07 Jul 2016 16:01:55 +0200
+Subject: [PATCH v3] ARM: tango: add Suspend-to-RAM support
+In-Reply-To: <577E543E.80401@sigmadesigns.com>
+References: <5773D3FB.4030101@sigmadesigns.com>
+ <577A25F8.80702@sigmadesigns.com> <577E543E.80401@sigmadesigns.com>
+Message-ID: <3357484.uFrtXQllNK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 6, 2016 10:04:11 PM CEST Florian Fainelli wrote:
-> This pull requests contains Broadcom ARM64-based SoC changes for 4.8 second part:
+On Thursday, July 7, 2016 3:08:14 PM CEST Marc Gonzalez wrote:
+> Ask firmware to put RAM in self-refresh mode and power system down.
 > 
-> - Eric updates the bcm2836 interrupt controller driver not to rely on ARM/Linux specific functions
->   in preparation for using it on ARM64
+>     echo mem > /sys/power/state
 > 
-> - Eric also adds a Kconfig entry for the BCM2835 Raspberry Pi family in the ARM64 Kconfig.platforms
->   file
+> See Documentation/power/states.txt
 > 
-> - Eric cherry picked a patch from Alexander Graf with Acks from ARM64 maintainers to support different
->   DMA and bus offsets, required for the Raspberry Pi 3 SoC
-> 
-> 
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+> v3 is identical to v2 minus the RFC tag
+> Olof, if still possible, please merge for v4.8
 
-Pulled into next/arm64, thanks!
+Applied to next/soc, thanks!
 
 	Arnd
