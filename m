@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 07 Jul 2016 12:01:47 +0200
-Subject: Applied "spi: clps711x: Driver refactor" to the spi tree
-In-Reply-To: <20160706145326.2658600-1-arnd@arndb.de>
-Message-ID: <E1bL67v-0000tk-JL@finisterre>
+Date: Thu, 07 Jul 2016 12:01:54 +0200
+Subject: Applied "spi: s3c64xx: do not disable the clock while configuring the
+ spi" to the spi tree
+In-Reply-To: <1467876237-12183-1-git-send-email-andi.shyti@samsung.com>
+Message-ID: <E1bL682-0000ul-2D@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: clps711x: Driver refactor
+   spi: s3c64xx: do not disable the clock while configuring the spi
 
 has been applied to the spi tree at
 
@@ -33,170 +34,55 @@ to this mail.
 Thanks,
 Mark
 
->From 6acaadc852f10b9f13b665a5798d4f2783317f80 Mon Sep 17 00:00:00 2001
-From: Alexander Shiyan <shc_work@mail.ru>
-Date: Wed, 6 Jul 2016 16:53:12 +0200
-Subject: [PATCH] spi: clps711x: Driver refactor
+>From d9aaf1dc984a448ae5630e53a611a8b3489d1f8d Mon Sep 17 00:00:00 2001
+From: Andi Shyti <andi.shyti@samsung.com>
+Date: Thu, 7 Jul 2016 16:23:57 +0900
+Subject: [PATCH] spi: s3c64xx: do not disable the clock while configuring the
+ spi
 
-This is a complex patch for refactoring CLPS711X SPI driver.
-This change adds devicetree support and removes board support.
+When the clock is coming from the cmu it is not required to be
+disabled and then re-enabled in order to change the rate.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Besides, some exynos chipsets (e.g. exynos5433) do not deliver
+any to the SFR if one from the pclk ("spi" in this case) or sclk
+("busclk") is disabled.
+
+Remove the clock disabling/enabling to avoid falling into this
+situation.
+
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-clps711x.c | 69 +++++++++++++++++-----------------------------
- 1 file changed, 26 insertions(+), 43 deletions(-)
+ drivers/spi/spi-s3c64xx.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-diff --git a/drivers/spi/spi-clps711x.c b/drivers/spi/spi-clps711x.c
-index 8c30de0315e7..18193df2eba8 100644
---- a/drivers/spi/spi-clps711x.c
-+++ b/drivers/spi/spi-clps711x.c
-@@ -1,7 +1,7 @@
- /*
-  *  CLPS711X SPI bus driver
-  *
-- *  Copyright (C) 2012-2014 Alexander Shiyan <shc_work@mail.ru>
-+ *  Copyright (C) 2012-2016 Alexander Shiyan <shc_work@mail.ru>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -12,7 +12,6 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/gpio.h>
--#include <linux/delay.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-@@ -20,9 +19,8 @@
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/clps711x.h>
- #include <linux/spi/spi.h>
--#include <linux/platform_data/spi-clps711x.h>
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 9f0119f64f93..df88fa161d8a 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -596,9 +596,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ 	u32 val;
  
--#define DRIVER_NAME	"spi-clps711x"
-+#define DRIVER_NAME		"clps711x-spi"
+ 	/* Disable Clock */
+-	if (sdd->port_conf->clk_from_cmu) {
+-		clk_disable_unprepare(sdd->src_clk);
+-	} else {
++	if (!sdd->port_conf->clk_from_cmu) {
+ 		val = readl(regs + S3C64XX_SPI_CLK_CFG);
+ 		val &= ~S3C64XX_SPI_ENCLK_ENABLE;
+ 		writel(val, regs + S3C64XX_SPI_CLK_CFG);
+@@ -641,11 +639,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ 	writel(val, regs + S3C64XX_SPI_MODE_CFG);
  
- #define SYNCIO_FRMLEN(x)	((x) << 8)
- #define SYNCIO_TXFRMEN		(1 << 14)
-@@ -40,6 +38,17 @@ struct spi_clps711x_data {
- 
- static int spi_clps711x_setup(struct spi_device *spi)
- {
-+	if (!spi->controller_state) {
-+		int ret;
-+
-+		ret = devm_gpio_request(&spi->master->dev, spi->cs_gpio,
-+					dev_name(&spi->master->dev));
-+		if (ret)
-+			return ret;
-+
-+		spi->controller_state = spi;
-+	}
-+
- 	/* We are expect that SPI-device is not selected */
- 	gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
- 
-@@ -104,20 +113,9 @@ static irqreturn_t spi_clps711x_isr(int irq, void *dev_id)
- static int spi_clps711x_probe(struct platform_device *pdev)
- {
- 	struct spi_clps711x_data *hw;
--	struct spi_clps711x_pdata *pdata = dev_get_platdata(&pdev->dev);
- 	struct spi_master *master;
- 	struct resource *res;
--	int i, irq, ret;
--
--	if (!pdata) {
--		dev_err(&pdev->dev, "No platform data supplied\n");
--		return -EINVAL;
--	}
--
--	if (pdata->num_chipselect < 1) {
--		dev_err(&pdev->dev, "At least one CS must be defined\n");
--		return -EINVAL;
--	}
-+	int irq, ret;
- 
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0)
-@@ -127,40 +125,24 @@ static int spi_clps711x_probe(struct platform_device *pdev)
- 	if (!master)
- 		return -ENOMEM;
- 
--	master->cs_gpios = devm_kzalloc(&pdev->dev, sizeof(int) *
--					pdata->num_chipselect, GFP_KERNEL);
--	if (!master->cs_gpios) {
--		ret = -ENOMEM;
--		goto err_out;
--	}
--
--	master->bus_num = pdev->id;
-+	master->bus_num = -1;
- 	master->mode_bits = SPI_CPHA | SPI_CS_HIGH;
- 	master->bits_per_word_mask =  SPI_BPW_RANGE_MASK(1, 8);
--	master->num_chipselect = pdata->num_chipselect;
-+	master->dev.of_node = pdev->dev.of_node;
- 	master->setup = spi_clps711x_setup;
- 	master->prepare_message = spi_clps711x_prepare_message;
- 	master->transfer_one = spi_clps711x_transfer_one;
- 
- 	hw = spi_master_get_devdata(master);
- 
--	for (i = 0; i < master->num_chipselect; i++) {
--		master->cs_gpios[i] = pdata->chipselect[i];
--		ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
--					DRIVER_NAME);
--		if (ret) {
--			dev_err(&pdev->dev, "Can't get CS GPIO %i\n", i);
--			goto err_out;
--		}
--	}
--
- 	hw->spi_clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(hw->spi_clk)) {
- 		ret = PTR_ERR(hw->spi_clk);
- 		goto err_out;
- 	}
- 
--	hw->syscon = syscon_regmap_lookup_by_pdevname("syscon.3");
-+	hw->syscon =
-+		syscon_regmap_lookup_by_compatible("cirrus,ep7209-syscon3");
- 	if (IS_ERR(hw->syscon)) {
- 		ret = PTR_ERR(hw->syscon);
- 		goto err_out;
-@@ -185,14 +167,8 @@ static int spi_clps711x_probe(struct platform_device *pdev)
- 		goto err_out;
- 
- 	ret = devm_spi_register_master(&pdev->dev, master);
--	if (!ret) {
--		dev_info(&pdev->dev,
--			 "SPI bus driver initialized. Master clock %u Hz\n",
--			 master->max_speed_hz);
-+	if (!ret)
- 		return 0;
--	}
--
--	dev_err(&pdev->dev, "Failed to register master\n");
- 
- err_out:
- 	spi_master_put(master);
-@@ -200,9 +176,16 @@ err_out:
- 	return ret;
- }
- 
-+static const struct of_device_id clps711x_spi_dt_ids[] = {
-+	{ .compatible = "cirrus,ep7209-spi", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, clps711x_spi_dt_ids);
-+
- static struct platform_driver clps711x_spi_driver = {
- 	.driver	= {
- 		.name	= DRIVER_NAME,
-+		.of_match_table = clps711x_spi_dt_ids,
- 	},
- 	.probe	= spi_clps711x_probe,
- };
+ 	if (sdd->port_conf->clk_from_cmu) {
+-		/* Configure Clock */
+-		/* There is half-multiplier before the SPI */
+ 		clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
+-		/* Enable Clock */
+-		clk_prepare_enable(sdd->src_clk);
+ 	} else {
+ 		/* Configure Clock */
+ 		val = readl(regs + S3C64XX_SPI_CLK_CFG);
 -- 
 2.8.1
