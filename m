@@ -1,33 +1,123 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 07 Jul 2016 12:45:57 +0200
-Subject: [PATCH v3 1/2] clk: samsung: cpu: Prepare for addition for Exynos7
- CPU clocks
-In-Reply-To: <1467750561-13957-2-git-send-email-a.kesavan@samsung.com>
-References: <1467750561-13957-1-git-send-email-a.kesavan@samsung.com>
- <1467750561-13957-2-git-send-email-a.kesavan@samsung.com>
-Message-ID: <577E32E5.4010902@samsung.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu,  7 Jul 2016 11:49:44 +0100
+Subject: [PATCH] arm64: kernel: Save and restore UAO and addr_limit on
+ exception entry
+Message-ID: <1467888584-12912-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2016 10:29 PM, Abhilash Kesavan wrote:
-> Exynos7 has the same CPU clock registers layout as that present
-> in Exynos5433 except for the bits in the MUX_STAT* registers.
-> Add a new CLK_CPU_HAS_MODIFIED_MUX_STAT flag to handle this change.
+If we take an exception while at EL1, the exception handler inherits
+the original context's addr_limit and PSTATE.UAO values. To be consistent
+always reset addr_limit and PSTATE.UAO on (re-)entry to EL1. This
+prevents accidental re-use of the original context's addr_limit.
 
-> --- a/drivers/clk/samsung/clk-cpu.h
-> +++ b/drivers/clk/samsung/clk-cpu.h
-> @@ -63,6 +63,8 @@ struct exynos_cpuclk {
->  /* The CPU clock registers have Exynos5433-compatible layout */
->  #define CLK_CPU_HAS_E5433_REGS_LAYOUT	(1 << 2)
+Based on a similar patch for arm from Russell King.
 
-> +/* Exynos5433-compatible layout with different MUX_STAT register bits */
-> +#define CLK_CPU_HAS_MODIFIED_MUX_STAT	(1 << 3)
+Signed-off-by: James Morse <james.morse@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+---
+If you want this backported, it only applies to v4.6 because of UAO:
+Cc: stable at vger.kernel.org # 4.6-
 
-It's getting a bit messy, what if there comes another SoC version
-which has some other modification of exynos5433 registers structure?
-We would need another variant of HAS_MODIFIED_MUX_STAT flag and we
-could easily get lost while trying to determine which modification
-is which. How about indicating explicitly it's an exynos7 bits
-layout and renaming the flag to something like
+It will also conflict with the irq_stack before v4.5
 
-#define CLK_CPU_HAS_E7_MUX_STAT	(1 << 16) ?
+
+ arch/arm64/include/asm/ptrace.h |  2 ++
+ arch/arm64/kernel/asm-offsets.c |  1 +
+ arch/arm64/kernel/entry.S       | 19 +++++++++++++++++--
+ arch/arm64/mm/fault.c           |  3 ++-
+ 4 files changed, 22 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index a307eb6e7fa8..7f94755089e2 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -117,6 +117,8 @@ struct pt_regs {
+ 	};
+ 	u64 orig_x0;
+ 	u64 syscallno;
++	u64 orig_addr_limit;
++	u64 unused;	// maintain 16 byte alignment
+ };
+ 
+ #define arch_has_single_step()	(1)
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index f8e5d47f0880..2f4ba774488a 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -60,6 +60,7 @@ int main(void)
+   DEFINE(S_PC,			offsetof(struct pt_regs, pc));
+   DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
+   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
++  DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
+   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
+   BLANK();
+   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id.counter));
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 12e8d2bcb3f9..6c3b7345a6c4 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -28,6 +28,7 @@
+ #include <asm/errno.h>
+ #include <asm/esr.h>
+ #include <asm/irq.h>
++#include <asm/memory.h>
+ #include <asm/thread_info.h>
+ #include <asm/unistd.h>
+ 
+@@ -97,7 +98,14 @@
+ 	mov	x29, xzr			// fp pointed to user-space
+ 	.else
+ 	add	x21, sp, #S_FRAME_SIZE
+-	.endif
++	get_thread_info tsk
++	/* Save the task's original addr_limit and set USER_DS (TASK_SIZE_64) */
++	ldr	x20, [tsk, #TI_ADDR_LIMIT]
++	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
++	mov	x20, #TASK_SIZE_64
++	str	x20, [tsk, #TI_ADDR_LIMIT]
++	ALTERNATIVE(nop, SET_PSTATE_UAO(0), ARM64_HAS_UAO, CONFIG_ARM64_UAO)
++	.endif /* \el == 0 */
+ 	mrs	x22, elr_el1
+ 	mrs	x23, spsr_el1
+ 	stp	lr, x21, [sp, #S_LR]
+@@ -128,6 +136,14 @@
+ 	.endm
+ 
+ 	.macro	kernel_exit, el
++	.if	\el != 0
++	/* Restore the task's original addr_limit. */
++	ldr	x20, [sp, #S_ORIG_ADDR_LIMIT]
++	str	x20, [tsk, #TI_ADDR_LIMIT]
++
++	/* No need to restore UAO, it will be restored from SPSR_EL1 */
++	.endif
++
+ 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
+ 	.if	\el == 0
+ 	ct_user_enter
+@@ -406,7 +422,6 @@ el1_irq:
+ 	bl	trace_hardirqs_off
+ #endif
+ 
+-	get_thread_info tsk
+ 	irq_handler
+ 
+ #ifdef CONFIG_PREEMPT
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index ba3fc12bd272..fb6c18d2845f 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -280,7 +280,8 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 	}
+ 
+ 	if (permission_fault(esr) && (addr < USER_DS)) {
+-		if (get_fs() == KERNEL_DS)
++		/* regs->orig_addr_limit may be 0 if we entered from EL0 */
++		if (regs->orig_addr_limit == KERNEL_DS)
+ 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
+ 
+ 		if (!search_exception_tables(regs->pc))
+-- 
+2.8.0.rc3
