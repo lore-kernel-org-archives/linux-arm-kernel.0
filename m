@@ -1,43 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 7 Jul 2016 12:35:02 -0600
-Subject: [PATCH V2 01/10] Documentation: dt-bindings: mailbox: tegra: Add
- binding for HSP mailbox
-In-Reply-To: <20160707181356.GA6864@kickseed.nvidia.com>
-References: <20160705090431.5852-1-josephl@nvidia.com>
- <20160705090431.5852-2-josephl@nvidia.com>
- <20160707181356.GA6864@kickseed.nvidia.com>
-Message-ID: <577EA0D6.9020308@wwwdotorg.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 7 Jul 2016 21:35:59 +0300
+Subject: [PATCH 1/9] mm: Hardened usercopy
+In-Reply-To: <CAGXu5jJV4ZQp4VQ44SPQ49RxXpFXzx6d233A3+_Ka7txYHmuMw@mail.gmail.com>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <1467843928-29351-2-git-send-email-keescook@chromium.org>
+ <20160707053710.GH2118@tarshish>
+ <CAGXu5jJV4ZQp4VQ44SPQ49RxXpFXzx6d233A3+_Ka7txYHmuMw@mail.gmail.com>
+Message-ID: <20160707183559.GR2118@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2016 12:13 PM, Sivaram Nair wrote:
-> On Tue, Jul 05, 2016 at 05:04:22PM +0800, Joseph Lo wrote:
->> Add DT binding for the Hardware Synchronization Primitives (HSP). The
->> HSP is designed for the processors to share resources and communicate
->> together. It provides a set of hardware synchronization primitives for
->> interprocessor communication. So the interprocessor communication (IPC)
->> protocols can use hardware synchronization primitive, when operating
->> between two processors not in an SMP relationship.
+Hi Kees,
 
->> diff --git a/include/dt-bindings/mailbox/tegra186-hsp.h b/include/dt-bindings/mailbox/tegra186-hsp.h
+On Thu, Jul 07, 2016 at 01:25:21PM -0400, Kees Cook wrote:
+> On Thu, Jul 7, 2016 at 1:37 AM, Baruch Siach <baruch@tkos.co.il> wrote:
+> > On Wed, Jul 06, 2016 at 03:25:20PM -0700, Kees Cook wrote:
+> >> +#ifdef CONFIG_HAVE_HARDENED_USERCOPY_ALLOCATOR
+> >
+> > Should be CONFIG_HARDENED_USERCOPY to match the slab/slub implementation
+> > condition.
+> >
+> >> +const char *__check_heap_object(const void *ptr, unsigned long n,
+> >> +                             struct page *page);
+> >> +#else
+> >> +static inline const char *__check_heap_object(const void *ptr,
+> >> +                                           unsigned long n,
+> >> +                                           struct page *page)
+> >> +{
+> >> +     return NULL;
+> >> +}
+> >> +#endif
+> 
+> Hmm, I think what I have is correct: if the allocator supports the
+> heap object checking, it defines __check_heap_object as existing via
+> CONFIG_HAVE_HARDENED_USERCOPY_ALLOCATOR. If usercopy checking is done
+> at all is controlled by CONFIG_HARDENED_USERCOPY.
+> 
+> I.e. you can have the other usercopy checks even if your allocator
+> doesn't support object size checking.
 
->> +#define HSP_MBOX_TYPE_DB 0x0
->> +#define HSP_MBOX_TYPE_SM 0x1
->> +#define HSP_MBOX_TYPE_SS 0x2
->> +#define HSP_MBOX_TYPE_AS 0x3
->> +
->> +#define HSP_DB_MASTER_CCPLEX 17
->> +#define HSP_DB_MASTER_BPMP 19
->> +
->> +#define HSP_MBOX_ID(type, ID) \
->> +		(HSP_MBOX_TYPE_##type << 16 | ID)
->
-> It will be nicer if you avoid the macro glue magic '##' for 'type'. I
-> would also suggest to use braces around 'type' and 'ID'.
+Right. I missed the fact that usercopy.c build also depends on 
+CONFIG_HARDENED_USERCOPY. Sorry for the noise.
 
-This technique been used without issue in quite a few other places 
-without issue, and has the benefit of simplifying the text wherever the 
-macro is used. What issue do you foresee?
+baruch
 
-BTW, if this patch does need reposting, I'd suggest s/ID/id/ since macro 
-parameters are usually lower-case.
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
