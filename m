@@ -1,359 +1,113 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  7 Jul 2016 10:00:42 +0200
-Subject: [PATCH 09/93] clocksource/drivers/oxnas-rps: Add Oxford Semiconductor
- RPS Dual Timer
+Date: Thu,  7 Jul 2016 10:00:40 +0200
+Subject: [PATCH 07/93] clocksource/drivers/rockchip: Add support for the
+ rk3399 SoC
 In-Reply-To: <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577E0BED.3020608@linaro.org>
  <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467878526-1238-9-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467878526-1238-7-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Neil Armstrong <narmstrong@baylibre.com>
+From: "Huang, Tao" <huangtao@rock-chips.com>
 
-Add clocksource and clockevent driver from dual RPS timer.
-The HW provides a dual one-shot or periodic 24bit timers,
-the drivers set the first one as tick event source and the
-second as a continuous scheduler clock source.
-The timer can use 1, 16 or 256 as pre-dividers, thus the
-clocksource uses 16 by default.
+The only difference between the rk3399 SoC and the other ones is the control
+register offset which is different.
 
-CC: Ma Haijun <mahaijuns@gmail.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Add a new field to store the control register address depending on the SoC
+and use it instead of the <base> + <control offset>.
+
+Signed-off-by: Huang Tao <huangtao@rock-chips.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/Kconfig           |   8 +
- drivers/clocksource/Makefile          |   1 +
- drivers/clocksource/timer-oxnas-rps.c | 290 ++++++++++++++++++++++++++++++++++
- 3 files changed, 299 insertions(+)
- create mode 100644 drivers/clocksource/timer-oxnas-rps.c
+ drivers/clocksource/rockchip_timer.c | 31 ++++++++++++++++++++++++++-----
+ 1 file changed, 26 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 6bbd3d8..d4b9e04 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -293,6 +293,14 @@ config VF_PIT_TIMER
- 	help
- 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index b510863..a3f22b0 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -19,7 +19,8 @@
  
-+config OXNAS_RPS_TIMER
-+	bool "Oxford Semiconductor OXNAS RPS Timers driver" if COMPILE_TEST
-+	depends on GENERIC_CLOCKEVENTS
-+	select CLKSRC_OF
-+	select CLKSRC_MMIO
-+	help
-+	  This enables support for the Oxford Semiconductor OXNAS RPS timers.
-+
- config SYS_SUPPORTS_SH_CMT
-         bool
+ #define TIMER_LOAD_COUNT0	0x00
+ #define TIMER_LOAD_COUNT1	0x04
+-#define TIMER_CONTROL_REG	0x10
++#define TIMER_CONTROL_REG3288	0x10
++#define TIMER_CONTROL_REG3399	0x1c
+ #define TIMER_INT_STATUS	0x18
  
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 473974f..bc66981 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -48,6 +48,7 @@ obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
- obj-$(CONFIG_CLKSRC_PISTACHIO)	+= time-pistachio.o
- obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
- obj-$(CONFIG_CLKSRC_NPS)	+= timer-nps.o
-+obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
+ #define TIMER_DISABLE		0x0
+@@ -31,6 +32,7 @@
+ struct bc_timer {
+ 	struct clock_event_device ce;
+ 	void __iomem *base;
++	void __iomem *ctrl;
+ 	u32 freq;
+ };
  
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
-diff --git a/drivers/clocksource/timer-oxnas-rps.c b/drivers/clocksource/timer-oxnas-rps.c
-new file mode 100644
-index 0000000..c002e99
---- /dev/null
-+++ b/drivers/clocksource/timer-oxnas-rps.c
-@@ -0,0 +1,290 @@
-+/*
-+ * drivers/clocksource/timer-oxnas-rps.c
-+ *
-+ * Copyright (C) 2009 Oxford Semiconductor Ltd
-+ * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
-+
-+#include <linux/init.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/slab.h>
-+#include <linux/interrupt.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/clockchips.h>
-+#include <linux/sched_clock.h>
-+
-+/* TIMER1 used as tick
-+ * TIMER2 used as clocksource
-+ */
-+
-+/* Registers definitions */
-+
-+#define TIMER_LOAD_REG		0x0
-+#define TIMER_CURR_REG		0x4
-+#define TIMER_CTRL_REG		0x8
-+#define TIMER_CLRINT_REG	0xC
-+
-+#define TIMER_BITS		24
-+
-+#define TIMER_MAX_VAL		(BIT(TIMER_BITS) - 1)
-+
-+#define TIMER_PERIODIC		BIT(6)
-+#define TIMER_ENABLE		BIT(7)
-+
-+#define TIMER_DIV1		(0)
-+#define TIMER_DIV16		(1 << 2)
-+#define TIMER_DIV256		(2 << 2)
-+
-+#define TIMER1_REG_OFFSET	0
-+#define TIMER2_REG_OFFSET	0x20
-+
-+/* Clockevent & Clocksource data */
-+
-+struct oxnas_rps_timer {
-+	struct clock_event_device clkevent;
-+	void __iomem *clksrc_base;
-+	void __iomem *clkevt_base;
-+	unsigned long timer_period;
-+	unsigned int timer_prescaler;
-+	struct clk *clk;
-+	int irq;
-+};
-+
-+static irqreturn_t oxnas_rps_timer_irq(int irq, void *dev_id)
+@@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct clock_event_device *ce)
+ 	return rk_timer(ce)->base;
+ }
+ 
++static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
 +{
-+	struct oxnas_rps_timer *rps = dev_id;
-+
-+	writel_relaxed(0, rps->clkevt_base + TIMER_CLRINT_REG);
-+
-+	rps->clkevent.event_handler(&rps->clkevent);
-+
-+	return IRQ_HANDLED;
++	return rk_timer(ce)->ctrl;
 +}
 +
-+static void oxnas_rps_timer_config(struct oxnas_rps_timer *rps,
-+				   unsigned long period,
-+				   unsigned int periodic)
+ static inline void rk_timer_disable(struct clock_event_device *ce)
+ {
+-	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
++	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
+ }
+ 
+ static inline void rk_timer_enable(struct clock_event_device *ce, u32 flags)
+ {
+ 	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+-		       rk_base(ce) + TIMER_CONTROL_REG);
++		       rk_ctrl(ce));
+ }
+ 
+ static void rk_timer_update_counter(unsigned long cycles,
+@@ -106,7 +113,7 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void __init rk_timer_init(struct device_node *np)
++static void __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+ {
+ 	struct clock_event_device *ce = &bc_timer.ce;
+ 	struct clk *timer_clk;
+@@ -118,6 +125,7 @@ static void __init rk_timer_init(struct device_node *np)
+ 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
+ 		return;
+ 	}
++	bc_timer.ctrl = bc_timer.base + ctrl_reg;
+ 
+ 	pclk = of_clk_get_by_name(np, "pclk");
+ 	if (IS_ERR(pclk)) {
+@@ -180,4 +188,17 @@ out_unmap:
+ 	iounmap(bc_timer.base);
+ }
+ 
+-CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
++static void __init rk3288_timer_init(struct device_node *np)
 +{
-+	uint32_t cfg = rps->timer_prescaler;
-+
-+	if (period)
-+		cfg |= TIMER_ENABLE;
-+
-+	if (periodic)
-+		cfg |= TIMER_PERIODIC;
-+
-+	writel_relaxed(period, rps->clkevt_base + TIMER_LOAD_REG);
-+	writel_relaxed(cfg, rps->clkevt_base + TIMER_CTRL_REG);
++	rk_timer_init(np, TIMER_CONTROL_REG3288);
 +}
 +
-+static int oxnas_rps_timer_shutdown(struct clock_event_device *evt)
++static void __init rk3399_timer_init(struct device_node *np)
 +{
-+	struct oxnas_rps_timer *rps =
-+		container_of(evt, struct oxnas_rps_timer, clkevent);
-+
-+	oxnas_rps_timer_config(rps, 0, 0);
-+
-+	return 0;
++	rk_timer_init(np, TIMER_CONTROL_REG3399);
 +}
 +
-+static int oxnas_rps_timer_set_periodic(struct clock_event_device *evt)
-+{
-+	struct oxnas_rps_timer *rps =
-+		container_of(evt, struct oxnas_rps_timer, clkevent);
-+
-+	oxnas_rps_timer_config(rps, rps->timer_period, 1);
-+
-+	return 0;
-+}
-+
-+static int oxnas_rps_timer_set_oneshot(struct clock_event_device *evt)
-+{
-+	struct oxnas_rps_timer *rps =
-+		container_of(evt, struct oxnas_rps_timer, clkevent);
-+
-+	oxnas_rps_timer_config(rps, rps->timer_period, 0);
-+
-+	return 0;
-+}
-+
-+static int oxnas_rps_timer_next_event(unsigned long delta,
-+				struct clock_event_device *evt)
-+{
-+	struct oxnas_rps_timer *rps =
-+		container_of(evt, struct oxnas_rps_timer, clkevent);
-+
-+	oxnas_rps_timer_config(rps, delta, 0);
-+
-+	return 0;
-+}
-+
-+static int __init oxnas_rps_clockevent_init(struct oxnas_rps_timer *rps)
-+{
-+	ulong clk_rate = clk_get_rate(rps->clk);
-+	ulong timer_rate;
-+
-+	/* Start with prescaler 1 */
-+	rps->timer_prescaler = TIMER_DIV1;
-+	rps->timer_period = DIV_ROUND_UP(clk_rate, HZ);
-+	timer_rate = clk_rate;
-+
-+	if (rps->timer_period > TIMER_MAX_VAL) {
-+		rps->timer_prescaler = TIMER_DIV16;
-+		timer_rate = clk_rate / 16;
-+		rps->timer_period = DIV_ROUND_UP(timer_rate, HZ);
-+	}
-+	if (rps->timer_period > TIMER_MAX_VAL) {
-+		rps->timer_prescaler = TIMER_DIV256;
-+		timer_rate = clk_rate / 256;
-+		rps->timer_period = DIV_ROUND_UP(timer_rate, HZ);
-+	}
-+
-+	rps->clkevent.name = "oxnas-rps";
-+	rps->clkevent.features = CLOCK_EVT_FEAT_PERIODIC |
-+				 CLOCK_EVT_FEAT_ONESHOT |
-+				 CLOCK_EVT_FEAT_DYNIRQ;
-+	rps->clkevent.tick_resume = oxnas_rps_timer_shutdown;
-+	rps->clkevent.set_state_shutdown = oxnas_rps_timer_shutdown;
-+	rps->clkevent.set_state_periodic = oxnas_rps_timer_set_periodic;
-+	rps->clkevent.set_state_oneshot = oxnas_rps_timer_set_oneshot;
-+	rps->clkevent.set_next_event = oxnas_rps_timer_next_event;
-+	rps->clkevent.rating = 200;
-+	rps->clkevent.cpumask = cpu_possible_mask;
-+	rps->clkevent.irq = rps->irq;
-+	clockevents_config_and_register(&rps->clkevent,
-+					timer_rate,
-+					1,
-+					TIMER_MAX_VAL);
-+
-+	pr_info("Registered clock event rate %luHz prescaler %x period %lu\n",
-+			clk_rate,
-+			rps->timer_prescaler,
-+			rps->timer_period);
-+
-+	return 0;
-+}
-+
-+/* Clocksource */
-+
-+static void __iomem *timer_sched_base;
-+
-+static u64 notrace oxnas_rps_read_sched_clock(void)
-+{
-+	return ~readl_relaxed(timer_sched_base);
-+}
-+
-+static int __init oxnas_rps_clocksource_init(struct oxnas_rps_timer *rps)
-+{
-+	ulong clk_rate = clk_get_rate(rps->clk);
-+	int ret;
-+
-+	/* use prescale 16 */
-+	clk_rate = clk_rate / 16;
-+
-+	writel_relaxed(TIMER_MAX_VAL, rps->clksrc_base + TIMER_LOAD_REG);
-+	writel_relaxed(TIMER_PERIODIC | TIMER_ENABLE | TIMER_DIV16,
-+			rps->clksrc_base + TIMER_CTRL_REG);
-+
-+	timer_sched_base = rps->clksrc_base + TIMER_CURR_REG;
-+	sched_clock_register(oxnas_rps_read_sched_clock,
-+			     TIMER_BITS, clk_rate);
-+	ret = clocksource_mmio_init(timer_sched_base,
-+				    "oxnas_rps_clocksource_timer",
-+				    clk_rate, 250, TIMER_BITS,
-+				    clocksource_mmio_readl_down);
-+	if (WARN_ON(ret)) {
-+		pr_err("can't register clocksource\n");
-+		return ret;
-+	}
-+
-+	pr_info("Registered clocksource rate %luHz\n", clk_rate);
-+
-+	return 0;
-+}
-+
-+static void __init oxnas_rps_timer_init(struct device_node *np)
-+{
-+	struct oxnas_rps_timer *rps;
-+	void __iomem *base;
-+	int ret;
-+
-+	rps = kzalloc(sizeof(*rps), GFP_KERNEL);
-+	if (!rps) {
-+		pr_err("Failed to allocate rps structure\n");
-+		return;
-+	}
-+
-+	rps->clk = of_clk_get(np, 0);
-+	if (WARN_ON(IS_ERR(rps->clk)))
-+		goto err_alloc;
-+
-+	if (WARN_ON(clk_prepare_enable(rps->clk)))
-+		goto err_clk;
-+
-+	base = of_iomap(np, 0);
-+	if (WARN_ON(!base))
-+		goto err_clk_prepare;
-+
-+	rps->irq = irq_of_parse_and_map(np, 0);
-+	if (WARN_ON(rps->irq < 0))
-+		goto err_iomap;
-+
-+	rps->clkevt_base = base + TIMER1_REG_OFFSET;
-+	rps->clksrc_base = base + TIMER2_REG_OFFSET;
-+
-+	/* Disable timers */
-+	writel_relaxed(0, rps->clkevt_base + TIMER_CTRL_REG);
-+	writel_relaxed(0, rps->clksrc_base + TIMER_CTRL_REG);
-+	writel_relaxed(0, rps->clkevt_base + TIMER_LOAD_REG);
-+	writel_relaxed(0, rps->clksrc_base + TIMER_LOAD_REG);
-+	writel_relaxed(0, rps->clkevt_base + TIMER_CLRINT_REG);
-+	writel_relaxed(0, rps->clksrc_base + TIMER_CLRINT_REG);
-+
-+	ret = request_irq(rps->irq, oxnas_rps_timer_irq,
-+			  IRQF_TIMER | IRQF_IRQPOLL,
-+			  "rps-timer", rps);
-+	if (WARN_ON(ret))
-+		goto err_iomap;
-+
-+	ret = oxnas_rps_clocksource_init(rps);
-+	if (ret)
-+		goto err_irqreq;
-+
-+	ret = oxnas_rps_clockevent_init(rps);
-+	if (ret)
-+		goto err_irqreq;
-+
-+	return;
-+
-+err_irqreq:
-+	free_irq(rps->irq, rps);
-+err_iomap:
-+	iounmap(base);
-+err_clk_prepare:
-+	clk_disable_unprepare(rps->clk);
-+err_clk:
-+	clk_put(rps->clk);
-+err_alloc:
-+	kfree(rps);
-+}
-+
-+CLOCKSOURCE_OF_DECLARE(ox810se_rps,
-+		       "oxsemi,ox810se-rps-timer", oxnas_rps_timer_init);
++CLOCKSOURCE_OF_DECLARE(rk3288_timer, "rockchip,rk3288-timer",
++		       rk3288_timer_init);
++CLOCKSOURCE_OF_DECLARE(rk3399_timer, "rockchip,rk3399-timer",
++		       rk3399_timer_init);
 -- 
 1.9.1
