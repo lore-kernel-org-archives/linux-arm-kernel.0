@@ -1,60 +1,56 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 7 Jul 2016 14:12:26 +1000
-Subject: linux-next: manual merge of the clockevents tree with the arm-soc tree
-Message-ID: <20160707141226.2b9c1e15@canb.auug.org.au>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Thu, 07 Jul 2016 13:25:08 +0900
+Subject: [PATCH -next v2] iommu/exynos: Fix return value check in
+ exynos_iommu_of_setup()
+In-Reply-To: <1467860372-6940-1-git-send-email-weiyj_lk@163.com>
+References: <1467807354-26503-1-git-send-email-weiyj_lk@163.com>
+ <CGME20160707030024epcas1p1454a6e40f68fbdcf0a103ce56d24ca22@epcas1p1.samsung.com>
+ <1467860372-6940-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <20160707042508.GG23620@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Wei,
 
-Today's linux-next merge of the clockevents tree got a conflict in:
+On Thu, Jul 07, 2016 at 02:59:32AM +0000, weiyj_lk at 163.com wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> In case of error, the function of_platform_device_create() returns
+> NULL pointer not ERR_PTR(). The IS_ERR() test in the return value
+> check should be replaced with NULL test.
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-  arch/arm/Kconfig
+Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
 
-between commit:
+Thanks,
+Andi
 
-  c86f51737f8d ("ARM: clps711x: Switch to MULTIPLATFORM")
-
-from the arm-soc tree and commit:
-
-  250e46aa3bb3 ("clocksource/drivers/clps_711x: Add the COMPILE_TEST option")
-
-from the clockevents tree.
-
-I fixed it up (I used the arm-soc version of this file and then added
-the following merge fix patch) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Thu, 7 Jul 2016 13:59:06 +1000
-Subject: [PATCH] clocksource/drivers/clps_711x: fixup for "ARM: clps711x: Switch to MULTIPLATFORM"
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- arch/arm/mach-clps711x/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
-index 3b56197ccfd0..dc7c6edeab39 100644
---- a/arch/arm/mach-clps711x/Kconfig
-+++ b/arch/arm/mach-clps711x/Kconfig
-@@ -3,8 +3,8 @@ menuconfig ARCH_CLPS711X
- 	depends on ARCH_MULTI_V4T
- 	select ARCH_REQUIRE_GPIOLIB
- 	select AUTO_ZRELADDR
--	select CLKSRC_MMIO
- 	select CLKSRC_OF
-+	select CLPS711X_TIMER
- 	select COMMON_CLK
- 	select CPU_ARM720T
- 	select GENERIC_CLOCKEVENTS
--- 
-2.8.1
-
--- 
-Cheers,
-Stephen Rothwell
+> ---
+> v1 -> v2: chenge the error code to -ENODEV
+> ---
+>  drivers/iommu/exynos-iommu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 33dcc29..9b23059 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -1345,8 +1345,8 @@ static int __init exynos_iommu_of_setup(struct device_node *np)
+>  		exynos_iommu_init();
+>  
+>  	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+> -	if (IS_ERR(pdev))
+> -		return PTR_ERR(pdev);
+> +	if (!pdev)
+> +		return -ENODEV;
+>  
+>  	/*
+>  	 * use the first registered sysmmu device for performing
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
