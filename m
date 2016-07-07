@@ -1,22 +1,22 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  7 Jul 2016 10:00:47 +0200
-Subject: [PATCH 14/93] clocksource/drivers/mtk_timer: Convert init function to
- return error
+Date: Thu,  7 Jul 2016 10:00:58 +0200
+Subject: [PATCH 25/93] clocksource/drivers/clksrc-dbx500: Convert init
+ function to return error
 In-Reply-To: <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577E0BED.3020608@linaro.org>
  <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467878526-1238-14-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467878526-1238-25-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The init functions do not return any error. They behave as the following:
 
- - panic, thus leading to a kernel crash while another timer may work and
-   make the system boot up correctly
+  - panic, thus leading to a kernel crash while another timer may work and
+       make the system boot up correctly
 
- or
+  or
 
- - print an error and let the caller unaware if the state of the system
+  - print an error and let the caller unaware if the state of the system
 
 Change that by converting the init functions to return an error conforming
 to the CLOCKSOURCE_OF_RET prototype.
@@ -26,50 +26,33 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/clocksource/mtk_timer.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/clocksource/clksrc-dbx500-prcmu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index 7e583f8..432a2c0 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -181,7 +181,7 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
- 			evt->gpt_base + GPT_IRQ_EN_REG);
- }
+diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
+index dfad6eb..5a59d29 100644
+--- a/drivers/clocksource/clksrc-dbx500-prcmu.c
++++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
+@@ -64,7 +64,7 @@ static u64 notrace dbx500_prcmu_sched_clock_read(void)
  
--static void __init mtk_timer_init(struct device_node *node)
-+static int __init mtk_timer_init(struct device_node *node)
+ #endif
+ 
+-static void __init clksrc_dbx500_prcmu_init(struct device_node *node)
++static int __init clksrc_dbx500_prcmu_init(struct device_node *node)
  {
- 	struct mtk_clock_event_device *evt;
- 	struct resource res;
-@@ -190,7 +190,7 @@ static void __init mtk_timer_init(struct device_node *node)
+ 	clksrc_dbx500_timer_base = of_iomap(node, 0);
  
- 	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
- 	if (!evt)
--		return;
-+		return -ENOMEM;
- 
- 	evt->dev.name = "mtk_tick";
- 	evt->dev.rating = 300;
-@@ -248,7 +248,7 @@ static void __init mtk_timer_init(struct device_node *node)
- 
- 	mtk_timer_enable_irq(evt, GPT_CLK_EVT);
- 
--	return;
-+	return 0;
- 
- err_clk_disable:
- 	clk_disable_unprepare(clk);
-@@ -262,5 +262,7 @@ err_mem:
- 	release_mem_region(res.start, resource_size(&res));
- err_kzalloc:
- 	kfree(evt);
-+
-+	return -EINVAL;
+@@ -84,7 +84,7 @@ static void __init clksrc_dbx500_prcmu_init(struct device_node *node)
+ #ifdef CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+ 	sched_clock_register(dbx500_prcmu_sched_clock_read, 32, RATE_32K);
+ #endif
+-	clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
++	return clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
  }
--CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
+-CLOCKSOURCE_OF_DECLARE(dbx500_prcmu, "stericsson,db8500-prcmu-timer-4",
++CLOCKSOURCE_OF_DECLARE_RET(dbx500_prcmu, "stericsson,db8500-prcmu-timer-4",
+ 		       clksrc_dbx500_prcmu_init);
 -- 
 1.9.1
