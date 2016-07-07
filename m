@@ -1,40 +1,49 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 06 Jul 2016 17:55:44 -0700
-Subject: [PATCH] clk: stm32f4: fix error handling
-In-Reply-To: <1467526003-13318-1-git-send-email-christophe.jaillet@wanadoo.fr>
-References: <1467526003-13318-1-git-send-email-christophe.jaillet@wanadoo.fr>
-Message-ID: <146785294442.73491.14204638951540057623@resonance>
+From: ttnguyen@apm.com (Tai Tri Nguyen)
+Date: Wed, 6 Jul 2016 18:01:39 -0700
+Subject: [PATCH v7 1/4] MAINTAINERS: Add entry for APM X-Gene SoC PMU
+ driver
+In-Reply-To: <1467852224.8360.60.camel@perches.com>
+References: <1467850045-10584-1-git-send-email-ttnguyen@apm.com>
+ <1467850045-10584-2-git-send-email-ttnguyen@apm.com>
+ <1467850751.8360.56.camel@perches.com>
+ <CACgAJHyvusvRPKNaxHLFK=gWw2UUtjV80H175eRu6EieutxNiw@mail.gmail.com>
+ <1467852224.8360.60.camel@perches.com>
+Message-ID: <CACgAJHzoRwfvnGuKLpymLQ2+FNjxZhfg2YnxHyP3CndrjAQapw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Christophe JAILLET (2016-07-02 23:06:43)
-> This is likely that checking 'clks[idx]' instead of 'clks[n]' is
-> expected here.
-> 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Hi Joe,
 
-Applied.
+On Wed, Jul 6, 2016 at 5:43 PM, Joe Perches <joe@perches.com> wrote:
+> On Wed, 2016-07-06 at 17:35 -0700, Tai Tri Nguyen wrote:
+>> Hi Joe,
+>
+> Ch?o Tai.
+>
+
+Thanks for the greeting!
+
+>> On Wed, Jul 6, 2016 at 5:19 PM, Joe Perches <joe@perches.com> wrote:
+>> > On Wed, 2016-07-06 at 17:07 -0700, Tai Nguyen wrote:
+> []
+>> > > diff --git a/MAINTAINERS b/MAINTAINERS
+>> > []
+>> > >
+>> > > @@ -8593,6 +8593,14 @@ L:     linux-scsi at vger.kernel.org
+>> > >  S:   Supported
+>> > >  F:   drivers/scsi/pm8001/
+>> > >
+>> > > +PMU-XGENE
+>> > > +APPLIED MICRO (APM) X-GENE SOC PMU
+>> > One line section header please.
+>> Is this strictly required?
+>
+> Yes.
+>
+> get_maintainer.pl doesn't like multiple line section headers.
+>
+
+Okay, I'll drop the first line and move it accordingly.
 
 Regards,
-Mike
-
-> ---
->  drivers/clk/clk-stm32f4.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-> index b6ca33f..02d6810 100644
-> --- a/drivers/clk/clk-stm32f4.c
-> +++ b/drivers/clk/clk-stm32f4.c
-> @@ -364,7 +364,7 @@ static void __init stm32f4_rcc_init(struct device_node *np)
->                     NULL, gd->name, gd->parent_name, gd->flags,
->                     base + gd->offset, gd->bit_idx, 0, &stm32f4_clk_lock);
->  
-> -               if (IS_ERR(clks[n])) {
-> +               if (IS_ERR(clks[idx])) {
->                         pr_err("%s: Unable to register leaf clock %s\n",
->                                np->full_name, gd->name);
->                         goto fail;
-> -- 
-> 2.7.4
-> 
+Tai
