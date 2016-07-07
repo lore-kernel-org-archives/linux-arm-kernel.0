@@ -1,85 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 7 Jul 2016 17:21:04 +0100
-Subject: [PATCH 08/11] arm64: pmu: Provide cpumask attribute for PMU
-In-Reply-To: <1466529109-21715-9-git-send-email-jeremy.linton@arm.com>
-References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
- <1466529109-21715-9-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20160707162103.GD9270@leverpostej>
+From: riel@redhat.com (Rik van Riel)
+Date: Thu, 07 Jul 2016 12:35:17 -0400
+Subject: [PATCH 1/9] mm: Hardened usercopy
+In-Reply-To: <1467843928-29351-2-git-send-email-keescook@chromium.org>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <1467843928-29351-2-git-send-email-keescook@chromium.org>
+Message-ID: <1467909317.13253.17.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
-
-Apologies for the late reply on this.
-
-On Tue, Jun 21, 2016 at 12:11:46PM -0500, Jeremy Linton wrote:
-> With heterogeneous PMUs its helpful to know which PMUs are bound
-> to each CPU. Provide that information with a cpumask sysfs entry
-> similar to other PMUs.
-
-Have you tested trying to stat on a particular PMU? e.g.
-
-$ perf stat -e armv8_cortex_a53/cpu_cycles/ ls
-
-I found that the presence of a cpumask file would cause (at least some
-versions) of perf-stat to hang, and was holding off adding a cpumask
-until we had a solution to that.
-
-See [1,2] for more details on that.
-
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-
-This should be generic across the arm-pmu code, and so should live under
-drivers/perf/.
-
-Thanks,
-Mark.
-
-[1] http://lkml.kernel.org/r/1467907474-3290-1-git-send-email-mark.rutland at arm.com
-[2] http://lkml.kernel.org/r/1467907474-3290-2-git-send-email-mark.rutland at arm.com
-
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 356fa6c..dae73ea 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -533,6 +533,26 @@ static struct attribute_group armv8_pmuv3_events_attr_group = {
->  
->  PMU_FORMAT_ATTR(event, "config:0-9");
->  
-> +static ssize_t
-> +cpumask_show(struct device *dev, struct device_attribute *attr, char *page)
-> +{
-> +	struct pmu *pmu = dev_get_drvdata(dev);
-> +	struct arm_pmu *cpu_pmu = container_of(pmu, struct arm_pmu, pmu);
-> +
-> +	return cpumap_print_to_pagebuf(true, page, &cpu_pmu->supported_cpus);
-> +}
-> +static DEVICE_ATTR_RO(cpumask);
-> +
-> +static struct attribute *armv8_pmuv3_attrs[] = {
-> +	 &dev_attr_cpumask.attr,
-> +	 NULL,
-> +};
-> +
-> +static struct attribute_group armv8_pmuv3_attr_group = {
-> +	.attrs = armv8_pmuv3_attrs,
-> +};
-> +
-> +
->  static struct attribute *armv8_pmuv3_format_attrs[] = {
->  	&format_attr_event.attr,
->  	NULL,
-> @@ -544,6 +564,7 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
->  };
->  
->  static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
-> +	&armv8_pmuv3_attr_group,
->  	&armv8_pmuv3_events_attr_group,
->  	&armv8_pmuv3_format_attr_group,
->  	NULL,
-> -- 
-> 2.5.5
+On Wed, 2016-07-06 at 15:25 -0700, Kees Cook wrote:
+>?
+> +	/* Allow kernel rodata region (if not marked as Reserved).
+> */
+> +	if (ptr >= (const void *)__start_rodata &&
+> +	????end <= (const void *)__end_rodata)
+> +		return NULL;
 > 
+One comment here.
+
+__check_object_size gets "to_user" as an argument.
+
+It may make sense to pass that to check_heap_object, and
+only allow copy_to_user from rodata, never copy_from_user,
+since that section should be read only.
+
+> +void __check_object_size(const void *ptr, unsigned long n, bool
+> to_user)
+> +{
+>?
+
+-- 
+
+All Rights Reversed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/f13757cc/attachment.sig>
