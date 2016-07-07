@@ -1,70 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jul 2016 10:46:28 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <bb1beb8d-652d-aa97-e24b-e3e27397dd2e@broadcom.com>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <3354017.XSBSmHHtrQ@wuerfel>
- <bb1beb8d-652d-aa97-e24b-e3e27397dd2e@broadcom.com>
-Message-ID: <3996482.D5xdKXDiGl@wuerfel>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 7 Jul 2016 10:50:15 +0200
+Subject: [PATCH v3 0/2] [for arm-soc] mach-tango updates for v4.8
+In-Reply-To: <20160707044516.GA32389@localhost>
+References: <57726597.8030501@sigmadesigns.com> <577BA8DF.9080603@free.fr>
+ <20160706035730.GA23212@localhost> <12902449.rg2TfjcyfJ@wuerfel>
+ <20160707044516.GA32389@localhost>
+Message-ID: <577E17C7.20509@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 6, 2016 9:19:41 PM CEST Arend Van Spriel wrote:
-> On 6-7-2016 15:42, Arnd Bergmann wrote:
-> > On Wednesday, July 6, 2016 10:08:55 AM CEST Arend Van Spriel wrote:
-> >> On Tue, Jul 5, 2016 at 3:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > All existing uses of the model property in arch/arm/boot/dts and most of
-> > the ones in arch/powerpc/boot/dts are against the intended usage in
-> > one way or another, but adding different kind of incorrect usage won't
-> > improve that.
-> > 
-> > The only way I can see the model property being used correctly would
-> > be to have it match the first entry in the compatible property, but
-> > that is completely redundant, so we tend to omit it, except for the
-> > root node in which it is required. For the root node however, the
-> > historic practice that has crept in on ARM is to put something completely
-> > different in there, which is a human-readable description of the
-> > machine rather than something we can use as a unique indentifier.
-> > 
-> > I'd just consider the "model" property burned, and not use it for anything
-> > that doesn't already use it, just like we handle "device_type": a few
-> > things require it, nothing else should use it.
+On 07/07/2016 06:45, Olof Johansson wrote:
+
+> On Wed, Jul 06, 2016 at 10:04:42PM +0200, Arnd Bergmann wrote:
 > 
-> If that is the agreed approach in devicetree arena I am fine with it. I
-> have been unaware of this and just looked at the suggestion from Jonas
-> seeing a solution to the problem at hand.
-
-I don't think it has been discussed or decided before as the question
-has not come up, so for now this is my personal view. Maybe one of
-the devicetree maintainers can comment on this.
-
-> > I agree with your point that the "compatible" property in case of brcmfmac
-> > is really odd because it is not required to identify the hardware when
-> > the SDIO device identification is sufficient, and we just need it to guard
-> > the definition of the other properties. However it seems that now we
-> > actually do need to identify the hardware because we cannot read the
-> > board ID and revision that is supposed to come from nvram but also needed
-> > to read the nvram contents from a file.
+>> I ran into a build regression during randconfig testing, I think
+>> we should apply the patch below on top of next/soc:
 > 
-> The board ID and rev in the nvram may not be used if the device has
-> these stored in OTP. However, the problem is that the device need
-> firmware+nvram loaded into it before we can start the firmware on the
-> device. Now if we were to add boardtype and boardrev properties in the
-> binding to identify the hardware, I suppose a new compatible value would
-> be required.
+> Yep, applied.
 
-I'm a bit confused by the interdependencies now. You say that there are
-board ID/rev values stored in OTP. What exactly prevents us from just
-using those to generate a file name to look up the nvram file on disk
-for the remaining values?
+Thanks to both of you.
 
-Do we require the firmware to be running before we can read the OTP,
-or are there cases where the board ID in OTP is wrong or missing?
-
-If we can't rely on OTP for one of those reasons and instead add two
-properties for boardtype/boardrev, I don't think that requires a
-change of the compatible string, we would just document those two
-as optional properties.
-
-	Arnd
+Regards.
