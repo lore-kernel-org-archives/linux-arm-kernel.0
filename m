@@ -1,62 +1,70 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jul 2016 10:43:25 +0200
-Subject: [PATCH] serial: imx: add rx and tx led trigger
-In-Reply-To: <20160707083322.GW16643@pengutronix.de>
-References: <1467646452-21243-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <6724841.mKIqTiexKe@wuerfel> <20160707083322.GW16643@pengutronix.de>
-Message-ID: <3798804.JuvLC6QIUV@wuerfel>
+Date: Thu, 07 Jul 2016 10:46:28 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
+ nvram_file_name dt property
+In-Reply-To: <bb1beb8d-652d-aa97-e24b-e3e27397dd2e@broadcom.com>
+References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
+ <3354017.XSBSmHHtrQ@wuerfel>
+ <bb1beb8d-652d-aa97-e24b-e3e27397dd2e@broadcom.com>
+Message-ID: <3996482.D5xdKXDiGl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 7, 2016 10:33:22 AM CEST Uwe Kleine-K?nig wrote:
-> On Thu, Jul 07, 2016 at 10:27:51AM +0200, Arnd Bergmann wrote:
-> > On Thursday, July 7, 2016 8:28:00 AM CEST Uwe Kleine-K?nig wrote:
-> > > On Wed, Jul 06, 2016 at 10:09:39PM +0200, Arnd Bergmann wrote:
-> > > > On Wednesday, July 6, 2016 7:30:57 PM CEST Uwe Kleine-K?nig wrote:
-> > > > > On Wed, Jul 06, 2016 at 05:22:40PM +0200, Arnd Bergmann wrote:
-> > > > > > On Monday, July 4, 2016 5:50:09 PM CEST Uwe Kleine-K?nig wrote:
-> > > > > > > On Mon, Jul 04, 2016 at 05:43:03PM +0200, Arnd Bergmann wrote:
-> > > > > > > > On Monday, July 4, 2016 5:34:12 PM CEST Uwe Kleine-K?nig wrote:
-> > > > > > > > > Add support for two led triggers per UART instance that blink on
-> > > > > > > > > transmission and reception of data respectively.
-> > > > > > > > > 
-> > > > > > If this is something we may want to do on other platforms as well,
-> > > > > > we should perhaps not hardwire the name of the imx tty device in
-> > > > > > the led trigger name.
-> > > > > 
-> > > > > I cannot follow. If we have several serial lines and a trigger for each
-> > > > > of them, they must get different names. Using the device's name to
-> > > > > distinguish them seems like a good and obvious idea.
-> > > > 
-> > > > The main problem I see is if someone puts the name of the trigger into
-> > > > a dtb file, as this hardcodes the connection between the Linux driver
-> > > > name and numbering system with the device tree binding, which are normally
-> > > > separate.
-> > > > 
-> > > > If we could derive the trigger name from the "/aliases/serial%d" property
-> > > > in DT instead, it would get a little more portable.
-> > > 
-> > > Alternatively we could invent a more dtish way as aliases seem to be
-> > > frowned upon [1], something like:
-> > > 
-> > >     led#0 {
-> > >             label = "userled";
-> > >             linux,default-trigger = &uart1, "tx";
-> > >     };
-> > > 
-> > >     uart1: serial at 43f90000 {
-> > >             ...
-> > >             #trigger-cells = <1>;
-> > >     };
+On Wednesday, July 6, 2016 9:19:41 PM CEST Arend Van Spriel wrote:
+> On 6-7-2016 15:42, Arnd Bergmann wrote:
+> > On Wednesday, July 6, 2016 10:08:55 AM CEST Arend Van Spriel wrote:
+> >> On Tue, Jul 5, 2016 at 3:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > All existing uses of the model property in arch/arm/boot/dts and most of
+> > the ones in arch/powerpc/boot/dts are against the intended usage in
+> > one way or another, but adding different kind of incorrect usage won't
+> > improve that.
 > > 
-> > That looks nice, but I don't see how we could implement this in a
-> > backwards compatible way, as we don't know whether the first cell
-> > of the property is a phandle or a string.
+> > The only way I can see the model property being used correctly would
+> > be to have it match the first entry in the compatible property, but
+> > that is completely redundant, so we tend to omit it, except for the
+> > root node in which it is required. For the root node however, the
+> > historic practice that has crept in on ARM is to put something completely
+> > different in there, which is a human-readable description of the
+> > machine rather than something we can use as a unique indentifier.
+> > 
+> > I'd just consider the "model" property burned, and not use it for anything
+> > that doesn't already use it, just like we handle "device_type": a few
+> > things require it, nothing else should use it.
 > 
-> If we agree, that this is OS-agnostic, we could use "default-trigger" as
-> property name instead of "linux,default-trigger".
+> If that is the agreed approach in devicetree arena I am fine with it. I
+> have been unaware of this and just looked at the suggestion from Jonas
+> seeing a solution to the problem at hand.
 
-Yes, I think that can work, but why not just use linux,default-trigger="serial%d-tx"
-where serial%d is the alias we already have?
+I don't think it has been discussed or decided before as the question
+has not come up, so for now this is my personal view. Maybe one of
+the devicetree maintainers can comment on this.
+
+> > I agree with your point that the "compatible" property in case of brcmfmac
+> > is really odd because it is not required to identify the hardware when
+> > the SDIO device identification is sufficient, and we just need it to guard
+> > the definition of the other properties. However it seems that now we
+> > actually do need to identify the hardware because we cannot read the
+> > board ID and revision that is supposed to come from nvram but also needed
+> > to read the nvram contents from a file.
+> 
+> The board ID and rev in the nvram may not be used if the device has
+> these stored in OTP. However, the problem is that the device need
+> firmware+nvram loaded into it before we can start the firmware on the
+> device. Now if we were to add boardtype and boardrev properties in the
+> binding to identify the hardware, I suppose a new compatible value would
+> be required.
+
+I'm a bit confused by the interdependencies now. You say that there are
+board ID/rev values stored in OTP. What exactly prevents us from just
+using those to generate a file name to look up the nvram file on disk
+for the remaining values?
+
+Do we require the firmware to be running before we can read the OTP,
+or are there cases where the board ID in OTP is wrong or missing?
+
+If we can't rely on OTP for one of those reasons and instead add two
+properties for boardtype/boardrev, I don't think that requires a
+change of the compatible string, we would just document those two
+as optional properties.
 
 	Arnd
