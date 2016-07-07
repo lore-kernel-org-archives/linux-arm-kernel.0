@@ -1,60 +1,64 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 7 Jul 2016 09:25:17 +0800
-Subject: [PATCH v6 18/18] remoteproc: core: Retry
- rproc_fw_config_virtio() if !rproc->table_ptr
-In-Reply-To: <1467795276-21725-19-git-send-email-peter.griffin@linaro.org>
-Message-ID: <201607070935.iuu6KqiK%fengguang.wu@intel.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 7 Jul 2016 11:00:25 +0900
+Subject: [PATCH v21 8/8] Documentation: dt: usable-memory and elfcorehdr
+ nodes for arm64 kexec
+In-Reply-To: <6483018.WWW2TSJB10@hactar>
+References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
+ <20160706075226.27609-9-takahiro.akashi@linaro.org>
+ <6483018.WWW2TSJB10@hactar>
+Message-ID: <20160707020025.GY20774@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 06, 2016 at 04:29:18PM -0300, Thiago Jung Bauermann wrote:
+> Hi,
+> 
+> Am Mittwoch, 06 Juli 2016, 16:52:26 schrieb AKASHI Takahiro:
+> > +linux,usable-memory
+> > +-------------------
+> > +
+> > +This property is set on PowerPC and arm64 by kexec-tools during kdump
+> > +to tell the crash kernel the base address of its reserved area of memory,
+> > and +the size. e.g.
+> > +
+> > +/ {
+> > +	chosen {
+> > +		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
+> > +	};
+> > +};
+> 
+> Again, this description is wrong for PowerPC. See messages from myself and 
+> Michael Ellerman:
+> 
+> https://lists.infradead.org/pipermail/kexec/2016-June/016250.html
+> 
+> https://lists.infradead.org/pipermail/kexec/2016-June/016253.html
 
-[auto build test WARNING on robh/for-next]
-[also build test WARNING on v4.7-rc6 next-20160706]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Oops, I must have missed your previous comments. Apologies.
 
-url:    https://github.com/0day-ci/linux/commits/Peter-Griffin/Add-support-for-FDMA-DMA-controller-and-slim-core-rproc-found-on-STi-chipsets/20160706-170304
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: openrisc-allyesconfig (attached as .config)
-compiler: or32-linux-gcc (GCC) 4.5.1-or32-1.0rc1
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=openrisc 
+Yes, I know that, and I used to implement the same functionality before.
+It did work for dtb-based systems, but not for UEFI(ACPI)-based systems
+because UEFI doesn't export memory regions information via a device tree,
+but rather via ACPI table. So "/memory" node won't appear.
+So I went back with "mem=" command line approach, and later this "/chosen/"
+approach.
 
-All warnings (new ones prefixed by >>):
+> IMHO, it would be simpler if ARM used linux,usable-memory in the same way 
+> that PowerPC does, for consistency.
 
->> drivers/remoteproc/remoteproc_internal.h:52:13: warning: 'rproc_fw_config_virtio_cb' declared 'static' but never defined
->> drivers/remoteproc/remoteproc_internal.h:53:13: warning: 'rproc_fw_config_virtio' declared 'static' but never defined
---
-   drivers/remoteproc/st_slim_rproc.c: In function 'slim_rproc_alloc':
-   drivers/remoteproc/st_slim_rproc.c:288:10: warning: assignment discards qualifiers from pointer target type
-   drivers/remoteproc/st_slim_rproc.c: At top level:
->> drivers/remoteproc/remoteproc_internal.h:52:13: warning: 'rproc_fw_config_virtio_cb' declared 'static' but never defined
->> drivers/remoteproc/remoteproc_internal.h:53:13: warning: 'rproc_fw_config_virtio' declared 'static' but never defined
+Well, this property won't conflict with per-"/memory" ones
+if we take it that the former, if present, supersedes the latter.
+Sophistic?
+What about changing the name to usable-memory-limit?
+(I know that you have another one, "memory-limit" though.)
 
-vim +52 drivers/remoteproc/remoteproc_internal.h
+Again, I would like to defer to arm64 maintainers.
 
-    46	};
-    47	
-    48	/* from remoteproc_core.c */
-    49	void rproc_release(struct kref *kref);
-    50	irqreturn_t rproc_vq_interrupt(struct rproc *rproc, int vq_id);
-    51	int rproc_boot_nowait(struct rproc *rproc);
-  > 52	static void rproc_fw_config_virtio_cb(const struct firmware *fw, void *context);
-  > 53	static void rproc_fw_config_virtio(const struct firmware *fw, struct rproc *rproc);
-    54	
-    55	
-    56	/* from remoteproc_virtio.c */
+Thanks,
+-Takahiro AKASHI
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 37350 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/64f9304f/attachment-0001.obj>
+> -- 
+> []'s
+> Thiago Jung Bauermann
+> IBM Linux Technology Center
+> 
