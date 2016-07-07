@@ -1,36 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Jul 2016 16:39:49 +0200
-Subject: [PATCH 6/8] arm64: dts: r8a7796: Use SYSC "always-on" PM Domain
+Date: Thu,  7 Jul 2016 16:39:48 +0200
+Subject: [PATCH 5/8] arm64: dts: r8a7796: Add SYSC PM Domains
 In-Reply-To: <cover.1467900241.git.horms+renesas@verge.net.au>
 References: <cover.1467900241.git.horms+renesas@verge.net.au>
-Message-ID: <a9003187a984ea835b5533165d97733303c5399e.1467900241.git.horms+renesas@verge.net.au>
+Message-ID: <56aebae0003f8987cf1f07238ec9e6243fe88080.1467900241.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Hook up all devices that are part of the CPG/MSSR Clock Domain to the
-SYSC "always-on" PM Domain, for a more consistent device-power-area
-description in DT.
+Add a device node for the System Controller.
+Hook up the Cortex-A57 CPU core and L2 cache/SCU to their respective PM
+Domains.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 85f0843ddd87..fab61eddede3 100644
+index 178debf68318..85f0843ddd87 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -122,7 +122,7 @@
- 				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
- 				 <&scif_clk>;
- 			clock-names = "fck", "brg_int", "scif_clk";
--			power-domains = <&cpg>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
- 			status = "disabled";
+@@ -10,6 +10,7 @@
+ 
+ #include <dt-bindings/clock/r8a7796-cpg-mssr.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/power/r8a7796-sysc.h>
+ 
+ / {
+ 	compatible = "renesas,r8a7796";
+@@ -30,6 +31,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0x0>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7796_PD_CA57_CPU0>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
  		};
- 	};
+@@ -37,6 +39,7 @@
+ 		L2_CA57: cache-controller at 0 {
+ 			compatible = "cache";
+ 			reg = <0>;
++			power-domains = <&sysc R8A7796_PD_CA57_SCU>;
+ 			cache-unified;
+ 			cache-level = <2>;
+ 		};
+@@ -104,6 +107,12 @@
+ 			#power-domain-cells = <0>;
+ 		};
+ 
++		sysc: system-controller at e6180000 {
++			compatible = "renesas,r8a7796-sysc";
++			reg = <0 0xe6180000 0 0x0400>;
++			#power-domain-cells = <1>;
++		};
++
+ 		scif2: serial at e6e88000 {
+ 			compatible = "renesas,scif-r8a7796",
+ 				     "renesas,rcar-gen3-scif", "renesas,scif";
 -- 
 2.7.0.rc3.207.g0ac5344
