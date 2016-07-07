@@ -1,29 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jul 2016 09:22:43 +0200
-Subject: [PATCH v4 4/5] soc: Add SoC driver for Freescale Vybrid platform
-In-Reply-To: <f600ac1c747813b26c80149b6fdf32d42b114235.1467872014.git.maitysanchayan@gmail.com>
-References: <cover.1467872014.git.maitysanchayan@gmail.com>
- <f600ac1c747813b26c80149b6fdf32d42b114235.1467872014.git.maitysanchayan@gmail.com>
-Message-ID: <5371423.yp5pHjKp9V@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 7 Jul 2016 09:23:22 +0200
+Subject: [PATCH -next] ARM: dts: sun8i: Add NFC node to Allwinner A23/A33
+ SoC
+In-Reply-To: <34841467849881@web8m.yandex.ru>
+References: <20160706003352.28194-1-icenowy@aosc.xyz>
+ <20160706202932.GD4247@lukather> <34841467849881@web8m.yandex.ru>
+Message-ID: <20160707072322.GC5907@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 7, 2016 12:09:29 PM CEST Sanchayan Maity wrote:
-> root at colibri-vf:/sys/bus/soc/devices/soc0# cat family
-> Freescale Vybrid VF610
-> root at colibri-vf:/sys/bus/soc/devices/soc0# cat machine
-> Freescale Vybrid
+On Thu, Jul 07, 2016 at 08:04:41AM +0800, Icenowy Zheng wrote:
+> with a http://linux-sunxi.org/Aoson_M751s tablet, (SKhynix
+> H27UCG8T2ETR-BC NAND chip).
 > 
+> I used the patchset at
+> http://lists.infradead.org/pipermail/linux-mtd/2016-June/067848.html
+> to ensure the NAND chip to work properly (otherwise the chip id
+> cannot be correctly identified)
 
-I only have one very high-level comment: I think that "family"
-is generally supposed to be the more generic one than "machine",
-so maybe swap the contents of the two?
+(Please reply in-line and wrap your mails).
 
-Can you have a look at the other users of soc_device and see how
-they handle it? I realize that we are already inconsistent about
-how we handle it, just try to make it do what the majority of the
-others have.
+Ok. That needs to be in the commit log then.
 
-Aside from that, it all looks reasonable.
+Thanks!
+Maxime
 
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/1eba7734/attachment.sig>
