@@ -1,32 +1,68 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed,  6 Jul 2016 17:35:12 -0700
-Subject: [PATCH v4 11/11] MAINTAINERS: xgene: Add driver and documentation path
-In-Reply-To: <1467851712-24780-1-git-send-email-isubramanian@apm.com>
-References: <1467851712-24780-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1467851712-24780-12-git-send-email-isubramanian@apm.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 06 Jul 2016 17:43:11 -0700
+Subject: [PATCH v2] clkdev: add devm_of_clk_get()
+In-Reply-To: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
+References: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <146785219147.73491.2827268663638530377@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added path to the MDIO driver and Documentation file.
+Quoting Kuninori Morimoto (2016-07-03 18:36:50)
+> +struct clk *devm_of_clk_get(struct device *dev,
+> +                           struct device_node *np, int index)
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
----
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+Any reason not to use devm_clk_get? Why do we need this helper?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6374be2..a2ce997 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -839,7 +839,9 @@ M:	Iyappan Subramanian <isubramanian@apm.com>
- M:	Keyur Chudgar <kchudgar@apm.com>
- S:	Supported
- F:	drivers/net/ethernet/apm/xgene/
-+F:	drivers/net/phy/mdio-xgene.c
- F:	Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-+F:	Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
- 
- APTINA CAMERA SENSOR PLL
- M:	Laurent Pinchart <Laurent.pinchart@ideasonboard.com>
--- 
-1.9.1
+Thanks,
+Mike
+
+> +{
+> +       struct clk **ptr, *clk;
+> +
+> +       ptr = devres_alloc(devm_of_clk_release, sizeof(*ptr), GFP_KERNEL);
+> +       if (!ptr)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       clk = of_clk_get(np, index);
+> +       if (!IS_ERR(clk)) {
+> +               *ptr = clk;
+> +               devres_add(dev, ptr);
+> +       } else {
+> +               devres_free(ptr);
+> +       }
+> +
+> +       return clk;
+> +}
+> +EXPORT_SYMBOL(devm_of_clk_get);
+> +
+>  static struct clk *__of_clk_get_by_name(struct device_node *np,
+>                                         const char *dev_id,
+>                                         const char *name)
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index a89ba4e..33cd540 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -502,6 +502,8 @@ struct of_phandle_args;
+>  
+>  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+>  struct clk *of_clk_get(struct device_node *np, int index);
+> +struct clk *devm_of_clk_get(struct device *dev,
+> +                           struct device_node *np, int index);
+>  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+>  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>  #else
+> @@ -509,6 +511,11 @@ static inline struct clk *of_clk_get(struct device_node *np, int index)
+>  {
+>         return ERR_PTR(-ENOENT);
+>  }
+> +static inline struct clk *devm_of_clk_get(struct device *dev,
+> +                           struct device_node *np, int index)
+> +{
+> +       return ERR_PTR(-ENOENT);
+> +}
+>  static inline struct clk *of_clk_get_by_name(struct device_node *np,
+>                                              const char *name)
+>  {
+> -- 
+> 1.9.1
+> 
