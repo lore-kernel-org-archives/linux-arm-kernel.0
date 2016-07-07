@@ -1,55 +1,74 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 7 Jul 2016 12:43:51 +0800
-Subject: [PATCH v6 01/18] remoteproc: st_slim_rproc: add a slimcore rproc
- driver
-In-Reply-To: <1467795276-21725-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <201607071253.LjDLXvzg%fengguang.wu@intel.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Thu,  7 Jul 2016 12:46:40 +0800
+Subject: [PATCH] arm64: dts: rockchip: support the usb2phy for rk3399 evb
+Message-ID: <1467866800-24794-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Frank Wang <frank.wang@rock-chips.com>
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.7-rc6 next-20160706]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This patch adds the usb2phy needed dts node information for rk3399.
 
-url:    https://github.com/0day-ci/linux/commits/Peter-Griffin/Add-support-for-FDMA-DMA-controller-and-slim-core-rproc-found-on-STi-chipsets/20160706-170304
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: m32r-allmodconfig (attached as .config)
-compiler: m32r-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=m32r 
+USB2.0 PHY is comprised of one Host port and one OTG port.
+Host Port is for USB2.0 host controller; OTG port is for USB2.0 part of
+USB3.0 OTG controller, and as a part to construct a fully feature TypeC
+subsystem.
 
-All errors (new ones prefixed by >>):
+The USB2.0 vbus gpio is board specific, it's no same with all rk3399
+boards, so move it into evb voard.
 
-   ERROR: "bad_dma_ops" [sound/soc/fsl/snd-soc-fsl-asrc.ko] undefined!
-   ERROR: "bad_dma_ops" [sound/soc/atmel/snd-soc-atmel-pcm-pdc.ko] undefined!
-   ERROR: "bad_dma_ops" [sound/core/snd-pcm.ko] undefined!
-   ERROR: "dma_common_mmap" [sound/core/snd-pcm.ko] undefined!
-   ERROR: "__ucmpdi2" [lib/842/842_decompress.ko] undefined!
-   ERROR: "__ucmpdi2" [fs/btrfs/btrfs.ko] undefined!
->> ERROR: "vring_del_virtqueue" [drivers/remoteproc/remoteproc.ko] undefined!
->> ERROR: "register_virtio_device" [drivers/remoteproc/remoteproc.ko] undefined!
->> ERROR: "bad_dma_ops" [drivers/remoteproc/remoteproc.ko] undefined!
->> ERROR: "unregister_virtio_device" [drivers/remoteproc/remoteproc.ko] undefined!
->> ERROR: "vring_new_virtqueue" [drivers/remoteproc/remoteproc.ko] undefined!
->> ERROR: "vring_interrupt" [drivers/remoteproc/remoteproc.ko] undefined!
->> ERROR: "vring_transport_features" [drivers/remoteproc/remoteproc.ko] undefined!
-   ERROR: "__ucmpdi2" [drivers/media/i2c/adv7842.ko] undefined!
-   ERROR: "__ucmpdi2" [drivers/md/bcache/bcache.ko] undefined!
-   ERROR: "__ucmpdi2" [drivers/iio/imu/inv_mpu6050/inv-mpu6050.ko] undefined!
-   ERROR: "bad_dma_ops" [drivers/fpga/zynq-fpga.ko] undefined!
-
+Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 35701 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/c3eb49d1/attachment-0001.obj>
+
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  4 ++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 19 +++++++++++++++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+index d33aa06..9be3715 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+@@ -105,6 +105,10 @@
+ 	status = "okay";
+ };
+ 
++&usb2phy {
++	vbus_drv-gpio = <&gpio4 25 GPIO_ACTIVE_HIGH>;
++};
++
+ &usb_host0_ehci {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 4c84229..21d147f 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -242,6 +242,25 @@
+ 		status = "disabled";
+ 	};
+ 
++	usb2phy: usb2phy {
++		compatible = "rockchip,rk3399-usb-phy";
++		rockchip,grf = <&grf>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		usb2phy0: usb2-phy0 {
++			#phy-cells = <0>;
++			#clock-cells = <0>;
++			reg = <0xe458>;
++		};
++
++		usb2phy1: usb2-phy1 {
++			#phy-cells = <0>;
++			#clock-cells = <0>;
++			reg = <0xe468>;
++		};
++	};
++
+ 	usb_host0_ehci: usb at fe380000 {
+ 		compatible = "generic-ehci";
+ 		reg = <0x0 0xfe380000 0x0 0x20000>;
+-- 
+1.9.1
