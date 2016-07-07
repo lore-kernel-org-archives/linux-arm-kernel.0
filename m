@@ -1,65 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 6 Jul 2016 22:28:27 -0700
-Subject: [GIT PULL] STi DT updates for v4.8
-In-Reply-To: <5776701A.1000808@st.com>
-References: <5776701A.1000808@st.com>
-Message-ID: <20160707052827.GL32389@localhost>
+Date: Wed, 6 Jul 2016 22:32:26 -0700
+Subject: [GIT PULL 1/6] bus: NVIDIA Tegra ACONNECT support
+In-Reply-To: <20160701145026.25760-1-thierry.reding@gmail.com>
+References: <20160701145026.25760-1-thierry.reding@gmail.com>
+Message-ID: <20160707053226.GN32389@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice,
-
-
-On Fri, Jul 01, 2016 at 03:28:58PM +0200, Patrice Chotard wrote:
-> Hi Olof, Arnd and Kevin,
+On Fri, Jul 01, 2016 at 04:50:21PM +0200, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
-> Please consider this first round of STi DT updates for v4.8:
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > 
-> The following changes since commit 6ca59e6e1fc3a8d7ccbf85ff036bd6ff40847c1a:
-> 
->   clk: st: clkgen-pll: Detect critical clocks (2016-06-30 12:17:11 -0700)
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
-> sti-dt-for-v4.8
-
-This specifies a branch, not a tag.
-
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.8-bus
 > 
-> for you to fetch changes up to 4543976eaf9ca9f379ac3a0bb8c5c8c84fe0a965:
+> for you to fetch changes up to 46a88534afb596eb4d9de07ddde778d0e9aa0e3a:
 > 
->   spi: st-ssc4: Remove 'no clocking' hack (2016-07-01 11:58:10 +0200)
+>   bus: Add support for Tegra ACONNECT (2016-07-01 16:35:43 +0200)
 > 
-> ----------------------------------------------------------------
-> Highlights:
-> -----------
->  -add STi critical clocks
-> - as discussed on IRC with Lee Jones, remove SPI hack wich has dependecy
-> with critical clocks
+> Thanks,
+> Thierry
 > 
 > ----------------------------------------------------------------
-> Lee Jones (3):
->       ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
->       ARM: sti: stih410-clocks: Identify critical clocks
->       spi: st-ssc4: Remove 'no clocking' hack
+> bus: NVIDIA Tegra ACONNECT support
+> 
+> Adds support for the Tegra ACONNECT bus that's used to access the APE
+> (audio processing engine) on Tegra X1.
 
-THere are more patches than this in this branch -- there are three clock
-branches that by the look of it have been applied by Stephen Boyd.
+Merged, thanks.
 
-However, since they have been brought in without doing a merge, it's hard for
-us to tell where they came form, and/or if they're in a shared branch
-somewhere. Therefore, I recommend doing a --no-ff merge of the branch, so it's
-obvious from the merge commit where they came form. They also need to be part
-of the diffstat.
-
-Finally, the clk patch doesn't really belong in the DT branch here. It's
-probably a suitable patch to send to the clk maintainers after the DT changes
-have gone in, i.e. for 4.9.
-
-Please respin this pull request and we'll take another look! 
-
-
-Thanks,
 
 -Olof
