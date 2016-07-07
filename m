@@ -1,39 +1,39 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 7 Jul 2016 09:15:12 +0200
-Subject: sama5d4, configure pck1 with dt?
-In-Reply-To: <alpine.DEB.2.02.1607062239210.12243@pmeerw.net>
-References: <alpine.DEB.2.02.1607062239210.12243@pmeerw.net>
-Message-ID: <20160707091512.387ea113@bbrezillon>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 7 Jul 2016 09:16:05 +0200
+Subject: [GIT PULL v2] STi SoC changes for v4.8
+Message-ID: <577E01B5.2030206@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+The following changes since commit 4c2e07c6a29e0129e975727b9f57eede813eea85:
 
-On Wed, 6 Jul 2016 23:17:07 +0200 (CEST)
-Peter Meerwald-Stadler <pmeerw@pmeerw.net> wrote:
+   Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
 
-> Hello,
-> 
-> how do I configure pck1 using devicetree to be used as the master 
-> clock for an audio codec?
-> 
-> in particular how do I choose the clock source and frequency for pck1?
-> is there a way to do this using devicetree?
-> 
-> or is the code in at91sam9g20ek_audio_probe() the way to go?
-> i.e mclk=clk_get(0, "pck1"); pllb=clk_get(0, "pllb"); clk_set_parent(mclk, 
-> pllb); clk_set_rate(mclk, 12000000);
+are available in the git repository at:
 
-It's as simple as that:
+   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+tags/sti-soc-for-v4.8
 
-mclk = clk_get(<your-device>, "<audio-clk-name>");
-clk_set_rate(mclk, <rate>);
+for you to fetch changes up to 55aa35180c57d82f3db23e5aabce97acb0d36681:
 
-<your-device> should not be NULL, <audio-clk-name> should not be pck1
-(see the DT binding doc), and you should not manually re-parent the mclk
-clk (the driver select the best parent when clk_set_rate() is
-called).
+   ARM: sti: Implement dummy L2 cache's write_sec (2016-07-01 16:23:44 
++0200)
 
-Regards,
+----------------------------------------------------------------
 
-Boris
+Highlights:
+-----------
+- Add a dummy L2 cache's write_sec callback as in non secure mode execution,
+   we can't get access to L2 cache secure registers
+- Cosmetics change, in case of dump_stack, update the hardware name with a
+   more generic for the STi SoCs family
+
+----------------------------------------------------------------
+Patrice Chotard (1):
+       ARM: sti: Implement dummy L2 cache's write_sec
+
+Peter Griffin (1):
+       ARM: STi: Update machine _namestr to be more generic.
+
+  arch/arm/mach-sti/board-dt.c | 11 ++++++++++-
+  1 file changed, 10 insertions(+), 1 deletion(-)
