@@ -1,46 +1,72 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 7 Jul 2016 13:19:26 -0400
-Subject: [PATCH 4/9] arm64/uaccess: Enable hardened usercopy
-In-Reply-To: <20160707100717.GB8306@leverpostej>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
- <1467843928-29351-5-git-send-email-keescook@chromium.org>
- <20160707100717.GB8306@leverpostej>
-Message-ID: <CAGXu5jLeH2KL+FVi7mxBF5oH2-zMfwSY=2ReJOL4JYsQuJKy6Q@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 7 Jul 2016 10:19:34 -0700
+Subject: [PATCH] MAINTAINERS: Change L to M for Broadcom ARM SoC entries
+In-Reply-To: <CAC3K-4quLJOCxp3i2naJWDrbMu3AywO4+4NWdizVAPD4-44SgA@mail.gmail.com>
+References: <1467761520-23796-1-git-send-email-f.fainelli@gmail.com>
+ <CAC3K-4quLJOCxp3i2naJWDrbMu3AywO4+4NWdizVAPD4-44SgA@mail.gmail.com>
+Message-ID: <577E8F26.4070403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 7, 2016 at 6:07 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
->
-> On Wed, Jul 06, 2016 at 03:25:23PM -0700, Kees Cook wrote:
->> Enables CONFIG_HARDENED_USERCOPY checks on arm64. As done by KASAN in -next,
->> renames the low-level functions to __arch_copy_*_user() so a static inline
->> can do additional work before the copy.
->
-> The checks themselves look fine, but as with the KASAN checks, it seems
-> a shame that this logic is duplicated per arch, integrated in subtly
-> different ways.
->
-> Can we not __arch prefix all the arch uaccess helpers, and place
-> kasan_check_*() and check_object_size() calls in generic wrappers?
->
-> If we're going to update all the arch uaccess helpers anyway, doing that
-> would make it easier to fix things up, or to add new checks in future.
+On 07/06/2016 07:05 AM, Jon Mason wrote:
+> On Tue, Jul 5, 2016 at 7:32 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> bcm-kernel-feedback-list at broadcom.com is a Broadcom internaly
+>> mailing-list for which no external subscribers are allowed for now, so
+>> update the different entries from L to M to reflect that.
+>>
+>> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+>> Suggested-by: Olof Johansson <olof@lixom.net>
+>> Suggested-by: Scott Branden <scott.branden@broadcom.com>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>> I am going to send this as a pull request since we have other
+>> changes to the MAINTAINERS file, just posting it publicly before
+>> the actual pull request.
+>>
+>>  MAINTAINERS | 8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index b673a000e715..a5130c5f9f75 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -2478,7 +2478,7 @@ BROADCOM BCM281XX/BCM11XXX/BCM216XX ARM ARCHITECTURE
+>>  M:     Florian Fainelli <f.fainelli@gmail.com>
+>>  M:     Ray Jui <rjui@broadcom.com>
+>>  M:     Scott Branden <sbranden@broadcom.com>
+>> -L:     bcm-kernel-feedback-list at broadcom.com
+>> +M:     bcm-kernel-feedback-list at broadcom.com
+>>  T:     git git://github.com/broadcom/mach-bcm
+>>  S:     Maintained
+>>  F:     arch/arm/mach-bcm/
+>> @@ -2522,7 +2522,7 @@ F:        arch/arm/boot/dts/bcm470*
+>>  BROADCOM BCM63XX ARM ARCHITECTURE
+>>  M:     Florian Fainelli <f.fainelli@gmail.com>
+>>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>> -L:     bcm-kernel-feedback-list at broadcom.com
+>> +M:     bcm-kernel-feedback-list at broadcom.com
+>>  T:     git git://github.com/broadcom/stblinux.git
+>>  S:     Maintained
+>>  F:     arch/arm/mach-bcm/bcm63xx.c
+>> @@ -2539,7 +2539,7 @@ M:        Brian Norris <computersforpeace@gmail.com>
+>>  M:     Gregory Fong <gregory.0xf0@gmail.com>
+>>  M:     Florian Fainelli <f.fainelli@gmail.com>
+>>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>> -L:     bcm-kernel-feedback-list at broadcom.com
+>> +M:     bcm-kernel-feedback-list at broadcom.com
+>>  T:     git git://github.com/broadcom/stblinux.git
+>>  S:     Maintained
+>>  F:     arch/arm/mach-bcm/*brcmstb*
+>> @@ -2598,7 +2598,7 @@ M:        Ray Jui <rjui@broadcom.com>
+>>  M:     Scott Branden <sbranden@broadcom.com>
+>>  M:     Jon Mason <jonmason@broadcom.com>
+>>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>> -L:     bcm-kernel-feedback-list at broadcom.com
+>> +M:     bcm-kernel-feedback-list at broadcom.com
+> 
+> Nit, shouldn't the "M"s be together?  If so, this should be moved up 1 line.
 
-Yeah, I totally agree, and my work on the next step of this hardening
-will require something like this to separate the "check" logic from
-the "copy" logic, as I want to introduce a set of constant-sized
-copy_*_user helpers.
-
-Though currently x86 poses a weird problem in this regard (they have
-separate code paths for copy_* and __copy*, but I think it's actually
-a harmless(?) mistake.
-
-For now, I'd like to leave this as-is, and then do the copy_* cleanup,
-then do step 2 (slab whitelisting).
-
--Kees
-
+Thanks, the version I submitted had that fixed and also updated the
+Vulcan entry.
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+Florian
