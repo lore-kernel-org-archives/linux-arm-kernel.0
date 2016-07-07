@@ -1,41 +1,55 @@
-From: riel@redhat.com (Rik van Riel)
-Date: Thu, 07 Jul 2016 12:35:17 -0400
-Subject: [PATCH 1/9] mm: Hardened usercopy
-In-Reply-To: <1467843928-29351-2-git-send-email-keescook@chromium.org>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
- <1467843928-29351-2-git-send-email-keescook@chromium.org>
-Message-ID: <1467909317.13253.17.camel@redhat.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 07 Jul 2016 09:42:34 -0700
+Subject: [PATCH v21 3/8] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <20160707004330.GU20774@linaro.org>
+References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
+ <20160706075226.27609-4-takahiro.akashi@linaro.org>
+ <1467826137.8880.35.camel@infradead.org>
+ <20160707004330.GU20774@linaro.org>
+Message-ID: <1467909754.8880.56.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-07-06 at 15:25 -0700, Kees Cook wrote:
->?
-> +	/* Allow kernel rodata region (if not marked as Reserved).
-> */
-> +	if (ptr >= (const void *)__start_rodata &&
-> +	????end <= (const void *)__end_rodata)
-> +		return NULL;
+Hi,
+
+On Thu, 2016-07-07 at 09:43 +0900, AKASHI Takahiro wrote:
+> On Wed, Jul 06, 2016 at 10:28:57AM -0700, Geoff Levand wrote:
+> > On Wed, 2016-07-06 at 16:52 +0900, AKASHI Takahiro wrote:
+> > > @@ -830,6 +855,14 @@ void handle_IPI(int ipinr, struct pt_regs
+> > > *regs)
+> > >  > > > > 	> > > > > > > 	> > > > irq_exit();
+> > >  > > > > 	> > > > > > > 	> > > > break;
+> > >  
+> > > +#ifdef CONFIG_KEXEC_CORE
+> > > +> > > > 	> > > > case IPI_CPU_CRASH_STOP:
+> > > +> > > > 	> > > > > > > 	> > > > irq_enter();
+> > > +> > > > 	> > > > > > > 	> > > > ipi_cpu_crash_stop(cpu, regs);
+> > > +
+> > > +> > > > 	> > > > > > > 	> > > > unreachable();
+> > > +#endif
+> > 
+> > It seems like you could simplifiy with something like:
+> > 
+> > 	> > case IPI_CPU_CRASH_STOP:
+> > 	> > 	> > if (IS_ENABLED(CONFIG_KEXEC_CORE) {
+> > 	> > 	> > 	> > irq_enter();
+> > 	> > 	> > 	> > ipi_cpu_crash_stop(cpu, regs);
+> > 	> > 	> > 	> > unreachable();
+> > 	> > 	> > }
 > 
-One comment here.
+> OK, I will take this.
+> 
+> > Then move the CONFIG_KEXEC_CORE conditional around
+> > ipi_cpu_crash_stop to just around crash_save_cpu().
+> 
+> Yeah, we can do that, but I added these conditionals just because
+> the kernel size can be reduced (a bit, obviously) if kexec is
+> not needed.
 
-__check_object_size gets "to_user" as an argument.
+The linker will remove the unused ipi_cpu_crash_stop since
+it is static.  atomic_t waiting_for_crash_ipi also becomes
+unused, and I think it will be removed also.  The motivation
+for these changes is to get a build test of this code
+even when CONFIG_KEXEC_CORE=n.
 
-It may make sense to pass that to check_heap_object, and
-only allow copy_to_user from rodata, never copy_from_user,
-since that section should be read only.
-
-> +void __check_object_size(const void *ptr, unsigned long n, bool
-> to_user)
-> +{
->?
-
--- 
-
-All Rights Reversed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/f13757cc/attachment.sig>
+-Geoff
