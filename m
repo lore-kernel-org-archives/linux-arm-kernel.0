@@ -1,27 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 7 Jul 2016 14:24:41 +0200
-Subject: [PATCH] spi: s3c64xx: do not disable the clock while configuring
- the spi
-In-Reply-To: <20160707095840.GH23620@samsunx.samsung>
-References: <CGME20160707072419epcas1p3ba881fb9b3270eb8cde87380aea7bcf9@epcas1p3.samsung.com>
- <1467876237-12183-1-git-send-email-andi.shyti@samsung.com>
- <20160707095840.GH23620@samsunx.samsung>
-Message-ID: <20160707122441.GP6247@sirena.org.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Jul 2016 13:26:36 +0100
+Subject: [PATCH v2] clkdev: add devm_of_clk_get()
+In-Reply-To: <87ziptixv7.wl%kuninori.morimoto.gx@renesas.com>
+References: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
+ <146785219147.73491.2827268663638530377@resonance>
+ <87ziptixv7.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20160707122636.GP1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 06:58:41PM +0900, Andi Shyti wrote:
+On Thu, Jul 07, 2016 at 09:54:03AM +0000, Kuninori Morimoto wrote:
+> 
+> Hi Michael
+> 
+> > > +struct clk *devm_of_clk_get(struct device *dev,
+> > > +                           struct device_node *np, int index)
+> > 
+> > Any reason not to use devm_clk_get? Why do we need this helper?
+> 
+> Because of_clk_get() can parse "clocks", "#clock-cells" on DT.
 
-> sorry, I will re-send it because I should not remove the comments
-> above.... in the future someone might wonder why it's multiplied
-> by 2.
+clk_get() should also work just fine.  clk_get() uses
+__of_clk_get_by_name() internally, which uses "clock-names" to
+locate the index if a connection id is given.  of_clk_get() allows
+lookup of a clock by index only, omitting the name, which means
+you need to coordinate the order of clocks in DT with the order
+that the driver wants... which sounds error prone to me.
 
-I already applied and published this, can you please send an incremental
-patch fixing the issue?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/749cc072/attachment-0001.sig>
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
