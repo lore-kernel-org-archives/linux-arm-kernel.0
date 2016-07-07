@@ -1,53 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 7 Jul 2016 11:26:01 +0100
-Subject: [PATCH RESEND] arm64: fix vdso-offsets.h dependency
-In-Reply-To: <20160706175739.GB22615@e104818-lin.cambridge.arm.com>
-References: <1463071155-7435-1-git-send-email-kevin.brodsky@arm.com>
- <20160706175739.GB22615@e104818-lin.cambridge.arm.com>
-Message-ID: <20160707102601.GA27180@e104818-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 07 Jul 2016 12:26:54 +0200
+Subject: [PATCH v3 2/2] clk: samsung: exynos7: Add clocks for atlas block
+In-Reply-To: <1467750561-13957-3-git-send-email-a.kesavan@samsung.com>
+References: <1467750561-13957-1-git-send-email-a.kesavan@samsung.com>
+ <1467750561-13957-3-git-send-email-a.kesavan@samsung.com>
+Message-ID: <577E2E6E.3040809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2016 at 06:57:39PM +0100, Catalin Marinas wrote:
-> On Thu, May 12, 2016 at 05:39:15PM +0100, Kevin Brodsky wrote:
-> > +# We need to generate vdso-offsets.h before compiling certain files in kernel/.
-> > +# In order to do that, we should use the archprepare target, but we can't since
-> > +# asm-offsets.h is included in some files used to generate vdso-offsets.h, and
-> > +# asm-offsets.h is built in prepare0, for which archprepare is a dependency.
-> > +# Therefore we need to generate the header after prepare0 has been made, hence
-> > +# this hack.
-> > +prepare: vdso_prepare
-> > +vdso_prepare: prepare0
-> > +	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
-> 
-> This indeed looks dodgy. I'm not sure about the makefile rules but would
-> the above override the "prepare" target in the top Makefile?
-> 
-> I think a dependency problem we have is that arch/arm64/kernel/signal.o
-> depends on include/generated/vdso-offsets.h. However, we don't have any
-> target for the latter, only for
-> $(objtree)arch/arm64/kernel/vdso/vdso-offsets.h which no-one is
-> including. Because of this, we have a fake dependency in
-> arch/arm64/kernel/Makefile.
-> 
-> -----------8<-------------------------
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 7700c0c23962..9bdacbf59091 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -55,5 +55,4 @@ head-y					:= head.o
->  extra-y					+= $(head-y) vmlinux.lds
->  
->  # vDSO - this must be built first to generate the symbol offsets
-> -$(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
-> -$(obj)/vdso/vdso-offsets.h: $(obj)/vdso
-> +$(objtree)/include/generated/vdso-offsets.h: $(obj)/vdso
+On 07/05/2016 10:29 PM, Abhilash Kesavan wrote:
 
-This didn't work either. Basically, when building
-arch/arm64/kernel/signal.o for example, it doesn't figure out that
-vdso-offsets.h has additional dependencies like the vdso.so.dbg so that
-it builds the vdso object first. I'll look for a little longer, maybe I
-find a better workaround.
+> +static const struct samsung_pll_rate_table pll1450x_24mhz_tbl[] = {
+> +	/* rate, m, p, s */
+> +	PLL_35XX_RATE(2496000000, 208, 2, 0),
 
--- 
-Catalin
+Please add U postfix to these constants to address compiler warning
+as reported by kbuild-all at 01.org:
+
+>> drivers/clk/samsung/clk-exynos7.c:43:2: warning: this decimal constant is
+unsigned only in ISO C90
+     PLL_35XX_RATE(2496000000, 208, 2, 0),
+     ^~~~~~~~~~~~~
+
+
+> +static void __init exynos7_clk_atlas_init(struct device_node *np)
+> +{
+> +	void __iomem *reg_base;
+> +	struct samsung_clk_provider *ctx;
+> +
+> +	reg_base = of_iomap(np, 0);
+> +	if (!reg_base) {
+> +		panic("%s: failed to map registers\n", __func__);
+> +		return;
+> +	}
+> +
+> +	ctx = samsung_clk_init(np, reg_base, ATLAS_NR_CLK);
+> +	if (!ctx) {
+> +		panic("%s: unable to allocate ctx\n", __func__);
+
+You can remove this panic() call, there is already one inside
+samsung_clk_init().
