@@ -1,52 +1,29 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 7 Jul 2016 13:41:30 -0400
-Subject: [PATCH 1/9] mm: Hardened usercopy
-In-Reply-To: <1467909317.13253.17.camel@redhat.com>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
- <1467843928-29351-2-git-send-email-keescook@chromium.org>
- <1467909317.13253.17.camel@redhat.com>
-Message-ID: <CAGXu5j+zxyPEfswD-03TDhuzxaG6itKsoc6-15rMuE+Sz3booA@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 07 Jul 2016 10:45:35 -0700
+Subject: [GIT PULL] Amlogic DT 64-bit updates for v4.8 (#2)
+In-Reply-To: <7025009.icO1nWIe4a@wuerfel> (Arnd Bergmann's message of "Thu, 07
+ Jul 2016 17:57:16 +0200")
+References: <m237nmqt41.fsf@baylibre.com> <7025009.icO1nWIe4a@wuerfel>
+Message-ID: <m2shvlpcjk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 7, 2016 at 12:35 PM, Rik van Riel <riel@redhat.com> wrote:
-> On Wed, 2016-07-06 at 15:25 -0700, Kees Cook wrote:
->>
->> +     /* Allow kernel rodata region (if not marked as Reserved).
->> */
->> +     if (ptr >= (const void *)__start_rodata &&
->> +         end <= (const void *)__end_rodata)
->> +             return NULL;
->>
-> One comment here.
+Arnd Bergmann <arnd@arndb.de> writes:
+
+> On Wednesday, July 6, 2016 3:50:06 PM CEST Kevin Hilman wrote:
+>> 
+>> Kevin Hilman (1):
+>>      ARM64: DTS: meson-gxbb: switch ethernet to real clock
 >
-> __check_object_size gets "to_user" as an argument.
 >
-> It may make sense to pass that to check_heap_object, and
-> only allow copy_to_user from rodata, never copy_from_user,
-> since that section should be read only.
-
-Well, that's two votes for this extra check, but I'm still not sure
-since it may already be allowed by the Reserved check, but I can
-reorder things to _reject_ on rodata writes before the Reserved check,
-etc.
-
-I'll see what could work here...
-
--Kees
-
+> This one caused a build regression since the clk driver is not part of arm-soc:
 >
->> +void __check_object_size(const void *ptr, unsigned long n, bool
->> to_user)
->> +{
->>
+> /work/build/batch/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi:48:41: fatal error: dt-bindings/clock/gxbb-clkc.h: No such file or directory
 >
-> --
->
-> All Rights Reversed.
+> I assume the patch was not meant to be applied yet and accidentally
+> slipped in, I've reverted it for now so we get a clean build with the
+> arm-soc tree.
 
+OK, Thanks.
 
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Kevin
