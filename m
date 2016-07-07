@@ -1,261 +1,193 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 07 Jul 2016 15:21:13 +0200
-Subject: [PATCH v7 4/6] cpuidle: introduce HAVE_GENERIC_CPUIDLE_ENTER for
- ARM{32, 64} platforms
-In-Reply-To: <1467122152-5604-5-git-send-email-sudeep.holla@arm.com>
-References: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
- <1467122152-5604-5-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1675585.udvKUofiJK@vostro.rjw.lan>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 7 Jul 2016 14:16:36 +0100
+Subject: [PATCH v4 3/5] nvmem: core: Add consumer API to get nvmem cell
+ from node
+In-Reply-To: <20160707123350.GA18563@Sanchayan-Arch.localdomain>
+References: <cover.1467872014.git.maitysanchayan@gmail.com>
+ <0e6294d931bf181376a6f4e1a86df3f6c6a5d575.1467872014.git.maitysanchayan@gmail.com>
+ <577E1E79.4090809@linaro.org>
+ <20160707123350.GA18563@Sanchayan-Arch.localdomain>
+Message-ID: <577E5634.7020805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 28, 2016 02:55:50 PM Sudeep Holla wrote:
-> The function arm_enter_idle_state is exactly the same in both generic
-> ARM{32,64} CPUIdle driver and will be the same even on ARM64 backend
-> for ACPI processor idle driver. So we can unify it and move it as
-> generic_cpuidle_enter by introducing HAVE_GENERIC_CPUIDLE_ENTER and
-> enabling the same on both ARM{32,64}.
-> 
-> This is in preparation of reuse of the generic cpuidle entry function
-> for ACPI LPI support on ARM64.
-> 
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm/Kconfig              |  1 +
->  arch/arm/kernel/cpuidle.c     |  4 ++--
->  arch/arm64/Kconfig            |  1 +
->  arch/arm64/kernel/cpuidle.c   |  6 +++---
->  drivers/cpuidle/Kconfig       |  3 +++
->  drivers/cpuidle/cpuidle-arm.c | 21 +--------------------
->  drivers/cpuidle/cpuidle.c     | 35 +++++++++++++++++++++++++++++++++++
->  include/linux/cpuidle.h       |  8 ++++++++
->  8 files changed, 54 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 90542db1220d..52b3dca0381c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -54,6 +54,7 @@ config ARM
->  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
->  	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
->  	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
-> +	select HAVE_GENERIC_CPUIDLE_ENTER
 
-That "generic" part in the name concerns me a bit, because the thing is not
-really generic.  It is "common on ARM" rather.
 
->  	select HAVE_GENERIC_DMA_COHERENT
->  	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
->  	select HAVE_IDE if PCI || ISA || PCMCIA
-> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-> index a44b268e12e1..49704e333bfc 100644
-> --- a/arch/arm/kernel/cpuidle.c
-> +++ b/arch/arm/kernel/cpuidle.c
-> @@ -41,7 +41,7 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
->  }
->  
->  /**
-> - * arm_cpuidle_suspend() - function to enter low power idle states
-> + * cpuidle_generic_enter() - function to enter low power idle states
->   * @index: an integer used as an identifier for the low level PM callbacks
->   *
->   * This function calls the underlying arch specific low level PM code as
-> @@ -50,7 +50,7 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
->   * Returns -EOPNOTSUPP if no suspend callback is defined, the result of the
->   * callback otherwise.
->   */
-> -int arm_cpuidle_suspend(int index)
-> +int cpuidle_generic_enter(int index)
->  {
->  	int ret = -EOPNOTSUPP;
->  	int cpu = smp_processor_id();
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 5a0a691d4220..0916b6e6c8ef 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -76,6 +76,7 @@ config ARM64
->  	select HAVE_FTRACE_MCOUNT_RECORD
->  	select HAVE_FUNCTION_TRACER
->  	select HAVE_FUNCTION_GRAPH_TRACER
-> +	select HAVE_GENERIC_CPUIDLE_ENTER
->  	select HAVE_GENERIC_DMA_COHERENT
->  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
->  	select HAVE_IRQ_TIME_ACCOUNTING
-> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-> index 06786fdaadeb..bade1b04ff12 100644
-> --- a/arch/arm64/kernel/cpuidle.c
-> +++ b/arch/arm64/kernel/cpuidle.c
-> @@ -9,10 +9,10 @@
->   * published by the Free Software Foundation.
->   */
->  
-> +#include <linux/cpuidle.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  
-> -#include <asm/cpuidle.h>
->  #include <asm/cpu_ops.h>
->  
->  int arm_cpuidle_init(unsigned int cpu)
-> @@ -27,13 +27,13 @@ int arm_cpuidle_init(unsigned int cpu)
->  }
->  
->  /**
-> - * cpu_suspend() - function to enter a low-power idle state
-> + * cpuidle_generic_enter() - function to enter a low-power idle state
->   * @arg: argument to pass to CPU suspend operations
->   *
->   * Return: 0 on success, -EOPNOTSUPP if CPU suspend hook not initialized, CPU
->   * operations back-end error code otherwise.
->   */
-> -int arm_cpuidle_suspend(int index)
-> +int cpuidle_generic_enter(int index)
->  {
->  	int cpu = smp_processor_id();
->  
-> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-> index 7e48eb5bf0a7..e557289cff90 100644
-> --- a/drivers/cpuidle/Kconfig
-> +++ b/drivers/cpuidle/Kconfig
-> @@ -45,4 +45,7 @@ endif
->  
->  config ARCH_NEEDS_CPU_IDLE_COUPLED
->  	def_bool n
-> +
-> +config HAVE_GENERIC_CPUIDLE_ENTER
-> +	def_bool n
->  endmenu
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index e342565e8715..13012d8eba53 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -36,26 +36,7 @@
->  static int arm_enter_idle_state(struct cpuidle_device *dev,
->  				struct cpuidle_driver *drv, int idx)
->  {
-> -	int ret;
-> -
-> -	if (!idx) {
-> -		cpu_do_idle();
-> -		return idx;
-> -	}
-> -
-> -	ret = cpu_pm_enter();
-> -	if (!ret) {
-> -		/*
-> -		 * Pass idle state index to cpu_suspend which in turn will
-> -		 * call the CPU ops suspend protocol with idle index as a
-> -		 * parameter.
-> -		 */
-> -		ret = arm_cpuidle_suspend(idx);
-> -
-> -		cpu_pm_exit();
-> -	}
-> -
-> -	return ret ? -1 : idx;
-> +	return cpuidle_generic_enter_state(idx);
->  }
->  
->  static struct cpuidle_driver arm_idle_driver = {
-> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
-> index a4d0059e232c..e490dea98b89 100644
-> --- a/drivers/cpuidle/cpuidle.c
-> +++ b/drivers/cpuidle/cpuidle.c
-> @@ -16,6 +16,7 @@
->  #include <linux/pm_qos.h>
->  #include <linux/cpu.h>
->  #include <linux/cpuidle.h>
-> +#include <linux/cpu_pm.h>
->  #include <linux/ktime.h>
->  #include <linux/hrtimer.h>
->  #include <linux/module.h>
-> @@ -255,6 +256,40 @@ int cpuidle_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
->  }
->  
->  /**
-> + * cpuidle_generic_enter_state - enter into the specified idle state using the
-> + *				 generic callback if implemented
-> + *
-> + * @index: the index in the idle state table
-> + *
-> + * Returns the index in the idle state, -1 in case of error.
-> + */
-> +int cpuidle_generic_enter_state(int idx)
-> +{
-> +	int ret;
-> +
-> +	if (!idx) {
-> +		cpu_do_idle();
-> +		return idx;
-> +	}
-> +
-> +	ret = cpu_pm_enter();
+On 07/07/16 13:33, maitysanchayan at gmail.com wrote:
+> Hello Srinivas,
+>
+> On 16-07-07 10:18:49, Srinivas Kandagatla wrote:
+>>
+>>
+>> On 07/07/16 07:39, Sanchayan Maity wrote:
+>>> From: Stefan Agner <stefan@agner.ch>
+>>>
+>>> The existing NVMEM consumer API's do not allow to get a
+>>> NVMEM cell directly given a device tree node. This patch
+>>> adds a function to provide this functionality.
+>>>
+>>> Assuming the nvmem cell id name is known, this can be used
+>>> as follows
+>>>
+>>> struct device_node *cell_np;
+>>> struct nvmem_cell *foo_cell;
+>>>
+>>> cell_np = of_find_node_by_name(parent, "foo");
+>>> foo_cell = of_nvmem_cell_get_direct(cell_np);
+>>
+>> I don't see a real gain in adding this new api,
+>> This will encourage people to use non-standard nvmem bindings.
+>>
+>> why not just use standard nvmem bindings.. and use
+>>
+>> of_nvmem_cell_get(np, "foo");
+>>
+>> which should work in your case.
+>
+> It will not work in our case. I believe what you are referring to will
+> work if I were to pass the device node pointer which was a NVMEM consumer
+> containing the nvmem-cells property. In our case, we pass the device node
+> pointer pointing to /soc which is not a nvmem consumer. In this case it
+> will not have nvmem-cells property causing of_nvmem_cell_get to return
+> EINVAL when it calls of_parse_phandle with "nvmem-cells".
 
-If you look at the users of cpu_pm_enter(), they are all ARM.  Nobody else uses
-it, so at least please put cpuidle_generic_enter_state() under a #ifdef to avoid
-building it in vain on non-ARM.
+I could not see any bindings/ dt patches or dt examples for this this 
+series.. so Am guessing your node would look like:
 
-> +	if (!ret) {
-> +		/*
-> +		 * Pass idle state index to cpu_suspend which in turn will
-> +		 * call the CPU ops suspend protocol with idle index as a
-> +		 * parameter.
-> +		 */
-> +		ret = cpuidle_generic_enter(idx);
-> +
-> +		cpu_pm_exit();
-> +	}
-> +
-> +	return ret ? -1 : idx;
-> +}
-> +
-> +EXPORT_SYMBOL_GPL(cpuidle_generic_enter_state);
-> +
-> +/**
->   * cpuidle_enter - enter into the specified idle state
->   *
->   * @drv:   the cpuidle driver tied with the cpu
-> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
-> index 07b83d32f66c..9fd3c10166fa 100644
-> --- a/include/linux/cpuidle.h
-> +++ b/include/linux/cpuidle.h
-> @@ -154,6 +154,7 @@ extern int cpuidle_play_dead(void);
->  extern struct cpuidle_driver *cpuidle_get_cpu_driver(struct cpuidle_device *dev);
->  static inline struct cpuidle_device *cpuidle_get_device(void)
->  {return __this_cpu_read(cpuidle_devices); }
-> +extern int cpuidle_generic_enter_state(int idx);
->  #else
->  static inline void disable_cpuidle(void) { }
->  static inline bool cpuidle_not_available(struct cpuidle_driver *drv,
-> @@ -190,6 +191,7 @@ static inline int cpuidle_play_dead(void) {return -ENODEV; }
->  static inline struct cpuidle_driver *cpuidle_get_cpu_driver(
->  	struct cpuidle_device *dev) {return NULL; }
->  static inline struct cpuidle_device *cpuidle_get_device(void) {return NULL; }
-> +static inline int cpuidle_generic_enter_state(int idx) { return -1; }
->  #endif
->  
->  #if defined(CONFIG_CPU_IDLE) && defined(CONFIG_SUSPEND)
-> @@ -246,6 +248,12 @@ static inline int cpuidle_register_governor(struct cpuidle_governor *gov)
->  {return 0;}
->  #endif
->  
-> +#ifdef CONFIG_HAVE_GENERIC_CPUIDLE_ENTER
-> +extern int cpuidle_generic_enter(int idx);
+soc {
+	cfg0: cfg0 {
+		...
+	};
+	cfg1: cfg1 {
+		...
+	};
+};
 
-And if you put it under the #ifdef here, its definition also should go under
-the same #ifdef.
+If this is not how it looks, can you share the details.
 
-> +#else
-> +static inline int cpuidle_generic_enter(int idx) { return -1; }
-> +#endif
-> +
->  #ifdef CONFIG_ARCH_HAS_CPU_RELAX
->  #define CPUIDLE_DRIVER_STATE_START	1
->  #else
-> 
+What Am saying is that why not have:
 
-Thanks,
-Rafael
+soc {
+	nvmem-cells = <&cfg0>, <&cfg1>;
+	nvmem-cell-names = "cfg0", "cfg1";
+
+	cfg0: cfg0 {
+		...
+	};
+
+	cfg1: cfg1 {
+		...
+	};
+};
+
+>
+> Our requirement is to be able to pass the soc node pointer and then
+> be able to get a nvmem cell by specifying it's name. So for our case
+
+Why?
+
+> ocotp node has cfg0 and cfg1 which we want but we cannot use existing
+> nvmem consumer API since that requires having the nvmem consumer properties
+> in the node we are binding to viz. is a direct nvmem consumer.
+>
+> Regards,
+> Sanchayan.
+>
+>>
+>> thanks,
+>> srini
+>>>
+>>> Parent node can also be the of_node of the main SoC device
+>>> node.
+>>>
+>>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>>> ---
+>>>    drivers/nvmem/core.c           | 44 +++++++++++++++++++++++++++++-------------
+>>>    include/linux/nvmem-consumer.h |  1 +
+>>>    2 files changed, 32 insertions(+), 13 deletions(-)
+>>>
+>>> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+>>> index 965911d..470abee 100644
+>>> --- a/drivers/nvmem/core.c
+>>> +++ b/drivers/nvmem/core.c
+>>> @@ -743,29 +743,21 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
+>>>
+>>>    #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+>>>    /**
+>>> - * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+>>> + * of_nvmem_cell_get_direct() - Get a nvmem cell from given device node
+>>>     *
+>>> - * @dev node: Device tree node that uses the nvmem cell
+>>> - * @id: nvmem cell name from nvmem-cell-names property.
+>>> + * @dev node: Device tree node that uses nvmem cell
+>>>     *
+>>>     * Return: Will be an ERR_PTR() on error or a valid pointer
+>>>     * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+>>>     * nvmem_cell_put().
+>>>     */
+>>> -struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>>> -					    const char *name)
+>>> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np)
+>>>    {
+>>> -	struct device_node *cell_np, *nvmem_np;
+>>> +	struct device_node *nvmem_np;
+>>>    	struct nvmem_cell *cell;
+>>>    	struct nvmem_device *nvmem;
+>>>    	const __be32 *addr;
+>>> -	int rval, len, index;
+>>> -
+>>> -	index = of_property_match_string(np, "nvmem-cell-names", name);
+>>> -
+>>> -	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+>>> -	if (!cell_np)
+>>> -		return ERR_PTR(-EINVAL);
+>>> +	int rval, len;
+>>>
+>>>    	nvmem_np = of_get_next_parent(cell_np);
+>>>    	if (!nvmem_np)
+>>> @@ -824,6 +816,32 @@ err_mem:
+>>>
+>>>    	return ERR_PTR(rval);
+>>>    }
+>>> +EXPORT_SYMBOL_GPL(of_nvmem_cell_get_direct);
+>>> +
+>>> +/**
+>>> + * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+>>> + *
+>>> + * @dev node: Device tree node that uses the nvmem cell
+>>> + * @id: nvmem cell name from nvmem-cell-names property.
+>>> + *
+>>> + * Return: Will be an ERR_PTR() on error or a valid pointer
+>>> + * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+>>> + * nvmem_cell_put().
+>>> + */
+>>> +struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>>> +					    const char *name)
+>>> +{
+>>> +	struct device_node *cell_np;
+>>> +	int index;
+>>> +
+>>> +	index = of_property_match_string(np, "nvmem-cell-names", name);
+>>> +
+>>> +	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+>>> +	if (!cell_np)
+>>> +		return ERR_PTR(-EINVAL);
+>>> +
+>>> +	return of_nvmem_cell_get_direct(cell_np);
+>>> +}
+>>>    EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
+>>>    #endif
+>>>
+>>> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+>>> index 9bb77d3..bf879fc 100644
+>>> --- a/include/linux/nvmem-consumer.h
+>>> +++ b/include/linux/nvmem-consumer.h
+>>> @@ -136,6 +136,7 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
+>>>    #endif /* CONFIG_NVMEM */
+>>>
+>>>    #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+>>> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np);
+>>>    struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>>>    				     const char *name);
+>>>    struct nvmem_device *of_nvmem_device_get(struct device_node *np,
+>>>
