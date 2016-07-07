@@ -1,48 +1,74 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 7 Jul 2016 14:51:44 +0100
-Subject: [GIT PULL]arm64: dts: hisilicon: hi6220 updates for 4.8(#2)
-Message-ID: <577E5E70.1050304@hisilicon.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 07 Jul 2016 15:58:04 +0200
+Subject: [PATCH v6 00/10] acpi,
+ clocksource: add GTDT driver and GTDT support in arm_arch_timer
+In-Reply-To: <20160707134023.GA655@red-moon>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <1890708.ZTyM2PUGdP@vostro.rjw.lan> <20160707134023.GA655@red-moon>
+Message-ID: <1603704.EGiVTcCxLR@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+On Thursday, July 07, 2016 02:40:23 PM Lorenzo Pieralisi wrote:
+> [+Sudeep]
+> 
+> On Thu, Jul 07, 2016 at 02:03:17PM +0200, Rafael J. Wysocki wrote:
+> 
+> [...]
+> 
+> > > >> So is this a documentation issue in which case Fu Wei can add that to
+> > > >> the file to explain its limited to ARM64. Or we could even rename the
+> > > >> file acpi_arm64_gtdt.c
+> > > >>
+> > > >> It seems a pity as the comment on this series were minors to block
+> > > >> things on a filename/location.
+> > > >
+> > > > Let me repeat what I said above:
+> > > >
+> > > > I'm mostly concerned about how (and by whom) that code is going to be
+> > > > maintained going forward.
+> > > >
+> > > > This is not about documentation, it is about responsibility.
+> > > >
+> > > > Honestly, I don't think I'm the right maintainer to apply the patch
+> > > > introducing this code and then handle bug reports regarding it and so
+> > > > on.  That has to be done by somebody else.
+> > > 
+> > > I'm working on ACPI for years and upstreamed the ARM64 ACPI core
+> > > support (with lots of people's help), I'm willing to maintain the ARM64
+> > > ACPI code under drivers/acpi/ if no objections.
+> > 
+> > OK
+> 
+> I would ask you please to add Sudeep and myself for the ARM64 specific
+> ACPI code maintainership too.
 
-I know the walkaround for this kind of patch is still under discussion.
-Could you please consider to pull the following changes?
+OK
 
-This depends on the change in clk tree (clk-hi6220-rtc)
-which is already in the clk-next.
+> > Can the ARM64-specific code go under drivers/acpi/arm64/ then, for clarity?
+> 
+> It can, but I do not understand why x86 should not have a separate
+> directory for all x86 specific stuff too then.
 
-And for easier grepping through history, below is the pull request
-for the dts specific change (no clk commits):
+It should. :-)
 
-Thanks!
+It doesn't have it ATM, but that doesn't mean it's all OK.
 
-Best Regards,
-Wei
+Well, some of the x86-specific stuff goes into arch/x86/kernel/acpi/, so it
+has something at least.
 
----
+In any case, IMO, if some code is only used by one architecture, it should be
+clear that this is the case, and moving that code into a separate directory
+helps to achieve that.
 
-The following changes since commit 6fb924dc9c482557ebd41f6c6a5fde34210a2e08:
+> Anyway let's avoid these petty arguments, I agree there must be some
+> sort of ARM64 ACPI maintainership for the reasons you mentioned above.
 
-  clk: hi6220: Add RTC clock for pl031 (2016-06-30 12:11:49 -0700)
+To avoid confusion on who's going to push stuff to Linus, I can do that,
+but it must be clear whose ACKs are needed for that to happen.  That may be
+one person or all of you, whatever you decide.
 
-are available in the git repository at:
+I can take pull requests too if that's more convenient.
 
-  git://github.com/hisilicon/linux-hisi.git tags/hi6220-dt-for-4.8-2
-
-for you to fetch changes up to 810bd15fe0f049233ce6b89e1fbfaaff124be8c2:
-
-  arm64: dts: hi6220: Add pl031 RTC support (2016-07-07 14:05:34 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon Hi6220 updates for 4.8
-
-- Add pl031 rtc0 and rtc1 support for hi6220 SoC
-
-----------------------------------------------------------------
-Zhangfei Gao (1):
-      arm64: dts: hi6220: Add pl031 RTC support
-
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Thanks,
+Rafael
