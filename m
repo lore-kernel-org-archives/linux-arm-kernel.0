@@ -1,44 +1,27 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Thu,  7 Jul 2016 12:17:33 +0000
-Subject: [PATCH -next v3] iommu/exynos: Fix return value check in
- exynos_iommu_of_setup()
-In-Reply-To: <1467860372-6940-1-git-send-email-weiyj_lk@163.com>
-References: <1467860372-6940-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <1467893853-21403-1-git-send-email-weiyj_lk@163.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 Jul 2016 14:22:19 +0200
+Subject: next-20160707 build: 1 failures 6 warnings (next-20160707)
+In-Reply-To: <E1bL5XI-0004Z9-EP@optimist>
+References: <E1bL5XI-0004Z9-EP@optimist>
+Message-ID: <20160707122219.GO6247@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Thu, Jul 07, 2016 at 10:23:56AM +0100, Build bot for Mark Brown wrote:
 
-In case of error, the function of_platform_device_create() returns
-NULL pointer not ERR_PTR(). The IS_ERR() test in the return value
-check should be replaced with NULL test.
+Today's -next fails to build an arm64 allmodconfig due to:
 
-Fixes: 8ed55c812fa8 ("iommu/exynos: Init from dt-specific callback
-instead of initcall")
-Cc: stable at vger.kernel.org
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Dennis Chen <dennis.chen@arm.com>
----
-v2 -> v3: added fixes and Reviewed-by.
----
- drivers/iommu/exynos-iommu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> 	arm64-allmodconfig
+> ../drivers/gpu/drm/rockchip/rockchip_drm_drv.c:17:27: fatal error: asm/dma-iommu.h: No such file or directory
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 33dcc29..9b23059 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -1345,8 +1345,8 @@ static int __init exynos_iommu_of_setup(struct device_node *np)
- 		exynos_iommu_init();
- 
- 	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
--	if (IS_ERR(pdev))
--		return PTR_ERR(pdev);
-+	if (!pdev)
-+		return -ENODEV;
- 
- 	/*
- 	 * use the first registered sysmmu device for performing
+triggered by c51f43a9c171ea (iommu/rockchip: Enable Rockchip IOMMU on
+ARM64) which enables the Rockchip IOMMU driver on ARM64 which lacks the
+above header.  Either the use of the header needs to be removed or an
+explicit ARM64 dependency added at the DRM level.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/bbf16e3b/attachment.sig>
