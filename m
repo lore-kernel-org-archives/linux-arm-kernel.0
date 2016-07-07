@@ -1,80 +1,135 @@
-From: arend.vanspriel@broadcom.com (Arend Van Spriel)
-Date: Thu, 7 Jul 2016 11:16:59 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
- dt property
-In-Reply-To: <3996482.D5xdKXDiGl@wuerfel>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <3354017.XSBSmHHtrQ@wuerfel>
- <bb1beb8d-652d-aa97-e24b-e3e27397dd2e@broadcom.com>
- <3996482.D5xdKXDiGl@wuerfel>
-Message-ID: <27f6d3d3-4bcc-8572-4c7b-b44966ad72f4@broadcom.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 7 Jul 2016 10:18:49 +0100
+Subject: [PATCH v4 3/5] nvmem: core: Add consumer API to get nvmem cell
+ from node
+In-Reply-To: <0e6294d931bf181376a6f4e1a86df3f6c6a5d575.1467872014.git.maitysanchayan@gmail.com>
+References: <cover.1467872014.git.maitysanchayan@gmail.com>
+ <0e6294d931bf181376a6f4e1a86df3f6c6a5d575.1467872014.git.maitysanchayan@gmail.com>
+Message-ID: <577E1E79.4090809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7-7-2016 10:46, Arnd Bergmann wrote:
-> On Wednesday, July 6, 2016 9:19:41 PM CEST Arend Van Spriel wrote:
->> On 6-7-2016 15:42, Arnd Bergmann wrote:
->>> On Wednesday, July 6, 2016 10:08:55 AM CEST Arend Van Spriel wrote:
->>>> On Tue, Jul 5, 2016 at 3:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> All existing uses of the model property in arch/arm/boot/dts and most of
->>> the ones in arch/powerpc/boot/dts are against the intended usage in
->>> one way or another, but adding different kind of incorrect usage won't
->>> improve that.
->>>
->>> The only way I can see the model property being used correctly would
->>> be to have it match the first entry in the compatible property, but
->>> that is completely redundant, so we tend to omit it, except for the
->>> root node in which it is required. For the root node however, the
->>> historic practice that has crept in on ARM is to put something completely
->>> different in there, which is a human-readable description of the
->>> machine rather than something we can use as a unique indentifier.
->>>
->>> I'd just consider the "model" property burned, and not use it for anything
->>> that doesn't already use it, just like we handle "device_type": a few
->>> things require it, nothing else should use it.
->>
->> If that is the agreed approach in devicetree arena I am fine with it. I
->> have been unaware of this and just looked at the suggestion from Jonas
->> seeing a solution to the problem at hand.
-> 
-> I don't think it has been discussed or decided before as the question
-> has not come up, so for now this is my personal view. Maybe one of
-> the devicetree maintainers can comment on this.
-> 
->>> I agree with your point that the "compatible" property in case of brcmfmac
->>> is really odd because it is not required to identify the hardware when
->>> the SDIO device identification is sufficient, and we just need it to guard
->>> the definition of the other properties. However it seems that now we
->>> actually do need to identify the hardware because we cannot read the
->>> board ID and revision that is supposed to come from nvram but also needed
->>> to read the nvram contents from a file.
->>
->> The board ID and rev in the nvram may not be used if the device has
->> these stored in OTP. However, the problem is that the device need
->> firmware+nvram loaded into it before we can start the firmware on the
->> device. Now if we were to add boardtype and boardrev properties in the
->> binding to identify the hardware, I suppose a new compatible value would
->> be required.
-> 
-> I'm a bit confused by the interdependencies now. You say that there are
-> board ID/rev values stored in OTP. What exactly prevents us from just
-> using those to generate a file name to look up the nvram file on disk
-> for the remaining values?
-> 
-> Do we require the firmware to be running before we can read the OTP,
-> or are there cases where the board ID in OTP is wrong or missing?
 
-Well, both. Primarily we need firmware running to get the info. If board
-ID is missing in OTP the value from nvram file is used. If board ID in
-OTP is wrong we are screwed :-p
 
-> If we can't rely on OTP for one of those reasons and instead add two
-> properties for boardtype/boardrev, I don't think that requires a
-> change of the compatible string, we would just document those two
-> as optional properties.
+On 07/07/16 07:39, Sanchayan Maity wrote:
+> From: Stefan Agner <stefan@agner.ch>
+>
+> The existing NVMEM consumer API's do not allow to get a
+> NVMEM cell directly given a device tree node. This patch
+> adds a function to provide this functionality.
+>
+> Assuming the nvmem cell id name is known, this can be used
+> as follows
+>
+> struct device_node *cell_np;
+> struct nvmem_cell *foo_cell;
+>
+> cell_np = of_find_node_by_name(parent, "foo");
+> foo_cell = of_nvmem_cell_get_direct(cell_np);
 
-Right. I suppose the bindings update and driver update should preferably
-be in the same kernel release although bindings are supposedly OS agnostic.
+I don't see a real gain in adding this new api,
+This will encourage people to use non-standard nvmem bindings.
 
-Regards,
-Arend
+why not just use standard nvmem bindings.. and use
+
+of_nvmem_cell_get(np, "foo");
+
+which should work in your case.
+
+thanks,
+srini
+>
+> Parent node can also be the of_node of the main SoC device
+> node.
+>
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>   drivers/nvmem/core.c           | 44 +++++++++++++++++++++++++++++-------------
+>   include/linux/nvmem-consumer.h |  1 +
+>   2 files changed, 32 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> index 965911d..470abee 100644
+> --- a/drivers/nvmem/core.c
+> +++ b/drivers/nvmem/core.c
+> @@ -743,29 +743,21 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
+>
+>   #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+>   /**
+> - * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+> + * of_nvmem_cell_get_direct() - Get a nvmem cell from given device node
+>    *
+> - * @dev node: Device tree node that uses the nvmem cell
+> - * @id: nvmem cell name from nvmem-cell-names property.
+> + * @dev node: Device tree node that uses nvmem cell
+>    *
+>    * Return: Will be an ERR_PTR() on error or a valid pointer
+>    * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+>    * nvmem_cell_put().
+>    */
+> -struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+> -					    const char *name)
+> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np)
+>   {
+> -	struct device_node *cell_np, *nvmem_np;
+> +	struct device_node *nvmem_np;
+>   	struct nvmem_cell *cell;
+>   	struct nvmem_device *nvmem;
+>   	const __be32 *addr;
+> -	int rval, len, index;
+> -
+> -	index = of_property_match_string(np, "nvmem-cell-names", name);
+> -
+> -	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+> -	if (!cell_np)
+> -		return ERR_PTR(-EINVAL);
+> +	int rval, len;
+>
+>   	nvmem_np = of_get_next_parent(cell_np);
+>   	if (!nvmem_np)
+> @@ -824,6 +816,32 @@ err_mem:
+>
+>   	return ERR_PTR(rval);
+>   }
+> +EXPORT_SYMBOL_GPL(of_nvmem_cell_get_direct);
+> +
+> +/**
+> + * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+> + *
+> + * @dev node: Device tree node that uses the nvmem cell
+> + * @id: nvmem cell name from nvmem-cell-names property.
+> + *
+> + * Return: Will be an ERR_PTR() on error or a valid pointer
+> + * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+> + * nvmem_cell_put().
+> + */
+> +struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+> +					    const char *name)
+> +{
+> +	struct device_node *cell_np;
+> +	int index;
+> +
+> +	index = of_property_match_string(np, "nvmem-cell-names", name);
+> +
+> +	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+> +	if (!cell_np)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	return of_nvmem_cell_get_direct(cell_np);
+> +}
+>   EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
+>   #endif
+>
+> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+> index 9bb77d3..bf879fc 100644
+> --- a/include/linux/nvmem-consumer.h
+> +++ b/include/linux/nvmem-consumer.h
+> @@ -136,6 +136,7 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
+>   #endif /* CONFIG_NVMEM */
+>
+>   #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np);
+>   struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>   				     const char *name);
+>   struct nvmem_device *of_nvmem_device_get(struct device_node *np,
+>
