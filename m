@@ -1,65 +1,33 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez)
-Date: Thu, 7 Jul 2016 10:55:05 +0200
-Subject: [PATCH v2 2/2] clk: hi6220: initialize UART1 clock to 150MHz
-In-Reply-To: <577DF73A.1030701@linaro.org>
-References: <1467189955-21694-1-git-send-email-guodong.xu@linaro.org>
- <1467189955-21694-2-git-send-email-guodong.xu@linaro.org>
- <146784139106.73491.6417383579004254897@resonance>
- <577DF73A.1030701@linaro.org>
-Message-ID: <577E18E9.5060308@linaro.org>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Thu, 7 Jul 2016 17:06:24 +0800
+Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for Mediatek
+ thermal controller
+In-Reply-To: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
+References: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <1467882386-40544-2-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2016 08:31 AM, Jorge Ramirez wrote:
-> On 07/06/2016 11:43 PM, Michael Turquette wrote:
->> Quoting Guodong Xu (2016-06-29 01:45:55)
->>> >From: Jorge Ramirez-Ortiz<jorge.ramirez-ortiz@linaro.org>
->>> >
->>> >Early at boot, during the sys_clk initialization, make sure UART1 uses
->>> >the higher frequency clock, 150MHz.
->>> >
->>> >This enables support for higher baud rates (up to 3Mbps) in UART1, 
->>> which
->>> >is required by faster bluetooth transfers.
->>> >
->>> >v2: use clk_set_rate() to propergate clock settings.
->>> >
->>> >Signed-off-by: Jorge Ramirez-Ortiz<jorge.ramirez-ortiz@linaro.org>
->>> >Signed-off-by: Guodong Xu<guodong.xu@linaro.org>
->>> >---
->>> >  drivers/clk/hisilicon/clk-hi6220.c | 4 ++++
->>> >  1 file changed, 4 insertions(+)
->>> >
->>> >diff --git a/drivers/clk/hisilicon/clk-hi6220.c 
->>> b/drivers/clk/hisilicon/clk-hi6220.c
->>> >index a36ffcb..631c56f 100644
->>> >--- a/drivers/clk/hisilicon/clk-hi6220.c
->>> >+++ b/drivers/clk/hisilicon/clk-hi6220.c
->>> >@@ -12,6 +12,7 @@
->>> >  >  #include <linux/kernel.h>
->>> >  #include <linux/clk-provider.h>
->>> >+#include <linux/clk.h>
->>> >  #include <linux/clkdev.h>
->>> >  #include <linux/io.h>
->>> >  #include <linux/of.h>
->>> >@@ -192,6 +193,9 @@ static void __init hi6220_clk_sys_init(struct 
->>> device_node *np)
->>> >  > hi6220_clk_register_divider(hi6220_div_clks_sys,
->>> >                         ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
->>> >+
->>> >+       if (clk_set_rate(clk_data->clk_data.clks[HI6220_UART1_SRC], 
->>> 150000000))
->>> >+               pr_err("failed to set uart1 clock rate\n");
->> Why doesn't the UART driver call clk_get and then clk_set_rate on this
->> clock? Why do it in the clk provider driver?
->
-> yes that was my initial choice as well; in the end I opted to do it in 
-> the clock driver because of it being a value that will not have to 
-> ever change for the SoC and - maybe more importantly- because of not 
-> having a DT property available for the primecell pl011 uart where to  
-> specify the value (so I thought this was a less intrusive 
-> implementation).
->
->
-I have v3 ready (changes done in amba-pl011.c and devicetree/bindings)
-please let me know if I should send those instead.
+This adds the device tree binding documentation for the mediatek thermal
+controller found on Mediatek MT2701.
+
+Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+---
+ .../bindings/thermal/mediatek-thermal.txt          |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+index 81f9a51..bb55e79 100644
+--- a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+@@ -8,7 +8,7 @@ apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
+ is also needed.
+ 
+ Required properties:
+-- compatible: "mediatek,mt8173-thermal"
++- compatible: "mediatek,mt8173-thermal" or "mediatek,mt2701-thermal"
+ - reg: Address range of the thermal controller
+ - interrupts: IRQ for the thermal controller
+ - clocks, clock-names: Clocks needed for the thermal controller. required
+-- 
+1.7.9.5
