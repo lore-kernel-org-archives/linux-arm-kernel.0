@@ -1,120 +1,297 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Thu,  7 Jul 2016 12:09:28 +0530
-Subject: [PATCH v4 3/5] nvmem: core: Add consumer API to get nvmem cell from
- node
+Date: Thu,  7 Jul 2016 12:09:29 +0530
+Subject: [PATCH v4 4/5] soc: Add SoC driver for Freescale Vybrid platform
 In-Reply-To: <cover.1467872014.git.maitysanchayan@gmail.com>
 References: <cover.1467872014.git.maitysanchayan@gmail.com>
-Message-ID: <0e6294d931bf181376a6f4e1a86df3f6c6a5d575.1467872014.git.maitysanchayan@gmail.com>
+Message-ID: <f600ac1c747813b26c80149b6fdf32d42b114235.1467872014.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch>
+This adds a SoC driver to be used by Freescale Vybrid SoC's.
+Driver utilises syscon and nvmem consumer API's to get the
+various register values needed and expose the SoC specific
+properties via sysfs.
 
-The existing NVMEM consumer API's do not allow to get a
-NVMEM cell directly given a device tree node. This patch
-adds a function to provide this functionality.
+A sample output from Colibri Vybrid VF61 is below:
 
-Assuming the nvmem cell id name is known, this can be used
-as follows
-
-struct device_node *cell_np;
-struct nvmem_cell *foo_cell;
-
-cell_np = of_find_node_by_name(parent, "foo");
-foo_cell = of_nvmem_cell_get_direct(cell_np);
-
-Parent node can also be the of_node of the main SoC device
-node.
+root at colibri-vf:~# cd /sys/bus/soc/devices/soc0
+root at colibri-vf:/sys/bus/soc/devices/soc0# ls
+family     machine    power      revision   soc_id     subsystem  uevent
+root at colibri-vf:/sys/bus/soc/devices/soc0# cat family
+Freescale Vybrid VF610
+root at colibri-vf:/sys/bus/soc/devices/soc0# cat machine
+Freescale Vybrid
+root at colibri-vf:/sys/bus/soc/devices/soc0# cat revision
+00000013
+root at colibri-vf:/sys/bus/soc/devices/soc0# cat soc_id
+df6472a6130f29d4
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- drivers/nvmem/core.c           | 44 +++++++++++++++++++++++++++++-------------
- include/linux/nvmem-consumer.h |  1 +
- 2 files changed, 32 insertions(+), 13 deletions(-)
+ drivers/soc/Kconfig         |   1 +
+ drivers/soc/fsl/Kconfig     |  10 +++
+ drivers/soc/fsl/Makefile    |   1 +
+ drivers/soc/fsl/soc-vf610.c | 212 ++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 224 insertions(+)
+ create mode 100644 drivers/soc/fsl/Kconfig
+ create mode 100644 drivers/soc/fsl/soc-vf610.c
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 965911d..470abee 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -743,29 +743,21 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index cb58ef0..4410eb7 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -2,6 +2,7 @@ menu "SOC (System On Chip) specific Drivers"
  
- #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
- /**
-- * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
-+ * of_nvmem_cell_get_direct() - Get a nvmem cell from given device node
-  *
-- * @dev node: Device tree node that uses the nvmem cell
-- * @id: nvmem cell name from nvmem-cell-names property.
-+ * @dev node: Device tree node that uses nvmem cell
-  *
-  * Return: Will be an ERR_PTR() on error or a valid pointer
-  * to a struct nvmem_cell.  The nvmem_cell will be freed by the
-  * nvmem_cell_put().
-  */
--struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
--					    const char *name)
-+struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np)
- {
--	struct device_node *cell_np, *nvmem_np;
-+	struct device_node *nvmem_np;
- 	struct nvmem_cell *cell;
- 	struct nvmem_device *nvmem;
- 	const __be32 *addr;
--	int rval, len, index;
--
--	index = of_property_match_string(np, "nvmem-cell-names", name);
--
--	cell_np = of_parse_phandle(np, "nvmem-cells", index);
--	if (!cell_np)
--		return ERR_PTR(-EINVAL);
-+	int rval, len;
- 
- 	nvmem_np = of_get_next_parent(cell_np);
- 	if (!nvmem_np)
-@@ -824,6 +816,32 @@ err_mem:
- 
- 	return ERR_PTR(rval);
- }
-+EXPORT_SYMBOL_GPL(of_nvmem_cell_get_direct);
+ source "drivers/soc/bcm/Kconfig"
+ source "drivers/soc/brcmstb/Kconfig"
++source "drivers/soc/fsl/Kconfig"
+ source "drivers/soc/fsl/qe/Kconfig"
+ source "drivers/soc/mediatek/Kconfig"
+ source "drivers/soc/qcom/Kconfig"
+diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+new file mode 100644
+index 0000000..746b5e3
+--- /dev/null
++++ b/drivers/soc/fsl/Kconfig
+@@ -0,0 +1,10 @@
++#
++# Freescale SoC drivers
 +
-+/**
-+ * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
++config SOC_BUS_VF610
++	bool "SoC bus device for the Freescale Vybrid platform"
++	depends on NVMEM && NVMEM_VF610_OCOTP && OF
++	select SOC_BUS
++	help
++	 Include support for the SoC bus on the Freescale Vybrid platform
++	 providing sysfs information about the module variant.
+diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+index 203307f..afaf092 100644
+--- a/drivers/soc/fsl/Makefile
++++ b/drivers/soc/fsl/Makefile
+@@ -2,5 +2,6 @@
+ # Makefile for the Linux Kernel SOC fsl specific device drivers
+ #
+ 
++obj-$(CONFIG_SOC_VF610)			+= soc-vf610.o
+ obj-$(CONFIG_QUICC_ENGINE)		+= qe/
+ obj-$(CONFIG_CPM)			+= qe/
+diff --git a/drivers/soc/fsl/soc-vf610.c b/drivers/soc/fsl/soc-vf610.c
+new file mode 100644
+index 0000000..23900ea
+--- /dev/null
++++ b/drivers/soc/fsl/soc-vf610.c
+@@ -0,0 +1,212 @@
++/*
++ * Copyright (C) 2016 Toradex AG.
 + *
-+ * @dev node: Device tree node that uses the nvmem cell
-+ * @id: nvmem cell name from nvmem-cell-names property.
++ * Author: Sanchayan Maity <sanchayan.maity@toradex.com>
 + *
-+ * Return: Will be an ERR_PTR() on error or a valid pointer
-+ * to a struct nvmem_cell.  The nvmem_cell will be freed by the
-+ * nvmem_cell_put().
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
-+					    const char *name)
++
++#include <linux/device.h>
++#include <linux/mfd/syscon.h>
++#include <linux/nvmem-consumer.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/random.h>
++#include <linux/regmap.h>
++#include <linux/slab.h>
++#include <linux/sys_soc.h>
++
++#define MSCM_CPxCOUNT_OFFSET	0x2C
++#define MSCM_CPxCFG1_OFFSET	0x14
++#define ROM_REVISION_OFFSET	0x80
++
++struct vf610_soc {
++	struct device *dev;
++	struct soc_device_attribute *soc_dev_attr;
++	struct soc_device *soc_dev;
++	struct nvmem_cell *ocotp_cfg0;
++	struct nvmem_cell *ocotp_cfg1;
++};
++
++static int vf610_soc_probe(struct platform_device *pdev)
 +{
-+	struct device_node *cell_np;
-+	int index;
++	struct vf610_soc *info;
++	struct device *dev = &pdev->dev;
++	struct device_node *soc_node;
++	struct device_node *cfg0_node, *cfg1_node;
++	struct regmap *rom_regmap, *mscm_regmap;
++	char soc_type[] = "xx0";
++	size_t id1_len, id2_len;
++	u32 cpucount, l2size, rom_rev;
++	u8 *socid1, *socid2;
++	int ret;
 +
-+	index = of_property_match_string(np, "nvmem-cell-names", name);
++	info = devm_kzalloc(dev, sizeof(struct vf610_soc), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++	info->dev = dev;
 +
-+	cell_np = of_parse_phandle(np, "nvmem-cells", index);
-+	if (!cell_np)
-+		return ERR_PTR(-EINVAL);
++	soc_node = of_find_node_by_path("/soc");
++	if (!soc_node)
++		return -ENODEV;
 +
-+	return of_nvmem_cell_get_direct(cell_np);
++	cfg0_node = of_find_node_by_name(soc_node, "cfg0");
++	if (!cfg0_node) {
++		ret = -ENODEV;
++		goto out_cfg0_node;
++	}
++
++	cfg1_node = of_find_node_by_name(soc_node, "cfg1");
++	if (!cfg1_node) {
++		ret = -ENODEV;
++		goto out_cfg1_node;
++	}
++
++	info->ocotp_cfg0 = of_nvmem_cell_get_direct(cfg0_node);
++	if (IS_ERR(info->ocotp_cfg0)) {
++		ret = PTR_ERR(info->ocotp_cfg0);
++		goto out_ocotp_cfg0;
++	}
++
++	info->ocotp_cfg1 = of_nvmem_cell_get_direct(cfg1_node);
++	if (IS_ERR(info->ocotp_cfg1)) {
++		ret = PTR_ERR(info->ocotp_cfg1);
++		goto out_ocotp_cfg1;
++	}
++
++	socid1 = nvmem_cell_read(info->ocotp_cfg0, &id1_len);
++	if (IS_ERR(socid1)) {
++		dev_err(dev, "Could not read nvmem cell %ld\n",
++			PTR_ERR(socid1));
++		ret = PTR_ERR(socid1);
++		goto out_socid1;
++	}
++
++	socid2 = nvmem_cell_read(info->ocotp_cfg1, &id2_len);
++	if (IS_ERR(socid2)) {
++		dev_err(dev, "Could not read nvmem cell %ld\n",
++			PTR_ERR(socid2));
++		ret = PTR_ERR(socid2);
++		goto out_socid2;
++	}
++	add_device_randomness(socid1, id1_len);
++	add_device_randomness(socid2, id2_len);
++
++	rom_regmap = syscon_regmap_lookup_by_compatible("fsl,vf610-ocrom");
++	if (IS_ERR(rom_regmap)) {
++		dev_err(dev, "regmap lookup for ocrom failed %ld\n",
++			PTR_ERR(rom_regmap));
++		ret = PTR_ERR(rom_regmap);
++		goto out;
++	}
++
++	mscm_regmap = syscon_regmap_lookup_by_compatible("fsl,vf610-mscm-cpucfg");
++	if (IS_ERR(mscm_regmap)) {
++		dev_err(dev, "regmap lookup for mscm failed %ld\n",
++			PTR_ERR(mscm_regmap));
++		ret = PTR_ERR(mscm_regmap);
++		goto out;
++	}
++
++	ret = regmap_read(rom_regmap, ROM_REVISION_OFFSET, &rom_rev);
++	if (ret) {
++		ret = -ENODEV;
++		goto out;
++	}
++
++	ret = regmap_read(mscm_regmap, MSCM_CPxCOUNT_OFFSET, &cpucount);
++	if (ret) {
++		ret = -ENODEV;
++		goto out;
++	}
++
++	ret = regmap_read(mscm_regmap, MSCM_CPxCFG1_OFFSET, &l2size);
++	if (ret) {
++		ret = -ENODEV;
++		goto out;
++	}
++
++	soc_type[0] = cpucount ? '6' : '5'; /* Dual Core => VF6x0 */
++	soc_type[1] = l2size ? '1' : '0'; /* L2 Cache => VFx10 */
++
++	info->soc_dev_attr = devm_kzalloc(dev,
++				sizeof(info->soc_dev_attr), GFP_KERNEL);
++	if (!info->soc_dev_attr) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	info->soc_dev_attr->machine = devm_kasprintf(dev,
++					GFP_KERNEL, "Freescale Vybrid");
++	info->soc_dev_attr->soc_id = devm_kasprintf(dev,
++					GFP_KERNEL,
++					"%02x%02x%02x%02x%02x%02x%02x%02x",
++					socid1[3], socid1[2], socid1[1],
++					socid1[0], socid2[3], socid2[2],
++					socid2[1], socid2[0]);
++	info->soc_dev_attr->family = devm_kasprintf(&pdev->dev,
++					GFP_KERNEL, "Freescale Vybrid VF%s",
++					soc_type);
++	info->soc_dev_attr->revision = devm_kasprintf(dev,
++					GFP_KERNEL, "%08x", rom_rev);
++
++	platform_set_drvdata(pdev, info);
++
++	info->soc_dev = soc_device_register(info->soc_dev_attr);
++	if (IS_ERR(info->soc_dev)) {
++		ret = -ENODEV;
++		goto out;
++	}
++
++	ret = 0;
++
++out:
++	kfree(socid2);
++out_socid2:
++	kfree(socid1);
++out_socid1:
++	nvmem_cell_put(info->ocotp_cfg1);
++out_ocotp_cfg1:
++	nvmem_cell_put(info->ocotp_cfg0);
++out_ocotp_cfg0:
++	of_node_put(cfg1_node);
++out_cfg1_node:
++	of_node_put(cfg0_node);
++out_cfg0_node:
++	of_node_put(soc_node);
++
++	return ret;
 +}
- EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
- #endif
- 
-diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index 9bb77d3..bf879fc 100644
---- a/include/linux/nvmem-consumer.h
-+++ b/include/linux/nvmem-consumer.h
-@@ -136,6 +136,7 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
- #endif /* CONFIG_NVMEM */
- 
- #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
-+struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np);
- struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
- 				     const char *name);
- struct nvmem_device *of_nvmem_device_get(struct device_node *np,
++
++static int vf610_soc_remove(struct platform_device *pdev)
++{
++	struct vf610_soc *info = platform_get_drvdata(pdev);
++
++	if (info->soc_dev)
++		soc_device_unregister(info->soc_dev);
++
++	return 0;
++}
++
++static const struct of_device_id vf610_soc_match[] = {
++	{ .compatible = "fsl,vf610-soc", },
++	{ /* */ }
++};
++
++static struct platform_driver vf610_soc_driver = {
++	.probe		= vf610_soc_probe,
++	.remove		= vf610_soc_remove,
++	.driver		= {
++		.name = "vf610-soc",
++		.of_match_table = vf610_soc_match,
++	},
++};
++builtin_platform_driver(vf610_soc_driver);
 -- 
 2.9.0
