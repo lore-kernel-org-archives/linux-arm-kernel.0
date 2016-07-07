@@ -1,49 +1,50 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Wed, 6 Jul 2016 18:01:39 -0700
-Subject: [PATCH v7 1/4] MAINTAINERS: Add entry for APM X-Gene SoC PMU
- driver
-In-Reply-To: <1467852224.8360.60.camel@perches.com>
-References: <1467850045-10584-1-git-send-email-ttnguyen@apm.com>
- <1467850045-10584-2-git-send-email-ttnguyen@apm.com>
- <1467850751.8360.56.camel@perches.com>
- <CACgAJHyvusvRPKNaxHLFK=gWw2UUtjV80H175eRu6EieutxNiw@mail.gmail.com>
- <1467852224.8360.60.camel@perches.com>
-Message-ID: <CACgAJHzoRwfvnGuKLpymLQ2+FNjxZhfg2YnxHyP3CndrjAQapw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 7 Jul 2016 10:17:47 +0900
+Subject: [PATCH v21 1/8] arm64: kdump: reserve memory for crash dump kernel
+In-Reply-To: <2543175.KeBui093Sr@hactar>
+References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
+ <20160706075226.27609-2-takahiro.akashi@linaro.org>
+ <2543175.KeBui093Sr@hactar>
+Message-ID: <20160707011745.GX20774@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+On Wed, Jul 06, 2016 at 03:11:45PM -0300, Thiago Jung Bauermann wrote:
+> Am Mittwoch, 06 Juli 2016, 16:52:19 schrieb AKASHI Takahiro:
+> > On the startup of primary kernel, the memory region used by crash dump
+> > kernel must be specified by "crashkernel=" kernel parameter.
+> > reserve_crashkernel() will allocate and reserve the region for later use.
+> > 
+> > User space tools, like kexec-tools, will be able to find that region
+> > marked as "Crash kernel" in /proc/iomem.
+> 
+> On powerpc, userspace tools get everything from the device tree (exposed to 
+> userspace in /proc/device-tree/), not /proc/iomem.
 
-On Wed, Jul 6, 2016 at 5:43 PM, Joe Perches <joe@perches.com> wrote:
-> On Wed, 2016-07-06 at 17:35 -0700, Tai Tri Nguyen wrote:
->> Hi Joe,
->
-> Ch?o Tai.
->
+I started my kdump patches with arm (not arm64) implementation, and
+so /proc/iomem is used for consistency. Since my kexec-tools (for arm64)
+have to access /proc/iomem to identify usable memory regions on
+*UEFI* systems anyway, I didn't think it was odd.
 
-Thanks for the greeting!
+(Please note that UEFI won't expose memory regions information via
+a device tree, but via ACPI table.)
 
->> On Wed, Jul 6, 2016 at 5:19 PM, Joe Perches <joe@perches.com> wrote:
->> > On Wed, 2016-07-06 at 17:07 -0700, Tai Nguyen wrote:
-> []
->> > > diff --git a/MAINTAINERS b/MAINTAINERS
->> > []
->> > >
->> > > @@ -8593,6 +8593,14 @@ L:     linux-scsi at vger.kernel.org
->> > >  S:   Supported
->> > >  F:   drivers/scsi/pm8001/
->> > >
->> > > +PMU-XGENE
->> > > +APPLIED MICRO (APM) X-GENE SOC PMU
->> > One line section header please.
->> Is this strictly required?
->
-> Yes.
->
-> get_maintainer.pl doesn't like multiple line section headers.
->
+> In the case of the crashkernel reserved region, that information is in 
+> /chosen/linux,crashkernel-base and /chosen/linux,crashkernel-size.
+> 
+> Either way is fine I think. I'm just mentioning this for reference in case 
+> you want the ARM implementation to be closer to another arch which is also 
+> based on the device tree.
 
-Okay, I'll drop the first line and move it accordingly.
+Adding those properties to a device tree is quite easy
+(and it won't conflict with /proc/iomem), so I'd like 
+to defer to arm64 maintainers.
 
-Regards,
-Tai
+Thanks,
+-Takahiro AKASHI
+
+> -- 
+> []'s
+> Thiago Jung Bauermann
+> IBM Linux Technology Center
+> 
