@@ -1,32 +1,34 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 7 Jul 2016 22:42:48 +0200
-Subject: [PATCH v4 0/4] dmaengine driver for Marvell XOR v2 engine
-In-Reply-To: <20160628143850.GD14945@localhost>
-References: <1466080116-26777-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160628143850.GD14945@localhost>
-Message-ID: <20160707224248.71511ecd@free-electrons.com>
+From: oss@buserror.net (Scott Wood)
+Date: Thu, 07 Jul 2016 15:42:54 -0500
+Subject: [PATCH 2/4] soc: fsl: add GUTS driver for QorIQ platforms
+In-Reply-To: <4094106.qfxJu3tJbO@wuerfel>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <1465609853.22191.151.camel@buserror.net>
+ <HE1PR04MB0889646206BFAD68046F3473F83B0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+ <4094106.qfxJu3tJbO@wuerfel>
+Message-ID: <1467924174.32358.69.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vinod,
-
-On Tue, 28 Jun 2016 20:08:50 +0530, Vinod Koul wrote:
-> On Thu, Jun 16, 2016 at 02:28:32PM +0200, Thomas Petazzoni wrote:
-> > Hello,
+On Thu, 2016-07-07 at 10:30 +0200, Arnd Bergmann wrote:
+> On Thursday, July 7, 2016 2:35:33 AM CEST Yangbo Lu wrote:
 > > 
-> > Here is the fourth version of the mv_xor_v2 driver, which allows to
-> > use the XOR engines available on the Marvell Armada 7K/8K ARM64 SoCs.  
-> 
-> Looks okay. But need ack on two ARM patches...
+> > Hi Arnd,
+> > 
+> > Could you reply when you see the email?
+> > If your method doesn?t resolve the problem, we still want to use our old
+> > patchset.
+> > 
+> > This guts driver had been discussed about one year and blocked many
+> > workaround upstream.
+> > So please help to review and comment soon.
+> > 
+> I don't really see how more discussion is going to help us here. I think
+> I've made it pretty clear that I don't want to see another platform
+> specific way to read an SoC revision and I've even sent a proof-of-concept
+> patch to show how the interface can work, now it's up to you to fit the
+> guts hardware into that and send a new patch series.
 
-Now that the two ARM patches have been taken by the ARM mvebu
-maintainer, do you think you could merge the DT binding and driver
-patches (PATCH 1/2 and PATCH 2/2 of this series) ?
+In which relevant maintainership capacity are you NACKing it?
 
-Thanks a lot!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-Scott
