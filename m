@@ -1,65 +1,45 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Thu, 7 Jul 2016 14:58:21 -0600
-Subject: [PATCH 0/3] Add support for privileged mappings
-In-Reply-To: <20160707170026.GG20682@arm.com>
-References: <20160706235136.27854-1-mitchelh@codeaurora.org>
- <20160707170026.GG20682@arm.com>
-Message-ID: <20160707205820.GA752@jcrouse-lnx.qualcomm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 7 Jul 2016 23:02:48 +0200
+Subject: [PATCH v8 0/6] ACPI / processor_idle: Add ACPI v6.0 LPI support
+In-Reply-To: <1467911451-24731-1-git-send-email-sudeep.holla@arm.com>
+References: <1467911451-24731-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAJZ5v0jhhXHVJi3Se0udcpfgQaqSANZgkKrM9REBxRT7p-3ggA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 06:00:26PM +0100, Will Deacon wrote:
-> On Wed, Jul 06, 2016 at 04:51:33PM -0700, Mitchel Humpherys wrote:
-> > The following patch to the ARM SMMU driver:
-> > 
-> >     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
-> >     Author: Robin Murphy <robin.murphy@arm.com>
-> >     Date:   Tue Jan 26 18:06:34 2016 +0000
-> >     
-> >         iommu/arm-smmu: Treat all device transactions as unprivileged
-> > 
-> > started forcing all SMMU transactions to come through as "unprivileged".
-> > The rationale given was that:
-> > 
-> >   (1) There is no way in the IOMMU API to even request privileged mappings.
-> > 
-> >   (2) It's difficult to implement a DMA mapper that correctly models the
-> >       ARM VMSAv8 behavior of unprivileged-writeable =>
-> >       privileged-execute-never.
-> > 
-> > This series attempts to rectify (1) by introducing an IOMMU API for
-> > privileged mappings (and implementing it in io-pgtable-arm).  It seems like
-> > (2) can be safely ignored for now under the assumption that any users of
-> > the IOMMU_PRIV flag will be using the low-level IOMMU APIs directly, rather
-> > than going through the DMA APIs.
-> > 
-> > Robin, Will, what do you think?  Jordan and Jeremy can provide more info on
-> > the use case if needed, but the high level is that it's a security feature
-> > to prevent attacks such as [1].
-> 
-> So I think the problem that the offending patch tried to fix is that
-> the PL330 DMA controller (drivers/dma/pl330.c) uses dma_alloc_coherent
-> to allocate its microcode buffer, but the so-called "manager" thread
-> that fetches the microcode does so with privileged accesses and
-> consequently fails.
- 
-Not surprisingly the GPU works almost exactly the same way. The microcode does a
-privileged access of certain buffers. The difference is that we use the IOMMU
-API directly instead of going through the DMA api. Obviously the GPU can work
-as is with the unprivileged transaction patch but it does leave largish
-blocks of memory open to possible attacks as Mitch pointed out.
+On Thu, Jul 7, 2016 at 7:10 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> ACPI 6.0 introduced LPI(Low Power Idle) states that provides an alternate
+> method to describe processor idle states. It extends the specification
+> to allow the expression of idle states like C-states selectable by the
+> OSPM when a processor goes idle, but may affect more than one processor,
+> and may affect other system components.
+>
+> LPI extensions leverages the processor container device(again introduced
+> in ACPI 6.0) allowing to express which parts of the system are affected
+> by a given LPI state. It defines the local power states for each node
+> in a hierarchical processor topology. The OSPM can use _LPI object to
+> select a local power state for each level of processor hierarchy in the
+> system. They used to produce a composite power state request that is
+> presented to the platform by the OSPM.
+>
+> Since multiple processors affect the idle state for any non-leaf hierarchy
+> node, coordination of idle state requests between the processors is
+> required. ACPI supports two different coordination schemes: Platform
+> coordinated and  OS initiated.
+>
+> This series aims at providing basic and initial support for platform
+> coordinated LPI states.
+>
+> v7[7]->v8:
+>         - Replaced HAVE_GENERIC_CPUIDLE_ENTER with CPU_IDLE_ENTER_WRAPPED
+>           macro, which is more cleaner and definately less confusing :)
+>           (Thanks to Rafael for the suggestion)
 
-> Whilst this series is a step in the right direction for fixing that, I
-> don't think you can claim that only low-level users need this, given that
-> we have in-tree code which would break without it. Perhaps you just need
-> to extend things slightly more to expose this to the DMA API as well (or,
-> alternatively, hack the PL330 driver some how).
+Patches [3-6/6] definitely look a lot cleaner to me now. :-)
 
-I agree that hacking the DMA api would be the best long term solution but there
-be dragons there. Perhaps a workable compromise might be to white-list
-privileged aware devices via the device tree.
+That said, the name of the macro I suggested was just an example, so
+if people don't like this one, it'd be fine to change it as far as I'm
+concerned.
 
-Jordan
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+Rafael
