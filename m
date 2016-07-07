@@ -1,38 +1,66 @@
-From: radioconfusion@gmail.com (radioconfusion at gmail.com)
-Date: Thu, 07 Jul 2016 12:20:58 +0300
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-Message-ID: <577e1efb.55052e0a.ec2be.3ec3@mx.google.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Thu, 7 Jul 2016 17:14:46 +0800
+Subject: [PATCH 0/6] power: add power sequence library
+Message-ID: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi all,
 
-On Wed, 6 Jul 2016 09:06:55 +0200, thomas.petazzoni at free-electronics.com wrote:
+This is a follow-up for my last power sequence framework patch set [1].
+According to Rob Herring and Ulf Hansson's comments[2], I use a generic
+power sequence library for parsing the power sequence elements on DT,
+and implement generic power sequence on library. The host driver
+can allocate power sequence instance, and calls pwrseq APIs accordingly.
 
-> Hello,
+In future, if there are special power sequence requirements, the special
+power sequence library can be created.
 
-> On Tue, 05 Jul 2016 11:46:30 +0300, radioconfusion at gmail.com wrote:
+This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+two hot-plug devices to simulate this use case, the related binding
+change is updated at patch[1/6], The udoo board changes were tested
+using my last power sequence patch set.[3]
 
-> > My Armada 385 -device hangs when using marvell-cesa -driver.
-> > I'm using Linux 4.4.10 and armada-385-db-ap.dts.
-> > I have also tried with the driver version of Linux 4.7-rc3.
-> > 
-> > Please see https://bugzilla.kernel.org/show_bug.cgi?id=120111 for details.
+Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+need to power on itself before it can be found by ULPI bus.
 
-> Can you try with
-> http://git.infradead.org/linux-mvebu.git/commitdiff/c5379ba8fccd99d5f99632c789f0393d84a57805
-> applied ?
+[1] http://www.spinics.net/lists/linux-usb/msg142755.html
+[2] http://www.spinics.net/lists/linux-usb/msg143106.html
+[3] http://www.spinics.net/lists/linux-usb/msg142815.html
 
-Thanks Thomas.
-Your patch seems to fix a random hang during crypto operations.
+Peter Chen (6):
+  binding-doc: power: pwrseq-generic: add binding doc for generic power
+    sequence library
+  power: add power sequence library
+  binding-doc: usb: usb-device: add optional properties for power
+    sequence
+  usb: core: add power sequence handling for USB devices
+  usb: chipidea: host: let the hcd know's parent device node
+  ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
 
-Unfortunately it seems to hit the crypto performance too.
-The command "cryptsetup benchmark --cipher aes-cbc"
-gives me around 35 MiB/s instead of 50 MiB/s.
+ .../bindings/power/pwrseq/pwrseq-generic.txt       |  56 +++++++++
+ .../devicetree/bindings/usb/usb-device.txt         |  10 ++
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  28 +++--
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/power/pwrseq/Kconfig                       |  20 +++
+ drivers/power/pwrseq/Makefile                      |   2 +
+ drivers/power/pwrseq/core.c                        |  79 ++++++++++++
+ drivers/power/pwrseq/pwrseq_generic.c              | 134 +++++++++++++++++++++
+ drivers/usb/chipidea/host.c                        |  18 ++-
+ drivers/usb/core/Makefile                          |   1 +
+ drivers/usb/core/hub.c                             |  12 +-
+ drivers/usb/core/hub.h                             |  12 ++
+ drivers/usb/core/pwrseq.c                          | 102 ++++++++++++++++
+ include/linux/power/pwrseq.h                       |  55 +++++++++
+ 15 files changed, 511 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+ create mode 100644 drivers/power/pwrseq/Kconfig
+ create mode 100644 drivers/power/pwrseq/Makefile
+ create mode 100644 drivers/power/pwrseq/core.c
+ create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+ create mode 100644 drivers/usb/core/pwrseq.c
+ create mode 100644 include/linux/power/pwrseq.h
 
-The patch did not fix the hanging which appears instantly after enabling tdma
-in the driver and running some crypto operation.
-
-Thanks,
-
-Jussi
+-- 
+1.9.1
