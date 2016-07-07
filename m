@@ -1,31 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 07 Jul 2016 11:43:30 +0200
-Subject: [PATCH -next v2] iommu/exynos: Fix return value check in
- exynos_iommu_of_setup()
-In-Reply-To: <1467860372-6940-1-git-send-email-weiyj_lk@163.com>
-References: <1467807354-26503-1-git-send-email-weiyj_lk@163.com>
- <1467860372-6940-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <577E2442.4000002@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 Jul 2016 11:48:25 +0200
+Subject: [PATCH 2/2] dt-bindings: spi: add binding for clps711x SPI
+In-Reply-To: <20160707092546.GJ6247@sirena.org.uk>
+References: <20160706145326.2658600-1-arnd@arndb.de>
+ <20160706145326.2658600-2-arnd@arndb.de>
+ <20160707092546.GJ6247@sirena.org.uk>
+Message-ID: <3501318.cujsGY8KyD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2016 04:59 AM, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Thursday, July 7, 2016 11:25:46 AM CEST Mark Brown wrote:
+> On Wed, Jul 06, 2016 at 04:53:13PM +0200, Arnd Bergmann wrote:
+> > This documents the binding used by Alexander Shiyan's DT support for
+> > the clps711x SPI controller.
 > 
-> In case of error, the function of_platform_device_create() returns
-> NULL pointer not ERR_PTR(). The IS_ERR() test in the return value
-> check should be replaced with NULL test.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
-> v1 -> v2: chenge the error code to -ENODEV
-> ---
->  drivers/iommu/exynos-iommu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
+> Please use subject lines matching the style for the subsystem.  This
+> makes it easier for people to identify relevant patches.
 
-Why you didn't include mine and Dennis reviews? Why you ignored my
-comments - you don't agree with them?
+I tried, though it's a bit tricky for dt-bindings. When I created the
+patch, using 'dt-bindings: $SUBSYSTEM' appeared to be the most common
+one, ahead of '$SUBSYSTEM' (mainly used for combined patches)
+and other random prefixes.
 
-Best regards,
-Krzysztof
+I'll resend it with just 'spi:', but I don't think there is a broad
+consensus on this in the existing patches.
+
+	Arnd
