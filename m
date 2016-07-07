@@ -1,45 +1,26 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 7 Jul 2016 12:52:36 +0100
-Subject: [GIT PULL v3] ARM: hisi: soc changes for v4.8
-Message-ID: <577E4284.1060701@hisilicon.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 Jul 2016 13:58:15 +0200
+Subject: [GIT PULL] STi defconfig updates for v4.8
+In-Reply-To: <57767948.6090009@st.com>
+References: <57767948.6090009@st.com>
+Message-ID: <3903716.QdcLzaNlmI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+On Friday, July 1, 2016 4:08:08 PM CEST Patrice Chotard wrote:
+> Patrice Chotard (2):
+>        ARM: multi_v7_defconfig: enable STMicroelectronics BDISP 2D 
+> blitter driver
+>        ARM: multi_v7_defconfig: enable STMicroelectronics DRM Support
+> 
 
-Please help to pull the following changes.
-Thanks!
+Please rebase this on top of v4.7-rc3 and add a signed tag with
+a branch description for the changelog.
 
-Best Regards,
-Wei
+Generally, we try to avoid backmerging later -rc releases into our
+branches as that messes up the git history, so you should base
+either on -rc1 or check what the latest -rc is in our next/* branches.
 
----
+The tag description is what ends up in the merge commit.
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.8-v3
-
-for you to fetch changes up to abee8fbf2b2170efa0956ce1942ebe777a94cfdd:
-
-  ARM: hisi: consolidate the hisilicon machine entries (2016-07-07 09:37:59 +0100)
-
-----------------------------------------------------------------
-ARM: mach-hisi: Hisilicon SoC updates for 4.8
-
-- Consolidate the hisilicon armv7 SoCs machine entries
-- Avoid the compiling warning by making unexported symbols static
-
-----------------------------------------------------------------
-Ben Dooks (1):
-      ARM: hisi: make unexported symbols static
-
-Jiancheng Xue (1):
-      ARM: hisi: consolidate the hisilicon machine entries
-
- arch/arm/mach-hisi/hisilicon.c | 28 ----------------------------
- arch/arm/mach-hisi/platsmp.c   |  4 ++--
- 2 files changed, 2 insertions(+), 30 deletions(-)
+	Arnd
