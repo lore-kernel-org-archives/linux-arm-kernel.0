@@ -1,34 +1,120 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Thu,  7 Jul 2016 12:09:27 +0530
-Subject: [PATCH v4 2/5] ARM: dts: vfxxx: Add On-Chip ROM node for Vybrid
+Date: Thu,  7 Jul 2016 12:09:28 +0530
+Subject: [PATCH v4 3/5] nvmem: core: Add consumer API to get nvmem cell from
+ node
 In-Reply-To: <cover.1467872014.git.maitysanchayan@gmail.com>
 References: <cover.1467872014.git.maitysanchayan@gmail.com>
-Message-ID: <1f0d02081aaf80c953d81fb63d75040470e06fba.1467872014.git.maitysanchayan@gmail.com>
+Message-ID: <0e6294d931bf181376a6f4e1a86df3f6c6a5d575.1467872014.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device tree node for the On-Chip ROM on Vybrid.
+From: Stefan Agner <stefan@agner.ch>
+
+The existing NVMEM consumer API's do not allow to get a
+NVMEM cell directly given a device tree node. This patch
+adds a function to provide this functionality.
+
+Assuming the nvmem cell id name is known, this can be used
+as follows
+
+struct device_node *cell_np;
+struct nvmem_cell *foo_cell;
+
+cell_np = of_find_node_by_name(parent, "foo");
+foo_cell = of_nvmem_cell_get_direct(cell_np);
+
+Parent node can also be the of_node of the main SoC device
+node.
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/nvmem/core.c           | 44 +++++++++++++++++++++++++++++-------------
+ include/linux/nvmem-consumer.h |  1 +
+ 2 files changed, 32 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 0e34d44..6c5222e 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -91,6 +91,11 @@
- 		interrupt-parent = <&mscm_ir>;
- 		ranges;
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 965911d..470abee 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -743,29 +743,21 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
  
-+		ocrom: ocrom at 00000000 {
-+			compatible = "fsl,vf610-ocrom", "syscon";
-+			reg = <0x00000000 0x18000>;
-+		};
+ #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+ /**
+- * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
++ * of_nvmem_cell_get_direct() - Get a nvmem cell from given device node
+  *
+- * @dev node: Device tree node that uses the nvmem cell
+- * @id: nvmem cell name from nvmem-cell-names property.
++ * @dev node: Device tree node that uses nvmem cell
+  *
+  * Return: Will be an ERR_PTR() on error or a valid pointer
+  * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+  * nvmem_cell_put().
+  */
+-struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+-					    const char *name)
++struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np)
+ {
+-	struct device_node *cell_np, *nvmem_np;
++	struct device_node *nvmem_np;
+ 	struct nvmem_cell *cell;
+ 	struct nvmem_device *nvmem;
+ 	const __be32 *addr;
+-	int rval, len, index;
+-
+-	index = of_property_match_string(np, "nvmem-cell-names", name);
+-
+-	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+-	if (!cell_np)
+-		return ERR_PTR(-EINVAL);
++	int rval, len;
+ 
+ 	nvmem_np = of_get_next_parent(cell_np);
+ 	if (!nvmem_np)
+@@ -824,6 +816,32 @@ err_mem:
+ 
+ 	return ERR_PTR(rval);
+ }
++EXPORT_SYMBOL_GPL(of_nvmem_cell_get_direct);
 +
- 		aips0: aips-bus at 40000000 {
- 			compatible = "fsl,aips-bus", "simple-bus";
- 			#address-cells = <1>;
++/**
++ * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
++ *
++ * @dev node: Device tree node that uses the nvmem cell
++ * @id: nvmem cell name from nvmem-cell-names property.
++ *
++ * Return: Will be an ERR_PTR() on error or a valid pointer
++ * to a struct nvmem_cell.  The nvmem_cell will be freed by the
++ * nvmem_cell_put().
++ */
++struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
++					    const char *name)
++{
++	struct device_node *cell_np;
++	int index;
++
++	index = of_property_match_string(np, "nvmem-cell-names", name);
++
++	cell_np = of_parse_phandle(np, "nvmem-cells", index);
++	if (!cell_np)
++		return ERR_PTR(-EINVAL);
++
++	return of_nvmem_cell_get_direct(cell_np);
++}
+ EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
+ #endif
+ 
+diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+index 9bb77d3..bf879fc 100644
+--- a/include/linux/nvmem-consumer.h
++++ b/include/linux/nvmem-consumer.h
+@@ -136,6 +136,7 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
+ #endif /* CONFIG_NVMEM */
+ 
+ #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
++struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np);
+ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+ 				     const char *name);
+ struct nvmem_device *of_nvmem_device_get(struct device_node *np,
 -- 
 2.9.0
