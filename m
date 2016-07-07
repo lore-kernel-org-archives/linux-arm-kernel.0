@@ -1,39 +1,29 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Thu, 7 Jul 2016 09:16:05 +0200
-Subject: [GIT PULL v2] STi SoC changes for v4.8
-Message-ID: <577E01B5.2030206@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 Jul 2016 09:22:43 +0200
+Subject: [PATCH v4 4/5] soc: Add SoC driver for Freescale Vybrid platform
+In-Reply-To: <f600ac1c747813b26c80149b6fdf32d42b114235.1467872014.git.maitysanchayan@gmail.com>
+References: <cover.1467872014.git.maitysanchayan@gmail.com>
+ <f600ac1c747813b26c80149b6fdf32d42b114235.1467872014.git.maitysanchayan@gmail.com>
+Message-ID: <5371423.yp5pHjKp9V@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4c2e07c6a29e0129e975727b9f57eede813eea85:
+On Thursday, July 7, 2016 12:09:29 PM CEST Sanchayan Maity wrote:
+> root at colibri-vf:/sys/bus/soc/devices/soc0# cat family
+> Freescale Vybrid VF610
+> root at colibri-vf:/sys/bus/soc/devices/soc0# cat machine
+> Freescale Vybrid
+> 
 
-   Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
+I only have one very high-level comment: I think that "family"
+is generally supposed to be the more generic one than "machine",
+so maybe swap the contents of the two?
 
-are available in the git repository at:
+Can you have a look at the other users of soc_device and see how
+they handle it? I realize that we are already inconsistent about
+how we handle it, just try to make it do what the majority of the
+others have.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
-tags/sti-soc-for-v4.8
+Aside from that, it all looks reasonable.
 
-for you to fetch changes up to 55aa35180c57d82f3db23e5aabce97acb0d36681:
-
-   ARM: sti: Implement dummy L2 cache's write_sec (2016-07-01 16:23:44 
-+0200)
-
-----------------------------------------------------------------
-
-Highlights:
------------
-- Add a dummy L2 cache's write_sec callback as in non secure mode execution,
-   we can't get access to L2 cache secure registers
-- Cosmetics change, in case of dump_stack, update the hardware name with a
-   more generic for the STi SoCs family
-
-----------------------------------------------------------------
-Patrice Chotard (1):
-       ARM: sti: Implement dummy L2 cache's write_sec
-
-Peter Griffin (1):
-       ARM: STi: Update machine _namestr to be more generic.
-
-  arch/arm/mach-sti/board-dt.c | 11 ++++++++++-
-  1 file changed, 10 insertions(+), 1 deletion(-)
+	Arnd
