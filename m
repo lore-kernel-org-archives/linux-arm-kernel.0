@@ -1,29 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jul 2016 14:05:24 +0200
-Subject: [PATCH] ARM: dts: Ux500: fix up TVK sensor data
-In-Reply-To: <1467637857-8205-1-git-send-email-linus.walleij@linaro.org>
-References: <1467637857-8205-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <5196188.7Jojq5Lqu2@wuerfel>
+Date: Thu, 07 Jul 2016 14:07:52 +0200
+Subject: [GIT PULL] ARM: at91: defconfig for 4.8 #2
+In-Reply-To: <20160704134427.GA32636@piout.net>
+References: <20160704134427.GA32636@piout.net>
+Message-ID: <211481522.vhPvv4NVuU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 4, 2016 3:10:57 PM CEST Linus Walleij wrote:
-> - Fix the I2C address and supply line names for the AK8974
+On Monday, July 4, 2016 3:44:27 PM CEST Alexandre Belloni wrote:
+> Defconfig changes for 4.8 #2:
+>  - Addition of the sama5d2 xplained PMIC: ACT8945A
 > 
-> - Sets up the interrupt lines to the different components as they
->   actually are connected, I was confused for some time by the fact
->   that several lines were connected with <NM> 0 Ohm resistors, which
->   means NOT MOUNTED and is thus not 0 Ohm at all but infinite ohms,
->   i.e. not connected at all.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi ARM SoC folks:
-> please apply this directly to the ARM SoC tree because I don't
-> think I will have more DT patches for Ux500 this merge window.
-> Your ux500/dt branch would be the best candidate to land this.
 > 
 
-Applied to next/dt, thanks!
+Pulled into next/defconfig, thanks!
 
 	Arnd
