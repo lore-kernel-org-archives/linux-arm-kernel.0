@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  7 Jul 2016 10:00:55 +0200
-Subject: [PATCH 22/93] clocksource/drivers/armv7m_systick: Convert init
- function to return error
+Date: Thu,  7 Jul 2016 10:00:47 +0200
+Subject: [PATCH 14/93] clocksource/drivers/mtk_timer: Convert init function to
+ return error
 In-Reply-To: <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577E0BED.3020608@linaro.org>
  <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467878526-1238-22-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467878526-1238-14-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,73 +26,50 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- drivers/clocksource/armv7m_systick.c | 18 ++++++++++++------
- 1 file changed, 12 insertions(+), 6 deletions(-)
+ drivers/clocksource/mtk_timer.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/armv7m_systick.c b/drivers/clocksource/armv7m_systick.c
-index addfd2c..2b55410 100644
---- a/drivers/clocksource/armv7m_systick.c
-+++ b/drivers/clocksource/armv7m_systick.c
-@@ -21,7 +21,7 @@
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index 7e583f8..432a2c0 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -181,7 +181,7 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
+ 			evt->gpt_base + GPT_IRQ_EN_REG);
+ }
  
- #define SYSTICK_LOAD_RELOAD_MASK 0x00FFFFFF
- 
--static void __init system_timer_of_register(struct device_node *np)
-+static int __init system_timer_of_register(struct device_node *np)
+-static void __init mtk_timer_init(struct device_node *node)
++static int __init mtk_timer_init(struct device_node *node)
  {
- 	struct clk *clk = NULL;
- 	void __iomem *base;
-@@ -31,22 +31,26 @@ static void __init system_timer_of_register(struct device_node *np)
- 	base = of_iomap(np, 0);
- 	if (!base) {
- 		pr_warn("system-timer: invalid base address\n");
+ 	struct mtk_clock_event_device *evt;
+ 	struct resource res;
+@@ -190,7 +190,7 @@ static void __init mtk_timer_init(struct device_node *node)
+ 
+ 	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
+ 	if (!evt)
 -		return;
-+		return -ENXIO;
- 	}
++		return -ENOMEM;
  
- 	ret = of_property_read_u32(np, "clock-frequency", &rate);
- 	if (ret) {
- 		clk = of_clk_get(np, 0);
--		if (IS_ERR(clk))
-+		if (IS_ERR(clk)) {
-+			ret = PTR_ERR(clk);
- 			goto out_unmap;
-+		}
+ 	evt->dev.name = "mtk_tick";
+ 	evt->dev.rating = 300;
+@@ -248,7 +248,7 @@ static void __init mtk_timer_init(struct device_node *node)
  
- 		ret = clk_prepare_enable(clk);
- 		if (ret)
- 			goto out_clk_put;
- 
- 		rate = clk_get_rate(clk);
--		if (!rate)
-+		if (!rate) {
-+			ret = -EINVAL;
- 			goto out_clk_disable;
-+		}
- 	}
- 
- 	writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
-@@ -64,7 +68,7 @@ static void __init system_timer_of_register(struct device_node *np)
- 
- 	pr_info("ARM System timer initialized as clocksource\n");
+ 	mtk_timer_enable_irq(evt, GPT_CLK_EVT);
  
 -	return;
 +	return 0;
  
- out_clk_disable:
+ err_clk_disable:
  	clk_disable_unprepare(clk);
-@@ -73,7 +77,9 @@ out_clk_put:
- out_unmap:
- 	iounmap(base);
- 	pr_warn("ARM System timer register failed (%d)\n", ret);
+@@ -262,5 +262,7 @@ err_mem:
+ 	release_mem_region(res.start, resource_size(&res));
+ err_kzalloc:
+ 	kfree(evt);
 +
-+	return ret;
++	return -EINVAL;
  }
- 
--CLOCKSOURCE_OF_DECLARE(arm_systick, "arm,armv7m-systick",
-+CLOCKSOURCE_OF_DECLARE_RET(arm_systick, "arm,armv7m-systick",
- 			system_timer_of_register);
+-CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
 -- 
 1.9.1
