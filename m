@@ -1,34 +1,32 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu,  7 Jul 2016 15:03:54 -0500
-Subject: [GIT PULL] Qualcomm Driver Updates for v4.8 Part 2
-Message-ID: <1467921834-13636-1-git-send-email-andy.gross@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 7 Jul 2016 22:42:48 +0200
+Subject: [PATCH v4 0/4] dmaengine driver for Marvell XOR v2 engine
+In-Reply-To: <20160628143850.GD14945@localhost>
+References: <1466080116-26777-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160628143850.GD14945@localhost>
+Message-ID: <20160707224248.71511ecd@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2cd83c75d4d2cb9832ccb4989443195c2379493e:
+Hello Vinod,
 
-  Merge tag 'qcom-drivers-for-4.8' into HEAD (2016-07-05 16:29:02 -0500)
+On Tue, 28 Jun 2016 20:08:50 +0530, Vinod Koul wrote:
+> On Thu, Jun 16, 2016 at 02:28:32PM +0200, Thomas Petazzoni wrote:
+> > Hello,
+> > 
+> > Here is the fourth version of the mv_xor_v2 driver, which allows to
+> > use the XOR engines available on the Marvell Armada 7K/8K ARM64 SoCs.  
+> 
+> Looks okay. But need ack on two ARM patches...
 
-are available in the git repository at:
+Now that the two ARM patches have been taken by the ARM mvebu
+maintainer, do you think you could merge the DT binding and driver
+patches (PATCH 1/2 and PATCH 2/2 of this series) ?
 
+Thanks a lot!
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git
-tags/qcom-drivers-for-4.8-2
-
-for you to fetch changes up to 6c8e99d874c96200ce985d19b407d49ed3306226:
-
-  firmware: qcom: scm: Change initcall to subsys (2016-07-05 16:29:25 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based Driver Updates for v4.8 Part 2
-
-* Fix probe order issue in SCM
-* Add missing qcom_scm_is_available() API
-
-----------------------------------------------------------------
-Andy Gross (2):
-      firmware: qcom_scm: Add missing is_available API
-      firmware: qcom: scm: Change initcall to subsys
-
- drivers/firmware/qcom_scm.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
