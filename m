@@ -1,35 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 6 Jul 2016 22:07:31 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.8
-In-Reply-To: <cover.1467292079.git.horms+renesas@verge.net.au>
-References: <cover.1467292079.git.horms+renesas@verge.net.au>
-Message-ID: <20160707050731.GE32389@localhost>
+Date: Wed, 6 Jul 2016 22:11:09 -0700
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v4.8
+In-Reply-To: <cover.1467294011.git.horms+renesas@verge.net.au>
+References: <cover.1467294011.git.horms+renesas@verge.net.au>
+Message-ID: <20160707051109.GF32389@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 04:15:38PM +0200, Simon Horman wrote:
+On Thu, Jun 30, 2016 at 04:15:54PM +0200, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Renesas ARM based SoC defconfig updates for v4.8.
+> Please consider these second round of Renesas ARM based SoC DT updates for v4.8.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-dt-for-v4.8,
+> which you have already pulled.
 > 
 > 
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> The following changes since commit b6960f19676e19f37a5e5a8af059fdf3b435d2f4:
 > 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>   ARM: dts: silk: Fix W=1 dtc warnings (2016-05-30 09:37:13 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.8
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.8
 > 
-> for you to fetch changes up to a1becf12c6dafd96d77e97c9a7cbc446ba1d1196:
+> for you to fetch changes up to 8fd763c75c3ab8e72e5d7f0d4c53531e6ff76197:
 > 
->   ARM: multi_v7_defconfig: defconfig: Enable r8a7792 SoC (2016-06-20 17:53:03 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC Defconfig Updates for v4.8
-> 
-> * Enable newly added support for r8a7792 SoC in multi_v7 and shmobile
->   defconfigs
+>   ARM: dts: r8a7792: add SMP support (2016-06-30 14:26:14 +0200)
+
+This one also introduces header files but I don't see any dependent driver
+changes posted so far, so I'm going to presume that those changes will happen
+after this is merged to avoid the cross-tree dependency.
+
 
 Merged, thanks.
 
