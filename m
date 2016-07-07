@@ -1,64 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Jul 2016 16:39:48 +0200
-Subject: [PATCH 5/8] arm64: dts: r8a7796: Add SYSC PM Domains
+Date: Thu,  7 Jul 2016 16:39:50 +0200
+Subject: [PATCH 7/8] arm64: dts: r8a7796: Add RWDT node
 In-Reply-To: <cover.1467900241.git.horms+renesas@verge.net.au>
 References: <cover.1467900241.git.horms+renesas@verge.net.au>
-Message-ID: <56aebae0003f8987cf1f07238ec9e6243fe88080.1467900241.git.horms+renesas@verge.net.au>
+Message-ID: <c8ce8007e5c0678fe40e3e401f68ee0b9e74ee92.1467900241.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add a device node for the System Controller.
-Hook up the Cortex-A57 CPU core and L2 cache/SCU to their respective PM
-Domains.
+Add a device node for the Watchdog Timer (WDT) controller on the Renesas
+R-Car M3-W (r8a7796) SoC.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
  arch/arm64/boot/dts/renesas/r8a7796.dtsi | 9 +++++++++
  1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 178debf68318..85f0843ddd87 100644
+index fab61eddede3..1edf82440d78 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -10,6 +10,7 @@
- 
- #include <dt-bindings/clock/r8a7796-cpg-mssr.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/power/r8a7796-sysc.h>
- 
- / {
- 	compatible = "renesas,r8a7796";
-@@ -30,6 +31,7 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0x0>;
- 			device_type = "cpu";
-+			power-domains = <&sysc R8A7796_PD_CA57_CPU0>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
- 		};
-@@ -37,6 +39,7 @@
- 		L2_CA57: cache-controller at 0 {
- 			compatible = "cache";
- 			reg = <0>;
-+			power-domains = <&sysc R8A7796_PD_CA57_SCU>;
- 			cache-unified;
- 			cache-level = <2>;
- 		};
-@@ -104,6 +107,12 @@
- 			#power-domain-cells = <0>;
+@@ -98,6 +98,15 @@
+ 					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
  		};
  
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a7796-sysc";
-+			reg = <0 0xe6180000 0 0x0400>;
-+			#power-domain-cells = <1>;
++		wdt0: watchdog at e6020000 {
++			compatible = "renesas,r8a7796-wdt",
++				     "renesas,rcar-gen3-wdt";
++			reg = <0 0xe6020000 0 0x0c>;
++			clocks = <&cpg CPG_MOD 402>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			status = "disabled";
 +		};
 +
- 		scif2: serial at e6e88000 {
- 			compatible = "renesas,scif-r8a7796",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
+ 		cpg: clock-controller at e6150000 {
+ 			compatible = "renesas,r8a7796-cpg-mssr";
+ 			reg = <0 0xe6150000 0 0x1000>;
 -- 
 2.7.0.rc3.207.g0ac5344
