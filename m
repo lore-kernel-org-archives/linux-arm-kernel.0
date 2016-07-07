@@ -1,156 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 7 Jul 2016 11:07:18 +0100
-Subject: [PATCH 4/9] arm64/uaccess: Enable hardened usercopy
-In-Reply-To: <1467843928-29351-5-git-send-email-keescook@chromium.org>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
- <1467843928-29351-5-git-send-email-keescook@chromium.org>
-Message-ID: <20160707100717.GB8306@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 Jul 2016 12:08:26 +0200
+Subject: [PATCH 03/11] ASoC: ab8500-codec: remove platform data based probe
+In-Reply-To: <CACRpkdZ7JW7iBzwL_7cY928Fp+CUNwPHQ6D8--CXvoLq7LMZAA@mail.gmail.com>
+References: <1467722710-1577-1-git-send-email-linus.walleij@linaro.org>
+ <1467722710-1577-3-git-send-email-linus.walleij@linaro.org>
+ <20160705134445.GV6247@sirena.org.uk>
+ <CACRpkdZ7JW7iBzwL_7cY928Fp+CUNwPHQ6D8--CXvoLq7LMZAA@mail.gmail.com>
+Message-ID: <20160707100826.GN6247@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 05, 2016 at 05:22:22PM +0200, Linus Walleij wrote:
 
-On Wed, Jul 06, 2016 at 03:25:23PM -0700, Kees Cook wrote:
-> Enables CONFIG_HARDENED_USERCOPY checks on arm64. As done by KASAN in -next,
-> renames the low-level functions to __arch_copy_*_user() so a static inline
-> can do additional work before the copy.
+> Do you prefer to apply it to the ASoC tree? I can drop
+> it from this series.
 
-The checks themselves look fine, but as with the KASAN checks, it seems
-a shame that this logic is duplicated per arch, integrated in subtly
-different ways.
+In general yes but it's also that if it looks like there should be some
+dependency due to it being a series and I can't see one then that makes
+me think I've missed something when reviewing and need to check.  Anyway:
 
-Can we not __arch prefix all the arch uaccess helpers, and place
-kasan_check_*() and check_object_size() calls in generic wrappers?
-
-If we're going to update all the arch uaccess helpers anyway, doing that
-would make it easier to fix things up, or to add new checks in future.
-
-Thanks,
-Mark.
-
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/arm64/Kconfig               |  2 ++
->  arch/arm64/include/asm/uaccess.h | 18 ++++++++++++++++--
->  arch/arm64/kernel/arm64ksyms.c   |  4 ++--
->  arch/arm64/lib/copy_from_user.S  |  4 ++--
->  arch/arm64/lib/copy_to_user.S    |  4 ++--
->  5 files changed, 24 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 5a0a691d4220..b771cd97f74b 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -51,10 +51,12 @@ config ARM64
->  	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
->  	select HAVE_ARCH_AUDITSYSCALL
->  	select HAVE_ARCH_BITREVERSE
-> +	select HAVE_ARCH_HARDENED_USERCOPY
->  	select HAVE_ARCH_HUGE_VMAP
->  	select HAVE_ARCH_JUMP_LABEL
->  	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->  	select HAVE_ARCH_KGDB
-> +	select HAVE_ARCH_LINEAR_KERNEL_MAPPING
->  	select HAVE_ARCH_MMAP_RND_BITS
->  	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->  	select HAVE_ARCH_SECCOMP_FILTER
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 9e397a542756..6d0f86300936 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -256,11 +256,25 @@ do {									\
->  		-EFAULT;						\
->  })
->  
-> -extern unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n);
-> -extern unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n);
-> +extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
-> +extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
->  extern unsigned long __must_check __copy_in_user(void __user *to, const void __user *from, unsigned long n);
->  extern unsigned long __must_check __clear_user(void __user *addr, unsigned long n);
->  
-> +static inline unsigned long __must_check
-> +__copy_from_user(void *to, const void __user *from, unsigned long n)
-> +{
-> +	check_object_size(to, n, false);
-> +	return __arch_copy_from_user(to, from, n);
-> +}
-> +
-> +static inline unsigned long __must_check
-> +__copy_to_user(void __user *to, const void *from, unsigned long n)
-> +{
-> +	check_object_size(from, n, true);
-> +	return __arch_copy_to_user(to, from, n);
-> +}
-> +
->  static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
->  {
->  	if (access_ok(VERIFY_READ, from, n))
-> diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-> index 678f30b05a45..2dc44406a7ad 100644
-> --- a/arch/arm64/kernel/arm64ksyms.c
-> +++ b/arch/arm64/kernel/arm64ksyms.c
-> @@ -34,8 +34,8 @@ EXPORT_SYMBOL(copy_page);
->  EXPORT_SYMBOL(clear_page);
->  
->  	/* user mem (segment) */
-> -EXPORT_SYMBOL(__copy_from_user);
-> -EXPORT_SYMBOL(__copy_to_user);
-> +EXPORT_SYMBOL(__arch_copy_from_user);
-> +EXPORT_SYMBOL(__arch_copy_to_user);
->  EXPORT_SYMBOL(__clear_user);
->  EXPORT_SYMBOL(__copy_in_user);
->  
-> diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-> index 17e8306dca29..0b90497d4424 100644
-> --- a/arch/arm64/lib/copy_from_user.S
-> +++ b/arch/arm64/lib/copy_from_user.S
-> @@ -66,7 +66,7 @@
->  	.endm
->  
->  end	.req	x5
-> -ENTRY(__copy_from_user)
-> +ENTRY(__arch_copy_from_user)
->  ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
->  	    CONFIG_ARM64_PAN)
->  	add	end, x0, x2
-> @@ -75,7 +75,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
->  	    CONFIG_ARM64_PAN)
->  	mov	x0, #0				// Nothing to copy
->  	ret
-> -ENDPROC(__copy_from_user)
-> +ENDPROC(__arch_copy_from_user)
->  
->  	.section .fixup,"ax"
->  	.align	2
-> diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-> index 21faae60f988..7a7efe255034 100644
-> --- a/arch/arm64/lib/copy_to_user.S
-> +++ b/arch/arm64/lib/copy_to_user.S
-> @@ -65,7 +65,7 @@
->  	.endm
->  
->  end	.req	x5
-> -ENTRY(__copy_to_user)
-> +ENTRY(__arch_copy_to_user)
->  ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
->  	    CONFIG_ARM64_PAN)
->  	add	end, x0, x2
-> @@ -74,7 +74,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
->  	    CONFIG_ARM64_PAN)
->  	mov	x0, #0
->  	ret
-> -ENDPROC(__copy_to_user)
-> +ENDPROC(__arch_copy_to_user)
->  
->  	.section .fixup,"ax"
->  	.align	2
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Acked-by: Mark Brown <broonie@kernel.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/bc6687c3/attachment.sig>
