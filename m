@@ -1,42 +1,65 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 6 Jul 2016 22:30:56 -0700
-Subject: [GIT PULL] STi SoC changes for v4.8
-In-Reply-To: <57768292.8070901@st.com>
-References: <57768292.8070901@st.com>
-Message-ID: <20160707053056.GM32389@localhost>
+Date: Wed, 6 Jul 2016 22:28:27 -0700
+Subject: [GIT PULL] STi DT updates for v4.8
+In-Reply-To: <5776701A.1000808@st.com>
+References: <5776701A.1000808@st.com>
+Message-ID: <20160707052827.GL32389@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 04:47:46PM +0200, Patrice Chotard wrote:
+Hi Patrice,
+
+
+On Fri, Jul 01, 2016 at 03:28:58PM +0200, Patrice Chotard wrote:
 > Hi Olof, Arnd and Kevin,
 > 
-> Please consider this first round of STi SoC updates for v4.8:
+> Please consider this first round of STi DT updates for v4.8:
 > 
-> The following changes since commit 4c2e07c6a29e0129e975727b9f57eede813eea85:
+> The following changes since commit 6ca59e6e1fc3a8d7ccbf85ff036bd6ff40847c1a:
 > 
->   Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
+>   clk: st: clkgen-pll: Detect critical clocks (2016-06-30 12:17:11 -0700)
 > 
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
-> sti-soc_for_v4.8
+> sti-dt-for-v4.8
 
-Again, that's a branch and not a tag.
+This specifies a branch, not a tag.
 
-> for you to fetch changes up to 55aa35180c57d82f3db23e5aabce97acb0d36681:
 > 
->   ARM: sti: Implement dummy L2 cache's write_sec (2016-07-01 16:23:44 +0200)
+> for you to fetch changes up to 4543976eaf9ca9f379ac3a0bb8c5c8c84fe0a965:
+> 
+>   spi: st-ssc4: Remove 'no clocking' hack (2016-07-01 11:58:10 +0200)
+> 
 > ----------------------------------------------------------------
-> 
 > Highlights:
 > -----------
-> _ add a dummy L2 cache's write_sec callback as in non secure mode execution,
->   we can't get access to L2 cache secure registers
-> _ cosmetics change, in case of dump_stack, update the hardware name with a
->   more genericfor the STi SoCs family
+>  -add STi critical clocks
+> - as discussed on IRC with Lee Jones, remove SPI hack wich has dependecy
+> with critical clocks
+> 
+> ----------------------------------------------------------------
+> Lee Jones (3):
+>       ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
+>       ARM: sti: stih410-clocks: Identify critical clocks
+>       spi: st-ssc4: Remove 'no clocking' hack
 
-Minor nit: This is a somewhat odd format to write a list in. Please use
-'-' or '*' instead, and feel free to use capital letters, etc. :)
+THere are more patches than this in this branch -- there are three clock
+branches that by the look of it have been applied by Stephen Boyd.
 
+However, since they have been brought in without doing a merge, it's hard for
+us to tell where they came form, and/or if they're in a shared branch
+somewhere. Therefore, I recommend doing a --no-ff merge of the branch, so it's
+obvious from the merge commit where they came form. They also need to be part
+of the diffstat.
+
+Finally, the clk patch doesn't really belong in the DT branch here. It's
+probably a suitable patch to send to the clk maintainers after the DT changes
+have gone in, i.e. for 4.9.
+
+Please respin this pull request and we'll take another look! 
+
+
+Thanks,
 
 -Olof
