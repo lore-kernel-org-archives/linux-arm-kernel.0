@@ -1,50 +1,39 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Thu, 7 Jul 2016 09:14:04 +0200
-Subject: [GIT PULL] STi SoC changes for v4.8
-In-Reply-To: <20160707053056.GM32389@localhost>
-References: <57768292.8070901@st.com> <20160707053056.GM32389@localhost>
-Message-ID: <577E013C.7030208@st.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 7 Jul 2016 09:15:12 +0200
+Subject: sama5d4, configure pck1 with dt?
+In-Reply-To: <alpine.DEB.2.02.1607062239210.12243@pmeerw.net>
+References: <alpine.DEB.2.02.1607062239210.12243@pmeerw.net>
+Message-ID: <20160707091512.387ea113@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof
+Hi Peter,
 
-On 07/07/2016 07:30 AM, Olof Johansson wrote:
-> On Fri, Jul 01, 2016 at 04:47:46PM +0200, Patrice Chotard wrote:
->> Hi Olof, Arnd and Kevin,
->>
->> Please consider this first round of STi SoC updates for v4.8:
->>
->> The following changes since commit 4c2e07c6a29e0129e975727b9f57eede813eea85:
->>
->>    Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
->> sti-soc_for_v4.8
-> Again, that's a branch and not a tag.
+On Wed, 6 Jul 2016 23:17:07 +0200 (CEST)
+Peter Meerwald-Stadler <pmeerw@pmeerw.net> wrote:
 
-Right, i will fix that
+> Hello,
+> 
+> how do I configure pck1 using devicetree to be used as the master 
+> clock for an audio codec?
+> 
+> in particular how do I choose the clock source and frequency for pck1?
+> is there a way to do this using devicetree?
+> 
+> or is the code in at91sam9g20ek_audio_probe() the way to go?
+> i.e mclk=clk_get(0, "pck1"); pllb=clk_get(0, "pllb"); clk_set_parent(mclk, 
+> pllb); clk_set_rate(mclk, 12000000);
 
->
->> for you to fetch changes up to 55aa35180c57d82f3db23e5aabce97acb0d36681:
->>
->>    ARM: sti: Implement dummy L2 cache's write_sec (2016-07-01 16:23:44 +0200)
->> ----------------------------------------------------------------
->>
->> Highlights:
->> -----------
->> _ add a dummy L2 cache's write_sec callback as in non secure mode execution,
->>    we can't get access to L2 cache secure registers
->> _ cosmetics change, in case of dump_stack, update the hardware name with a
->>    more genericfor the STi SoCs family
-> Minor nit: This is a somewhat odd format to write a list in. Please use
-> '-' or '*' instead, and feel free to use capital letters, etc. :)
+It's as simple as that:
 
-Thanks for reviewing, i will submit a v2
+mclk = clk_get(<your-device>, "<audio-clk-name>");
+clk_set_rate(mclk, <rate>);
 
-Patrice
->
->
-> -Olof
+<your-device> should not be NULL, <audio-clk-name> should not be pck1
+(see the DT binding doc), and you should not manually re-parent the mclk
+clk (the driver select the best parent when clk_set_rate() is
+called).
+
+Regards,
+
+Boris
