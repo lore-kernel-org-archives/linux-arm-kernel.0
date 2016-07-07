@@ -1,67 +1,54 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Thu, 7 Jul 2016 17:14:51 +0800
-Subject: [PATCH 5/6] usb: chipidea: host: let the hcd know's parent device node
-In-Reply-To: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
-References: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1467882892-27589-6-git-send-email-peter.chen@nxp.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu,  7 Jul 2016 11:24:32 +0200
+Subject: [PATCH] drm: atmel-hlcdc: Fix vertical scaling
+Message-ID: <1467883472-28168-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Chen <peter.chen@freescale.com>
+From: Jan Leupold <leupold@rsi-elektrotechnik.de>
 
-Since the hcd (chipidea core device) has no device node, so
-if we want to describe the child node under the hcd, we had
-to put it under its parent's node (glue layer device), and
-in the code, we need to let the hcd knows glue layer's code,
-then the USB core can handle this node.
+The code is applying the same scaling for the X and Y components,
+thus making the scaling feature only functional when both components
+have the same scaling factor.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
-Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+Do the s/_w/_h/ replacement where appropriate to fix vertical scaling.
+
+Signed-off-by: Jan Leupold <leupold@rsi-elektrotechnik.de>
+Fixes: 1a396789f65a2 ("drm: add Atmel HLCDC Display Controller support")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/usb/chipidea/host.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index 053bac9..55120ef 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -109,15 +109,25 @@ static int host_start(struct ci_hdrc *ci)
- 	struct ehci_hcd *ehci;
- 	struct ehci_ci_priv *priv;
- 	int ret;
-+	struct device *dev = ci->dev;
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+index 016c191221f3..52c527f6642a 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+@@ -320,19 +320,19 @@ atmel_hlcdc_plane_update_pos_and_size(struct atmel_hlcdc_plane *plane,
+ 			u32 *coeff_tab = heo_upscaling_ycoef;
+ 			u32 max_memsize;
  
--	if (usb_disabled())
-+	if (usb_disabled() || !dev)
- 		return -ENODEV;
- 
--	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
-+	/*
-+	 * USB Core will try to get child node under roothub,
-+	 * but chipidea core has no of_node, and the child node
-+	 * for controller is located at glue layer's node which
-+	 * is chipidea core's parent.
-+	 */
-+	if (dev->parent && dev->parent->of_node)
-+		dev->of_node = dev->parent->of_node;
-+
-+	hcd = usb_create_hcd(&ci_ehci_hc_driver, dev, dev_name(dev));
- 	if (!hcd)
- 		return -ENOMEM;
- 
--	dev_set_drvdata(ci->dev, ci);
-+	dev_set_drvdata(dev, ci);
- 	hcd->rsrc_start = ci->hw_bank.phys;
- 	hcd->rsrc_len = ci->hw_bank.size;
- 	hcd->regs = ci->hw_bank.abs;
-@@ -143,7 +153,7 @@ static int host_start(struct ci_hdrc *ci)
- 		if (ci->platdata->flags & CI_HDRC_TURN_VBUS_EARLY_ON) {
- 			ret = regulator_enable(ci->platdata->reg_vbus);
- 			if (ret) {
--				dev_err(ci->dev,
-+				dev_err(dev,
- 				"Failed to enable vbus regulator, ret=%d\n",
- 									ret);
- 				goto put_hcd;
+-			if (state->crtc_w < state->src_w)
++			if (state->crtc_h < state->src_h)
+ 				coeff_tab = heo_downscaling_ycoef;
+ 			for (i = 0; i < ARRAY_SIZE(heo_upscaling_ycoef); i++)
+ 				atmel_hlcdc_layer_update_cfg(&plane->layer,
+ 							     33 + i,
+ 							     0xffffffff,
+ 							     coeff_tab[i]);
+-			factor = ((8 * 256 * state->src_w) - (256 * 4)) /
+-				 state->crtc_w;
++			factor = ((8 * 256 * state->src_h) - (256 * 4)) /
++				 state->crtc_h;
+ 			factor++;
+-			max_memsize = ((factor * state->crtc_w) + (256 * 4)) /
++			max_memsize = ((factor * state->crtc_h) + (256 * 4)) /
+ 				      2048;
+-			if (max_memsize > state->src_w)
++			if (max_memsize > state->src_h)
+ 				factor--;
+ 			factor_reg |= (factor << 16) | 0x80000000;
+ 		}
 -- 
-1.9.1
+2.7.4
