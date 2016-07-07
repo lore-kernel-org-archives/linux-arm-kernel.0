@@ -1,22 +1,19 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 6 Jul 2016 19:43:46 -0700
-Subject: [PATCH] ARM: debug: Enable DEBUG_BCM_5301X for Northstar Plus SoCs
-In-Reply-To: <CAC3K-4p0wwArVUefsC9ku=tBVz8sdLpBkrgagfYKXGCOZayKXQ@mail.gmail.com>
-References: <1467331810-929-1-git-send-email-f.fainelli@gmail.com>
- <CAC3K-4p0wwArVUefsC9ku=tBVz8sdLpBkrgagfYKXGCOZayKXQ@mail.gmail.com>
-Message-ID: <577DC1E2.7010501@gmail.com>
+Date: Wed, 6 Jul 2016 19:44:13 -0700
+Subject: [PATCH 1/2] ARM: BCM5301X: Specify NAND chip select and ECC in
+ separated files
+In-Reply-To: <1465199036-24366-1-git-send-email-zajec5@gmail.com>
+References: <1465199036-24366-1-git-send-email-zajec5@gmail.com>
+Message-ID: <577DC1FD.8000804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/07/2016 08:21, Jon Mason a ?crit :
-> On Thu, Jun 30, 2016 at 8:10 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> Northstar Plus SoCs (ARCH_BCM_NSP) have the exact same UART location and
->> properties like the register shift of 0, so make it usable.
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Le 06/06/2016 00:43, Rafa? Mi?ecki a ?crit :
+> Using separated file with common chip select parameters will allow us
+> adding other ECC setups without code duplication.
 > 
-> Acked-by: Jon Mason <jon.mason@broadcom.com>
+> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 
-Applied; thanks!
+Applied, thanks!
 -- 
 Florian
