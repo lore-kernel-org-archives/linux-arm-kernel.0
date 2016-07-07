@@ -1,114 +1,49 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 7 Jul 2016 13:37:43 -0400
-Subject: [PATCH 1/9] mm: Hardened usercopy
-In-Reply-To: <3418914.byvl8Wuxlf@wuerfel>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
- <1467843928-29351-2-git-send-email-keescook@chromium.org>
- <3418914.byvl8Wuxlf@wuerfel>
-Message-ID: <CAGXu5jLyBfqXJKxohHiZgztRVrFyqwbta1W_Dw6KyyGM3LzshQ@mail.gmail.com>
+From: oss@buserror.net (Scott Wood)
+Date: Thu, 07 Jul 2016 12:39:42 -0500
+Subject: [PATCH v3 3/3] arm64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <577E524F.3030403@huawei.com>
+References: <1467412897-15220-1-git-send-email-oss@buserror.net>
+ <1467412897-15220-3-git-send-email-oss@buserror.net>
+ <577E2226.3020902@huawei.com> <577E25A4.2010800@arm.com>
+ <577E3EF2.9080105@huawei.com> <577E424C.5030908@arm.com>
+ <577E524F.3030403@huawei.com>
+Message-ID: <1467913182.32358.68.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 7, 2016 at 4:01 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday, July 6, 2016 3:25:20 PM CEST Kees Cook wrote:
->> This is the start of porting PAX_USERCOPY into the mainline kernel. This
->> is the first set of features, controlled by CONFIG_HARDENED_USERCOPY. The
->> work is based on code by PaX Team and Brad Spengler, and an earlier port
->> from Casey Schaufler. Additional non-slab page tests are from Rik van Riel.
->>
->> This patch contains the logic for validating several conditions when
->> performing copy_to_user() and copy_from_user() on the kernel object
->> being copied to/from:
->> - address range doesn't wrap around
->> - address range isn't NULL or zero-allocated (with a non-zero copy size)
->> - if on the slab allocator:
->>   - object size must be less than or equal to copy size (when check is
->>     implemented in the allocator, which appear in subsequent patches)
->> - otherwise, object must not span page allocations
->> - if on the stack
->>   - object must not extend before/after the current process task
->>   - object must be contained by the current stack frame (when there is
->>     arch/build support for identifying stack frames)
->> - object must not overlap with kernel text
->>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->
-> Nice!
->
-> I have a few further thoughts, most of which have probably been
-> considered before:
->
->> +static inline const char *check_bogus_address(const void *ptr, unsigned long n)
->> +{
->> +     /* Reject if object wraps past end of memory. */
->> +     if (ptr + n < ptr)
->> +             return "<wrapped address>";
->> +
->> +     /* Reject if NULL or ZERO-allocation. */
->> +     if (ZERO_OR_NULL_PTR(ptr))
->> +             return "<null>";
->> +
->> +     return NULL;
->> +}
->
-> This checks against address (void*)16, but I guess on most architectures the
-> lowest possible kernel address is much higher. While there may not be much
-> that to exploit if the expected kernel address points to userland, forbidding
-> any obviously incorrect address that is outside of the kernel may be easier.
->
-> Even on architectures like s390 that start the kernel memory at (void *)0x0,
-> the lowest address to which we may want to do a copy_to_user would be much
-> higher than (void*)0x16.
+On Thu, 2016-07-07 at 20:59 +0800, Ding Tianhong wrote:
+> On 2016/7/7 19:51, Marc Zyngier wrote:
+> > 
+> > On 07/07/16 12:37, Ding Tianhong wrote:
+> > > 
+> > > On 2016/7/7 17:49, Marc Zyngier wrote:
+> > > > 
+> > > > What makes you think that ignoring the two bottom bits is a safe thing
+> > > > to do? Talking about performance when the HW has such a dramatic bug
+> > > > is
+> > > > like putting a bigger engine on a car that has no brakes: you just hit
+> > > > the wall quicker.
+> > > > 
+> > > > Thanks,
+> > > > 
+> > > I have a chip which has the same problem like Scott's chip, and I
+> > > wish to solve this problem in the same way, our chip designer told me
+> > > that if you got a wrong value from the cntvct_el0, you would not get
+> > > a wrong value until 8 cycles later, so I could ignoring the lowest 3
+> > > bits if I reading twice together.
+> > Is that CPU cycles? Or timer cycles? What guarantees do you have that
+> > the two reads are *always* done in the right timing window?
+> > 
+> The timer counter only use 56 bits in aarch64, my chip would change one of
+> the higher?
+> bit(55 to 3) to a wrong value when occur bug, so there will be more than 8
+> cycles between
+> correct value and wrong value from the timer counter. Maybe Scott's problem
+> is not just like
+> mine.
 
-Yeah, that's worth exploring, but given the shenanigans around
-set_fs(), I'd like to leave this as-is, and we can add to these checks
-as we remove as much of the insane usage of set_fs().
+It's not like yours. ?Most errors I saw were time going backwards by 1, 3, or
+7 cycles (with occasional larger errors).
 
->> +
->> +     /* Allow kernel rodata region (if not marked as Reserved). */
->> +     if (ptr >= (const void *)__start_rodata &&
->> +         end <= (const void *)__end_rodata)
->> +             return NULL;
->
-> Should we explicitly forbid writing to rodata, or is it enough to
-> rely on page protection here?
-
-Hm, interesting. That's a very small check to add. My knee-jerk is to
-just leave it up to page protection. I'm on the fence. :)
-
->
->> +     /* Allow kernel bss region (if not marked as Reserved). */
->> +     if (ptr >= (const void *)__bss_start &&
->> +         end <= (const void *)__bss_stop)
->> +             return NULL;
->
-> accesses to .data/.rodata/.bss are probably not performance critical,
-> so we could go further here and check the kallsyms table to ensure
-> that we are not spanning multiple symbols here.
-
-Oh, interesting! Yeah, would you be willing to put together that patch
-and test it? I wonder if there are any cases where there are
-legitimate usercopys across multiple symbols.
-
-> For stuff that is performance critical, should there be a way to
-> opt out of the checks, or do we assume it already uses functions
-> that avoid the checks? I looked at the file and network I/O path
-> briefly and they seem to use kmap_atomic() to get to the user pages
-> at least in some of the common cases (but I may well be missing
-> important ones).
-
-I don't want to start with an exemption here, so until such a case is
-found, I'd rather leave this as-is. That said, the primary protection
-here tends to be buggy lengths (which is why put/get_user() is
-untouched). For constant-sized copies, some checks could be skipped.
-In the second part of this protection (what I named
-CONFIG_HARDENED_USERCOPY_WHITELIST in the RFC version of this series),
-there are cases where we want to skip the whitelist checking since it
-is for a constant-sized copy the code understands is okay to pull out
-of an otherwise disallowed allocator object.
-
--Kees
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+-Scott
