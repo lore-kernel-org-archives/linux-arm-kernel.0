@@ -1,27 +1,30 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 7 Jul 2016 14:22:19 +0200
-Subject: next-20160707 build: 1 failures 6 warnings (next-20160707)
-In-Reply-To: <E1bL5XI-0004Z9-EP@optimist>
-References: <E1bL5XI-0004Z9-EP@optimist>
-Message-ID: <20160707122219.GO6247@sirena.org.uk>
+Date: Thu, 7 Jul 2016 11:50:34 +0200
+Subject: SPI: performance regression when using the common message
+ queuing infrastructure
+In-Reply-To: <577CD464.6050506@atmel.com>
+References: <577CD464.6050506@atmel.com>
+Message-ID: <20160707095034.GL6247@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 10:23:56AM +0100, Build bot for Mark Brown wrote:
+On Wed, Jul 06, 2016 at 11:50:28AM +0200, Cyrille Pitchen wrote:
 
-Today's -next fails to build an arm64 allmodconfig due to:
+> So do you recommend us to keep our current generic implementation relying on
+> the SPI framework workqueue or to go back to a custom implementation using
+> tasklet?
+> If we keep the current implementation, is there a way to improve the
+> performances so we go back to something close to what he had before?
 
-> 	arm64-allmodconfig
-> ../drivers/gpu/drm/rockchip/rockchip_drm_drv.c:17:27: fatal error: asm/dma-iommu.h: No such file or directory
-
-triggered by c51f43a9c171ea (iommu/rockchip: Enable Rockchip IOMMU on
-ARM64) which enables the Rockchip IOMMU driver on ARM64 which lacks the
-above header.  Either the use of the header needs to be removed or an
-explicit ARM64 dependency added at the DRM level.
+I'd suggest trying to implement whatever it is that your customm
+implementation was doing in the core, having individual drivers trying
+to open code the message pump is obviously not sensible.  If what you're
+doing makes your controllers run faster it'll probably make everyone
+else's run faster too.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/bbf16e3b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/e453244b/attachment.sig>
