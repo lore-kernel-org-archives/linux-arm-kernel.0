@@ -1,66 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jul 2016 10:27:51 +0200
-Subject: [PATCH] serial: imx: add rx and tx led trigger
-In-Reply-To: <20160707062800.GT16643@pengutronix.de>
-References: <1467646452-21243-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <3835401.kFNahHioV5@wuerfel> <20160707062800.GT16643@pengutronix.de>
-Message-ID: <6724841.mKIqTiexKe@wuerfel>
+Date: Thu, 07 Jul 2016 10:30:29 +0200
+Subject: [PATCH 2/4] soc: fsl: add GUTS driver for QorIQ platforms
+In-Reply-To: <HE1PR04MB0889646206BFAD68046F3473F83B0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <1465609853.22191.151.camel@buserror.net>
+ <HE1PR04MB0889646206BFAD68046F3473F83B0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+Message-ID: <4094106.qfxJu3tJbO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 7, 2016 8:28:00 AM CEST Uwe Kleine-K?nig wrote:
-> Hello Arnd,
+On Thursday, July 7, 2016 2:35:33 AM CEST Yangbo Lu wrote:
+> Hi Arnd,
 > 
-> [adding Rob Herring to Cc]
+> Could you reply when you see the email?
+> If your method doesn?t resolve the problem, we still want to use our old patchset.
 > 
-> On Wed, Jul 06, 2016 at 10:09:39PM +0200, Arnd Bergmann wrote:
-> > On Wednesday, July 6, 2016 7:30:57 PM CEST Uwe Kleine-K?nig wrote:
-> > > On Wed, Jul 06, 2016 at 05:22:40PM +0200, Arnd Bergmann wrote:
-> > > > On Monday, July 4, 2016 5:50:09 PM CEST Uwe Kleine-K?nig wrote:
-> > > > > On Mon, Jul 04, 2016 at 05:43:03PM +0200, Arnd Bergmann wrote:
-> > > > > > On Monday, July 4, 2016 5:34:12 PM CEST Uwe Kleine-K?nig wrote:
-> > > > > > > Add support for two led triggers per UART instance that blink on
-> > > > > > > transmission and reception of data respectively.
-> > > > > > > 
-> > > > If this is something we may want to do on other platforms as well,
-> > > > we should perhaps not hardwire the name of the imx tty device in
-> > > > the led trigger name.
-> > > 
-> > > I cannot follow. If we have several serial lines and a trigger for each
-> > > of them, they must get different names. Using the device's name to
-> > > distinguish them seems like a good and obvious idea.
-> > 
-> > The main problem I see is if someone puts the name of the trigger into
-> > a dtb file, as this hardcodes the connection between the Linux driver
-> > name and numbering system with the device tree binding, which are normally
-> > separate.
-> > 
-> > If we could derive the trigger name from the "/aliases/serial%d" property
-> > in DT instead, it would get a little more portable.
+> This guts driver had been discussed about one year and blocked many workaround upstream.
+> So please help to review and comment soon.
 > 
-> Alternatively we could invent a more dtish way as aliases seem to be
-> frowned upon [1], something like:
-> 
-> 	led#0 {
-> 		label = "userled";
-> 		linux,default-trigger = &uart1, "tx";
-> 	};
-> 
-> 	uart1: serial at 43f90000 {
-> 		...
-> 		#trigger-cells = <1>;
-> 	};
 
-That looks nice, but I don't see how we could implement this in a
-backwards compatible way, as we don't know whether the first cell
-of the property is a phandle or a string.
-
-> Having said that, I don't think it's a big problem if the value of
-> "linux,default-trigger" is Linux-specific. Moreover, is a default
-> trigger considered a hardware description?
-
-What's more important here I think is that even in Linux, the name
-of the uart is not always stable across versions or configurations,
-e.g. in on OMAP we can have either ttyO%d or ttyS%d.
+I don't really see how more discussion is going to help us here. I think
+I've made it pretty clear that I don't want to see another platform
+specific way to read an SoC revision and I've even sent a proof-of-concept
+patch to show how the interface can work, now it's up to you to fit the
+guts hardware into that and send a new patch series.
 
 	Arnd
