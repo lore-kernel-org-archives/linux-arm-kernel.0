@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  7 Jul 2016 10:01:41 +0200
-Subject: [PATCH 68/93] clocksource/drivers/smp_twd: Convert init function to
+Date: Thu,  7 Jul 2016 10:01:44 +0200
+Subject: [PATCH 71/93] clocksource/drivers/oxnas-rps: Convert init function to
  return error
 In-Reply-To: <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577E0BED.3020608@linaro.org>
  <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467878526-1238-68-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467878526-1238-71-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,35 +26,91 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/kernel/smp_twd.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/clocksource/timer-oxnas-rps.c | 33 ++++++++++++++++++++-------------
+ 1 file changed, 20 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 1bfa7a7..2b24be4 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -390,7 +390,7 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
+diff --git a/drivers/clocksource/timer-oxnas-rps.c b/drivers/clocksource/timer-oxnas-rps.c
+index c002e99..0d99f40 100644
+--- a/drivers/clocksource/timer-oxnas-rps.c
++++ b/drivers/clocksource/timer-oxnas-rps.c
+@@ -220,32 +220,37 @@ static int __init oxnas_rps_clocksource_init(struct oxnas_rps_timer *rps)
+ 	return 0;
  }
  
- #ifdef CONFIG_OF
--static void __init twd_local_timer_of_register(struct device_node *np)
-+static int __init twd_local_timer_of_register(struct device_node *np)
+-static void __init oxnas_rps_timer_init(struct device_node *np)
++static int __init oxnas_rps_timer_init(struct device_node *np)
  {
- 	int err;
+ 	struct oxnas_rps_timer *rps;
+ 	void __iomem *base;
+ 	int ret;
  
-@@ -410,8 +410,9 @@ static void __init twd_local_timer_of_register(struct device_node *np)
+ 	rps = kzalloc(sizeof(*rps), GFP_KERNEL);
+-	if (!rps) {
+-		pr_err("Failed to allocate rps structure\n");
+-		return;
+-	}
++	if (!rps)
++		return -ENOMEM;
  
- out:
- 	WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
-+	return err;
+ 	rps->clk = of_clk_get(np, 0);
+-	if (WARN_ON(IS_ERR(rps->clk)))
++	if (IS_ERR(rps->clk)) {
++		ret = PTR_ERR(rps->clk);
+ 		goto err_alloc;
++	}
+ 
+-	if (WARN_ON(clk_prepare_enable(rps->clk)))
++	ret = clk_prepare_enable(rps->clk);
++	if (ret)
+ 		goto err_clk;
+ 
+ 	base = of_iomap(np, 0);
+-	if (WARN_ON(!base))
++	if (!base) {
++		ret = -ENXIO;
+ 		goto err_clk_prepare;
++	}
+ 
+ 	rps->irq = irq_of_parse_and_map(np, 0);
+-	if (WARN_ON(rps->irq < 0))
++	if (rps->irq < 0) {
++		ret = -EINVAL;
+ 		goto err_iomap;
++	}
+ 
+ 	rps->clkevt_base = base + TIMER1_REG_OFFSET;
+ 	rps->clksrc_base = base + TIMER2_REG_OFFSET;
+@@ -261,7 +266,7 @@ static void __init oxnas_rps_timer_init(struct device_node *np)
+ 	ret = request_irq(rps->irq, oxnas_rps_timer_irq,
+ 			  IRQF_TIMER | IRQF_IRQPOLL,
+ 			  "rps-timer", rps);
+-	if (WARN_ON(ret))
++	if (ret)
+ 		goto err_iomap;
+ 
+ 	ret = oxnas_rps_clocksource_init(rps);
+@@ -272,7 +277,7 @@ static void __init oxnas_rps_timer_init(struct device_node *np)
+ 	if (ret)
+ 		goto err_irqreq;
+ 
+-	return;
++	return 0;
+ 
+ err_irqreq:
+ 	free_irq(rps->irq, rps);
+@@ -284,7 +289,9 @@ err_clk:
+ 	clk_put(rps->clk);
+ err_alloc:
+ 	kfree(rps);
++
++	return ret;
  }
--CLOCKSOURCE_OF_DECLARE(arm_twd_a9, "arm,cortex-a9-twd-timer", twd_local_timer_of_register);
--CLOCKSOURCE_OF_DECLARE(arm_twd_a5, "arm,cortex-a5-twd-timer", twd_local_timer_of_register);
--CLOCKSOURCE_OF_DECLARE(arm_twd_11mp, "arm,arm11mp-twd-timer", twd_local_timer_of_register);
-+CLOCKSOURCE_OF_DECLARE_RET(arm_twd_a9, "arm,cortex-a9-twd-timer", twd_local_timer_of_register);
-+CLOCKSOURCE_OF_DECLARE_RET(arm_twd_a5, "arm,cortex-a5-twd-timer", twd_local_timer_of_register);
-+CLOCKSOURCE_OF_DECLARE_RET(arm_twd_11mp, "arm,arm11mp-twd-timer", twd_local_timer_of_register);
- #endif
+ 
+-CLOCKSOURCE_OF_DECLARE(ox810se_rps,
+-		       "oxsemi,ox810se-rps-timer", oxnas_rps_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(ox810se_rps,
++			   "oxsemi,ox810se-rps-timer", oxnas_rps_timer_init);
 -- 
 1.9.1
