@@ -1,20 +1,20 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 6 Jul 2016 22:05:04 -0700
-Subject: [GIT PULL 0/4] Second round of Broadcom changes for 4.8
-In-Reply-To: <1467862574-6522-1-git-send-email-f.fainelli@gmail.com>
-References: <1467862574-6522-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <577DE300.1070505@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 06 Jul 2016 22:31:52 -0700 (PDT)
+Subject: [PATCH -next] net: mediatek: remove .owner field for driver
+In-Reply-To: <1467811813-4864-1-git-send-email-weiyj_lk@163.com>
+References: <1467811813-4864-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <20160706.223152.980979934196013750.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/07/2016 20:36, Florian Fainelli a ?crit :
-> Hi Arnd, Olof, Kevin,
-> 
-> Apologies for sending this second part so close from the merge window,
-> we had to wait for a few fixes and form the Raspberry Pi 3 changes to be
-> ironed out before sending those out.
+From: weiyj_lk@163.com
+Date: Wed,  6 Jul 2016 13:30:13 +0000
 
-And now pull request 5/4 is sent with subject "Broadcom soc-arm64
-changes for 4.8 part 2", sorry about that.
--- 
-Florian
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Remove .owner field since calls to module_platform_driver() will
+> set it automatically.
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+
+Applied.
