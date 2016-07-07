@@ -1,41 +1,62 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu,  7 Jul 2016 15:20:53 -0700
-Subject: [PATCH v2 02/22] of: device: Export of_device_{get_modalias,
- uvent_modalias} to modules
+Date: Thu,  7 Jul 2016 15:20:57 -0700
+Subject: [PATCH v2 06/22] usb: chipidea: Add platform flag for wrapper phy
+ management
 In-Reply-To: <20160707222114.1673-1-stephen.boyd@linaro.org>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
-Message-ID: <20160707222114.1673-3-stephen.boyd@linaro.org>
+Message-ID: <20160707222114.1673-7-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ULPI bus can be built as a module, and it will soon be
-calling these functions when it supports probing devices from DT.
-Export them so they can be used by the ULPI module.
+The ULPI phy on qcom platforms needs to be initialized and
+powered on after a USB reset and before we toggle the run/stop
+bit. Otherwise, the phy locks up and doesn't work properly.
+Therefore, add a flag to skip any phy power management in the
+core layer, leaving it up to the glue driver to manage.
 
+Cc: Peter Chen <peter.chen@nxp.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/of/device.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/usb/chipidea/core.c  | 6 ++++++
+ include/linux/usb/chipidea.h | 1 +
+ 2 files changed, 7 insertions(+)
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 8a22a253a830..6719ab35b62e 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
- 
- 	return tsize;
- }
-+EXPORT_SYMBOL_GPL(of_device_get_modalias);
- 
- int of_device_request_module(struct device *dev)
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 01390e02ee53..532085a096d9 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -361,6 +361,9 @@ static int _ci_usb_phy_init(struct ci_hdrc *ci)
+  */
+ static void ci_usb_phy_exit(struct ci_hdrc *ci)
  {
-@@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
- 	}
- 	mutex_unlock(&of_mutex);
- }
-+EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
- 
- int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
++	if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
++		return;
++
+ 	if (ci->phy) {
+ 		phy_power_off(ci->phy);
+ 		phy_exit(ci->phy);
+@@ -379,6 +382,9 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
  {
+ 	int ret;
+ 
++	if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
++		return 0;
++
+ 	switch (ci->platdata->phy_mode) {
+ 	case USBPHY_INTERFACE_MODE_UTMI:
+ 	case USBPHY_INTERFACE_MODE_UTMIW:
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index f9be467d6695..d07b162073f7 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -57,6 +57,7 @@ struct ci_hdrc_platform_data {
+ #define CI_HDRC_OVERRIDE_AHB_BURST	BIT(9)
+ #define CI_HDRC_OVERRIDE_TX_BURST	BIT(10)
+ #define CI_HDRC_OVERRIDE_RX_BURST	BIT(11)
++#define CI_HDRC_OVERRIDE_PHY_CONTROL	BIT(12) /* Glue layer manages phy */
+ 	enum usb_dr_mode	dr_mode;
+ #define CI_HDRC_CONTROLLER_RESET_EVENT		0
+ #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
 -- 
 2.9.0.rc2.8.ga28705d
