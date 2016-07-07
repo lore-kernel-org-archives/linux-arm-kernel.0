@@ -1,50 +1,99 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Jul 2016 18:00:26 +0100
-Subject: [PATCH 0/3] Add support for privileged mappings
-In-Reply-To: <20160706235136.27854-1-mitchelh@codeaurora.org>
-References: <20160706235136.27854-1-mitchelh@codeaurora.org>
-Message-ID: <20160707170026.GG20682@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 07 Jul 2016 17:58:42 +0100
+Subject: [PATCH v3 6/7] arm64: hibernate: Resume on the CPU that created
+ the hibernate image
+In-Reply-To: <20160705145530.GA19925@red-moon>
+References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
+ <1467125510-18758-7-git-send-email-james.morse@arm.com>
+ <20160705145530.GA19925@red-moon>
+Message-ID: <577E8A42.1020609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2016 at 04:51:33PM -0700, Mitchel Humpherys wrote:
-> The following patch to the ARM SMMU driver:
-> 
->     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
->     Author: Robin Murphy <robin.murphy@arm.com>
->     Date:   Tue Jan 26 18:06:34 2016 +0000
->     
->         iommu/arm-smmu: Treat all device transactions as unprivileged
-> 
-> started forcing all SMMU transactions to come through as "unprivileged".
-> The rationale given was that:
-> 
->   (1) There is no way in the IOMMU API to even request privileged mappings.
-> 
->   (2) It's difficult to implement a DMA mapper that correctly models the
->       ARM VMSAv8 behavior of unprivileged-writeable =>
->       privileged-execute-never.
-> 
-> This series attempts to rectify (1) by introducing an IOMMU API for
-> privileged mappings (and implementing it in io-pgtable-arm).  It seems like
-> (2) can be safely ignored for now under the assumption that any users of
-> the IOMMU_PRIV flag will be using the low-level IOMMU APIs directly, rather
-> than going through the DMA APIs.
-> 
-> Robin, Will, what do you think?  Jordan and Jeremy can provide more info on
-> the use case if needed, but the high level is that it's a security feature
-> to prevent attacks such as [1].
+Hi Lorenzo,
 
-So I think the problem that the offending patch tried to fix is that
-the PL330 DMA controller (drivers/dma/pl330.c) uses dma_alloc_coherent
-to allocate its microcode buffer, but the so-called "manager" thread
-that fetches the microcode does so with privileged accesses and
-consequently fails.
+On 05/07/16 15:55, Lorenzo Pieralisi wrote:
+> On Tue, Jun 28, 2016 at 03:51:49PM +0100, James Morse wrote:
+>> On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
+>> user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
+>> kernel will assign logical id 0 to a different physical CPU.
+>> This breaks hibernate as hibernate and resume will be attempted on different
+>> CPUs. A previous patch detects this situation when we come to resume,
+>> and returns an error. (data stored in the hibernate image is lost)
+>>
+>> We currently forbid hibernate if CPU0 has been hotplugged out to avoid
+>> this situation without kexec.
+>>
+>> Use arch_hibernation_disable_cpus() to direct which CPU we should resume
+>> on based on the MPIDR of the CPU we hibernated on. This allows us to
+>> hibernate/resume on any CPU, even if the logical numbers have been
+>> shuffled by kexec.
 
-Whilst this series is a step in the right direction for fixing that, I
-don't think you can claim that only low-level users need this, given that
-we have in-tree code which would break without it. Perhaps you just need
-to extend things slightly more to expose this to the DMA API as well (or,
-alternatively, hack the PL330 driver some how).
+>> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+>> index 8c7c6d7d4cd4..cbcc8243575e 100644
+>> --- a/arch/arm64/kernel/hibernate.c
+>> +++ b/arch/arm64/kernel/hibernate.c
 
-Will
+>> +int _arch_hibernation_disable_cpus(bool suspend)
+>> +{
+>> +	int cpu, ret;
+>> +
+>> +	if (suspend) {
+>> +		/*
+>> +		 * During hibernate we need frozen_cpus to be updated and saved.
+>> +		 */
+>> +		ret = disable_nonboot_cpus();
+>> +	} else {
+>> +		/*
+>> +		 * Resuming from hibernate. From here, we can't race with
+>> +		 * userspace, and don't need to update frozen_cpus.
+> 
+> Yes, but...
+> 
+>> +		 */
+>> +		pr_info("Disabling secondary CPUs ...\n");
+>> +
+>> +		/* sleep_cpu must have been loaded from the arch header */
+>> +		BUG_ON(sleep_cpu < 0);
+>> +
+>> +		for_each_online_cpu(cpu) {
+>> +			if (cpu == sleep_cpu)
+>> +				continue;
+>> +			ret = cpu_down(cpu);
+> 
+> This has a side effect, in that tasks are frozen here but we are now
+> calling _cpu_down() through:
+> 
+> 	cpu_down() -> do_cpu_down()
+> 
+> and we are telling the kernel that tasks are _not_ frozen, which
+> AFAIK changes the cpuhp_tasks_frozen variable and related actions
+> (eg __cpu_notify()), I suspect this may confuse some notifiers
+> state machines that depend on CPU_TASKS_FROZEN to be set, maybe
+> not but it is worth a look.
+
+Thanks for this - I missed that implication.
+
+I've been through all the cpu notifiers in the core code, almost all of them
+either mask out the frozen bits, or do something symmetric.
+
+The exceptions are:
+__zcomp_cpu_notifier() and __zswap_cpu_dstmem_notifier(), which will free memory
+in this scenario.
+evtchn_fifo_cpu_notification() which could end up in generic_handle_irq().
+nmi_timer_cpu_notifier() (part of oprofile), will disable a perf timer.
+bcm2836_arm_irqchip_cpu_notify() will mask IPIs, but will still unmask them on
+CPU_STARTING_FROZEN.
+
+coretemp_cpu_callback(), via_cputemp_cpu_callback() and
+powerclamp_cpu_callback() would remove platform devices, or stop threads, but
+these three are x86 specific.
+All the rest live under /arch.
+
+I haven't found any that are a problem, but this doesn't feel like the right
+thing to do. I will look for a way to tidy this up.
+
+
+Thanks,
+
+James
