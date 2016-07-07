@@ -1,67 +1,76 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu, 7 Jul 2016 13:27:03 -0400
-Subject: [PATCH 0/9] mm: Hardened usercopy
-In-Reply-To: <577E04FF.1090000@de.ibm.com>
+Date: Thu, 7 Jul 2016 13:29:38 -0400
+Subject: [PATCH 1/9] mm: Hardened usercopy
+In-Reply-To: <alpine.DEB.2.11.1607070938430.4083@nanos>
 References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
- <577E04FF.1090000@de.ibm.com>
-Message-ID: <CAGXu5jLiqNWHR09StBirH3c3ZHpwnpPOBRE40BGwWBJES5kpBw@mail.gmail.com>
+ <1467843928-29351-2-git-send-email-keescook@chromium.org>
+ <alpine.DEB.2.11.1607070938430.4083@nanos>
+Message-ID: <CAGXu5jJWVow4i_M7Qg4ZFgZh3k_fUxUs4pDJSf5Yc8Q-FK9HoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 7, 2016 at 3:30 AM, Christian Borntraeger
-<borntraeger@de.ibm.com> wrote:
-> On 07/07/2016 12:25 AM, Kees Cook wrote:
->> Hi,
->>
->> This is a start of the mainline port of PAX_USERCOPY[1]. After I started
->> writing tests (now in lkdtm in -next) for Casey's earlier port[2], I
->> kept tweaking things further and further until I ended up with a whole
->> new patch series. To that end, I took Rik's feedback and made a number
->> of other changes and clean-ups as well.
->>
->> Based on my understanding, PAX_USERCOPY was designed to catch a few
->> classes of flaws around the use of copy_to_user()/copy_from_user(). These
->> changes don't touch get_user() and put_user(), since these operate on
->> constant sized lengths, and tend to be much less vulnerable. There
->> are effectively three distinct protections in the whole series,
->> each of which I've given a separate CONFIG, though this patch set is
->> only the first of the three intended protections. (Generally speaking,
->> PAX_USERCOPY covers what I'm calling CONFIG_HARDENED_USERCOPY (this) and
->> CONFIG_HARDENED_USERCOPY_WHITELIST (future), and PAX_USERCOPY_SLABS covers
->> CONFIG_HARDENED_USERCOPY_SPLIT_KMALLOC (future).)
->>
->> This series, which adds CONFIG_HARDENED_USERCOPY, checks that objects
->> being copied to/from userspace meet certain criteria:
->> - if address is a heap object, the size must not exceed the object's
->>   allocated size. (This will catch all kinds of heap overflow flaws.)
->> - if address range is in the current process stack, it must be within the
->>   current stack frame (if such checking is possible) or at least entirely
->>   within the current process's stack. (This could catch large lengths that
->>   would have extended beyond the current process stack, or overflows if
->>   their length extends back into the original stack.)
->> - if the address range is part of kernel data, rodata, or bss, allow it.
->> - if address range is page-allocated, that it doesn't span multiple
->>   allocations.
->> - if address is within the kernel text, reject it.
->> - everything else is accepted
->>
->> The patches in the series are:
->> - The core copy_to/from_user() checks, without the slab object checks:
->>       1- mm: Hardened usercopy
->> - Per-arch enablement of the protection:
->>       2- x86/uaccess: Enable hardened usercopy
->>       3- ARM: uaccess: Enable hardened usercopy
->>       4- arm64/uaccess: Enable hardened usercopy
->>       5- ia64/uaccess: Enable hardened usercopy
->>       6- powerpc/uaccess: Enable hardened usercopy
->>       7- sparc/uaccess: Enable hardened usercopy
+On Thu, Jul 7, 2016 at 3:42 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Wed, 6 Jul 2016, Kees Cook wrote:
+>> +
+>> +#if defined(CONFIG_FRAME_POINTER) && defined(CONFIG_X86)
+>> +     const void *frame = NULL;
+>> +     const void *oldframe;
+>> +#endif
 >
-> Was there a reason why you did not change s390?
+> That's ugly
 
-No reason -- just didn't have a good build setup for testing it.
-(Everything but arm64 was already in grsecurity, and I was able to
-build-test arm64 when I added it there.) I would love to include s390
-too!
+Yeah, I'd like to have this be controlled by a specific CONFIG, like I
+invented for the linear mapping, but I wasn't sure what was the best
+approach.
+
+>
+>> +
+>> +     /* Object is not on the stack at all. */
+>> +     if (obj + len <= stack || stackend <= obj)
+>> +             return 0;
+>> +
+>> +     /*
+>> +      * Reject: object partially overlaps the stack (passing the
+>> +      * the check above means at least one end is within the stack,
+>> +      * so if this check fails, the other end is outside the stack).
+>> +      */
+>> +     if (obj < stack || stackend < obj + len)
+>> +             return -1;
+>> +
+>> +#if defined(CONFIG_FRAME_POINTER) && defined(CONFIG_X86)
+>> +     oldframe = __builtin_frame_address(1);
+>> +     if (oldframe)
+>> +             frame = __builtin_frame_address(2);
+>> +     /*
+>> +      * low ----------------------------------------------> high
+>> +      * [saved bp][saved ip][args][local vars][saved bp][saved ip]
+>> +      *                   ^----------------^
+>> +      *             allow copies only within here
+>> +      */
+>> +     while (stack <= frame && frame < stackend) {
+>> +             /*
+>> +              * If obj + len extends past the last frame, this
+>> +              * check won't pass and the next frame will be 0,
+>> +              * causing us to bail out and correctly report
+>> +              * the copy as invalid.
+>> +              */
+>> +             if (obj + len <= frame)
+>> +                     return obj >= oldframe + 2 * sizeof(void *) ? 2 : -1;
+>> +             oldframe = frame;
+>> +             frame = *(const void * const *)frame;
+>> +     }
+>> +     return -1;
+>> +#else
+>> +     return 1;
+>> +#endif
+>
+> I'd rather make that a weak function returning 1 which can be replaced by
+> x86 for CONFIG_FRAME_POINTER=y. That also allows other architectures to
+> implement their specific frame checks.
+
+Yeah, though I prefer CONFIG-controlled stuff over weak functions, but
+I agree, something like arch_check_stack_frame(...) or similar. I'll
+build something for this on the next revision.
 
 -Kees
 
