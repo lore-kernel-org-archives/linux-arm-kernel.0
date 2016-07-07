@@ -1,59 +1,128 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 8 Jul 2016 00:47:19 +0800
-Subject: [arm-soc:for-next 3/8]
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi:48:41: fatal error:
- dt-bindings/clock/gxbb-clkc.h: No such file or directory
-Message-ID: <201607080017.hiQXrLVX%fengguang.wu@intel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 7 Jul 2016 17:51:16 +0100
+Subject: [PATCH v3 6/9] iommu/of: Introduce iommu_fwspec
+In-Reply-To: <57765C5E.8010400@arm.com>
+References: <cover.1467123945.git.robin.murphy@arm.com>
+ <227abd6fb43e4163d94673066b4b736d7efaa635.1467123945.git.robin.murphy@arm.com>
+ <20160701105505.GH12735@arm.com> <57765C5E.8010400@arm.com>
+Message-ID: <20160707165116.GA2685@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
-head:   cdd641aa1c2dbf8b83f3eee0568ac51a165b1c54
-commit: 6f5f1e81cdad1d1e019e4dc4b1d532a43a6c3ffe [3/8] Merge branch 'next/dt64' into for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 6f5f1e81cdad1d1e019e4dc4b1d532a43a6c3ffe
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+On Fri, Jul 01, 2016 at 01:04:46PM +0100, Robin Murphy wrote:
+> On 01/07/16 11:55, Will Deacon wrote:
+> > On Tue, Jun 28, 2016 at 04:48:25PM +0100, Robin Murphy wrote:
+> >> Introduce a common structure to hold the per-device firmware data that
+> >> non-architectural IOMMU drivers generally need to keep track of.
+> >> Initially this is DT-specific to complement the existing of_iommu
+> >> support code, but will generalise further once other firmware methods
+> >> (e.g. ACPI IORT) come along.
+> >>
+> >> Ultimately the aim is to promote the fwspec to a first-class member of
+> >> struct device, and handle the init/free automatically in the firmware
+> >> code. That way we can have API calls look for dev->fwspec->iommu_ops
+> >> before falling back to dev->bus->iommu_ops, and thus gracefully handle
+> >> those troublesome multi-IOMMU systems which we currently cannot. To
+> >> start with, though, make use of the existing archdata field and delegate
+> >> the init/free to drivers to allow an incremental conversion rather than
+> >> the impractical pain of trying to attempt everything in one go.
+> >>
+> >> Suggested-by: Will Deacon <will.deacon@arm.com>
+> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >> ---
+> >>
+> >> v3: New.
+> >>
+> >>  drivers/iommu/of_iommu.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+> >>  include/linux/of_iommu.h | 18 ++++++++++++++++++
+> >>  2 files changed, 65 insertions(+)
+> >>
+> >> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> >> index 25406a8b9d4e..2b90c1f56ff2 100644
+> >> --- a/drivers/iommu/of_iommu.c
+> >> +++ b/drivers/iommu/of_iommu.c
+> >> @@ -220,3 +220,50 @@ void __init of_iommu_init(void)
+> >>  				of_node_full_name(np));
+> >>  	}
+> >>  }
+> >> +
+> >> +int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np)
+> > 
+> > These functions might want an of_* prefix to match the rest of the file,
+> > or do you plan to re-use these later for ACPI?
+> 
+> Indeed, the naming is a deliberate concession to the future - I was
+> trying to pre-empt the idea that the interface might be intended to grow
+> into separate of_* and iort_* versions. I'm just using raw device_nodes
+> for the moment as I don't think we'd reached a consensus on whether
+> fwnode_handle or some other abstraction was the appropriate way to go.
 
-Note: the arm-soc/for-next HEAD cdd641aa1c2dbf8b83f3eee0568ac51a165b1c54 builds fine.
-      It only hurts bisectibility.
+Yes, for the time being you could just consider the whole thing
+OF specific and in my series providing IORT support I will have to
+find a place for this code to live, likely to be a new compilation
+unit anyway (which means that the raw device_node will become
+fwnode_handle types too in the process).
 
-All errors (new ones prefixed by >>):
+> >> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> >> index bd02b44902d0..5a4f516cfcfe 100644
+> >> --- a/include/linux/of_iommu.h
+> >> +++ b/include/linux/of_iommu.h
+> >> @@ -15,6 +15,14 @@ extern void of_iommu_init(void);
+> >>  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
+> >>  					struct device_node *master_np);
+> >>  
+> >> +struct iommu_fwspec {
+> >> +	const struct iommu_ops	*iommu_ops;
+> >> +	struct device_node	*iommu_np;
+> >> +	void			*iommu_priv;
+> >> +	unsigned int		num_ids;
+> >> +	u32			ids[];
+> >> +};
+> >> +
+> >>  #else
+> >>  
+> >>  static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+> >> @@ -31,8 +39,18 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+> >>  	return NULL;
+> >>  }
+> >>  
+> >> +struct iommu_fwspec;
+> >> +
+> >>  #endif	/* CONFIG_OF_IOMMU */
+> >>  
+> >> +int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
+> >> +void iommu_fwspec_free(struct device *dev);
+> >> +int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
+> >> +static inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
+> >> +{
+> >> +	return dev->archdata.iommu;
+> >> +}
+> > 
+> > I'm a bit nervous about putting this inline in a header file, since not
+> > all architectures unconditionally provide the iommu field in dev_archdata.
+> 
+> Ah yes, you're right, this shouldn't be defined without OF_IOMMU (or the
+> IORT equivalent) anyway. Clearly the premature optimisation demons had
+> begun whispering "A measly one-line accessor in a separate compilation
+> unit? Won't somebody think of the chil^Wbranch predictors!?"
 
-   In file included from arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts:47:0:
->> arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi:48:41: fatal error: dt-bindings/clock/gxbb-clkc.h: No such file or directory
-   compilation terminated.
+Well, moving this inline to of_iommu.c (as per v4) improves things a
+bit, but it looks a bit incosistent to me anyway given that we would
+*assume* archdata.iommu exists if CONFIG_OF_IOMMU, which should be
+true (is it on eg powerpc ?) but it is still an assumption AFAIK.
 
-vim +48 arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+An option could be to add the generic iommu_fwspec API but for
+the time being decoupling it from struct device and leaving it
+to IOMMU drivers to decide where the iommu_fwspec structure pointer
+should be stored (ie on ARM systems dev->archdata.iommu).
 
-4f24eda8 Andreas F?rber 2016-02-05  42  
-4f24eda8 Andreas F?rber 2016-02-05  43  #include <dt-bindings/gpio/gpio.h>
-4f24eda8 Andreas F?rber 2016-02-05  44  #include <dt-bindings/interrupt-controller/irq.h>
-4f24eda8 Andreas F?rber 2016-02-05  45  #include <dt-bindings/interrupt-controller/arm-gic.h>
-f40d437f Carlo Caione   2016-05-02  46  #include <dt-bindings/gpio/meson-gxbb-gpio.h>
-6d1a5c93 Neil Armstrong 2016-05-30  47  #include <dt-bindings/reset/amlogic,meson-gxbb-reset.h>
-f3abd629 Kevin Hilman   2016-06-14 @48  #include <dt-bindings/clock/gxbb-clkc.h>
-4f24eda8 Andreas F?rber 2016-02-05  49  
-4f24eda8 Andreas F?rber 2016-02-05  50  / {
-4f24eda8 Andreas F?rber 2016-02-05  51  	compatible = "amlogic,meson-gxbb";
+Understood, you want to keep struct device part of the API so
+that, when the iommu_fwspec will be integrated into struct device
+we won't have to change the iommu_fwspec API, still, it does not
+look right.
 
-:::::: The code at line 48 was first introduced by commit
-:::::: f3abd6296168d9d356192b50a92a7a980ca99a2f ARM64: DTS: meson-gxbb: switch ethernet to real clock
+Other option would be adding this code to a separate compilation
+unit that is compiled only on (ARM || ARM64), not sure what's the
+most reasonable option here.
 
-:::::: TO: Kevin Hilman <khilman@baylibre.com>
-:::::: CC: Kevin Hilman <khilman@baylibre.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 26353 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160708/ec589444/attachment-0001.obj>
+Lorenzo
