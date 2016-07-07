@@ -1,155 +1,110 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu,  7 Jul 2016 15:21:05 -0700
-Subject: [PATCH v2 14/22] usb: chipidea: msm: Add proper clk and reset support
+Date: Thu,  7 Jul 2016 15:21:07 -0700
+Subject: [PATCH v2 16/22] usb: chipidea: msm: Restore wrapper settings after
+ reset
 In-Reply-To: <20160707222114.1673-1-stephen.boyd@linaro.org>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
-Message-ID: <20160707222114.1673-15-stephen.boyd@linaro.org>
+Message-ID: <20160707222114.1673-17-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The msm chipidea controller uses two main clks, an AHB clk to
-read/write the MMIO registers and a core clk called the system
-clk that drives the controller itself. Add support for these clks
-as they're required in all designs.
-
-Also add support for an optional third clk that we need to turn
-on to reset the controller and wrapper logic and other
-"housekeeping" things. This clk was removed in later revisions of
-the hardware because the reset methodology no longer required
-clks to be enabled to propagate resets.
+When the RESET bit is set in the USBCMD register it resets quite
+a few of the wrapper's registers to their reset state. This
+includes the GENCONFIG and GENCONFIG2 registers. Currently this
+is done by the usb phy and ehci-msm drivers writing into the
+controller wrapper's MMIO address space. Let's consolidate the
+register writes into the wrapper driver instead so that we
+clearly split the wrapper from the phys.
 
 Cc: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/ci_hdrc_msm.c | 72 +++++++++++++++++++++++++++++++++++---
- 1 file changed, 68 insertions(+), 4 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_msm.c | 39 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
 diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-index b282a717bf8c..7e870a253f55 100644
+index 7708bee3ff3e..81437c8cea82 100644
 --- a/drivers/usb/chipidea/ci_hdrc_msm.c
 +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-@@ -10,11 +10,20 @@
- #include <linux/pm_runtime.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/chipidea.h>
-+#include <linux/clk.h>
-+#include <linux/reset.h>
+@@ -14,11 +14,22 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ #include <linux/io.h>
++#include <linux/extcon.h>
++#include <linux/of.h>
  
  #include "ci.h"
  
  #define HS_PHY_AHB_MODE			0x0098
  
-+struct ci_hdrc_msm {
-+	struct platform_device *ci;
-+	struct clk *core_clk;
-+	struct clk *iface_clk;
-+	struct clk *fs_clk;
-+};
++#define HS_PHY_GENCONFIG		0x009c
++#define HS_PHY_TXFIFO_IDLE_FORCE_DIS	BIT(4)
 +
- static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
- {
- 	struct device *dev = ci->gadget.dev.parent;
-@@ -52,11 +61,20 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
++#define HS_PHY_GENCONFIG_2		0x00a0
++#define HS_PHY_SESS_VLD_CTRL_EN		BIT(7)
++#define HS_PHY_ULPI_TX_PKT_EN_CLR_FIX	BIT(19)
++
++#define HSPHY_SESS_VLD_CTRL		BIT(25)
++
+ /* Vendor base starts at 0x200 beyond CI base */
+ #define HS_PHY_SEC_CTRL			0x0078
+ #define HS_PHY_DIG_CLAMP_N		BIT(16)
+@@ -29,6 +40,7 @@ struct ci_hdrc_msm {
+ 	struct clk *iface_clk;
+ 	struct clk *fs_clk;
+ 	bool secondary_phy;
++	bool hsic;
+ 	void __iomem *base;
+ };
  
- static int ci_hdrc_msm_probe(struct platform_device *pdev)
- {
-+	struct ci_hdrc_msm *ci;
- 	struct platform_device *plat_ci;
- 	struct usb_phy *phy;
-+	struct clk *clk;
-+	struct reset_control *reset;
-+	int ret;
+@@ -48,6 +60,24 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+ 
+ 		/* use AHB transactor, allow posted data writes */
+ 		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
++
++		/* workaround for rx buffer collision issue */
++		hw_write_id_reg(ci, HS_PHY_GENCONFIG,
++				HS_PHY_TXFIFO_IDLE_FORCE_DIS, 0);
++
++		if (!msm_ci->hsic)
++			hw_write_id_reg(ci, HS_PHY_GENCONFIG_2,
++					HS_PHY_ULPI_TX_PKT_EN_CLR_FIX, 0);
++
++		if (ci->platdata->vbus_extcon.edev) {
++			hw_write_id_reg(ci, HS_PHY_GENCONFIG_2,
++					HS_PHY_SESS_VLD_CTRL_EN,
++					HS_PHY_SESS_VLD_CTRL_EN);
++			hw_write(ci, OP_USBCMD, HSPHY_SESS_VLD_CTRL,
++				 HSPHY_SESS_VLD_CTRL);
++
++		}
++
+ 		usb_phy_init(ci->usb_phy);
+ 		break;
+ 	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
+@@ -116,6 +146,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+ 	struct reset_control *reset;
+ 	struct resource *res;
+ 	int ret;
++	struct device_node *ulpi_node, *phy_node;
  
  	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
  
-+	ci = devm_kzalloc(&pdev->dev, sizeof(*ci), GFP_KERNEL);
-+	if (!ci)
-+		return -ENOMEM;
-+	platform_set_drvdata(pdev, ci);
-+
- 	/*
- 	 * OTG(PHY) driver takes care of PHY initialization, clock management,
- 	 * powering up VBUS, mapping of registers address space and power
-@@ -68,29 +86,75 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+@@ -181,6 +212,14 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_mux;
  
- 	ci_hdrc_msm_platdata.usb_phy = phy;
- 
-+	reset = devm_reset_control_get(&pdev->dev, "core");
-+	if (IS_ERR(reset))
-+		return PTR_ERR(reset);
-+
-+	ci->core_clk = clk = devm_clk_get(&pdev->dev, "core");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	ci->iface_clk = clk = devm_clk_get(&pdev->dev, "iface");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	ci->fs_clk = clk = devm_clk_get(&pdev->dev, "fs");
-+	if (IS_ERR(clk)) {
-+		if (PTR_ERR(clk) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		ci->fs_clk = NULL;
++	ulpi_node = of_find_node_by_name(pdev->dev.of_node, "ulpi");
++	if (ulpi_node) {
++		phy_node = of_get_next_available_child(ulpi_node, NULL);
++		ci->hsic = of_device_is_compatible(phy_node, "qcom,usb-hsic-phy");
++		of_node_put(phy_node);
 +	}
++	of_node_put(ulpi_node);
 +
-+	ret = clk_prepare_enable(ci->fs_clk);
-+	if (ret)
-+		return ret;
-+
-+	reset_control_assert(reset);
-+	usleep_range(10000, 12000);
-+	reset_control_deassert(reset);
-+
-+	clk_disable_unprepare(ci->fs_clk);
-+
-+	ret = clk_prepare_enable(ci->core_clk);
-+	if (ret)
-+		return ret;
-+
-+	ret = clk_prepare_enable(ci->iface_clk);
-+	if (ret)
-+		goto err_iface;
-+
- 	plat_ci = ci_hdrc_add_device(&pdev->dev,
- 				pdev->resource, pdev->num_resources,
- 				&ci_hdrc_msm_platdata);
+ 	plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
+ 				     pdev->num_resources, &ci_hdrc_msm_platdata);
  	if (IS_ERR(plat_ci)) {
- 		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
--		return PTR_ERR(plat_ci);
-+		ret = PTR_ERR(plat_ci);
-+		goto err_mux;
- 	}
- 
--	platform_set_drvdata(pdev, plat_ci);
-+	ci->ci = plat_ci;
- 
- 	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_no_callbacks(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
- 
- 	return 0;
-+
-+err_mux:
-+	clk_disable_unprepare(ci->iface_clk);
-+err_iface:
-+	clk_disable_unprepare(ci->core_clk);
-+	return ret;
- }
- 
- static int ci_hdrc_msm_remove(struct platform_device *pdev)
- {
--	struct platform_device *plat_ci = platform_get_drvdata(pdev);
-+	struct ci_hdrc_msm *ci = platform_get_drvdata(pdev);
- 
- 	pm_runtime_disable(&pdev->dev);
--	ci_hdrc_remove_device(plat_ci);
-+	ci_hdrc_remove_device(ci->ci);
-+	clk_disable_unprepare(ci->iface_clk);
-+	clk_disable_unprepare(ci->core_clk);
- 
- 	return 0;
- }
 -- 
 2.9.0.rc2.8.ga28705d
