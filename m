@@ -1,75 +1,52 @@
-From: rmk@armlinux.org.uk (Russell King)
-Date: Thu, 07 Jul 2016 15:01:24 +0100
-Subject: [PATCH 2/2] arm: use zImage size from header
-In-Reply-To: <20160707102003.GO1041@n2100.armlinux.org.uk>
-References: <20160707102003.GO1041@n2100.armlinux.org.uk>
-Message-ID: <E1bL9ro-0002P2-Cr@e0050434b2927.dyn.armlinux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 7 Jul 2016 16:03:02 +0200
+Subject: [PATCH v2 3/5] drivers: net: phy: Add MDIO driver
+In-Reply-To: <CAKh23FnvgWRMo=M35Mj4=a_KeUpvOoHa8stU=bSk9Y3VSRtyzQ@mail.gmail.com>
+References: <1464739840-21971-1-git-send-email-isubramanian@apm.com>
+ <1464739840-21971-4-git-send-email-isubramanian@apm.com>
+ <20160601011148.GD31982@lunn.ch>
+ <CAKh23FmaQy8J=f-eyfBeNndz0oT5R0icvwJ3vrw1DMJnj9uv_g@mail.gmail.com>
+ <20160705134950.GC5230@lunn.ch>
+ <CAKh23FnvgWRMo=M35Mj4=a_KeUpvOoHa8stU=bSk9Y3VSRtyzQ@mail.gmail.com>
+Message-ID: <20160707140302.GP19800@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We do not support zImage with an appended DTB as we need to supply our
-own DTB to the kernel, and an appended DTB will override any that we
-try to supply.  To ensure that we do not load an appended DTB, clamp
-the kernel size to the size specified in the zImage header.
+> Wed, Jul 06, 2016 at 04:44:44PM -0700, Iyappan Subramanian wrote:
+> Hi Andrew,
+> 
+> On Tue, Jul 5, 2016 at 6:49 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> > On Mon, Jun 06, 2016 at 10:12:35AM -0700, Iyappan Subramanian wrote:
+> >> Hi Andrew,
+> >>
+> >> Thanks for the review.
+> >>
+> >> On Tue, May 31, 2016 at 6:11 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> >> > On Tue, May 31, 2016 at 05:10:38PM -0700, Iyappan Subramanian wrote:
+> >> >> +static int xgene_mdio_reset(struct xgene_mdio_pdata *pdata)
+> >> >> +{
+> >> >> +     int ret;
+> >> >> +
+> >> >> +     if (pdata->mdio_id == XGENE_MDIO_RGMII) {
+> >> >> +             if (pdata->dev->of_node) {
+> >> >> +                     clk_prepare_enable(pdata->clk);
+> >> >> +                     clk_disable_unprepare(pdata->clk);
+> >> >> +                     clk_prepare_enable(pdata->clk);
+> >> >
+> >> > Hi Iyappan
+> >> >
+> >> > Is that a workaround for a hardware problem? If so, i would suggest
+> >> > adding a comment, to stop people submitting a patch simplifying it.
+> >>
+> >> Hardware expects this clock sequence.  I'll add comment as you suggested.
+> >
+> > What exactly does the hardware require? Is this a workaround for a bug
+> > in the clock generator? Or a workaround for a bug in the MDIO device?
+> 
+> Hardware requires a clock pulse.  There is no bug.
 
-Signed-off-by: Russell King <rmk@armlinux.org.uk>
----
- kexec/arch/arm/kexec-zImage-arm.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+And how are you guaranteeing a pulse? You enable/disable/enable
+without any sleeps, so it could all happen within a single clock
+cycle?
 
-diff --git a/kexec/arch/arm/kexec-zImage-arm.c b/kexec/arch/arm/kexec-zImage-arm.c
-index c8b90f96..7f02b931 100644
---- a/kexec/arch/arm/kexec-zImage-arm.c
-+++ b/kexec/arch/arm/kexec-zImage-arm.c
-@@ -28,6 +28,14 @@ off_t initrd_base = 0, initrd_size = 0;
- unsigned int kexec_arm_image_size = 0;
- unsigned long long user_page_offset = (-1ULL);
- 
-+struct zimage_header {
-+	uint32_t instr[9];
-+	uint32_t magic;
-+#define ZIMAGE_MAGIC cpu_to_le32(0x016f2818)
-+	uint32_t start;
-+	uint32_t end;
-+};
-+
- struct android_image {
- 	char magic[8];
- 	uint32_t kernel_size;
-@@ -435,6 +443,34 @@ int zImage_arm_load(int argc, char **argv, const char *buf, off_t len,
- 	if (dtb_file)
- 		dtb_buf = slurp_file(dtb_file, &dtb_length);
- 
-+	if (len > 0x34) {
-+		const struct zimage_header *hdr;
-+		off_t size;
-+
-+		hdr = (const struct zimage_header *)buf;
-+
-+		dbgprintf("zImage header: 0x%08x 0x%08x 0x%08x\n",
-+			  hdr->magic, hdr->start, hdr->end);
-+
-+		if (hdr->magic == ZIMAGE_MAGIC) {
-+			size = le32_to_cpu(hdr->end) - le32_to_cpu(hdr->start);
-+
-+			dbgprintf("zImage size 0x%llx, file size 0x%llx\n",
-+				  (unsigned long long)size,
-+				  (unsigned long long)len);
-+
-+			if (size > len) {
-+				fprintf(stderr,
-+					"zImage is truncated - file 0x%llx vs header 0x%llx\n",
-+					(unsigned long long)len,
-+					(unsigned long long)size);
-+				return -1;
-+			}
-+			if (size < len)
-+				len = size;
-+		}
-+	}
-+
- 	/* Handle android images, 2048 is the minimum page size */
- 	if (len > 2048 && !strncmp(buf, "ANDROID!", 8)) {
- 		const struct android_image *aimg = (const void *)buf;
--- 
-1.9.1
+	Andrew
