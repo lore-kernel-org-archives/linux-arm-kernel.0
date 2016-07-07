@@ -1,44 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jul 2016 11:24:53 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm,
- nvram_file_name dt property
-In-Reply-To: <27f6d3d3-4bcc-8572-4c7b-b44966ad72f4@broadcom.com>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <3996482.D5xdKXDiGl@wuerfel>
- <27f6d3d3-4bcc-8572-4c7b-b44966ad72f4@broadcom.com>
-Message-ID: <5859938.CkoVuKNmJq@wuerfel>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Thu, 7 Jul 2016 17:14:51 +0800
+Subject: [PATCH 5/6] usb: chipidea: host: let the hcd know's parent device node
+In-Reply-To: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
+References: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1467882892-27589-6-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 7, 2016 11:16:59 AM CEST Arend Van Spriel wrote:
-> On 7-7-2016 10:46, Arnd Bergmann wrote:
-> > On Wednesday, July 6, 2016 9:19:41 PM CEST Arend Van Spriel wrote:
-> >> On 6-7-2016 15:42, Arnd Bergmann wrote:
-> >>> On Wednesday, July 6, 2016 10:08:55 AM CEST Arend Van Spriel wrote:
-> >>>> On Tue, Jul 5, 2016 at 3:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I'm a bit confused by the interdependencies now. You say that there are
-> > board ID/rev values stored in OTP. What exactly prevents us from just
-> > using those to generate a file name to look up the nvram file on disk
-> > for the remaining values?
-> > 
-> > Do we require the firmware to be running before we can read the OTP,
-> > or are there cases where the board ID in OTP is wrong or missing?
-> 
-> Well, both. Primarily we need firmware running to get the info. If board
-> ID is missing in OTP the value from nvram file is used. If board ID in
-> OTP is wrong we are screwed 
+From: Peter Chen <peter.chen@freescale.com>
 
-Ok.
+Since the hcd (chipidea core device) has no device node, so
+if we want to describe the child node under the hcd, we had
+to put it under its parent's node (glue layer device), and
+in the code, we need to let the hcd knows glue layer's code,
+then the USB core can handle this node.
 
-> > If we can't rely on OTP for one of those reasons and instead add two
-> > properties for boardtype/boardrev, I don't think that requires a
-> > change of the compatible string, we would just document those two
-> > as optional properties.
-> 
-> Right. I suppose the bindings update and driver update should preferably
-> be in the same kernel release although bindings are supposedly OS agnostic.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+---
+ drivers/usb/chipidea/host.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-It's a one-way dependency, we shouldn't add the kernel code handling
-the property without having agreed on and updated the binding first.
-
-	Arnd
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 053bac9..55120ef 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -109,15 +109,25 @@ static int host_start(struct ci_hdrc *ci)
+ 	struct ehci_hcd *ehci;
+ 	struct ehci_ci_priv *priv;
+ 	int ret;
++	struct device *dev = ci->dev;
+ 
+-	if (usb_disabled())
++	if (usb_disabled() || !dev)
+ 		return -ENODEV;
+ 
+-	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
++	/*
++	 * USB Core will try to get child node under roothub,
++	 * but chipidea core has no of_node, and the child node
++	 * for controller is located at glue layer's node which
++	 * is chipidea core's parent.
++	 */
++	if (dev->parent && dev->parent->of_node)
++		dev->of_node = dev->parent->of_node;
++
++	hcd = usb_create_hcd(&ci_ehci_hc_driver, dev, dev_name(dev));
+ 	if (!hcd)
+ 		return -ENOMEM;
+ 
+-	dev_set_drvdata(ci->dev, ci);
++	dev_set_drvdata(dev, ci);
+ 	hcd->rsrc_start = ci->hw_bank.phys;
+ 	hcd->rsrc_len = ci->hw_bank.size;
+ 	hcd->regs = ci->hw_bank.abs;
+@@ -143,7 +153,7 @@ static int host_start(struct ci_hdrc *ci)
+ 		if (ci->platdata->flags & CI_HDRC_TURN_VBUS_EARLY_ON) {
+ 			ret = regulator_enable(ci->platdata->reg_vbus);
+ 			if (ret) {
+-				dev_err(ci->dev,
++				dev_err(dev,
+ 				"Failed to enable vbus regulator, ret=%d\n",
+ 									ret);
+ 				goto put_hcd;
+-- 
+1.9.1
