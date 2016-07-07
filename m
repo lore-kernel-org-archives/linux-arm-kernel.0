@@ -1,45 +1,37 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 06 Jul 2016 19:33:08 -0700
-Subject: [PATCH v3 13/14] clk: sunxi-ng: Add H3 clocks
-In-Reply-To: <20160629190535.11855-14-maxime.ripard@free-electrons.com>
-References: <20160629190535.11855-1-maxime.ripard@free-electrons.com>
- <20160629190535.11855-14-maxime.ripard@free-electrons.com>
-Message-ID: <146785878822.73491.15164592643568518865@resonance>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Thu, 07 Jul 2016 11:34:43 +0900
+Subject: [PATCH -next] iommu/exynos: Fix return value check in
+ exynos_iommu_of_setup()
+In-Reply-To: <577D0316.1050502@samsung.com>
+References: <1467807354-26503-1-git-send-email-weiyj_lk@163.com>
+ <CGME20160706131005epcas1p2f8c6a70cbacbcdeb3e5293f37b0140ce@epcas1p2.samsung.com>
+ <577D0316.1050502@samsung.com>
+Message-ID: <20160707023443.GF23620@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-Quoting Maxime Ripard (2016-06-29 12:05:34)
-> +static void __init sun8i_h3_ccu_setup(struct device_node *node)
-> +{
-> +       void __iomem *reg;
-> +       u32 val;
-> +
-> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +       if (IS_ERR(reg)) {
-> +               pr_err("%s: Could not map the clock registers\n",
-> +                      of_node_full_name(node));
-> +               return;
-> +       }
-> +
-> +       /* Force the PLL-Audio-1x divider to 4 */
-> +       val = readl(reg + SUN8I_H3_PLL_AUDIO_REG);
-> +       val &= ~GENMASK(4, 0);
-> +       writel(val | 3, reg + SUN8I_H3_PLL_AUDIO_REG);
-> +
-> +       sunxi_ccu_probe(node, reg, &sun8i_h3_ccu_desc);
-> +}
-> +CLK_OF_DECLARE(sun8i_h3_ccu, "allwinner,sun8i-h3-ccu",
-> +              sun8i_h3_ccu_setup);
+just a question,
 
-There are several examples of drivers that split the clocks between
-"early" CLK_OF_DECLARE clocks and "late" module clocks. If you really
-need early clocks (which is less likely on a 64-bit platform with
-architected timers), it would be nice to pair that with a proper
-platform_driver (using builtin_platform_driver most likely).
+> >  	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+> > -	if (IS_ERR(pdev))
+> > -		return PTR_ERR(pdev);
+> > +	if (!pdev)
+> > +		return -ENOMEM;
+> >  
+> >  	/*
+> >  	 * use the first registered sysmmu device for performing
+> > 
+> 
 
-Otherwise that is my only nitpick with this series. Looks good!
+is ENOMEM the right return value? of_platform_device_create()
+doesn't fail only in case of malloc failure.
 
-Best regards,
-Mike
+Shouldn't it be ENODEV instead, which might also mean with some
+imagination that there is no memory available for that device?
+
+Thanks,
+Andi
+
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
