@@ -1,55 +1,70 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 6 Jul 2016 22:42:07 -0700
-Subject: [GIT PULL 6/6] arm64: tegra: Changes for v4.8-rc1
-In-Reply-To: <20160701145026.25760-6-thierry.reding@gmail.com>
-References: <20160701145026.25760-1-thierry.reding@gmail.com>
- <20160701145026.25760-6-thierry.reding@gmail.com>
-Message-ID: <20160707054207.GS32389@localhost>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 7 Jul 2016 13:48:07 +0800
+Subject: [PATCH] arm64: dts: berlin4ct: Add L2 cache topology
+In-Reply-To: <577D448D.8030701@gmail.com>
+References: <1466066418-1141-1-git-send-email-jszhang@marvell.com>
+ <577D448D.8030701@gmail.com>
+Message-ID: <20160707134807.08b70b38@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2016 at 04:50:26PM +0200, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
-> 
-Hi,
+Dear Sebastian,
 
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-> 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.8-arm64
-> 
-> for you to fetch changes up to a3ceccd756edc3fc7829f6fb66afa1cef413767b:
-> 
->   arm64: Update default configuration (2016-07-01 16:22:24 +0200)
-> 
-> Thanks,
-> Thierry
-> 
-> ----------------------------------------------------------------
-> arm64: tegra: Changes for v4.8-rc1
-> 
-> A slew of updates for Tegra210 support: PMIC and regulator additions,
-> which in turn allow a bunch of features to be enabled. Some assemblies
-> of the Jetson TX1 come with a DSI panel that is now supported. For all
-> other assemblies, this set of changes enables the HDMI output. Jetson
-> TX1 can now also make use of the XUSB controller, and provided that it
-> is supported by the bootloader, the GPU can also be enabled.
-> 
-> PMIC and regulator support is also added for Smaug, which will allow a
-> number of interesting feature additions in future releases.
-> 
-> Finally, a bunch of configuration options are enabled to support the
-> features mentioned above.
+On Wed, 6 Jul 2016 19:49:01 +0200 Sebastian Hesselbarth wrote:
 
-Hi, again here we keep DT changes separate from defconfig and Kconfig, etc,
-changes. Please respin.  Note that we keep arm64 and arm DT changes separate,
-so send two branches for those.
+> On 16.06.2016 10:40, Jisheng Zhang wrote:
+> > This patch adds the L2 cache topology for berlin4ct which has 1MB L2
+> > cache.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+> > index 099ad93..c9e3a98 100644
+> > --- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+> > +++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi  
+> [...]
+> > @@ -92,9 +95,14 @@
+> >  			device_type = "cpu";
+> >  			reg = <0x3>;
+> >  			enable-method = "psci";
+> > +			next-level-cache = <&L2_0>;
+> >  			cpu-idle-states = <&CPU_SLEEP_0>;
+> >  		};
+> >  
+> > +		L2_0: l2-cache0 {  
+> 
+> Jisheng,
+> 
+> The node name should just have a generic name that reflects
+> the purpose of the unit it represents, i.e.
+> s/l2-cache0/cache/
 
-I guess there's just one defconfig patch, so send it as a patch instead of
-a branch if you prefer, either is fine with us.
+IMHO, "cache" is too generic, this is L2 cache topology, so in v2, I use 
+"l2-cache" instead. what do you think?
 
+PS: I found other arm64 SoCs also use "l2-cache" as the node name.
 
--Olof
+> 
+> nits:
+> - What is that "0" for? Please remove if there is no good reason.
+> - Does the node label need to be upper-case? Please make it lower case.
+> 
+
+oh yeah, thanks for the hints! will do in v2.
+
+Thanks for reviewing,
+Jisheng
+
+> Sebastian
+> 
+> > +			compatible = "cache";
+> > +		};
+> > +
+> >  		idle-states {
+> >  			entry-method = "psci";
+> >  			CPU_SLEEP_0: cpu-sleep-0 {
+> >   
+> 
