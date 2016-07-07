@@ -1,42 +1,53 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 7 Jul 2016 11:20:29 +0100
-Subject: [PATCH v6 18/18] remoteproc: core: Retry
- rproc_fw_config_virtio() if !rproc->table_ptr
-In-Reply-To: <201607070935.iuu6KqiK%fengguang.wu@intel.com>
-References: <1467795276-21725-19-git-send-email-peter.griffin@linaro.org>
- <201607070935.iuu6KqiK%fengguang.wu@intel.com>
-Message-ID: <20160707102029.GA8755@griffinp-ThinkPad-X1-Carbon-2nd>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 7 Jul 2016 11:26:01 +0100
+Subject: [PATCH RESEND] arm64: fix vdso-offsets.h dependency
+In-Reply-To: <20160706175739.GB22615@e104818-lin.cambridge.arm.com>
+References: <1463071155-7435-1-git-send-email-kevin.brodsky@arm.com>
+ <20160706175739.GB22615@e104818-lin.cambridge.arm.com>
+Message-ID: <20160707102601.GA27180@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, 07 Jul 2016, kbuild test robot wrote:
-
-> Hi,
+On Wed, Jul 06, 2016 at 06:57:39PM +0100, Catalin Marinas wrote:
+> On Thu, May 12, 2016 at 05:39:15PM +0100, Kevin Brodsky wrote:
+> > +# We need to generate vdso-offsets.h before compiling certain files in kernel/.
+> > +# In order to do that, we should use the archprepare target, but we can't since
+> > +# asm-offsets.h is included in some files used to generate vdso-offsets.h, and
+> > +# asm-offsets.h is built in prepare0, for which archprepare is a dependency.
+> > +# Therefore we need to generate the header after prepare0 has been made, hence
+> > +# this hack.
+> > +prepare: vdso_prepare
+> > +vdso_prepare: prepare0
+> > +	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
 > 
-> [auto build test WARNING on robh/for-next]
-> [also build test WARNING on v4.7-rc6 next-20160706]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> This indeed looks dodgy. I'm not sure about the makefile rules but would
+> the above override the "prepare" target in the top Makefile?
 > 
-> url:    https://github.com/0day-ci/linux/commits/Peter-Griffin/Add-support-for-FDMA-DMA-controller-and-slim-core-rproc-found-on-STi-chipsets/20160706-170304
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-> config: openrisc-allyesconfig (attached as .config)
-> compiler: or32-linux-gcc (GCC) 4.5.1-or32-1.0rc1
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=openrisc 
+> I think a dependency problem we have is that arch/arm64/kernel/signal.o
+> depends on include/generated/vdso-offsets.h. However, we don't have any
+> target for the latter, only for
+> $(objtree)arch/arm64/kernel/vdso/vdso-offsets.h which no-one is
+> including. Because of this, we have a fake dependency in
+> arch/arm64/kernel/Makefile.
 > 
-> All warnings (new ones prefixed by >>):
-> 
-> >> drivers/remoteproc/remoteproc_internal.h:52:13: warning: 'rproc_fw_config_virtio_cb' declared 'static' but never defined
-> >> drivers/remoteproc/remoteproc_internal.h:53:13: warning:
-> >> 'rproc_fw_config_virtio' declared 'static' but never defined
+> -----------8<-------------------------
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 7700c0c23962..9bdacbf59091 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -55,5 +55,4 @@ head-y					:= head.o
+>  extra-y					+= $(head-y) vmlinux.lds
+>  
+>  # vDSO - this must be built first to generate the symbol offsets
+> -$(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
+> -$(obj)/vdso/vdso-offsets.h: $(obj)/vdso
+> +$(objtree)/include/generated/vdso-offsets.h: $(obj)/vdso
 
-Will fix this in next version.
+This didn't work either. Basically, when building
+arch/arm64/kernel/signal.o for example, it doesn't figure out that
+vdso-offsets.h has additional dependencies like the vdso.so.dbg so that
+it builds the vdso object first. I'll look for a little longer, maybe I
+find a better workaround.
 
-regards,
-
-Peter.
+-- 
+Catalin
