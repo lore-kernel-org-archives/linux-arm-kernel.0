@@ -1,41 +1,60 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 6 Jul 2016 20:50:48 -0700
-Subject: [PATCH 1/2] hwspinlock: qcom_hwspinlock: add missing of_node_put
- after calling of_parse_phandle
-In-Reply-To: <HE1PR04MB14505D3BC18163C1E4430E918B3B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
-References: <1467684664-21155-1-git-send-email-peter.chen@nxp.com>
- <20160706193512.GB23833@tuxbot>
- <HE1PR04MB14505D3BC18163C1E4430E918B3B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
-Message-ID: <20160707035047.GD23833@tuxbot>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 7 Jul 2016 14:12:26 +1000
+Subject: linux-next: manual merge of the clockevents tree with the arm-soc tree
+Message-ID: <20160707141226.2b9c1e15@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 06 Jul 18:18 PDT 2016, Peter Chen wrote:
+Hi Daniel,
 
->  
-> >On Mon 04 Jul 19:11 PDT 2016, Peter Chen wrote:
-> >
-> >> of_node_put needs to be called when the device node which is got from
-> >> of_parse_phandle has finished using.
-> >>
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Cc: linux-arm-msm at vger.kernel.org
-> >> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> >
-> >Applied.
-> >
-> >Please use get_maintainer.pl to find out whom to send patches to, I only stumbled
-> >upon this while looking for something else.
-> >
-> 
-> There is no maintainer for this file. Below is the output for get_maintainer.pl:
-> 
-> $ ./scripts/get_maintainer.pl patch_0705_2/0001-hwspinlock-qcom_hwspinlock-add-missing-of_node_put-a.patch 
-> linux-kernel at vger.kernel.org (open list)
-> 
+Today's linux-next merge of the clockevents tree got a conflict in:
 
-That's not good, sorry about that! I sent out a patch including the
-other files as well as hwlock related dt bindings.
+  arch/arm/Kconfig
 
-Regards,
-Bjorn
+between commit:
+
+  c86f51737f8d ("ARM: clps711x: Switch to MULTIPLATFORM")
+
+from the arm-soc tree and commit:
+
+  250e46aa3bb3 ("clocksource/drivers/clps_711x: Add the COMPILE_TEST option")
+
+from the clockevents tree.
+
+I fixed it up (I used the arm-soc version of this file and then added
+the following merge fix patch) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+Date: Thu, 7 Jul 2016 13:59:06 +1000
+Subject: [PATCH] clocksource/drivers/clps_711x: fixup for "ARM: clps711x: Switch to MULTIPLATFORM"
+
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+---
+ arch/arm/mach-clps711x/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
+index 3b56197ccfd0..dc7c6edeab39 100644
+--- a/arch/arm/mach-clps711x/Kconfig
++++ b/arch/arm/mach-clps711x/Kconfig
+@@ -3,8 +3,8 @@ menuconfig ARCH_CLPS711X
+ 	depends on ARCH_MULTI_V4T
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select AUTO_ZRELADDR
+-	select CLKSRC_MMIO
+ 	select CLKSRC_OF
++	select CLPS711X_TIMER
+ 	select COMMON_CLK
+ 	select CPU_ARM720T
+ 	select GENERIC_CLOCKEVENTS
+-- 
+2.8.1
+
+-- 
+Cheers,
+Stephen Rothwell
