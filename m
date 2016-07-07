@@ -1,74 +1,58 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu,  7 Jul 2016 12:46:40 +0800
-Subject: [PATCH] arm64: dts: rockchip: support the usb2phy for rk3399 evb
-Message-ID: <1467866800-24794-1-git-send-email-wxt@rock-chips.com>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Thu, 7 Jul 2016 10:18:17 +0530
+Subject: [PATCH] arm64: Enable workaround for Cavium erratum 27456 on
+ thunderx-81xx
+Message-ID: <1467866897-2543-1-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Wang <frank.wang@rock-chips.com>
+Cavium erratum 27456 commit 104a0c02e8b1
+("arm64: Add workaround for Cavium erratum 27456")
+is applicable for thunderx-81xx pass1.0 SoC as well.
+Adding code to enable to 81xx.
 
-This patch adds the usb2phy needed dts node information for rk3399.
-
-USB2.0 PHY is comprised of one Host port and one OTG port.
-Host Port is for USB2.0 host controller; OTG port is for USB2.0 part of
-USB3.0 OTG controller, and as a part to construct a fully feature TypeC
-subsystem.
-
-The USB2.0 vbus gpio is board specific, it's no same with all rk3399
-boards, so move it into evb voard.
-
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Signed-off-by: Ganapatrao Kulkarni <gkulkarni@cavium.com>
+Reviewed-by: Andrew Pinski <apinski@cavium.com>
 ---
+ arch/arm64/include/asm/cputype.h | 2 ++
+ arch/arm64/kernel/cpu_errata.c   | 6 ++++++
+ 2 files changed, 8 insertions(+)
 
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  4 ++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 19 +++++++++++++++++++
- 2 files changed, 23 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-index d33aa06..9be3715 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -105,6 +105,10 @@
- 	status = "okay";
- };
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 87e1985..9d9fd4b 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -80,12 +80,14 @@
+ #define APM_CPU_PART_POTENZA		0x000
  
-+&usb2phy {
-+	vbus_drv-gpio = <&gpio4 25 GPIO_ACTIVE_HIGH>;
-+};
-+
- &usb_host0_ehci {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 4c84229..21d147f 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -242,6 +242,25 @@
- 		status = "disabled";
- 	};
+ #define CAVIUM_CPU_PART_THUNDERX	0x0A1
++#define CAVIUM_CPU_PART_THUNDERX_81XX	0x0A2
  
-+	usb2phy: usb2phy {
-+		compatible = "rockchip,rk3399-usb-phy";
-+		rockchip,grf = <&grf>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		usb2phy0: usb2-phy0 {
-+			#phy-cells = <0>;
-+			#clock-cells = <0>;
-+			reg = <0xe458>;
-+		};
-+
-+		usb2phy1: usb2-phy1 {
-+			#phy-cells = <0>;
-+			#clock-cells = <0>;
-+			reg = <0xe468>;
-+		};
-+	};
-+
- 	usb_host0_ehci: usb at fe380000 {
- 		compatible = "generic-ehci";
- 		reg = <0x0 0xfe380000 0x0 0x20000>;
+ #define BRCM_CPU_PART_VULCAN		0x516
+ 
+ #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+ #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
++#define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index d427894..af716b6 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -98,6 +98,12 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		MIDR_RANGE(MIDR_THUNDERX, 0x00,
+ 			   (1 << MIDR_VARIANT_SHIFT) | 1),
+ 	},
++	{
++	/* Cavium ThunderX, T81 pass 1.0 */
++		.desc = "Cavium erratum 27456",
++		.capability = ARM64_WORKAROUND_CAVIUM_27456,
++		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x00),
++	},
+ #endif
+ 	{
+ 	}
 -- 
-1.9.1
+1.8.1.4
