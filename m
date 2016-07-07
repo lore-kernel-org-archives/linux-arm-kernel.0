@@ -1,63 +1,45 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri,  8 Jul 2016 01:46:41 +0300
-Subject: [PATCH] ARM: dts: lpc32xx: add device node for IRAM on-chip memory
-Message-ID: <1467931601-25067-1-git-send-email-vz@mleia.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Thu, 07 Jul 2016 15:56:51 -0700
+Subject: [PATCH 5/6] usb: chipidea: host: let the hcd know's parent device
+ node
+In-Reply-To: <1467882892-27589-6-git-send-email-peter.chen@nxp.com>
+References: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
+ <1467882892-27589-6-git-send-email-peter.chen@nxp.com>
+Message-ID: <146793221122.31330.7571458363004882365@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change adds a new device node with description of generic SRAM
-on-chip memory found on NXP LPC32xx SoC series and connected to AHB
-matrix slave port 3.
+Quoting Peter Chen (2016-07-07 02:14:51)
+> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+> index 053bac9..55120ef 100644
+> --- a/drivers/usb/chipidea/host.c
+> +++ b/drivers/usb/chipidea/host.c
+> @@ -109,15 +109,25 @@ static int host_start(struct ci_hdrc *ci)
+>         struct ehci_hcd *ehci;
+>         struct ehci_ci_priv *priv;
+>         int ret;
+> +       struct device *dev = ci->dev;
+>  
+> -       if (usb_disabled())
+> +       if (usb_disabled() || !dev)
 
-Note that NXP LPC3220 SoC has 128KiB of SRAM memory, the other
-LPC3230, LPC3240 and LPC3250 SoCs all have 256KiB SRAM space,
-in the shared DTSI file this change specifies 128KiB SRAM size.
+Does that ever happen?
 
-Also it's worth to mention that the SRAM area contains of 64KiB banks,
-2 banks on LPC3220 and 4 banks on the other SoCs from the series, and
-all SRAM banks but the first one have independent power controls,
-the description of this feature will be added with the introduction of
-power domains for the SoC series.
+>                 return -ENODEV;
+>  
+> -       hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
+> +       /*
+> +        * USB Core will try to get child node under roothub,
+> +        * but chipidea core has no of_node, and the child node
+> +        * for controller is located at glue layer's node which
+> +        * is chipidea core's parent.
+> +        */
+> +       if (dev->parent && dev->parent->of_node)
+> +               dev->of_node = dev->parent->of_node;
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
----
+Why not do this during the ci device probe? How is host special for
+having an of_node for the child device.
 
-Hi Arnd, Olof, Kevin,
-
-please consider to include this NXP LPC32xx DT change directly to
-ARM tree for v4.8.
-
-The SRAM device node will be utilized to store PM resume code
-and to store MAC buffers.
-
- arch/arm/boot/dts/lpc32xx.dtsi | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index e295e1e..b5841fa 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -51,9 +51,19 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		compatible = "simple-bus";
--		ranges = <0x20000000 0x20000000 0x30000000>,
-+		ranges = <0x00000000 0x00000000 0x10000000>,
-+			 <0x20000000 0x20000000 0x30000000>,
- 			 <0xe0000000 0xe0000000 0x04000000>;
- 
-+		iram: sram at 08000000 {
-+			compatible = "mmio-sram";
-+			reg = <0x08000000 0x20000>;
-+
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x00000000 0x08000000 0x20000>;
-+		};
-+
- 		/*
- 		 * Enable either SLC or MLC
- 		 */
--- 
-2.8.0.rc3
+Doing that would also make my ULPI bus DT discovery patch simpler
+because we wouldn't have to search the parent of the parent for a DT
+node to find the ULPI node that's a child of the ci glue device.
