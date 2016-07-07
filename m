@@ -1,125 +1,132 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 7 Jul 2016 19:08:10 +0100
-Subject: [PATCH RESEND] arm64: fix vdso-offsets.h dependency
-In-Reply-To: <20160707112325.GB27180@e104818-lin.cambridge.arm.com>
-References: <1463071155-7435-1-git-send-email-kevin.brodsky@arm.com>
- <20160706175739.GB22615@e104818-lin.cambridge.arm.com>
- <20160707102601.GA27180@e104818-lin.cambridge.arm.com>
- <20160707112325.GB27180@e104818-lin.cambridge.arm.com>
-Message-ID: <20160707180810.GD27180@e104818-lin.cambridge.arm.com>
+From: sivaramn@nvidia.com (Sivaram Nair)
+Date: Thu, 7 Jul 2016 11:13:56 -0700
+Subject: [PATCH V2 01/10] Documentation: dt-bindings: mailbox: tegra: Add
+ binding for HSP mailbox
+In-Reply-To: <20160705090431.5852-2-josephl@nvidia.com>
+References: <20160705090431.5852-1-josephl@nvidia.com>
+ <20160705090431.5852-2-josephl@nvidia.com>
+Message-ID: <20160707181356.GA6864@kickseed.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 12:23:25PM +0100, Catalin Marinas wrote:
-> On Thu, Jul 07, 2016 at 11:26:01AM +0100, Catalin Marinas wrote:
-> > On Wed, Jul 06, 2016 at 06:57:39PM +0100, Catalin Marinas wrote:
-> > > On Thu, May 12, 2016 at 05:39:15PM +0100, Kevin Brodsky wrote:
-> > > > +# We need to generate vdso-offsets.h before compiling certain files in kernel/.
-> > > > +# In order to do that, we should use the archprepare target, but we can't since
-> > > > +# asm-offsets.h is included in some files used to generate vdso-offsets.h, and
-> > > > +# asm-offsets.h is built in prepare0, for which archprepare is a dependency.
-> > > > +# Therefore we need to generate the header after prepare0 has been made, hence
-> > > > +# this hack.
-> > > > +prepare: vdso_prepare
-> > > > +vdso_prepare: prepare0
-> > > > +	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
-> > > 
-> > > This indeed looks dodgy. I'm not sure about the makefile rules but would
-> > > the above override the "prepare" target in the top Makefile?
-> > > 
-> > > I think a dependency problem we have is that arch/arm64/kernel/signal.o
-> > > depends on include/generated/vdso-offsets.h. However, we don't have any
-> > > target for the latter, only for
-> > > $(objtree)arch/arm64/kernel/vdso/vdso-offsets.h which no-one is
-> > > including. Because of this, we have a fake dependency in
-> > > arch/arm64/kernel/Makefile.
-> > > 
-> > > -----------8<-------------------------
-> > > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> > > index 7700c0c23962..9bdacbf59091 100644
-> > > --- a/arch/arm64/kernel/Makefile
-> > > +++ b/arch/arm64/kernel/Makefile
-> > > @@ -55,5 +55,4 @@ head-y					:= head.o
-> > >  extra-y					+= $(head-y) vmlinux.lds
-> > >  
-> > >  # vDSO - this must be built first to generate the symbol offsets
-> > > -$(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
-> > > -$(obj)/vdso/vdso-offsets.h: $(obj)/vdso
-> > > +$(objtree)/include/generated/vdso-offsets.h: $(obj)/vdso
-> > 
-> > This didn't work either. Basically, when building
-> > arch/arm64/kernel/signal.o for example, it doesn't figure out that
-> > vdso-offsets.h has additional dependencies like the vdso.so.dbg so that
-> > it builds the vdso object first. I'll look for a little longer, maybe I
-> > find a better workaround.
+On Tue, Jul 05, 2016 at 05:04:22PM +0800, Joseph Lo wrote:
+> Add DT binding for the Hardware Synchronization Primitives (HSP). The
+> HSP is designed for the processors to share resources and communicate
+> together. It provides a set of hardware synchronization primitives for
+> interprocessor communication. So the interprocessor communication (IPC)
+> protocols can use hardware synchronization primitive, when operating
+> between two processors not in an SMP relationship.
 > 
-> If I also add the patch below, it works fine but I'm not sure we can
-> guarantee that kbuild first dives into subdirectories with a parallel
-> build:
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+> Changes in V2:
+> - revise the compatible string, interrupt-names, interrupts, and #mbox-cells
+>   properties
+> - remove "nvidia,hsp-function" property
+> - fix the header file name
+> - the binding supports the concept of multiple HSP sub-modules on one HSP HW
+>   block now.
+> ---
+>  .../bindings/mailbox/nvidia,tegra186-hsp.txt       | 51 ++++++++++++++++++++++
+>  include/dt-bindings/mailbox/tegra186-hsp.h         | 23 ++++++++++
+>  2 files changed, 74 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+>  create mode 100644 include/dt-bindings/mailbox/tegra186-hsp.h
 > 
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -49,11 +49,7 @@ arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
->  arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
->  					   cpu-reset.o
->  
-> -obj-y					+= $(arm64-obj-y) vdso/
-> +obj-y					+= vdso/ $(arm64-obj-y)
+> diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+> new file mode 100644
+> index 000000000000..10e53edbe1c7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+> @@ -0,0 +1,51 @@
+> +NVIDIA Tegra Hardware Synchronization Primitives (HSP)
+> +
+> +The HSP modules are used for the processors to share resources and communicate
+> +together. It provides a set of hardware synchronization primitives for
+> +interprocessor communication. So the interprocessor communication (IPC)
+> +protocols can use hardware synchronization primitives, when operating between
+> +two processors not in an SMP relationship.
+> +
+> +The features that HSP supported are shared mailboxes, shared semaphores,
+> +arbitrated semaphores and doorbells.
+> +
+> +Required properties:
+> +- name : Should be hsp
+> +- compatible
+> +    Array of strings.
+> +    one of:
+> +    - "nvidia,tegra186-hsp"
+> +- reg : Offset and length of the register set for the device.
+> +- interrupt-names
+> +    Array of strings.
+> +    Contains a list of names for the interrupts described by the interrupt
+> +    property. May contain the following entries, in any order:
+> +    - "doorbell"
+> +    Users of this binding MUST look up entries in the interrupt property
+> +    by name, using this interrupt-names property to do so.
+> +- interrupts
+> +    Array of interrupt specifiers.
+> +    Must contain one entry per entry in the interrupt-names property,
+> +    in a matching order.
+> +- #mbox-cells : Should be 1.
+> +
+> +The mbox specifier of the "mboxes" property in the client node should use
+> +the "HSP_MBOX_ID" macro which integrates the HSP type and master ID data.
+> +Those information can be found in the following file.
+> +
+> +- <dt-bindings/mailbox/tegra186-hsp.h>.
+> +
+> +Example:
+> +
+> +hsp_top0: hsp at 3c00000 {
+> +	compatible = "nvidia,tegra186-hsp";
+> +	reg = <0x0 0x03c00000 0x0 0xa0000>;
+> +	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-names = "doorbell";
+> +	#mbox-cells = <1>;
+> +};
+> +
+> +client {
+> +	...
+> +	mboxes = <&hsp_top0 HSP_MBOX_ID(DB, HSP_DB_MASTER_XXX)>;
+> +};
+> diff --git a/include/dt-bindings/mailbox/tegra186-hsp.h b/include/dt-bindings/mailbox/tegra186-hsp.h
+> new file mode 100644
+> index 000000000000..365dbeb5d894
+> --- /dev/null
+> +++ b/include/dt-bindings/mailbox/tegra186-hsp.h
+> @@ -0,0 +1,23 @@
+> +/*
+> + * This header provides constants for binding nvidia,tegra186-hsp.
+> + *
+> + * The number with HSP_DB_MASTER prefix indicates the bit that is
+> + * associated with a master ID in the doorbell registers.
+> + */
+> +
+> +
+> +#ifndef _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
+> +#define _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
+> +
+> +#define HSP_MBOX_TYPE_DB 0x0
+> +#define HSP_MBOX_TYPE_SM 0x1
+> +#define HSP_MBOX_TYPE_SS 0x2
+> +#define HSP_MBOX_TYPE_AS 0x3
+> +
+> +#define HSP_DB_MASTER_CCPLEX 17
+> +#define HSP_DB_MASTER_BPMP 19
+> +
+> +#define HSP_MBOX_ID(type, ID) \
+> +		(HSP_MBOX_TYPE_##type << 16 | ID)
 
-This one works "most of the time" but not always. What I found to work
-reliably (until further notice ;)) is to force the vdso build like
-below:
+It will be nicer if you avoid the macro glue magic '##' for 'type'. I
+would also suggest to use braces around 'type' and 'ID'.
 
-----------------------8<----------------------------
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7700c0c23962..366e4f26071f 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -55,5 +55,5 @@ head-y					:= head.o
- extra-y					+= $(head-y) vmlinux.lds
- 
- # vDSO - this must be built first to generate the symbol offsets
--$(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
--$(obj)/vdso/vdso-offsets.h: $(obj)/vdso
-+$(objtree)/include/generated/vdso-offsets.h: $(obj)/vdso
-+	$(Q)$(MAKE) $(build)=$< $@
-diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-index b467fd0a384b..238bb2db76be 100644
---- a/arch/arm64/kernel/vdso/Makefile
-+++ b/arch/arm64/kernel/vdso/Makefile
-@@ -23,7 +23,7 @@ GCOV_PROFILE := n
- ccflags-y += -Wl,-shared
- 
- obj-y += vdso.o
--extra-y += vdso.lds vdso-offsets.h
-+extra-y += vdso.lds ../../../../include/generated/vdso-offsets.h
- CPPFLAGS_vdso.lds += -P -C -U$(ARCH)
- 
- # Force dependency (incbin is bad)
-@@ -42,11 +42,10 @@ $(obj)/%.so: $(obj)/%.so.dbg FORCE
- gen-vdsosym := $(srctree)/$(src)/gen_vdso_offsets.sh
- quiet_cmd_vdsosym = VDSOSYM $@
- define cmd_vdsosym
--	$(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@ && \
--	cp $@ include/generated/
-+	$(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@
- endef
- 
--$(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
-+$(objtree)/include/generated/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
- 	$(call if_changed,vdsosym)
- 
- # Assembly rules for the .S files
-----------------------8<----------------------------
-
-This was my last attempt@solving this. Unless someone has a better
-idea or thinkg the above doesn't work (or it's uglier than Kevin's
-original patch) I plan to merge it.
-
-Other advantages are that it only generates a single vdso-offets.h file.
-It also only rebuilds those objects that depend on vdso-offests.h rather
-than everything under arch/arm64/kernel/ (Kevin's patch was also solving
-this).
-
--- 
-Catalin
+> +
+> +#endif	/* _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H */
+> -- 
+> 2.9.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
