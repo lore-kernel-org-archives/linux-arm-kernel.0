@@ -1,31 +1,75 @@
-From: nicolaooyman@wellsfargo.com (=?UTF-8?Q?Nicola_Ooyman?=)
-Date: Tue, 5 Jul 2016 02:59:23 +0400
-Subject: =?UTF-8?Q?Re=3bRemittance?=
-Message-ID: <312a8b930d7958c58a93d1b851094c11@www.batarey.net>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Thu,  7 Jul 2016 12:17:51 -0500
+Subject: [RFC] [PATCH v3 4/4] ARM: dts: am335x-icev2: Add SPI based NOR
+In-Reply-To: <1467911871-4508-1-git-send-email-fcooper@ti.com>
+References: <1467911871-4508-1-git-send-email-fcooper@ti.com>
+Message-ID: <1467911871-4508-5-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Enable support for W25Q64CVSSIG which is a Winbond 64 Mbit SPI NOR.
 
-In response to the payment request we received from your client, we wish to notify you that payment has now been processed to your bank details on file through our intermediary bank.
+At boot you will see the following message:
+m25p80 spi1.0: found s25fl064k, expected w25q64
 
-Wire Confirmation No: BOA1516288924NBC.
-Transaction Status: Completed.
-Further Details: On Payment Receipt
+This is because the JEDEC ID for this chip is the same as s25fl064k.
+However, this should be harmless since both chips are essentially the
+same.
 
-Attached to this email is the secure remittance advice. To access the receipt and further details relating to this transaction.
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+ arch/arm/boot/dts/am335x-icev2.dts | 39 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-You will be required to download and authenticate your email client on the Microsoft Secure File Access attached for security purposes.
-
-If you are unable to view the file, do not hesitate to contact me.
-
-Regards
-Nicola Ooyman
-Accounts Payable
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: Secure Remittance Advice.htm
-Type: application/octet-stream
-Size: 8946 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160705/ad7bc140/attachment-0001.obj>
+diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
+index e271013..e4d2d13 100644
+--- a/arch/arm/boot/dts/am335x-icev2.dts
++++ b/arch/arm/boot/dts/am335x-icev2.dts
+@@ -208,6 +208,45 @@
+ 	};
+ };
+ 
++&spi0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins_default>;
++
++	spi_nor: flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "winbond,w25q64", "jedec,spi-nor";
++		spi-max-frequency = <80000000>;
++		m25p,fast-read;
++		reg = <0>;
++
++		partition at 0 {
++			label = "u-boot-spl";
++			reg = <0x0 0x80000>;
++			read-only;
++		};
++
++		partition at 1 {
++			label = "u-boot";
++			reg = <0x80000 0x100000>;
++			read-only;
++		};
++
++		partition at 2 {
++			label = "u-boot-env";
++			reg = <0x180000 0x20000>;
++			read-only;
++		};
++
++		partition at 3 {
++			label = "misc";
++			reg = <0x1A0000 0x660000>;
++		};
++	};
++
++};
++
+ #include "tps65910.dtsi"
+ 
+ &tps {
+-- 
+2.7.0
