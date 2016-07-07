@@ -1,66 +1,42 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 7 Jul 2016 09:42:17 +0200 (CEST)
-Subject: [PATCH 1/9] mm: Hardened usercopy
-In-Reply-To: <1467843928-29351-2-git-send-email-keescook@chromium.org>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
- <1467843928-29351-2-git-send-email-keescook@chromium.org>
-Message-ID: <alpine.DEB.2.11.1607070938430.4083@nanos>
+From: oss@buserror.net (Scott Wood)
+Date: Thu,  7 Jul 2016 02:46:10 -0500
+Subject: [PATCH v4 2/4] arm64: dts: Add timer erratum property for LS2080A and
+ LS1043A
+In-Reply-To: <1467877572-10817-1-git-send-email-oss@buserror.net>
+References: <1467877572-10817-1-git-send-email-oss@buserror.net>
+Message-ID: <1467877572-10817-2-git-send-email-oss@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2016, Kees Cook wrote:
-> +
-> +#if defined(CONFIG_FRAME_POINTER) && defined(CONFIG_X86)
-> +	const void *frame = NULL;
-> +	const void *oldframe;
-> +#endif
+Signed-off-by: Scott Wood <oss@buserror.net>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
 
-That's ugly
-
-> +
-> +	/* Object is not on the stack at all. */
-> +	if (obj + len <= stack || stackend <= obj)
-> +		return 0;
-> +
-> +	/*
-> +	 * Reject: object partially overlaps the stack (passing the
-> +	 * the check above means at least one end is within the stack,
-> +	 * so if this check fails, the other end is outside the stack).
-> +	 */
-> +	if (obj < stack || stackend < obj + len)
-> +		return -1;
-> +
-> +#if defined(CONFIG_FRAME_POINTER) && defined(CONFIG_X86)
-> +	oldframe = __builtin_frame_address(1);
-> +	if (oldframe)
-> +		frame = __builtin_frame_address(2);
-> +	/*
-> +	 * low ----------------------------------------------> high
-> +	 * [saved bp][saved ip][args][local vars][saved bp][saved ip]
-> +	 *		     ^----------------^
-> +	 *             allow copies only within here
-> +	 */
-> +	while (stack <= frame && frame < stackend) {
-> +		/*
-> +		 * If obj + len extends past the last frame, this
-> +		 * check won't pass and the next frame will be 0,
-> +		 * causing us to bail out and correctly report
-> +		 * the copy as invalid.
-> +		 */
-> +		if (obj + len <= frame)
-> +			return obj >= oldframe + 2 * sizeof(void *) ? 2 : -1;
-> +		oldframe = frame;
-> +		frame = *(const void * const *)frame;
-> +	}
-> +	return -1;
-> +#else
-> +	return 1;
-> +#endif
-
-I'd rather make that a weak function returning 1 which can be replaced by
-x86 for CONFIG_FRAME_POINTER=y. That also allows other architectures to
-implement their specific frame checks.
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index de0323b..c277ba6 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -115,6 +115,7 @@
+ 			     <1 14 0x1>, /* Physical Non-Secure PPI */
+ 			     <1 11 0x1>, /* Virtual PPI */
+ 			     <1 10 0x1>; /* Hypervisor PPI */
++		fsl,erratum-a008585;
+ 	};
+ 
+ 	pmu {
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 3187c82..768b899 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -171,6 +171,7 @@
+ 			     <1 14 0x8>, /* Physical Non-Secure PPI, active-low */
+ 			     <1 11 0x8>, /* Virtual PPI, active-low */
+ 			     <1 10 0x8>; /* Hypervisor PPI, active-low */
++		fsl,erratum-a008585;
+ 	};
+ 
+ 	pmu {
+-- 
+2.7.4
