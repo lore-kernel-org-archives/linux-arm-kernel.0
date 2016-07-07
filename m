@@ -1,20 +1,35 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 06 Jul 2016 22:31:52 -0700 (PDT)
-Subject: [PATCH -next] net: mediatek: remove .owner field for driver
-In-Reply-To: <1467811813-4864-1-git-send-email-weiyj_lk@163.com>
-References: <1467811813-4864-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <20160706.223152.980979934196013750.davem@davemloft.net>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 7 Jul 2016 08:37:10 +0300
+Subject: [PATCH 1/9] mm: Hardened usercopy
+In-Reply-To: <1467843928-29351-2-git-send-email-keescook@chromium.org>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <1467843928-29351-2-git-send-email-keescook@chromium.org>
+Message-ID: <20160707053710.GH2118@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: weiyj_lk@163.com
-Date: Wed,  6 Jul 2016 13:30:13 +0000
+Hi Kees,
 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> Remove .owner field since calls to module_platform_driver() will
-> set it automatically.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Wed, Jul 06, 2016 at 03:25:20PM -0700, Kees Cook wrote:
+> +#ifdef CONFIG_HAVE_HARDENED_USERCOPY_ALLOCATOR
 
-Applied.
+Should be CONFIG_HARDENED_USERCOPY to match the slab/slub implementation 
+condition.
+
+> +const char *__check_heap_object(const void *ptr, unsigned long n,
+> +				struct page *page);
+> +#else
+> +static inline const char *__check_heap_object(const void *ptr,
+> +					      unsigned long n,
+> +					      struct page *page)
+> +{
+> +	return NULL;
+> +}
+> +#endif
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
