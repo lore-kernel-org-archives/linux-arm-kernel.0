@@ -1,29 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 7 Jul 2016 12:08:26 +0200
-Subject: [PATCH 03/11] ASoC: ab8500-codec: remove platform data based probe
-In-Reply-To: <CACRpkdZ7JW7iBzwL_7cY928Fp+CUNwPHQ6D8--CXvoLq7LMZAA@mail.gmail.com>
-References: <1467722710-1577-1-git-send-email-linus.walleij@linaro.org>
- <1467722710-1577-3-git-send-email-linus.walleij@linaro.org>
- <20160705134445.GV6247@sirena.org.uk>
- <CACRpkdZ7JW7iBzwL_7cY928Fp+CUNwPHQ6D8--CXvoLq7LMZAA@mail.gmail.com>
-Message-ID: <20160707100826.GN6247@sirena.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 07 Jul 2016 12:11:41 +0200
+Subject: [PATCH] arm64: dts: rockchip: support the usb2phy for rk3399 evb
+In-Reply-To: <1467866800-24794-1-git-send-email-wxt@rock-chips.com>
+References: <1467866800-24794-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <2150255.RfISFviJKP@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 05:22:22PM +0200, Linus Walleij wrote:
+Hi,
 
-> Do you prefer to apply it to the ASoC tree? I can drop
-> it from this series.
+Am Donnerstag, 7. Juli 2016, 12:46:40 schrieb Caesar Wang:
+> From: Frank Wang <frank.wang@rock-chips.com>
+> 
+> This patch adds the usb2phy needed dts node information for rk3399.
+> 
+> USB2.0 PHY is comprised of one Host port and one OTG port.
+> Host Port is for USB2.0 host controller; OTG port is for USB2.0 part of
+> USB3.0 OTG controller, and as a part to construct a fully feature TypeC
+> subsystem.
+> 
+> The USB2.0 vbus gpio is board specific, it's no same with all rk3399
+> boards, so move it into evb voard.
+> 
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> ---
+> 
+>  arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  4 ++++
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 19 +++++++++++++++++++
+>  2 files changed, 23 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 4c84229..21d147f 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -242,6 +242,25 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	usb2phy: usb2phy {
+> +		compatible = "rockchip,rk3399-usb-phy";
+> +		rockchip,grf = <&grf>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		usb2phy0: usb2-phy0 {
+> +			#phy-cells = <0>;
+> +			#clock-cells = <0>;
+> +			reg = <0xe458>;
+> +		};
+> +
+> +		usb2phy1: usb2-phy1 {
+> +			#phy-cells = <0>;
+> +			#clock-cells = <0>;
+> +			reg = <0xe468>;
+> +		};
+> +	};
+> +
 
-In general yes but it's also that if it looks like there should be some
-dependency due to it being a series and I can't see one then that makes
-me think I've missed something when reviewing and need to check.  Anyway:
+The rk3399 uses the innosilicon usb2 phy and the binding we've come up for 
+it looks a lot different than the above. So I'm not sure where this is 
+coming from, especially as I haven't seen the driver part for the rk3399 at 
+all yet. So far Frank was always working on te rk3366 variant, which seemed 
+to be the most complete.
 
-Acked-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/bc6687c3/attachment.sig>
+
+Heiko
