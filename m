@@ -1,46 +1,31 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 07 Jul 2016 23:35:38 +0200
-Subject: [PATCH 0/3] ARM: dts: the dts support for rk3288 firefly reload
-In-Reply-To: <1467829380-16242-1-git-send-email-ayaka@soulik.info>
-References: <3015470.z4L7UQJKa9@phil>
- <1467829380-16242-1-git-send-email-ayaka@soulik.info>
-Message-ID: <2686572.mni1Mn7R6t@phil>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 7 Jul 2016 23:52:01 +0200
+Subject: [PATCH v1 1/5] dt-bindings: Add support for LG LP079QX1-SP0V
+ 1536x2048 panel
+In-Reply-To: <1467089472-18584-1-git-send-email-ykk@rock-chips.com>
+References: <1467089288-18355-1-git-send-email-ykk@rock-chips.com>
+ <1467089472-18584-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20160707215159.GA744@mithrandir.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
-
-Am Donnerstag, 7. Juli 2016, 02:22:57 schrieb Randy Li:
-> The rk3288 firefly reload  is a Rockchip RK3288 based board be found by
-> core board and main board. The regulators are connected in a different
-> way to the previous version of firefly boards, it is necessary to
-> move some common code to uncommon place.
+On Tue, Jun 28, 2016 at 12:51:12PM +0800, Yakir Yang wrote:
+> The LG LP079QX1-SP0V is an 7.9" QXGA TFT with LED Backlight unit and
+> 32 pins eDP interface. This module supports 1536x2048 mode.
 > 
-> I only tested the ethernet and confirmed that works.
-> The usb in this board won't caused by the bugs in the driver.
-> 
-> This version follow the suggests from Heiko Stuebner,
-> except the duplicated supply name problem, I don't think
-> it could be fixed in that way.
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> ---
+>  .../devicetree/bindings/display/panel/lg,lp079qx1-sp0v.txt         | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/lg,lp079qx1-sp0v.txt
 
-I've now had a chance to look at that reload board on the firefly site.
-Firefly also is the company name, so a board named that way is not 
-necessarily a "variant" :-) .
+Applied, thanks.
 
-And looking at the "reload" board this definitly seems to be a very 
-different product with it being a system-on-module+baseboard design with 
-additional peripherals like that sata bridge, camera interfaces and probably 
-more.
-
-As you might've seen, most Rockchip boards are based on some reference-
-design, so are similar in a big part of their core layout.
-So, looking at the vastly different product the reload is, I'd really like 
-to have a separate dts for the reload, to not run into more confusing 
-differences later on.
-
-Also, when adding a new board, please also add an entry to 
-Documentation/devicetree/bindingd/arm/rockchip.txt
-
-
-Thanks
-Heiko
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160707/eda340cd/attachment.sig>
