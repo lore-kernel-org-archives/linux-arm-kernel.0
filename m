@@ -1,174 +1,52 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu,  7 Jul 2016 18:10:46 +0100
-Subject: [PATCH v8 1/6] ACPI / processor_idle: introduce ACPI_PROCESSOR_CSTATE
-In-Reply-To: <1467911451-24731-1-git-send-email-sudeep.holla@arm.com>
+Date: Thu,  7 Jul 2016 18:10:48 +0100
+Subject: [PATCH v8 3/6] arm64: cpuidle: drop __init section marker to
+ arm_cpuidle_init
+In-Reply-To: <1467911451-24731-3-git-send-email-sudeep.holla@arm.com>
 References: <1467911451-24731-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1467911451-24731-2-git-send-email-sudeep.holla@arm.com>
+ <1467911451-24731-2-git-send-email-sudeep.holla@arm.com>
+ <1467911451-24731-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1467911451-24731-4-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI 6.0 adds a new method to specify the CPU idle states(C-states)
-called Low Power Idle(LPI) states. Since new architectures like ARM64
-use only LPIs, introduce ACPI_PROCESSOR_CSTATE to encapsulate all the
-code supporting the old style C-states(_CST).
+Commit ea389daa7fd9 ("arm64: cpuidle: add __init section marker to
+arm_cpuidle_init") added the __init annotation to arm_cpuidle_init
+as it was not needed after booting which was correct at that time.
 
-This patch will help to extend the processor_idle module to support
-LPI.
+However with the introduction of ACPI LPI support, this will be used
+from cpuhotplug path in ACPI processor driver.
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+This patch drops the __init annotation from arm_cpuidle_init to avoid
+the following warning:
+
+WARNING: vmlinux.o(.text+0x113c8): Section mismatch in reference from the
+	function acpi_processor_ffh_lpi_probe() to the function
+	.init.text:arm_cpuidle_init()
+The function acpi_processor_ffh_lpi_probe() references
+the function __init arm_cpuidle_init().
+This is often because acpi_processor_ffh_lpi_probe lacks a __init
+annotation or the annotation of arm_cpuidle_init is wrong.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/acpi/Kconfig          |  4 +++
- drivers/acpi/processor_idle.c | 80 ++++++++++++++++++++++++++++---------------
- include/acpi/processor.h      |  2 +-
- 3 files changed, 58 insertions(+), 28 deletions(-)
+ arch/arm64/kernel/cpuidle.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index b7e2e776397d..1358fb7d7a68 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -213,6 +213,10 @@ config ACPI_CPU_FREQ_PSS
- 	bool
- 	select THERMAL
+diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
+index e11857fce05f..06786fdaadeb 100644
+--- a/arch/arm64/kernel/cpuidle.c
++++ b/arch/arm64/kernel/cpuidle.c
+@@ -15,7 +15,7 @@
+ #include <asm/cpuidle.h>
+ #include <asm/cpu_ops.h>
  
-+config ACPI_PROCESSOR_CSTATE
-+	def_bool y
-+	depends on IA64 || X86
-+
- config ACPI_PROCESSOR_IDLE
- 	bool
- 	select CPU_IDLE
-diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
-index 444e3745c8b3..ca0de35d1c3a 100644
---- a/drivers/acpi/processor_idle.c
-+++ b/drivers/acpi/processor_idle.c
-@@ -59,6 +59,12 @@ module_param(latency_factor, uint, 0644);
- 
- static DEFINE_PER_CPU(struct cpuidle_device *, acpi_cpuidle_device);
- 
-+struct cpuidle_driver acpi_idle_driver = {
-+	.name =		"acpi_idle",
-+	.owner =	THIS_MODULE,
-+};
-+
-+#ifdef CONFIG_ACPI_PROCESSOR_CSTATE
- static
- DEFINE_PER_CPU(struct acpi_processor_cx * [CPUIDLE_STATE_MAX], acpi_cstate);
- 
-@@ -804,11 +810,6 @@ static void acpi_idle_enter_freeze(struct cpuidle_device *dev,
- 	acpi_idle_do_entry(cx);
- }
- 
--struct cpuidle_driver acpi_idle_driver = {
--	.name =		"acpi_idle",
--	.owner =	THIS_MODULE,
--};
--
- /**
-  * acpi_processor_setup_cpuidle_cx - prepares and configures CPUIDLE
-  * device i.e. per-cpu data
-@@ -925,6 +926,50 @@ static int acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
- 	return 0;
- }
- 
-+static inline void acpi_processor_cstate_first_run_checks(void)
-+{
-+	acpi_status status;
-+	static int first_run;
-+
-+	if (first_run)
-+		return;
-+	dmi_check_system(processor_power_dmi_table);
-+	max_cstate = acpi_processor_cstate_check(max_cstate);
-+	if (max_cstate < ACPI_C_STATES_MAX)
-+		pr_notice("ACPI: processor limited to max C-state %d\n",
-+			  max_cstate);
-+	first_run++;
-+
-+	if (acpi_gbl_FADT.cst_control && !nocst) {
-+		status = acpi_os_write_port(acpi_gbl_FADT.smi_command,
-+					    acpi_gbl_FADT.cst_control, 8);
-+		if (ACPI_FAILURE(status))
-+			ACPI_EXCEPTION((AE_INFO, status,
-+					"Notifying BIOS of _CST ability failed"));
-+	}
-+}
-+#else
-+
-+static inline int disabled_by_idle_boot_param(void) { return 0; }
-+static inline void acpi_processor_cstate_first_run_checks(void) { }
-+static int acpi_processor_get_power_info(struct acpi_processor *pr)
-+{
-+	return -ENODEV;
-+}
-+
-+static int acpi_processor_setup_cpuidle_cx(struct acpi_processor *pr,
-+					   struct cpuidle_device *dev)
-+{
-+	return -EINVAL;
-+}
-+
-+static int acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
-+{
-+	return -EINVAL;
-+}
-+
-+#endif /* CONFIG_ACPI_PROCESSOR_CSTATE */
-+
- int acpi_processor_hotplug(struct acpi_processor *pr)
+-int __init arm_cpuidle_init(unsigned int cpu)
++int arm_cpuidle_init(unsigned int cpu)
  {
- 	int ret = 0;
-@@ -1015,35 +1060,16 @@ static int acpi_processor_registered;
+ 	int ret = -EOPNOTSUPP;
  
- int acpi_processor_power_init(struct acpi_processor *pr)
- {
--	acpi_status status;
- 	int retval;
- 	struct cpuidle_device *dev;
--	static int first_run;
- 
- 	if (disabled_by_idle_boot_param())
- 		return 0;
- 
--	if (!first_run) {
--		dmi_check_system(processor_power_dmi_table);
--		max_cstate = acpi_processor_cstate_check(max_cstate);
--		if (max_cstate < ACPI_C_STATES_MAX)
--			printk(KERN_NOTICE
--			       "ACPI: processor limited to max C-state %d\n",
--			       max_cstate);
--		first_run++;
--	}
-+	acpi_processor_cstate_first_run_checks();
- 
--	if (acpi_gbl_FADT.cst_control && !nocst) {
--		status =
--		    acpi_os_write_port(acpi_gbl_FADT.smi_command, acpi_gbl_FADT.cst_control, 8);
--		if (ACPI_FAILURE(status)) {
--			ACPI_EXCEPTION((AE_INFO, status,
--					"Notifying BIOS of _CST ability failed"));
--		}
--	}
--
--	acpi_processor_get_power_info(pr);
--	pr->flags.power_setup_done = 1;
-+	if (!acpi_processor_get_power_info(pr))
-+		pr->flags.power_setup_done = 1;
- 
- 	/*
- 	 * Install the idle handler if processor power management is supported.
-diff --git a/include/acpi/processor.h b/include/acpi/processor.h
-index 6f1805dd5d3c..48779d678122 100644
---- a/include/acpi/processor.h
-+++ b/include/acpi/processor.h
-@@ -242,7 +242,7 @@ extern int acpi_processor_get_performance_info(struct acpi_processor *pr);
- DECLARE_PER_CPU(struct acpi_processor *, processors);
- extern struct acpi_processor_errata errata;
- 
--#ifdef ARCH_HAS_POWER_INIT
-+#if defined(ARCH_HAS_POWER_INIT) && defined(CONFIG_ACPI_PROCESSOR_CSTATE)
- void acpi_processor_power_init_bm_check(struct acpi_processor_flags *flags,
- 					unsigned int cpu);
- int acpi_processor_ffh_cstate_probe(unsigned int cpu,
 -- 
 2.7.4
