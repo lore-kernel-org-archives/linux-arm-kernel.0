@@ -1,61 +1,121 @@
-From: andi@etezian.org (Andi Shyti)
-Date: Fri, 8 Jul 2016 00:39:07 +0900
-Subject: [PATCH v4 1/2] clk: exynos5433: do not use CLK_IGNORE_UNUSED for
- SPI clocks
-In-Reply-To: <577E7343.9090002@samsung.com>
-References: <1467893637-12573-1-git-send-email-andi.shyti@samsung.com>
- <1467893637-12573-2-git-send-email-andi.shyti@samsung.com>
- <CGME20160707124623epcas1p2452001bf48f03cb47c7f7db437130e6d@epcas1p2.samsung.com>
- <577E4F1C.8070004@samsung.com>
- <20160707132738.GI23620@samsunx.samsung>
- <577E7343.9090002@samsung.com>
-Message-ID: <20160707153907.GB1256@jack.zhora.eu>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 7 Jul 2016 16:48:10 +0100
+Subject: [PATCH v7 4/6] cpuidle: introduce HAVE_GENERIC_CPUIDLE_ENTER for
+ ARM{32,64} platforms
+In-Reply-To: <3343646.556h6ef0ix@vostro.rjw.lan>
+References: <1467122152-5604-1-git-send-email-sudeep.holla@arm.com>
+ <1675585.udvKUofiJK@vostro.rjw.lan> <577E5A6C.9020007@arm.com>
+ <3343646.556h6ef0ix@vostro.rjw.lan>
+Message-ID: <577E79BA.6000706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
 
-> >>> > > The CLK_IGNORE_UNUSED flag has to be avoided whenever possible.
-> >>> > > Use the CLK_IS_CRITICAL flag instead for critical SPI1 clocks,
-> >>> > > which enables the clock line during boot time.
-> >> > 
-> >> > I don't agree. Both flags should be avoided. Clk is critical does not
-> >> > solve the problem. It is just a better workaround for lack of proper
-> >> > clock consumers.
-> >> > 
-> >> > The IOCLK is not a critical clock. It can be disabled (e.g. when SoC
-> >> >  is used on a board without any SPI device connected).
-> >
-> > As we discussed offline there is no driver which is requesting
-> > this clock. We cannot ask to the spi driver to handle three
-> > clocks because the exynos5433 has its own peculiarities.
-> > 
-> > If we want this on the spi driver's side, we need to add a new
-> > compatible and check it everytime. To me it looks uglier than
-> > just keep it alive.
-> 
-> I took a closer look at what those IOCLK clocks exactly are and
-> unfortunately I must agree with Krzysztof.  These clock gates are
-> closely related to the IP blocks and to me proper approach is to
-> have them listed in DT and controlled by the SPI bus driver.
-> 
-> I checked and there is similar pattern for other IPs like I2S and
-> other SoCs, e.g. exynos7420.
-> Additionally parents of those IOCLK_SPI?_CLK clocks are currently
-> wrongly modelled as fixed rate clocks.  These clocks really don't
-> have a parent until some clock is fed externally to the SoC's I/O
-> pin.  But this issue could be addressed later.
 
-yes, it's a weird design :/
+On 07/07/16 15:49, Rafael J. Wysocki wrote:
+> On Thursday, July 07, 2016 02:34:36 PM Sudeep Holla wrote:
+>>
+>> On 07/07/16 14:21, Rafael J. Wysocki wrote:
+>>> On Tuesday, June 28, 2016 02:55:50 PM Sudeep Holla wrote:
+>>>> The function arm_enter_idle_state is exactly the same in both generic
+>>>> ARM{32,64} CPUIdle driver and will be the same even on ARM64 backend
+>>>> for ACPI processor idle driver. So we can unify it and move it as
+>>>> generic_cpuidle_enter by introducing HAVE_GENERIC_CPUIDLE_ENTER and
+>>>> enabling the same on both ARM{32,64}.
+>>>>
+>>>> This is in preparation of reuse of the generic cpuidle entry function
+>>>> for ACPI LPI support on ARM64.
+>>>>
+>>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>> ---
+>>>>    arch/arm/Kconfig              |  1 +
+>>>>    arch/arm/kernel/cpuidle.c     |  4 ++--
+>>>>    arch/arm64/Kconfig            |  1 +
+>>>>    arch/arm64/kernel/cpuidle.c   |  6 +++---
+>>>>    drivers/cpuidle/Kconfig       |  3 +++
+>>>>    drivers/cpuidle/cpuidle-arm.c | 21 +--------------------
+>>>>    drivers/cpuidle/cpuidle.c     | 35 +++++++++++++++++++++++++++++++++++
+>>>>    include/linux/cpuidle.h       |  8 ++++++++
+>>>>    8 files changed, 54 insertions(+), 25 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>>>> index 90542db1220d..52b3dca0381c 100644
+>>>> --- a/arch/arm/Kconfig
+>>>> +++ b/arch/arm/Kconfig
+>>>> @@ -54,6 +54,7 @@ config ARM
+>>>>    	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+>>>>    	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+>>>>    	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+>>>> +	select HAVE_GENERIC_CPUIDLE_ENTER
+>>>
+>>> That "generic" part in the name concerns me a bit, because the thing is not
+>>> really generic.  It is "common on ARM" rather.
+>>>
+>>
+>> I agree and that's exactly what I told Daniel. It's rather just
+>> *ARM Generic*. Any preference on the name ? I had it header file under
+>> include/linu/cpuidle-arm.h in the previous version. Do you prefer that ?
+>
+> Well, I got confused by these names which probably means that they really
+> are confusing. :-)
+>
 
-> I think it is not a big deal to add "samsung-exynos5433-spi"
-> compatible to the SPI driver along with a new variant data and
-> a flag like "has_cmu_ioclk" to indicate whether a third clock
-> should be handled or not. Presumably for now the ioclk clock can
-> just simply be enabled in probe(), this way it will be enabled
-> only for SPI controllers actually in use.
+I know and I am all for getting rid of that.
 
-OK, I will work on s3c64xx driver side, then.
+> So the underlying observation is that ->enter() callbacks in some ARM code
+> tend to do the same thing, ie. wrap the cpu_pm_enter()/exit() pair around
+> the actual "low-level enter" routine, so the idea is to move the wrapping
+> to the core and add the symbol plus standard header for the "low-level enter"
+> thing.
+>
+> But then ->enter has to point to the wrapper and that just invokes a static
+> function defined somewhere.
+>
+> So in fact what you want is to avoid code duplication in the source, but not
+> in the binary.
+>
+> For that, I'd use a macro like this:
+>
+> #define CPU_IDLE_ENTER_WRAPPED(low_level_idle_enter, idx)	\
+> ({								\
+> 	int __ret;						\
+> 								\
+> 	if (!idx) {						\
+> 		cpu_do_idle();					\
+> 		return idx;					\
+> 	}							\
+> 								\
+> 	__ret = cpu_pm_enter();					\
+> 	if (!__ret) {						\
+> 		__ret = low_level_idle_enter(idx);		\
+> 		cpu_pm_exit();					\
+> 	}							\
+> 								\
+> 	__ret ? -1 : idx;					\
+> })
+>
+> and then, whoever want's to generate a "wrapped" callback, will need to
+> define the low_level_idle_enter thing, say my_low_level_idle_enter() and
+> then do
+>
+> int idle_enter(int idx)
+> {
+> 	return CPU_IDLE_ENTER_WRAPPED(my_low_level_idle_enter, idx);
+> }
+>
+> and point the ->enter callback to idle_enter().
+>
+> No need for extra symbols, confusing function names and similar.
+>
+> And the macro can go into cpuidle.h if you want.
+>
 
-Thanks,
-Andi
+Sounds good. Thanks for the suggestion. I will respin the series with
+this change then.
+
+-- 
+Regards,
+Sudeep
