@@ -1,88 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 07 Jul 2016 12:01:54 +0200
-Subject: Applied "spi: s3c64xx: do not disable the clock while configuring the
- spi" to the spi tree
-In-Reply-To: <1467876237-12183-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <E1bL682-0000ul-2D@finisterre>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 Jul 2016 12:08:01 +0200
+Subject: [GIT PULL] STi DT updates for v4.8
+In-Reply-To: <577E0734.2070206@st.com>
+References: <5776701A.1000808@st.com> <20160707052827.GL32389@localhost>
+ <577E0734.2070206@st.com>
+Message-ID: <9427724.UUV0z7XpPd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Thursday, July 7, 2016 9:39:32 AM CEST Patrice Chotard wrote:
+> On 07/07/2016 07:28 AM, Olof Johansson wrote:
+> > On Fri, Jul 01, 2016 at 03:28:58PM +0200, Patrice Chotard wrote:
+> >> ----------------------------------------------------------------
+> >> Highlights:
+> >> -----------
+> >>   -add STi critical clocks
+> >> - as discussed on IRC with Lee Jones, remove SPI hack wich has dependecy
+> >> with critical clocks
+> >>
+> >> ----------------------------------------------------------------
+> >> Lee Jones (3):
+> >>        ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
+> >>        ARM: sti: stih410-clocks: Identify critical clocks
+> >>        spi: st-ssc4: Remove 'no clocking' hack
+> > THere are more patches than this in this branch -- there are three clock
+> > branches that by the look of it have been applied by Stephen Boyd.
+> >
+> > However, since they have been brought in without doing a merge, it's hard for
+> > us to tell where they came form, and/or if they're in a shared branch
+> > somewhere. Therefore, I recommend doing a --no-ff merge of the branch, so it's
+> > obvious from the merge commit where they came form. They also need to be part
+> > of the diffstat.
+> >
+> > Finally, the clk patch doesn't really belong in the DT branch here. It's
+> > probably a suitable patch to send to the clk maintainers after the DT changes
+> > have gone in, i.e. for 4.9.
+> >
+> > Please respin this pull request and we'll take another look!
+> 
+> There was a discussion on IRC armlinux's channel between Lee Jones, Arnd 
+> Bergman
+> and Mark Brown about the way to proceed with this pull request.
+> 
+> As there are dependencies between the 3 critical clocks patches on 
+> Stephen Boyd's
+> branch clk-next/clk-st-critical, our STi DT and our SPI drivers which 
+> remove a temporary
+> clock hack, the decision was taken to put our DT STi fixes on top of 
+> Stephen Boyd critical clk
+>   branch and our SPI patches on the top.
+> 
+> For more details i put in attachment the IRC exchange about this.
 
-   spi: s3c64xx: do not disable the clock while configuring the spi
+This information belongs into the tag description, it's required for
+us to make the decision whether the branch is can be merged or not.
 
-has been applied to the spi tree at
+In particular, you need to spell out the specific dependency that
+exists between the clk patches and the dt patches.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+What I understood from Lee before is that there is no such dependency
+at all and the only thing that needs the clk changes is the spi
+patch, while the DT patches and the clk patches are independent.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+However, Lee's explanation was a bit ambiguous and could be interpreted
+as meaning that there is another dependency here, which was simply
+not explained.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From d9aaf1dc984a448ae5630e53a611a8b3489d1f8d Mon Sep 17 00:00:00 2001
-From: Andi Shyti <andi.shyti@samsung.com>
-Date: Thu, 7 Jul 2016 16:23:57 +0900
-Subject: [PATCH] spi: s3c64xx: do not disable the clock while configuring the
- spi
-
-When the clock is coming from the cmu it is not required to be
-disabled and then re-enabled in order to change the rate.
-
-Besides, some exynos chipsets (e.g. exynos5433) do not deliver
-any to the SFR if one from the pclk ("spi" in this case) or sclk
-("busclk") is disabled.
-
-Remove the clock disabling/enabling to avoid falling into this
-situation.
-
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-s3c64xx.c | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
-
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 9f0119f64f93..df88fa161d8a 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -596,9 +596,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
- 	u32 val;
- 
- 	/* Disable Clock */
--	if (sdd->port_conf->clk_from_cmu) {
--		clk_disable_unprepare(sdd->src_clk);
--	} else {
-+	if (!sdd->port_conf->clk_from_cmu) {
- 		val = readl(regs + S3C64XX_SPI_CLK_CFG);
- 		val &= ~S3C64XX_SPI_ENCLK_ENABLE;
- 		writel(val, regs + S3C64XX_SPI_CLK_CFG);
-@@ -641,11 +639,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
- 	writel(val, regs + S3C64XX_SPI_MODE_CFG);
- 
- 	if (sdd->port_conf->clk_from_cmu) {
--		/* Configure Clock */
--		/* There is half-multiplier before the SPI */
- 		clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
--		/* Enable Clock */
--		clk_prepare_enable(sdd->src_clk);
- 	} else {
- 		/* Configure Clock */
- 		val = readl(regs + S3C64XX_SPI_CLK_CFG);
--- 
-2.8.1
+	Arnd
