@@ -1,143 +1,41 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu,  7 Jul 2016 15:20:51 -0700
-Subject: [PATCH v2 00/22] Support qcom's HSIC USB and rewrite USB2 HS phy
- support
-Message-ID: <20160707222114.1673-1-stephen.boyd@linaro.org>
+Date: Thu,  7 Jul 2016 15:20:53 -0700
+Subject: [PATCH v2 02/22] of: device: Export of_device_{get_modalias,
+ uvent_modalias} to modules
+In-Reply-To: <20160707222114.1673-1-stephen.boyd@linaro.org>
+References: <20160707222114.1673-1-stephen.boyd@linaro.org>
+Message-ID: <20160707222114.1673-3-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The state of USB ChipIdea support on Qualcomm's platforms is not great.
-The DT description of these devices requires up to three different nodes
-for what amounts to be the same hardware block, when there should really
-only be one. Furthermore, the "phy" driver that is in mainline (phy-msm-usb.c)
-duplicates the OTG state machine and touches the ci controller wrapper
-registers when it should really be focused on the phy and the ULPI accesses
-needed to get the phy working. There's also a slimmed down phy driver for
-the msm8916 platform, but really the phy hardware is the same as other MSMs,
-so we have two drivers doing pretty much the same thing. This leads to a
-situtaion where we have the chipidea core driver, the "phy" driver, and
-sometimes the ehci-msm.c driver operating the same device all at the same
-time with very little coordination. This just isn't very safe and is
-confusing from a driver perspective when trying to figure out who does what.
-Finally, there isn't any HSIC support on platforms like apq8074 so we
-should add that.
+The ULPI bus can be built as a module, and it will soon be
+calling these functions when it supports probing devices from DT.
+Export them so they can be used by the ULPI module.
 
-This patch series updates the ChipIdea driver and the MSM wrapper
-(ci_hdrc_msm.c) to properly handle the PHY and wrapper bits at the right
-times in the right places. To get there, we update the ChipIdea core to
-have support for the ULPI phy bus introduced by Heikki. Along the way
-we fix bugs with the extcon handling for peripheral and OTG mode controllers
-and move the parts of phy-usb-msm.c that are touching the CI controller
-wrapper into the wrapper driver (ci_hdrc_msm.c). Finally we add support
-for the HSIC phy based on the ULPI bus and rewrite the HS phy driver
-(phy-usb-msm.c) as a standard ULPI phy driver.
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
+ drivers/of/device.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Once this series is accepted, we should be able to delete the phy-usb-msm.c,
-phy-qcom-8x16-usb.c, and ehci-msm.c drivers from the tree and use the ULPI
-based phy driver (which also lives in drivers/phy/ instead of drivers/usb/phy/)
-and the chipidea host core instead.
-
-I've also sent separate patches for other minor pieces to make this
-all work. The full tree can be found here[3], hacks and all to get
-things working. I've tested this on the db410c, apq8074 dragonboard,
-and ifc6410 with configfs gadgets and otg cables.
-
-Changes from v1:
-
- * Reworked ULPI device probing to keep using vendor/product ids that
-   come from DT if needed and falls back to OF style match when product id
-   is 0
-
- * PHY init later patch was rejected so that moved to a quirk flag and
-   the msm wrapper started managing the phy on/off
-
- * Updated clk requirements for HSIC phy in binding doc
-
- * Added optional clk in wrapper for "housekeeping" found on older qcom
-   platforms
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 8a22a253a830..6719ab35b62e 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
  
- * Bug fix to otgsc polling function
-
- * Changed runtime PM patch to set as active instead of get/put
-
-TODO:
- * DMA fails on arm64 so we need something like [1] to make it work.
-
- * The db410c needs a driver to toggle the onboard switch to connect
-   the usb hub instead of micro port when the usb cable is disconnected
-
- * apq8064 platforms need a vbus regulator to really use otg and I haven't
-   tried out the RPM based regulators yet
-
- * The HSIC phy on the apq8074 dragonboard is connected to a usb4604
-   device which requires the i2c driver to probe and send an i2c
-   sequence before the HSIC controller enumerates or HSIC doesn't work.
-   Right now I have a hack to force the controller to probe defer
-   once so that usb4604 probes first. This needs a more proper solution
-   like having the DT describe a linkage between the controller and
-   the usb device so we can enforce probe ordering.
+ 	return tsize;
+ }
++EXPORT_SYMBOL_GPL(of_device_get_modalias);
  
- * OTG support requires a working VBUS supply on apq8074 dragonboard
-   and that requires changes to the smbb_charger driver to support
-   the OTG OVP switch as a regulator[2]. This series needs revival
-   on the list so that OTG works properly on that board.
-
-[1] https://lkml.org/lkml/2016/2/22/7
-[2] http://lkml.kernel.org/g/1449621618-11900-1-git-send-email-tim.bird at sonymobile.com
-[3] https://git.linaro.org/people/stephen.boyd/linux.git/shortlog/refs/heads/usb-hsic-8074
-
-Stephen Boyd (22):
-  of: device: Support loading a module with OF based modalias
-  of: device: Export of_device_{get_modalias,uvent_modalias} to modules
-  usb: ulpi: Support device discovery via device properties
-  usb: chipidea: Only read/write OTGSC from one place
-  usb: chipidea: Handle extcon events properly
-  usb: chipidea: Add platform flag for wrapper phy management
-  usb: chipidea: Notify events when switching host mode
-  usb: chipidea: Remove locking in ci_udc_start()
-  usb: chipidea: Kick OTG state machine for AVVIS with vbus extcon
-  usb: chipidea: Add support for ULPI PHY bus
-  usb: chipidea: msm: Mark device as runtime pm active
-  usb: chipidea: msm: Rely on core to override AHBBURST
-  usb: chipidea: msm: Use hw_write_id_reg() instead of writel
-  usb: chipidea: msm: Add proper clk and reset support
-  usb: chipidea: msm: Mux over secondary phy at the right time
-  usb: chipidea: msm: Restore wrapper settings after reset
-  usb: chipidea: msm: Make platform data driver local instead of global
-  usb: chipidea: msm: Add reset controller for PHY POR bit
-  usb: chipidea: msm: Handle phy power states
-  usb: chipidea: msm: Be silent on probe defer errors
-  phy: Add support for Qualcomm's USB HSIC phy
-  phy: Add support for Qualcomm's USB HS phy
-
- .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  83 ++++++
- .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  72 +++++
- Documentation/devicetree/bindings/usb/ulpi.txt     |  35 +++
- drivers/of/device.c                                |  25 ++
- drivers/phy/Kconfig                                |  15 ++
- drivers/phy/Makefile                               |   2 +
- drivers/phy/phy-qcom-usb-hs.c                      | 295 +++++++++++++++++++++
- drivers/phy/phy-qcom-usb-hsic.c                    | 167 ++++++++++++
- drivers/usb/chipidea/Kconfig                       |   8 +
- drivers/usb/chipidea/Makefile                      |   1 +
- drivers/usb/chipidea/ci.h                          |  23 +-
- drivers/usb/chipidea/ci_hdrc_msm.c                 | 275 ++++++++++++++++---
- drivers/usb/chipidea/core.c                        |  77 +++---
- drivers/usb/chipidea/host.c                        |  10 +
- drivers/usb/chipidea/otg.c                         |  80 +++++-
- drivers/usb/chipidea/otg_fsm.c                     |  17 ++
- drivers/usb/chipidea/udc.c                         |   3 -
- drivers/usb/chipidea/ulpi.c                        | 113 ++++++++
- drivers/usb/common/ulpi.c                          |  74 +++++-
- include/linux/of_device.h                          |   6 +
- include/linux/usb/chipidea.h                       |   5 +-
- 21 files changed, 1290 insertions(+), 96 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
- create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
- create mode 100644 Documentation/devicetree/bindings/usb/ulpi.txt
- create mode 100644 drivers/phy/phy-qcom-usb-hs.c
- create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
- create mode 100644 drivers/usb/chipidea/ulpi.c
-
+ int of_device_request_module(struct device *dev)
+ {
+@@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+ 	}
+ 	mutex_unlock(&of_mutex);
+ }
++EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
+ 
+ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
+ {
 -- 
 2.9.0.rc2.8.ga28705d
