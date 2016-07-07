@@ -1,67 +1,89 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 7 Jul 2016 08:28:00 +0200
-Subject: [PATCH] serial: imx: add rx and tx led trigger
-In-Reply-To: <3835401.kFNahHioV5@wuerfel>
-References: <1467646452-21243-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5565521.Lr5FKj2vNK@wuerfel>
- <20160706173057.GS16643@pengutronix.de>
- <3835401.kFNahHioV5@wuerfel>
-Message-ID: <20160707062800.GT16643@pengutronix.de>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 7 Jul 2016 07:26:43 +0100
+Subject: [GIT PULL] ARM: hisi: soc changes for v4.8
+In-Reply-To: <20160707044609.GB32389@localhost>
+References: <5772B754.2080701@hisilicon.com>
+ <20160706043320.GG23212@localhost> <577CDA3C.5060706@hisilicon.com>
+ <20160707044609.GB32389@localhost>
+Message-ID: <577DF623.5020905@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+Hi Olof,
 
-[adding Rob Herring to Cc]
-
-On Wed, Jul 06, 2016 at 10:09:39PM +0200, Arnd Bergmann wrote:
-> On Wednesday, July 6, 2016 7:30:57 PM CEST Uwe Kleine-K?nig wrote:
-> > On Wed, Jul 06, 2016 at 05:22:40PM +0200, Arnd Bergmann wrote:
-> > > On Monday, July 4, 2016 5:50:09 PM CEST Uwe Kleine-K?nig wrote:
-> > > > On Mon, Jul 04, 2016 at 05:43:03PM +0200, Arnd Bergmann wrote:
-> > > > > On Monday, July 4, 2016 5:34:12 PM CEST Uwe Kleine-K?nig wrote:
-> > > > > > Add support for two led triggers per UART instance that blink on
-> > > > > > transmission and reception of data respectively.
-> > > > > > 
-> > > If this is something we may want to do on other platforms as well,
-> > > we should perhaps not hardwire the name of the imx tty device in
-> > > the led trigger name.
-> > 
-> > I cannot follow. If we have several serial lines and a trigger for each
-> > of them, they must get different names. Using the device's name to
-> > distinguish them seems like a good and obvious idea.
+On 07/07/2016 05:46, Olof Johansson wrote:
+> On Wed, Jul 06, 2016 at 11:15:24AM +0100, Wei Xu wrote:
+>> Hi Olof,
+>>
+>> On 06/07/2016 05:33, Olof Johansson wrote:
+>>> Hi,
+>>>
+>>> On Tue, Jun 28, 2016 at 06:43:48PM +0100, Wei Xu wrote:
+>>>> Hi Arnd, Hi Olof, Hi Kevin,
+>>>>
+>>>> Please help to pull the following changes.
+>>>> Thanks!
+>>>>
+>>>> Best Regards,
+>>>> Wei
+>>>>
+>>>> ---
+>>>>
+>>>> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+>>>>
+>>>>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.8
+>>>>
+>>>> for you to fetch changes up to c90047616d4411ff6e7a8a40ed87731dda0753b9:
+>>>>
+>>>>   ARM: hisi: add compatible string for Hi3519 soc (2016-06-28 16:24:33 +0100)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> ARM: mach-hisi: Hisilicon SoC updates for 4.8
+>>>>
+>>>> - Add initial support for the hi3519 SoC based on armv7
+>>>> - Avoid the compiling warning by making unexported symbols static
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Ben Dooks (1):
+>>>>       ARM: hisi: make unexported symbols static
+>>>>
+>>>> Jiancheng Xue (1):
+>>>>       ARM: hisi: add compatible string for Hi3519 soc
+>>>
+>>> This patch does more than this, it consolidates a bunch of machine entries.
+>>>
+>>> Since none of them are needed (the generic machine will match instead), just
+>>> remove all of them instead, please.
+>>>
+>>> I'd recommend a future cleanup to do this instead, as I did for Qualcomm, but
+>>> since you're already churning this code it's better to do it now.
+>>>
+>>> So, please respin this pull request with the above addressed.
+>>
+>> There is a specific "map_io" for hi3620 so that we kept 2 machine entries.
+>> Do you mean we need to merge all of them in one machine entry?
+>> In that case, I will add a new "hisilicon_map_io" function to invoke
+>> "debug_ll_io_init" and check the board compatible string.
+>> Is it OK?
 > 
-> The main problem I see is if someone puts the name of the trigger into
-> a dtb file, as this hardcodes the connection between the Linux driver
-> name and numbering system with the device tree binding, which are normally
-> separate.
+> I mean that you only need one machine entry: The one that needs map_io. The
+> others don't need a machine entry at all; they'll be handled by the generic
+> entry in arch/arm/kernel/devtree.c.
+
+Thanks!
+Please ignore the v2 pull request about this.
+I will send the v3 today.
+
+Best Regards,
+Wei
+
 > 
-> If we could derive the trigger name from the "/aliases/serial%d" property
-> in DT instead, it would get a little more portable.
-
-Alternatively we could invent a more dtish way as aliases seem to be
-frowned upon [1], something like:
-
-	led#0 {
-		label = "userled";
-		linux,default-trigger = &uart1, "tx";
-	};
-
-	uart1: serial at 43f90000 {
-		...
-		#trigger-cells = <1>;
-	};
-
-Having said that, I don't think it's a big problem if the value of
-"linux,default-trigger" is Linux-specific. Moreover, is a default
-trigger considered a hardware description?
-
-Best regards
-Uwe
-
-[1] http://mid.gmane.org/20160705140546.GA10601 at rob-hp-laptop
-    Not sure this is a general objection to aliases, though.
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+> -Olof
+> 
+> .
+> 
