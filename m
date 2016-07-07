@@ -1,74 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 6 Jul 2016 21:46:09 -0700
-Subject: [GIT PULL] ARM: hisi: soc changes for v4.8
-In-Reply-To: <577CDA3C.5060706@hisilicon.com>
-References: <5772B754.2080701@hisilicon.com> <20160706043320.GG23212@localhost>
- <577CDA3C.5060706@hisilicon.com>
-Message-ID: <20160707044609.GB32389@localhost>
+Date: Wed, 6 Jul 2016 22:00:51 -0700
+Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.8
+In-Reply-To: <cover.1467291186.git.horms+renesas@verge.net.au>
+References: <cover.1467291186.git.horms+renesas@verge.net.au>
+Message-ID: <20160707050051.GC32389@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2016 at 11:15:24AM +0100, Wei Xu wrote:
-> Hi Olof,
+On Thu, Jun 30, 2016 at 04:14:56PM +0200, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> On 06/07/2016 05:33, Olof Johansson wrote:
-> > Hi,
-> > 
-> > On Tue, Jun 28, 2016 at 06:43:48PM +0100, Wei Xu wrote:
-> >> Hi Arnd, Hi Olof, Hi Kevin,
-> >>
-> >> Please help to pull the following changes.
-> >> Thanks!
-> >>
-> >> Best Regards,
-> >> Wei
-> >>
-> >> ---
-> >>
-> >> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-> >>
-> >>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.8
-> >>
-> >> for you to fetch changes up to c90047616d4411ff6e7a8a40ed87731dda0753b9:
-> >>
-> >>   ARM: hisi: add compatible string for Hi3519 soc (2016-06-28 16:24:33 +0100)
-> >>
-> >> ----------------------------------------------------------------
-> >> ARM: mach-hisi: Hisilicon SoC updates for 4.8
-> >>
-> >> - Add initial support for the hi3519 SoC based on armv7
-> >> - Avoid the compiling warning by making unexported symbols static
-> >>
-> >> ----------------------------------------------------------------
-> >> Ben Dooks (1):
-> >>       ARM: hisi: make unexported symbols static
-> >>
-> >> Jiancheng Xue (1):
-> >>       ARM: hisi: add compatible string for Hi3519 soc
-> > 
-> > This patch does more than this, it consolidates a bunch of machine entries.
-> > 
-> > Since none of them are needed (the generic machine will match instead), just
-> > remove all of them instead, please.
-> > 
-> > I'd recommend a future cleanup to do this instead, as I did for Qualcomm, but
-> > since you're already churning this code it's better to do it now.
-> >
-> > So, please respin this pull request with the above addressed.
+> Please consider these Renesas ARM64 based SoC defconfig updates for v4.8.
 > 
-> There is a specific "map_io" for hi3620 so that we kept 2 machine entries.
-> Do you mean we need to merge all of them in one machine entry?
-> In that case, I will add a new "hisilicon_map_io" function to invoke
-> "debug_ll_io_init" and check the board compatible string.
-> Is it OK?
+> 
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> 
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.8
+> 
+> for you to fetch changes up to 62bcf9087150f9588456d941d4ee444ead8ed6f2:
+> 
+>   arm64: defconfig: enable Renesas R8A7796 SoC (2016-06-06 10:26:04 +0900)
 
-I mean that you only need one machine entry: The one that needs map_io. The
-others don't need a machine entry at all; they'll be handled by the generic
-entry in arch/arm/kernel/devtree.c.
+Merged, thanks.
 
 
 -Olof
