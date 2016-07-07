@@ -1,68 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  7 Jul 2016 11:49:46 +0200
-Subject: [PATCH v2 2/2] spi: add DT binding for clps711x SPI
-In-Reply-To: <20160707094952.4111577-1-arnd@arndb.de>
-References: <20160707094952.4111577-1-arnd@arndb.de>
-Message-ID: <20160707094952.4111577-2-arnd@arndb.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 07 Jul 2016 11:47:14 +0200
+Subject: [PATCH 1/6] binding-doc: power: pwrseq-generic: add binding doc
+ for generic power sequence library
+In-Reply-To: <1467882892-27589-2-git-send-email-peter.chen@nxp.com>
+References: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
+ <1467882892-27589-2-git-send-email-peter.chen@nxp.com>
+Message-ID: <1467884834.4236.36.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This documents the binding used by Alexander Shiyan's DT support for
-the clps711x SPI controller.
+Am Donnerstag, den 07.07.2016, 17:14 +0800 schrieb Peter Chen:
+> Add binding doc for generic power sequence library.
+> 
+> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> ---
+>  .../bindings/power/pwrseq/pwrseq-generic.txt       | 56 ++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> new file mode 100644
+> index 0000000..4b23834
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> @@ -0,0 +1,56 @@
+> +The generic power sequence library
+> +
+> +Some hard-wired USB/MMC devices need to do power sequence to let the
+> +device work normally, the typical power sequence like: enable USB
+> +PHY clock, toggle reset pin, etc. But current Linux USB driver
+> +lacks of such code to do it, it may cause some hard-wired USB devices
+> +works abnormal or can't be recognized by controller at all. The
+> +power sequence will be done before this device can be found at USB
+> +bus.
+> +
+> +The power sequence properties is under the device node.
+> +
+> +Required properties:
+> +- power-sequence: this device needs to do power sequence before enumeration
+> +
+> +Optional properties:
+> +- clocks: the input clock for device.
+> +- clock-name: must be "pwrseq-clk"
 
-I've left the file name to match the ARM platform port name "clps711x"
-for consistency with the other bindings, even though the compatible
-string refers to the later ep7309 chip.
+The "-clk" in the clock name is redundant.
 
-Linux no longer supports the old clps711x and ep72xx product lines,
-but we still use the name. The entire family is now discontinued
-by the manufacturer.
+> +- pwrseq-reset-gpios: Should specify the GPIO for reset.
+> +- pwrseq-reset-duration-us: the duration in microsecond for assert reset signal.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Alexander Shiyan <shc_work@mail.ru>
----
- .../devicetree/bindings/spi/spi-clps711x.txt       | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-clps711x.txt
+I understand you want to make it explicit that this GPIO is for the
+pwrseq library, but are we really gaining anything over just calling
+these reset-gpios and reset-duration-us?
+The same applies to the clock name above.
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-clps711x.txt b/Documentation/devicetree/bindings/spi/spi-clps711x.txt
-new file mode 100644
-index 000000000000..4c3ec13f423f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-clps711x.txt
-@@ -0,0 +1,33 @@
-+Serial Peripheral Interface on Cirrus Logic CL-PS71xx, EP72xx, EP73xx
-+
-+Required properties
-+- #address-cells: must be <1>
-+- #size-cells: must be <0>
-+- compatible: should include "cirrus,ep7209-spi"
-+- reg: Address and length of one register range
-+- interrupts: one interrupt line
-+- clocks: One entry, refers to the SPI bus clock
-+- cs-gpios: Specifies the gpio pins to be used for chipselects.
-+	    See: Documentation/devicetree/bindings/spi/spi-bus.txt
-+
-+An additional register is present in the system controller,
-+which is assumed to be in the same device tree, with and marked
-+as compatible with "cirrus,ep7209-syscon3".
-+
-+Example:
-+
-+spi at 80000500 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	compatible = "cirrus,ep7209-spi";
-+	reg = <0x80000500 0x4>;
-+	interrupts = <15>;
-+	clocks = <&clks CLPS711X_CLK_SPI>;
-+	status = "disabled";
-+};
-+
-+syscon3: syscon at 80002200 {
-+	compatible = "cirrus,ep7209-syscon3", "syscon";
-+	reg = <0x80002200 0x40>;
-+};
-+
--- 
-2.9.0
+> +Below is the example of USB power sequence properties on USB device
+> +nodes which have two level USB hubs.
+> +
+> +&usbotg1 {
+> +	vbus-supply = <&reg_usb_otg1_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usb_otg1_id>;
+> +	status = "okay";
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	hub: genesys at 1 {
+> +		compatible = "usb5e3,608";
+> +		reg = <1>;
+> +
+> +		power-sequence;
+> +		clocks = <&clks IMX6SX_CLK_CKO>;
+> +		clock-names = "pwrseq-clk";
+> +		pwrseq-reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
+> +		pwrseq-reset-duration-us = <10>;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		ethernet: asix at 1 {
+> +			compatible = "usbb95,1708";
+> +			reg = <1>;
+> +
+> +			power-sequence;
+> +			clocks = <&clks IMX6SX_CLK_IPG>;
+> +			clock-names = "pwrseq-clk";
+> +			pwrseq-reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
+> +			pwrseq-reset-duration-us = <15>;
+> +		};
+
+This looks weird. The hub and ethernet chips don't have "pwrseq" clock
+and reset input pins. I'd remove the clock-names and pwrseq- reset
+prefix.
+
+regards
+Philipp
