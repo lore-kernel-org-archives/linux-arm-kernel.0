@@ -1,16 +1,19 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  7 Jul 2016 10:00:41 +0200
-Subject: [PATCH 08/93] arm64: dts: rockchip: Add rktimer device node for rk3399
+Date: Thu,  7 Jul 2016 10:00:39 +0200
+Subject: [PATCH 06/93] clocksource/drivers/rockchip: Add the dynamic irq flag
+ to the timer
 In-Reply-To: <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577E0BED.3020608@linaro.org>
  <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467878526-1238-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467878526-1238-6-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Huang Tao <huangtao@rock-chips.com>
+From: "Huang, Tao" <huangtao@rock-chips.com>
 
-Add a 'rktimer' node in the device treee for the ARM64 rk3399 SoC.
+The rockchip timer is a broadcast timer. Add the CLOCK_EVT_FEAT_DYNIRQ flag
+and set the cpumask to all possible cpus to save power by avoiding
+unnecessary wakeups and IPIs.
 
 Signed-off-by: Huang Tao <huangtao@rock-chips.com>
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
@@ -20,27 +23,28 @@ Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/clocksource/rockchip_timer.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 46f325a..f0c0d76 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -492,6 +492,14 @@
- 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
- 	};
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index b991b28..b510863 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -150,12 +150,13 @@ static void __init rk_timer_init(struct device_node *np)
+ 	}
  
-+	rktimer: rktimer at ff850000 {
-+		compatible = "rockchip,rk3399-timer";
-+		reg = <0x0 0xff850000 0x0 0x1000>;
-+		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru PCLK_TIMER0>, <&cru SCLK_TIMER00>;
-+		clock-names = "pclk", "timer";
-+	};
-+
- 	spdif: spdif at ff870000 {
- 		compatible = "rockchip,rk3399-spdif";
- 		reg = <0x0 0xff870000 0x0 0x1000>;
+ 	ce->name = TIMER_NAME;
+-	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
++	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
++		       CLOCK_EVT_FEAT_DYNIRQ;
+ 	ce->set_next_event = rk_timer_set_next_event;
+ 	ce->set_state_shutdown = rk_timer_shutdown;
+ 	ce->set_state_periodic = rk_timer_set_periodic;
+ 	ce->irq = irq;
+-	ce->cpumask = cpumask_of(0);
++	ce->cpumask = cpu_possible_mask;
+ 	ce->rating = 250;
+ 
+ 	rk_timer_interrupt_clear(ce);
 -- 
 1.9.1
