@@ -1,280 +1,152 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Thu, 7 Jul 2016 15:37:09 +0800
-Subject: [PATCH v3 2/2] drm/mediatek: set mt8173 dithering function
-In-Reply-To: <1467877029-45236-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1467877029-45236-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1467877029-45236-3-git-send-email-bibby.hsieh@mediatek.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 7 Jul 2016 09:39:32 +0200
+Subject: [GIT PULL] STi DT updates for v4.8
+In-Reply-To: <20160707052827.GL32389@localhost>
+References: <5776701A.1000808@st.com> <20160707052827.GL32389@localhost>
+Message-ID: <577E0734.2070206@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some panels only accept bpc (bit per color) 6-bit.
-But, the default bpc in mt8173 display data path is 8-bit.
-If we didn't enable dithering function to convert bpc,
-display cannot show the smooth grayscale image.
+Hi Olof
 
-In mt8173, the dithering function in OD (OverDrive) and
-GAMMA module, we have to config them with
-connector->display_mode.bpc when CRTC initial.
+On 07/07/2016 07:28 AM, Olof Johansson wrote:
+> Hi Patrice,
+>
+>
+> On Fri, Jul 01, 2016 at 03:28:58PM +0200, Patrice Chotard wrote:
+>> Hi Olof, Arnd and Kevin,
+>>
+>> Please consider this first round of STi DT updates for v4.8:
+>>
+>> The following changes since commit 6ca59e6e1fc3a8d7ccbf85ff036bd6ff40847c1a:
+>>
+>>    clk: st: clkgen-pll: Detect critical clocks (2016-06-30 12:17:11 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
+>> sti-dt-for-v4.8
+> This specifies a branch, not a tag.
 
-1. Clear the default value at *_DITHER_5 and *_DITHER_7 register.
-2. Calculate the LSB_ERR_SHIFT bits and ADD_LSHIFT bits two values.
-i.e. Input bpc of OD is 10 bits, we assume the bpc of panel is 6-bit,
-so, we need to set 4-bit to LSB_ERR_SHIFT and ADD_LSHIFT bits respectively.
-3. Then, set the OD or GAMMA to dithering mode depends on path-1 or path-2.
+Right, i will push the tag sti-dt-for-v4.8
+>
+>> for you to fetch changes up to 4543976eaf9ca9f379ac3a0bb8c5c8c84fe0a965:
+>>
+>>    spi: st-ssc4: Remove 'no clocking' hack (2016-07-01 11:58:10 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Highlights:
+>> -----------
+>>   -add STi critical clocks
+>> - as discussed on IRC with Lee Jones, remove SPI hack wich has dependecy
+>> with critical clocks
+>>
+>> ----------------------------------------------------------------
+>> Lee Jones (3):
+>>        ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
+>>        ARM: sti: stih410-clocks: Identify critical clocks
+>>        spi: st-ssc4: Remove 'no clocking' hack
+> THere are more patches than this in this branch -- there are three clock
+> branches that by the look of it have been applied by Stephen Boyd.
+>
+> However, since they have been brought in without doing a merge, it's hard for
+> us to tell where they came form, and/or if they're in a shared branch
+> somewhere. Therefore, I recommend doing a --no-ff merge of the branch, so it's
+> obvious from the merge commit where they came form. They also need to be part
+> of the diffstat.
+>
+> Finally, the clk patch doesn't really belong in the DT branch here. It's
+> probably a suitable patch to send to the clk maintainers after the DT changes
+> have gone in, i.e. for 4.9.
+>
+> Please respin this pull request and we'll take another look!
 
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |    3 +-
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |    3 +-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   21 ++++++--
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |   77 +++++++++++++++++++++++----
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |    6 +--
- 5 files changed, 92 insertions(+), 18 deletions(-)
+There was a discussion on IRC armlinux's channel between Lee Jones, Arnd 
+Bergman
+and Mark Brown about the way to proceed with this pull request.
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-index 8f62671f..019b7ca 100644
---- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-+++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-@@ -103,7 +103,8 @@ static void mtk_ovl_stop(struct mtk_ddp_comp *comp)
- }
- 
- static void mtk_ovl_config(struct mtk_ddp_comp *comp, unsigned int w,
--			   unsigned int h, unsigned int vrefresh)
-+			   unsigned int h, unsigned int vrefresh,
-+			   unsigned int bpc)
- {
- 	if (w != 0 && h != 0)
- 		writel_relaxed(h << 16 | w, comp->regs + DISP_REG_OVL_ROI_SIZE);
-diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-index 5fb80cb..0df05f9 100644
---- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-+++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-@@ -106,7 +106,8 @@ static void mtk_rdma_stop(struct mtk_ddp_comp *comp)
- }
- 
- static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
--			    unsigned int height, unsigned int vrefresh)
-+			    unsigned int height, unsigned int vrefresh,
-+			    unsigned int bpc)
- {
- 	unsigned int threshold;
- 	unsigned int reg;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index ee219bb..18c9d0d 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -222,7 +222,9 @@ static void mtk_crtc_ddp_clk_disable(struct mtk_drm_crtc *mtk_crtc)
- static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
- {
- 	struct drm_crtc *crtc = &mtk_crtc->base;
--	unsigned int width, height, vrefresh;
-+	struct drm_connector *connector;
-+	struct drm_encoder *encoder;
-+	unsigned int width, height, vrefresh, bpc = 0;
- 	int ret;
- 	int i;
- 
-@@ -234,6 +236,19 @@ static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
- 	height = crtc->state->adjusted_mode.vdisplay;
- 	vrefresh = crtc->state->adjusted_mode.vrefresh;
- 
-+	drm_for_each_encoder(encoder, crtc->dev) {
-+		if (encoder->crtc != crtc)
-+			continue;
-+
-+		drm_for_each_connector(connector, crtc->dev) {
-+			if (connector->encoder != encoder)
-+				continue;
-+			if (connector->display_info.bpc >= 3 &&
-+			    (bpc == 0 || bpc > connector->display_info.bpc))
-+				bpc = connector->display_info.bpc;
-+		}
-+	}
-+
- 	ret = pm_runtime_get_sync(crtc->dev->dev);
- 	if (ret < 0) {
- 		DRM_ERROR("Failed to enable power domain: %d\n", ret);
-@@ -266,7 +281,7 @@ static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
- 	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++) {
- 		struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[i];
- 
--		mtk_ddp_comp_config(comp, width, height, vrefresh);
-+		mtk_ddp_comp_config(comp, width, height, vrefresh, bpc);
- 		mtk_ddp_comp_start(comp);
- 	}
- 
-@@ -469,7 +484,7 @@ void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
- 	if (state->pending_config) {
- 		mtk_ddp_comp_config(ovl, state->pending_width,
- 				    state->pending_height,
--				    state->pending_vrefresh);
-+				    state->pending_vrefresh, 0);
- 
- 		state->pending_config = false;
- 	}
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-index 56c5894..c10faac 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-@@ -30,7 +30,26 @@
- #define DISP_OD_INTEN				0x0008
- #define DISP_OD_INTSTA				0x000c
- #define DISP_OD_CFG				0x0020
-+#define OD_RELAYMODE				BIT(0)
-+#define OD_DITHERING				BIT(2)
- #define DISP_OD_SIZE				0x0030
-+#define DISP_OD_DITHER_5			0x0114
-+#define DISP_OD_DITHER_7			0x011c
-+#define DISP_OD_DITHER_15			0x013c
-+#define DITHER_LSB_ERR_SHIFT_R(x)		(((x) & 0x7) << 28)
-+#define DITHER_OVFLW_BIT_R(x)			(((x) & 0x7) << 24)
-+#define DITHER_ADD_LSHIFT_R(x)			(((x) & 0x7) << 20)
-+#define DITHER_ADD_RSHIFT_R(x)			(((x) & 0x7) << 16)
-+#define DITHER_NEW_BIT_MODE			BIT(0)
-+#define DISP_OD_DITHER_16			0x140
-+#define DITHER_LSB_ERR_SHIFT_B(x)		(((x) & 0x7) << 28)
-+#define DITHER_OVFLW_BIT_B(x)			(((x) & 0x7) << 24)
-+#define DITHER_ADD_LSHIFT_B(x)			(((x) & 0x7) << 20)
-+#define DITHER_ADD_RSHIFT_B(x)			(((x) & 0x7) << 16)
-+#define DITHER_LSB_ERR_SHIFT_G(x)		(((x) & 0x7) << 12)
-+#define DITHER_OVFLW_BIT_G(x)			(((x) & 0x7) << 8)
-+#define DITHER_ADD_LSHIFT_G(x)			(((x) & 0x7) << 4)
-+#define DITHER_ADD_RSHIFT_G(x)			(((x) & 0x7) << 0)
- 
- #define DISP_REG_UFO_START			0x0000
- 
-@@ -44,25 +63,28 @@
- 
- #define DISP_GAMMA_EN				0x000
- #define DISP_GAMMA_CFG				0x020
-+#define GAMMA_EN				BIT(0)
-+#define GAMMA_LUT_EN				BIT(1)
-+#define GAMMA_DITHERING				BIT(2)
- #define DISP_GAMMA_SIZE				0x030
- #define DISP_GAMMA_LUT				0x700
-+#define DISP_GAMMA_DITHER_5			0x0114
-+#define DISP_GAMMA_DITHER_7			0x011c
-+#define DISP_GAMMA_DITHER_15			0x013c
-+#define DISP_GAMMA_DITHER_16			0x0140
- 
- #define LUT_10BIT_MASK				0x3ff
- 
- #define AAL_EN			BIT(0)
- 
--#define GAMMA_EN		BIT(0)
--#define GAMMA_LUT_EN		BIT(1)
--
--#define	OD_RELAY_MODE		BIT(0)
--
- #define	UFO_BYPASS		BIT(2)
- 
- #define	COLOR_BYPASS_ALL	BIT(7)
- #define	COLOR_SEQ_SEL		BIT(13)
- 
- static void mtk_color_config(struct mtk_ddp_comp *comp, unsigned int w,
--			     unsigned int h, unsigned int vrefresh)
-+			     unsigned int h, unsigned int vrefresh,
-+			     unsigned int bpc)
- {
- 	writel(w, comp->regs + DISP_COLOR_WIDTH);
- 	writel(h, comp->regs + DISP_COLOR_HEIGHT);
-@@ -76,14 +98,33 @@ static void mtk_color_start(struct mtk_ddp_comp *comp)
- }
- 
- static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
--			  unsigned int h, unsigned int vrefresh)
-+			  unsigned int h, unsigned int vrefresh,
-+			  unsigned int bpc)
- {
- 	writel(w << 16 | h, comp->regs + DISP_OD_SIZE);
-+	if (bpc >= 3 && bpc < 10) {
-+		writel(0, comp->regs + DISP_OD_DITHER_5);
-+		writel(0, comp->regs + DISP_OD_DITHER_7);
-+		writel(DITHER_LSB_ERR_SHIFT_R(10 - bpc) |
-+		       DITHER_ADD_LSHIFT_R(10 - bpc) |
-+		       DITHER_NEW_BIT_MODE,
-+		       comp->regs + DISP_OD_DITHER_15);
-+		writel(DITHER_LSB_ERR_SHIFT_B(10 - bpc) |
-+		       DITHER_ADD_LSHIFT_B(10 - bpc) |
-+		       DITHER_LSB_ERR_SHIFT_G(10 - bpc) |
-+		       DITHER_ADD_LSHIFT_G(10 - bpc),
-+		       comp->regs + DISP_OD_DITHER_16);
-+		writel(OD_DITHERING,
-+		       comp->regs + DISP_OD_CFG);
-+	} else {
-+		writel(OD_RELAYMODE,
-+		       comp->regs + DISP_OD_CFG);
-+	}
-+
- }
- 
- static void mtk_od_start(struct mtk_ddp_comp *comp)
- {
--	writel(OD_RELAY_MODE, comp->regs + DISP_OD_CFG);
- 	writel(1, comp->regs + DISP_OD_EN);
- }
- 
-@@ -93,7 +134,8 @@ static void mtk_ufoe_start(struct mtk_ddp_comp *comp)
- }
- 
- static void mtk_aal_config(struct mtk_ddp_comp *comp, unsigned int w,
--			   unsigned int h, unsigned int vrefresh)
-+			   unsigned int h, unsigned int vrefresh,
-+			   unsigned int bpc)
- {
- 	writel(h << 16 | w, comp->regs + DISP_AAL_SIZE);
- }
-@@ -109,9 +151,24 @@ static void mtk_aal_stop(struct mtk_ddp_comp *comp)
- }
- 
- static void mtk_gamma_config(struct mtk_ddp_comp *comp, unsigned int w,
--			     unsigned int h, unsigned int vrefresh)
-+			     unsigned int h, unsigned int vrefresh,
-+			     unsigned int bpc)
- {
- 	writel(h << 16 | w, comp->regs + DISP_GAMMA_SIZE);
-+	if (bpc >= 3 && bpc < 10) {
-+		writel(0, comp->regs + DISP_GAMMA_DITHER_5);
-+		writel(0, comp->regs + DISP_GAMMA_DITHER_7);
-+		writel(DITHER_LSB_ERR_SHIFT_R(10 - bpc) |
-+		       DITHER_ADD_LSHIFT_R(10 - bpc) |
-+		       DITHER_NEW_BIT_MODE,
-+		       comp->regs + DISP_GAMMA_DITHER_15);
-+		writel(DITHER_LSB_ERR_SHIFT_B(10 - bpc) |
-+		       DITHER_ADD_LSHIFT_B(10 - bpc) |
-+		       DITHER_LSB_ERR_SHIFT_G(10 - bpc) |
-+		       DITHER_ADD_LSHIFT_G(10 - bpc),
-+		       comp->regs + DISP_GAMMA_DITHER_16);
-+		writel(GAMMA_DITHERING, comp->regs + DISP_GAMMA_CFG);
-+	}
- }
- 
- static void mtk_gamma_start(struct mtk_ddp_comp *comp)
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-index 07e17fe..c7c2e92 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-@@ -65,7 +65,7 @@ struct mtk_ddp_comp;
- 
- struct mtk_ddp_comp_funcs {
- 	void (*config)(struct mtk_ddp_comp *comp, unsigned int w,
--		       unsigned int h, unsigned int vrefresh);
-+		       unsigned int h, unsigned int vrefresh, unsigned int bpc);
- 	void (*start)(struct mtk_ddp_comp *comp);
- 	void (*stop)(struct mtk_ddp_comp *comp);
- 	void (*enable_vblank)(struct mtk_ddp_comp *comp, struct drm_crtc *crtc);
-@@ -89,10 +89,10 @@ struct mtk_ddp_comp {
- 
- static inline void mtk_ddp_comp_config(struct mtk_ddp_comp *comp,
- 				       unsigned int w, unsigned int h,
--				       unsigned int vrefresh)
-+				       unsigned int vrefresh, unsigned int bpc)
- {
- 	if (comp->funcs && comp->funcs->config)
--		comp->funcs->config(comp, w, h, vrefresh);
-+		comp->funcs->config(comp, w, h, vrefresh, bpc);
- }
- 
- static inline void mtk_ddp_comp_start(struct mtk_ddp_comp *comp)
--- 
-1.7.9.5
+As there are dependencies between the 3 critical clocks patches on 
+Stephen Boyd's
+branch clk-next/clk-st-critical, our STi DT and our SPI drivers which 
+remove a temporary
+clock hack, the decision was taken to put our DT STi fixes on top of 
+Stephen Boyd critical clk
+  branch and our SPI patches on the top.
+
+For more details i put in attachment the IRC exchange about this.
+
+Patrice
+
+
+
+
+
+>
+>
+> Thanks,
+>
+> -Olof
+
+-------------- next part --------------
+<lag> arnd: ojn: khilman: Morning chaps.  Just wanted to clear something with you before wasting the STi Maintainer's time
+<lag> arnd: ojn: khilman: We have a set for identifying Critical Clocks -- the core API and STi changes have now been merged
+<lag> arnd: ojn: khilman: I've written an anti-hack for SPI, which we've now obtained an Ack for
+* weox (uid112413 at gateway/web/irccloud.com/x-hsqquvsjfapqgsde) has joined #armlinux
+<lag> arnd: ojn: khilman: The sboyd has kindly supplied an immutable branch for the STi Maintainer to base his ARM-SoC DT PR on
+<lag> arnd: ojn: khilman: As you know, this is how we usually work over multiple subsystems
+<lag> arnd: ojn: khilman: Are you guys happy to work like this too?
+* liuyq (~liuyq at 85.203.21.78) has joined #armlinux
+<lag> arnd: ojn: khilman: To clarify, is it okay for pchotard's STi DT ARM-SoC PR to be based on sboyd's immutable branch and contain the SPI patch?
+<arnd> lag: can you clarify what the dependency is? I assume it's ok, but we should only do this if it can't be avoided
+<lag> arnd: If the SPI patch lands in Mainline first, it will break SPI on our platform
+<lag> arnd: The alternative is to push the SPI patch via broonie during -rc1
+<lag> arnd: But this kinda breaks convention
+<arnd> lag: so the reason is that you are breaking both backward and forward compatibility with old DTs?
+<arnd> lag: if that is the case, what is the reason the spi driver can't cope with old DT?
+<lag> arnd: The only reason it copes currently is a) we have clk_ignore_unused (cmd line arg) enable and b) it contains a hack: drivers/spi/spi-st-ssc4.c lines 79 & 92
+<lag> arnd: The SPI change I'm speaking about removes the hack
+<lag> arnd: ST do not use unmatching DTB files
+<lag> arnd: It's a ridiculousness we've adopted from Enterprise for some reason!
+<arnd> lag: so could we just defer the spi patch to the next merge window? it doesn't seem urgent at all, though it's clearly the right thing to do
+<arnd> we try to not have any changes in next/dt besides dts files and bindinds
+<lag> arnd: That means SPI will remain broken for another version, which I'd like to avoid
+<arnd> ok, maybe we can put the spi change into a next/late branch then
+<arnd> I don't know if ojn has already started one
+<lag> arnd: Then I suggest the alternative and push the SPI patch through the -rcs
+<lag> arnd: Holding it back an entire kernel version isn't reasonable
+<arnd> the next/late branch is what we commonly use for this kind of dependency
+<lag> arnd: Sounds good
+<lag> pH5: You around?
+<lag> pH5: 4aa34ce :)
+<arnd> does the dt branch still require the dependency on clk branch, or do we just need the spi patch on top of both the dt and the clk branches?
+<lag> arnd: Needs to be on top of both
+<lag> arnd: But that should be handled, depending on when sboyd sends his set
+<lag> arnd: He has an immutable branch which only contains 3 patches, if that's of use
+<arnd> so our next/late branch just depends on clk, but next/dt doesn't?
+<lag> arnd: The SPI patch depends on them both landing
+<lag> arnd: ... before it does
+<lag> arnd: If broonie will be kind enough to take it into his SPI -fixes branch, that would solve all of this
+<broonie> I don't know what patch you lot are talking about here...
+<broonie> But why not just merge all three bits via the same path with the dependencies sorted out in git?
+<pH5> lag: hi, sorry I didn't realize your fixes also depended on the shared+optional api patch, at first.
+<arnd> that would work too. lag, can you easily separate out the dt changes for this thing from the other dt changes? then the three clk changes, the respective dt changes  and the bugfix can all go into arm-soc/next/late together
+<lag> broonie: That's what I suggested to start with
+<lag> pH5: Ya!  But I explained that to Linus and he accepted anyway, so all good :)
+<lag> pH5: Thanks for your help
+<lag> arnd: That works for me too
+<lag> pchotard: Are you happy do to that?
+<lag> pchotard: I can help you create that branch, then it just needs submitting separate from the 3 you already know about
+<lag> pchotard: The alternative is, you provide me with Acks for the DT changes and I can submit the PR to ARM-SoC
+<redengin> anyone know where I can find a cortex-r linux start?
+<pchotard> lag: so if i have well all understood, i will submit the critical DT changes on top of clk-next/clk-st-critical branch from sboyd , right ?
+<pchotard> lag: and then the SPI hack ?
+<lag> pchotard: Correct
+<lag> pchotard: As well as the Critical Clock DT changes
+<lag> pchotard: So now you have; dt, defconfig, machine and late
+<lag> pchotard: These will go into your 'late' PR
+<pchotard> lag: to sum up, i still need to do separate PR ? one for DT, one for defconfig, one for machine ?
+<pchotard> lag: what is the content of the late PR ? only the spi hack patch ?
+* ming_lei (~ming at 183.37.224.163) has joined #armlinux
+<lag> pchotard: The 'late' PR needs to be based on sboyd's immutable branch and contain the Critical Clock DT changes and the SPI patch needs to be on the top
+<lag> pchotard:       | /drivers/clk/sti/ | STi DT | SPI |
+<pchotard> lag: ok , that what i initially understood, but your exchange with arnd confused me, my english need improvements ;-)
