@@ -1,157 +1,107 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  8 Jul 2016 01:15:29 +0200
-Subject: [PATCH] pinctrl: qcom: establish proper EBI2 pin groups
-Message-ID: <1467933329-2854-1-git-send-email-linus.walleij@linaro.org>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Thu, 7 Jul 2016 16:53:07 -0700
+Subject: [PATCH 1/6] binding-doc: power: pwrseq-generic: add binding doc
+ for generic power sequence library
+In-Reply-To: <1467884834.4236.36.camel@pengutronix.de>
+References: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
+ <1467882892-27589-2-git-send-email-peter.chen@nxp.com>
+ <1467884834.4236.36.camel@pengutronix.de>
+Message-ID: <577EEB63.3020007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After some digging around I found documentation (!) of the APQ8060
-EBI2 pin groups. It turns out I first need to split the group in
-two: ebi2cs and ebi2 proper. The chip select pins are kind of
-orthogonal to the other EBI2 pins since CS1B and CS2B can be muxed
-over address bits 7 and 6 (don't know why, but they can). This
-is good to fix up before we add users.
 
-Also found what the "holes" in the assignment all the way up to
-gpio158 was actually for.
 
-All mux documentation comes from "Snapdragon(TM) S3 APQ8060-based
-DragonBoard(TM) GPIO User Guide Rev. E August 10, 2012", published
-by Bsquare Corporation.
-
-As the documentation seems a bit hard to come by I put some comments
-in the group definitions so that it is clear to all readers what
-is going on here and what the lines are used for.
-
-Cc: Bj?rn Andersson <bjorn.andersson@linaro.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/qcom/pinctrl-msm8660.c | 68 +++++++++++++++++++++++-----------
- 1 file changed, 46 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm8660.c b/drivers/pinctrl/qcom/pinctrl-msm8660.c
-index 98eb0e33df84..5591d093bf78 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm8660.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm8660.c
-@@ -506,6 +506,7 @@ enum msm8660_functions {
- 	MSM_MUX_usb_fs2_oe_n,
- 	MSM_MUX_vfe,
- 	MSM_MUX_vsens_alarm,
-+	MSM_MUX_ebi2cs,
- 	MSM_MUX_ebi2,
- 	MSM_MUX__,
- };
-@@ -697,13 +698,35 @@ static const char * const vfe_groups[] = {
- static const char * const vsens_alarm_groups[] = {
- 	"gpio127"
- };
-+static const char * const ebi2cs_groups[] = {
-+	"gpio39", /* CS1A */
-+	"gpio40", /* CS2A */
-+	"gpio123", /* CS1B */
-+	"gpio124", /* CS2B */
-+	"gpio131", /* CS5 */
-+	"gpio132", /* CS4 */
-+	"gpio133", /* CS3 */
-+	"gpio134", /* CS0 */
-+};
- static const char * const ebi2_groups[] = {
--	"gpio39", "gpio40", "gpio123", "gpio124", "gpio125", "gpio126",
--	"gpio127", "gpio128", "gpio129", "gpio130", "gpio132", "gpio133",
--	"gpio134", "gpio135", "gpio136", "gpio137", "gpio138", "gpio139",
--	"gpio140", "gpio141", "gpio142", "gpio143", "gpio144", "gpio145",
--	"gpio146", "gpio147", "gpio148", "gpio149", "gpio150", "gpio151",
--	"gpio153", "gpio157"
-+	/* ADDR9 & ADDR8 */
-+	"gpio37", "gpio38",
-+	/* ADDR7 - ADDR 0 */
-+	"gpio123", "gpio124", "gpio125", "gpio126",
-+	"gpio127", "gpio128", "gpio129", "gpio130",
-+	/* (muxed address+data) AD15 - AD0 */
-+	"gpio135", "gpio136", "gpio137", "gpio138", "gpio139",
-+	"gpio140", "gpio141", "gpio142", "gpio143", "gpio144",
-+	"gpio145", "gpio146", "gpio147", "gpio148", "gpio149",
-+	"gpio150",
-+	"gpio151", /* OE output enable */
-+	"gpio152", /* clock */
-+	"gpio153", /* ADV */
-+	"gpio154", /* WAIT (input) */
-+	"gpio155", /* UB Upper Byte Enable */
-+	"gpio156", /* LB Lower Byte Enable */
-+	"gpio157", /* WE Write Enable */
-+	"gpio158", /* busy */
- };
- 
- static const struct msm_function msm8660_functions[] = {
-@@ -758,7 +781,8 @@ static const struct msm_function msm8660_functions[] = {
- 	FUNCTION(usb_fs2_oe_n),
- 	FUNCTION(vfe),
- 	FUNCTION(vsens_alarm),
--	FUNCTION(ebi2),
-+	FUNCTION(ebi2cs), /* for EBI2 chip selects */
-+	FUNCTION(ebi2), /* for general EBI2 pins */
- };
- 
- static const struct msm_pingroup msm8660_groups[] = {
-@@ -799,10 +823,10 @@ static const struct msm_pingroup msm8660_groups[] = {
- 	PINGROUP(34, gsbi1, _, _, _, _, _, _),
- 	PINGROUP(35, gsbi1, _, _, _, _, _, _),
- 	PINGROUP(36, gsbi1, _, _, _, _, _, _),
--	PINGROUP(37, gsbi2, _, _, _, _, _, _),
--	PINGROUP(38, gsbi2, _, _, _, _, _, _),
--	PINGROUP(39, gsbi2, ebi2, mdp_vsync, _, _, _, _),
--	PINGROUP(40, gsbi2, ebi2, _, _, _, _, _),
-+	PINGROUP(37, gsbi2, ebi2, _, _, _, _, _),
-+	PINGROUP(38, gsbi2, ebi2, _, _, _, _, _),
-+	PINGROUP(39, gsbi2, ebi2cs, mdp_vsync, _, _, _, _),
-+	PINGROUP(40, gsbi2, ebi2cs, _, _, _, _, _),
- 	PINGROUP(41, gsbi3, mdp_vsync, _, _, _, _, _),
- 	PINGROUP(42, gsbi3, vfe, _, _, _, _, _),
- 	PINGROUP(43, gsbi3, _, _, _, _, _, _),
-@@ -885,18 +909,18 @@ static const struct msm_pingroup msm8660_groups[] = {
- 	PINGROUP(120, i2s, _, _, _, _, _, _),
- 	PINGROUP(121, i2s, _, _, _, _, _, _),
- 	PINGROUP(122, i2s, gp_clk_1b, _, _, _, _, _),
--	PINGROUP(123, ebi2, gsbi2_spi_cs1_n, _, _, _, _, _),
--	PINGROUP(124, ebi2, gsbi2_spi_cs2_n, _, _, _, _, _),
-+	PINGROUP(123, ebi2, gsbi2_spi_cs1_n, ebi2cs, _, _, _, _),
-+	PINGROUP(124, ebi2, gsbi2_spi_cs2_n, ebi2cs, _, _, _, _),
- 	PINGROUP(125, ebi2, gsbi2_spi_cs3_n, _, _, _, _, _),
- 	PINGROUP(126, ebi2, _, _, _, _, _, _),
- 	PINGROUP(127, ebi2, vsens_alarm, _, _, _, _, _),
- 	PINGROUP(128, ebi2, _, _, _, _, _, _),
- 	PINGROUP(129, ebi2, _, _, _, _, _, _),
- 	PINGROUP(130, ebi2, _, _, _, _, _, _),
--	PINGROUP(131, _, _, _, _, _, _, _),
--	PINGROUP(132, ebi2, _, _, _, _, _, _),
--	PINGROUP(133, ebi2, _, _, _, _, _, _),
--	PINGROUP(134, ebi2, _, _, _, _, _, _),
-+	PINGROUP(131, ebi2cs, _, _, _, _, _, _),
-+	PINGROUP(132, ebi2cs, _, _, _, _, _, _),
-+	PINGROUP(133, ebi2cs, _, _, _, _, _, _),
-+	PINGROUP(134, ebi2cs, _, _, _, _, _, _),
- 	PINGROUP(135, ebi2, _, _, _, _, _, _),
- 	PINGROUP(136, ebi2, _, _, _, _, _, _),
- 	PINGROUP(137, ebi2, _, _, _, _, _, _),
-@@ -914,13 +938,13 @@ static const struct msm_pingroup msm8660_groups[] = {
- 	PINGROUP(149, ebi2, sdc2, _, _, _, _, _),
- 	PINGROUP(150, ebi2, sdc2, _, _, _, _, _),
- 	PINGROUP(151, ebi2, sdc2, _, _, _, _, _),
--	PINGROUP(152, _, sdc2, _, _, _, _, _),
-+	PINGROUP(152, ebi2, sdc2, _, _, _, _, _),
- 	PINGROUP(153, ebi2, _, _, _, _, _, _),
--	PINGROUP(154, _, _, _, _, _, _, _),
--	PINGROUP(155, _, _, _, _, _, _, _),
--	PINGROUP(156, _, _, _, _, _, _, _),
-+	PINGROUP(154, ebi2, _, _, _, _, _, _),
-+	PINGROUP(155, ebi2, _, _, _, _, _, _),
-+	PINGROUP(156, ebi2, _, _, _, _, _, _),
- 	PINGROUP(157, ebi2, _, _, _, _, _, _),
--	PINGROUP(158, _, _, _, _, _, _, _),
-+	PINGROUP(158, ebi2, _, _, _, _, _, _),
- 	PINGROUP(159, sdc1, _, _, _, _, _, _),
- 	PINGROUP(160, sdc1, _, _, _, _, _, _),
- 	PINGROUP(161, sdc1, _, _, _, _, _, _),
--- 
-2.7.4
+On 07/07/2016 02:47 AM, Philipp Zabel wrote:
+> Am Donnerstag, den 07.07.2016, 17:14 +0800 schrieb Peter Chen:
+>> Add binding doc for generic power sequence library.
+>>
+>> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+>> ---
+>>  .../bindings/power/pwrseq/pwrseq-generic.txt       | 56 ++++++++++++++++++++++
+>>  1 file changed, 56 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>> new file mode 100644
+>> index 0000000..4b23834
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>> @@ -0,0 +1,56 @@
+>> +The generic power sequence library
+>> +
+>> +Some hard-wired USB/MMC devices need to do power sequence to let the
+>> +device work normally, the typical power sequence like: enable USB
+>> +PHY clock, toggle reset pin, etc. But current Linux USB driver
+>> +lacks of such code to do it, it may cause some hard-wired USB devices
+>> +works abnormal or can't be recognized by controller at all. The
+>> +power sequence will be done before this device can be found at USB
+>> +bus.
+>> +
+>> +The power sequence properties is under the device node.
+>> +
+>> +Required properties:
+>> +- power-sequence: this device needs to do power sequence before enumeration
+>> +
+>> +Optional properties:
+>> +- clocks: the input clock for device.
+>> +- clock-name: must be "pwrseq-clk"
+> The "-clk" in the clock name is redundant.
+>
+>> +- pwrseq-reset-gpios: Should specify the GPIO for reset.
+>> +- pwrseq-reset-duration-us: the duration in microsecond for assert reset signal.
+> I understand you want to make it explicit that this GPIO is for the
+> pwrseq library, but are we really gaining anything over just calling
+> these reset-gpios and reset-duration-us?
+> The same applies to the clock name above.
+using  reset-gpios makes sense to  me too.
+The above "power-sequence" might then be better called "reset-on-init",
+But really, if a device has a reset gpio shouldn't the default behavior be to
+reset it on boot and when coming back from sleep?
+Is a special property even needed?
+>
+>> +Below is the example of USB power sequence properties on USB device
+>> +nodes which have two level USB hubs.
+>> +
+>> +&usbotg1 {
+>> +	vbus-supply = <&reg_usb_otg1_vbus>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usb_otg1_id>;
+>> +	status = "okay";
+>> +
+>> +	#address-cells = <1>;
+>> +	#size-cells = <0>;
+>> +	hub: genesys at 1 {
+>> +		compatible = "usb5e3,608";
+>> +		reg = <1>;
+>> +
+>> +		power-sequence;
+>> +		clocks = <&clks IMX6SX_CLK_CKO>;
+>> +		clock-names = "pwrseq-clk";
+>> +		pwrseq-reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
+>> +		pwrseq-reset-duration-us = <10>;
+>> +
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		ethernet: asix at 1 {
+>> +			compatible = "usbb95,1708";
+>> +			reg = <1>;
+>> +
+>> +			power-sequence;
+>> +			clocks = <&clks IMX6SX_CLK_IPG>;
+>> +			clock-names = "pwrseq-clk";
+>> +			pwrseq-reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
+>> +			pwrseq-reset-duration-us = <15>;
+>> +		};
+> This looks weird. The hub and ethernet chips don't have "pwrseq" clock
+> and reset input pins. I'd remove the clock-names and pwrseq- reset
+> prefix.
+>
+> regards
+> Philipp
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
