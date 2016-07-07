@@ -1,23 +1,56 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 08 Jul 2016 00:35:57 +0200
-Subject: [PATCH v1 5/5] ARM: dts: rockchip: add the panel power supply for
- rk3288-evb board with rk808 pmu
-In-Reply-To: <1467089484-18756-1-git-send-email-ykk@rock-chips.com>
-References: <1467089288-18355-1-git-send-email-ykk@rock-chips.com>
- <1467089484-18756-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <5331482.3zk2CO4kJV@phil>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  8 Jul 2016 00:37:46 +0200
+Subject: [PATCH v2 1/6] dt-bindings: clock: add DT binding for the Xtal clock
+ on Armada 3700
+In-Reply-To: <1467931071-31004-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1467931071-31004-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1467931071-31004-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 28. Juni 2016, 12:51:24 schrieb Yakir Yang:
-> Panel regulator is controller by a normal GPIO, so we need to
-> write a regulator-fixed node for it.
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+This commit adds the DT binding documentation for the the Xtal clock on
+Armada 3700 used in the Marvell Armada 3700 SoCs.
 
-applied after rewording the commit message a bit.
-On the rk808-evb vcc_lcd comes from the rk808 directly and not through some 
-gpio regulator :-) .
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/clock/armada3700-xtal-clock.txt       | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
 
-
-Heiko
+diff --git a/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+new file mode 100644
+index 000000000000..176c4fe6f0e9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+@@ -0,0 +1,28 @@
++* Xtal Clock bindings for Marvell Armada 37xx SoCs
++
++Marvell Armada 37xx SoCs allow to determine the xtal clock frequencies by
++reading the gpio latch register.
++
++This node must be a subnode of the node exposing the register address
++of the GPIO block where the gpio latch is located.
++
++Required properties:
++- compatible : shall be one of the following:
++	"marvell,armada-3700-xtal-clock"
++- #clock-cells : from common clock binding; shall be set to 0
++
++Optional properties:
++- clock-output-names : from common clock binding; allows overwrite default clock
++	output names ("xtal")
++
++Example:
++gpio1: gpio at 13800 {
++	compatible = "marvell,mvebu-gpio-3700",	"syscon", "simple-mfd";
++	reg = <0x13800 0x1000>;
++
++	xtalclk: xtal-clk {
++		compatible = "marvell,armada-3700-xtal-clock";
++		clock-output-names = "xtal";
++		#clock-cells = <0>;
++	};
++};
+-- 
+2.5.0
