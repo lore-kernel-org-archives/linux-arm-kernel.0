@@ -1,155 +1,29 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 7 Jul 2016 14:12:45 +0800
-Subject: [RFC] arm64: kexec_file_load support
-In-Reply-To: <20160705080355.GQ20774@linaro.org>
-References: <20160701051111.GL20774@linaro.org> <3300473.zhbeG65qgA@hactar>
- <20160704065814.GO20774@linaro.org>
- <20160705012556.GC8190@dhcp-128-65.nay.redhat.com>
- <20160705080355.GQ20774@linaro.org>
-Message-ID: <20160707061245.GA18459@dhcp-128-65.nay.redhat.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 7 Jul 2016 14:24:13 +0800
+Subject: [PATCH V2 01/10] Documentation: dt-bindings: mailbox: tegra: Add
+ binding for HSP mailbox
+In-Reply-To: <577D39B6.701@wwwdotorg.org>
+References: <20160705090431.5852-1-josephl@nvidia.com>
+ <20160705090431.5852-2-josephl@nvidia.com> <577D39B6.701@wwwdotorg.org>
+Message-ID: <577DF58D.4020901@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/16 at 05:03pm, AKASHI Takahiro wrote:
-> Hi Dave,
-> 
-> On Tue, Jul 05, 2016 at 09:25:56AM +0800, Dave Young wrote:
-> > On 07/04/16 at 03:58pm, AKASHI Takahiro wrote:
-> > > Hi,
-> > > 
-> > > On Fri, Jul 01, 2016 at 12:46:31PM -0300, Thiago Jung Bauermann wrote:
-> > > > Am Freitag, 01 Juli 2016, 14:11:12 schrieb AKASHI Takahiro:
-> > > > > I'm not sure whether there is any demand for kexec_file_load
-> > > > > support on arm64, but anyhow I'm working on this and now
-> > > > > my early prototype code does work fine.
-> > > > 
-> > > > It is necessary if you want to support loading only signed kernels, and also 
-> > > > if you want IMA to measure the kernel in its event log.
-> > > > 
-> > > > > There is, however, one essential issue:
-> > > > > While arm64 kernel requires a device tree blob to be set up
-> > > > > correctly at boot time, the current system call API doesn't
-> > > > > have this parameter.
-> > > > >     int kexec_file_load(int kernel_fd, int initrd_fd,
-> > > > >                         unsigned long cmdline_len, const char
-> > > > > *cmdline_ptr, unsigned long flags);
-> > > > > 
-> > > > > Should we invent a new system call, like kexec_file_load2,
-> > > > > and, if so, what kind of interface would be desired?
-> > > > 
-> > > > I'm facing the same issue on powerpc. What I'm doing is taking the device 
-> > > > tree that was used to boot the current kernel and modifying it as necessary 
-> > > > to pass it to the next kernel.
-> > > 
-> > > That is exactly what I do.
-> > > 
-> > > > I agree that it would be better if we could have a system call where a 
-> > > > custom device tree could be passed. One suggestion is:
-> > > 
-> > > For powerpc, you might be able to use dtbImage instead of Image
-> > > without changing the kernel interfaces.
-> > > > 
-> > > > kexec_file_load2(int fds[], int fd_types[], int nr_fds,
-> > > > 		 unsigned long cmdline_len, const char *cmdline_ptr,
-> > > > 		unsigned long flags);
-> > > 
-> > > You don't want to simply add one more argument, i.e. dtb_fd, don't you.
-> > > 
-> > > I prefer a slightly-simpler interface:
-> > >         struct kexec_file_fd {
-> > >                 enum kexec_file_type;
-> > >                 int fd;
-> > >         }
-> > > 
-> > >         int kexec_file_load2(struct kexec_file_fd[], int nr_fds, int flags);
-> > > 
-> > > Or if you want to keep the compatibility with the existing system call,
-> > > 
-> > >         int kexec_file_load(int kernel_fd, int initrd_fd,
-> > >                         unsigned long cmdline_len, const char *cmdline_ptr,
-> > >                         unsigned long flags,
-> > >                         int struct kexec_file_fd[], int nr_fds);
-> > > 
-> > > Here SYSCALL_DEFINE7() have to be defined, and I'm not sure that we will not
-> > > have a problem in adding a system call with more than 6 arguments.
-> > > 
-> > > > Where fds is an array with nr_fds file descriptors and fd_types is an array 
-> > > > specifying what each fd in fds is. So for example, if fds[i] is the kernel, 
-> > > > then fd_types[i] would have the value KEXEC_FILE_KERNEL_FD. If fds[i] is the 
-> > > > device tree blob, fd_types[i], would have the value KEXEC_FILE_DTB and so 
-> > > > on. That way, the syscall can be extended for an arbitrary number and types 
-> > > > of segments that have to be loaded, just like kexec_load.
-> > > > 
-> > > > Another option is to have a struct:
-> > > > 
-> > > > kexec_file_load2(struct kexec_file_params *params, unsigned long params_sz);
-> > > 
-> > > Wow, we can add any number of new parameters with this interface.
-> > > 
-> > > Thanks,
-> > > -Takahiro AKASHI
-> > > 
-> > > > Where:
-> > > > 
-> > > > struct kexec_file_params {
-> > > > 	int version;	/* allows struct to be extended in the future */
-> > > > 	int fds[];
-> > > > 	int fd_types[];
-> > > > 	int nr_fds;
-> > > > 	unsigned long cmdline_len;
-> > > > 	const char *cmdline_ptr;
-> > > > 	unsigned long flags;
-> > > > };
-> > > > 
-> > > > This is even more flexible.
-> > 
-> > I would like to vote for this one, and use kexec_file_fd fds[] in the struct 
-> 
-> If we take this approach, we'd better take "flags" out of struct,
-> and my preference would be:
-> 
->         enum kexec_file_type {
->                 KEXEC_FILE_TYPE_KERNEL;
->                 KEXEC_FILE_TYPE_INITRD;
->                 KEXEC_FILE_TYPE_DTB;
->         }
-> 
->         struct kexec_file_fd {
->                 enum kexec_file_type;
->                 int fd;
->         }
-> 
->         sturct kexec_file_params {
->                 int version;
->                 unsigned char *cmdline;
->                 unsigned long cmdline_len;
->                 int nr_fds;
->                 struct kexec_file_fd fds[0];
->         }
-> 
->         int kexec_file_load2(int kernel_fd, unsigned long flags,
->                                 sturct kexec_file_params extra);
-> 
-> So we don't have to retrieve extra if KEXEC_FILE_UNLOAD
-> (or kernel_fd < 0?),
-> and only once retrieve extra if extra != NULL && nr_fds == 0.
+On 07/07/2016 01:02 AM, Stephen Warren wrote:
+> On 07/05/2016 03:04 AM, Joseph Lo wrote:
+>> Add DT binding for the Hardware Synchronization Primitives (HSP). The
+>> HSP is designed for the processors to share resources and communicate
+>> together. It provides a set of hardware synchronization primitives for
+>> interprocessor communication. So the interprocessor communication (IPC)
+>> protocols can use hardware synchronization primitive, when operating
+>> between two processors not in an SMP relationship.
+>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-If so maybe change a bit from your precious mentioned 7 args proposal like
-below?
+Thanks,
+-Joseph
 
-struct kexec_file_fd {
-	enum kexec_file_type;
-	int fd;
-}
-
-struct kexec_fdset {
-	int nr_fd;
-	struct kexec_file_fd fd[0];
-}
-
-int kexec_file_load(int kernel_fd, int initrd_fd,
-		    unsigned long cmdline_len, const char *cmdline_ptr,
-		    unsigned long flags, struct kexec_fdset *extra_fds);
-
-Thanks
-Dave
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
