@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  7 Jul 2016 10:00:51 +0200
-Subject: [PATCH 18/93] clocksource/drivers/st_lpc: Convert init function to
- return error
+Date: Thu,  7 Jul 2016 10:00:55 +0200
+Subject: [PATCH 22/93] clocksource/drivers/armv7m_systick: Convert init
+ function to return error
 In-Reply-To: <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577E0BED.3020608@linaro.org>
  <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467878526-1238-18-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467878526-1238-22-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,69 +26,73 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
 Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- drivers/clocksource/clksrc_st_lpc.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+ drivers/clocksource/armv7m_systick.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clocksource/clksrc_st_lpc.c b/drivers/clocksource/clksrc_st_lpc.c
-index 65ec467..c9022a9 100644
---- a/drivers/clocksource/clksrc_st_lpc.c
-+++ b/drivers/clocksource/clksrc_st_lpc.c
-@@ -92,7 +92,7 @@ static int __init st_clksrc_setup_clk(struct device_node *np)
- 	return 0;
- }
+diff --git a/drivers/clocksource/armv7m_systick.c b/drivers/clocksource/armv7m_systick.c
+index addfd2c..2b55410 100644
+--- a/drivers/clocksource/armv7m_systick.c
++++ b/drivers/clocksource/armv7m_systick.c
+@@ -21,7 +21,7 @@
  
--static void __init st_clksrc_of_register(struct device_node *np)
-+static int __init st_clksrc_of_register(struct device_node *np)
+ #define SYSTICK_LOAD_RELOAD_MASK 0x00FFFFFF
+ 
+-static void __init system_timer_of_register(struct device_node *np)
++static int __init system_timer_of_register(struct device_node *np)
  {
- 	int ret;
- 	uint32_t mode;
-@@ -100,32 +100,36 @@ static void __init st_clksrc_of_register(struct device_node *np)
- 	ret = of_property_read_u32(np, "st,lpc-mode", &mode);
- 	if (ret) {
- 		pr_err("clksrc-st-lpc: An LPC mode must be provided\n");
--		return;
-+		return ret;
- 	}
- 
- 	/* LPC can either run as a Clocksource or in RTC or WDT mode */
- 	if (mode != ST_LPC_MODE_CLKSRC)
--		return;
-+		return 0;
- 
- 	ddata.base = of_iomap(np, 0);
- 	if (!ddata.base) {
- 		pr_err("clksrc-st-lpc: Unable to map iomem\n");
+ 	struct clk *clk = NULL;
+ 	void __iomem *base;
+@@ -31,22 +31,26 @@ static void __init system_timer_of_register(struct device_node *np)
+ 	base = of_iomap(np, 0);
+ 	if (!base) {
+ 		pr_warn("system-timer: invalid base address\n");
 -		return;
 +		return -ENXIO;
  	}
  
--	if (st_clksrc_setup_clk(np)) {
-+	ret = st_clksrc_setup_clk(np);
-+	if (ret) {
- 		iounmap(ddata.base);
--		return;
-+		return ret;
+ 	ret = of_property_read_u32(np, "clock-frequency", &rate);
+ 	if (ret) {
+ 		clk = of_clk_get(np, 0);
+-		if (IS_ERR(clk))
++		if (IS_ERR(clk)) {
++			ret = PTR_ERR(clk);
+ 			goto out_unmap;
++		}
+ 
+ 		ret = clk_prepare_enable(clk);
+ 		if (ret)
+ 			goto out_clk_put;
+ 
+ 		rate = clk_get_rate(clk);
+-		if (!rate)
++		if (!rate) {
++			ret = -EINVAL;
+ 			goto out_clk_disable;
++		}
  	}
  
--	if (st_clksrc_init()) {
-+	ret = st_clksrc_init();
-+	if (ret) {
- 		clk_disable_unprepare(ddata.clk);
- 		clk_put(ddata.clk);
- 		iounmap(ddata.base);
--		return;
-+		return ret;
- 	}
+ 	writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
+@@ -64,7 +68,7 @@ static void __init system_timer_of_register(struct device_node *np)
  
- 	pr_info("clksrc-st-lpc: clocksource initialised - running @ %luHz\n",
- 		clk_get_rate(ddata.clk));
+ 	pr_info("ARM System timer initialized as clocksource\n");
+ 
+-	return;
++	return 0;
+ 
+ out_clk_disable:
+ 	clk_disable_unprepare(clk);
+@@ -73,7 +77,9 @@ out_clk_put:
+ out_unmap:
+ 	iounmap(base);
+ 	pr_warn("ARM System timer register failed (%d)\n", ret);
 +
 +	return ret;
  }
--CLOCKSOURCE_OF_DECLARE(ddata, "st,stih407-lpc", st_clksrc_of_register);
-+CLOCKSOURCE_OF_DECLARE_RET(ddata, "st,stih407-lpc", st_clksrc_of_register);
+ 
+-CLOCKSOURCE_OF_DECLARE(arm_systick, "arm,armv7m-systick",
++CLOCKSOURCE_OF_DECLARE_RET(arm_systick, "arm,armv7m-systick",
+ 			system_timer_of_register);
 -- 
 1.9.1
