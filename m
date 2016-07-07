@@ -1,42 +1,41 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed,  6 Jul 2016 20:38:37 -0700
-Subject: [PATCH v2] clk: gxbb: expose CLKID_MMC_PCLK
-Message-ID: <20160707033837.20029-1-khilman@baylibre.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 6 Jul 2016 20:50:48 -0700
+Subject: [PATCH 1/2] hwspinlock: qcom_hwspinlock: add missing of_node_put
+ after calling of_parse_phandle
+In-Reply-To: <HE1PR04MB14505D3BC18163C1E4430E918B3B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+References: <1467684664-21155-1-git-send-email-peter.chen@nxp.com>
+ <20160706193512.GB23833@tuxbot>
+ <HE1PR04MB14505D3BC18163C1E4430E918B3B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+Message-ID: <20160707035047.GD23833@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC_PCLK is needed for the SD/eMMC driver, expose to DT (and comment
-out in clk driver)
+On Wed 06 Jul 18:18 PDT 2016, Peter Chen wrote:
 
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- drivers/clk/meson/gxbb.h              | 2 +-
- include/dt-bindings/clock/gxbb-clkc.h | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+>  
+> >On Mon 04 Jul 19:11 PDT 2016, Peter Chen wrote:
+> >
+> >> of_node_put needs to be called when the device node which is got from
+> >> of_parse_phandle has finished using.
+> >>
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Cc: linux-arm-msm at vger.kernel.org
+> >> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> >
+> >Applied.
+> >
+> >Please use get_maintainer.pl to find out whom to send patches to, I only stumbled
+> >upon this while looking for something else.
+> >
+> 
+> There is no maintainer for this file. Below is the output for get_maintainer.pl:
+> 
+> $ ./scripts/get_maintainer.pl patch_0705_2/0001-hwspinlock-qcom_hwspinlock-add-missing-of_node_put-a.patch 
+> linux-kernel at vger.kernel.org (open list)
+> 
 
-diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-index a2adf3448b59..8355ecd27b81 100644
---- a/drivers/clk/meson/gxbb.h
-+++ b/drivers/clk/meson/gxbb.h
-@@ -234,7 +234,7 @@
- #define CLKID_HDMI_PCLK		  63
- #define CLKID_USB1_DDR_BRIDGE	  64
- #define CLKID_USB0_DDR_BRIDGE	  65
--#define CLKID_MMC_PCLK		  66
-+/* CLKID_MMC_PCLK */	       
- #define CLKID_DVIN		  67
- #define CLKID_UART2		  68
- #define CLKID_SANA		  69
-diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-index f889d80246cb..5eb69ec74f6b 100644
---- a/include/dt-bindings/clock/gxbb-clkc.h
-+++ b/include/dt-bindings/clock/gxbb-clkc.h
-@@ -8,5 +8,6 @@
- #define CLKID_CPUCLK		1
- #define CLKID_CLK81		12
- #define CLKID_ETH		36
-+#define CLKID_MMC_PCLK		66
- 
- #endif /* __GXBB_CLKC_H */
--- 
-2.9.0
+That's not good, sorry about that! I sent out a patch including the
+other files as well as hwlock related dt bindings.
+
+Regards,
+Bjorn
