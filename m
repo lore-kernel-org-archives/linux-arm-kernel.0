@@ -1,94 +1,67 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed,  6 Jul 2016 17:35:08 -0700
-Subject: [PATCH v4 07/11] drivers: net: xgene: Enable MDIO driver
+Date: Wed,  6 Jul 2016 17:35:09 -0700
+Subject: [PATCH v4 08/11] drivers: net: xgene: ethtool: Use phy_ethtool_gset
+ and sset
 In-Reply-To: <1467851712-24780-1-git-send-email-isubramanian@apm.com>
 References: <1467851712-24780-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1467851712-24780-8-git-send-email-isubramanian@apm.com>
+Message-ID: <1467851712-24780-9-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables MDIO driver by,
-
-- Selecting MDIO_XGENE
-- Changed open and close to use phy_start and phy_stop
-- Changed to use mac_ops->tx(rx)_enable and tx(rx)_disable
+Changed SGMII 1G get_settings to use phy_ethtool_gset.
+Changed SGMII 1G set_settings to use phy_ethtool_sset.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Tested-by: Fushen Chen <fchen@apm.com>
 Tested-by: Toan Le <toanle@apm.com>
-Tested-by: Matthias Brugger <mbrugger@suse.com>
 ---
- drivers/net/ethernet/apm/xgene/Kconfig           |  1 +
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c   |  8 ++++----
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 12 ++++++------
- 3 files changed, 11 insertions(+), 10 deletions(-)
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/Kconfig b/drivers/net/ethernet/apm/xgene/Kconfig
-index 19e38af..300e3b5 100644
---- a/drivers/net/ethernet/apm/xgene/Kconfig
-+++ b/drivers/net/ethernet/apm/xgene/Kconfig
-@@ -3,6 +3,7 @@ config NET_XGENE
- 	depends on HAS_DMA
- 	depends on ARCH_XGENE || COMPILE_TEST
- 	select PHYLIB
-+	select MDIO_XGENE
- 	help
- 	  This is the Ethernet driver for the on-chip ethernet interface on the
- 	  APM X-Gene SoC.
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index 96f8de7..37d0c14 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -788,13 +788,13 @@ static void xgene_enet_adjust_link(struct net_device *ndev)
- 		if (pdata->phy_speed != phydev->speed) {
- 			pdata->phy_speed = phydev->speed;
- 			mac_ops->set_speed(pdata);
--			xgene_gmac_rx_enable(pdata);
--			xgene_gmac_tx_enable(pdata);
-+			mac_ops->rx_enable(pdata);
-+			mac_ops->tx_enable(pdata);
- 			phy_print_status(phydev);
- 		}
- 	} else {
--		xgene_gmac_rx_disable(pdata);
--		xgene_gmac_tx_disable(pdata);
-+		mac_ops->rx_disable(pdata);
-+		mac_ops->tx_disable(pdata);
- 		pdata->phy_speed = SPEED_UNKNOWN;
- 		phy_print_status(phydev);
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c b/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
+index 416d6eb..22a7b26 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
+@@ -65,8 +65,15 @@ static int xgene_get_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
+ 
+ 		return phy_ethtool_gset(phydev, cmd);
+ 	} else if (pdata->phy_mode == PHY_INTERFACE_MODE_SGMII) {
+-		cmd->supported = SUPPORTED_1000baseT_Full |
+-				 SUPPORTED_Autoneg | SUPPORTED_MII;
++		if (pdata->mdio_driver) {
++			if (!phydev)
++				return -ENODEV;
++
++			return phy_ethtool_gset(phydev, cmd);
++		}
++
++		cmd->supported = SUPPORTED_1000baseT_Full | SUPPORTED_Autoneg |
++				 SUPPORTED_MII;
+ 		cmd->advertising = cmd->supported;
+ 		ethtool_cmd_speed_set(cmd, SPEED_1000);
+ 		cmd->duplex = DUPLEX_FULL;
+@@ -92,12 +99,21 @@ static int xgene_set_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
+ 	struct phy_device *phydev = pdata->phy_dev;
+ 
+ 	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII) {
+-		if (phydev == NULL)
++		if (!phydev)
+ 			return -ENODEV;
+ 
+ 		return phy_ethtool_sset(phydev, cmd);
  	}
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index a8693de..ed30b51 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -739,9 +739,9 @@ static int xgene_enet_open(struct net_device *ndev)
- 	if (ret)
- 		return ret;
  
--	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
-+	if (pdata->phy_dev) {
- 		phy_start(pdata->phy_dev);
--	else {
-+	} else {
- 		schedule_delayed_work(&pdata->link_work, PHY_POLL_LINK_OFF);
- 		netif_carrier_off(ndev);
- 	}
-@@ -756,12 +756,12 @@ static int xgene_enet_open(struct net_device *ndev)
- static int xgene_enet_close(struct net_device *ndev)
- {
- 	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
--	const struct xgene_mac_ops *mac_ops = pdata->mac_ops;
- 	int i;
++	if (pdata->phy_mode == PHY_INTERFACE_MODE_SGMII) {
++		if (pdata->mdio_driver) {
++			if (!phydev)
++				return -ENODEV;
++
++			return phy_ethtool_sset(phydev, cmd);
++		}
++	}
++
+ 	return -EINVAL;
+ }
  
--	netif_tx_stop_all_queues(ndev);
--	mac_ops->tx_disable(pdata);
--	mac_ops->rx_disable(pdata);
-+	if (pdata->phy_dev)
-+		phy_stop(pdata->phy_dev);
-+	else
-+		cancel_delayed_work_sync(&pdata->link_work);
- 
- 	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
- 		phy_stop(pdata->phy_dev);
 -- 
 1.9.1
