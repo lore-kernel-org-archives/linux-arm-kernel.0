@@ -1,43 +1,114 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 7 Jul 2016 10:33:54 -0700
-Subject: [RFC] [PATCH v3 2/4] spi: spi-omap2-mcspi: Select SPI_SPLIT
-In-Reply-To: <1467911871-4508-3-git-send-email-fcooper@ti.com>
-References: <1467911871-4508-1-git-send-email-fcooper@ti.com>
- <1467911871-4508-3-git-send-email-fcooper@ti.com>
-Message-ID: <577E9282.1070105@infradead.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 7 Jul 2016 13:37:43 -0400
+Subject: [PATCH 1/9] mm: Hardened usercopy
+In-Reply-To: <3418914.byvl8Wuxlf@wuerfel>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <1467843928-29351-2-git-send-email-keescook@chromium.org>
+ <3418914.byvl8Wuxlf@wuerfel>
+Message-ID: <CAGXu5jLyBfqXJKxohHiZgztRVrFyqwbta1W_Dw6KyyGM3LzshQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/16 10:17, Franklin S Cooper Jr wrote:
-> The function spi_split will be used by spi-omap2-mcspi to handle a SoC
+On Thu, Jul 7, 2016 at 4:01 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday, July 6, 2016 3:25:20 PM CEST Kees Cook wrote:
+>> This is the start of porting PAX_USERCOPY into the mainline kernel. This
+>> is the first set of features, controlled by CONFIG_HARDENED_USERCOPY. The
+>> work is based on code by PaX Team and Brad Spengler, and an earlier port
+>> from Casey Schaufler. Additional non-slab page tests are from Rik van Riel.
+>>
+>> This patch contains the logic for validating several conditions when
+>> performing copy_to_user() and copy_from_user() on the kernel object
+>> being copied to/from:
+>> - address range doesn't wrap around
+>> - address range isn't NULL or zero-allocated (with a non-zero copy size)
+>> - if on the slab allocator:
+>>   - object size must be less than or equal to copy size (when check is
+>>     implemented in the allocator, which appear in subsequent patches)
+>> - otherwise, object must not span page allocations
+>> - if on the stack
+>>   - object must not extend before/after the current process task
+>>   - object must be contained by the current stack frame (when there is
+>>     arch/build support for identifying stack frames)
+>> - object must not overlap with kernel text
+>>
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>
+> Nice!
+>
+> I have a few further thoughts, most of which have probably been
+> considered before:
+>
+>> +static inline const char *check_bogus_address(const void *ptr, unsigned long n)
+>> +{
+>> +     /* Reject if object wraps past end of memory. */
+>> +     if (ptr + n < ptr)
+>> +             return "<wrapped address>";
+>> +
+>> +     /* Reject if NULL or ZERO-allocation. */
+>> +     if (ZERO_OR_NULL_PTR(ptr))
+>> +             return "<null>";
+>> +
+>> +     return NULL;
+>> +}
+>
+> This checks against address (void*)16, but I guess on most architectures the
+> lowest possible kernel address is much higher. While there may not be much
+> that to exploit if the expected kernel address points to userland, forbidding
+> any obviously incorrect address that is outside of the kernel may be easier.
+>
+> Even on architectures like s390 that start the kernel memory at (void *)0x0,
+> the lowest address to which we may want to do a copy_to_user would be much
+> higher than (void*)0x16.
 
-s/spi_split/sg_split/
+Yeah, that's worth exploring, but given the shenanigans around
+set_fs(), I'd like to leave this as-is, and we can add to these checks
+as we remove as much of the insane usage of set_fs().
 
-> workaround in the SPI driver. Therefore, select SPI_SPLIT so this function
+>> +
+>> +     /* Allow kernel rodata region (if not marked as Reserved). */
+>> +     if (ptr >= (const void *)__start_rodata &&
+>> +         end <= (const void *)__end_rodata)
+>> +             return NULL;
+>
+> Should we explicitly forbid writing to rodata, or is it enough to
+> rely on page protection here?
 
-s/SPI_SPLIT/SG_SPLIT/ on line above and in $Subject.
+Hm, interesting. That's a very small check to add. My knee-jerk is to
+just leave it up to page protection. I'm on the fence. :)
 
-> is available to the driver.
-> 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> ---
->  drivers/spi/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-> index 4b931ec..d6fb8d4 100644
-> --- a/drivers/spi/Kconfig
-> +++ b/drivers/spi/Kconfig
-> @@ -411,6 +411,7 @@ config SPI_OMAP24XX
->  	tristate "McSPI driver for OMAP"
->  	depends on HAS_DMA
->  	depends on ARCH_OMAP2PLUS || COMPILE_TEST
-> +	select SG_SPLIT
->  	help
->  	  SPI master controller for OMAP24XX and later Multichannel SPI
->  	  (McSPI) modules.
-> 
+>
+>> +     /* Allow kernel bss region (if not marked as Reserved). */
+>> +     if (ptr >= (const void *)__bss_start &&
+>> +         end <= (const void *)__bss_stop)
+>> +             return NULL;
+>
+> accesses to .data/.rodata/.bss are probably not performance critical,
+> so we could go further here and check the kallsyms table to ensure
+> that we are not spanning multiple symbols here.
 
+Oh, interesting! Yeah, would you be willing to put together that patch
+and test it? I wonder if there are any cases where there are
+legitimate usercopys across multiple symbols.
+
+> For stuff that is performance critical, should there be a way to
+> opt out of the checks, or do we assume it already uses functions
+> that avoid the checks? I looked at the file and network I/O path
+> briefly and they seem to use kmap_atomic() to get to the user pages
+> at least in some of the common cases (but I may well be missing
+> important ones).
+
+I don't want to start with an exemption here, so until such a case is
+found, I'd rather leave this as-is. That said, the primary protection
+here tends to be buggy lengths (which is why put/get_user() is
+untouched). For constant-sized copies, some checks could be skipped.
+In the second part of this protection (what I named
+CONFIG_HARDENED_USERCOPY_WHITELIST in the RFC version of this series),
+there are cases where we want to skip the whitelist checking since it
+is for a constant-sized copy the code understands is okay to pull out
+of an otherwise disallowed allocator object.
+
+-Kees
 
 -- 
-~Randy
+Kees Cook
+Chrome OS & Brillo Security
