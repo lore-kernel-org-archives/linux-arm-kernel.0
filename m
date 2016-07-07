@@ -1,64 +1,68 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 7 Jul 2016 11:00:25 +0900
-Subject: [PATCH v21 8/8] Documentation: dt: usable-memory and elfcorehdr
- nodes for arm64 kexec
-In-Reply-To: <6483018.WWW2TSJB10@hactar>
-References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
- <20160706075226.27609-9-takahiro.akashi@linaro.org>
- <6483018.WWW2TSJB10@hactar>
-Message-ID: <20160707020025.GY20774@linaro.org>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 7 Jul 2016 11:24:39 +0900
+Subject: [PATCH V2 05/10] firmware: tegra: add BPMP support
+In-Reply-To: <577D363A.4010003@nvidia.com>
+References: <20160705090431.5852-1-josephl@nvidia.com>
+ <20160705090431.5852-6-josephl@nvidia.com>
+ <CAAVeFuKvp4d=RoPZGGLmhqXs1oHZPrEOxTJd_b6b7-rHq_mqqg@mail.gmail.com>
+ <577D363A.4010003@nvidia.com>
+Message-ID: <CAAVeFuKd_w6jJbAXPNOX+M7aAgS9doR6c5h1QxHbRySRgzviHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2016 at 04:29:18PM -0300, Thiago Jung Bauermann wrote:
-> Hi,
-> 
-> Am Mittwoch, 06 Juli 2016, 16:52:26 schrieb AKASHI Takahiro:
-> > +linux,usable-memory
-> > +-------------------
-> > +
-> > +This property is set on PowerPC and arm64 by kexec-tools during kdump
-> > +to tell the crash kernel the base address of its reserved area of memory,
-> > and +the size. e.g.
-> > +
-> > +/ {
-> > +	chosen {
-> > +		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
-> > +	};
-> > +};
-> 
-> Again, this description is wrong for PowerPC. See messages from myself and 
-> Michael Ellerman:
-> 
-> https://lists.infradead.org/pipermail/kexec/2016-June/016250.html
-> 
-> https://lists.infradead.org/pipermail/kexec/2016-June/016253.html
+On Thu, Jul 7, 2016 at 1:47 AM, Matt Longnecker <mlongnecker@nvidia.com> wrote:
+> Alex,
+>
+>
+> On 07/06/2016 04:39 AM, Alexandre Courbot wrote:
+>>>
+>>> diff --git a/include/soc/tegra/bpmp_abi.h b/include/soc/tegra/bpmp_abi.h
+>>> >new file mode 100644
+>>> >index 000000000000..0aaef5960e29
+>>> >--- /dev/null
+>>> >+++ b/include/soc/tegra/bpmp_abi.h
+>>> >@@ -0,0 +1,1601 @@
+>>> >+/*
+>>> >+ * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+>>> >+ *
+>>> >+ * This program is free software; you can redistribute it and/or modify
+>>> > it
+>>> >+ * under the terms and conditions of the GNU General Public License,
+>>> >+ * version 2, as published by the Free Software Foundation.
+>>> >+ *
+>>> >+ * This program is distributed in the hope it will be useful, but
+>>> > WITHOUT
+>>> >+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+>>> > or
+>>> >+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+>>> > License for
+>>> >+ * more details.
+>>> >+ *
+>>> >+ * You should have received a copy of the GNU General Public License
+>>> >+ * along with this program.  If not, see<http://www.gnu.org/licenses/>.
+>>> >+ */
+>>> >+
+>>> >+#ifndef_ABI_BPMP_ABI_H_
+>>> >+#define_ABI_BPMP_ABI_H_
+>>> >+
+>>>
+>> ...
+>>
+>> There is a lot of stuff in this file, most of which we are not using
+>> now - this is ok, but unless this is a file synced from an outside
+>> resource maybe we should trim the structures we don't need and add
+>> them as we make use of them? It helps dividing the work in bite-size
+>> chunks.
+>>
+>> Regarding the documentation format of this file, is this valid kernel
+>> documentation since the adoption of Sphynx? Or is it whatever the
+>> origin is using?
+>
+> bpmp_abi.h is meant to be delivered as is from an NVIDIA internal repo to a
+> variety of OS'es. Each of them has a different documentation standard and
+> coding standard.
+>
+> I'd like to avoid trimming parts from the file (or even worse modifying
+> parts of the file) so that future deliveries are trivial.
 
-Oops, I must have missed your previous comments. Apologies.
-
-Yes, I know that, and I used to implement the same functionality before.
-It did work for dtb-based systems, but not for UEFI(ACPI)-based systems
-because UEFI doesn't export memory regions information via a device tree,
-but rather via ACPI table. So "/memory" node won't appear.
-So I went back with "mem=" command line approach, and later this "/chosen/"
-approach.
-
-> IMHO, it would be simpler if ARM used linux,usable-memory in the same way 
-> that PowerPC does, for consistency.
-
-Well, this property won't conflict with per-"/memory" ones
-if we take it that the former, if present, supersedes the latter.
-Sophistic?
-What about changing the name to usable-memory-limit?
-(I know that you have another one, "memory-limit" though.)
-
-Again, I would like to defer to arm64 maintainers.
-
-Thanks,
--Takahiro AKASHI
-
-> -- 
-> []'s
-> Thiago Jung Bauermann
-> IBM Linux Technology Center
-> 
+Makes sense, thanks to you and Stephen for the clarification.
