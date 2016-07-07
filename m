@@ -1,124 +1,50 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 7 Jul 2016 14:49:18 +0800
-Subject: [PATCH V2 02/10] mailbox: tegra-hsp: Add HSP(Hardware
- Synchronization Primitives) driver
-In-Reply-To: <577D36F3.9010806@wwwdotorg.org>
-References: <20160705090431.5852-1-josephl@nvidia.com>
- <20160705090431.5852-3-josephl@nvidia.com>
- <CAAVeFuK1nY2M3vU9j-D5TJwZCEj+sXRDy=W4XMTqSdsveTTQww@mail.gmail.com>
- <577CCA0A.4000203@nvidia.com> <577D36F3.9010806@wwwdotorg.org>
-Message-ID: <577DFB6E.2060508@nvidia.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 7 Jul 2016 09:14:04 +0200
+Subject: [GIT PULL] STi SoC changes for v4.8
+In-Reply-To: <20160707053056.GM32389@localhost>
+References: <57768292.8070901@st.com> <20160707053056.GM32389@localhost>
+Message-ID: <577E013C.7030208@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2016 12:50 AM, Stephen Warren wrote:
-> On 07/06/2016 03:06 AM, Joseph Lo wrote:
->> On 07/06/2016 03:05 PM, Alexandre Courbot wrote:
->>> On Tue, Jul 5, 2016 at 6:04 PM, Joseph Lo <josephl@nvidia.com> wrote:
->>>> The Tegra HSP mailbox driver implements the signaling doorbell-based
->>>> interprocessor communication (IPC) for remote processors currently. The
->>>> HSP HW modules support some different features for that, which are
->>>> shared mailboxes, shared semaphores, arbitrated semaphores, and
->>>> doorbells. And there are multiple HSP HW instances on the chip. So the
->>>> driver is extendable to support more features for different IPC
->>>> requirement.
->>>>
->>>> The driver of remote processor can use it as a mailbox client and deal
->>>> with the IPC protocol to synchronize the data communications.
->
->>>> diff --git a/drivers/mailbox/tegra-hsp.c b/drivers/mailbox/tegra-hsp.c
->
->>>> +static irqreturn_t hsp_db_irq(int irq, void *p)
->>>> +{
->>>> +       struct tegra_hsp_mbox *hsp_mbox = p;
->>>> +       ulong val;
->>>> +       int master_id;
->>>> +
->>>> +       val = (ulong)hsp_readl(hsp_mbox->db_base[HSP_DB_CCPLEX],
->>>> +                              HSP_DB_REG_PENDING);
->>>> +       hsp_writel(hsp_mbox->db_base[HSP_DB_CCPLEX],
->>>> HSP_DB_REG_PENDING, val);
->>>> +
->>>> +       spin_lock(&hsp_mbox->lock);
->>>> +       for_each_set_bit(master_id, &val, MAX_NUM_HSP_CHAN) {
->>>> +               struct mbox_chan *chan;
->>>> +               struct tegra_hsp_mbox_chan *mchan;
->>>> +               int i;
->>>> +
->>>> +               for (i = 0; i < MAX_NUM_HSP_CHAN; i++) {
->>>
->>> I wonder if this could not be optimized. You are doing a double loop
->>> on MAX_NUM_HSP_CHAN to look for an identical master_id. Since it seems
->>> like the same master_id cannot be used twice (considering that the
->>> inner loop only processes the first match), couldn't you just select
->>> the free channel in of_hsp_mbox_xlate() by doing
->>> &mbox->chans[master_id] (and returning an error if it is already
->>> used), then simply getting chan as &hsp_mbox->mbox->chans[master_id]
->>> instead of having the inner loop below? That would remove the need for
->>> the second loop.
+Hi Olof
+
+On 07/07/2016 07:30 AM, Olof Johansson wrote:
+> On Fri, Jul 01, 2016 at 04:47:46PM +0200, Patrice Chotard wrote:
+>> Hi Olof, Arnd and Kevin,
 >>
->> That was exactly what I did in the V1, which only supported one HSP
->> sub-module per HSP HW block. So we can just use the master_id as the
->> mbox channel ID.
+>> Please consider this first round of STi SoC updates for v4.8:
 >>
->> Meanwhile, the V2 is purposed to support multiple HSP sub-modules to be
->> running on the same HSP HW block. The "ID" between different modules
->> could be conflict. So I dropped the mechanism that used the master_id as
->> the mbox channel ID.
->
-> I haven't looked at the code in this patch since I'm mainly concerned
-> about the DT bindings. However, I will say that nothing in the change to
-> the mailbox specifier in DT should have required /any/ changes to the
-> code, except to add a single check to validate that the "mailbox type"
-> encoded into the top 16 bits of the mailbox ID were 0, and hence
-> represented a doorbell rather than anything else. Any enhancements to
-> support other mailbox types could have happened later, and I doubt would
-> require anything dynamic even then.
-
-Yes, I only add the code for that change. Maybe some glue code for the 
-extend-ability to support more HSP modules in the future.
-
->
->>>> +static int tegra_hsp_db_init(struct tegra_hsp_mbox *hsp_mbox,
->>>> +                            struct mbox_chan *mchan, int master_id)
->>>> +{
->>>> +       struct platform_device *pdev =
->>>> to_platform_device(hsp_mbox->mbox->dev);
->>>> +       struct tegra_hsp_mbox_chan *hsp_mbox_chan;
->>>> +       int ret;
->>>> +
->>>> +       if (!hsp_mbox->db_irq) {
->>>> +               int i;
->>>> +
->>>> +               hsp_mbox->db_irq = platform_get_irq_byname(pdev,
->>>> "doorbell");
->>>
->>> Getting the IRQ sounds more like a job for probe() - I don't see the
->>> benefit of lazy-doing it?
+>> The following changes since commit 4c2e07c6a29e0129e975727b9f57eede813eea85:
 >>
->> We only need the IRQ when the client is requesting the DB service. For
->> other HSP sub-modules, they are using different IRQ. So I didn't do that
->> at probe time.
->
-> All resources provided by other devices/drivers must be acquired at
-> probe time, since that's the only time it's possible to defer probe if
-> the provider of the resource is not available.
->
-> If you don't follow that rule, what happens is:
->
-> 1) This driver probes.
->
-> 2) Some other driver calls tegra_hsp_db_init(), and it fails since the
-> provider of the IRQ is not yet available. This likely ends up returning
-> something other than -EPROBE_DEFER since the HSP driver was found
-> successfully (thus there is no deferred probe situation as far as the
-> mailbox core is concerned), it's just that the mailbox channel
-> lookup/init/... failed.
->
-> 3) The other driver's probe() fails due to this, but since the error
-> wasn't a probe deferral, the other driver's probe() is never retried.
+>>    Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
+>> sti-soc_for_v4.8
+> Again, that's a branch and not a tag.
 
-Agree, will fix this.
+Right, i will fix that
 
-Thanks,
--Joseph
+>
+>> for you to fetch changes up to 55aa35180c57d82f3db23e5aabce97acb0d36681:
+>>
+>>    ARM: sti: Implement dummy L2 cache's write_sec (2016-07-01 16:23:44 +0200)
+>> ----------------------------------------------------------------
+>>
+>> Highlights:
+>> -----------
+>> _ add a dummy L2 cache's write_sec callback as in non secure mode execution,
+>>    we can't get access to L2 cache secure registers
+>> _ cosmetics change, in case of dump_stack, update the hardware name with a
+>>    more genericfor the STi SoCs family
+> Minor nit: This is a somewhat odd format to write a list in. Please use
+> '-' or '*' instead, and feel free to use capital letters, etc. :)
+
+Thanks for reviewing, i will submit a v2
+
+Patrice
+>
+>
+> -Olof
