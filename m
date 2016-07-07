@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  7 Jul 2016 10:01:31 +0200
-Subject: [PATCH 58/93] clocksource/drivers/sun5i: Convert init function to
+Date: Thu,  7 Jul 2016 10:01:36 +0200
+Subject: [PATCH 63/93] clocksource/drivers/vt8500: Convert init function to
  return error
 In-Reply-To: <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577E0BED.3020608@linaro.org>
  <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467878526-1238-58-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467878526-1238-63-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,69 +27,69 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-sun5i.c | 37 +++++++++++++++++++++++--------------
- 1 file changed, 23 insertions(+), 14 deletions(-)
+ drivers/clocksource/vt8500_timer.c | 26 ++++++++++++++++++--------
+ 1 file changed, 18 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index 24c83f9..f0a3ffb 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -311,33 +311,42 @@ err_free:
- 	return ret;
- }
+diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
+index ddb4092..1bc8707 100644
+--- a/drivers/clocksource/vt8500_timer.c
++++ b/drivers/clocksource/vt8500_timer.c
+@@ -121,38 +121,48 @@ static struct irqaction irq = {
+ 	.dev_id  = &clockevent,
+ };
  
--static void __init sun5i_timer_init(struct device_node *node)
-+static int __init sun5i_timer_init(struct device_node *node)
+-static void __init vt8500_timer_init(struct device_node *np)
++static int __init vt8500_timer_init(struct device_node *np)
  {
- 	struct reset_control *rstc;
- 	void __iomem *timer_base;
- 	struct clk *clk;
--	int irq;
-+	int irq, ret;
+-	int timer_irq;
++	int timer_irq, ret;
  
- 	timer_base = of_io_request_and_map(node, 0, of_node_full_name(node));
--	if (IS_ERR(timer_base))
--		panic("Can't map registers");
-+	if (IS_ERR(timer_base)) {
-+		pr_err("Can't map registers");
-+		return PTR_ERR(timer_base);;
-+	}
- 
- 	irq = irq_of_parse_and_map(node, 0);
--	if (irq <= 0)
--		panic("Can't parse IRQ");
-+	if (irq <= 0) {
-+		pr_err("Can't parse IRQ");
-+		return -EINVAL;
-+	}
- 
- 	clk = of_clk_get(node, 0);
--	if (IS_ERR(clk))
--		panic("Can't get timer clock");
-+	if (IS_ERR(clk)) {
-+		pr_err("Can't get timer clock");
-+		return PTR_ERR(clk);
-+	}
- 
- 	rstc = of_reset_control_get(node, NULL);
- 	if (!IS_ERR(rstc))
- 		reset_control_deassert(rstc);
- 
--	sun5i_setup_clocksource(node, timer_base, clk, irq);
--	sun5i_setup_clockevent(node, timer_base, clk, irq);
-+	ret = sun5i_setup_clocksource(node, timer_base, clk, irq);
-+	if (ret)
-+		return ret;
+ 	regbase = of_iomap(np, 0);
+ 	if (!regbase) {
+ 		pr_err("%s: Missing iobase description in Device Tree\n",
+ 								__func__);
+-		return;
++		return -ENXIO;
+ 	}
 +
-+	return sun5i_setup_clockevent(node, timer_base, clk, irq);
+ 	timer_irq = irq_of_parse_and_map(np, 0);
+ 	if (!timer_irq) {
+ 		pr_err("%s: Missing irq description in Device Tree\n",
+ 								__func__);
+-		return;
++		return -EINVAL;
+ 	}
+ 
+ 	writel(1, regbase + TIMER_CTRL_VAL);
+ 	writel(0xf, regbase + TIMER_STATUS_VAL);
+ 	writel(~0, regbase + TIMER_MATCH_VAL);
+ 
+-	if (clocksource_register_hz(&clocksource, VT8500_TIMER_HZ))
++	ret = clocksource_register_hz(&clocksource, VT8500_TIMER_HZ);
++	if (ret) {
+ 		pr_err("%s: vt8500_timer_init: clocksource_register failed for %s\n",
+-					__func__, clocksource.name);
++		       __func__, clocksource.name);
++		return ret;
++	}
+ 
+ 	clockevent.cpumask = cpumask_of(0);
+ 
+-	if (setup_irq(timer_irq, &irq))
++	ret = setup_irq(timer_irq, &irq);
++	if (ret) {
+ 		pr_err("%s: setup_irq failed for %s\n", __func__,
+ 							clockevent.name);
++		return ret;
++	}
++
+ 	clockevents_config_and_register(&clockevent, VT8500_TIMER_HZ,
+ 					MIN_OSCR_DELTA * 2, 0xf0000000);
++
++	return 0;
  }
--CLOCKSOURCE_OF_DECLARE(sun5i_a13, "allwinner,sun5i-a13-hstimer",
--		       sun5i_timer_init);
--CLOCKSOURCE_OF_DECLARE(sun7i_a20, "allwinner,sun7i-a20-hstimer",
--		       sun5i_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(sun5i_a13, "allwinner,sun5i-a13-hstimer",
-+			   sun5i_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(sun7i_a20, "allwinner,sun7i-a20-hstimer",
-+			   sun5i_timer_init);
+ 
+-CLOCKSOURCE_OF_DECLARE(vt8500, "via,vt8500-timer", vt8500_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(vt8500, "via,vt8500-timer", vt8500_timer_init);
 -- 
 1.9.1
