@@ -1,75 +1,40 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu,  7 Jul 2016 12:17:51 -0500
-Subject: [RFC] [PATCH v3 4/4] ARM: dts: am335x-icev2: Add SPI based NOR
-In-Reply-To: <1467911871-4508-1-git-send-email-fcooper@ti.com>
-References: <1467911871-4508-1-git-send-email-fcooper@ti.com>
-Message-ID: <1467911871-4508-5-git-send-email-fcooper@ti.com>
+Date: Thu,  7 Jul 2016 12:17:47 -0500
+Subject: [RFC] [PATCH v3 0/4] spi: omap2-mcspi: Use the SPI framework to
+ handle DMA mapping
+Message-ID: <1467911871-4508-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for W25Q64CVSSIG which is a Winbond 64 Mbit SPI NOR.
+This patchset switches omap2-mcspi from handling DMA mapping internally to
+using the mechanism built into the SPI framework.
 
-At boot you will see the following message:
-m25p80 spi1.0: found s25fl064k, expected w25q64
+However, this is slightly complex since some OMAP SoCs have a quirk that
+needs to be handled. In the driver on certain OMAP SOCs if certain
+conditions are met the DMA should transfer one or two less elements
+when reading from the SPI. The remaining bytes are read in CPU mode.
+Sg_split is used to implement this quirk without altering the original
+sgl.
 
-This is because the JEDEC ID for this chip is the same as s25fl064k.
-However, this should be harmless since both chips are essentially the
-same.
+Note: The first patch looks to already have been accepted.
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
- arch/arm/boot/dts/am335x-icev2.dts | 39 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+V2 changes:
+Save page_link value if page_link doesn't point to chained sg_list
 
-diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
-index e271013..e4d2d13 100644
---- a/arch/arm/boot/dts/am335x-icev2.dts
-+++ b/arch/arm/boot/dts/am335x-icev2.dts
-@@ -208,6 +208,45 @@
- 	};
- };
- 
-+&spi0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_default>;
-+
-+	spi_nor: flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "winbond,w25q64", "jedec,spi-nor";
-+		spi-max-frequency = <80000000>;
-+		m25p,fast-read;
-+		reg = <0>;
-+
-+		partition at 0 {
-+			label = "u-boot-spl";
-+			reg = <0x0 0x80000>;
-+			read-only;
-+		};
-+
-+		partition at 1 {
-+			label = "u-boot";
-+			reg = <0x80000 0x100000>;
-+			read-only;
-+		};
-+
-+		partition at 2 {
-+			label = "u-boot-env";
-+			reg = <0x180000 0x20000>;
-+			read-only;
-+		};
-+
-+		partition at 3 {
-+			label = "misc";
-+			reg = <0x1A0000 0x660000>;
-+		};
-+	};
-+
-+};
-+
- #include "tps65910.dtsi"
- 
- &tps {
+v3 changes:
+Switch from using custom sg_table clone function to sg_split that already
+exist within the kernel.
+
+Franklin S Cooper Jr (4):
+  spi: omap2-mcspi: Add comments for RX only DMA buffer workaround
+  spi: spi-omap2-mcspi: Select SPI_SPLIT
+  spi: omap2-mcspi: Use the SPI framework to handle DMA mapping
+  ARM: dts: am335x-icev2: Add SPI based NOR
+
+ arch/arm/boot/dts/am335x-icev2.dts |  39 ++++++++++
+ drivers/spi/Kconfig                |   1 +
+ drivers/spi/spi-omap2-mcspi.c      | 145 ++++++++++++++++++-------------------
+ 3 files changed, 109 insertions(+), 76 deletions(-)
+
 -- 
 2.7.0
