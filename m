@@ -1,55 +1,59 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 07 Jul 2016 09:42:34 -0700
-Subject: [PATCH v21 3/8] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20160707004330.GU20774@linaro.org>
-References: <20160706075226.27609-1-takahiro.akashi@linaro.org>
- <20160706075226.27609-4-takahiro.akashi@linaro.org>
- <1467826137.8880.35.camel@infradead.org>
- <20160707004330.GU20774@linaro.org>
-Message-ID: <1467909754.8880.56.camel@infradead.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 8 Jul 2016 00:47:19 +0800
+Subject: [arm-soc:for-next 3/8]
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi:48:41: fatal error:
+ dt-bindings/clock/gxbb-clkc.h: No such file or directory
+Message-ID: <201607080017.hiQXrLVX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
+head:   cdd641aa1c2dbf8b83f3eee0568ac51a165b1c54
+commit: 6f5f1e81cdad1d1e019e4dc4b1d532a43a6c3ffe [3/8] Merge branch 'next/dt64' into for-next
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 6f5f1e81cdad1d1e019e4dc4b1d532a43a6c3ffe
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-On Thu, 2016-07-07 at 09:43 +0900, AKASHI Takahiro wrote:
-> On Wed, Jul 06, 2016 at 10:28:57AM -0700, Geoff Levand wrote:
-> > On Wed, 2016-07-06 at 16:52 +0900, AKASHI Takahiro wrote:
-> > > @@ -830,6 +855,14 @@ void handle_IPI(int ipinr, struct pt_regs
-> > > *regs)
-> > >  > > > > 	> > > > > > > 	> > > > irq_exit();
-> > >  > > > > 	> > > > > > > 	> > > > break;
-> > >  
-> > > +#ifdef CONFIG_KEXEC_CORE
-> > > +> > > > 	> > > > case IPI_CPU_CRASH_STOP:
-> > > +> > > > 	> > > > > > > 	> > > > irq_enter();
-> > > +> > > > 	> > > > > > > 	> > > > ipi_cpu_crash_stop(cpu, regs);
-> > > +
-> > > +> > > > 	> > > > > > > 	> > > > unreachable();
-> > > +#endif
-> > 
-> > It seems like you could simplifiy with something like:
-> > 
-> > 	> > case IPI_CPU_CRASH_STOP:
-> > 	> > 	> > if (IS_ENABLED(CONFIG_KEXEC_CORE) {
-> > 	> > 	> > 	> > irq_enter();
-> > 	> > 	> > 	> > ipi_cpu_crash_stop(cpu, regs);
-> > 	> > 	> > 	> > unreachable();
-> > 	> > 	> > }
-> 
-> OK, I will take this.
-> 
-> > Then move the CONFIG_KEXEC_CORE conditional around
-> > ipi_cpu_crash_stop to just around crash_save_cpu().
-> 
-> Yeah, we can do that, but I added these conditionals just because
-> the kernel size can be reduced (a bit, obviously) if kexec is
-> not needed.
+Note: the arm-soc/for-next HEAD cdd641aa1c2dbf8b83f3eee0568ac51a165b1c54 builds fine.
+      It only hurts bisectibility.
 
-The linker will remove the unused ipi_cpu_crash_stop since
-it is static.  atomic_t waiting_for_crash_ipi also becomes
-unused, and I think it will be removed also.  The motivation
-for these changes is to get a build test of this code
-even when CONFIG_KEXEC_CORE=n.
+All errors (new ones prefixed by >>):
 
--Geoff
+   In file included from arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts:47:0:
+>> arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi:48:41: fatal error: dt-bindings/clock/gxbb-clkc.h: No such file or directory
+   compilation terminated.
+
+vim +48 arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+
+4f24eda8 Andreas F?rber 2016-02-05  42  
+4f24eda8 Andreas F?rber 2016-02-05  43  #include <dt-bindings/gpio/gpio.h>
+4f24eda8 Andreas F?rber 2016-02-05  44  #include <dt-bindings/interrupt-controller/irq.h>
+4f24eda8 Andreas F?rber 2016-02-05  45  #include <dt-bindings/interrupt-controller/arm-gic.h>
+f40d437f Carlo Caione   2016-05-02  46  #include <dt-bindings/gpio/meson-gxbb-gpio.h>
+6d1a5c93 Neil Armstrong 2016-05-30  47  #include <dt-bindings/reset/amlogic,meson-gxbb-reset.h>
+f3abd629 Kevin Hilman   2016-06-14 @48  #include <dt-bindings/clock/gxbb-clkc.h>
+4f24eda8 Andreas F?rber 2016-02-05  49  
+4f24eda8 Andreas F?rber 2016-02-05  50  / {
+4f24eda8 Andreas F?rber 2016-02-05  51  	compatible = "amlogic,meson-gxbb";
+
+:::::: The code at line 48 was first introduced by commit
+:::::: f3abd6296168d9d356192b50a92a7a980ca99a2f ARM64: DTS: meson-gxbb: switch ethernet to real clock
+
+:::::: TO: Kevin Hilman <khilman@baylibre.com>
+:::::: CC: Kevin Hilman <khilman@baylibre.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 26353 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160708/ec589444/attachment-0001.obj>
