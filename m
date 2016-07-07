@@ -1,33 +1,38 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed,  6 Jul 2016 20:36:14 -0700
-Subject: [GIT PULL 2/4] Broadcom ARM-based SoC changes for 4.8 (part 2)
-In-Reply-To: <1467862574-6522-1-git-send-email-f.fainelli@gmail.com>
-References: <1467862574-6522-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1467862574-6522-5-git-send-email-f.fainelli@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 06 Jul 2016 20:38:22 -0700
+Subject: [PATCH] clk: gxbb: expose CLKID_MMC_PCLK
+In-Reply-To: <146784996534.73491.14217049599437131929@resonance> (Michael
+ Turquette's message of "Wed, 06 Jul 2016 17:06:05 -0700")
+References: <20160706230749.9620-1-khilman@baylibre.com>
+ <146784996534.73491.14217049599437131929@resonance>
+Message-ID: <m2y45ep175.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 423779cfd3ca73b9236e6eb798477f3a4f13355d:
+Michael Turquette <mturquette@baylibre.com> writes:
 
-  ARM: bcm: fix missing include of kona_l2_cache.h (2016-06-08 10:17:15 -0700)
+> Hi Kevin,
+>
+> Quoting Kevin Hilman (2016-07-06 16:07:49)
+>> The MMC_PCLK is needed for the SD/eMMC driver.
+>> 
+>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>> ---
+>>  include/dt-bindings/clock/gxbb-clkc.h | 1 +
+>>  1 file changed, 1 insertion(+)
+>> 
+>> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+>> index f889d80246cb..5eb69ec74f6b 100644
+>> --- a/include/dt-bindings/clock/gxbb-clkc.h
+>> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+>> @@ -8,5 +8,6 @@
+>>  #define CLKID_CPUCLK           1
+>>  #define CLKID_CLK81            12
+>>  #define CLKID_ETH              36
+>> +#define CLKID_MMC_PCLK         66
+>
+> I think you're missing removal of the duplicate macro as well:
 
-are available in the git repository at:
+Er, yup.  Re-spin coming right up.
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.8/soc-part2
-
-for you to fetch changes up to 2dc9e0b9f162af7e2047176a31716eac5301916f:
-
-  ARM: debug: Enable DEBUG_BCM_5301X for Northstar Plus SoCs (2016-07-06 19:43:22 -0700)
-
-----------------------------------------------------------------
-This pull request contains the second part of the Broadcom ARM-based SoC changes:
-
-- Florian updates the DEBUG_UART_BCM5301X entry to cover both NS and NSP SoCs
-  since they both have the same location
-
-----------------------------------------------------------------
-Florian Fainelli (1):
-      ARM: debug: Enable DEBUG_BCM_5301X for Northstar Plus SoCs
-
- arch/arm/Kconfig.debug | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Kevin
