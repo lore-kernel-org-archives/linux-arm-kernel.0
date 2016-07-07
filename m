@@ -1,57 +1,51 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 07 Jul 2016 08:04:41 +0800
-Subject: [PATCH -next] ARM: dts: sun8i: Add NFC node to Allwinner A23/A33
- SoC
-In-Reply-To: <20160706202932.GD4247@lukather>
-References: <20160706003352.28194-1-icenowy@aosc.xyz>
- <20160706202932.GD4247@lukather>
-Message-ID: <34841467849881@web8m.yandex.ru>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 06 Jul 2016 17:06:05 -0700
+Subject: [PATCH] clk: gxbb: expose CLKID_MMC_PCLK
+In-Reply-To: <20160706230749.9620-1-khilman@baylibre.com>
+References: <20160706230749.9620-1-khilman@baylibre.com>
+Message-ID: <146784996534.73491.14217049599437131929@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Kevin,
+
+Quoting Kevin Hilman (2016-07-06 16:07:49)
+> The MMC_PCLK is needed for the SD/eMMC driver.
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+>  include/dt-bindings/clock/gxbb-clkc.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+> index f889d80246cb..5eb69ec74f6b 100644
+> --- a/include/dt-bindings/clock/gxbb-clkc.h
+> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+> @@ -8,5 +8,6 @@
+>  #define CLKID_CPUCLK           1
+>  #define CLKID_CLK81            12
+>  #define CLKID_ETH              36
+> +#define CLKID_MMC_PCLK         66
+
+I think you're missing removal of the duplicate macro as well:
 
 
-07.07.2016, 04:29, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> On Wed, Jul 06, 2016 at 08:33:52AM +0800, Icenowy Zheng wrote:
->> ?Add NAND Flash controller node definition to the A23/A33 SoC.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->
-> Has this ever been tested? On what board, with what NAND chip?
->
->> ?---
->> ??arch/arm/boot/dts/sun8i-a23-a33.dtsi | 23 +++++++++++++++++++++++
->> ??1 file changed, 23 insertions(+)
->>
->> ?diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
->> ?index 7e05e09..270c38a 100644
->> ?--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
->> ?+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
->> ?@@ -209,6 +209,14 @@
->> ??????????????????????????????????????????"apb2_uart3", "apb2_uart4";
->> ??????????????????};
->>
->> ?+ nand_clk: clk at 01c20080 {
->> ?+ #clock-cells = <0>;
->> ?+ compatible = "allwinner,sun4i-a10-mod0-clk";
->> ?+ reg = <0x01c20080 0x4>;
->> ?+ clocks = <&osc24M>, <&pll6 1>;
->> ?+ clock-output-names = "nand";
->> ?+ };
->> ?+
->
-> This should be in a separate patch.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
 
-with a http://linux-sunxi.org/Aoson_M751s tablet, (SKhynix H27UCG8T2ETR-BC NAND chip).
+diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+index a2adf3448b59..f0fab2286c18 100644
+--- a/drivers/clk/meson/gxbb.h
++++ b/drivers/clk/meson/gxbb.h
+@@ -234,7 +234,7 @@
+ #define CLKID_HDMI_PCLK		  63
+ #define CLKID_USB1_DDR_BRIDGE	  64
+ #define CLKID_USB0_DDR_BRIDGE	  65
+-#define CLKID_MMC_PCLK		  66
++/* CLKID_MMC_PCLK */
+ #define CLKID_DVIN		  67
+ #define CLKID_UART2		  68
+ #define CLKID_SANA		  69
 
-I used the patchset at http://lists.infradead.org/pipermail/linux-mtd/2016-June/067848.html to ensure the NAND chip to work properly (otherwise the chip id cannot be correctly identified)
+
+
+Regards,
+Mike
