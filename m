@@ -1,101 +1,126 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 7 Jul 2016 19:12:38 +0800
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <CAJZ5v0iFUH3CgN2d1t8V13aRYdibiZSy+26sNLz3E-8mNvsn6Q@mail.gmail.com>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <57714bed-3f9c-90c2-ac30-2d462d8a06d4@linaro.org>
- <20160701152340.GO12735@arm.com> <2183745.J7YpvxXQ47@vostro.rjw.lan>
- <CAJZ5v0iFcjxQV9YV2KaXGAPRBM8M2xxPm5e2b4uhwYAZZtndPg@mail.gmail.com>
- <20160705141858.GD18338@xora-haswell.xora.org.uk>
- <CAJZ5v0iFUH3CgN2d1t8V13aRYdibiZSy+26sNLz3E-8mNvsn6Q@mail.gmail.com>
-Message-ID: <baf8e09d-0249-9da2-1a78-aac3bc35b8b5@linaro.org>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Thu, 7 Jul 2016 13:13:53 +0200
+Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
+In-Reply-To: <1467886612.21382.18.camel@mtksdaap41>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+ <577D0576.2050706@xs4all.nl> <1467886612.21382.18.camel@mtksdaap41>
+Message-ID: <577E3971.1080305@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/7/6 8:00, Rafael J. Wysocki wrote:
-> On Tue, Jul 5, 2016 at 4:18 PM, Graeme Gregory <gg@slimlogic.co.uk> wrote:
->> On Mon, Jul 04, 2016 at 02:53:20PM +0200, Rafael J. Wysocki wrote:
->>> On Fri, Jul 1, 2016 at 11:04 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->>>> On Friday, July 01, 2016 04:23:40 PM Will Deacon wrote:
->>>>> On Thu, Jun 30, 2016 at 09:48:02PM +0800, Hanjun Guo wrote:
->>>>>> On 2016/6/30 21:27, Rafael J. Wysocki wrote:
->>>>>>> On Thursday, June 30, 2016 10:10:02 AM Hanjun Guo wrote:
->>>>>>>> GTDT is part of ACPI spec, drivers/acpi/ is for driver code of
->>>>>>>> ACPI spec, I think it can stay in drivers/acpi/ from this point
->>>>>>>> of view, am I right?
->>>>>>>
->>>>>>> The question is not "Can it?", but "Does it need to?".
->>>>>>>
->>>>>>> It is in the spec, but still there's only one architecture needing it.
->>>>>>>
->>>>>>> There is no way to test it on any other architecture and no reason to build it
->>>>>>> for any other architecture, so why does it need to be located in drivers/acpi/ ?
->>>>>>
->>>>>> I'm fine to move it to other places such as arch/arm64/kernel/, but I
->>>>>> would like to ask ARM64 maintainer's suggestion for this.
->>>>>>
->>>>>> Will, Catalin, what's your opinion on this?
->>>>>
->>>>> We don't have any device-tree code for the architected timer under
->>>>> arch/arm64, so I don't see why we should need anything for ACPI either.
->>>>
->>>> And I don't see a reason for the GTDT code to be there in drivers/acpi/.
->>>>
->>>> What gives?
->>>
->>> Well, since there are things like acpi_lpss in there, my position here
->>> is kind of weak. :-)
->>>
->>> That said I'm not particularly happy with having them in
->>> drivers/acpi/, so I definitely won't object against attempts to moving
->>> them somewhere else.
->>>
->>>> Maybe it should go to the same place as the analogus DT code, then?
->>>
->>> I'm mostly concerned about how (and by whom) that code is going to be
->>> maintained going forward, though.  I also think it should be made
->>> clear that it is ARM64-only.
->>>
+Hi Tiffany,
+
+On 07/07/16 12:16, tiffany lin wrote:
+> Hi Hans,
+> 
+> 
+> On Wed, 2016-07-06 at 15:19 +0200, Hans Verkuil wrote:
+>> Hi Tiffany,
 >>
->> So is this a documentation issue in which case Fu Wei can add that to
->> the file to explain its limited to ARM64. Or we could even rename the
->> file acpi_arm64_gtdt.c
+>> I plan to review this patch series on Friday, but one obvious question is
+>> what the reason for these failures is:
 >>
->> It seems a pity as the comment on this series were minors to block
->> things on a filename/location.
->
-> Let me repeat what I said above:
->
-> I'm mostly concerned about how (and by whom) that code is going to be
-> maintained going forward.
->
-> This is not about documentation, it is about responsibility.
->
-> Honestly, I don't think I'm the right maintainer to apply the patch
-> introducing this code and then handle bug reports regarding it and so
-> on.  That has to be done by somebody else.
+>>> Input/Output configuration ioctls:
+>>>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+>>>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+>>>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+>>>         test VIDIOC_G/S_EDID: OK (Not Supported)
+>>>
+>>>         Control ioctls:
+>>>                 test VIDIOC_QUERYCTRL/MENU: OK
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(357): g_ctrl returned an error (11)
+>>>                 test VIDIOC_G/S_CTRL: FAIL
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(579): g_ext_ctrls returned an error (11)
+>>>                 test VIDIOC_G/S/TRY_EXT_CTRLS: FAIL
+> These fails are because VIDIOC_G_CTRL and VIDIOC_G_EXT_CTRLS return
+> V4L2_CID_MIN_BUFFERS_FOR_CAPTURE only when dirver in MTK_STATE_HEADER
+> state, or it will return EAGAIN.
+> This could help user space get correct value, not default value that may
+> changed base on media content.
 
-I'm working on ACPI for years and upstreamed the ARM64 ACPI core
-support (with lots of people's help), I'm willing to maintain the ARM64
-ACPI code under drivers/acpi/ if no objections.
+So this should be improved in v4l2-compliance.
 
->
-> That's one thing.
->
-> Another one is the question I asked a few messages ago: Why having the
-> GTDT code in drivers/acpi/ is actually useful to anyone?  It
-> definitely would not be useful to me as the maintainer of
-> drivers/acpi/, but maybe it would be useful to somebody for a specific
-> practical reason.  Or is it just "let's put this into drivers/acpi/
-> for the lack of a better place"?
+> 
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(721): subscribe event for control 'User Controls' failed
+>>>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
+> Driver do not support subscribe event for control 'User Controls' for
+> now.
+> Do we need to support this?
 
-Having GTDT code in drivers/acpi/ is useful as it is code that is used
-by two different subsystems, clocksource and watchdog,and where people
-look by default for utility ACPI code.
+Let me check: this might be a knock-on effect from the previous error.
 
-If the mostly concerned thing (maintainer ship) is settled down, the
-second question would be easily solved.
+Which controls does your driver have? (v4l2-ctl -l)
 
-Thanks
-Hanjun
+> 
+>>>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+>>>                 Standard Controls: 2 Private Controls: 0
+>>>
+>>>         Format ioctls:
+>>>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+>>>                 test VIDIOC_G/S_PARM: OK (Not Supported)
+>>>                 test VIDIOC_G_FBUF: OK (Not Supported)
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-formats.cpp(405): expected EINVAL, but got 11 when getting format for buftype 9
+>>>                 test VIDIOC_G_FMT: FAIL
+> This is because vidioc_vdec_g_fmt only succeed when context is in
+> MTK_STATE_HEADER state, or user space cannot get correct format data
+> using this function.
+
+I'll take a look at this as well.
+
+> 
+>>>                 test VIDIOC_TRY_FMT: OK (Not Supported)
+>>>                 test VIDIOC_S_FMT: OK (Not Supported)
+>>>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+>>>
+>>>         Codec ioctls:
+>>>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+>>>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+>>>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+>>>
+>>>         Buffer ioctls:
+>>>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(500): q.has_expbuf(node)
+
+Don't use v4l-utils-1.6: just use the latest master branch. That way you can
+be certain that the latest fixes are in. Besides, 1.6.0 is really old (almost
+two years!). If you used the same old version for the encoder driver as well,
+then please retest that encoder driver!
+
+> Our OUTPUT and CAPTURE queue support both VB2_DMABUF and VB2_MMAP, user
+> space can select which to use in runtime.
+> So our driver default support v4l2_m2m_ioctl_expbuf functionality.
+> In v4l2-compliance test, it will check v4l2_m2m_ioctl_expbuf only valid
+> when node->valid_memorytype is V4L2_MEMORY_MMAP.
+> So when go through node->valid_memorytype is V4L2_MEMORY_DMABUF, it
+> fail.
+
+That sounds like a bug. I'll take a look. For all I know, this is fixed in the
+master branch.
+
+Regards,
+
+	Hans
+
+> 
+> 
+> best regards,
+> Tiffany
+> 
+> 
+> 
+>>>                 test VIDIOC_EXPBUF: FAIL
+>>>
+>>>
+>>> Total: 38, Succeeded: 33, Failed: 5, Warnings: 0
+>>
+>> If it is due to a bug in v4l2-compliance, then let me know and I'll fix it. If not,
+>> then it should be fixed in the driver.
+>>
+>> Frankly, it was the presence of these failures that made me think this patch series
+>> wasn't final. Before a v4l2 driver can be accepted in the kernel, v4l2-compliance must pass.
+>>
+>> Regards,
+>>
+>> 	Hans
+> 
+> 
