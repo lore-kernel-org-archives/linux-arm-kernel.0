@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  7 Jul 2016 10:00:54 +0200
-Subject: [PATCH 21/93] clocksource/drivers/digicolor: Convert init function to
+Date: Thu,  7 Jul 2016 10:00:53 +0200
+Subject: [PATCH 20/93] clocksource/drivers/clps711x: Convert init function to
  return error
 In-Reply-To: <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
 References: <577E0BED.3020608@linaro.org>
  <1467878526-1238-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1467878526-1238-21-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1467878526-1238-20-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,66 +26,41 @@ by case, thus this change just return back an error or success in the init
 function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Baruch Siach <baruch@tkos.co.il>
 ---
- drivers/clocksource/timer-digicolor.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ drivers/clocksource/clps711x-timer.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
-index 96bb222..b929061 100644
---- a/drivers/clocksource/timer-digicolor.c
-+++ b/drivers/clocksource/timer-digicolor.c
-@@ -148,7 +148,7 @@ static u64 notrace digicolor_timer_sched_read(void)
- 	return ~readl(dc_timer_dev.base + COUNT(TIMER_B));
+diff --git a/drivers/clocksource/clps711x-timer.c b/drivers/clocksource/clps711x-timer.c
+index cdd86e3..3b66198 100644
+--- a/drivers/clocksource/clps711x-timer.c
++++ b/drivers/clocksource/clps711x-timer.c
+@@ -104,7 +104,7 @@ void __init clps711x_clksrc_init(void __iomem *tc1_base, void __iomem *tc2_base,
  }
  
--static void __init digicolor_timer_init(struct device_node *node)
-+static int __init digicolor_timer_init(struct device_node *node)
+ #ifdef CONFIG_CLKSRC_OF
+-static void __init clps711x_timer_init(struct device_node *np)
++static int __init clps711x_timer_init(struct device_node *np)
  {
- 	unsigned long rate;
- 	struct clk *clk;
-@@ -161,19 +161,19 @@ static void __init digicolor_timer_init(struct device_node *node)
- 	dc_timer_dev.base = of_iomap(node, 0);
- 	if (!dc_timer_dev.base) {
- 		pr_err("Can't map registers");
--		return;
-+		return -ENXIO;
- 	}
+ 	unsigned int irq = irq_of_parse_and_map(np, 0);
+ 	struct clk *clock = of_clk_get(np, 0);
+@@ -112,14 +112,12 @@ static void __init clps711x_timer_init(struct device_node *np)
  
- 	irq = irq_of_parse_and_map(node, dc_timer_dev.timer_id);
- 	if (irq <= 0) {
- 		pr_err("Can't parse IRQ");
--		return;
+ 	switch (of_alias_get_id(np, "timer")) {
+ 	case CLPS711X_CLKSRC_CLOCKSOURCE:
+-		BUG_ON(_clps711x_clksrc_init(clock, base));
+-		break;
++		return _clps711x_clksrc_init(clock, base);
+ 	case CLPS711X_CLKSRC_CLOCKEVENT:
+-		BUG_ON(_clps711x_clkevt_init(clock, base, irq));
+-		break;
++		return _clps711x_clkevt_init(clock, base, irq);
+ 	default:
+-		break;
 +		return -EINVAL;
  	}
- 
- 	clk = of_clk_get(node, 0);
- 	if (IS_ERR(clk)) {
- 		pr_err("Can't get timer clock");
--		return;
-+		return PTR_ERR(clk);
- 	}
- 	clk_prepare_enable(clk);
- 	rate = clk_get_rate(clk);
-@@ -190,13 +190,17 @@ static void __init digicolor_timer_init(struct device_node *node)
- 	ret = request_irq(irq, digicolor_timer_interrupt,
- 			  IRQF_TIMER | IRQF_IRQPOLL, "digicolor_timerC",
- 			  &dc_timer_dev.ce);
--	if (ret)
-+	if (ret) {
- 		pr_warn("request of timer irq %d failed (%d)\n", irq, ret);
-+		return ret;
-+	}
- 
- 	dc_timer_dev.ce.cpumask = cpu_possible_mask;
- 	dc_timer_dev.ce.irq = irq;
- 
- 	clockevents_config_and_register(&dc_timer_dev.ce, rate, 0, 0xffffffff);
-+
-+	return 0;
  }
--CLOCKSOURCE_OF_DECLARE(conexant_digicolor, "cnxt,cx92755-timer",
-+CLOCKSOURCE_OF_DECLARE_RET(conexant_digicolor, "cnxt,cx92755-timer",
- 		       digicolor_timer_init);
+-CLOCKSOURCE_OF_DECLARE(clps711x, "cirrus,clps711x-timer", clps711x_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(clps711x, "cirrus,clps711x-timer", clps711x_timer_init);
+ #endif
 -- 
 1.9.1
