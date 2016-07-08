@@ -1,95 +1,35 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  8 Jul 2016 18:07:55 +0100
-Subject: [PATCH v9 4/7] cpuidle: introduce CPU_PM_CPU_IDLE_ENTER macro for
- ARM{32, 64}
+Date: Fri,  8 Jul 2016 18:07:58 +0100
+Subject: [PATCH v9 7/7] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
 In-Reply-To: <1467997678-7107-1-git-send-email-sudeep.holla@arm.com>
 References: <1467997678-7107-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1467997678-7107-5-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1467997678-7107-8-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function arm_enter_idle_state is exactly the same in both generic
-ARM{32,64} CPUIdle driver and will be the same even on ARM64 backend
-for ACPI processor idle driver. So we can unify it and move it to a
-common place by introducing CPU_PM_CPU_IDLE_ENTER macro that can be
-used in all places avoiding duplication.
+Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
+enable ACPI_PROCESSOR_IDLE for ARM64 too.
 
-This is in preparation of reuse of the generic cpuidle entry function
-for ACPI LPI support on ARM64.
+This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
 
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Suggested-by: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/cpuidle/cpuidle-arm.c | 26 ++++++--------------------
- include/linux/cpuidle.h       | 18 ++++++++++++++++++
- 2 files changed, 24 insertions(+), 20 deletions(-)
+ drivers/acpi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index e342565e8715..4ba3d3fe142f 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -36,26 +36,12 @@
- static int arm_enter_idle_state(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv, int idx)
- {
--	int ret;
--
--	if (!idx) {
--		cpu_do_idle();
--		return idx;
--	}
--
--	ret = cpu_pm_enter();
--	if (!ret) {
--		/*
--		 * Pass idle state index to cpu_suspend which in turn will
--		 * call the CPU ops suspend protocol with idle index as a
--		 * parameter.
--		 */
--		ret = arm_cpuidle_suspend(idx);
--
--		cpu_pm_exit();
--	}
--
--	return ret ? -1 : idx;
-+	/*
-+	 * Pass idle state index to arm_cpuidle_suspend which in turn
-+	 * will call the CPU ops suspend protocol with idle index as a
-+	 * parameter.
-+	 */
-+	return CPU_PM_CPU_IDLE_ENTER(arm_cpuidle_suspend, idx);
- }
- 
- static struct cpuidle_driver arm_idle_driver = {
-diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
-index 07b83d32f66c..bb31373c3478 100644
---- a/include/linux/cpuidle.h
-+++ b/include/linux/cpuidle.h
-@@ -252,4 +252,22 @@ static inline int cpuidle_register_governor(struct cpuidle_governor *gov)
- #define CPUIDLE_DRIVER_STATE_START	0
- #endif
- 
-+#define CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx)	\
-+({								\
-+	int __ret;						\
-+								\
-+	if (!idx) {						\
-+		cpu_do_idle();					\
-+		return idx;					\
-+	}							\
-+								\
-+	__ret = cpu_pm_enter();					\
-+	if (!__ret) {						\
-+		__ret = low_level_idle_enter(idx);		\
-+		cpu_pm_exit();					\
-+	}							\
-+								\
-+	__ret ? -1 : idx;					\
-+})
-+
- #endif /* _LINUX_CPUIDLE_H */
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 1358fb7d7a68..d74275c0f374 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
+ config ACPI_PROCESSOR
+ 	tristate "Processor"
+ 	depends on X86 || IA64 || ARM64
+-	select ACPI_PROCESSOR_IDLE if X86 || IA64
++	select ACPI_PROCESSOR_IDLE
+ 	select ACPI_CPU_FREQ_PSS if X86 || IA64
+ 	default y
+ 	help
 -- 
 2.7.4
