@@ -1,37 +1,38 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 8 Jul 2016 22:35:28 +0200
-Subject: [PATCH v2 6/7] spi: s3c64xx: restore removed comments
-In-Reply-To: <1467989201-14661-7-git-send-email-andi.shyti@samsung.com>
+Date: Fri, 8 Jul 2016 22:39:27 +0200
+Subject: [PATCH v2 5/7] spi: s3c64xx: add exynos5433 compatible for ioclk
+ handling
+In-Reply-To: <1467989201-14661-6-git-send-email-andi.shyti@samsung.com>
 References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
- <1467989201-14661-7-git-send-email-andi.shyti@samsung.com>
-Message-ID: <20160708203528.GA26626@kozik-lap>
+ <1467989201-14661-6-git-send-email-andi.shyti@samsung.com>
+Message-ID: <20160708203927.GB26626@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 11:46:40PM +0900, Andi Shyti wrote:
-> Patch a9e93e8 has erroneously removed some comments which are
-> important to understand why the bus frequency is multiplied by
-> two during the spi transfer.
+On Fri, Jul 08, 2016 at 11:46:39PM +0900, Andi Shyti wrote:
+> The new compatible is related to the Samsung Exynos5433 SoC. The
+> difference between the previous is that in the exynos5433 the SPI
+> controller is driven by three clocks instead of only one.
+> 
+> The new clock (ioclk) is controlling the input/output clock
+> whenever the controller is slave or master.
+> 
+> The presence of the clock line is detected from the compatibility
+> structure (exynos5433_spi_port_config) as a boolean value.
+> 
+> The probe function checks whether the ioclk is present and if so,
+> it acquires.
+> 
+> The runtime suspend and resume functions will handle the clock
+> enabling and disabling as well.
 > 
 > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 > ---
->  drivers/spi/spi-s3c64xx.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 6da663f..32b66f0 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -639,6 +639,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
->  	writel(val, regs + S3C64XX_SPI_MODE_CFG);
->  
->  	if (sdd->port_conf->clk_from_cmu) {
-> +		/* There is half-multiplier before the SPI */
->  		clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
->  	} else {
->  		/* Configure Clock */
+>  drivers/spi/spi-s3c64xx.c | 57 ++++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 52 insertions(+), 5 deletions(-)
+>
 
-Regardless of possible followup after Michael's comments:
+Looks fine to me, thanks for updates.
 
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
