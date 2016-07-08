@@ -1,67 +1,75 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 8 Jul 2016 11:49:38 -0400
-Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
-In-Reply-To: <20160708152421.GG3556@pathway.suse.cz>
-References: <20160627151500.2247A68D20@newverein.lst.de>
- <20160627151717.BD25468D26@newverein.lst.de>
- <20160708145800.GE3556@pathway.suse.cz>
- <20160708150709.GA8979@lst.de>
- <20160708152421.GG3556@pathway.suse.cz>
-Message-ID: <20160708114938.49052cee@gandalf.local.home>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Fri, 8 Jul 2016 11:52:42 -0400
+Subject: [PATCH v2 0/6] net: ethernet: bgmac: Add platform device support
+In-Reply-To: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
+References: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <CAC3K-4r6wsL++uO8KZWYf75KNCrEGi3VB9vbWbWT_yVUP7TgWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Jul 2016 17:24:21 +0200
-Petr Mladek <pmladek@suse.com> wrote:
+On Thu, Jul 7, 2016 at 7:08 PM, Jon Mason <jon.mason@broadcom.com> wrote:
+> David Miller, Please consider including patches 1-5 in net-next
+>
+> Florian Fainelli, Please consider including patches 6 & 7 in
+>   devicetree/next
 
-> On Fri 2016-07-08 17:07:09, Torsten Duwe wrote:
-> > On Fri, Jul 08, 2016 at 04:58:00PM +0200, Petr Mladek wrote:  
-> > > On Mon 2016-06-27 17:17:17, Torsten Duwe wrote:  
-> > > > Once gcc is enhanced to optionally generate NOPs at the beginning
-> > > > of each function, like the concept proven in
-> > > > https://gcc.gnu.org/ml/gcc-patches/2016-04/msg01671.html
-> > > > (sans the "fprintf (... pad_size);", which spoils the data structure
-> > > > for kernel use), the generated pads can nicely be used to reroute
-> > > > function calls for tracing/profiling, or live patching.
-> > > > diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> > > > index ebecf9a..917065c 100644
-> > > > --- a/arch/arm64/kernel/ftrace.c
-> > > > +++ b/arch/arm64/kernel/ftrace.c
-> > > > @@ -39,6 +39,12 @@ static int ftrace_modify_code(unsigned long pc, u32 old, u32 new,
-> > > >  		if (aarch64_insn_read((void *)pc, &replaced))
-> > > >  			return -EFAULT;
-> > > >  
-> > > > +		/* If we already have what we'll finally want,
-> > > > +		 * report success. This is needed on startup.
-> > > > +		 */
-> > > > +		if (replaced == new)
-> > > > +			return 0;  
-> > > 
-> > > This looks strange. I wonder if it actually hides a real bug that we
-> > > modify the code twice or so.  
-> > 
-> > Not at all. All "profilers" we abused so far generate code that needs to
-> > be disabled on boot first. prolog-pad generates nops, initially.  
-> 
-> Yeah, but I cannot find this kind of check in other architectures.
-> I checked arch/x86/kernel/ftrace.c, arch/s390/kernel/ftrace.c, and
-> arch/powerpc/kernel/ftrace.c. These all support ftrace with
-> regs and livepatching.
+Oops.  I didn't send out the 7th patch in this series.  Sending out
+shortly as 7/7.
 
-I guess the question is, with this approach, there's no call to mcount
-or fentry at compile time? Just nops are added? In this case perhaps the
-if statement should be more defined:
+Thanks,
+Jon
 
-	/*
-	 * On boot, with the prologue code, the code will already
-	 * be a nop.
-	 */
-	if (replace == new && new == NOP)
-		return 0;
-
-And perhaps you can even pass in addr and check if it equals the nop
-address. Maybe even not call this code then? That is, if addr ==
-MCOUNT_ADDR passed in by ftrace_code_disable() have ftrace_make_nop()
-simple return 0 without doing anything.
-
--- Steve
+> Changes in v2:
+> * Made device tree binding changes suggested by Sergei Shtylyov,
+>   Ray Jui, Rob Herring, Florian Fainelli, and Arnd Bergmann
+> * Removed devm_* error paths in the bgmac_platform.c suggested by
+>   Florian Fainelli
+> * Added Arnd Bergmann's Acked-by to the first 5 (there were changes
+>   outlined in the bullets above, but I believe them to be minor enough
+>   for him to not revoke his acks)
+>
+>
+> This patch series adds support for other, non-bcma iProc SoC's to the
+> bgmac driver.  This series only adds NSP support, but we are interested
+> in adding support for the Cygnus and NS2 families (with more possible
+> down the road).
+>
+> To support non-bcma enabled SoCs, we need to add the standard device
+> tree "platform device" support.  Unfortunately, this driver is very
+> tighly coupled with the bcma bus and much unwinding is needed.  I tried
+> to break this up into a number of patches to make it more obvious what
+> was being done to add platform device support.  I was able to verify
+> that the bcma code still works using a 53012K board (NS SoC), and that
+> the platform code works using a 58625K board (NSP SoC).
+>
+> Thanks,
+> Jon
+>
+>
+> Jon Mason (6):
+>   net: ethernet: bgmac: change bgmac_* prints to dev_* prints
+>   net: ethernet: bgmac: add dma_dev pointer
+>   net: ethernet: bgmac: move BCMA MDIO Phy code into a separate file
+>   net: ethernet: bgmac: convert to feature flags
+>   net: ethernet: bgmac: Add platform device support
+>   dt-bindings: net: bgmac: add bindings documentation for bgmac
+>
+>  .../devicetree/bindings/net/brcm,amac.txt          |  24 +
+>  .../devicetree/bindings/net/brcm,bgmac-nsp.txt     |  24 +
+>  drivers/net/ethernet/broadcom/Kconfig              |  23 +-
+>  drivers/net/ethernet/broadcom/Makefile             |   2 +
+>  drivers/net/ethernet/broadcom/bgmac-bcma-mdio.c    | 266 +++++++++
+>  drivers/net/ethernet/broadcom/bgmac-bcma.c         | 315 ++++++++++
+>  drivers/net/ethernet/broadcom/bgmac-platform.c     | 189 ++++++
+>  drivers/net/ethernet/broadcom/bgmac.c              | 658 +++++----------------
+>  drivers/net/ethernet/broadcom/bgmac.h              | 112 +++-
+>  9 files changed, 1097 insertions(+), 516 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/net/brcm,amac.txt
+>  create mode 100644 Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
+>  create mode 100644 drivers/net/ethernet/broadcom/bgmac-bcma-mdio.c
+>  create mode 100644 drivers/net/ethernet/broadcom/bgmac-bcma.c
+>  create mode 100644 drivers/net/ethernet/broadcom/bgmac-platform.c
+>
+> --
+> 1.9.1
+>
