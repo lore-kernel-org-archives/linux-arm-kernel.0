@@ -1,193 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  8 Jul 2016 11:12:02 +0200
-Subject: [PATCH 4/4] ARM: dts: add SMSC ethernet on the APQ8060 Dragonboard
-In-Reply-To: <1467969122-6552-1-git-send-email-linus.walleij@linaro.org>
-References: <1467969122-6552-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1467969122-6552-5-git-send-email-linus.walleij@linaro.org>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Fri, 8 Jul 2016 11:12:35 +0200
+Subject: [RESEND PATCH v2 02/13] drivers: clk: st: Simplify clock binding
+ of STiH4xx platforms
+In-Reply-To: <146794221378.73491.2803164814485320331@resonance>
+References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1466068833-5055-3-git-send-email-gabriel.fernandez@linaro.org>
+ <20160619150458.GA26824@rob-hp-laptop>
+ <146794221378.73491.2803164814485320331@resonance>
+Message-ID: <577F6E83.3080006@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMSC9112 ethernet controller is connected to chip select 2
-on the EBI2 bus on the APQ8060 Dragonboard. We set this up by
-activating EBI2, creating a chipselect entry as a subnode, and then
-putting the ethernet controller in a subnode of the chipselect.
+Hi Mike,
 
-After the chipselect is configured, the SMSC device will be
-instantiated.
+On 07/08/2016 03:43 AM, Michael Turquette wrote:
+> Quoting Rob Herring (2016-06-19 08:04:58)
+>> On Thu, Jun 16, 2016 at 11:20:22AM +0200, Gabriel Fernandez wrote:
+>>> This patch reworks the clock binding to avoid too much detail in DT.
+>>> Now we have only compatible string per type of clock
+>>> (remark from Rob https://lkml.org/lkml/2016/5/25/492)
+>>>
+>> I have no idea what the clock trees and clock controller in these chips
+>> look like, so it's hard to say if the changes here are good. It still
+>> looks like things are somewhat fine grained clocks in DT. I'll leave
+>> it up to the platform maintainers to decide...
+> Is this series breaking ABI? If yes, why not do what Maxime did for the
+> Allwinner/sunxi clocks and just fully convert over to a
+> one-node-per-clock-controller binding? This one-node-per-clock stuff is
+> pretty unfortunate, and if we're deprecating platforms (patch #1) then
+> now might be a good time to re-evaluate the whole thing.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 130 +++++++++++++++++++++++++
- 1 file changed, 130 insertions(+)
+The goal of my patchset was to be aligned with DRM / KMS development and 
+to offer
+the possibility to make a correct video playback on STiH407/STiH410 
+platform.
+Our milestone is the 4.8 for that.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 0abc93e5bb00..3604608afe1e 100644
---- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-+++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -51,6 +51,29 @@
- 			regulator-boot-on;
- 		};
- 
-+		/* GPIO controlled ethernet power regulator */
-+		dragon_veth: xc622a331mrg {
-+			compatible = "regulator-fixed";
-+			regulator-name = "XC6222A331MR-G";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			vin-supply = <&vph>;
-+			gpio = <&pm8058_gpio 40 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&dragon_veth_gpios>;
-+			regulator-always-on;
-+		};
-+
-+		/* VDDvario fixed regulator */
-+		dragon_vario: nds332p {
-+			compatible = "regulator-fixed";
-+			regulator-name = "NDS332P";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			vin-supply = <&pm8058_s3>;
-+		};
-+
- 		/* This is a levelshifter for SDCC5 */
- 		dragon_vio_txb: txb0104rgyr {
- 			compatible = "regulator-fixed";
-@@ -167,6 +190,41 @@
- 					bias-pull-up;
- 				};
- 			};
-+
-+			dragon_ebi2_pins: ebi2 {
-+				/*
-+				 * Pins used by EBI2 on the Dragonboard, actually only
-+				 * only CS2 is used by a real peripheral. CS0 is just
-+				 * routed to a test point.
-+				 */
-+				mux0 {
-+					/*
-+					 * Pins used by EBI2 on the Dragonboard, actually only
-+					 * only CS2 is used by a real peripheral. CS0 is just
-+					 * routed to a test point.
-+					 */
-+					pins =
-+					    /* "gpio39", CS1A_N this is not good to mux */
-+					    "gpio40", /* CS2A_N */
-+					    "gpio134"; /* CS0_N testpoint TP29 */
-+					function = "ebi2cs";
-+				};
-+				mux1 {
-+					pins =
-+					    /* EBI2_ADDR_7 downto EBI2_ADDR_0 address bus */
-+					    "gpio123", "gpio124", "gpio125", "gpio126",
-+					    "gpio127", "gpio128", "gpio129", "gpio130",
-+					    /* EBI2_DATA_15 downto EBI2_DATA_0 data bus */
-+					    "gpio135", "gpio136", "gpio137", "gpio138",
-+					    "gpio139", "gpio140", "gpio141", "gpio142",
-+					    "gpio143", "gpio144", "gpio145", "gpio146",
-+					    "gpio147", "gpio148", "gpio149", "gpio150",
-+					    "gpio151", /* EBI2_OE_N */
-+					    "gpio153", /* EBI2_ADV */
-+					    "gpio157"; /* EBI2_WE_N */
-+					function = "ebi2";
-+				};
-+			};
- 		};
- 
- 		qcom,ssbi at 500000 {
-@@ -201,6 +259,15 @@
- 				};
- 
- 				gpio at 150 {
-+					dragon_ethernet_gpios: ethernet-gpios {
-+						pinconf {
-+							pins = "gpio7";
-+							function = "normal";
-+							input-enable;
-+							bias-disable;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
- 					dragon_bmp085_gpios: bmp085-gpios {
- 						pinconf {
- 							pins = "gpio16";
-@@ -238,6 +305,15 @@
- 							power-source = <PM8058_GPIO_S3>;
- 						};
- 					};
-+					dragon_veth_gpios: veth-gpios {
-+						pinconf {
-+							pins = "gpio40";
-+							function = "normal";
-+							bias-disable;
-+							drive-push-pull;
-+							// power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
- 				};
- 			};
- 		};
-@@ -283,6 +359,60 @@
- 			};
- 		};
- 
-+		ebi2 at 1a100000 {
-+			/* The EBI2 will instantiate first, then populate its children */
-+			status = "ok";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&dragon_ebi2_pins>;
-+
-+			cs2 at 1b800000 {
-+				chipselect = <2>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+				/*
-+				 * SLOW chipselect config
-+				 * Delay 9 cycles (140ns at 64MHz) between SMSC LAN9221
-+				 * Ethernet controller reads and writes.
-+				 */
-+				xmem-recovery-cycles = <0>;
-+				xmem-write-hold-cycles = <3>;
-+				xmem-write-delta-cycles = <31>;
-+				xmem-read-delta-cycles = <28>;
-+				xmem-write-wait-cycles = <9>;
-+				xmem-read-wait-cycles = <9>;
-+
-+				/*
-+				 * An on-board SMSC LAN9221 chip for "debug ethernet",
-+				 * which is actually just an ordinary ethernet on the
-+				 * EBI2. This has a 25MHz chrystal next to it, so no
-+				 * clocking is needed.
-+				 */
-+				ethernet-ebi2 at 1b800000 {
-+					compatible = "smsc,lan9221", "smsc,lan9115";
-+					reg = <0x1b800000 0x100>;
-+					/*
-+					 * GPIO7 has interrupt 198 on the PM8058
-+					 * The second interrupt is the PME interrupt
-+					 * for network wakeup, connected to the TLMM.
-+					 */
-+					interrupts-extended = <&pmicintc 198 IRQ_TYPE_EDGE_FALLING>,
-+							    <&tlmm 29 IRQ_TYPE_EDGE_RISING>;
-+					reset-gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
-+					vdd33a-supply = <&dragon_veth>;
-+					vddvario-supply = <&dragon_vario>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&dragon_ethernet_gpios>;
-+					phy-mode = "mii";
-+					reg-io-width = <2>;
-+					smsc,force-external-phy;
-+					/* IRQ on edge falling = active low */
-+					smsc,irq-active-low;
-+					smsc,irq-push-pull;
-+				};
-+			};
-+		};
-+
- 		rpm at 104000 {
- 			/*
- 			 * Set up of the PMIC RPM regulators for this board
--- 
-2.7.4
+Currently people need these patches to work.
+I'm not sure it's a good time to re-evaluate the whole thing.
+
+Is it possible to re-evaluate later ?
+
+Best regards,
+Gabriel
+
+> Regards,
+> Mike
+>
+>>   
+>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>>> ---
+>>>   .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  2 +-
+>>>   .../devicetree/bindings/clock/st/st,clkgen-pll.txt | 11 ++--
+>>>   .../devicetree/bindings/clock/st/st,clkgen.txt     |  2 +-
+>>>   .../devicetree/bindings/clock/st/st,quadfs.txt     |  6 +--
+>>>   drivers/clk/st/clkgen-fsyn.c                       | 41 ++++++--------
+>>>   drivers/clk/st/clkgen-mux.c                        | 28 ++++------
+>>>   drivers/clk/st/clkgen-pll.c                        | 62 ++++++++++------------
+>>>   7 files changed, 65 insertions(+), 87 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+>>> index 4d277d6..9a46cb1d7 100644
+>>> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+>>> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+>>> @@ -10,7 +10,7 @@ This binding uses the common clock binding[1].
+>>>   Required properties:
+>>>   
+>>>   - compatible : shall be:
+>>> -     "st,stih407-clkgen-a9-mux",     "st,clkgen-mux"
+>>> +     "st,stih407-clkgen-a9-mux"
+>>>   
+>>>   - #clock-cells : from common clock binding; shall be set to 0.
+>>>   
+>>> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+>>> index c9fd674..be0b043 100644
+>>> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+>>> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+>>> @@ -9,11 +9,10 @@ Base address is located to the parent node. See clock binding[2]
+>>>   Required properties:
+>>>   
+>>>   - compatible : shall be:
+>>> -     "st,stih407-plls-c32-a0",       "st,clkgen-plls-c32"
+>>> -     "st,stih407-plls-c32-a9",       "st,clkgen-plls-c32"
+>>> -     "sst,plls-c32-cx_0",            "st,clkgen-plls-c32"
+>>> -     "sst,plls-c32-cx_1",            "st,clkgen-plls-c32"
+>>> -     "st,stih418-plls-c28-a9",       "st,clkgen-plls-c32"
+>>> +     "st,clkgen-pll0"
+>>> +     "st,clkgen-pll0"
+>> Repeated. Supposed to be 0 and 1? This seems a bit generic, too.
+>>
+>>> +     "st,stih407-clkgen-plla9"
+>>> +     "st,stih418-clkgen-plla9"
