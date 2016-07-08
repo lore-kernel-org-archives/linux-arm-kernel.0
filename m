@@ -1,45 +1,54 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri,  8 Jul 2016 17:58:42 +0200
-Subject: [PATCH] ARM: Kconfig: select GENERIC_CLOCKEVENTS_BROADCAST also on UP
-Message-ID: <1467993522-9176-1-git-send-email-l.stach@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 Jul 2016 16:59:46 +0100
+Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.8
+Message-ID: <20160708155946.GG6493@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quite a few systems have deeper idle states where the local timer tick
-stops to fire, that rely on the GENERIC_CLOCKEVENTS_BROADCAST
-infrastructure to switch to a global (non-stopping) clockevent device.
-This is also true on UP systems, so select GENERIC_CLOCKEVENTS_BROADCAST
-unconditionally.
+Hi Joerg,
 
-Instead only select ARCH_HAS_TICK_BROADCAST if SMP is present, as this
-is only implemented for SMP systems.
+Please pull these arm-smmu updates for 4.8. There's really not a lot
+here, but the highlight is the fix to iova_to_phys which really improves
+our VFIO teardown performance, where we previously did everything on a
+page-by-page basis.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Whilst Robin had an SMMUv3 series in good shape for the default domain
+stuff (and of_xlate binding), it's not quite ready for 4.8, so we'll
+spend the extra time to get it in for 4.9.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 90542db1220d..745843ea769c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -4,7 +4,7 @@ config ARM
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ELF_RANDOMIZE
--	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-+	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST && SMP
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
-@@ -20,7 +20,7 @@ config ARM
- 	select EDAC_ATOMIC_SCRUB
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
--	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-+	select GENERIC_CLOCKEVENTS_BROADCAST
- 	select GENERIC_EARLY_IOREMAP
- 	select GENERIC_IDLE_POLL_SETUP
- 	select GENERIC_IRQ_PROBE
--- 
-2.8.1
+Cheers,
+
+Will
+
+--->8
+
+The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
+
+  Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+
+for you to fetch changes up to bee140044579fbfdad5fd98717c0405d7b492226:
+
+  iommu/arm-smmu: Use devm_request_irq and devm_free_irq (2016-07-06 18:31:51 +0100)
+
+----------------------------------------------------------------
+Andrea Gelmini (1):
+      iommu/arm-smmu: Fix typo in devicetree binding introductory text
+
+Peng Fan (1):
+      iommu/arm-smmu: Use devm_request_irq and devm_free_irq
+
+Wei Chen (1):
+      iommu/arm-smmu: request pcie devices to enable ACS
+
+Will Deacon (1):
+      iommu/io-pgtable-arm: Fix iova_to_phys for block entries
+
+ .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  2 +-
+ drivers/iommu/arm-smmu-v3.c                        |  2 ++
+ drivers/iommu/arm-smmu.c                           | 28 ++++++++++------------
+ drivers/iommu/io-pgtable-arm.c                     |  2 +-
+ 4 files changed, 17 insertions(+), 17 deletions(-)
