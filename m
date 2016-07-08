@@ -1,61 +1,61 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 8 Jul 2016 17:45:28 +0800
-Subject: [PATCH v2 08/22] usb: chipidea: Remove locking in ci_udc_start()
-In-Reply-To: <20160707222114.1673-9-stephen.boyd@linaro.org>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-9-stephen.boyd@linaro.org>
-Message-ID: <20160708094528.GF20485@shlinux2>
+From: radioconfusion@gmail.com (radioconfusion at gmail.com)
+Date: Fri, 08 Jul 2016 12:55:12 +0300
+Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
+Message-ID: <577f7881.c90f190a.7312d.03c2@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 03:20:59PM -0700, Stephen Boyd wrote:
-> We don't call hw_device_reset() with the ci->lock held, so it
-> doesn't seem like this lock here is protecting anything. Let's
-> just remove it. This allows us to call sleeping functions like
-> phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
-> 
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/usb/chipidea/udc.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> index 065f5d97aa67..f16be4710cdb 100644
-> --- a/drivers/usb/chipidea/udc.c
-> +++ b/drivers/usb/chipidea/udc.c
-> @@ -1719,7 +1719,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
->  			 struct usb_gadget_driver *driver)
->  {
->  	struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
-> -	unsigned long flags;
->  	int retval = -ENOMEM;
->  
->  	if (driver->disconnect == NULL)
-> @@ -1746,7 +1745,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
->  
->  	pm_runtime_get_sync(&ci->gadget.dev);
->  	if (ci->vbus_active) {
-> -		spin_lock_irqsave(&ci->lock, flags);
->  		hw_device_reset(ci);
->  	} else {
->  		usb_udc_vbus_handler(&ci->gadget, false);
-> @@ -1755,7 +1753,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
->  	}
->  
->  	retval = hw_device_state(ci, ci->ep0out->qh.dma);
-> -	spin_unlock_irqrestore(&ci->lock, flags);
->  	if (retval)
->  		pm_runtime_put_sync(&ci->gadget.dev);
->  
+Hello,
 
-The main purpose for this is disabling interrupt when reset controller,
-in case the unexpected interrupts occur.
+On Thu, 7 Jul 2016 15:43:14 +0200, thomas.petazzoni at free-electrons.com wrote:
 
-You can move this between hw_device_state.
+> > > > My Armada 385 -device hangs when using marvell-cesa -driver.
+> > > > I'm using Linux 4.4.10 and armada-385-db-ap.dts.
+> > > > I have also tried with the driver version of Linux 4.7-rc3.
+> > > > 
+> > > > Please see https://bugzilla.kernel.org/show_bug.cgi?id=120111 for details.  
+> > 
+> > > Can you try with
+> > > http://git.infradead.org/linux-mvebu.git/commitdiff/c5379ba8fccd99d5f99632c789f0393d84a57805
+> > > applied ?  
+> > 
+> > Thanks Thomas.
+> > Your patch seems to fix a random hang during crypto operations.
+>
+> OK, great.
+>
+> > Unfortunately it seems to hit the crypto performance too.
+> > The command "cryptsetup benchmark --cipher aes-cbc"
+> > gives me around 35 MiB/s instead of 50 MiB/s.
+> > 
+> > The patch did not fix the hanging which appears instantly after enabling tdma
+> > in the driver and running some crypto operation.
+>
+> I don't understand. Above you're saying that it fixes the problem, and
+> now you're saying that it doesn't.
 
--- 
+I'm sorry that ambiguity.
+As I wrote to bugzilla (link above), there might be two different problems.
 
-Best Regards,
-Peter Chen
+1. Without patching (Linux 4.4.10 -version):
+"Cryptsetup benchmark never completes and the device locks up."
+This happens always and instantly.
+
+I found a workaround for this first problem. If I disable tdma on driver,
+I can run successfully some crypto tasks (with quite poor performance),
+including cryptsetup benchmark. Then I found the second problem.
+
+2. After disabling tdma (patch provided on bugzilla):
+"The device still hangs after a couple of crypto tasks, e.g. when writing a few
+hundred MiB of data to btrfs which is on top of luks."
+
+Your c5379ba8 -commit fixed the second problem for me.
+Still I have the first problem when tdma is enabled.
+
+> Could you test with the latest 4.7-rc kernel + the patch I provided?
+
+Yes, I will.
+
+Thanks,
+
+Jussi
