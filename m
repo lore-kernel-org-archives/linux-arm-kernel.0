@@ -1,39 +1,54 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Fri, 08 Jul 2016 11:48:44 -0300
-Subject: [RFC] arm64: kexec_file_load support
-In-Reply-To: <20160707061245.GA18459@dhcp-128-65.nay.redhat.com>
-References: <20160701051111.GL20774@linaro.org>
- <20160705080355.GQ20774@linaro.org>
- <20160707061245.GA18459@dhcp-128-65.nay.redhat.com>
-Message-ID: <11139482.zLvCKVycQr@hactar>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 Jul 2016 15:49:00 +0100
+Subject: [GIT PULL] arm64: fixes for -rc7
+Message-ID: <20160708144859.GC6493@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 07 Juli 2016, 14:12:45 schrieb Dave Young:
-> If so maybe change a bit from your precious mentioned 7 args proposal like
-> below?
-> 
-> struct kexec_file_fd {
-> 	enum kexec_file_type;
-> 	int fd;
-> }
-> 
-> struct kexec_fdset {
-> 	int nr_fd;
-> 	struct kexec_file_fd fd[0];
-> }
-> 
-> int kexec_file_load(int kernel_fd, int initrd_fd,
-> 		    unsigned long cmdline_len, const char *cmdline_ptr,
-> 		    unsigned long flags, struct kexec_fdset *extra_fds);
+Hi Linus,
 
+A couple of late fixes here, but one that we've been sitting on for a
+few weeks while the details were worked out. Specifically, we now
+enforce USER_DS on taking exceptions whilst in the kernel, which avoids
+leaking kernel data to userspace through things like perf. The other
+patch is an update to a workaround for a hardware erratum on some Cavium
+SoCs.
 
-Is there a way for the kernel to distinguish whether the process passed 5 or 
-6 arguments? How can it know whether extra_fds is a valid argument or just 
-garbage? I think we have to define a new flag KEXEC_FILE_EXTRA_FDS so that 
-the process can signal that it is using the new interface.
+Please pull,
 
--- 
-[]'s
-Thiago Jung Bauermann
-IBM Linux Technology Center
+Will
+
+--->8
+
+The following changes since commit 4c2e07c6a29e0129e975727b9f57eede813eea85:
+
+  Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 47c459beabe969c6751e2ea8d1f85c5fa1652d6c:
+
+  arm64: Enable workaround for Cavium erratum 27456 on thunderx-81xx (2016-07-07 18:35:21 +0100)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Enforce USER_DS on exception entry from EL1
+- Apply workaround for Cavium errata #27456 on Thunderx-81xx parts
+
+----------------------------------------------------------------
+Ganapatrao Kulkarni (1):
+      arm64: Enable workaround for Cavium erratum 27456 on thunderx-81xx
+
+James Morse (1):
+      arm64: kernel: Save and restore UAO and addr_limit on exception entry
+
+ arch/arm64/include/asm/cputype.h |  2 ++
+ arch/arm64/include/asm/ptrace.h  |  2 ++
+ arch/arm64/kernel/asm-offsets.c  |  1 +
+ arch/arm64/kernel/cpu_errata.c   |  6 ++++++
+ arch/arm64/kernel/entry.S        | 19 +++++++++++++++++--
+ arch/arm64/mm/fault.c            |  3 ++-
+ 6 files changed, 30 insertions(+), 3 deletions(-)
