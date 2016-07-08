@@ -1,54 +1,34 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 8 Jul 2016 13:41:20 -0400
-Subject: [kernel-hardening] Re: [PATCH 9/9] mm: SLUB hardened usercopy
- support
-In-Reply-To: <alpine.DEB.2.20.1607081119170.6192@east.gentwo.org>
-References: <577f7e55.4668420a.84f17.5cb9SMTPIN_ADDED_MISSING@mx.google.com>
- <alpine.DEB.2.20.1607080844370.3379@east.gentwo.org>
- <CAGXu5jKE=h32tHVLsDeaPN1GfC+BB3YbFvC+5TE5TK1oR-xU3A@mail.gmail.com>
- <alpine.DEB.2.20.1607081119170.6192@east.gentwo.org>
-Message-ID: <CAGXu5j+UdkQA+k39GNLe5CwBPVD5ZbRGTCQLqS8VF=kWx+PtsQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri,  8 Jul 2016 19:41:12 +0200
+Subject: [PATCH] pinctrl: qcom: update DT bindings with ebi2 groups
+Message-ID: <1467999672-14259-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 8, 2016 at 12:20 PM, Christoph Lameter <cl@linux.com> wrote:
-> On Fri, 8 Jul 2016, Kees Cook wrote:
->
->> Is check_valid_pointer() making sure the pointer is within the usable
->> size? It seemed like it was checking that it was within the slub
->> object (checks against s->size, wants it above base after moving
->> pointer to include redzone, etc).
->
-> check_valid_pointer verifies that a pointer is pointing to the start of an
-> object. It is used to verify the internal points that SLUB used and
-> should not be modified to do anything different.
+This adds the ebi2 and ebi2cs groups to the MSM8660 pin control
+documentation document.
 
-Yup, no worries -- I won't touch it. :) I just wanted to verify my
-understanding.
+Cc: devicetree at vger.kernel.org
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Bj?rn Andersson <bjorn.andersson@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ Documentation/devicetree/bindings/pinctrl/qcom,msm8660-pinctrl.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-And after playing a bit more, I see that the only thing to the left is
-padding and redzone. SLUB layout, from what I saw:
-
-offset: what's there
--------
-start: padding, redzone
-red_left_pad: object itself
-inuse: rest of metadata
-size: start of next slub object
-
-(and object_size == inuse - red_left_pad)
-
-i.e. a pointer must be between red_left_pad and inuse, which is the
-same as pointer - ref_left_pad being less than object_size.
-
-So, as found already, the position in the usercopy check needs to be
-bumped down by red_left_pad, which is what Michael's fix does, so I'll
-include it in the next version.
-
-Thanks!
-
--Kees
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8660-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8660-pinctrl.txt
+index 77aa11790163..df9a838ec5f9 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8660-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8660-pinctrl.txt
+@@ -52,7 +52,7 @@ Valid values for function are:
+   gsbi2_spi_cs3_n, gsbi3, gsbi3_spi_cs1_n, gsbi3_spi_cs2_n, gsbi3_spi_cs3_n,
+   gsbi4, gsbi5, gsbi6, gsbi7, gsbi8, gsbi9, gsbi10, gsbi11, gsbi12, hdmi, i2s,
+   lcdc, mdp_vsync, mi2s, pcm, ps_hold, sdc1, sdc2, sdc5, tsif1, tsif2, usb_fs1,
+-  usb_fs1_oe_n, usb_fs2, usb_fs2_oe_n, vfe, vsens_alarm,
++  usb_fs1_oe_n, usb_fs2, usb_fs2_oe_n, vfe, vsens_alarm, ebi2, ebi2cs
+ 
+ Example:
+ 
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+2.7.4
