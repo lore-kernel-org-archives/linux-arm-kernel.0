@@ -1,39 +1,48 @@
 From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 08 Jul 2016 23:46:36 +0900
-Subject: [PATCH v2 2/7] bindings: spi-samsung: document the clocks and the
- clock-name property
+Date: Fri, 08 Jul 2016 23:46:38 +0900
+Subject: [PATCH v2 4/7] spi: s3c64xx: use error code from clk_prepare_enable()
 In-Reply-To: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
 References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1467989201-14661-3-git-send-email-andi.shyti@samsung.com>
+Message-ID: <1467989201-14661-5-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two properties were not documented but used in the spi
-dts. Add the related documentation.
+If clk_prepare_enable() fails do not return -EBUSY but use the
+value provided by the function itself.
 
+Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 ---
- Documentation/devicetree/bindings/spi/spi-samsung.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/spi/spi-s3c64xx.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-index 57d5539..2b7167e 100644
---- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-@@ -24,6 +24,14 @@ Required SoC Specific Properties:
- - dma-names: Names for the dma channels. There must be at least one channel
-   named "tx" for transmit and named "rx" for receive.
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 0784a4d..3a65adf 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1126,9 +1126,9 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 		goto err_deref_master;
+ 	}
  
-+- clocks: specifies the clock IDs provided to the SPI controller; they are
-+  required for interacting with the controller itself, for synchronizing the bus
-+  and as I/O clock (the latter is required by exynos5433 and exynos7).
-+
-+- clock-names: string names of the clocks in the 'clocks' property; the names
-+  mut be "spi", "spi_busclkN" and "spi_ioclk", where N is determined by
-+  "samsung,spi-src-clk".
-+
- Required Board Specific Properties:
+-	if (clk_prepare_enable(sdd->clk)) {
++	ret = clk_prepare_enable(sdd->clk);
++	if (ret) {
+ 		dev_err(&pdev->dev, "Couldn't enable clock 'spi'\n");
+-		ret = -EBUSY;
+ 		goto err_deref_master;
+ 	}
  
- - #address-cells: should be 1.
+@@ -1141,9 +1141,9 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 		goto err_disable_clk;
+ 	}
+ 
+-	if (clk_prepare_enable(sdd->src_clk)) {
++	ret = clk_prepare_enable(sdd->src_clk);
++	if (ret) {
+ 		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n", clk_name);
+-		ret = -EBUSY;
+ 		goto err_disable_clk;
+ 	}
+ 
 -- 
 2.8.1
