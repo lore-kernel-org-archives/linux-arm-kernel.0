@@ -1,114 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 8 Jul 2016 11:57:43 +0100
-Subject: [PATCH v3 6/7] arm64: hibernate: Resume on the CPU that created
- the hibernate image
-In-Reply-To: <577E8A42.1020609@arm.com>
-References: <1467125510-18758-1-git-send-email-james.morse@arm.com>
- <1467125510-18758-7-git-send-email-james.morse@arm.com>
- <20160705145530.GA19925@red-moon> <577E8A42.1020609@arm.com>
-Message-ID: <20160708105743.GB3784@red-moon>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 8 Jul 2016 18:58:54 +0800
+Subject: [PATCH v4 2/2] ARM: cpuidle: make arm_cpuidle_suspend() a bit
+ more efficient
+In-Reply-To: <20160708105012.GA32305@linaro.org>
+References: <1467785755-3488-1-git-send-email-jszhang@marvell.com>
+ <1467785755-3488-3-git-send-email-jszhang@marvell.com>
+ <20160707134628.GB20553@linaro.org>	<20160708141729.3fa61c10@xhacker>
+ <20160708105012.GA32305@linaro.org>
+Message-ID: <20160708185854.22e9fae9@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 05:58:42PM +0100, James Morse wrote:
-> Hi Lorenzo,
-> 
-> On 05/07/16 15:55, Lorenzo Pieralisi wrote:
-> > On Tue, Jun 28, 2016 at 03:51:49PM +0100, James Morse wrote:
-> >> On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
-> >> user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
-> >> kernel will assign logical id 0 to a different physical CPU.
-> >> This breaks hibernate as hibernate and resume will be attempted on different
-> >> CPUs. A previous patch detects this situation when we come to resume,
-> >> and returns an error. (data stored in the hibernate image is lost)
-> >>
-> >> We currently forbid hibernate if CPU0 has been hotplugged out to avoid
-> >> this situation without kexec.
-> >>
-> >> Use arch_hibernation_disable_cpus() to direct which CPU we should resume
-> >> on based on the MPIDR of the CPU we hibernated on. This allows us to
-> >> hibernate/resume on any CPU, even if the logical numbers have been
-> >> shuffled by kexec.
-> 
-> >> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> >> index 8c7c6d7d4cd4..cbcc8243575e 100644
-> >> --- a/arch/arm64/kernel/hibernate.c
-> >> +++ b/arch/arm64/kernel/hibernate.c
-> 
-> >> +int _arch_hibernation_disable_cpus(bool suspend)
-> >> +{
-> >> +	int cpu, ret;
-> >> +
-> >> +	if (suspend) {
-> >> +		/*
-> >> +		 * During hibernate we need frozen_cpus to be updated and saved.
-> >> +		 */
-> >> +		ret = disable_nonboot_cpus();
-> >> +	} else {
-> >> +		/*
-> >> +		 * Resuming from hibernate. From here, we can't race with
-> >> +		 * userspace, and don't need to update frozen_cpus.
-> > 
-> > Yes, but...
-> > 
-> >> +		 */
-> >> +		pr_info("Disabling secondary CPUs ...\n");
-> >> +
-> >> +		/* sleep_cpu must have been loaded from the arch header */
-> >> +		BUG_ON(sleep_cpu < 0);
-> >> +
-> >> +		for_each_online_cpu(cpu) {
-> >> +			if (cpu == sleep_cpu)
-> >> +				continue;
-> >> +			ret = cpu_down(cpu);
-> > 
-> > This has a side effect, in that tasks are frozen here but we are now
-> > calling _cpu_down() through:
-> > 
-> > 	cpu_down() -> do_cpu_down()
-> > 
-> > and we are telling the kernel that tasks are _not_ frozen, which
-> > AFAIK changes the cpuhp_tasks_frozen variable and related actions
-> > (eg __cpu_notify()), I suspect this may confuse some notifiers
-> > state machines that depend on CPU_TASKS_FROZEN to be set, maybe
-> > not but it is worth a look.
-> 
-> Thanks for this - I missed that implication.
-> 
-> I've been through all the cpu notifiers in the core code, almost all of them
-> either mask out the frozen bits, or do something symmetric.
-> 
-> The exceptions are:
-> __zcomp_cpu_notifier() and __zswap_cpu_dstmem_notifier(), which will free memory
-> in this scenario.
-> evtchn_fifo_cpu_notification() which could end up in generic_handle_irq().
-> nmi_timer_cpu_notifier() (part of oprofile), will disable a perf timer.
-> bcm2836_arm_irqchip_cpu_notify() will mask IPIs, but will still unmask them on
-> CPU_STARTING_FROZEN.
-> 
-> coretemp_cpu_callback(), via_cputemp_cpu_callback() and
-> powerclamp_cpu_callback() would remove platform devices, or stop threads, but
-> these three are x86 specific.
-> All the rest live under /arch.
-> 
-> I haven't found any that are a problem, but this doesn't feel like the right
-> thing to do. I will look for a way to tidy this up.
+On Fri, 8 Jul 2016 12:50:12 +0200 Daniel Lezcano  wrote:
 
-Thanks for that. I do not think there is any problem, the only thing
-that nags me is that we are using the cpu_down() interface
-inconsistently with the rest of the kernel, agreed the issues are quite
-theoretical but still the code is inconsistent.
+> On Fri, Jul 08, 2016 at 02:17:29PM +0800, Jisheng Zhang wrote:
+> > Dear Daniel,
+> > 
+> > On Thu, 7 Jul 2016 15:46:28 +0200 Daniel Lezcano wrote:
+> >   
+> > > On Wed, Jul 06, 2016 at 02:15:55PM +0800, Jisheng Zhang wrote:  
+> > > > Currently, we check cpuidle_ops.suspend every time when entering a
+> > > > low-power idle state. But this check could be avoided in this hot path
+> > > > by moving it into arm_cpuidle_read_ops() to reduce arm_cpuidle_suspend
+> > > > overhead a bit.
+> > > > 
+> > > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > > > ---    
+> > > 
+> > > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>  
+> > 
+> > I'm not sure the upstream merging path this patch should follow, Per my
+> > understanding, I need to put it into Russell's PATCH system.  
+> 
+> Or alternatively through arm-soc
+> 
 
-I wonder what's the best way to clean this up, possibly adding code
-that allows us to define what logical index the boot cpu is to
-disable_nonboot_cpus() (ie with disable_nonboot_cpus() falling back
-to first online cpu to keep current behaviour).
+Got it. thanks.
 
-Just tossing around ideas, something has to be changed in core code
-anyway if we wanted to keep things consistent.
+Dear Arnd, Olof,
 
-Other solution would be setting cpuhp_tasks_frozen in
-_arch_hibernation_disable_cpus() but I think that should be done
-within a cpu_hotplug_begin() protected region of code.
+I have no pull request permission. what's your preference? Could you please
+advise?
 
-Lorenzo
+Thanks
