@@ -1,35 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jul 2016 12:06:06 +0200
-Subject: [PATCH] ARM: davinci: remove unused davinci-i2s pdata
-In-Reply-To: <575AB71B.9070007@ti.com>
-References: <1462802388-25088-1-git-send-email-petr@barix.com>
- <575AB71B.9070007@ti.com>
-Message-ID: <5213058.cGsNedsgWG@wuerfel>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Fri, 08 Jul 2016 12:17:46 +0200
+Subject: [PATCH v9 1/4] dt-bindings: soc: Add documentation for the
+ MediaTek GCE unit
+In-Reply-To: <1467270883-1407-2-git-send-email-hs.liao@mediatek.com>
+References: <1467270883-1407-1-git-send-email-hs.liao@mediatek.com>
+ <1467270883-1407-2-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1467973066.2472.238.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 10, 2016 6:18:27 PM CEST Sekhar Nori wrote:
-> On Monday 09 May 2016 07:29 PM, Petr Kulhavy wrote:
-> > The davinci-i2s driver ("davinci-mcbsp") does not use platform
-> > data any longer. Remove the dummy pdata provided by the board
-> > drivers dm355, dm365, dm644x and neuros-osd2.
-> > 
-> > Signed-off-by: Petr Kulhavy <petr@barix.com>
-> > Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> 
-> Applied to v4.8/cleanup
+On Do, 2016-06-30 at 15:14 +0800, HS Liao wrote:
+[...]
+> +Required properties:
+> +- compatible: Must be "mediatek,mt8173-gce"
+> +- reg: Address range of the GCE unit
+> +- interrupts: The interrupt signal from the GCE block
+> +- clock: Clocks according to the common clock binding
+> +- clock-names: Must be "gce" to stand for GCE clock
+> +- #mbox-cells: Should be 1
+[...]
+> +		#mbox-cells = <1>;
+[...]
+> +		mediatek,gce = <&gce>;
+> +		mboxes = <&gce 0 1 /* main display with merging wfe */
+> +			  &gce 1 1>; /* sub display with merging wfe */
 
-This caused a randconfig failure:
+It seems that you use two cells instead of one as you declared above.
+This should be consistent.
 
-arch/arm/mach-davinci/board-dm365-evm.c: In function 'dm365_evm_init':
-arch/arm/mach-davinci/board-dm365-evm.c:764:17: error: 'dm365_evm_snd_data' undeclared (first use in this function)
-  dm365_init_vc(&dm365_evm_snd_data);
-                 ^~~~~~~~~~~~~~~~~~
-arch/arm/mach-davinci/board-dm365-evm.c:764:17: note: each undeclared identifier is reported only once for each function it appears in
+Also, why do you need an explicit phandle to the gce if you already use
+mailboxes?
 
-clearly, the dm365_evm_snd_data is still passed as platform_data
-into the voicecodec. However, I cannot see where it gets used,
-my interpretation of the git log is that it never was, so we should
-remove that too.
-
-	Arnd
+Best regards,
+Jan L?bbe
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
