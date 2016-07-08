@@ -1,40 +1,35 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Fri, 8 Jul 2016 17:07:09 +0200
-Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
-In-Reply-To: <20160708145800.GE3556@pathway.suse.cz>
-References: <20160627151500.2247A68D20@newverein.lst.de>
- <20160627151717.BD25468D26@newverein.lst.de>
- <20160708145800.GE3556@pathway.suse.cz>
-Message-ID: <20160708150709.GA8979@lst.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 8 Jul 2016 17:16:12 +0200
+Subject: [PATCH v5 2/3] pwm: iproc: Add support for Broadcom iproc pwm
+ controller
+In-Reply-To: <1467698426-27600-3-git-send-email-yendapally.reddy@broadcom.com>
+References: <1467698426-27600-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1467698426-27600-3-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <20160708151612.GB1151@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 04:58:00PM +0200, Petr Mladek wrote:
-> On Mon 2016-06-27 17:17:17, Torsten Duwe wrote:
-> > Once gcc is enhanced to optionally generate NOPs at the beginning
-> > of each function, like the concept proven in
-> > https://gcc.gnu.org/ml/gcc-patches/2016-04/msg01671.html
-> > (sans the "fprintf (... pad_size);", which spoils the data structure
-> > for kernel use), the generated pads can nicely be used to reroute
-> > function calls for tracing/profiling, or live patching.
-> > diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> > index ebecf9a..917065c 100644
-> > --- a/arch/arm64/kernel/ftrace.c
-> > +++ b/arch/arm64/kernel/ftrace.c
-> > @@ -39,6 +39,12 @@ static int ftrace_modify_code(unsigned long pc, u32 old, u32 new,
-> >  		if (aarch64_insn_read((void *)pc, &replaced))
-> >  			return -EFAULT;
-> >  
-> > +		/* If we already have what we'll finally want,
-> > +		 * report success. This is needed on startup.
-> > +		 */
-> > +		if (replaced == new)
-> > +			return 0;
+On Tue, Jul 05, 2016 at 02:00:25AM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
+> Add support for the PWM controller present in Broadcom's iProc
+> family of SoCs.It has been tested on the  Northstar+ bcm958625HR board.
 > 
-> This looks strange. I wonder if it actually hides a real bug that we
-> modify the code twice or so.
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+> ---
+>  drivers/pwm/Kconfig         |  10 ++
+>  drivers/pwm/Makefile        |   1 +
+>  drivers/pwm/pwm-bcm-iproc.c | 268 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 279 insertions(+)
+>  create mode 100644 drivers/pwm/pwm-bcm-iproc.c
 
-Not at all. All "profilers" we abused so far generate code that needs to
-be disabled on boot first. prolog-pad generates nops, initially.
+I've applied this, but I had to make a couple of changes for coding
+style and to squash compiler warnings. Please check the PWM tree's
+for-next branch to see if it still works for you.
 
-	Torsten
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160708/f7673726/attachment.sig>
