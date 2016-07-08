@@ -1,93 +1,82 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Fri, 8 Jul 2016 11:12:35 +0200
-Subject: [RESEND PATCH v2 02/13] drivers: clk: st: Simplify clock binding
- of STiH4xx platforms
-In-Reply-To: <146794221378.73491.2803164814485320331@resonance>
-References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
- <1466068833-5055-3-git-send-email-gabriel.fernandez@linaro.org>
- <20160619150458.GA26824@rob-hp-laptop>
- <146794221378.73491.2803164814485320331@resonance>
-Message-ID: <577F6E83.3080006@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 Jul 2016 11:22:28 +0200
+Subject: [PATCH 1/9] mm: Hardened usercopy
+In-Reply-To: <CAGXu5jLyBfqXJKxohHiZgztRVrFyqwbta1W_Dw6KyyGM3LzshQ@mail.gmail.com>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <3418914.byvl8Wuxlf@wuerfel>
+ <CAGXu5jLyBfqXJKxohHiZgztRVrFyqwbta1W_Dw6KyyGM3LzshQ@mail.gmail.com>
+Message-ID: <9920033.q6Ud9av8s4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thursday, July 7, 2016 1:37:43 PM CEST Kees Cook wrote:
+> >
+> >> +     /* Allow kernel bss region (if not marked as Reserved). */
+> >> +     if (ptr >= (const void *)__bss_start &&
+> >> +         end <= (const void *)__bss_stop)
+> >> +             return NULL;
+> >
+> > accesses to .data/.rodata/.bss are probably not performance critical,
+> > so we could go further here and check the kallsyms table to ensure
+> > that we are not spanning multiple symbols here.
+> 
+> Oh, interesting! Yeah, would you be willing to put together that patch
+> and test it?
 
-On 07/08/2016 03:43 AM, Michael Turquette wrote:
-> Quoting Rob Herring (2016-06-19 08:04:58)
->> On Thu, Jun 16, 2016 at 11:20:22AM +0200, Gabriel Fernandez wrote:
->>> This patch reworks the clock binding to avoid too much detail in DT.
->>> Now we have only compatible string per type of clock
->>> (remark from Rob https://lkml.org/lkml/2016/5/25/492)
->>>
->> I have no idea what the clock trees and clock controller in these chips
->> look like, so it's hard to say if the changes here are good. It still
->> looks like things are somewhat fine grained clocks in DT. I'll leave
->> it up to the platform maintainers to decide...
-> Is this series breaking ABI? If yes, why not do what Maxime did for the
-> Allwinner/sunxi clocks and just fully convert over to a
-> one-node-per-clock-controller binding? This one-node-per-clock stuff is
-> pretty unfortunate, and if we're deprecating platforms (patch #1) then
-> now might be a good time to re-evaluate the whole thing.
+Not at the moment, sorry.
 
-The goal of my patchset was to be aligned with DRM / KMS development and 
-to offer
-the possibility to make a correct video playback on STiH407/STiH410 
-platform.
-Our milestone is the 4.8 for that.
+I've given it a closer look and unfortunately realized that kallsyms
+today only covers .text and .init.text, so it's currently useless because
+those sections are already disallowed.
 
-Currently people need these patches to work.
-I'm not sure it's a good time to re-evaluate the whole thing.
+We could extend kallsyms to also cover all other sections, but doing
+that right will likely cause a number of problems (most likely
+kallsyms size mismatch) that will have to be debugged first.\
 
-Is it possible to re-evaluate later ?
+I think it's doable but time-consuming. The check function should
+actually be trivial:
 
-Best regards,
-Gabriel
+static bool usercopy_spans_multiple_symbols(void *ptr, size_t len)
+{
+	unsigned long size, offset;	
 
-> Regards,
-> Mike
->
->>   
->>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->>> ---
->>>   .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  2 +-
->>>   .../devicetree/bindings/clock/st/st,clkgen-pll.txt | 11 ++--
->>>   .../devicetree/bindings/clock/st/st,clkgen.txt     |  2 +-
->>>   .../devicetree/bindings/clock/st/st,quadfs.txt     |  6 +--
->>>   drivers/clk/st/clkgen-fsyn.c                       | 41 ++++++--------
->>>   drivers/clk/st/clkgen-mux.c                        | 28 ++++------
->>>   drivers/clk/st/clkgen-pll.c                        | 62 ++++++++++------------
->>>   7 files changed, 65 insertions(+), 87 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
->>> index 4d277d6..9a46cb1d7 100644
->>> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
->>> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
->>> @@ -10,7 +10,7 @@ This binding uses the common clock binding[1].
->>>   Required properties:
->>>   
->>>   - compatible : shall be:
->>> -     "st,stih407-clkgen-a9-mux",     "st,clkgen-mux"
->>> +     "st,stih407-clkgen-a9-mux"
->>>   
->>>   - #clock-cells : from common clock binding; shall be set to 0.
->>>   
->>> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
->>> index c9fd674..be0b043 100644
->>> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
->>> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
->>> @@ -9,11 +9,10 @@ Base address is located to the parent node. See clock binding[2]
->>>   Required properties:
->>>   
->>>   - compatible : shall be:
->>> -     "st,stih407-plls-c32-a0",       "st,clkgen-plls-c32"
->>> -     "st,stih407-plls-c32-a9",       "st,clkgen-plls-c32"
->>> -     "sst,plls-c32-cx_0",            "st,clkgen-plls-c32"
->>> -     "sst,plls-c32-cx_1",            "st,clkgen-plls-c32"
->>> -     "st,stih418-plls-c28-a9",       "st,clkgen-plls-c32"
->>> +     "st,clkgen-pll0"
->>> +     "st,clkgen-pll0"
->> Repeated. Supposed to be 0 and 1? This seems a bit generic, too.
->>
->>> +     "st,stih407-clkgen-plla9"
->>> +     "st,stih418-clkgen-plla9"
+	if (kallsyms_lookup_size_offset((unsigned long)ptr, &size, &offset))
+		return 0; /* no symbol found or kallsyms disabled */
+
+	if (size - offset <= len)
+		return 0; /* range is within one symbol */
+
+	return 1;
+}
+
+This part would also be trivial:
+
+diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+index 1f22a186c18c..e0f37212e2a9 100644
+--- a/scripts/kallsyms.c
++++ b/scripts/kallsyms.c
+@@ -50,6 +50,11 @@ static struct addr_range text_ranges[] = {
+ 	{ "_sinittext", "_einittext" },
+ 	{ "_stext_l1",  "_etext_l1"  },	/* Blackfin on-chip L1 inst SRAM */
+ 	{ "_stext_l2",  "_etext_l2"  },	/* Blackfin on-chip L2 SRAM */
++#ifdef CONFIG_HARDENED_USERCOPY
++	{ "_sdata",	"_edata"     },
++	{ "__bss_start", "__bss_stop" },
++	{ "__start_rodata", "__end_rodata" },
++#endif
+ };
+ #define text_range_text     (&text_ranges[0])
+ #define text_range_inittext (&text_ranges[1])
+
+but I fear that if you actually try that, things start falling apart
+in a big way, so I didn't try ;-)
+
+> I wonder if there are any cases where there are
+> legitimate usercopys across multiple symbols.
+
+The only possible use case I can think of is for reading out the entire
+kernel memory from /dev/kmem, but your other checks in here already
+define that as illegitimate. On that subject, we probably want to
+make CONFIG_DEVKMEM mutually exclusive with CONFIG_HARDENED_USERCOPY.
+
+	Arnd
