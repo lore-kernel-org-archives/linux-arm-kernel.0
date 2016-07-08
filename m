@@ -1,37 +1,39 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 8 Jul 2016 12:20:58 -0500
-Subject: [PATCH] pinctrl: qcom: establish proper EBI2 pin groups
-In-Reply-To: <1467933329-2854-1-git-send-email-linus.walleij@linaro.org>
-References: <1467933329-2854-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160708172058.GA7896@hector.attlocal.net>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Fri, 08 Jul 2016 10:23:28 -0700
+Subject: [PATCH 2/2] arm64: dts: set UART1 clock frequency to 150MHz
+In-Reply-To: <1467965467-28180-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1467965467-28180-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+Message-ID: <146799860795.73491.14234650786991740924@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 01:15:29AM +0200, Linus Walleij wrote:
-> After some digging around I found documentation (!) of the APQ8060
-> EBI2 pin groups. It turns out I first need to split the group in
-> two: ebi2cs and ebi2 proper. The chip select pins are kind of
-> orthogonal to the other EBI2 pins since CS1B and CS2B can be muxed
-> over address bits 7 and 6 (don't know why, but they can). This
-> is good to fix up before we add users.
+Quoting Jorge Ramirez-Ortiz (2016-07-08 01:11:07)
+> Enable support for higher baud rates (up to 3Mbps) in UART1 - required
+> for bluetooth transfers.
 > 
-> Also found what the "holes" in the assignment all the way up to
-> gpio158 was actually for.
-> 
-> All mux documentation comes from "Snapdragon(TM) S3 APQ8060-based
-> DragonBoard(TM) GPIO User Guide Rev. E August 10, 2012", published
-> by Bsquare Corporation.
-> 
-> As the documentation seems a bit hard to come by I put some comments
-> in the group definitions so that it is clear to all readers what
-> is going on here and what the lines are used for.
-> 
-> Cc: Bj?rn Andersson <bjorn.andersson@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> Tested-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+
+Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+
 > ---
-
-Seems reasonable.  I'd presume the Documentation needs updating too for the new
-groups.
-
-Reviewed-by: Andy Gross <andy.gross@linaro.org>
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index e92a30c..27be812 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -55,6 +55,8 @@
+>                 };
+>  
+>                 uart1: uart at f7111000 {
+> +                       assigned-clocks = <&sys_ctrl HI6220_UART1_SRC>;
+> +                       assigned-clock-rates = <150000000>;
+>                         status = "ok";
+>                 };
+>  
+> -- 
+> 2.7.4
+> 
