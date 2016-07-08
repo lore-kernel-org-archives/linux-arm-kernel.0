@@ -1,40 +1,42 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Fri, 08 Jul 2016 12:17:46 +0200
-Subject: [PATCH v9 1/4] dt-bindings: soc: Add documentation for the
- MediaTek GCE unit
-In-Reply-To: <1467270883-1407-2-git-send-email-hs.liao@mediatek.com>
-References: <1467270883-1407-1-git-send-email-hs.liao@mediatek.com>
- <1467270883-1407-2-git-send-email-hs.liao@mediatek.com>
-Message-ID: <1467973066.2472.238.camel@pengutronix.de>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 8 Jul 2016 12:18:38 +0200
+Subject: [PATCH v2 2/9] [media] : v4l: add Mediatek compressed video block
+ format
+In-Reply-To: <1463052250-38262-3-git-send-email-tiffany.lin@mediatek.com>
+References: <1463052250-38262-1-git-send-email-tiffany.lin@mediatek.com>
+ <1463052250-38262-2-git-send-email-tiffany.lin@mediatek.com>
+ <1463052250-38262-3-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <78c9f4a1-e2b8-69ef-acc5-d24984497b33@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Do, 2016-06-30 at 15:14 +0800, HS Liao wrote:
-[...]
-> +Required properties:
-> +- compatible: Must be "mediatek,mt8173-gce"
-> +- reg: Address range of the GCE unit
-> +- interrupts: The interrupt signal from the GCE block
-> +- clock: Clocks according to the common clock binding
-> +- clock-names: Must be "gce" to stand for GCE clock
-> +- #mbox-cells: Should be 1
-[...]
-> +		#mbox-cells = <1>;
-[...]
-> +		mediatek,gce = <&gce>;
-> +		mboxes = <&gce 0 1 /* main display with merging wfe */
-> +			  &gce 1 1>; /* sub display with merging wfe */
+On 05/12/2016 01:24 PM, Tiffany Lin wrote:
+> Add V4L2_PIX_FMT_MT21 format used on MT8173 driver.
+> It is compressed format and need MT8173 MDP driver to transfer to other 
+> standard format.
+> 
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> ---
+>  include/uapi/linux/videodev2.h |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index 8f95191..52feea6 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -625,6 +625,7 @@ struct v4l2_pix_format {
+>  #define V4L2_PIX_FMT_Y8I      v4l2_fourcc('Y', '8', 'I', ' ') /* Greyscale 8-bit L/R interleaved */
+>  #define V4L2_PIX_FMT_Y12I     v4l2_fourcc('Y', '1', '2', 'I') /* Greyscale 12-bit L/R interleaved */
+>  #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
+> +#define V4L2_PIX_FMT_MT21     v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
 
-It seems that you use two cells instead of one as you declared above.
-This should be consistent.
+v4l2-ioctl.c should be modified as well so the correct description string is filled in.
 
-Also, why do you need an explicit phandle to the gce if you already use
-mailboxes?
+Regards,
 
-Best regards,
-Jan L?bbe
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Hans
+
+>  
+>  /* SDR formats - used only for Software Defined Radio devices */
+>  #define V4L2_SDR_FMT_CU8          v4l2_fourcc('C', 'U', '0', '8') /* IQ u8 */
+> 
