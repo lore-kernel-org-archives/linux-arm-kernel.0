@@ -1,138 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 8 Jul 2016 14:34:42 +0100
-Subject: [PATCH v8 09/17] KVM: arm64: introduce ITS emulation file with
- MMIO framework
-In-Reply-To: <20160705112309.28877-10-andre.przywara@arm.com>
-References: <20160705112309.28877-1-andre.przywara@arm.com>
- <20160705112309.28877-10-andre.przywara@arm.com>
-Message-ID: <577FABF2.30302@arm.com>
+From: weiyj_lk@163.com (weiyj_lk at 163.com)
+Date: Fri,  8 Jul 2016 13:41:33 +0000
+Subject: [PATCH -next] ASoC: mediatek: mt2701: cHECK-fix non static symbol
+ warning
+Message-ID: <1467985293-9041-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/16 12:23, Andre Przywara wrote:
-> The ARM GICv3 ITS emulation code goes into a separate file, but needs
-> to be connected to the GICv3 emulation, of which it is an option.
-> The ITS MMIO handlers require the respective ITS pointer to be passed in,
-> so we amend the existing VGIC MMIO framework to let it cope with that.
-> Also we introduce the basic ITS data structure and initialize it, but
-> don't return any success yet, as we are not yet ready for the show.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm64/kvm/Makefile          |   1 +
->  include/kvm/arm_vgic.h           |  14 +++++-
->  virt/kvm/arm/vgic/vgic-its.c     | 100 +++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-mmio-v2.c |  40 +++++++--------
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 104 ++++++++++++++++++++++++++-------------
->  virt/kvm/arm/vgic/vgic-mmio.c    |  36 +++++++++++---
->  virt/kvm/arm/vgic/vgic-mmio.h    |  31 +++++++++---
->  virt/kvm/arm/vgic/vgic.h         |   7 +++
->  8 files changed, 266 insertions(+), 67 deletions(-)
->  create mode 100644 virt/kvm/arm/vgic/vgic-its.c
-> 
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index f00b2cd..a5b9664 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -29,5 +29,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
-> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
->  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index f6f860d..f606641 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -108,15 +108,27 @@ struct vgic_irq {
->  };
->  
->  struct vgic_register_region;
-> +struct vgic_its;
->  
->  struct vgic_io_device {
->  	gpa_t base_addr;
-> -	struct kvm_vcpu *redist_vcpu;
-> +	union {
-> +		struct kvm_vcpu *redist_vcpu;
-> +		struct vgic_its *its;
-> +	};
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-The only question that springs to mind is...
+Fixes the following sparse warning:
 
->  	const struct vgic_register_region *regions;
->  	int nr_regions;
->  	struct kvm_io_device dev;
->  };
->  
-> +struct vgic_its {
-> +	/* The base address of the ITS control register frame */
-> +	gpa_t			vgic_its_base;
-> +
-> +	bool			enabled;
-> +	struct vgic_io_device	iodev;
-> +};
-> +
->  struct vgic_dist {
->  	bool			in_kernel;
->  	bool			ready;
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> new file mode 100644
-> index 0000000..ab8d244
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -0,0 +1,100 @@
-> +/*
-> + * GICv3 ITS emulation
-> + *
-> + * Copyright (C) 2015,2016 ARM Ltd.
-> + * Author: Andre Przywara <andre.przywara@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/interrupt.h>
-> +
-> +#include <linux/irqchip/arm-gic-v3.h>
-> +
-> +#include <asm/kvm_emulate.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_mmu.h>
-> +
-> +#include "vgic.h"
-> +#include "vgic-mmio.h"
-> +
-> +#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
-> +{								\
-> +	.reg_offset = off,					\
-> +	.len = length,						\
-> +	.access_flags = acc,					\
-> +	.iodev_type = IODEV_ITS,				\
+sound/soc/mediatek/mt2701/mt2701-afe-pcm.c:72:5: warning:
+ symbol 'mt2701_dai_num_to_i2s' was not declared. Should it be static?
 
-... why isn't this at the device level? It doesn't make much sense to
-have it at the register level (we never access a register in isolation,
-we always access it relatively to a device).
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-And given that the *only* time you actually evaluate this flag is in
-dispatch_mmio_read/write, there is zero benefit in duplicating it all
-over the place.
-
-Smaller structures, smaller patch. Am I missing something?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index 15522c0..34a6123 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -69,7 +69,7 @@ static const struct mt2701_afe_rate mt2701_afe_i2s_rates[] = {
+ 	{ .rate = 352800, .regvalue = 24 },
+ };
+ 
+-int mt2701_dai_num_to_i2s(struct mtk_base_afe *afe, int num)
++static int mt2701_dai_num_to_i2s(struct mtk_base_afe *afe, int num)
+ {
+ 	int val = num - MT2701_IO_I2S;
+ 
