@@ -1,56 +1,75 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez)
-Date: Fri, 8 Jul 2016 23:39:50 +0200
-Subject: [PATCH 1/2] tty: amba-pl011: add support for clock frequency
- setting via dt
-In-Reply-To: <146799807004.73491.2602277598493203375@resonance>
-References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <146799807004.73491.2602277598493203375@resonance>
-Message-ID: <57801DA6.5010506@linaro.org>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sat, 9 Jul 2016 01:06:53 +0300
+Subject: [PATCH v2] arm: omap1_defconfig: convert to use libata PATA
+ drivers
+In-Reply-To: <1467985859-23500-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1467985859-23500-1-git-send-email-b.zolnierkie@samsung.com>
+ <1467985859-23500-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20160708220653.GB14630@raspberrypi.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2016 07:14 PM, Michael Turquette wrote:
-> Quoting Jorge Ramirez-Ortiz (2016-07-08 01:11:06)
->> Allow to specify the clock frequency for any given port via the
->> assigned-clock-rates device tree property.
->>
->> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
->> Tested-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
->> ---
->>   drivers/tty/serial/amba-pl011.c | 5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
->> index 1b7331e..51867ab 100644
->> --- a/drivers/tty/serial/amba-pl011.c
->> +++ b/drivers/tty/serial/amba-pl011.c
->> @@ -55,6 +55,7 @@
->>   #include <linux/types.h>
->>   #include <linux/of.h>
->>   #include <linux/of_device.h>
->> +#include <linux/clk/clk-conf.h>
->>   #include <linux/pinctrl/consumer.h>
->>   #include <linux/sizes.h>
->>   #include <linux/io.h>
->> @@ -2472,6 +2473,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->>          if (IS_ERR(uap->clk))
->>                  return PTR_ERR(uap->clk);
->>   
->> +       ret = of_clk_set_defaults(dev->dev.of_node, false);
-> Change looks good to me, but with one question: should this change be
-> put into more generic code instead of in this specific driver? For
-> instance, we call of_clk_set_defaults from the following files:
->
-> drivers/base/platform.c
-> drivers/i2c/i2c-core.c
-> drivers/spi/spi.c
->
-> And Stephen posted a patch to do this for devices on the AMBA bus:
->
-> https://patchwork.kernel.org/patch/6501691/
->
-> Does Stephen's patch mean that you do not need patch #1?
+Hi,
 
-I did a quick test (replaced my changes with the patch above) and the 
-console broke and the BT stack couldn't communicate to the device over 
-the uart...I guess something else needs doing on top of Stephen's change.
+On Fri, Jul 08, 2016 at 03:50:59PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> IDE subsystem has been deprecated since 2009 and the majority
+> (if not all) of Linux distributions have switched to use
+> libata for ATA support exclusively.  However there are still
+> some users (mostly old or/and embedded non-x86 systems) that
+> have not converted from using IDE subsystem to libata PATA
+> drivers.  This doesn't seem to be good thing in the long-term
+> for Linux as while there is less and less PATA systems left
+> in use:
+> 
+> * testing efforts are divided between two subsystems
+> 
+> * having duplicate drivers for same hardware confuses users
+> 
+> This patch converts omap1_defconfig to use libata PATA
+> drivers.
+> 
+> Cc: linux-omap at vger.kernel.org
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+I have been using ATA/PATA_PCMCIA on OMAP1 already for a while, so:
+
+Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+
+A.
+
+> ---
+> v2:
+> - added Acked-by tag from Tony
+> 
+>  arch/arm/configs/omap1_defconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/configs/omap1_defconfig b/arch/arm/configs/omap1_defconfig
+> index 0c8a787..6ffc984 100644
+> --- a/arch/arm/configs/omap1_defconfig
+> +++ b/arch/arm/configs/omap1_defconfig
+> @@ -96,14 +96,14 @@ CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_BLK_DEV_RAM=y
+>  CONFIG_BLK_DEV_RAM_COUNT=2
+>  CONFIG_BLK_DEV_RAM_SIZE=8192
+> -CONFIG_IDE=m
+> -CONFIG_BLK_DEV_IDECS=m
+>  CONFIG_SCSI=y
+>  # CONFIG_SCSI_PROC_FS is not set
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_CHR_DEV_ST=y
+>  CONFIG_BLK_DEV_SR=y
+>  CONFIG_CHR_DEV_SG=y
+> +CONFIG_ATA=m
+> +CONFIG_PATA_PCMCIA=m
+>  CONFIG_NETDEVICES=y
+>  CONFIG_TUN=y
+>  CONFIG_PHYLIB=y
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
