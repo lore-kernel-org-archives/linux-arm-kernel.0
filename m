@@ -1,45 +1,55 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 8 Jul 2016 18:58:54 +0800
-Subject: [PATCH v4 2/2] ARM: cpuidle: make arm_cpuidle_suspend() a bit
- more efficient
-In-Reply-To: <20160708105012.GA32305@linaro.org>
-References: <1467785755-3488-1-git-send-email-jszhang@marvell.com>
- <1467785755-3488-3-git-send-email-jszhang@marvell.com>
- <20160707134628.GB20553@linaro.org>	<20160708141729.3fa61c10@xhacker>
- <20160708105012.GA32305@linaro.org>
-Message-ID: <20160708185854.22e9fae9@xhacker>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 8 Jul 2016 12:04:40 +0100
+Subject: [PATCH v8 0/6] ACPI / processor_idle: Add ACPI v6.0 LPI support
+In-Reply-To: <CAJZ5v0jhhXHVJi3Se0udcpfgQaqSANZgkKrM9REBxRT7p-3ggA@mail.gmail.com>
+References: <1467911451-24731-1-git-send-email-sudeep.holla@arm.com>
+ <CAJZ5v0jhhXHVJi3Se0udcpfgQaqSANZgkKrM9REBxRT7p-3ggA@mail.gmail.com>
+Message-ID: <577F88C8.8010209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Jul 2016 12:50:12 +0200 Daniel Lezcano  wrote:
 
-> On Fri, Jul 08, 2016 at 02:17:29PM +0800, Jisheng Zhang wrote:
-> > Dear Daniel,
-> > 
-> > On Thu, 7 Jul 2016 15:46:28 +0200 Daniel Lezcano wrote:
-> >   
-> > > On Wed, Jul 06, 2016 at 02:15:55PM +0800, Jisheng Zhang wrote:  
-> > > > Currently, we check cpuidle_ops.suspend every time when entering a
-> > > > low-power idle state. But this check could be avoided in this hot path
-> > > > by moving it into arm_cpuidle_read_ops() to reduce arm_cpuidle_suspend
-> > > > overhead a bit.
-> > > > 
-> > > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > > > ---    
-> > > 
-> > > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>  
-> > 
-> > I'm not sure the upstream merging path this patch should follow, Per my
-> > understanding, I need to put it into Russell's PATCH system.  
-> 
-> Or alternatively through arm-soc
-> 
 
-Got it. thanks.
+On 07/07/16 22:02, Rafael J. Wysocki wrote:
+> On Thu, Jul 7, 2016 at 7:10 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> ACPI 6.0 introduced LPI(Low Power Idle) states that provides an alternate
+>> method to describe processor idle states. It extends the specification
+>> to allow the expression of idle states like C-states selectable by the
+>> OSPM when a processor goes idle, but may affect more than one processor,
+>> and may affect other system components.
+>>
+>> LPI extensions leverages the processor container device(again introduced
+>> in ACPI 6.0) allowing to express which parts of the system are affected
+>> by a given LPI state. It defines the local power states for each node
+>> in a hierarchical processor topology. The OSPM can use _LPI object to
+>> select a local power state for each level of processor hierarchy in the
+>> system. They used to produce a composite power state request that is
+>> presented to the platform by the OSPM.
+>>
+>> Since multiple processors affect the idle state for any non-leaf hierarchy
+>> node, coordination of idle state requests between the processors is
+>> required. ACPI supports two different coordination schemes: Platform
+>> coordinated and  OS initiated.
+>>
+>> This series aims at providing basic and initial support for platform
+>> coordinated LPI states.
+>>
+>> v7[7]->v8:
+>>          - Replaced HAVE_GENERIC_CPUIDLE_ENTER with CPU_IDLE_ENTER_WRAPPED
+>>            macro, which is more cleaner and definately less confusing :)
+>>            (Thanks to Rafael for the suggestion)
+>
+> Patches [3-6/6] definitely look a lot cleaner to me now. :-)
+>
+> That said, the name of the macro I suggested was just an example, so
+> if people don't like this one, it'd be fine to change it as far as I'm
+> concerned.
+>
 
-Dear Arnd, Olof,
+I can think of addition to indicate it's pm notifiers wrapper.
+i.e. CPU_IDLE_ENTER_PM_NOTIFIERS_WRAPPED. Is it too long ? I am happy
+with the way it is too.
 
-I have no pull request permission. what's your preference? Could you please
-advise?
-
-Thanks
+-- 
+Regards,
+Sudeep
