@@ -1,57 +1,66 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Fri, 8 Jul 2016 10:35:55 +0100
-Subject: [PATCH v2] xen/arm: register clocks used by the hypervisor
-In-Reply-To: <20733b68-9529-bdb9-2a7d-576c8193f15c@de.bosch.com>
-References: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
- <146776885213.35356.11565744417822933094@resonance>
- <20733b68-9529-bdb9-2a7d-576c8193f15c@de.bosch.com>
-Message-ID: <577F73FB.1070302@arm.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 8 Jul 2016 17:29:05 +0800
+Subject: [PATCH v2 07/22] usb: chipidea: Notify events when switching
+ host mode
+In-Reply-To: <20160707222114.1673-8-stephen.boyd@linaro.org>
+References: <20160707222114.1673-1-stephen.boyd@linaro.org>
+ <20160707222114.1673-8-stephen.boyd@linaro.org>
+Message-ID: <20160708092905.GE20485@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 07, 2016 at 03:20:58PM -0700, Stephen Boyd wrote:
+> The chipidea/udc.c file sends a CI_HDRC_CONTROLLER_RESET_EVENT to
+> the wrapper drivers when it calls hw_device_reset(), but that
+> function is not called from chipidea/host.c. And the udc.c file
+> sends the CI_HDRC_CONTROLLER_STOPPED_EVENT but the host.c file
+> doesn't do anything.
+> 
+> The intent of the reset event is to allow the wrapper driver to
+> do any wrapper specific things after the reset bit has been set
+> in the usb command register. Therefore, add this event hook in
+> the host role after we toggle that bit.
+> 
+> Similarly, the intent of the stopped event is to allow the
+> wrapper driver to do any wrapper specific things after the device
+> is stopped. So when we stop the host role, send the stopped
+> event.
+> 
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  drivers/usb/chipidea/host.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+> index 053bac9d983c..a1d8551ca79d 100644
+> --- a/drivers/usb/chipidea/host.c
+> +++ b/drivers/usb/chipidea/host.c
+> @@ -87,6 +87,9 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
+>  	if (ret)
+>  		return ret;
+>  
+> +	if (ci->platdata->notify_event)
+> +		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
+> +
+>  	ci_platform_configure(ci);
+>  
+>  	return ret;
+> @@ -184,6 +187,9 @@ static void host_stop(struct ci_hdrc *ci)
+>  	struct usb_hcd *hcd = ci->hcd;
+>  
+>  	if (hcd) {
+> +		if (ci->platdata->notify_event)
+> +			ci->platdata->notify_event(ci,
+> +				CI_HDRC_CONTROLLER_STOPPED_EVENT);
+>  		usb_remove_hcd(hcd);
+>  		usb_put_hcd(hcd);
+>  		if (ci->platdata->reg_vbus && !ci_otg_is_fsm_mode(ci) &&
 
-
-On 08/07/16 07:48, Dirk Behme wrote:
->>>  #include <linux/cpuidle.h>
->>>  #include <linux/cpufreq.h>
->>>  #include <linux/cpu.h>
->>> @@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
->>>  }
->>>  late_initcall(xen_pm_init);
->>>
->>> +/*
->>> + * Check if we want to register some clocks, that they
->>> + * are not freed because unused by clk_disable_unused().
->>> + * E.g. the serial console clock.
->>> + */
->>> +static int __init xen_arm_register_clks(void)
->>> +{
->>> +       struct clk *clk;
->>> +       struct device_node *xen_node;
->>> +       unsigned int i, count;
->>> +       int ret = 0;
->>> +
->>> +       xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
->>> +       if (!xen_node) {
->>> +               pr_err("Xen support was detected before, but it has
->>> disappeared\n");
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       count = of_clk_get_parent_count(xen_node);
->>> +       if (!count)
->>> +               goto out;
->>> +
->>> +       for (i = 0; i < count; i++) {
->>> +               clk = of_clk_get(xen_node, i);
->>
->> Is there a struct device we can use here?
->
->
-> It doesn't look so. Julien?
-
-We don't have a struct device. Maybe we can create a dummy one if it 
-simplifies the logic?
+Acked-by: Peter Chen <peter.chen@nxp.com>
 
 -- 
-Julien Grall
+
+Best Regards,
+Peter Chen
