@@ -1,31 +1,29 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Fri,  8 Jul 2016 08:12:00 -0600
-Subject: [PATCH] media: Doc s5p-mfc add missing fields to s5p_mfc_dev
- structure definition
-Message-ID: <1467987120-5167-1-git-send-email-shuahkh@osg.samsung.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Fri, 08 Jul 2016 23:27:48 +0900
+Subject: [PATCH v5] clk: exynos5433: remove CLK_IGNORE_UNUSED flag from SPI
+ clocks
+In-Reply-To: <577FA99C.9020600@samsung.com>
+References: <1467982058-14339-1-git-send-email-andi.shyti@samsung.com>
+ <CGME20160708132447epcas1p34cafe41f04b10ffa54bbd66813e656f6@epcas1p3.samsung.com>
+ <577FA99C.9020600@samsung.com>
+Message-ID: <20160708142748.GL23620@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing documentation for s5p_mfc_dev structure definition.
+> >  drivers/clk/samsung/clk-exynos5433.c | 5 ++---
+> >  1 file changed, 2 insertions(+), 3 deletions(-)
+> > 
+> 
+> Patch is okay:
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> but I think this should not go in separately. This should be part of
+> SPI-related changes which add proper ioclk consumer to the SPI driver.
+> Without these changes, as you said to me, synchronous abort will happen.
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
----
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 2 ++
- 1 file changed, 2 insertions(+)
+OK, I will send this patch with the SPI patchset.
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-index 9eb2481..1d06d6a 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-@@ -291,7 +291,9 @@ struct s5p_mfc_priv_buf {
-  * @warn_start:		hardware error code from which warnings start
-  * @mfc_ops:		ops structure holding HW operation function pointers
-  * @mfc_cmds:		cmd structure holding HW commands function pointers
-+ * @mfc_regs:		structure holding MFC registers
-  * @fw_ver:		loaded firmware sub-version
-+ * risc_on:		flag indicates RISC is on or off
-  *
-  */
- struct s5p_mfc_dev {
--- 
-2.7.4
+Please ignore.
+
+Thanks,
+Andi
