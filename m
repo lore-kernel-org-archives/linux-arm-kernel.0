@@ -1,39 +1,39 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 08 Jul 2016 23:46:35 +0900
-Subject: [PATCH v2 1/7] bindings: spi-samsung: add exynos5433 spi compatible
-In-Reply-To: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
-References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1467989201-14661-2-git-send-email-andi.shyti@samsung.com>
+From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
+Date: Fri, 08 Jul 2016 11:48:44 -0300
+Subject: [RFC] arm64: kexec_file_load support
+In-Reply-To: <20160707061245.GA18459@dhcp-128-65.nay.redhat.com>
+References: <20160701051111.GL20774@linaro.org>
+ <20160705080355.GQ20774@linaro.org>
+ <20160707061245.GA18459@dhcp-128-65.nay.redhat.com>
+Message-ID: <11139482.zLvCKVycQr@hactar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The samsung,exynos5433-spi has some peculiarities that bring the
-need of creating a new compatible in the binding.
+Am Donnerstag, 07 Juli 2016, 14:12:45 schrieb Dave Young:
+> If so maybe change a bit from your precious mentioned 7 args proposal like
+> below?
+> 
+> struct kexec_file_fd {
+> 	enum kexec_file_type;
+> 	int fd;
+> }
+> 
+> struct kexec_fdset {
+> 	int nr_fd;
+> 	struct kexec_file_fd fd[0];
+> }
+> 
+> int kexec_file_load(int kernel_fd, int initrd_fd,
+> 		    unsigned long cmdline_len, const char *cmdline_ptr,
+> 		    unsigned long flags, struct kexec_fdset *extra_fds);
 
-One of those is the 3-clocks controller management where the spi
-is fed with three clocks: "spi", "busclkN" and "ioclk".
 
-By adding the exynos5433-spi, we deprecate the exynos7 compatible
-and discourage its use.
+Is there a way for the kernel to distinguish whether the process passed 5 or 
+6 arguments? How can it know whether extra_fds is a valid argument or just 
+garbage? I think we have to define a new flag KEXEC_FILE_EXTRA_FDS so that 
+the process can signal that it is using the new interface.
 
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
----
- Documentation/devicetree/bindings/spi/spi-samsung.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-index 6dbdeb3..57d5539 100644
---- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-@@ -9,7 +9,8 @@ Required SoC Specific Properties:
-     - samsung,s3c2443-spi: for s3c2443, s3c2416 and s3c2450 platforms
-     - samsung,s3c6410-spi: for s3c6410 platforms
-     - samsung,s5pv210-spi: for s5pv210 and s5pc110 platforms
--    - samsung,exynos7-spi: for exynos7 platforms
-+    - samsung,exynos5433-spi: for exynos5433 compatible controllers
-+    - samsung,exynos7-spi: for exynos7 platforms <DEPRECATED>
- 
- - reg: physical base address of the controller and length of memory mapped
-   region.
 -- 
-2.8.1
+[]'s
+Thiago Jung Bauermann
+IBM Linux Technology Center
